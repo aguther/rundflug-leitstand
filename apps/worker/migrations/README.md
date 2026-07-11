@@ -30,3 +30,11 @@ Erweitert Geräte um die Rolle Flugleitung, ergänzt den Rücknahmezeitpunkt ein
 historisierte betriebliche Blockierungen ein. Vor Anwendung ist eine Sicherung verpflichtend. Der
 Tabellenneuaufbau von `paired_devices` wird zuerst in Acceptance geprüft; Wiederherstellung erfolgt
 aus der Sicherung. Bestehende Credentials werden unverändert als Hash übernommen.
+
+## 0013 – Optionaler Anwesenheitsabgleich
+
+Ergänzt Tickets ausschließlich um den technischen Anwesenheitsstatus `NOT_CHECKED_IN` oder
+`CHECKED_IN`. Bestehende Tickets beginnen neutral als nicht eingecheckt; Namen, Telefonnummern oder
+andere Gastdaten werden nicht ergänzt. Vor Anwendung wird eine D1-/R2-Sicherung erzeugt.
+Wiederherstellung erfolgt aus dieser Sicherung, da SQLite die Spalte nicht ohne Tabellenneuaufbau
+entfernen kann.

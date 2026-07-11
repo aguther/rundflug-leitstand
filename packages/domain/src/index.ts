@@ -131,7 +131,8 @@ export type OperationalCommandType =
   | "UPSERT_PILOT"
   | "CONFIGURE_AIRCRAFT_REFUEL_THRESHOLD"
   | "SET_RESOURCE_GROUP_NOTICE"
-  | "REVOKE_CALL";
+  | "REVOKE_CALL"
+  | "SET_TICKET_ATTENDANCE";
 
 const commandRoles: Readonly<Record<OperationalCommandType, readonly DeviceRole[]>> = {
   SELL_TICKET_GROUP: ["CASHIER", "ADMIN"],
@@ -157,6 +158,7 @@ const commandRoles: Readonly<Record<OperationalCommandType, readonly DeviceRole[
   CONFIGURE_AIRCRAFT_REFUEL_THRESHOLD: ["ADMIN"],
   SET_RESOURCE_GROUP_NOTICE: ["FLIGHT_LINE_LEAD", "FLIGHT_DIRECTOR", "ADMIN"],
   REVOKE_CALL: ["FLIGHT_LINE", "FLIGHT_LINE_LEAD", "ADMIN"],
+  SET_TICKET_ATTENDANCE: ["FLIGHT_LINE", "FLIGHT_LINE_LEAD", "ADMIN"],
 };
 
 export function assertRoleMayExecute(role: DeviceRole, command: OperationalCommandType): void {

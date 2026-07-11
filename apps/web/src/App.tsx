@@ -473,8 +473,12 @@ function FlightLineView() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [queueReason, setQueueReason] = useState("");
+  const operationalRotations = board?.rotations.filter(
+    (rotation) => rotation.status !== "COMPLETED",
+  );
   const selected =
-    board?.rotations.find((rotation) => rotation.id === selectedId) ?? board?.rotations[0];
+    operationalRotations?.find((rotation) => rotation.id === selectedId) ??
+    operationalRotations?.[0];
   const action = selected ? actionForState[selected.status] : null;
 
   async function advance() {
@@ -559,6 +563,28 @@ function FlightLineView() {
     }
   }
 
+  async function setAttendance(ticketId: string, checkedIn: boolean) {
+    if (!board || !selected || !["DRAFT", "CALLED"].includes(selected.status)) return;
+    try {
+      await sendCommand(
+        {
+          commandId: crypto.randomUUID(),
+          eventId: EVENT_ID,
+          deviceId: FLIGHT_LINE_DEVICE_ID,
+          expectedVersion: board.event.version,
+          issuedAt: new Date().toISOString(),
+          type: "SET_TICKET_ATTENDANCE",
+          payload: { ticketId, checkedIn },
+        },
+        deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
+      );
+      setMessage(checkedIn ? "Ticket als anwesend markiert." : "Anwesenheit zurückgenommen.");
+      await refresh();
+    } catch (reason) {
+      setMessage(reason instanceof Error ? reason.message : "Anwesenheitsabgleich fehlgeschlagen.");
+    }
+  }
+
   return (
     <Shell title="Flight Line">
       <ConnectionNotice error={error} />
@@ -568,7 +594,7 @@ function FlightLineView() {
       <section className="flight-workspace">
         <div className="queue-list">
           <h1>Warteschlange</h1>
-          {board?.rotations.map((rotation) => (
+          {operationalRotations?.map((rotation) => (
             <button
               key={rotation.id}
               className={rotation.id === selected?.id ? "queue-row selected" : "queue-row"}
@@ -583,6 +609,7 @@ function FlightLineView() {
               </span>
             </button>
           ))}
+          {operationalRotations?.length === 0 ? <p>Keine offenen Fluggruppen.</p> : null}
         </div>
         <div className="rotation-detail">
           {selected ? (
@@ -620,6 +647,37 @@ function FlightLineView() {
                   </dd>
                 </div>
               </dl>
+              <section className="attendance-panel" aria-labelledby="attendance-title">
+                <div>
+                  <h3 id="attendance-title">Anwesenheit (optional)</h3>
+                  <span>
+                    {
+                      selected.tickets.filter((ticket) => ticket.attendanceStatus === "CHECKED_IN")
+                        .length
+                    }
+                    /{selected.tickets.length} eingecheckt
+                  </span>
+                </div>
+                <div className="attendance-list">
+                  {selected.tickets.map((ticket, index) => {
+                    const checkedIn = ticket.attendanceStatus === "CHECKED_IN";
+                    return (
+                      <button
+                        className={checkedIn ? "checked-in" : ""}
+                        disabled={!["DRAFT", "CALLED"].includes(selected.status)}
+                        key={ticket.id}
+                        onClick={() => setAttendance(ticket.id, !checkedIn)}
+                        type="button"
+                      >
+                        Ticket {index + 1} · {checkedIn ? "anwesend" : "offen"}
+                      </button>
+                    );
+                  })}
+                </div>
+                <small>
+                  Der Standardumlauf bleibt auch ohne Einzelabgleich vollständig bedienbar.
+                </small>
+              </section>
               {selected.status === "LANDED" ? (
                 <p className="landed-warning">Gelandet · noch nicht verfügbar</p>
               ) : null}
