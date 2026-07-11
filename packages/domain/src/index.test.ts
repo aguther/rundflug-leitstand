@@ -129,6 +129,13 @@ describe("sale guard", () => {
       /darf SET_EVENT_INTERRUPTION nicht/,
     );
   });
+
+  it("allows operational leads but not cashiers to manage anonymous pilot pauses", () => {
+    expect(() => assertRoleMayExecute("FLIGHT_LINE_LEAD", "SET_PILOT_PAUSE")).not.toThrow();
+    expect(() => assertRoleMayExecute("CASHIER", "SET_PILOT_PAUSE")).toThrowError(
+      /darf SET_PILOT_PAUSE nicht/,
+    );
+  });
 });
 
 describe("public ticket codes", () => {

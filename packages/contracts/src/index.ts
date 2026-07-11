@@ -33,6 +33,7 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
     payload: z.object({
       rotationId: z.string().min(1).max(100),
       aircraftId: z.string().min(1).max(100),
+      pilotId: z.string().min(1).max(100),
     }),
   }),
   commandBaseSchema.extend({
@@ -133,6 +134,15 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
       pairedDeviceId: z.string().min(1).max(100),
       adminPin: z.string().min(4).max(32),
       reason: z.string().trim().min(3).max(240),
+    }),
+  }),
+  commandBaseSchema.extend({
+    type: z.literal("SET_PILOT_PAUSE"),
+    payload: z.object({
+      pilotId: z.string().min(1).max(100),
+      paused: z.boolean(),
+      reason: z.string().trim().min(3).max(240),
+      expectedReviewAt: z.iso.datetime().nullable(),
     }),
   }),
   commandBaseSchema.extend({
@@ -262,6 +272,10 @@ export const rotationOperationalSummarySchema = z.object({
   ticketGroupId: z.string(),
   aircraftId: z.string().nullable(),
   aircraftRegistration: z.string().nullable(),
+  pilotId: z.string().nullable(),
+  pilotOperationalCode: z.string().nullable(),
+  suggestedPilotId: z.string().nullable(),
+  suggestedPilotOperationalCode: z.string().nullable(),
   suggestedAircraftId: z.string().nullable(),
   suggestedAircraftRegistration: z.string().nullable(),
   ticketCount: z.number().int().nonnegative(),
@@ -298,6 +312,8 @@ export const pilotOperationalSummarySchema = z.object({
   id: z.string(),
   operationalCode: z.string(),
   active: z.boolean(),
+  paused: z.boolean(),
+  pauseExpectedReviewAt: z.string().nullable(),
 });
 
 export const operationBoardSchema = z.object({
