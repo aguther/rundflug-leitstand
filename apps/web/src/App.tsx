@@ -1,6 +1,18 @@
-import type { OperationBoard, PublicBoard, PublicTicketStatus } from "@rundflug/contracts";
+import type {
+  AuditHistory,
+  OperationBoard,
+  PublicBoard,
+  PublicTicketStatus,
+} from "@rundflug/contracts";
 import { useCallback, useEffect, useState } from "react";
-import { getOperationBoard, getPublicBoard, getPublicTicketStatus, sendCommand } from "./api";
+import {
+  downloadDailyReport,
+  getAuditHistory,
+  getOperationBoard,
+  getPublicBoard,
+  getPublicTicketStatus,
+  sendCommand,
+} from "./api";
 
 const EVENT_ID = "demo-2026";
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -28,6 +40,20 @@ function createTicketCode(): string {
   return Array.from(bytes, (value) => CODE_ALPHABET[value % CODE_ALPHABET.length]).join("");
 }
 
+function useConnectivity(): boolean {
+  const [online, setOnline] = useState(() => navigator.onLine);
+  useEffect(() => {
+    const update = () => setOnline(navigator.onLine);
+    window.addEventListener("online", update);
+    window.addEventListener("offline", update);
+    return () => {
+      window.removeEventListener("online", update);
+      window.removeEventListener("offline", update);
+    };
+  }, []);
+  return online;
+}
+
 function useOperationBoard(deviceId: string) {
   const [board, setBoard] = useState<OperationBoard | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -48,6 +74,7 @@ function useOperationBoard(deviceId: string) {
 }
 
 function Shell({ title, children }: { title: string; children: React.ReactNode }) {
+  const online = useConnectivity();
   return (
     <main className="app-shell">
       <header className="app-header">
@@ -62,6 +89,11 @@ function Shell({ title, children }: { title: string; children: React.ReactNode }
           <a href="/admin">Administration</a>
         </nav>
       </header>
+      {!online ? (
+        <div className="connection-warning">
+          Offline · letzter bestätigter Stand bleibt sichtbar; operative Aktionen sind gesperrt.
+        </div>
+      ) : null}
       {children}
       <footer>Keine flugbetriebliche oder sicherheitsrelevante Freigabewirkung.</footer>
     </main>
@@ -80,8 +112,28 @@ function EmergencyNotice({ active }: { active: boolean }) {
 
 function CashierView() {
   const { board, error, refresh } = useOperationBoard("cashier-tablet-1");
-  const [productId, setProductId] = useState("panorama-20");
-  const [size, setSize] = useState(1);
+  const [productId, setProductId] = useState(() => {
+    try {
+      const draft = JSON.parse(localStorage.getItem("cashier-draft-v1") ?? "{}") as {
+        productId?: string;
+      };
+      return draft.productId ?? "panorama-20";
+    } catch {
+      return "panorama-20";
+    }
+  });
+  const [size, setSize] = useState(() => {
+    try {
+      const draft = JSON.parse(localStorage.getItem("cashier-draft-v1") ?? "{}") as {
+        size?: number;
+      };
+      return Number.isInteger(draft.size) && (draft.size ?? 0) >= 1 && (draft.size ?? 0) <= 12
+        ? (draft.size ?? 1)
+        : 1;
+    } catch {
+      return 1;
+    }
+  });
   const [busy, setBusy] = useState(false);
   const [receipt, setReceipt] = useState<string[]>([]);
   const [message, setMessage] = useState<string | null>(null);
@@ -90,6 +142,9 @@ function CashierView() {
   const [cancelReason, setCancelReason] = useState("");
   const [rebookProductId, setRebookProductId] = useState("");
   const product = board?.products.find((entry) => entry.id === productId) ?? board?.products[0];
+  useEffect(() => {
+    localStorage.setItem("cashier-draft-v1", JSON.stringify({ version: 1, productId, size }));
+  }, [productId, size]);
 
   async function sell() {
     if (!board || !product || busy) return;
@@ -627,9 +682,22 @@ function AdminView() {
   const [reason, setReason] = useState("");
   const [adminPin, setAdminPin] = useState("");
   const [message, setMessage] = useState<string | null>(null);
+  const [history, setHistory] = useState<AuditHistory>({ entries: [] });
   const resourceGroups = Array.from(
     new Map(board?.products.map((product) => [product.resourceGroupId, product]) ?? []).values(),
   );
+  const refreshHistory = useCallback(async () => {
+    try {
+      setHistory(
+        await getAuditHistory(EVENT_ID, "technical-scaffold", deviceTokenFor("technical-scaffold")),
+      );
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : "Historie nicht verfügbar.");
+    }
+  }, []);
+  useEffect(() => {
+    void refreshHistory();
+  }, [refreshHistory]);
 
   async function emergency(type: "TRIGGER_EMERGENCY" | "CLEAR_EMERGENCY") {
     if (!board || reason.trim().length < 3) return;
@@ -662,6 +730,7 @@ function AdminView() {
       setReason("");
       setAdminPin("");
       await refresh();
+      await refreshHistory();
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : "Notfallkommando fehlgeschlagen.");
     }
@@ -688,8 +757,22 @@ function AdminView() {
       setMessage(`Ressourcengruppe auf ${status} gesetzt.`);
       setReason("");
       await refresh();
+      await refreshHistory();
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : "Statusänderung fehlgeschlagen.");
+    }
+  }
+
+  async function exportDailyReport() {
+    try {
+      await downloadDailyReport(
+        EVENT_ID,
+        "technical-scaffold",
+        deviceTokenFor("technical-scaffold"),
+      );
+      setMessage("Tagesbericht wurde erzeugt.");
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : "Tagesbericht fehlgeschlagen.");
     }
   }
 
@@ -769,6 +852,28 @@ function AdminView() {
               </div>
             </div>
           ))}
+        </section>
+        <section className="admin-section">
+          <div className="section-heading">
+            <h2>Audit und Tagesabschluss</h2>
+            <button onClick={exportDailyReport} type="button">
+              CSV-Tagesbericht
+            </button>
+          </div>
+          <div className="audit-list">
+            {history.entries.slice(0, 20).map((entry) => (
+              <div key={entry.sequence}>
+                <time dateTime={entry.occurredAt}>
+                  {new Date(entry.occurredAt).toLocaleTimeString("de-DE")}
+                </time>
+                <strong>{entry.eventType}</strong>
+                <span>
+                  {entry.aggregateType} · Version {entry.aggregateVersion}
+                </span>
+                <code>{entry.deviceId}</code>
+              </div>
+            ))}
+          </div>
         </section>
         {message ? (
           <div className="action-message" role="status">

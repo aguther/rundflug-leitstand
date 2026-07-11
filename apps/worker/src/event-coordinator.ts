@@ -658,12 +658,13 @@ export class EventCoordinator extends DurableObject<Env> {
 
     let targetProductId = group.product_id;
     let targetResourceGroupId = group.resource_group_id;
+    let targetPriceCents: number | null = null;
     if (command.type === "REBOOK_TICKET_GROUP") {
       const target = await this.env.DB.prepare(
-        "SELECT id, resource_group_id FROM products WHERE id = ?1 AND operation_day_id = ?2 AND sale_enabled = 1",
+        "SELECT id, resource_group_id, price_cents FROM products WHERE id = ?1 AND operation_day_id = ?2 AND sale_enabled = 1",
       )
         .bind(command.payload.newProductId, command.eventId)
-        .first<{ id: string; resource_group_id: string }>();
+        .first<{ id: string; resource_group_id: string; price_cents: number }>();
       if (!target) {
         return json(
           {
@@ -677,6 +678,7 @@ export class EventCoordinator extends DurableObject<Env> {
       }
       targetProductId = target.id;
       targetResourceGroupId = target.resource_group_id;
+      targetPriceCents = target.price_cents;
     }
 
     const now = new Date().toISOString();
@@ -742,9 +744,13 @@ export class EventCoordinator extends DurableObject<Env> {
           `UPDATE ticket_groups SET product_id = ?1, queue_sequence = ?2, status = 'QUEUED',
                   version = version + 1 WHERE id = ?3 AND version = ?4`,
         ).bind(targetProductId, queue?.next_sequence ?? 1, group.id, group.version),
-        this.env.DB.prepare("UPDATE tickets SET status = 'QUEUED' WHERE ticket_group_id = ?1").bind(
-          group.id,
-        ),
+        targetPriceCents === null
+          ? this.env.DB.prepare(
+              "UPDATE tickets SET status = 'QUEUED' WHERE ticket_group_id = ?1",
+            ).bind(group.id)
+          : this.env.DB.prepare(
+              "UPDATE tickets SET status = 'QUEUED', price_cents = ?1 WHERE ticket_group_id = ?2",
+            ).bind(targetPriceCents, group.id),
         this.env.DB.prepare(
           `INSERT INTO flight_groups
             (id, operation_day_id, resource_group_id, communication_number, status, version, created_at, updated_at)
