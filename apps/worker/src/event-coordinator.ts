@@ -325,6 +325,16 @@ export class EventCoordinator extends DurableObject<Env> {
 
       if (command.type !== "SET_OPERATIONAL_NOTE") {
         if (
+          command.type === "TRIGGER_EMERGENCY" ||
+          command.type === "CLEAR_EMERGENCY" ||
+          command.type === "SET_RESOURCE_GROUP_STATUS"
+        ) {
+          return this.handleOperationalControl(command, current);
+        }
+        if (command.type === "REVOKE_CALL") {
+          return this.handleRevokeCall(command, current);
+        }
+        if (
           command.type === "CANCEL_TICKET_GROUP" ||
           command.type === "REBOOK_TICKET_GROUP" ||
           command.type === "DEFER_TICKET_GROUP" ||
@@ -338,6 +348,17 @@ export class EventCoordinator extends DurableObject<Env> {
           command.type === "MARK_LANDED" ||
           command.type === "MARK_COMPLETED"
         ) {
+          if (command.type === "CALL_NEXT" && current.emergency_mode === 1) {
+            return json(
+              {
+                error: {
+                  code: "CALL_BLOCKED_EMERGENCY",
+                  message: "Neue Aufrufe sind im Notfallmodus gesperrt.",
+                },
+              },
+              { status: 409 },
+            );
+          }
           return this.handleRotationTransition(command, current);
         }
         return json(
@@ -772,6 +793,239 @@ export class EventCoordinator extends DurableObject<Env> {
         now,
         JSON.stringify(result),
       ),
+      this.env.DB.prepare(
+        "INSERT INTO outbox (id, operation_day_id, topic, payload_json, created_at) VALUES (?1, ?2, 'EVENT_STATE_CHANGED', ?3, ?4)",
+      ).bind(crypto.randomUUID(), command.eventId, JSON.stringify(result), now),
+    );
+    await this.env.DB.batch(statements);
+    this.broadcast(result);
+    return json(result);
+  }
+
+  private async handleOperationalControl(
+    command: Extract<
+      CommandEnvelope,
+      { type: "TRIGGER_EMERGENCY" | "CLEAR_EMERGENCY" | "SET_RESOURCE_GROUP_STATUS" }
+    >,
+    current: StoredEventRow,
+  ): Promise<Response> {
+    if (
+      command.type === "CLEAR_EMERGENCY" &&
+      !(await verifyCredential(command.payload.adminPin, this.env.ADMIN_PIN_HASH))
+    ) {
+      return json(
+        { error: { code: "ADMIN_PIN_INVALID", message: "Administrator-PIN ist ungültig." } },
+        { status: 403 },
+      );
+    }
+    if (command.type === "SET_RESOURCE_GROUP_STATUS") {
+      const exists = await this.env.DB.prepare(
+        "SELECT id FROM resource_groups WHERE id = ?1 AND operation_day_id = ?2",
+      )
+        .bind(command.payload.resourceGroupId, command.eventId)
+        .first<{ id: string }>();
+      if (!exists) {
+        return json(
+          {
+            error: {
+              code: "RESOURCE_GROUP_NOT_FOUND",
+              message: "Ressourcengruppe nicht gefunden.",
+            },
+          },
+          { status: 404 },
+        );
+      }
+    }
+
+    const now = new Date().toISOString();
+    const nextVersion = current.version + 1;
+    const eventType =
+      command.type === "TRIGGER_EMERGENCY"
+        ? "EMERGENCY_MODE_TRIGGERED"
+        : command.type === "CLEAR_EMERGENCY"
+          ? "EMERGENCY_MODE_CLEARED"
+          : "RESOURCE_GROUP_STATUS_CHANGED";
+    const emergencyMode =
+      command.type === "TRIGGER_EMERGENCY"
+        ? 1
+        : command.type === "CLEAR_EMERGENCY"
+          ? 0
+          : current.emergency_mode;
+    const result: CommandResult = {
+      accepted: true,
+      duplicate: false,
+      event: rowToSnapshot({
+        ...current,
+        emergency_mode: emergencyMode,
+        version: nextVersion,
+        updated_at: now,
+      }),
+      eventType,
+      aggregate: { type: "OPERATION_DAY", id: command.eventId },
+    };
+    const statements: D1PreparedStatement[] = [
+      this.env.DB.prepare(
+        "UPDATE operation_days SET emergency_mode = ?1, version = ?2, updated_at = ?3 WHERE id = ?4 AND version = ?5",
+      ).bind(emergencyMode, nextVersion, now, command.eventId, current.version),
+    ];
+
+    if (command.type === "SET_RESOURCE_GROUP_STATUS") {
+      statements.push(
+        this.env.DB.prepare(
+          "UPDATE resource_groups SET status = ?1, version = version + 1, updated_at = ?2 WHERE id = ?3",
+        ).bind(command.payload.status, now, command.payload.resourceGroupId),
+      );
+      if (command.payload.status === "ACTIVE") {
+        statements.push(
+          this.env.DB.prepare(
+            `UPDATE operational_blocks SET status = 'CLEARED', cleared_at = ?1
+              WHERE operation_day_id = ?2 AND scope_type = 'RESOURCE_GROUP' AND scope_id = ?3 AND status = 'ACTIVE'`,
+          ).bind(now, command.eventId, command.payload.resourceGroupId),
+        );
+      } else {
+        statements.push(
+          this.env.DB.prepare(
+            `INSERT INTO operational_blocks
+              (id, operation_day_id, scope_type, scope_id, block_type, status, reason,
+               started_at, expected_review_at, device_id)
+             VALUES (?1, ?2, 'RESOURCE_GROUP', ?3, ?4, 'ACTIVE', ?5, ?6, ?7, ?8)`,
+          ).bind(
+            crypto.randomUUID(),
+            command.eventId,
+            command.payload.resourceGroupId,
+            command.payload.status === "PAUSED" ? "PAUSE" : "INTERRUPTION",
+            command.payload.reason,
+            now,
+            command.payload.expectedReviewAt,
+            command.deviceId,
+          ),
+        );
+      }
+    }
+
+    const reason = command.payload.reason;
+    const payload =
+      command.type === "SET_RESOURCE_GROUP_STATUS"
+        ? {
+            reason,
+            resourceGroupId: command.payload.resourceGroupId,
+            status: command.payload.status,
+            expectedReviewAt: command.payload.expectedReviewAt,
+          }
+        : { reason };
+    statements.push(
+      this.env.DB.prepare(
+        `INSERT INTO operational_events
+          (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type,
+           aggregate_id, aggregate_version, payload_json)
+         VALUES (?1, ?2, ?3, ?4, ?5, 'OPERATION_DAY', ?2, ?6, ?7)`,
+      ).bind(
+        crypto.randomUUID(),
+        command.eventId,
+        eventType,
+        now,
+        command.deviceId,
+        nextVersion,
+        JSON.stringify(payload),
+      ),
+      this.env.DB.prepare(
+        `INSERT INTO idempotency_receipts
+          (command_id, operation_day_id, device_id, command_type, received_at, response_json)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)`,
+      ).bind(
+        command.commandId,
+        command.eventId,
+        command.deviceId,
+        command.type,
+        now,
+        JSON.stringify(result),
+      ),
+      this.env.DB.prepare(
+        "INSERT INTO outbox (id, operation_day_id, topic, payload_json, created_at) VALUES (?1, ?2, 'EVENT_STATE_CHANGED', ?3, ?4)",
+      ).bind(crypto.randomUUID(), command.eventId, JSON.stringify(result), now),
+    );
+    await this.env.DB.batch(statements);
+    this.broadcast(result);
+    return json(result);
+  }
+
+  private async handleRevokeCall(
+    command: Extract<CommandEnvelope, { type: "REVOKE_CALL" }>,
+    current: StoredEventRow,
+  ): Promise<Response> {
+    const rotation = await this.env.DB.prepare(
+      "SELECT id, status, version, aircraft_id, called_at FROM rotations WHERE id = ?1 AND operation_day_id = ?2",
+    )
+      .bind(command.payload.rotationId, command.eventId)
+      .first<{
+        id: string;
+        status: string;
+        version: number;
+        aircraft_id: string | null;
+        called_at: string | null;
+      }>();
+    if (rotation?.status !== "CALLED" || !rotation.called_at) {
+      return json(
+        {
+          error: {
+            code: "CALL_NOT_REVERSIBLE",
+            message: "Aufruf kann nicht zurückgenommen werden.",
+          },
+        },
+        { status: 409 },
+      );
+    }
+    if (Date.now() - Date.parse(rotation.called_at) > 10_000) {
+      return json(
+        { error: { code: "UNDO_WINDOW_EXPIRED", message: "Zehn-Sekunden-Frist ist abgelaufen." } },
+        { status: 409 },
+      );
+    }
+    const now = new Date().toISOString();
+    const nextVersion = current.version + 1;
+    const result: CommandResult = {
+      accepted: true,
+      duplicate: false,
+      event: rowToSnapshot({ ...current, version: nextVersion, updated_at: now }),
+      eventType: "CALL_REVOKED",
+      aggregate: { type: "ROTATION", id: rotation.id },
+    };
+    const statements: D1PreparedStatement[] = [
+      this.env.DB.prepare(
+        "UPDATE operation_days SET version = ?1, updated_at = ?2 WHERE id = ?3 AND version = ?4",
+      ).bind(nextVersion, now, command.eventId, current.version),
+      this.env.DB.prepare(
+        `UPDATE rotations SET status = 'DRAFT', aircraft_id = NULL, call_revoked_at = ?1,
+                version = version + 1, updated_at = ?1 WHERE id = ?2 AND version = ?3`,
+      ).bind(now, rotation.id, rotation.version),
+    ];
+    if (rotation.aircraft_id) {
+      statements.push(
+        this.env.DB.prepare(
+          "UPDATE aircraft SET operational_state = 'AVAILABLE', updated_at = ?1 WHERE id = ?2",
+        ).bind(now, rotation.aircraft_id),
+      );
+    }
+    statements.push(
+      this.env.DB.prepare(
+        `INSERT INTO operational_events
+          (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type,
+           aggregate_id, aggregate_version, payload_json)
+         VALUES (?1, ?2, 'CALL_REVOKED', ?3, ?4, 'ROTATION', ?5, ?6, ?7)`,
+      ).bind(
+        crypto.randomUUID(),
+        command.eventId,
+        now,
+        command.deviceId,
+        rotation.id,
+        rotation.version + 1,
+        JSON.stringify({ corrects: "FLIGHT_GROUP_CALLED", calledAt: rotation.called_at }),
+      ),
+      this.env.DB.prepare(
+        `INSERT INTO idempotency_receipts
+          (command_id, operation_day_id, device_id, command_type, received_at, response_json)
+         VALUES (?1, ?2, ?3, 'REVOKE_CALL', ?4, ?5)`,
+      ).bind(command.commandId, command.eventId, command.deviceId, now, JSON.stringify(result)),
       this.env.DB.prepare(
         "INSERT INTO outbox (id, operation_day_id, topic, payload_json, created_at) VALUES (?1, ?2, 'EVENT_STATE_CHANGED', ?3, ?4)",
       ).bind(crypto.randomUUID(), command.eventId, JSON.stringify(result), now),

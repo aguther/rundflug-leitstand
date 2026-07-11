@@ -100,7 +100,13 @@ export function transitionRotation(current: RotationState, next: RotationState):
   return next;
 }
 
-export type DeviceRole = "CASHIER" | "FLIGHT_LINE" | "FLIGHT_LINE_LEAD" | "ADMIN" | "DISPLAY";
+export type DeviceRole =
+  | "CASHIER"
+  | "FLIGHT_LINE"
+  | "FLIGHT_LINE_LEAD"
+  | "FLIGHT_DIRECTOR"
+  | "ADMIN"
+  | "DISPLAY";
 
 export type OperationalCommandType =
   | "SELL_TICKET_GROUP"
@@ -111,7 +117,11 @@ export type OperationalCommandType =
   | "CANCEL_TICKET_GROUP"
   | "REBOOK_TICKET_GROUP"
   | "DEFER_TICKET_GROUP"
-  | "MARK_NO_SHOW";
+  | "MARK_NO_SHOW"
+  | "TRIGGER_EMERGENCY"
+  | "CLEAR_EMERGENCY"
+  | "SET_RESOURCE_GROUP_STATUS"
+  | "REVOKE_CALL";
 
 const commandRoles: Readonly<Record<OperationalCommandType, readonly DeviceRole[]>> = {
   SELL_TICKET_GROUP: ["CASHIER", "ADMIN"],
@@ -123,6 +133,10 @@ const commandRoles: Readonly<Record<OperationalCommandType, readonly DeviceRole[
   REBOOK_TICKET_GROUP: ["CASHIER", "ADMIN"],
   DEFER_TICKET_GROUP: ["FLIGHT_LINE", "FLIGHT_LINE_LEAD", "ADMIN"],
   MARK_NO_SHOW: ["FLIGHT_LINE", "FLIGHT_LINE_LEAD", "ADMIN"],
+  TRIGGER_EMERGENCY: ["FLIGHT_LINE_LEAD", "FLIGHT_DIRECTOR", "ADMIN"],
+  CLEAR_EMERGENCY: ["ADMIN"],
+  SET_RESOURCE_GROUP_STATUS: ["FLIGHT_LINE_LEAD", "FLIGHT_DIRECTOR", "ADMIN"],
+  REVOKE_CALL: ["FLIGHT_LINE", "FLIGHT_LINE_LEAD", "ADMIN"],
 };
 
 export function assertRoleMayExecute(role: DeviceRole, command: OperationalCommandType): void {

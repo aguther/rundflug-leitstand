@@ -91,4 +91,18 @@ describe("commandEnvelopeSchema", () => {
     expect("aircraftRegistration" in status).toBe(false);
     expect("guestName" in board).toBe(false);
   });
+
+  it("requires an administrator PIN in the clear-emergency contract", () => {
+    expect(() =>
+      commandEnvelopeSchema.parse({
+        commandId: "00e971df-23d5-4d28-9107-92b447416285",
+        eventId: "demo-2026",
+        deviceId: "technical-scaffold",
+        expectedVersion: 9,
+        issuedAt: "2026-07-11T12:00:00.000Z",
+        type: "CLEAR_EMERGENCY",
+        payload: { reason: "Übung beendet" },
+      }),
+    ).toThrow();
+  });
 });

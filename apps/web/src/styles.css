@@ -74,6 +74,14 @@ input:focus-visible {
   border-bottom: 1px solid #efb35d;
   font-weight: 750;
 }
+.emergency-notice {
+  padding: 14px 24px;
+  color: #fff;
+  background: #a61b1b;
+  font-size: 1.05rem;
+  font-weight: 850;
+  text-align: center;
+}
 footer {
   margin-top: auto;
   padding: 13px 20px;
@@ -351,6 +359,67 @@ p {
   color: #276044;
   background: #eaf6ef;
   font-weight: 800;
+}
+.undo-action {
+  min-height: 48px;
+  margin-bottom: 12px;
+  border: 2px solid #1769d2;
+  border-radius: 4px;
+  background: #fff;
+  color: #145aa7;
+  font-weight: 800;
+  cursor: pointer;
+}
+.admin-workspace {
+  width: min(1000px, calc(100% - 32px));
+  margin: 20px auto;
+  display: grid;
+  gap: 16px;
+}
+.admin-workspace > label,
+.admin-section label {
+  display: grid;
+  gap: 7px;
+  font-weight: 750;
+}
+.admin-workspace input {
+  min-height: 48px;
+  padding: 10px 12px;
+  border: 1px solid #93a4b8;
+  border-radius: 4px;
+}
+.admin-section {
+  padding: 24px;
+  background: #fff;
+  border: 1px solid #c3cfdd;
+  border-radius: 6px;
+  display: grid;
+  gap: 14px;
+}
+.danger-action {
+  min-height: 58px;
+  border: 0;
+  border-radius: 4px;
+  padding: 14px 20px;
+  color: #fff;
+  background: #a61b1b;
+  font-weight: 850;
+  cursor: pointer;
+}
+.danger-action:disabled {
+  background: #a99;
+  cursor: not-allowed;
+}
+.resource-control {
+  padding: 16px 0;
+  border-top: 1px solid #d5dee8;
+  display: grid;
+  gap: 12px;
+}
+.resource-control > div:first-child {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
 }
 .fids-board {
   width: min(1500px, calc(100% - 32px));

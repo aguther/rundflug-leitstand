@@ -54,6 +54,30 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
       reason: z.string().trim().min(3).max(240),
     }),
   }),
+  commandBaseSchema.extend({
+    type: z.literal("TRIGGER_EMERGENCY"),
+    payload: z.object({ reason: z.string().trim().min(3).max(240) }),
+  }),
+  commandBaseSchema.extend({
+    type: z.literal("CLEAR_EMERGENCY"),
+    payload: z.object({
+      reason: z.string().trim().min(3).max(240),
+      adminPin: z.string().min(4).max(32),
+    }),
+  }),
+  commandBaseSchema.extend({
+    type: z.literal("SET_RESOURCE_GROUP_STATUS"),
+    payload: z.object({
+      resourceGroupId: z.string().min(1).max(100),
+      status: z.enum(["ACTIVE", "PAUSED", "INTERRUPTED", "ENDED"]),
+      reason: z.string().trim().min(3).max(240),
+      expectedReviewAt: z.iso.datetime().nullable(),
+    }),
+  }),
+  commandBaseSchema.extend({
+    type: z.literal("REVOKE_CALL"),
+    payload: z.object({ rotationId: z.string().min(1).max(100) }),
+  }),
 ]);
 
 export type CommandEnvelope = z.infer<typeof commandEnvelopeSchema>;
@@ -125,6 +149,7 @@ export const rotationOperationalSummarySchema = z.object({
   ticketCount: z.number().int().nonnegative(),
   predictedLowerMinutes: z.number().int().nonnegative(),
   predictedUpperMinutes: z.number().int().nonnegative(),
+  calledAt: z.string().nullable(),
 });
 
 export const operationBoardSchema = z.object({

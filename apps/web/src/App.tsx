@@ -59,6 +59,7 @@ function Shell({ title, children }: { title: string; children: React.ReactNode }
           <a href="/kasse">Kasse</a>
           <a href="/flight-line">Flight Line</a>
           <a href="/fids">FIDS</a>
+          <a href="/admin">Administration</a>
         </nav>
       </header>
       {children}
@@ -69,6 +70,12 @@ function Shell({ title, children }: { title: string; children: React.ReactNode }
 
 function ConnectionNotice({ error }: { error: string | null }) {
   return error ? <div className="connection-warning">Möglicherweise veraltet · {error}</div> : null;
+}
+
+function EmergencyNotice({ active }: { active: boolean }) {
+  return active ? (
+    <div className="emergency-notice">Notfallmodus aktiv · keine Verkäufe oder neuen Aufrufe</div>
+  ) : null;
 }
 
 function CashierView() {
@@ -177,6 +184,7 @@ function CashierView() {
   return (
     <Shell title="Kasse">
       <ConnectionNotice error={error} />
+      <EmergencyNotice active={board?.event.emergencyMode ?? false} />
       <section className="cashier-workspace">
         <div className="product-strip">
           {board?.products.map((entry) => (
@@ -271,7 +279,13 @@ function CashierView() {
         </div>
         <button
           className="primary-action"
-          disabled={!board || !product?.saleEnabled || busy}
+          disabled={
+            !board ||
+            !product?.saleEnabled ||
+            product.resourceGroupStatus !== "ACTIVE" ||
+            board.event.emergencyMode ||
+            busy
+          }
           onClick={sell}
           type="button"
         >
@@ -357,9 +371,32 @@ function FlightLineView() {
     }
   }
 
+  async function revokeCall() {
+    if (!board || !selected || selected.status !== "CALLED") return;
+    try {
+      await sendCommand(
+        {
+          commandId: crypto.randomUUID(),
+          eventId: EVENT_ID,
+          deviceId: "flight-line-tablet-1",
+          expectedVersion: board.event.version,
+          issuedAt: new Date().toISOString(),
+          type: "REVOKE_CALL",
+          payload: { rotationId: selected.id },
+        },
+        deviceTokenFor("flight-line-tablet-1"),
+      );
+      setMessage("NEXT wurde durch ein Korrekturereignis zurückgenommen.");
+      await refresh();
+    } catch (reason) {
+      setMessage(reason instanceof Error ? reason.message : "Rücknahme fehlgeschlagen.");
+    }
+  }
+
   return (
     <Shell title="Flight Line">
       <ConnectionNotice error={error} />
+      <EmergencyNotice active={board?.event.emergencyMode ?? false} />
       <section className="flight-workspace">
         <div className="queue-list">
           <h1>Warteschlange</h1>
@@ -442,10 +479,20 @@ function FlightLineView() {
                   {message}
                 </div>
               ) : null}
+              {selected.status === "CALLED" &&
+              selected.calledAt &&
+              Date.now() - Date.parse(selected.calledAt) <= 10_000 ? (
+                <button className="undo-action" onClick={revokeCall} type="button">
+                  NEXT rückgängig
+                </button>
+              ) : null}
               {action ? (
                 <button
                   className="primary-action"
-                  disabled={action.command === "CALL_NEXT" && !selected.suggestedAircraftId}
+                  disabled={
+                    action.command === "CALL_NEXT" &&
+                    (!selected.suggestedAircraftId || board?.event.emergencyMode)
+                  }
                   onClick={advance}
                   type="button"
                 >
@@ -575,6 +622,164 @@ function FidsView() {
   );
 }
 
+function AdminView() {
+  const { board, error, refresh } = useOperationBoard("technical-scaffold");
+  const [reason, setReason] = useState("");
+  const [adminPin, setAdminPin] = useState("");
+  const [message, setMessage] = useState<string | null>(null);
+  const resourceGroups = Array.from(
+    new Map(board?.products.map((product) => [product.resourceGroupId, product]) ?? []).values(),
+  );
+
+  async function emergency(type: "TRIGGER_EMERGENCY" | "CLEAR_EMERGENCY") {
+    if (!board || reason.trim().length < 3) return;
+    try {
+      await sendCommand(
+        type === "TRIGGER_EMERGENCY"
+          ? {
+              commandId: crypto.randomUUID(),
+              eventId: EVENT_ID,
+              deviceId: "technical-scaffold",
+              expectedVersion: board.event.version,
+              issuedAt: new Date().toISOString(),
+              type,
+              payload: { reason: reason.trim() },
+            }
+          : {
+              commandId: crypto.randomUUID(),
+              eventId: EVENT_ID,
+              deviceId: "technical-scaffold",
+              expectedVersion: board.event.version,
+              issuedAt: new Date().toISOString(),
+              type,
+              payload: { reason: reason.trim(), adminPin },
+            },
+        deviceTokenFor("technical-scaffold"),
+      );
+      setMessage(
+        type === "TRIGGER_EMERGENCY" ? "Notfallmodus ausgelöst." : "Notfallmodus aufgehoben.",
+      );
+      setReason("");
+      setAdminPin("");
+      await refresh();
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : "Notfallkommando fehlgeschlagen.");
+    }
+  }
+
+  async function setResourceStatus(
+    resourceGroupId: string,
+    status: "ACTIVE" | "PAUSED" | "INTERRUPTED",
+  ) {
+    if (!board || reason.trim().length < 3) return;
+    try {
+      await sendCommand(
+        {
+          commandId: crypto.randomUUID(),
+          eventId: EVENT_ID,
+          deviceId: "technical-scaffold",
+          expectedVersion: board.event.version,
+          issuedAt: new Date().toISOString(),
+          type: "SET_RESOURCE_GROUP_STATUS",
+          payload: { resourceGroupId, status, reason: reason.trim(), expectedReviewAt: null },
+        },
+        deviceTokenFor("technical-scaffold"),
+      );
+      setMessage(`Ressourcengruppe auf ${status} gesetzt.`);
+      setReason("");
+      await refresh();
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : "Statusänderung fehlgeschlagen.");
+    }
+  }
+
+  return (
+    <Shell title="Administration">
+      <ConnectionNotice error={error} />
+      <EmergencyNotice active={board?.event.emergencyMode ?? false} />
+      <section className="admin-workspace">
+        <h1>Betriebssteuerung</h1>
+        <label>
+          Begründung
+          <input
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+            placeholder="Pflichtangabe"
+          />
+        </label>
+        <section className="admin-section">
+          <h2>Notfallmodus</h2>
+          {!board?.event.emergencyMode ? (
+            <button
+              className="danger-action"
+              disabled={reason.trim().length < 3}
+              onClick={() => emergency("TRIGGER_EMERGENCY")}
+              type="button"
+            >
+              Not-Halt auslösen
+            </button>
+          ) : (
+            <>
+              <label>
+                Administrator-PIN
+                <input
+                  type="password"
+                  value={adminPin}
+                  onChange={(event) => setAdminPin(event.target.value)}
+                />
+              </label>
+              <button
+                className="danger-action"
+                disabled={reason.trim().length < 3 || adminPin.length < 4}
+                onClick={() => emergency("CLEAR_EMERGENCY")}
+                type="button"
+              >
+                Notfallmodus aufheben
+              </button>
+            </>
+          )}
+        </section>
+        <section className="admin-section">
+          <h2>Ressourcengruppen</h2>
+          {resourceGroups.map((group) => (
+            <div className="resource-control" key={group.resourceGroupId}>
+              <div>
+                <strong>{group.name}</strong>
+                <span>{group.resourceGroupStatus}</span>
+              </div>
+              <div className="secondary-actions">
+                <button
+                  onClick={() => setResourceStatus(group.resourceGroupId, "PAUSED")}
+                  type="button"
+                >
+                  Pausieren
+                </button>
+                <button
+                  onClick={() => setResourceStatus(group.resourceGroupId, "INTERRUPTED")}
+                  type="button"
+                >
+                  Unterbrechen
+                </button>
+                <button
+                  onClick={() => setResourceStatus(group.resourceGroupId, "ACTIVE")}
+                  type="button"
+                >
+                  Aktivieren
+                </button>
+              </div>
+            </div>
+          ))}
+        </section>
+        {message ? (
+          <div className="action-message" role="status">
+            {message}
+          </div>
+        ) : null}
+      </section>
+    </Shell>
+  );
+}
+
 export function App() {
   const path = window.location.pathname;
   const ticketMatch = path.match(/^\/ticket\/([A-Za-z2-9]{12,32})$/);
@@ -582,5 +787,6 @@ export function App() {
   if (ticketCode) return <TicketStatusView code={ticketCode.toUpperCase()} />;
   if (path === "/flight-line") return <FlightLineView />;
   if (path === "/fids") return <FidsView />;
+  if (path === "/admin") return <AdminView />;
   return <CashierView />;
 }
