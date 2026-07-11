@@ -84,6 +84,13 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
     }),
   }),
   commandBaseSchema.extend({
+    type: z.literal("SET_RESOURCE_GROUP_NOTICE"),
+    payload: z.object({
+      resourceGroupId: z.string().min(1).max(100),
+      note: z.string().trim().max(240),
+    }),
+  }),
+  commandBaseSchema.extend({
     type: z.literal("CONFIGURE_PRODUCT_SALES"),
     payload: z.object({
       productId: z.string().min(1).max(100),
@@ -191,6 +198,7 @@ export const commandResultSchema = z.object({
       type: z.enum([
         "OPERATION_DAY",
         "PRODUCT",
+        "RESOURCE_GROUP",
         "DEVICE",
         "AIRCRAFT",
         "PILOT",
@@ -219,6 +227,7 @@ export const productOperationalSummarySchema = z.object({
   resourceGroupId: z.string(),
   resourceGroupName: z.string(),
   resourceGroupStatus: z.enum(["ACTIVE", "PAUSED", "INTERRUPTED", "ENDED"]),
+  resourceGroupOperationalNote: z.string(),
   priceCents: z.number().int().nonnegative(),
   saleEnabled: z.boolean(),
   referenceCapacity: z.number().int().positive(),
@@ -308,6 +317,7 @@ export const publicTicketStatusSchema = z.object({
   waitUpperMinutes: z.number().int().nonnegative(),
   predictionQuality: z.enum(["STABLE", "CHANGING", "UNCERTAIN"]),
   message: z.string(),
+  operationalNotice: z.string(),
   updatedAt: z.string(),
 });
 export type PublicTicketStatus = z.infer<typeof publicTicketStatusSchema>;
@@ -315,6 +325,7 @@ export type PublicTicketStatus = z.infer<typeof publicTicketStatusSchema>;
 export const publicBoardSchema = z.object({
   eventName: z.string(),
   emergencyMode: z.boolean(),
+  operationalNotice: z.string(),
   updatedAt: z.string(),
   groups: z.array(
     z.object({
@@ -323,6 +334,7 @@ export const publicBoardSchema = z.object({
       status: z.enum(["WAITING", "COME_TO_FLIGHT_LINE", "IN_FLIGHT", "LANDED", "COMPLETED"]),
       waitLowerMinutes: z.number().int().nonnegative(),
       waitUpperMinutes: z.number().int().nonnegative(),
+      operationalNotice: z.string(),
     }),
   ),
 });

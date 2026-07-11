@@ -69,6 +69,15 @@ describe("command authorization", () => {
     ).not.toThrow();
   });
 
+  it("allows operational leads to publish non-safety resource notices", () => {
+    expect(() =>
+      assertRoleMayExecute("FLIGHT_LINE_LEAD", "SET_RESOURCE_GROUP_NOTICE"),
+    ).not.toThrow();
+    expect(() => assertRoleMayExecute("CASHIER", "SET_RESOURCE_GROUP_NOTICE")).toThrowError(
+      /darf SET_RESOURCE_GROUP_NOTICE nicht/,
+    );
+  });
+
   it("allows flight direction to trigger but not clear emergency mode", () => {
     expect(() => assertRoleMayExecute("FLIGHT_DIRECTOR", "TRIGGER_EMERGENCY")).not.toThrow();
     expect(() => assertRoleMayExecute("FLIGHT_DIRECTOR", "CLEAR_EMERGENCY")).toThrowError(

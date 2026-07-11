@@ -167,6 +167,15 @@ function EmergencyNotice({ active }: { active: boolean }) {
   ) : null;
 }
 
+function OperationalNotice({ note }: { note: string | null | undefined }) {
+  return note ? (
+    <div className="operational-notice">
+      <strong>Betriebshinweis:</strong> {note}
+      <small>Organisatorische Information ohne Sicherheits- oder Freigabewirkung.</small>
+    </div>
+  ) : null;
+}
+
 function CashierView() {
   const { board, error, refresh } = useOperationBoard(CASHIER_DEVICE_ID);
   const [productId, setProductId] = useState(() => {
@@ -305,6 +314,7 @@ function CashierView() {
     <Shell title="Kasse">
       <ConnectionNotice error={error} />
       <EmergencyNotice active={board?.event.emergencyMode ?? false} />
+      <OperationalNotice note={board?.event.operationalNote} />
       <section className="cashier-workspace">
         <div className="product-strip">
           {board?.products.map((entry) => (
@@ -320,6 +330,9 @@ function CashierView() {
                 Wartezeit {entry.estimatedWaitLowerMinutes}–{entry.estimatedWaitUpperMinutes} Min.
               </span>
               <span>{capacityLabel[entry.capacityStatus]}</span>
+              {entry.resourceGroupOperationalNote ? (
+                <span>Betriebshinweis: {entry.resourceGroupOperationalNote}</span>
+              ) : null}
               <span>Noch vorsichtig kalkuliert: {entry.remainingSellableSeats} Plätze</span>
               {saleClosingLabel(entry.saleClosesAt) ? (
                 <span>{saleClosingLabel(entry.saleClosesAt)}</span>
@@ -533,6 +546,7 @@ function FlightLineView() {
     <Shell title="Flight Line">
       <ConnectionNotice error={error} />
       <EmergencyNotice active={board?.event.emergencyMode ?? false} />
+      <OperationalNotice note={board?.event.operationalNote} />
       <section className="flight-workspace">
         <div className="queue-list">
           <h1>Warteschlange</h1>
@@ -721,6 +735,7 @@ function TicketStatusView({ code }: { code: string }) {
               <strong>{publicStatusLabel[status.status]}</strong>
             </div>
             <p>{status.message}</p>
+            <OperationalNotice note={status.operationalNotice} />
             {status.predictionQuality === "UNCERTAIN" ? (
               <div className="uncertainty">Betrieb verzögert – bitte Status erneut prüfen</div>
             ) : (
@@ -876,14 +891,18 @@ function FidsView() {
         {board?.emergencyMode ? (
           <div className="uncertainty">Der Rundflugbetrieb ist derzeit unterbrochen.</div>
         ) : null}
+        <OperationalNotice note={board?.operationalNotice} />
         {board?.groups.map((group) => (
-          <div className="fids-row" key={group.communicationNumber}>
-            <strong>{group.productName}</strong>
-            <b>{group.communicationNumber}</b>
-            <span>{publicStatusLabel[group.status]}</span>
-            <span>
-              {group.waitLowerMinutes}–{group.waitUpperMinutes} Min.
-            </span>
+          <div key={group.communicationNumber}>
+            <div className="fids-row">
+              <strong>{group.productName}</strong>
+              <b>{group.communicationNumber}</b>
+              <span>{publicStatusLabel[group.status]}</span>
+              <span>
+                {group.waitLowerMinutes}–{group.waitUpperMinutes} Min.
+              </span>
+            </div>
+            <OperationalNotice note={group.operationalNotice} />
           </div>
         ))}
         <p>Zeiten sind typische Bereiche und nicht garantiert.</p>
@@ -908,6 +927,7 @@ function AdminView() {
   const [pairingUrl, setPairingUrl] = useState<string | null>(null);
   const [pilotCode, setPilotCode] = useState("P-02");
   const [refuelThreshold, setRefuelThreshold] = useState(5);
+  const [operationalNotice, setOperationalNotice] = useState("");
   const resourceGroups = Array.from(
     new Map(board?.products.map((product) => [product.resourceGroupId, product]) ?? []).values(),
   );
@@ -1058,6 +1078,39 @@ function AdminView() {
       await refreshHistory();
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : "Statusänderung fehlgeschlagen.");
+    }
+  }
+
+  async function setNotice(resourceGroupId?: string) {
+    if (!board) return;
+    try {
+      await sendCommand(
+        resourceGroupId
+          ? {
+              commandId: crypto.randomUUID(),
+              eventId: EVENT_ID,
+              deviceId: ADMIN_DEVICE_ID,
+              expectedVersion: board.event.version,
+              issuedAt: new Date().toISOString(),
+              type: "SET_RESOURCE_GROUP_NOTICE",
+              payload: { resourceGroupId, note: operationalNotice.trim() },
+            }
+          : {
+              commandId: crypto.randomUUID(),
+              eventId: EVENT_ID,
+              deviceId: ADMIN_DEVICE_ID,
+              expectedVersion: board.event.version,
+              issuedAt: new Date().toISOString(),
+              type: "SET_OPERATIONAL_NOTE",
+              payload: { note: operationalNotice.trim() },
+            },
+        deviceTokenFor(ADMIN_DEVICE_ID),
+      );
+      setMessage("Betriebshinweis wurde veröffentlicht und auditiert.");
+      await refresh();
+      await refreshHistory();
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : "Betriebshinweis fehlgeschlagen.");
     }
   }
 
@@ -1225,6 +1278,7 @@ function AdminView() {
     <Shell title="Administration">
       <ConnectionNotice error={error} />
       <EmergencyNotice active={board?.event.emergencyMode ?? false} />
+      <OperationalNotice note={board?.event.operationalNote} />
       <section className="admin-workspace">
         <h1>Betriebssteuerung</h1>
         <label>
@@ -1266,6 +1320,33 @@ function AdminView() {
               </button>
             </>
           )}
+        </section>
+        <section className="admin-section">
+          <h2>Betriebs- und Wetterhinweise</h2>
+          <label>
+            Organisatorischer Hinweis
+            <input
+              value={operationalNotice}
+              maxLength={240}
+              onChange={(event) => setOperationalNotice(event.target.value)}
+              placeholder="Hinweis setzen oder leer speichern zum Entfernen"
+            />
+          </label>
+          <div className="secondary-actions notice-actions">
+            <button onClick={() => setNotice()} type="button">
+              Für gesamte Veranstaltung veröffentlichen
+            </button>
+            {resourceGroups.map((group) => (
+              <button
+                key={group.resourceGroupId}
+                onClick={() => setNotice(group.resourceGroupId)}
+                type="button"
+              >
+                Für {group.resourceGroupName} veröffentlichen
+              </button>
+            ))}
+          </div>
+          <p>Hinweise stoppen keinen Flugbetrieb. Unterbrechungen werden separat gesetzt.</p>
         </section>
         <section className="admin-section">
           <h2>Kapazität und Verkaufsempfehlung</h2>
