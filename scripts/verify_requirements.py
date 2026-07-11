@@ -10,7 +10,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 YAML_PATH = ROOT / "docs/requirements/requirements-v1.4.yaml"
 CSV_PATH = ROOT / "docs/requirements/traceability.csv"
+BACKLOG_PATH = ROOT / "docs/backlog/v1-initial.md"
 ID_PATTERN = re.compile(r"^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+$")
+ALLOWED_PRIORITIES = {"MUSS", "SOLL", "KANN"}
+ALLOWED_STAGES = {"V1", "V2", "V3", "V4"}
+ALLOWED_STATUSES = {"geplant", "in Arbeit", "umgesetzt", "abgenommen", "entfällt"}
+BACKLOG_PATTERN = re.compile(r"^BP-(?:0[1-9]|1[0-2])$")
 
 
 def load_json_compatible_yaml(path: Path):
@@ -34,6 +39,16 @@ def main() -> None:
     invalid = [value for value in ids if not ID_PATTERN.match(value)]
     if invalid:
         fail(f"invalid requirement IDs: {invalid}")
+    required_fields = {"id", "requirement", "priority", "stage", "section", "implementation", "tests"}
+    incomplete = [item.get("id", "<without id>") for item in requirements if not required_fields <= item.keys()]
+    if incomplete:
+        fail(f"requirements with missing fields: {incomplete}")
+    invalid_priorities = sorted({item["priority"] for item in requirements} - ALLOWED_PRIORITIES)
+    invalid_stages = sorted({item["stage"] for item in requirements} - ALLOWED_STAGES)
+    if invalid_priorities:
+        fail(f"invalid priorities: {invalid_priorities}")
+    if invalid_stages:
+        fail(f"invalid stages: {invalid_stages}")
 
     with CSV_PATH.open(newline="", encoding="utf-8-sig") as handle:
         rows = list(csv.DictReader(handle))
@@ -45,7 +60,54 @@ def main() -> None:
     if len(csv_ids) != len(set(csv_ids)):
         fail("duplicate requirement IDs in traceability.csv")
 
-    print(f"OK: {len(ids)} unique requirements and matching traceability rows")
+    requirements_by_id = {item["id"]: item for item in requirements}
+    metadata_mismatches = []
+    for row in rows:
+        requirement = requirements_by_id[row["ID"]]
+        if row["Stufe"] != requirement["stage"] or row["Priorität"] != requirement["priority"]:
+            metadata_mismatches.append(row["ID"])
+    if metadata_mismatches:
+        fail(f"stage/priority mismatch in traceability rows: {metadata_mismatches}")
+
+    invalid_statuses = sorted({row["Status"] for row in rows} - ALLOWED_STATUSES)
+    if invalid_statuses:
+        fail(f"invalid traceability statuses: {invalid_statuses}")
+
+    v1_rows = [row for row in rows if row["Stufe"] == "V1"]
+    incomplete_v1 = [
+        row["ID"]
+        for row in v1_rows
+        if not row["Modul"].strip() or not row["Tests"].strip()
+    ]
+    if incomplete_v1:
+        fail(f"V1 traceability rows without module/test assignment: {incomplete_v1}")
+
+    invalid_modules = sorted(
+        {
+            module.strip()
+            for row in v1_rows
+            for module in row["Modul"].split("+")
+            if not BACKLOG_PATTERN.match(module.strip())
+        }
+    )
+    if invalid_modules:
+        fail(f"invalid V1 backlog package references: {invalid_modules}")
+
+    backlog = BACKLOG_PATH.read_text(encoding="utf-8")
+    missing_packages = [
+        f"BP-{number:02d}" for number in range(1, 13) if f"## BP-{number:02d} " not in backlog
+    ]
+    if missing_packages:
+        fail(f"backlog packages missing from v1-initial.md: {missing_packages}")
+
+    v1_must = [row for row in v1_rows if row["Priorität"] == "MUSS"]
+    if len(v1_must) != 157:
+        fail(f"expected 157 V1 MUSS requirements, found {len(v1_must)}")
+
+    print(
+        f"OK: {len(ids)} unique requirements, {len(v1_rows)} assigned V1 rows "
+        f"and {len(v1_must)} assigned V1 MUSS rows"
+    )
 
 
 if __name__ == "__main__":
