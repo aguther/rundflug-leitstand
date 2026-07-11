@@ -99,3 +99,63 @@ export function transitionRotation(current: RotationState, next: RotationState):
   }
   return next;
 }
+
+export type DeviceRole = "CASHIER" | "FLIGHT_LINE" | "FLIGHT_LINE_LEAD" | "ADMIN" | "DISPLAY";
+
+export type OperationalCommandType =
+  | "SELL_TICKET_GROUP"
+  | "CALL_NEXT"
+  | "MARK_IN_FLIGHT"
+  | "MARK_LANDED"
+  | "MARK_COMPLETED";
+
+const commandRoles: Readonly<Record<OperationalCommandType, readonly DeviceRole[]>> = {
+  SELL_TICKET_GROUP: ["CASHIER", "ADMIN"],
+  CALL_NEXT: ["FLIGHT_LINE", "FLIGHT_LINE_LEAD", "ADMIN"],
+  MARK_IN_FLIGHT: ["FLIGHT_LINE", "FLIGHT_LINE_LEAD", "ADMIN"],
+  MARK_LANDED: ["FLIGHT_LINE", "FLIGHT_LINE_LEAD", "ADMIN"],
+  MARK_COMPLETED: ["FLIGHT_LINE", "FLIGHT_LINE_LEAD", "ADMIN"],
+};
+
+export function assertRoleMayExecute(role: DeviceRole, command: OperationalCommandType): void {
+  if (!commandRoles[command].includes(role)) {
+    throw new DomainRuleError(
+      "ROLE_NOT_AUTHORIZED",
+      `Die Geräterolle ${role} darf ${command} nicht ausführen.`,
+    );
+  }
+}
+
+export function assertSaleAllowed(input: {
+  productSaleEnabled: boolean;
+  resourceGroupStatus: "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED";
+  emergencyMode: boolean;
+  saleClosingReached: boolean;
+}): void {
+  if (input.emergencyMode) {
+    throw new DomainRuleError("SALE_BLOCKED_EMERGENCY", "Verkauf ist im Notfallmodus gesperrt.");
+  }
+  if (!input.productSaleEnabled) {
+    throw new DomainRuleError("SALE_BLOCKED_PRODUCT", "Das Produkt ist nicht verkaufbar.");
+  }
+  if (input.resourceGroupStatus !== "ACTIVE") {
+    throw new DomainRuleError(
+      "SALE_BLOCKED_RESOURCE_GROUP",
+      "Die Ressourcengruppe ist nicht aktiv verkaufbar.",
+    );
+  }
+  if (input.saleClosingReached) {
+    throw new DomainRuleError("SALE_BLOCKED_CLOSING", "Der Verkaufsschluss ist erreicht.");
+  }
+}
+
+export function assertPublicTicketCode(code: string): string {
+  const normalized = code.trim().toUpperCase();
+  if (!/^[A-Z2-9]{12,32}$/.test(normalized)) {
+    throw new DomainRuleError(
+      "PUBLIC_TICKET_CODE_INVALID",
+      "Ticketcode muss nicht erratbar und formal gültig sein.",
+    );
+  }
+  return normalized;
+}
