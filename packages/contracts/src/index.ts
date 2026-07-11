@@ -479,6 +479,28 @@ export const rotationOperationalSummarySchema = z.object({
   predictedLowerMinutes: z.number().int().nonnegative(),
   predictedUpperMinutes: z.number().int().nonnegative(),
   calledAt: z.string().nullable(),
+  timeline: z.object({
+    planned: z.object({
+      boardingAt: z.string().nullable(),
+      departureAt: z.string().nullable(),
+      landingAt: z.string().nullable(),
+      completionAt: z.string().nullable(),
+    }),
+    predicted: z.object({
+      boardingAt: z.string().nullable(),
+      departureAt: z.string().nullable(),
+      landingAt: z.string().nullable(),
+      completionAt: z.string().nullable(),
+    }),
+    actual: z.object({
+      boardingAt: z.string().nullable(),
+      departureAt: z.string().nullable(),
+      landingAt: z.string().nullable(),
+      completionAt: z.string().nullable(),
+    }),
+    predictionQuality: z.enum(["STABLE", "CHANGING", "UNCERTAIN"]).nullable(),
+    predictionUpdatedAt: z.string().nullable(),
+  }),
   tickets: z.array(
     z.object({
       id: z.string(),

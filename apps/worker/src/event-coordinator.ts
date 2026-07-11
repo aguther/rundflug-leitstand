@@ -14,6 +14,8 @@ import {
   assessRemainingCapacity,
   type DeviceRole,
   DomainRuleError,
+  estimateDuration,
+  forecastQueueWindows,
   type OperationalCommandType,
   transitionAircraft,
   transitionRotation,
@@ -645,12 +647,221 @@ export class EventCoordinator extends DurableObject<Env> {
   }
 
   private broadcast(result: CommandResult): void {
+    this.ctx.waitUntil(
+      this.recalculateForecastTimelines(result.event.eventId).catch((reason: unknown) => {
+        console.error(
+          JSON.stringify({
+            level: "error",
+            code: "FORECAST_RECALCULATION_FAILED",
+            eventId: result.event.eventId,
+            message: safeErrorMessage(reason),
+          }),
+        );
+      }),
+    );
     const broadcast = JSON.stringify({ type: "event-state-changed", data: result });
     for (const socket of this.ctx.getWebSockets()) {
       try {
         socket.send(broadcast);
       } catch {
         socket.close(1011, "Broadcast fehlgeschlagen");
+      }
+    }
+  }
+
+  private async recalculateForecastTimelines(eventId: string): Promise<void> {
+    const [event, rotationRows, durationRows, capacityRows, pilotRow] = await Promise.all([
+      this.env.DB.prepare(
+        `SELECT version, operational_interrupted, emergency_mode, planned_boarding_minutes,
+                planned_deboarding_minutes, planned_buffer_minutes, updated_at
+           FROM operation_days WHERE id = ?1`,
+      )
+        .bind(eventId)
+        .first<{
+          version: number;
+          operational_interrupted: number;
+          emergency_mode: number;
+          planned_boarding_minutes: number;
+          planned_deboarding_minutes: number;
+          planned_buffer_minutes: number;
+          updated_at: string;
+        }>(),
+      this.env.DB.prepare(
+        `SELECT r.id, r.status, r.created_at, r.called_at, r.departed_at, r.landed_at,
+                r.completed_at, fg.resource_group_id, rg.status AS resource_group_status,
+                COALESCE(MIN(tg.queue_sequence), 1) AS queue_sequence,
+                COALESCE(MIN(p.reference_duration_minutes), 20) AS reference_duration_minutes
+           FROM rotations r
+           JOIN flight_groups fg ON fg.id = r.flight_group_id
+           JOIN resource_groups rg ON rg.id = fg.resource_group_id
+           LEFT JOIN rotation_tickets rt ON rt.rotation_id = r.id AND rt.released_at IS NULL
+           LEFT JOIN tickets t ON t.id = rt.ticket_id
+           LEFT JOIN ticket_groups tg ON tg.id = t.ticket_group_id
+           LEFT JOIN products p ON p.id = tg.product_id
+          WHERE r.operation_day_id = ?1 AND r.status NOT IN ('COMPLETED', 'CANCELED')
+          GROUP BY r.id ORDER BY tg.queue_sequence, r.created_at`,
+      )
+        .bind(eventId)
+        .all<{
+          id: string;
+          status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED";
+          created_at: string;
+          called_at: string | null;
+          departed_at: string | null;
+          landed_at: string | null;
+          completed_at: string | null;
+          resource_group_id: string;
+          resource_group_status: "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED";
+          queue_sequence: number;
+          reference_duration_minutes: number;
+        }>(),
+      this.env.DB.prepare(
+        `SELECT (julianday(completed_at) - julianday(called_at)) * 1440.0 AS minutes,
+                completed_at
+           FROM rotations
+          WHERE operation_day_id = ?1 AND called_at IS NOT NULL AND completed_at IS NOT NULL
+          ORDER BY completed_at DESC LIMIT 12`,
+      )
+        .bind(eventId)
+        .all<{ minutes: number; completed_at: string }>(),
+      this.env.DB.prepare(
+        `SELECT m.resource_group_id, COUNT(*) AS count
+           FROM resource_group_memberships m
+           JOIN aircraft a ON a.id = m.aircraft_id
+          WHERE m.operation_day_id = ?1 AND m.active_until IS NULL
+            AND a.operational_state NOT IN ('INACTIVE', 'PAUSED', 'REFUELING', 'INTERRUPTED')
+          GROUP BY m.resource_group_id`,
+      )
+        .bind(eventId)
+        .all<{ resource_group_id: string; count: number }>(),
+      this.env.DB.prepare(
+        "SELECT COUNT(*) AS count FROM pilots WHERE operation_day_id = ?1 AND active = 1 AND paused = 0",
+      )
+        .bind(eventId)
+        .first<{ count: number }>(),
+    ]);
+    if (!event || rotationRows.results.length === 0) return;
+
+    const now = new Date();
+    const nowIso = now.toISOString();
+    const addMinutes = (value: string | Date, minutes: number) =>
+      new Date(new Date(value).getTime() + minutes * 60_000).toISOString();
+    const actualDurations = durationRows.results.map((row) => row.minutes);
+    const lastActualAt = durationRows.results[0]?.completed_at;
+    const dataAgeMinutes = lastActualAt
+      ? Math.max(0, (now.getTime() - Date.parse(lastActualAt)) / 60_000)
+      : 0;
+    const capacities = new Map(
+      capacityRows.results.map((row) => [
+        row.resource_group_id,
+        Math.min(row.count, pilotRow?.count ?? 0),
+      ]),
+    );
+    const statements: D1PreparedStatement[] = [];
+    for (const rotation of rotationRows.results) {
+      const boarding = event.planned_boarding_minutes;
+      const deboarding = event.planned_deboarding_minutes;
+      const buffer = event.planned_buffer_minutes;
+      const referenceTotal = boarding + rotation.reference_duration_minutes + deboarding + buffer;
+      const activeCapacity = capacities.get(rotation.resource_group_id) ?? 0;
+      const estimate = estimateDuration({
+        referenceMinutes: referenceTotal,
+        actualDurationsMinutes: actualDurations,
+        dataAgeMinutes,
+        interrupted:
+          event.operational_interrupted === 1 ||
+          event.emergency_mode === 1 ||
+          rotation.resource_group_status !== "ACTIVE",
+        activeCapacity,
+      });
+      const window = forecastQueueWindows({
+        queueSequence: rotation.queue_sequence,
+        activeAircraft: activeCapacity,
+        duration: estimate,
+      });
+      const planOffset =
+        Math.floor(Math.max(0, rotation.queue_sequence - 1) / Math.max(1, activeCapacity)) *
+        referenceTotal;
+      const plannedBoardingAt = addMinutes(rotation.created_at, planOffset);
+      const plannedDepartureAt = addMinutes(plannedBoardingAt, boarding);
+      const plannedLandingAt = addMinutes(plannedDepartureAt, rotation.reference_duration_minutes);
+      const plannedCompletionAt = addMinutes(plannedLandingAt, deboarding + buffer);
+      let predictedBoardingAt = addMinutes(now, window.lowerMinutes);
+      if (rotation.called_at) predictedBoardingAt = rotation.called_at;
+      let predictedDepartureAt = addMinutes(predictedBoardingAt, boarding);
+      if (rotation.departed_at) predictedDepartureAt = rotation.departed_at;
+      else if (rotation.status === "CALLED" && Date.parse(predictedDepartureAt) < now.getTime())
+        predictedDepartureAt = nowIso;
+      const expectedFlightMinutes = Math.max(
+        rotation.reference_duration_minutes,
+        estimate.expectedMinutes - boarding - deboarding - buffer,
+      );
+      let predictedLandingAt = addMinutes(predictedDepartureAt, expectedFlightMinutes);
+      if (rotation.landed_at) predictedLandingAt = rotation.landed_at;
+      const predictedCompletionAt = addMinutes(predictedLandingAt, deboarding + buffer);
+      statements.push(
+        this.env.DB.prepare(
+          `UPDATE rotations SET
+            planned_boarding_at = COALESCE(planned_boarding_at, ?1),
+            planned_departure_at = COALESCE(planned_departure_at, ?2),
+            planned_landing_at = COALESCE(planned_landing_at, ?3),
+            planned_completion_at = COALESCE(planned_completion_at, ?4),
+            predicted_boarding_at = ?5, predicted_departure_at = ?6,
+            predicted_landing_at = ?7, predicted_completion_at = ?8,
+            prediction_quality = ?9, prediction_lower_minutes = ?10,
+            prediction_upper_minutes = ?11, prediction_updated_at = ?12
+           WHERE id = ?13`,
+        ).bind(
+          plannedBoardingAt,
+          plannedDepartureAt,
+          plannedLandingAt,
+          plannedCompletionAt,
+          predictedBoardingAt,
+          predictedDepartureAt,
+          predictedLandingAt,
+          predictedCompletionAt,
+          estimate.quality,
+          window.lowerMinutes,
+          window.upperMinutes,
+          nowIso,
+          rotation.id,
+        ),
+        this.env.DB.prepare(
+          `INSERT INTO forecast_snapshots
+            (id, operation_day_id, rotation_id, operation_day_version, captured_at, quality,
+             lower_minutes, upper_minutes, predicted_boarding_at, predicted_departure_at,
+             predicted_landing_at, predicted_completion_at)
+           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)`,
+        ).bind(
+          crypto.randomUUID(),
+          eventId,
+          rotation.id,
+          event.version,
+          nowIso,
+          estimate.quality,
+          window.lowerMinutes,
+          window.upperMinutes,
+          predictedBoardingAt,
+          predictedDepartureAt,
+          predictedLandingAt,
+          predictedCompletionAt,
+        ),
+      );
+    }
+    for (let index = 0; index < statements.length; index += 80) {
+      await this.env.DB.batch(statements.slice(index, index + 80));
+    }
+    const forecastMessage = JSON.stringify({
+      type: "forecast-updated",
+      eventId,
+      eventVersion: event.version,
+      updatedAt: nowIso,
+    });
+    for (const socket of this.ctx.getWebSockets()) {
+      try {
+        socket.send(forecastMessage);
+      } catch {
+        socket.close(1011, "Prognose-Broadcast fehlgeschlagen");
       }
     }
   }

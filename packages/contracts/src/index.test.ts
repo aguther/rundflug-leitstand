@@ -4,6 +4,7 @@ import {
   commandEnvelopeSchema,
   publicBoardSchema,
   publicTicketStatusSchema,
+  rotationOperationalSummarySchema,
   ticketSearchResponseSchema,
 } from "./index";
 
@@ -437,5 +438,53 @@ describe("commandEnvelopeSchema", () => {
         payload: { rotationId: "synthetic-rotation", reason: "" },
       }),
     ).toThrow();
+  });
+
+  it("keeps plan, forecast and actual rotation timestamps separate", () => {
+    const parsed = rotationOperationalSummarySchema.parse({
+      id: "synthetic-rotation",
+      flightGroupId: "synthetic-flight-group",
+      communicationNumber: 42,
+      productName: "Panorama",
+      status: "IN_FLIGHT",
+      ticketGroupId: "synthetic-ticket-group",
+      aircraftId: "synthetic-aircraft",
+      aircraftRegistration: "D-ETST",
+      pilotId: "synthetic-pilot",
+      pilotOperationalCode: "P-01",
+      suggestedPilotId: null,
+      suggestedPilotOperationalCode: null,
+      suggestedAircraftId: null,
+      suggestedAircraftRegistration: null,
+      ticketCount: 2,
+      predictedLowerMinutes: 0,
+      predictedUpperMinutes: 25,
+      calledAt: "2026-07-11T12:05:00.000Z",
+      timeline: {
+        planned: {
+          boardingAt: "2026-07-11T12:00:00.000Z",
+          departureAt: "2026-07-11T12:08:00.000Z",
+          landingAt: "2026-07-11T12:28:00.000Z",
+          completionAt: "2026-07-11T12:36:00.000Z",
+        },
+        predicted: {
+          boardingAt: "2026-07-11T12:05:00.000Z",
+          departureAt: "2026-07-11T12:13:00.000Z",
+          landingAt: "2026-07-11T12:33:00.000Z",
+          completionAt: "2026-07-11T12:41:00.000Z",
+        },
+        actual: {
+          boardingAt: "2026-07-11T12:05:00.000Z",
+          departureAt: "2026-07-11T12:14:00.000Z",
+          landingAt: null,
+          completionAt: null,
+        },
+        predictionQuality: "CHANGING",
+        predictionUpdatedAt: "2026-07-11T12:14:00.000Z",
+      },
+      tickets: [],
+    });
+    expect(parsed.timeline.planned.departureAt).not.toBe(parsed.timeline.actual.departureAt);
+    expect(parsed.timeline.predicted.landingAt).toBeTruthy();
   });
 });

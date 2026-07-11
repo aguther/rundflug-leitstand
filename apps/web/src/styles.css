@@ -496,6 +496,35 @@ p {
   margin: 0;
   font-weight: 750;
 }
+.rotation-timeline {
+  margin: 18px 0;
+  border: 1px solid #c3cfdd;
+  background: #f8fafc;
+}
+.rotation-timeline > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+}
+.rotation-timeline h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+.rotation-timeline table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.rotation-timeline th,
+.rotation-timeline td {
+  padding: 9px 12px;
+  text-align: left;
+  border-top: 1px solid #d7e0ea;
+}
+.rotation-timeline thead th {
+  color: #52677f;
+  font-size: 0.8rem;
+}
 .landed-warning {
   padding: 16px;
   color: #8b2b23;

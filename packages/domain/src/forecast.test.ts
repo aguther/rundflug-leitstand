@@ -25,6 +25,17 @@ describe("event-driven forecast", () => {
     expect(estimate.quality).toBe("STABLE");
   });
 
+  it("weights even the first actual duration more strongly than the static plan", () => {
+    const estimate = estimateDuration({
+      referenceMinutes: 20,
+      actualDurationsMinutes: [40],
+      dataAgeMinutes: 1,
+      interrupted: false,
+      activeCapacity: 1,
+    });
+    expect(estimate.expectedMinutes).toBeGreaterThan(30);
+  });
+
   it("marks stale or interrupted data as uncertain without a countdown", () => {
     const estimate = estimateDuration({
       referenceMinutes: 20,

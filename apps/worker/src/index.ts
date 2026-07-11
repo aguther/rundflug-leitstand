@@ -496,7 +496,12 @@ app.get("/api/events/:eventId/operations", async (context) => {
         capacity_critical_threshold: number;
       }>(),
     context.env.DB.prepare(
-      `SELECT r.id, r.flight_group_id, fg.resource_group_id, fg.communication_number, r.status, r.aircraft_id, r.called_at,
+      `SELECT r.id, r.flight_group_id, fg.resource_group_id, fg.communication_number, r.status, r.aircraft_id,
+              r.called_at, r.departed_at, r.landed_at, r.completed_at,
+              r.planned_boarding_at, r.planned_departure_at, r.planned_landing_at,
+              r.planned_completion_at, r.predicted_boarding_at, r.predicted_departure_at,
+              r.predicted_landing_at, r.predicted_completion_at, r.prediction_quality,
+              r.prediction_lower_minutes, r.prediction_upper_minutes, r.prediction_updated_at,
               a.registration AS aircraft_registration,
               r.pilot_id, assigned_pilot.operational_code AS pilot_operational_code,
               (SELECT available_pilot.id FROM pilots available_pilot
@@ -575,6 +580,21 @@ app.get("/api/events/:eventId/operations", async (context) => {
         product_name: string;
         reference_duration_minutes: number;
         called_at: string | null;
+        departed_at: string | null;
+        landed_at: string | null;
+        completed_at: string | null;
+        planned_boarding_at: string | null;
+        planned_departure_at: string | null;
+        planned_landing_at: string | null;
+        planned_completion_at: string | null;
+        predicted_boarding_at: string | null;
+        predicted_departure_at: string | null;
+        predicted_landing_at: string | null;
+        predicted_completion_at: string | null;
+        prediction_quality: "STABLE" | "CHANGING" | "UNCERTAIN" | null;
+        prediction_lower_minutes: number | null;
+        prediction_upper_minutes: number | null;
+        prediction_updated_at: string | null;
         tickets_json: string;
       }>(),
     context.env.DB.prepare(
@@ -805,6 +825,7 @@ app.get("/api/events/:eventId/operations", async (context) => {
         capacityStatus: capacity.status,
         saleRecommended:
           capacity.saleRecommended &&
+          eventRow.status === "ACTIVE" &&
           product.sale_enabled === 1 &&
           product.resource_group_status === "ACTIVE" &&
           eventRow.emergency_mode === 0 &&
@@ -838,37 +859,63 @@ app.get("/api/events/:eventId/operations", async (context) => {
         suggestedAircraftId: rotation.suggested_aircraft_id,
         suggestedAircraftRegistration: rotation.suggested_aircraft_registration,
         ticketCount: rotation.ticket_count,
-        predictedLowerMinutes: forecastQueueWindows({
-          queueSequence: index + 1,
-          activeAircraft: effectiveActiveCapacity,
-          duration: estimateDuration({
-            referenceMinutes:
-              rotation.reference_duration_minutes +
-              (eventRow.planned_boarding_minutes ?? 8) +
-              (eventRow.planned_deboarding_minutes ?? 5) +
-              (eventRow.planned_buffer_minutes ?? 3),
-            actualDurationsMinutes: actualDurations,
-            dataAgeMinutes,
-            interrupted: eventRow.emergency_mode === 1 || eventRow.operational_interrupted === 1,
-            activeCapacity: effectiveActiveCapacity,
-          }),
-        }).lowerMinutes,
-        predictedUpperMinutes: forecastQueueWindows({
-          queueSequence: index + 1,
-          activeAircraft: effectiveActiveCapacity,
-          duration: estimateDuration({
-            referenceMinutes:
-              rotation.reference_duration_minutes +
-              (eventRow.planned_boarding_minutes ?? 8) +
-              (eventRow.planned_deboarding_minutes ?? 5) +
-              (eventRow.planned_buffer_minutes ?? 3),
-            actualDurationsMinutes: actualDurations,
-            dataAgeMinutes,
-            interrupted: eventRow.emergency_mode === 1 || eventRow.operational_interrupted === 1,
-            activeCapacity: effectiveActiveCapacity,
-          }),
-        }).upperMinutes,
+        predictedLowerMinutes:
+          rotation.prediction_lower_minutes ??
+          forecastQueueWindows({
+            queueSequence: index + 1,
+            activeAircraft: effectiveActiveCapacity,
+            duration: estimateDuration({
+              referenceMinutes:
+                rotation.reference_duration_minutes +
+                (eventRow.planned_boarding_minutes ?? 8) +
+                (eventRow.planned_deboarding_minutes ?? 5) +
+                (eventRow.planned_buffer_minutes ?? 3),
+              actualDurationsMinutes: actualDurations,
+              dataAgeMinutes,
+              interrupted: eventRow.emergency_mode === 1 || eventRow.operational_interrupted === 1,
+              activeCapacity: effectiveActiveCapacity,
+            }),
+          }).lowerMinutes,
+        predictedUpperMinutes:
+          rotation.prediction_upper_minutes ??
+          forecastQueueWindows({
+            queueSequence: index + 1,
+            activeAircraft: effectiveActiveCapacity,
+            duration: estimateDuration({
+              referenceMinutes:
+                rotation.reference_duration_minutes +
+                (eventRow.planned_boarding_minutes ?? 8) +
+                (eventRow.planned_deboarding_minutes ?? 5) +
+                (eventRow.planned_buffer_minutes ?? 3),
+              actualDurationsMinutes: actualDurations,
+              dataAgeMinutes,
+              interrupted: eventRow.emergency_mode === 1 || eventRow.operational_interrupted === 1,
+              activeCapacity: effectiveActiveCapacity,
+            }),
+          }).upperMinutes,
         calledAt: rotation.called_at,
+        timeline: {
+          planned: {
+            boardingAt: rotation.planned_boarding_at,
+            departureAt: rotation.planned_departure_at,
+            landingAt: rotation.planned_landing_at,
+            completionAt: rotation.planned_completion_at,
+          },
+          predicted: {
+            boardingAt: rotation.predicted_boarding_at,
+            departureAt: rotation.predicted_departure_at,
+            landingAt: rotation.predicted_landing_at,
+            completionAt: rotation.predicted_completion_at,
+          },
+          actual: {
+            boardingAt: rotation.called_at,
+            departureAt: rotation.departed_at,
+            landingAt: rotation.landed_at,
+            completionAt: rotation.completed_at,
+          },
+          predictionQuality: rotation.prediction_quality,
+          predictionUpdatedAt: rotation.prediction_updated_at,
+        },
         tickets: JSON.parse(rotation.tickets_json) as Array<{
           id: string;
           attendanceStatus: "NOT_CHECKED_IN" | "CHECKED_IN";

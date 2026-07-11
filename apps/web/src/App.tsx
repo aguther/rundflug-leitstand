@@ -90,6 +90,11 @@ function toLocalDateTimeInput(value: string | null): string {
   return local.toISOString().slice(0, 16);
 }
 
+function operationalTimeLabel(value: string | null): string {
+  if (!value) return "–";
+  return new Date(value).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+}
+
 function deviceTokenFor(deviceId: string): string {
   if (LOCAL_DEVELOPMENT && EVENT_ID === "demo-2026") {
     if (deviceId === "cashier-tablet-1") return "demo-cashier-device-token";
@@ -984,6 +989,42 @@ function FlightLineView() {
                   </dd>
                 </div>
               </dl>
+              <section className="rotation-timeline" aria-labelledby="timeline-title">
+                <div>
+                  <h3 id="timeline-title">Plan · Prognose · Ist</h3>
+                  <span>
+                    Prognosequalität:{" "}
+                    {selected.timeline.predictionQuality ?? "noch nicht berechnet"}
+                  </span>
+                </div>
+                <table>
+                  <thead>
+                    <tr>
+                      <th scope="col">Punkt</th>
+                      <th scope="col">Plan</th>
+                      <th scope="col">Prognose</th>
+                      <th scope="col">Ist</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(
+                      [
+                        ["Boarding", "boardingAt"],
+                        ["Start", "departureAt"],
+                        ["Landung", "landingAt"],
+                        ["Abschluss", "completionAt"],
+                      ] as const
+                    ).map(([label, field]) => (
+                      <tr key={field}>
+                        <th scope="row">{label}</th>
+                        <td>{operationalTimeLabel(selected.timeline.planned[field])}</td>
+                        <td>{operationalTimeLabel(selected.timeline.predicted[field])}</td>
+                        <td>{operationalTimeLabel(selected.timeline.actual[field])}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </section>
               <section className="attendance-panel" aria-labelledby="attendance-title">
                 <div>
                   <h3 id="attendance-title">Anwesenheit (optional)</h3>
@@ -1077,6 +1118,7 @@ function FlightLineView() {
                     (!selected.suggestedAircraftId ||
                       !selected.suggestedPilotId ||
                       board?.event.emergencyMode ||
+                      board?.event.status !== "ACTIVE" ||
                       board?.event.operationalInterrupted)
                   }
                   onClick={advance}
