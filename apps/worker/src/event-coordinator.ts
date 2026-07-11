@@ -18,6 +18,7 @@ import {
 import { sha256Hex, verifyCredential } from "./crypto";
 import { rowToSnapshot, safeErrorMessage } from "./snapshot";
 import type { Env, StoredEventRow } from "./types";
+import { sendRotationPushNotifications } from "./web-push";
 
 const JSON_HEADERS = { "content-type": "application/json; charset=utf-8" } as const;
 
@@ -597,6 +598,9 @@ export class EventCoordinator extends DurableObject<Env> {
         "INSERT INTO outbox (id, operation_day_id, topic, payload_json, created_at) VALUES (?1, ?2, 'EVENT_STATE_CHANGED', ?3, ?4)",
       ).bind(crypto.randomUUID(), command.eventId, JSON.stringify(result), now),
     ]);
+    this.ctx.waitUntil(
+      sendRotationPushNotifications(this.env, rotation.id, eventType[command.type]),
+    );
     this.broadcast(result);
     return json(result);
   }

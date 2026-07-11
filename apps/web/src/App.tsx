@@ -11,6 +11,9 @@ import {
   getOperationBoard,
   getPublicBoard,
   getPublicTicketStatus,
+  getPushPublicKey,
+  registerTicketPush,
+  revokeTicketPush,
   sendCommand,
 } from "./api";
 
@@ -570,6 +573,7 @@ function TicketStatusView({ code }: { code: string }) {
   const [status, setStatus] = useState<PublicTicketStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [push, setPush] = useState(false);
+  const [pushMessage, setPushMessage] = useState<string | null>(null);
   useEffect(() => {
     const controller = new AbortController();
     getPublicTicketStatus(code, controller.signal)
@@ -579,6 +583,53 @@ function TicketStatusView({ code }: { code: string }) {
       );
     return () => controller.abort();
   }, [code]);
+  useEffect(() => {
+    navigator.serviceWorker?.ready
+      .then((registration) => registration.pushManager.getSubscription())
+      .then((subscription) =>
+        setPush(
+          Boolean(subscription) && window.localStorage.getItem(`ticket-push:${code}`) === "1",
+        ),
+      )
+      .catch(() => undefined);
+  }, [code]);
+
+  const changePush = async (enabled: boolean) => {
+    setPushMessage(null);
+    try {
+      if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+        throw new Error("Web-Push wird von diesem Browser nicht unterstützt.");
+      }
+      const registration = await navigator.serviceWorker.ready;
+      const existing = await registration.pushManager.getSubscription();
+      if (!enabled) {
+        if (existing) {
+          await revokeTicketPush(code, existing.endpoint);
+          await existing.unsubscribe();
+        }
+        window.localStorage.removeItem(`ticket-push:${code}`);
+        setPush(false);
+        setPushMessage("Web-Push wurde deaktiviert; das Push-Ziel wird gelöscht.");
+        return;
+      }
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") throw new Error("Benachrichtigungen wurden nicht freigegeben.");
+      const publicKey = await getPushPublicKey();
+      const subscription =
+        existing ??
+        (await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: publicKey,
+        }));
+      await registerTicketPush(code, subscription);
+      window.localStorage.setItem(`ticket-push:${code}`, "1");
+      setPush(true);
+      setPushMessage("Web-Push ist für dieses Ticket aktiviert.");
+    } catch (reason) {
+      setPush(false);
+      setPushMessage(reason instanceof Error ? reason.message : "Web-Push ist nicht verfügbar.");
+    }
+  };
   return (
     <Shell title="Ticketstatus">
       <section className="ticket-status-page">
@@ -607,9 +658,14 @@ function TicketStatusView({ code }: { code: string }) {
               <input
                 type="checkbox"
                 checked={push}
-                onChange={(event) => setPush(event.target.checked)}
+                onChange={(event) => void changePush(event.target.checked)}
               />
             </label>
+            {pushMessage ? (
+              <p className="push-message" role="status">
+                {pushMessage}
+              </p>
+            ) : null}
             <a className="privacy-link" href="/datenschutz">
               Datenschutz &amp; Privatsphäre
             </a>
@@ -617,6 +673,35 @@ function TicketStatusView({ code }: { code: string }) {
         ) : (
           <p>{error ?? "Status wird geladen …"}</p>
         )}
+      </section>
+    </Shell>
+  );
+}
+
+function PrivacyView() {
+  return (
+    <Shell title="Datenschutz">
+      <section className="privacy-page">
+        <span className="eyebrow">Datensparsame V1</span>
+        <h1>Privatsphäre ohne Gastkonto</h1>
+        <p>
+          Der Rundflug-Leitstand erfasst keine Namen und keine Telefonnummern. Der Ticketstatus ist
+          ausschließlich über einen zufälligen Ticketcode erreichbar.
+        </p>
+        <h2>Web-Push ist freiwillig</h2>
+        <p>
+          Erst nach Ihrer aktiven Zustimmung speichert das System die pseudonyme Push-Adresse Ihres
+          Browsers, die technischen Push-Schlüssel, den Einwilligungszeitpunkt und die Zuordnung zum
+          Ticket. Die Daten dienen nur den Statushinweisen für dieses Ticket.
+        </p>
+        <p>
+          Die Push-Daten werden bei Deaktivierung widerrufen und automatisch spätestens sieben Tage
+          nach der Einwilligung gelöscht. Der operative Ticket- und Auditbestand bleibt davon
+          getrennt.
+        </p>
+        <a className="privacy-link" href="/">
+          Zurück zum Leitstand
+        </a>
       </section>
     </Shell>
   );
@@ -890,6 +975,7 @@ export function App() {
   const ticketMatch = path.match(/^\/ticket\/([A-Za-z2-9]{12,32})$/);
   const ticketCode = ticketMatch?.[1];
   if (ticketCode) return <TicketStatusView code={ticketCode.toUpperCase()} />;
+  if (path === "/datenschutz") return <PrivacyView />;
   if (path === "/flight-line") return <FlightLineView />;
   if (path === "/fids") return <FidsView />;
   if (path === "/admin") return <AdminView />;

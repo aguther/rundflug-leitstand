@@ -104,6 +104,40 @@ export async function getPublicTicketStatus(
   return publicTicketStatusSchema.parse(await response.json());
 }
 
+export async function getPushPublicKey(): Promise<string> {
+  const response = await fetch("/api/public/push/config");
+  if (!response.ok) throw new Error("Web-Push ist noch nicht eingerichtet.");
+  const body = (await response.json()) as { publicKey: string };
+  return body.publicKey;
+}
+
+export async function registerTicketPush(
+  ticketCode: string,
+  subscription: PushSubscription,
+): Promise<void> {
+  const response = await fetch(
+    `/api/public/tickets/${encodeURIComponent(ticketCode)}/push-subscriptions`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ consent: true, ...subscription.toJSON() }),
+    },
+  );
+  if (!response.ok) throw new Error("Web-Push konnte nicht aktiviert werden.");
+}
+
+export async function revokeTicketPush(ticketCode: string, endpoint: string): Promise<void> {
+  const response = await fetch(
+    `/api/public/tickets/${encodeURIComponent(ticketCode)}/push-subscriptions`,
+    {
+      method: "DELETE",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ endpoint }),
+    },
+  );
+  if (!response.ok) throw new Error("Web-Push konnte nicht deaktiviert werden.");
+}
+
 export async function getHealth(signal?: AbortSignal): Promise<HealthResponse> {
   const response = await fetch("/api/health", signal ? { signal } : {});
   if (!response.ok) {
