@@ -18,10 +18,22 @@ export async function getAuditHistory(
   eventId: string,
   deviceId: string,
   deviceToken: string,
+  filters: {
+    eventType?: string;
+    aggregateType?: string;
+    aggregateId?: string;
+    since?: string;
+    until?: string;
+  } = {},
 ): Promise<AuditHistory> {
-  const response = await fetch(`/api/events/${encodeURIComponent(eventId)}/history`, {
-    headers: { "x-device-id": deviceId, "x-device-token": deviceToken },
-  });
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) if (value) query.set(key, value);
+  const response = await fetch(
+    `/api/events/${encodeURIComponent(eventId)}/history?${query.toString()}`,
+    {
+      headers: { "x-device-id": deviceId, "x-device-token": deviceToken },
+    },
+  );
   if (!response.ok) throw new Error("Audit-Historie nicht verfügbar.");
   return auditHistorySchema.parse(await response.json());
 }
@@ -43,6 +55,43 @@ export async function downloadDailyReport(
   link.click();
   URL.revokeObjectURL(url);
 }
+
+async function downloadProtectedFile(
+  eventId: string,
+  deviceId: string,
+  deviceToken: string,
+  path: string,
+  filename: string,
+): Promise<void> {
+  const response = await fetch(`/api/events/${encodeURIComponent(eventId)}/${path}`, {
+    headers: { "x-device-id": deviceId, "x-device-token": deviceToken },
+  });
+  if (!response.ok) throw new Error("Export nicht verfügbar.");
+  const url = URL.createObjectURL(await response.blob());
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+export const downloadDailyPdf = (eventId: string, deviceId: string, deviceToken: string) =>
+  downloadProtectedFile(
+    eventId,
+    deviceId,
+    deviceToken,
+    "reports/daily.pdf",
+    `tagesbericht-${eventId}.pdf`,
+  );
+
+export const downloadTicketRawData = (eventId: string, deviceId: string, deviceToken: string) =>
+  downloadProtectedFile(
+    eventId,
+    deviceId,
+    deviceToken,
+    "exports/tickets.csv",
+    `rohdaten-tickets-${eventId}.csv`,
+  );
 
 export interface HealthResponse {
   ok: boolean;

@@ -754,6 +754,31 @@ p {
   padding: 10px 0;
   border-top: 1px solid #d5dee8;
 }
+.report-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.history-filters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  align-items: end;
+  margin: 16px 0;
+  padding: 14px;
+  border: 1px solid #d5dee8;
+  background: #f7f9fb;
+}
+.history-filters legend {
+  padding: 0 6px;
+  font-weight: 800;
+}
+.history-filters label {
+  display: grid;
+  gap: 5px;
+  font-weight: 700;
+}
 .online-dot {
   width: 10px;
   height: 10px;
@@ -815,6 +840,7 @@ p {
   }
   .device-pairing-form,
   .device-list > div,
+  .history-filters,
   .fleet-row,
   .pilot-list > div,
   .active-rotation-list > div {

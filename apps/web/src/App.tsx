@@ -8,7 +8,9 @@ import QRCode from "qrcode";
 import { useCallback, useEffect, useState } from "react";
 import type { PairedDeviceSummary } from "./api";
 import {
+  downloadDailyPdf,
   downloadDailyReport,
+  downloadTicketRawData,
   getAuditHistory,
   getOperationBoard,
   getPairedDevices,
@@ -951,6 +953,11 @@ function AdminView() {
   const [saleClosesAt, setSaleClosesAt] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [history, setHistory] = useState<AuditHistory>({ entries: [] });
+  const [historyEventType, setHistoryEventType] = useState("");
+  const [historyAggregateType, setHistoryAggregateType] = useState("");
+  const [historyAggregateId, setHistoryAggregateId] = useState("");
+  const [historySince, setHistorySince] = useState("");
+  const [historyUntil, setHistoryUntil] = useState("");
   const [devices, setDevices] = useState<PairedDeviceSummary[]>([]);
   const [deviceLabel, setDeviceLabel] = useState("Kasse 2");
   const [deviceRole, setDeviceRole] = useState<
@@ -967,11 +974,19 @@ function AdminView() {
   const isAdministrator = board?.currentDeviceRole === "ADMIN";
   const refreshHistory = useCallback(async () => {
     try {
-      setHistory(await getAuditHistory(EVENT_ID, ADMIN_DEVICE_ID, deviceTokenFor(ADMIN_DEVICE_ID)));
+      setHistory(
+        await getAuditHistory(EVENT_ID, ADMIN_DEVICE_ID, deviceTokenFor(ADMIN_DEVICE_ID), {
+          eventType: historyEventType,
+          aggregateType: historyAggregateType,
+          aggregateId: historyAggregateId,
+          since: historySince,
+          until: historyUntil,
+        }),
+      );
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : "Historie nicht verfügbar.");
     }
-  }, []);
+  }, [historyAggregateId, historyAggregateType, historyEventType, historySince, historyUntil]);
   const refreshDevices = useCallback(async () => {
     try {
       setDevices(
@@ -1355,6 +1370,24 @@ function AdminView() {
       setMessage("Tagesbericht wurde erzeugt.");
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : "Tagesbericht fehlgeschlagen.");
+    }
+  }
+
+  async function exportDailyPdf() {
+    try {
+      await downloadDailyPdf(EVENT_ID, ADMIN_DEVICE_ID, deviceTokenFor(ADMIN_DEVICE_ID));
+      setMessage("PDF-Tagesbericht wurde erzeugt.");
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : "PDF-Tagesbericht fehlgeschlagen.");
+    }
+  }
+
+  async function exportRawData() {
+    try {
+      await downloadTicketRawData(EVENT_ID, ADMIN_DEVICE_ID, deviceTokenFor(ADMIN_DEVICE_ID));
+      setMessage("Ticket-Rohdaten wurden exportiert.");
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : "Rohdatenexport fehlgeschlagen.");
     }
   }
 
@@ -1807,10 +1840,64 @@ function AdminView() {
         <section className="admin-section">
           <div className="section-heading">
             <h2>Audit und Tagesabschluss</h2>
-            <button onClick={exportDailyReport} type="button">
-              CSV-Tagesbericht
-            </button>
+            <div className="report-actions">
+              <button onClick={exportDailyReport} type="button">
+                CSV-Tagesbericht
+              </button>
+              <button onClick={exportDailyPdf} type="button">
+                PDF-Tagesbericht
+              </button>
+              <button onClick={exportRawData} type="button">
+                Ticket-Rohdaten CSV
+              </button>
+            </div>
           </div>
+          <fieldset className="history-filters">
+            <legend>Audit-Historie filtern</legend>
+            <label>
+              Ereignistyp
+              <input
+                value={historyEventType}
+                onChange={(event) => setHistoryEventType(event.target.value)}
+                placeholder="z. B. TICKETS_SOLD"
+              />
+            </label>
+            <label>
+              Bezugsart
+              <input
+                value={historyAggregateType}
+                onChange={(event) => setHistoryAggregateType(event.target.value)}
+                placeholder="z. B. ROTATION"
+              />
+            </label>
+            <label>
+              Bezugs-ID
+              <input
+                value={historyAggregateId}
+                onChange={(event) => setHistoryAggregateId(event.target.value)}
+                placeholder="interne ID"
+              />
+            </label>
+            <label>
+              Von
+              <input
+                type="datetime-local"
+                value={historySince}
+                onChange={(event) => setHistorySince(event.target.value)}
+              />
+            </label>
+            <label>
+              Bis
+              <input
+                type="datetime-local"
+                value={historyUntil}
+                onChange={(event) => setHistoryUntil(event.target.value)}
+              />
+            </label>
+            <button onClick={refreshHistory} type="button">
+              Filter anwenden
+            </button>
+          </fieldset>
           <div className="audit-list">
             {history.entries.slice(0, 20).map((entry) => (
               <div key={entry.sequence}>
@@ -1824,6 +1911,7 @@ function AdminView() {
                 <code>{entry.deviceId}</code>
               </div>
             ))}
+            {history.entries.length === 0 ? <p>Keine passenden Ereignisse.</p> : null}
           </div>
         </section>
         {message ? (
