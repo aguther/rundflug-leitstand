@@ -1,4 +1,5 @@
 import { APP_NAME, REQUIREMENTS_VERSION } from "@rundflug/config";
+import { estimateDuration, forecastQueueWindows } from "@rundflug/domain";
 import { Hono } from "hono";
 import { secureHeaders } from "hono/secure-headers";
 import { sha256Hex, verifyCredential } from "./crypto";
@@ -108,10 +109,10 @@ app.get("/api/events/:eventId/operations", async (context) => {
     );
   }
 
-  const [products, rotations] = await Promise.all([
+  const [products, rotations, durationRows, aircraftCountRow] = await Promise.all([
     context.env.DB.prepare(
       `SELECT p.id, p.name, p.resource_group_id, rg.status AS resource_group_status,
-              p.price_cents, p.sale_enabled, p.reference_capacity,
+              p.price_cents, p.sale_enabled, p.reference_capacity, p.reference_duration_minutes,
               COUNT(CASE WHEN t.status = 'QUEUED' THEN 1 END) AS queued_tickets
          FROM products p
          JOIN resource_groups rg ON rg.id = p.resource_group_id
@@ -130,6 +131,7 @@ app.get("/api/events/:eventId/operations", async (context) => {
         price_cents: number;
         sale_enabled: number;
         reference_capacity: number;
+        reference_duration_minutes: number;
         queued_tickets: number;
       }>(),
     context.env.DB.prepare(
@@ -149,7 +151,7 @@ app.get("/api/events/:eventId/operations", async (context) => {
                  AND membership.active_until IS NULL
                  AND candidate.operational_state = 'AVAILABLE'
                ORDER BY candidate.registration LIMIT 1) AS suggested_aircraft_registration,
-              COUNT(rt.ticket_id) AS ticket_count,
+              MIN(tg.id) AS ticket_group_id, COUNT(rt.ticket_id) AS ticket_count,
               COALESCE(MIN(p.name), 'Rundflug') AS product_name
          FROM rotations r
          JOIN flight_groups fg ON fg.id = r.flight_group_id
@@ -158,7 +160,7 @@ app.get("/api/events/:eventId/operations", async (context) => {
          LEFT JOIN tickets t ON t.id = rt.ticket_id
          LEFT JOIN ticket_groups tg ON tg.id = t.ticket_group_id
          LEFT JOIN products p ON p.id = tg.product_id
-        WHERE r.operation_day_id = ?1
+        WHERE r.operation_day_id = ?1 AND r.status <> 'CANCELED'
         GROUP BY r.id
         ORDER BY fg.communication_number`,
     )
@@ -172,15 +174,47 @@ app.get("/api/events/:eventId/operations", async (context) => {
         aircraft_registration: string | null;
         suggested_aircraft_id: string | null;
         suggested_aircraft_registration: string | null;
+        ticket_group_id: string;
         ticket_count: number;
         product_name: string;
       }>(),
+    context.env.DB.prepare(
+      `SELECT (julianday(landed_at) - julianday(departed_at)) * 1440.0 AS duration_minutes
+         FROM rotations
+        WHERE operation_day_id = ?1 AND departed_at IS NOT NULL AND landed_at IS NOT NULL
+        ORDER BY landed_at DESC LIMIT 12`,
+    )
+      .bind(eventId)
+      .all<{ duration_minutes: number }>(),
+    context.env.DB.prepare(
+      `SELECT COUNT(*) AS active_count FROM aircraft a
+        WHERE a.operational_state NOT IN ('INACTIVE', 'PAUSED')
+          AND EXISTS (SELECT 1 FROM resource_group_memberships m
+                       WHERE m.aircraft_id = a.id AND m.operation_day_id = ?1 AND m.active_until IS NULL)`,
+    )
+      .bind(eventId)
+      .first<{ active_count: number }>(),
   ]);
+
+  const actualDurations = durationRows.results.map((row) => row.duration_minutes);
+  const dataAgeMinutes = Math.max(0, (Date.now() - Date.parse(eventRow.updated_at)) / 60_000);
+  const activeAircraft = aircraftCountRow?.active_count ?? 0;
 
   return context.json({
     event: rowToSnapshot(eventRow),
     products: products.results.map((product) => {
-      const cycles = Math.ceil(product.queued_tickets / product.reference_capacity);
+      const queueSequence = Math.max(
+        1,
+        Math.ceil(product.queued_tickets / product.reference_capacity),
+      );
+      const duration = estimateDuration({
+        referenceMinutes: product.reference_duration_minutes,
+        actualDurationsMinutes: actualDurations,
+        dataAgeMinutes,
+        interrupted: product.resource_group_status !== "ACTIVE" || eventRow.emergency_mode === 1,
+        activeCapacity: activeAircraft,
+      });
+      const forecast = forecastQueueWindows({ queueSequence, activeAircraft, duration });
       return {
         id: product.id,
         name: product.name,
@@ -190,9 +224,10 @@ app.get("/api/events/:eventId/operations", async (context) => {
         saleEnabled: product.sale_enabled === 1,
         referenceCapacity: product.reference_capacity,
         queuedTickets: product.queued_tickets,
-        estimatedWaitLowerMinutes: Math.max(0, (cycles - 1) * 20),
-        estimatedWaitUpperMinutes: Math.max(20, cycles * 30),
+        estimatedWaitLowerMinutes: forecast.lowerMinutes,
+        estimatedWaitUpperMinutes: forecast.upperMinutes,
         remainingSellableSeats: Math.max(0, 1000 - product.queued_tickets),
+        predictionQuality: forecast.quality,
       };
     }),
     rotations: rotations.results.map((rotation, index) => ({
@@ -201,13 +236,34 @@ app.get("/api/events/:eventId/operations", async (context) => {
       communicationNumber: rotation.communication_number,
       productName: rotation.product_name,
       status: rotation.status,
+      ticketGroupId: rotation.ticket_group_id,
       aircraftId: rotation.aircraft_id,
       aircraftRegistration: rotation.aircraft_registration,
       suggestedAircraftId: rotation.suggested_aircraft_id,
       suggestedAircraftRegistration: rotation.suggested_aircraft_registration,
       ticketCount: rotation.ticket_count,
-      predictedLowerMinutes: index * 20,
-      predictedUpperMinutes: (index + 1) * 30,
+      predictedLowerMinutes: forecastQueueWindows({
+        queueSequence: index + 1,
+        activeAircraft,
+        duration: estimateDuration({
+          referenceMinutes: 20,
+          actualDurationsMinutes: actualDurations,
+          dataAgeMinutes,
+          interrupted: eventRow.emergency_mode === 1,
+          activeCapacity: activeAircraft,
+        }),
+      }).lowerMinutes,
+      predictedUpperMinutes: forecastQueueWindows({
+        queueSequence: index + 1,
+        activeAircraft,
+        duration: estimateDuration({
+          referenceMinutes: 20,
+          actualDurationsMinutes: actualDurations,
+          dataAgeMinutes,
+          interrupted: eventRow.emergency_mode === 1,
+          activeCapacity: activeAircraft,
+        }),
+      }).upperMinutes,
     })),
   });
 });
@@ -295,7 +351,7 @@ app.get("/api/public/events/:eventId/board", async (context) => {
        LEFT JOIN tickets t ON t.id = rt.ticket_id
        LEFT JOIN ticket_groups tg ON tg.id = t.ticket_group_id
        LEFT JOIN products p ON p.id = tg.product_id
-      WHERE r.operation_day_id = ?1
+      WHERE r.operation_day_id = ?1 AND r.status <> 'CANCELED'
       GROUP BY r.id
       ORDER BY fg.communication_number
       LIMIT 20`,

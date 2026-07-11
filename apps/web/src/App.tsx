@@ -78,6 +78,10 @@ function CashierView() {
   const [busy, setBusy] = useState(false);
   const [receipt, setReceipt] = useState<string[]>([]);
   const [message, setMessage] = useState<string | null>(null);
+  const [lastTicketGroupId, setLastTicketGroupId] = useState<string | null>(null);
+  const [lastProductId, setLastProductId] = useState<string | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
+  const [rebookProductId, setRebookProductId] = useState("");
   const product = board?.products.find((entry) => entry.id === productId) ?? board?.products[0];
 
   async function sell() {
@@ -85,7 +89,7 @@ function CashierView() {
     const codes = Array.from({ length: size }, createTicketCode);
     setBusy(true);
     try {
-      await sendCommand(
+      const saleResult = await sendCommand(
         {
           commandId: crypto.randomUUID(),
           eventId: EVENT_ID,
@@ -104,12 +108,69 @@ function CashierView() {
         deviceTokenFor("cashier-tablet-1"),
       );
       setReceipt(codes);
+      setLastTicketGroupId(saleResult.aggregate?.id ?? null);
+      setLastProductId(product.id);
       setMessage(`${codes.length} Ticket${codes.length === 1 ? "" : "s"} verkauft.`);
       await refresh();
     } catch (reason) {
       setMessage(reason instanceof Error ? reason.message : "Verkauf fehlgeschlagen.");
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function cancelLastSale() {
+    if (!board || !lastTicketGroupId || cancelReason.trim().length < 3) return;
+    try {
+      await sendCommand(
+        {
+          commandId: crypto.randomUUID(),
+          eventId: EVENT_ID,
+          deviceId: "cashier-tablet-1",
+          expectedVersion: board.event.version,
+          issuedAt: new Date().toISOString(),
+          type: "CANCEL_TICKET_GROUP",
+          payload: { ticketGroupId: lastTicketGroupId, reason: cancelReason.trim() },
+        },
+        deviceTokenFor("cashier-tablet-1"),
+      );
+      setMessage("Verkauf storniert und protokolliert.");
+      setReceipt([]);
+      setLastTicketGroupId(null);
+      setLastProductId(null);
+      setCancelReason("");
+      await refresh();
+    } catch (reason) {
+      setMessage(reason instanceof Error ? reason.message : "Storno fehlgeschlagen.");
+    }
+  }
+
+  async function rebookLastSale() {
+    if (!board || !lastTicketGroupId || !rebookProductId || cancelReason.trim().length < 3) return;
+    try {
+      await sendCommand(
+        {
+          commandId: crypto.randomUUID(),
+          eventId: EVENT_ID,
+          deviceId: "cashier-tablet-1",
+          expectedVersion: board.event.version,
+          issuedAt: new Date().toISOString(),
+          type: "REBOOK_TICKET_GROUP",
+          payload: {
+            ticketGroupId: lastTicketGroupId,
+            newProductId: rebookProductId,
+            reason: cancelReason.trim(),
+          },
+        },
+        deviceTokenFor("cashier-tablet-1"),
+      );
+      setMessage("Tickets umgebucht und in die neue Queue eingereiht.");
+      setCancelReason("");
+      setRebookProductId("");
+      setLastProductId(rebookProductId);
+      await refresh();
+    } catch (reason) {
+      setMessage(reason instanceof Error ? reason.message : "Umbuchung fehlgeschlagen.");
     }
   }
 
@@ -164,6 +225,48 @@ function CashierView() {
                 {message}
               </div>
             ) : null}
+            {lastTicketGroupId ? (
+              <div className="correction-controls">
+                <label>
+                  Stornogrund
+                  <input
+                    value={cancelReason}
+                    onChange={(event) => setCancelReason(event.target.value)}
+                    placeholder="Mindestens 3 Zeichen"
+                  />
+                </label>
+                <button
+                  disabled={cancelReason.trim().length < 3}
+                  onClick={cancelLastSale}
+                  type="button"
+                >
+                  Letzten Verkauf stornieren
+                </button>
+                <label>
+                  Umbuchen auf
+                  <select
+                    value={rebookProductId}
+                    onChange={(event) => setRebookProductId(event.target.value)}
+                  >
+                    <option value="">Zielprodukt wählen</option>
+                    {board?.products
+                      .filter((entry) => entry.id !== lastProductId)
+                      .map((entry) => (
+                        <option key={entry.id} value={entry.id}>
+                          {entry.name}
+                        </option>
+                      ))}
+                  </select>
+                </label>
+                <button
+                  disabled={!rebookProductId || cancelReason.trim().length < 3}
+                  onClick={rebookLastSale}
+                  type="button"
+                >
+                  Tickets umbuchen
+                </button>
+              </div>
+            ) : null}
           </section>
         </div>
         <button
@@ -193,6 +296,7 @@ function FlightLineView() {
   const { board, error, refresh } = useOperationBoard("flight-line-tablet-1");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [queueReason, setQueueReason] = useState("");
   const selected =
     board?.rotations.find((rotation) => rotation.id === selectedId) ?? board?.rotations[0];
   const action = selected ? actionForState[selected.status] : null;
@@ -226,6 +330,30 @@ function FlightLineView() {
       await refresh();
     } catch (reason) {
       setMessage(reason instanceof Error ? reason.message : "Aktion fehlgeschlagen.");
+    }
+  }
+
+  async function mutateQueue(type: "DEFER_TICKET_GROUP" | "MARK_NO_SHOW") {
+    if (!board || !selected || queueReason.trim().length < 3) return;
+    try {
+      await sendCommand(
+        {
+          commandId: crypto.randomUUID(),
+          eventId: EVENT_ID,
+          deviceId: "flight-line-tablet-1",
+          expectedVersion: board.event.version,
+          issuedAt: new Date().toISOString(),
+          type,
+          payload: { ticketGroupId: selected.ticketGroupId, reason: queueReason.trim() },
+        },
+        deviceTokenFor("flight-line-tablet-1"),
+      );
+      setMessage(type === "MARK_NO_SHOW" ? "No-Show protokolliert." : "Fluggruppe zurückgestellt.");
+      setQueueReason("");
+      setSelectedId(null);
+      await refresh();
+    } catch (reason) {
+      setMessage(reason instanceof Error ? reason.message : "Queue-Aktion fehlgeschlagen.");
     }
   }
 
@@ -280,6 +408,34 @@ function FlightLineView() {
               </dl>
               {selected.status === "LANDED" ? (
                 <p className="landed-warning">Gelandet · noch nicht verfügbar</p>
+              ) : null}
+              {selected.status === "DRAFT" || selected.status === "CALLED" ? (
+                <div className="correction-controls">
+                  <label>
+                    Grund für Queue-Abweichung
+                    <input
+                      value={queueReason}
+                      onChange={(event) => setQueueReason(event.target.value)}
+                      placeholder="Mindestens 3 Zeichen"
+                    />
+                  </label>
+                  <div className="secondary-actions">
+                    <button
+                      disabled={queueReason.trim().length < 3}
+                      onClick={() => mutateQueue("DEFER_TICKET_GROUP")}
+                      type="button"
+                    >
+                      Zurückstellen
+                    </button>
+                    <button
+                      disabled={queueReason.trim().length < 3}
+                      onClick={() => mutateQueue("MARK_NO_SHOW")}
+                      type="button"
+                    >
+                      No-Show
+                    </button>
+                  </div>
+                </div>
               ) : null}
               {message ? (
                 <div className="action-message" role="status">

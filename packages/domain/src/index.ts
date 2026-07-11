@@ -107,7 +107,11 @@ export type OperationalCommandType =
   | "CALL_NEXT"
   | "MARK_IN_FLIGHT"
   | "MARK_LANDED"
-  | "MARK_COMPLETED";
+  | "MARK_COMPLETED"
+  | "CANCEL_TICKET_GROUP"
+  | "REBOOK_TICKET_GROUP"
+  | "DEFER_TICKET_GROUP"
+  | "MARK_NO_SHOW";
 
 const commandRoles: Readonly<Record<OperationalCommandType, readonly DeviceRole[]>> = {
   SELL_TICKET_GROUP: ["CASHIER", "ADMIN"],
@@ -115,6 +119,10 @@ const commandRoles: Readonly<Record<OperationalCommandType, readonly DeviceRole[
   MARK_IN_FLIGHT: ["FLIGHT_LINE", "FLIGHT_LINE_LEAD", "ADMIN"],
   MARK_LANDED: ["FLIGHT_LINE", "FLIGHT_LINE_LEAD", "ADMIN"],
   MARK_COMPLETED: ["FLIGHT_LINE", "FLIGHT_LINE_LEAD", "ADMIN"],
+  CANCEL_TICKET_GROUP: ["CASHIER", "ADMIN"],
+  REBOOK_TICKET_GROUP: ["CASHIER", "ADMIN"],
+  DEFER_TICKET_GROUP: ["FLIGHT_LINE", "FLIGHT_LINE_LEAD", "ADMIN"],
+  MARK_NO_SHOW: ["FLIGHT_LINE", "FLIGHT_LINE_LEAD", "ADMIN"],
 };
 
 export function assertRoleMayExecute(role: DeviceRole, command: OperationalCommandType): void {
@@ -159,3 +167,6 @@ export function assertPublicTicketCode(code: string): string {
   }
   return normalized;
 }
+
+export * from "./forecast";
+export * from "./queue";

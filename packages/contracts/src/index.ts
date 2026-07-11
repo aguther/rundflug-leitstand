@@ -39,6 +39,21 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
     type: z.enum(["MARK_IN_FLIGHT", "MARK_LANDED", "MARK_COMPLETED"]),
     payload: z.object({ rotationId: z.string().min(1).max(100) }),
   }),
+  commandBaseSchema.extend({
+    type: z.enum(["CANCEL_TICKET_GROUP", "DEFER_TICKET_GROUP", "MARK_NO_SHOW"]),
+    payload: z.object({
+      ticketGroupId: z.string().min(1).max(100),
+      reason: z.string().trim().min(3).max(240),
+    }),
+  }),
+  commandBaseSchema.extend({
+    type: z.literal("REBOOK_TICKET_GROUP"),
+    payload: z.object({
+      ticketGroupId: z.string().min(1).max(100),
+      newProductId: z.string().min(1).max(100),
+      reason: z.string().trim().min(3).max(240),
+    }),
+  }),
 ]);
 
 export type CommandEnvelope = z.infer<typeof commandEnvelopeSchema>;
@@ -93,6 +108,7 @@ export const productOperationalSummarySchema = z.object({
   estimatedWaitLowerMinutes: z.number().int().nonnegative(),
   estimatedWaitUpperMinutes: z.number().int().nonnegative(),
   remainingSellableSeats: z.number().int().nonnegative(),
+  predictionQuality: z.enum(["STABLE", "CHANGING", "UNCERTAIN"]),
 });
 
 export const rotationOperationalSummarySchema = z.object({
@@ -101,6 +117,7 @@ export const rotationOperationalSummarySchema = z.object({
   communicationNumber: z.number().int().positive(),
   productName: z.string(),
   status: z.enum(["DRAFT", "CALLED", "IN_FLIGHT", "LANDED", "COMPLETED"]),
+  ticketGroupId: z.string(),
   aircraftId: z.string().nullable(),
   aircraftRegistration: z.string().nullable(),
   suggestedAircraftId: z.string().nullable(),
