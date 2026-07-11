@@ -907,6 +907,7 @@ function AdminView() {
   const [pairingQr, setPairingQr] = useState<string | null>(null);
   const [pairingUrl, setPairingUrl] = useState<string | null>(null);
   const [pilotCode, setPilotCode] = useState("P-02");
+  const [refuelThreshold, setRefuelThreshold] = useState(5);
   const resourceGroups = Array.from(
     new Map(board?.products.map((product) => [product.resourceGroupId, product]) ?? []).values(),
   );
@@ -1150,6 +1151,35 @@ function AdminView() {
     }
   }
 
+  async function configureRefuelThreshold(aircraftId: string) {
+    if (!board || reason.trim().length < 3 || adminPin.length < 4) return;
+    try {
+      await sendCommand(
+        {
+          commandId: crypto.randomUUID(),
+          eventId: EVENT_ID,
+          deviceId: ADMIN_DEVICE_ID,
+          expectedVersion: board.event.version,
+          issuedAt: new Date().toISOString(),
+          type: "CONFIGURE_AIRCRAFT_REFUEL_THRESHOLD",
+          payload: {
+            aircraftId,
+            reminderThreshold: refuelThreshold,
+            reason: reason.trim(),
+            adminPin,
+          },
+        },
+        deviceTokenFor(ADMIN_DEVICE_ID),
+      );
+      setMessage("Organisatorische Tank-Erinnerungsschwelle wurde aktualisiert.");
+      setAdminPin("");
+      await refresh();
+      await refreshHistory();
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : "Erinnerungsschwelle fehlgeschlagen.");
+    }
+  }
+
   async function upsertPilot(pilotId: string, operationalCode: string, active: boolean) {
     if (!board || reason.trim().length < 3 || adminPin.length < 4) return;
     try {
@@ -1357,10 +1387,27 @@ function AdminView() {
                   >
                     {aircraft.refuelPlanned ? "Vormerkung aufheben" : "Tanken vormerken"}
                   </button>
+                  <button
+                    disabled={reason.trim().length < 3 || adminPin.length < 4}
+                    onClick={() => configureRefuelThreshold(aircraft.id)}
+                    type="button"
+                  >
+                    Schwelle {refuelThreshold} setzen
+                  </button>
                 </div>
               </div>
             ))}
           </div>
+          <label className="threshold-input">
+            Umläufe bis Tank-Erinnerung
+            <input
+              type="number"
+              min={1}
+              max={100}
+              value={refuelThreshold}
+              onChange={(event) => setRefuelThreshold(Number(event.target.value))}
+            />
+          </label>
           <h3>Anonyme Pilotencodes</h3>
           <div className="pilot-controls">
             <input

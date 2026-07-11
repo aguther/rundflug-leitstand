@@ -627,6 +627,14 @@ p {
   display: grid;
   grid-template-columns: repeat(3, minmax(110px, 1fr));
 }
+.threshold-input {
+  display: grid;
+  grid-template-columns: 1fr 120px;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 0;
+  max-width: 420px;
+}
 .fleet-row .warning-text {
   color: #9a4f00;
   font-weight: 800;

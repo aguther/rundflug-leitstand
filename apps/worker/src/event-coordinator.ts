@@ -216,13 +216,13 @@ export class EventCoordinator extends DurableObject<Env> {
         }
         const [aircraftRows, openTicketRow] = await Promise.all([
           this.env.DB.prepare(
-            `SELECT a.passenger_seats FROM aircraft a
+            `SELECT a.passenger_seats, a.refuel_planned FROM aircraft a
                JOIN resource_group_memberships m ON m.aircraft_id = a.id
               WHERE m.operation_day_id = ?1 AND m.resource_group_id = ?2 AND m.active_until IS NULL
                 AND a.operational_state NOT IN ('INACTIVE', 'PAUSED', 'REFUELING')`,
           )
             .bind(command.eventId, product.resource_group_id)
-            .all<{ passenger_seats: number }>(),
+            .all<{ passenger_seats: number; refuel_planned: number }>(),
           this.env.DB.prepare(
             `SELECT COUNT(*) AS open_tickets FROM tickets t
                JOIN ticket_groups tg ON tg.id = t.ticket_group_id
@@ -250,6 +250,9 @@ export class EventCoordinator extends DurableObject<Env> {
           ),
           expectedRotationMinutes: product.reference_duration_minutes,
           activeAircraftSeats: aircraftRows.results.map((row) => row.passenger_seats),
+          reservedSeats: aircraftRows.results
+            .filter((row) => row.refuel_planned === 1)
+            .reduce((sum, row) => sum + row.passenger_seats, 0),
           openTickets: openTicketRow?.open_tickets ?? 0,
           predictionQuality: "CHANGING",
           warningThreshold: product.capacity_warning_threshold,
@@ -393,6 +396,7 @@ export class EventCoordinator extends DurableObject<Env> {
         if (
           command.type === "SET_AIRCRAFT_OPERATIONAL_STATE" ||
           command.type === "SCHEDULE_AIRCRAFT_REFUEL" ||
+          command.type === "CONFIGURE_AIRCRAFT_REFUEL_THRESHOLD" ||
           command.type === "UPSERT_PILOT"
         ) {
           return this.handleFleetAdministration(command, current);
@@ -535,13 +539,17 @@ export class EventCoordinator extends DurableObject<Env> {
     command: Extract<
       CommandEnvelope,
       {
-        type: "SET_AIRCRAFT_OPERATIONAL_STATE" | "SCHEDULE_AIRCRAFT_REFUEL" | "UPSERT_PILOT";
+        type:
+          | "SET_AIRCRAFT_OPERATIONAL_STATE"
+          | "SCHEDULE_AIRCRAFT_REFUEL"
+          | "CONFIGURE_AIRCRAFT_REFUEL_THRESHOLD"
+          | "UPSERT_PILOT";
       }
     >,
     current: StoredEventRow,
   ): Promise<Response> {
     if (
-      command.type === "UPSERT_PILOT" &&
+      (command.type === "UPSERT_PILOT" || command.type === "CONFIGURE_AIRCRAFT_REFUEL_THRESHOLD") &&
       !(await verifyCredential(command.payload.adminPin, this.env.ADMIN_PIN_HASH))
     ) {
       return json(
@@ -620,7 +628,19 @@ export class EventCoordinator extends DurableObject<Env> {
       }
       aggregateType = "AIRCRAFT";
       aggregateId = aircraft.id;
-      if (command.type === "SCHEDULE_AIRCRAFT_REFUEL") {
+      if (command.type === "CONFIGURE_AIRCRAFT_REFUEL_THRESHOLD") {
+        statements.push(
+          this.env.DB.prepare(
+            "UPDATE aircraft SET refuel_reminder_threshold = ?1, updated_at = ?2 WHERE id = ?3",
+          ).bind(command.payload.reminderThreshold, now, aircraft.id),
+        );
+        eventType = "AIRCRAFT_REFUEL_THRESHOLD_CONFIGURED";
+        auditPayload = {
+          reminderThreshold: command.payload.reminderThreshold,
+          reason: command.payload.reason,
+          informationalOnly: true,
+        };
+      } else if (command.type === "SCHEDULE_AIRCRAFT_REFUEL") {
         statements.push(
           this.env.DB.prepare(
             "UPDATE aircraft SET refuel_planned = ?1, updated_at = ?2 WHERE id = ?3",

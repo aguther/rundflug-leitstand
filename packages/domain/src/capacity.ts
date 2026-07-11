@@ -14,6 +14,7 @@ export function assessRemainingCapacity(input: {
   expectedRotationMinutes: number;
   activeAircraftSeats: readonly number[];
   openTickets: number;
+  reservedSeats?: number;
   predictionQuality: PredictionQuality;
   warningThreshold: number;
   criticalThreshold: number;
@@ -29,7 +30,10 @@ export function assessRemainingCapacity(input: {
       .reduce((sum, seats) => sum + seats, 0);
   const qualityFactor =
     input.predictionQuality === "STABLE" ? 1 : input.predictionQuality === "CHANGING" ? 0.85 : 0.6;
-  const projectedSeats = Math.floor(rawProjectedSeats * qualityFactor);
+  const projectedSeats = Math.max(
+    0,
+    Math.floor(rawProjectedSeats * qualityFactor) - Math.max(0, input.reservedSeats ?? 0),
+  );
   const remainingSellableSeats = Math.max(0, projectedSeats - Math.max(0, input.openTickets));
   const status: CapacityStatus =
     remainingSellableSeats === 0

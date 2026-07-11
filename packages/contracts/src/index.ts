@@ -138,6 +138,15 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
     }),
   }),
   commandBaseSchema.extend({
+    type: z.literal("CONFIGURE_AIRCRAFT_REFUEL_THRESHOLD"),
+    payload: z.object({
+      aircraftId: z.string().min(1).max(100),
+      reminderThreshold: z.number().int().min(1).max(100),
+      reason: z.string().trim().min(3).max(240),
+      adminPin: z.string().min(4).max(32),
+    }),
+  }),
+  commandBaseSchema.extend({
     type: z.literal("UPSERT_PILOT"),
     payload: z.object({
       pilotId: z.uuid(),

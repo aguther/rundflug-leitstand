@@ -50,4 +50,19 @@ describe("verbleibende Kapazität", () => {
       }).status,
     ).toBe("SOLD_OUT");
   });
+
+  it("reserves one conservative gap for planned refueling", () => {
+    const result = assessRemainingCapacity({
+      remainingOperatingMinutes: 120,
+      expectedRotationMinutes: 20,
+      activeAircraftSeats: [4],
+      openTickets: 4,
+      reservedSeats: 4,
+      predictionQuality: "STABLE",
+      warningThreshold: 8,
+      criticalThreshold: 3,
+    });
+    expect(result.projectedSeats).toBe(20);
+    expect(result.remainingSellableSeats).toBe(16);
+  });
 });
