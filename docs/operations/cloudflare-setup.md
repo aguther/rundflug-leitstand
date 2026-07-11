@@ -54,6 +54,25 @@ npx wrangler secret put ADMIN_PIN_HASH --env acceptance
 npx wrangler secret put ADMIN_PIN_HASH --env production
 ```
 
+Für Web-Push ein eigenes VAPID-Schlüsselpaar je Umgebung erzeugen. Die Ausgabe enthält den privaten
+Schlüssel und darf nicht in Tickets, Chats oder Logs kopiert werden:
+
+```bash
+npx web-push generate-vapid-keys --json
+```
+
+Die drei Werte anschließend interaktiv als Cloudflare-Secrets setzen. Als `VAPID_SUBJECT` eine
+erreichbare Betreiberadresse im Format `mailto:adresse@example.de` verwenden:
+
+```bash
+npx wrangler secret put VAPID_PUBLIC_KEY --env acceptance
+npx wrangler secret put VAPID_PRIVATE_KEY --env acceptance
+npx wrangler secret put VAPID_SUBJECT --env acceptance
+```
+
+Für Produktion ein neues Schlüsselpaar erzeugen und dieselben drei Befehle mit `--env production`
+ausführen. Der private Schlüssel gehört niemals in `wrangler.jsonc`, `.env.example` oder D1.
+
 Geräte werden über zufällige Kopplungstokens authentisiert; ausschließlich deren SHA-256-Hashes werden
 in D1 gespeichert. Demo-Tokens aus dem lokalen Seed dürfen nicht in Acceptance oder Produktion
 übernommen werden.
@@ -72,7 +91,8 @@ npm run deploy:production
 - Kostenwarnungen und CPU-Limits konfigurieren
 - keine geplanten Deployments am Veranstaltungstag
 
-## Noch nicht automatisiert
+## Automatisierter Betrieb
 
-Die Startfassung implementiert noch keinen vollständigen D1-Export nach R2 und keine Push-Secrets.
-Diese Punkte dürfen vor dem Echtbetrieb nicht als erledigt gelten.
+Der tägliche Cron erzeugt einen portablen D1-Export in R2, entfernt Sicherungen nach 14 Tagen und
+löscht abgelaufene oder widerrufene Web-Push-Ziele. Wiederherstellung und Prüfschritte stehen in
+`backup-restore.md`; der reale Wiederherstellungstest in Acceptance bleibt vor dem Echtbetrieb Pflicht.
