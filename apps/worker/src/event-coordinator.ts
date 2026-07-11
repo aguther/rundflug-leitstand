@@ -7,6 +7,7 @@ import {
 } from "@rundflug/contracts";
 import {
   assertPublicTicketCode,
+  assertQueueMutationAllowed,
   assertRoleMayExecute,
   assertSaleAllowed,
   type DeviceRole,
@@ -323,7 +324,26 @@ export class EventCoordinator extends DurableObject<Env> {
       }
 
       if (command.type !== "SET_OPERATIONAL_NOTE") {
-        return this.handleRotationTransition(command, current);
+        if (
+          command.type === "CANCEL_TICKET_GROUP" ||
+          command.type === "REBOOK_TICKET_GROUP" ||
+          command.type === "DEFER_TICKET_GROUP" ||
+          command.type === "MARK_NO_SHOW"
+        ) {
+          return this.handleTicketGroupMutation(command, current);
+        }
+        if (
+          command.type === "CALL_NEXT" ||
+          command.type === "MARK_IN_FLIGHT" ||
+          command.type === "MARK_LANDED" ||
+          command.type === "MARK_COMPLETED"
+        ) {
+          return this.handleRotationTransition(command, current);
+        }
+        return json(
+          { error: { code: "COMMAND_NOT_IMPLEMENTED", message: "Kommando nicht implementiert." } },
+          { status: 501 },
+        );
       }
 
       const nextVersion = current.version + 1;
@@ -556,6 +576,207 @@ export class EventCoordinator extends DurableObject<Env> {
         "INSERT INTO outbox (id, operation_day_id, topic, payload_json, created_at) VALUES (?1, ?2, 'EVENT_STATE_CHANGED', ?3, ?4)",
       ).bind(crypto.randomUUID(), command.eventId, JSON.stringify(result), now),
     ]);
+    this.broadcast(result);
+    return json(result);
+  }
+
+  private async handleTicketGroupMutation(
+    command: Extract<
+      CommandEnvelope,
+      {
+        type: "CANCEL_TICKET_GROUP" | "REBOOK_TICKET_GROUP" | "DEFER_TICKET_GROUP" | "MARK_NO_SHOW";
+      }
+    >,
+    current: StoredEventRow,
+  ): Promise<Response> {
+    const group = await this.env.DB.prepare(
+      `SELECT tg.id, tg.product_id, tg.version, r.id AS rotation_id, r.status AS rotation_status,
+              r.aircraft_id, fg.resource_group_id
+         FROM ticket_groups tg
+         JOIN tickets t ON t.ticket_group_id = tg.id
+         JOIN rotation_tickets rt ON rt.ticket_id = t.id AND rt.released_at IS NULL
+         JOIN rotations r ON r.id = rt.rotation_id
+         JOIN flight_groups fg ON fg.id = r.flight_group_id
+        WHERE tg.id = ?1 AND tg.operation_day_id = ?2
+        LIMIT 1`,
+    )
+      .bind(command.payload.ticketGroupId, command.eventId)
+      .first<{
+        id: string;
+        product_id: string;
+        version: number;
+        rotation_id: string;
+        rotation_status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
+        aircraft_id: string | null;
+        resource_group_id: string;
+      }>();
+    if (!group) {
+      return json(
+        { error: { code: "TICKET_GROUP_NOT_FOUND", message: "Ticketgruppe nicht gefunden." } },
+        { status: 404 },
+      );
+    }
+    try {
+      assertQueueMutationAllowed({
+        rotationState: group.rotation_status,
+        action:
+          command.type === "CANCEL_TICKET_GROUP"
+            ? "CANCEL"
+            : command.type === "REBOOK_TICKET_GROUP"
+              ? "REBOOK"
+              : command.type === "MARK_NO_SHOW"
+                ? "NO_SHOW"
+                : "DEFER",
+      });
+    } catch (reason: unknown) {
+      if (reason instanceof DomainRuleError) {
+        return json({ error: { code: reason.code, message: reason.message } }, { status: 409 });
+      }
+      throw reason;
+    }
+
+    let targetProductId = group.product_id;
+    let targetResourceGroupId = group.resource_group_id;
+    if (command.type === "REBOOK_TICKET_GROUP") {
+      const target = await this.env.DB.prepare(
+        "SELECT id, resource_group_id FROM products WHERE id = ?1 AND operation_day_id = ?2 AND sale_enabled = 1",
+      )
+        .bind(command.payload.newProductId, command.eventId)
+        .first<{ id: string; resource_group_id: string }>();
+      if (!target) {
+        return json(
+          {
+            error: {
+              code: "TARGET_PRODUCT_NOT_AVAILABLE",
+              message: "Zielprodukt ist nicht verfügbar.",
+            },
+          },
+          { status: 409 },
+        );
+      }
+      targetProductId = target.id;
+      targetResourceGroupId = target.resource_group_id;
+    }
+
+    const now = new Date().toISOString();
+    const nextVersion = current.version + 1;
+    const eventType = {
+      CANCEL_TICKET_GROUP: "TICKET_GROUP_CANCELED",
+      REBOOK_TICKET_GROUP: "TICKET_GROUP_REBOOKED",
+      DEFER_TICKET_GROUP: "TICKET_GROUP_DEFERRED",
+      MARK_NO_SHOW: "TICKET_GROUP_NO_SHOW",
+    } as const;
+    const result: CommandResult = {
+      accepted: true,
+      duplicate: false,
+      event: rowToSnapshot({ ...current, version: nextVersion, updated_at: now }),
+      eventType: eventType[command.type],
+      aggregate: { type: "TICKET_GROUP", id: group.id },
+    };
+    const statements: D1PreparedStatement[] = [
+      this.env.DB.prepare(
+        "UPDATE operation_days SET version = ?1, updated_at = ?2 WHERE id = ?3 AND version = ?4",
+      ).bind(nextVersion, now, command.eventId, current.version),
+      this.env.DB.prepare(
+        "UPDATE rotation_tickets SET released_at = ?1 WHERE rotation_id = ?2 AND released_at IS NULL",
+      ).bind(now, group.rotation_id),
+      this.env.DB.prepare(
+        "UPDATE rotations SET status = 'CANCELED', version = version + 1, updated_at = ?1 WHERE id = ?2",
+      ).bind(now, group.rotation_id),
+    ];
+    if (group.aircraft_id) {
+      statements.push(
+        this.env.DB.prepare(
+          "UPDATE aircraft SET operational_state = 'AVAILABLE', updated_at = ?1 WHERE id = ?2",
+        ).bind(now, group.aircraft_id),
+      );
+    }
+
+    if (command.type === "CANCEL_TICKET_GROUP" || command.type === "MARK_NO_SHOW") {
+      const status = command.type === "CANCEL_TICKET_GROUP" ? "CANCELED" : "NO_SHOW";
+      statements.push(
+        this.env.DB.prepare(
+          "UPDATE ticket_groups SET status = ?1, version = version + 1 WHERE id = ?2 AND version = ?3",
+        ).bind(status, group.id, group.version),
+        this.env.DB.prepare("UPDATE tickets SET status = ?1 WHERE ticket_group_id = ?2").bind(
+          status,
+          group.id,
+        ),
+      );
+    } else {
+      const queue = await this.env.DB.prepare(
+        "SELECT COALESCE(MAX(queue_sequence), 0) + 1 AS next_sequence FROM ticket_groups WHERE operation_day_id = ?1 AND product_id = ?2",
+      )
+        .bind(command.eventId, targetProductId)
+        .first<{ next_sequence: number }>();
+      const communication = await this.env.DB.prepare(
+        "SELECT COALESCE(MAX(communication_number), 100) + 1 AS next_number FROM flight_groups WHERE operation_day_id = ?1 AND resource_group_id = ?2",
+      )
+        .bind(command.eventId, targetResourceGroupId)
+        .first<{ next_number: number }>();
+      const flightGroupId = crypto.randomUUID();
+      const rotationId = crypto.randomUUID();
+      statements.push(
+        this.env.DB.prepare(
+          `UPDATE ticket_groups SET product_id = ?1, queue_sequence = ?2, status = 'QUEUED',
+                  version = version + 1 WHERE id = ?3 AND version = ?4`,
+        ).bind(targetProductId, queue?.next_sequence ?? 1, group.id, group.version),
+        this.env.DB.prepare("UPDATE tickets SET status = 'QUEUED' WHERE ticket_group_id = ?1").bind(
+          group.id,
+        ),
+        this.env.DB.prepare(
+          `INSERT INTO flight_groups
+            (id, operation_day_id, resource_group_id, communication_number, status, version, created_at, updated_at)
+           VALUES (?1, ?2, ?3, ?4, 'DRAFT', 0, ?5, ?5)`,
+        ).bind(
+          flightGroupId,
+          command.eventId,
+          targetResourceGroupId,
+          communication?.next_number ?? 101,
+          now,
+        ),
+        this.env.DB.prepare(
+          `INSERT INTO rotations (id, operation_day_id, flight_group_id, status, version, created_at, updated_at)
+           VALUES (?1, ?2, ?3, 'DRAFT', 0, ?4, ?4)`,
+        ).bind(rotationId, command.eventId, flightGroupId, now),
+        this.env.DB.prepare(
+          `INSERT INTO rotation_tickets (rotation_id, ticket_id, assigned_at)
+           SELECT ?1, id, ?2 FROM tickets WHERE ticket_group_id = ?3`,
+        ).bind(rotationId, now, group.id),
+      );
+    }
+
+    statements.push(
+      this.env.DB.prepare(
+        `INSERT INTO operational_events
+          (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type, aggregate_id, aggregate_version, payload_json)
+         VALUES (?1, ?2, ?3, ?4, ?5, 'TICKET_GROUP', ?6, ?7, ?8)`,
+      ).bind(
+        crypto.randomUUID(),
+        command.eventId,
+        eventType[command.type],
+        now,
+        command.deviceId,
+        group.id,
+        group.version + 1,
+        JSON.stringify({ reason: command.payload.reason, targetProductId }),
+      ),
+      this.env.DB.prepare(
+        `INSERT INTO idempotency_receipts (command_id, operation_day_id, device_id, command_type, received_at, response_json)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)`,
+      ).bind(
+        command.commandId,
+        command.eventId,
+        command.deviceId,
+        command.type,
+        now,
+        JSON.stringify(result),
+      ),
+      this.env.DB.prepare(
+        "INSERT INTO outbox (id, operation_day_id, topic, payload_json, created_at) VALUES (?1, ?2, 'EVENT_STATE_CHANGED', ?3, ?4)",
+      ).bind(crypto.randomUUID(), command.eventId, JSON.stringify(result), now),
+    );
+    await this.env.DB.batch(statements);
     this.broadcast(result);
     return json(result);
   }

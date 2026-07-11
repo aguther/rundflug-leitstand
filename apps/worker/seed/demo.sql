@@ -41,6 +41,12 @@ INSERT OR IGNORE INTO products
 VALUES ('panorama-20', 'demo-2026', 'rg-panorama', '20 Min. Panorama', 4500, 1, 4, 20,
         '2026-07-11T08:00:00.000Z', '2026-07-11T08:00:00.000Z');
 
+INSERT OR IGNORE INTO products
+  (id, operation_day_id, resource_group_id, name, price_cents, sale_enabled, reference_capacity,
+   reference_duration_minutes, created_at, updated_at)
+VALUES ('panorama-30', 'demo-2026', 'rg-panorama', '30 Min. Panorama', 6500, 1, 3, 30,
+        '2026-07-11T08:00:00.000Z', '2026-07-11T08:00:00.000Z');
+
 -- Hashes ausschließlich synthetischer lokaler Demo-Tokens; keine Produktiv-Credentials.
 UPDATE paired_devices SET credential_hash = '5077b8b10f7ee36a8bb5162d25d60ee7c6a2e474826592d5ab8f4312610a0de0'
  WHERE id = 'technical-scaffold';

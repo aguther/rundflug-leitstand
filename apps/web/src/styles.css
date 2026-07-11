@@ -206,6 +206,49 @@ p {
   background: #eaf3ff;
   border-left: 4px solid #1769d2;
 }
+.correction-controls {
+  margin: 18px 0;
+  padding: 16px;
+  border: 1px solid #c7d2df;
+  background: #f8fafc;
+  display: grid;
+  gap: 12px;
+}
+.correction-controls label {
+  display: grid;
+  gap: 7px;
+  color: #52677f;
+  font-weight: 700;
+}
+.correction-controls input,
+.correction-controls select {
+  min-height: 48px;
+  padding: 10px 12px;
+  border: 1px solid #93a4b8;
+  border-radius: 4px;
+  background: #fff;
+}
+.correction-controls button,
+.secondary-actions button {
+  min-height: 48px;
+  padding: 10px 16px;
+  border: 1px solid #59728d;
+  border-radius: 4px;
+  background: #fff;
+  color: #193d65;
+  font-weight: 750;
+  cursor: pointer;
+}
+.correction-controls button:disabled {
+  color: #8798aa;
+  border-color: #c3cfda;
+  cursor: not-allowed;
+}
+.secondary-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
 .flight-workspace {
   flex: 1;
   display: grid;
