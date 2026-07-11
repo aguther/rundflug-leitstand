@@ -5,6 +5,7 @@ const BACKUP_TABLES = [
   "operation_days",
   "resource_groups",
   "aircraft",
+  "pilots",
   "resource_group_memberships",
   "products",
   "ticket_groups",

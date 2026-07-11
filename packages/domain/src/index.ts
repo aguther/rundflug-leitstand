@@ -124,6 +124,9 @@ export type OperationalCommandType =
   | "CONFIGURE_PRODUCT_SALES"
   | "PAIR_DEVICE"
   | "REVOKE_DEVICE"
+  | "SET_AIRCRAFT_OPERATIONAL_STATE"
+  | "SCHEDULE_AIRCRAFT_REFUEL"
+  | "UPSERT_PILOT"
   | "REVOKE_CALL";
 
 const commandRoles: Readonly<Record<OperationalCommandType, readonly DeviceRole[]>> = {
@@ -142,6 +145,9 @@ const commandRoles: Readonly<Record<OperationalCommandType, readonly DeviceRole[
   CONFIGURE_PRODUCT_SALES: ["ADMIN"],
   PAIR_DEVICE: ["ADMIN"],
   REVOKE_DEVICE: ["ADMIN"],
+  SET_AIRCRAFT_OPERATIONAL_STATE: ["FLIGHT_LINE_LEAD", "FLIGHT_DIRECTOR", "ADMIN"],
+  SCHEDULE_AIRCRAFT_REFUEL: ["FLIGHT_LINE", "FLIGHT_LINE_LEAD", "FLIGHT_DIRECTOR", "ADMIN"],
+  UPSERT_PILOT: ["ADMIN"],
   REVOKE_CALL: ["FLIGHT_LINE", "FLIGHT_LINE_LEAD", "ADMIN"],
 };
 

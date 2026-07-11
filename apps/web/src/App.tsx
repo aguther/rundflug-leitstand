@@ -37,6 +37,17 @@ const capacityLabel = {
   MANUAL_REVIEW: "Manuelle Prüfung erforderlich",
   SOLD_OUT: "Keine sichere Restkapazität",
 } as const;
+const aircraftStateLabel = {
+  AVAILABLE: "Verfügbar",
+  BOARDING: "Boarding",
+  IN_FLIGHT: "Im Flug",
+  LANDED: "Gelandet / Deboarding",
+  TURNAROUND: "Bodenprozess",
+  REFUELING: "Tanken aktuell",
+  PAUSED: "Pause",
+  INTERRUPTED: "Flugbetrieb unterbrochen",
+  INACTIVE: "Kurzfristig inaktiv",
+} as const;
 
 function saleClosingLabel(value: string | null): string | null {
   if (!value) return null;
@@ -895,6 +906,7 @@ function AdminView() {
   >("CASHIER");
   const [pairingQr, setPairingQr] = useState<string | null>(null);
   const [pairingUrl, setPairingUrl] = useState<string | null>(null);
+  const [pilotCode, setPilotCode] = useState("P-02");
   const resourceGroups = Array.from(
     new Map(board?.products.map((product) => [product.resourceGroupId, product]) ?? []).values(),
   );
@@ -1087,6 +1099,89 @@ function AdminView() {
     }
   }
 
+  async function setAircraftState(
+    aircraftId: string,
+    state: "AVAILABLE" | "REFUELING" | "PAUSED" | "INTERRUPTED" | "INACTIVE",
+  ) {
+    if (!board || reason.trim().length < 3) return;
+    try {
+      await sendCommand(
+        {
+          commandId: crypto.randomUUID(),
+          eventId: EVENT_ID,
+          deviceId: ADMIN_DEVICE_ID,
+          expectedVersion: board.event.version,
+          issuedAt: new Date().toISOString(),
+          type: "SET_AIRCRAFT_OPERATIONAL_STATE",
+          payload: { aircraftId, state, reason: reason.trim(), expectedReviewAt: null },
+        },
+        deviceTokenFor(ADMIN_DEVICE_ID),
+      );
+      setMessage("Flugzeugstatus wurde organisatorisch aktualisiert und protokolliert.");
+      await refresh();
+      await refreshHistory();
+    } catch (cause) {
+      setMessage(
+        cause instanceof Error ? cause.message : "Flugzeugstatus konnte nicht geändert werden.",
+      );
+    }
+  }
+
+  async function scheduleRefuel(aircraftId: string, planned: boolean) {
+    if (!board || reason.trim().length < 3) return;
+    try {
+      await sendCommand(
+        {
+          commandId: crypto.randomUUID(),
+          eventId: EVENT_ID,
+          deviceId: ADMIN_DEVICE_ID,
+          expectedVersion: board.event.version,
+          issuedAt: new Date().toISOString(),
+          type: "SCHEDULE_AIRCRAFT_REFUEL",
+          payload: { aircraftId, planned, reason: reason.trim() },
+        },
+        deviceTokenFor(ADMIN_DEVICE_ID),
+      );
+      setMessage(planned ? "Tanken wurde unverbindlich vorgemerkt." : "Tankvormerkung aufgehoben.");
+      await refresh();
+      await refreshHistory();
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : "Tankvormerkung fehlgeschlagen.");
+    }
+  }
+
+  async function upsertPilot(pilotId: string, operationalCode: string, active: boolean) {
+    if (!board || reason.trim().length < 3 || adminPin.length < 4) return;
+    try {
+      await sendCommand(
+        {
+          commandId: crypto.randomUUID(),
+          eventId: EVENT_ID,
+          deviceId: ADMIN_DEVICE_ID,
+          expectedVersion: board.event.version,
+          issuedAt: new Date().toISOString(),
+          type: "UPSERT_PILOT",
+          payload: {
+            pilotId,
+            operationalCode: operationalCode.trim().toUpperCase(),
+            active,
+            reason: reason.trim(),
+            adminPin,
+          },
+        },
+        deviceTokenFor(ADMIN_DEVICE_ID),
+      );
+      setMessage("Anonymer operativer Pilotencode wurde aktualisiert.");
+      setAdminPin("");
+      await refresh();
+      await refreshHistory();
+    } catch (cause) {
+      setMessage(
+        cause instanceof Error ? cause.message : "Pilotencode konnte nicht geändert werden.",
+      );
+    }
+  }
+
   async function exportDailyReport() {
     try {
       await downloadDailyReport(EVENT_ID, ADMIN_DEVICE_ID, deviceTokenFor(ADMIN_DEVICE_ID));
@@ -1185,6 +1280,118 @@ function AdminView() {
                     Verkaufsschluss setzen
                   </button>
                 </div>
+              </div>
+            ))}
+          </div>
+        </section>
+        <section className="admin-section">
+          <h2>Flotte, Tanken und Pausen</h2>
+          <p className="safety-disclaimer">
+            Ausschließlich organisatorische Hinweise – keine flugbetriebliche oder
+            sicherheitsbezogene Freigabewirkung.
+          </p>
+          <div className="fleet-list">
+            {board?.aircraft.map((aircraft) => (
+              <div className="fleet-row" key={aircraft.id}>
+                <div>
+                  <strong>{aircraft.registration}</strong>
+                  <span>
+                    {aircraft.aircraftType} · {aircraft.passengerSeats} Sitze
+                  </span>
+                  <span>Queue {aircraft.resourceGroupName}</span>
+                </div>
+                <div>
+                  <strong>{aircraftStateLabel[aircraft.operationalState]}</strong>
+                  <span>
+                    {aircraft.rotationsSinceRefuel}/{aircraft.refuelReminderThreshold} Umläufe seit
+                    Tanken
+                  </span>
+                  {aircraft.refuelPlanned ? (
+                    <span className="warning-text">Tanken vorgemerkt</span>
+                  ) : null}
+                </div>
+                <div className="secondary-actions fleet-actions">
+                  <button
+                    disabled={
+                      !["REFUELING", "PAUSED", "INACTIVE", "INTERRUPTED"].includes(
+                        aircraft.operationalState,
+                      ) || reason.trim().length < 3
+                    }
+                    onClick={() => setAircraftState(aircraft.id, "AVAILABLE")}
+                    type="button"
+                  >
+                    Verfügbar
+                  </button>
+                  <button
+                    disabled={aircraft.operationalState !== "AVAILABLE" || reason.trim().length < 3}
+                    onClick={() => setAircraftState(aircraft.id, "PAUSED")}
+                    type="button"
+                  >
+                    Pause
+                  </button>
+                  <button
+                    disabled={aircraft.operationalState !== "AVAILABLE" || reason.trim().length < 3}
+                    onClick={() => setAircraftState(aircraft.id, "REFUELING")}
+                    type="button"
+                  >
+                    Tanken aktuell
+                  </button>
+                  <button
+                    disabled={aircraft.operationalState !== "AVAILABLE" || reason.trim().length < 3}
+                    onClick={() => setAircraftState(aircraft.id, "INACTIVE")}
+                    type="button"
+                  >
+                    Inaktiv
+                  </button>
+                  <button
+                    disabled={aircraft.operationalState !== "AVAILABLE" || reason.trim().length < 3}
+                    onClick={() => setAircraftState(aircraft.id, "INTERRUPTED")}
+                    type="button"
+                  >
+                    Unterbrechen
+                  </button>
+                  <button
+                    disabled={reason.trim().length < 3}
+                    onClick={() => scheduleRefuel(aircraft.id, !aircraft.refuelPlanned)}
+                    type="button"
+                  >
+                    {aircraft.refuelPlanned ? "Vormerkung aufheben" : "Tanken vormerken"}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+          <h3>Anonyme Pilotencodes</h3>
+          <div className="pilot-controls">
+            <input
+              value={pilotCode}
+              onChange={(event) => setPilotCode(event.target.value.toUpperCase())}
+              aria-label="Neuer operativer Pilotencode"
+            />
+            <button
+              disabled={
+                !/^[A-Z0-9-]{2,12}$/.test(pilotCode) ||
+                reason.trim().length < 3 ||
+                adminPin.length < 4
+              }
+              onClick={() => upsertPilot(crypto.randomUUID(), pilotCode, true)}
+              type="button"
+            >
+              Pilotencode anlegen
+            </button>
+          </div>
+          <div className="pilot-list">
+            {board?.pilots.map((pilot) => (
+              <div key={pilot.id}>
+                <strong>{pilot.operationalCode}</strong>
+                <span>{pilot.active ? "aktiv" : "inaktiv"}</span>
+                <button
+                  disabled={reason.trim().length < 3 || adminPin.length < 4}
+                  onClick={() => upsertPilot(pilot.id, pilot.operationalCode, !pilot.active)}
+                  type="button"
+                >
+                  {pilot.active ? "Deaktivieren" : "Aktivieren"}
+                </button>
               </div>
             ))}
           </div>

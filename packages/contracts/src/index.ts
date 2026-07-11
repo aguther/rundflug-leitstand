@@ -121,6 +121,36 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
     }),
   }),
   commandBaseSchema.extend({
+    type: z.literal("SET_AIRCRAFT_OPERATIONAL_STATE"),
+    payload: z.object({
+      aircraftId: z.string().min(1).max(100),
+      state: z.enum(["AVAILABLE", "REFUELING", "PAUSED", "INTERRUPTED", "INACTIVE"]),
+      reason: z.string().trim().min(3).max(240),
+      expectedReviewAt: z.iso.datetime().nullable(),
+    }),
+  }),
+  commandBaseSchema.extend({
+    type: z.literal("SCHEDULE_AIRCRAFT_REFUEL"),
+    payload: z.object({
+      aircraftId: z.string().min(1).max(100),
+      planned: z.boolean(),
+      reason: z.string().trim().min(3).max(240),
+    }),
+  }),
+  commandBaseSchema.extend({
+    type: z.literal("UPSERT_PILOT"),
+    payload: z.object({
+      pilotId: z.uuid(),
+      operationalCode: z
+        .string()
+        .trim()
+        .regex(/^[A-Z0-9-]{2,12}$/),
+      active: z.boolean(),
+      reason: z.string().trim().min(3).max(240),
+      adminPin: z.string().min(4).max(32),
+    }),
+  }),
+  commandBaseSchema.extend({
     type: z.literal("REVOKE_CALL"),
     payload: z.object({ rotationId: z.string().min(1).max(100) }),
   }),
@@ -149,7 +179,15 @@ export const commandResultSchema = z.object({
   eventType: z.string(),
   aggregate: z
     .object({
-      type: z.enum(["OPERATION_DAY", "PRODUCT", "DEVICE", "TICKET_GROUP", "ROTATION"]),
+      type: z.enum([
+        "OPERATION_DAY",
+        "PRODUCT",
+        "DEVICE",
+        "AIRCRAFT",
+        "PILOT",
+        "TICKET_GROUP",
+        "ROTATION",
+      ]),
       id: z.string(),
       relatedRotationId: z.string().optional(),
     })
@@ -205,10 +243,42 @@ export const rotationOperationalSummarySchema = z.object({
   calledAt: z.string().nullable(),
 });
 
+export const aircraftOperationalSummarySchema = z.object({
+  id: z.string(),
+  registration: z.string(),
+  aircraftType: z.string(),
+  passengerSeats: z.number().int().positive(),
+  operationalState: z.enum([
+    "AVAILABLE",
+    "BOARDING",
+    "IN_FLIGHT",
+    "LANDED",
+    "TURNAROUND",
+    "REFUELING",
+    "PAUSED",
+    "INTERRUPTED",
+    "INACTIVE",
+  ]),
+  resourceGroupId: z.string(),
+  resourceGroupName: z.string(),
+  refuelPlanned: z.boolean(),
+  rotationsSinceRefuel: z.number().int().nonnegative(),
+  refuelReminderThreshold: z.number().int().positive(),
+  expectedReviewAt: z.string().nullable(),
+});
+
+export const pilotOperationalSummarySchema = z.object({
+  id: z.string(),
+  operationalCode: z.string(),
+  active: z.boolean(),
+});
+
 export const operationBoardSchema = z.object({
   event: eventSnapshotSchema,
   products: z.array(productOperationalSummarySchema),
   rotations: z.array(rotationOperationalSummarySchema),
+  aircraft: z.array(aircraftOperationalSummarySchema),
+  pilots: z.array(pilotOperationalSummarySchema),
 });
 export type OperationBoard = z.infer<typeof operationBoardSchema>;
 

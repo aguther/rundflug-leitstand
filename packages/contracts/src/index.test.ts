@@ -43,6 +43,45 @@ describe("commandEnvelopeSchema", () => {
     expect(JSON.stringify(parsed)).not.toContain("device-token");
   });
 
+  it("validates organizational fleet controls without safety semantics", () => {
+    const parsed = commandEnvelopeSchema.parse({
+      commandId: "550e8400-e29b-41d4-a716-446655440010",
+      eventId: "synthetic-event",
+      deviceId: "synthetic-flight-lead",
+      expectedVersion: 4,
+      issuedAt: "2026-07-11T12:00:00.000Z",
+      type: "SET_AIRCRAFT_OPERATIONAL_STATE",
+      payload: {
+        aircraftId: "synthetic-aircraft",
+        state: "PAUSED",
+        reason: "Organisatorische Pause",
+        expectedReviewAt: "2026-07-11T12:30:00.000Z",
+      },
+    });
+    expect(parsed.type).toBe("SET_AIRCRAFT_OPERATIONAL_STATE");
+    expect(JSON.stringify(parsed)).not.toMatch(/safe|freigabe/i);
+  });
+
+  it("accepts anonymous pilot codes and no pilot name", () => {
+    const parsed = commandEnvelopeSchema.parse({
+      commandId: "550e8400-e29b-41d4-a716-446655440011",
+      eventId: "synthetic-event",
+      deviceId: "synthetic-admin",
+      expectedVersion: 5,
+      issuedAt: "2026-07-11T12:00:00.000Z",
+      type: "UPSERT_PILOT",
+      payload: {
+        pilotId: "550e8400-e29b-41d4-a716-446655440012",
+        operationalCode: "P-01",
+        active: true,
+        reason: "Dienstplan aktualisiert",
+        adminPin: "0000",
+      },
+    });
+    expect(parsed.type).toBe("UPSERT_PILOT");
+    expect(JSON.stringify(parsed)).not.toContain("pilotName");
+  });
+
   it("accepts the technical scaffold command", () => {
     const parsed = commandEnvelopeSchema.parse({
       commandId: "4f6ef267-f2c3-4c20-95fe-283e6f4ecab1",
