@@ -60,16 +60,16 @@
       "d1_databases": [
         {
           "binding": "DB",
-          "database_name": "rundflug-leitstand-acceptance",
-          // Placeholder; insert the ID returned by `wrangler d1 create`.
-          "database_id": "00000000-0000-0000-0000-000000000001",
+          "database_name": "rundflug-leitstand",
+          "database_id": "a7de5fcd-654e-4e9f-ab20-83caaed74c02",
           "migrations_dir": "apps/worker/migrations"
         }
       ],
       "r2_buckets": [
         {
           "binding": "BACKUPS",
-          "bucket_name": "rundflug-leitstand-acceptance-backups"
+          "bucket_name": "rundflug-leitstand",
+          "jurisdiction": "eu"
         }
       ],
       "durable_objects": {
@@ -102,7 +102,8 @@
       "r2_buckets": [
         {
           "binding": "BACKUPS",
-          "bucket_name": "rundflug-leitstand-production-backups"
+          "bucket_name": "rundflug-leitstand-production-backups",
+          "jurisdiction": "eu"
         }
       ],
       "durable_objects": {
