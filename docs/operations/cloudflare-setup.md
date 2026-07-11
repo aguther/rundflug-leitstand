@@ -46,6 +46,20 @@ dokumentieren.
 
 ## 6. Deployment
 
+Vor dem Deployment je Umgebung den SHA-256-Hash der Administrator-PIN als Secret setzen. Die PIN
+selbst wird weder in Cloudflare-Konfiguration noch D1 gespeichert:
+
+```bash
+npx wrangler secret put ADMIN_PIN_HASH --env acceptance
+npx wrangler secret put ADMIN_PIN_HASH --env production
+```
+
+Geräte werden über zufällige Kopplungstokens authentisiert; ausschließlich deren SHA-256-Hashes werden
+in D1 gespeichert. Demo-Tokens aus dem lokalen Seed dürfen nicht in Acceptance oder Produktion
+übernommen werden.
+
+Danach:
+
 ```bash
 npm run deploy:acceptance
 npm run deploy:production
@@ -60,5 +74,5 @@ npm run deploy:production
 
 ## Noch nicht automatisiert
 
-Die Startfassung implementiert noch keinen vollständigen D1-Export nach R2, keine Push-Secrets und keine
-produktive Geräteauthentifizierung. Diese Punkte dürfen vor dem Echtbetrieb nicht als erledigt gelten.
+Die Startfassung implementiert noch keinen vollständigen D1-Export nach R2 und keine Push-Secrets.
+Diese Punkte dürfen vor dem Echtbetrieb nicht als erledigt gelten.

@@ -135,7 +135,7 @@ app.get("/api/events/:eventId/operations", async (context) => {
         queued_tickets: number;
       }>(),
     context.env.DB.prepare(
-      `SELECT r.id, r.flight_group_id, fg.communication_number, r.status, r.aircraft_id,
+      `SELECT r.id, r.flight_group_id, fg.communication_number, r.status, r.aircraft_id, r.called_at,
               a.registration AS aircraft_registration,
               (SELECT candidate.id FROM resource_group_memberships membership
                 JOIN aircraft candidate ON candidate.id = membership.aircraft_id
@@ -177,6 +177,7 @@ app.get("/api/events/:eventId/operations", async (context) => {
         ticket_group_id: string;
         ticket_count: number;
         product_name: string;
+        called_at: string | null;
       }>(),
     context.env.DB.prepare(
       `SELECT (julianday(landed_at) - julianday(departed_at)) * 1440.0 AS duration_minutes
@@ -264,6 +265,7 @@ app.get("/api/events/:eventId/operations", async (context) => {
           activeCapacity: activeAircraft,
         }),
       }).upperMinutes,
+      calledAt: rotation.called_at,
     })),
   });
 });

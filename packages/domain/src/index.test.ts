@@ -27,6 +27,13 @@ describe("command authorization", () => {
   it("rejects a display device for operational commands", () => {
     expect(() => assertRoleMayExecute("DISPLAY", "CALL_NEXT")).toThrowError(/darf CALL_NEXT nicht/);
   });
+
+  it("allows flight direction to trigger but not clear emergency mode", () => {
+    expect(() => assertRoleMayExecute("FLIGHT_DIRECTOR", "TRIGGER_EMERGENCY")).not.toThrow();
+    expect(() => assertRoleMayExecute("FLIGHT_DIRECTOR", "CLEAR_EMERGENCY")).toThrowError(
+      /darf CLEAR_EMERGENCY nicht/,
+    );
+  });
 });
 
 describe("sale guard", () => {

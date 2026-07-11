@@ -23,3 +23,10 @@ Gastnamen eingeführt.
 Ergänzt den SHA-256-Hash eines zufälligen Geräte-Tokens. Bestehende Geräte müssen nach der Migration
 neu gekoppelt werden, bevor sie schreiben dürfen; ein leerer Hash wird abgelehnt. Wiederherstellung
 erfolgt aus der Sicherung vor Migration. Tokens selbst werden weder in D1 noch in Logs gespeichert.
+
+## 0005 – Notfall, Unterbrechung und Korrektur
+
+Erweitert Geräte um die Rolle Flugleitung, ergänzt den Rücknahmezeitpunkt eines Aufrufs und führt
+historisierte betriebliche Blockierungen ein. Vor Anwendung ist eine Sicherung verpflichtend. Der
+Tabellenneuaufbau von `paired_devices` wird zuerst in Acceptance geprüft; Wiederherstellung erfolgt
+aus der Sicherung. Bestehende Credentials werden unverändert als Hash übernommen.
