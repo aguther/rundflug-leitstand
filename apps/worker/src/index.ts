@@ -138,8 +138,8 @@ app.get("/api/events/:eventId/operations", async (context) => {
     );
   }
 
-  const [products, rotations, durationRows, aircraftRows, fleetRows, pilotRows] = await Promise.all(
-    [
+  const [products, rotations, durationRows, aircraftRows, fleetRows, pilotRows, metricsRow] =
+    await Promise.all([
       context.env.DB.prepare(
         `SELECT p.id, p.name, p.resource_group_id, rg.name AS resource_group_name,
               rg.status AS resource_group_status, rg.operational_note AS resource_group_operational_note,
@@ -306,8 +306,57 @@ app.get("/api/events/:eventId/operations", async (context) => {
           paused: number;
           pause_expected_review_at: string | null;
         }>(),
-    ],
-  );
+      context.env.DB.prepare(
+        `SELECT
+          (SELECT COUNT(*) FROM tickets t JOIN ticket_groups tg ON tg.id = t.ticket_group_id
+            WHERE tg.operation_day_id = ?1 AND t.status = 'QUEUED') AS open_tickets,
+          (SELECT COUNT(*) FROM tickets t JOIN ticket_groups tg ON tg.id = t.ticket_group_id
+            WHERE tg.operation_day_id = ?1) AS sold_tickets,
+          (SELECT COUNT(*) FROM rotations WHERE operation_day_id = ?1 AND status = 'COMPLETED') AS completed_rotations,
+          (SELECT COUNT(*) FROM rotations WHERE operation_day_id = ?1
+            AND status IN ('CALLED', 'IN_FLIGHT', 'LANDED')) AS active_rotations,
+          (SELECT ROUND(AVG((julianday(departed_at) - julianday(called_at)) * 1440.0), 1)
+            FROM rotations WHERE operation_day_id = ?1 AND called_at IS NOT NULL AND departed_at IS NOT NULL)
+            AS average_boarding_minutes,
+          (SELECT ROUND(AVG((julianday(landed_at) - julianday(departed_at)) * 1440.0), 1)
+            FROM rotations WHERE operation_day_id = ?1 AND departed_at IS NOT NULL AND landed_at IS NOT NULL)
+            AS average_flight_minutes,
+          (SELECT ROUND(AVG((julianday(completed_at) - julianday(landed_at)) * 1440.0), 1)
+            FROM rotations WHERE operation_day_id = ?1 AND landed_at IS NOT NULL AND completed_at IS NOT NULL)
+            AS average_turnaround_minutes,
+          (SELECT ROUND(AVG((julianday(completed_at) - julianday(called_at)) * 1440.0), 1)
+            FROM rotations WHERE operation_day_id = ?1 AND called_at IS NOT NULL AND completed_at IS NOT NULL)
+            AS average_rotation_minutes,
+          (SELECT ROUND(AVG((julianday(r.called_at) - julianday(tg.sold_at)) * 1440.0), 1)
+            FROM ticket_groups tg
+            JOIN tickets t ON t.ticket_group_id = tg.id
+            JOIN rotation_tickets rt ON rt.ticket_id = t.id AND rt.released_at IS NULL
+            JOIN rotations r ON r.id = rt.rotation_id
+            WHERE tg.operation_day_id = ?1 AND r.called_at IS NOT NULL) AS average_wait_minutes,
+          (SELECT COALESCE(SUM(CASE WHEN t.status <> 'CANCELED' THEN t.price_cents ELSE 0 END), 0)
+            FROM tickets t JOIN ticket_groups tg ON tg.id = t.ticket_group_id
+            WHERE tg.operation_day_id = ?1) AS informational_revenue_cents,
+          (SELECT COUNT(*) FROM paired_devices WHERE operation_day_id = ?1 AND active = 1
+            AND last_seen_at >= ?2) AS active_devices,
+          (SELECT COUNT(*) FROM web_push_subscriptions WHERE operation_day_id = ?1
+            AND status = 'ACTIVE' AND delete_after > ?3) AS active_push_subscriptions`,
+      )
+        .bind(eventId, new Date(Date.now() - 120_000).toISOString(), new Date().toISOString())
+        .first<{
+          open_tickets: number;
+          sold_tickets: number;
+          completed_rotations: number;
+          active_rotations: number;
+          average_boarding_minutes: number | null;
+          average_flight_minutes: number | null;
+          average_turnaround_minutes: number | null;
+          average_rotation_minutes: number | null;
+          average_wait_minutes: number | null;
+          informational_revenue_cents: number;
+          active_devices: number;
+          active_push_subscriptions: number;
+        }>(),
+    ]);
 
   const actualDurations = durationRows.results.map((row) => row.duration_minutes);
   const activePilotCount = pilotRows.results.filter(
@@ -318,6 +367,7 @@ app.get("/api/events/:eventId/operations", async (context) => {
   const remainingOperatingMinutes = Math.max(0, (operationsEnd - Date.now()) / 60_000);
 
   return context.json({
+    currentDeviceRole: device.role,
     event: rowToSnapshot(eventRow),
     products: products.results.map((product) => {
       const groupAircraftSeats = aircraftRows.results
@@ -453,6 +503,20 @@ app.get("/api/events/:eventId/operations", async (context) => {
       paused: pilot.paused === 1,
       pauseExpectedReviewAt: pilot.pause_expected_review_at,
     })),
+    metrics: {
+      openTickets: metricsRow?.open_tickets ?? 0,
+      soldTickets: metricsRow?.sold_tickets ?? 0,
+      completedRotations: metricsRow?.completed_rotations ?? 0,
+      activeRotations: metricsRow?.active_rotations ?? 0,
+      averageBoardingMinutes: metricsRow?.average_boarding_minutes ?? null,
+      averageFlightMinutes: metricsRow?.average_flight_minutes ?? null,
+      averageTurnaroundMinutes: metricsRow?.average_turnaround_minutes ?? null,
+      averageRotationMinutes: metricsRow?.average_rotation_minutes ?? null,
+      averageWaitMinutes: metricsRow?.average_wait_minutes ?? null,
+      informationalRevenueCents: metricsRow?.informational_revenue_cents ?? 0,
+      activeDevices: metricsRow?.active_devices ?? 0,
+      activePushSubscriptions: metricsRow?.active_push_subscriptions ?? 0,
+    },
   });
 });
 
