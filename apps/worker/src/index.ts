@@ -5,6 +5,7 @@ import { secureHeaders } from "hono/secure-headers";
 import { createPortableBackup } from "./backup";
 import { sha256Hex, verifyCredential } from "./crypto";
 import { EventCoordinator } from "./event-coordinator";
+import { createCsv, createTextPdf } from "./report";
 import { rowToSnapshot } from "./snapshot";
 import type { Env, StoredEventRow } from "./types";
 import { isAllowedPushEndpoint, purgeExpiredPushSubscriptions } from "./web-push";
@@ -28,11 +29,6 @@ async function authorizeDevice(
     .bind(new Date().toISOString(), deviceId)
     .run();
   return { role: device.role };
-}
-
-function csvCell(value: string | number): string {
-  const text = String(value);
-  return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 }
 
 function eventCoordinatorNamespace(env: Env): DurableObjectNamespace {
@@ -534,13 +530,37 @@ app.get("/api/events/:eventId/history", async (context) => {
       403,
     );
   }
+  const conditions = ["operation_day_id = ?1"];
+  const bindings: Array<string | number> = [eventId];
+  const addFilter = (column: string, value: string | undefined) => {
+    if (!value?.trim()) return;
+    bindings.push(value.trim());
+    conditions.push(`${column} = ?${bindings.length}`);
+  };
+  addFilter("event_type", context.req.query("eventType"));
+  addFilter("aggregate_type", context.req.query("aggregateType"));
+  addFilter("aggregate_id", context.req.query("aggregateId"));
+  addFilter("device_id", context.req.query("deviceId"));
+  const since = context.req.query("since");
+  if (since && !Number.isNaN(Date.parse(since))) {
+    bindings.push(new Date(since).toISOString());
+    conditions.push(`occurred_at >= ?${bindings.length}`);
+  }
+  const until = context.req.query("until");
+  if (until && !Number.isNaN(Date.parse(until))) {
+    bindings.push(new Date(until).toISOString());
+    conditions.push(`occurred_at <= ?${bindings.length}`);
+  }
+  const requestedLimit = Number.parseInt(context.req.query("limit") ?? "200", 10);
+  const limit = Math.min(Math.max(Number.isFinite(requestedLimit) ? requestedLimit : 200, 1), 1000);
+  bindings.push(limit);
   const rows = await context.env.DB.prepare(
     `SELECT sequence, event_type, occurred_at, device_id, aggregate_type, aggregate_id,
             aggregate_version, payload_json
-       FROM operational_events WHERE operation_day_id = ?1
-      ORDER BY sequence DESC LIMIT 200`,
+       FROM operational_events WHERE ${conditions.join(" AND ")}
+      ORDER BY sequence DESC LIMIT ?${bindings.length}`,
   )
-    .bind(eventId)
+    .bind(...bindings)
     .all<{
       sequence: number;
       event_type: string;
@@ -654,7 +674,7 @@ app.get("/api/events/:eventId/reports/daily.csv", async (context) => {
       row.amount_cents,
     ]),
   ];
-  const csv = `\uFEFF${lines.map((line) => line.map(csvCell).join(";")).join("\r\n")}\r\n`;
+  const csv = createCsv(lines);
   return new Response(csv, {
     headers: {
       "content-type": "text/csv; charset=utf-8",
@@ -662,6 +682,135 @@ app.get("/api/events/:eventId/reports/daily.csv", async (context) => {
       "cache-control": "no-store",
     },
   });
+});
+
+app.get("/api/events/:eventId/exports/tickets.csv", async (context) => {
+  const eventId = context.req.param("eventId");
+  const device = await authorizeDevice(
+    context.env,
+    eventId,
+    context.req.header("x-device-id"),
+    context.req.header("x-device-token"),
+  );
+  if (!device || !["ADMIN", "CASHIER", "FLIGHT_DIRECTOR"].includes(device.role)) {
+    return context.json(
+      { error: { code: "DEVICE_NOT_AUTHORIZED", message: "Gerät nicht berechtigt." } },
+      403,
+    );
+  }
+  const rows = await context.env.DB.prepare(
+    `SELECT t.id AS ticket_id, t.status AS ticket_status, t.weight_class,
+            t.payment_method, t.payment_status, t.price_cents, t.created_at,
+            tg.id AS ticket_group_id, tg.queue_sequence, tg.standby,
+            p.id AS product_id, p.name AS product_name,
+            rg.id AS resource_group_id, rg.name AS resource_group_name,
+            fg.communication_number, r.id AS rotation_id, r.status AS rotation_status,
+            a.registration, pl.operational_code AS pilot_code,
+            r.called_at, r.departed_at, r.landed_at, r.completed_at
+       FROM tickets t
+       JOIN ticket_groups tg ON tg.id = t.ticket_group_id
+       JOIN products p ON p.id = tg.product_id
+       JOIN resource_groups rg ON rg.id = p.resource_group_id
+       LEFT JOIN rotation_tickets rt ON rt.ticket_id = t.id AND rt.released_at IS NULL
+       LEFT JOIN rotations r ON r.id = rt.rotation_id
+       LEFT JOIN flight_groups fg ON fg.id = r.flight_group_id
+       LEFT JOIN aircraft a ON a.id = r.aircraft_id
+       LEFT JOIN pilots pl ON pl.id = r.pilot_id
+      WHERE tg.operation_day_id = ?1
+      ORDER BY t.created_at, t.id`,
+  )
+    .bind(eventId)
+    .all<Record<string, string | number | null>>();
+  const columns = [
+    "ticket_id",
+    "ticket_status",
+    "weight_class",
+    "payment_method",
+    "payment_status",
+    "price_cents",
+    "created_at",
+    "ticket_group_id",
+    "queue_sequence",
+    "standby",
+    "product_id",
+    "product_name",
+    "resource_group_id",
+    "resource_group_name",
+    "communication_number",
+    "rotation_id",
+    "rotation_status",
+    "registration",
+    "pilot_code",
+    "called_at",
+    "departed_at",
+    "landed_at",
+    "completed_at",
+  ];
+  return new Response(
+    createCsv([
+      columns,
+      ...rows.results.map((row) => columns.map((column) => row[column] ?? null)),
+    ]),
+    {
+      headers: {
+        "content-type": "text/csv; charset=utf-8",
+        "content-disposition": `attachment; filename="rohdaten-tickets-${eventId}.csv"`,
+        "cache-control": "no-store",
+      },
+    },
+  );
+});
+
+app.get("/api/events/:eventId/reports/daily.pdf", async (context) => {
+  const eventId = context.req.param("eventId");
+  const device = await authorizeDevice(
+    context.env,
+    eventId,
+    context.req.header("x-device-id"),
+    context.req.header("x-device-token"),
+  );
+  if (!device || !["ADMIN", "CASHIER", "FLIGHT_DIRECTOR"].includes(device.role)) {
+    return context.json(
+      { error: { code: "DEVICE_NOT_AUTHORIZED", message: "Gerät nicht berechtigt." } },
+      403,
+    );
+  }
+  const summary = await context.env.DB.prepare(
+    `SELECT od.name, od.event_date,
+            (SELECT COUNT(*) FROM tickets t JOIN ticket_groups tg ON tg.id = t.ticket_group_id WHERE tg.operation_day_id = od.id) AS tickets,
+            (SELECT COUNT(*) FROM tickets t JOIN ticket_groups tg ON tg.id = t.ticket_group_id WHERE tg.operation_day_id = od.id AND t.status = 'CANCELED') AS cancellations,
+            (SELECT COALESCE(SUM(t.price_cents), 0) FROM tickets t JOIN ticket_groups tg ON tg.id = t.ticket_group_id WHERE tg.operation_day_id = od.id AND t.status <> 'CANCELED') AS revenue,
+            (SELECT COUNT(*) FROM rotations r WHERE r.operation_day_id = od.id AND r.status = 'COMPLETED') AS completed_rotations,
+            (SELECT ROUND(AVG((julianday(r.completed_at) - julianday(r.called_at)) * 1440), 1) FROM rotations r WHERE r.operation_day_id = od.id AND r.completed_at IS NOT NULL) AS average_rotation
+       FROM operation_days od
+      WHERE od.id = ?1`,
+  )
+    .bind(eventId)
+    .first<Record<string, string | number | null>>();
+  if (!summary)
+    return context.json(
+      { error: { code: "EVENT_NOT_FOUND", message: "Veranstaltung nicht gefunden." } },
+      404,
+    );
+  const pdf = createTextPdf(`Tagesbericht ${String(summary.name)}`, [
+    `Datum: ${String(summary.event_date)}`,
+    `Tickets: ${String(summary.tickets ?? 0)}`,
+    `Stornos: ${String(summary.cancellations ?? 0)}`,
+    `Abgeschlossene Umlaeufe: ${String(summary.completed_rotations ?? 0)}`,
+    `Mittlere Umlaufzeit: ${String(summary.average_rotation ?? "-")} Minuten`,
+    `Informatorischer Umsatz: ${(Number(summary.revenue ?? 0) / 100).toFixed(2)} EUR`,
+    "Zeitangaben basieren auf bestaetigten operativen Ist-Ereignissen.",
+  ]);
+  return new Response(
+    pdf.buffer.slice(pdf.byteOffset, pdf.byteOffset + pdf.byteLength) as ArrayBuffer,
+    {
+      headers: {
+        "content-type": "application/pdf",
+        "content-disposition": `attachment; filename="tagesbericht-${eventId}.pdf"`,
+        "cache-control": "no-store",
+      },
+    },
+  );
 });
 
 app.get("/api/public/tickets/:ticketCode", async (context) => {
