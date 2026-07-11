@@ -677,7 +677,7 @@ p {
 }
 .pilot-list > div {
   display: grid;
-  grid-template-columns: 1fr 1fr auto;
+  grid-template-columns: 1fr 1fr auto auto;
   align-items: center;
   gap: 10px;
   padding: 8px 0;

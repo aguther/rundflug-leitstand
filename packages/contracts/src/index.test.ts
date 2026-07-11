@@ -173,6 +173,37 @@ describe("commandEnvelopeSchema", () => {
     ).toThrow();
   });
 
+  it("requires both aircraft and anonymous pilot confirmation for NEXT", () => {
+    const parsed = commandEnvelopeSchema.parse({
+      commandId: "00e971df-23d5-4d28-9107-92b447416294",
+      eventId: "demo-2026",
+      deviceId: "flight-line-tablet-1",
+      expectedVersion: 4,
+      issuedAt: "2026-07-11T12:00:00.000Z",
+      type: "CALL_NEXT",
+      payload: { rotationId: "rotation-1", aircraftId: "aircraft-1", pilotId: "pilot-code-1" },
+    });
+    expect(parsed.type).toBe("CALL_NEXT");
+  });
+
+  it("validates an anonymous pilot pause with optional review time", () => {
+    const parsed = commandEnvelopeSchema.parse({
+      commandId: "00e971df-23d5-4d28-9107-92b447416295",
+      eventId: "demo-2026",
+      deviceId: "flight-line-lead-1",
+      expectedVersion: 5,
+      issuedAt: "2026-07-11T12:00:00.000Z",
+      type: "SET_PILOT_PAUSE",
+      payload: {
+        pilotId: "pilot-code-1",
+        paused: true,
+        reason: "Organisatorische Pause",
+        expectedReviewAt: "2026-07-11T12:30:00.000Z",
+      },
+    });
+    expect(parsed.type).toBe("SET_PILOT_PAUSE");
+  });
+
   it("keeps public DTOs free of aircraft and guest identity", () => {
     const status = publicTicketStatusSchema.parse({
       productName: "Panorama",

@@ -180,6 +180,27 @@ app.get("/api/events/:eventId/operations", async (context) => {
       context.env.DB.prepare(
         `SELECT r.id, r.flight_group_id, fg.resource_group_id, fg.communication_number, r.status, r.aircraft_id, r.called_at,
               a.registration AS aircraft_registration,
+              r.pilot_id, assigned_pilot.operational_code AS pilot_operational_code,
+              (SELECT available_pilot.id FROM pilots available_pilot
+                WHERE available_pilot.operation_day_id = r.operation_day_id
+                  AND available_pilot.active = 1 AND available_pilot.paused = 0
+                  AND NOT EXISTS (
+                    SELECT 1 FROM rotations pilot_rotation
+                     WHERE pilot_rotation.operation_day_id = r.operation_day_id
+                       AND pilot_rotation.pilot_id = available_pilot.id
+                       AND pilot_rotation.status IN ('CALLED', 'IN_FLIGHT', 'LANDED')
+                  )
+                ORDER BY available_pilot.operational_code LIMIT 1) AS suggested_pilot_id,
+              (SELECT available_pilot.operational_code FROM pilots available_pilot
+                WHERE available_pilot.operation_day_id = r.operation_day_id
+                  AND available_pilot.active = 1 AND available_pilot.paused = 0
+                  AND NOT EXISTS (
+                    SELECT 1 FROM rotations pilot_rotation
+                     WHERE pilot_rotation.operation_day_id = r.operation_day_id
+                       AND pilot_rotation.pilot_id = available_pilot.id
+                       AND pilot_rotation.status IN ('CALLED', 'IN_FLIGHT', 'LANDED')
+                  )
+                ORDER BY available_pilot.operational_code LIMIT 1) AS suggested_pilot_operational_code,
               (SELECT candidate.id FROM resource_group_memberships membership
                 JOIN aircraft candidate ON candidate.id = membership.aircraft_id
                WHERE membership.operation_day_id = r.operation_day_id
@@ -199,6 +220,7 @@ app.get("/api/events/:eventId/operations", async (context) => {
          FROM rotations r
          JOIN flight_groups fg ON fg.id = r.flight_group_id
          LEFT JOIN aircraft a ON a.id = r.aircraft_id
+         LEFT JOIN pilots assigned_pilot ON assigned_pilot.id = r.pilot_id
          LEFT JOIN rotation_tickets rt ON rt.rotation_id = r.id AND rt.released_at IS NULL
          LEFT JOIN tickets t ON t.id = rt.ticket_id
          LEFT JOIN ticket_groups tg ON tg.id = t.ticket_group_id
@@ -216,6 +238,10 @@ app.get("/api/events/:eventId/operations", async (context) => {
           status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
           aircraft_id: string | null;
           aircraft_registration: string | null;
+          pilot_id: string | null;
+          pilot_operational_code: string | null;
+          suggested_pilot_id: string | null;
+          suggested_pilot_operational_code: string | null;
           suggested_aircraft_id: string | null;
           suggested_aircraft_registration: string | null;
           ticket_group_id: string;
@@ -269,14 +295,24 @@ app.get("/api/events/:eventId/operations", async (context) => {
           expected_review_at: string | null;
         }>(),
       context.env.DB.prepare(
-        "SELECT id, operational_code, active FROM pilots WHERE operation_day_id = ?1 ORDER BY operational_code",
+        `SELECT id, operational_code, active, paused, pause_expected_review_at
+         FROM pilots WHERE operation_day_id = ?1 ORDER BY operational_code`,
       )
         .bind(eventId)
-        .all<{ id: string; operational_code: string; active: number }>(),
+        .all<{
+          id: string;
+          operational_code: string;
+          active: number;
+          paused: number;
+          pause_expected_review_at: string | null;
+        }>(),
     ],
   );
 
   const actualDurations = durationRows.results.map((row) => row.duration_minutes);
+  const activePilotCount = pilotRows.results.filter(
+    (pilot) => pilot.active === 1 && pilot.paused === 0,
+  ).length;
   const dataAgeMinutes = Math.max(0, (Date.now() - Date.parse(eventRow.updated_at)) / 60_000);
   const operationsEnd = eventRow.operations_end_at ? Date.parse(eventRow.operations_end_at) : 0;
   const remainingOperatingMinutes = Math.max(0, (operationsEnd - Date.now()) / 60_000);
@@ -286,7 +322,8 @@ app.get("/api/events/:eventId/operations", async (context) => {
     products: products.results.map((product) => {
       const groupAircraftSeats = aircraftRows.results
         .filter((aircraft) => aircraft.resource_group_id === product.resource_group_id)
-        .map((aircraft) => aircraft.passenger_seats);
+        .map((aircraft) => aircraft.passenger_seats)
+        .slice(0, activePilotCount);
       const reservedRefuelSeats = aircraftRows.results
         .filter(
           (aircraft) =>
@@ -353,6 +390,7 @@ app.get("/api/events/:eventId/operations", async (context) => {
       const activeAircraft = aircraftRows.results.filter(
         (aircraft) => aircraft.resource_group_id === rotation.resource_group_id,
       ).length;
+      const effectiveActiveCapacity = Math.min(activeAircraft, activePilotCount);
       return {
         id: rotation.id,
         flightGroupId: rotation.flight_group_id,
@@ -362,29 +400,33 @@ app.get("/api/events/:eventId/operations", async (context) => {
         ticketGroupId: rotation.ticket_group_id,
         aircraftId: rotation.aircraft_id,
         aircraftRegistration: rotation.aircraft_registration,
+        pilotId: rotation.pilot_id,
+        pilotOperationalCode: rotation.pilot_operational_code,
+        suggestedPilotId: rotation.suggested_pilot_id,
+        suggestedPilotOperationalCode: rotation.suggested_pilot_operational_code,
         suggestedAircraftId: rotation.suggested_aircraft_id,
         suggestedAircraftRegistration: rotation.suggested_aircraft_registration,
         ticketCount: rotation.ticket_count,
         predictedLowerMinutes: forecastQueueWindows({
           queueSequence: index + 1,
-          activeAircraft,
+          activeAircraft: effectiveActiveCapacity,
           duration: estimateDuration({
             referenceMinutes: 20,
             actualDurationsMinutes: actualDurations,
             dataAgeMinutes,
             interrupted: eventRow.emergency_mode === 1 || eventRow.operational_interrupted === 1,
-            activeCapacity: activeAircraft,
+            activeCapacity: effectiveActiveCapacity,
           }),
         }).lowerMinutes,
         predictedUpperMinutes: forecastQueueWindows({
           queueSequence: index + 1,
-          activeAircraft,
+          activeAircraft: effectiveActiveCapacity,
           duration: estimateDuration({
             referenceMinutes: 20,
             actualDurationsMinutes: actualDurations,
             dataAgeMinutes,
             interrupted: eventRow.emergency_mode === 1 || eventRow.operational_interrupted === 1,
-            activeCapacity: activeAircraft,
+            activeCapacity: effectiveActiveCapacity,
           }),
         }).upperMinutes,
         calledAt: rotation.called_at,
@@ -408,6 +450,8 @@ app.get("/api/events/:eventId/operations", async (context) => {
       id: pilot.id,
       operationalCode: pilot.operational_code,
       active: pilot.active === 1,
+      paused: pilot.paused === 1,
+      pauseExpectedReviewAt: pilot.pause_expected_review_at,
     })),
   });
 });

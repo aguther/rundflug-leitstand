@@ -490,7 +490,11 @@ function FlightLineView() {
           {
             ...commandBase,
             type: "CALL_NEXT",
-            payload: { rotationId: selected.id, aircraftId: selected.suggestedAircraftId ?? "" },
+            payload: {
+              rotationId: selected.id,
+              aircraftId: selected.suggestedAircraftId ?? "",
+              pilotId: selected.suggestedPilotId ?? "",
+            },
           },
           deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
         );
@@ -604,6 +608,15 @@ function FlightLineView() {
                         : "Kein kompatibles Flugzeug verfügbar")}
                   </dd>
                 </div>
+                <div>
+                  <dt>Pilotencode</dt>
+                  <dd>
+                    {selected.pilotOperationalCode ??
+                      (selected.suggestedPilotOperationalCode
+                        ? `Vorschlag ${selected.suggestedPilotOperationalCode} · Bestätigung mit NEXT`
+                        : "Kein anonymer Pilotencode verfügbar")}
+                  </dd>
+                </div>
               </dl>
               {selected.status === "LANDED" ? (
                 <p className="landed-warning">Gelandet · noch nicht verfügbar</p>
@@ -654,6 +667,7 @@ function FlightLineView() {
                   disabled={
                     action.command === "CALL_NEXT" &&
                     (!selected.suggestedAircraftId ||
+                      !selected.suggestedPilotId ||
                       board?.event.emergencyMode ||
                       board?.event.operationalInterrupted)
                   }
@@ -1311,6 +1325,29 @@ function AdminView() {
     }
   }
 
+  async function setPilotPause(pilotId: string, paused: boolean) {
+    if (!board || reason.trim().length < 3) return;
+    try {
+      await sendCommand(
+        {
+          commandId: crypto.randomUUID(),
+          eventId: EVENT_ID,
+          deviceId: ADMIN_DEVICE_ID,
+          expectedVersion: board.event.version,
+          issuedAt: new Date().toISOString(),
+          type: "SET_PILOT_PAUSE",
+          payload: { pilotId, paused, reason: reason.trim(), expectedReviewAt: null },
+        },
+        deviceTokenFor(ADMIN_DEVICE_ID),
+      );
+      setMessage(paused ? "Anonyme Pilotenpause gestartet." : "Anonyme Pilotenpause beendet.");
+      await refresh();
+      await refreshHistory();
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : "Pilotenpause fehlgeschlagen.");
+    }
+  }
+
   async function exportDailyReport() {
     try {
       await downloadDailyReport(EVENT_ID, ADMIN_DEVICE_ID, deviceTokenFor(ADMIN_DEVICE_ID));
@@ -1569,7 +1606,14 @@ function AdminView() {
             {board?.pilots.map((pilot) => (
               <div key={pilot.id}>
                 <strong>{pilot.operationalCode}</strong>
-                <span>{pilot.active ? "aktiv" : "inaktiv"}</span>
+                <span>{pilot.active ? (pilot.paused ? "Pause" : "aktiv") : "inaktiv"}</span>
+                <button
+                  disabled={!pilot.active || reason.trim().length < 3}
+                  onClick={() => setPilotPause(pilot.id, !pilot.paused)}
+                  type="button"
+                >
+                  {pilot.paused ? "Pause beenden" : "Pause starten"}
+                </button>
                 <button
                   disabled={reason.trim().length < 3 || adminPin.length < 4}
                   onClick={() => upsertPilot(pilot.id, pilot.operationalCode, !pilot.active)}

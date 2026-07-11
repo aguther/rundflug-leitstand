@@ -215,7 +215,7 @@ export class EventCoordinator extends DurableObject<Env> {
           }
           throw reason;
         }
-        const [aircraftRows, openTicketRow] = await Promise.all([
+        const [aircraftRows, openTicketRow, pilotCountRow] = await Promise.all([
           this.env.DB.prepare(
             `SELECT a.passenger_seats, a.refuel_planned FROM aircraft a
                JOIN resource_group_memberships m ON m.aircraft_id = a.id
@@ -232,6 +232,11 @@ export class EventCoordinator extends DurableObject<Env> {
           )
             .bind(product.resource_group_id)
             .first<{ open_tickets: number }>(),
+          this.env.DB.prepare(
+            "SELECT COUNT(*) AS count FROM pilots WHERE operation_day_id = ?1 AND active = 1 AND paused = 0",
+          )
+            .bind(command.eventId)
+            .first<{ count: number }>(),
         ]);
         if (!current.operations_end_at) {
           return json(
@@ -250,7 +255,9 @@ export class EventCoordinator extends DurableObject<Env> {
             (Date.parse(current.operations_end_at) - Date.now()) / 60_000,
           ),
           expectedRotationMinutes: product.reference_duration_minutes,
-          activeAircraftSeats: aircraftRows.results.map((row) => row.passenger_seats),
+          activeAircraftSeats: aircraftRows.results
+            .map((row) => row.passenger_seats)
+            .slice(0, pilotCountRow?.count ?? 0),
           reservedSeats: aircraftRows.results
             .filter((row) => row.refuel_planned === 1)
             .reduce((sum, row) => sum + row.passenger_seats, 0),
@@ -398,6 +405,7 @@ export class EventCoordinator extends DurableObject<Env> {
           command.type === "SET_AIRCRAFT_OPERATIONAL_STATE" ||
           command.type === "SCHEDULE_AIRCRAFT_REFUEL" ||
           command.type === "CONFIGURE_AIRCRAFT_REFUEL_THRESHOLD" ||
+          command.type === "SET_PILOT_PAUSE" ||
           command.type === "UPSERT_PILOT"
         ) {
           return this.handleFleetAdministration(command, current);
@@ -557,6 +565,7 @@ export class EventCoordinator extends DurableObject<Env> {
           | "SET_AIRCRAFT_OPERATIONAL_STATE"
           | "SCHEDULE_AIRCRAFT_REFUEL"
           | "CONFIGURE_AIRCRAFT_REFUEL_THRESHOLD"
+          | "SET_PILOT_PAUSE"
           | "UPSERT_PILOT";
       }
     >,
@@ -583,42 +592,99 @@ export class EventCoordinator extends DurableObject<Env> {
     let eventType: string;
     let auditPayload: Record<string, unknown>;
 
-    if (command.type === "UPSERT_PILOT") {
-      const duplicateCode = await this.env.DB.prepare(
-        "SELECT id FROM pilots WHERE operation_day_id = ?1 AND operational_code = ?2 AND id <> ?3",
-      )
-        .bind(command.eventId, command.payload.operationalCode, command.payload.pilotId)
-        .first<{ id: string }>();
-      if (duplicateCode) {
-        return json(
-          {
-            error: { code: "PILOT_CODE_EXISTS", message: "Operatives Pilotenkürzel ist vergeben." },
-          },
-          { status: 409 },
+    if (command.type === "UPSERT_PILOT" || command.type === "SET_PILOT_PAUSE") {
+      if (command.type === "SET_PILOT_PAUSE") {
+        const pilot = await this.env.DB.prepare(
+          "SELECT id, operational_code, active, paused FROM pilots WHERE id = ?1 AND operation_day_id = ?2",
+        )
+          .bind(command.payload.pilotId, command.eventId)
+          .first<{ id: string; operational_code: string; active: number; paused: number }>();
+        if (!pilot) {
+          return json(
+            { error: { code: "PILOT_NOT_FOUND", message: "Pilotencode nicht gefunden." } },
+            { status: 404 },
+          );
+        }
+        if (command.payload.paused) {
+          const activeRotation = await this.env.DB.prepare(
+            `SELECT id FROM rotations WHERE operation_day_id = ?1 AND pilot_id = ?2
+              AND status IN ('CALLED', 'IN_FLIGHT', 'LANDED') LIMIT 1`,
+          )
+            .bind(command.eventId, pilot.id)
+            .first<{ id: string }>();
+          if (activeRotation) {
+            return json(
+              {
+                error: {
+                  code: "PILOT_ASSIGNED_ACTIVE_ROTATION",
+                  message: "Pilotencode ist noch an einen aktiven Umlauf gebunden.",
+                },
+              },
+              { status: 409 },
+            );
+          }
+        }
+        statements.push(
+          this.env.DB.prepare(
+            `UPDATE pilots SET paused = ?1, pause_expected_review_at = ?2, updated_at = ?3
+              WHERE id = ?4 AND operation_day_id = ?5`,
+          ).bind(
+            command.payload.paused ? 1 : 0,
+            command.payload.paused ? command.payload.expectedReviewAt : null,
+            now,
+            pilot.id,
+            command.eventId,
+          ),
         );
-      }
-      statements.push(
-        this.env.DB.prepare(
-          `INSERT INTO pilots (id, operation_day_id, operational_code, active, created_at, updated_at)
+        aggregateType = "PILOT";
+        aggregateId = pilot.id;
+        eventType = command.payload.paused ? "PILOT_PAUSE_STARTED" : "PILOT_PAUSE_ENDED";
+        auditPayload = {
+          operationalCode: pilot.operational_code,
+          paused: command.payload.paused,
+          reason: command.payload.reason,
+          expectedReviewAt: command.payload.expectedReviewAt,
+        };
+      } else {
+        const duplicateCode = await this.env.DB.prepare(
+          "SELECT id FROM pilots WHERE operation_day_id = ?1 AND operational_code = ?2 AND id <> ?3",
+        )
+          .bind(command.eventId, command.payload.operationalCode, command.payload.pilotId)
+          .first<{ id: string }>();
+        if (duplicateCode) {
+          return json(
+            {
+              error: {
+                code: "PILOT_CODE_EXISTS",
+                message: "Operatives Pilotenkürzel ist vergeben.",
+              },
+            },
+            { status: 409 },
+          );
+        }
+        statements.push(
+          this.env.DB.prepare(
+            `INSERT INTO pilots (id, operation_day_id, operational_code, active, created_at, updated_at)
            VALUES (?1, ?2, ?3, ?4, ?5, ?5)
            ON CONFLICT(id) DO UPDATE SET operational_code = excluded.operational_code,
              active = excluded.active, updated_at = excluded.updated_at`,
-        ).bind(
-          command.payload.pilotId,
-          command.eventId,
-          command.payload.operationalCode,
-          command.payload.active ? 1 : 0,
-          now,
-        ),
-      );
-      aggregateType = "PILOT";
-      aggregateId = command.payload.pilotId;
-      eventType = "PILOT_CONFIGURATION_CHANGED";
-      auditPayload = {
-        operationalCode: command.payload.operationalCode,
-        active: command.payload.active,
-        reason: command.payload.reason,
-      };
+          ).bind(
+            command.payload.pilotId,
+            command.eventId,
+            command.payload.operationalCode,
+            command.payload.active ? 1 : 0,
+            now,
+          ),
+        );
+        aggregateType = "PILOT";
+        aggregateId = command.payload.pilotId;
+        eventType = "PILOT_CONFIGURATION_CHANGED";
+        auditPayload = {
+          operationalCode: command.payload.operationalCode,
+          active: command.payload.active,
+          reason: command.payload.reason,
+        };
+      }
     } else {
       const aircraft = await this.env.DB.prepare(
         `SELECT id, operational_state, rotations_since_refuel, refuel_planned, operational_interrupted
@@ -1029,7 +1095,7 @@ export class EventCoordinator extends DurableObject<Env> {
     current: StoredEventRow,
   ): Promise<Response> {
     const rotation = await this.env.DB.prepare(
-      "SELECT id, status, version, aircraft_id FROM rotations WHERE id = ?1 AND operation_day_id = ?2",
+      "SELECT id, status, version, aircraft_id, pilot_id FROM rotations WHERE id = ?1 AND operation_day_id = ?2",
     )
       .bind(command.payload.rotationId, command.eventId)
       .first<{
@@ -1037,6 +1103,7 @@ export class EventCoordinator extends DurableObject<Env> {
         status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
         version: number;
         aircraft_id: string | null;
+        pilot_id: string | null;
       }>();
     if (!rotation)
       return json(
@@ -1076,6 +1143,29 @@ export class EventCoordinator extends DurableObject<Env> {
             error: {
               code: "AIRCRAFT_CAPACITY_EXCEEDED",
               message: "Flugzeugkapazität reicht nicht aus.",
+            },
+          },
+          { status: 409 },
+        );
+      }
+      const pilot = await this.env.DB.prepare(
+        `SELECT p.id FROM pilots p
+          WHERE p.id = ?1 AND p.operation_day_id = ?2 AND p.active = 1 AND p.paused = 0
+            AND NOT EXISTS (
+              SELECT 1 FROM rotations active_rotation
+               WHERE active_rotation.operation_day_id = p.operation_day_id
+                 AND active_rotation.pilot_id = p.id
+                 AND active_rotation.status IN ('CALLED', 'IN_FLIGHT', 'LANDED')
+            )`,
+      )
+        .bind(command.payload.pilotId, command.eventId)
+        .first<{ id: string }>();
+      if (!pilot) {
+        return json(
+          {
+            error: {
+              code: "PILOT_NOT_AVAILABLE",
+              message: "Pilotencode ist nicht aktiv verfügbar.",
             },
           },
           { status: 409 },
@@ -1125,6 +1215,14 @@ export class EventCoordinator extends DurableObject<Env> {
         { status: 409 },
       );
     }
+    const selectedPilotId =
+      command.type === "CALL_NEXT" ? command.payload.pilotId : rotation.pilot_id;
+    if (!selectedPilotId) {
+      return json(
+        { error: { code: "PILOT_ASSIGNMENT_REQUIRED", message: "Pilotenzuordnung fehlt." } },
+        { status: 409 },
+      );
+    }
     const aircraftState = {
       CALL_NEXT: "BOARDING",
       MARK_IN_FLIGHT: "IN_FLIGHT",
@@ -1137,8 +1235,9 @@ export class EventCoordinator extends DurableObject<Env> {
       ).bind(nextVersion, now, command.eventId, current.version),
       this.env.DB.prepare(
         `UPDATE rotations SET status = ?1, ${timestampColumn[command.type]} = ?2, aircraft_id = ?3,
-                version = version + 1, updated_at = ?2 WHERE id = ?4 AND version = ?5`,
-      ).bind(nextState, now, selectedAircraftId, rotation.id, rotation.version),
+                pilot_id = ?4, version = version + 1, updated_at = ?2
+          WHERE id = ?5 AND version = ?6`,
+      ).bind(nextState, now, selectedAircraftId, selectedPilotId, rotation.id, rotation.version),
       this.env.DB.prepare(
         `UPDATE aircraft SET operational_state = ?1, updated_at = ?2,
                 rotations_since_refuel = rotations_since_refuel + ?4 WHERE id = ?3`,
@@ -1157,7 +1256,12 @@ export class EventCoordinator extends DurableObject<Env> {
         command.deviceId,
         rotation.id,
         rotation.version + 1,
-        JSON.stringify({ from: rotation.status, to: nextState }),
+        JSON.stringify({
+          from: rotation.status,
+          to: nextState,
+          aircraftId: selectedAircraftId,
+          pilotId: selectedPilotId,
+        }),
       ),
       this.env.DB.prepare(`INSERT INTO idempotency_receipts (command_id, operation_day_id, device_id, command_type, received_at, response_json)
         VALUES (?1, ?2, ?3, ?4, ?5, ?6)`).bind(
@@ -1682,7 +1786,7 @@ export class EventCoordinator extends DurableObject<Env> {
         "UPDATE operation_days SET version = ?1, updated_at = ?2 WHERE id = ?3 AND version = ?4",
       ).bind(nextVersion, now, command.eventId, current.version),
       this.env.DB.prepare(
-        `UPDATE rotations SET status = 'DRAFT', aircraft_id = NULL, call_revoked_at = ?1,
+        `UPDATE rotations SET status = 'DRAFT', aircraft_id = NULL, pilot_id = NULL, call_revoked_at = ?1,
                 version = version + 1, updated_at = ?1 WHERE id = ?2 AND version = ?3`,
       ).bind(now, rotation.id, rotation.version),
     ];
