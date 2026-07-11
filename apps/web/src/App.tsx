@@ -63,6 +63,7 @@ type TicketDetail = {
   weightClass: WeightClass;
   individualWeightKg: number | null;
 };
+type TicketReceipt = { code: string; statusUrl: string; qrDataUrl: string };
 const weightClassLabel: Record<WeightClass, string> = {
   NOT_CAPTURED: "Nicht erfassen",
   CHILD: "Kind",
@@ -239,7 +240,9 @@ function CashierView() {
     }
   });
   const [busy, setBusy] = useState(false);
-  const [receipt, setReceipt] = useState<string[]>([]);
+  const [receipt, setReceipt] = useState<TicketReceipt[]>([]);
+  const [ticketCodeMode, setTicketCodeMode] = useState<"GENERATED" | "PREPRINTED">("GENERATED");
+  const [preprintedCodes, setPreprintedCodes] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [lastTicketGroupId, setLastTicketGroupId] = useState<string | null>(null);
   const [lastProductId, setLastProductId] = useState<string | null>(null);
@@ -272,7 +275,24 @@ function CashierView() {
 
   async function sell() {
     if (!board || !product || busy) return;
-    const codes = Array.from({ length: size }, createTicketCode);
+    const codes =
+      ticketCodeMode === "GENERATED"
+        ? Array.from({ length: size }, createTicketCode)
+        : preprintedCodes
+            .toUpperCase()
+            .split(/[\s,;]+/)
+            .map((code) => code.trim())
+            .filter(Boolean);
+    if (
+      codes.length !== size ||
+      new Set(codes).size !== codes.length ||
+      codes.some((code) => !/^[A-Z2-9]{12,32}$/.test(code))
+    ) {
+      setMessage(
+        `Für die Gruppe werden ${size} eindeutige vorgedruckte Codes mit jeweils 12–32 Zeichen benötigt.`,
+      );
+      return;
+    }
     setBusy(true);
     try {
       const saleResult = await sendCommand(
@@ -294,7 +314,23 @@ function CashierView() {
         },
         deviceTokenFor(CASHIER_DEVICE_ID),
       );
-      setReceipt(codes);
+      setReceipt(
+        await Promise.all(
+          codes.map(async (code) => {
+            const statusUrl = `${window.location.origin}/ticket/${encodeURIComponent(code)}`;
+            return {
+              code,
+              statusUrl,
+              qrDataUrl: await QRCode.toDataURL(statusUrl, {
+                errorCorrectionLevel: "M",
+                margin: 2,
+                width: 280,
+              }),
+            };
+          }),
+        ),
+      );
+      setPreprintedCodes("");
       setLastTicketGroupId(saleResult.aggregate?.id ?? null);
       setLastProductId(product.id);
       setCorrectionTargetLabel("Letzter Verkauf");
@@ -445,6 +481,29 @@ function CashierView() {
               </button>
             </div>
             <p>Keine Namen und keine Telefonnummern.</p>
+            <label className="ticket-code-mode">
+              Ticket-Ausgabe
+              <select
+                value={ticketCodeMode}
+                onChange={(event) =>
+                  setTicketCodeMode(event.target.value as "GENERATED" | "PREPRINTED")
+                }
+              >
+                <option value="GENERATED">QR-Tickets erzeugen</option>
+                <option value="PREPRINTED">Vorgedruckte Codes scannen</option>
+              </select>
+            </label>
+            {ticketCodeMode === "PREPRINTED" ? (
+              <label className="preprinted-code-input">
+                Codes · einer pro Ticket
+                <textarea
+                  rows={Math.min(6, Math.max(2, size))}
+                  value={preprintedCodes}
+                  onChange={(event) => setPreprintedCodes(event.target.value)}
+                  placeholder="QR-Code scannen oder eingeben"
+                />
+              </label>
+            ) : null}
             {product &&
             (product.weightClasses.length > 1 || product.weightClasses[0] !== "NOT_CAPTURED") ? (
               <div className="weight-class-list">
@@ -506,9 +565,16 @@ function CashierView() {
             <h2>QR-Tickets</h2>
             {receipt.length > 0 ? (
               <div className="receipt-list">
-                {receipt.map((code) => (
-                  <code key={code}>{code}</code>
+                {receipt.map((ticket) => (
+                  <article key={ticket.code} className="ticket-receipt">
+                    <img src={ticket.qrDataUrl} alt={`QR-Ticket ${ticket.code}`} />
+                    <code>{ticket.code}</code>
+                    <span>QR-Code öffnet den anonymen Ticketstatus.</span>
+                  </article>
                 ))}
+                <button className="print-tickets" type="button" onClick={() => window.print()}>
+                  QR-Tickets drucken
+                </button>
               </div>
             ) : (
               <p>Beim Bestätigen werden {size} nicht erratbare Codes erzeugt.</p>
