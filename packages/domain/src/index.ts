@@ -135,7 +135,10 @@ export type OperationalCommandType =
   | "SET_TICKET_ATTENDANCE"
   | "CONFIGURE_EVENT_PARAMETERS"
   | "UPSERT_GATE"
-  | "UPSERT_PRODUCT";
+  | "UPSERT_PRODUCT"
+  | "UPSERT_RESOURCE_GROUP"
+  | "UPSERT_AIRCRAFT"
+  | "ASSIGN_AIRCRAFT_RESOURCE_GROUP";
 
 const commandRoles: Readonly<Record<OperationalCommandType, readonly DeviceRole[]>> = {
   SELL_TICKET_GROUP: ["CASHIER", "ADMIN"],
@@ -165,6 +168,9 @@ const commandRoles: Readonly<Record<OperationalCommandType, readonly DeviceRole[
   CONFIGURE_EVENT_PARAMETERS: ["ADMIN"],
   UPSERT_GATE: ["ADMIN"],
   UPSERT_PRODUCT: ["ADMIN"],
+  UPSERT_RESOURCE_GROUP: ["ADMIN"],
+  UPSERT_AIRCRAFT: ["ADMIN"],
+  ASSIGN_AIRCRAFT_RESOURCE_GROUP: ["ADMIN"],
 };
 
 export function assertRoleMayExecute(role: DeviceRole, command: OperationalCommandType): void {

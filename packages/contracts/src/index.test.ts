@@ -325,4 +325,23 @@ describe("commandEnvelopeSchema", () => {
     expect(parsed.type).toBe("UPSERT_PRODUCT");
     expect("guestName" in parsed.payload).toBe(false);
   });
+
+  it("validates a reasoned aircraft resource assignment", () => {
+    const parsed = commandEnvelopeSchema.parse({
+      commandId: "00e971df-23d5-4d28-9107-92b447416289",
+      eventId: "demo-2026",
+      deviceId: "technical-scaffold",
+      expectedVersion: 14,
+      issuedAt: "2026-07-11T12:00:00.000Z",
+      type: "ASSIGN_AIRCRAFT_RESOURCE_GROUP",
+      payload: {
+        aircraftId: "aircraft-a",
+        resourceGroupId: "rg-panorama",
+        effectiveAt: "2026-07-11T12:00:00.000Z",
+        reason: "Operative Neuordnung",
+        adminPin: "0000",
+      },
+    });
+    expect(parsed.type).toBe("ASSIGN_AIRCRAFT_RESOURCE_GROUP");
+  });
 });

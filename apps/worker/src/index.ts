@@ -148,6 +148,7 @@ app.get("/api/events/:eventId/operations", async (context) => {
     fleetRows,
     pilotRows,
     gatesRows,
+    resourceGroupRows,
     metricsRow,
   ] = await Promise.all([
     context.env.DB.prepare(
@@ -296,7 +297,8 @@ app.get("/api/events/:eventId/operations", async (context) => {
       .bind(eventId)
       .all<{ resource_group_id: string; passenger_seats: number; refuel_planned: number }>(),
     context.env.DB.prepare(
-      `SELECT a.id, a.registration, a.aircraft_type, a.passenger_seats, a.operational_state,
+      `SELECT a.id, a.registration, a.aircraft_type, a.passenger_seats,
+              a.maximum_passenger_payload_kg, a.operational_state,
               a.refuel_planned, a.rotations_since_refuel, a.refuel_reminder_threshold,
               a.operational_interrupted,
               m.resource_group_id, rg.name AS resource_group_name,
@@ -305,9 +307,10 @@ app.get("/api/events/:eventId/operations", async (context) => {
                   AND b.scope_id = a.id AND b.status = 'ACTIVE'
                 ORDER BY b.started_at DESC LIMIT 1) AS expected_review_at
          FROM aircraft a
-         JOIN resource_group_memberships m ON m.aircraft_id = a.id AND m.active_until IS NULL
-         JOIN resource_groups rg ON rg.id = m.resource_group_id
-        WHERE m.operation_day_id = ?1 ORDER BY a.registration`,
+         LEFT JOIN resource_group_memberships m ON m.aircraft_id = a.id
+          AND m.operation_day_id = ?1 AND m.active_until IS NULL
+         LEFT JOIN resource_groups rg ON rg.id = m.resource_group_id
+        ORDER BY a.registration`,
     )
       .bind(eventId)
       .all<{
@@ -315,13 +318,14 @@ app.get("/api/events/:eventId/operations", async (context) => {
         registration: string;
         aircraft_type: string;
         passenger_seats: number;
+        maximum_passenger_payload_kg: number | null;
         operational_state: string;
         refuel_planned: number;
         rotations_since_refuel: number;
         refuel_reminder_threshold: number;
         operational_interrupted: number;
-        resource_group_id: string;
-        resource_group_name: string;
+        resource_group_id: string | null;
+        resource_group_name: string | null;
         expected_review_at: string | null;
       }>(),
     context.env.DB.prepare(
@@ -347,6 +351,29 @@ app.get("/api/events/:eventId/operations", async (context) => {
         gate_type: "FLIGHT_LINE" | "BOARDING" | "DISPLAY_ONLY";
         active: number;
         sort_order: number;
+      }>(),
+    context.env.DB.prepare(
+      `SELECT rg.id, rg.name, rg.status, rg.gate_id, g.label AS gate_label,
+              rg.reference_capacity, rg.planned_rotation_minutes,
+              rg.compatible_aircraft_types_json,
+              COALESCE((SELECT json_group_array(m.aircraft_id)
+                FROM resource_group_memberships m
+               WHERE m.operation_day_id = rg.operation_day_id
+                 AND m.resource_group_id = rg.id AND m.active_until IS NULL), '[]') AS aircraft_ids_json
+         FROM resource_groups rg JOIN gates g ON g.id = rg.gate_id
+        WHERE rg.operation_day_id = ?1 ORDER BY rg.name`,
+    )
+      .bind(eventId)
+      .all<{
+        id: string;
+        name: string;
+        status: "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED";
+        gate_id: string;
+        gate_label: string;
+        reference_capacity: number;
+        planned_rotation_minutes: number;
+        compatible_aircraft_types_json: string;
+        aircraft_ids_json: string;
       }>(),
     context.env.DB.prepare(
       `SELECT
@@ -556,10 +583,11 @@ app.get("/api/events/:eventId/operations", async (context) => {
       registration: aircraft.registration,
       aircraftType: aircraft.aircraft_type,
       passengerSeats: aircraft.passenger_seats,
+      maximumPassengerPayloadKg: aircraft.maximum_passenger_payload_kg,
       operationalState:
         aircraft.operational_interrupted === 1 ? "INTERRUPTED" : aircraft.operational_state,
-      resourceGroupId: aircraft.resource_group_id,
-      resourceGroupName: aircraft.resource_group_name,
+      resourceGroupId: aircraft.resource_group_id ?? "",
+      resourceGroupName: aircraft.resource_group_name ?? "Nicht zugeordnet",
       refuelPlanned: aircraft.refuel_planned === 1,
       rotationsSinceRefuel: aircraft.rotations_since_refuel,
       refuelReminderThreshold: aircraft.refuel_reminder_threshold,
@@ -578,6 +606,17 @@ app.get("/api/events/:eventId/operations", async (context) => {
       gateType: gate.gate_type,
       active: gate.active === 1,
       sortOrder: gate.sort_order,
+    })),
+    resourceGroups: resourceGroupRows.results.map((group) => ({
+      id: group.id,
+      name: group.name,
+      status: group.status,
+      gateId: group.gate_id,
+      gateLabel: group.gate_label,
+      referenceCapacity: group.reference_capacity,
+      plannedRotationMinutes: group.planned_rotation_minutes,
+      compatibleAircraftTypes: JSON.parse(group.compatible_aircraft_types_json) as string[],
+      activeAircraftIds: JSON.parse(group.aircraft_ids_json) as string[],
     })),
     metrics: {
       openTickets: metricsRow?.open_tickets ?? 0,
