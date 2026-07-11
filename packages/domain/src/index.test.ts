@@ -60,6 +60,15 @@ describe("command authorization", () => {
     expect(() => assertRoleMayExecute("ADMIN", "UPSERT_PILOT")).not.toThrow();
   });
 
+  it("protects the refuel reminder threshold as administration", () => {
+    expect(() =>
+      assertRoleMayExecute("FLIGHT_LINE_LEAD", "CONFIGURE_AIRCRAFT_REFUEL_THRESHOLD"),
+    ).toThrowError(/darf CONFIGURE_AIRCRAFT_REFUEL_THRESHOLD nicht/);
+    expect(() =>
+      assertRoleMayExecute("ADMIN", "CONFIGURE_AIRCRAFT_REFUEL_THRESHOLD"),
+    ).not.toThrow();
+  });
+
   it("allows flight direction to trigger but not clear emergency mode", () => {
     expect(() => assertRoleMayExecute("FLIGHT_DIRECTOR", "TRIGGER_EMERGENCY")).not.toThrow();
     expect(() => assertRoleMayExecute("FLIGHT_DIRECTOR", "CLEAR_EMERGENCY")).toThrowError(

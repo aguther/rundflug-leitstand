@@ -231,13 +231,13 @@ app.get("/api/events/:eventId/operations", async (context) => {
         .bind(eventId)
         .all<{ duration_minutes: number }>(),
       context.env.DB.prepare(
-        `SELECT m.resource_group_id, a.passenger_seats FROM aircraft a
+        `SELECT m.resource_group_id, a.passenger_seats, a.refuel_planned FROM aircraft a
          JOIN resource_group_memberships m ON m.aircraft_id = a.id
         WHERE m.operation_day_id = ?1 AND m.active_until IS NULL
           AND a.operational_state NOT IN ('INACTIVE', 'PAUSED', 'REFUELING')`,
       )
         .bind(eventId)
-        .all<{ resource_group_id: string; passenger_seats: number }>(),
+        .all<{ resource_group_id: string; passenger_seats: number; refuel_planned: number }>(),
       context.env.DB.prepare(
         `SELECT a.id, a.registration, a.aircraft_type, a.passenger_seats, a.operational_state,
               a.refuel_planned, a.rotations_since_refuel, a.refuel_reminder_threshold,
@@ -286,6 +286,13 @@ app.get("/api/events/:eventId/operations", async (context) => {
       const groupAircraftSeats = aircraftRows.results
         .filter((aircraft) => aircraft.resource_group_id === product.resource_group_id)
         .map((aircraft) => aircraft.passenger_seats);
+      const reservedRefuelSeats = aircraftRows.results
+        .filter(
+          (aircraft) =>
+            aircraft.resource_group_id === product.resource_group_id &&
+            aircraft.refuel_planned === 1,
+        )
+        .reduce((sum, aircraft) => sum + aircraft.passenger_seats, 0);
       const activeAircraft = groupAircraftSeats.length;
       const queueSequence = Math.max(
         1,
@@ -304,6 +311,7 @@ app.get("/api/events/:eventId/operations", async (context) => {
         expectedRotationMinutes: duration.expectedMinutes,
         activeAircraftSeats: groupAircraftSeats,
         openTickets: product.resource_group_open_tickets,
+        reservedSeats: reservedRefuelSeats,
         predictionQuality: forecast.quality,
         warningThreshold: product.capacity_warning_threshold,
         criticalThreshold: product.capacity_critical_threshold,

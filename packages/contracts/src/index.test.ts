@@ -82,6 +82,24 @@ describe("commandEnvelopeSchema", () => {
     expect(JSON.stringify(parsed)).not.toContain("pilotName");
   });
 
+  it("validates the organizational refuel reminder threshold", () => {
+    const parsed = commandEnvelopeSchema.parse({
+      commandId: "550e8400-e29b-41d4-a716-446655440013",
+      eventId: "synthetic-event",
+      deviceId: "synthetic-admin",
+      expectedVersion: 6,
+      issuedAt: "2026-07-11T12:00:00.000Z",
+      type: "CONFIGURE_AIRCRAFT_REFUEL_THRESHOLD",
+      payload: {
+        aircraftId: "synthetic-aircraft",
+        reminderThreshold: 6,
+        reason: "Organisatorische Erinnerung",
+        adminPin: "0000",
+      },
+    });
+    expect(parsed.type).toBe("CONFIGURE_AIRCRAFT_REFUEL_THRESHOLD");
+  });
+
   it("accepts the technical scaffold command", () => {
     const parsed = commandEnvelopeSchema.parse({
       commandId: "4f6ef267-f2c3-4c20-95fe-283e6f4ecab1",
