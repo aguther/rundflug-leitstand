@@ -128,6 +128,7 @@ export type OperationalCommandType =
   | "SCHEDULE_AIRCRAFT_REFUEL"
   | "UPSERT_PILOT"
   | "CONFIGURE_AIRCRAFT_REFUEL_THRESHOLD"
+  | "SET_RESOURCE_GROUP_NOTICE"
   | "REVOKE_CALL";
 
 const commandRoles: Readonly<Record<OperationalCommandType, readonly DeviceRole[]>> = {
@@ -150,6 +151,7 @@ const commandRoles: Readonly<Record<OperationalCommandType, readonly DeviceRole[
   SCHEDULE_AIRCRAFT_REFUEL: ["FLIGHT_LINE", "FLIGHT_LINE_LEAD", "FLIGHT_DIRECTOR", "ADMIN"],
   UPSERT_PILOT: ["ADMIN"],
   CONFIGURE_AIRCRAFT_REFUEL_THRESHOLD: ["ADMIN"],
+  SET_RESOURCE_GROUP_NOTICE: ["FLIGHT_LINE_LEAD", "FLIGHT_DIRECTOR", "ADMIN"],
   REVOKE_CALL: ["FLIGHT_LINE", "FLIGHT_LINE_LEAD", "ADMIN"],
 };
 

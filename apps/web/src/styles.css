@@ -82,6 +82,19 @@ input:focus-visible {
   font-weight: 850;
   text-align: center;
 }
+.operational-notice {
+  padding: 12px 20px;
+  border-left: 5px solid #ef9f1a;
+  background: #fff7e6;
+  color: #6b3d00;
+}
+.operational-notice small {
+  display: block;
+  margin-top: 4px;
+}
+.notice-actions {
+  margin-top: 10px;
+}
 footer {
   margin-top: auto;
   padding: 13px 20px;

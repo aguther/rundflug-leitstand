@@ -142,7 +142,7 @@ app.get("/api/events/:eventId/operations", async (context) => {
     [
       context.env.DB.prepare(
         `SELECT p.id, p.name, p.resource_group_id, rg.name AS resource_group_name,
-              rg.status AS resource_group_status,
+              rg.status AS resource_group_status, rg.operational_note AS resource_group_operational_note,
               p.price_cents, p.sale_enabled, p.reference_capacity, p.reference_duration_minutes,
               p.sale_closes_at, p.capacity_warning_threshold, p.capacity_critical_threshold,
               COUNT(CASE WHEN t.status = 'QUEUED' THEN 1 END) AS queued_tickets,
@@ -166,6 +166,7 @@ app.get("/api/events/:eventId/operations", async (context) => {
           resource_group_id: string;
           resource_group_name: string;
           resource_group_status: "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED";
+          resource_group_operational_note: string;
           price_cents: number;
           sale_enabled: number;
           reference_capacity: number;
@@ -322,6 +323,7 @@ app.get("/api/events/:eventId/operations", async (context) => {
         resourceGroupId: product.resource_group_id,
         resourceGroupName: product.resource_group_name,
         resourceGroupStatus: product.resource_group_status,
+        resourceGroupOperationalNote: product.resource_group_operational_note,
         priceCents: product.price_cents,
         saleEnabled: product.sale_enabled === 1,
         referenceCapacity: product.reference_capacity,
@@ -561,13 +563,15 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
   const ticketHash = await sha256Hex(ticketCode);
   const row = await context.env.DB.prepare(
     `SELECT p.name AS product_name, fg.communication_number, r.status, tg.queue_sequence,
-            od.updated_at
+            od.operational_note AS event_operational_note,
+            rg.operational_note AS resource_group_operational_note, od.updated_at
        FROM tickets t
        JOIN ticket_groups tg ON tg.id = t.ticket_group_id
        JOIN products p ON p.id = tg.product_id
        JOIN rotation_tickets rt ON rt.ticket_id = t.id AND rt.released_at IS NULL
        JOIN rotations r ON r.id = rt.rotation_id
        JOIN flight_groups fg ON fg.id = r.flight_group_id
+       JOIN resource_groups rg ON rg.id = fg.resource_group_id
        JOIN operation_days od ON od.id = tg.operation_day_id
       WHERE t.public_code_hash = ?1`,
   )
@@ -578,6 +582,8 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
       status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
       queue_sequence: number;
       updated_at: string;
+      event_operational_note: string;
+      resource_group_operational_note: string;
     }>();
   if (!row) {
     return context.json(
@@ -608,6 +614,7 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
     waitUpperMinutes: row.status === "DRAFT" ? row.queue_sequence * 30 : 0,
     predictionQuality: "CHANGING",
     message: message[row.status],
+    operationalNotice: row.resource_group_operational_note || row.event_operational_note,
     updatedAt: row.updated_at,
   });
 });
@@ -706,10 +713,15 @@ app.delete("/api/public/tickets/:ticketCode/push-subscriptions", async (context)
 app.get("/api/public/events/:eventId/board", async (context) => {
   const eventId = context.req.param("eventId");
   const event = await context.env.DB.prepare(
-    "SELECT name, emergency_mode, updated_at FROM operation_days WHERE id = ?1",
+    "SELECT name, emergency_mode, operational_note, updated_at FROM operation_days WHERE id = ?1",
   )
     .bind(eventId)
-    .first<{ name: string; emergency_mode: number; updated_at: string }>();
+    .first<{
+      name: string;
+      emergency_mode: number;
+      operational_note: string;
+      updated_at: string;
+    }>();
   if (!event) {
     return context.json(
       { error: { code: "EVENT_NOT_FOUND", message: "Veranstaltung nicht gefunden." } },
@@ -717,9 +729,11 @@ app.get("/api/public/events/:eventId/board", async (context) => {
     );
   }
   const rows = await context.env.DB.prepare(
-    `SELECT COALESCE(MIN(p.name), 'Rundflug') AS product_name, fg.communication_number, r.status
+    `SELECT COALESCE(MIN(p.name), 'Rundflug') AS product_name, fg.communication_number, r.status,
+            rg.operational_note AS resource_group_operational_note
        FROM rotations r
        JOIN flight_groups fg ON fg.id = r.flight_group_id
+       JOIN resource_groups rg ON rg.id = fg.resource_group_id
        LEFT JOIN rotation_tickets rt ON rt.rotation_id = r.id AND rt.released_at IS NULL
        LEFT JOIN tickets t ON t.id = rt.ticket_id
        LEFT JOIN ticket_groups tg ON tg.id = t.ticket_group_id
@@ -734,6 +748,7 @@ app.get("/api/public/events/:eventId/board", async (context) => {
       product_name: string;
       communication_number: number;
       status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
+      resource_group_operational_note: string;
     }>();
   const publicState = {
     DRAFT: "WAITING",
@@ -745,6 +760,7 @@ app.get("/api/public/events/:eventId/board", async (context) => {
   return context.json({
     eventName: event.name,
     emergencyMode: event.emergency_mode === 1,
+    operationalNotice: event.operational_note,
     updatedAt: event.updated_at,
     groups: event.emergency_mode
       ? []
@@ -754,6 +770,7 @@ app.get("/api/public/events/:eventId/board", async (context) => {
           status: publicState[row.status],
           waitLowerMinutes: index * 20,
           waitUpperMinutes: (index + 1) * 30,
+          operationalNotice: row.resource_group_operational_note,
         })),
   });
 });

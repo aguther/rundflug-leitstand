@@ -410,7 +410,8 @@ export class EventCoordinator extends DurableObject<Env> {
         if (
           command.type === "TRIGGER_EMERGENCY" ||
           command.type === "CLEAR_EMERGENCY" ||
-          command.type === "SET_RESOURCE_GROUP_STATUS"
+          command.type === "SET_RESOURCE_GROUP_STATUS" ||
+          command.type === "SET_RESOURCE_GROUP_NOTICE"
         ) {
           return this.handleOperationalControl(command, current);
         }
@@ -1384,7 +1385,13 @@ export class EventCoordinator extends DurableObject<Env> {
   private async handleOperationalControl(
     command: Extract<
       CommandEnvelope,
-      { type: "TRIGGER_EMERGENCY" | "CLEAR_EMERGENCY" | "SET_RESOURCE_GROUP_STATUS" }
+      {
+        type:
+          | "TRIGGER_EMERGENCY"
+          | "CLEAR_EMERGENCY"
+          | "SET_RESOURCE_GROUP_STATUS"
+          | "SET_RESOURCE_GROUP_NOTICE";
+      }
     >,
     current: StoredEventRow,
   ): Promise<Response> {
@@ -1397,7 +1404,10 @@ export class EventCoordinator extends DurableObject<Env> {
         { status: 403 },
       );
     }
-    if (command.type === "SET_RESOURCE_GROUP_STATUS") {
+    if (
+      command.type === "SET_RESOURCE_GROUP_STATUS" ||
+      command.type === "SET_RESOURCE_GROUP_NOTICE"
+    ) {
       const exists = await this.env.DB.prepare(
         "SELECT id FROM resource_groups WHERE id = ?1 AND operation_day_id = ?2",
       )
@@ -1423,7 +1433,9 @@ export class EventCoordinator extends DurableObject<Env> {
         ? "EMERGENCY_MODE_TRIGGERED"
         : command.type === "CLEAR_EMERGENCY"
           ? "EMERGENCY_MODE_CLEARED"
-          : "RESOURCE_GROUP_STATUS_CHANGED";
+          : command.type === "SET_RESOURCE_GROUP_STATUS"
+            ? "RESOURCE_GROUP_STATUS_CHANGED"
+            : "RESOURCE_GROUP_NOTICE_SET";
     const emergencyMode =
       command.type === "TRIGGER_EMERGENCY"
         ? 1
@@ -1440,7 +1452,10 @@ export class EventCoordinator extends DurableObject<Env> {
         updated_at: now,
       }),
       eventType,
-      aggregate: { type: "OPERATION_DAY", id: command.eventId },
+      aggregate:
+        command.type === "SET_RESOURCE_GROUP_STATUS" || command.type === "SET_RESOURCE_GROUP_NOTICE"
+          ? { type: "RESOURCE_GROUP", id: command.payload.resourceGroupId }
+          : { type: "OPERATION_DAY", id: command.eventId },
     };
     const statements: D1PreparedStatement[] = [
       this.env.DB.prepare(
@@ -1482,7 +1497,16 @@ export class EventCoordinator extends DurableObject<Env> {
       }
     }
 
-    const reason = command.payload.reason;
+    if (command.type === "SET_RESOURCE_GROUP_NOTICE") {
+      statements.push(
+        this.env.DB.prepare(
+          "UPDATE resource_groups SET operational_note = ?1, version = version + 1, updated_at = ?2 WHERE id = ?3",
+        ).bind(command.payload.note, now, command.payload.resourceGroupId),
+      );
+    }
+
+    const reason =
+      command.type === "SET_RESOURCE_GROUP_NOTICE" ? command.payload.note : command.payload.reason;
     const payload =
       command.type === "SET_RESOURCE_GROUP_STATUS"
         ? {
@@ -1491,19 +1515,35 @@ export class EventCoordinator extends DurableObject<Env> {
             status: command.payload.status,
             expectedReviewAt: command.payload.expectedReviewAt,
           }
-        : { reason };
+        : command.type === "SET_RESOURCE_GROUP_NOTICE"
+          ? {
+              note: command.payload.note,
+              resourceGroupId: command.payload.resourceGroupId,
+              informationalOnly: true,
+            }
+          : { reason };
+    const aggregateType =
+      command.type === "SET_RESOURCE_GROUP_STATUS" || command.type === "SET_RESOURCE_GROUP_NOTICE"
+        ? "RESOURCE_GROUP"
+        : "OPERATION_DAY";
+    const aggregateId =
+      command.type === "SET_RESOURCE_GROUP_STATUS" || command.type === "SET_RESOURCE_GROUP_NOTICE"
+        ? command.payload.resourceGroupId
+        : command.eventId;
     statements.push(
       this.env.DB.prepare(
         `INSERT INTO operational_events
           (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type,
            aggregate_id, aggregate_version, payload_json)
-         VALUES (?1, ?2, ?3, ?4, ?5, 'OPERATION_DAY', ?2, ?6, ?7)`,
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)`,
       ).bind(
         crypto.randomUUID(),
         command.eventId,
         eventType,
         now,
         command.deviceId,
+        aggregateType,
+        aggregateId,
         nextVersion,
         JSON.stringify(payload),
       ),

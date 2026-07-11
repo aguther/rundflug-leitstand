@@ -100,6 +100,19 @@ describe("commandEnvelopeSchema", () => {
     expect(parsed.type).toBe("CONFIGURE_AIRCRAFT_REFUEL_THRESHOLD");
   });
 
+  it("allows a resource notice to be cleared without safety semantics", () => {
+    const parsed = commandEnvelopeSchema.parse({
+      commandId: "550e8400-e29b-41d4-a716-446655440014",
+      eventId: "synthetic-event",
+      deviceId: "synthetic-flight-lead",
+      expectedVersion: 7,
+      issuedAt: "2026-07-11T12:00:00.000Z",
+      type: "SET_RESOURCE_GROUP_NOTICE",
+      payload: { resourceGroupId: "synthetic-group", note: "" },
+    });
+    expect(parsed.type).toBe("SET_RESOURCE_GROUP_NOTICE");
+  });
+
   it("accepts the technical scaffold command", () => {
     const parsed = commandEnvelopeSchema.parse({
       commandId: "4f6ef267-f2c3-4c20-95fe-283e6f4ecab1",
@@ -170,11 +183,13 @@ describe("commandEnvelopeSchema", () => {
       waitUpperMinutes: 30,
       predictionQuality: "CHANGING",
       message: "Bitte Status prüfen.",
+      operationalNotice: "",
       updatedAt: "2026-07-11T12:00:00.000Z",
     });
     const board = publicBoardSchema.parse({
       eventName: "Demo",
       emergencyMode: false,
+      operationalNotice: "",
       updatedAt: "2026-07-11T12:00:00.000Z",
       groups: [
         {
@@ -183,6 +198,7 @@ describe("commandEnvelopeSchema", () => {
           status: "WAITING",
           waitLowerMinutes: 0,
           waitUpperMinutes: 30,
+          operationalNotice: "",
         },
       ],
     });
