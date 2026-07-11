@@ -180,7 +180,7 @@ export class EventCoordinator extends DurableObject<Env> {
       if (command.type === "SELL_TICKET_GROUP") {
         const product = await this.env.DB.prepare(
           `SELECT p.id, p.resource_group_id, p.price_cents, p.sale_enabled, p.sale_closes_at,
-                  p.reference_duration_minutes, p.capacity_warning_threshold,
+                  p.reference_duration_minutes, p.weight_classes_json, p.capacity_warning_threshold,
                   p.capacity_critical_threshold, rg.status AS resource_group_status
              FROM products p
              JOIN resource_groups rg ON rg.id = p.resource_group_id
@@ -194,6 +194,7 @@ export class EventCoordinator extends DurableObject<Env> {
             sale_enabled: number;
             sale_closes_at: string | null;
             reference_duration_minutes: number;
+            weight_classes_json: string;
             capacity_warning_threshold: number;
             capacity_critical_threshold: number;
             resource_group_status: "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED";
@@ -312,6 +313,44 @@ export class EventCoordinator extends DurableObject<Env> {
             { status: 409 },
           );
         }
+        const allowedWeightClasses = JSON.parse(product.weight_classes_json) as Array<
+          "NOT_CAPTURED" | "CHILD" | "NORMAL" | "HEAVY" | "INDIVIDUAL"
+        >;
+        const ticketDetails =
+          command.payload.ticketDetails ??
+          normalizedCodes.map(() => ({
+            weightClass: "NOT_CAPTURED" as const,
+            individualWeightKg: null,
+          }));
+        if (ticketDetails.length !== normalizedCodes.length) {
+          return json(
+            {
+              error: {
+                code: "TICKET_DETAILS_COUNT_MISMATCH",
+                message: "Für jedes Ticket muss genau eine Gewichtsklasse angegeben werden.",
+              },
+            },
+            { status: 409 },
+          );
+        }
+        if (
+          ticketDetails.some(
+            (detail) =>
+              !allowedWeightClasses.includes(detail.weightClass) ||
+              (detail.weightClass === "INDIVIDUAL" && detail.individualWeightKg === null) ||
+              (detail.weightClass !== "INDIVIDUAL" && detail.individualWeightKg !== null),
+          )
+        ) {
+          return json(
+            {
+              error: {
+                code: "WEIGHT_CLASS_NOT_ALLOWED",
+                message: "Gewichtsklasse oder individuelle Kilogrammangabe ist nicht zulässig.",
+              },
+            },
+            { status: 409 },
+          );
+        }
         const hashes = await Promise.all(normalizedCodes.map(sha256Hex));
         const queueRow = await this.env.DB.prepare(
           "SELECT COALESCE(MAX(queue_sequence), 0) + 1 AS next_sequence FROM ticket_groups WHERE operation_day_id = ?1",
@@ -370,11 +409,14 @@ export class EventCoordinator extends DurableObject<Env> {
           ),
           ...hashes.flatMap((hash, index) => [
             this.env.DB.prepare(`INSERT INTO tickets
-              (id, ticket_group_id, public_code_hash, status, weight_class, payment_status, payment_method, price_cents, created_at)
-              VALUES (?1, ?2, ?3, 'QUEUED', 'NOT_CAPTURED', ?4, ?5, ?6, ?7)`).bind(
+              (id, ticket_group_id, public_code_hash, status, weight_class, individual_weight_kg,
+               payment_status, payment_method, price_cents, created_at)
+              VALUES (?1, ?2, ?3, 'QUEUED', ?4, ?5, ?6, ?7, ?8, ?9)`).bind(
               ticketIds[index],
               ticketGroupId,
               hash,
+              ticketDetails[index]?.weightClass,
+              ticketDetails[index]?.individualWeightKg,
               command.payload.paymentStatus,
               command.payload.paymentMethod,
               product.price_cents,
@@ -398,6 +440,7 @@ export class EventCoordinator extends DurableObject<Env> {
               rotationId,
               ticketCount: ticketIds.length,
               productId: product.id,
+              weightClasses: ticketDetails.map((detail) => detail.weightClass),
             }),
           ),
           this.env.DB.prepare(`INSERT INTO idempotency_receipts

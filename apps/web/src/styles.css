@@ -208,6 +208,32 @@ p {
 .ticket-preview p {
   color: #60758d;
 }
+.weight-class-list {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid #cbd5e1;
+}
+.weight-class-list h2 {
+  font-size: 1rem;
+}
+.weight-class-row {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) 90px;
+  gap: 8px;
+  margin-top: 8px;
+}
+.weight-class-row label {
+  display: grid;
+  gap: 4px;
+  color: #52677f;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+.weight-class-row select,
+.weight-class-row input {
+  min-height: 44px;
+  padding: 8px;
+}
 .receipt-list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
