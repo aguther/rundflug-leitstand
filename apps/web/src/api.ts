@@ -15,7 +15,23 @@ import {
   type PublicTicketStatus,
   publicBoardSchema,
   publicTicketStatusSchema,
+  type TicketSearchResponse,
+  ticketSearchResponseSchema,
 } from "@rundflug/contracts";
+
+export async function searchTickets(
+  eventId: string,
+  deviceId: string,
+  deviceToken: string,
+  query: string,
+): Promise<TicketSearchResponse> {
+  const response = await fetch(
+    `/api/events/${encodeURIComponent(eventId)}/tickets/search?q=${encodeURIComponent(query)}`,
+    { headers: { "x-device-id": deviceId, "x-device-token": deviceToken } },
+  );
+  if (!response.ok) throw new Error("Ticketsuche nicht verfügbar.");
+  return ticketSearchResponseSchema.parse(await response.json());
+}
 
 export async function getEventCatalog(
   sourceEventId: string,
