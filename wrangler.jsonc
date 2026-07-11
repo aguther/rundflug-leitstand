@@ -1,0 +1,121 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "rundflug-leitstand-dev",
+  "main": "apps/worker/src/index.ts",
+  "compatibility_date": "2026-07-11",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "observability": {
+    "enabled": true
+  },
+  "assets": {
+    "directory": "./apps/web/dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  "vars": {
+    "APP_ENV": "development",
+    "DATA_JURISDICTION": "eu"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "rundflug-leitstand-dev",
+      // Local development placeholder; replace before any remote dev deployment.
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "apps/worker/migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "BACKUPS",
+      "bucket_name": "rundflug-leitstand-dev-backups"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "EVENT_COORDINATOR",
+        "class_name": "EventCoordinator"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["EventCoordinator"]
+    }
+  ],
+  "triggers": {
+    "crons": ["15 2 * * *"]
+  },
+  "env": {
+    "acceptance": {
+      "name": "rundflug-leitstand-acceptance",
+      "vars": {
+        "APP_ENV": "acceptance",
+        "DATA_JURISDICTION": "eu"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "rundflug-leitstand-acceptance",
+          // Placeholder; insert the ID returned by `wrangler d1 create`.
+          "database_id": "00000000-0000-0000-0000-000000000001",
+          "migrations_dir": "apps/worker/migrations"
+        }
+      ],
+      "r2_buckets": [
+        {
+          "binding": "BACKUPS",
+          "bucket_name": "rundflug-leitstand-acceptance-backups"
+        }
+      ],
+      "durable_objects": {
+        "bindings": [
+          {
+            "name": "EVENT_COORDINATOR",
+            "class_name": "EventCoordinator"
+          }
+        ]
+      },
+      "triggers": {
+        "crons": ["15 2 * * *"]
+      }
+    },
+    "production": {
+      "name": "rundflug-leitstand",
+      "vars": {
+        "APP_ENV": "production",
+        "DATA_JURISDICTION": "eu"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "rundflug-leitstand-production",
+          // Placeholder; insert the ID returned by `wrangler d1 create`.
+          "database_id": "00000000-0000-0000-0000-000000000002",
+          "migrations_dir": "apps/worker/migrations"
+        }
+      ],
+      "r2_buckets": [
+        {
+          "binding": "BACKUPS",
+          "bucket_name": "rundflug-leitstand-production-backups"
+        }
+      ],
+      "durable_objects": {
+        "bindings": [
+          {
+            "name": "EVENT_COORDINATOR",
+            "class_name": "EventCoordinator"
+          }
+        ]
+      },
+      "triggers": {
+        "crons": ["15 2 * * *"]
+      }
+    }
+  }
+}

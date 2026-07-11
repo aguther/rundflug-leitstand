@@ -1,0 +1,17 @@
+{
+  "name": "@rundflug/worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --config ../../wrangler.jsonc",
+    "build": "wrangler deploy --dry-run --outdir dist --env=\"\" --config ../../wrangler.jsonc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@rundflug/config": "0.1.0",
+    "@rundflug/contracts": "0.1.0",
+    "hono": "4.12.29",
+    "zod": "4.4.3"
+  }
+}
