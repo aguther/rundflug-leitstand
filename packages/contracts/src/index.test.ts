@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { commandEnvelopeSchema } from "./index";
+import { commandEnvelopeSchema, publicBoardSchema, publicTicketStatusSchema } from "./index";
 
 describe("commandEnvelopeSchema", () => {
   it("accepts the technical scaffold command", () => {
@@ -46,5 +46,49 @@ describe("commandEnvelopeSchema", () => {
     });
     expect(parsed.type).toBe("SELL_TICKET_GROUP");
     expect("phoneNumber" in parsed.payload).toBe(false);
+  });
+
+  it("requires a concrete aircraft confirmation for NEXT", () => {
+    expect(() =>
+      commandEnvelopeSchema.parse({
+        commandId: "00e971df-23d5-4d28-9107-92b447416284",
+        eventId: "demo-2026",
+        deviceId: "flight-line-tablet-1",
+        expectedVersion: 4,
+        issuedAt: "2026-07-11T12:00:00.000Z",
+        type: "CALL_NEXT",
+        payload: { rotationId: "rotation-1" },
+      }),
+    ).toThrow();
+  });
+
+  it("keeps public DTOs free of aircraft and guest identity", () => {
+    const status = publicTicketStatusSchema.parse({
+      productName: "Panorama",
+      communicationNumber: 101,
+      status: "WAITING",
+      queuePosition: 1,
+      waitLowerMinutes: 0,
+      waitUpperMinutes: 30,
+      predictionQuality: "CHANGING",
+      message: "Bitte Status prüfen.",
+      updatedAt: "2026-07-11T12:00:00.000Z",
+    });
+    const board = publicBoardSchema.parse({
+      eventName: "Demo",
+      emergencyMode: false,
+      updatedAt: "2026-07-11T12:00:00.000Z",
+      groups: [
+        {
+          productName: "Panorama",
+          communicationNumber: 101,
+          status: "WAITING",
+          waitLowerMinutes: 0,
+          waitUpperMinutes: 30,
+        },
+      ],
+    });
+    expect("aircraftRegistration" in status).toBe(false);
+    expect("guestName" in board).toBe(false);
   });
 });

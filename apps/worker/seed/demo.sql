@@ -40,3 +40,11 @@ INSERT OR IGNORE INTO products
    reference_duration_minutes, created_at, updated_at)
 VALUES ('panorama-20', 'demo-2026', 'rg-panorama', '20 Min. Panorama', 4500, 1, 4, 20,
         '2026-07-11T08:00:00.000Z', '2026-07-11T08:00:00.000Z');
+
+-- Hashes ausschließlich synthetischer lokaler Demo-Tokens; keine Produktiv-Credentials.
+UPDATE paired_devices SET credential_hash = '5077b8b10f7ee36a8bb5162d25d60ee7c6a2e474826592d5ab8f4312610a0de0'
+ WHERE id = 'technical-scaffold';
+UPDATE paired_devices SET credential_hash = '512d8b41c03e67c38cf5b8a6a3202d6fd6b56ed1f8c9c97ae0b818c1d4377ef3'
+ WHERE id = 'cashier-tablet-1';
+UPDATE paired_devices SET credential_hash = 'a123beb36cf990172441b691ca1c519f512bfc5249900f2a828eff6369d9aa21'
+ WHERE id = 'flight-line-tablet-1';

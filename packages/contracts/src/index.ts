@@ -29,7 +29,14 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
     }),
   }),
   commandBaseSchema.extend({
-    type: z.enum(["CALL_NEXT", "MARK_IN_FLIGHT", "MARK_LANDED", "MARK_COMPLETED"]),
+    type: z.literal("CALL_NEXT"),
+    payload: z.object({
+      rotationId: z.string().min(1).max(100),
+      aircraftId: z.string().min(1).max(100),
+    }),
+  }),
+  commandBaseSchema.extend({
+    type: z.enum(["MARK_IN_FLIGHT", "MARK_LANDED", "MARK_COMPLETED"]),
     payload: z.object({ rotationId: z.string().min(1).max(100) }),
   }),
 ]);
@@ -73,3 +80,76 @@ export const apiErrorSchema = z.object({
   }),
 });
 export type ApiError = z.infer<typeof apiErrorSchema>;
+
+export const productOperationalSummarySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  resourceGroupId: z.string(),
+  resourceGroupStatus: z.enum(["ACTIVE", "PAUSED", "INTERRUPTED", "ENDED"]),
+  priceCents: z.number().int().nonnegative(),
+  saleEnabled: z.boolean(),
+  referenceCapacity: z.number().int().positive(),
+  queuedTickets: z.number().int().nonnegative(),
+  estimatedWaitLowerMinutes: z.number().int().nonnegative(),
+  estimatedWaitUpperMinutes: z.number().int().nonnegative(),
+  remainingSellableSeats: z.number().int().nonnegative(),
+});
+
+export const rotationOperationalSummarySchema = z.object({
+  id: z.string(),
+  flightGroupId: z.string(),
+  communicationNumber: z.number().int().positive(),
+  productName: z.string(),
+  status: z.enum(["DRAFT", "CALLED", "IN_FLIGHT", "LANDED", "COMPLETED"]),
+  aircraftId: z.string().nullable(),
+  aircraftRegistration: z.string().nullable(),
+  suggestedAircraftId: z.string().nullable(),
+  suggestedAircraftRegistration: z.string().nullable(),
+  ticketCount: z.number().int().nonnegative(),
+  predictedLowerMinutes: z.number().int().nonnegative(),
+  predictedUpperMinutes: z.number().int().nonnegative(),
+});
+
+export const operationBoardSchema = z.object({
+  event: eventSnapshotSchema,
+  products: z.array(productOperationalSummarySchema),
+  rotations: z.array(rotationOperationalSummarySchema),
+});
+export type OperationBoard = z.infer<typeof operationBoardSchema>;
+
+export const publicTicketStatusSchema = z.object({
+  productName: z.string(),
+  communicationNumber: z.number().int().positive(),
+  status: z.enum([
+    "WAITING",
+    "PREPARE",
+    "COME_TO_FLIGHT_LINE",
+    "BOARDING",
+    "IN_FLIGHT",
+    "LANDED",
+    "COMPLETED",
+  ]),
+  queuePosition: z.number().int().positive().nullable(),
+  waitLowerMinutes: z.number().int().nonnegative(),
+  waitUpperMinutes: z.number().int().nonnegative(),
+  predictionQuality: z.enum(["STABLE", "CHANGING", "UNCERTAIN"]),
+  message: z.string(),
+  updatedAt: z.string(),
+});
+export type PublicTicketStatus = z.infer<typeof publicTicketStatusSchema>;
+
+export const publicBoardSchema = z.object({
+  eventName: z.string(),
+  emergencyMode: z.boolean(),
+  updatedAt: z.string(),
+  groups: z.array(
+    z.object({
+      productName: z.string(),
+      communicationNumber: z.number().int().positive(),
+      status: z.enum(["WAITING", "COME_TO_FLIGHT_LINE", "IN_FLIGHT", "LANDED", "COMPLETED"]),
+      waitLowerMinutes: z.number().int().nonnegative(),
+      waitUpperMinutes: z.number().int().nonnegative(),
+    }),
+  ),
+});
+export type PublicBoard = z.infer<typeof publicBoardSchema>;

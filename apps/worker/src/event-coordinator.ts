@@ -14,15 +14,11 @@ import {
   type OperationalCommandType,
   transitionRotation,
 } from "@rundflug/domain";
+import { sha256Hex, verifyCredential } from "./crypto";
 import { rowToSnapshot, safeErrorMessage } from "./snapshot";
 import type { Env, StoredEventRow } from "./types";
 
 const JSON_HEADERS = { "content-type": "application/json; charset=utf-8" } as const;
-
-async function sha256(value: string): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
-  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
-}
 
 function json(data: unknown, init: ResponseInit = {}): Response {
   const headers = new Headers(init.headers);
@@ -108,13 +104,16 @@ export class EventCoordinator extends DurableObject<Env> {
       }
 
       const device = await this.env.DB.prepare(
-        `SELECT role
+        `SELECT role, credential_hash
            FROM paired_devices
           WHERE id = ?1 AND operation_day_id = ?2 AND active = 1`,
       )
         .bind(command.deviceId, command.eventId)
-        .first<{ role: DeviceRole }>();
-      if (!device) {
+        .first<{ role: DeviceRole; credential_hash: string | null }>();
+      if (
+        !device ||
+        !(await verifyCredential(request.headers.get("x-device-token"), device.credential_hash))
+      ) {
         return json(
           { error: { code: "DEVICE_NOT_PAIRED", message: "Gerät ist nicht aktiv gekoppelt." } },
           { status: 401 },
@@ -216,7 +215,7 @@ export class EventCoordinator extends DurableObject<Env> {
             { status: 409 },
           );
         }
-        const hashes = await Promise.all(normalizedCodes.map(sha256));
+        const hashes = await Promise.all(normalizedCodes.map(sha256Hex));
         const queueRow = await this.env.DB.prepare(
           "SELECT COALESCE(MAX(queue_sequence), 0) + 1 AS next_sequence FROM ticket_groups WHERE operation_day_id = ?1",
         )
@@ -434,6 +433,45 @@ export class EventCoordinator extends DurableObject<Env> {
         { error: { code: "ROTATION_NOT_FOUND", message: "Umlauf nicht gefunden." } },
         { status: 404 },
       );
+    if (command.type === "CALL_NEXT") {
+      const candidate = await this.env.DB.prepare(
+        `SELECT a.id, a.passenger_seats, a.operational_state, COUNT(rt.ticket_id) AS ticket_count
+           FROM rotations r
+           JOIN flight_groups fg ON fg.id = r.flight_group_id
+           JOIN resource_group_memberships membership
+             ON membership.resource_group_id = fg.resource_group_id
+            AND membership.operation_day_id = r.operation_day_id
+            AND membership.active_until IS NULL
+           JOIN aircraft a ON a.id = membership.aircraft_id
+           LEFT JOIN rotation_tickets rt ON rt.rotation_id = r.id AND rt.released_at IS NULL
+          WHERE r.id = ?1 AND a.id = ?2
+          GROUP BY a.id`,
+      )
+        .bind(rotation.id, command.payload.aircraftId)
+        .first<{
+          id: string;
+          passenger_seats: number;
+          operational_state: string;
+          ticket_count: number;
+        }>();
+      if (candidate?.operational_state !== "AVAILABLE") {
+        return json(
+          { error: { code: "AIRCRAFT_NOT_AVAILABLE", message: "Flugzeug ist nicht verfügbar." } },
+          { status: 409 },
+        );
+      }
+      if (candidate.ticket_count > candidate.passenger_seats) {
+        return json(
+          {
+            error: {
+              code: "AIRCRAFT_CAPACITY_EXCEEDED",
+              message: "Flugzeugkapazität reicht nicht aus.",
+            },
+          },
+          { status: 409 },
+        );
+      }
+    }
     const target = {
       CALL_NEXT: "CALLED",
       MARK_IN_FLIGHT: "IN_FLIGHT",
@@ -469,13 +507,31 @@ export class EventCoordinator extends DurableObject<Env> {
       eventType: eventType[command.type],
       aggregate: { type: "ROTATION", id: rotation.id },
     };
+    const selectedAircraftId =
+      command.type === "CALL_NEXT" ? command.payload.aircraftId : rotation.aircraft_id;
+    if (!selectedAircraftId) {
+      return json(
+        { error: { code: "AIRCRAFT_ASSIGNMENT_REQUIRED", message: "Flugzeugzuordnung fehlt." } },
+        { status: 409 },
+      );
+    }
+    const aircraftState = {
+      CALL_NEXT: "BOARDING",
+      MARK_IN_FLIGHT: "IN_FLIGHT",
+      MARK_LANDED: "LANDED",
+      MARK_COMPLETED: "AVAILABLE",
+    } as const;
     await this.env.DB.batch([
       this.env.DB.prepare(
         "UPDATE operation_days SET version = ?1, updated_at = ?2 WHERE id = ?3 AND version = ?4",
       ).bind(nextVersion, now, command.eventId, current.version),
       this.env.DB.prepare(
-        `UPDATE rotations SET status = ?1, ${timestampColumn[command.type]} = ?2, version = version + 1, updated_at = ?2 WHERE id = ?3 AND version = ?4`,
-      ).bind(nextState, now, rotation.id, rotation.version),
+        `UPDATE rotations SET status = ?1, ${timestampColumn[command.type]} = ?2, aircraft_id = ?3,
+                version = version + 1, updated_at = ?2 WHERE id = ?4 AND version = ?5`,
+      ).bind(nextState, now, selectedAircraftId, rotation.id, rotation.version),
+      this.env.DB.prepare(
+        "UPDATE aircraft SET operational_state = ?1, updated_at = ?2 WHERE id = ?3",
+      ).bind(aircraftState[command.type], now, selectedAircraftId),
       this.env.DB.prepare(`INSERT INTO operational_events (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type, aggregate_id, aggregate_version, payload_json)
         VALUES (?1, ?2, ?3, ?4, ?5, 'ROTATION', ?6, ?7, ?8)`).bind(
         crypto.randomUUID(),
