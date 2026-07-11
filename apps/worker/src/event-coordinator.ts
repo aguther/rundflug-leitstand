@@ -147,7 +147,8 @@ export class EventCoordinator extends DurableObject<Env> {
       }
 
       const current = await this.env.DB.prepare(
-        `SELECT id, name, event_date, time_zone, status, emergency_mode, operational_interrupted, version,
+        `SELECT id, name, event_date, aerodrome, time_zone, status, archived_at, template_source_id,
+                emergency_mode, operational_interrupted, version,
                 operational_note, operations_end_at, sale_opens_at, no_show_after_minutes,
                 notification_lead_minutes, child_reference_weight_kg, normal_reference_weight_kg,
                 heavy_reference_weight_kg, planned_boarding_minutes, planned_deboarding_minutes,

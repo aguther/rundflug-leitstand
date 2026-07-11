@@ -60,3 +60,9 @@ Ergänzt Ressourcengruppen um Kapazität, Planumlaufzeit und kompatible Flugzeug
 um die optionale maximale Passagierzuladung. Zuordnungshistorien erhalten Änderungsgrund und Gerät.
 Die bestehende partielle Eindeutigkeitsregel verhindert weiterhin zwei aktive Ressourcengruppen je
 Flugzeug. Vor Anwendung wird gesichert; Wiederherstellung erfolgt aus der portablen Sicherung.
+
+## 0017 – Mehrveranstaltungsbetrieb und Vorlagen
+
+Ergänzt Veranstaltungen um Flugplatz, Archivzeitpunkt und den nachvollziehbaren Bezug zur kopierten
+Vorveranstaltung. Die Änderung ist additiv; vor Anwendung wird dennoch eine portable Sicherung
+erstellt. Wiederherstellung erfolgt aus dieser Sicherung, da D1 Spalten nicht einzeln zurückrollt.

@@ -294,8 +294,11 @@ export const eventSnapshotSchema = z.object({
   eventId: z.string(),
   name: z.string(),
   eventDate: z.string(),
+  aerodrome: z.string(),
   timeZone: z.string(),
   status: z.string(),
+  archivedAt: z.string().nullable(),
+  templateSourceId: z.string().nullable(),
   emergencyMode: z.boolean(),
   operationalInterrupted: z.boolean(),
   version: z.number().int().nonnegative(),
@@ -316,6 +319,35 @@ export const eventSnapshotSchema = z.object({
 });
 
 export type EventSnapshot = z.infer<typeof eventSnapshotSchema>;
+
+export const eventCatalogEntrySchema = z.object({
+  eventId: z.string(),
+  name: z.string(),
+  eventDate: z.string(),
+  aerodrome: z.string(),
+  timeZone: z.string(),
+  status: z.string(),
+  archivedAt: z.string().nullable(),
+  templateSourceId: z.string().nullable(),
+  version: z.number().int().nonnegative(),
+});
+export const eventCatalogSchema = z.object({ events: z.array(eventCatalogEntrySchema) });
+export type EventCatalogEntry = z.infer<typeof eventCatalogEntrySchema>;
+export type EventCatalog = z.infer<typeof eventCatalogSchema>;
+
+export const cloneEventRequestSchema = z.object({
+  commandId: z.uuid(),
+  expectedSourceVersion: z.number().int().nonnegative(),
+  eventId: z
+    .string()
+    .trim()
+    .regex(/^[a-z0-9][a-z0-9-]{2,63}$/),
+  name: z.string().trim().min(3).max(120),
+  eventDate: z.iso.date(),
+  aerodrome: z.string().trim().min(2).max(120),
+  timeZone: z.string().trim().min(3).max(80).default("Europe/Berlin"),
+});
+export type CloneEventRequest = z.infer<typeof cloneEventRequestSchema>;
 
 export const commandResultSchema = z.object({
   accepted: z.literal(true),

@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { commandEnvelopeSchema, publicBoardSchema, publicTicketStatusSchema } from "./index";
+import {
+  cloneEventRequestSchema,
+  commandEnvelopeSchema,
+  publicBoardSchema,
+  publicTicketStatusSchema,
+} from "./index";
 
 describe("commandEnvelopeSchema", () => {
   it("validates auditable product sale controls", () => {
@@ -343,5 +348,20 @@ describe("commandEnvelopeSchema", () => {
       },
     });
     expect(parsed.type).toBe("ASSIGN_AIRCRAFT_RESOURCE_GROUP");
+  });
+
+  it("validates an anonymous event template copy", () => {
+    const parsed = cloneEventRequestSchema.parse({
+      commandId: "ea9c9a6c-0dc4-467d-87ee-3bf675a88f67",
+      expectedSourceVersion: 14,
+      eventId: "flugtag-2027",
+      name: "Flugtag 2027",
+      eventDate: "2027-06-12",
+      aerodrome: "EDXX Testflugplatz",
+      timeZone: "Europe/Berlin",
+    });
+    expect(parsed.eventId).toBe("flugtag-2027");
+    expect("guestName" in parsed).toBe(false);
+    expect(() => cloneEventRequestSchema.parse({ ...parsed, eventId: "Ungültige ID" })).toThrow();
   });
 });
