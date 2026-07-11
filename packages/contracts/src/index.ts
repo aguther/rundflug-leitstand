@@ -212,6 +212,42 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
       adminPin: z.string().min(4).max(32),
     }),
   }),
+  commandBaseSchema.extend({
+    type: z.literal("UPSERT_GATE"),
+    payload: z.object({
+      gateId: z.string().min(1).max(100),
+      label: z.string().trim().min(2).max(80),
+      gateType: z.enum(["FLIGHT_LINE", "BOARDING", "DISPLAY_ONLY"]),
+      active: z.boolean(),
+      sortOrder: z.number().int().min(0).max(1000),
+      reason: z.string().trim().min(3).max(240),
+      adminPin: z.string().min(4).max(32),
+    }),
+  }),
+  commandBaseSchema.extend({
+    type: z.literal("UPSERT_PRODUCT"),
+    payload: z.object({
+      productId: z.string().min(1).max(100),
+      resourceGroupId: z.string().min(1).max(100),
+      gateId: z.string().min(1).max(100),
+      name: z.string().trim().min(2).max(100),
+      code: z
+        .string()
+        .trim()
+        .regex(/^[A-Z0-9-]{2,12}$/),
+      publicDescription: z.string().trim().max(240),
+      priceCents: z.number().int().min(0).max(1_000_000),
+      referenceCapacity: z.number().int().min(1).max(100),
+      referenceDurationMinutes: z.number().int().min(1).max(600),
+      childCompanionRequired: z.boolean(),
+      weightClasses: z
+        .array(z.enum(["NOT_CAPTURED", "CHILD", "NORMAL", "HEAVY", "INDIVIDUAL"]))
+        .min(1),
+      sortOrder: z.number().int().min(0).max(1000),
+      reason: z.string().trim().min(3).max(240),
+      adminPin: z.string().min(4).max(32),
+    }),
+  }),
 ]);
 
 export type CommandEnvelope = z.infer<typeof commandEnvelopeSchema>;
@@ -258,6 +294,7 @@ export const commandResultSchema = z.object({
         "AIRCRAFT",
         "PILOT",
         "TICKET",
+        "GATE",
         "TICKET_GROUP",
         "ROTATION",
       ]),
@@ -279,14 +316,22 @@ export type ApiError = z.infer<typeof apiErrorSchema>;
 
 export const productOperationalSummarySchema = z.object({
   id: z.string(),
+  code: z.string(),
   name: z.string(),
+  publicDescription: z.string(),
   resourceGroupId: z.string(),
   resourceGroupName: z.string(),
   resourceGroupStatus: z.enum(["ACTIVE", "PAUSED", "INTERRUPTED", "ENDED"]),
   resourceGroupOperationalNote: z.string(),
   priceCents: z.number().int().nonnegative(),
+  gateId: z.string(),
+  gateLabel: z.string(),
+  childCompanionRequired: z.boolean(),
+  weightClasses: z.array(z.enum(["NOT_CAPTURED", "CHILD", "NORMAL", "HEAVY", "INDIVIDUAL"])),
+  sortOrder: z.number().int().nonnegative(),
   saleEnabled: z.boolean(),
   referenceCapacity: z.number().int().positive(),
+  referenceDurationMinutes: z.number().int().positive(),
   queuedTickets: z.number().int().nonnegative(),
   estimatedWaitLowerMinutes: z.number().int().nonnegative(),
   estimatedWaitUpperMinutes: z.number().int().nonnegative(),
@@ -372,6 +417,15 @@ export const operationBoardSchema = z.object({
   rotations: z.array(rotationOperationalSummarySchema),
   aircraft: z.array(aircraftOperationalSummarySchema),
   pilots: z.array(pilotOperationalSummarySchema),
+  gates: z.array(
+    z.object({
+      id: z.string(),
+      label: z.string(),
+      gateType: z.enum(["FLIGHT_LINE", "BOARDING", "DISPLAY_ONLY"]),
+      active: z.boolean(),
+      sortOrder: z.number().int().nonnegative(),
+    }),
+  ),
   metrics: z.object({
     openTickets: z.number().int().nonnegative(),
     soldTickets: z.number().int().nonnegative(),
@@ -391,6 +445,9 @@ export type OperationBoard = z.infer<typeof operationBoardSchema>;
 
 export const publicTicketStatusSchema = z.object({
   productName: z.string(),
+  productCode: z.string(),
+  publicDescription: z.string(),
+  gateLabel: z.string(),
   communicationNumber: z.number().int().positive(),
   status: z.enum([
     "WAITING",
@@ -420,6 +477,8 @@ export const publicBoardSchema = z.object({
   groups: z.array(
     z.object({
       productName: z.string(),
+      productCode: z.string(),
+      gateLabel: z.string(),
       communicationNumber: z.number().int().positive(),
       status: z.enum(["WAITING", "COME_TO_FLIGHT_LINE", "IN_FLIGHT", "LANDED", "COMPLETED"]),
       waitLowerMinutes: z.number().int().nonnegative(),

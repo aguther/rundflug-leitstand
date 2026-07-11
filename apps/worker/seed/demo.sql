@@ -16,6 +16,11 @@ INSERT OR IGNORE INTO operation_days (
 UPDATE operation_days SET operations_end_at = '2026-07-11T19:00:00.000Z'
  WHERE id = 'demo-2026' AND operations_end_at IS NULL;
 
+INSERT OR IGNORE INTO gates
+  (id, operation_day_id, label, gate_type, active, sort_order, created_at, updated_at)
+VALUES ('demo-2026-gate-main', 'demo-2026', 'Flight Line 1', 'FLIGHT_LINE', 1, 10,
+        '2026-07-11T08:00:00.000Z', '2026-07-11T08:00:00.000Z');
+
 INSERT OR IGNORE INTO paired_devices (
   id, operation_day_id, label, role, active, paired_at, last_seen_at
 ) VALUES (
@@ -28,8 +33,8 @@ VALUES
   ('cashier-tablet-1', 'demo-2026', 'Kasse 1', 'CASHIER', 1, '2026-07-11T08:00:00.000Z', '2026-07-11T08:00:00.000Z'),
   ('flight-line-tablet-1', 'demo-2026', 'Flight Line 1', 'FLIGHT_LINE', 1, '2026-07-11T08:00:00.000Z', '2026-07-11T08:00:00.000Z');
 
-INSERT OR IGNORE INTO resource_groups (id, operation_day_id, name, status, version, created_at, updated_at)
-VALUES ('rg-panorama', 'demo-2026', 'Panorama', 'ACTIVE', 0, '2026-07-11T08:00:00.000Z', '2026-07-11T08:00:00.000Z');
+INSERT OR IGNORE INTO resource_groups (id, operation_day_id, name, status, gate_id, version, created_at, updated_at)
+VALUES ('rg-panorama', 'demo-2026', 'Panorama', 'ACTIVE', 'demo-2026-gate-main', 0, '2026-07-11T08:00:00.000Z', '2026-07-11T08:00:00.000Z');
 
 INSERT OR IGNORE INTO aircraft (id, registration, aircraft_type, passenger_seats, created_at, updated_at)
 VALUES ('aircraft-a', 'D-EDEM', 'SYNTHETIC-DEMO', 4, '2026-07-11T08:00:00.000Z', '2026-07-11T08:00:00.000Z');
@@ -44,15 +49,15 @@ VALUES ('550e8400-e29b-41d4-a716-446655440100', 'demo-2026', 'P-01', 1,
         '2026-07-11T08:00:00.000Z', '2026-07-11T08:00:00.000Z');
 
 INSERT OR IGNORE INTO products
-  (id, operation_day_id, resource_group_id, name, price_cents, sale_enabled, reference_capacity,
+  (id, operation_day_id, resource_group_id, gate_id, name, code, price_cents, sale_enabled, reference_capacity,
    reference_duration_minutes, created_at, updated_at)
-VALUES ('panorama-20', 'demo-2026', 'rg-panorama', '20 Min. Panorama', 4500, 1, 4, 20,
+VALUES ('panorama-20', 'demo-2026', 'rg-panorama', 'demo-2026-gate-main', '20 Min. Panorama', 'PAN20', 4500, 1, 4, 20,
         '2026-07-11T08:00:00.000Z', '2026-07-11T08:00:00.000Z');
 
 INSERT OR IGNORE INTO products
-  (id, operation_day_id, resource_group_id, name, price_cents, sale_enabled, reference_capacity,
+  (id, operation_day_id, resource_group_id, gate_id, name, code, price_cents, sale_enabled, reference_capacity,
    reference_duration_minutes, created_at, updated_at)
-VALUES ('panorama-30', 'demo-2026', 'rg-panorama', '30 Min. Panorama', 6500, 1, 3, 30,
+VALUES ('panorama-30', 'demo-2026', 'rg-panorama', 'demo-2026-gate-main', '30 Min. Panorama', 'PAN30', 6500, 1, 3, 30,
         '2026-07-11T08:00:00.000Z', '2026-07-11T08:00:00.000Z');
 
 -- Hashes ausschließlich synthetischer lokaler Demo-Tokens; keine Produktiv-Credentials.

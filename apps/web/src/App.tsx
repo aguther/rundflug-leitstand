@@ -832,7 +832,11 @@ function TicketStatusView({ code }: { code: string }) {
         <code>{code}</code>
         {status ? (
           <>
-            <h1>{status.productName}</h1>
+            <h1>
+              {status.productCode} · {status.productName}
+            </h1>
+            {status.publicDescription ? <p>{status.publicDescription}</p> : null}
+            <p>Gate: {status.gateLabel}</p>
             <div className="public-status">
               <span>Fluggruppe {status.communicationNumber}</span>
               <strong>{publicStatusLabel[status.status]}</strong>
@@ -989,6 +993,7 @@ function FidsView() {
           <span>Produkt</span>
           <span>Gruppe</span>
           <span>Status</span>
+          <span>Gate</span>
           <span>Zeitfenster</span>
         </div>
         {board?.emergencyMode ? (
@@ -1003,9 +1008,12 @@ function FidsView() {
         {board?.groups.map((group) => (
           <div key={group.communicationNumber}>
             <div className="fids-row">
-              <strong>{group.productName}</strong>
+              <strong>
+                {group.productCode} · {group.productName}
+              </strong>
               <b>{group.communicationNumber}</b>
               <span>{publicStatusLabel[group.status]}</span>
+              <span>{group.gateLabel}</span>
               <span>
                 {group.waitLowerMinutes}–{group.waitUpperMinutes} Min.
               </span>
@@ -1052,6 +1060,25 @@ function AdminView() {
   const [plannedBoardingMinutes, setPlannedBoardingMinutes] = useState(8);
   const [plannedDeboardingMinutes, setPlannedDeboardingMinutes] = useState(5);
   const [plannedBufferMinutes, setPlannedBufferMinutes] = useState(3);
+  const [productEditorId, setProductEditorId] = useState("new");
+  const [productName, setProductName] = useState("");
+  const [productCode, setProductCode] = useState("");
+  const [productDescription, setProductDescription] = useState("");
+  const [productResourceGroupId, setProductResourceGroupId] = useState("");
+  const [productGateId, setProductGateId] = useState("");
+  const [productPriceCents, setProductPriceCents] = useState(0);
+  const [productReferenceCapacity, setProductReferenceCapacity] = useState(1);
+  const [productReferenceDuration, setProductReferenceDuration] = useState(20);
+  const [productChildCompanion, setProductChildCompanion] = useState(false);
+  const [productWeightClasses, setProductWeightClasses] = useState<string[]>(["NOT_CAPTURED"]);
+  const [productSortOrder, setProductSortOrder] = useState(10);
+  const [gateEditorId, setGateEditorId] = useState("new");
+  const [gateLabel, setGateLabel] = useState("");
+  const [gateType, setGateType] = useState<"FLIGHT_LINE" | "BOARDING" | "DISPLAY_ONLY">(
+    "FLIGHT_LINE",
+  );
+  const [gateActive, setGateActive] = useState(true);
+  const [gateSortOrder, setGateSortOrder] = useState(10);
   const resourceGroups = Array.from(
     new Map(board?.products.map((product) => [product.resourceGroupId, product]) ?? []).values(),
   );
@@ -1173,6 +1200,118 @@ function AdminView() {
     } catch (cause) {
       setMessage(
         cause instanceof Error ? cause.message : "Parameter konnten nicht gespeichert werden.",
+      );
+    }
+  }
+
+  function selectProductForEditing(id: string) {
+    setProductEditorId(id);
+    const entry = board?.products.find((product) => product.id === id);
+    setProductName(entry?.name ?? "");
+    setProductCode(entry?.code ?? "");
+    setProductDescription(entry?.publicDescription ?? "");
+    setProductResourceGroupId(entry?.resourceGroupId ?? resourceGroups[0]?.resourceGroupId ?? "");
+    setProductGateId(entry?.gateId ?? board?.gates.find((gate) => gate.active)?.id ?? "");
+    setProductPriceCents(entry?.priceCents ?? 0);
+    setProductReferenceCapacity(entry?.referenceCapacity ?? 1);
+    setProductReferenceDuration(entry?.referenceDurationMinutes ?? 20);
+    setProductChildCompanion(entry?.childCompanionRequired ?? false);
+    setProductWeightClasses(entry?.weightClasses ?? ["NOT_CAPTURED"]);
+    setProductSortOrder(entry?.sortOrder ?? 10);
+  }
+
+  function selectGateForEditing(id: string) {
+    setGateEditorId(id);
+    const entry = board?.gates.find((gate) => gate.id === id);
+    setGateLabel(entry?.label ?? "");
+    setGateType(entry?.gateType ?? "FLIGHT_LINE");
+    setGateActive(entry?.active ?? true);
+    setGateSortOrder(entry?.sortOrder ?? 10);
+  }
+
+  async function saveGate() {
+    if (!board || gateLabel.trim().length < 2 || reason.trim().length < 3 || adminPin.length < 4)
+      return;
+    try {
+      await sendCommand(
+        {
+          commandId: crypto.randomUUID(),
+          eventId: EVENT_ID,
+          deviceId: ADMIN_DEVICE_ID,
+          expectedVersion: board.event.version,
+          issuedAt: new Date().toISOString(),
+          type: "UPSERT_GATE",
+          payload: {
+            gateId: gateEditorId === "new" ? crypto.randomUUID() : gateEditorId,
+            label: gateLabel.trim(),
+            gateType,
+            active: gateActive,
+            sortOrder: gateSortOrder,
+            reason: reason.trim(),
+            adminPin,
+          },
+        },
+        deviceTokenFor(ADMIN_DEVICE_ID),
+      );
+      setMessage("Gate-Stammdaten wurden protokolliert gespeichert.");
+      setAdminPin("");
+      setGateEditorId("new");
+      setGateLabel("");
+      await refresh();
+      await refreshHistory();
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : "Gate konnte nicht gespeichert werden.");
+    }
+  }
+
+  async function saveProduct() {
+    if (
+      !board ||
+      !productResourceGroupId ||
+      !productGateId ||
+      productWeightClasses.length === 0 ||
+      reason.trim().length < 3 ||
+      adminPin.length < 4
+    )
+      return;
+    try {
+      await sendCommand(
+        {
+          commandId: crypto.randomUUID(),
+          eventId: EVENT_ID,
+          deviceId: ADMIN_DEVICE_ID,
+          expectedVersion: board.event.version,
+          issuedAt: new Date().toISOString(),
+          type: "UPSERT_PRODUCT",
+          payload: {
+            productId: productEditorId === "new" ? crypto.randomUUID() : productEditorId,
+            resourceGroupId: productResourceGroupId,
+            gateId: productGateId,
+            name: productName.trim(),
+            code: productCode.trim().toUpperCase(),
+            publicDescription: productDescription.trim(),
+            priceCents: productPriceCents,
+            referenceCapacity: productReferenceCapacity,
+            referenceDurationMinutes: productReferenceDuration,
+            childCompanionRequired: productChildCompanion,
+            weightClasses: productWeightClasses as Array<
+              "NOT_CAPTURED" | "CHILD" | "NORMAL" | "HEAVY" | "INDIVIDUAL"
+            >,
+            sortOrder: productSortOrder,
+            reason: reason.trim(),
+            adminPin,
+          },
+        },
+        deviceTokenFor(ADMIN_DEVICE_ID),
+      );
+      setMessage("Produktstammdaten wurden protokolliert gespeichert.");
+      setAdminPin("");
+      selectProductForEditing("new");
+      await refresh();
+      await refreshHistory();
+    } catch (cause) {
+      setMessage(
+        cause instanceof Error ? cause.message : "Produkt konnte nicht gespeichert werden.",
       );
     }
   }
@@ -1720,6 +1859,234 @@ function AdminView() {
           >
             Veranstaltungsparameter speichern
           </button>
+        </section>
+        <section className="admin-section">
+          <h2>Gates und Produktstammdaten</h2>
+          <div className="master-data-columns">
+            <fieldset>
+              <legend>Gate</legend>
+              <label>
+                Datensatz
+                <select
+                  value={gateEditorId}
+                  onChange={(event) => selectGateForEditing(event.target.value)}
+                >
+                  <option value="new">Neues Gate</option>
+                  {board?.gates.map((gate) => (
+                    <option key={gate.id} value={gate.id}>
+                      {gate.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Bezeichnung
+                <input value={gateLabel} onChange={(event) => setGateLabel(event.target.value)} />
+              </label>
+              <label>
+                Art
+                <select
+                  value={gateType}
+                  onChange={(event) => setGateType(event.target.value as typeof gateType)}
+                >
+                  <option value="FLIGHT_LINE">Flight Line</option>
+                  <option value="BOARDING">Boarding</option>
+                  <option value="DISPLAY_ONLY">Nur Anzeige</option>
+                </select>
+              </label>
+              <label>
+                Sortierung
+                <input
+                  type="number"
+                  min="0"
+                  value={gateSortOrder}
+                  onChange={(event) => setGateSortOrder(Number(event.target.value))}
+                />
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={gateActive}
+                  onChange={(event) => setGateActive(event.target.checked)}
+                />{" "}
+                aktiv
+              </label>
+              <button
+                disabled={
+                  !isAdministrator ||
+                  gateLabel.trim().length < 2 ||
+                  reason.trim().length < 3 ||
+                  adminPin.length < 4
+                }
+                onClick={saveGate}
+                type="button"
+              >
+                Gate speichern
+              </button>
+            </fieldset>
+            <fieldset>
+              <legend>Produkt</legend>
+              <label>
+                Datensatz
+                <select
+                  value={productEditorId}
+                  onChange={(event) => selectProductForEditing(event.target.value)}
+                >
+                  <option value="new">Neues Produkt</option>
+                  {board?.products.map((product) => (
+                    <option key={product.id} value={product.id}>
+                      {product.code} · {product.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="parameter-grid">
+                <label>
+                  Bezeichnung
+                  <input
+                    value={productName}
+                    onChange={(event) => setProductName(event.target.value)}
+                  />
+                </label>
+                <label>
+                  Kürzel
+                  <input
+                    value={productCode}
+                    maxLength={12}
+                    onChange={(event) => setProductCode(event.target.value.toUpperCase())}
+                  />
+                </label>
+                <label>
+                  Preis (Cent)
+                  <input
+                    type="number"
+                    min="0"
+                    value={productPriceCents}
+                    onChange={(event) => setProductPriceCents(Number(event.target.value))}
+                  />
+                </label>
+                <label>
+                  Ressourcengruppe
+                  <select
+                    value={productResourceGroupId}
+                    onChange={(event) => setProductResourceGroupId(event.target.value)}
+                  >
+                    <option value="">Bitte wählen</option>
+                    {resourceGroups.map((group) => (
+                      <option key={group.resourceGroupId} value={group.resourceGroupId}>
+                        {group.resourceGroupName}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Gate
+                  <select
+                    value={productGateId}
+                    onChange={(event) => setProductGateId(event.target.value)}
+                  >
+                    <option value="">Bitte wählen</option>
+                    {board?.gates
+                      .filter((gate) => gate.active)
+                      .map((gate) => (
+                        <option key={gate.id} value={gate.id}>
+                          {gate.label}
+                        </option>
+                      ))}
+                  </select>
+                </label>
+                <label>
+                  Referenzplätze
+                  <input
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={productReferenceCapacity}
+                    onChange={(event) => setProductReferenceCapacity(Number(event.target.value))}
+                  />
+                </label>
+                <label>
+                  Flugdauer (Min.)
+                  <input
+                    type="number"
+                    min="1"
+                    max="600"
+                    value={productReferenceDuration}
+                    onChange={(event) => setProductReferenceDuration(Number(event.target.value))}
+                  />
+                </label>
+                <label>
+                  Sortierung
+                  <input
+                    type="number"
+                    min="0"
+                    value={productSortOrder}
+                    onChange={(event) => setProductSortOrder(Number(event.target.value))}
+                  />
+                </label>
+              </div>
+              <label>
+                Öffentliche Beschreibung
+                <input
+                  value={productDescription}
+                  maxLength={240}
+                  onChange={(event) => setProductDescription(event.target.value)}
+                />
+              </label>
+              <div className="weight-class-options">
+                {(["NOT_CAPTURED", "CHILD", "NORMAL", "HEAVY", "INDIVIDUAL"] as const).map(
+                  (weightClass) => (
+                    <label key={weightClass}>
+                      <input
+                        type="checkbox"
+                        checked={productWeightClasses.includes(weightClass)}
+                        onChange={(event) =>
+                          setProductWeightClasses((current) =>
+                            event.target.checked
+                              ? [...new Set([...current, weightClass])]
+                              : current.filter((entry) => entry !== weightClass),
+                          )
+                        }
+                      />
+                      {weightClass}
+                    </label>
+                  ),
+                )}
+              </div>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={productChildCompanion}
+                  onChange={(event) => setProductChildCompanion(event.target.checked)}
+                />{" "}
+                Begleitpflicht für Kinder
+              </label>
+              <label>
+                Administrator-PIN
+                <input
+                  type="password"
+                  value={adminPin}
+                  onChange={(event) => setAdminPin(event.target.value)}
+                />
+              </label>
+              <button
+                disabled={
+                  !isAdministrator ||
+                  productName.trim().length < 2 ||
+                  !/^[A-Z0-9-]{2,12}$/.test(productCode) ||
+                  !productResourceGroupId ||
+                  !productGateId ||
+                  productWeightClasses.length === 0 ||
+                  reason.trim().length < 3 ||
+                  adminPin.length < 4
+                }
+                onClick={saveProduct}
+                type="button"
+              >
+                Produkt speichern
+              </button>
+            </fieldset>
+          </div>
         </section>
         <section className="admin-section">
           <h2>Notfallmodus</h2>

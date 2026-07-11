@@ -207,6 +207,9 @@ describe("commandEnvelopeSchema", () => {
   it("keeps public DTOs free of aircraft and guest identity", () => {
     const status = publicTicketStatusSchema.parse({
       productName: "Panorama",
+      productCode: "PAN",
+      publicDescription: "Panoramaflug",
+      gateLabel: "Flight Line 1",
       communicationNumber: 101,
       status: "WAITING",
       queuePosition: 1,
@@ -226,6 +229,8 @@ describe("commandEnvelopeSchema", () => {
       groups: [
         {
           productName: "Panorama",
+          productCode: "PAN",
+          gateLabel: "Flight Line 1",
           communicationNumber: 101,
           status: "WAITING",
           waitLowerMinutes: 0,
@@ -289,6 +294,35 @@ describe("commandEnvelopeSchema", () => {
       },
     });
     expect(parsed.type).toBe("CONFIGURE_EVENT_PARAMETERS");
+    expect("guestName" in parsed.payload).toBe(false);
+  });
+
+  it("validates anonymous product master data", () => {
+    const parsed = commandEnvelopeSchema.parse({
+      commandId: "00e971df-23d5-4d28-9107-92b447416288",
+      eventId: "demo-2026",
+      deviceId: "technical-scaffold",
+      expectedVersion: 13,
+      issuedAt: "2026-07-11T12:00:00.000Z",
+      type: "UPSERT_PRODUCT",
+      payload: {
+        productId: "panorama-20",
+        resourceGroupId: "rg-panorama",
+        gateId: "demo-2026-gate-main",
+        name: "20 Min. Panorama",
+        code: "PAN20",
+        publicDescription: "Panoramaflug",
+        priceCents: 4500,
+        referenceCapacity: 4,
+        referenceDurationMinutes: 20,
+        childCompanionRequired: true,
+        weightClasses: ["CHILD", "NORMAL", "HEAVY"],
+        sortOrder: 10,
+        reason: "Stammdatenpflege",
+        adminPin: "0000",
+      },
+    });
+    expect(parsed.type).toBe("UPSERT_PRODUCT");
     expect("guestName" in parsed.payload).toBe(false);
   });
 });
