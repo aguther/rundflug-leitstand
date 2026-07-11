@@ -28,6 +28,13 @@ describe("command authorization", () => {
     expect(() => assertRoleMayExecute("DISPLAY", "CALL_NEXT")).toThrowError(/darf CALL_NEXT nicht/);
   });
 
+  it("allows flight-line roles to abort a called rotation but not cashiers", () => {
+    expect(() => assertRoleMayExecute("FLIGHT_LINE", "ABORT_ROTATION")).not.toThrow();
+    expect(() => assertRoleMayExecute("CASHIER", "ABORT_ROTATION")).toThrowError(
+      /darf ABORT_ROTATION nicht/,
+    );
+  });
+
   it("reserves live product sales configuration for administrators", () => {
     expect(() => assertRoleMayExecute("CASHIER", "CONFIGURE_PRODUCT_SALES")).toThrowError(
       /darf CONFIGURE_PRODUCT_SALES nicht/,

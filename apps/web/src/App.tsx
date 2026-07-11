@@ -876,6 +876,30 @@ function FlightLineView() {
     }
   }
 
+  async function abortRotation() {
+    if (!board || !selected || selected.status !== "CALLED" || queueReason.trim().length < 3)
+      return;
+    try {
+      await sendCommand(
+        {
+          commandId: crypto.randomUUID(),
+          eventId: EVENT_ID,
+          deviceId: FLIGHT_LINE_DEVICE_ID,
+          expectedVersion: board.event.version,
+          issuedAt: new Date().toISOString(),
+          type: "ABORT_ROTATION",
+          payload: { rotationId: selected.id, reason: queueReason.trim() },
+        },
+        deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
+      );
+      setMessage("Umlauf abgebrochen; die Gruppe steht wieder vorn in ihrer Produkt-Queue.");
+      setQueueReason("");
+      await refresh();
+    } catch (reason) {
+      setMessage(reason instanceof Error ? reason.message : "Umlaufabbruch fehlgeschlagen.");
+    }
+  }
+
   async function setAttendance(ticketId: string, checkedIn: boolean) {
     if (!board || !selected || !["DRAFT", "CALLED"].includes(selected.status)) return;
     try {
@@ -1021,6 +1045,15 @@ function FlightLineView() {
                         ? `No-Show nach ${board?.event.noShowAfterMinutes ?? 10} Min.`
                         : "No-Show"}
                     </button>
+                    {selected.status === "CALLED" ? (
+                      <button
+                        disabled={queueReason.trim().length < 3}
+                        onClick={() => void abortRotation()}
+                        type="button"
+                      >
+                        Umlauf abbrechen · Gruppe nach vorn
+                      </button>
+                    ) : null}
                   </div>
                 </div>
               ) : null}

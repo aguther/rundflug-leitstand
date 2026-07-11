@@ -207,6 +207,13 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
     payload: z.object({ rotationId: z.string().min(1).max(100) }),
   }),
   commandBaseSchema.extend({
+    type: z.literal("ABORT_ROTATION"),
+    payload: z.object({
+      rotationId: z.string().min(1).max(100),
+      reason: z.string().trim().min(3).max(240),
+    }),
+  }),
+  commandBaseSchema.extend({
     type: z.literal("SET_TICKET_ATTENDANCE"),
     payload: z.object({
       ticketId: z.string().min(1).max(100),
