@@ -186,6 +186,7 @@ function CashierView() {
   const [lastTicketGroupId, setLastTicketGroupId] = useState<string | null>(null);
   const [lastProductId, setLastProductId] = useState<string | null>(null);
   const [cancelReason, setCancelReason] = useState("");
+  const [correctionPin, setCorrectionPin] = useState("");
   const [rebookProductId, setRebookProductId] = useState("");
   const product = board?.products.find((entry) => entry.id === productId) ?? board?.products[0];
   useEffect(() => {
@@ -238,7 +239,11 @@ function CashierView() {
           expectedVersion: board.event.version,
           issuedAt: new Date().toISOString(),
           type: "CANCEL_TICKET_GROUP",
-          payload: { ticketGroupId: lastTicketGroupId, reason: cancelReason.trim() },
+          payload: {
+            ticketGroupId: lastTicketGroupId,
+            reason: cancelReason.trim(),
+            adminPin: correctionPin,
+          },
         },
         deviceTokenFor(CASHIER_DEVICE_ID),
       );
@@ -247,6 +252,7 @@ function CashierView() {
       setLastTicketGroupId(null);
       setLastProductId(null);
       setCancelReason("");
+      setCorrectionPin("");
       await refresh();
     } catch (reason) {
       setMessage(reason instanceof Error ? reason.message : "Storno fehlgeschlagen.");
@@ -268,12 +274,14 @@ function CashierView() {
             ticketGroupId: lastTicketGroupId,
             newProductId: rebookProductId,
             reason: cancelReason.trim(),
+            adminPin: correctionPin,
           },
         },
         deviceTokenFor(CASHIER_DEVICE_ID),
       );
       setMessage("Tickets umgebucht und in die neue Queue eingereiht.");
       setCancelReason("");
+      setCorrectionPin("");
       setRebookProductId("");
       setLastProductId(rebookProductId);
       await refresh();
@@ -348,8 +356,16 @@ function CashierView() {
                     placeholder="Mindestens 3 Zeichen"
                   />
                 </label>
+                <label>
+                  Administrator-PIN für Storno/Umbuchung
+                  <input
+                    type="password"
+                    value={correctionPin}
+                    onChange={(event) => setCorrectionPin(event.target.value)}
+                  />
+                </label>
                 <button
-                  disabled={cancelReason.trim().length < 3}
+                  disabled={cancelReason.trim().length < 3 || correctionPin.length < 4}
                   onClick={cancelLastSale}
                   type="button"
                 >
@@ -372,7 +388,9 @@ function CashierView() {
                   </select>
                 </label>
                 <button
-                  disabled={!rebookProductId || cancelReason.trim().length < 3}
+                  disabled={
+                    !rebookProductId || cancelReason.trim().length < 3 || correctionPin.length < 4
+                  }
                   onClick={rebookLastSale}
                   type="button"
                 >
@@ -966,7 +984,8 @@ function AdminView() {
   }
 
   async function emergency(type: "TRIGGER_EMERGENCY" | "CLEAR_EMERGENCY") {
-    if (!board || reason.trim().length < 3) return;
+    if (!board || reason.trim().length < 3 || (type === "CLEAR_EMERGENCY" && adminPin.length < 4))
+      return;
     try {
       await sendCommand(
         type === "TRIGGER_EMERGENCY"
@@ -1034,7 +1053,7 @@ function AdminView() {
     saleEnabled: boolean,
     useEnteredClosingTime = false,
   ) {
-    if (!board || reason.trim().length < 3) return;
+    if (!board || reason.trim().length < 3 || adminPin.length < 4) return;
     try {
       const configuredClosing =
         useEnteredClosingTime && saleClosesAt
@@ -1055,6 +1074,7 @@ function AdminView() {
             warningThreshold: product.capacityWarningThreshold,
             criticalThreshold: product.capacityCriticalThreshold,
             reason: reason.trim(),
+            adminPin,
           },
         },
         deviceTokenFor(ADMIN_DEVICE_ID),
@@ -1151,14 +1171,14 @@ function AdminView() {
                 </div>
                 <div className="secondary-actions">
                   <button
-                    disabled={reason.trim().length < 3}
+                    disabled={reason.trim().length < 3 || adminPin.length < 4}
                     onClick={() => configureProductSales(product, !product.saleEnabled)}
                     type="button"
                   >
                     {product.saleEnabled ? "Verkauf sperren" : "Verkauf freigeben"}
                   </button>
                   <button
-                    disabled={reason.trim().length < 3 || !saleClosesAt}
+                    disabled={reason.trim().length < 3 || adminPin.length < 4 || !saleClosesAt}
                     onClick={() => configureProductSales(product, product.saleEnabled, true)}
                     type="button"
                   >

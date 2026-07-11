@@ -40,10 +40,18 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
     payload: z.object({ rotationId: z.string().min(1).max(100) }),
   }),
   commandBaseSchema.extend({
-    type: z.enum(["CANCEL_TICKET_GROUP", "DEFER_TICKET_GROUP", "MARK_NO_SHOW"]),
+    type: z.enum(["DEFER_TICKET_GROUP", "MARK_NO_SHOW"]),
     payload: z.object({
       ticketGroupId: z.string().min(1).max(100),
       reason: z.string().trim().min(3).max(240),
+    }),
+  }),
+  commandBaseSchema.extend({
+    type: z.literal("CANCEL_TICKET_GROUP"),
+    payload: z.object({
+      ticketGroupId: z.string().min(1).max(100),
+      reason: z.string().trim().min(3).max(240),
+      adminPin: z.string().min(4).max(32),
     }),
   }),
   commandBaseSchema.extend({
@@ -52,6 +60,7 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
       ticketGroupId: z.string().min(1).max(100),
       newProductId: z.string().min(1).max(100),
       reason: z.string().trim().min(3).max(240),
+      adminPin: z.string().min(4).max(32),
     }),
   }),
   commandBaseSchema.extend({
@@ -83,6 +92,7 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
       warningThreshold: z.number().int().nonnegative().max(1000),
       criticalThreshold: z.number().int().nonnegative().max(1000),
       reason: z.string().trim().min(3).max(240),
+      adminPin: z.string().min(4).max(32),
     }),
   }),
   commandBaseSchema.extend({

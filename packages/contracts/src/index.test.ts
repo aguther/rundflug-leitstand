@@ -17,6 +17,7 @@ describe("commandEnvelopeSchema", () => {
         warningThreshold: 12,
         criticalThreshold: 4,
         reason: "Kapazität prüfen",
+        adminPin: "0000",
       },
     });
     expect(parsed.type).toBe("CONFIGURE_PRODUCT_SALES");
