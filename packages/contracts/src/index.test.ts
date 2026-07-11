@@ -398,4 +398,21 @@ describe("commandEnvelopeSchema", () => {
     expect("publicCode" in result).toBe(false);
     expect("guestName" in result).toBe(false);
   });
+
+  it("validates an auditable event lifecycle command", () => {
+    const parsed = commandEnvelopeSchema.parse({
+      commandId: "7e7839a6-0ab3-4508-82da-96db7de7d851",
+      eventId: "synthetic-event",
+      deviceId: "synthetic-admin",
+      expectedVersion: 4,
+      issuedAt: "2026-07-11T12:00:00.000Z",
+      type: "SET_EVENT_LIFECYCLE",
+      payload: {
+        status: "CLOSED",
+        reason: "Veranstaltungstag abgeschlossen",
+        adminPin: "0000",
+      },
+    });
+    expect(parsed.type).toBe("SET_EVENT_LIFECYCLE");
+  });
 });

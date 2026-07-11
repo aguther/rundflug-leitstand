@@ -19,6 +19,14 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
     }),
   }),
   commandBaseSchema.extend({
+    type: z.literal("SET_EVENT_LIFECYCLE"),
+    payload: z.object({
+      status: z.enum(["PREPARATION", "ACTIVE", "CLOSED", "ARCHIVED"]),
+      reason: z.string().trim().min(3).max(240),
+      adminPin: z.string().min(4).max(32),
+    }),
+  }),
+  commandBaseSchema.extend({
     type: z.literal("SELL_TICKET_GROUP"),
     payload: z.object({
       productId: z.string().min(1).max(100),
@@ -306,7 +314,7 @@ export const eventSnapshotSchema = z.object({
   eventDate: z.string(),
   aerodrome: z.string(),
   timeZone: z.string(),
-  status: z.string(),
+  status: z.enum(["PREPARATION", "ACTIVE", "CLOSED", "ARCHIVED"]),
   archivedAt: z.string().nullable(),
   templateSourceId: z.string().nullable(),
   emergencyMode: z.boolean(),

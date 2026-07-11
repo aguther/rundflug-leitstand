@@ -138,7 +138,8 @@ export type OperationalCommandType =
   | "UPSERT_PRODUCT"
   | "UPSERT_RESOURCE_GROUP"
   | "UPSERT_AIRCRAFT"
-  | "ASSIGN_AIRCRAFT_RESOURCE_GROUP";
+  | "ASSIGN_AIRCRAFT_RESOURCE_GROUP"
+  | "SET_EVENT_LIFECYCLE";
 
 const commandRoles: Readonly<Record<OperationalCommandType, readonly DeviceRole[]>> = {
   SELL_TICKET_GROUP: ["CASHIER", "ADMIN"],
@@ -171,6 +172,7 @@ const commandRoles: Readonly<Record<OperationalCommandType, readonly DeviceRole[
   UPSERT_RESOURCE_GROUP: ["ADMIN"],
   UPSERT_AIRCRAFT: ["ADMIN"],
   ASSIGN_AIRCRAFT_RESOURCE_GROUP: ["ADMIN"],
+  SET_EVENT_LIFECYCLE: ["ADMIN"],
 };
 
 export function assertRoleMayExecute(role: DeviceRole, command: OperationalCommandType): void {
@@ -183,12 +185,19 @@ export function assertRoleMayExecute(role: DeviceRole, command: OperationalComma
 }
 
 export function assertSaleAllowed(input: {
+  eventStatus: "PREPARATION" | "ACTIVE" | "CLOSED" | "ARCHIVED";
   productSaleEnabled: boolean;
   resourceGroupStatus: "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED";
   emergencyMode: boolean;
   eventInterrupted: boolean;
   saleClosingReached: boolean;
 }): void {
+  if (input.eventStatus !== "ACTIVE") {
+    throw new DomainRuleError(
+      "SALE_BLOCKED_EVENT_STATUS",
+      "Die Veranstaltung ist nicht für den Verkauf aktiv.",
+    );
+  }
   if (input.emergencyMode) {
     throw new DomainRuleError("SALE_BLOCKED_EMERGENCY", "Verkauf ist im Notfallmodus gesperrt.");
   }

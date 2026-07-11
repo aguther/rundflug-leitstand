@@ -17,7 +17,7 @@ export interface StoredEventRow {
   event_date: string;
   aerodrome?: string;
   time_zone: string;
-  status: string;
+  status: "PREPARATION" | "ACTIVE" | "CLOSED" | "ARCHIVED";
   archived_at?: string | null;
   template_source_id?: string | null;
   emergency_mode: number;

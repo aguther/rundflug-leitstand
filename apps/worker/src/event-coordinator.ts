@@ -218,6 +218,7 @@ export class EventCoordinator extends DurableObject<Env> {
         }
         try {
           assertSaleAllowed({
+            eventStatus: current.status,
             productSaleEnabled: product.sale_enabled === 1,
             resourceGroupStatus: product.resource_group_status,
             emergencyMode: current.emergency_mode === 1,
@@ -481,6 +482,9 @@ export class EventCoordinator extends DurableObject<Env> {
         if (command.type === "CONFIGURE_EVENT_PARAMETERS") {
           return this.handleEventParameters(command, current);
         }
+        if (command.type === "SET_EVENT_LIFECYCLE") {
+          return this.handleEventLifecycle(command, current);
+        }
         if (command.type === "UPSERT_GATE" || command.type === "UPSERT_PRODUCT") {
           return this.handleMasterData(command, current);
         }
@@ -520,6 +524,17 @@ export class EventCoordinator extends DurableObject<Env> {
           command.type === "MARK_LANDED" ||
           command.type === "MARK_COMPLETED"
         ) {
+          if (command.type === "CALL_NEXT" && current.status !== "ACTIVE") {
+            return json(
+              {
+                error: {
+                  code: "CALL_BLOCKED_EVENT_STATUS",
+                  message: "Neue Aufrufe sind nur bei aktiver Veranstaltung zulässig.",
+                },
+              },
+              { status: 409 },
+            );
+          }
           if (command.type === "CALL_NEXT" && current.emergency_mode === 1) {
             return json(
               {
@@ -1555,6 +1570,160 @@ export class EventCoordinator extends DurableObject<Env> {
         aggregate.id,
         nextVersion,
         JSON.stringify(auditPayload),
+      ),
+      this.env.DB.prepare(
+        `INSERT INTO idempotency_receipts
+          (command_id, operation_day_id, device_id, command_type, received_at, response_json)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)`,
+      ).bind(
+        command.commandId,
+        command.eventId,
+        command.deviceId,
+        command.type,
+        now,
+        JSON.stringify(result),
+      ),
+      this.env.DB.prepare(
+        "INSERT INTO outbox (id, operation_day_id, topic, payload_json, created_at) VALUES (?1, ?2, 'EVENT_STATE_CHANGED', ?3, ?4)",
+      ).bind(crypto.randomUUID(), command.eventId, JSON.stringify(result), now),
+    ]);
+    this.broadcast(result);
+    return json(result);
+  }
+
+  private async handleEventLifecycle(
+    command: Extract<CommandEnvelope, { type: "SET_EVENT_LIFECYCLE" }>,
+    current: StoredEventRow,
+  ): Promise<Response> {
+    if (!(await verifyCredential(command.payload.adminPin, this.env.ADMIN_PIN_HASH))) {
+      return json(
+        { error: { code: "ADMIN_PIN_INVALID", message: "Administrator-PIN ist ungültig." } },
+        { status: 403 },
+      );
+    }
+    const target = command.payload.status;
+    const allowedTransitions: Record<StoredEventRow["status"], StoredEventRow["status"][]> = {
+      PREPARATION: ["ACTIVE"],
+      ACTIVE: ["CLOSED"],
+      CLOSED: ["ACTIVE", "ARCHIVED"],
+      ARCHIVED: [],
+    };
+    if (target === current.status) {
+      return json(
+        { error: { code: "EVENT_STATUS_UNCHANGED", message: "Der Status ist bereits gesetzt." } },
+        { status: 409 },
+      );
+    }
+    if (!allowedTransitions[current.status].includes(target)) {
+      return json(
+        {
+          error: {
+            code: "EVENT_LIFECYCLE_TRANSITION_NOT_ALLOWED",
+            message: `Übergang ${current.status} → ${target} ist nicht zulässig.`,
+          },
+        },
+        { status: 409 },
+      );
+    }
+    if (target === "ACTIVE") {
+      const readiness = await this.env.DB.prepare(
+        `SELECT
+          (SELECT COUNT(*) FROM products WHERE operation_day_id = ?1) AS products,
+          (SELECT COUNT(*) FROM resource_groups WHERE operation_day_id = ?1 AND status = 'ACTIVE') AS resource_groups,
+          (SELECT COUNT(*) FROM resource_group_memberships WHERE operation_day_id = ?1 AND active_until IS NULL) AS aircraft,
+          (SELECT COUNT(*) FROM pilots WHERE operation_day_id = ?1 AND active = 1) AS pilots,
+          (SELECT COUNT(*) FROM gates WHERE operation_day_id = ?1 AND active = 1) AS gates`,
+      )
+        .bind(command.eventId)
+        .first<{
+          products: number;
+          resource_groups: number;
+          aircraft: number;
+          pilots: number;
+          gates: number;
+        }>();
+      if (
+        !current.operations_end_at ||
+        !readiness ||
+        [
+          readiness.products,
+          readiness.resource_groups,
+          readiness.aircraft,
+          readiness.pilots,
+          readiness.gates,
+        ].some((count) => count < 1)
+      ) {
+        return json(
+          {
+            error: {
+              code: "EVENT_NOT_READY",
+              message:
+                "Vor Aktivierung sind Betriebsende, Produkt, Ressourcengruppe, Flugzeug, Pilot und Gate erforderlich.",
+            },
+          },
+          { status: 409 },
+        );
+      }
+    }
+    if (target === "CLOSED" || target === "ARCHIVED") {
+      const open = await this.env.DB.prepare(
+        `SELECT COUNT(*) AS count FROM rotations
+          WHERE operation_day_id = ?1 AND status NOT IN ('COMPLETED', 'CANCELED')`,
+      )
+        .bind(command.eventId)
+        .first<{ count: number }>();
+      if ((open?.count ?? 0) > 0) {
+        return json(
+          {
+            error: {
+              code: "EVENT_HAS_OPEN_ROTATIONS",
+              message:
+                "Offene Fluggruppen oder Umläufe müssen vor dem Schließen abgeschlossen werden.",
+            },
+          },
+          { status: 409 },
+        );
+      }
+    }
+    const now = new Date().toISOString();
+    const nextVersion = current.version + 1;
+    const archivedAt = target === "ARCHIVED" ? now : null;
+    const eventType = `EVENT_${target}`;
+    const result: CommandResult = {
+      accepted: true,
+      duplicate: false,
+      event: rowToSnapshot({
+        ...current,
+        status: target,
+        archived_at: archivedAt,
+        version: nextVersion,
+        updated_at: now,
+      }),
+      eventType,
+      aggregate: { type: "OPERATION_DAY", id: command.eventId },
+    };
+    await this.env.DB.batch([
+      this.env.DB.prepare(
+        `UPDATE operation_days SET status = ?1, archived_at = ?2, version = ?3, updated_at = ?4
+          WHERE id = ?5 AND version = ?6`,
+      ).bind(target, archivedAt, nextVersion, now, command.eventId, current.version),
+      this.env.DB.prepare(
+        `INSERT INTO operational_events
+          (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type,
+           aggregate_id, aggregate_version, payload_json)
+         VALUES (?1, ?2, ?3, ?4, ?5, 'OPERATION_DAY', ?2, ?6, ?7)`,
+      ).bind(
+        crypto.randomUUID(),
+        command.eventId,
+        eventType,
+        now,
+        command.deviceId,
+        nextVersion,
+        JSON.stringify({
+          previousStatus: current.status,
+          status: target,
+          reason: command.payload.reason,
+        }),
       ),
       this.env.DB.prepare(
         `INSERT INTO idempotency_receipts

@@ -573,6 +573,34 @@ p {
   gap: 0.75rem;
   margin: 1rem 0;
 }
+.event-lifecycle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 1rem 0;
+  padding: 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.5rem;
+  background: #f8fafc;
+}
+.event-lifecycle span {
+  margin-right: auto;
+}
+.event-lifecycle label {
+  display: grid;
+  gap: 3px;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.event-lifecycle input {
+  width: 150px;
+  min-height: 40px;
+}
+.event-lifecycle button {
+  min-height: 44px;
+  padding: 8px 14px;
+}
 
 .event-catalog a {
   display: grid;
