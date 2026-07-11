@@ -1,0 +1,44 @@
+{
+  "name": "rundflug-leitstand",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Cloudflare-native start repository for the Rundflug-Leitstand.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run build:web && concurrently --kill-others --names web,worker --prefix-colors cyan,magenta \"npm run dev:web\" \"npm run dev:worker\"",
+    "dev:web": "npm run dev -w @rundflug/web",
+    "dev:worker": "npm run dev -w @rundflug/worker",
+    "build": "npm run typecheck && npm run test && npm run build:web && npm run build:worker",
+    "build:web": "npm run build -w @rundflug/web",
+    "build:worker": "npm run build -w @rundflug/worker",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "check": "npm run lint && npm run build && npm run requirements:verify",
+    "requirements:verify": "python3 scripts/verify_requirements.py",
+    "db:migrate:local": "wrangler d1 migrations apply rundflug-leitstand-dev --local --config wrangler.jsonc",
+    "db:seed:local": "wrangler d1 execute rundflug-leitstand-dev --local --file apps/worker/seed/demo.sql --config wrangler.jsonc",
+    "db:reset:local": "node scripts/reset_local_db.mjs",
+    "deploy:acceptance": "npm run build:web && wrangler deploy --env acceptance --config wrangler.jsonc",
+    "deploy:production": "npm run build:web && wrangler deploy --env production --config wrangler.jsonc",
+    "clean": "node -e \"const fs=require('node:fs'); for (const p of ['apps/web/dist','apps/worker/dist']) fs.rmSync(p,{recursive:true,force:true})\""
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.3",
+    "@cloudflare/workers-types": "5.20260711.1",
+    "concurrently": "10.0.3",
+    "typescript": "6.0.3",
+    "vitest": "4.1.10",
+    "wrangler": "4.110.0"
+  },
+  "packageManager": "npm@10.9.2"
+}

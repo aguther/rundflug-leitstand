@@ -1,0 +1,2589 @@
+[
+  {
+    "id": "F-KAS-010",
+    "section": "8.1 Ticketverkauf (Kasse)",
+    "requirement": "Das Kassenpersonal muss einen Standardverkauf für eine Gruppe in maximal sechs Interaktionen und in der Regel in weniger als 15 Sekunden abschließen können. Freiwillige Zusatzangaben und Sonderfälle sind von dieser Zielzeit ausgenommen.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-KAS-020",
+    "section": "8.1 Ticketverkauf (Kasse)",
+    "requirement": "Zusammen verkaufte Tickets erhalten automatisch eine gemeinsame Gruppen-ID. Gruppenbindungen werden in allen Folgeprozessen berücksichtigt.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-KAS-030",
+    "section": "8.1 Ticketverkauf (Kasse)",
+    "requirement": "Gewichtsklassen (Kind, Normal, Schwer, Individuell mit kg-Angabe) müssen je Produkt oder Veranstaltung konfigurierbar aktivierbar sein. Ist die Funktion aktiv, ist je Person eine Klasse zu erfassen; ist sie deaktiviert, darf sie den Verkaufsablauf nicht verlängern.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-KAS-040",
+    "section": "8.1 Ticketverkauf (Kasse)",
+    "requirement": "Optional erfassbar sind Telefonnummer ausschließlich zur Ticketnummer, gewünschter Benachrichtigungskanal und Standby-Kennzeichen. Namen oder weitere Gastdaten werden im Kernsystem nicht erfasst.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-KAS-050",
+    "section": "8.1 Ticketverkauf (Kasse)",
+    "requirement": "Jedes Ticket erhält eine eindeutige, nicht erratbare Ticketnummer mit QR-Code. V1 unterstützt sowohl vorgedruckte Ticketcodes als auch die Ausgabe eines druckbaren oder digitalen Tickets aus dem System.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-KAS-055",
+    "section": "8.1 Ticketverkauf (Kasse)",
+    "requirement": "Eine gerätespezifische Bondrucker-Anbindung zur direkten Ticketausgabe ist vorzusehen.",
+    "priority": "SOLL",
+    "stage": "V2",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-KAS-060",
+    "section": "8.1 Ticketverkauf (Kasse)",
+    "requirement": "Bezahlstatus, Betrag und Zahlart werden rein informatorisch erfasst. Das System ist keine elektronische Registrierkasse und ersetzt keine bestehende Vereinskasse oder ein Kartenterminal.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-KAS-070",
+    "section": "8.1 Ticketverkauf (Kasse)",
+    "requirement": "Storno ist nur für Kasse und Administrator zulässig, erfordert einen Grund und erzeugt einen unveränderlichen Protokolleintrag.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-KAS-080",
+    "section": "8.1 Ticketverkauf (Kasse)",
+    "requirement": "Umbuchung eines Tickets auf ein anderes Produkt muss mit korrekter Neueinreihung in die operative Warteschlange und vollständiger Protokollierung möglich sein.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-KAS-090",
+    "section": "8.1 Ticketverkauf (Kasse)",
+    "requirement": "Ticketsuche nach Ticketnummer, Gruppen-ID, Fluggruppen-/Slotnummer und QR-Code.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-KAS-100",
+    "section": "8.1 Ticketverkauf (Kasse)",
+    "requirement": "Die Verkaufskachel zeigt je Produkt mindestens: Betriebsstatus, realistische Wartezeitspanne, prognostiziertes Aufruf-/Boardingfenster, Kapazitätsampel und realistisch verbleibende verkaufbare Plätze.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-KAS-110",
+    "section": "8.1 Ticketverkauf (Kasse)",
+    "requirement": "Ist für ein Produkt eine Begleitpflicht für Kinder hinterlegt, weist das System bei einer Kinderbuchung ohne erwachsene Begleitung in derselben Gruppe deutlich darauf hin.",
+    "priority": "SOLL",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-KAS-120",
+    "section": "8.1 Ticketverkauf (Kasse)",
+    "requirement": "Der Verkauf wird technisch gesperrt, wenn das Produkt oder seine Ressourcengruppe nicht verkaufbar ist, der Verkaufsschluss erreicht ist oder der Notfallmodus aktiv ist. Der Sperrgrund wird angezeigt.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-KAS-130",
+    "section": "8.1 Ticketverkauf (Kasse)",
+    "requirement": "Tageszählbericht als Abstimmhilfe mit verkauften Tickets, Stornos und informatorischen Summen je Produkt und Zahlart.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-KAS-140",
+    "section": "8.1 Ticketverkauf (Kasse)",
+    "requirement": "Gutschein-Tickets können ohne sofortige Einreihung ausgegeben und später an der Kasse eingelöst werden.",
+    "priority": "KANN",
+    "stage": "V2",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-KAS-150",
+    "section": "8.1 Ticketverkauf (Kasse)",
+    "requirement": "Warteliste je Produkt für ausverkaufte oder gesperrte Angebote; Vormerkung ohne Zahlung und geregeltes Nachrücken bei frei werdender Kapazität.",
+    "priority": "KANN",
+    "stage": "V2",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-KAS-160",
+    "section": "8.1 Ticketverkauf (Kasse)",
+    "requirement": "Die Kasse verkauft ausschließlich auf Basis der aktuellen Betriebs- und Prognoselage. Eine feste Flugzeug- oder Pilotenzuordnung durch die Kasse ist ausgeschlossen.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-RES-010",
+    "section": "8.2 Produkte, Ressourcengruppen und Flugzeuge",
+    "requirement": "Jedes buchbare Produkt verwendet genau eine Ressourcengruppe. Produktmerkmale wie Bezeichnung, Preis, Referenzdauer, öffentliche Darstellung und Verkaufsregeln sind von der Ressourcengruppe getrennt zu führen.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-RES-020",
+    "section": "8.2 Produkte, Ressourcengruppen und Flugzeuge",
+    "requirement": "Mehrere Produkte dürfen dieselbe Ressourcengruppe verwenden. Deren Nachfrage wird in einer gemeinsamen operativen Kapazität disponiert.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-RES-030",
+    "section": "8.2 Produkte, Ressourcengruppen und Flugzeuge",
+    "requirement": "Eine Ressourcengruppe kann ein oder mehrere Flugzeuge enthalten. Standardmäßig besitzt jedes Flugzeug eine eigene Ressourcengruppe; die Zusammenfassung mehrerer Flugzeuge ist konfigurierbar.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-RES-040",
+    "section": "8.2 Produkte, Ressourcengruppen und Flugzeuge",
+    "requirement": "Ein Flugzeug darf zu jedem Zeitpunkt höchstens einer aktiven Ressourcengruppe zugeordnet sein. Das System muss widersprüchliche Zuordnungen technisch verhindern.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-RES-050",
+    "section": "8.2 Produkte, Ressourcengruppen und Flugzeuge",
+    "requirement": "Zuordnungen von Flugzeugen zu Ressourcengruppen besitzen Gültigkeitszeiträume und werden historisiert. Änderungen im laufenden Betrieb werden mit Auswirkungen auf Queue und Prognose sofort verarbeitet.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-RES-060",
+    "section": "8.2 Produkte, Ressourcengruppen und Flugzeuge",
+    "requirement": "Je Produkt und Ressourcengruppe sind Kompatibilitätsmerkmale zu führen, insbesondere zulässige Flugzeugtypen, Passagierkapazität, Gate und planmäßige Prozessdauern.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-RES-070",
+    "section": "8.2 Produkte, Ressourcengruppen und Flugzeuge",
+    "requirement": "Ressourcengruppen besitzen einen eigenen Betriebsstatus: aktiv, pausiert, unterbrochen oder beendet. Der Status wirkt auf Verkauf, Aufruf, Prognose und Anzeigen.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-RES-080",
+    "section": "8.2 Produkte, Ressourcengruppen und Flugzeuge",
+    "requirement": "Die operative Queue wird je Ressourcengruppe geführt. Produktzugehörigkeit und stabile öffentliche Fluggruppen-/Slotnummern bleiben dabei erhalten.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-RES-090",
+    "section": "8.2 Produkte, Ressourcengruppen und Flugzeuge",
+    "requirement": "Flugzeuge mit abweichender Sitzplatzkapazität dürfen in einer Ressourcengruppe betrieben werden, sofern die konkrete Kapazität beim Umlauf berücksichtigt wird. V1 darf hierfür einen bestätigungspflichtigen Vorschlag statt vollautomatischer Optimierung verwenden.",
+    "priority": "SOLL",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-RES-100",
+    "section": "8.2 Produkte, Ressourcengruppen und Flugzeuge",
+    "requirement": "Eine temporäre Umgruppierung eines Flugzeugs im laufenden Betrieb ist nur durch Leiter Flight Line oder Administrator zulässig, zeigt die prognostizierten Auswirkungen vor Bestätigung und wird protokolliert.",
+    "priority": "SOLL",
+    "stage": "V2",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-SLT-010",
+    "section": "8.3 Fluggruppen, Slots und Warteschlangen",
+    "requirement": "Das System bildet aus verkauften Tickets stabile Fluggruppen/Slots je Produkt. Die operative Reihenfolge wird innerhalb der zugehörigen Ressourcengruppe geführt. Beim Verkauf erfolgt keine Flugzeugzuordnung.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-SLT-020",
+    "section": "8.3 Fluggruppen, Slots und Warteschlangen",
+    "requirement": "Zusammen gekaufte Tickets bleiben grundsätzlich zusammen. Ist eine Gruppe größer als die verfügbare Kapazität eines einzelnen Umlaufs, wird sie nur nach ausdrücklichem Hinweis auf unmittelbar aufeinanderfolgende Fluggruppen verteilt.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-SLT-030",
+    "section": "8.3 Fluggruppen, Slots und Warteschlangen",
+    "requirement": "Freie Plätze in noch nicht aufgerufenen Fluggruppen füllt das System automatisch mit der vordersten passenden Gruppe oder Einzelperson. Standby-Tickets dürfen bevorzugt werden. Ab dem Aufruf erfolgen Änderungen nur noch als bestätigungspflichtiger Vorschlag.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-SLT-040",
+    "section": "8.3 Fluggruppen, Slots und Warteschlangen",
+    "requirement": "Fluggruppen dürfen bis zum Statuswechsel IM FLUG geändert, ergänzt oder nachbesetzt werden. Nach IM FLUG ist die Besetzung unveränderlich; Korrekturen sind nur als dokumentierter Administrationsvorgang zulässig.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-SLT-050",
+    "section": "8.3 Fluggruppen, Slots und Warteschlangen",
+    "requirement": "Leiter Flight Line und Flight-Line-Personal können Fluggruppen manuell anpassen. Jede Abweichung vom Systemvorschlag wird protokolliert.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-SLT-060",
+    "section": "8.3 Fluggruppen, Slots und Warteschlangen",
+    "requirement": "Die nutzbare Platzanzahl eines konkreten Umlaufs kann vor dem Aufruf reduziert werden. Nicht mitfliegende Tickets rücken unter Erhalt der Gruppenbindung an die vorderste passende Warteschlangenposition.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-SLT-070",
+    "section": "8.3 Fluggruppen, Slots und Warteschlangen",
+    "requirement": "Die Referenzkapazität eines Produkts dient der anfänglichen Fluggruppenbildung. Maßgeblich für den konkreten Umlauf ist die Kapazität des zugeordneten Flugzeugs; Abweichungen werden deutlich angezeigt und müssen bestätigt werden.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-SLT-080",
+    "section": "8.3 Fluggruppen, Slots und Warteschlangen",
+    "requirement": "Nach jedem relevanten Ereignis berechnet das System Reihenfolge, Zuordnungen, Prognosen und Wartezeitspannen neu und verteilt den neuen Stand in Echtzeit an alle Geräte.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-SLT-090",
+    "section": "8.3 Fluggruppen, Slots und Warteschlangen",
+    "requirement": "Fällt ein Flugzeug aus, verteilt das System noch nicht gestartete Fluggruppen auf verbleibende kompatible Flugzeuge der Ressourcengruppe neu. Bereits aufgerufene Gruppen werden nicht stillschweigend verändert.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-SLT-100",
+    "section": "8.3 Fluggruppen, Slots und Warteschlangen",
+    "requirement": "Jede Fluggruppe erhält eine fortlaufende, gut kommunizierbare Tagesnummer in Verbindung mit dem Produktkürzel, z. B. SR-042. Diese Kennung ist auf allen Ansichten identisch.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-SLT-110",
+    "section": "8.3 Fluggruppen, Slots und Warteschlangen",
+    "requirement": "Nutzen mehrere Produkte dieselbe Ressourcengruppe, gilt in V1 grundsätzlich die Verkaufsreihenfolge über Produktgrenzen hinweg. Konfigurierbare Produktprioritäten oder Quoten dürfen diese Regel in späteren Stufen ergänzen.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-SLT-120",
+    "section": "8.3 Fluggruppen, Slots und Warteschlangen",
+    "requirement": "Eine noch nicht fest zugeordnete Fluggruppe wird dem frühest verfügbaren kompatiblen Flugzeug vorgeschlagen. Dabei dürfen weder Flugzeug- noch Pilotenkonflikte entstehen.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-EVT-010",
+    "section": "8.4 Ereignisse und Flight-Line-/Boarding-Ablauf",
+    "requirement": "Alle fachlich relevanten Änderungen werden als Ereignisse mit Zeitstempel, Quelle, Gerät, Bezug und Nutzdaten erfasst. Der operative Zustand wird aus diesen Ereignissen abgeleitet.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-EVT-020",
+    "section": "8.4 Ereignisse und Flight-Line-/Boarding-Ablauf",
+    "requirement": "Ereignisse müssen idempotent verarbeitet werden. Doppel-Tipps, Wiederholungen nach Verbindungsstörungen oder parallele Eingaben dürfen keine doppelten Statuswechsel erzeugen.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-EVT-030",
+    "section": "8.4 Ereignisse und Flight-Line-/Boarding-Ablauf",
+    "requirement": "Fehleingaben werden nicht durch Überschreiben historischer Zeitstempel korrigiert, sondern durch ein nachvollziehbares Korrektur- oder Rücknahmeereignis.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-EVT-040",
+    "section": "8.4 Ereignisse und Flight-Line-/Boarding-Ablauf",
+    "requirement": "Das System darf aus einer Primäraktion mehrere fachliche Ereignisse ableiten, sofern diese Ableitung transparent und protokolliert ist, z. B. NEXT erzeugt Aufruf und Boardingbeginn.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-EVT-050",
+    "section": "8.4 Ereignisse und Flight-Line-/Boarding-Ablauf",
+    "requirement": "Spätere automatische Quellen wie ADS-B dürfen Ereignisse vorschlagen oder plausibilisieren. Eine automatische Übernahme muss je Ereignistyp konfigurierbar sein.",
+    "priority": "SOLL",
+    "stage": "V3",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-BRD-010",
+    "section": "8.4 Ereignisse und Flight-Line-/Boarding-Ablauf",
+    "requirement": "Der Standardumlauf ist mit vier Primäraktionen durchführbar: NEXT, IM FLUG, GELANDET und ABGESCHLOSSEN/VERFÜGBAR. Flugzeug und Pilot werden vorgeschlagen; zusätzliche Interaktionen entstehen nur bei Abweichungen oder Sonderfällen.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-BRD-020",
+    "section": "8.4 Ereignisse und Flight-Line-/Boarding-Ablauf",
+    "requirement": "NEXT übernimmt den aktuellen Vorschlag, setzt die Fluggruppe auf Bitte zur Flight Line/Boarding, startet die Boardingmessung und löst Monitore sowie Benachrichtigungen aus.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-BRD-025",
+    "section": "8.4 Ereignisse und Flight-Line-/Boarding-Ablauf",
+    "requirement": "Check-in beziehungsweise Anwesenheit kann je Ticket per QR-Scan oder Antippen erfasst werden. Der Standardumlauf muss auch ohne Einzel-Scan vollständig bedienbar bleiben.",
+    "priority": "SOLL",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-BRD-030",
+    "section": "8.4 Ereignisse und Flight-Line-/Boarding-Ablauf",
+    "requirement": "Je Flugzeug ist ein aktueller Pilot hinterlegt und wird vorgeschlagen. Ein Pilotwechsel ist mit einer zusätzlichen Interaktion möglich und wird protokolliert.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-BRD-040",
+    "section": "8.4 Ereignisse und Flight-Line-/Boarding-Ablauf",
+    "requirement": "Ein Pilot darf zu keinem Zeitpunkt mehr als einen Umlauf in Boarding, Bereit oder Im Flug besitzen. Das System verhindert Konflikte technisch.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-BRD-050",
+    "section": "8.4 Ereignisse und Flight-Line-/Boarding-Ablauf",
+    "requirement": "Ein Ticket darf zu keinem Zeitpunkt mehr als einem nicht abgeschlossenen Umlauf zugeordnet sein. Dies gilt auch bei paralleler Bedienung mehrerer Geräte.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-BRD-060",
+    "section": "8.4 Ereignisse und Flight-Line-/Boarding-Ablauf",
+    "requirement": "Das System führt mindestens die Ticketzustände Verkauft, Wartend, Voraufruf, Bitte zur Flight Line, Eingecheckt, Boarding, Im Flug, Gelandet, Abgeschlossen, Zurückgestellt, No-Show, Klärung Kasse und Storniert.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-BRD-070",
+    "section": "8.4 Ereignisse und Flight-Line-/Boarding-Ablauf",
+    "requirement": "Tickets können mit einer Interaktion zurückgestellt werden. Die Anzahl wird gezählt; nach einer konfigurierbaren Höchstzahl wechselt das Ticket in Klärung Kasse.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-BRD-080",
+    "section": "8.4 Ereignisse und Flight-Line-/Boarding-Ablauf",
+    "requirement": "Erscheint ein aufgerufener Gast nicht innerhalb der konfigurierten Frist, kann das Ticket auf No-Show gesetzt werden. Das System schlägt eine Nachbesetzung vor; das Personal entscheidet über Nachbesetzen, Leerplatz oder Zurückstellung.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-BRD-085",
+    "section": "8.4 Ereignisse und Flight-Line-/Boarding-Ablauf",
+    "requirement": "Gruppenschutz: Gruppen werden nach dem Aufruf niemals automatisch getrennt. Fehlen Mitglieder, entscheidet das Flight-Line-Personal zwischen unvollständig fliegen, Gruppe gemeinsam zurückstellen oder Platz leer lassen.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-BRD-090",
+    "section": "8.4 Ereignisse und Flight-Line-/Boarding-Ablauf",
+    "requirement": "Ein Umlauf kann vor IM FLUG abgebrochen werden; alle Tickets kehren unter Erhalt ihrer Gruppenbindung an die vorderste passende Warteschlangenposition zurück.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-BRD-100",
+    "section": "8.4 Ereignisse und Flight-Line-/Boarding-Ablauf",
+    "requirement": "Das System misst getrennt mindestens Boardingdauer, Flugzeit, Zeit von Landung bis Abschluss und gesamte Umlaufzeit. Die Messpunkte werden aus den Primärereignissen abgeleitet.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-BRD-110",
+    "section": "8.4 Ereignisse und Flight-Line-/Boarding-Ablauf",
+    "requirement": "Anwesenheitsabgleich per QR-Scan oder Antippen in der Fluggruppenkarte.",
+    "priority": "SOLL",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-BRD-120",
+    "section": "8.4 Ereignisse und Flight-Line-/Boarding-Ablauf",
+    "requirement": "Die geschätzte Passagierzuladung wird auf Basis konfigurierbarer Referenzgewichte neutral angezeigt. Sie trägt dauerhaft den Hinweis, dass die Entscheidung ausschließlich beim Piloten liegt und besitzt keine Freigabesemantik.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-BRD-130",
+    "section": "8.4 Ereignisse und Flight-Line-/Boarding-Ablauf",
+    "requirement": "Sitzplatzzuordnung je Passagier innerhalb des Umlaufs.",
+    "priority": "SOLL",
+    "stage": "V2",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-BRD-140",
+    "section": "8.4 Ereignisse und Flight-Line-/Boarding-Ablauf",
+    "requirement": "Vollständige Schwerpunktberechnung als getrenntes Pilotenwerkzeug mit echten Gewichten, Hebelarmen und Sitzpositionen; ohne Freigabewirkung für den organisatorischen Leitstand.",
+    "priority": "KANN",
+    "stage": "V3",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-BRD-150",
+    "section": "8.4 Ereignisse und Flight-Line-/Boarding-Ablauf",
+    "requirement": "Mehrere Flight Lines beziehungsweise Gates werden im Datenmodell ab V1 berücksichtigt; parallele Bedienung mehrerer Gates wird in V2 bereitgestellt.",
+    "priority": "SOLL",
+    "stage": "V2",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-BRD-160",
+    "section": "8.4 Ereignisse und Flight-Line-/Boarding-Ablauf",
+    "requirement": "GELANDET beendet nicht automatisch die Flugzeugbelegung. Erst ABGESCHLOSSEN/VERFÜGBAR kennzeichnet Ausstieg und Bodenprozess als beendet und gibt das Flugzeug für den nächsten Umlauf frei.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-FLT-010",
+    "section": "8.5 Flotte, Piloten, Pausen und Tanken",
+    "requirement": "Verwaltung der Flugzeugstammdaten einschließlich Ressourcengruppen-Zuordnung und Pflege im laufenden Betrieb.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-FLT-020",
+    "section": "8.5 Flotte, Piloten, Pausen und Tanken",
+    "requirement": "Event-Status je Flugzeug: aktiv oder inaktiv für die Veranstaltung.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-FLT-030",
+    "section": "8.5 Flotte, Piloten, Pausen und Tanken",
+    "requirement": "Live-Status je Flugzeug mindestens: verfügbar, Boarding, im Flug, gelandet/deboarding, Tanken vorgemerkt, Tanken aktuell, Pause, Flugbetrieb unterbrochen und kurzfristig inaktiv. Statuswechsel sind in höchstens zwei Interaktionen möglich.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-FLT-040",
+    "section": "8.5 Flotte, Piloten, Pausen und Tanken",
+    "requirement": "Piloten werden mit Name und Kürzel geführt und können live angelegt oder deaktiviert werden. Lizenz-, Dokumenten- und Flugbuchverwaltung sind ausgeschlossen.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-FLT-050",
+    "section": "8.5 Flotte, Piloten, Pausen und Tanken",
+    "requirement": "Tanken vorgemerkt reserviert eine passende operative Lücke ohne feste Zusage; Tanken aktuell nimmt das Flugzeug aus der Disposition. Beide Zustände wirken sofort auf Prognose und Kapazität.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-FLT-060",
+    "section": "8.5 Flotte, Piloten, Pausen und Tanken",
+    "requirement": "Je Flugzeug führt das System einen Umlaufzähler seit dem letzten Tanken mit konfigurierbarer Erinnerungsschwelle.",
+    "priority": "SOLL",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-FLT-070",
+    "section": "8.5 Flotte, Piloten, Pausen und Tanken",
+    "requirement": "Geschätzte Kraftstoffbilanz je Flugzeug als organisatorische Erinnerungshilfe mit Startfüllstand, pauschalem Verbrauch, Warnschwelle und Korrektur beim Tanken; ohne Sicherheitsfunktion.",
+    "priority": "SOLL",
+    "stage": "V2",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-FLT-080",
+    "section": "8.5 Flotte, Piloten, Pausen und Tanken",
+    "requirement": "Die aktuelle Ressourcengruppe und ihre Queue sind am Flugzeug sichtbar. Status- oder Gruppierungsänderungen lösen eine automatische Neuplanung aller abhängigen Prognosen aus.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-FLT-090",
+    "section": "8.5 Flotte, Piloten, Pausen und Tanken",
+    "requirement": "Pilotenpausen können als zeitlich offene oder mit erwarteter Mindestdauer versehene Blockierung erfasst werden. Das System plant keine Verfügbarkeit gegen eine aktive Pause.",
+    "priority": "SOLL",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-PRG-010",
+    "section": "8.6 Prognose, Disposition und Kapazität",
+    "requirement": "Für alle relevanten Prozesspunkte unterscheidet das System Planzeit, Prognosezeit und Ist-Zeit. Diese Werte werden getrennt gespeichert und angezeigt.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-PRG-020",
+    "section": "8.6 Prognose, Disposition und Kapazität",
+    "requirement": "Nach jedem relevanten Ereignis werden erwartetes Boarding, Start, Landung, Abschluss, verbleibende Wartezeit und alle abhängigen Folgeflüge automatisch neu berechnet.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-PRG-030",
+    "section": "8.6 Prognose, Disposition und Kapazität",
+    "requirement": "Die Prognose berücksichtigt mindestens Produktdauer, Flugzeugprofil, Boarding-, Flug-, Deboarding- und Pufferzeiten, aktuelle Flugzeugzustände, Pausen, Tanken, Unterbrechungen und Queue-Reihenfolge.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-PRG-040",
+    "section": "8.6 Prognose, Disposition und Kapazität",
+    "requirement": "Tatsächlich gemessene Ereignisdauern müssen stärker in die Prognose eingehen als statische Planwerte. Planwerte dienen als Start- und Rückfallwerte.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-PRG-050",
+    "section": "8.6 Prognose, Disposition und Kapazität",
+    "requirement": "Bei wenigen oder fehlenden Tagesmesswerten verwendet das System einen nachvollziehbaren Kaltstart aus Stammdaten und historischen Parametern, ohne die Prognose als hochsicher darzustellen.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-PRG-060",
+    "section": "8.6 Prognose, Disposition und Kapazität",
+    "requirement": "Ausreißer, abgebrochene Flüge, aktive Unterbrechungen und fehlerhaft korrigierte Ereignisse dürfen Durchschnittswerte nicht unkontrolliert verzerren. Die Behandlung muss im Pflichtenheft nachvollziehbar beschrieben werden.",
+    "priority": "SOLL",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-PRG-070",
+    "section": "8.6 Prognose, Disposition und Kapazität",
+    "requirement": "Interne Rollen sehen konkrete Prognosezeitpunkte für Boarding, Start, Landung und Abschluss sowie die zugrunde liegende Unsicherheit.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-PRG-080",
+    "section": "8.6 Prognose, Disposition und Kapazität",
+    "requirement": "Gegenüber Gästen werden Countdown oder Zeitfenster kommuniziert. Eine einzelne exakte Uhrzeit darf nicht als feste Zusage erscheinen; ein ungefähres Uhrzeitfenster ist zulässig.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-PRG-090",
+    "section": "8.6 Prognose, Disposition und Kapazität",
+    "requirement": "Jede Prognose besitzt eine Qualitäts- oder Unsicherheitsangabe, z. B. hoch/mittel/gering oder ein Zeitintervall. Weit entfernte Fluggruppen erhalten breitere Intervalle.",
+    "priority": "SOLL",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-PRG-100",
+    "section": "8.6 Prognose, Disposition und Kapazität",
+    "requirement": "Das System erkennt Verspätungen und ungeplante Verlängerungen anhand ausbleibender Ereignisse und gemessener Abweichungen und aktualisiert den Folgeplan ohne manuelle Zeitkorrektur.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-PRG-110",
+    "section": "8.6 Prognose, Disposition und Kapazität",
+    "requirement": "Bei mehreren Flugzeugen einer Ressourcengruppe darf das System noch nicht festgelegte Fluggruppen auf ein früher verfügbares kompatibles Flugzeug umplanen. Ab NEXT sind Änderungen bestätigungspflichtig.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-PRG-120",
+    "section": "8.6 Prognose, Disposition und Kapazität",
+    "requirement": "Prognose-Snapshots werden zu definierten Zeitpunkten gespeichert, damit Prognosegüte und Entwicklung nach dem Event ausgewertet werden können.",
+    "priority": "SOLL",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-PRG-130",
+    "section": "8.6 Prognose, Disposition und Kapazität",
+    "requirement": "Operative Eingriffe erfolgen grundsätzlich über reale Zustände und Ereignisse wie Pause, Tanken, Blockierung oder Wetterunterbrechung. Das direkte Überschreiben einzelner Folgezeiten ist im Regelbetrieb nicht vorgesehen.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-KAP-010",
+    "section": "8.6 Prognose, Disposition und Kapazität",
+    "requirement": "Das System berechnet laufend die realistisch verbleibende Kapazität je Produkt und Ressourcengruppe aus aktiven Flugzeugen, Prognosedauern, verbleibender Betriebszeit, offenen Tickets und Blockierungen.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-KAP-020",
+    "section": "8.6 Prognose, Disposition und Kapazität",
+    "requirement": "Kapazitätsampel je Produkt und Ressourcengruppe mit konfigurierbaren Schwellwerten; sichtbar an Kasse und Administration. Farben werden stets durch Text oder Symbol ergänzt.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-KAP-030",
+    "section": "8.6 Prognose, Disposition und Kapazität",
+    "requirement": "Harter Verkaufsschluss zu einer konfigurierbaren Uhrzeit mit rechtzeitiger Vorwarnung. Er wirkt zusätzlich zur dynamischen Kapazitätsentscheidung.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-KAP-040",
+    "section": "8.6 Prognose, Disposition und Kapazität",
+    "requirement": "Produkte und Ressourcengruppen können live auf verkaufbar beziehungsweise nicht verkaufbar gesetzt werden; jede Änderung wird protokolliert.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-KAP-050",
+    "section": "8.6 Prognose, Disposition und Kapazität",
+    "requirement": "Die Kasse erhält eine konkrete, vorsichtige Verkaufsempfehlung je Produkt, einschließlich Restplätzen und Prognosefenster.",
+    "priority": "SOLL",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-KAP-060",
+    "section": "8.6 Prognose, Disposition und Kapazität",
+    "requirement": "Bei geringer Prognosequalität muss die Verkaufsempfehlung konservativer ausfallen oder eine manuelle Freigabe verlangen.",
+    "priority": "SOLL",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-WET-010",
+    "section": "8.7 Wetter, Betriebsunterbrechung und Notfallmodus",
+    "requirement": "Globale oder ressourcengruppenspezifische Wetter- und Betriebshinweise können gesetzt werden und erscheinen auf Bediengeräten, Monitoren und Status-Seiten. Ein Hinweis löst nicht automatisch einen sicherheitsrelevanten Flugstopp aus.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-WET-020",
+    "section": "8.7 Wetter, Betriebsunterbrechung und Notfallmodus",
+    "requirement": "Flugbetrieb unterbrochen ist je Flugzeug, Ressourcengruppe oder gesamter Veranstaltung setzbar. Nicht betroffene Ressourcen laufen unverändert weiter.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-WET-030",
+    "section": "8.7 Wetter, Betriebsunterbrechung und Notfallmodus",
+    "requirement": "Hinweise, Unterbrechungen und deren Aufhebung werden mit Zeitstempel und auslösendem Gerät protokolliert.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-WET-040",
+    "section": "8.7 Wetter, Betriebsunterbrechung und Notfallmodus",
+    "requirement": "Für organisatorische Zwecke darf eine unverbindliche erwartete Mindestdauer oder ein Prüfzeitpunkt der Unterbrechung erfasst werden. Dies ist keine direkte manuelle Korrektur einzelner Flugzeiten.",
+    "priority": "SOLL",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-NOT-010",
+    "section": "8.7 Wetter, Betriebsunterbrechung und Notfallmodus",
+    "requirement": "Administrator, Leiter Flight Line und Flugleitung können den Notfallmodus in maximal zwei Interaktionen auslösen.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-NOT-020",
+    "section": "8.7 Wetter, Betriebsunterbrechung und Notfallmodus",
+    "requirement": "Der Notfallmodus sperrt sofort Verkauf und neue Aufrufe, schaltet öffentliche Anzeigen auf neutralen Inhalt und kennzeichnet alle Bediengeräte deutlich.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-NOT-030",
+    "section": "8.7 Wetter, Betriebsunterbrechung und Notfallmodus",
+    "requirement": "Laufende Flüge bleiben unverändert und können weiter mit GELANDET und ABGESCHLOSSEN dokumentiert werden.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-NOT-040",
+    "section": "8.7 Wetter, Betriebsunterbrechung und Notfallmodus",
+    "requirement": "Das Aufheben des Notfallmodus erfordert die Administrator-PIN. Auslösung und Aufhebung werden protokolliert.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-MON-010",
+    "section": "8.8 Besucher-, FIDS- und Boardinganzeigen",
+    "requirement": "Der Fluggastmonitor zeigt im FIDS-Stil mindestens Produkt, Fluggruppen-/Slotnummer, Gate, Status, aktuelle Boardingaufrufe und die nächsten Fluggruppen mit Countdown oder Zeitfenster. Eine einzelne exakte Uhrzeit wird nicht als feste Zusage dargestellt.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-MON-020",
+    "section": "8.8 Besucher-, FIDS- und Boardinganzeigen",
+    "requirement": "Der Boardingmonitor zeigt mehrere kommende Fluggruppen, Ticketnummern, Gate und nach Zuordnung das Flugzeug sowie eine Flottenstatuszeile.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-MON-030",
+    "section": "8.8 Besucher-, FIDS- und Boardinganzeigen",
+    "requirement": "Monitore laufen im Vollbild-Kioskmodus, aktualisieren sich in Echtzeit, verbinden sich automatisch neu und benötigen während des Veranstaltungstags keinen manuellen Eingriff.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-MON-040",
+    "section": "8.8 Besucher-, FIDS- und Boardinganzeigen",
+    "requirement": "Personenbezogene Daten auf Monitoren sind ausgeschlossen. Angezeigt werden nur Ticket-/Fluggruppenkennungen, Produkte, Gates, Status und Betriebsinformationen.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-MON-050",
+    "section": "8.8 Besucher-, FIDS- und Boardinganzeigen",
+    "requirement": "Im Notfallmodus zeigen alle öffentlichen Monitore unverzüglich einen neutralen Hinweis ohne Aufrufe.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-MON-060",
+    "section": "8.8 Besucher-, FIDS- und Boardinganzeigen",
+    "requirement": "Mehrsprachige Anzeige mindestens Deutsch/Englisch für Monitore und Status-Seiten.",
+    "priority": "KANN",
+    "stage": "V3",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-MON-070",
+    "section": "8.8 Besucher-, FIDS- und Boardinganzeigen",
+    "requirement": "Statusfarben sind systemweit einheitlich, werden aber stets zusätzlich durch Text oder Symbol erläutert.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-MON-080",
+    "section": "8.8 Besucher-, FIDS- und Boardinganzeigen",
+    "requirement": "Die Anzeige kann je Gate, Flight Line oder Ressourcengruppe gefiltert werden; der parallele Mehr-Gate-Betrieb der Bedienoberfläche folgt in V2.",
+    "priority": "SOLL",
+    "stage": "V2",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-BEN-010",
+    "section": "8.9 Gastinformation und Benachrichtigung",
+    "requirement": "Jedes Ticket verlinkt per QR-Code auf eine öffentliche Status-Seite ohne Anmeldung. Sie zeigt Produkt, Fluggruppe, öffentlichen Status, verbleibende Wartezeit beziehungsweise Zeitfenster, Position, Gate, Hinweise und Zeitpunkt der letzten Aktualisierung.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-BEN-020",
+    "section": "8.9 Gastinformation und Benachrichtigung",
+    "requirement": "Gäste können Web-Push-Benachrichtigungen je Ticket aktivieren, ohne App-Installation und ohne Telefonnummer.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-BEN-030",
+    "section": "8.9 Gastinformation und Benachrichtigung",
+    "requirement": "Vorabbenachrichtigungen werden aus Prognose und Queue-Position abgeleitet; zusätzlich erfolgt beim NEXT ein verbindlicher Aufruf. Die Schwellen sind konfigurierbar.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-BEN-040",
+    "section": "8.9 Gastinformation und Benachrichtigung",
+    "requirement": "Benachrichtigungen können alternativ an der Kasse für die Ticketnummer aktiviert werden.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-BEN-050",
+    "section": "8.9 Gastinformation und Benachrichtigung",
+    "requirement": "SMS als zusätzlicher Kanal über einen externen Versanddienst mit Warteschlange, Wiederholung und sichtbarem Versandstatus.",
+    "priority": "SOLL",
+    "stage": "V2",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-BEN-060",
+    "section": "8.9 Gastinformation und Benachrichtigung",
+    "requirement": "Jede Telefonnummer oder Messenger-Registrierung erfordert eine dokumentierte Einwilligung mit Zeitpunkt und Kanal.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-BEN-070",
+    "section": "8.9 Gastinformation und Benachrichtigung",
+    "requirement": "Bei relevanten Änderungen wie erheblicher Verschiebung, Unterbrechung, Gate-Wechsel oder Notfallmodus werden betroffene registrierte Gäste informiert.",
+    "priority": "SOLL",
+    "stage": "V2",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-BEN-080",
+    "section": "8.9 Gastinformation und Benachrichtigung",
+    "requirement": "WhatsApp oder vergleichbarer Messenger über eine offizielle Business-Schnittstelle mit dokumentierter Einwilligung.",
+    "priority": "KANN",
+    "stage": "V3",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-BEN-090",
+    "section": "8.9 Gastinformation und Benachrichtigung",
+    "requirement": "Öffentliche Statusbezeichnungen sind auf wenige handlungsorientierte Zustände zu reduzieren: Warten, Bitte vorbereiten, Bitte zur Flight Line, Boarding, Flug läuft, Gelandet und Abgeschlossen.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-BEN-100",
+    "section": "8.9 Gastinformation und Benachrichtigung",
+    "requirement": "Bei unsicherer oder unterbrochener Prognose zeigt die Status-Seite einen ehrlichen Hinweis statt eines scheinbar präzisen Countdowns.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-HIS-010",
+    "section": "8.10 Historie, Protokoll und Auswertung",
+    "requirement": "Flüge, Fluggruppen und Tickets werden dauerhaft gespeichert und sind nach Datum, Flugzeug, Pilot, Produkt, Ressourcengruppe, Slotnummer, Ticket und Status filterbar.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-HIS-020",
+    "section": "8.10 Historie, Protokoll und Auswertung",
+    "requirement": "Unveränderliches, nur anfügendes Ereignisprotokoll mindestens für Verkauf, Storno, Umbuchung, Aufruf, Check-in, IM FLUG, GELANDET, ABGESCHLOSSEN, Zurückstellung, No-Show, Pilot- und Ressourcenwechsel, Tanken, Wetter, Unterbrechung, Notfallmodus und manuelle Disposition.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-HIS-030",
+    "section": "8.10 Historie, Protokoll und Auswertung",
+    "requirement": "Automatischer Tagesbericht als PDF und CSV mit Flügen, Passagierzahlen, Auslastung, gemessenen Prozesszeiten, Wartezeiten, Kassen-Zählbericht, Prognoseentwicklung und besonderen Ereignissen.",
+    "priority": "SOLL",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-HIS-040",
+    "section": "8.10 Historie, Protokoll und Auswertung",
+    "requirement": "CSV-Export der fachlichen Rohdaten für Vereinsabrechnung und eigene Auswertungen.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-HIS-050",
+    "section": "8.10 Historie, Protokoll und Auswertung",
+    "requirement": "Statistik-Dashboard über mehrere Veranstaltungen mit Durchsatz, Auslastung, Wartezeit, Prognosegüte und informatorischem Umsatzvergleich.",
+    "priority": "SOLL",
+    "stage": "V2",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-HIS-060",
+    "section": "8.10 Historie, Protokoll und Auswertung",
+    "requirement": "Prognose-Snapshots und zugehörige Ist-Ergebnisse sind auswertbar, insbesondere Abweichung von Boarding-, Start- und Abschlussprognose.",
+    "priority": "SOLL",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-HIS-070",
+    "section": "8.10 Historie, Protokoll und Auswertung",
+    "requirement": "Kennzahlen wie Boardingdauer, Flugzeit, Bodenzeit, Umlaufzeit und Wartezeit besitzen im System eindeutige, dokumentierte Start- und Endereignisse.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-ADM-010",
+    "section": "8.11 Administration und Geräteverwaltung",
+    "requirement": "Pflege der Veranstaltungsparameter einschließlich Verkaufszeiten, Betriebsende, Fristen, Ampelschwellen, Referenzgewichte, Benachrichtigungsvorlauf sowie Planwerte und Prognoseparameter.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-ADM-020",
+    "section": "8.11 Administration und Geräteverwaltung",
+    "requirement": "Stammdaten für Produkte, Ressourcengruppen, Flugzeuge, Zuordnungen, Piloten und Gates sind auch während des Betriebs änderbar; Änderungen werden protokolliert und wirken kontrolliert auf den Livezustand.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-ADM-030",
+    "section": "8.11 Administration und Geräteverwaltung",
+    "requirement": "Gerätekopplung ohne persönliche Helferkonten: Der Administrator koppelt ein Gerät per QR-Code mit einer festen Rolle für die Veranstaltung. Kopplungen sind einzeln widerrufbar.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-ADM-040",
+    "section": "8.11 Administration und Geräteverwaltung",
+    "requirement": "Geräteübersicht mit Rolle, Online-Status, letztem Kontakt und, soweit verfügbar, Akkustand.",
+    "priority": "SOLL",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-ADM-050",
+    "section": "8.11 Administration und Geräteverwaltung",
+    "requirement": "Kritische Aktionen wie Storno, Aufheben des Notfallmodus, Löschen von Stammdaten und wesentliche Live-Konfigurationsänderungen erfordern eine Administrator-PIN.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-ADM-060",
+    "section": "8.11 Administration und Geräteverwaltung",
+    "requirement": "Administrations-Dashboard mit offenen Tickets, Durchsatz, mittleren Prozesszeiten, Prognosequalität, Geräte- und Benachrichtigungsstatus sowie informatorischen Umsatzzählern.",
+    "priority": "SOLL",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-ADM-070",
+    "section": "8.11 Administration und Geräteverwaltung",
+    "requirement": "Trainingsmodus mit Beispieldaten und vollständiger Rücksetzung; Trainingsdaten dürfen nicht in Auswertungen einfließen.",
+    "priority": "KANN",
+    "stage": "V2",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-ADM-080",
+    "section": "8.11 Administration und Geräteverwaltung",
+    "requirement": "Verwaltung mehrerer Veranstaltungen mit eventübergreifender Stammdatenbibliothek und Kopie einer Vorveranstaltung als Vorlage.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-ADM-090",
+    "section": "8.11 Administration und Geräteverwaltung",
+    "requirement": "Dashboard Flugleitung als primär lesende Gesamtsicht mit offenen Tickets, Ressourcenstatus, laufenden Flügen, Kapazität, Prognosen und Not-Halt.",
+    "priority": "SOLL",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-ADM-100",
+    "section": "8.11 Administration und Geräteverwaltung",
+    "requirement": "Die Administration verhindert technisch ungültige Ressourcengruppen-Zuordnungen und zeigt Konflikte vor dem Speichern verständlich an.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-INT-010",
+    "section": "8.12 Schnittstellen und spätere Erweiterungen",
+    "requirement": "Die Architektur stellt eine dokumentierte interne Schnittstelle für Ereignisse und Statusabfragen bereit, damit spätere Datenquellen ohne Neuentwicklung des Kerns angebunden werden können.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-INT-020",
+    "section": "8.12 Schnittstellen und spätere Erweiterungen",
+    "requirement": "ADS-B- oder Flugbewegungsmonitoring zur Plausibilisierung von Start, Landung und ETA.",
+    "priority": "KANN",
+    "stage": "V3",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-INT-030",
+    "section": "8.12 Schnittstellen und spätere Erweiterungen",
+    "requirement": "Automatische Erkennung von Start und Landung als Vorschlag oder konfigurierbare automatische Ereignisquelle.",
+    "priority": "KANN",
+    "stage": "V3",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-INT-040",
+    "section": "8.12 Schnittstellen und spätere Erweiterungen",
+    "requirement": "Digitale Passagierlisten werden, falls erforderlich, als separates Modul mit eigener Berechtigung, Rechtsgrundlage und Löschfrist umgesetzt; keine stillschweigende Erweiterung des datensparsamen Kern-Ticketings.",
+    "priority": "KANN",
+    "stage": "V3",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-INT-050",
+    "section": "8.12 Schnittstellen und spätere Erweiterungen",
+    "requirement": "Online-Vorverkauf mit Kontingentsteuerung bleibt optional und darf den Vor-Ort-Regelbetrieb nicht voraussetzen.",
+    "priority": "KANN",
+    "stage": "V3",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-INT-060",
+    "section": "8.12 Schnittstellen und spätere Erweiterungen",
+    "requirement": "Mehrere Flugplätze und Mandantenfähigkeit für mehrere Veranstalter.",
+    "priority": "KANN",
+    "stage": "V4",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "F-INT-070",
+    "section": "8.12 Schnittstellen und spätere Erweiterungen",
+    "requirement": "Mehrere Kassen- und Flight-Line-Geräte dürfen bereits in V1 parallel auf denselben Livezustand zugreifen; mehrere organisatorisch unabhängige Flight Lines folgen in V2.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "D-010",
+    "section": "9 Datenanforderungen",
+    "requirement": "Flugzeug: Kennzeichen, Typ, Passagierkapazität, maximale Passagierzuladung, Gate, Event- und Live-Status, aktueller Pilot, Zeitprofile, Tankhinweise und aktive Ressourcengruppe.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "D-015",
+    "section": "9 Datenanforderungen",
+    "requirement": "Ressourcengruppe: Bezeichnung, Status, Referenzkapazität, zugehörige Produkte, Prognoseparameter, Gates und aktive Flugzeugzuordnungen.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "D-016",
+    "section": "9 Datenanforderungen",
+    "requirement": "Ressourcengruppen-Zuordnung: Flugzeug, Ressourcengruppe, gültig ab/bis, aktiv, Änderungsgrund und Protokollbezug.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "D-020",
+    "section": "9 Datenanforderungen",
+    "requirement": "Produkt: Bezeichnung, Kürzel, Preis, Ressourcengruppe, öffentliche Darstellung, Referenzdauer, Referenzkapazität, Verkaufsregeln, Begleitpflicht und Sortierung.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "D-030",
+    "section": "9 Datenanforderungen",
+    "requirement": "Ticket: nicht erratbare Ticketnummer, Produkt, Fluggruppe beziehungsweise Queue-Position, Gruppen-ID, optionale Gewichtsklasse, optionale Telefonnummer, Benachrichtigung, Einwilligung, Standby, Status, Zahl- und Verkaufsdaten.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "D-040",
+    "section": "9 Datenanforderungen",
+    "requirement": "Buchungsgruppe: Gruppen-ID, Größe, zugehörige Tickets, Gruppenbindung, Standby-Regel und gegebenenfalls Aufteilung auf unmittelbar aufeinanderfolgende Fluggruppen.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "D-045",
+    "section": "9 Datenanforderungen",
+    "requirement": "Fluggruppe/Slot: stabile Tageskennung, Produkt, Ressourcengruppe, Tickets, Queue-Position, öffentliche Statusinformation, prognostizierte Zeitfenster und gegebenenfalls zugeordneter Umlauf.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "D-050",
+    "section": "9 Datenanforderungen",
+    "requirement": "Flug/Umlauf: Fluggruppe, Flugzeug, Pilot, Gate, Tickets, Status, Plan-, Prognose- und Ist-Zeiten für Aufruf, Boarding, Start, Landung und Abschluss sowie Bemerkungen.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "D-055",
+    "section": "9 Datenanforderungen",
+    "requirement": "Prognose-Snapshot: Erstellzeitpunkt, Bezug, prognostizierte Prozesszeiten, Zeitfenster, Qualitätsstufe, verwendete Datengrundlage und Auslöser der Neuberechnung.",
+    "priority": "SOLL",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "D-060",
+    "section": "9 Datenanforderungen",
+    "requirement": "Pilot: Name, Kürzel, aktiv, aktuelle Zuordnung und optionale Bemerkung; keine Lizenz- oder Dokumentenverwaltung.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "D-065",
+    "section": "9 Datenanforderungen",
+    "requirement": "Blockierung/Unterbrechung: Geltungsbereich, Typ, Beginn, optionaler Prüfzeitpunkt oder Mindestdauer, Status, Grund und Aufhebung.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "D-070",
+    "section": "9 Datenanforderungen",
+    "requirement": "Gate/Flight Line: Bezeichnung, Art, zugeordnete Ressourcengruppen und Anzeigefilter.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "D-080",
+    "section": "9 Datenanforderungen",
+    "requirement": "Gerät: Bezeichnung, Rolle, Kopplung, letzter Kontakt, aktiv und technische Statusinformationen.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "D-090",
+    "section": "9 Datenanforderungen",
+    "requirement": "Ereignis: fortlaufende ID, Zeitstempel, Ereignistyp, Quelle, auslösendes Gerät, fachlicher Bezug, Nutzdaten und gegebenenfalls Korrekturbezug.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "D-100",
+    "section": "9 Datenanforderungen",
+    "requirement": "Veranstaltung: Name, Datum, Flugplatz, Zeitzone, Parameter, Notfallstatus, Betriebsphasen und Archivkennzeichen.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "D-110",
+    "section": "9 Datenanforderungen",
+    "requirement": "Benachrichtigungsregistrierung: Ticketbezug, Kanal, Zielkennung soweit erforderlich, Einwilligung, Status und Löschzeitpunkt.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "Q-UX-010",
+    "section": "10.1 Bedienbarkeit und Oberfläche",
+    "requirement": "Alle Bedienoberflächen sind für Fingerbedienung auf Tablets ausgelegt: große Bedienelemente, hoher Kontrast für Sonnenlicht und maximal eine hervorgehobene Primäraktion je Arbeitszustand.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "Q-UX-020",
+    "section": "10.1 Bedienbarkeit und Oberfläche",
+    "requirement": "Kasse und Flight Line kommen im Standardablauf ohne Menünavigation aus; alle Regelfunktionen liegen auf jeweils einer Arbeitsansicht.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "Q-UX-030",
+    "section": "10.1 Bedienbarkeit und Oberfläche",
+    "requirement": "Häufige Aktionen sind ohne Bestätigungsdialog ausführbar und mindestens zehn Sekunden rückgängig zu machen. Weitreichende destruktive Aktionen erfordern PIN oder explizite Bestätigung.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "Q-UX-040",
+    "section": "10.1 Bedienbarkeit und Oberfläche",
+    "requirement": "Statusbegriffe, Farben und Symbole sind systemweit einheitlich.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "Q-UX-050",
+    "section": "10.1 Bedienbarkeit und Oberfläche",
+    "requirement": "Doppelte Eingaben dürfen keine doppelten Buchungen, Ereignisse oder Statuswechsel erzeugen.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "Q-UX-060",
+    "section": "10.1 Bedienbarkeit und Oberfläche",
+    "requirement": "Die deutsche Bedienoberfläche muss nach höchstens zehn Minuten Einweisung je Helferrolle sicher bedienbar sein.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "Q-UX-070",
+    "section": "10.1 Bedienbarkeit und Oberfläche",
+    "requirement": "Umschaltbares helles und dunkles Farbschema für Sonne, Dämmerung und Abendbetrieb.",
+    "priority": "KANN",
+    "stage": "V2",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "Q-UX-080",
+    "section": "10.1 Bedienbarkeit und Oberfläche",
+    "requirement": "Öffentliche Ansichten formulieren handlungsorientiert und vermeiden interne Fachbegriffe, wenn diese für Gäste nicht erforderlich sind.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "Q-ZUV-010",
+    "section": "10.2 Zuverlässigkeit und Verbindungsverhalten",
+    "requirement": "Status- und Prognoseänderungen sind im Normalbetrieb innerhalb von zwei Sekunden auf allen verbundenen Geräten sichtbar.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "Q-ZUV-020",
+    "section": "10.2 Zuverlässigkeit und Verbindungsverhalten",
+    "requirement": "Verbindungsaussetzer bis etwa 60 Sekunden werden ohne Verlust bereits erfasster Eingaben überbrückt. Der letzte Stand bleibt sichtbar und wird als möglicherweise veraltet gekennzeichnet.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "Q-ZUV-030",
+    "section": "10.2 Zuverlässigkeit und Verbindungsverhalten",
+    "requirement": "Nach einer Störung stellen Geräte die Verbindung automatisch wieder her und gleichen den Zustand vollständig ab; ein manueller Neustart ist nicht erforderlich.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "Q-ZUV-040",
+    "section": "10.2 Zuverlässigkeit und Verbindungsverhalten",
+    "requirement": "Widersprüchliche parallele Bedienung wird serverseitig konfliktgeprüft aufgelöst. Kein Gerät darf einen neueren Zustand mit einem veralteten Stand überschreiben.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "Q-ZUV-050",
+    "section": "10.2 Zuverlässigkeit und Verbindungsverhalten",
+    "requirement": "Das System ist für mindestens zwölf Stunden durchgehenden Veranstaltungseinsatz ohne Neustart ausgelegt.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "Q-ZUV-060",
+    "section": "10.2 Zuverlässigkeit und Verbindungsverhalten",
+    "requirement": "Verfügbarkeit der zentralen Serverumgebung während des Veranstaltungszeitraums mindestens 99,5 Prozent; geplante Wartung an Veranstaltungstagen ist ausgeschlossen.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "Q-ZUV-070",
+    "section": "10.2 Zuverlässigkeit und Verbindungsverhalten",
+    "requirement": "Für Totalausfall der Verbindung besteht eine dokumentierte Papier-Rückfallebene einschließlich geregelter Wiedereinpflege nach Wiederanlauf.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "Q-PER-010",
+    "section": "10.3 Performance und Mengengerüst",
+    "requirement": "Lokale Reaktion der Bedienoberfläche auf Eingaben unter 300 ms; serverseitiger Abschluss eines Standardverkaufs im Normalbetrieb unter zwei Sekunden.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "Q-PER-020",
+    "section": "10.3 Performance und Mengengerüst",
+    "requirement": "Auslegung mindestens auf 20 gleichzeitig verbundene Geräte, 1.000 Tickets, 300 Flugumläufe je Veranstaltungstag und fünf Jahre Historie ohne spürbare Verschlechterung.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "Q-PER-030",
+    "section": "10.3 Performance und Mengengerüst",
+    "requirement": "Eine vollständige Neuberechnung der V1-Prognose für alle offenen Fluggruppen erfolgt im festgelegten Mengengerüst in höchstens zwei Sekunden.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "Q-SIC-010",
+    "section": "10.4 Sicherheit, Datenschutz und Zugriffsschutz",
+    "requirement": "Sämtliche Kommunikation erfolgt verschlüsselt über HTTPS/TLS.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "Q-SIC-020",
+    "section": "10.4 Sicherheit, Datenschutz und Zugriffsschutz",
+    "requirement": "Schreibzugriff ist nur für gekoppelte Geräte mit rollenbezogener Berechtigung zulässig; jede Schreiboperation ist einem Gerät zuordenbar.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "Q-SIC-030",
+    "section": "10.4 Sicherheit, Datenschutz und Zugriffsschutz",
+    "requirement": "Die öffentliche Status-Seite gibt ausschließlich Informationen zum jeweiligen nicht erratbaren Ticketcode preis. Aufzählbarkeit und automatisierte Fehlversuche werden begrenzt.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "Q-SIC-040",
+    "section": "10.4 Sicherheit, Datenschutz und Zugriffsschutz",
+    "requirement": "Es werden keine Werbung, kein Tracking und keine externen Analysedienste eingebunden.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "Q-DSG-010",
+    "section": "10.4 Sicherheit, Datenschutz und Zugriffsschutz",
+    "requirement": "Im Kernsystem werden keine Gastnamen oder sonstigen nicht erforderlichen Personendaten erfasst. Der Betrieb funktioniert vollständig ohne Telefonnummer.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "Q-DSG-020",
+    "section": "10.4 Sicherheit, Datenschutz und Zugriffsschutz",
+    "requirement": "Telefonnummern und Push-Registrierungen werden nach einer konfigurierbaren Frist nach Veranstaltungsende, standardmäßig sieben Tage, gelöscht oder anonymisiert.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "Q-DSG-030",
+    "section": "10.4 Sicherheit, Datenschutz und Zugriffsschutz",
+    "requirement": "Einwilligungen werden mit Zeitpunkt und Kanal dokumentiert; Datenschutzhinweise sind auf der Status-Seite abrufbar.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "Q-DSG-040",
+    "section": "10.4 Sicherheit, Datenschutz und Zugriffsschutz",
+    "requirement": "Personenbezogene Daten werden ausschließlich in Rechenzentren innerhalb der EU verarbeitet; erforderliche Auftragsverarbeitungsverträge und Angaben für das Verarbeitungsverzeichnis werden bereitgestellt.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "Q-DSG-050",
+    "section": "10.4 Sicherheit, Datenschutz und Zugriffsschutz",
+    "requirement": "Ein späteres Passagierlistenmodul ist technisch und berechtigungsseitig vom datensparsamen Ticketing zu trennen.",
+    "priority": "MUSS",
+    "stage": "V3",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "Q-WAR-010",
+    "section": "10.5 Wartbarkeit, Erweiterbarkeit und Betriebskosten",
+    "requirement": "Verwendung verbreiteter, quelloffener Standardtechnologien ohne exotische Abhängigkeiten; ein erfahrener Webentwickler kann sich ohne Herstellerbindung einarbeiten.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "Q-WAR-020",
+    "section": "10.5 Wartbarkeit, Erweiterbarkeit und Betriebskosten",
+    "requirement": "Betriebliche Parameter, Texte, Schwellenwerte, Referenzzeiten und Gewichtsklassen sind ohne Programmänderung konfigurierbar.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "Q-WAR-030",
+    "section": "10.5 Wartbarkeit, Erweiterbarkeit und Betriebskosten",
+    "requirement": "Laufende Grundbetriebskosten für Hosting, Domain und Zertifikate sollen ohne Mobilfunk- und volumenabhängige Versandkosten höchstens 15 Euro je Monat betragen. Abweichungen sind transparent zu begründen.",
+    "priority": "SOLL",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "Q-WAR-040",
+    "section": "10.5 Wartbarkeit, Erweiterbarkeit und Betriebskosten",
+    "requirement": "Die Architektur ermöglicht V2 bis V4 ohne Neuentwicklung des Kerns; insbesondere sind Ressourcengruppen, mehrere Produkte je Gruppe, Gates, Mehrveranstaltungsbetrieb, Sitzplätze und externe Ereignisquellen von Beginn an modelliert.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "Q-WAR-050",
+    "section": "10.5 Wartbarkeit, Erweiterbarkeit und Betriebskosten",
+    "requirement": "Prognoseverfahren, Zustandsautomaten und fachliche Invarianten sind in einer für Betreiber und zukünftige Entwickler nachvollziehbaren technischen Dokumentation beschrieben.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "T-010",
+    "section": "11 Technische Rahmenbedingungen",
+    "requirement": "Die Lösung ist eine responsive Progressive Web App; eine Installation aus einem App-Store ist nicht erforderlich.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "T-020",
+    "section": "11 Technische Rahmenbedingungen",
+    "requirement": "Unterstützt werden aktuelle Versionen von Chrome, Safari und Edge auf Android-Tablets, iPads und Windows-PCs.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "T-030",
+    "section": "11 Technische Rahmenbedingungen",
+    "requirement": "Zentraler Betrieb in einem EU-Rechenzentrum. Am Veranstaltungsort erfolgt die Anbindung über LTE/5G; ein Dual-SIM-Router unterschiedlicher Netzbetreiber wird empfohlen.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "T-035",
+    "section": "11 Technische Rahmenbedingungen",
+    "requirement": "Bediengeräte besitzen lokale Zwischenspeicherung und Offline-Queue für kurze Ausfälle. Ein optionaler lokaler Edge-Betrieb darf später ergänzt werden, ohne das fachliche Modell zu ändern.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "T-040",
+    "section": "11 Technische Rahmenbedingungen",
+    "requirement": "Monitore werden über handelsübliche Kiosk-Abspielgeräte betrieben und laden ihre Ansicht nach dem Einschalten automatisch im Vollbild.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "T-050",
+    "section": "11 Technische Rahmenbedingungen",
+    "requirement": "Automatische tägliche Datensicherung mit mindestens 14 Tagen Aufbewahrung sowie Sicherung vor Veranstaltungstagen; dokumentierter Wiederanlauf innerhalb von 30 Minuten.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "T-060",
+    "section": "11 Technische Rahmenbedingungen",
+    "requirement": "Zeitzonen- und sommerzeitfeste Verarbeitung, standardmäßig Europe/Berlin.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "T-070",
+    "section": "11 Technische Rahmenbedingungen",
+    "requirement": "Getrennte Test-/Abnahmeumgebung und Produktivumgebung.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "T-080",
+    "section": "11 Technische Rahmenbedingungen",
+    "requirement": "Vollständiger Quellcode, Konfiguration und Deploymentbeschreibung gehen in das uneingeschränkte Nutzungsrecht des Auftraggebers über; ein Betreiberwechsel darf nicht durch proprietäre Bindungen verhindert werden.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "T-090",
+    "section": "11 Technische Rahmenbedingungen",
+    "requirement": "Echtzeitaktualisierung erfolgt über eine geeignete Push-Technik mit automatischem Fallback und Wiederverbindung.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  },
+  {
+    "id": "T-100",
+    "section": "11 Technische Rahmenbedingungen",
+    "requirement": "Die technische Umsetzung muss die fachlichen Ereignisse, Zustandsübergänge und Invarianten transaktional konsistent verarbeiten.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": {
+      "issue": "",
+      "module": "",
+      "status": "planned"
+    },
+    "tests": []
+  }
+]

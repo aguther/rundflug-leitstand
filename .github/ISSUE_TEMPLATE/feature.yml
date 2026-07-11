@@ -1,0 +1,27 @@
+name: Fachliches Arbeitspaket
+about: Umsetzbares Arbeitspaket mit Anforderungs-IDs
+labels: [feature]
+body:
+  - type: input
+    id: requirements
+    attributes:
+      label: Anforderungs-IDs
+      placeholder: F-KAS-010, F-KAS-020
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Gewünschtes Ergebnis
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Abnahmekriterien
+    validations:
+      required: true
+  - type: textarea
+    id: risks
+    attributes:
+      label: Risiken und offene Fragen
