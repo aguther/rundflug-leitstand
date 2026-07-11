@@ -690,7 +690,8 @@ export class EventCoordinator extends DurableObject<Env> {
         `SELECT r.id, r.status, r.created_at, r.called_at, r.departed_at, r.landed_at,
                 r.completed_at, fg.resource_group_id, rg.status AS resource_group_status,
                 COALESCE(MIN(tg.queue_sequence), 1) AS queue_sequence,
-                COALESCE(MIN(p.reference_duration_minutes), 20) AS reference_duration_minutes
+                COALESCE(MIN(p.reference_duration_minutes), 20) AS reference_duration_minutes,
+                COALESCE(MIN(p.code), '') AS product_code, a.aircraft_type
            FROM rotations r
            JOIN flight_groups fg ON fg.id = r.flight_group_id
            JOIN resource_groups rg ON rg.id = fg.resource_group_id
@@ -698,6 +699,7 @@ export class EventCoordinator extends DurableObject<Env> {
            LEFT JOIN tickets t ON t.id = rt.ticket_id
            LEFT JOIN ticket_groups tg ON tg.id = t.ticket_group_id
            LEFT JOIN products p ON p.id = tg.product_id
+           LEFT JOIN aircraft a ON a.id = r.aircraft_id
           WHERE r.operation_day_id = ?1 AND r.status NOT IN ('COMPLETED', 'CANCELED')
           GROUP BY r.id ORDER BY tg.queue_sequence, r.created_at`,
       )
@@ -714,16 +716,27 @@ export class EventCoordinator extends DurableObject<Env> {
           resource_group_status: "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED";
           queue_sequence: number;
           reference_duration_minutes: number;
+          product_code: string;
+          aircraft_type: string | null;
         }>(),
       this.env.DB.prepare(
-        `SELECT (julianday(completed_at) - julianday(called_at)) * 1440.0 AS minutes,
-                completed_at
-           FROM rotations
-          WHERE operation_day_id = ?1 AND called_at IS NOT NULL AND completed_at IS NOT NULL
-          ORDER BY completed_at DESC LIMIT 12`,
-      )
-        .bind(eventId)
-        .all<{ minutes: number; completed_at: string }>(),
+        `SELECT (julianday(r.completed_at) - julianday(r.called_at)) * 1440.0 AS minutes,
+                r.completed_at, p.code AS product_code, a.aircraft_type
+           FROM rotations r
+           JOIN rotation_tickets rt ON rt.rotation_id = r.id
+           JOIN tickets t ON t.id = rt.ticket_id
+           JOIN ticket_groups tg ON tg.id = t.ticket_group_id
+           JOIN products p ON p.id = tg.product_id
+           LEFT JOIN aircraft a ON a.id = r.aircraft_id
+          WHERE r.called_at IS NOT NULL AND r.completed_at IS NOT NULL
+          GROUP BY r.id, p.code, a.aircraft_type
+          ORDER BY r.completed_at DESC LIMIT 200`,
+      ).all<{
+        minutes: number;
+        completed_at: string;
+        product_code: string;
+        aircraft_type: string | null;
+      }>(),
       this.env.DB.prepare(
         `SELECT m.resource_group_id, COUNT(*) AS count
            FROM resource_group_memberships m
@@ -746,11 +759,6 @@ export class EventCoordinator extends DurableObject<Env> {
     const nowIso = now.toISOString();
     const addMinutes = (value: string | Date, minutes: number) =>
       new Date(new Date(value).getTime() + minutes * 60_000).toISOString();
-    const actualDurations = durationRows.results.map((row) => row.minutes);
-    const lastActualAt = durationRows.results[0]?.completed_at;
-    const dataAgeMinutes = lastActualAt
-      ? Math.max(0, (now.getTime() - Date.parse(lastActualAt)) / 60_000)
-      : 0;
     const capacities = new Map(
       capacityRows.results.map((row) => [
         row.resource_group_id,
@@ -764,6 +772,21 @@ export class EventCoordinator extends DurableObject<Env> {
       const buffer = event.planned_buffer_minutes;
       const referenceTotal = boarding + rotation.reference_duration_minutes + deboarding + buffer;
       const activeCapacity = capacities.get(rotation.resource_group_id) ?? 0;
+      const productHistory = durationRows.results.filter(
+        (row) => row.product_code === rotation.product_code,
+      );
+      const aircraftHistory = rotation.aircraft_type
+        ? productHistory.filter((row) => row.aircraft_type === rotation.aircraft_type)
+        : [];
+      const selectedHistory = (aircraftHistory.length > 0 ? aircraftHistory : productHistory).slice(
+        0,
+        12,
+      );
+      const actualDurations = [...selectedHistory].reverse().map((row) => row.minutes);
+      const lastActualAt = selectedHistory[0]?.completed_at;
+      const dataAgeMinutes = lastActualAt
+        ? Math.max(0, (now.getTime() - Date.parse(lastActualAt)) / 60_000)
+        : 0;
       const estimate = estimateDuration({
         referenceMinutes: referenceTotal,
         actualDurationsMinutes: actualDurations,
