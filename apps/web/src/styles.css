@@ -583,6 +583,27 @@ p {
 .privacy-page h1 {
   margin-top: 8px;
 }
+.capacity-overview {
+  display: grid;
+  gap: 10px;
+}
+.capacity-row {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr 1.2fr;
+  gap: 16px;
+  padding: 14px;
+  border: 1px solid #d5dee8;
+  background: #fff;
+}
+.capacity-row div,
+.capacity-row span {
+  display: block;
+}
+.capacity-row span {
+  margin-top: 4px;
+  color: #60758d;
+  font-size: 0.85rem;
+}
 @media (max-width: 760px) {
   .app-header {
     align-items: flex-start;
@@ -608,6 +629,9 @@ p {
   .fids-header span:last-child,
   .fids-row span:last-child {
     display: none;
+  }
+  .capacity-row {
+    grid-template-columns: 1fr;
   }
 }
 @media (prefers-reduced-motion: reduce) {

@@ -75,6 +75,17 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
     }),
   }),
   commandBaseSchema.extend({
+    type: z.literal("CONFIGURE_PRODUCT_SALES"),
+    payload: z.object({
+      productId: z.string().min(1).max(100),
+      saleEnabled: z.boolean(),
+      saleClosesAt: z.iso.datetime().nullable(),
+      warningThreshold: z.number().int().nonnegative().max(1000),
+      criticalThreshold: z.number().int().nonnegative().max(1000),
+      reason: z.string().trim().min(3).max(240),
+    }),
+  }),
+  commandBaseSchema.extend({
     type: z.literal("REVOKE_CALL"),
     payload: z.object({ rotationId: z.string().min(1).max(100) }),
   }),
@@ -103,7 +114,7 @@ export const commandResultSchema = z.object({
   eventType: z.string(),
   aggregate: z
     .object({
-      type: z.enum(["OPERATION_DAY", "TICKET_GROUP", "ROTATION"]),
+      type: z.enum(["OPERATION_DAY", "PRODUCT", "TICKET_GROUP", "ROTATION"]),
       id: z.string(),
       relatedRotationId: z.string().optional(),
     })
@@ -124,6 +135,7 @@ export const productOperationalSummarySchema = z.object({
   id: z.string(),
   name: z.string(),
   resourceGroupId: z.string(),
+  resourceGroupName: z.string(),
   resourceGroupStatus: z.enum(["ACTIVE", "PAUSED", "INTERRUPTED", "ENDED"]),
   priceCents: z.number().int().nonnegative(),
   saleEnabled: z.boolean(),
@@ -132,6 +144,12 @@ export const productOperationalSummarySchema = z.object({
   estimatedWaitLowerMinutes: z.number().int().nonnegative(),
   estimatedWaitUpperMinutes: z.number().int().nonnegative(),
   remainingSellableSeats: z.number().int().nonnegative(),
+  projectedSeats: z.number().int().nonnegative(),
+  capacityStatus: z.enum(["AVAILABLE", "LIMITED", "MANUAL_REVIEW", "SOLD_OUT"]),
+  saleRecommended: z.boolean(),
+  saleClosesAt: z.string().nullable(),
+  capacityWarningThreshold: z.number().int().nonnegative(),
+  capacityCriticalThreshold: z.number().int().nonnegative(),
   predictionQuality: z.enum(["STABLE", "CHANGING", "UNCERTAIN"]),
 });
 

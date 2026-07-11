@@ -28,6 +28,23 @@ const publicStatusLabel = {
   LANDED: "Gelandet",
   COMPLETED: "Abgeschlossen",
 } as const;
+const capacityLabel = {
+  AVAILABLE: "Kapazität verfügbar",
+  LIMITED: "Nur noch begrenzt verfügbar",
+  MANUAL_REVIEW: "Manuelle Prüfung erforderlich",
+  SOLD_OUT: "Keine sichere Restkapazität",
+} as const;
+
+function saleClosingLabel(value: string | null): string | null {
+  if (!value) return null;
+  const minutes = Math.ceil((Date.parse(value) - Date.now()) / 60_000);
+  if (minutes <= 0) return "Verkaufsschluss erreicht";
+  if (minutes <= 30) return `Verkaufsschluss in ${minutes} Minuten`;
+  return `Verkaufsschluss ${new Date(value).toLocaleTimeString("de-DE", {
+    hour: "2-digit",
+    minute: "2-digit",
+  })}`;
+}
 
 function deviceTokenFor(deviceId: string): string {
   if (import.meta.env.DEV) {
@@ -257,7 +274,11 @@ function CashierView() {
               <span>
                 Wartezeit {entry.estimatedWaitLowerMinutes}–{entry.estimatedWaitUpperMinutes} Min.
               </span>
-              <span>Noch {entry.remainingSellableSeats} Plätze</span>
+              <span>{capacityLabel[entry.capacityStatus]}</span>
+              <span>Noch vorsichtig kalkuliert: {entry.remainingSellableSeats} Plätze</span>
+              {saleClosingLabel(entry.saleClosesAt) ? (
+                <span>{saleClosingLabel(entry.saleClosesAt)}</span>
+              ) : null}
             </button>
           ))}
         </div>
@@ -341,6 +362,8 @@ function CashierView() {
             !board ||
             !product?.saleEnabled ||
             product.resourceGroupStatus !== "ACTIVE" ||
+            !product.saleRecommended ||
+            product.remainingSellableSeats < size ||
             board.event.emergencyMode ||
             busy
           }
@@ -766,6 +789,7 @@ function AdminView() {
   const { board, error, refresh } = useOperationBoard("technical-scaffold");
   const [reason, setReason] = useState("");
   const [adminPin, setAdminPin] = useState("");
+  const [saleClosesAt, setSaleClosesAt] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [history, setHistory] = useState<AuditHistory>({ entries: [] });
   const resourceGroups = Array.from(
@@ -848,6 +872,44 @@ function AdminView() {
     }
   }
 
+  async function configureProductSales(
+    product: OperationBoard["products"][number],
+    saleEnabled: boolean,
+    useEnteredClosingTime = false,
+  ) {
+    if (!board || reason.trim().length < 3) return;
+    try {
+      const configuredClosing =
+        useEnteredClosingTime && saleClosesAt
+          ? new Date(saleClosesAt).toISOString()
+          : product.saleClosesAt;
+      await sendCommand(
+        {
+          commandId: crypto.randomUUID(),
+          eventId: EVENT_ID,
+          deviceId: "technical-scaffold",
+          expectedVersion: board.event.version,
+          issuedAt: new Date().toISOString(),
+          type: "CONFIGURE_PRODUCT_SALES",
+          payload: {
+            productId: product.id,
+            saleEnabled,
+            saleClosesAt: configuredClosing,
+            warningThreshold: product.capacityWarningThreshold,
+            criticalThreshold: product.capacityCriticalThreshold,
+            reason: reason.trim(),
+          },
+        },
+        deviceTokenFor("technical-scaffold"),
+      );
+      setMessage("Verkaufssteuerung wurde protokolliert aktualisiert.");
+      await refresh();
+      await refreshHistory();
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : "Verkaufssteuerung fehlgeschlagen.");
+    }
+  }
+
   async function exportDailyReport() {
     try {
       await downloadDailyReport(
@@ -908,11 +970,58 @@ function AdminView() {
           )}
         </section>
         <section className="admin-section">
+          <h2>Kapazität und Verkaufsempfehlung</h2>
+          <label>
+            Neuer harter Verkaufsschluss
+            <input
+              type="datetime-local"
+              value={saleClosesAt}
+              onChange={(event) => setSaleClosesAt(event.target.value)}
+            />
+          </label>
+          <div className="capacity-overview">
+            {board?.products.map((product) => (
+              <div className="capacity-row" key={product.id}>
+                <div>
+                  <strong>{product.name}</strong>
+                  <span>{capacityLabel[product.capacityStatus]}</span>
+                </div>
+                <div>
+                  <strong>{product.remainingSellableSeats}</strong>
+                  <span>vorsichtig kalkulierte Restplätze</span>
+                </div>
+                <div>
+                  <strong>
+                    {product.saleRecommended ? "Verkauf empfohlen" : "Nicht verkaufen"}
+                  </strong>
+                  <span>Prognose {product.predictionQuality}</span>
+                </div>
+                <div className="secondary-actions">
+                  <button
+                    disabled={reason.trim().length < 3}
+                    onClick={() => configureProductSales(product, !product.saleEnabled)}
+                    type="button"
+                  >
+                    {product.saleEnabled ? "Verkauf sperren" : "Verkauf freigeben"}
+                  </button>
+                  <button
+                    disabled={reason.trim().length < 3 || !saleClosesAt}
+                    onClick={() => configureProductSales(product, product.saleEnabled, true)}
+                    type="button"
+                  >
+                    Verkaufsschluss setzen
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+        <section className="admin-section">
           <h2>Ressourcengruppen</h2>
           {resourceGroups.map((group) => (
             <div className="resource-control" key={group.resourceGroupId}>
               <div>
-                <strong>{group.name}</strong>
+                <strong>{group.resourceGroupName}</strong>
                 <span>{group.resourceGroupStatus}</span>
               </div>
               <div className="secondary-actions">

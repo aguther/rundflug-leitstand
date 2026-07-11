@@ -28,6 +28,13 @@ describe("command authorization", () => {
     expect(() => assertRoleMayExecute("DISPLAY", "CALL_NEXT")).toThrowError(/darf CALL_NEXT nicht/);
   });
 
+  it("reserves live product sales configuration for administrators", () => {
+    expect(() => assertRoleMayExecute("CASHIER", "CONFIGURE_PRODUCT_SALES")).toThrowError(
+      /darf CONFIGURE_PRODUCT_SALES nicht/,
+    );
+    expect(() => assertRoleMayExecute("ADMIN", "CONFIGURE_PRODUCT_SALES")).not.toThrow();
+  });
+
   it("allows flight direction to trigger but not clear emergency mode", () => {
     expect(() => assertRoleMayExecute("FLIGHT_DIRECTOR", "TRIGGER_EMERGENCY")).not.toThrow();
     expect(() => assertRoleMayExecute("FLIGHT_DIRECTOR", "CLEAR_EMERGENCY")).toThrowError(

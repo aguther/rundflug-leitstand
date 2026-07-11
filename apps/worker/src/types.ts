@@ -20,5 +20,6 @@ export interface StoredEventRow {
   emergency_mode: number;
   version: number;
   operational_note: string;
+  operations_end_at?: string | null;
   updated_at: string;
 }

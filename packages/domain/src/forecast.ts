@@ -21,7 +21,11 @@ export function estimateDuration(input: {
         Number.isFinite(duration) && duration > 0 && duration <= input.referenceMinutes * 3,
     )
     .slice(-12);
-  if (input.interrupted || input.activeCapacity === 0 || input.dataAgeMinutes > 5) {
+  if (
+    input.interrupted ||
+    input.activeCapacity === 0 ||
+    (validSamples.length > 0 && input.dataAgeMinutes > 5)
+  ) {
     return {
       expectedMinutes: Math.round(input.referenceMinutes),
       lowerMinutes: Math.max(0, Math.round(input.referenceMinutes - 10)),

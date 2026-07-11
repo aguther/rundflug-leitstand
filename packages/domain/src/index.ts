@@ -121,6 +121,7 @@ export type OperationalCommandType =
   | "TRIGGER_EMERGENCY"
   | "CLEAR_EMERGENCY"
   | "SET_RESOURCE_GROUP_STATUS"
+  | "CONFIGURE_PRODUCT_SALES"
   | "REVOKE_CALL";
 
 const commandRoles: Readonly<Record<OperationalCommandType, readonly DeviceRole[]>> = {
@@ -136,6 +137,7 @@ const commandRoles: Readonly<Record<OperationalCommandType, readonly DeviceRole[
   TRIGGER_EMERGENCY: ["FLIGHT_LINE_LEAD", "FLIGHT_DIRECTOR", "ADMIN"],
   CLEAR_EMERGENCY: ["ADMIN"],
   SET_RESOURCE_GROUP_STATUS: ["FLIGHT_LINE_LEAD", "FLIGHT_DIRECTOR", "ADMIN"],
+  CONFIGURE_PRODUCT_SALES: ["ADMIN"],
   REVOKE_CALL: ["FLIGHT_LINE", "FLIGHT_LINE_LEAD", "ADMIN"],
 };
 
@@ -182,5 +184,6 @@ export function assertPublicTicketCode(code: string): string {
   return normalized;
 }
 
+export * from "./capacity";
 export * from "./forecast";
 export * from "./queue";

@@ -2,6 +2,26 @@ import { describe, expect, it } from "vitest";
 import { commandEnvelopeSchema, publicBoardSchema, publicTicketStatusSchema } from "./index";
 
 describe("commandEnvelopeSchema", () => {
+  it("validates auditable product sale controls", () => {
+    const parsed = commandEnvelopeSchema.parse({
+      commandId: "550e8400-e29b-41d4-a716-446655440000",
+      eventId: "synthetic-event",
+      deviceId: "synthetic-admin",
+      expectedVersion: 2,
+      issuedAt: "2026-07-11T12:00:00.000Z",
+      type: "CONFIGURE_PRODUCT_SALES",
+      payload: {
+        productId: "synthetic-product",
+        saleEnabled: false,
+        saleClosesAt: "2026-07-11T18:00:00.000Z",
+        warningThreshold: 12,
+        criticalThreshold: 4,
+        reason: "Kapazität prüfen",
+      },
+    });
+    expect(parsed.type).toBe("CONFIGURE_PRODUCT_SALES");
+  });
+
   it("accepts the technical scaffold command", () => {
     const parsed = commandEnvelopeSchema.parse({
       commandId: "4f6ef267-f2c3-4c20-95fe-283e6f4ecab1",
