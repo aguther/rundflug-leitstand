@@ -526,6 +526,12 @@ export class EventCoordinator extends DurableObject<Env> {
     command: Extract<CommandEnvelope, { type: "CONFIGURE_PRODUCT_SALES" }>,
     current: StoredEventRow,
   ): Promise<Response> {
+    if (!(await verifyCredential(command.payload.adminPin, this.env.ADMIN_PIN_HASH))) {
+      return json(
+        { error: { code: "ADMIN_PIN_INVALID", message: "Administrator-PIN ist ungültig." } },
+        { status: 403 },
+      );
+    }
     if (command.payload.criticalThreshold > command.payload.warningThreshold) {
       return json(
         {
@@ -899,6 +905,15 @@ export class EventCoordinator extends DurableObject<Env> {
     >,
     current: StoredEventRow,
   ): Promise<Response> {
+    if (
+      (command.type === "CANCEL_TICKET_GROUP" || command.type === "REBOOK_TICKET_GROUP") &&
+      !(await verifyCredential(command.payload.adminPin, this.env.ADMIN_PIN_HASH))
+    ) {
+      return json(
+        { error: { code: "ADMIN_PIN_INVALID", message: "Administrator-PIN ist ungültig." } },
+        { status: 403 },
+      );
+    }
     const group = await this.env.DB.prepare(
       `SELECT tg.id, tg.product_id, tg.version, r.id AS rotation_id, r.status AS rotation_status,
               r.aircraft_id, fg.resource_group_id
