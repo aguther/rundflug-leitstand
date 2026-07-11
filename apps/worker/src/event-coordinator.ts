@@ -442,6 +442,8 @@ export class EventCoordinator extends DurableObject<Env> {
               ticketCount: ticketIds.length,
               productId: product.id,
               weightClasses: ticketDetails.map((detail) => detail.weightClass),
+              paymentStatus: command.payload.paymentStatus,
+              paymentMethod: command.payload.paymentMethod,
             }),
           ),
           this.env.DB.prepare(`INSERT INTO idempotency_receipts

@@ -222,6 +222,33 @@ p {
   padding: 9px;
   font: inherit;
 }
+.payment-information {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 16px;
+  padding: 12px;
+  border: 1px solid #cbd5e1;
+}
+.payment-information label {
+  display: grid;
+  gap: 4px;
+  color: #52677f;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+.payment-information select {
+  min-height: 44px;
+  padding: 8px;
+}
+.payment-information strong,
+.payment-information p {
+  grid-column: 1 / -1;
+}
+.payment-information p {
+  margin: 0;
+  font-size: 0.8rem;
+}
 .weight-class-list {
   margin-top: 20px;
   padding-top: 16px;
