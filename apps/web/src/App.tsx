@@ -57,6 +57,19 @@ const aircraftStateLabel = {
   INTERRUPTED: "Flugbetrieb unterbrochen",
   INACTIVE: "Kurzfristig inaktiv",
 } as const;
+type WeightClass = "NOT_CAPTURED" | "CHILD" | "NORMAL" | "HEAVY" | "INDIVIDUAL";
+type TicketDetail = {
+  clientId: string;
+  weightClass: WeightClass;
+  individualWeightKg: number | null;
+};
+const weightClassLabel: Record<WeightClass, string> = {
+  NOT_CAPTURED: "Nicht erfassen",
+  CHILD: "Kind",
+  NORMAL: "Normal",
+  HEAVY: "Schwer",
+  INDIVIDUAL: "Individuell",
+};
 
 function saleClosingLabel(value: string | null): string | null {
   if (!value) return null;
@@ -236,10 +249,26 @@ function CashierView() {
   const [ticketSearch, setTicketSearch] = useState("");
   const [ticketSearchResults, setTicketSearchResults] = useState<TicketSearchResult[]>([]);
   const [correctionTargetLabel, setCorrectionTargetLabel] = useState("Letzter Verkauf");
+  const [ticketDetails, setTicketDetails] = useState<TicketDetail[]>([]);
   const product = board?.products.find((entry) => entry.id === productId) ?? board?.products[0];
   useEffect(() => {
     localStorage.setItem("cashier-draft-v1", JSON.stringify({ version: 1, productId, size }));
   }, [productId, size]);
+  useEffect(() => {
+    const allowed = product?.weightClasses ?? ["NOT_CAPTURED"];
+    const fallback = allowed[0] ?? "NOT_CAPTURED";
+    setTicketDetails((current) =>
+      Array.from({ length: size }, (_, index) => {
+        const existing = current[index];
+        if (existing && allowed.includes(existing.weightClass)) return existing;
+        return {
+          clientId: crypto.randomUUID(),
+          weightClass: fallback,
+          individualWeightKg: fallback === "INDIVIDUAL" ? 80 : null,
+        };
+      }),
+    );
+  }, [product?.weightClasses, size]);
 
   async function sell() {
     if (!board || !product || busy) return;
@@ -257,6 +286,7 @@ function CashierView() {
           payload: {
             productId: product.id,
             publicTicketCodes: codes,
+            ticketDetails,
             standby: false,
             paymentStatus: "PAID",
             paymentMethod: "CASH",
@@ -415,6 +445,62 @@ function CashierView() {
               </button>
             </div>
             <p>Keine Namen und keine Telefonnummern.</p>
+            {product &&
+            (product.weightClasses.length > 1 || product.weightClasses[0] !== "NOT_CAPTURED") ? (
+              <div className="weight-class-list">
+                <h2>Gewichtsklassen</h2>
+                {ticketDetails.map((detail, index) => (
+                  <div className="weight-class-row" key={detail.clientId}>
+                    <label>
+                      Ticket {index + 1}
+                      <select
+                        value={detail.weightClass}
+                        onChange={(event) => {
+                          const weightClass = event.target.value as WeightClass;
+                          setTicketDetails((current) =>
+                            current.map((entry, detailIndex) =>
+                              detailIndex === index
+                                ? {
+                                    ...entry,
+                                    weightClass,
+                                    individualWeightKg: weightClass === "INDIVIDUAL" ? 80 : null,
+                                  }
+                                : entry,
+                            ),
+                          );
+                        }}
+                      >
+                        {product.weightClasses.map((weightClass) => (
+                          <option value={weightClass} key={weightClass}>
+                            {weightClassLabel[weightClass]}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    {detail.weightClass === "INDIVIDUAL" ? (
+                      <label>
+                        kg
+                        <input
+                          type="number"
+                          min="15"
+                          max="250"
+                          value={detail.individualWeightKg ?? ""}
+                          onChange={(event) =>
+                            setTicketDetails((current) =>
+                              current.map((entry, detailIndex) =>
+                                detailIndex === index
+                                  ? { ...entry, individualWeightKg: Number(event.target.value) }
+                                  : entry,
+                              ),
+                            )
+                          }
+                        />
+                      </label>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            ) : null}
           </section>
           <section className="ticket-preview">
             <h2>QR-Tickets</h2>
@@ -538,6 +624,12 @@ function CashierView() {
             product.remainingSellableSeats < size ||
             board.event.emergencyMode ||
             board.event.operationalInterrupted ||
+            ticketDetails.length !== size ||
+            ticketDetails.some(
+              (detail) =>
+                detail.weightClass === "INDIVIDUAL" &&
+                ((detail.individualWeightKg ?? 0) < 15 || (detail.individualWeightKg ?? 0) > 250),
+            ) ||
             busy
           }
           onClick={sell}

@@ -156,13 +156,19 @@ describe("commandEnvelopeSchema", () => {
       type: "SELL_TICKET_GROUP",
       payload: {
         productId: "panorama-20",
-        publicTicketCodes: ["ABCDE2345678"],
+        publicTicketCodes: ["ABCDE2345678", "FGHJK2345678"],
+        ticketDetails: [
+          { weightClass: "CHILD", individualWeightKg: null },
+          { weightClass: "INDIVIDUAL", individualWeightKg: 72 },
+        ],
         paymentStatus: "PAID",
         paymentMethod: "CASH",
       },
     });
     expect(parsed.type).toBe("SELL_TICKET_GROUP");
+    if (parsed.type !== "SELL_TICKET_GROUP") throw new Error("Verkaufskommando erwartet.");
     expect("phoneNumber" in parsed.payload).toBe(false);
+    expect(parsed.payload.ticketDetails?.[1]?.individualWeightKg).toBe(72);
   });
 
   it("requires a concrete aircraft confirmation for NEXT", () => {

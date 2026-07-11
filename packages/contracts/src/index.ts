@@ -23,6 +23,16 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
     payload: z.object({
       productId: z.string().min(1).max(100),
       publicTicketCodes: z.array(z.string().min(12).max(32)).min(1).max(12),
+      ticketDetails: z
+        .array(
+          z.object({
+            weightClass: z.enum(["NOT_CAPTURED", "CHILD", "NORMAL", "HEAVY", "INDIVIDUAL"]),
+            individualWeightKg: z.number().min(15).max(250).nullable(),
+          }),
+        )
+        .min(1)
+        .max(12)
+        .optional(),
       standby: z.boolean().default(false),
       paymentStatus: z.enum(["UNPAID", "PAID", "WAIVED", "INFORMATIONAL_ONLY"]),
       paymentMethod: z.enum(["CASH", "CARD", "VOUCHER", "OTHER"]).nullable(),
