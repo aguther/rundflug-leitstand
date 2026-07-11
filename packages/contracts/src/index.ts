@@ -195,6 +195,23 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
       checkedIn: z.boolean(),
     }),
   }),
+  commandBaseSchema.extend({
+    type: z.literal("CONFIGURE_EVENT_PARAMETERS"),
+    payload: z.object({
+      saleOpensAt: z.iso.datetime().nullable(),
+      operationsEndAt: z.iso.datetime(),
+      noShowAfterMinutes: z.number().int().min(1).max(120),
+      notificationLeadMinutes: z.number().int().min(1).max(240),
+      childReferenceWeightKg: z.number().positive().max(300),
+      normalReferenceWeightKg: z.number().positive().max(300),
+      heavyReferenceWeightKg: z.number().positive().max(300),
+      plannedBoardingMinutes: z.number().int().min(1).max(120),
+      plannedDeboardingMinutes: z.number().int().min(1).max(120),
+      plannedBufferMinutes: z.number().int().min(0).max(120),
+      reason: z.string().trim().min(3).max(240),
+      adminPin: z.string().min(4).max(32),
+    }),
+  }),
 ]);
 
 export type CommandEnvelope = z.infer<typeof commandEnvelopeSchema>;
@@ -209,6 +226,18 @@ export const eventSnapshotSchema = z.object({
   operationalInterrupted: z.boolean(),
   version: z.number().int().nonnegative(),
   operationalNote: z.string(),
+  saleOpensAt: z.string().nullable(),
+  operationsEndAt: z.string().nullable(),
+  noShowAfterMinutes: z.number().int().positive(),
+  notificationLeadMinutes: z.number().int().positive(),
+  referenceWeightsKg: z.object({
+    child: z.number().positive(),
+    normal: z.number().positive(),
+    heavy: z.number().positive(),
+  }),
+  plannedBoardingMinutes: z.number().int().positive(),
+  plannedDeboardingMinutes: z.number().int().positive(),
+  plannedBufferMinutes: z.number().int().nonnegative(),
   updatedAt: z.string(),
 });
 

@@ -22,5 +22,14 @@ export interface StoredEventRow {
   version: number;
   operational_note: string;
   operations_end_at?: string | null;
+  sale_opens_at?: string | null;
+  no_show_after_minutes?: number;
+  notification_lead_minutes?: number;
+  child_reference_weight_kg?: number;
+  normal_reference_weight_kg?: number;
+  heavy_reference_weight_kg?: number;
+  planned_boarding_minutes?: number;
+  planned_deboarding_minutes?: number;
+  planned_buffer_minutes?: number;
   updated_at: string;
 }

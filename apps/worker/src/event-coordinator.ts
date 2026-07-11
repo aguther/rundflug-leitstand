@@ -148,7 +148,10 @@ export class EventCoordinator extends DurableObject<Env> {
 
       const current = await this.env.DB.prepare(
         `SELECT id, name, event_date, time_zone, status, emergency_mode, operational_interrupted, version,
-                operational_note, operations_end_at, updated_at
+                operational_note, operations_end_at, sale_opens_at, no_show_after_minutes,
+                notification_lead_minutes, child_reference_weight_kg, normal_reference_weight_kg,
+                heavy_reference_weight_kg, planned_boarding_minutes, planned_deboarding_minutes,
+                planned_buffer_minutes, updated_at
            FROM operation_days
           WHERE id = ?1`,
       )
@@ -198,6 +201,17 @@ export class EventCoordinator extends DurableObject<Env> {
           return json(
             { error: { code: "PRODUCT_NOT_FOUND", message: "Produkt nicht gefunden." } },
             { status: 404 },
+          );
+        }
+        if (current.sale_opens_at && Date.parse(current.sale_opens_at) > Date.now()) {
+          return json(
+            {
+              error: {
+                code: "SALE_NOT_OPEN",
+                message: "Der konfigurierte Verkaufsbeginn ist noch nicht erreicht.",
+              },
+            },
+            { status: 409 },
           );
         }
         try {
@@ -254,7 +268,11 @@ export class EventCoordinator extends DurableObject<Env> {
             0,
             (Date.parse(current.operations_end_at) - Date.now()) / 60_000,
           ),
-          expectedRotationMinutes: product.reference_duration_minutes,
+          expectedRotationMinutes:
+            product.reference_duration_minutes +
+            (current.planned_boarding_minutes ?? 8) +
+            (current.planned_deboarding_minutes ?? 5) +
+            (current.planned_buffer_minutes ?? 3),
           activeAircraftSeats: aircraftRows.results
             .map((row) => row.passenger_seats)
             .slice(0, pilotCountRow?.count ?? 0),
@@ -415,6 +433,9 @@ export class EventCoordinator extends DurableObject<Env> {
         }
         if (command.type === "CONFIGURE_PRODUCT_SALES") {
           return this.handleProductSalesConfiguration(command, current);
+        }
+        if (command.type === "CONFIGURE_EVENT_PARAMETERS") {
+          return this.handleEventParameters(command, current);
         }
         if (
           command.type === "TRIGGER_EMERGENCY" ||
@@ -966,6 +987,142 @@ export class EventCoordinator extends DurableObject<Env> {
     return json(result);
   }
 
+  private async handleEventParameters(
+    command: Extract<CommandEnvelope, { type: "CONFIGURE_EVENT_PARAMETERS" }>,
+    current: StoredEventRow,
+  ): Promise<Response> {
+    if (!(await verifyCredential(command.payload.adminPin, this.env.ADMIN_PIN_HASH))) {
+      return json(
+        { error: { code: "ADMIN_PIN_INVALID", message: "Administrator-PIN ist ungültig." } },
+        { status: 403 },
+      );
+    }
+    const payload = command.payload;
+    if (
+      payload.saleOpensAt &&
+      Date.parse(payload.saleOpensAt) >= Date.parse(payload.operationsEndAt)
+    ) {
+      return json(
+        {
+          error: {
+            code: "EVENT_TIME_RANGE_INVALID",
+            message: "Der Verkaufsbeginn muss vor dem Betriebsende liegen.",
+          },
+        },
+        { status: 409 },
+      );
+    }
+    if (
+      !(
+        payload.childReferenceWeightKg < payload.normalReferenceWeightKg &&
+        payload.normalReferenceWeightKg < payload.heavyReferenceWeightKg
+      )
+    ) {
+      return json(
+        {
+          error: {
+            code: "REFERENCE_WEIGHTS_INVALID",
+            message: "Referenzgewichte müssen in der Reihenfolge Kind, Normal, Schwer ansteigen.",
+          },
+        },
+        { status: 409 },
+      );
+    }
+    const now = new Date().toISOString();
+    const nextVersion = current.version + 1;
+    const result: CommandResult = {
+      accepted: true,
+      duplicate: false,
+      event: rowToSnapshot({
+        ...current,
+        version: nextVersion,
+        sale_opens_at: payload.saleOpensAt,
+        operations_end_at: payload.operationsEndAt,
+        no_show_after_minutes: payload.noShowAfterMinutes,
+        notification_lead_minutes: payload.notificationLeadMinutes,
+        child_reference_weight_kg: payload.childReferenceWeightKg,
+        normal_reference_weight_kg: payload.normalReferenceWeightKg,
+        heavy_reference_weight_kg: payload.heavyReferenceWeightKg,
+        planned_boarding_minutes: payload.plannedBoardingMinutes,
+        planned_deboarding_minutes: payload.plannedDeboardingMinutes,
+        planned_buffer_minutes: payload.plannedBufferMinutes,
+        updated_at: now,
+      }),
+      eventType: "EVENT_PARAMETERS_CONFIGURED",
+      aggregate: { type: "OPERATION_DAY", id: current.id },
+    };
+    const auditPayload = {
+      saleOpensAt: payload.saleOpensAt,
+      operationsEndAt: payload.operationsEndAt,
+      noShowAfterMinutes: payload.noShowAfterMinutes,
+      notificationLeadMinutes: payload.notificationLeadMinutes,
+      referenceWeightsKg: {
+        child: payload.childReferenceWeightKg,
+        normal: payload.normalReferenceWeightKg,
+        heavy: payload.heavyReferenceWeightKg,
+      },
+      plannedBoardingMinutes: payload.plannedBoardingMinutes,
+      plannedDeboardingMinutes: payload.plannedDeboardingMinutes,
+      plannedBufferMinutes: payload.plannedBufferMinutes,
+      reason: payload.reason,
+    };
+    await this.env.DB.batch([
+      this.env.DB.prepare(
+        `UPDATE operation_days SET sale_opens_at = ?1, operations_end_at = ?2,
+          no_show_after_minutes = ?3, notification_lead_minutes = ?4,
+          child_reference_weight_kg = ?5, normal_reference_weight_kg = ?6,
+          heavy_reference_weight_kg = ?7, planned_boarding_minutes = ?8,
+          planned_deboarding_minutes = ?9, planned_buffer_minutes = ?10,
+          version = ?11, updated_at = ?12 WHERE id = ?13 AND version = ?14`,
+      ).bind(
+        payload.saleOpensAt,
+        payload.operationsEndAt,
+        payload.noShowAfterMinutes,
+        payload.notificationLeadMinutes,
+        payload.childReferenceWeightKg,
+        payload.normalReferenceWeightKg,
+        payload.heavyReferenceWeightKg,
+        payload.plannedBoardingMinutes,
+        payload.plannedDeboardingMinutes,
+        payload.plannedBufferMinutes,
+        nextVersion,
+        now,
+        command.eventId,
+        current.version,
+      ),
+      this.env.DB.prepare(
+        `INSERT INTO operational_events
+          (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type,
+           aggregate_id, aggregate_version, payload_json)
+         VALUES (?1, ?2, 'EVENT_PARAMETERS_CONFIGURED', ?3, ?4, 'OPERATION_DAY', ?2, ?5, ?6)`,
+      ).bind(
+        crypto.randomUUID(),
+        command.eventId,
+        now,
+        command.deviceId,
+        nextVersion,
+        JSON.stringify(auditPayload),
+      ),
+      this.env.DB.prepare(
+        `INSERT INTO idempotency_receipts
+          (command_id, operation_day_id, device_id, command_type, received_at, response_json)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)`,
+      ).bind(
+        command.commandId,
+        command.eventId,
+        command.deviceId,
+        command.type,
+        now,
+        JSON.stringify(result),
+      ),
+      this.env.DB.prepare(
+        "INSERT INTO outbox (id, operation_day_id, topic, payload_json, created_at) VALUES (?1, ?2, 'EVENT_STATE_CHANGED', ?3, ?4)",
+      ).bind(crypto.randomUUID(), command.eventId, JSON.stringify(result), now),
+    ]);
+    this.broadcast(result);
+    return json(result);
+  }
+
   private async handleDeviceAdministration(
     command: Extract<CommandEnvelope, { type: "PAIR_DEVICE" | "REVOKE_DEVICE" }>,
     current: StoredEventRow,
@@ -1312,6 +1469,7 @@ export class EventCoordinator extends DurableObject<Env> {
     }
     const group = await this.env.DB.prepare(
       `SELECT tg.id, tg.product_id, tg.version, r.id AS rotation_id, r.status AS rotation_status,
+              r.called_at,
               r.aircraft_id, fg.resource_group_id
          FROM ticket_groups tg
          JOIN tickets t ON t.ticket_group_id = tg.id
@@ -1328,6 +1486,7 @@ export class EventCoordinator extends DurableObject<Env> {
         version: number;
         rotation_id: string;
         rotation_status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
+        called_at: string | null;
         aircraft_id: string | null;
         resource_group_id: string;
       }>();
@@ -1335,6 +1494,22 @@ export class EventCoordinator extends DurableObject<Env> {
       return json(
         { error: { code: "TICKET_GROUP_NOT_FOUND", message: "Ticketgruppe nicht gefunden." } },
         { status: 404 },
+      );
+    }
+    if (
+      command.type === "MARK_NO_SHOW" &&
+      (group.rotation_status !== "CALLED" ||
+        !group.called_at ||
+        Date.now() - Date.parse(group.called_at) < (current.no_show_after_minutes ?? 10) * 60_000)
+    ) {
+      return json(
+        {
+          error: {
+            code: "NO_SHOW_DEADLINE_NOT_REACHED",
+            message: "Die konfigurierte No-Show-Frist ist noch nicht erreicht.",
+          },
+        },
+        { status: 409 },
       );
     }
     try {

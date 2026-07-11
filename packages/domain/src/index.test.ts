@@ -199,3 +199,10 @@ describe("attendance authorization", () => {
     );
   });
 });
+
+describe("event parameter authorization", () => {
+  it("is restricted to administration devices", () => {
+    expect(() => assertRoleMayExecute("ADMIN", "CONFIGURE_EVENT_PARAMETERS")).not.toThrow();
+    expect(() => assertRoleMayExecute("FLIGHT_DIRECTOR", "CONFIGURE_EVENT_PARAMETERS")).toThrow();
+  });
+});

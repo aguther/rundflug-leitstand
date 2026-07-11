@@ -264,4 +264,31 @@ describe("commandEnvelopeSchema", () => {
     });
     expect(parsed.type).toBe("SET_TICKET_ATTENDANCE");
   });
+
+  it("validates configurable event parameters without guest data", () => {
+    const parsed = commandEnvelopeSchema.parse({
+      commandId: "00e971df-23d5-4d28-9107-92b447416287",
+      eventId: "demo-2026",
+      deviceId: "technical-scaffold",
+      expectedVersion: 12,
+      issuedAt: "2026-07-11T12:00:00.000Z",
+      type: "CONFIGURE_EVENT_PARAMETERS",
+      payload: {
+        saleOpensAt: "2026-07-11T07:00:00.000Z",
+        operationsEndAt: "2026-07-11T18:00:00.000Z",
+        noShowAfterMinutes: 10,
+        notificationLeadMinutes: 15,
+        childReferenceWeightKg: 35,
+        normalReferenceWeightKg: 80,
+        heavyReferenceWeightKg: 110,
+        plannedBoardingMinutes: 8,
+        plannedDeboardingMinutes: 5,
+        plannedBufferMinutes: 3,
+        reason: "Tagesparameter geprüft",
+        adminPin: "0000",
+      },
+    });
+    expect(parsed.type).toBe("CONFIGURE_EVENT_PARAMETERS");
+    expect("guestName" in parsed.payload).toBe(false);
+  });
 });
