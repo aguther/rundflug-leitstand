@@ -4,11 +4,14 @@ import type {
   PublicBoard,
   PublicTicketStatus,
 } from "@rundflug/contracts";
+import QRCode from "qrcode";
 import { useCallback, useEffect, useState } from "react";
+import type { PairedDeviceSummary } from "./api";
 import {
   downloadDailyReport,
   getAuditHistory,
   getOperationBoard,
+  getPairedDevices,
   getPublicBoard,
   getPublicTicketStatus,
   getPushPublicKey,
@@ -55,9 +58,32 @@ function deviceTokenFor(deviceId: string): string {
   return window.localStorage.getItem(`device-token:${deviceId}`) ?? "";
 }
 
+function deviceIdForRole(role: string, developmentId: string): string {
+  return import.meta.env.DEV
+    ? developmentId
+    : (window.localStorage.getItem(`device-id:${role}`) ?? `unpaired-${role.toLowerCase()}`);
+}
+
+const CASHIER_DEVICE_ID = deviceIdForRole("CASHIER", "cashier-tablet-1");
+const FLIGHT_LINE_DEVICE_ID = deviceIdForRole("FLIGHT_LINE", "flight-line-tablet-1");
+const ADMIN_DEVICE_ID = deviceIdForRole("ADMIN", "technical-scaffold");
+
 function createTicketCode(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(16));
   return Array.from(bytes, (value) => CODE_ALPHABET[value % CODE_ALPHABET.length]).join("");
+}
+
+function createDeviceToken(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  return btoa(String.fromCharCode(...bytes))
+    .replaceAll("+", "-")
+    .replaceAll("/", "_")
+    .replaceAll("=", "");
+}
+
+async function sha256HexBrowser(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
 function useConnectivity(): boolean {
@@ -131,7 +157,7 @@ function EmergencyNotice({ active }: { active: boolean }) {
 }
 
 function CashierView() {
-  const { board, error, refresh } = useOperationBoard("cashier-tablet-1");
+  const { board, error, refresh } = useOperationBoard(CASHIER_DEVICE_ID);
   const [productId, setProductId] = useState(() => {
     try {
       const draft = JSON.parse(localStorage.getItem("cashier-draft-v1") ?? "{}") as {
@@ -175,7 +201,7 @@ function CashierView() {
         {
           commandId: crypto.randomUUID(),
           eventId: EVENT_ID,
-          deviceId: "cashier-tablet-1",
+          deviceId: CASHIER_DEVICE_ID,
           expectedVersion: board.event.version,
           issuedAt: new Date().toISOString(),
           type: "SELL_TICKET_GROUP",
@@ -187,7 +213,7 @@ function CashierView() {
             paymentMethod: "CASH",
           },
         },
-        deviceTokenFor("cashier-tablet-1"),
+        deviceTokenFor(CASHIER_DEVICE_ID),
       );
       setReceipt(codes);
       setLastTicketGroupId(saleResult.aggregate?.id ?? null);
@@ -208,13 +234,13 @@ function CashierView() {
         {
           commandId: crypto.randomUUID(),
           eventId: EVENT_ID,
-          deviceId: "cashier-tablet-1",
+          deviceId: CASHIER_DEVICE_ID,
           expectedVersion: board.event.version,
           issuedAt: new Date().toISOString(),
           type: "CANCEL_TICKET_GROUP",
           payload: { ticketGroupId: lastTicketGroupId, reason: cancelReason.trim() },
         },
-        deviceTokenFor("cashier-tablet-1"),
+        deviceTokenFor(CASHIER_DEVICE_ID),
       );
       setMessage("Verkauf storniert und protokolliert.");
       setReceipt([]);
@@ -234,7 +260,7 @@ function CashierView() {
         {
           commandId: crypto.randomUUID(),
           eventId: EVENT_ID,
-          deviceId: "cashier-tablet-1",
+          deviceId: CASHIER_DEVICE_ID,
           expectedVersion: board.event.version,
           issuedAt: new Date().toISOString(),
           type: "REBOOK_TICKET_GROUP",
@@ -244,7 +270,7 @@ function CashierView() {
             reason: cancelReason.trim(),
           },
         },
-        deviceTokenFor("cashier-tablet-1"),
+        deviceTokenFor(CASHIER_DEVICE_ID),
       );
       setMessage("Tickets umgebucht und in die neue Queue eingereiht.");
       setCancelReason("");
@@ -388,7 +414,7 @@ const actionForState = {
 } as const;
 
 function FlightLineView() {
-  const { board, error, refresh } = useOperationBoard("flight-line-tablet-1");
+  const { board, error, refresh } = useOperationBoard(FLIGHT_LINE_DEVICE_ID);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [queueReason, setQueueReason] = useState("");
@@ -402,7 +428,7 @@ function FlightLineView() {
       const commandBase = {
         commandId: crypto.randomUUID(),
         eventId: EVENT_ID,
-        deviceId: "flight-line-tablet-1",
+        deviceId: FLIGHT_LINE_DEVICE_ID,
         expectedVersion: board.event.version,
         issuedAt: new Date().toISOString(),
       };
@@ -413,12 +439,12 @@ function FlightLineView() {
             type: "CALL_NEXT",
             payload: { rotationId: selected.id, aircraftId: selected.suggestedAircraftId ?? "" },
           },
-          deviceTokenFor("flight-line-tablet-1"),
+          deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
         );
       } else {
         await sendCommand(
           { ...commandBase, type: action.command, payload: { rotationId: selected.id } },
-          deviceTokenFor("flight-line-tablet-1"),
+          deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
         );
       }
       setMessage(`${action.label} bestätigt.`);
@@ -435,13 +461,13 @@ function FlightLineView() {
         {
           commandId: crypto.randomUUID(),
           eventId: EVENT_ID,
-          deviceId: "flight-line-tablet-1",
+          deviceId: FLIGHT_LINE_DEVICE_ID,
           expectedVersion: board.event.version,
           issuedAt: new Date().toISOString(),
           type,
           payload: { ticketGroupId: selected.ticketGroupId, reason: queueReason.trim() },
         },
-        deviceTokenFor("flight-line-tablet-1"),
+        deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
       );
       setMessage(type === "MARK_NO_SHOW" ? "No-Show protokolliert." : "Fluggruppe zurückgestellt.");
       setQueueReason("");
@@ -459,13 +485,13 @@ function FlightLineView() {
         {
           commandId: crypto.randomUUID(),
           eventId: EVENT_ID,
-          deviceId: "flight-line-tablet-1",
+          deviceId: FLIGHT_LINE_DEVICE_ID,
           expectedVersion: board.event.version,
           issuedAt: new Date().toISOString(),
           type: "REVOKE_CALL",
           payload: { rotationId: selected.id },
         },
-        deviceTokenFor("flight-line-tablet-1"),
+        deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
       );
       setMessage("NEXT wurde durch ein Korrekturereignis zurückgenommen.");
       await refresh();
@@ -730,6 +756,58 @@ function PrivacyView() {
   );
 }
 
+function PairDeviceView() {
+  const params = new URLSearchParams(window.location.hash.slice(1));
+  const deviceId = params.get("device") ?? "";
+  const token = params.get("token") ?? "";
+  const role = params.get("role") ?? "";
+  const roleTargets: Record<string, string> = {
+    CASHIER: "/",
+    FLIGHT_LINE: "/flight-line",
+    FLIGHT_LINE_LEAD: "/flight-line",
+    FLIGHT_DIRECTOR: "/admin",
+    ADMIN: "/admin",
+    DISPLAY: "/fids",
+  };
+  const valid =
+    /^[0-9a-f-]{36}$/i.test(deviceId) &&
+    /^[A-Za-z0-9_-]{40,64}$/.test(token) &&
+    role in roleTargets;
+  const activate = () => {
+    if (!valid) return;
+    const viewRole =
+      role === "FLIGHT_LINE_LEAD" ? "FLIGHT_LINE" : role === "FLIGHT_DIRECTOR" ? "ADMIN" : role;
+    window.localStorage.setItem(`device-id:${viewRole}`, deviceId);
+    window.localStorage.setItem(`device-token:${deviceId}`, token);
+    window.history.replaceState(null, "", "/pair");
+    window.location.assign(roleTargets[role] ?? "/");
+  };
+  return (
+    <Shell title="Gerätekopplung">
+      <section className="pair-device-page">
+        <span className="eyebrow">Anonyme Geräteidentität</span>
+        <h1>Gerät koppeln</h1>
+        {valid ? (
+          <>
+            <p>
+              Dieses Gerät erhält für den Veranstaltungstag die feste Rolle <strong>{role}</strong>.
+              Es wird kein persönliches Helferkonto angelegt.
+            </p>
+            <button className="primary-action" onClick={activate} type="button">
+              Kopplung bestätigen
+            </button>
+          </>
+        ) : (
+          <p>
+            Der Kopplungslink ist ungültig. Bitte in der Administration einen neuen QR-Code
+            erzeugen.
+          </p>
+        )}
+      </section>
+    </Shell>
+  );
+}
+
 function FidsView() {
   const [board, setBoard] = useState<PublicBoard | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -786,27 +864,106 @@ function FidsView() {
 }
 
 function AdminView() {
-  const { board, error, refresh } = useOperationBoard("technical-scaffold");
+  const { board, error, refresh } = useOperationBoard(ADMIN_DEVICE_ID);
   const [reason, setReason] = useState("");
   const [adminPin, setAdminPin] = useState("");
   const [saleClosesAt, setSaleClosesAt] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [history, setHistory] = useState<AuditHistory>({ entries: [] });
+  const [devices, setDevices] = useState<PairedDeviceSummary[]>([]);
+  const [deviceLabel, setDeviceLabel] = useState("Kasse 2");
+  const [deviceRole, setDeviceRole] = useState<
+    "CASHIER" | "FLIGHT_LINE" | "FLIGHT_LINE_LEAD" | "FLIGHT_DIRECTOR" | "ADMIN" | "DISPLAY"
+  >("CASHIER");
+  const [pairingQr, setPairingQr] = useState<string | null>(null);
+  const [pairingUrl, setPairingUrl] = useState<string | null>(null);
   const resourceGroups = Array.from(
     new Map(board?.products.map((product) => [product.resourceGroupId, product]) ?? []).values(),
   );
   const refreshHistory = useCallback(async () => {
     try {
-      setHistory(
-        await getAuditHistory(EVENT_ID, "technical-scaffold", deviceTokenFor("technical-scaffold")),
-      );
+      setHistory(await getAuditHistory(EVENT_ID, ADMIN_DEVICE_ID, deviceTokenFor(ADMIN_DEVICE_ID)));
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : "Historie nicht verfügbar.");
     }
   }, []);
+  const refreshDevices = useCallback(async () => {
+    try {
+      setDevices(
+        await getPairedDevices(EVENT_ID, ADMIN_DEVICE_ID, deviceTokenFor(ADMIN_DEVICE_ID)),
+      );
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : "Geräteübersicht nicht verfügbar.");
+    }
+  }, []);
   useEffect(() => {
     void refreshHistory();
-  }, [refreshHistory]);
+    void refreshDevices();
+  }, [refreshDevices, refreshHistory]);
+
+  async function pairDevice() {
+    if (!board || deviceLabel.trim().length < 2 || adminPin.length < 4) return;
+    const pairedDeviceId = crypto.randomUUID();
+    const token = createDeviceToken();
+    try {
+      await sendCommand(
+        {
+          commandId: crypto.randomUUID(),
+          eventId: EVENT_ID,
+          deviceId: ADMIN_DEVICE_ID,
+          expectedVersion: board.event.version,
+          issuedAt: new Date().toISOString(),
+          type: "PAIR_DEVICE",
+          payload: {
+            pairedDeviceId,
+            label: deviceLabel.trim(),
+            role: deviceRole,
+            credentialHash: await sha256HexBrowser(token),
+            adminPin,
+          },
+        },
+        deviceTokenFor(ADMIN_DEVICE_ID),
+      );
+      const params = new URLSearchParams({ device: pairedDeviceId, token, role: deviceRole });
+      const url = `${window.location.origin}/pair#${params.toString()}`;
+      setPairingUrl(url);
+      setPairingQr(
+        await QRCode.toDataURL(url, { errorCorrectionLevel: "M", margin: 2, width: 320 }),
+      );
+      setMessage("Kopplung erstellt. QR-Code nur am vorgesehenen Gerät scannen.");
+      setAdminPin("");
+      await refresh();
+      await refreshDevices();
+      await refreshHistory();
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : "Gerätekopplung fehlgeschlagen.");
+    }
+  }
+
+  async function revokeDevice(device: PairedDeviceSummary) {
+    if (!board || reason.trim().length < 3 || adminPin.length < 4) return;
+    try {
+      await sendCommand(
+        {
+          commandId: crypto.randomUUID(),
+          eventId: EVENT_ID,
+          deviceId: ADMIN_DEVICE_ID,
+          expectedVersion: board.event.version,
+          issuedAt: new Date().toISOString(),
+          type: "REVOKE_DEVICE",
+          payload: { pairedDeviceId: device.id, adminPin, reason: reason.trim() },
+        },
+        deviceTokenFor(ADMIN_DEVICE_ID),
+      );
+      setMessage("Gerätekopplung wurde sofort widerrufen.");
+      setAdminPin("");
+      await refresh();
+      await refreshDevices();
+      await refreshHistory();
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : "Widerruf fehlgeschlagen.");
+    }
+  }
 
   async function emergency(type: "TRIGGER_EMERGENCY" | "CLEAR_EMERGENCY") {
     if (!board || reason.trim().length < 3) return;
@@ -816,7 +973,7 @@ function AdminView() {
           ? {
               commandId: crypto.randomUUID(),
               eventId: EVENT_ID,
-              deviceId: "technical-scaffold",
+              deviceId: ADMIN_DEVICE_ID,
               expectedVersion: board.event.version,
               issuedAt: new Date().toISOString(),
               type,
@@ -825,13 +982,13 @@ function AdminView() {
           : {
               commandId: crypto.randomUUID(),
               eventId: EVENT_ID,
-              deviceId: "technical-scaffold",
+              deviceId: ADMIN_DEVICE_ID,
               expectedVersion: board.event.version,
               issuedAt: new Date().toISOString(),
               type,
               payload: { reason: reason.trim(), adminPin },
             },
-        deviceTokenFor("technical-scaffold"),
+        deviceTokenFor(ADMIN_DEVICE_ID),
       );
       setMessage(
         type === "TRIGGER_EMERGENCY" ? "Notfallmodus ausgelöst." : "Notfallmodus aufgehoben.",
@@ -855,13 +1012,13 @@ function AdminView() {
         {
           commandId: crypto.randomUUID(),
           eventId: EVENT_ID,
-          deviceId: "technical-scaffold",
+          deviceId: ADMIN_DEVICE_ID,
           expectedVersion: board.event.version,
           issuedAt: new Date().toISOString(),
           type: "SET_RESOURCE_GROUP_STATUS",
           payload: { resourceGroupId, status, reason: reason.trim(), expectedReviewAt: null },
         },
-        deviceTokenFor("technical-scaffold"),
+        deviceTokenFor(ADMIN_DEVICE_ID),
       );
       setMessage(`Ressourcengruppe auf ${status} gesetzt.`);
       setReason("");
@@ -887,7 +1044,7 @@ function AdminView() {
         {
           commandId: crypto.randomUUID(),
           eventId: EVENT_ID,
-          deviceId: "technical-scaffold",
+          deviceId: ADMIN_DEVICE_ID,
           expectedVersion: board.event.version,
           issuedAt: new Date().toISOString(),
           type: "CONFIGURE_PRODUCT_SALES",
@@ -900,7 +1057,7 @@ function AdminView() {
             reason: reason.trim(),
           },
         },
-        deviceTokenFor("technical-scaffold"),
+        deviceTokenFor(ADMIN_DEVICE_ID),
       );
       setMessage("Verkaufssteuerung wurde protokolliert aktualisiert.");
       await refresh();
@@ -912,11 +1069,7 @@ function AdminView() {
 
   async function exportDailyReport() {
     try {
-      await downloadDailyReport(
-        EVENT_ID,
-        "technical-scaffold",
-        deviceTokenFor("technical-scaffold"),
-      );
+      await downloadDailyReport(EVENT_ID, ADMIN_DEVICE_ID, deviceTokenFor(ADMIN_DEVICE_ID));
       setMessage("Tagesbericht wurde erzeugt.");
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : "Tagesbericht fehlgeschlagen.");
@@ -1048,6 +1201,75 @@ function AdminView() {
           ))}
         </section>
         <section className="admin-section">
+          <h2>Geräte ohne Helferkonten</h2>
+          <div className="device-pairing-form">
+            <label>
+              Technische Gerätebezeichnung
+              <input value={deviceLabel} onChange={(event) => setDeviceLabel(event.target.value)} />
+            </label>
+            <label>
+              Feste Rolle
+              <select
+                value={deviceRole}
+                onChange={(event) => setDeviceRole(event.target.value as typeof deviceRole)}
+              >
+                <option value="CASHIER">Kasse</option>
+                <option value="FLIGHT_LINE">Flight Line</option>
+                <option value="FLIGHT_LINE_LEAD">Leitung Flight Line</option>
+                <option value="FLIGHT_DIRECTOR">Flugleitung</option>
+                <option value="DISPLAY">Anzeige</option>
+                <option value="ADMIN">Administration</option>
+              </select>
+            </label>
+            <label>
+              Administrator-PIN
+              <input
+                type="password"
+                value={adminPin}
+                onChange={(event) => setAdminPin(event.target.value)}
+              />
+            </label>
+            <button
+              disabled={deviceLabel.trim().length < 2 || adminPin.length < 4}
+              onClick={pairDevice}
+              type="button"
+            >
+              QR-Kopplung erzeugen
+            </button>
+          </div>
+          {pairingQr && pairingUrl ? (
+            <div className="pairing-qr">
+              <img src={pairingQr} alt="QR-Code zur einmaligen Gerätekopplung" />
+              <p>
+                Nur mit dem vorgesehenen Gerät scannen. Der QR-Code enthält dessen Zugangsschlüssel.
+              </p>
+              <a href={pairingUrl}>Kopplung auf diesem Gerät öffnen</a>
+            </div>
+          ) : null}
+          <div className="device-list">
+            {devices.map((device) => (
+              <div key={device.id}>
+                <span className={device.online ? "online-dot online" : "online-dot"} />
+                <strong>{device.label}</strong>
+                <span>{device.role}</span>
+                <span>{device.active ? (device.online ? "online" : "offline") : "widerrufen"}</span>
+                <time dateTime={device.lastSeenAt}>
+                  zuletzt {new Date(device.lastSeenAt).toLocaleString("de-DE")}
+                </time>
+                {device.active ? (
+                  <button
+                    disabled={reason.trim().length < 3 || adminPin.length < 4}
+                    onClick={() => revokeDevice(device)}
+                    type="button"
+                  >
+                    Widerrufen
+                  </button>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        </section>
+        <section className="admin-section">
           <div className="section-heading">
             <h2>Audit und Tagesabschluss</h2>
             <button onClick={exportDailyReport} type="button">
@@ -1084,6 +1306,7 @@ export function App() {
   const ticketMatch = path.match(/^\/ticket\/([A-Za-z2-9]{12,32})$/);
   const ticketCode = ticketMatch?.[1];
   if (ticketCode) return <TicketStatusView code={ticketCode.toUpperCase()} />;
+  if (path === "/pair") return <PairDeviceView />;
   if (path === "/datenschutz") return <PrivacyView />;
   if (path === "/flight-line") return <FlightLineView />;
   if (path === "/fids") return <FidsView />;

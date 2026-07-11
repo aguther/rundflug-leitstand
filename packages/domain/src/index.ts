@@ -122,6 +122,8 @@ export type OperationalCommandType =
   | "CLEAR_EMERGENCY"
   | "SET_RESOURCE_GROUP_STATUS"
   | "CONFIGURE_PRODUCT_SALES"
+  | "PAIR_DEVICE"
+  | "REVOKE_DEVICE"
   | "REVOKE_CALL";
 
 const commandRoles: Readonly<Record<OperationalCommandType, readonly DeviceRole[]>> = {
@@ -138,6 +140,8 @@ const commandRoles: Readonly<Record<OperationalCommandType, readonly DeviceRole[
   CLEAR_EMERGENCY: ["ADMIN"],
   SET_RESOURCE_GROUP_STATUS: ["FLIGHT_LINE_LEAD", "FLIGHT_DIRECTOR", "ADMIN"],
   CONFIGURE_PRODUCT_SALES: ["ADMIN"],
+  PAIR_DEVICE: ["ADMIN"],
+  REVOKE_DEVICE: ["ADMIN"],
   REVOKE_CALL: ["FLIGHT_LINE", "FLIGHT_LINE_LEAD", "ADMIN"],
 };
 

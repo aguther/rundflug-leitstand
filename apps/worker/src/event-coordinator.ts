@@ -122,6 +122,9 @@ export class EventCoordinator extends DurableObject<Env> {
           { status: 401 },
         );
       }
+      await this.env.DB.prepare("UPDATE paired_devices SET last_seen_at = ?1 WHERE id = ?2")
+        .bind(new Date().toISOString(), command.deviceId)
+        .run();
 
       if (command.type === "SET_OPERATIONAL_NOTE") {
         if (device.role !== "ADMIN") {
@@ -385,6 +388,9 @@ export class EventCoordinator extends DurableObject<Env> {
       }
 
       if (command.type !== "SET_OPERATIONAL_NOTE") {
+        if (command.type === "PAIR_DEVICE" || command.type === "REVOKE_DEVICE") {
+          return this.handleDeviceAdministration(command, current);
+        }
         if (command.type === "CONFIGURE_PRODUCT_SALES") {
           return this.handleProductSalesConfiguration(command, current);
         }
@@ -587,6 +593,130 @@ export class EventCoordinator extends DurableObject<Env> {
           criticalThreshold: command.payload.criticalThreshold,
           reason: command.payload.reason,
         }),
+      ),
+      this.env.DB.prepare(
+        `INSERT INTO idempotency_receipts
+          (command_id, operation_day_id, device_id, command_type, received_at, response_json)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)`,
+      ).bind(
+        command.commandId,
+        command.eventId,
+        command.deviceId,
+        command.type,
+        now,
+        JSON.stringify(result),
+      ),
+      this.env.DB.prepare(
+        "INSERT INTO outbox (id, operation_day_id, topic, payload_json, created_at) VALUES (?1, ?2, 'EVENT_STATE_CHANGED', ?3, ?4)",
+      ).bind(crypto.randomUUID(), command.eventId, JSON.stringify(result), now),
+    ]);
+    this.broadcast(result);
+    return json(result);
+  }
+
+  private async handleDeviceAdministration(
+    command: Extract<CommandEnvelope, { type: "PAIR_DEVICE" | "REVOKE_DEVICE" }>,
+    current: StoredEventRow,
+  ): Promise<Response> {
+    if (!(await verifyCredential(command.payload.adminPin, this.env.ADMIN_PIN_HASH))) {
+      return json(
+        { error: { code: "ADMIN_PIN_INVALID", message: "Administrator-PIN ist ungültig." } },
+        { status: 403 },
+      );
+    }
+    const targetId = command.payload.pairedDeviceId;
+    if (command.type === "REVOKE_DEVICE") {
+      const target = await this.env.DB.prepare(
+        "SELECT id, role, active FROM paired_devices WHERE id = ?1 AND operation_day_id = ?2",
+      )
+        .bind(targetId, command.eventId)
+        .first<{ id: string; role: DeviceRole; active: number }>();
+      if (!target) {
+        return json(
+          { error: { code: "DEVICE_NOT_FOUND", message: "Gerät nicht gefunden." } },
+          { status: 404 },
+        );
+      }
+      if (target.role === "ADMIN" && target.active === 1) {
+        const admins = await this.env.DB.prepare(
+          "SELECT COUNT(*) AS count FROM paired_devices WHERE operation_day_id = ?1 AND role = 'ADMIN' AND active = 1",
+        )
+          .bind(command.eventId)
+          .first<{ count: number }>();
+        if ((admins?.count ?? 0) <= 1) {
+          return json(
+            {
+              error: {
+                code: "LAST_ADMIN_DEVICE",
+                message: "Das letzte aktive Administrationsgerät kann nicht widerrufen werden.",
+              },
+            },
+            { status: 409 },
+          );
+        }
+      }
+    } else {
+      const existing = await this.env.DB.prepare("SELECT id FROM paired_devices WHERE id = ?1")
+        .bind(targetId)
+        .first<{ id: string }>();
+      if (existing) {
+        return json(
+          { error: { code: "DEVICE_ID_EXISTS", message: "Geräte-ID ist bereits vergeben." } },
+          { status: 409 },
+        );
+      }
+    }
+    const now = new Date().toISOString();
+    const nextVersion = current.version + 1;
+    const eventType = command.type === "PAIR_DEVICE" ? "DEVICE_PAIRED" : "DEVICE_REVOKED";
+    const result: CommandResult = {
+      accepted: true,
+      duplicate: false,
+      event: rowToSnapshot({ ...current, version: nextVersion, updated_at: now }),
+      eventType,
+      aggregate: { type: "DEVICE", id: targetId },
+    };
+    const deviceMutation =
+      command.type === "PAIR_DEVICE"
+        ? this.env.DB.prepare(
+            `INSERT INTO paired_devices
+              (id, operation_day_id, label, role, active, paired_at, last_seen_at, credential_hash)
+             VALUES (?1, ?2, ?3, ?4, 1, ?5, '1970-01-01T00:00:00.000Z', ?6)`,
+          ).bind(
+            targetId,
+            command.eventId,
+            command.payload.label,
+            command.payload.role,
+            now,
+            command.payload.credentialHash,
+          )
+        : this.env.DB.prepare(
+            `UPDATE paired_devices SET active = 0, revoked_at = ?1, credential_hash = NULL
+              WHERE id = ?2 AND operation_day_id = ?3`,
+          ).bind(now, targetId, command.eventId);
+    await this.env.DB.batch([
+      this.env.DB.prepare(
+        "UPDATE operation_days SET version = ?1, updated_at = ?2 WHERE id = ?3 AND version = ?4",
+      ).bind(nextVersion, now, command.eventId, current.version),
+      deviceMutation,
+      this.env.DB.prepare(
+        `INSERT INTO operational_events
+          (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type,
+           aggregate_id, aggregate_version, payload_json)
+         VALUES (?1, ?2, ?3, ?4, ?5, 'DEVICE', ?6, ?7, ?8)`,
+      ).bind(
+        crypto.randomUUID(),
+        command.eventId,
+        eventType,
+        now,
+        command.deviceId,
+        targetId,
+        nextVersion,
+        JSON.stringify(
+          command.type === "PAIR_DEVICE"
+            ? { label: command.payload.label, role: command.payload.role }
+            : { reason: command.payload.reason },
+        ),
       ),
       this.env.DB.prepare(
         `INSERT INTO idempotency_receipts

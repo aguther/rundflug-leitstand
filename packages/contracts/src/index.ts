@@ -86,6 +86,31 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
     }),
   }),
   commandBaseSchema.extend({
+    type: z.literal("PAIR_DEVICE"),
+    payload: z.object({
+      pairedDeviceId: z.uuid(),
+      label: z.string().trim().min(2).max(80),
+      role: z.enum([
+        "CASHIER",
+        "FLIGHT_LINE",
+        "FLIGHT_LINE_LEAD",
+        "FLIGHT_DIRECTOR",
+        "ADMIN",
+        "DISPLAY",
+      ]),
+      credentialHash: z.string().regex(/^[a-f0-9]{64}$/),
+      adminPin: z.string().min(4).max(32),
+    }),
+  }),
+  commandBaseSchema.extend({
+    type: z.literal("REVOKE_DEVICE"),
+    payload: z.object({
+      pairedDeviceId: z.string().min(1).max(100),
+      adminPin: z.string().min(4).max(32),
+      reason: z.string().trim().min(3).max(240),
+    }),
+  }),
+  commandBaseSchema.extend({
     type: z.literal("REVOKE_CALL"),
     payload: z.object({ rotationId: z.string().min(1).max(100) }),
   }),
@@ -114,7 +139,7 @@ export const commandResultSchema = z.object({
   eventType: z.string(),
   aggregate: z
     .object({
-      type: z.enum(["OPERATION_DAY", "PRODUCT", "TICKET_GROUP", "ROTATION"]),
+      type: z.enum(["OPERATION_DAY", "PRODUCT", "DEVICE", "TICKET_GROUP", "ROTATION"]),
       id: z.string(),
       relatedRotationId: z.string().optional(),
     })
