@@ -24,6 +24,9 @@ async function authorizeDevice(
     .bind(deviceId, eventId)
     .first<{ role: string; credential_hash: string | null }>();
   if (!device || !(await verifyCredential(token ?? null, device.credential_hash))) return null;
+  await env.DB.prepare("UPDATE paired_devices SET last_seen_at = ?1 WHERE id = ?2")
+    .bind(new Date().toISOString(), deviceId)
+    .run();
   return { role: device.role };
 }
 
@@ -118,6 +121,9 @@ app.get("/api/events/:eventId/operations", async (context) => {
       403,
     );
   }
+  await context.env.DB.prepare("UPDATE paired_devices SET last_seen_at = ?1 WHERE id = ?2")
+    .bind(new Date().toISOString(), deviceId)
+    .run();
 
   const eventRow = await context.env.DB.prepare(
     `SELECT id, name, event_date, time_zone, status, emergency_mode, version,
@@ -378,6 +384,49 @@ app.get("/api/events/:eventId/history", async (context) => {
       aggregateId: row.aggregate_id,
       aggregateVersion: row.aggregate_version,
       payload: JSON.parse(row.payload_json) as Record<string, unknown>,
+    })),
+  });
+});
+
+app.get("/api/events/:eventId/devices", async (context) => {
+  const eventId = context.req.param("eventId");
+  const device = await authorizeDevice(
+    context.env,
+    eventId,
+    context.req.header("x-device-id"),
+    context.req.header("x-device-token"),
+  );
+  if (device?.role !== "ADMIN") {
+    return context.json(
+      { error: { code: "DEVICE_NOT_AUTHORIZED", message: "Gerät nicht berechtigt." } },
+      403,
+    );
+  }
+  const devices = await context.env.DB.prepare(
+    `SELECT id, label, role, active, paired_at, last_seen_at, revoked_at
+       FROM paired_devices WHERE operation_day_id = ?1 ORDER BY active DESC, paired_at DESC`,
+  )
+    .bind(eventId)
+    .all<{
+      id: string;
+      label: string;
+      role: string;
+      active: number;
+      paired_at: string;
+      last_seen_at: string;
+      revoked_at: string | null;
+    }>();
+  const now = Date.now();
+  return context.json({
+    devices: devices.results.map((entry) => ({
+      id: entry.id,
+      label: entry.label,
+      role: entry.role,
+      active: entry.active === 1,
+      online: entry.active === 1 && now - Date.parse(entry.last_seen_at) <= 120_000,
+      pairedAt: entry.paired_at,
+      lastSeenAt: entry.last_seen_at,
+      revokedAt: entry.revoked_at,
     })),
   });
 });

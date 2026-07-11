@@ -52,6 +52,30 @@ export interface HealthResponse {
   timestamp: string;
 }
 
+export interface PairedDeviceSummary {
+  id: string;
+  label: string;
+  role: string;
+  active: boolean;
+  online: boolean;
+  pairedAt: string;
+  lastSeenAt: string;
+  revokedAt: string | null;
+}
+
+export async function getPairedDevices(
+  eventId: string,
+  deviceId: string,
+  deviceToken: string,
+): Promise<PairedDeviceSummary[]> {
+  const response = await fetch(`/api/events/${encodeURIComponent(eventId)}/devices`, {
+    headers: { "x-device-id": deviceId, "x-device-token": deviceToken },
+  });
+  if (!response.ok) throw new Error("Geräteübersicht nicht verfügbar.");
+  const body = (await response.json()) as { devices: PairedDeviceSummary[] };
+  return body.devices;
+}
+
 export async function getPublicBoard(eventId: string, signal?: AbortSignal): Promise<PublicBoard> {
   const response = await fetch(`/api/public/events/${encodeURIComponent(eventId)}/board`, {
     ...(signal ? { signal } : {}),

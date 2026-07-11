@@ -35,6 +35,14 @@ describe("command authorization", () => {
     expect(() => assertRoleMayExecute("ADMIN", "CONFIGURE_PRODUCT_SALES")).not.toThrow();
   });
 
+  it("reserves device pairing and revocation for administrators", () => {
+    expect(() => assertRoleMayExecute("FLIGHT_DIRECTOR", "PAIR_DEVICE")).toThrowError(
+      /darf PAIR_DEVICE nicht/,
+    );
+    expect(() => assertRoleMayExecute("ADMIN", "PAIR_DEVICE")).not.toThrow();
+    expect(() => assertRoleMayExecute("ADMIN", "REVOKE_DEVICE")).not.toThrow();
+  });
+
   it("allows flight direction to trigger but not clear emergency mode", () => {
     expect(() => assertRoleMayExecute("FLIGHT_DIRECTOR", "TRIGGER_EMERGENCY")).not.toThrow();
     expect(() => assertRoleMayExecute("FLIGHT_DIRECTOR", "CLEAR_EMERGENCY")).toThrowError(

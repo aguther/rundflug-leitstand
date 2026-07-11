@@ -599,6 +599,63 @@ p {
 .capacity-row span {
   display: block;
 }
+.device-pairing-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr auto;
+  gap: 12px;
+  align-items: end;
+}
+.pairing-qr {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+  margin: 18px 0;
+  padding: 16px;
+  border: 2px solid #1769d2;
+  background: #edf5ff;
+}
+.pairing-qr img {
+  width: 220px;
+  height: 220px;
+}
+.device-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 18px;
+}
+.device-list > div {
+  display: grid;
+  grid-template-columns: auto 1.3fr 1fr 0.8fr 1.4fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-top: 1px solid #d5dee8;
+}
+.online-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #94a3b8;
+}
+.online-dot.online {
+  background: #198754;
+}
+.pair-device-page {
+  max-width: 620px;
+  margin: 50px auto;
+  padding: 28px;
+  background: #fff;
+  border: 1px solid #d5dee8;
+  overflow: hidden;
+}
+.pair-device-page p {
+  overflow-wrap: anywhere;
+}
+.pair-device-page .primary-action {
+  width: 100%;
+  min-width: 0;
+  white-space: normal;
+}
 .capacity-row span {
   margin-top: 4px;
   color: #60758d;
@@ -631,6 +688,10 @@ p {
     display: none;
   }
   .capacity-row {
+    grid-template-columns: 1fr;
+  }
+  .device-pairing-form,
+  .device-list > div {
     grid-template-columns: 1fr;
   }
 }

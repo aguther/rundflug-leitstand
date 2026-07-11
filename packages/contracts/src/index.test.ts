@@ -22,6 +22,26 @@ describe("commandEnvelopeSchema", () => {
     expect(parsed.type).toBe("CONFIGURE_PRODUCT_SALES");
   });
 
+  it("accepts only hashed credentials for device pairing", () => {
+    const parsed = commandEnvelopeSchema.parse({
+      commandId: "550e8400-e29b-41d4-a716-446655440001",
+      eventId: "synthetic-event",
+      deviceId: "synthetic-admin",
+      expectedVersion: 2,
+      issuedAt: "2026-07-11T12:00:00.000Z",
+      type: "PAIR_DEVICE",
+      payload: {
+        pairedDeviceId: "550e8400-e29b-41d4-a716-446655440002",
+        label: "Kasse 2",
+        role: "CASHIER",
+        credentialHash: "a".repeat(64),
+        adminPin: "0000",
+      },
+    });
+    expect(parsed.type).toBe("PAIR_DEVICE");
+    expect(JSON.stringify(parsed)).not.toContain("device-token");
+  });
+
   it("accepts the technical scaffold command", () => {
     const parsed = commandEnvelopeSchema.parse({
       commandId: "4f6ef267-f2c3-4c20-95fe-283e6f4ecab1",
