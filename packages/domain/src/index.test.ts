@@ -93,6 +93,7 @@ describe("sale guard", () => {
         productSaleEnabled: true,
         resourceGroupStatus: "ACTIVE",
         emergencyMode: false,
+        eventInterrupted: false,
         saleClosingReached: false,
       }),
     ).not.toThrow();
@@ -104,9 +105,29 @@ describe("sale guard", () => {
         productSaleEnabled: true,
         resourceGroupStatus: "ACTIVE",
         emergencyMode: true,
+        eventInterrupted: false,
         saleClosingReached: false,
       }),
     ).toThrowError(/Notfallmodus/);
+  });
+
+  it("blocks sales during a normal event interruption", () => {
+    expect(() =>
+      assertSaleAllowed({
+        productSaleEnabled: true,
+        resourceGroupStatus: "ACTIVE",
+        emergencyMode: false,
+        eventInterrupted: true,
+        saleClosingReached: false,
+      }),
+    ).toThrowError(/Betriebsunterbrechung/);
+  });
+
+  it("allows operational leads to interrupt the event without emergency semantics", () => {
+    expect(() => assertRoleMayExecute("FLIGHT_LINE_LEAD", "SET_EVENT_INTERRUPTION")).not.toThrow();
+    expect(() => assertRoleMayExecute("CASHIER", "SET_EVENT_INTERRUPTION")).toThrowError(
+      /darf SET_EVENT_INTERRUPTION nicht/,
+    );
   });
 });
 

@@ -147,7 +147,7 @@ export class EventCoordinator extends DurableObject<Env> {
       }
 
       const current = await this.env.DB.prepare(
-        `SELECT id, name, event_date, time_zone, status, emergency_mode, version,
+        `SELECT id, name, event_date, time_zone, status, emergency_mode, operational_interrupted, version,
                 operational_note, operations_end_at, updated_at
            FROM operation_days
           WHERE id = ?1`,
@@ -205,6 +205,7 @@ export class EventCoordinator extends DurableObject<Env> {
             productSaleEnabled: product.sale_enabled === 1,
             resourceGroupStatus: product.resource_group_status,
             emergencyMode: current.emergency_mode === 1,
+            eventInterrupted: current.operational_interrupted === 1,
             saleClosingReached:
               product.sale_closes_at !== null && Date.parse(product.sale_closes_at) <= Date.now(),
           });
@@ -410,6 +411,7 @@ export class EventCoordinator extends DurableObject<Env> {
         if (
           command.type === "TRIGGER_EMERGENCY" ||
           command.type === "CLEAR_EMERGENCY" ||
+          command.type === "SET_EVENT_INTERRUPTION" ||
           command.type === "SET_RESOURCE_GROUP_STATUS" ||
           command.type === "SET_RESOURCE_GROUP_NOTICE"
         ) {
@@ -438,6 +440,17 @@ export class EventCoordinator extends DurableObject<Env> {
                 error: {
                   code: "CALL_BLOCKED_EMERGENCY",
                   message: "Neue Aufrufe sind im Notfallmodus gesperrt.",
+                },
+              },
+              { status: 409 },
+            );
+          }
+          if (command.type === "CALL_NEXT" && current.operational_interrupted === 1) {
+            return json(
+              {
+                error: {
+                  code: "CALL_BLOCKED_INTERRUPTION",
+                  message: "Neue Aufrufe sind während der Betriebsunterbrechung gesperrt.",
                 },
               },
               { status: 409 },
@@ -1389,6 +1402,7 @@ export class EventCoordinator extends DurableObject<Env> {
         type:
           | "TRIGGER_EMERGENCY"
           | "CLEAR_EMERGENCY"
+          | "SET_EVENT_INTERRUPTION"
           | "SET_RESOURCE_GROUP_STATUS"
           | "SET_RESOURCE_GROUP_NOTICE";
       }
@@ -1433,21 +1447,32 @@ export class EventCoordinator extends DurableObject<Env> {
         ? "EMERGENCY_MODE_TRIGGERED"
         : command.type === "CLEAR_EMERGENCY"
           ? "EMERGENCY_MODE_CLEARED"
-          : command.type === "SET_RESOURCE_GROUP_STATUS"
-            ? "RESOURCE_GROUP_STATUS_CHANGED"
-            : "RESOURCE_GROUP_NOTICE_SET";
+          : command.type === "SET_EVENT_INTERRUPTION"
+            ? command.payload.interrupted
+              ? "EVENT_OPERATION_INTERRUPTED"
+              : "EVENT_OPERATION_RESUMED"
+            : command.type === "SET_RESOURCE_GROUP_STATUS"
+              ? "RESOURCE_GROUP_STATUS_CHANGED"
+              : "RESOURCE_GROUP_NOTICE_SET";
     const emergencyMode =
       command.type === "TRIGGER_EMERGENCY"
         ? 1
         : command.type === "CLEAR_EMERGENCY"
           ? 0
           : current.emergency_mode;
+    const operationalInterrupted =
+      command.type === "SET_EVENT_INTERRUPTION"
+        ? command.payload.interrupted
+          ? 1
+          : 0
+        : (current.operational_interrupted ?? 0);
     const result: CommandResult = {
       accepted: true,
       duplicate: false,
       event: rowToSnapshot({
         ...current,
         emergency_mode: emergencyMode,
+        operational_interrupted: operationalInterrupted,
         version: nextVersion,
         updated_at: now,
       }),
@@ -1459,9 +1484,45 @@ export class EventCoordinator extends DurableObject<Env> {
     };
     const statements: D1PreparedStatement[] = [
       this.env.DB.prepare(
-        "UPDATE operation_days SET emergency_mode = ?1, version = ?2, updated_at = ?3 WHERE id = ?4 AND version = ?5",
-      ).bind(emergencyMode, nextVersion, now, command.eventId, current.version),
+        `UPDATE operation_days SET emergency_mode = ?1, operational_interrupted = ?2,
+                version = ?3, updated_at = ?4 WHERE id = ?5 AND version = ?6`,
+      ).bind(
+        emergencyMode,
+        operationalInterrupted,
+        nextVersion,
+        now,
+        command.eventId,
+        current.version,
+      ),
     ];
+
+    if (command.type === "SET_EVENT_INTERRUPTION") {
+      if (command.payload.interrupted) {
+        statements.push(
+          this.env.DB.prepare(
+            `INSERT INTO operational_blocks
+              (id, operation_day_id, scope_type, scope_id, block_type, status, reason,
+               started_at, expected_review_at, device_id)
+             VALUES (?1, ?2, 'EVENT', ?2, 'INTERRUPTION', 'ACTIVE', ?3, ?4, ?5, ?6)`,
+          ).bind(
+            crypto.randomUUID(),
+            command.eventId,
+            command.payload.reason,
+            now,
+            command.payload.expectedReviewAt,
+            command.deviceId,
+          ),
+        );
+      } else {
+        statements.push(
+          this.env.DB.prepare(
+            `UPDATE operational_blocks SET status = 'CLEARED', cleared_at = ?1
+              WHERE operation_day_id = ?2 AND scope_type = 'EVENT' AND scope_id = ?2
+                AND status = 'ACTIVE'`,
+          ).bind(now, command.eventId),
+        );
+      }
+    }
 
     if (command.type === "SET_RESOURCE_GROUP_STATUS") {
       statements.push(
@@ -1521,7 +1582,14 @@ export class EventCoordinator extends DurableObject<Env> {
               resourceGroupId: command.payload.resourceGroupId,
               informationalOnly: true,
             }
-          : { reason };
+          : command.type === "SET_EVENT_INTERRUPTION"
+            ? {
+                reason,
+                interrupted: command.payload.interrupted,
+                expectedReviewAt: command.payload.expectedReviewAt,
+                informationalOnly: true,
+              }
+            : { reason };
     const aggregateType =
       command.type === "SET_RESOURCE_GROUP_STATUS" || command.type === "SET_RESOURCE_GROUP_NOTICE"
         ? "RESOURCE_GROUP"

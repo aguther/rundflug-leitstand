@@ -75,6 +75,14 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
     }),
   }),
   commandBaseSchema.extend({
+    type: z.literal("SET_EVENT_INTERRUPTION"),
+    payload: z.object({
+      interrupted: z.boolean(),
+      reason: z.string().trim().min(3).max(240),
+      expectedReviewAt: z.iso.datetime().nullable(),
+    }),
+  }),
+  commandBaseSchema.extend({
     type: z.literal("SET_RESOURCE_GROUP_STATUS"),
     payload: z.object({
       resourceGroupId: z.string().min(1).max(100),
@@ -181,6 +189,7 @@ export const eventSnapshotSchema = z.object({
   timeZone: z.string(),
   status: z.string(),
   emergencyMode: z.boolean(),
+  operationalInterrupted: z.boolean(),
   version: z.number().int().nonnegative(),
   operationalNote: z.string(),
   updatedAt: z.string(),
@@ -325,6 +334,7 @@ export type PublicTicketStatus = z.infer<typeof publicTicketStatusSchema>;
 export const publicBoardSchema = z.object({
   eventName: z.string(),
   emergencyMode: z.boolean(),
+  operationalInterrupted: z.boolean(),
   operationalNotice: z.string(),
   updatedAt: z.string(),
   groups: z.array(

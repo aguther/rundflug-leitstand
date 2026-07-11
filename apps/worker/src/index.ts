@@ -81,7 +81,7 @@ app.get("/api/meta", (context) =>
 
 app.get("/api/events/:eventId/snapshot", async (context) => {
   const row = await context.env.DB.prepare(
-    `SELECT id, name, event_date, time_zone, status, emergency_mode, version,
+    `SELECT id, name, event_date, time_zone, status, emergency_mode, operational_interrupted, version,
             operational_note, operations_end_at, updated_at
        FROM operation_days
       WHERE id = ?1`,
@@ -126,7 +126,7 @@ app.get("/api/events/:eventId/operations", async (context) => {
     .run();
 
   const eventRow = await context.env.DB.prepare(
-    `SELECT id, name, event_date, time_zone, status, emergency_mode, version,
+    `SELECT id, name, event_date, time_zone, status, emergency_mode, operational_interrupted, version,
             operational_note, operations_end_at, updated_at FROM operation_days WHERE id = ?1`,
   )
     .bind(eventId)
@@ -303,14 +303,17 @@ app.get("/api/events/:eventId/operations", async (context) => {
         referenceMinutes: product.reference_duration_minutes,
         actualDurationsMinutes: actualDurations,
         dataAgeMinutes,
-        interrupted: product.resource_group_status !== "ACTIVE" || eventRow.emergency_mode === 1,
+        interrupted:
+          product.resource_group_status !== "ACTIVE" ||
+          eventRow.emergency_mode === 1 ||
+          eventRow.operational_interrupted === 1,
         activeCapacity: activeAircraft,
       });
       const forecast = forecastQueueWindows({ queueSequence, activeAircraft, duration });
       const capacity = assessRemainingCapacity({
         remainingOperatingMinutes,
         expectedRotationMinutes: duration.expectedMinutes,
-        activeAircraftSeats: groupAircraftSeats,
+        activeAircraftSeats: eventRow.operational_interrupted === 1 ? [] : groupAircraftSeats,
         openTickets: product.resource_group_open_tickets,
         reservedSeats: reservedRefuelSeats,
         predictionQuality: forecast.quality,
@@ -338,6 +341,7 @@ app.get("/api/events/:eventId/operations", async (context) => {
           product.sale_enabled === 1 &&
           product.resource_group_status === "ACTIVE" &&
           eventRow.emergency_mode === 0 &&
+          eventRow.operational_interrupted !== 1 &&
           (product.sale_closes_at === null || Date.parse(product.sale_closes_at) > Date.now()),
         saleClosesAt: product.sale_closes_at,
         capacityWarningThreshold: product.capacity_warning_threshold,
@@ -368,7 +372,7 @@ app.get("/api/events/:eventId/operations", async (context) => {
             referenceMinutes: 20,
             actualDurationsMinutes: actualDurations,
             dataAgeMinutes,
-            interrupted: eventRow.emergency_mode === 1,
+            interrupted: eventRow.emergency_mode === 1 || eventRow.operational_interrupted === 1,
             activeCapacity: activeAircraft,
           }),
         }).lowerMinutes,
@@ -379,7 +383,7 @@ app.get("/api/events/:eventId/operations", async (context) => {
             referenceMinutes: 20,
             actualDurationsMinutes: actualDurations,
             dataAgeMinutes,
-            interrupted: eventRow.emergency_mode === 1,
+            interrupted: eventRow.emergency_mode === 1 || eventRow.operational_interrupted === 1,
             activeCapacity: activeAircraft,
           }),
         }).upperMinutes,
@@ -563,7 +567,7 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
   const ticketHash = await sha256Hex(ticketCode);
   const row = await context.env.DB.prepare(
     `SELECT p.name AS product_name, fg.communication_number, r.status, tg.queue_sequence,
-            od.operational_note AS event_operational_note,
+            od.operational_note AS event_operational_note, od.operational_interrupted,
             rg.operational_note AS resource_group_operational_note, od.updated_at
        FROM tickets t
        JOIN ticket_groups tg ON tg.id = t.ticket_group_id
@@ -584,6 +588,7 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
       updated_at: string;
       event_operational_note: string;
       resource_group_operational_note: string;
+      operational_interrupted: number;
     }>();
   if (!row) {
     return context.json(
@@ -610,10 +615,17 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
     communicationNumber: row.communication_number,
     status: publicState[row.status],
     queuePosition: row.status === "DRAFT" ? row.queue_sequence : null,
-    waitLowerMinutes: row.status === "DRAFT" ? Math.max(0, (row.queue_sequence - 1) * 20) : 0,
-    waitUpperMinutes: row.status === "DRAFT" ? row.queue_sequence * 30 : 0,
-    predictionQuality: "CHANGING",
-    message: message[row.status],
+    waitLowerMinutes:
+      row.status === "DRAFT" && row.operational_interrupted === 0
+        ? Math.max(0, (row.queue_sequence - 1) * 20)
+        : 0,
+    waitUpperMinutes:
+      row.status === "DRAFT" && row.operational_interrupted === 0 ? row.queue_sequence * 30 : 0,
+    predictionQuality: row.operational_interrupted === 1 ? "UNCERTAIN" : "CHANGING",
+    message:
+      row.operational_interrupted === 1
+        ? "Flugbetrieb unterbrochen – bitte Status erneut prüfen."
+        : message[row.status],
     operationalNotice: row.resource_group_operational_note || row.event_operational_note,
     updatedAt: row.updated_at,
   });
@@ -713,12 +725,13 @@ app.delete("/api/public/tickets/:ticketCode/push-subscriptions", async (context)
 app.get("/api/public/events/:eventId/board", async (context) => {
   const eventId = context.req.param("eventId");
   const event = await context.env.DB.prepare(
-    "SELECT name, emergency_mode, operational_note, updated_at FROM operation_days WHERE id = ?1",
+    "SELECT name, emergency_mode, operational_interrupted, operational_note, updated_at FROM operation_days WHERE id = ?1",
   )
     .bind(eventId)
     .first<{
       name: string;
       emergency_mode: number;
+      operational_interrupted: number;
       operational_note: string;
       updated_at: string;
     }>();
@@ -760,6 +773,7 @@ app.get("/api/public/events/:eventId/board", async (context) => {
   return context.json({
     eventName: event.name,
     emergencyMode: event.emergency_mode === 1,
+    operationalInterrupted: event.operational_interrupted === 1,
     operationalNotice: event.operational_note,
     updatedAt: event.updated_at,
     groups: event.emergency_mode
@@ -768,8 +782,8 @@ app.get("/api/public/events/:eventId/board", async (context) => {
           productName: row.product_name,
           communicationNumber: row.communication_number,
           status: publicState[row.status],
-          waitLowerMinutes: index * 20,
-          waitUpperMinutes: (index + 1) * 30,
+          waitLowerMinutes: event.operational_interrupted === 1 ? 0 : index * 20,
+          waitUpperMinutes: event.operational_interrupted === 1 ? 0 : (index + 1) * 30,
           operationalNotice: row.resource_group_operational_note,
         })),
   });
