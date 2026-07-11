@@ -509,6 +509,9 @@ export class EventCoordinator extends DurableObject<Env> {
         if (command.type === "REVOKE_CALL") {
           return this.handleRevokeCall(command, current);
         }
+        if (command.type === "ABORT_ROTATION") {
+          return this.handleAbortRotation(command, current);
+        }
         if (command.type === "SET_TICKET_ATTENDANCE") {
           return this.handleTicketAttendance(command, current);
         }
@@ -2751,6 +2754,128 @@ export class EventCoordinator extends DurableObject<Env> {
         aggregateId,
         nextVersion,
         JSON.stringify(payload),
+      ),
+      this.env.DB.prepare(
+        `INSERT INTO idempotency_receipts
+          (command_id, operation_day_id, device_id, command_type, received_at, response_json)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)`,
+      ).bind(
+        command.commandId,
+        command.eventId,
+        command.deviceId,
+        command.type,
+        now,
+        JSON.stringify(result),
+      ),
+      this.env.DB.prepare(
+        "INSERT INTO outbox (id, operation_day_id, topic, payload_json, created_at) VALUES (?1, ?2, 'EVENT_STATE_CHANGED', ?3, ?4)",
+      ).bind(crypto.randomUUID(), command.eventId, JSON.stringify(result), now),
+    );
+    await this.env.DB.batch(statements);
+    this.broadcast(result);
+    return json(result);
+  }
+
+  private async handleAbortRotation(
+    command: Extract<CommandEnvelope, { type: "ABORT_ROTATION" }>,
+    current: StoredEventRow,
+  ): Promise<Response> {
+    const rotation = await this.env.DB.prepare(
+      `SELECT r.id, r.status, r.version, r.aircraft_id, fg.id AS flight_group_id,
+              tg.id AS ticket_group_id, tg.product_id
+         FROM rotations r
+         JOIN flight_groups fg ON fg.id = r.flight_group_id
+         JOIN rotation_tickets rt ON rt.rotation_id = r.id AND rt.released_at IS NULL
+         JOIN tickets t ON t.id = rt.ticket_id
+         JOIN ticket_groups tg ON tg.id = t.ticket_group_id
+        WHERE r.id = ?1 AND r.operation_day_id = ?2
+        LIMIT 1`,
+    )
+      .bind(command.payload.rotationId, command.eventId)
+      .first<{
+        id: string;
+        status: string;
+        version: number;
+        aircraft_id: string | null;
+        flight_group_id: string;
+        ticket_group_id: string;
+        product_id: string;
+      }>();
+    if (rotation?.status !== "CALLED") {
+      return json(
+        {
+          error: {
+            code: "ROTATION_ABORT_NOT_ALLOWED",
+            message: "Nur ein aufgerufener, noch nicht gestarteter Umlauf kann abgebrochen werden.",
+          },
+        },
+        { status: 409 },
+      );
+    }
+    const now = new Date().toISOString();
+    const nextVersion = current.version + 1;
+    const result: CommandResult = {
+      accepted: true,
+      duplicate: false,
+      event: rowToSnapshot({ ...current, version: nextVersion, updated_at: now }),
+      eventType: "ROTATION_ABORTED_TO_QUEUE",
+      aggregate: { type: "ROTATION", id: rotation.id },
+    };
+    const statements: D1PreparedStatement[] = [
+      this.env.DB.prepare(
+        "UPDATE operation_days SET version = ?1, updated_at = ?2 WHERE id = ?3 AND version = ?4",
+      ).bind(nextVersion, now, command.eventId, current.version),
+      this.env.DB.prepare(
+        `UPDATE ticket_groups SET queue_sequence = queue_sequence + 100000
+          WHERE operation_day_id = ?1 AND product_id = ?2 AND id <> ?3 AND status = 'QUEUED'`,
+      ).bind(command.eventId, rotation.product_id, rotation.ticket_group_id),
+      this.env.DB.prepare(
+        `UPDATE ticket_groups SET queue_sequence = 1, status = 'QUEUED', version = version + 1
+          WHERE id = ?1`,
+      ).bind(rotation.ticket_group_id),
+      this.env.DB.prepare(
+        `UPDATE ticket_groups SET queue_sequence = queue_sequence - 99999
+          WHERE operation_day_id = ?1 AND product_id = ?2 AND id <> ?3
+            AND status = 'QUEUED' AND queue_sequence >= 100000`,
+      ).bind(command.eventId, rotation.product_id, rotation.ticket_group_id),
+      this.env.DB.prepare(
+        `UPDATE rotations SET status = 'DRAFT', aircraft_id = NULL, pilot_id = NULL,
+                called_at = NULL, version = version + 1, updated_at = ?1
+          WHERE id = ?2 AND version = ?3`,
+      ).bind(now, rotation.id, rotation.version),
+      this.env.DB.prepare(
+        "UPDATE flight_groups SET status = 'DRAFT', version = version + 1, updated_at = ?1 WHERE id = ?2",
+      ).bind(now, rotation.flight_group_id),
+      this.env.DB.prepare(
+        `UPDATE tickets SET status = 'QUEUED'
+          WHERE id IN (SELECT ticket_id FROM rotation_tickets WHERE rotation_id = ?1 AND released_at IS NULL)`,
+      ).bind(rotation.id),
+    ];
+    if (rotation.aircraft_id) {
+      statements.push(
+        this.env.DB.prepare(
+          "UPDATE aircraft SET operational_state = 'AVAILABLE', updated_at = ?1 WHERE id = ?2",
+        ).bind(now, rotation.aircraft_id),
+      );
+    }
+    statements.push(
+      this.env.DB.prepare(
+        `INSERT INTO operational_events
+          (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type,
+           aggregate_id, aggregate_version, payload_json)
+         VALUES (?1, ?2, 'ROTATION_ABORTED_TO_QUEUE', ?3, ?4, 'ROTATION', ?5, ?6, ?7)`,
+      ).bind(
+        crypto.randomUUID(),
+        command.eventId,
+        now,
+        command.deviceId,
+        rotation.id,
+        rotation.version + 1,
+        JSON.stringify({
+          reason: command.payload.reason,
+          ticketGroupId: rotation.ticket_group_id,
+          returnedToQueueSequence: 1,
+        }),
       ),
       this.env.DB.prepare(
         `INSERT INTO idempotency_receipts

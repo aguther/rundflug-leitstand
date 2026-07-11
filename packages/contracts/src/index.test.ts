@@ -415,4 +415,27 @@ describe("commandEnvelopeSchema", () => {
     });
     expect(parsed.type).toBe("SET_EVENT_LIFECYCLE");
   });
+
+  it("requires a reason for aborting a called rotation", () => {
+    const base = {
+      commandId: "a8557fe5-e707-4a6e-a8a7-ae8b540c9148",
+      eventId: "synthetic-event",
+      deviceId: "synthetic-flight-line",
+      expectedVersion: 8,
+      issuedAt: "2026-07-11T12:00:00.000Z",
+      type: "ABORT_ROTATION",
+    } as const;
+    expect(
+      commandEnvelopeSchema.parse({
+        ...base,
+        payload: { rotationId: "synthetic-rotation", reason: "Bodenabbruch vor Start" },
+      }).type,
+    ).toBe("ABORT_ROTATION");
+    expect(() =>
+      commandEnvelopeSchema.parse({
+        ...base,
+        payload: { rotationId: "synthetic-rotation", reason: "" },
+      }),
+    ).toThrow();
+  });
 });
