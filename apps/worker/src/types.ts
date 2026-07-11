@@ -15,8 +15,11 @@ export interface StoredEventRow {
   id: string;
   name: string;
   event_date: string;
+  aerodrome?: string;
   time_zone: string;
   status: string;
+  archived_at?: string | null;
+  template_source_id?: string | null;
   emergency_mode: number;
   operational_interrupted?: number;
   version: number;

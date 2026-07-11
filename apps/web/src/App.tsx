@@ -1,5 +1,6 @@
 import type {
   AuditHistory,
+  EventCatalogEntry,
   OperationBoard,
   PublicBoard,
   PublicTicketStatus,
@@ -8,10 +9,12 @@ import QRCode from "qrcode";
 import { useCallback, useEffect, useState } from "react";
 import type { PairedDeviceSummary } from "./api";
 import {
+  cloneEvent,
   downloadDailyPdf,
   downloadDailyReport,
   downloadTicketRawData,
   getAuditHistory,
+  getEventCatalog,
   getOperationBoard,
   getPairedDevices,
   getPublicBoard,
@@ -22,7 +25,9 @@ import {
   sendCommand,
 } from "./api";
 
-const EVENT_ID = "demo-2026";
+const EVENT_ID = new URLSearchParams(window.location.search).get("event") ?? "demo-2026";
+const LOCAL_DEVELOPMENT =
+  import.meta.env.DEV || ["localhost", "127.0.0.1"].includes(window.location.hostname);
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const publicStatusLabel = {
   WAITING: "Warten",
@@ -70,7 +75,7 @@ function toLocalDateTimeInput(value: string | null): string {
 }
 
 function deviceTokenFor(deviceId: string): string {
-  if (import.meta.env.DEV) {
+  if (LOCAL_DEVELOPMENT && EVENT_ID === "demo-2026") {
     if (deviceId === "cashier-tablet-1") return "demo-cashier-device-token";
     if (deviceId === "flight-line-tablet-1") return "demo-flight-line-device-token";
     return "demo-admin-device-token";
@@ -79,7 +84,7 @@ function deviceTokenFor(deviceId: string): string {
 }
 
 function deviceIdForRole(role: string, developmentId: string): string {
-  return import.meta.env.DEV
+  return LOCAL_DEVELOPMENT && EVENT_ID === "demo-2026"
     ? developmentId
     : (window.localStorage.getItem(`device-id:${role}`) ?? `unpaired-${role.toLowerCase()}`);
 }
@@ -1092,6 +1097,11 @@ function AdminView() {
   const [aircraftMaximumPayload, setAircraftMaximumPayload] = useState("");
   const [assignmentAircraftId, setAssignmentAircraftId] = useState("");
   const [assignmentResourceGroupId, setAssignmentResourceGroupId] = useState("");
+  const [events, setEvents] = useState<EventCatalogEntry[]>([]);
+  const [newEventId, setNewEventId] = useState("");
+  const [newEventName, setNewEventName] = useState("");
+  const [newEventDate, setNewEventDate] = useState("");
+  const [newEventAerodrome, setNewEventAerodrome] = useState("");
   const resourceGroups = board?.resourceGroups ?? [];
   const isAdministrator = board?.currentDeviceRole === "ADMIN";
   const refreshHistory = useCallback(async () => {
@@ -1136,6 +1146,40 @@ function AdminView() {
     setPlannedBufferMinutes(board.event.plannedBufferMinutes);
     setEventSettingsInitialized(true);
   }, [board, eventSettingsInitialized]);
+
+  const refreshEvents = useCallback(async () => {
+    if (!isAdministrator) return;
+    try {
+      setEvents(
+        (await getEventCatalog(EVENT_ID, ADMIN_DEVICE_ID, deviceTokenFor(ADMIN_DEVICE_ID))).events,
+      );
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : "Veranstaltungen nicht verfügbar.");
+    }
+  }, [isAdministrator]);
+  useEffect(() => {
+    void refreshEvents();
+  }, [refreshEvents]);
+
+  async function createEventFromTemplate() {
+    try {
+      const result = await cloneEvent(EVENT_ID, ADMIN_DEVICE_ID, deviceTokenFor(ADMIN_DEVICE_ID), {
+        commandId: crypto.randomUUID(),
+        expectedSourceVersion: board?.event.version ?? 0,
+        eventId: newEventId,
+        name: newEventName,
+        eventDate: newEventDate,
+        aerodrome: newEventAerodrome,
+        timeZone: board?.event.timeZone ?? "Europe/Berlin",
+      });
+      window.localStorage.setItem("device-id:ADMIN", result.adminDeviceId);
+      window.location.assign(`/admin?event=${encodeURIComponent(result.eventId)}`);
+    } catch (cause) {
+      setMessage(
+        cause instanceof Error ? cause.message : "Veranstaltung konnte nicht angelegt werden.",
+      );
+    }
+  }
 
   async function pairDevice() {
     if (!board || deviceLabel.trim().length < 2 || adminPin.length < 4) return;
@@ -1902,6 +1946,66 @@ function AdminView() {
             placeholder="Pflichtangabe"
           />
         </label>
+        {isAdministrator ? (
+          <section className="admin-section">
+            <h2>Veranstaltungen und Vorlagen</h2>
+            <p>
+              Aktive Veranstaltung: <strong>{board?.event.name ?? EVENT_ID}</strong>. Eine Kopie
+              übernimmt Stammdaten und Parameter, startet aber ohne Verkäufe und Umläufe.
+            </p>
+            <div className="event-catalog">
+              {events.map((entry) => (
+                <a
+                  className={entry.eventId === EVENT_ID ? "current-event" : ""}
+                  href={`/admin?event=${encodeURIComponent(entry.eventId)}`}
+                  key={entry.eventId}
+                >
+                  <strong>{entry.name}</strong>
+                  <span>
+                    {entry.eventDate} · {entry.aerodrome || "Flugplatz offen"}
+                  </span>
+                </a>
+              ))}
+            </div>
+            <div className="parameter-grid">
+              <label>
+                Technische ID
+                <input
+                  value={newEventId}
+                  onChange={(event) => setNewEventId(event.target.value)}
+                  placeholder="rundflug-2027"
+                />
+              </label>
+              <label>
+                Bezeichnung
+                <input
+                  value={newEventName}
+                  onChange={(event) => setNewEventName(event.target.value)}
+                  placeholder="Flugtag 2027"
+                />
+              </label>
+              <label>
+                Datum
+                <input
+                  type="date"
+                  value={newEventDate}
+                  onChange={(event) => setNewEventDate(event.target.value)}
+                />
+              </label>
+              <label>
+                Flugplatz
+                <input
+                  value={newEventAerodrome}
+                  onChange={(event) => setNewEventAerodrome(event.target.value)}
+                  placeholder="EDXX"
+                />
+              </label>
+            </div>
+            <button type="button" onClick={() => void createEventFromTemplate()}>
+              Aus dieser Veranstaltung anlegen
+            </button>
+          </section>
+        ) : null}
         <section className="admin-section">
           <h2>Veranstaltungsparameter</h2>
           <div className="parameter-grid">

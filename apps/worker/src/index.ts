@@ -1,4 +1,5 @@
 import { APP_NAME, REQUIREMENTS_VERSION } from "@rundflug/config";
+import { cloneEventRequestSchema } from "@rundflug/contracts";
 import { assessRemainingCapacity, estimateDuration, forecastQueueWindows } from "@rundflug/domain";
 import { Hono } from "hono";
 import { secureHeaders } from "hono/secure-headers";
@@ -75,9 +76,304 @@ app.get("/api/meta", (context) =>
   }),
 );
 
+app.get("/api/admin/events", async (context) => {
+  const sourceEventId = context.req.header("x-event-id");
+  const device = sourceEventId
+    ? await authorizeDevice(
+        context.env,
+        sourceEventId,
+        context.req.header("x-device-id"),
+        context.req.header("x-device-token"),
+      )
+    : null;
+  if (device?.role !== "ADMIN") {
+    return context.json(
+      { error: { code: "ADMIN_REQUIRED", message: "Administration erforderlich." } },
+      403,
+    );
+  }
+  const rows = await context.env.DB.prepare(
+    `SELECT id, name, event_date, aerodrome, time_zone, status, archived_at,
+            template_source_id, version
+       FROM operation_days ORDER BY event_date DESC, name`,
+  ).all<{
+    id: string;
+    name: string;
+    event_date: string;
+    aerodrome: string;
+    time_zone: string;
+    status: string;
+    archived_at: string | null;
+    template_source_id: string | null;
+    version: number;
+  }>();
+  return context.json({
+    events: rows.results.map((row) => ({
+      eventId: row.id,
+      name: row.name,
+      eventDate: row.event_date,
+      aerodrome: row.aerodrome,
+      timeZone: row.time_zone,
+      status: row.status,
+      archivedAt: row.archived_at,
+      templateSourceId: row.template_source_id,
+      version: row.version,
+    })),
+  });
+});
+
+app.post("/api/admin/events/:sourceEventId/clone", async (context) => {
+  const sourceEventId = context.req.param("sourceEventId");
+  const sourceAdmin = await context.env.DB.prepare(
+    `SELECT role, credential_hash FROM paired_devices
+      WHERE id = ?1 AND operation_day_id = ?2 AND active = 1`,
+  )
+    .bind(context.req.header("x-device-id"), sourceEventId)
+    .first<{ role: string; credential_hash: string | null }>();
+  if (
+    sourceAdmin?.role !== "ADMIN" ||
+    !(await verifyCredential(
+      context.req.header("x-device-token") ?? null,
+      sourceAdmin.credential_hash,
+    ))
+  ) {
+    return context.json(
+      { error: { code: "ADMIN_REQUIRED", message: "Administration erforderlich." } },
+      403,
+    );
+  }
+  const parsed = cloneEventRequestSchema.safeParse(await context.req.json().catch(() => null));
+  if (!parsed.success) {
+    return context.json(
+      { error: { code: "INVALID_EVENT", message: "Veranstaltungsdaten sind unvollständig." } },
+      400,
+    );
+  }
+  const input = parsed.data;
+  const receipt = await context.env.DB.prepare(
+    `SELECT operation_day_id, device_id, response_json FROM idempotency_receipts
+      WHERE command_id = ?1`,
+  )
+    .bind(input.commandId)
+    .first<{ operation_day_id: string; device_id: string; response_json: string }>();
+  if (receipt) {
+    if (
+      receipt.operation_day_id !== sourceEventId ||
+      receipt.device_id !== context.req.header("x-device-id")
+    ) {
+      return context.json(
+        { error: { code: "IDEMPOTENCY_CONFLICT", message: "Kommando-ID ist bereits belegt." } },
+        409,
+      );
+    }
+    return context.json(JSON.parse(receipt.response_json));
+  }
+  const existing = await context.env.DB.prepare("SELECT id FROM operation_days WHERE id = ?1")
+    .bind(input.eventId)
+    .first();
+  if (existing) {
+    return context.json(
+      {
+        error: {
+          code: "EVENT_ID_EXISTS",
+          message: "Diese Veranstaltungs-ID ist bereits vergeben.",
+        },
+      },
+      409,
+    );
+  }
+  const source = await context.env.DB.prepare("SELECT * FROM operation_days WHERE id = ?1")
+    .bind(sourceEventId)
+    .first<Record<string, unknown>>();
+  if (!source) {
+    return context.json(
+      { error: { code: "EVENT_NOT_FOUND", message: "Vorveranstaltung nicht gefunden." } },
+      404,
+    );
+  }
+  if (Number(source.version) !== input.expectedSourceVersion) {
+    return context.json(
+      {
+        error: {
+          code: "STALE_VERSION",
+          message: "Die Vorveranstaltung wurde zwischenzeitlich geändert. Bitte neu laden.",
+        },
+      },
+      409,
+    );
+  }
+  const [gates, groups, products, pilots, memberships] = await Promise.all([
+    context.env.DB.prepare("SELECT * FROM gates WHERE operation_day_id = ?1")
+      .bind(sourceEventId)
+      .all<Record<string, unknown>>(),
+    context.env.DB.prepare("SELECT * FROM resource_groups WHERE operation_day_id = ?1")
+      .bind(sourceEventId)
+      .all<Record<string, unknown>>(),
+    context.env.DB.prepare("SELECT * FROM products WHERE operation_day_id = ?1")
+      .bind(sourceEventId)
+      .all<Record<string, unknown>>(),
+    context.env.DB.prepare("SELECT * FROM pilots WHERE operation_day_id = ?1")
+      .bind(sourceEventId)
+      .all<Record<string, unknown>>(),
+    context.env.DB.prepare(
+      "SELECT * FROM resource_group_memberships WHERE operation_day_id = ?1 AND active_until IS NULL",
+    )
+      .bind(sourceEventId)
+      .all<Record<string, unknown>>(),
+  ]);
+  const now = new Date().toISOString();
+  const gateIds = new Map(gates.results.map((row) => [String(row.id), crypto.randomUUID()]));
+  const groupIds = new Map(groups.results.map((row) => [String(row.id), crypto.randomUUID()]));
+  const adminDeviceId = crypto.randomUUID();
+  const responseBody = {
+    eventId: input.eventId,
+    adminDeviceId,
+    templateSourceId: sourceEventId,
+  };
+  const statements = [
+    context.env.DB.prepare(
+      `INSERT INTO operation_days
+        (id, name, event_date, time_zone, status, emergency_mode, operational_note, version,
+         created_at, updated_at, operations_end_at, operational_interrupted, sale_opens_at,
+         no_show_after_minutes, notification_lead_minutes, child_reference_weight_kg,
+         normal_reference_weight_kg, heavy_reference_weight_kg, planned_boarding_minutes,
+         planned_deboarding_minutes, planned_buffer_minutes, aerodrome, template_source_id)
+       VALUES (?1, ?2, ?3, ?4, 'PREPARATION', 0, '', 0, ?5, ?5, NULL, 0, NULL,
+         ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)`,
+    ).bind(
+      input.eventId,
+      input.name,
+      input.eventDate,
+      input.timeZone,
+      now,
+      source.no_show_after_minutes,
+      source.notification_lead_minutes,
+      source.child_reference_weight_kg,
+      source.normal_reference_weight_kg,
+      source.heavy_reference_weight_kg,
+      source.planned_boarding_minutes,
+      source.planned_deboarding_minutes,
+      source.planned_buffer_minutes,
+      input.aerodrome,
+      sourceEventId,
+    ),
+    ...gates.results.map((row) =>
+      context.env.DB.prepare(
+        `INSERT INTO gates (id, operation_day_id, label, gate_type, active, sort_order, created_at, updated_at)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7)`,
+      ).bind(
+        gateIds.get(String(row.id)),
+        input.eventId,
+        row.label,
+        row.gate_type,
+        row.active,
+        row.sort_order,
+        now,
+      ),
+    ),
+    ...groups.results.map((row) =>
+      context.env.DB.prepare(
+        `INSERT INTO resource_groups
+        (id, operation_day_id, name, status, version, created_at, updated_at, gate_id,
+         reference_capacity, planned_rotation_minutes, compatible_aircraft_types_json)
+       VALUES (?1, ?2, ?3, 'ACTIVE', 0, ?4, ?4, ?5, ?6, ?7, ?8)`,
+      ).bind(
+        groupIds.get(String(row.id)),
+        input.eventId,
+        row.name,
+        now,
+        row.gate_id ? gateIds.get(String(row.gate_id)) : null,
+        row.reference_capacity,
+        row.planned_rotation_minutes,
+        row.compatible_aircraft_types_json,
+      ),
+    ),
+    ...products.results.map((row) =>
+      context.env.DB.prepare(
+        `INSERT INTO products
+        (id, operation_day_id, resource_group_id, name, price_cents, sale_enabled, created_at,
+         updated_at, sale_closes_at, capacity_warning_threshold, capacity_critical_threshold,
+         code, public_description, child_companion_required, sort_order, weight_classes_json, gate_id)
+       VALUES (?1, ?2, ?3, ?4, ?5, 0, ?6, ?6, NULL, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)`,
+      ).bind(
+        crypto.randomUUID(),
+        input.eventId,
+        groupIds.get(String(row.resource_group_id)),
+        row.name,
+        row.price_cents,
+        now,
+        row.capacity_warning_threshold,
+        row.capacity_critical_threshold,
+        row.code,
+        row.public_description,
+        row.child_companion_required,
+        row.sort_order,
+        row.weight_classes_json,
+        row.gate_id ? gateIds.get(String(row.gate_id)) : null,
+      ),
+    ),
+    ...pilots.results.map((row) =>
+      context.env.DB.prepare(
+        `INSERT INTO pilots (id, operation_day_id, operational_code, active, created_at, updated_at)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?5)`,
+      ).bind(crypto.randomUUID(), input.eventId, row.operational_code, row.active, now),
+    ),
+    ...memberships.results.map((row) =>
+      context.env.DB.prepare(
+        `INSERT INTO resource_group_memberships
+        (id, operation_day_id, resource_group_id, aircraft_id, active_from, created_at,
+         change_reason, changed_by_device_id)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?5, 'Aus Vorveranstaltung übernommen', ?6)`,
+      ).bind(
+        crypto.randomUUID(),
+        input.eventId,
+        groupIds.get(String(row.resource_group_id)),
+        row.aircraft_id,
+        now,
+        adminDeviceId,
+      ),
+    ),
+    context.env.DB.prepare(
+      `INSERT INTO paired_devices
+        (id, operation_day_id, label, role, active, paired_at, last_seen_at, credential_hash)
+       VALUES (?1, ?2, 'Übernommenes Administrationsgerät', 'ADMIN', 1, ?3, ?3, ?4)`,
+    ).bind(adminDeviceId, input.eventId, now, sourceAdmin.credential_hash),
+    context.env.DB.prepare(
+      `INSERT INTO operational_events
+        (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type,
+         aggregate_id, aggregate_version, payload_json)
+       VALUES (?1, ?2, 'EVENT_CREATED_FROM_TEMPLATE', ?3, ?4, 'OPERATION_DAY', ?2, 0, ?5)`,
+    ).bind(
+      crypto.randomUUID(),
+      input.eventId,
+      now,
+      adminDeviceId,
+      JSON.stringify({ templateSourceId: sourceEventId }),
+    ),
+    context.env.DB.prepare(
+      `INSERT INTO outbox (id, operation_day_id, topic, payload_json, created_at)
+       VALUES (?1, ?2, 'EVENT_CREATED_FROM_TEMPLATE', ?3, ?4)`,
+    ).bind(crypto.randomUUID(), input.eventId, JSON.stringify(responseBody), now),
+    context.env.DB.prepare(
+      `INSERT INTO idempotency_receipts
+        (command_id, operation_day_id, device_id, command_type, received_at, response_json)
+       VALUES (?1, ?2, ?3, 'CREATE_EVENT_FROM_TEMPLATE', ?4, ?5)`,
+    ).bind(
+      input.commandId,
+      sourceEventId,
+      context.req.header("x-device-id"),
+      now,
+      JSON.stringify(responseBody),
+    ),
+  ];
+  await context.env.DB.batch(statements);
+  return context.json(responseBody, 201);
+});
+
 app.get("/api/events/:eventId/snapshot", async (context) => {
   const row = await context.env.DB.prepare(
-    `SELECT id, name, event_date, time_zone, status, emergency_mode, operational_interrupted, version,
+    `SELECT id, name, event_date, aerodrome, time_zone, status, archived_at, template_source_id,
+            emergency_mode, operational_interrupted, version,
             operational_note, operations_end_at, sale_opens_at, no_show_after_minutes,
             notification_lead_minutes, child_reference_weight_kg, normal_reference_weight_kg,
             heavy_reference_weight_kg, planned_boarding_minutes, planned_deboarding_minutes,
@@ -125,7 +421,8 @@ app.get("/api/events/:eventId/operations", async (context) => {
     .run();
 
   const eventRow = await context.env.DB.prepare(
-    `SELECT id, name, event_date, time_zone, status, emergency_mode, operational_interrupted, version,
+    `SELECT id, name, event_date, aerodrome, time_zone, status, archived_at, template_source_id,
+            emergency_mode, operational_interrupted, version,
             operational_note, operations_end_at, sale_opens_at, no_show_after_minutes,
             notification_lead_minutes, child_reference_weight_kg, normal_reference_weight_kg,
             heavy_reference_weight_kg, planned_boarding_minutes, planned_deboarding_minutes,

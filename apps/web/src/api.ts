@@ -1,10 +1,13 @@
 import {
   type AuditHistory,
   auditHistorySchema,
+  type CloneEventRequest,
   type CommandEnvelope,
   type CommandResult,
   commandResultSchema,
+  type EventCatalog,
   type EventSnapshot,
+  eventCatalogSchema,
   eventSnapshotSchema,
   type OperationBoard,
   operationBoardSchema,
@@ -13,6 +16,49 @@ import {
   publicBoardSchema,
   publicTicketStatusSchema,
 } from "@rundflug/contracts";
+
+export async function getEventCatalog(
+  sourceEventId: string,
+  deviceId: string,
+  deviceToken: string,
+): Promise<EventCatalog> {
+  const response = await fetch("/api/admin/events", {
+    headers: {
+      "x-event-id": sourceEventId,
+      "x-device-id": deviceId,
+      "x-device-token": deviceToken,
+    },
+  });
+  if (!response.ok) throw new Error("Veranstaltungsliste nicht verfügbar.");
+  return eventCatalogSchema.parse(await response.json());
+}
+
+export async function cloneEvent(
+  sourceEventId: string,
+  deviceId: string,
+  deviceToken: string,
+  input: CloneEventRequest,
+): Promise<{ eventId: string; adminDeviceId: string; templateSourceId: string }> {
+  const response = await fetch(`/api/admin/events/${encodeURIComponent(sourceEventId)}/clone`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-device-id": deviceId,
+      "x-device-token": deviceToken,
+    },
+    body: JSON.stringify(input),
+  });
+  const body = (await response.json()) as {
+    eventId?: string;
+    adminDeviceId?: string;
+    templateSourceId?: string;
+    error?: { message?: string };
+  };
+  if (!response.ok || !body.eventId || !body.adminDeviceId || !body.templateSourceId) {
+    throw new Error(body.error?.message ?? "Veranstaltung konnte nicht angelegt werden.");
+  }
+  return body as { eventId: string; adminDeviceId: string; templateSourceId: string };
+}
 
 export async function getAuditHistory(
   eventId: string,
