@@ -1,4 +1,6 @@
 import {
+  type AuditHistory,
+  auditHistorySchema,
   type CommandEnvelope,
   type CommandResult,
   commandResultSchema,
@@ -11,6 +13,36 @@ import {
   publicBoardSchema,
   publicTicketStatusSchema,
 } from "@rundflug/contracts";
+
+export async function getAuditHistory(
+  eventId: string,
+  deviceId: string,
+  deviceToken: string,
+): Promise<AuditHistory> {
+  const response = await fetch(`/api/events/${encodeURIComponent(eventId)}/history`, {
+    headers: { "x-device-id": deviceId, "x-device-token": deviceToken },
+  });
+  if (!response.ok) throw new Error("Audit-Historie nicht verfügbar.");
+  return auditHistorySchema.parse(await response.json());
+}
+
+export async function downloadDailyReport(
+  eventId: string,
+  deviceId: string,
+  deviceToken: string,
+): Promise<void> {
+  const response = await fetch(`/api/events/${encodeURIComponent(eventId)}/reports/daily.csv`, {
+    headers: { "x-device-id": deviceId, "x-device-token": deviceToken },
+  });
+  if (!response.ok) throw new Error("Tagesbericht nicht verfügbar.");
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `tagesbericht-${eventId}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
 
 export interface HealthResponse {
   ok: boolean;
@@ -46,6 +78,9 @@ export async function sendCommand(
   command: CommandEnvelope,
   deviceToken: string,
 ): Promise<CommandResult> {
+  if (!navigator.onLine) {
+    throw new Error("Offline: operative Aktion benötigt eine Serverbestätigung.");
+  }
   const response = await fetch(`/api/events/${encodeURIComponent(command.eventId)}/commands`, {
     method: "POST",
     headers: { "content-type": "application/json", "x-device-token": deviceToken },

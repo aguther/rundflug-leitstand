@@ -2,12 +2,34 @@ import { APP_NAME, REQUIREMENTS_VERSION } from "@rundflug/config";
 import { estimateDuration, forecastQueueWindows } from "@rundflug/domain";
 import { Hono } from "hono";
 import { secureHeaders } from "hono/secure-headers";
+import { createPortableBackup } from "./backup";
 import { sha256Hex, verifyCredential } from "./crypto";
 import { EventCoordinator } from "./event-coordinator";
 import { rowToSnapshot } from "./snapshot";
 import type { Env, StoredEventRow } from "./types";
 
 const app = new Hono<{ Bindings: Env }>();
+
+async function authorizeDevice(
+  env: Env,
+  eventId: string,
+  deviceId: string | undefined,
+  token: string | undefined,
+): Promise<{ role: string } | null> {
+  if (!deviceId) return null;
+  const device = await env.DB.prepare(
+    "SELECT role, credential_hash FROM paired_devices WHERE id = ?1 AND operation_day_id = ?2 AND active = 1",
+  )
+    .bind(deviceId, eventId)
+    .first<{ role: string; credential_hash: string | null }>();
+  if (!device || !(await verifyCredential(token ?? null, device.credential_hash))) return null;
+  return { role: device.role };
+}
+
+function csvCell(value: string | number): string {
+  const text = String(value);
+  return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+}
 
 function eventCoordinatorNamespace(env: Env): DurableObjectNamespace {
   // workerd/miniflare does not implement jurisdiction restrictions locally.
@@ -270,6 +292,107 @@ app.get("/api/events/:eventId/operations", async (context) => {
   });
 });
 
+app.get("/api/events/:eventId/history", async (context) => {
+  const eventId = context.req.param("eventId");
+  const device = await authorizeDevice(
+    context.env,
+    eventId,
+    context.req.header("x-device-id"),
+    context.req.header("x-device-token"),
+  );
+  if (!device || !["ADMIN", "FLIGHT_LINE_LEAD", "FLIGHT_DIRECTOR"].includes(device.role)) {
+    return context.json(
+      { error: { code: "DEVICE_NOT_AUTHORIZED", message: "Gerät nicht berechtigt." } },
+      403,
+    );
+  }
+  const rows = await context.env.DB.prepare(
+    `SELECT sequence, event_type, occurred_at, device_id, aggregate_type, aggregate_id,
+            aggregate_version, payload_json
+       FROM operational_events WHERE operation_day_id = ?1
+      ORDER BY sequence DESC LIMIT 200`,
+  )
+    .bind(eventId)
+    .all<{
+      sequence: number;
+      event_type: string;
+      occurred_at: string;
+      device_id: string;
+      aggregate_type: string;
+      aggregate_id: string;
+      aggregate_version: number;
+      payload_json: string;
+    }>();
+  return context.json({
+    entries: rows.results.map((row) => ({
+      sequence: row.sequence,
+      eventType: row.event_type,
+      occurredAt: row.occurred_at,
+      deviceId: row.device_id,
+      aggregateType: row.aggregate_type,
+      aggregateId: row.aggregate_id,
+      aggregateVersion: row.aggregate_version,
+      payload: JSON.parse(row.payload_json) as Record<string, unknown>,
+    })),
+  });
+});
+
+app.get("/api/events/:eventId/reports/daily.csv", async (context) => {
+  const eventId = context.req.param("eventId");
+  const device = await authorizeDevice(
+    context.env,
+    eventId,
+    context.req.header("x-device-id"),
+    context.req.header("x-device-token"),
+  );
+  if (!device || !["ADMIN", "CASHIER"].includes(device.role)) {
+    return context.json(
+      { error: { code: "DEVICE_NOT_AUTHORIZED", message: "Gerät nicht berechtigt." } },
+      403,
+    );
+  }
+  const rows = await context.env.DB.prepare(
+    `SELECT p.name AS product_name, t.payment_method, t.payment_status,
+            COUNT(*) AS ticket_count,
+            SUM(CASE WHEN t.status = 'CANCELED' THEN 1 ELSE 0 END) AS canceled_count,
+            SUM(CASE WHEN t.status <> 'CANCELED' THEN t.price_cents ELSE 0 END) AS amount_cents
+       FROM tickets t
+       JOIN ticket_groups tg ON tg.id = t.ticket_group_id
+       JOIN products p ON p.id = tg.product_id
+      WHERE tg.operation_day_id = ?1
+      GROUP BY p.id, t.payment_method, t.payment_status
+      ORDER BY p.name, t.payment_method`,
+  )
+    .bind(eventId)
+    .all<{
+      product_name: string;
+      payment_method: string | null;
+      payment_status: string;
+      ticket_count: number;
+      canceled_count: number;
+      amount_cents: number;
+    }>();
+  const lines = [
+    ["Produkt", "Zahlart", "Zahlstatus", "Tickets", "Stornos", "Betrag_Cent"],
+    ...rows.results.map((row) => [
+      row.product_name,
+      row.payment_method ?? "NICHT_ERFASST",
+      row.payment_status,
+      row.ticket_count,
+      row.canceled_count,
+      row.amount_cents,
+    ]),
+  ];
+  const csv = `\uFEFF${lines.map((line) => line.map(csvCell).join(";")).join("\r\n")}\r\n`;
+  return new Response(csv, {
+    headers: {
+      "content-type": "text/csv; charset=utf-8",
+      "content-disposition": `attachment; filename="tagesbericht-${eventId}.csv"`,
+      "cache-control": "no-store",
+    },
+  });
+});
+
 app.get("/api/public/tickets/:ticketCode", async (context) => {
   const ticketCode = context.req.param("ticketCode").trim().toUpperCase();
   if (!/^[A-Z2-9]{12,32}$/.test(ticketCode)) {
@@ -422,14 +545,16 @@ export default {
   fetch: app.fetch,
   async scheduled(
     _controller: ScheduledController,
-    _env: Env,
+    env: Env,
     _ctx: ExecutionContext,
   ): Promise<void> {
-    // Deliberately no fake backup implementation. See docs/operations/backup-restore.md.
+    const result = await createPortableBackup(env);
     console.log(
       JSON.stringify({
         level: "info",
-        code: "MAINTENANCE_TRIGGER",
+        code: "PORTABLE_BACKUP_CREATED",
+        key: result.key,
+        checksum: result.checksum,
         timestamp: new Date().toISOString(),
       }),
     );

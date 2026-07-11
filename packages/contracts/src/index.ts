@@ -195,3 +195,16 @@ export const publicBoardSchema = z.object({
   ),
 });
 export type PublicBoard = z.infer<typeof publicBoardSchema>;
+
+export const auditEntrySchema = z.object({
+  sequence: z.number().int().positive(),
+  eventType: z.string(),
+  occurredAt: z.string(),
+  deviceId: z.string(),
+  aggregateType: z.string(),
+  aggregateId: z.string(),
+  aggregateVersion: z.number().int().nonnegative(),
+  payload: z.record(z.string(), z.unknown()),
+});
+export const auditHistorySchema = z.object({ entries: z.array(auditEntrySchema) });
+export type AuditHistory = z.infer<typeof auditHistorySchema>;

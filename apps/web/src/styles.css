@@ -421,6 +421,44 @@ p {
   justify-content: space-between;
   gap: 16px;
 }
+.section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.section-heading h2 {
+  margin: 0;
+}
+.section-heading button {
+  min-height: 48px;
+  padding: 10px 16px;
+  border: 1px solid #1769d2;
+  border-radius: 4px;
+  background: #fff;
+  color: #145aa7;
+  font-weight: 800;
+  cursor: pointer;
+}
+.audit-list {
+  max-height: 420px;
+  overflow: auto;
+  border-top: 1px solid #d5dee8;
+}
+.audit-list > div {
+  display: grid;
+  grid-template-columns: 90px 1.3fr 1fr 1fr;
+  gap: 12px;
+  padding: 12px 4px;
+  border-bottom: 1px solid #e2e8f0;
+  align-items: center;
+}
+.audit-list time,
+.audit-list span,
+.audit-list code {
+  color: #60758d;
+  font-size: 0.86rem;
+}
 .fids-board {
   width: min(1500px, calc(100% - 32px));
   margin: 18px auto;
