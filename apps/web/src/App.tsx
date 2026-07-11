@@ -243,6 +243,12 @@ function CashierView() {
   const [receipt, setReceipt] = useState<TicketReceipt[]>([]);
   const [ticketCodeMode, setTicketCodeMode] = useState<"GENERATED" | "PREPRINTED">("GENERATED");
   const [preprintedCodes, setPreprintedCodes] = useState("");
+  const [paymentStatus, setPaymentStatus] = useState<
+    "UNPAID" | "PAID" | "WAIVED" | "INFORMATIONAL_ONLY"
+  >("PAID");
+  const [paymentMethod, setPaymentMethod] = useState<"CASH" | "CARD" | "VOUCHER" | "OTHER" | null>(
+    "CASH",
+  );
   const [message, setMessage] = useState<string | null>(null);
   const [lastTicketGroupId, setLastTicketGroupId] = useState<string | null>(null);
   const [lastProductId, setLastProductId] = useState<string | null>(null);
@@ -272,6 +278,10 @@ function CashierView() {
       }),
     );
   }, [product?.weightClasses, size]);
+  useEffect(() => {
+    if (paymentStatus === "UNPAID" || paymentStatus === "WAIVED") setPaymentMethod(null);
+    else if (paymentMethod === null) setPaymentMethod("CASH");
+  }, [paymentMethod, paymentStatus]);
 
   async function sell() {
     if (!board || !product || busy) return;
@@ -308,8 +318,8 @@ function CashierView() {
             publicTicketCodes: codes,
             ticketDetails,
             standby: false,
-            paymentStatus: "PAID",
-            paymentMethod: "CASH",
+            paymentStatus,
+            paymentMethod,
           },
         },
         deviceTokenFor(CASHIER_DEVICE_ID),
@@ -504,6 +514,51 @@ function CashierView() {
                 />
               </label>
             ) : null}
+            <fieldset className="payment-information">
+              <legend>Zahlungsinformation</legend>
+              <label>
+                Status
+                <select
+                  value={paymentStatus}
+                  onChange={(event) =>
+                    setPaymentStatus(
+                      event.target.value as "UNPAID" | "PAID" | "WAIVED" | "INFORMATIONAL_ONLY",
+                    )
+                  }
+                >
+                  <option value="PAID">Bezahlt</option>
+                  <option value="UNPAID">Offen</option>
+                  <option value="WAIVED">Erlassen</option>
+                  <option value="INFORMATIONAL_ONLY">Nur Information</option>
+                </select>
+              </label>
+              <label>
+                Zahlart
+                <select
+                  disabled={paymentStatus === "UNPAID" || paymentStatus === "WAIVED"}
+                  value={paymentMethod ?? ""}
+                  onChange={(event) =>
+                    setPaymentMethod(
+                      (event.target.value || null) as "CASH" | "CARD" | "VOUCHER" | "OTHER" | null,
+                    )
+                  }
+                >
+                  <option value="">Keine</option>
+                  <option value="CASH">Bar</option>
+                  <option value="CARD">Karte</option>
+                  <option value="VOUCHER">Gutschein</option>
+                  <option value="OTHER">Sonstige</option>
+                </select>
+              </label>
+              <strong>
+                Summe:{" "}
+                {(((product?.priceCents ?? 0) * size) / 100).toLocaleString("de-DE", {
+                  style: "currency",
+                  currency: "EUR",
+                })}
+              </strong>
+              <p>Nur Abstimmhilfe · keine elektronische Kasse oder Zahlungsabwicklung.</p>
+            </fieldset>
             {product &&
             (product.weightClasses.length > 1 || product.weightClasses[0] !== "NOT_CAPTURED") ? (
               <div className="weight-class-list">
@@ -696,6 +751,8 @@ function CashierView() {
                 detail.weightClass === "INDIVIDUAL" &&
                 ((detail.individualWeightKg ?? 0) < 15 || (detail.individualWeightKg ?? 0) > 250),
             ) ||
+            ((paymentStatus === "PAID" || paymentStatus === "INFORMATIONAL_ONLY") &&
+              paymentMethod === null) ||
             busy
           }
           onClick={sell}
