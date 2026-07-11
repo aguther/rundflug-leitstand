@@ -10,6 +10,7 @@ import {
   assertQueueMutationAllowed,
   assertRoleMayExecute,
   assertSaleAllowed,
+  assessRemainingCapacity,
   type DeviceRole,
   DomainRuleError,
   type OperationalCommandType,
@@ -142,7 +143,7 @@ export class EventCoordinator extends DurableObject<Env> {
 
       const current = await this.env.DB.prepare(
         `SELECT id, name, event_date, time_zone, status, emergency_mode, version,
-                operational_note, updated_at
+                operational_note, operations_end_at, updated_at
            FROM operation_days
           WHERE id = ?1`,
       )
@@ -170,7 +171,8 @@ export class EventCoordinator extends DurableObject<Env> {
       if (command.type === "SELL_TICKET_GROUP") {
         const product = await this.env.DB.prepare(
           `SELECT p.id, p.resource_group_id, p.price_cents, p.sale_enabled, p.sale_closes_at,
-                  rg.status AS resource_group_status
+                  p.reference_duration_minutes, p.capacity_warning_threshold,
+                  p.capacity_critical_threshold, rg.status AS resource_group_status
              FROM products p
              JOIN resource_groups rg ON rg.id = p.resource_group_id
             WHERE p.id = ?1 AND p.operation_day_id = ?2`,
@@ -182,6 +184,9 @@ export class EventCoordinator extends DurableObject<Env> {
             price_cents: number;
             sale_enabled: number;
             sale_closes_at: string | null;
+            reference_duration_minutes: number;
+            capacity_warning_threshold: number;
+            capacity_critical_threshold: number;
             resource_group_status: "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED";
           }>();
         if (!product) {
@@ -203,6 +208,61 @@ export class EventCoordinator extends DurableObject<Env> {
             return json({ error: { code: reason.code, message: reason.message } }, { status: 409 });
           }
           throw reason;
+        }
+        const [aircraftRows, openTicketRow] = await Promise.all([
+          this.env.DB.prepare(
+            `SELECT a.passenger_seats FROM aircraft a
+               JOIN resource_group_memberships m ON m.aircraft_id = a.id
+              WHERE m.operation_day_id = ?1 AND m.resource_group_id = ?2 AND m.active_until IS NULL
+                AND a.operational_state NOT IN ('INACTIVE', 'PAUSED', 'REFUELING')`,
+          )
+            .bind(command.eventId, product.resource_group_id)
+            .all<{ passenger_seats: number }>(),
+          this.env.DB.prepare(
+            `SELECT COUNT(*) AS open_tickets FROM tickets t
+               JOIN ticket_groups tg ON tg.id = t.ticket_group_id
+               JOIN products p ON p.id = tg.product_id
+              WHERE p.resource_group_id = ?1 AND t.status = 'QUEUED'`,
+          )
+            .bind(product.resource_group_id)
+            .first<{ open_tickets: number }>(),
+        ]);
+        if (!current.operations_end_at) {
+          return json(
+            {
+              error: {
+                code: "OPERATING_END_REQUIRED",
+                message: "Betriebsende muss vor dem Verkauf konfiguriert sein.",
+              },
+            },
+            { status: 409 },
+          );
+        }
+        const capacity = assessRemainingCapacity({
+          remainingOperatingMinutes: Math.max(
+            0,
+            (Date.parse(current.operations_end_at) - Date.now()) / 60_000,
+          ),
+          expectedRotationMinutes: product.reference_duration_minutes,
+          activeAircraftSeats: aircraftRows.results.map((row) => row.passenger_seats),
+          openTickets: openTicketRow?.open_tickets ?? 0,
+          predictionQuality: "CHANGING",
+          warningThreshold: product.capacity_warning_threshold,
+          criticalThreshold: product.capacity_critical_threshold,
+        });
+        if (
+          !capacity.saleRecommended ||
+          capacity.remainingSellableSeats < command.payload.publicTicketCodes.length
+        ) {
+          return json(
+            {
+              error: {
+                code: "SALE_BLOCKED_CAPACITY",
+                message: "Verbleibende Kapazität reicht für diesen Verkauf nicht sicher aus.",
+              },
+            },
+            { status: 409 },
+          );
         }
 
         const normalizedCodes = command.payload.publicTicketCodes.map(assertPublicTicketCode);
@@ -325,6 +385,9 @@ export class EventCoordinator extends DurableObject<Env> {
       }
 
       if (command.type !== "SET_OPERATIONAL_NOTE") {
+        if (command.type === "CONFIGURE_PRODUCT_SALES") {
+          return this.handleProductSalesConfiguration(command, current);
+        }
         if (
           command.type === "TRIGGER_EMERGENCY" ||
           command.type === "CLEAR_EMERGENCY" ||
@@ -451,6 +514,98 @@ export class EventCoordinator extends DurableObject<Env> {
         socket.close(1011, "Broadcast fehlgeschlagen");
       }
     }
+  }
+
+  private async handleProductSalesConfiguration(
+    command: Extract<CommandEnvelope, { type: "CONFIGURE_PRODUCT_SALES" }>,
+    current: StoredEventRow,
+  ): Promise<Response> {
+    if (command.payload.criticalThreshold > command.payload.warningThreshold) {
+      return json(
+        {
+          error: {
+            code: "CAPACITY_THRESHOLDS_INVALID",
+            message: "Die kritische Schwelle darf die Warnschwelle nicht überschreiten.",
+          },
+        },
+        { status: 400 },
+      );
+    }
+    const product = await this.env.DB.prepare(
+      "SELECT id FROM products WHERE id = ?1 AND operation_day_id = ?2",
+    )
+      .bind(command.payload.productId, command.eventId)
+      .first<{ id: string }>();
+    if (!product) {
+      return json(
+        { error: { code: "PRODUCT_NOT_FOUND", message: "Produkt nicht gefunden." } },
+        { status: 404 },
+      );
+    }
+    const now = new Date().toISOString();
+    const nextVersion = current.version + 1;
+    const result: CommandResult = {
+      accepted: true,
+      duplicate: false,
+      event: rowToSnapshot({ ...current, version: nextVersion, updated_at: now }),
+      eventType: "PRODUCT_SALES_CONFIGURED",
+      aggregate: { type: "PRODUCT", id: product.id },
+    };
+    await this.env.DB.batch([
+      this.env.DB.prepare(
+        "UPDATE operation_days SET version = ?1, updated_at = ?2 WHERE id = ?3 AND version = ?4",
+      ).bind(nextVersion, now, command.eventId, current.version),
+      this.env.DB.prepare(
+        `UPDATE products SET sale_enabled = ?1, sale_closes_at = ?2,
+                capacity_warning_threshold = ?3, capacity_critical_threshold = ?4, updated_at = ?5
+          WHERE id = ?6 AND operation_day_id = ?7`,
+      ).bind(
+        command.payload.saleEnabled ? 1 : 0,
+        command.payload.saleClosesAt,
+        command.payload.warningThreshold,
+        command.payload.criticalThreshold,
+        now,
+        product.id,
+        command.eventId,
+      ),
+      this.env.DB.prepare(
+        `INSERT INTO operational_events
+          (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type,
+           aggregate_id, aggregate_version, payload_json)
+         VALUES (?1, ?2, 'PRODUCT_SALES_CONFIGURED', ?3, ?4, 'PRODUCT', ?5, ?6, ?7)`,
+      ).bind(
+        crypto.randomUUID(),
+        command.eventId,
+        now,
+        command.deviceId,
+        product.id,
+        nextVersion,
+        JSON.stringify({
+          saleEnabled: command.payload.saleEnabled,
+          saleClosesAt: command.payload.saleClosesAt,
+          warningThreshold: command.payload.warningThreshold,
+          criticalThreshold: command.payload.criticalThreshold,
+          reason: command.payload.reason,
+        }),
+      ),
+      this.env.DB.prepare(
+        `INSERT INTO idempotency_receipts
+          (command_id, operation_day_id, device_id, command_type, received_at, response_json)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)`,
+      ).bind(
+        command.commandId,
+        command.eventId,
+        command.deviceId,
+        command.type,
+        now,
+        JSON.stringify(result),
+      ),
+      this.env.DB.prepare(
+        "INSERT INTO outbox (id, operation_day_id, topic, payload_json, created_at) VALUES (?1, ?2, 'EVENT_STATE_CHANGED', ?3, ?4)",
+      ).bind(crypto.randomUUID(), command.eventId, JSON.stringify(result), now),
+    ]);
+    this.broadcast(result);
+    return json(result);
   }
 
   private async handleRotationTransition(

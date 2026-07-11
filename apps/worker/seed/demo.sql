@@ -13,6 +13,9 @@ INSERT OR IGNORE INTO operation_days (
   '2026-07-11T08:00:00.000Z'
 );
 
+UPDATE operation_days SET operations_end_at = '2026-07-11T19:00:00.000Z'
+ WHERE id = 'demo-2026' AND operations_end_at IS NULL;
+
 INSERT OR IGNORE INTO paired_devices (
   id, operation_day_id, label, role, active, paired_at, last_seen_at
 ) VALUES (

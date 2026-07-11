@@ -1,5 +1,5 @@
 import { APP_NAME, REQUIREMENTS_VERSION } from "@rundflug/config";
-import { estimateDuration, forecastQueueWindows } from "@rundflug/domain";
+import { assessRemainingCapacity, estimateDuration, forecastQueueWindows } from "@rundflug/domain";
 import { Hono } from "hono";
 import { secureHeaders } from "hono/secure-headers";
 import { createPortableBackup } from "./backup";
@@ -79,7 +79,7 @@ app.get("/api/meta", (context) =>
 app.get("/api/events/:eventId/snapshot", async (context) => {
   const row = await context.env.DB.prepare(
     `SELECT id, name, event_date, time_zone, status, emergency_mode, version,
-            operational_note, updated_at
+            operational_note, operations_end_at, updated_at
        FROM operation_days
       WHERE id = ?1`,
   )
@@ -121,7 +121,7 @@ app.get("/api/events/:eventId/operations", async (context) => {
 
   const eventRow = await context.env.DB.prepare(
     `SELECT id, name, event_date, time_zone, status, emergency_mode, version,
-            operational_note, updated_at FROM operation_days WHERE id = ?1`,
+            operational_note, operations_end_at, updated_at FROM operation_days WHERE id = ?1`,
   )
     .bind(eventId)
     .first<StoredEventRow>();
@@ -132,11 +132,18 @@ app.get("/api/events/:eventId/operations", async (context) => {
     );
   }
 
-  const [products, rotations, durationRows, aircraftCountRow] = await Promise.all([
+  const [products, rotations, durationRows, aircraftRows] = await Promise.all([
     context.env.DB.prepare(
-      `SELECT p.id, p.name, p.resource_group_id, rg.status AS resource_group_status,
+      `SELECT p.id, p.name, p.resource_group_id, rg.name AS resource_group_name,
+              rg.status AS resource_group_status,
               p.price_cents, p.sale_enabled, p.reference_capacity, p.reference_duration_minutes,
-              COUNT(CASE WHEN t.status = 'QUEUED' THEN 1 END) AS queued_tickets
+              p.sale_closes_at, p.capacity_warning_threshold, p.capacity_critical_threshold,
+              COUNT(CASE WHEN t.status = 'QUEUED' THEN 1 END) AS queued_tickets,
+              (SELECT COUNT(*) FROM tickets shared_t
+                JOIN ticket_groups shared_tg ON shared_tg.id = shared_t.ticket_group_id
+                JOIN products shared_p ON shared_p.id = shared_tg.product_id
+               WHERE shared_p.resource_group_id = p.resource_group_id
+                 AND shared_t.status = 'QUEUED') AS resource_group_open_tickets
          FROM products p
          JOIN resource_groups rg ON rg.id = p.resource_group_id
          LEFT JOIN ticket_groups tg ON tg.product_id = p.id
@@ -150,15 +157,20 @@ app.get("/api/events/:eventId/operations", async (context) => {
         id: string;
         name: string;
         resource_group_id: string;
+        resource_group_name: string;
         resource_group_status: "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED";
         price_cents: number;
         sale_enabled: number;
         reference_capacity: number;
         reference_duration_minutes: number;
         queued_tickets: number;
+        resource_group_open_tickets: number;
+        sale_closes_at: string | null;
+        capacity_warning_threshold: number;
+        capacity_critical_threshold: number;
       }>(),
     context.env.DB.prepare(
-      `SELECT r.id, r.flight_group_id, fg.communication_number, r.status, r.aircraft_id, r.called_at,
+      `SELECT r.id, r.flight_group_id, fg.resource_group_id, fg.communication_number, r.status, r.aircraft_id, r.called_at,
               a.registration AS aircraft_registration,
               (SELECT candidate.id FROM resource_group_memberships membership
                 JOIN aircraft candidate ON candidate.id = membership.aircraft_id
@@ -191,6 +203,7 @@ app.get("/api/events/:eventId/operations", async (context) => {
       .all<{
         id: string;
         flight_group_id: string;
+        resource_group_id: string;
         communication_number: number;
         status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
         aircraft_id: string | null;
@@ -211,22 +224,27 @@ app.get("/api/events/:eventId/operations", async (context) => {
       .bind(eventId)
       .all<{ duration_minutes: number }>(),
     context.env.DB.prepare(
-      `SELECT COUNT(*) AS active_count FROM aircraft a
-        WHERE a.operational_state NOT IN ('INACTIVE', 'PAUSED')
-          AND EXISTS (SELECT 1 FROM resource_group_memberships m
-                       WHERE m.aircraft_id = a.id AND m.operation_day_id = ?1 AND m.active_until IS NULL)`,
+      `SELECT m.resource_group_id, a.passenger_seats FROM aircraft a
+         JOIN resource_group_memberships m ON m.aircraft_id = a.id
+        WHERE m.operation_day_id = ?1 AND m.active_until IS NULL
+          AND a.operational_state NOT IN ('INACTIVE', 'PAUSED', 'REFUELING')`,
     )
       .bind(eventId)
-      .first<{ active_count: number }>(),
+      .all<{ resource_group_id: string; passenger_seats: number }>(),
   ]);
 
   const actualDurations = durationRows.results.map((row) => row.duration_minutes);
   const dataAgeMinutes = Math.max(0, (Date.now() - Date.parse(eventRow.updated_at)) / 60_000);
-  const activeAircraft = aircraftCountRow?.active_count ?? 0;
+  const operationsEnd = eventRow.operations_end_at ? Date.parse(eventRow.operations_end_at) : 0;
+  const remainingOperatingMinutes = Math.max(0, (operationsEnd - Date.now()) / 60_000);
 
   return context.json({
     event: rowToSnapshot(eventRow),
     products: products.results.map((product) => {
+      const groupAircraftSeats = aircraftRows.results
+        .filter((aircraft) => aircraft.resource_group_id === product.resource_group_id)
+        .map((aircraft) => aircraft.passenger_seats);
+      const activeAircraft = groupAircraftSeats.length;
       const queueSequence = Math.max(
         1,
         Math.ceil(product.queued_tickets / product.reference_capacity),
@@ -239,10 +257,20 @@ app.get("/api/events/:eventId/operations", async (context) => {
         activeCapacity: activeAircraft,
       });
       const forecast = forecastQueueWindows({ queueSequence, activeAircraft, duration });
+      const capacity = assessRemainingCapacity({
+        remainingOperatingMinutes,
+        expectedRotationMinutes: duration.expectedMinutes,
+        activeAircraftSeats: groupAircraftSeats,
+        openTickets: product.resource_group_open_tickets,
+        predictionQuality: forecast.quality,
+        warningThreshold: product.capacity_warning_threshold,
+        criticalThreshold: product.capacity_critical_threshold,
+      });
       return {
         id: product.id,
         name: product.name,
         resourceGroupId: product.resource_group_id,
+        resourceGroupName: product.resource_group_name,
         resourceGroupStatus: product.resource_group_status,
         priceCents: product.price_cents,
         saleEnabled: product.sale_enabled === 1,
@@ -250,46 +278,62 @@ app.get("/api/events/:eventId/operations", async (context) => {
         queuedTickets: product.queued_tickets,
         estimatedWaitLowerMinutes: forecast.lowerMinutes,
         estimatedWaitUpperMinutes: forecast.upperMinutes,
-        remainingSellableSeats: Math.max(0, 1000 - product.queued_tickets),
+        remainingSellableSeats: capacity.remainingSellableSeats,
+        projectedSeats: capacity.projectedSeats,
+        capacityStatus: capacity.status,
+        saleRecommended:
+          capacity.saleRecommended &&
+          product.sale_enabled === 1 &&
+          product.resource_group_status === "ACTIVE" &&
+          eventRow.emergency_mode === 0 &&
+          (product.sale_closes_at === null || Date.parse(product.sale_closes_at) > Date.now()),
+        saleClosesAt: product.sale_closes_at,
+        capacityWarningThreshold: product.capacity_warning_threshold,
+        capacityCriticalThreshold: product.capacity_critical_threshold,
         predictionQuality: forecast.quality,
       };
     }),
-    rotations: rotations.results.map((rotation, index) => ({
-      id: rotation.id,
-      flightGroupId: rotation.flight_group_id,
-      communicationNumber: rotation.communication_number,
-      productName: rotation.product_name,
-      status: rotation.status,
-      ticketGroupId: rotation.ticket_group_id,
-      aircraftId: rotation.aircraft_id,
-      aircraftRegistration: rotation.aircraft_registration,
-      suggestedAircraftId: rotation.suggested_aircraft_id,
-      suggestedAircraftRegistration: rotation.suggested_aircraft_registration,
-      ticketCount: rotation.ticket_count,
-      predictedLowerMinutes: forecastQueueWindows({
-        queueSequence: index + 1,
-        activeAircraft,
-        duration: estimateDuration({
-          referenceMinutes: 20,
-          actualDurationsMinutes: actualDurations,
-          dataAgeMinutes,
-          interrupted: eventRow.emergency_mode === 1,
-          activeCapacity: activeAircraft,
-        }),
-      }).lowerMinutes,
-      predictedUpperMinutes: forecastQueueWindows({
-        queueSequence: index + 1,
-        activeAircraft,
-        duration: estimateDuration({
-          referenceMinutes: 20,
-          actualDurationsMinutes: actualDurations,
-          dataAgeMinutes,
-          interrupted: eventRow.emergency_mode === 1,
-          activeCapacity: activeAircraft,
-        }),
-      }).upperMinutes,
-      calledAt: rotation.called_at,
-    })),
+    rotations: rotations.results.map((rotation, index) => {
+      const activeAircraft = aircraftRows.results.filter(
+        (aircraft) => aircraft.resource_group_id === rotation.resource_group_id,
+      ).length;
+      return {
+        id: rotation.id,
+        flightGroupId: rotation.flight_group_id,
+        communicationNumber: rotation.communication_number,
+        productName: rotation.product_name,
+        status: rotation.status,
+        ticketGroupId: rotation.ticket_group_id,
+        aircraftId: rotation.aircraft_id,
+        aircraftRegistration: rotation.aircraft_registration,
+        suggestedAircraftId: rotation.suggested_aircraft_id,
+        suggestedAircraftRegistration: rotation.suggested_aircraft_registration,
+        ticketCount: rotation.ticket_count,
+        predictedLowerMinutes: forecastQueueWindows({
+          queueSequence: index + 1,
+          activeAircraft,
+          duration: estimateDuration({
+            referenceMinutes: 20,
+            actualDurationsMinutes: actualDurations,
+            dataAgeMinutes,
+            interrupted: eventRow.emergency_mode === 1,
+            activeCapacity: activeAircraft,
+          }),
+        }).lowerMinutes,
+        predictedUpperMinutes: forecastQueueWindows({
+          queueSequence: index + 1,
+          activeAircraft,
+          duration: estimateDuration({
+            referenceMinutes: 20,
+            actualDurationsMinutes: actualDurations,
+            dataAgeMinutes,
+            interrupted: eventRow.emergency_mode === 1,
+            activeCapacity: activeAircraft,
+          }),
+        }).upperMinutes,
+        calledAt: rotation.called_at,
+      };
+    }),
   });
 });
 
