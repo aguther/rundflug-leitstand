@@ -45,3 +45,11 @@ Ergänzt additive, nicht personenbezogene Konfigurationsfelder für Verkaufsbegi
 Referenzgewichte und Planprozesszeiten. Bestehende Veranstaltungen erhalten dokumentierte
 Standardwerte. Vor Anwendung wird eine portable Sicherung erstellt; Wiederherstellung erfolgt aus
 dieser Sicherung, da ein spaltenweiser Rückbau einen SQLite-Tabellenneuaufbau erfordern würde.
+
+## 0015 – Produkt- und Gate-Stammdaten
+
+Führt Gates sowie additive Produktfelder für Kürzel, öffentliche Beschreibung, Begleitpflicht,
+Gewichtsklassen und Sortierung ein. Bestehende Veranstaltungen erhalten ein synthetisches Haupt-Gate;
+Produktkürzel werden deterministisch aus internen IDs abgeleitet. Vor Anwendung wird gesichert.
+Wiederherstellung erfolgt aus der Sicherung, weil Spalten und Gate-Bezüge nicht verlustfrei einzeln
+zurückgebaut werden können.

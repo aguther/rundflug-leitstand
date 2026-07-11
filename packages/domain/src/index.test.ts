@@ -206,3 +206,10 @@ describe("event parameter authorization", () => {
     expect(() => assertRoleMayExecute("FLIGHT_DIRECTOR", "CONFIGURE_EVENT_PARAMETERS")).toThrow();
   });
 });
+
+describe("master data authorization", () => {
+  it("restricts product and gate changes to administration", () => {
+    expect(() => assertRoleMayExecute("ADMIN", "UPSERT_PRODUCT")).not.toThrow();
+    expect(() => assertRoleMayExecute("FLIGHT_LINE_LEAD", "UPSERT_GATE")).toThrow();
+  });
+});
