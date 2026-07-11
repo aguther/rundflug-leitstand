@@ -17,7 +17,6 @@ npx wrangler login
 
 ```bash
 npx wrangler d1 create rundflug-leitstand --jurisdiction=eu
-npx wrangler d1 create rundflug-leitstand-production --jurisdiction=eu
 ```
 
 Die ausgegebenen `database_id`-Werte in `wrangler.jsonc` eintragen.
@@ -30,15 +29,13 @@ Prüfe zunächst die mit der installierten Wrangler-Version gültige Syntax:
 npx wrangler r2 bucket create --help
 ```
 
-Lege anschließend die Buckets `rundflug-leitstand` und
-`rundflug-leitstand-production-backups` ausdrücklich mit EU-Jurisdiktion an. Die Bucket-Namen sind in
-`wrangler.jsonc` bereits als Bindings vorgesehen.
+Lege anschließend den Bucket `rundflug-leitstand` ausdrücklich mit EU-Jurisdiktion an. Der Bucket-Name
+ist in `wrangler.jsonc` bereits als Binding vorgesehen.
 
 ## 5. Migrationen
 
 ```bash
-npx wrangler d1 migrations apply rundflug-leitstand --remote --env acceptance
-npx wrangler d1 migrations apply rundflug-leitstand-production --remote --env production
+npx wrangler d1 migrations apply rundflug-leitstand --remote
 ```
 
 Vor Produktionsmigrationen: Backup erstellen, Migration in Abnahme prüfen und Wiederherstellungspfad
@@ -46,28 +43,28 @@ dokumentieren.
 
 ## 6. Deployment
 
-### Workers Builds für Acceptance
+### Workers Builds
 
-Der im Cloudflare-Dashboard verbundene Worker muss `rundflug-leitstand-acceptance` heißen. Für den
-ersten Test nicht den Worker `rundflug-leitstand` verwenden; dieser Name ist für Produktion
-reserviert. Unter **Settings → Build** gelten:
+Der im Cloudflare-Dashboard verbundene Worker heißt `rundflug-leitstand`. Solange die Anwendung noch
+nicht produktiv genutzt wird, gibt es in Cloudflare bewusst nur diese eine Umgebung. Unter
+**Settings → Build** gelten:
 
 - Root directory: Repository-Wurzel
 - Build command: `npm run build`
-- Deploy command: `npx wrangler deploy --env acceptance --config wrangler.jsonc`
+- Deploy command: `npx wrangler deploy --config wrangler.jsonc`
 - Non-production branch deploy command:
-  `npx wrangler versions upload --env acceptance --config wrangler.jsonc`
+  `npx wrangler versions upload --config wrangler.jsonc`
 
 Die D1-Migrationen laufen bewusst nicht implizit im Build. Sie werden vor dem ersten Acceptance-
-Deployment und nach neuen Migrationen mit dem Befehl aus Abschnitt 5 angewendet. Worker-Name,
-Wrangler-Environment und die in `wrangler.jsonc` eingetragene reale D1-ID müssen zusammenpassen.
+Deployment und nach neuen Migrationen mit dem Befehl aus Abschnitt 5 angewendet. Worker-Name und die
+in `wrangler.jsonc` eingetragene reale D1-ID müssen zusammenpassen. Lokale Entwicklung bleibt durch
+den lokalen Startbefehl und lokale D1-Daten getrennt.
 
 Vor dem Deployment je Umgebung den SHA-256-Hash der Administrator-PIN als Secret setzen. Die PIN
 selbst wird weder in Cloudflare-Konfiguration noch D1 gespeichert:
 
 ```bash
-npx wrangler secret put ADMIN_PIN_HASH --env acceptance
-npx wrangler secret put ADMIN_PIN_HASH --env production
+npx wrangler secret put ADMIN_PIN_HASH
 ```
 
 Für Web-Push ein eigenes VAPID-Schlüsselpaar je Umgebung erzeugen. Die Ausgabe enthält den privaten
@@ -81,13 +78,13 @@ Die drei Werte anschließend interaktiv als Cloudflare-Secrets setzen. Als `VAPI
 erreichbare Betreiberadresse im Format `mailto:adresse@example.de` verwenden:
 
 ```bash
-npx wrangler secret put VAPID_PUBLIC_KEY --env acceptance
-npx wrangler secret put VAPID_PRIVATE_KEY --env acceptance
-npx wrangler secret put VAPID_SUBJECT --env acceptance
+npx wrangler secret put VAPID_PUBLIC_KEY
+npx wrangler secret put VAPID_PRIVATE_KEY
+npx wrangler secret put VAPID_SUBJECT
 ```
 
-Für Produktion ein neues Schlüsselpaar erzeugen und dieselben drei Befehle mit `--env production`
-ausführen. Der private Schlüssel gehört niemals in `wrangler.jsonc`, `.env.example` oder D1.
+Beim späteren Übergang auf getrennte Cloudflare-Umgebungen ein neues Schlüsselpaar für Produktion
+erzeugen. Der private Schlüssel gehört niemals in `wrangler.jsonc`, `.env.example` oder D1.
 
 Geräte werden über zufällige Kopplungstokens authentisiert; ausschließlich deren SHA-256-Hashes werden
 in D1 gespeichert. Demo-Tokens aus dem lokalen Seed dürfen nicht in Acceptance oder Produktion
@@ -96,8 +93,7 @@ in D1 gespeichert. Demo-Tokens aus dem lokalen Seed dürfen nicht in Acceptance 
 Danach:
 
 ```bash
-npm run deploy:acceptance
-npm run deploy:production
+npm run deploy
 ```
 
 ## 7. Domain und Monitoring

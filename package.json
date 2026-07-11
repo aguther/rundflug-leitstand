@@ -28,8 +28,7 @@
     "db:migrate:local": "wrangler d1 migrations apply rundflug-leitstand-dev --local --config wrangler.jsonc",
     "db:seed:local": "wrangler d1 execute rundflug-leitstand-dev --local --file apps/worker/seed/demo.sql --config wrangler.jsonc",
     "db:reset:local": "node scripts/reset_local_db.mjs",
-    "deploy:acceptance": "npm run build:web && wrangler deploy --env acceptance --config wrangler.jsonc",
-    "deploy:production": "npm run build:web && wrangler deploy --env production --config wrangler.jsonc",
+    "deploy": "npm run build:web && wrangler deploy --config wrangler.jsonc",
     "clean": "node -e \"const fs=require('node:fs'); for (const p of ['apps/web/dist','apps/worker/dist']) fs.rmSync(p,{recursive:true,force:true})\""
   },
   "devDependencies": {
