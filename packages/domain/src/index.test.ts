@@ -90,6 +90,7 @@ describe("sale guard", () => {
   it("allows sales only in an active normal operating state", () => {
     expect(() =>
       assertSaleAllowed({
+        eventStatus: "ACTIVE",
         productSaleEnabled: true,
         resourceGroupStatus: "ACTIVE",
         emergencyMode: false,
@@ -102,6 +103,7 @@ describe("sale guard", () => {
   it("blocks sales in emergency mode", () => {
     expect(() =>
       assertSaleAllowed({
+        eventStatus: "ACTIVE",
         productSaleEnabled: true,
         resourceGroupStatus: "ACTIVE",
         emergencyMode: true,
@@ -114,6 +116,7 @@ describe("sale guard", () => {
   it("blocks sales during a normal event interruption", () => {
     expect(() =>
       assertSaleAllowed({
+        eventStatus: "ACTIVE",
         productSaleEnabled: true,
         resourceGroupStatus: "ACTIVE",
         emergencyMode: false,
@@ -121,6 +124,26 @@ describe("sale guard", () => {
         saleClosingReached: false,
       }),
     ).toThrowError(/Betriebsunterbrechung/);
+  });
+
+  it("blocks sales outside the active event phase", () => {
+    expect(() =>
+      assertSaleAllowed({
+        eventStatus: "CLOSED",
+        productSaleEnabled: true,
+        resourceGroupStatus: "ACTIVE",
+        emergencyMode: false,
+        eventInterrupted: false,
+        saleClosingReached: false,
+      }),
+    ).toThrowError(/nicht für den Verkauf aktiv/);
+  });
+
+  it("allows lifecycle changes only for administrators", () => {
+    expect(() => assertRoleMayExecute("ADMIN", "SET_EVENT_LIFECYCLE")).not.toThrow();
+    expect(() => assertRoleMayExecute("CASHIER", "SET_EVENT_LIFECYCLE")).toThrowError(
+      /darf SET_EVENT_LIFECYCLE nicht/,
+    );
   });
 
   it("allows operational leads to interrupt the event without emergency semantics", () => {

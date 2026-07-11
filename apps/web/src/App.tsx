@@ -1353,6 +1353,30 @@ function AdminView() {
     }
   }
 
+  async function setEventLifecycle(status: "PREPARATION" | "ACTIVE" | "CLOSED" | "ARCHIVED") {
+    if (!board || reason.trim().length < 3 || adminPin.length < 4) return;
+    try {
+      await sendCommand(
+        {
+          commandId: crypto.randomUUID(),
+          eventId: EVENT_ID,
+          deviceId: ADMIN_DEVICE_ID,
+          expectedVersion: board.event.version,
+          issuedAt: new Date().toISOString(),
+          type: "SET_EVENT_LIFECYCLE",
+          payload: { status, reason: reason.trim(), adminPin },
+        },
+        deviceTokenFor(ADMIN_DEVICE_ID),
+      );
+      setMessage(`Veranstaltungsstatus auf ${status} gesetzt und protokolliert.`);
+      setAdminPin("");
+      await refresh();
+      await refreshEvents();
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : "Statusänderung fehlgeschlagen.");
+    }
+  }
+
   async function pairDevice() {
     if (!board || deviceLabel.trim().length < 2 || adminPin.length < 4) return;
     const pairedDeviceId = crypto.randomUUID();
@@ -2125,6 +2149,55 @@ function AdminView() {
               Aktive Veranstaltung: <strong>{board?.event.name ?? EVENT_ID}</strong>. Eine Kopie
               übernimmt Stammdaten und Parameter, startet aber ohne Verkäufe und Umläufe.
             </p>
+            <div className="event-lifecycle">
+              <span>
+                Betriebsphase: <strong>{board?.event.status ?? "–"}</strong>
+              </span>
+              <label>
+                Administrator-PIN
+                <input
+                  type="password"
+                  value={adminPin}
+                  onChange={(event) => setAdminPin(event.target.value)}
+                />
+              </label>
+              {board?.event.status === "PREPARATION" ? (
+                <button
+                  type="button"
+                  disabled={reason.trim().length < 3 || adminPin.length < 4}
+                  onClick={() => void setEventLifecycle("ACTIVE")}
+                >
+                  Veranstaltung aktivieren
+                </button>
+              ) : null}
+              {board?.event.status === "ACTIVE" ? (
+                <button
+                  type="button"
+                  disabled={reason.trim().length < 3 || adminPin.length < 4}
+                  onClick={() => void setEventLifecycle("CLOSED")}
+                >
+                  Veranstaltung schließen
+                </button>
+              ) : null}
+              {board?.event.status === "CLOSED" ? (
+                <>
+                  <button
+                    type="button"
+                    disabled={reason.trim().length < 3 || adminPin.length < 4}
+                    onClick={() => void setEventLifecycle("ACTIVE")}
+                  >
+                    Erneut aktivieren
+                  </button>
+                  <button
+                    type="button"
+                    disabled={reason.trim().length < 3 || adminPin.length < 4}
+                    onClick={() => void setEventLifecycle("ARCHIVED")}
+                  >
+                    Archivieren
+                  </button>
+                </>
+              ) : null}
+            </div>
             <div className="event-catalog">
               {events.map((entry) => (
                 <a
