@@ -282,6 +282,38 @@ p {
   border-color: #c3cfda;
   cursor: not-allowed;
 }
+.ticket-search {
+  padding: 18px;
+  border: 1px solid #c3cfdd;
+  border-radius: 6px;
+  background: #fff;
+}
+.ticket-search-input {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+}
+.ticket-search-input input,
+.ticket-search-input button {
+  min-height: 52px;
+  padding: 10px 14px;
+}
+.ticket-search-results {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+.ticket-search-results button {
+  display: grid;
+  gap: 5px;
+  padding: 14px;
+  text-align: left;
+  border: 1px solid #93a4b8;
+  border-radius: 5px;
+  background: #f8fafc;
+  color: #173a63;
+}
 .secondary-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;

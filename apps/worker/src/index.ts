@@ -932,6 +932,88 @@ app.get("/api/events/:eventId/operations", async (context) => {
   });
 });
 
+app.get("/api/events/:eventId/tickets/search", async (context) => {
+  const eventId = context.req.param("eventId");
+  const device = await authorizeDevice(
+    context.env,
+    eventId,
+    context.req.header("x-device-id"),
+    context.req.header("x-device-token"),
+  );
+  if (!device || !["CASHIER", "FLIGHT_LINE", "FLIGHT_LINE_LEAD", "ADMIN"].includes(device.role)) {
+    return context.json(
+      { error: { code: "DEVICE_NOT_AUTHORIZED", message: "Gerät nicht berechtigt." } },
+      403,
+    );
+  }
+  const rawQuery = context.req.query("q")?.trim() ?? "";
+  if (rawQuery.length < 2 || rawQuery.length > 200) {
+    return context.json({ results: [] });
+  }
+  let query = rawQuery;
+  try {
+    const url = new URL(rawQuery);
+    query = decodeURIComponent(url.pathname.split("/").filter(Boolean).at(-1) ?? rawQuery);
+  } catch {
+    // Plain ticket, group or communication identifier.
+  }
+  const normalized = query.trim().toUpperCase();
+  const ticketHash = await sha256Hex(normalized);
+  const likeQuery = `%${query.trim()}%`;
+  const numericQuery = /^\d+$/.test(normalized) ? String(Number(normalized)) : "";
+  const rows = await context.env.DB.prepare(
+    `SELECT tg.id AS ticket_group_id, tg.status AS group_status, tg.queue_sequence, tg.standby,
+            tg.sold_at, p.id AS product_id, p.code AS product_code, p.name AS product_name,
+            COUNT(DISTINCT t.id) AS group_size, fg.communication_number,
+            r.status AS rotation_status
+       FROM ticket_groups tg
+       JOIN products p ON p.id = tg.product_id
+       JOIN tickets t ON t.ticket_group_id = tg.id
+       LEFT JOIN rotation_tickets rt ON rt.ticket_id = t.id AND rt.released_at IS NULL
+       LEFT JOIN rotations r ON r.id = rt.rotation_id
+       LEFT JOIN flight_groups fg ON fg.id = r.flight_group_id
+      WHERE tg.operation_day_id = ?1
+        AND (t.public_code_hash = ?2 OR tg.id LIKE ?3 OR CAST(fg.communication_number AS TEXT) = ?4
+             OR UPPER(p.code || '-' || printf('%03d', fg.communication_number)) = ?5)
+      GROUP BY tg.id, tg.status, tg.queue_sequence, tg.standby, tg.sold_at, p.id, p.code, p.name,
+               fg.communication_number, r.status
+      ORDER BY tg.sold_at DESC LIMIT 20`,
+  )
+    .bind(eventId, ticketHash, likeQuery, numericQuery, normalized)
+    .all<{
+      ticket_group_id: string;
+      group_status: string;
+      queue_sequence: number;
+      standby: number;
+      sold_at: string;
+      product_id: string;
+      product_code: string;
+      product_name: string;
+      group_size: number;
+      communication_number: number | null;
+      rotation_status: string | null;
+    }>();
+  return context.json({
+    results: rows.results.map((row) => ({
+      ticketGroupId: row.ticket_group_id,
+      productId: row.product_id,
+      productCode: row.product_code,
+      productName: row.product_name,
+      groupStatus: row.group_status,
+      groupSize: row.group_size,
+      queueSequence: row.queue_sequence,
+      standby: row.standby === 1,
+      soldAt: row.sold_at,
+      communicationNumber: row.communication_number,
+      communicationLabel:
+        row.communication_number === null
+          ? null
+          : `${row.product_code}-${String(row.communication_number).padStart(3, "0")}`,
+      rotationStatus: row.rotation_status,
+    })),
+  });
+});
+
 app.get("/api/events/:eventId/history", async (context) => {
   const eventId = context.req.param("eventId");
   const device = await authorizeDevice(

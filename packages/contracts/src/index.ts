@@ -335,6 +335,26 @@ export const eventCatalogSchema = z.object({ events: z.array(eventCatalogEntrySc
 export type EventCatalogEntry = z.infer<typeof eventCatalogEntrySchema>;
 export type EventCatalog = z.infer<typeof eventCatalogSchema>;
 
+export const ticketSearchResultSchema = z.object({
+  ticketGroupId: z.string(),
+  productId: z.string(),
+  productCode: z.string(),
+  productName: z.string(),
+  groupStatus: z.string(),
+  groupSize: z.number().int().positive(),
+  queueSequence: z.number().int().positive(),
+  standby: z.boolean(),
+  soldAt: z.string(),
+  communicationNumber: z.number().int().positive().nullable(),
+  communicationLabel: z.string().nullable(),
+  rotationStatus: z.string().nullable(),
+});
+export const ticketSearchResponseSchema = z.object({
+  results: z.array(ticketSearchResultSchema).max(20),
+});
+export type TicketSearchResult = z.infer<typeof ticketSearchResultSchema>;
+export type TicketSearchResponse = z.infer<typeof ticketSearchResponseSchema>;
+
 export const cloneEventRequestSchema = z.object({
   commandId: z.uuid(),
   expectedSourceVersion: z.number().int().nonnegative(),

@@ -4,6 +4,7 @@ import type {
   OperationBoard,
   PublicBoard,
   PublicTicketStatus,
+  TicketSearchResult,
 } from "@rundflug/contracts";
 import QRCode from "qrcode";
 import { useCallback, useEffect, useState } from "react";
@@ -22,6 +23,7 @@ import {
   getPushPublicKey,
   registerTicketPush,
   revokeTicketPush,
+  searchTickets,
   sendCommand,
 } from "./api";
 
@@ -231,6 +233,9 @@ function CashierView() {
   const [cancelReason, setCancelReason] = useState("");
   const [correctionPin, setCorrectionPin] = useState("");
   const [rebookProductId, setRebookProductId] = useState("");
+  const [ticketSearch, setTicketSearch] = useState("");
+  const [ticketSearchResults, setTicketSearchResults] = useState<TicketSearchResult[]>([]);
+  const [correctionTargetLabel, setCorrectionTargetLabel] = useState("Letzter Verkauf");
   const product = board?.products.find((entry) => entry.id === productId) ?? board?.products[0];
   useEffect(() => {
     localStorage.setItem("cashier-draft-v1", JSON.stringify({ version: 1, productId, size }));
@@ -262,6 +267,7 @@ function CashierView() {
       setReceipt(codes);
       setLastTicketGroupId(saleResult.aggregate?.id ?? null);
       setLastProductId(product.id);
+      setCorrectionTargetLabel("Letzter Verkauf");
       setMessage(`${codes.length} Ticket${codes.length === 1 ? "" : "s"} verkauft.`);
       await refresh();
     } catch (reason) {
@@ -331,6 +337,38 @@ function CashierView() {
     } catch (reason) {
       setMessage(reason instanceof Error ? reason.message : "Umbuchung fehlgeschlagen.");
     }
+  }
+
+  async function runTicketSearch() {
+    if (ticketSearch.trim().length < 2) return;
+    try {
+      const response = await searchTickets(
+        EVENT_ID,
+        CASHIER_DEVICE_ID,
+        deviceTokenFor(CASHIER_DEVICE_ID),
+        ticketSearch.trim(),
+      );
+      setTicketSearchResults(response.results);
+      setMessage(
+        response.results.length === 0
+          ? "Kein passendes Ticket gefunden."
+          : `${response.results.length} Buchungsgruppe${response.results.length === 1 ? "" : "n"} gefunden.`,
+      );
+    } catch (reason) {
+      setMessage(reason instanceof Error ? reason.message : "Ticketsuche fehlgeschlagen.");
+    }
+  }
+
+  function selectSearchResult(result: TicketSearchResult) {
+    setLastTicketGroupId(result.ticketGroupId);
+    setLastProductId(result.productId);
+    setCorrectionTargetLabel(
+      result.communicationLabel ?? `Gruppe ${result.ticketGroupId.slice(0, 8)}`,
+    );
+    setReceipt([]);
+    setMessage(
+      `${result.productName} · ${result.groupSize} Ticket${result.groupSize === 1 ? "" : "s"} ausgewählt.`,
+    );
   }
 
   return (
@@ -417,7 +455,7 @@ function CashierView() {
                   onClick={cancelLastSale}
                   type="button"
                 >
-                  Letzten Verkauf stornieren
+                  {correctionTargetLabel} stornieren
                 </button>
                 <label>
                   Umbuchen auf
@@ -448,6 +486,48 @@ function CashierView() {
             ) : null}
           </section>
         </div>
+        <section className="ticket-search" aria-labelledby="ticket-search-title">
+          <div>
+            <h2 id="ticket-search-title">Ticketsuche</h2>
+            <p>Ticket-/QR-Code, Gruppen-ID oder Fluggruppenkennung eingeben.</p>
+          </div>
+          <div className="ticket-search-input">
+            <input
+              aria-label="Suchbegriff"
+              value={ticketSearch}
+              onChange={(event) => setTicketSearch(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") void runTicketSearch();
+              }}
+              placeholder="z. B. PAN20-042"
+            />
+            <button
+              type="button"
+              onClick={() => void runTicketSearch()}
+              disabled={ticketSearch.trim().length < 2}
+            >
+              Suchen
+            </button>
+          </div>
+          {ticketSearchResults.length > 0 ? (
+            <div className="ticket-search-results">
+              {ticketSearchResults.map((result) => (
+                <button
+                  type="button"
+                  key={result.ticketGroupId}
+                  onClick={() => selectSearchResult(result)}
+                >
+                  <strong>{result.communicationLabel ?? result.productCode}</strong>
+                  <span>
+                    {result.productName} · {result.groupSize} Ticket
+                    {result.groupSize === 1 ? "" : "s"}
+                  </span>
+                  <span>Status: {result.groupStatus}</span>
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </section>
         <button
           className="primary-action"
           disabled={

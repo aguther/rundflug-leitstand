@@ -4,6 +4,7 @@ import {
   commandEnvelopeSchema,
   publicBoardSchema,
   publicTicketStatusSchema,
+  ticketSearchResponseSchema,
 } from "./index";
 
 describe("commandEnvelopeSchema", () => {
@@ -363,5 +364,32 @@ describe("commandEnvelopeSchema", () => {
     expect(parsed.eventId).toBe("flugtag-2027");
     expect("guestName" in parsed).toBe(false);
     expect(() => cloneEventRequestSchema.parse({ ...parsed, eventId: "Ungültige ID" })).toThrow();
+  });
+
+  it("keeps protected ticket search results free of public codes and guest data", () => {
+    const parsed = ticketSearchResponseSchema.parse({
+      results: [
+        {
+          ticketGroupId: "synthetic-group",
+          productId: "synthetic-product",
+          productCode: "PAN20",
+          productName: "Panorama",
+          groupStatus: "WAITING",
+          groupSize: 2,
+          queueSequence: 4,
+          standby: false,
+          soldAt: "2026-07-11T12:00:00.000Z",
+          communicationNumber: 42,
+          communicationLabel: "PAN20-042",
+          rotationStatus: "DRAFT",
+        },
+      ],
+    });
+    expect(parsed.results).toHaveLength(1);
+    const result = parsed.results[0];
+    expect(result).toBeDefined();
+    if (!result) throw new Error("Synthetischer Suchtreffer fehlt.");
+    expect("publicCode" in result).toBe(false);
+    expect("guestName" in result).toBe(false);
   });
 });
