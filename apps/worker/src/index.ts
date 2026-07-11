@@ -744,7 +744,7 @@ app.get("/api/events/:eventId/operations", async (context) => {
       }>(),
   ]);
 
-  const actualDurations = durationRows.results.map((row) => row.duration_minutes);
+  const actualDurations = [...durationRows.results].reverse().map((row) => row.duration_minutes);
   const activePilotCount = pilotRows.results.filter(
     (pilot) => pilot.active === 1 && pilot.paused === 0,
   ).length;

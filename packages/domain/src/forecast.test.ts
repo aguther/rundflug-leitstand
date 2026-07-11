@@ -36,6 +36,17 @@ describe("event-driven forecast", () => {
     expect(estimate.expectedMinutes).toBeGreaterThan(30);
   });
 
+  it("gives the newest value the greatest weight when samples are chronological", () => {
+    const estimate = estimateDuration({
+      referenceMinutes: 20,
+      actualDurationsMinutes: [10, 30],
+      dataAgeMinutes: 1,
+      interrupted: false,
+      activeCapacity: 1,
+    });
+    expect(estimate.expectedMinutes).toBe(22);
+  });
+
   it("marks stale or interrupted data as uncertain without a countdown", () => {
     const estimate = estimateDuration({
       referenceMinutes: 20,
