@@ -11,10 +11,28 @@ describe("rowToSnapshot", () => {
         time_zone: "Europe/Berlin",
         status: "PREPARATION",
         emergency_mode: 1,
+        operational_interrupted: 0,
         version: 2,
         operational_note: "Test",
         updated_at: "2026-07-11T10:00:00.000Z",
       }).emergencyMode,
     ).toBe(true);
+  });
+
+  it("keeps normal interruption separate from emergency mode", () => {
+    const snapshot = rowToSnapshot({
+      id: "demo-2026",
+      name: "Demo",
+      event_date: "2026-07-11",
+      time_zone: "Europe/Berlin",
+      status: "ACTIVE",
+      emergency_mode: 0,
+      operational_interrupted: 1,
+      version: 3,
+      operational_note: "",
+      updated_at: "2026-07-11T10:00:00.000Z",
+    });
+    expect(snapshot.emergencyMode).toBe(false);
+    expect(snapshot.operationalInterrupted).toBe(true);
   });
 });

@@ -18,6 +18,7 @@ export interface StoredEventRow {
   time_zone: string;
   status: string;
   emergency_mode: number;
+  operational_interrupted?: number;
   version: number;
   operational_note: string;
   operations_end_at?: string | null;

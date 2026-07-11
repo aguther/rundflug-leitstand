@@ -167,6 +167,15 @@ function EmergencyNotice({ active }: { active: boolean }) {
   ) : null;
 }
 
+function InterruptionNotice({ active }: { active: boolean }) {
+  return active ? (
+    <div className="interruption-notice">
+      Flugbetrieb unterbrochen · keine Verkäufe oder neuen Aufrufe; laufende Flüge bleiben
+      dokumentierbar
+    </div>
+  ) : null;
+}
+
 function OperationalNotice({ note }: { note: string | null | undefined }) {
   return note ? (
     <div className="operational-notice">
@@ -314,6 +323,7 @@ function CashierView() {
     <Shell title="Kasse">
       <ConnectionNotice error={error} />
       <EmergencyNotice active={board?.event.emergencyMode ?? false} />
+      <InterruptionNotice active={board?.event.operationalInterrupted ?? false} />
       <OperationalNotice note={board?.event.operationalNote} />
       <section className="cashier-workspace">
         <div className="product-strip">
@@ -433,6 +443,7 @@ function CashierView() {
             !product.saleRecommended ||
             product.remainingSellableSeats < size ||
             board.event.emergencyMode ||
+            board.event.operationalInterrupted ||
             busy
           }
           onClick={sell}
@@ -546,6 +557,7 @@ function FlightLineView() {
     <Shell title="Flight Line">
       <ConnectionNotice error={error} />
       <EmergencyNotice active={board?.event.emergencyMode ?? false} />
+      <InterruptionNotice active={board?.event.operationalInterrupted ?? false} />
       <OperationalNotice note={board?.event.operationalNote} />
       <section className="flight-workspace">
         <div className="queue-list">
@@ -641,7 +653,9 @@ function FlightLineView() {
                   className="primary-action"
                   disabled={
                     action.command === "CALL_NEXT" &&
-                    (!selected.suggestedAircraftId || board?.event.emergencyMode)
+                    (!selected.suggestedAircraftId ||
+                      board?.event.emergencyMode ||
+                      board?.event.operationalInterrupted)
                   }
                   onClick={advance}
                   type="button"
@@ -891,6 +905,11 @@ function FidsView() {
         {board?.emergencyMode ? (
           <div className="uncertainty">Der Rundflugbetrieb ist derzeit unterbrochen.</div>
         ) : null}
+        {board?.operationalInterrupted ? (
+          <div className="uncertainty">
+            Flugbetrieb organisatorisch unterbrochen – Zeitfenster ausgesetzt.
+          </div>
+        ) : null}
         <OperationalNotice note={board?.operationalNotice} />
         {board?.groups.map((group) => (
           <div key={group.communicationNumber}>
@@ -1114,6 +1133,33 @@ function AdminView() {
     }
   }
 
+  async function setEventInterruption(interrupted: boolean) {
+    if (!board || reason.trim().length < 3) return;
+    try {
+      await sendCommand(
+        {
+          commandId: crypto.randomUUID(),
+          eventId: EVENT_ID,
+          deviceId: ADMIN_DEVICE_ID,
+          expectedVersion: board.event.version,
+          issuedAt: new Date().toISOString(),
+          type: "SET_EVENT_INTERRUPTION",
+          payload: { interrupted, reason: reason.trim(), expectedReviewAt: null },
+        },
+        deviceTokenFor(ADMIN_DEVICE_ID),
+      );
+      setMessage(
+        interrupted ? "Flugbetrieb organisatorisch unterbrochen." : "Flugbetrieb fortgesetzt.",
+      );
+      await refresh();
+      await refreshHistory();
+    } catch (cause) {
+      setMessage(
+        cause instanceof Error ? cause.message : "Betriebsstatus konnte nicht geändert werden.",
+      );
+    }
+  }
+
   async function configureProductSales(
     product: OperationBoard["products"][number],
     saleEnabled: boolean,
@@ -1278,6 +1324,7 @@ function AdminView() {
     <Shell title="Administration">
       <ConnectionNotice error={error} />
       <EmergencyNotice active={board?.event.emergencyMode ?? false} />
+      <InterruptionNotice active={board?.event.operationalInterrupted ?? false} />
       <OperationalNotice note={board?.event.operationalNote} />
       <section className="admin-workspace">
         <h1>Betriebssteuerung</h1>
@@ -1346,6 +1393,16 @@ function AdminView() {
               </button>
             ))}
           </div>
+          <button
+            className="interrupt-action"
+            disabled={reason.trim().length < 3}
+            onClick={() => setEventInterruption(!(board?.event.operationalInterrupted ?? false))}
+            type="button"
+          >
+            {board?.event.operationalInterrupted
+              ? "Veranstaltungsbetrieb fortsetzen"
+              : "Veranstaltungsbetrieb unterbrechen"}
+          </button>
           <p>Hinweise stoppen keinen Flugbetrieb. Unterbrechungen werden separat gesetzt.</p>
         </section>
         <section className="admin-section">

@@ -189,6 +189,7 @@ describe("commandEnvelopeSchema", () => {
     const board = publicBoardSchema.parse({
       eventName: "Demo",
       emergencyMode: false,
+      operationalInterrupted: false,
       operationalNotice: "",
       updatedAt: "2026-07-11T12:00:00.000Z",
       groups: [

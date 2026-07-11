@@ -121,6 +121,7 @@ export type OperationalCommandType =
   | "TRIGGER_EMERGENCY"
   | "CLEAR_EMERGENCY"
   | "SET_RESOURCE_GROUP_STATUS"
+  | "SET_EVENT_INTERRUPTION"
   | "CONFIGURE_PRODUCT_SALES"
   | "PAIR_DEVICE"
   | "REVOKE_DEVICE"
@@ -144,6 +145,7 @@ const commandRoles: Readonly<Record<OperationalCommandType, readonly DeviceRole[
   TRIGGER_EMERGENCY: ["FLIGHT_LINE_LEAD", "FLIGHT_DIRECTOR", "ADMIN"],
   CLEAR_EMERGENCY: ["ADMIN"],
   SET_RESOURCE_GROUP_STATUS: ["FLIGHT_LINE_LEAD", "FLIGHT_DIRECTOR", "ADMIN"],
+  SET_EVENT_INTERRUPTION: ["FLIGHT_LINE_LEAD", "FLIGHT_DIRECTOR", "ADMIN"],
   CONFIGURE_PRODUCT_SALES: ["ADMIN"],
   PAIR_DEVICE: ["ADMIN"],
   REVOKE_DEVICE: ["ADMIN"],
@@ -168,10 +170,17 @@ export function assertSaleAllowed(input: {
   productSaleEnabled: boolean;
   resourceGroupStatus: "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED";
   emergencyMode: boolean;
+  eventInterrupted: boolean;
   saleClosingReached: boolean;
 }): void {
   if (input.emergencyMode) {
     throw new DomainRuleError("SALE_BLOCKED_EMERGENCY", "Verkauf ist im Notfallmodus gesperrt.");
+  }
+  if (input.eventInterrupted) {
+    throw new DomainRuleError(
+      "SALE_BLOCKED_INTERRUPTION",
+      "Verkauf ist während der Betriebsunterbrechung gesperrt.",
+    );
   }
   if (!input.productSaleEnabled) {
     throw new DomainRuleError("SALE_BLOCKED_PRODUCT", "Das Produkt ist nicht verkaufbar.");
