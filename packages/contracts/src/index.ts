@@ -248,6 +248,44 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
       adminPin: z.string().min(4).max(32),
     }),
   }),
+  commandBaseSchema.extend({
+    type: z.literal("UPSERT_RESOURCE_GROUP"),
+    payload: z.object({
+      resourceGroupId: z.string().min(1).max(100),
+      name: z.string().trim().min(2).max(100),
+      gateId: z.string().min(1).max(100),
+      referenceCapacity: z.number().int().min(1).max(100),
+      plannedRotationMinutes: z.number().int().min(1).max(600),
+      compatibleAircraftTypes: z.array(z.string().trim().min(1).max(80)).max(50),
+      reason: z.string().trim().min(3).max(240),
+      adminPin: z.string().min(4).max(32),
+    }),
+  }),
+  commandBaseSchema.extend({
+    type: z.literal("UPSERT_AIRCRAFT"),
+    payload: z.object({
+      aircraftId: z.string().min(1).max(100),
+      registration: z
+        .string()
+        .trim()
+        .regex(/^[A-Z0-9-]{3,16}$/),
+      aircraftType: z.string().trim().min(2).max(80),
+      passengerSeats: z.number().int().min(1).max(100),
+      maximumPassengerPayloadKg: z.number().positive().max(10_000).nullable(),
+      reason: z.string().trim().min(3).max(240),
+      adminPin: z.string().min(4).max(32),
+    }),
+  }),
+  commandBaseSchema.extend({
+    type: z.literal("ASSIGN_AIRCRAFT_RESOURCE_GROUP"),
+    payload: z.object({
+      aircraftId: z.string().min(1).max(100),
+      resourceGroupId: z.string().min(1).max(100),
+      effectiveAt: z.iso.datetime(),
+      reason: z.string().trim().min(3).max(240),
+      adminPin: z.string().min(4).max(32),
+    }),
+  }),
 ]);
 
 export type CommandEnvelope = z.infer<typeof commandEnvelopeSchema>;
@@ -377,6 +415,7 @@ export const aircraftOperationalSummarySchema = z.object({
   registration: z.string(),
   aircraftType: z.string(),
   passengerSeats: z.number().int().positive(),
+  maximumPassengerPayloadKg: z.number().positive().nullable(),
   operationalState: z.enum([
     "AVAILABLE",
     "BOARDING",
@@ -424,6 +463,19 @@ export const operationBoardSchema = z.object({
       gateType: z.enum(["FLIGHT_LINE", "BOARDING", "DISPLAY_ONLY"]),
       active: z.boolean(),
       sortOrder: z.number().int().nonnegative(),
+    }),
+  ),
+  resourceGroups: z.array(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+      status: z.enum(["ACTIVE", "PAUSED", "INTERRUPTED", "ENDED"]),
+      gateId: z.string(),
+      gateLabel: z.string(),
+      referenceCapacity: z.number().int().positive(),
+      plannedRotationMinutes: z.number().int().positive(),
+      compatibleAircraftTypes: z.array(z.string()),
+      activeAircraftIds: z.array(z.string()),
     }),
   ),
   metrics: z.object({

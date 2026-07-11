@@ -1079,9 +1079,20 @@ function AdminView() {
   );
   const [gateActive, setGateActive] = useState(true);
   const [gateSortOrder, setGateSortOrder] = useState(10);
-  const resourceGroups = Array.from(
-    new Map(board?.products.map((product) => [product.resourceGroupId, product]) ?? []).values(),
-  );
+  const [resourceEditorId, setResourceEditorId] = useState("new");
+  const [resourceName, setResourceName] = useState("");
+  const [resourceGateId, setResourceGateId] = useState("");
+  const [resourceReferenceCapacity, setResourceReferenceCapacity] = useState(1);
+  const [resourcePlannedMinutes, setResourcePlannedMinutes] = useState(30);
+  const [resourceCompatibleTypes, setResourceCompatibleTypes] = useState("");
+  const [aircraftEditorId, setAircraftEditorId] = useState("new");
+  const [aircraftRegistration, setAircraftRegistration] = useState("");
+  const [aircraftType, setAircraftType] = useState("");
+  const [aircraftSeats, setAircraftSeats] = useState(4);
+  const [aircraftMaximumPayload, setAircraftMaximumPayload] = useState("");
+  const [assignmentAircraftId, setAssignmentAircraftId] = useState("");
+  const [assignmentResourceGroupId, setAssignmentResourceGroupId] = useState("");
+  const resourceGroups = board?.resourceGroups ?? [];
   const isAdministrator = board?.currentDeviceRole === "ADMIN";
   const refreshHistory = useCallback(async () => {
     try {
@@ -1210,7 +1221,7 @@ function AdminView() {
     setProductName(entry?.name ?? "");
     setProductCode(entry?.code ?? "");
     setProductDescription(entry?.publicDescription ?? "");
-    setProductResourceGroupId(entry?.resourceGroupId ?? resourceGroups[0]?.resourceGroupId ?? "");
+    setProductResourceGroupId(entry?.resourceGroupId ?? resourceGroups[0]?.id ?? "");
     setProductGateId(entry?.gateId ?? board?.gates.find((gate) => gate.active)?.id ?? "");
     setProductPriceCents(entry?.priceCents ?? 0);
     setProductReferenceCapacity(entry?.referenceCapacity ?? 1);
@@ -1312,6 +1323,158 @@ function AdminView() {
     } catch (cause) {
       setMessage(
         cause instanceof Error ? cause.message : "Produkt konnte nicht gespeichert werden.",
+      );
+    }
+  }
+
+  function selectResourceForEditing(id: string) {
+    setResourceEditorId(id);
+    const entry = resourceGroups.find((group) => group.id === id);
+    setResourceName(entry?.name ?? "");
+    setResourceGateId(entry?.gateId ?? board?.gates.find((gate) => gate.active)?.id ?? "");
+    setResourceReferenceCapacity(entry?.referenceCapacity ?? 1);
+    setResourcePlannedMinutes(entry?.plannedRotationMinutes ?? 30);
+    setResourceCompatibleTypes(entry?.compatibleAircraftTypes.join(", ") ?? "");
+  }
+
+  function selectAircraftForEditing(id: string) {
+    setAircraftEditorId(id);
+    const entry = board?.aircraft.find((aircraft) => aircraft.id === id);
+    setAircraftRegistration(entry?.registration ?? "");
+    setAircraftType(entry?.aircraftType ?? "");
+    setAircraftSeats(entry?.passengerSeats ?? 4);
+    setAircraftMaximumPayload(entry?.maximumPassengerPayloadKg?.toString() ?? "");
+  }
+
+  async function saveResourceGroup() {
+    if (
+      !board ||
+      !resourceGateId ||
+      resourceName.trim().length < 2 ||
+      reason.trim().length < 3 ||
+      adminPin.length < 4
+    )
+      return;
+    try {
+      await sendCommand(
+        {
+          commandId: crypto.randomUUID(),
+          eventId: EVENT_ID,
+          deviceId: ADMIN_DEVICE_ID,
+          expectedVersion: board.event.version,
+          issuedAt: new Date().toISOString(),
+          type: "UPSERT_RESOURCE_GROUP",
+          payload: {
+            resourceGroupId: resourceEditorId === "new" ? crypto.randomUUID() : resourceEditorId,
+            name: resourceName.trim(),
+            gateId: resourceGateId,
+            referenceCapacity: resourceReferenceCapacity,
+            plannedRotationMinutes: resourcePlannedMinutes,
+            compatibleAircraftTypes: resourceCompatibleTypes
+              .split(",")
+              .map((entry) => entry.trim())
+              .filter(Boolean),
+            reason: reason.trim(),
+            adminPin,
+          },
+        },
+        deviceTokenFor(ADMIN_DEVICE_ID),
+      );
+      setMessage("Ressourcengruppe wurde protokolliert gespeichert.");
+      setAdminPin("");
+      selectResourceForEditing("new");
+      await refresh();
+      await refreshHistory();
+    } catch (cause) {
+      setMessage(
+        cause instanceof Error
+          ? cause.message
+          : "Ressourcengruppe konnte nicht gespeichert werden.",
+      );
+    }
+  }
+
+  async function saveAircraft() {
+    if (
+      !board ||
+      aircraftRegistration.trim().length < 3 ||
+      aircraftType.trim().length < 2 ||
+      reason.trim().length < 3 ||
+      adminPin.length < 4
+    )
+      return;
+    try {
+      await sendCommand(
+        {
+          commandId: crypto.randomUUID(),
+          eventId: EVENT_ID,
+          deviceId: ADMIN_DEVICE_ID,
+          expectedVersion: board.event.version,
+          issuedAt: new Date().toISOString(),
+          type: "UPSERT_AIRCRAFT",
+          payload: {
+            aircraftId: aircraftEditorId === "new" ? crypto.randomUUID() : aircraftEditorId,
+            registration: aircraftRegistration.trim().toUpperCase(),
+            aircraftType: aircraftType.trim(),
+            passengerSeats: aircraftSeats,
+            maximumPassengerPayloadKg: aircraftMaximumPayload
+              ? Number(aircraftMaximumPayload)
+              : null,
+            reason: reason.trim(),
+            adminPin,
+          },
+        },
+        deviceTokenFor(ADMIN_DEVICE_ID),
+      );
+      setMessage("Flugzeugstammdaten wurden protokolliert gespeichert.");
+      setAdminPin("");
+      selectAircraftForEditing("new");
+      await refresh();
+      await refreshHistory();
+    } catch (cause) {
+      setMessage(
+        cause instanceof Error ? cause.message : "Flugzeug konnte nicht gespeichert werden.",
+      );
+    }
+  }
+
+  async function assignAircraft() {
+    if (
+      !board ||
+      !assignmentAircraftId ||
+      !assignmentResourceGroupId ||
+      reason.trim().length < 3 ||
+      adminPin.length < 4
+    )
+      return;
+    try {
+      await sendCommand(
+        {
+          commandId: crypto.randomUUID(),
+          eventId: EVENT_ID,
+          deviceId: ADMIN_DEVICE_ID,
+          expectedVersion: board.event.version,
+          issuedAt: new Date().toISOString(),
+          type: "ASSIGN_AIRCRAFT_RESOURCE_GROUP",
+          payload: {
+            aircraftId: assignmentAircraftId,
+            resourceGroupId: assignmentResourceGroupId,
+            effectiveAt: new Date().toISOString(),
+            reason: reason.trim(),
+            adminPin,
+          },
+        },
+        deviceTokenFor(ADMIN_DEVICE_ID),
+      );
+      setMessage(
+        "Flugzeugzuordnung wurde historisiert geändert; Queue und Prognose werden neu berechnet.",
+      );
+      setAdminPin("");
+      await refresh();
+      await refreshHistory();
+    } catch (cause) {
+      setMessage(
+        cause instanceof Error ? cause.message : "Flugzeugzuordnung konnte nicht geändert werden.",
       );
     }
   }
@@ -1973,8 +2136,8 @@ function AdminView() {
                   >
                     <option value="">Bitte wählen</option>
                     {resourceGroups.map((group) => (
-                      <option key={group.resourceGroupId} value={group.resourceGroupId}>
-                        {group.resourceGroupName}
+                      <option key={group.id} value={group.id}>
+                        {group.name}
                       </option>
                     ))}
                   </select>
@@ -2089,6 +2252,214 @@ function AdminView() {
           </div>
         </section>
         <section className="admin-section">
+          <h2>Ressourcen und Flugzeugzuordnung</h2>
+          <div className="resource-master-grid">
+            <fieldset>
+              <legend>Ressourcengruppe</legend>
+              <label>
+                Datensatz
+                <select
+                  value={resourceEditorId}
+                  onChange={(event) => selectResourceForEditing(event.target.value)}
+                >
+                  <option value="new">Neue Ressourcengruppe</option>
+                  {resourceGroups.map((group) => (
+                    <option key={group.id} value={group.id}>
+                      {group.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Bezeichnung
+                <input
+                  value={resourceName}
+                  onChange={(event) => setResourceName(event.target.value)}
+                />
+              </label>
+              <label>
+                Gate
+                <select
+                  value={resourceGateId}
+                  onChange={(event) => setResourceGateId(event.target.value)}
+                >
+                  <option value="">Bitte wählen</option>
+                  {board?.gates
+                    .filter((gate) => gate.active)
+                    .map((gate) => (
+                      <option key={gate.id} value={gate.id}>
+                        {gate.label}
+                      </option>
+                    ))}
+                </select>
+              </label>
+              <label>
+                Referenzkapazität
+                <input
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={resourceReferenceCapacity}
+                  onChange={(event) => setResourceReferenceCapacity(Number(event.target.value))}
+                />
+              </label>
+              <label>
+                Plan-Umlaufzeit (Min.)
+                <input
+                  type="number"
+                  min="1"
+                  max="600"
+                  value={resourcePlannedMinutes}
+                  onChange={(event) => setResourcePlannedMinutes(Number(event.target.value))}
+                />
+              </label>
+              <label>
+                Kompatible Typen (kommagetrennt)
+                <input
+                  value={resourceCompatibleTypes}
+                  onChange={(event) => setResourceCompatibleTypes(event.target.value)}
+                  placeholder="leer = alle Typen"
+                />
+              </label>
+              <button
+                disabled={
+                  !isAdministrator ||
+                  resourceName.trim().length < 2 ||
+                  !resourceGateId ||
+                  reason.trim().length < 3 ||
+                  adminPin.length < 4
+                }
+                onClick={saveResourceGroup}
+                type="button"
+              >
+                Ressourcengruppe speichern
+              </button>
+            </fieldset>
+            <fieldset>
+              <legend>Flugzeug</legend>
+              <label>
+                Datensatz
+                <select
+                  value={aircraftEditorId}
+                  onChange={(event) => selectAircraftForEditing(event.target.value)}
+                >
+                  <option value="new">Neues Flugzeug</option>
+                  {board?.aircraft.map((aircraft) => (
+                    <option key={aircraft.id} value={aircraft.id}>
+                      {aircraft.registration}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Kennzeichen
+                <input
+                  value={aircraftRegistration}
+                  maxLength={16}
+                  onChange={(event) => setAircraftRegistration(event.target.value.toUpperCase())}
+                />
+              </label>
+              <label>
+                Flugzeugtyp
+                <input
+                  value={aircraftType}
+                  onChange={(event) => setAircraftType(event.target.value)}
+                />
+              </label>
+              <label>
+                Passagierplätze
+                <input
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={aircraftSeats}
+                  onChange={(event) => setAircraftSeats(Number(event.target.value))}
+                />
+              </label>
+              <label>
+                Max. Passagierzuladung (kg, optional)
+                <input
+                  type="number"
+                  min="1"
+                  value={aircraftMaximumPayload}
+                  onChange={(event) => setAircraftMaximumPayload(event.target.value)}
+                />
+              </label>
+              <button
+                disabled={
+                  !isAdministrator ||
+                  aircraftRegistration.trim().length < 3 ||
+                  aircraftType.trim().length < 2 ||
+                  reason.trim().length < 3 ||
+                  adminPin.length < 4
+                }
+                onClick={saveAircraft}
+                type="button"
+              >
+                Flugzeug speichern
+              </button>
+            </fieldset>
+            <fieldset>
+              <legend>Historisierte Zuordnung</legend>
+              <label>
+                Flugzeug
+                <select
+                  value={assignmentAircraftId}
+                  onChange={(event) => setAssignmentAircraftId(event.target.value)}
+                >
+                  <option value="">Bitte wählen</option>
+                  {board?.aircraft.map((aircraft) => (
+                    <option key={aircraft.id} value={aircraft.id}>
+                      {aircraft.registration} · {aircraft.resourceGroupName}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Neue Ressourcengruppe
+                <select
+                  value={assignmentResourceGroupId}
+                  onChange={(event) => setAssignmentResourceGroupId(event.target.value)}
+                >
+                  <option value="">Bitte wählen</option>
+                  {resourceGroups
+                    .filter((group) => group.status !== "ENDED")
+                    .map((group) => (
+                      <option key={group.id} value={group.id}>
+                        {group.name}
+                      </option>
+                    ))}
+                </select>
+              </label>
+              <p>
+                Wirksam ab Bestätigung. Aktive Umläufe und inkompatible Flugzeugtypen werden
+                serverseitig abgewiesen.
+              </p>
+              <label>
+                Administrator-PIN
+                <input
+                  type="password"
+                  value={adminPin}
+                  onChange={(event) => setAdminPin(event.target.value)}
+                />
+              </label>
+              <button
+                disabled={
+                  !isAdministrator ||
+                  !assignmentAircraftId ||
+                  !assignmentResourceGroupId ||
+                  reason.trim().length < 3 ||
+                  adminPin.length < 4
+                }
+                onClick={assignAircraft}
+                type="button"
+              >
+                Zuordnung ändern
+              </button>
+            </fieldset>
+          </div>
+        </section>
+        <section className="admin-section">
           <h2>Notfallmodus</h2>
           {!board?.event.emergencyMode ? (
             <button
@@ -2152,12 +2523,8 @@ function AdminView() {
               Für gesamte Veranstaltung veröffentlichen
             </button>
             {resourceGroups.map((group) => (
-              <button
-                key={group.resourceGroupId}
-                onClick={() => setNotice(group.resourceGroupId)}
-                type="button"
-              >
-                Für {group.resourceGroupName} veröffentlichen
+              <button key={group.id} onClick={() => setNotice(group.id)} type="button">
+                Für {group.name} veröffentlichen
               </button>
             ))}
           </div>
@@ -2365,28 +2732,19 @@ function AdminView() {
         <section className="admin-section">
           <h2>Ressourcengruppen</h2>
           {resourceGroups.map((group) => (
-            <div className="resource-control" key={group.resourceGroupId}>
+            <div className="resource-control" key={group.id}>
               <div>
-                <strong>{group.resourceGroupName}</strong>
-                <span>{group.resourceGroupStatus}</span>
+                <strong>{group.name}</strong>
+                <span>{group.status}</span>
               </div>
               <div className="secondary-actions">
-                <button
-                  onClick={() => setResourceStatus(group.resourceGroupId, "PAUSED")}
-                  type="button"
-                >
+                <button onClick={() => setResourceStatus(group.id, "PAUSED")} type="button">
                   Pausieren
                 </button>
-                <button
-                  onClick={() => setResourceStatus(group.resourceGroupId, "INTERRUPTED")}
-                  type="button"
-                >
+                <button onClick={() => setResourceStatus(group.id, "INTERRUPTED")} type="button">
                   Unterbrechen
                 </button>
-                <button
-                  onClick={() => setResourceStatus(group.resourceGroupId, "ACTIVE")}
-                  type="button"
-                >
+                <button onClick={() => setResourceStatus(group.id, "ACTIVE")} type="button">
                   Aktivieren
                 </button>
               </div>

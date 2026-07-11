@@ -53,3 +53,10 @@ Gewichtsklassen und Sortierung ein. Bestehende Veranstaltungen erhalten ein synt
 Produktkürzel werden deterministisch aus internen IDs abgeleitet. Vor Anwendung wird gesichert.
 Wiederherstellung erfolgt aus der Sicherung, weil Spalten und Gate-Bezüge nicht verlustfrei einzeln
 zurückgebaut werden können.
+
+## 0016 – Ressourcen- und Flugzeugstammdaten
+
+Ergänzt Ressourcengruppen um Kapazität, Planumlaufzeit und kompatible Flugzeugtypen sowie Flugzeuge
+um die optionale maximale Passagierzuladung. Zuordnungshistorien erhalten Änderungsgrund und Gerät.
+Die bestehende partielle Eindeutigkeitsregel verhindert weiterhin zwei aktive Ressourcengruppen je
+Flugzeug. Vor Anwendung wird gesichert; Wiederherstellung erfolgt aus der portablen Sicherung.

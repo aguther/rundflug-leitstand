@@ -213,3 +213,12 @@ describe("master data authorization", () => {
     expect(() => assertRoleMayExecute("FLIGHT_LINE_LEAD", "UPSERT_GATE")).toThrow();
   });
 });
+
+describe("aircraft assignment authorization", () => {
+  it("restricts assignments to administration", () => {
+    expect(() => assertRoleMayExecute("ADMIN", "ASSIGN_AIRCRAFT_RESOURCE_GROUP")).not.toThrow();
+    expect(() =>
+      assertRoleMayExecute("FLIGHT_DIRECTOR", "ASSIGN_AIRCRAFT_RESOURCE_GROUP"),
+    ).toThrow();
+  });
+});
