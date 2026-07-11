@@ -208,6 +208,20 @@ p {
 .ticket-preview p {
   color: #60758d;
 }
+.ticket-code-mode,
+.preprinted-code-input {
+  display: grid;
+  gap: 6px;
+  margin-top: 14px;
+  color: #52677f;
+  font-weight: 700;
+}
+.ticket-code-mode select,
+.preprinted-code-input textarea {
+  min-height: 46px;
+  padding: 9px;
+  font: inherit;
+}
 .weight-class-list {
   margin-top: 20px;
   padding-top: 16px;
@@ -239,15 +253,40 @@ p {
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: 12px;
 }
-.receipt-list code {
-  padding: 18px 12px;
+.ticket-receipt {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 14px;
   border: 1px dashed #8093aa;
+  background: #fff;
+}
+.ticket-receipt img {
+  width: min(100%, 220px);
+  height: auto;
+}
+.ticket-receipt code {
+  padding: 18px 12px;
   background: #f8fafc;
   text-align: center;
   font-size: 1rem;
   font-weight: 800;
   letter-spacing: 0.04em;
 }
+.ticket-receipt span {
+  text-align: center;
+  color: #52677f;
+  font-size: 0.8rem;
+}
+.print-tickets {
+  min-height: 48px;
+  padding: 10px 16px;
+  border: 1px solid #1769d2;
+  background: #fff;
+  color: #1769d2;
+  font-weight: 800;
+}
+
 .primary-action {
   min-height: 64px;
   width: 100%;
@@ -1061,5 +1100,27 @@ p {
   *::before,
   *::after {
     scroll-behavior: auto;
+  }
+}
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .ticket-preview,
+  .ticket-preview * {
+    visibility: visible;
+  }
+  .ticket-preview {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    border: 0;
+  }
+  .ticket-preview > h2,
+  .ticket-preview > p,
+  .ticket-preview .action-message,
+  .ticket-preview .correction-controls,
+  .print-tickets {
+    display: none;
   }
 }
