@@ -7,6 +7,7 @@ import { sha256Hex, verifyCredential } from "./crypto";
 import { EventCoordinator } from "./event-coordinator";
 import { rowToSnapshot } from "./snapshot";
 import type { Env, StoredEventRow } from "./types";
+import { isAllowedPushEndpoint, purgeExpiredPushSubscriptions } from "./web-push";
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -455,6 +456,97 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
   });
 });
 
+app.get("/api/public/push/config", (context) => {
+  if (!context.env.VAPID_PUBLIC_KEY) {
+    return context.json(
+      { error: { code: "PUSH_NOT_CONFIGURED", message: "Web-Push ist noch nicht eingerichtet." } },
+      503,
+    );
+  }
+  return context.json({ publicKey: context.env.VAPID_PUBLIC_KEY, retentionDays: 7 });
+});
+
+app.post("/api/public/tickets/:ticketCode/push-subscriptions", async (context) => {
+  const ticketCode = context.req.param("ticketCode").trim().toUpperCase();
+  if (!/^[A-Z2-9]{12,32}$/.test(ticketCode)) {
+    return context.json(
+      { error: { code: "TICKET_NOT_FOUND", message: "Ticket nicht gefunden." } },
+      404,
+    );
+  }
+  const body = await context.req.json<{
+    consent?: boolean;
+    endpoint?: string;
+    keys?: { p256dh?: string; auth?: string };
+  }>();
+  if (
+    body.consent !== true ||
+    typeof body.endpoint !== "string" ||
+    !isAllowedPushEndpoint(body.endpoint) ||
+    typeof body.keys?.p256dh !== "string" ||
+    typeof body.keys.auth !== "string"
+  ) {
+    return context.json(
+      { error: { code: "INVALID_PUSH_SUBSCRIPTION", message: "Push-Einwilligung ist ungültig." } },
+      400,
+    );
+  }
+  const ticket = await context.env.DB.prepare(
+    `SELECT t.id, tg.operation_day_id FROM tickets t
+       JOIN ticket_groups tg ON tg.id = t.ticket_group_id
+      WHERE t.public_code_hash = ?1 AND t.status <> 'CANCELED'`,
+  )
+    .bind(await sha256Hex(ticketCode))
+    .first<{ id: string; operation_day_id: string }>();
+  if (!ticket) {
+    return context.json(
+      { error: { code: "TICKET_NOT_FOUND", message: "Ticket nicht gefunden." } },
+      404,
+    );
+  }
+  const now = new Date();
+  const deleteAfter = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  await context.env.DB.prepare(
+    `INSERT INTO web_push_subscriptions
+       (id, operation_day_id, ticket_id, endpoint, p256dh, auth, consented_at, delete_after, status, updated_at)
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'ACTIVE', ?7)
+     ON CONFLICT(endpoint) DO UPDATE SET ticket_id = excluded.ticket_id,
+       operation_day_id = excluded.operation_day_id, p256dh = excluded.p256dh, auth = excluded.auth,
+       consented_at = excluded.consented_at, delete_after = excluded.delete_after,
+       status = 'ACTIVE', updated_at = excluded.updated_at`,
+  )
+    .bind(
+      crypto.randomUUID(),
+      ticket.operation_day_id,
+      ticket.id,
+      body.endpoint,
+      body.keys.p256dh,
+      body.keys.auth,
+      now.toISOString(),
+      deleteAfter,
+    )
+    .run();
+  return context.json({ active: true, consentedAt: now.toISOString(), deleteAfter }, 201);
+});
+
+app.delete("/api/public/tickets/:ticketCode/push-subscriptions", async (context) => {
+  const ticketCode = context.req.param("ticketCode").trim().toUpperCase();
+  const body = await context.req.json<{ endpoint?: string }>();
+  if (!/^[A-Z2-9]{12,32}$/.test(ticketCode) || typeof body.endpoint !== "string") {
+    return context.json(
+      { error: { code: "INVALID_REQUEST", message: "Abmeldung ist ungültig." } },
+      400,
+    );
+  }
+  await context.env.DB.prepare(
+    `DELETE FROM web_push_subscriptions
+      WHERE endpoint = ?1 AND ticket_id IN (SELECT id FROM tickets WHERE public_code_hash = ?2)`,
+  )
+    .bind(body.endpoint, await sha256Hex(ticketCode))
+    .run();
+  return context.body(null, 204);
+});
+
 app.get("/api/public/events/:eventId/board", async (context) => {
   const eventId = context.req.param("eventId");
   const event = await context.env.DB.prepare(
@@ -548,6 +640,7 @@ export default {
     env: Env,
     _ctx: ExecutionContext,
   ): Promise<void> {
+    const purgedPushSubscriptions = await purgeExpiredPushSubscriptions(env);
     const result = await createPortableBackup(env);
     console.log(
       JSON.stringify({
@@ -555,6 +648,7 @@ export default {
         code: "PORTABLE_BACKUP_CREATED",
         key: result.key,
         checksum: result.checksum,
+        purgedPushSubscriptions,
         timestamp: new Date().toISOString(),
       }),
     );
