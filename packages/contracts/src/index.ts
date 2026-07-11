@@ -317,11 +317,32 @@ export const pilotOperationalSummarySchema = z.object({
 });
 
 export const operationBoardSchema = z.object({
+  currentDeviceRole: z.enum([
+    "CASHIER",
+    "FLIGHT_LINE",
+    "FLIGHT_LINE_LEAD",
+    "FLIGHT_DIRECTOR",
+    "ADMIN",
+  ]),
   event: eventSnapshotSchema,
   products: z.array(productOperationalSummarySchema),
   rotations: z.array(rotationOperationalSummarySchema),
   aircraft: z.array(aircraftOperationalSummarySchema),
   pilots: z.array(pilotOperationalSummarySchema),
+  metrics: z.object({
+    openTickets: z.number().int().nonnegative(),
+    soldTickets: z.number().int().nonnegative(),
+    completedRotations: z.number().int().nonnegative(),
+    activeRotations: z.number().int().nonnegative(),
+    averageBoardingMinutes: z.number().nonnegative().nullable(),
+    averageFlightMinutes: z.number().nonnegative().nullable(),
+    averageTurnaroundMinutes: z.number().nonnegative().nullable(),
+    averageRotationMinutes: z.number().nonnegative().nullable(),
+    averageWaitMinutes: z.number().nonnegative().nullable(),
+    informationalRevenueCents: z.number().int().nonnegative(),
+    activeDevices: z.number().int().nonnegative(),
+    activePushSubscriptions: z.number().int().nonnegative(),
+  }),
 });
 export type OperationBoard = z.infer<typeof operationBoardSchema>;
 

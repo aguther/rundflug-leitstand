@@ -1247,6 +1247,12 @@ export class EventCoordinator extends DurableObject<Env> {
         selectedAircraftId,
         command.type === "MARK_COMPLETED" ? 1 : 0,
       ),
+      this.env.DB.prepare(
+        `UPDATE tickets SET status = ?1
+          WHERE id IN (
+            SELECT ticket_id FROM rotation_tickets WHERE rotation_id = ?2 AND released_at IS NULL
+          )`,
+      ).bind(nextState, rotation.id),
       this.env.DB.prepare(`INSERT INTO operational_events (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type, aggregate_id, aggregate_version, payload_json)
         VALUES (?1, ?2, ?3, ?4, ?5, 'ROTATION', ?6, ?7, ?8)`).bind(
         crypto.randomUUID(),
@@ -1789,6 +1795,12 @@ export class EventCoordinator extends DurableObject<Env> {
         `UPDATE rotations SET status = 'DRAFT', aircraft_id = NULL, pilot_id = NULL, call_revoked_at = ?1,
                 version = version + 1, updated_at = ?1 WHERE id = ?2 AND version = ?3`,
       ).bind(now, rotation.id, rotation.version),
+      this.env.DB.prepare(
+        `UPDATE tickets SET status = 'QUEUED'
+          WHERE id IN (
+            SELECT ticket_id FROM rotation_tickets WHERE rotation_id = ?1 AND released_at IS NULL
+          )`,
+      ).bind(rotation.id),
     ];
     if (rotation.aircraft_id) {
       statements.push(

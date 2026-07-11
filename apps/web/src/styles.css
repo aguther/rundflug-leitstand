@@ -406,6 +406,45 @@ p {
   display: grid;
   gap: 16px;
 }
+.readonly-banner {
+  padding: 12px 16px;
+  border-left: 5px solid #1769d2;
+  background: #edf5ff;
+  font-weight: 800;
+}
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.metrics-grid > div {
+  padding: 14px;
+  border: 1px solid #d5dee8;
+  background: #fff;
+}
+.metrics-grid strong,
+.metrics-grid span {
+  display: block;
+}
+.active-rotation-list {
+  display: grid;
+  gap: 8px;
+}
+.active-rotation-list > div {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 1fr 1fr;
+  gap: 10px;
+  padding: 10px 0;
+  border-top: 1px solid #d5dee8;
+}
+.metrics-grid strong {
+  font-size: 1.35rem;
+}
+.metrics-grid span {
+  margin-top: 4px;
+  color: #60758d;
+  font-size: 0.85rem;
+}
 .admin-workspace > label,
 .admin-section label {
   display: grid;
@@ -777,8 +816,12 @@ p {
   .device-pairing-form,
   .device-list > div,
   .fleet-row,
-  .pilot-list > div {
+  .pilot-list > div,
+  .active-rotation-list > div {
     grid-template-columns: 1fr;
+  }
+  .metrics-grid {
+    grid-template-columns: 1fr 1fr;
   }
   .fleet-actions {
     grid-template-columns: 1fr 1fr;

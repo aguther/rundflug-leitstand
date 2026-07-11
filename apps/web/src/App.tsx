@@ -964,6 +964,7 @@ function AdminView() {
   const resourceGroups = Array.from(
     new Map(board?.products.map((product) => [product.resourceGroupId, product]) ?? []).values(),
   );
+  const isAdministrator = board?.currentDeviceRole === "ADMIN";
   const refreshHistory = useCallback(async () => {
     try {
       setHistory(await getAuditHistory(EVENT_ID, ADMIN_DEVICE_ID, deviceTokenFor(ADMIN_DEVICE_ID)));
@@ -982,8 +983,8 @@ function AdminView() {
   }, []);
   useEffect(() => {
     void refreshHistory();
-    void refreshDevices();
-  }, [refreshDevices, refreshHistory]);
+    if (isAdministrator) void refreshDevices();
+  }, [isAdministrator, refreshDevices, refreshHistory]);
 
   async function pairDevice() {
     if (!board || deviceLabel.trim().length < 2 || adminPin.length < 4) return;
@@ -1365,6 +1366,62 @@ function AdminView() {
       <OperationalNotice note={board?.event.operationalNote} />
       <section className="admin-workspace">
         <h1>Betriebssteuerung</h1>
+        {board?.currentDeviceRole === "FLIGHT_DIRECTOR" ? (
+          <div className="readonly-banner">Flugleitungsansicht · primär lesend</div>
+        ) : null}
+        {board ? (
+          <section className="metrics-grid" aria-label="Betriebskennzahlen">
+            <div>
+              <strong>{board.metrics.openTickets}</strong>
+              <span>offene Tickets</span>
+            </div>
+            <div>
+              <strong>{board.metrics.activeRotations}</strong>
+              <span>aktive Umläufe</span>
+            </div>
+            <div>
+              <strong>{board.metrics.completedRotations}</strong>
+              <span>abgeschlossen</span>
+            </div>
+            <div>
+              <strong>{board.metrics.averageBoardingMinutes ?? "–"}</strong>
+              <span>Ø Boarding Min.</span>
+            </div>
+            <div>
+              <strong>{board.metrics.averageFlightMinutes ?? "–"}</strong>
+              <span>Ø Flug Min.</span>
+            </div>
+            <div>
+              <strong>{board.metrics.averageTurnaroundMinutes ?? "–"}</strong>
+              <span>Ø Landung–frei Min.</span>
+            </div>
+            <div>
+              <strong>{board.metrics.averageRotationMinutes ?? "–"}</strong>
+              <span>Ø NEXT–frei Min.</span>
+            </div>
+            <div>
+              <strong>{board.metrics.averageWaitMinutes ?? "–"}</strong>
+              <span>Ø Verkauf–NEXT Min.</span>
+            </div>
+            <div>
+              <strong>
+                {(board.metrics.informationalRevenueCents / 100).toLocaleString("de-DE", {
+                  style: "currency",
+                  currency: "EUR",
+                })}
+              </strong>
+              <span>informatorischer Umsatz</span>
+            </div>
+            <div>
+              <strong>{board.metrics.activeDevices}</strong>
+              <span>Geräte online</span>
+            </div>
+            <div>
+              <strong>{board.metrics.activePushSubscriptions}</strong>
+              <span>Web-Push aktiv</span>
+            </div>
+          </section>
+        ) : null}
         <label>
           Begründung
           <input
@@ -1396,7 +1453,7 @@ function AdminView() {
               </label>
               <button
                 className="danger-action"
-                disabled={reason.trim().length < 3 || adminPin.length < 4}
+                disabled={!isAdministrator || reason.trim().length < 3 || adminPin.length < 4}
                 onClick={() => emergency("CLEAR_EMERGENCY")}
                 type="button"
               >
@@ -1404,6 +1461,22 @@ function AdminView() {
               </button>
             </>
           )}
+        </section>
+        <section className="admin-section">
+          <h2>Laufende Umläufe</h2>
+          <div className="active-rotation-list">
+            {board?.rotations
+              .filter((rotation) => ["CALLED", "IN_FLIGHT", "LANDED"].includes(rotation.status))
+              .map((rotation) => (
+                <div key={rotation.id}>
+                  <strong>Gruppe {rotation.communicationNumber}</strong>
+                  <span>{rotation.status}</span>
+                  <span>{rotation.aircraftRegistration ?? "Flugzeug offen"}</span>
+                  <span>Pilotencode {rotation.pilotOperationalCode ?? "offen"}</span>
+                </div>
+              ))}
+            {board && board.metrics.activeRotations === 0 ? <p>Keine laufenden Umläufe.</p> : null}
+          </div>
         </section>
         <section className="admin-section">
           <h2>Betriebs- und Wetterhinweise</h2>
@@ -1471,14 +1544,19 @@ function AdminView() {
                 </div>
                 <div className="secondary-actions">
                   <button
-                    disabled={reason.trim().length < 3 || adminPin.length < 4}
+                    disabled={!isAdministrator || reason.trim().length < 3 || adminPin.length < 4}
                     onClick={() => configureProductSales(product, !product.saleEnabled)}
                     type="button"
                   >
                     {product.saleEnabled ? "Verkauf sperren" : "Verkauf freigeben"}
                   </button>
                   <button
-                    disabled={reason.trim().length < 3 || adminPin.length < 4 || !saleClosesAt}
+                    disabled={
+                      !isAdministrator ||
+                      reason.trim().length < 3 ||
+                      adminPin.length < 4 ||
+                      !saleClosesAt
+                    }
                     onClick={() => configureProductSales(product, product.saleEnabled, true)}
                     type="button"
                   >
@@ -1563,7 +1641,7 @@ function AdminView() {
                     {aircraft.refuelPlanned ? "Vormerkung aufheben" : "Tanken vormerken"}
                   </button>
                   <button
-                    disabled={reason.trim().length < 3 || adminPin.length < 4}
+                    disabled={!isAdministrator || reason.trim().length < 3 || adminPin.length < 4}
                     onClick={() => configureRefuelThreshold(aircraft.id)}
                     type="button"
                   >
@@ -1592,6 +1670,7 @@ function AdminView() {
             />
             <button
               disabled={
+                !isAdministrator ||
                 !/^[A-Z0-9-]{2,12}$/.test(pilotCode) ||
                 reason.trim().length < 3 ||
                 adminPin.length < 4
@@ -1615,7 +1694,7 @@ function AdminView() {
                   {pilot.paused ? "Pause beenden" : "Pause starten"}
                 </button>
                 <button
-                  disabled={reason.trim().length < 3 || adminPin.length < 4}
+                  disabled={!isAdministrator || reason.trim().length < 3 || adminPin.length < 4}
                   onClick={() => upsertPilot(pilot.id, pilot.operationalCode, !pilot.active)}
                   type="button"
                 >
@@ -1686,7 +1765,7 @@ function AdminView() {
               />
             </label>
             <button
-              disabled={deviceLabel.trim().length < 2 || adminPin.length < 4}
+              disabled={!isAdministrator || deviceLabel.trim().length < 2 || adminPin.length < 4}
               onClick={pairDevice}
               type="button"
             >
@@ -1714,7 +1793,7 @@ function AdminView() {
                 </time>
                 {device.active ? (
                   <button
-                    disabled={reason.trim().length < 3 || adminPin.length < 4}
+                    disabled={!isAdministrator || reason.trim().length < 3 || adminPin.length < 4}
                     onClick={() => revokeDevice(device)}
                     type="button"
                   >
