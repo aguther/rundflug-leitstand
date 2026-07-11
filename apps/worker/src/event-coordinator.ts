@@ -428,6 +428,9 @@ export class EventCoordinator extends DurableObject<Env> {
         if (command.type === "REVOKE_CALL") {
           return this.handleRevokeCall(command, current);
         }
+        if (command.type === "SET_TICKET_ATTENDANCE") {
+          return this.handleTicketAttendance(command, current);
+        }
         if (
           command.type === "CANCEL_TICKET_GROUP" ||
           command.type === "REBOOK_TICKET_GROUP" ||
@@ -1501,6 +1504,95 @@ export class EventCoordinator extends DurableObject<Env> {
       ).bind(crypto.randomUUID(), command.eventId, JSON.stringify(result), now),
     );
     await this.env.DB.batch(statements);
+    this.broadcast(result);
+    return json(result);
+  }
+
+  private async handleTicketAttendance(
+    command: Extract<CommandEnvelope, { type: "SET_TICKET_ATTENDANCE" }>,
+    current: StoredEventRow,
+  ): Promise<Response> {
+    const ticket = await this.env.DB.prepare(
+      `SELECT t.id, t.attendance_status, r.status AS rotation_status
+         FROM tickets t
+         JOIN ticket_groups tg ON tg.id = t.ticket_group_id
+         JOIN rotation_tickets rt ON rt.ticket_id = t.id AND rt.released_at IS NULL
+         JOIN rotations r ON r.id = rt.rotation_id
+        WHERE t.id = ?1 AND tg.operation_day_id = ?2`,
+    )
+      .bind(command.payload.ticketId, command.eventId)
+      .first<{
+        id: string;
+        attendance_status: "NOT_CHECKED_IN" | "CHECKED_IN";
+        rotation_status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
+      }>();
+    if (!ticket) {
+      return json(
+        { error: { code: "TICKET_NOT_FOUND", message: "Ticket nicht gefunden." } },
+        { status: 404 },
+      );
+    }
+    if (!["DRAFT", "CALLED"].includes(ticket.rotation_status)) {
+      return json(
+        {
+          error: {
+            code: "ATTENDANCE_LOCKED",
+            message: "Der Anwesenheitsstatus ist nach IM FLUG nicht mehr änderbar.",
+          },
+        },
+        { status: 409 },
+      );
+    }
+    const nextAttendance = command.payload.checkedIn ? "CHECKED_IN" : "NOT_CHECKED_IN";
+    const now = new Date().toISOString();
+    const nextVersion = current.version + 1;
+    const eventType = command.payload.checkedIn ? "TICKET_CHECKED_IN" : "TICKET_CHECK_IN_REVOKED";
+    const result: CommandResult = {
+      accepted: true,
+      duplicate: false,
+      event: rowToSnapshot({ ...current, version: nextVersion, updated_at: now }),
+      eventType,
+      aggregate: { type: "TICKET", id: ticket.id },
+    };
+    await this.env.DB.batch([
+      this.env.DB.prepare(
+        "UPDATE operation_days SET version = ?1, updated_at = ?2 WHERE id = ?3 AND version = ?4",
+      ).bind(nextVersion, now, command.eventId, current.version),
+      this.env.DB.prepare("UPDATE tickets SET attendance_status = ?1 WHERE id = ?2").bind(
+        nextAttendance,
+        ticket.id,
+      ),
+      this.env.DB.prepare(
+        `INSERT INTO operational_events
+          (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type,
+           aggregate_id, aggregate_version, payload_json)
+         VALUES (?1, ?2, ?3, ?4, ?5, 'TICKET', ?6, ?7, ?8)`,
+      ).bind(
+        crypto.randomUUID(),
+        command.eventId,
+        eventType,
+        now,
+        command.deviceId,
+        ticket.id,
+        nextVersion,
+        JSON.stringify({ from: ticket.attendance_status, to: nextAttendance }),
+      ),
+      this.env.DB.prepare(
+        `INSERT INTO idempotency_receipts
+          (command_id, operation_day_id, device_id, command_type, received_at, response_json)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)`,
+      ).bind(
+        command.commandId,
+        command.eventId,
+        command.deviceId,
+        command.type,
+        now,
+        JSON.stringify(result),
+      ),
+      this.env.DB.prepare(
+        "INSERT INTO outbox (id, operation_day_id, topic, payload_json, created_at) VALUES (?1, ?2, 'EVENT_STATE_CHANGED', ?3, ?4)",
+      ).bind(crypto.randomUUID(), command.eventId, JSON.stringify(result), now),
+    ]);
     this.broadcast(result);
     return json(result);
   }

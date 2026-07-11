@@ -188,6 +188,13 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
     type: z.literal("REVOKE_CALL"),
     payload: z.object({ rotationId: z.string().min(1).max(100) }),
   }),
+  commandBaseSchema.extend({
+    type: z.literal("SET_TICKET_ATTENDANCE"),
+    payload: z.object({
+      ticketId: z.string().min(1).max(100),
+      checkedIn: z.boolean(),
+    }),
+  }),
 ]);
 
 export type CommandEnvelope = z.infer<typeof commandEnvelopeSchema>;
@@ -221,6 +228,7 @@ export const commandResultSchema = z.object({
         "DEVICE",
         "AIRCRAFT",
         "PILOT",
+        "TICKET",
         "TICKET_GROUP",
         "ROTATION",
       ]),
@@ -282,6 +290,12 @@ export const rotationOperationalSummarySchema = z.object({
   predictedLowerMinutes: z.number().int().nonnegative(),
   predictedUpperMinutes: z.number().int().nonnegative(),
   calledAt: z.string().nullable(),
+  tickets: z.array(
+    z.object({
+      id: z.string(),
+      attendanceStatus: z.enum(["NOT_CHECKED_IN", "CHECKED_IN"]),
+    }),
+  ),
 });
 
 export const aircraftOperationalSummarySchema = z.object({

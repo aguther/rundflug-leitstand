@@ -212,7 +212,14 @@ app.get("/api/events/:eventId/operations", async (context) => {
                  AND candidate.operational_state = 'AVAILABLE'
                ORDER BY candidate.registration LIMIT 1) AS suggested_aircraft_registration,
               MIN(tg.id) AS ticket_group_id, COUNT(rt.ticket_id) AS ticket_count,
-              COALESCE(MIN(p.name), 'Rundflug') AS product_name
+              COALESCE(MIN(p.name), 'Rundflug') AS product_name,
+              (SELECT json_group_array(json_object(
+                'id', attendance_ticket.id,
+                'attendanceStatus', attendance_ticket.attendance_status
+              ))
+                FROM rotation_tickets attendance_rt
+                JOIN tickets attendance_ticket ON attendance_ticket.id = attendance_rt.ticket_id
+               WHERE attendance_rt.rotation_id = r.id AND attendance_rt.released_at IS NULL) AS tickets_json
          FROM rotations r
          JOIN flight_groups fg ON fg.id = r.flight_group_id
          LEFT JOIN aircraft a ON a.id = r.aircraft_id
@@ -244,6 +251,7 @@ app.get("/api/events/:eventId/operations", async (context) => {
           ticket_count: number;
           product_name: string;
           called_at: string | null;
+          tickets_json: string;
         }>(),
       context.env.DB.prepare(
         `SELECT (julianday(landed_at) - julianday(departed_at)) * 1440.0 AS duration_minutes
@@ -476,6 +484,10 @@ app.get("/api/events/:eventId/operations", async (context) => {
           }),
         }).upperMinutes,
         calledAt: rotation.called_at,
+        tickets: JSON.parse(rotation.tickets_json) as Array<{
+          id: string;
+          attendanceStatus: "NOT_CHECKED_IN" | "CHECKED_IN";
+        }>,
       };
     }),
     aircraft: fleetRows.results.map((aircraft) => ({

@@ -251,4 +251,17 @@ describe("commandEnvelopeSchema", () => {
       }),
     ).toThrow();
   });
+
+  it("accepts an anonymous ticket attendance toggle", () => {
+    const parsed = commandEnvelopeSchema.parse({
+      commandId: "00e971df-23d5-4d28-9107-92b447416286",
+      eventId: "demo-2026",
+      deviceId: "flight-line-tablet-1",
+      expectedVersion: 9,
+      issuedAt: "2026-07-11T12:00:00.000Z",
+      type: "SET_TICKET_ATTENDANCE",
+      payload: { ticketId: "internal-ticket-id", checkedIn: true },
+    });
+    expect(parsed.type).toBe("SET_TICKET_ATTENDANCE");
+  });
 });

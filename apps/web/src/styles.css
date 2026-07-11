@@ -379,6 +379,38 @@ p {
   border: 1px solid #e99a91;
   font-weight: 800;
 }
+.attendance-panel {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 18px;
+  padding: 14px;
+  border: 1px solid #c7d2df;
+  background: #f8fafc;
+}
+.attendance-panel > div:first-child {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.attendance-panel h3 {
+  margin: 0;
+}
+.attendance-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+}
+.attendance-list button {
+  min-height: 48px;
+  border: 1px solid #59728d;
+  background: #fff;
+  font-weight: 750;
+}
+.attendance-list button.checked-in {
+  color: #165b35;
+  border-color: #198754;
+  background: #eaf6ef;
+}
 .rotation-detail .primary-action {
   margin-top: auto;
 }

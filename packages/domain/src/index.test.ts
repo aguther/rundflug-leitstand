@@ -190,3 +190,12 @@ describe("rotation lifecycle", () => {
     expect(transitionRotation("LANDED", "COMPLETED")).toBe("COMPLETED");
   });
 });
+
+describe("attendance authorization", () => {
+  it("allows flight line but not cashier devices to toggle attendance", () => {
+    expect(() => assertRoleMayExecute("FLIGHT_LINE", "SET_TICKET_ATTENDANCE")).not.toThrow();
+    expect(() => assertRoleMayExecute("CASHIER", "SET_TICKET_ATTENDANCE")).toThrowError(
+      /darf SET_TICKET_ATTENDANCE nicht/,
+    );
+  });
+});
