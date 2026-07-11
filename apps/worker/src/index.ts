@@ -78,7 +78,10 @@ app.get("/api/meta", (context) =>
 app.get("/api/events/:eventId/snapshot", async (context) => {
   const row = await context.env.DB.prepare(
     `SELECT id, name, event_date, time_zone, status, emergency_mode, operational_interrupted, version,
-            operational_note, operations_end_at, updated_at
+            operational_note, operations_end_at, sale_opens_at, no_show_after_minutes,
+            notification_lead_minutes, child_reference_weight_kg, normal_reference_weight_kg,
+            heavy_reference_weight_kg, planned_boarding_minutes, planned_deboarding_minutes,
+            planned_buffer_minutes, updated_at
        FROM operation_days
       WHERE id = ?1`,
   )
@@ -123,7 +126,10 @@ app.get("/api/events/:eventId/operations", async (context) => {
 
   const eventRow = await context.env.DB.prepare(
     `SELECT id, name, event_date, time_zone, status, emergency_mode, operational_interrupted, version,
-            operational_note, operations_end_at, updated_at FROM operation_days WHERE id = ?1`,
+            operational_note, operations_end_at, sale_opens_at, no_show_after_minutes,
+            notification_lead_minutes, child_reference_weight_kg, normal_reference_weight_kg,
+            heavy_reference_weight_kg, planned_boarding_minutes, planned_deboarding_minutes,
+            planned_buffer_minutes, updated_at FROM operation_days WHERE id = ?1`,
   )
     .bind(eventId)
     .first<StoredEventRow>();
@@ -213,6 +219,7 @@ app.get("/api/events/:eventId/operations", async (context) => {
                ORDER BY candidate.registration LIMIT 1) AS suggested_aircraft_registration,
               MIN(tg.id) AS ticket_group_id, COUNT(rt.ticket_id) AS ticket_count,
               COALESCE(MIN(p.name), 'Rundflug') AS product_name,
+              COALESCE(MIN(p.reference_duration_minutes), 20) AS reference_duration_minutes,
               (SELECT json_group_array(json_object(
                 'id', attendance_ticket.id,
                 'attendanceStatus', attendance_ticket.attendance_status
@@ -250,6 +257,7 @@ app.get("/api/events/:eventId/operations", async (context) => {
           ticket_group_id: string;
           ticket_count: number;
           product_name: string;
+          reference_duration_minutes: number;
           called_at: string | null;
           tickets_json: string;
         }>(),
@@ -391,7 +399,11 @@ app.get("/api/events/:eventId/operations", async (context) => {
         Math.ceil(product.queued_tickets / product.reference_capacity),
       );
       const duration = estimateDuration({
-        referenceMinutes: product.reference_duration_minutes,
+        referenceMinutes:
+          product.reference_duration_minutes +
+          (eventRow.planned_boarding_minutes ?? 8) +
+          (eventRow.planned_deboarding_minutes ?? 5) +
+          (eventRow.planned_buffer_minutes ?? 3),
         actualDurationsMinutes: actualDurations,
         dataAgeMinutes,
         interrupted:
@@ -433,7 +445,8 @@ app.get("/api/events/:eventId/operations", async (context) => {
           product.resource_group_status === "ACTIVE" &&
           eventRow.emergency_mode === 0 &&
           eventRow.operational_interrupted !== 1 &&
-          (product.sale_closes_at === null || Date.parse(product.sale_closes_at) > Date.now()),
+          (product.sale_closes_at === null || Date.parse(product.sale_closes_at) > Date.now()) &&
+          (!eventRow.sale_opens_at || Date.parse(eventRow.sale_opens_at) <= Date.now()),
         saleClosesAt: product.sale_closes_at,
         capacityWarningThreshold: product.capacity_warning_threshold,
         capacityCriticalThreshold: product.capacity_critical_threshold,
@@ -465,7 +478,11 @@ app.get("/api/events/:eventId/operations", async (context) => {
           queueSequence: index + 1,
           activeAircraft: effectiveActiveCapacity,
           duration: estimateDuration({
-            referenceMinutes: 20,
+            referenceMinutes:
+              rotation.reference_duration_minutes +
+              (eventRow.planned_boarding_minutes ?? 8) +
+              (eventRow.planned_deboarding_minutes ?? 5) +
+              (eventRow.planned_buffer_minutes ?? 3),
             actualDurationsMinutes: actualDurations,
             dataAgeMinutes,
             interrupted: eventRow.emergency_mode === 1 || eventRow.operational_interrupted === 1,
@@ -476,7 +493,11 @@ app.get("/api/events/:eventId/operations", async (context) => {
           queueSequence: index + 1,
           activeAircraft: effectiveActiveCapacity,
           duration: estimateDuration({
-            referenceMinutes: 20,
+            referenceMinutes:
+              rotation.reference_duration_minutes +
+              (eventRow.planned_boarding_minutes ?? 8) +
+              (eventRow.planned_deboarding_minutes ?? 5) +
+              (eventRow.planned_buffer_minutes ?? 3),
             actualDurationsMinutes: actualDurations,
             dataAgeMinutes,
             interrupted: eventRow.emergency_mode === 1 || eventRow.operational_interrupted === 1,

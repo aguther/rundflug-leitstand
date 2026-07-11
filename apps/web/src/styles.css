@@ -497,6 +497,11 @@ p {
   display: grid;
   gap: 14px;
 }
+.parameter-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
 .danger-action {
   min-height: 58px;
   border: 0;
@@ -873,6 +878,7 @@ p {
   .device-pairing-form,
   .device-list > div,
   .history-filters,
+  .parameter-grid,
   .fleet-row,
   .pilot-list > div,
   .active-rotation-list > div {

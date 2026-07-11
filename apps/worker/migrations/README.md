@@ -38,3 +38,10 @@ Ergänzt Tickets ausschließlich um den technischen Anwesenheitsstatus `NOT_CHEC
 andere Gastdaten werden nicht ergänzt. Vor Anwendung wird eine D1-/R2-Sicherung erzeugt.
 Wiederherstellung erfolgt aus dieser Sicherung, da SQLite die Spalte nicht ohne Tabellenneuaufbau
 entfernen kann.
+
+## 0014 – Veranstaltungsparameter
+
+Ergänzt additive, nicht personenbezogene Konfigurationsfelder für Verkaufsbeginn, Fristen,
+Referenzgewichte und Planprozesszeiten. Bestehende Veranstaltungen erhalten dokumentierte
+Standardwerte. Vor Anwendung wird eine portable Sicherung erstellt; Wiederherstellung erfolgt aus
+dieser Sicherung, da ein spaltenweiser Rückbau einen SQLite-Tabellenneuaufbau erfordern würde.

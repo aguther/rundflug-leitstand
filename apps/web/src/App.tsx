@@ -62,6 +62,13 @@ function saleClosingLabel(value: string | null): string | null {
   })}`;
 }
 
+function toLocalDateTimeInput(value: string | null): string {
+  if (!value) return "";
+  const date = new Date(value);
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 16);
+}
+
 function deviceTokenFor(deviceId: string): string {
   if (import.meta.env.DEV) {
     if (deviceId === "cashier-tablet-1") return "demo-cashier-device-token";
@@ -480,6 +487,12 @@ function FlightLineView() {
     operationalRotations?.find((rotation) => rotation.id === selectedId) ??
     operationalRotations?.[0];
   const action = selected ? actionForState[selected.status] : null;
+  const noShowReady = Boolean(
+    selected?.status === "CALLED" &&
+      selected.calledAt &&
+      board &&
+      Date.now() - Date.parse(selected.calledAt) >= board.event.noShowAfterMinutes * 60_000,
+  );
 
   async function advance() {
     if (!board || !selected || !action) return;
@@ -700,11 +713,13 @@ function FlightLineView() {
                       Zurückstellen
                     </button>
                     <button
-                      disabled={queueReason.trim().length < 3}
+                      disabled={queueReason.trim().length < 3 || !noShowReady}
                       onClick={() => mutateQueue("MARK_NO_SHOW")}
                       type="button"
                     >
-                      No-Show
+                      {selected.status === "CALLED" && !noShowReady
+                        ? `No-Show nach ${board?.event.noShowAfterMinutes ?? 10} Min.`
+                        : "No-Show"}
                     </button>
                   </div>
                 </div>
@@ -1026,6 +1041,17 @@ function AdminView() {
   const [pilotCode, setPilotCode] = useState("P-02");
   const [refuelThreshold, setRefuelThreshold] = useState(5);
   const [operationalNotice, setOperationalNotice] = useState("");
+  const [eventSettingsInitialized, setEventSettingsInitialized] = useState(false);
+  const [saleOpensAt, setSaleOpensAt] = useState("");
+  const [operationsEndAt, setOperationsEndAt] = useState("");
+  const [noShowAfterMinutes, setNoShowAfterMinutes] = useState(10);
+  const [notificationLeadMinutes, setNotificationLeadMinutes] = useState(15);
+  const [childReferenceWeightKg, setChildReferenceWeightKg] = useState(35);
+  const [normalReferenceWeightKg, setNormalReferenceWeightKg] = useState(80);
+  const [heavyReferenceWeightKg, setHeavyReferenceWeightKg] = useState(110);
+  const [plannedBoardingMinutes, setPlannedBoardingMinutes] = useState(8);
+  const [plannedDeboardingMinutes, setPlannedDeboardingMinutes] = useState(5);
+  const [plannedBufferMinutes, setPlannedBufferMinutes] = useState(3);
   const resourceGroups = Array.from(
     new Map(board?.products.map((product) => [product.resourceGroupId, product]) ?? []).values(),
   );
@@ -1058,6 +1084,20 @@ function AdminView() {
     void refreshHistory();
     if (isAdministrator) void refreshDevices();
   }, [isAdministrator, refreshDevices, refreshHistory]);
+  useEffect(() => {
+    if (!board || eventSettingsInitialized) return;
+    setSaleOpensAt(toLocalDateTimeInput(board.event.saleOpensAt));
+    setOperationsEndAt(toLocalDateTimeInput(board.event.operationsEndAt));
+    setNoShowAfterMinutes(board.event.noShowAfterMinutes);
+    setNotificationLeadMinutes(board.event.notificationLeadMinutes);
+    setChildReferenceWeightKg(board.event.referenceWeightsKg.child);
+    setNormalReferenceWeightKg(board.event.referenceWeightsKg.normal);
+    setHeavyReferenceWeightKg(board.event.referenceWeightsKg.heavy);
+    setPlannedBoardingMinutes(board.event.plannedBoardingMinutes);
+    setPlannedDeboardingMinutes(board.event.plannedDeboardingMinutes);
+    setPlannedBufferMinutes(board.event.plannedBufferMinutes);
+    setEventSettingsInitialized(true);
+  }, [board, eventSettingsInitialized]);
 
   async function pairDevice() {
     if (!board || deviceLabel.trim().length < 2 || adminPin.length < 4) return;
@@ -1095,6 +1135,45 @@ function AdminView() {
       await refreshHistory();
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : "Gerätekopplung fehlgeschlagen.");
+    }
+  }
+
+  async function saveEventParameters() {
+    if (!board || !operationsEndAt || reason.trim().length < 3 || adminPin.length < 4) return;
+    try {
+      await sendCommand(
+        {
+          commandId: crypto.randomUUID(),
+          eventId: EVENT_ID,
+          deviceId: ADMIN_DEVICE_ID,
+          expectedVersion: board.event.version,
+          issuedAt: new Date().toISOString(),
+          type: "CONFIGURE_EVENT_PARAMETERS",
+          payload: {
+            saleOpensAt: saleOpensAt ? new Date(saleOpensAt).toISOString() : null,
+            operationsEndAt: new Date(operationsEndAt).toISOString(),
+            noShowAfterMinutes,
+            notificationLeadMinutes,
+            childReferenceWeightKg,
+            normalReferenceWeightKg,
+            heavyReferenceWeightKg,
+            plannedBoardingMinutes,
+            plannedDeboardingMinutes,
+            plannedBufferMinutes,
+            reason: reason.trim(),
+            adminPin,
+          },
+        },
+        deviceTokenFor(ADMIN_DEVICE_ID),
+      );
+      setMessage("Veranstaltungsparameter wurden protokolliert aktualisiert.");
+      setAdminPin("");
+      await refresh();
+      await refreshHistory();
+    } catch (cause) {
+      setMessage(
+        cause instanceof Error ? cause.message : "Parameter konnten nicht gespeichert werden.",
+      );
     }
   }
 
@@ -1521,6 +1600,127 @@ function AdminView() {
             placeholder="Pflichtangabe"
           />
         </label>
+        <section className="admin-section">
+          <h2>Veranstaltungsparameter</h2>
+          <div className="parameter-grid">
+            <label>
+              Verkaufsbeginn
+              <input
+                type="datetime-local"
+                value={saleOpensAt}
+                onChange={(event) => setSaleOpensAt(event.target.value)}
+              />
+            </label>
+            <label>
+              Betriebsende
+              <input
+                type="datetime-local"
+                value={operationsEndAt}
+                onChange={(event) => setOperationsEndAt(event.target.value)}
+              />
+            </label>
+            <label>
+              No-Show nach Minuten
+              <input
+                type="number"
+                min="1"
+                max="120"
+                value={noShowAfterMinutes}
+                onChange={(event) => setNoShowAfterMinutes(Number(event.target.value))}
+              />
+            </label>
+            <label>
+              Benachrichtigungsvorlauf (Min.)
+              <input
+                type="number"
+                min="1"
+                max="240"
+                value={notificationLeadMinutes}
+                onChange={(event) => setNotificationLeadMinutes(Number(event.target.value))}
+              />
+            </label>
+            <label>
+              Referenzgewicht Kind (kg)
+              <input
+                type="number"
+                min="1"
+                max="300"
+                value={childReferenceWeightKg}
+                onChange={(event) => setChildReferenceWeightKg(Number(event.target.value))}
+              />
+            </label>
+            <label>
+              Referenzgewicht Normal (kg)
+              <input
+                type="number"
+                min="1"
+                max="300"
+                value={normalReferenceWeightKg}
+                onChange={(event) => setNormalReferenceWeightKg(Number(event.target.value))}
+              />
+            </label>
+            <label>
+              Referenzgewicht Schwer (kg)
+              <input
+                type="number"
+                min="1"
+                max="300"
+                value={heavyReferenceWeightKg}
+                onChange={(event) => setHeavyReferenceWeightKg(Number(event.target.value))}
+              />
+            </label>
+            <label>
+              Plan Boarding (Min.)
+              <input
+                type="number"
+                min="1"
+                max="120"
+                value={plannedBoardingMinutes}
+                onChange={(event) => setPlannedBoardingMinutes(Number(event.target.value))}
+              />
+            </label>
+            <label>
+              Plan Ausstieg (Min.)
+              <input
+                type="number"
+                min="1"
+                max="120"
+                value={plannedDeboardingMinutes}
+                onChange={(event) => setPlannedDeboardingMinutes(Number(event.target.value))}
+              />
+            </label>
+            <label>
+              Plan Puffer (Min.)
+              <input
+                type="number"
+                min="0"
+                max="120"
+                value={plannedBufferMinutes}
+                onChange={(event) => setPlannedBufferMinutes(Number(event.target.value))}
+              />
+            </label>
+            <label>
+              Administrator-PIN
+              <input
+                type="password"
+                value={adminPin}
+                onChange={(event) => setAdminPin(event.target.value)}
+              />
+            </label>
+          </div>
+          <button
+            disabled={
+              !isAdministrator ||
+              !operationsEndAt ||
+              reason.trim().length < 3 ||
+              adminPin.length < 4
+            }
+            onClick={saveEventParameters}
+            type="button"
+          >
+            Veranstaltungsparameter speichern
+          </button>
+        </section>
         <section className="admin-section">
           <h2>Notfallmodus</h2>
           {!board?.event.emergencyMode ? (
