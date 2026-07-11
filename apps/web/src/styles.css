@@ -599,6 +599,52 @@ p {
 .capacity-row span {
   display: block;
 }
+.safety-disclaimer {
+  padding: 10px 12px;
+  border-left: 4px solid #ef9f1a;
+  background: #fff7e6;
+  color: #6b3d00;
+  font-weight: 700;
+}
+.fleet-list,
+.pilot-list {
+  display: grid;
+  gap: 10px;
+}
+.fleet-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 2fr;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid #d5dee8;
+}
+.fleet-row span {
+  display: block;
+  margin-top: 4px;
+  color: #60758d;
+}
+.fleet-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(110px, 1fr));
+}
+.fleet-row .warning-text {
+  color: #9a4f00;
+  font-weight: 800;
+}
+.pilot-controls {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.pilot-list > div {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-top: 1px solid #d5dee8;
+}
 .device-pairing-form {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr auto;
@@ -691,8 +737,13 @@ p {
     grid-template-columns: 1fr;
   }
   .device-pairing-form,
-  .device-list > div {
+  .device-list > div,
+  .fleet-row,
+  .pilot-list > div {
     grid-template-columns: 1fr;
+  }
+  .fleet-actions {
+    grid-template-columns: 1fr 1fr;
   }
 }
 @media (prefers-reduced-motion: reduce) {

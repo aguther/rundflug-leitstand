@@ -138,9 +138,10 @@ app.get("/api/events/:eventId/operations", async (context) => {
     );
   }
 
-  const [products, rotations, durationRows, aircraftRows] = await Promise.all([
-    context.env.DB.prepare(
-      `SELECT p.id, p.name, p.resource_group_id, rg.name AS resource_group_name,
+  const [products, rotations, durationRows, aircraftRows, fleetRows, pilotRows] = await Promise.all(
+    [
+      context.env.DB.prepare(
+        `SELECT p.id, p.name, p.resource_group_id, rg.name AS resource_group_name,
               rg.status AS resource_group_status,
               p.price_cents, p.sale_enabled, p.reference_capacity, p.reference_duration_minutes,
               p.sale_closes_at, p.capacity_warning_threshold, p.capacity_critical_threshold,
@@ -157,26 +158,26 @@ app.get("/api/events/:eventId/operations", async (context) => {
         WHERE p.operation_day_id = ?1
         GROUP BY p.id
         ORDER BY p.name`,
-    )
-      .bind(eventId)
-      .all<{
-        id: string;
-        name: string;
-        resource_group_id: string;
-        resource_group_name: string;
-        resource_group_status: "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED";
-        price_cents: number;
-        sale_enabled: number;
-        reference_capacity: number;
-        reference_duration_minutes: number;
-        queued_tickets: number;
-        resource_group_open_tickets: number;
-        sale_closes_at: string | null;
-        capacity_warning_threshold: number;
-        capacity_critical_threshold: number;
-      }>(),
-    context.env.DB.prepare(
-      `SELECT r.id, r.flight_group_id, fg.resource_group_id, fg.communication_number, r.status, r.aircraft_id, r.called_at,
+      )
+        .bind(eventId)
+        .all<{
+          id: string;
+          name: string;
+          resource_group_id: string;
+          resource_group_name: string;
+          resource_group_status: "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED";
+          price_cents: number;
+          sale_enabled: number;
+          reference_capacity: number;
+          reference_duration_minutes: number;
+          queued_tickets: number;
+          resource_group_open_tickets: number;
+          sale_closes_at: string | null;
+          capacity_warning_threshold: number;
+          capacity_critical_threshold: number;
+        }>(),
+      context.env.DB.prepare(
+        `SELECT r.id, r.flight_group_id, fg.resource_group_id, fg.communication_number, r.status, r.aircraft_id, r.called_at,
               a.registration AS aircraft_registration,
               (SELECT candidate.id FROM resource_group_memberships membership
                 JOIN aircraft candidate ON candidate.id = membership.aircraft_id
@@ -204,40 +205,75 @@ app.get("/api/events/:eventId/operations", async (context) => {
         WHERE r.operation_day_id = ?1 AND r.status <> 'CANCELED'
         GROUP BY r.id
         ORDER BY fg.communication_number`,
-    )
-      .bind(eventId)
-      .all<{
-        id: string;
-        flight_group_id: string;
-        resource_group_id: string;
-        communication_number: number;
-        status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
-        aircraft_id: string | null;
-        aircraft_registration: string | null;
-        suggested_aircraft_id: string | null;
-        suggested_aircraft_registration: string | null;
-        ticket_group_id: string;
-        ticket_count: number;
-        product_name: string;
-        called_at: string | null;
-      }>(),
-    context.env.DB.prepare(
-      `SELECT (julianday(landed_at) - julianday(departed_at)) * 1440.0 AS duration_minutes
+      )
+        .bind(eventId)
+        .all<{
+          id: string;
+          flight_group_id: string;
+          resource_group_id: string;
+          communication_number: number;
+          status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
+          aircraft_id: string | null;
+          aircraft_registration: string | null;
+          suggested_aircraft_id: string | null;
+          suggested_aircraft_registration: string | null;
+          ticket_group_id: string;
+          ticket_count: number;
+          product_name: string;
+          called_at: string | null;
+        }>(),
+      context.env.DB.prepare(
+        `SELECT (julianday(landed_at) - julianday(departed_at)) * 1440.0 AS duration_minutes
          FROM rotations
         WHERE operation_day_id = ?1 AND departed_at IS NOT NULL AND landed_at IS NOT NULL
         ORDER BY landed_at DESC LIMIT 12`,
-    )
-      .bind(eventId)
-      .all<{ duration_minutes: number }>(),
-    context.env.DB.prepare(
-      `SELECT m.resource_group_id, a.passenger_seats FROM aircraft a
+      )
+        .bind(eventId)
+        .all<{ duration_minutes: number }>(),
+      context.env.DB.prepare(
+        `SELECT m.resource_group_id, a.passenger_seats FROM aircraft a
          JOIN resource_group_memberships m ON m.aircraft_id = a.id
         WHERE m.operation_day_id = ?1 AND m.active_until IS NULL
           AND a.operational_state NOT IN ('INACTIVE', 'PAUSED', 'REFUELING')`,
-    )
-      .bind(eventId)
-      .all<{ resource_group_id: string; passenger_seats: number }>(),
-  ]);
+      )
+        .bind(eventId)
+        .all<{ resource_group_id: string; passenger_seats: number }>(),
+      context.env.DB.prepare(
+        `SELECT a.id, a.registration, a.aircraft_type, a.passenger_seats, a.operational_state,
+              a.refuel_planned, a.rotations_since_refuel, a.refuel_reminder_threshold,
+              a.operational_interrupted,
+              m.resource_group_id, rg.name AS resource_group_name,
+              (SELECT b.expected_review_at FROM operational_blocks b
+                WHERE b.operation_day_id = m.operation_day_id AND b.scope_type = 'AIRCRAFT'
+                  AND b.scope_id = a.id AND b.status = 'ACTIVE'
+                ORDER BY b.started_at DESC LIMIT 1) AS expected_review_at
+         FROM aircraft a
+         JOIN resource_group_memberships m ON m.aircraft_id = a.id AND m.active_until IS NULL
+         JOIN resource_groups rg ON rg.id = m.resource_group_id
+        WHERE m.operation_day_id = ?1 ORDER BY a.registration`,
+      )
+        .bind(eventId)
+        .all<{
+          id: string;
+          registration: string;
+          aircraft_type: string;
+          passenger_seats: number;
+          operational_state: string;
+          refuel_planned: number;
+          rotations_since_refuel: number;
+          refuel_reminder_threshold: number;
+          operational_interrupted: number;
+          resource_group_id: string;
+          resource_group_name: string;
+          expected_review_at: string | null;
+        }>(),
+      context.env.DB.prepare(
+        "SELECT id, operational_code, active FROM pilots WHERE operation_day_id = ?1 ORDER BY operational_code",
+      )
+        .bind(eventId)
+        .all<{ id: string; operational_code: string; active: number }>(),
+    ],
+  );
 
   const actualDurations = durationRows.results.map((row) => row.duration_minutes);
   const dataAgeMinutes = Math.max(0, (Date.now() - Date.parse(eventRow.updated_at)) / 60_000);
@@ -340,6 +376,25 @@ app.get("/api/events/:eventId/operations", async (context) => {
         calledAt: rotation.called_at,
       };
     }),
+    aircraft: fleetRows.results.map((aircraft) => ({
+      id: aircraft.id,
+      registration: aircraft.registration,
+      aircraftType: aircraft.aircraft_type,
+      passengerSeats: aircraft.passenger_seats,
+      operationalState:
+        aircraft.operational_interrupted === 1 ? "INTERRUPTED" : aircraft.operational_state,
+      resourceGroupId: aircraft.resource_group_id,
+      resourceGroupName: aircraft.resource_group_name,
+      refuelPlanned: aircraft.refuel_planned === 1,
+      rotationsSinceRefuel: aircraft.rotations_since_refuel,
+      refuelReminderThreshold: aircraft.refuel_reminder_threshold,
+      expectedReviewAt: aircraft.expected_review_at,
+    })),
+    pilots: pilotRows.results.map((pilot) => ({
+      id: pilot.id,
+      operationalCode: pilot.operational_code,
+      active: pilot.active === 1,
+    })),
   });
 });
 

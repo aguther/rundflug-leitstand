@@ -13,5 +13,6 @@ describe("portable backup format", () => {
     expect(JSON.parse(serialized)).toMatchObject({ formatVersion: 1, requirementsVersion: "1.4" });
     expect(serialized).not.toContain("guestName");
     expect(serialized).not.toContain("phone");
+    expect(serialized).not.toContain("pilotName");
   });
 });

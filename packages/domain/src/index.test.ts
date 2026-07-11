@@ -43,6 +43,23 @@ describe("command authorization", () => {
     expect(() => assertRoleMayExecute("ADMIN", "REVOKE_DEVICE")).not.toThrow();
   });
 
+  it("separates refuel planning from capacity-removing fleet states", () => {
+    expect(() => assertRoleMayExecute("FLIGHT_LINE", "SCHEDULE_AIRCRAFT_REFUEL")).not.toThrow();
+    expect(() =>
+      assertRoleMayExecute("FLIGHT_LINE", "SET_AIRCRAFT_OPERATIONAL_STATE"),
+    ).toThrowError(/darf SET_AIRCRAFT_OPERATIONAL_STATE nicht/);
+    expect(() =>
+      assertRoleMayExecute("FLIGHT_LINE_LEAD", "SET_AIRCRAFT_OPERATIONAL_STATE"),
+    ).not.toThrow();
+  });
+
+  it("reserves anonymous pilot-code administration for administrators", () => {
+    expect(() => assertRoleMayExecute("FLIGHT_DIRECTOR", "UPSERT_PILOT")).toThrowError(
+      /darf UPSERT_PILOT nicht/,
+    );
+    expect(() => assertRoleMayExecute("ADMIN", "UPSERT_PILOT")).not.toThrow();
+  });
+
   it("allows flight direction to trigger but not clear emergency mode", () => {
     expect(() => assertRoleMayExecute("FLIGHT_DIRECTOR", "TRIGGER_EMERGENCY")).not.toThrow();
     expect(() => assertRoleMayExecute("FLIGHT_DIRECTOR", "CLEAR_EMERGENCY")).toThrowError(
