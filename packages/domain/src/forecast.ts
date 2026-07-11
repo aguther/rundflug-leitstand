@@ -44,10 +44,10 @@ export function estimateDuration(input: {
     };
   }
 
-  let weightedSum = input.referenceMinutes * 2;
-  let weightSum = 2;
+  let weightedSum = input.referenceMinutes;
+  let weightSum = 1;
   for (const [index, duration] of validSamples.entries()) {
-    const weight = index + 1;
+    const weight = index + 2;
     weightedSum += duration * weight;
     weightSum += weight;
   }

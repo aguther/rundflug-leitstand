@@ -66,3 +66,10 @@ Flugzeug. Vor Anwendung wird gesichert; Wiederherstellung erfolgt aus der portab
 Ergänzt Veranstaltungen um Flugplatz, Archivzeitpunkt und den nachvollziehbaren Bezug zur kopierten
 Vorveranstaltung. Die Änderung ist additiv; vor Anwendung wird dennoch eine portable Sicherung
 erstellt. Wiederherstellung erfolgt aus dieser Sicherung, da D1 Spalten nicht einzeln zurückrollt.
+
+## 0018 – Plan-, Prognose- und Ist-Zeitleisten
+
+Ergänzt Umläufe um getrennte Plan- und Prognosezeitpunkte; die vorhandenen Primärzeitstempel bleiben
+die unveränderten Ist-Werte. Prognose-Snapshots dokumentieren die Entwicklung je Event-Version.
+Vor Anwendung wird eine portable Sicherung erzeugt. Wiederherstellung erfolgt aus dieser Sicherung,
+weil additive D1-Spalten nicht einzeln zurückgebaut werden.
