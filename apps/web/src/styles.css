@@ -857,7 +857,7 @@ p {
 .fids-header,
 .fids-row {
   display: grid;
-  grid-template-columns: 2fr 0.65fr 1.25fr 0.9fr 1fr;
+  grid-template-columns: 1.6fr 1.2fr 1.15fr 0.8fr 1fr 0.9fr;
   gap: 16px;
   align-items: center;
   padding: 15px 16px;
@@ -876,6 +876,58 @@ p {
 }
 .fids-row b {
   font-size: 1.5em;
+}
+.fids-group {
+  display: grid;
+  gap: 4px;
+}
+.fids-group small {
+  overflow-wrap: anywhere;
+  color: #60758d;
+  font-size: 0.7em;
+}
+.status-chip {
+  padding: 8px 10px;
+  border: 2px solid currentColor;
+  border-radius: 999px;
+  font-weight: 850;
+  text-align: center;
+}
+.status-waiting {
+  color: #35516f;
+  background: #edf3f8;
+}
+.status-come_to_flight_line {
+  color: #7a2f05;
+  background: #fff1d6;
+}
+.status-in_flight {
+  color: #075b36;
+  background: #e5f7ee;
+}
+.status-landed,
+.status-completed {
+  color: #423184;
+  background: #f0edff;
+}
+.fleet-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  margin-top: 18px;
+  padding: 14px 16px;
+  border-top: 2px solid #9bacbf;
+  background: #f7f9fb;
+}
+.fleet-status span {
+  font-weight: 750;
+}
+.kiosk-shell .app-header nav,
+.kiosk-shell footer {
+  display: none;
+}
+.kiosk-shell .app-header {
+  justify-content: flex-start;
 }
 .fids-board > p {
   margin: 16px 0 0;
@@ -1150,11 +1202,23 @@ p {
   }
   .fids-header,
   .fids-row {
-    grid-template-columns: 1.5fr 0.7fr 1fr 0.8fr;
+    grid-template-columns: 1fr 1fr;
   }
-  .fids-header span:last-child,
-  .fids-row span:last-child {
+  .fids-header {
     display: none;
+  }
+  .fids-row > * {
+    display: grid;
+    align-content: start;
+    gap: 4px;
+  }
+  .fids-row > *::before {
+    content: attr(data-label);
+    color: #60758d;
+    font-size: 0.65rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
   }
   .capacity-row {
     grid-template-columns: 1fr;
@@ -1178,9 +1242,7 @@ p {
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
+  :where(*, *::before, *::after) {
     scroll-behavior: auto;
   }
 }

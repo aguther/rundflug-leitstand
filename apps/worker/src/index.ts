@@ -1600,6 +1600,8 @@ app.get("/api/public/events/:eventId/board", async (context) => {
             COALESCE(MIN(p.code), 'RF') AS product_code,
             COALESCE(MIN(g.label), 'Flight Line') AS gate_label,
             fg.communication_number, r.status,
+            MIN(a.registration) AS aircraft_registration,
+            COUNT(rt.ticket_id) AS ticket_count,
             rg.operational_note AS resource_group_operational_note
        FROM rotations r
        JOIN flight_groups fg ON fg.id = r.flight_group_id
@@ -1609,6 +1611,7 @@ app.get("/api/public/events/:eventId/board", async (context) => {
        LEFT JOIN ticket_groups tg ON tg.id = t.ticket_group_id
        LEFT JOIN products p ON p.id = tg.product_id
        LEFT JOIN gates g ON g.id = p.gate_id
+       LEFT JOIN aircraft a ON a.id = r.aircraft_id
       WHERE r.operation_day_id = ?1 AND r.status <> 'CANCELED'
       GROUP BY r.id
       ORDER BY fg.communication_number
@@ -1621,8 +1624,20 @@ app.get("/api/public/events/:eventId/board", async (context) => {
       gate_label: string;
       communication_number: number;
       status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
+      aircraft_registration: string | null;
+      ticket_count: number;
       resource_group_operational_note: string;
     }>();
+  const fleet = await context.env.DB.prepare(
+    `SELECT a.registration, a.operational_state, a.refuel_planned
+       FROM aircraft a
+       JOIN resource_group_memberships m ON m.aircraft_id = a.id
+      WHERE m.operation_day_id = ?1 AND m.active_until IS NULL
+      GROUP BY a.id, a.registration, a.operational_state, a.refuel_planned
+      ORDER BY a.registration`,
+  )
+    .bind(eventId)
+    .all<{ registration: string; operational_state: string; refuel_planned: number }>();
   const publicState = {
     DRAFT: "WAITING",
     CALLED: "COME_TO_FLIGHT_LINE",
@@ -1643,12 +1658,33 @@ app.get("/api/public/events/:eventId/board", async (context) => {
           productCode: row.product_code,
           gateLabel: row.gate_label,
           communicationNumber: row.communication_number,
+          ticketLabels: Array.from(
+            { length: row.ticket_count },
+            (_, ticketIndex) =>
+              `${row.product_code}-${String(row.communication_number).padStart(3, "0")}/${ticketIndex + 1}`,
+          ),
+          aircraftRegistration: row.aircraft_registration,
           status: publicState[row.status],
           waitLowerMinutes: event.operational_interrupted === 1 ? 0 : index * 20,
           waitUpperMinutes: event.operational_interrupted === 1 ? 0 : (index + 1) * 30,
           operationalNotice: row.resource_group_operational_note,
         })),
+    fleet: event.emergency_mode
+      ? []
+      : fleet.results.map((aircraft) => ({
+          registration: aircraft.registration,
+          status: aircraft.operational_state,
+          refuelPlanned: aircraft.refuel_planned === 1,
+        })),
   });
+});
+
+app.all("/api/public/events/:eventId/live", async (context) => {
+  const eventId = context.req.param("eventId");
+  const namespace = eventCoordinatorNamespace(context.env);
+  const stub = namespace.get(namespace.idFromName(eventId));
+  const response = await stub.fetch(context.req.raw);
+  return new Response(response.body, response);
 });
 
 app.all("/api/events/:eventId/live", async (context) => {

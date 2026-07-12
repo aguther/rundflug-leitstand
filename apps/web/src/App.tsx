@@ -42,6 +42,7 @@ import {
 import { confirmedStateLabel, loadOperationBoard, saveOperationBoard } from "./offline-store";
 
 const EVENT_ID = new URLSearchParams(window.location.search).get("event") ?? "demo-2026";
+const KIOSK_MODE = new URLSearchParams(window.location.search).get("kiosk") === "1";
 const LOCAL_DEVELOPMENT =
   import.meta.env.DEV || ["localhost", "127.0.0.1"].includes(window.location.hostname);
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -202,10 +203,18 @@ function useOperationBoard(deviceId: string) {
   return { ...state, refresh };
 }
 
-function Shell({ title, children }: { title: string; children: React.ReactNode }) {
+function Shell({
+  title,
+  children,
+  kiosk = false,
+}: {
+  title: string;
+  children: React.ReactNode;
+  kiosk?: boolean;
+}) {
   const online = useConnectivity();
   return (
-    <main className="app-shell">
+    <main className={kiosk ? "app-shell kiosk-shell" : "app-shell"}>
       <header className="app-header">
         <div>
           <strong>Rundflug-Leitstand</strong>
@@ -1392,7 +1401,7 @@ function PairDeviceView() {
     FLIGHT_LINE_LEAD: "/flight-line",
     FLIGHT_DIRECTOR: "/admin",
     ADMIN: "/admin",
-    DISPLAY: "/fids",
+    DISPLAY: "/fids?kiosk=1",
   };
   const valid =
     /^[0-9a-f-]{36}$/i.test(deviceId) &&
@@ -1438,6 +1447,9 @@ function FidsView() {
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     let active = true;
+    let socket: WebSocket | null = null;
+    let reconnectTimer: number | null = null;
+    let reconnectDelay = 1_000;
     const refresh = () =>
       getPublicBoard(EVENT_ID)
         .then((nextBoard) => {
@@ -1451,23 +1463,44 @@ function FidsView() {
             setError(reason instanceof Error ? reason.message : "Anzeige nicht verfügbar.");
           }
         });
+    const connect = () => {
+      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      socket = new WebSocket(
+        `${protocol}//${window.location.host}/api/public/events/${encodeURIComponent(EVENT_ID)}/live`,
+      );
+      socket.addEventListener("open", () => {
+        reconnectDelay = 1_000;
+        void refresh();
+      });
+      socket.addEventListener("message", () => void refresh());
+      socket.addEventListener("close", () => {
+        if (!active) return;
+        reconnectTimer = window.setTimeout(connect, reconnectDelay);
+        reconnectDelay = Math.min(reconnectDelay * 2, 15_000);
+      });
+      socket.addEventListener("error", () => socket?.close());
+    };
     void refresh();
-    const timer = window.setInterval(refresh, 5000);
+    connect();
+    const timer = window.setInterval(refresh, 15_000);
     return () => {
       active = false;
+      socket?.close();
+      if (reconnectTimer !== null) window.clearTimeout(reconnectTimer);
       window.clearInterval(timer);
     };
   }, []);
   return (
-    <Shell title="FIDS">
+    <Shell title="FIDS" kiosk={KIOSK_MODE}>
       <ConnectionNotice error={error} />
       <section className="fids-board">
         <h1>Rundflug-Leitstand – FIDS</h1>
         <div className="fids-header">
           <span>Produkt</span>
-          <span>Gruppe</span>
+          <span>Gruppe / Tickets</span>
           <span>Status</span>
           <span>Gate</span>
+          <span>Flugzeug</span>
           <span>Zeitfenster</span>
         </div>
         {board?.emergencyMode ? (
@@ -1485,16 +1518,38 @@ function FidsView() {
               <strong>
                 {group.productCode} · {group.productName}
               </strong>
-              <b>{group.communicationNumber}</b>
-              <span>{publicStatusLabel[group.status]}</span>
-              <span>{group.gateLabel}</span>
-              <span>
+              <span className="fids-group" data-label="Gruppe / Tickets">
+                <b>
+                  {group.productCode}-{String(group.communicationNumber).padStart(3, "0")}
+                </b>
+                <small>{group.ticketLabels.join(" · ")}</small>
+              </span>
+              <span
+                className={`status-chip status-${group.status.toLowerCase()}`}
+                data-label="Status"
+              >
+                {publicStatusLabel[group.status]}
+              </span>
+              <span data-label="Gate">{group.gateLabel}</span>
+              <span data-label="Flugzeug">{group.aircraftRegistration ?? "Zuweisung offen"}</span>
+              <span data-label="Zeitfenster">
                 {group.waitLowerMinutes}–{group.waitUpperMinutes} Min.
               </span>
             </div>
             <OperationalNotice note={group.operationalNotice} />
           </div>
         ))}
+        {board && board.fleet.length > 0 ? (
+          <section className="fleet-status" aria-label="Flottenstatus">
+            <strong>Flotte</strong>
+            {board.fleet.map((aircraft) => (
+              <span key={aircraft.registration}>
+                {aircraft.registration} · {aircraftStateLabel[aircraft.status]}
+                {aircraft.refuelPlanned ? " · Tanken vorgemerkt" : ""}
+              </span>
+            ))}
+          </section>
+        ) : null}
         <p>Zeiten sind typische Bereiche und nicht garantiert.</p>
       </section>
     </Shell>
