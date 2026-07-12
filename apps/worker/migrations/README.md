@@ -73,3 +73,11 @@ Ergänzt Umläufe um getrennte Plan- und Prognosezeitpunkte; die vorhandenen Pri
 die unveränderten Ist-Werte. Prognose-Snapshots dokumentieren die Entwicklung je Event-Version.
 Vor Anwendung wird eine portable Sicherung erzeugt. Wiederherstellung erfolgt aus dieser Sicherung,
 weil additive D1-Spalten nicht einzeln zurückgebaut werden.
+
+## 0019 – Geregelte Nacherfassung nach Totalausfall
+
+Führt append-only-nahe Nacherfassungsbatches und geordnete Papierbelege mit Vorsimulation,
+Konfliktstatus und späterem Vier-Augen-Bezug ein. Das Ereignisledger erhält ausschließlich additive
+Metadaten für ursprüngliche Ereigniszeit, Batch und anonymen Papierbezug; Namen oder Telefonnummern
+werden nicht eingeführt. Vor Anwendung wird ein portables Backup erstellt. Wiederherstellung erfolgt
+aus diesem Backup, da D1 die additiven Ledger-Spalten nicht einzeln zurückbauen kann.

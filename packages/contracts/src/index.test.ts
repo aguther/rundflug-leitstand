@@ -5,10 +5,61 @@ import {
   publicBoardSchema,
   publicTicketStatusSchema,
   rotationOperationalSummarySchema,
+  stageOutageRecoveryRequestSchema,
   ticketSearchResponseSchema,
 } from "./index";
 
 describe("commandEnvelopeSchema", () => {
+  it("accepts anonymous, ordered paper recovery records without guest fields", () => {
+    const parsed = stageOutageRecoveryRequestSchema.parse({
+      batchId: "550e8400-e29b-41d4-a716-446655440090",
+      expectedVersion: 12,
+      entries: [
+        {
+          id: "550e8400-e29b-41d4-a716-446655440091",
+          type: "PAPER_SALE",
+          originalOccurredAt: "2026-07-11T12:00:00.000Z",
+          paperSequence: 1,
+          paperReference: "BELEG-001",
+          payload: {
+            productId: "panorama-20",
+            publicTicketCodes: ["ABCDEFGHJKLM"],
+            paymentStatus: "PAID",
+            paymentMethod: "CASH",
+          },
+        },
+      ],
+    });
+
+    expect(parsed.entries[0]?.type).toBe("PAPER_SALE");
+    expect(JSON.stringify(parsed)).not.toMatch(/name|phone|telefon/i);
+  });
+
+  it("rejects guest identity fields in outage recovery records", () => {
+    expect(() =>
+      stageOutageRecoveryRequestSchema.parse({
+        batchId: "550e8400-e29b-41d4-a716-446655440090",
+        expectedVersion: 12,
+        entries: [
+          {
+            id: "550e8400-e29b-41d4-a716-446655440091",
+            type: "PAPER_SALE",
+            originalOccurredAt: "2026-07-11T12:00:00.000Z",
+            paperSequence: 1,
+            paperReference: "BELEG-001",
+            guestName: "Nicht zulässig",
+            payload: {
+              productId: "panorama-20",
+              publicTicketCodes: ["ABCDEFGHJKLM"],
+              paymentStatus: "PAID",
+              paymentMethod: "CASH",
+            },
+          },
+        ],
+      }),
+    ).toThrow();
+  });
+
   it("validates auditable product sale controls", () => {
     const parsed = commandEnvelopeSchema.parse({
       commandId: "550e8400-e29b-41d4-a716-446655440000",
