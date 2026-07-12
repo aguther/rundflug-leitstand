@@ -33,6 +33,16 @@
       "jurisdiction": "eu"
     }
   ],
+  "ratelimits": [
+    {
+      "name": "PUBLIC_TICKET_RATE_LIMITER",
+      "namespace_id": "7112401",
+      "simple": {
+        "limit": 30,
+        "period": 60
+      }
+    }
+  ],
   "durable_objects": {
     "bindings": [
       {

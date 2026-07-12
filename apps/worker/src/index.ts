@@ -6,12 +6,26 @@ import { secureHeaders } from "hono/secure-headers";
 import { createPortableBackup } from "./backup";
 import { sha256Hex, verifyCredential } from "./crypto";
 import { EventCoordinator } from "./event-coordinator";
+import { allowUnknownTicketAttempt } from "./public-access";
 import { createCsv, createTextPdf } from "./report";
 import { rowToSnapshot } from "./snapshot";
 import type { Env, StoredEventRow } from "./types";
 import { isAllowedPushEndpoint, purgeExpiredPushSubscriptions } from "./web-push";
 
 const app = new Hono<{ Bindings: Env }>();
+
+async function unknownTicketResponse(env: Env, request: Request): Promise<Response> {
+  if (!(await allowUnknownTicketAttempt(env.PUBLIC_TICKET_RATE_LIMITER, request))) {
+    return Response.json(
+      { error: { code: "TOO_MANY_TICKET_ATTEMPTS", message: "Bitte später erneut versuchen." } },
+      { status: 429, headers: { "retry-after": "60", "cache-control": "no-store" } },
+    );
+  }
+  return Response.json(
+    { error: { code: "TICKET_NOT_FOUND", message: "Ticket nicht gefunden." } },
+    { status: 404, headers: { "cache-control": "no-store" } },
+  );
+}
 
 async function authorizeDevice(
   env: Env,
@@ -1361,10 +1375,7 @@ app.get("/api/events/:eventId/reports/daily.pdf", async (context) => {
 app.get("/api/public/tickets/:ticketCode", async (context) => {
   const ticketCode = context.req.param("ticketCode").trim().toUpperCase();
   if (!/^[A-Z2-9]{12,32}$/.test(ticketCode)) {
-    return context.json(
-      { error: { code: "TICKET_NOT_FOUND", message: "Ticket nicht gefunden." } },
-      404,
-    );
+    return unknownTicketResponse(context.env, context.req.raw);
   }
   const ticketHash = await sha256Hex(ticketCode);
   const row = await context.env.DB.prepare(
@@ -1399,10 +1410,7 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
       operational_interrupted: number;
     }>();
   if (!row) {
-    return context.json(
-      { error: { code: "TICKET_NOT_FOUND", message: "Ticket nicht gefunden." } },
-      404,
-    );
+    return unknownTicketResponse(context.env, context.req.raw);
   }
   const publicState = {
     DRAFT: "WAITING",
@@ -1455,10 +1463,7 @@ app.get("/api/public/push/config", (context) => {
 app.post("/api/public/tickets/:ticketCode/push-subscriptions", async (context) => {
   const ticketCode = context.req.param("ticketCode").trim().toUpperCase();
   if (!/^[A-Z2-9]{12,32}$/.test(ticketCode)) {
-    return context.json(
-      { error: { code: "TICKET_NOT_FOUND", message: "Ticket nicht gefunden." } },
-      404,
-    );
+    return unknownTicketResponse(context.env, context.req.raw);
   }
   const body = await context.req.json<{
     consent?: boolean;
@@ -1485,10 +1490,7 @@ app.post("/api/public/tickets/:ticketCode/push-subscriptions", async (context) =
     .bind(await sha256Hex(ticketCode))
     .first<{ id: string; operation_day_id: string }>();
   if (!ticket) {
-    return context.json(
-      { error: { code: "TICKET_NOT_FOUND", message: "Ticket nicht gefunden." } },
-      404,
-    );
+    return unknownTicketResponse(context.env, context.req.raw);
   }
   const now = new Date();
   const deleteAfter = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
