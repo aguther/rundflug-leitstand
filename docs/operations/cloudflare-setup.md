@@ -67,6 +67,19 @@ selbst wird weder in Cloudflare-Konfiguration noch D1 gespeichert:
 npx wrangler secret put ADMIN_PIN_HASH
 ```
 
+Zusätzlich einen einmaligen, zufälligen Einrichtungscode mit mindestens 16 Zeichen ausschließlich
+interaktiv als Secret hinterlegen. Der Klartext wird danach nur einmal in `/setup` eingegeben und
+nicht in D1 gespeichert:
+
+```bash
+npx wrangler secret put BOOTSTRAP_TOKEN
+```
+
+Nach Deployment und Migration `https://<worker-domain>/setup` öffnen. Dort Veranstaltungsdaten,
+denselben Einrichtungscode und die zur Hashbildung verwendete Administrator-PIN eingeben. Der
+Leitstand erzeugt das erste anonyme Administrationsgerät im Browser und sperrt den Setup-Endpunkt
+anschließend dauerhaft. Demo-Seeds dürfen hierfür nicht verwendet werden.
+
 Für Web-Push ein eigenes VAPID-Schlüsselpaar je Umgebung erzeugen. Die Ausgabe enthält den privaten
 Schlüssel und darf nicht in Tickets, Chats oder Logs kopiert werden:
 

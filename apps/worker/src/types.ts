@@ -2,6 +2,7 @@ export interface Env {
   APP_ENV: "development" | "acceptance" | "production";
   DATA_JURISDICTION: "eu";
   ADMIN_PIN_HASH: string;
+  BOOTSTRAP_TOKEN?: string;
   VAPID_PUBLIC_KEY?: string;
   VAPID_PRIVATE_KEY?: string;
   VAPID_SUBJECT?: string;

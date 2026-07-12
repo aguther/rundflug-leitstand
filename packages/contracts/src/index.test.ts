@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  bootstrapRequestSchema,
   cloneEventRequestSchema,
   commandEnvelopeSchema,
   publicBoardSchema,
@@ -10,6 +11,24 @@ import {
 } from "./index";
 
 describe("commandEnvelopeSchema", () => {
+  it("accepts only anonymous, hashed first-run administration data", () => {
+    const parsed = bootstrapRequestSchema.parse({
+      setupCode: "synthetic-first-run-code",
+      adminPin: "0000",
+      eventId: "synthetic-first-run",
+      name: "Synthetischer Erststart",
+      eventDate: "2026-07-12",
+      aerodrome: "EDQA",
+      timeZone: "Europe/Berlin",
+      adminDeviceId: "550e8400-e29b-41d4-a716-446655440300",
+      adminCredentialHash: "a".repeat(64),
+    });
+    expect(parsed.eventId).toBe("synthetic-first-run");
+    expect("guestName" in parsed).toBe(false);
+    expect(() =>
+      bootstrapRequestSchema.parse({ ...parsed, adminCredentialHash: "clear-device-token" }),
+    ).toThrow();
+  });
   it("accepts anonymous, ordered paper recovery records without guest fields", () => {
     const parsed = stageOutageRecoveryRequestSchema.parse({
       batchId: "550e8400-e29b-41d4-a716-446655440090",

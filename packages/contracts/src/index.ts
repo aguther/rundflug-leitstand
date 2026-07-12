@@ -477,6 +477,22 @@ export const eventCatalogSchema = z.object({ events: z.array(eventCatalogEntrySc
 export type EventCatalogEntry = z.infer<typeof eventCatalogEntrySchema>;
 export type EventCatalog = z.infer<typeof eventCatalogSchema>;
 
+export const bootstrapRequestSchema = z.object({
+  setupCode: z.string().min(16).max(256),
+  adminPin: z.string().min(4).max(32),
+  eventId: z
+    .string()
+    .trim()
+    .regex(/^[a-z0-9][a-z0-9-]{2,63}$/),
+  name: z.string().trim().min(3).max(120),
+  eventDate: z.iso.date(),
+  aerodrome: z.string().trim().min(2).max(120),
+  timeZone: z.string().trim().min(3).max(80).default("Europe/Berlin"),
+  adminDeviceId: z.uuid(),
+  adminCredentialHash: z.string().regex(/^[a-f0-9]{64}$/),
+});
+export type BootstrapRequest = z.infer<typeof bootstrapRequestSchema>;
+
 export const ticketSearchResultSchema = z.object({
   ticketGroupId: z.string(),
   productId: z.string(),

@@ -1,6 +1,7 @@
 import {
   type AuditHistory,
   auditHistorySchema,
+  type BootstrapRequest,
   type CloneEventRequest,
   type CommandEnvelope,
   type CommandResult,
@@ -18,6 +19,34 @@ import {
   type TicketSearchResponse,
   ticketSearchResponseSchema,
 } from "@rundflug/contracts";
+
+export async function getSetupStatus(): Promise<{
+  setupRequired: boolean;
+  setupConfigured: boolean;
+}> {
+  const response = await fetch("/api/setup/status", { headers: { "cache-control": "no-store" } });
+  if (!response.ok) throw new Error("Einrichtungsstatus ist nicht verfügbar.");
+  return response.json();
+}
+
+export async function bootstrapSystem(
+  input: BootstrapRequest,
+): Promise<{ eventId: string; adminDeviceId: string }> {
+  const response = await fetch("/api/setup", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  const body = (await response.json()) as {
+    eventId?: string;
+    adminDeviceId?: string;
+    error?: { message?: string };
+  };
+  if (!response.ok || !body.eventId || !body.adminDeviceId) {
+    throw new Error(body.error?.message ?? "Ersteinrichtung fehlgeschlagen.");
+  }
+  return { eventId: body.eventId, adminDeviceId: body.adminDeviceId };
+}
 
 export async function searchTickets(
   eventId: string,

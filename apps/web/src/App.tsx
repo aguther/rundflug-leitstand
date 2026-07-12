@@ -10,6 +10,7 @@ import QRCode from "qrcode";
 import { useCallback, useEffect, useState } from "react";
 import type { PairedDeviceSummary } from "./api";
 import {
+  bootstrapSystem,
   cloneEvent,
   downloadDailyPdf,
   downloadDailyReport,
@@ -21,6 +22,7 @@ import {
   getPublicBoard,
   getPublicTicketStatus,
   getPushPublicKey,
+  getSetupStatus,
   registerTicketPush,
   revokeTicketPush,
   searchTickets,
@@ -1540,6 +1542,150 @@ function PairDeviceView() {
   );
 }
 
+function SetupView() {
+  const [status, setStatus] = useState<{
+    setupRequired: boolean;
+    setupConfigured: boolean;
+  } | null>(null);
+  const [eventId, setEventId] = useState(`rundflug-${new Date().getFullYear()}`);
+  const [name, setName] = useState(`Rundflug ${new Date().getFullYear()}`);
+  const [eventDate, setEventDate] = useState(new Date().toISOString().slice(0, 10));
+  const [aerodrome, setAerodrome] = useState("");
+  const [setupCode, setSetupCode] = useState("");
+  const [adminPin, setAdminPin] = useState("");
+  const [message, setMessage] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    void getSetupStatus()
+      .then(setStatus)
+      .catch((cause) =>
+        setMessage(cause instanceof Error ? cause.message : "Einrichtungsstatus nicht verfügbar."),
+      );
+  }, []);
+
+  async function submitSetup() {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const adminDeviceId = crypto.randomUUID();
+      const token = createDeviceToken();
+      const result = await bootstrapSystem({
+        setupCode,
+        adminPin,
+        eventId: eventId.trim(),
+        name: name.trim(),
+        eventDate,
+        aerodrome: aerodrome.trim(),
+        timeZone: "Europe/Berlin",
+        adminDeviceId,
+        adminCredentialHash: await sha256HexBrowser(token),
+      });
+      window.localStorage.setItem("device-id:ADMIN", result.adminDeviceId);
+      window.localStorage.setItem(`device-token:${result.adminDeviceId}`, token);
+      window.location.assign(`/admin?event=${encodeURIComponent(result.eventId)}`);
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : "Ersteinrichtung fehlgeschlagen.");
+      setBusy(false);
+    }
+  }
+
+  const valid =
+    status?.setupRequired === true &&
+    status.setupConfigured &&
+    /^[a-z0-9][a-z0-9-]{2,63}$/.test(eventId.trim()) &&
+    name.trim().length >= 3 &&
+    Boolean(eventDate) &&
+    aerodrome.trim().length >= 2 &&
+    setupCode.length >= 16 &&
+    adminPin.length >= 4;
+  return (
+    <Shell title="Ersteinrichtung">
+      <section className="setup-page">
+        <span className="eyebrow">Einmaliger Systemstart</span>
+        <h1>Rundflug-Leitstand einrichten</h1>
+        {status && !status.setupRequired ? (
+          <>
+            <p>Die Ersteinrichtung ist bereits abgeschlossen.</p>
+            <a className="privacy-link" href="/admin">
+              Zur Administration
+            </a>
+          </>
+        ) : (
+          <>
+            <p>
+              Legt die erste Veranstaltung und dieses anonyme Administrationsgerät an. Es werden
+              keine Personen- oder Gastnamen erfasst.
+            </p>
+            {status && !status.setupConfigured ? (
+              <p className="connection-warning">
+                Cloudflare-Secrets für Einrichtungscode und Administrator-PIN fehlen noch.
+              </p>
+            ) : null}
+            <div className="setup-grid">
+              <label>
+                Technische Veranstaltungs-ID
+                <input value={eventId} onChange={(event) => setEventId(event.target.value)} />
+              </label>
+              <label>
+                Bezeichnung
+                <input value={name} onChange={(event) => setName(event.target.value)} />
+              </label>
+              <label>
+                Datum
+                <input
+                  type="date"
+                  value={eventDate}
+                  onChange={(event) => setEventDate(event.target.value)}
+                />
+              </label>
+              <label>
+                Flugplatz
+                <input
+                  value={aerodrome}
+                  onChange={(event) => setAerodrome(event.target.value)}
+                  placeholder="z. B. EDXX"
+                />
+              </label>
+              <label>
+                Einmaliger Einrichtungscode
+                <input
+                  type="password"
+                  value={setupCode}
+                  onChange={(event) => setSetupCode(event.target.value)}
+                  autoComplete="off"
+                />
+              </label>
+              <label>
+                Administrator-PIN
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  value={adminPin}
+                  onChange={(event) => setAdminPin(event.target.value)}
+                  autoComplete="off"
+                />
+              </label>
+            </div>
+            <button
+              className="primary-action"
+              type="button"
+              disabled={!valid || busy}
+              onClick={() => void submitSetup()}
+            >
+              {busy ? "Einrichtung läuft …" : "System einmalig einrichten"}
+            </button>
+          </>
+        )}
+        {message ? (
+          <p className="action-message" role="status">
+            {message}
+          </p>
+        ) : null}
+      </section>
+    </Shell>
+  );
+}
+
 function FidsView() {
   const [board, setBoard] = useState<PublicBoard | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -1660,6 +1806,7 @@ function AdminView() {
   const [adminPin, setAdminPin] = useState("");
   const [saleClosesAt, setSaleClosesAt] = useState("");
   const [message, setMessage] = useState<string | null>(null);
+  const [setupRequired, setSetupRequired] = useState(false);
   const [history, setHistory] = useState<AuditHistory>({ entries: [] });
   const [historyEventType, setHistoryEventType] = useState("");
   const [historyAggregateType, setHistoryAggregateType] = useState("");
@@ -1688,6 +1835,15 @@ function AdminView() {
   const [plannedBoardingMinutes, setPlannedBoardingMinutes] = useState(8);
   const [plannedDeboardingMinutes, setPlannedDeboardingMinutes] = useState(5);
   const [plannedBufferMinutes, setPlannedBufferMinutes] = useState(3);
+  useEffect(() => {
+    if (board) {
+      setSetupRequired(false);
+      return;
+    }
+    void getSetupStatus()
+      .then((result) => setSetupRequired(result.setupRequired))
+      .catch(() => setSetupRequired(false));
+  }, [board]);
   const [productEditorId, setProductEditorId] = useState("new");
   const [productName, setProductName] = useState("");
   const [productCode, setProductCode] = useState("");
@@ -2534,6 +2690,11 @@ function AdminView() {
   return (
     <Shell title="Administration">
       <ConnectionNotice error={error} lastConfirmedAt={lastConfirmedAt} />
+      {setupRequired ? (
+        <div className="connection-warning" role="status">
+          Dieses System ist noch nicht eingerichtet. <a href="/setup">Ersteinrichtung öffnen</a>
+        </div>
+      ) : null}
       <EmergencyNotice active={board?.event.emergencyMode ?? false} />
       <InterruptionNotice active={board?.event.operationalInterrupted ?? false} />
       <OperationalNotice note={board?.event.operationalNote} />
@@ -3785,6 +3946,7 @@ export function App() {
   const ticketMatch = path.match(/^\/ticket\/([A-Za-z2-9]{12,32})$/);
   const ticketCode = ticketMatch?.[1];
   if (ticketCode) return <TicketStatusView code={ticketCode.toUpperCase()} />;
+  if (path === "/setup") return <SetupView />;
   if (path === "/pair") return <PairDeviceView />;
   if (path === "/datenschutz") return <PrivacyView />;
   if (path === "/flight-line") return <FlightLineView />;
