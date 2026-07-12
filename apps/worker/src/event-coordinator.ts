@@ -1024,14 +1024,17 @@ export class EventCoordinator extends DurableObject<Env> {
         }
         statements.push(
           this.env.DB.prepare(
-            `INSERT INTO pilots (id, operation_day_id, operational_code, active, created_at, updated_at)
-           VALUES (?1, ?2, ?3, ?4, ?5, ?5)
+            `INSERT INTO pilots
+              (id, operation_day_id, operational_code, operational_note, active, created_at, updated_at)
+           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?6)
            ON CONFLICT(id) DO UPDATE SET operational_code = excluded.operational_code,
-             active = excluded.active, updated_at = excluded.updated_at`,
+             operational_note = excluded.operational_note, active = excluded.active,
+             updated_at = excluded.updated_at`,
           ).bind(
             command.payload.pilotId,
             command.eventId,
             command.payload.operationalCode,
+            command.payload.operationalNote,
             command.payload.active ? 1 : 0,
             now,
           ),
@@ -1041,6 +1044,7 @@ export class EventCoordinator extends DurableObject<Env> {
         eventType = "PILOT_CONFIGURATION_CHANGED";
         auditPayload = {
           operationalCode: command.payload.operationalCode,
+          operationalNote: command.payload.operationalNote,
           active: command.payload.active,
           reason: command.payload.reason,
         };

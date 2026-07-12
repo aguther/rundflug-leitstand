@@ -221,6 +221,7 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
         .string()
         .trim()
         .regex(/^[A-Z0-9-]{2,12}$/),
+      operationalNote: z.string().trim().max(240).default(""),
       active: z.boolean(),
       reason: z.string().trim().min(3).max(240),
       adminPin: z.string().min(4).max(32),
@@ -655,9 +656,12 @@ export const aircraftOperationalSummarySchema = z.object({
 export const pilotOperationalSummarySchema = z.object({
   id: z.string(),
   operationalCode: z.string(),
+  operationalNote: z.string(),
   active: z.boolean(),
   paused: z.boolean(),
   pauseExpectedReviewAt: z.string().nullable(),
+  currentRotationId: z.string().nullable(),
+  currentCommunicationNumber: z.number().int().positive().nullable(),
 });
 
 export const operationBoardSchema = z.object({

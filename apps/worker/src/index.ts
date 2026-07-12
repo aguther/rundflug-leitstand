@@ -666,16 +666,28 @@ app.get("/api/events/:eventId/operations", async (context) => {
         expected_review_at: string | null;
       }>(),
     context.env.DB.prepare(
-      `SELECT id, operational_code, active, paused, pause_expected_review_at
-         FROM pilots WHERE operation_day_id = ?1 ORDER BY operational_code`,
+      `SELECT p.id, p.operational_code, p.operational_note, p.active, p.paused,
+              p.pause_expected_review_at,
+              (SELECT r.id FROM rotations r WHERE r.operation_day_id = p.operation_day_id
+                AND r.pilot_id = p.id AND r.status IN ('CALLED', 'IN_FLIGHT', 'LANDED')
+                ORDER BY r.updated_at DESC LIMIT 1) AS current_rotation_id,
+              (SELECT fg.communication_number FROM rotations r
+                JOIN flight_groups fg ON fg.id = r.flight_group_id
+                WHERE r.operation_day_id = p.operation_day_id AND r.pilot_id = p.id
+                  AND r.status IN ('CALLED', 'IN_FLIGHT', 'LANDED')
+                ORDER BY r.updated_at DESC LIMIT 1) AS current_communication_number
+         FROM pilots p WHERE p.operation_day_id = ?1 ORDER BY p.operational_code`,
     )
       .bind(eventId)
       .all<{
         id: string;
         operational_code: string;
+        operational_note: string;
         active: number;
         paused: number;
         pause_expected_review_at: string | null;
+        current_rotation_id: string | null;
+        current_communication_number: number | null;
       }>(),
     context.env.DB.prepare(
       `SELECT id, label, gate_type, active, sort_order
@@ -961,9 +973,12 @@ app.get("/api/events/:eventId/operations", async (context) => {
     pilots: pilotRows.results.map((pilot) => ({
       id: pilot.id,
       operationalCode: pilot.operational_code,
+      operationalNote: pilot.operational_note,
       active: pilot.active === 1,
       paused: pilot.paused === 1,
       pauseExpectedReviewAt: pilot.pause_expected_review_at,
+      currentRotationId: pilot.current_rotation_id,
+      currentCommunicationNumber: pilot.current_communication_number,
     })),
     gates: gatesRows.results.map((gate) => ({
       id: gate.id,

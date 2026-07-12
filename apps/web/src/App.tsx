@@ -1639,6 +1639,7 @@ function AdminView() {
   const [pairingQr, setPairingQr] = useState<string | null>(null);
   const [pairingUrl, setPairingUrl] = useState<string | null>(null);
   const [pilotCode, setPilotCode] = useState("P-02");
+  const [pilotNote, setPilotNote] = useState("");
   const [refuelThreshold, setRefuelThreshold] = useState(5);
   const [operationalNotice, setOperationalNotice] = useState("");
   const [eventSettingsInitialized, setEventSettingsInitialized] = useState(false);
@@ -2403,7 +2404,12 @@ function AdminView() {
     }
   }
 
-  async function upsertPilot(pilotId: string, operationalCode: string, active: boolean) {
+  async function upsertPilot(
+    pilotId: string,
+    operationalCode: string,
+    operationalNote: string,
+    active: boolean,
+  ) {
     if (!board || reason.trim().length < 3 || adminPin.length < 4) return;
     try {
       await sendCommand(
@@ -2417,6 +2423,7 @@ function AdminView() {
           payload: {
             pilotId,
             operationalCode: operationalCode.trim().toUpperCase(),
+            operationalNote: operationalNote.trim(),
             active,
             reason: reason.trim(),
             adminPin,
@@ -2426,6 +2433,7 @@ function AdminView() {
       );
       setMessage("Anonymer operativer Pilotencode wurde aktualisiert.");
       setAdminPin("");
+      setPilotNote("");
       await refresh();
       await refreshHistory();
     } catch (cause) {
@@ -3457,6 +3465,12 @@ function AdminView() {
               onChange={(event) => setPilotCode(event.target.value.toUpperCase())}
               aria-label="Neuer operativer Pilotencode"
             />
+            <input
+              value={pilotNote}
+              onChange={(event) => setPilotNote(event.target.value)}
+              aria-label="Organisatorische Pilotencode-Bemerkung"
+              placeholder="Optional · keine Namen oder Lizenzdaten"
+            />
             <button
               disabled={
                 !isAdministrator ||
@@ -3464,7 +3478,7 @@ function AdminView() {
                 reason.trim().length < 3 ||
                 adminPin.length < 4
               }
-              onClick={() => upsertPilot(crypto.randomUUID(), pilotCode, true)}
+              onClick={() => upsertPilot(crypto.randomUUID(), pilotCode, pilotNote, true)}
               type="button"
             >
               Pilotencode anlegen
@@ -3475,6 +3489,12 @@ function AdminView() {
               <div key={pilot.id}>
                 <strong>{pilot.operationalCode}</strong>
                 <span>{pilot.active ? (pilot.paused ? "Pause" : "aktiv") : "inaktiv"}</span>
+                <span>{pilot.operationalNote || "Keine organisatorische Bemerkung"}</span>
+                <span>
+                  {pilot.currentCommunicationNumber
+                    ? `Aktuell Fluggruppe ${pilot.currentCommunicationNumber}`
+                    : "Aktuell keinem Umlauf zugeordnet"}
+                </span>
                 <button
                   disabled={!pilot.active || reason.trim().length < 3}
                   onClick={() => setPilotPause(pilot.id, !pilot.paused)}
@@ -3484,7 +3504,14 @@ function AdminView() {
                 </button>
                 <button
                   disabled={!isAdministrator || reason.trim().length < 3 || adminPin.length < 4}
-                  onClick={() => upsertPilot(pilot.id, pilot.operationalCode, !pilot.active)}
+                  onClick={() =>
+                    upsertPilot(
+                      pilot.id,
+                      pilot.operationalCode,
+                      pilot.operationalNote,
+                      !pilot.active,
+                    )
+                  }
                   type="button"
                 >
                   {pilot.active ? "Deaktivieren" : "Aktivieren"}
