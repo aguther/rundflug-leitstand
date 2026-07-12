@@ -9,6 +9,7 @@ import { EventCoordinator } from "./event-coordinator";
 import { allowUnknownTicketAttempt } from "./public-access";
 import { createCsv, createTextPdf } from "./report";
 import { rowToSnapshot } from "./snapshot";
+import { httpsRedirectLocation } from "./transport-security";
 import type { Env, StoredEventRow } from "./types";
 import {
   isAllowedPushEndpoint,
@@ -19,6 +20,12 @@ import {
 } from "./web-push";
 
 const app = new Hono<{ Bindings: Env }>();
+
+app.use("*", async (context, next) => {
+  const redirectLocation = httpsRedirectLocation(context.req.url, context.env.APP_ENV);
+  if (redirectLocation) return context.redirect(redirectLocation, 308);
+  await next();
+});
 
 async function unknownTicketResponse(env: Env, request: Request): Promise<Response> {
   if (!(await allowUnknownTicketAttempt(env.PUBLIC_TICKET_RATE_LIMITER, request))) {
