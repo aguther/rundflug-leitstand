@@ -367,11 +367,12 @@ app.post("/api/admin/events/:sourceEventId/clone", async (context) => {
       `INSERT INTO operation_days
         (id, name, event_date, time_zone, status, emergency_mode, operational_note, version,
          created_at, updated_at, operations_end_at, operational_interrupted, sale_opens_at,
-         no_show_after_minutes, notification_lead_minutes, child_reference_weight_kg,
+         no_show_after_minutes, max_ticket_deferrals, notification_lead_minutes,
+         child_reference_weight_kg,
          normal_reference_weight_kg, heavy_reference_weight_kg, planned_boarding_minutes,
          planned_deboarding_minutes, planned_buffer_minutes, aerodrome, template_source_id)
        VALUES (?1, ?2, ?3, ?4, 'PREPARATION', 0, '', 0, ?5, ?5, NULL, 0, NULL,
-         ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)`,
+         ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)`,
     ).bind(
       input.eventId,
       input.name,
@@ -379,6 +380,7 @@ app.post("/api/admin/events/:sourceEventId/clone", async (context) => {
       input.timeZone,
       now,
       source.no_show_after_minutes,
+      source.max_ticket_deferrals,
       source.notification_lead_minutes,
       source.child_reference_weight_kg,
       source.normal_reference_weight_kg,
@@ -507,6 +509,7 @@ app.get("/api/events/:eventId/snapshot", async (context) => {
     `SELECT id, name, event_date, aerodrome, time_zone, status, archived_at, template_source_id,
             emergency_mode, operational_interrupted, version,
             operational_note, operations_end_at, sale_opens_at, no_show_after_minutes,
+            max_ticket_deferrals,
             notification_lead_minutes, child_reference_weight_kg, normal_reference_weight_kg,
             heavy_reference_weight_kg, planned_boarding_minutes, planned_deboarding_minutes,
             planned_buffer_minutes, updated_at
@@ -556,6 +559,7 @@ app.get("/api/events/:eventId/operations", async (context) => {
     `SELECT id, name, event_date, aerodrome, time_zone, status, archived_at, template_source_id,
             emergency_mode, operational_interrupted, version,
             operational_note, operations_end_at, sale_opens_at, no_show_after_minutes,
+            max_ticket_deferrals,
             notification_lead_minutes, child_reference_weight_kg, normal_reference_weight_kg,
             heavy_reference_weight_kg, planned_boarding_minutes, planned_deboarding_minutes,
             planned_buffer_minutes, updated_at FROM operation_days WHERE id = ?1`,
@@ -680,11 +684,13 @@ app.get("/api/events/:eventId/operations", async (context) => {
                     WHERE capacity_rt.rotation_id = r.id AND capacity_rt.released_at IS NULL
                  )
                ORDER BY candidate.registration LIMIT 1) AS suggested_aircraft_registration,
-              MIN(tg.id) AS ticket_group_id, COUNT(rt.ticket_id) AS ticket_count,
+              MIN(tg.id) AS ticket_group_id, MIN(tg.deferral_count) AS deferral_count,
+              COUNT(rt.ticket_id) AS ticket_count,
               COALESCE(MIN(p.name), 'Rundflug') AS product_name,
               COALESCE(MIN(p.reference_duration_minutes), 20) AS reference_duration_minutes,
               (SELECT json_group_array(json_object(
                 'id', attendance_ticket.id,
+                'status', attendance_ticket.status,
                 'attendanceStatus', attendance_ticket.attendance_status
               ))
                 FROM rotation_tickets attendance_rt
@@ -718,6 +724,7 @@ app.get("/api/events/:eventId/operations", async (context) => {
         suggested_aircraft_id: string | null;
         suggested_aircraft_registration: string | null;
         ticket_group_id: string;
+        deferral_count: number;
         ticket_count: number;
         product_name: string;
         reference_duration_minutes: number;
@@ -853,7 +860,8 @@ app.get("/api/events/:eventId/operations", async (context) => {
     context.env.DB.prepare(
       `SELECT
           (SELECT COUNT(*) FROM tickets t JOIN ticket_groups tg ON tg.id = t.ticket_group_id
-            WHERE tg.operation_day_id = ?1 AND t.status = 'QUEUED') AS open_tickets,
+            WHERE tg.operation_day_id = ?1
+              AND t.status NOT IN ('COMPLETED', 'CANCELED', 'NO_SHOW')) AS open_tickets,
           (SELECT COUNT(*) FROM tickets t JOIN ticket_groups tg ON tg.id = t.ticket_group_id
             WHERE tg.operation_day_id = ?1) AS sold_tickets,
           (SELECT COUNT(*) FROM rotations WHERE operation_day_id = ?1 AND status = 'COMPLETED') AS completed_rotations,
@@ -1075,6 +1083,7 @@ app.get("/api/events/:eventId/operations", async (context) => {
             }),
           }).upperMinutes,
         calledAt: rotation.called_at,
+        deferralCount: rotation.deferral_count,
         timeline: {
           planned: {
             boardingAt: rotation.planned_boarding_at,
@@ -1099,6 +1108,17 @@ app.get("/api/events/:eventId/operations", async (context) => {
         },
         tickets: JSON.parse(rotation.tickets_json) as Array<{
           id: string;
+          status:
+            | "QUEUED"
+            | "CHECKED_IN"
+            | "CALLED"
+            | "BOARDING"
+            | "IN_FLIGHT"
+            | "LANDED"
+            | "COMPLETED"
+            | "NO_SHOW"
+            | "CANCELED"
+            | "CLARIFICATION";
           attendanceStatus: "NOT_CHECKED_IN" | "CHECKED_IN";
         }>,
       };

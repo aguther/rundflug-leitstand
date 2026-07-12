@@ -30,6 +30,7 @@ export interface StoredEventRow {
   operations_end_at?: string | null;
   sale_opens_at?: string | null;
   no_show_after_minutes?: number;
+  max_ticket_deferrals?: number;
   notification_lead_minutes?: number;
   child_reference_weight_kg?: number;
   normal_reference_weight_kg?: number;

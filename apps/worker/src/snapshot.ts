@@ -18,6 +18,7 @@ export function rowToSnapshot(row: StoredEventRow): EventSnapshot {
     saleOpensAt: row.sale_opens_at ?? null,
     operationsEndAt: row.operations_end_at ?? null,
     noShowAfterMinutes: row.no_show_after_minutes ?? 10,
+    maxTicketDeferrals: row.max_ticket_deferrals ?? 2,
     notificationLeadMinutes: row.notification_lead_minutes ?? 15,
     referenceWeightsKg: {
       child: row.child_reference_weight_kg ?? 35,

@@ -1,5 +1,16 @@
 # Backup und Wiederherstellung
 
+## Migrationsnotiz 0025 – Ticket-Zurückstellungen
+
+Migration `0025_ticket_deferrals.sql` ergänzt ausschließlich zwei Spalten mit sicheren
+Standardwerten (`max_ticket_deferrals = 2`, `deferral_count = 0`) und entfernt oder verändert keine
+bestehenden Daten. Vor dem Remote-Lauf wird die von Wrangler/D1 erzeugte Sicherung kontrolliert.
+Ein technisches Down-Migration-Skript ist wegen der additiven SQLite-Spalten nicht vorgesehen.
+Falls der neue Worker nach der Migration nicht betrieben werden kann, wird zuerst der vorherige
+Worker deployt; für eine vollständige Schema-Rückkehr wird D1 aus der unmittelbar vor der Migration
+erzeugten Sicherung beziehungsweise per Time Travel wiederhergestellt und anschließend der
+Datenbestand verifiziert.
+
 ## Ziel
 
 - tägliche Sicherung

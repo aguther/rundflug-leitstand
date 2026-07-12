@@ -236,10 +236,12 @@ try {
   const proposedRotation = proposedBoard.rotations.find((rotation) => rotation.id === rotationId);
   if (
     proposedRotation?.suggestedAircraftId !== "aircraft-a" ||
-    proposedRotation?.suggestedPilotId !== "550e8400-e29b-41d4-a716-446655440100"
+    proposedRotation?.suggestedPilotId !== "550e8400-e29b-41d4-a716-446655440100" ||
+    proposedRotation.tickets.some((ticket) => ticket.status !== "QUEUED")
   ) {
-    throw new Error("Flugzeug- oder Pilotenvorschlag fehlt im Standardumlauf.");
+    throw new Error("Vorschlag oder initialer Ticketstatus fehlt im Standardumlauf.");
   }
+  const checkedTicketId = proposedRotation.tickets[0].id;
   flightLineSocket.close();
   const reconnectStartedAt = Date.now();
   flightLineSocket = await connectRealtime();
@@ -257,6 +259,14 @@ try {
   if (callRealtime.version !== firstCall.event.version) {
     throw new Error("Wiederverbundenes Gerät erhielt den Aufruf nicht.");
   }
+  current = await board("flight-line-tablet-1", tokens.flightLine);
+  if (
+    current.rotations
+      .find((rotation) => rotation.id === rotationId)
+      ?.tickets.some((ticket) => ticket.status !== "CALLED")
+  ) {
+    throw new Error("NEXT hat den Ticketstatus nicht auf CALLED gesetzt.");
+  }
   const revoked = await post(
     tokens.flightLine,
     envelope("flight-line-tablet-1", firstCall.event.version, "REVOKE_CALL", { rotationId }),
@@ -264,7 +274,11 @@ try {
   current = await board("flight-line-tablet-1", tokens.flightLine);
   const revokedRotation = current.rotations.find((rotation) => rotation.id === rotationId);
   const releasedAircraft = current.aircraft.find((aircraft) => aircraft.id === "aircraft-a");
-  if (revokedRotation?.status !== "DRAFT" || releasedAircraft?.operationalState !== "AVAILABLE") {
+  if (
+    revokedRotation?.status !== "DRAFT" ||
+    releasedAircraft?.operationalState !== "AVAILABLE" ||
+    revokedRotation.tickets.some((ticket) => ticket.status !== "QUEUED")
+  ) {
     throw new Error("Rücknahme hat Umlauf oder Flugzeug nicht in den Vorschlagszustand versetzt.");
   }
   const correctionHistory = await history(rotationId);
@@ -282,14 +296,35 @@ try {
       "Rücknahme verweist nicht nachvollziehbar auf das ursprüngliche Aufrufereignis.",
     );
   }
+  const checkedIn = await post(
+    tokens.flightLine,
+    envelope("flight-line-tablet-1", revoked.event.version, "SET_TICKET_ATTENDANCE", {
+      ticketId: checkedTicketId,
+      checkedIn: true,
+    }),
+  );
+  current = await board("flight-line-tablet-1", tokens.flightLine);
+  const checkedRotation = current.rotations.find((rotation) => rotation.id === rotationId);
+  if (
+    checkedRotation?.tickets.find((ticket) => ticket.id === checkedTicketId)?.status !==
+    "CHECKED_IN"
+  ) {
+    throw new Error("Check-in hat den Ticketstatus nicht atomar auf CHECKED_IN gesetzt.");
+  }
   const called = await post(
     tokens.flightLine,
-    envelope("flight-line-tablet-1", revoked.event.version, "CALL_NEXT", {
+    envelope("flight-line-tablet-1", checkedIn.event.version, "CALL_NEXT", {
       rotationId,
       aircraftId: "aircraft-a",
       pilotId: "550e8400-e29b-41d4-a716-446655440100",
     }),
   );
+  current = await board("flight-line-tablet-1", tokens.flightLine);
+  const boardingRotation = current.rotations.find((rotation) => rotation.id === rotationId);
+  const boardingStatuses = boardingRotation?.tickets.map((ticket) => ticket.status).sort();
+  if (boardingStatuses?.join(",") !== "BOARDING,CALLED") {
+    throw new Error(`NEXT bildet Check-in/Boarding nicht korrekt ab: ${boardingStatuses}`);
+  }
   const started = await post(
     tokens.flightLine,
     envelope("flight-line-tablet-1", called.event.version, "MARK_IN_FLIGHT", { rotationId }),
@@ -300,7 +335,11 @@ try {
   );
   current = await board("flight-line-tablet-1", tokens.flightLine);
   const landedAircraft = current.aircraft.find((aircraft) => aircraft.id === "aircraft-a");
-  if (landedAircraft?.operationalState !== "LANDED") {
+  const landedRotation = current.rotations.find((rotation) => rotation.id === rotationId);
+  if (
+    landedAircraft?.operationalState !== "LANDED" ||
+    landedRotation?.tickets.some((ticket) => ticket.status !== "LANDED")
+  ) {
     throw new Error("GELANDET hat den erwarteten belegten Flugzeugzustand nicht erhalten.");
   }
   const completed = await post(
@@ -310,7 +349,11 @@ try {
   current = await board("flight-line-tablet-1", tokens.flightLine);
   const finalAircraft = current.aircraft.find((aircraft) => aircraft.id === "aircraft-a");
   const finalRotation = current.rotations.find((rotation) => rotation.id === rotationId);
-  if (finalAircraft?.operationalState !== "AVAILABLE" || finalRotation?.status !== "COMPLETED") {
+  if (
+    finalAircraft?.operationalState !== "AVAILABLE" ||
+    finalRotation?.status !== "COMPLETED" ||
+    finalRotation.tickets.some((ticket) => ticket.status !== "COMPLETED")
+  ) {
     throw new Error("ABGESCHLOSSEN hat Umlauf oder Flugzeug nicht korrekt freigegeben.");
   }
   const timingComplete = [
@@ -353,6 +396,7 @@ try {
       assignmentSuggested: true,
       cashierProductForecastComplete: true,
       callCorrectionAudited: true,
+      ticketStateSequenceVerified: true,
       transitions: [called.eventType, started.eventType, landed.eventType, completed.eventType],
       landedAircraftState: landedAircraft.operationalState,
       finalAircraftState: finalAircraft.operationalState,
