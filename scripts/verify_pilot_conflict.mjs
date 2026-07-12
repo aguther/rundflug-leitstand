@@ -87,6 +87,14 @@ const sell = (version) =>
     paymentStatus: "PAID",
     paymentMethod: "CASH",
   });
+const history = async (rotationId) => {
+  const query = new URLSearchParams({ aggregateType: "ROTATION", aggregateId: rotationId });
+  const response = await fetch(`${base}/api/events/demo-2026/history?${query}`, {
+    headers: { "x-device-id": "technical-scaffold", "x-device-token": tokens.admin },
+  });
+  if (!response.ok) throw new Error(`Historien-Abruf fehlgeschlagen (${response.status}).`);
+  return response.json();
+};
 
 try {
   await waitForWorker();
@@ -184,13 +192,90 @@ try {
   ) {
     throw new Error("Konfliktfreie Pilotenzuordnungen sind in der Operationssicht inkonsistent.");
   }
+  let transition = secondCall;
+  for (const rotationId of [
+    firstSale.aggregate.relatedRotationId,
+    secondSale.aggregate.relatedRotationId,
+  ]) {
+    for (const type of ["MARK_IN_FLIGHT", "MARK_LANDED", "MARK_COMPLETED"]) {
+      transition = await command(
+        "flight-line-tablet-1",
+        tokens.flightLine,
+        transition.event.version,
+        type,
+        { rotationId },
+      );
+    }
+  }
+  const thirdSale = await sell(transition.event.version);
+  current = await board();
+  const thirdProposal = current.rotations.find(
+    (rotation) => rotation.id === thirdSale.aggregate.relatedRotationId,
+  );
+  if (
+    thirdProposal?.suggestedAircraftId !== "aircraft-a" ||
+    thirdProposal.suggestedPilotId !== "550e8400-e29b-41d4-a716-446655440100"
+  ) {
+    throw new Error("Zuletzt bestätigter Pilotencode wird für das Flugzeug nicht vorgeschlagen.");
+  }
+  const changedPilot = await command(
+    "flight-line-tablet-1",
+    tokens.flightLine,
+    thirdSale.event.version,
+    "CALL_NEXT",
+    {
+      rotationId: thirdSale.aggregate.relatedRotationId,
+      aircraftId: "aircraft-a",
+      pilotId: "550e8400-e29b-41d4-a716-446655440200",
+    },
+  );
+  current = await board();
+  const changedAircraft = current.aircraft.find((aircraft) => aircraft.id === "aircraft-a");
+  const changeHistory = await history(thirdSale.aggregate.relatedRotationId);
+  const callAudit = changeHistory.entries.find(
+    (entry) => entry.eventType === "FLIGHT_GROUP_CALLED",
+  );
+  if (
+    changedPilot.event.version !== current.event.version ||
+    changedAircraft?.currentPilotId !== "550e8400-e29b-41d4-a716-446655440200" ||
+    callAudit?.payload?.previousAircraftPilotId !== "550e8400-e29b-41d4-a716-446655440100" ||
+    callAudit.payload.pilotChanged !== true
+  ) {
+    throw new Error("Bewusster Pilotwechsel wurde nicht fortgeführt und vollständig auditiert.");
+  }
+  transition = changedPilot;
+  for (const type of ["MARK_IN_FLIGHT", "MARK_LANDED", "MARK_COMPLETED"]) {
+    transition = await command(
+      "flight-line-tablet-1",
+      tokens.flightLine,
+      transition.event.version,
+      type,
+      { rotationId: thirdSale.aggregate.relatedRotationId },
+    );
+  }
+  const fourthSale = await sell(transition.event.version);
+  current = await board();
+  const fourthProposal = current.rotations.find(
+    (rotation) => rotation.id === fourthSale.aggregate.relatedRotationId,
+  );
+  if (
+    fourthProposal?.suggestedAircraftId !== "aircraft-a" ||
+    fourthProposal.suggestedPilotId !== "550e8400-e29b-41d4-a716-446655440200"
+  ) {
+    throw new Error(
+      "Geänderter Pilotencode wird beim Folgeumlauf nicht fortgeführt vorgeschlagen.",
+    );
+  }
   console.log(
     JSON.stringify({
       ok: true,
-      requirement: "F-BRD-040",
+      requirements: ["F-BRD-030", "F-BRD-040"],
       samePilotConflictRejected: true,
       differentPilotsAccepted: true,
       activeRotations: active.length,
+      rememberedPilotSuggested: true,
+      pilotChangeAudited: true,
+      changedPilotSuggestedNext: true,
     }),
   );
 } finally {

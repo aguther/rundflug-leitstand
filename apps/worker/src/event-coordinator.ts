@@ -2337,6 +2337,7 @@ export class EventCoordinator extends DurableObject<Env> {
         { error: { code: "ROTATION_NOT_FOUND", message: "Umlauf nicht gefunden." } },
         { status: 404 },
       );
+    let previousAircraftPilotId: string | null = null;
     if (command.type === "CALL_NEXT") {
       if (rotation.resource_group_status !== "ACTIVE") {
         return json(
@@ -2350,7 +2351,8 @@ export class EventCoordinator extends DurableObject<Env> {
         );
       }
       const candidate = await this.env.DB.prepare(
-        `SELECT a.id, a.passenger_seats, a.operational_state, COUNT(rt.ticket_id) AS ticket_count
+        `SELECT a.id, a.passenger_seats, a.operational_state,
+                membership.current_pilot_id, COUNT(rt.ticket_id) AS ticket_count
            FROM rotations r
            JOIN flight_groups fg ON fg.id = r.flight_group_id
            JOIN resource_group_memberships membership
@@ -2368,6 +2370,7 @@ export class EventCoordinator extends DurableObject<Env> {
           passenger_seats: number;
           operational_state: string;
           ticket_count: number;
+          current_pilot_id: string | null;
         }>();
       if (candidate?.operational_state !== "AVAILABLE") {
         return json(
@@ -2386,6 +2389,7 @@ export class EventCoordinator extends DurableObject<Env> {
           { status: 409 },
         );
       }
+      previousAircraftPilotId = candidate.current_pilot_id;
       const pilot = await this.env.DB.prepare(
         `SELECT p.id FROM pilots p
           WHERE p.id = ?1 AND p.operation_day_id = ?2 AND p.active = 1 AND p.paused = 0
@@ -2486,6 +2490,11 @@ export class EventCoordinator extends DurableObject<Env> {
         command.type === "MARK_COMPLETED" ? 1 : 0,
       ),
       this.env.DB.prepare(
+        `UPDATE resource_group_memberships SET current_pilot_id = ?1
+          WHERE operation_day_id = ?2 AND aircraft_id = ?3 AND active_until IS NULL
+            AND ?4 = 'CALL_NEXT'`,
+      ).bind(selectedPilotId, command.eventId, selectedAircraftId, command.type),
+      this.env.DB.prepare(
         `UPDATE tickets SET status = ?1
           WHERE id IN (
             SELECT ticket_id FROM rotation_tickets WHERE rotation_id = ?2 AND released_at IS NULL
@@ -2505,6 +2514,8 @@ export class EventCoordinator extends DurableObject<Env> {
           to: nextState,
           aircraftId: selectedAircraftId,
           pilotId: selectedPilotId,
+          previousAircraftPilotId,
+          pilotChanged: command.type === "CALL_NEXT" && previousAircraftPilotId !== selectedPilotId,
         }),
       ),
       this.env.DB.prepare(`INSERT INTO idempotency_receipts (command_id, operation_day_id, device_id, command_type, received_at, response_json)

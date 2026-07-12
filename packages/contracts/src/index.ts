@@ -654,6 +654,8 @@ export const aircraftOperationalSummarySchema = z.object({
   rotationsSinceRefuel: z.number().int().nonnegative(),
   refuelReminderThreshold: z.number().int().positive(),
   expectedReviewAt: z.string().nullable(),
+  currentPilotId: z.string().nullable(),
+  currentPilotOperationalCode: z.string().nullable(),
 });
 
 export const pilotOperationalSummarySchema = z.object({

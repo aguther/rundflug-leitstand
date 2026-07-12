@@ -640,6 +640,7 @@ app.get("/api/events/:eventId/operations", async (context) => {
               a.refuel_planned, a.rotations_since_refuel, a.refuel_reminder_threshold,
               a.operational_interrupted,
               m.resource_group_id, rg.name AS resource_group_name,
+              m.current_pilot_id, current_pilot.operational_code AS current_pilot_operational_code,
               (SELECT b.expected_review_at FROM operational_blocks b
                 WHERE b.operation_day_id = m.operation_day_id AND b.scope_type = 'AIRCRAFT'
                   AND b.scope_id = a.id AND b.status = 'ACTIVE'
@@ -648,6 +649,7 @@ app.get("/api/events/:eventId/operations", async (context) => {
          LEFT JOIN resource_group_memberships m ON m.aircraft_id = a.id
           AND m.operation_day_id = ?1 AND m.active_until IS NULL
          LEFT JOIN resource_groups rg ON rg.id = m.resource_group_id
+         LEFT JOIN pilots current_pilot ON current_pilot.id = m.current_pilot_id
         ORDER BY a.registration`,
     )
       .bind(eventId)
@@ -664,6 +666,8 @@ app.get("/api/events/:eventId/operations", async (context) => {
         operational_interrupted: number;
         resource_group_id: string | null;
         resource_group_name: string | null;
+        current_pilot_id: string | null;
+        current_pilot_operational_code: string | null;
         expected_review_at: string | null;
       }>(),
     context.env.DB.prepare(
@@ -888,6 +892,16 @@ app.get("/api/events/:eventId/operations", async (context) => {
         (aircraft) => aircraft.resource_group_id === rotation.resource_group_id,
       ).length;
       const effectiveActiveCapacity = Math.min(activeAircraft, activePilotCount);
+      const suggestedAircraft = fleetRows.results.find(
+        (aircraft) => aircraft.id === rotation.suggested_aircraft_id,
+      );
+      const rememberedPilot = pilotRows.results.find(
+        (pilot) =>
+          pilot.id === suggestedAircraft?.current_pilot_id &&
+          pilot.active === 1 &&
+          pilot.paused === 0 &&
+          pilot.current_rotation_id === null,
+      );
       return {
         id: rotation.id,
         flightGroupId: rotation.flight_group_id,
@@ -899,8 +913,9 @@ app.get("/api/events/:eventId/operations", async (context) => {
         aircraftRegistration: rotation.aircraft_registration,
         pilotId: rotation.pilot_id,
         pilotOperationalCode: rotation.pilot_operational_code,
-        suggestedPilotId: rotation.suggested_pilot_id,
-        suggestedPilotOperationalCode: rotation.suggested_pilot_operational_code,
+        suggestedPilotId: rememberedPilot?.id ?? rotation.suggested_pilot_id,
+        suggestedPilotOperationalCode:
+          rememberedPilot?.operational_code ?? rotation.suggested_pilot_operational_code,
         suggestedAircraftId: rotation.suggested_aircraft_id,
         suggestedAircraftRegistration: rotation.suggested_aircraft_registration,
         ticketCount: rotation.ticket_count,
@@ -981,6 +996,8 @@ app.get("/api/events/:eventId/operations", async (context) => {
       rotationsSinceRefuel: aircraft.rotations_since_refuel,
       refuelReminderThreshold: aircraft.refuel_reminder_threshold,
       expectedReviewAt: aircraft.expected_review_at,
+      currentPilotId: aircraft.current_pilot_id,
+      currentPilotOperationalCode: aircraft.current_pilot_operational_code,
     })),
     pilots: pilotRows.results.map((pilot) => ({
       id: pilot.id,
