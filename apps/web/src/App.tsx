@@ -53,6 +53,7 @@ const publicStatusLabel = {
   IN_FLIGHT: "Flug läuft",
   LANDED: "Gelandet",
   COMPLETED: "Abgeschlossen",
+  SERVICE_PAUSED: "Organisatorischer Betrieb pausiert",
 } as const;
 const capacityLabel = {
   AVAILABLE: "Kapazität verfügbar",
@@ -110,18 +111,22 @@ function operationalTimeLabel(value: string | null): string {
 }
 
 function deviceTokenFor(deviceId: string): string {
+  const pairedToken = window.localStorage.getItem(`device-token:${deviceId}`);
+  if (pairedToken) return pairedToken;
   if (LOCAL_DEVELOPMENT && EVENT_ID === "demo-2026") {
     if (deviceId === "cashier-tablet-1") return "demo-cashier-device-token";
     if (deviceId === "flight-line-tablet-1") return "demo-flight-line-device-token";
     return "demo-admin-device-token";
   }
-  return window.localStorage.getItem(`device-token:${deviceId}`) ?? "";
+  return "";
 }
 
 function deviceIdForRole(role: string, developmentId: string): string {
+  const pairedDeviceId = window.localStorage.getItem(`device-id:${role}`);
+  if (pairedDeviceId) return pairedDeviceId;
   return LOCAL_DEVELOPMENT && EVENT_ID === "demo-2026"
     ? developmentId
-    : (window.localStorage.getItem(`device-id:${role}`) ?? `unpaired-${role.toLowerCase()}`);
+    : `unpaired-${role.toLowerCase()}`;
 }
 
 const CASHIER_DEVICE_ID = deviceIdForRole("CASHIER", "cashier-tablet-1");
@@ -835,6 +840,7 @@ function FlightLineView() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [queueReason, setQueueReason] = useState("");
+  const [emergencyReason, setEmergencyReason] = useState("");
   const operationalRotations = board?.rotations.filter(
     (rotation) => rotation.status !== "COMPLETED",
   );
@@ -882,6 +888,29 @@ function FlightLineView() {
       await refresh();
     } catch (reason) {
       setMessage(reason instanceof Error ? reason.message : "Aktion fehlgeschlagen.");
+    }
+  }
+
+  async function triggerEmergency() {
+    if (!board || emergencyReason.trim().length < 3) return;
+    try {
+      await sendCommand(
+        {
+          commandId: crypto.randomUUID(),
+          eventId: EVENT_ID,
+          deviceId: FLIGHT_LINE_DEVICE_ID,
+          expectedVersion: board.event.version,
+          issuedAt: new Date().toISOString(),
+          type: "TRIGGER_EMERGENCY",
+          payload: { reason: emergencyReason.trim() },
+        },
+        deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
+      );
+      setMessage("Notfallmodus ausgelöst.");
+      setEmergencyReason("");
+      await refresh();
+    } catch (reason) {
+      setMessage(reason instanceof Error ? reason.message : "Notfallkommando fehlgeschlagen.");
     }
   }
 
@@ -983,6 +1012,26 @@ function FlightLineView() {
       <EmergencyNotice active={board?.event.emergencyMode ?? false} />
       <InterruptionNotice active={board?.event.operationalInterrupted ?? false} />
       <OperationalNotice note={board?.event.operationalNote} />
+      {board?.currentDeviceRole === "FLIGHT_LINE_LEAD" && !board.event.emergencyMode ? (
+        <section className="emergency-control" aria-labelledby="flight-line-emergency-title">
+          <label>
+            <span id="flight-line-emergency-title">Not-Halt</span>
+            <input
+              value={emergencyReason}
+              onChange={(event) => setEmergencyReason(event.target.value)}
+              placeholder="Grund eingeben"
+            />
+          </label>
+          <button
+            className="danger-action"
+            disabled={emergencyReason.trim().length < 3}
+            onClick={triggerEmergency}
+            type="button"
+          >
+            Not-Halt auslösen
+          </button>
+        </section>
+      ) : null}
       <section className="flight-workspace">
         <div className="queue-list">
           <h1>Warteschlange</h1>
@@ -1320,9 +1369,9 @@ function PrivacyView() {
           Ticket. Die Daten dienen nur den Statushinweisen für dieses Ticket.
         </p>
         <p>
-          Die Push-Daten werden bei Deaktivierung widerrufen und automatisch spätestens sieben Tage
-          nach der Einwilligung gelöscht. Der operative Ticket- und Auditbestand bleibt davon
-          getrennt.
+          Die Push-Daten werden bei Deaktivierung widerrufen und automatisch nach der für die
+          Veranstaltung festgelegten Frist gelöscht, standardmäßig sieben Tage nach
+          Veranstaltungsende. Der operative Ticket- und Auditbestand bleibt davon getrennt.
         </p>
         <a className="privacy-link" href="/">
           Zurück zum Leitstand

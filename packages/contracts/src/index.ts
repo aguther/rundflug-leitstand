@@ -725,6 +725,7 @@ export const publicTicketStatusSchema = z.object({
     "IN_FLIGHT",
     "LANDED",
     "COMPLETED",
+    "SERVICE_PAUSED",
   ]),
   queuePosition: z.number().int().positive().nullable(),
   waitLowerMinutes: z.number().int().nonnegative(),

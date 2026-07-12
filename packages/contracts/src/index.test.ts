@@ -305,6 +305,17 @@ describe("commandEnvelopeSchema", () => {
     });
     expect("aircraftRegistration" in status).toBe(false);
     expect("guestName" in board).toBe(false);
+    expect(
+      publicTicketStatusSchema.parse({
+        ...status,
+        status: "SERVICE_PAUSED",
+        queuePosition: null,
+        waitLowerMinutes: 0,
+        waitUpperMinutes: 0,
+        predictionQuality: "UNCERTAIN",
+        message: "Organisatorischer Betrieb pausiert – bitte später erneut prüfen.",
+      }).status,
+    ).toBe("SERVICE_PAUSED");
   });
 
   it("requires an administrator PIN in the clear-emergency contract", () => {

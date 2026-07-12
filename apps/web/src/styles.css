@@ -90,6 +90,27 @@ input:focus-visible {
   font-weight: 850;
   text-align: center;
 }
+.emergency-control {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) auto;
+  align-items: end;
+  gap: 12px;
+  width: min(100% - 32px, 1468px);
+  margin: 16px auto 0;
+  padding: 14px;
+  border: 2px solid #a61b1b;
+  border-radius: 6px;
+  background: #fff5f5;
+}
+.emergency-control label {
+  display: grid;
+  gap: 6px;
+  color: #761414;
+  font-weight: 800;
+}
+.emergency-control input {
+  min-height: 48px;
+}
 .interrupt-action {
   min-height: 48px;
   margin-top: 12px;
@@ -1117,6 +1138,11 @@ p {
   }
   .flight-workspace {
     padding: 10px;
+  }
+  .emergency-control {
+    grid-template-columns: 1fr;
+    width: calc(100% - 20px);
+    margin-top: 10px;
   }
   .queue-list {
     max-height: 42vh;
