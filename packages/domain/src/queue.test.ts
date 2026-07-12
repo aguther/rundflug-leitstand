@@ -15,6 +15,20 @@ describe("resource-group queue planning", () => {
     expect(plan.assignments[0]?.occupiedSeats).toBe(4);
   });
 
+  it("preserves one sales order across products sharing a resource-group queue", () => {
+    const plan = planNextRotations({
+      groups: [
+        { id: "later-p1", size: 1, queueSequence: 3, productId: "p1", standby: false },
+        { id: "first-p2", size: 1, queueSequence: 1, productId: "p2", standby: false },
+        { id: "second-p1", size: 1, queueSequence: 2, productId: "p1", standby: false },
+      ],
+      aircraft: [{ id: "a1", capacity: 3, compatibleProductIds: ["p1", "p2"], available: true }],
+      standbyPriority: false,
+    });
+
+    expect(plan.assignments[0]?.groupIds).toEqual(["first-p2", "second-p1", "later-p1"]);
+  });
+
   it("never splits a group that is larger than every compatible aircraft", () => {
     const plan = planNextRotations({
       groups: [{ id: "family", size: 5, queueSequence: 1, productId: "p1", standby: false }],

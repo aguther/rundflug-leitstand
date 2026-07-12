@@ -356,9 +356,12 @@ export class EventCoordinator extends DurableObject<Env> {
         }
         const hashes = await Promise.all(normalizedCodes.map(sha256Hex));
         const queueRow = await this.env.DB.prepare(
-          "SELECT COALESCE(MAX(queue_sequence), 0) + 1 AS next_sequence FROM ticket_groups WHERE operation_day_id = ?1",
+          `SELECT COALESCE(MAX(tg.queue_sequence), 0) + 1 AS next_sequence
+             FROM ticket_groups tg
+             JOIN products p ON p.id = tg.product_id
+            WHERE tg.operation_day_id = ?1 AND p.resource_group_id = ?2`,
         )
-          .bind(command.eventId)
+          .bind(command.eventId, product.resource_group_id)
           .first<{ next_sequence: number }>();
         const communicationRow = await this.env.DB.prepare(
           "SELECT COALESCE(MAX(communication_number), 100) + 1 AS next_number FROM flight_groups WHERE operation_day_id = ?1 AND resource_group_id = ?2",
@@ -2600,9 +2603,12 @@ export class EventCoordinator extends DurableObject<Env> {
       );
     } else {
       const queue = await this.env.DB.prepare(
-        "SELECT COALESCE(MAX(queue_sequence), 0) + 1 AS next_sequence FROM ticket_groups WHERE operation_day_id = ?1 AND product_id = ?2",
+        `SELECT COALESCE(MAX(tg.queue_sequence), 0) + 1 AS next_sequence
+           FROM ticket_groups tg
+           JOIN products p ON p.id = tg.product_id
+          WHERE tg.operation_day_id = ?1 AND p.resource_group_id = ?2`,
       )
-        .bind(command.eventId, targetProductId)
+        .bind(command.eventId, targetResourceGroupId)
         .first<{ next_sequence: number }>();
       const communication = await this.env.DB.prepare(
         "SELECT COALESCE(MAX(communication_number), 100) + 1 AS next_number FROM flight_groups WHERE operation_day_id = ?1 AND resource_group_id = ?2",
@@ -3016,6 +3022,7 @@ export class EventCoordinator extends DurableObject<Env> {
   ): Promise<Response> {
     const rotation = await this.env.DB.prepare(
       `SELECT r.id, r.status, r.version, r.aircraft_id, fg.id AS flight_group_id,
+              fg.resource_group_id,
               tg.id AS ticket_group_id, tg.product_id
          FROM rotations r
          JOIN flight_groups fg ON fg.id = r.flight_group_id
@@ -3032,6 +3039,7 @@ export class EventCoordinator extends DurableObject<Env> {
         version: number;
         aircraft_id: string | null;
         flight_group_id: string;
+        resource_group_id: string;
         ticket_group_id: string;
         product_id: string;
       }>();
@@ -3061,17 +3069,18 @@ export class EventCoordinator extends DurableObject<Env> {
       ).bind(nextVersion, now, command.eventId, current.version),
       this.env.DB.prepare(
         `UPDATE ticket_groups SET queue_sequence = queue_sequence + 100000
-          WHERE operation_day_id = ?1 AND product_id = ?2 AND id <> ?3 AND status = 'QUEUED'`,
-      ).bind(command.eventId, rotation.product_id, rotation.ticket_group_id),
+          WHERE operation_day_id = ?1 AND id <> ?3 AND status = 'QUEUED'
+            AND product_id IN (SELECT id FROM products WHERE operation_day_id = ?1 AND resource_group_id = ?2)`,
+      ).bind(command.eventId, rotation.resource_group_id, rotation.ticket_group_id),
       this.env.DB.prepare(
         `UPDATE ticket_groups SET queue_sequence = 1, status = 'QUEUED', version = version + 1
           WHERE id = ?1`,
       ).bind(rotation.ticket_group_id),
       this.env.DB.prepare(
         `UPDATE ticket_groups SET queue_sequence = queue_sequence - 99999
-          WHERE operation_day_id = ?1 AND product_id = ?2 AND id <> ?3
-            AND status = 'QUEUED' AND queue_sequence >= 100000`,
-      ).bind(command.eventId, rotation.product_id, rotation.ticket_group_id),
+          WHERE operation_day_id = ?1 AND id <> ?3 AND status = 'QUEUED' AND queue_sequence >= 100000
+            AND product_id IN (SELECT id FROM products WHERE operation_day_id = ?1 AND resource_group_id = ?2)`,
+      ).bind(command.eventId, rotation.resource_group_id, rotation.ticket_group_id),
       this.env.DB.prepare(
         `UPDATE rotations SET status = 'DRAFT', aircraft_id = NULL, pilot_id = NULL,
                 called_at = NULL, version = version + 1, updated_at = ?1
