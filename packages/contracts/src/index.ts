@@ -570,6 +570,8 @@ export const productOperationalSummarySchema = z.object({
   resourceGroupOpenTickets: z.number().int().nonnegative(),
   estimatedWaitLowerMinutes: z.number().int().nonnegative(),
   estimatedWaitUpperMinutes: z.number().int().nonnegative(),
+  nextBoardingWindowLowerAt: z.string().nullable(),
+  nextBoardingWindowUpperAt: z.string().nullable(),
   remainingSellableSeats: z.number().int().nonnegative(),
   projectedSeats: z.number().int().nonnegative(),
   capacityStatus: z.enum(["AVAILABLE", "LIMITED", "MANUAL_REVIEW", "SOLD_OUT"]),

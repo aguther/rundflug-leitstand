@@ -560,6 +560,11 @@ function CashierView() {
               <span>
                 Wartezeit {entry.estimatedWaitLowerMinutes}–{entry.estimatedWaitUpperMinutes} Min.
               </span>
+              <span>
+                {entry.nextBoardingWindowLowerAt && entry.nextBoardingWindowUpperAt
+                  ? `Nächstes Boardingfenster ${operationalTimeLabel(entry.nextBoardingWindowLowerAt)}–${operationalTimeLabel(entry.nextBoardingWindowUpperAt)}`
+                  : "Boardingfenster derzeit unsicher"}
+              </span>
               <span>Gemeinsame Queue: {entry.resourceGroupOpenTickets} Tickets</span>
               <span>{capacityLabel[entry.capacityStatus]}</span>
               {entry.resourceGroupOperationalNote ? (

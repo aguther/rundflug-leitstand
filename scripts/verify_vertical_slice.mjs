@@ -160,6 +160,22 @@ try {
       adminPin: pin,
     }),
   );
+  const cashierProducts = (await board("cashier-tablet-1", tokens.cashier)).products;
+  if (
+    cashierProducts.length === 0 ||
+    cashierProducts.some(
+      (product) =>
+        !["AVAILABLE", "LIMITED", "MANUAL_REVIEW", "SOLD_OUT"].includes(product.capacityStatus) ||
+        product.remainingSellableSeats < 0 ||
+        product.estimatedWaitUpperMinutes < product.estimatedWaitLowerMinutes ||
+        !product.nextBoardingWindowLowerAt ||
+        !product.nextBoardingWindowUpperAt ||
+        Date.parse(product.nextBoardingWindowUpperAt) <
+          Date.parse(product.nextBoardingWindowLowerAt),
+    )
+  ) {
+    throw new Error("Verkaufskachel erhält kein vollständiges vorsichtiges Prognosefenster.");
+  }
   cashierSocket = await connectRealtime();
   flightLineSocket = await connectRealtime();
   const cashierSaleSignal = nextRealtimeVersion(cashierSocket);
@@ -335,6 +351,7 @@ try {
       reconnectMilliseconds,
       deviceAttributionVisible: true,
       assignmentSuggested: true,
+      cashierProductForecastComplete: true,
       callCorrectionAudited: true,
       transitions: [called.eventType, started.eventType, landed.eventType, completed.eventType],
       landedAircraftState: landedAircraft.operationalState,
