@@ -25,5 +25,15 @@ Leiter Flight Line nur Umlaufereignisse und Administratoren beide Arten anlegen.
 Quellzeilen, Audit-Ereignis, Idempotenzbeleg und Outbox werden gemeinsam gespeichert. Öffentliche
 Ticketcodes werden vor der Persistenz gehasht und erscheinen weder im Audit-Payload noch in Logs.
 
-Migration 0019 wurde am 12.07.2026 erfolgreich auf die Cloudflare-Abnahme-D1 angewendet. Weiterhin
-gesperrt bleiben Vier-Augen-Freigabe und Live-Anwendung des Batches.
+Migration 0019 wurde am 12.07.2026 erfolgreich auf die Cloudflare-Abnahme-D1 angewendet.
+
+## Vier-Augen-Freigabe
+
+`APPROVE_OUTAGE_RECOVERY` ist ausschließlich für ein gekoppeltes Administratorgerät mit gültiger PIN
+zulässig. Das freigebende Gerät muss vom Erfassungsgerät verschieden sein. Freigegeben werden nur
+konfliktfreie Batches im Status `STAGED`; außerdem muss die Event-Version exakt der bei Simulation
+verwendeten Version plus dem auditierenden Staging-Schritt entsprechen. Jede zwischenzeitliche
+Änderung erzwingt eine neue Simulation. Freigabe, Event-Version, Audit, Idempotenzbeleg und Outbox
+werden gemeinsam gespeichert.
+
+Weiterhin gesperrt bleibt ausschließlich die geordnete Live-Anwendung des freigegebenen Batches.
