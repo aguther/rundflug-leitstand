@@ -1,6 +1,12 @@
 import type { OperationBoard } from "@rundflug/contracts";
 
-export const OPERATION_BOARD_POLL_INTERVAL_MS = 5_000;
+export const OPERATION_BOARD_POLL_INTERVAL_MS = 15_000;
+export const OPERATION_BOARD_RECONNECT_INITIAL_MS = 1_000;
+export const OPERATION_BOARD_RECONNECT_MAX_MS = 15_000;
+
+export function nextBoardReconnectDelay(currentDelayMs: number): number {
+  return Math.min(currentDelayMs * 2, OPERATION_BOARD_RECONNECT_MAX_MS);
+}
 
 export interface BoardSyncState {
   board: OperationBoard | null;

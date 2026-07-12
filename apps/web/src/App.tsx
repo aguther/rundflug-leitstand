@@ -28,7 +28,9 @@ import {
 } from "./api";
 import {
   type BoardSyncState,
+  nextBoardReconnectDelay,
   OPERATION_BOARD_POLL_INTERVAL_MS,
+  OPERATION_BOARD_RECONNECT_INITIAL_MS,
   reduceBoardSyncState,
   requestBoardSync,
 } from "./board-sync";
@@ -183,6 +185,26 @@ function useOperationBoard(deviceId: string) {
   }, [deviceId]);
   useEffect(() => {
     let active = true;
+    let socket: WebSocket | null = null;
+    let reconnectTimer: number | null = null;
+    let reconnectDelay = OPERATION_BOARD_RECONNECT_INITIAL_MS;
+    const connect = () => {
+      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      socket = new WebSocket(
+        `${protocol}//${window.location.host}/api/public/events/${encodeURIComponent(EVENT_ID)}/live`,
+      );
+      socket.addEventListener("open", () => {
+        reconnectDelay = OPERATION_BOARD_RECONNECT_INITIAL_MS;
+        void refresh();
+      });
+      socket.addEventListener("message", () => void refresh());
+      socket.addEventListener("close", () => {
+        if (!active) return;
+        reconnectTimer = window.setTimeout(connect, reconnectDelay);
+        reconnectDelay = nextBoardReconnectDelay(reconnectDelay);
+      });
+      socket.addEventListener("error", () => socket?.close());
+    };
     void loadOperationBoard(EVENT_ID, deviceId).then((cached) => {
       if (!active || !cached) return;
       setState((current) =>
@@ -194,9 +216,12 @@ function useOperationBoard(deviceId: string) {
       );
     });
     void refresh();
+    connect();
     const timer = window.setInterval(refresh, OPERATION_BOARD_POLL_INTERVAL_MS);
     return () => {
       active = false;
+      socket?.close();
+      if (reconnectTimer !== null) window.clearTimeout(reconnectTimer);
       window.clearInterval(timer);
     };
   }, [refresh, deviceId]);
