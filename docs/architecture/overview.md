@@ -46,6 +46,16 @@ WebSocket-Verbindungen werden mit Hibernation betrieben. Clients erhalten nach W
 zuerst einen vollständigen Snapshot und danach Ereignisse ab der bekannten Version. Polling ist nur ein
 Fallback.
 
+## Öffentlicher Ticketzugriff
+
+Öffentliche Statusabfragen verwenden ausschließlich den SHA-256-Hash des kryptografisch zufälligen
+Ticketcodes als D1-Schlüssel. Unbekannte und syntaktisch ungültige Codes liefern dieselbe neutrale
+Antwort. Nach 30 unbekannten Codes je 60 Sekunden und anfragendem Akteur weist die Cloudflare-
+Rate-Limiting-Bindung weitere Versuche mit HTTP 429 ab. Als flüchtiger Zählerschlüssel wird nur ein
+SHA-256-Hash der von Cloudflare bereitgestellten Akteursadresse verwendet; Adresse und Hash werden
+weder in D1 noch im Audit-Ledger oder in Anwendungslogs gespeichert. Erfolgreiche Statusabrufe
+verbrauchen dieses Fehlversuchslimit nicht.
+
 ## Offline
 
 Die PWA speichert den letzten bestätigten Snapshot und eine lokale Kommando-Queue in IndexedDB. Jedes

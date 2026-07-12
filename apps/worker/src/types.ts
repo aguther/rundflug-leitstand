@@ -7,6 +7,7 @@ export interface Env {
   VAPID_SUBJECT?: string;
   DB: D1Database;
   BACKUPS: R2Bucket;
+  PUBLIC_TICKET_RATE_LIMITER: RateLimit;
   EVENT_COORDINATOR: DurableObjectNamespace;
   ASSETS: Fetcher;
 }
