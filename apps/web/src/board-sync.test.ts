@@ -2,12 +2,27 @@ import type { OperationBoard } from "@rundflug/contracts";
 import { describe, expect, it } from "vitest";
 import {
   type BoardSyncState,
+  nextBoardReconnectDelay,
   OPERATION_BOARD_POLL_INTERVAL_MS,
+  OPERATION_BOARD_RECONNECT_INITIAL_MS,
+  OPERATION_BOARD_RECONNECT_MAX_MS,
   reduceBoardSyncState,
   requestBoardSync,
 } from "./board-sync";
 
 describe("operation board reconnection", () => {
+  it("backs off reconnect attempts within the polling fallback bound", () => {
+    let delay = OPERATION_BOARD_RECONNECT_INITIAL_MS;
+    delay = nextBoardReconnectDelay(delay);
+    expect(delay).toBe(2_000);
+    delay = nextBoardReconnectDelay(delay);
+    expect(delay).toBe(4_000);
+    delay = nextBoardReconnectDelay(8_000);
+    expect(delay).toBe(OPERATION_BOARD_RECONNECT_MAX_MS);
+    expect(nextBoardReconnectDelay(delay)).toBe(OPERATION_BOARD_RECONNECT_MAX_MS);
+    expect(OPERATION_BOARD_POLL_INTERVAL_MS).toBe(15_000);
+  });
+
   it("keeps the last confirmation through a 60-second outage and accepts recovery automatically", async () => {
     const firstBoard = { event: { version: 10 } } as OperationBoard;
     const recoveredBoard = { event: { version: 11 } } as OperationBoard;

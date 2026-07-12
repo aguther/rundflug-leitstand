@@ -32,6 +32,7 @@ const server = spawn(
   { cwd: root, stdio: "ignore", windowsHide: true },
 );
 const base = "http://127.0.0.1:8787";
+const wsBase = "ws://127.0.0.1:8787";
 const waitForWorker = async () => {
   for (let attempt = 0; attempt < 40; attempt += 1) {
     try {
@@ -86,7 +87,51 @@ const ticketCode = () =>
     .toString("base64url")
     .toUpperCase()
     .replaceAll(/[01OI_-]/g, "A");
+const connectRealtime = () =>
+  new Promise((resolvePromise, reject) => {
+    const socket = new WebSocket(`${wsBase}/api/public/events/demo-2026/live`);
+    const timeout = setTimeout(() => {
+      socket.close();
+      reject(new Error("Realtime-Verbindung wurde nicht rechtzeitig hergestellt."));
+    }, 2_000);
+    socket.addEventListener("message", (event) => {
+      const message = JSON.parse(String(event.data));
+      if (message.type !== "connected") return;
+      clearTimeout(timeout);
+      resolvePromise(socket);
+    });
+    socket.addEventListener(
+      "error",
+      () => reject(new Error("Realtime-Verbindung fehlgeschlagen.")),
+      {
+        once: true,
+      },
+    );
+  });
+const nextRealtimeVersion = (socket) =>
+  new Promise((resolvePromise, reject) => {
+    const startedAt = Date.now();
+    const timeout = setTimeout(
+      () =>
+        reject(
+          new Error("Paralleles Gerät erhielt die Änderung nicht innerhalb von zwei Sekunden."),
+        ),
+      2_000,
+    );
+    socket.addEventListener(
+      "message",
+      (event) => {
+        const message = JSON.parse(String(event.data));
+        if (message.type !== "event-state-changed") return;
+        clearTimeout(timeout);
+        resolvePromise({ version: message.eventVersion, elapsedMs: Date.now() - startedAt });
+      },
+      { once: true },
+    );
+  });
 
+let cashierSocket;
+let flightLineSocket;
 try {
   await waitForWorker();
   let current = await board("technical-scaffold", tokens.admin);
@@ -115,6 +160,10 @@ try {
       adminPin: pin,
     }),
   );
+  cashierSocket = await connectRealtime();
+  flightLineSocket = await connectRealtime();
+  const cashierSaleSignal = nextRealtimeVersion(cashierSocket);
+  const flightLineSaleSignal = nextRealtimeVersion(flightLineSocket);
   const saleEnvelope = envelope("cashier-tablet-1", activated.event.version, "SELL_TICKET_GROUP", {
     productId: "panorama-20",
     publicTicketCodes: [ticketCode(), ticketCode()],
@@ -123,6 +172,16 @@ try {
     paymentMethod: "CASH",
   });
   const sold = await post(tokens.cashier, saleEnvelope);
+  const [cashierRealtime, flightLineRealtime] = await Promise.all([
+    cashierSaleSignal,
+    flightLineSaleSignal,
+  ]);
+  if (
+    cashierRealtime.version !== sold.event.version ||
+    flightLineRealtime.version !== sold.event.version
+  ) {
+    throw new Error("Parallele Geräte erhielten eine abweichende Veranstaltungsversion.");
+  }
   const duplicate = await post(tokens.cashier, saleEnvelope);
   if (!duplicate.duplicate || duplicate.event.version !== sold.event.version) {
     throw new Error("Idempotente Wiederholung erzeugte einen abweichenden Zustand.");
@@ -137,6 +196,26 @@ try {
   await post(tokens.cashier, staleSale, 409);
 
   const rotationId = sold.aggregate.relatedRotationId;
+  await post(
+    "invalid-synthetic-token",
+    envelope("cashier-tablet-1", sold.event.version, "SELL_TICKET_GROUP", {
+      productId: "panorama-20",
+      publicTicketCodes: [ticketCode()],
+      standby: false,
+      paymentStatus: "PAID",
+      paymentMethod: "CASH",
+    }),
+    401,
+  );
+  await post(
+    tokens.cashier,
+    envelope("cashier-tablet-1", sold.event.version, "CALL_NEXT", {
+      rotationId,
+      aircraftId: "aircraft-a",
+      pilotId: "550e8400-e29b-41d4-a716-446655440100",
+    }),
+    403,
+  );
   const proposedBoard = await board("flight-line-tablet-1", tokens.flightLine);
   const proposedRotation = proposedBoard.rotations.find((rotation) => rotation.id === rotationId);
   if (
@@ -145,6 +224,11 @@ try {
   ) {
     throw new Error("Flugzeug- oder Pilotenvorschlag fehlt im Standardumlauf.");
   }
+  flightLineSocket.close();
+  const reconnectStartedAt = Date.now();
+  flightLineSocket = await connectRealtime();
+  const reconnectMilliseconds = Date.now() - reconnectStartedAt;
+  const callSignal = nextRealtimeVersion(flightLineSocket);
   const firstCall = await post(
     tokens.flightLine,
     envelope("flight-line-tablet-1", sold.event.version, "CALL_NEXT", {
@@ -153,6 +237,10 @@ try {
       pilotId: "550e8400-e29b-41d4-a716-446655440100",
     }),
   );
+  const callRealtime = await callSignal;
+  if (callRealtime.version !== firstCall.event.version) {
+    throw new Error("Wiederverbundenes Gerät erhielt den Aufruf nicht.");
+  }
   const revoked = await post(
     tokens.flightLine,
     envelope("flight-line-tablet-1", firstCall.event.version, "REVOKE_CALL", { rotationId }),
@@ -170,6 +258,7 @@ try {
   const correction = correctionHistory.entries.find((entry) => entry.eventType === "CALL_REVOKED");
   if (
     !originalCall?.occurredAt ||
+    originalCall.deviceId !== "flight-line-tablet-1" ||
     correction?.payload.corrects !== "FLIGHT_GROUP_CALLED" ||
     correction.payload.calledAt !== originalCall.occurredAt
   ) {
@@ -217,11 +306,34 @@ try {
   if (!timingComplete || finalRotation.ticketCount !== 2) {
     throw new Error("Zeitmesspunkte oder Gruppenbindung des Umlaufs sind unvollständig.");
   }
+  const devicesResponse = await fetch(`${base}/api/events/demo-2026/devices`, {
+    headers: { "x-device-id": "technical-scaffold", "x-device-token": tokens.admin },
+  });
+  const deviceBody = await devicesResponse.json();
+  if (
+    !devicesResponse.ok ||
+    !deviceBody.devices.some(
+      (device) =>
+        device.id === "cashier-tablet-1" && device.role === "CASHIER" && device.lastSeenAt,
+    )
+  ) {
+    throw new Error("Geräterolle oder letzter Kontakt ist administrativ nicht nachvollziehbar.");
+  }
   process.stdout.write(
     JSON.stringify({
       sale: sold.eventType,
       duplicate: duplicate.duplicate,
       staleRejected: true,
+      unpairedRejected: true,
+      wrongRoleRejected: true,
+      twoDevicesRealtimeUnderTwoSeconds: true,
+      maximumRealtimeMilliseconds: Math.max(
+        cashierRealtime.elapsedMs,
+        flightLineRealtime.elapsedMs,
+        callRealtime.elapsedMs,
+      ),
+      reconnectMilliseconds,
+      deviceAttributionVisible: true,
       assignmentSuggested: true,
       callCorrectionAudited: true,
       transitions: [called.eventType, started.eventType, landed.eventType, completed.eventType],
@@ -233,6 +345,8 @@ try {
     }),
   );
 } finally {
+  cashierSocket?.close();
+  flightLineSocket?.close();
   if (process.platform === "win32") {
     spawnSync("taskkill", ["/PID", String(server.pid), "/T", "/F"], { stdio: "ignore" });
   } else {
