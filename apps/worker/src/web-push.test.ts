@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Env } from "./types";
-import { isAllowedPushEndpoint, purgeExpiredPushSubscriptions } from "./web-push";
+import {
+  isAllowedPushEndpoint,
+  purgeExpiredPushSubscriptions,
+  pushDeleteAfter,
+  pushRetentionDays,
+} from "./web-push";
 
 describe("Web-Push-Endpunkte", () => {
   it("erlaubt Browser-Push-Dienste und blockiert beliebige Ziele", () => {
@@ -17,6 +22,15 @@ describe("Web-Push-Endpunkte", () => {
 });
 
 describe("Web-Push-Aufbewahrung", () => {
+  it("berechnet die konfigurierbare Löschfrist ab Veranstaltungsende", () => {
+    expect(pushRetentionDays(undefined)).toBe(7);
+    expect(pushRetentionDays("14")).toBe(14);
+    expect(pushRetentionDays("0")).toBe(7);
+    expect(pushRetentionDays("invalid")).toBe(7);
+    expect(pushDeleteAfter("2026-07-12T18:00:00.000Z", 7)).toBe("2026-07-19T18:00:00.000Z");
+    expect(() => pushDeleteAfter("invalid", 7)).toThrow(/Veranstaltungsende/);
+  });
+
   it("löscht abgelaufene und widerrufene Ziele", async () => {
     const bind = vi
       .fn()
