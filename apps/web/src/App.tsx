@@ -965,6 +965,8 @@ function FlightLineView() {
 
   async function mutateQueue(type: "DEFER_TICKET_GROUP" | "MARK_NO_SHOW") {
     if (!board || !selected || queueReason.trim().length < 3) return;
+    const movesToClarification =
+      type === "DEFER_TICKET_GROUP" && selected.deferralCount + 1 >= board.event.maxTicketDeferrals;
     try {
       await sendCommand(
         {
@@ -978,7 +980,13 @@ function FlightLineView() {
         },
         deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
       );
-      setMessage(type === "MARK_NO_SHOW" ? "No-Show protokolliert." : "Fluggruppe zurückgestellt.");
+      setMessage(
+        type === "MARK_NO_SHOW"
+          ? "No-Show protokolliert."
+          : movesToClarification
+            ? "Höchstzahl erreicht · Fluggruppe zur Klärung an die Kasse gegeben."
+            : "Fluggruppe zurückgestellt.",
+      );
       setQueueReason("");
       setSelectedId(null);
       await refresh();
@@ -1117,6 +1125,12 @@ function FlightLineView() {
                 <div>
                   <dt>Tickets</dt>
                   <dd>{selected.ticketCount}</dd>
+                </div>
+                <div>
+                  <dt>Zurückstellungen</dt>
+                  <dd>
+                    {selected.deferralCount}/{board?.event.maxTicketDeferrals ?? 2}
+                  </dd>
                 </div>
                 <div>
                   <dt>Flugzeug</dt>
@@ -1828,6 +1842,7 @@ function AdminView() {
   const [saleOpensAt, setSaleOpensAt] = useState("");
   const [operationsEndAt, setOperationsEndAt] = useState("");
   const [noShowAfterMinutes, setNoShowAfterMinutes] = useState(10);
+  const [maxTicketDeferrals, setMaxTicketDeferrals] = useState(2);
   const [notificationLeadMinutes, setNotificationLeadMinutes] = useState(15);
   const [childReferenceWeightKg, setChildReferenceWeightKg] = useState(35);
   const [normalReferenceWeightKg, setNormalReferenceWeightKg] = useState(80);
@@ -1918,6 +1933,7 @@ function AdminView() {
     setSaleOpensAt(toLocalDateTimeInput(board.event.saleOpensAt));
     setOperationsEndAt(toLocalDateTimeInput(board.event.operationsEndAt));
     setNoShowAfterMinutes(board.event.noShowAfterMinutes);
+    setMaxTicketDeferrals(board.event.maxTicketDeferrals);
     setNotificationLeadMinutes(board.event.notificationLeadMinutes);
     setChildReferenceWeightKg(board.event.referenceWeightsKg.child);
     setNormalReferenceWeightKg(board.event.referenceWeightsKg.normal);
@@ -2041,6 +2057,7 @@ function AdminView() {
             saleOpensAt: saleOpensAt ? new Date(saleOpensAt).toISOString() : null,
             operationsEndAt: new Date(operationsEndAt).toISOString(),
             noShowAfterMinutes,
+            maxTicketDeferrals,
             notificationLeadMinutes,
             childReferenceWeightKg,
             normalReferenceWeightKg,
@@ -2937,6 +2954,16 @@ function AdminView() {
                 max="120"
                 value={noShowAfterMinutes}
                 onChange={(event) => setNoShowAfterMinutes(Number(event.target.value))}
+              />
+            </label>
+            <label>
+              Klärung Kasse nach Zurückstellungen
+              <input
+                type="number"
+                min="1"
+                max="10"
+                value={maxTicketDeferrals}
+                onChange={(event) => setMaxTicketDeferrals(Number(event.target.value))}
               />
             </label>
             <label>
