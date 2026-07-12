@@ -8,6 +8,7 @@ import {
 import {
   type AircraftOperationalState,
   assertMayStageOutageRecoveryEntry,
+  assertOutageRecoveryApproval,
   assertPublicTicketCode,
   assertQueueMutationAllowed,
   assertRoleMayExecute,
@@ -480,6 +481,9 @@ export class EventCoordinator extends DurableObject<Env> {
       if (command.type !== "SET_OPERATIONAL_NOTE") {
         if (command.type === "STAGE_OUTAGE_RECOVERY") {
           return this.handleStageOutageRecovery(command, current);
+        }
+        if (command.type === "APPROVE_OUTAGE_RECOVERY") {
+          return this.handleApproveOutageRecovery(command, current);
         }
         if (
           command.type === "SET_AIRCRAFT_OPERATIONAL_STATE" ||
@@ -2455,6 +2459,110 @@ export class EventCoordinator extends DurableObject<Env> {
     this.ctx.waitUntil(
       sendRotationPushNotifications(this.env, rotation.id, eventType[command.type]),
     );
+    this.broadcast(result);
+    return json(result);
+  }
+
+  private async handleApproveOutageRecovery(
+    command: Extract<CommandEnvelope, { type: "APPROVE_OUTAGE_RECOVERY" }>,
+    current: StoredEventRow,
+  ): Promise<Response> {
+    if (!(await verifyCredential(command.payload.adminPin, this.env.ADMIN_PIN_HASH))) {
+      return json(
+        { error: { code: "ADMIN_PIN_INVALID", message: "Administrator-PIN ist ungültig." } },
+        { status: 403 },
+      );
+    }
+    const batch = await this.env.DB.prepare(
+      `SELECT id, status, created_by_device_id, simulated_against_version, version
+         FROM outage_recovery_batches
+        WHERE id = ?1 AND operation_day_id = ?2`,
+    )
+      .bind(command.payload.batchId, command.eventId)
+      .first<{
+        id: string;
+        status: "STAGED" | "CONFLICTED" | "APPROVED" | "APPLYING" | "APPLIED" | "REJECTED";
+        created_by_device_id: string;
+        simulated_against_version: number;
+        version: number;
+      }>();
+    if (!batch) {
+      return json(
+        {
+          error: {
+            code: "RECOVERY_BATCH_NOT_FOUND",
+            message: "Nacherfassungsbatch nicht gefunden.",
+          },
+        },
+        { status: 404 },
+      );
+    }
+    try {
+      assertOutageRecoveryApproval({
+        status: batch.status,
+        createdByDeviceId: batch.created_by_device_id,
+        approvedByDeviceId: command.deviceId,
+        simulatedAgainstVersion: batch.simulated_against_version,
+        currentEventVersion: current.version,
+      });
+    } catch (reason) {
+      if (reason instanceof DomainRuleError) {
+        return json({ error: { code: reason.code, message: reason.message } }, { status: 409 });
+      }
+      throw reason;
+    }
+    const now = new Date().toISOString();
+    const nextVersion = current.version + 1;
+    const result: CommandResult = {
+      accepted: true,
+      duplicate: false,
+      event: rowToSnapshot({ ...current, version: nextVersion, updated_at: now }),
+      eventType: "OUTAGE_RECOVERY_APPROVED",
+      aggregate: { type: "RECOVERY_BATCH", id: batch.id },
+    };
+    await this.env.DB.batch([
+      this.env.DB.prepare(
+        "UPDATE operation_days SET version = ?1, updated_at = ?2 WHERE id = ?3 AND version = ?4",
+      ).bind(nextVersion, now, command.eventId, current.version),
+      this.env.DB.prepare(
+        `UPDATE outage_recovery_batches
+            SET status = 'APPROVED', approved_by_device_id = ?1, approved_at = ?2,
+                version = version + 1
+          WHERE id = ?3 AND version = ?4 AND status = 'STAGED'`,
+      ).bind(command.deviceId, now, batch.id, batch.version),
+      this.env.DB.prepare(
+        `INSERT INTO operational_events
+          (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type,
+           aggregate_id, aggregate_version, payload_json)
+         VALUES (?1, ?2, 'OUTAGE_RECOVERY_APPROVED', ?3, ?4, 'RECOVERY_BATCH', ?5, ?6, ?7)`,
+      ).bind(
+        crypto.randomUUID(),
+        command.eventId,
+        now,
+        command.deviceId,
+        batch.id,
+        batch.version + 1,
+        JSON.stringify({
+          createdByDeviceId: batch.created_by_device_id,
+          simulatedAgainstVersion: batch.simulated_against_version,
+        }),
+      ),
+      this.env.DB.prepare(
+        `INSERT INTO idempotency_receipts
+          (command_id, operation_day_id, device_id, command_type, received_at, response_json)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)`,
+      ).bind(
+        command.commandId,
+        command.eventId,
+        command.deviceId,
+        command.type,
+        now,
+        JSON.stringify(result),
+      ),
+      this.env.DB.prepare(
+        "INSERT INTO outbox (id, operation_day_id, topic, payload_json, created_at) VALUES (?1, ?2, 'EVENT_STATE_CHANGED', ?3, ?4)",
+      ).bind(crypto.randomUUID(), command.eventId, JSON.stringify(result), now),
+    ]);
     this.broadcast(result);
     return json(result);
   }

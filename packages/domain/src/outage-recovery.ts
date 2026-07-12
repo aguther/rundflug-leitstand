@@ -51,6 +51,33 @@ export function assertMayStageOutageRecoveryEntry(
   }
 }
 
+export function assertOutageRecoveryApproval(input: {
+  status: "STAGED" | "CONFLICTED" | "APPROVED" | "APPLYING" | "APPLIED" | "REJECTED";
+  createdByDeviceId: string;
+  approvedByDeviceId: string;
+  simulatedAgainstVersion: number;
+  currentEventVersion: number;
+}): void {
+  if (input.status !== "STAGED") {
+    throw new DomainRuleError(
+      "OUTAGE_RECOVERY_NOT_APPROVABLE",
+      "Nur ein konfliktfrei simulierter, noch nicht freigegebener Batch kann freigegeben werden.",
+    );
+  }
+  if (input.createdByDeviceId === input.approvedByDeviceId) {
+    throw new DomainRuleError(
+      "OUTAGE_RECOVERY_FOUR_EYES_REQUIRED",
+      "Nacherfassung und Freigabe müssen durch unterschiedliche Geräte erfolgen.",
+    );
+  }
+  if (input.currentEventVersion !== input.simulatedAgainstVersion + 1) {
+    throw new DomainRuleError(
+      "OUTAGE_RECOVERY_RESIMULATION_REQUIRED",
+      "Der Livezustand wurde seit der Simulation geändert; der Batch muss neu simuliert werden.",
+    );
+  }
+}
+
 const targetState: Readonly<Record<Exclude<OutageRecoveryEntryType, "PAPER_SALE">, RotationState>> =
   {
     ROTATION_CALLED: "CALLED",

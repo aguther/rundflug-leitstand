@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   assertMayStageOutageRecoveryEntry,
+  assertOutageRecoveryApproval,
   type OutageRecoveryEntry,
   simulateOutageRecovery,
 } from "./outage-recovery";
@@ -18,6 +19,45 @@ function entry(
 }
 
 describe("outage recovery simulation", () => {
+  it("requires a different approving device and an unchanged post-staging event version", () => {
+    expect(() =>
+      assertOutageRecoveryApproval({
+        status: "STAGED",
+        createdByDeviceId: "cashier-1",
+        approvedByDeviceId: "admin-2",
+        simulatedAgainstVersion: 20,
+        currentEventVersion: 21,
+      }),
+    ).not.toThrow();
+    expect(() =>
+      assertOutageRecoveryApproval({
+        status: "STAGED",
+        createdByDeviceId: "admin-1",
+        approvedByDeviceId: "admin-1",
+        simulatedAgainstVersion: 20,
+        currentEventVersion: 21,
+      }),
+    ).toThrowError(/unterschiedliche Geräte/);
+    expect(() =>
+      assertOutageRecoveryApproval({
+        status: "STAGED",
+        createdByDeviceId: "cashier-1",
+        approvedByDeviceId: "admin-2",
+        simulatedAgainstVersion: 20,
+        currentEventVersion: 22,
+      }),
+    ).toThrowError(/neu simuliert/);
+    expect(() =>
+      assertOutageRecoveryApproval({
+        status: "CONFLICTED",
+        createdByDeviceId: "cashier-1",
+        approvedByDeviceId: "admin-2",
+        simulatedAgainstVersion: 20,
+        currentEventVersion: 21,
+      }),
+    ).toThrowError(/konfliktfrei/);
+  });
+
   it("separates cashier paper sales from flight-line-lead rotation records", () => {
     expect(() => assertMayStageOutageRecoveryEntry("CASHIER", "PAPER_SALE")).not.toThrow();
     expect(() => assertMayStageOutageRecoveryEntry("CASHIER", "ROTATION_CALLED")).toThrowError(
