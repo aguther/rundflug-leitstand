@@ -44,6 +44,13 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
     }),
   }),
   commandBaseSchema.extend({
+    type: z.literal("APPLY_OUTAGE_RECOVERY"),
+    payload: z.object({
+      batchId: z.uuid(),
+      adminPin: z.string().min(4).max(32),
+    }),
+  }),
+  commandBaseSchema.extend({
     type: z.literal("SELL_TICKET_GROUP"),
     payload: z.object({
       productId: z.string().min(1).max(100),
@@ -372,6 +379,25 @@ export const outageRecoveryEntrySchema = z.discriminatedUnion("type", [
 ]);
 export type OutageRecoveryEntryContract = z.infer<typeof outageRecoveryEntrySchema>;
 
+export const storedOutagePaperSalePayloadSchema = z
+  .object({
+    productId: z.string().min(1).max(100),
+    publicTicketCodeHashes: z
+      .array(z.string().regex(/^[a-f0-9]{64}$/))
+      .min(1)
+      .max(12),
+    paymentStatus: z.enum(["UNPAID", "PAID", "WAIVED", "INFORMATIONAL_ONLY"]),
+    paymentMethod: z.enum(["CASH", "CARD", "VOUCHER", "OTHER"]).nullable(),
+  })
+  .strict();
+export const storedOutageCallPayloadSchema = z
+  .object({
+    aircraftId: z.string().min(1).max(100),
+    pilotId: z.string().min(1).max(100),
+  })
+  .strict();
+export const storedOutageTransitionPayloadSchema = z.object({}).strict();
+
 export const stageOutageRecoveryRequestSchema = z
   .object({
     batchId: z.uuid(),
@@ -390,6 +416,8 @@ export const outageRecoveryConflictSchema = z.object({
     "PAPER_REFERENCE_ALREADY_EXISTS",
     "PAPER_REFERENCE_UNKNOWN",
     "RECOVERY_TRANSITION_INVALID",
+    "DUPLICATE_TICKET_CODE",
+    "TICKET_CODE_ALREADY_EXISTS",
   ]),
   message: z.string(),
 });

@@ -36,4 +36,18 @@ verwendeten Version plus dem auditierenden Staging-Schritt entsprechen. Jede zwi
 Änderung erzwingt eine neue Simulation. Freigabe, Event-Version, Audit, Idempotenzbeleg und Outbox
 werden gemeinsam gespeichert.
 
-Weiterhin gesperrt bleibt ausschließlich die geordnete Live-Anwendung des freigegebenen Batches.
+## Geordnete Live-Anwendung
+
+`APPLY_OUTAGE_RECOVERY` prüft erneut Administratorrolle, PIN, Batchstatus und Event-Version. Ein
+freigegebener Batch wird vollständig in einem D1-Batch angewendet oder gar nicht. Papierverkäufe
+erzeugen Ticketgruppe, gehashte Tickets, stabile Fluggruppe und Umlauf; Flight-Line-Einträge führen
+denselben Papierbezug in der erlaubten Reihenfolge bis `ABGESCHLOSSEN` fort. Jede fachliche Zeile
+erzeugt ein Ledger-Ereignis mit `recordedAfterOutage`, ursprünglicher Zeit, Batch-ID,
+Nacherfassergerät und anonymer Papierbelegreferenz. Ticketcodes erscheinen weder im Ledger noch in
+Ausgaben.
+
+Der reproduzierbare Befehl `npm run test:outage-recovery` setzt eine synthetische lokale D1 neu auf
+und prüft getrennte Kassen- und Flight-Line-Lead-Batches samt anderem Administratorgerät. Ergebnis am
+12.07.2026: beide Batches `STAGED → APPROVED → APPLIED`, finale Event-Version 6 und ein vollständig
+abgeschlossener nacherfasster Umlauf. Migration 0020 wurde anschließend erfolgreich auf die
+Cloudflare-Abnahme-D1 angewendet.

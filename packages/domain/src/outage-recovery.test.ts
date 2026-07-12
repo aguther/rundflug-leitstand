@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   assertMayStageOutageRecoveryEntry,
+  assertOutageRecoveryApplication,
   assertOutageRecoveryApproval,
   type OutageRecoveryEntry,
   simulateOutageRecovery,
@@ -19,6 +20,30 @@ function entry(
 }
 
 describe("outage recovery simulation", () => {
+  it("applies only an approved batch before another live write occurs", () => {
+    expect(() =>
+      assertOutageRecoveryApplication({
+        status: "APPROVED",
+        simulatedAgainstVersion: 20,
+        currentEventVersion: 22,
+      }),
+    ).not.toThrow();
+    expect(() =>
+      assertOutageRecoveryApplication({
+        status: "STAGED",
+        simulatedAgainstVersion: 20,
+        currentEventVersion: 21,
+      }),
+    ).toThrowError(/Vier-Augen/);
+    expect(() =>
+      assertOutageRecoveryApplication({
+        status: "APPROVED",
+        simulatedAgainstVersion: 20,
+        currentEventVersion: 23,
+      }),
+    ).toThrowError(/nach Freigabe geändert/);
+  });
+
   it("requires a different approving device and an unchanged post-staging event version", () => {
     expect(() =>
       assertOutageRecoveryApproval({
@@ -127,5 +152,35 @@ describe("outage recovery simulation", () => {
         "EVENT_IN_FUTURE",
       ]),
     );
+  });
+
+  it("detects ticket codes reused in history or within the paper batch", () => {
+    const result = simulateOutageRecovery({
+      entries: [
+        { ...entry("sale-1", "PAPER_SALE", 0, 1, "BELEG-1"), ticketKeys: ["used", "same"] },
+        { ...entry("sale-2", "PAPER_SALE", 1, 2, "BELEG-2"), ticketKeys: ["same"] },
+      ],
+      existingPaperReferences: [],
+      existingTicketKeys: ["used"],
+      recordedAt: at(30),
+    });
+
+    expect(result.conflicts.map((conflict) => conflict.code)).toEqual(
+      expect.arrayContaining(["TICKET_CODE_ALREADY_EXISTS", "DUPLICATE_TICKET_CODE"]),
+    );
+  });
+
+  it("continues a flight-line batch from an already applied cashier paper sale", () => {
+    const result = simulateOutageRecovery({
+      entries: [
+        entry("called", "ROTATION_CALLED", 5, 1),
+        entry("started", "ROTATION_IN_FLIGHT", 10, 2),
+      ],
+      existingPaperReferences: ["BELEG-001"],
+      existingReferenceStates: { "BELEG-001": "DRAFT" },
+      recordedAt: at(30),
+    });
+
+    expect(result).toMatchObject({ canCommit: true, conflicts: [] });
   });
 });

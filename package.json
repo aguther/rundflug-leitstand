@@ -20,6 +20,7 @@
     "build:worker": "npm run build -w @rundflug/worker",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "vitest run",
+    "test:outage-recovery": "node scripts/verify_outage_recovery.mjs",
     "test:watch": "vitest",
     "lint": "biome check .",
     "format": "biome format --write .",

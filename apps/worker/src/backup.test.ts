@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { serializePortableBackup } from "./backup";
+import { BACKUP_TABLES, serializePortableBackup } from "./backup";
 
 describe("portable backup format", () => {
   it("contains an explicit version and no implicit guest-name field", () => {
@@ -14,5 +14,18 @@ describe("portable backup format", () => {
     expect(serialized).not.toContain("guestName");
     expect(serialized).not.toContain("phone");
     expect(serialized).not.toContain("pilotName");
+  });
+
+  it("includes every V1 recovery, forecast, gate and notification table", () => {
+    expect(BACKUP_TABLES).toEqual(
+      expect.arrayContaining([
+        "gates",
+        "forecast_snapshots",
+        "web_push_subscriptions",
+        "outage_recovery_batches",
+        "outage_recovery_entries",
+        "outage_recovery_references",
+      ]),
+    );
   });
 });

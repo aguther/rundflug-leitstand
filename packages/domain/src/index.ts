@@ -142,7 +142,8 @@ export type OperationalCommandType =
   | "ASSIGN_AIRCRAFT_RESOURCE_GROUP"
   | "SET_EVENT_LIFECYCLE"
   | "STAGE_OUTAGE_RECOVERY"
-  | "APPROVE_OUTAGE_RECOVERY";
+  | "APPROVE_OUTAGE_RECOVERY"
+  | "APPLY_OUTAGE_RECOVERY";
 
 const commandRoles: Readonly<Record<OperationalCommandType, readonly DeviceRole[]>> = {
   SELL_TICKET_GROUP: ["CASHIER", "ADMIN"],
@@ -179,6 +180,7 @@ const commandRoles: Readonly<Record<OperationalCommandType, readonly DeviceRole[
   SET_EVENT_LIFECYCLE: ["ADMIN"],
   STAGE_OUTAGE_RECOVERY: ["CASHIER", "FLIGHT_LINE_LEAD", "ADMIN"],
   APPROVE_OUTAGE_RECOVERY: ["ADMIN"],
+  APPLY_OUTAGE_RECOVERY: ["ADMIN"],
 };
 
 export function assertRoleMayExecute(role: DeviceRole, command: OperationalCommandType): void {

@@ -4,10 +4,14 @@ import {
   type CommandResult,
   commandEnvelopeSchema,
   commandResultSchema,
+  storedOutageCallPayloadSchema,
+  storedOutagePaperSalePayloadSchema,
+  storedOutageTransitionPayloadSchema,
 } from "@rundflug/contracts";
 import {
   type AircraftOperationalState,
   assertMayStageOutageRecoveryEntry,
+  assertOutageRecoveryApplication,
   assertOutageRecoveryApproval,
   assertPublicTicketCode,
   assertQueueMutationAllowed,
@@ -484,6 +488,9 @@ export class EventCoordinator extends DurableObject<Env> {
         }
         if (command.type === "APPROVE_OUTAGE_RECOVERY") {
           return this.handleApproveOutageRecovery(command, current);
+        }
+        if (command.type === "APPLY_OUTAGE_RECOVERY") {
+          return this.handleApplyOutageRecovery(command, current);
         }
         if (
           command.type === "SET_AIRCRAFT_OPERATIONAL_STATE" ||
@@ -2463,6 +2470,595 @@ export class EventCoordinator extends DurableObject<Env> {
     return json(result);
   }
 
+  private async handleApplyOutageRecovery(
+    command: Extract<CommandEnvelope, { type: "APPLY_OUTAGE_RECOVERY" }>,
+    current: StoredEventRow,
+  ): Promise<Response> {
+    if (!(await verifyCredential(command.payload.adminPin, this.env.ADMIN_PIN_HASH))) {
+      return json(
+        { error: { code: "ADMIN_PIN_INVALID", message: "Administrator-PIN ist ungültig." } },
+        { status: 403 },
+      );
+    }
+    const batch = await this.env.DB.prepare(
+      `SELECT id, status, created_by_device_id, approved_by_device_id,
+              simulated_against_version, version
+         FROM outage_recovery_batches
+        WHERE id = ?1 AND operation_day_id = ?2`,
+    )
+      .bind(command.payload.batchId, command.eventId)
+      .first<{
+        id: string;
+        status: "STAGED" | "CONFLICTED" | "APPROVED" | "APPLYING" | "APPLIED" | "REJECTED";
+        created_by_device_id: string;
+        approved_by_device_id: string | null;
+        simulated_against_version: number;
+        version: number;
+      }>();
+    if (!batch) {
+      return json(
+        {
+          error: {
+            code: "RECOVERY_BATCH_NOT_FOUND",
+            message: "Nacherfassungsbatch nicht gefunden.",
+          },
+        },
+        { status: 404 },
+      );
+    }
+    try {
+      assertOutageRecoveryApplication({
+        status: batch.status,
+        simulatedAgainstVersion: batch.simulated_against_version,
+        currentEventVersion: current.version,
+      });
+    } catch (reason) {
+      if (reason instanceof DomainRuleError) {
+        return json({ error: { code: reason.code, message: reason.message } }, { status: 409 });
+      }
+      throw reason;
+    }
+    const entries = await this.env.DB.prepare(
+      `SELECT id, source_entry_id, entry_type, original_occurred_at, paper_sequence,
+              paper_reference, payload_json, status
+         FROM outage_recovery_entries
+        WHERE batch_id = ?1
+        ORDER BY original_occurred_at, paper_sequence, id`,
+    )
+      .bind(batch.id)
+      .all<{
+        id: string;
+        source_entry_id: string;
+        entry_type:
+          | "PAPER_SALE"
+          | "ROTATION_CALLED"
+          | "ROTATION_IN_FLIGHT"
+          | "ROTATION_LANDED"
+          | "ROTATION_COMPLETED";
+        original_occurred_at: string;
+        paper_sequence: number;
+        paper_reference: string;
+        payload_json: string;
+        status: "STAGED" | "CONFLICT" | "APPLIED";
+      }>();
+    if (
+      entries.results.length === 0 ||
+      entries.results.some((entry) => entry.status !== "STAGED")
+    ) {
+      return json(
+        {
+          error: {
+            code: "RECOVERY_ENTRIES_NOT_APPLICABLE",
+            message: "Der Batch enthält keine vollständig freigegebenen Nacherfassungszeilen.",
+          },
+        },
+        { status: 409 },
+      );
+    }
+    const [products, aircraftRows, pilotRows, existingReferences, queueRows, communicationRows] =
+      await Promise.all([
+        this.env.DB.prepare(
+          "SELECT id, resource_group_id, price_cents FROM products WHERE operation_day_id = ?1",
+        )
+          .bind(command.eventId)
+          .all<{ id: string; resource_group_id: string; price_cents: number }>(),
+        this.env.DB.prepare(
+          `SELECT a.id, a.passenger_seats, a.operational_state, membership.resource_group_id
+             FROM aircraft a
+             JOIN resource_group_memberships membership
+               ON membership.aircraft_id = a.id AND membership.active_until IS NULL
+            WHERE membership.operation_day_id = ?1`,
+        )
+          .bind(command.eventId)
+          .all<{
+            id: string;
+            passenger_seats: number;
+            operational_state: string;
+            resource_group_id: string;
+          }>(),
+        this.env.DB.prepare("SELECT id, active, paused FROM pilots WHERE operation_day_id = ?1")
+          .bind(command.eventId)
+          .all<{ id: string; active: number; paused: number }>(),
+        this.env.DB.prepare(
+          `SELECT reference.paper_reference, reference.ticket_group_id, reference.rotation_id,
+                  reference.current_state, r.aircraft_id, r.pilot_id, fg.resource_group_id,
+                  r.version, COUNT(rt.ticket_id) AS ticket_count
+             FROM outage_recovery_references reference
+             JOIN rotations r ON r.id = reference.rotation_id
+             JOIN flight_groups fg ON fg.id = r.flight_group_id
+             LEFT JOIN rotation_tickets rt ON rt.rotation_id = r.id AND rt.released_at IS NULL
+            WHERE reference.operation_day_id = ?1
+            GROUP BY reference.paper_reference`,
+        )
+          .bind(command.eventId)
+          .all<{
+            paper_reference: string;
+            ticket_group_id: string;
+            rotation_id: string;
+            current_state: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
+            aircraft_id: string | null;
+            pilot_id: string | null;
+            resource_group_id: string;
+            version: number;
+            ticket_count: number;
+          }>(),
+        this.env.DB.prepare(
+          `SELECT p.resource_group_id, COALESCE(MAX(tg.queue_sequence), 0) AS maximum
+             FROM products p
+             LEFT JOIN ticket_groups tg ON tg.product_id = p.id AND tg.operation_day_id = p.operation_day_id
+            WHERE p.operation_day_id = ?1 GROUP BY p.resource_group_id`,
+        )
+          .bind(command.eventId)
+          .all<{ resource_group_id: string; maximum: number }>(),
+        this.env.DB.prepare(
+          `SELECT resource_group_id, COALESCE(MAX(communication_number), 100) AS maximum
+             FROM flight_groups WHERE operation_day_id = ?1 GROUP BY resource_group_id`,
+        )
+          .bind(command.eventId)
+          .all<{ resource_group_id: string; maximum: number }>(),
+      ]);
+    const productById = new Map(products.results.map((product) => [product.id, product]));
+    const aircraftById = new Map(aircraftRows.results.map((aircraft) => [aircraft.id, aircraft]));
+    const pilotById = new Map(pilotRows.results.map((pilot) => [pilot.id, pilot]));
+    const nextQueue = new Map(queueRows.results.map((row) => [row.resource_group_id, row.maximum]));
+    const nextCommunication = new Map(
+      communicationRows.results.map((row) => [row.resource_group_id, row.maximum]),
+    );
+    type WorkingReference = {
+      ticketGroupId: string;
+      rotationId: string;
+      flightGroupId?: string;
+      state: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
+      resourceGroupId: string;
+      ticketCount: number;
+      rotationVersion: number;
+      aircraftId: string | null;
+      pilotId: string | null;
+    };
+    const references = new Map<string, WorkingReference>(
+      existingReferences.results.map((reference) => [
+        reference.paper_reference,
+        {
+          ticketGroupId: reference.ticket_group_id,
+          rotationId: reference.rotation_id,
+          state: reference.current_state,
+          resourceGroupId: reference.resource_group_id,
+          ticketCount: reference.ticket_count,
+          rotationVersion: reference.version,
+          aircraftId: reference.aircraft_id,
+          pilotId: reference.pilot_id,
+        },
+      ]),
+    );
+    const now = new Date().toISOString();
+    const nextVersion = current.version + 1;
+    const statements: D1PreparedStatement[] = [
+      this.env.DB.prepare(
+        "UPDATE operation_days SET version = ?1, updated_at = ?2 WHERE id = ?3 AND version = ?4",
+      ).bind(nextVersion, now, command.eventId, current.version),
+    ];
+    const completedRotationsByAircraft = new Map<string, number>();
+    const activeRecoveredAircraft = new Map<string, string>();
+    const activeRecoveredPilots = new Map<string, string>();
+    try {
+      for (const entry of entries.results) {
+        if (entry.entry_type === "PAPER_SALE") {
+          if (references.has(entry.paper_reference)) {
+            throw new DomainRuleError(
+              "PAPER_REFERENCE_ALREADY_EXISTS",
+              "Die Papier-Belegreferenz wurde bereits angewendet.",
+            );
+          }
+          const payload = storedOutagePaperSalePayloadSchema.parse(JSON.parse(entry.payload_json));
+          const product = productById.get(payload.productId);
+          if (!product) {
+            throw new DomainRuleError(
+              "RECOVERY_PRODUCT_NOT_FOUND",
+              "Das Produkt des Papierverkaufs ist nicht mehr vorhanden.",
+            );
+          }
+          const queueSequence = (nextQueue.get(product.resource_group_id) ?? 0) + 1;
+          nextQueue.set(product.resource_group_id, queueSequence);
+          const communicationNumber = (nextCommunication.get(product.resource_group_id) ?? 100) + 1;
+          nextCommunication.set(product.resource_group_id, communicationNumber);
+          const ticketGroupId = crypto.randomUUID();
+          const flightGroupId = crypto.randomUUID();
+          const rotationId = crypto.randomUUID();
+          const ticketIds = payload.publicTicketCodeHashes.map(() => crypto.randomUUID());
+          const reference: WorkingReference = {
+            ticketGroupId,
+            flightGroupId,
+            rotationId,
+            state: "DRAFT",
+            resourceGroupId: product.resource_group_id,
+            ticketCount: ticketIds.length,
+            rotationVersion: 0,
+            aircraftId: null,
+            pilotId: null,
+          };
+          references.set(entry.paper_reference, reference);
+          statements.push(
+            this.env.DB.prepare(
+              `INSERT INTO ticket_groups
+                (id, operation_day_id, product_id, queue_sequence, standby, status, sold_at, version)
+               VALUES (?1, ?2, ?3, ?4, 0, 'QUEUED', ?5, 0)`,
+            ).bind(
+              ticketGroupId,
+              command.eventId,
+              product.id,
+              queueSequence,
+              entry.original_occurred_at,
+            ),
+            this.env.DB.prepare(
+              `INSERT INTO flight_groups
+                (id, operation_day_id, resource_group_id, communication_number, status,
+                 version, created_at, updated_at)
+               VALUES (?1, ?2, ?3, ?4, 'DRAFT', 0, ?5, ?5)`,
+            ).bind(
+              flightGroupId,
+              command.eventId,
+              product.resource_group_id,
+              communicationNumber,
+              entry.original_occurred_at,
+            ),
+            this.env.DB.prepare(
+              `INSERT INTO rotations
+                (id, operation_day_id, flight_group_id, status, version, created_at, updated_at)
+               VALUES (?1, ?2, ?3, 'DRAFT', 0, ?4, ?4)`,
+            ).bind(rotationId, command.eventId, flightGroupId, entry.original_occurred_at),
+            this.env.DB.prepare(
+              `INSERT INTO outage_recovery_references
+                (operation_day_id, paper_reference, ticket_group_id, rotation_id, current_state,
+                 last_source_entry_id, created_by_batch_id, updated_at)
+               VALUES (?1, ?2, ?3, ?4, 'DRAFT', ?5, ?6, ?7)`,
+            ).bind(
+              command.eventId,
+              entry.paper_reference,
+              ticketGroupId,
+              rotationId,
+              entry.source_entry_id,
+              batch.id,
+              now,
+            ),
+          );
+          for (let index = 0; index < ticketIds.length; index += 1) {
+            statements.push(
+              this.env.DB.prepare(
+                `INSERT INTO tickets
+                  (id, ticket_group_id, public_code_hash, status, weight_class,
+                   individual_weight_kg, payment_status, payment_method, price_cents, created_at)
+                 VALUES (?1, ?2, ?3, 'QUEUED', 'NOT_CAPTURED', NULL, ?4, ?5, ?6, ?7)`,
+              ).bind(
+                ticketIds[index],
+                ticketGroupId,
+                payload.publicTicketCodeHashes[index],
+                payload.paymentStatus,
+                payload.paymentMethod,
+                product.price_cents,
+                entry.original_occurred_at,
+              ),
+              this.env.DB.prepare(
+                `INSERT INTO rotation_tickets (rotation_id, ticket_id, assigned_at)
+                 VALUES (?1, ?2, ?3)`,
+              ).bind(rotationId, ticketIds[index], entry.original_occurred_at),
+            );
+          }
+          statements.push(
+            this.recoveryLedgerStatement({
+              eventId: command.eventId,
+              eventType: "TICKET_GROUP_SOLD",
+              occurredAt: entry.original_occurred_at,
+              deviceId: batch.created_by_device_id,
+              aggregateType: "TICKET_GROUP",
+              aggregateId: ticketGroupId,
+              aggregateVersion: 0,
+              payload: { productId: product.id, ticketCount: ticketIds.length, rotationId },
+              batchId: batch.id,
+              paperReference: entry.paper_reference,
+            }),
+          );
+          continue;
+        }
+        const reference = references.get(entry.paper_reference);
+        if (!reference) {
+          throw new DomainRuleError(
+            "PAPER_REFERENCE_UNKNOWN",
+            "Für das Umlaufereignis fehlt ein angewendeter Papierverkauf.",
+          );
+        }
+        const target = {
+          ROTATION_CALLED: "CALLED",
+          ROTATION_IN_FLIGHT: "IN_FLIGHT",
+          ROTATION_LANDED: "LANDED",
+          ROTATION_COMPLETED: "COMPLETED",
+        } as const;
+        const nextState = transitionRotation(reference.state, target[entry.entry_type]);
+        if (entry.entry_type === "ROTATION_CALLED") {
+          const payload = storedOutageCallPayloadSchema.parse(JSON.parse(entry.payload_json));
+          const aircraft = aircraftById.get(payload.aircraftId);
+          if (
+            !aircraft ||
+            aircraft.resource_group_id !== reference.resourceGroupId ||
+            aircraft.passenger_seats < reference.ticketCount
+          ) {
+            throw new DomainRuleError(
+              "RECOVERY_AIRCRAFT_INCOMPATIBLE",
+              "Flugzeugzuordnung oder Kapazität passt nicht zum Papierumlauf.",
+            );
+          }
+          if (!pilotById.has(payload.pilotId)) {
+            throw new DomainRuleError(
+              "RECOVERY_PILOT_NOT_FOUND",
+              "Der anonyme Pilotencode des Papierumlaufs ist nicht vorhanden.",
+            );
+          }
+          reference.aircraftId = payload.aircraftId;
+          reference.pilotId = payload.pilotId;
+        } else {
+          storedOutageTransitionPayloadSchema.parse(JSON.parse(entry.payload_json));
+        }
+        if (!reference.aircraftId || !reference.pilotId) {
+          throw new DomainRuleError(
+            "RECOVERY_ASSIGNMENT_REQUIRED",
+            "Flugzeug- und Pilotenzuordnung fehlen im Papierumlauf.",
+          );
+        }
+        reference.rotationVersion += 1;
+        reference.state = nextState;
+        const timestampColumn = {
+          ROTATION_CALLED: "called_at",
+          ROTATION_IN_FLIGHT: "departed_at",
+          ROTATION_LANDED: "landed_at",
+          ROTATION_COMPLETED: "completed_at",
+        } as const;
+        const eventType = {
+          ROTATION_CALLED: "FLIGHT_GROUP_CALLED",
+          ROTATION_IN_FLIGHT: "ROTATION_STARTED",
+          ROTATION_LANDED: "ROTATION_LANDED",
+          ROTATION_COMPLETED: "ROTATION_COMPLETED",
+        } as const;
+        statements.push(
+          this.env.DB.prepare(
+            `UPDATE rotations SET status = ?1, ${timestampColumn[entry.entry_type]} = ?2,
+                    aircraft_id = ?3, pilot_id = ?4, version = version + 1, updated_at = ?5
+              WHERE id = ?6 AND version = ?7`,
+          ).bind(
+            nextState,
+            entry.original_occurred_at,
+            reference.aircraftId,
+            reference.pilotId,
+            now,
+            reference.rotationId,
+            reference.rotationVersion - 1,
+          ),
+          this.env.DB.prepare(
+            `UPDATE tickets SET status = ?1
+              WHERE id IN (SELECT ticket_id FROM rotation_tickets WHERE rotation_id = ?2 AND released_at IS NULL)`,
+          ).bind(nextState, reference.rotationId),
+          this.env.DB.prepare(
+            `UPDATE outage_recovery_references
+                SET current_state = ?1, last_source_entry_id = ?2, updated_at = ?3
+              WHERE operation_day_id = ?4 AND paper_reference = ?5`,
+          ).bind(nextState, entry.source_entry_id, now, command.eventId, entry.paper_reference),
+          this.recoveryLedgerStatement({
+            eventId: command.eventId,
+            eventType: eventType[entry.entry_type],
+            occurredAt: entry.original_occurred_at,
+            deviceId: batch.created_by_device_id,
+            aggregateType: "ROTATION",
+            aggregateId: reference.rotationId,
+            aggregateVersion: reference.rotationVersion,
+            payload: {
+              to: nextState,
+              aircraftId: reference.aircraftId,
+              pilotId: reference.pilotId,
+            },
+            batchId: batch.id,
+            paperReference: entry.paper_reference,
+          }),
+        );
+        if (nextState === "COMPLETED") {
+          completedRotationsByAircraft.set(
+            reference.aircraftId,
+            (completedRotationsByAircraft.get(reference.aircraftId) ?? 0) + 1,
+          );
+        }
+      }
+      const activeRotationIds = new Set(
+        [...references.values()]
+          .filter((reference) => reference.state !== "COMPLETED" && reference.state !== "DRAFT")
+          .map((reference) => reference.rotationId),
+      );
+      const activeRows = await this.env.DB.prepare(
+        `SELECT id, aircraft_id, pilot_id FROM rotations
+          WHERE operation_day_id = ?1 AND status IN ('CALLED', 'IN_FLIGHT', 'LANDED')`,
+      )
+        .bind(command.eventId)
+        .all<{ id: string; aircraft_id: string | null; pilot_id: string | null }>();
+      const preexistingActiveRotationIds = new Set(activeRows.results.map((row) => row.id));
+      for (const active of activeRows.results) {
+        if (activeRotationIds.has(active.id)) continue;
+        if (active.aircraft_id) activeRecoveredAircraft.set(active.aircraft_id, active.id);
+        if (active.pilot_id) activeRecoveredPilots.set(active.pilot_id, active.id);
+      }
+      for (const reference of references.values()) {
+        if (reference.state === "DRAFT" || reference.state === "COMPLETED") continue;
+        if (!reference.aircraftId || !reference.pilotId) continue;
+        const aircraftConflict = activeRecoveredAircraft.get(reference.aircraftId);
+        const pilotConflict = activeRecoveredPilots.get(reference.pilotId);
+        const aircraft = aircraftById.get(reference.aircraftId);
+        const pilot = pilotById.get(reference.pilotId);
+        if (aircraftConflict && aircraftConflict !== reference.rotationId) {
+          throw new DomainRuleError(
+            "RECOVERY_AIRCRAFT_CONFLICT",
+            "Das Flugzeug ist bereits einem anderen aktiven Umlauf zugeordnet.",
+          );
+        }
+        if (pilotConflict && pilotConflict !== reference.rotationId) {
+          throw new DomainRuleError(
+            "RECOVERY_PILOT_CONFLICT",
+            "Der Pilotencode ist bereits einem anderen aktiven Umlauf zugeordnet.",
+          );
+        }
+        if (
+          !aircraft ||
+          (!preexistingActiveRotationIds.has(reference.rotationId) &&
+            aircraft.operational_state !== "AVAILABLE")
+        ) {
+          throw new DomainRuleError(
+            "RECOVERY_AIRCRAFT_NOT_AVAILABLE",
+            "Das Flugzeug ist für den wiederhergestellten aktiven Umlauf nicht verfügbar.",
+          );
+        }
+        if (pilot?.active !== 1 || pilot.paused === 1) {
+          throw new DomainRuleError(
+            "RECOVERY_PILOT_NOT_AVAILABLE",
+            "Der Pilotencode ist für den wiederhergestellten aktiven Umlauf nicht verfügbar.",
+          );
+        }
+        activeRecoveredAircraft.set(reference.aircraftId, reference.rotationId);
+        activeRecoveredPilots.set(reference.pilotId, reference.rotationId);
+        const aircraftState =
+          reference.state === "CALLED"
+            ? "BOARDING"
+            : reference.state === "IN_FLIGHT"
+              ? "IN_FLIGHT"
+              : "LANDED";
+        statements.push(
+          this.env.DB.prepare(
+            "UPDATE aircraft SET operational_state = ?1, updated_at = ?2 WHERE id = ?3",
+          ).bind(aircraftState, now, reference.aircraftId),
+        );
+      }
+      for (const [aircraftId, completedCount] of completedRotationsByAircraft) {
+        statements.push(
+          this.env.DB.prepare(
+            `UPDATE aircraft SET rotations_since_refuel = rotations_since_refuel + ?1,
+                    updated_at = ?2 WHERE id = ?3`,
+          ).bind(completedCount, now, aircraftId),
+        );
+      }
+    } catch (reason) {
+      if (reason instanceof DomainRuleError) {
+        return json({ error: { code: reason.code, message: reason.message } }, { status: 409 });
+      }
+      return json(
+        {
+          error: {
+            code: "RECOVERY_PAYLOAD_INVALID",
+            message: "Gespeicherte Nacherfassungsdaten sind ungültig; Anwendung wurde abgebrochen.",
+          },
+        },
+        { status: 409 },
+      );
+    }
+    const result: CommandResult = {
+      accepted: true,
+      duplicate: false,
+      event: rowToSnapshot({ ...current, version: nextVersion, updated_at: now }),
+      eventType: "OUTAGE_RECOVERY_APPLIED",
+      aggregate: { type: "RECOVERY_BATCH", id: batch.id },
+    };
+    statements.push(
+      this.env.DB.prepare(
+        "UPDATE outage_recovery_entries SET status = 'APPLIED' WHERE batch_id = ?1 AND status = 'STAGED'",
+      ).bind(batch.id),
+      this.env.DB.prepare(
+        `UPDATE outage_recovery_batches SET status = 'APPLIED', applied_at = ?1,
+                version = version + 1 WHERE id = ?2 AND version = ?3 AND status = 'APPROVED'`,
+      ).bind(now, batch.id, batch.version),
+      this.env.DB.prepare(
+        `INSERT INTO operational_events
+          (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type,
+           aggregate_id, aggregate_version, payload_json)
+         VALUES (?1, ?2, 'OUTAGE_RECOVERY_APPLIED', ?3, ?4, 'RECOVERY_BATCH', ?5, ?6, ?7)`,
+      ).bind(
+        crypto.randomUUID(),
+        command.eventId,
+        now,
+        command.deviceId,
+        batch.id,
+        batch.version + 1,
+        JSON.stringify({
+          entryCount: entries.results.length,
+          createdByDeviceId: batch.created_by_device_id,
+          approvedByDeviceId: batch.approved_by_device_id,
+        }),
+      ),
+      this.env.DB.prepare(
+        `INSERT INTO idempotency_receipts
+          (command_id, operation_day_id, device_id, command_type, received_at, response_json)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)`,
+      ).bind(
+        command.commandId,
+        command.eventId,
+        command.deviceId,
+        command.type,
+        now,
+        JSON.stringify(result),
+      ),
+      this.env.DB.prepare(
+        "INSERT INTO outbox (id, operation_day_id, topic, payload_json, created_at) VALUES (?1, ?2, 'EVENT_STATE_CHANGED', ?3, ?4)",
+      ).bind(crypto.randomUUID(), command.eventId, JSON.stringify(result), now),
+    );
+    await this.env.DB.batch(statements);
+    this.broadcast(result);
+    return json(result);
+  }
+
+  private recoveryLedgerStatement(input: {
+    eventId: string;
+    eventType: string;
+    occurredAt: string;
+    deviceId: string;
+    aggregateType: "TICKET_GROUP" | "ROTATION";
+    aggregateId: string;
+    aggregateVersion: number;
+    payload: Record<string, unknown>;
+    batchId: string;
+    paperReference: string;
+  }): D1PreparedStatement {
+    return this.env.DB.prepare(
+      `INSERT INTO operational_events
+        (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type,
+         aggregate_id, aggregate_version, payload_json, recorded_after_outage,
+         original_occurred_at, recovery_batch_id, paper_reference)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 1, ?4, ?10, ?11)`,
+    ).bind(
+      crypto.randomUUID(),
+      input.eventId,
+      input.eventType,
+      input.occurredAt,
+      input.deviceId,
+      input.aggregateType,
+      input.aggregateId,
+      input.aggregateVersion,
+      JSON.stringify(input.payload),
+      input.batchId,
+      input.paperReference,
+    );
+  }
+
   private async handleApproveOutageRecovery(
     command: Extract<CommandEnvelope, { type: "APPROVE_OUTAGE_RECOVERY" }>,
     current: StoredEventRow,
@@ -2595,16 +3191,65 @@ export class EventCoordinator extends DurableObject<Env> {
     )
       .bind(command.eventId)
       .all<{ paper_reference: string }>();
+    const existingTicketKeys = await this.env.DB.prepare(
+      `SELECT t.public_code_hash
+         FROM tickets t
+         JOIN ticket_groups tg ON tg.id = t.ticket_group_id
+        WHERE tg.operation_day_id = ?1`,
+    )
+      .bind(command.eventId)
+      .all<{ public_code_hash: string }>();
+    const appliedRecoveryReferences = await this.env.DB.prepare(
+      `SELECT paper_reference, current_state
+         FROM outage_recovery_references
+        WHERE operation_day_id = ?1`,
+    )
+      .bind(command.eventId)
+      .all<{
+        paper_reference: string;
+        current_state: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
+      }>();
+    const appliedReferenceStates: Record<
+      string,
+      "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED"
+    > = {};
+    for (const entry of appliedRecoveryReferences.results) {
+      appliedReferenceStates[entry.paper_reference] = entry.current_state;
+    }
+    const preparedEntries = await Promise.all(
+      command.payload.entries.map(async (entry) => {
+        const ticketKeys =
+          entry.type === "PAPER_SALE"
+            ? await Promise.all(entry.payload.publicTicketCodes.map(sha256Hex))
+            : [];
+        return {
+          entry,
+          ticketKeys,
+          storedPayload:
+            entry.type === "PAPER_SALE"
+              ? {
+                  productId: entry.payload.productId,
+                  publicTicketCodeHashes: ticketKeys,
+                  paymentStatus: entry.payload.paymentStatus,
+                  paymentMethod: entry.payload.paymentMethod,
+                }
+              : entry.payload,
+        };
+      }),
+    );
     const now = new Date().toISOString();
     const simulation = simulateOutageRecovery({
-      entries: command.payload.entries.map((entry) => ({
+      entries: preparedEntries.map(({ entry, ticketKeys }) => ({
         id: entry.id,
         type: entry.type,
         originalOccurredAt: entry.originalOccurredAt,
         paperSequence: entry.paperSequence,
         paperReference: entry.paperReference,
+        ticketKeys,
       })),
       existingPaperReferences: existingReferences.results.map((row) => row.paper_reference),
+      existingReferenceStates: appliedReferenceStates,
+      existingTicketKeys: existingTicketKeys.results.map((row) => row.public_code_hash),
       recordedAt: now,
     });
     const nextVersion = current.version + 1;
@@ -2644,21 +3289,10 @@ export class EventCoordinator extends DurableObject<Env> {
         JSON.stringify(simulationPayload),
       ),
     ];
-    for (const entry of command.payload.entries) {
+    for (const { entry, storedPayload } of preparedEntries) {
       const entryConflicts = simulation.conflicts.filter(
         (conflict) => conflict.entryId === entry.id,
       );
-      const storedPayload =
-        entry.type === "PAPER_SALE"
-          ? {
-              productId: entry.payload.productId,
-              publicTicketCodeHashes: await Promise.all(
-                entry.payload.publicTicketCodes.map(sha256Hex),
-              ),
-              paymentStatus: entry.payload.paymentStatus,
-              paymentMethod: entry.payload.paymentMethod,
-            }
-          : entry.payload;
       statements.push(
         this.env.DB.prepare(
           `INSERT INTO outage_recovery_entries

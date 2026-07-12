@@ -81,3 +81,11 @@ Konfliktstatus und späterem Vier-Augen-Bezug ein. Das Ereignisledger erhält au
 Metadaten für ursprüngliche Ereigniszeit, Batch und anonymen Papierbezug; Namen oder Telefonnummern
 werden nicht eingeführt. Vor Anwendung wird ein portables Backup erstellt. Wiederherstellung erfolgt
 aus diesem Backup, da D1 die additiven Ledger-Spalten nicht einzeln zurückbauen kann.
+
+## 0020 – Anonyme Papierbezug-Zuordnung
+
+Ordnet eine nicht personenbezogene Papier-Belegreferenz nach erfolgreicher Anwendung genau einer
+Ticketgruppe und einem Umlauf zu. Dadurch können Kassen- und Flight-Line-Nacherfassung in getrennten,
+rollenrichtigen Batches fortgesetzt werden. Der aktuelle Zuordnungszustand ist ein technischer Index;
+die unveränderliche Historie bleibt im Ereignisledger. Vor Anwendung wird portabel gesichert;
+Wiederherstellung erfolgt aus dieser Sicherung.

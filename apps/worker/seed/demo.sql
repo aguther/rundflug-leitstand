@@ -31,7 +31,9 @@ INSERT OR IGNORE INTO paired_devices (
 INSERT OR IGNORE INTO paired_devices (id, operation_day_id, label, role, active, paired_at, last_seen_at)
 VALUES
   ('cashier-tablet-1', 'demo-2026', 'Kasse 1', 'CASHIER', 1, '2026-07-11T08:00:00.000Z', '2026-07-11T08:00:00.000Z'),
-  ('flight-line-tablet-1', 'demo-2026', 'Flight Line 1', 'FLIGHT_LINE', 1, '2026-07-11T08:00:00.000Z', '2026-07-11T08:00:00.000Z');
+  ('flight-line-tablet-1', 'demo-2026', 'Flight Line 1', 'FLIGHT_LINE', 1, '2026-07-11T08:00:00.000Z', '2026-07-11T08:00:00.000Z'),
+  ('recovery-reviewer', 'demo-2026', 'Recovery Reviewer', 'ADMIN', 1, '2026-07-11T08:00:00.000Z', '2026-07-11T08:00:00.000Z'),
+  ('recovery-flight-lead', 'demo-2026', 'Recovery Flight Lead', 'FLIGHT_LINE_LEAD', 1, '2026-07-11T08:00:00.000Z', '2026-07-11T08:00:00.000Z');
 
 INSERT OR IGNORE INTO resource_groups (id, operation_day_id, name, status, gate_id, version, created_at, updated_at)
 VALUES ('rg-panorama', 'demo-2026', 'Panorama', 'ACTIVE', 'demo-2026-gate-main', 0, '2026-07-11T08:00:00.000Z', '2026-07-11T08:00:00.000Z');
@@ -67,3 +69,7 @@ UPDATE paired_devices SET credential_hash = '512d8b41c03e67c38cf5b8a6a3202d6fd6b
  WHERE id = 'cashier-tablet-1';
 UPDATE paired_devices SET credential_hash = 'a123beb36cf990172441b691ca1c519f512bfc5249900f2a828eff6369d9aa21'
  WHERE id = 'flight-line-tablet-1';
+UPDATE paired_devices SET credential_hash = '07e742660840b9e7152f22027d3bea537ed65012d98a3175bc84274ac83bbd63'
+ WHERE id = 'recovery-reviewer';
+UPDATE paired_devices SET credential_hash = 'e9ba86744dece195cc2d4294bc39cfc6b9a304505b5e841b82a452e4791a28e4'
+ WHERE id = 'recovery-flight-lead';
