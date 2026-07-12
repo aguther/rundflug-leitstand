@@ -53,6 +53,14 @@ const board = async (deviceId, token) => {
   if (!response.ok) throw new Error(`Board-Abruf fehlgeschlagen (${response.status}).`);
   return response.json();
 };
+const history = async (aggregateId) => {
+  const query = new URLSearchParams({ aggregateType: "ROTATION", aggregateId });
+  const response = await fetch(`${base}/api/events/demo-2026/history?${query}`, {
+    headers: { "x-device-id": "technical-scaffold", "x-device-token": tokens.admin },
+  });
+  if (!response.ok) throw new Error(`Historien-Abruf fehlgeschlagen (${response.status}).`);
+  return response.json();
+};
 const envelope = (deviceId, expectedVersion, type, payload) => ({
   commandId: randomUUID(),
   eventId: "demo-2026",
@@ -137,9 +145,41 @@ try {
   ) {
     throw new Error("Flugzeug- oder Pilotenvorschlag fehlt im Standardumlauf.");
   }
-  const called = await post(
+  const firstCall = await post(
     tokens.flightLine,
     envelope("flight-line-tablet-1", sold.event.version, "CALL_NEXT", {
+      rotationId,
+      aircraftId: "aircraft-a",
+      pilotId: "550e8400-e29b-41d4-a716-446655440100",
+    }),
+  );
+  const revoked = await post(
+    tokens.flightLine,
+    envelope("flight-line-tablet-1", firstCall.event.version, "REVOKE_CALL", { rotationId }),
+  );
+  current = await board("flight-line-tablet-1", tokens.flightLine);
+  const revokedRotation = current.rotations.find((rotation) => rotation.id === rotationId);
+  const releasedAircraft = current.aircraft.find((aircraft) => aircraft.id === "aircraft-a");
+  if (revokedRotation?.status !== "DRAFT" || releasedAircraft?.operationalState !== "AVAILABLE") {
+    throw new Error("Rücknahme hat Umlauf oder Flugzeug nicht in den Vorschlagszustand versetzt.");
+  }
+  const correctionHistory = await history(rotationId);
+  const originalCall = correctionHistory.entries.find(
+    (entry) => entry.eventType === "FLIGHT_GROUP_CALLED",
+  );
+  const correction = correctionHistory.entries.find((entry) => entry.eventType === "CALL_REVOKED");
+  if (
+    !originalCall?.occurredAt ||
+    correction?.payload.corrects !== "FLIGHT_GROUP_CALLED" ||
+    correction.payload.calledAt !== originalCall.occurredAt
+  ) {
+    throw new Error(
+      "Rücknahme verweist nicht nachvollziehbar auf das ursprüngliche Aufrufereignis.",
+    );
+  }
+  const called = await post(
+    tokens.flightLine,
+    envelope("flight-line-tablet-1", revoked.event.version, "CALL_NEXT", {
       rotationId,
       aircraftId: "aircraft-a",
       pilotId: "550e8400-e29b-41d4-a716-446655440100",
@@ -183,6 +223,7 @@ try {
       duplicate: duplicate.duplicate,
       staleRejected: true,
       assignmentSuggested: true,
+      callCorrectionAudited: true,
       transitions: [called.eventType, started.eventType, landed.eventType, completed.eventType],
       landedAircraftState: landedAircraft.operationalState,
       finalAircraftState: finalAircraft.operationalState,
