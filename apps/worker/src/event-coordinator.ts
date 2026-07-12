@@ -30,7 +30,7 @@ import {
 import { sha256Hex, verifyCredential } from "./crypto";
 import { rowToSnapshot, safeErrorMessage } from "./snapshot";
 import type { Env, StoredEventRow } from "./types";
-import { sendRotationPushNotifications } from "./web-push";
+import { queueEligiblePreparationNotifications, sendRotationPushNotifications } from "./web-push";
 
 const JSON_HEADERS = { "content-type": "application/json; charset=utf-8" } as const;
 
@@ -901,6 +901,7 @@ export class EventCoordinator extends DurableObject<Env> {
     for (let index = 0; index < statements.length; index += 80) {
       await this.env.DB.batch(statements.slice(index, index + 80));
     }
+    await queueEligiblePreparationNotifications(this.env, eventId);
     const forecastMessage = JSON.stringify({
       type: "forecast-updated",
       eventId,

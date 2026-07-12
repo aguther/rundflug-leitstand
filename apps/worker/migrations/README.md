@@ -89,3 +89,11 @@ Ticketgruppe und einem Umlauf zu. Dadurch können Kassen- und Flight-Line-Nacher
 rollenrichtigen Batches fortgesetzt werden. Der aktuelle Zuordnungszustand ist ein technischer Index;
 die unveränderliche Historie bleibt im Ereignisledger. Vor Anwendung wird portabel gesichert;
 Wiederherstellung erfolgt aus dieser Sicherung.
+
+## 0021 – Deduplizierte Web-Push-Zustellaufträge
+
+Ergänzt eine Zustellqueue für freiwillige, ticketbezogene Web-Push-Hinweise. Die eindeutige
+Kombination aus Abonnement, Umlauf und Hinweistyp verhindert doppelte Vorab- oder Aufrufmeldungen.
+Zustellaufträge werden über Fremdschlüssel zusammen mit dem befristeten Push-Abonnement gelöscht und
+bewusst nicht in portable operative Backups aufgenommen. Ein Rollback kann die neue Tabelle und den
+Index entfernen; bereits versendete Browsermeldungen lassen sich naturgemäß nicht zurückrufen.

@@ -270,6 +270,7 @@ describe("commandEnvelopeSchema", () => {
 
   it("keeps public DTOs free of aircraft and guest identity", () => {
     const status = publicTicketStatusSchema.parse({
+      eventId: "event-1",
       productName: "Panorama",
       productCode: "PAN",
       publicDescription: "Panoramaflug",

@@ -1278,13 +1278,50 @@ function TicketStatusView({ code }: { code: string }) {
   const [push, setPush] = useState(false);
   const [pushMessage, setPushMessage] = useState<string | null>(null);
   useEffect(() => {
+    let active = true;
+    let socket: WebSocket | null = null;
+    let reconnectTimer: number | null = null;
+    let reconnectDelay = OPERATION_BOARD_RECONNECT_INITIAL_MS;
     const controller = new AbortController();
-    getPublicTicketStatus(code, controller.signal)
-      .then(setStatus)
-      .catch((reason) =>
-        setError(reason instanceof Error ? reason.message : "Status nicht verfügbar."),
+    const refresh = () =>
+      getPublicTicketStatus(code, controller.signal)
+        .then((nextStatus) => {
+          if (active) setStatus(nextStatus);
+          return nextStatus;
+        })
+        .catch((reason) => {
+          if (active)
+            setError(reason instanceof Error ? reason.message : "Status nicht verfügbar.");
+          return null;
+        });
+    const connect = (eventId: string) => {
+      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      socket = new WebSocket(
+        `${protocol}//${window.location.host}/api/public/events/${encodeURIComponent(eventId)}/live`,
       );
-    return () => controller.abort();
+      socket.addEventListener("open", () => {
+        reconnectDelay = OPERATION_BOARD_RECONNECT_INITIAL_MS;
+        void refresh();
+      });
+      socket.addEventListener("message", () => void refresh());
+      socket.addEventListener("close", () => {
+        if (!active) return;
+        reconnectTimer = window.setTimeout(() => connect(eventId), reconnectDelay);
+        reconnectDelay = nextBoardReconnectDelay(reconnectDelay);
+      });
+      socket.addEventListener("error", () => socket?.close());
+    };
+    void refresh().then((nextStatus) => {
+      if (nextStatus && active) connect(nextStatus.eventId);
+    });
+    const timer = window.setInterval(() => void refresh(), OPERATION_BOARD_POLL_INTERVAL_MS);
+    return () => {
+      active = false;
+      controller.abort();
+      socket?.close();
+      if (reconnectTimer !== null) window.clearTimeout(reconnectTimer);
+      window.clearInterval(timer);
+    };
   }, [code]);
   useEffect(() => {
     navigator.serviceWorker?.ready
