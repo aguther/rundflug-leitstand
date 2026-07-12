@@ -195,7 +195,8 @@ export class EventCoordinator extends DurableObject<Env> {
         const product = await this.env.DB.prepare(
           `SELECT p.id, p.resource_group_id, p.price_cents, p.sale_enabled, p.sale_closes_at,
                   p.reference_duration_minutes, p.weight_classes_json, p.capacity_warning_threshold,
-                  p.capacity_critical_threshold, rg.status AS resource_group_status
+                  p.capacity_critical_threshold, p.reference_capacity,
+                  rg.status AS resource_group_status
              FROM products p
              JOIN resource_groups rg ON rg.id = p.resource_group_id
             WHERE p.id = ?1 AND p.operation_day_id = ?2`,
@@ -211,6 +212,7 @@ export class EventCoordinator extends DurableObject<Env> {
             weight_classes_json: string;
             capacity_warning_threshold: number;
             capacity_critical_threshold: number;
+            reference_capacity: number;
             resource_group_status: "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED";
           }>();
         if (!product) {
@@ -375,16 +377,41 @@ export class EventCoordinator extends DurableObject<Env> {
         )
           .bind(command.eventId, product.resource_group_id)
           .first<{ next_sequence: number }>();
-        const communicationRow = await this.env.DB.prepare(
-          "SELECT COALESCE(MAX(communication_number), 100) + 1 AS next_number FROM flight_groups WHERE operation_day_id = ?1 AND resource_group_id = ?2",
+        const openFlightGroup = await this.env.DB.prepare(
+          `SELECT r.id AS rotation_id, fg.id AS flight_group_id
+             FROM rotations r
+             JOIN flight_groups fg ON fg.id = r.flight_group_id
+             JOIN rotation_tickets rt ON rt.rotation_id = r.id AND rt.released_at IS NULL
+             JOIN tickets t ON t.id = rt.ticket_id
+             JOIN ticket_groups tg ON tg.id = t.ticket_group_id
+            WHERE r.operation_day_id = ?1 AND fg.resource_group_id = ?2
+              AND r.status = 'DRAFT' AND r.called_at IS NULL
+            GROUP BY r.id, fg.id
+           HAVING COUNT(DISTINCT tg.product_id) = 1 AND MIN(tg.product_id) = ?3
+              AND COUNT(rt.ticket_id) + ?4 <= ?5
+            ORDER BY fg.communication_number
+            LIMIT 1`,
         )
-          .bind(command.eventId, product.resource_group_id)
-          .first<{ next_number: number }>();
+          .bind(
+            command.eventId,
+            product.resource_group_id,
+            product.id,
+            normalizedCodes.length,
+            product.reference_capacity,
+          )
+          .first<{ rotation_id: string; flight_group_id: string }>();
+        const communicationRow = openFlightGroup
+          ? null
+          : await this.env.DB.prepare(
+              "SELECT COALESCE(MAX(communication_number), 100) + 1 AS next_number FROM flight_groups WHERE operation_day_id = ?1 AND resource_group_id = ?2",
+            )
+              .bind(command.eventId, product.resource_group_id)
+              .first<{ next_number: number }>();
         const now = new Date().toISOString();
         const nextVersion = current.version + 1;
         const ticketGroupId = crypto.randomUUID();
-        const flightGroupId = crypto.randomUUID();
-        const rotationId = crypto.randomUUID();
+        const flightGroupId = openFlightGroup?.flight_group_id ?? crypto.randomUUID();
+        const rotationId = openFlightGroup?.rotation_id ?? crypto.randomUUID();
         const ticketIds = hashes.map(() => crypto.randomUUID());
         const eventId = crypto.randomUUID();
         const result: CommandResult = {
@@ -408,23 +435,27 @@ export class EventCoordinator extends DurableObject<Env> {
             command.payload.standby ? 1 : 0,
             now,
           ),
-          this.env.DB.prepare(`INSERT INTO flight_groups
-            (id, operation_day_id, resource_group_id, communication_number, status, version, created_at, updated_at)
-            VALUES (?1, ?2, ?3, ?4, 'DRAFT', 0, ?5, ?5)`).bind(
-            flightGroupId,
-            command.eventId,
-            product.resource_group_id,
-            communicationRow?.next_number ?? 101,
-            now,
-          ),
-          this.env.DB.prepare(`INSERT INTO rotations
-            (id, operation_day_id, flight_group_id, status, version, created_at, updated_at)
-            VALUES (?1, ?2, ?3, 'DRAFT', 0, ?4, ?4)`).bind(
-            rotationId,
-            command.eventId,
-            flightGroupId,
-            now,
-          ),
+          ...(openFlightGroup
+            ? []
+            : [
+                this.env.DB.prepare(`INSERT INTO flight_groups
+                  (id, operation_day_id, resource_group_id, communication_number, status, version, created_at, updated_at)
+                  VALUES (?1, ?2, ?3, ?4, 'DRAFT', 0, ?5, ?5)`).bind(
+                  flightGroupId,
+                  command.eventId,
+                  product.resource_group_id,
+                  communicationRow?.next_number ?? 101,
+                  now,
+                ),
+                this.env.DB.prepare(`INSERT INTO rotations
+                  (id, operation_day_id, flight_group_id, status, version, created_at, updated_at)
+                  VALUES (?1, ?2, ?3, 'DRAFT', 0, ?4, ?4)`).bind(
+                  rotationId,
+                  command.eventId,
+                  flightGroupId,
+                  now,
+                ),
+              ]),
           ...hashes.flatMap((hash, index) => [
             this.env.DB.prepare(`INSERT INTO tickets
               (id, ticket_group_id, public_code_hash, status, weight_class, individual_weight_kg,
@@ -461,6 +492,7 @@ export class EventCoordinator extends DurableObject<Env> {
               weightClasses: ticketDetails.map((detail) => detail.weightClass),
               paymentStatus: command.payload.paymentStatus,
               paymentMethod: command.payload.paymentMethod,
+              joinedExistingFlightGroup: openFlightGroup !== null,
             }),
           ),
           this.env.DB.prepare(`INSERT INTO idempotency_receipts
@@ -3399,7 +3431,12 @@ export class EventCoordinator extends DurableObject<Env> {
     const group = await this.env.DB.prepare(
       `SELECT tg.id, tg.product_id, tg.version, r.id AS rotation_id, r.status AS rotation_status,
               r.called_at,
-              r.aircraft_id, fg.resource_group_id
+              r.aircraft_id, fg.resource_group_id,
+              (SELECT COUNT(DISTINCT grouped_ticket.ticket_group_id)
+                 FROM rotation_tickets grouped_rt
+                 JOIN tickets grouped_ticket ON grouped_ticket.id = grouped_rt.ticket_id
+                WHERE grouped_rt.rotation_id = r.id AND grouped_rt.released_at IS NULL)
+                AS rotation_group_count
          FROM ticket_groups tg
          JOIN tickets t ON t.ticket_group_id = tg.id
          JOIN rotation_tickets rt ON rt.ticket_id = t.id AND rt.released_at IS NULL
@@ -3418,6 +3455,7 @@ export class EventCoordinator extends DurableObject<Env> {
         called_at: string | null;
         aircraft_id: string | null;
         resource_group_id: string;
+        rotation_group_count: number;
       }>();
     if (!group) {
       return json(
@@ -3505,13 +3543,19 @@ export class EventCoordinator extends DurableObject<Env> {
         "UPDATE operation_days SET version = ?1, updated_at = ?2 WHERE id = ?3 AND version = ?4",
       ).bind(nextVersion, now, command.eventId, current.version),
       this.env.DB.prepare(
-        "UPDATE rotation_tickets SET released_at = ?1 WHERE rotation_id = ?2 AND released_at IS NULL",
-      ).bind(now, group.rotation_id),
-      this.env.DB.prepare(
-        "UPDATE rotations SET status = 'CANCELED', version = version + 1, updated_at = ?1 WHERE id = ?2",
-      ).bind(now, group.rotation_id),
+        `UPDATE rotation_tickets SET released_at = ?1
+          WHERE rotation_id = ?2 AND released_at IS NULL
+            AND ticket_id IN (SELECT id FROM tickets WHERE ticket_group_id = ?3)`,
+      ).bind(now, group.rotation_id, group.id),
     ];
-    if (group.aircraft_id) {
+    if (group.rotation_group_count === 1) {
+      statements.push(
+        this.env.DB.prepare(
+          "UPDATE rotations SET status = 'CANCELED', version = version + 1, updated_at = ?1 WHERE id = ?2",
+        ).bind(now, group.rotation_id),
+      );
+    }
+    if (group.rotation_group_count === 1 && group.aircraft_id) {
       statements.push(
         this.env.DB.prepare(
           "UPDATE aircraft SET operational_state = 'AVAILABLE', updated_at = ?1 WHERE id = ?2",
