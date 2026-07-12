@@ -40,6 +40,7 @@
     "db:reset:local": "node scripts/reset_local_db.mjs",
     "db:reset:empty-local": "node scripts/reset_local_db.mjs --empty",
     "deploy": "npm run build:web && wrangler deploy --config wrangler.jsonc",
+    "cloudflare:configure-setup": "node scripts/configure_cloudflare_setup.mjs",
     "clean": "node -e \"const fs=require('node:fs'); for (const p of ['apps/web/dist','apps/worker/dist']) fs.rmSync(p,{recursive:true,force:true})\""
   },
   "devDependencies": {
