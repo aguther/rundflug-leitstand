@@ -100,6 +100,22 @@ try {
   await waitForWorker();
   let current = await board();
   let result = await admin(current.event.version, "UPSERT_AIRCRAFT", {
+    aircraftId: "aircraft-too-small",
+    registration: "D-AAAA",
+    aircraftType: "SYNTHETIC-DEMO",
+    passengerSeats: 2,
+    maximumPassengerPayloadKg: null,
+    reason: "Synthetischer Kapazitätsvorschlagstest",
+    adminPin: pin,
+  });
+  result = await admin(result.event.version, "ASSIGN_AIRCRAFT_RESOURCE_GROUP", {
+    aircraftId: "aircraft-too-small",
+    resourceGroupId: "rg-panorama",
+    effectiveAt: new Date().toISOString(),
+    reason: "Synthetischer Kapazitätsvorschlagstest",
+    adminPin: pin,
+  });
+  result = await admin(result.event.version, "UPSERT_AIRCRAFT", {
     aircraftId: "aircraft-b",
     registration: "D-TEST",
     aircraftType: "Synthetic-4",
@@ -143,6 +159,13 @@ try {
     adminPin: pin,
   });
   const firstSale = await sell(result.event.version);
+  current = await board();
+  const capacitySafeProposal = current.rotations.find(
+    (rotation) => rotation.id === firstSale.aggregate.relatedRotationId,
+  );
+  if (capacitySafeProposal?.suggestedAircraftId !== "aircraft-a") {
+    throw new Error("Zu kleines Flugzeug wurde für eine Vierergruppe vorgeschlagen.");
+  }
   const secondSale = await sell(firstSale.event.version);
   const firstCall = await command(
     "flight-line-tablet-1",
@@ -271,6 +294,7 @@ try {
       ok: true,
       requirements: ["F-BRD-030", "F-BRD-040"],
       samePilotConflictRejected: true,
+      undersizedAircraftNotSuggested: true,
       differentPilotsAccepted: true,
       activeRotations: active.length,
       rememberedPilotSuggested: true,
