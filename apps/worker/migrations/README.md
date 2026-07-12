@@ -104,3 +104,12 @@ Ergänzt am anonymen, veranstaltungsbezogenen Pilotencode eine optionale organis
 Die Oberfläche weist ausdrücklich darauf hin, dort keine Namen oder Lizenzdaten zu erfassen. Vor
 Anwendung wird portabel gesichert. Wiederherstellung erfolgt aus dieser Sicherung, da D1 additive
 Spalten nicht einzeln zurückrollt; ältere Anwendungen können die neue Spalte gefahrlos ignorieren.
+
+## 0023 – Aktueller anonymer Pilotencode je Veranstaltungsflugzeug
+
+Ergänzt die veranstaltungsbezogene aktive Flugzeugzuordnung additiv um den zuletzt mit `NEXT`
+bestätigten anonymen Pilotencode. Dadurch kann der Leitstand diesen Code beim nächsten Umlauf dieses
+Flugzeugs vorrangig vorschlagen; ein bewusster Wechsel bleibt möglich und wird auditiert. Es werden
+keine Namen oder Lizenzdaten gespeichert. Vor Anwendung wird eine portable Sicherung erzeugt.
+Wiederherstellung erfolgt aus dieser Sicherung; ältere Anwendungen können die nullable Spalte und den
+partiellen Index gefahrlos ignorieren.

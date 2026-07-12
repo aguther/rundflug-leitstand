@@ -881,6 +881,8 @@ function FlightLineView() {
   const [message, setMessage] = useState<string | null>(null);
   const [queueReason, setQueueReason] = useState("");
   const [emergencyReason, setEmergencyReason] = useState("");
+  const [nextAircraftId, setNextAircraftId] = useState("");
+  const [nextPilotId, setNextPilotId] = useState("");
   const operationalRotations = board?.rotations.filter(
     (rotation) => rotation.status !== "COMPLETED",
   );
@@ -888,6 +890,11 @@ function FlightLineView() {
     operationalRotations?.find((rotation) => rotation.id === selectedId) ??
     operationalRotations?.[0];
   const action = selected ? actionForState[selected.status] : null;
+  useEffect(() => {
+    if (selected?.status !== "DRAFT") return;
+    setNextAircraftId(selected.suggestedAircraftId ?? "");
+    setNextPilotId(selected.suggestedPilotId ?? "");
+  }, [selected?.status, selected?.suggestedAircraftId, selected?.suggestedPilotId]);
   const noShowReady = Boolean(
     selected?.status === "CALLED" &&
       selected.calledAt &&
@@ -912,8 +919,8 @@ function FlightLineView() {
             type: "CALL_NEXT",
             payload: {
               rotationId: selected.id,
-              aircraftId: selected.suggestedAircraftId ?? "",
-              pilotId: selected.suggestedPilotId ?? "",
+              aircraftId: nextAircraftId,
+              pilotId: nextPilotId,
             },
           },
           deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
@@ -1121,10 +1128,33 @@ function FlightLineView() {
                 <div>
                   <dt>Pilotencode</dt>
                   <dd>
-                    {selected.pilotOperationalCode ??
-                      (selected.suggestedPilotOperationalCode
-                        ? `Vorschlag ${selected.suggestedPilotOperationalCode} · Bestätigung mit NEXT`
-                        : "Kein anonymer Pilotencode verfügbar")}
+                    {selected.status === "DRAFT" ? (
+                      <label>
+                        <select
+                          aria-label="Pilotencode für NEXT"
+                          value={nextPilotId}
+                          onChange={(event) => setNextPilotId(event.target.value)}
+                        >
+                          <option value="">Kein Pilotencode verfügbar</option>
+                          {board?.pilots
+                            .filter(
+                              (pilot) =>
+                                pilot.active &&
+                                !pilot.paused &&
+                                (!pilot.currentRotationId ||
+                                  pilot.currentRotationId === selected.id),
+                            )
+                            .map((pilot) => (
+                              <option value={pilot.id} key={pilot.id}>
+                                {pilot.operationalCode}
+                                {pilot.id === selected.suggestedPilotId ? " · Vorschlag" : ""}
+                              </option>
+                            ))}
+                        </select>
+                      </label>
+                    ) : (
+                      (selected.pilotOperationalCode ?? "Kein anonymer Pilotencode verfügbar")
+                    )}
                   </dd>
                 </div>
               </dl>
@@ -1254,8 +1284,8 @@ function FlightLineView() {
                   className="primary-action"
                   disabled={
                     action.command === "CALL_NEXT" &&
-                    (!selected.suggestedAircraftId ||
-                      !selected.suggestedPilotId ||
+                    (!nextAircraftId ||
+                      !nextPilotId ||
                       board?.event.emergencyMode ||
                       board?.event.status !== "ACTIVE" ||
                       board?.event.operationalInterrupted)
