@@ -901,6 +901,10 @@ p {
   color: #7a2f05;
   background: #fff1d6;
 }
+.status-service_paused {
+  color: #713b08;
+  background: #fff4dc;
+}
 .status-in_flight {
   color: #075b36;
   background: #e5f7ee;

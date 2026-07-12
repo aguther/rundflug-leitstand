@@ -2280,7 +2280,12 @@ export class EventCoordinator extends DurableObject<Env> {
     current: StoredEventRow,
   ): Promise<Response> {
     const rotation = await this.env.DB.prepare(
-      "SELECT id, status, version, aircraft_id, pilot_id FROM rotations WHERE id = ?1 AND operation_day_id = ?2",
+      `SELECT r.id, r.status, r.version, r.aircraft_id, r.pilot_id,
+              rg.status AS resource_group_status
+         FROM rotations r
+         JOIN flight_groups fg ON fg.id = r.flight_group_id
+         JOIN resource_groups rg ON rg.id = fg.resource_group_id
+        WHERE r.id = ?1 AND r.operation_day_id = ?2`,
     )
       .bind(command.payload.rotationId, command.eventId)
       .first<{
@@ -2289,6 +2294,7 @@ export class EventCoordinator extends DurableObject<Env> {
         version: number;
         aircraft_id: string | null;
         pilot_id: string | null;
+        resource_group_status: "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED";
       }>();
     if (!rotation)
       return json(
@@ -2296,6 +2302,17 @@ export class EventCoordinator extends DurableObject<Env> {
         { status: 404 },
       );
     if (command.type === "CALL_NEXT") {
+      if (rotation.resource_group_status !== "ACTIVE") {
+        return json(
+          {
+            error: {
+              code: "RESOURCE_GROUP_NOT_ACTIVE",
+              message: "Ressourcengruppe ist für neue Aufrufe nicht aktiv.",
+            },
+          },
+          { status: 409 },
+        );
+      }
       const candidate = await this.env.DB.prepare(
         `SELECT a.id, a.passenger_seats, a.operational_state, COUNT(rt.ticket_id) AS ticket_count
            FROM rotations r
