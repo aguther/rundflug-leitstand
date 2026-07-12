@@ -820,6 +820,15 @@ app.get("/api/events/:eventId/operations", async (context) => {
         activeCapacity: activeAircraft,
       });
       const forecast = forecastQueueWindows({ queueSequence, activeAircraft, duration });
+      const forecastReferenceMs = Date.now();
+      const nextBoardingWindowLowerAt =
+        forecast.quality === "UNCERTAIN"
+          ? null
+          : new Date(forecastReferenceMs + forecast.lowerMinutes * 60_000).toISOString();
+      const nextBoardingWindowUpperAt =
+        forecast.quality === "UNCERTAIN"
+          ? null
+          : new Date(forecastReferenceMs + forecast.upperMinutes * 60_000).toISOString();
       const capacity = assessRemainingCapacity({
         remainingOperatingMinutes,
         expectedRotationMinutes: duration.expectedMinutes,
@@ -854,6 +863,8 @@ app.get("/api/events/:eventId/operations", async (context) => {
         resourceGroupOpenTickets: product.resource_group_open_tickets,
         estimatedWaitLowerMinutes: forecast.lowerMinutes,
         estimatedWaitUpperMinutes: forecast.upperMinutes,
+        nextBoardingWindowLowerAt,
+        nextBoardingWindowUpperAt,
         remainingSellableSeats: capacity.remainingSellableSeats,
         projectedSeats: capacity.projectedSeats,
         capacityStatus: capacity.status,
