@@ -566,6 +566,7 @@ describe("commandEnvelopeSchema", () => {
       predictedLowerMinutes: 0,
       predictedUpperMinutes: 25,
       calledAt: "2026-07-11T12:05:00.000Z",
+      deferralCount: 0,
       timeline: {
         planned: {
           boardingAt: "2026-07-11T12:00:00.000Z",

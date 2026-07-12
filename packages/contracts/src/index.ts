@@ -251,6 +251,7 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
       saleOpensAt: z.iso.datetime().nullable(),
       operationsEndAt: z.iso.datetime(),
       noShowAfterMinutes: z.number().int().min(1).max(120),
+      maxTicketDeferrals: z.number().int().min(1).max(10).default(2),
       notificationLeadMinutes: z.number().int().min(1).max(240),
       childReferenceWeightKg: z.number().positive().max(300),
       normalReferenceWeightKg: z.number().positive().max(300),
@@ -448,6 +449,7 @@ export const eventSnapshotSchema = z.object({
   saleOpensAt: z.string().nullable(),
   operationsEndAt: z.string().nullable(),
   noShowAfterMinutes: z.number().int().positive(),
+  maxTicketDeferrals: z.number().int().min(1).max(10),
   notificationLeadMinutes: z.number().int().positive(),
   referenceWeightsKg: z.object({
     child: z.number().positive(),
@@ -617,6 +619,7 @@ export const rotationOperationalSummarySchema = z.object({
   predictedLowerMinutes: z.number().int().nonnegative(),
   predictedUpperMinutes: z.number().int().nonnegative(),
   calledAt: z.string().nullable(),
+  deferralCount: z.number().int().nonnegative(),
   timeline: z.object({
     planned: z.object({
       boardingAt: z.string().nullable(),
@@ -642,6 +645,18 @@ export const rotationOperationalSummarySchema = z.object({
   tickets: z.array(
     z.object({
       id: z.string(),
+      status: z.enum([
+        "QUEUED",
+        "CHECKED_IN",
+        "CALLED",
+        "BOARDING",
+        "IN_FLIGHT",
+        "LANDED",
+        "COMPLETED",
+        "NO_SHOW",
+        "CANCELED",
+        "CLARIFICATION",
+      ]),
       attendanceStatus: z.enum(["NOT_CHECKED_IN", "CHECKED_IN"]),
     }),
   ),
