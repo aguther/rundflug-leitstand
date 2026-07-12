@@ -1690,6 +1690,8 @@ function AdminView() {
   const [newEventName, setNewEventName] = useState("");
   const [newEventDate, setNewEventDate] = useState("");
   const [newEventAerodrome, setNewEventAerodrome] = useState("");
+  const [restartMode, setRestartMode] = useState<"KEEP_MASTER_DATA" | "EMPTY">("KEEP_MASTER_DATA");
+  const [restartConfirmation, setRestartConfirmation] = useState("");
   const resourceGroups = board?.resourceGroups ?? [];
   const isAdministrator = board?.currentDeviceRole === "ADMIN";
   const refreshHistory = useCallback(async () => {
@@ -1759,6 +1761,7 @@ function AdminView() {
         eventDate: newEventDate,
         aerodrome: newEventAerodrome,
         timeZone: board?.event.timeZone ?? "Europe/Berlin",
+        restartMode,
       });
       window.localStorage.setItem("device-id:ADMIN", result.adminDeviceId);
       window.location.assign(`/admin?event=${encodeURIComponent(result.eventId)}`);
@@ -2569,8 +2572,9 @@ function AdminView() {
           <section className="admin-section">
             <h2>Veranstaltungen und Vorlagen</h2>
             <p>
-              Aktive Veranstaltung: <strong>{board?.event.name ?? EVENT_ID}</strong>. Eine Kopie
-              übernimmt Stammdaten und Parameter, startet aber ohne Verkäufe und Umläufe.
+              Aktive Veranstaltung: <strong>{board?.event.name ?? EVENT_ID}</strong>. Ein Neustart
+              legt eine neue Veranstaltung an. Der bisherige Stand bleibt für Audit, Berichte und
+              Wiederherstellung unverändert erhalten.
             </p>
             <div className="event-lifecycle">
               <span>
@@ -2637,6 +2641,18 @@ function AdminView() {
             </div>
             <div className="parameter-grid">
               <label>
+                Neustart-Stufe
+                <select
+                  value={restartMode}
+                  onChange={(event) =>
+                    setRestartMode(event.target.value as "KEEP_MASTER_DATA" | "EMPTY")
+                  }
+                >
+                  <option value="KEEP_MASTER_DATA">Betriebsdaten zurücksetzen</option>
+                  <option value="EMPTY">Vollständig neu einrichten</option>
+                </select>
+              </label>
+              <label>
                 Technische ID
                 <input
                   value={newEventId}
@@ -2668,9 +2684,33 @@ function AdminView() {
                   placeholder="EDXX"
                 />
               </label>
+              <label>
+                Bestätigung
+                <input
+                  value={restartConfirmation}
+                  onChange={(event) => setRestartConfirmation(event.target.value)}
+                  placeholder="NEUSTART"
+                  autoComplete="off"
+                />
+              </label>
             </div>
-            <button type="button" onClick={() => void createEventFromTemplate()}>
-              Aus dieser Veranstaltung anlegen
+            <p className="help-text">
+              {restartMode === "KEEP_MASTER_DATA"
+                ? "Übernommen werden Parameter, Gates, Ressourcengruppen, Produkte, Flugzeugzuordnungen und Piloten-IDs. Tickets, Gruppen, Umläufe und Flugdaten beginnen leer; Verkäufe bleiben zunächst gesperrt."
+                : "Nur Veranstaltungsdaten, Grundeinstellungen und dieses Administrationsgerät werden angelegt. Gates, Ressourcengruppen, Produkte, Flugzeugzuordnungen, Piloten-IDs und alle Betriebsdaten beginnen leer."}
+            </p>
+            <button
+              type="button"
+              disabled={
+                restartConfirmation !== "NEUSTART" ||
+                newEventId.trim().length < 3 ||
+                newEventName.trim().length < 3 ||
+                !newEventDate ||
+                newEventAerodrome.trim().length < 2
+              }
+              onClick={() => void createEventFromTemplate()}
+            >
+              Sicheren Neustart anlegen
             </button>
           </section>
         ) : null}

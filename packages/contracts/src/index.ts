@@ -508,6 +508,7 @@ export const cloneEventRequestSchema = z.object({
   eventDate: z.iso.date(),
   aerodrome: z.string().trim().min(2).max(120),
   timeZone: z.string().trim().min(3).max(80).default("Europe/Berlin"),
+  restartMode: z.enum(["KEEP_MASTER_DATA", "EMPTY"]).default("KEEP_MASTER_DATA"),
 });
 export type CloneEventRequest = z.infer<typeof cloneEventRequestSchema>;
 

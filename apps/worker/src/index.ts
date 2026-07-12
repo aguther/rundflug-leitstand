@@ -242,6 +242,7 @@ app.post("/api/admin/events/:sourceEventId/clone", async (context) => {
       .all<Record<string, unknown>>(),
   ]);
   const now = new Date().toISOString();
+  const keepMasterData = input.restartMode === "KEEP_MASTER_DATA";
   const gateIds = new Map(gates.results.map((row) => [String(row.id), crypto.randomUUID()]));
   const groupIds = new Map(groups.results.map((row) => [String(row.id), crypto.randomUUID()]));
   const adminDeviceId = crypto.randomUUID();
@@ -277,7 +278,7 @@ app.post("/api/admin/events/:sourceEventId/clone", async (context) => {
       input.aerodrome,
       sourceEventId,
     ),
-    ...gates.results.map((row) =>
+    ...(keepMasterData ? gates.results : []).map((row) =>
       context.env.DB.prepare(
         `INSERT INTO gates (id, operation_day_id, label, gate_type, active, sort_order, created_at, updated_at)
        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7)`,
@@ -291,7 +292,7 @@ app.post("/api/admin/events/:sourceEventId/clone", async (context) => {
         now,
       ),
     ),
-    ...groups.results.map((row) =>
+    ...(keepMasterData ? groups.results : []).map((row) =>
       context.env.DB.prepare(
         `INSERT INTO resource_groups
         (id, operation_day_id, name, status, version, created_at, updated_at, gate_id,
@@ -308,7 +309,7 @@ app.post("/api/admin/events/:sourceEventId/clone", async (context) => {
         row.compatible_aircraft_types_json,
       ),
     ),
-    ...products.results.map((row) =>
+    ...(keepMasterData ? products.results : []).map((row) =>
       context.env.DB.prepare(
         `INSERT INTO products
         (id, operation_day_id, resource_group_id, name, price_cents, sale_enabled, created_at,
@@ -332,13 +333,13 @@ app.post("/api/admin/events/:sourceEventId/clone", async (context) => {
         row.gate_id ? gateIds.get(String(row.gate_id)) : null,
       ),
     ),
-    ...pilots.results.map((row) =>
+    ...(keepMasterData ? pilots.results : []).map((row) =>
       context.env.DB.prepare(
         `INSERT INTO pilots (id, operation_day_id, operational_code, active, created_at, updated_at)
        VALUES (?1, ?2, ?3, ?4, ?5, ?5)`,
       ).bind(crypto.randomUUID(), input.eventId, row.operational_code, row.active, now),
     ),
-    ...memberships.results.map((row) =>
+    ...(keepMasterData ? memberships.results : []).map((row) =>
       context.env.DB.prepare(
         `INSERT INTO resource_group_memberships
         (id, operation_day_id, resource_group_id, aircraft_id, active_from, created_at,
@@ -368,7 +369,7 @@ app.post("/api/admin/events/:sourceEventId/clone", async (context) => {
       input.eventId,
       now,
       adminDeviceId,
-      JSON.stringify({ templateSourceId: sourceEventId }),
+      JSON.stringify({ templateSourceId: sourceEventId, restartMode: input.restartMode }),
     ),
     context.env.DB.prepare(
       `INSERT INTO outbox (id, operation_day_id, topic, payload_json, created_at)
