@@ -26,6 +26,7 @@ import {
   searchTickets,
   sendCommand,
 } from "./api";
+import { confirmedStateLabel, loadOperationBoard, saveOperationBoard } from "./offline-store";
 
 const EVENT_ID = new URLSearchParams(window.location.search).get("event") ?? "demo-2026";
 const LOCAL_DEVELOPMENT =
@@ -149,20 +150,34 @@ function useConnectivity(): boolean {
 function useOperationBoard(deviceId: string) {
   const [board, setBoard] = useState<OperationBoard | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [lastConfirmedAt, setLastConfirmedAt] = useState<string | null>(null);
   const refresh = useCallback(async () => {
     try {
-      setBoard(await getOperationBoard(EVENT_ID, deviceId, deviceTokenFor(deviceId)));
+      const confirmedBoard = await getOperationBoard(EVENT_ID, deviceId, deviceTokenFor(deviceId));
+      const confirmedAt = new Date().toISOString();
+      setBoard(confirmedBoard);
+      setLastConfirmedAt(confirmedAt);
       setError(null);
+      void saveOperationBoard(EVENT_ID, deviceId, confirmedBoard, confirmedAt);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Betriebsdaten nicht verfügbar.");
     }
   }, [deviceId]);
   useEffect(() => {
+    let active = true;
+    void loadOperationBoard(EVENT_ID, deviceId).then((cached) => {
+      if (!active || !cached) return;
+      setBoard((current) => current ?? cached.board);
+      setLastConfirmedAt((current) => current ?? cached.savedAt);
+    });
     void refresh();
     const timer = window.setInterval(refresh, 5000);
-    return () => window.clearInterval(timer);
-  }, [refresh]);
-  return { board, error, refresh };
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [refresh, deviceId]);
+  return { board, error, lastConfirmedAt, refresh };
 }
 
 function Shell({ title, children }: { title: string; children: React.ReactNode }) {
@@ -192,8 +207,20 @@ function Shell({ title, children }: { title: string; children: React.ReactNode }
   );
 }
 
-function ConnectionNotice({ error }: { error: string | null }) {
-  return error ? <div className="connection-warning">Möglicherweise veraltet · {error}</div> : null;
+function ConnectionNotice({
+  error,
+  lastConfirmedAt,
+}: {
+  error: string | null;
+  lastConfirmedAt?: string | null;
+}) {
+  return error ? (
+    <div className="connection-warning">
+      Möglicherweise veraltet
+      {lastConfirmedAt ? ` · ${confirmedStateLabel(lastConfirmedAt)}` : " · kein bestätigter Stand"}
+      {` · ${error}`}
+    </div>
+  ) : null;
 }
 
 function EmergencyNotice({ active }: { active: boolean }) {
@@ -221,7 +248,7 @@ function OperationalNotice({ note }: { note: string | null | undefined }) {
 }
 
 function CashierView() {
-  const { board, error, refresh } = useOperationBoard(CASHIER_DEVICE_ID);
+  const { board, error, lastConfirmedAt, refresh } = useOperationBoard(CASHIER_DEVICE_ID);
   const [productId, setProductId] = useState(() => {
     try {
       const draft = JSON.parse(localStorage.getItem("cashier-draft-v1") ?? "{}") as {
@@ -454,7 +481,7 @@ function CashierView() {
 
   return (
     <Shell title="Kasse">
-      <ConnectionNotice error={error} />
+      <ConnectionNotice error={error} lastConfirmedAt={lastConfirmedAt} />
       <EmergencyNotice active={board?.event.emergencyMode ?? false} />
       <InterruptionNotice active={board?.event.operationalInterrupted ?? false} />
       <OperationalNotice note={board?.event.operationalNote} />
@@ -781,7 +808,7 @@ const actionForState = {
 } as const;
 
 function FlightLineView() {
-  const { board, error, refresh } = useOperationBoard(FLIGHT_LINE_DEVICE_ID);
+  const { board, error, lastConfirmedAt, refresh } = useOperationBoard(FLIGHT_LINE_DEVICE_ID);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [queueReason, setQueueReason] = useState("");
@@ -929,7 +956,7 @@ function FlightLineView() {
 
   return (
     <Shell title="Flight Line">
-      <ConnectionNotice error={error} />
+      <ConnectionNotice error={error} lastConfirmedAt={lastConfirmedAt} />
       <EmergencyNotice active={board?.event.emergencyMode ?? false} />
       <InterruptionNotice active={board?.event.operationalInterrupted ?? false} />
       <OperationalNotice note={board?.event.operationalNote} />
@@ -1403,7 +1430,7 @@ function FidsView() {
 }
 
 function AdminView() {
-  const { board, error, refresh } = useOperationBoard(ADMIN_DEVICE_ID);
+  const { board, error, lastConfirmedAt, refresh } = useOperationBoard(ADMIN_DEVICE_ID);
   const [reason, setReason] = useState("");
   const [adminPin, setAdminPin] = useState("");
   const [saleClosesAt, setSaleClosesAt] = useState("");
@@ -2270,7 +2297,7 @@ function AdminView() {
 
   return (
     <Shell title="Administration">
-      <ConnectionNotice error={error} />
+      <ConnectionNotice error={error} lastConfirmedAt={lastConfirmedAt} />
       <EmergencyNotice active={board?.event.emergencyMode ?? false} />
       <InterruptionNotice active={board?.event.operationalInterrupted ?? false} />
       <OperationalNotice note={board?.event.operationalNote} />
