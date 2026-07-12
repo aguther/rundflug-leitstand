@@ -60,8 +60,16 @@ Deployment und nach neuen Migrationen mit dem Befehl aus Abschnitt 5 angewendet.
 in `wrangler.jsonc` eingetragene reale D1-ID müssen zusammenpassen. Lokale Entwicklung bleibt durch
 den lokalen Startbefehl und lokale D1-Daten getrennt.
 
-Vor dem Deployment je Umgebung den SHA-256-Hash der Administrator-PIN als Secret setzen. Die PIN
-selbst wird weder in Cloudflare-Konfiguration noch D1 gespeichert:
+PIN und Einrichtungscode können verdeckt abgefragt und direkt als Cloudflare-Secrets gesetzt werden;
+die PIN wird dabei ausschließlich lokal gehasht:
+
+```bash
+npm run cloudflare:configure-setup
+```
+
+Alternativ vor dem Deployment den bereits lokal gebildeten SHA-256-Hash der Administrator-PIN
+interaktiv als Secret setzen. Die PIN selbst wird weder in Cloudflare-Konfiguration noch D1
+gespeichert:
 
 ```bash
 npx wrangler secret put ADMIN_PIN_HASH
