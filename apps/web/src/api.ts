@@ -213,9 +213,7 @@ export async function sendCommand(
   command: CommandEnvelope,
   deviceToken: string,
 ): Promise<CommandResult> {
-  if (!navigator.onLine) {
-    throw new Error("Offline: operative Aktion benötigt eine Serverbestätigung.");
-  }
+  assertOperationalConnection(navigator.onLine);
   const response = await fetch(`/api/events/${encodeURIComponent(command.eventId)}/commands`, {
     method: "POST",
     headers: { "content-type": "application/json", "x-device-token": deviceToken },
@@ -226,6 +224,10 @@ export async function sendCommand(
     throw new Error(body.error?.message ?? `Kommando abgelehnt (${response.status})`);
   }
   return commandResultSchema.parse(await response.json());
+}
+
+export function assertOperationalConnection(online: boolean): void {
+  if (!online) throw new Error("Offline: operative Aktion benötigt eine Serverbestätigung.");
 }
 
 export async function getPublicTicketStatus(
