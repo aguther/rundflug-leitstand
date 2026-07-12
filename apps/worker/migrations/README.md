@@ -97,3 +97,10 @@ Kombination aus Abonnement, Umlauf und Hinweistyp verhindert doppelte Vorab- ode
 Zustellaufträge werden über Fremdschlüssel zusammen mit dem befristeten Push-Abonnement gelöscht und
 bewusst nicht in portable operative Backups aufgenommen. Ein Rollback kann die neue Tabelle und den
 Index entfernen; bereits versendete Browsermeldungen lassen sich naturgemäß nicht zurückrufen.
+
+## 0022 – Organisatorische Bemerkung zum Pilotencode
+
+Ergänzt am anonymen, veranstaltungsbezogenen Pilotencode eine optionale organisatorische Bemerkung.
+Die Oberfläche weist ausdrücklich darauf hin, dort keine Namen oder Lizenzdaten zu erfassen. Vor
+Anwendung wird portabel gesichert. Wiederherstellung erfolgt aus dieser Sicherung, da D1 additive
+Spalten nicht einzeln zurückrollt; ältere Anwendungen können die neue Spalte gefahrlos ignorieren.

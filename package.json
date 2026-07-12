@@ -23,6 +23,7 @@
     "test:outage-recovery": "node scripts/verify_outage_recovery.mjs",
     "test:emergency-mode": "node scripts/verify_emergency_mode.mjs",
     "test:master-data": "node scripts/verify_master_data.mjs",
+    "test:fleet-operations": "node scripts/verify_fleet_operations.mjs",
     "test:public-monitors": "node scripts/verify_public_monitors.mjs",
     "test:vertical-slice": "node scripts/verify_vertical_slice.mjs",
     "test:watch": "vitest",
