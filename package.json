@@ -21,6 +21,7 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "vitest run",
     "test:outage-recovery": "node scripts/verify_outage_recovery.mjs",
+    "test:vertical-slice": "node scripts/verify_vertical_slice.mjs",
     "test:watch": "vitest",
     "lint": "biome check .",
     "format": "biome format --write .",
