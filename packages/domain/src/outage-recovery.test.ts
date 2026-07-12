@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { type OutageRecoveryEntry, simulateOutageRecovery } from "./outage-recovery";
+import {
+  assertMayStageOutageRecoveryEntry,
+  type OutageRecoveryEntry,
+  simulateOutageRecovery,
+} from "./outage-recovery";
 
 const at = (minute: number) => `2026-07-12T06:${minute.toString().padStart(2, "0")}:00.000Z`;
 
@@ -14,6 +18,19 @@ function entry(
 }
 
 describe("outage recovery simulation", () => {
+  it("separates cashier paper sales from flight-line-lead rotation records", () => {
+    expect(() => assertMayStageOutageRecoveryEntry("CASHIER", "PAPER_SALE")).not.toThrow();
+    expect(() => assertMayStageOutageRecoveryEntry("CASHIER", "ROTATION_CALLED")).toThrowError(
+      /Leiter Flight Line/,
+    );
+    expect(() => assertMayStageOutageRecoveryEntry("FLIGHT_LINE_LEAD", "PAPER_SALE")).toThrowError(
+      /Kasse/,
+    );
+    expect(() =>
+      assertMayStageOutageRecoveryEntry("FLIGHT_LINE_LEAD", "ROTATION_LANDED"),
+    ).not.toThrow();
+  });
+
   it("orders paper records by original time and paper sequence and accepts a complete lifecycle", () => {
     const result = simulateOutageRecovery({
       entries: [

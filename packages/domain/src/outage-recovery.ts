@@ -1,4 +1,4 @@
-import { DomainRuleError, type RotationState, transitionRotation } from "./index";
+import { type DeviceRole, DomainRuleError, type RotationState, transitionRotation } from "./index";
 
 export type OutageRecoveryEntryType =
   | "PAPER_SALE"
@@ -31,6 +31,24 @@ export interface OutageRecoverySimulation {
   orderedEntries: OutageRecoveryEntry[];
   conflicts: OutageRecoveryConflict[];
   canCommit: boolean;
+}
+
+export function assertMayStageOutageRecoveryEntry(
+  role: DeviceRole,
+  entryType: OutageRecoveryEntryType,
+): void {
+  const permitted =
+    role === "ADMIN" ||
+    (entryType === "PAPER_SALE" && role === "CASHIER") ||
+    (entryType !== "PAPER_SALE" && role === "FLIGHT_LINE_LEAD");
+  if (!permitted) {
+    throw new DomainRuleError(
+      "OUTAGE_RECOVERY_ROLE_NOT_AUTHORIZED",
+      entryType === "PAPER_SALE"
+        ? "Papierverkäufe dürfen nur Kasse oder Administration nacherfassen."
+        : "Umlaufereignisse dürfen nur Leiter Flight Line oder Administration nacherfassen.",
+    );
+  }
 }
 
 const targetState: Readonly<Record<Exclude<OutageRecoveryEntryType, "PAPER_SALE">, RotationState>> =

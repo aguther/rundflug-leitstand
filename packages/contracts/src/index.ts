@@ -27,6 +27,23 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
     }),
   }),
   commandBaseSchema.extend({
+    type: z.literal("STAGE_OUTAGE_RECOVERY"),
+    payload: z.object({
+      batchId: z.uuid(),
+      entries: z
+        .array(z.lazy(() => outageRecoveryEntrySchema))
+        .min(1)
+        .max(500),
+    }),
+  }),
+  commandBaseSchema.extend({
+    type: z.literal("APPROVE_OUTAGE_RECOVERY"),
+    payload: z.object({
+      batchId: z.uuid(),
+      adminPin: z.string().min(4).max(32),
+    }),
+  }),
+  commandBaseSchema.extend({
     type: z.literal("SELL_TICKET_GROUP"),
     payload: z.object({
       productId: z.string().min(1).max(100),
@@ -483,6 +500,7 @@ export const commandResultSchema = z.object({
         "GATE",
         "TICKET_GROUP",
         "ROTATION",
+        "RECOVERY_BATCH",
       ]),
       id: z.string(),
       relatedRotationId: z.string().optional(),

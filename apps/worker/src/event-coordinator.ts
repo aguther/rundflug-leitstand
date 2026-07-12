@@ -7,6 +7,7 @@ import {
 } from "@rundflug/contracts";
 import {
   type AircraftOperationalState,
+  assertMayStageOutageRecoveryEntry,
   assertPublicTicketCode,
   assertQueueMutationAllowed,
   assertRoleMayExecute,
@@ -17,6 +18,7 @@ import {
   estimateDuration,
   forecastQueueWindows,
   type OperationalCommandType,
+  simulateOutageRecovery,
   transitionAircraft,
   transitionRotation,
 } from "@rundflug/domain";
@@ -140,6 +142,11 @@ export class EventCoordinator extends DurableObject<Env> {
       } else {
         try {
           assertRoleMayExecute(device.role, command.type as OperationalCommandType);
+          if (command.type === "STAGE_OUTAGE_RECOVERY") {
+            for (const entry of command.payload.entries) {
+              assertMayStageOutageRecoveryEntry(device.role, entry.type);
+            }
+          }
         } catch (reason: unknown) {
           if (reason instanceof DomainRuleError) {
             return json({ error: { code: reason.code, message: reason.message } }, { status: 403 });
@@ -471,6 +478,9 @@ export class EventCoordinator extends DurableObject<Env> {
       }
 
       if (command.type !== "SET_OPERATIONAL_NOTE") {
+        if (command.type === "STAGE_OUTAGE_RECOVERY") {
+          return this.handleStageOutageRecovery(command, current);
+        }
         if (
           command.type === "SET_AIRCRAFT_OPERATIONAL_STATE" ||
           command.type === "SCHEDULE_AIRCRAFT_REFUEL" ||
@@ -2445,6 +2455,158 @@ export class EventCoordinator extends DurableObject<Env> {
     this.ctx.waitUntil(
       sendRotationPushNotifications(this.env, rotation.id, eventType[command.type]),
     );
+    this.broadcast(result);
+    return json(result);
+  }
+
+  private async handleStageOutageRecovery(
+    command: Extract<CommandEnvelope, { type: "STAGE_OUTAGE_RECOVERY" }>,
+    current: StoredEventRow,
+  ): Promise<Response> {
+    const existingBatch = await this.env.DB.prepare(
+      "SELECT id FROM outage_recovery_batches WHERE id = ?1",
+    )
+      .bind(command.payload.batchId)
+      .first<{ id: string }>();
+    if (existingBatch) {
+      return json(
+        {
+          error: {
+            code: "RECOVERY_BATCH_ALREADY_EXISTS",
+            message: "Der Nacherfassungsbatch existiert bereits.",
+          },
+        },
+        { status: 409 },
+      );
+    }
+    const existingReferences = await this.env.DB.prepare(
+      `SELECT DISTINCT ore.paper_reference
+         FROM outage_recovery_entries ore
+         JOIN outage_recovery_batches orb ON orb.id = ore.batch_id
+        WHERE orb.operation_day_id = ?1 AND orb.status <> 'REJECTED'`,
+    )
+      .bind(command.eventId)
+      .all<{ paper_reference: string }>();
+    const now = new Date().toISOString();
+    const simulation = simulateOutageRecovery({
+      entries: command.payload.entries.map((entry) => ({
+        id: entry.id,
+        type: entry.type,
+        originalOccurredAt: entry.originalOccurredAt,
+        paperSequence: entry.paperSequence,
+        paperReference: entry.paperReference,
+      })),
+      existingPaperReferences: existingReferences.results.map((row) => row.paper_reference),
+      recordedAt: now,
+    });
+    const nextVersion = current.version + 1;
+    const eventType = simulation.canCommit
+      ? "OUTAGE_RECOVERY_STAGED"
+      : "OUTAGE_RECOVERY_CONFLICTED";
+    const result: CommandResult = {
+      accepted: true,
+      duplicate: false,
+      event: rowToSnapshot({ ...current, version: nextVersion, updated_at: now }),
+      eventType,
+      aggregate: { type: "RECOVERY_BATCH", id: command.payload.batchId },
+    };
+    const simulationPayload = {
+      batchId: command.payload.batchId,
+      simulatedAgainstVersion: current.version,
+      canCommit: simulation.canCommit,
+      orderedEntryIds: simulation.orderedEntries.map((entry) => entry.id),
+      conflicts: simulation.conflicts,
+    };
+    const statements: D1PreparedStatement[] = [
+      this.env.DB.prepare(
+        "UPDATE operation_days SET version = ?1, updated_at = ?2 WHERE id = ?3 AND version = ?4",
+      ).bind(nextVersion, now, command.eventId, current.version),
+      this.env.DB.prepare(
+        `INSERT INTO outage_recovery_batches
+          (id, operation_day_id, created_by_device_id, created_at, simulated_against_version,
+           status, simulation_json, version)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 0)`,
+      ).bind(
+        command.payload.batchId,
+        command.eventId,
+        command.deviceId,
+        now,
+        current.version,
+        simulation.canCommit ? "STAGED" : "CONFLICTED",
+        JSON.stringify(simulationPayload),
+      ),
+    ];
+    for (const entry of command.payload.entries) {
+      const entryConflicts = simulation.conflicts.filter(
+        (conflict) => conflict.entryId === entry.id,
+      );
+      const storedPayload =
+        entry.type === "PAPER_SALE"
+          ? {
+              productId: entry.payload.productId,
+              publicTicketCodeHashes: await Promise.all(
+                entry.payload.publicTicketCodes.map(sha256Hex),
+              ),
+              paymentStatus: entry.payload.paymentStatus,
+              paymentMethod: entry.payload.paymentMethod,
+            }
+          : entry.payload;
+      statements.push(
+        this.env.DB.prepare(
+          `INSERT INTO outage_recovery_entries
+            (id, source_entry_id, batch_id, entry_type, original_occurred_at, paper_sequence,
+             paper_reference, payload_json, status, conflict_json)
+           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)`,
+        ).bind(
+          crypto.randomUUID(),
+          entry.id,
+          command.payload.batchId,
+          entry.type,
+          entry.originalOccurredAt,
+          entry.paperSequence,
+          entry.paperReference,
+          JSON.stringify(storedPayload),
+          entryConflicts.length === 0 ? "STAGED" : "CONFLICT",
+          entryConflicts.length === 0 ? null : JSON.stringify(entryConflicts),
+        ),
+      );
+    }
+    statements.push(
+      this.env.DB.prepare(
+        `INSERT INTO operational_events
+          (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type,
+           aggregate_id, aggregate_version, payload_json)
+         VALUES (?1, ?2, ?3, ?4, ?5, 'RECOVERY_BATCH', ?6, 0, ?7)`,
+      ).bind(
+        crypto.randomUUID(),
+        command.eventId,
+        eventType,
+        now,
+        command.deviceId,
+        command.payload.batchId,
+        JSON.stringify({
+          entryCount: command.payload.entries.length,
+          conflictCount: simulation.conflicts.length,
+          simulatedAgainstVersion: current.version,
+        }),
+      ),
+      this.env.DB.prepare(
+        `INSERT INTO idempotency_receipts
+          (command_id, operation_day_id, device_id, command_type, received_at, response_json)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)`,
+      ).bind(
+        command.commandId,
+        command.eventId,
+        command.deviceId,
+        command.type,
+        now,
+        JSON.stringify(result),
+      ),
+      this.env.DB.prepare(
+        "INSERT INTO outbox (id, operation_day_id, topic, payload_json, created_at) VALUES (?1, ?2, 'EVENT_STATE_CHANGED', ?3, ?4)",
+      ).bind(crypto.randomUUID(), command.eventId, JSON.stringify(result), now),
+    );
+    await this.env.DB.batch(statements);
     this.broadcast(result);
     return json(result);
   }
