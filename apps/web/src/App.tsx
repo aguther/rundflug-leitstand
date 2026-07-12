@@ -26,6 +26,12 @@ import {
   searchTickets,
   sendCommand,
 } from "./api";
+import {
+  type BoardSyncState,
+  OPERATION_BOARD_POLL_INTERVAL_MS,
+  reduceBoardSyncState,
+  requestBoardSync,
+} from "./board-sync";
 import { confirmedStateLabel, loadOperationBoard, saveOperationBoard } from "./offline-store";
 
 const EVENT_ID = new URLSearchParams(window.location.search).get("event") ?? "demo-2026";
@@ -148,36 +154,40 @@ function useConnectivity(): boolean {
 }
 
 function useOperationBoard(deviceId: string) {
-  const [board, setBoard] = useState<OperationBoard | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [lastConfirmedAt, setLastConfirmedAt] = useState<string | null>(null);
+  const [state, setState] = useState<BoardSyncState>({
+    board: null,
+    error: null,
+    lastConfirmedAt: null,
+  });
   const refresh = useCallback(async () => {
-    try {
-      const confirmedBoard = await getOperationBoard(EVENT_ID, deviceId, deviceTokenFor(deviceId));
-      const confirmedAt = new Date().toISOString();
-      setBoard(confirmedBoard);
-      setLastConfirmedAt(confirmedAt);
-      setError(null);
-      void saveOperationBoard(EVENT_ID, deviceId, confirmedBoard, confirmedAt);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Betriebsdaten nicht verfügbar.");
+    const outcome = await requestBoardSync(() =>
+      getOperationBoard(EVENT_ID, deviceId, deviceTokenFor(deviceId)),
+    );
+    setState((current) => reduceBoardSyncState(current, outcome));
+    if (outcome.type === "CONFIRMED") {
+      void saveOperationBoard(EVENT_ID, deviceId, outcome.board, outcome.confirmedAt);
     }
   }, [deviceId]);
   useEffect(() => {
     let active = true;
     void loadOperationBoard(EVENT_ID, deviceId).then((cached) => {
       if (!active || !cached) return;
-      setBoard((current) => current ?? cached.board);
-      setLastConfirmedAt((current) => current ?? cached.savedAt);
+      setState((current) =>
+        reduceBoardSyncState(current, {
+          type: "RESTORED",
+          board: cached.board,
+          savedAt: cached.savedAt,
+        }),
+      );
     });
     void refresh();
-    const timer = window.setInterval(refresh, 5000);
+    const timer = window.setInterval(refresh, OPERATION_BOARD_POLL_INTERVAL_MS);
     return () => {
       active = false;
       window.clearInterval(timer);
     };
   }, [refresh, deviceId]);
-  return { board, error, lastConfirmedAt, refresh };
+  return { ...state, refresh };
 }
 
 function Shell({ title, children }: { title: string; children: React.ReactNode }) {
