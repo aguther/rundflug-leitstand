@@ -139,6 +139,32 @@ const ticketCode = () =>
     .toUpperCase()
     .replaceAll(/[01OI_-]/g, "A");
 
+const assertPublicTimeCommunication = (payload, label) => {
+  const containsExactPrediction = (value) => {
+    if (Array.isArray(value)) return value.some(containsExactPrediction);
+    if (!value || typeof value !== "object") return false;
+    return Object.entries(value).some(
+      ([key, entry]) =>
+        /^(planned|predicted).*(At|Time)$/i.test(key) || containsExactPrediction(entry),
+    );
+  };
+  if (containsExactPrediction(payload)) {
+    throw new Error(`${label} veröffentlicht eine exakte Plan- oder Prognosezeit.`);
+  }
+  const windows = "groups" in payload ? payload.groups : [payload];
+  if (
+    windows.some(
+      (entry) =>
+        !Number.isInteger(entry.waitLowerMinutes) ||
+        !Number.isInteger(entry.waitUpperMinutes) ||
+        entry.waitLowerMinutes < 0 ||
+        entry.waitUpperMinutes < entry.waitLowerMinutes,
+    )
+  ) {
+    throw new Error(`${label} veröffentlicht kein konsistentes Wartezeitfenster.`);
+  }
+};
+
 let socket;
 try {
   await waitForWorker();
@@ -207,6 +233,7 @@ try {
       `Ticketstatus leitet die Vorbereitung nicht aus Prognose und Vorlaufgrenze ab: ${JSON.stringify(initialTicketStatus)}`,
     );
   }
+  assertPublicTimeCommunication(initialTicketStatus, "Ticketstatus");
   const pushEndpoint = `https://fcm.googleapis.com/fcm/send/synthetic-${randomUUID()}`;
   const registerPush = async (consent) => {
     const response = await fetch(
@@ -241,6 +268,7 @@ try {
     );
   }
   let publicBoard = await board();
+  assertPublicTimeCommunication(publicBoard, "FIDS");
   const group = publicBoard.groups.find((entry) => entry.ticketLabels.length === 2);
   const serializedBoard = JSON.stringify(publicBoard);
   if (
@@ -267,6 +295,7 @@ try {
   );
   await secondSaleRefresh;
   publicBoard = await board();
+  assertPublicTimeCommunication(publicBoard, "FIDS nach weiterem Verkauf");
   if (
     publicBoard.groups.length < 2 ||
     !publicBoard.groups.some((entry) => entry.productCode === "PAN30")
@@ -299,6 +328,7 @@ try {
     throw new Error("Boardingaufruf, Flugzeug oder Flottenstatus fehlt im FIDS.");
   }
   const calledTicketStatus = await ticketStatus(privateCodes[0]);
+  assertPublicTimeCommunication(calledTicketStatus, "aufgerufener Ticketstatus");
   if (
     calledTicketStatus.status !== "COME_TO_FLIGHT_LINE" ||
     calledTicketStatus.message !== "Bitte jetzt zur Flight Line kommen."
@@ -370,6 +400,8 @@ try {
       aircraftVisibleAfterAssignment: true,
       fleetStatusVisible: true,
       multipleUpcomingGroupsVisible: true,
+      noExactPublicPredictionTimestamps: true,
+      publicWaitWindowsConsistent: true,
       realtimeUnderTwoSeconds: true,
       reconnectMilliseconds,
       pollingFallbackSeconds: 15,

@@ -5,6 +5,10 @@ Gruppen unterschiedlicher Produkte, sichere öffentliche Ticketkennungen, Boardi
 Flottenstatus sowie den Ausschluss privater Ticketcodes und Pilotendaten. Außerdem werden eine
 WebSocket-Aktualisierung unter zwei Sekunden, die automatische Neuverbindung und das 15-Sekunden-
 Polling als Rückfallebene verifiziert. Statusfarben werden stets durch ausgeschriebenen Text ergänzt.
+Die öffentlichen Verträge lehnen zusätzliche exakte Plan- oder Prognosezeitstempel ab. Der
+Integrationslauf prüft Ticketstatus und FIDS rekursiv auf solche Felder und validiert stattdessen
+nichtnegative Zeitfenster mit konsistenter Unter- und Obergrenze. Damit erscheint gegenüber Gästen
+keine einzelne Uhrzeit als feste Zusage.
 
 Zusätzlich prüft der Lauf den Ticketstatus ohne Anmeldung, die Vorbereitung aus Prognose und
 konfigurierter Vorlaufgrenze, den verbindlichen Aufruf, Boarding nach Check-in sowie die freiwillige
