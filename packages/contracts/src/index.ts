@@ -712,6 +712,7 @@ export const operationBoardSchema = z.object({
 export type OperationBoard = z.infer<typeof operationBoardSchema>;
 
 export const publicTicketStatusSchema = z.object({
+  eventId: z.string(),
   productName: z.string(),
   productCode: z.string(),
   publicDescription: z.string(),

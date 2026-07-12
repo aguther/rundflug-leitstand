@@ -58,6 +58,19 @@ const board = async () => {
   if (!response.ok) throw new Error(`FIDS-Abruf fehlgeschlagen (${response.status}).`);
   return response.json();
 };
+const operationBoard = async (device, token) => {
+  const response = await fetch(`${base}/api/events/demo-2026/operations`, {
+    headers: { "x-device-id": device, "x-device-token": token },
+  });
+  if (!response.ok) throw new Error(`Operativer Board-Abruf fehlgeschlagen (${response.status}).`);
+  return response.json();
+};
+const ticketStatus = async (code) => {
+  const response = await fetch(`${base}/api/public/tickets/${code}`);
+  if (!response.ok)
+    throw new Error(`Öffentlicher Ticketstatus fehlgeschlagen (${response.status}).`);
+  return response.json();
+};
 const command = async (device, token, expectedVersion, type, payload) => {
   const response = await fetch(`${base}/api/events/demo-2026/commands`, {
     method: "POST",
@@ -142,7 +155,7 @@ try {
       saleOpensAt: null,
       operationsEndAt: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString(),
       noShowAfterMinutes: 10,
-      notificationLeadMinutes: 20,
+      notificationLeadMinutes: 60,
       childReferenceWeightKg: 35,
       normalReferenceWeightKg: 80,
       heavyReferenceWeightKg: 110,
@@ -179,6 +192,54 @@ try {
   if ((await saleRefresh) !== sold.event.version) {
     throw new Error("Realtime-Version stimmt nach Verkauf nicht überein.");
   }
+  let initialTicketStatus;
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    initialTicketStatus = await ticketStatus(privateCodes[0]);
+    if (initialTicketStatus.status === "PREPARE") break;
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 100));
+  }
+  if (
+    initialTicketStatus?.status !== "PREPARE" ||
+    initialTicketStatus.predictionQuality === "UNCERTAIN" ||
+    initialTicketStatus.waitUpperMinutes > 60
+  ) {
+    throw new Error(
+      `Ticketstatus leitet die Vorbereitung nicht aus Prognose und Vorlaufgrenze ab: ${JSON.stringify(initialTicketStatus)}`,
+    );
+  }
+  const pushEndpoint = `https://fcm.googleapis.com/fcm/send/synthetic-${randomUUID()}`;
+  const registerPush = async (consent) => {
+    const response = await fetch(
+      `${base}/api/public/tickets/${privateCodes[0]}/push-subscriptions`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          consent,
+          endpoint: pushEndpoint,
+          keys: { p256dh: "synthetic-p256dh", auth: "synthetic-auth" },
+        }),
+      },
+    );
+    return { response, body: await response.json() };
+  };
+  const rejectedConsent = await registerPush(false);
+  if (rejectedConsent.response.status !== 400) {
+    throw new Error("Web-Push wurde ohne ausdrückliche Einwilligung akzeptiert.");
+  }
+  const firstConsent = await registerPush(true);
+  const duplicateConsent = await registerPush(true);
+  if (
+    firstConsent.response.status !== 201 ||
+    firstConsent.body.preparationQueued !== true ||
+    duplicateConsent.body.preparationQueued !== false ||
+    !firstConsent.body.consentedAt ||
+    !firstConsent.body.deleteAfter
+  ) {
+    throw new Error(
+      "Push-Einwilligung oder deduplizierter Vorbereitungshinweis ist unvollständig.",
+    );
+  }
   let publicBoard = await board();
   const group = publicBoard.groups.find((entry) => entry.ticketLabels.length === 2);
   const serializedBoard = JSON.stringify(publicBoard);
@@ -190,7 +251,6 @@ try {
   ) {
     throw new Error("FIDS-Ticketlabels sind unvollständig oder enthalten vertrauliche Daten.");
   }
-
   const secondSaleRefresh = nextRefresh(socket);
   const secondSale = await command(
     devices.cashier,
@@ -238,6 +298,32 @@ try {
   ) {
     throw new Error("Boardingaufruf, Flugzeug oder Flottenstatus fehlt im FIDS.");
   }
+  const calledTicketStatus = await ticketStatus(privateCodes[0]);
+  if (
+    calledTicketStatus.status !== "COME_TO_FLIGHT_LINE" ||
+    calledTicketStatus.message !== "Bitte jetzt zur Flight Line kommen."
+  ) {
+    throw new Error(
+      `Verbindlicher Aufruf fehlt im öffentlichen Ticketstatus: ${JSON.stringify(calledTicketStatus)}`,
+    );
+  }
+  const calledOperationBoard = await operationBoard(devices.flightLine, tokens.flightLine);
+  const calledRotation = calledOperationBoard.rotations.find(
+    (rotation) => rotation.id === sold.aggregate.relatedRotationId,
+  );
+  const attendanceRefresh = nextRefresh(socket);
+  const attendance = await command(
+    devices.flightLine,
+    tokens.flightLine,
+    called.event.version,
+    "SET_TICKET_ATTENDANCE",
+    { ticketId: calledRotation.tickets[0].id, checkedIn: true },
+  );
+  await attendanceRefresh;
+  const boardingTicketStatus = await ticketStatus(privateCodes[0]);
+  if (boardingTicketStatus.status !== "BOARDING") {
+    throw new Error("Eingechecktes Ticket wechselt öffentlich nicht auf Boarding.");
+  }
 
   socket.close();
   const reconnectStartedAt = Date.now();
@@ -247,7 +333,7 @@ try {
   const started = await command(
     devices.flightLine,
     tokens.flightLine,
-    called.event.version,
+    attendance.event.version,
     "MARK_IN_FLIGHT",
     { rotationId: sold.aggregate.relatedRotationId },
   );
@@ -259,10 +345,27 @@ try {
   ) {
     throw new Error("FIDS wurde nach Reconnect nicht auf IM FLUG aktualisiert.");
   }
+  const revokePush = await fetch(
+    `${base}/api/public/tickets/${privateCodes[0]}/push-subscriptions`,
+    {
+      method: "DELETE",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ endpoint: pushEndpoint }),
+    },
+  );
+  if (revokePush.status !== 204) throw new Error("Push-Widerruf wurde nicht unmittelbar gelöscht.");
   process.stdout.write(
     JSON.stringify({
       ticketLabels: group.ticketLabels,
       privateCodesHidden: true,
+      publicTicketStatusWithoutLogin: true,
+      preparationFromForecast: true,
+      explicitPushConsentRequired: true,
+      preparationPushDeduplicated: true,
+      consentTimestampAndDeletionRecorded: true,
+      pushRevocationDeleted: true,
+      bindingCallVisible: true,
+      boardingStatusVisible: true,
       boardingCallVisible: true,
       aircraftVisibleAfterAssignment: true,
       fleetStatusVisible: true,

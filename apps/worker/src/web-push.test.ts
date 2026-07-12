@@ -5,6 +5,7 @@ import {
   purgeExpiredPushSubscriptions,
   pushDeleteAfter,
   pushRetentionDays,
+  shouldQueuePreparationNotification,
 } from "./web-push";
 
 describe("Web-Push-Endpunkte", () => {
@@ -43,5 +44,32 @@ describe("Web-Push-Aufbewahrung", () => {
       "DELETE FROM web_push_subscriptions WHERE delete_after <= ?1 OR status <> 'ACTIVE'",
     );
     expect(bind).toHaveBeenCalledWith("2026-07-18T12:00:00.000Z");
+  });
+});
+
+describe("prognosebasierte Web-Push-Vorbereitung", () => {
+  const eligible = {
+    emergencyMode: false,
+    interrupted: false,
+    status: "DRAFT",
+    predictionQuality: "CHANGING",
+    predictionUpperMinutes: 15,
+    notificationLeadMinutes: 20,
+  };
+
+  it("verwendet die konfigurierte Vorlaufgrenze", () => {
+    expect(shouldQueuePreparationNotification(eligible)).toBe(true);
+    expect(shouldQueuePreparationNotification({ ...eligible, predictionUpperMinutes: 21 })).toBe(
+      false,
+    );
+  });
+
+  it("sendet bei unsicherem, unterbrochenem oder bereits aufgerufenem Betrieb nicht vorab", () => {
+    expect(
+      shouldQueuePreparationNotification({ ...eligible, predictionQuality: "UNCERTAIN" }),
+    ).toBe(false);
+    expect(shouldQueuePreparationNotification({ ...eligible, interrupted: true })).toBe(false);
+    expect(shouldQueuePreparationNotification({ ...eligible, emergencyMode: true })).toBe(false);
+    expect(shouldQueuePreparationNotification({ ...eligible, status: "CALLED" })).toBe(false);
   });
 });
