@@ -683,7 +683,10 @@ export class EventCoordinator extends DurableObject<Env> {
         );
       }),
     );
-    const broadcast = JSON.stringify({ type: "event-state-changed", data: result });
+    const broadcast = JSON.stringify({
+      type: "event-state-changed",
+      eventVersion: result.event.version,
+    });
     for (const socket of this.ctx.getWebSockets()) {
       try {
         socket.send(broadcast);

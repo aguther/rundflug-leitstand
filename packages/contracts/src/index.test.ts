@@ -296,12 +296,15 @@ describe("commandEnvelopeSchema", () => {
           productCode: "PAN",
           gateLabel: "Flight Line 1",
           communicationNumber: 101,
+          ticketLabels: ["PAN-101/1"],
+          aircraftRegistration: null,
           status: "WAITING",
           waitLowerMinutes: 0,
           waitUpperMinutes: 30,
           operationalNotice: "",
         },
       ],
+      fleet: [{ registration: "D-EAAA", status: "AVAILABLE", refuelPlanned: false }],
     });
     expect("aircraftRegistration" in status).toBe(false);
     expect("guestName" in board).toBe(false);
