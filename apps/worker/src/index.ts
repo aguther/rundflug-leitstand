@@ -1,5 +1,5 @@
 import { APP_NAME, REQUIREMENTS_VERSION } from "@rundflug/config";
-import { cloneEventRequestSchema } from "@rundflug/contracts";
+import { bootstrapRequestSchema, cloneEventRequestSchema } from "@rundflug/contracts";
 import { assessRemainingCapacity, estimateDuration, forecastQueueWindows } from "@rundflug/domain";
 import { Hono } from "hono";
 import { secureHeaders } from "hono/secure-headers";
@@ -95,6 +95,110 @@ app.get("/api/meta", (context) =>
     productionReady: false,
   }),
 );
+
+app.get("/api/setup/status", async (context) => {
+  const state = await context.env.DB.prepare(
+    `SELECT
+      (SELECT COUNT(*) FROM app_bootstrap) AS completed,
+      (SELECT COUNT(*) FROM operation_days) AS events,
+      (SELECT COUNT(*) FROM paired_devices WHERE role = 'ADMIN' AND active = 1) AS admins`,
+  ).first<{ completed: number; events: number; admins: number }>();
+  return context.json({
+    setupRequired:
+      (state?.completed ?? 0) === 0 && (state?.events ?? 0) === 0 && (state?.admins ?? 0) === 0,
+    setupConfigured: Boolean(context.env.BOOTSTRAP_TOKEN && context.env.ADMIN_PIN_HASH),
+  });
+});
+
+app.post("/api/setup", async (context) => {
+  const parsed = bootstrapRequestSchema.safeParse(await context.req.json().catch(() => null));
+  if (!parsed.success) {
+    return context.json(
+      { error: { code: "INVALID_SETUP", message: "Einrichtungsdaten sind unvollständig." } },
+      400,
+    );
+  }
+  if (!context.env.BOOTSTRAP_TOKEN || !context.env.ADMIN_PIN_HASH) {
+    return context.json(
+      {
+        error: {
+          code: "SETUP_NOT_CONFIGURED",
+          message: "Ersteinrichtung ist serverseitig noch nicht freigeschaltet.",
+        },
+      },
+      503,
+    );
+  }
+  const state = await context.env.DB.prepare(
+    `SELECT
+      (SELECT COUNT(*) FROM app_bootstrap) AS completed,
+      (SELECT COUNT(*) FROM operation_days) AS events,
+      (SELECT COUNT(*) FROM paired_devices WHERE role = 'ADMIN' AND active = 1) AS admins`,
+  ).first<{ completed: number; events: number; admins: number }>();
+  if ((state?.completed ?? 0) > 0 || (state?.events ?? 0) > 0 || (state?.admins ?? 0) > 0) {
+    return context.json(
+      { error: { code: "SETUP_ALREADY_COMPLETED", message: "Ersteinrichtung ist abgeschlossen." } },
+      409,
+    );
+  }
+  const setupTokenHash = await sha256Hex(context.env.BOOTSTRAP_TOKEN);
+  if (
+    !(await verifyCredential(parsed.data.setupCode, setupTokenHash)) ||
+    !(await verifyCredential(parsed.data.adminPin, context.env.ADMIN_PIN_HASH))
+  ) {
+    return context.json(
+      { error: { code: "SETUP_CREDENTIALS_INVALID", message: "Einrichtung nicht autorisiert." } },
+      403,
+    );
+  }
+  const input = parsed.data;
+  const now = new Date().toISOString();
+  try {
+    await context.env.DB.batch([
+      context.env.DB.prepare(
+        `INSERT INTO operation_days
+          (id, name, event_date, time_zone, status, emergency_mode, operational_note, version,
+           created_at, updated_at, operations_end_at, operational_interrupted, sale_opens_at,
+           no_show_after_minutes, notification_lead_minutes, child_reference_weight_kg,
+           normal_reference_weight_kg, heavy_reference_weight_kg, planned_boarding_minutes,
+           planned_deboarding_minutes, planned_buffer_minutes, aerodrome)
+         VALUES (?1, ?2, ?3, ?4, 'PREPARATION', 0, '', 0, ?5, ?5, NULL, 0, NULL,
+           10, 15, 35, 80, 110, 8, 5, 3, ?6)`,
+      ).bind(input.eventId, input.name, input.eventDate, input.timeZone, now, input.aerodrome),
+      context.env.DB.prepare(
+        `INSERT INTO paired_devices
+          (id, operation_day_id, label, role, active, paired_at, last_seen_at, credential_hash)
+         VALUES (?1, ?2, 'Erstes Administrationsgerät', 'ADMIN', 1, ?3, ?3, ?4)`,
+      ).bind(input.adminDeviceId, input.eventId, now, input.adminCredentialHash),
+      context.env.DB.prepare(
+        `INSERT INTO app_bootstrap (singleton, operation_day_id, admin_device_id, completed_at)
+         VALUES (1, ?1, ?2, ?3)`,
+      ).bind(input.eventId, input.adminDeviceId, now),
+      context.env.DB.prepare(
+        `INSERT INTO operational_events
+          (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type,
+           aggregate_id, aggregate_version, payload_json)
+         VALUES (?1, ?2, 'SYSTEM_BOOTSTRAPPED', ?3, ?4, 'OPERATION_DAY', ?2, 0, ?5)`,
+      ).bind(
+        crypto.randomUUID(),
+        input.eventId,
+        now,
+        input.adminDeviceId,
+        JSON.stringify({ anonymousAdministration: true }),
+      ),
+      context.env.DB.prepare(
+        `INSERT INTO outbox (id, operation_day_id, topic, payload_json, created_at)
+         VALUES (?1, ?2, 'SYSTEM_BOOTSTRAPPED', ?3, ?4)`,
+      ).bind(crypto.randomUUID(), input.eventId, JSON.stringify({ eventId: input.eventId }), now),
+    ]);
+  } catch {
+    return context.json(
+      { error: { code: "SETUP_ALREADY_COMPLETED", message: "Ersteinrichtung ist abgeschlossen." } },
+      409,
+    );
+  }
+  return context.json({ eventId: input.eventId, adminDeviceId: input.adminDeviceId }, 201);
+});
 
 app.get("/api/admin/events", async (context) => {
   const sourceEventId = context.req.header("x-event-id");

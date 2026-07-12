@@ -9,11 +9,13 @@ zur Wiederherstellung erhalten.
 
 1. D1-Datenbank und R2-Bucket in EU-Jurisdiktion anlegen und in `wrangler.jsonc` binden.
 2. Migrationen auf D1 anwenden und den Worker aus `main` bereitstellen.
-3. Administrator-PIN und Gerätezugang als Secrets einrichten. Secrets niemals in Dateien oder Logs
-   schreiben.
-4. Für Web-Push die drei VAPID-Werte einrichten. Ohne diese Werte funktioniert der Leitstand, aber
+3. `ADMIN_PIN_HASH` und den einmaligen `BOOTSTRAP_TOKEN` als Cloudflare-Secrets einrichten. Secrets
+   niemals in Dateien oder Logs schreiben.
+4. Nach dem ersten Deployment `/setup` öffnen und dort die erste Veranstaltung sowie das anonyme
+   Administrationsgerät anlegen. Der Setup-Zugang sperrt sich danach dauerhaft.
+5. Für Web-Push die drei VAPID-Werte einrichten. Ohne diese Werte funktioniert der Leitstand, aber
    Browser-Benachrichtigungen werden nicht zugestellt.
-5. Healthcheck, Administrationsoberfläche, D1-Sicherung nach R2 und einen Wiederherstellungstest
+6. Healthcheck, Administrationsoberfläche, D1-Sicherung nach R2 und einen Wiederherstellungstest
    prüfen.
 
 Die konkreten Cloudflare-Schritte und Befehle stehen in [cloudflare-setup.md](cloudflare-setup.md),

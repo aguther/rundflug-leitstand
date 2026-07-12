@@ -1176,12 +1176,35 @@ p {
   min-width: 0;
   white-space: normal;
 }
+.setup-page {
+  max-width: 760px;
+  margin: 36px auto;
+  padding: 28px;
+  background: #fff;
+  border: 1px solid #d5dee8;
+}
+.setup-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin: 24px 0;
+}
+.setup-grid label,
+.setup-grid input {
+  width: 100%;
+}
+.setup-page .primary-action {
+  width: 100%;
+}
 .capacity-row span {
   margin-top: 4px;
   color: #60758d;
   font-size: 0.85rem;
 }
 @media (max-width: 760px) {
+  .setup-grid {
+    grid-template-columns: 1fr;
+  }
   .app-header {
     align-items: flex-start;
   }

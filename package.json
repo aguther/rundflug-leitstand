@@ -27,6 +27,7 @@
     "test:ticket-corrections": "node scripts/verify_ticket_corrections.mjs",
     "test:queue-grouping": "node scripts/verify_queue_grouping.mjs",
     "test:pilot-conflict": "node scripts/verify_pilot_conflict.mjs",
+    "test:first-run-setup": "node scripts/verify_first_run_setup.mjs",
     "test:public-monitors": "node scripts/verify_public_monitors.mjs",
     "test:vertical-slice": "node scripts/verify_vertical_slice.mjs",
     "test:watch": "vitest",
@@ -37,6 +38,7 @@
     "db:migrate:local": "wrangler d1 migrations apply DB --local --config wrangler.jsonc",
     "db:seed:local": "wrangler d1 execute DB --local --file apps/worker/seed/demo.sql --config wrangler.jsonc",
     "db:reset:local": "node scripts/reset_local_db.mjs",
+    "db:reset:empty-local": "node scripts/reset_local_db.mjs --empty",
     "deploy": "npm run build:web && wrangler deploy --config wrangler.jsonc",
     "clean": "node -e \"const fs=require('node:fs'); for (const p of ['apps/web/dist','apps/worker/dist']) fs.rmSync(p,{recursive:true,force:true})\""
   },

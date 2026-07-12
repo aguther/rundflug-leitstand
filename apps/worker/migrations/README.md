@@ -113,3 +113,11 @@ Flugzeugs vorrangig vorschlagen; ein bewusster Wechsel bleibt möglich und wird 
 keine Namen oder Lizenzdaten gespeichert. Vor Anwendung wird eine portable Sicherung erzeugt.
 Wiederherstellung erfolgt aus dieser Sicherung; ältere Anwendungen können die nullable Spalte und den
 partiellen Index gefahrlos ignorieren.
+
+## 0024 – Einmalige Ersteinrichtung
+
+Führt einen Singleton-Guard für die atomare erste Anlage von Veranstaltung und anonymem
+Administrationsgerät ein. Der Guard verhindert auch bei parallelen Anfragen eine zweite
+Ersteinrichtung. Die Tabelle enthält ausschließlich technische IDs und den Abschlusszeitpunkt. Vor
+Anwendung wird portabel gesichert. Ein Rollback erfolgt aus dieser Sicherung; der Guard darf nach
+erfolgreichem Produktiv-Bootstrap nicht isoliert entfernt werden.
