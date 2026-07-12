@@ -24,6 +24,7 @@
     "test:emergency-mode": "node scripts/verify_emergency_mode.mjs",
     "test:master-data": "node scripts/verify_master_data.mjs",
     "test:fleet-operations": "node scripts/verify_fleet_operations.mjs",
+    "test:ticket-corrections": "node scripts/verify_ticket_corrections.mjs",
     "test:public-monitors": "node scripts/verify_public_monitors.mjs",
     "test:vertical-slice": "node scripts/verify_vertical_slice.mjs",
     "test:watch": "vitest",
