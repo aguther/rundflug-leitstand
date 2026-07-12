@@ -1388,6 +1388,7 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
             g.label AS gate_label,
             fg.communication_number, r.status, tg.queue_sequence,
             od.operational_note AS event_operational_note, od.operational_interrupted,
+            od.emergency_mode,
             rg.operational_note AS resource_group_operational_note, od.updated_at
        FROM tickets t
        JOIN ticket_groups tg ON tg.id = t.ticket_group_id
@@ -1413,6 +1414,7 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
       event_operational_note: string;
       resource_group_operational_note: string;
       operational_interrupted: number;
+      emergency_mode: number;
     }>();
   if (!row) {
     return unknownTicketResponse(context.env, context.req.raw);
@@ -1437,19 +1439,24 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
     publicDescription: row.public_description,
     gateLabel: row.gate_label,
     communicationNumber: row.communication_number,
-    status: publicState[row.status],
-    queuePosition: row.status === "DRAFT" ? row.queue_sequence : null,
+    status: row.emergency_mode === 1 ? "SERVICE_PAUSED" : publicState[row.status],
+    queuePosition: row.emergency_mode === 0 && row.status === "DRAFT" ? row.queue_sequence : null,
     waitLowerMinutes:
-      row.status === "DRAFT" && row.operational_interrupted === 0
+      row.emergency_mode === 0 && row.status === "DRAFT" && row.operational_interrupted === 0
         ? Math.max(0, (row.queue_sequence - 1) * 20)
         : 0,
     waitUpperMinutes:
-      row.status === "DRAFT" && row.operational_interrupted === 0 ? row.queue_sequence * 30 : 0,
-    predictionQuality: row.operational_interrupted === 1 ? "UNCERTAIN" : "CHANGING",
+      row.emergency_mode === 0 && row.status === "DRAFT" && row.operational_interrupted === 0
+        ? row.queue_sequence * 30
+        : 0,
+    predictionQuality:
+      row.emergency_mode === 1 || row.operational_interrupted === 1 ? "UNCERTAIN" : "CHANGING",
     message:
-      row.operational_interrupted === 1
-        ? "Flugbetrieb unterbrochen – bitte Status erneut prüfen."
-        : message[row.status],
+      row.emergency_mode === 1
+        ? "Organisatorischer Betrieb pausiert – bitte später erneut prüfen."
+        : row.operational_interrupted === 1
+          ? "Flugbetrieb unterbrochen – bitte Status erneut prüfen."
+          : message[row.status],
     operationalNotice: row.resource_group_operational_note || row.event_operational_note,
     updatedAt: row.updated_at,
   });
