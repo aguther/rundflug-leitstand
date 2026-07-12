@@ -13,6 +13,7 @@ export interface OutageRecoveryEntry {
   originalOccurredAt: string;
   paperSequence: number;
   paperReference: string;
+  ticketKeys?: readonly string[];
 }
 
 export interface OutageRecoveryConflict {
@@ -23,7 +24,9 @@ export interface OutageRecoveryConflict {
     | "EVENT_IN_FUTURE"
     | "PAPER_REFERENCE_ALREADY_EXISTS"
     | "PAPER_REFERENCE_UNKNOWN"
-    | "RECOVERY_TRANSITION_INVALID";
+    | "RECOVERY_TRANSITION_INVALID"
+    | "DUPLICATE_TICKET_CODE"
+    | "TICKET_CODE_ALREADY_EXISTS";
   message: string;
 }
 
@@ -78,6 +81,25 @@ export function assertOutageRecoveryApproval(input: {
   }
 }
 
+export function assertOutageRecoveryApplication(input: {
+  status: "STAGED" | "CONFLICTED" | "APPROVED" | "APPLYING" | "APPLIED" | "REJECTED";
+  simulatedAgainstVersion: number;
+  currentEventVersion: number;
+}): void {
+  if (input.status !== "APPROVED") {
+    throw new DomainRuleError(
+      "OUTAGE_RECOVERY_NOT_APPLICABLE",
+      "Nur ein im Vier-Augen-Prinzip freigegebener Batch kann angewendet werden.",
+    );
+  }
+  if (input.currentEventVersion !== input.simulatedAgainstVersion + 2) {
+    throw new DomainRuleError(
+      "OUTAGE_RECOVERY_APPLICATION_STALE",
+      "Der Livezustand wurde nach Freigabe geändert; der Batch darf nicht angewendet werden.",
+    );
+  }
+}
+
 const targetState: Readonly<Record<Exclude<OutageRecoveryEntryType, "PAPER_SALE">, RotationState>> =
   {
     ROTATION_CALLED: "CALLED",
@@ -89,6 +111,8 @@ const targetState: Readonly<Record<Exclude<OutageRecoveryEntryType, "PAPER_SALE"
 export function simulateOutageRecovery(input: {
   entries: readonly OutageRecoveryEntry[];
   existingPaperReferences: readonly string[];
+  existingReferenceStates?: Readonly<Record<string, RotationState>>;
+  existingTicketKeys?: readonly string[];
   recordedAt: string;
 }): OutageRecoverySimulation {
   const orderedEntries = [...input.entries].sort(
@@ -101,7 +125,10 @@ export function simulateOutageRecovery(input: {
   const ids = new Set<string>();
   const sequences = new Set<number>();
   const references = new Set(input.existingPaperReferences);
-  const states = new Map<string, RotationState>();
+  const states = new Map<string, RotationState>(
+    Object.entries(input.existingReferenceStates ?? {}),
+  );
+  const ticketKeys = new Set(input.existingTicketKeys ?? []);
   const recordedAtMs = Date.parse(input.recordedAt);
 
   for (const entry of orderedEntries) {
@@ -141,6 +168,18 @@ export function simulateOutageRecovery(input: {
       }
       references.add(entry.paperReference);
       states.set(entry.paperReference, "DRAFT");
+      for (const ticketKey of entry.ticketKeys ?? []) {
+        if (ticketKeys.has(ticketKey)) {
+          conflicts.push({
+            entryId: entry.id,
+            code: (input.existingTicketKeys ?? []).includes(ticketKey)
+              ? "TICKET_CODE_ALREADY_EXISTS"
+              : "DUPLICATE_TICKET_CODE",
+            message: "Ein Ticketcode ist bereits vorhanden oder kommt im Batch mehrfach vor.",
+          });
+        }
+        ticketKeys.add(ticketKey);
+      }
       continue;
     }
 

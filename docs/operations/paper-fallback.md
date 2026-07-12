@@ -35,7 +35,7 @@ Bei längerem Totalausfall werden keine unbestätigten digitalen Zustände als v
    Nacherfassergerät und anonyme Papier-Belegreferenz im append-only Ledger.
 7. Abschließend werden Ticketanzahl, Umläufe und Zahlungssummen gegen die Papierlisten abgeglichen.
 
-Die Fachsimulation und das persistente Batch-/Belegmodell sind implementiert. Rollenprüfung,
-Vier-Augen-Freigabe und Anwendung auf den Livezustand werden im unmittelbar folgenden Arbeitsschritt
-ergänzt. Die laminierfähige Ein-Seiten-Anweisung wird in der Generalprobe mit der realen Hardware
-abgenommen.
+Fachsimulation, persistentes Batch-/Belegmodell, Rollenprüfung, Vier-Augen-Freigabe und atomare
+Anwendung auf den Livezustand sind implementiert und synthetisch Ende-zu-Ende geprüft. Die
+laminierfähige Ein-Seiten-Anweisung und die Bedienoberfläche werden in der Generalprobe mit der realen
+Hardware abgenommen.

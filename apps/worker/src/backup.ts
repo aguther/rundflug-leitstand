@@ -1,13 +1,14 @@
 import { sha256Hex } from "./crypto";
 import type { Env } from "./types";
 
-const BACKUP_TABLES = [
+export const BACKUP_TABLES = [
   "operation_days",
   "resource_groups",
   "aircraft",
   "pilots",
   "resource_group_memberships",
   "products",
+  "gates",
   "ticket_groups",
   "tickets",
   "flight_groups",
@@ -15,6 +16,11 @@ const BACKUP_TABLES = [
   "rotation_tickets",
   "paired_devices",
   "operational_blocks",
+  "forecast_snapshots",
+  "web_push_subscriptions",
+  "outage_recovery_batches",
+  "outage_recovery_entries",
+  "outage_recovery_references",
   "operational_events",
   "idempotency_receipts",
   "outbox",
