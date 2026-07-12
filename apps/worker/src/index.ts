@@ -655,6 +655,11 @@ app.get("/api/events/:eventId/operations", async (context) => {
                  AND membership.resource_group_id = fg.resource_group_id
                  AND membership.active_until IS NULL
                  AND candidate.operational_state = 'AVAILABLE'
+                 AND candidate.operational_interrupted = 0
+                 AND candidate.passenger_seats >= (
+                   SELECT COUNT(*) FROM rotation_tickets capacity_rt
+                    WHERE capacity_rt.rotation_id = r.id AND capacity_rt.released_at IS NULL
+                 )
                ORDER BY candidate.registration LIMIT 1) AS suggested_aircraft_id,
               (SELECT candidate.registration FROM resource_group_memberships membership
                 JOIN aircraft candidate ON candidate.id = membership.aircraft_id
@@ -662,6 +667,11 @@ app.get("/api/events/:eventId/operations", async (context) => {
                  AND membership.resource_group_id = fg.resource_group_id
                  AND membership.active_until IS NULL
                  AND candidate.operational_state = 'AVAILABLE'
+                 AND candidate.operational_interrupted = 0
+                 AND candidate.passenger_seats >= (
+                   SELECT COUNT(*) FROM rotation_tickets capacity_rt
+                    WHERE capacity_rt.rotation_id = r.id AND capacity_rt.released_at IS NULL
+                 )
                ORDER BY candidate.registration LIMIT 1) AS suggested_aircraft_registration,
               MIN(tg.id) AS ticket_group_id, COUNT(rt.ticket_id) AS ticket_count,
               COALESCE(MIN(p.name), 'Rundflug') AS product_name,
