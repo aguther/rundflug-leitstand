@@ -328,6 +328,23 @@ describe("commandEnvelopeSchema", () => {
     });
     expect("aircraftRegistration" in status).toBe(false);
     expect("guestName" in board).toBe(false);
+    expect(() =>
+      publicTicketStatusSchema.parse({
+        ...status,
+        predictedBoardingAt: "2026-07-11T12:15:00.000Z",
+      }),
+    ).toThrow();
+    expect(() =>
+      publicBoardSchema.parse({
+        ...board,
+        groups: [
+          {
+            ...board.groups[0],
+            predictedDepartureAt: "2026-07-11T12:20:00.000Z",
+          },
+        ],
+      }),
+    ).toThrow();
     expect(
       publicTicketStatusSchema.parse({
         ...status,

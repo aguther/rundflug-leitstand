@@ -737,31 +737,33 @@ export const operationBoardSchema = z.object({
 });
 export type OperationBoard = z.infer<typeof operationBoardSchema>;
 
-export const publicTicketStatusSchema = z.object({
-  eventId: z.string(),
-  productName: z.string(),
-  productCode: z.string(),
-  publicDescription: z.string(),
-  gateLabel: z.string(),
-  communicationNumber: z.number().int().positive(),
-  status: z.enum([
-    "WAITING",
-    "PREPARE",
-    "COME_TO_FLIGHT_LINE",
-    "BOARDING",
-    "IN_FLIGHT",
-    "LANDED",
-    "COMPLETED",
-    "SERVICE_PAUSED",
-  ]),
-  queuePosition: z.number().int().positive().nullable(),
-  waitLowerMinutes: z.number().int().nonnegative(),
-  waitUpperMinutes: z.number().int().nonnegative(),
-  predictionQuality: z.enum(["STABLE", "CHANGING", "UNCERTAIN"]),
-  message: z.string(),
-  operationalNotice: z.string(),
-  updatedAt: z.string(),
-});
+export const publicTicketStatusSchema = z
+  .object({
+    eventId: z.string(),
+    productName: z.string(),
+    productCode: z.string(),
+    publicDescription: z.string(),
+    gateLabel: z.string(),
+    communicationNumber: z.number().int().positive(),
+    status: z.enum([
+      "WAITING",
+      "PREPARE",
+      "COME_TO_FLIGHT_LINE",
+      "BOARDING",
+      "IN_FLIGHT",
+      "LANDED",
+      "COMPLETED",
+      "SERVICE_PAUSED",
+    ]),
+    queuePosition: z.number().int().positive().nullable(),
+    waitLowerMinutes: z.number().int().nonnegative(),
+    waitUpperMinutes: z.number().int().nonnegative(),
+    predictionQuality: z.enum(["STABLE", "CHANGING", "UNCERTAIN"]),
+    message: z.string(),
+    operationalNotice: z.string(),
+    updatedAt: z.string(),
+  })
+  .strict();
 export type PublicTicketStatus = z.infer<typeof publicTicketStatusSchema>;
 
 export const publicBoardSchema = z.object({
@@ -771,25 +773,27 @@ export const publicBoardSchema = z.object({
   operationalNotice: z.string(),
   updatedAt: z.string(),
   groups: z.array(
-    z.object({
-      productName: z.string(),
-      productCode: z.string(),
-      gateLabel: z.string(),
-      communicationNumber: z.number().int().positive(),
-      ticketLabels: z.array(z.string()).min(1),
-      aircraftRegistration: z.string().nullable(),
-      status: z.enum([
-        "WAITING",
-        "COME_TO_FLIGHT_LINE",
-        "IN_FLIGHT",
-        "LANDED",
-        "COMPLETED",
-        "SERVICE_PAUSED",
-      ]),
-      waitLowerMinutes: z.number().int().nonnegative(),
-      waitUpperMinutes: z.number().int().nonnegative(),
-      operationalNotice: z.string(),
-    }),
+    z
+      .object({
+        productName: z.string(),
+        productCode: z.string(),
+        gateLabel: z.string(),
+        communicationNumber: z.number().int().positive(),
+        ticketLabels: z.array(z.string()).min(1),
+        aircraftRegistration: z.string().nullable(),
+        status: z.enum([
+          "WAITING",
+          "COME_TO_FLIGHT_LINE",
+          "IN_FLIGHT",
+          "LANDED",
+          "COMPLETED",
+          "SERVICE_PAUSED",
+        ]),
+        waitLowerMinutes: z.number().int().nonnegative(),
+        waitUpperMinutes: z.number().int().nonnegative(),
+        operationalNotice: z.string(),
+      })
+      .strict(),
   ),
   fleet: z.array(
     z.object({
