@@ -58,6 +58,14 @@ verbrauchen dieses Fehlversuchslimit nicht.
 
 ## Offline
 
-Die PWA speichert den letzten bestätigten Snapshot und eine lokale Kommando-Queue in IndexedDB. Jedes
-Kommando enthält `commandId`, `eventId`, `expectedVersion`, Geräteidentität und Zeitpunkt. Konflikte
-werden sichtbar zurückgegeben und nicht automatisch überschrieben.
+Die PWA speichert den letzten bestätigten operativen Snapshot je Veranstaltung und Gerät in IndexedDB.
+Bei einem Ausfall oder nach einem Offline-Neustart bleibt dieser Stand sichtbar und wird mit dem Alter
+der letzten Serverbestätigung als möglicherweise veraltet gekennzeichnet. Vorbereitende, lokal
+reversible Kassenentwürfe wie Produktauswahl und Gruppengröße bleiben lokal erhalten.
+
+Operativ wirksame Kommandos werden gemäß OQ-01 nicht offline angenommen: Verkauf, Storno, Umbuchung,
+`NEXT`, `IM FLUG`, `GELANDET`, `ABGESCHLOSSEN`, Not-Halt und Stammdatenänderungen benötigen eine
+Serverbestätigung. Sie werden bei fehlender Verbindung gesperrt statt scheinbar erfolgreich in eine
+lokale Fachkommando-Queue gestellt. Bestätigte Kommandos enthalten weiterhin `commandId`, `eventId`,
+`expectedVersion`, Geräteidentität und Zeitpunkt; Konflikte werden sichtbar zurückgegeben und nicht
+automatisch überschrieben.
