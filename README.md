@@ -50,6 +50,9 @@ Danach:
 
 Vite leitet `/api` und WebSocket-Verbindungen im Entwicklungsbetrieb an Wrangler weiter.
 
+Die vollständige Checkliste für Einrichtung, Betriebsbeginn und einen gestuften sicheren Neustart
+steht in [docs/operations/betriebsstart-und-neustart.md](docs/operations/betriebsstart-und-neustart.md).
+
 ## Qualitätsprüfung
 
 ```bash
@@ -62,19 +65,8 @@ Die vor dem Verpacken ausgeführten Prüfungen sind in `docs/verification/initia
 
 ## Cloudflare-Ressourcen
 
-Die IDs in `wrangler.jsonc` für Abnahme und Produktion sind Platzhalter. Ressourcen werden bewusst
-nicht automatisch angelegt, damit Jurisdiktion, Kontoinhaberschaft und Namensgebung vor dem ersten
-Deployment geprüft werden.
-
-Beispiel für D1:
-
-```bash
-npx wrangler d1 create rundflug-leitstand-acceptance --jurisdiction=eu
-npx wrangler d1 create rundflug-leitstand-production --jurisdiction=eu
-```
-
-Die von Wrangler ausgegebenen IDs werden in `wrangler.jsonc` eingetragen. R2-Buckets müssen ebenfalls
-mit EU-Jurisdiktion angelegt werden. Die vollständige Anleitung steht in
+Die aktuell verwendete D1-Datenbank und der R2-Bucket sind in `wrangler.jsonc` gebunden. Beide
+Ressourcen müssen in EU-Jurisdiktion liegen. Die vollständige Anleitung steht in
 `docs/operations/cloudflare-setup.md`.
 
 ## Repository-Struktur

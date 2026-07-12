@@ -437,6 +437,10 @@ describe("commandEnvelopeSchema", () => {
     expect(parsed.eventId).toBe("flugtag-2027");
     expect("guestName" in parsed).toBe(false);
     expect(() => cloneEventRequestSchema.parse({ ...parsed, eventId: "Ungültige ID" })).toThrow();
+    expect(parsed.restartMode).toBe("KEEP_MASTER_DATA");
+    expect(cloneEventRequestSchema.parse({ ...parsed, restartMode: "EMPTY" }).restartMode).toBe(
+      "EMPTY",
+    );
   });
 
   it("keeps protected ticket search results free of public codes and guest data", () => {
