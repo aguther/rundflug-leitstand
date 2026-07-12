@@ -838,6 +838,7 @@ app.get("/api/events/:eventId/operations", async (context) => {
         referenceCapacity: product.reference_capacity,
         referenceDurationMinutes: product.reference_duration_minutes,
         queuedTickets: product.queued_tickets,
+        resourceGroupOpenTickets: product.resource_group_open_tickets,
         estimatedWaitLowerMinutes: forecast.lowerMinutes,
         estimatedWaitUpperMinutes: forecast.upperMinutes,
         remainingSellableSeats: capacity.remainingSellableSeats,
@@ -1392,6 +1393,7 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
             r.prediction_quality, r.prediction_lower_minutes, r.prediction_upper_minutes,
             od.operational_note AS event_operational_note, od.operational_interrupted,
             od.emergency_mode, od.notification_lead_minutes,
+            rg.status AS resource_group_status,
             rg.operational_note AS resource_group_operational_note, od.updated_at
        FROM tickets t
        JOIN ticket_groups tg ON tg.id = t.ticket_group_id
@@ -1424,12 +1426,14 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
       operational_interrupted: number;
       emergency_mode: number;
       notification_lead_minutes: number;
+      resource_group_status: "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED";
     }>();
   if (!row) {
     return unknownTicketResponse(context.env, context.req.raw);
   }
   const prepare =
     row.status === "DRAFT" &&
+    row.resource_group_status === "ACTIVE" &&
     row.operational_interrupted === 0 &&
     row.prediction_quality !== "UNCERTAIN" &&
     row.prediction_upper_minutes !== null &&
@@ -1457,26 +1461,39 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
     publicDescription: row.public_description,
     gateLabel: row.gate_label,
     communicationNumber: row.communication_number,
-    status: row.emergency_mode === 1 ? "SERVICE_PAUSED" : publicState[row.status],
+    status:
+      row.emergency_mode === 1 || row.resource_group_status !== "ACTIVE"
+        ? "SERVICE_PAUSED"
+        : publicState[row.status],
     queuePosition: row.emergency_mode === 0 && row.status === "DRAFT" ? row.queue_sequence : null,
     waitLowerMinutes:
-      row.emergency_mode === 0 && row.status === "DRAFT" && row.operational_interrupted === 0
+      row.emergency_mode === 0 &&
+      row.resource_group_status === "ACTIVE" &&
+      row.status === "DRAFT" &&
+      row.operational_interrupted === 0
         ? (row.prediction_lower_minutes ?? Math.max(0, (row.queue_sequence - 1) * 20))
         : 0,
     waitUpperMinutes:
-      row.emergency_mode === 0 && row.status === "DRAFT" && row.operational_interrupted === 0
+      row.emergency_mode === 0 &&
+      row.resource_group_status === "ACTIVE" &&
+      row.status === "DRAFT" &&
+      row.operational_interrupted === 0
         ? (row.prediction_upper_minutes ?? row.queue_sequence * 30)
         : 0,
     predictionQuality:
-      row.emergency_mode === 1 || row.operational_interrupted === 1
+      row.emergency_mode === 1 ||
+      row.operational_interrupted === 1 ||
+      row.resource_group_status !== "ACTIVE"
         ? "UNCERTAIN"
         : (row.prediction_quality ?? "CHANGING"),
     message:
       row.emergency_mode === 1
         ? "Organisatorischer Betrieb pausiert – bitte später erneut prüfen."
-        : row.operational_interrupted === 1
-          ? "Flugbetrieb unterbrochen – bitte Status erneut prüfen."
-          : message[row.status],
+        : row.resource_group_status !== "ACTIVE"
+          ? "Flugbetrieb für dieses Produkt pausiert – bitte Status erneut prüfen."
+          : row.operational_interrupted === 1
+            ? "Flugbetrieb unterbrochen – bitte Status erneut prüfen."
+            : message[row.status],
     operationalNotice: row.resource_group_operational_note || row.event_operational_note,
     updatedAt: row.updated_at,
   });
@@ -1641,6 +1658,7 @@ app.get("/api/public/events/:eventId/board", async (context) => {
             fg.communication_number, r.status,
             MIN(a.registration) AS aircraft_registration,
             COUNT(rt.ticket_id) AS ticket_count,
+            rg.status AS resource_group_status,
             rg.operational_note AS resource_group_operational_note
        FROM rotations r
        JOIN flight_groups fg ON fg.id = r.flight_group_id
@@ -1665,6 +1683,7 @@ app.get("/api/public/events/:eventId/board", async (context) => {
       status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
       aircraft_registration: string | null;
       ticket_count: number;
+      resource_group_status: "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED";
       resource_group_operational_note: string;
     }>();
   const fleet = await context.env.DB.prepare(
@@ -1703,9 +1722,16 @@ app.get("/api/public/events/:eventId/board", async (context) => {
               `${row.product_code}-${String(row.communication_number).padStart(3, "0")}/${ticketIndex + 1}`,
           ),
           aircraftRegistration: row.aircraft_registration,
-          status: publicState[row.status],
-          waitLowerMinutes: event.operational_interrupted === 1 ? 0 : index * 20,
-          waitUpperMinutes: event.operational_interrupted === 1 ? 0 : (index + 1) * 30,
+          status:
+            row.resource_group_status === "ACTIVE" ? publicState[row.status] : "SERVICE_PAUSED",
+          waitLowerMinutes:
+            event.operational_interrupted === 1 || row.resource_group_status !== "ACTIVE"
+              ? 0
+              : index * 20,
+          waitUpperMinutes:
+            event.operational_interrupted === 1 || row.resource_group_status !== "ACTIVE"
+              ? 0
+              : (index + 1) * 30,
           operationalNotice: row.resource_group_operational_note,
         })),
     fleet: event.emergency_mode

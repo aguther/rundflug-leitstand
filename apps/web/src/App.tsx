@@ -560,6 +560,7 @@ function CashierView() {
               <span>
                 Wartezeit {entry.estimatedWaitLowerMinutes}–{entry.estimatedWaitUpperMinutes} Min.
               </span>
+              <span>Gemeinsame Queue: {entry.resourceGroupOpenTickets} Tickets</span>
               <span>{capacityLabel[entry.capacityStatus]}</span>
               {entry.resourceGroupOperationalNote ? (
                 <span>Betriebshinweis: {entry.resourceGroupOperationalNote}</span>
@@ -2198,7 +2199,7 @@ function AdminView() {
 
   async function setResourceStatus(
     resourceGroupId: string,
-    status: "ACTIVE" | "PAUSED" | "INTERRUPTED",
+    status: "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED",
   ) {
     if (!board || reason.trim().length < 3) return;
     try {
@@ -3509,6 +3510,13 @@ function AdminView() {
                 </button>
                 <button onClick={() => setResourceStatus(group.id, "ACTIVE")} type="button">
                   Aktivieren
+                </button>
+                <button
+                  disabled={group.status === "ENDED"}
+                  onClick={() => setResourceStatus(group.id, "ENDED")}
+                  type="button"
+                >
+                  Beenden
                 </button>
               </div>
             </div>
