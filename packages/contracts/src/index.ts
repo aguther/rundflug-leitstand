@@ -315,6 +315,77 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
 
 export type CommandEnvelope = z.infer<typeof commandEnvelopeSchema>;
 
+const outageRecoveryEntryBaseSchema = z
+  .object({
+    id: z.uuid(),
+    originalOccurredAt: z.iso.datetime(),
+    paperSequence: z.number().int().positive(),
+    paperReference: z.string().trim().min(3).max(64),
+  })
+  .strict();
+
+export const outageRecoveryEntrySchema = z.discriminatedUnion("type", [
+  outageRecoveryEntryBaseSchema.extend({
+    type: z.literal("PAPER_SALE"),
+    payload: z
+      .object({
+        productId: z.string().min(1).max(100),
+        publicTicketCodes: z
+          .array(z.string().regex(/^[A-Z2-9]{12,32}$/))
+          .min(1)
+          .max(12),
+        paymentStatus: z.enum(["UNPAID", "PAID", "WAIVED", "INFORMATIONAL_ONLY"]),
+        paymentMethod: z.enum(["CASH", "CARD", "VOUCHER", "OTHER"]).nullable(),
+      })
+      .strict(),
+  }),
+  outageRecoveryEntryBaseSchema.extend({
+    type: z.literal("ROTATION_CALLED"),
+    payload: z
+      .object({
+        aircraftId: z.string().min(1).max(100),
+        pilotId: z.string().min(1).max(100),
+      })
+      .strict(),
+  }),
+  outageRecoveryEntryBaseSchema.extend({
+    type: z.enum(["ROTATION_IN_FLIGHT", "ROTATION_LANDED", "ROTATION_COMPLETED"]),
+    payload: z.object({}).strict(),
+  }),
+]);
+export type OutageRecoveryEntryContract = z.infer<typeof outageRecoveryEntrySchema>;
+
+export const stageOutageRecoveryRequestSchema = z
+  .object({
+    batchId: z.uuid(),
+    expectedVersion: z.number().int().nonnegative(),
+    entries: z.array(outageRecoveryEntrySchema).min(1).max(500),
+  })
+  .strict();
+export type StageOutageRecoveryRequest = z.infer<typeof stageOutageRecoveryRequestSchema>;
+
+export const outageRecoveryConflictSchema = z.object({
+  entryId: z.string(),
+  code: z.enum([
+    "DUPLICATE_ENTRY_ID",
+    "DUPLICATE_PAPER_SEQUENCE",
+    "EVENT_IN_FUTURE",
+    "PAPER_REFERENCE_ALREADY_EXISTS",
+    "PAPER_REFERENCE_UNKNOWN",
+    "RECOVERY_TRANSITION_INVALID",
+  ]),
+  message: z.string(),
+});
+
+export const outageRecoverySimulationSchema = z.object({
+  batchId: z.uuid(),
+  simulatedAgainstVersion: z.number().int().nonnegative(),
+  canCommit: z.boolean(),
+  orderedEntryIds: z.array(z.uuid()),
+  conflicts: z.array(outageRecoveryConflictSchema),
+});
+export type OutageRecoverySimulation = z.infer<typeof outageRecoverySimulationSchema>;
+
 export const eventSnapshotSchema = z.object({
   eventId: z.string(),
   name: z.string(),
