@@ -32,6 +32,13 @@ import {
   reduceBoardSyncState,
   requestBoardSync,
 } from "./board-sync";
+import {
+  appendCashierDraftRevision,
+  cashierDraftQueueKey,
+  latestCashierDraft,
+  readCashierDraftQueue,
+  writeCashierDraftQueue,
+} from "./offline-drafts";
 import { confirmedStateLabel, loadOperationBoard, saveOperationBoard } from "./offline-store";
 
 const EVENT_ID = new URLSearchParams(window.location.search).get("event") ?? "demo-2026";
@@ -259,28 +266,18 @@ function OperationalNotice({ note }: { note: string | null | undefined }) {
 
 function CashierView() {
   const { board, error, lastConfirmedAt, refresh } = useOperationBoard(CASHIER_DEVICE_ID);
+  const online = useConnectivity();
+  const serverConfirmed = online && error === null;
+  const draftQueueKey = cashierDraftQueueKey(EVENT_ID, CASHIER_DEVICE_ID);
+  const initialDraftQueue = readCashierDraftQueue(localStorage, draftQueueKey);
+  const initialDraft = latestCashierDraft(initialDraftQueue);
   const [productId, setProductId] = useState(() => {
-    try {
-      const draft = JSON.parse(localStorage.getItem("cashier-draft-v1") ?? "{}") as {
-        productId?: string;
-      };
-      return draft.productId ?? "panorama-20";
-    } catch {
-      return "panorama-20";
-    }
+    return initialDraft?.productId ?? "panorama-20";
   });
   const [size, setSize] = useState(() => {
-    try {
-      const draft = JSON.parse(localStorage.getItem("cashier-draft-v1") ?? "{}") as {
-        size?: number;
-      };
-      return Number.isInteger(draft.size) && (draft.size ?? 0) >= 1 && (draft.size ?? 0) <= 12
-        ? (draft.size ?? 1)
-        : 1;
-    } catch {
-      return 1;
-    }
+    return initialDraft?.size ?? 1;
   });
+  const [pendingDraftCount, setPendingDraftCount] = useState(initialDraftQueue.length);
   const [busy, setBusy] = useState(false);
   const [receipt, setReceipt] = useState<TicketReceipt[]>([]);
   const [ticketCodeMode, setTicketCodeMode] = useState<"GENERATED" | "PREPRINTED">("GENERATED");
@@ -303,8 +300,14 @@ function CashierView() {
   const [ticketDetails, setTicketDetails] = useState<TicketDetail[]>([]);
   const product = board?.products.find((entry) => entry.id === productId) ?? board?.products[0];
   useEffect(() => {
-    localStorage.setItem("cashier-draft-v1", JSON.stringify({ version: 1, productId, size }));
-  }, [productId, size]);
+    if (serverConfirmed && pendingDraftCount === 0) return;
+    const queue = appendCashierDraftRevision(readCashierDraftQueue(localStorage, draftQueueKey), {
+      productId,
+      size,
+    });
+    writeCashierDraftQueue(localStorage, draftQueueKey, queue);
+    setPendingDraftCount(queue.length);
+  }, [draftQueueKey, pendingDraftCount, productId, serverConfirmed, size]);
   useEffect(() => {
     const allowed = product?.weightClasses ?? ["NOT_CAPTURED"];
     const fallback = allowed[0] ?? "NOT_CAPTURED";
@@ -387,6 +390,8 @@ function CashierView() {
       setLastProductId(product.id);
       setCorrectionTargetLabel("Letzter Verkauf");
       setMessage(`${codes.length} Ticket${codes.length === 1 ? "" : "s"} verkauft.`);
+      writeCashierDraftQueue(localStorage, draftQueueKey, []);
+      setPendingDraftCount(0);
       await refresh();
     } catch (reason) {
       setMessage(reason instanceof Error ? reason.message : "Verkauf fehlgeschlagen.");
@@ -492,6 +497,13 @@ function CashierView() {
   return (
     <Shell title="Kasse">
       <ConnectionNotice error={error} lastConfirmedAt={lastConfirmedAt} />
+      {pendingDraftCount > 0 ? (
+        <div className="connection-warning" role="status">
+          {serverConfirmed
+            ? `Offline-Entwurf wiederhergestellt · ${pendingDraftCount} Änderung${pendingDraftCount === 1 ? "" : "en"} prüfen und Verkauf bewusst bestätigen.`
+            : `Entwurf lokal gespeichert · ${pendingDraftCount} Änderung${pendingDraftCount === 1 ? "" : "en"} ausstehend · ohne operative Wirkung.`}
+        </div>
+      ) : null}
       <EmergencyNotice active={board?.event.emergencyMode ?? false} />
       <InterruptionNotice active={board?.event.operationalInterrupted ?? false} />
       <OperationalNotice note={board?.event.operationalNote} />
@@ -780,6 +792,7 @@ function CashierView() {
         <button
           className="primary-action"
           disabled={
+            !serverConfirmed ||
             !board ||
             !product?.saleEnabled ||
             product.resourceGroupStatus !== "ACTIVE" ||

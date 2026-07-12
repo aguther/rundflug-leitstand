@@ -19,6 +19,11 @@ entfernt die Störungsmeldung und ersetzt den Stand nur bei gleicher oder neuere
 abgelehnt werden. `apps/web/src/offline-store.test.ts` prüft Altersanzeige und sicheres Degradieren bei
 nicht verfügbarem Browserspeicher.
 
+`apps/web/src/offline-drafts.test.ts` prüft die ausschließlich vorbereitende Draft-Queue: Revisionen
+bleiben geordnet, identische Entwürfe werden dedupliziert, die Historie ist auf 50 Einträge begrenzt
+und der Schlüssel ist an Veranstaltung und Gerät gebunden. Ticketcodes, Namen, Telefonnummern oder
+operative Kommandos werden darin nicht gespeichert. Die Queue wird niemals automatisch abgespielt.
+
 ## Browserprüfung
 
 Geprüfter Ablauf: Kasse online mit synthetischem Board → lokaler Worker beendet → nächster Poll schlägt

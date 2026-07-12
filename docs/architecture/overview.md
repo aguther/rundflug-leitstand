@@ -61,7 +61,11 @@ verbrauchen dieses Fehlversuchslimit nicht.
 Die PWA speichert den letzten bestätigten operativen Snapshot je Veranstaltung und Gerät in IndexedDB.
 Bei einem Ausfall oder nach einem Offline-Neustart bleibt dieser Stand sichtbar und wird mit dem Alter
 der letzten Serverbestätigung als möglicherweise veraltet gekennzeichnet. Vorbereitende, lokal
-reversible Kassenentwürfe wie Produktauswahl und Gruppengröße bleiben lokal erhalten.
+reversible Kassenentwürfe wie Produktauswahl und Gruppengröße werden veranstaltungs- und
+gerätebezogen in einer auf 50 Revisionen begrenzten lokalen Draft-Queue gehalten. Sie sind sichtbar
+als ausstehend und ohne operative Wirkung gekennzeichnet. Nach Wiederverbindung werden sie nicht
+automatisch gesendet: Die Kasse prüft den Entwurf und bestätigt den Verkauf bewusst gegen die aktuelle
+Serverversion; erst nach erfolgreicher Bestätigung wird die Draft-Queue geleert.
 
 Operativ wirksame Kommandos werden gemäß OQ-01 nicht offline angenommen: Verkauf, Storno, Umbuchung,
 `NEXT`, `IM FLUG`, `GELANDET`, `ABGESCHLOSSEN`, Not-Halt und Stammdatenänderungen benötigen eine
