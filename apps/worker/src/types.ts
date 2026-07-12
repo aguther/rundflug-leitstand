@@ -5,6 +5,7 @@ export interface Env {
   VAPID_PUBLIC_KEY?: string;
   VAPID_PRIVATE_KEY?: string;
   VAPID_SUBJECT?: string;
+  PUSH_RETENTION_DAYS?: string;
   DB: D1Database;
   BACKUPS: R2Bucket;
   PUBLIC_TICKET_RATE_LIMITER: RateLimit;

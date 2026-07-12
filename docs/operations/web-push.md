@@ -10,15 +10,20 @@ Krypto-Laufzeit im Cloudflare Worker funktioniert.
 - Gespeichert werden Ticket-ID, Push-Endpunkt, Browser-Schlüssel, Einwilligungszeitpunkt und
   Löschzeitpunkt – keine Namen und keine Telefonnummern.
 - Push-Ziele liegen in einer getrennten Tabelle und werden nicht in portable R2-Sicherungen aufgenommen.
-- Widerrufene, technisch abgelaufene und mehr als sieben Tage alte Einträge löscht der tägliche Cron.
+- Die Aufbewahrungsfrist wird mit `PUSH_RETENTION_DAYS` konfiguriert (zulässig: 1 bis 30 Tage,
+  Standard: 7) und beginnt am festgelegten Veranstaltungsende. Ohne Veranstaltungsende ist keine
+  Registrierung möglich.
+- Nach Ablauf der Frist werden Ziele nicht mehr verwendet; der tägliche Cron löscht sie ebenso wie
+  widerrufene oder technisch abgelaufene Einträge. Nach Fristablauf werden keine neuen Ziele mehr
+  angenommen.
 - Push-Endpunkte oder Schlüssel dürfen niemals geloggt werden.
 
 ## Cloudflare-Konfiguration
 
-Für Acceptance und Produktion wird jeweils ein eigenes P-256-VAPID-Schlüsselpaar empfohlen. Der
+Für die gemeinsame Cloudflare-Umgebung wird ein P-256-VAPID-Schlüsselpaar benötigt. Der
 öffentliche Schlüssel wird als Variable `VAPID_PUBLIC_KEY` bereitgestellt. Der private Schlüssel wird
 ausschließlich als Secret `VAPID_PRIVATE_KEY` gespeichert. `VAPID_SUBJECT` ist eine `mailto:`-Adresse
 oder eine HTTPS-URL des Betreibers.
 
-Die konkreten Einrichtungsbefehle werden erst nach dem lokalen Abnahmetest ausgeführt. Die D1-Migration
-`0006_web_push.sql` muss vor dem ersten Registrierungstest in der Zielumgebung angewendet sein.
+Die D1-Migration `0006_web_push.sql` muss vor dem ersten Registrierungstest in der Zielumgebung
+angewendet sein.

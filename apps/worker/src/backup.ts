@@ -17,7 +17,6 @@ export const BACKUP_TABLES = [
   "paired_devices",
   "operational_blocks",
   "forecast_snapshots",
-  "web_push_subscriptions",
   "outage_recovery_batches",
   "outage_recovery_entries",
   "outage_recovery_references",

@@ -16,7 +16,8 @@
   },
   "vars": {
     "APP_ENV": "acceptance",
-    "DATA_JURISDICTION": "eu"
+    "DATA_JURISDICTION": "eu",
+    "PUSH_RETENTION_DAYS": "7"
   },
   "d1_databases": [
     {

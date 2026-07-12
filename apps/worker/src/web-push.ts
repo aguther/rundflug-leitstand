@@ -8,6 +8,23 @@ interface StoredPushSubscription {
   auth: string;
 }
 
+const DEFAULT_PUSH_RETENTION_DAYS = 7;
+
+export function pushRetentionDays(value: string | undefined): number {
+  const parsed = Number.parseInt(value ?? "", 10);
+  return Number.isInteger(parsed) && parsed >= 1 && parsed <= 30
+    ? parsed
+    : DEFAULT_PUSH_RETENTION_DAYS;
+}
+
+export function pushDeleteAfter(operationsEndAt: string, retentionDays: number): string {
+  const operationsEnd = Date.parse(operationsEndAt);
+  if (!Number.isFinite(operationsEnd)) {
+    throw new Error("Veranstaltungsende für Push-Aufbewahrung ist ungültig.");
+  }
+  return new Date(operationsEnd + retentionDays * 24 * 60 * 60 * 1000).toISOString();
+}
+
 const PUSH_ENDPOINT_SUFFIXES = [
   "fcm.googleapis.com",
   "push.services.mozilla.com",

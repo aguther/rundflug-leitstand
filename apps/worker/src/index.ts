@@ -10,7 +10,12 @@ import { allowUnknownTicketAttempt } from "./public-access";
 import { createCsv, createTextPdf } from "./report";
 import { rowToSnapshot } from "./snapshot";
 import type { Env, StoredEventRow } from "./types";
-import { isAllowedPushEndpoint, purgeExpiredPushSubscriptions } from "./web-push";
+import {
+  isAllowedPushEndpoint,
+  purgeExpiredPushSubscriptions,
+  pushDeleteAfter,
+  pushRetentionDays,
+} from "./web-push";
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -1457,7 +1462,10 @@ app.get("/api/public/push/config", (context) => {
       503,
     );
   }
-  return context.json({ publicKey: context.env.VAPID_PUBLIC_KEY, retentionDays: 7 });
+  return context.json({
+    publicKey: context.env.VAPID_PUBLIC_KEY,
+    retentionDays: pushRetentionDays(context.env.PUSH_RETENTION_DAYS),
+  });
 });
 
 app.post("/api/public/tickets/:ticketCode/push-subscriptions", async (context) => {
@@ -1483,17 +1491,43 @@ app.post("/api/public/tickets/:ticketCode/push-subscriptions", async (context) =
     );
   }
   const ticket = await context.env.DB.prepare(
-    `SELECT t.id, tg.operation_day_id FROM tickets t
+    `SELECT t.id, tg.operation_day_id, od.operations_end_at FROM tickets t
        JOIN ticket_groups tg ON tg.id = t.ticket_group_id
+       JOIN operation_days od ON od.id = tg.operation_day_id
       WHERE t.public_code_hash = ?1 AND t.status <> 'CANCELED'`,
   )
     .bind(await sha256Hex(ticketCode))
-    .first<{ id: string; operation_day_id: string }>();
+    .first<{ id: string; operation_day_id: string; operations_end_at: string | null }>();
   if (!ticket) {
     return unknownTicketResponse(context.env, context.req.raw);
   }
+  if (!ticket.operations_end_at) {
+    return context.json(
+      {
+        error: {
+          code: "PUSH_RETENTION_UNCONFIGURED",
+          message: "Web-Push ist erst nach Festlegung des Veranstaltungsendes verfügbar.",
+        },
+      },
+      409,
+    );
+  }
   const now = new Date();
-  const deleteAfter = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  const deleteAfter = pushDeleteAfter(
+    ticket.operations_end_at,
+    pushRetentionDays(context.env.PUSH_RETENTION_DAYS),
+  );
+  if (Date.parse(deleteAfter) <= now.getTime()) {
+    return context.json(
+      {
+        error: {
+          code: "PUSH_RETENTION_EXPIRED",
+          message: "Für diese Veranstaltung werden keine Push-Ziele mehr gespeichert.",
+        },
+      },
+      409,
+    );
+  }
   await context.env.DB.prepare(
     `INSERT INTO web_push_subscriptions
        (id, operation_day_id, ticket_id, endpoint, p256dh, auth, consented_at, delete_after, status, updated_at)

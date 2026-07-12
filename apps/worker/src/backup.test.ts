@@ -16,16 +16,16 @@ describe("portable backup format", () => {
     expect(serialized).not.toContain("pilotName");
   });
 
-  it("includes every V1 recovery, forecast, gate and notification table", () => {
+  it("includes every operational V1 table but excludes ephemeral push credentials", () => {
     expect(BACKUP_TABLES).toEqual(
       expect.arrayContaining([
         "gates",
         "forecast_snapshots",
-        "web_push_subscriptions",
         "outage_recovery_batches",
         "outage_recovery_entries",
         "outage_recovery_references",
       ]),
     );
+    expect(BACKUP_TABLES).not.toContain("web_push_subscriptions");
   });
 });
