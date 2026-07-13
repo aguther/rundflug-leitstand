@@ -44,6 +44,7 @@ import {
   writeCashierDraftQueue,
 } from "./offline-drafts";
 import { confirmedStateLabel, loadOperationBoard, saveOperationBoard } from "./offline-store";
+import { setupValidationMessages } from "./setup-validation";
 
 const EVENT_ID = new URLSearchParams(window.location.search).get("event") ?? "demo-2026";
 const KIOSK_MODE = new URLSearchParams(window.location.search).get("kiosk") === "1";
@@ -1579,6 +1580,18 @@ function SetupView() {
 
   async function submitSetup() {
     if (busy) return;
+    const validationMessages = setupValidationMessages({
+      eventId,
+      name,
+      eventDate,
+      aerodrome,
+      setupCode,
+      adminPin,
+    });
+    if (validationMessages.length > 0) {
+      setMessage(validationMessages.join(" "));
+      return;
+    }
     setBusy(true);
     try {
       const adminDeviceId = crypto.randomUUID();
@@ -1603,15 +1616,7 @@ function SetupView() {
     }
   }
 
-  const valid =
-    status?.setupRequired === true &&
-    status.setupConfigured &&
-    /^[a-z0-9][a-z0-9-]{2,63}$/.test(eventId.trim()) &&
-    name.trim().length >= 3 &&
-    Boolean(eventDate) &&
-    aerodrome.trim().length >= 2 &&
-    setupCode.length >= 16 &&
-    adminPin.length >= 4;
+  const setupAvailable = status?.setupRequired === true && status.setupConfigured;
   return (
     <Shell title="Ersteinrichtung">
       <section className="setup-page">
@@ -1638,7 +1643,12 @@ function SetupView() {
             <div className="setup-grid">
               <label>
                 Technische Veranstaltungs-ID
-                <input value={eventId} onChange={(event) => setEventId(event.target.value)} />
+                <input
+                  value={eventId}
+                  onChange={(event) => setEventId(event.target.value.toLowerCase())}
+                  aria-describedby="event-id-help"
+                />
+                <small id="event-id-help">Kleinbuchstaben, Ziffern und Bindestriche</small>
               </label>
               <label>
                 Bezeichnung
@@ -1668,6 +1678,7 @@ function SetupView() {
                   onChange={(event) => setSetupCode(event.target.value)}
                   autoComplete="off"
                 />
+                <small>Mindestens 16 Zeichen; exakt wie im Terminal eingegeben</small>
               </label>
               <label>
                 Administrator-PIN
@@ -1678,12 +1689,13 @@ function SetupView() {
                   onChange={(event) => setAdminPin(event.target.value)}
                   autoComplete="off"
                 />
+                <small>Mindestens 4 Zeichen</small>
               </label>
             </div>
             <button
               className="primary-action"
               type="button"
-              disabled={!valid || busy}
+              disabled={!setupAvailable || busy}
               onClick={() => void submitSetup()}
             >
               {busy ? "Einrichtung läuft …" : "System einmalig einrichten"}
