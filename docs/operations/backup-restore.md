@@ -23,9 +23,11 @@ Datenbestand verifiziert.
 1. D1 Time Travel als schnelle erste Wiederherstellungsebene.
 2. Täglicher portabler JSON-Export aller V1-Kerntabellen nach EU-R2 unter `backups/YYYY-MM-DD/`.
 3. SHA-256-Prüfsumme als R2-Custom-Metadata und strukturiertes Format `formatVersion: 1`.
-4. monatlicher automatisierter Restore-Test in einer isolierten Testdatenbank.
-5. manueller Pre-Event-Backup-Check in der Aufbaucheckliste.
-
+4. automatisierter Restore-Test in zwei isolierten SQLite-Datenbanken mit Prüfsummen-, Mengen-,
+   Fremdschlüssel- und Auditkontrolle über `npm run backup:restore:test`; Bestandteil von
+   `npm run check` und zusätzlich monatlich im Betriebscheck auszuführen.
+5. Der tägliche Cron prüft das nächste Datum in `Europe/Berlin`. Liegt dort eine vorbereitete oder
+   aktive Veranstaltung, wird der Export als `PRE_EVENT` in den R2-Metadaten gekennzeichnet.
 6. Der Cron löscht Objekte erst nach Ablauf von 14 vollständigen Tagen.
 
 ## Wiederanlauf
@@ -40,7 +42,11 @@ Datenbestand verifiziert.
 6. Worker-Binding erst nach erfolgreicher Prüfung auf die wiederhergestellte D1-Instanz umstellen.
 7. Ziel: Entscheidung, Restore und Umschaltung innerhalb von 30 Minuten in der Generalprobe.
 
-## Offener Abnahmenachweis
+## Wiederkehrender Abnahmenachweis
 
-Der Export und die 14-Tage-Lifecycle-Regel sind implementiert. Der isolierte Remote-Restore und die
-30-Minuten-Messung benötigen eingerichtete Acceptance-D1-/R2-Ressourcen und werden dort abgenommen.
+`npm run backup:restore:test` baut das vollständige Migrationsschema zweimal isoliert auf, erzeugt
+einen synthetischen anonymen V1-Datenbestand, exportiert ihn im portablen Format und stellt ihn in
+die zweite Datenbank wieder her. Der Lauf prüft SHA-256, alle Tabellenmengen, Fremdschlüssel und das
+append-only Auditprotokoll und bricht oberhalb von 30 Minuten ab. Vor dem Echtbetrieb und danach
+monatlich wird zusätzlich ein reales R2-Objekt in eine neu angelegte isolierte D1-Datenbank
+eingespielt; die produktive Datenbank wird dabei niemals überschrieben.

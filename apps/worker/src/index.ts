@@ -3,7 +3,7 @@ import { bootstrapRequestSchema, cloneEventRequestSchema } from "@rundflug/contr
 import { assessRemainingCapacity, estimateDuration, forecastQueueWindows } from "@rundflug/domain";
 import { Hono } from "hono";
 import { secureHeaders } from "hono/secure-headers";
-import { createPortableBackup } from "./backup";
+import { createPortableBackup, operationDateInTimeZone } from "./backup";
 import { sha256Hex, verifyCredential } from "./crypto";
 import { EventCoordinator } from "./event-coordinator";
 import { allowUnknownTicketAttempt } from "./public-access";
@@ -2045,15 +2045,27 @@ export default {
     _ctx: ExecutionContext,
   ): Promise<void> {
     const purgedPushSubscriptions = await purgeExpiredPushSubscriptions(env);
-    const result = await createPortableBackup(env);
+    const now = new Date();
+    const nextOperationDate = operationDateInTimeZone(
+      new Date(now.getTime() + 24 * 60 * 60 * 1000),
+    );
+    const upcoming = await env.DB.prepare(
+      `SELECT COUNT(*) AS count FROM operation_days
+        WHERE event_date = ?1 AND status IN ('PREPARATION', 'ACTIVE')`,
+    )
+      .bind(nextOperationDate)
+      .first<{ count: number }>();
+    const backupReason = (upcoming?.count ?? 0) > 0 ? "PRE_EVENT" : "DAILY";
+    const result = await createPortableBackup(env, now, backupReason);
     console.log(
       JSON.stringify({
         level: "info",
         code: "PORTABLE_BACKUP_CREATED",
         key: result.key,
         checksum: result.checksum,
+        reason: backupReason,
         purgedPushSubscriptions,
-        timestamp: new Date().toISOString(),
+        timestamp: now.toISOString(),
       }),
     );
   },
