@@ -563,6 +563,30 @@ describe("commandEnvelopeSchema", () => {
     expect(parsed.type).toBe("ASSIGN_AIRCRAFT_RESOURCE_GROUP");
   });
 
+  it("requires an administrator PIN for master-data deletion", () => {
+    const parsed = commandEnvelopeSchema.parse({
+      commandId: "80cd849e-5a0e-49f7-827f-69b84b261164",
+      eventId: "demo-2026",
+      deviceId: "technical-scaffold",
+      expectedVersion: 15,
+      issuedAt: "2026-07-11T12:00:00.000Z",
+      type: "DELETE_MASTER_DATA",
+      payload: {
+        entityType: "AIRCRAFT",
+        entityId: "aircraft-a",
+        reason: "Administrative Stammdatenlöschung",
+        adminPin: "0000",
+      },
+    });
+    expect(parsed.type).toBe("DELETE_MASTER_DATA");
+    expect(() =>
+      commandEnvelopeSchema.parse({
+        ...parsed,
+        payload: { ...parsed.payload, adminPin: "" },
+      }),
+    ).toThrow();
+  });
+
   it("validates an anonymous event template copy", () => {
     const parsed = cloneEventRequestSchema.parse({
       commandId: "ea9c9a6c-0dc4-467d-87ee-3bf675a88f67",

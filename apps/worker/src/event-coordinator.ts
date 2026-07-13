@@ -626,6 +626,9 @@ export class EventCoordinator extends DurableObject<Env> {
         if (command.type === "SET_EVENT_LIFECYCLE") {
           return this.handleEventLifecycle(command, current);
         }
+        if (command.type === "DELETE_MASTER_DATA") {
+          return this.handleMasterDataDeletion(command, current);
+        }
         if (command.type === "UPSERT_GATE" || command.type === "UPSERT_PRODUCT") {
           return this.handleMasterData(command, current);
         }
@@ -1672,6 +1675,293 @@ export class EventCoordinator extends DurableObject<Env> {
         aggregate.id,
         nextVersion,
         JSON.stringify(auditPayload),
+      ),
+      this.env.DB.prepare(
+        `INSERT INTO idempotency_receipts
+          (command_id, operation_day_id, device_id, command_type, received_at, response_json)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)`,
+      ).bind(
+        command.commandId,
+        command.eventId,
+        command.deviceId,
+        command.type,
+        now,
+        JSON.stringify(result),
+      ),
+      this.env.DB.prepare(
+        "INSERT INTO outbox (id, operation_day_id, topic, payload_json, created_at) VALUES (?1, ?2, 'EVENT_STATE_CHANGED', ?3, ?4)",
+      ).bind(crypto.randomUUID(), command.eventId, JSON.stringify(result), now),
+    ]);
+    this.broadcast(result);
+    return json(result);
+  }
+
+  private async handleMasterDataDeletion(
+    command: Extract<CommandEnvelope, { type: "DELETE_MASTER_DATA" }>,
+    current: StoredEventRow,
+  ): Promise<Response> {
+    if (!(await verifyCredential(command.payload.adminPin, this.env.ADMIN_PIN_HASH))) {
+      return json(
+        { error: { code: "ADMIN_PIN_INVALID", message: "Administrator-PIN ist ungültig." } },
+        { status: 403 },
+      );
+    }
+    if (current.status !== "PREPARATION") {
+      return json(
+        {
+          error: {
+            code: "MASTER_DATA_DELETE_PHASE_LOCKED",
+            message:
+              "Stammdaten können nur vor der Betriebsfreigabe endgültig gelöscht werden. Im laufenden Betrieb bitte deaktivieren.",
+          },
+        },
+        { status: 409 },
+      );
+    }
+
+    const { entityId, entityType } = command.payload;
+    const blockers: string[] = [];
+    let label = entityId;
+    let eventType: string;
+    let aggregate: NonNullable<CommandResult["aggregate"]>;
+    let deletion: D1PreparedStatement;
+    let removedMembershipCount = 0;
+
+    if (entityType === "GATE") {
+      const [entity, groups, products, rotations] = await Promise.all([
+        this.env.DB.prepare("SELECT label FROM gates WHERE id = ?1 AND operation_day_id = ?2")
+          .bind(entityId, command.eventId)
+          .first<{ label: string }>(),
+        this.env.DB.prepare(
+          "SELECT COUNT(*) AS count FROM resource_groups WHERE gate_id = ?1 AND operation_day_id = ?2",
+        )
+          .bind(entityId, command.eventId)
+          .first<{ count: number }>(),
+        this.env.DB.prepare(
+          "SELECT COUNT(*) AS count FROM products WHERE gate_id = ?1 AND operation_day_id = ?2",
+        )
+          .bind(entityId, command.eventId)
+          .first<{ count: number }>(),
+        this.env.DB.prepare(
+          "SELECT COUNT(*) AS count FROM rotations WHERE gate_id = ?1 AND operation_day_id = ?2",
+        )
+          .bind(entityId, command.eventId)
+          .first<{ count: number }>(),
+      ]);
+      if (!entity)
+        return json(
+          { error: { code: "GATE_NOT_FOUND", message: "Gate nicht gefunden." } },
+          { status: 404 },
+        );
+      label = entity.label;
+      if ((groups?.count ?? 0) > 0) blockers.push(`${groups?.count} Ressourcengruppe(n)`);
+      if ((products?.count ?? 0) > 0) blockers.push(`${products?.count} Produkt(e)`);
+      if ((rotations?.count ?? 0) > 0) blockers.push(`${rotations?.count} Umlauf/Umläufe`);
+      eventType = "GATE_DELETED";
+      aggregate = { type: "GATE", id: entityId };
+      deletion = this.env.DB.prepare(
+        "DELETE FROM gates WHERE id = ?1 AND operation_day_id = ?2",
+      ).bind(entityId, command.eventId);
+    } else if (entityType === "RESOURCE_GROUP") {
+      const [entity, products, memberships, flightGroups] = await Promise.all([
+        this.env.DB.prepare(
+          "SELECT name FROM resource_groups WHERE id = ?1 AND operation_day_id = ?2",
+        )
+          .bind(entityId, command.eventId)
+          .first<{ name: string }>(),
+        this.env.DB.prepare(
+          "SELECT COUNT(*) AS count FROM products WHERE resource_group_id = ?1 AND operation_day_id = ?2",
+        )
+          .bind(entityId, command.eventId)
+          .first<{ count: number }>(),
+        this.env.DB.prepare(
+          "SELECT COUNT(*) AS count FROM resource_group_memberships WHERE resource_group_id = ?1 AND operation_day_id = ?2",
+        )
+          .bind(entityId, command.eventId)
+          .first<{ count: number }>(),
+        this.env.DB.prepare(
+          "SELECT COUNT(*) AS count FROM flight_groups WHERE resource_group_id = ?1 AND operation_day_id = ?2",
+        )
+          .bind(entityId, command.eventId)
+          .first<{ count: number }>(),
+      ]);
+      if (!entity)
+        return json(
+          {
+            error: {
+              code: "RESOURCE_GROUP_NOT_FOUND",
+              message: "Ressourcengruppe nicht gefunden.",
+            },
+          },
+          { status: 404 },
+        );
+      label = entity.name;
+      if ((products?.count ?? 0) > 0) blockers.push(`${products?.count} Produkt(e)`);
+      if ((memberships?.count ?? 0) > 0)
+        blockers.push(`${memberships?.count} Flugzeugzuordnung(en)`);
+      if ((flightGroups?.count ?? 0) > 0) blockers.push(`${flightGroups?.count} Fluggruppe(n)`);
+      eventType = "RESOURCE_GROUP_DELETED";
+      aggregate = { type: "RESOURCE_GROUP", id: entityId };
+      deletion = this.env.DB.prepare(
+        "DELETE FROM resource_groups WHERE id = ?1 AND operation_day_id = ?2",
+      ).bind(entityId, command.eventId);
+    } else if (entityType === "PRODUCT") {
+      const [entity, ticketGroups] = await Promise.all([
+        this.env.DB.prepare("SELECT name FROM products WHERE id = ?1 AND operation_day_id = ?2")
+          .bind(entityId, command.eventId)
+          .first<{ name: string }>(),
+        this.env.DB.prepare(
+          "SELECT COUNT(*) AS count FROM ticket_groups WHERE product_id = ?1 AND operation_day_id = ?2",
+        )
+          .bind(entityId, command.eventId)
+          .first<{ count: number }>(),
+      ]);
+      if (!entity)
+        return json(
+          { error: { code: "PRODUCT_NOT_FOUND", message: "Produkt nicht gefunden." } },
+          { status: 404 },
+        );
+      label = entity.name;
+      if ((ticketGroups?.count ?? 0) > 0) blockers.push(`${ticketGroups?.count} Ticketgruppe(n)`);
+      eventType = "PRODUCT_DELETED";
+      aggregate = { type: "PRODUCT", id: entityId };
+      deletion = this.env.DB.prepare(
+        "DELETE FROM products WHERE id = ?1 AND operation_day_id = ?2",
+      ).bind(entityId, command.eventId);
+    } else if (entityType === "PILOT") {
+      const [entity, rotations, aircraft] = await Promise.all([
+        this.env.DB.prepare(
+          "SELECT operational_code FROM pilots WHERE id = ?1 AND operation_day_id = ?2",
+        )
+          .bind(entityId, command.eventId)
+          .first<{ operational_code: string }>(),
+        this.env.DB.prepare(
+          "SELECT COUNT(*) AS count FROM rotations WHERE pilot_id = ?1 AND operation_day_id = ?2",
+        )
+          .bind(entityId, command.eventId)
+          .first<{ count: number }>(),
+        this.env.DB.prepare(
+          "SELECT COUNT(*) AS count FROM resource_group_memberships WHERE current_pilot_id = ?1 AND operation_day_id = ?2",
+        )
+          .bind(entityId, command.eventId)
+          .first<{ count: number }>(),
+      ]);
+      if (!entity)
+        return json(
+          { error: { code: "PILOT_NOT_FOUND", message: "Pilotencode nicht gefunden." } },
+          { status: 404 },
+        );
+      label = entity.operational_code;
+      if ((rotations?.count ?? 0) > 0) blockers.push(`${rotations?.count} Umlauf/Umläufe`);
+      if ((aircraft?.count ?? 0) > 0) blockers.push(`${aircraft?.count} Flugzeugbindung(en)`);
+      eventType = "PILOT_DELETED";
+      aggregate = { type: "PILOT", id: entityId };
+      deletion = this.env.DB.prepare(
+        "DELETE FROM pilots WHERE id = ?1 AND operation_day_id = ?2",
+      ).bind(entityId, command.eventId);
+    } else if (entityType === "AIRCRAFT") {
+      const [entity, memberships, rotations] = await Promise.all([
+        this.env.DB.prepare("SELECT registration FROM aircraft WHERE id = ?1")
+          .bind(entityId)
+          .first<{ registration: string }>(),
+        this.env.DB.prepare(
+          "SELECT COUNT(*) AS count FROM resource_group_memberships WHERE aircraft_id = ?1",
+        )
+          .bind(entityId)
+          .first<{ count: number }>(),
+        this.env.DB.prepare("SELECT COUNT(*) AS count FROM rotations WHERE aircraft_id = ?1")
+          .bind(entityId)
+          .first<{ count: number }>(),
+      ]);
+      if (!entity)
+        return json(
+          { error: { code: "AIRCRAFT_NOT_FOUND", message: "Flugzeug nicht gefunden." } },
+          { status: 404 },
+        );
+      label = entity.registration;
+      if ((memberships?.count ?? 0) > 0)
+        blockers.push(`${memberships?.count} Flugzeugzuordnung(en)`);
+      if ((rotations?.count ?? 0) > 0) blockers.push(`${rotations?.count} Umlauf/Umläufe`);
+      eventType = "AIRCRAFT_DELETED";
+      aggregate = { type: "AIRCRAFT", id: entityId };
+      deletion = this.env.DB.prepare("DELETE FROM aircraft WHERE id = ?1").bind(entityId);
+    } else {
+      const [memberships, rotations] = await Promise.all([
+        this.env.DB.prepare(
+          `SELECT m.id, a.registration FROM resource_group_memberships m
+             JOIN aircraft a ON a.id = m.aircraft_id
+            WHERE m.operation_day_id = ?1 AND m.aircraft_id = ?2`,
+        )
+          .bind(command.eventId, entityId)
+          .all<{ id: string; registration: string }>(),
+        this.env.DB.prepare(
+          "SELECT COUNT(*) AS count FROM rotations WHERE operation_day_id = ?1 AND aircraft_id = ?2",
+        )
+          .bind(command.eventId, entityId)
+          .first<{ count: number }>(),
+      ]);
+      if (memberships.results.length === 0) {
+        return json(
+          { error: { code: "ASSIGNMENT_NOT_FOUND", message: "Flugzeugzuordnung nicht gefunden." } },
+          { status: 404 },
+        );
+      }
+      label = memberships.results[0]?.registration ?? entityId;
+      if ((rotations?.count ?? 0) > 0) blockers.push(`${rotations?.count} Umlauf/Umläufe`);
+      removedMembershipCount = memberships.results.length;
+      eventType = "AIRCRAFT_RESOURCE_GROUP_ASSIGNMENT_DELETED";
+      aggregate = { type: "AIRCRAFT", id: entityId };
+      deletion = this.env.DB.prepare(
+        "DELETE FROM resource_group_memberships WHERE operation_day_id = ?1 AND aircraft_id = ?2",
+      ).bind(command.eventId, entityId);
+    }
+
+    if (blockers.length > 0) {
+      return json(
+        {
+          error: {
+            code: "MASTER_DATA_DELETE_BLOCKED",
+            message: `Löschen nicht möglich. Zuerst entfernen: ${blockers.join(", ")}.`,
+          },
+        },
+        { status: 409 },
+      );
+    }
+
+    const now = new Date().toISOString();
+    const nextVersion = current.version + 1;
+    const result: CommandResult = {
+      accepted: true,
+      duplicate: false,
+      event: rowToSnapshot({ ...current, version: nextVersion, updated_at: now }),
+      eventType,
+      aggregate,
+    };
+    await this.env.DB.batch([
+      this.env.DB.prepare(
+        "UPDATE operation_days SET version = ?1, updated_at = ?2 WHERE id = ?3 AND version = ?4",
+      ).bind(nextVersion, now, command.eventId, current.version),
+      deletion,
+      this.env.DB.prepare(
+        `INSERT INTO operational_events
+          (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type,
+           aggregate_id, aggregate_version, payload_json)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)`,
+      ).bind(
+        crypto.randomUUID(),
+        command.eventId,
+        eventType,
+        now,
+        command.deviceId,
+        aggregate.type,
+        aggregate.id,
+        nextVersion,
+        JSON.stringify({
+          entityType,
+          label,
+          reason: command.payload.reason,
+          ...(removedMembershipCount > 0 ? { removedMembershipCount } : {}),
+        }),
       ),
       this.env.DB.prepare(
         `INSERT INTO idempotency_receipts
