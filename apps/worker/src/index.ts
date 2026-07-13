@@ -710,6 +710,18 @@ app.get("/api/events/:eventId/operations", async (context) => {
                LIMIT 1) AS suggested_aircraft_registration,
               MIN(tg.id) AS ticket_group_id, MIN(tg.deferral_count) AS deferral_count,
               COUNT(rt.ticket_id) AS ticket_count,
+              CASE
+                WHEN COUNT(rt.ticket_id) = 0
+                  OR SUM(CASE WHEN t.weight_class = 'NOT_CAPTURED' THEN 1 ELSE 0 END) > 0
+                THEN NULL
+                ELSE SUM(CASE t.weight_class
+                  WHEN 'CHILD' THEN od.child_reference_weight_kg
+                  WHEN 'NORMAL' THEN od.normal_reference_weight_kg
+                  WHEN 'HEAVY' THEN od.heavy_reference_weight_kg
+                  WHEN 'INDIVIDUAL' THEN t.individual_weight_kg
+                  ELSE NULL
+                END)
+              END AS estimated_passenger_payload_kg,
               COALESCE(MIN(p.code), 'RUND') AS product_code,
               COALESCE(MIN(p.name), 'Rundflug') AS product_name,
               COALESCE(MIN(p.reference_duration_minutes), 20) AS reference_duration_minutes,
@@ -722,6 +734,7 @@ app.get("/api/events/:eventId/operations", async (context) => {
                 JOIN tickets attendance_ticket ON attendance_ticket.id = attendance_rt.ticket_id
                WHERE attendance_rt.rotation_id = r.id AND attendance_rt.released_at IS NULL) AS tickets_json
          FROM rotations r
+         JOIN operation_days od ON od.id = r.operation_day_id
          JOIN flight_groups fg ON fg.id = r.flight_group_id
          LEFT JOIN aircraft a ON a.id = r.aircraft_id
          LEFT JOIN pilots assigned_pilot ON assigned_pilot.id = r.pilot_id
@@ -751,6 +764,7 @@ app.get("/api/events/:eventId/operations", async (context) => {
         ticket_group_id: string;
         deferral_count: number;
         ticket_count: number;
+        estimated_passenger_payload_kg: number | null;
         product_code: string;
         product_name: string;
         reference_duration_minutes: number;
@@ -1076,6 +1090,7 @@ app.get("/api/events/:eventId/operations", async (context) => {
         suggestedAircraftId: rotation.suggested_aircraft_id,
         suggestedAircraftRegistration: rotation.suggested_aircraft_registration,
         ticketCount: rotation.ticket_count,
+        estimatedPassengerPayloadKg: rotation.estimated_passenger_payload_kg,
         predictedLowerMinutes:
           rotation.prediction_lower_minutes ??
           forecastQueueWindows({
