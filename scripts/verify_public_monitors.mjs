@@ -274,16 +274,66 @@ try {
   if (
     group?.ticketLabels.length !== 2 ||
     group.ticketLabels.some((label) => !label.startsWith("PAN20-")) ||
+    group.gateLabel !== "Flight Line 1" ||
+    initialTicketStatus.gateLabel !== "Flight Line 1" ||
     privateCodes.some((code) => serializedBoard.includes(code)) ||
     /pilot/i.test(serializedBoard)
   ) {
     throw new Error("FIDS-Ticketlabels sind unvollständig oder enthalten vertrauliche Daten.");
   }
+  const alternateGate = await command(
+    devices.admin,
+    tokens.admin,
+    sold.event.version,
+    "UPSERT_GATE",
+    {
+      gateId: "demo-2026-gate-alternate",
+      label: "Flight Line 2",
+      gateType: "FLIGHT_LINE",
+      active: true,
+      sortOrder: 20,
+      reason: "Synthetischer Monitortest",
+      adminPin: pin,
+    },
+  );
+  const retargetedProduct = await command(
+    devices.admin,
+    tokens.admin,
+    alternateGate.event.version,
+    "UPSERT_PRODUCT",
+    {
+      productId: "panorama-20",
+      resourceGroupId: "rg-panorama",
+      gateId: "demo-2026-gate-alternate",
+      name: "20 Min. Panorama",
+      code: "PAN20",
+      publicDescription: "Synthetisches Testprodukt",
+      priceCents: 4500,
+      referenceCapacity: 4,
+      referenceDurationMinutes: 20,
+      childCompanionRequired: false,
+      weightClasses: ["CHILD", "NORMAL", "HEAVY", "INDIVIDUAL"],
+      sortOrder: 10,
+      reason: "Synthetischer Monitortest",
+      adminPin: pin,
+    },
+  );
+  const historicalTicketStatus = await ticketStatus(privateCodes[0]);
+  publicBoard = await board();
+  const historicalGroup = publicBoard.groups.find(
+    (entry) => entry.communicationNumber === group.communicationNumber,
+  );
+  if (
+    historicalTicketStatus.gateLabel !== "Flight Line 1" ||
+    historicalGroup?.gateLabel !== "Flight Line 1"
+  ) {
+    throw new Error("Eine Produktänderung hat das historische Umlauf-Gate überschrieben.");
+  }
   const secondSaleRefresh = nextRefresh(socket);
   const secondSale = await command(
     devices.cashier,
     tokens.cashier,
-    sold.event.version,
+    retargetedProduct.event.version,
     "SELL_TICKET_GROUP",
     {
       productId: "panorama-30",
@@ -402,6 +452,7 @@ try {
       multipleUpcomingGroupsVisible: true,
       noExactPublicPredictionTimestamps: true,
       publicWaitWindowsConsistent: true,
+      historicalRotationGatePreserved: true,
       realtimeUnderTwoSeconds: true,
       reconnectMilliseconds,
       pollingFallbackSeconds: 15,

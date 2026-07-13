@@ -3,6 +3,9 @@ import anonymityDecision from "../../../docs/adr/0006-vollstaendig-anonyme-ident
 import cashierSource from "../../web/src/App.tsx?raw";
 import initialMigration from "../migrations/0001_initial.sql?raw";
 import pushMigration from "../migrations/0006_web_push.sql?raw";
+import rotationMigration from "../migrations/0026_rotation_gate_and_note.sql?raw";
+import coordinator from "./event-coordinator.ts?raw";
+import worker from "./index.ts?raw";
 
 describe("anonymous V1 ticket data model", () => {
   it("stores the complete operational ticket record without contact data", () => {
@@ -32,5 +35,28 @@ describe("anonymous V1 ticket data model", () => {
     expect(cashierSource).toMatch(
       /function createTicketCode\(\): string \{[\s\S]*crypto\.getRandomValues\(new Uint8Array\(16\)\)/,
     );
+  });
+
+  it("normalizes the complete stable flight-group and queue model", () => {
+    expect(initialMigration).toMatch(
+      /CREATE TABLE flight_groups \([\s\S]*operation_day_id TEXT NOT NULL[\s\S]*resource_group_id TEXT NOT NULL[\s\S]*communication_number INTEGER NOT NULL[\s\S]*status TEXT NOT NULL[\s\S]*UNIQUE \(operation_day_id, resource_group_id, communication_number\)/,
+    );
+    expect(initialMigration).toMatch(
+      /CREATE TABLE rotations \([\s\S]*flight_group_id TEXT NOT NULL REFERENCES flight_groups\(id\)/,
+    );
+    expect(initialMigration).toMatch(
+      /CREATE TABLE rotation_tickets \([\s\S]*rotation_id TEXT NOT NULL[\s\S]*ticket_id TEXT NOT NULL/,
+    );
+    expect(rotationMigration).toContain("ALTER TABLE rotations ADD COLUMN gate_id");
+    expect(coordinator).toMatch(/MAX\(tg\.queue_sequence\)[\s\S]*p\.resource_group_id = \?2/);
+  });
+
+  it("uses the frozen rotation gate in protected and public slot projections", () => {
+    expect(worker).toContain("COALESCE(r.gate_id, MIN(p.gate_id), '') AS gate_id");
+    expect(worker.match(/g\.id = COALESCE\(r\.gate_id, p\.gate_id\)/g)).toHaveLength(2);
+    expect(worker).toContain("communicationNumber: row.communication_number");
+    expect(worker).toContain("queuePosition:");
+    expect(worker).toContain("prediction_lower_minutes");
+    expect(worker).toContain("prediction_upper_minutes");
   });
 });
