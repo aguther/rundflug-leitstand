@@ -1128,6 +1128,14 @@ function FlightLineView() {
                   <dd>{selected.ticketCount}</dd>
                 </div>
                 <div>
+                  <dt>Geschätzte Passagierzuladung</dt>
+                  <dd>
+                    {selected.estimatedPassengerPayloadKg === null
+                      ? "Nicht vollständig erfasst"
+                      : `${selected.estimatedPassengerPayloadKg} kg`}
+                  </dd>
+                </div>
+                <div>
                   <dt>Zurückstellungen</dt>
                   <dd>
                     {selected.deferralCount}/{board?.event.maxTicketDeferrals ?? 2}
@@ -1175,6 +1183,11 @@ function FlightLineView() {
                   </dd>
                 </div>
               </dl>
+              <p className="safety-disclaimer">
+                Nur organisatorische Schätzung aus konfigurierten Referenzgewichten. Die Bewertung
+                und Entscheidung liegt ausschließlich beim Piloten; keine Sicherheits- oder
+                Freigabewirkung.
+              </p>
               <section className="rotation-timeline" aria-labelledby="timeline-title">
                 <div>
                   <h3 id="timeline-title">Plan · Prognose · Ist</h3>

@@ -618,6 +618,7 @@ export const rotationOperationalSummarySchema = z.object({
   suggestedAircraftId: z.string().nullable(),
   suggestedAircraftRegistration: z.string().nullable(),
   ticketCount: z.number().int().nonnegative(),
+  estimatedPassengerPayloadKg: z.number().positive().nullable(),
   predictedLowerMinutes: z.number().int().nonnegative(),
   predictedUpperMinutes: z.number().int().nonnegative(),
   calledAt: z.string().nullable(),

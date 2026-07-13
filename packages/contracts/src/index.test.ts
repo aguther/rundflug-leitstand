@@ -565,6 +565,7 @@ describe("commandEnvelopeSchema", () => {
       suggestedAircraftId: null,
       suggestedAircraftRegistration: null,
       ticketCount: 2,
+      estimatedPassengerPayloadKg: 107,
       predictedLowerMinutes: 0,
       predictedUpperMinutes: 25,
       calledAt: "2026-07-11T12:05:00.000Z",

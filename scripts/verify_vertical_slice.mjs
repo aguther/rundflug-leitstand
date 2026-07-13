@@ -152,9 +152,28 @@ try {
       adminPin: pin,
     }),
   );
+  const configuredProduct = await post(
+    tokens.admin,
+    envelope("technical-scaffold", configured.event.version, "UPSERT_PRODUCT", {
+      productId: "panorama-20",
+      resourceGroupId: "rg-panorama",
+      gateId: "demo-2026-gate-main",
+      name: "20 Min. Panorama",
+      code: "PAN20",
+      publicDescription: "Synthetisches Testprodukt",
+      priceCents: 4500,
+      referenceCapacity: 4,
+      referenceDurationMinutes: 20,
+      childCompanionRequired: false,
+      weightClasses: ["CHILD", "NORMAL", "HEAVY", "INDIVIDUAL"],
+      sortOrder: 10,
+      reason: "Synthetischer Zuladungstest",
+      adminPin: pin,
+    }),
+  );
   const activated = await post(
     tokens.admin,
-    envelope("technical-scaffold", configured.event.version, "SET_EVENT_LIFECYCLE", {
+    envelope("technical-scaffold", configuredProduct.event.version, "SET_EVENT_LIFECYCLE", {
       status: "ACTIVE",
       reason: "Synthetischer Vertical-Slice-Test",
       adminPin: pin,
@@ -183,6 +202,10 @@ try {
   const saleEnvelope = envelope("cashier-tablet-1", activated.event.version, "SELL_TICKET_GROUP", {
     productId: "panorama-20",
     publicTicketCodes: [ticketCode(), ticketCode()],
+    ticketDetails: [
+      { weightClass: "CHILD", individualWeightKg: null },
+      { weightClass: "INDIVIDUAL", individualWeightKg: 72 },
+    ],
     standby: false,
     paymentStatus: "PAID",
     paymentMethod: "CASH",
@@ -237,9 +260,12 @@ try {
   if (
     proposedRotation?.suggestedAircraftId !== "aircraft-a" ||
     proposedRotation?.suggestedPilotId !== "550e8400-e29b-41d4-a716-446655440100" ||
+    proposedRotation?.estimatedPassengerPayloadKg !== 107 ||
     proposedRotation.tickets.some((ticket) => ticket.status !== "QUEUED")
   ) {
-    throw new Error("Vorschlag oder initialer Ticketstatus fehlt im Standardumlauf.");
+    throw new Error(
+      "Vorschlag, neutrale Zuladungsschätzung oder initialer Ticketstatus fehlt im Standardumlauf.",
+    );
   }
   const checkedTicketId = proposedRotation.tickets[0].id;
   flightLineSocket.close();
@@ -380,6 +406,7 @@ try {
   }
   process.stdout.write(
     JSON.stringify({
+      requirements: ["F-BRD-120"],
       sale: sold.eventType,
       duplicate: duplicate.duplicate,
       staleRejected: true,
@@ -394,6 +421,7 @@ try {
       reconnectMilliseconds,
       deviceAttributionVisible: true,
       assignmentSuggested: true,
+      estimatedPassengerPayloadKg: proposedRotation.estimatedPassengerPayloadKg,
       cashierProductForecastComplete: true,
       callCorrectionAudited: true,
       ticketStateSequenceVerified: true,
