@@ -87,9 +87,9 @@ def seed_source(connection: sqlite3.Connection) -> None:
     )
     connection.execute(
         "INSERT INTO rotations "
-        "(id,operation_day_id,flight_group_id,aircraft_id,status,version,created_at,updated_at,pilot_id) "
-        "VALUES (?,?,?,?,?,?,?,?,?)",
-        ("synthetic-rotation", "synthetic-event", "synthetic-flight-group", "synthetic-aircraft", "DRAFT", 0, now, now, "synthetic-pilot"),
+        "(id,operation_day_id,flight_group_id,aircraft_id,status,version,created_at,updated_at,pilot_id,gate_id,operational_note) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+        ("synthetic-rotation", "synthetic-event", "synthetic-flight-group", "synthetic-aircraft", "DRAFT", 0, now, now, "synthetic-pilot", "synthetic-gate", "Organisatorischer Testhinweis"),
     )
     connection.execute(
         "INSERT INTO rotation_tickets (rotation_id,ticket_id,assigned_at) VALUES (?,?,?)",
@@ -169,6 +169,12 @@ def main() -> None:
             raise AssertionError(f"Mengenkontrolle für {table} fehlgeschlagen")
     if target.execute("SELECT COUNT(*) FROM operational_events").fetchone()[0] != 1:
         raise AssertionError("Append-only Auditbestand wurde nicht wiederhergestellt")
+    restored_rotation = target.execute(
+        "SELECT gate_id, operational_note FROM rotations WHERE id = ?",
+        ("synthetic-rotation",),
+    ).fetchone()
+    if restored_rotation != ("synthetic-gate", "Organisatorischer Testhinweis"):
+        raise AssertionError("Historisches Umlauf-Gate oder Bemerkung wurde nicht wiederhergestellt")
     source.close()
     target.close()
     elapsed = time.monotonic() - started

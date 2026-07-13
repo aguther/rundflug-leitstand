@@ -659,6 +659,9 @@ app.get("/api/events/:eventId/operations", async (context) => {
       }>(),
     context.env.DB.prepare(
       `SELECT r.id, r.flight_group_id, fg.resource_group_id, fg.communication_number, r.status, r.aircraft_id,
+              COALESCE(r.gate_id, MIN(p.gate_id), '') AS gate_id,
+              COALESCE(MAX(rotation_gate.label), MIN(product_gate.label), '') AS gate_label,
+              r.operational_note,
               r.called_at, r.departed_at, r.landed_at, r.completed_at,
               r.planned_boarding_at, r.planned_departure_at, r.planned_landing_at,
               r.planned_completion_at, r.predicted_boarding_at, r.predicted_departure_at,
@@ -768,6 +771,8 @@ app.get("/api/events/:eventId/operations", async (context) => {
          LEFT JOIN tickets t ON t.id = rt.ticket_id
          LEFT JOIN ticket_groups tg ON tg.id = t.ticket_group_id
          LEFT JOIN products p ON p.id = tg.product_id
+         LEFT JOIN gates rotation_gate ON rotation_gate.id = r.gate_id
+         LEFT JOIN gates product_gate ON product_gate.id = p.gate_id
         WHERE r.operation_day_id = ?1 AND r.status <> 'CANCELED'
         GROUP BY r.id
         ORDER BY fg.communication_number`,
@@ -779,6 +784,9 @@ app.get("/api/events/:eventId/operations", async (context) => {
         resource_group_id: string;
         communication_number: number;
         status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
+        gate_id: string;
+        gate_label: string;
+        operational_note: string;
         aircraft_id: string | null;
         aircraft_registration: string | null;
         pilot_id: string | null;
@@ -1106,6 +1114,8 @@ app.get("/api/events/:eventId/operations", async (context) => {
         productName: rotation.product_name,
         status: rotation.status,
         ticketGroupId: rotation.ticket_group_id,
+        gateId: rotation.gate_id,
+        gateLabel: rotation.gate_label,
         aircraftId: rotation.aircraft_id,
         aircraftRegistration: rotation.aircraft_registration,
         pilotId: rotation.pilot_id,
@@ -1153,6 +1163,7 @@ app.get("/api/events/:eventId/operations", async (context) => {
           }).upperMinutes,
         calledAt: rotation.called_at,
         deferralCount: rotation.deferral_count,
+        operationalNote: rotation.operational_note,
         timeline: {
           planned: {
             boardingAt: rotation.planned_boarding_at,

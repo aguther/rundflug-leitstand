@@ -594,6 +594,8 @@ describe("commandEnvelopeSchema", () => {
       productName: "Panorama",
       status: "IN_FLIGHT",
       ticketGroupId: "synthetic-ticket-group",
+      gateId: "synthetic-gate",
+      gateLabel: "Flight Line 1",
       aircraftId: "synthetic-aircraft",
       aircraftRegistration: "D-ETST",
       pilotId: "synthetic-pilot",
@@ -608,6 +610,7 @@ describe("commandEnvelopeSchema", () => {
       predictedUpperMinutes: 25,
       calledAt: "2026-07-11T12:05:00.000Z",
       deferralCount: 0,
+      operationalNote: "Nur organisatorischer Testhinweis",
       timeline: {
         planned: {
           boardingAt: "2026-07-11T12:00:00.000Z",
@@ -634,5 +637,25 @@ describe("commandEnvelopeSchema", () => {
     });
     expect(parsed.timeline.planned.departureAt).not.toBe(parsed.timeline.actual.departureAt);
     expect(parsed.timeline.predicted.landingAt).toBeTruthy();
+    expect(parsed.gateId).toBe("synthetic-gate");
+    expect(parsed.operationalNote).toBe("Nur organisatorischer Testhinweis");
+  });
+
+  it("validates an anonymous, auditable rotation note", () => {
+    const parsed = commandEnvelopeSchema.parse({
+      commandId: "2b428d92-224f-47ea-8d68-89f5d69158ed",
+      eventId: "synthetic-event",
+      deviceId: "synthetic-flight-line",
+      expectedVersion: 8,
+      issuedAt: "2026-07-11T12:00:00.000Z",
+      type: "SET_ROTATION_NOTE",
+      payload: {
+        rotationId: "synthetic-rotation",
+        note: "Organisatorischer Hinweis 42",
+        reason: "Hinweis aktualisiert",
+      },
+    });
+    expect(parsed.type).toBe("SET_ROTATION_NOTE");
+    expect("guestName" in parsed.payload).toBe(false);
   });
 });

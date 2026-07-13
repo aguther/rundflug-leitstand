@@ -195,7 +195,7 @@ export class EventCoordinator extends DurableObject<Env> {
 
       if (command.type === "SELL_TICKET_GROUP") {
         const product = await this.env.DB.prepare(
-          `SELECT p.id, p.resource_group_id, p.price_cents, p.sale_enabled, p.sale_closes_at,
+          `SELECT p.id, p.resource_group_id, p.gate_id, p.price_cents, p.sale_enabled, p.sale_closes_at,
                   p.reference_duration_minutes, p.weight_classes_json, p.capacity_warning_threshold,
                   p.capacity_critical_threshold, p.reference_capacity,
                   rg.status AS resource_group_status
@@ -207,6 +207,7 @@ export class EventCoordinator extends DurableObject<Env> {
           .first<{
             id: string;
             resource_group_id: string;
+            gate_id: string;
             price_cents: number;
             sale_enabled: number;
             sale_closes_at: string | null;
@@ -221,6 +222,17 @@ export class EventCoordinator extends DurableObject<Env> {
           return json(
             { error: { code: "PRODUCT_NOT_FOUND", message: "Produkt nicht gefunden." } },
             { status: 404 },
+          );
+        }
+        if (!product.gate_id) {
+          return json(
+            {
+              error: {
+                code: "PRODUCT_GATE_REQUIRED",
+                message: "Für das Produkt muss vor dem Verkauf ein Gate konfiguriert sein.",
+              },
+            },
+            { status: 409 },
           );
         }
         if (current.sale_opens_at && Date.parse(current.sale_opens_at) > Date.now()) {
@@ -450,11 +462,12 @@ export class EventCoordinator extends DurableObject<Env> {
                   now,
                 ),
                 this.env.DB.prepare(`INSERT INTO rotations
-                  (id, operation_day_id, flight_group_id, status, version, created_at, updated_at)
-                  VALUES (?1, ?2, ?3, 'DRAFT', 0, ?4, ?4)`).bind(
+                  (id, operation_day_id, flight_group_id, gate_id, status, version, created_at, updated_at)
+                  VALUES (?1, ?2, ?3, ?4, 'DRAFT', 0, ?5, ?5)`).bind(
                   rotationId,
                   command.eventId,
                   flightGroupId,
+                  product.gate_id,
                   now,
                 ),
               ]),
@@ -574,6 +587,9 @@ export class EventCoordinator extends DurableObject<Env> {
         }
         if (command.type === "SET_TICKET_ATTENDANCE") {
           return this.handleTicketAttendance(command, current);
+        }
+        if (command.type === "SET_ROTATION_NOTE") {
+          return this.handleRotationNote(command, current);
         }
         if (
           command.type === "CANCEL_TICKET_GROUP" ||
@@ -1906,6 +1922,72 @@ export class EventCoordinator extends DurableObject<Env> {
     return json(result);
   }
 
+  private async handleRotationNote(
+    command: Extract<CommandEnvelope, { type: "SET_ROTATION_NOTE" }>,
+    current: StoredEventRow,
+  ): Promise<Response> {
+    const rotation = await this.env.DB.prepare(
+      "SELECT id, version FROM rotations WHERE id = ?1 AND operation_day_id = ?2",
+    )
+      .bind(command.payload.rotationId, command.eventId)
+      .first<{ id: string; version: number }>();
+    if (!rotation) {
+      return json(
+        { error: { code: "ROTATION_NOT_FOUND", message: "Umlauf nicht gefunden." } },
+        { status: 404 },
+      );
+    }
+
+    const now = new Date().toISOString();
+    const nextVersion = current.version + 1;
+    const result: CommandResult = {
+      accepted: true,
+      duplicate: false,
+      event: rowToSnapshot({ ...current, version: nextVersion, updated_at: now }),
+      eventType: "ROTATION_NOTE_SET",
+      aggregate: { type: "ROTATION", id: rotation.id },
+    };
+    await this.env.DB.batch([
+      this.env.DB.prepare(
+        "UPDATE operation_days SET version = ?1, updated_at = ?2 WHERE id = ?3 AND version = ?4",
+      ).bind(nextVersion, now, command.eventId, current.version),
+      this.env.DB.prepare(
+        "UPDATE rotations SET operational_note = ?1, version = version + 1, updated_at = ?2 WHERE id = ?3 AND version = ?4",
+      ).bind(command.payload.note, now, rotation.id, rotation.version),
+      this.env.DB.prepare(
+        `INSERT INTO operational_events
+          (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type,
+           aggregate_id, aggregate_version, payload_json)
+         VALUES (?1, ?2, 'ROTATION_NOTE_SET', ?3, ?4, 'ROTATION', ?5, ?6, ?7)`,
+      ).bind(
+        crypto.randomUUID(),
+        command.eventId,
+        now,
+        command.deviceId,
+        rotation.id,
+        rotation.version + 1,
+        JSON.stringify({ note: command.payload.note, reason: command.payload.reason }),
+      ),
+      this.env.DB.prepare(
+        `INSERT INTO idempotency_receipts
+          (command_id, operation_day_id, device_id, command_type, received_at, response_json)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)`,
+      ).bind(
+        command.commandId,
+        command.eventId,
+        command.deviceId,
+        command.type,
+        now,
+        JSON.stringify(result),
+      ),
+      this.env.DB.prepare(
+        "INSERT INTO outbox (id, operation_day_id, topic, payload_json, created_at) VALUES (?1, ?2, 'EVENT_STATE_CHANGED', ?3, ?4)",
+      ).bind(crypto.randomUUID(), command.eventId, JSON.stringify(result), now),
+    ]);
+    this.broadcast(result);
+    return json(result);
+  }
+
   private async handleEventLifecycle(
     command: Extract<CommandEnvelope, { type: "SET_EVENT_LIFECYCLE" }>,
     current: StoredEventRow,
@@ -2645,10 +2727,10 @@ export class EventCoordinator extends DurableObject<Env> {
     const [products, aircraftRows, pilotRows, existingReferences, queueRows, communicationRows] =
       await Promise.all([
         this.env.DB.prepare(
-          "SELECT id, resource_group_id, price_cents FROM products WHERE operation_day_id = ?1",
+          "SELECT id, resource_group_id, gate_id, price_cents FROM products WHERE operation_day_id = ?1",
         )
           .bind(command.eventId)
-          .all<{ id: string; resource_group_id: string; price_cents: number }>(),
+          .all<{ id: string; resource_group_id: string; gate_id: string; price_cents: number }>(),
         this.env.DB.prepare(
           `SELECT a.id, a.passenger_seats, a.operational_state, membership.resource_group_id
              FROM aircraft a
@@ -2764,6 +2846,12 @@ export class EventCoordinator extends DurableObject<Env> {
               "Das Produkt des Papierverkaufs ist nicht mehr vorhanden.",
             );
           }
+          if (!product.gate_id) {
+            throw new DomainRuleError(
+              "RECOVERY_PRODUCT_GATE_REQUIRED",
+              "Für das Produkt des Papierverkaufs fehlt ein Gate.",
+            );
+          }
           const queueSequence = (nextQueue.get(product.resource_group_id) ?? 0) + 1;
           nextQueue.set(product.resource_group_id, queueSequence);
           const communicationNumber = (nextCommunication.get(product.resource_group_id) ?? 100) + 1;
@@ -2810,9 +2898,15 @@ export class EventCoordinator extends DurableObject<Env> {
             ),
             this.env.DB.prepare(
               `INSERT INTO rotations
-                (id, operation_day_id, flight_group_id, status, version, created_at, updated_at)
-               VALUES (?1, ?2, ?3, 'DRAFT', 0, ?4, ?4)`,
-            ).bind(rotationId, command.eventId, flightGroupId, entry.original_occurred_at),
+                (id, operation_day_id, flight_group_id, gate_id, status, version, created_at, updated_at)
+               VALUES (?1, ?2, ?3, ?4, 'DRAFT', 0, ?5, ?5)`,
+            ).bind(
+              rotationId,
+              command.eventId,
+              flightGroupId,
+              product.gate_id,
+              entry.original_occurred_at,
+            ),
             this.env.DB.prepare(
               `INSERT INTO outage_recovery_references
                 (operation_day_id, paper_reference, ticket_group_id, rotation_id, current_state,
@@ -3532,13 +3626,14 @@ export class EventCoordinator extends DurableObject<Env> {
 
     let targetProductId = group.product_id;
     let targetResourceGroupId = group.resource_group_id;
+    let targetGateId: string | null = null;
     let targetPriceCents: number | null = null;
     if (command.type === "REBOOK_TICKET_GROUP") {
       const target = await this.env.DB.prepare(
-        "SELECT id, resource_group_id, price_cents FROM products WHERE id = ?1 AND operation_day_id = ?2 AND sale_enabled = 1",
+        "SELECT id, resource_group_id, gate_id, price_cents FROM products WHERE id = ?1 AND operation_day_id = ?2 AND sale_enabled = 1",
       )
         .bind(command.payload.newProductId, command.eventId)
-        .first<{ id: string; resource_group_id: string; price_cents: number }>();
+        .first<{ id: string; resource_group_id: string; gate_id: string; price_cents: number }>();
       if (!target) {
         return json(
           {
@@ -3552,7 +3647,29 @@ export class EventCoordinator extends DurableObject<Env> {
       }
       targetProductId = target.id;
       targetResourceGroupId = target.resource_group_id;
+      targetGateId = target.gate_id;
       targetPriceCents = target.price_cents;
+    } else {
+      const currentProduct = await this.env.DB.prepare(
+        "SELECT gate_id FROM products WHERE id = ?1 AND operation_day_id = ?2",
+      )
+        .bind(targetProductId, command.eventId)
+        .first<{ gate_id: string }>();
+      targetGateId = currentProduct?.gate_id ?? null;
+    }
+    if (
+      (command.type === "REBOOK_TICKET_GROUP" || command.type === "DEFER_TICKET_GROUP") &&
+      !targetGateId
+    ) {
+      return json(
+        {
+          error: {
+            code: "PRODUCT_GATE_REQUIRED",
+            message: "Für den neuen Umlauf muss ein Produkt-Gate konfiguriert sein.",
+          },
+        },
+        { status: 409 },
+      );
     }
 
     const now = new Date().toISOString();
@@ -3667,9 +3784,9 @@ export class EventCoordinator extends DurableObject<Env> {
           now,
         ),
         this.env.DB.prepare(
-          `INSERT INTO rotations (id, operation_day_id, flight_group_id, status, version, created_at, updated_at)
-           VALUES (?1, ?2, ?3, 'DRAFT', 0, ?4, ?4)`,
-        ).bind(rotationId, command.eventId, flightGroupId, now),
+          `INSERT INTO rotations (id, operation_day_id, flight_group_id, gate_id, status, version, created_at, updated_at)
+           VALUES (?1, ?2, ?3, ?4, 'DRAFT', 0, ?5, ?5)`,
+        ).bind(rotationId, command.eventId, flightGroupId, targetGateId, now),
         this.env.DB.prepare(
           `INSERT INTO rotation_tickets (rotation_id, ticket_id, assigned_at)
            SELECT ?1, id, ?2 FROM tickets WHERE ticket_group_id = ?3`,
