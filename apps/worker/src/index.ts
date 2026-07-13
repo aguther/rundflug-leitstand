@@ -665,25 +665,49 @@ app.get("/api/events/:eventId/operations", async (context) => {
                WHERE membership.operation_day_id = r.operation_day_id
                  AND membership.resource_group_id = fg.resource_group_id
                  AND membership.active_until IS NULL
-                 AND candidate.operational_state = 'AVAILABLE'
+                 AND candidate.operational_state IN ('AVAILABLE', 'BOARDING', 'IN_FLIGHT', 'LANDED', 'TURNAROUND')
                  AND candidate.operational_interrupted = 0
                  AND candidate.passenger_seats >= (
                    SELECT COUNT(*) FROM rotation_tickets capacity_rt
                     WHERE capacity_rt.rotation_id = r.id AND capacity_rt.released_at IS NULL
                  )
-               ORDER BY candidate.registration LIMIT 1) AS suggested_aircraft_id,
+               ORDER BY
+                 CASE WHEN candidate.operational_state = 'AVAILABLE' THEN 0 ELSE 1 END,
+                 COALESCE((
+                   SELECT candidate_rotation.predicted_completion_at
+                     FROM rotations candidate_rotation
+                    WHERE candidate_rotation.operation_day_id = membership.operation_day_id
+                      AND candidate_rotation.aircraft_id = candidate.id
+                      AND candidate_rotation.status IN ('CALLED', 'IN_FLIGHT', 'LANDED')
+                    ORDER BY candidate_rotation.predicted_completion_at DESC
+                    LIMIT 1
+                 ), '9999-12-31T23:59:59.999Z'),
+                 candidate.registration
+               LIMIT 1) AS suggested_aircraft_id,
               (SELECT candidate.registration FROM resource_group_memberships membership
                 JOIN aircraft candidate ON candidate.id = membership.aircraft_id
                WHERE membership.operation_day_id = r.operation_day_id
                  AND membership.resource_group_id = fg.resource_group_id
                  AND membership.active_until IS NULL
-                 AND candidate.operational_state = 'AVAILABLE'
+                 AND candidate.operational_state IN ('AVAILABLE', 'BOARDING', 'IN_FLIGHT', 'LANDED', 'TURNAROUND')
                  AND candidate.operational_interrupted = 0
                  AND candidate.passenger_seats >= (
                    SELECT COUNT(*) FROM rotation_tickets capacity_rt
                     WHERE capacity_rt.rotation_id = r.id AND capacity_rt.released_at IS NULL
                  )
-               ORDER BY candidate.registration LIMIT 1) AS suggested_aircraft_registration,
+               ORDER BY
+                 CASE WHEN candidate.operational_state = 'AVAILABLE' THEN 0 ELSE 1 END,
+                 COALESCE((
+                   SELECT candidate_rotation.predicted_completion_at
+                     FROM rotations candidate_rotation
+                    WHERE candidate_rotation.operation_day_id = membership.operation_day_id
+                      AND candidate_rotation.aircraft_id = candidate.id
+                      AND candidate_rotation.status IN ('CALLED', 'IN_FLIGHT', 'LANDED')
+                    ORDER BY candidate_rotation.predicted_completion_at DESC
+                    LIMIT 1
+                 ), '9999-12-31T23:59:59.999Z'),
+                 candidate.registration
+               LIMIT 1) AS suggested_aircraft_registration,
               MIN(tg.id) AS ticket_group_id, MIN(tg.deferral_count) AS deferral_count,
               COUNT(rt.ticket_id) AS ticket_count,
               COALESCE(MIN(p.name), 'Rundflug') AS product_name,
