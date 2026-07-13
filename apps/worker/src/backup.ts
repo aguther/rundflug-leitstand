@@ -3,25 +3,25 @@ import type { Env } from "./types";
 
 export const BACKUP_TABLES = [
   "operation_days",
+  "gates",
   "resource_groups",
   "aircraft",
   "pilots",
+  "paired_devices",
   "resource_group_memberships",
   "products",
-  "gates",
   "ticket_groups",
   "tickets",
   "flight_groups",
   "rotations",
   "rotation_tickets",
-  "paired_devices",
   "app_bootstrap",
   "operational_blocks",
   "forecast_snapshots",
   "outage_recovery_batches",
+  "operational_events",
   "outage_recovery_entries",
   "outage_recovery_references",
-  "operational_events",
   "idempotency_receipts",
   "outbox",
 ] as const;
@@ -31,7 +31,22 @@ export interface PortableBackup {
   formatVersion: 1;
   createdAt: string;
   requirementsVersion: "1.4";
+  reason: BackupReason;
   tables: Record<string, unknown[]>;
+}
+
+export type BackupReason = "DAILY" | "PRE_EVENT";
+
+export function operationDateInTimeZone(date: Date, timeZone = "Europe/Berlin"): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((entry) => entry.type === type)?.value ?? "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
 }
 
 export function serializePortableBackup(backup: PortableBackup): string {
@@ -41,6 +56,7 @@ export function serializePortableBackup(backup: PortableBackup): string {
 export async function createPortableBackup(
   env: Env,
   now = new Date(),
+  reason: BackupReason = "DAILY",
 ): Promise<{
   key: string;
   checksum: string;
@@ -56,6 +72,7 @@ export async function createPortableBackup(
     formatVersion: 1,
     createdAt,
     requirementsVersion: "1.4",
+    reason,
     tables,
   };
   const body = serializePortableBackup(backup);
@@ -64,7 +81,7 @@ export async function createPortableBackup(
   const key = `backups/${day}/${createdAt.replaceAll(":", "-")}.json`;
   await env.BACKUPS.put(key, body, {
     httpMetadata: { contentType: "application/json" },
-    customMetadata: { sha256: checksum, formatVersion: "1" },
+    customMetadata: { sha256: checksum, formatVersion: "1", reason },
   });
 
   const retentionThreshold = now.getTime() - 14 * 24 * 60 * 60 * 1000;
