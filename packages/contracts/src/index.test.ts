@@ -28,6 +28,9 @@ describe("commandEnvelopeSchema", () => {
     expect(() =>
       bootstrapRequestSchema.parse({ ...parsed, adminCredentialHash: "clear-device-token" }),
     ).toThrow();
+    expect(() => bootstrapRequestSchema.parse({ ...parsed, timeZone: "Mars/Olympus" })).toThrow(
+      "Ungültige IANA-Zeitzone",
+    );
   });
   it("accepts anonymous, ordered paper recovery records without guest fields", () => {
     const parsed = stageOutageRecoveryRequestSchema.parse({
@@ -505,6 +508,9 @@ describe("commandEnvelopeSchema", () => {
     expect(parsed.eventId).toBe("flugtag-2027");
     expect("guestName" in parsed).toBe(false);
     expect(() => cloneEventRequestSchema.parse({ ...parsed, eventId: "Ungültige ID" })).toThrow();
+    expect(() => cloneEventRequestSchema.parse({ ...parsed, timeZone: "Berlin" })).toThrow(
+      "Ungültige IANA-Zeitzone",
+    );
     expect(parsed.restartMode).toBe("KEEP_MASTER_DATA");
     expect(cloneEventRequestSchema.parse({ ...parsed, restartMode: "EMPTY" }).restartMode).toBe(
       "EMPTY",

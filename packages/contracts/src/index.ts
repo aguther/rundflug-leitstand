@@ -3,6 +3,23 @@ import { z } from "zod";
 export const appEnvironmentSchema = z.enum(["development", "acceptance", "production"]);
 export type AppEnvironment = z.infer<typeof appEnvironmentSchema>;
 
+export const timeZoneSchema = z
+  .string()
+  .trim()
+  .min(3)
+  .max(80)
+  .refine(
+    (value) => {
+      try {
+        new Intl.DateTimeFormat("en", { timeZone: value }).format();
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    { message: "Ungültige IANA-Zeitzone" },
+  );
+
 const commandBaseSchema = z.object({
   commandId: z.uuid(),
   eventId: z.string().min(1).max(100),
@@ -448,7 +465,7 @@ export const eventSnapshotSchema = z.object({
   name: z.string(),
   eventDate: z.string(),
   aerodrome: z.string(),
-  timeZone: z.string(),
+  timeZone: timeZoneSchema,
   status: z.enum(["PREPARATION", "ACTIVE", "CLOSED", "ARCHIVED"]),
   archivedAt: z.string().nullable(),
   templateSourceId: z.string().nullable(),
@@ -479,7 +496,7 @@ export const eventCatalogEntrySchema = z.object({
   name: z.string(),
   eventDate: z.string(),
   aerodrome: z.string(),
-  timeZone: z.string(),
+  timeZone: timeZoneSchema,
   status: z.string(),
   archivedAt: z.string().nullable(),
   templateSourceId: z.string().nullable(),
@@ -499,7 +516,7 @@ export const bootstrapRequestSchema = z.object({
   name: z.string().trim().min(3).max(120),
   eventDate: z.iso.date(),
   aerodrome: z.string().trim().min(2).max(120),
-  timeZone: z.string().trim().min(3).max(80).default("Europe/Berlin"),
+  timeZone: timeZoneSchema.default("Europe/Berlin"),
   adminDeviceId: z.uuid(),
   adminCredentialHash: z.string().regex(/^[a-f0-9]{64}$/),
 });
@@ -535,7 +552,7 @@ export const cloneEventRequestSchema = z.object({
   name: z.string().trim().min(3).max(120),
   eventDate: z.iso.date(),
   aerodrome: z.string().trim().min(2).max(120),
-  timeZone: z.string().trim().min(3).max(80).default("Europe/Berlin"),
+  timeZone: timeZoneSchema.default("Europe/Berlin"),
   restartMode: z.enum(["KEEP_MASTER_DATA", "EMPTY"]).default("KEEP_MASTER_DATA"),
 });
 export type CloneEventRequest = z.infer<typeof cloneEventRequestSchema>;
