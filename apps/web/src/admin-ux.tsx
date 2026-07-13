@@ -1,7 +1,13 @@
 import type { ReactNode } from "react";
 
 export type AdminArea = "overview" | "setup" | "master-data" | "operations" | "backup";
-export type MasterDataCategory = "gates" | "resource-groups" | "aircraft" | "pilots" | "products";
+export type MasterDataCategory =
+  | "gates"
+  | "resource-groups"
+  | "aircraft"
+  | "assignments"
+  | "pilots"
+  | "products";
 
 export type SetupStep = {
   id: string;
@@ -125,20 +131,23 @@ const masterDataItems: Array<{ id: MasterDataCategory; label: string }> = [
   { id: "gates", label: "Gates" },
   { id: "resource-groups", label: "Ressourcengruppen" },
   { id: "aircraft", label: "Flugzeuge" },
+  { id: "assignments", label: "Zuordnungen" },
   { id: "pilots", label: "Piloten" },
   { id: "products", label: "Produkte" },
 ];
 
 export function MasterDataNavigation({
   activeCategory,
+  counts,
   onChange,
 }: {
   activeCategory: MasterDataCategory;
+  counts: Record<MasterDataCategory, number>;
   onChange: (category: MasterDataCategory) => void;
 }) {
   return (
     <nav aria-label="Stammdatenkategorien" className="master-data-nav">
-      {masterDataItems.map((item) => (
+      {masterDataItems.map((item, index) => (
         <button
           aria-current={activeCategory === item.id ? "page" : undefined}
           className={activeCategory === item.id ? "active" : ""}
@@ -146,7 +155,11 @@ export function MasterDataNavigation({
           onClick={() => onChange(item.id)}
           type="button"
         >
-          {item.label}
+          <span className="master-data-order">{index + 1}</span>
+          <span className="master-data-nav-copy">
+            <strong>{item.label}</strong>
+            <small>{counts[item.id]}</small>
+          </span>
         </button>
       ))}
     </nav>

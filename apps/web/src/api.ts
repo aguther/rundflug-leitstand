@@ -10,6 +10,9 @@ import {
   type EventSnapshot,
   eventCatalogSchema,
   eventSnapshotSchema,
+  type FactoryResetRequest,
+  type FactoryResetResponse,
+  factoryResetResponseSchema,
   type OperationBoard,
   operationBoardSchema,
   type PublicBoard,
@@ -121,6 +124,28 @@ export async function cloneEvent(
     throw new Error(body.error?.message ?? "Veranstaltung konnte nicht angelegt werden.");
   }
   return body as { eventId: string; adminDeviceId: string; templateSourceId: string };
+}
+
+export async function factoryReset(
+  eventId: string,
+  deviceId: string,
+  deviceToken: string,
+  input: FactoryResetRequest,
+): Promise<FactoryResetResponse> {
+  const response = await fetch(`/api/admin/events/${encodeURIComponent(eventId)}/factory-reset`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-device-id": deviceId,
+      "x-device-token": deviceToken,
+    },
+    body: JSON.stringify(input),
+  });
+  const body = (await response.json()) as unknown;
+  const completed = factoryResetResponseSchema.safeParse(body);
+  if (completed.success) return completed.data;
+  const error = body as { error?: { message?: string } };
+  throw new Error(error.error?.message ?? "Werkszustand konnte nicht hergestellt werden.");
 }
 
 export async function getAuditHistory(

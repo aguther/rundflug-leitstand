@@ -90,3 +90,13 @@ export function confirmedStateLabel(savedAt: string, now = Date.now()): string {
   if (ageSeconds < 60) return `letzte Bestätigung vor ${ageSeconds} s`;
   return `letzte Bestätigung vor ${Math.floor(ageSeconds / 60)} min`;
 }
+
+export async function clearOfflineOperationBoards(): Promise<void> {
+  if (!("indexedDB" in globalThis)) return;
+  await new Promise<void>((resolve) => {
+    const request = indexedDB.deleteDatabase(DATABASE_NAME);
+    request.onsuccess = () => resolve();
+    request.onerror = () => resolve();
+    request.onblocked = () => resolve();
+  });
+}

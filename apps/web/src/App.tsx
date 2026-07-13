@@ -24,6 +24,7 @@ import {
   downloadDailyPdf,
   downloadDailyReport,
   downloadTicketRawData,
+  factoryReset,
   getAuditHistory,
   getDeviceContext,
   getEventCatalog,
@@ -59,7 +60,12 @@ import {
   readCashierDraftQueue,
   writeCashierDraftQueue,
 } from "./offline-drafts";
-import { confirmedStateLabel, loadOperationBoard, saveOperationBoard } from "./offline-store";
+import {
+  clearOfflineOperationBoards,
+  confirmedStateLabel,
+  loadOperationBoard,
+  saveOperationBoard,
+} from "./offline-store";
 import { setupValidationMessages } from "./setup-validation";
 
 const EVENT_ID = resolveActiveEvent(window.location.search, window.localStorage);
@@ -1894,6 +1900,18 @@ function AdminView() {
   const [masterDataCategory, setMasterDataCategory] = useState<MasterDataCategory>("aircraft");
   const [reason, setReason] = useState("");
   const [adminPin, setAdminPin] = useState("");
+  const [masterEditorOpen, setMasterEditorOpen] = useState(false);
+  const [masterSubmitAttempted, setMasterSubmitAttempted] = useState(false);
+  const [pendingMasterAction, setPendingMasterAction] = useState<
+    | "gate"
+    | "resource-group"
+    | "aircraft"
+    | "assignment"
+    | "pilot"
+    | "pilot-toggle"
+    | "product"
+    | null
+  >(null);
   const [saleClosesAt, setSaleClosesAt] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [setupRequired, setSetupRequired] = useState(false);
@@ -1975,6 +1993,14 @@ function AdminView() {
   const [newEventAerodrome, setNewEventAerodrome] = useState("");
   const [restartMode, setRestartMode] = useState<"KEEP_MASTER_DATA" | "EMPTY">("KEEP_MASTER_DATA");
   const [restartConfirmation, setRestartConfirmation] = useState("");
+  const [factoryResetOpen, setFactoryResetOpen] = useState(false);
+  const [factoryResetBusy, setFactoryResetBusy] = useState(false);
+  const [factoryResetReason, setFactoryResetReason] = useState("");
+  const [factoryResetPin, setFactoryResetPin] = useState("");
+  const [factoryResetConfirmation, setFactoryResetConfirmation] = useState("");
+  const [retainRecoveryBackup, setRetainRecoveryBackup] = useState(true);
+  const [deleteAllBackups, setDeleteAllBackups] = useState(false);
+  const [factoryResetCommandId, setFactoryResetCommandId] = useState(() => crypto.randomUUID());
   const resourceGroups = board?.resourceGroups ?? [];
   const isAdministrator = board?.currentDeviceRole === "ADMIN";
   const refreshHistory = useCallback(async () => {
@@ -2175,6 +2201,8 @@ function AdminView() {
   }
 
   function selectProductForEditing(id: string) {
+    setMasterEditorOpen(true);
+    setMasterSubmitAttempted(false);
     setProductEditorId(id);
     const entry = board?.products.find((product) => product.id === id);
     setProductName(entry?.name ?? "");
@@ -2191,6 +2219,8 @@ function AdminView() {
   }
 
   function selectGateForEditing(id: string) {
+    setMasterEditorOpen(true);
+    setMasterSubmitAttempted(false);
     setGateEditorId(id);
     const entry = board?.gates.find((gate) => gate.id === id);
     setGateLabel(entry?.label ?? "");
@@ -2225,6 +2255,8 @@ function AdminView() {
       );
       setMessage("Gate-Stammdaten wurden protokolliert gespeichert.");
       setAdminPin("");
+      setReason("");
+      setMasterEditorOpen(false);
       setGateEditorId("new");
       setGateLabel("");
       await refresh();
@@ -2276,7 +2308,9 @@ function AdminView() {
       );
       setMessage("Produktstammdaten wurden protokolliert gespeichert.");
       setAdminPin("");
+      setReason("");
       selectProductForEditing("new");
+      setMasterEditorOpen(false);
       await refresh();
       await refreshHistory();
     } catch (cause) {
@@ -2287,6 +2321,8 @@ function AdminView() {
   }
 
   function selectResourceForEditing(id: string) {
+    setMasterEditorOpen(true);
+    setMasterSubmitAttempted(false);
     setResourceEditorId(id);
     const entry = resourceGroups.find((group) => group.id === id);
     setResourceName(entry?.name ?? "");
@@ -2297,6 +2333,8 @@ function AdminView() {
   }
 
   function selectAircraftForEditing(id: string) {
+    setMasterEditorOpen(true);
+    setMasterSubmitAttempted(false);
     setAircraftEditorId(id);
     const entry = board?.aircraft.find((aircraft) => aircraft.id === id);
     setAircraftRegistration(entry?.registration ?? "");
@@ -2341,7 +2379,9 @@ function AdminView() {
       );
       setMessage("Ressourcengruppe wurde protokolliert gespeichert.");
       setAdminPin("");
+      setReason("");
       selectResourceForEditing("new");
+      setMasterEditorOpen(false);
       await refresh();
       await refreshHistory();
     } catch (cause) {
@@ -2387,7 +2427,9 @@ function AdminView() {
       );
       setMessage("Flugzeugstammdaten wurden protokolliert gespeichert.");
       setAdminPin("");
+      setReason("");
       selectAircraftForEditing("new");
+      setMasterEditorOpen(false);
       await refresh();
       await refreshHistory();
     } catch (cause) {
@@ -2429,6 +2471,8 @@ function AdminView() {
         "Flugzeugzuordnung wurde historisiert geändert; Queue und Prognose werden neu berechnet.",
       );
       setAdminPin("");
+      setReason("");
+      setMasterEditorOpen(false);
       await refresh();
       await refreshHistory();
     } catch (cause) {
@@ -2736,9 +2780,11 @@ function AdminView() {
       );
       setMessage("Anonymer operativer Pilotencode wurde aktualisiert.");
       setAdminPin("");
+      setReason("");
       setPilotEditorId("new");
       setPilotCode("P-02");
       setPilotNote("");
+      setMasterEditorOpen(false);
       await refresh();
       await refreshHistory();
     } catch (cause) {
@@ -2749,6 +2795,8 @@ function AdminView() {
   }
 
   function selectPilotForEditing(id: string) {
+    setMasterEditorOpen(true);
+    setMasterSubmitAttempted(false);
     setPilotEditorId(id);
     const entry = board?.pilots.find((pilot) => pilot.id === id);
     setPilotCode(entry?.operationalCode ?? "P-02");
@@ -2805,6 +2853,113 @@ function AdminView() {
     }
   }
 
+  function requestMasterSave(
+    action:
+      | "gate"
+      | "resource-group"
+      | "aircraft"
+      | "assignment"
+      | "pilot"
+      | "pilot-toggle"
+      | "product",
+    valid: boolean,
+  ) {
+    setMasterSubmitAttempted(true);
+    if (!isAdministrator) {
+      setMessage("Für Stammdatenänderungen wird ein Administrationsgerät benötigt.");
+      return;
+    }
+    if (!valid) return;
+    setReason("");
+    setAdminPin("");
+    setPendingMasterAction(action);
+  }
+
+  async function confirmMasterSave() {
+    const action = pendingMasterAction;
+    if (!action || reason.trim().length < 3 || adminPin.length < 4) return;
+    setPendingMasterAction(null);
+    if (action === "gate") await saveGate();
+    if (action === "resource-group") await saveResourceGroup();
+    if (action === "aircraft") await saveAircraft();
+    if (action === "assignment") await assignAircraft();
+    if (action === "product") await saveProduct();
+    if (action === "pilot") {
+      const existing = board?.pilots.find((pilot) => pilot.id === pilotEditorId);
+      await upsertPilot(
+        pilotEditorId === "new" ? crypto.randomUUID() : pilotEditorId,
+        pilotCode,
+        pilotNote,
+        existing?.active ?? true,
+      );
+    }
+    if (action === "pilot-toggle") {
+      const existing = board?.pilots.find((pilot) => pilot.id === pilotEditorId);
+      if (existing) {
+        await upsertPilot(
+          existing.id,
+          existing.operationalCode,
+          existing.operationalNote,
+          !existing.active,
+        );
+      }
+    }
+  }
+
+  function openFactoryReset() {
+    setFactoryResetCommandId(crypto.randomUUID());
+    setFactoryResetReason("");
+    setFactoryResetPin("");
+    setFactoryResetConfirmation("");
+    setRetainRecoveryBackup(true);
+    setDeleteAllBackups(false);
+    setFactoryResetOpen(true);
+  }
+
+  async function performFactoryReset() {
+    if (
+      factoryResetBusy ||
+      factoryResetReason.trim().length < 3 ||
+      factoryResetPin.length < 4 ||
+      factoryResetConfirmation !== "WERKSZUSTAND"
+    )
+      return;
+    setFactoryResetBusy(true);
+    try {
+      const result = await factoryReset(
+        EVENT_ID,
+        ADMIN_DEVICE_ID,
+        deviceTokenFor(ADMIN_DEVICE_ID),
+        {
+          commandId: factoryResetCommandId,
+          eventId: EVENT_ID,
+          reason: factoryResetReason.trim(),
+          adminPin: factoryResetPin,
+          confirmation: "WERKSZUSTAND",
+          retainRecoveryBackup,
+          deleteAllBackups,
+        },
+      );
+      if (result.resetComplete) {
+        await clearOfflineOperationBoards();
+        try {
+          const registration = await navigator.serviceWorker?.ready;
+          const subscription = await registration?.pushManager.getSubscription();
+          await subscription?.unsubscribe();
+        } catch {
+          // Der Serverzustand ist bereits gelöscht; lokale Push-Bereinigung ist best effort.
+        }
+        window.localStorage.clear();
+        window.location.replace("/setup");
+      }
+    } catch (cause) {
+      setMessage(
+        cause instanceof Error ? cause.message : "Werkszustand konnte nicht hergestellt werden.",
+      );
+      setFactoryResetBusy(false);
+    }
+  }
+
   const setupSteps: SetupStep[] = [
     {
       id: "parameters",
@@ -2831,7 +2986,7 @@ function AdminView() {
       label: "Flugzeuge",
       complete: Boolean(board?.aircraft.length),
       area: "master-data",
-      category: "aircraft",
+      category: "assignments",
     },
     {
       id: "assignments",
@@ -2874,7 +3029,7 @@ function AdminView() {
     },
     "master-data": {
       title: "Stammdaten verwalten",
-      description: "Bestehende Ressourcen bearbeiten oder neue Einträge anlegen.",
+      description: "Ressourcen in sinnvoller Reihenfolge anlegen und bearbeiten.",
     },
     operations: {
       title: "Betrieb",
@@ -2882,7 +3037,7 @@ function AdminView() {
     },
     backup: {
       title: "Sicherung & Reset",
-      description: "Veranstaltungen, Geräte, Exporte und Wiederanlauf kontrolliert verwalten.",
+      description: "Daten gezielt bereinigen oder das System vollständig neu einrichten.",
     },
   };
 
@@ -2895,9 +3050,24 @@ function AdminView() {
     if (masterDataCategory === "gates") selectGateForEditing("new");
     if (masterDataCategory === "resource-groups") selectResourceForEditing("new");
     if (masterDataCategory === "aircraft") selectAircraftForEditing("new");
+    if (masterDataCategory === "assignments") {
+      setAssignmentAircraftId(board?.aircraft[0]?.id ?? "");
+      setAssignmentResourceGroupId(board?.aircraft[0]?.resourceGroupId ?? "");
+      setMasterSubmitAttempted(false);
+      setMasterEditorOpen(true);
+    }
     if (masterDataCategory === "pilots") selectPilotForEditing("new");
     if (masterDataCategory === "products") selectProductForEditing("new");
   }
+
+  const masterDataCounts: Record<MasterDataCategory, number> = {
+    gates: board?.gates.length ?? 0,
+    "resource-groups": resourceGroups.length,
+    aircraft: board?.aircraft.length ?? 0,
+    assignments: board?.aircraft.filter((aircraft) => aircraft.resourceGroupId).length ?? 0,
+    pilots: board?.pilots.length ?? 0,
+    products: board?.products.length ?? 0,
+  };
 
   return (
     <Shell title="Administration">
@@ -2928,7 +3098,9 @@ function AdminView() {
                     : "Stand wird geladen"}
             </span>
           </header>
-          <SetupProgress onSelect={openSetupStep} steps={setupSteps} />
+          {adminArea === "setup" ? (
+            <SetupProgress onSelect={openSetupStep} steps={setupSteps} />
+          ) : null}
           {board?.currentDeviceRole === "FLIGHT_DIRECTOR" ? (
             <div className="readonly-banner">Flugleitungsansicht · primär lesend</div>
           ) : null}
@@ -2989,7 +3161,10 @@ function AdminView() {
               </div>
             </section>
           ) : null}
-          <section className="admin-edit-context" hidden={adminArea === "overview"}>
+          <section
+            className="admin-edit-context"
+            hidden={["overview", "master-data", "backup"].includes(adminArea)}
+          >
             <div>
               <strong>Änderungen bestätigen</strong>
               <span>Begründung und Administrator-PIN gelten für die nächste Speicherung.</span>
@@ -3028,54 +3203,65 @@ function AdminView() {
             )}
           </section>
           {isAdministrator ? (
+            <section className="reset-levels" hidden={adminArea !== "backup"}>
+              <div className="reset-level-row">
+                <div>
+                  <h2>Betriebsdaten zurücksetzen</h2>
+                  <p>
+                    Einen neuen, leeren Betriebsstand mit bestehenden Stammdaten anlegen. Der
+                    bisherige Stand bleibt als Audit- und Wiederherstellungsquelle erhalten.
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setRestartMode("KEEP_MASTER_DATA");
+                    setRestartConfirmation("");
+                  }}
+                  type="button"
+                >
+                  Betriebsdaten zurücksetzen
+                </button>
+              </div>
+              <div className="reset-level-row">
+                <div>
+                  <h2>Neue Veranstaltung beginnen</h2>
+                  <p>
+                    Einen neuen Veranstaltungstag ohne bestehende Gates, Ressourcen, Flugzeuge,
+                    Pilotencodes oder Produkte beginnen.
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setRestartMode("EMPTY");
+                    setRestartConfirmation("");
+                  }}
+                  type="button"
+                >
+                  Neue Veranstaltung
+                </button>
+              </div>
+              <div className="reset-level-row factory-reset-row">
+                <div>
+                  <h2>Werkszustand herstellen</h2>
+                  <p>
+                    Alle Anwendungsdaten, Stammdaten, Historien, Gerätebindungen und die
+                    Ersteinrichtung werden gelöscht. Danach startet das System wieder bei /setup.
+                  </p>
+                </div>
+                <button className="danger-action" onClick={openFactoryReset} type="button">
+                  Werkszustand vorbereiten
+                </button>
+              </div>
+            </section>
+          ) : null}
+          {isAdministrator ? (
             <section className="admin-section" hidden={adminArea !== "backup"}>
-              <h2>Veranstaltungen und Vorlagen</h2>
+              <h2>Neuen Betriebsstand anlegen</h2>
               <p>
                 Aktive Veranstaltung: <strong>{board?.event.name ?? EVENT_ID}</strong>. Ein Neustart
                 legt eine neue Veranstaltung an. Der bisherige Stand bleibt für Audit, Berichte und
                 Wiederherstellung unverändert erhalten.
               </p>
-              <div className="event-lifecycle">
-                <span>
-                  Betriebsphase: <strong>{board?.event.status ?? "–"}</strong>
-                </span>
-                {board?.event.status === "PREPARATION" ? (
-                  <button
-                    type="button"
-                    disabled={reason.trim().length < 3 || adminPin.length < 4}
-                    onClick={() => void setEventLifecycle("ACTIVE")}
-                  >
-                    Veranstaltung aktivieren
-                  </button>
-                ) : null}
-                {board?.event.status === "ACTIVE" ? (
-                  <button
-                    type="button"
-                    disabled={reason.trim().length < 3 || adminPin.length < 4}
-                    onClick={() => void setEventLifecycle("CLOSED")}
-                  >
-                    Veranstaltung schließen
-                  </button>
-                ) : null}
-                {board?.event.status === "CLOSED" ? (
-                  <>
-                    <button
-                      type="button"
-                      disabled={reason.trim().length < 3 || adminPin.length < 4}
-                      onClick={() => void setEventLifecycle("ACTIVE")}
-                    >
-                      Erneut aktivieren
-                    </button>
-                    <button
-                      type="button"
-                      disabled={reason.trim().length < 3 || adminPin.length < 4}
-                      onClick={() => void setEventLifecycle("ARCHIVED")}
-                    >
-                      Archivieren
-                    </button>
-                  </>
-                ) : null}
-              </div>
               <div className="event-catalog">
                 {events.map((entry) => (
                   <a
@@ -3348,9 +3534,15 @@ function AdminView() {
           <section className="master-data-workspace" hidden={adminArea !== "master-data"}>
             <MasterDataNavigation
               activeCategory={masterDataCategory}
-              onChange={setMasterDataCategory}
+              counts={masterDataCounts}
+              onChange={(category) => {
+                setMasterDataCategory(category);
+                setMasterEditorOpen(false);
+                setMasterSubmitAttempted(false);
+              }}
             />
-            {masterDataCategory === "aircraft" && resourceGroups.length === 0 ? (
+            {["aircraft", "assignments"].includes(masterDataCategory) &&
+            resourceGroups.length === 0 ? (
               <ValidationHint>
                 Für eine Zuordnung muss zuerst eine Ressourcengruppe angelegt sein.
               </ValidationHint>
@@ -3363,9 +3555,11 @@ function AdminView() {
                     ? `${resourceGroups.length} Ressourcengruppen`
                     : masterDataCategory === "aircraft"
                       ? `${board?.aircraft.length ?? 0} Flugzeuge`
-                      : masterDataCategory === "pilots"
-                        ? `${board?.pilots.length ?? 0} Pilotencodes`
-                        : `${board?.products.length ?? 0} Produkte`}
+                      : masterDataCategory === "assignments"
+                        ? `${masterDataCounts.assignments} Zuordnungen`
+                        : masterDataCategory === "pilots"
+                          ? `${board?.pilots.length ?? 0} Pilotencodes`
+                          : `${board?.products.length ?? 0} Produkte`}
               </span>
               <button className="primary-action" onClick={startNewMasterDataEntry} type="button">
                 +{" "}
@@ -3375,9 +3569,11 @@ function AdminView() {
                     ? "Ressourcengruppe anlegen"
                     : masterDataCategory === "aircraft"
                       ? "Flugzeug anlegen"
-                      : masterDataCategory === "pilots"
-                        ? "Pilotencode anlegen"
-                        : "Produkt anlegen"}
+                      : masterDataCategory === "assignments"
+                        ? "Zuordnung ändern"
+                        : masterDataCategory === "pilots"
+                          ? "Pilotencode anlegen"
+                          : "Produkt anlegen"}
               </button>
             </div>
             <div className="master-data-table-scroll">
@@ -3513,6 +3709,46 @@ function AdminView() {
                   </tbody>
                 </table>
               ) : null}
+              {masterDataCategory === "assignments" ? (
+                <table className="master-data-table">
+                  <thead>
+                    <tr>
+                      <th>Flugzeug</th>
+                      <th>Flugzeugtyp</th>
+                      <th>Aktuelle Ressourcengruppe</th>
+                      <th>Aktionen</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {board?.aircraft.map((aircraft) => (
+                      <tr
+                        className={assignmentAircraftId === aircraft.id ? "selected" : ""}
+                        key={aircraft.id}
+                      >
+                        <td>
+                          <strong>{aircraft.registration}</strong>
+                        </td>
+                        <td>{aircraft.aircraftType}</td>
+                        <td>{aircraft.resourceGroupName || "Nicht zugeordnet"}</td>
+                        <td>
+                          <button
+                            className="table-action"
+                            onClick={() => {
+                              setAssignmentAircraftId(aircraft.id);
+                              setAssignmentResourceGroupId(aircraft.resourceGroupId);
+                              setMasterSubmitAttempted(false);
+                              setMasterEditorOpen(true);
+                            }}
+                            type="button"
+                          >
+                            Zuordnung ändern
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : null}
               {masterDataCategory === "pilots" ? (
                 <table className="master-data-table">
                   <thead>
@@ -3600,15 +3836,68 @@ function AdminView() {
                   </tbody>
                 </table>
               ) : null}
+              {(masterDataCategory === "gates" && (board?.gates.length ?? 0) === 0) ||
+              (masterDataCategory === "resource-groups" && resourceGroups.length === 0) ||
+              (masterDataCategory === "aircraft" && (board?.aircraft.length ?? 0) === 0) ||
+              (masterDataCategory === "assignments" && (board?.aircraft.length ?? 0) === 0) ||
+              (masterDataCategory === "pilots" && (board?.pilots.length ?? 0) === 0) ||
+              (masterDataCategory === "products" && (board?.products.length ?? 0) === 0) ? (
+                <div className="master-data-empty">
+                  <strong>
+                    Noch keine{" "}
+                    {masterDataCategory === "gates"
+                      ? "Gates"
+                      : masterDataCategory === "resource-groups"
+                        ? "Ressourcengruppe"
+                        : masterDataCategory === "aircraft"
+                          ? "Flugzeuge"
+                          : masterDataCategory === "assignments"
+                            ? "Flugzeuge für eine Zuordnung"
+                            : masterDataCategory === "pilots"
+                              ? "Pilotencodes"
+                              : "Produkte"}{" "}
+                    angelegt
+                  </strong>
+                  <p>
+                    {masterDataCategory === "resource-groups"
+                      ? "Eine Ressourcengruppe benötigt ein aktives Gate."
+                      : masterDataCategory === "products"
+                        ? "Ein Produkt benötigt eine Ressourcengruppe und ein aktives Gate."
+                        : masterDataCategory === "assignments"
+                          ? "Legen Sie zuerst ein Flugzeug und eine Ressourcengruppe an."
+                          : "Mit der Schaltfläche oben kann der erste Datensatz angelegt werden."}
+                  </p>
+                  {masterDataCategory === "resource-groups" ? (
+                    <button
+                      className="table-action"
+                      onClick={() => setMasterDataCategory("gates")}
+                      type="button"
+                    >
+                      Gate verwalten
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           </section>
           <section
-            className="admin-section master-data-editor"
+            className="admin-section master-data-editor master-data-drawer"
             hidden={
-              adminArea !== "master-data" || !["gates", "products"].includes(masterDataCategory)
+              adminArea !== "master-data" ||
+              !masterEditorOpen ||
+              !["gates", "products"].includes(masterDataCategory)
             }
           >
-            <h2>{masterDataCategory === "gates" ? "Gate bearbeiten" : "Produkt bearbeiten"}</h2>
+            <div className="drawer-heading">
+              <h2>{masterDataCategory === "gates" ? "Gate bearbeiten" : "Produkt bearbeiten"}</h2>
+              <button
+                aria-label="Editor schließen"
+                onClick={() => setMasterEditorOpen(false)}
+                type="button"
+              >
+                ×
+              </button>
+            </div>
             <div className="master-data-columns">
               <fieldset hidden={masterDataCategory !== "gates"}>
                 <legend>Gate</legend>
@@ -3658,20 +3947,15 @@ function AdminView() {
                   />{" "}
                   aktiv
                 </label>
-                {gateLabel.trim().length < 2 ? (
+                {masterSubmitAttempted && gateLabel.trim().length < 2 ? (
                   <ValidationHint tone="error">
                     Die Gate-Bezeichnung muss mindestens 2 Zeichen lang sein.
                   </ValidationHint>
                 ) : null}
                 <button
                   className="primary-action"
-                  disabled={
-                    !isAdministrator ||
-                    gateLabel.trim().length < 2 ||
-                    reason.trim().length < 3 ||
-                    adminPin.length < 4
-                  }
-                  onClick={saveGate}
+                  disabled={!isAdministrator}
+                  onClick={() => requestMasterSave("gate", gateLabel.trim().length >= 2)}
                   type="button"
                 >
                   Gate speichern
@@ -3814,27 +4098,28 @@ function AdminView() {
                   />{" "}
                   Begleitpflicht für Kinder
                 </label>
-                {productName.trim().length < 2 ||
-                !/^[A-Z0-9-]{2,12}$/.test(productCode) ||
-                !productResourceGroupId ||
-                !productGateId ? (
+                {masterSubmitAttempted &&
+                (productName.trim().length < 2 ||
+                  !/^[A-Z0-9-]{2,12}$/.test(productCode) ||
+                  !productResourceGroupId ||
+                  !productGateId) ? (
                   <ValidationHint tone="error">
                     Bezeichnung, gültiges Kürzel, Ressourcengruppe und Gate müssen vollständig sein.
                   </ValidationHint>
                 ) : null}
                 <button
                   className="primary-action"
-                  disabled={
-                    !isAdministrator ||
-                    productName.trim().length < 2 ||
-                    !/^[A-Z0-9-]{2,12}$/.test(productCode) ||
-                    !productResourceGroupId ||
-                    !productGateId ||
-                    productWeightClasses.length === 0 ||
-                    reason.trim().length < 3 ||
-                    adminPin.length < 4
+                  disabled={!isAdministrator}
+                  onClick={() =>
+                    requestMasterSave(
+                      "product",
+                      productName.trim().length >= 2 &&
+                        /^[A-Z0-9-]{2,12}$/.test(productCode) &&
+                        Boolean(productResourceGroupId) &&
+                        Boolean(productGateId) &&
+                        productWeightClasses.length > 0,
+                    )
                   }
-                  onClick={saveProduct}
                   type="button"
                 >
                   Produkt speichern
@@ -3843,17 +4128,29 @@ function AdminView() {
             </div>
           </section>
           <section
-            className="admin-section master-data-editor"
+            className="admin-section master-data-editor master-data-drawer"
             hidden={
               adminArea !== "master-data" ||
-              !["resource-groups", "aircraft"].includes(masterDataCategory)
+              !masterEditorOpen ||
+              !["resource-groups", "aircraft", "assignments"].includes(masterDataCategory)
             }
           >
-            <h2>
-              {masterDataCategory === "resource-groups"
-                ? "Ressourcengruppe bearbeiten"
-                : "Flugzeug bearbeiten"}
-            </h2>
+            <div className="drawer-heading">
+              <h2>
+                {masterDataCategory === "resource-groups"
+                  ? "Ressourcengruppe bearbeiten"
+                  : masterDataCategory === "assignments"
+                    ? "Zuordnung ändern"
+                    : "Flugzeug bearbeiten"}
+              </h2>
+              <button
+                aria-label="Editor schließen"
+                onClick={() => setMasterEditorOpen(false)}
+                type="button"
+              >
+                ×
+              </button>
+            </div>
             <div className="resource-master-grid">
               <fieldset hidden={masterDataCategory !== "resource-groups"}>
                 <legend>Ressourcengruppe</legend>
@@ -3922,21 +4219,20 @@ function AdminView() {
                     placeholder="leer = alle Typen"
                   />
                 </label>
-                {resourceName.trim().length < 2 || !resourceGateId ? (
+                {masterSubmitAttempted && (resourceName.trim().length < 2 || !resourceGateId) ? (
                   <ValidationHint tone="error">
                     Bezeichnung und Gate müssen für die Ressourcengruppe angegeben werden.
                   </ValidationHint>
                 ) : null}
                 <button
                   className="primary-action"
-                  disabled={
-                    !isAdministrator ||
-                    resourceName.trim().length < 2 ||
-                    !resourceGateId ||
-                    reason.trim().length < 3 ||
-                    adminPin.length < 4
+                  disabled={!isAdministrator}
+                  onClick={() =>
+                    requestMasterSave(
+                      "resource-group",
+                      resourceName.trim().length >= 2 && Boolean(resourceGateId),
+                    )
                   }
-                  onClick={saveResourceGroup}
                   type="button"
                 >
                   Ressourcengruppe speichern
@@ -3992,27 +4288,27 @@ function AdminView() {
                     onChange={(event) => setAircraftMaximumPayload(event.target.value)}
                   />
                 </label>
-                {aircraftRegistration.trim().length < 2 || aircraftType.trim().length < 2 ? (
+                {masterSubmitAttempted &&
+                (aircraftRegistration.trim().length < 3 || aircraftType.trim().length < 2) ? (
                   <ValidationHint tone="error">
                     Kennzeichen und Flugzeugtyp müssen mindestens 2 Zeichen lang sein.
                   </ValidationHint>
                 ) : null}
                 <button
                   className="primary-action"
-                  disabled={
-                    !isAdministrator ||
-                    aircraftRegistration.trim().length < 3 ||
-                    aircraftType.trim().length < 2 ||
-                    reason.trim().length < 3 ||
-                    adminPin.length < 4
+                  disabled={!isAdministrator}
+                  onClick={() =>
+                    requestMasterSave(
+                      "aircraft",
+                      aircraftRegistration.trim().length >= 3 && aircraftType.trim().length >= 2,
+                    )
                   }
-                  onClick={saveAircraft}
                   type="button"
                 >
                   Flugzeug speichern
                 </button>
               </fieldset>
-              <fieldset hidden={masterDataCategory !== "aircraft"}>
+              <fieldset hidden={masterDataCategory !== "assignments"}>
                 <legend>Historisierte Zuordnung</legend>
                 <label>
                   Flugzeug
@@ -4048,21 +4344,20 @@ function AdminView() {
                   Wirksam ab Bestätigung. Aktive Umläufe und inkompatible Flugzeugtypen werden
                   serverseitig abgewiesen.
                 </p>
-                {!assignmentAircraftId || !assignmentResourceGroupId ? (
+                {masterSubmitAttempted && (!assignmentAircraftId || !assignmentResourceGroupId) ? (
                   <ValidationHint tone="error">
                     Flugzeug und neue Ressourcengruppe müssen ausgewählt werden.
                   </ValidationHint>
                 ) : null}
                 <button
                   className="primary-action"
-                  disabled={
-                    !isAdministrator ||
-                    !assignmentAircraftId ||
-                    !assignmentResourceGroupId ||
-                    reason.trim().length < 3 ||
-                    adminPin.length < 4
+                  disabled={!isAdministrator}
+                  onClick={() =>
+                    requestMasterSave(
+                      "assignment",
+                      Boolean(assignmentAircraftId && assignmentResourceGroupId),
+                    )
                   }
-                  onClick={assignAircraft}
                   type="button"
                 >
                   Zuordnung ändern
@@ -4071,10 +4366,21 @@ function AdminView() {
             </div>
           </section>
           <section
-            className="admin-section master-data-editor"
-            hidden={adminArea !== "master-data" || masterDataCategory !== "pilots"}
+            className="admin-section master-data-editor master-data-drawer"
+            hidden={
+              adminArea !== "master-data" || !masterEditorOpen || masterDataCategory !== "pilots"
+            }
           >
-            <h2>{pilotEditorId === "new" ? "Pilotencode anlegen" : "Pilotencode bearbeiten"}</h2>
+            <div className="drawer-heading">
+              <h2>{pilotEditorId === "new" ? "Pilotencode anlegen" : "Pilotencode bearbeiten"}</h2>
+              <button
+                aria-label="Editor schließen"
+                onClick={() => setMasterEditorOpen(false)}
+                type="button"
+              >
+                ×
+              </button>
+            </div>
             <div className="parameter-grid compact-editor-grid">
               <label>
                 Operativer Pilotencode
@@ -4096,7 +4402,7 @@ function AdminView() {
                 />
               </label>
             </div>
-            {!/^[A-Z0-9-]{2,12}$/.test(pilotCode) ? (
+            {masterSubmitAttempted && !/^[A-Z0-9-]{2,12}$/.test(pilotCode) ? (
               <ValidationHint tone="error">
                 Der Pilotencode muss aus 2 bis 12 Großbuchstaben, Ziffern oder Bindestrichen
                 bestehen.
@@ -4105,42 +4411,19 @@ function AdminView() {
             <div className="editor-actions">
               <button
                 className="primary-action"
-                disabled={
-                  !isAdministrator ||
-                  !/^[A-Z0-9-]{2,12}$/.test(pilotCode) ||
-                  reason.trim().length < 3 ||
-                  adminPin.length < 4
-                }
-                onClick={() => {
-                  const existing = board?.pilots.find((pilot) => pilot.id === pilotEditorId);
-                  void upsertPilot(
-                    pilotEditorId === "new" ? crypto.randomUUID() : pilotEditorId,
-                    pilotCode,
-                    pilotNote,
-                    existing?.active ?? true,
-                  );
-                }}
+                disabled={!isAdministrator}
+                onClick={() => requestMasterSave("pilot", /^[A-Z0-9-]{2,12}$/.test(pilotCode))}
                 type="button"
               >
                 {pilotEditorId === "new" ? "Pilotencode anlegen" : "Änderungen speichern"}
               </button>
-              <button onClick={() => selectPilotForEditing("new")} type="button">
+              <button onClick={() => setMasterEditorOpen(false)} type="button">
                 Abbrechen
               </button>
               {pilotEditorId !== "new" ? (
                 <button
-                  disabled={!isAdministrator || reason.trim().length < 3 || adminPin.length < 4}
-                  onClick={() => {
-                    const existing = board?.pilots.find((pilot) => pilot.id === pilotEditorId);
-                    if (existing) {
-                      void upsertPilot(
-                        existing.id,
-                        existing.operationalCode,
-                        existing.operationalNote,
-                        !existing.active,
-                      );
-                    }
-                  }}
+                  disabled={!isAdministrator}
+                  onClick={() => requestMasterSave("pilot-toggle", true)}
                   type="button"
                 >
                   {board?.pilots.find((pilot) => pilot.id === pilotEditorId)?.active
@@ -4434,6 +4717,31 @@ function AdminView() {
           </section>
           <section className="admin-section" hidden={adminArea !== "backup"}>
             <h2>Geräte ohne Helferkonten</h2>
+            <div className="admin-edit-context device-admin-context">
+              <div>
+                <strong>Geräteänderung bestätigen</strong>
+                <span>
+                  PIN ist für Kopplungen, Begründung zusätzlich für Widerrufe erforderlich.
+                </span>
+              </div>
+              <label>
+                Begründung
+                <input
+                  onChange={(event) => setReason(event.target.value)}
+                  placeholder="Für einen Widerruf"
+                  value={reason}
+                />
+              </label>
+              <label>
+                Administrator-PIN
+                <input
+                  autoComplete="current-password"
+                  onChange={(event) => setAdminPin(event.target.value)}
+                  type="password"
+                  value={adminPin}
+                />
+              </label>
+            </div>
             <div className="device-pairing-form">
               <label>
                 Technische Gerätebezeichnung
@@ -4581,6 +4889,176 @@ function AdminView() {
               {history.entries.length === 0 ? <p>Keine passenden Ereignisse.</p> : null}
             </div>
           </section>
+          {pendingMasterAction ? (
+            <div className="modal-backdrop">
+              <section
+                aria-labelledby="master-confirmation-title"
+                aria-modal="true"
+                className="confirmation-dialog"
+                role="dialog"
+              >
+                <div className="drawer-heading">
+                  <div>
+                    <h2 id="master-confirmation-title">Änderung bestätigen</h2>
+                    <p>Die Stammdatenänderung wird protokolliert.</p>
+                  </div>
+                  <button
+                    aria-label="Bestätigung schließen"
+                    onClick={() => setPendingMasterAction(null)}
+                    type="button"
+                  >
+                    ×
+                  </button>
+                </div>
+                <label>
+                  Begründung
+                  <textarea
+                    maxLength={240}
+                    onChange={(event) => setReason(event.target.value)}
+                    placeholder="Grund für die Änderung"
+                    value={reason}
+                  />
+                </label>
+                <label>
+                  Administrator-PIN
+                  <input
+                    autoComplete="current-password"
+                    onChange={(event) => setAdminPin(event.target.value)}
+                    type="password"
+                    value={adminPin}
+                  />
+                </label>
+                <div className="dialog-actions">
+                  <button onClick={() => setPendingMasterAction(null)} type="button">
+                    Abbrechen
+                  </button>
+                  <button
+                    className="primary-action"
+                    disabled={reason.trim().length < 3 || adminPin.length < 4}
+                    onClick={() => void confirmMasterSave()}
+                    type="button"
+                  >
+                    Bestätigen und speichern
+                  </button>
+                </div>
+              </section>
+            </div>
+          ) : null}
+          {factoryResetOpen ? (
+            <div className="modal-backdrop factory-reset-backdrop">
+              <section
+                aria-labelledby="factory-reset-title"
+                aria-modal="true"
+                className="confirmation-dialog factory-reset-dialog"
+                role="dialog"
+              >
+                <div className="drawer-heading">
+                  <div>
+                    <h2 id="factory-reset-title">Werkszustand herstellen</h2>
+                    <p>Diese Aktion kann nicht rückgängig gemacht werden.</p>
+                  </div>
+                  <button
+                    aria-label="Werksreset schließen"
+                    disabled={factoryResetBusy}
+                    onClick={() => setFactoryResetOpen(false)}
+                    type="button"
+                  >
+                    ×
+                  </button>
+                </div>
+                <div className="factory-delete-summary">
+                  <strong>Wird gelöscht</strong>
+                  <ul>
+                    <li>Alle Tickets, Warteschlangen, Umläufe und Flugdaten</li>
+                    <li>Alle Stammdaten und Veranstaltungsparameter</li>
+                    <li>Alle Historien, Protokolle und Gerätebindungen</li>
+                    <li>Die Ersteinrichtung und lokalen Zugangsdaten</li>
+                  </ul>
+                </div>
+                <label>
+                  Begründung
+                  <textarea
+                    maxLength={240}
+                    onChange={(event) => setFactoryResetReason(event.target.value)}
+                    placeholder="Grund für den Werksreset"
+                    value={factoryResetReason}
+                  />
+                </label>
+                <label>
+                  Administrator-PIN
+                  <input
+                    autoComplete="current-password"
+                    onChange={(event) => setFactoryResetPin(event.target.value)}
+                    type="password"
+                    value={factoryResetPin}
+                  />
+                </label>
+                <label>
+                  Zum Bestätigen <strong>WERKSZUSTAND</strong> eingeben
+                  <input
+                    autoComplete="off"
+                    onChange={(event) => setFactoryResetConfirmation(event.target.value)}
+                    value={factoryResetConfirmation}
+                  />
+                </label>
+                <label className="reset-checkbox">
+                  <input
+                    checked={retainRecoveryBackup}
+                    onChange={(event) => {
+                      setRetainRecoveryBackup(event.target.checked);
+                      if (event.target.checked) setDeleteAllBackups(false);
+                    }}
+                    type="checkbox"
+                  />
+                  <span>
+                    <strong>Wiederherstellungssicherung in R2 behalten</strong>
+                    <small>Empfohlen – ermöglicht eine spätere Wiederherstellung.</small>
+                  </span>
+                </label>
+                <label className="reset-checkbox extra-danger">
+                  <input
+                    checked={deleteAllBackups}
+                    onChange={(event) => {
+                      setDeleteAllBackups(event.target.checked);
+                      if (event.target.checked) setRetainRecoveryBackup(false);
+                    }}
+                    type="checkbox"
+                  />
+                  <span>
+                    <strong>Auch alle R2-Sicherungen endgültig löschen</strong>
+                    <small>Diese Aktion kann nicht rückgängig gemacht werden.</small>
+                  </span>
+                </label>
+                <p className="reset-consequence">
+                  Nach erfolgreichem Reset werden lokale Zugangsdaten entfernt und /setup geöffnet.
+                </p>
+                <div className="dialog-actions">
+                  <button
+                    disabled={factoryResetBusy}
+                    onClick={() => setFactoryResetOpen(false)}
+                    type="button"
+                  >
+                    Abbrechen
+                  </button>
+                  <button
+                    className="danger-action"
+                    disabled={
+                      factoryResetBusy ||
+                      factoryResetReason.trim().length < 3 ||
+                      factoryResetPin.length < 4 ||
+                      factoryResetConfirmation !== "WERKSZUSTAND"
+                    }
+                    onClick={() => void performFactoryReset()}
+                    type="button"
+                  >
+                    {factoryResetBusy
+                      ? "System wird zurückgesetzt …"
+                      : "Alles löschen und neu starten"}
+                  </button>
+                </div>
+              </section>
+            </div>
+          ) : null}
           {message ? (
             <div className="action-message" role="status">
               {message}
