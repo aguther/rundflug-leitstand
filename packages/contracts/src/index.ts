@@ -604,6 +604,8 @@ export const rotationOperationalSummarySchema = z.object({
   id: z.string(),
   flightGroupId: z.string(),
   communicationNumber: z.number().int().positive(),
+  communicationLabel: z.string().regex(/^[A-Z0-9-]+-\d{3,}$/),
+  productCode: z.string(),
   productName: z.string(),
   status: z.enum(["DRAFT", "CALLED", "IN_FLIGHT", "LANDED", "COMPLETED"]),
   ticketGroupId: z.string(),

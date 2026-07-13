@@ -551,6 +551,8 @@ describe("commandEnvelopeSchema", () => {
       id: "synthetic-rotation",
       flightGroupId: "synthetic-flight-group",
       communicationNumber: 42,
+      communicationLabel: "PAN-042",
+      productCode: "PAN",
       productName: "Panorama",
       status: "IN_FLIGHT",
       ticketGroupId: "synthetic-ticket-group",

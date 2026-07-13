@@ -710,6 +710,7 @@ app.get("/api/events/:eventId/operations", async (context) => {
                LIMIT 1) AS suggested_aircraft_registration,
               MIN(tg.id) AS ticket_group_id, MIN(tg.deferral_count) AS deferral_count,
               COUNT(rt.ticket_id) AS ticket_count,
+              COALESCE(MIN(p.code), 'RUND') AS product_code,
               COALESCE(MIN(p.name), 'Rundflug') AS product_name,
               COALESCE(MIN(p.reference_duration_minutes), 20) AS reference_duration_minutes,
               (SELECT json_group_array(json_object(
@@ -750,6 +751,7 @@ app.get("/api/events/:eventId/operations", async (context) => {
         ticket_group_id: string;
         deferral_count: number;
         ticket_count: number;
+        product_code: string;
         product_name: string;
         reference_duration_minutes: number;
         called_at: string | null;
@@ -1059,6 +1061,8 @@ app.get("/api/events/:eventId/operations", async (context) => {
         id: rotation.id,
         flightGroupId: rotation.flight_group_id,
         communicationNumber: rotation.communication_number,
+        communicationLabel: `${rotation.product_code}-${String(rotation.communication_number).padStart(3, "0")}`,
+        productCode: rotation.product_code,
         productName: rotation.product_name,
         status: rotation.status,
         ticketGroupId: rotation.ticket_group_id,
