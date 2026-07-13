@@ -139,6 +139,38 @@ describe("commandEnvelopeSchema", () => {
     expect(JSON.stringify(parsed)).not.toMatch(/safe|freigabe/i);
   });
 
+  it("forbids direct forecast overrides in operational commands", () => {
+    const base = {
+      commandId: "550e8400-e29b-41d4-a716-446655440099",
+      eventId: "synthetic-event",
+      deviceId: "synthetic-flight-lead",
+      expectedVersion: 4,
+      issuedAt: "2026-07-11T12:00:00.000Z",
+    };
+    expect(() =>
+      commandEnvelopeSchema.parse({
+        ...base,
+        type: "SET_EVENT_INTERRUPTION",
+        payload: {
+          interrupted: true,
+          reason: "Synthetische Wetterunterbrechung",
+          expectedReviewAt: null,
+          predictedDepartureAt: "2026-07-11T12:30:00.000Z",
+        },
+      }),
+    ).toThrow();
+    expect(() =>
+      commandEnvelopeSchema.parse({
+        ...base,
+        type: "SET_FORECAST_TIME",
+        payload: {
+          rotationId: "synthetic-rotation",
+          predictedDepartureAt: "2026-07-11T12:30:00.000Z",
+        },
+      }),
+    ).toThrow();
+  });
+
   it("accepts anonymous pilot codes and no pilot name", () => {
     const parsed = commandEnvelopeSchema.parse({
       commandId: "550e8400-e29b-41d4-a716-446655440011",
