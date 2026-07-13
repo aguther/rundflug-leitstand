@@ -427,6 +427,7 @@ function CashierView() {
             standby: false,
             paymentStatus,
             paymentMethod,
+            oversizeSplitAcknowledged: false,
           },
         },
         deviceTokenFor(CASHIER_DEVICE_ID),
@@ -548,7 +549,7 @@ function CashierView() {
     setLastTicketGroupId(result.ticketGroupId);
     setLastProductId(result.productId);
     setCorrectionTargetLabel(
-      result.communicationLabel ?? `Gruppe ${result.ticketGroupId.slice(0, 8)}`,
+      result.communicationLabels.join(" / ") || `Gruppe ${result.ticketGroupId.slice(0, 8)}`,
     );
     setReceipt([]);
     setMessage(
@@ -846,7 +847,7 @@ function CashierView() {
                   key={result.ticketGroupId}
                   onClick={() => selectSearchResult(result)}
                 >
-                  <strong>{result.communicationLabel ?? result.productCode}</strong>
+                  <strong>{result.communicationLabels.join(" / ") || result.productCode}</strong>
                   <span>
                     {result.productName} · {result.groupSize} Ticket
                     {result.groupSize === 1 ? "" : "s"}

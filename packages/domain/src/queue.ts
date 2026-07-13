@@ -26,6 +26,37 @@ export interface QueuePlan {
   unassigned: Array<{ groupId: string; reason: "NO_CAPACITY" | "GROUP_TOO_LARGE" }>;
 }
 
+export interface BookingGroupSplitPlan {
+  slotSizes: number[];
+  splitAcknowledged: boolean;
+}
+
+export function planBookingGroupSplit(input: {
+  groupSize: number;
+  referenceCapacity: number;
+  splitAcknowledged: boolean;
+}): BookingGroupSplitPlan {
+  if (!Number.isInteger(input.groupSize) || input.groupSize <= 0) {
+    throw new DomainRuleError("BOOKING_GROUP_SIZE_INVALID", "Gruppengröße muss positiv sein.");
+  }
+  if (!Number.isInteger(input.referenceCapacity) || input.referenceCapacity <= 0) {
+    throw new DomainRuleError("REFERENCE_CAPACITY_INVALID", "Referenzkapazität muss positiv sein.");
+  }
+  const requiredFlightGroupCount = Math.ceil(input.groupSize / input.referenceCapacity);
+  if (requiredFlightGroupCount > 1 && !input.splitAcknowledged) {
+    throw new DomainRuleError(
+      "OVERSIZE_GROUP_SPLIT_CONFIRMATION_REQUIRED",
+      "Die Buchungsgruppe passt nicht in einen Umlauf. Die Aufteilung auf unmittelbar folgende Fluggruppen muss ausdrücklich bestätigt werden.",
+    );
+  }
+  return {
+    slotSizes: Array.from({ length: requiredFlightGroupCount }, (_, index) =>
+      Math.min(input.referenceCapacity, input.groupSize - index * input.referenceCapacity),
+    ),
+    splitAcknowledged: requiredFlightGroupCount > 1,
+  };
+}
+
 export function planNextRotations(input: {
   groups: readonly QueueGroup[];
   aircraft: readonly QueueAircraft[];

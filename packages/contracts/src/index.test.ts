@@ -103,6 +103,35 @@ describe("commandEnvelopeSchema", () => {
     expect(parsed.type).toBe("CONFIGURE_PRODUCT_SALES");
   });
 
+  it("requires an explicit transport flag for acknowledged oversized group splits", () => {
+    const sale = {
+      commandId: "550e8400-e29b-41d4-a716-446655440020",
+      eventId: "synthetic-event",
+      deviceId: "synthetic-cashier",
+      expectedVersion: 2,
+      issuedAt: "2026-07-11T12:00:00.000Z",
+      type: "SELL_TICKET_GROUP",
+      payload: {
+        productId: "synthetic-product",
+        publicTicketCodes: ["ABCDEFGHJKLM"],
+        standby: false,
+        paymentStatus: "PAID",
+        paymentMethod: "CASH",
+      },
+    } as const;
+    const ordinary = commandEnvelopeSchema.parse(sale);
+    const acknowledged = commandEnvelopeSchema.parse({
+      ...sale,
+      payload: { ...sale.payload, oversizeSplitAcknowledged: true },
+    });
+    expect(
+      ordinary.type === "SELL_TICKET_GROUP" && ordinary.payload.oversizeSplitAcknowledged,
+    ).toBe(false);
+    expect(
+      acknowledged.type === "SELL_TICKET_GROUP" && acknowledged.payload.oversizeSplitAcknowledged,
+    ).toBe(true);
+  });
+
   it("accepts only hashed credentials for device pairing", () => {
     const parsed = commandEnvelopeSchema.parse({
       commandId: "550e8400-e29b-41d4-a716-446655440001",
@@ -532,7 +561,10 @@ describe("commandEnvelopeSchema", () => {
           soldAt: "2026-07-11T12:00:00.000Z",
           communicationNumber: 42,
           communicationLabel: "PAN20-042",
+          communicationNumbers: [42, 43],
+          communicationLabels: ["PAN20-042", "PAN20-043"],
           rotationStatus: "DRAFT",
+          rotationStatuses: ["DRAFT"],
         },
       ],
     });
