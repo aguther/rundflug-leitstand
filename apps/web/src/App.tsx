@@ -39,6 +39,11 @@ import {
 } from "./board-sync";
 import { rememberActiveEvent, resolveActiveEvent } from "./event-context";
 import {
+  eventDateInTimeZone,
+  eventLocalDateTimeToIso,
+  formatEventLocalDateTime,
+} from "./event-time";
+import {
   appendCashierDraftRevision,
   cashierDraftQueueKey,
   latestCashierDraft,
@@ -95,7 +100,7 @@ const weightClassLabel: Record<WeightClass, string> = {
   INDIVIDUAL: "Individuell",
 };
 
-function saleClosingLabel(value: string | null): string | null {
+function saleClosingLabel(value: string | null, timeZone: string): string | null {
   if (!value) return null;
   const minutes = Math.ceil((Date.parse(value) - Date.now()) / 60_000);
   if (minutes <= 0) return "Verkaufsschluss erreicht";
@@ -103,19 +108,17 @@ function saleClosingLabel(value: string | null): string | null {
   return `Verkaufsschluss ${new Date(value).toLocaleTimeString("de-DE", {
     hour: "2-digit",
     minute: "2-digit",
+    timeZone,
   })}`;
 }
 
-function toLocalDateTimeInput(value: string | null): string {
-  if (!value) return "";
-  const date = new Date(value);
-  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
-  return local.toISOString().slice(0, 16);
-}
-
-function operationalTimeLabel(value: string | null): string {
+function operationalTimeLabel(value: string | null, timeZone: string): string {
   if (!value) return "–";
-  return new Date(value).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+  return new Date(value).toLocaleTimeString("de-DE", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone,
+  });
 }
 
 function deviceTokenFor(deviceId: string): string {
@@ -582,7 +585,7 @@ function CashierView() {
               </span>
               <span>
                 {entry.nextBoardingWindowLowerAt && entry.nextBoardingWindowUpperAt
-                  ? `Nächstes Boardingfenster ${operationalTimeLabel(entry.nextBoardingWindowLowerAt)}–${operationalTimeLabel(entry.nextBoardingWindowUpperAt)}`
+                  ? `Nächstes Boardingfenster ${operationalTimeLabel(entry.nextBoardingWindowLowerAt, board.event.timeZone)}–${operationalTimeLabel(entry.nextBoardingWindowUpperAt, board.event.timeZone)}`
                   : "Boardingfenster derzeit unsicher"}
               </span>
               <span>Gemeinsame Queue: {entry.resourceGroupOpenTickets} Tickets</span>
@@ -591,8 +594,8 @@ function CashierView() {
                 <span>Betriebshinweis: {entry.resourceGroupOperationalNote}</span>
               ) : null}
               <span>Noch vorsichtig kalkuliert: {entry.remainingSellableSeats} Plätze</span>
-              {saleClosingLabel(entry.saleClosesAt) ? (
-                <span>{saleClosingLabel(entry.saleClosesAt)}</span>
+              {saleClosingLabel(entry.saleClosesAt, board.event.timeZone) ? (
+                <span>{saleClosingLabel(entry.saleClosesAt, board.event.timeZone)}</span>
               ) : null}
             </button>
           ))}
@@ -1233,9 +1236,24 @@ function FlightLineView() {
                     ).map(([label, field]) => (
                       <tr key={field}>
                         <th scope="row">{label}</th>
-                        <td>{operationalTimeLabel(selected.timeline.planned[field])}</td>
-                        <td>{operationalTimeLabel(selected.timeline.predicted[field])}</td>
-                        <td>{operationalTimeLabel(selected.timeline.actual[field])}</td>
+                        <td>
+                          {operationalTimeLabel(
+                            selected.timeline.planned[field],
+                            board?.event.timeZone ?? "Europe/Berlin",
+                          )}
+                        </td>
+                        <td>
+                          {operationalTimeLabel(
+                            selected.timeline.predicted[field],
+                            board?.event.timeZone ?? "Europe/Berlin",
+                          )}
+                        </td>
+                        <td>
+                          {operationalTimeLabel(
+                            selected.timeline.actual[field],
+                            board?.event.timeZone ?? "Europe/Berlin",
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -1597,7 +1615,7 @@ function SetupView() {
   } | null>(null);
   const [eventId, setEventId] = useState(`rundflug-${new Date().getFullYear()}`);
   const [name, setName] = useState(`Rundflug ${new Date().getFullYear()}`);
-  const [eventDate, setEventDate] = useState(new Date().toISOString().slice(0, 10));
+  const [eventDate, setEventDate] = useState(eventDateInTimeZone(new Date(), "Europe/Berlin"));
   const [aerodrome, setAerodrome] = useState("");
   const [setupCode, setSetupCode] = useState("");
   const [adminPin, setAdminPin] = useState("");
@@ -1948,19 +1966,27 @@ function AdminView() {
   const isAdministrator = board?.currentDeviceRole === "ADMIN";
   const refreshHistory = useCallback(async () => {
     try {
+      const timeZone = board?.event.timeZone ?? "Europe/Berlin";
       setHistory(
         await getAuditHistory(EVENT_ID, ADMIN_DEVICE_ID, deviceTokenFor(ADMIN_DEVICE_ID), {
           eventType: historyEventType,
           aggregateType: historyAggregateType,
           aggregateId: historyAggregateId,
-          since: historySince,
-          until: historyUntil,
+          ...(historySince ? { since: eventLocalDateTimeToIso(historySince, timeZone) } : {}),
+          ...(historyUntil ? { until: eventLocalDateTimeToIso(historyUntil, timeZone) } : {}),
         }),
       );
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : "Historie nicht verfügbar.");
     }
-  }, [historyAggregateId, historyAggregateType, historyEventType, historySince, historyUntil]);
+  }, [
+    board?.event.timeZone,
+    historyAggregateId,
+    historyAggregateType,
+    historyEventType,
+    historySince,
+    historyUntil,
+  ]);
   const refreshDevices = useCallback(async () => {
     try {
       setDevices(
@@ -1976,8 +2002,8 @@ function AdminView() {
   }, [isAdministrator, refreshDevices, refreshHistory]);
   useEffect(() => {
     if (!board || eventSettingsInitialized) return;
-    setSaleOpensAt(toLocalDateTimeInput(board.event.saleOpensAt));
-    setOperationsEndAt(toLocalDateTimeInput(board.event.operationsEndAt));
+    setSaleOpensAt(formatEventLocalDateTime(board.event.saleOpensAt, board.event.timeZone));
+    setOperationsEndAt(formatEventLocalDateTime(board.event.operationsEndAt, board.event.timeZone));
     setNoShowAfterMinutes(board.event.noShowAfterMinutes);
     setMaxTicketDeferrals(board.event.maxTicketDeferrals);
     setNotificationLeadMinutes(board.event.notificationLeadMinutes);
@@ -2105,8 +2131,10 @@ function AdminView() {
           issuedAt: new Date().toISOString(),
           type: "CONFIGURE_EVENT_PARAMETERS",
           payload: {
-            saleOpensAt: saleOpensAt ? new Date(saleOpensAt).toISOString() : null,
-            operationsEndAt: new Date(operationsEndAt).toISOString(),
+            saleOpensAt: saleOpensAt
+              ? eventLocalDateTimeToIso(saleOpensAt, board.event.timeZone)
+              : null,
+            operationsEndAt: eventLocalDateTimeToIso(operationsEndAt, board.event.timeZone),
             noShowAfterMinutes,
             maxTicketDeferrals,
             notificationLeadMinutes,
@@ -2556,7 +2584,7 @@ function AdminView() {
     try {
       const configuredClosing =
         useEnteredClosingTime && saleClosesAt
-          ? new Date(saleClosesAt).toISOString()
+          ? eventLocalDateTimeToIso(saleClosesAt, board.event.timeZone)
           : product.saleClosesAt;
       await sendCommand(
         {
@@ -3917,7 +3945,10 @@ function AdminView() {
                 <span>{device.role}</span>
                 <span>{device.active ? (device.online ? "online" : "offline") : "widerrufen"}</span>
                 <time dateTime={device.lastSeenAt}>
-                  zuletzt {new Date(device.lastSeenAt).toLocaleString("de-DE")}
+                  zuletzt{" "}
+                  {new Date(device.lastSeenAt).toLocaleString("de-DE", {
+                    timeZone: board?.event.timeZone ?? "Europe/Berlin",
+                  })}
                 </time>
                 {device.active ? (
                   <button
@@ -3997,7 +4028,9 @@ function AdminView() {
             {history.entries.slice(0, 20).map((entry) => (
               <div key={entry.sequence}>
                 <time dateTime={entry.occurredAt}>
-                  {new Date(entry.occurredAt).toLocaleTimeString("de-DE")}
+                  {new Date(entry.occurredAt).toLocaleTimeString("de-DE", {
+                    timeZone: board?.event.timeZone ?? "Europe/Berlin",
+                  })}
                 </time>
                 <strong>{entry.eventType}</strong>
                 <span>
