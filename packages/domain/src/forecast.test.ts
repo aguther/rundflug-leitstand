@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { estimateDuration, forecastQueueWindows } from "./forecast";
+import { advanceOverduePrediction, estimateDuration, forecastQueueWindows } from "./forecast";
 
 describe("event-driven forecast", () => {
   it("uses the reference model on cold start without requiring a recent actual event", () => {
@@ -63,6 +63,62 @@ describe("event-driven forecast", () => {
       upperMinutes: 0,
       quality: "UNCERTAIN",
     });
+  });
+
+  it.each([
+    {
+      status: "CALLED" as const,
+      now: "2026-07-11T12:30:00.000Z",
+      expected: {
+        predictedDepartureAt: "2026-07-11T12:30:00.000Z",
+        predictedLandingAt: "2026-07-11T12:50:00.000Z",
+        predictedCompletionAt: "2026-07-11T13:00:00.000Z",
+      },
+    },
+    {
+      status: "IN_FLIGHT" as const,
+      now: "2026-07-11T12:30:00.000Z",
+      expected: {
+        predictedDepartureAt: "2026-07-11T12:00:00.000Z",
+        predictedLandingAt: "2026-07-11T12:30:00.000Z",
+        predictedCompletionAt: "2026-07-11T12:40:00.000Z",
+      },
+    },
+    {
+      status: "LANDED" as const,
+      now: "2026-07-11T12:40:00.000Z",
+      expected: {
+        predictedDepartureAt: "2026-07-11T12:00:00.000Z",
+        predictedLandingAt: "2026-07-11T12:20:00.000Z",
+        predictedCompletionAt: "2026-07-11T12:40:00.000Z",
+      },
+    },
+  ])("moves an overdue $status milestone and every following milestone", ({
+    status,
+    now,
+    expected,
+  }) => {
+    expect(
+      advanceOverduePrediction({
+        status,
+        now,
+        predictedDepartureAt: "2026-07-11T12:00:00.000Z",
+        predictedLandingAt: "2026-07-11T12:20:00.000Z",
+        predictedCompletionAt: "2026-07-11T12:30:00.000Z",
+      }),
+    ).toEqual({ ...expected, delayedByMissingEvent: true });
+  });
+
+  it("does not move a future milestone without a missing event", () => {
+    expect(
+      advanceOverduePrediction({
+        status: "IN_FLIGHT",
+        now: "2026-07-11T12:10:00.000Z",
+        predictedDepartureAt: "2026-07-11T12:00:00.000Z",
+        predictedLandingAt: "2026-07-11T12:20:00.000Z",
+        predictedCompletionAt: "2026-07-11T12:30:00.000Z",
+      }).delayedByMissingEvent,
+    ).toBe(false);
   });
 
   it("recalculates the V1 sizing scenario well below two seconds", () => {

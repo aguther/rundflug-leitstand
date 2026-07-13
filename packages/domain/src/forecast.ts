@@ -8,6 +8,49 @@ export interface DurationEstimate {
   sampleCount: number;
 }
 
+export function advanceOverduePrediction(input: {
+  status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED";
+  now: string;
+  predictedDepartureAt: string;
+  predictedLandingAt: string;
+  predictedCompletionAt: string;
+}): {
+  predictedDepartureAt: string;
+  predictedLandingAt: string;
+  predictedCompletionAt: string;
+  delayedByMissingEvent: boolean;
+} {
+  const nowMs = Date.parse(input.now);
+  let departureMs = Date.parse(input.predictedDepartureAt);
+  let landingMs = Date.parse(input.predictedLandingAt);
+  let completionMs = Date.parse(input.predictedCompletionAt);
+  let delayedByMissingEvent = false;
+  const shiftFrom = (milestoneMs: number) => {
+    const delayMs = nowMs - milestoneMs;
+    if (delayMs <= 0) return 0;
+    delayedByMissingEvent = true;
+    return delayMs;
+  };
+  if (input.status === "CALLED") {
+    const delayMs = shiftFrom(departureMs);
+    departureMs += delayMs;
+    landingMs += delayMs;
+    completionMs += delayMs;
+  } else if (input.status === "IN_FLIGHT") {
+    const delayMs = shiftFrom(landingMs);
+    landingMs += delayMs;
+    completionMs += delayMs;
+  } else if (input.status === "LANDED") {
+    completionMs += shiftFrom(completionMs);
+  }
+  return {
+    predictedDepartureAt: new Date(departureMs).toISOString(),
+    predictedLandingAt: new Date(landingMs).toISOString(),
+    predictedCompletionAt: new Date(completionMs).toISOString(),
+    delayedByMissingEvent,
+  };
+}
+
 export function estimateDuration(input: {
   referenceMinutes: number;
   actualDurationsMinutes: readonly number[];

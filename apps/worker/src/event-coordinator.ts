@@ -10,6 +10,7 @@ import {
 } from "@rundflug/contracts";
 import {
   type AircraftOperationalState,
+  advanceOverduePrediction,
   assertMayStageOutageRecoveryEntry,
   assertOutageRecoveryApplication,
   assertOutageRecoveryApproval,
@@ -873,15 +874,25 @@ export class EventCoordinator extends DurableObject<Env> {
       if (rotation.called_at) predictedBoardingAt = rotation.called_at;
       let predictedDepartureAt = addMinutes(predictedBoardingAt, boarding);
       if (rotation.departed_at) predictedDepartureAt = rotation.departed_at;
-      else if (rotation.status === "CALLED" && Date.parse(predictedDepartureAt) < now.getTime())
-        predictedDepartureAt = nowIso;
       const expectedFlightMinutes = Math.max(
         rotation.reference_duration_minutes,
         estimate.expectedMinutes - boarding - deboarding - buffer,
       );
       let predictedLandingAt = addMinutes(predictedDepartureAt, expectedFlightMinutes);
       if (rotation.landed_at) predictedLandingAt = rotation.landed_at;
-      const predictedCompletionAt = addMinutes(predictedLandingAt, deboarding + buffer);
+      let predictedCompletionAt = addMinutes(predictedLandingAt, deboarding + buffer);
+      if (rotation.status !== "DRAFT") {
+        const advanced = advanceOverduePrediction({
+          status: rotation.status,
+          now: nowIso,
+          predictedDepartureAt,
+          predictedLandingAt,
+          predictedCompletionAt,
+        });
+        predictedDepartureAt = advanced.predictedDepartureAt;
+        predictedLandingAt = advanced.predictedLandingAt;
+        predictedCompletionAt = advanced.predictedCompletionAt;
+      }
       statements.push(
         this.env.DB.prepare(
           `UPDATE rotations SET
