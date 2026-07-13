@@ -207,6 +207,32 @@ app.post("/api/setup", async (context) => {
   return context.json({ eventId: input.eventId, adminDeviceId: input.adminDeviceId }, 201);
 });
 
+app.get("/api/device/context", async (context) => {
+  const deviceId = context.req.header("x-device-id");
+  if (!deviceId) {
+    return context.json(
+      { error: { code: "DEVICE_REQUIRED", message: "Gerätekopplung erforderlich." } },
+      403,
+    );
+  }
+  const device = await context.env.DB.prepare(
+    `SELECT operation_day_id, role, credential_hash FROM paired_devices
+      WHERE id = ?1 AND active = 1`,
+  )
+    .bind(deviceId)
+    .first<{ operation_day_id: string; role: string; credential_hash: string | null }>();
+  if (
+    !device ||
+    !(await verifyCredential(context.req.header("x-device-token") ?? null, device.credential_hash))
+  ) {
+    return context.json(
+      { error: { code: "DEVICE_REQUIRED", message: "Gerätekopplung erforderlich." } },
+      403,
+    );
+  }
+  return context.json({ eventId: device.operation_day_id, role: device.role });
+});
+
 app.get("/api/admin/events", async (context) => {
   const sourceEventId = context.req.header("x-event-id");
   const device = sourceEventId
