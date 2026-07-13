@@ -1,11 +1,17 @@
 import { APP_NAME, REQUIREMENTS_VERSION } from "@rundflug/config";
-import { bootstrapRequestSchema, cloneEventRequestSchema } from "@rundflug/contracts";
+import {
+  bootstrapRequestSchema,
+  cloneEventRequestSchema,
+  type FactoryResetResponse,
+  factoryResetRequestSchema,
+} from "@rundflug/contracts";
 import { assessRemainingCapacity, estimateDuration, forecastQueueWindows } from "@rundflug/domain";
 import { Hono } from "hono";
 import { secureHeaders } from "hono/secure-headers";
 import { createPortableBackup, operationDateInTimeZone } from "./backup";
 import { sha256Hex, verifyCredential } from "./crypto";
 import { EventCoordinator } from "./event-coordinator";
+import { factoryResetRequestHash, factoryResetStatements, finishR2Cleanup } from "./factory-reset";
 import { allowUnknownTicketAttempt } from "./public-access";
 import { createCsv, createTextPdf } from "./report";
 import { rowToSnapshot } from "./snapshot";
@@ -231,6 +237,100 @@ app.get("/api/device/context", async (context) => {
     );
   }
   return context.json({ eventId: device.operation_day_id, role: device.role });
+});
+
+app.post("/api/admin/events/:eventId/factory-reset", async (context) => {
+  const parsed = factoryResetRequestSchema.safeParse(await context.req.json().catch(() => null));
+  if (!parsed.success || parsed.data.eventId !== context.req.param("eventId")) {
+    return context.json(
+      { error: { code: "INVALID_FACTORY_RESET", message: "Reset-Daten sind unvollständig." } },
+      400,
+    );
+  }
+  const input = parsed.data;
+  const requestHash = await factoryResetRequestHash(input);
+  const prior = await context.env.DB.prepare(
+    `SELECT request_hash, r2_cleanup_pending, response_json
+       FROM system_reset_receipts WHERE command_id = ?1`,
+  )
+    .bind(input.commandId)
+    .first<{
+      request_hash: string;
+      r2_cleanup_pending: number;
+      response_json: string;
+    }>();
+  if (prior) {
+    if (prior.request_hash !== requestHash) {
+      return context.json(
+        { error: { code: "IDEMPOTENCY_CONFLICT", message: "Reset-ID ist bereits belegt." } },
+        409,
+      );
+    }
+    let response = JSON.parse(prior.response_json) as FactoryResetResponse;
+    if (prior.r2_cleanup_pending) {
+      response = await finishR2Cleanup(context.env, input.commandId, response);
+    }
+    return context.json(response);
+  }
+
+  const authorized = await authorizeDevice(
+    context.env,
+    input.eventId,
+    context.req.header("x-device-id"),
+    context.req.header("x-device-token"),
+  );
+  if (
+    authorized?.role !== "ADMIN" ||
+    !(await verifyCredential(input.adminPin, context.env.ADMIN_PIN_HASH))
+  ) {
+    return context.json(
+      { error: { code: "ADMIN_REQUIRED", message: "Administration erforderlich." } },
+      403,
+    );
+  }
+
+  const eventRows = await context.env.DB.prepare("SELECT id FROM operation_days").all<{
+    id: string;
+  }>();
+  let recoveryBackupKey: string | null = null;
+  if (input.retainRecoveryBackup) {
+    recoveryBackupKey = (await createPortableBackup(context.env, new Date(), "FACTORY_RESET")).key;
+  }
+  const coordinator = eventCoordinatorNamespace(context.env);
+  await Promise.all(
+    eventRows.results.map(async ({ id }) => {
+      const stub = coordinator.get(coordinator.idFromName(id));
+      const response = await stub.fetch(`https://internal/events/${id}/factory-reset`, {
+        method: "POST",
+      });
+      if (!response.ok) throw new Error(`Durable Object ${id} konnte nicht geleert werden.`);
+    }),
+  );
+
+  const response: FactoryResetResponse = {
+    resetComplete: true,
+    setupRequired: true,
+    recoveryBackupKey,
+    r2BackupsDeleted: false,
+  };
+  await context.env.DB.batch(
+    factoryResetStatements(
+      context.env,
+      input.commandId,
+      requestHash,
+      new Date().toISOString(),
+      input.deleteAllBackups,
+      response,
+    ),
+  );
+  if (input.deleteAllBackups) {
+    try {
+      return context.json(await finishR2Cleanup(context.env, input.commandId, response));
+    } catch {
+      return context.json(response, 202);
+    }
+  }
+  return context.json(response);
 });
 
 app.get("/api/admin/events", async (context) => {
