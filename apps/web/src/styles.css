@@ -16,6 +16,11 @@
   --ui-accent-soft: #edf5ff;
   --ui-danger: #c82626;
   --ui-danger-soft: #fff4f4;
+  --ui-warning: #c27a08;
+  --ui-warning-soft: #fff7e6;
+  --ui-warning-text: #6b3d00;
+  --ui-success-soft: #eaf6ef;
+  --ui-success-text: #176b42;
   --ui-shadow: 0 16px 44px rgb(15 37 64 / 10%);
 }
 
@@ -109,7 +114,9 @@
 }
 .master-data-workspace {
   grid-template-columns: minmax(0, 1fr);
-  min-height: 560px;
+  min-height: 0;
+  align-content: start;
+  gap: 0;
   border-color: var(--ui-border);
   background: var(--ui-surface);
 }
@@ -121,7 +128,7 @@
   grid-column: 1;
   grid-row: 1;
   display: flex;
-  gap: 24px;
+  gap: 20px;
   padding: 0 18px;
   overflow-x: auto;
   border-right: 0;
@@ -129,7 +136,7 @@
   background: var(--ui-surface);
 }
 .master-data-nav button {
-  min-height: 52px;
+  min-height: 46px;
   display: flex;
   align-items: center;
   gap: 7px;
@@ -161,7 +168,9 @@
   display: none;
 }
 .master-data-toolbar {
-  padding-top: 16px;
+  min-height: 62px;
+  padding-top: 10px;
+  padding-bottom: 8px;
 }
 .master-data-search {
   width: min(440px, 100%);
@@ -181,7 +190,7 @@
 }
 .master-data-search input {
   width: 100%;
-  min-height: 44px;
+  min-height: 40px;
   padding: 9px 13px 9px 40px;
   border: 1px solid var(--ui-border);
   border-radius: 7px;
@@ -189,14 +198,21 @@
   background: var(--ui-surface-subtle);
 }
 .master-data-table-scroll {
+  height: clamp(230px, 31vh, 340px);
+  margin-bottom: 12px;
+  overflow: auto;
   border-color: var(--ui-border);
   border-radius: 7px;
+  scrollbar-gutter: stable;
 }
 .master-data-table {
   min-width: 700px;
+  table-layout: fixed;
 }
 .master-data-table th,
 .master-data-table td {
+  height: 50px;
+  padding-block: 9px;
   border-color: var(--ui-border);
 }
 .master-data-table th {
@@ -328,6 +344,156 @@
   background: var(--ui-surface-subtle);
 }
 
+/* Complete theme coverage for administrative surfaces that still originate in the legacy layer. */
+.metrics-grid > div,
+.admin-edit-context,
+.setup-checklist,
+.admin-section,
+.correction-controls,
+.capacity-row,
+.fleet-row,
+.pilot-row {
+  color: var(--ui-text);
+  border-color: var(--ui-border);
+  background: var(--ui-surface);
+}
+.admin-edit-context,
+.correction-controls {
+  background: var(--ui-surface-subtle);
+}
+.metrics-grid span,
+.admin-edit-context > div:first-child span,
+.setup-checklist strong,
+.capacity-row span {
+  color: var(--ui-muted);
+}
+.setup-progress {
+  border-color: var(--ui-border);
+}
+.setup-progress li::before {
+  background: var(--ui-border);
+}
+.setup-progress button,
+.setup-step-number {
+  color: var(--ui-muted);
+}
+.setup-step-number {
+  border-color: var(--ui-border);
+  background: var(--ui-surface-subtle);
+}
+.setup-checklist li,
+.active-rotation-list > div {
+  border-color: var(--ui-border);
+}
+.setup-checklist button {
+  color: var(--ui-accent);
+}
+.admin-workspace input,
+.admin-workspace select,
+.admin-workspace textarea,
+.admin-edit-context input {
+  color: var(--ui-text);
+  border-color: var(--ui-border);
+  background: var(--ui-surface-subtle);
+}
+.admin-workspace .primary-action:disabled,
+.admin-workspace button:disabled {
+  border-color: var(--ui-border);
+  color: var(--ui-muted);
+  background: color-mix(in srgb, var(--ui-surface-subtle) 82%, var(--ui-border));
+}
+.action-message,
+.readonly-banner,
+.admin-validation {
+  color: color-mix(in srgb, var(--ui-accent) 78%, var(--ui-text));
+  border-color: color-mix(in srgb, var(--ui-accent) 45%, var(--ui-border));
+  background: var(--ui-accent-soft);
+}
+.admin-validation.error {
+  color: var(--ui-danger);
+  border-color: color-mix(in srgb, var(--ui-danger) 48%, var(--ui-border));
+  background: var(--ui-danger-soft);
+}
+.safety-disclaimer,
+.operational-notice,
+.connection-warning {
+  color: var(--ui-warning-text);
+  border-color: var(--ui-warning);
+  background: var(--ui-warning-soft);
+}
+.success-message {
+  color: var(--ui-success-text);
+  background: var(--ui-success-soft);
+}
+.master-data-empty {
+  min-height: 230px;
+  color: var(--ui-muted);
+  background: var(--ui-surface);
+}
+footer {
+  color: var(--ui-muted);
+  border-top: 1px solid var(--ui-border);
+  background: var(--ui-surface-subtle);
+}
+.localized-input-field {
+  display: grid;
+  gap: 7px;
+  color: var(--ui-text);
+  font-weight: 750;
+}
+.localized-date-time {
+  display: grid;
+  grid-template-columns: minmax(145px, 1fr) auto minmax(105px, 0.6fr);
+  align-items: center;
+  gap: 8px;
+}
+.localized-date-time > span {
+  color: var(--ui-muted);
+  font-size: 0.82rem;
+  font-weight: 650;
+}
+.localized-date-time input {
+  min-width: 0;
+}
+.localized-picker-control {
+  position: relative;
+  min-width: 0;
+}
+.localized-picker-control > input {
+  width: 100%;
+  padding-right: 42px;
+  font-variant-numeric: tabular-nums;
+}
+.localized-picker-trigger {
+  width: 40px;
+  position: absolute;
+  inset: 1px 1px 1px auto;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-left: 1px solid var(--ui-border);
+  color: var(--ui-muted);
+  cursor: pointer;
+}
+.localized-picker-trigger svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
+  pointer-events: none;
+}
+.localized-picker-trigger input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
 @media (max-width: 760px) {
   .app-header {
     padding: 8px 12px;
@@ -380,7 +546,7 @@
     font-size: 1.55rem;
   }
   .master-data-workspace {
-    min-height: 65vh;
+    min-height: 0;
     border-inline: 0;
   }
   .master-data-workspace > :not(.master-data-nav) {
@@ -404,6 +570,8 @@
     padding-inline: 13px;
   }
   .master-data-table-scroll {
+    height: auto;
+    max-height: none;
     overflow: visible;
     border: 0;
   }
@@ -463,6 +631,12 @@
     align-items: flex-start;
     flex-direction: column;
   }
+  .localized-date-time {
+    grid-template-columns: 1fr 94px;
+  }
+  .localized-date-time > span {
+    display: none;
+  }
   .modal-backdrop {
     align-items: end;
     padding: 0;
@@ -486,6 +660,11 @@
   --ui-accent-soft: #122c4d;
   --ui-danger: #ef5b5b;
   --ui-danger-soft: #2b151b;
+  --ui-warning: #f2b84b;
+  --ui-warning-soft: #2b2415;
+  --ui-warning-text: #f7d58f;
+  --ui-success-soft: #10271d;
+  --ui-success-text: #7edca6;
   --ui-shadow: 0 20px 54px rgb(0 0 0 / 35%);
 }
 /* biome-ignore format: Preserve the existing legacy stylesheet while V3 is migrated incrementally. */

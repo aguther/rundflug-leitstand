@@ -53,6 +53,7 @@ import {
   eventLocalDateTimeToIso,
   formatEventLocalDateTime,
 } from "./event-time";
+import { LocalizedDateInput, LocalizedDateTimeInput } from "./localized-date-input";
 import {
   appendCashierDraftRevision,
   cashierDraftQueueKey,
@@ -1762,14 +1763,7 @@ function SetupView() {
                 Bezeichnung
                 <input value={name} onChange={(event) => setName(event.target.value)} />
               </label>
-              <label>
-                Datum
-                <input
-                  type="date"
-                  value={eventDate}
-                  onChange={(event) => setEventDate(event.target.value)}
-                />
-              </label>
+              <LocalizedDateInput label="Datum" value={eventDate} onChange={setEventDate} />
               <label>
                 Flugplatz
                 <input
@@ -3471,14 +3465,7 @@ function AdminView() {
                     placeholder="Flugtag 2027"
                   />
                 </label>
-                <label>
-                  Datum
-                  <input
-                    type="date"
-                    value={newEventDate}
-                    onChange={(event) => setNewEventDate(event.target.value)}
-                  />
-                </label>
+                <LocalizedDateInput label="Datum" value={newEventDate} onChange={setNewEventDate} />
                 <label>
                   Flugplatz
                   <input
@@ -3520,22 +3507,16 @@ function AdminView() {
           <section className="admin-section" hidden={adminArea !== "setup"}>
             <h2>Veranstaltungsparameter</h2>
             <div className="parameter-grid">
-              <label>
-                Verkaufsbeginn
-                <input
-                  type="datetime-local"
-                  value={saleOpensAt}
-                  onChange={(event) => setSaleOpensAt(event.target.value)}
-                />
-              </label>
-              <label>
-                Betriebsende
-                <input
-                  type="datetime-local"
-                  value={operationsEndAt}
-                  onChange={(event) => setOperationsEndAt(event.target.value)}
-                />
-              </label>
+              <LocalizedDateTimeInput
+                label="Verkaufsbeginn"
+                value={saleOpensAt}
+                onChange={setSaleOpensAt}
+              />
+              <LocalizedDateTimeInput
+                label="Betriebsende"
+                value={operationsEndAt}
+                onChange={setOperationsEndAt}
+              />
               <label>
                 No-Show nach Minuten
                 <input
@@ -4779,14 +4760,11 @@ function AdminView() {
           </section>
           <section className="admin-section" hidden={adminArea !== "operations"}>
             <h2>Kapazität und Verkaufsempfehlung</h2>
-            <label>
-              Neuer harter Verkaufsschluss
-              <input
-                type="datetime-local"
-                value={saleClosesAt}
-                onChange={(event) => setSaleClosesAt(event.target.value)}
-              />
-            </label>
+            <LocalizedDateTimeInput
+              label="Neuer harter Verkaufsschluss"
+              value={saleClosesAt}
+              onChange={setSaleClosesAt}
+            />
             <div className="capacity-overview">
               {board?.products.map((product) => (
                 <div className="capacity-row" key={product.id}>
@@ -5122,22 +5100,8 @@ function AdminView() {
                   placeholder="interne ID"
                 />
               </label>
-              <label>
-                Von
-                <input
-                  type="datetime-local"
-                  value={historySince}
-                  onChange={(event) => setHistorySince(event.target.value)}
-                />
-              </label>
-              <label>
-                Bis
-                <input
-                  type="datetime-local"
-                  value={historyUntil}
-                  onChange={(event) => setHistoryUntil(event.target.value)}
-                />
-              </label>
+              <LocalizedDateTimeInput label="Von" value={historySince} onChange={setHistorySince} />
+              <LocalizedDateTimeInput label="Bis" value={historyUntil} onChange={setHistoryUntil} />
               <button onClick={refreshHistory} type="button">
                 Filter anwenden
               </button>
