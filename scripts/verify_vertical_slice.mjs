@@ -129,6 +129,26 @@ const nextRealtimeVersion = (socket) =>
       { once: true },
     );
   });
+const nextForecastVersion = (socket) =>
+  new Promise((resolvePromise, reject) => {
+    const startedAt = Date.now();
+    const timeout = setTimeout(() => {
+      socket.removeEventListener("message", onMessage);
+      reject(new Error("Gerät erhielt die neue Prognose nicht innerhalb von zwei Sekunden."));
+    }, 2_000);
+    const onMessage = (event) => {
+      const message = JSON.parse(String(event.data));
+      if (message.type !== "forecast-updated") return;
+      clearTimeout(timeout);
+      socket.removeEventListener("message", onMessage);
+      resolvePromise({
+        version: message.eventVersion,
+        updatedAt: message.updatedAt,
+        elapsedMs: Date.now() - startedAt,
+      });
+    };
+    socket.addEventListener("message", onMessage);
+  });
 
 let cashierSocket;
 let flightLineSocket;
@@ -199,6 +219,8 @@ try {
   flightLineSocket = await connectRealtime();
   const cashierSaleSignal = nextRealtimeVersion(cashierSocket);
   const flightLineSaleSignal = nextRealtimeVersion(flightLineSocket);
+  const cashierSaleForecast = nextForecastVersion(cashierSocket);
+  const flightLineSaleForecast = nextForecastVersion(flightLineSocket);
   const saleEnvelope = envelope("cashier-tablet-1", activated.event.version, "SELL_TICKET_GROUP", {
     productId: "panorama-20",
     publicTicketCodes: [ticketCode(), ticketCode()],
@@ -215,11 +237,37 @@ try {
     cashierSaleSignal,
     flightLineSaleSignal,
   ]);
+  const [cashierForecast, flightLineForecast] = await Promise.all([
+    cashierSaleForecast,
+    flightLineSaleForecast,
+  ]);
   if (
     cashierRealtime.version !== sold.event.version ||
-    flightLineRealtime.version !== sold.event.version
+    flightLineRealtime.version !== sold.event.version ||
+    cashierForecast.version !== sold.event.version ||
+    flightLineForecast.version !== sold.event.version
   ) {
-    throw new Error("Parallele Geräte erhielten eine abweichende Veranstaltungsversion.");
+    throw new Error("Parallele Geräte erhielten Zustand oder Prognose in abweichender Version.");
+  }
+  const [cashierForecastBoard, flightLineForecastBoard] = await Promise.all([
+    board("cashier-tablet-1", tokens.cashier),
+    board("flight-line-tablet-1", tokens.flightLine),
+  ]);
+  const cashierForecastRotation = cashierForecastBoard.rotations.find(
+    (rotation) => rotation.id === sold.aggregate.relatedRotationId,
+  );
+  const flightLineForecastRotation = flightLineForecastBoard.rotations.find(
+    (rotation) => rotation.id === sold.aggregate.relatedRotationId,
+  );
+  if (
+    cashierForecastBoard.event.version !== sold.event.version ||
+    flightLineForecastBoard.event.version !== sold.event.version ||
+    !cashierForecastRotation?.timeline.predictionUpdatedAt ||
+    cashierForecastRotation.timeline.predictionUpdatedAt !==
+      flightLineForecastRotation?.timeline.predictionUpdatedAt ||
+    cashierForecastRotation.predictedUpperMinutes < cashierForecastRotation.predictedLowerMinutes
+  ) {
+    throw new Error("Persistierte Mehrgeräte-Prognose ist nach dem Verkauf inkonsistent.");
   }
   const duplicate = await post(tokens.cashier, saleEnvelope);
   if (!duplicate.duplicate || duplicate.event.version !== sold.event.version) {
@@ -273,6 +321,7 @@ try {
   flightLineSocket = await connectRealtime();
   const reconnectMilliseconds = Date.now() - reconnectStartedAt;
   const callSignal = nextRealtimeVersion(flightLineSocket);
+  const callForecastSignal = nextForecastVersion(flightLineSocket);
   const firstCall = await post(
     tokens.flightLine,
     envelope("flight-line-tablet-1", sold.event.version, "CALL_NEXT", {
@@ -282,7 +331,11 @@ try {
     }),
   );
   const callRealtime = await callSignal;
-  if (callRealtime.version !== firstCall.event.version) {
+  const callForecast = await callForecastSignal;
+  if (
+    callRealtime.version !== firstCall.event.version ||
+    callForecast.version !== firstCall.event.version
+  ) {
     throw new Error("Wiederverbundenes Gerät erhielt den Aufruf nicht.");
   }
   current = await board("flight-line-tablet-1", tokens.flightLine);
@@ -406,17 +459,22 @@ try {
   }
   process.stdout.write(
     JSON.stringify({
-      requirements: ["F-BRD-120"],
+      requirements: ["F-BRD-120", "F-SLT-080"],
       sale: sold.eventType,
       duplicate: duplicate.duplicate,
       staleRejected: true,
       unpairedRejected: true,
       wrongRoleRejected: true,
       twoDevicesRealtimeUnderTwoSeconds: true,
+      twoDevicesForecastUnderTwoSeconds: true,
+      persistedForecastVersionConsistent: true,
       maximumRealtimeMilliseconds: Math.max(
         cashierRealtime.elapsedMs,
         flightLineRealtime.elapsedMs,
         callRealtime.elapsedMs,
+        cashierForecast.elapsedMs,
+        flightLineForecast.elapsedMs,
+        callForecast.elapsedMs,
       ),
       reconnectMilliseconds,
       deviceAttributionVisible: true,
