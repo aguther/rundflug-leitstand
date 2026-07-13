@@ -130,3 +130,14 @@ einem Gate zugeordnet. Die Bemerkung beginnt leer und darf keine Namen oder ande
 enthalten. Vor Anwendung wird eine portable Sicherung erzeugt. Wiederherstellung erfolgt aus dieser
 Sicherung, da D1 additive Spalten nicht einzeln zurückrollt; ältere Anwendungen können beide Spalten
 gefahrlos ignorieren.
+
+## 0027 – Operative Queue-Position und nutzbare Umlaufkapazität
+
+Trennt die veränderliche operative Reihenfolge von der stabilen Kommunikationsnummer und ergänzt
+eine optionale, vor dem Aufruf reduzierte nutzbare Kapazität am konkreten Umlauf. Bestehende
+Fluggruppen erhalten ihre bisherige Kommunikationsnummer als initiale Sortierposition; dadurch
+bleibt ihre Reihenfolge unverändert. Vor Anwendung wird eine portable D1-Sicherung erzeugt.
+Wiederherstellung erfolgt aus dieser Sicherung beziehungsweise per D1 Time Travel, weil die beiden
+additiven Spalten nicht ohne Tabellenneuaufbau entfernt werden können. Ein älterer Worker kann die
+nullable Spalten übergangsweise ignorieren, darf nach einer bereits vorgenommenen manuellen
+Wiedereinreihung aber nicht dauerhaft weiterbetrieben werden.

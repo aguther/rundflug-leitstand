@@ -110,6 +110,7 @@ export type DeviceRole =
 
 export type OperationalCommandType =
   | "SET_ROTATION_NOTE"
+  | "SET_ROTATION_CAPACITY"
   | "SELL_TICKET_GROUP"
   | "CALL_NEXT"
   | "MARK_IN_FLIGHT"
@@ -149,6 +150,7 @@ export type OperationalCommandType =
 
 const commandRoles: Readonly<Record<OperationalCommandType, readonly DeviceRole[]>> = {
   SET_ROTATION_NOTE: ["FLIGHT_LINE", "FLIGHT_LINE_LEAD", "ADMIN"],
+  SET_ROTATION_CAPACITY: ["FLIGHT_LINE", "FLIGHT_LINE_LEAD", "ADMIN"],
   SELL_TICKET_GROUP: ["CASHIER", "ADMIN"],
   CALL_NEXT: ["FLIGHT_LINE", "FLIGHT_LINE_LEAD", "ADMIN"],
   MARK_IN_FLIGHT: ["FLIGHT_LINE", "FLIGHT_LINE_LEAD", "ADMIN"],

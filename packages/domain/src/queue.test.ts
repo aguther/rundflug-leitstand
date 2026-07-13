@@ -4,6 +4,7 @@ import {
   assertQueueMutationAllowed,
   planBookingGroupSplit,
   planNextRotations,
+  planRotationCapacityReduction,
 } from "./queue";
 
 describe("resource-group queue planning", () => {
@@ -96,5 +97,32 @@ describe("resource-group queue planning", () => {
         targetCapacity: 4,
       }),
     ).toThrowError(/nach IM FLUG/);
+  });
+
+  it("reduces a draft rotation by evicting only a whole queue suffix", () => {
+    expect(
+      planRotationCapacityReduction({
+        rotationState: "DRAFT",
+        called: false,
+        baselineCapacity: 4,
+        currentUsableCapacity: null,
+        requestedUsableCapacity: 3,
+        segments: [
+          { ticketGroupId: "first", size: 2 },
+          { ticketGroupId: "second", size: 2 },
+          { ticketGroupId: "third", size: 1 },
+        ],
+      }),
+    ).toEqual({ keptGroupIds: ["first"], evictedGroupIds: ["second", "third"], occupiedSeats: 2 });
+    expect(() =>
+      planRotationCapacityReduction({
+        rotationState: "CALLED",
+        called: true,
+        baselineCapacity: 4,
+        currentUsableCapacity: null,
+        requestedUsableCapacity: 3,
+        segments: [{ ticketGroupId: "first", size: 2 }],
+      }),
+    ).toThrowError(/nur vor dem Aufruf/);
   });
 });

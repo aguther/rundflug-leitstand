@@ -169,6 +169,14 @@ describe("sale guard", () => {
     );
   });
 
+  it("allows usable rotation capacity changes only for operational roles", () => {
+    expect(() => assertRoleMayExecute("FLIGHT_LINE", "SET_ROTATION_CAPACITY")).not.toThrow();
+    expect(() => assertRoleMayExecute("ADMIN", "SET_ROTATION_CAPACITY")).not.toThrow();
+    expect(() => assertRoleMayExecute("CASHIER", "SET_ROTATION_CAPACITY")).toThrowError(
+      /darf SET_ROTATION_CAPACITY nicht/,
+    );
+  });
+
   it("allows operational leads to interrupt the event without emergency semantics", () => {
     expect(() => assertRoleMayExecute("FLIGHT_LINE_LEAD", "SET_EVENT_INTERRUPTION")).not.toThrow();
     expect(() => assertRoleMayExecute("CASHIER", "SET_EVENT_INTERRUPTION")).toThrowError(

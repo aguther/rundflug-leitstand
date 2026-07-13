@@ -44,6 +44,14 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
     }),
   }),
   commandBaseSchema.extend({
+    type: z.literal("SET_ROTATION_CAPACITY"),
+    payload: z.object({
+      rotationId: z.string().min(1).max(100),
+      usableCapacity: z.number().int().min(1).max(100),
+      reason: z.string().trim().min(3).max(240),
+    }),
+  }),
+  commandBaseSchema.extend({
     type: z.literal("SET_EVENT_LIFECYCLE"),
     payload: z.object({
       status: z.enum(["PREPARATION", "ACTIVE", "CLOSED", "ARCHIVED"]),
@@ -652,6 +660,7 @@ export const rotationOperationalSummarySchema = z.object({
   flightGroupId: z.string(),
   communicationNumber: z.number().int().positive(),
   communicationLabel: z.string().regex(/^[A-Z0-9-]+-\d{3,}$/),
+  queuePosition: z.number().int().positive(),
   productCode: z.string(),
   productName: z.string(),
   status: z.enum(["DRAFT", "CALLED", "IN_FLIGHT", "LANDED", "COMPLETED"]),
@@ -667,6 +676,9 @@ export const rotationOperationalSummarySchema = z.object({
   suggestedAircraftId: z.string().nullable(),
   suggestedAircraftRegistration: z.string().nullable(),
   ticketCount: z.number().int().nonnegative(),
+  baselineCapacity: z.number().int().positive(),
+  usableCapacity: z.number().int().positive(),
+  capacityReduced: z.boolean(),
   estimatedPassengerPayloadKg: z.number().positive().nullable(),
   predictedLowerMinutes: z.number().int().nonnegative(),
   predictedUpperMinutes: z.number().int().nonnegative(),

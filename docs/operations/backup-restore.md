@@ -1,5 +1,15 @@
 # Backup und Wiederherstellung
 
+## Migrationsnotiz 0027 – Umlaufkapazität und operative Queue
+
+Migration `0027_rotation_capacity_queue.sql` ergänzt ausschließlich zwei nullable Spalten und einen
+Index. Bestehende Fluggruppen übernehmen ihre Kommunikationsnummer als initiale operative
+Sortierposition; öffentliche Kennungen werden nicht verändert. Vor dem Remote-Lauf wird ein
+portabler D1-Export erstellt. Bei einem fehlgeschlagenen Worker-Rollout wird zunächst die vorherige
+Worker-Version wiederhergestellt. Für eine vollständige Schema-Rückkehr oder nach bereits erfolgten
+Wiedereinreihungen wird die Datenbank aus diesem Export beziehungsweise per D1 Time Travel
+wiederhergestellt und anschließend mit `npm run backup:restore:test` verifiziert.
+
 ## Migrationsnotiz 0025 – Ticket-Zurückstellungen
 
 Migration `0025_ticket_deferrals.sql` ergänzt ausschließlich zwei Spalten mit sicheren
