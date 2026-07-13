@@ -183,9 +183,62 @@ try {
       expectedReviewAt: null,
     },
   );
-  const called = await flight(restoredAircraft.event.version, "CALL_NEXT", {
+  const initialCall = await flight(restoredAircraft.event.version, "CALL_NEXT", {
     rotationId: sold.aggregate.relatedRotationId,
     aircraftId: "aircraft-a",
+    pilotId: "550e8400-e29b-41d4-a716-446655440199",
+  });
+  const abortedForFailure = await flight(initialCall.event.version, "ABORT_ROTATION", {
+    rotationId: sold.aggregate.relatedRotationId,
+    reason: "Synthetischer Flugzeugausfall vor Start",
+  });
+  const failedAircraft = await admin(
+    abortedForFailure.event.version,
+    "SET_AIRCRAFT_OPERATIONAL_STATE",
+    {
+      aircraftId: "aircraft-a",
+      state: "INACTIVE",
+      reason: "Synthetischer Flugzeugausfall",
+      expectedReviewAt: reviewAt,
+    },
+  );
+  const replacementAircraft = await admin(failedAircraft.event.version, "UPSERT_AIRCRAFT", {
+    aircraftId: "aircraft-replacement",
+    registration: "D-ERSA",
+    aircraftType: "SYNTHETIC-DEMO",
+    passengerSeats: 4,
+    maximumPassengerPayloadKg: null,
+    reason: "Synthetisches Ersatzflugzeug",
+    adminPin: pin,
+  });
+  const replacementAssigned = await admin(
+    replacementAircraft.event.version,
+    "ASSIGN_AIRCRAFT_RESOURCE_GROUP",
+    {
+      aircraftId: "aircraft-replacement",
+      resourceGroupId: "rg-panorama",
+      effectiveAt: new Date().toISOString(),
+      reason: "Synthetisches Ersatzflugzeug",
+      adminPin: pin,
+    },
+  );
+  current = await board(devices.flightLine, tokens.flightLine);
+  const replacementProposal = current.rotations.find(
+    (entry) => entry.id === sold.aggregate.relatedRotationId,
+  );
+  if (
+    replacementProposal?.status !== "DRAFT" ||
+    replacementProposal.ticketCount !== 1 ||
+    replacementProposal.suggestedAircraftId !== "aircraft-replacement" ||
+    replacementProposal.aircraftId !== null
+  ) {
+    throw new Error(
+      "Ausfall hat die Gruppe nicht geschützt oder ein Flugzeug ohne Personalentscheidung zugeordnet.",
+    );
+  }
+  const called = await flight(replacementAssigned.event.version, "CALL_NEXT", {
+    rotationId: sold.aggregate.relatedRotationId,
+    aircraftId: "aircraft-replacement",
     pilotId: "550e8400-e29b-41d4-a716-446655440199",
   });
   current = await board(devices.admin, tokens.admin);
@@ -261,6 +314,7 @@ try {
   }
   const pilotHistory = await history("PILOT", assignedPilot.id);
   const aircraftHistory = await history("AIRCRAFT", "aircraft-a");
+  const rotationHistory = await history("ROTATION", sold.aggregate.relatedRotationId);
   if (
     pilotHistory.entries.filter((entry) => entry.eventType.startsWith("PILOT_PAUSE_")).length !==
       2 ||
@@ -273,12 +327,20 @@ try {
       (entry) =>
         entry.eventType === "AIRCRAFT_OPERATIONAL_STATE_CHANGED" &&
         entry.payload.expectedReviewAt === reviewAt,
+    ) ||
+    rotationHistory.entries.filter((entry) => entry.eventType === "FLIGHT_GROUP_CALLED").length !==
+      2 ||
+    !rotationHistory.entries.some(
+      (entry) =>
+        entry.eventType === "ROTATION_ABORTED_TO_QUEUE" &&
+        entry.payload.reason === "Synthetischer Flugzeugausfall vor Start",
     )
   ) {
     throw new Error("Flotten-/Piloten-Audit ist unvollständig.");
   }
   process.stdout.write(
     JSON.stringify({
+      requirements: ["F-SLT-090"],
       anonymousPilotCodeAndNoteVisible: true,
       currentPilotAssignmentVisible: true,
       activePilotPauseRejected: true,
@@ -286,6 +348,9 @@ try {
       aircraftQueueVisible: true,
       aircraftPauseBlocksCall: true,
       aircraftStatusReplansForecast: true,
+      aircraftFailureOnlyProposesReplacement: true,
+      replacementConfirmedBySecondCall: true,
+      groupProtectedDuringAircraftFailure: true,
       blockReviewAndClearAudited: true,
       refuelPlanningAndThresholdVisible: true,
       finalVersion: threshold.event.version,
