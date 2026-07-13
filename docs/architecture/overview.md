@@ -1,5 +1,9 @@
 # Architekturübersicht
 
+Die detaillierte Beschreibung des Fachmodells, aller V1-Zustandsautomaten, technischen Invarianten
+und des Prognoseverfahrens steht in
+[`domain-state-and-forecast-v1.md`](domain-state-and-forecast-v1.md).
+
 ```text
 Browser / PWA
 ├── Kasse
