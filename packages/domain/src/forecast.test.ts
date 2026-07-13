@@ -65,6 +65,24 @@ describe("event-driven forecast", () => {
     });
   });
 
+  it("widens the uncertainty interval for flight groups farther back in the queue", () => {
+    const duration = estimateDuration({
+      referenceMinutes: 20,
+      actualDurationsMinutes: [18, 20, 21, 22, 22, 23],
+      dataAgeMinutes: 1,
+      interrupted: false,
+      activeCapacity: 3,
+    });
+    const windows = [1, 4, 7].map((queueSequence) =>
+      forecastQueueWindows({ queueSequence, activeAircraft: 3, duration }),
+    );
+    const widths = windows.map((window) => window.upperMinutes - window.lowerMinutes);
+
+    expect(windows.every((window) => window.quality === "STABLE")).toBe(true);
+    expect(widths[1]).toBeGreaterThan(widths[0] ?? 0);
+    expect(widths[2]).toBeGreaterThan(widths[1] ?? 0);
+  });
+
   it.each([
     {
       status: "CALLED" as const,
