@@ -158,6 +158,8 @@ function deviceIdForRole(role: string, developmentId: string): string {
 const CASHIER_DEVICE_ID = deviceIdForRole("CASHIER", "cashier-tablet-1");
 const FLIGHT_LINE_DEVICE_ID = deviceIdForRole("FLIGHT_LINE", "flight-line-tablet-1");
 const ADMIN_DEVICE_ID = deviceIdForRole("ADMIN", "technical-scaffold");
+const MASTER_DATA_AUDIT_REASON = "Administrative Stammdatenpflege";
+const ADMIN_CONFIGURATION_AUDIT_REASON = "Administrative Konfigurationspflege";
 
 function createTicketCode(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(16));
@@ -2091,7 +2093,7 @@ function AdminView() {
   }
 
   async function setEventLifecycle(status: "PREPARATION" | "ACTIVE" | "CLOSED" | "ARCHIVED") {
-    if (!board || reason.trim().length < 3 || adminPin.length < 4) return;
+    if (!board || adminPin.length < 4) return;
     try {
       await sendCommand(
         {
@@ -2101,7 +2103,7 @@ function AdminView() {
           expectedVersion: board.event.version,
           issuedAt: new Date().toISOString(),
           type: "SET_EVENT_LIFECYCLE",
-          payload: { status, reason: reason.trim(), adminPin },
+          payload: { status, reason: ADMIN_CONFIGURATION_AUDIT_REASON, adminPin },
         },
         deviceTokenFor(ADMIN_DEVICE_ID),
       );
@@ -2159,7 +2161,7 @@ function AdminView() {
   }
 
   async function saveEventParameters() {
-    if (!board || !operationsEndAt || reason.trim().length < 3 || adminPin.length < 4) return;
+    if (!board || !operationsEndAt || adminPin.length < 4) return;
     try {
       await sendCommand(
         {
@@ -2183,7 +2185,7 @@ function AdminView() {
             plannedBoardingMinutes,
             plannedDeboardingMinutes,
             plannedBufferMinutes,
-            reason: reason.trim(),
+            reason: ADMIN_CONFIGURATION_AUDIT_REASON,
             adminPin,
           },
         },
@@ -2230,8 +2232,7 @@ function AdminView() {
   }
 
   async function saveGate() {
-    if (!board || gateLabel.trim().length < 2 || reason.trim().length < 3 || adminPin.length < 4)
-      return;
+    if (!board || gateLabel.trim().length < 2 || adminPin.length < 4) return;
     try {
       await sendCommand(
         {
@@ -2247,7 +2248,7 @@ function AdminView() {
             gateType,
             active: gateActive,
             sortOrder: gateSortOrder,
-            reason: reason.trim(),
+            reason: MASTER_DATA_AUDIT_REASON,
             adminPin,
           },
         },
@@ -2255,7 +2256,6 @@ function AdminView() {
       );
       setMessage("Gate-Stammdaten wurden protokolliert gespeichert.");
       setAdminPin("");
-      setReason("");
       setMasterEditorOpen(false);
       setGateEditorId("new");
       setGateLabel("");
@@ -2272,7 +2272,6 @@ function AdminView() {
       !productResourceGroupId ||
       !productGateId ||
       productWeightClasses.length === 0 ||
-      reason.trim().length < 3 ||
       adminPin.length < 4
     )
       return;
@@ -2300,7 +2299,7 @@ function AdminView() {
               "NOT_CAPTURED" | "CHILD" | "NORMAL" | "HEAVY" | "INDIVIDUAL"
             >,
             sortOrder: productSortOrder,
-            reason: reason.trim(),
+            reason: MASTER_DATA_AUDIT_REASON,
             adminPin,
           },
         },
@@ -2308,7 +2307,6 @@ function AdminView() {
       );
       setMessage("Produktstammdaten wurden protokolliert gespeichert.");
       setAdminPin("");
-      setReason("");
       selectProductForEditing("new");
       setMasterEditorOpen(false);
       await refresh();
@@ -2344,14 +2342,7 @@ function AdminView() {
   }
 
   async function saveResourceGroup() {
-    if (
-      !board ||
-      !resourceGateId ||
-      resourceName.trim().length < 2 ||
-      reason.trim().length < 3 ||
-      adminPin.length < 4
-    )
-      return;
+    if (!board || !resourceGateId || resourceName.trim().length < 2 || adminPin.length < 4) return;
     try {
       await sendCommand(
         {
@@ -2371,7 +2362,7 @@ function AdminView() {
               .split(",")
               .map((entry) => entry.trim())
               .filter(Boolean),
-            reason: reason.trim(),
+            reason: MASTER_DATA_AUDIT_REASON,
             adminPin,
           },
         },
@@ -2379,7 +2370,6 @@ function AdminView() {
       );
       setMessage("Ressourcengruppe wurde protokolliert gespeichert.");
       setAdminPin("");
-      setReason("");
       selectResourceForEditing("new");
       setMasterEditorOpen(false);
       await refresh();
@@ -2398,7 +2388,6 @@ function AdminView() {
       !board ||
       aircraftRegistration.trim().length < 3 ||
       aircraftType.trim().length < 2 ||
-      reason.trim().length < 3 ||
       adminPin.length < 4
     )
       return;
@@ -2419,7 +2408,7 @@ function AdminView() {
             maximumPassengerPayloadKg: aircraftMaximumPayload
               ? Number(aircraftMaximumPayload)
               : null,
-            reason: reason.trim(),
+            reason: MASTER_DATA_AUDIT_REASON,
             adminPin,
           },
         },
@@ -2427,7 +2416,6 @@ function AdminView() {
       );
       setMessage("Flugzeugstammdaten wurden protokolliert gespeichert.");
       setAdminPin("");
-      setReason("");
       selectAircraftForEditing("new");
       setMasterEditorOpen(false);
       await refresh();
@@ -2440,13 +2428,7 @@ function AdminView() {
   }
 
   async function assignAircraft() {
-    if (
-      !board ||
-      !assignmentAircraftId ||
-      !assignmentResourceGroupId ||
-      reason.trim().length < 3 ||
-      adminPin.length < 4
-    )
+    if (!board || !assignmentAircraftId || !assignmentResourceGroupId || adminPin.length < 4)
       return;
     try {
       await sendCommand(
@@ -2461,7 +2443,7 @@ function AdminView() {
             aircraftId: assignmentAircraftId,
             resourceGroupId: assignmentResourceGroupId,
             effectiveAt: new Date().toISOString(),
-            reason: reason.trim(),
+            reason: MASTER_DATA_AUDIT_REASON,
             adminPin,
           },
         },
@@ -2471,7 +2453,6 @@ function AdminView() {
         "Flugzeugzuordnung wurde historisiert geändert; Queue und Prognose werden neu berechnet.",
       );
       setAdminPin("");
-      setReason("");
       setMasterEditorOpen(false);
       await refresh();
       await refreshHistory();
@@ -2757,7 +2738,7 @@ function AdminView() {
     operationalNote: string,
     active: boolean,
   ) {
-    if (!board || reason.trim().length < 3 || adminPin.length < 4) return;
+    if (!board || adminPin.length < 4) return;
     try {
       await sendCommand(
         {
@@ -2772,7 +2753,7 @@ function AdminView() {
             operationalCode: operationalCode.trim().toUpperCase(),
             operationalNote: operationalNote.trim(),
             active,
-            reason: reason.trim(),
+            reason: MASTER_DATA_AUDIT_REASON,
             adminPin,
           },
         },
@@ -2780,7 +2761,6 @@ function AdminView() {
       );
       setMessage("Anonymer operativer Pilotencode wurde aktualisiert.");
       setAdminPin("");
-      setReason("");
       setPilotEditorId("new");
       setPilotCode("P-02");
       setPilotNote("");
@@ -2870,14 +2850,13 @@ function AdminView() {
       return;
     }
     if (!valid) return;
-    setReason("");
     setAdminPin("");
     setPendingMasterAction(action);
   }
 
   async function confirmMasterSave() {
     const action = pendingMasterAction;
-    if (!action || reason.trim().length < 3 || adminPin.length < 4) return;
+    if (!action || adminPin.length < 4) return;
     setPendingMasterAction(null);
     if (action === "gate") await saveGate();
     if (action === "resource-group") await saveResourceGroup();
@@ -3167,16 +3146,22 @@ function AdminView() {
           >
             <div>
               <strong>Änderungen bestätigen</strong>
-              <span>Begründung und Administrator-PIN gelten für die nächste Speicherung.</span>
+              <span>
+                {adminArea === "operations"
+                  ? "Begründung und Administrator-PIN gelten für die nächste operative Änderung."
+                  : "Für normale Konfigurationsänderungen genügt die Administrator-PIN."}
+              </span>
             </div>
-            <label>
-              Begründung
-              <input
-                value={reason}
-                onChange={(event) => setReason(event.target.value)}
-                placeholder="Mindestens 3 Zeichen"
-              />
-            </label>
+            {adminArea === "operations" ? (
+              <label>
+                Begründung
+                <input
+                  value={reason}
+                  onChange={(event) => setReason(event.target.value)}
+                  placeholder="Mindestens 3 Zeichen"
+                />
+              </label>
+            ) : null}
             {isAdministrator ? (
               <label>
                 Administrator-PIN
@@ -3188,9 +3173,10 @@ function AdminView() {
                 />
               </label>
             ) : null}
-            {reason.trim().length < 3 ? (
+            {adminArea === "operations" && reason.trim().length < 3 ? (
               <ValidationHint tone="error">
-                Vor dem Speichern muss eine Begründung mit mindestens 3 Zeichen eingetragen werden.
+                Für operative Änderungen muss eine Begründung mit mindestens 3 Zeichen eingetragen
+                werden.
               </ValidationHint>
             ) : isAdministrator && adminPin.length < 4 ? (
               <ValidationHint tone="error">
@@ -3466,12 +3452,7 @@ function AdminView() {
             ) : null}
             <button
               className="primary-action"
-              disabled={
-                !isAdministrator ||
-                !operationsEndAt ||
-                reason.trim().length < 3 ||
-                adminPin.length < 4
-              }
+              disabled={!isAdministrator || !operationsEndAt || adminPin.length < 4}
               onClick={saveEventParameters}
               type="button"
             >
@@ -3517,7 +3498,6 @@ function AdminView() {
                 disabled={
                   !isAdministrator ||
                   setupSteps.slice(0, -1).some((step) => !step.complete) ||
-                  reason.trim().length < 3 ||
                   adminPin.length < 4
                 }
                 onClick={() => void setEventLifecycle("ACTIVE")}
@@ -4900,7 +4880,7 @@ function AdminView() {
                 <div className="drawer-heading">
                   <div>
                     <h2 id="master-confirmation-title">Änderung bestätigen</h2>
-                    <p>Die Stammdatenänderung wird protokolliert.</p>
+                    <p>Die Stammdatenänderung wird automatisch protokolliert.</p>
                   </div>
                   <button
                     aria-label="Bestätigung schließen"
@@ -4910,15 +4890,6 @@ function AdminView() {
                     ×
                   </button>
                 </div>
-                <label>
-                  Begründung
-                  <textarea
-                    maxLength={240}
-                    onChange={(event) => setReason(event.target.value)}
-                    placeholder="Grund für die Änderung"
-                    value={reason}
-                  />
-                </label>
                 <label>
                   Administrator-PIN
                   <input
@@ -4934,7 +4905,7 @@ function AdminView() {
                   </button>
                   <button
                     className="primary-action"
-                    disabled={reason.trim().length < 3 || adminPin.length < 4}
+                    disabled={adminPin.length < 4}
                     onClick={() => void confirmMasterSave()}
                     type="button"
                   >
