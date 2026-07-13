@@ -93,6 +93,7 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
       standby: z.boolean().default(false),
       paymentStatus: z.enum(["UNPAID", "PAID", "WAIVED", "INFORMATIONAL_ONLY"]),
       paymentMethod: z.enum(["CASH", "CARD", "VOUCHER", "OTHER"]).nullable(),
+      oversizeSplitAcknowledged: z.boolean().default(false),
     }),
   }),
   commandBaseSchema.extend({
@@ -542,7 +543,10 @@ export const ticketSearchResultSchema = z.object({
   soldAt: z.string(),
   communicationNumber: z.number().int().positive().nullable(),
   communicationLabel: z.string().nullable(),
+  communicationNumbers: z.array(z.number().int().positive()),
+  communicationLabels: z.array(z.string()),
   rotationStatus: z.string().nullable(),
+  rotationStatuses: z.array(z.string()),
 });
 export const ticketSearchResponseSchema = z.object({
   results: z.array(ticketSearchResultSchema).max(20),

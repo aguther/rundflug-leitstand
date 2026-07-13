@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assertQueueMutationAllowed, planNextRotations } from "./queue";
+import { assertQueueMutationAllowed, planBookingGroupSplit, planNextRotations } from "./queue";
 
 describe("resource-group queue planning", () => {
   it("keeps purchased groups together and fills compatible aircraft in order", () => {
@@ -37,6 +37,18 @@ describe("resource-group queue planning", () => {
     });
     expect(plan.assignments[0]?.groupIds).toEqual([]);
     expect(plan.unassigned).toEqual([{ groupId: "family", reason: "GROUP_TOO_LARGE" }]);
+  });
+
+  it("splits an oversized booking group only after explicit acknowledgement", () => {
+    expect(() =>
+      planBookingGroupSplit({ groupSize: 5, referenceCapacity: 4, splitAcknowledged: false }),
+    ).toThrowError(/ausdrücklich bestätigt/);
+    expect(
+      planBookingGroupSplit({ groupSize: 9, referenceCapacity: 4, splitAcknowledged: true }),
+    ).toEqual({ slotSizes: [4, 4, 1], splitAcknowledged: true });
+    expect(
+      planBookingGroupSplit({ groupSize: 4, referenceCapacity: 4, splitAcknowledged: false }),
+    ).toEqual({ slotSizes: [4], splitAcknowledged: false });
   });
 
   it("rejects queue mutations once a rotation is in flight", () => {

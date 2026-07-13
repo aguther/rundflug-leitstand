@@ -1297,8 +1297,21 @@ app.get("/api/events/:eventId/tickets/search", async (context) => {
   const rows = await context.env.DB.prepare(
     `SELECT tg.id AS ticket_group_id, tg.status AS group_status, tg.queue_sequence, tg.standby,
             tg.sold_at, p.id AS product_id, p.code AS product_code, p.name AS product_name,
-            COUNT(DISTINCT t.id) AS group_size, fg.communication_number,
-            r.status AS rotation_status
+            (SELECT COUNT(*) FROM tickets group_ticket WHERE group_ticket.ticket_group_id = tg.id)
+              AS group_size,
+            (SELECT GROUP_CONCAT(DISTINCT group_fg.communication_number)
+               FROM tickets grouped_ticket
+               JOIN rotation_tickets group_rt
+                 ON group_rt.ticket_id = grouped_ticket.id AND group_rt.released_at IS NULL
+               JOIN rotations group_rotation ON group_rotation.id = group_rt.rotation_id
+               JOIN flight_groups group_fg ON group_fg.id = group_rotation.flight_group_id
+              WHERE grouped_ticket.ticket_group_id = tg.id) AS communication_numbers,
+            (SELECT GROUP_CONCAT(DISTINCT group_rotation.status)
+               FROM tickets grouped_ticket
+               JOIN rotation_tickets group_rt
+                 ON group_rt.ticket_id = grouped_ticket.id AND group_rt.released_at IS NULL
+               JOIN rotations group_rotation ON group_rotation.id = group_rt.rotation_id
+              WHERE grouped_ticket.ticket_group_id = tg.id) AS rotation_statuses
        FROM ticket_groups tg
        JOIN products p ON p.id = tg.product_id
        JOIN tickets t ON t.ticket_group_id = tg.id
@@ -1308,8 +1321,7 @@ app.get("/api/events/:eventId/tickets/search", async (context) => {
       WHERE tg.operation_day_id = ?1
         AND (t.public_code_hash = ?2 OR tg.id LIKE ?3 OR CAST(fg.communication_number AS TEXT) = ?4
              OR UPPER(p.code || '-' || printf('%03d', fg.communication_number)) = ?5)
-      GROUP BY tg.id, tg.status, tg.queue_sequence, tg.standby, tg.sold_at, p.id, p.code, p.name,
-               fg.communication_number, r.status
+      GROUP BY tg.id, tg.status, tg.queue_sequence, tg.standby, tg.sold_at, p.id, p.code, p.name
       ORDER BY tg.sold_at DESC LIMIT 20`,
   )
     .bind(eventId, ticketHash, likeQuery, numericQuery, normalized)
@@ -1323,27 +1335,37 @@ app.get("/api/events/:eventId/tickets/search", async (context) => {
       product_code: string;
       product_name: string;
       group_size: number;
-      communication_number: number | null;
-      rotation_status: string | null;
+      communication_numbers: string | null;
+      rotation_statuses: string | null;
     }>();
   return context.json({
-    results: rows.results.map((row) => ({
-      ticketGroupId: row.ticket_group_id,
-      productId: row.product_id,
-      productCode: row.product_code,
-      productName: row.product_name,
-      groupStatus: row.group_status,
-      groupSize: row.group_size,
-      queueSequence: row.queue_sequence,
-      standby: row.standby === 1,
-      soldAt: row.sold_at,
-      communicationNumber: row.communication_number,
-      communicationLabel:
-        row.communication_number === null
-          ? null
-          : `${row.product_code}-${String(row.communication_number).padStart(3, "0")}`,
-      rotationStatus: row.rotation_status,
-    })),
+    results: rows.results.map((row) => {
+      const communicationNumbers = (row.communication_numbers?.split(",") ?? [])
+        .map(Number)
+        .filter(Number.isInteger)
+        .sort((left, right) => left - right);
+      const communicationLabels = communicationNumbers.map(
+        (number) => `${row.product_code}-${String(number).padStart(3, "0")}`,
+      );
+      const rotationStatuses = (row.rotation_statuses?.split(",") ?? []).sort();
+      return {
+        ticketGroupId: row.ticket_group_id,
+        productId: row.product_id,
+        productCode: row.product_code,
+        productName: row.product_name,
+        groupStatus: row.group_status,
+        groupSize: row.group_size,
+        queueSequence: row.queue_sequence,
+        standby: row.standby === 1,
+        soldAt: row.sold_at,
+        communicationNumber: communicationNumbers[0] ?? null,
+        communicationLabel: communicationLabels[0] ?? null,
+        communicationNumbers,
+        communicationLabels,
+        rotationStatus: rotationStatuses[0] ?? null,
+        rotationStatuses,
+      };
+    }),
   });
 });
 

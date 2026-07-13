@@ -24,6 +24,7 @@ import {
   estimateDuration,
   forecastQueueWindows,
   type OperationalCommandType,
+  planBookingGroupSplit,
   simulateOutageRecovery,
   transitionAircraft,
   transitionRotation,
@@ -332,6 +333,32 @@ export class EventCoordinator extends DurableObject<Env> {
           );
         }
 
+        let splitPlan: ReturnType<typeof planBookingGroupSplit>;
+        try {
+          splitPlan = planBookingGroupSplit({
+            groupSize: command.payload.publicTicketCodes.length,
+            referenceCapacity: product.reference_capacity,
+            splitAcknowledged: command.payload.oversizeSplitAcknowledged,
+          });
+        } catch (reason: unknown) {
+          if (!(reason instanceof DomainRuleError)) throw reason;
+          return json(
+            {
+              error: {
+                code: reason.code,
+                message: reason.message,
+                referenceCapacity: product.reference_capacity,
+                groupSize: command.payload.publicTicketCodes.length,
+                requiredFlightGroupCount: Math.ceil(
+                  command.payload.publicTicketCodes.length / product.reference_capacity,
+                ),
+              },
+            },
+            { status: 409 },
+          );
+        }
+        const requiredFlightGroupCount = splitPlan.slotSizes.length;
+
         const normalizedCodes = command.payload.publicTicketCodes.map(assertPublicTicketCode);
         if (new Set(normalizedCodes).size !== normalizedCodes.length) {
           return json(
@@ -391,29 +418,32 @@ export class EventCoordinator extends DurableObject<Env> {
         )
           .bind(command.eventId, product.resource_group_id)
           .first<{ next_sequence: number }>();
-        const openFlightGroup = await this.env.DB.prepare(
-          `SELECT r.id AS rotation_id, fg.id AS flight_group_id
-             FROM rotations r
-             JOIN flight_groups fg ON fg.id = r.flight_group_id
-             JOIN rotation_tickets rt ON rt.rotation_id = r.id AND rt.released_at IS NULL
-             JOIN tickets t ON t.id = rt.ticket_id
-             JOIN ticket_groups tg ON tg.id = t.ticket_group_id
-            WHERE r.operation_day_id = ?1 AND fg.resource_group_id = ?2
-              AND r.status = 'DRAFT' AND r.called_at IS NULL
-            GROUP BY r.id, fg.id
-           HAVING COUNT(DISTINCT tg.product_id) = 1 AND MIN(tg.product_id) = ?3
-              AND COUNT(rt.ticket_id) + ?4 <= ?5
-            ORDER BY fg.communication_number
-            LIMIT 1`,
-        )
-          .bind(
-            command.eventId,
-            product.resource_group_id,
-            product.id,
-            normalizedCodes.length,
-            product.reference_capacity,
-          )
-          .first<{ rotation_id: string; flight_group_id: string }>();
+        const splitAcrossFlightGroups = requiredFlightGroupCount > 1;
+        const openFlightGroup = splitAcrossFlightGroups
+          ? null
+          : await this.env.DB.prepare(
+              `SELECT r.id AS rotation_id, fg.id AS flight_group_id
+                 FROM rotations r
+                 JOIN flight_groups fg ON fg.id = r.flight_group_id
+                 JOIN rotation_tickets rt ON rt.rotation_id = r.id AND rt.released_at IS NULL
+                 JOIN tickets t ON t.id = rt.ticket_id
+                 JOIN ticket_groups tg ON tg.id = t.ticket_group_id
+                WHERE r.operation_day_id = ?1 AND fg.resource_group_id = ?2
+                  AND r.status = 'DRAFT' AND r.called_at IS NULL
+                GROUP BY r.id, fg.id
+               HAVING COUNT(DISTINCT tg.product_id) = 1 AND MIN(tg.product_id) = ?3
+                  AND COUNT(rt.ticket_id) + ?4 <= ?5
+                ORDER BY fg.communication_number
+                LIMIT 1`,
+            )
+              .bind(
+                command.eventId,
+                product.resource_group_id,
+                product.id,
+                normalizedCodes.length,
+                product.reference_capacity,
+              )
+              .first<{ rotation_id: string; flight_group_id: string }>();
         const communicationRow = openFlightGroup
           ? null
           : await this.env.DB.prepare(
@@ -424,8 +454,21 @@ export class EventCoordinator extends DurableObject<Env> {
         const now = new Date().toISOString();
         const nextVersion = current.version + 1;
         const ticketGroupId = crypto.randomUUID();
-        const flightGroupId = openFlightGroup?.flight_group_id ?? crypto.randomUUID();
-        const rotationId = openFlightGroup?.rotation_id ?? crypto.randomUUID();
+        const slots = openFlightGroup
+          ? [
+              {
+                flightGroupId: openFlightGroup.flight_group_id,
+                rotationId: openFlightGroup.rotation_id,
+                communicationNumber: null,
+              },
+            ]
+          : Array.from({ length: requiredFlightGroupCount }, (_, index) => ({
+              flightGroupId: crypto.randomUUID(),
+              rotationId: crypto.randomUUID(),
+              communicationNumber: (communicationRow?.next_number ?? 101) + index,
+            }));
+        const primarySlot = slots[0];
+        if (!primarySlot) throw new Error("Mindestens ein Fluggruppen-Slot wurde erwartet.");
         const ticketIds = hashes.map(() => crypto.randomUUID());
         const eventId = crypto.randomUUID();
         const result: CommandResult = {
@@ -433,7 +476,11 @@ export class EventCoordinator extends DurableObject<Env> {
           duplicate: false,
           event: rowToSnapshot({ ...current, version: nextVersion, updated_at: now }),
           eventType: "TICKET_GROUP_SOLD",
-          aggregate: { type: "TICKET_GROUP", id: ticketGroupId, relatedRotationId: rotationId },
+          aggregate: {
+            type: "TICKET_GROUP",
+            id: ticketGroupId,
+            relatedRotationId: primarySlot.rotationId,
+          },
         };
         const statements = [
           this.env.DB.prepare(
@@ -451,45 +498,52 @@ export class EventCoordinator extends DurableObject<Env> {
           ),
           ...(openFlightGroup
             ? []
-            : [
+            : slots.flatMap((slot) => [
                 this.env.DB.prepare(`INSERT INTO flight_groups
                   (id, operation_day_id, resource_group_id, communication_number, status, version, created_at, updated_at)
                   VALUES (?1, ?2, ?3, ?4, 'DRAFT', 0, ?5, ?5)`).bind(
-                  flightGroupId,
+                  slot.flightGroupId,
                   command.eventId,
                   product.resource_group_id,
-                  communicationRow?.next_number ?? 101,
+                  slot.communicationNumber,
                   now,
                 ),
                 this.env.DB.prepare(`INSERT INTO rotations
                   (id, operation_day_id, flight_group_id, gate_id, status, version, created_at, updated_at)
                   VALUES (?1, ?2, ?3, ?4, 'DRAFT', 0, ?5, ?5)`).bind(
-                  rotationId,
+                  slot.rotationId,
                   command.eventId,
-                  flightGroupId,
+                  slot.flightGroupId,
                   product.gate_id,
                   now,
                 ),
-              ]),
-          ...hashes.flatMap((hash, index) => [
-            this.env.DB.prepare(`INSERT INTO tickets
-              (id, ticket_group_id, public_code_hash, status, weight_class, individual_weight_kg,
-               payment_status, payment_method, price_cents, created_at)
-              VALUES (?1, ?2, ?3, 'QUEUED', ?4, ?5, ?6, ?7, ?8, ?9)`).bind(
-              ticketIds[index],
-              ticketGroupId,
-              hash,
-              ticketDetails[index]?.weightClass,
-              ticketDetails[index]?.individualWeightKg,
-              command.payload.paymentStatus,
-              command.payload.paymentMethod,
-              product.price_cents,
-              now,
-            ),
-            this.env.DB.prepare(
-              "INSERT INTO rotation_tickets (rotation_id, ticket_id, assigned_at) VALUES (?1, ?2, ?3)",
-            ).bind(rotationId, ticketIds[index], now),
-          ]),
+              ])),
+          ...hashes.flatMap((hash, index) => {
+            const slotIndex = splitAcrossFlightGroups
+              ? Math.floor(index / product.reference_capacity)
+              : 0;
+            const ticketSlot = slots[slotIndex];
+            if (!ticketSlot) throw new Error("Fluggruppen-Slot für Ticket fehlt.");
+            return [
+              this.env.DB.prepare(`INSERT INTO tickets
+                (id, ticket_group_id, public_code_hash, status, weight_class, individual_weight_kg,
+                 payment_status, payment_method, price_cents, created_at)
+                VALUES (?1, ?2, ?3, 'QUEUED', ?4, ?5, ?6, ?7, ?8, ?9)`).bind(
+                ticketIds[index],
+                ticketGroupId,
+                hash,
+                ticketDetails[index]?.weightClass,
+                ticketDetails[index]?.individualWeightKg,
+                command.payload.paymentStatus,
+                command.payload.paymentMethod,
+                product.price_cents,
+                now,
+              ),
+              this.env.DB.prepare(
+                "INSERT INTO rotation_tickets (rotation_id, ticket_id, assigned_at) VALUES (?1, ?2, ?3)",
+              ).bind(ticketSlot.rotationId, ticketIds[index], now),
+            ];
+          }),
           this.env.DB.prepare(`INSERT INTO operational_events
             (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type, aggregate_id, aggregate_version, payload_json)
             VALUES (?1, ?2, 'TICKET_GROUP_SOLD', ?3, ?4, 'TICKET_GROUP', ?5, 0, ?6)`).bind(
@@ -500,14 +554,17 @@ export class EventCoordinator extends DurableObject<Env> {
             ticketGroupId,
             JSON.stringify({
               ticketGroupId,
-              flightGroupId,
-              rotationId,
+              flightGroupId: primarySlot.flightGroupId,
+              rotationId: primarySlot.rotationId,
+              flightGroupIds: slots.map((slot) => slot.flightGroupId),
+              rotationIds: slots.map((slot) => slot.rotationId),
               ticketCount: ticketIds.length,
               productId: product.id,
               weightClasses: ticketDetails.map((detail) => detail.weightClass),
               paymentStatus: command.payload.paymentStatus,
               paymentMethod: command.payload.paymentMethod,
               joinedExistingFlightGroup: openFlightGroup !== null,
+              oversizeSplitAcknowledged: splitAcrossFlightGroups,
             }),
           ),
           this.env.DB.prepare(`INSERT INTO idempotency_receipts
@@ -3554,21 +3611,12 @@ export class EventCoordinator extends DurableObject<Env> {
     }
     const group = await this.env.DB.prepare(
       `SELECT tg.id, tg.product_id, tg.version, tg.deferral_count,
-              r.id AS rotation_id, r.status AS rotation_status,
-              r.called_at,
-              r.aircraft_id, fg.resource_group_id,
-              (SELECT COUNT(DISTINCT grouped_ticket.ticket_group_id)
-                 FROM rotation_tickets grouped_rt
-                 JOIN tickets grouped_ticket ON grouped_ticket.id = grouped_rt.ticket_id
-                WHERE grouped_rt.rotation_id = r.id AND grouped_rt.released_at IS NULL)
-                AS rotation_group_count
+              p.resource_group_id, COUNT(t.id) AS group_size
          FROM ticket_groups tg
+         JOIN products p ON p.id = tg.product_id
          JOIN tickets t ON t.ticket_group_id = tg.id
-         JOIN rotation_tickets rt ON rt.ticket_id = t.id AND rt.released_at IS NULL
-         JOIN rotations r ON r.id = rt.rotation_id
-         JOIN flight_groups fg ON fg.id = r.flight_group_id
         WHERE tg.id = ?1 AND tg.operation_day_id = ?2
-        LIMIT 1`,
+        GROUP BY tg.id, tg.product_id, tg.version, tg.deferral_count, p.resource_group_id`,
     )
       .bind(command.payload.ticketGroupId, command.eventId)
       .first<{
@@ -3576,12 +3624,8 @@ export class EventCoordinator extends DurableObject<Env> {
         product_id: string;
         version: number;
         deferral_count: number;
-        rotation_id: string;
-        rotation_status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
-        called_at: string | null;
-        aircraft_id: string | null;
         resource_group_id: string;
-        rotation_group_count: number;
+        group_size: number;
       }>();
     if (!group) {
       return json(
@@ -3589,11 +3633,44 @@ export class EventCoordinator extends DurableObject<Env> {
         { status: 404 },
       );
     }
+    const rotationRows = await this.env.DB.prepare(
+      `SELECT DISTINCT r.id, r.status, r.called_at, r.aircraft_id,
+              (SELECT COUNT(DISTINCT grouped_ticket.ticket_group_id)
+                 FROM rotation_tickets grouped_rt
+                 JOIN tickets grouped_ticket ON grouped_ticket.id = grouped_rt.ticket_id
+                WHERE grouped_rt.rotation_id = r.id AND grouped_rt.released_at IS NULL)
+                AS rotation_group_count
+         FROM tickets t
+         JOIN rotation_tickets rt ON rt.ticket_id = t.id AND rt.released_at IS NULL
+         JOIN rotations r ON r.id = rt.rotation_id
+        WHERE t.ticket_group_id = ?1
+        ORDER BY r.created_at, r.id`,
+    )
+      .bind(group.id)
+      .all<{
+        id: string;
+        status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
+        called_at: string | null;
+        aircraft_id: string | null;
+        rotation_group_count: number;
+      }>();
+    if (rotationRows.results.length === 0) {
+      return json(
+        {
+          error: { code: "TICKET_GROUP_UNASSIGNED", message: "Ticketgruppe ist nicht zugeordnet." },
+        },
+        { status: 409 },
+      );
+    }
     if (
       command.type === "MARK_NO_SHOW" &&
-      (group.rotation_status !== "CALLED" ||
-        !group.called_at ||
-        Date.now() - Date.parse(group.called_at) < (current.no_show_after_minutes ?? 10) * 60_000)
+      rotationRows.results.some(
+        (rotation) =>
+          rotation.status !== "CALLED" ||
+          !rotation.called_at ||
+          Date.now() - Date.parse(rotation.called_at) <
+            (current.no_show_after_minutes ?? 10) * 60_000,
+      )
     ) {
       return json(
         {
@@ -3606,17 +3683,19 @@ export class EventCoordinator extends DurableObject<Env> {
       );
     }
     try {
-      assertQueueMutationAllowed({
-        rotationState: group.rotation_status,
-        action:
-          command.type === "CANCEL_TICKET_GROUP"
-            ? "CANCEL"
-            : command.type === "REBOOK_TICKET_GROUP"
-              ? "REBOOK"
-              : command.type === "MARK_NO_SHOW"
-                ? "NO_SHOW"
-                : "DEFER",
-      });
+      for (const rotation of rotationRows.results) {
+        assertQueueMutationAllowed({
+          rotationState: rotation.status,
+          action:
+            command.type === "CANCEL_TICKET_GROUP"
+              ? "CANCEL"
+              : command.type === "REBOOK_TICKET_GROUP"
+                ? "REBOOK"
+                : command.type === "MARK_NO_SHOW"
+                  ? "NO_SHOW"
+                  : "DEFER",
+        });
+      }
     } catch (reason: unknown) {
       if (reason instanceof DomainRuleError) {
         return json({ error: { code: reason.code, message: reason.message } }, { status: 409 });
@@ -3628,12 +3707,19 @@ export class EventCoordinator extends DurableObject<Env> {
     let targetResourceGroupId = group.resource_group_id;
     let targetGateId: string | null = null;
     let targetPriceCents: number | null = null;
+    let targetReferenceCapacity = 0;
     if (command.type === "REBOOK_TICKET_GROUP") {
       const target = await this.env.DB.prepare(
-        "SELECT id, resource_group_id, gate_id, price_cents FROM products WHERE id = ?1 AND operation_day_id = ?2 AND sale_enabled = 1",
+        "SELECT id, resource_group_id, gate_id, price_cents, reference_capacity FROM products WHERE id = ?1 AND operation_day_id = ?2 AND sale_enabled = 1",
       )
         .bind(command.payload.newProductId, command.eventId)
-        .first<{ id: string; resource_group_id: string; gate_id: string; price_cents: number }>();
+        .first<{
+          id: string;
+          resource_group_id: string;
+          gate_id: string;
+          price_cents: number;
+          reference_capacity: number;
+        }>();
       if (!target) {
         return json(
           {
@@ -3649,13 +3735,15 @@ export class EventCoordinator extends DurableObject<Env> {
       targetResourceGroupId = target.resource_group_id;
       targetGateId = target.gate_id;
       targetPriceCents = target.price_cents;
+      targetReferenceCapacity = target.reference_capacity;
     } else {
       const currentProduct = await this.env.DB.prepare(
-        "SELECT gate_id FROM products WHERE id = ?1 AND operation_day_id = ?2",
+        "SELECT gate_id, reference_capacity FROM products WHERE id = ?1 AND operation_day_id = ?2",
       )
         .bind(targetProductId, command.eventId)
-        .first<{ gate_id: string }>();
+        .first<{ gate_id: string; reference_capacity: number }>();
       targetGateId = currentProduct?.gate_id ?? null;
+      targetReferenceCapacity = currentProduct?.reference_capacity ?? 0;
     }
     if (
       (command.type === "REBOOK_TICKET_GROUP" || command.type === "DEFER_TICKET_GROUP") &&
@@ -3698,23 +3786,25 @@ export class EventCoordinator extends DurableObject<Env> {
       ).bind(nextVersion, now, command.eventId, current.version),
       this.env.DB.prepare(
         `UPDATE rotation_tickets SET released_at = ?1
-          WHERE rotation_id = ?2 AND released_at IS NULL
-            AND ticket_id IN (SELECT id FROM tickets WHERE ticket_group_id = ?3)`,
-      ).bind(now, group.rotation_id, group.id),
+          WHERE released_at IS NULL
+            AND ticket_id IN (SELECT id FROM tickets WHERE ticket_group_id = ?2)`,
+      ).bind(now, group.id),
     ];
-    if (group.rotation_group_count === 1) {
-      statements.push(
-        this.env.DB.prepare(
-          "UPDATE rotations SET status = 'CANCELED', version = version + 1, updated_at = ?1 WHERE id = ?2",
-        ).bind(now, group.rotation_id),
-      );
-    }
-    if (group.rotation_group_count === 1 && group.aircraft_id) {
-      statements.push(
-        this.env.DB.prepare(
-          "UPDATE aircraft SET operational_state = 'AVAILABLE', updated_at = ?1 WHERE id = ?2",
-        ).bind(now, group.aircraft_id),
-      );
+    for (const rotation of rotationRows.results) {
+      if (rotation.rotation_group_count === 1) {
+        statements.push(
+          this.env.DB.prepare(
+            "UPDATE rotations SET status = 'CANCELED', version = version + 1, updated_at = ?1 WHERE id = ?2",
+          ).bind(now, rotation.id),
+        );
+      }
+      if (rotation.rotation_group_count === 1 && rotation.aircraft_id) {
+        statements.push(
+          this.env.DB.prepare(
+            "UPDATE aircraft SET operational_state = 'AVAILABLE', updated_at = ?1 WHERE id = ?2",
+          ).bind(now, rotation.aircraft_id),
+        );
+      }
     }
 
     if (
@@ -3752,8 +3842,18 @@ export class EventCoordinator extends DurableObject<Env> {
       )
         .bind(command.eventId, targetResourceGroupId)
         .first<{ next_number: number }>();
-      const flightGroupId = crypto.randomUUID();
-      const rotationId = crypto.randomUUID();
+      const reassignmentPlan = planBookingGroupSplit({
+        groupSize: group.group_size,
+        referenceCapacity: targetReferenceCapacity,
+        splitAcknowledged: true,
+      });
+      const reassignmentSlots = reassignmentPlan.slotSizes.map((slotSize, index) => ({
+        flightGroupId: crypto.randomUUID(),
+        rotationId: crypto.randomUUID(),
+        communicationNumber: (communication?.next_number ?? 101) + index,
+        ticketOffset: index * targetReferenceCapacity,
+        ticketCount: slotSize,
+      }));
       statements.push(
         this.env.DB.prepare(
           `UPDATE ticket_groups SET product_id = ?1, queue_sequence = ?2, status = 'QUEUED',
@@ -3772,26 +3872,31 @@ export class EventCoordinator extends DurableObject<Env> {
           : this.env.DB.prepare(
               "UPDATE tickets SET status = 'QUEUED', price_cents = ?1 WHERE ticket_group_id = ?2",
             ).bind(targetPriceCents, group.id),
-        this.env.DB.prepare(
-          `INSERT INTO flight_groups
+      );
+      for (const slot of reassignmentSlots) {
+        statements.push(
+          this.env.DB.prepare(
+            `INSERT INTO flight_groups
             (id, operation_day_id, resource_group_id, communication_number, status, version, created_at, updated_at)
            VALUES (?1, ?2, ?3, ?4, 'DRAFT', 0, ?5, ?5)`,
-        ).bind(
-          flightGroupId,
-          command.eventId,
-          targetResourceGroupId,
-          communication?.next_number ?? 101,
-          now,
-        ),
-        this.env.DB.prepare(
-          `INSERT INTO rotations (id, operation_day_id, flight_group_id, gate_id, status, version, created_at, updated_at)
-           VALUES (?1, ?2, ?3, ?4, 'DRAFT', 0, ?5, ?5)`,
-        ).bind(rotationId, command.eventId, flightGroupId, targetGateId, now),
-        this.env.DB.prepare(
-          `INSERT INTO rotation_tickets (rotation_id, ticket_id, assigned_at)
-           SELECT ?1, id, ?2 FROM tickets WHERE ticket_group_id = ?3`,
-        ).bind(rotationId, now, group.id),
-      );
+          ).bind(
+            slot.flightGroupId,
+            command.eventId,
+            targetResourceGroupId,
+            slot.communicationNumber,
+            now,
+          ),
+          this.env.DB.prepare(
+            `INSERT INTO rotations (id, operation_day_id, flight_group_id, gate_id, status, version, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, 'DRAFT', 0, ?5, ?5)`,
+          ).bind(slot.rotationId, command.eventId, slot.flightGroupId, targetGateId, now),
+          this.env.DB.prepare(
+            `INSERT INTO rotation_tickets (rotation_id, ticket_id, assigned_at)
+             SELECT ?1, id, ?2 FROM tickets WHERE ticket_group_id = ?3
+              ORDER BY created_at, id LIMIT ?4 OFFSET ?5`,
+          ).bind(slot.rotationId, now, group.id, slot.ticketCount, slot.ticketOffset),
+        );
+      }
     }
 
     statements.push(

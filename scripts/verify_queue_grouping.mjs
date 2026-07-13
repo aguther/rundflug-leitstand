@@ -32,6 +32,7 @@ const base = "http://127.0.0.1:8787";
 const tokens = {
   admin: ["demo", "admin", "device", "token"].join("-"),
   cashier: ["demo", "cashier", "device", "token"].join("-"),
+  flightLine: ["demo", "flight", "line", "device", "token"].join("-"),
 };
 const waitForWorker = async () => {
   for (let attempt = 0; attempt < 40; attempt += 1) {
@@ -49,7 +50,7 @@ const board = async () => {
   if (!response.ok) throw new Error(`Board-Abruf fehlgeschlagen (${response.status}).`);
   return response.json();
 };
-const command = async (deviceId, token, expectedVersion, type, payload) => {
+const command = async (deviceId, token, expectedVersion, type, payload, expectedStatus = 200) => {
   const response = await fetch(`${base}/api/events/demo-2026/commands`, {
     method: "POST",
     headers: { "content-type": "application/json", "x-device-token": token },
@@ -64,7 +65,11 @@ const command = async (deviceId, token, expectedVersion, type, payload) => {
     }),
   });
   const result = await response.json();
-  if (!response.ok) throw new Error(`${type} fehlgeschlagen: ${JSON.stringify(result)}`);
+  if (response.status !== expectedStatus) {
+    throw new Error(
+      `${type} lieferte ${response.status} statt ${expectedStatus}: ${JSON.stringify(result)}`,
+    );
+  }
   return result;
 };
 const ticketCode = () =>
@@ -72,14 +77,22 @@ const ticketCode = () =>
     .toString("base64url")
     .toUpperCase()
     .replaceAll(/[01OI_-]/g, "A");
-const sell = (version, productId, size) =>
-  command("cashier-tablet-1", tokens.cashier, version, "SELL_TICKET_GROUP", {
-    productId,
-    publicTicketCodes: Array.from({ length: size }, ticketCode),
-    standby: false,
-    paymentStatus: "PAID",
-    paymentMethod: "CASH",
-  });
+const sell = (version, productId, size, oversizeSplitAcknowledged = false, expectedStatus = 200) =>
+  command(
+    "cashier-tablet-1",
+    tokens.cashier,
+    version,
+    "SELL_TICKET_GROUP",
+    {
+      productId,
+      publicTicketCodes: Array.from({ length: size }, ticketCode),
+      standby: false,
+      paymentStatus: "PAID",
+      paymentMethod: "CASH",
+      oversizeSplitAcknowledged,
+    },
+    expectedStatus,
+  );
 const search = async (groupId) => {
   const query = new URLSearchParams({ q: groupId });
   const response = await fetch(`${base}/api/events/demo-2026/tickets/search?${query}`, {
@@ -195,6 +208,92 @@ try {
   ) {
     throw new Error("Korrektur einer Teilgruppe hat eine andere Buchungsgruppe mitgelöst.");
   }
+  const rejectedOversize = await sell(
+    canceledPackedGroup.event.version,
+    "panorama-20",
+    5,
+    false,
+    409,
+  );
+  if (
+    rejectedOversize.error?.code !== "OVERSIZE_GROUP_SPLIT_CONFIRMATION_REQUIRED" ||
+    rejectedOversize.error.referenceCapacity !== 4 ||
+    rejectedOversize.error.requiredFlightGroupCount !== 2
+  ) {
+    throw new Error("Übergröße wurde ohne verständliche Bestätigungsvorgabe verarbeitet.");
+  }
+  const splitGroup = await sell(canceledPackedGroup.event.version, "panorama-20", 5, true);
+  current = await board();
+  const splitRotations = current.rotations
+    .filter((rotation) => rotation.ticketGroupId === splitGroup.aggregate.id)
+    .sort((left, right) => left.communicationNumber - right.communicationNumber);
+  if (
+    splitRotations.length !== 2 ||
+    splitRotations[0]?.ticketCount !== 4 ||
+    splitRotations[1]?.ticketCount !== 1 ||
+    splitRotations[1].communicationNumber !== splitRotations[0].communicationNumber + 1
+  ) {
+    throw new Error("Bestätigte Übergröße wurde nicht auf unmittelbar folgende Slots verteilt.");
+  }
+  const splitSearch = await search(splitGroup.aggregate.id);
+  const splitMatch = splitSearch.results.find(
+    (entry) => entry.ticketGroupId === splitGroup.aggregate.id,
+  );
+  if (
+    splitSearch.results.length !== 1 ||
+    splitMatch?.groupSize !== 5 ||
+    splitMatch.communicationLabels.length !== 2 ||
+    splitMatch.communicationNumbers[1] !== splitMatch.communicationNumbers[0] + 1
+  ) {
+    throw new Error("Aufgeteilte Buchungsgruppe ist in der Ticketsuche nicht vollständig.");
+  }
+  const deferredSplit = await command(
+    "flight-line-tablet-1",
+    tokens.flightLine,
+    splitGroup.event.version,
+    "DEFER_TICKET_GROUP",
+    {
+      ticketGroupId: splitGroup.aggregate.id,
+      reason: "Synthetischer Gruppenschutztest",
+    },
+  );
+  current = await board();
+  const reassignedSplitRotations = current.rotations
+    .filter((rotation) => rotation.ticketGroupId === splitGroup.aggregate.id)
+    .sort((left, right) => left.communicationNumber - right.communicationNumber);
+  if (
+    reassignedSplitRotations.length !== 2 ||
+    reassignedSplitRotations[0]?.ticketCount !== 4 ||
+    reassignedSplitRotations[1]?.ticketCount !== 1 ||
+    reassignedSplitRotations[1].communicationNumber !==
+      reassignedSplitRotations[0].communicationNumber + 1
+  ) {
+    throw new Error("Zurückstellung hat den Schutz der aufgeteilten Buchungsgruppe verletzt.");
+  }
+  const canceledSplit = await command(
+    "cashier-tablet-1",
+    tokens.cashier,
+    deferredSplit.event.version,
+    "CANCEL_TICKET_GROUP",
+    {
+      ticketGroupId: splitGroup.aggregate.id,
+      reason: "Synthetischer Gruppenschutztest",
+      adminPin: pin,
+    },
+  );
+  current = await board();
+  const canceledSplitSearch = await search(splitGroup.aggregate.id);
+  const canceledSplitMatch = canceledSplitSearch.results.find(
+    (entry) => entry.ticketGroupId === splitGroup.aggregate.id,
+  );
+  if (
+    current.event.version !== canceledSplit.event.version ||
+    current.rotations.some((rotation) => rotation.ticketGroupId === splitGroup.aggregate.id) ||
+    canceledSplitMatch?.groupStatus !== "CANCELED" ||
+    canceledSplitMatch.communicationLabels.length !== 0
+  ) {
+    throw new Error("Stornierung hat aktive Zuordnungen der aufgeteilten Gruppe hinterlassen.");
+  }
   console.log(
     JSON.stringify({
       ok: true,
@@ -205,6 +304,11 @@ try {
       groupSizes: [firstMatch.groupSize, secondMatch.groupSize],
       overflowSeparated: true,
       differentProductSeparated: true,
+      oversizeSplitRequiresConfirmation: true,
+      oversizeSplitSlotSizes: splitRotations.map((rotation) => rotation.ticketCount),
+      oversizeSplitCommunicationLabels: splitMatch.communicationLabels,
+      splitPreservedAfterDeferral: true,
+      splitCancellationReleasedAllAssignments: true,
     }),
   );
 } finally {
