@@ -166,6 +166,21 @@ try {
   if (capacitySafeProposal?.suggestedAircraftId !== "aircraft-a") {
     throw new Error("Zu kleines Flugzeug wurde für eine Vierergruppe vorgeschlagen.");
   }
+  const undersizedCall = await command(
+    "flight-line-tablet-1",
+    tokens.flightLine,
+    firstSale.event.version,
+    "CALL_NEXT",
+    {
+      rotationId: firstSale.aggregate.relatedRotationId,
+      aircraftId: "aircraft-too-small",
+      pilotId: "550e8400-e29b-41d4-a716-446655440100",
+    },
+    409,
+  );
+  if (undersizedCall.error?.code !== "AIRCRAFT_CAPACITY_EXCEEDED") {
+    throw new Error("Konkrete Flugzeugkapazität wurde beim NEXT nicht hart durchgesetzt.");
+  }
   const secondSale = await sell(firstSale.event.version);
   const firstCall = await command(
     "flight-line-tablet-1",
@@ -301,9 +316,10 @@ try {
   console.log(
     JSON.stringify({
       ok: true,
-      requirements: ["F-BRD-030", "F-BRD-040", "F-SLT-120"],
+      requirements: ["F-BRD-030", "F-BRD-040", "F-SLT-070", "F-SLT-120"],
       samePilotConflictRejected: true,
       undersizedAircraftNotSuggested: true,
+      undersizedAircraftCallRejected: true,
       differentPilotsAccepted: true,
       activeRotations: active.length,
       earliestBusyAircraftSuggested: true,
