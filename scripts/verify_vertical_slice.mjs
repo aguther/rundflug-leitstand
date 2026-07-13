@@ -315,6 +315,36 @@ try {
       "Vorschlag, neutrale Zuladungsschätzung oder initialer Ticketstatus fehlt im Standardumlauf.",
     );
   }
+  await post(
+    tokens.cashier,
+    envelope("cashier-tablet-1", sold.event.version, "SET_ROTATION_NOTE", {
+      rotationId,
+      note: "Organisatorischer Testhinweis 42",
+      reason: "Synthetischer D-050-Test",
+    }),
+    403,
+  );
+  const noted = await post(
+    tokens.flightLine,
+    envelope("flight-line-tablet-1", sold.event.version, "SET_ROTATION_NOTE", {
+      rotationId,
+      note: "Organisatorischer Testhinweis 42",
+      reason: "Synthetischer D-050-Test",
+    }),
+  );
+  current = await board("flight-line-tablet-1", tokens.flightLine);
+  const notedRotation = current.rotations.find((rotation) => rotation.id === rotationId);
+  const noteHistory = await history(rotationId);
+  const noteAudit = noteHistory.entries.find((entry) => entry.eventType === "ROTATION_NOTE_SET");
+  if (
+    notedRotation?.gateId !== "demo-2026-gate-main" ||
+    notedRotation.gateLabel !== "Flight Line 1" ||
+    notedRotation.operationalNote !== "Organisatorischer Testhinweis 42" ||
+    noteAudit?.payload.reason !== "Synthetischer D-050-Test" ||
+    noteAudit.payload.note !== "Organisatorischer Testhinweis 42"
+  ) {
+    throw new Error("Umlauf-Gate, organisatorische Bemerkung oder Auditbezug fehlt.");
+  }
   const checkedTicketId = proposedRotation.tickets[0].id;
   flightLineSocket.close();
   const reconnectStartedAt = Date.now();
@@ -324,7 +354,7 @@ try {
   const callForecastSignal = nextForecastVersion(flightLineSocket);
   const firstCall = await post(
     tokens.flightLine,
-    envelope("flight-line-tablet-1", sold.event.version, "CALL_NEXT", {
+    envelope("flight-line-tablet-1", noted.event.version, "CALL_NEXT", {
       rotationId,
       aircraftId: "aircraft-a",
       pilotId: "550e8400-e29b-41d4-a716-446655440100",
@@ -459,7 +489,7 @@ try {
   }
   process.stdout.write(
     JSON.stringify({
-      requirements: ["F-BRD-120", "F-SLT-080"],
+      requirements: ["F-BRD-120", "F-SLT-080", "D-050"],
       sale: sold.eventType,
       duplicate: duplicate.duplicate,
       staleRejected: true,
@@ -483,6 +513,7 @@ try {
       cashierProductForecastComplete: true,
       callCorrectionAudited: true,
       ticketStateSequenceVerified: true,
+      rotationGateAndNoteVerified: true,
       transitions: [called.eventType, started.eventType, landed.eventType, completed.eventType],
       landedAircraftState: landedAircraft.operationalState,
       finalAircraftState: finalAircraft.operationalState,

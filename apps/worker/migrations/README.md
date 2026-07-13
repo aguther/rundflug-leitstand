@@ -121,3 +121,12 @@ Administrationsgerät ein. Der Guard verhindert auch bei parallelen Anfragen ein
 Ersteinrichtung. Die Tabelle enthält ausschließlich technische IDs und den Abschlusszeitpunkt. Vor
 Anwendung wird portabel gesichert. Ein Rollback erfolgt aus dieser Sicherung; der Guard darf nach
 erfolgreichem Produktiv-Bootstrap nicht isoliert entfernt werden.
+
+## 0026 – Historisches Umlauf-Gate und organisatorische Bemerkung
+
+Ergänzt Umläufe additiv um das beim Anlegen wirksame Gate und eine optionale organisatorische
+Bemerkung. Bestehende Umläufe werden zuerst über ihr Produkt, ersatzweise über die Ressourcengruppe,
+einem Gate zugeordnet. Die Bemerkung beginnt leer und darf keine Namen oder anderen Personendaten
+enthalten. Vor Anwendung wird eine portable Sicherung erzeugt. Wiederherstellung erfolgt aus dieser
+Sicherung, da D1 additive Spalten nicht einzeln zurückrollt; ältere Anwendungen können beide Spalten
+gefahrlos ignorieren.

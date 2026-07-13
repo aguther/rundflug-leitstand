@@ -68,6 +68,9 @@ beenden oder überschreiben die Veranstaltungshistorie nicht.
 `GELANDET` macht ein Flugzeug ausdrücklich nicht verfügbar. Erst `MARK_COMPLETED` bestätigt den
 Abschluss von Ausstieg und Bodenprozess. Ab `IN_FLIGHT` sind Besetzung, Anwesenheit und normale
 Queue-Korrekturen gesperrt. Ein Pilot darf nicht gleichzeitig in mehreren aktiven Umläufen stehen.
+Jeder Umlauf hält das beim Anlegen wirksame Gate historisch fest. Eine rein organisatorische,
+anonyme Bemerkung kann über `SET_ROTATION_NOTE` geändert werden; Änderung und Begründung werden
+auditiert.
 
 Die reine Übergangsprüfung erfolgt durch `transitionRotation` in `packages/domain/src/index.ts`.
 Flugzeug-, Pilot-, Ticket- und Umlaufzustand werden im Worker in derselben D1-Batchgrenze
@@ -256,4 +259,3 @@ implementieren.
 Vor einer Änderung an einem Automaten oder einer Invariante sind mindestens Vertrag, Domänentest,
 Integrationspfad, Audit-Ereignis, Idempotenz, stale-write-Verhalten, Realtime-Auswirkung und
 Wiederherstellbarkeit zu prüfen. Der vollständige Nachweis läuft mit `npm run check`.
-

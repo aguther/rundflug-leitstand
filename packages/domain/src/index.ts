@@ -109,6 +109,7 @@ export type DeviceRole =
   | "DISPLAY";
 
 export type OperationalCommandType =
+  | "SET_ROTATION_NOTE"
   | "SELL_TICKET_GROUP"
   | "CALL_NEXT"
   | "MARK_IN_FLIGHT"
@@ -146,6 +147,7 @@ export type OperationalCommandType =
   | "APPLY_OUTAGE_RECOVERY";
 
 const commandRoles: Readonly<Record<OperationalCommandType, readonly DeviceRole[]>> = {
+  SET_ROTATION_NOTE: ["FLIGHT_LINE", "FLIGHT_LINE_LEAD", "ADMIN"],
   SELL_TICKET_GROUP: ["CASHIER", "ADMIN"],
   CALL_NEXT: ["FLIGHT_LINE", "FLIGHT_LINE_LEAD", "ADMIN"],
   MARK_IN_FLIGHT: ["FLIGHT_LINE", "FLIGHT_LINE_LEAD", "ADMIN"],

@@ -36,6 +36,14 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
     }),
   }),
   commandBaseSchema.extend({
+    type: z.literal("SET_ROTATION_NOTE"),
+    payload: z.object({
+      rotationId: z.string().min(1).max(100),
+      note: z.string().trim().max(240),
+      reason: z.string().trim().min(3).max(240),
+    }),
+  }),
+  commandBaseSchema.extend({
     type: z.literal("SET_EVENT_LIFECYCLE"),
     payload: z.object({
       status: z.enum(["PREPARATION", "ACTIVE", "CLOSED", "ARCHIVED"]),
@@ -603,8 +611,8 @@ export const productOperationalSummarySchema = z.object({
   resourceGroupStatus: z.enum(["ACTIVE", "PAUSED", "INTERRUPTED", "ENDED"]),
   resourceGroupOperationalNote: z.string(),
   priceCents: z.number().int().nonnegative(),
-  gateId: z.string(),
-  gateLabel: z.string(),
+  gateId: z.string().min(1),
+  gateLabel: z.string().min(1),
   childCompanionRequired: z.boolean(),
   weightClasses: z.array(z.enum(["NOT_CAPTURED", "CHILD", "NORMAL", "HEAVY", "INDIVIDUAL"])),
   sortOrder: z.number().int().nonnegative(),
@@ -636,6 +644,8 @@ export const rotationOperationalSummarySchema = z.object({
   productName: z.string(),
   status: z.enum(["DRAFT", "CALLED", "IN_FLIGHT", "LANDED", "COMPLETED"]),
   ticketGroupId: z.string(),
+  gateId: z.string().min(1),
+  gateLabel: z.string().min(1),
   aircraftId: z.string().nullable(),
   aircraftRegistration: z.string().nullable(),
   pilotId: z.string().nullable(),
@@ -650,6 +660,7 @@ export const rotationOperationalSummarySchema = z.object({
   predictedUpperMinutes: z.number().int().nonnegative(),
   calledAt: z.string().nullable(),
   deferralCount: z.number().int().nonnegative(),
+  operationalNote: z.string(),
   timeline: z.object({
     planned: z.object({
       boardingAt: z.string().nullable(),
