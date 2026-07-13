@@ -33,6 +33,23 @@ Am 13. Juli 2026 wurde ergänzend freigegeben:
   getrennte Datums- und Zeitfelder, wobei die Zeit im 24-Stunden-Format `HH:mm` eingegeben wird.
   Die intern verwendeten ISO-Werte und die Veranstaltungszeitzone bleiben unverändert.
 
+## Systemweite Theme-Korrektur
+
+Am 13. Juli 2026 wurde die Theme-Korrektur für die gesamte Anwendung freigegeben. Hell- und
+Dunkelmodus verwenden in Administration, Kasse, Flight Line, FIDS sowie den öffentlichen Status-
+und Kopplungsseiten dieselbe semantische Farb- und Kontrastlogik:
+
+- Arbeitsflächen, untergeordnete Flächen, Formulare und deaktivierte Elemente sind in jedem Theme
+  eindeutig voneinander unterscheidbar, ohne im Dunkelmodus auf helle Ersatzflächen zu wechseln.
+- Primäre, sekundäre, warnende und endgültige Aktionen bleiben anhand von Farbe, Kontur und Text
+  erkennbar. Farbe ist dabei nicht das einzige Unterscheidungsmerkmal.
+- Texte, Platzhalter, Tabellenköpfe und Statusmeldungen besitzen auf ihren jeweiligen Flächen eine
+  gut lesbare Kontraststufe. Gedämpfte Texte bleiben lesbar und dienen nur der visuellen Hierarchie.
+- Kasse und Flight Line behalten ihre vorgeschriebenen Ein-Bildschirm-Abläufe. Die Korrektur ändert
+  keine fachliche Reihenfolge und führt kein Karten-Dashboard ein.
+- Das FIDS bleibt aus typischer Betrachtungsentfernung lesbar; Statuschips und Flottenhinweise
+  verwenden dieselben Zustandsfarben wie die operativen Ansichten.
+
 ## Endgültiges Löschen
 
 Anforderung `F-ADM-050` gilt für Gates, Ressourcengruppen, Flugzeuge, deren Zuordnungen,

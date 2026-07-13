@@ -21,6 +21,12 @@
   --ui-warning-text: #6b3d00;
   --ui-success-soft: #eaf6ef;
   --ui-success-text: #176b42;
+  --ui-control: #ffffff;
+  --ui-control-hover: #eef4fb;
+  --ui-disabled: #e7edf3;
+  --ui-disabled-text: #718096;
+  --ui-purple-soft: #f0edff;
+  --ui-purple-text: #51409a;
   --ui-shadow: 0 16px 44px rgb(15 37 64 / 10%);
 }
 
@@ -494,6 +500,286 @@ footer {
   cursor: pointer;
 }
 
+/* Theme V4: one modern surface and control language across every application view. */
+.cashier-workspace,
+.flight-workspace,
+.privacy-page {
+  color: var(--ui-text);
+}
+.group-size,
+.ticket-preview,
+.ticket-search,
+.ticket-receipt,
+.queue-list,
+.rotation-detail,
+.rotation-timeline,
+.attendance-panel,
+.fids-board,
+.ticket-status-page,
+.pair-device-page,
+.setup-page,
+.reset-level-row,
+.history-filters,
+.payment-information,
+.event-catalog a,
+.pairing-qr {
+  color: var(--ui-text);
+  border-color: var(--ui-border);
+  background: var(--ui-surface);
+}
+.emergency-control {
+  color: var(--ui-danger);
+  border-color: color-mix(in srgb, var(--ui-danger) 72%, var(--ui-border));
+  background: var(--ui-danger-soft);
+}
+.emergency-control label {
+  color: var(--ui-danger);
+}
+.payment-information,
+.rotation-timeline,
+.attendance-panel,
+.history-filters,
+.ticket-receipt code {
+  background: var(--ui-surface-subtle);
+}
+.product-option,
+.queue-row,
+.ticket-search-results button {
+  color: var(--ui-text);
+  border-color: var(--ui-border);
+  background: var(--ui-surface);
+  box-shadow: 0 1px 2px rgb(15 37 64 / 5%);
+}
+.product-option:hover,
+.queue-row:hover,
+.ticket-search-results button:hover {
+  border-color: color-mix(in srgb, var(--ui-accent) 55%, var(--ui-border));
+  background: var(--ui-control-hover);
+}
+.product-option.selected,
+.queue-row.selected,
+.event-catalog a.current-event {
+  color: var(--ui-text);
+  border-color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+}
+.product-option span,
+.group-size p,
+.ticket-preview p,
+.ticket-code-mode,
+.payment-information label,
+.weight-class-row label,
+.ticket-receipt span,
+.correction-controls label,
+.queue-row span:last-child,
+.rotation-detail dt,
+.rotation-timeline thead th,
+.fids-header,
+.fids-group small,
+.fids-board > p,
+.eyebrow,
+.push-toggle small,
+.push-message,
+.fleet-row span,
+.audit-list time,
+.audit-list span,
+.audit-list code,
+.reset-level-row p,
+.reset-checkbox small {
+  color: var(--ui-muted);
+}
+.stepper output,
+.reset-level-row h2,
+.master-data-empty strong {
+  color: var(--ui-text);
+}
+.cashier-workspace input,
+.cashier-workspace select,
+.cashier-workspace textarea,
+.flight-workspace input,
+.flight-workspace select,
+.flight-workspace textarea,
+.history-filters input,
+.history-filters select,
+.event-lifecycle input,
+.device-pairing-form input,
+.device-pairing-form select,
+.pilot-controls input,
+.threshold-input input,
+.setup-page input,
+.pair-device-page input {
+  color: var(--ui-text);
+  border-color: var(--ui-border);
+  background: var(--ui-control);
+}
+.cashier-workspace input::placeholder,
+.cashier-workspace textarea::placeholder,
+.flight-workspace input::placeholder,
+.history-filters input::placeholder,
+.admin-workspace input::placeholder,
+.admin-workspace textarea::placeholder {
+  color: var(--ui-disabled-text);
+  opacity: 1;
+}
+.stepper button,
+.print-tickets,
+.correction-controls button,
+.secondary-actions button,
+.ticket-search-input button,
+.attendance-list button,
+.undo-action,
+.section-heading button,
+.reset-level-row > button,
+.report-actions button,
+.device-list button,
+.event-lifecycle button,
+.pilot-controls button,
+.fleet-actions button {
+  color: var(--ui-accent);
+  border-color: color-mix(in srgb, var(--ui-accent) 62%, var(--ui-border));
+  background: var(--ui-control);
+  box-shadow: none;
+}
+.interrupt-action,
+.device-pairing-form button,
+.history-filters button,
+.dialog-actions > button:not(.danger-action) {
+  color: var(--ui-accent);
+  border-color: color-mix(in srgb, var(--ui-accent) 62%, var(--ui-border));
+  background: var(--ui-control);
+  box-shadow: none;
+}
+.interrupt-action {
+  color: var(--ui-warning-text);
+  border-color: color-mix(in srgb, var(--ui-warning) 62%, var(--ui-border));
+  background: var(--ui-warning-soft);
+}
+.stepper button:hover,
+.print-tickets:hover,
+.correction-controls button:hover:not(:disabled),
+.secondary-actions button:hover:not(:disabled),
+.ticket-search-input button:hover:not(:disabled),
+.attendance-list button:hover:not(:disabled),
+.undo-action:hover,
+.section-heading button:hover,
+.reset-level-row > button:hover,
+.report-actions button:hover,
+.device-list button:hover,
+.event-lifecycle button:hover,
+.pilot-controls button:hover,
+.fleet-actions button:hover {
+  background: var(--ui-control-hover);
+}
+.device-pairing-form button:hover:not(:disabled),
+.history-filters button:hover:not(:disabled),
+.dialog-actions > button:not(.danger-action):hover:not(:disabled) {
+  background: var(--ui-control-hover);
+}
+.interrupt-action:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--ui-warning-soft) 78%, var(--ui-warning));
+}
+.primary-action:disabled,
+.danger-action:disabled,
+.correction-controls button:disabled,
+.secondary-actions button:disabled,
+.ticket-search-input button:disabled,
+.attendance-list button:disabled,
+.reset-level-row > button:disabled,
+.report-actions button:disabled,
+.event-lifecycle button:disabled {
+  color: var(--ui-disabled-text);
+  border-color: var(--ui-border);
+  background: var(--ui-disabled);
+  opacity: 1;
+}
+.device-pairing-form button:disabled,
+.history-filters button:disabled,
+.dialog-actions > button:disabled,
+.interrupt-action:disabled {
+  color: var(--ui-disabled-text);
+  border-color: var(--ui-border);
+  background: var(--ui-disabled);
+  opacity: 1;
+}
+.state-banner {
+  color: var(--ui-text);
+  border-color: var(--ui-muted);
+  background: var(--ui-surface-subtle);
+}
+.state-called,
+.public-status {
+  color: var(--ui-text);
+  border-color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+}
+.state-in_flight,
+.state-landed,
+.completed-state,
+.attendance-list button.checked-in {
+  color: var(--ui-success-text);
+  border-color: color-mix(in srgb, var(--ui-success-text) 55%, var(--ui-border));
+  background: var(--ui-success-soft);
+}
+.landed-warning,
+.uncertainty {
+  color: var(--ui-warning-text);
+  border-color: color-mix(in srgb, var(--ui-warning) 55%, var(--ui-border));
+  background: var(--ui-warning-soft);
+}
+.factory-reset-row,
+.reset-consequence {
+  color: var(--ui-danger);
+  border-color: color-mix(in srgb, var(--ui-danger) 60%, var(--ui-border));
+  background: var(--ui-danger-soft);
+}
+.factory-reset-row h2,
+.reset-checkbox.extra-danger strong {
+  color: var(--ui-danger);
+}
+.status-waiting {
+  color: var(--ui-text);
+  background: var(--ui-surface-subtle);
+}
+.status-come_to_flight_line,
+.status-service_paused {
+  color: var(--ui-warning-text);
+  background: var(--ui-warning-soft);
+}
+.status-in_flight {
+  color: var(--ui-success-text);
+  background: var(--ui-success-soft);
+}
+.status-landed,
+.status-completed {
+  color: var(--ui-purple-text);
+  background: var(--ui-purple-soft);
+}
+.fids-board,
+.ticket-status-page,
+.pair-device-page,
+.setup-page {
+  border-radius: 8px;
+  box-shadow: var(--ui-shadow);
+}
+.fids-header,
+.fids-row,
+.fleet-status,
+.push-toggle,
+.rotation-detail dl div,
+.rotation-timeline th,
+.rotation-timeline td,
+.audit-list,
+.audit-list > div,
+.pilot-list > div,
+.device-list > div {
+  border-color: var(--ui-border);
+}
+.fleet-status,
+.time-window {
+  color: var(--ui-text);
+  background: var(--ui-surface-subtle);
+}
+
 @media (max-width: 760px) {
   .app-header {
     padding: 8px 12px;
@@ -665,6 +951,12 @@ footer {
   --ui-warning-text: #f7d58f;
   --ui-success-soft: #10271d;
   --ui-success-text: #7edca6;
+  --ui-control: #101d2d;
+  --ui-control-hover: #16263a;
+  --ui-disabled: #182638;
+  --ui-disabled-text: #7f90a6;
+  --ui-purple-soft: #211d3a;
+  --ui-purple-text: #b9aaf5;
   --ui-shadow: 0 20px 54px rgb(0 0 0 / 35%);
 }
 /* biome-ignore format: Preserve the existing legacy stylesheet while V3 is migrated incrementally. */
