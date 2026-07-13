@@ -316,7 +316,7 @@ try {
   console.log(
     JSON.stringify({
       ok: true,
-      requirements: ["F-BRD-030", "F-BRD-040", "F-SLT-070", "F-SLT-120"],
+      requirements: ["F-BRD-030", "F-BRD-040", "F-PRG-110", "F-SLT-070", "F-SLT-120"],
       samePilotConflictRejected: true,
       undersizedAircraftNotSuggested: true,
       undersizedAircraftCallRejected: true,
