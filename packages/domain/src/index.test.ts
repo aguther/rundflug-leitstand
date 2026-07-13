@@ -24,6 +24,14 @@ describe("command authorization", () => {
     expect(() => assertRoleMayExecute("CASHIER", "SELL_TICKET_GROUP")).not.toThrow();
   });
 
+  it("allows only flight-line roles and administrators to move whole ticket groups", () => {
+    expect(() => assertRoleMayExecute("FLIGHT_LINE", "MOVE_TICKET_GROUP")).not.toThrow();
+    expect(() => assertRoleMayExecute("FLIGHT_LINE_LEAD", "MOVE_TICKET_GROUP")).not.toThrow();
+    expect(() => assertRoleMayExecute("CASHIER", "MOVE_TICKET_GROUP")).toThrowError(
+      /darf MOVE_TICKET_GROUP nicht/,
+    );
+  });
+
   it("rejects a display device for operational commands", () => {
     expect(() => assertRoleMayExecute("DISPLAY", "CALL_NEXT")).toThrowError(/darf CALL_NEXT nicht/);
   });

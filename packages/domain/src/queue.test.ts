@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { assertQueueMutationAllowed, planBookingGroupSplit, planNextRotations } from "./queue";
+import {
+  assertManualGroupMoveAllowed,
+  assertQueueMutationAllowed,
+  planBookingGroupSplit,
+  planNextRotations,
+} from "./queue";
 
 describe("resource-group queue planning", () => {
   it("keeps purchased groups together and fills compatible aircraft in order", () => {
@@ -54,6 +59,42 @@ describe("resource-group queue planning", () => {
   it("rejects queue mutations once a rotation is in flight", () => {
     expect(() =>
       assertQueueMutationAllowed({ rotationState: "IN_FLIGHT", action: "REBOOK" }),
+    ).toThrowError(/nach IM FLUG/);
+  });
+
+  it("allows a reasoned whole-group move until takeoff and protects target capacity", () => {
+    expect(() =>
+      assertManualGroupMoveAllowed({
+        sourceStates: ["DRAFT"],
+        targetState: "CALLED",
+        sameResourceGroup: true,
+        sameProduct: true,
+        groupSize: 2,
+        targetOccupiedSeats: 2,
+        targetCapacity: 4,
+      }),
+    ).not.toThrow();
+    expect(() =>
+      assertManualGroupMoveAllowed({
+        sourceStates: ["DRAFT"],
+        targetState: "DRAFT",
+        sameResourceGroup: true,
+        sameProduct: true,
+        groupSize: 3,
+        targetOccupiedSeats: 2,
+        targetCapacity: 4,
+      }),
+    ).toThrowError(/gesamte Buchungsgruppe/);
+    expect(() =>
+      assertManualGroupMoveAllowed({
+        sourceStates: ["IN_FLIGHT"],
+        targetState: "DRAFT",
+        sameResourceGroup: true,
+        sameProduct: true,
+        groupSize: 1,
+        targetOccupiedSeats: 0,
+        targetCapacity: 4,
+      }),
     ).toThrowError(/nach IM FLUG/);
   });
 });

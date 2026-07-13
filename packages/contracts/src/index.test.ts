@@ -132,6 +132,24 @@ describe("commandEnvelopeSchema", () => {
     ).toBe(true);
   });
 
+  it("validates a reasoned whole-group move without guest or safety data", () => {
+    const parsed = commandEnvelopeSchema.parse({
+      commandId: "550e8400-e29b-41d4-a716-446655440021",
+      eventId: "synthetic-event",
+      deviceId: "synthetic-flight-line",
+      expectedVersion: 3,
+      issuedAt: "2026-07-11T12:00:00.000Z",
+      type: "MOVE_TICKET_GROUP",
+      payload: {
+        ticketGroupId: "synthetic-group",
+        targetRotationId: "synthetic-target",
+        reason: "Manuell bestätigte Nachbesetzung",
+      },
+    });
+    expect(parsed.type).toBe("MOVE_TICKET_GROUP");
+    expect(JSON.stringify(parsed)).not.toMatch(/guest|name|safe|freigabe/i);
+  });
+
   it("accepts only hashed credentials for device pairing", () => {
     const parsed = commandEnvelopeSchema.parse({
       commandId: "550e8400-e29b-41d4-a716-446655440001",

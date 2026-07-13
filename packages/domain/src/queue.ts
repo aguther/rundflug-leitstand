@@ -120,3 +120,41 @@ export function assertQueueMutationAllowed(input: {
     );
   }
 }
+
+export function assertManualGroupMoveAllowed(input: {
+  sourceStates: readonly ("DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED")[];
+  targetState: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
+  sameResourceGroup: boolean;
+  sameProduct: boolean;
+  groupSize: number;
+  targetOccupiedSeats: number;
+  targetCapacity: number;
+}): void {
+  if (
+    input.sourceStates.some((state) => ["IN_FLIGHT", "LANDED", "COMPLETED"].includes(state)) ||
+    ["IN_FLIGHT", "LANDED", "COMPLETED"].includes(input.targetState)
+  ) {
+    throw new DomainRuleError(
+      "MANUAL_GROUP_MOVE_TOO_LATE",
+      "Fluggruppen dürfen nach IM FLUG nicht mehr operativ umbesetzt werden.",
+    );
+  }
+  if (!input.sameResourceGroup) {
+    throw new DomainRuleError(
+      "MANUAL_GROUP_MOVE_RESOURCE_MISMATCH",
+      "Quelle und Ziel müssen derselben Ressourcengruppe angehören.",
+    );
+  }
+  if (!input.sameProduct) {
+    throw new DomainRuleError(
+      "MANUAL_GROUP_MOVE_PRODUCT_MISMATCH",
+      "Eine manuelle Umbesetzung darf keine Produkte in einem Umlauf vermischen.",
+    );
+  }
+  if (input.targetOccupiedSeats + input.groupSize > input.targetCapacity) {
+    throw new DomainRuleError(
+      "MANUAL_GROUP_MOVE_CAPACITY_EXCEEDED",
+      "Die gesamte Buchungsgruppe passt nicht in den Zielumlauf.",
+    );
+  }
+}
