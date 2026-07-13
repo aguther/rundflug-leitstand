@@ -48,6 +48,24 @@ export async function bootstrapSystem(
   return { eventId: body.eventId, adminDeviceId: body.adminDeviceId };
 }
 
+export async function getDeviceContext(
+  deviceId: string,
+  deviceToken: string,
+): Promise<{ eventId: string; role: string }> {
+  const response = await fetch("/api/device/context", {
+    headers: { "x-device-id": deviceId, "x-device-token": deviceToken },
+  });
+  const body = (await response.json()) as {
+    eventId?: string;
+    role?: string;
+    error?: { message?: string };
+  };
+  if (!response.ok || !body.eventId || !body.role) {
+    throw new Error(body.error?.message ?? "Gerätekontext nicht verfügbar.");
+  }
+  return { eventId: body.eventId, role: body.role };
+}
+
 export async function searchTickets(
   eventId: string,
   deviceId: string,

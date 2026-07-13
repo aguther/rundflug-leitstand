@@ -16,6 +16,7 @@ import {
   downloadDailyReport,
   downloadTicketRawData,
   getAuditHistory,
+  getDeviceContext,
   getEventCatalog,
   getOperationBoard,
   getPairedDevices,
@@ -36,6 +37,7 @@ import {
   reduceBoardSyncState,
   requestBoardSync,
 } from "./board-sync";
+import { rememberActiveEvent, resolveActiveEvent } from "./event-context";
 import {
   appendCashierDraftRevision,
   cashierDraftQueueKey,
@@ -46,7 +48,7 @@ import {
 import { confirmedStateLabel, loadOperationBoard, saveOperationBoard } from "./offline-store";
 import { setupValidationMessages } from "./setup-validation";
 
-const EVENT_ID = new URLSearchParams(window.location.search).get("event") ?? "demo-2026";
+const EVENT_ID = resolveActiveEvent(window.location.search, window.localStorage);
 const KIOSK_MODE = new URLSearchParams(window.location.search).get("kiosk") === "1";
 const LOCAL_DEVELOPMENT =
   import.meta.env.DEV || ["localhost", "127.0.0.1"].includes(window.location.hostname);
@@ -178,9 +180,24 @@ function useOperationBoard(deviceId: string) {
     lastConfirmedAt: null,
   });
   const refresh = useCallback(async () => {
+    const deviceToken = deviceTokenFor(deviceId);
     const outcome = await requestBoardSync(() =>
-      getOperationBoard(EVENT_ID, deviceId, deviceTokenFor(deviceId)),
+      getOperationBoard(EVENT_ID, deviceId, deviceToken),
     );
+    if (outcome.type === "UNAVAILABLE" && outcome.message.includes("(403)") && deviceToken) {
+      try {
+        const context = await getDeviceContext(deviceId, deviceToken);
+        if (context.eventId !== EVENT_ID) {
+          rememberActiveEvent(window.localStorage, context.eventId);
+          const target = new URL(window.location.href);
+          target.searchParams.set("event", context.eventId);
+          window.location.replace(target);
+          return;
+        }
+      } catch {
+        // The original board error remains the useful user-facing state.
+      }
+    }
     setState((current) => reduceBoardSyncState(current, outcome));
     if (outcome.type === "CONFIRMED") {
       void saveOperationBoard(EVENT_ID, deviceId, outcome.board, outcome.confirmedAt);
@@ -1523,6 +1540,7 @@ function PairDeviceView() {
   const deviceId = params.get("device") ?? "";
   const token = params.get("token") ?? "";
   const role = params.get("role") ?? "";
+  const eventId = params.get("event") ?? "";
   const roleTargets: Record<string, string> = {
     CASHIER: "/",
     FLIGHT_LINE: "/flight-line",
@@ -1534,6 +1552,7 @@ function PairDeviceView() {
   const valid =
     /^[0-9a-f-]{36}$/i.test(deviceId) &&
     /^[A-Za-z0-9_-]{40,64}$/.test(token) &&
+    eventId.trim().length > 0 &&
     role in roleTargets;
   const activate = () => {
     if (!valid) return;
@@ -1541,6 +1560,7 @@ function PairDeviceView() {
       role === "FLIGHT_LINE_LEAD" ? "FLIGHT_LINE" : role === "FLIGHT_DIRECTOR" ? "ADMIN" : role;
     window.localStorage.setItem(`device-id:${viewRole}`, deviceId);
     window.localStorage.setItem(`device-token:${deviceId}`, token);
+    rememberActiveEvent(window.localStorage, eventId);
     window.history.replaceState(null, "", "/pair");
     window.location.assign(roleTargets[role] ?? "/");
   };
@@ -1622,6 +1642,7 @@ function SetupView() {
       });
       window.localStorage.setItem("device-id:ADMIN", result.adminDeviceId);
       window.localStorage.setItem(`device-token:${result.adminDeviceId}`, token);
+      rememberActiveEvent(window.localStorage, result.eventId);
       window.location.assign(`/admin?event=${encodeURIComponent(result.eventId)}`);
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : "Ersteinrichtung fehlgeschlagen.");
@@ -2051,7 +2072,12 @@ function AdminView() {
         },
         deviceTokenFor(ADMIN_DEVICE_ID),
       );
-      const params = new URLSearchParams({ device: pairedDeviceId, token, role: deviceRole });
+      const params = new URLSearchParams({
+        device: pairedDeviceId,
+        token,
+        role: deviceRole,
+        event: EVENT_ID,
+      });
       const url = `${window.location.origin}/pair#${params.toString()}`;
       setPairingUrl(url);
       setPairingQr(
