@@ -109,8 +109,8 @@ const search = async (groupId) => {
   if (!response.ok) throw new Error(`Ticketsuche fehlgeschlagen (${response.status}).`);
   return response.json();
 };
-const history = async (groupId) => {
-  const query = new URLSearchParams({ aggregateType: "TICKET_GROUP", aggregateId: groupId });
+const history = async (aggregateType, aggregateId) => {
+  const query = new URLSearchParams({ aggregateType, aggregateId });
   const response = await fetch(`${base}/api/events/demo-2026/history?${query}`, {
     headers: { "x-device-id": "technical-scaffold", "x-device-token": tokens.admin },
   });
@@ -308,7 +308,7 @@ try {
   const manuallyFilledTarget = current.rotations.find(
     (rotation) => rotation.id === first.aggregate.relatedRotationId,
   );
-  const moveHistory = await history(overflow.aggregate.id);
+  const moveHistory = await history("TICKET_GROUP", overflow.aggregate.id);
   const moveAudit = moveHistory.entries.find((entry) => entry.eventType === "TICKET_GROUP_MOVED");
   if (
     manuallyFilledTarget?.status !== "CALLED" ||
@@ -425,6 +425,111 @@ try {
   ) {
     throw new Error("Stornierung hat aktive Zuordnungen der aufgeteilten Gruppe hinterlassen.");
   }
+  const capacityFill = await sell(canceledSplit.event.version, "panorama-20", 2);
+  const capacityOverflow = await sell(capacityFill.event.version, "panorama-20", 1);
+  if (
+    capacityFill.aggregate.relatedRotationId !== lateMoveSource.aggregate.relatedRotationId ||
+    capacityOverflow.aggregate.relatedRotationId !== lateMoveSource.aggregate.relatedRotationId
+  ) {
+    throw new Error("Synthetischer Kapazitätsumlauf wurde nicht wie erwartet gefüllt.");
+  }
+  const capacityCommandId = randomUUID();
+  const reducedCapacity = await command(
+    "flight-line-tablet-1",
+    tokens.flightLine,
+    capacityOverflow.event.version,
+    "SET_ROTATION_CAPACITY",
+    {
+      rotationId: lateMoveSource.aggregate.relatedRotationId,
+      usableCapacity: 3,
+      reason: "Organisatorisch nur drei Plätze nutzbar",
+    },
+    200,
+    capacityCommandId,
+  );
+  const duplicateCapacity = await command(
+    "flight-line-tablet-1",
+    tokens.flightLine,
+    capacityOverflow.event.version,
+    "SET_ROTATION_CAPACITY",
+    {
+      rotationId: lateMoveSource.aggregate.relatedRotationId,
+      usableCapacity: 3,
+      reason: "Organisatorisch nur drei Plätze nutzbar",
+    },
+    200,
+    capacityCommandId,
+  );
+  const staleCapacity = await command(
+    "flight-line-tablet-1",
+    tokens.flightLine,
+    capacityOverflow.event.version,
+    "SET_ROTATION_CAPACITY",
+    {
+      rotationId: lateMoveSource.aggregate.relatedRotationId,
+      usableCapacity: 2,
+      reason: "Veralteter Kapazitätsversuch",
+    },
+    409,
+  );
+  const rejectedCashierCapacity = await command(
+    "cashier-tablet-1",
+    tokens.cashier,
+    reducedCapacity.event.version,
+    "SET_ROTATION_CAPACITY",
+    {
+      rotationId: lateMoveSource.aggregate.relatedRotationId,
+      usableCapacity: 2,
+      reason: "Unzulässiger Kassentest",
+    },
+    403,
+  );
+  const rejectedLateCapacity = await command(
+    "flight-line-tablet-1",
+    tokens.flightLine,
+    reducedCapacity.event.version,
+    "SET_ROTATION_CAPACITY",
+    {
+      rotationId: first.aggregate.relatedRotationId,
+      usableCapacity: 3,
+      reason: "Unzulässiger später Kapazitätstest",
+    },
+    409,
+  );
+  current = await board();
+  const reducedRotation = current.rotations.find(
+    (rotation) => rotation.id === lateMoveSource.aggregate.relatedRotationId,
+  );
+  const requeuedCapacityGroup = current.rotations.find(
+    (rotation) => rotation.ticketGroupId === capacityOverflow.aggregate.id,
+  );
+  const capacityHistory = await history("ROTATION", lateMoveSource.aggregate.relatedRotationId);
+  const capacityAudit = capacityHistory.entries.find(
+    (entry) => entry.eventType === "ROTATION_CAPACITY_CHANGED",
+  );
+  const capacitySearch = await search(capacityOverflow.aggregate.id);
+  const capacitySearchMatch = capacitySearch.results.find(
+    (entry) => entry.ticketGroupId === capacityOverflow.aggregate.id,
+  );
+  if (
+    reducedRotation?.ticketCount !== 3 ||
+    reducedRotation.baselineCapacity !== 4 ||
+    reducedRotation.usableCapacity !== 3 ||
+    reducedRotation.capacityReduced !== true ||
+    requeuedCapacityGroup?.ticketCount !== 1 ||
+    requeuedCapacityGroup.queuePosition >= reducedRotation.queuePosition ||
+    capacitySearchMatch?.queueSequence !== 1 ||
+    capacityAudit?.payload.reason !== "Organisatorisch nur drei Plätze nutzbar" ||
+    capacityAudit.payload.requeuedTicketGroupIds?.[0] !== capacityOverflow.aggregate.id ||
+    duplicateCapacity.duplicate !== true ||
+    staleCapacity.error?.code !== "STALE_VERSION" ||
+    rejectedCashierCapacity.error?.code !== "ROLE_NOT_AUTHORIZED" ||
+    rejectedLateCapacity.error?.code !== "ROTATION_CAPACITY_CHANGE_TOO_LATE"
+  ) {
+    throw new Error(
+      "Kapazitätsreduktion oder gruppenschützende Wiedereinreihung ist inkonsistent.",
+    );
+  }
   console.log(
     JSON.stringify({
       ok: true,
@@ -447,6 +552,13 @@ try {
       oversizeSplitCommunicationLabels: splitMatch.communicationLabels,
       splitPreservedAfterDeferral: true,
       splitCancellationReleasedAllAssignments: true,
+      usableCapacityReducedBeforeCall: true,
+      capacityQueueSuffixRequeuedAsWholeGroup: true,
+      capacityRequeueMovedToFront: true,
+      capacityChangeAuditRecorded: true,
+      capacityChangeIdempotent: true,
+      capacityChangeStaleWriteRejected: true,
+      capacityChangeAfterCallRejected: true,
     }),
   );
 } finally {

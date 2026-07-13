@@ -640,6 +640,7 @@ describe("commandEnvelopeSchema", () => {
       flightGroupId: "synthetic-flight-group",
       communicationNumber: 42,
       communicationLabel: "PAN-042",
+      queuePosition: 3,
       productCode: "PAN",
       productName: "Panorama",
       status: "IN_FLIGHT",
@@ -655,6 +656,9 @@ describe("commandEnvelopeSchema", () => {
       suggestedAircraftId: null,
       suggestedAircraftRegistration: null,
       ticketCount: 2,
+      baselineCapacity: 4,
+      usableCapacity: 3,
+      capacityReduced: true,
       estimatedPassengerPayloadKg: 107,
       predictedLowerMinutes: 0,
       predictedUpperMinutes: 25,
@@ -707,5 +711,23 @@ describe("commandEnvelopeSchema", () => {
     });
     expect(parsed.type).toBe("SET_ROTATION_NOTE");
     expect("guestName" in parsed.payload).toBe(false);
+  });
+
+  it("validates a reasoned usable-capacity reduction without safety semantics", () => {
+    const parsed = commandEnvelopeSchema.parse({
+      commandId: "2b428d92-224f-47ea-8d68-89f5d69158ee",
+      eventId: "synthetic-event",
+      deviceId: "synthetic-flight-line",
+      expectedVersion: 9,
+      issuedAt: "2026-07-11T12:00:00.000Z",
+      type: "SET_ROTATION_CAPACITY",
+      payload: {
+        rotationId: "synthetic-rotation",
+        usableCapacity: 3,
+        reason: "Organisatorisch nutzbare Plätze reduziert",
+      },
+    });
+    expect(parsed.type).toBe("SET_ROTATION_CAPACITY");
+    expect(JSON.stringify(parsed)).not.toMatch(/safe|freigabe|gewicht|zuladung/i);
   });
 });

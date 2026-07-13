@@ -26,6 +26,7 @@ import {
   forecastQueueWindows,
   type OperationalCommandType,
   planBookingGroupSplit,
+  planRotationCapacityReduction,
   simulateOutageRecovery,
   transitionAircraft,
   transitionRotation,
@@ -649,6 +650,9 @@ export class EventCoordinator extends DurableObject<Env> {
         if (command.type === "SET_ROTATION_NOTE") {
           return this.handleRotationNote(command, current);
         }
+        if (command.type === "SET_ROTATION_CAPACITY") {
+          return this.handleRotationCapacity(command, current);
+        }
         if (command.type === "MOVE_TICKET_GROUP") {
           return this.handleManualTicketGroupMove(command, current);
         }
@@ -839,7 +843,9 @@ export class EventCoordinator extends DurableObject<Env> {
            LEFT JOIN products p ON p.id = tg.product_id
            LEFT JOIN aircraft a ON a.id = r.aircraft_id
           WHERE r.operation_day_id = ?1 AND r.status NOT IN ('COMPLETED', 'CANCELED')
-          GROUP BY r.id ORDER BY tg.queue_sequence, r.created_at`,
+          GROUP BY r.id
+          ORDER BY CASE WHEN r.status = 'DRAFT' THEN 1 ELSE 0 END,
+                   COALESCE(fg.queue_position, fg.communication_number), r.created_at`,
       )
         .bind(eventId)
         .all<{
@@ -3595,6 +3601,229 @@ export class EventCoordinator extends DurableObject<Env> {
     return json(result);
   }
 
+  private async handleRotationCapacity(
+    command: Extract<CommandEnvelope, { type: "SET_ROTATION_CAPACITY" }>,
+    current: StoredEventRow,
+  ): Promise<Response> {
+    const rotation = await this.env.DB.prepare(
+      `SELECT r.id, r.status, r.version, r.called_at, r.usable_capacity, r.aircraft_id,
+              fg.id AS flight_group_id, fg.resource_group_id,
+              COALESCE(a.passenger_seats, MIN(p.reference_capacity), rg.reference_capacity)
+                AS baseline_capacity
+         FROM rotations r
+         JOIN flight_groups fg ON fg.id = r.flight_group_id
+         JOIN resource_groups rg ON rg.id = fg.resource_group_id
+         LEFT JOIN aircraft a ON a.id = r.aircraft_id
+         LEFT JOIN rotation_tickets rt ON rt.rotation_id = r.id AND rt.released_at IS NULL
+         LEFT JOIN tickets t ON t.id = rt.ticket_id
+         LEFT JOIN ticket_groups tg ON tg.id = t.ticket_group_id
+         LEFT JOIN products p ON p.id = tg.product_id
+        WHERE r.id = ?1 AND r.operation_day_id = ?2 AND r.status <> 'CANCELED'
+        GROUP BY r.id, r.status, r.version, r.called_at, r.usable_capacity, r.aircraft_id,
+                 fg.id, fg.resource_group_id, a.passenger_seats, rg.reference_capacity`,
+    )
+      .bind(command.payload.rotationId, command.eventId)
+      .first<{
+        id: string;
+        status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
+        version: number;
+        called_at: string | null;
+        usable_capacity: number | null;
+        aircraft_id: string | null;
+        flight_group_id: string;
+        resource_group_id: string;
+        baseline_capacity: number;
+      }>();
+    if (!rotation) {
+      return json(
+        { error: { code: "ROTATION_NOT_FOUND", message: "Umlauf nicht gefunden." } },
+        { status: 404 },
+      );
+    }
+    const segmentRows = await this.env.DB.prepare(
+      `SELECT tg.id AS ticket_group_id, tg.product_id, tg.queue_sequence,
+              p.gate_id, COUNT(rt.ticket_id) AS segment_size, MIN(rt.assigned_at) AS assigned_at
+         FROM rotation_tickets rt
+         JOIN tickets t ON t.id = rt.ticket_id
+         JOIN ticket_groups tg ON tg.id = t.ticket_group_id
+         JOIN products p ON p.id = tg.product_id
+        WHERE rt.rotation_id = ?1 AND rt.released_at IS NULL
+        GROUP BY tg.id, tg.product_id, tg.queue_sequence, p.gate_id
+        ORDER BY tg.queue_sequence, assigned_at, tg.id`,
+    )
+      .bind(rotation.id)
+      .all<{
+        ticket_group_id: string;
+        product_id: string;
+        queue_sequence: number;
+        gate_id: string;
+        segment_size: number;
+        assigned_at: string;
+      }>();
+    let reduction: ReturnType<typeof planRotationCapacityReduction>;
+    try {
+      reduction = planRotationCapacityReduction({
+        rotationState: rotation.status,
+        called: rotation.called_at !== null,
+        baselineCapacity: rotation.baseline_capacity,
+        currentUsableCapacity: rotation.usable_capacity,
+        requestedUsableCapacity: command.payload.usableCapacity,
+        segments: segmentRows.results.map((segment) => ({
+          ticketGroupId: segment.ticket_group_id,
+          size: segment.segment_size,
+        })),
+      });
+    } catch (reason: unknown) {
+      if (reason instanceof DomainRuleError) {
+        return json({ error: { code: reason.code, message: reason.message } }, { status: 409 });
+      }
+      throw reason;
+    }
+    const evictedSegments = reduction.evictedGroupIds.map((ticketGroupId) => {
+      const segment = segmentRows.results.find((entry) => entry.ticket_group_id === ticketGroupId);
+      if (!segment) throw new Error("Zu verdrängende Buchungsgruppe fehlt.");
+      return segment;
+    });
+    const communication = await this.env.DB.prepare(
+      `SELECT COALESCE(MAX(communication_number), 100) + 1 AS next_number
+         FROM flight_groups WHERE operation_day_id = ?1 AND resource_group_id = ?2`,
+    )
+      .bind(command.eventId, rotation.resource_group_id)
+      .first<{ next_number: number }>();
+    const requeuedSlots = evictedSegments.map((segment, index) => ({
+      ...segment,
+      flightGroupId: crypto.randomUUID(),
+      rotationId: crypto.randomUUID(),
+      communicationNumber: (communication?.next_number ?? 101) + index,
+      queuePosition: index + 1,
+    }));
+    const now = new Date().toISOString();
+    const nextVersion = current.version + 1;
+    const targetCanceled = reduction.keptGroupIds.length === 0;
+    const result: CommandResult = {
+      accepted: true,
+      duplicate: false,
+      event: rowToSnapshot({ ...current, version: nextVersion, updated_at: now }),
+      eventType: "ROTATION_CAPACITY_CHANGED",
+      aggregate: { type: "ROTATION", id: rotation.id },
+    };
+    const statements: D1PreparedStatement[] = [
+      this.env.DB.prepare(
+        "UPDATE operation_days SET version = ?1, updated_at = ?2 WHERE id = ?3 AND version = ?4",
+      ).bind(nextVersion, now, command.eventId, current.version),
+      this.env.DB.prepare(
+        `UPDATE flight_groups
+            SET queue_position = COALESCE(queue_position, communication_number) + ?1
+          WHERE operation_day_id = ?2 AND resource_group_id = ?3
+            AND id IN (SELECT flight_group_id FROM rotations WHERE status IN ('DRAFT', 'CALLED'))`,
+      ).bind(requeuedSlots.length, command.eventId, rotation.resource_group_id),
+      this.env.DB.prepare(
+        `UPDATE rotations SET usable_capacity = ?1, status = ?2,
+                version = version + 1, updated_at = ?3 WHERE id = ?4 AND version = ?5`,
+      ).bind(
+        command.payload.usableCapacity,
+        targetCanceled ? "CANCELED" : rotation.status,
+        now,
+        rotation.id,
+        rotation.version,
+      ),
+    ];
+    if (targetCanceled && rotation.aircraft_id) {
+      statements.push(
+        this.env.DB.prepare(
+          "UPDATE aircraft SET operational_state = 'AVAILABLE', updated_at = ?1 WHERE id = ?2",
+        ).bind(now, rotation.aircraft_id),
+      );
+    }
+    for (const slot of requeuedSlots) {
+      statements.push(
+        this.env.DB.prepare(
+          `UPDATE rotation_tickets SET released_at = ?1
+            WHERE rotation_id = ?2 AND released_at IS NULL
+              AND ticket_id IN (SELECT id FROM tickets WHERE ticket_group_id = ?3)`,
+        ).bind(now, rotation.id, slot.ticket_group_id),
+        this.env.DB.prepare(
+          `UPDATE ticket_groups SET status = 'QUEUED', version = version + 1 WHERE id = ?1`,
+        ).bind(slot.ticket_group_id),
+        this.env.DB.prepare(
+          `UPDATE tickets SET status = 'QUEUED'
+            WHERE id IN (
+              SELECT rt.ticket_id FROM rotation_tickets rt
+               WHERE rt.rotation_id = ?1 AND rt.released_at = ?2
+            )`,
+        ).bind(rotation.id, now),
+        this.env.DB.prepare(
+          `INSERT INTO flight_groups
+            (id, operation_day_id, resource_group_id, communication_number, queue_position,
+             status, version, created_at, updated_at)
+           VALUES (?1, ?2, ?3, ?4, ?5, 'DRAFT', 0, ?6, ?6)`,
+        ).bind(
+          slot.flightGroupId,
+          command.eventId,
+          rotation.resource_group_id,
+          slot.communicationNumber,
+          slot.queuePosition,
+          now,
+        ),
+        this.env.DB.prepare(
+          `INSERT INTO rotations
+            (id, operation_day_id, flight_group_id, gate_id, status, version, created_at, updated_at)
+           VALUES (?1, ?2, ?3, ?4, 'DRAFT', 0, ?5, ?5)`,
+        ).bind(slot.rotationId, command.eventId, slot.flightGroupId, slot.gate_id, now),
+        this.env.DB.prepare(
+          `INSERT INTO rotation_tickets (rotation_id, ticket_id, assigned_at)
+           SELECT ?1, rt.ticket_id, ?2
+             FROM rotation_tickets rt
+             JOIN tickets t ON t.id = rt.ticket_id
+            WHERE rt.rotation_id = ?3 AND rt.released_at = ?2 AND t.ticket_group_id = ?4`,
+        ).bind(slot.rotationId, now, rotation.id, slot.ticket_group_id),
+      );
+    }
+    statements.push(
+      this.env.DB.prepare(
+        `INSERT INTO operational_events
+          (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type,
+           aggregate_id, aggregate_version, payload_json)
+         VALUES (?1, ?2, 'ROTATION_CAPACITY_CHANGED', ?3, ?4, 'ROTATION', ?5, ?6, ?7)`,
+      ).bind(
+        crypto.randomUUID(),
+        command.eventId,
+        now,
+        command.deviceId,
+        rotation.id,
+        rotation.version + 1,
+        JSON.stringify({
+          reason: command.payload.reason,
+          baselineCapacity: rotation.baseline_capacity,
+          previousUsableCapacity: rotation.usable_capacity ?? rotation.baseline_capacity,
+          usableCapacity: command.payload.usableCapacity,
+          keptTicketGroupIds: reduction.keptGroupIds,
+          requeuedTicketGroupIds: reduction.evictedGroupIds,
+          requeuedRotationIds: requeuedSlots.map((slot) => slot.rotationId),
+          targetCanceled,
+        }),
+      ),
+      this.env.DB.prepare(
+        `INSERT INTO idempotency_receipts
+          (command_id, operation_day_id, device_id, command_type, received_at, response_json)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)`,
+      ).bind(
+        command.commandId,
+        command.eventId,
+        command.deviceId,
+        command.type,
+        now,
+        JSON.stringify(result),
+      ),
+      this.env.DB.prepare(
+        "INSERT INTO outbox (id, operation_day_id, topic, payload_json, created_at) VALUES (?1, ?2, 'EVENT_STATE_CHANGED', ?3, ?4)",
+      ).bind(crypto.randomUUID(), command.eventId, JSON.stringify(result), now),
+    );
+    await this.env.DB.batch(statements);
+    this.broadcast(result);
+    return json(result);
+  }
+
   private async handleManualTicketGroupMove(
     command: Extract<CommandEnvelope, { type: "MOVE_TICKET_GROUP" }>,
     current: StoredEventRow,
@@ -3665,7 +3894,7 @@ export class EventCoordinator extends DurableObject<Env> {
     }
     const target = await this.env.DB.prepare(
       `SELECT r.id, r.status, fg.resource_group_id,
-              COALESCE(a.passenger_seats, MIN(p.reference_capacity), rg.reference_capacity)
+              COALESCE(r.usable_capacity, a.passenger_seats, MIN(p.reference_capacity), rg.reference_capacity)
                 AS target_capacity,
               SUM(CASE WHEN tg.id IS NOT NULL AND tg.id <> ?3 THEN 1 ELSE 0 END)
                 AS occupied_seats,
@@ -3680,7 +3909,8 @@ export class EventCoordinator extends DurableObject<Env> {
          LEFT JOIN ticket_groups tg ON tg.id = t.ticket_group_id
          LEFT JOIN products p ON p.id = tg.product_id
         WHERE r.id = ?1 AND r.operation_day_id = ?2 AND r.status <> 'CANCELED'
-        GROUP BY r.id, r.status, fg.resource_group_id, a.passenger_seats, rg.reference_capacity`,
+        GROUP BY r.id, r.status, r.usable_capacity, fg.resource_group_id,
+                 a.passenger_seats, rg.reference_capacity`,
     )
       .bind(command.payload.targetRotationId, command.eventId, group.id, group.product_id)
       .first<{

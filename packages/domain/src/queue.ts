@@ -158,3 +158,60 @@ export function assertManualGroupMoveAllowed(input: {
     );
   }
 }
+
+export interface CapacityReductionSegment {
+  ticketGroupId: string;
+  size: number;
+}
+
+export function planRotationCapacityReduction(input: {
+  rotationState: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
+  called: boolean;
+  baselineCapacity: number;
+  currentUsableCapacity: number | null;
+  requestedUsableCapacity: number;
+  segments: readonly CapacityReductionSegment[];
+}): { keptGroupIds: string[]; evictedGroupIds: string[]; occupiedSeats: number } {
+  if (input.rotationState !== "DRAFT" || input.called) {
+    throw new DomainRuleError(
+      "ROTATION_CAPACITY_CHANGE_TOO_LATE",
+      "Die nutzbare Kapazität darf nur vor dem Aufruf geändert werden.",
+    );
+  }
+  if (
+    !Number.isInteger(input.requestedUsableCapacity) ||
+    input.requestedUsableCapacity <= 0 ||
+    input.requestedUsableCapacity > input.baselineCapacity
+  ) {
+    throw new DomainRuleError(
+      "ROTATION_CAPACITY_INVALID",
+      "Die nutzbare Kapazität muss positiv sein und darf die Basiskapazität nicht überschreiten.",
+    );
+  }
+  if (input.currentUsableCapacity === input.requestedUsableCapacity) {
+    throw new DomainRuleError(
+      "ROTATION_CAPACITY_UNCHANGED",
+      "Die nutzbare Kapazität ist bereits so eingestellt.",
+    );
+  }
+  const keptGroupIds: string[] = [];
+  const evictedGroupIds: string[] = [];
+  let occupiedSeats = 0;
+  let queueCutReached = false;
+  for (const segment of input.segments) {
+    if (!Number.isInteger(segment.size) || segment.size <= 0) {
+      throw new DomainRuleError(
+        "ROTATION_CAPACITY_SEGMENT_INVALID",
+        "Eine zugeordnete Buchungsgruppe besitzt keine gültige Größe.",
+      );
+    }
+    if (!queueCutReached && occupiedSeats + segment.size <= input.requestedUsableCapacity) {
+      keptGroupIds.push(segment.ticketGroupId);
+      occupiedSeats += segment.size;
+    } else {
+      queueCutReached = true;
+      evictedGroupIds.push(segment.ticketGroupId);
+    }
+  }
+  return { keptGroupIds, evictedGroupIds, occupiedSeats };
+}
