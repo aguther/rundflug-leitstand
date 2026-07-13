@@ -173,8 +173,8 @@ try {
     secondSale.event.version,
     "CALL_NEXT",
     {
-      rotationId: firstSale.aggregate.relatedRotationId,
-      aircraftId: "aircraft-a",
+      rotationId: secondSale.aggregate.relatedRotationId,
+      aircraftId: "aircraft-b",
       pilotId: "550e8400-e29b-41d4-a716-446655440100",
     },
   );
@@ -184,8 +184,8 @@ try {
     firstCall.event.version,
     "CALL_NEXT",
     {
-      rotationId: secondSale.aggregate.relatedRotationId,
-      aircraftId: "aircraft-b",
+      rotationId: firstSale.aggregate.relatedRotationId,
+      aircraftId: "aircraft-a",
       pilotId: "550e8400-e29b-41d4-a716-446655440100",
     },
     409,
@@ -195,14 +195,15 @@ try {
       "Parallele Pilotenzuordnung wurde nicht mit dem erwarteten Konflikt abgewiesen.",
     );
   }
+  await new Promise((resolvePromise) => setTimeout(resolvePromise, 20));
   const secondCall = await command(
     "flight-line-tablet-1",
     tokens.flightLine,
     firstCall.event.version,
     "CALL_NEXT",
     {
-      rotationId: secondSale.aggregate.relatedRotationId,
-      aircraftId: "aircraft-b",
+      rotationId: firstSale.aggregate.relatedRotationId,
+      aircraftId: "aircraft-a",
       pilotId: "550e8400-e29b-41d4-a716-446655440200",
     },
   );
@@ -215,7 +216,15 @@ try {
   ) {
     throw new Error("Konfliktfreie Pilotenzuordnungen sind in der Operationssicht inkonsistent.");
   }
-  let transition = secondCall;
+  const busySale = await sell(secondCall.event.version);
+  current = await board();
+  const earliestBusyProposal = current.rotations.find(
+    (rotation) => rotation.id === busySale.aggregate.relatedRotationId,
+  );
+  if (earliestBusyProposal?.suggestedAircraftId !== "aircraft-b") {
+    throw new Error("Das zeitlich früher verfügbare laufende Flugzeug wurde nicht vorgeschlagen.");
+  }
+  let transition = busySale;
   for (const rotationId of [
     firstSale.aggregate.relatedRotationId,
     secondSale.aggregate.relatedRotationId,
@@ -237,7 +246,7 @@ try {
   );
   if (
     thirdProposal?.suggestedAircraftId !== "aircraft-a" ||
-    thirdProposal.suggestedPilotId !== "550e8400-e29b-41d4-a716-446655440100"
+    thirdProposal.suggestedPilotId !== "550e8400-e29b-41d4-a716-446655440200"
   ) {
     throw new Error("Zuletzt bestätigter Pilotencode wird für das Flugzeug nicht vorgeschlagen.");
   }
@@ -249,7 +258,7 @@ try {
     {
       rotationId: thirdSale.aggregate.relatedRotationId,
       aircraftId: "aircraft-a",
-      pilotId: "550e8400-e29b-41d4-a716-446655440200",
+      pilotId: "550e8400-e29b-41d4-a716-446655440100",
     },
   );
   current = await board();
@@ -260,8 +269,8 @@ try {
   );
   if (
     changedPilot.event.version !== current.event.version ||
-    changedAircraft?.currentPilotId !== "550e8400-e29b-41d4-a716-446655440200" ||
-    callAudit?.payload?.previousAircraftPilotId !== "550e8400-e29b-41d4-a716-446655440100" ||
+    changedAircraft?.currentPilotId !== "550e8400-e29b-41d4-a716-446655440100" ||
+    callAudit?.payload?.previousAircraftPilotId !== "550e8400-e29b-41d4-a716-446655440200" ||
     callAudit.payload.pilotChanged !== true
   ) {
     throw new Error("Bewusster Pilotwechsel wurde nicht fortgeführt und vollständig auditiert.");
@@ -283,7 +292,7 @@ try {
   );
   if (
     fourthProposal?.suggestedAircraftId !== "aircraft-a" ||
-    fourthProposal.suggestedPilotId !== "550e8400-e29b-41d4-a716-446655440200"
+    fourthProposal.suggestedPilotId !== "550e8400-e29b-41d4-a716-446655440100"
   ) {
     throw new Error(
       "Geänderter Pilotencode wird beim Folgeumlauf nicht fortgeführt vorgeschlagen.",
@@ -292,11 +301,12 @@ try {
   console.log(
     JSON.stringify({
       ok: true,
-      requirements: ["F-BRD-030", "F-BRD-040"],
+      requirements: ["F-BRD-030", "F-BRD-040", "F-SLT-120"],
       samePilotConflictRejected: true,
       undersizedAircraftNotSuggested: true,
       differentPilotsAccepted: true,
       activeRotations: active.length,
+      earliestBusyAircraftSuggested: true,
       rememberedPilotSuggested: true,
       pilotChangeAudited: true,
       changedPilotSuggestedNext: true,
