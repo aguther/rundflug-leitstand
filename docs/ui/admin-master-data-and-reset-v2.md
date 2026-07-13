@@ -13,8 +13,12 @@ Freigegeben am 13. Juli 2026. Die beiden Bilddateien sind die visuelle Spezifika
 - Anlegen und Bearbeiten öffnet einen rechten Editor; ohne Auswahl bleibt der Arbeitsbereich frei.
 - Unberührte Felder zeigen keine roten Fehler. Erst ein Speicherversuch markiert fachlich fehlende
   Eingaben.
-- Begründung und Administrator-PIN gehören in den abschließenden Bestätigungsdialog und blockieren
-  nicht unsichtbar die fachliche Hauptaktion.
+- Der abschließende Bestätigungsdialog verlangt nur die Administrator-PIN. Das System protokolliert
+  normale Stammdatenänderungen mit dem einheitlichen Audit-Grund `Administrative Stammdatenpflege`;
+  normale Einrichtungs- und Konfigurationsänderungen erhalten entsprechend `Administrative
+  Konfigurationspflege`. Eine freie Begründung bleibt operativen oder folgenreichen Aktionen wie
+  Pausen, Widerruf, Neustart und Werksreset vorbehalten. Diese Vereinfachung wurde am 13. Juli 2026
+  nach der Browserabnahme freigegeben.
 - Fehlende Abhängigkeiten bieten einen direkten Weg zum benötigten Stammdatentyp.
 
 ## Sicherung und Reset
