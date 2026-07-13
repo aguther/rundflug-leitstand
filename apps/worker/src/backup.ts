@@ -35,7 +35,7 @@ export interface PortableBackup {
   tables: Record<string, unknown[]>;
 }
 
-export type BackupReason = "DAILY" | "PRE_EVENT";
+export type BackupReason = "DAILY" | "PRE_EVENT" | "FACTORY_RESET";
 
 export function operationDateInTimeZone(date: Date, timeZone = "Europe/Berlin"): string {
   const parts = new Intl.DateTimeFormat("en-CA", {

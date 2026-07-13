@@ -92,3 +92,26 @@ npm run db:reset:local
 
 Dieser Befehl ist nicht für Cloudflare-D1 vorgesehen. In Cloudflare immer den sicheren Neustart über
 die Administration verwenden.
+
+## Werkszustand für eine vollständige Ersteinrichtung
+
+Unter **Administration → Sicherung & Reset → Werkszustand herstellen** kann ein
+Administrationsgerät das gesamte System in den Zustand vor der Ersteinrichtung versetzen. Der
+Vorgang löscht alle Veranstaltungen, Stammdaten, Tickets, Umläufe, Prognosen, Audit-Ereignisse,
+Gerätekopplungen, Push-Zustellungen und den Bootstrap-Beleg. Danach ist `/setup` wieder zwingend.
+
+Standardmäßig wird unmittelbar vor dem D1-Reset eine portable Sicherung mit dem Grund
+`FACTORY_RESET` in R2 abgelegt. Sie ist der Wiederherstellungspunkt, falls der Reset irrtümlich
+ausgeführt wurde. Die zusätzliche Option **Auch alle R2-Sicherungen endgültig löschen** leert den
+gesamten gebundenen Bucket und darf nur verwendet werden, wenn ausdrücklich keine Wiederherstellung
+mehr möglich sein soll.
+
+Der D1-Anteil läuft als atomarer Batch. Ein fehlerhafter Löschschritt rollt den gesamten D1-Reset
+zurück. Durable-Object-Speicher und offene WebSockets werden vor dem D1-Commit geleert. Die R2-
+Leerung ist wiederholbar; ein technischer Reset-Beleg erlaubt das Fortsetzen, wenn ausschließlich
+dieser letzte Schritt unterbrochen wurde. Dieser Beleg enthält keine PIN, keinen Gerätetoken und
+keine personenbezogenen Daten.
+
+Nach einem erfolgreichen Reset löscht der Browser Geräteschlüssel und Offline-Snapshots und wechselt
+zu `/setup`. Für die neue Ersteinrichtung werden wieder der serverseitig konfigurierte Setup-Code und
+die Administrator-PIN benötigt.

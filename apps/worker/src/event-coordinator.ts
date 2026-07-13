@@ -50,6 +50,13 @@ export class EventCoordinator extends DurableObject<Env> {
     if (request.headers.get("Upgrade")?.toLowerCase() === "websocket") {
       return this.openWebSocket();
     }
+    if (request.method === "POST" && url.pathname.endsWith("/factory-reset")) {
+      for (const socket of this.ctx.getWebSockets()) {
+        socket.close(1012, "System wird neu eingerichtet");
+      }
+      await this.ctx.storage.deleteAll();
+      return json({ reset: true });
+    }
     if (request.method === "POST" && url.pathname.endsWith("/command")) {
       return this.handleCommand(request);
     }

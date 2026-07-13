@@ -3,6 +3,7 @@ import {
   bootstrapRequestSchema,
   cloneEventRequestSchema,
   commandEnvelopeSchema,
+  factoryResetRequestSchema,
   publicBoardSchema,
   publicTicketStatusSchema,
   rotationOperationalSummarySchema,
@@ -11,6 +12,26 @@ import {
 } from "./index";
 
 describe("commandEnvelopeSchema", () => {
+  it("requires explicit, anonymous confirmation for a factory reset", () => {
+    const parsed = factoryResetRequestSchema.parse({
+      commandId: "550e8400-e29b-41d4-a716-446655440500",
+      eventId: "synthetic-event",
+      reason: "Entwicklungsstand neu aufbauen",
+      adminPin: "0000",
+      confirmation: "WERKSZUSTAND",
+      retainRecoveryBackup: true,
+      deleteAllBackups: false,
+    });
+    expect(parsed.confirmation).toBe("WERKSZUSTAND");
+    expect(() => factoryResetRequestSchema.parse({ ...parsed, confirmation: "RESET" })).toThrow();
+    expect(() =>
+      factoryResetRequestSchema.parse({
+        ...parsed,
+        retainRecoveryBackup: true,
+        deleteAllBackups: true,
+      }),
+    ).toThrow();
+  });
   it("accepts only anonymous, hashed first-run administration data", () => {
     const parsed = bootstrapRequestSchema.parse({
       setupCode: "synthetic-first-run-code",
