@@ -1,16 +1,14 @@
 # Rundflug-Leitstand
 
-Initiales, **noch nicht produktionsreifes** Repository für ein webbasiertes
-Operations-Management-System zur Organisation von Rundflügen auf Flugplatzfesten und Fly-Ins.
+In Entwicklung befindliche V1 eines webbasierten Operations-Management-Systems zur Organisation
+von Rundflügen auf Flugplatzfesten und Fly-Ins. Der aktuelle Stand läuft als nicht produktive
+Cloudflare-Abnahmeumgebung; die Produktivfreigabe erfolgt erst nach vollständiger V1-Abnahme.
 
-Das Repository ist als kontrollierter Startpunkt für die weitere Umsetzung mit Codex angelegt. Es
-enthält die konsolidierten Anforderungen, eine Traceability-Matrix, Architekturentscheidungen,
-Cloudflare-Konfiguration, ein minimales React-Frontend, einen Worker mit D1- und Durable-Object-
-Gerüst sowie ausführbare Qualitätsprüfungen.
-
-> **Wichtig:** Die vorhandene Oberfläche ist ausschließlich ein technischer Startbildschirm. Kasse,
-> Flight Line, FIDS, Ticketstatus, Offlinebetrieb, Benachrichtigungen und die fachlichen Workflows sind
-> noch nicht implementiert.
+Das Repository enthält die konsolidierten Anforderungen, Traceability, Architekturentscheidungen,
+React-PWA, Cloudflare Worker, D1-/Durable-Object-Kommandoverarbeitung, R2-Sicherung sowie ausführbare
+Qualitätsprüfungen. Kasse, Flight Line, Administration, öffentliche Monitore, anonymer QR-Status,
+Web-Push, Offline-Überbrückung und Betriebsberichte sind als V1-Bausteine vorhanden; noch offene
+Abnahmepunkte sind in `docs/requirements/traceability.csv` sichtbar.
 
 ## Zielarchitektur
 
@@ -25,6 +23,8 @@ Gerüst sowie ausführbare Qualitätsprüfungen.
 
 Die Entscheidung für diese Architektur ist in `docs/adr/` dokumentiert.
 Ein datierter Vergleich mit kostengünstigen Alternativen liegt unter `docs/operations/provider-comparison.md`.
+Fachmodell, Zustandsautomaten, Invarianten und Prognoseverfahren sind unter
+`docs/architecture/domain-state-and-forecast-v1.md` zusammenhängend beschrieben.
 
 ## Voraussetzungen
 
@@ -72,7 +72,7 @@ Ressourcen müssen in EU-Jurisdiktion liegen. Die vollständige Anleitung steht 
 ## Repository-Struktur
 
 ```text
-apps/web/                 React-PWA und technische Startoberfläche
+apps/web/                 React-PWA für operative, administrative und öffentliche Oberflächen
 apps/worker/              Worker, API, Durable Object und D1-Migrationen
 packages/contracts/       transportfähige Schemas und Kommandoverträge
 packages/domain/          reine Fachlogik und Invarianten
