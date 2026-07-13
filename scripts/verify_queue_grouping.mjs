@@ -146,6 +146,7 @@ try {
   );
   if (
     packed?.ticketCount !== 4 ||
+    packed.communicationLabel !== "PAN20-101" ||
     overflowRotation?.ticketCount !== 1 ||
     otherRotation?.ticketCount !== 1
   ) {
@@ -164,6 +165,7 @@ try {
   if (
     !firstMatch?.communicationLabel ||
     firstMatch.communicationLabel !== secondMatch?.communicationLabel ||
+    firstMatch.communicationLabel !== packed.communicationLabel ||
     firstMatch.groupSize !== 3 ||
     secondMatch.groupSize !== 1
   ) {
@@ -196,7 +198,7 @@ try {
   console.log(
     JSON.stringify({
       ok: true,
-      requirements: ["F-SLT-010", "F-SLT-020", "F-SLT-030"],
+      requirements: ["F-SLT-010", "F-SLT-020", "F-SLT-030", "F-SLT-100"],
       packedTicketCount: packed.ticketCount,
       remainingTicketsAfterPartialCancellation: protectedRotation.ticketCount,
       stableCommunicationLabel: firstMatch.communicationLabel,

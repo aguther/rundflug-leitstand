@@ -1100,7 +1100,7 @@ function FlightLineView() {
               onClick={() => setSelectedId(rotation.id)}
               type="button"
             >
-              <strong>Gruppe {rotation.communicationNumber}</strong>
+              <strong>{rotation.communicationLabel}</strong>
               <span>{rotation.productName}</span>
               <span>
                 {rotation.ticketCount} Plätze · {rotation.predictedLowerMinutes}–
@@ -1117,7 +1117,7 @@ function FlightLineView() {
                 <span>Status</span>
                 <strong>{selected.status}</strong>
               </div>
-              <h2>Fluggruppe {selected.communicationNumber}</h2>
+              <h2>Fluggruppe {selected.communicationLabel}</h2>
               <dl>
                 <div>
                   <dt>Produkt</dt>
@@ -3545,7 +3545,7 @@ function AdminView() {
               .filter((rotation) => ["CALLED", "IN_FLIGHT", "LANDED"].includes(rotation.status))
               .map((rotation) => (
                 <div key={rotation.id}>
-                  <strong>Gruppe {rotation.communicationNumber}</strong>
+                  <strong>{rotation.communicationLabel}</strong>
                   <span>{rotation.status}</span>
                   <span>{rotation.aircraftRegistration ?? "Flugzeug offen"}</span>
                   <span>Pilotencode {rotation.pilotOperationalCode ?? "offen"}</span>
