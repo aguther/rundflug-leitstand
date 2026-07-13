@@ -8,6 +8,28 @@ export interface DurationEstimate {
   sampleCount: number;
 }
 
+function median(values: readonly number[]): number {
+  const sorted = [...values].sort((left, right) => left - right);
+  const middle = Math.floor(sorted.length / 2);
+  if (sorted.length % 2 === 1) return sorted[middle] ?? 0;
+  return ((sorted[middle - 1] ?? 0) + (sorted[middle] ?? 0)) / 2;
+}
+
+function selectRobustDurationSamples(
+  samples: readonly number[],
+  referenceMinutes: number,
+): number[] {
+  const plausible = samples.filter(
+    (duration) => Number.isFinite(duration) && duration > 0 && duration <= referenceMinutes * 3,
+  );
+  if (plausible.length < 5) return plausible.slice(-12);
+  const center = median(plausible);
+  const absoluteDeviations = plausible.map((duration) => Math.abs(duration - center));
+  const medianAbsoluteDeviation = median(absoluteDeviations);
+  const tolerance = Math.max(referenceMinutes * 0.5, medianAbsoluteDeviation * 3);
+  return plausible.filter((duration) => Math.abs(duration - center) <= tolerance).slice(-12);
+}
+
 export function advanceOverduePrediction(input: {
   status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED";
   now: string;
@@ -58,12 +80,10 @@ export function estimateDuration(input: {
   interrupted: boolean;
   activeCapacity: number;
 }): DurationEstimate {
-  const validSamples = input.actualDurationsMinutes
-    .filter(
-      (duration) =>
-        Number.isFinite(duration) && duration > 0 && duration <= input.referenceMinutes * 3,
-    )
-    .slice(-12);
+  const validSamples = selectRobustDurationSamples(
+    input.actualDurationsMinutes,
+    input.referenceMinutes,
+  );
   if (
     input.interrupted ||
     input.activeCapacity === 0 ||

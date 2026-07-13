@@ -789,7 +789,7 @@ export class EventCoordinator extends DurableObject<Env> {
            JOIN ticket_groups tg ON tg.id = t.ticket_group_id
            JOIN products p ON p.id = tg.product_id
            LEFT JOIN aircraft a ON a.id = r.aircraft_id
-          WHERE r.called_at IS NOT NULL AND r.completed_at IS NOT NULL
+          WHERE r.status = 'COMPLETED' AND r.called_at IS NOT NULL AND r.completed_at IS NOT NULL
           GROUP BY r.id, p.code, a.aircraft_type
           ORDER BY r.completed_at DESC LIMIT 200`,
       ).all<{

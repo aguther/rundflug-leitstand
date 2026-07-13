@@ -47,6 +47,26 @@ describe("event-driven forecast", () => {
     expect(estimate.expectedMinutes).toBe(22);
   });
 
+  it("rejects a single statistical outlier without changing the learned duration", () => {
+    const regular = estimateDuration({
+      referenceMinutes: 20,
+      actualDurationsMinutes: [19, 20, 20, 21, 22],
+      dataAgeMinutes: 1,
+      interrupted: false,
+      activeCapacity: 1,
+    });
+    const withOutlier = estimateDuration({
+      referenceMinutes: 20,
+      actualDurationsMinutes: [19, 20, 20, 21, 22, 55],
+      dataAgeMinutes: 1,
+      interrupted: false,
+      activeCapacity: 1,
+    });
+
+    expect(withOutlier.expectedMinutes).toBe(regular.expectedMinutes);
+    expect(withOutlier.sampleCount).toBe(regular.sampleCount);
+  });
+
   it("marks stale or interrupted data as uncertain without a countdown", () => {
     const estimate = estimateDuration({
       referenceMinutes: 20,
