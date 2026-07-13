@@ -1663,9 +1663,9 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
        FROM tickets t
        JOIN ticket_groups tg ON tg.id = t.ticket_group_id
        JOIN products p ON p.id = tg.product_id
-       JOIN gates g ON g.id = p.gate_id
        JOIN rotation_tickets rt ON rt.ticket_id = t.id AND rt.released_at IS NULL
        JOIN rotations r ON r.id = rt.rotation_id
+       JOIN gates g ON g.id = COALESCE(r.gate_id, p.gate_id)
        JOIN flight_groups fg ON fg.id = r.flight_group_id
        JOIN resource_groups rg ON rg.id = fg.resource_group_id
        JOIN operation_days od ON od.id = tg.operation_day_id
@@ -1932,7 +1932,7 @@ app.get("/api/public/events/:eventId/board", async (context) => {
        LEFT JOIN tickets t ON t.id = rt.ticket_id
        LEFT JOIN ticket_groups tg ON tg.id = t.ticket_group_id
        LEFT JOIN products p ON p.id = tg.product_id
-       LEFT JOIN gates g ON g.id = p.gate_id
+       LEFT JOIN gates g ON g.id = COALESCE(r.gate_id, p.gate_id)
        LEFT JOIN aircraft a ON a.id = r.aircraft_id
       WHERE r.operation_day_id = ?1 AND r.status <> 'CANCELED'
       GROUP BY r.id
