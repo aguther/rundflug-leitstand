@@ -340,7 +340,7 @@ try {
   }
   process.stdout.write(
     JSON.stringify({
-      requirements: ["F-SLT-090"],
+      requirements: ["F-PRG-130", "F-SLT-090"],
       anonymousPilotCodeAndNoteVisible: true,
       currentPilotAssignmentVisible: true,
       activePilotPauseRejected: true,

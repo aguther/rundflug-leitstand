@@ -119,20 +119,24 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
   }),
   commandBaseSchema.extend({
     type: z.literal("SET_EVENT_INTERRUPTION"),
-    payload: z.object({
-      interrupted: z.boolean(),
-      reason: z.string().trim().min(3).max(240),
-      expectedReviewAt: z.iso.datetime().nullable(),
-    }),
+    payload: z
+      .object({
+        interrupted: z.boolean(),
+        reason: z.string().trim().min(3).max(240),
+        expectedReviewAt: z.iso.datetime().nullable(),
+      })
+      .strict(),
   }),
   commandBaseSchema.extend({
     type: z.literal("SET_RESOURCE_GROUP_STATUS"),
-    payload: z.object({
-      resourceGroupId: z.string().min(1).max(100),
-      status: z.enum(["ACTIVE", "PAUSED", "INTERRUPTED", "ENDED"]),
-      reason: z.string().trim().min(3).max(240),
-      expectedReviewAt: z.iso.datetime().nullable(),
-    }),
+    payload: z
+      .object({
+        resourceGroupId: z.string().min(1).max(100),
+        status: z.enum(["ACTIVE", "PAUSED", "INTERRUPTED", "ENDED"]),
+        reason: z.string().trim().min(3).max(240),
+        expectedReviewAt: z.iso.datetime().nullable(),
+      })
+      .strict(),
   }),
   commandBaseSchema.extend({
     type: z.literal("SET_RESOURCE_GROUP_NOTICE"),
@@ -180,29 +184,35 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
   }),
   commandBaseSchema.extend({
     type: z.literal("SET_PILOT_PAUSE"),
-    payload: z.object({
-      pilotId: z.string().min(1).max(100),
-      paused: z.boolean(),
-      reason: z.string().trim().min(3).max(240),
-      expectedReviewAt: z.iso.datetime().nullable(),
-    }),
+    payload: z
+      .object({
+        pilotId: z.string().min(1).max(100),
+        paused: z.boolean(),
+        reason: z.string().trim().min(3).max(240),
+        expectedReviewAt: z.iso.datetime().nullable(),
+      })
+      .strict(),
   }),
   commandBaseSchema.extend({
     type: z.literal("SET_AIRCRAFT_OPERATIONAL_STATE"),
-    payload: z.object({
-      aircraftId: z.string().min(1).max(100),
-      state: z.enum(["AVAILABLE", "REFUELING", "PAUSED", "INTERRUPTED", "INACTIVE"]),
-      reason: z.string().trim().min(3).max(240),
-      expectedReviewAt: z.iso.datetime().nullable(),
-    }),
+    payload: z
+      .object({
+        aircraftId: z.string().min(1).max(100),
+        state: z.enum(["AVAILABLE", "REFUELING", "PAUSED", "INTERRUPTED", "INACTIVE"]),
+        reason: z.string().trim().min(3).max(240),
+        expectedReviewAt: z.iso.datetime().nullable(),
+      })
+      .strict(),
   }),
   commandBaseSchema.extend({
     type: z.literal("SCHEDULE_AIRCRAFT_REFUEL"),
-    payload: z.object({
-      aircraftId: z.string().min(1).max(100),
-      planned: z.boolean(),
-      reason: z.string().trim().min(3).max(240),
-    }),
+    payload: z
+      .object({
+        aircraftId: z.string().min(1).max(100),
+        planned: z.boolean(),
+        reason: z.string().trim().min(3).max(240),
+      })
+      .strict(),
   }),
   commandBaseSchema.extend({
     type: z.literal("CONFIGURE_AIRCRAFT_REFUEL_THRESHOLD"),

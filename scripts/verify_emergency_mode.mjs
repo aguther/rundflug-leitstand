@@ -284,6 +284,7 @@ try {
   }
   process.stdout.write(
     JSON.stringify({
+      requirements: ["F-PRG-130"],
       triggeredByLead: true,
       saleBlocked: true,
       callBlocked: true,
