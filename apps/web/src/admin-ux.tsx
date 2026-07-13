@@ -147,7 +147,7 @@ export function MasterDataNavigation({
 }) {
   return (
     <nav aria-label="Stammdatenkategorien" className="master-data-nav">
-      {masterDataItems.map((item, index) => (
+      {masterDataItems.map((item) => (
         <button
           aria-current={activeCategory === item.id ? "page" : undefined}
           className={activeCategory === item.id ? "active" : ""}
@@ -155,11 +155,8 @@ export function MasterDataNavigation({
           onClick={() => onChange(item.id)}
           type="button"
         >
-          <span className="master-data-order">{index + 1}</span>
-          <span className="master-data-nav-copy">
-            <strong>{item.label}</strong>
-            <small>{counts[item.id]}</small>
-          </span>
+          <strong>{item.label}</strong>
+          <small>{counts[item.id]}</small>
         </button>
       ))}
     </nav>

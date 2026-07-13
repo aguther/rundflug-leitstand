@@ -160,6 +160,13 @@ const FLIGHT_LINE_DEVICE_ID = deviceIdForRole("FLIGHT_LINE", "flight-line-tablet
 const ADMIN_DEVICE_ID = deviceIdForRole("ADMIN", "technical-scaffold");
 const MASTER_DATA_AUDIT_REASON = "Administrative Stammdatenpflege";
 const ADMIN_CONFIGURATION_AUDIT_REASON = "Administrative Konfigurationspflege";
+const MASTER_DATA_DELETE_REASON = "Administrative Stammdatenlöschung";
+type MasterDataDeleteTarget = {
+  entityType: "GATE" | "RESOURCE_GROUP" | "AIRCRAFT" | "ASSIGNMENT" | "PILOT" | "PRODUCT";
+  entityId: string;
+  label: string;
+  blockers: string[];
+};
 
 function createTicketCode(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(16));
@@ -278,10 +285,23 @@ function Shell({
   kiosk?: boolean;
 }) {
   const online = useConnectivity();
+  const [theme, setTheme] = useState<"light" | "dark">(() => {
+    const stored = window.localStorage.getItem("ui-theme");
+    if (stored === "light" || stored === "dark") return stored;
+    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  });
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    document.documentElement.style.colorScheme = theme;
+    window.localStorage.setItem("ui-theme", theme);
+  }, [theme]);
   return (
     <main className={kiosk ? "app-shell kiosk-shell" : "app-shell"}>
       <header className="app-header">
         <div>
+          <svg aria-hidden="true" className="app-brand-mark" viewBox="0 0 24 24">
+            <path d="m3 13 7-2.5L14 3l2 1-1.5 6 5.5-2 1 1.5-6 4.5-1 6-2-1-1-4-5 2-1-1.5 4-3.5Z" />
+          </svg>
           <strong>Rundflug-Leitstand</strong>
           <span>{title}</span>
         </div>
@@ -291,6 +311,24 @@ function Shell({
           <a href="/fids">FIDS</a>
           <a href="/admin">Administration</a>
         </nav>
+        <button
+          aria-label={theme === "dark" ? "Helles Erscheinungsbild" : "Dunkles Erscheinungsbild"}
+          className="theme-toggle"
+          onClick={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
+          title={theme === "dark" ? "Helles Erscheinungsbild" : "Dunkles Erscheinungsbild"}
+          type="button"
+        >
+          <svg aria-hidden="true" viewBox="0 0 24 24">
+            {theme === "dark" ? (
+              <>
+                <circle cx="12" cy="12" r="4" />
+                <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+              </>
+            ) : (
+              <path d="M20.5 15.2A8.5 8.5 0 0 1 8.8 3.5 8.5 8.5 0 1 0 20.5 15.2Z" />
+            )}
+          </svg>
+        </button>
       </header>
       {!online ? (
         <div className="connection-warning">
@@ -1904,6 +1942,10 @@ function AdminView() {
   const [adminPin, setAdminPin] = useState("");
   const [masterEditorOpen, setMasterEditorOpen] = useState(false);
   const [masterSubmitAttempted, setMasterSubmitAttempted] = useState(false);
+  const [masterSearch, setMasterSearch] = useState("");
+  const [pendingMasterDelete, setPendingMasterDelete] = useState<MasterDataDeleteTarget | null>(
+    null,
+  );
   const [pendingMasterAction, setPendingMasterAction] = useState<
     | "gate"
     | "resource-group"
@@ -3007,8 +3049,8 @@ function AdminView() {
       description: "Das System Schritt für Schritt für den Rundflugbetrieb vorbereiten.",
     },
     "master-data": {
-      title: "Stammdaten verwalten",
-      description: "Ressourcen in sinnvoller Reihenfolge anlegen und bearbeiten.",
+      title: "Stammdaten",
+      description: "Ressourcen für den Flugtag verwalten.",
     },
     operations: {
       title: "Betrieb",
@@ -3039,6 +3081,114 @@ function AdminView() {
     if (masterDataCategory === "products") selectProductForEditing("new");
   }
 
+  function masterDataDeletionBlockers(
+    entityType: MasterDataDeleteTarget["entityType"],
+    entityId: string,
+  ): string[] {
+    if (!board) return ["Der bestätigte Betriebsstand wird noch geladen"];
+    if (entityType === "GATE") {
+      const groups = resourceGroups.filter((group) => group.gateId === entityId).length;
+      const products = board.products.filter((product) => product.gateId === entityId).length;
+      const rotations = board.rotations.filter((rotation) => rotation.gateId === entityId).length;
+      return [
+        ...(groups ? [`${groups} Ressourcengruppe(n)`] : []),
+        ...(products ? [`${products} Produkt(e)`] : []),
+        ...(rotations ? [`${rotations} Umlauf/Umläufe`] : []),
+      ];
+    }
+    if (entityType === "RESOURCE_GROUP") {
+      const products = board.products.filter(
+        (product) => product.resourceGroupId === entityId,
+      ).length;
+      const assignments = board.aircraft.filter(
+        (aircraft) => aircraft.resourceGroupId === entityId,
+      ).length;
+      return [
+        ...(products ? [`${products} Produkt(e)`] : []),
+        ...(assignments ? [`${assignments} Flugzeugzuordnung(en)`] : []),
+      ];
+    }
+    if (entityType === "PRODUCT") {
+      const code = board.products.find((product) => product.id === entityId)?.code;
+      const rotations = board.rotations.filter((rotation) => rotation.productCode === code).length;
+      return rotations ? [`${rotations} Umlauf/Umläufe`] : [];
+    }
+    if (entityType === "AIRCRAFT") {
+      const aircraft = board.aircraft.find((entry) => entry.id === entityId);
+      const rotations = board.rotations.filter(
+        (rotation) => rotation.aircraftId === entityId,
+      ).length;
+      return [
+        ...(aircraft?.resourceGroupId ? ["1 Flugzeugzuordnung"] : []),
+        ...(rotations ? [`${rotations} Umlauf/Umläufe`] : []),
+      ];
+    }
+    if (entityType === "PILOT") {
+      const pilot = board.pilots.find((entry) => entry.id === entityId);
+      const aircraft = board.aircraft.filter((entry) => entry.currentPilotId === entityId).length;
+      return [
+        ...(pilot?.currentRotationId ? ["1 aktiver Umlauf"] : []),
+        ...(aircraft ? [`${aircraft} Flugzeugbindung(en)`] : []),
+      ];
+    }
+    const rotations = board.rotations.filter((rotation) => rotation.aircraftId === entityId).length;
+    return rotations ? [`${rotations} Umlauf/Umläufe`] : [];
+  }
+
+  function requestMasterDelete(
+    entityType: MasterDataDeleteTarget["entityType"],
+    entityId: string,
+    label: string,
+  ) {
+    setAdminPin("");
+    setPendingMasterDelete({
+      entityType,
+      entityId,
+      label,
+      blockers: masterDataDeletionBlockers(entityType, entityId),
+    });
+  }
+
+  async function confirmMasterDelete() {
+    if (
+      !board ||
+      !pendingMasterDelete ||
+      pendingMasterDelete.blockers.length > 0 ||
+      board.event.status !== "PREPARATION" ||
+      adminPin.length < 4
+    )
+      return;
+    try {
+      await sendCommand(
+        {
+          commandId: crypto.randomUUID(),
+          eventId: EVENT_ID,
+          deviceId: ADMIN_DEVICE_ID,
+          expectedVersion: board.event.version,
+          issuedAt: new Date().toISOString(),
+          type: "DELETE_MASTER_DATA",
+          payload: {
+            entityType: pendingMasterDelete.entityType,
+            entityId: pendingMasterDelete.entityId,
+            reason: MASTER_DATA_DELETE_REASON,
+            adminPin,
+          },
+        },
+        deviceTokenFor(ADMIN_DEVICE_ID),
+      );
+      setMessage(`${pendingMasterDelete.label} wurde gelöscht und die Löschung protokolliert.`);
+      setPendingMasterDelete(null);
+      setMasterEditorOpen(false);
+      setAdminPin("");
+      await refresh();
+      await refreshHistory();
+    } catch (cause) {
+      setMessage(
+        cause instanceof Error ? cause.message : "Stammdatensatz konnte nicht gelöscht werden.",
+      );
+    }
+  }
+
   const masterDataCounts: Record<MasterDataCategory, number> = {
     gates: board?.gates.length ?? 0,
     "resource-groups": resourceGroups.length,
@@ -3046,6 +3196,36 @@ function AdminView() {
     assignments: board?.aircraft.filter((aircraft) => aircraft.resourceGroupId).length ?? 0,
     pilots: board?.pilots.length ?? 0,
     products: board?.products.length ?? 0,
+  };
+  const normalizedMasterSearch = masterSearch.trim().toLocaleLowerCase("de-DE");
+  const visibleGates = (board?.gates ?? []).filter((gate) =>
+    `${gate.label} ${gate.gateType}`.toLocaleLowerCase("de-DE").includes(normalizedMasterSearch),
+  );
+  const visibleResourceGroups = resourceGroups.filter((group) =>
+    `${group.name} ${group.gateLabel}`.toLocaleLowerCase("de-DE").includes(normalizedMasterSearch),
+  );
+  const visibleAircraft = (board?.aircraft ?? []).filter((aircraft) =>
+    `${aircraft.registration} ${aircraft.aircraftType} ${aircraft.resourceGroupName}`
+      .toLocaleLowerCase("de-DE")
+      .includes(normalizedMasterSearch),
+  );
+  const visiblePilots = (board?.pilots ?? []).filter((pilot) =>
+    `${pilot.operationalCode} ${pilot.operationalNote}`
+      .toLocaleLowerCase("de-DE")
+      .includes(normalizedMasterSearch),
+  );
+  const visibleProducts = (board?.products ?? []).filter((product) =>
+    `${product.code} ${product.name} ${product.resourceGroupName} ${product.gateLabel}`
+      .toLocaleLowerCase("de-DE")
+      .includes(normalizedMasterSearch),
+  );
+  const masterDataSingularLabel: Record<MasterDataCategory, string> = {
+    gates: "Gate",
+    "resource-groups": "Ressourcengruppe",
+    aircraft: "Flugzeug",
+    assignments: "Zuordnung",
+    pilots: "Pilotencode",
+    products: "Produkt",
   };
 
   return (
@@ -3517,6 +3697,7 @@ function AdminView() {
               counts={masterDataCounts}
               onChange={(category) => {
                 setMasterDataCategory(category);
+                setMasterSearch("");
                 setMasterEditorOpen(false);
                 setMasterSubmitAttempted(false);
               }}
@@ -3528,32 +3709,21 @@ function AdminView() {
               </ValidationHint>
             ) : null}
             <div className="master-data-toolbar">
-              <span>
-                {masterDataCategory === "gates"
-                  ? `${board?.gates.length ?? 0} Gates`
-                  : masterDataCategory === "resource-groups"
-                    ? `${resourceGroups.length} Ressourcengruppen`
-                    : masterDataCategory === "aircraft"
-                      ? `${board?.aircraft.length ?? 0} Flugzeuge`
-                      : masterDataCategory === "assignments"
-                        ? `${masterDataCounts.assignments} Zuordnungen`
-                        : masterDataCategory === "pilots"
-                          ? `${board?.pilots.length ?? 0} Pilotencodes`
-                          : `${board?.products.length ?? 0} Produkte`}
-              </span>
+              <label className="master-data-search">
+                <span className="visually-hidden">Stammdaten durchsuchen</span>
+                <svg aria-hidden="true" viewBox="0 0 24 24">
+                  <circle cx="11" cy="11" r="6.5" />
+                  <path d="m16 16 4.5 4.5" />
+                </svg>
+                <input
+                  onChange={(event) => setMasterSearch(event.target.value)}
+                  placeholder={`${masterDataSingularLabel[masterDataCategory]} suchen`}
+                  type="search"
+                  value={masterSearch}
+                />
+              </label>
               <button className="primary-action" onClick={startNewMasterDataEntry} type="button">
-                +{" "}
-                {masterDataCategory === "gates"
-                  ? "Gate anlegen"
-                  : masterDataCategory === "resource-groups"
-                    ? "Ressourcengruppe anlegen"
-                    : masterDataCategory === "aircraft"
-                      ? "Flugzeug anlegen"
-                      : masterDataCategory === "assignments"
-                        ? "Zuordnung ändern"
-                        : masterDataCategory === "pilots"
-                          ? "Pilotencode anlegen"
-                          : "Produkt anlegen"}
+                <span aria-hidden="true">+</span> {masterDataSingularLabel[masterDataCategory]}
               </button>
             </div>
             <div className="master-data-table-scroll">
@@ -3569,8 +3739,17 @@ function AdminView() {
                     </tr>
                   </thead>
                   <tbody>
-                    {board?.gates.map((gate) => (
-                      <tr className={gateEditorId === gate.id ? "selected" : ""} key={gate.id}>
+                    {visibleGates.map((gate) => (
+                      <tr
+                        className={gateEditorId === gate.id ? "selected" : ""}
+                        key={gate.id}
+                        onClick={() => selectGateForEditing(gate.id)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ")
+                            selectGateForEditing(gate.id);
+                        }}
+                        tabIndex={0}
+                      >
                         <td>{gate.label}</td>
                         <td>{gate.gateType}</td>
                         <td>{gate.sortOrder}</td>
@@ -3581,11 +3760,15 @@ function AdminView() {
                         </td>
                         <td>
                           <button
-                            className="table-action"
-                            onClick={() => selectGateForEditing(gate.id)}
+                            aria-label={`${gate.label} öffnen`}
+                            className="table-overflow-action"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              selectGateForEditing(gate.id);
+                            }}
                             type="button"
                           >
-                            Bearbeiten
+                            ⋯
                           </button>
                         </td>
                       </tr>
@@ -3605,10 +3788,16 @@ function AdminView() {
                     </tr>
                   </thead>
                   <tbody>
-                    {resourceGroups.map((group) => (
+                    {visibleResourceGroups.map((group) => (
                       <tr
                         className={resourceEditorId === group.id ? "selected" : ""}
                         key={group.id}
+                        onClick={() => selectResourceForEditing(group.id)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ")
+                            selectResourceForEditing(group.id);
+                        }}
+                        tabIndex={0}
                       >
                         <td>{group.name}</td>
                         <td>{group.gateLabel}</td>
@@ -3622,11 +3811,15 @@ function AdminView() {
                         </td>
                         <td>
                           <button
-                            className="table-action"
-                            onClick={() => selectResourceForEditing(group.id)}
+                            aria-label={`${group.name} öffnen`}
+                            className="table-overflow-action"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              selectResourceForEditing(group.id);
+                            }}
                             type="button"
                           >
-                            Bearbeiten
+                            ⋯
                           </button>
                         </td>
                       </tr>
@@ -3647,10 +3840,16 @@ function AdminView() {
                     </tr>
                   </thead>
                   <tbody>
-                    {board?.aircraft.map((aircraft) => (
+                    {visibleAircraft.map((aircraft) => (
                       <tr
                         className={aircraftEditorId === aircraft.id ? "selected" : ""}
                         key={aircraft.id}
+                        onClick={() => selectAircraftForEditing(aircraft.id)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ")
+                            selectAircraftForEditing(aircraft.id);
+                        }}
+                        tabIndex={0}
                       >
                         <td>
                           <strong>{aircraft.registration}</strong>
@@ -3665,23 +3864,17 @@ function AdminView() {
                             {aircraftStateLabel[aircraft.operationalState]}
                           </span>
                         </td>
-                        <td className="table-actions">
+                        <td>
                           <button
-                            className="table-action"
-                            onClick={() => selectAircraftForEditing(aircraft.id)}
-                            type="button"
-                          >
-                            Bearbeiten
-                          </button>
-                          <button
-                            className="table-action"
-                            onClick={() => {
-                              setAssignmentAircraftId(aircraft.id);
-                              setAssignmentResourceGroupId(aircraft.resourceGroupId);
+                            aria-label={`${aircraft.registration} öffnen`}
+                            className="table-overflow-action"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              selectAircraftForEditing(aircraft.id);
                             }}
                             type="button"
                           >
-                            Zuordnung ändern
+                            ⋯
                           </button>
                         </td>
                       </tr>
@@ -3700,10 +3893,25 @@ function AdminView() {
                     </tr>
                   </thead>
                   <tbody>
-                    {board?.aircraft.map((aircraft) => (
+                    {visibleAircraft.map((aircraft) => (
                       <tr
                         className={assignmentAircraftId === aircraft.id ? "selected" : ""}
                         key={aircraft.id}
+                        onClick={() => {
+                          setAssignmentAircraftId(aircraft.id);
+                          setAssignmentResourceGroupId(aircraft.resourceGroupId);
+                          setMasterSubmitAttempted(false);
+                          setMasterEditorOpen(true);
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            setAssignmentAircraftId(aircraft.id);
+                            setAssignmentResourceGroupId(aircraft.resourceGroupId);
+                            setMasterSubmitAttempted(false);
+                            setMasterEditorOpen(true);
+                          }
+                        }}
+                        tabIndex={0}
                       >
                         <td>
                           <strong>{aircraft.registration}</strong>
@@ -3712,8 +3920,10 @@ function AdminView() {
                         <td>{aircraft.resourceGroupName || "Nicht zugeordnet"}</td>
                         <td>
                           <button
-                            className="table-action"
-                            onClick={() => {
+                            aria-label={`Zuordnung von ${aircraft.registration} öffnen`}
+                            className="table-overflow-action"
+                            onClick={(event) => {
+                              event.stopPropagation();
                               setAssignmentAircraftId(aircraft.id);
                               setAssignmentResourceGroupId(aircraft.resourceGroupId);
                               setMasterSubmitAttempted(false);
@@ -3721,7 +3931,7 @@ function AdminView() {
                             }}
                             type="button"
                           >
-                            Zuordnung ändern
+                            ⋯
                           </button>
                         </td>
                       </tr>
@@ -3741,8 +3951,17 @@ function AdminView() {
                     </tr>
                   </thead>
                   <tbody>
-                    {board?.pilots.map((pilot) => (
-                      <tr className={pilotEditorId === pilot.id ? "selected" : ""} key={pilot.id}>
+                    {visiblePilots.map((pilot) => (
+                      <tr
+                        className={pilotEditorId === pilot.id ? "selected" : ""}
+                        key={pilot.id}
+                        onClick={() => selectPilotForEditing(pilot.id)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ")
+                            selectPilotForEditing(pilot.id);
+                        }}
+                        tabIndex={0}
+                      >
                         <td>
                           <strong>{pilot.operationalCode}</strong>
                         </td>
@@ -3759,11 +3978,15 @@ function AdminView() {
                         </td>
                         <td>
                           <button
-                            className="table-action"
-                            onClick={() => selectPilotForEditing(pilot.id)}
+                            aria-label={`${pilot.operationalCode} öffnen`}
+                            className="table-overflow-action"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              selectPilotForEditing(pilot.id);
+                            }}
                             type="button"
                           >
-                            Bearbeiten
+                            ⋯
                           </button>
                         </td>
                       </tr>
@@ -3784,10 +4007,16 @@ function AdminView() {
                     </tr>
                   </thead>
                   <tbody>
-                    {board?.products.map((product) => (
+                    {visibleProducts.map((product) => (
                       <tr
                         className={productEditorId === product.id ? "selected" : ""}
                         key={product.id}
+                        onClick={() => selectProductForEditing(product.id)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ")
+                            selectProductForEditing(product.id);
+                        }}
+                        tabIndex={0}
                       >
                         <td>
                           <strong>{product.code}</strong>
@@ -3804,11 +4033,15 @@ function AdminView() {
                         </td>
                         <td>
                           <button
-                            className="table-action"
-                            onClick={() => selectProductForEditing(product.id)}
+                            aria-label={`${product.name} öffnen`}
+                            className="table-overflow-action"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              selectProductForEditing(product.id);
+                            }}
                             type="button"
                           >
-                            Bearbeiten
+                            ⋯
                           </button>
                         </td>
                       </tr>
@@ -3869,7 +4102,15 @@ function AdminView() {
             }
           >
             <div className="drawer-heading">
-              <h2>{masterDataCategory === "gates" ? "Gate bearbeiten" : "Produkt bearbeiten"}</h2>
+              <h2>
+                {masterDataCategory === "gates"
+                  ? gateEditorId === "new"
+                    ? "Gate anlegen"
+                    : "Gate bearbeiten"
+                  : productEditorId === "new"
+                    ? "Produkt anlegen"
+                    : "Produkt bearbeiten"}
+              </h2>
               <button
                 aria-label="Editor schließen"
                 onClick={() => setMasterEditorOpen(false)}
@@ -3881,20 +4122,6 @@ function AdminView() {
             <div className="master-data-columns">
               <fieldset hidden={masterDataCategory !== "gates"}>
                 <legend>Gate</legend>
-                <label>
-                  Datensatz
-                  <select
-                    value={gateEditorId}
-                    onChange={(event) => selectGateForEditing(event.target.value)}
-                  >
-                    <option value="new">Neues Gate</option>
-                    {board?.gates.map((gate) => (
-                      <option key={gate.id} value={gate.id}>
-                        {gate.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
                 <label>
                   Bezeichnung
                   <input value={gateLabel} onChange={(event) => setGateLabel(event.target.value)} />
@@ -3940,23 +4167,24 @@ function AdminView() {
                 >
                   Gate speichern
                 </button>
+                {gateEditorId !== "new" ? (
+                  <div className="master-delete-zone">
+                    <div>
+                      <strong>Gate löschen</strong>
+                      <span>Nur in der Vorbereitung und ohne operative Verwendung möglich.</span>
+                    </div>
+                    <button
+                      className="danger-link-action"
+                      onClick={() => requestMasterDelete("GATE", gateEditorId, gateLabel)}
+                      type="button"
+                    >
+                      Löschen
+                    </button>
+                  </div>
+                ) : null}
               </fieldset>
               <fieldset hidden={masterDataCategory !== "products"}>
                 <legend>Produkt</legend>
-                <label>
-                  Datensatz
-                  <select
-                    value={productEditorId}
-                    onChange={(event) => selectProductForEditing(event.target.value)}
-                  >
-                    <option value="new">Neues Produkt</option>
-                    {board?.products.map((product) => (
-                      <option key={product.id} value={product.id}>
-                        {product.code} · {product.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
                 <div className="parameter-grid">
                   <label>
                     Bezeichnung
@@ -4104,6 +4332,21 @@ function AdminView() {
                 >
                   Produkt speichern
                 </button>
+                {productEditorId !== "new" ? (
+                  <div className="master-delete-zone">
+                    <div>
+                      <strong>Produkt löschen</strong>
+                      <span>Nur ohne Tickets oder Umläufe möglich.</span>
+                    </div>
+                    <button
+                      className="danger-link-action"
+                      onClick={() => requestMasterDelete("PRODUCT", productEditorId, productName)}
+                      type="button"
+                    >
+                      Löschen
+                    </button>
+                  </div>
+                ) : null}
               </fieldset>
             </div>
           </section>
@@ -4118,10 +4361,14 @@ function AdminView() {
             <div className="drawer-heading">
               <h2>
                 {masterDataCategory === "resource-groups"
-                  ? "Ressourcengruppe bearbeiten"
+                  ? resourceEditorId === "new"
+                    ? "Ressourcengruppe anlegen"
+                    : "Ressourcengruppe bearbeiten"
                   : masterDataCategory === "assignments"
                     ? "Zuordnung ändern"
-                    : "Flugzeug bearbeiten"}
+                    : aircraftEditorId === "new"
+                      ? "Flugzeug anlegen"
+                      : "Flugzeug bearbeiten"}
               </h2>
               <button
                 aria-label="Editor schließen"
@@ -4134,20 +4381,6 @@ function AdminView() {
             <div className="resource-master-grid">
               <fieldset hidden={masterDataCategory !== "resource-groups"}>
                 <legend>Ressourcengruppe</legend>
-                <label>
-                  Datensatz
-                  <select
-                    value={resourceEditorId}
-                    onChange={(event) => selectResourceForEditing(event.target.value)}
-                  >
-                    <option value="new">Neue Ressourcengruppe</option>
-                    {resourceGroups.map((group) => (
-                      <option key={group.id} value={group.id}>
-                        {group.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
                 <label>
                   Bezeichnung
                   <input
@@ -4217,23 +4450,26 @@ function AdminView() {
                 >
                   Ressourcengruppe speichern
                 </button>
+                {resourceEditorId !== "new" ? (
+                  <div className="master-delete-zone">
+                    <div>
+                      <strong>Ressourcengruppe löschen</strong>
+                      <span>Produkte und Flugzeugzuordnungen müssen vorher entfernt sein.</span>
+                    </div>
+                    <button
+                      className="danger-link-action"
+                      onClick={() =>
+                        requestMasterDelete("RESOURCE_GROUP", resourceEditorId, resourceName)
+                      }
+                      type="button"
+                    >
+                      Löschen
+                    </button>
+                  </div>
+                ) : null}
               </fieldset>
               <fieldset hidden={masterDataCategory !== "aircraft"}>
                 <legend>Flugzeug</legend>
-                <label>
-                  Datensatz
-                  <select
-                    value={aircraftEditorId}
-                    onChange={(event) => selectAircraftForEditing(event.target.value)}
-                  >
-                    <option value="new">Neues Flugzeug</option>
-                    {board?.aircraft.map((aircraft) => (
-                      <option key={aircraft.id} value={aircraft.id}>
-                        {aircraft.registration}
-                      </option>
-                    ))}
-                  </select>
-                </label>
                 <label>
                   Kennzeichen
                   <input
@@ -4287,6 +4523,23 @@ function AdminView() {
                 >
                   Flugzeug speichern
                 </button>
+                {aircraftEditorId !== "new" ? (
+                  <div className="master-delete-zone">
+                    <div>
+                      <strong>Flugzeug löschen</strong>
+                      <span>Eine bestehende Zuordnung muss zuerst entfernt werden.</span>
+                    </div>
+                    <button
+                      className="danger-link-action"
+                      onClick={() =>
+                        requestMasterDelete("AIRCRAFT", aircraftEditorId, aircraftRegistration)
+                      }
+                      type="button"
+                    >
+                      Löschen
+                    </button>
+                  </div>
+                ) : null}
               </fieldset>
               <fieldset hidden={masterDataCategory !== "assignments"}>
                 <legend>Historisierte Zuordnung</legend>
@@ -4342,6 +4595,29 @@ function AdminView() {
                 >
                   Zuordnung ändern
                 </button>
+                {assignmentAircraftId &&
+                board?.aircraft.find((entry) => entry.id === assignmentAircraftId)
+                  ?.resourceGroupId ? (
+                  <div className="master-delete-zone">
+                    <div>
+                      <strong>Zuordnung entfernen</strong>
+                      <span>Das Flugzeug und die Ressourcengruppe bleiben erhalten.</span>
+                    </div>
+                    <button
+                      className="danger-link-action"
+                      onClick={() =>
+                        requestMasterDelete(
+                          "ASSIGNMENT",
+                          assignmentAircraftId,
+                          `Zuordnung ${board?.aircraft.find((entry) => entry.id === assignmentAircraftId)?.registration ?? ""}`,
+                        )
+                      }
+                      type="button"
+                    >
+                      Entfernen
+                    </button>
+                  </div>
+                ) : null}
               </fieldset>
             </div>
           </section>
@@ -4412,6 +4688,21 @@ function AdminView() {
                 </button>
               ) : null}
             </div>
+            {pilotEditorId !== "new" ? (
+              <div className="master-delete-zone">
+                <div>
+                  <strong>Pilotencode löschen</strong>
+                  <span>Nur ohne Umlauf oder Flugzeugbindung möglich.</span>
+                </div>
+                <button
+                  className="danger-link-action"
+                  onClick={() => requestMasterDelete("PILOT", pilotEditorId, pilotCode)}
+                  type="button"
+                >
+                  Löschen
+                </button>
+              </div>
+            ) : null}
           </section>
           <section className="admin-section" hidden={adminArea !== "operations"}>
             <h2>Notfallmodus</h2>
@@ -4910,6 +5201,78 @@ function AdminView() {
                     type="button"
                   >
                     Bestätigen und speichern
+                  </button>
+                </div>
+              </section>
+            </div>
+          ) : null}
+          {pendingMasterDelete ? (
+            <div className="modal-backdrop">
+              <section
+                aria-labelledby="master-delete-title"
+                aria-modal="true"
+                className="confirmation-dialog master-delete-dialog"
+                role="dialog"
+              >
+                <div className="drawer-heading">
+                  <div>
+                    <span className="danger-eyebrow">Endgültig löschen</span>
+                    <h2 id="master-delete-title">{pendingMasterDelete.label} löschen?</h2>
+                    <p>Die Löschung wird mit Ihrer technischen Geräte-ID protokolliert.</p>
+                  </div>
+                  <button
+                    aria-label="Löschen abbrechen"
+                    onClick={() => setPendingMasterDelete(null)}
+                    type="button"
+                  >
+                    ×
+                  </button>
+                </div>
+                {board?.event.status !== "PREPARATION" ? (
+                  <div className="delete-blockers" role="status">
+                    <strong>Löschen ist nach Betriebsfreigabe gesperrt.</strong>
+                    <span>Stammdaten können jetzt nur noch deaktiviert werden.</span>
+                  </div>
+                ) : pendingMasterDelete.blockers.length > 0 ? (
+                  <div className="delete-blockers" role="status">
+                    <strong>Löschen noch nicht möglich</strong>
+                    <span>Zuerst entfernen:</span>
+                    <ul>
+                      {pendingMasterDelete.blockers.map((blocker) => (
+                        <li key={blocker}>{blocker}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : (
+                  <p className="delete-ready-copy">
+                    Der Datensatz hat keine erkennbaren Abhängigkeiten und kann in der Vorbereitung
+                    entfernt werden. Der Server prüft dies vor der Löschung erneut.
+                  </p>
+                )}
+                <label>
+                  Administrator-PIN
+                  <input
+                    autoComplete="current-password"
+                    onChange={(event) => setAdminPin(event.target.value)}
+                    type="password"
+                    value={adminPin}
+                  />
+                </label>
+                <div className="dialog-actions">
+                  <button onClick={() => setPendingMasterDelete(null)} type="button">
+                    Abbrechen
+                  </button>
+                  <button
+                    className="danger-action"
+                    disabled={
+                      board?.event.status !== "PREPARATION" ||
+                      pendingMasterDelete.blockers.length > 0 ||
+                      adminPin.length < 4
+                    }
+                    onClick={() => void confirmMasterDelete()}
+                    type="button"
+                  >
+                    Endgültig löschen
                   </button>
                 </div>
               </section>
