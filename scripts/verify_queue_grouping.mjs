@@ -50,12 +50,20 @@ const board = async () => {
   if (!response.ok) throw new Error(`Board-Abruf fehlgeschlagen (${response.status}).`);
   return response.json();
 };
-const command = async (deviceId, token, expectedVersion, type, payload, expectedStatus = 200) => {
+const command = async (
+  deviceId,
+  token,
+  expectedVersion,
+  type,
+  payload,
+  expectedStatus = 200,
+  commandId = randomUUID(),
+) => {
   const response = await fetch(`${base}/api/events/demo-2026/commands`, {
     method: "POST",
     headers: { "content-type": "application/json", "x-device-token": token },
     body: JSON.stringify({
-      commandId: randomUUID(),
+      commandId,
       eventId: "demo-2026",
       deviceId,
       expectedVersion,
@@ -99,6 +107,14 @@ const search = async (groupId) => {
     headers: { "x-device-id": "cashier-tablet-1", "x-device-token": tokens.cashier },
   });
   if (!response.ok) throw new Error(`Ticketsuche fehlgeschlagen (${response.status}).`);
+  return response.json();
+};
+const history = async (groupId) => {
+  const query = new URLSearchParams({ aggregateType: "TICKET_GROUP", aggregateId: groupId });
+  const response = await fetch(`${base}/api/events/demo-2026/history?${query}`, {
+    headers: { "x-device-id": "technical-scaffold", "x-device-token": tokens.admin },
+  });
+  if (!response.ok) throw new Error(`Historienabruf fehlgeschlagen (${response.status}).`);
   return response.json();
 };
 
@@ -186,6 +202,36 @@ try {
       "Stabile Kennung oder Gruppenschutz ist in der Ticketsuche nicht nachvollziehbar.",
     );
   }
+  const rejectedCashierMove = await command(
+    "cashier-tablet-1",
+    tokens.cashier,
+    otherProduct.event.version,
+    "MOVE_TICKET_GROUP",
+    {
+      ticketGroupId: overflow.aggregate.id,
+      targetRotationId: first.aggregate.relatedRotationId,
+      reason: "Unzulässiger Kassentest",
+    },
+    403,
+  );
+  const rejectedCapacityMove = await command(
+    "flight-line-tablet-1",
+    tokens.flightLine,
+    otherProduct.event.version,
+    "MOVE_TICKET_GROUP",
+    {
+      ticketGroupId: overflow.aggregate.id,
+      targetRotationId: first.aggregate.relatedRotationId,
+      reason: "Unzulässiger Kapazitätstest",
+    },
+    409,
+  );
+  if (
+    rejectedCashierMove.error?.code !== "ROLE_NOT_AUTHORIZED" ||
+    rejectedCapacityMove.error?.code !== "MANUAL_GROUP_MOVE_CAPACITY_EXCEEDED"
+  ) {
+    throw new Error("Rolle oder Gruppenkapazität wurde bei manueller Umbesetzung nicht geschützt.");
+  }
   const canceledPackedGroup = await command(
     "cashier-tablet-1",
     tokens.cashier,
@@ -208,13 +254,98 @@ try {
   ) {
     throw new Error("Korrektur einer Teilgruppe hat eine andere Buchungsgruppe mitgelöst.");
   }
-  const rejectedOversize = await sell(
+  const calledTarget = await command(
+    "flight-line-tablet-1",
+    tokens.flightLine,
     canceledPackedGroup.event.version,
-    "panorama-20",
-    5,
-    false,
+    "CALL_NEXT",
+    {
+      rotationId: first.aggregate.relatedRotationId,
+      aircraftId: "aircraft-a",
+      pilotId: "550e8400-e29b-41d4-a716-446655440100",
+    },
+  );
+  const moveCommandId = randomUUID();
+  const movedAfterCall = await command(
+    "flight-line-tablet-1",
+    tokens.flightLine,
+    calledTarget.event.version,
+    "MOVE_TICKET_GROUP",
+    {
+      ticketGroupId: overflow.aggregate.id,
+      targetRotationId: first.aggregate.relatedRotationId,
+      reason: "Bestätigte manuelle Nachbesetzung",
+    },
+    200,
+    moveCommandId,
+  );
+  const duplicateMove = await command(
+    "flight-line-tablet-1",
+    tokens.flightLine,
+    calledTarget.event.version,
+    "MOVE_TICKET_GROUP",
+    {
+      ticketGroupId: overflow.aggregate.id,
+      targetRotationId: first.aggregate.relatedRotationId,
+      reason: "Bestätigte manuelle Nachbesetzung",
+    },
+    200,
+    moveCommandId,
+  );
+  const staleMove = await command(
+    "flight-line-tablet-1",
+    tokens.flightLine,
+    calledTarget.event.version,
+    "MOVE_TICKET_GROUP",
+    {
+      ticketGroupId: overflow.aggregate.id,
+      targetRotationId: first.aggregate.relatedRotationId,
+      reason: "Veralteter Parallelversuch",
+    },
     409,
   );
+  current = await board();
+  const manuallyFilledTarget = current.rotations.find(
+    (rotation) => rotation.id === first.aggregate.relatedRotationId,
+  );
+  const moveHistory = await history(overflow.aggregate.id);
+  const moveAudit = moveHistory.entries.find((entry) => entry.eventType === "TICKET_GROUP_MOVED");
+  if (
+    manuallyFilledTarget?.status !== "CALLED" ||
+    manuallyFilledTarget.ticketCount !== 4 ||
+    current.rotations.some((rotation) => rotation.id === overflow.aggregate.relatedRotationId) ||
+    moveAudit?.payload.reason !== "Bestätigte manuelle Nachbesetzung" ||
+    moveAudit.payload.changedAfterCall !== true ||
+    moveAudit.payload.manualDeviationFromAutomaticQueue !== true ||
+    duplicateMove.duplicate !== true ||
+    staleMove.error?.code !== "STALE_VERSION"
+  ) {
+    throw new Error("Bestätigte manuelle Nachbesetzung wurde nicht vollständig protokolliert.");
+  }
+  const startedTarget = await command(
+    "flight-line-tablet-1",
+    tokens.flightLine,
+    movedAfterCall.event.version,
+    "MARK_IN_FLIGHT",
+    { rotationId: first.aggregate.relatedRotationId },
+  );
+  const lateMoveSource = await sell(startedTarget.event.version, "panorama-20", 1);
+  const rejectedLateMove = await command(
+    "flight-line-tablet-1",
+    tokens.flightLine,
+    lateMoveSource.event.version,
+    "MOVE_TICKET_GROUP",
+    {
+      ticketGroupId: lateMoveSource.aggregate.id,
+      targetRotationId: first.aggregate.relatedRotationId,
+      reason: "Unzulässiger später Test",
+    },
+    409,
+  );
+  if (rejectedLateMove.error?.code !== "MANUAL_GROUP_MOVE_TOO_LATE") {
+    throw new Error("Umbesetzung nach IM FLUG wurde nicht fachlich abgelehnt.");
+  }
+  const rejectedOversize = await sell(lateMoveSource.event.version, "panorama-20", 5, false, 409);
   if (
     rejectedOversize.error?.code !== "OVERSIZE_GROUP_SPLIT_CONFIRMATION_REQUIRED" ||
     rejectedOversize.error.referenceCapacity !== 4 ||
@@ -222,7 +353,7 @@ try {
   ) {
     throw new Error("Übergröße wurde ohne verständliche Bestätigungsvorgabe verarbeitet.");
   }
-  const splitGroup = await sell(canceledPackedGroup.event.version, "panorama-20", 5, true);
+  const splitGroup = await sell(lateMoveSource.event.version, "panorama-20", 5, true);
   current = await board();
   const splitRotations = current.rotations
     .filter((rotation) => rotation.ticketGroupId === splitGroup.aggregate.id)
@@ -304,6 +435,13 @@ try {
       groupSizes: [firstMatch.groupSize, secondMatch.groupSize],
       overflowSeparated: true,
       differentProductSeparated: true,
+      manualMoveAfterCallConfirmed: true,
+      manualMoveAuditRecorded: true,
+      manualMoveAfterTakeoffRejected: true,
+      manualMoveRoleProtected: true,
+      manualMoveCapacityProtected: true,
+      manualMoveIdempotent: true,
+      manualMoveStaleWriteRejected: true,
       oversizeSplitRequiresConfirmation: true,
       oversizeSplitSlotSizes: splitRotations.map((rotation) => rotation.ticketCount),
       oversizeSplitCommunicationLabels: splitMatch.communicationLabels,

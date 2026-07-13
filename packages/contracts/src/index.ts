@@ -133,6 +133,14 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
     }),
   }),
   commandBaseSchema.extend({
+    type: z.literal("MOVE_TICKET_GROUP"),
+    payload: z.object({
+      ticketGroupId: z.string().min(1).max(100),
+      targetRotationId: z.string().min(1).max(100),
+      reason: z.string().trim().min(3).max(240),
+    }),
+  }),
+  commandBaseSchema.extend({
     type: z.literal("TRIGGER_EMERGENCY"),
     payload: z.object({ reason: z.string().trim().min(3).max(240) }),
   }),

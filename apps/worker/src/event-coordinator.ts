@@ -11,6 +11,7 @@ import {
 import {
   type AircraftOperationalState,
   advanceOverduePrediction,
+  assertManualGroupMoveAllowed,
   assertMayStageOutageRecoveryEntry,
   assertOutageRecoveryApplication,
   assertOutageRecoveryApproval,
@@ -647,6 +648,9 @@ export class EventCoordinator extends DurableObject<Env> {
         }
         if (command.type === "SET_ROTATION_NOTE") {
           return this.handleRotationNote(command, current);
+        }
+        if (command.type === "MOVE_TICKET_GROUP") {
+          return this.handleManualTicketGroupMove(command, current);
         }
         if (
           command.type === "CANCEL_TICKET_GROUP" ||
@@ -3568,6 +3572,225 @@ export class EventCoordinator extends DurableObject<Env> {
           entryCount: command.payload.entries.length,
           conflictCount: simulation.conflicts.length,
           simulatedAgainstVersion: current.version,
+        }),
+      ),
+      this.env.DB.prepare(
+        `INSERT INTO idempotency_receipts
+          (command_id, operation_day_id, device_id, command_type, received_at, response_json)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)`,
+      ).bind(
+        command.commandId,
+        command.eventId,
+        command.deviceId,
+        command.type,
+        now,
+        JSON.stringify(result),
+      ),
+      this.env.DB.prepare(
+        "INSERT INTO outbox (id, operation_day_id, topic, payload_json, created_at) VALUES (?1, ?2, 'EVENT_STATE_CHANGED', ?3, ?4)",
+      ).bind(crypto.randomUUID(), command.eventId, JSON.stringify(result), now),
+    );
+    await this.env.DB.batch(statements);
+    this.broadcast(result);
+    return json(result);
+  }
+
+  private async handleManualTicketGroupMove(
+    command: Extract<CommandEnvelope, { type: "MOVE_TICKET_GROUP" }>,
+    current: StoredEventRow,
+  ): Promise<Response> {
+    const group = await this.env.DB.prepare(
+      `SELECT tg.id, tg.product_id, tg.version, p.resource_group_id, COUNT(t.id) AS group_size
+         FROM ticket_groups tg
+         JOIN products p ON p.id = tg.product_id
+         JOIN tickets t ON t.ticket_group_id = tg.id
+        WHERE tg.id = ?1 AND tg.operation_day_id = ?2
+        GROUP BY tg.id, tg.product_id, tg.version, p.resource_group_id`,
+    )
+      .bind(command.payload.ticketGroupId, command.eventId)
+      .first<{
+        id: string;
+        product_id: string;
+        version: number;
+        resource_group_id: string;
+        group_size: number;
+      }>();
+    if (!group) {
+      return json(
+        { error: { code: "TICKET_GROUP_NOT_FOUND", message: "Ticketgruppe nicht gefunden." } },
+        { status: 404 },
+      );
+    }
+    const sourceRotations = await this.env.DB.prepare(
+      `SELECT DISTINCT r.id, r.status, r.aircraft_id,
+              (SELECT COUNT(DISTINCT source_ticket.ticket_group_id)
+                 FROM rotation_tickets source_rt
+                 JOIN tickets source_ticket ON source_ticket.id = source_rt.ticket_id
+                WHERE source_rt.rotation_id = r.id AND source_rt.released_at IS NULL)
+                AS rotation_group_count
+         FROM tickets t
+         JOIN rotation_tickets rt ON rt.ticket_id = t.id AND rt.released_at IS NULL
+         JOIN rotations r ON r.id = rt.rotation_id
+        WHERE t.ticket_group_id = ?1
+        ORDER BY r.created_at, r.id`,
+    )
+      .bind(group.id)
+      .all<{
+        id: string;
+        status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
+        aircraft_id: string | null;
+        rotation_group_count: number;
+      }>();
+    if (sourceRotations.results.length === 0) {
+      return json(
+        {
+          error: { code: "TICKET_GROUP_UNASSIGNED", message: "Ticketgruppe ist nicht zugeordnet." },
+        },
+        { status: 409 },
+      );
+    }
+    if (
+      sourceRotations.results.length === 1 &&
+      sourceRotations.results[0]?.id === command.payload.targetRotationId
+    ) {
+      return json(
+        {
+          error: {
+            code: "TICKET_GROUP_ALREADY_ASSIGNED",
+            message: "Die Buchungsgruppe ist diesem Umlauf bereits vollständig zugeordnet.",
+          },
+        },
+        { status: 409 },
+      );
+    }
+    const target = await this.env.DB.prepare(
+      `SELECT r.id, r.status, fg.resource_group_id,
+              COALESCE(a.passenger_seats, MIN(p.reference_capacity), rg.reference_capacity)
+                AS target_capacity,
+              SUM(CASE WHEN tg.id IS NOT NULL AND tg.id <> ?3 THEN 1 ELSE 0 END)
+                AS occupied_seats,
+              SUM(CASE WHEN tg.id IS NOT NULL AND tg.id <> ?3 AND tg.product_id <> ?4
+                       THEN 1 ELSE 0 END) AS incompatible_product_tickets
+         FROM rotations r
+         JOIN flight_groups fg ON fg.id = r.flight_group_id
+         JOIN resource_groups rg ON rg.id = fg.resource_group_id
+         LEFT JOIN aircraft a ON a.id = r.aircraft_id
+         LEFT JOIN rotation_tickets rt ON rt.rotation_id = r.id AND rt.released_at IS NULL
+         LEFT JOIN tickets t ON t.id = rt.ticket_id
+         LEFT JOIN ticket_groups tg ON tg.id = t.ticket_group_id
+         LEFT JOIN products p ON p.id = tg.product_id
+        WHERE r.id = ?1 AND r.operation_day_id = ?2 AND r.status <> 'CANCELED'
+        GROUP BY r.id, r.status, fg.resource_group_id, a.passenger_seats, rg.reference_capacity`,
+    )
+      .bind(command.payload.targetRotationId, command.eventId, group.id, group.product_id)
+      .first<{
+        id: string;
+        status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
+        resource_group_id: string;
+        target_capacity: number;
+        occupied_seats: number;
+        incompatible_product_tickets: number;
+      }>();
+    if (!target) {
+      return json(
+        { error: { code: "TARGET_ROTATION_NOT_FOUND", message: "Zielumlauf nicht gefunden." } },
+        { status: 404 },
+      );
+    }
+    try {
+      assertManualGroupMoveAllowed({
+        sourceStates: sourceRotations.results.map((rotation) => rotation.status),
+        targetState: target.status,
+        sameResourceGroup: target.resource_group_id === group.resource_group_id,
+        sameProduct: target.incompatible_product_tickets === 0,
+        groupSize: group.group_size,
+        targetOccupiedSeats: target.occupied_seats,
+        targetCapacity: target.target_capacity,
+      });
+    } catch (reason: unknown) {
+      if (reason instanceof DomainRuleError) {
+        return json({ error: { code: reason.code, message: reason.message } }, { status: 409 });
+      }
+      throw reason;
+    }
+
+    const now = new Date().toISOString();
+    const nextVersion = current.version + 1;
+    const changedAfterCall =
+      target.status === "CALLED" ||
+      sourceRotations.results.some((rotation) => rotation.status === "CALLED");
+    const result: CommandResult = {
+      accepted: true,
+      duplicate: false,
+      event: rowToSnapshot({ ...current, version: nextVersion, updated_at: now }),
+      eventType: "TICKET_GROUP_MOVED",
+      aggregate: { type: "TICKET_GROUP", id: group.id, relatedRotationId: target.id },
+    };
+    const statements: D1PreparedStatement[] = [
+      this.env.DB.prepare(
+        "UPDATE operation_days SET version = ?1, updated_at = ?2 WHERE id = ?3 AND version = ?4",
+      ).bind(nextVersion, now, command.eventId, current.version),
+      this.env.DB.prepare(
+        `UPDATE rotation_tickets SET released_at = ?1
+          WHERE released_at IS NULL
+            AND ticket_id IN (SELECT id FROM tickets WHERE ticket_group_id = ?2)`,
+      ).bind(now, group.id),
+      this.env.DB.prepare(
+        `INSERT INTO rotation_tickets (rotation_id, ticket_id, assigned_at)
+         SELECT ?1, id, ?2 FROM tickets WHERE ticket_group_id = ?3 ORDER BY created_at, id`,
+      ).bind(target.id, now, group.id),
+      this.env.DB.prepare(
+        `UPDATE tickets
+            SET status = CASE
+              WHEN ?1 = 'CALLED' AND attendance_status = 'CHECKED_IN' THEN 'BOARDING'
+              WHEN ?1 = 'CALLED' THEN 'CALLED'
+              WHEN attendance_status = 'CHECKED_IN' THEN 'CHECKED_IN'
+              ELSE 'QUEUED'
+            END
+          WHERE ticket_group_id = ?2`,
+      ).bind(target.status, group.id),
+      this.env.DB.prepare(
+        `UPDATE ticket_groups SET status = ?1, version = version + 1
+          WHERE id = ?2 AND version = ?3`,
+      ).bind(target.status === "CALLED" ? "CALLED" : "QUEUED", group.id, group.version),
+    ];
+    for (const source of sourceRotations.results) {
+      if (source.id === target.id || source.rotation_group_count !== 1) continue;
+      statements.push(
+        this.env.DB.prepare(
+          "UPDATE rotations SET status = 'CANCELED', version = version + 1, updated_at = ?1 WHERE id = ?2",
+        ).bind(now, source.id),
+      );
+      if (source.aircraft_id) {
+        statements.push(
+          this.env.DB.prepare(
+            "UPDATE aircraft SET operational_state = 'AVAILABLE', updated_at = ?1 WHERE id = ?2",
+          ).bind(now, source.aircraft_id),
+        );
+      }
+    }
+    statements.push(
+      this.env.DB.prepare(
+        `INSERT INTO operational_events
+          (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type,
+           aggregate_id, aggregate_version, payload_json)
+         VALUES (?1, ?2, 'TICKET_GROUP_MOVED', ?3, ?4, 'TICKET_GROUP', ?5, ?6, ?7)`,
+      ).bind(
+        crypto.randomUUID(),
+        command.eventId,
+        now,
+        command.deviceId,
+        group.id,
+        group.version + 1,
+        JSON.stringify({
+          reason: command.payload.reason,
+          sourceRotationIds: sourceRotations.results.map((rotation) => rotation.id),
+          targetRotationId: target.id,
+          groupSize: group.group_size,
+          targetCapacity: target.target_capacity,
+          targetOccupiedSeatsBeforeMove: target.occupied_seats,
+          changedAfterCall,
+          manualDeviationFromAutomaticQueue: true,
         }),
       ),
       this.env.DB.prepare(
