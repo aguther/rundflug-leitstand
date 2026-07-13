@@ -18,6 +18,21 @@ Hell- und Dunkelmodus verwenden dieselbe Informationshierarchie. Die Auswahl wir
 Gerät gespeichert. Die mobile Administration besitzt eine feste untere Bereichsnavigation, horizontal
 scrollbare Stammdatenkategorien und zeilenförmige Datensätze ohne horizontales Seiten-Scrolling.
 
+## Freigegebene Kompakt- und Theme-Korrektur
+
+Am 13. Juli 2026 wurde ergänzend freigegeben:
+
+- Alle administrativen Flächen verwenden auch im Dunkelmodus ausschließlich semantische
+  Theme-Farben. Dies umfasst Kennzahlen, PIN-Bereiche, Hinweise, deaktivierte Aktionen und die
+  Fußzeile.
+- Reiter, Suche und Tabellenkopf bleiben beim Kategorienwechsel an derselben Position. Die
+  Stammdatentabelle besitzt eine kompakte, begrenzte Arbeitsfläche mit internem Scrollen und
+  stabiler Scrollbar; unterschiedliche Zeilenzahlen verschieben die Bedienoberfläche nicht.
+- Tabellenzeilen bleiben kompakt, leere Kategorien verwenden keinen großflächigen Leerzustand.
+- Datumsfelder werden deutsch als `TT.MM.JJJJ` angeboten. Kombinierte Zeitpunkte verwenden
+  getrennte Datums- und Zeitfelder, wobei die Zeit im 24-Stunden-Format `HH:mm` eingegeben wird.
+  Die intern verwendeten ISO-Werte und die Veranstaltungszeitzone bleiben unverändert.
+
 ## Endgültiges Löschen
 
 Anforderung `F-ADM-050` gilt für Gates, Ressourcengruppen, Flugzeuge, deren Zuordnungen,
