@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { confirmedStateLabel, loadOperationBoard, saveOperationBoard } from "./offline-store";
+import {
+  clearOfflineOperationBoards,
+  confirmedStateLabel,
+  loadOperationBoard,
+  saveOperationBoard,
+} from "./offline-store";
 
 describe("offline operation snapshot", () => {
   it("reports the age of the last server-confirmed state", () => {
@@ -14,5 +19,6 @@ describe("offline operation snapshot", () => {
   it("degrades safely when IndexedDB is unavailable", async () => {
     await expect(loadOperationBoard("event", "device")).resolves.toBeNull();
     await expect(saveOperationBoard("event", "device", {} as never)).resolves.toBeUndefined();
+    await expect(clearOfflineOperationBoards()).resolves.toBeUndefined();
   });
 });
