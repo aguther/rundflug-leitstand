@@ -389,6 +389,24 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
       adminPin: z.string().min(4).max(32),
     }),
   }),
+  commandBaseSchema.extend({
+    type: z.literal("DELETE_MASTER_DATA"),
+    payload: z
+      .object({
+        entityType: z.enum([
+          "GATE",
+          "RESOURCE_GROUP",
+          "AIRCRAFT",
+          "ASSIGNMENT",
+          "PILOT",
+          "PRODUCT",
+        ]),
+        entityId: z.string().min(1).max(100),
+        reason: z.string().trim().min(3).max(240),
+        adminPin: z.string().min(4).max(32),
+      })
+      .strict(),
+  }),
 ]);
 
 export type CommandEnvelope = z.infer<typeof commandEnvelopeSchema>;

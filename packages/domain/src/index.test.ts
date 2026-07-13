@@ -271,6 +271,10 @@ describe("master data authorization", () => {
 describe("aircraft assignment authorization", () => {
   it("restricts assignments to administration", () => {
     expect(() => assertRoleMayExecute("ADMIN", "ASSIGN_AIRCRAFT_RESOURCE_GROUP")).not.toThrow();
+    expect(() => assertRoleMayExecute("ADMIN", "DELETE_MASTER_DATA")).not.toThrow();
+    expect(() => assertRoleMayExecute("FLIGHT_DIRECTOR", "DELETE_MASTER_DATA")).toThrow(
+      /darf DELETE_MASTER_DATA nicht ausführen/,
+    );
     expect(() =>
       assertRoleMayExecute("FLIGHT_DIRECTOR", "ASSIGN_AIRCRAFT_RESOURCE_GROUP"),
     ).toThrow();

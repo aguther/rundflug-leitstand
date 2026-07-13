@@ -97,6 +97,40 @@ try {
   await waitForWorker();
   let board = await operationBoard(devices.admin, tokens.admin);
   let result = await admin(board.event.version, "UPSERT_GATE", {
+    gateId: "gate-delete-test",
+    label: "Synthetisches Lösch-Gate",
+    gateType: "DISPLAY_ONLY",
+    active: true,
+    sortOrder: 99,
+    reason: "Synthetischer Löschtest",
+    adminPin: pin,
+  });
+  await admin(
+    result.event.version,
+    "DELETE_MASTER_DATA",
+    {
+      entityType: "GATE",
+      entityId: "gate-delete-test",
+      reason: "Synthetischer Löschtest",
+      adminPin: "9999",
+    },
+    403,
+  );
+  result = await admin(result.event.version, "DELETE_MASTER_DATA", {
+    entityType: "GATE",
+    entityId: "gate-delete-test",
+    reason: "Synthetischer Löschtest",
+    adminPin: pin,
+  });
+  board = await operationBoard(devices.admin, tokens.admin);
+  if (board.gates.some((gate) => gate.id === "gate-delete-test")) {
+    throw new Error("Abhängigkeitsfreies Gate wurde in der Vorbereitung nicht gelöscht.");
+  }
+  const deleteHistory = await history("GATE", "gate-delete-test");
+  if (!deleteHistory.entries.some((entry) => entry.eventType === "GATE_DELETED")) {
+    throw new Error("Audit-Ereignis für die Stammdatenlöschung fehlt.");
+  }
+  result = await admin(result.event.version, "UPSERT_GATE", {
     gateId: "gate-resource-test",
     label: "Flight Line Ressourcen",
     gateType: "FLIGHT_LINE",
@@ -115,6 +149,17 @@ try {
     reason: "Synthetischer Stammdatentest",
     adminPin: pin,
   });
+  await admin(
+    result.event.version,
+    "DELETE_MASTER_DATA",
+    {
+      entityType: "GATE",
+      entityId: "gate-resource-test",
+      reason: "Synthetischer Abhängigkeitstest",
+      adminPin: pin,
+    },
+    409,
+  );
   for (const aircraft of [
     { id: "aircraft-shared-a", registration: "D-ETSA" },
     { id: "aircraft-shared-b", registration: "D-ETSB" },
@@ -188,6 +233,17 @@ try {
     reason: "Synthetischer Stammdatentest",
     adminPin: pin,
   });
+  await admin(
+    result.event.version,
+    "DELETE_MASTER_DATA",
+    {
+      entityType: "GATE",
+      entityId: "gate-resource-test",
+      reason: "Synthetischer Phasentest",
+      adminPin: pin,
+    },
+    409,
+  );
   const codes = [ticketCode(), ticketCode()];
   const firstSale = await command(
     devices.cashier,

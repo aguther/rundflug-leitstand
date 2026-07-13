@@ -9,6 +9,10 @@ weist nach:
 - zwei Flugzeuge können derselben Gruppe zugeordnet werden,
 - Typkompatibilität, Sitzplätze, Referenzkapazität und Planumlaufzeit sind konfiguriert,
 - ein veralteter paralleler Stammdatenbefehl wird abgelehnt,
+- eine endgültige Löschung funktioniert nur in der Vorbereitung, mit gültiger Administrator-PIN
+  und ohne fachliche Abhängigkeiten,
+- abhängige Stammdaten sowie Löschversuche nach der Betriebsfreigabe werden abgelehnt,
+- erfolgreiche Löschungen erzeugen einen append-only Audit-Eintrag,
 - Zuordnungs- und Statusänderungen erscheinen mit Gerät und Begründung im Auditverlauf,
 - eine Gruppenpause blockiert Verkauf und Aufruf, macht die Prognose unsicher und erscheint auf
   Ticketstatus und FIDS ohne irreführenden Countdown,
