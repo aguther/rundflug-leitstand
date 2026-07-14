@@ -37,6 +37,50 @@ export const gateDisplayFilterSchema = z
   .strict();
 export type GateDisplayFilter = z.infer<typeof gateDisplayFilterSchema>;
 
+const productWeightClassSchema = z.enum(["NOT_CAPTURED", "CHILD", "NORMAL", "HEAVY", "INDIVIDUAL"]);
+
+const upsertProductPayloadSchema = z
+  .object({
+    productId: z.string().min(1).max(100),
+    resourceGroupId: z.string().min(1).max(100),
+    gateId: z.string().min(1).max(100),
+    name: z.string().trim().min(2).max(100),
+    code: z
+      .string()
+      .trim()
+      .regex(/^[A-Z0-9-]{2,12}$/),
+    publicDescription: z.string().trim().max(240),
+    priceCents: z.number().int().min(0).max(1_000_000),
+    referenceCapacity: z.number().int().min(1).max(100),
+    referenceDurationMinutes: z.number().int().min(1).max(600),
+    childCompanionRequired: z.boolean(),
+    weightClasses: z
+      .array(productWeightClassSchema)
+      .min(1)
+      .refine((values) => new Set(values).size === values.length, {
+        message: "Gewichtsklassen dürfen nicht doppelt vorkommen.",
+      }),
+    sortOrder: z.number().int().min(0).max(1000),
+    reason: z.string().trim().min(3).max(240),
+    adminPin: z.string().min(4).max(32),
+  })
+  .superRefine((payload, context) => {
+    if (payload.weightClasses.includes("NOT_CAPTURED") && payload.weightClasses.length !== 1) {
+      context.addIssue({
+        code: "custom",
+        message: "Keine Gewichtserfassung kann nicht mit Gewichtsklassen kombiniert werden.",
+        path: ["weightClasses"],
+      });
+    }
+    if (payload.childCompanionRequired && !payload.weightClasses.includes("CHILD")) {
+      context.addIssue({
+        code: "custom",
+        message: "Der Begleithinweis setzt die Gewichtsklasse Kind voraus.",
+        path: ["childCompanionRequired"],
+      });
+    }
+  });
+
 const commandBaseSchema = z.object({
   commandId: z.uuid(),
   eventId: z.string().min(1).max(100),
@@ -370,27 +414,7 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
   }),
   commandBaseSchema.extend({
     type: z.literal("UPSERT_PRODUCT"),
-    payload: z.object({
-      productId: z.string().min(1).max(100),
-      resourceGroupId: z.string().min(1).max(100),
-      gateId: z.string().min(1).max(100),
-      name: z.string().trim().min(2).max(100),
-      code: z
-        .string()
-        .trim()
-        .regex(/^[A-Z0-9-]{2,12}$/),
-      publicDescription: z.string().trim().max(240),
-      priceCents: z.number().int().min(0).max(1_000_000),
-      referenceCapacity: z.number().int().min(1).max(100),
-      referenceDurationMinutes: z.number().int().min(1).max(600),
-      childCompanionRequired: z.boolean(),
-      weightClasses: z
-        .array(z.enum(["NOT_CAPTURED", "CHILD", "NORMAL", "HEAVY", "INDIVIDUAL"]))
-        .min(1),
-      sortOrder: z.number().int().min(0).max(1000),
-      reason: z.string().trim().min(3).max(240),
-      adminPin: z.string().min(4).max(32),
-    }),
+    payload: upsertProductPayloadSchema,
   }),
   commandBaseSchema.extend({
     type: z.literal("UPSERT_RESOURCE_GROUP"),

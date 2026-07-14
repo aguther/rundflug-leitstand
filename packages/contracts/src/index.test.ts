@@ -620,6 +620,64 @@ describe("commandEnvelopeSchema", () => {
     expect("guestName" in parsed.payload).toBe(false);
   });
 
+  it("keeps disabled weight capture exclusive", () => {
+    const invalid = commandEnvelopeSchema.safeParse({
+      commandId: "550e8400-e29b-41d4-a716-446655440080",
+      eventId: "event-1",
+      deviceId: "admin-1",
+      expectedVersion: 1,
+      issuedAt: "2026-07-14T10:00:00.000Z",
+      type: "UPSERT_PRODUCT",
+      payload: {
+        productId: "product-1",
+        resourceGroupId: "resource-1",
+        gateId: "gate-1",
+        name: "Panorama",
+        code: "PAN20",
+        publicDescription: "Panoramaflug",
+        priceCents: 4500,
+        referenceCapacity: 3,
+        referenceDurationMinutes: 20,
+        childCompanionRequired: false,
+        weightClasses: ["NOT_CAPTURED", "CHILD"],
+        sortOrder: 10,
+        reason: "Synthetischer Vertragstest",
+        adminPin: "0000",
+      },
+    });
+
+    expect(invalid.success).toBe(false);
+  });
+
+  it("requires the child class for the companion warning", () => {
+    const invalid = commandEnvelopeSchema.safeParse({
+      commandId: "550e8400-e29b-41d4-a716-446655440081",
+      eventId: "event-1",
+      deviceId: "admin-1",
+      expectedVersion: 1,
+      issuedAt: "2026-07-14T10:00:00.000Z",
+      type: "UPSERT_PRODUCT",
+      payload: {
+        productId: "product-1",
+        resourceGroupId: "resource-1",
+        gateId: "gate-1",
+        name: "Panorama",
+        code: "PAN20",
+        publicDescription: "Panoramaflug",
+        priceCents: 4500,
+        referenceCapacity: 3,
+        referenceDurationMinutes: 20,
+        childCompanionRequired: true,
+        weightClasses: ["NORMAL"],
+        sortOrder: 10,
+        reason: "Synthetischer Vertragstest",
+        adminPin: "0000",
+      },
+    });
+
+    expect(invalid.success).toBe(false);
+  });
+
   it("validates a reasoned aircraft resource assignment", () => {
     const parsed = commandEnvelopeSchema.parse({
       commandId: "00e971df-23d5-4d28-9107-92b447416289",

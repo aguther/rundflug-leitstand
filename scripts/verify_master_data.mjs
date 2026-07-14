@@ -181,7 +181,7 @@ try {
       adminPin: pin,
     });
   }
-  const productPayload = (id, code, name, duration) => ({
+  const productPayload = (id, code, name, duration, overrides = {}) => ({
     productId: id,
     resourceGroupId: "resource-shared-test",
     gateId: "gate-resource-test",
@@ -196,11 +196,50 @@ try {
     sortOrder: duration,
     reason: "Synthetischer Stammdatentest",
     adminPin: pin,
+    ...overrides,
   });
   result = await admin(
     result.event.version,
     "UPSERT_PRODUCT",
     productPayload("product-shared-20", "TST20", "Test Panorama 20", 20),
+  );
+  await admin(
+    result.event.version,
+    "UPSERT_PRODUCT",
+    productPayload("product-invalid-weight", "INVW", "Ungültige Gewichtsklassen", 20, {
+      weightClasses: ["NOT_CAPTURED", "CHILD"],
+    }),
+    400,
+  );
+  await admin(
+    result.event.version,
+    "UPSERT_PRODUCT",
+    productPayload("product-invalid-child", "INVC", "Ungültiger Begleithinweis", 20, {
+      childCompanionRequired: true,
+      weightClasses: ["NORMAL"],
+    }),
+    400,
+  );
+  await admin(
+    result.event.version,
+    "UPSERT_PRODUCT",
+    productPayload("product-invalid-reference", "INVR", "Ungültiger Bezug", 20, {
+      resourceGroupId: "unknown-resource-group",
+    }),
+    409,
+  );
+  await admin(
+    result.event.version,
+    "UPSERT_PRODUCT",
+    productPayload("product-duplicate-code", "TST20", "Doppeltes Kürzel", 20),
+    409,
+  );
+  result = await admin(
+    result.event.version,
+    "UPSERT_PRODUCT",
+    productPayload("product-shared-20", "TST20", "Test Panorama 20 aktualisiert", 20, {
+      priceCents: 4550,
+    }),
   );
   const staleVersion = result.event.version;
   result = await admin(
@@ -306,11 +345,14 @@ try {
   const sharedProducts = board.products.filter(
     (product) => product.resourceGroupId === "resource-shared-test",
   );
+  const updatedProduct = sharedProducts.find((product) => product.id === "product-shared-20");
   const sharedGroup = board.resourceGroups.find((group) => group.id === "resource-shared-test");
   const sharedGate = board.gates.find((gate) => gate.id === "gate-resource-test");
   if (
     sharedProducts.length !== 2 ||
     sharedProducts.some((product) => product.resourceGroupOpenTickets !== 2) ||
+    updatedProduct?.name !== "Test Panorama 20 aktualisiert" ||
+    updatedProduct.priceCents !== 4550 ||
     sharedGroup?.activeAircraftIds.length !== 2 ||
     sharedGroup.gateId !== "gate-resource-test" ||
     !sharedGate?.assignedResourceGroupIds.includes("resource-shared-test") ||
@@ -382,6 +424,7 @@ try {
   });
   const resourceHistory = await history("RESOURCE_GROUP", "resource-shared-test");
   const aircraftHistory = await history("AIRCRAFT", "aircraft-shared-a");
+  const productHistory = await history("PRODUCT", "product-shared-20");
   if (
     !resourceHistory.entries.some((entry) => entry.eventType === "RESOURCE_GROUP_UPSERTED") ||
     resourceHistory.entries.filter((entry) => entry.eventType === "RESOURCE_GROUP_STATUS_CHANGED")
@@ -390,6 +433,10 @@ try {
       (entry) =>
         entry.eventType === "AIRCRAFT_RESOURCE_GROUP_ASSIGNED" &&
         entry.payload.toResourceGroupId === "resource-shared-test",
+    ) ||
+    productHistory.entries.filter((entry) => entry.eventType === "PRODUCT_UPSERTED").length !== 2 ||
+    !productHistory.entries.some(
+      (entry) => entry.eventType === "PRODUCT_UPSERTED" && entry.payload.priceCents === 4550,
     )
   ) {
     throw new Error("Stammdaten- oder Zuordnungshistorie ist unvollständig.");
@@ -403,6 +450,10 @@ try {
       gateAssignmentsProjected: true,
       gateDisplayFilterAppliedPublicly: true,
       invalidGateDisplayReferenceRejected: true,
+      productCreateUpdateAndAuditConfirmed: true,
+      invalidProductReferencesRejected: true,
+      duplicateProductCodesRejected: true,
+      invalidWeightConfigurationRejected: true,
       staleMasterDataRejected: true,
       pauseBlocksSales: true,
       pauseBlocksCalls: true,
