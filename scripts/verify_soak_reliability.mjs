@@ -1,6 +1,6 @@
 import { spawn, spawnSync } from "node:child_process";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
-import { rm } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -20,7 +20,37 @@ if (!Number.isInteger(port) || port < 1_024 || port > 55_000) {
 
 const wranglerCli = resolve(root, "node_modules", "wrangler", "bin", "wrangler.js");
 const persistPath = resolve(root, process.env.SOAK_PERSIST_TO ?? ".wrangler/soak-state");
+const runtimePath = resolve(root, process.env.SOAK_RUNTIME_TO ?? ".wrangler/soak-runtime");
+const bundlePath = resolve(runtimePath, "bundle");
+const bundledWorkerPath = resolve(bundlePath, "index.js");
+const runtimeConfigPath = resolve(runtimePath, "wrangler.json");
 await rm(persistPath, { recursive: true, force: true });
+await rm(runtimePath, { recursive: true, force: true });
+await mkdir(runtimePath, { recursive: true });
+const runtimeConfig = JSON.parse(await readFile(resolve(root, "wrangler.jsonc"), "utf8"));
+runtimeConfig.name = `${runtimeConfig.name}-soak`;
+delete runtimeConfig.main;
+delete runtimeConfig.assets;
+delete runtimeConfig.triggers;
+delete runtimeConfig.observability;
+for (const database of runtimeConfig.d1_databases ?? []) delete database.migrations_dir;
+await writeFile(runtimeConfigPath, JSON.stringify(runtimeConfig, null, 2));
+const bundle = spawnSync(
+  process.execPath,
+  [
+    wranglerCli,
+    "deploy",
+    resolve(root, "apps/worker/src/index.ts"),
+    "--dry-run",
+    "--outdir",
+    bundlePath,
+    "--config",
+    runtimeConfigPath,
+  ],
+  { cwd: root, stdio: "ignore" },
+);
+if (bundle.status !== 0)
+  throw new Error("Isoliertes Worker-Bundle für den Langlauf konnte nicht erzeugt werden.");
 const wranglerBaseArguments = [
   "--local",
   "--persist-to",
@@ -85,8 +115,10 @@ const server = spawn(
   [
     wranglerCli,
     "dev",
+    bundledWorkerPath,
+    "--no-bundle",
     "--config",
-    "wrangler.jsonc",
+    runtimeConfigPath,
     "--port",
     String(port),
     "--inspector-port",

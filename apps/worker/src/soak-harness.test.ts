@@ -9,7 +9,11 @@ describe("V1 twelve-hour reliability harness", () => {
     expect(soakHarness).toContain("AbortSignal.timeout(maximumMilliseconds)");
     expect(soakHarness).toContain("SOAK_PORT");
     expect(soakHarness).toContain("SOAK_PERSIST_TO");
+    expect(soakHarness).toContain("SOAK_RUNTIME_TO");
     expect(soakHarness).toContain('"--persist-to"');
+    expect(soakHarness).toContain('"--outdir"');
+    expect(soakHarness).toContain('"--no-bundle"');
+    expect(soakHarness).toContain("bundledWorkerPath");
   });
 
   it("exercises authenticated writes, reads, realtime and latency limits anonymously", () => {

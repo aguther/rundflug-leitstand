@@ -4,10 +4,12 @@ Status: Harness implementiert und im Kurzlauf verifiziert; echter 12-Stunden-Abn
 
 Betroffene Anforderung: Q-ZUV-050.
 
-`npm run test:soak-reliability` startet genau einen lokalen Worker-Prozess mit isolierter lokaler
-D1-Datenbank unter `.wrangler/soak-state` und standardmäßig auf Port 8797
-und ausschließlich synthetischen anonymen Daten. Ohne Neustart wiederholt der Lauf standardmäßig
-zwölf Stunden lang:
+`npm run test:soak-reliability` erzeugt zunächst ein unveränderliches Worker-Bundle unter
+`.wrangler/soak-runtime`. Anschließend startet es genau einen lokalen Worker-Prozess mit isolierter
+lokaler D1-Datenbank unter `.wrangler/soak-state`, standardmäßig auf Port 8797 und ausschließlich
+synthetischen anonymen Daten. Quellcode- oder Buildänderungen im normalen Arbeitsbaum lösen dadurch
+keinen Reload des Langlauf-Workers aus. Ohne Neustart wiederholt der Lauf standardmäßig zwölf
+Stunden lang:
 
 - authentisierten Abruf des Healthchecks und des bestätigten Operationsstands,
 - Verkauf eines anonymen QR-Tickets über den realen Kommando-/Durable-Object-Pfad,
@@ -54,7 +56,7 @@ p95 45,8 ms, Maximum 52,9 ms und kein Worker-Neustart. Port 8787 und `.wrangler/
 nicht verwendet.
 
 Q-ZUV-050 bleibt bis zu einem erfolgreichen ungekürzten Lauf mit mindestens 43.200 Sekunden in der
-Traceability auf `geplant`.
+Traceability auf `in Arbeit`.
 
 ## Fehlgeschlagener Abnahmelauf vom 14. Juli 2026
 
@@ -89,6 +91,23 @@ Ein anschließender 12-Minuten-Lauf überschritt beide bisherigen Abbruchpunkte 
 - Median 35,0 ms, p95 45,9 ms und Maximum 53,9 ms.
 
 Auch dieser Diagnoselauf ersetzt den ungekürzten 12-Stunden-Nachweis nicht.
+
+Der dritte ungekürzte Versuch ab 22:03 Uhr erreichte 60 Zyklen und knapp eine Stunde. Während eines
+parallel ausgeführten vollständigen Projektchecks änderten PWA- und Worker-Builds jedoch beobachtete
+Dateien. Der damalige `wrangler dev`-Prozess lud daraufhin neu; der Testclient protokollierte mehrere
+WebSocket-Schließungen und brach korrekt ab. Der Versuch ist kein positiver Q-ZUV-050-Nachweis, weil
+der geprüfte Worker während des Messzeitraums nicht unverändert blieb.
+
+Daraufhin wurde der Harness auf ein vorab erzeugtes, separates Worker-Bundle mit eigener
+Laufzeitkonfiguration umgestellt. Ein gezielt parallel zu einem vollständigen `npm run build`
+ausgeführter 60-Sekunden-Isolationstest war erfolgreich:
+
+- 30 Zyklen und 150 erfolgreiche Requests,
+- 60 Realtime-Zustandsänderungen und 30 beantwortete Heartbeats,
+- keine WebSocket-Schließung, keine Wiederverbindung und kein Worker-Neustart,
+- Median 35,4 ms, p95 44,5 ms und Maximum 51,5 ms.
+
+Der ungekürzte Lauf wird auf Basis dieses unveränderlichen Bundles neu gestartet.
 
 Die PWA verwendet denselben 30-Sekunden-Heartbeat nun in Betriebsansichten, öffentlichem
 Ticketstatus und FIDS. `pong` bestätigt ausschließlich die Verbindung und löst keinen unnötigen
