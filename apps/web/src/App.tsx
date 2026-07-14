@@ -9,7 +9,7 @@ import type {
   TicketSearchResult,
 } from "@rundflug/contracts";
 import QRCode from "qrcode";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   type AdminArea,
   AdminNavigation,
@@ -42,6 +42,7 @@ import {
   revokeTicketPush,
   searchTickets,
   sendCommand,
+  verifyAdminPin,
 } from "./api";
 import {
   type BoardSyncState,
@@ -51,6 +52,7 @@ import {
   reduceBoardSyncState,
   requestBoardSync,
 } from "./board-sync";
+import { requiresChildCompanionWarning } from "./cashier-guidance";
 import { rememberActiveEvent, resolveActiveEvent } from "./event-context";
 import {
   eventDateInTimeZone,
@@ -78,6 +80,14 @@ import {
   replacementSuggestion,
   sharedGroupSegmentLabel,
 } from "./operational-exceptions";
+import {
+  formatEuroInput,
+  parseEuroToCents,
+  productPositionOptions,
+  setWeightCaptureMode,
+  toggleWeightClass,
+  weightCaptureEnabled,
+} from "./product-editor";
 import {
   isRealtimeStateChange,
   REALTIME_HEARTBEAT_INTERVAL_MS,
@@ -117,6 +127,20 @@ const aircraftStateLabel = {
   INTERRUPTED: "Flugbetrieb unterbrochen",
   INACTIVE: "Kurzfristig inaktiv",
 } as const;
+
+function FieldLabel({ label, help }: { label: string; help: string }) {
+  return (
+    <span className="field-label-with-info">
+      <span>{label}</span>
+      <details className="field-info">
+        <summary aria-label={`Information zu ${label}`} title={help}>
+          i
+        </summary>
+        <span role="note">{help}</span>
+      </details>
+    </span>
+  );
+}
 type WeightClass = "NOT_CAPTURED" | "CHILD" | "NORMAL" | "HEAVY" | "INDIVIDUAL";
 type TicketDetail = {
   clientId: string;
@@ -449,6 +473,10 @@ function CashierView() {
   const [oversizeSplitAcknowledged, setOversizeSplitAcknowledged] = useState(false);
   const product = board?.products.find((entry) => entry.id === productId) ?? board?.products[0];
   const splitPreview = oversizeSplitPreview(size, product?.referenceCapacity ?? size);
+  const childCompanionWarning = requiresChildCompanionWarning(
+    product?.childCompanionRequired ?? false,
+    ticketDetails.map((detail) => detail.weightClass),
+  );
   useEffect(() => {
     if (serverConfirmed && pendingDraftCount === 0) return;
     const queue = appendCashierDraftRevision(readCashierDraftQueue(localStorage, draftQueueKey), {
@@ -863,6 +891,15 @@ function CashierView() {
                     ) : null}
                   </div>
                 ))}
+                {childCompanionWarning ? (
+                  <div className="child-companion-warning" role="alert">
+                    <strong>Begleitung prüfen</strong>
+                    <span>
+                      In dieser Gruppe ist ein Kind erfasst, aber keine erwachsene Begleitperson.
+                    </span>
+                    <small>Organisatorischer Hinweis ohne flugbetriebliche Freigabewirkung.</small>
+                  </div>
+                ) : null}
               </div>
             ) : null}
           </section>
@@ -2344,22 +2381,18 @@ function AdminView() {
   const [masterDataCategory, setMasterDataCategory] = useState<MasterDataCategory>("aircraft");
   const [reason, setReason] = useState("");
   const [adminPin, setAdminPin] = useState("");
+  const [adminModeUnlocked, setAdminModeUnlocked] = useState(false);
+  const [adminPinDialog, setAdminPinDialog] = useState<"unlock" | "action" | null>(null);
+  const [adminPinError, setAdminPinError] = useState<string | null>(null);
+  const [adminPinBusy, setAdminPinBusy] = useState(false);
+  const pendingAdminActionRef = useRef<(() => Promise<void>) | null>(null);
+  const adminPinInputRef = useRef<HTMLInputElement>(null);
   const [masterEditorOpen, setMasterEditorOpen] = useState(false);
   const [masterSubmitAttempted, setMasterSubmitAttempted] = useState(false);
   const [masterSearch, setMasterSearch] = useState("");
   const [pendingMasterDelete, setPendingMasterDelete] = useState<MasterDataDeleteTarget | null>(
     null,
   );
-  const [pendingMasterAction, setPendingMasterAction] = useState<
-    | "gate"
-    | "resource-group"
-    | "aircraft"
-    | "assignment"
-    | "pilot"
-    | "pilot-toggle"
-    | "product"
-    | null
-  >(null);
   const [saleClosesAt, setSaleClosesAt] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [setupRequired, setSetupRequired] = useState(false);
@@ -2433,7 +2466,7 @@ function AdminView() {
   const [productDescription, setProductDescription] = useState("");
   const [productResourceGroupId, setProductResourceGroupId] = useState("");
   const [productGateId, setProductGateId] = useState("");
-  const [productPriceCents, setProductPriceCents] = useState(0);
+  const [productPriceInput, setProductPriceInput] = useState("0,00 €");
   const [productReferenceCapacity, setProductReferenceCapacity] = useState(1);
   const [productReferenceDuration, setProductReferenceDuration] = useState(20);
   const [productChildCompanion, setProductChildCompanion] = useState(false);
@@ -2476,6 +2509,46 @@ function AdminView() {
   const [factoryResetCommandId, setFactoryResetCommandId] = useState(() => crypto.randomUUID());
   const resourceGroups = board?.resourceGroups ?? [];
   const isAdministrator = board?.currentDeviceRole === "ADMIN";
+  const productPriceCents = parseEuroToCents(productPriceInput);
+
+  useEffect(() => {
+    if (!adminPinDialog && (!pendingMasterDelete || adminModeUnlocked)) return;
+    const frame = window.requestAnimationFrame(() => adminPinInputRef.current?.focus());
+    return () => window.cancelAnimationFrame(frame);
+  }, [adminModeUnlocked, adminPinDialog, pendingMasterDelete]);
+
+  useEffect(() => {
+    if (!adminModeUnlocked || !isAdministrator) return;
+    let timeout = window.setTimeout(() => undefined, 0);
+    const lockAfterInactivity = () => {
+      window.clearTimeout(timeout);
+      timeout = window.setTimeout(
+        () => {
+          setAdminModeUnlocked(false);
+          setAdminPin("");
+          setMessage("Bearbeitungsmodus wurde nach 15 Minuten Inaktivität gesperrt.");
+        },
+        15 * 60 * 1000,
+      );
+    };
+    const activityEvents = ["pointerdown", "keydown"] as const;
+    activityEvents.forEach((eventName) => {
+      window.addEventListener(eventName, lockAfterInactivity);
+    });
+    lockAfterInactivity();
+    return () => {
+      window.clearTimeout(timeout);
+      activityEvents.forEach((eventName) => {
+        window.removeEventListener(eventName, lockAfterInactivity);
+      });
+    };
+  }, [adminModeUnlocked, isAdministrator]);
+
+  useEffect(() => {
+    if (isAdministrator) return;
+    setAdminModeUnlocked(false);
+    setAdminPin("");
+  }, [isAdministrator]);
   const refreshHistory = useCallback(async () => {
     try {
       const timeZone = board?.event.timeZone ?? "Europe/Berlin";
@@ -2632,6 +2705,75 @@ function AdminView() {
     }
   }
 
+  function lockAdminMode(messageText = "Bearbeitungsmodus gesperrt.") {
+    setAdminModeUnlocked(false);
+    setAdminPin("");
+    setAdminPinDialog(null);
+    pendingAdminActionRef.current = null;
+    setMessage(messageText);
+  }
+
+  function closeAdminPinDialog() {
+    if (adminPinBusy) return;
+    setAdminPinDialog(null);
+    setAdminPinError(null);
+    setAdminPin("");
+    pendingAdminActionRef.current = null;
+  }
+
+  function requestAdminAction(action: () => Promise<void>) {
+    if (!isAdministrator) {
+      setMessage("Für diese Änderung wird ein Administrationsgerät benötigt.");
+      return;
+    }
+    if (adminModeUnlocked && adminPin.length >= 4) {
+      void action();
+      return;
+    }
+    pendingAdminActionRef.current = action;
+    setAdminPin("");
+    setAdminPinError(null);
+    setAdminPinDialog("action");
+  }
+
+  function requestAdminModeUnlock() {
+    if (!isAdministrator) {
+      setMessage("Der Bearbeitungsmodus ist nur auf einem Administrationsgerät verfügbar.");
+      return;
+    }
+    pendingAdminActionRef.current = null;
+    setAdminPin("");
+    setAdminPinError(null);
+    setAdminPinDialog("unlock");
+  }
+
+  async function confirmAdminPinDialog() {
+    if (!adminPinDialog || adminPinBusy || adminPin.length < 4) return;
+    setAdminPinBusy(true);
+    setAdminPinError(null);
+    try {
+      await verifyAdminPin(EVENT_ID, ADMIN_DEVICE_ID, deviceTokenFor(ADMIN_DEVICE_ID), adminPin);
+      if (adminPinDialog === "unlock") {
+        setAdminModeUnlocked(true);
+        setAdminPinDialog(null);
+        setMessage("Bearbeitungsmodus aktiv. Mehrere Änderungen können gespeichert werden.");
+        return;
+      }
+      const action = pendingAdminActionRef.current;
+      pendingAdminActionRef.current = null;
+      setAdminPinDialog(null);
+      if (action) await action();
+      setAdminPin("");
+    } catch (cause) {
+      setAdminPinError(
+        cause instanceof Error ? cause.message : "Administrator-PIN konnte nicht geprüft werden.",
+      );
+      window.requestAnimationFrame(() => adminPinInputRef.current?.select());
+    } finally {
+      setAdminPinBusy(false);
+    }
+  }
+
   async function setEventLifecycle(status: "PREPARATION" | "ACTIVE" | "CLOSED" | "ARCHIVED") {
     if (!board || adminPin.length < 4) return;
     try {
@@ -2648,7 +2790,7 @@ function AdminView() {
         deviceTokenFor(ADMIN_DEVICE_ID),
       );
       setMessage(`Veranstaltungsstatus auf ${status} gesetzt und protokolliert.`);
-      setAdminPin("");
+      if (!adminModeUnlocked) setAdminPin("");
       await refresh();
       await refreshEvents();
     } catch (cause) {
@@ -2691,7 +2833,7 @@ function AdminView() {
         await QRCode.toDataURL(url, { errorCorrectionLevel: "M", margin: 2, width: 320 }),
       );
       setMessage("Kopplung erstellt. QR-Code nur am vorgesehenen Gerät scannen.");
-      setAdminPin("");
+      if (!adminModeUnlocked) setAdminPin("");
       await refresh();
       await refreshDevices();
       await refreshHistory();
@@ -2732,7 +2874,7 @@ function AdminView() {
         deviceTokenFor(ADMIN_DEVICE_ID),
       );
       setMessage("Veranstaltungsparameter wurden protokolliert aktualisiert.");
-      setAdminPin("");
+      if (!adminModeUnlocked) setAdminPin("");
       await refresh();
       await refreshHistory();
     } catch (cause) {
@@ -2752,7 +2894,7 @@ function AdminView() {
     setProductDescription(entry?.publicDescription ?? "");
     setProductResourceGroupId(entry?.resourceGroupId ?? resourceGroups[0]?.id ?? "");
     setProductGateId(entry?.gateId ?? board?.gates.find((gate) => gate.active)?.id ?? "");
-    setProductPriceCents(entry?.priceCents ?? 0);
+    setProductPriceInput(formatEuroInput(entry?.priceCents ?? 0));
     setProductReferenceCapacity(entry?.referenceCapacity ?? 1);
     setProductReferenceDuration(entry?.referenceDurationMinutes ?? 20);
     setProductChildCompanion(entry?.childCompanionRequired ?? false);
@@ -2795,7 +2937,7 @@ function AdminView() {
         deviceTokenFor(ADMIN_DEVICE_ID),
       );
       setMessage("Gate-Stammdaten wurden protokolliert gespeichert.");
-      setAdminPin("");
+      if (!adminModeUnlocked) setAdminPin("");
       setMasterEditorOpen(false);
       setGateEditorId("new");
       setGateLabel("");
@@ -2812,6 +2954,7 @@ function AdminView() {
       !productResourceGroupId ||
       !productGateId ||
       productWeightClasses.length === 0 ||
+      productPriceCents === null ||
       adminPin.length < 4
     )
       return;
@@ -2846,7 +2989,7 @@ function AdminView() {
         deviceTokenFor(ADMIN_DEVICE_ID),
       );
       setMessage("Produktstammdaten wurden protokolliert gespeichert.");
-      setAdminPin("");
+      if (!adminModeUnlocked) setAdminPin("");
       selectProductForEditing("new");
       setMasterEditorOpen(false);
       await refresh();
@@ -2909,7 +3052,7 @@ function AdminView() {
         deviceTokenFor(ADMIN_DEVICE_ID),
       );
       setMessage("Ressourcengruppe wurde protokolliert gespeichert.");
-      setAdminPin("");
+      if (!adminModeUnlocked) setAdminPin("");
       selectResourceForEditing("new");
       setMasterEditorOpen(false);
       await refresh();
@@ -2955,7 +3098,7 @@ function AdminView() {
         deviceTokenFor(ADMIN_DEVICE_ID),
       );
       setMessage("Flugzeugstammdaten wurden protokolliert gespeichert.");
-      setAdminPin("");
+      if (!adminModeUnlocked) setAdminPin("");
       selectAircraftForEditing("new");
       setMasterEditorOpen(false);
       await refresh();
@@ -2992,7 +3135,7 @@ function AdminView() {
       setMessage(
         "Flugzeugzuordnung wurde historisiert geändert; Queue und Prognose werden neu berechnet.",
       );
-      setAdminPin("");
+      if (!adminModeUnlocked) setAdminPin("");
       setMasterEditorOpen(false);
       await refresh();
       await refreshHistory();
@@ -3019,7 +3162,7 @@ function AdminView() {
         deviceTokenFor(ADMIN_DEVICE_ID),
       );
       setMessage("Gerätekopplung wurde sofort widerrufen.");
-      setAdminPin("");
+      if (!adminModeUnlocked) setAdminPin("");
       await refresh();
       await refreshDevices();
       await refreshHistory();
@@ -3058,7 +3201,7 @@ function AdminView() {
         type === "TRIGGER_EMERGENCY" ? "Notfallmodus ausgelöst." : "Notfallmodus aufgehoben.",
       );
       setReason("");
-      setAdminPin("");
+      if (!adminModeUnlocked) setAdminPin("");
       await refresh();
       await refreshHistory();
     } catch (cause) {
@@ -3264,7 +3407,7 @@ function AdminView() {
         deviceTokenFor(ADMIN_DEVICE_ID),
       );
       setMessage("Organisatorische Tank-Erinnerungsschwelle wurde aktualisiert.");
-      setAdminPin("");
+      if (!adminModeUnlocked) setAdminPin("");
       await refresh();
       await refreshHistory();
     } catch (cause) {
@@ -3300,7 +3443,7 @@ function AdminView() {
         deviceTokenFor(ADMIN_DEVICE_ID),
       );
       setMessage("Anonymer operativer Pilotencode wurde aktualisiert.");
-      setAdminPin("");
+      if (!adminModeUnlocked) setAdminPin("");
       setPilotEditorId("new");
       setPilotCode("P-02");
       setPilotNote("");
@@ -3390,39 +3533,58 @@ function AdminView() {
       return;
     }
     if (!valid) return;
-    setAdminPin("");
-    setPendingMasterAction(action);
-  }
-
-  async function confirmMasterSave() {
-    const action = pendingMasterAction;
-    if (!action || adminPin.length < 4) return;
-    setPendingMasterAction(null);
-    if (action === "gate") await saveGate();
-    if (action === "resource-group") await saveResourceGroup();
-    if (action === "aircraft") await saveAircraft();
-    if (action === "assignment") await assignAircraft();
-    if (action === "product") await saveProduct();
-    if (action === "pilot") {
-      const existing = board?.pilots.find((pilot) => pilot.id === pilotEditorId);
-      await upsertPilot(
-        pilotEditorId === "new" ? crypto.randomUUID() : pilotEditorId,
-        pilotCode,
-        pilotNote,
-        existing?.active ?? true,
-      );
-    }
-    if (action === "pilot-toggle") {
-      const existing = board?.pilots.find((pilot) => pilot.id === pilotEditorId);
-      if (existing) {
+    requestAdminAction(async () => {
+      if (action === "gate") await saveGate();
+      if (action === "resource-group") await saveResourceGroup();
+      if (action === "aircraft") await saveAircraft();
+      if (action === "assignment") await assignAircraft();
+      if (action === "product") await saveProduct();
+      if (action === "pilot") {
+        const existing = board?.pilots.find((pilot) => pilot.id === pilotEditorId);
         await upsertPilot(
-          existing.id,
-          existing.operationalCode,
-          existing.operationalNote,
-          !existing.active,
+          pilotEditorId === "new" ? crypto.randomUUID() : pilotEditorId,
+          pilotCode,
+          pilotNote,
+          existing?.active ?? true,
         );
       }
+      if (action === "pilot-toggle") {
+        const existing = board?.pilots.find((pilot) => pilot.id === pilotEditorId);
+        if (existing) {
+          await upsertPilot(
+            existing.id,
+            existing.operationalCode,
+            existing.operationalNote,
+            !existing.active,
+          );
+        }
+      }
+    });
+  }
+
+  function requestProductSave() {
+    setMasterSubmitAttempted(true);
+    const invalidFieldId =
+      productName.trim().length < 2
+        ? "product-name"
+        : !/^[A-Z0-9-]{2,12}$/.test(productCode)
+          ? "product-code"
+          : productPriceCents === null
+            ? "product-price"
+            : !productResourceGroupId
+              ? "product-resource-group"
+              : !productGateId
+                ? "product-gate"
+                : productWeightClasses.length === 0
+                  ? "product-weight-capture"
+                  : productChildCompanion && !productWeightClasses.includes("CHILD")
+                    ? "product-child-companion"
+                    : null;
+    if (invalidFieldId) {
+      window.requestAnimationFrame(() => document.getElementById(invalidFieldId)?.focus());
+      return;
     }
+    requestMasterSave("product", true);
   }
 
   function openFactoryReset() {
@@ -3638,7 +3800,7 @@ function AdminView() {
     entityId: string,
     label: string,
   ) {
-    setAdminPin("");
+    if (!adminModeUnlocked) setAdminPin("");
     setPendingMasterDelete({
       entityType,
       entityId,
@@ -3677,7 +3839,7 @@ function AdminView() {
       setMessage(`${pendingMasterDelete.label} wurde gelöscht und die Löschung protokolliert.`);
       setPendingMasterDelete(null);
       setMasterEditorOpen(false);
-      setAdminPin("");
+      if (!adminModeUnlocked) setAdminPin("");
       await refresh();
       await refreshHistory();
     } catch (cause) {
@@ -3717,6 +3879,7 @@ function AdminView() {
       .toLocaleLowerCase("de-DE")
       .includes(normalizedMasterSearch),
   );
+  const productPositionChoices = productPositionOptions(board?.products ?? [], productEditorId);
   const masterDataSingularLabel: Record<MasterDataCategory, string> = {
     gates: "Gate",
     "resource-groups": "Ressourcengruppe",
@@ -3819,17 +3982,27 @@ function AdminView() {
             </section>
           ) : null}
           <section
-            className="admin-edit-context"
-            hidden={["overview", "master-data", "backup"].includes(adminArea)}
+            className={`admin-edit-context admin-mode-bar ${adminModeUnlocked ? "unlocked" : "locked"}`}
           >
             <div>
-              <strong>Änderungen bestätigen</strong>
+              <strong>
+                {adminModeUnlocked ? "Bearbeitungsmodus aktiv" : "Administration gesperrt"}
+              </strong>
               <span>
-                {adminArea === "operations"
-                  ? "Begründung und Administrator-PIN gelten für die nächste operative Änderung."
-                  : "Für normale Konfigurationsänderungen genügt die Administrator-PIN."}
+                {adminModeUnlocked
+                  ? "Mehrere Änderungen sind möglich. Jede Änderung wird weiterhin einzeln protokolliert."
+                  : "Änderungen fragen die PIN einzeln ab oder können für diese Arbeitssitzung entsperrt werden."}
               </span>
             </div>
+            {isAdministrator ? (
+              <button
+                className={adminModeUnlocked ? "secondary-action" : "primary-action"}
+                onClick={() => (adminModeUnlocked ? lockAdminMode() : requestAdminModeUnlock())}
+                type="button"
+              >
+                {adminModeUnlocked ? "Bearbeitungsmodus sperren" : "Bearbeitungsmodus entsperren"}
+              </button>
+            ) : null}
             {adminArea === "operations" ? (
               <label>
                 Begründung
@@ -3840,29 +4013,16 @@ function AdminView() {
                 />
               </label>
             ) : null}
-            {isAdministrator ? (
-              <label>
-                Administrator-PIN
-                <input
-                  autoComplete="current-password"
-                  type="password"
-                  value={adminPin}
-                  onChange={(event) => setAdminPin(event.target.value)}
-                />
-              </label>
-            ) : null}
             {adminArea === "operations" && reason.trim().length < 3 ? (
               <ValidationHint tone="error">
                 Für operative Änderungen muss eine Begründung mit mindestens 3 Zeichen eingetragen
                 werden.
               </ValidationHint>
-            ) : isAdministrator && adminPin.length < 4 ? (
-              <ValidationHint tone="error">
-                Für administrative Änderungen wird die Administrator-PIN benötigt.
-              </ValidationHint>
             ) : (
               <ValidationHint>
-                Die nächste Änderung kann bestätigt und protokolliert werden.
+                {adminModeUnlocked
+                  ? "Änderungen sind freigeschaltet und werden protokolliert."
+                  : "Beim Auslösen einer administrativen Änderung erscheint die PIN-Abfrage."}
               </ValidationHint>
             )}
           </section>
@@ -4117,8 +4277,8 @@ function AdminView() {
             ) : null}
             <button
               className="primary-action"
-              disabled={!isAdministrator || !operationsEndAt || adminPin.length < 4}
-              onClick={saveEventParameters}
+              disabled={!isAdministrator || !operationsEndAt}
+              onClick={() => requestAdminAction(saveEventParameters)}
               type="button"
             >
               Veranstaltungsparameter speichern
@@ -4161,11 +4321,9 @@ function AdminView() {
               <button
                 className="primary-action release-action"
                 disabled={
-                  !isAdministrator ||
-                  setupSteps.slice(0, -1).some((step) => !step.complete) ||
-                  adminPin.length < 4
+                  !isAdministrator || setupSteps.slice(0, -1).some((step) => !step.complete)
                 }
-                onClick={() => void setEventLifecycle("ACTIVE")}
+                onClick={() => requestAdminAction(() => setEventLifecycle("ACTIVE"))}
                 type="button"
               >
                 Veranstaltung aktivieren
@@ -4670,153 +4828,258 @@ function AdminView() {
               </fieldset>
               <fieldset hidden={masterDataCategory !== "products"}>
                 <legend>Produkt</legend>
-                <div className="parameter-grid">
-                  <label>
-                    Bezeichnung
-                    <input
-                      value={productName}
-                      onChange={(event) => setProductName(event.target.value)}
-                    />
-                  </label>
-                  <label>
-                    Kürzel
-                    <input
-                      value={productCode}
-                      maxLength={12}
-                      onChange={(event) => setProductCode(event.target.value.toUpperCase())}
-                    />
-                  </label>
-                  <label>
-                    Preis (Cent)
-                    <input
-                      type="number"
-                      min="0"
-                      value={productPriceCents}
-                      onChange={(event) => setProductPriceCents(Number(event.target.value))}
-                    />
-                  </label>
-                  <label>
-                    Ressourcengruppe
-                    <select
-                      value={productResourceGroupId}
-                      onChange={(event) => setProductResourceGroupId(event.target.value)}
-                    >
-                      <option value="">Bitte wählen</option>
-                      {resourceGroups.map((group) => (
-                        <option key={group.id} value={group.id}>
-                          {group.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    Gate
-                    <select
-                      value={productGateId}
-                      onChange={(event) => setProductGateId(event.target.value)}
-                    >
-                      <option value="">Bitte wählen</option>
-                      {board?.gates
-                        .filter((gate) => gate.active)
-                        .map((gate) => (
-                          <option key={gate.id} value={gate.id}>
-                            {gate.label}
+                <section className="product-editor-section">
+                  <h3>Allgemein</h3>
+                  <div className="parameter-grid">
+                    <label>
+                      <FieldLabel
+                        label="Bezeichnung"
+                        help="Interner und öffentlicher Name des Produkts."
+                      />
+                      <input
+                        id="product-name"
+                        value={productName}
+                        onChange={(event) => setProductName(event.target.value)}
+                      />
+                      {masterSubmitAttempted && productName.trim().length < 2 ? (
+                        <span className="field-error">Mindestens 2 Zeichen eingeben.</span>
+                      ) : null}
+                    </label>
+                    <label>
+                      <FieldLabel
+                        label="Kürzel"
+                        help="2–12 Großbuchstaben, Ziffern oder Bindestriche; Bestandteil der stabilen Fluggruppenkennung."
+                      />
+                      <input
+                        id="product-code"
+                        value={productCode}
+                        maxLength={12}
+                        onChange={(event) => setProductCode(event.target.value.toUpperCase())}
+                      />
+                      {masterSubmitAttempted && !/^[A-Z0-9-]{2,12}$/.test(productCode) ? (
+                        <span className="field-error">Zum Beispiel PAN20 oder KURZ-10.</span>
+                      ) : null}
+                    </label>
+                    <label>
+                      <FieldLabel
+                        label="Preis in €"
+                        help="Informatorischer Einzelpreis je Ticket. Das System ist keine elektronische Kasse."
+                      />
+                      <input
+                        id="product-price"
+                        inputMode="decimal"
+                        value={productPriceInput}
+                        onBlur={() => {
+                          const cents = parseEuroToCents(productPriceInput);
+                          if (cents !== null) setProductPriceInput(formatEuroInput(cents));
+                        }}
+                        onChange={(event) => setProductPriceInput(event.target.value)}
+                      />
+                      {masterSubmitAttempted && productPriceCents === null ? (
+                        <span className="field-error">
+                          Eurobetrag mit höchstens zwei Nachkommastellen eingeben.
+                        </span>
+                      ) : null}
+                    </label>
+                    <label className="product-description-field">
+                      <FieldLabel
+                        label="Öffentliche Beschreibung"
+                        help="Kurzer Text für Kasse und öffentliche Anzeigen."
+                      />
+                      <input
+                        value={productDescription}
+                        maxLength={240}
+                        onChange={(event) => setProductDescription(event.target.value)}
+                      />
+                    </label>
+                  </div>
+                </section>
+                <section className="product-editor-section">
+                  <h3>Planung</h3>
+                  <div className="parameter-grid">
+                    <label>
+                      <FieldLabel
+                        label="Ressourcengruppe"
+                        help="Ordnet das Produkt genau einer gemeinsamen operativen Queue und Kapazität zu."
+                      />
+                      <select
+                        id="product-resource-group"
+                        value={productResourceGroupId}
+                        onChange={(event) => setProductResourceGroupId(event.target.value)}
+                      >
+                        <option value="">Bitte wählen</option>
+                        {resourceGroups.map((group) => (
+                          <option key={group.id} value={group.id}>
+                            {group.name}
                           </option>
                         ))}
-                    </select>
-                  </label>
-                  <label>
-                    Referenzplätze
-                    <input
-                      type="number"
-                      min="1"
-                      max="100"
-                      value={productReferenceCapacity}
-                      onChange={(event) => setProductReferenceCapacity(Number(event.target.value))}
-                    />
-                  </label>
-                  <label>
-                    Flugdauer (Min.)
-                    <input
-                      type="number"
-                      min="1"
-                      max="600"
-                      value={productReferenceDuration}
-                      onChange={(event) => setProductReferenceDuration(Number(event.target.value))}
-                    />
-                  </label>
-                  <label>
-                    Sortierung
-                    <input
-                      type="number"
-                      min="0"
-                      value={productSortOrder}
-                      onChange={(event) => setProductSortOrder(Number(event.target.value))}
-                    />
-                  </label>
-                </div>
-                <label>
-                  Öffentliche Beschreibung
-                  <input
-                    value={productDescription}
-                    maxLength={240}
-                    onChange={(event) => setProductDescription(event.target.value)}
+                      </select>
+                      {masterSubmitAttempted && !productResourceGroupId ? (
+                        <span className="field-error">Eine Ressourcengruppe auswählen.</span>
+                      ) : null}
+                    </label>
+                    <label>
+                      <FieldLabel
+                        label="Gate"
+                        help="Veröffentlichter Treffpunkt beziehungsweise Abfertigungsort."
+                      />
+                      <select
+                        id="product-gate"
+                        value={productGateId}
+                        onChange={(event) => setProductGateId(event.target.value)}
+                      >
+                        <option value="">Bitte wählen</option>
+                        {board?.gates
+                          .filter((gate) => gate.active)
+                          .map((gate) => (
+                            <option key={gate.id} value={gate.id}>
+                              {gate.label}
+                            </option>
+                          ))}
+                      </select>
+                      {masterSubmitAttempted && !productGateId ? (
+                        <span className="field-error">Ein aktives Gate auswählen.</span>
+                      ) : null}
+                    </label>
+                    <label>
+                      <FieldLabel
+                        label="Referenzplätze"
+                        help="Ausgangswert für die Gruppenbildung; die konkrete Flugzeugkapazität bleibt maßgeblich."
+                      />
+                      <input
+                        type="number"
+                        min="1"
+                        max="100"
+                        value={productReferenceCapacity}
+                        onChange={(event) =>
+                          setProductReferenceCapacity(Number(event.target.value))
+                        }
+                      />
+                    </label>
+                    <label>
+                      <FieldLabel
+                        label="Referenzdauer"
+                        help="Planwert für den Kaltstart der Prognose, keine zugesagte Flugzeit."
+                      />
+                      <input
+                        type="number"
+                        min="1"
+                        max="600"
+                        value={productReferenceDuration}
+                        onChange={(event) =>
+                          setProductReferenceDuration(Number(event.target.value))
+                        }
+                      />
+                    </label>
+                    <label>
+                      <FieldLabel
+                        label="Position in Anzeigen"
+                        help="Legt nur die Reihenfolge in Kasse und Anzeigen fest. Queue und Priorität ändern sich dadurch nicht."
+                      />
+                      <select
+                        value={productSortOrder}
+                        onChange={(event) => setProductSortOrder(Number(event.target.value))}
+                      >
+                        {productPositionChoices.map((option) => (
+                          <option key={`${option.value}-${option.label}`} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                </section>
+                <section className="product-editor-section product-weight-section">
+                  <h3>Angaben beim Verkauf</h3>
+                  <FieldLabel
+                    label="Gewichtserfassung"
+                    help="Aktivierte Klassen werden an der Kasse je anonymem Ticket abgefragt. Es werden keine Namen erfasst."
                   />
-                </label>
-                <div className="weight-class-options">
-                  {(["NOT_CAPTURED", "CHILD", "NORMAL", "HEAVY", "INDIVIDUAL"] as const).map(
-                    (weightClass) => (
-                      <label key={weightClass}>
-                        <input
-                          type="checkbox"
-                          checked={productWeightClasses.includes(weightClass)}
-                          onChange={(event) =>
-                            setProductWeightClasses((current) =>
-                              event.target.checked
-                                ? [...new Set([...current, weightClass])]
-                                : current.filter((entry) => entry !== weightClass),
-                            )
-                          }
-                        />
-                        {weightClass}
-                      </label>
-                    ),
-                  )}
+                  <div className="weight-capture-mode" id="product-weight-capture">
+                    <label>
+                      <input
+                        checked={!weightCaptureEnabled(productWeightClasses)}
+                        name="product-weight-mode"
+                        onChange={() => {
+                          setProductWeightClasses(setWeightCaptureMode(false));
+                          setProductChildCompanion(false);
+                        }}
+                        type="radio"
+                      />
+                      Keine Gewichtserfassung
+                    </label>
+                    <label>
+                      <input
+                        checked={weightCaptureEnabled(productWeightClasses)}
+                        name="product-weight-mode"
+                        onChange={() => setProductWeightClasses(setWeightCaptureMode(true))}
+                        type="radio"
+                      />
+                      Gewichtsklassen erfassen
+                    </label>
+                  </div>
+                  {weightCaptureEnabled(productWeightClasses) ? (
+                    <div className="weight-class-options">
+                      {(
+                        [
+                          ["CHILD", "Kind"],
+                          ["NORMAL", "Standard"],
+                          ["HEAVY", "Schwer"],
+                          ["INDIVIDUAL", "Individuelles Gewicht"],
+                        ] as const
+                      ).map(([weightClass, label]) => (
+                        <label key={weightClass}>
+                          <input
+                            type="checkbox"
+                            checked={productWeightClasses.includes(weightClass)}
+                            onChange={(event) => {
+                              const checked = event.target.checked;
+                              setProductWeightClasses((current) =>
+                                toggleWeightClass(current, weightClass, checked),
+                              );
+                              if (weightClass === "CHILD" && !checked)
+                                setProductChildCompanion(false);
+                            }}
+                          />
+                          {label}
+                        </label>
+                      ))}
+                    </div>
+                  ) : null}
+                  {masterSubmitAttempted && productWeightClasses.length === 0 ? (
+                    <span className="field-error">Mindestens eine Gewichtsklasse auswählen.</span>
+                  ) : null}
+                  <label className="checkbox-label">
+                    <input
+                      id="product-child-companion"
+                      type="checkbox"
+                      checked={productChildCompanion}
+                      disabled={!productWeightClasses.includes("CHILD")}
+                      onChange={(event) => setProductChildCompanion(event.target.checked)}
+                    />{" "}
+                    Bei Kindern auf erforderliche Begleitung hinweisen
+                    <FieldLabel
+                      label="Begleithinweis"
+                      help="Zeigt bei einer Kinderbuchung ohne passende Begleitung einen organisatorischen Hinweis. Dies ist keine flugbetriebliche Freigabe."
+                    />
+                  </label>
+                  {!productWeightClasses.includes("CHILD") ? (
+                    <span className="field-help">Wird verfügbar, sobald „Kind“ aktiviert ist.</span>
+                  ) : null}
+                </section>
+                <div className="editor-actions product-editor-actions">
+                  <button onClick={() => setMasterEditorOpen(false)} type="button">
+                    Abbrechen
+                  </button>
+                  <button
+                    className="primary-action"
+                    disabled={!isAdministrator}
+                    onClick={requestProductSave}
+                    type="button"
+                  >
+                    Produkt speichern
+                  </button>
                 </div>
-                <label className="checkbox-label">
-                  <input
-                    type="checkbox"
-                    checked={productChildCompanion}
-                    onChange={(event) => setProductChildCompanion(event.target.checked)}
-                  />{" "}
-                  Begleitpflicht für Kinder
-                </label>
-                {masterSubmitAttempted &&
-                (productName.trim().length < 2 ||
-                  !/^[A-Z0-9-]{2,12}$/.test(productCode) ||
-                  !productResourceGroupId ||
-                  !productGateId) ? (
-                  <ValidationHint tone="error">
-                    Bezeichnung, gültiges Kürzel, Ressourcengruppe und Gate müssen vollständig sein.
-                  </ValidationHint>
-                ) : null}
-                <button
-                  className="primary-action"
-                  disabled={!isAdministrator}
-                  onClick={() =>
-                    requestMasterSave(
-                      "product",
-                      productName.trim().length >= 2 &&
-                        /^[A-Z0-9-]{2,12}$/.test(productCode) &&
-                        Boolean(productResourceGroupId) &&
-                        Boolean(productGateId) &&
-                        productWeightClasses.length > 0,
-                    )
-                  }
-                  type="button"
-                >
-                  Produkt speichern
-                </button>
                 {productEditorId !== "new" ? (
                   <div className="master-delete-zone">
                     <div>
@@ -5203,8 +5466,8 @@ function AdminView() {
             ) : (
               <button
                 className="danger-action"
-                disabled={!isAdministrator || reason.trim().length < 3 || adminPin.length < 4}
-                onClick={() => emergency("CLEAR_EMERGENCY")}
+                disabled={!isAdministrator || reason.trim().length < 3}
+                onClick={() => requestAdminAction(() => emergency("CLEAR_EMERGENCY"))}
                 type="button"
               >
                 Notfallmodus aufheben
@@ -5288,20 +5551,23 @@ function AdminView() {
                   </div>
                   <div className="secondary-actions">
                     <button
-                      disabled={!isAdministrator || reason.trim().length < 3 || adminPin.length < 4}
-                      onClick={() => configureProductSales(product, !product.saleEnabled)}
+                      disabled={!isAdministrator || reason.trim().length < 3}
+                      onClick={() =>
+                        requestAdminAction(() =>
+                          configureProductSales(product, !product.saleEnabled),
+                        )
+                      }
                       type="button"
                     >
                       {product.saleEnabled ? "Verkauf sperren" : "Verkauf freigeben"}
                     </button>
                     <button
-                      disabled={
-                        !isAdministrator ||
-                        reason.trim().length < 3 ||
-                        adminPin.length < 4 ||
-                        !saleClosesAt
+                      disabled={!isAdministrator || reason.trim().length < 3 || !saleClosesAt}
+                      onClick={() =>
+                        requestAdminAction(() =>
+                          configureProductSales(product, product.saleEnabled, true),
+                        )
                       }
-                      onClick={() => configureProductSales(product, product.saleEnabled, true)}
                       type="button"
                     >
                       Verkaufsschluss setzen
@@ -5393,8 +5659,10 @@ function AdminView() {
                       {aircraft.refuelPlanned ? "Vormerkung aufheben" : "Tanken vormerken"}
                     </button>
                     <button
-                      disabled={!isAdministrator || reason.trim().length < 3 || adminPin.length < 4}
-                      onClick={() => configureRefuelThreshold(aircraft.id)}
+                      disabled={!isAdministrator || reason.trim().length < 3}
+                      onClick={() =>
+                        requestAdminAction(() => configureRefuelThreshold(aircraft.id))
+                      }
                       type="button"
                     >
                       Schwelle {refuelThreshold} setzen
@@ -5470,11 +5738,12 @@ function AdminView() {
           </section>
           <section className="admin-section" hidden={adminArea !== "backup"}>
             <h2>Geräte ohne Helferkonten</h2>
-            <div className="admin-edit-context device-admin-context">
+            <div className="device-admin-context">
               <div>
                 <strong>Geräteänderung bestätigen</strong>
                 <span>
-                  PIN ist für Kopplungen, Begründung zusätzlich für Widerrufe erforderlich.
+                  Änderungen nutzen den Bearbeitungsmodus oder fragen die PIN direkt ab.
+                  Begründungen sind zusätzlich für Widerrufe erforderlich.
                 </span>
               </div>
               <label>
@@ -5483,15 +5752,6 @@ function AdminView() {
                   onChange={(event) => setReason(event.target.value)}
                   placeholder="Für einen Widerruf"
                   value={reason}
-                />
-              </label>
-              <label>
-                Administrator-PIN
-                <input
-                  autoComplete="current-password"
-                  onChange={(event) => setAdminPin(event.target.value)}
-                  type="password"
-                  value={adminPin}
                 />
               </label>
             </div>
@@ -5518,8 +5778,8 @@ function AdminView() {
                 </select>
               </label>
               <button
-                disabled={!isAdministrator || deviceLabel.trim().length < 2 || adminPin.length < 4}
-                onClick={pairDevice}
+                disabled={!isAdministrator || deviceLabel.trim().length < 2}
+                onClick={() => requestAdminAction(pairDevice)}
                 type="button"
               >
                 QR-Kopplung erzeugen
@@ -5552,8 +5812,8 @@ function AdminView() {
                   </time>
                   {device.active ? (
                     <button
-                      disabled={!isAdministrator || reason.trim().length < 3 || adminPin.length < 4}
-                      onClick={() => revokeDevice(device)}
+                      disabled={!isAdministrator || reason.trim().length < 3}
+                      onClick={() => requestAdminAction(() => revokeDevice(device))}
                       type="button"
                     >
                       Widerrufen
@@ -5908,22 +6168,38 @@ function AdminView() {
               </div>
             ) : null}
           </section>
-          {pendingMasterAction ? (
+          {adminPinDialog ? (
             <div className="modal-backdrop">
-              <section
-                aria-labelledby="master-confirmation-title"
+              <form
+                aria-labelledby="admin-pin-dialog-title"
                 aria-modal="true"
                 className="confirmation-dialog"
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") closeAdminPinDialog();
+                }}
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void confirmAdminPinDialog();
+                }}
                 role="dialog"
               >
                 <div className="drawer-heading">
                   <div>
-                    <h2 id="master-confirmation-title">Änderung bestätigen</h2>
-                    <p>Die Stammdatenänderung wird automatisch protokolliert.</p>
+                    <h2 id="admin-pin-dialog-title">
+                      {adminPinDialog === "unlock"
+                        ? "Bearbeitungsmodus entsperren"
+                        : "Änderung bestätigen"}
+                    </h2>
+                    <p>
+                      {adminPinDialog === "unlock"
+                        ? "Die PIN gilt nur in diesem Browser-Tab und wird nach 15 Minuten Inaktivität verworfen."
+                        : "Diese einzelne Änderung wird nach erfolgreicher PIN-Prüfung ausgeführt und protokolliert."}
+                    </p>
                   </div>
                   <button
                     aria-label="Bestätigung schließen"
-                    onClick={() => setPendingMasterAction(null)}
+                    disabled={adminPinBusy}
+                    onClick={closeAdminPinDialog}
                     type="button"
                   >
                     ×
@@ -5934,32 +6210,52 @@ function AdminView() {
                   <input
                     autoComplete="current-password"
                     onChange={(event) => setAdminPin(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        void confirmAdminPinDialog();
+                      }
+                    }}
+                    ref={adminPinInputRef}
                     type="password"
                     value={adminPin}
                   />
                 </label>
+                {adminPinError ? (
+                  <ValidationHint tone="error">{adminPinError}</ValidationHint>
+                ) : null}
                 <div className="dialog-actions">
-                  <button onClick={() => setPendingMasterAction(null)} type="button">
+                  <button disabled={adminPinBusy} onClick={closeAdminPinDialog} type="button">
                     Abbrechen
                   </button>
                   <button
                     className="primary-action"
-                    disabled={adminPin.length < 4}
-                    onClick={() => void confirmMasterSave()}
-                    type="button"
+                    disabled={adminPin.length < 4 || adminPinBusy}
+                    type="submit"
                   >
-                    Bestätigen und speichern
+                    {adminPinBusy
+                      ? "PIN wird geprüft …"
+                      : adminPinDialog === "unlock"
+                        ? "Entsperren"
+                        : "Bestätigen"}
                   </button>
                 </div>
-              </section>
+              </form>
             </div>
           ) : null}
           {pendingMasterDelete ? (
             <div className="modal-backdrop">
-              <section
+              <form
                 aria-labelledby="master-delete-title"
                 aria-modal="true"
                 className="confirmation-dialog master-delete-dialog"
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") setPendingMasterDelete(null);
+                }}
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void confirmMasterDelete();
+                }}
                 role="dialog"
               >
                 <div className="drawer-heading">
@@ -5997,15 +6293,23 @@ function AdminView() {
                     entfernt werden. Der Server prüft dies vor der Löschung erneut.
                   </p>
                 )}
-                <label>
-                  Administrator-PIN
-                  <input
-                    autoComplete="current-password"
-                    onChange={(event) => setAdminPin(event.target.value)}
-                    type="password"
-                    value={adminPin}
-                  />
-                </label>
+                {!adminModeUnlocked ? (
+                  <label>
+                    Administrator-PIN
+                    <input
+                      autoComplete="current-password"
+                      onChange={(event) => setAdminPin(event.target.value)}
+                      ref={adminPinInputRef}
+                      type="password"
+                      value={adminPin}
+                    />
+                  </label>
+                ) : (
+                  <ValidationHint>
+                    Bearbeitungsmodus aktiv. Die Löschung benötigt weiterhin diese ausdrückliche
+                    Bestätigung.
+                  </ValidationHint>
+                )}
                 <div className="dialog-actions">
                   <button onClick={() => setPendingMasterDelete(null)} type="button">
                     Abbrechen
@@ -6017,13 +6321,12 @@ function AdminView() {
                       pendingMasterDelete.blockers.length > 0 ||
                       adminPin.length < 4
                     }
-                    onClick={() => void confirmMasterDelete()}
-                    type="button"
+                    type="submit"
                   >
                     Endgültig löschen
                   </button>
                 </div>
-              </section>
+              </form>
             </div>
           ) : null}
           {factoryResetOpen ? (

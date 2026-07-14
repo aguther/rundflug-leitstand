@@ -1,5 +1,6 @@
 import { APP_NAME, REQUIREMENTS_VERSION } from "@rundflug/config";
 import {
+  adminPinVerificationSchema,
   bootstrapRequestSchema,
   cloneEventRequestSchema,
   type FactoryResetResponse,
@@ -246,6 +247,34 @@ app.get("/api/device/context", async (context) => {
     );
   }
   return context.json({ eventId: device.operation_day_id, role: device.role });
+});
+
+app.post("/api/admin/events/:eventId/verify-pin", async (context) => {
+  const parsed = adminPinVerificationSchema.safeParse(await context.req.json().catch(() => null));
+  if (!parsed.success) {
+    return context.json(
+      { error: { code: "INVALID_ADMIN_PIN", message: "Administrator-PIN ist unvollständig." } },
+      400,
+    );
+  }
+  const eventId = context.req.param("eventId");
+  const authorized = await authorizeDevice(
+    context.env,
+    eventId,
+    context.req.header("x-device-id"),
+    context.req.header("x-device-token"),
+  );
+  if (
+    authorized?.role !== "ADMIN" ||
+    !(await verifyCredential(parsed.data.adminPin, context.env.ADMIN_PIN_HASH))
+  ) {
+    return context.json(
+      { error: { code: "ADMIN_REQUIRED", message: "Administrator-PIN ist nicht korrekt." } },
+      403,
+      { "cache-control": "no-store" },
+    );
+  }
+  return context.json({ valid: true as const }, 200, { "cache-control": "no-store" });
 });
 
 app.post("/api/admin/events/:eventId/factory-reset", async (context) => {

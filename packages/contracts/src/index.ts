@@ -630,6 +630,11 @@ export const bootstrapRequestSchema = z.object({
 });
 export type BootstrapRequest = z.infer<typeof bootstrapRequestSchema>;
 
+export const adminPinVerificationSchema = z.object({
+  adminPin: z.string().min(4).max(32),
+});
+export type AdminPinVerification = z.infer<typeof adminPinVerificationSchema>;
+
 export const ticketSearchResultSchema = z.object({
   ticketGroupId: z.string(),
   productId: z.string(),

@@ -256,6 +256,187 @@
   border-color: var(--ui-border);
   box-shadow: var(--ui-shadow);
 }
+
+.admin-mode-bar {
+  grid-template-columns: minmax(240px, 1fr) auto minmax(190px, 0.65fr);
+  align-items: center;
+  border-left: 3px solid var(--ui-border);
+}
+.admin-mode-bar.unlocked {
+  border-left-color: var(--ui-success-text);
+  background: var(--ui-success-soft);
+}
+.admin-mode-bar > button {
+  min-height: 42px;
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-weight: 760;
+  white-space: nowrap;
+}
+.admin-mode-bar .secondary-action {
+  color: var(--ui-text);
+  border: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+}
+.device-admin-context {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) minmax(220px, 0.7fr);
+  align-items: end;
+  gap: 14px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--ui-border);
+}
+.device-admin-context > div {
+  display: grid;
+  gap: 4px;
+}
+.device-admin-context span {
+  color: var(--ui-muted);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+.device-admin-context label {
+  display: grid;
+  gap: 5px;
+}
+.product-editor-section {
+  display: grid;
+  gap: 13px;
+  padding: 4px 0 18px;
+  border-bottom: 1px solid var(--ui-border);
+}
+.master-data-drawer .master-data-columns,
+.master-data-drawer fieldset {
+  width: 100%;
+  min-width: 0;
+}
+.master-data-drawer fieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.product-editor-section label,
+.product-editor-section input,
+.product-editor-section select {
+  min-width: 0;
+}
+.product-editor-section input,
+.product-editor-section select {
+  width: 100%;
+}
+.product-editor-section + .product-editor-section {
+  padding-top: 18px;
+}
+.product-editor-section h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--ui-text);
+  font-size: 0.92rem;
+}
+.product-editor-section .parameter-grid {
+  grid-template-columns: 1fr 1fr;
+}
+.product-description-field {
+  grid-column: 1 / -1;
+}
+.field-label-with-info {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.field-info {
+  position: relative;
+  display: inline-grid;
+  font-weight: 500;
+}
+.field-info summary {
+  width: 19px;
+  height: 19px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--ui-border);
+  border-radius: 50%;
+  color: var(--ui-muted);
+  background: var(--ui-surface-subtle);
+  font-size: 0.72rem;
+  font-weight: 850;
+  line-height: 1;
+  list-style: none;
+  cursor: help;
+}
+.field-info summary::-webkit-details-marker {
+  display: none;
+}
+.field-info summary:hover,
+.field-info summary:focus-visible {
+  color: var(--ui-accent);
+  border-color: var(--ui-accent);
+}
+.field-info[open] > span {
+  position: absolute;
+  z-index: 5;
+  top: 26px;
+  left: -8px;
+  width: min(280px, calc(100vw - 48px));
+  padding: 10px 12px;
+  border: 1px solid var(--ui-border);
+  border-radius: 7px;
+  color: var(--ui-text);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow);
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.45;
+}
+.field-error {
+  color: var(--ui-danger);
+  font-size: 0.76rem;
+  font-weight: 650;
+  line-height: 1.35;
+}
+.weight-capture-mode {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.weight-capture-mode label,
+.product-weight-section .weight-class-options label {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: 6px;
+  background: var(--ui-surface-subtle);
+}
+.weight-capture-mode input,
+.product-weight-section .weight-class-options input {
+  width: 18px;
+  min-height: 18px;
+  margin: 0;
+}
+.product-weight-section .checkbox-label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+}
+.product-weight-section .checkbox-label input {
+  width: 18px;
+}
+.product-editor-actions {
+  position: sticky;
+  bottom: -24px;
+  z-index: 3;
+  margin: 0 -24px -24px;
+  padding: 14px 24px;
+  border-top: 1px solid var(--ui-border);
+  background: color-mix(in srgb, var(--ui-surface) 94%, transparent);
+  backdrop-filter: blur(8px);
+}
 .master-data-drawer fieldset,
 .master-data-drawer label {
   color: var(--ui-text);
@@ -1227,9 +1408,25 @@ footer {
     inset: 12vh 0 66px;
     width: 100%;
     height: auto;
+    padding: 18px 14px;
     border-top: 1px solid var(--ui-border);
     border-left: 0;
     border-radius: 16px 16px 0 0;
+  }
+  .admin-mode-bar,
+  .device-admin-context,
+  .product-editor-section .parameter-grid,
+  .weight-capture-mode {
+    grid-template-columns: 1fr;
+  }
+  .admin-mode-bar > button {
+    justify-self: start;
+    white-space: normal;
+  }
+  .product-editor-actions {
+    bottom: -18px;
+    margin: 0;
+    padding: 12px 0 18px;
   }
   .master-delete-zone {
     align-items: flex-start;
@@ -1595,6 +1792,23 @@ p {
   margin-top: 16px;
   padding: 12px;
   border: 1px solid #cbd5e1;
+}
+
+.child-companion-warning {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.85rem 1rem;
+  color: var(--ui-warning-text);
+  border: 1px solid color-mix(in srgb, var(--ui-warning) 62%, var(--ui-border));
+  border-left-width: 0.3rem;
+  border-radius: 0.55rem;
+  background: var(--ui-warning-soft);
+}
+
+.child-companion-warning strong,
+.child-companion-warning span,
+.child-companion-warning small {
+  color: inherit;
 }
 .payment-information label {
   display: grid;
@@ -3085,7 +3299,7 @@ p {
   position: fixed;
   z-index: 40;
   inset: 0 0 0 auto;
-  width: min(470px, 100vw);
+  width: min(520px, 100vw);
   height: 100dvh;
   align-content: start;
   overflow-y: auto;
@@ -3348,6 +3562,21 @@ p {
   .master-data-editor fieldset,
   .compact-editor-grid {
     grid-template-columns: 1fr;
+  }
+  .admin-mode-bar,
+  .device-admin-context,
+  .product-editor-section .parameter-grid,
+  .weight-capture-mode {
+    grid-template-columns: 1fr;
+  }
+  .admin-mode-bar > button {
+    justify-self: start;
+    white-space: normal;
+  }
+  .product-editor-actions {
+    bottom: -18px;
+    margin: 0 -14px -18px;
+    padding: 12px 14px;
   }
   .admin-edit-context > div:first-child,
   .admin-edit-context .admin-validation,

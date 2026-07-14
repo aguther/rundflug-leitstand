@@ -75,6 +75,27 @@ export async function getDeviceContext(
   return { eventId: body.eventId, role: body.role };
 }
 
+export async function verifyAdminPin(
+  eventId: string,
+  deviceId: string,
+  deviceToken: string,
+  adminPin: string,
+): Promise<void> {
+  const response = await fetch(`/api/admin/events/${encodeURIComponent(eventId)}/verify-pin`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-device-id": deviceId,
+      "x-device-token": deviceToken,
+    },
+    body: JSON.stringify({ adminPin }),
+  });
+  if (!response.ok) {
+    const body = (await response.json()) as { error?: { message?: string } };
+    throw new Error(body.error?.message ?? "Administrator-PIN konnte nicht geprüft werden.");
+  }
+}
+
 export async function searchTickets(
   eventId: string,
   deviceId: string,
