@@ -115,3 +115,16 @@ keine personenbezogenen Daten.
 Nach einem erfolgreichen Reset löscht der Browser Geräteschlüssel und Offline-Snapshots und wechselt
 zu `/setup`. Für die neue Ersteinrichtung werden wieder der serverseitig konfigurierte Setup-Code und
 die Administrator-PIN benötigt.
+
+## Gestörte Administrationsgerätebindung
+
+Zeigt die Administration `Betriebsdaten nicht verfügbar (403)`, ist der Browser nicht als aktuelles
+Administrationsgerät bestätigt. Die Seite blendet deshalb weder Reset noch den Hinweis zum
+Bearbeitungsmodus aus: Unter **Sicherung & Reset** bleiben alle Stufen sichtbar, ihre Aktionen aber
+bis zur Bestätigung gesperrt. **Gerätebindung erneut prüfen** startet die Prüfung erneut.
+
+Bei einem mit einer älteren Version angelegten sicheren Neustart kann die Anwendung einen noch lokal
+vorhandenen anonymen Admin-Gerätetoken automatisch der neuen Geräte-ID zuordnen. Der Token wird nur
+an denselben Worker gesendet, nie angezeigt oder geloggt und erst nach bestätigter Admin-Rolle
+übernommen. Fehlt der Token vollständig, muss das Gerät über ein anderes Administrationsgerät neu
+gekoppelt werden; die Administrator-PIN allein ersetzt keine Geräteberechtigung.
