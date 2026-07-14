@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { assertOperationalConnection, factoryReset, getDeviceContext } from "./api";
+import { assertOperationalConnection, factoryReset, getDeviceContext, verifyAdminPin } from "./api";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -74,5 +74,33 @@ describe("factory reset transport", () => {
       }),
     );
     expect(fetchMock.mock.calls[0]?.[0]).not.toContain("synthetic-token");
+  });
+});
+
+describe("administrator edit mode transport", () => {
+  it("verifies the PIN with paired-device authentication and no URL credentials", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ valid: true }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      verifyAdminPin("synthetic-event", "synthetic-admin", "synthetic-token", "0000"),
+    ).resolves.toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/admin/events/synthetic-event/verify-pin",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          "x-device-id": "synthetic-admin",
+          "x-device-token": "synthetic-token",
+        }),
+        body: JSON.stringify({ adminPin: "0000" }),
+      }),
+    );
+    expect(fetchMock.mock.calls[0]?.[0]).not.toContain("0000");
   });
 });
