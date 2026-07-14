@@ -18,8 +18,9 @@ Die aktuelle Produktmaske bildet den technischen Vertrag zu direkt ab:
   aber nicht in der Validierung. Dadurch wirkt die Produktanlage funktionslos.
 - Die PIN-Bestätigung ist weder als Formular mit Enter-Aktion umgesetzt noch erhält das PIN-Feld
   automatisch den Fokus.
-- Für den vollständigen Produkt-Speicherweg fehlt ein Worker-Integrationstest; der reine
-  Contract-Test belegt noch keine erfolgreiche Persistenz.
+- Der Worker-/D1-Speicherweg funktioniert nachweislich; der Integrationstest deckt Anlage,
+  Änderung, Audit, ungültige Referenzen, doppelte Kürzel und stale writes ab. Der gemeldete
+  Bedienfehler liegt damit in der aktuellen Oberfläche und ihrer unklaren Validierung.
 
 ## Zielbild
 
@@ -118,8 +119,9 @@ maximal zwei kurze Sätze lang und vollständig per Tastatur sowie Screenreader 
   zugeordnet zurück.
 - Ein erfolgreicher Speichervorgang schließt den Editor, aktualisiert die Liste und zeigt eine kurze
   Bestätigung mit dem Produktnamen.
-- Ein Integrationstest weist Anlage, Änderung, Audit, Idempotenz, stale write, ungültige Referenz
-  und doppeltes Kürzel nach.
+- Der Integrationstest weist Anlage, Änderung, Audit, stale write, ungültige Referenz, doppeltes
+  Kürzel und widersprüchliche Gewichtskonfigurationen nach; die allgemeine Kommando-Pipeline deckt
+  zusätzlich Idempotenz ab.
 
 ## Admin-Bearbeitungsmodus
 
