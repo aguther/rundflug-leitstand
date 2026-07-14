@@ -492,6 +492,30 @@ describe("commandEnvelopeSchema", () => {
     expect(parsed.type).toBe("SET_TICKET_ATTENDANCE");
   });
 
+  it("keeps no-show and incomplete-attendance decisions anonymous and explicit", () => {
+    const noShow = commandEnvelopeSchema.parse({
+      commandId: "00e971df-23d5-4d28-9107-92b447416291",
+      eventId: "demo-2026",
+      deviceId: "flight-line-tablet-1",
+      expectedVersion: 10,
+      issuedAt: "2026-07-11T12:10:00.000Z",
+      type: "MARK_TICKET_NO_SHOW",
+      payload: { ticketId: "internal-ticket-id", reason: "Frist abgelaufen" },
+    });
+    const decision = commandEnvelopeSchema.parse({
+      commandId: "00e971df-23d5-4d28-9107-92b447416292",
+      eventId: "demo-2026",
+      deviceId: "flight-line-tablet-1",
+      expectedVersion: 11,
+      issuedAt: "2026-07-11T12:11:00.000Z",
+      type: "CONFIRM_ATTENDANCE_DECISION",
+      payload: { rotationId: "rotation-id", decision: "LEAVE_SEAT_EMPTY" },
+    });
+    expect(noShow.type).toBe("MARK_TICKET_NO_SHOW");
+    expect(decision.type).toBe("CONFIRM_ATTENDANCE_DECISION");
+    expect(JSON.stringify([noShow, decision])).not.toMatch(/name|phone|telefon/i);
+  });
+
   it("validates configurable event parameters without guest data", () => {
     const parsed = commandEnvelopeSchema.parse({
       commandId: "00e971df-23d5-4d28-9107-92b447416287",

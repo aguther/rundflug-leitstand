@@ -5,6 +5,7 @@ import {
   assertRoleMayExecute,
   assertSaleAllowed,
   assertSingleActiveResourceGroup,
+  assertTicketNoShowAllowed,
   DomainRuleError,
   transitionAircraft,
   transitionRotation,
@@ -171,6 +172,7 @@ describe("sale guard", () => {
 
   it("allows usable rotation capacity changes only for operational roles", () => {
     expect(() => assertRoleMayExecute("FLIGHT_LINE", "SET_ROTATION_CAPACITY")).not.toThrow();
+    expect(() => assertRoleMayExecute("FLIGHT_LINE_LEAD", "SET_ROTATION_CAPACITY")).not.toThrow();
     expect(() => assertRoleMayExecute("ADMIN", "SET_ROTATION_CAPACITY")).not.toThrow();
     expect(() => assertRoleMayExecute("CASHIER", "SET_ROTATION_CAPACITY")).toThrowError(
       /darf SET_ROTATION_CAPACITY nicht/,
@@ -251,6 +253,47 @@ describe("attendance authorization", () => {
     expect(() => assertRoleMayExecute("CASHIER", "SET_TICKET_ATTENDANCE")).toThrowError(
       /darf SET_TICKET_ATTENDANCE nicht/,
     );
+  });
+
+  it("allows only operational flight-line roles to resolve attendance exceptions", () => {
+    expect(() => assertRoleMayExecute("FLIGHT_LINE", "MARK_TICKET_NO_SHOW")).not.toThrow();
+    expect(() =>
+      assertRoleMayExecute("FLIGHT_LINE_LEAD", "CONFIRM_ATTENDANCE_DECISION"),
+    ).not.toThrow();
+    expect(() => assertRoleMayExecute("CASHIER", "MARK_TICKET_NO_SHOW")).toThrow();
+    expect(() => assertRoleMayExecute("DISPLAY", "CONFIRM_ATTENDANCE_DECISION")).toThrow();
+  });
+});
+
+describe("anonymous no-show deadline", () => {
+  it("allows only a missing called ticket after the configured deadline", () => {
+    expect(() =>
+      assertTicketNoShowAllowed({
+        rotationState: "CALLED",
+        calledAt: "2026-07-11T10:00:00.000Z",
+        attendanceStatus: "NOT_CHECKED_IN",
+        noShowAfterMinutes: 10,
+        now: "2026-07-11T10:10:00.000Z",
+      }),
+    ).not.toThrow();
+    expect(() =>
+      assertTicketNoShowAllowed({
+        rotationState: "CALLED",
+        calledAt: "2026-07-11T10:00:00.000Z",
+        attendanceStatus: "NOT_CHECKED_IN",
+        noShowAfterMinutes: 10,
+        now: "2026-07-11T10:09:59.999Z",
+      }),
+    ).toThrowError(/Frist/);
+    expect(() =>
+      assertTicketNoShowAllowed({
+        rotationState: "CALLED",
+        calledAt: "2026-07-11T10:00:00.000Z",
+        attendanceStatus: "CHECKED_IN",
+        noShowAfterMinutes: 10,
+        now: "2026-07-11T10:11:00.000Z",
+      }),
+    ).toThrowError(/anwesend/);
   });
 });
 

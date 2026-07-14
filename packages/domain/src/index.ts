@@ -80,6 +80,33 @@ export function assertGroupIsNotAutomaticallySplit(input: {
   }
 }
 
+export function assertTicketNoShowAllowed(input: {
+  rotationState: RotationState;
+  calledAt: string | null;
+  attendanceStatus: "NOT_CHECKED_IN" | "CHECKED_IN";
+  noShowAfterMinutes: number;
+  now: string;
+}): void {
+  if (input.rotationState !== "CALLED" || !input.calledAt) {
+    throw new DomainRuleError(
+      "TICKET_NO_SHOW_NOT_CALLED",
+      "No-Show ist nur für aufgerufene Tickets zulässig.",
+    );
+  }
+  if (input.attendanceStatus === "CHECKED_IN") {
+    throw new DomainRuleError(
+      "TICKET_PRESENT",
+      "Ein als anwesend bestätigtes Ticket kann nicht als No-Show markiert werden.",
+    );
+  }
+  if (Date.parse(input.now) - Date.parse(input.calledAt) < input.noShowAfterMinutes * 60_000) {
+    throw new DomainRuleError(
+      "NO_SHOW_DEADLINE_NOT_REACHED",
+      "Die konfigurierte No-Show-Frist ist noch nicht erreicht.",
+    );
+  }
+}
+
 export type RotationState = "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
 
 const allowedRotationTransitions: Readonly<Record<RotationState, readonly RotationState[]>> = {
@@ -137,6 +164,8 @@ export type OperationalCommandType =
   | "REVOKE_CALL"
   | "ABORT_ROTATION"
   | "SET_TICKET_ATTENDANCE"
+  | "MARK_TICKET_NO_SHOW"
+  | "CONFIRM_ATTENDANCE_DECISION"
   | "CONFIGURE_EVENT_PARAMETERS"
   | "UPSERT_GATE"
   | "UPSERT_PRODUCT"
@@ -178,6 +207,8 @@ const commandRoles: Readonly<Record<OperationalCommandType, readonly DeviceRole[
   REVOKE_CALL: ["FLIGHT_LINE", "FLIGHT_LINE_LEAD", "ADMIN"],
   ABORT_ROTATION: ["FLIGHT_LINE", "FLIGHT_LINE_LEAD", "ADMIN"],
   SET_TICKET_ATTENDANCE: ["FLIGHT_LINE", "FLIGHT_LINE_LEAD", "ADMIN"],
+  MARK_TICKET_NO_SHOW: ["FLIGHT_LINE", "FLIGHT_LINE_LEAD", "ADMIN"],
+  CONFIRM_ATTENDANCE_DECISION: ["FLIGHT_LINE", "FLIGHT_LINE_LEAD", "ADMIN"],
   CONFIGURE_EVENT_PARAMETERS: ["ADMIN"],
   UPSERT_GATE: ["ADMIN"],
   UPSERT_PRODUCT: ["ADMIN"],

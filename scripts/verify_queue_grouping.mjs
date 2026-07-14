@@ -322,10 +322,71 @@ try {
   ) {
     throw new Error("Bestätigte manuelle Nachbesetzung wurde nicht vollständig protokolliert.");
   }
-  const startedTarget = await command(
+  const presentTicketId = manuallyFilledTarget.tickets[0]?.id;
+  const missingTicketId = manuallyFilledTarget.tickets[1]?.id;
+  if (!presentTicketId || !missingTicketId) {
+    throw new Error("Synthetische Anwesenheitstickets fehlen.");
+  }
+  const checkedIn = await command(
     "flight-line-tablet-1",
     tokens.flightLine,
     movedAfterCall.event.version,
+    "SET_TICKET_ATTENDANCE",
+    { ticketId: presentTicketId, checkedIn: true },
+  );
+  const attendanceDecisionId = randomUUID();
+  const attendanceDecision = await command(
+    "flight-line-tablet-1",
+    tokens.flightLine,
+    checkedIn.event.version,
+    "CONFIRM_ATTENDANCE_DECISION",
+    { rotationId: first.aggregate.relatedRotationId, decision: "LEAVE_SEAT_EMPTY" },
+    200,
+    attendanceDecisionId,
+  );
+  const duplicateAttendanceDecision = await command(
+    "flight-line-tablet-1",
+    tokens.flightLine,
+    checkedIn.event.version,
+    "CONFIRM_ATTENDANCE_DECISION",
+    { rotationId: first.aggregate.relatedRotationId, decision: "LEAVE_SEAT_EMPTY" },
+    200,
+    attendanceDecisionId,
+  );
+  const conflictingAttendanceDecision = await command(
+    "flight-line-tablet-1",
+    tokens.flightLine,
+    attendanceDecision.event.version,
+    "CONFIRM_ATTENDANCE_DECISION",
+    { rotationId: first.aggregate.relatedRotationId, decision: "FLY_WITH_PRESENT" },
+    409,
+  );
+  const earlyNoShow = await command(
+    "flight-line-tablet-1",
+    tokens.flightLine,
+    attendanceDecision.event.version,
+    "MARK_TICKET_NO_SHOW",
+    { ticketId: missingTicketId, reason: "Synthetischer Fristtest" },
+    409,
+  );
+  const attendanceHistory = await history("ROTATION", first.aggregate.relatedRotationId);
+  const attendanceAudit = attendanceHistory.entries.find(
+    (entry) => entry.eventType === "ATTENDANCE_EMPTY_SEAT_CONFIRMED",
+  );
+  if (
+    attendanceAudit?.payload.presentCount !== 1 ||
+    attendanceAudit.payload.missingCount !== 3 ||
+    attendanceAudit.payload.automaticReplacement !== false ||
+    duplicateAttendanceDecision.duplicate !== true ||
+    conflictingAttendanceDecision.error?.code !== "ATTENDANCE_DECISION_ALREADY_CONFIRMED" ||
+    earlyNoShow.error?.code !== "NO_SHOW_DEADLINE_NOT_REACHED"
+  ) {
+    throw new Error("Anwesenheitsentscheidung oder No-Show-Frist wurde nicht korrekt auditiert.");
+  }
+  const startedTarget = await command(
+    "flight-line-tablet-1",
+    tokens.flightLine,
+    attendanceDecision.event.version,
     "MARK_IN_FLIGHT",
     { rotationId: first.aggregate.relatedRotationId },
   );
@@ -533,7 +594,17 @@ try {
   console.log(
     JSON.stringify({
       ok: true,
-      requirements: ["F-SLT-010", "F-SLT-020", "F-SLT-030", "F-SLT-100"],
+      requirements: [
+        "F-SLT-010",
+        "F-SLT-020",
+        "F-SLT-030",
+        "F-SLT-040",
+        "F-SLT-050",
+        "F-SLT-060",
+        "F-SLT-100",
+        "F-BRD-080",
+        "F-BRD-085",
+      ],
       packedTicketCount: packed.ticketCount,
       remainingTicketsAfterPartialCancellation: protectedRotation.ticketCount,
       stableCommunicationLabel: firstMatch.communicationLabel,
@@ -547,6 +618,10 @@ try {
       manualMoveCapacityProtected: true,
       manualMoveIdempotent: true,
       manualMoveStaleWriteRejected: true,
+      attendanceDecisionAudited: true,
+      attendanceDecisionIdempotent: true,
+      conflictingAttendanceDecisionRejected: true,
+      earlyNoShowRejected: true,
       oversizeSplitRequiresConfirmation: true,
       oversizeSplitSlotSizes: splitRotations.map((rotation) => rotation.ticketCount),
       oversizeSplitCommunicationLabels: splitMatch.communicationLabels,
