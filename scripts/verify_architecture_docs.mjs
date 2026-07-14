@@ -47,6 +47,32 @@ if (missingMaintainability.length > 0) {
   throw new Error(`Wartbarkeitsdokumentation unvollständig: ${missingMaintainability.join(", ")}`);
 }
 
+const privacyAcceptancePath = new URL(
+  "../docs/operations/cloudflare-data-protection-acceptance-v1.md",
+  import.meta.url,
+);
+const privacyAcceptance = await readFile(privacyAcceptancePath, "utf8");
+const privacyAcceptanceEvidence = [
+  "Q-DSG-040",
+  "Regional Services",
+  "Customer Metadata Boundary",
+  "Worker-Subrequests",
+  "Cloudflare Customer DPA",
+  "Subprozessor",
+  "Verzeichnis der Verarbeitungstätigkeiten",
+  "Strenge EU-Anforderung beibehalten",
+  "Anforderung formal ändern",
+  "Betriebsplattform ändern",
+];
+const missingPrivacyAcceptance = privacyAcceptanceEvidence.filter(
+  (entry) => !privacyAcceptance.includes(entry),
+);
+if (missingPrivacyAcceptance.length > 0) {
+  throw new Error(
+    `Cloudflare-Datenschutzabnahme unvollständig: ${missingPrivacyAcceptance.join(", ")}`,
+  );
+}
+
 console.log(
-  "OK: Q-WAR-010/020/040/050 Fachmodell, Grenzen, Konfiguration und Prognose dokumentiert",
+  "OK: Q-WAR-010/020/040/050 und Q-DSG-040 Betriebs-, Fachmodell- und Konfigurationsnachweise dokumentiert",
 );

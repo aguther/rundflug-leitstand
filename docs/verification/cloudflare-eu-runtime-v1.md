@@ -43,5 +43,13 @@ Q-DSG-040 bleibt offen, bis Auftragsverarbeitungsvertrag, Betreiberangaben und E
 Verzeichnis der Verarbeitungstätigkeiten vom Auftraggeber geprüft beziehungsweise bereitgestellt
 sind. Der technische EU-Nachweis ersetzt diese Dokumente nicht.
 
+Die offizielle Prüfung vom 14. Juli 2026 hat zusätzlich bestätigt, dass die aktuelle
+`workers.dev`-Bereitstellung die strenge OQ-06-Auslegung nicht vollständig erfüllt: EU-beschränkte
+TLS-Terminierung und Worker-Ausführung benötigen Regional Services auf einer Custom Domain sowie
+für EU-Metadaten eine gesonderte Customer Metadata Boundary. Diese Data-Localization-Funktionen sind
+ein Enterprise-Zusatz. Regional Services gilt außerdem nicht für Worker-Subrequests und Cron-Trigger.
+Der vollständige Befund und die erforderliche Betreiberentscheidung sind unter
+`docs/operations/cloudflare-data-protection-acceptance-v1.md` dokumentiert.
+
 Das aus dem implementierten Schema abgeleitete technische Daten- und Verarbeitungsinventar unter
 `docs/operations/privacy-data-inventory-v1.md` dient als ausfüllbare Grundlage für diese Prüfung.
