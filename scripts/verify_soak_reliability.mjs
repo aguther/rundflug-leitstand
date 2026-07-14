@@ -134,7 +134,10 @@ const waitForWorker = async () => {
 };
 const requestJson = async (url, init, maximumMilliseconds = 2_000) => {
   const started = performance.now();
-  const response = await fetch(url, init);
+  const response = await fetch(url, {
+    ...init,
+    signal: AbortSignal.timeout(maximumMilliseconds),
+  });
   const elapsedMilliseconds = performance.now() - started;
   const body = await response.json();
   if (!response.ok) {

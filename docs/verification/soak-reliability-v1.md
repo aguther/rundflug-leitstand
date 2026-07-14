@@ -55,3 +55,18 @@ nicht verwendet.
 
 Q-ZUV-050 bleibt bis zu einem erfolgreichen ungekürzten Lauf mit mindestens 43.200 Sekunden in der
 Traceability auf `geplant`.
+
+## Fehlgeschlagener Abnahmelauf vom 14. Juli 2026
+
+Der erste ungekürzte Versuch ab 08:10 Uhr wurde nach sieben persistierten Zyklen bewusst als
+fehlgeschlagen beendet, weil nach dem siebten Zustandszyklus innerhalb von zwei Sekunden kein neues
+Realtime-Ereignis erkannt wurde. Bis dahin waren 35 REST-Requests und 14 Schreibkommandos
+erfolgreich und der Worker war nicht neu gestartet worden. Dieser Versuch ist kein positiver
+Q-ZUV-050-Nachweis.
+
+Die Analyse deckte zusätzlich auf, dass der Harness die Zwei-Sekunden-Grenze zwar nach einer
+Antwort prüfte, einen vollständig hängenden Request aber nicht aktiv abbrach. Vor dem Neustart des
+Abnahmelaufs wurde deshalb ein harter Request-Abbruch mit `AbortSignal.timeout` ergänzt. Ein
+isolierter Reproduktionslauf über 150 Sekunden mit echten 60-Sekunden-Intervallen verlief danach
+erfolgreich: drei Zyklen, 15 Requests, zehn Realtime-Nachrichten, Maximum 57,2 ms und kein
+Worker-Neustart. Der ungekürzte Lauf muss dennoch vollständig wiederholt werden.
