@@ -34,6 +34,7 @@
     "test:factory-reset": "node scripts/verify_factory_reset.mjs",
     "test:public-monitors": "node scripts/verify_public_monitors.mjs",
     "test:vertical-slice": "node scripts/verify_vertical_slice.mjs",
+    "test:scale-performance": "node scripts/verify_scale_performance.mjs",
     "test:watch": "vitest",
     "lint": "biome check .",
     "format": "biome format --write .",
