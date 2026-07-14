@@ -1,6 +1,6 @@
 # Verfügbarkeitsnachweis der zentralen Umgebung V1
 
-Status: Monitor implementiert; vollständiger Veranstaltungs-/Abnahmelauf ausstehend.
+Status: Vollständiger 12-Stunden-Abnahmelauf erfolgreich.
 
 Betroffene Anforderung: Q-ZUV-060.
 
@@ -54,3 +54,21 @@ erfolgreich abgeschlossen:
 
 Dieser Vorab-Lauf ersetzt nicht den vollständigen Abnahmelauf über den maßgeblichen
 Veranstaltungszeitraum.
+
+## Vollständiger Abnahmelauf vom 14. Juli 2026
+
+Der ungekürzte Lauf gegen die zentrale Cloudflare-Umgebung wurde von 08:18:12 bis 20:18:12 Uhr
+Europe/Berlin erfolgreich abgeschlossen:
+
+- konfigurierte und tatsächliche Laufzeit: 43.200 Sekunden,
+- 720 von 720 vollständig verfügbare Messintervalle,
+- gemessene Verfügbarkeit: 100 Prozent, gefordert mindestens 99,5 Prozent,
+- keine Ausfälle von Web-Anwendung, Worker-Healthcheck oder lesendem D1-Zugriff,
+- keine geplante Wartung oder sonstige Zeit aus der Messung ausgeschlossen,
+- Median 233,3 ms, p95 383,8 ms und Maximum 1.444,5 ms über alle drei Prüfpfade.
+
+Der Lauf überspannte mehrere automatische Deployments aus `main` und blieb auch dabei vollständig
+verfügbar. Zusammen mit dem unveränderten Harness, den Rohprotokollen unter
+`.wrangler/availability-12h-*.log` und dem maschinengeprüften 99,5-Prozent-Gate ist Q-ZUV-060
+technisch nachgewiesen. Für einen echten Veranstaltungstag gilt weiterhin der dokumentierte
+Deploy-/Migrationsfreeze ohne geplante Wartung.

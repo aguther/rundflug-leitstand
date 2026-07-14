@@ -48,8 +48,8 @@ Detailnachweise liegen thematisch in diesem Verzeichnis, unter anderem:
 ## Laufende technische Abnahmen
 
 - Q-ZUV-050: Der korrigierte ungekürzte 12-Stunden-Langlauf läuft seit 14. Juli 2026, 17:44 Uhr.
-- Q-ZUV-060: Der 12-Stunden-Monitor der zentralen Cloudflare-Umgebung läuft seit
-  14. Juli 2026, 08:18 Uhr.
+- Q-ZUV-060: Der 12-Stunden-Monitor der zentralen Cloudflare-Umgebung wurde am 14. Juli 2026 mit
+  720/720 verfügbaren Intervallen und 100 Prozent erfolgreich abgeschlossen.
 - D1-Migrationen 0030 und 0031 müssen in der zentralen Umgebung noch angewendet werden.
 
 Ergebnisse dürfen erst nach vollständigem, erfolgreichem Abschluss in der Traceability als
