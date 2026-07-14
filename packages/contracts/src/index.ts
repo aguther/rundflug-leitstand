@@ -149,6 +149,15 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
     }),
   }),
   commandBaseSchema.extend({
+    type: z.literal("CORRECT_ROTATION_MANIFEST"),
+    payload: z.object({
+      ticketGroupId: z.string().min(1).max(100),
+      targetRotationId: z.string().min(1).max(100),
+      reason: z.string().trim().min(10).max(500),
+      adminPin: z.string().min(4).max(32),
+    }),
+  }),
+  commandBaseSchema.extend({
     type: z.literal("TRIGGER_EMERGENCY"),
     payload: z.object({ reason: z.string().trim().min(3).max(240) }),
   }),

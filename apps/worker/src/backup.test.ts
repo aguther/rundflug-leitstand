@@ -31,6 +31,7 @@ describe("portable backup format", () => {
         "outage_recovery_entries",
         "outage_recovery_references",
         "app_bootstrap",
+        "rotation_manifest_corrections",
       ]),
     );
     expect(BACKUP_TABLES).not.toContain("web_push_subscriptions");

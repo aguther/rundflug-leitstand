@@ -673,6 +673,9 @@ export class EventCoordinator extends DurableObject<Env> {
         if (command.type === "MOVE_TICKET_GROUP") {
           return this.handleManualTicketGroupMove(command, current);
         }
+        if (command.type === "CORRECT_ROTATION_MANIFEST") {
+          return this.handleRotationManifestCorrection(command, current);
+        }
         if (
           command.type === "CANCEL_TICKET_GROUP" ||
           command.type === "REBOOK_TICKET_GROUP" ||
@@ -4362,6 +4365,214 @@ export class EventCoordinator extends DurableObject<Env> {
       ).bind(crypto.randomUUID(), command.eventId, JSON.stringify(result), now),
     );
     await this.env.DB.batch(statements);
+    this.broadcast(result);
+    return json(result);
+  }
+
+  private async handleRotationManifestCorrection(
+    command: Extract<CommandEnvelope, { type: "CORRECT_ROTATION_MANIFEST" }>,
+    current: StoredEventRow,
+  ): Promise<Response> {
+    if (!(await verifyCredential(command.payload.adminPin, this.env.ADMIN_PIN_HASH))) {
+      return json(
+        { error: { code: "ADMIN_PIN_INVALID", message: "Administrator-PIN ist ungültig." } },
+        { status: 403 },
+      );
+    }
+    const group = await this.env.DB.prepare(
+      `SELECT tg.id, tg.version, COUNT(t.id) AS group_size
+         FROM ticket_groups tg
+         JOIN tickets t ON t.ticket_group_id = tg.id
+        WHERE tg.id = ?1 AND tg.operation_day_id = ?2
+        GROUP BY tg.id, tg.version`,
+    )
+      .bind(command.payload.ticketGroupId, command.eventId)
+      .first<{ id: string; version: number; group_size: number }>();
+    if (!group) {
+      return json(
+        { error: { code: "TICKET_GROUP_NOT_FOUND", message: "Ticketgruppe nicht gefunden." } },
+        { status: 404 },
+      );
+    }
+    const sourceRows = await this.env.DB.prepare(
+      `SELECT r.id, r.status, COUNT(rt.ticket_id) AS assigned_tickets
+         FROM tickets t
+         JOIN rotation_tickets rt ON rt.ticket_id = t.id AND rt.released_at IS NULL
+         JOIN rotations r ON r.id = rt.rotation_id
+        WHERE t.ticket_group_id = ?1
+        GROUP BY r.id, r.status
+        ORDER BY r.created_at, r.id`,
+    )
+      .bind(group.id)
+      .all<{
+        id: string;
+        status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
+        assigned_tickets: number;
+      }>();
+    const assignedTicketCount = sourceRows.results.reduce(
+      (sum, source) => sum + source.assigned_tickets,
+      0,
+    );
+    if (sourceRows.results.length === 0 || assignedTicketCount !== group.group_size) {
+      return json(
+        {
+          error: {
+            code: "TICKET_GROUP_ASSIGNMENT_INCOMPLETE",
+            message:
+              "Die vollständige Buchungsgruppe muss einer aktiven Besetzung zugeordnet sein.",
+          },
+        },
+        { status: 409 },
+      );
+    }
+    if (
+      sourceRows.results.length === 1 &&
+      sourceRows.results[0]?.id === command.payload.targetRotationId
+    ) {
+      return json(
+        {
+          error: {
+            code: "MANIFEST_CORRECTION_UNCHANGED",
+            message: "Die dokumentierte Besetzung entspricht bereits dem Zielumlauf.",
+          },
+        },
+        { status: 409 },
+      );
+    }
+    const target = await this.env.DB.prepare(
+      `SELECT r.id, r.status,
+              COALESCE(r.usable_capacity, a.passenger_seats, rg.reference_capacity) AS capacity,
+              COUNT(rt.ticket_id) AS occupied_seats
+         FROM rotations r
+         JOIN flight_groups fg ON fg.id = r.flight_group_id
+         JOIN resource_groups rg ON rg.id = fg.resource_group_id
+         LEFT JOIN aircraft a ON a.id = r.aircraft_id
+         LEFT JOIN rotation_tickets rt ON rt.rotation_id = r.id AND rt.released_at IS NULL
+        WHERE r.id = ?1 AND r.operation_day_id = ?2
+        GROUP BY r.id, r.status, r.usable_capacity, a.passenger_seats, rg.reference_capacity`,
+    )
+      .bind(command.payload.targetRotationId, command.eventId)
+      .first<{
+        id: string;
+        status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
+        capacity: number;
+        occupied_seats: number;
+      }>();
+    if (!target) {
+      return json(
+        { error: { code: "TARGET_ROTATION_NOT_FOUND", message: "Zielumlauf nicht gefunden." } },
+        { status: 404 },
+      );
+    }
+    if (
+      target.status !== "IN_FLIGHT" &&
+      target.status !== "LANDED" &&
+      target.status !== "COMPLETED"
+    ) {
+      return json(
+        {
+          error: {
+            code: "MANIFEST_CORRECTION_NOT_POST_DEPARTURE",
+            message: "Der Administrator-Sonderpfad ist erst ab IM FLUG zulässig.",
+          },
+        },
+        { status: 409 },
+      );
+    }
+
+    const now = new Date().toISOString();
+    const nextVersion = current.version + 1;
+    const sourceRotationIds = sourceRows.results.map((source) => source.id);
+    const capacityExceeded = target.occupied_seats + group.group_size > target.capacity;
+    const correctionId = crypto.randomUUID();
+    const result: CommandResult = {
+      accepted: true,
+      duplicate: false,
+      event: rowToSnapshot({ ...current, version: nextVersion, updated_at: now }),
+      eventType: "ROTATION_MANIFEST_CORRECTED",
+      aggregate: { type: "TICKET_GROUP", id: group.id, relatedRotationId: target.id },
+    };
+    await this.env.DB.batch([
+      this.env.DB.prepare(
+        "UPDATE operation_days SET version = ?1, updated_at = ?2 WHERE id = ?3 AND version = ?4",
+      ).bind(nextVersion, now, command.eventId, current.version),
+      this.env.DB.prepare(
+        `UPDATE rotation_tickets SET released_at = ?1
+          WHERE released_at IS NULL
+            AND ticket_id IN (SELECT id FROM tickets WHERE ticket_group_id = ?2)`,
+      ).bind(now, group.id),
+      this.env.DB.prepare(
+        `INSERT INTO rotation_tickets (rotation_id, ticket_id, assigned_at, released_at)
+         SELECT ?1, id, ?2, NULL FROM tickets WHERE ticket_group_id = ?3 ORDER BY created_at, id
+         ON CONFLICT(rotation_id, ticket_id) DO UPDATE
+           SET assigned_at = excluded.assigned_at, released_at = NULL`,
+      ).bind(target.id, now, group.id),
+      this.env.DB.prepare("UPDATE tickets SET status = ?1 WHERE ticket_group_id = ?2").bind(
+        target.status,
+        group.id,
+      ),
+      this.env.DB.prepare(
+        "UPDATE ticket_groups SET status = ?1, version = version + 1 WHERE id = ?2 AND version = ?3",
+      ).bind(target.status, group.id, group.version),
+      this.env.DB.prepare(
+        `INSERT INTO rotation_manifest_corrections
+          (id, operation_day_id, ticket_group_id, source_rotation_ids_json, target_rotation_id,
+           reason, corrected_at, device_id, event_version)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)`,
+      ).bind(
+        correctionId,
+        command.eventId,
+        group.id,
+        JSON.stringify(sourceRotationIds),
+        target.id,
+        command.payload.reason,
+        now,
+        command.deviceId,
+        nextVersion,
+      ),
+      this.env.DB.prepare(
+        `INSERT INTO operational_events
+          (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type,
+           aggregate_id, aggregate_version, payload_json)
+         VALUES (?1, ?2, 'ROTATION_MANIFEST_CORRECTED', ?3, ?4, 'TICKET_GROUP', ?5, ?6, ?7)`,
+      ).bind(
+        crypto.randomUUID(),
+        command.eventId,
+        now,
+        command.deviceId,
+        group.id,
+        group.version + 1,
+        JSON.stringify({
+          correctionId,
+          reason: command.payload.reason,
+          sourceRotationIds,
+          targetRotationId: target.id,
+          targetStatus: target.status,
+          groupSize: group.group_size,
+          targetCapacity: target.capacity,
+          targetOccupiedSeatsBeforeCorrection: target.occupied_seats,
+          capacityExceeded,
+          wholeGroupPreserved: true,
+          administrativeCorrection: true,
+          safetyApproval: false,
+        }),
+      ),
+      this.env.DB.prepare(
+        `INSERT INTO idempotency_receipts
+          (command_id, operation_day_id, device_id, command_type, received_at, response_json)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)`,
+      ).bind(
+        command.commandId,
+        command.eventId,
+        command.deviceId,
+        command.type,
+        now,
+        JSON.stringify(result),
+      ),
+      this.env.DB.prepare(
+        "INSERT INTO outbox (id, operation_day_id, topic, payload_json, created_at) VALUES (?1, ?2, 'EVENT_STATE_CHANGED', ?3, ?4)",
+      ).bind(crypto.randomUUID(), command.eventId, JSON.stringify(result), now),
+    ]);
     this.broadcast(result);
     return json(result);
   }

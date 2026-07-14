@@ -17,6 +17,7 @@ describe("factory reset", () => {
         "operational_events",
         "app_bootstrap",
         "operation_days",
+        "rotation_manifest_corrections",
       ]),
     );
     expect(FACTORY_RESET_DELETE_TABLES).not.toContain("system_reset_receipts");
