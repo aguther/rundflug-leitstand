@@ -1,6 +1,6 @@
 # Bedienkonzept Produkt- und Stammdatenpflege V1
 
-Status: **zur fachlichen und visuellen Freigabe**
+Status: **am 14.07.2026 fachlich und visuell freigegeben und umgesetzt**
 
 Betroffene Anforderungen: F-RES-010, F-RES-020, F-RES-060, F-KAS-030, F-KAS-110,
 Q-UX-010, Q-UX-020 und Q-UX-040.
@@ -169,3 +169,23 @@ Die Administration bietet oben eine klar erkennbare Aktion `Bearbeitungsmodus en
 7. Im entsperrten Modus sind mehrere Änderungen ohne erneute Eingabe möglich; Sperren oder
    Inaktivität stellt die Einzelabfrage wieder her.
 8. Anlage und Änderung sind in Light/Dark bei 430, 768 und 1440 Pixel ohne Überlauf lesbar.
+
+## Umsetzungs- und Prüfnachweis
+
+Die freigegebene Oberfläche ist in der Administration umgesetzt. Die Prüfung am 14.07.2026
+umfasste den realen lokalen Worker-/D1-Pfad sowie die Darstellung bei 430 und 1440 Pixel Breite in
+Light und Dark. Dabei wurden insbesondere folgende Abläufe nachgewiesen:
+
+- Produktanlage mit deutschem Eurobetrag und exakter Umrechnung in Cent an der API-Grenze,
+- verständliche Anzeigenposition statt technischer Sortierzahl,
+- ausschließliche Auswahl zwischen keiner Gewichtserfassung und fachlichen Gewichtsklassen,
+- Kopplung des Begleithinweises an die Gewichtsklasse `Kind`,
+- feldbezogene, per Tastatur erreichbare Info-Aktionen und Validierung,
+- fokussierte Einzel-PIN-Abfrage mit Enter-Bestätigung und Escape-Abbruch,
+- mehrere Änderungen im entsperrten Bearbeitungsmodus sowie manuelles Sperren,
+- kein horizontaler Überlauf des Editors auf Mobil- und Desktopbreite.
+
+Die PIN wird im Bearbeitungsmodus nur im Arbeitsspeicher des aktuellen Tabs gehalten. Der neue
+Prüfendpunkt verlangt zusätzlich ein bereits gekoppeltes Administrationsgerät, setzt
+`Cache-Control: no-store` und erzeugt weder eine persistente Sitzung noch einen Audit-Eintrag ohne
+fachliche Änderung.
