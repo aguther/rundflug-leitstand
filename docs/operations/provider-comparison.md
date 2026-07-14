@@ -1,10 +1,10 @@
-# Hostingvergleich – Arbeitsstand 11.07.2026
+# Hostingvergleich – geprüft am 14.07.2026
 
 Die Preise und Kontingente sind zeitabhängig und vor einer Beschaffung erneut zu prüfen.
 
 | Variante | Typische Mindestkosten | Vorteile | Nachteile für dieses Projekt | Einschätzung |
 |---|---:|---|---|---|
-| Cloudflare Workers + D1 + Durable Objects + R2 | Free für Entwicklung; Workers Paid ab 5 USD/Monat | wenig Betriebsaufwand, globale Auslieferung, hibernierende WebSockets, Scale-to-zero | proprietäre Adapter, Self-Service-Tarif ohne individuell zugesicherte Betriebsbetreuung | empfohlener Standard |
+| Cloudflare Workers + D1 + Durable Objects + R2 | Free für Entwicklung; Workers Paid mindestens 5 USD/Monat einschließlich Grundkontingenten | wenig Betriebsaufwand, globale Auslieferung, hibernierende WebSockets, Scale-to-zero | proprietäre Adapter, Self-Service-Tarif ohne individuell zugesicherte Betriebsbetreuung | empfohlener Standard; erwartete V1-Grundkosten einschließlich Domainreserve unter 8 EUR/Monat |
 | Hetzner Cloud VPS | etwa 4 EUR/Monat für kleine Instanz, Zusatzkosten für Backups möglich | EU-Standorte, voller Linux-/PostgreSQL-Zugriff, sehr portabel | Betriebssystem, Patches, Monitoring, Backups, TLS, Hochverfügbarkeit und Realtime selbst betreiben | günstigster Geldpreis, höheres Betriebsrisiko |
 | Railway Hobby | 5 USD Mindestnutzung/Monat | einfacher Container-/PostgreSQL-Betrieb, Rollbacks, wenig Serveradministration | nutzungsabhängige Kosten, Hobby-Workspace auf einen Entwickler ausgerichtet | gute Prototyp-Alternative |
 | Firebase | Spark ggf. 0 USD, Blaze nutzungsabhängig | sehr einfacher Realtime-Start, Push-Ökosystem | NoSQL-Modell passt schlechter zu Audit-/Transaktionsanforderungen; Kostenmodell bei vielen Reads beachten | technisch möglich, aber Domänenmodell ungünstiger |
