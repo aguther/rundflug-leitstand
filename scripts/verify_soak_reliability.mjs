@@ -186,47 +186,100 @@ const percentile = (values, fraction) => {
   const sorted = [...values].sort((left, right) => left - right);
   return sorted[Math.max(0, Math.ceil(sorted.length * fraction) - 1)] ?? 0;
 };
-const waitForRealtimeIncrease = async (previousCount, readCount, timeoutMilliseconds = 2_000) => {
+const waitForRealtimeIncrease = async (
+  previousCount,
+  readCount,
+  failureMessage,
+  timeoutMilliseconds = 2_000,
+) => {
   const deadline = Date.now() + timeoutMilliseconds;
   while (Date.now() < deadline) {
     if (readCount() > previousCount) return;
     await sleep(25);
   }
-  throw new Error("Im Langlauf wurde nach Zustandsänderungen kein Realtime-Ereignis empfangen.");
+  throw new Error(failureMessage);
 };
 
 let socket;
 try {
   await waitForWorker();
   let realtimeMessages = 0;
-  socket = new WebSocket(`ws://127.0.0.1:${port}/api/public/events/${eventId}/live`);
-  socket.addEventListener("message", () => {
-    realtimeMessages += 1;
-  });
-  await new Promise((resolvePromise, rejectPromise) => {
-    const timeout = setTimeout(
-      () => rejectPromise(new Error("Realtime-Verbindung wurde nicht rechtzeitig geöffnet.")),
-      5_000,
-    );
-    socket.addEventListener("open", () => {
-      clearTimeout(timeout);
-      resolvePromise();
+  let realtimeStateChanges = 0;
+  let realtimePongs = 0;
+  let realtimeReconnects = 0;
+  let realtimeCloses = 0;
+  let lastRealtimeClose = null;
+  const openRealtimeSocket = async (reconnect) => {
+    const candidate = new WebSocket(`ws://127.0.0.1:${port}/api/public/events/${eventId}/live`);
+    candidate.addEventListener("message", (event) => {
+      realtimeMessages += 1;
+      try {
+        const message = JSON.parse(String(event.data));
+        if (message.type === "event-state-changed") realtimeStateChanges += 1;
+        if (message.type === "pong") realtimePongs += 1;
+      } catch {}
     });
-    socket.addEventListener("error", () => {
-      clearTimeout(timeout);
-      rejectPromise(new Error("Realtime-Verbindung des Langlaufs ist fehlgeschlagen."));
+    candidate.addEventListener("close", (event) => {
+      realtimeCloses += 1;
+      lastRealtimeClose = {
+        code: event.code,
+        reason: event.reason,
+        wasClean: event.wasClean,
+      };
     });
-  });
+    await new Promise((resolvePromise, rejectPromise) => {
+      const timeout = setTimeout(
+        () => rejectPromise(new Error("Realtime-Verbindung wurde nicht rechtzeitig geöffnet.")),
+        5_000,
+      );
+      candidate.addEventListener("open", () => {
+        clearTimeout(timeout);
+        resolvePromise();
+      });
+      candidate.addEventListener("error", () => {
+        clearTimeout(timeout);
+        rejectPromise(new Error("Realtime-Verbindung des Langlaufs ist fehlgeschlagen."));
+      });
+    });
+    socket = candidate;
+    if (reconnect) realtimeReconnects += 1;
+  };
+  const ensureRealtimeHealthy = async () => {
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      await openRealtimeSocket(true);
+    }
+    let previousPongs = realtimePongs;
+    socket.send("ping");
+    try {
+      await waitForRealtimeIncrease(
+        previousPongs,
+        () => realtimePongs,
+        "Realtime-Heartbeat wurde nicht beantwortet.",
+      );
+    } catch {
+      socket.close();
+      await openRealtimeSocket(true);
+      previousPongs = realtimePongs;
+      socket.send("ping");
+      await waitForRealtimeIncrease(
+        previousPongs,
+        () => realtimePongs,
+        "Realtime-Heartbeat blieb auch nach automatischer Wiederverbindung aus.",
+      );
+    }
+  };
+  await openRealtimeSocket(false);
 
   const startedAt = Date.now();
   const deadline = startedAt + durationSeconds * 1_000;
   const latencies = [];
   let cycles = 0;
-  let previousRealtimeMessages = realtimeMessages;
   while (Date.now() < deadline) {
     if (server.exitCode !== null)
       throw new Error("Worker-Prozess wurde während des Langlaufs beendet.");
     const cycleStartedAt = Date.now();
+    await ensureRealtimeHealthy();
+    const previousRealtimeStateChanges = realtimeStateChanges;
     const health = await requestJson(`${base}/api/health`);
     const current = await board();
     const sale = await command(current.body.event.version, "SELL_TICKET_GROUP", {
@@ -254,8 +307,11 @@ try {
       confirmed.elapsedMilliseconds,
     );
     cycles += 1;
-    await waitForRealtimeIncrease(previousRealtimeMessages, () => realtimeMessages);
-    previousRealtimeMessages = realtimeMessages;
+    await waitForRealtimeIncrease(
+      previousRealtimeStateChanges,
+      () => realtimeStateChanges,
+      `Im Langlauf wurde nach Zustandsänderungen kein Realtime-Ereignis empfangen: ${JSON.stringify({ readyState: socket?.readyState, realtimeCloses, lastRealtimeClose })}`,
+    );
     if (cycles === 1 || cycles % 60 === 0) {
       console.log(
         JSON.stringify({
@@ -264,6 +320,8 @@ try {
           elapsedMinutes: Number(((Date.now() - startedAt) / 60_000).toFixed(1)),
           p95Milliseconds: Number(percentile(latencies, 0.95).toFixed(1)),
           realtimeMessages,
+          realtimeStateChanges,
+          realtimeReconnects,
         }),
       );
     }
@@ -289,6 +347,10 @@ try {
       p95Milliseconds: Number(percentile(latencies, 0.95).toFixed(1)),
       maximumMilliseconds: Number(Math.max(...latencies).toFixed(1)),
       realtimeMessages,
+      realtimeStateChanges,
+      realtimePongs,
+      realtimeReconnects,
+      realtimeCloses,
       workerRestarted: false,
       anonymousSyntheticDataOnly: true,
     }),
