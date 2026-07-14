@@ -2,6 +2,7 @@ import type { OperationBoard } from "@rundflug/contracts";
 import { describe, expect, it } from "vitest";
 import {
   type BoardSyncState,
+  isDeviceAuthorizationError,
   nextBoardReconnectDelay,
   OPERATION_BOARD_POLL_INTERVAL_MS,
   OPERATION_BOARD_RECONNECT_INITIAL_MS,
@@ -11,6 +12,13 @@ import {
 } from "./board-sync";
 
 describe("operation board reconnection", () => {
+  it("distinguishes a rejected device credential from a transient server failure", () => {
+    expect(isDeviceAuthorizationError("Betriebsdaten nicht verfügbar (403)")).toBe(true);
+    expect(isDeviceAuthorizationError("Betriebsdaten nicht verfügbar (401)")).toBe(true);
+    expect(isDeviceAuthorizationError("Betriebsdaten nicht verfügbar (500)")).toBe(false);
+    expect(isDeviceAuthorizationError(null)).toBe(false);
+  });
+
   it("backs off reconnect attempts within the polling fallback bound", () => {
     let delay = OPERATION_BOARD_RECONNECT_INITIAL_MS;
     delay = nextBoardReconnectDelay(delay);
