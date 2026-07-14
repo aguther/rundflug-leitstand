@@ -21,6 +21,10 @@ import { dailyReportCsv, dailyReportPdfLines, loadDailyReport } from "./daily-re
 import { EventCoordinator } from "./event-coordinator";
 import { factoryResetRequestHash, factoryResetStatements, finishR2Cleanup } from "./factory-reset";
 import { buildForecastHistoryStatement } from "./forecast-history";
+import {
+  EMPTY_GATE_DISPLAY_FILTER_JSON,
+  withGateDisplayFilterFallback,
+} from "./gate-display-filter-storage";
 import { buildOperationalHistoryStatement } from "./operational-history";
 import { allowUnknownTicketAttempt } from "./public-access";
 import { createCsv, createTextPdf } from "./report";
@@ -1055,23 +1059,29 @@ app.get("/api/events/:eventId/operations", async (context) => {
         current_rotation_id: string | null;
         current_communication_number: number | null;
       }>(),
-    context.env.DB.prepare(
-      `SELECT g.id, g.label, g.gate_type, g.active, g.sort_order, g.display_filter_json,
-              COALESCE((SELECT json_group_array(rg.id) FROM resource_groups rg
-                WHERE rg.operation_day_id = g.operation_day_id AND rg.gate_id = g.id), '[]')
-                AS assigned_resource_group_ids_json
-           FROM gates g WHERE g.operation_day_id = ?1 ORDER BY g.sort_order, g.label`,
-    )
-      .bind(eventId)
-      .all<{
-        id: string;
-        label: string;
-        gate_type: "FLIGHT_LINE" | "BOARDING" | "DISPLAY_ONLY";
-        active: number;
-        sort_order: number;
-        display_filter_json: string;
-        assigned_resource_group_ids_json: string;
-      }>(),
+    withGateDisplayFilterFallback((mode) => {
+      const displayFilterProjection =
+        mode === "current"
+          ? "g.display_filter_json"
+          : `'${EMPTY_GATE_DISPLAY_FILTER_JSON}' AS display_filter_json`;
+      return context.env.DB.prepare(
+        `SELECT g.id, g.label, g.gate_type, g.active, g.sort_order, ${displayFilterProjection},
+                COALESCE((SELECT json_group_array(rg.id) FROM resource_groups rg
+                  WHERE rg.operation_day_id = g.operation_day_id AND rg.gate_id = g.id), '[]')
+                  AS assigned_resource_group_ids_json
+             FROM gates g WHERE g.operation_day_id = ?1 ORDER BY g.sort_order, g.label`,
+      )
+        .bind(eventId)
+        .all<{
+          id: string;
+          label: string;
+          gate_type: "FLIGHT_LINE" | "BOARDING" | "DISPLAY_ONLY";
+          active: number;
+          sort_order: number;
+          display_filter_json: string;
+          assigned_resource_group_ids_json: string;
+        }>();
+    }),
     context.env.DB.prepare(
       `SELECT rg.id, rg.name, rg.status, rg.gate_id, g.label AS gate_label,
               rg.reference_capacity, rg.planned_rotation_minutes,
@@ -2317,11 +2327,18 @@ app.get("/api/public/events/:eventId/board", async (context) => {
     );
   }
   const selectedGate = requestedGateId
-    ? await context.env.DB.prepare(
-        "SELECT id, label, display_filter_json FROM gates WHERE id = ?1 AND operation_day_id = ?2 AND active = 1",
-      )
-        .bind(requestedGateId, eventId)
-        .first<{ id: string; label: string; display_filter_json: string }>()
+    ? await withGateDisplayFilterFallback((mode) => {
+        const displayFilterProjection =
+          mode === "current"
+            ? "display_filter_json"
+            : `'${EMPTY_GATE_DISPLAY_FILTER_JSON}' AS display_filter_json`;
+        return context.env.DB.prepare(
+          `SELECT id, label, ${displayFilterProjection} FROM gates
+            WHERE id = ?1 AND operation_day_id = ?2 AND active = 1`,
+        )
+          .bind(requestedGateId, eventId)
+          .first<{ id: string; label: string; display_filter_json: string }>();
+      })
     : null;
   if (requestedGateId && !selectedGate) {
     return context.json(
