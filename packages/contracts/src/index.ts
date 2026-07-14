@@ -298,6 +298,20 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
     }),
   }),
   commandBaseSchema.extend({
+    type: z.literal("MARK_TICKET_NO_SHOW"),
+    payload: z.object({
+      ticketId: z.string().min(1).max(100),
+      reason: z.string().trim().min(3).max(240),
+    }),
+  }),
+  commandBaseSchema.extend({
+    type: z.literal("CONFIRM_ATTENDANCE_DECISION"),
+    payload: z.object({
+      rotationId: z.string().min(1).max(100),
+      decision: z.enum(["FLY_WITH_PRESENT", "LEAVE_SEAT_EMPTY"]),
+    }),
+  }),
+  commandBaseSchema.extend({
     type: z.literal("CONFIGURE_EVENT_PARAMETERS"),
     payload: z.object({
       saleOpensAt: z.iso.datetime().nullable(),
