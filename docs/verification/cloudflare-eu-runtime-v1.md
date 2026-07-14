@@ -42,3 +42,6 @@ Mobilfunknetzen; dies ist lokale Veranstaltungsinfrastruktur und keine Softwarek
 Q-DSG-040 bleibt offen, bis Auftragsverarbeitungsvertrag, Betreiberangaben und Eintrag für das
 Verzeichnis der Verarbeitungstätigkeiten vom Auftraggeber geprüft beziehungsweise bereitgestellt
 sind. Der technische EU-Nachweis ersetzt diese Dokumente nicht.
+
+Das aus dem implementierten Schema abgeleitete technische Daten- und Verarbeitungsinventar unter
+`docs/operations/privacy-data-inventory-v1.md` dient als ausfüllbare Grundlage für diese Prüfung.
