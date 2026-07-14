@@ -36,6 +36,7 @@
     "test:vertical-slice": "node scripts/verify_vertical_slice.mjs",
     "test:scale-performance": "node scripts/verify_scale_performance.mjs",
     "test:soak-reliability": "node scripts/verify_soak_reliability.mjs",
+    "test:cloudflare-availability": "node scripts/verify_cloudflare_availability.mjs",
     "test:watch": "vitest",
     "lint": "biome check .",
     "format": "biome format --write .",
