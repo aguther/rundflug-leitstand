@@ -70,3 +70,22 @@ Abnahmelaufs wurde deshalb ein harter Request-Abbruch mit `AbortSignal.timeout` 
 isolierter Reproduktionslauf über 150 Sekunden mit echten 60-Sekunden-Intervallen verlief danach
 erfolgreich: drei Zyklen, 15 Requests, zehn Realtime-Nachrichten, Maximum 57,2 ms und kein
 Worker-Neustart. Der ungekürzte Lauf muss dennoch vollständig wiederholt werden.
+
+Der zweite ungekürzte Versuch ab 17:44 Uhr scheiterte nach neun persistierten Zyklen am gleichen
+Realtime-Kriterium. Die REST-Kommandos, Versionen und Auditereignisse waren erneut vollständig
+persistiert. Da der Socket dabei nicht zuverlässig als geschlossen erkennbar war, wurde der
+Testclient entsprechend der geforderten Wiederverbindungsstrategie erweitert:
+
+- Heartbeat vor jedem Zustandszyklus,
+- Wiederverbindung bei geschlossenem Socket oder ausbleibendem Heartbeat,
+- weiterhin zwingender Zustands-Broadcast innerhalb von zwei Sekunden nach den Schreibkommandos,
+- getrennte Zählung von Broadcasts, Pongs, Verbindungsabbrüchen und Wiederverbindungen.
+
+Ein anschließender 12-Minuten-Lauf überschritt beide bisherigen Abbruchpunkte erfolgreich:
+
+- 12 Zyklen und 60 erfolgreiche Requests,
+- 24 Zustands-Broadcasts und 12 beantwortete Heartbeats,
+- keine Wiederverbindung, kein Verbindungsabbruch und kein Worker-Neustart,
+- Median 35,0 ms, p95 45,9 ms und Maximum 53,9 ms.
+
+Auch dieser Diagnoselauf ersetzt den ungekürzten 12-Stunden-Nachweis nicht.

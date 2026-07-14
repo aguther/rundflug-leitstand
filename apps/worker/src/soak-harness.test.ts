@@ -19,6 +19,8 @@ describe("V1 twelve-hour reliability harness", () => {
       "/operations",
       "/api/health",
       "WebSocket",
+      'socket.send("ping")',
+      "realtimeReconnects",
       "2_000",
       "randomBytes(16)",
       "anonymousSyntheticDataOnly: true",
