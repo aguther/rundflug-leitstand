@@ -78,6 +78,11 @@ import {
   replacementSuggestion,
   sharedGroupSegmentLabel,
 } from "./operational-exceptions";
+import {
+  isRealtimeStateChange,
+  REALTIME_HEARTBEAT_INTERVAL_MS,
+  sendRealtimeHeartbeat,
+} from "./realtime-heartbeat";
 import { setupValidationMessages } from "./setup-validation";
 
 const EVENT_ID = resolveActiveEvent(window.location.search, window.localStorage);
@@ -246,7 +251,12 @@ function useOperationBoard(deviceId: string) {
     let active = true;
     let socket: WebSocket | null = null;
     let reconnectTimer: number | null = null;
+    let heartbeatTimer: number | null = null;
     let reconnectDelay = OPERATION_BOARD_RECONNECT_INITIAL_MS;
+    const stopHeartbeat = () => {
+      if (heartbeatTimer !== null) window.clearInterval(heartbeatTimer);
+      heartbeatTimer = null;
+    };
     const connect = () => {
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
       socket = new WebSocket(
@@ -254,10 +264,18 @@ function useOperationBoard(deviceId: string) {
       );
       socket.addEventListener("open", () => {
         reconnectDelay = OPERATION_BOARD_RECONNECT_INITIAL_MS;
+        stopHeartbeat();
+        heartbeatTimer = window.setInterval(
+          () => sendRealtimeHeartbeat(socket),
+          REALTIME_HEARTBEAT_INTERVAL_MS,
+        );
         void refresh();
       });
-      socket.addEventListener("message", () => void refresh());
+      socket.addEventListener("message", (event) => {
+        if (isRealtimeStateChange(event.data)) void refresh();
+      });
       socket.addEventListener("close", () => {
+        stopHeartbeat();
         if (!active) return;
         reconnectTimer = window.setTimeout(connect, reconnectDelay);
         reconnectDelay = nextBoardReconnectDelay(reconnectDelay);
@@ -280,6 +298,7 @@ function useOperationBoard(deviceId: string) {
     return () => {
       active = false;
       socket?.close();
+      stopHeartbeat();
       if (reconnectTimer !== null) window.clearTimeout(reconnectTimer);
       window.clearInterval(timer);
     };
@@ -1802,7 +1821,12 @@ function TicketStatusView({ code }: { code: string }) {
     let active = true;
     let socket: WebSocket | null = null;
     let reconnectTimer: number | null = null;
+    let heartbeatTimer: number | null = null;
     let reconnectDelay = OPERATION_BOARD_RECONNECT_INITIAL_MS;
+    const stopHeartbeat = () => {
+      if (heartbeatTimer !== null) window.clearInterval(heartbeatTimer);
+      heartbeatTimer = null;
+    };
     const controller = new AbortController();
     const refresh = () =>
       getPublicTicketStatus(code, controller.signal)
@@ -1822,10 +1846,18 @@ function TicketStatusView({ code }: { code: string }) {
       );
       socket.addEventListener("open", () => {
         reconnectDelay = OPERATION_BOARD_RECONNECT_INITIAL_MS;
+        stopHeartbeat();
+        heartbeatTimer = window.setInterval(
+          () => sendRealtimeHeartbeat(socket),
+          REALTIME_HEARTBEAT_INTERVAL_MS,
+        );
         void refresh();
       });
-      socket.addEventListener("message", () => void refresh());
+      socket.addEventListener("message", (event) => {
+        if (isRealtimeStateChange(event.data)) void refresh();
+      });
       socket.addEventListener("close", () => {
+        stopHeartbeat();
         if (!active) return;
         reconnectTimer = window.setTimeout(() => connect(eventId), reconnectDelay);
         reconnectDelay = nextBoardReconnectDelay(reconnectDelay);
@@ -1840,6 +1872,7 @@ function TicketStatusView({ code }: { code: string }) {
       active = false;
       controller.abort();
       socket?.close();
+      stopHeartbeat();
       if (reconnectTimer !== null) window.clearTimeout(reconnectTimer);
       window.clearInterval(timer);
     };
@@ -2184,7 +2217,12 @@ function FidsView() {
     let active = true;
     let socket: WebSocket | null = null;
     let reconnectTimer: number | null = null;
+    let heartbeatTimer: number | null = null;
     let reconnectDelay = 1_000;
+    const stopHeartbeat = () => {
+      if (heartbeatTimer !== null) window.clearInterval(heartbeatTimer);
+      heartbeatTimer = null;
+    };
     const refresh = () =>
       getPublicBoard(EVENT_ID)
         .then((nextBoard) => {
@@ -2205,10 +2243,18 @@ function FidsView() {
       );
       socket.addEventListener("open", () => {
         reconnectDelay = 1_000;
+        stopHeartbeat();
+        heartbeatTimer = window.setInterval(
+          () => sendRealtimeHeartbeat(socket),
+          REALTIME_HEARTBEAT_INTERVAL_MS,
+        );
         void refresh();
       });
-      socket.addEventListener("message", () => void refresh());
+      socket.addEventListener("message", (event) => {
+        if (isRealtimeStateChange(event.data)) void refresh();
+      });
       socket.addEventListener("close", () => {
+        stopHeartbeat();
         if (!active) return;
         reconnectTimer = window.setTimeout(connect, reconnectDelay);
         reconnectDelay = Math.min(reconnectDelay * 2, 15_000);
@@ -2221,6 +2267,7 @@ function FidsView() {
     return () => {
       active = false;
       socket?.close();
+      stopHeartbeat();
       if (reconnectTimer !== null) window.clearTimeout(reconnectTimer);
       window.clearInterval(timer);
     };
