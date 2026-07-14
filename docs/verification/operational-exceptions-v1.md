@@ -2,8 +2,8 @@
 
 Stand: 14. Juli 2026
 
-Betroffene Anforderungen: F-SLT-020, F-SLT-040, F-SLT-050, F-SLT-060, F-BRD-080 und
-F-BRD-085.
+Betroffene Anforderungen: F-SLT-020, F-SLT-040, F-SLT-050, F-SLT-060, F-BRD-080, F-BRD-085 und
+D-040.
 
 ## Umgesetzter Umfang
 

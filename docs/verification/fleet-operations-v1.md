@@ -13,6 +13,10 @@
 - Beginn, Geltungsbereich, Grund, Prüfzeitpunkt und Aufhebung der Blockierung sind im Zustand und
   Auditverlauf nachweisbar.
 - Tankvormerkung und organisatorische Erinnerungsschwelle erscheinen im bestätigten Flottenzustand.
+- Unterschiedliche Sitzplatzkapazitäten innerhalb derselben Ressourcengruppe bleiben zulässig. Der
+  Kapazitäts-/Pilotkonflikttest weist nach, dass für eine Vierergruppe das früheste passende
+  Vier-Sitz-Flugzeug vorgeschlagen und ein ebenfalls zugeordnetes Zwei-Sitz-Flugzeug weder
+  vorgeschlagen noch bei `NEXT` akzeptiert wird.
 
 Der Referenzlauf endete konsistent mit Veranstaltungsversion 14. Die Daten sind organisatorische
 Hinweise und besitzen ausdrücklich keine Sicherheits- oder Freigabewirkung.
