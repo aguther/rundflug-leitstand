@@ -406,7 +406,102 @@ try {
   if (rejectedLateMove.error?.code !== "MANUAL_GROUP_MOVE_TOO_LATE") {
     throw new Error("Umbesetzung nach IM FLUG wurde nicht fachlich abgelehnt.");
   }
-  const rejectedOversize = await sell(lateMoveSource.event.version, "panorama-20", 5, false, 409);
+  const rejectedLeadCorrection = await command(
+    "flight-line-tablet-1",
+    tokens.flightLine,
+    lateMoveSource.event.version,
+    "CORRECT_ROTATION_MANIFEST",
+    {
+      ticketGroupId: lateMoveSource.aggregate.id,
+      targetRotationId: first.aggregate.relatedRotationId,
+      reason: "Unzulässiger Korrekturversuch ohne Administratorrolle",
+      adminPin: pin,
+    },
+    403,
+  );
+  const rejectedPinCorrection = await command(
+    "technical-scaffold",
+    tokens.admin,
+    lateMoveSource.event.version,
+    "CORRECT_ROTATION_MANIFEST",
+    {
+      ticketGroupId: lateMoveSource.aggregate.id,
+      targetRotationId: first.aggregate.relatedRotationId,
+      reason: "Korrekturversuch mit ungültiger Administrator-PIN",
+      adminPin: "9999",
+    },
+    403,
+  );
+  const correctionCommandId = randomUUID();
+  const correctedManifest = await command(
+    "technical-scaffold",
+    tokens.admin,
+    lateMoveSource.event.version,
+    "CORRECT_ROTATION_MANIFEST",
+    {
+      ticketGroupId: lateMoveSource.aggregate.id,
+      targetRotationId: first.aggregate.relatedRotationId,
+      reason: "Tatsächliche Gruppenbesetzung nach dem Start richtigstellen",
+      adminPin: pin,
+    },
+    200,
+    correctionCommandId,
+  );
+  const duplicateCorrection = await command(
+    "technical-scaffold",
+    tokens.admin,
+    lateMoveSource.event.version,
+    "CORRECT_ROTATION_MANIFEST",
+    {
+      ticketGroupId: lateMoveSource.aggregate.id,
+      targetRotationId: first.aggregate.relatedRotationId,
+      reason: "Tatsächliche Gruppenbesetzung nach dem Start richtigstellen",
+      adminPin: pin,
+    },
+    200,
+    correctionCommandId,
+  );
+  const staleCorrection = await command(
+    "technical-scaffold",
+    tokens.admin,
+    lateMoveSource.event.version,
+    "CORRECT_ROTATION_MANIFEST",
+    {
+      ticketGroupId: lateMoveSource.aggregate.id,
+      targetRotationId: first.aggregate.relatedRotationId,
+      reason: "Veralteten Korrekturstand sichtbar ablehnen",
+      adminPin: pin,
+    },
+    409,
+  );
+  current = await board();
+  const correctedTarget = current.rotations.find(
+    (rotation) => rotation.id === first.aggregate.relatedRotationId,
+  );
+  const correctionHistory = await history("TICKET_GROUP", lateMoveSource.aggregate.id);
+  const correctionAudit = correctionHistory.entries.find(
+    (entry) => entry.eventType === "ROTATION_MANIFEST_CORRECTED",
+  );
+  if (
+    rejectedLeadCorrection.error?.code !== "ROLE_NOT_AUTHORIZED" ||
+    rejectedPinCorrection.error?.code !== "ADMIN_PIN_INVALID" ||
+    duplicateCorrection.duplicate !== true ||
+    staleCorrection.error?.code !== "STALE_VERSION" ||
+    correctedTarget?.ticketCount !== 5 ||
+    correctionAudit?.payload.wholeGroupPreserved !== true ||
+    correctionAudit.payload.administrativeCorrection !== true ||
+    correctionAudit.payload.safetyApproval !== false ||
+    correctionAudit.payload.capacityExceeded !== true
+  ) {
+    throw new Error("Administrativer Manifest-Korrekturpfad ist nicht vollständig geschützt.");
+  }
+  const rejectedOversize = await sell(
+    correctedManifest.event.version,
+    "panorama-20",
+    5,
+    false,
+    409,
+  );
   if (
     rejectedOversize.error?.code !== "OVERSIZE_GROUP_SPLIT_CONFIRMATION_REQUIRED" ||
     rejectedOversize.error.referenceCapacity !== 4 ||
@@ -414,7 +509,7 @@ try {
   ) {
     throw new Error("Übergröße wurde ohne verständliche Bestätigungsvorgabe verarbeitet.");
   }
-  const splitGroup = await sell(lateMoveSource.event.version, "panorama-20", 5, true);
+  const splitGroup = await sell(correctedManifest.event.version, "panorama-20", 5, true);
   current = await board();
   const splitRotations = current.rotations
     .filter((rotation) => rotation.ticketGroupId === splitGroup.aggregate.id)
@@ -486,11 +581,12 @@ try {
   ) {
     throw new Error("Stornierung hat aktive Zuordnungen der aufgeteilten Gruppe hinterlassen.");
   }
-  const capacityFill = await sell(canceledSplit.event.version, "panorama-20", 2);
+  const capacitySeed = await sell(canceledSplit.event.version, "panorama-20", 1);
+  const capacityFill = await sell(capacitySeed.event.version, "panorama-20", 2);
   const capacityOverflow = await sell(capacityFill.event.version, "panorama-20", 1);
   if (
-    capacityFill.aggregate.relatedRotationId !== lateMoveSource.aggregate.relatedRotationId ||
-    capacityOverflow.aggregate.relatedRotationId !== lateMoveSource.aggregate.relatedRotationId
+    capacityFill.aggregate.relatedRotationId !== capacitySeed.aggregate.relatedRotationId ||
+    capacityOverflow.aggregate.relatedRotationId !== capacitySeed.aggregate.relatedRotationId
   ) {
     throw new Error("Synthetischer Kapazitätsumlauf wurde nicht wie erwartet gefüllt.");
   }
@@ -501,7 +597,7 @@ try {
     capacityOverflow.event.version,
     "SET_ROTATION_CAPACITY",
     {
-      rotationId: lateMoveSource.aggregate.relatedRotationId,
+      rotationId: capacityFill.aggregate.relatedRotationId,
       usableCapacity: 3,
       reason: "Organisatorisch nur drei Plätze nutzbar",
     },
@@ -514,7 +610,7 @@ try {
     capacityOverflow.event.version,
     "SET_ROTATION_CAPACITY",
     {
-      rotationId: lateMoveSource.aggregate.relatedRotationId,
+      rotationId: capacityFill.aggregate.relatedRotationId,
       usableCapacity: 3,
       reason: "Organisatorisch nur drei Plätze nutzbar",
     },
@@ -527,7 +623,7 @@ try {
     capacityOverflow.event.version,
     "SET_ROTATION_CAPACITY",
     {
-      rotationId: lateMoveSource.aggregate.relatedRotationId,
+      rotationId: capacityFill.aggregate.relatedRotationId,
       usableCapacity: 2,
       reason: "Veralteter Kapazitätsversuch",
     },
@@ -539,7 +635,7 @@ try {
     reducedCapacity.event.version,
     "SET_ROTATION_CAPACITY",
     {
-      rotationId: lateMoveSource.aggregate.relatedRotationId,
+      rotationId: capacityFill.aggregate.relatedRotationId,
       usableCapacity: 2,
       reason: "Unzulässiger Kassentest",
     },
@@ -559,12 +655,12 @@ try {
   );
   current = await board();
   const reducedRotation = current.rotations.find(
-    (rotation) => rotation.id === lateMoveSource.aggregate.relatedRotationId,
+    (rotation) => rotation.id === capacityFill.aggregate.relatedRotationId,
   );
   const requeuedCapacityGroup = current.rotations.find(
     (rotation) => rotation.ticketGroupId === capacityOverflow.aggregate.id,
   );
-  const capacityHistory = await history("ROTATION", lateMoveSource.aggregate.relatedRotationId);
+  const capacityHistory = await history("ROTATION", capacityFill.aggregate.relatedRotationId);
   const capacityAudit = capacityHistory.entries.find(
     (entry) => entry.eventType === "ROTATION_CAPACITY_CHANGED",
   );
@@ -614,6 +710,12 @@ try {
       manualMoveAfterCallConfirmed: true,
       manualMoveAuditRecorded: true,
       manualMoveAfterTakeoffRejected: true,
+      administrativeManifestCorrection: true,
+      manifestCorrectionRoleAndPinProtected: true,
+      manifestCorrectionWholeGroupPreserved: true,
+      manifestCorrectionCapacityDeviationAudited: true,
+      manifestCorrectionIdempotent: true,
+      manifestCorrectionStaleWriteRejected: true,
       manualMoveRoleProtected: true,
       manualMoveCapacityProtected: true,
       manualMoveIdempotent: true,

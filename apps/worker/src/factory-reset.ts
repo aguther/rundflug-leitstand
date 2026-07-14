@@ -9,6 +9,7 @@ export const FACTORY_RESET_DELETE_TABLES = [
   "outage_recovery_entries",
   "outage_recovery_batches",
   "forecast_snapshots",
+  "rotation_manifest_corrections",
   "rotation_tickets",
   "rotations",
   "flight_groups",

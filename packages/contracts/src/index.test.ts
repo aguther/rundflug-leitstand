@@ -175,6 +175,25 @@ describe("commandEnvelopeSchema", () => {
     expect(JSON.stringify(parsed)).not.toMatch(/guest|name|safe|freigabe/i);
   });
 
+  it("validates an administrator manifest correction without personal data", () => {
+    const parsed = commandEnvelopeSchema.parse({
+      commandId: "550e8400-e29b-41d4-a716-446655440031",
+      eventId: "synthetic-event",
+      deviceId: "synthetic-admin",
+      expectedVersion: 4,
+      issuedAt: "2026-07-11T12:00:00.000Z",
+      type: "CORRECT_ROTATION_MANIFEST",
+      payload: {
+        ticketGroupId: "synthetic-group",
+        targetRotationId: "synthetic-target",
+        reason: "Tatsächliche Gruppenbesetzung nachträglich richtigstellen",
+        adminPin: "0000",
+      },
+    });
+    expect(parsed.type).toBe("CORRECT_ROTATION_MANIFEST");
+    expect(JSON.stringify(parsed)).not.toMatch(/guestName|phoneNumber|passengerName/);
+  });
+
   it("accepts only hashed credentials for device pairing", () => {
     const parsed = commandEnvelopeSchema.parse({
       commandId: "550e8400-e29b-41d4-a716-446655440001",

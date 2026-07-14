@@ -33,6 +33,13 @@ describe("command authorization", () => {
     );
   });
 
+  it("reserves post-departure manifest corrections for administrators", () => {
+    expect(() => assertRoleMayExecute("ADMIN", "CORRECT_ROTATION_MANIFEST")).not.toThrow();
+    expect(() =>
+      assertRoleMayExecute("FLIGHT_LINE_LEAD", "CORRECT_ROTATION_MANIFEST"),
+    ).toThrowError(/darf CORRECT_ROTATION_MANIFEST nicht/);
+  });
+
   it("rejects a display device for operational commands", () => {
     expect(() => assertRoleMayExecute("DISPLAY", "CALL_NEXT")).toThrowError(/darf CALL_NEXT nicht/);
   });

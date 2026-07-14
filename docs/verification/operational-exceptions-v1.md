@@ -65,6 +65,11 @@ Protocol durchgeführt.
 
 ## Verbleibende Abgrenzung
 
-F-SLT-040 bleibt teilweise offen: Änderungen vor `IN_FLIGHT` und die technische Sperre danach sind
-umgesetzt. Ein eigener dokumentierter Administrationsvorgang für eine nachträgliche Korrektur nach
-`IN_FLIGHT` ist noch nicht Bestandteil dieses Ergebnisses.
+F-SLT-040 ist auf Vertrags-, Rollen-, Datenbank- und Worker-Ebene vollständig geschützt: Änderungen
+vor `IN_FLIGHT` laufen über die normale Disposition, danach ist dieser Pfad gesperrt. Der separate
+Administrator-Korrekturpfad `CORRECT_ROTATION_MANIFEST` verlangt eine gültige PIN, verschiebt nur
+vollständige anonyme Ticketgruppen und schreibt Ausgangs-/Zielumlauf, Begründung, Eventversion,
+Kapazitätsabweichung und die fehlende Sicherheitsfreigabe append-only in Migration 0030 und Audit.
+Der Integrationstest belegt Rollen- und PIN-Schutz, Idempotenz, stale-write-Ablehnung sowie den
+Gruppenschutz. Die Bedienoberfläche für diesen seltenen Sonderfall bleibt Teil der noch ausstehenden
+Administrationsabnahme; deshalb verbleibt die Traceability bis dahin auf `geplant`.
