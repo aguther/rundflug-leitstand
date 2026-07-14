@@ -50,6 +50,7 @@ import {
 } from "./api";
 import {
   type BoardSyncState,
+  isDeviceAuthorizationError,
   nextBoardReconnectDelay,
   OPERATION_BOARD_POLL_INTERVAL_MS,
   OPERATION_BOARD_RECONNECT_INITIAL_MS,
@@ -2563,7 +2564,8 @@ function AdminView() {
   const [deleteAllBackups, setDeleteAllBackups] = useState(false);
   const [factoryResetCommandId, setFactoryResetCommandId] = useState(() => crypto.randomUUID());
   const resourceGroups = board?.resourceGroups ?? [];
-  const isAdministrator = error === null && board?.currentDeviceRole === "ADMIN";
+  const isAdministrator = board?.currentDeviceRole === "ADMIN";
+  const deviceAuthorizationRejected = isDeviceAuthorizationError(error);
   const productPriceCents = parseEuroToCents(productPriceInput);
   const manifestCandidates = manifestCorrectionCandidates(board?.rotations ?? []);
   const selectedManifestCandidate = manifestCandidates.find(
@@ -4029,7 +4031,9 @@ function AdminView() {
                   ? "Betrieb noch nicht freigegeben"
                   : board?.event.status === "CLOSED"
                     ? "Betrieb geschlossen"
-                    : "Stand wird geladen"}
+                    : error
+                      ? "Stand nicht verfügbar"
+                      : "Stand wird geladen"}
             </span>
           </header>
           {adminArea === "setup" ? (
@@ -4120,20 +4124,34 @@ function AdminView() {
               <button
                 className="secondary-action"
                 onClick={() => {
-                  allowDeviceCredentialRecovery(ADMIN_DEVICE_ID);
+                  if (deviceAuthorizationRejected) {
+                    allowDeviceCredentialRecovery(ADMIN_DEVICE_ID);
+                  }
                   void refresh();
                 }}
                 type="button"
               >
-                Gerätebindung erneut prüfen
+                {deviceAuthorizationRejected
+                  ? "Gerätebindung erneut prüfen"
+                  : "Betriebsstand erneut laden"}
               </button>
             )}
             {!isAdministrator ? (
-              <ValidationHint tone="error">
-                Dieses Browsergerät ist aktuell nicht als Administration bestätigt. Die vorhandene
-                lokale Gerätebindung wird automatisch geprüft; danach erscheinen PIN-Modus und Reset
-                wieder aktiv.
-              </ValidationHint>
+              deviceAuthorizationRejected ? (
+                <ValidationHint tone="error">
+                  Dieses Browsergerät wurde vom Server nicht als Administration bestätigt. Die
+                  vorhandene lokale Gerätebindung wird erneut geprüft; danach erscheinen PIN-Modus
+                  und Reset wieder aktiv.
+                </ValidationHint>
+              ) : error ? (
+                <ValidationHint tone="error">
+                  Der Betriebsstand ist serverseitig nicht verfügbar. Das bedeutet nicht, dass die
+                  Gerätebindung verloren ist. PIN-Modus und Reset erscheinen wieder, sobald ein
+                  bestätigter Stand geladen wurde.
+                </ValidationHint>
+              ) : (
+                <ValidationHint>Gerätebindung und Betriebsstand werden geprüft.</ValidationHint>
+              )
             ) : null}
             {adminArea === "operations" ? (
               <label>

@@ -20,6 +20,8 @@ describe("V1 administration completion UI", () => {
 
   it("keeps recovery controls visible and transfers the anonymous admin credential on restart", () => {
     expect(appSource).toContain("Gerätebindung erneut prüfen");
+    expect(appSource).toContain("Betriebsstand erneut laden");
+    expect(appSource).toContain("Das bedeutet nicht, dass die");
     expect(appSource).toContain("attemptedDeviceCredentialRecoveries.has(deviceId)");
     expect(appSource).toContain("allowDeviceCredentialRecovery(ADMIN_DEVICE_ID)");
     expect(appSource).toContain("Reset ist sichtbar, bleibt aber gesperrt");
