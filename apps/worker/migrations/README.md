@@ -141,3 +141,12 @@ Wiederherstellung erfolgt aus dieser Sicherung beziehungsweise per D1 Time Trave
 additiven Spalten nicht ohne Tabellenneuaufbau entfernt werden können. Ein älterer Worker kann die
 nullable Spalten übergangsweise ignorieren, darf nach einer bereits vorgenommenen manuellen
 Wiedereinreihung aber nicht dauerhaft weiterbetrieben werden.
+
+## 0029 – Nachvollziehbare Prognosedatengrundlage
+
+Ergänzt Prognose-Snapshots additiv um den auslösenden fachlichen Ereignistyp, den verwendeten
+Historienbezug, Stichprobengröße und Datenalter sowie aktive Kapazität und Referenzdauer. Bestehende
+Snapshots werden ausdrücklich als `LEGACY_UNKNOWN` gekennzeichnet und bleiben unverändert
+auswertbar. Vor Anwendung wird eine portable D1-Sicherung erzeugt. Wiederherstellung erfolgt aus
+dieser Sicherung beziehungsweise per D1 Time Travel; ältere Worker dürfen nach der Migration keine
+neuen Snapshots mehr schreiben, weil ihnen die vollständige Datengrundlage fehlt.

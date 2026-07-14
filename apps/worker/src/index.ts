@@ -4,6 +4,8 @@ import {
   cloneEventRequestSchema,
   type FactoryResetResponse,
   factoryResetRequestSchema,
+  forecastHistoryQuerySchema,
+  forecastHistorySchema,
   operationalHistoryQuerySchema,
   operationalHistorySchema,
 } from "@rundflug/contracts";
@@ -12,8 +14,10 @@ import { Hono } from "hono";
 import { secureHeaders } from "hono/secure-headers";
 import { createPortableBackup, operationDateInTimeZone } from "./backup";
 import { sha256Hex, verifyCredential } from "./crypto";
+import { dailyReportCsv, dailyReportPdfLines, loadDailyReport } from "./daily-report";
 import { EventCoordinator } from "./event-coordinator";
 import { factoryResetRequestHash, factoryResetStatements, finishR2Cleanup } from "./factory-reset";
+import { buildForecastHistoryStatement } from "./forecast-history";
 import { buildOperationalHistoryStatement } from "./operational-history";
 import { allowUnknownTicketAttempt } from "./public-access";
 import { createCsv, createTextPdf } from "./report";
@@ -1682,6 +1686,128 @@ app.get("/api/events/:eventId/history/operations", async (context) => {
   );
 });
 
+app.get("/api/events/:eventId/history/forecasts", async (context) => {
+  const eventId = context.req.param("eventId");
+  const device = await authorizeDevice(
+    context.env,
+    eventId,
+    context.req.header("x-device-id"),
+    context.req.header("x-device-token"),
+  );
+  if (!device || !["ADMIN", "FLIGHT_LINE_LEAD", "FLIGHT_DIRECTOR"].includes(device.role)) {
+    return context.json(
+      { error: { code: "DEVICE_NOT_AUTHORIZED", message: "Gerät nicht berechtigt." } },
+      403,
+    );
+  }
+  const parsedQuery = forecastHistoryQuerySchema.safeParse({
+    rotationId: context.req.query("rotationId"),
+    aircraftId: context.req.query("aircraftId"),
+    pilotId: context.req.query("pilotId"),
+    since: context.req.query("since"),
+    until: context.req.query("until"),
+    limit: context.req.query("limit"),
+    offset: context.req.query("offset"),
+  });
+  if (!parsedQuery.success) {
+    return context.json(
+      {
+        error: {
+          code: "FORECAST_FILTERS_INVALID",
+          message: "Die Prognosefilter sind ungültig.",
+        },
+      },
+      400,
+    );
+  }
+  const statement = buildForecastHistoryStatement(eventId, parsedQuery.data);
+  const rows = await context.env.DB.prepare(statement.sql)
+    .bind(...statement.bindings)
+    .all<{
+      snapshot_id: string;
+      rotation_id: string;
+      flight_group_id: string;
+      communication_number: number;
+      product_code: string;
+      aircraft_id: string | null;
+      aircraft_registration: string | null;
+      pilot_id: string | null;
+      pilot_operational_code: string | null;
+      operation_day_version: number;
+      captured_at: string;
+      trigger_event_type: string;
+      quality: string;
+      lower_minutes: number;
+      upper_minutes: number;
+      data_basis_scope: string;
+      sample_size: number;
+      data_age_minutes: number;
+      active_capacity: number;
+      reference_duration_minutes: number;
+      predicted_boarding_at: string | null;
+      predicted_departure_at: string | null;
+      predicted_landing_at: string | null;
+      predicted_completion_at: string | null;
+      called_at: string | null;
+      departed_at: string | null;
+      landed_at: string | null;
+      completed_at: string | null;
+      boarding_deviation_minutes: number | null;
+      departure_deviation_minutes: number | null;
+      landing_deviation_minutes: number | null;
+      completion_deviation_minutes: number | null;
+      total_count: number;
+    }>();
+  const query = parsedQuery.data;
+  return context.json(
+    forecastHistorySchema.parse({
+      entries: rows.results.map((row) => ({
+        snapshotId: row.snapshot_id,
+        rotationId: row.rotation_id,
+        flightGroupId: row.flight_group_id,
+        communicationNumber: row.communication_number,
+        communicationLabel: `${row.product_code}-${String(row.communication_number).padStart(3, "0")}`,
+        aircraftId: row.aircraft_id,
+        aircraftRegistration: row.aircraft_registration,
+        pilotId: row.pilot_id,
+        pilotOperationalCode: row.pilot_operational_code,
+        operationDayVersion: row.operation_day_version,
+        capturedAt: row.captured_at,
+        triggerEventType: row.trigger_event_type,
+        quality: row.quality,
+        lowerMinutes: row.lower_minutes,
+        upperMinutes: row.upper_minutes,
+        dataBasisScope: row.data_basis_scope,
+        sampleSize: row.sample_size,
+        dataAgeMinutes: row.data_age_minutes,
+        activeCapacity: row.active_capacity,
+        referenceDurationMinutes: row.reference_duration_minutes,
+        predicted: {
+          boardingAt: row.predicted_boarding_at,
+          departureAt: row.predicted_departure_at,
+          landingAt: row.predicted_landing_at,
+          completionAt: row.predicted_completion_at,
+        },
+        actual: {
+          boardingAt: row.called_at,
+          departureAt: row.departed_at,
+          landingAt: row.landed_at,
+          completionAt: row.completed_at,
+        },
+        deviationMinutes: {
+          boarding: row.boarding_deviation_minutes,
+          departure: row.departure_deviation_minutes,
+          landing: row.landing_deviation_minutes,
+          completion: row.completion_deviation_minutes,
+        },
+      })),
+      total: rows.results[0]?.total_count ?? 0,
+      limit: query.limit,
+      offset: query.offset,
+    }),
+  );
+});
+
 app.get("/api/events/:eventId/devices", async (context) => {
   const eventId = context.req.param("eventId");
   const device = await authorizeDevice(
@@ -1739,39 +1865,14 @@ app.get("/api/events/:eventId/reports/daily.csv", async (context) => {
       403,
     );
   }
-  const rows = await context.env.DB.prepare(
-    `SELECT p.name AS product_name, t.payment_method, t.payment_status,
-            COUNT(*) AS ticket_count,
-            SUM(CASE WHEN t.status = 'CANCELED' THEN 1 ELSE 0 END) AS canceled_count,
-            SUM(CASE WHEN t.status <> 'CANCELED' THEN t.price_cents ELSE 0 END) AS amount_cents
-       FROM tickets t
-       JOIN ticket_groups tg ON tg.id = t.ticket_group_id
-       JOIN products p ON p.id = tg.product_id
-      WHERE tg.operation_day_id = ?1
-      GROUP BY p.id, t.payment_method, t.payment_status
-      ORDER BY p.name, t.payment_method`,
-  )
-    .bind(eventId)
-    .all<{
-      product_name: string;
-      payment_method: string | null;
-      payment_status: string;
-      ticket_count: number;
-      canceled_count: number;
-      amount_cents: number;
-    }>();
-  const lines = [
-    ["Produkt", "Zahlart", "Zahlstatus", "Tickets", "Stornos", "Betrag_Cent"],
-    ...rows.results.map((row) => [
-      row.product_name,
-      row.payment_method ?? "NICHT_ERFASST",
-      row.payment_status,
-      row.ticket_count,
-      row.canceled_count,
-      row.amount_cents,
-    ]),
-  ];
-  const csv = createCsv(lines);
+  const report = await loadDailyReport(context.env.DB, eventId);
+  if (!report) {
+    return context.json(
+      { error: { code: "EVENT_NOT_FOUND", message: "Veranstaltung nicht gefunden." } },
+      404,
+    );
+  }
+  const csv = dailyReportCsv(report);
   return new Response(csv, {
     headers: {
       "content-type": "text/csv; charset=utf-8",
@@ -1872,32 +1973,13 @@ app.get("/api/events/:eventId/reports/daily.pdf", async (context) => {
       403,
     );
   }
-  const summary = await context.env.DB.prepare(
-    `SELECT od.name, od.event_date,
-            (SELECT COUNT(*) FROM tickets t JOIN ticket_groups tg ON tg.id = t.ticket_group_id WHERE tg.operation_day_id = od.id) AS tickets,
-            (SELECT COUNT(*) FROM tickets t JOIN ticket_groups tg ON tg.id = t.ticket_group_id WHERE tg.operation_day_id = od.id AND t.status = 'CANCELED') AS cancellations,
-            (SELECT COALESCE(SUM(t.price_cents), 0) FROM tickets t JOIN ticket_groups tg ON tg.id = t.ticket_group_id WHERE tg.operation_day_id = od.id AND t.status <> 'CANCELED') AS revenue,
-            (SELECT COUNT(*) FROM rotations r WHERE r.operation_day_id = od.id AND r.status = 'COMPLETED') AS completed_rotations,
-            (SELECT ROUND(AVG((julianday(r.completed_at) - julianday(r.called_at)) * 1440), 1) FROM rotations r WHERE r.operation_day_id = od.id AND r.completed_at IS NOT NULL) AS average_rotation
-       FROM operation_days od
-      WHERE od.id = ?1`,
-  )
-    .bind(eventId)
-    .first<Record<string, string | number | null>>();
-  if (!summary)
+  const report = await loadDailyReport(context.env.DB, eventId);
+  if (!report)
     return context.json(
       { error: { code: "EVENT_NOT_FOUND", message: "Veranstaltung nicht gefunden." } },
       404,
     );
-  const pdf = createTextPdf(`Tagesbericht ${String(summary.name)}`, [
-    `Datum: ${String(summary.event_date)}`,
-    `Tickets: ${String(summary.tickets ?? 0)}`,
-    `Stornos: ${String(summary.cancellations ?? 0)}`,
-    `Abgeschlossene Umlaeufe: ${String(summary.completed_rotations ?? 0)}`,
-    `Mittlere Umlaufzeit: ${String(summary.average_rotation ?? "-")} Minuten`,
-    `Informatorischer Umsatz: ${(Number(summary.revenue ?? 0) / 100).toFixed(2)} EUR`,
-    "Zeitangaben basieren auf bestaetigten operativen Ist-Ereignissen.",
-  ]);
+  const pdf = createTextPdf(`Tagesbericht ${report.summary.name}`, dailyReportPdfLines(report));
   return new Response(
     pdf.buffer.slice(pdf.byteOffset, pdf.byteOffset + pdf.byteLength) as ArrayBuffer,
     {
