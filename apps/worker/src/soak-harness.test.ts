@@ -6,6 +6,9 @@ describe("V1 twelve-hour reliability harness", () => {
     expect(soakHarness).toContain("12 * 60 * 60");
     expect(soakHarness).toContain("Worker-Prozess wurde während des Langlaufs beendet");
     expect(soakHarness).toContain("workerRestarted: false");
+    expect(soakHarness).toContain("SOAK_PORT");
+    expect(soakHarness).toContain("SOAK_PERSIST_TO");
+    expect(soakHarness).toContain('"--persist-to"');
   });
 
   it("exercises authenticated writes, reads, realtime and latency limits anonymously", () => {

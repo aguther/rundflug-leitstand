@@ -4,7 +4,8 @@ Status: Harness implementiert und im Kurzlauf verifiziert; echter 12-Stunden-Abn
 
 Betroffene Anforderung: Q-ZUV-050.
 
-`npm run test:soak-reliability` startet genau einen lokalen Worker-Prozess mit lokaler D1-Datenbank
+`npm run test:soak-reliability` startet genau einen lokalen Worker-Prozess mit isolierter lokaler
+D1-Datenbank unter `.wrangler/soak-state` und standardmäßig auf Port 8797
 und ausschließlich synthetischen anonymen Daten. Ohne Neustart wiederholt der Lauf standardmäßig
 zwölf Stunden lang:
 
@@ -15,7 +16,8 @@ zwölf Stunden lang:
 - Empfang mindestens eines Realtime-Ereignisses je Zustandszyklus,
 - harte Zwei-Sekunden-Grenze für jeden Request.
 
-Die lokale Datenbank wird vor dem Lauf zurückgesetzt. PIN, Gerätetoken und öffentliche Ticketcodes
+Nur die isolierte Langlaufdatenbank wird vor dem Lauf zurückgesetzt; die normale lokale Entwicklung
+unter `.wrangler/state` und Port 8787 bleibt unberührt. PIN, Gerätetoken und öffentliche Ticketcodes
 sind ausschließlich synthetisch; sie werden nicht ausgegeben. Der Abschlussbericht enthält Laufzeit,
 Zyklen, Requestanzahl, Median, p95, Maximum, Realtime-Nachrichten und den Nachweis, dass der
 Worker-Prozess nicht beendet wurde.
@@ -45,6 +47,11 @@ abgeschlossen:
 
 Der Vorab-Lauf weist die Funktionsfähigkeit des Harnesses und des wiederholten Ende-zu-Ende-Pfads
 nach. Er ersetzt nicht die geforderte zwölfstündige Beobachtungsdauer.
+
+Die isolierte Ausführung wurde nach Einführung des separaten Persistenzpfads zusätzlich mit 20
+Sekunden und Zwei-Sekunden-Intervall geprüft: 10 Zyklen, 50 Requests, 31 Realtime-Nachrichten,
+p95 45,8 ms, Maximum 52,9 ms und kein Worker-Neustart. Port 8787 und `.wrangler/state` wurden dabei
+nicht verwendet.
 
 Q-ZUV-050 bleibt bis zu einem erfolgreichen ungekürzten Lauf mit mindestens 43.200 Sekunden in der
 Traceability auf `geplant`.
