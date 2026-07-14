@@ -45,6 +45,8 @@
     "docs:verify": "node scripts/verify_architecture_docs.mjs",
     "requirements:verify": "python3 scripts/verify_requirements.py",
     "db:migrate:local": "wrangler d1 migrations apply DB --local --config wrangler.jsonc",
+    "db:migrations:remote:status": "wrangler d1 migrations list DB --remote --config wrangler.jsonc",
+    "db:migrate:remote": "wrangler d1 migrations apply DB --remote --config wrangler.jsonc",
     "db:seed:local": "wrangler d1 execute DB --local --file apps/worker/seed/demo.sql --config wrangler.jsonc",
     "db:reset:local": "node scripts/reset_local_db.mjs",
     "db:reset:empty-local": "node scripts/reset_local_db.mjs --empty",

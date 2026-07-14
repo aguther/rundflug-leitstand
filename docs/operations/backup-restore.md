@@ -1,5 +1,29 @@
 # Backup und Wiederherstellung
 
+## Migrationsnotiz 0031 – Gate-Anzeigefilter
+
+Migration `0031_gate_display_filters.sql` ergänzt ausschließlich die nicht-nullbare Spalte
+`gates.display_filter_json` mit dem sicheren Standard `{"productIds":[],"rotationStatuses":[]}`.
+Bestehende Gates zeigen damit weiterhin alle Produkte und Umlaufstatus; Daten werden weder gelöscht
+noch umgedeutet. Der Worker kann lesende Kernansichten während des additiven Migrationsfensters mit
+diesem Standard bedienen. Speichern neuer Filter setzt die angewendete Migration voraus.
+
+Vor dem Remote-Lauf werden ein portables R2-Backup und der D1-Time-Travel-Zeitpunkt kontrolliert. Bei
+einem fehlgeschlagenen Worker-Rollout wird zuerst die vorherige Worker-Version wiederhergestellt.
+Eine technische Down-Migration ist wegen der additiven SQLite-Spalte nicht vorgesehen; falls eine
+vollständige Schema-Rückkehr erforderlich ist, wird D1 in eine isolierte Datenbank aus dem
+unmittelbar vorherigen Backup beziehungsweise per Time Travel wiederhergestellt und dort geprüft.
+
+## Migrationsnotiz 0030 – dokumentierte Manifestkorrekturen
+
+Migration `0030_rotation_manifest_corrections.sql` ergänzt eine neue append-only Tabelle samt Index
+und Update-/Delete-Sperren. Bestehende Tickets, Umläufe und Auditereignisse bleiben unverändert. Vor
+dem Remote-Lauf werden ein portables R2-Backup und der D1-Time-Travel-Zeitpunkt kontrolliert. Bei
+einem fehlgeschlagenen Worker-Rollout wird zuerst die vorherige Worker-Version wiederhergestellt.
+Für eine vollständige Schema-Rückkehr wird D1 aus dem unmittelbar vorherigen Backup beziehungsweise
+per Time Travel in eine isolierte Datenbank wiederhergestellt; die Korrekturtabelle wird nicht
+manuell aus einer laufenden Datenbank entfernt.
+
 ## Migrationsnotiz 0027 – Umlaufkapazität und operative Queue
 
 Migration `0027_rotation_capacity_queue.sql` ergänzt ausschließlich zwei nullable Spalten und einen
