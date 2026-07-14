@@ -1,5 +1,5 @@
-import { buildPushPayload } from "@block65/webcrypto-web-push";
 import type { Env } from "./types";
+import { buildWebPushRequest } from "./web-push-request";
 
 interface StoredPushSubscription {
   delivery_id: string;
@@ -94,6 +94,11 @@ export async function sendRotationPushNotifications(
     .run();
   if (!env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_KEY || !env.VAPID_SUBJECT)
     return queued.meta.changes;
+  const vapid = {
+    subject: env.VAPID_SUBJECT,
+    publicKey: env.VAPID_PUBLIC_KEY,
+    privateKey: env.VAPID_PRIVATE_KEY,
+  };
   const subscriptions = await env.DB.prepare(
     `SELECT d.id AS delivery_id, w.id, w.endpoint, w.p256dh, w.auth
        FROM web_push_deliveries d
@@ -106,22 +111,14 @@ export async function sendRotationPushNotifications(
   const messageBody = PUSH_MESSAGES[eventType];
   await Promise.allSettled(
     subscriptions.results.map(async (subscription) => {
-      const payload = await buildPushPayload(
-        {
-          data: JSON.stringify({ title: "Rundflug-Leitstand", body: messageBody, url: "/" }),
-          options: { ttl: 300 },
-        },
-        {
-          endpoint: subscription.endpoint,
-          expirationTime: null,
-          keys: { p256dh: subscription.p256dh, auth: subscription.auth },
-        },
-        {
-          subject: env.VAPID_SUBJECT,
-          publicKey: env.VAPID_PUBLIC_KEY,
-          privateKey: env.VAPID_PRIVATE_KEY,
-        },
-      );
+      const payload = await buildWebPushRequest({
+        data: JSON.stringify({ title: "Rundflug-Leitstand", body: messageBody, url: "/" }),
+        endpoint: subscription.endpoint,
+        p256dh: subscription.p256dh,
+        auth: subscription.auth,
+        ttl: 300,
+        vapid,
+      });
       const requestBody = new ArrayBuffer(payload.body.byteLength);
       new Uint8Array(requestBody).set(payload.body);
       const headers = new Headers();
