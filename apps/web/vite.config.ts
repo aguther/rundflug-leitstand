@@ -7,7 +7,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: [],
+      includeAssets: ["icons/app-icon.svg", "icons/app-icon-180.png"],
       manifest: {
         name: "Rundflug-Leitstand",
         short_name: "Leitstand",
@@ -17,7 +17,26 @@ export default defineConfig({
         display: "standalone",
         background_color: "#f4f7fa",
         theme_color: "#102a43",
-        icons: [],
+        icons: [
+          {
+            src: "/icons/app-icon-192.png",
+            sizes: "192x192",
+            type: "image/png",
+            purpose: "any",
+          },
+          {
+            src: "/icons/app-icon-512.png",
+            sizes: "512x512",
+            type: "image/png",
+            purpose: "any",
+          },
+          {
+            src: "/icons/app-icon-512-maskable.png",
+            sizes: "512x512",
+            type: "image/png",
+            purpose: "maskable",
+          },
+        ],
       },
       workbox: {
         navigateFallback: "/index.html",
