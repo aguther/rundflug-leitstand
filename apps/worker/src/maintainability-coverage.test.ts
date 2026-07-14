@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import interfaceDocumentation from "../../../docs/architecture/command-and-realtime-interface.md?raw";
 import rootManifestRaw from "../../../package.json?raw";
+import packageLockRaw from "../../../package-lock.json?raw";
 import contractsManifestRaw from "../../../packages/contracts/package.json?raw";
 import contractSource from "../../../packages/contracts/src/index.ts?raw";
 import domainManifestRaw from "../../../packages/domain/package.json?raw";
@@ -33,7 +34,6 @@ const dependencyNames = (raw: string) => {
 describe("V1 maintainability and portability boundaries", () => {
   it("uses a deliberately small allowlist of common open-source runtime and build dependencies", () => {
     const allowed = new Set([
-      "@block65/webcrypto-web-push",
       "@cloudflare/workers-types",
       "@rundflug/config",
       "@rundflug/contracts",
@@ -66,6 +66,8 @@ describe("V1 maintainability and portability boundaries", () => {
 
     expect([...new Set(dependencies)].filter((name) => !allowed.has(name))).toEqual([]);
     expect(JSON.parse(domainManifestRaw)).not.toHaveProperty("dependencies");
+    expect(packageLockRaw).not.toContain("@block65/webcrypto-web-push");
+    expect(packageLockRaw).not.toContain("@block65/custom-error");
   });
 
   it("keeps the complete domain package free of UI, HTTP, database and Cloudflare adapters", () => {
