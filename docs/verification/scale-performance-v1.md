@@ -28,6 +28,21 @@ Referenzlauf am 14. Juli 2026:
 Die Messwerte sind harte Abbruchkriterien des Skripts; eine Überschreitung beendet den Lauf
 fehlerhaft. Q-PER-020 und die Worker-Seite von Q-PER-010 sind damit reproduzierbar nachgewiesen.
 
-Nicht durch diesen lokalen Lauf ersetzt werden die Browsermessung der lokalen UI-Reaktion unter
-300 ms, der zwölfstündige Langlauf, die Cloudflare-Verfügbarkeitsmessung oder die Generalprobe auf
-Originalhardware. Diese Nachweise bleiben eigene Abnahmepunkte.
+## Lokale Browserreaktion
+
+Die sichtbare Reaktion des Mengenschritts in der Kasse wurde am 14. Juli 2026 in Microsoft Edge über
+das Chrome DevTools Protocol gemessen. Jede Probe beginnt mit dem programmatischen Klick, wartet auf
+die React-DOM-Änderung und anschließend auf den nächsten Animationsframe. Dadurch wird nicht nur die
+Event-Handler-Laufzeit, sondern die nächste darstellbare Reaktion erfasst.
+
+| Viewport | Proben | Median | p95 | Maximum | Grenze |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Desktop 1440 × 1000 | 100 | 16,7 ms | 18,1 ms | 18,5 ms | < 300 ms |
+| Mobil 430 × 900 | 100 | 16,5 ms | 18,0 ms | 18,6 ms | < 300 ms |
+
+Auf Mobil blieb die Seitenbreite bei exakt 430 Pixeln. Zusammen mit dem serverseitigen
+Standardverkauf von 89 ms sind damit beide Grenzwerte aus Q-PER-010 nachgewiesen.
+
+Nicht durch diese lokalen Läufe ersetzt werden der zwölfstündige Langlauf, die
+Cloudflare-Verfügbarkeitsmessung oder die Generalprobe auf Originalhardware. Diese Nachweise bleiben
+eigene Abnahmepunkte.
