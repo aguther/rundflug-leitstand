@@ -34,12 +34,37 @@ ist in `wrangler.jsonc` bereits als Binding vorgesehen.
 
 ## 5. Migrationen
 
+Den ausstehenden Stand zunächst ausschließlich lesend prüfen:
+
 ```bash
-npx wrangler d1 migrations apply rundflug-leitstand --remote
+npm run db:migrations:remote:status
 ```
 
-Vor Produktionsmigrationen: Backup erstellen, Migration in Abnahme prüfen und Wiederherstellungspfad
-dokumentieren.
+Nach geprüftem Backup und ausdrücklicher Freigabe anwenden:
+
+```bash
+npm run db:migrate:remote
+```
+
+Beide Kommandos verwenden das Binding `DB` und ausdrücklich `wrangler.jsonc`. Dadurch wird nicht
+versehentlich eine gleichnamige lokale Datenbank oder eine alte Dashboard-Umgebung angesprochen.
+
+### Reihenfolge bei einem Commit mit neuen Migrationen
+
+Workers Builds deployt jeden Push auf `main` automatisch. Deshalb gilt für additive Migrationen:
+
+1. Commit lokal vollständig mit `npm run check` prüfen, aber noch nicht pushen.
+2. Portables R2-Backup und verfügbaren D1-Time-Travel-Zeitpunkt kontrollieren.
+3. `npm run db:migrations:remote:status` ausführen und die erwarteten Dateinamen abgleichen.
+4. Nach Freigabe `npm run db:migrate:remote` ausführen.
+5. Den bereits geprüften Commit nach `main` pushen und den Cloudflare-Build beobachten.
+6. Erneut den Migrationsstatus prüfen; `No migrations to apply` muss gemeldet werden.
+7. Healthcheck sowie je einen authentisierten und öffentlichen Smoke-Test ausführen.
+
+Neue Migrationen müssen abwärtskompatibel zum zu diesem Zeitpunkt noch laufenden Worker sein. Ist
+das nicht möglich, wird Workers Builds vorübergehend pausiert und ein dokumentiertes Wartungsfenster
+mit vorherigem Backup verwendet. Migrationen werden niemals stillschweigend im normalen Build
+ausgeführt.
 
 ## 6. Deployment
 
@@ -56,9 +81,9 @@ nicht produktiv genutzt wird, gibt es in Cloudflare bewusst nur diese eine Umgeb
   `npx wrangler versions upload --config wrangler.jsonc`
 
 Die D1-Migrationen laufen bewusst nicht implizit im Build. Sie werden vor dem ersten Acceptance-
-Deployment und nach neuen Migrationen mit dem Befehl aus Abschnitt 5 angewendet. Worker-Name und die
-in `wrangler.jsonc` eingetragene reale D1-ID müssen zusammenpassen. Lokale Entwicklung bleibt durch
-den lokalen Startbefehl und lokale D1-Daten getrennt.
+Deployment und bei neuen Migrationen in der Reihenfolge aus Abschnitt 5 angewendet. Worker-Name und
+die in `wrangler.jsonc` eingetragene reale D1-ID müssen zusammenpassen. Lokale Entwicklung bleibt
+durch den lokalen Startbefehl und lokale D1-Daten getrennt.
 
 PIN und Einrichtungscode können verdeckt abgefragt und direkt als Cloudflare-Secrets gesetzt werden;
 die PIN wird dabei ausschließlich lokal gehasht:

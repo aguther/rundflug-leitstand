@@ -69,6 +69,19 @@ Die aktuell verwendete D1-Datenbank und der R2-Bucket sind in `wrangler.jsonc` g
 Ressourcen müssen in EU-Jurisdiktion liegen. Die vollständige Anleitung steht in
 `docs/operations/cloudflare-setup.md`.
 
+Den Remote-Migrationsstand zeigt ausschließlich lesend:
+
+```bash
+npm run db:migrations:remote:status
+```
+
+Das Anwenden ausstehender Migrationen verändert die gebundene Cloudflare-D1 und erfolgt bewusst nur
+als eigener, bestätigter Betriebsschritt:
+
+```bash
+npm run db:migrate:remote
+```
+
 ## Repository-Struktur
 
 ```text
