@@ -100,7 +100,7 @@ HTTPS/WSS außerhalb der lokalen Entwicklung.
 | Datenschutzkontakt/Datenschutzbeauftragter, soweit erforderlich | offen |
 | konkrete Zwecke und Rechtsgrundlage je Datenkategorie | offen |
 | Kategorien betroffener Personen und Empfänger | offen |
-| Cloudflare-Vertragspartner, AVV/DPA und aktuelle Subprozessoren | offen |
+| Cloudflare-Vertragspartner, DPA v6.4 und aktuelle Subprozessoren gemäß Datenschutzabnahme | offen |
 | Push-Anbieter und mögliche Drittland-/Metadatenverarbeitung | offen |
 | Frist für operative Historie, Audit und Account-/Observability-Logs | offen |
 | Verfahren für Auskunft, Löschung, Sicherheitsvorfall und Betreiberwechsel | offen |
@@ -109,4 +109,5 @@ HTTPS/WSS außerhalb der lokalen Entwicklung.
 | Datum, prüfende Person und Freigabeentscheidung | offen |
 
 Q-DSG-040 bleibt bis zur dokumentierten Prüfung und Freigabe dieser Angaben sowie des realen
-Cloudflare-Vertrags-/Subprozessorstands auf `geplant`.
+Cloudflare-Vertrags-/Subprozessorstands auf `in Arbeit`. Das verbindliche Prüfprotokoll liegt unter
+`docs/operations/cloudflare-data-protection-acceptance-v1.md`.
