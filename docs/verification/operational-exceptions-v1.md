@@ -71,5 +71,8 @@ Administrator-Korrekturpfad `CORRECT_ROTATION_MANIFEST` verlangt eine gültige P
 vollständige anonyme Ticketgruppen und schreibt Ausgangs-/Zielumlauf, Begründung, Eventversion,
 Kapazitätsabweichung und die fehlende Sicherheitsfreigabe append-only in Migration 0030 und Audit.
 Der Integrationstest belegt Rollen- und PIN-Schutz, Idempotenz, stale-write-Ablehnung sowie den
-Gruppenschutz. Die Bedienoberfläche für diesen seltenen Sonderfall bleibt Teil der noch ausstehenden
-Administrationsabnahme; deshalb verbleibt die Traceability bis dahin auf `geplant`.
+Gruppenschutz. Die Administration bietet den seltenen Sonderfall im Bereich Betrieb als klar
+abgesetzte Korrektur an: auswählbar sind nur bereits gestartete vollständige anonyme Ticketgruppen
+und fachlich zulässige Zielumläufe; Grund, PIN-Modus und fehlende Sicherheitsfreigabe werden sichtbar
+erklärt. Die Browserabnahme vom 14. Juli 2026 und die ergänzenden UI-Modelltests schließen den
+V1-Nachweis ab.

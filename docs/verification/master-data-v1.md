@@ -58,6 +58,13 @@ Die Produkt- und PIN-Bedienung wurde nach Freigabe von `docs/ui/product-master-d
 - Einzel-PIN-Abfrage mit direktem Fokus, Enter und Escape,
 - serverseitig geprüften, speicherfreien Bearbeitungsmodus mit manueller Sperre.
 
+Nach einem sicheren Neustart übernimmt der Browser neben der neuen anonymen Admin-Geräte-ID auch
+den zugehörigen Gerätetoken. Für bereits mit einer früheren Version angelegte Neustarts prüft die
+Oberfläche lokal vorhandene frühere Tokens ausschließlich gegen dieselbe Geräte-ID und denselben
+Server. Erst eine bestätigte `ADMIN`-Rolle repariert die lokale Bindung; Tokens werden dabei weder
+angezeigt noch protokolliert. Bei einer gestörten Bindung bleiben Reset-Stufen und eine erneute
+Verbindungsprüfung sichtbar, aber serverseitig gesperrt.
+
 Die ergänzende Prüfung bei 768 Pixel erfolgt durch dieselben responsiven Regeln zwischen den
 nachgewiesenen Endpunkten; die verbindliche Originalhardware- und Sonnenlichtabnahme bleibt Teil
 des Feldabnahmeprotokolls.
