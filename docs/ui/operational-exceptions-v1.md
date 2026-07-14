@@ -1,6 +1,6 @@
 # Bedienkonzept operative Sonderfälle V1
 
-Status: **zur fachlichen und visuellen Freigabe**
+Status: **fachlich und visuell freigegeben am 14. Juli 2026**
 
 Betroffene Anforderungen: F-SLT-020, F-SLT-040, F-SLT-050, F-SLT-060, F-BRD-080,
 F-BRD-085, Q-UX-010, Q-UX-020, Q-UX-030 und Q-UX-040.

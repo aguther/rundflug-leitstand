@@ -12,8 +12,14 @@ import {
   eventSnapshotSchema,
   type FactoryResetRequest,
   type FactoryResetResponse,
+  type ForecastHistory,
+  type ForecastHistoryQuery,
   factoryResetResponseSchema,
+  forecastHistorySchema,
+  type OperationalHistory,
+  type OperationalHistoryQuery,
   type OperationBoard,
+  operationalHistorySchema,
   operationBoardSchema,
   type PublicBoard,
   type PublicTicketStatus,
@@ -170,6 +176,42 @@ export async function getAuditHistory(
   );
   if (!response.ok) throw new Error("Audit-Historie nicht verfügbar.");
   return auditHistorySchema.parse(await response.json());
+}
+
+function historyQuery(filters: Record<string, string | number | undefined>): string {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) {
+    if (value !== undefined && value !== "") query.set(key, String(value));
+  }
+  return query.toString();
+}
+
+export async function getOperationalHistory(
+  eventId: string,
+  deviceId: string,
+  deviceToken: string,
+  filters: Partial<OperationalHistoryQuery> = {},
+): Promise<OperationalHistory> {
+  const response = await fetch(
+    `/api/events/${encodeURIComponent(eventId)}/history/operations?${historyQuery(filters)}`,
+    { headers: { "x-device-id": deviceId, "x-device-token": deviceToken } },
+  );
+  if (!response.ok) throw new Error("Betriebshistorie nicht verfügbar.");
+  return operationalHistorySchema.parse(await response.json());
+}
+
+export async function getForecastHistory(
+  eventId: string,
+  deviceId: string,
+  deviceToken: string,
+  filters: Partial<ForecastHistoryQuery> = {},
+): Promise<ForecastHistory> {
+  const response = await fetch(
+    `/api/events/${encodeURIComponent(eventId)}/history/forecasts?${historyQuery(filters)}`,
+    { headers: { "x-device-id": deviceId, "x-device-token": deviceToken } },
+  );
+  if (!response.ok) throw new Error("Prognosehistorie nicht verfügbar.");
+  return forecastHistorySchema.parse(await response.json());
 }
 
 export async function downloadDailyReport(

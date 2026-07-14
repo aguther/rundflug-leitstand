@@ -11,6 +11,7 @@ node_modules/
 coverage/
 playwright-report/
 test-results/
+rundflug-leitstand-before-*.sql
 .DS_Store
 Thumbs.db
 *.log
