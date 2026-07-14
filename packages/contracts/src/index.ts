@@ -20,6 +20,23 @@ export const timeZoneSchema = z
     { message: "Ungültige IANA-Zeitzone" },
   );
 
+export const gateDisplayFilterSchema = z
+  .object({
+    productIds: z
+      .array(z.string().min(1).max(100))
+      .max(100)
+      .refine(
+        (values) => new Set(values).size === values.length,
+        "Produktfilter enthält Duplikate",
+      ),
+    rotationStatuses: z
+      .array(z.enum(["DRAFT", "CALLED", "IN_FLIGHT", "LANDED", "COMPLETED"]))
+      .max(5)
+      .refine((values) => new Set(values).size === values.length, "Statusfilter enthält Duplikate"),
+  })
+  .strict();
+export type GateDisplayFilter = z.infer<typeof gateDisplayFilterSchema>;
+
 const commandBaseSchema = z.object({
   commandId: z.uuid(),
   eventId: z.string().min(1).max(100),
@@ -346,6 +363,7 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
       gateType: z.enum(["FLIGHT_LINE", "BOARDING", "DISPLAY_ONLY"]),
       active: z.boolean(),
       sortOrder: z.number().int().min(0).max(1000),
+      displayFilter: gateDisplayFilterSchema.optional(),
       reason: z.string().trim().min(3).max(240),
       adminPin: z.string().min(4).max(32),
     }),
@@ -852,6 +870,8 @@ export const operationBoardSchema = z.object({
       gateType: z.enum(["FLIGHT_LINE", "BOARDING", "DISPLAY_ONLY"]),
       active: z.boolean(),
       sortOrder: z.number().int().nonnegative(),
+      displayFilter: gateDisplayFilterSchema,
+      assignedResourceGroupIds: z.array(z.string()),
     }),
   ),
   resourceGroups: z.array(
@@ -915,6 +935,9 @@ export type PublicTicketStatus = z.infer<typeof publicTicketStatusSchema>;
 
 export const publicBoardSchema = z.object({
   eventName: z.string(),
+  selectedGate: z
+    .object({ id: z.string(), label: z.string(), displayFilter: gateDisplayFilterSchema })
+    .nullable(),
   emergencyMode: z.boolean(),
   operationalInterrupted: z.boolean(),
   operationalNotice: z.string(),

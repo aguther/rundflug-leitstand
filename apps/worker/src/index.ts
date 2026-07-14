@@ -6,6 +6,8 @@ import {
   factoryResetRequestSchema,
   forecastHistoryQuerySchema,
   forecastHistorySchema,
+  type GateDisplayFilter,
+  gateDisplayFilterSchema,
   operationalHistoryQuerySchema,
   operationalHistorySchema,
 } from "@rundflug/contracts";
@@ -489,6 +491,7 @@ app.post("/api/admin/events/:sourceEventId/clone", async (context) => {
   const keepMasterData = input.restartMode === "KEEP_MASTER_DATA";
   const gateIds = new Map(gates.results.map((row) => [String(row.id), crypto.randomUUID()]));
   const groupIds = new Map(groups.results.map((row) => [String(row.id), crypto.randomUUID()]));
+  const productIds = new Map(products.results.map((row) => [String(row.id), crypto.randomUUID()]));
   const adminDeviceId = crypto.randomUUID();
   const responseBody = {
     eventId: input.eventId,
@@ -526,8 +529,10 @@ app.post("/api/admin/events/:sourceEventId/clone", async (context) => {
     ),
     ...(keepMasterData ? gates.results : []).map((row) =>
       context.env.DB.prepare(
-        `INSERT INTO gates (id, operation_day_id, label, gate_type, active, sort_order, created_at, updated_at)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7)`,
+        `INSERT INTO gates
+          (id, operation_day_id, label, gate_type, active, sort_order, display_filter_json,
+           created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?8)`,
       ).bind(
         gateIds.get(String(row.id)),
         input.eventId,
@@ -535,6 +540,15 @@ app.post("/api/admin/events/:sourceEventId/clone", async (context) => {
         row.gate_type,
         row.active,
         row.sort_order,
+        JSON.stringify({
+          ...gateDisplayFilterSchema.parse(JSON.parse(String(row.display_filter_json))),
+          productIds: gateDisplayFilterSchema
+            .parse(JSON.parse(String(row.display_filter_json)))
+            .productIds.flatMap((id) => {
+              const mappedId = productIds.get(id);
+              return mappedId ? [mappedId] : [];
+            }),
+        }),
         now,
       ),
     ),
@@ -563,7 +577,7 @@ app.post("/api/admin/events/:sourceEventId/clone", async (context) => {
          code, public_description, child_companion_required, sort_order, weight_classes_json, gate_id)
        VALUES (?1, ?2, ?3, ?4, ?5, 0, ?6, ?6, NULL, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)`,
       ).bind(
-        crypto.randomUUID(),
+        productIds.get(String(row.id)),
         input.eventId,
         groupIds.get(String(row.resource_group_id)),
         row.name,
@@ -1013,8 +1027,11 @@ app.get("/api/events/:eventId/operations", async (context) => {
         current_communication_number: number | null;
       }>(),
     context.env.DB.prepare(
-      `SELECT id, label, gate_type, active, sort_order
-           FROM gates WHERE operation_day_id = ?1 ORDER BY sort_order, label`,
+      `SELECT g.id, g.label, g.gate_type, g.active, g.sort_order, g.display_filter_json,
+              COALESCE((SELECT json_group_array(rg.id) FROM resource_groups rg
+                WHERE rg.operation_day_id = g.operation_day_id AND rg.gate_id = g.id), '[]')
+                AS assigned_resource_group_ids_json
+           FROM gates g WHERE g.operation_day_id = ?1 ORDER BY g.sort_order, g.label`,
     )
       .bind(eventId)
       .all<{
@@ -1023,6 +1040,8 @@ app.get("/api/events/:eventId/operations", async (context) => {
         gate_type: "FLIGHT_LINE" | "BOARDING" | "DISPLAY_ONLY";
         active: number;
         sort_order: number;
+        display_filter_json: string;
+        assigned_resource_group_ids_json: string;
       }>(),
     context.env.DB.prepare(
       `SELECT rg.id, rg.name, rg.status, rg.gate_id, g.label AS gate_label,
@@ -1358,6 +1377,8 @@ app.get("/api/events/:eventId/operations", async (context) => {
       gateType: gate.gate_type,
       active: gate.active === 1,
       sortOrder: gate.sort_order,
+      displayFilter: gateDisplayFilterSchema.parse(JSON.parse(gate.display_filter_json)),
+      assignedResourceGroupIds: JSON.parse(gate.assigned_resource_group_ids_json) as string[],
     })),
     resourceGroups: resourceGroupRows.results.map((group) => ({
       id: group.id,
@@ -2248,6 +2269,7 @@ app.delete("/api/public/tickets/:ticketCode/push-subscriptions", async (context)
 
 app.get("/api/public/events/:eventId/board", async (context) => {
   const eventId = context.req.param("eventId");
+  const requestedGateId = context.req.query("gateId")?.trim() || null;
   const event = await context.env.DB.prepare(
     "SELECT name, emergency_mode, operational_interrupted, operational_note, updated_at FROM operation_days WHERE id = ?1",
   )
@@ -2265,6 +2287,24 @@ app.get("/api/public/events/:eventId/board", async (context) => {
       404,
     );
   }
+  const selectedGate = requestedGateId
+    ? await context.env.DB.prepare(
+        "SELECT id, label, display_filter_json FROM gates WHERE id = ?1 AND operation_day_id = ?2 AND active = 1",
+      )
+        .bind(requestedGateId, eventId)
+        .first<{ id: string; label: string; display_filter_json: string }>()
+    : null;
+  if (requestedGateId && !selectedGate) {
+    return context.json(
+      { error: { code: "GATE_NOT_FOUND", message: "Anzeige-Gate nicht gefunden." } },
+      404,
+    );
+  }
+  const displayFilter: GateDisplayFilter = selectedGate
+    ? gateDisplayFilterSchema.parse(JSON.parse(selectedGate.display_filter_json))
+    : { productIds: [], rotationStatuses: [] };
+  const productFilterJson = JSON.stringify(displayFilter.productIds);
+  const statusFilterJson = JSON.stringify(displayFilter.rotationStatuses);
   const rows = await context.env.DB.prepare(
     `SELECT COALESCE(MIN(p.name), 'Rundflug') AS product_name,
             COALESCE(MIN(p.code), 'RF') AS product_code,
@@ -2285,12 +2325,15 @@ app.get("/api/public/events/:eventId/board", async (context) => {
        LEFT JOIN gates g ON g.id = COALESCE(r.gate_id, p.gate_id)
        LEFT JOIN aircraft a ON a.id = r.aircraft_id
       WHERE r.operation_day_id = ?1 AND r.status <> 'CANCELED'
+        AND (?2 IS NULL OR g.id = ?2)
+        AND (?3 = '[]' OR p.id IN (SELECT value FROM json_each(?3)))
+        AND (?4 = '[]' OR r.status IN (SELECT value FROM json_each(?4)))
       GROUP BY r.id
       ORDER BY CASE WHEN r.status = 'DRAFT' THEN 1 ELSE 0 END,
                COALESCE(fg.queue_position, fg.communication_number), fg.communication_number
       LIMIT 20`,
   )
-    .bind(eventId)
+    .bind(eventId, requestedGateId, productFilterJson, statusFilterJson)
     .all<{
       product_name: string;
       product_code: string;
@@ -2322,6 +2365,9 @@ app.get("/api/public/events/:eventId/board", async (context) => {
   } as const;
   return context.json({
     eventName: event.name,
+    selectedGate: selectedGate
+      ? { id: selectedGate.id, label: selectedGate.label, displayFilter }
+      : null,
     emergencyMode: event.emergency_mode === 1,
     operationalInterrupted: event.operational_interrupted === 1,
     operationalNotice: event.operational_note,
