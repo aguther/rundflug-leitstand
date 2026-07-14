@@ -1,6 +1,8 @@
 import type {
   AuditHistory,
   EventCatalogEntry,
+  ForecastHistory,
+  OperationalHistory,
   OperationBoard,
   PublicBoard,
   PublicTicketStatus,
@@ -28,6 +30,8 @@ import {
   getAuditHistory,
   getDeviceContext,
   getEventCatalog,
+  getForecastHistory,
+  getOperationalHistory,
   getOperationBoard,
   getPairedDevices,
   getPublicBoard,
@@ -67,6 +71,13 @@ import {
   loadOperationBoard,
   saveOperationBoard,
 } from "./offline-store";
+import {
+  checkedInCount,
+  eligibleMoveTargets,
+  oversizeSplitPreview,
+  replacementSuggestion,
+  sharedGroupSegmentLabel,
+} from "./operational-exceptions";
 import { setupValidationMessages } from "./setup-validation";
 
 const EVENT_ID = resolveActiveEvent(window.location.search, window.localStorage);
@@ -416,7 +427,9 @@ function CashierView() {
   const [ticketSearchResults, setTicketSearchResults] = useState<TicketSearchResult[]>([]);
   const [correctionTargetLabel, setCorrectionTargetLabel] = useState("Letzter Verkauf");
   const [ticketDetails, setTicketDetails] = useState<TicketDetail[]>([]);
+  const [oversizeSplitAcknowledged, setOversizeSplitAcknowledged] = useState(false);
   const product = board?.products.find((entry) => entry.id === productId) ?? board?.products[0];
+  const splitPreview = oversizeSplitPreview(size, product?.referenceCapacity ?? size);
   useEffect(() => {
     if (serverConfirmed && pendingDraftCount === 0) return;
     const queue = appendCashierDraftRevision(readCashierDraftQueue(localStorage, draftQueueKey), {
@@ -483,7 +496,7 @@ function CashierView() {
             standby: false,
             paymentStatus,
             paymentMethod,
-            oversizeSplitAcknowledged: false,
+            oversizeSplitAcknowledged,
           },
         },
         deviceTokenFor(CASHIER_DEVICE_ID),
@@ -632,7 +645,10 @@ function CashierView() {
             <button
               className={entry.id === product?.id ? "product-option selected" : "product-option"}
               key={entry.id}
-              onClick={() => setProductId(entry.id)}
+              onClick={() => {
+                setProductId(entry.id);
+                setOversizeSplitAcknowledged(false);
+              }}
               type="button"
             >
               <strong>{entry.name}</strong>
@@ -661,14 +677,50 @@ function CashierView() {
           <section className="group-size" aria-labelledby="group-title">
             <h1 id="group-title">Gruppengröße</h1>
             <div className="stepper">
-              <button type="button" onClick={() => setSize((value) => Math.max(1, value - 1))}>
+              <button
+                type="button"
+                onClick={() => {
+                  setSize((value) => Math.max(1, value - 1));
+                  setOversizeSplitAcknowledged(false);
+                }}
+              >
                 −
               </button>
               <output>{size}</output>
-              <button type="button" onClick={() => setSize((value) => Math.min(12, value + 1))}>
+              <button
+                type="button"
+                onClick={() => {
+                  setSize((value) => Math.min(12, value + 1));
+                  setOversizeSplitAcknowledged(false);
+                }}
+              >
                 +
               </button>
             </div>
+            {product && splitPreview.required ? (
+              <div className="oversize-split-notice" role="status">
+                <div>
+                  <strong>Aufteilung erforderlich</strong>
+                  <span>
+                    {size} Tickets passen nicht gemeinsam in einen Umlauf mit{" "}
+                    {product.referenceCapacity} Plätzen. Vorgesehen:{" "}
+                    {splitPreview.slotSizes.join(" + ")} in {splitPreview.slotSizes.length}{" "}
+                    aufeinanderfolgenden Fluggruppen.
+                  </span>
+                  <small>
+                    Die gemeinsam verkaufte Buchungsgruppe bleibt vollständig verbunden.
+                  </small>
+                </div>
+                <label>
+                  <input
+                    checked={oversizeSplitAcknowledged}
+                    onChange={(event) => setOversizeSplitAcknowledged(event.target.checked)}
+                    type="checkbox"
+                  />
+                  Aufteilung verstanden
+                </label>
+              </div>
+            ) : null}
             <p>Keine Namen und keine Telefonnummern.</p>
             <label className="ticket-code-mode">
               Ticket-Ausgabe
@@ -926,6 +978,7 @@ function CashierView() {
             board.event.emergencyMode ||
             board.event.operationalInterrupted ||
             ticketDetails.length !== size ||
+            (splitPreview.required && !oversizeSplitAcknowledged) ||
             ticketDetails.some(
               (detail) =>
                 detail.weightClass === "INDIVIDUAL" &&
@@ -940,7 +993,9 @@ function CashierView() {
         >
           {busy
             ? "Wird bestätigt …"
-            : `Verkauf bestätigen · ${size} Ticket${size === 1 ? "" : "s"}`}
+            : splitPreview.required && !oversizeSplitAcknowledged
+              ? "Aufteilung bestätigen"
+              : `Verkauf bestätigen · ${size} Ticket${size === 1 ? "" : "s"}`}
         </button>
       </section>
     </Shell>
@@ -963,6 +1018,10 @@ function FlightLineView() {
   const [emergencyReason, setEmergencyReason] = useState("");
   const [nextAircraftId, setNextAircraftId] = useState("");
   const [nextPilotId, setNextPilotId] = useState("");
+  const [dispositionOpen, setDispositionOpen] = useState(false);
+  const [dispositionCapacity, setDispositionCapacity] = useState(1);
+  const [moveTargetId, setMoveTargetId] = useState("");
+  const [moveReason, setMoveReason] = useState("");
   const operationalRotations = board?.rotations.filter(
     (rotation) => rotation.status !== "COMPLETED",
   );
@@ -970,11 +1029,21 @@ function FlightLineView() {
     operationalRotations?.find((rotation) => rotation.id === selectedId) ??
     operationalRotations?.[0];
   const action = selected ? actionForState[selected.status] : null;
+  const moveTargets = selected ? eligibleMoveTargets(selected, operationalRotations ?? []) : [];
+  const presentCount = selected ? checkedInCount(selected) : 0;
+  const missingTickets =
+    selected?.tickets.filter((ticket) => ticket.attendanceStatus !== "CHECKED_IN") ?? [];
+  const replacement = selected ? replacementSuggestion(selected, operationalRotations ?? []) : null;
   useEffect(() => {
     if (selected?.status !== "DRAFT") return;
     setNextAircraftId(selected.suggestedAircraftId ?? "");
     setNextPilotId(selected.suggestedPilotId ?? "");
   }, [selected?.status, selected?.suggestedAircraftId, selected?.suggestedPilotId]);
+  useEffect(() => {
+    setDispositionCapacity(selected?.usableCapacity ?? 1);
+    setMoveTargetId("");
+    setMoveReason("");
+  }, [selected?.usableCapacity]);
   const noShowReady = Boolean(
     selected?.status === "CALLED" &&
       selected.calledAt &&
@@ -1041,8 +1110,9 @@ function FlightLineView() {
     }
   }
 
-  async function mutateQueue(type: "DEFER_TICKET_GROUP" | "MARK_NO_SHOW") {
-    if (!board || !selected || queueReason.trim().length < 3) return;
+  async function mutateQueue(type: "DEFER_TICKET_GROUP" | "MARK_NO_SHOW", reasonOverride?: string) {
+    const effectiveReason = reasonOverride ?? queueReason.trim();
+    if (!board || !selected || effectiveReason.length < 3) return;
     const movesToClarification =
       type === "DEFER_TICKET_GROUP" && selected.deferralCount + 1 >= board.event.maxTicketDeferrals;
     try {
@@ -1054,7 +1124,7 @@ function FlightLineView() {
           expectedVersion: board.event.version,
           issuedAt: new Date().toISOString(),
           type,
-          payload: { ticketGroupId: selected.ticketGroupId, reason: queueReason.trim() },
+          payload: { ticketGroupId: selected.ticketGroupId, reason: effectiveReason },
         },
         deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
       );
@@ -1070,6 +1140,107 @@ function FlightLineView() {
       await refresh();
     } catch (reason) {
       setMessage(reason instanceof Error ? reason.message : "Queue-Aktion fehlgeschlagen.");
+    }
+  }
+
+  async function setRotationCapacity() {
+    if (!board || !selected || selected.status !== "DRAFT") return;
+    try {
+      await sendCommand(
+        {
+          commandId: crypto.randomUUID(),
+          eventId: EVENT_ID,
+          deviceId: FLIGHT_LINE_DEVICE_ID,
+          expectedVersion: board.event.version,
+          issuedAt: new Date().toISOString(),
+          type: "SET_ROTATION_CAPACITY",
+          payload: {
+            rotationId: selected.id,
+            usableCapacity: dispositionCapacity,
+            reason: "Nutzbare Kapazität vor dem Aufruf organisatorisch angepasst",
+          },
+        },
+        deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
+      );
+      setMessage("Nutzbare Kapazität übernommen; betroffene Gruppen wurden gemeinsam neu gereiht.");
+      await refresh();
+    } catch (reason) {
+      setMessage(reason instanceof Error ? reason.message : "Kapazitätsänderung fehlgeschlagen.");
+    }
+  }
+
+  async function moveTicketGroup(ticketGroupId: string, targetRotationId: string, reason: string) {
+    if (!board || reason.trim().length < 3) return;
+    try {
+      await sendCommand(
+        {
+          commandId: crypto.randomUUID(),
+          eventId: EVENT_ID,
+          deviceId: FLIGHT_LINE_DEVICE_ID,
+          expectedVersion: board.event.version,
+          issuedAt: new Date().toISOString(),
+          type: "MOVE_TICKET_GROUP",
+          payload: { ticketGroupId, targetRotationId, reason: reason.trim() },
+        },
+        deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
+      );
+      setMessage("Die gesamte Buchungsgruppe wurde verschoben und protokolliert.");
+      setMoveReason("");
+      await refresh();
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : "Verschiebung fehlgeschlagen.");
+    }
+  }
+
+  async function markTicketNoShow(ticketId: string) {
+    if (!board || !selected || !noShowReady) return;
+    try {
+      await sendCommand(
+        {
+          commandId: crypto.randomUUID(),
+          eventId: EVENT_ID,
+          deviceId: FLIGHT_LINE_DEVICE_ID,
+          expectedVersion: board.event.version,
+          issuedAt: new Date().toISOString(),
+          type: "MARK_TICKET_NO_SHOW",
+          payload: {
+            ticketId,
+            reason: "Nach Ablauf der No-Show-Frist nicht anwesend",
+          },
+        },
+        deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
+      );
+      setMessage("Das fehlende anonyme Ticket wurde als No-Show protokolliert.");
+      await refresh();
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : "No-Show konnte nicht gesetzt werden.");
+    }
+  }
+
+  async function confirmAttendanceDecision(decision: "FLY_WITH_PRESENT" | "LEAVE_SEAT_EMPTY") {
+    if (!board || !selected) return;
+    try {
+      await sendCommand(
+        {
+          commandId: crypto.randomUUID(),
+          eventId: EVENT_ID,
+          deviceId: FLIGHT_LINE_DEVICE_ID,
+          expectedVersion: board.event.version,
+          issuedAt: new Date().toISOString(),
+          type: "CONFIRM_ATTENDANCE_DECISION",
+          payload: { rotationId: selected.id, decision },
+        },
+        deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
+      );
+      setMessage(
+        decision === "FLY_WITH_PRESENT"
+          ? `Entscheidung für ${presentCount} anwesende Tickets dokumentiert.`
+          : "Entscheidung für freie Plätze dokumentiert.",
+      );
+      setDispositionOpen(false);
+      await refresh();
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : "Entscheidung nicht gespeichert.");
     }
   }
 
@@ -1170,21 +1341,45 @@ function FlightLineView() {
       <section className="flight-workspace">
         <div className="queue-list">
           <h1>Warteschlange</h1>
-          {operationalRotations?.map((rotation) => (
-            <button
-              key={rotation.id}
-              className={rotation.id === selected?.id ? "queue-row selected" : "queue-row"}
-              onClick={() => setSelectedId(rotation.id)}
-              type="button"
-            >
-              <strong>{rotation.communicationLabel}</strong>
-              <span>{rotation.productName}</span>
-              <span>
-                {rotation.ticketCount} Plätze · {rotation.predictedLowerMinutes}–
-                {rotation.predictedUpperMinutes} Min.
-              </span>
-            </button>
-          ))}
+          {operationalRotations?.map((rotation) => {
+            const segmentLabel = sharedGroupSegmentLabel(rotation, operationalRotations);
+            return (
+              <div className="queue-row-wrap" key={rotation.id}>
+                <button
+                  className={rotation.id === selected?.id ? "queue-row selected" : "queue-row"}
+                  onClick={() => {
+                    setSelectedId(rotation.id);
+                    setDispositionCapacity(rotation.usableCapacity);
+                    setMoveTargetId("");
+                    setMoveReason("");
+                  }}
+                  type="button"
+                >
+                  <strong>{rotation.communicationLabel}</strong>
+                  <span>{rotation.productName}</span>
+                  <span>
+                    {rotation.ticketCount}/{rotation.usableCapacity} Plätze ·{" "}
+                    {rotation.predictedLowerMinutes}–{rotation.predictedUpperMinutes} Min.
+                  </span>
+                  {segmentLabel ? <small>{segmentLabel}</small> : null}
+                </button>
+                <button
+                  aria-label={`Disposition für ${rotation.communicationLabel}`}
+                  className="disposition-trigger"
+                  onClick={() => {
+                    setSelectedId(rotation.id);
+                    setDispositionCapacity(rotation.usableCapacity);
+                    setMoveTargetId("");
+                    setMoveReason("");
+                    setDispositionOpen(true);
+                  }}
+                  type="button"
+                >
+                  Disposition
+                </button>
+              </div>
+            );
+          })}
           {operationalRotations?.length === 0 ? <p>Keine offenen Fluggruppen.</p> : null}
         </div>
         <div className="rotation-detail">
@@ -1195,6 +1390,11 @@ function FlightLineView() {
                 <strong>{selected.status}</strong>
               </div>
               <h2>Fluggruppe {selected.communicationLabel}</h2>
+              {sharedGroupSegmentLabel(selected, operationalRotations ?? []) ? (
+                <p className="shared-group-label">
+                  {sharedGroupSegmentLabel(selected, operationalRotations ?? [])}
+                </p>
+              ) : null}
               <dl>
                 <div>
                   <dt>Produkt</dt>
@@ -1368,15 +1568,6 @@ function FlightLineView() {
                     >
                       Zurückstellen
                     </button>
-                    <button
-                      disabled={queueReason.trim().length < 3 || !noShowReady}
-                      onClick={() => mutateQueue("MARK_NO_SHOW")}
-                      type="button"
-                    >
-                      {selected.status === "CALLED" && !noShowReady
-                        ? `No-Show nach ${board?.event.noShowAfterMinutes ?? 10} Min.`
-                        : "No-Show"}
-                    </button>
                     {selected.status === "CALLED" ? (
                       <button
                         disabled={queueReason.trim().length < 3}
@@ -1425,6 +1616,178 @@ function FlightLineView() {
             <p>Noch keine Fluggruppe vorhanden.</p>
           )}
         </div>
+        {dispositionOpen && selected ? (
+          <aside className="disposition-panel" aria-labelledby="disposition-title">
+            <div className="disposition-heading">
+              <div>
+                <span>Disposition</span>
+                <h2 id="disposition-title">{selected.communicationLabel}</h2>
+              </div>
+              <button
+                aria-label="Disposition schließen"
+                onClick={() => setDispositionOpen(false)}
+                type="button"
+              >
+                ×
+              </button>
+            </div>
+            <p className="disposition-status">
+              {selected.status === "DRAFT" ? "Vor dem Aufruf" : "Aufgerufen"} · ganze Gruppen
+              bleiben verbunden
+            </p>
+            {selected.status === "DRAFT" &&
+            ["FLIGHT_LINE_LEAD", "ADMIN"].includes(board?.currentDeviceRole ?? "") ? (
+              <section>
+                <h3>Nutzbare Plätze</h3>
+                <div className="compact-stepper">
+                  <button
+                    onClick={() => setDispositionCapacity((value) => Math.max(1, value - 1))}
+                    type="button"
+                  >
+                    −
+                  </button>
+                  <output>{dispositionCapacity}</output>
+                  <button
+                    onClick={() =>
+                      setDispositionCapacity((value) =>
+                        Math.min(selected.baselineCapacity, value + 1),
+                      )
+                    }
+                    type="button"
+                  >
+                    +
+                  </button>
+                </div>
+                <p>
+                  Ausgangskapazität {selected.baselineCapacity}.{" "}
+                  {dispositionCapacity < selected.ticketCount
+                    ? `Die Gruppe ${selected.ticketGroupId.slice(0, 8)} mit ${selected.ticketCount} Tickets rückt gemeinsam an die vorderste passende Position.`
+                    : "Keine Buchungsgruppe muss neu eingereiht werden."}
+                </p>
+                <small>Rein organisatorisch · keine Sicherheits- oder Freigabewirkung.</small>
+                <button
+                  disabled={dispositionCapacity === selected.usableCapacity}
+                  onClick={() => void setRotationCapacity()}
+                  type="button"
+                >
+                  Kapazität übernehmen
+                </button>
+              </section>
+            ) : null}
+            {["DRAFT", "CALLED"].includes(selected.status) ? (
+              <section>
+                <h3>Ganze Gruppe verschieben</h3>
+                <label>
+                  Zielumlauf
+                  <select
+                    value={moveTargetId}
+                    onChange={(event) => setMoveTargetId(event.target.value)}
+                  >
+                    <option value="">Passendes Ziel wählen</option>
+                    {moveTargets.map(({ rotation, freeSeats }) => (
+                      <option value={rotation.id} key={rotation.id}>
+                        {rotation.communicationLabel} · {freeSeats} Plätze frei · {rotation.status}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Begründung der Abweichung
+                  <input
+                    value={moveReason}
+                    onChange={(event) => setMoveReason(event.target.value)}
+                    placeholder="Kurz begründen"
+                  />
+                </label>
+                <small>Die gesamte Buchungsgruppe wird verschoben; keine Trennung.</small>
+                <button
+                  disabled={!moveTargetId || moveReason.trim().length < 3}
+                  onClick={() =>
+                    void moveTicketGroup(selected.ticketGroupId, moveTargetId, moveReason)
+                  }
+                  type="button"
+                >
+                  Verschiebung übernehmen
+                </button>
+                {moveTargets.length === 0 ? (
+                  <p>Aktuell ist kein passendes Ziel mit genügend Platz vorhanden.</p>
+                ) : null}
+              </section>
+            ) : null}
+            {selected.status === "CALLED" ? (
+              <section className="attendance-decision">
+                <h3>Anwesenheitsentscheidung</h3>
+                <strong>
+                  Anwesend {presentCount} von {selected.tickets.length}
+                </strong>
+                {!noShowReady ? (
+                  <p>
+                    No-Show ist erst nach {board?.event.noShowAfterMinutes ?? 10} Minuten verfügbar.
+                  </p>
+                ) : null}
+                {missingTickets.length > 0 && presentCount > 0 ? (
+                  <div className="disposition-actions">
+                    <button
+                      onClick={() =>
+                        void mutateQueue(
+                          "DEFER_TICKET_GROUP",
+                          "Aufgerufene Gruppe gemeinsam zurückgestellt",
+                        )
+                      }
+                      type="button"
+                    >
+                      Gemeinsam zurückstellen
+                    </button>
+                    <button
+                      onClick={() => void confirmAttendanceDecision("FLY_WITH_PRESENT")}
+                      type="button"
+                    >
+                      Mit {presentCount} Personen fliegen
+                    </button>
+                    <button
+                      onClick={() => void confirmAttendanceDecision("LEAVE_SEAT_EMPTY")}
+                      type="button"
+                    >
+                      Fehlende Plätze leer lassen
+                    </button>
+                  </div>
+                ) : null}
+                {missingTickets.map((ticket, index) => (
+                  <button
+                    disabled={!noShowReady}
+                    key={ticket.id}
+                    onClick={() => void markTicketNoShow(ticket.id)}
+                    type="button"
+                  >
+                    Fehlendes Ticket {index + 1} als No-Show markieren
+                  </button>
+                ))}
+                {replacement ? (
+                  <div className="replacement-suggestion">
+                    <strong>Ersatzvorschlag</strong>
+                    <span>
+                      {replacement.rotation.communicationLabel} · {replacement.rotation.ticketCount}{" "}
+                      Ticket{replacement.rotation.ticketCount === 1 ? "" : "s"} · vollständig
+                      eingecheckt
+                    </span>
+                    <button
+                      onClick={() =>
+                        void moveTicketGroup(
+                          replacement.rotation.ticketGroupId,
+                          selected.id,
+                          "Bestätigter Ersatzvorschlag nach Anwesenheitsabgleich",
+                        )
+                      }
+                      type="button"
+                    >
+                      Ersatz übernehmen
+                    </button>
+                  </div>
+                ) : null}
+              </section>
+            ) : null}
+          </aside>
+        ) : null}
       </section>
     </Shell>
   );
@@ -1954,11 +2317,36 @@ function AdminView() {
   const [message, setMessage] = useState<string | null>(null);
   const [setupRequired, setSetupRequired] = useState(false);
   const [history, setHistory] = useState<AuditHistory>({ entries: [] });
+  const [historyView, setHistoryView] = useState<"OPERATIONS" | "FORECASTS" | "AUDIT">(
+    "OPERATIONS",
+  );
+  const [operationalHistory, setOperationalHistory] = useState<OperationalHistory>({
+    entries: [],
+    total: 0,
+    limit: 50,
+    offset: 0,
+  });
+  const [forecastHistory, setForecastHistory] = useState<ForecastHistory>({
+    entries: [],
+    total: 0,
+    limit: 50,
+    offset: 0,
+  });
+  const [historyOffset, setHistoryOffset] = useState(0);
   const [historyEventType, setHistoryEventType] = useState("");
   const [historyAggregateType, setHistoryAggregateType] = useState("");
   const [historyAggregateId, setHistoryAggregateId] = useState("");
   const [historySince, setHistorySince] = useState("");
   const [historyUntil, setHistoryUntil] = useState("");
+  const [historyTicketStatus, setHistoryTicketStatus] = useState("");
+  const [historyAircraftId, setHistoryAircraftId] = useState("");
+  const [historyPilotId, setHistoryPilotId] = useState("");
+  const [historyProductId, setHistoryProductId] = useState("");
+  const [historyResourceGroupId, setHistoryResourceGroupId] = useState("");
+  const [historyCommunicationNumber, setHistoryCommunicationNumber] = useState("");
+  const [historyTicketId, setHistoryTicketId] = useState("");
+  const [historyTicketGroupId, setHistoryTicketGroupId] = useState("");
+  const [historyRotationId, setHistoryRotationId] = useState("");
   const [devices, setDevices] = useState<PairedDeviceSummary[]>([]);
   const [deviceLabel, setDeviceLabel] = useState("Kasse 2");
   const [deviceRole, setDeviceRole] = useState<
@@ -2064,6 +2452,74 @@ function AdminView() {
     historySince,
     historyUntil,
   ]);
+  const refreshDetailedHistory = useCallback(
+    async (requestedOffset: number) => {
+      try {
+        const timeZone = board?.event.timeZone ?? "Europe/Berlin";
+        const shared = {
+          ...(historySince ? { since: eventLocalDateTimeToIso(historySince, timeZone) } : {}),
+          ...(historyUntil ? { until: eventLocalDateTimeToIso(historyUntil, timeZone) } : {}),
+          ...(historyAircraftId ? { aircraftId: historyAircraftId } : {}),
+          ...(historyPilotId ? { pilotId: historyPilotId } : {}),
+          ...(historyRotationId ? { rotationId: historyRotationId.trim() } : {}),
+          limit: 50,
+          offset: requestedOffset,
+        };
+        if (historyView === "FORECASTS") {
+          setForecastHistory(
+            await getForecastHistory(
+              EVENT_ID,
+              ADMIN_DEVICE_ID,
+              deviceTokenFor(ADMIN_DEVICE_ID),
+              shared,
+            ),
+          );
+        } else if (historyView === "OPERATIONS") {
+          setOperationalHistory(
+            await getOperationalHistory(
+              EVENT_ID,
+              ADMIN_DEVICE_ID,
+              deviceTokenFor(ADMIN_DEVICE_ID),
+              {
+                ...shared,
+                ...(historyTicketStatus
+                  ? {
+                      ticketStatus:
+                        historyTicketStatus as OperationalHistory["entries"][number]["ticketStatus"],
+                    }
+                  : {}),
+                ...(historyProductId ? { productId: historyProductId } : {}),
+                ...(historyResourceGroupId ? { resourceGroupId: historyResourceGroupId } : {}),
+                ...(historyCommunicationNumber
+                  ? { communicationNumber: Number(historyCommunicationNumber) }
+                  : {}),
+                ...(historyTicketId ? { ticketId: historyTicketId.trim() } : {}),
+                ...(historyTicketGroupId ? { ticketGroupId: historyTicketGroupId.trim() } : {}),
+              },
+            ),
+          );
+        }
+        setHistoryOffset(requestedOffset);
+      } catch (cause) {
+        setMessage(cause instanceof Error ? cause.message : "Verlauf nicht verfügbar.");
+      }
+    },
+    [
+      board?.event.timeZone,
+      historyAircraftId,
+      historyCommunicationNumber,
+      historyPilotId,
+      historyProductId,
+      historyResourceGroupId,
+      historyRotationId,
+      historySince,
+      historyTicketGroupId,
+      historyTicketId,
+      historyTicketStatus,
+      historyUntil,
+      historyView,
+    ],
+  );
   const refreshDevices = useCallback(async () => {
     try {
       setDevices(
@@ -2075,8 +2531,9 @@ function AdminView() {
   }, []);
   useEffect(() => {
     void refreshHistory();
+    if (historyView !== "AUDIT") void refreshDetailedHistory(0);
     if (isAdministrator) void refreshDevices();
-  }, [isAdministrator, refreshDevices, refreshHistory]);
+  }, [historyView, isAdministrator, refreshDevices, refreshDetailedHistory, refreshHistory]);
   useEffect(() => {
     if (!board || eventSettingsInitialized) return;
     setSaleOpensAt(formatEventLocalDateTime(board.event.saleOpensAt, board.event.timeZone));
@@ -5074,55 +5531,335 @@ function AdminView() {
                 </button>
               </div>
             </div>
+            <div className="history-tabs" role="tablist" aria-label="Verlaufsansicht">
+              {(
+                [
+                  ["OPERATIONS", "Betriebshistorie"],
+                  ["FORECASTS", "Prognosegüte"],
+                  ["AUDIT", "Auditprotokoll"],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  aria-selected={historyView === value}
+                  className={historyView === value ? "active" : ""}
+                  key={value}
+                  onClick={() => {
+                    setHistoryView(value);
+                    setHistoryOffset(0);
+                  }}
+                  role="tab"
+                  type="button"
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
             <fieldset className="history-filters">
-              <legend>Audit-Historie filtern</legend>
-              <label>
-                Ereignistyp
-                <input
-                  value={historyEventType}
-                  onChange={(event) => setHistoryEventType(event.target.value)}
-                  placeholder="z. B. TICKETS_SOLD"
-                />
-              </label>
-              <label>
-                Bezugsart
-                <input
-                  value={historyAggregateType}
-                  onChange={(event) => setHistoryAggregateType(event.target.value)}
-                  placeholder="z. B. ROTATION"
-                />
-              </label>
-              <label>
-                Bezugs-ID
-                <input
-                  value={historyAggregateId}
-                  onChange={(event) => setHistoryAggregateId(event.target.value)}
-                  placeholder="interne ID"
-                />
-              </label>
+              <legend>
+                {historyView === "OPERATIONS"
+                  ? "Betriebsdaten filtern"
+                  : historyView === "FORECASTS"
+                    ? "Prognosen filtern"
+                    : "Audit-Ereignisse filtern"}
+              </legend>
               <LocalizedDateTimeInput label="Von" value={historySince} onChange={setHistorySince} />
               <LocalizedDateTimeInput label="Bis" value={historyUntil} onChange={setHistoryUntil} />
-              <button onClick={refreshHistory} type="button">
+              {historyView === "AUDIT" ? (
+                <>
+                  <label>
+                    Ereignistyp
+                    <input
+                      value={historyEventType}
+                      onChange={(event) => setHistoryEventType(event.target.value)}
+                      placeholder="z. B. TICKET_NO_SHOW"
+                    />
+                  </label>
+                  <label>
+                    Bezugsart
+                    <input
+                      value={historyAggregateType}
+                      onChange={(event) => setHistoryAggregateType(event.target.value)}
+                      placeholder="z. B. ROTATION"
+                    />
+                  </label>
+                  <label>
+                    Bezugs-ID
+                    <input
+                      value={historyAggregateId}
+                      onChange={(event) => setHistoryAggregateId(event.target.value)}
+                      placeholder="interne ID"
+                    />
+                  </label>
+                </>
+              ) : (
+                <>
+                  <label>
+                    Flugzeug
+                    <select
+                      value={historyAircraftId}
+                      onChange={(event) => setHistoryAircraftId(event.target.value)}
+                    >
+                      <option value="">Alle</option>
+                      {board?.aircraft.map((aircraft) => (
+                        <option value={aircraft.id} key={aircraft.id}>
+                          {aircraft.registration}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Pilotencode
+                    <select
+                      value={historyPilotId}
+                      onChange={(event) => setHistoryPilotId(event.target.value)}
+                    >
+                      <option value="">Alle</option>
+                      {board?.pilots.map((pilot) => (
+                        <option value={pilot.id} key={pilot.id}>
+                          {pilot.operationalCode}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Umlauf-ID
+                    <input
+                      value={historyRotationId}
+                      onChange={(event) => setHistoryRotationId(event.target.value)}
+                      placeholder="interne ID"
+                    />
+                  </label>
+                  {historyView === "OPERATIONS" ? (
+                    <>
+                      <label>
+                        Ticketstatus
+                        <select
+                          value={historyTicketStatus}
+                          onChange={(event) => setHistoryTicketStatus(event.target.value)}
+                        >
+                          <option value="">Alle</option>
+                          {[
+                            "QUEUED",
+                            "CHECKED_IN",
+                            "CALLED",
+                            "BOARDING",
+                            "IN_FLIGHT",
+                            "LANDED",
+                            "COMPLETED",
+                            "NO_SHOW",
+                            "CANCELED",
+                            "CLARIFICATION",
+                          ].map((status) => (
+                            <option value={status} key={status}>
+                              {status}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label>
+                        Produkt
+                        <select
+                          value={historyProductId}
+                          onChange={(event) => setHistoryProductId(event.target.value)}
+                        >
+                          <option value="">Alle</option>
+                          {board?.products.map((product) => (
+                            <option value={product.id} key={product.id}>
+                              {product.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label>
+                        Ressourcengruppe
+                        <select
+                          value={historyResourceGroupId}
+                          onChange={(event) => setHistoryResourceGroupId(event.target.value)}
+                        >
+                          <option value="">Alle</option>
+                          {board?.resourceGroups.map((group) => (
+                            <option value={group.id} key={group.id}>
+                              {group.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label>
+                        Slotnummer
+                        <input
+                          min="1"
+                          type="number"
+                          value={historyCommunicationNumber}
+                          onChange={(event) => setHistoryCommunicationNumber(event.target.value)}
+                        />
+                      </label>
+                      <label>
+                        Ticket-ID
+                        <input
+                          value={historyTicketId}
+                          onChange={(event) => setHistoryTicketId(event.target.value)}
+                          placeholder="interne ID"
+                        />
+                      </label>
+                      <label>
+                        Ticketgruppe
+                        <input
+                          value={historyTicketGroupId}
+                          onChange={(event) => setHistoryTicketGroupId(event.target.value)}
+                          placeholder="interne ID"
+                        />
+                      </label>
+                    </>
+                  ) : null}
+                </>
+              )}
+              <button
+                onClick={() =>
+                  historyView === "AUDIT" ? void refreshHistory() : void refreshDetailedHistory(0)
+                }
+                type="button"
+              >
                 Filter anwenden
               </button>
             </fieldset>
-            <div className="audit-list">
-              {history.entries.slice(0, 20).map((entry) => (
-                <div key={entry.sequence}>
-                  <time dateTime={entry.occurredAt}>
-                    {new Date(entry.occurredAt).toLocaleTimeString("de-DE", {
-                      timeZone: board?.event.timeZone ?? "Europe/Berlin",
-                    })}
-                  </time>
-                  <strong>{entry.eventType}</strong>
-                  <span>
-                    {entry.aggregateType} · Version {entry.aggregateVersion}
-                  </span>
-                  <code>{entry.deviceId}</code>
-                </div>
-              ))}
-              {history.entries.length === 0 ? <p>Keine passenden Ereignisse.</p> : null}
-            </div>
+            {historyView === "OPERATIONS" ? (
+              <div className="history-table-wrap">
+                <table className="history-table">
+                  <thead>
+                    <tr>
+                      <th>Zeitpunkt</th>
+                      <th>Fluggruppe</th>
+                      <th>Ticket / Gruppe</th>
+                      <th>Status</th>
+                      <th>Flugzeug</th>
+                      <th>Pilot</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {operationalHistory.entries.map((entry) => (
+                      <tr key={`${entry.ticketId}-${entry.rotationId ?? "open"}`}>
+                        <td>
+                          {new Date(entry.latestAt).toLocaleString("de-DE", {
+                            timeZone: board?.event.timeZone ?? "Europe/Berlin",
+                          })}
+                        </td>
+                        <td>{entry.communicationLabel ?? "Noch offen"}</td>
+                        <td>
+                          <code>{entry.ticketId}</code>
+                          <small>
+                            <code>{entry.ticketGroupId}</code>
+                          </small>
+                        </td>
+                        <td>{entry.ticketStatus}</td>
+                        <td>{entry.aircraftRegistration ?? "–"}</td>
+                        <td>{entry.pilotOperationalCode ?? "–"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {operationalHistory.entries.length === 0 ? (
+                  <p>Keine passenden Betriebsdaten.</p>
+                ) : null}
+              </div>
+            ) : historyView === "FORECASTS" ? (
+              <div className="history-table-wrap">
+                <table className="history-table forecast-history-table">
+                  <thead>
+                    <tr>
+                      <th>Snapshot</th>
+                      <th>Fluggruppe</th>
+                      <th>Auslöser</th>
+                      <th>Qualität / Grundlage</th>
+                      <th>Abweichungen in Minuten</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {forecastHistory.entries.map((entry) => (
+                      <tr key={entry.snapshotId}>
+                        <td>
+                          {new Date(entry.capturedAt).toLocaleString("de-DE", {
+                            timeZone: board?.event.timeZone ?? "Europe/Berlin",
+                          })}
+                        </td>
+                        <td>
+                          {entry.communicationLabel}
+                          <small>
+                            <code>{entry.rotationId}</code>
+                          </small>
+                        </td>
+                        <td>{entry.triggerEventType}</td>
+                        <td>
+                          {entry.quality}
+                          <small>
+                            {entry.dataBasisScope} · n={entry.sampleSize} · Alter{" "}
+                            {Math.round(entry.dataAgeMinutes)} Min.
+                          </small>
+                        </td>
+                        <td>
+                          <span>Boarding {entry.deviationMinutes.boarding ?? "–"}</span>
+                          <span>Start {entry.deviationMinutes.departure ?? "–"}</span>
+                          <span>Landung {entry.deviationMinutes.landing ?? "–"}</span>
+                          <span>Abschluss {entry.deviationMinutes.completion ?? "–"}</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {forecastHistory.entries.length === 0 ? (
+                  <p>Keine passenden Prognosesnapshots.</p>
+                ) : null}
+              </div>
+            ) : (
+              <div className="audit-list">
+                {history.entries.slice(0, 50).map((entry) => (
+                  <div key={entry.sequence}>
+                    <time dateTime={entry.occurredAt}>
+                      {new Date(entry.occurredAt).toLocaleString("de-DE", {
+                        timeZone: board?.event.timeZone ?? "Europe/Berlin",
+                      })}
+                    </time>
+                    <strong>{entry.eventType}</strong>
+                    <span>
+                      {entry.aggregateType} · Version {entry.aggregateVersion}
+                    </span>
+                    <code>{entry.deviceId}</code>
+                  </div>
+                ))}
+                {history.entries.length === 0 ? <p>Keine passenden Ereignisse.</p> : null}
+              </div>
+            )}
+            {historyView !== "AUDIT" ? (
+              <div className="history-pagination">
+                <button
+                  disabled={historyOffset === 0}
+                  onClick={() => void refreshDetailedHistory(Math.max(0, historyOffset - 50))}
+                  type="button"
+                >
+                  Zurück
+                </button>
+                <span>
+                  {historyOffset + 1}–
+                  {Math.min(
+                    historyOffset + 50,
+                    historyView === "OPERATIONS" ? operationalHistory.total : forecastHistory.total,
+                  )}{" "}
+                  von{" "}
+                  {historyView === "OPERATIONS" ? operationalHistory.total : forecastHistory.total}
+                </span>
+                <button
+                  disabled={
+                    historyOffset + 50 >=
+                    (historyView === "OPERATIONS"
+                      ? operationalHistory.total
+                      : forecastHistory.total)
+                  }
+                  onClick={() => void refreshDetailedHistory(historyOffset + 50)}
+                  type="button"
+                >
+                  Weiter
+                </button>
+              </div>
+            ) : null}
           </section>
           {pendingMasterAction ? (
             <div className="modal-backdrop">
