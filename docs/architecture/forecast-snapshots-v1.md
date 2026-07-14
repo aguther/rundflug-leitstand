@@ -5,8 +5,10 @@
 Nach jedem erfolgreich persistierten operativen Kommando stößt das Durable Object die erneute
 Prognoseberechnung an. Für jeden noch offenen Umlauf wird dabei ein Snapshot mit der bestätigten
 Veranstaltungsversion, Erfassungszeitpunkt, Qualitätsstufe, Minutenintervall und den prognostizierten
-Zeitpunkten für Boarding, Start, Landung und Abschluss geschrieben. Fehlgeschlagene oder abgelehnte
-Kommandos erzeugen keinen Snapshot.
+Zeitpunkten für Boarding, Start, Landung und Abschluss geschrieben. Zusätzlich hält der Snapshot den
+auslösenden fachlichen Ereignistyp, Historienbezug, Stichprobengröße und Datenalter sowie aktive
+Kapazität und verwendete Referenzdauer fest. Damit ist nicht nur das Ergebnis, sondern auch seine
+Datengrundlage nachvollziehbar. Fehlgeschlagene oder abgelehnte Kommandos erzeugen keinen Snapshot.
 
 ## Unveränderlichkeit und Auswertung
 

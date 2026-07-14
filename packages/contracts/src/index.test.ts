@@ -4,6 +4,8 @@ import {
   cloneEventRequestSchema,
   commandEnvelopeSchema,
   factoryResetRequestSchema,
+  forecastHistoryQuerySchema,
+  forecastHistorySchema,
   operationalHistoryQuerySchema,
   operationalHistorySchema,
   publicBoardSchema,
@@ -848,6 +850,75 @@ describe("operational history contracts", () => {
     });
 
     expect(parsed.entries[0]?.communicationLabel).toBe("SYN-123");
+    expect(JSON.stringify(parsed)).not.toMatch(/guest|phone|telefon/i);
+  });
+});
+
+describe("forecast history contracts", () => {
+  it("normalizes bounded filters and rejects reversed time ranges", () => {
+    const parsed = forecastHistoryQuerySchema.parse({
+      rotationId: "synthetic-rotation",
+      since: "2026-07-11T08:00:00.000Z",
+      until: "2026-07-11T18:00:00.000Z",
+      limit: "25",
+      offset: "50",
+    });
+    expect(parsed.limit).toBe(25);
+    expect(parsed.offset).toBe(50);
+    expect(() =>
+      forecastHistoryQuerySchema.parse({
+        since: "2026-07-11T18:00:00.000Z",
+        until: "2026-07-11T08:00:00.000Z",
+      }),
+    ).toThrow();
+  });
+
+  it("keeps prediction basis and actual deviations anonymous", () => {
+    const parsed = forecastHistorySchema.parse({
+      entries: [
+        {
+          snapshotId: "snapshot-synthetic",
+          rotationId: "rotation-synthetic",
+          flightGroupId: "flight-group-synthetic",
+          communicationNumber: 42,
+          communicationLabel: "SYN-042",
+          aircraftId: "aircraft-synthetic",
+          aircraftRegistration: "D-TEST",
+          pilotId: "pilot-synthetic",
+          pilotOperationalCode: "P-01",
+          operationDayVersion: 12,
+          capturedAt: "2026-07-11T08:00:00.000Z",
+          triggerEventType: "ROTATION_IN_FLIGHT",
+          quality: "CHANGING",
+          lowerMinutes: 4,
+          upperMinutes: 8,
+          dataBasisScope: "AIRCRAFT_PRODUCT_HISTORY",
+          sampleSize: 6,
+          dataAgeMinutes: 15,
+          activeCapacity: 2,
+          referenceDurationMinutes: 35,
+          predicted: {
+            boardingAt: "2026-07-11T08:04:00.000Z",
+            departureAt: "2026-07-11T08:10:00.000Z",
+            landingAt: "2026-07-11T08:30:00.000Z",
+            completionAt: "2026-07-11T08:35:00.000Z",
+          },
+          actual: {
+            boardingAt: "2026-07-11T08:05:00.000Z",
+            departureAt: "2026-07-11T08:12:00.000Z",
+            landingAt: "2026-07-11T08:33:00.000Z",
+            completionAt: "2026-07-11T08:39:00.000Z",
+          },
+          deviationMinutes: { boarding: 1, departure: 2, landing: 3, completion: 4 },
+        },
+      ],
+      total: 1,
+      limit: 100,
+      offset: 0,
+    });
+
+    expect(parsed.entries[0]?.triggerEventType).toBe("ROTATION_IN_FLIGHT");
+    expect(parsed.entries[0]?.deviationMinutes.completion).toBe(4);
     expect(JSON.stringify(parsed)).not.toMatch(/guest|phone|telefon/i);
   });
 });

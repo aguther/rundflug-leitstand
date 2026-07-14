@@ -1036,3 +1036,75 @@ export const operationalHistorySchema = z.object({
   offset: z.number().int().nonnegative(),
 });
 export type OperationalHistory = z.infer<typeof operationalHistorySchema>;
+
+export const forecastHistoryQuerySchema = z
+  .object({
+    rotationId: z.string().trim().min(1).max(100).optional(),
+    aircraftId: z.string().trim().min(1).max(100).optional(),
+    pilotId: z.string().trim().min(1).max(100).optional(),
+    since: z.iso.datetime().optional(),
+    until: z.iso.datetime().optional(),
+    limit: z.coerce.number().int().min(1).max(200).default(100),
+    offset: z.coerce.number().int().min(0).max(100_000).default(0),
+  })
+  .strict()
+  .refine(
+    (query) => !query.since || !query.until || Date.parse(query.since) <= Date.parse(query.until),
+    { message: "Der Beginn des Zeitraums muss vor seinem Ende liegen.", path: ["since"] },
+  );
+export type ForecastHistoryQuery = z.infer<typeof forecastHistoryQuerySchema>;
+
+const nullableTimestampSchema = z.string().nullable();
+const nullableDeviationSchema = z.number().nullable();
+export const forecastHistoryEntrySchema = z.object({
+  snapshotId: z.string(),
+  rotationId: z.string(),
+  flightGroupId: z.string(),
+  communicationNumber: z.number().int().positive(),
+  communicationLabel: z.string(),
+  aircraftId: z.string().nullable(),
+  aircraftRegistration: z.string().nullable(),
+  pilotId: z.string().nullable(),
+  pilotOperationalCode: z.string().nullable(),
+  operationDayVersion: z.number().int().nonnegative(),
+  capturedAt: z.string(),
+  triggerEventType: z.string(),
+  quality: z.enum(["STABLE", "CHANGING", "UNCERTAIN"]),
+  lowerMinutes: z.number().int().nonnegative(),
+  upperMinutes: z.number().int().nonnegative(),
+  dataBasisScope: z.enum([
+    "AIRCRAFT_PRODUCT_HISTORY",
+    "PRODUCT_HISTORY",
+    "REFERENCE_ONLY",
+    "LEGACY_UNKNOWN",
+  ]),
+  sampleSize: z.number().int().nonnegative(),
+  dataAgeMinutes: z.number().nonnegative(),
+  activeCapacity: z.number().int().nonnegative(),
+  referenceDurationMinutes: z.number().int().nonnegative(),
+  predicted: z.object({
+    boardingAt: nullableTimestampSchema,
+    departureAt: nullableTimestampSchema,
+    landingAt: nullableTimestampSchema,
+    completionAt: nullableTimestampSchema,
+  }),
+  actual: z.object({
+    boardingAt: nullableTimestampSchema,
+    departureAt: nullableTimestampSchema,
+    landingAt: nullableTimestampSchema,
+    completionAt: nullableTimestampSchema,
+  }),
+  deviationMinutes: z.object({
+    boarding: nullableDeviationSchema,
+    departure: nullableDeviationSchema,
+    landing: nullableDeviationSchema,
+    completion: nullableDeviationSchema,
+  }),
+});
+export const forecastHistorySchema = z.object({
+  entries: z.array(forecastHistoryEntrySchema),
+  total: z.number().int().nonnegative(),
+  limit: z.number().int().positive(),
+  offset: z.number().int().nonnegative(),
+});
+export type ForecastHistory = z.infer<typeof forecastHistorySchema>;

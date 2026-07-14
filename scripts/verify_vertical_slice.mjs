@@ -62,6 +62,13 @@ const history = async (aggregateId) => {
   if (!response.ok) throw new Error(`Historien-Abruf fehlgeschlagen (${response.status}).`);
   return response.json();
 };
+const forecastHistory = async (filters, deviceId = "technical-scaffold", token = tokens.admin) => {
+  const query = new URLSearchParams(filters);
+  const response = await fetch(`${base}/api/events/demo-2026/history/forecasts?${query}`, {
+    headers: { "x-device-id": deviceId, "x-device-token": token },
+  });
+  return { response, body: await response.json() };
+};
 const envelope = (deviceId, expectedVersion, type, payload) => ({
   commandId: randomUUID(),
   eventId: "demo-2026",
@@ -474,6 +481,79 @@ try {
   if (!timingComplete || finalRotation.ticketCount !== 2) {
     throw new Error("Zeitmesspunkte oder Gruppenbindung des Umlaufs sind unvollständig.");
   }
+  let forecastResult;
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    forecastResult = await forecastHistory({
+      rotationId,
+      aircraftId: "aircraft-a",
+      pilotId: "550e8400-e29b-41d4-a716-446655440100",
+      limit: "200",
+      offset: "0",
+    });
+    if (forecastResult.response.ok && forecastResult.body.total > 0) break;
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 100));
+  }
+  if (
+    !forecastResult?.response.ok ||
+    forecastResult.body.total < 1 ||
+    forecastResult.body.entries.some(
+      (entry) =>
+        entry.dataBasisScope === "LEGACY_UNKNOWN" ||
+        entry.triggerEventType === "LEGACY_UNKNOWN" ||
+        entry.referenceDurationMinutes <= 0 ||
+        entry.activeCapacity <= 0 ||
+        entry.actual.completionAt === null ||
+        entry.deviationMinutes.boarding === null ||
+        entry.deviationMinutes.departure === null ||
+        entry.deviationMinutes.completion === null,
+    )
+  ) {
+    throw new Error(
+      `Prognoseverlauf oder Ist-Abweichungen sind unvollständig: ${JSON.stringify(forecastResult?.body)}`,
+    );
+  }
+  const cashierForecastHistory = await forecastHistory(
+    { rotationId },
+    "cashier-tablet-1",
+    tokens.cashier,
+  );
+  if (cashierForecastHistory.response.status !== 403) {
+    throw new Error("Kassengerät erhielt unzulässigen Zugriff auf die Prognosehistorie.");
+  }
+  const invalidForecastRange = await forecastHistory({
+    since: "2026-07-11T18:00:00.000Z",
+    until: "2026-07-11T08:00:00.000Z",
+  });
+  if (invalidForecastRange.response.status !== 400) {
+    throw new Error("Umgekehrter Prognosezeitraum wurde nicht abgelehnt.");
+  }
+  const dailyCsvResponse = await fetch(`${base}/api/events/demo-2026/reports/daily.csv`, {
+    headers: { "x-device-id": "technical-scaffold", "x-device-token": tokens.admin },
+  });
+  const dailyCsv = await dailyCsvResponse.text();
+  if (
+    !dailyCsvResponse.ok ||
+    !["KASSEN-ZÄHLBERICHT", "FLÜGE", "PROGNOSEENTWICKLUNG", "BESONDERE EREIGNISSE"].every(
+      (section) => dailyCsv.includes(section),
+    ) ||
+    !dailyCsv.includes(finalRotation.communicationLabel) ||
+    !dailyCsv.includes("Mittlere Boardingdauer") ||
+    !dailyCsv.includes("Auslastung") ||
+    !dailyCsv.includes("CALL_REVOKED")
+  ) {
+    throw new Error("Der vollständige CSV-Tagesbericht enthält nicht alle V1-Abschnitte.");
+  }
+  const dailyPdfResponse = await fetch(`${base}/api/events/demo-2026/reports/daily.pdf`, {
+    headers: { "x-device-id": "technical-scaffold", "x-device-token": tokens.admin },
+  });
+  const dailyPdf = new Uint8Array(await dailyPdfResponse.arrayBuffer());
+  if (
+    !dailyPdfResponse.ok ||
+    dailyPdfResponse.headers.get("content-type") !== "application/pdf" ||
+    dailyPdf.byteLength < 500
+  ) {
+    throw new Error("Der archivfähige PDF-Tagesbericht konnte nicht vollständig erzeugt werden.");
+  }
   const devicesResponse = await fetch(`${base}/api/events/demo-2026/devices`, {
     headers: { "x-device-id": "technical-scaffold", "x-device-token": tokens.admin },
   });
@@ -489,7 +569,7 @@ try {
   }
   process.stdout.write(
     JSON.stringify({
-      requirements: ["F-BRD-120", "F-SLT-080", "D-050"],
+      requirements: ["F-BRD-120", "F-SLT-080", "F-HIS-030", "F-HIS-060", "D-050", "D-055"],
       sale: sold.eventType,
       duplicate: duplicate.duplicate,
       staleRejected: true,
@@ -519,6 +599,8 @@ try {
       finalAircraftState: finalAircraft.operationalState,
       ticketCount: finalRotation.ticketCount,
       timingComplete,
+      forecastBasisAndActualDeviationVerified: true,
+      completeDailyCsvAndPdfVerified: true,
       finalVersion: current.event.version,
     }),
   );

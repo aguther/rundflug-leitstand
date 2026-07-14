@@ -797,16 +797,18 @@ export class EventCoordinator extends DurableObject<Env> {
 
   private broadcast(result: CommandResult): void {
     this.ctx.waitUntil(
-      this.recalculateForecastTimelines(result.event.eventId).catch((reason: unknown) => {
-        console.error(
-          JSON.stringify({
-            level: "error",
-            code: "FORECAST_RECALCULATION_FAILED",
-            eventId: result.event.eventId,
-            message: safeErrorMessage(reason),
-          }),
-        );
-      }),
+      this.recalculateForecastTimelines(result.event.eventId, result.eventType).catch(
+        (reason: unknown) => {
+          console.error(
+            JSON.stringify({
+              level: "error",
+              code: "FORECAST_RECALCULATION_FAILED",
+              eventId: result.event.eventId,
+              message: safeErrorMessage(reason),
+            }),
+          );
+        },
+      ),
     );
     const broadcast = JSON.stringify({
       type: "event-state-changed",
@@ -821,7 +823,10 @@ export class EventCoordinator extends DurableObject<Env> {
     }
   }
 
-  private async recalculateForecastTimelines(eventId: string): Promise<void> {
+  private async recalculateForecastTimelines(
+    eventId: string,
+    triggerEventType: string,
+  ): Promise<void> {
     const [event, rotationRows, durationRows, capacityRows, pilotRow] = await Promise.all([
       this.env.DB.prepare(
         `SELECT version, operational_interrupted, emergency_mode, planned_boarding_minutes,
@@ -936,6 +941,12 @@ export class EventCoordinator extends DurableObject<Env> {
         0,
         12,
       );
+      const dataBasisScope =
+        selectedHistory.length === 0
+          ? "REFERENCE_ONLY"
+          : aircraftHistory.length > 0
+            ? "AIRCRAFT_PRODUCT_HISTORY"
+            : "PRODUCT_HISTORY";
       const actualDurations = [...selectedHistory].reverse().map((row) => row.minutes);
       const lastActualAt = selectedHistory[0]?.completed_at;
       const dataAgeMinutes = lastActualAt
@@ -1017,8 +1028,9 @@ export class EventCoordinator extends DurableObject<Env> {
           `INSERT INTO forecast_snapshots
             (id, operation_day_id, rotation_id, operation_day_version, captured_at, quality,
              lower_minutes, upper_minutes, predicted_boarding_at, predicted_departure_at,
-             predicted_landing_at, predicted_completion_at)
-           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)`,
+             predicted_landing_at, predicted_completion_at, trigger_event_type, data_basis_scope,
+             sample_size, data_age_minutes, active_capacity, reference_duration_minutes)
+           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)`,
         ).bind(
           crypto.randomUUID(),
           eventId,
@@ -1032,6 +1044,12 @@ export class EventCoordinator extends DurableObject<Env> {
           predictedDepartureAt,
           predictedLandingAt,
           predictedCompletionAt,
+          triggerEventType,
+          dataBasisScope,
+          selectedHistory.length,
+          dataAgeMinutes,
+          activeCapacity,
+          referenceTotal,
         ),
       );
     }
