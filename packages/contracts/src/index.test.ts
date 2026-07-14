@@ -194,6 +194,34 @@ describe("commandEnvelopeSchema", () => {
     expect(JSON.stringify(parsed)).not.toMatch(/guestName|phoneNumber|passengerName/);
   });
 
+  it("validates typed gate display filters without duplicating gate assignments", () => {
+    const parsed = commandEnvelopeSchema.parse({
+      commandId: "550e8400-e29b-41d4-a716-446655440032",
+      eventId: "synthetic-event",
+      deviceId: "synthetic-admin",
+      expectedVersion: 4,
+      issuedAt: "2026-07-11T12:00:00.000Z",
+      type: "UPSERT_GATE",
+      payload: {
+        gateId: "synthetic-gate",
+        label: "Flight Line 1",
+        gateType: "FLIGHT_LINE",
+        active: true,
+        sortOrder: 10,
+        displayFilter: {
+          productIds: ["synthetic-product"],
+          rotationStatuses: ["DRAFT", "CALLED"],
+        },
+        reason: "Synthetischen Anzeigefilter konfigurieren",
+        adminPin: "0000",
+      },
+    });
+    expect(parsed.type === "UPSERT_GATE" && parsed.payload.displayFilter).toEqual({
+      productIds: ["synthetic-product"],
+      rotationStatuses: ["DRAFT", "CALLED"],
+    });
+  });
+
   it("accepts only hashed credentials for device pairing", () => {
     const parsed = commandEnvelopeSchema.parse({
       commandId: "550e8400-e29b-41d4-a716-446655440001",
@@ -432,6 +460,7 @@ describe("commandEnvelopeSchema", () => {
     });
     const board = publicBoardSchema.parse({
       eventName: "Demo",
+      selectedGate: null,
       emergencyMode: false,
       operationalInterrupted: false,
       operationalNotice: "",

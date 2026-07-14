@@ -4,6 +4,8 @@ import {
   type CommandResult,
   commandEnvelopeSchema,
   commandResultSchema,
+  type GateDisplayFilter,
+  gateDisplayFilterSchema,
   storedOutageCallPayloadSchema,
   storedOutagePaperSalePayloadSchema,
   storedOutageTransitionPayloadSchema,
@@ -1510,11 +1512,18 @@ export class EventCoordinator extends DurableObject<Env> {
     let auditPayload: Record<string, unknown>;
 
     if (command.type === "UPSERT_GATE") {
-      const duplicate = await this.env.DB.prepare(
-        "SELECT id FROM gates WHERE operation_day_id = ?1 AND label = ?2 AND id <> ?3",
-      )
-        .bind(command.eventId, command.payload.label, command.payload.gateId)
-        .first<{ id: string }>();
+      const [duplicate, existing] = await Promise.all([
+        this.env.DB.prepare(
+          "SELECT id FROM gates WHERE operation_day_id = ?1 AND label = ?2 AND id <> ?3",
+        )
+          .bind(command.eventId, command.payload.label, command.payload.gateId)
+          .first<{ id: string }>(),
+        this.env.DB.prepare(
+          "SELECT display_filter_json FROM gates WHERE id = ?1 AND operation_day_id = ?2",
+        )
+          .bind(command.payload.gateId, command.eventId)
+          .first<{ display_filter_json: string }>(),
+      ]);
       if (duplicate) {
         return json(
           {
@@ -1522,6 +1531,31 @@ export class EventCoordinator extends DurableObject<Env> {
           },
           { status: 409 },
         );
+      }
+      const displayFilter: GateDisplayFilter =
+        command.payload.displayFilter ??
+        (existing
+          ? gateDisplayFilterSchema.parse(JSON.parse(existing.display_filter_json))
+          : { productIds: [], rotationStatuses: [] });
+      if (displayFilter.productIds.length > 0) {
+        const placeholders = displayFilter.productIds.map((_, index) => `?${index + 2}`).join(",");
+        const products = await this.env.DB.prepare(
+          `SELECT COUNT(*) AS count FROM products
+            WHERE operation_day_id = ?1 AND id IN (${placeholders})`,
+        )
+          .bind(command.eventId, ...displayFilter.productIds)
+          .first<{ count: number }>();
+        if ((products?.count ?? 0) !== displayFilter.productIds.length) {
+          return json(
+            {
+              error: {
+                code: "GATE_DISPLAY_FILTER_REFERENCE_INVALID",
+                message: "Der Anzeigefilter verweist auf ein unbekanntes Produkt.",
+              },
+            },
+            { status: 409 },
+          );
+        }
       }
       if (!command.payload.active) {
         const usage = await this.env.DB.prepare(
@@ -1549,14 +1583,17 @@ export class EventCoordinator extends DurableObject<Env> {
         gateType: command.payload.gateType,
         active: command.payload.active,
         sortOrder: command.payload.sortOrder,
+        displayFilter,
         reason: command.payload.reason,
       };
       mutation = this.env.DB.prepare(
         `INSERT INTO gates
-          (id, operation_day_id, label, gate_type, active, sort_order, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7)
+          (id, operation_day_id, label, gate_type, active, sort_order, display_filter_json,
+           created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?8)
          ON CONFLICT(id) DO UPDATE SET label = excluded.label, gate_type = excluded.gate_type,
-          active = excluded.active, sort_order = excluded.sort_order, updated_at = excluded.updated_at
+          active = excluded.active, sort_order = excluded.sort_order,
+          display_filter_json = excluded.display_filter_json, updated_at = excluded.updated_at
          WHERE gates.operation_day_id = excluded.operation_day_id`,
       ).bind(
         command.payload.gateId,
@@ -1565,6 +1602,7 @@ export class EventCoordinator extends DurableObject<Env> {
         command.payload.gateType,
         command.payload.active ? 1 : 0,
         command.payload.sortOrder,
+        JSON.stringify(displayFilter),
         now,
       );
     } else {

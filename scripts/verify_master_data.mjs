@@ -209,6 +209,37 @@ try {
     productPayload("product-shared-30", "TST30", "Test Panorama 30", 30),
   );
   await admin(
+    result.event.version,
+    "UPSERT_GATE",
+    {
+      gateId: "gate-resource-test",
+      label: "Flight Line Ressourcen",
+      gateType: "FLIGHT_LINE",
+      active: true,
+      sortOrder: 20,
+      displayFilter: {
+        productIds: ["unknown-product"],
+        rotationStatuses: ["DRAFT"],
+      },
+      reason: "Ungültigen synthetischen Anzeigefilter ablehnen",
+      adminPin: pin,
+    },
+    409,
+  );
+  result = await admin(result.event.version, "UPSERT_GATE", {
+    gateId: "gate-resource-test",
+    label: "Flight Line Ressourcen",
+    gateType: "FLIGHT_LINE",
+    active: true,
+    sortOrder: 20,
+    displayFilter: {
+      productIds: ["product-shared-20"],
+      rotationStatuses: ["DRAFT"],
+    },
+    reason: "Synthetischen Gate-Anzeigefilter konfigurieren",
+    adminPin: pin,
+  });
+  await admin(
     staleVersion,
     "UPSERT_PRODUCT",
     productPayload("product-stale", "STALE", "Veraltetes Produkt", 25),
@@ -276,11 +307,15 @@ try {
     (product) => product.resourceGroupId === "resource-shared-test",
   );
   const sharedGroup = board.resourceGroups.find((group) => group.id === "resource-shared-test");
+  const sharedGate = board.gates.find((gate) => gate.id === "gate-resource-test");
   if (
     sharedProducts.length !== 2 ||
     sharedProducts.some((product) => product.resourceGroupOpenTickets !== 2) ||
     sharedGroup?.activeAircraftIds.length !== 2 ||
-    sharedGroup.gateId !== "gate-resource-test"
+    sharedGroup.gateId !== "gate-resource-test" ||
+    !sharedGate?.assignedResourceGroupIds.includes("resource-shared-test") ||
+    sharedGate.displayFilter.productIds[0] !== "product-shared-20" ||
+    sharedGate.displayFilter.rotationStatuses[0] !== "DRAFT"
   ) {
     throw new Error(
       `Gemeinsame Ressourcenkapazität oder Stammdatenbezüge sind inkonsistent: ${JSON.stringify({ sharedProducts, sharedGroup })}`,
@@ -324,12 +359,18 @@ try {
   const publicBoard = await fetch(`${base}/api/public/events/demo-2026/board`).then((response) =>
     response.json(),
   );
+  const gateBoard = await fetch(
+    `${base}/api/public/events/demo-2026/board?gateId=gate-resource-test`,
+  ).then((response) => response.json());
   if (
     publicStatus.status !== "SERVICE_PAUSED" ||
     publicStatus.predictionQuality !== "UNCERTAIN" ||
     !publicBoard.groups.some(
       (group) => group.productCode === "TST20" && group.status === "SERVICE_PAUSED",
-    )
+    ) ||
+    gateBoard.selectedGate?.id !== "gate-resource-test" ||
+    gateBoard.groups.length !== 1 ||
+    gateBoard.groups[0]?.productCode !== "TST20"
   ) {
     throw new Error("Ressourcenpause wirkt nicht ehrlich auf öffentliche Anzeigen.");
   }
@@ -359,6 +400,9 @@ try {
       sharedQueueDemandVisible: true,
       twoAircraftInResourceGroup: true,
       compatibilityAndGateConfigured: true,
+      gateAssignmentsProjected: true,
+      gateDisplayFilterAppliedPublicly: true,
+      invalidGateDisplayReferenceRejected: true,
       staleMasterDataRejected: true,
       pauseBlocksSales: true,
       pauseBlocksCalls: true,
