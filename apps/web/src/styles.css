@@ -3318,6 +3318,104 @@ p {
 .master-data-drawer fieldset > * {
   grid-column: 1;
 }
+.gate-active-field {
+  display: grid;
+  gap: 8px;
+}
+.gate-display-filter {
+  display: grid;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid var(--ui-border);
+  border-radius: 7px;
+  background: var(--ui-surface-subtle);
+}
+.master-data-editor fieldset > .gate-display-filter {
+  grid-column: 1 / -1;
+}
+.gate-display-filter h3,
+.gate-display-filter p {
+  margin: 0;
+}
+.gate-display-filter p,
+.gate-assignment-summary small {
+  color: var(--ui-muted);
+}
+.gate-filter-group,
+.gate-assignment-summary {
+  display: grid;
+  gap: 8px;
+}
+.gate-filter-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+.gate-filter-options .checkbox-label {
+  min-height: 32px;
+}
+.gate-assignment-summary {
+  padding-top: 14px;
+  border-top: 1px solid var(--ui-border);
+}
+.manifest-correction {
+  display: grid;
+  gap: 18px;
+}
+.manifest-correction[hidden] {
+  display: none;
+}
+.admin-only-badge {
+  align-self: start;
+  padding: 6px 9px;
+  border-radius: 999px;
+  color: var(--ui-purple-text);
+  background: var(--ui-purple-soft);
+  font-size: 0.75rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.manifest-correction-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.manifest-correction-grid label {
+  display: grid;
+  gap: 7px;
+}
+.manifest-reason-field {
+  grid-column: 1 / -1;
+}
+.manifest-reason-field textarea {
+  min-height: 92px;
+  resize: vertical;
+}
+.manifest-reason-field small {
+  color: var(--ui-muted);
+  text-align: right;
+}
+.manifest-correction-preview {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid var(--ui-border);
+  border-radius: 7px;
+  background: var(--ui-surface-subtle);
+}
+.manifest-correction-preview > div {
+  display: grid;
+  gap: 4px;
+}
+.manifest-correction-preview span {
+  color: var(--ui-muted);
+  font-size: 0.78rem;
+}
+.manifest-correction-action {
+  justify-self: end;
+}
 .drawer-heading {
   display: flex;
   align-items: flex-start;
@@ -3566,8 +3664,18 @@ p {
   .admin-mode-bar,
   .device-admin-context,
   .product-editor-section .parameter-grid,
-  .weight-capture-mode {
+  .weight-capture-mode,
+  .manifest-correction-grid,
+  .manifest-correction-preview {
     grid-template-columns: 1fr;
+  }
+  .manifest-correction-preview > span {
+    transform: rotate(90deg);
+    justify-self: start;
+  }
+  .manifest-correction-action {
+    width: 100%;
+    justify-self: stretch;
   }
   .admin-mode-bar > button {
     justify-self: start;

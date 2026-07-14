@@ -11,6 +11,10 @@ import type {
 import QRCode from "qrcode";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  manifestCorrectionCandidates,
+  manifestCorrectionTargets,
+} from "./admin-manifest-correction";
+import {
   type AdminArea,
   AdminNavigation,
   type MasterDataCategory,
@@ -53,6 +57,11 @@ import {
   requestBoardSync,
 } from "./board-sync";
 import { requiresChildCompanionWarning } from "./cashier-guidance";
+import {
+  deviceCredentialCandidates,
+  deviceCredentialToken,
+  rememberDeviceCredential,
+} from "./device-credentials";
 import { rememberActiveEvent, resolveActiveEvent } from "./event-context";
 import {
   eventDateInTimeZone,
@@ -116,6 +125,13 @@ const capacityLabel = {
   MANUAL_REVIEW: "Manuelle Prüfung erforderlich",
   SOLD_OUT: "Keine sichere Restkapazität",
 } as const;
+const rotationStatusLabel = {
+  DRAFT: "Vorbereitung",
+  CALLED: "Aufgerufen",
+  IN_FLIGHT: "Im Flug",
+  LANDED: "Gelandet",
+  COMPLETED: "Abgeschlossen",
+} as const;
 const aircraftStateLabel = {
   AVAILABLE: "Verfügbar",
   BOARDING: "Boarding",
@@ -142,6 +158,8 @@ function FieldLabel({ label, help }: { label: string; help: string }) {
   );
 }
 type WeightClass = "NOT_CAPTURED" | "CHILD" | "NORMAL" | "HEAVY" | "INDIVIDUAL";
+type GateDisplayStatus = "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
+const attemptedDeviceCredentialRecoveries = new Set<string>();
 type TicketDetail = {
   clientId: string;
   weightClass: WeightClass;
@@ -177,8 +195,15 @@ function operationalTimeLabel(value: string | null, timeZone: string): string {
   });
 }
 
+function deviceRoleFor(deviceId: string): string | null {
+  for (const role of ["ADMIN", "CASHIER", "FLIGHT_LINE", "DISPLAY"]) {
+    if (window.localStorage.getItem(`device-id:${role}`) === deviceId) return role;
+  }
+  return null;
+}
+
 function deviceTokenFor(deviceId: string): string {
-  const pairedToken = window.localStorage.getItem(`device-token:${deviceId}`);
+  const pairedToken = deviceCredentialToken(window.localStorage, deviceRoleFor(deviceId), deviceId);
   if (pairedToken) return pairedToken;
   if (LOCAL_DEVELOPMENT && EVENT_ID === "demo-2026") {
     if (deviceId === "cashier-tablet-1") return "demo-cashier-device-token";
@@ -186,6 +211,10 @@ function deviceTokenFor(deviceId: string): string {
     return "demo-admin-device-token";
   }
   return "";
+}
+
+function allowDeviceCredentialRecovery(deviceId: string): void {
+  attemptedDeviceCredentialRecoveries.delete(deviceId);
 }
 
 function deviceIdForRole(role: string, developmentId: string): string {
@@ -248,22 +277,36 @@ function useOperationBoard(deviceId: string) {
     lastConfirmedAt: null,
   });
   const refresh = useCallback(async () => {
-    const deviceToken = deviceTokenFor(deviceId);
-    const outcome = await requestBoardSync(() =>
-      getOperationBoard(EVENT_ID, deviceId, deviceToken),
-    );
-    if (outcome.type === "UNAVAILABLE" && outcome.message.includes("(403)") && deviceToken) {
-      try {
-        const context = await getDeviceContext(deviceId, deviceToken);
-        if (context.eventId !== EVENT_ID) {
-          rememberActiveEvent(window.localStorage, context.eventId);
-          const target = new URL(window.location.href);
-          target.searchParams.set("event", context.eventId);
-          window.location.replace(target);
-          return;
+    let deviceToken = deviceTokenFor(deviceId);
+    let outcome = await requestBoardSync(() => getOperationBoard(EVENT_ID, deviceId, deviceToken));
+    if (
+      outcome.type === "UNAVAILABLE" &&
+      outcome.message.includes("(403)") &&
+      !attemptedDeviceCredentialRecoveries.has(deviceId)
+    ) {
+      attemptedDeviceCredentialRecoveries.add(deviceId);
+      const role = deviceRoleFor(deviceId);
+      for (const candidate of deviceCredentialCandidates(window.localStorage, role, deviceId)) {
+        try {
+          const context = await getDeviceContext(deviceId, candidate);
+          if (role && context.role !== role) continue;
+          rememberDeviceCredential(window.localStorage, context.role, deviceId, candidate);
+          deviceToken = candidate;
+          if (context.eventId !== EVENT_ID) {
+            rememberActiveEvent(window.localStorage, context.eventId);
+            const target = new URL(window.location.href);
+            target.searchParams.set("event", context.eventId);
+            window.location.replace(target);
+            return;
+          }
+          outcome = await requestBoardSync(() =>
+            getOperationBoard(EVENT_ID, deviceId, deviceToken),
+          );
+          if (outcome.type === "CONFIRMED") break;
+        } catch {
+          // Try the next credential kept in this browser. Tokens are never logged or persisted anew
+          // unless the server confirms the device/role combination.
         }
-      } catch {
-        // The original board error remains the useful user-facing state.
       }
     }
     setState((current) => reduceBoardSyncState(current, outcome));
@@ -2066,8 +2109,7 @@ function PairDeviceView() {
     if (!valid) return;
     const viewRole =
       role === "FLIGHT_LINE_LEAD" ? "FLIGHT_LINE" : role === "FLIGHT_DIRECTOR" ? "ADMIN" : role;
-    window.localStorage.setItem(`device-id:${viewRole}`, deviceId);
-    window.localStorage.setItem(`device-token:${deviceId}`, token);
+    rememberDeviceCredential(window.localStorage, viewRole, deviceId, token);
     rememberActiveEvent(window.localStorage, eventId);
     window.history.replaceState(null, "", "/pair");
     window.location.assign(roleTargets[role] ?? "/");
@@ -2148,8 +2190,7 @@ function SetupView() {
         adminDeviceId,
         adminCredentialHash: await sha256HexBrowser(token),
       });
-      window.localStorage.setItem("device-id:ADMIN", result.adminDeviceId);
-      window.localStorage.setItem(`device-token:${result.adminDeviceId}`, token);
+      rememberDeviceCredential(window.localStorage, "ADMIN", result.adminDeviceId, token);
       rememberActiveEvent(window.localStorage, result.eventId);
       window.location.assign(`/admin?event=${encodeURIComponent(result.eventId)}`);
     } catch (cause) {
@@ -2479,6 +2520,13 @@ function AdminView() {
   );
   const [gateActive, setGateActive] = useState(true);
   const [gateSortOrder, setGateSortOrder] = useState(10);
+  const [gateDisplayProductIds, setGateDisplayProductIds] = useState<string[]>([]);
+  const [gateDisplayRotationStatuses, setGateDisplayRotationStatuses] = useState<
+    GateDisplayStatus[]
+  >([]);
+  const [manifestTicketGroupId, setManifestTicketGroupId] = useState("");
+  const [manifestTargetRotationId, setManifestTargetRotationId] = useState("");
+  const [manifestCorrectionReason, setManifestCorrectionReason] = useState("");
   const [resourceEditorId, setResourceEditorId] = useState("new");
   const [resourceName, setResourceName] = useState("");
   const [resourceGateId, setResourceGateId] = useState("");
@@ -2508,8 +2556,16 @@ function AdminView() {
   const [deleteAllBackups, setDeleteAllBackups] = useState(false);
   const [factoryResetCommandId, setFactoryResetCommandId] = useState(() => crypto.randomUUID());
   const resourceGroups = board?.resourceGroups ?? [];
-  const isAdministrator = board?.currentDeviceRole === "ADMIN";
+  const isAdministrator = error === null && board?.currentDeviceRole === "ADMIN";
   const productPriceCents = parseEuroToCents(productPriceInput);
+  const manifestCandidates = manifestCorrectionCandidates(board?.rotations ?? []);
+  const selectedManifestCandidate = manifestCandidates.find(
+    (candidate) => candidate.ticketGroupId === manifestTicketGroupId,
+  );
+  const manifestTargets = manifestCorrectionTargets(
+    board?.rotations ?? [],
+    selectedManifestCandidate,
+  );
 
   useEffect(() => {
     if (!adminPinDialog && (!pendingMasterDelete || adminModeUnlocked)) return;
@@ -2686,7 +2742,8 @@ function AdminView() {
 
   async function createEventFromTemplate() {
     try {
-      const result = await cloneEvent(EVENT_ID, ADMIN_DEVICE_ID, deviceTokenFor(ADMIN_DEVICE_ID), {
+      const adminToken = deviceTokenFor(ADMIN_DEVICE_ID);
+      const result = await cloneEvent(EVENT_ID, ADMIN_DEVICE_ID, adminToken, {
         commandId: crypto.randomUUID(),
         expectedSourceVersion: board?.event.version ?? 0,
         eventId: newEventId,
@@ -2696,7 +2753,8 @@ function AdminView() {
         timeZone: board?.event.timeZone ?? "Europe/Berlin",
         restartMode,
       });
-      window.localStorage.setItem("device-id:ADMIN", result.adminDeviceId);
+      rememberDeviceCredential(window.localStorage, "ADMIN", result.adminDeviceId, adminToken);
+      rememberActiveEvent(window.localStorage, result.eventId);
       window.location.assign(`/admin?event=${encodeURIComponent(result.eventId)}`);
     } catch (cause) {
       setMessage(
@@ -2911,6 +2969,8 @@ function AdminView() {
     setGateType(entry?.gateType ?? "FLIGHT_LINE");
     setGateActive(entry?.active ?? true);
     setGateSortOrder(entry?.sortOrder ?? 10);
+    setGateDisplayProductIds(entry?.displayFilter.productIds ?? []);
+    setGateDisplayRotationStatuses(entry?.displayFilter.rotationStatuses ?? []);
   }
 
   async function saveGate() {
@@ -2930,6 +2990,10 @@ function AdminView() {
             gateType,
             active: gateActive,
             sortOrder: gateSortOrder,
+            displayFilter: {
+              productIds: gateDisplayProductIds,
+              rotationStatuses: gateDisplayRotationStatuses,
+            },
             reason: MASTER_DATA_AUDIT_REASON,
             adminPin,
           },
@@ -2945,6 +3009,49 @@ function AdminView() {
       await refreshHistory();
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : "Gate konnte nicht gespeichert werden.");
+    }
+  }
+
+  async function correctRotationManifest() {
+    if (
+      !board ||
+      !manifestTicketGroupId ||
+      !manifestTargetRotationId ||
+      manifestCorrectionReason.trim().length < 10 ||
+      adminPin.length < 4
+    )
+      return;
+    try {
+      await sendCommand(
+        {
+          commandId: crypto.randomUUID(),
+          eventId: EVENT_ID,
+          deviceId: ADMIN_DEVICE_ID,
+          expectedVersion: board.event.version,
+          issuedAt: new Date().toISOString(),
+          type: "CORRECT_ROTATION_MANIFEST",
+          payload: {
+            ticketGroupId: manifestTicketGroupId,
+            targetRotationId: manifestTargetRotationId,
+            reason: manifestCorrectionReason.trim(),
+            adminPin,
+          },
+        },
+        deviceTokenFor(ADMIN_DEVICE_ID),
+      );
+      setManifestTicketGroupId("");
+      setManifestTargetRotationId("");
+      setManifestCorrectionReason("");
+      setMessage("Dokumentierte Besetzung wurde als Admin-Korrektur vollständig auditiert.");
+      if (!adminModeUnlocked) setAdminPin("");
+      await refresh();
+      await refreshHistory();
+    } catch (cause) {
+      setMessage(
+        cause instanceof Error
+          ? cause.message
+          : "Manifestkorrektur konnte nicht gespeichert werden.",
+      );
     }
   }
 
@@ -4002,6 +4109,24 @@ function AdminView() {
               >
                 {adminModeUnlocked ? "Bearbeitungsmodus sperren" : "Bearbeitungsmodus entsperren"}
               </button>
+            ) : (
+              <button
+                className="secondary-action"
+                onClick={() => {
+                  allowDeviceCredentialRecovery(ADMIN_DEVICE_ID);
+                  void refresh();
+                }}
+                type="button"
+              >
+                Gerätebindung erneut prüfen
+              </button>
+            )}
+            {!isAdministrator ? (
+              <ValidationHint tone="error">
+                Dieses Browsergerät ist aktuell nicht als Administration bestätigt. Die vorhandene
+                lokale Gerätebindung wird automatisch geprüft; danach erscheinen PIN-Modus und Reset
+                wieder aktiv.
+              </ValidationHint>
             ) : null}
             {adminArea === "operations" ? (
               <label>
@@ -4026,148 +4151,158 @@ function AdminView() {
               </ValidationHint>
             )}
           </section>
-          {isAdministrator ? (
-            <section className="reset-levels" hidden={adminArea !== "backup"}>
-              <div className="reset-level-row">
-                <div>
-                  <h2>Betriebsdaten zurücksetzen</h2>
-                  <p>
-                    Einen neuen, leeren Betriebsstand mit bestehenden Stammdaten anlegen. Der
-                    bisherige Stand bleibt als Audit- und Wiederherstellungsquelle erhalten.
-                  </p>
-                </div>
-                <button
-                  onClick={() => {
-                    setRestartMode("KEEP_MASTER_DATA");
-                    setRestartConfirmation("");
-                  }}
-                  type="button"
-                >
-                  Betriebsdaten zurücksetzen
-                </button>
+          <section className="reset-levels" hidden={adminArea !== "backup"}>
+            {!isAdministrator ? (
+              <ValidationHint tone="error">
+                Reset ist sichtbar, bleibt aber gesperrt, bis dieses Administrationsgerät vom Server
+                bestätigt wurde.
+              </ValidationHint>
+            ) : null}
+            <div className="reset-level-row">
+              <div>
+                <h2>Betriebsdaten zurücksetzen</h2>
+                <p>
+                  Einen neuen, leeren Betriebsstand mit bestehenden Stammdaten anlegen. Der
+                  bisherige Stand bleibt als Audit- und Wiederherstellungsquelle erhalten.
+                </p>
               </div>
-              <div className="reset-level-row">
-                <div>
-                  <h2>Neue Veranstaltung beginnen</h2>
-                  <p>
-                    Einen neuen Veranstaltungstag ohne bestehende Gates, Ressourcen, Flugzeuge,
-                    Pilotencodes oder Produkte beginnen.
-                  </p>
-                </div>
-                <button
-                  onClick={() => {
-                    setRestartMode("EMPTY");
-                    setRestartConfirmation("");
-                  }}
-                  type="button"
-                >
-                  Neue Veranstaltung
-                </button>
-              </div>
-              <div className="reset-level-row factory-reset-row">
-                <div>
-                  <h2>Werkszustand herstellen</h2>
-                  <p>
-                    Alle Anwendungsdaten, Stammdaten, Historien, Gerätebindungen und die
-                    Ersteinrichtung werden gelöscht. Danach startet das System wieder bei /setup.
-                  </p>
-                </div>
-                <button className="danger-action" onClick={openFactoryReset} type="button">
-                  Werkszustand vorbereiten
-                </button>
-              </div>
-            </section>
-          ) : null}
-          {isAdministrator ? (
-            <section className="admin-section" hidden={adminArea !== "backup"}>
-              <h2>Neuen Betriebsstand anlegen</h2>
-              <p>
-                Aktive Veranstaltung: <strong>{board?.event.name ?? EVENT_ID}</strong>. Ein Neustart
-                legt eine neue Veranstaltung an. Der bisherige Stand bleibt für Audit, Berichte und
-                Wiederherstellung unverändert erhalten.
-              </p>
-              <div className="event-catalog">
-                {events.map((entry) => (
-                  <a
-                    className={entry.eventId === EVENT_ID ? "current-event" : ""}
-                    href={`/admin?event=${encodeURIComponent(entry.eventId)}`}
-                    key={entry.eventId}
-                  >
-                    <strong>{entry.name}</strong>
-                    <span>
-                      {entry.eventDate} · {entry.aerodrome || "Flugplatz offen"}
-                    </span>
-                  </a>
-                ))}
-              </div>
-              <div className="parameter-grid">
-                <label>
-                  Neustart-Stufe
-                  <select
-                    value={restartMode}
-                    onChange={(event) =>
-                      setRestartMode(event.target.value as "KEEP_MASTER_DATA" | "EMPTY")
-                    }
-                  >
-                    <option value="KEEP_MASTER_DATA">Betriebsdaten zurücksetzen</option>
-                    <option value="EMPTY">Vollständig neu einrichten</option>
-                  </select>
-                </label>
-                <label>
-                  Technische ID
-                  <input
-                    value={newEventId}
-                    onChange={(event) => setNewEventId(event.target.value)}
-                    placeholder="rundflug-2027"
-                  />
-                </label>
-                <label>
-                  Bezeichnung
-                  <input
-                    value={newEventName}
-                    onChange={(event) => setNewEventName(event.target.value)}
-                    placeholder="Flugtag 2027"
-                  />
-                </label>
-                <LocalizedDateInput label="Datum" value={newEventDate} onChange={setNewEventDate} />
-                <label>
-                  Flugplatz
-                  <input
-                    value={newEventAerodrome}
-                    onChange={(event) => setNewEventAerodrome(event.target.value)}
-                    placeholder="EDXX"
-                  />
-                </label>
-                <label>
-                  Bestätigung
-                  <input
-                    value={restartConfirmation}
-                    onChange={(event) => setRestartConfirmation(event.target.value)}
-                    placeholder="NEUSTART"
-                    autoComplete="off"
-                  />
-                </label>
-              </div>
-              <p className="help-text">
-                {restartMode === "KEEP_MASTER_DATA"
-                  ? "Übernommen werden Parameter, Gates, Ressourcengruppen, Produkte, Flugzeugzuordnungen und Piloten-IDs. Tickets, Gruppen, Umläufe und Flugdaten beginnen leer; Verkäufe bleiben zunächst gesperrt."
-                  : "Nur Veranstaltungsdaten, Grundeinstellungen und dieses Administrationsgerät werden angelegt. Gates, Ressourcengruppen, Produkte, Flugzeugzuordnungen, Piloten-IDs und alle Betriebsdaten beginnen leer."}
-              </p>
               <button
+                disabled={!isAdministrator}
+                onClick={() => {
+                  setRestartMode("KEEP_MASTER_DATA");
+                  setRestartConfirmation("");
+                }}
                 type="button"
-                disabled={
-                  restartConfirmation !== "NEUSTART" ||
-                  newEventId.trim().length < 3 ||
-                  newEventName.trim().length < 3 ||
-                  !newEventDate ||
-                  newEventAerodrome.trim().length < 2
-                }
-                onClick={() => void createEventFromTemplate()}
               >
-                Sicheren Neustart anlegen
+                Betriebsdaten zurücksetzen
               </button>
-            </section>
-          ) : null}
+            </div>
+            <div className="reset-level-row">
+              <div>
+                <h2>Neue Veranstaltung beginnen</h2>
+                <p>
+                  Einen neuen Veranstaltungstag ohne bestehende Gates, Ressourcen, Flugzeuge,
+                  Pilotencodes oder Produkte beginnen.
+                </p>
+              </div>
+              <button
+                disabled={!isAdministrator}
+                onClick={() => {
+                  setRestartMode("EMPTY");
+                  setRestartConfirmation("");
+                }}
+                type="button"
+              >
+                Neue Veranstaltung
+              </button>
+            </div>
+            <div className="reset-level-row factory-reset-row">
+              <div>
+                <h2>Werkszustand herstellen</h2>
+                <p>
+                  Alle Anwendungsdaten, Stammdaten, Historien, Gerätebindungen und die
+                  Ersteinrichtung werden gelöscht. Danach startet das System wieder bei /setup.
+                </p>
+              </div>
+              <button
+                className="danger-action"
+                disabled={!isAdministrator}
+                onClick={openFactoryReset}
+                type="button"
+              >
+                Werkszustand vorbereiten
+              </button>
+            </div>
+          </section>
+          <section className="admin-section" hidden={adminArea !== "backup"}>
+            <h2>Neuen Betriebsstand anlegen</h2>
+            <p>
+              Aktive Veranstaltung: <strong>{board?.event.name ?? EVENT_ID}</strong>. Ein Neustart
+              legt eine neue Veranstaltung an. Der bisherige Stand bleibt für Audit, Berichte und
+              Wiederherstellung unverändert erhalten.
+            </p>
+            <div className="event-catalog">
+              {events.map((entry) => (
+                <a
+                  className={entry.eventId === EVENT_ID ? "current-event" : ""}
+                  href={`/admin?event=${encodeURIComponent(entry.eventId)}`}
+                  key={entry.eventId}
+                >
+                  <strong>{entry.name}</strong>
+                  <span>
+                    {entry.eventDate} · {entry.aerodrome || "Flugplatz offen"}
+                  </span>
+                </a>
+              ))}
+            </div>
+            <div className="parameter-grid">
+              <label>
+                Neustart-Stufe
+                <select
+                  value={restartMode}
+                  onChange={(event) =>
+                    setRestartMode(event.target.value as "KEEP_MASTER_DATA" | "EMPTY")
+                  }
+                >
+                  <option value="KEEP_MASTER_DATA">Betriebsdaten zurücksetzen</option>
+                  <option value="EMPTY">Vollständig neu einrichten</option>
+                </select>
+              </label>
+              <label>
+                Technische ID
+                <input
+                  value={newEventId}
+                  onChange={(event) => setNewEventId(event.target.value)}
+                  placeholder="rundflug-2027"
+                />
+              </label>
+              <label>
+                Bezeichnung
+                <input
+                  value={newEventName}
+                  onChange={(event) => setNewEventName(event.target.value)}
+                  placeholder="Flugtag 2027"
+                />
+              </label>
+              <LocalizedDateInput label="Datum" value={newEventDate} onChange={setNewEventDate} />
+              <label>
+                Flugplatz
+                <input
+                  value={newEventAerodrome}
+                  onChange={(event) => setNewEventAerodrome(event.target.value)}
+                  placeholder="EDXX"
+                />
+              </label>
+              <label>
+                Bestätigung
+                <input
+                  value={restartConfirmation}
+                  onChange={(event) => setRestartConfirmation(event.target.value)}
+                  placeholder="NEUSTART"
+                  autoComplete="off"
+                />
+              </label>
+            </div>
+            <p className="help-text">
+              {restartMode === "KEEP_MASTER_DATA"
+                ? "Übernommen werden Parameter, Gates, Ressourcengruppen, Produkte, Flugzeugzuordnungen und Piloten-IDs. Tickets, Gruppen, Umläufe und Flugdaten beginnen leer; Verkäufe bleiben zunächst gesperrt."
+                : "Nur Veranstaltungsdaten, Grundeinstellungen und dieses Administrationsgerät werden angelegt. Gates, Ressourcengruppen, Produkte, Flugzeugzuordnungen, Piloten-IDs und alle Betriebsdaten beginnen leer."}
+            </p>
+            <button
+              type="button"
+              disabled={
+                !isAdministrator ||
+                restartConfirmation !== "NEUSTART" ||
+                newEventId.trim().length < 3 ||
+                newEventName.trim().length < 3 ||
+                !newEventDate ||
+                newEventAerodrome.trim().length < 2
+              }
+              onClick={() => void createEventFromTemplate()}
+            >
+              Sicheren Neustart anlegen
+            </button>
+          </section>
           <section className="admin-section" hidden={adminArea !== "setup"}>
             <h2>Veranstaltungsparameter</h2>
             <div className="parameter-grid">
@@ -4766,11 +4901,17 @@ function AdminView() {
               <fieldset hidden={masterDataCategory !== "gates"}>
                 <legend>Gate</legend>
                 <label>
-                  Bezeichnung
+                  <FieldLabel
+                    label="Bezeichnung"
+                    help="Kurzer, vor Ort eindeutig sichtbarer Name, zum Beispiel Eingang Halle oder Flight Line Nord."
+                  />
                   <input value={gateLabel} onChange={(event) => setGateLabel(event.target.value)} />
                 </label>
                 <label>
-                  Art
+                  <FieldLabel
+                    label="Art"
+                    help="Flight Line steuert den operativen Ablauf, Boarding kennzeichnet einen Sammelpunkt und Nur Anzeige dient ausschließlich der Information."
+                  />
                   <select
                     value={gateType}
                     onChange={(event) => setGateType(event.target.value as typeof gateType)}
@@ -4781,7 +4922,10 @@ function AdminView() {
                   </select>
                 </label>
                 <label>
-                  Sortierung
+                  <FieldLabel
+                    label="Position"
+                    help="Kleinere Zahlen erscheinen in Auswahllisten und Anzeigen weiter oben. Abstände wie 10, 20 und 30 erleichtern spätere Ergänzungen."
+                  />
                   <input
                     type="number"
                     min="0"
@@ -4789,14 +4933,107 @@ function AdminView() {
                     onChange={(event) => setGateSortOrder(Number(event.target.value))}
                   />
                 </label>
-                <label className="checkbox-label">
-                  <input
-                    type="checkbox"
-                    checked={gateActive}
-                    onChange={(event) => setGateActive(event.target.checked)}
-                  />{" "}
-                  aktiv
-                </label>
+                <div className="gate-active-field">
+                  <FieldLabel
+                    label="Status"
+                    help="Nur aktive Gates stehen für neue Zuordnungen und öffentliche Anzeigen zur Verfügung."
+                  />
+                  <label className="checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={gateActive}
+                      onChange={(event) => setGateActive(event.target.checked)}
+                    />
+                    <span>Gate ist aktiv</span>
+                  </label>
+                </div>
+                <section
+                  className="gate-display-filter"
+                  aria-labelledby="gate-display-filter-title"
+                >
+                  <div>
+                    <h3 id="gate-display-filter-title">Anzeigefilter</h3>
+                    <p>
+                      Leere Auswahl bedeutet: alle Produkte beziehungsweise alle Umlaufstatus
+                      anzeigen.
+                    </p>
+                  </div>
+                  <div className="gate-filter-group">
+                    <strong>
+                      <FieldLabel
+                        label="Produkte"
+                        help="Begrenzt die öffentliche Gate-Anzeige auf die ausgewählten Produkte. Die Ressourcenzuordnung bleibt unverändert."
+                      />
+                    </strong>
+                    <div className="gate-filter-options">
+                      {board?.products.map((product) => (
+                        <label className="checkbox-label" key={product.id}>
+                          <input
+                            checked={gateDisplayProductIds.includes(product.id)}
+                            onChange={() =>
+                              setGateDisplayProductIds((current) =>
+                                current.includes(product.id)
+                                  ? current.filter((id) => id !== product.id)
+                                  : [...current, product.id],
+                              )
+                            }
+                            type="checkbox"
+                          />
+                          <span>{product.name}</span>
+                        </label>
+                      ))}
+                      {board?.products.length === 0 ? (
+                        <span className="help-text">Noch keine Produkte angelegt.</span>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className="gate-filter-group">
+                    <strong>
+                      <FieldLabel
+                        label="Umlaufstatus"
+                        help="Begrenzt die Anzeige auf die gewählten Phasen. Diese Auswahl löst keine Zustandsänderung aus."
+                      />
+                    </strong>
+                    <div className="gate-filter-options">
+                      {(
+                        [
+                          ["DRAFT", "Vorbereitung"],
+                          ["CALLED", "Aufgerufen"],
+                          ["IN_FLIGHT", "Im Flug"],
+                          ["LANDED", "Gelandet"],
+                          ["COMPLETED", "Abgeschlossen"],
+                        ] as const
+                      ).map(([status, label]) => (
+                        <label className="checkbox-label" key={status}>
+                          <input
+                            checked={gateDisplayRotationStatuses.includes(status)}
+                            onChange={() =>
+                              setGateDisplayRotationStatuses((current) =>
+                                current.includes(status)
+                                  ? current.filter((entry) => entry !== status)
+                                  : [...current, status],
+                              )
+                            }
+                            type="checkbox"
+                          />
+                          <span>{label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  {gateEditorId !== "new" ? (
+                    <div className="gate-assignment-summary">
+                      <strong>Zugeordnete Ressourcengruppen</strong>
+                      <span>
+                        {resourceGroups
+                          .filter((group) => group.gateId === gateEditorId)
+                          .map((group) => group.name)
+                          .join(", ") || "Keine"}
+                      </span>
+                      <small>Zuordnungen werden bei der Ressourcengruppe gepflegt.</small>
+                    </div>
+                  ) : null}
+                </section>
                 {masterSubmitAttempted && gateLabel.trim().length < 2 ? (
                   <ValidationHint tone="error">
                     Die Gate-Bezeichnung muss mindestens 2 Zeichen lang sein.
@@ -5491,6 +5728,111 @@ function AdminView() {
                 <p>Keine laufenden Umläufe.</p>
               ) : null}
             </div>
+          </section>
+          <section
+            className="admin-section manifest-correction"
+            hidden={adminArea !== "operations"}
+          >
+            <div className="section-heading">
+              <div>
+                <h2>Dokumentierte Besetzung korrigieren</h2>
+                <p>
+                  Seltener Admin-Sonderweg nach dem Flugstart. Eine anonyme Buchungsgruppe wird
+                  immer vollständig einem bereits gestarteten oder abgeschlossenen Umlauf
+                  zugeordnet.
+                </p>
+              </div>
+              <span className="admin-only-badge">Nur Administration</span>
+            </div>
+            <ValidationHint>
+              Diese Korrektur berichtigt ausschließlich die Dokumentation und besitzt keine
+              flugbetriebliche oder sicherheitsbezogene Freigabewirkung.
+            </ValidationHint>
+            <div className="manifest-correction-grid">
+              <label>
+                <FieldLabel
+                  label="Zu korrigierende Buchungsgruppe"
+                  help="Es werden nur anonyme Gruppen angeboten, deren dokumentierter Umlauf bereits im Flug, gelandet oder abgeschlossen ist."
+                />
+                <select
+                  value={manifestTicketGroupId}
+                  onChange={(event) => {
+                    setManifestTicketGroupId(event.target.value);
+                    setManifestTargetRotationId("");
+                  }}
+                >
+                  <option value="">Bitte wählen</option>
+                  {manifestCandidates.map((candidate) => (
+                    <option key={candidate.ticketGroupId} value={candidate.ticketGroupId}>
+                      {candidate.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <FieldLabel
+                  label="Tatsächlicher Zielumlauf"
+                  help="Der Zielumlauf muss mindestens den Status Im Flug erreicht haben. Bisherige Umläufe der Gruppe sind ausgeschlossen."
+                />
+                <select
+                  disabled={!selectedManifestCandidate}
+                  value={manifestTargetRotationId}
+                  onChange={(event) => setManifestTargetRotationId(event.target.value)}
+                >
+                  <option value="">Bitte wählen</option>
+                  {manifestTargets.map((rotation) => (
+                    <option key={rotation.id} value={rotation.id}>
+                      {rotation.communicationLabel} · {rotationStatusLabel[rotation.status]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="manifest-reason-field">
+                <FieldLabel
+                  label="Dokumentationsgrund"
+                  help="Mindestens 10 Zeichen. Der Grund wird zusammen mit Quelle, Ziel, Gerät und Version dauerhaft auditiert."
+                />
+                <textarea
+                  maxLength={500}
+                  placeholder="Zum Beispiel: Tatsächliche Besetzung nach Rückmeldung der Flight Line berichtigen"
+                  value={manifestCorrectionReason}
+                  onChange={(event) => setManifestCorrectionReason(event.target.value)}
+                />
+                <small>{manifestCorrectionReason.trim().length}/10 Mindestzeichen</small>
+              </label>
+            </div>
+            {selectedManifestCandidate ? (
+              <div className="manifest-correction-preview">
+                <div>
+                  <span>Bisher dokumentiert</span>
+                  <strong>{selectedManifestCandidate.label}</strong>
+                </div>
+                <span aria-hidden="true">→</span>
+                <div>
+                  <span>Wird vollständig zugeordnet zu</span>
+                  <strong>
+                    {manifestTargets.find((rotation) => rotation.id === manifestTargetRotationId)
+                      ?.communicationLabel ?? "Zielumlauf wählen"}
+                  </strong>
+                </div>
+              </div>
+            ) : null}
+            <button
+              className="primary-action manifest-correction-action"
+              disabled={
+                !isAdministrator ||
+                !manifestTicketGroupId ||
+                !manifestTargetRotationId ||
+                manifestCorrectionReason.trim().length < 10
+              }
+              onClick={() => requestAdminAction(correctRotationManifest)}
+              type="button"
+            >
+              Besetzung protokolliert korrigieren
+            </button>
+            {manifestCandidates.length === 0 ? (
+              <p className="help-text">Aktuell ist keine Korrektur nach Flugstart erforderlich.</p>
+            ) : null}
           </section>
           <section className="admin-section" hidden={adminArea !== "operations"}>
             <h2>Betriebs- und Wetterhinweise</h2>
