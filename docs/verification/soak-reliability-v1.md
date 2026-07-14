@@ -89,3 +89,8 @@ Ein anschließender 12-Minuten-Lauf überschritt beide bisherigen Abbruchpunkte 
 - Median 35,0 ms, p95 45,9 ms und Maximum 53,9 ms.
 
 Auch dieser Diagnoselauf ersetzt den ungekürzten 12-Stunden-Nachweis nicht.
+
+Die PWA verwendet denselben 30-Sekunden-Heartbeat nun in Betriebsansichten, öffentlichem
+Ticketstatus und FIDS. `pong` bestätigt ausschließlich die Verbindung und löst keinen unnötigen
+Board-Abruf aus; ein geschlossener oder fehlerhafter Socket wird über den bestehenden exponentiellen
+Reconnect sowie den 15-Sekunden-REST-Fallback wieder aufgenommen.
