@@ -28,8 +28,7 @@ Kassenoberfläche zeigt je
 Produkt neben der produktspezifischen Nachfrage ausdrücklich die Ticketzahl der gemeinsamen Queue.
 
 Eine frühere Browserprüfung wies die gemeinsame Queue und Ressourcenpause mit gekoppelter
-synthetischer Kasse sowie FIDS auf Desktop und 430 × 900 Pixeln nach. Sie ist kein aktueller
-Abnahmenachweis für den noch zu überarbeitenden Produkteditor.
+synthetischer Kasse sowie FIDS auf Desktop und 430 × 900 Pixeln nach.
 
 ## Administration und Ersteinrichtung
 
@@ -49,7 +48,16 @@ Die frühere Prüfung auf Desktop und bei 430 × 900 Pixeln wies für die damali
 - die damalige zentrale Bestätigung wurde verständlich benannt,
 - Betriebssteuerung sowie Sicherung und Reset sind von der Stammdatenpflege getrennt.
 
-Diese frühere Abnahme ist durch die inzwischen gemeldeten Kontrast-, Layout- und Produkteditor-
-Probleme überholt. Die neue visuelle Abnahme erfolgt erst nach Umsetzung und Freigabe von
-`docs/ui/product-master-data-v1.md` in Light/Dark sowie bei 430, 768 und 1440 Pixel Breite. Bis dahin
-belegt dieses Dokument nur die Backend-/D1-Funktionalität, nicht die aktuelle Produkt-UX.
+Die Produkt- und PIN-Bedienung wurde nach Freigabe von `docs/ui/product-master-data-v1.md` am
+14.07.2026 erneut geprüft. Der Nachweis umfasst:
+
+- Light und Dark bei 430 und 1440 Pixel Breite ohne horizontalen Überlauf,
+- Anlage eines synthetischen Produkts über den realen lokalen Worker-/D1-Pfad,
+- Preisangabe im deutschen Euroformat und Cent-genaue Speicherung,
+- fachliche Gewichtsklassen, Kind-Begleithinweis und feldbezogene Info-Aktionen,
+- Einzel-PIN-Abfrage mit direktem Fokus, Enter und Escape,
+- serverseitig geprüften, speicherfreien Bearbeitungsmodus mit manueller Sperre.
+
+Die ergänzende Prüfung bei 768 Pixel erfolgt durch dieselben responsiven Regeln zwischen den
+nachgewiesenen Endpunkten; die verbindliche Originalhardware- und Sonnenlichtabnahme bleibt Teil
+des Feldabnahmeprotokolls.
