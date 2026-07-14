@@ -14,9 +14,9 @@ npm run check
 
 Zuletzt erfolgreich am 14. Juli 2026:
 
-- Biome-Prüfung von 119 Dateien,
+- Biome-Prüfung von 133 Dateien,
 - TypeScript-Prüfung aller sechs Workspaces,
-- 39 Testdateien mit 201 Tests,
+- 47 Testdateien mit 226 Tests,
 - React-/PWA-Produktionsbuild einschließlich Service Worker,
 - Cloudflare-Worker-Dry-Run mit D1-, Durable-Object-, R2- und Rate-Limit-Bindings,
 - isolierter Backup-Restore mit Prüfsumme und Fremdschlüsseln,
@@ -37,6 +37,7 @@ Detailnachweise liegen thematisch in diesem Verzeichnis, unter anderem:
 
 - [command-pipeline-v1.md](command-pipeline-v1.md)
 - [vertical-slice-v1.md](vertical-slice-v1.md)
+- [v1-acceptance-day.md](v1-acceptance-day.md)
 - [master-data-v1.md](master-data-v1.md)
 - [fleet-operations-v1.md](fleet-operations-v1.md)
 - [public-monitors-v1.md](public-monitors-v1.md)
@@ -47,7 +48,9 @@ Detailnachweise liegen thematisch in diesem Verzeichnis, unter anderem:
 
 ## Laufende technische Abnahmen
 
-- Q-ZUV-050: Der korrigierte ungekürzte 12-Stunden-Langlauf läuft seit 14. Juli 2026, 17:44 Uhr.
+- BP-12: Der automatisierte V1-Abnahmetag mit drei Flugzeugen, zwei Ressourcengruppen, drei
+  Produkten, 60 Tickets und 20 vollständigen Umläufen wurde erfolgreich abgeschlossen.
+- Q-ZUV-050: Der korrigierte ungekürzte 12-Stunden-Langlauf läuft seit 14. Juli 2026, 22:03 Uhr.
 - Q-ZUV-060: Der 12-Stunden-Monitor der zentralen Cloudflare-Umgebung wurde am 14. Juli 2026 mit
   720/720 verfügbaren Intervallen und 100 Prozent erfolgreich abgeschlossen.
 - D1-Migrationen 0030 und 0031 müssen in der zentralen Umgebung noch angewendet werden.
