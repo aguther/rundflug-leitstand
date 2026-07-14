@@ -73,6 +73,28 @@ if (missingPrivacyAcceptance.length > 0) {
   );
 }
 
+const licenseInventoryPath = new URL(
+  "../docs/operations/third-party-licenses-v1.md",
+  import.meta.url,
+);
+const licenseInventory = await readFile(licenseInventoryPath, "utf8");
+const licenseInventoryEvidence = [
+  "T-080",
+  "@block65/custom-error",
+  "RFC 8291",
+  "nativen Web-Crypto-API",
+  "27 unter MIT und 6 unter ISC",
+  "Nutzungsrecht, Lizenztext und Übergabeprotokoll",
+];
+const missingLicenseInventory = licenseInventoryEvidence.filter(
+  (entry) => !licenseInventory.includes(entry),
+);
+if (missingLicenseInventory.length > 0) {
+  throw new Error(
+    `Drittanbieter-Lizenzinventar unvollständig: ${missingLicenseInventory.join(", ")}`,
+  );
+}
+
 console.log(
-  "OK: Q-WAR-010/020/040/050 und Q-DSG-040 Betriebs-, Fachmodell- und Konfigurationsnachweise dokumentiert",
+  "OK: Q-WAR-010/020/040/050, Q-DSG-040 und T-080 Betriebs-, Fachmodell-, Datenschutz- und Lizenznachweise dokumentiert",
 );

@@ -1,6 +1,7 @@
 # Betreiberübergabe und Providerwechsel V1
 
-Status: Technischer Übergabeweg dokumentiert; Nutzungsrechts-/Lizenzfreigabe ausstehend.
+Status: Technischer Übergabeweg und Drittanbieter-Lizenzinventar dokumentiert;
+Nutzungsrechts-/Projektlizenzfreigabe ausstehend.
 
 Betroffene Anforderungen: Q-WAR-010, Q-WAR-030, Q-WAR-040 und T-080.
 
@@ -17,6 +18,8 @@ Dem neuen Betreiber werden mindestens übergeben:
 - letzter portabler D1-/R2-Backupnachweis samt SHA-256-Prüfsumme,
 - DNS-/Domainzuständigkeit, Cloudflare-Accountrollen und CI-/GitHub-Buildkonfiguration,
 - Inventar externer Verträge, AVV/DPA, Subprozessoren und Push-Anbieter,
+- geprüftes Drittanbieter-Lizenzinventar aus
+  `docs/operations/third-party-licenses-v1.md`,
 - offene Abweichungen, Migrationen und Abnahmeauflagen.
 
 Nicht in Repository, Übergabeprotokoll oder Tickets kopiert werden Klartext-PIN, Bootstrap-Code,
