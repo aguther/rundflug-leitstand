@@ -73,8 +73,8 @@
   stroke-width: 1.7;
 }
 .theme-toggle {
-  width: 42px;
-  height: 42px;
+  width: 44px;
+  height: 44px;
   display: grid;
   flex: 0 0 auto;
   place-items: center;
@@ -267,7 +267,7 @@
   background: var(--ui-success-soft);
 }
 .admin-mode-bar > button {
-  min-height: 42px;
+  min-height: 44px;
   padding: 8px 14px;
   border-radius: 6px;
   font-weight: 760;
@@ -648,11 +648,11 @@ footer {
 }
 .localized-picker-control > input {
   width: 100%;
-  padding-right: 42px;
+  padding-right: 48px;
   font-variant-numeric: tabular-nums;
 }
 .localized-picker-trigger {
-  width: 40px;
+  width: 46px;
   position: absolute;
   inset: 1px 1px 1px auto;
   display: grid;
@@ -2147,6 +2147,14 @@ p {
 .rotation-detail .primary-action {
   margin-top: auto;
 }
+.rotation-detail select {
+  min-height: 44px;
+  padding: 9px 11px;
+  border: 1px solid var(--ui-border);
+  border-radius: 6px;
+  color: var(--ui-text);
+  background: var(--ui-control);
+}
 .completed-state {
   margin-top: auto;
   padding: 20px;
@@ -2586,7 +2594,10 @@ p {
   background: #ffe7b7;
 }
 .setup-checklist button {
-  padding: 4px 0;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  padding: 8px 0;
   border: 0;
   color: #164e91;
   background: transparent;
