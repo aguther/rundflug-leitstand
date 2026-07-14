@@ -20,6 +20,9 @@ WebSocket-Verteilung und Objektspeicher, aber keine Neuentwicklung der Fachregel
 Sicherungen und CSV-Exporte verhindern, dass operative Daten ausschließlich in einem proprietären
 Format verbleiben.
 
+Der ausführbare Übergabe- und Providerwechselpfad einschließlich Adapterzuordnung, Secretrotation
+und Abnahmekriterien ist in `docs/operations/operator-handover-v1.md` dokumentiert.
+
 ## Q-WAR-020: Konfiguration ohne Programmänderung
 
 | Konfigurationsgruppe | Administrativer Schreibpfad |
