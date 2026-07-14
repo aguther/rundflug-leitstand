@@ -4,6 +4,8 @@ import {
   cloneEventRequestSchema,
   type FactoryResetResponse,
   factoryResetRequestSchema,
+  operationalHistoryQuerySchema,
+  operationalHistorySchema,
 } from "@rundflug/contracts";
 import { assessRemainingCapacity, estimateDuration, forecastQueueWindows } from "@rundflug/domain";
 import { Hono } from "hono";
@@ -12,6 +14,7 @@ import { createPortableBackup, operationDateInTimeZone } from "./backup";
 import { sha256Hex, verifyCredential } from "./crypto";
 import { EventCoordinator } from "./event-coordinator";
 import { factoryResetRequestHash, factoryResetStatements, finishR2Cleanup } from "./factory-reset";
+import { buildOperationalHistoryStatement } from "./operational-history";
 import { allowUnknownTicketAttempt } from "./public-access";
 import { createCsv, createTextPdf } from "./report";
 import { rowToSnapshot } from "./snapshot";
@@ -1559,6 +1562,124 @@ app.get("/api/events/:eventId/history", async (context) => {
       payload: JSON.parse(row.payload_json) as Record<string, unknown>,
     })),
   });
+});
+
+app.get("/api/events/:eventId/history/operations", async (context) => {
+  const eventId = context.req.param("eventId");
+  const device = await authorizeDevice(
+    context.env,
+    eventId,
+    context.req.header("x-device-id"),
+    context.req.header("x-device-token"),
+  );
+  if (!device || !["ADMIN", "FLIGHT_LINE_LEAD", "FLIGHT_DIRECTOR"].includes(device.role)) {
+    return context.json(
+      { error: { code: "DEVICE_NOT_AUTHORIZED", message: "Gerät nicht berechtigt." } },
+      403,
+    );
+  }
+  const parsedQuery = operationalHistoryQuerySchema.safeParse({
+    ticketId: context.req.query("ticketId"),
+    ticketGroupId: context.req.query("ticketGroupId"),
+    rotationId: context.req.query("rotationId"),
+    flightGroupId: context.req.query("flightGroupId"),
+    aircraftId: context.req.query("aircraftId"),
+    pilotId: context.req.query("pilotId"),
+    productId: context.req.query("productId"),
+    resourceGroupId: context.req.query("resourceGroupId"),
+    gateId: context.req.query("gateId"),
+    communicationNumber: context.req.query("communicationNumber"),
+    ticketStatus: context.req.query("ticketStatus"),
+    rotationStatus: context.req.query("rotationStatus"),
+    since: context.req.query("since"),
+    until: context.req.query("until"),
+    limit: context.req.query("limit"),
+    offset: context.req.query("offset"),
+  });
+  if (!parsedQuery.success) {
+    return context.json(
+      {
+        error: {
+          code: "HISTORY_FILTERS_INVALID",
+          message: "Die Historienfilter sind ungültig.",
+        },
+      },
+      400,
+    );
+  }
+  const statement = buildOperationalHistoryStatement(eventId, parsedQuery.data);
+  const rows = await context.env.DB.prepare(statement.sql)
+    .bind(...statement.bindings)
+    .all<{
+      ticket_id: string;
+      ticket_group_id: string;
+      ticket_status: string;
+      sold_at: string;
+      assigned_at: string | null;
+      released_at: string | null;
+      rotation_id: string | null;
+      rotation_status: string | null;
+      flight_group_id: string | null;
+      communication_number: number | null;
+      product_id: string;
+      product_code: string;
+      product_name: string;
+      resource_group_id: string;
+      resource_group_name: string;
+      gate_id: string | null;
+      gate_label: string | null;
+      aircraft_id: string | null;
+      aircraft_registration: string | null;
+      pilot_id: string | null;
+      pilot_operational_code: string | null;
+      called_at: string | null;
+      departed_at: string | null;
+      landed_at: string | null;
+      completed_at: string | null;
+      latest_at: string;
+      total_count: number;
+    }>();
+  const query = parsedQuery.data;
+  return context.json(
+    operationalHistorySchema.parse({
+      entries: rows.results.map((row) => ({
+        ticketId: row.ticket_id,
+        ticketGroupId: row.ticket_group_id,
+        ticketStatus: row.ticket_status,
+        soldAt: row.sold_at,
+        assignmentActive: row.assigned_at !== null && row.released_at === null,
+        assignedAt: row.assigned_at,
+        releasedAt: row.released_at,
+        rotationId: row.rotation_id,
+        rotationStatus: row.rotation_status,
+        flightGroupId: row.flight_group_id,
+        communicationNumber: row.communication_number,
+        communicationLabel:
+          row.communication_number === null
+            ? null
+            : `${row.product_code}-${String(row.communication_number).padStart(3, "0")}`,
+        productId: row.product_id,
+        productCode: row.product_code,
+        productName: row.product_name,
+        resourceGroupId: row.resource_group_id,
+        resourceGroupName: row.resource_group_name,
+        gateId: row.gate_id,
+        gateLabel: row.gate_label,
+        aircraftId: row.aircraft_id,
+        aircraftRegistration: row.aircraft_registration,
+        pilotId: row.pilot_id,
+        pilotOperationalCode: row.pilot_operational_code,
+        calledAt: row.called_at,
+        departedAt: row.departed_at,
+        landedAt: row.landed_at,
+        completedAt: row.completed_at,
+        latestAt: row.latest_at,
+      })),
+      total: rows.results[0]?.total_count ?? 0,
+      limit: query.limit,
+      offset: query.offset,
+    }),
+  );
 });
 
 app.get("/api/events/:eventId/devices", async (context) => {

@@ -4,6 +4,8 @@ import {
   cloneEventRequestSchema,
   commandEnvelopeSchema,
   factoryResetRequestSchema,
+  operationalHistoryQuerySchema,
+  operationalHistorySchema,
   publicBoardSchema,
   publicTicketStatusSchema,
   rotationOperationalSummarySchema,
@@ -774,5 +776,78 @@ describe("commandEnvelopeSchema", () => {
     });
     expect(parsed.type).toBe("SET_ROTATION_CAPACITY");
     expect(JSON.stringify(parsed)).not.toMatch(/safe|freigabe|gewicht|zuladung/i);
+  });
+});
+
+describe("operational history contracts", () => {
+  it("normalizes bounded entity and time filters", () => {
+    const parsed = operationalHistoryQuerySchema.parse({
+      aircraftId: "synthetic-aircraft",
+      pilotId: "synthetic-pilot",
+      communicationNumber: "123",
+      ticketStatus: "COMPLETED",
+      rotationStatus: "COMPLETED",
+      since: "2026-07-11T08:00:00.000Z",
+      until: "2026-07-11T18:00:00.000Z",
+      limit: "50",
+      offset: "100",
+    });
+
+    expect(parsed.communicationNumber).toBe(123);
+    expect(parsed.limit).toBe(50);
+    expect(parsed.offset).toBe(100);
+  });
+
+  it("rejects reversed ranges and unknown statuses", () => {
+    expect(() =>
+      operationalHistoryQuerySchema.parse({
+        since: "2026-07-11T18:00:00.000Z",
+        until: "2026-07-11T08:00:00.000Z",
+      }),
+    ).toThrow();
+    expect(() => operationalHistoryQuerySchema.parse({ ticketStatus: "UNKNOWN" })).toThrow();
+  });
+
+  it("describes an anonymous ticket-to-rotation history row", () => {
+    const parsed = operationalHistorySchema.parse({
+      entries: [
+        {
+          ticketId: "ticket-synthetic-1",
+          ticketGroupId: "group-synthetic-1",
+          ticketStatus: "COMPLETED",
+          soldAt: "2026-07-11T08:00:00.000Z",
+          assignmentActive: true,
+          assignedAt: "2026-07-11T08:01:00.000Z",
+          releasedAt: null,
+          rotationId: "rotation-synthetic-1",
+          rotationStatus: "COMPLETED",
+          flightGroupId: "flight-group-synthetic-1",
+          communicationNumber: 123,
+          communicationLabel: "SYN-123",
+          productId: "product-synthetic",
+          productCode: "SYN",
+          productName: "Synthetischer Rundflug",
+          resourceGroupId: "resource-synthetic",
+          resourceGroupName: "Synthetische Ressource",
+          gateId: "gate-synthetic",
+          gateLabel: "Synthetisches Gate",
+          aircraftId: "aircraft-synthetic",
+          aircraftRegistration: "D-TEST",
+          pilotId: "pilot-synthetic",
+          pilotOperationalCode: "P-01",
+          calledAt: "2026-07-11T08:10:00.000Z",
+          departedAt: "2026-07-11T08:15:00.000Z",
+          landedAt: "2026-07-11T08:35:00.000Z",
+          completedAt: "2026-07-11T08:40:00.000Z",
+          latestAt: "2026-07-11T08:40:00.000Z",
+        },
+      ],
+      total: 1,
+      limit: 100,
+      offset: 0,
+    });
+
+    expect(parsed.entries[0]?.communicationLabel).toBe("SYN-123");
+    expect(JSON.stringify(parsed)).not.toMatch(/guest|phone|telefon/i);
   });
 });

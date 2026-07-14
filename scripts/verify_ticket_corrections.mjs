@@ -90,6 +90,19 @@ const history = async (ticketGroupId) => {
   if (!response.ok) throw new Error(`Historien-Abruf fehlgeschlagen (${response.status}).`);
   return response.json();
 };
+const operationalHistory = async (filters, device = "admin", expectedStatus = 200) => {
+  const query = new URLSearchParams(filters);
+  const response = await fetch(`${base}/api/events/demo-2026/history/operations?${query}`, {
+    headers: { "x-device-id": devices[device], "x-device-token": tokens[device] },
+  });
+  const result = await response.json();
+  if (response.status !== expectedStatus) {
+    throw new Error(
+      `Fachhistorie lieferte ${response.status} statt ${expectedStatus}: ${JSON.stringify(result)}`,
+    );
+  }
+  return result;
+};
 const dailyReport = async () => {
   const response = await fetch(`${base}/api/events/demo-2026/reports/daily.csv`, {
     headers: { "x-device-id": devices.admin, "x-device-token": tokens.admin },
@@ -187,6 +200,20 @@ try {
   if (cancelEvent?.payload?.reason !== cancelPayload.reason) {
     throw new Error("Stornogrund fehlt im unveränderlichen Audit-Eintrag.");
   }
+  const canceledHistory = await operationalHistory({
+    ticketGroupId: cancelGroupId,
+    ticketStatus: "CANCELED",
+  });
+  if (
+    canceledHistory.total !== 2 ||
+    canceledHistory.entries.some(
+      (entry) => entry.assignmentActive || !entry.releasedAt || !entry.rotationId,
+    )
+  ) {
+    throw new Error(
+      "Stornierte Tickets oder freigegebene Umlaufzuordnungen fehlen in der Fachhistorie.",
+    );
+  }
 
   const rebookSale = await sale(canceled.event.version);
   const rebookGroupId = rebookSale.aggregate.id;
@@ -213,9 +240,11 @@ try {
   const newRotation = current.rotations.find(
     (entry) => entry.ticketGroupId === rebookGroupId && entry.status === "DRAFT",
   );
+  const rebookProduct = current.products.find((entry) => entry.id === "panorama-30");
   if (newRotation?.productName !== "30 Min. Panorama") {
     throw new Error("Umbuchung hat die Gruppe nicht korrekt in die Ziel-Queue neu eingereiht.");
   }
+  if (!rebookProduct) throw new Error("Synthetisches Zielprodukt fehlt in der Operationssicht.");
   const rebookAudit = await history(rebookGroupId);
   const rebookEvent = rebookAudit.entries.find(
     (entry) => entry.eventType === "TICKET_GROUP_REBOOKED",
@@ -229,10 +258,39 @@ try {
   if (rebooked.event.version !== current.event.version) {
     throw new Error("Bestätigte Umbuchung und Operationssicht haben abweichende Versionen.");
   }
+  const rebookedHistory = await operationalHistory({
+    productId: "panorama-30",
+    resourceGroupId: rebookProduct.resourceGroupId,
+    ticketGroupId: rebookGroupId,
+    communicationNumber: String(newRotation.communicationNumber),
+    ticketStatus: "QUEUED",
+    rotationStatus: "DRAFT",
+    limit: "1",
+    offset: "0",
+  });
+  if (
+    rebookedHistory.total !== 2 ||
+    rebookedHistory.entries.length !== 1 ||
+    rebookedHistory.entries[0]?.communicationLabel !== newRotation.communicationLabel ||
+    rebookedHistory.entries[0]?.productId !== "panorama-30"
+  ) {
+    throw new Error(
+      "Produkt-, Ressourcen-, Slot- oder Statusfilter der Fachhistorie sind inkonsistent.",
+    );
+  }
+  await operationalHistory(
+    {
+      since: "2026-07-11T18:00:00.000Z",
+      until: "2026-07-11T08:00:00.000Z",
+    },
+    "admin",
+    400,
+  );
+  await operationalHistory({ ticketGroupId: rebookGroupId }, "cashier", 403);
   console.log(
     JSON.stringify({
       ok: true,
-      requirements: ["F-KAS-070", "F-KAS-080", "F-HIS-020"],
+      requirements: ["F-KAS-070", "F-KAS-080", "F-HIS-010", "F-HIS-020"],
       verified: [
         "role-and-pin-authorization",
         "reason-audit",
@@ -240,6 +298,8 @@ try {
         "stale-write-rejection",
         "rotation-release",
         "target-queue-reentry",
+        "authorized-paginated-operational-history",
+        "entity-status-and-time-filter-validation",
       ],
     }),
   );

@@ -951,3 +951,88 @@ export const auditEntrySchema = z.object({
 });
 export const auditHistorySchema = z.object({ entries: z.array(auditEntrySchema) });
 export type AuditHistory = z.infer<typeof auditHistorySchema>;
+
+const ticketHistoryStatusSchema = z.enum([
+  "QUEUED",
+  "CHECKED_IN",
+  "CALLED",
+  "BOARDING",
+  "IN_FLIGHT",
+  "LANDED",
+  "COMPLETED",
+  "NO_SHOW",
+  "CANCELED",
+  "CLARIFICATION",
+]);
+const rotationHistoryStatusSchema = z.enum([
+  "DRAFT",
+  "CALLED",
+  "IN_FLIGHT",
+  "LANDED",
+  "COMPLETED",
+  "CANCELED",
+]);
+
+export const operationalHistoryQuerySchema = z
+  .object({
+    ticketId: z.string().trim().min(1).max(100).optional(),
+    ticketGroupId: z.string().trim().min(1).max(100).optional(),
+    rotationId: z.string().trim().min(1).max(100).optional(),
+    flightGroupId: z.string().trim().min(1).max(100).optional(),
+    aircraftId: z.string().trim().min(1).max(100).optional(),
+    pilotId: z.string().trim().min(1).max(100).optional(),
+    productId: z.string().trim().min(1).max(100).optional(),
+    resourceGroupId: z.string().trim().min(1).max(100).optional(),
+    gateId: z.string().trim().min(1).max(100).optional(),
+    communicationNumber: z.coerce.number().int().positive().optional(),
+    ticketStatus: ticketHistoryStatusSchema.optional(),
+    rotationStatus: rotationHistoryStatusSchema.optional(),
+    since: z.iso.datetime().optional(),
+    until: z.iso.datetime().optional(),
+    limit: z.coerce.number().int().min(1).max(200).default(100),
+    offset: z.coerce.number().int().min(0).max(100_000).default(0),
+  })
+  .strict()
+  .refine(
+    (query) => !query.since || !query.until || Date.parse(query.since) <= Date.parse(query.until),
+    { message: "Der Beginn des Zeitraums muss vor seinem Ende liegen.", path: ["since"] },
+  );
+export type OperationalHistoryQuery = z.infer<typeof operationalHistoryQuerySchema>;
+
+export const operationalHistoryEntrySchema = z.object({
+  ticketId: z.string(),
+  ticketGroupId: z.string(),
+  ticketStatus: ticketHistoryStatusSchema,
+  soldAt: z.string(),
+  assignmentActive: z.boolean(),
+  assignedAt: z.string().nullable(),
+  releasedAt: z.string().nullable(),
+  rotationId: z.string().nullable(),
+  rotationStatus: rotationHistoryStatusSchema.nullable(),
+  flightGroupId: z.string().nullable(),
+  communicationNumber: z.number().int().positive().nullable(),
+  communicationLabel: z.string().nullable(),
+  productId: z.string(),
+  productCode: z.string(),
+  productName: z.string(),
+  resourceGroupId: z.string(),
+  resourceGroupName: z.string(),
+  gateId: z.string().nullable(),
+  gateLabel: z.string().nullable(),
+  aircraftId: z.string().nullable(),
+  aircraftRegistration: z.string().nullable(),
+  pilotId: z.string().nullable(),
+  pilotOperationalCode: z.string().nullable(),
+  calledAt: z.string().nullable(),
+  departedAt: z.string().nullable(),
+  landedAt: z.string().nullable(),
+  completedAt: z.string().nullable(),
+  latestAt: z.string(),
+});
+export const operationalHistorySchema = z.object({
+  entries: z.array(operationalHistoryEntrySchema),
+  total: z.number().int().nonnegative(),
+  limit: z.number().int().positive(),
+  offset: z.number().int().nonnegative(),
+});
+export type OperationalHistory = z.infer<typeof operationalHistorySchema>;
