@@ -124,6 +124,28 @@ Light und Dark geprüft:
 
 ## 7. Ergebnisprotokoll
 
+### Vorbereitender automatisierter Browsernachweis vom 14.07.2026
+
+Dieser Nachweis ersetzt die geforderte Originalhardware- und Helferabnahme nicht, reduziert aber
+deren offenes Risiko. Geprüft wurde lokal mit synthetischem Seed gegen den realen Worker-/D1-Pfad:
+
+- 30 aufeinanderfolgende Standardverkäufe: Median 581 ms, Maximum 843 ms, alle 30 unter 15 Sekunden,
+  höchstens zwei Interaktionen und bei jedem Lauf ein neuer sichtbarer Beleg;
+- Flight-Line-Aktion `NEXT`: kein Bestätigungsdialog, Zustandswechsel nach 534 ms, sichtbare
+  Rückgängig-Aktion und Wiederherstellung nach 309 ms;
+- Administration: PIN-Dialog setzt den Fokus unmittelbar in das Passwortfeld;
+- responsive Vorprüfung bei 430 × 900 und 1280 × 720 ohne horizontalen Seitenüberlauf;
+- sichtbare Bedienelemente der geprüften Kernabläufe mindestens 44 px groß;
+- je geprüftem Arbeitsbereich eine hervorgehobene Hauptaktion sowie deutsche Status- und
+  Prognosebegriffe statt interner Codes;
+- keine relevanten Browser-Konsolenfehler in den geprüften lokalen Abläufen.
+
+Offen und deshalb weiterhin ausdrücklich durch dieses Protokoll abzunehmen sind Originalhardware,
+Sonnenlichtkontrast, Safari/iPadOS, Chrome/Android, Edge/Windows, Web-Push auf realen Geräten und die
+selbstständige Bedienung durch Helfer nach höchstens zehn Minuten Einweisung.
+
+### Verbindliches Abnahmeergebnis
+
 Das unterschriebene Ergebnis enthält:
 
 - Datum, Ort und anonymisierte Testpersonen-Kürzel,

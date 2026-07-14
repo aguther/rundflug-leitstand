@@ -132,6 +132,11 @@ const rotationStatusLabel = {
   LANDED: "Gelandet",
   COMPLETED: "Abgeschlossen",
 } as const;
+const predictionQualityLabel = {
+  STABLE: "stabil",
+  CHANGING: "in Veränderung",
+  UNCERTAIN: "unsicher",
+} as const;
 const aircraftStateLabel = {
   AVAILABLE: "Verfügbar",
   BOARDING: "Boarding",
@@ -1486,7 +1491,7 @@ function FlightLineView() {
             <>
               <div className={`state-banner state-${selected.status.toLowerCase()}`}>
                 <span>Status</span>
-                <strong>{selected.status}</strong>
+                <strong>{rotationStatusLabel[selected.status]}</strong>
               </div>
               <h2>Fluggruppe {selected.communicationLabel}</h2>
               {sharedGroupSegmentLabel(selected, operationalRotations ?? []) ? (
@@ -1569,7 +1574,9 @@ function FlightLineView() {
                   <h3 id="timeline-title">Plan · Prognose · Ist</h3>
                   <span>
                     Prognosequalität:{" "}
-                    {selected.timeline.predictionQuality ?? "noch nicht berechnet"}
+                    {selected.timeline.predictionQuality
+                      ? predictionQualityLabel[selected.timeline.predictionQuality]
+                      : "noch nicht berechnet"}
                   </span>
                 </div>
                 <table>
@@ -4103,7 +4110,7 @@ function AdminView() {
             </div>
             {isAdministrator ? (
               <button
-                className={adminModeUnlocked ? "secondary-action" : "primary-action"}
+                className="secondary-action"
                 onClick={() => (adminModeUnlocked ? lockAdminMode() : requestAdminModeUnlock())}
                 type="button"
               >
@@ -5889,7 +5896,7 @@ function AdminView() {
                     <strong>
                       {product.saleRecommended ? "Verkauf empfohlen" : "Nicht verkaufen"}
                     </strong>
-                    <span>Prognose {product.predictionQuality}</span>
+                    <span>Prognose {predictionQualityLabel[product.predictionQuality]}</span>
                   </div>
                   <div className="secondary-actions">
                     <button
