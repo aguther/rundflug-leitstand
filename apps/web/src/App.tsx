@@ -736,8 +736,8 @@ function CashierView() {
       {pendingDraftCount > 0 ? (
         <div className="connection-warning" role="status">
           {serverConfirmed
-            ? `Offline-Entwurf wiederhergestellt · ${pendingDraftCount} Änderung${pendingDraftCount === 1 ? "" : "en"} prüfen und Verkauf bewusst bestätigen.`
-            : `Entwurf lokal gespeichert · ${pendingDraftCount} Änderung${pendingDraftCount === 1 ? "" : "en"} ausstehend · ohne operative Wirkung.`}
+            ? "Offline-Entwurf wiederhergestellt · aktuellen Stand prüfen und Verkauf bewusst bestätigen."
+            : "Entwurf lokal gespeichert · noch nicht bestätigt · ohne operative Wirkung."}
         </div>
       ) : null}
       <EmergencyNotice active={board?.event.emergencyMode ?? false} />
@@ -2586,6 +2586,7 @@ function AdminView() {
   const [restartConfirmation, setRestartConfirmation] = useState("");
   const [factoryResetOpen, setFactoryResetOpen] = useState(false);
   const [factoryResetBusy, setFactoryResetBusy] = useState(false);
+  const [factoryResetError, setFactoryResetError] = useState<string | null>(null);
   const [factoryResetReason, setFactoryResetReason] = useState("");
   const [factoryResetPin, setFactoryResetPin] = useState("");
   const [factoryResetConfirmation, setFactoryResetConfirmation] = useState("");
@@ -3757,6 +3758,8 @@ function AdminView() {
 
   function openFactoryReset() {
     setFactoryResetCommandId(crypto.randomUUID());
+    setFactoryResetError(null);
+    setMessage(null);
     setFactoryResetReason("");
     setFactoryResetPin("");
     setFactoryResetConfirmation("");
@@ -3774,6 +3777,7 @@ function AdminView() {
     )
       return;
     setFactoryResetBusy(true);
+    setFactoryResetError(null);
     try {
       const result = await factoryReset(
         EVENT_ID,
@@ -3805,7 +3809,7 @@ function AdminView() {
         window.location.replace("/setup");
       }
     } catch (cause) {
-      setMessage(
+      setFactoryResetError(
         cause instanceof Error ? cause.message : "Werkszustand konnte nicht hergestellt werden.",
       );
       setFactoryResetBusy(false);
@@ -4316,7 +4320,7 @@ function AdminView() {
                 onClick={openFactoryReset}
                 type="button"
               >
-                Werkszustand vorbereiten
+                <span>Werkszustand vorbereiten</span>
               </button>
             </div>
           </section>
@@ -5413,7 +5417,7 @@ function AdminView() {
                         }}
                         type="radio"
                       />
-                      Keine Gewichtserfassung
+                      <span>Keine Gewichtserfassung</span>
                     </label>
                     <label>
                       <input
@@ -5422,7 +5426,7 @@ function AdminView() {
                         onChange={() => setProductWeightClasses(setWeightCaptureMode(true))}
                         type="radio"
                       />
-                      Gewichtsklassen erfassen
+                      <span>Gewichtsklassen erfassen</span>
                     </label>
                   </div>
                   {weightCaptureEnabled(productWeightClasses) ? (
@@ -5448,7 +5452,7 @@ function AdminView() {
                                 setProductChildCompanion(false);
                             }}
                           />
-                          {label}
+                          <span>{label}</span>
                         </label>
                       ))}
                     </div>
@@ -5495,7 +5499,7 @@ function AdminView() {
                     onClick={requestProductSave}
                     type="button"
                   >
-                    Produkt speichern
+                    <span>Produkt speichern</span>
                   </button>
                 </div>
                 {productEditorId !== "new" ? (
@@ -7059,6 +7063,9 @@ function AdminView() {
                 <p className="reset-consequence">
                   Nach erfolgreichem Reset werden lokale Zugangsdaten entfernt und /setup geöffnet.
                 </p>
+                {factoryResetError ? (
+                  <ValidationHint tone="error">{factoryResetError}</ValidationHint>
+                ) : null}
                 <div className="dialog-actions">
                   <button
                     disabled={factoryResetBusy}
@@ -7078,16 +7085,18 @@ function AdminView() {
                     onClick={() => void performFactoryReset()}
                     type="button"
                   >
-                    {factoryResetBusy
-                      ? "System wird zurückgesetzt …"
-                      : "Alles löschen und neu starten"}
+                    <span>
+                      {factoryResetBusy
+                        ? "System wird zurückgesetzt …"
+                        : "Alles löschen und neu starten"}
+                    </span>
                   </button>
                 </div>
               </section>
             </div>
           ) : null}
           {message ? (
-            <div className="action-message" role="status">
+            <div className="action-message admin-action-message" role="status">
               {message}
             </div>
           ) : null}

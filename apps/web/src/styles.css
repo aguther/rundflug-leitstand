@@ -411,6 +411,14 @@
   border: 1px solid var(--ui-border);
   border-radius: 6px;
   background: var(--ui-surface-subtle);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.weight-capture-mode label > span,
+.product-weight-section .weight-class-options label > span,
+.product-weight-section .checkbox-label > span,
+.admin-workspace button > span {
+  pointer-events: none;
 }
 .weight-capture-mode input,
 .product-weight-section .weight-class-options input {
@@ -1947,6 +1955,18 @@ p {
   padding: 13px 16px;
   background: #eaf3ff;
   border-left: 4px solid #1769d2;
+}
+.admin-action-message {
+  position: fixed;
+  z-index: 90;
+  right: 20px;
+  bottom: 20px;
+  width: min(520px, calc(100vw - 40px));
+  margin: 0;
+  border: 1px solid color-mix(in srgb, var(--ui-accent) 45%, var(--ui-border));
+  border-left-width: 4px;
+  border-radius: 8px;
+  box-shadow: var(--ui-shadow);
 }
 .correction-controls {
   margin: 18px 0;

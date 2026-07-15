@@ -8,7 +8,7 @@ import {
 } from "./offline-drafts";
 
 describe("cashier offline draft queue", () => {
-  it("keeps ordered reversible revisions without treating them as commands", () => {
+  it("keeps only the current reversible draft without treating UI clicks as commands", () => {
     const first = appendCashierDraftRevision(
       [],
       { productId: "p1", size: 2 },
@@ -22,11 +22,11 @@ describe("cashier offline draft queue", () => {
       "2026-07-12T06:00:05.000Z",
     );
 
-    expect(second.map((entry) => entry.id)).toEqual(["revision-1", "revision-2"]);
+    expect(second.map((entry) => entry.id)).toEqual(["revision-2"]);
     expect(latestCashierDraft(second)).toEqual({ productId: "p1", size: 3 });
   });
 
-  it("deduplicates unchanged drafts and caps local history", () => {
+  it("deduplicates unchanged drafts and replaces the previous local value", () => {
     let queue = appendCashierDraftRevision(
       [],
       { productId: "p1", size: 1 },
@@ -44,8 +44,8 @@ describe("cashier offline draft queue", () => {
         new Date(Date.UTC(2026, 6, 12, 6, 1, index)).toISOString(),
       );
     }
-    expect(queue).toHaveLength(50);
-    expect(queue[0]?.id).toBe("revision-10");
+    expect(queue).toHaveLength(1);
+    expect(queue[0]?.id).toBe("revision-59");
   });
 
   it("persists only validated, event-and-device-scoped draft data", () => {
@@ -65,5 +65,25 @@ describe("cashier offline draft queue", () => {
     writeCashierDraftQueue(storage, key, queue);
     expect(readCashierDraftQueue(storage, key)).toEqual(queue);
     expect(key).toContain("event-a:cashier-a");
+  });
+
+  it("collapses legacy revision histories to their newest valid draft", () => {
+    const storage = {
+      getItem: () =>
+        JSON.stringify([
+          {
+            id: "old",
+            createdAt: "2026-07-12T06:00:00.000Z",
+            draft: { productId: "p1", size: 2 },
+          },
+          {
+            id: "current",
+            createdAt: "2026-07-12T06:00:05.000Z",
+            draft: { productId: "p1", size: 4 },
+          },
+        ]),
+    };
+
+    expect(readCashierDraftQueue(storage, "legacy").map((entry) => entry.id)).toEqual(["current"]);
   });
 });
