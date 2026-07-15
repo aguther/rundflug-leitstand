@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   deviceCredentialCandidates,
   deviceCredentialToken,
+  deviceIdForOperationalView,
   rememberDeviceCredential,
 } from "./device-credentials";
 
@@ -51,5 +52,23 @@ describe("device credentials", () => {
     expect(deviceCredentialCandidates(storage, "ADMIN", "admin-new")).toEqual([
       "synthetic-current-token",
     ]);
+  });
+
+  it("uses the administrator device for operational views when no dedicated device is paired", () => {
+    const storage = storageFixture({
+      "device-id:ADMIN": "admin-device",
+    });
+
+    expect(deviceIdForOperationalView(storage, "CASHIER")).toBe("admin-device");
+    expect(deviceIdForOperationalView(storage, "FLIGHT_LINE")).toBe("admin-device");
+  });
+
+  it("keeps a dedicated operational device ahead of the administrator fallback", () => {
+    const storage = storageFixture({
+      "device-id:ADMIN": "admin-device",
+      "device-id:CASHIER": "cashier-device",
+    });
+
+    expect(deviceIdForOperationalView(storage, "CASHIER")).toBe("cashier-device");
   });
 });

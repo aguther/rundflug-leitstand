@@ -62,6 +62,7 @@ import { requiresChildCompanionWarning } from "./cashier-guidance";
 import {
   deviceCredentialCandidates,
   deviceCredentialToken,
+  deviceIdForOperationalView,
   rememberDeviceCredential,
 } from "./device-credentials";
 import { rememberActiveEvent, resolveActiveEvent } from "./event-context";
@@ -232,7 +233,10 @@ function allowDeviceCredentialRecovery(deviceId: string): void {
 }
 
 function deviceIdForRole(role: string, developmentId: string): string {
-  const pairedDeviceId = window.localStorage.getItem(`device-id:${role}`);
+  const pairedDeviceId =
+    role === "CASHIER" || role === "FLIGHT_LINE"
+      ? deviceIdForOperationalView(window.localStorage, role)
+      : window.localStorage.getItem(`device-id:${role}`);
   if (pairedDeviceId) return pairedDeviceId;
   return LOCAL_DEVELOPMENT && EVENT_ID === "demo-2026"
     ? developmentId
@@ -2516,6 +2520,11 @@ function AdminView() {
   const [pushConfigurationStatus, setPushConfigurationStatus] = useState<
     "loading" | "configured" | "missing" | "unavailable"
   >("loading");
+  useEffect(() => {
+    if (!message) return;
+    const timeout = window.setTimeout(() => setMessage(null), 6_000);
+    return () => window.clearTimeout(timeout);
+  }, [message]);
   useEffect(() => {
     const controller = new AbortController();
     void getPushConfiguration(controller.signal)
@@ -6968,10 +6977,14 @@ function AdminView() {
           ) : null}
           {factoryResetOpen ? (
             <div className="modal-backdrop factory-reset-backdrop">
-              <section
+              <form
                 aria-labelledby="factory-reset-title"
                 aria-modal="true"
                 className="confirmation-dialog factory-reset-dialog"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void performFactoryReset();
+                }}
                 role="dialog"
               >
                 <div className="drawer-heading">
@@ -7082,22 +7095,22 @@ function AdminView() {
                       factoryResetPin.length < 4 ||
                       factoryResetConfirmation !== "WERKSZUSTAND"
                     }
-                    onClick={() => void performFactoryReset()}
-                    type="button"
+                    type="submit"
                   >
-                    <span>
-                      {factoryResetBusy
-                        ? "System wird zurückgesetzt …"
-                        : "Alles löschen und neu starten"}
-                    </span>
+                    {factoryResetBusy
+                      ? "System wird zurückgesetzt …"
+                      : "Alles löschen und neu starten"}
                   </button>
                 </div>
-              </section>
+              </form>
             </div>
           ) : null}
           {message ? (
             <div className="action-message admin-action-message" role="status">
-              {message}
+              <span>{message}</span>
+              <button aria-label="Hinweis schließen" onClick={() => setMessage(null)} type="button">
+                ×
+              </button>
             </div>
           ) : null}
         </div>

@@ -1960,13 +1960,28 @@ p {
   position: fixed;
   z-index: 90;
   right: 20px;
-  bottom: 20px;
+  top: 76px;
   width: min(520px, calc(100vw - 40px));
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 12px;
   margin: 0;
   border: 1px solid color-mix(in srgb, var(--ui-accent) 45%, var(--ui-border));
   border-left-width: 4px;
   border-radius: 8px;
   box-shadow: var(--ui-shadow);
+}
+.admin-action-message > button {
+  width: 32px;
+  min-height: 32px;
+  padding: 0;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  color: inherit;
+  background: transparent;
+  font-size: 1.15rem;
+  line-height: 1;
 }
 .correction-controls {
   margin: 18px 0;

@@ -4,6 +4,13 @@ const MAX_RECOVERY_CANDIDATES = 32;
 
 type CredentialStorage = Pick<Storage, "getItem" | "setItem" | "key" | "length">;
 
+export function deviceIdForOperationalView(
+  storage: Pick<Storage, "getItem">,
+  role: "CASHIER" | "FLIGHT_LINE",
+): string | null {
+  return storage.getItem(`device-id:${role}`) ?? storage.getItem("device-id:ADMIN");
+}
+
 export function rememberDeviceCredential(
   storage: CredentialStorage,
   role: string,

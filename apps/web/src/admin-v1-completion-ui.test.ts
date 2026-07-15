@@ -56,6 +56,9 @@ describe("V1 administration completion UI", () => {
     expect(stylesSource).toContain(".admin-workspace button > span");
     expect(stylesSource).toContain(".admin-action-message");
     expect(stylesSource).toContain("z-index: 90");
+    expect(stylesSource).toContain("top: 76px");
+    expect(appSource).toContain('aria-label="Hinweis schließen"');
+    expect(appSource).toContain("6_000");
   });
 
   it("distinguishes missing Web Push setup from zero active subscriptions", () => {
@@ -92,5 +95,9 @@ describe("V1 administration completion UI", () => {
   it("finishes a factory reset even when no service worker is registered", () => {
     expect(appSource).toContain("await navigator.serviceWorker?.getRegistration()");
     expect(appSource).toContain('window.location.replace("/setup")');
+    expect(appSource).toContain('className="confirmation-dialog factory-reset-dialog"');
+    expect(appSource).toContain("void performFactoryReset()");
+    expect(appSource).toContain('type="submit"');
+    expect(appSource).toContain("Alles löschen und neu starten");
   });
 });
