@@ -1,5 +1,7 @@
 import { generateKeyPairSync } from "node:crypto";
 
+export const REQUIRED_VAPID_SECRETS = ["VAPID_PUBLIC_KEY", "VAPID_PRIVATE_KEY", "VAPID_SUBJECT"];
+
 function decodeBase64Url(value) {
   return Buffer.from(value, "base64url");
 }
@@ -38,4 +40,15 @@ export function generateVapidKeyPair() {
     publicKey: Buffer.concat([Buffer.from([4]), x, y]).toString("base64url"),
     privateKey: privateJwk.d,
   };
+}
+
+export function findMissingVapidSecrets(entries) {
+  const names = new Set(
+    Array.isArray(entries)
+      ? entries.flatMap((entry) =>
+          entry && typeof entry === "object" && typeof entry.name === "string" ? [entry.name] : [],
+        )
+      : [],
+  );
+  return REQUIRED_VAPID_SECRETS.filter((name) => !names.has(name));
 }

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 // @ts-expect-error The operational Node script deliberately has no production TypeScript surface.
-import { generateVapidKeyPair, validateVapidSubject } from "../../../scripts/vapid-keys.mjs";
+import * as vapidKeys from "../../../scripts/vapid-keys.mjs";
+
+const { findMissingVapidSecrets, generateVapidKeyPair, validateVapidSubject } = vapidKeys;
 
 const decodeBase64Url = (value: string) =>
   Uint8Array.from(atob(value.replaceAll("-", "+").replaceAll("_", "/")), (entry) =>
@@ -45,5 +47,21 @@ describe("VAPID setup keys", () => {
     expect(validateVapidSubject("https://example.de/kontakt")).toBe("https://example.de/kontakt");
     expect(() => validateVapidSubject("http://example.de")).toThrow(/mailto:- oder https:/);
     expect(() => validateVapidSubject("mailto:ungueltig")).toThrow(/mailto:- oder https:/);
+  });
+
+  it("verifies all required Cloudflare secret names without reading their values", () => {
+    expect(
+      findMissingVapidSecrets([
+        { name: "VAPID_PRIVATE_KEY", type: "secret_text" },
+        { name: "VAPID_PUBLIC_KEY", type: "secret_text" },
+        { name: "VAPID_SUBJECT", type: "secret_text" },
+        { name: "ADMIN_PIN_HASH", type: "secret_text" },
+      ]),
+    ).toEqual([]);
+    expect(findMissingVapidSecrets([{ name: "VAPID_PUBLIC_KEY" }])).toEqual([
+      "VAPID_PRIVATE_KEY",
+      "VAPID_SUBJECT",
+    ]);
+    expect(findMissingVapidSecrets(undefined)).toHaveLength(3);
   });
 });

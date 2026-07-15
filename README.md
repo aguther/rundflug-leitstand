@@ -80,8 +80,9 @@ Die für V1 erforderliche, telefonnummernfreie Browser-Benachrichtigung wird sic
 npm run cloudflare:configure-push
 ```
 
-Das Kommando erzeugt den privaten VAPID-Schlüssel nur im Arbeitsspeicher und überträgt ihn ohne
-Ausgabe direkt als Cloudflare-Secret.
+Das Kommando erzeugt den privaten VAPID-Schlüssel nur im Arbeitsspeicher, überträgt ihn ohne
+Ausgabe direkt als Cloudflare-Secret und bestätigt anschließend über Cloudflare, dass alle drei
+erforderlichen Secret-Namen vorhanden sind.
 
 Den Remote-Migrationsstand zeigt ausschließlich lesend:
 
