@@ -40,6 +40,7 @@ import {
   getPairedDevices,
   getPublicBoard,
   getPublicTicketStatus,
+  getPushConfiguration,
   getPushPublicKey,
   getSetupStatus,
   registerTicketPush,
@@ -2512,6 +2513,22 @@ function AdminView() {
   const [plannedBoardingMinutes, setPlannedBoardingMinutes] = useState(8);
   const [plannedDeboardingMinutes, setPlannedDeboardingMinutes] = useState(5);
   const [plannedBufferMinutes, setPlannedBufferMinutes] = useState(3);
+  const [pushConfigurationStatus, setPushConfigurationStatus] = useState<
+    "loading" | "configured" | "missing" | "unavailable"
+  >("loading");
+  useEffect(() => {
+    const controller = new AbortController();
+    void getPushConfiguration(controller.signal)
+      .then((configuration) =>
+        setPushConfigurationStatus(configuration.configured ? "configured" : "missing"),
+      )
+      .catch((cause) => {
+        if (!(cause instanceof DOMException && cause.name === "AbortError")) {
+          setPushConfigurationStatus("unavailable");
+        }
+      });
+    return () => controller.abort();
+  }, []);
   useEffect(() => {
     if (board) {
       setSetupRequired(false);
@@ -4078,61 +4095,84 @@ function AdminView() {
             <div className="readonly-banner">Flugleitungsansicht · primär lesend</div>
           ) : null}
           {board ? (
-            <section
-              aria-label="Betriebskennzahlen"
-              className="metrics-grid"
-              hidden={adminArea !== "overview"}
-            >
-              <div>
-                <strong>{board.metrics.openTickets}</strong>
-                <span>offene Tickets</span>
-              </div>
-              <div>
-                <strong>{board.metrics.activeRotations}</strong>
-                <span>aktive Umläufe</span>
-              </div>
-              <div>
-                <strong>{board.metrics.completedRotations}</strong>
-                <span>abgeschlossen</span>
-              </div>
-              <div>
-                <strong>{board.metrics.averageBoardingMinutes ?? "–"}</strong>
-                <span>Ø Boarding Min.</span>
-              </div>
-              <div>
-                <strong>{board.metrics.averageFlightMinutes ?? "–"}</strong>
-                <span>Ø Flug Min.</span>
-              </div>
-              <div>
-                <strong>{board.metrics.averageTurnaroundMinutes ?? "–"}</strong>
-                <span>Ø Landung–frei Min.</span>
-              </div>
-              <div>
-                <strong>{board.metrics.averageRotationMinutes ?? "–"}</strong>
-                <span>Ø NEXT–frei Min.</span>
-              </div>
-              <div>
-                <strong>{board.metrics.averageWaitMinutes ?? "–"}</strong>
-                <span>Ø Verkauf–NEXT Min.</span>
-              </div>
-              <div>
-                <strong>
-                  {(board.metrics.informationalRevenueCents / 100).toLocaleString("de-DE", {
-                    style: "currency",
-                    currency: "EUR",
-                  })}
-                </strong>
-                <span>informatorischer Umsatz</span>
-              </div>
-              <div>
-                <strong>{board.metrics.activeDevices}</strong>
-                <span>Geräte online</span>
-              </div>
-              <div>
-                <strong>{board.metrics.activePushSubscriptions}</strong>
-                <span>Web-Push aktiv</span>
-              </div>
-            </section>
+            <>
+              <section
+                aria-label="Betriebskennzahlen"
+                className="metrics-grid"
+                hidden={adminArea !== "overview"}
+              >
+                <div>
+                  <strong>{board.metrics.openTickets}</strong>
+                  <span>offene Tickets</span>
+                </div>
+                <div>
+                  <strong>{board.metrics.activeRotations}</strong>
+                  <span>aktive Umläufe</span>
+                </div>
+                <div>
+                  <strong>{board.metrics.completedRotations}</strong>
+                  <span>abgeschlossen</span>
+                </div>
+                <div>
+                  <strong>{board.metrics.averageBoardingMinutes ?? "–"}</strong>
+                  <span>Ø Boarding Min.</span>
+                </div>
+                <div>
+                  <strong>{board.metrics.averageFlightMinutes ?? "–"}</strong>
+                  <span>Ø Flug Min.</span>
+                </div>
+                <div>
+                  <strong>{board.metrics.averageTurnaroundMinutes ?? "–"}</strong>
+                  <span>Ø Landung–frei Min.</span>
+                </div>
+                <div>
+                  <strong>{board.metrics.averageRotationMinutes ?? "–"}</strong>
+                  <span>Ø NEXT–frei Min.</span>
+                </div>
+                <div>
+                  <strong>{board.metrics.averageWaitMinutes ?? "–"}</strong>
+                  <span>Ø Verkauf–NEXT Min.</span>
+                </div>
+                <div>
+                  <strong>
+                    {(board.metrics.informationalRevenueCents / 100).toLocaleString("de-DE", {
+                      style: "currency",
+                      currency: "EUR",
+                    })}
+                  </strong>
+                  <span>informatorischer Umsatz</span>
+                </div>
+                <div>
+                  <strong>{board.metrics.activeDevices}</strong>
+                  <span>Geräte online</span>
+                </div>
+                <div>
+                  <strong>
+                    {pushConfigurationStatus === "configured"
+                      ? board.metrics.activePushSubscriptions
+                      : pushConfigurationStatus === "loading"
+                        ? "…"
+                        : "–"}
+                  </strong>
+                  <span>
+                    {pushConfigurationStatus === "configured"
+                      ? "Web-Push aktiv"
+                      : pushConfigurationStatus === "missing"
+                        ? "Web-Push fehlt"
+                        : pushConfigurationStatus === "loading"
+                          ? "Web-Push wird geprüft"
+                          : "Web-Push nicht geprüft"}
+                  </span>
+                </div>
+              </section>
+              {adminArea === "overview" && pushConfigurationStatus === "missing" ? (
+                <ValidationHint tone="warning">
+                  <strong>Web-Push ist noch nicht eingerichtet.</strong> VAPID-Secrets mit{" "}
+                  <code>npm run cloudflare:configure-push</code> setzen und danach auf einem echten
+                  Besuchergerät testen.
+                </ValidationHint>
+              ) : null}
+            </>
           ) : null}
           <section
             className={`admin-edit-context admin-mode-bar ${adminModeUnlocked ? "unlocked" : "locked"}`}

@@ -376,11 +376,33 @@ export async function getPublicTicketStatus(
   return publicTicketStatusSchema.parse(await response.json());
 }
 
+export type PushConfiguration =
+  | { configured: true; publicKey: string; retentionDays: number }
+  | { configured: false };
+
+export async function getPushConfiguration(signal?: AbortSignal): Promise<PushConfiguration> {
+  const response = await fetch("/api/public/push/config", signal ? { signal } : {});
+  if (response.status === 503) return { configured: false };
+  if (!response.ok) throw new Error("Web-Push-Konfiguration ist nicht erreichbar.");
+  const body = (await response.json()) as { publicKey?: string; retentionDays?: number };
+  if (
+    typeof body.publicKey !== "string" ||
+    body.publicKey.length < 80 ||
+    !Number.isInteger(body.retentionDays)
+  ) {
+    throw new Error("Web-Push-Konfiguration ist unvollständig.");
+  }
+  return {
+    configured: true,
+    publicKey: body.publicKey,
+    retentionDays: body.retentionDays as number,
+  };
+}
+
 export async function getPushPublicKey(): Promise<string> {
-  const response = await fetch("/api/public/push/config");
-  if (!response.ok) throw new Error("Web-Push ist noch nicht eingerichtet.");
-  const body = (await response.json()) as { publicKey: string };
-  return body.publicKey;
+  const configuration = await getPushConfiguration();
+  if (!configuration.configured) throw new Error("Web-Push ist noch nicht eingerichtet.");
+  return configuration.publicKey;
 }
 
 export async function registerTicketPush(

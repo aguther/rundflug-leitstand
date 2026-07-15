@@ -44,4 +44,10 @@ describe("V1 administration completion UI", () => {
     expect(appSource).toContain("Bei Kinderbuchungen auf Begleitung hinweisen");
     expect(appSource.match(/<FieldLabel/g)?.length).toBeGreaterThan(35);
   });
+
+  it("distinguishes missing Web Push setup from zero active subscriptions", () => {
+    expect(appSource).toContain("getPushConfiguration(controller.signal)");
+    expect(appSource).toContain("Web-Push ist noch nicht eingerichtet.");
+    expect(appSource).toContain("npm run cloudflare:configure-push");
+  });
 });

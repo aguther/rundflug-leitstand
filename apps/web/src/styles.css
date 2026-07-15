@@ -624,6 +624,15 @@
   border-color: color-mix(in srgb, var(--ui-danger) 48%, var(--ui-border));
   background: var(--ui-danger-soft);
 }
+.admin-validation.warning {
+  color: var(--ui-warning-text);
+  border-color: color-mix(in srgb, var(--ui-warning) 58%, var(--ui-border));
+  background: var(--ui-warning-soft);
+}
+.admin-validation code {
+  font-size: 0.88em;
+  overflow-wrap: anywhere;
+}
 .safety-disclaimer,
 .operational-notice,
 .connection-warning {

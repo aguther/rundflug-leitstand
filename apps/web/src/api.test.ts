@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { assertOperationalConnection, factoryReset, getDeviceContext, verifyAdminPin } from "./api";
+import {
+  assertOperationalConnection,
+  factoryReset,
+  getDeviceContext,
+  getPushConfiguration,
+  verifyAdminPin,
+} from "./api";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -102,5 +108,38 @@ describe("administrator edit mode transport", () => {
       }),
     );
     expect(fetchMock.mock.calls[0]?.[0]).not.toContain("0000");
+  });
+});
+
+describe("web push configuration status", () => {
+  it("distinguishes missing Cloudflare secrets from zero active subscriptions", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(
+          new Response(JSON.stringify({ error: { code: "PUSH_NOT_CONFIGURED" } }), { status: 503 }),
+        ),
+    );
+
+    await expect(getPushConfiguration()).resolves.toEqual({ configured: false });
+  });
+
+  it("returns a validated configured state", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ publicKey: "A".repeat(87), retentionDays: 7 }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+      ),
+    );
+
+    await expect(getPushConfiguration()).resolves.toEqual({
+      configured: true,
+      publicKey: "A".repeat(87),
+      retentionDays: 7,
+    });
   });
 });

@@ -168,11 +168,11 @@ export function ValidationHint({
   tone = "info",
 }: {
   children: ReactNode;
-  tone?: "info" | "error";
+  tone?: "info" | "warning" | "error";
 }) {
   return (
     <div className={`admin-validation ${tone}`} role={tone === "error" ? "alert" : "status"}>
-      <span aria-hidden="true">{tone === "error" ? "!" : "i"}</span>
+      <span aria-hidden="true">{tone === "info" ? "i" : "!"}</span>
       <p>{children}</p>
     </div>
   );
