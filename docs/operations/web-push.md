@@ -1,8 +1,10 @@
 # Web-Push-Betrieb
 
-Web-Push setzt `@block65/webcrypto-web-push` ein, weil die Bibliothek den standardisierten
-Web-Push-Payload ausschließlich mit Web Crypto erzeugt und damit ohne Node-spezifische
-Krypto-Laufzeit im Cloudflare Worker funktioniert.
+Web-Push erzeugt den standardisierten `aes128gcm`-Payload und die VAPID-Authentifizierung direkt mit
+der nativen Web-Crypto-API des Cloudflare Workers nach RFC 8188, RFC 8291 und RFC 8292. Dafür wird
+keine zusätzliche Web-Push-Kryptobibliothek eingesetzt. Der kryptografische Regressionstest
+`apps/worker/src/web-push-request.test.ts` entschlüsselt ein erzeugtes Paket wieder und verifiziert
+die VAPID-Signatur.
 
 ## Datenschutz und Aufbewahrung
 
