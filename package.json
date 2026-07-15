@@ -41,7 +41,7 @@
     "test:watch": "vitest",
     "lint": "biome check .",
     "format": "biome format --write .",
-    "check": "npm run lint && npm run build && npm run test:v1-acceptance-day && npm run backup:restore:test && npm run docs:verify && npm run requirements:verify",
+    "check": "npm run lint && npm run build && npm run test:master-data && npm run test:v1-acceptance-day && npm run backup:restore:test && npm run docs:verify && npm run requirements:verify",
     "backup:restore:test": "python3 scripts/verify_backup_restore.py",
     "docs:verify": "node scripts/verify_architecture_docs.mjs",
     "requirements:verify": "python3 scripts/verify_requirements.py",
