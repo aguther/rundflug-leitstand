@@ -69,6 +69,11 @@ Die aktuell verwendete D1-Datenbank und der R2-Bucket sind in `wrangler.jsonc` g
 Ressourcen müssen in EU-Jurisdiktion liegen. Die vollständige Anleitung steht in
 `docs/operations/cloudflare-setup.md`.
 
+Bis zur Produktionsfreigabe wird gemäß
+[ADR-0007](docs/adr/0007-eine-cloudflare-abnahmeumgebung.md) bewusst nur diese eine zentrale
+Abnahmeumgebung von `main` aus betrieben. Sie ist keine Produktivumgebung; die nach T-070
+erforderliche Trennung ist ein eigenes Produktions-Gate.
+
 Die für V1 erforderliche, telefonnummernfreie Browser-Benachrichtigung wird sicher eingerichtet mit:
 
 ```bash

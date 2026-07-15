@@ -95,6 +95,30 @@ if (missingLicenseInventory.length > 0) {
   );
 }
 
+const environmentDecisionPath = new URL(
+  "../docs/adr/0007-eine-cloudflare-abnahmeumgebung.md",
+  import.meta.url,
+);
+const environmentDecision = await readFile(environmentDecisionPath, "utf8");
+const environmentDecisionEvidence = [
+  "T-070",
+  "APP_ENV",
+  "Abnahmeumgebung",
+  "erfüllt T-070 nicht",
+  "Verbindliches Produktions-Gate",
+  "separate D1-Datenbank",
+  "separater EU-R2-Bucket",
+  "getrennte Secret-Sätze",
+];
+const missingEnvironmentDecision = environmentDecisionEvidence.filter(
+  (entry) => !environmentDecision.includes(entry),
+);
+if (missingEnvironmentDecision.length > 0) {
+  throw new Error(
+    `Cloudflare-Umgebungsentscheidung unvollständig: ${missingEnvironmentDecision.join(", ")}`,
+  );
+}
+
 console.log(
-  "OK: Q-WAR-010/020/040/050, Q-DSG-040 und T-080 Betriebs-, Fachmodell-, Datenschutz- und Lizenznachweise dokumentiert",
+  "OK: Q-WAR-010/020/040/050, Q-DSG-040, T-070 und T-080 Betriebs-, Fachmodell-, Datenschutz-, Umgebungs- und Lizenznachweise dokumentiert",
 );
