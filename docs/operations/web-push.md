@@ -25,10 +25,20 @@ die VAPID-Signatur.
 
 ## Cloudflare-Konfiguration
 
-Für die gemeinsame Cloudflare-Umgebung wird ein P-256-VAPID-Schlüsselpaar benötigt. Der
-öffentliche Schlüssel wird als Variable `VAPID_PUBLIC_KEY` bereitgestellt. Der private Schlüssel wird
-ausschließlich als Secret `VAPID_PRIVATE_KEY` gespeichert. `VAPID_SUBJECT` ist eine `mailto:`-Adresse
-oder eine HTTPS-URL des Betreibers.
+Für die gemeinsame Cloudflare-Umgebung wird ein P-256-VAPID-Schlüsselpaar benötigt. Der öffentliche
+Schlüssel wird als Binding `VAPID_PUBLIC_KEY` bereitgestellt; der private Schlüssel liegt
+ausschließlich im Secret `VAPID_PRIVATE_KEY`. `VAPID_SUBJECT` ist eine `mailto:`-Adresse oder eine
+HTTPS-URL des Betreibers. Das Einrichtungswerkzeug überträgt alle drei gemeinsam als Secrets, damit
+kein Wert versehentlich in der versionierten Konfiguration landet.
+
+Die drei Werte werden ohne Ausgabe oder lokale Speicherung des privaten Schlüssels eingerichtet:
+
+```bash
+npm run cloudflare:configure-push
+```
+
+Anschließend muss `/api/public/push/config` mit HTTP 200 antworten. HTTP 503 mit
+`PUSH_NOT_CONFIGURED` bedeutet, dass die V1-Browserbenachrichtigung noch nicht betriebsbereit ist.
 
 Die D1-Migrationen `0006_web_push.sql` und `0021_web_push_delivery_queue.sql` müssen vor dem ersten
 Registrierungs- und Zustellungstest in der Zielumgebung angewendet sein.

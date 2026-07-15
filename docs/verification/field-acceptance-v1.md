@@ -152,8 +152,8 @@ simulierte mobile Breite von 430 × 900:
   und breit;
 - das Produktformular zeigte Preis in Euro, verständliche Anzeigenposition und kontextbezogene
   Informationen an allen fachlichen Feldern;
-- deaktivierte Begleitpflicht erklärte unmittelbar, dass sie erst nach Aktivierung der
-  Gewichtsklasse Kind verfügbar wird;
+- der Begleithinweis für Kinder war direkt auswählbar und aktivierte die erforderliche
+  Gewichtsklasse Kind automatisch;
 - deutsche Datumsfelder verwendeten `TT.MM.JJJJ`, Zeitfelder das 24-Stunden-Format `HH:mm`;
 - der PIN-Dialog setzte den Fokus nach dem Öffnen in das Passwortfeld und war als
   Enter-bestätigbares Formular umgesetzt;
@@ -165,6 +165,11 @@ simulierte mobile Breite von 430 × 900:
 Die integrierte Chrome-Screenshotaufnahme lief trotz erfolgreicher DOM-, Layout- und
 Interaktionsprüfung in ein Zeitlimit. Deshalb ist dieser Lauf kein visueller Screenshotnachweis und
 weiterhin kein Ersatz für die nachfolgende Originalhardwarematrix.
+
+Eine zusätzliche lokale Browserprüfung am 15. Juli 2026 bestätigte nach der PIN-Korrektur die
+vollständige Produktanlage über den realen Worker-/D1-Pfad: PIN-Fokus, Bestätigung per Eingabetaste,
+protokollierte Speicherung, direkt bedienbarer Kinder-Begleithinweis, aufgeklappte Feldhilfe und eine
+430-Pixel-Ansicht ohne horizontalen Überlauf.
 
 Offen und deshalb weiterhin ausdrücklich durch dieses Protokoll abzunehmen sind Originalhardware,
 Sonnenlichtkontrast, Safari/iPadOS, Chrome/Android, Edge/Windows, Web-Push auf realen Geräten und die
