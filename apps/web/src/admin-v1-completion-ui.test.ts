@@ -1,5 +1,8 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import appSource from "./App.tsx?raw";
+
+const stylesSource = readFileSync(new URL("./styles.css", import.meta.url), "utf8");
 
 describe("V1 administration completion UI", () => {
   it("exposes typed gate display filters in the existing gate editor", () => {
@@ -43,6 +46,16 @@ describe("V1 administration completion UI", () => {
     expect(appSource).toContain("weightClassesForChildCompanion(current, true)");
     expect(appSource).toContain("Bei Kinderbuchungen auf Begleitung hinweisen");
     expect(appSource.match(/<FieldLabel/g)?.length).toBeGreaterThan(35);
+    expect(stylesSource).toContain(".product-weight-section .checkbox-label > span");
+    expect(stylesSource).toContain("pointer-events: none");
+  });
+
+  it("keeps admin action feedback visible above dialogs and makes text part of the hit target", () => {
+    expect(appSource).toContain("factoryResetError");
+    expect(appSource).toContain('className="action-message admin-action-message"');
+    expect(stylesSource).toContain(".admin-workspace button > span");
+    expect(stylesSource).toContain(".admin-action-message");
+    expect(stylesSource).toContain("z-index: 90");
   });
 
   it("distinguishes missing Web Push setup from zero active subscriptions", () => {

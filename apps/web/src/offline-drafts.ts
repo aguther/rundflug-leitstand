@@ -9,8 +9,6 @@ export interface CashierDraftRevision {
   draft: CashierDraft;
 }
 
-const MAX_DRAFT_REVISIONS = 50;
-
 export function cashierDraftQueueKey(eventId: string, deviceId: string): string {
   return `cashier-draft-queue:v1:${eventId}:${deviceId}`;
 }
@@ -22,8 +20,11 @@ export function appendCashierDraftRevision(
   createdAt = new Date().toISOString(),
 ): CashierDraftRevision[] {
   const previous = queue.at(-1)?.draft;
-  if (previous?.productId === draft.productId && previous.size === draft.size) return [...queue];
-  return [...queue, { id, createdAt, draft }].slice(-MAX_DRAFT_REVISIONS);
+  if (previous?.productId === draft.productId && previous.size === draft.size) {
+    const current = queue.at(-1);
+    return current ? [current] : [];
+  }
+  return [{ id, createdAt, draft }];
 }
 
 export function readCashierDraftQueue(
@@ -33,7 +34,7 @@ export function readCashierDraftQueue(
   try {
     const parsed = JSON.parse(storage.getItem(key) ?? "[]") as unknown;
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter((entry): entry is CashierDraftRevision => {
+    const valid = parsed.filter((entry): entry is CashierDraftRevision => {
       if (!entry || typeof entry !== "object") return false;
       const candidate = entry as Partial<CashierDraftRevision>;
       return (
@@ -46,6 +47,7 @@ export function readCashierDraftQueue(
         (candidate.draft.size ?? 0) <= 12
       );
     });
+    return valid.slice(-1);
   } catch {
     return [];
   }
