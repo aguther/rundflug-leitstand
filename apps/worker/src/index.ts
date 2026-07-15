@@ -19,7 +19,12 @@ import { createPortableBackup, operationDateInTimeZone } from "./backup";
 import { sha256Hex, verifyCredential } from "./crypto";
 import { dailyReportCsv, dailyReportPdfLines, loadDailyReport } from "./daily-report";
 import { EventCoordinator } from "./event-coordinator";
-import { factoryResetRequestHash, factoryResetStatements, finishR2Cleanup } from "./factory-reset";
+import {
+  clearFactoryResetCoordinators,
+  factoryResetRequestHash,
+  factoryResetStatements,
+  finishR2Cleanup,
+} from "./factory-reset";
 import { buildForecastHistoryStatement } from "./forecast-history";
 import {
   EMPTY_GATE_DISPLAY_FILTER_JSON,
@@ -336,18 +341,39 @@ app.post("/api/admin/events/:eventId/factory-reset", async (context) => {
   }>();
   let recoveryBackupKey: string | null = null;
   if (input.retainRecoveryBackup) {
-    recoveryBackupKey = (await createPortableBackup(context.env, new Date(), "FACTORY_RESET")).key;
+    try {
+      recoveryBackupKey = (await createPortableBackup(context.env, new Date(), "FACTORY_RESET"))
+        .key;
+    } catch {
+      return context.json(
+        {
+          error: {
+            code: "FACTORY_RESET_BACKUP_FAILED",
+            message: "Die Wiederherstellungssicherung konnte nicht erstellt werden.",
+          },
+        },
+        500,
+      );
+    }
   }
   const coordinator = eventCoordinatorNamespace(context.env);
-  await Promise.all(
-    eventRows.results.map(async ({ id }) => {
-      const stub = coordinator.get(coordinator.idFromName(id));
-      const response = await stub.fetch(`https://internal/events/${id}/factory-reset`, {
-        method: "POST",
-      });
-      if (!response.ok) throw new Error(`Durable Object ${id} konnte nicht geleert werden.`);
-    }),
-  );
+  try {
+    await clearFactoryResetCoordinators(
+      coordinator,
+      eventRows.results.map(({ id }) => id),
+    );
+  } catch {
+    return context.json(
+      {
+        error: {
+          code: "FACTORY_RESET_COORDINATOR_FAILED",
+          message:
+            "Die laufenden Veranstaltungskoordinatoren konnten nicht vollständig geleert werden.",
+        },
+      },
+      500,
+    );
+  }
 
   const response: FactoryResetResponse = {
     resetComplete: true,
@@ -355,16 +381,28 @@ app.post("/api/admin/events/:eventId/factory-reset", async (context) => {
     recoveryBackupKey,
     r2BackupsDeleted: false,
   };
-  await context.env.DB.batch(
-    factoryResetStatements(
-      context.env,
-      input.commandId,
-      requestHash,
-      new Date().toISOString(),
-      input.deleteAllBackups,
-      response,
-    ),
-  );
+  try {
+    await context.env.DB.batch(
+      factoryResetStatements(
+        context.env,
+        input.commandId,
+        requestHash,
+        new Date().toISOString(),
+        input.deleteAllBackups,
+        response,
+      ),
+    );
+  } catch {
+    return context.json(
+      {
+        error: {
+          code: "FACTORY_RESET_DATABASE_FAILED",
+          message: "Die Anwendungsdaten konnten nicht vollständig zurückgesetzt werden.",
+        },
+      },
+      500,
+    );
+  }
   if (input.deleteAllBackups) {
     try {
       return context.json(await finishR2Cleanup(context.env, input.commandId, response));

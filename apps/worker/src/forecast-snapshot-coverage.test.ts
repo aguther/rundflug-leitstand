@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import forecastMigration from "../migrations/0018_forecast_timelines.sql?raw";
 import forecastBasisMigration from "../migrations/0029_forecast_snapshot_basis.sql?raw";
+import factoryResetForecastMigration from "../migrations/0032_factory_reset_forecast_snapshots.sql?raw";
 import backupSource from "./backup.ts?raw";
 import coordinatorSource from "./event-coordinator.ts?raw";
 
@@ -24,6 +25,9 @@ describe("forecast snapshot retention", () => {
     );
     expect(forecastMigration).toMatch(
       /CREATE TRIGGER forecast_snapshots_no_delete[\s\S]*BEFORE DELETE ON forecast_snapshots/,
+    );
+    expect(factoryResetForecastMigration).toMatch(
+      /BEFORE DELETE ON forecast_snapshots[\s\S]*WHEN COALESCE\(\(SELECT active FROM system_reset_control WHERE singleton = 1\), 0\) = 0/,
     );
     expect(coordinatorSource).not.toMatch(/UPDATE\s+forecast_snapshots/i);
     expect(coordinatorSource).not.toMatch(/DELETE\s+FROM\s+forecast_snapshots/i);

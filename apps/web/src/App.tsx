@@ -3792,7 +3792,10 @@ function AdminView() {
       if (result.resetComplete) {
         await clearOfflineOperationBoards();
         try {
-          const registration = await navigator.serviceWorker?.ready;
+          // `ready` remains pending forever when this browser has no active PWA registration
+          // (for example during the initial local setup). Reset cleanup must never block the
+          // mandatory redirect back to /setup.
+          const registration = await navigator.serviceWorker?.getRegistration();
           const subscription = await registration?.pushManager.getSubscription();
           await subscription?.unsubscribe();
         } catch {

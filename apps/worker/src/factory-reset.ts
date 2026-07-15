@@ -43,6 +43,22 @@ export async function factoryResetRequestHash(input: FactoryResetRequest): Promi
   );
 }
 
+export async function clearFactoryResetCoordinators(
+  namespace: DurableObjectNamespace,
+  eventIds: readonly string[],
+): Promise<void> {
+  // A real installation can contain dozens of historical events. Running every Durable Object
+  // request concurrently exceeds the Worker's outbound connection budget during a factory reset.
+  // The reset is exceptional and destructive, so deterministic sequential cleanup is preferable.
+  for (const eventId of eventIds) {
+    const stub = namespace.get(namespace.idFromName(eventId));
+    const response = await stub.fetch(`https://internal/events/${eventId}/factory-reset`, {
+      method: "POST",
+    });
+    if (!response.ok) throw new Error(`Durable Object ${eventId} konnte nicht geleert werden.`);
+  }
+}
+
 export function factoryResetStatements(
   env: Env,
   commandId: string,
