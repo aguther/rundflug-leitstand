@@ -50,4 +50,29 @@ describe("V1 administration completion UI", () => {
     expect(appSource).toContain("Web-Push ist noch nicht eingerichtet.");
     expect(appSource).toContain("npm run cloudflare:configure-push");
   });
+
+  it("keeps every master-data category operable from create through delete or removal", () => {
+    for (const label of [
+      "Gate anlegen",
+      "Gate speichern",
+      "Gate löschen",
+      "Ressourcengruppe anlegen",
+      "Ressourcengruppe speichern",
+      "Ressourcengruppe löschen",
+      "Flugzeug anlegen",
+      "Flugzeug speichern",
+      "Flugzeug löschen",
+      "Zuordnung ändern",
+      "Zuordnung entfernen",
+      "Pilotencode anlegen",
+      "Änderungen speichern",
+      "Pilotencode löschen",
+      "Produkt anlegen",
+      "Produkt speichern",
+      "Produkt löschen",
+    ]) {
+      expect(appSource).toContain(label);
+    }
+    expect(appSource).toContain("Endgültig löschen");
+  });
 });

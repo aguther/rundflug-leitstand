@@ -16,7 +16,7 @@ Zuletzt erfolgreich am 15. Juli 2026, parallel zum isolierten 12-Stunden-Langlau
 
 - Biome-Prüfung von 140 Dateien,
 - TypeScript-Prüfung aller sechs Workspaces,
-- 50 Testdateien mit 236 Tests,
+- 50 Testdateien mit 240 Tests,
 - React-/PWA-Produktionsbuild einschließlich Service Worker,
 - Cloudflare-Worker-Dry-Run mit D1-, Durable-Object-, R2- und Rate-Limit-Bindings,
 - 15 sequenziell ausgeführte Worker-/D1-Integrationssuiten für die zentralen V1-Abläufe,
@@ -38,16 +38,27 @@ Die Tests decken insbesondere ab:
 
 ## Browserprüfung der Administration
 
-Am 15. Juli 2026 wurde die Produktpflege zusätzlich im lokalen Browser mit synthetischen Daten
-geprüft:
+Am 15. Juli 2026 wurde die Stammdatenpflege zusätzlich im lokalen Browser mit synthetischen Daten
+über den realen Worker-/D1-Pfad geprüft:
 
-- Produktanlage mit deutschem Euro-Preisformat,
+- Gate, Ressourcengruppe, Flugzeug, Pilotencode und Produkt jeweils angelegt, geändert und wieder
+  gelöscht,
+- die bestehende Flugzeug-/Ressourcengruppenzuordnung entfernt und anschließend identisch
+  wiederhergestellt,
+- alle ursprünglichen Stammdatenmengen nach Abschluss der Probe wiederhergestellt,
+- Produktanlage mit deutschem Euro-Preisformat sowie direkter Auswahl des Kinder-Begleithinweises,
 - einmalige PIN-Abfrage mit automatischem Eingabefokus und Bestätigung per Eingabetaste,
-- anschließende protokollierte Speicherung und Anzeige in der Stammdatentabelle,
+- protokollierte Speicherung und unmittelbare Anzeige jeder Änderung in der jeweiligen Tabelle,
 - direkt bedienbarer Begleithinweis für Kinder mit automatischer Auswahl der Gewichtsklasse
   `CHILD`,
 - kontextuelle, aufklappbare Feldhilfe im Produkteditor,
-- Dark-Mode-Kontrast sowie Desktop- und 430-Pixel-Mobilansicht ohne horizontalen Überlauf.
+- Dark-Mode-Kontrast sowie Desktop- und 430-Pixel-Mobilansicht ohne horizontalen Überlauf,
+- keine Browserwarnung, kein Konsolenfehler und kein Framework-Overlay während der CRUD-Probe.
+
+Die Administration unterscheidet außerdem einen eingerichteten Web-Push-Dienst, eine noch fehlende
+VAPID-Konfiguration und einen nicht erreichbaren Konfigurationsendpunkt. Bei fehlenden Secrets zeigt
+sie den einmaligen Einrichtungsbefehl, statt null aktive Abonnements fälschlich als betriebsbereiten
+Push-Dienst darzustellen.
 
 Die produktübergreifenden Hilfetexte wurden außerdem als wiederverwendbare Feldkomponente in die
 sinnvollen Eingaben von Einrichtung, Stammdaten, Betrieb, Geräteverwaltung, Historie und Reset

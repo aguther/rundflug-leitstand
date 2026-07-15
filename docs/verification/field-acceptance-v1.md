@@ -171,6 +171,16 @@ vollständige Produktanlage über den realen Worker-/D1-Pfad: PIN-Fokus, Bestät
 protokollierte Speicherung, direkt bedienbarer Kinder-Begleithinweis, aufgeklappte Feldhilfe und eine
 430-Pixel-Ansicht ohne horizontalen Überlauf.
 
+Eine anschließende vollständige lokale Stammdatenprobe bestätigte über denselben realen
+Worker-/D1-Pfad außerdem:
+
+- Gate, Ressourcengruppe, Flugzeug, Pilotencode und Produkt jeweils anlegen, ändern und vor der
+  Betriebsfreigabe wieder löschen;
+- eine historisierte Flugzeug-/Ressourcengruppenzuordnung entfernen und identisch wieder anlegen;
+- deutsches Euro-Preisformat und direkt auswählbaren Kinder-Begleithinweis real speichern;
+- unveränderte Ausgangsmengen nach dem kontrollierten Rückbau aller synthetischen QA-Datensätze;
+- keine Warnung oder Fehlerausgabe in der Browserkonsole während der gesamten CRUD-Probe.
+
 Offen und deshalb weiterhin ausdrücklich durch dieses Protokoll abzunehmen sind Originalhardware,
 Sonnenlichtkontrast, Safari/iPadOS, Chrome/Android, Edge/Windows, Web-Push auf realen Geräten und die
 selbstständige Bedienung durch Helfer nach höchstens zehn Minuten Einweisung.
