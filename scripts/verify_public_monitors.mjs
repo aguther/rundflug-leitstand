@@ -400,9 +400,16 @@ try {
     { ticketId: calledRotation.tickets[0].id, checkedIn: true },
   );
   await attendanceRefresh;
-  const boardingTicketStatus = await ticketStatus(privateCodes[0]);
-  if (boardingTicketStatus.status !== "BOARDING") {
-    throw new Error("Eingechecktes Ticket wechselt öffentlich nicht auf Boarding.");
+  const boardingTicketStatuses = await Promise.all(privateCodes.map((code) => ticketStatus(code)));
+  if (
+    boardingTicketStatuses.filter((status) => status.status === "BOARDING").length !== 1 ||
+    boardingTicketStatuses.filter((status) => status.status === "COME_TO_FLIGHT_LINE").length !== 1
+  ) {
+    throw new Error(
+      `Der Check-in wird nicht ticketgenau öffentlich projiziert: ${JSON.stringify(
+        boardingTicketStatuses.map((status) => status.status),
+      )}`,
+    );
   }
 
   socket.close();
