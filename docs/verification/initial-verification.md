@@ -1,6 +1,6 @@
 # Verifikationsstand V1
 
-Stand: 14.07.2026
+Stand: 15.07.2026
 
 Dieses Dokument ist der Einstieg in die technischen V1-Nachweise. Ein grüner automatisierter
 Projektcheck belegt die implementierten Fach- und Infrastrukturpfade, ersetzt aber nicht die
@@ -12,11 +12,11 @@ ausdrücklich geforderte Generalprobe mit Originalhardware.
 npm run check
 ```
 
-Zuletzt erfolgreich am 14. Juli 2026:
+Zuletzt erfolgreich am 15. Juli 2026, parallel zum isolierten 12-Stunden-Langlauf:
 
-- Biome-Prüfung von 133 Dateien,
+- Biome-Prüfung von 135 Dateien,
 - TypeScript-Prüfung aller sechs Workspaces,
-- 47 Testdateien mit 226 Tests,
+- 48 Testdateien mit 229 Tests,
 - React-/PWA-Produktionsbuild einschließlich Service Worker,
 - Cloudflare-Worker-Dry-Run mit D1-, Durable-Object-, R2- und Rate-Limit-Bindings,
 - isolierter Backup-Restore mit Prüfsumme und Fremdschlüsseln,
@@ -50,10 +50,18 @@ Detailnachweise liegen thematisch in diesem Verzeichnis, unter anderem:
 
 - BP-12: Der automatisierte V1-Abnahmetag mit drei Flugzeugen, zwei Ressourcengruppen, drei
   Produkten, 60 Tickets und 20 vollständigen Umläufen wurde erfolgreich abgeschlossen.
-- Q-ZUV-050: Der korrigierte ungekürzte 12-Stunden-Langlauf läuft seit 14. Juli 2026, 22:03 Uhr.
+- Q-ZUV-050: Nach einem nicht verwertbaren, vom ausführenden Prozess getrennten Start läuft der
+  überwachte ungekürzte 12-Stunden-Langlauf seit 15. Juli 2026, 05:54 Uhr. Ein unmittelbar zuvor
+  ausgeführter 30-Sekunden-Kontrolllauf bestand 15 Zyklen, 75 Requests und 30
+  Realtime-Zustandsänderungen ohne Trennung oder Worker-Neustart. Der parallele vollständige
+  Projektcheck löste im isolierten Worker keinen Neustart aus.
 - Q-ZUV-060: Der 12-Stunden-Monitor der zentralen Cloudflare-Umgebung wurde am 14. Juli 2026 mit
   720/720 verfügbaren Intervallen und 100 Prozent erfolgreich abgeschlossen.
-- D1-Migrationen 0030 und 0031 müssen in der zentralen Umgebung noch angewendet werden.
+- D1-Migrationen 0030 und 0031 wurden am 15. Juli 2026 erfolgreich in der zentralen Umgebung
+  angewendet. Vorher wurde ein D1-Export unter
+  `migration-backups/2026-07-15/pre-0030-0031-20260715-000428.sql` im EU-R2-Bucket abgelegt und per
+  SHA-256-Rückprüfung verifiziert. Wrangler meldet anschließend `No migrations to apply`; Health,
+  Setup, öffentliches FIDS und Administration antworteten jeweils mit HTTP 200.
 
 Ergebnisse dürfen erst nach vollständigem, erfolgreichem Abschluss in der Traceability als
 `umgesetzt` markiert werden.
