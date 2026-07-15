@@ -37,6 +37,13 @@ Die drei Werte werden ohne Ausgabe oder lokale Speicherung des privaten Schlüss
 npm run cloudflare:configure-push
 ```
 
+In nicht interaktiven Betriebsumgebungen kann der öffentlich sichtbare Kontakt ausdrücklich als
+Argument übergeben werden; private Schlüssel oder andere Secrets dürfen nie als Argument folgen:
+
+```bash
+npm run cloudflare:configure-push -- --subject https://<worker-domain>/
+```
+
 Anschließend muss `/api/public/push/config` mit HTTP 200 antworten. HTTP 503 mit
 `PUSH_NOT_CONFIGURED` bedeutet, dass die V1-Browserbenachrichtigung noch nicht betriebsbereit ist.
 

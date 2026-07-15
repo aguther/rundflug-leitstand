@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 // @ts-expect-error The operational Node script deliberately has no production TypeScript surface.
 import * as vapidKeys from "../../../scripts/vapid-keys.mjs";
 
-const { findMissingVapidSecrets, generateVapidKeyPair, validateVapidSubject } = vapidKeys;
+const {
+  findMissingVapidSecrets,
+  generateVapidKeyPair,
+  readVapidSubjectArgument,
+  validateVapidSubject,
+} = vapidKeys;
 
 const decodeBase64Url = (value: string) =>
   Uint8Array.from(atob(value.replaceAll("-", "+").replaceAll("_", "/")), (entry) =>
@@ -47,6 +52,24 @@ describe("VAPID setup keys", () => {
     expect(validateVapidSubject("https://example.de/kontakt")).toBe("https://example.de/kontakt");
     expect(() => validateVapidSubject("http://example.de")).toThrow(/mailto:- oder https:/);
     expect(() => validateVapidSubject("mailto:ungueltig")).toThrow(/mailto:- oder https:/);
+  });
+
+  it("accepts a public operator URL without exposing a secret on the command line", () => {
+    expect(readVapidSubjectArgument([])).toBeNull();
+    expect(readVapidSubjectArgument(["--subject", "https://example.de/kontakt"])).toBe(
+      "https://example.de/kontakt",
+    );
+    expect(readVapidSubjectArgument(["--subject=https://example.de/kontakt"])).toBe(
+      "https://example.de/kontakt",
+    );
+    expect(() => readVapidSubjectArgument(["--subject"])).toThrow(/Adresse benötigt/);
+    expect(() =>
+      readVapidSubjectArgument([
+        "--subject=https://example.de",
+        "--subject",
+        "https://example.org",
+      ]),
+    ).toThrow(/nur einmal/);
   });
 
   it("verifies all required Cloudflare secret names without reading their values", () => {

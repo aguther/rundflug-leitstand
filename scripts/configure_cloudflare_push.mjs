@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import {
   findMissingVapidSecrets,
   generateVapidKeyPair,
+  readVapidSubjectArgument,
   validateVapidSubject,
 } from "./vapid-keys.mjs";
 
@@ -54,20 +55,23 @@ async function listSecrets() {
   });
 }
 
-if (!process.stdin.isTTY || !process.stdout.isTTY) {
-  throw new Error("Dieser Befehl benötigt ein interaktives Terminal.");
-}
-
-const prompt = createInterface({ input: process.stdin, output: process.stdout });
-let subject;
-try {
-  subject = validateVapidSubject(
-    await prompt.question(
-      "Betreiberkontakt für Web-Push (mailto:adresse@example.de oder https://…): ",
-    ),
-  );
-} finally {
-  prompt.close();
+let subject = readVapidSubjectArgument(process.argv.slice(2));
+if (subject === null) {
+  if (!process.stdin.isTTY || !process.stdout.isTTY) {
+    throw new Error(
+      "Dieser Befehl benötigt ein interaktives Terminal oder --subject mit einer öffentlichen Betreiber-URL.",
+    );
+  }
+  const prompt = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    subject = validateVapidSubject(
+      await prompt.question(
+        "Betreiberkontakt für Web-Push (mailto:adresse@example.de oder https://…): ",
+      ),
+    );
+  } finally {
+    prompt.close();
+  }
 }
 
 process.stdout.write("Erzeuge ein neues P-256-Schlüsselpaar und übertrage drei Secrets …\n");
