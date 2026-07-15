@@ -1,10 +1,14 @@
-# Offene fachliche Entscheidungen
+# Fachliche Entscheidungen V1
 
-Diese Liste enthält ausschließlich Fragen, die mindestens ein V1-Arbeitspaket blockieren. Sie ändert
-keine Anforderung und darf nicht durch eine technische Implementierungsannahme ersetzt werden. Eine
-Entscheidung wird mit Datum, verantwortlicher Rolle, Begründung und betroffenen Anforderungs-IDs
-dokumentiert. `ABGESCHLOSSEN/VERFÜGBAR` ist gemäß Lastenheft bereits das Ereignis, das nach
-`GELANDET` den Turnaround beendet; dies ist daher keine offene Frage.
+Diese Liste entstand aus Fragen, die mindestens ein V1-Arbeitspaket blockierten. OQ-01 bis OQ-12
+wurden am 11.07.2026 im unten stehenden Freigabeprotokoll entschieden und sind keine offenen
+fachlichen Blocker mehr. Die Beschlüsse ändern die binären Referenzanforderungen nicht stillschweigend;
+Abweichungen und Konkretisierungen sind in ADRs, Traceability und Tests nachvollziehbar. Die noch
+ausstehende Datenschutz-/Produktionsabnahme zu OQ-06 ist eine Betreiber- und Rechtsfreigabe, keine
+ungeklärte fachliche Entscheidung.
+
+`ABGESCHLOSSEN/VERFÜGBAR` ist gemäß Lastenheft bereits das Ereignis, das nach `GELANDET` den
+Turnaround beendet; dies war daher nie eine offene Frage.
 
 | Nr. | Blockierende Entscheidung | Betroffene Anforderungen | Entscheidung durch | Benötigt vor | Blockiert |
 |---|---|---|---|---|---|
@@ -23,14 +27,13 @@ dokumentiert. `ABGESCHLOSSEN/VERFÜGBAR` ist gemäß Lastenheft bereits das Erei
 
 ## Entscheidungsprotokoll
 
-Noch keine der oben aufgeführten Fragen ist entschieden. Beschlüsse werden hier ergänzt und anschließend
-in Traceability, Backlog, ADRs und Tests nachvollziehbar referenziert.
+Alle oben aufgeführten Fragen sind im Freigabeprotokoll entschieden und in Traceability, Backlog,
+ADRs und Tests nachvollziehbar referenziert.
 
-## Entscheidungsvorschlag vom 11.07.2026
+## Freigegebene Entscheidungsgrundlage vom 11.07.2026
 
-Die folgenden Antworten sind ein konsistenter V1-Vorschlag, aber noch **kein Beschluss**. Die in der
-Tabelle genannten verantwortlichen Rollen müssen ihn freigeben. Bis dahin dürfen Implementierung und
-Tests diese Werte nur als synthetische Abnahmekonfiguration verwenden.
+Die folgenden Antworten bildeten den konsistenten V1-Vorschlag und wurden mit den im
+Freigabeprotokoll dokumentierten Ergänzungen verbindlich freigegeben.
 
 | Nr. | Empfohlene V1-Entscheidung |
 |---|---|
@@ -66,8 +69,8 @@ Tests diese Werte nur als synthetische Abnahmekonfiguration verwenden.
 
 | Datum | Status | Verantwortliche Rolle | Umfang und Begründung |
 |---|---|---|---|
-| 11.07.2026 | freigegeben | Auftraggeber | OQ-01 bis OQ-05 und OQ-07 bis OQ-12 gemäß Entscheidungsvorschlag vom 11.07.2026. |
-| 11.07.2026 | freigegeben | Auftraggeber und Datenschutzverantwortlicher | OQ-06 gemäß Entscheidungsvorschlag: namens- und telefonnummernfreier, rein ID-basierter Kern; freiwilliges ticketbezogenes Web-Push bleibt erhalten. Die Verarbeitung ist damit datensparsam und pseudonym, nicht vollständig anonym. Q-DSG-040 wird streng ausgelegt; Produktionsfreigabe erfordert nachgewiesene EU-Verarbeitung einschließlich Push- und Netzwerkmetadaten. |
+| 11.07.2026 | freigegeben | Auftraggeber | OQ-01 bis OQ-05 und OQ-07 bis OQ-12 gemäß freigegebener Entscheidungsgrundlage vom 11.07.2026. |
+| 11.07.2026 | freigegeben | Auftraggeber und Datenschutzverantwortlicher | OQ-06 gemäß freigegebener Entscheidungsgrundlage: namens- und telefonnummernfreier, rein ID-basierter Kern; freiwilliges ticketbezogenes Web-Push bleibt erhalten. Die Verarbeitung ist damit datensparsam und pseudonym, nicht vollständig anonym. Q-DSG-040 wird streng ausgelegt; Produktionsfreigabe erfordert nachgewiesene EU-Verarbeitung einschließlich Push- und Netzwerkmetadaten. |
 | 11.07.2026 | freigegeben | Auftraggeber | V1 erfasst abweichend von F-KAS-040 und D-030 keinerlei Telefonnummern, auch nicht optional. Telefonnummern-, SMS- und Messenger-basierte Benachrichtigung ist nicht Bestandteil von V1. Der Gast ruft seinen Status ausschließlich über einen nicht erratbaren QR-/Ticketcode in Webseite oder PWA ab. Die binären Referenzanforderungen bleiben unverändert; die Änderung ist in der nächsten konsolidierten Anforderungsversion nachzuführen. |
 | 11.07.2026 | freigegeben | Auftraggeber | Freiwilliges Web-Push je Ticket in der PWA bleibt Bestandteil von V1 (F-BEN-020, F-BEN-040, D-110 und Q-DSG-020/Q-DSG-030). Push-Abonnement und Einwilligung werden strikt vom operativen Ticketkern getrennt, zweckgebunden gespeichert und fristgerecht gelöscht. |
 
