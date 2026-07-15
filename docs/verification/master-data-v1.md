@@ -1,8 +1,8 @@
 # Verifikation Stammdaten und Ressourcengruppen V1
 
-`npm run test:master-data` erzeugt ausschließlich synthetisch ein Gate, eine gemeinsame
-Ressourcengruppe, zwei kompatible Flugzeuge und zwei Produkte unterschiedlicher Dauer. Der Lauf
-weist nach:
+`npm run test:master-data` ist Bestandteil von `npm run check` und erzeugt ausschließlich
+synthetisch ein Gate, eine gemeinsame Ressourcengruppe, zwei kompatible Flugzeuge und zwei Produkte
+unterschiedlicher Dauer. Der Lauf weist nach:
 
 - jedes Produkt besitzt genau einen Ressourcengruppen- und Gate-Bezug,
 - Produkte lassen sich über den realen Worker-/D1-Pfad anlegen und ändern; der bestätigte
@@ -23,9 +23,10 @@ weist nach:
   Ticketstatus und FIDS ohne irreführenden Countdown,
 - die Reaktivierung räumt die operative Blockierung nachvollziehbar auf.
 
-Der Referenzlauf vom 14. Juli 2026 endete konsistent mit Veranstaltungsversion 18. Die
-Kassenoberfläche zeigt je
-Produkt neben der produktspezifischen Nachfrage ausdrücklich die Ticketzahl der gemeinsamen Queue.
+Der Referenzlauf vom 15. Juli 2026 endete konsistent mit Veranstaltungsversion 18 und bestätigte
+unter anderem Anlage, Änderung und Rücklesen eines Produkts mit 45,50 Euro. Die Kassenoberfläche
+zeigt je Produkt neben der produktspezifischen Nachfrage ausdrücklich die Ticketzahl der gemeinsamen
+Queue.
 
 Eine frühere Browserprüfung wies die gemeinsame Queue und Ressourcenpause mit gekoppelter
 synthetischer Kasse sowie FIDS auf Desktop und 430 × 900 Pixeln nach.
