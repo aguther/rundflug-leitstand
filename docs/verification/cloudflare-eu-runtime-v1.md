@@ -1,6 +1,6 @@
 # Cloudflare-EU-Laufzeitnachweis V1
 
-Stand: 14. Juli 2026
+Stand: 15. Juli 2026
 
 Betroffene Anforderung: T-030. Q-DSG-040 wird dadurch nur technisch, nicht rechtlich vollständig
 abgedeckt.
@@ -26,6 +26,10 @@ Ergebnis:
   Jurisdiktion `eu` an.
 - D1 ist relationale Source of Truth, R2 speichert Sicherungen/Berichte und das Durable Object
   serialisiert Kommandos; damit liegen die zentralen zustandsführenden Komponenten im EU-Bereich.
+- Migration 0032 wurde nach einem geprüften D1-Export angewendet. Der Export liegt unter
+  `migration-backups/2026-07-15/pre-0032-20260715-111305.sql` im EU-R2-Bucket; die Remote-Abfrage
+  meldete danach keine ausstehenden Migrationen und bestätigte den weiterhin append-only
+  geschützten Prognose-Snapshot-Trigger mit ausschließlich kontrollierter Werksreset-Ausnahme.
 
 Cloudflare dokumentiert, dass D1-Jurisdiktionen die Ausführung und Persistenz der Datenbank auf die
 gewählte Jurisdiktion beschränken und dass R2 Jurisdictional Restrictions Speicherung und
