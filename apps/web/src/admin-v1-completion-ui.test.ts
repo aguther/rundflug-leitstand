@@ -30,4 +30,18 @@ describe("V1 administration completion UI", () => {
     );
     expect(appSource).toContain("Bearbeitungsmodus entsperren");
   });
+
+  it("keeps one-time PIN actions usable without retaining the PIN", () => {
+    expect(appSource).toContain('const adminPinRef = useRef("")');
+    expect(appSource).toContain("adminPinRef.current = value");
+    expect(appSource.match(/adminPin: adminPinRef\.current/g)?.length).toBeGreaterThan(10);
+    expect(appSource).toContain('if (!adminModeUnlocked) setAdminPin("")');
+  });
+
+  it("makes child guidance directly selectable and explains meaningful admin fields", () => {
+    expect(appSource).not.toContain('disabled={!productWeightClasses.includes("CHILD")}');
+    expect(appSource).toContain("weightClassesForChildCompanion(current, true)");
+    expect(appSource).toContain("Bei Kinderbuchungen auf Begleitung hinweisen");
+    expect(appSource.match(/<FieldLabel/g)?.length).toBeGreaterThan(35);
+  });
 });

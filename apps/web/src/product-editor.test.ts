@@ -6,6 +6,7 @@ import {
   setWeightCaptureMode,
   toggleWeightClass,
   weightCaptureEnabled,
+  weightClassesForChildCompanion,
 } from "./product-editor";
 
 describe("product editor values", () => {
@@ -23,6 +24,12 @@ describe("product editor values", () => {
     expect(toggleWeightClass(["NOT_CAPTURED"], "CHILD", true)).toEqual(["CHILD"]);
     expect(toggleWeightClass(["CHILD", "NORMAL"], "CHILD", false)).toEqual(["NORMAL"]);
     expect(setWeightCaptureMode(false)).toEqual(["NOT_CAPTURED"]);
+  });
+
+  it("makes the child companion option directly usable", () => {
+    expect(weightClassesForChildCompanion(["NOT_CAPTURED"], true)).toEqual(["CHILD"]);
+    expect(weightClassesForChildCompanion(["NORMAL"], true)).toEqual(["NORMAL", "CHILD"]);
+    expect(weightClassesForChildCompanion(["CHILD", "NORMAL"], false)).toEqual(["CHILD", "NORMAL"]);
   });
 
   it("describes a product position without exposing sort-order internals", () => {

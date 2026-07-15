@@ -427,6 +427,29 @@
 .product-weight-section .checkbox-label input {
   width: 18px;
 }
+.checkbox-field {
+  display: grid;
+  gap: 5px;
+  padding: 10px 12px;
+  border: 1px solid var(--ui-border);
+  border-radius: 6px;
+  background: var(--ui-surface-subtle);
+}
+.checkbox-field-heading {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.checkbox-field-heading .checkbox-label {
+  min-width: 0;
+  min-height: 32px;
+  margin: 0;
+}
+.checkbox-field-heading .field-info {
+  flex: 0 0 auto;
+}
 .product-editor-actions {
   position: sticky;
   bottom: -24px;

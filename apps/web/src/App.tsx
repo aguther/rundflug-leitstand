@@ -97,6 +97,7 @@ import {
   setWeightCaptureMode,
   toggleWeightClass,
   weightCaptureEnabled,
+  weightClassesForChildCompanion,
 } from "./product-editor";
 import {
   isRealtimeStateChange,
@@ -150,16 +151,22 @@ const aircraftStateLabel = {
   INACTIVE: "Kurzfristig inaktiv",
 } as const;
 
+function FieldHelp({ label, help }: { label: string; help: string }) {
+  return (
+    <details className="field-info">
+      <summary aria-label={`Information zu ${label}`} title={help}>
+        i
+      </summary>
+      <span role="note">{help}</span>
+    </details>
+  );
+}
+
 function FieldLabel({ label, help }: { label: string; help: string }) {
   return (
     <span className="field-label-with-info">
       <span>{label}</span>
-      <details className="field-info">
-        <summary aria-label={`Information zu ${label}`} title={help}>
-          i
-        </summary>
-        <span role="note">{help}</span>
-      </details>
+      <FieldHelp label={label} help={help} />
     </span>
   );
 }
@@ -2429,7 +2436,12 @@ function AdminView() {
   const [adminArea, setAdminArea] = useState<AdminArea>("setup");
   const [masterDataCategory, setMasterDataCategory] = useState<MasterDataCategory>("aircraft");
   const [reason, setReason] = useState("");
-  const [adminPin, setAdminPin] = useState("");
+  const [adminPin, setAdminPinState] = useState("");
+  const adminPinRef = useRef("");
+  const setAdminPin = useCallback((value: string) => {
+    adminPinRef.current = value;
+    setAdminPinState(value);
+  }, []);
   const [adminModeUnlocked, setAdminModeUnlocked] = useState(false);
   const [adminPinDialog, setAdminPinDialog] = useState<"unlock" | "action" | null>(null);
   const [adminPinError, setAdminPinError] = useState<string | null>(null);
@@ -2607,13 +2619,13 @@ function AdminView() {
         window.removeEventListener(eventName, lockAfterInactivity);
       });
     };
-  }, [adminModeUnlocked, isAdministrator]);
+  }, [adminModeUnlocked, isAdministrator, setAdminPin]);
 
   useEffect(() => {
     if (isAdministrator) return;
     setAdminModeUnlocked(false);
     setAdminPin("");
-  }, [isAdministrator]);
+  }, [isAdministrator, setAdminPin]);
   const refreshHistory = useCallback(async () => {
     try {
       const timeZone = board?.event.timeZone ?? "Europe/Berlin";
@@ -2793,7 +2805,7 @@ function AdminView() {
       setMessage("Für diese Änderung wird ein Administrationsgerät benötigt.");
       return;
     }
-    if (adminModeUnlocked && adminPin.length >= 4) {
+    if (adminModeUnlocked && adminPinRef.current.length >= 4) {
       void action();
       return;
     }
@@ -2842,7 +2854,7 @@ function AdminView() {
   }
 
   async function setEventLifecycle(status: "PREPARATION" | "ACTIVE" | "CLOSED" | "ARCHIVED") {
-    if (!board || adminPin.length < 4) return;
+    if (!board || adminPinRef.current.length < 4) return;
     try {
       await sendCommand(
         {
@@ -2852,7 +2864,11 @@ function AdminView() {
           expectedVersion: board.event.version,
           issuedAt: new Date().toISOString(),
           type: "SET_EVENT_LIFECYCLE",
-          payload: { status, reason: ADMIN_CONFIGURATION_AUDIT_REASON, adminPin },
+          payload: {
+            status,
+            reason: ADMIN_CONFIGURATION_AUDIT_REASON,
+            adminPin: adminPinRef.current,
+          },
         },
         deviceTokenFor(ADMIN_DEVICE_ID),
       );
@@ -2866,7 +2882,7 @@ function AdminView() {
   }
 
   async function pairDevice() {
-    if (!board || deviceLabel.trim().length < 2 || adminPin.length < 4) return;
+    if (!board || deviceLabel.trim().length < 2 || adminPinRef.current.length < 4) return;
     const pairedDeviceId = crypto.randomUUID();
     const token = createDeviceToken();
     try {
@@ -2883,7 +2899,7 @@ function AdminView() {
             label: deviceLabel.trim(),
             role: deviceRole,
             credentialHash: await sha256HexBrowser(token),
-            adminPin,
+            adminPin: adminPinRef.current,
           },
         },
         deviceTokenFor(ADMIN_DEVICE_ID),
@@ -2910,7 +2926,7 @@ function AdminView() {
   }
 
   async function saveEventParameters() {
-    if (!board || !operationsEndAt || adminPin.length < 4) return;
+    if (!board || !operationsEndAt || adminPinRef.current.length < 4) return;
     try {
       await sendCommand(
         {
@@ -2935,7 +2951,7 @@ function AdminView() {
             plannedDeboardingMinutes,
             plannedBufferMinutes,
             reason: ADMIN_CONFIGURATION_AUDIT_REASON,
-            adminPin,
+            adminPin: adminPinRef.current,
           },
         },
         deviceTokenFor(ADMIN_DEVICE_ID),
@@ -2983,7 +2999,7 @@ function AdminView() {
   }
 
   async function saveGate() {
-    if (!board || gateLabel.trim().length < 2 || adminPin.length < 4) return;
+    if (!board || gateLabel.trim().length < 2 || adminPinRef.current.length < 4) return;
     try {
       await sendCommand(
         {
@@ -3004,7 +3020,7 @@ function AdminView() {
               rotationStatuses: gateDisplayRotationStatuses,
             },
             reason: MASTER_DATA_AUDIT_REASON,
-            adminPin,
+            adminPin: adminPinRef.current,
           },
         },
         deviceTokenFor(ADMIN_DEVICE_ID),
@@ -3027,7 +3043,7 @@ function AdminView() {
       !manifestTicketGroupId ||
       !manifestTargetRotationId ||
       manifestCorrectionReason.trim().length < 10 ||
-      adminPin.length < 4
+      adminPinRef.current.length < 4
     )
       return;
     try {
@@ -3043,7 +3059,7 @@ function AdminView() {
             ticketGroupId: manifestTicketGroupId,
             targetRotationId: manifestTargetRotationId,
             reason: manifestCorrectionReason.trim(),
-            adminPin,
+            adminPin: adminPinRef.current,
           },
         },
         deviceTokenFor(ADMIN_DEVICE_ID),
@@ -3071,7 +3087,7 @@ function AdminView() {
       !productGateId ||
       productWeightClasses.length === 0 ||
       productPriceCents === null ||
-      adminPin.length < 4
+      adminPinRef.current.length < 4
     )
       return;
     try {
@@ -3099,7 +3115,7 @@ function AdminView() {
             >,
             sortOrder: productSortOrder,
             reason: MASTER_DATA_AUDIT_REASON,
-            adminPin,
+            adminPin: adminPinRef.current,
           },
         },
         deviceTokenFor(ADMIN_DEVICE_ID),
@@ -3141,7 +3157,13 @@ function AdminView() {
   }
 
   async function saveResourceGroup() {
-    if (!board || !resourceGateId || resourceName.trim().length < 2 || adminPin.length < 4) return;
+    if (
+      !board ||
+      !resourceGateId ||
+      resourceName.trim().length < 2 ||
+      adminPinRef.current.length < 4
+    )
+      return;
     try {
       await sendCommand(
         {
@@ -3162,7 +3184,7 @@ function AdminView() {
               .map((entry) => entry.trim())
               .filter(Boolean),
             reason: MASTER_DATA_AUDIT_REASON,
-            adminPin,
+            adminPin: adminPinRef.current,
           },
         },
         deviceTokenFor(ADMIN_DEVICE_ID),
@@ -3187,7 +3209,7 @@ function AdminView() {
       !board ||
       aircraftRegistration.trim().length < 3 ||
       aircraftType.trim().length < 2 ||
-      adminPin.length < 4
+      adminPinRef.current.length < 4
     )
       return;
     try {
@@ -3208,7 +3230,7 @@ function AdminView() {
               ? Number(aircraftMaximumPayload)
               : null,
             reason: MASTER_DATA_AUDIT_REASON,
-            adminPin,
+            adminPin: adminPinRef.current,
           },
         },
         deviceTokenFor(ADMIN_DEVICE_ID),
@@ -3227,7 +3249,12 @@ function AdminView() {
   }
 
   async function assignAircraft() {
-    if (!board || !assignmentAircraftId || !assignmentResourceGroupId || adminPin.length < 4)
+    if (
+      !board ||
+      !assignmentAircraftId ||
+      !assignmentResourceGroupId ||
+      adminPinRef.current.length < 4
+    )
       return;
     try {
       await sendCommand(
@@ -3243,7 +3270,7 @@ function AdminView() {
             resourceGroupId: assignmentResourceGroupId,
             effectiveAt: new Date().toISOString(),
             reason: MASTER_DATA_AUDIT_REASON,
-            adminPin,
+            adminPin: adminPinRef.current,
           },
         },
         deviceTokenFor(ADMIN_DEVICE_ID),
@@ -3263,7 +3290,7 @@ function AdminView() {
   }
 
   async function revokeDevice(device: PairedDeviceSummary) {
-    if (!board || reason.trim().length < 3 || adminPin.length < 4) return;
+    if (!board || reason.trim().length < 3 || adminPinRef.current.length < 4) return;
     try {
       await sendCommand(
         {
@@ -3273,7 +3300,11 @@ function AdminView() {
           expectedVersion: board.event.version,
           issuedAt: new Date().toISOString(),
           type: "REVOKE_DEVICE",
-          payload: { pairedDeviceId: device.id, adminPin, reason: reason.trim() },
+          payload: {
+            pairedDeviceId: device.id,
+            adminPin: adminPinRef.current,
+            reason: reason.trim(),
+          },
         },
         deviceTokenFor(ADMIN_DEVICE_ID),
       );
@@ -3288,7 +3319,11 @@ function AdminView() {
   }
 
   async function emergency(type: "TRIGGER_EMERGENCY" | "CLEAR_EMERGENCY") {
-    if (!board || reason.trim().length < 3 || (type === "CLEAR_EMERGENCY" && adminPin.length < 4))
+    if (
+      !board ||
+      reason.trim().length < 3 ||
+      (type === "CLEAR_EMERGENCY" && adminPinRef.current.length < 4)
+    )
       return;
     try {
       await sendCommand(
@@ -3309,7 +3344,7 @@ function AdminView() {
               expectedVersion: board.event.version,
               issuedAt: new Date().toISOString(),
               type,
-              payload: { reason: reason.trim(), adminPin },
+              payload: { reason: reason.trim(), adminPin: adminPinRef.current },
             },
         deviceTokenFor(ADMIN_DEVICE_ID),
       );
@@ -3417,7 +3452,7 @@ function AdminView() {
     saleEnabled: boolean,
     useEnteredClosingTime = false,
   ) {
-    if (!board || reason.trim().length < 3 || adminPin.length < 4) return;
+    if (!board || reason.trim().length < 3 || adminPinRef.current.length < 4) return;
     try {
       const configuredClosing =
         useEnteredClosingTime && saleClosesAt
@@ -3438,7 +3473,7 @@ function AdminView() {
             warningThreshold: product.capacityWarningThreshold,
             criticalThreshold: product.capacityCriticalThreshold,
             reason: reason.trim(),
-            adminPin,
+            adminPin: adminPinRef.current,
           },
         },
         deviceTokenFor(ADMIN_DEVICE_ID),
@@ -3503,7 +3538,7 @@ function AdminView() {
   }
 
   async function configureRefuelThreshold(aircraftId: string) {
-    if (!board || reason.trim().length < 3 || adminPin.length < 4) return;
+    if (!board || reason.trim().length < 3 || adminPinRef.current.length < 4) return;
     try {
       await sendCommand(
         {
@@ -3517,7 +3552,7 @@ function AdminView() {
             aircraftId,
             reminderThreshold: refuelThreshold,
             reason: reason.trim(),
-            adminPin,
+            adminPin: adminPinRef.current,
           },
         },
         deviceTokenFor(ADMIN_DEVICE_ID),
@@ -3537,7 +3572,7 @@ function AdminView() {
     operationalNote: string,
     active: boolean,
   ) {
-    if (!board || adminPin.length < 4) return;
+    if (!board || adminPinRef.current.length < 4) return;
     try {
       await sendCommand(
         {
@@ -3553,7 +3588,7 @@ function AdminView() {
             operationalNote: operationalNote.trim(),
             active,
             reason: MASTER_DATA_AUDIT_REASON,
-            adminPin,
+            adminPin: adminPinRef.current,
           },
         },
         deviceTokenFor(ADMIN_DEVICE_ID),
@@ -3931,7 +3966,7 @@ function AdminView() {
       !pendingMasterDelete ||
       pendingMasterDelete.blockers.length > 0 ||
       board.event.status !== "PREPARATION" ||
-      adminPin.length < 4
+      adminPinRef.current.length < 4
     )
       return;
     try {
@@ -3947,7 +3982,7 @@ function AdminView() {
             entityType: pendingMasterDelete.entityType,
             entityId: pendingMasterDelete.entityId,
             reason: MASTER_DATA_DELETE_REASON,
-            adminPin,
+            adminPin: adminPinRef.current,
           },
         },
         deviceTokenFor(ADMIN_DEVICE_ID),
@@ -4155,7 +4190,10 @@ function AdminView() {
             ) : null}
             {adminArea === "operations" ? (
               <label>
-                Begründung
+                <FieldLabel
+                  label="Begründung"
+                  help="Kurzer nachvollziehbarer Anlass für operative Änderungen. Er wird im Auditprotokoll gespeichert."
+                />
                 <input
                   value={reason}
                   onChange={(event) => setReason(event.target.value)}
@@ -4262,7 +4300,10 @@ function AdminView() {
             </div>
             <div className="parameter-grid">
               <label>
-                Neustart-Stufe
+                <FieldLabel
+                  label="Neustart-Stufe"
+                  help="Bestimmt, ob Stammdaten übernommen werden oder die neue Veranstaltung vollständig leer beginnt."
+                />
                 <select
                   value={restartMode}
                   onChange={(event) =>
@@ -4274,7 +4315,10 @@ function AdminView() {
                 </select>
               </label>
               <label>
-                Technische ID
+                <FieldLabel
+                  label="Technische ID"
+                  help="Eindeutige, URL-taugliche Kennung der neuen Veranstaltung; zum Beispiel rundflug-2027."
+                />
                 <input
                   value={newEventId}
                   onChange={(event) => setNewEventId(event.target.value)}
@@ -4282,16 +4326,32 @@ function AdminView() {
                 />
               </label>
               <label>
-                Bezeichnung
+                <FieldLabel
+                  label="Bezeichnung"
+                  help="Lesbarer Veranstaltungsname für Administration, Kasse und Anzeigen."
+                />
                 <input
                   value={newEventName}
                   onChange={(event) => setNewEventName(event.target.value)}
                   placeholder="Flugtag 2027"
                 />
               </label>
-              <LocalizedDateInput label="Datum" value={newEventDate} onChange={setNewEventDate} />
+              <LocalizedDateInput
+                label="Datum"
+                labelContent={
+                  <FieldLabel
+                    label="Datum"
+                    help="Veranstaltungstag im deutschen Format TT.MM.JJJJ."
+                  />
+                }
+                value={newEventDate}
+                onChange={setNewEventDate}
+              />
               <label>
-                Flugplatz
+                <FieldLabel
+                  label="Flugplatz"
+                  help="Kurze Flugplatzkennung oder Ortsangabe für die Veranstaltung."
+                />
                 <input
                   value={newEventAerodrome}
                   onChange={(event) => setNewEventAerodrome(event.target.value)}
@@ -4299,7 +4359,10 @@ function AdminView() {
                 />
               </label>
               <label>
-                Bestätigung
+                <FieldLabel
+                  label="Bestätigung"
+                  help="Schutz vor versehentlichem Neustart. Zur Ausführung muss NEUSTART eingegeben werden."
+                />
                 <input
                   value={restartConfirmation}
                   onChange={(event) => setRestartConfirmation(event.target.value)}
@@ -4333,16 +4396,31 @@ function AdminView() {
             <div className="parameter-grid">
               <LocalizedDateTimeInput
                 label="Verkaufsbeginn"
+                labelContent={
+                  <FieldLabel
+                    label="Verkaufsbeginn"
+                    help="Lokaler Zeitpunkt, ab dem Tickets verkauft werden dürfen. Eingabe im deutschen Datum und 24-Stunden-Format."
+                  />
+                }
                 value={saleOpensAt}
                 onChange={setSaleOpensAt}
               />
               <LocalizedDateTimeInput
                 label="Betriebsende"
+                labelContent={
+                  <FieldLabel
+                    label="Betriebsende"
+                    help="Geplantes lokales Ende des Rundflugbetriebs; Grundlage für Verkaufs- und Kapazitätsgrenzen."
+                  />
+                }
                 value={operationsEndAt}
                 onChange={setOperationsEndAt}
               />
               <label>
-                No-Show nach Minuten
+                <FieldLabel
+                  label="No-Show nach Minuten"
+                  help="Frühester Zeitpunkt nach dem Aufruf, ab dem fehlende Tickets manuell als No-Show behandelt werden dürfen."
+                />
                 <input
                   type="number"
                   min="1"
@@ -4352,7 +4430,10 @@ function AdminView() {
                 />
               </label>
               <label>
-                Klärung Kasse nach Zurückstellungen
+                <FieldLabel
+                  label="Klärung Kasse nach Zurückstellungen"
+                  help="Nach dieser Anzahl manueller Zurückstellungen wird die Gruppe zur Klärung an der Kasse markiert."
+                />
                 <input
                   type="number"
                   min="1"
@@ -4362,7 +4443,10 @@ function AdminView() {
                 />
               </label>
               <label>
-                Benachrichtigungsvorlauf (Min.)
+                <FieldLabel
+                  label="Benachrichtigungsvorlauf (Min.)"
+                  help="Bestimmt, wie früh ein freiwilliger Web-Push zur Vorbereitung ausgelöst werden kann."
+                />
                 <input
                   type="number"
                   min="1"
@@ -4372,7 +4456,10 @@ function AdminView() {
                 />
               </label>
               <label>
-                Referenzgewicht Kind (kg)
+                <FieldLabel
+                  label="Referenzgewicht Kind (kg)"
+                  help="Anonymer Rechenwert für Tickets der Gewichtsklasse Kind; keine flugbetriebliche Freigabe."
+                />
                 <input
                   type="number"
                   min="1"
@@ -4382,7 +4469,10 @@ function AdminView() {
                 />
               </label>
               <label>
-                Referenzgewicht Normal (kg)
+                <FieldLabel
+                  label="Referenzgewicht Normal (kg)"
+                  help="Anonymer Rechenwert für Tickets der Gewichtsklasse Normal; keine flugbetriebliche Freigabe."
+                />
                 <input
                   type="number"
                   min="1"
@@ -4392,7 +4482,10 @@ function AdminView() {
                 />
               </label>
               <label>
-                Referenzgewicht Schwer (kg)
+                <FieldLabel
+                  label="Referenzgewicht Schwer (kg)"
+                  help="Anonymer Rechenwert für Tickets der Gewichtsklasse Schwer; keine flugbetriebliche Freigabe."
+                />
                 <input
                   type="number"
                   min="1"
@@ -4402,7 +4495,10 @@ function AdminView() {
                 />
               </label>
               <label>
-                Plan Boarding (Min.)
+                <FieldLabel
+                  label="Plan Boarding (Min.)"
+                  help="Planwert für das Einsteigen zur initialen Prognose; tatsächliche Ereignisse ersetzen ihn im Betrieb."
+                />
                 <input
                   type="number"
                   min="1"
@@ -4412,7 +4508,10 @@ function AdminView() {
                 />
               </label>
               <label>
-                Plan Ausstieg (Min.)
+                <FieldLabel
+                  label="Plan Ausstieg (Min.)"
+                  help="Planwert für Ausstieg und Bodenprozess nach der Landung."
+                />
                 <input
                   type="number"
                   min="1"
@@ -4422,7 +4521,10 @@ function AdminView() {
                 />
               </label>
               <label>
-                Plan Puffer (Min.)
+                <FieldLabel
+                  label="Plan Puffer (Min.)"
+                  help="Zusätzlicher organisatorischer Zeitpuffer zwischen Umläufen."
+                />
                 <input
                   type="number"
                   min="0"
@@ -5311,23 +5413,34 @@ function AdminView() {
                   {masterSubmitAttempted && productWeightClasses.length === 0 ? (
                     <span className="field-error">Mindestens eine Gewichtsklasse auswählen.</span>
                   ) : null}
-                  <label className="checkbox-label">
-                    <input
-                      id="product-child-companion"
-                      type="checkbox"
-                      checked={productChildCompanion}
-                      disabled={!productWeightClasses.includes("CHILD")}
-                      onChange={(event) => setProductChildCompanion(event.target.checked)}
-                    />{" "}
-                    Bei Kindern auf erforderliche Begleitung hinweisen
-                    <FieldLabel
-                      label="Begleithinweis"
-                      help="Zeigt bei einer Kinderbuchung ohne passende Begleitung einen organisatorischen Hinweis. Dies ist keine flugbetriebliche Freigabe."
-                    />
-                  </label>
-                  {!productWeightClasses.includes("CHILD") ? (
-                    <span className="field-help">Wird verfügbar, sobald „Kind“ aktiviert ist.</span>
-                  ) : null}
+                  <div className="checkbox-field">
+                    <div className="checkbox-field-heading">
+                      <label className="checkbox-label">
+                        <input
+                          id="product-child-companion"
+                          type="checkbox"
+                          checked={productChildCompanion}
+                          onChange={(event) => {
+                            const checked = event.target.checked;
+                            setProductChildCompanion(checked);
+                            if (checked) {
+                              setProductWeightClasses((current) =>
+                                weightClassesForChildCompanion(current, true),
+                              );
+                            }
+                          }}
+                        />
+                        <span>Bei Kinderbuchungen auf Begleitung hinweisen</span>
+                      </label>
+                      <FieldHelp
+                        label="Begleithinweis für Kinder"
+                        help="Aktiviert bei Bedarf automatisch die Gewichtsklasse „Kind“ und zeigt an der Kasse einen organisatorischen Hinweis, wenn keine passende Begleitung erfasst ist. Dies ist keine flugbetriebliche Freigabe."
+                      />
+                    </div>
+                    <span className="field-help">
+                      Die Auswahl „Kind“ wird beim Aktivieren automatisch eingeschaltet.
+                    </span>
+                  </div>
                 </section>
                 <div className="editor-actions product-editor-actions">
                   <button onClick={() => setMasterEditorOpen(false)} type="button">
@@ -5392,14 +5505,20 @@ function AdminView() {
               <fieldset hidden={masterDataCategory !== "resource-groups"}>
                 <legend>Ressourcengruppe</legend>
                 <label>
-                  Bezeichnung
+                  <FieldLabel
+                    label="Bezeichnung"
+                    help="Lesbarer Name der gemeinsamen operativen Warteschlange."
+                  />
                   <input
                     value={resourceName}
                     onChange={(event) => setResourceName(event.target.value)}
                   />
                 </label>
                 <label>
-                  Gate
+                  <FieldLabel
+                    label="Gate"
+                    help="Standardmäßiger Treffpunkt für Produkte und Umläufe dieser Ressourcengruppe."
+                  />
                   <select
                     value={resourceGateId}
                     onChange={(event) => setResourceGateId(event.target.value)}
@@ -5415,7 +5534,10 @@ function AdminView() {
                   </select>
                 </label>
                 <label>
-                  Referenzkapazität
+                  <FieldLabel
+                    label="Referenzkapazität"
+                    help="Ausgangswert für Planung und Gruppierung; die konkrete Flugzeugkapazität bleibt maßgeblich."
+                  />
                   <input
                     type="number"
                     min="1"
@@ -5425,7 +5547,10 @@ function AdminView() {
                   />
                 </label>
                 <label>
-                  Plan-Umlaufzeit (Min.)
+                  <FieldLabel
+                    label="Plan-Umlaufzeit (Min.)"
+                    help="Initialer Zeitwert eines vollständigen Umlaufs für die Prognose."
+                  />
                   <input
                     type="number"
                     min="1"
@@ -5435,7 +5560,10 @@ function AdminView() {
                   />
                 </label>
                 <label>
-                  Kompatible Typen (kommagetrennt)
+                  <FieldLabel
+                    label="Kompatible Typen"
+                    help="Optional zulässige Flugzeugtypen, durch Kommas getrennt. Leer bedeutet keine Typbeschränkung."
+                  />
                   <input
                     value={resourceCompatibleTypes}
                     onChange={(event) => setResourceCompatibleTypes(event.target.value)}
@@ -5481,7 +5609,10 @@ function AdminView() {
               <fieldset hidden={masterDataCategory !== "aircraft"}>
                 <legend>Flugzeug</legend>
                 <label>
-                  Kennzeichen
+                  <FieldLabel
+                    label="Kennzeichen"
+                    help="Eindeutiges operatives Luftfahrzeugkennzeichen, beispielsweise D-EXYZ."
+                  />
                   <input
                     value={aircraftRegistration}
                     maxLength={16}
@@ -5489,14 +5620,20 @@ function AdminView() {
                   />
                 </label>
                 <label>
-                  Flugzeugtyp
+                  <FieldLabel
+                    label="Flugzeugtyp"
+                    help="Typbezeichnung zur Prüfung gegen kompatible Ressourcengruppen."
+                  />
                   <input
                     value={aircraftType}
                     onChange={(event) => setAircraftType(event.target.value)}
                   />
                 </label>
                 <label>
-                  Passagierplätze
+                  <FieldLabel
+                    label="Passagierplätze"
+                    help="Maximale Ticketanzahl je Umlauf; Besatzungsplätze werden hier nicht eingetragen."
+                  />
                   <input
                     type="number"
                     min="1"
@@ -5506,7 +5643,10 @@ function AdminView() {
                   />
                 </label>
                 <label>
-                  Max. Passagierzuladung (kg, optional)
+                  <FieldLabel
+                    label="Max. Passagierzuladung (kg)"
+                    help="Optionaler organisatorischer Hinweiswert. Er besitzt keine Freigabe- oder Sicherheitssemantik."
+                  />
                   <input
                     type="number"
                     min="1"
@@ -5554,7 +5694,10 @@ function AdminView() {
               <fieldset hidden={masterDataCategory !== "assignments"}>
                 <legend>Historisierte Zuordnung</legend>
                 <label>
-                  Flugzeug
+                  <FieldLabel
+                    label="Flugzeug"
+                    help="Flugzeug, dessen aktive Ressourcengruppenzuordnung geändert werden soll."
+                  />
                   <select
                     value={assignmentAircraftId}
                     onChange={(event) => setAssignmentAircraftId(event.target.value)}
@@ -5568,7 +5711,10 @@ function AdminView() {
                   </select>
                 </label>
                 <label>
-                  Neue Ressourcengruppe
+                  <FieldLabel
+                    label="Neue Ressourcengruppe"
+                    help="Zielgruppe der neuen historisierten Zuordnung. Ein Flugzeug kann gleichzeitig nur einer aktiven Gruppe angehören."
+                  />
                   <select
                     value={assignmentResourceGroupId}
                     onChange={(event) => setAssignmentResourceGroupId(event.target.value)}
@@ -5649,7 +5795,10 @@ function AdminView() {
             </div>
             <div className="parameter-grid compact-editor-grid">
               <label>
-                Operativer Pilotencode
+                <FieldLabel
+                  label="Operativer Pilotencode"
+                  help="Anonymer technischer Code für die operative Zuordnung; keine Namen oder Lizenzdaten erfassen."
+                />
                 <input
                   aria-label="Operativer Pilotencode"
                   value={pilotCode}
@@ -5660,7 +5809,10 @@ function AdminView() {
                 </span>
               </label>
               <label>
-                Organisatorische Bemerkung
+                <FieldLabel
+                  label="Organisatorische Bemerkung"
+                  help="Optionaler nicht personenbezogener Hinweis, zum Beispiel Einsatzbereich oder Schicht."
+                />
                 <input
                   value={pilotNote}
                   onChange={(event) => setPilotNote(event.target.value)}
@@ -5862,7 +6014,10 @@ function AdminView() {
           <section className="admin-section" hidden={adminArea !== "operations"}>
             <h2>Betriebs- und Wetterhinweise</h2>
             <label>
-              Organisatorischer Hinweis
+              <FieldLabel
+                label="Organisatorischer Hinweis"
+                help="Öffentlich sichtbare Information ohne automatische Auswirkung auf Verkauf oder Flugbetrieb."
+              />
               <input
                 value={operationalNotice}
                 maxLength={240}
@@ -5896,6 +6051,12 @@ function AdminView() {
             <h2>Kapazität und Verkaufsempfehlung</h2>
             <LocalizedDateTimeInput
               label="Neuer harter Verkaufsschluss"
+              labelContent={
+                <FieldLabel
+                  label="Neuer harter Verkaufsschluss"
+                  help="Nach diesem lokalen Zeitpunkt werden für das gewählte Produkt keine neuen Verkäufe akzeptiert."
+                />
+              }
               value={saleClosesAt}
               onChange={setSaleClosesAt}
             />
@@ -6039,7 +6200,10 @@ function AdminView() {
               ))}
             </div>
             <label className="threshold-input">
-              Umläufe bis Tank-Erinnerung
+              <FieldLabel
+                label="Umläufe bis Tank-Erinnerung"
+                help="Rein organisatorischer Erinnerungswert je Flugzeug; keine Kraftstoff- oder Freigabeentscheidung."
+              />
               <input
                 type="number"
                 min={1}
@@ -6114,7 +6278,10 @@ function AdminView() {
                 </span>
               </div>
               <label>
-                Begründung
+                <FieldLabel
+                  label="Begründung"
+                  help="Wird nur beim Widerruf einer Gerätebindung verlangt und dauerhaft auditiert."
+                />
                 <input
                   onChange={(event) => setReason(event.target.value)}
                   placeholder="Für einen Widerruf"
@@ -6124,14 +6291,20 @@ function AdminView() {
             </div>
             <div className="device-pairing-form">
               <label>
-                Technische Gerätebezeichnung
+                <FieldLabel
+                  label="Technische Gerätebezeichnung"
+                  help="Erkennbare, nicht personenbezogene Bezeichnung wie „Kasse Eingang“ oder „Flight Line 2“."
+                />
                 <input
                   value={deviceLabel}
                   onChange={(event) => setDeviceLabel(event.target.value)}
                 />
               </label>
               <label>
-                Feste Rolle
+                <FieldLabel
+                  label="Feste Rolle"
+                  help="Legt die Berechtigungen dieses Geräts dauerhaft fest. Eine spätere Änderung erfordert eine neue Kopplung."
+                />
                 <select
                   value={deviceRole}
                   onChange={(event) => setDeviceRole(event.target.value as typeof deviceRole)}
@@ -6236,12 +6409,29 @@ function AdminView() {
                     ? "Prognosen filtern"
                     : "Audit-Ereignisse filtern"}
               </legend>
-              <LocalizedDateTimeInput label="Von" value={historySince} onChange={setHistorySince} />
-              <LocalizedDateTimeInput label="Bis" value={historyUntil} onChange={setHistoryUntil} />
+              <LocalizedDateTimeInput
+                label="Von"
+                labelContent={
+                  <FieldLabel label="Von" help="Optionaler Beginn des ausgewerteten Zeitraums." />
+                }
+                value={historySince}
+                onChange={setHistorySince}
+              />
+              <LocalizedDateTimeInput
+                label="Bis"
+                labelContent={
+                  <FieldLabel label="Bis" help="Optionales Ende des ausgewerteten Zeitraums." />
+                }
+                value={historyUntil}
+                onChange={setHistoryUntil}
+              />
               {historyView === "AUDIT" ? (
                 <>
                   <label>
-                    Ereignistyp
+                    <FieldLabel
+                      label="Ereignistyp"
+                      help="Technischer Audit-Ereignisname, beispielsweise TICKET_NO_SHOW. Leer zeigt alle Typen."
+                    />
                     <input
                       value={historyEventType}
                       onChange={(event) => setHistoryEventType(event.target.value)}
@@ -6249,7 +6439,10 @@ function AdminView() {
                     />
                   </label>
                   <label>
-                    Bezugsart
+                    <FieldLabel
+                      label="Bezugsart"
+                      help="Art des betroffenen Objekts, beispielsweise ROTATION, TICKET oder PRODUCT."
+                    />
                     <input
                       value={historyAggregateType}
                       onChange={(event) => setHistoryAggregateType(event.target.value)}
@@ -6257,7 +6450,10 @@ function AdminView() {
                     />
                   </label>
                   <label>
-                    Bezugs-ID
+                    <FieldLabel
+                      label="Bezugs-ID"
+                      help="Interne anonyme Kennung eines bestimmten Objekts zur gezielten Nachverfolgung."
+                    />
                     <input
                       value={historyAggregateId}
                       onChange={(event) => setHistoryAggregateId(event.target.value)}
@@ -6268,7 +6464,10 @@ function AdminView() {
               ) : (
                 <>
                   <label>
-                    Flugzeug
+                    <FieldLabel
+                      label="Flugzeug"
+                      help="Begrenzt Betriebs- oder Prognoseeinträge auf ein Flugzeug."
+                    />
                     <select
                       value={historyAircraftId}
                       onChange={(event) => setHistoryAircraftId(event.target.value)}
@@ -6282,7 +6481,10 @@ function AdminView() {
                     </select>
                   </label>
                   <label>
-                    Pilotencode
+                    <FieldLabel
+                      label="Pilotencode"
+                      help="Begrenzt die Ansicht auf einen anonymen operativen Pilotencode."
+                    />
                     <select
                       value={historyPilotId}
                       onChange={(event) => setHistoryPilotId(event.target.value)}
@@ -6296,7 +6498,10 @@ function AdminView() {
                     </select>
                   </label>
                   <label>
-                    Umlauf-ID
+                    <FieldLabel
+                      label="Umlauf-ID"
+                      help="Interne Kennung eines konkreten Umlaufs; leer zeigt alle Umläufe."
+                    />
                     <input
                       value={historyRotationId}
                       onChange={(event) => setHistoryRotationId(event.target.value)}
@@ -6306,7 +6511,10 @@ function AdminView() {
                   {historyView === "OPERATIONS" ? (
                     <>
                       <label>
-                        Ticketstatus
+                        <FieldLabel
+                          label="Ticketstatus"
+                          help="Filtert nach dem aktuellen oder protokollierten anonymen Ticketzustand."
+                        />
                         <select
                           value={historyTicketStatus}
                           onChange={(event) => setHistoryTicketStatus(event.target.value)}
@@ -6331,7 +6539,10 @@ function AdminView() {
                         </select>
                       </label>
                       <label>
-                        Produkt
+                        <FieldLabel
+                          label="Produkt"
+                          help="Begrenzt die Betriebshistorie auf ein Produkt."
+                        />
                         <select
                           value={historyProductId}
                           onChange={(event) => setHistoryProductId(event.target.value)}
@@ -6345,7 +6556,10 @@ function AdminView() {
                         </select>
                       </label>
                       <label>
-                        Ressourcengruppe
+                        <FieldLabel
+                          label="Ressourcengruppe"
+                          help="Begrenzt die Betriebshistorie auf die gemeinsame operative Queue."
+                        />
                         <select
                           value={historyResourceGroupId}
                           onChange={(event) => setHistoryResourceGroupId(event.target.value)}
@@ -6359,7 +6573,10 @@ function AdminView() {
                         </select>
                       </label>
                       <label>
-                        Slotnummer
+                        <FieldLabel
+                          label="Fluggruppennummer"
+                          help="Stabile öffentliche Kommunikationsnummer der Fluggruppe, keine garantierte Uhrzeit."
+                        />
                         <input
                           min="1"
                           type="number"
@@ -6368,7 +6585,10 @@ function AdminView() {
                         />
                       </label>
                       <label>
-                        Ticket-ID
+                        <FieldLabel
+                          label="Ticket-ID"
+                          help="Interne anonyme Ticketkennung; nicht der öffentliche QR-Code."
+                        />
                         <input
                           value={historyTicketId}
                           onChange={(event) => setHistoryTicketId(event.target.value)}
@@ -6376,7 +6596,10 @@ function AdminView() {
                         />
                       </label>
                       <label>
-                        Ticketgruppe
+                        <FieldLabel
+                          label="Ticketgruppe"
+                          help="Interne anonyme Kennung einer gemeinsam gebuchten und untrennbaren Gruppe."
+                        />
                         <input
                           value={historyTicketGroupId}
                           onChange={(event) => setHistoryTicketGroupId(event.target.value)}
@@ -6728,7 +6951,10 @@ function AdminView() {
                   </ul>
                 </div>
                 <label>
-                  Begründung
+                  <FieldLabel
+                    label="Begründung"
+                    help="Dokumentiert, warum der vollständige Werksreset ausgeführt wird."
+                  />
                   <textarea
                     maxLength={240}
                     onChange={(event) => setFactoryResetReason(event.target.value)}
@@ -6737,7 +6963,10 @@ function AdminView() {
                   />
                 </label>
                 <label>
-                  Administrator-PIN
+                  <FieldLabel
+                    label="Administrator-PIN"
+                    help="Bestätigt die Berechtigung für diesen irreversiblen Vorgang. Die PIN wird nicht protokolliert."
+                  />
                   <input
                     autoComplete="current-password"
                     onChange={(event) => setFactoryResetPin(event.target.value)}
@@ -6746,7 +6975,10 @@ function AdminView() {
                   />
                 </label>
                 <label>
-                  Zum Bestätigen <strong>WERKSZUSTAND</strong> eingeben
+                  <FieldLabel
+                    label="Sicherheitsbestätigung"
+                    help="Zum Schutz vor versehentlicher Ausführung muss WERKSZUSTAND vollständig eingegeben werden."
+                  />
                   <input
                     autoComplete="off"
                     onChange={(event) => setFactoryResetConfirmation(event.target.value)}

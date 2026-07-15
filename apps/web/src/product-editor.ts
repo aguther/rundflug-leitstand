@@ -40,6 +40,14 @@ export function toggleWeightClass(
     : captured.filter((entry) => entry !== weightClass);
 }
 
+export function weightClassesForChildCompanion(
+  current: string[],
+  enabled: boolean,
+): ProductWeightClass[] {
+  if (!enabled || current.includes("CHILD")) return current as ProductWeightClass[];
+  return toggleWeightClass(current, "CHILD", true);
+}
+
 export interface SortableProduct {
   id: string;
   name: string;
