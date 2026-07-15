@@ -122,7 +122,9 @@ npm run cloudflare:configure-push
 
 Das Kommando erzeugt das P-256-Schlüsselpaar ausschließlich im Arbeitsspeicher und überträgt
 `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` und `VAPID_SUBJECT` gemeinsam über Wrangler. Der private
-Schlüssel wird weder angezeigt noch in eine Datei geschrieben. Als Betreiberkontakt wird eine
+Schlüssel wird weder angezeigt noch in eine Datei geschrieben. Anschließend liest das Kommando
+ausschließlich die Secret-Namen von Cloudflare zurück und bricht ab, falls einer der drei Einträge
+fehlt; Secret-Werte werden dabei nicht gelesen oder angezeigt. Als Betreiberkontakt wird eine
 `mailto:`- oder `https:`-Adresse akzeptiert. Eine erneute Ausführung ersetzt das Schlüsselpaar;
 bereits registrierte Browser müssen Web-Push danach erneut aktivieren.
 

@@ -16,7 +16,7 @@ Zuletzt erfolgreich am 15. Juli 2026, parallel zum isolierten 12-Stunden-Langlau
 
 - Biome-Prüfung von 140 Dateien,
 - TypeScript-Prüfung aller sechs Workspaces,
-- 50 Testdateien mit 240 Tests,
+- 50 Testdateien mit 241 Tests,
 - React-/PWA-Produktionsbuild einschließlich Service Worker,
 - Cloudflare-Worker-Dry-Run mit D1-, Durable-Object-, R2- und Rate-Limit-Bindings,
 - 15 sequenziell ausgeführte Worker-/D1-Integrationssuiten für die zentralen V1-Abläufe,
