@@ -95,11 +95,14 @@ Detailnachweise liegen thematisch in diesem Verzeichnis, unter anderem:
   Projektcheck löste im isolierten Worker keinen Neustart aus.
 - Q-ZUV-060: Der 12-Stunden-Monitor der zentralen Cloudflare-Umgebung wurde am 14. Juli 2026 mit
   720/720 verfügbaren Intervallen und 100 Prozent erfolgreich abgeschlossen.
-- D1-Migrationen 0030 und 0031 wurden am 15. Juli 2026 erfolgreich in der zentralen Umgebung
+- D1-Migrationen 0030 bis 0032 wurden am 15. Juli 2026 erfolgreich in der zentralen Umgebung
   angewendet. Vorher wurde ein D1-Export unter
   `migration-backups/2026-07-15/pre-0030-0031-20260715-000428.sql` im EU-R2-Bucket abgelegt und per
-  SHA-256-Rückprüfung verifiziert. Wrangler meldet anschließend `No migrations to apply`; Health,
-  Setup, öffentliches FIDS und Administration antworteten jeweils mit HTTP 200.
+  SHA-256-Rückprüfung verifiziert. Unmittelbar vor 0032 wurde zusätzlich
+  `migration-backups/2026-07-15/pre-0032-20260715-111305.sql` mit 72.746 Byte und SHA-256
+  `F58B39175882C37D3FCE0EF05CF4CA1BDE6C3F4D9C5BC3AFCD8D8D4BBCB6FCB4` im EU-R2-Bucket
+  gesichert. Die anschließende Remote-Abfrage bestätigte den kontrollierten Reset-Trigger und
+  `No migrations to apply`; Health, Setup und Administration antworteten jeweils mit HTTP 200.
 - Der öffentliche Web-Push-Konfigurationsendpunkt der zentralen Umgebung antwortete am 15. Juli
   2026 noch mit `503 PUSH_NOT_CONFIGURED`. Die Anwendung unterstützt Web-Push vollständig, für den
   realen Betrieb müssen jedoch noch die VAPID-Secrets mit `npm run cloudflare:configure-push`
