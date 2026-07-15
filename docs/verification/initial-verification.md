@@ -14,9 +14,9 @@ npm run check
 
 Zuletzt erfolgreich am 15. Juli 2026, parallel zum isolierten 12-Stunden-Langlauf:
 
-- Biome-Prüfung von 135 Dateien,
+- Biome-Prüfung von 136 Dateien,
 - TypeScript-Prüfung aller sechs Workspaces,
-- 48 Testdateien mit 229 Tests,
+- 49 Testdateien mit 231 Tests,
 - React-/PWA-Produktionsbuild einschließlich Service Worker,
 - Cloudflare-Worker-Dry-Run mit D1-, Durable-Object-, R2- und Rate-Limit-Bindings,
 - isolierter Backup-Restore mit Prüfsumme und Fremdschlüsseln,
@@ -31,7 +31,9 @@ Die Tests decken insbesondere ab:
 - Offline-Wiederanlauf, Notbetrieb und Realtime-Verteilung,
 - Stammdaten, Administrationsgeräte, Setup, Neustart und Werkszustand,
 - öffentliche Monitore, Ticketstatus, Web-Push-Verträge und Zugriffsbegrenzung,
-- Backup/Restore, Berichte, Transport-Sicherheit und EU-Adapterkonfiguration.
+- Backup/Restore, Berichte, Transport-Sicherheit und EU-Adapterkonfiguration,
+- vollständiger SQL-Migrationsguard gegen Gast-/Passagiernamen, Telefon-/Kontaktfelder und
+  im Klartext gespeicherte öffentliche Ticketcodes.
 
 Detailnachweise liegen thematisch in diesem Verzeichnis, unter anderem:
 
