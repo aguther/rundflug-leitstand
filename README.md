@@ -69,6 +69,15 @@ Die aktuell verwendete D1-Datenbank und der R2-Bucket sind in `wrangler.jsonc` g
 Ressourcen müssen in EU-Jurisdiktion liegen. Die vollständige Anleitung steht in
 `docs/operations/cloudflare-setup.md`.
 
+Die für V1 erforderliche, telefonnummernfreie Browser-Benachrichtigung wird sicher eingerichtet mit:
+
+```bash
+npm run cloudflare:configure-push
+```
+
+Das Kommando erzeugt den privaten VAPID-Schlüssel nur im Arbeitsspeicher und überträgt ihn ohne
+Ausgabe direkt als Cloudflare-Secret.
+
 Den Remote-Migrationsstand zeigt ausschließlich lesend:
 
 ```bash

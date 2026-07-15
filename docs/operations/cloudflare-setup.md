@@ -113,24 +113,29 @@ denselben Einrichtungscode und die zur Hashbildung verwendete Administrator-PIN 
 Leitstand erzeugt das erste anonyme Administrationsgerät im Browser und sperrt den Setup-Endpunkt
 anschließend dauerhaft. Demo-Seeds dürfen hierfür nicht verwendet werden.
 
-Für Web-Push ein eigenes VAPID-Schlüsselpaar je Umgebung erzeugen. Die Ausgabe enthält den privaten
-Schlüssel und darf nicht in Tickets, Chats oder Logs kopiert werden:
+Für Web-Push ein eigenes VAPID-Schlüsselpaar erzeugen und zusammen mit einem erreichbaren
+Betreiberkontakt als Cloudflare-Secrets setzen:
 
 ```bash
-npx web-push generate-vapid-keys --json
+npm run cloudflare:configure-push
 ```
 
-Die drei Werte anschließend interaktiv als Cloudflare-Secrets setzen. Als `VAPID_SUBJECT` eine
-erreichbare Betreiberadresse im Format `mailto:adresse@example.de` verwenden:
-
-```bash
-npx wrangler secret put VAPID_PUBLIC_KEY
-npx wrangler secret put VAPID_PRIVATE_KEY
-npx wrangler secret put VAPID_SUBJECT
-```
+Das Kommando erzeugt das P-256-Schlüsselpaar ausschließlich im Arbeitsspeicher und überträgt
+`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` und `VAPID_SUBJECT` gemeinsam über Wrangler. Der private
+Schlüssel wird weder angezeigt noch in eine Datei geschrieben. Als Betreiberkontakt wird eine
+`mailto:`- oder `https:`-Adresse akzeptiert. Eine erneute Ausführung ersetzt das Schlüsselpaar;
+bereits registrierte Browser müssen Web-Push danach erneut aktivieren.
 
 Beim späteren Übergang auf getrennte Cloudflare-Umgebungen ein neues Schlüsselpaar für Produktion
 erzeugen. Der private Schlüssel gehört niemals in `wrangler.jsonc`, `.env.example` oder D1.
+
+Nach der Einrichtung muss der öffentliche Konfigurationsendpunkt HTTP 200 liefern:
+
+```bash
+curl -i https://<worker-domain>/api/public/push/config
+```
+
+Eine Antwort `503 PUSH_NOT_CONFIGURED` bedeutet, dass Web-Push noch nicht betriebsbereit ist.
 
 Geräte werden über zufällige Kopplungstokens authentisiert; ausschließlich deren SHA-256-Hashes werden
 in D1 gespeichert. Demo-Tokens aus dem lokalen Seed dürfen nicht in Acceptance oder Produktion

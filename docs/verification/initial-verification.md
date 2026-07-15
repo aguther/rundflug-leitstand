@@ -14,9 +14,9 @@ npm run check
 
 Zuletzt erfolgreich am 15. Juli 2026, parallel zum isolierten 12-Stunden-Langlauf:
 
-- Biome-Prüfung von 137 Dateien,
+- Biome-Prüfung von 140 Dateien,
 - TypeScript-Prüfung aller sechs Workspaces,
-- 49 Testdateien mit 234 Tests,
+- 50 Testdateien mit 236 Tests,
 - React-/PWA-Produktionsbuild einschließlich Service Worker,
 - Cloudflare-Worker-Dry-Run mit D1-, Durable-Object-, R2- und Rate-Limit-Bindings,
 - 15 sequenziell ausgeführte Worker-/D1-Integrationssuiten für die zentralen V1-Abläufe,
@@ -83,6 +83,10 @@ Detailnachweise liegen thematisch in diesem Verzeichnis, unter anderem:
   `migration-backups/2026-07-15/pre-0030-0031-20260715-000428.sql` im EU-R2-Bucket abgelegt und per
   SHA-256-Rückprüfung verifiziert. Wrangler meldet anschließend `No migrations to apply`; Health,
   Setup, öffentliches FIDS und Administration antworteten jeweils mit HTTP 200.
+- Der öffentliche Web-Push-Konfigurationsendpunkt der zentralen Umgebung antwortete am 15. Juli
+  2026 noch mit `503 PUSH_NOT_CONFIGURED`. Die Anwendung unterstützt Web-Push vollständig, für den
+  realen Betrieb müssen jedoch noch die VAPID-Secrets mit `npm run cloudflare:configure-push`
+  gesetzt und anschließend auf einem echten Besuchergerät geprüft werden.
 
 Ergebnisse dürfen erst nach vollständigem, erfolgreichem Abschluss in der Traceability als
 `umgesetzt` markiert werden.

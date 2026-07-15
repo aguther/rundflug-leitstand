@@ -13,8 +13,8 @@ zur Wiederherstellung erhalten.
    niemals in Dateien oder Logs schreiben.
 4. Nach dem ersten Deployment `/setup` öffnen und dort die erste Veranstaltung sowie das anonyme
    Administrationsgerät anlegen. Der Setup-Zugang sperrt sich danach dauerhaft.
-5. Für Web-Push die drei VAPID-Werte einrichten. Ohne diese Werte funktioniert der Leitstand, aber
-   Browser-Benachrichtigungen werden nicht zugestellt.
+5. Web-Push mit `npm run cloudflare:configure-push` einrichten. Ohne diese Werte funktioniert der
+   übrige Leitstand, aber die verbindliche V1-Browserbenachrichtigung ist nicht betriebsbereit.
 6. Healthcheck, Administrationsoberfläche, D1-Sicherung nach R2 und einen Wiederherstellungstest
    prüfen.
 
