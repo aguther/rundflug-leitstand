@@ -140,6 +140,32 @@ deren offenes Risiko. Geprüft wurde lokal mit synthetischem Seed gegen den real
   Prognosebegriffe statt interner Codes;
 - keine relevanten Browser-Konsolenfehler in den geprüften lokalen Abläufen.
 
+### Zusätzlicher Cloudflare-Chrome-Smoketest vom 15.07.2026
+
+Die bereitgestellte Anwendung unter `rundflug-leitstand.andreas-7f3.workers.dev` wurde mit einem
+bereits gekoppelten Administrationsgerät im realen Chrome-Browser ausschließlich lesend geprüft.
+Es wurden keine PIN und keine Stammdaten übermittelt. Der Test umfasste 1280 × 720 sowie eine
+simulierte mobile Breite von 430 × 900:
+
+- Administration und FIDS hatten keinen horizontalen Seitenüberlauf;
+- alle sichtbaren Schaltflächen und Links der geprüften Administration waren mindestens 44 px hoch
+  und breit;
+- das Produktformular zeigte Preis in Euro, verständliche Anzeigenposition und kontextbezogene
+  Informationen an allen fachlichen Feldern;
+- deaktivierte Begleitpflicht erklärte unmittelbar, dass sie erst nach Aktivierung der
+  Gewichtsklasse Kind verfügbar wird;
+- deutsche Datumsfelder verwendeten `TT.MM.JJJJ`, Zeitfelder das 24-Stunden-Format `HH:mm`;
+- der PIN-Dialog setzte den Fokus nach dem Öffnen in das Passwortfeld und war als
+  Enter-bestätigbares Formular umgesetzt;
+- Light und Dark Theme ließen sich umschalten; danach wurde der ursprüngliche Dark-Stand
+  wiederhergestellt;
+- das FIDS zeigte ausschließlich typische Bereiche und keine garantierten Uhrzeiten;
+- Browserkonsole und DOM zeigten keine relevanten Warnungen, Fehler oder Framework-Overlays.
+
+Die integrierte Chrome-Screenshotaufnahme lief trotz erfolgreicher DOM-, Layout- und
+Interaktionsprüfung in ein Zeitlimit. Deshalb ist dieser Lauf kein visueller Screenshotnachweis und
+weiterhin kein Ersatz für die nachfolgende Originalhardwarematrix.
+
 Offen und deshalb weiterhin ausdrücklich durch dieses Protokoll abzunehmen sind Originalhardware,
 Sonnenlichtkontrast, Safari/iPadOS, Chrome/Android, Edge/Windows, Web-Push auf realen Geräten und die
 selbstständige Bedienung durch Helfer nach höchstens zehn Minuten Einweisung.
