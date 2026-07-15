@@ -1,6 +1,7 @@
 # 12-Stunden-Zuverlässigkeitsnachweis V1
 
-Status: Harness implementiert und im Kurzlauf verifiziert; echter 12-Stunden-Abnahmelauf ausstehend.
+Status: Harness implementiert; neunstündiger stabiler Zwischenlauf vom Auftraggeber vorläufig
+akzeptiert, formaler 12-Stunden-Abnahmelauf weiterhin ausstehend.
 
 Betroffene Anforderung: Q-ZUV-050.
 
@@ -57,6 +58,24 @@ nicht verwendet.
 
 Q-ZUV-050 bleibt bis zu einem erfolgreichen ungekürzten Lauf mit mindestens 43.200 Sekunden in der
 Traceability auf `in Arbeit`.
+
+## Vorläufig akzeptierter Langlauf vom 15. Juli 2026
+
+Der auf einem unveränderlichen, isolierten Worker-Bundle gestartete Lauf wurde nach ausdrücklicher
+Akzeptanz des Auftraggebers kontrolliert beendet, weil der bis dahin erreichte Nachweis für den
+gegenwärtigen Entwicklungsstand als ausreichend bewertet wurde. Er erreichte ohne beobachteten
+Worker-Neustart:
+
+- 540 vollständige Zustandszyklen über 539,1 Minuten (knapp neun Stunden),
+- 2.700 erfolgreiche REST-Requests,
+- 1.080 Realtime-Zustandsänderungen und insgesamt 2.161 Realtime-Nachrichten,
+- p95 47,9 ms bei einer harten Zwei-Sekunden-Grenze je Request,
+- keine WebSocket-Wiederverbindung.
+
+Der Testprozess und sein isolierter Worker wurden anschließend kontrolliert beendet; Port 8797 war
+danach frei. Das Ergebnis ist ein belastbarer technischer Zwischenstand, aber kein stillschweigender
+Ersatz für die in Q-ZUV-050 geforderten zwölf Stunden. Die Traceability bleibt deshalb bis zu einer
+späteren vollständigen Abnahme auf `in Arbeit`.
 
 ## Fehlgeschlagener Abnahmelauf vom 14. Juli 2026
 

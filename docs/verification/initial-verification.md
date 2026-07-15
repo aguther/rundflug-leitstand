@@ -88,11 +88,12 @@ Detailnachweise liegen thematisch in diesem Verzeichnis, unter anderem:
 
 - BP-12: Der automatisierte V1-Abnahmetag mit drei Flugzeugen, zwei Ressourcengruppen, drei
   Produkten, 60 Tickets und 20 vollständigen Umläufen wurde erfolgreich abgeschlossen.
-- Q-ZUV-050: Nach einem nicht verwertbaren, vom ausführenden Prozess getrennten Start läuft der
-  überwachte ungekürzte 12-Stunden-Langlauf seit 15. Juli 2026, 05:54 Uhr. Ein unmittelbar zuvor
-  ausgeführter 30-Sekunden-Kontrolllauf bestand 15 Zyklen, 75 Requests und 30
-  Realtime-Zustandsänderungen ohne Trennung oder Worker-Neustart. Der parallele vollständige
-  Projektcheck löste im isolierten Worker keinen Neustart aus.
+- Q-ZUV-050: Der überwachte Langlauf auf dem isolierten, unveränderlichen Worker-Bundle erreichte am
+  15. Juli 2026 insgesamt 540 Zyklen über 539,1 Minuten, 2.700 erfolgreiche Requests, 1.080
+  Realtime-Zustandsänderungen, p95 47,9 ms und keine Wiederverbindung. Der Auftraggeber akzeptierte
+  diesen knapp neunstündigen Lauf ausdrücklich als ausreichenden Zwischenstand; Test und Worker
+  wurden danach kontrolliert beendet. Da die geforderten zwölf Stunden nicht vollständig erreicht
+  wurden, bleibt Q-ZUV-050 formal auf `in Arbeit`.
 - Q-ZUV-060: Der 12-Stunden-Monitor der zentralen Cloudflare-Umgebung wurde am 14. Juli 2026 mit
   720/720 verfügbaren Intervallen und 100 Prozent erfolgreich abgeschlossen.
 - D1-Migrationen 0030 bis 0032 wurden am 15. Juli 2026 erfolgreich in der zentralen Umgebung
