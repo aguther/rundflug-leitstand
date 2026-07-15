@@ -120,6 +120,12 @@ Betreiberkontakt als Cloudflare-Secrets setzen:
 npm run cloudflare:configure-push
 ```
 
+Ohne interaktives Terminal kann stattdessen eine öffentliche Betreiber-URL gesetzt werden:
+
+```bash
+npm run cloudflare:configure-push -- --subject https://<worker-domain>/
+```
+
 Das Kommando erzeugt das P-256-Schlüsselpaar ausschließlich im Arbeitsspeicher und überträgt
 `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` und `VAPID_SUBJECT` gemeinsam über Wrangler. Der private
 Schlüssel wird weder angezeigt noch in eine Datei geschrieben. Anschließend liest das Kommando

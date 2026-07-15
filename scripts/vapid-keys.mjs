@@ -21,6 +21,21 @@ export function validateVapidSubject(value) {
   throw new Error("VAPID_SUBJECT muss eine mailto:- oder https:-Adresse sein.");
 }
 
+export function readVapidSubjectArgument(args) {
+  const inline = args.filter((entry) => entry.startsWith("--subject="));
+  const positions = args.flatMap((entry, index) => (entry === "--subject" ? [index] : []));
+  if (inline.length + positions.length > 1) {
+    throw new Error("VAPID_SUBJECT darf nur einmal angegeben werden.");
+  }
+  if (inline.length === 1) return validateVapidSubject(inline[0].slice("--subject=".length));
+  if (positions.length === 0) return null;
+  const value = args[positions[0] + 1];
+  if (!value || value.startsWith("--")) {
+    throw new Error("Nach --subject wird eine mailto:- oder https:-Adresse benötigt.");
+  }
+  return validateVapidSubject(value);
+}
+
 export function generateVapidKeyPair() {
   const { privateKey, publicKey } = generateKeyPairSync("ec", {
     namedCurve: "prime256v1",
