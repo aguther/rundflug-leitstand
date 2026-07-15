@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  clearFactoryResetCoordinators,
   emptyBackupBucket,
   FACTORY_RESET_DELETE_TABLES,
   factoryResetRequestHash,
@@ -61,5 +62,30 @@ describe("factory reset", () => {
     expect(list).toHaveBeenNthCalledWith(2, { cursor: "next-page" });
     expect(remove).toHaveBeenNthCalledWith(1, ["backups/one.json", "reports/one.csv"]);
     expect(remove).toHaveBeenNthCalledWith(2, ["backups/two.json"]);
+  });
+
+  it("clears many historical event coordinators without concurrent subrequests", async () => {
+    let activeRequests = 0;
+    let maximumActiveRequests = 0;
+    const cleared: string[] = [];
+    const namespace = {
+      idFromName: (eventId: string) => eventId,
+      get: (eventId: string) => ({
+        fetch: async () => {
+          activeRequests += 1;
+          maximumActiveRequests = Math.max(maximumActiveRequests, activeRequests);
+          await Promise.resolve();
+          cleared.push(eventId);
+          activeRequests -= 1;
+          return new Response(null, { status: 204 });
+        },
+      }),
+    };
+    const eventIds = Array.from({ length: 62 }, (_, index) => `synthetic-history-${index + 1}`);
+
+    await clearFactoryResetCoordinators(namespace as unknown as DurableObjectNamespace, eventIds);
+
+    expect(cleared).toEqual(eventIds);
+    expect(maximumActiveRequests).toBe(1);
   });
 });

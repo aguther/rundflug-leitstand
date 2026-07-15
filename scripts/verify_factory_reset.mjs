@@ -12,12 +12,44 @@ const reset = spawnSync(process.execPath, [npmCli, "run", "db:reset:local"], {
 });
 if (reset.status !== 0) throw new Error("Lokale Testdatenbank konnte nicht initialisiert werden.");
 
+const wrangler = resolve(root, "node_modules", "wrangler", "bin", "wrangler.js");
+const forecastFixture = spawnSync(
+  process.execPath,
+  [
+    wrangler,
+    "d1",
+    "execute",
+    "DB",
+    "--local",
+    "--config",
+    "wrangler.jsonc",
+    "--command",
+    `INSERT INTO flight_groups
+      (id, operation_day_id, resource_group_id, communication_number, status, version, created_at, updated_at)
+     VALUES ('factory-reset-flight-group', 'demo-2026', 'rg-panorama', 999, 'PLANNED', 0,
+             '2026-07-11T09:00:00.000Z', '2026-07-11T09:00:00.000Z');
+     INSERT INTO rotations
+      (id, operation_day_id, flight_group_id, aircraft_id, status, version, created_at, updated_at)
+     VALUES ('factory-reset-rotation', 'demo-2026', 'factory-reset-flight-group', 'aircraft-a',
+             'PLANNED', 0, '2026-07-11T09:00:00.000Z', '2026-07-11T09:00:00.000Z');
+     INSERT INTO forecast_snapshots
+      (id, operation_day_id, rotation_id, operation_day_version, captured_at, quality,
+       lower_minutes, upper_minutes)
+     VALUES ('factory-reset-forecast', 'demo-2026', 'factory-reset-rotation', 0,
+             '2026-07-11T09:00:00.000Z', 'STABLE', 10, 20);`,
+  ],
+  { cwd: root, stdio: "ignore" },
+);
+if (forecastFixture.status !== 0) {
+  throw new Error("Prognosehistorie für den Werksreset-Test konnte nicht angelegt werden.");
+}
+
 const pin = String.fromCharCode(48).repeat(4);
 const setupCode = ["synthetic", "factory", "reset", "setup", "code"].join("-");
 const server = spawn(
   process.execPath,
   [
-    resolve(root, "node_modules", "wrangler", "bin", "wrangler.js"),
+    wrangler,
     "dev",
     "--config",
     "wrangler.jsonc",
@@ -105,6 +137,7 @@ try {
     JSON.stringify({
       resetComplete: true,
       recoveryBackupCreated: true,
+      forecastHistoryDeleted: true,
       duplicateResetIdempotent: true,
       setupRequiredAfterReset: true,
       setupCompletedAgain: true,

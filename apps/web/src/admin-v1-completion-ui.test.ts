@@ -75,4 +75,9 @@ describe("V1 administration completion UI", () => {
     }
     expect(appSource).toContain("Endgültig löschen");
   });
+
+  it("finishes a factory reset even when no service worker is registered", () => {
+    expect(appSource).toContain("await navigator.serviceWorker?.getRegistration()");
+    expect(appSource).toContain('window.location.replace("/setup")');
+  });
 });

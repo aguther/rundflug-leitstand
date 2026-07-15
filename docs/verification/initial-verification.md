@@ -16,7 +16,7 @@ Zuletzt erfolgreich am 15. Juli 2026, parallel zum isolierten 12-Stunden-Langlau
 
 - Biome-Prüfung von 140 Dateien,
 - TypeScript-Prüfung aller sechs Workspaces,
-- 50 Testdateien mit 241 Tests,
+- 50 Testdateien mit 243 Tests,
 - React-/PWA-Produktionsbuild einschließlich Service Worker,
 - Cloudflare-Worker-Dry-Run mit D1-, Durable-Object-, R2- und Rate-Limit-Bindings,
 - 15 sequenziell ausgeführte Worker-/D1-Integrationssuiten für die zentralen V1-Abläufe,
@@ -54,6 +54,12 @@ Am 15. Juli 2026 wurde die Stammdatenpflege zusätzlich im lokalen Browser mit s
 - kontextuelle, aufklappbare Feldhilfe im Produkteditor,
 - Dark-Mode-Kontrast sowie Desktop- und 430-Pixel-Mobilansicht ohne horizontalen Überlauf,
 - keine Browserwarnung, kein Konsolenfehler und kein Framework-Overlay während der CRUD-Probe.
+
+Der vollständige Werksreset wurde ebenfalls über den realen Admin-Dialog geprüft. Er erstellt die
+Wiederherstellungssicherung, löscht auch vorhandene Prognosehistorien innerhalb des kontrollierten
+Reset-Batches, entfernt die lokale anonyme Gerätebindung und leitet anschließend ohne registrierten
+Service Worker und ohne Konsolenfehler zwingend zu `/setup` weiter. Der lokale synthetische
+Demo-Stand wurde nach der Prüfung wiederhergestellt.
 
 Die Administration unterscheidet außerdem einen eingerichteten Web-Push-Dienst, eine noch fehlende
 VAPID-Konfiguration und einen nicht erreichbaren Konfigurationsendpunkt. Bei fehlenden Secrets zeigt
