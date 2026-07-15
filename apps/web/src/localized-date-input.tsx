@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 
 type LocalizedInputProps = {
   label: string;
+  labelContent?: ReactNode;
   value: string;
   onChange: (value: string) => void;
   dateLabel?: string;
@@ -161,13 +162,14 @@ function GermanTimeControl({
 
 export function LocalizedDateInput({
   label,
+  labelContent,
   value,
   onChange,
   dateLabel = "Datum im Format TT.MM.JJJJ",
 }: Omit<LocalizedInputProps, "timeLabel">) {
   return (
     <div className="localized-input-field">
-      <span>{label}</span>
+      <span>{labelContent ?? label}</span>
       <GermanDateControl ariaLabel={`${label}: ${dateLabel}`} onChange={onChange} value={value} />
     </div>
   );
@@ -175,6 +177,7 @@ export function LocalizedDateInput({
 
 export function LocalizedDateTimeInput({
   label,
+  labelContent,
   value,
   onChange,
   dateLabel = "Datum im Format TT.MM.JJJJ",
@@ -184,7 +187,7 @@ export function LocalizedDateTimeInput({
   const time = value.length >= 16 ? value.slice(11, 16) : "";
   return (
     <div className="localized-input-field">
-      <span>{label}</span>
+      <span>{labelContent ?? label}</span>
       <div className="localized-date-time">
         <GermanDateControl
           ariaLabel={`${label}: ${dateLabel}`}

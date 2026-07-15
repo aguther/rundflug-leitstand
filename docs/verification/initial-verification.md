@@ -14,11 +14,12 @@ npm run check
 
 Zuletzt erfolgreich am 15. Juli 2026, parallel zum isolierten 12-Stunden-Langlauf:
 
-- Biome-Prüfung von 136 Dateien,
+- Biome-Prüfung von 137 Dateien,
 - TypeScript-Prüfung aller sechs Workspaces,
-- 49 Testdateien mit 231 Tests,
+- 49 Testdateien mit 234 Tests,
 - React-/PWA-Produktionsbuild einschließlich Service Worker,
 - Cloudflare-Worker-Dry-Run mit D1-, Durable-Object-, R2- und Rate-Limit-Bindings,
+- 15 sequenziell ausgeführte Worker-/D1-Integrationssuiten für die zentralen V1-Abläufe,
 - isolierter Backup-Restore mit Prüfsumme und Fremdschlüsseln,
 - Architektur- und Dokumentationsprüfung,
 - 199 eindeutige Anforderungen sowie 176 zugeordnete V1-Anforderungen verifiziert.
@@ -34,6 +35,24 @@ Die Tests decken insbesondere ab:
 - Backup/Restore, Berichte, Transport-Sicherheit und EU-Adapterkonfiguration,
 - vollständiger SQL-Migrationsguard gegen Gast-/Passagiernamen, Telefon-/Kontaktfelder und
   im Klartext gespeicherte öffentliche Ticketcodes.
+
+## Browserprüfung der Administration
+
+Am 15. Juli 2026 wurde die Produktpflege zusätzlich im lokalen Browser mit synthetischen Daten
+geprüft:
+
+- Produktanlage mit deutschem Euro-Preisformat,
+- einmalige PIN-Abfrage mit automatischem Eingabefokus und Bestätigung per Eingabetaste,
+- anschließende protokollierte Speicherung und Anzeige in der Stammdatentabelle,
+- direkt bedienbarer Begleithinweis für Kinder mit automatischer Auswahl der Gewichtsklasse
+  `CHILD`,
+- kontextuelle, aufklappbare Feldhilfe im Produkteditor,
+- Dark-Mode-Kontrast sowie Desktop- und 430-Pixel-Mobilansicht ohne horizontalen Überlauf.
+
+Die produktübergreifenden Hilfetexte wurden außerdem als wiederverwendbare Feldkomponente in die
+sinnvollen Eingaben von Einrichtung, Stammdaten, Betrieb, Geräteverwaltung, Historie und Reset
+integriert. Die Hilfe bleibt standardmäßig geschlossen und überlagert den normalen Arbeitsablauf
+nicht.
 
 Detailnachweise liegen thematisch in diesem Verzeichnis, unter anderem:
 
