@@ -2445,8 +2445,9 @@ function FidsView() {
 
 function AdminView() {
   const { board, error, lastConfirmedAt, refresh } = useOperationBoard(ADMIN_DEVICE_ID);
-  const [adminArea, setAdminArea] = useState<AdminArea>("setup");
-  const [masterDataCategory, setMasterDataCategory] = useState<MasterDataCategory>("aircraft");
+  const [adminArea, setAdminArea] = useState<AdminArea>("master-data");
+  const [masterDataCategory, setMasterDataCategory] =
+    useState<MasterDataCategory>("resource-groups");
   const [reason, setReason] = useState("");
   const [adminPin, setAdminPinState] = useState("");
   const adminPinRef = useRef("");
@@ -2460,7 +2461,8 @@ function AdminView() {
   const [adminPinBusy, setAdminPinBusy] = useState(false);
   const pendingAdminActionRef = useRef<(() => Promise<void>) | null>(null);
   const adminPinInputRef = useRef<HTMLInputElement>(null);
-  const [masterEditorOpen, setMasterEditorOpen] = useState(false);
+  const [masterEditorOpen, setMasterEditorOpen] = useState(true);
+  const initialMasterSelectionRef = useRef(false);
   const [masterSubmitAttempted, setMasterSubmitAttempted] = useState(false);
   const [masterSearch, setMasterSearch] = useState("");
   const [pendingMasterDelete, setPendingMasterDelete] = useState<MasterDataDeleteTarget | null>(
@@ -2619,6 +2621,17 @@ function AdminView() {
     board?.rotations ?? [],
     selectedManifestCandidate,
   );
+
+  useEffect(() => {
+    if (initialMasterSelectionRef.current || adminArea !== "master-data" || !board) return;
+    initialMasterSelectionRef.current = true;
+    const entry = board.resourceGroups[0];
+    setResourceEditorId(entry?.id ?? "new");
+    setResourceName(entry?.name ?? "");
+    setResourceGateId(entry?.gateId ?? board.gates.find((gate) => gate.active)?.id ?? "");
+    setResourcePlannedMinutes(entry?.plannedRotationMinutes ?? 30);
+    setResourceAircraftIds(entry?.activeAircraftIds ?? []);
+  }, [adminArea, board]);
 
   useEffect(() => {
     if (!adminPinDialog && (!pendingMasterDelete || adminModeUnlocked)) return;
@@ -4083,6 +4096,13 @@ function AdminView() {
       .toLocaleLowerCase("de-DE")
       .includes(normalizedMasterSearch),
   );
+  const selectedResourceAircraft = (board?.aircraft ?? []).filter((aircraft) =>
+    resourceAircraftIds.includes(aircraft.id),
+  );
+  const selectedResourceCapacity = selectedResourceAircraft.reduce(
+    (maximum, aircraft) => Math.max(maximum, aircraft.passengerSeats),
+    0,
+  );
   const productPositionChoices = productPositionOptions(board?.products ?? [], productEditorId);
   const masterDataSingularLabel: Record<MasterDataCategory, string> = {
     gates: "Gate",
@@ -4106,24 +4126,28 @@ function AdminView() {
       <OperationalNotice note={board?.event.operationalNote} />
       <section className="admin-layout">
         <AdminNavigation activeArea={adminArea} onChange={setAdminArea} />
-        <div className="admin-workspace">
-          <header className="admin-page-header">
-            <div>
-              <h1>{adminAreaCopy[adminArea].title}</h1>
-              <p>{adminAreaCopy[adminArea].description}</p>
-            </div>
-            <span className={`event-phase ${board?.event.status.toLowerCase() ?? "unknown"}`}>
-              {board?.event.status === "ACTIVE"
-                ? "Betrieb aktiv"
-                : board?.event.status === "PREPARATION"
-                  ? "Betrieb noch nicht freigegeben"
-                  : board?.event.status === "CLOSED"
-                    ? "Betrieb geschlossen"
-                    : error
-                      ? "Stand nicht verfügbar"
-                      : "Stand wird geladen"}
-            </span>
-          </header>
+        <div
+          className={`admin-workspace ${adminArea === "master-data" ? "master-data-active" : ""}`}
+        >
+          {adminArea !== "master-data" ? (
+            <header className="admin-page-header">
+              <div>
+                <h1>{adminAreaCopy[adminArea].title}</h1>
+                <p>{adminAreaCopy[adminArea].description}</p>
+              </div>
+              <span className={`event-phase ${board?.event.status.toLowerCase() ?? "unknown"}`}>
+                {board?.event.status === "ACTIVE"
+                  ? "Betrieb aktiv"
+                  : board?.event.status === "PREPARATION"
+                    ? "Betrieb noch nicht freigegeben"
+                    : board?.event.status === "CLOSED"
+                      ? "Betrieb geschlossen"
+                      : error
+                        ? "Stand nicht verfügbar"
+                        : "Stand wird geladen"}
+              </span>
+            </header>
+          ) : null}
           {adminArea === "setup" ? (
             <SetupProgress onSelect={openSetupStep} steps={setupSteps} />
           ) : null}
@@ -4652,17 +4676,27 @@ function AdminView() {
               </p>
             )}
           </section>
+          <MasterDataNavigation
+            activeCategory={masterDataCategory}
+            counts={masterDataCounts}
+            onChange={(category) => {
+              setMasterDataCategory(category);
+              setMasterSearch("");
+              setMasterSubmitAttempted(false);
+              if (category === "gates") selectGateForEditing(board?.gates[0]?.id ?? "new");
+              if (category === "resource-groups") {
+                selectResourceForEditing(resourceGroups[0]?.id ?? "new");
+              }
+              if (category === "aircraft") {
+                selectAircraftForEditing(board?.aircraft[0]?.id ?? "new");
+              }
+              if (category === "pilots") selectPilotForEditing(board?.pilots[0]?.id ?? "new");
+              if (category === "products") {
+                selectProductForEditing(board?.products[0]?.id ?? "new");
+              }
+            }}
+          />
           <section className="master-data-workspace" hidden={adminArea !== "master-data"}>
-            <MasterDataNavigation
-              activeCategory={masterDataCategory}
-              counts={masterDataCounts}
-              onChange={(category) => {
-                setMasterDataCategory(category);
-                setMasterSearch("");
-                setMasterEditorOpen(false);
-                setMasterSubmitAttempted(false);
-              }}
-            />
             {["aircraft", "assignments"].includes(masterDataCategory) &&
             resourceGroups.length === 0 ? (
               <ValidationHint>
@@ -4734,14 +4768,11 @@ function AdminView() {
                 </table>
               ) : null}
               {masterDataCategory === "resource-groups" ? (
-                <table className="master-data-table">
+                <table className="master-data-table resource-group-list-table">
                   <thead>
                     <tr>
-                      <th>Bezeichnung</th>
-                      <th>Gate</th>
-                      <th>Kapazität</th>
+                      <th>Ressourcengruppe</th>
                       <th>Status</th>
-                      <th>Aktionen</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -4756,28 +4787,21 @@ function AdminView() {
                         }}
                         tabIndex={0}
                       >
-                        <td>{group.name}</td>
-                        <td>{group.gateLabel}</td>
-                        <td>{group.referenceCapacity}</td>
+                        <td>
+                          <strong>{group.name}</strong>
+                          <small>
+                            {group.activeAircraftIds.length} Flugzeug
+                            {group.activeAircraftIds.length === 1 ? "" : "e"} · Kapazität{" "}
+                            {group.referenceCapacity}{" "}
+                            {group.referenceCapacity === 1 ? "Platz" : "Plätze"} · {group.gateLabel}
+                          </small>
+                        </td>
                         <td>
                           <span
                             className={`status-text ${group.status === "ACTIVE" ? "active" : "inactive"}`}
                           >
                             {group.status === "ACTIVE" ? "Aktiv" : group.status}
                           </span>
-                        </td>
-                        <td>
-                          <button
-                            aria-label={`${group.name} öffnen`}
-                            className="table-overflow-action"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              selectResourceForEditing(group.id);
-                            }}
-                            type="button"
-                          >
-                            ⋯
-                          </button>
                         </td>
                       </tr>
                     ))}
@@ -5596,6 +5620,19 @@ function AdminView() {
                       erfolgen.
                     </ValidationHint>
                   ) : null}
+                </section>
+                <section
+                  className="derived-resource-summary"
+                  aria-label="Abgeleitete Zusammenfassung"
+                >
+                  <strong>Zusammenfassung (abgeleitet)</strong>
+                  <span>
+                    {selectedResourceAircraft.length} Flugzeug
+                    {selectedResourceAircraft.length === 1 ? "" : "e"} · Kapazität{" "}
+                    {selectedResourceCapacity || "–"}{" "}
+                    {selectedResourceCapacity === 1 ? "Platz" : "Plätze"} · Gruppen bis{" "}
+                    {selectedResourceCapacity || "–"} Personen ohne Teilung
+                  </span>
                 </section>
                 {masterSubmitAttempted && (resourceName.trim().length < 2 || !resourceGateId) ? (
                   <ValidationHint tone="error">
