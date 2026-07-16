@@ -282,6 +282,17 @@
   border: 1px solid var(--ui-border);
   background: var(--ui-surface);
 }
+.admin-recovery-actions {
+  grid-template-columns: repeat(2, minmax(138px, 1fr));
+}
+.admin-recovery-actions .secondary-action {
+  min-height: 44px;
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-weight: 760;
+  white-space: nowrap;
+  touch-action: manipulation;
+}
 .device-admin-context {
   display: grid;
   grid-template-columns: minmax(240px, 1fr) minmax(220px, 0.7fr);
