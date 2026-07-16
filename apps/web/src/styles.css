@@ -4308,3 +4308,246 @@ p {
     max-height: none;
   }
 }
+
+/* Flight Line Supervisor: aircraft-first operational workspace */
+.flight-supervisor {
+  width: min(1720px, calc(100% - 32px));
+  margin: 16px auto 32px;
+  display: grid;
+  grid-template-columns: 230px minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  background: var(--ui-surface);
+}
+.emergency-control {
+  width: min(1720px, calc(100% - 32px));
+  min-height: 0;
+  margin: 12px auto 0;
+  padding: 0;
+  display: block;
+  border: 1px solid color-mix(in srgb, var(--ui-danger) 55%, var(--ui-border));
+  border-radius: 6px;
+  background: var(--ui-surface);
+}
+.emergency-control summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  padding: 8px 13px;
+  color: var(--ui-danger);
+  cursor: pointer;
+  font-weight: 800;
+}
+.emergency-control-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  padding: 0 13px 13px;
+}
+.emergency-control-body label {
+  display: grid;
+  gap: 5px;
+}
+.emergency-control-body input,
+.emergency-control-body button {
+  min-height: 44px;
+}
+.flight-supervisor > .aircraft-selector {
+  width: auto;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  border-right: 1px solid var(--ui-border);
+  background: var(--ui-surface-subtle);
+}
+.aircraft-selector-heading {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--ui-muted);
+}
+.aircraft-selector-heading span {
+  min-width: 26px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--ui-control);
+  text-align: center;
+}
+.flight-supervisor > .aircraft-selector button {
+  min-height: 78px;
+  border-radius: 6px;
+  background: var(--ui-surface);
+}
+.flight-supervisor > .flight-workspace {
+  max-width: none;
+  margin: 0;
+  padding: 14px;
+}
+.flight-supervisor .queue-list,
+.flight-supervisor .rotation-detail {
+  border-color: var(--ui-border);
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  box-shadow: none;
+}
+.flight-supervisor .queue-row {
+  border-color: var(--ui-border);
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text);
+}
+.flight-supervisor .queue-row span:last-child {
+  color: var(--ui-muted);
+}
+.flight-supervisor .queue-row.selected {
+  padding: 13px 15px;
+  border: 2px solid var(--ui-accent);
+  background: var(--ui-accent-soft);
+}
+.supervisor-aircraft-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--ui-border);
+}
+.supervisor-aircraft-summary h1 {
+  margin: 3px 0 2px;
+  font-size: clamp(1.7rem, 3vw, 2.5rem);
+}
+.supervisor-aircraft-summary p,
+.supervisor-aircraft-summary small {
+  margin: 0;
+  color: var(--ui-muted);
+}
+.supervisor-aircraft-summary > small {
+  grid-column: 1 / -1;
+}
+.aircraft-state {
+  align-self: start;
+  padding: 7px 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: 5px;
+  color: var(--ui-muted);
+  background: var(--ui-surface-subtle);
+  font-size: 0.82rem;
+}
+.aircraft-state.state-available {
+  color: var(--ui-success);
+  border-color: color-mix(in srgb, var(--ui-success) 45%, var(--ui-border));
+}
+.aircraft-state.state-paused,
+.aircraft-state.state-refueling {
+  color: var(--ui-warning-text);
+  border-color: color-mix(in srgb, var(--ui-warning) 55%, var(--ui-border));
+  background: var(--ui-warning-soft);
+}
+.supervisor-aircraft-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 5px;
+}
+.supervisor-aircraft-actions button {
+  min-height: 44px;
+  padding: 8px 13px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 5px;
+  color: var(--ui-text);
+  background: var(--ui-control);
+}
+.supervisor-aircraft-actions .primary-action {
+  margin: 0;
+  color: #fff;
+  border-color: var(--ui-accent);
+  background: var(--ui-accent);
+}
+.supervisor-aircraft-actions > span {
+  color: var(--ui-muted);
+  font-size: 0.82rem;
+}
+.aircraft-pause-dialog {
+  width: min(560px, calc(100% - 24px));
+}
+.aircraft-pause-dialog fieldset {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.aircraft-pause-dialog legend {
+  margin-bottom: 10px;
+  color: var(--ui-muted);
+}
+.pause-duration-presets {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.pause-duration-presets button {
+  min-height: 52px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 6px;
+  color: var(--ui-text);
+  background: var(--ui-control);
+}
+.pause-duration-presets button.selected {
+  border-color: var(--ui-warning);
+  box-shadow: inset 0 0 0 1px var(--ui-warning);
+}
+.pause-primary-action {
+  color: #111827;
+  border-color: var(--ui-warning);
+  background: var(--ui-warning);
+  font-weight: 800;
+}
+
+@media (max-width: 1100px) {
+  .flight-supervisor {
+    grid-template-columns: 1fr;
+  }
+  .flight-supervisor > .aircraft-selector {
+    flex-direction: row;
+    overflow-x: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--ui-border);
+  }
+  .aircraft-selector-heading {
+    display: none;
+  }
+  .flight-supervisor > .aircraft-selector button {
+    flex: 0 0 190px;
+  }
+}
+
+@media (max-width: 700px) {
+  .flight-supervisor {
+    width: calc(100% - 20px);
+    margin: 10px auto 24px;
+  }
+  .flight-supervisor > .flight-workspace {
+    padding: 10px;
+  }
+  .supervisor-aircraft-summary {
+    grid-template-columns: 1fr;
+  }
+  .aircraft-state,
+  .supervisor-aircraft-summary > small,
+  .supervisor-aircraft-actions {
+    grid-column: 1;
+  }
+  .pause-duration-presets {
+    grid-template-columns: 1fr;
+  }
+  .emergency-control {
+    width: calc(100% - 20px);
+  }
+  .emergency-control-body {
+    grid-template-columns: 1fr;
+  }
+}
