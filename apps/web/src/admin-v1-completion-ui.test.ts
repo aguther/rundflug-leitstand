@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import appSource from "./App.tsx?raw";
+import adminUxSource from "./admin-ux.tsx?raw";
 
 const stylesSource = readFileSync(new URL("./styles.css", import.meta.url), "utf8");
 
@@ -111,6 +112,16 @@ describe("V1 administration completion UI", () => {
     expect(stylesSource).toContain(".admin-workspace.master-data-active.editor-open");
     expect(stylesSource).toContain("grid-template-columns: minmax(0, 1fr)");
     expect(stylesSource).toContain("max-height: none");
+  });
+
+  it("separates administrative evaluation from operational flight-line work", () => {
+    expect(adminUxSource).toContain('{ id: "evaluation", label: "Auswertung"');
+    expect(adminUxSource).not.toContain('label: "Betrieb"');
+    expect(appSource).toContain('title: "Auswertung"');
+    expect(appSource).toContain("Verläufe, Berichte und seltene administrative Sonderfälle");
+    expect(appSource).toContain(
+      '<section className="admin-section" hidden={adminArea !== "evaluation"}>',
+    );
   });
 
   it("keeps the manual board refresh touchable and exposes its loading state", () => {
