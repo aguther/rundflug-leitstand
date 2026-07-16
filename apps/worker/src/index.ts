@@ -23,6 +23,7 @@ import { Hono } from "hono";
 import { secureHeaders } from "hono/secure-headers";
 import { createPortableBackup, operationDateInTimeZone } from "./backup";
 import { sha256Hex, verifyCredential } from "./crypto";
+import { runD1ReadsSequentially } from "./d1-read-scheduler";
 import { dailyReportCsv, dailyReportPdfLines, loadDailyReport } from "./daily-report";
 import { EventCoordinator } from "./event-coordinator";
 import {
@@ -886,9 +887,10 @@ app.get("/api/events/:eventId/operations", async (context) => {
     gatesRows,
     resourceGroupRows,
     metricsRow,
-  ] = await Promise.all([
-    context.env.DB.prepare(
-      `SELECT p.id, p.code, p.name, p.public_description, p.resource_group_id, rg.name AS resource_group_name,
+  ] = await runD1ReadsSequentially([
+    () =>
+      context.env.DB.prepare(
+        `SELECT p.id, p.code, p.name, p.public_description, p.resource_group_id, rg.name AS resource_group_name,
               rg.status AS resource_group_status, rg.operational_note AS resource_group_operational_note,
               p.price_cents, p.sale_enabled, p.reference_capacity, p.reference_duration_minutes,
               p.sale_closes_at, p.capacity_warning_threshold, p.capacity_critical_threshold,
@@ -908,34 +910,35 @@ app.get("/api/events/:eventId/operations", async (context) => {
         WHERE p.operation_day_id = ?1
         GROUP BY p.id
         ORDER BY p.sort_order, p.name`,
-    )
-      .bind(eventId)
-      .all<{
-        id: string;
-        code: string;
-        name: string;
-        public_description: string;
-        resource_group_id: string;
-        resource_group_name: string;
-        resource_group_status: "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED";
-        resource_group_operational_note: string;
-        price_cents: number;
-        gate_id: string;
-        gate_label: string;
-        child_companion_required: number;
-        weight_classes_json: string;
-        sort_order: number;
-        sale_enabled: number;
-        reference_capacity: number;
-        reference_duration_minutes: number;
-        queued_tickets: number;
-        resource_group_open_tickets: number;
-        sale_closes_at: string | null;
-        capacity_warning_threshold: number;
-        capacity_critical_threshold: number;
-      }>(),
-    context.env.DB.prepare(
-      `SELECT r.id, r.flight_group_id, fg.resource_group_id, fg.communication_number,
+      )
+        .bind(eventId)
+        .all<{
+          id: string;
+          code: string;
+          name: string;
+          public_description: string;
+          resource_group_id: string;
+          resource_group_name: string;
+          resource_group_status: "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED";
+          resource_group_operational_note: string;
+          price_cents: number;
+          gate_id: string;
+          gate_label: string;
+          child_companion_required: number;
+          weight_classes_json: string;
+          sort_order: number;
+          sale_enabled: number;
+          reference_capacity: number;
+          reference_duration_minutes: number;
+          queued_tickets: number;
+          resource_group_open_tickets: number;
+          sale_closes_at: string | null;
+          capacity_warning_threshold: number;
+          capacity_critical_threshold: number;
+        }>(),
+    () =>
+      context.env.DB.prepare(
+        `SELECT r.id, r.flight_group_id, fg.resource_group_id, fg.communication_number,
               COALESCE(fg.queue_position, fg.communication_number) AS queue_position,
               r.status, r.aircraft_id, r.usable_capacity,
               COALESCE(r.gate_id, MIN(p.gate_id), '') AS gate_id,
@@ -1061,71 +1064,74 @@ app.get("/api/events/:eventId/operations", async (context) => {
         GROUP BY r.id
         ORDER BY CASE WHEN r.status = 'DRAFT' THEN 1 ELSE 0 END,
                  COALESCE(fg.queue_position, fg.communication_number), fg.communication_number`,
-    )
-      .bind(eventId)
-      .all<{
-        id: string;
-        flight_group_id: string;
-        resource_group_id: string;
-        communication_number: number;
-        queue_position: number;
-        status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
-        gate_id: string;
-        gate_label: string;
-        operational_note: string;
-        aircraft_id: string | null;
-        aircraft_registration: string | null;
-        pilot_id: string | null;
-        pilot_operational_code: string | null;
-        suggested_pilot_id: string | null;
-        suggested_pilot_operational_code: string | null;
-        suggested_aircraft_id: string | null;
-        suggested_aircraft_registration: string | null;
-        ticket_group_id: string;
-        deferral_count: number;
-        ticket_count: number;
-        baseline_capacity: number;
-        usable_capacity: number | null;
-        estimated_passenger_payload_kg: number | null;
-        product_code: string;
-        product_name: string;
-        reference_duration_minutes: number;
-        called_at: string | null;
-        departed_at: string | null;
-        landed_at: string | null;
-        completed_at: string | null;
-        planned_boarding_at: string | null;
-        planned_departure_at: string | null;
-        planned_landing_at: string | null;
-        planned_completion_at: string | null;
-        predicted_boarding_at: string | null;
-        predicted_departure_at: string | null;
-        predicted_landing_at: string | null;
-        predicted_completion_at: string | null;
-        prediction_quality: "STABLE" | "CHANGING" | "UNCERTAIN" | null;
-        prediction_lower_minutes: number | null;
-        prediction_upper_minutes: number | null;
-        prediction_updated_at: string | null;
-        tickets_json: string;
-      }>(),
-    context.env.DB.prepare(
-      `SELECT (julianday(landed_at) - julianday(departed_at)) * 1440.0 AS duration_minutes
+      )
+        .bind(eventId)
+        .all<{
+          id: string;
+          flight_group_id: string;
+          resource_group_id: string;
+          communication_number: number;
+          queue_position: number;
+          status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
+          gate_id: string;
+          gate_label: string;
+          operational_note: string;
+          aircraft_id: string | null;
+          aircraft_registration: string | null;
+          pilot_id: string | null;
+          pilot_operational_code: string | null;
+          suggested_pilot_id: string | null;
+          suggested_pilot_operational_code: string | null;
+          suggested_aircraft_id: string | null;
+          suggested_aircraft_registration: string | null;
+          ticket_group_id: string;
+          deferral_count: number;
+          ticket_count: number;
+          baseline_capacity: number;
+          usable_capacity: number | null;
+          estimated_passenger_payload_kg: number | null;
+          product_code: string;
+          product_name: string;
+          reference_duration_minutes: number;
+          called_at: string | null;
+          departed_at: string | null;
+          landed_at: string | null;
+          completed_at: string | null;
+          planned_boarding_at: string | null;
+          planned_departure_at: string | null;
+          planned_landing_at: string | null;
+          planned_completion_at: string | null;
+          predicted_boarding_at: string | null;
+          predicted_departure_at: string | null;
+          predicted_landing_at: string | null;
+          predicted_completion_at: string | null;
+          prediction_quality: "STABLE" | "CHANGING" | "UNCERTAIN" | null;
+          prediction_lower_minutes: number | null;
+          prediction_upper_minutes: number | null;
+          prediction_updated_at: string | null;
+          tickets_json: string;
+        }>(),
+    () =>
+      context.env.DB.prepare(
+        `SELECT (julianday(landed_at) - julianday(departed_at)) * 1440.0 AS duration_minutes
          FROM rotations
         WHERE operation_day_id = ?1 AND departed_at IS NOT NULL AND landed_at IS NOT NULL
         ORDER BY landed_at DESC LIMIT 12`,
-    )
-      .bind(eventId)
-      .all<{ duration_minutes: number }>(),
-    context.env.DB.prepare(
-      `SELECT m.resource_group_id, a.passenger_seats, a.refuel_planned FROM aircraft a
+      )
+        .bind(eventId)
+        .all<{ duration_minutes: number }>(),
+    () =>
+      context.env.DB.prepare(
+        `SELECT m.resource_group_id, a.passenger_seats, a.refuel_planned FROM aircraft a
          JOIN resource_group_memberships m ON m.aircraft_id = a.id
         WHERE m.operation_day_id = ?1 AND m.active_until IS NULL
           AND a.operational_state NOT IN ('INACTIVE', 'PAUSED', 'REFUELING')`,
-    )
-      .bind(eventId)
-      .all<{ resource_group_id: string; passenger_seats: number; refuel_planned: number }>(),
-    context.env.DB.prepare(
-      `SELECT a.id, a.registration, a.aircraft_type, a.passenger_seats,
+      )
+        .bind(eventId)
+        .all<{ resource_group_id: string; passenger_seats: number; refuel_planned: number }>(),
+    () =>
+      context.env.DB.prepare(
+        `SELECT a.id, a.registration, a.aircraft_type, a.passenger_seats,
               a.maximum_passenger_payload_kg, a.operational_state,
               a.refuel_planned, a.rotations_since_refuel, a.refuel_reminder_threshold,
               a.operational_interrupted,
@@ -1141,27 +1147,28 @@ app.get("/api/events/:eventId/operations", async (context) => {
          LEFT JOIN resource_groups rg ON rg.id = m.resource_group_id
          LEFT JOIN pilots current_pilot ON current_pilot.id = m.current_pilot_id
         ORDER BY a.registration`,
-    )
-      .bind(eventId)
-      .all<{
-        id: string;
-        registration: string;
-        aircraft_type: string;
-        passenger_seats: number;
-        maximum_passenger_payload_kg: number | null;
-        operational_state: string;
-        refuel_planned: number;
-        rotations_since_refuel: number;
-        refuel_reminder_threshold: number;
-        operational_interrupted: number;
-        resource_group_id: string | null;
-        resource_group_name: string | null;
-        current_pilot_id: string | null;
-        current_pilot_operational_code: string | null;
-        expected_review_at: string | null;
-      }>(),
-    context.env.DB.prepare(
-      `SELECT p.id, p.operational_code, p.operational_note, p.active, p.paused,
+      )
+        .bind(eventId)
+        .all<{
+          id: string;
+          registration: string;
+          aircraft_type: string;
+          passenger_seats: number;
+          maximum_passenger_payload_kg: number | null;
+          operational_state: string;
+          refuel_planned: number;
+          rotations_since_refuel: number;
+          refuel_reminder_threshold: number;
+          operational_interrupted: number;
+          resource_group_id: string | null;
+          resource_group_name: string | null;
+          current_pilot_id: string | null;
+          current_pilot_operational_code: string | null;
+          expected_review_at: string | null;
+        }>(),
+    () =>
+      context.env.DB.prepare(
+        `SELECT p.id, p.operational_code, p.operational_note, p.active, p.paused,
               p.pause_expected_review_at,
               (SELECT r.id FROM rotations r WHERE r.operation_day_id = p.operation_day_id
                 AND r.pilot_id = p.id AND r.status IN ('CALLED', 'IN_FLIGHT', 'LANDED')
@@ -1172,43 +1179,45 @@ app.get("/api/events/:eventId/operations", async (context) => {
                   AND r.status IN ('CALLED', 'IN_FLIGHT', 'LANDED')
                 ORDER BY r.updated_at DESC LIMIT 1) AS current_communication_number
          FROM pilots p WHERE p.operation_day_id = ?1 ORDER BY p.operational_code`,
-    )
-      .bind(eventId)
-      .all<{
-        id: string;
-        operational_code: string;
-        operational_note: string;
-        active: number;
-        paused: number;
-        pause_expected_review_at: string | null;
-        current_rotation_id: string | null;
-        current_communication_number: number | null;
-      }>(),
-    withGateDisplayFilterFallback((mode) => {
-      const displayFilterProjection =
-        mode === "current"
-          ? "g.display_filter_json"
-          : `'${EMPTY_GATE_DISPLAY_FILTER_JSON}' AS display_filter_json`;
-      return context.env.DB.prepare(
-        `SELECT g.id, g.label, g.gate_type, g.active, g.sort_order, ${displayFilterProjection},
-                COALESCE((SELECT json_group_array(rg.id) FROM resource_groups rg
-                  WHERE rg.operation_day_id = g.operation_day_id AND rg.gate_id = g.id), '[]')
-                  AS assigned_resource_group_ids_json
-             FROM gates g WHERE g.operation_day_id = ?1 ORDER BY g.sort_order, g.label`,
       )
         .bind(eventId)
         .all<{
           id: string;
-          label: string;
-          gate_type: "FLIGHT_LINE" | "BOARDING" | "DISPLAY_ONLY";
+          operational_code: string;
+          operational_note: string;
           active: number;
-          sort_order: number;
-          display_filter_json: string;
-          assigned_resource_group_ids_json: string;
-        }>();
-    }),
-    context.env.DB.prepare(
-      `SELECT rg.id, rg.name, rg.status, rg.gate_id, g.label AS gate_label,
+          paused: number;
+          pause_expected_review_at: string | null;
+          current_rotation_id: string | null;
+          current_communication_number: number | null;
+        }>(),
+    () =>
+      withGateDisplayFilterFallback((mode) => {
+        const displayFilterProjection =
+          mode === "current"
+            ? "g.display_filter_json"
+            : `'${EMPTY_GATE_DISPLAY_FILTER_JSON}' AS display_filter_json`;
+        return context.env.DB.prepare(
+          `SELECT g.id, g.label, g.gate_type, g.active, g.sort_order, ${displayFilterProjection},
+                COALESCE((SELECT json_group_array(rg.id) FROM resource_groups rg
+                  WHERE rg.operation_day_id = g.operation_day_id AND rg.gate_id = g.id), '[]')
+                  AS assigned_resource_group_ids_json
+             FROM gates g WHERE g.operation_day_id = ?1 ORDER BY g.sort_order, g.label`,
+        )
+          .bind(eventId)
+          .all<{
+            id: string;
+            label: string;
+            gate_type: "FLIGHT_LINE" | "BOARDING" | "DISPLAY_ONLY";
+            active: number;
+            sort_order: number;
+            display_filter_json: string;
+            assigned_resource_group_ids_json: string;
+          }>();
+      }),
+    () =>
+      context.env.DB.prepare(
+        `SELECT rg.id, rg.name, rg.status, rg.gate_id, g.label AS gate_label,
               rg.reference_capacity, rg.planned_rotation_minutes,
               rg.compatible_aircraft_types_json,
               COALESCE((SELECT json_group_array(m.aircraft_id)
@@ -1217,21 +1226,22 @@ app.get("/api/events/:eventId/operations", async (context) => {
                  AND m.resource_group_id = rg.id AND m.active_until IS NULL), '[]') AS aircraft_ids_json
          FROM resource_groups rg JOIN gates g ON g.id = rg.gate_id
         WHERE rg.operation_day_id = ?1 ORDER BY rg.name`,
-    )
-      .bind(eventId)
-      .all<{
-        id: string;
-        name: string;
-        status: "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED";
-        gate_id: string;
-        gate_label: string;
-        reference_capacity: number;
-        planned_rotation_minutes: number;
-        compatible_aircraft_types_json: string;
-        aircraft_ids_json: string;
-      }>(),
-    context.env.DB.prepare(
-      `SELECT
+      )
+        .bind(eventId)
+        .all<{
+          id: string;
+          name: string;
+          status: "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED";
+          gate_id: string;
+          gate_label: string;
+          reference_capacity: number;
+          planned_rotation_minutes: number;
+          compatible_aircraft_types_json: string;
+          aircraft_ids_json: string;
+        }>(),
+    () =>
+      context.env.DB.prepare(
+        `SELECT
           (SELECT COUNT(*) FROM tickets t JOIN ticket_groups tg ON tg.id = t.ticket_group_id
             WHERE tg.operation_day_id = ?1
               AND t.status NOT IN ('COMPLETED', 'CANCELED', 'NO_SHOW')) AS open_tickets,
@@ -1265,23 +1275,23 @@ app.get("/api/events/:eventId/operations", async (context) => {
             AND last_seen_at >= ?2) AS active_devices,
           (SELECT COUNT(*) FROM web_push_subscriptions WHERE operation_day_id = ?1
             AND status = 'ACTIVE' AND delete_after > ?3) AS active_push_subscriptions`,
-    )
-      .bind(eventId, new Date(Date.now() - 120_000).toISOString(), new Date().toISOString())
-      .first<{
-        open_tickets: number;
-        sold_tickets: number;
-        completed_rotations: number;
-        active_rotations: number;
-        average_boarding_minutes: number | null;
-        average_flight_minutes: number | null;
-        average_turnaround_minutes: number | null;
-        average_rotation_minutes: number | null;
-        average_wait_minutes: number | null;
-        informational_revenue_cents: number;
-        active_devices: number;
-        active_push_subscriptions: number;
-      }>(),
-  ]);
+      )
+        .bind(eventId, new Date(Date.now() - 120_000).toISOString(), new Date().toISOString())
+        .first<{
+          open_tickets: number;
+          sold_tickets: number;
+          completed_rotations: number;
+          active_rotations: number;
+          average_boarding_minutes: number | null;
+          average_flight_minutes: number | null;
+          average_turnaround_minutes: number | null;
+          average_rotation_minutes: number | null;
+          average_wait_minutes: number | null;
+          informational_revenue_cents: number;
+          active_devices: number;
+          active_push_subscriptions: number;
+        }>(),
+  ] as const);
 
   const actualDurations = [...durationRows.results].reverse().map((row) => row.duration_minutes);
   const activePilotCount = pilotRows.results.filter(
