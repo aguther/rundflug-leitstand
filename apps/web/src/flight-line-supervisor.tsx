@@ -84,6 +84,7 @@ export function FlightLineSupervisorConsole({
   onRefuel,
   onUnavailable,
   onAvailable,
+  onReleaseAssist,
 }: {
   board: OperationBoard;
   aircraft: Aircraft[];
@@ -102,6 +103,7 @@ export function FlightLineSupervisorConsole({
   onRefuel: () => void;
   onUnavailable: () => void;
   onAvailable: () => void;
+  onReleaseAssist: (aircraftId: string) => void;
 }) {
   const [search, setSearch] = useState("");
   const [resourceGroupId, setResourceGroupId] = useState("");
@@ -273,6 +275,9 @@ export function FlightLineSupervisorConsole({
           </div>
           {filteredAircraft.map((entry) => {
             const rotation = suggestedRotationFor(entry, board.rotations, board.products);
+            const assistClaim = (board.assistClaims ?? []).find(
+              (claim) => claim.aircraftId === entry.id,
+            );
             const currentStage = stageFor(entry, rotation);
             const selected = entry.id === selectedAircraft?.id;
             return (
@@ -302,6 +307,7 @@ export function FlightLineSupervisorConsole({
                   ) : (
                     "–"
                   )}
+                  {assistClaim ? <small>Assist-Gerät betreut</small> : null}
                 </span>
                 {stages.map(([key, label]) => (
                   <span
@@ -353,6 +359,11 @@ export function FlightLineSupervisorConsole({
                     <button onClick={onOpenDisposition} type="button">
                       Andere Gruppe
                     </button>
+                    {assistClaim ? (
+                      <button onClick={() => onReleaseAssist(entry.id)} type="button">
+                        Assist freigeben
+                      </button>
+                    ) : null}
                   </div>
                 ) : null}
               </div>

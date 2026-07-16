@@ -831,6 +831,124 @@ app.get("/api/events/:eventId/snapshot", async (context) => {
   return context.json(rowToSnapshot(row));
 });
 
+app.put("/api/events/:eventId/assist-claims/:aircraftId", async (context) => {
+  const eventId = context.req.param("eventId");
+  const aircraftId = context.req.param("aircraftId");
+  const deviceId = context.req.header("x-device-id");
+  const device = await authorizeDevice(
+    context.env,
+    eventId,
+    deviceId,
+    context.req.header("x-device-token"),
+  );
+  if (!device || !deviceId || !["FLIGHT_LINE", "FLIGHT_LINE_LEAD", "ADMIN"].includes(device.role)) {
+    return context.json(
+      { error: { code: "DEVICE_NOT_AUTHORIZED", message: "Gerät nicht berechtigt." } },
+      403,
+    );
+  }
+  const aircraft = await context.env.DB.prepare(
+    `SELECT a.id FROM aircraft a
+      JOIN resource_group_memberships membership ON membership.aircraft_id = a.id
+     WHERE a.id = ?1 AND membership.operation_day_id = ?2 AND membership.active_until IS NULL`,
+  )
+    .bind(aircraftId, eventId)
+    .first<{ id: string }>();
+  if (!aircraft) {
+    return context.json(
+      { error: { code: "AIRCRAFT_NOT_FOUND", message: "Flugzeug nicht gefunden." } },
+      404,
+    );
+  }
+  const claimedAt = new Date().toISOString();
+  const expiresAt = new Date(Date.now() + 45_000).toISOString();
+  try {
+    await context.env.DB.prepare(
+      `INSERT INTO flight_line_assist_claims
+        (operation_day_id, aircraft_id, device_id, claimed_at, expires_at)
+       VALUES (?1, ?2, ?3, ?4, ?5)
+       ON CONFLICT(operation_day_id, aircraft_id) DO UPDATE SET
+         device_id = excluded.device_id,
+         claimed_at = excluded.claimed_at,
+         expires_at = excluded.expires_at
+       WHERE flight_line_assist_claims.device_id = excluded.device_id
+          OR flight_line_assist_claims.expires_at <= excluded.claimed_at`,
+    )
+      .bind(eventId, aircraftId, deviceId, claimedAt, expiresAt)
+      .run();
+  } catch (cause) {
+    if (String(cause).includes("no such table: flight_line_assist_claims")) {
+      return context.json(
+        {
+          error: {
+            code: "ASSIST_MIGRATION_REQUIRED",
+            message: "Flight Line Assist wird nach Cloudflare-Migration 0033 verfügbar.",
+          },
+        },
+        503,
+      );
+    }
+    throw cause;
+  }
+  const claim = await context.env.DB.prepare(
+    `SELECT device_id, claimed_at, expires_at FROM flight_line_assist_claims
+      WHERE operation_day_id = ?1 AND aircraft_id = ?2`,
+  )
+    .bind(eventId, aircraftId)
+    .first<{ device_id: string; claimed_at: string; expires_at: string }>();
+  if (!claim || claim.device_id !== deviceId) {
+    return context.json(
+      {
+        error: {
+          code: "AIRCRAFT_ASSIST_CLAIMED",
+          message: "Dieses Flugzeug wird bereits von einem anderen Assist-Gerät betreut.",
+        },
+      },
+      409,
+    );
+  }
+  return context.json({
+    aircraftId,
+    deviceId,
+    claimedAt: claim.claimed_at,
+    expiresAt: claim.expires_at,
+  });
+});
+
+app.delete("/api/events/:eventId/assist-claims/:aircraftId", async (context) => {
+  const eventId = context.req.param("eventId");
+  const aircraftId = context.req.param("aircraftId");
+  const deviceId = context.req.header("x-device-id");
+  const device = await authorizeDevice(
+    context.env,
+    eventId,
+    deviceId,
+    context.req.header("x-device-token"),
+  );
+  if (!device || !deviceId || !["FLIGHT_LINE", "FLIGHT_LINE_LEAD", "ADMIN"].includes(device.role)) {
+    return context.json(
+      { error: { code: "DEVICE_NOT_AUTHORIZED", message: "Gerät nicht berechtigt." } },
+      403,
+    );
+  }
+  if (["FLIGHT_LINE_LEAD", "ADMIN"].includes(device.role)) {
+    await context.env.DB.prepare(
+      `DELETE FROM flight_line_assist_claims
+        WHERE operation_day_id = ?1 AND aircraft_id = ?2`,
+    )
+      .bind(eventId, aircraftId)
+      .run();
+  } else {
+    await context.env.DB.prepare(
+      `DELETE FROM flight_line_assist_claims
+        WHERE operation_day_id = ?1 AND aircraft_id = ?2 AND device_id = ?3`,
+    )
+      .bind(eventId, aircraftId, deviceId)
+      .run();
+  }
+  return context.body(null, 204);
+});
+
 app.get("/api/events/:eventId/operations", async (context) => {
   const eventId = context.req.param("eventId");
   const deviceId = context.req.header("x-device-id");
@@ -1293,6 +1411,31 @@ app.get("/api/events/:eventId/operations", async (context) => {
         }>(),
   ] as const);
 
+  let assistClaims: Array<{
+    aircraft_id: string;
+    device_id: string;
+    claimed_at: string;
+    expires_at: string;
+  }> = [];
+  try {
+    const claims = await context.env.DB.prepare(
+      `SELECT aircraft_id, device_id, claimed_at, expires_at
+         FROM flight_line_assist_claims
+        WHERE operation_day_id = ?1 AND expires_at > ?2
+        ORDER BY claimed_at`,
+    )
+      .bind(eventId, new Date().toISOString())
+      .all<{
+        aircraft_id: string;
+        device_id: string;
+        claimed_at: string;
+        expires_at: string;
+      }>();
+    assistClaims = claims.results;
+  } catch (cause) {
+    if (!String(cause).includes("no such table: flight_line_assist_claims")) throw cause;
+  }
+
   const actualDurations = [...durationRows.results].reverse().map((row) => row.duration_minutes);
   const activePilotCount = pilotRows.results.filter(
     (pilot) => pilot.active === 1 && pilot.paused === 0,
@@ -1538,6 +1681,12 @@ app.get("/api/events/:eventId/operations", async (context) => {
       expectedReviewAt: aircraft.expected_review_at,
       currentPilotId: aircraft.current_pilot_id,
       currentPilotOperationalCode: aircraft.current_pilot_operational_code,
+    })),
+    assistClaims: assistClaims.map((claim) => ({
+      aircraftId: claim.aircraft_id,
+      deviceId: claim.device_id,
+      claimedAt: claim.claimed_at,
+      expiresAt: claim.expires_at,
     })),
     pilots: pilotRows.results.map((pilot) => ({
       id: pilot.id,

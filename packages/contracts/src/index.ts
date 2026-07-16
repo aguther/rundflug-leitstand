@@ -898,6 +898,14 @@ export const operationBoardSchema = z.object({
   products: z.array(productOperationalSummarySchema),
   rotations: z.array(rotationOperationalSummarySchema),
   aircraft: z.array(aircraftOperationalSummarySchema),
+  assistClaims: z.array(
+    z.object({
+      aircraftId: z.string(),
+      deviceId: z.string(),
+      claimedAt: z.string(),
+      expiresAt: z.string(),
+    }),
+  ),
   pilots: z.array(pilotOperationalSummarySchema),
   gates: z.array(
     z.object({

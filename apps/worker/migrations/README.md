@@ -150,3 +150,11 @@ Snapshots werden ausdrücklich als `LEGACY_UNKNOWN` gekennzeichnet und bleiben u
 auswertbar. Vor Anwendung wird eine portable D1-Sicherung erzeugt. Wiederherstellung erfolgt aus
 dieser Sicherung beziehungsweise per D1 Time Travel; ältere Worker dürfen nach der Migration keine
 neuen Snapshots mehr schreiben, weil ihnen die vollständige Datengrundlage fehlt.
+
+## 0033 – Kurzlebige anonyme Flight-Line-Betreuung
+
+Führt eine rein technische, auslaufende Gerätereservierung je Veranstaltungsflugzeug ein. Sie
+verhindert, dass zwei Assist-Geräte unbemerkt dasselbe Flugzeug betreuen, speichert aber weder Namen
+noch andere personenbezogene Daten und besitzt keine Freigabewirkung. Ein Rollback kann Tabelle und
+Index entfernen; vor Anwendung wird dennoch eine portable D1-Sicherung empfohlen. Beim Werksreset
+und beim Löschen der Veranstaltung werden alle Reservierungen entfernt.

@@ -25,4 +25,11 @@ describe("Flight Line Assist", () => {
     expect(assistSource).toContain("ticketCount");
     expect(assistSource).not.toMatch(/guestName|phoneNumber|payment/i);
   });
+
+  it("renews and releases the anonymous server claim", () => {
+    expect(assistSource).toContain("board.assistClaims");
+    expect(assistSource).toContain("25_000");
+    expect(assistSource).toContain("await onClaim(entry.id)");
+    expect(assistSource).toContain("await onRelease(claimedAircraftId)");
+  });
 });
