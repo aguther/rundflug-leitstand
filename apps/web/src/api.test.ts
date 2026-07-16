@@ -3,6 +3,7 @@ import {
   assertOperationalConnection,
   factoryReset,
   getDeviceContext,
+  getHealth,
   getPushConfiguration,
   verifyAdminPin,
 } from "./api";
@@ -18,6 +19,16 @@ describe("operational command connection policy", () => {
 
   it("allows the command transport only while online", () => {
     expect(() => assertOperationalConnection(true)).not.toThrow();
+  });
+});
+
+describe("network failure guidance", () => {
+  it("replaces the browser-specific fetch error with an actionable message", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Failed to fetch")));
+
+    await expect(getHealth()).rejects.toThrowError(
+      "Server nicht erreichbar. Bitte Verbindung prüfen und die Seite neu laden.",
+    );
   });
 });
 

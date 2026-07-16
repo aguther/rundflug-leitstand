@@ -40,6 +40,7 @@ export default defineConfig({
       },
       workbox: {
         navigateFallback: "/index.html",
+        navigateFallbackDenylist: [/^\/api(?:\/|$)/],
         importScripts: ["/push-sw.js"],
       },
     }),
