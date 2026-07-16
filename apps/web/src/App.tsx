@@ -4429,9 +4429,17 @@ function AdminView() {
     pilots: "Pilotencode",
     products: "Produkt",
   };
+  const masterDataSectionLabel: Record<MasterDataCategory, string> = {
+    gates: "Gates",
+    "resource-groups": "Ressourcengruppen",
+    aircraft: "Flugzeuge",
+    assignments: "Zuordnungen",
+    pilots: "Pilotencodes",
+    products: "Produkte",
+  };
 
   return (
-    <Shell title="Administration">
+    <Shell className="admin-shell" title="Administration">
       <ConnectionNotice error={error} lastConfirmedAt={lastConfirmedAt} />
       {setupRequired ? (
         <div className="connection-warning" role="status">
@@ -4614,6 +4622,14 @@ function AdminView() {
                 : "Beim Auslösen einer administrativen Änderung erscheint die PIN-Abfrage."}
             </ValidationHint>
           </section>
+          {adminArea === "master-data" ? (
+            <header className="master-data-heading">
+              <h1>
+                Stammdaten <span aria-hidden="true">›</span>{" "}
+                <strong>{masterDataSectionLabel[masterDataCategory]}</strong>
+              </h1>
+            </header>
+          ) : null}
           <section className="reset-levels" hidden={adminArea !== "backup"}>
             {!isAdministrator ? (
               <ValidationHint tone="error">
