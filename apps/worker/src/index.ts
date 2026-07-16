@@ -2657,6 +2657,8 @@ app.get("/api/public/events/:eventId/board", async (context) => {
             fg.communication_number,
             COALESCE(fg.queue_position, fg.communication_number) AS queue_position, r.status,
             MIN(a.registration) AS aircraft_registration,
+            MIN(a.operational_state) AS aircraft_operational_state,
+            r.departed_at,
             COUNT(rt.ticket_id) AS ticket_count,
             rg.status AS resource_group_status,
             rg.operational_note AS resource_group_operational_note
@@ -2687,6 +2689,8 @@ app.get("/api/public/events/:eventId/board", async (context) => {
       queue_position: number;
       status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
       aircraft_registration: string | null;
+      aircraft_operational_state: string | null;
+      departed_at: string | null;
       ticket_count: number;
       resource_group_status: "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED";
       resource_group_operational_note: string;
@@ -2730,8 +2734,13 @@ app.get("/api/public/events/:eventId/board", async (context) => {
               `${row.product_code}-${String(row.communication_number).padStart(3, "0")}/${ticketIndex + 1}`,
           ),
           aircraftRegistration: row.aircraft_registration,
+          departedAt: row.departed_at,
           status:
-            row.resource_group_status === "ACTIVE" ? publicState[row.status] : "SERVICE_PAUSED",
+            row.resource_group_status !== "ACTIVE"
+              ? "SERVICE_PAUSED"
+              : row.status === "CALLED" && row.aircraft_operational_state === "BOARDING"
+                ? "BOARDING"
+                : publicState[row.status],
           waitLowerMinutes:
             event.operational_interrupted === 1 || row.resource_group_status !== "ACTIVE"
               ? 0

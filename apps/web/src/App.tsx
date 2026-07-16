@@ -74,6 +74,7 @@ import {
   eventLocalDateTimeToIso,
   formatEventLocalDateTime,
 } from "./event-time";
+import { FidsDisplay } from "./fids-display";
 import { FlightLineAssist } from "./flight-line-assist";
 import { expectedReviewAtFromPause } from "./flight-line-pause";
 import { FlightLineSupervisorConsole } from "./flight-line-supervisor";
@@ -115,7 +116,6 @@ import {
 import { setupValidationMessages } from "./setup-validation";
 
 const EVENT_ID = resolveActiveEvent(window.location.search, window.localStorage);
-const KIOSK_MODE = new URLSearchParams(window.location.search).get("kiosk") === "1";
 const FLIGHT_LINE_ASSIST_MODE = window.location.pathname === "/flight-line/assist";
 const LOCAL_DEVELOPMENT =
   import.meta.env.DEV || ["localhost", "127.0.0.1"].includes(window.location.hostname);
@@ -2720,70 +2720,12 @@ function FidsView() {
       window.clearInterval(timer);
     };
   }, []);
-  return (
-    <Shell title="FIDS" kiosk={KIOSK_MODE}>
-      <ConnectionNotice error={error} />
-      <section className="fids-board">
-        <h1>Rundflug-Leitstand – FIDS</h1>
-        <div className="fids-header">
-          <span>Produkt</span>
-          <span>Gruppe / Tickets</span>
-          <span>Status</span>
-          <span>Gate</span>
-          <span>Flugzeug</span>
-          <span>Zeitfenster</span>
-        </div>
-        {board?.emergencyMode ? (
-          <div className="uncertainty">Der Rundflugbetrieb ist derzeit unterbrochen.</div>
-        ) : null}
-        {board?.operationalInterrupted ? (
-          <div className="uncertainty">
-            Flugbetrieb organisatorisch unterbrochen – Zeitfenster ausgesetzt.
-          </div>
-        ) : null}
-        <OperationalNotice note={board?.operationalNotice} />
-        {board?.groups.map((group) => (
-          <div key={group.communicationNumber}>
-            <div className="fids-row">
-              <strong>
-                {group.productCode} · {group.productName}
-              </strong>
-              <span className="fids-group" data-label="Gruppe / Tickets">
-                <b>
-                  {group.productCode}-{String(group.communicationNumber).padStart(3, "0")}
-                </b>
-                <small>{group.ticketLabels.join(" · ")}</small>
-              </span>
-              <span
-                className={`status-chip status-${group.status.toLowerCase()}`}
-                data-label="Status"
-              >
-                {publicStatusLabel[group.status]}
-              </span>
-              <span data-label="Gate">{group.gateLabel}</span>
-              <span data-label="Flugzeug">{group.aircraftRegistration ?? "Zuweisung offen"}</span>
-              <span data-label="Zeitfenster">
-                {group.waitLowerMinutes}–{group.waitUpperMinutes} Min.
-              </span>
-            </div>
-            <OperationalNotice note={group.operationalNotice} />
-          </div>
-        ))}
-        {board && board.fleet.length > 0 ? (
-          <section className="fleet-status" aria-label="Flottenstatus">
-            <strong>Flotte</strong>
-            {board.fleet.map((aircraft) => (
-              <span key={aircraft.registration}>
-                {aircraft.registration} · {aircraftStateLabel[aircraft.status]}
-                {aircraft.refuelPlanned ? " · Tanken vorgemerkt" : ""}
-              </span>
-            ))}
-          </section>
-        ) : null}
-        <p>Zeiten sind typische Bereiche und nicht garantiert.</p>
-      </section>
-    </Shell>
-  );
+  const mode =
+    window.location.pathname === "/fids/terminal" ||
+    new URLSearchParams(window.location.search).get("style") === "terminal"
+      ? "terminal"
+      : "standard";
+  return <FidsDisplay board={board} error={error} mode={mode} />;
 }
 
 function AdminView() {
@@ -7531,7 +7473,7 @@ export function App() {
   if (path === "/pair") return <PairDeviceView />;
   if (path === "/datenschutz") return <PrivacyView />;
   if (path === "/flight-line" || path === "/flight-line/assist") return <FlightLineView />;
-  if (path === "/fids") return <FidsView />;
+  if (path === "/fids" || path === "/fids/terminal") return <FidsView />;
   if (path === "/admin") return <AdminView />;
   return <CashierView />;
 }
