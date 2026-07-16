@@ -2437,7 +2437,7 @@ p {
 }
 .setup-progress {
   display: grid;
-  grid-template-columns: repeat(8, minmax(86px, 1fr));
+  grid-template-columns: repeat(7, minmax(86px, 1fr));
   gap: 0;
   min-width: 0;
   margin: 0;
@@ -3881,7 +3881,30 @@ p {
     white-space: normal;
   }
   .setup-progress {
-    grid-template-columns: repeat(8, 92px);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    overflow: visible;
+  }
+  .setup-progress li {
+    min-width: 0;
+  }
+  .setup-progress li::before {
+    display: none;
+  }
+  .setup-progress button {
+    grid-template-columns: 30px 1fr;
+    justify-items: start;
+    align-items: center;
+    min-height: 42px;
+    padding: 5px 8px;
+    text-align: left;
+    border: 1px solid var(--ui-border);
+    border-radius: 6px;
+    background: var(--ui-surface-subtle);
+  }
+  .setup-step-number {
+    width: 28px;
+    height: 28px;
   }
   .admin-edit-context,
   .master-data-editor fieldset,
