@@ -2110,6 +2110,65 @@ p {
   width: 100%;
   margin: 0 auto;
 }
+.aircraft-selector {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  width: min(1500px, calc(100% - 32px));
+  margin: 16px auto 0;
+}
+.aircraft-selector button {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 12px;
+  min-height: 76px;
+  padding: 12px 14px;
+  color: var(--ui-text);
+  text-align: left;
+  border: 1px solid var(--ui-border);
+  border-radius: 6px;
+  background: var(--ui-surface);
+  cursor: pointer;
+}
+.aircraft-selector button:hover {
+  border-color: color-mix(in srgb, var(--ui-accent) 55%, var(--ui-border));
+  background: var(--ui-control-hover);
+}
+.aircraft-selector button.selected {
+  border-color: var(--ui-accent);
+  box-shadow: inset 3px 0 var(--ui-accent);
+  background: var(--ui-accent-soft);
+}
+.aircraft-selector strong {
+  font-size: 1.05rem;
+}
+.aircraft-selector span,
+.aircraft-selector small {
+  color: var(--ui-muted);
+}
+.aircraft-selector small {
+  grid-column: 1 / -1;
+}
+.pilot-assignment {
+  margin: 14px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--ui-border);
+  border-radius: 6px;
+  background: var(--ui-surface-subtle);
+}
+.pilot-assignment summary {
+  color: var(--ui-text);
+  cursor: pointer;
+  font-weight: 800;
+}
+.pilot-assignment[open] summary {
+  margin-bottom: 12px;
+}
+.pilot-assignment label {
+  display: grid;
+  gap: 6px;
+  color: var(--ui-muted);
+}
 .queue-list {
   display: flex;
   flex-direction: column;
