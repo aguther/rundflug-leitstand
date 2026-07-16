@@ -26,6 +26,7 @@ import {
 import type { PairedDeviceSummary } from "./api";
 import {
   bootstrapSystem,
+  claimFlightLineAircraft,
   cloneEvent,
   downloadDailyPdf,
   downloadDailyReport,
@@ -45,6 +46,7 @@ import {
   getSetupStatus,
   recoverAdminDevice,
   registerTicketPush,
+  releaseFlightLineAircraft,
   revokeTicketPush,
   searchTickets,
   sendCommand,
@@ -1529,10 +1531,29 @@ function FlightLineView() {
           action={primaryFlightLineAction}
           aircraft={operationalAircraft}
           board={board}
+          deviceId={FLIGHT_LINE_DEVICE_ID}
           message={message}
+          onClaim={async (aircraftId) => {
+            await claimFlightLineAircraft(
+              EVENT_ID,
+              aircraftId,
+              FLIGHT_LINE_DEVICE_ID,
+              deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
+            );
+            await refresh();
+          }}
           onAvailable={() => void setFlightLineAircraftState("AVAILABLE")}
           onPause={() => setAircraftPauseOpen(true)}
           onRefuel={() => void setFlightLineAircraftState("REFUELING")}
+          onRelease={async (aircraftId) => {
+            await releaseFlightLineAircraft(
+              EVENT_ID,
+              aircraftId,
+              FLIGHT_LINE_DEVICE_ID,
+              deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
+            );
+            await refresh();
+          }}
           onSelectAircraft={(aircraftId) => {
             setSelectedAircraftId(aircraftId);
             setSelectedId(null);
@@ -1555,6 +1576,14 @@ function FlightLineView() {
           onPause={() => setAircraftPauseOpen(true)}
           onPilotChange={setNextPilotId}
           onRefuel={() => void setFlightLineAircraftState("REFUELING")}
+          onReleaseAssist={(aircraftId) =>
+            void releaseFlightLineAircraft(
+              EVENT_ID,
+              aircraftId,
+              FLIGHT_LINE_DEVICE_ID,
+              deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
+            ).then(refresh)
+          }
           onSelectAircraft={(aircraftId) => {
             setSelectedAircraftId(aircraftId);
             setSelectedId(null);

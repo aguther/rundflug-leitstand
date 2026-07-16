@@ -1,5 +1,5 @@
 import type { OperationBoard } from "@rundflug/contracts";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type Aircraft = OperationBoard["aircraft"][number];
 type Rotation = OperationBoard["rotations"][number];
@@ -67,6 +67,9 @@ export function FlightLineAssist({
   onRefuel,
   onUnavailable,
   onAvailable,
+  deviceId,
+  onClaim,
+  onRelease,
 }: {
   board: OperationBoard;
   aircraft: Aircraft[];
@@ -79,8 +82,20 @@ export function FlightLineAssist({
   onRefuel: () => void;
   onUnavailable: () => void;
   onAvailable: () => void;
+  deviceId: string;
+  onClaim: (aircraftId: string) => Promise<void>;
+  onRelease: (aircraftId: string) => Promise<void>;
 }) {
-  const [claimedAircraftId, setClaimedAircraftId] = useState<string | null>(null);
+  const assistClaims = board.assistClaims ?? [];
+  const ownServerClaim = assistClaims.find((claim) => claim.deviceId === deviceId);
+  const [claimedAircraftId, setClaimedAircraftId] = useState<string | null>(
+    ownServerClaim?.aircraftId ?? null,
+  );
+  const [claimError, setClaimError] = useState<string | null>(null);
+  const availableAircraft = aircraft.filter((entry) => {
+    const claim = assistClaims.find((candidate) => candidate.aircraftId === entry.id);
+    return !claim || claim.deviceId === deviceId || entry.id === claimedAircraftId;
+  });
   const claimedAircraft = aircraft.find((entry) => entry.id === claimedAircraftId);
   const activeAircraft = claimedAircraft ?? selectedAircraft;
   const activeRotation = activeAircraft
@@ -91,9 +106,42 @@ export function FlightLineAssist({
     .filter((rotation) => ["DRAFT", "CALLED"].includes(rotation.status))
     .slice(0, 3);
 
-  function claim(entry: Aircraft) {
-    setClaimedAircraftId(entry.id);
-    onSelectAircraft(entry.id);
+  useEffect(() => {
+    if (!claimedAircraftId && ownServerClaim) setClaimedAircraftId(ownServerClaim.aircraftId);
+  }, [claimedAircraftId, ownServerClaim]);
+
+  useEffect(() => {
+    if (!claimedAircraftId) return;
+    const renewal = window.setInterval(() => {
+      void onClaim(claimedAircraftId).catch(() => setClaimedAircraftId(null));
+    }, 25_000);
+    return () => window.clearInterval(renewal);
+  }, [claimedAircraftId, onClaim]);
+
+  async function claim(entry: Aircraft) {
+    try {
+      await onClaim(entry.id);
+      setClaimedAircraftId(entry.id);
+      setClaimError(null);
+      onSelectAircraft(entry.id);
+    } catch (cause) {
+      setClaimError(
+        cause instanceof Error ? cause.message : "Betreuung konnte nicht übernommen werden.",
+      );
+    }
+  }
+
+  async function finishClaim() {
+    if (!claimedAircraftId) return;
+    try {
+      await onRelease(claimedAircraftId);
+      setClaimedAircraftId(null);
+      setClaimError(null);
+    } catch (cause) {
+      setClaimError(
+        cause instanceof Error ? cause.message : "Betreuung konnte nicht beendet werden.",
+      );
+    }
   }
 
   return (
@@ -120,7 +168,7 @@ export function FlightLineAssist({
         <span className="assist-device">▣ Gerät FL-03</span>
       </header>
 
-      {message ? <p className="assist-message">{message}</p> : null}
+      {message || claimError ? <p className="assist-message">{claimError ?? message}</p> : null}
 
       <div className="assist-main-grid">
         <section className="assist-pick-list">
@@ -138,7 +186,7 @@ export function FlightLineAssist({
             </button>
           </div>
           <div className="assist-aircraft-cards">
-            {aircraft.slice(0, 4).map((entry) => {
+            {availableAircraft.slice(0, 4).map((entry) => {
               const rotation = rotationForAircraft(entry, board.rotations, board.products);
               const state = assistState(entry, rotation);
               const claimed = entry.id === claimedAircraftId;
@@ -166,7 +214,7 @@ export function FlightLineAssist({
               );
             })}
           </div>
-          {aircraft.length > 4 ? (
+          {availableAircraft.length > 4 ? (
             <button className="assist-more" type="button">
               Weitere anzeigen
             </button>
@@ -215,11 +263,7 @@ export function FlightLineAssist({
                 </button>
               </div>
               <div className="assist-current-footer">
-                <button
-                  className="assist-finish"
-                  onClick={() => setClaimedAircraftId(null)}
-                  type="button"
-                >
+                <button className="assist-finish" onClick={() => void finishClaim()} type="button">
                   ✓ Betreuung abschließen
                 </button>
               </div>

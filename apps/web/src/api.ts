@@ -110,6 +110,51 @@ export async function verifyAdminPin(
   }
 }
 
+export async function claimFlightLineAircraft(
+  eventId: string,
+  aircraftId: string,
+  deviceId: string,
+  deviceToken: string,
+): Promise<{ aircraftId: string; deviceId: string; claimedAt: string; expiresAt: string }> {
+  const response = await apiFetch(
+    `/api/events/${encodeURIComponent(eventId)}/assist-claims/${encodeURIComponent(aircraftId)}`,
+    {
+      method: "PUT",
+      headers: { "x-device-id": deviceId, "x-device-token": deviceToken },
+    },
+  );
+  const body = (await response.json()) as {
+    aircraftId?: string;
+    deviceId?: string;
+    claimedAt?: string;
+    expiresAt?: string;
+    error?: { message?: string };
+  };
+  if (!response.ok || !body.aircraftId || !body.deviceId || !body.claimedAt || !body.expiresAt) {
+    throw new Error(body.error?.message ?? "Betreuung konnte nicht übernommen werden.");
+  }
+  return body as { aircraftId: string; deviceId: string; claimedAt: string; expiresAt: string };
+}
+
+export async function releaseFlightLineAircraft(
+  eventId: string,
+  aircraftId: string,
+  deviceId: string,
+  deviceToken: string,
+): Promise<void> {
+  const response = await apiFetch(
+    `/api/events/${encodeURIComponent(eventId)}/assist-claims/${encodeURIComponent(aircraftId)}`,
+    {
+      method: "DELETE",
+      headers: { "x-device-id": deviceId, "x-device-token": deviceToken },
+    },
+  );
+  if (!response.ok) {
+    const body = (await response.json()) as { error?: { message?: string } };
+    throw new Error(body.error?.message ?? "Betreuung konnte nicht beendet werden.");
+  }
+}
+
 export async function searchTickets(
   eventId: string,
   deviceId: string,
