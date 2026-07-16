@@ -4180,9 +4180,9 @@ function AdminView() {
       title: "Stammdaten",
       description: "Ressourcen für den Flugtag verwalten.",
     },
-    operations: {
-      title: "Betrieb",
-      description: "Laufende Umläufe und organisatorische Betriebszustände steuern.",
+    evaluation: {
+      title: "Auswertung",
+      description: "Verläufe, Berichte und seltene administrative Sonderfälle prüfen.",
     },
     backup: {
       title: "Sicherung & Reset",
@@ -6182,7 +6182,7 @@ function AdminView() {
               </div>
             ) : null}
           </section>
-          <section className="admin-section" hidden={adminArea !== "operations"}>
+          <section className="admin-section" hidden={adminArea !== "evaluation"}>
             <h2>Notfallmodus</h2>
             <label>
               <FieldLabel
@@ -6215,7 +6215,7 @@ function AdminView() {
               </button>
             )}
           </section>
-          <section className="admin-section" hidden={adminArea !== "operations"}>
+          <section className="admin-section" hidden={adminArea !== "evaluation"}>
             <h2>Laufende Umläufe</h2>
             <div className="active-rotation-list">
               {board?.rotations
@@ -6235,7 +6235,7 @@ function AdminView() {
           </section>
           <section
             className="admin-section manifest-correction"
-            hidden={adminArea !== "operations"}
+            hidden={adminArea !== "evaluation"}
           >
             <div className="section-heading">
               <div>
@@ -6338,7 +6338,7 @@ function AdminView() {
               <p className="help-text">Aktuell ist keine Korrektur nach Flugstart erforderlich.</p>
             ) : null}
           </section>
-          <section className="admin-section" hidden={adminArea !== "operations"}>
+          <section className="admin-section" hidden={adminArea !== "evaluation"}>
             <h2>Betriebs- und Wetterhinweise</h2>
             <label>
               <FieldLabel
@@ -6373,7 +6373,7 @@ function AdminView() {
             </button>
             <p>Hinweise stoppen keinen Flugbetrieb. Unterbrechungen werden separat gesetzt.</p>
           </section>
-          <section className="admin-section" hidden={adminArea !== "operations"}>
+          <section className="admin-section" hidden={adminArea !== "evaluation"}>
             <h2>Kapazität und Verkaufsempfehlung</h2>
             <LocalizedDateTimeInput
               label="Neuer harter Verkaufsschluss"
@@ -6431,7 +6431,7 @@ function AdminView() {
               ))}
             </div>
           </section>
-          <section className="admin-section" hidden={adminArea !== "operations"}>
+          <section className="admin-section" hidden={adminArea !== "evaluation"}>
             <h2>Flotte, Tanken und Pausen</h2>
             <p className="safety-disclaimer">
               Ausschließlich organisatorische Hinweise – keine flugbetriebliche oder
@@ -6555,7 +6555,7 @@ function AdminView() {
               ))}
             </div>
           </section>
-          <section className="admin-section" hidden={adminArea !== "operations"}>
+          <section className="admin-section" hidden={adminArea !== "evaluation"}>
             <h2>Ressourcengruppen</h2>
             {resourceGroups.map((group) => (
               <div className="resource-control" key={group.id}>
@@ -6680,7 +6680,7 @@ function AdminView() {
               ))}
             </div>
           </section>
-          <section className="admin-section" hidden={adminArea !== "backup"}>
+          <section className="admin-section" hidden={adminArea !== "evaluation"}>
             <div className="section-heading">
               <h2>Audit und Tagesabschluss</h2>
               <div className="report-actions">

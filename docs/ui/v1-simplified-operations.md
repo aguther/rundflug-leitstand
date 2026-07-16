@@ -48,6 +48,11 @@ und dürfen den Standardpfad nicht dominieren.
 
 ## Administration `/admin`
 
+Die Hauptnavigation trennt `Übersicht`, `Einrichtung`, `Stammdaten`, `Auswertung` und
+`Sicherung & Reset`. Ein eigener Administrationsbereich „Betrieb“ entfällt: die laufende
+Flottensteuerung liegt im Flight-Line-Supervisor. Unter „Auswertung“ bleiben Historie,
+Tagesberichte und seltene, ausdrücklich administrative Sonderfälle erreichbar.
+
 Die Stammdatenbereiche sind Gates, Ressourcengruppen, Flugzeuge, Pilotencodes und Produkte. Ein
 separater Bereich „Zuordnungen“ entfällt; konkrete Flugzeuge werden direkt in der Ressourcengruppe
 ausgewählt. Die Liste bleibt sichtbar, während der Editor daneben arbeitet.
@@ -79,4 +84,3 @@ Tastatur nachgewiesen funktionieren muss.
   horizontale Seitenüberläufe.
 - Mobil unter 700 Pixeln: jeweils nur eine Aufgabe im Vordergrund; Hauptaktion bleibt am unteren Rand
   sichtbar, ohne Inhalte zu verdecken.
-
