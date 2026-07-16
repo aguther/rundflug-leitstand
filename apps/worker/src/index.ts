@@ -12,7 +12,12 @@ import {
   operationalHistoryQuerySchema,
   operationalHistorySchema,
 } from "@rundflug/contracts";
-import { assessRemainingCapacity, estimateDuration, forecastQueueWindows } from "@rundflug/domain";
+import {
+  assessRemainingCapacity,
+  deriveResourceGroupCapacity,
+  estimateDuration,
+  forecastQueueWindows,
+} from "@rundflug/domain";
 import { Hono } from "hono";
 import { secureHeaders } from "hono/secure-headers";
 import { createPortableBackup, operationDateInTimeZone } from "./backup";
@@ -905,6 +910,7 @@ app.get("/api/events/:eventId/operations", async (context) => {
                     ORDER BY candidate_rotation.predicted_completion_at DESC
                     LIMIT 1
                  ), '9999-12-31T23:59:59.999Z'),
+                 candidate.passenger_seats,
                  candidate.registration
                LIMIT 1) AS suggested_aircraft_id,
               (SELECT candidate.registration FROM resource_group_memberships membership
@@ -929,6 +935,7 @@ app.get("/api/events/:eventId/operations", async (context) => {
                     ORDER BY candidate_rotation.predicted_completion_at DESC
                     LIMIT 1
                  ), '9999-12-31T23:59:59.999Z'),
+                 candidate.passenger_seats,
                  candidate.registration
                LIMIT 1) AS suggested_aircraft_registration,
               MIN(tg.id) AS ticket_group_id, MIN(tg.deferral_count) AS deferral_count,
@@ -1208,10 +1215,14 @@ app.get("/api/events/:eventId/operations", async (context) => {
     currentDeviceRole: device.role,
     event: rowToSnapshot(eventRow),
     products: products.results.map((product) => {
-      const groupAircraftSeats = aircraftRows.results
+      const allGroupAircraftSeats = aircraftRows.results
         .filter((aircraft) => aircraft.resource_group_id === product.resource_group_id)
-        .map((aircraft) => aircraft.passenger_seats)
-        .slice(0, activePilotCount);
+        .map((aircraft) => aircraft.passenger_seats);
+      const groupAircraftSeats = allGroupAircraftSeats.slice(0, activePilotCount);
+      const effectiveReferenceCapacity = Math.max(
+        1,
+        deriveResourceGroupCapacity(allGroupAircraftSeats),
+      );
       const reservedRefuelSeats = aircraftRows.results
         .filter(
           (aircraft) =>
@@ -1276,7 +1287,7 @@ app.get("/api/events/:eventId/operations", async (context) => {
         >,
         sortOrder: product.sort_order,
         saleEnabled: product.sale_enabled === 1,
-        referenceCapacity: product.reference_capacity,
+        referenceCapacity: effectiveReferenceCapacity,
         referenceDurationMinutes: product.reference_duration_minutes,
         queuedTickets: product.queued_tickets,
         resourceGroupOpenTickets: product.resource_group_open_tickets,
@@ -1457,17 +1468,28 @@ app.get("/api/events/:eventId/operations", async (context) => {
       displayFilter: gateDisplayFilterSchema.parse(JSON.parse(gate.display_filter_json)),
       assignedResourceGroupIds: JSON.parse(gate.assigned_resource_group_ids_json) as string[],
     })),
-    resourceGroups: resourceGroupRows.results.map((group) => ({
-      id: group.id,
-      name: group.name,
-      status: group.status,
-      gateId: group.gate_id,
-      gateLabel: group.gate_label,
-      referenceCapacity: group.reference_capacity,
-      plannedRotationMinutes: group.planned_rotation_minutes,
-      compatibleAircraftTypes: JSON.parse(group.compatible_aircraft_types_json) as string[],
-      activeAircraftIds: JSON.parse(group.aircraft_ids_json) as string[],
-    })),
+    resourceGroups: resourceGroupRows.results.map((group) => {
+      const activeAircraftIds = JSON.parse(group.aircraft_ids_json) as string[];
+      const effectiveReferenceCapacity = Math.max(
+        1,
+        deriveResourceGroupCapacity(
+          fleetRows.results
+            .filter((aircraft) => activeAircraftIds.includes(aircraft.id))
+            .map((aircraft) => aircraft.passenger_seats),
+        ),
+      );
+      return {
+        id: group.id,
+        name: group.name,
+        status: group.status,
+        gateId: group.gate_id,
+        gateLabel: group.gate_label,
+        referenceCapacity: effectiveReferenceCapacity,
+        plannedRotationMinutes: group.planned_rotation_minutes,
+        compatibleAircraftTypes: [],
+        activeAircraftIds,
+      };
+    }),
     metrics: {
       openTickets: metricsRow?.open_tickets ?? 0,
       soldTickets: metricsRow?.sold_tickets ?? 0,

@@ -24,6 +24,7 @@ import {
   assertTicketNoShowAllowed,
   assessRemainingCapacity,
   type DeviceRole,
+  deriveResourceGroupCapacity,
   DomainRuleError,
   estimateDuration,
   forecastQueueWindows,
@@ -330,6 +331,21 @@ export class EventCoordinator extends DurableObject<Env> {
           warningThreshold: product.capacity_warning_threshold,
           criticalThreshold: product.capacity_critical_threshold,
         });
+        const effectiveGroupCapacity = deriveResourceGroupCapacity(
+          aircraftRows.results.map((row) => row.passenger_seats),
+        );
+        if (effectiveGroupCapacity === 0) {
+          return json(
+            {
+              error: {
+                code: "SALE_BLOCKED_NO_AIRCRAFT",
+                message:
+                  "Der Ressourcengruppe ist derzeit kein nutzbares Flugzeug zugeordnet.",
+              },
+            },
+            { status: 409 },
+          );
+        }
         if (
           !capacity.saleRecommended ||
           capacity.remainingSellableSeats < command.payload.publicTicketCodes.length
@@ -349,7 +365,7 @@ export class EventCoordinator extends DurableObject<Env> {
         try {
           splitPlan = planBookingGroupSplit({
             groupSize: command.payload.publicTicketCodes.length,
-            referenceCapacity: product.reference_capacity,
+            referenceCapacity: effectiveGroupCapacity,
             splitAcknowledged: command.payload.oversizeSplitAcknowledged,
           });
         } catch (reason: unknown) {
@@ -359,10 +375,10 @@ export class EventCoordinator extends DurableObject<Env> {
               error: {
                 code: reason.code,
                 message: reason.message,
-                referenceCapacity: product.reference_capacity,
+                referenceCapacity: effectiveGroupCapacity,
                 groupSize: command.payload.publicTicketCodes.length,
                 requiredFlightGroupCount: Math.ceil(
-                  command.payload.publicTicketCodes.length / product.reference_capacity,
+                  command.payload.publicTicketCodes.length / effectiveGroupCapacity,
                 ),
               },
             },
@@ -453,7 +469,7 @@ export class EventCoordinator extends DurableObject<Env> {
                 product.resource_group_id,
                 product.id,
                 normalizedCodes.length,
-                product.reference_capacity,
+                effectiveGroupCapacity,
               )
               .first<{ rotation_id: string; flight_group_id: string }>();
         const communicationRow = openFlightGroup
@@ -532,7 +548,7 @@ export class EventCoordinator extends DurableObject<Env> {
               ])),
           ...hashes.flatMap((hash, index) => {
             const slotIndex = splitAcrossFlightGroups
-              ? Math.floor(index / product.reference_capacity)
+              ? Math.floor(index / effectiveGroupCapacity)
               : 0;
             const ticketSlot = slots[slotIndex];
             if (!ticketSlot) throw new Error("Fluggruppen-Slot für Ticket fehlt.");
