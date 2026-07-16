@@ -72,6 +72,7 @@ import {
   eventLocalDateTimeToIso,
   formatEventLocalDateTime,
 } from "./event-time";
+import { expectedReviewAtFromPause } from "./flight-line-pause";
 import { LocalizedDateInput, LocalizedDateTimeInput } from "./localized-date-input";
 import {
   appendCashierDraftRevision,
@@ -200,7 +201,14 @@ function operationalTimeLabel(value: string | null, timeZone: string): string {
 }
 
 function deviceRoleFor(deviceId: string): string | null {
-  for (const role of ["ADMIN", "CASHIER", "FLIGHT_LINE", "DISPLAY"]) {
+  for (const role of [
+    "ADMIN",
+    "CASHIER",
+    "FLIGHT_LINE",
+    "FLIGHT_LINE_LEAD",
+    "FLIGHT_DIRECTOR",
+    "DISPLAY",
+  ]) {
     if (window.localStorage.getItem(`device-id:${role}`) === deviceId) return role;
   }
   return null;
@@ -212,24 +220,27 @@ function deviceTokenFor(deviceId: string): string {
   if (LOCAL_DEVELOPMENT && EVENT_ID === "demo-2026") {
     if (deviceId === "cashier-tablet-1") return "demo-cashier-device-token";
     if (deviceId === "flight-line-tablet-1") return "demo-flight-line-device-token";
+    if (deviceId === "recovery-flight-lead") return "lead-device-credential";
     return "demo-admin-device-token";
   }
   return "";
 }
 
 function deviceIdForRole(role: string, developmentId: string): string {
+  if (LOCAL_DEVELOPMENT && EVENT_ID === "demo-2026") return developmentId;
   const pairedDeviceId =
     role === "CASHIER" || role === "FLIGHT_LINE"
       ? deviceIdForOperationalView(window.localStorage, role)
-      : window.localStorage.getItem(`device-id:${role}`);
+      : role === "FLIGHT_LINE_LEAD"
+        ? (window.localStorage.getItem("device-id:FLIGHT_LINE_LEAD") ??
+          deviceIdForOperationalView(window.localStorage, "FLIGHT_LINE"))
+        : window.localStorage.getItem(`device-id:${role}`);
   if (pairedDeviceId) return pairedDeviceId;
-  return LOCAL_DEVELOPMENT && EVENT_ID === "demo-2026"
-    ? developmentId
-    : `unpaired-${role.toLowerCase()}`;
+  return `unpaired-${role.toLowerCase()}`;
 }
 
 const CASHIER_DEVICE_ID = deviceIdForRole("CASHIER", "cashier-tablet-1");
-const FLIGHT_LINE_DEVICE_ID = deviceIdForRole("FLIGHT_LINE", "flight-line-tablet-1");
+const FLIGHT_LINE_DEVICE_ID = deviceIdForRole("FLIGHT_LINE_LEAD", "recovery-flight-lead");
 const ADMIN_DEVICE_ID = deviceIdForRole("ADMIN", "technical-scaffold");
 const MASTER_DATA_AUDIT_REASON = "Administrative Stammdatenpflege";
 const OPERATIONAL_AUDIT_REASON = "Operative Änderung über Administration";
@@ -1087,11 +1098,16 @@ function FlightLineView() {
   const [dispositionCapacity, setDispositionCapacity] = useState(1);
   const [moveTargetId, setMoveTargetId] = useState("");
   const [moveReason, setMoveReason] = useState("");
+  const [aircraftPauseOpen, setAircraftPauseOpen] = useState(false);
+  const [aircraftPauseMinutes, setAircraftPauseMinutes] = useState("20");
+  const [aircraftPauseUnknown, setAircraftPauseUnknown] = useState(false);
   const operationalRotations = board?.rotations.filter(
     (rotation) => rotation.status !== "COMPLETED",
   );
-  const operationalAircraft =
-    board?.aircraft.filter((aircraft) => aircraft.operationalState !== "INACTIVE") ?? [];
+  const operationalAircraft = board?.aircraft ?? [];
+  const canManageAircraft = ["FLIGHT_LINE_LEAD", "FLIGHT_DIRECTOR", "ADMIN"].includes(
+    board?.currentDeviceRole ?? "",
+  );
   const selectedAircraft =
     operationalAircraft.find((aircraft) => aircraft.id === selectedAircraftId) ??
     operationalAircraft[0];
@@ -1103,6 +1119,7 @@ function FlightLineView() {
     );
     return (
       rotation.status === "DRAFT" &&
+      selectedAircraft.operationalState === "AVAILABLE" &&
       rotationProduct?.resourceGroupId === selectedAircraft.resourceGroupId &&
       rotation.ticketCount <= selectedAircraft.passengerSeats
     );
@@ -1176,6 +1193,56 @@ function FlightLineView() {
     } catch (reason) {
       setMessage(reason instanceof Error ? reason.message : "Aktion fehlgeschlagen.");
     }
+  }
+
+  async function setFlightLineAircraftState(
+    state: "AVAILABLE" | "REFUELING" | "PAUSED" | "INTERRUPTED" | "INACTIVE",
+    expectedReviewAt: string | null = null,
+  ) {
+    if (!board || !selectedAircraft) return;
+    const reasonByState = {
+      AVAILABLE: "Flugzeug durch Flight Line wieder verfügbar gemeldet",
+      REFUELING: "Tanken durch Flight Line begonnen",
+      PAUSED: "Flugzeugpause durch Flight Line begonnen",
+      INTERRUPTED: "Flugzeugbetrieb durch Flight Line unterbrochen",
+      INACTIVE: "Flugzeug durch Flight Line vorübergehend inaktiv gemeldet",
+    } as const;
+    try {
+      await sendCommand(
+        {
+          commandId: crypto.randomUUID(),
+          eventId: EVENT_ID,
+          deviceId: FLIGHT_LINE_DEVICE_ID,
+          expectedVersion: board.event.version,
+          issuedAt: new Date().toISOString(),
+          type: "SET_AIRCRAFT_OPERATIONAL_STATE",
+          payload: {
+            aircraftId: selectedAircraft.id,
+            state,
+            reason: reasonByState[state],
+            expectedReviewAt,
+          },
+        },
+        deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
+      );
+      setMessage(
+        state === "AVAILABLE"
+          ? `${selectedAircraft.registration} ist wieder verfügbar.`
+          : `${selectedAircraft.registration}: ${aircraftStateLabel[state]}.`,
+      );
+      setAircraftPauseOpen(false);
+      await refresh();
+    } catch (cause) {
+      setMessage(
+        cause instanceof Error ? cause.message : "Flugzeugstatus konnte nicht geändert werden.",
+      );
+    }
+  }
+
+  function startAircraftPause() {
+    if (!selectedAircraft) return;
+    const expectedReviewAt = expectedReviewAtFromPause(aircraftPauseMinutes, aircraftPauseUnknown);
+    void setFlightLineAircraftState("PAUSED", expectedReviewAt);
   }
 
   async function triggerEmergency() {
@@ -1410,516 +1477,668 @@ function FlightLineView() {
       <InterruptionNotice active={board?.event.operationalInterrupted ?? false} />
       <OperationalNotice note={board?.event.operationalNote} />
       {board?.currentDeviceRole === "FLIGHT_LINE_LEAD" && !board.event.emergencyMode ? (
-        <section className="emergency-control" aria-labelledby="flight-line-emergency-title">
-          <label>
-            <span id="flight-line-emergency-title">Not-Halt</span>
-            <input
-              value={emergencyReason}
-              onChange={(event) => setEmergencyReason(event.target.value)}
-              placeholder="Grund eingeben"
-            />
-          </label>
-          <button
-            className="danger-action"
-            disabled={emergencyReason.trim().length < 3}
-            onClick={triggerEmergency}
-            type="button"
-          >
-            Not-Halt auslösen
-          </button>
-        </section>
-      ) : null}
-      <nav className="aircraft-selector" aria-label="Flugzeug auswählen">
-        {operationalAircraft.map((aircraft) => {
-          const assignedRotation = operationalRotations?.find(
-            (rotation) => rotation.aircraftId === aircraft.id,
-          );
-          return (
+        <details className="emergency-control">
+          <summary>Not-Halt</summary>
+          <div className="emergency-control-body">
+            <label>
+              <span id="flight-line-emergency-title">Begründung</span>
+              <input
+                value={emergencyReason}
+                onChange={(event) => setEmergencyReason(event.target.value)}
+                placeholder="Grund eingeben"
+              />
+            </label>
             <button
-              className={aircraft.id === selectedAircraft?.id ? "selected" : ""}
-              key={aircraft.id}
-              onClick={() => {
-                setSelectedAircraftId(aircraft.id);
-                setSelectedId(null);
-                setDispositionOpen(false);
-              }}
+              className="danger-action"
+              disabled={emergencyReason.trim().length < 3}
+              onClick={triggerEmergency}
               type="button"
             >
-              <strong>{aircraft.registration}</strong>
-              <span>{aircraft.passengerSeats} Plätze</span>
-              <small>
-                {assignedRotation
-                  ? `${assignedRotation.communicationLabel} · ${rotationStatusLabel[assignedRotation.status]}`
-                  : aircraftStateLabel[aircraft.operationalState]}
-              </small>
+              Not-Halt auslösen
             </button>
-          );
-        })}
-      </nav>
-      <section className="flight-workspace">
-        <div className="queue-list">
-          <h1>
-            {selectedAircraft
-              ? `Nächste Gruppen für ${selectedAircraft.registration}`
-              : "Flugzeuge"}
-          </h1>
-          {aircraftRotations?.map((rotation) => {
-            const segmentLabel = sharedGroupSegmentLabel(rotation, operationalRotations ?? []);
+          </div>
+        </details>
+      ) : null}
+      <section className="flight-supervisor">
+        <nav className="aircraft-selector" aria-label="Flugzeug auswählen">
+          <div className="aircraft-selector-heading">
+            <strong>Flugzeuge</strong>
+            <span>{operationalAircraft.length}</span>
+          </div>
+          {operationalAircraft.map((aircraft) => {
+            const assignedRotation = operationalRotations?.find(
+              (rotation) => rotation.aircraftId === aircraft.id,
+            );
             return (
-              <div className="queue-row-wrap" key={rotation.id}>
-                <button
-                  className={rotation.id === selected?.id ? "queue-row selected" : "queue-row"}
-                  onClick={() => {
-                    setSelectedId(rotation.id);
-                    setDispositionCapacity(rotation.usableCapacity);
-                    setMoveTargetId("");
-                    setMoveReason("");
-                  }}
-                  type="button"
-                >
-                  <strong>{rotation.communicationLabel}</strong>
-                  <span>{rotation.productName}</span>
-                  <span>
-                    {rotation.ticketCount}/{rotation.usableCapacity} Plätze ·{" "}
-                    {rotation.predictedLowerMinutes}–{rotation.predictedUpperMinutes} Min.
-                  </span>
-                  {segmentLabel ? <small>{segmentLabel}</small> : null}
-                </button>
-                <button
-                  aria-label={`Disposition für ${rotation.communicationLabel}`}
-                  className="disposition-trigger"
-                  onClick={() => {
-                    setSelectedId(rotation.id);
-                    setDispositionCapacity(rotation.usableCapacity);
-                    setMoveTargetId("");
-                    setMoveReason("");
-                    setDispositionOpen(true);
-                  }}
-                  type="button"
-                >
-                  Disposition
-                </button>
-              </div>
+              <button
+                className={aircraft.id === selectedAircraft?.id ? "selected" : ""}
+                key={aircraft.id}
+                onClick={() => {
+                  setSelectedAircraftId(aircraft.id);
+                  setSelectedId(null);
+                  setDispositionOpen(false);
+                }}
+                type="button"
+              >
+                <strong>{aircraft.registration}</strong>
+                <span>{aircraft.passengerSeats} Plätze</span>
+                <small>
+                  {assignedRotation
+                    ? `${assignedRotation.communicationLabel} · ${rotationStatusLabel[assignedRotation.status]}`
+                    : aircraftStateLabel[aircraft.operationalState]}
+                </small>
+              </button>
             );
           })}
-          {selectedAircraft && aircraftRotations?.length === 0 ? (
-            <p>Für dieses Flugzeug ist aktuell keine passende Fluggruppe offen.</p>
-          ) : null}
-          {!selectedAircraft ? <p>Kein aktives Flugzeug verfügbar.</p> : null}
-        </div>
-        <div className="rotation-detail">
-          {selected ? (
-            <>
-              <div className={`state-banner state-${selected.status.toLowerCase()}`}>
-                <span>Status</span>
-                <strong>{rotationStatusLabel[selected.status]}</strong>
-              </div>
-              <h2>Fluggruppe {selected.communicationLabel}</h2>
-              {sharedGroupSegmentLabel(selected, operationalRotations ?? []) ? (
-                <p className="shared-group-label">
-                  {sharedGroupSegmentLabel(selected, operationalRotations ?? [])}
-                </p>
-              ) : null}
-              <dl>
-                <div>
-                  <dt>Produkt</dt>
-                  <dd>{selected.productName}</dd>
+        </nav>
+        <section className="flight-workspace">
+          <div className="queue-list">
+            <h1>
+              {selectedAircraft
+                ? `Nächste Gruppen für ${selectedAircraft.registration}`
+                : "Flugzeuge"}
+            </h1>
+            {aircraftRotations?.map((rotation) => {
+              const segmentLabel = sharedGroupSegmentLabel(rotation, operationalRotations ?? []);
+              return (
+                <div className="queue-row-wrap" key={rotation.id}>
+                  <button
+                    className={rotation.id === selected?.id ? "queue-row selected" : "queue-row"}
+                    onClick={() => {
+                      setSelectedId(rotation.id);
+                      setDispositionCapacity(rotation.usableCapacity);
+                      setMoveTargetId("");
+                      setMoveReason("");
+                    }}
+                    type="button"
+                  >
+                    <strong>{rotation.communicationLabel}</strong>
+                    <span>{rotation.productName}</span>
+                    <span>
+                      {rotation.ticketCount}/{rotation.usableCapacity} Plätze ·{" "}
+                      {rotation.predictedLowerMinutes}–{rotation.predictedUpperMinutes} Min.
+                    </span>
+                    {segmentLabel ? <small>{segmentLabel}</small> : null}
+                  </button>
+                  <button
+                    aria-label={`Disposition für ${rotation.communicationLabel}`}
+                    className="disposition-trigger"
+                    onClick={() => {
+                      setSelectedId(rotation.id);
+                      setDispositionCapacity(rotation.usableCapacity);
+                      setMoveTargetId("");
+                      setMoveReason("");
+                      setDispositionOpen(true);
+                    }}
+                    type="button"
+                  >
+                    Disposition
+                  </button>
                 </div>
+              );
+            })}
+            {selectedAircraft && aircraftRotations?.length === 0 ? (
+              <p>Für dieses Flugzeug ist aktuell keine passende Fluggruppe offen.</p>
+            ) : null}
+            {!selectedAircraft ? <p>Kein aktives Flugzeug verfügbar.</p> : null}
+          </div>
+          <div className="rotation-detail">
+            {selectedAircraft ? (
+              <section className="supervisor-aircraft-summary">
                 <div>
-                  <dt>Tickets</dt>
-                  <dd>{selected.ticketCount}</dd>
+                  <span>Ausgewähltes Flugzeug</span>
+                  <h1>{selectedAircraft.registration}</h1>
+                  <p>
+                    {selectedAircraft.aircraftType} · {selectedAircraft.passengerSeats} Plätze ·{" "}
+                    {selectedAircraft.resourceGroupName || "Keine Ressourcengruppe"}
+                  </p>
                 </div>
-                <div>
-                  <dt>Geschätzte Passagierzuladung</dt>
-                  <dd>
-                    {selected.estimatedPassengerPayloadKg === null
-                      ? "Nicht vollständig erfasst"
-                      : `${selected.estimatedPassengerPayloadKg} kg`}
-                  </dd>
-                </div>
-                <div>
-                  <dt>Zurückstellungen</dt>
-                  <dd>
-                    {selected.deferralCount}/{board?.event.maxTicketDeferrals ?? 2}
-                  </dd>
-                </div>
-                <div>
-                  <dt>Flugzeug</dt>
-                  <dd>
-                    {selected.aircraftRegistration ??
-                      (selected.suggestedAircraftRegistration
-                        ? `Vorschlag ${selected.suggestedAircraftRegistration} · Bestätigung mit NEXT`
-                        : "Kein kompatibles Flugzeug verfügbar")}
-                  </dd>
-                </div>
-                {selected.status !== "DRAFT" ? (
-                  <div>
-                    <dt>Pilotencode</dt>
-                    <dd>{selected.pilotOperationalCode ?? "Nicht erfasst"}</dd>
-                  </div>
+                <strong
+                  className={`aircraft-state state-${selectedAircraft.operationalState.toLowerCase()}`}
+                >
+                  {aircraftStateLabel[selectedAircraft.operationalState]}
+                </strong>
+                {selectedAircraft.expectedReviewAt ? (
+                  <small>
+                    Erwartete Rückkehr{" "}
+                    {operationalTimeLabel(
+                      selectedAircraft.expectedReviewAt,
+                      board?.event.timeZone ?? "Europe/Berlin",
+                    )}
+                  </small>
                 ) : null}
-              </dl>
-              {selected.status === "DRAFT" ? (
-                <details className="pilot-assignment">
-                  <summary>
-                    Pilotzuordnung · {selected.suggestedPilotOperationalCode ?? "noch offen"}
-                  </summary>
-                  <label>
-                    Anonymer Pilotencode
-                    <select
-                      aria-label="Pilotencode für NEXT"
-                      value={nextPilotId}
-                      onChange={(event) => setNextPilotId(event.target.value)}
-                    >
-                      <option value="">Pilotencode wählen</option>
-                      {board?.pilots
-                        .filter(
-                          (pilot) =>
-                            pilot.active &&
-                            !pilot.paused &&
-                            (!pilot.currentRotationId || pilot.currentRotationId === selected.id),
-                        )
-                        .map((pilot) => (
-                          <option value={pilot.id} key={pilot.id}>
-                            {pilot.operationalCode}
-                            {pilot.id === selected.suggestedPilotId ? " · Vorschlag" : ""}
-                          </option>
-                        ))}
-                    </select>
-                  </label>
-                </details>
-              ) : null}
-              <p className="safety-disclaimer">
-                Nur organisatorische Schätzung aus konfigurierten Referenzgewichten. Die Bewertung
-                und Entscheidung liegt ausschließlich beim Piloten; keine Sicherheits- oder
-                Freigabewirkung.
-              </p>
-              <section className="rotation-timeline" aria-labelledby="timeline-title">
-                <div>
-                  <h3 id="timeline-title">Plan · Prognose · Ist</h3>
-                  <span>
-                    Prognosequalität:{" "}
-                    {selected.timeline.predictionQuality
-                      ? predictionQualityLabel[selected.timeline.predictionQuality]
-                      : "noch nicht berechnet"}
-                  </span>
-                </div>
-                <table>
-                  <thead>
-                    <tr>
-                      <th scope="col">Punkt</th>
-                      <th scope="col">Plan</th>
-                      <th scope="col">Prognose</th>
-                      <th scope="col">Ist</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(
-                      [
-                        ["Boarding", "boardingAt"],
-                        ["Start", "departureAt"],
-                        ["Landung", "landingAt"],
-                        ["Abschluss", "completionAt"],
-                      ] as const
-                    ).map(([label, field]) => (
-                      <tr key={field}>
-                        <th scope="row">{label}</th>
-                        <td>
-                          {operationalTimeLabel(
-                            selected.timeline.planned[field],
-                            board?.event.timeZone ?? "Europe/Berlin",
-                          )}
-                        </td>
-                        <td>
-                          {operationalTimeLabel(
-                            selected.timeline.predicted[field],
-                            board?.event.timeZone ?? "Europe/Berlin",
-                          )}
-                        </td>
-                        <td>
-                          {operationalTimeLabel(
-                            selected.timeline.actual[field],
-                            board?.event.timeZone ?? "Europe/Berlin",
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </section>
-              <section className="attendance-panel" aria-labelledby="attendance-title">
-                <div>
-                  <h3 id="attendance-title">Anwesenheit (optional)</h3>
-                  <span>
-                    {
-                      selected.tickets.filter((ticket) => ticket.attendanceStatus === "CHECKED_IN")
-                        .length
-                    }
-                    /{selected.tickets.length} eingecheckt
-                  </span>
-                </div>
-                <div className="attendance-list">
-                  {selected.tickets.map((ticket, index) => {
-                    const checkedIn = ticket.attendanceStatus === "CHECKED_IN";
-                    return (
+                <div className="supervisor-aircraft-actions">
+                  {!canManageAircraft ? (
+                    <span>Flottenstatus wird durch die Flight-Line-Leitung gesteuert.</span>
+                  ) : selectedAircraft.operationalState === "AVAILABLE" ? (
+                    <>
+                      <button onClick={() => setAircraftPauseOpen(true)} type="button">
+                        Pause
+                      </button>
                       <button
-                        className={checkedIn ? "checked-in" : ""}
-                        disabled={!["DRAFT", "CALLED"].includes(selected.status)}
-                        key={ticket.id}
-                        onClick={() => setAttendance(ticket.id, !checkedIn)}
+                        onClick={() => void setFlightLineAircraftState("REFUELING")}
                         type="button"
                       >
-                        Ticket {index + 1} · {checkedIn ? "anwesend" : "offen"}
+                        Tanken
                       </button>
-                    );
-                  })}
-                </div>
-                <small>
-                  Der Standardumlauf bleibt auch ohne Einzelabgleich vollständig bedienbar.
-                </small>
-              </section>
-              {selected.status === "LANDED" ? (
-                <p className="landed-warning">Gelandet · noch nicht verfügbar</p>
-              ) : null}
-              {selected.status === "DRAFT" || selected.status === "CALLED" ? (
-                <div className="correction-controls">
-                  <label>
-                    Grund für Queue-Abweichung
-                    <input
-                      value={queueReason}
-                      onChange={(event) => setQueueReason(event.target.value)}
-                      placeholder="Mindestens 3 Zeichen"
-                    />
-                  </label>
-                  <div className="secondary-actions">
+                      <button
+                        onClick={() => void setFlightLineAircraftState("INACTIVE")}
+                        type="button"
+                      >
+                        Herausnehmen
+                      </button>
+                    </>
+                  ) : ["PAUSED", "REFUELING", "INACTIVE", "INTERRUPTED"].includes(
+                      selectedAircraft.operationalState,
+                    ) ? (
                     <button
-                      disabled={queueReason.trim().length < 3}
-                      onClick={() => mutateQueue("DEFER_TICKET_GROUP")}
+                      className="primary-action"
+                      onClick={() => void setFlightLineAircraftState("AVAILABLE")}
                       type="button"
                     >
-                      Zurückstellen
+                      Wieder verfügbar
                     </button>
-                    {selected.status === "CALLED" ? (
+                  ) : null}
+                </div>
+              </section>
+            ) : null}
+            {selected ? (
+              <>
+                <div className={`state-banner state-${selected.status.toLowerCase()}`}>
+                  <span>Status</span>
+                  <strong>{rotationStatusLabel[selected.status]}</strong>
+                </div>
+                <h2>Fluggruppe {selected.communicationLabel}</h2>
+                {sharedGroupSegmentLabel(selected, operationalRotations ?? []) ? (
+                  <p className="shared-group-label">
+                    {sharedGroupSegmentLabel(selected, operationalRotations ?? [])}
+                  </p>
+                ) : null}
+                <dl>
+                  <div>
+                    <dt>Produkt</dt>
+                    <dd>{selected.productName}</dd>
+                  </div>
+                  <div>
+                    <dt>Tickets</dt>
+                    <dd>{selected.ticketCount}</dd>
+                  </div>
+                  <div>
+                    <dt>Geschätzte Passagierzuladung</dt>
+                    <dd>
+                      {selected.estimatedPassengerPayloadKg === null
+                        ? "Nicht vollständig erfasst"
+                        : `${selected.estimatedPassengerPayloadKg} kg`}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Zurückstellungen</dt>
+                    <dd>
+                      {selected.deferralCount}/{board?.event.maxTicketDeferrals ?? 2}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Flugzeug</dt>
+                    <dd>
+                      {selected.aircraftRegistration ??
+                        (selected.suggestedAircraftRegistration
+                          ? `Vorschlag ${selected.suggestedAircraftRegistration} · Bestätigung mit NEXT`
+                          : "Kein kompatibles Flugzeug verfügbar")}
+                    </dd>
+                  </div>
+                  {selected.status !== "DRAFT" ? (
+                    <div>
+                      <dt>Pilotencode</dt>
+                      <dd>{selected.pilotOperationalCode ?? "Nicht erfasst"}</dd>
+                    </div>
+                  ) : null}
+                </dl>
+                {selected.status === "DRAFT" ? (
+                  <details className="pilot-assignment">
+                    <summary>
+                      Pilotzuordnung · {selected.suggestedPilotOperationalCode ?? "noch offen"}
+                    </summary>
+                    <label>
+                      Anonymer Pilotencode
+                      <select
+                        aria-label="Pilotencode für NEXT"
+                        value={nextPilotId}
+                        onChange={(event) => setNextPilotId(event.target.value)}
+                      >
+                        <option value="">Pilotencode wählen</option>
+                        {board?.pilots
+                          .filter(
+                            (pilot) =>
+                              pilot.active &&
+                              !pilot.paused &&
+                              (!pilot.currentRotationId || pilot.currentRotationId === selected.id),
+                          )
+                          .map((pilot) => (
+                            <option value={pilot.id} key={pilot.id}>
+                              {pilot.operationalCode}
+                              {pilot.id === selected.suggestedPilotId ? " · Vorschlag" : ""}
+                            </option>
+                          ))}
+                      </select>
+                    </label>
+                  </details>
+                ) : null}
+                <p className="safety-disclaimer">
+                  Nur organisatorische Schätzung aus konfigurierten Referenzgewichten. Die Bewertung
+                  und Entscheidung liegt ausschließlich beim Piloten; keine Sicherheits- oder
+                  Freigabewirkung.
+                </p>
+                <section className="rotation-timeline" aria-labelledby="timeline-title">
+                  <div>
+                    <h3 id="timeline-title">Plan · Prognose · Ist</h3>
+                    <span>
+                      Prognosequalität:{" "}
+                      {selected.timeline.predictionQuality
+                        ? predictionQualityLabel[selected.timeline.predictionQuality]
+                        : "noch nicht berechnet"}
+                    </span>
+                  </div>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th scope="col">Punkt</th>
+                        <th scope="col">Plan</th>
+                        <th scope="col">Prognose</th>
+                        <th scope="col">Ist</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(
+                        [
+                          ["Boarding", "boardingAt"],
+                          ["Start", "departureAt"],
+                          ["Landung", "landingAt"],
+                          ["Abschluss", "completionAt"],
+                        ] as const
+                      ).map(([label, field]) => (
+                        <tr key={field}>
+                          <th scope="row">{label}</th>
+                          <td>
+                            {operationalTimeLabel(
+                              selected.timeline.planned[field],
+                              board?.event.timeZone ?? "Europe/Berlin",
+                            )}
+                          </td>
+                          <td>
+                            {operationalTimeLabel(
+                              selected.timeline.predicted[field],
+                              board?.event.timeZone ?? "Europe/Berlin",
+                            )}
+                          </td>
+                          <td>
+                            {operationalTimeLabel(
+                              selected.timeline.actual[field],
+                              board?.event.timeZone ?? "Europe/Berlin",
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </section>
+                <section className="attendance-panel" aria-labelledby="attendance-title">
+                  <div>
+                    <h3 id="attendance-title">Anwesenheit (optional)</h3>
+                    <span>
+                      {
+                        selected.tickets.filter(
+                          (ticket) => ticket.attendanceStatus === "CHECKED_IN",
+                        ).length
+                      }
+                      /{selected.tickets.length} eingecheckt
+                    </span>
+                  </div>
+                  <div className="attendance-list">
+                    {selected.tickets.map((ticket, index) => {
+                      const checkedIn = ticket.attendanceStatus === "CHECKED_IN";
+                      return (
+                        <button
+                          className={checkedIn ? "checked-in" : ""}
+                          disabled={!["DRAFT", "CALLED"].includes(selected.status)}
+                          key={ticket.id}
+                          onClick={() => setAttendance(ticket.id, !checkedIn)}
+                          type="button"
+                        >
+                          Ticket {index + 1} · {checkedIn ? "anwesend" : "offen"}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <small>
+                    Der Standardumlauf bleibt auch ohne Einzelabgleich vollständig bedienbar.
+                  </small>
+                </section>
+                {selected.status === "LANDED" ? (
+                  <p className="landed-warning">Gelandet · noch nicht verfügbar</p>
+                ) : null}
+                {selected.status === "DRAFT" || selected.status === "CALLED" ? (
+                  <div className="correction-controls">
+                    <label>
+                      Grund für Queue-Abweichung
+                      <input
+                        value={queueReason}
+                        onChange={(event) => setQueueReason(event.target.value)}
+                        placeholder="Mindestens 3 Zeichen"
+                      />
+                    </label>
+                    <div className="secondary-actions">
                       <button
                         disabled={queueReason.trim().length < 3}
-                        onClick={() => void abortRotation()}
+                        onClick={() => mutateQueue("DEFER_TICKET_GROUP")}
                         type="button"
                       >
-                        Umlauf abbrechen · Gruppe nach vorn
+                        Zurückstellen
                       </button>
-                    ) : null}
+                      {selected.status === "CALLED" ? (
+                        <button
+                          disabled={queueReason.trim().length < 3}
+                          onClick={() => void abortRotation()}
+                          type="button"
+                        >
+                          Umlauf abbrechen · Gruppe nach vorn
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
+                ) : null}
+                {message ? (
+                  <div className="action-message" role="status">
+                    {message}
+                  </div>
+                ) : null}
+                {selected.status === "CALLED" &&
+                selected.calledAt &&
+                Date.now() - Date.parse(selected.calledAt) <= 10_000 ? (
+                  <button className="undo-action" onClick={revokeCall} type="button">
+                    NEXT rückgängig
+                  </button>
+                ) : null}
+                {action ? (
+                  <button
+                    className="primary-action"
+                    disabled={
+                      action.command === "CALL_NEXT" &&
+                      (!nextAircraftId ||
+                        !nextPilotId ||
+                        board?.event.emergencyMode ||
+                        board?.event.status !== "ACTIVE" ||
+                        board?.event.operationalInterrupted)
+                    }
+                    onClick={advance}
+                    type="button"
+                  >
+                    {action.label}
+                  </button>
+                ) : (
+                  <div className="completed-state">Umlauf abgeschlossen</div>
+                )}
+              </>
+            ) : (
+              <p>Noch keine Fluggruppe vorhanden.</p>
+            )}
+          </div>
+          {dispositionOpen && selected ? (
+            <aside className="disposition-panel" aria-labelledby="disposition-title">
+              <div className="disposition-heading">
+                <div>
+                  <span>Disposition</span>
+                  <h2 id="disposition-title">{selected.communicationLabel}</h2>
                 </div>
-              ) : null}
-              {message ? (
-                <div className="action-message" role="status">
-                  {message}
-                </div>
-              ) : null}
-              {selected.status === "CALLED" &&
-              selected.calledAt &&
-              Date.now() - Date.parse(selected.calledAt) <= 10_000 ? (
-                <button className="undo-action" onClick={revokeCall} type="button">
-                  NEXT rückgängig
-                </button>
-              ) : null}
-              {action ? (
                 <button
-                  className="primary-action"
-                  disabled={
-                    action.command === "CALL_NEXT" &&
-                    (!nextAircraftId ||
-                      !nextPilotId ||
-                      board?.event.emergencyMode ||
-                      board?.event.status !== "ACTIVE" ||
-                      board?.event.operationalInterrupted)
-                  }
-                  onClick={advance}
+                  aria-label="Disposition schließen"
+                  onClick={() => setDispositionOpen(false)}
                   type="button"
                 >
-                  {action.label}
+                  ×
                 </button>
-              ) : (
-                <div className="completed-state">Umlauf abgeschlossen</div>
-              )}
-            </>
-          ) : (
-            <p>Noch keine Fluggruppe vorhanden.</p>
-          )}
-        </div>
-        {dispositionOpen && selected ? (
-          <aside className="disposition-panel" aria-labelledby="disposition-title">
-            <div className="disposition-heading">
+              </div>
+              <p className="disposition-status">
+                {selected.status === "DRAFT" ? "Vor dem Aufruf" : "Aufgerufen"} · ganze Gruppen
+                bleiben verbunden
+              </p>
+              {selected.status === "DRAFT" &&
+              ["FLIGHT_LINE_LEAD", "ADMIN"].includes(board?.currentDeviceRole ?? "") ? (
+                <section>
+                  <h3>Nutzbare Plätze</h3>
+                  <div className="compact-stepper">
+                    <button
+                      onClick={() => setDispositionCapacity((value) => Math.max(1, value - 1))}
+                      type="button"
+                    >
+                      −
+                    </button>
+                    <output>{dispositionCapacity}</output>
+                    <button
+                      onClick={() =>
+                        setDispositionCapacity((value) =>
+                          Math.min(selected.baselineCapacity, value + 1),
+                        )
+                      }
+                      type="button"
+                    >
+                      +
+                    </button>
+                  </div>
+                  <p>
+                    Ausgangskapazität {selected.baselineCapacity}.{" "}
+                    {dispositionCapacity < selected.ticketCount
+                      ? `Die Gruppe ${selected.ticketGroupId.slice(0, 8)} mit ${selected.ticketCount} Tickets rückt gemeinsam an die vorderste passende Position.`
+                      : "Keine Buchungsgruppe muss neu eingereiht werden."}
+                  </p>
+                  <small>Rein organisatorisch · keine Sicherheits- oder Freigabewirkung.</small>
+                  <button
+                    disabled={dispositionCapacity === selected.usableCapacity}
+                    onClick={() => void setRotationCapacity()}
+                    type="button"
+                  >
+                    Kapazität übernehmen
+                  </button>
+                </section>
+              ) : null}
+              {["DRAFT", "CALLED"].includes(selected.status) ? (
+                <section>
+                  <h3>Ganze Gruppe verschieben</h3>
+                  <label>
+                    Zielumlauf
+                    <select
+                      value={moveTargetId}
+                      onChange={(event) => setMoveTargetId(event.target.value)}
+                    >
+                      <option value="">Passendes Ziel wählen</option>
+                      {moveTargets.map(({ rotation, freeSeats }) => (
+                        <option value={rotation.id} key={rotation.id}>
+                          {rotation.communicationLabel} · {freeSeats} Plätze frei ·{" "}
+                          {rotation.status}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Begründung der Abweichung
+                    <input
+                      value={moveReason}
+                      onChange={(event) => setMoveReason(event.target.value)}
+                      placeholder="Kurz begründen"
+                    />
+                  </label>
+                  <small>Die gesamte Buchungsgruppe wird verschoben; keine Trennung.</small>
+                  <button
+                    disabled={!moveTargetId || moveReason.trim().length < 3}
+                    onClick={() =>
+                      void moveTicketGroup(selected.ticketGroupId, moveTargetId, moveReason)
+                    }
+                    type="button"
+                  >
+                    Verschiebung übernehmen
+                  </button>
+                  {moveTargets.length === 0 ? (
+                    <p>Aktuell ist kein passendes Ziel mit genügend Platz vorhanden.</p>
+                  ) : null}
+                </section>
+              ) : null}
+              {selected.status === "CALLED" ? (
+                <section className="attendance-decision">
+                  <h3>Anwesenheitsentscheidung</h3>
+                  <strong>
+                    Anwesend {presentCount} von {selected.tickets.length}
+                  </strong>
+                  {!noShowReady ? (
+                    <p>
+                      No-Show ist erst nach {board?.event.noShowAfterMinutes ?? 10} Minuten
+                      verfügbar.
+                    </p>
+                  ) : null}
+                  {missingTickets.length > 0 && presentCount > 0 ? (
+                    <div className="disposition-actions">
+                      <button
+                        onClick={() =>
+                          void mutateQueue(
+                            "DEFER_TICKET_GROUP",
+                            "Aufgerufene Gruppe gemeinsam zurückgestellt",
+                          )
+                        }
+                        type="button"
+                      >
+                        Gemeinsam zurückstellen
+                      </button>
+                      <button
+                        onClick={() => void confirmAttendanceDecision("FLY_WITH_PRESENT")}
+                        type="button"
+                      >
+                        Mit {presentCount} Personen fliegen
+                      </button>
+                      <button
+                        onClick={() => void confirmAttendanceDecision("LEAVE_SEAT_EMPTY")}
+                        type="button"
+                      >
+                        Fehlende Plätze leer lassen
+                      </button>
+                    </div>
+                  ) : null}
+                  {missingTickets.map((ticket, index) => (
+                    <button
+                      disabled={!noShowReady}
+                      key={ticket.id}
+                      onClick={() => void markTicketNoShow(ticket.id)}
+                      type="button"
+                    >
+                      Fehlendes Ticket {index + 1} als No-Show markieren
+                    </button>
+                  ))}
+                  {replacement ? (
+                    <div className="replacement-suggestion">
+                      <strong>Ersatzvorschlag</strong>
+                      <span>
+                        {replacement.rotation.communicationLabel} ·{" "}
+                        {replacement.rotation.ticketCount} Ticket
+                        {replacement.rotation.ticketCount === 1 ? "" : "s"} · vollständig
+                        eingecheckt
+                      </span>
+                      <button
+                        onClick={() =>
+                          void moveTicketGroup(
+                            replacement.rotation.ticketGroupId,
+                            selected.id,
+                            "Bestätigter Ersatzvorschlag nach Anwesenheitsabgleich",
+                          )
+                        }
+                        type="button"
+                      >
+                        Ersatz übernehmen
+                      </button>
+                    </div>
+                  ) : null}
+                </section>
+              ) : null}
+            </aside>
+          ) : null}
+        </section>
+      </section>
+      {aircraftPauseOpen && selectedAircraft ? (
+        <div className="modal-backdrop">
+          <form
+            aria-labelledby="aircraft-pause-title"
+            aria-modal="true"
+            className="confirmation-dialog aircraft-pause-dialog"
+            onSubmit={(event) => {
+              event.preventDefault();
+              startAircraftPause();
+            }}
+            role="dialog"
+          >
+            <div className="drawer-heading">
               <div>
-                <span>Disposition</span>
-                <h2 id="disposition-title">{selected.communicationLabel}</h2>
+                <h2 id="aircraft-pause-title">Pause für {selectedAircraft.registration}</h2>
+                <p>Die Dauer verbessert nur die Wartezeitprognose.</p>
               </div>
               <button
-                aria-label="Disposition schließen"
-                onClick={() => setDispositionOpen(false)}
+                aria-label="Pausendialog schließen"
+                onClick={() => setAircraftPauseOpen(false)}
                 type="button"
               >
                 ×
               </button>
             </div>
-            <p className="disposition-status">
-              {selected.status === "DRAFT" ? "Vor dem Aufruf" : "Aufgerufen"} · ganze Gruppen
-              bleiben verbunden
-            </p>
-            {selected.status === "DRAFT" &&
-            ["FLIGHT_LINE_LEAD", "ADMIN"].includes(board?.currentDeviceRole ?? "") ? (
-              <section>
-                <h3>Nutzbare Plätze</h3>
-                <div className="compact-stepper">
+            <fieldset disabled={aircraftPauseUnknown}>
+              <legend>Geschätzte Dauer (optional)</legend>
+              <div className="pause-duration-presets">
+                {[10, 20, 30].map((minutes) => (
                   <button
-                    onClick={() => setDispositionCapacity((value) => Math.max(1, value - 1))}
+                    className={aircraftPauseMinutes === String(minutes) ? "selected" : ""}
+                    key={minutes}
+                    onClick={() => setAircraftPauseMinutes(String(minutes))}
                     type="button"
                   >
-                    −
-                  </button>
-                  <output>{dispositionCapacity}</output>
-                  <button
-                    onClick={() =>
-                      setDispositionCapacity((value) =>
-                        Math.min(selected.baselineCapacity, value + 1),
-                      )
-                    }
-                    type="button"
-                  >
-                    +
-                  </button>
-                </div>
-                <p>
-                  Ausgangskapazität {selected.baselineCapacity}.{" "}
-                  {dispositionCapacity < selected.ticketCount
-                    ? `Die Gruppe ${selected.ticketGroupId.slice(0, 8)} mit ${selected.ticketCount} Tickets rückt gemeinsam an die vorderste passende Position.`
-                    : "Keine Buchungsgruppe muss neu eingereiht werden."}
-                </p>
-                <small>Rein organisatorisch · keine Sicherheits- oder Freigabewirkung.</small>
-                <button
-                  disabled={dispositionCapacity === selected.usableCapacity}
-                  onClick={() => void setRotationCapacity()}
-                  type="button"
-                >
-                  Kapazität übernehmen
-                </button>
-              </section>
-            ) : null}
-            {["DRAFT", "CALLED"].includes(selected.status) ? (
-              <section>
-                <h3>Ganze Gruppe verschieben</h3>
-                <label>
-                  Zielumlauf
-                  <select
-                    value={moveTargetId}
-                    onChange={(event) => setMoveTargetId(event.target.value)}
-                  >
-                    <option value="">Passendes Ziel wählen</option>
-                    {moveTargets.map(({ rotation, freeSeats }) => (
-                      <option value={rotation.id} key={rotation.id}>
-                        {rotation.communicationLabel} · {freeSeats} Plätze frei · {rotation.status}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  Begründung der Abweichung
-                  <input
-                    value={moveReason}
-                    onChange={(event) => setMoveReason(event.target.value)}
-                    placeholder="Kurz begründen"
-                  />
-                </label>
-                <small>Die gesamte Buchungsgruppe wird verschoben; keine Trennung.</small>
-                <button
-                  disabled={!moveTargetId || moveReason.trim().length < 3}
-                  onClick={() =>
-                    void moveTicketGroup(selected.ticketGroupId, moveTargetId, moveReason)
-                  }
-                  type="button"
-                >
-                  Verschiebung übernehmen
-                </button>
-                {moveTargets.length === 0 ? (
-                  <p>Aktuell ist kein passendes Ziel mit genügend Platz vorhanden.</p>
-                ) : null}
-              </section>
-            ) : null}
-            {selected.status === "CALLED" ? (
-              <section className="attendance-decision">
-                <h3>Anwesenheitsentscheidung</h3>
-                <strong>
-                  Anwesend {presentCount} von {selected.tickets.length}
-                </strong>
-                {!noShowReady ? (
-                  <p>
-                    No-Show ist erst nach {board?.event.noShowAfterMinutes ?? 10} Minuten verfügbar.
-                  </p>
-                ) : null}
-                {missingTickets.length > 0 && presentCount > 0 ? (
-                  <div className="disposition-actions">
-                    <button
-                      onClick={() =>
-                        void mutateQueue(
-                          "DEFER_TICKET_GROUP",
-                          "Aufgerufene Gruppe gemeinsam zurückgestellt",
-                        )
-                      }
-                      type="button"
-                    >
-                      Gemeinsam zurückstellen
-                    </button>
-                    <button
-                      onClick={() => void confirmAttendanceDecision("FLY_WITH_PRESENT")}
-                      type="button"
-                    >
-                      Mit {presentCount} Personen fliegen
-                    </button>
-                    <button
-                      onClick={() => void confirmAttendanceDecision("LEAVE_SEAT_EMPTY")}
-                      type="button"
-                    >
-                      Fehlende Plätze leer lassen
-                    </button>
-                  </div>
-                ) : null}
-                {missingTickets.map((ticket, index) => (
-                  <button
-                    disabled={!noShowReady}
-                    key={ticket.id}
-                    onClick={() => void markTicketNoShow(ticket.id)}
-                    type="button"
-                  >
-                    Fehlendes Ticket {index + 1} als No-Show markieren
+                    {minutes} Min.
                   </button>
                 ))}
-                {replacement ? (
-                  <div className="replacement-suggestion">
-                    <strong>Ersatzvorschlag</strong>
-                    <span>
-                      {replacement.rotation.communicationLabel} · {replacement.rotation.ticketCount}{" "}
-                      Ticket{replacement.rotation.ticketCount === 1 ? "" : "s"} · vollständig
-                      eingecheckt
-                    </span>
-                    <button
-                      onClick={() =>
-                        void moveTicketGroup(
-                          replacement.rotation.ticketGroupId,
-                          selected.id,
-                          "Bestätigter Ersatzvorschlag nach Anwesenheitsabgleich",
-                        )
-                      }
-                      type="button"
-                    >
-                      Ersatz übernehmen
-                    </button>
-                  </div>
-                ) : null}
-              </section>
-            ) : null}
-          </aside>
-        ) : null}
-      </section>
+              </div>
+              <label>
+                Andere Dauer
+                <input
+                  min={1}
+                  onChange={(event) => setAircraftPauseMinutes(event.target.value)}
+                  type="number"
+                  value={aircraftPauseMinutes}
+                />
+              </label>
+            </fieldset>
+            <label className="checkbox-label">
+              <input
+                checked={aircraftPauseUnknown}
+                onChange={(event) => setAircraftPauseUnknown(event.target.checked)}
+                type="checkbox"
+              />
+              Dauer noch unbekannt
+            </label>
+            <ValidationHint>
+              Das Flugzeug wird nicht automatisch freigegeben. „Wieder verfügbar“ bleibt eine
+              bewusste Bestätigung der Flight Line.
+            </ValidationHint>
+            <div className="dialog-actions">
+              <button onClick={() => setAircraftPauseOpen(false)} type="button">
+                Abbrechen
+              </button>
+              <button
+                className="pause-primary-action"
+                disabled={
+                  !aircraftPauseUnknown &&
+                  (!Number.isFinite(Number(aircraftPauseMinutes)) ||
+                    Number(aircraftPauseMinutes) < 1)
+                }
+                type="submit"
+              >
+                Pause starten
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : null}
     </Shell>
   );
 }
