@@ -10,6 +10,7 @@ export interface Env {
   DB: D1Database;
   BACKUPS: R2Bucket;
   PUBLIC_TICKET_RATE_LIMITER: RateLimit;
+  ADMIN_RECOVERY_RATE_LIMITER: RateLimit;
   EVENT_COORDINATOR: DurableObjectNamespace;
   ASSETS: Fetcher;
 }

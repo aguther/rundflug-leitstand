@@ -5,6 +5,7 @@ import {
   getDeviceContext,
   getHealth,
   getPushConfiguration,
+  recoverAdminDevice,
   verifyAdminPin,
 } from "./api";
 
@@ -52,6 +53,38 @@ describe("paired device context recovery", () => {
         "x-device-token": "synthetic-secret-token",
       },
     });
+  });
+
+  it("renews an administration credential with PIN and a client-generated hash", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          eventId: "rundflug-2026",
+          adminDeviceId: "synthetic-device",
+          role: "ADMIN",
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      recoverAdminDevice("rundflug-2026", "synthetic-device", "0000", "a".repeat(64)),
+    ).resolves.toEqual({
+      eventId: "rundflug-2026",
+      adminDeviceId: "synthetic-device",
+      role: "ADMIN",
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/admin/events/rundflug-2026/recover-device",
+      expect.objectContaining({
+        method: "POST",
+        cache: "no-store",
+        headers: expect.objectContaining({ "x-device-id": "synthetic-device" }),
+        body: JSON.stringify({ adminPin: "0000", credentialHash: "a".repeat(64) }),
+      }),
+    );
+    expect(fetchMock.mock.calls[0]?.[0]).not.toContain("0000");
   });
 });
 
