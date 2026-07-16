@@ -7,9 +7,11 @@ und des Prognoseverfahrens steht in
 ```text
 Browser / PWA
 ├── Kasse
-├── Flight Line
-├── Administration / Flugleitung
-├── FIDS / Boardingmonitor
+├── Flight Line Supervisor (Desktop)
+├── Flight Line Assist (Mobilgerät)
+├── kompakte Administration
+├── Standard-FIDS / Boardingmonitor
+├── Terminal-FIDS (vollständig Englisch)
 └── öffentliche Ticketstatusseite
           │ HTTPS + WebSocket
           ▼
@@ -48,7 +50,9 @@ vorhandenen fachlichen Zustand.
 
 WebSocket-Verbindungen werden mit Hibernation betrieben. Clients erhalten nach Wiederverbindung immer
 zuerst einen vollständigen Snapshot und danach Ereignisse ab der bekannten Version. Polling ist nur ein
-Fallback.
+Fallback. Bei einem Server- oder D1-Fehler bleibt der letzte bestätigte Snapshot sichtbar und wird mit
+Alter und Störungsstatus gekennzeichnet. Schreibaktionen bleiben bis zu einer neuen
+Serverbestätigung gesperrt; ein Fehler leert den sichtbaren Stand nicht.
 
 ## Öffentlicher Ticketzugriff
 

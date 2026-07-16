@@ -12,7 +12,8 @@ unterschiedlicher Dauer. Der Lauf weist nach:
   Gewichtskonfigurationen werden ohne Versionsänderung abgelehnt,
 - beide Produkte zeigen dieselbe gemeinsame Queue-Nachfrage,
 - zwei Flugzeuge können derselben Gruppe zugeordnet werden,
-- Typkompatibilität, Sitzplätze, Referenzkapazität und Planumlaufzeit sind konfiguriert,
+- konkrete Flugzeugzuordnung, Sitzplätze, daraus abgeleitete Kapazitätsspanne und Planumlaufzeit
+  sind wirksam,
 - ein veralteter paralleler Stammdatenbefehl wird abgelehnt,
 - eine endgültige Löschung funktioniert nur in der Vorbereitung, mit gültiger Administrator-PIN
   und ohne fachliche Abhängigkeiten,
@@ -34,8 +35,9 @@ synthetischer Kasse sowie FIDS auf Desktop und 430 × 900 Pixeln nach.
 ## Administration und Ersteinrichtung
 
 Die Administrationsoberfläche wurde gegen das freigegebene Konzept
-`docs/ui/admin-ux-v1-approved.png` geprüft. Sie gliedert die Aufgaben in Übersicht, Einrichtung,
-Stammdaten, Betrieb sowie Sicherung und Reset. Der Einrichtungsfortschritt weist Parameter, Gates,
+`docs/ui/operations-v2-multi-surface-concept.md` fortgeschrieben. Sie gliedert die Aufgaben in
+Übersicht, Einrichtung, Stammdaten, Auswertung sowie Sicherung und Reset. Operative Steuerung liegt
+in Flight Line Supervisor. Der Einrichtungsfortschritt weist Parameter, Gates,
 Ressourcengruppen, Flugzeuge, Zuordnungen, anonyme Pilotencodes, Produkte und Betriebsfreigabe als
 acht voneinander abhängige Schritte aus.
 
@@ -47,7 +49,10 @@ Die frühere Prüfung auf Desktop und bei 430 × 900 Pixeln wies für die damali
   sichtbar und können zur Bearbeitung ausgewählt werden,
 - Abhängigkeiten und fehlende Pflichtangaben werden direkt am betroffenen Arbeitsbereich erklärt,
 - die damalige zentrale Bestätigung wurde verständlich benannt,
-- Betriebssteuerung sowie Sicherung und Reset sind von der Stammdatenpflege getrennt.
+- Auswertung sowie Sicherung und Reset sind von der Stammdatenpflege getrennt.
+
+Die erneute Browserabnahme muss zusätzlich nachweisen, dass im Ruhezustand nur kompakte Tabellen
+sichtbar sind und Editoren ausschließlich nach „Neu“ oder „Bearbeiten“ öffnen.
 
 Die Produkt- und PIN-Bedienung wurde nach Freigabe von `docs/ui/product-master-data-v1.md` am
 14.07.2026 erneut geprüft. Der Nachweis umfasst:

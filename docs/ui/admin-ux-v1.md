@@ -1,6 +1,7 @@
 # Freigegebenes Administrationskonzept V1
 
-Status: fachlich und visuell am 13.07.2026 freigegeben.
+Status: fachlich und visuell am 13.07.2026 freigegeben; für den weiteren Ausbau durch
+`operations-v2-multi-surface-concept.md` und ADR-0009 präzisiert.
 
 Referenz: `admin-ux-v1-approved.png`
 
@@ -12,8 +13,9 @@ Die Administration trennt fünf Arbeitsbereiche:
 2. **Einrichtung** – geführte Reihenfolge Parameter, Gates, Ressourcengruppen, Flugzeuge,
    Zuordnungen, Piloten, Produkte und Betriebsfreigabe.
 3. **Stammdaten** – sichtbare Listen und Editoren für Gates, Ressourcengruppen, Flugzeuge,
-   Piloten-IDs und Produkte.
-4. **Betrieb** – laufende Umläufe, Hinweise, Kapazität, Flottenzustand und Notfallmodus.
+   Pilotencodes und Produkte.
+4. **Betrieb** – organisatorische Parameter, Unterbrechungen und Notfallmodus. Die laufende
+   Flottensteuerung liegt in Flight Line Supervisor beziehungsweise Flight Line Assist.
 5. **Sicherung & Reset** – Veranstaltungen, Neustartstufen, Geräte, Exporte und Audit-Historie.
 
 ## Interaktionsregeln

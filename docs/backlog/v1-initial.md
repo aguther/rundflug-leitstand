@@ -1,7 +1,7 @@
 # Priorisierter V1-Backlog
 
 Die Pakete sind in Abhängigkeitsreihenfolge priorisiert und liefern jeweils ein sichtbares,
-überprüfbares Ergebnis. Die vollständige Einzelzuordnung aller 176 V1-Anforderungen steht in
+überprüfbares Ergebnis. Die vollständige Einzelzuordnung aller 177 V1-Anforderungen steht in
 `docs/requirements/traceability.csv`; die folgenden ID-Listen benennen die fachlichen Schwerpunkte.
 Offene Fragen werden nicht als Annahmen entschieden.
 
@@ -10,10 +10,10 @@ Offene Fragen werden nicht als Annahmen entschieden.
 **Ziel/Ergebnis:** Formal und fachlich prüfbarer V1-Katalog mit Risikoregister, höchstens zwölf
 blockierenden Fragen und durchgängiger Zuordnung zu Paketen und Tests.
 
-- **Anforderungen:** alle 176 V1-IDs; besonders Q-WAR-050, T-080.
+- **Anforderungen:** alle 177 V1-IDs; besonders Q-WAR-050, T-080.
 - **Abhängigkeiten:** keine.
 - **Blocker:** keine; verwaltet OQ-01 bis OQ-12.
-- **Akzeptanz:** 199 eindeutige YAML-/CSV-IDs; alle 157 V1-MUSS-IDs besitzen Paket und Testnachweis;
+- **Akzeptanz:** 199 eindeutige YAML-/CSV-IDs; alle 158 V1-MUSS-IDs besitzen Paket und Testnachweis;
   `npm run requirements:verify` ist erfolgreich.
 
 ## BP-02 – Geräteidentität, Rollen und auditierte Kommandoannahme
@@ -82,22 +82,26 @@ Zeitpunkte sowie ehrliche öffentliche Fenster und konservative Verkaufsempfehlu
 - **Akzeptanz:** Kaltstart, Messwertgewichtung, Ausreißerbehandlung und Unsicherheit sind deterministisch
   dokumentiert; Verzögerung kaskadiert ohne manuelle Folgezeitpflege; Vollrechnung bleibt unter 2 s.
 
-## BP-07 – Besucherstatus, FIDS, Boardingmonitor und Web-Push
+## BP-07 – Besucherstatus, zwei FIDS-Profile, automatischer Voraufruf und Web-Push
 
-**Ziel/Ergebnis:** Ticketstatus, FIDS und Boardingmonitor zeigen denselben datensparsamen Livezustand;
-Web-Push kann je Ticket mit dokumentierter Einwilligung aktiviert werden.
+**Ziel/Ergebnis:** Ticketstatus, deutsches Standard-FIDS und vollständig englisches Terminal-FIDS
+zeigen denselben datensparsamen Livezustand. Das System setzt geeignete Gruppen automatisch auf
+`GO_TO_GATE`; `NEXT` bleibt menschlich bestätigt. Web-Push kann je Ticket mit dokumentierter
+Einwilligung aktiviert werden.
 
-- **Anforderungen:** F-BEN-010 bis F-BEN-040, F-BEN-060, F-BEN-090, F-BEN-100, F-MON-010 bis
+- **Anforderungen:** F-BEN-010 bis F-BEN-040, F-BEN-090, F-BEN-100, F-MON-010 bis
   F-MON-050, F-MON-070, D-110, Q-DSG-010, Q-DSG-030, Q-SIC-030, Q-SIC-040, Q-UX-080, T-040.
 - **Abhängigkeiten:** BP-02, BP-04, BP-06.
 - **Blocker:** OQ-05, OQ-06, OQ-11.
-- **Akzeptanz:** keine Namen/Interna öffentlich; Ticketcodes nicht aufzählbar; Reconnect ohne Bedienung;
-  Unsicherheit handlungsorientiert; Einwilligung mit Zeitpunkt und Kanal nachweisbar.
+- **Akzeptanz:** keine Namen/Interna öffentlich; Ticketcodes nicht aufzählbar; Reconnect ohne
+  Bedienung; Terminalprofil vollständig Englisch; `DEPARTED` verschwindet nach konfigurierter Zeit nur
+  aus der Anzeige; Unsicherheit handlungsorientiert; Einwilligung mit Zeitpunkt und Kanal nachweisbar.
 
 ## BP-08 – Unterbrechung, Notfallmodus, Tanken und Pausen
 
-**Ziel/Ergebnis:** Blockierungen wirken sofort und nur im gewählten Geltungsbereich; Not-Halt stoppt
-Verkauf/Aufrufe, lässt laufende Flüge aber dokumentierbar.
+**Ziel/Ergebnis:** Blockierungen wirken sofort und nur im gewählten Geltungsbereich; optionale
+Pausendauern verbessern die Prognose ohne automatische Freigabe. Not-Halt stoppt Verkauf/Aufrufe,
+lässt laufende Flüge aber dokumentierbar.
 
 - **Anforderungen:** F-WET-010 bis F-WET-040, F-NOT-010 bis F-NOT-040, F-FLT-030,
   F-FLT-050, F-FLT-060, F-FLT-080, F-FLT-090, D-065, F-KAP-040.
@@ -108,19 +112,23 @@ Verkauf/Aufrufe, lässt laufende Flüge aber dokumentierbar.
 
 ## BP-09 – Offline-Queue, Wiederverbindung und Konfliktauflösung
 
-**Ziel/Ergebnis:** Zulässige Kommandos überstehen 60 Sekunden Verbindungsabbruch, werden geordnet
-wiederholt und bei Konflikten sichtbar statt automatisch zusammengeführt.
+**Ziel/Ergebnis:** Der letzte bestätigte Stand übersteht mindestens 60 Sekunden Verbindungsabbruch.
+Operative Kommandos bleiben gesperrt; ausschließlich vorbereitende lokale Kassenentwürfe bleiben
+erhalten und werden nach Wiederverbindung bewusst neu bestätigt.
 
 - **Anforderungen:** T-035, Q-ZUV-020, Q-ZUV-030, Q-ZUV-040, Q-ZUV-070, F-EVT-020, F-INT-070.
 - **Abhängigkeiten:** BP-02, BP-04, BP-05, BP-08.
 - **Blocker:** OQ-01, OQ-08, OQ-12.
-- **Akzeptanz:** veralteter Snapshot ist gekennzeichnet; Wiederholung ist idempotent; Konflikt zeigt
-  Serverzustand; kein manueller Neustart; Papier-Nacherfassung ist nachvollziehbar.
+- **Akzeptanz:** veralteter Snapshot ist gekennzeichnet; Server-/D1-Fehler leeren ihn nicht;
+  Wiederholung bestätigter Kommandos ist idempotent; Konflikt zeigt Serverzustand; kein manueller
+  Neustart; Papier-Nacherfassung ist nachvollziehbar.
 
 ## BP-10 – Administration, Historie, Berichte und Datenschutzlöschung
 
-**Ziel/Ergebnis:** Berechtigte Rollen administrieren den Livebetrieb, durchsuchen Audit/Historie,
-exportieren Tagesdaten und löschen personenbezogene Benachrichtigungsdaten fristgerecht.
+**Ziel/Ergebnis:** Berechtigte Rollen pflegen Stammdaten in einer kompakten Tabelle-mit-Editor-
+Oberfläche, durchsuchen Audit/Historie, exportieren Tagesdaten und löschen personenbezogene
+Benachrichtigungsdaten fristgerecht. Operative Flottensteuerung erfolgt im Supervisor und in der
+mobilen Assist-Ansicht.
 
 - **Anforderungen:** F-ADM-010, F-ADM-020, F-ADM-060, F-ADM-080, F-ADM-090, F-HIS-010 bis
   F-HIS-040, F-HIS-060, F-HIS-070, F-KAS-130, Q-DSG-020, D-090, Q-WAR-050.

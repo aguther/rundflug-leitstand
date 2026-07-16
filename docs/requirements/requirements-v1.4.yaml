@@ -41,7 +41,7 @@
   {
     "id": "F-KAS-040",
     "section": "8.1 Ticketverkauf (Kasse)",
-    "requirement": "Optional erfassbar sind Telefonnummer ausschließlich zur Ticketnummer, gewünschter Benachrichtigungskanal und Standby-Kennzeichen. Namen oder weitere Gastdaten werden im Kernsystem nicht erfasst.",
+    "requirement": "Im Ticketkern werden weder Namen noch Telefonnummern erfasst. Optional sind ausschließlich anonyme ticketbezogene Merkmale wie Standby und erforderliche Produktoptionen; Web-Push wird getrennt und freiwillig je Ticket registriert.",
     "priority": "MUSS",
     "stage": "V1",
     "implementation": {
@@ -80,7 +80,7 @@
   {
     "id": "F-KAS-060",
     "section": "8.1 Ticketverkauf (Kasse)",
-    "requirement": "Bezahlstatus, Betrag und Zahlart werden rein informatorisch erfasst. Das System ist keine elektronische Registrierkasse und ersetzt keine bestehende Vereinskasse oder ein Kartenterminal.",
+    "requirement": "Bezahlstatus und Zahlart werden nicht erfasst. Der Produktpreis wird ausschließlich als Produkt- und Abstimmungsinformation angezeigt; das System ist keine elektronische Registrierkasse und wickelt keine Zahlung ab.",
     "priority": "MUSS",
     "stage": "V1",
     "implementation": {
@@ -171,7 +171,7 @@
   {
     "id": "F-KAS-130",
     "section": "8.1 Ticketverkauf (Kasse)",
-    "requirement": "Tageszählbericht als Abstimmhilfe mit verkauften Tickets, Stornos und informatorischen Summen je Produkt und Zahlart.",
+    "requirement": "Tageszählbericht als Abstimmhilfe mit verkauften Tickets und Stornos je Produkt. Zahlarten, Bezahlstatus und Zahlungsabwicklung sind ausgeschlossen.",
     "priority": "MUSS",
     "stage": "V1",
     "implementation": {
@@ -288,7 +288,7 @@
   {
     "id": "F-RES-060",
     "section": "8.2 Produkte, Ressourcengruppen und Flugzeuge",
-    "requirement": "Je Produkt und Ressourcengruppe sind Kompatibilitätsmerkmale zu führen, insbesondere zulässige Flugzeugtypen, Passagierkapazität, Gate und planmäßige Prozessdauern.",
+    "requirement": "Ein Produkt verwendet genau eine Ressourcengruppe. Flugzeugkompatibilität und Passagierkapazität werden aus den konkret aktiv zugeordneten Flugzeugen abgeleitet; gepflegt werden Gate und planmäßige Prozessdauern, keine Freitext-Typenlisten oder manuelle Gruppenkapazität.",
     "priority": "MUSS",
     "stage": "V1",
     "implementation": {
@@ -431,7 +431,7 @@
   {
     "id": "F-SLT-070",
     "section": "8.3 Fluggruppen, Slots und Warteschlangen",
-    "requirement": "Die Referenzkapazität eines Produkts dient der anfänglichen Fluggruppenbildung. Maßgeblich für den konkreten Umlauf ist die Kapazität des zugeordneten Flugzeugs; Abweichungen werden deutlich angezeigt und müssen bestätigt werden.",
+    "requirement": "Fluggruppenbildung und Verkauf verwenden die aus den aktuell nutzbaren Flugzeugen der Ressourcengruppe abgeleitete Kapazitätsspanne. Maßgeblich für den konkreten Umlauf ist die Kapazität des bestätigten Flugzeugs; eine Gruppe wird nur geteilt, wenn kein nutzbares Flugzeug sie gemeinsam aufnehmen kann und die Teilung ausdrücklich bestätigt wird.",
     "priority": "MUSS",
     "stage": "V1",
     "implementation": {
@@ -847,7 +847,7 @@
   {
     "id": "F-FLT-040",
     "section": "8.5 Flotte, Piloten, Pausen und Tanken",
-    "requirement": "Piloten werden mit Name und Kürzel geführt und können live angelegt oder deaktiviert werden. Lizenz-, Dokumenten- und Flugbuchverwaltung sind ausgeschlossen.",
+    "requirement": "Piloten werden ausschließlich über anonyme operative Codes geführt, die bei P-01 beginnen und live angelegt oder deaktiviert werden können. Namen, Lizenz-, Dokumenten- und Flugbuchdaten sind ausgeschlossen.",
     "priority": "MUSS",
     "stage": "V1",
     "implementation": {
@@ -912,7 +912,7 @@
   {
     "id": "F-FLT-090",
     "section": "8.5 Flotte, Piloten, Pausen und Tanken",
-    "requirement": "Pilotenpausen können als zeitlich offene oder mit erwarteter Mindestdauer versehene Blockierung erfasst werden. Das System plant keine Verfügbarkeit gegen eine aktive Pause.",
+    "requirement": "Pausen können je Flugzeug oder anonymem Pilotencode ohne Dauer oder mit geschätzter Dauer erfasst werden. Ein bekanntes Pausenende darf als unsichere erwartete Verfügbarkeit in Prognosen einfließen; tatsächlich verfügbar wird die Ressource erst nach menschlicher Bestätigung. Eine Pause ohne Dauer nimmt die Ressource vollständig aus der prognostizierten Kapazität.",
     "priority": "SOLL",
     "stage": "V1",
     "implementation": {
@@ -1276,7 +1276,7 @@
   {
     "id": "F-MON-010",
     "section": "8.8 Besucher-, FIDS- und Boardinganzeigen",
-    "requirement": "Der Fluggastmonitor zeigt im FIDS-Stil mindestens Produkt, Fluggruppen-/Slotnummer, Gate, Status, aktuelle Boardingaufrufe und die nächsten Fluggruppen mit Countdown oder Zeitfenster. Eine einzelne exakte Uhrzeit wird nicht als feste Zusage dargestellt.",
+    "requirement": "Der Fluggastmonitor zeigt mindestens Produkt, Fluggruppen-/Slotnummer, Gate, Status, aktuelle Boardingaufrufe und die nächsten Fluggruppen mit Countdown oder Zeitfenster. Er besitzt ein modernes Standardprofil und ein klassisches Terminalprofil. Abgeflogene Zeilen zeigen kurz DEPARTED beziehungsweise Abgeflogen und verschwinden nach einer konfigurierbaren Nachlaufzeit, ohne fachliche Daten zu löschen.",
     "priority": "MUSS",
     "stage": "V1",
     "implementation": {
@@ -1341,9 +1341,9 @@
   {
     "id": "F-MON-060",
     "section": "8.8 Besucher-, FIDS- und Boardinganzeigen",
-    "requirement": "Mehrsprachige Anzeige mindestens Deutsch/Englisch für Monitore und Status-Seiten.",
-    "priority": "KANN",
-    "stage": "V3",
+    "requirement": "Das Standardprofil verwendet die deutsche öffentliche Terminologie. Das Terminalprofil verwendet ausschließlich englische beschreibende Begriffe, insbesondere DEPARTURES, WAITING, GO TO GATE, BOARDING, DELAYED und DEPARTED; der Produkt-Eigenname darf unverändert bleiben.",
+    "priority": "MUSS",
+    "stage": "V1",
     "implementation": {
       "issue": "",
       "module": "",
@@ -1406,7 +1406,7 @@
   {
     "id": "F-BEN-030",
     "section": "8.9 Gastinformation und Benachrichtigung",
-    "requirement": "Vorabbenachrichtigungen werden aus Prognose und Queue-Position abgeleitet; zusätzlich erfolgt beim NEXT ein verbindlicher Aufruf. Die Schwellen sind konfigurierbar.",
+    "requirement": "Das System löst aus Prognose, Queue-Position, Prognosequalität und maximal akzeptierter Gate-Wartezeit automatisch den Voraufruf Bitte zum Gate beziehungsweise GO TO GATE aus. Schwellen und Vorlauf sind konfigurierbar. NEXT bleibt davon getrennt, bindet erst nach menschlicher Bestätigung das Flugzeug und startet Boarding sowie den verbindlichen Aufruf.",
     "priority": "MUSS",
     "stage": "V1",
     "implementation": {
@@ -1445,9 +1445,9 @@
   {
     "id": "F-BEN-060",
     "section": "8.9 Gastinformation und Benachrichtigung",
-    "requirement": "Jede Telefonnummer oder Messenger-Registrierung erfordert eine dokumentierte Einwilligung mit Zeitpunkt und Kanal.",
+    "requirement": "Falls Telefon- oder Messenger-Kanäle in einer späteren Stufe ergänzt werden, erfordert jede Registrierung eine dokumentierte Einwilligung mit Zeitpunkt und Kanal. V1 erfasst keine Telefonnummern.",
     "priority": "MUSS",
-    "stage": "V1",
+    "stage": "V2",
     "implementation": {
       "issue": "",
       "module": "",
@@ -1484,7 +1484,7 @@
   {
     "id": "F-BEN-090",
     "section": "8.9 Gastinformation und Benachrichtigung",
-    "requirement": "Öffentliche Statusbezeichnungen sind auf wenige handlungsorientierte Zustände zu reduzieren: Warten, Bitte vorbereiten, Bitte zur Flight Line, Boarding, Flug läuft, Gelandet und Abgeschlossen.",
+    "requirement": "Öffentliche Statusbezeichnungen sind auf wenige handlungsorientierte Zustände zu reduzieren: Warten, Bitte zum Gate, Boarding, Abgeflogen beziehungsweise Flug läuft, Verzögert, Gelandet und Abgeschlossen. Das Terminalprofil bildet diese ausschließlich auf WAITING, GO TO GATE, BOARDING, DEPARTED und DELAYED ab.",
     "priority": "MUSS",
     "stage": "V1",
     "implementation": {
@@ -1536,7 +1536,7 @@
   {
     "id": "F-HIS-030",
     "section": "8.10 Historie, Protokoll und Auswertung",
-    "requirement": "Automatischer Tagesbericht als PDF und CSV mit Flügen, Passagierzahlen, Auslastung, gemessenen Prozesszeiten, Wartezeiten, Kassen-Zählbericht, Prognoseentwicklung und besonderen Ereignissen.",
+    "requirement": "Automatischer Tagesbericht als PDF und CSV mit Flügen, Passagierzahlen, Auslastung, gemessenen Prozesszeiten, Wartezeiten, Ticket-Zählbericht je Produkt, Prognoseentwicklung und besonderen Ereignissen.",
     "priority": "SOLL",
     "stage": "V1",
     "implementation": {
@@ -1562,7 +1562,7 @@
   {
     "id": "F-HIS-050",
     "section": "8.10 Historie, Protokoll und Auswertung",
-    "requirement": "Statistik-Dashboard über mehrere Veranstaltungen mit Durchsatz, Auslastung, Wartezeit, Prognosegüte und informatorischem Umsatzvergleich.",
+    "requirement": "Statistik-Dashboard über mehrere Veranstaltungen mit Durchsatz, Auslastung, Wartezeit und Prognosegüte.",
     "priority": "SOLL",
     "stage": "V2",
     "implementation": {
@@ -1614,7 +1614,7 @@
   {
     "id": "F-ADM-020",
     "section": "8.11 Administration und Geräteverwaltung",
-    "requirement": "Stammdaten für Produkte, Ressourcengruppen, Flugzeuge, Zuordnungen, Piloten und Gates sind auch während des Betriebs änderbar; Änderungen werden protokolliert und wirken kontrolliert auf den Livezustand.",
+    "requirement": "Stammdaten für Produkte, Ressourcengruppen, Flugzeuge, anonyme Pilotencodes und Gates sind auch während des Betriebs änderbar; Zuordnungen werden direkt an der Ressourcengruppe gepflegt. Änderungen werden protokolliert und wirken kontrolliert auf den Livezustand.",
     "priority": "MUSS",
     "stage": "V1",
     "implementation": {
@@ -1666,7 +1666,7 @@
   {
     "id": "F-ADM-060",
     "section": "8.11 Administration und Geräteverwaltung",
-    "requirement": "Administrations-Dashboard mit offenen Tickets, Durchsatz, mittleren Prozesszeiten, Prognosequalität, Geräte- und Benachrichtigungsstatus sowie informatorischen Umsatzzählern.",
+    "requirement": "Kompakte Administrationsübersicht mit offenen Tickets, Durchsatz, mittleren Prozesszeiten, Prognosequalität sowie Geräte- und Benachrichtigungsstatus. Operative Flottensteuerung liegt in der Flight-Line-Supervisor-Ansicht.",
     "priority": "SOLL",
     "stage": "V1",
     "implementation": {
@@ -1809,7 +1809,7 @@
   {
     "id": "F-INT-070",
     "section": "8.12 Schnittstellen und spätere Erweiterungen",
-    "requirement": "Mehrere Kassen- und Flight-Line-Geräte dürfen bereits in V1 parallel auf denselben Livezustand zugreifen; mehrere organisatorisch unabhängige Flight Lines folgen in V2.",
+    "requirement": "Mehrere Kassen- und Flight-Line-Geräte dürfen bereits in V1 parallel auf denselben Livezustand zugreifen. Flight Line Assist koordiniert die kurzzeitige Betreuung eines Flugzeugs über anonyme, auslaufende Gerätereservierungen; fachliche Schreibkommandos bleiben versioniert und konfliktgeprüft. Mehrere organisatorisch unabhängige Flight Lines folgen in V2.",
     "priority": "MUSS",
     "stage": "V1",
     "implementation": {
@@ -1822,7 +1822,7 @@
   {
     "id": "D-010",
     "section": "9 Datenanforderungen",
-    "requirement": "Flugzeug: Kennzeichen, Typ, Passagierkapazität, maximale Passagierzuladung, Gate, Event- und Live-Status, aktueller Pilot, Zeitprofile, Tankhinweise und aktive Ressourcengruppe.",
+    "requirement": "Flugzeug: Kennzeichen, Typ, Passagierkapazität, maximale Passagierzuladung, Gate, Event- und Live-Status, aktueller Pilotencode, Zeitprofile, Tankhinweise, optionale geschätzte Pausendauer und aktive Ressourcengruppe.",
     "priority": "MUSS",
     "stage": "V1",
     "implementation": {
@@ -1835,7 +1835,7 @@
   {
     "id": "D-015",
     "section": "9 Datenanforderungen",
-    "requirement": "Ressourcengruppe: Bezeichnung, Status, Referenzkapazität, zugehörige Produkte, Prognoseparameter, Gates und aktive Flugzeugzuordnungen.",
+    "requirement": "Ressourcengruppe: Bezeichnung, Status, zugehörige Produkte, Prognoseparameter, Gates, aktive Flugzeugzuordnungen und daraus abgeleitete Kapazitätsspanne.",
     "priority": "MUSS",
     "stage": "V1",
     "implementation": {
@@ -1861,7 +1861,7 @@
   {
     "id": "D-020",
     "section": "9 Datenanforderungen",
-    "requirement": "Produkt: Bezeichnung, Kürzel, Preis, Ressourcengruppe, öffentliche Darstellung, Referenzdauer, Referenzkapazität, Verkaufsregeln, Begleitpflicht und Sortierung.",
+    "requirement": "Produkt: Bezeichnung, Kürzel, Preis, genau eine Ressourcengruppe, öffentliche Darstellung, Referenzdauer, Verkaufsregeln, Begleitpflicht und Sortierung; keine manuell gepflegte Referenzkapazität.",
     "priority": "MUSS",
     "stage": "V1",
     "implementation": {
@@ -1874,7 +1874,7 @@
   {
     "id": "D-030",
     "section": "9 Datenanforderungen",
-    "requirement": "Ticket: nicht erratbare Ticketnummer, Produkt, Fluggruppe beziehungsweise Queue-Position, Gruppen-ID, optionale Gewichtsklasse, optionale Telefonnummer, Benachrichtigung, Einwilligung, Standby, Status, Zahl- und Verkaufsdaten.",
+    "requirement": "Ticket: nicht erratbare Ticketnummer, Produkt, Fluggruppe beziehungsweise Queue-Position, Gruppen-ID, optionale Gewichtsklasse, Standby, Status und Verkaufszeitpunkt. Namen, Telefonnummern und Zahlungsdaten werden nicht im Ticketkern gespeichert; Web-Push-Registrierungen sind getrennt.",
     "priority": "MUSS",
     "stage": "V1",
     "implementation": {
@@ -1913,7 +1913,7 @@
   {
     "id": "D-050",
     "section": "9 Datenanforderungen",
-    "requirement": "Flug/Umlauf: Fluggruppe, Flugzeug, Pilot, Gate, Tickets, Status, Plan-, Prognose- und Ist-Zeiten für Aufruf, Boarding, Start, Landung und Abschluss sowie Bemerkungen.",
+    "requirement": "Flug/Umlauf: Fluggruppe, Flugzeug, anonymer Pilotencode, Gate, Tickets, Status, Plan-, Prognose- und Ist-Zeiten für Aufruf, Boarding, Start, Landung und Abschluss sowie anonyme organisatorische Bemerkungen.",
     "priority": "MUSS",
     "stage": "V1",
     "implementation": {
@@ -1939,7 +1939,7 @@
   {
     "id": "D-060",
     "section": "9 Datenanforderungen",
-    "requirement": "Pilot: Name, Kürzel, aktiv, aktuelle Zuordnung und optionale Bemerkung; keine Lizenz- oder Dokumentenverwaltung.",
+    "requirement": "Pilot: anonymer operativer Code, aktiv, aktuelle Zuordnung und optionale nicht personenbezogene Bemerkung; keine Namen, Lizenz- oder Dokumentendaten.",
     "priority": "MUSS",
     "stage": "V1",
     "implementation": {
@@ -1952,7 +1952,7 @@
   {
     "id": "D-065",
     "section": "9 Datenanforderungen",
-    "requirement": "Blockierung/Unterbrechung: Geltungsbereich, Typ, Beginn, optionaler Prüfzeitpunkt oder Mindestdauer, Status, Grund und Aufhebung.",
+    "requirement": "Blockierung/Unterbrechung/Pause: Geltungsbereich, Typ, Beginn, optionaler erwarteter Rückkehr- oder Prüfzeitpunkt, Status, Grund und bestätigte Aufhebung.",
     "priority": "MUSS",
     "stage": "V1",
     "implementation": {
@@ -2043,7 +2043,7 @@
   {
     "id": "Q-UX-020",
     "section": "10.1 Bedienbarkeit und Oberfläche",
-    "requirement": "Kasse und Flight Line kommen im Standardablauf ohne Menünavigation aus; alle Regelfunktionen liegen auf jeweils einer Arbeitsansicht.",
+    "requirement": "Kasse und Flight Line kommen im Standardablauf ohne Menünavigation aus. Flight Line besitzt eine Desktop-Supervisor-Ansicht und eine vereinfachte Assistenzansicht für iPad, iPad mini, iPhone und vergleichbare Geräte. Die Administration zeigt kompakte Tabellen; Formulare öffnen nur nach Neu oder Bearbeiten.",
     "priority": "MUSS",
     "stage": "V1",
     "implementation": {
@@ -2108,9 +2108,9 @@
   {
     "id": "Q-UX-070",
     "section": "10.1 Bedienbarkeit und Oberfläche",
-    "requirement": "Umschaltbares helles und dunkles Farbschema für Sonne, Dämmerung und Abendbetrieb.",
-    "priority": "KANN",
-    "stage": "V2",
+    "requirement": "Umschaltbares helles und dunkles Farbschema für Sonne, Dämmerung und Abendbetrieb auf allen Bedienoberflächen.",
+    "priority": "MUSS",
+    "stage": "V1",
     "implementation": {
       "issue": "",
       "module": "",
@@ -2147,7 +2147,7 @@
   {
     "id": "Q-ZUV-020",
     "section": "10.2 Zuverlässigkeit und Verbindungsverhalten",
-    "requirement": "Verbindungsaussetzer bis etwa 60 Sekunden werden ohne Verlust bereits erfasster Eingaben überbrückt. Der letzte Stand bleibt sichtbar und wird als möglicherweise veraltet gekennzeichnet.",
+    "requirement": "Verbindungsaussetzer und vorübergehende Server- oder D1-Fehler werden ohne Leeren der Oberfläche überbrückt. Der letzte bestätigte Stand bleibt mit Alter und Verbindungsstatus sichtbar; unbestätigte Schreibaktionen bleiben gesperrt und werden nicht als operative Änderungen gezählt.",
     "priority": "MUSS",
     "stage": "V1",
     "implementation": {
@@ -2329,7 +2329,7 @@
   {
     "id": "Q-DSG-020",
     "section": "10.4 Sicherheit, Datenschutz und Zugriffsschutz",
-    "requirement": "Telefonnummern und Push-Registrierungen werden nach einer konfigurierbaren Frist nach Veranstaltungsende, standardmäßig sieben Tage, gelöscht oder anonymisiert.",
+    "requirement": "Push-Registrierungen werden nach einer konfigurierbaren Frist nach Veranstaltungsende, standardmäßig sieben Tage, gelöscht oder irreversibel entkoppelt. V1 speichert keine Telefonnummern.",
     "priority": "MUSS",
     "stage": "V1",
     "implementation": {

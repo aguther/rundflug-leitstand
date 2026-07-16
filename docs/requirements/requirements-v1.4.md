@@ -36,7 +36,7 @@ Konsolidierte Leitentscheidungen
 | Bedienung Flight Line | Vier Primäraktionen: NEXT, IM FLUG, GELANDET, ABGESCHLOSSEN/VERFÜGBAR. Optionaler Check-in per Scan. |
 | Automatisierung | Vor NEXT automatische Optimierung; ab NEXT nur Vorschläge und menschliche Bestätigung. Gruppen werden nie automatisch getrennt. |
 | Prognose | Reale Ereignisse wirken stärker als Planwerte; alle Folgeflüge werden nach relevanten Ereignissen neu disponiert. |
-| Sitzplatzkapazität | Referenzkapazität für frühe Gruppenbildung; konkrete Flugzeugkapazität ist für den Umlauf maßgeblich. |
+| Sitzplatzkapazität | Aus der aktiven Flotte der Ressourcengruppe abgeleitete Kapazitätsspanne; konkrete Flugzeugkapazität ist für den Umlauf maßgeblich. |
 | Ticketbereitstellung | V1 unterstützt vorgedruckte QR-Tickets und druckbare/digitale Tickets; spezielle Bondrucker-Anbindung folgt in V2. |
 | Betriebsarchitektur | Zentrale EU-Cloud-PWA mit Offline-Queue für kurze Ausfälle; Papier-Rückfallebene für Totalausfall. |
 | Datenschutz | Keine Gastnamen im Kernsystem; ein optionales Passagierlistenmodul bleibt strikt getrennt. |
@@ -168,7 +168,7 @@ Die Fassung 1.4 verbindet die operative Einfachheit des Lastenhefts v1.3 mit dem
 | Keine Uhrzeiten oder FIDS-Prognose | Intern konkrete Prognosezeiten; extern Countdown oder Zeitfenster. Damit bleibt das System rechenfähig, ohne feste Zusagen zu erzeugen. |
 | Vier Taps oder mehr Messpunkte | Vier Primäraktionen erzeugen mehrere fachliche Ereignisse. Optionaler Check-in bleibt außerhalb des Minimalpfads. |
 | Feste Slots oder dynamische Planung | Fluggruppe/Slot ist eine stabile Passagierkohorte und Kommunikationsnummer, keine feste Zeit oder Maschine. |
-| Homogene oder gemischte Flotte | Referenzkapazität vereinfacht die frühe Bildung; die konkrete Maschinenkapazität entscheidet beim Umlauf. |
+| Homogene oder gemischte Flotte | Die aktive Flotte liefert die Kapazitätsspanne; die konkrete Maschinenkapazität entscheidet beim Umlauf. |
 | Vorgedrucktes oder gedrucktes Ticket | Beide Ausgabearten werden in V1 unterstützt; spezifische Bondrucker-Integration folgt später. |
 
 ## 1.6 Verbindlichkeit, Priorisierung und Ausbaustufen
@@ -278,7 +278,7 @@ Das System darf intern minutengenaue Prognosewerte berechnen. Gäste erhalten da
 | Interner Status | Öffentliche Darstellung / Handlung |
 | --- | --- |
 | Verkauft / Wartend | Warten - noch nicht zur Flight Line kommen. |
-| Voraufruf | Bitte vorbereiten - Status aufmerksam verfolgen. |
+| Voraufruf | Bitte zum Gate / GO TO GATE - Ticket bereithalten. |
 | Aufgerufen / Boarding | Bitte jetzt zur Flight Line / Boarding. |
 | Eingecheckt | An der Flight Line registriert. |
 | Im Flug | Flug läuft. |
@@ -302,14 +302,14 @@ Manuelle Eingriffe erfassen reale betriebliche Zustände und keine willkürliche
 
 ## 5.1 Ticketverkauf
 
-| Produkt antippen | > | Personen Gruppe bilden | > | Optionen nur falls nötig | > | QR-Ticket zuordnen/ausgeben | > | Zahlung informativ | > | Verkaufen Queue + Prognose |
+| Produkt antippen | > | Personen Gruppe bilden | > | Optionen nur falls nötig | > | QR-Ticket zuordnen/ausgeben | > | Verkaufen Queue + Prognose |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 
 Der Standardverkauf erfolgt auf einer einzigen Kassenansicht. Die Kasse wählt Produkt und Gruppengröße, erfasst nur die für dieses Produkt aktivierten Zusatzangaben, ordnet Ticketcodes zu beziehungsweise druckt Tickets und bestätigt den Verkauf. Das System reiht die Gruppe in die Ressourcengruppen-Queue ein, bildet beziehungsweise füllt Fluggruppen und aktualisiert alle Prognosen.
 ## 5.2 Queue- und Fluggruppenbildung
 
 1. Ticketgruppe in die Queue der Ressourcengruppe einreihen.
-2. Produkt, Gruppenbindung und Referenzkapazität berücksichtigen.
+2. Produkt, Gruppenbindung und abgeleitete Kapazitätsspanne berücksichtigen.
 3. Freie Plätze vor dem Aufruf mit vordersten passenden Tickets füllen; Standby kann bevorzugt werden.
 4. Stabile Fluggruppen-/Slotnummer vergeben und öffentlich anzeigen.
 5. Noch keine feste Maschine zusagen; konkrete Disposition aus der Ressourcenlage ableiten.
@@ -384,15 +384,18 @@ Bleibt ein erwartetes Ereignis aus oder dauert eine Prozessphase länger als pro
 - Storno, Suche und Tagesbericht als klar getrennte Sekundärfunktionen.
 ## 7.2 Flight Line / Boarding
 
-- Arbeitsliste der nächsten Fluggruppen und Live-Flottenstatus auf einer Ansicht.
-- Je verfügbarem Flugzeug klare nächste Primäraktion.
+- Supervisor-Ansicht am Desktop mit Arbeitsliste, Queue, Prognosen und Live-Flottenstatus.
+- Separate Flight-Line-Assistenz für Tablet und Mobiltelefon mit je Flugzeug genau den nächsten
+  sinnvollen Primäraktionen und anonymer kurzzeitiger Betreuungsreservierung.
 - Vier Primäraktionen im Standardumlauf; Sonderfälle über kurze kontextbezogene Dialoge.
 - Fehlende Passagiere, Gruppenschutz und Nachbesetzung als bestätigungspflichtige Vorschläge.
 - Not-Halt jederzeit sichtbar, aber gegen versehentliche Aufhebung geschützt.
 ## 7.3 Flugleitung und Administration
 
-- Gesamtübersicht über Queues, offene Tickets, laufende Flüge, Ressourcen, Blockierungen und Prognosen.
+- Gesamtübersicht über Queues, laufende Flüge, Ressourcen, Blockierungen und Prognosen in der
+  Flight-Line-Supervisor-Ansicht.
 - Flugleitung primär lesend; Administration konfigurierend.
+- Die Administration verwendet kompakte Tabellen. Editoren öffnen nur nach „Neu“ oder „Bearbeiten“.
 - Änderungen von Stammdaten und Ressourcenzuordnungen zeigen vorab ihre betrieblichen Auswirkungen.
 ## 7.4 Besucherstatus und Benachrichtigung
 
@@ -401,7 +404,7 @@ Die Besucheransicht beantwortet nur vier Fragen: Was habe ich gebucht? Wie ist m
 
 | Anzeige | Kerninhalt |
 | --- | --- |
-| Fluggastmonitor / FIDS | Jetzt Boarding, Bitte zur Flight Line, nächste Fluggruppen, Produkt, Gate, Zeitfenster/Countdown, allgemeine Hinweise. |
+| Fluggastmonitor / FIDS | Konfigurierbares Standardprofil sowie vollständig englisches Terminalprofil mit WAITING, GO TO GATE, BOARDING, DELAYED und DEPARTED; nächste Fluggruppen, Produkt, Gate und Zeitfenster/Countdown. |
 | Boardingmonitor | Kommende Fluggruppen, Ticketnummern, vorgeschlagene beziehungsweise zugeordnete Maschine, Gate und Flottenstatus. |
 
 # 8 Funktionale Anforderungen
@@ -413,17 +416,17 @@ Die Besucheransicht beantwortet nur vier Fragen: Was habe ich gebucht? Wie ist m
 | F-KAS-010 | Das Kassenpersonal muss einen Standardverkauf für eine Gruppe in maximal sechs Interaktionen und in der Regel in weniger als 15 Sekunden abschließen können. Freiwillige Zusatzangaben und Sonderfälle sind von dieser Zielzeit ausgenommen. | MUSS | V1 |
 | F-KAS-020 | Zusammen verkaufte Tickets erhalten automatisch eine gemeinsame Gruppen-ID. Gruppenbindungen werden in allen Folgeprozessen berücksichtigt. | MUSS | V1 |
 | F-KAS-030 | Gewichtsklassen (Kind, Normal, Schwer, Individuell mit kg-Angabe) müssen je Produkt oder Veranstaltung konfigurierbar aktivierbar sein. Ist die Funktion aktiv, ist je Person eine Klasse zu erfassen; ist sie deaktiviert, darf sie den Verkaufsablauf nicht verlängern. | MUSS | V1 |
-| F-KAS-040 | Optional erfassbar sind Telefonnummer ausschließlich zur Ticketnummer, gewünschter Benachrichtigungskanal und Standby-Kennzeichen. Namen oder weitere Gastdaten werden im Kernsystem nicht erfasst. | MUSS | V1 |
+| F-KAS-040 | Im Ticketkern werden weder Namen noch Telefonnummern erfasst. Optional sind ausschließlich anonyme ticketbezogene Merkmale wie Standby und erforderliche Produktoptionen; Web-Push wird getrennt und freiwillig je Ticket registriert. | MUSS | V1 |
 | F-KAS-050 | Jedes Ticket erhält eine eindeutige, nicht erratbare Ticketnummer mit QR-Code. V1 unterstützt sowohl vorgedruckte Ticketcodes als auch die Ausgabe eines druckbaren oder digitalen Tickets aus dem System. | MUSS | V1 |
 | F-KAS-055 | Eine gerätespezifische Bondrucker-Anbindung zur direkten Ticketausgabe ist vorzusehen. | SOLL | V2 |
-| F-KAS-060 | Bezahlstatus, Betrag und Zahlart werden rein informatorisch erfasst. Das System ist keine elektronische Registrierkasse und ersetzt keine bestehende Vereinskasse oder ein Kartenterminal. | MUSS | V1 |
+| F-KAS-060 | Bezahlstatus und Zahlart werden nicht erfasst. Der Produktpreis wird ausschließlich als Produkt- und Abstimmungsinformation angezeigt; das System ist keine elektronische Registrierkasse und wickelt keine Zahlung ab. | MUSS | V1 |
 | F-KAS-070 | Storno ist nur für Kasse und Administrator zulässig, erfordert einen Grund und erzeugt einen unveränderlichen Protokolleintrag. | MUSS | V1 |
 | F-KAS-080 | Umbuchung eines Tickets auf ein anderes Produkt muss mit korrekter Neueinreihung in die operative Warteschlange und vollständiger Protokollierung möglich sein. | MUSS | V1 |
 | F-KAS-090 | Ticketsuche nach Ticketnummer, Gruppen-ID, Fluggruppen-/Slotnummer und QR-Code. | MUSS | V1 |
 | F-KAS-100 | Die Verkaufskachel zeigt je Produkt mindestens: Betriebsstatus, realistische Wartezeitspanne, prognostiziertes Aufruf-/Boardingfenster, Kapazitätsampel und realistisch verbleibende verkaufbare Plätze. | MUSS | V1 |
 | F-KAS-110 | Ist für ein Produkt eine Begleitpflicht für Kinder hinterlegt, weist das System bei einer Kinderbuchung ohne erwachsene Begleitung in derselben Gruppe deutlich darauf hin. | SOLL | V1 |
 | F-KAS-120 | Der Verkauf wird technisch gesperrt, wenn das Produkt oder seine Ressourcengruppe nicht verkaufbar ist, der Verkaufsschluss erreicht ist oder der Notfallmodus aktiv ist. Der Sperrgrund wird angezeigt. | MUSS | V1 |
-| F-KAS-130 | Tageszählbericht als Abstimmhilfe mit verkauften Tickets, Stornos und informatorischen Summen je Produkt und Zahlart. | MUSS | V1 |
+| F-KAS-130 | Tageszählbericht als Abstimmhilfe mit verkauften Tickets und Stornos je Produkt. Zahlarten, Bezahlstatus und Zahlungsabwicklung sind ausgeschlossen. | MUSS | V1 |
 | F-KAS-140 | Gutschein-Tickets können ohne sofortige Einreihung ausgegeben und später an der Kasse eingelöst werden. | KANN | V2 |
 | F-KAS-150 | Warteliste je Produkt für ausverkaufte oder gesperrte Angebote; Vormerkung ohne Zahlung und geregeltes Nachrücken bei frei werdender Kapazität. | KANN | V2 |
 | F-KAS-160 | Die Kasse verkauft ausschließlich auf Basis der aktuellen Betriebs- und Prognoselage. Eine feste Flugzeug- oder Pilotenzuordnung durch die Kasse ist ausgeschlossen. | MUSS | V1 |
@@ -437,7 +440,7 @@ Die Besucheransicht beantwortet nur vier Fragen: Was habe ich gebucht? Wie ist m
 | F-RES-030 | Eine Ressourcengruppe kann ein oder mehrere Flugzeuge enthalten. Standardmäßig besitzt jedes Flugzeug eine eigene Ressourcengruppe; die Zusammenfassung mehrerer Flugzeuge ist konfigurierbar. | MUSS | V1 |
 | F-RES-040 | Ein Flugzeug darf zu jedem Zeitpunkt höchstens einer aktiven Ressourcengruppe zugeordnet sein. Das System muss widersprüchliche Zuordnungen technisch verhindern. | MUSS | V1 |
 | F-RES-050 | Zuordnungen von Flugzeugen zu Ressourcengruppen besitzen Gültigkeitszeiträume und werden historisiert. Änderungen im laufenden Betrieb werden mit Auswirkungen auf Queue und Prognose sofort verarbeitet. | MUSS | V1 |
-| F-RES-060 | Je Produkt und Ressourcengruppe sind Kompatibilitätsmerkmale zu führen, insbesondere zulässige Flugzeugtypen, Passagierkapazität, Gate und planmäßige Prozessdauern. | MUSS | V1 |
+| F-RES-060 | Ein Produkt verwendet genau eine Ressourcengruppe. Flugzeugkompatibilität und Passagierkapazität werden aus den konkret aktiv zugeordneten Flugzeugen abgeleitet; gepflegt werden Gate und planmäßige Prozessdauern, keine Freitext-Typenlisten oder manuelle Gruppenkapazität. | MUSS | V1 |
 | F-RES-070 | Ressourcengruppen besitzen einen eigenen Betriebsstatus: aktiv, pausiert, unterbrochen oder beendet. Der Status wirkt auf Verkauf, Aufruf, Prognose und Anzeigen. | MUSS | V1 |
 | F-RES-080 | Die operative Queue wird je Ressourcengruppe geführt. Produktzugehörigkeit und stabile öffentliche Fluggruppen-/Slotnummern bleiben dabei erhalten. | MUSS | V1 |
 | F-RES-090 | Flugzeuge mit abweichender Sitzplatzkapazität dürfen in einer Ressourcengruppe betrieben werden, sofern die konkrete Kapazität beim Umlauf berücksichtigt wird. V1 darf hierfür einen bestätigungspflichtigen Vorschlag statt vollautomatischer Optimierung verwenden. | SOLL | V1 |
@@ -453,7 +456,7 @@ Die Besucheransicht beantwortet nur vier Fragen: Was habe ich gebucht? Wie ist m
 | F-SLT-040 | Fluggruppen dürfen bis zum Statuswechsel IM FLUG geändert, ergänzt oder nachbesetzt werden. Nach IM FLUG ist die Besetzung unveränderlich; Korrekturen sind nur als dokumentierter Administrationsvorgang zulässig. | MUSS | V1 |
 | F-SLT-050 | Leiter Flight Line und Flight-Line-Personal können Fluggruppen manuell anpassen. Jede Abweichung vom Systemvorschlag wird protokolliert. | MUSS | V1 |
 | F-SLT-060 | Die nutzbare Platzanzahl eines konkreten Umlaufs kann vor dem Aufruf reduziert werden. Nicht mitfliegende Tickets rücken unter Erhalt der Gruppenbindung an die vorderste passende Warteschlangenposition. | MUSS | V1 |
-| F-SLT-070 | Die Referenzkapazität eines Produkts dient der anfänglichen Fluggruppenbildung. Maßgeblich für den konkreten Umlauf ist die Kapazität des zugeordneten Flugzeugs; Abweichungen werden deutlich angezeigt und müssen bestätigt werden. | MUSS | V1 |
+| F-SLT-070 | Fluggruppenbildung und Verkauf verwenden die aus den aktuell nutzbaren Flugzeugen der Ressourcengruppe abgeleitete Kapazitätsspanne. Maßgeblich für den konkreten Umlauf ist die Kapazität des bestätigten Flugzeugs; eine Gruppe wird nur geteilt, wenn kein nutzbares Flugzeug sie gemeinsam aufnehmen kann und die Teilung ausdrücklich bestätigt wird. | MUSS | V1 |
 | F-SLT-080 | Nach jedem relevanten Ereignis berechnet das System Reihenfolge, Zuordnungen, Prognosen und Wartezeitspannen neu und verteilt den neuen Stand in Echtzeit an alle Geräte. | MUSS | V1 |
 | F-SLT-090 | Fällt ein Flugzeug aus, verteilt das System noch nicht gestartete Fluggruppen auf verbleibende kompatible Flugzeuge der Ressourcengruppe neu. Bereits aufgerufene Gruppen werden nicht stillschweigend verändert. | MUSS | V1 |
 | F-SLT-100 | Jede Fluggruppe erhält eine fortlaufende, gut kommunizierbare Tagesnummer in Verbindung mit dem Produktkürzel, z. B. SR-042. Diese Kennung ist auf allen Ansichten identisch. | MUSS | V1 |
@@ -495,12 +498,12 @@ Die Besucheransicht beantwortet nur vier Fragen: Was habe ich gebucht? Wie ist m
 | F-FLT-010 | Verwaltung der Flugzeugstammdaten einschließlich Ressourcengruppen-Zuordnung und Pflege im laufenden Betrieb. | MUSS | V1 |
 | F-FLT-020 | Event-Status je Flugzeug: aktiv oder inaktiv für die Veranstaltung. | MUSS | V1 |
 | F-FLT-030 | Live-Status je Flugzeug mindestens: verfügbar, Boarding, im Flug, gelandet/deboarding, Tanken vorgemerkt, Tanken aktuell, Pause, Flugbetrieb unterbrochen und kurzfristig inaktiv. Statuswechsel sind in höchstens zwei Interaktionen möglich. | MUSS | V1 |
-| F-FLT-040 | Piloten werden mit Name und Kürzel geführt und können live angelegt oder deaktiviert werden. Lizenz-, Dokumenten- und Flugbuchverwaltung sind ausgeschlossen. | MUSS | V1 |
+| F-FLT-040 | Piloten werden ausschließlich über anonyme operative Codes geführt, die bei P-01 beginnen und live angelegt oder deaktiviert werden können. Namen, Lizenz-, Dokumenten- und Flugbuchdaten sind ausgeschlossen. | MUSS | V1 |
 | F-FLT-050 | Tanken vorgemerkt reserviert eine passende operative Lücke ohne feste Zusage; Tanken aktuell nimmt das Flugzeug aus der Disposition. Beide Zustände wirken sofort auf Prognose und Kapazität. | MUSS | V1 |
 | F-FLT-060 | Je Flugzeug führt das System einen Umlaufzähler seit dem letzten Tanken mit konfigurierbarer Erinnerungsschwelle. | SOLL | V1 |
 | F-FLT-070 | Geschätzte Kraftstoffbilanz je Flugzeug als organisatorische Erinnerungshilfe mit Startfüllstand, pauschalem Verbrauch, Warnschwelle und Korrektur beim Tanken; ohne Sicherheitsfunktion. | SOLL | V2 |
 | F-FLT-080 | Die aktuelle Ressourcengruppe und ihre Queue sind am Flugzeug sichtbar. Status- oder Gruppierungsänderungen lösen eine automatische Neuplanung aller abhängigen Prognosen aus. | MUSS | V1 |
-| F-FLT-090 | Pilotenpausen können als zeitlich offene oder mit erwarteter Mindestdauer versehene Blockierung erfasst werden. Das System plant keine Verfügbarkeit gegen eine aktive Pause. | SOLL | V1 |
+| F-FLT-090 | Pausen können je Flugzeug oder anonymem Pilotencode ohne Dauer oder mit geschätzter Dauer erfasst werden. Ein bekanntes Pausenende darf als unsichere erwartete Verfügbarkeit in Prognosen einfließen; tatsächlich verfügbar wird die Ressource erst nach menschlicher Bestätigung. Eine Pause ohne Dauer nimmt die Ressource vollständig aus der prognostizierten Kapazität. | SOLL | V1 |
 
 ## 8.6 Prognose, Disposition und Kapazität
 
@@ -543,12 +546,12 @@ Die Besucheransicht beantwortet nur vier Fragen: Was habe ich gebucht? Wie ist m
 
 | ID | Anforderung | Priorität | Stufe |
 | --- | --- | --- | --- |
-| F-MON-010 | Der Fluggastmonitor zeigt im FIDS-Stil mindestens Produkt, Fluggruppen-/Slotnummer, Gate, Status, aktuelle Boardingaufrufe und die nächsten Fluggruppen mit Countdown oder Zeitfenster. Eine einzelne exakte Uhrzeit wird nicht als feste Zusage dargestellt. | MUSS | V1 |
+| F-MON-010 | Der Fluggastmonitor zeigt mindestens Produkt, Fluggruppen-/Slotnummer, Gate, Status, aktuelle Boardingaufrufe und die nächsten Fluggruppen mit Countdown oder Zeitfenster. Er besitzt ein modernes Standardprofil und ein klassisches Terminalprofil. Abgeflogene Zeilen zeigen kurz DEPARTED beziehungsweise Abgeflogen und verschwinden nach einer konfigurierbaren Nachlaufzeit, ohne fachliche Daten zu löschen. | MUSS | V1 |
 | F-MON-020 | Der Boardingmonitor zeigt mehrere kommende Fluggruppen, Ticketnummern, Gate und nach Zuordnung das Flugzeug sowie eine Flottenstatuszeile. | MUSS | V1 |
 | F-MON-030 | Monitore laufen im Vollbild-Kioskmodus, aktualisieren sich in Echtzeit, verbinden sich automatisch neu und benötigen während des Veranstaltungstags keinen manuellen Eingriff. | MUSS | V1 |
 | F-MON-040 | Personenbezogene Daten auf Monitoren sind ausgeschlossen. Angezeigt werden nur Ticket-/Fluggruppenkennungen, Produkte, Gates, Status und Betriebsinformationen. | MUSS | V1 |
 | F-MON-050 | Im Notfallmodus zeigen alle öffentlichen Monitore unverzüglich einen neutralen Hinweis ohne Aufrufe. | MUSS | V1 |
-| F-MON-060 | Mehrsprachige Anzeige mindestens Deutsch/Englisch für Monitore und Status-Seiten. | KANN | V3 |
+| F-MON-060 | Das Standardprofil verwendet die deutsche öffentliche Terminologie. Das Terminalprofil verwendet ausschließlich englische beschreibende Begriffe, insbesondere DEPARTURES, WAITING, GO TO GATE, BOARDING, DELAYED und DEPARTED; der Produkt-Eigenname darf unverändert bleiben. | MUSS | V1 |
 | F-MON-070 | Statusfarben sind systemweit einheitlich, werden aber stets zusätzlich durch Text oder Symbol erläutert. | MUSS | V1 |
 | F-MON-080 | Die Anzeige kann je Gate, Flight Line oder Ressourcengruppe gefiltert werden; der parallele Mehr-Gate-Betrieb der Bedienoberfläche folgt in V2. | SOLL | V2 |
 
@@ -558,13 +561,13 @@ Die Besucheransicht beantwortet nur vier Fragen: Was habe ich gebucht? Wie ist m
 | --- | --- | --- | --- |
 | F-BEN-010 | Jedes Ticket verlinkt per QR-Code auf eine öffentliche Status-Seite ohne Anmeldung. Sie zeigt Produkt, Fluggruppe, öffentlichen Status, verbleibende Wartezeit beziehungsweise Zeitfenster, Position, Gate, Hinweise und Zeitpunkt der letzten Aktualisierung. | MUSS | V1 |
 | F-BEN-020 | Gäste können Web-Push-Benachrichtigungen je Ticket aktivieren, ohne App-Installation und ohne Telefonnummer. | MUSS | V1 |
-| F-BEN-030 | Vorabbenachrichtigungen werden aus Prognose und Queue-Position abgeleitet; zusätzlich erfolgt beim NEXT ein verbindlicher Aufruf. Die Schwellen sind konfigurierbar. | MUSS | V1 |
+| F-BEN-030 | Das System löst aus Prognose, Queue-Position, Prognosequalität und maximal akzeptierter Gate-Wartezeit automatisch den Voraufruf „Bitte zum Gate“ beziehungsweise GO TO GATE aus. Schwellen und Vorlauf sind konfigurierbar. NEXT bleibt davon getrennt, bindet erst nach menschlicher Bestätigung das Flugzeug und startet Boarding sowie den verbindlichen Aufruf. | MUSS | V1 |
 | F-BEN-040 | Benachrichtigungen können alternativ an der Kasse für die Ticketnummer aktiviert werden. | MUSS | V1 |
 | F-BEN-050 | SMS als zusätzlicher Kanal über einen externen Versanddienst mit Warteschlange, Wiederholung und sichtbarem Versandstatus. | SOLL | V2 |
-| F-BEN-060 | Jede Telefonnummer oder Messenger-Registrierung erfordert eine dokumentierte Einwilligung mit Zeitpunkt und Kanal. | MUSS | V1 |
+| F-BEN-060 | Falls Telefon- oder Messenger-Kanäle in einer späteren Stufe ergänzt werden, erfordert jede Registrierung eine dokumentierte Einwilligung mit Zeitpunkt und Kanal. V1 erfasst keine Telefonnummern. | MUSS | V2 |
 | F-BEN-070 | Bei relevanten Änderungen wie erheblicher Verschiebung, Unterbrechung, Gate-Wechsel oder Notfallmodus werden betroffene registrierte Gäste informiert. | SOLL | V2 |
 | F-BEN-080 | WhatsApp oder vergleichbarer Messenger über eine offizielle Business-Schnittstelle mit dokumentierter Einwilligung. | KANN | V3 |
-| F-BEN-090 | Öffentliche Statusbezeichnungen sind auf wenige handlungsorientierte Zustände zu reduzieren: Warten, Bitte vorbereiten, Bitte zur Flight Line, Boarding, Flug läuft, Gelandet und Abgeschlossen. | MUSS | V1 |
+| F-BEN-090 | Öffentliche Statusbezeichnungen sind auf wenige handlungsorientierte Zustände zu reduzieren: Warten, Bitte zum Gate, Boarding, Abgeflogen beziehungsweise Flug läuft, Verzögert, Gelandet und Abgeschlossen. Das Terminalprofil bildet diese ausschließlich auf WAITING, GO TO GATE, BOARDING, DEPARTED und DELAYED ab. | MUSS | V1 |
 | F-BEN-100 | Bei unsicherer oder unterbrochener Prognose zeigt die Status-Seite einen ehrlichen Hinweis statt eines scheinbar präzisen Countdowns. | MUSS | V1 |
 
 ## 8.10 Historie, Protokoll und Auswertung
@@ -573,9 +576,9 @@ Die Besucheransicht beantwortet nur vier Fragen: Was habe ich gebucht? Wie ist m
 | --- | --- | --- | --- |
 | F-HIS-010 | Flüge, Fluggruppen und Tickets werden dauerhaft gespeichert und sind nach Datum, Flugzeug, Pilot, Produkt, Ressourcengruppe, Slotnummer, Ticket und Status filterbar. | MUSS | V1 |
 | F-HIS-020 | Unveränderliches, nur anfügendes Ereignisprotokoll mindestens für Verkauf, Storno, Umbuchung, Aufruf, Check-in, IM FLUG, GELANDET, ABGESCHLOSSEN, Zurückstellung, No-Show, Pilot- und Ressourcenwechsel, Tanken, Wetter, Unterbrechung, Notfallmodus und manuelle Disposition. | MUSS | V1 |
-| F-HIS-030 | Automatischer Tagesbericht als PDF und CSV mit Flügen, Passagierzahlen, Auslastung, gemessenen Prozesszeiten, Wartezeiten, Kassen-Zählbericht, Prognoseentwicklung und besonderen Ereignissen. | SOLL | V1 |
+| F-HIS-030 | Automatischer Tagesbericht als PDF und CSV mit Flügen, Passagierzahlen, Auslastung, gemessenen Prozesszeiten, Wartezeiten, Ticket-Zählbericht je Produkt, Prognoseentwicklung und besonderen Ereignissen. | SOLL | V1 |
 | F-HIS-040 | CSV-Export der fachlichen Rohdaten für Vereinsabrechnung und eigene Auswertungen. | MUSS | V1 |
-| F-HIS-050 | Statistik-Dashboard über mehrere Veranstaltungen mit Durchsatz, Auslastung, Wartezeit, Prognosegüte und informatorischem Umsatzvergleich. | SOLL | V2 |
+| F-HIS-050 | Statistik-Dashboard über mehrere Veranstaltungen mit Durchsatz, Auslastung, Wartezeit und Prognosegüte. | SOLL | V2 |
 | F-HIS-060 | Prognose-Snapshots und zugehörige Ist-Ergebnisse sind auswertbar, insbesondere Abweichung von Boarding-, Start- und Abschlussprognose. | SOLL | V1 |
 | F-HIS-070 | Kennzahlen wie Boardingdauer, Flugzeit, Bodenzeit, Umlaufzeit und Wartezeit besitzen im System eindeutige, dokumentierte Start- und Endereignisse. | MUSS | V1 |
 
@@ -584,11 +587,11 @@ Die Besucheransicht beantwortet nur vier Fragen: Was habe ich gebucht? Wie ist m
 | ID | Anforderung | Priorität | Stufe |
 | --- | --- | --- | --- |
 | F-ADM-010 | Pflege der Veranstaltungsparameter einschließlich Verkaufszeiten, Betriebsende, Fristen, Ampelschwellen, Referenzgewichte, Benachrichtigungsvorlauf sowie Planwerte und Prognoseparameter. | MUSS | V1 |
-| F-ADM-020 | Stammdaten für Produkte, Ressourcengruppen, Flugzeuge, Zuordnungen, Piloten und Gates sind auch während des Betriebs änderbar; Änderungen werden protokolliert und wirken kontrolliert auf den Livezustand. | MUSS | V1 |
+| F-ADM-020 | Stammdaten für Produkte, Ressourcengruppen, Flugzeuge, anonyme Pilotencodes und Gates sind auch während des Betriebs änderbar; Zuordnungen werden direkt an der Ressourcengruppe gepflegt. Änderungen werden protokolliert und wirken kontrolliert auf den Livezustand. | MUSS | V1 |
 | F-ADM-030 | Gerätekopplung ohne persönliche Helferkonten: Der Administrator koppelt ein Gerät per QR-Code mit einer festen Rolle für die Veranstaltung. Kopplungen sind einzeln widerrufbar. | MUSS | V1 |
 | F-ADM-040 | Geräteübersicht mit Rolle, Online-Status, letztem Kontakt und, soweit verfügbar, Akkustand. | SOLL | V1 |
 | F-ADM-050 | Kritische Aktionen wie Storno, Aufheben des Notfallmodus, Löschen von Stammdaten und wesentliche Live-Konfigurationsänderungen erfordern eine Administrator-PIN. | MUSS | V1 |
-| F-ADM-060 | Administrations-Dashboard mit offenen Tickets, Durchsatz, mittleren Prozesszeiten, Prognosequalität, Geräte- und Benachrichtigungsstatus sowie informatorischen Umsatzzählern. | SOLL | V1 |
+| F-ADM-060 | Kompakte Administrationsübersicht mit offenen Tickets, Durchsatz, mittleren Prozesszeiten, Prognosequalität sowie Geräte- und Benachrichtigungsstatus. Operative Flottensteuerung liegt in der Flight-Line-Supervisor-Ansicht. | SOLL | V1 |
 | F-ADM-070 | Trainingsmodus mit Beispieldaten und vollständiger Rücksetzung; Trainingsdaten dürfen nicht in Auswertungen einfließen. | KANN | V2 |
 | F-ADM-080 | Verwaltung mehrerer Veranstaltungen mit eventübergreifender Stammdatenbibliothek und Kopie einer Vorveranstaltung als Vorlage. | MUSS | V1 |
 | F-ADM-090 | Dashboard Flugleitung als primär lesende Gesamtsicht mit offenen Tickets, Ressourcenstatus, laufenden Flügen, Kapazität, Prognosen und Not-Halt. | SOLL | V1 |
@@ -604,24 +607,24 @@ Die Besucheransicht beantwortet nur vier Fragen: Was habe ich gebucht? Wie ist m
 | F-INT-040 | Digitale Passagierlisten werden, falls erforderlich, als separates Modul mit eigener Berechtigung, Rechtsgrundlage und Löschfrist umgesetzt; keine stillschweigende Erweiterung des datensparsamen Kern-Ticketings. | KANN | V3 |
 | F-INT-050 | Online-Vorverkauf mit Kontingentsteuerung bleibt optional und darf den Vor-Ort-Regelbetrieb nicht voraussetzen. | KANN | V3 |
 | F-INT-060 | Mehrere Flugplätze und Mandantenfähigkeit für mehrere Veranstalter. | KANN | V4 |
-| F-INT-070 | Mehrere Kassen- und Flight-Line-Geräte dürfen bereits in V1 parallel auf denselben Livezustand zugreifen; mehrere organisatorisch unabhängige Flight Lines folgen in V2. | MUSS | V1 |
+| F-INT-070 | Mehrere Kassen- und Flight-Line-Geräte dürfen bereits in V1 parallel auf denselben Livezustand zugreifen. Flight Line Assist koordiniert die kurzzeitige Betreuung eines Flugzeugs über anonyme, auslaufende Gerätereservierungen; fachliche Schreibkommandos bleiben versioniert und konfliktgeprüft. Mehrere organisatorisch unabhängige Flight Lines folgen in V2. | MUSS | V1 |
 
 # 9 Datenanforderungen
 
 Die folgenden Angaben definieren die fachlich zu führenden Daten. Die technische Modellierung und Normalisierung obliegen dem Auftragnehmer, müssen jedoch die beschriebenen Invarianten und Historisierungsanforderungen erfüllen.
 | ID | Anforderung | Priorität | Stufe |
 | --- | --- | --- | --- |
-| D-010 | Flugzeug: Kennzeichen, Typ, Passagierkapazität, maximale Passagierzuladung, Gate, Event- und Live-Status, aktueller Pilot, Zeitprofile, Tankhinweise und aktive Ressourcengruppe. | MUSS | V1 |
-| D-015 | Ressourcengruppe: Bezeichnung, Status, Referenzkapazität, zugehörige Produkte, Prognoseparameter, Gates und aktive Flugzeugzuordnungen. | MUSS | V1 |
+| D-010 | Flugzeug: Kennzeichen, Typ, Passagierkapazität, maximale Passagierzuladung, Gate, Event- und Live-Status, aktueller Pilotencode, Zeitprofile, Tankhinweise, optionale geschätzte Pausendauer und aktive Ressourcengruppe. | MUSS | V1 |
+| D-015 | Ressourcengruppe: Bezeichnung, Status, zugehörige Produkte, Prognoseparameter, Gates, aktive Flugzeugzuordnungen und daraus abgeleitete Kapazitätsspanne. | MUSS | V1 |
 | D-016 | Ressourcengruppen-Zuordnung: Flugzeug, Ressourcengruppe, gültig ab/bis, aktiv, Änderungsgrund und Protokollbezug. | MUSS | V1 |
-| D-020 | Produkt: Bezeichnung, Kürzel, Preis, Ressourcengruppe, öffentliche Darstellung, Referenzdauer, Referenzkapazität, Verkaufsregeln, Begleitpflicht und Sortierung. | MUSS | V1 |
-| D-030 | Ticket: nicht erratbare Ticketnummer, Produkt, Fluggruppe beziehungsweise Queue-Position, Gruppen-ID, optionale Gewichtsklasse, optionale Telefonnummer, Benachrichtigung, Einwilligung, Standby, Status, Zahl- und Verkaufsdaten. | MUSS | V1 |
+| D-020 | Produkt: Bezeichnung, Kürzel, Preis, genau eine Ressourcengruppe, öffentliche Darstellung, Referenzdauer, Verkaufsregeln, Begleitpflicht und Sortierung; keine manuell gepflegte Referenzkapazität. | MUSS | V1 |
+| D-030 | Ticket: nicht erratbare Ticketnummer, Produkt, Fluggruppe beziehungsweise Queue-Position, Gruppen-ID, optionale Gewichtsklasse, Standby, Status und Verkaufszeitpunkt. Namen, Telefonnummern und Zahlungsdaten werden nicht im Ticketkern gespeichert; Web-Push-Registrierungen sind getrennt. | MUSS | V1 |
 | D-040 | Buchungsgruppe: Gruppen-ID, Größe, zugehörige Tickets, Gruppenbindung, Standby-Regel und gegebenenfalls Aufteilung auf unmittelbar aufeinanderfolgende Fluggruppen. | MUSS | V1 |
 | D-045 | Fluggruppe/Slot: stabile Tageskennung, Produkt, Ressourcengruppe, Tickets, Queue-Position, öffentliche Statusinformation, prognostizierte Zeitfenster und gegebenenfalls zugeordneter Umlauf. | MUSS | V1 |
-| D-050 | Flug/Umlauf: Fluggruppe, Flugzeug, Pilot, Gate, Tickets, Status, Plan-, Prognose- und Ist-Zeiten für Aufruf, Boarding, Start, Landung und Abschluss sowie Bemerkungen. | MUSS | V1 |
+| D-050 | Flug/Umlauf: Fluggruppe, Flugzeug, anonymer Pilotencode, Gate, Tickets, Status, Plan-, Prognose- und Ist-Zeiten für Aufruf, Boarding, Start, Landung und Abschluss sowie anonyme organisatorische Bemerkungen. | MUSS | V1 |
 | D-055 | Prognose-Snapshot: Erstellzeitpunkt, Bezug, prognostizierte Prozesszeiten, Zeitfenster, Qualitätsstufe, verwendete Datengrundlage und Auslöser der Neuberechnung. | SOLL | V1 |
-| D-060 | Pilot: Name, Kürzel, aktiv, aktuelle Zuordnung und optionale Bemerkung; keine Lizenz- oder Dokumentenverwaltung. | MUSS | V1 |
-| D-065 | Blockierung/Unterbrechung: Geltungsbereich, Typ, Beginn, optionaler Prüfzeitpunkt oder Mindestdauer, Status, Grund und Aufhebung. | MUSS | V1 |
+| D-060 | Pilot: anonymer operativer Code, aktiv, aktuelle Zuordnung und optionale nicht personenbezogene Bemerkung; keine Namen, Lizenz- oder Dokumentendaten. | MUSS | V1 |
+| D-065 | Blockierung/Unterbrechung/Pause: Geltungsbereich, Typ, Beginn, optionaler erwarteter Rückkehr- oder Prüfzeitpunkt, Status, Grund und bestätigte Aufhebung. | MUSS | V1 |
 | D-070 | Gate/Flight Line: Bezeichnung, Art, zugeordnete Ressourcengruppen und Anzeigefilter. | MUSS | V1 |
 | D-080 | Gerät: Bezeichnung, Rolle, Kopplung, letzter Kontakt, aktiv und technische Statusinformationen. | MUSS | V1 |
 | D-090 | Ereignis: fortlaufende ID, Zeitstempel, Ereignistyp, Quelle, auslösendes Gerät, fachlicher Bezug, Nutzdaten und gegebenenfalls Korrekturbezug. | MUSS | V1 |
@@ -635,12 +638,12 @@ Die folgenden Angaben definieren die fachlich zu führenden Daten. Die technisch
 | ID | Anforderung | Priorität | Stufe |
 | --- | --- | --- | --- |
 | Q-UX-010 | Alle Bedienoberflächen sind für Fingerbedienung auf Tablets ausgelegt: große Bedienelemente, hoher Kontrast für Sonnenlicht und maximal eine hervorgehobene Primäraktion je Arbeitszustand. | MUSS | V1 |
-| Q-UX-020 | Kasse und Flight Line kommen im Standardablauf ohne Menünavigation aus; alle Regelfunktionen liegen auf jeweils einer Arbeitsansicht. | MUSS | V1 |
+| Q-UX-020 | Kasse und Flight Line kommen im Standardablauf ohne Menünavigation aus. Flight Line besitzt eine Desktop-Supervisor-Ansicht und eine vereinfachte Assistenzansicht für iPad, iPad mini, iPhone und vergleichbare Geräte. Die Administration zeigt kompakte Tabellen; Formulare öffnen nur nach Neu oder Bearbeiten. | MUSS | V1 |
 | Q-UX-030 | Häufige Aktionen sind ohne Bestätigungsdialog ausführbar und mindestens zehn Sekunden rückgängig zu machen. Weitreichende destruktive Aktionen erfordern PIN oder explizite Bestätigung. | MUSS | V1 |
 | Q-UX-040 | Statusbegriffe, Farben und Symbole sind systemweit einheitlich. | MUSS | V1 |
 | Q-UX-050 | Doppelte Eingaben dürfen keine doppelten Buchungen, Ereignisse oder Statuswechsel erzeugen. | MUSS | V1 |
 | Q-UX-060 | Die deutsche Bedienoberfläche muss nach höchstens zehn Minuten Einweisung je Helferrolle sicher bedienbar sein. | MUSS | V1 |
-| Q-UX-070 | Umschaltbares helles und dunkles Farbschema für Sonne, Dämmerung und Abendbetrieb. | KANN | V2 |
+| Q-UX-070 | Umschaltbares helles und dunkles Farbschema für Sonne, Dämmerung und Abendbetrieb auf allen Bedienoberflächen. | MUSS | V1 |
 | Q-UX-080 | Öffentliche Ansichten formulieren handlungsorientiert und vermeiden interne Fachbegriffe, wenn diese für Gäste nicht erforderlich sind. | MUSS | V1 |
 
 ## 10.2 Zuverlässigkeit und Verbindungsverhalten
@@ -648,7 +651,7 @@ Die folgenden Angaben definieren die fachlich zu führenden Daten. Die technisch
 | ID | Anforderung | Priorität | Stufe |
 | --- | --- | --- | --- |
 | Q-ZUV-010 | Status- und Prognoseänderungen sind im Normalbetrieb innerhalb von zwei Sekunden auf allen verbundenen Geräten sichtbar. | MUSS | V1 |
-| Q-ZUV-020 | Verbindungsaussetzer bis etwa 60 Sekunden werden ohne Verlust bereits erfasster Eingaben überbrückt. Der letzte Stand bleibt sichtbar und wird als möglicherweise veraltet gekennzeichnet. | MUSS | V1 |
+| Q-ZUV-020 | Verbindungsaussetzer und vorübergehende Server- oder D1-Fehler werden ohne Leeren der Oberfläche überbrückt. Der letzte bestätigte Stand bleibt mit Alter und Verbindungsstatus sichtbar; unbestätigte Schreibaktionen bleiben gesperrt und werden nicht als operative Änderungen gezählt. | MUSS | V1 |
 | Q-ZUV-030 | Nach einer Störung stellen Geräte die Verbindung automatisch wieder her und gleichen den Zustand vollständig ab; ein manueller Neustart ist nicht erforderlich. | MUSS | V1 |
 | Q-ZUV-040 | Widersprüchliche parallele Bedienung wird serverseitig konfliktgeprüft aufgelöst. Kein Gerät darf einen neueren Zustand mit einem veralteten Stand überschreiben. | MUSS | V1 |
 | Q-ZUV-050 | Das System ist für mindestens zwölf Stunden durchgehenden Veranstaltungseinsatz ohne Neustart ausgelegt. | MUSS | V1 |
@@ -672,7 +675,7 @@ Die folgenden Angaben definieren die fachlich zu führenden Daten. Die technisch
 | Q-SIC-030 | Die öffentliche Status-Seite gibt ausschließlich Informationen zum jeweiligen nicht erratbaren Ticketcode preis. Aufzählbarkeit und automatisierte Fehlversuche werden begrenzt. | MUSS | V1 |
 | Q-SIC-040 | Es werden keine Werbung, kein Tracking und keine externen Analysedienste eingebunden. | MUSS | V1 |
 | Q-DSG-010 | Im Kernsystem werden keine Gastnamen oder sonstigen nicht erforderlichen Personendaten erfasst. Der Betrieb funktioniert vollständig ohne Telefonnummer. | MUSS | V1 |
-| Q-DSG-020 | Telefonnummern und Push-Registrierungen werden nach einer konfigurierbaren Frist nach Veranstaltungsende, standardmäßig sieben Tage, gelöscht oder anonymisiert. | MUSS | V1 |
+| Q-DSG-020 | Push-Registrierungen werden nach einer konfigurierbaren Frist nach Veranstaltungsende, standardmäßig sieben Tage, gelöscht oder irreversibel entkoppelt. V1 speichert keine Telefonnummern. | MUSS | V1 |
 | Q-DSG-030 | Einwilligungen werden mit Zeitpunkt und Kanal dokumentiert; Datenschutzhinweise sind auf der Status-Seite abrufbar. | MUSS | V1 |
 | Q-DSG-040 | Personenbezogene Daten werden ausschließlich in Rechenzentren innerhalb der EU verarbeitet; erforderliche Auftragsverarbeitungsverträge und Angaben für das Verarbeitungsverzeichnis werden bereitgestellt. | MUSS | V1 |
 | Q-DSG-050 | Ein späteres Passagierlistenmodul ist technisch und berechtigungsseitig vom datensparsamen Ticketing zu trennen. | MUSS | V3 |
@@ -787,7 +790,7 @@ Die Abnahme umfasst einen simulierten Veranstaltungstag mit mindestens drei Flug
 | Gewichtsdaten | Gewichtsklassen verpflichtend in V1. | Gewicht/Schwerpunkt als spätere Erweiterung. | Gewichtsklassen konfigurierbar; neutrale Schätzung, Schwerpunkt getrennt später. |
 | Ticket | Vorgedruckte QR-Tickets V1, Bondrucker V2. | Ticketdruck mit QR-Code. | V1 unterstützt vorgedruckt und druckbar/digital; Hardwareintegration V2. |
 | Hosting | EU-Cloud über LTE/5G mit Kurzzeitpuffer. | Robuster Betrieb am Platz, lokale Option denkbar. | EU-Cloud-PWA V1; Offline-Queue und Papierfallback, Edge optional später. |
-| Datenschutz | Keine Gastnamen; Telefonnummer freiwillig. | Spätere digitale Passagierlisten denkbar. | Datensparsamer Kern bleibt; Listen nur als getrenntes Modul. |
+| Datenschutz | Keine Gastnamen oder Telefonnummern; freiwilliges ticketbezogenes Web-Push getrennt. | Spätere digitale Passagierlisten denkbar. | Datensparsamer Kern bleibt; Listen nur als getrenntes Modul. |
 
 | Freigabehinweis Vor Beauftragung sollten Auftraggeber, Flight-Line-Verantwortliche, Kasse, Flugleitung und ein technischer Auftragnehmer die V1-MUSS-Anforderungen gemeinsam in einer moderierten Durchsicht bestätigen. Offene rechtliche oder vereinsinterne Betriebsregeln sind als gesonderte Entscheidungen zu dokumentieren. |
 | --- |

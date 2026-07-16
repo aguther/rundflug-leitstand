@@ -11,7 +11,7 @@ gehen nicht als Nullwert in einen Durchschnitt ein.
 | Bodenzeit | `GELANDET` | `ABGESCHLOSSEN/VERFÜGBAR` |
 | Umlaufzeit | `NEXT` / Aufruf | `ABGESCHLOSSEN/VERFÜGBAR` |
 
-Der informatorische Umsatz summiert Ticketpreise ohne stornierte Tickets und besitzt keine
-Buchungs- oder Kassenabschlusswirkung. „Geräte online“ bedeutet einen bestätigten Kontakt innerhalb
-der letzten zwei Minuten. Aktive Web-Push-Abonnements sind eingewilligt, nicht widerrufen und noch
-nicht abgelaufen.
+Der Produktpreis ist reine Produktinformation. Umsatz, Zahlart und Bezahlstatus sind keine
+Betriebskennzahlen des Rundflug-Leitstands. „Geräte online“ bedeutet einen bestätigten Kontakt
+innerhalb der letzten zwei Minuten. Aktive Web-Push-Abonnements sind eingewilligt, nicht widerrufen
+und noch nicht abgelaufen.
