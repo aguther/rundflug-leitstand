@@ -2965,6 +2965,29 @@ p {
 .weight-class-options input {
   min-height: auto;
 }
+.admin-check-row,
+.admin-section label.admin-check-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 42px;
+  padding: 9px 11px;
+  border: 1px solid var(--ui-border);
+  border-radius: 6px;
+  background: var(--ui-control);
+  cursor: pointer;
+}
+.admin-check-row input[type="checkbox"] {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  min-height: 18px;
+  margin: 0;
+  accent-color: var(--ui-accent);
+}
+.admin-check-row .field-label {
+  min-width: 0;
+}
 .weight-class-options {
   display: flex;
   flex-wrap: wrap;
