@@ -267,11 +267,15 @@
   background: var(--ui-success-soft);
 }
 .admin-mode-bar > button {
+  position: relative;
+  z-index: 2;
   min-height: 44px;
   padding: 8px 14px;
   border-radius: 6px;
   font-weight: 760;
   white-space: nowrap;
+  pointer-events: auto;
+  touch-action: manipulation;
 }
 .admin-mode-bar .secondary-action {
   color: var(--ui-text);

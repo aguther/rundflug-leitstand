@@ -115,6 +115,11 @@ app.use(
   }),
 );
 
+app.use("/api/*", async (context, next) => {
+  await next();
+  context.header("cache-control", "no-store");
+});
+
 app.get("/api/health", (context) =>
   context.json({
     ok: true,
