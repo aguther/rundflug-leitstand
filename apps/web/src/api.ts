@@ -29,11 +29,25 @@ import {
   ticketSearchResponseSchema,
 } from "@rundflug/contracts";
 
+const SERVER_UNREACHABLE_MESSAGE =
+  "Server nicht erreichbar. Bitte Verbindung prüfen und die Seite neu laden.";
+
+async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  try {
+    return await fetch(input, init);
+  } catch (cause) {
+    if (cause instanceof DOMException && cause.name === "AbortError") throw cause;
+    throw new Error(SERVER_UNREACHABLE_MESSAGE, { cause });
+  }
+}
+
 export async function getSetupStatus(): Promise<{
   setupRequired: boolean;
   setupConfigured: boolean;
 }> {
-  const response = await fetch("/api/setup/status", { headers: { "cache-control": "no-store" } });
+  const response = await apiFetch("/api/setup/status", {
+    headers: { "cache-control": "no-store" },
+  });
   if (!response.ok) throw new Error("Einrichtungsstatus ist nicht verfügbar.");
   return response.json();
 }
@@ -41,7 +55,7 @@ export async function getSetupStatus(): Promise<{
 export async function bootstrapSystem(
   input: BootstrapRequest,
 ): Promise<{ eventId: string; adminDeviceId: string }> {
-  const response = await fetch("/api/setup", {
+  const response = await apiFetch("/api/setup", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(input),
@@ -61,7 +75,7 @@ export async function getDeviceContext(
   deviceId: string,
   deviceToken: string,
 ): Promise<{ eventId: string; role: string }> {
-  const response = await fetch("/api/device/context", {
+  const response = await apiFetch("/api/device/context", {
     headers: { "x-device-id": deviceId, "x-device-token": deviceToken },
   });
   const body = (await response.json()) as {
@@ -81,7 +95,7 @@ export async function verifyAdminPin(
   deviceToken: string,
   adminPin: string,
 ): Promise<void> {
-  const response = await fetch(`/api/admin/events/${encodeURIComponent(eventId)}/verify-pin`, {
+  const response = await apiFetch(`/api/admin/events/${encodeURIComponent(eventId)}/verify-pin`, {
     method: "POST",
     headers: {
       "content-type": "application/json",
@@ -102,7 +116,7 @@ export async function searchTickets(
   deviceToken: string,
   query: string,
 ): Promise<TicketSearchResponse> {
-  const response = await fetch(
+  const response = await apiFetch(
     `/api/events/${encodeURIComponent(eventId)}/tickets/search?q=${encodeURIComponent(query)}`,
     { headers: { "x-device-id": deviceId, "x-device-token": deviceToken } },
   );
@@ -115,7 +129,7 @@ export async function getEventCatalog(
   deviceId: string,
   deviceToken: string,
 ): Promise<EventCatalog> {
-  const response = await fetch("/api/admin/events", {
+  const response = await apiFetch("/api/admin/events", {
     headers: {
       "x-event-id": sourceEventId,
       "x-device-id": deviceId,
@@ -132,7 +146,7 @@ export async function cloneEvent(
   deviceToken: string,
   input: CloneEventRequest,
 ): Promise<{ eventId: string; adminDeviceId: string; templateSourceId: string }> {
-  const response = await fetch(`/api/admin/events/${encodeURIComponent(sourceEventId)}/clone`, {
+  const response = await apiFetch(`/api/admin/events/${encodeURIComponent(sourceEventId)}/clone`, {
     method: "POST",
     headers: {
       "content-type": "application/json",
@@ -159,15 +173,18 @@ export async function factoryReset(
   deviceToken: string,
   input: FactoryResetRequest,
 ): Promise<FactoryResetResponse> {
-  const response = await fetch(`/api/admin/events/${encodeURIComponent(eventId)}/factory-reset`, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-device-id": deviceId,
-      "x-device-token": deviceToken,
+  const response = await apiFetch(
+    `/api/admin/events/${encodeURIComponent(eventId)}/factory-reset`,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-device-id": deviceId,
+        "x-device-token": deviceToken,
+      },
+      body: JSON.stringify(input),
     },
-    body: JSON.stringify(input),
-  });
+  );
   const body = (await response.json()) as unknown;
   const completed = factoryResetResponseSchema.safeParse(body);
   if (completed.success) return completed.data;
@@ -189,7 +206,7 @@ export async function getAuditHistory(
 ): Promise<AuditHistory> {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(filters)) if (value) query.set(key, value);
-  const response = await fetch(
+  const response = await apiFetch(
     `/api/events/${encodeURIComponent(eventId)}/history?${query.toString()}`,
     {
       headers: { "x-device-id": deviceId, "x-device-token": deviceToken },
@@ -213,7 +230,7 @@ export async function getOperationalHistory(
   deviceToken: string,
   filters: Partial<OperationalHistoryQuery> = {},
 ): Promise<OperationalHistory> {
-  const response = await fetch(
+  const response = await apiFetch(
     `/api/events/${encodeURIComponent(eventId)}/history/operations?${historyQuery(filters)}`,
     { headers: { "x-device-id": deviceId, "x-device-token": deviceToken } },
   );
@@ -227,7 +244,7 @@ export async function getForecastHistory(
   deviceToken: string,
   filters: Partial<ForecastHistoryQuery> = {},
 ): Promise<ForecastHistory> {
-  const response = await fetch(
+  const response = await apiFetch(
     `/api/events/${encodeURIComponent(eventId)}/history/forecasts?${historyQuery(filters)}`,
     { headers: { "x-device-id": deviceId, "x-device-token": deviceToken } },
   );
@@ -240,7 +257,7 @@ export async function downloadDailyReport(
   deviceId: string,
   deviceToken: string,
 ): Promise<void> {
-  const response = await fetch(`/api/events/${encodeURIComponent(eventId)}/reports/daily.csv`, {
+  const response = await apiFetch(`/api/events/${encodeURIComponent(eventId)}/reports/daily.csv`, {
     headers: { "x-device-id": deviceId, "x-device-token": deviceToken },
   });
   if (!response.ok) throw new Error("Tagesbericht nicht verfügbar.");
@@ -260,7 +277,7 @@ async function downloadProtectedFile(
   path: string,
   filename: string,
 ): Promise<void> {
-  const response = await fetch(`/api/events/${encodeURIComponent(eventId)}/${path}`, {
+  const response = await apiFetch(`/api/events/${encodeURIComponent(eventId)}/${path}`, {
     headers: { "x-device-id": deviceId, "x-device-token": deviceToken },
   });
   if (!response.ok) throw new Error("Export nicht verfügbar.");
@@ -314,7 +331,7 @@ export async function getPairedDevices(
   deviceId: string,
   deviceToken: string,
 ): Promise<PairedDeviceSummary[]> {
-  const response = await fetch(`/api/events/${encodeURIComponent(eventId)}/devices`, {
+  const response = await apiFetch(`/api/events/${encodeURIComponent(eventId)}/devices`, {
     headers: { "x-device-id": deviceId, "x-device-token": deviceToken },
   });
   if (!response.ok) throw new Error("Geräteübersicht nicht verfügbar.");
@@ -323,7 +340,7 @@ export async function getPairedDevices(
 }
 
 export async function getPublicBoard(eventId: string, signal?: AbortSignal): Promise<PublicBoard> {
-  const response = await fetch(`/api/public/events/${encodeURIComponent(eventId)}/board`, {
+  const response = await apiFetch(`/api/public/events/${encodeURIComponent(eventId)}/board`, {
     ...(signal ? { signal } : {}),
   });
   if (!response.ok) throw new Error("Öffentliche Anzeige nicht verfügbar.");
@@ -336,7 +353,7 @@ export async function getOperationBoard(
   deviceToken: string,
   signal?: AbortSignal,
 ): Promise<OperationBoard> {
-  const response = await fetch(`/api/events/${encodeURIComponent(eventId)}/operations`, {
+  const response = await apiFetch(`/api/events/${encodeURIComponent(eventId)}/operations`, {
     headers: { "x-device-id": deviceId, "x-device-token": deviceToken },
     ...(signal ? { signal } : {}),
   });
@@ -349,7 +366,7 @@ export async function sendCommand(
   deviceToken: string,
 ): Promise<CommandResult> {
   assertOperationalConnection(navigator.onLine);
-  const response = await fetch(`/api/events/${encodeURIComponent(command.eventId)}/commands`, {
+  const response = await apiFetch(`/api/events/${encodeURIComponent(command.eventId)}/commands`, {
     method: "POST",
     headers: { "content-type": "application/json", "x-device-token": deviceToken },
     body: JSON.stringify(command),
@@ -369,7 +386,7 @@ export async function getPublicTicketStatus(
   ticketCode: string,
   signal?: AbortSignal,
 ): Promise<PublicTicketStatus> {
-  const response = await fetch(`/api/public/tickets/${encodeURIComponent(ticketCode)}`, {
+  const response = await apiFetch(`/api/public/tickets/${encodeURIComponent(ticketCode)}`, {
     ...(signal ? { signal } : {}),
   });
   if (!response.ok) throw new Error("Ticket nicht gefunden.");
@@ -381,7 +398,7 @@ export type PushConfiguration =
   | { configured: false };
 
 export async function getPushConfiguration(signal?: AbortSignal): Promise<PushConfiguration> {
-  const response = await fetch("/api/public/push/config", signal ? { signal } : {});
+  const response = await apiFetch("/api/public/push/config", signal ? { signal } : {});
   if (response.status === 503) return { configured: false };
   if (!response.ok) throw new Error("Web-Push-Konfiguration ist nicht erreichbar.");
   const body = (await response.json()) as { publicKey?: string; retentionDays?: number };
@@ -409,7 +426,7 @@ export async function registerTicketPush(
   ticketCode: string,
   subscription: PushSubscription,
 ): Promise<void> {
-  const response = await fetch(
+  const response = await apiFetch(
     `/api/public/tickets/${encodeURIComponent(ticketCode)}/push-subscriptions`,
     {
       method: "POST",
@@ -421,7 +438,7 @@ export async function registerTicketPush(
 }
 
 export async function revokeTicketPush(ticketCode: string, endpoint: string): Promise<void> {
-  const response = await fetch(
+  const response = await apiFetch(
     `/api/public/tickets/${encodeURIComponent(ticketCode)}/push-subscriptions`,
     {
       method: "DELETE",
@@ -433,7 +450,7 @@ export async function revokeTicketPush(ticketCode: string, endpoint: string): Pr
 }
 
 export async function getHealth(signal?: AbortSignal): Promise<HealthResponse> {
-  const response = await fetch("/api/health", signal ? { signal } : {});
+  const response = await apiFetch("/api/health", signal ? { signal } : {});
   if (!response.ok) {
     throw new Error(`Healthcheck fehlgeschlagen (${response.status})`);
   }
@@ -441,7 +458,7 @@ export async function getHealth(signal?: AbortSignal): Promise<HealthResponse> {
 }
 
 export async function getDemoSnapshot(signal?: AbortSignal): Promise<EventSnapshot> {
-  const response = await fetch("/api/events/demo-2026/snapshot", signal ? { signal } : {});
+  const response = await apiFetch("/api/events/demo-2026/snapshot", signal ? { signal } : {});
   if (!response.ok) {
     throw new Error(`Demo-Snapshot nicht verfügbar (${response.status})`);
   }
