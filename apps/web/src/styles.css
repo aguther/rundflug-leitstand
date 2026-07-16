@@ -4141,8 +4141,11 @@ p {
   border-radius: 6px;
 }
 .admin-workspace.master-data-active {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto auto;
+}
+.admin-workspace.master-data-active.editor-open {
   grid-template-columns: minmax(320px, 0.8fr) minmax(460px, 1.2fr);
-  grid-template-rows: auto auto minmax(560px, 1fr);
 }
 .admin-workspace:not(.master-data-active) > .master-data-nav {
   display: none;
@@ -4192,14 +4195,14 @@ p {
   grid-column: 1;
   grid-row: 3;
   min-width: 0;
-  min-height: 560px;
+  min-height: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   align-content: start;
   gap: 0;
   overflow: hidden;
   border: 0;
-  border-right: 1px solid var(--ui-border);
+  border-right: 0;
   border-radius: 0;
   background: var(--ui-surface);
 }
@@ -4212,9 +4215,12 @@ p {
   padding-top: 14px;
 }
 .admin-workspace.master-data-active .master-data-table-scroll {
-  max-height: 480px;
+  max-height: none;
   margin-bottom: 14px;
   overflow: auto;
+}
+.admin-workspace.master-data-active.editor-open > .master-data-workspace {
+  border-right: 1px solid var(--ui-border);
 }
 .admin-workspace.master-data-active > .master-data-drawer {
   position: relative;

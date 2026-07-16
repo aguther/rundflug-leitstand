@@ -2468,7 +2468,7 @@ function AdminView() {
   const [adminPinBusy, setAdminPinBusy] = useState(false);
   const pendingAdminActionRef = useRef<(() => Promise<void>) | null>(null);
   const adminPinInputRef = useRef<HTMLInputElement>(null);
-  const [masterEditorOpen, setMasterEditorOpen] = useState(true);
+  const [masterEditorOpen, setMasterEditorOpen] = useState(false);
   const initialMasterSelectionRef = useRef(false);
   const [masterSubmitAttempted, setMasterSubmitAttempted] = useState(false);
   const [masterSearch, setMasterSearch] = useState("");
@@ -4159,7 +4159,7 @@ function AdminView() {
       <section className="admin-layout">
         <AdminNavigation activeArea={adminArea} onChange={setAdminArea} />
         <div
-          className={`admin-workspace ${adminArea === "master-data" ? "master-data-active" : ""}`}
+          className={`admin-workspace ${adminArea === "master-data" ? `master-data-active ${masterEditorOpen ? "editor-open" : "editor-closed"}` : ""}`}
         >
           {adminArea !== "master-data" ? (
             <header className="admin-page-header">
@@ -4718,17 +4718,7 @@ function AdminView() {
               setMasterDataCategory(category);
               setMasterSearch("");
               setMasterSubmitAttempted(false);
-              if (category === "gates") selectGateForEditing(board?.gates[0]?.id ?? "new");
-              if (category === "resource-groups") {
-                selectResourceForEditing(resourceGroups[0]?.id ?? "new");
-              }
-              if (category === "aircraft") {
-                selectAircraftForEditing(board?.aircraft[0]?.id ?? "new");
-              }
-              if (category === "pilots") selectPilotForEditing(board?.pilots[0]?.id ?? "new");
-              if (category === "products") {
-                selectProductForEditing(board?.products[0]?.id ?? "new");
-              }
+              setMasterEditorOpen(false);
             }}
           />
           <section className="master-data-workspace" hidden={adminArea !== "master-data"}>
@@ -4769,7 +4759,7 @@ function AdminView() {
                   <tbody>
                     {visibleGates.map((gate) => (
                       <tr
-                        className={gateEditorId === gate.id ? "selected" : ""}
+                        className={masterEditorOpen && gateEditorId === gate.id ? "selected" : ""}
                         key={gate.id}
                         onClick={() => selectGateForEditing(gate.id)}
                         onKeyDown={(event) => {
@@ -4813,7 +4803,9 @@ function AdminView() {
                   <tbody>
                     {visibleResourceGroups.map((group) => (
                       <tr
-                        className={resourceEditorId === group.id ? "selected" : ""}
+                        className={
+                          masterEditorOpen && resourceEditorId === group.id ? "selected" : ""
+                        }
                         key={group.id}
                         onClick={() => selectResourceForEditing(group.id)}
                         onKeyDown={(event) => {
@@ -4858,7 +4850,9 @@ function AdminView() {
                   <tbody>
                     {visibleAircraft.map((aircraft) => (
                       <tr
-                        className={aircraftEditorId === aircraft.id ? "selected" : ""}
+                        className={
+                          masterEditorOpen && aircraftEditorId === aircraft.id ? "selected" : ""
+                        }
                         key={aircraft.id}
                         onClick={() => selectAircraftForEditing(aircraft.id)}
                         onKeyDown={(event) => {
@@ -4911,7 +4905,9 @@ function AdminView() {
                   <tbody>
                     {visibleAircraft.map((aircraft) => (
                       <tr
-                        className={assignmentAircraftId === aircraft.id ? "selected" : ""}
+                        className={
+                          masterEditorOpen && assignmentAircraftId === aircraft.id ? "selected" : ""
+                        }
                         key={aircraft.id}
                         onClick={() => {
                           setAssignmentAircraftId(aircraft.id);
@@ -4969,7 +4965,7 @@ function AdminView() {
                   <tbody>
                     {visiblePilots.map((pilot) => (
                       <tr
-                        className={pilotEditorId === pilot.id ? "selected" : ""}
+                        className={masterEditorOpen && pilotEditorId === pilot.id ? "selected" : ""}
                         key={pilot.id}
                         onClick={() => selectPilotForEditing(pilot.id)}
                         onKeyDown={(event) => {
@@ -5025,7 +5021,9 @@ function AdminView() {
                   <tbody>
                     {visibleProducts.map((product) => (
                       <tr
-                        className={productEditorId === product.id ? "selected" : ""}
+                        className={
+                          masterEditorOpen && productEditorId === product.id ? "selected" : ""
+                        }
                         key={product.id}
                         onClick={() => selectProductForEditing(product.id)}
                         onKeyDown={(event) => {
