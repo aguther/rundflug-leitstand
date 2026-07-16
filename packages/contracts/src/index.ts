@@ -995,9 +995,11 @@ export const publicBoardSchema = z.object({
         communicationNumber: z.number().int().positive(),
         ticketLabels: z.array(z.string()).min(1),
         aircraftRegistration: z.string().nullable(),
+        departedAt: z.string().nullable().optional().default(null),
         status: z.enum([
           "WAITING",
           "COME_TO_FLIGHT_LINE",
+          "BOARDING",
           "IN_FLIGHT",
           "LANDED",
           "COMPLETED",

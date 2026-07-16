@@ -485,6 +485,7 @@ describe("commandEnvelopeSchema", () => {
           communicationNumber: 101,
           ticketLabels: ["PAN-101/1"],
           aircraftRegistration: null,
+          departedAt: null,
           status: "WAITING",
           waitLowerMinutes: 0,
           waitUpperMinutes: 30,
