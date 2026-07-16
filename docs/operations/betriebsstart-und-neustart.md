@@ -121,10 +121,14 @@ die Administrator-PIN benötigt.
 Zeigt die Administration `Betriebsdaten nicht verfügbar (403)`, ist der Browser nicht als aktuelles
 Administrationsgerät bestätigt. Die Seite blendet deshalb weder Reset noch den Hinweis zum
 Bearbeitungsmodus aus: Unter **Sicherung & Reset** bleiben alle Stufen sichtbar, ihre Aktionen aber
-bis zur Bestätigung gesperrt. **Gerätebindung erneut prüfen** startet die Prüfung erneut.
+bis zur Bestätigung gesperrt. **Administrationszugang erneuern** öffnet eine PIN-Abfrage und stellt
+für diesen Browser einen neuen anonymen Geräteschlüssel aus. Betriebs- und Stammdaten bleiben dabei
+unverändert.
 
 Bei einem mit einer älteren Version angelegten sicheren Neustart kann die Anwendung einen noch lokal
 vorhandenen anonymen Admin-Gerätetoken automatisch der neuen Geräte-ID zuordnen. Der Token wird nur
 an denselben Worker gesendet, nie angezeigt oder geloggt und erst nach bestätigter Admin-Rolle
-übernommen. Fehlt der Token vollständig, muss das Gerät über ein anderes Administrationsgerät neu
-gekoppelt werden; die Administrator-PIN allein ersetzt keine Geräteberechtigung.
+übernommen. Fehlt der Token oder passt er nicht mehr, kann die serverseitig konfigurierte
+Administrator-PIN den Zugang erneuern. Der Vorgang ist je Netzquelle auf fünf Versuche
+pro Minute begrenzt, wird ohne PIN oder Tokeninhalt auditiert und speichert ausschließlich den neuen
+Credential-Hash. Weitere Administrationsgeräte können weiterhin gezielt widerrufen werden.

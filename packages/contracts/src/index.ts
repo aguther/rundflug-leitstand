@@ -636,6 +636,12 @@ export const adminPinVerificationSchema = z.object({
 });
 export type AdminPinVerification = z.infer<typeof adminPinVerificationSchema>;
 
+export const adminDeviceRecoverySchema = z.object({
+  adminPin: z.string().min(4).max(32),
+  credentialHash: z.string().regex(/^[a-f0-9]{64}$/),
+});
+export type AdminDeviceRecovery = z.infer<typeof adminDeviceRecoverySchema>;
+
 export const ticketSearchResultSchema = z.object({
   ticketGroupId: z.string(),
   productId: z.string(),

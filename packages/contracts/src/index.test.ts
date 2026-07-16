@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  adminDeviceRecoverySchema,
   bootstrapRequestSchema,
   cloneEventRequestSchema,
   commandEnvelopeSchema,
@@ -16,6 +17,17 @@ import {
 } from "./index";
 
 describe("commandEnvelopeSchema", () => {
+  it("accepts only a PIN and hashed client credential for admin recovery", () => {
+    const parsed = adminDeviceRecoverySchema.parse({
+      adminPin: "0000",
+      credentialHash: "a".repeat(64),
+    });
+    expect(parsed.credentialHash).toHaveLength(64);
+    expect(() =>
+      adminDeviceRecoverySchema.parse({ adminPin: "0000", credentialHash: "plain-token" }),
+    ).toThrow();
+  });
+
   it("requires explicit, anonymous confirmation for a factory reset", () => {
     const parsed = factoryResetRequestSchema.parse({
       commandId: "550e8400-e29b-41d4-a716-446655440500",

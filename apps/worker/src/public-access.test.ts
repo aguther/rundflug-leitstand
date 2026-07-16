@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { allowUnknownTicketAttempt } from "./public-access";
+import { allowAdminDeviceRecoveryAttempt, allowUnknownTicketAttempt } from "./public-access";
 
 describe("public ticket access", () => {
   it("limits unknown-ticket attempts per requesting actor without persisting the address", async () => {
@@ -21,5 +21,19 @@ describe("public ticket access", () => {
       allowUnknownTicketAttempt({ limit }, new Request("https://example.test/status")),
     ).resolves.toBe(true);
     expect(limit.mock.calls[0]?.[0].key).toMatch(/^unknown-ticket:[a-f0-9]{64}$/);
+  });
+});
+
+describe("administrator device recovery access", () => {
+  it("rate-limits the edge actor even when device IDs are changed", async () => {
+    const limit = vi.fn().mockResolvedValue({ success: true });
+    const request = new Request("https://example.test/api/admin/events/event/recover-device", {
+      headers: { "cf-connecting-ip": "192.0.2.20" },
+    });
+
+    await expect(allowAdminDeviceRecoveryAttempt({ limit }, request)).resolves.toBe(true);
+    const key = limit.mock.calls[0]?.[0].key as string;
+    expect(key).toMatch(/^admin-device-recovery:[a-f0-9]{64}$/);
+    expect(key).not.toContain("192.0.2.20");
   });
 });

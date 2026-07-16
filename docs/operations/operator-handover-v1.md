@@ -74,7 +74,7 @@ Zu ersetzende Cloudflare-Adapter:
 | D1 | transaktionale SQLite-/PostgreSQL-Datenbank mit Constraints und Batchgrenze |
 | Durable Object | genau-ein serieller Kommando-Koordinator je Veranstaltung samt WebSocket-Hub |
 | R2 | S3-kompatibler Objektspeicher mit Metadaten/Lifecycle |
-| Rate-Limit-Binding | serverseitiger verteilter Rate Limiter für öffentliche Codes |
+| Rate-Limit-Bindings | serverseitige verteilte Rate Limiter für öffentliche Codes und die PIN-geschützte Wiederherstellung des Administrationszugangs |
 | Cron Trigger | täglich zuverlässig ausgeführter Scheduler |
 | Workers Builds | CI/CD-Pipeline mit Build, Migration-Gate und Rollback |
 

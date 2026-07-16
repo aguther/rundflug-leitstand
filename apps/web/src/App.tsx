@@ -43,6 +43,7 @@ import {
   getPushConfiguration,
   getPushPublicKey,
   getSetupStatus,
+  recoverAdminDevice,
   registerTicketPush,
   revokeTicketPush,
   searchTickets,
@@ -214,10 +215,6 @@ function deviceTokenFor(deviceId: string): string {
     return "demo-admin-device-token";
   }
   return "";
-}
-
-function allowDeviceCredentialRecovery(deviceId: string): void {
-  attemptedDeviceCredentialRecoveries.delete(deviceId);
 }
 
 function deviceIdForRole(role: string, developmentId: string): string {
@@ -2464,7 +2461,9 @@ function AdminView() {
     setAdminPinState(value);
   }, []);
   const [adminModeUnlocked, setAdminModeUnlocked] = useState(false);
-  const [adminPinDialog, setAdminPinDialog] = useState<"unlock" | "action" | null>(null);
+  const [adminPinDialog, setAdminPinDialog] = useState<"unlock" | "action" | "recover" | null>(
+    null,
+  );
   const [adminPinError, setAdminPinError] = useState<string | null>(null);
   const [adminPinBusy, setAdminPinBusy] = useState(false);
   const pendingAdminActionRef = useRef<(() => Promise<void>) | null>(null);
@@ -2879,11 +2878,36 @@ function AdminView() {
     setAdminPinDialog("unlock");
   }
 
+  function requestAdminDeviceRecovery() {
+    pendingAdminActionRef.current = null;
+    setAdminPin("");
+    setAdminPinError(null);
+    setAdminPinDialog("recover");
+  }
+
   async function confirmAdminPinDialog() {
     if (!adminPinDialog || adminPinBusy || adminPin.length < 4) return;
     setAdminPinBusy(true);
     setAdminPinError(null);
     try {
+      if (adminPinDialog === "recover") {
+        const recoveredDeviceId = ADMIN_DEVICE_ID.startsWith("unpaired-")
+          ? crypto.randomUUID()
+          : ADMIN_DEVICE_ID;
+        const token = createDeviceToken();
+        const result = await recoverAdminDevice(
+          EVENT_ID,
+          recoveredDeviceId,
+          adminPin,
+          await sha256HexBrowser(token),
+        );
+        rememberDeviceCredential(window.localStorage, "ADMIN", result.adminDeviceId, token);
+        rememberActiveEvent(window.localStorage, result.eventId);
+        setAdminPinDialog(null);
+        setAdminPin("");
+        window.location.reload();
+        return;
+      }
       await verifyAdminPin(EVENT_ID, ADMIN_DEVICE_ID, deviceTokenFor(ADMIN_DEVICE_ID), adminPin);
       if (adminPinDialog === "unlock") {
         setAdminModeUnlocked(true);
@@ -4270,7 +4294,8 @@ function AdminView() {
                 disabled={refreshing}
                 onClick={() => {
                   if (deviceAuthorizationRejected) {
-                    allowDeviceCredentialRecovery(ADMIN_DEVICE_ID);
+                    requestAdminDeviceRecovery();
+                    return;
                   }
                   void refresh();
                 }}
@@ -4279,16 +4304,15 @@ function AdminView() {
                 {refreshing
                   ? "Betriebsstand wird geladen …"
                   : deviceAuthorizationRejected
-                    ? "Gerätebindung erneut prüfen"
+                    ? "Administrationszugang erneuern"
                     : "Betriebsstand erneut laden"}
               </button>
             )}
             {!isAdministrator ? (
               deviceAuthorizationRejected ? (
                 <ValidationHint tone="error">
-                  Dieses Browsergerät wurde vom Server nicht als Administration bestätigt. Die
-                  vorhandene lokale Gerätebindung wird erneut geprüft; danach erscheinen PIN-Modus
-                  und Reset wieder aktiv.
+                  Dieses Browsergerät wurde nicht als Administration bestätigt. Mit der
+                  Administrator-PIN kann der Zugang auf diesem Gerät sicher erneuert werden.
                 </ValidationHint>
               ) : error ? (
                 <ValidationHint tone="error">
@@ -6853,14 +6877,18 @@ function AdminView() {
                 <div className="drawer-heading">
                   <div>
                     <h2 id="admin-pin-dialog-title">
-                      {adminPinDialog === "unlock"
-                        ? "Bearbeitungsmodus entsperren"
-                        : "Änderung bestätigen"}
+                      {adminPinDialog === "recover"
+                        ? "Administrationszugang erneuern"
+                        : adminPinDialog === "unlock"
+                          ? "Bearbeitungsmodus entsperren"
+                          : "Änderung bestätigen"}
                     </h2>
                     <p>
-                      {adminPinDialog === "unlock"
-                        ? "Die PIN gilt nur in diesem Browser-Tab und wird nach 15 Minuten Inaktivität verworfen."
-                        : "Diese einzelne Änderung wird nach erfolgreicher PIN-Prüfung ausgeführt und protokolliert."}
+                      {adminPinDialog === "recover"
+                        ? "Die Gerätebindung wird mit der Administrator-PIN neu ausgestellt. Vorhandene Betriebsdaten bleiben unverändert."
+                        : adminPinDialog === "unlock"
+                          ? "Die PIN gilt nur in diesem Browser-Tab und wird nach 15 Minuten Inaktivität verworfen."
+                          : "Diese einzelne Änderung wird nach erfolgreicher PIN-Prüfung ausgeführt und protokolliert."}
                     </p>
                   </div>
                   <button
@@ -6902,9 +6930,11 @@ function AdminView() {
                   >
                     {adminPinBusy
                       ? "PIN wird geprüft …"
-                      : adminPinDialog === "unlock"
-                        ? "Entsperren"
-                        : "Bestätigen"}
+                      : adminPinDialog === "recover"
+                        ? "Zugang erneuern"
+                        : adminPinDialog === "unlock"
+                          ? "Entsperren"
+                          : "Bestätigen"}
                   </button>
                 </div>
               </form>

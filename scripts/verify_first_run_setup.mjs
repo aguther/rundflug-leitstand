@@ -113,6 +113,79 @@ try {
       "Erstes anonymes Administrationsgerät erhält keinen sauberen Vorbereitungsstand.",
     );
   }
+  const recoveredToken = ["synthetic", "recovered", "admin", "device", "token"].join("-");
+  const rejectedRecovery = await fetch(
+    `${base}/api/admin/events/${request.eventId}/recover-device`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-device-id": adminDeviceId },
+      body: JSON.stringify({
+        adminPin: "9999",
+        credentialHash: createHash("sha256").update(recoveredToken).digest("hex"),
+      }),
+    },
+  );
+  if (rejectedRecovery.status !== 403) {
+    throw new Error("Falsche PIN wurde bei der Admin-Wiederherstellung nicht abgewiesen.");
+  }
+  const recovered = await fetch(`${base}/api/admin/events/${request.eventId}/recover-device`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-device-id": adminDeviceId },
+    body: JSON.stringify({
+      adminPin: pin,
+      credentialHash: createHash("sha256").update(recoveredToken).digest("hex"),
+    }),
+  });
+  const recoveredBody = await recovered.json();
+  if (
+    !recovered.ok ||
+    recoveredBody.adminDeviceId !== adminDeviceId ||
+    recoveredBody.role !== "ADMIN"
+  ) {
+    throw new Error("Administrationsgerät konnte nicht mit der PIN erneuert werden.");
+  }
+  const oldCredentialResponse = await fetch(`${base}/api/events/${request.eventId}/operations`, {
+    headers: { "x-device-id": adminDeviceId, "x-device-token": deviceToken },
+  });
+  if (oldCredentialResponse.status !== 403) {
+    throw new Error("Der ersetzte Geräteschlüssel blieb nach der Wiederherstellung gültig.");
+  }
+  const recoveredBoardResponse = await fetch(`${base}/api/events/${request.eventId}/operations`, {
+    headers: { "x-device-id": adminDeviceId, "x-device-token": recoveredToken },
+  });
+  if (!recoveredBoardResponse.ok) {
+    throw new Error("Der erneuerte Geräteschlüssel lädt keinen bestätigten Betriebsstand.");
+  }
+  const additionalAdminDeviceId = randomUUID();
+  const additionalAdminToken = ["synthetic", "additional", "admin", "device", "token"].join("-");
+  const additionalRecovery = await fetch(
+    `${base}/api/admin/events/${request.eventId}/recover-device`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-device-id": additionalAdminDeviceId },
+      body: JSON.stringify({
+        adminPin: pin,
+        credentialHash: createHash("sha256").update(additionalAdminToken).digest("hex"),
+      }),
+    },
+  );
+  if (!additionalRecovery.ok) {
+    throw new Error("Ein neuer Browser konnte keinen PIN-geschützten Adminzugang erhalten.");
+  }
+  const additionalBoardResponse = await fetch(`${base}/api/events/${request.eventId}/operations`, {
+    headers: { "x-device-id": additionalAdminDeviceId, "x-device-token": additionalAdminToken },
+  });
+  if (!additionalBoardResponse.ok) {
+    throw new Error("Der neue PIN-geschützte Adminzugang lädt keinen Betriebsstand.");
+  }
+  const recoveryHistoryResponse = await fetch(
+    `${base}/api/events/${request.eventId}/history?eventType=ADMIN_DEVICE_CREDENTIAL_RECOVERED`,
+    { headers: { "x-device-id": adminDeviceId, "x-device-token": recoveredToken } },
+  );
+  const recoveryHistory = await recoveryHistoryResponse.json();
+  if (!recoveryHistoryResponse.ok || recoveryHistory.entries?.length !== 2) {
+    throw new Error("Die Admin-Wiederherstellungen wurden nicht vollständig auditiert.");
+  }
   console.log(
     JSON.stringify({
       ok: true,
@@ -121,6 +194,10 @@ try {
       bootstrapAtomic: true,
       duplicateBootstrapRejected: true,
       anonymousAdminAuthorized: true,
+      adminCredentialRecoveryVerified: true,
+      newBrowserAdminLoginVerified: true,
+      replacedCredentialRejected: true,
+      recoveryAudited: true,
       preparationStartsWithoutMasterData: true,
     }),
   );

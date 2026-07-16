@@ -354,11 +354,39 @@ export async function getOperationBoard(
   signal?: AbortSignal,
 ): Promise<OperationBoard> {
   const response = await apiFetch(`/api/events/${encodeURIComponent(eventId)}/operations`, {
+    cache: "no-store",
     headers: { "x-device-id": deviceId, "x-device-token": deviceToken },
     ...(signal ? { signal } : {}),
   });
   if (!response.ok) throw new Error(`Betriebsdaten nicht verfügbar (${response.status})`);
   return operationBoardSchema.parse(await response.json());
+}
+
+export async function recoverAdminDevice(
+  eventId: string,
+  deviceId: string,
+  adminPin: string,
+  credentialHash: string,
+): Promise<{ eventId: string; adminDeviceId: string; role: "ADMIN" }> {
+  const response = await apiFetch(
+    `/api/admin/events/${encodeURIComponent(eventId)}/recover-device`,
+    {
+      method: "POST",
+      cache: "no-store",
+      headers: { "content-type": "application/json", "x-device-id": deviceId },
+      body: JSON.stringify({ adminPin, credentialHash }),
+    },
+  );
+  const body = (await response.json()) as {
+    eventId?: string;
+    adminDeviceId?: string;
+    role?: "ADMIN";
+    error?: { message?: string };
+  };
+  if (!response.ok || !body.eventId || !body.adminDeviceId || body.role !== "ADMIN") {
+    throw new Error(body.error?.message ?? "Administrationsgerät konnte nicht erneuert werden.");
+  }
+  return { eventId: body.eventId, adminDeviceId: body.adminDeviceId, role: body.role };
 }
 
 export async function sendCommand(
