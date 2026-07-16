@@ -33,8 +33,7 @@ export interface BookingGroupSplitPlan {
 
 export function deriveResourceGroupCapacity(passengerSeats: readonly number[]): number {
   return passengerSeats.reduce(
-    (maximum, seats) =>
-      Number.isInteger(seats) && seats > 0 ? Math.max(maximum, seats) : maximum,
+    (maximum, seats) => (Number.isInteger(seats) && seats > 0 ? Math.max(maximum, seats) : maximum),
     0,
   );
 }
