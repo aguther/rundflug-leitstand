@@ -189,18 +189,6 @@ const weightClassLabel: Record<WeightClass, string> = {
   INDIVIDUAL: "Individuell",
 };
 
-function saleClosingLabel(value: string | null, timeZone: string): string | null {
-  if (!value) return null;
-  const minutes = Math.ceil((Date.parse(value) - Date.now()) / 60_000);
-  if (minutes <= 0) return "Verkaufsschluss erreicht";
-  if (minutes <= 30) return `Verkaufsschluss in ${minutes} Minuten`;
-  return `Verkaufsschluss ${new Date(value).toLocaleTimeString("de-DE", {
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone,
-  })}`;
-}
-
 function operationalTimeLabel(value: string | null, timeZone: string): string {
   if (!value) return "–";
   return new Date(value).toLocaleTimeString("de-DE", {
@@ -516,12 +504,6 @@ function CashierView() {
   const [receipt, setReceipt] = useState<TicketReceipt[]>([]);
   const [ticketCodeMode, setTicketCodeMode] = useState<"GENERATED" | "PREPRINTED">("GENERATED");
   const [preprintedCodes, setPreprintedCodes] = useState("");
-  const [paymentStatus, setPaymentStatus] = useState<
-    "UNPAID" | "PAID" | "WAIVED" | "INFORMATIONAL_ONLY"
-  >("PAID");
-  const [paymentMethod, setPaymentMethod] = useState<"CASH" | "CARD" | "VOUCHER" | "OTHER" | null>(
-    "CASH",
-  );
   const [message, setMessage] = useState<string | null>(null);
   const [lastTicketGroupId, setLastTicketGroupId] = useState<string | null>(null);
   const [lastProductId, setLastProductId] = useState<string | null>(null);
@@ -535,6 +517,14 @@ function CashierView() {
   const [oversizeSplitAcknowledged, setOversizeSplitAcknowledged] = useState(false);
   const product = board?.products.find((entry) => entry.id === productId) ?? board?.products[0];
   const splitPreview = oversizeSplitPreview(size, product?.referenceCapacity ?? size);
+  const productAircraft =
+    board?.aircraft.filter((aircraft) => aircraft.resourceGroupId === product?.resourceGroupId) ??
+    [];
+  const fittingAircraft = productAircraft.filter((aircraft) => aircraft.passengerSeats >= size);
+  const limitedLargeAircraft =
+    !splitPreview.required &&
+    fittingAircraft.length > 0 &&
+    fittingAircraft.length < productAircraft.length;
   const childCompanionWarning = requiresChildCompanionWarning(
     product?.childCompanionRequired ?? false,
     ticketDetails.map((detail) => detail.weightClass),
@@ -563,11 +553,6 @@ function CashierView() {
       }),
     );
   }, [product?.weightClasses, size]);
-  useEffect(() => {
-    if (paymentStatus === "UNPAID" || paymentStatus === "WAIVED") setPaymentMethod(null);
-    else if (paymentMethod === null) setPaymentMethod("CASH");
-  }, [paymentMethod, paymentStatus]);
-
   async function sell() {
     if (!board || !product || busy) return;
     const codes =
@@ -603,8 +588,8 @@ function CashierView() {
             publicTicketCodes: codes,
             ticketDetails,
             standby: false,
-            paymentStatus,
-            paymentMethod,
+            paymentStatus: "INFORMATIONAL_ONLY",
+            paymentMethod: null,
             oversizeSplitAcknowledged,
           },
         },
@@ -760,24 +745,18 @@ function CashierView() {
               }}
               type="button"
             >
-              <strong>{entry.name}</strong>
-              <span>{entry.resourceGroupStatus === "ACTIVE" ? "Verkauf aktiv" : "Gesperrt"}</span>
-              <span>
-                Wartezeit {entry.estimatedWaitLowerMinutes}–{entry.estimatedWaitUpperMinutes} Min.
+              <span className="product-option-heading">
+                <strong>{entry.name}</strong>
+                <small>
+                  {entry.resourceGroupStatus === "ACTIVE" ? "Verkauf aktiv" : "Gesperrt"}
+                </small>
               </span>
-              <span>
-                {entry.nextBoardingWindowLowerAt && entry.nextBoardingWindowUpperAt
-                  ? `Nächstes Boardingfenster ${operationalTimeLabel(entry.nextBoardingWindowLowerAt, board.event.timeZone)}–${operationalTimeLabel(entry.nextBoardingWindowUpperAt, board.event.timeZone)}`
-                  : "Boardingfenster derzeit unsicher"}
+              <span className="product-wait">
+                {entry.estimatedWaitLowerMinutes}–{entry.estimatedWaitUpperMinutes} Min.
               </span>
-              <span>Gemeinsame Queue: {entry.resourceGroupOpenTickets} Tickets</span>
-              <span>{capacityLabel[entry.capacityStatus]}</span>
+              <span>{entry.resourceGroupOpenTickets} Tickets in der Queue</span>
               {entry.resourceGroupOperationalNote ? (
                 <span>Betriebshinweis: {entry.resourceGroupOperationalNote}</span>
-              ) : null}
-              <span>Noch vorsichtig kalkuliert: {entry.remainingSellableSeats} Plätze</span>
-              {saleClosingLabel(entry.saleClosesAt, board.event.timeZone) ? (
-                <span>{saleClosingLabel(entry.saleClosesAt, board.event.timeZone)}</span>
               ) : null}
             </button>
           ))}
@@ -830,7 +809,17 @@ function CashierView() {
                 </label>
               </div>
             ) : null}
-            <p>Keine Namen und keine Telefonnummern.</p>
+            {limitedLargeAircraft ? (
+              <div className="capacity-fit-notice" role="status">
+                <strong>Gemeinsamer Flug möglich</strong>
+                <span>
+                  {fittingAircraft.length} von {productAircraft.length} Flugzeug
+                  {productAircraft.length === 1 ? "" : "en"} passen für diese Gruppe. Dadurch kann
+                  die Wartezeit etwas länger sein.
+                </span>
+              </div>
+            ) : null}
+            <p className="privacy-note">Anonymer Verkauf – keine Namen und Telefonnummern.</p>
             <label className="ticket-code-mode">
               Ticket-Ausgabe
               <select
@@ -854,51 +843,6 @@ function CashierView() {
                 />
               </label>
             ) : null}
-            <fieldset className="payment-information">
-              <legend>Zahlungsinformation</legend>
-              <label>
-                Status
-                <select
-                  value={paymentStatus}
-                  onChange={(event) =>
-                    setPaymentStatus(
-                      event.target.value as "UNPAID" | "PAID" | "WAIVED" | "INFORMATIONAL_ONLY",
-                    )
-                  }
-                >
-                  <option value="PAID">Bezahlt</option>
-                  <option value="UNPAID">Offen</option>
-                  <option value="WAIVED">Erlassen</option>
-                  <option value="INFORMATIONAL_ONLY">Nur Information</option>
-                </select>
-              </label>
-              <label>
-                Zahlart
-                <select
-                  disabled={paymentStatus === "UNPAID" || paymentStatus === "WAIVED"}
-                  value={paymentMethod ?? ""}
-                  onChange={(event) =>
-                    setPaymentMethod(
-                      (event.target.value || null) as "CASH" | "CARD" | "VOUCHER" | "OTHER" | null,
-                    )
-                  }
-                >
-                  <option value="">Keine</option>
-                  <option value="CASH">Bar</option>
-                  <option value="CARD">Karte</option>
-                  <option value="VOUCHER">Gutschein</option>
-                  <option value="OTHER">Sonstige</option>
-                </select>
-              </label>
-              <strong>
-                Summe:{" "}
-                {(((product?.priceCents ?? 0) * size) / 100).toLocaleString("de-DE", {
-                  style: "currency",
-                  currency: "EUR",
-                })}
-              </strong>
-              <p>Nur Abstimmhilfe · keine elektronische Kasse oder Zahlungsabwicklung.</p>
-            </fieldset>
             {product &&
             (product.weightClasses.length > 1 || product.weightClasses[0] !== "NOT_CAPTURED") ? (
               <div className="weight-class-list">
@@ -965,88 +909,87 @@ function CashierView() {
               </div>
             ) : null}
           </section>
-          <section className="ticket-preview">
-            <h2>QR-Tickets</h2>
-            {receipt.length > 0 ? (
-              <div className="receipt-list">
-                {receipt.map((ticket) => (
-                  <article key={ticket.code} className="ticket-receipt">
-                    <img src={ticket.qrDataUrl} alt={`QR-Ticket ${ticket.code}`} />
-                    <code>{ticket.code}</code>
-                    <span>QR-Code öffnet den anonymen Ticketstatus.</span>
-                  </article>
-                ))}
-                <button className="print-tickets" type="button" onClick={() => window.print()}>
-                  QR-Tickets drucken
-                </button>
-              </div>
-            ) : (
-              <p>Beim Bestätigen werden {size} nicht erratbare Codes erzeugt.</p>
-            )}
-            {message ? (
-              <div className="action-message" role="status">
-                {message}
-              </div>
-            ) : null}
-            {lastTicketGroupId ? (
-              <div className="correction-controls">
-                <label>
-                  Stornogrund
-                  <input
-                    value={cancelReason}
-                    onChange={(event) => setCancelReason(event.target.value)}
-                    placeholder="Mindestens 3 Zeichen"
-                  />
-                </label>
-                <label>
-                  Administrator-PIN für Storno/Umbuchung
-                  <input
-                    type="password"
-                    value={correctionPin}
-                    onChange={(event) => setCorrectionPin(event.target.value)}
-                  />
-                </label>
-                <button
-                  disabled={cancelReason.trim().length < 3 || correctionPin.length < 4}
-                  onClick={cancelLastSale}
-                  type="button"
-                >
-                  {correctionTargetLabel} stornieren
-                </button>
-                <label>
-                  Umbuchen auf
-                  <select
-                    value={rebookProductId}
-                    onChange={(event) => setRebookProductId(event.target.value)}
+          {receipt.length > 0 || message || lastTicketGroupId ? (
+            <section className="ticket-preview">
+              {receipt.length > 0 ? <h2>QR-Tickets</h2> : null}
+              {receipt.length > 0 ? (
+                <div className="receipt-list">
+                  {receipt.map((ticket) => (
+                    <article key={ticket.code} className="ticket-receipt">
+                      <img src={ticket.qrDataUrl} alt={`QR-Ticket ${ticket.code}`} />
+                      <code>{ticket.code}</code>
+                      <span>QR-Code öffnet den anonymen Ticketstatus.</span>
+                    </article>
+                  ))}
+                  <button className="print-tickets" type="button" onClick={() => window.print()}>
+                    QR-Tickets drucken
+                  </button>
+                </div>
+              ) : null}
+              {message ? (
+                <div className="action-message" role="status">
+                  {message}
+                </div>
+              ) : null}
+              {lastTicketGroupId ? (
+                <details className="correction-controls">
+                  <summary>Verkauf korrigieren</summary>
+                  <label>
+                    Stornogrund
+                    <input
+                      value={cancelReason}
+                      onChange={(event) => setCancelReason(event.target.value)}
+                      placeholder="Mindestens 3 Zeichen"
+                    />
+                  </label>
+                  <label>
+                    Administrator-PIN für Storno/Umbuchung
+                    <input
+                      type="password"
+                      value={correctionPin}
+                      onChange={(event) => setCorrectionPin(event.target.value)}
+                    />
+                  </label>
+                  <button
+                    disabled={cancelReason.trim().length < 3 || correctionPin.length < 4}
+                    onClick={cancelLastSale}
+                    type="button"
                   >
-                    <option value="">Zielprodukt wählen</option>
-                    {board?.products
-                      .filter((entry) => entry.id !== lastProductId)
-                      .map((entry) => (
-                        <option key={entry.id} value={entry.id}>
-                          {entry.name}
-                        </option>
-                      ))}
-                  </select>
-                </label>
-                <button
-                  disabled={
-                    !rebookProductId || cancelReason.trim().length < 3 || correctionPin.length < 4
-                  }
-                  onClick={rebookLastSale}
-                  type="button"
-                >
-                  Tickets umbuchen
-                </button>
-              </div>
-            ) : null}
-          </section>
+                    {correctionTargetLabel} stornieren
+                  </button>
+                  <label>
+                    Umbuchen auf
+                    <select
+                      value={rebookProductId}
+                      onChange={(event) => setRebookProductId(event.target.value)}
+                    >
+                      <option value="">Zielprodukt wählen</option>
+                      {board?.products
+                        .filter((entry) => entry.id !== lastProductId)
+                        .map((entry) => (
+                          <option key={entry.id} value={entry.id}>
+                            {entry.name}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                  <button
+                    disabled={
+                      !rebookProductId || cancelReason.trim().length < 3 || correctionPin.length < 4
+                    }
+                    onClick={rebookLastSale}
+                    type="button"
+                  >
+                    Tickets umbuchen
+                  </button>
+                </details>
+              ) : null}
+            </section>
+          ) : null}
         </div>
-        <section className="ticket-search" aria-labelledby="ticket-search-title">
-          <div>
-            <h2 id="ticket-search-title">Ticketsuche</h2>
-            <p>Ticket-/QR-Code, Gruppen-ID oder Fluggruppenkennung eingeben.</p>
-          </div>
+        <details className="ticket-search">
+          <summary id="ticket-search-title">Bestehenden Verkauf suchen oder bearbeiten</summary>
+          <p>Ticket-/QR-Code, Gruppen-ID oder Fluggruppenkennung eingeben.</p>
           <div className="ticket-search-input">
             <input
               aria-label="Suchbegriff"
@@ -1083,7 +1026,7 @@ function CashierView() {
               ))}
             </div>
           ) : null}
-        </section>
+        </details>
         <button
           className="primary-action"
           disabled={
@@ -1102,8 +1045,6 @@ function CashierView() {
                 detail.weightClass === "INDIVIDUAL" &&
                 ((detail.individualWeightKg ?? 0) < 15 || (detail.individualWeightKg ?? 0) > 250),
             ) ||
-            ((paymentStatus === "PAID" || paymentStatus === "INFORMATIONAL_ONLY") &&
-              paymentMethod === null) ||
             busy
           }
           onClick={sell}
