@@ -17,6 +17,12 @@ describe("PWA deployment updates", () => {
     expect(mainSource).toContain("window.location.reload()");
   });
 
+  it("checks for a new service worker on every app start without removing web push", () => {
+    expect(mainSource).toContain("onRegisteredSW:");
+    expect(mainSource).toContain("registration?.update()");
+    expect(mainSource).not.toContain("registration?.unregister()");
+  });
+
   it("always sends API requests directly to the network without dropping web push", () => {
     expect(apiSource).toMatch(/getOperationBoard[\s\S]*cache: "no-store"/);
     expect(pushWorkerSource).not.toContain('addEventListener("fetch"');
