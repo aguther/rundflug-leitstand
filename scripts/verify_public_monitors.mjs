@@ -371,7 +371,7 @@ try {
     (entry) => entry.communicationNumber === group.communicationNumber,
   );
   if (
-    calledGroup?.status !== "COME_TO_FLIGHT_LINE" ||
+    calledGroup?.status !== "BOARDING" ||
     calledGroup.aircraftRegistration !== "D-EDEM" ||
     publicBoard.fleet.find((aircraft) => aircraft.registration === "D-EDEM")?.status !== "BOARDING"
   ) {

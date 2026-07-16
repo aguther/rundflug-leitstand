@@ -25,6 +25,7 @@ import {
   assessRemainingCapacity,
   type DeviceRole,
   DomainRuleError,
+  decideAutomaticPrecall,
   deriveResourceGroupCapacity,
   estimateDuration,
   forecastQueueWindows,
@@ -181,6 +182,8 @@ export class EventCoordinator extends DurableObject<Env> {
                 operational_note, operations_end_at, sale_opens_at, no_show_after_minutes,
                 max_ticket_deferrals,
                 notification_lead_minutes, child_reference_weight_kg, normal_reference_weight_kg,
+                automatic_precall_enabled, precall_lead_minutes, max_gate_wait_minutes,
+                precall_min_quality, precall_gate_cooldown_minutes,
                 heavy_reference_weight_kg, planned_boarding_minutes, planned_deboarding_minutes,
                 planned_buffer_minutes, updated_at
            FROM operation_days
@@ -857,7 +860,9 @@ export class EventCoordinator extends DurableObject<Env> {
     const [event, rotationRows, durationRows, capacityRows, pilotRow] = await Promise.all([
       this.env.DB.prepare(
         `SELECT version, operational_interrupted, emergency_mode, planned_boarding_minutes,
-                planned_deboarding_minutes, planned_buffer_minutes, updated_at
+                planned_deboarding_minutes, planned_buffer_minutes, updated_at, status,
+                automatic_precall_enabled, precall_lead_minutes, max_gate_wait_minutes,
+                precall_min_quality, precall_gate_cooldown_minutes
            FROM operation_days WHERE id = ?1`,
       )
         .bind(eventId)
@@ -869,13 +874,23 @@ export class EventCoordinator extends DurableObject<Env> {
           planned_deboarding_minutes: number;
           planned_buffer_minutes: number;
           updated_at: string;
+          status: "PREPARATION" | "ACTIVE" | "CLOSED" | "ARCHIVED";
+          automatic_precall_enabled: number;
+          precall_lead_minutes: number;
+          max_gate_wait_minutes: number;
+          precall_min_quality: "STABLE" | "CHANGING";
+          precall_gate_cooldown_minutes: number;
         }>(),
       this.env.DB.prepare(
         `SELECT r.id, r.status, r.created_at, r.called_at, r.departed_at, r.landed_at,
-                r.completed_at, fg.resource_group_id, rg.status AS resource_group_status,
+                r.completed_at, fg.id AS flight_group_id, fg.version AS flight_group_version,
+                fg.precalled_at, fg.resource_group_id, rg.status AS resource_group_status,
+                rg.automatic_precall_enabled AS resource_group_precall_enabled,
                 COALESCE(MIN(tg.queue_sequence), 1) AS queue_sequence,
+                COUNT(DISTINCT rt.ticket_id) AS ticket_count,
                 COALESCE(MIN(p.reference_duration_minutes), 20) AS reference_duration_minutes,
-                COALESCE(MIN(p.code), '') AS product_code, a.aircraft_type
+                COALESCE(MIN(p.code), '') AS product_code, a.aircraft_type,
+                COALESCE(r.gate_id, MIN(p.gate_id)) AS gate_id
            FROM rotations r
            JOIN flight_groups fg ON fg.id = r.flight_group_id
            JOIN resource_groups rg ON rg.id = fg.resource_group_id
@@ -898,12 +913,18 @@ export class EventCoordinator extends DurableObject<Env> {
           departed_at: string | null;
           landed_at: string | null;
           completed_at: string | null;
+          flight_group_id: string;
+          flight_group_version: number;
+          precalled_at: string | null;
           resource_group_id: string;
           resource_group_status: "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED";
+          resource_group_precall_enabled: number;
           queue_sequence: number;
+          ticket_count: number;
           reference_duration_minutes: number;
           product_code: string;
           aircraft_type: string | null;
+          gate_id: string | null;
         }>(),
       this.env.DB.prepare(
         `SELECT (julianday(r.completed_at) - julianday(r.called_at)) * 1440.0 AS minutes,
@@ -924,7 +945,7 @@ export class EventCoordinator extends DurableObject<Env> {
         aircraft_type: string | null;
       }>(),
       this.env.DB.prepare(
-        `SELECT m.resource_group_id, COUNT(*) AS count
+        `SELECT m.resource_group_id, COUNT(*) AS count, MAX(a.passenger_seats) AS max_seats
            FROM resource_group_memberships m
            JOIN aircraft a ON a.id = m.aircraft_id
           WHERE m.operation_day_id = ?1 AND m.active_until IS NULL
@@ -932,7 +953,7 @@ export class EventCoordinator extends DurableObject<Env> {
           GROUP BY m.resource_group_id`,
       )
         .bind(eventId)
-        .all<{ resource_group_id: string; count: number }>(),
+        .all<{ resource_group_id: string; count: number; max_seats: number }>(),
       this.env.DB.prepare(
         "SELECT COUNT(*) AS count FROM pilots WHERE operation_day_id = ?1 AND active = 1 AND paused = 0",
       )
@@ -951,6 +972,26 @@ export class EventCoordinator extends DurableObject<Env> {
         Math.min(row.count, pilotRow?.count ?? 0),
       ]),
     );
+    const maximumSeats = new Map(
+      capacityRows.results.map((row) => [row.resource_group_id, row.max_seats ?? 0]),
+    );
+    const lastGatePrecall = new Map<string, number>();
+    for (const rotation of rotationRows.results) {
+      if (!rotation.gate_id || !rotation.precalled_at) continue;
+      lastGatePrecall.set(
+        rotation.gate_id,
+        Math.max(lastGatePrecall.get(rotation.gate_id) ?? 0, Date.parse(rotation.precalled_at)),
+      );
+    }
+    const evaluatedResourceGroups = new Set<string>();
+    const precallCandidates: Array<{
+      flightGroupId: string;
+      rotationId: string;
+      expectedVersion: number;
+      gateId: string | null;
+      predictionUpperMinutes: number;
+      predictionQuality: "STABLE" | "CHANGING" | "UNCERTAIN";
+    }> = [];
     const statements: D1PreparedStatement[] = [];
     for (const rotation of rotationRows.results) {
       const boarding = event.planned_boarding_minutes;
@@ -994,6 +1035,42 @@ export class EventCoordinator extends DurableObject<Env> {
         activeAircraft: activeCapacity,
         duration: estimate,
       });
+      const firstWaitingGroup =
+        rotation.status === "DRAFT" && !evaluatedResourceGroups.has(rotation.resource_group_id);
+      if (rotation.status === "DRAFT") evaluatedResourceGroups.add(rotation.resource_group_id);
+      const lastGateCallAt = rotation.gate_id ? lastGatePrecall.get(rotation.gate_id) : undefined;
+      const precallDecision = decideAutomaticPrecall({
+        enabled: event.automatic_precall_enabled === 1,
+        eventActive: event.status === "ACTIVE",
+        operationsAvailable: event.operational_interrupted === 0 && event.emergency_mode === 0,
+        resourceGroupActive: rotation.resource_group_status === "ACTIVE",
+        resourceGroupEnabled: rotation.resource_group_precall_enabled === 1,
+        firstWaitingGroup,
+        alreadyPrecalled: rotation.precalled_at !== null,
+        groupSize: rotation.ticket_count,
+        largestEligibleAircraftSeats: maximumSeats.get(rotation.resource_group_id) ?? 0,
+        predictionQuality: estimate.quality,
+        minimumQuality: event.precall_min_quality,
+        predictedUpperMinutes: window.upperMinutes,
+        leadMinutes: event.precall_lead_minutes,
+        maximumGateWaitMinutes: event.max_gate_wait_minutes,
+        minutesSinceLastGatePrecall:
+          lastGateCallAt === undefined
+            ? null
+            : Math.max(0, (now.getTime() - lastGateCallAt) / 60_000),
+        gateCooldownMinutes: event.precall_gate_cooldown_minutes,
+      });
+      if (precallDecision.eligible) {
+        precallCandidates.push({
+          flightGroupId: rotation.flight_group_id,
+          rotationId: rotation.id,
+          expectedVersion: rotation.flight_group_version,
+          gateId: rotation.gate_id,
+          predictionUpperMinutes: window.upperMinutes,
+          predictionQuality: estimate.quality,
+        });
+        if (rotation.gate_id) lastGatePrecall.set(rotation.gate_id, now.getTime());
+      }
       const planOffset =
         Math.floor(Math.max(0, rotation.queue_sequence - 1) / Math.max(1, activeCapacity)) *
         referenceTotal;
@@ -1083,6 +1160,7 @@ export class EventCoordinator extends DurableObject<Env> {
     for (let index = 0; index < statements.length; index += 80) {
       await this.env.DB.batch(statements.slice(index, index + 80));
     }
+    await this.persistAutomaticPrecalls(eventId, precallCandidates, nowIso);
     await queueEligiblePreparationNotifications(this.env, eventId);
     const forecastMessage = JSON.stringify({
       type: "forecast-updated",
@@ -1095,6 +1173,71 @@ export class EventCoordinator extends DurableObject<Env> {
         socket.send(forecastMessage);
       } catch {
         socket.close(1011, "Prognose-Broadcast fehlgeschlagen");
+      }
+    }
+  }
+
+  private async persistAutomaticPrecalls(
+    eventId: string,
+    candidates: Array<{
+      flightGroupId: string;
+      rotationId: string;
+      expectedVersion: number;
+      gateId: string | null;
+      predictionUpperMinutes: number;
+      predictionQuality: "STABLE" | "CHANGING" | "UNCERTAIN";
+    }>,
+    now: string,
+  ): Promise<void> {
+    for (const candidate of candidates) {
+      const systemCommandId = crypto.randomUUID();
+      const nextVersion = candidate.expectedVersion + 1;
+      const payload = JSON.stringify({
+        trigger: "AUTOMATIC_PRECALL",
+        gateId: candidate.gateId,
+        predictionUpperMinutes: candidate.predictionUpperMinutes,
+        predictionQuality: candidate.predictionQuality,
+      });
+      await this.env.DB.batch([
+        this.env.DB.prepare(
+          `UPDATE flight_groups
+              SET precalled_at = ?1, precall_trigger = ?2, version = ?3, updated_at = ?1
+            WHERE id = ?4 AND operation_day_id = ?5 AND version = ?6 AND precalled_at IS NULL`,
+        ).bind(
+          now,
+          systemCommandId,
+          nextVersion,
+          candidate.flightGroupId,
+          eventId,
+          candidate.expectedVersion,
+        ),
+        this.env.DB.prepare(
+          `INSERT INTO operational_events
+            (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type,
+             aggregate_id, aggregate_version, payload_json)
+           SELECT ?1, ?2, 'FLIGHT_GROUP_PRECALLED', ?3, 'SYSTEM', 'FLIGHT_GROUP', ?4, ?5, ?6
+             FROM flight_groups WHERE id = ?4 AND precall_trigger = ?1`,
+        ).bind(systemCommandId, eventId, now, candidate.flightGroupId, nextVersion, payload),
+        this.env.DB.prepare(
+          `INSERT INTO outbox (id, operation_day_id, topic, payload_json, created_at)
+           SELECT ?1, ?2, 'EVENT_STATE_CHANGED', ?3, ?4
+             FROM flight_groups WHERE id = ?5 AND precall_trigger = ?6`,
+        ).bind(
+          crypto.randomUUID(),
+          eventId,
+          payload,
+          now,
+          candidate.flightGroupId,
+          systemCommandId,
+        ),
+      ]);
+      const persisted = await this.env.DB.prepare(
+        "SELECT 1 AS persisted FROM flight_groups WHERE id = ?1 AND precall_trigger = ?2",
+      )
+        .bind(candidate.flightGroupId, systemCommandId)
+        .first<{ persisted: number }>();
+      if (persisted) {
+        await sendRotationPushNotifications(this.env, candidate.rotationId, "FLIGHT_GROUP_CALLED");
       }
     }
   }
@@ -2177,6 +2320,7 @@ export class EventCoordinator extends DurableObject<Env> {
         referenceCapacity: command.payload.referenceCapacity,
         plannedRotationMinutes: command.payload.plannedRotationMinutes,
         compatibleAircraftTypes: command.payload.compatibleAircraftTypes,
+        automaticPrecallEnabled: command.payload.automaticPrecallEnabled,
         aircraftIds: desiredAircraftIds,
         reason: command.payload.reason,
       };
@@ -2184,12 +2328,14 @@ export class EventCoordinator extends DurableObject<Env> {
         this.env.DB.prepare(
           `INSERT INTO resource_groups
             (id, operation_day_id, name, status, gate_id, reference_capacity,
-             planned_rotation_minutes, compatible_aircraft_types_json, version, created_at, updated_at)
-           VALUES (?1, ?2, ?3, 'ACTIVE', ?4, ?5, ?6, ?7, 0, ?8, ?8)
+             planned_rotation_minutes, compatible_aircraft_types_json, automatic_precall_enabled,
+             version, created_at, updated_at)
+           VALUES (?1, ?2, ?3, 'ACTIVE', ?4, ?5, ?6, ?7, ?8, 0, ?9, ?9)
            ON CONFLICT(id) DO UPDATE SET name = excluded.name, gate_id = excluded.gate_id,
             reference_capacity = excluded.reference_capacity,
             planned_rotation_minutes = excluded.planned_rotation_minutes,
             compatible_aircraft_types_json = excluded.compatible_aircraft_types_json,
+            automatic_precall_enabled = excluded.automatic_precall_enabled,
             version = resource_groups.version + 1, updated_at = excluded.updated_at
            WHERE resource_groups.operation_day_id = excluded.operation_day_id`,
         ).bind(
@@ -2200,6 +2346,7 @@ export class EventCoordinator extends DurableObject<Env> {
           command.payload.referenceCapacity,
           command.payload.plannedRotationMinutes,
           JSON.stringify([...new Set(command.payload.compatibleAircraftTypes)]),
+          command.payload.automaticPrecallEnabled ? 1 : 0,
           now,
         ),
       );
@@ -2739,6 +2886,11 @@ export class EventCoordinator extends DurableObject<Env> {
         no_show_after_minutes: payload.noShowAfterMinutes,
         max_ticket_deferrals: payload.maxTicketDeferrals,
         notification_lead_minutes: payload.notificationLeadMinutes,
+        automatic_precall_enabled: payload.automaticPrecallEnabled ? 1 : 0,
+        precall_lead_minutes: payload.precallLeadMinutes,
+        max_gate_wait_minutes: payload.maximumGateWaitMinutes,
+        precall_min_quality: payload.precallMinimumQuality,
+        precall_gate_cooldown_minutes: payload.precallGateCooldownMinutes,
         child_reference_weight_kg: payload.childReferenceWeightKg,
         normal_reference_weight_kg: payload.normalReferenceWeightKg,
         heavy_reference_weight_kg: payload.heavyReferenceWeightKg,
@@ -2756,6 +2908,11 @@ export class EventCoordinator extends DurableObject<Env> {
       noShowAfterMinutes: payload.noShowAfterMinutes,
       maxTicketDeferrals: payload.maxTicketDeferrals,
       notificationLeadMinutes: payload.notificationLeadMinutes,
+      automaticPrecallEnabled: payload.automaticPrecallEnabled,
+      precallLeadMinutes: payload.precallLeadMinutes,
+      maximumGateWaitMinutes: payload.maximumGateWaitMinutes,
+      precallMinimumQuality: payload.precallMinimumQuality,
+      precallGateCooldownMinutes: payload.precallGateCooldownMinutes,
       referenceWeightsKg: {
         child: payload.childReferenceWeightKg,
         normal: payload.normalReferenceWeightKg,
@@ -2770,16 +2927,24 @@ export class EventCoordinator extends DurableObject<Env> {
       this.env.DB.prepare(
         `UPDATE operation_days SET sale_opens_at = ?1, operations_end_at = ?2,
           no_show_after_minutes = ?3, max_ticket_deferrals = ?4, notification_lead_minutes = ?5,
-          child_reference_weight_kg = ?6, normal_reference_weight_kg = ?7,
-          heavy_reference_weight_kg = ?8, planned_boarding_minutes = ?9,
-          planned_deboarding_minutes = ?10, planned_buffer_minutes = ?11,
-          version = ?12, updated_at = ?13 WHERE id = ?14 AND version = ?15`,
+          automatic_precall_enabled = ?6, precall_lead_minutes = ?7,
+          max_gate_wait_minutes = ?8, precall_min_quality = ?9,
+          precall_gate_cooldown_minutes = ?10,
+          child_reference_weight_kg = ?11, normal_reference_weight_kg = ?12,
+          heavy_reference_weight_kg = ?13, planned_boarding_minutes = ?14,
+          planned_deboarding_minutes = ?15, planned_buffer_minutes = ?16,
+          version = ?17, updated_at = ?18 WHERE id = ?19 AND version = ?20`,
       ).bind(
         payload.saleOpensAt,
         payload.operationsEndAt,
         payload.noShowAfterMinutes,
         payload.maxTicketDeferrals,
         payload.notificationLeadMinutes,
+        payload.automaticPrecallEnabled ? 1 : 0,
+        payload.precallLeadMinutes,
+        payload.maximumGateWaitMinutes,
+        payload.precallMinimumQuality,
+        payload.precallGateCooldownMinutes,
         payload.childReferenceWeightKg,
         payload.normalReferenceWeightKg,
         payload.heavyReferenceWeightKg,

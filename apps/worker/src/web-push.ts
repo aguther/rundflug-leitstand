@@ -12,7 +12,7 @@ interface StoredPushSubscription {
 const DEFAULT_PUSH_RETENTION_DAYS = 7;
 const PUSH_MESSAGES = {
   PREPARE_FOR_FLIGHT: "Bitte auf den bevorstehenden Aufruf vorbereiten.",
-  FLIGHT_GROUP_CALLED: "Bitte jetzt zur Flight Line kommen.",
+  FLIGHT_GROUP_CALLED: "Bitte jetzt zum angegebenen Gate kommen.",
   ROTATION_STARTED: "Ihr Rundflug hat begonnen.",
   ROTATION_LANDED: "Ihr Rundflug ist gelandet.",
   ROTATION_COMPLETED: "Ihr Rundflug ist abgeschlossen.",

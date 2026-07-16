@@ -20,6 +20,11 @@ export function rowToSnapshot(row: StoredEventRow): EventSnapshot {
     noShowAfterMinutes: row.no_show_after_minutes ?? 10,
     maxTicketDeferrals: row.max_ticket_deferrals ?? 2,
     notificationLeadMinutes: row.notification_lead_minutes ?? 15,
+    automaticPrecallEnabled: row.automatic_precall_enabled !== 0,
+    precallLeadMinutes: row.precall_lead_minutes ?? 15,
+    maximumGateWaitMinutes: row.max_gate_wait_minutes ?? 20,
+    precallMinimumQuality: row.precall_min_quality ?? "CHANGING",
+    precallGateCooldownMinutes: row.precall_gate_cooldown_minutes ?? 2,
     referenceWeightsKg: {
       child: row.child_reference_weight_kg ?? 35,
       normal: row.normal_reference_weight_kg ?? 80,

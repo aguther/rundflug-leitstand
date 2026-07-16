@@ -815,6 +815,8 @@ app.get("/api/events/:eventId/snapshot", async (context) => {
             operational_note, operations_end_at, sale_opens_at, no_show_after_minutes,
             max_ticket_deferrals,
             notification_lead_minutes, child_reference_weight_kg, normal_reference_weight_kg,
+            automatic_precall_enabled, precall_lead_minutes, max_gate_wait_minutes,
+            precall_min_quality, precall_gate_cooldown_minutes,
             heavy_reference_weight_kg, planned_boarding_minutes, planned_deboarding_minutes,
             planned_buffer_minutes, updated_at
        FROM operation_days
@@ -983,6 +985,8 @@ app.get("/api/events/:eventId/operations", async (context) => {
             operational_note, operations_end_at, sale_opens_at, no_show_after_minutes,
             max_ticket_deferrals,
             notification_lead_minutes, child_reference_weight_kg, normal_reference_weight_kg,
+            automatic_precall_enabled, precall_lead_minutes, max_gate_wait_minutes,
+            precall_min_quality, precall_gate_cooldown_minutes,
             heavy_reference_weight_kg, planned_boarding_minutes, planned_deboarding_minutes,
             planned_buffer_minutes, updated_at FROM operation_days WHERE id = ?1`,
   )
@@ -1058,7 +1062,7 @@ app.get("/api/events/:eventId/operations", async (context) => {
       context.env.DB.prepare(
         `SELECT r.id, r.flight_group_id, fg.resource_group_id, fg.communication_number,
               COALESCE(fg.queue_position, fg.communication_number) AS queue_position,
-              r.status, r.aircraft_id, r.usable_capacity,
+              r.status, r.aircraft_id, r.usable_capacity, fg.precalled_at,
               COALESCE(r.gate_id, MIN(p.gate_id), '') AS gate_id,
               COALESCE(MAX(rotation_gate.label), MIN(product_gate.label), '') AS gate_label,
               r.operational_note,
@@ -1191,6 +1195,7 @@ app.get("/api/events/:eventId/operations", async (context) => {
           communication_number: number;
           queue_position: number;
           status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
+          precalled_at: string | null;
           gate_id: string;
           gate_label: string;
           operational_note: string;
@@ -1337,7 +1342,7 @@ app.get("/api/events/:eventId/operations", async (context) => {
       context.env.DB.prepare(
         `SELECT rg.id, rg.name, rg.status, rg.gate_id, g.label AS gate_label,
               rg.reference_capacity, rg.planned_rotation_minutes,
-              rg.compatible_aircraft_types_json,
+              rg.compatible_aircraft_types_json, rg.automatic_precall_enabled,
               COALESCE((SELECT json_group_array(m.aircraft_id)
                 FROM resource_group_memberships m
                WHERE m.operation_day_id = rg.operation_day_id
@@ -1355,6 +1360,7 @@ app.get("/api/events/:eventId/operations", async (context) => {
           reference_capacity: number;
           planned_rotation_minutes: number;
           compatible_aircraft_types_json: string;
+          automatic_precall_enabled: number;
           aircraft_ids_json: string;
         }>(),
     () =>
@@ -1623,6 +1629,7 @@ app.get("/api/events/:eventId/operations", async (context) => {
               activeCapacity: effectiveActiveCapacity,
             }),
           }).upperMinutes,
+        precalledAt: rotation.precalled_at,
         calledAt: rotation.called_at,
         deferralCount: rotation.deferral_count,
         operationalNote: rotation.operational_note,
@@ -1726,6 +1733,7 @@ app.get("/api/events/:eventId/operations", async (context) => {
         referenceCapacity: effectiveReferenceCapacity,
         plannedRotationMinutes: group.planned_rotation_minutes,
         compatibleAircraftTypes: [],
+        automaticPrecallEnabled: group.automatic_precall_enabled === 1,
         activeAircraftIds,
       };
     }),
@@ -2360,7 +2368,7 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
   const row = await context.env.DB.prepare(
     `SELECT p.name AS product_name, p.code AS product_code, p.public_description,
             g.label AS gate_label,
-            fg.communication_number, r.status, tg.operation_day_id,
+            fg.communication_number, fg.precalled_at, r.status, tg.operation_day_id,
             COALESCE(fg.queue_position, tg.queue_sequence) AS queue_sequence,
             t.attendance_status,
             r.prediction_quality, r.prediction_lower_minutes, r.prediction_upper_minutes,
@@ -2386,6 +2394,7 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
       public_description: string;
       gate_label: string;
       communication_number: number;
+      precalled_at: string | null;
       status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
       operation_day_id: string;
       queue_sequence: number;
@@ -2412,16 +2421,18 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
     row.prediction_upper_minutes !== null &&
     row.prediction_upper_minutes <= row.notification_lead_minutes;
   const publicState = {
-    DRAFT: prepare ? "PREPARE" : "WAITING",
+    DRAFT: row.precalled_at ? "COME_TO_FLIGHT_LINE" : prepare ? "PREPARE" : "WAITING",
     CALLED: row.attendance_status === "CHECKED_IN" ? "BOARDING" : "COME_TO_FLIGHT_LINE",
     IN_FLIGHT: "IN_FLIGHT",
     LANDED: "LANDED",
     COMPLETED: "COMPLETED",
   } as const;
   const message = {
-    DRAFT: prepare
-      ? "Bitte auf den bevorstehenden Aufruf vorbereiten."
-      : "Bitte Status regelmäßig prüfen.",
+    DRAFT: row.precalled_at
+      ? "Bitte jetzt zum angegebenen Gate kommen."
+      : prepare
+        ? "Bitte auf den bevorstehenden Aufruf vorbereiten."
+        : "Bitte Status regelmäßig prüfen.",
     CALLED: "Bitte jetzt zur Flight Line kommen.",
     IN_FLIGHT: "Der Flug läuft.",
     LANDED: "Der Flug ist gelandet.",
@@ -2654,7 +2665,7 @@ app.get("/api/public/events/:eventId/board", async (context) => {
     `SELECT COALESCE(MIN(p.name), 'Rundflug') AS product_name,
             COALESCE(MIN(p.code), 'RF') AS product_code,
             COALESCE(MIN(g.label), 'Flight Line') AS gate_label,
-            fg.communication_number,
+            fg.communication_number, fg.precalled_at,
             COALESCE(fg.queue_position, fg.communication_number) AS queue_position, r.status,
             MIN(a.registration) AS aircraft_registration,
             MIN(a.operational_state) AS aircraft_operational_state,
@@ -2686,6 +2697,7 @@ app.get("/api/public/events/:eventId/board", async (context) => {
       product_code: string;
       gate_label: string;
       communication_number: number;
+      precalled_at: string | null;
       queue_position: number;
       status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
       aircraft_registration: string | null;
@@ -2738,9 +2750,11 @@ app.get("/api/public/events/:eventId/board", async (context) => {
           status:
             row.resource_group_status !== "ACTIVE"
               ? "SERVICE_PAUSED"
-              : row.status === "CALLED" && row.aircraft_operational_state === "BOARDING"
-                ? "BOARDING"
-                : publicState[row.status],
+              : row.status === "DRAFT" && row.precalled_at !== null
+                ? "COME_TO_FLIGHT_LINE"
+                : row.status === "CALLED" && row.aircraft_operational_state === "BOARDING"
+                  ? "BOARDING"
+                  : publicState[row.status],
           waitLowerMinutes:
             event.operational_interrupted === 1 || row.resource_group_status !== "ACTIVE"
               ? 0

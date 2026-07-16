@@ -284,7 +284,13 @@ export function FlightLineAssist({
         {waitingGroups.map((rotation) => (
           <div key={rotation.id}>
             <strong>{rotation.communicationLabel}</strong>
-            <span>{rotation.status === "CALLED" ? "Aufgerufen" : "Wartet"}</span>
+            <span>
+              {rotation.status === "CALLED"
+                ? "Boarding"
+                : rotation.precalledAt
+                  ? "GO TO GATE"
+                  : "Wartet"}
+            </span>
             <span>
               {rotation.ticketCount} / {rotation.ticketCount} Tickets vor Ort
             </span>
