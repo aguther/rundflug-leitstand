@@ -1107,7 +1107,7 @@ function FlightLineView() {
   const [moveTargetId, setMoveTargetId] = useState("");
   const [moveReason, setMoveReason] = useState("");
   const [aircraftPauseOpen, setAircraftPauseOpen] = useState(false);
-  const [aircraftPauseMinutes, setAircraftPauseMinutes] = useState("20");
+  const [aircraftPauseMinutes, setAircraftPauseMinutes] = useState("");
   const [aircraftPauseUnknown, setAircraftPauseUnknown] = useState(false);
   const operationalRotations = board?.rotations.filter(
     (rotation) => rotation.status !== "COMPLETED",
@@ -1251,6 +1251,12 @@ function FlightLineView() {
     if (!selectedAircraft) return;
     const expectedReviewAt = expectedReviewAtFromPause(aircraftPauseMinutes, aircraftPauseUnknown);
     void setFlightLineAircraftState("PAUSED", expectedReviewAt);
+  }
+
+  function openAircraftPauseDialog() {
+    setAircraftPauseMinutes("");
+    setAircraftPauseUnknown(false);
+    setAircraftPauseOpen(true);
   }
 
   async function triggerEmergency() {
@@ -1543,7 +1549,7 @@ function FlightLineView() {
             await refresh();
           }}
           onAvailable={() => void setFlightLineAircraftState("AVAILABLE")}
-          onPause={() => setAircraftPauseOpen(true)}
+          onPause={openAircraftPauseDialog}
           onRefuel={() => void setFlightLineAircraftState("REFUELING")}
           onRelease={async (aircraftId) => {
             await releaseFlightLineAircraft(
@@ -1573,7 +1579,7 @@ function FlightLineView() {
           onAvailable={() => void setFlightLineAircraftState("AVAILABLE")}
           onOpenDetails={() => setDetailsOpen(true)}
           onOpenDisposition={() => setDispositionOpen(true)}
-          onPause={() => setAircraftPauseOpen(true)}
+          onPause={openAircraftPauseDialog}
           onPilotChange={setNextPilotId}
           onRefuel={() => void setFlightLineAircraftState("REFUELING")}
           onReleaseAssist={(aircraftId) =>
@@ -1731,7 +1737,7 @@ function FlightLineView() {
                     <span>Flottenstatus wird durch die Flight-Line-Leitung gesteuert.</span>
                   ) : selectedAircraft.operationalState === "AVAILABLE" ? (
                     <>
-                      <button onClick={() => setAircraftPauseOpen(true)} type="button">
+                      <button onClick={openAircraftPauseDialog} type="button">
                         Pause
                       </button>
                       <button
@@ -2222,6 +2228,7 @@ function FlightLineView() {
                 <input
                   min={1}
                   onChange={(event) => setAircraftPauseMinutes(event.target.value)}
+                  placeholder="Minuten"
                   type="number"
                   value={aircraftPauseMinutes}
                 />
