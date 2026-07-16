@@ -1071,6 +1071,7 @@ const actionForState = {
 
 function FlightLineView() {
   const { board, error, lastConfirmedAt, refresh } = useOperationBoard(FLIGHT_LINE_DEVICE_ID);
+  const [selectedAircraftId, setSelectedAircraftId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [queueReason, setQueueReason] = useState("");
@@ -1084,9 +1085,25 @@ function FlightLineView() {
   const operationalRotations = board?.rotations.filter(
     (rotation) => rotation.status !== "COMPLETED",
   );
+  const operationalAircraft =
+    board?.aircraft.filter((aircraft) => aircraft.operationalState !== "INACTIVE") ?? [];
+  const selectedAircraft =
+    operationalAircraft.find((aircraft) => aircraft.id === selectedAircraftId) ??
+    operationalAircraft[0];
+  const aircraftRotations = operationalRotations?.filter((rotation) => {
+    if (!selectedAircraft) return false;
+    if (rotation.aircraftId) return rotation.aircraftId === selectedAircraft.id;
+    const rotationProduct = board?.products.find(
+      (productEntry) => productEntry.code === rotation.productCode,
+    );
+    return (
+      rotation.status === "DRAFT" &&
+      rotationProduct?.resourceGroupId === selectedAircraft.resourceGroupId &&
+      rotation.ticketCount <= selectedAircraft.passengerSeats
+    );
+  });
   const selected =
-    operationalRotations?.find((rotation) => rotation.id === selectedId) ??
-    operationalRotations?.[0];
+    aircraftRotations?.find((rotation) => rotation.id === selectedId) ?? aircraftRotations?.[0];
   const action = selected ? actionForState[selected.status] : null;
   const moveTargets = selected ? eligibleMoveTargets(selected, operationalRotations ?? []) : [];
   const presentCount = selected ? checkedInCount(selected) : 0;
@@ -1094,10 +1111,20 @@ function FlightLineView() {
     selected?.tickets.filter((ticket) => ticket.attendanceStatus !== "CHECKED_IN") ?? [];
   const replacement = selected ? replacementSuggestion(selected, operationalRotations ?? []) : null;
   useEffect(() => {
+    if (!selectedAircraftId && operationalAircraft[0]) {
+      setSelectedAircraftId(operationalAircraft[0].id);
+    }
+  }, [operationalAircraft, selectedAircraftId]);
+  useEffect(() => {
     if (selected?.status !== "DRAFT") return;
-    setNextAircraftId(selected.suggestedAircraftId ?? "");
+    setNextAircraftId(selectedAircraft?.id ?? selected.suggestedAircraftId ?? "");
     setNextPilotId(selected.suggestedPilotId ?? "");
-  }, [selected?.status, selected?.suggestedAircraftId, selected?.suggestedPilotId]);
+  }, [
+    selected?.status,
+    selected?.suggestedAircraftId,
+    selected?.suggestedPilotId,
+    selectedAircraft?.id,
+  ]);
   useEffect(() => {
     setDispositionCapacity(selected?.usableCapacity ?? 1);
     setMoveTargetId("");
@@ -1397,11 +1424,42 @@ function FlightLineView() {
           </button>
         </section>
       ) : null}
+      <nav className="aircraft-selector" aria-label="Flugzeug auswählen">
+        {operationalAircraft.map((aircraft) => {
+          const assignedRotation = operationalRotations?.find(
+            (rotation) => rotation.aircraftId === aircraft.id,
+          );
+          return (
+            <button
+              className={aircraft.id === selectedAircraft?.id ? "selected" : ""}
+              key={aircraft.id}
+              onClick={() => {
+                setSelectedAircraftId(aircraft.id);
+                setSelectedId(null);
+                setDispositionOpen(false);
+              }}
+              type="button"
+            >
+              <strong>{aircraft.registration}</strong>
+              <span>{aircraft.passengerSeats} Plätze</span>
+              <small>
+                {assignedRotation
+                  ? `${assignedRotation.communicationLabel} · ${rotationStatusLabel[assignedRotation.status]}`
+                  : aircraftStateLabel[aircraft.operationalState]}
+              </small>
+            </button>
+          );
+        })}
+      </nav>
       <section className="flight-workspace">
         <div className="queue-list">
-          <h1>Warteschlange</h1>
-          {operationalRotations?.map((rotation) => {
-            const segmentLabel = sharedGroupSegmentLabel(rotation, operationalRotations);
+          <h1>
+            {selectedAircraft
+              ? `Nächste Gruppen für ${selectedAircraft.registration}`
+              : "Flugzeuge"}
+          </h1>
+          {aircraftRotations?.map((rotation) => {
+            const segmentLabel = sharedGroupSegmentLabel(rotation, operationalRotations ?? []);
             return (
               <div className="queue-row-wrap" key={rotation.id}>
                 <button
@@ -1439,7 +1497,10 @@ function FlightLineView() {
               </div>
             );
           })}
-          {operationalRotations?.length === 0 ? <p>Keine offenen Fluggruppen.</p> : null}
+          {selectedAircraft && aircraftRotations?.length === 0 ? (
+            <p>Für dieses Flugzeug ist aktuell keine passende Fluggruppe offen.</p>
+          ) : null}
+          {!selectedAircraft ? <p>Kein aktives Flugzeug verfügbar.</p> : null}
         </div>
         <div className="rotation-detail">
           {selected ? (
@@ -1486,39 +1547,43 @@ function FlightLineView() {
                         : "Kein kompatibles Flugzeug verfügbar")}
                   </dd>
                 </div>
-                <div>
-                  <dt>Pilotencode</dt>
-                  <dd>
-                    {selected.status === "DRAFT" ? (
-                      <label>
-                        <select
-                          aria-label="Pilotencode für NEXT"
-                          value={nextPilotId}
-                          onChange={(event) => setNextPilotId(event.target.value)}
-                        >
-                          <option value="">Kein Pilotencode verfügbar</option>
-                          {board?.pilots
-                            .filter(
-                              (pilot) =>
-                                pilot.active &&
-                                !pilot.paused &&
-                                (!pilot.currentRotationId ||
-                                  pilot.currentRotationId === selected.id),
-                            )
-                            .map((pilot) => (
-                              <option value={pilot.id} key={pilot.id}>
-                                {pilot.operationalCode}
-                                {pilot.id === selected.suggestedPilotId ? " · Vorschlag" : ""}
-                              </option>
-                            ))}
-                        </select>
-                      </label>
-                    ) : (
-                      (selected.pilotOperationalCode ?? "Kein anonymer Pilotencode verfügbar")
-                    )}
-                  </dd>
-                </div>
+                {selected.status !== "DRAFT" ? (
+                  <div>
+                    <dt>Pilotencode</dt>
+                    <dd>{selected.pilotOperationalCode ?? "Nicht erfasst"}</dd>
+                  </div>
+                ) : null}
               </dl>
+              {selected.status === "DRAFT" ? (
+                <details className="pilot-assignment">
+                  <summary>
+                    Pilotzuordnung · {selected.suggestedPilotOperationalCode ?? "noch offen"}
+                  </summary>
+                  <label>
+                    Anonymer Pilotencode
+                    <select
+                      aria-label="Pilotencode für NEXT"
+                      value={nextPilotId}
+                      onChange={(event) => setNextPilotId(event.target.value)}
+                    >
+                      <option value="">Pilotencode wählen</option>
+                      {board?.pilots
+                        .filter(
+                          (pilot) =>
+                            pilot.active &&
+                            !pilot.paused &&
+                            (!pilot.currentRotationId || pilot.currentRotationId === selected.id),
+                        )
+                        .map((pilot) => (
+                          <option value={pilot.id} key={pilot.id}>
+                            {pilot.operationalCode}
+                            {pilot.id === selected.suggestedPilotId ? " · Vorschlag" : ""}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                </details>
+              ) : null}
               <p className="safety-disclaimer">
                 Nur organisatorische Schätzung aus konfigurierten Referenzgewichten. Die Bewertung
                 und Entscheidung liegt ausschließlich beim Piloten; keine Sicherheits- oder
