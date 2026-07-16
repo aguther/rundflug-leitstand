@@ -425,6 +425,7 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
       referenceCapacity: z.number().int().min(1).max(100),
       plannedRotationMinutes: z.number().int().min(1).max(600),
       compatibleAircraftTypes: z.array(z.string().trim().min(1).max(80)).max(50),
+      aircraftIds: z.array(z.string().min(1).max(100)).max(100).optional(),
       reason: z.string().trim().min(3).max(240),
       adminPin: z.string().min(4).max(32),
     }),

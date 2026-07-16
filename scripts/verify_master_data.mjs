@@ -139,13 +139,28 @@ try {
     reason: "Synthetischer Stammdatentest",
     adminPin: pin,
   });
+  for (const aircraft of [
+    { id: "aircraft-shared-a", registration: "D-ETSA" },
+    { id: "aircraft-shared-b", registration: "D-ETSB" },
+  ]) {
+    result = await admin(result.event.version, "UPSERT_AIRCRAFT", {
+      aircraftId: aircraft.id,
+      registration: aircraft.registration,
+      aircraftType: "C172",
+      passengerSeats: 3,
+      maximumPassengerPayloadKg: 250,
+      reason: "Synthetischer Stammdatentest",
+      adminPin: pin,
+    });
+  }
   result = await admin(result.event.version, "UPSERT_RESOURCE_GROUP", {
     resourceGroupId: "resource-shared-test",
     name: "Gemeinsame Panorama-Flotte",
     gateId: "gate-resource-test",
-    referenceCapacity: 8,
+    referenceCapacity: 3,
     plannedRotationMinutes: 35,
-    compatibleAircraftTypes: ["C172"],
+    compatibleAircraftTypes: [],
+    aircraftIds: ["aircraft-shared-a", "aircraft-shared-b"],
     reason: "Synthetischer Stammdatentest",
     adminPin: pin,
   });
@@ -160,27 +175,6 @@ try {
     },
     409,
   );
-  for (const aircraft of [
-    { id: "aircraft-shared-a", registration: "D-ETSA" },
-    { id: "aircraft-shared-b", registration: "D-ETSB" },
-  ]) {
-    result = await admin(result.event.version, "UPSERT_AIRCRAFT", {
-      aircraftId: aircraft.id,
-      registration: aircraft.registration,
-      aircraftType: "C172",
-      passengerSeats: 3,
-      maximumPassengerPayloadKg: 250,
-      reason: "Synthetischer Stammdatentest",
-      adminPin: pin,
-    });
-    result = await admin(result.event.version, "ASSIGN_AIRCRAFT_RESOURCE_GROUP", {
-      aircraftId: aircraft.id,
-      resourceGroupId: "resource-shared-test",
-      effectiveAt: new Date(Date.now() + result.event.version).toISOString(),
-      reason: "Synthetischer Stammdatentest",
-      adminPin: pin,
-    });
-  }
   const productPayload = (id, code, name, duration, overrides = {}) => ({
     productId: id,
     resourceGroupId: "resource-shared-test",
@@ -423,16 +417,16 @@ try {
     expectedReviewAt: null,
   });
   const resourceHistory = await history("RESOURCE_GROUP", "resource-shared-test");
-  const aircraftHistory = await history("AIRCRAFT", "aircraft-shared-a");
   const productHistory = await history("PRODUCT", "product-shared-20");
   if (
     !resourceHistory.entries.some((entry) => entry.eventType === "RESOURCE_GROUP_UPSERTED") ||
     resourceHistory.entries.filter((entry) => entry.eventType === "RESOURCE_GROUP_STATUS_CHANGED")
       .length !== 2 ||
-    !aircraftHistory.entries.some(
+    !resourceHistory.entries.some(
       (entry) =>
-        entry.eventType === "AIRCRAFT_RESOURCE_GROUP_ASSIGNED" &&
-        entry.payload.toResourceGroupId === "resource-shared-test",
+        entry.eventType === "RESOURCE_GROUP_UPSERTED" &&
+        entry.payload.aircraftIds?.includes("aircraft-shared-a") &&
+        entry.payload.aircraftIds?.includes("aircraft-shared-b"),
     ) ||
     productHistory.entries.filter((entry) => entry.eventType === "PRODUCT_UPSERTED").length !== 2 ||
     !productHistory.entries.some(
