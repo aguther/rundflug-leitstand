@@ -2,7 +2,9 @@
 
 - Status: Freigegeben
 - Datum: 2026-07-16
-- Referenz: `docs/ui/v1-simplified-operations-approved.png`
+- Historische Referenz: `docs/ui/v1-simplified-operations-approved.png`
+- Status: Durch `docs/ui/operations-v2-multi-surface-concept.md` und dessen sechs freigegebene
+  Referenzbilder ersetzt; nicht mehr als visuelle Abnahmevorlage verwenden.
 - Bedingung der Freigabe: Kasse, Flight Line und Administration sind drei unabhängige Routen und
   werden niemals gleichzeitig nebeneinander dargestellt. Das Referenzbild ist ausschließlich ein
   Vergleichsboard.

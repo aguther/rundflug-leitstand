@@ -73,6 +73,7 @@ import {
   formatEventLocalDateTime,
 } from "./event-time";
 import { expectedReviewAtFromPause } from "./flight-line-pause";
+import { FlightLineSupervisorConsole } from "./flight-line-supervisor";
 import { LocalizedDateInput, LocalizedDateTimeInput } from "./localized-date-input";
 import {
   appendCashierDraftRevision,
@@ -400,10 +401,12 @@ function Shell({
   title,
   children,
   kiosk = false,
+  className = "",
 }: {
   title: string;
   children: React.ReactNode;
   kiosk?: boolean;
+  className?: string;
 }) {
   const online = useConnectivity();
   const [theme, setTheme] = useState<"light" | "dark">(() => {
@@ -417,7 +420,7 @@ function Shell({
     window.localStorage.setItem("ui-theme", theme);
   }, [theme]);
   return (
-    <main className={kiosk ? "app-shell kiosk-shell" : "app-shell"}>
+    <main className={`${kiosk ? "app-shell kiosk-shell" : "app-shell"} ${className}`.trim()}>
       <header className="app-header">
         <div>
           <svg aria-hidden="true" className="app-brand-mark" viewBox="0 0 24 24">
@@ -1081,7 +1084,7 @@ const actionForState = {
   DRAFT: { label: "NEXT", command: "CALL_NEXT" },
   CALLED: { label: "IM FLUG", command: "MARK_IN_FLIGHT" },
   IN_FLIGHT: { label: "GELANDET", command: "MARK_LANDED" },
-  LANDED: { label: "ABGESCHLOSSEN", command: "MARK_COMPLETED" },
+  LANDED: { label: "VERFÜGBAR", command: "MARK_COMPLETED" },
   COMPLETED: null,
 } as const;
 
@@ -1095,6 +1098,7 @@ function FlightLineView() {
   const [nextAircraftId, setNextAircraftId] = useState("");
   const [nextPilotId, setNextPilotId] = useState("");
   const [dispositionOpen, setDispositionOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [dispositionCapacity, setDispositionCapacity] = useState(1);
   const [moveTargetId, setMoveTargetId] = useState("");
   const [moveReason, setMoveReason] = useState("");
@@ -1471,7 +1475,7 @@ function FlightLineView() {
   }
 
   return (
-    <Shell title="Flight Line">
+    <Shell className="flight-line-shell" title="Flight Line">
       <ConnectionNotice error={error} lastConfirmedAt={lastConfirmedAt} />
       <EmergencyNotice active={board?.event.emergencyMode ?? false} />
       <InterruptionNotice active={board?.event.operationalInterrupted ?? false} />
@@ -1499,7 +1503,69 @@ function FlightLineView() {
           </div>
         </details>
       ) : null}
-      <section className="flight-supervisor">
+      {board ? (
+        <FlightLineSupervisorConsole
+          action={
+            action
+              ? {
+                  label: action.label,
+                  disabled:
+                    action.command === "CALL_NEXT" &&
+                    (!nextAircraftId ||
+                      !nextPilotId ||
+                      board.event.emergencyMode ||
+                      board.event.status !== "ACTIVE" ||
+                      board.event.operationalInterrupted),
+                  run: () => void advance(),
+                }
+              : null
+          }
+          aircraft={operationalAircraft}
+          aircraftRotations={aircraftRotations ?? []}
+          board={board}
+          message={message}
+          nextPilotId={nextPilotId}
+          onAvailable={() => void setFlightLineAircraftState("AVAILABLE")}
+          onOpenDetails={() => setDetailsOpen(true)}
+          onOpenDisposition={() => setDispositionOpen(true)}
+          onPause={() => setAircraftPauseOpen(true)}
+          onPilotChange={setNextPilotId}
+          onRefuel={() => void setFlightLineAircraftState("REFUELING")}
+          onSelectAircraft={(aircraftId) => {
+            setSelectedAircraftId(aircraftId);
+            setSelectedId(null);
+            setDispositionOpen(false);
+            setDetailsOpen(false);
+          }}
+          onSelectRotation={(rotationId) => {
+            const rotation = aircraftRotations?.find((entry) => entry.id === rotationId);
+            setSelectedId(rotationId);
+            if (rotation) setDispositionCapacity(rotation.usableCapacity);
+            setMoveTargetId("");
+            setMoveReason("");
+          }}
+          onUnavailable={() => void setFlightLineAircraftState("INACTIVE")}
+          selectedAircraft={selectedAircraft}
+          selectedRotation={selected}
+        />
+      ) : null}
+      <section
+        className={`flight-supervisor legacy-flight-line-overlay ${
+          dispositionOpen ? "show-disposition" : "show-details"
+        }`}
+        hidden={!dispositionOpen && !detailsOpen}
+      >
+        <button
+          aria-label="Erweiterte Flight-Line-Details schließen"
+          className="legacy-overlay-close"
+          onClick={() => {
+            setDispositionOpen(false);
+            setDetailsOpen(false);
+          }}
+          type="button"
+        >
+          ×
+        </button>
         <nav className="aircraft-selector" aria-label="Flugzeug auswählen">
           <div className="aircraft-selector-heading">
             <strong>Flugzeuge</strong>

@@ -1,13 +1,24 @@
 import { describe, expect, it } from "vitest";
 import appSource from "./App.tsx?raw";
 import { expectedReviewAtFromPause } from "./flight-line-pause";
+import supervisorSource from "./flight-line-supervisor.tsx?raw";
 
 describe("Flight Line Supervisor", () => {
   it("keeps every aircraft visible and makes the aircraft the primary operational object", () => {
     expect(appSource).toContain("const operationalAircraft = board?.aircraft ?? []");
-    expect(appSource).toContain('className="flight-supervisor"');
-    expect(appSource).toContain("Ausgewähltes Flugzeug");
+    expect(appSource).toContain("<FlightLineSupervisorConsole");
+    expect(supervisorSource).toContain('className="flight-line-console"');
+    expect(supervisorSource).toContain('className="console-status-matrix"');
+    expect(supervisorSource).toContain("Nächste Gruppen");
+    expect(supervisorSource).toContain("Vorgeschlagene Zuordnung");
     expect(appSource).toContain("Wieder verfügbar");
+  });
+
+  it("uses real controls for search, resource filtering and alternate group selection", () => {
+    expect(supervisorSource).toContain('type="search"');
+    expect(supervisorSource).toContain("Alle Ressourcen");
+    expect(supervisorSource).toContain("onOpenDisposition");
+    expect(supervisorSource).toContain("onOpenDetails");
   });
 
   it("supports an optional pause estimate without automatic release", () => {
