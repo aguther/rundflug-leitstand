@@ -101,13 +101,16 @@ describe("V1 administration completion UI", () => {
   it("uses the approved compact list-and-editor administration as the default workspace", () => {
     expect(appSource).toContain('useState<AdminArea>("master-data")');
     expect(appSource).toContain('useState<MasterDataCategory>("resource-groups")');
-    expect(appSource).toContain('"master-data-active"');
+    expect(appSource).toContain("const [masterEditorOpen, setMasterEditorOpen] = useState(false);");
+    expect(appSource).toContain('masterEditorOpen ? "editor-open" : "editor-closed"');
+    expect(appSource).toContain("setMasterEditorOpen(false)");
+    expect(appSource).toContain("master-data-active ${masterEditorOpen");
     expect(appSource).toContain("Zusammenfassung (abgeleitet)");
     expect(stylesSource).toContain(".admin-workspace.master-data-active > .master-data-workspace");
     expect(stylesSource).toContain(".admin-workspace.master-data-active > .master-data-drawer");
-    expect(stylesSource).toContain(
-      "grid-template-columns: minmax(320px, 0.8fr) minmax(460px, 1.2fr)",
-    );
+    expect(stylesSource).toContain(".admin-workspace.master-data-active.editor-open");
+    expect(stylesSource).toContain("grid-template-columns: minmax(0, 1fr)");
+    expect(stylesSource).toContain("max-height: none");
   });
 
   it("keeps the manual board refresh touchable and exposes its loading state", () => {
