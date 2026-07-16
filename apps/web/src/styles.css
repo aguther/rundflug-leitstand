@@ -4551,3 +4551,662 @@ p {
     grid-template-columns: 1fr;
   }
 }
+
+/* Flight Line Supervisor – approved dense console concept (2026-07-16) */
+.flight-line-shell {
+  min-height: 100dvh;
+  color: #e7eaee;
+  background: #080a0c;
+  --console-bg: #080a0c;
+  --console-surface: #0d1013;
+  --console-surface-raised: #11161a;
+  --console-border: #292f34;
+  --console-border-soft: #1b2025;
+  --console-muted: #929aa3;
+  --console-blue: #2383f4;
+  --console-blue-soft: #10243a;
+  --console-green: #32c765;
+  --console-yellow: #f5b800;
+  --console-cyan: #26c8ef;
+  --console-red: #ff4b3e;
+}
+.flight-line-shell .flight-supervisor[hidden] {
+  display: none;
+}
+.flight-line-shell .legacy-flight-line-overlay:not([hidden]) {
+  position: fixed;
+  z-index: 80;
+  inset: 62px 0 0;
+  display: block;
+  padding: 18px;
+  overflow: auto;
+  color: #e7eaee;
+  background: rgb(8 10 12 / 96%);
+  backdrop-filter: blur(14px);
+}
+.legacy-flight-line-overlay > .aircraft-selector,
+.legacy-flight-line-overlay .queue-list {
+  display: none;
+}
+.legacy-flight-line-overlay .flight-workspace {
+  display: block;
+  max-width: 1100px;
+  margin: 34px auto 0;
+}
+.legacy-flight-line-overlay .rotation-detail {
+  min-height: auto;
+  border: 1px solid var(--console-border);
+  border-radius: 6px;
+  background: var(--console-surface);
+}
+.legacy-flight-line-overlay.show-disposition .rotation-detail {
+  display: none;
+}
+.legacy-flight-line-overlay.show-details .disposition-panel {
+  display: none;
+}
+.legacy-flight-line-overlay .disposition-panel {
+  position: relative;
+  inset: auto;
+  width: min(560px, 100%);
+  max-height: none;
+  margin: 34px auto 0;
+}
+.legacy-overlay-close {
+  position: fixed;
+  z-index: 2;
+  top: 78px;
+  right: 22px;
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--console-border);
+  border-radius: 5px;
+  color: #e7eaee;
+  background: #15191d;
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+.flight-line-shell > .app-header,
+.flight-line-shell > footer,
+.flight-line-shell > .operational-notice,
+.flight-line-shell > .emergency-control:not([open]) {
+  display: none;
+}
+.flight-line-shell > .connection-warning,
+.flight-line-shell > .emergency-notice,
+.flight-line-shell > .interruption-notice {
+  position: relative;
+  z-index: 10;
+  margin: 0;
+}
+.flight-line-console {
+  min-height: 100dvh;
+  display: grid;
+  grid-template-columns: 160px 310px minmax(0, 1fr);
+  grid-template-rows: 62px minmax(0, 1fr);
+  color: #e7eaee;
+  background:
+    radial-gradient(circle at 75% 10%, rgb(31 42 50 / 18%), transparent 32%), var(--console-bg);
+  font-family: Inter, "Segoe UI", Arial, sans-serif;
+}
+.flight-line-console-header {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 260px 150px 150px minmax(0, 1fr);
+  align-items: center;
+  min-width: 0;
+  border-bottom: 1px solid var(--console-border);
+  background: rgb(8 10 12 / 92%);
+}
+.flight-line-console-brand,
+.flight-line-console-header > time,
+.console-live-state,
+.console-header-context {
+  min-height: 62px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 18px;
+  border-right: 1px solid var(--console-border);
+}
+.flight-line-console-brand > span {
+  width: 48px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  border-radius: 50%;
+  background: #16466a;
+  font-size: 1.55rem;
+  transform: rotate(-10deg);
+}
+.flight-line-console-brand div,
+.flight-line-console-header time {
+  display: grid;
+}
+.flight-line-console-brand strong {
+  font-size: 1.15rem;
+}
+.flight-line-console small {
+  color: var(--console-muted);
+}
+.console-live-state {
+  color: #b7bdc4;
+  font-size: 0.83rem;
+}
+.console-live-state > span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--console-green);
+  box-shadow: 0 0 12px rgb(50 199 101 / 50%);
+}
+.flight-line-console-header > time strong {
+  font-size: 0.92rem;
+}
+.flight-line-console-header > time small {
+  font-size: 0.75rem;
+}
+.console-header-context {
+  justify-content: flex-end;
+  border-right: 0;
+  color: #aeb5bd;
+  font-size: 0.78rem;
+}
+.console-header-context > * {
+  padding-inline: 12px;
+  border-right: 1px solid var(--console-border);
+}
+.console-header-context > :last-child {
+  border-right: 0;
+}
+.console-header-context > strong {
+  color: var(--console-yellow);
+}
+.console-online {
+  color: var(--console-green);
+}
+.flight-line-console-nav {
+  grid-column: 1;
+  grid-row: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 10px;
+  border-right: 1px solid var(--console-border);
+  background: #090b0d;
+}
+.flight-line-console-nav span,
+.flight-line-console-nav strong {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  border-radius: 5px;
+  color: #b8bec5;
+  font-size: 0.83rem;
+  font-weight: 500;
+}
+.flight-line-console-nav .active {
+  color: #eaf3ff;
+  border: 1px solid #18467c;
+  background: #122b49;
+  font-weight: 750;
+}
+.console-aircraft-list {
+  grid-column: 2;
+  grid-row: 2;
+  min-width: 0;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  padding: 12px;
+  border-right: 1px solid var(--console-border);
+  background: #0b0e10;
+}
+.console-panel-title {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.console-panel-title > div,
+.console-panel-title:has(> strong) {
+  align-content: center;
+}
+.console-panel-title strong,
+.console-panel-title small {
+  display: block;
+}
+.console-aircraft-search {
+  width: 118px;
+}
+.console-aircraft-search input,
+.console-resource-filter select {
+  width: 100%;
+  min-height: 32px;
+  padding: 6px 10px;
+  color: #dce1e6;
+  border: 1px solid var(--console-border);
+  border-radius: 4px;
+  background: #111519;
+  font: inherit;
+}
+.console-aircraft-search input::placeholder {
+  color: #727b84;
+}
+.console-resource-filter {
+  width: 152px;
+}
+.console-aircraft-table-head,
+.console-aircraft-rows > button {
+  display: grid;
+  grid-template-columns: 1.3fr 0.42fr 0.9fr 0.78fr;
+  align-items: center;
+}
+.console-aircraft-table-head {
+  min-height: 32px;
+  padding: 0 9px;
+  color: #9ba3ab;
+  border: 1px solid var(--console-border);
+  background: #0f1215;
+  font-size: 0.66rem;
+}
+.console-aircraft-rows {
+  overflow: auto;
+  border-inline: 1px solid var(--console-border);
+}
+.console-aircraft-rows > button {
+  width: 100%;
+  min-height: 60px;
+  padding: 7px 9px;
+  border: 0;
+  border-bottom: 1px solid var(--console-border);
+  border-radius: 0;
+  color: #d8dde2;
+  background: #0d1013;
+  text-align: left;
+  cursor: pointer;
+}
+.console-aircraft-rows > button:hover,
+.console-aircraft-rows > button.selected {
+  background: #122438;
+}
+.console-aircraft-rows > button.selected {
+  box-shadow:
+    inset 2px 0 var(--console-blue),
+    inset 0 0 0 1px var(--console-blue);
+}
+.console-aircraft-rows > button > span:first-child {
+  display: grid;
+  gap: 2px;
+}
+.console-aircraft-rows strong {
+  font-size: 0.88rem;
+}
+.console-aircraft-rows small,
+.console-aircraft-rows > button > span {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 0.66rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.console-status {
+  width: fit-content;
+  max-width: 100%;
+  padding: 3px 6px;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  color: var(--console-green);
+  font-size: 0.66rem;
+  line-height: 1.15;
+}
+.console-status.status-boarding,
+.console-status.status-paused {
+  color: var(--console-yellow);
+}
+.console-status.status-off-block,
+.console-status.status-on-block {
+  color: #4a9cff;
+}
+.console-status.status-refueling {
+  color: var(--console-cyan);
+}
+.console-status.status-unavailable {
+  color: var(--console-red);
+}
+.console-list-count {
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+  padding: 0 9px;
+  border: 1px solid var(--console-border);
+  border-top: 0;
+}
+.flight-line-console-main {
+  grid-column: 3;
+  grid-row: 2;
+  min-width: 0;
+  padding: 12px;
+  overflow: auto;
+}
+.console-toolbar {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.console-toolbar > div:first-child {
+  display: grid;
+}
+.console-toolbar > div:last-child {
+  display: flex;
+  gap: 8px;
+}
+.console-toolbar button,
+.console-toolbar summary,
+.matrix-details,
+.matrix-recommendation button {
+  min-height: 34px;
+  padding: 7px 12px;
+  border: 1px solid var(--console-border);
+  border-radius: 4px;
+  color: #dce1e6;
+  background: #15191d;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+.console-toolbar details {
+  position: relative;
+}
+.console-toolbar details > summary {
+  color: #fff;
+  border-color: #1c6bc6;
+  background: #1267cc;
+  list-style: none;
+}
+.console-toolbar details > div {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 180px;
+  display: grid;
+  gap: 4px;
+  padding: 6px;
+  border: 1px solid var(--console-border);
+  border-radius: 5px;
+  background: #111519;
+  box-shadow: 0 16px 36px rgb(0 0 0 / 55%);
+}
+.console-status-matrix,
+.console-next-groups,
+.console-aircraft-detail {
+  overflow: hidden;
+  border: 1px solid var(--console-border);
+  border-radius: 5px;
+  background: var(--console-surface);
+}
+.console-matrix-head,
+.console-matrix-row {
+  display: grid;
+  grid-template-columns: minmax(100px, 0.9fr) minmax(70px, 0.65fr) minmax(145px, 1.25fr) repeat(
+      8,
+      minmax(50px, 0.65fr)
+    ) minmax(76px, 0.7fr);
+  align-items: center;
+}
+.console-matrix-head {
+  min-height: 34px;
+  padding: 0 10px;
+  color: #a8afb7;
+  border-bottom: 1px solid var(--console-border);
+  background: #0e1114;
+  font-size: 0.62rem;
+  text-align: center;
+}
+.console-matrix-head > :nth-child(-n + 3) {
+  text-align: left;
+}
+.console-matrix-row {
+  position: relative;
+  min-height: 54px;
+  padding: 5px 10px;
+  border-bottom: 1px solid var(--console-border-soft);
+}
+.console-matrix-row.selected {
+  min-height: 118px;
+  align-content: start;
+  border: 1px solid var(--console-blue);
+  background: #0d151e;
+  box-shadow: inset 2px 0 var(--console-blue);
+}
+.matrix-aircraft {
+  display: grid;
+  gap: 2px;
+  padding: 0;
+  border: 0;
+  color: #e4e8ec;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+.matrix-aircraft strong {
+  font-size: 0.92rem;
+}
+.matrix-aircraft small,
+.matrix-assignment small {
+  display: block;
+  font-size: 0.64rem;
+}
+.matrix-assignment {
+  min-width: 0;
+  padding-inline: 8px;
+  overflow: hidden;
+  font-size: 0.68rem;
+  text-overflow: ellipsis;
+}
+.matrix-stage {
+  position: relative;
+  width: 15px;
+  height: 15px;
+  justify-self: center;
+  border: 1px solid #69717a;
+  border-radius: 50%;
+  background: #0b0e10;
+}
+.matrix-stage::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 100%;
+  width: max(20px, calc((100vw - 700px) / 80));
+  border-top: 1px dashed #40464c;
+}
+.matrix-stage.active {
+  border: 3px solid var(--console-blue);
+  box-shadow: 0 0 0 2px rgb(35 131 244 / 25%);
+}
+.matrix-stage.stage-ready {
+  border-color: var(--console-green);
+}
+.matrix-stage.stage-boarding,
+.matrix-stage.stage-paused {
+  border-color: var(--console-yellow);
+}
+.matrix-stage.stage-refueling {
+  border-color: var(--console-cyan);
+}
+.matrix-stage.stage-unavailable {
+  border-color: var(--console-red);
+}
+.matrix-details {
+  justify-self: end;
+}
+.matrix-recommendation {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 1.2fr auto auto;
+  align-items: center;
+  gap: 14px;
+  min-height: 56px;
+  margin-top: 5px;
+  padding: 8px 12px;
+  border: 1px solid var(--console-border);
+  background: #0f1317;
+}
+.matrix-recommendation > div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+.matrix-recommendation small,
+.matrix-recommendation span {
+  color: #9098a1;
+  font-size: 0.66rem;
+}
+.matrix-recommendation strong {
+  font-size: 0.82rem;
+}
+.matrix-recommendation .console-confirm {
+  color: #fff;
+  border-color: #1d75d7;
+  background: #1976df;
+}
+.console-bottom-grid {
+  display: grid;
+  grid-template-columns: minmax(360px, 0.85fr) minmax(500px, 1.45fr);
+  gap: 10px;
+  margin-top: 10px;
+}
+.console-next-groups,
+.console-aircraft-detail {
+  min-height: 234px;
+  padding: 10px;
+}
+.console-next-groups .console-panel-title {
+  justify-content: flex-start;
+}
+.console-next-groups .console-panel-title small {
+  padding: 3px 7px;
+  border-radius: 3px;
+  background: #171c20;
+}
+.next-group-head,
+.console-next-groups > button {
+  display: grid;
+  grid-template-columns: 0.72fr 0.52fr 0.95fr 1.12fr 0.9fr;
+  align-items: center;
+}
+.next-group-head {
+  min-height: 30px;
+  padding: 0 10px;
+  color: #9da5ad;
+  border-bottom: 1px solid var(--console-border);
+  font-size: 0.64rem;
+}
+.console-next-groups > button {
+  width: 100%;
+  min-height: 38px;
+  padding: 0 10px;
+  border: 0;
+  border-bottom: 1px solid var(--console-border);
+  border-radius: 0;
+  color: #cdd2d7;
+  background: #0e1114;
+  text-align: left;
+  font-size: 0.7rem;
+}
+.console-next-groups > button.selected {
+  border: 1px solid var(--console-blue);
+  background: #10253e;
+}
+.console-next-groups > p {
+  margin: 18px 10px;
+  color: var(--console-muted);
+}
+.console-next-groups > small {
+  display: block;
+  margin-top: 10px;
+}
+.console-aircraft-detail > nav {
+  display: flex;
+  gap: 24px;
+  min-height: 34px;
+  align-items: center;
+  border-bottom: 1px solid var(--console-border);
+  color: #929aa3;
+  font-size: 0.7rem;
+}
+.console-aircraft-detail > nav strong {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  color: var(--console-blue);
+  border-bottom: 2px solid var(--console-blue);
+}
+.console-detail-content {
+  display: grid;
+  grid-template-columns: 1fr 0.8fr 1fr;
+  gap: 20px;
+  padding: 12px 4px 4px;
+}
+.console-detail-content dl {
+  margin: 0;
+}
+.console-detail-content dl div {
+  display: grid;
+  grid-template-columns: 115px 1fr;
+  gap: 8px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--console-border-soft);
+  font-size: 0.7rem;
+}
+.console-detail-content dt {
+  color: #929aa3;
+}
+.console-detail-content dd {
+  margin: 0;
+}
+.console-detail-content select {
+  min-height: 30px;
+  width: 100%;
+  color: #dfe4e9;
+  border: 1px solid var(--console-border);
+  background: #12161a;
+}
+.console-info-note {
+  display: grid;
+  align-content: center;
+  gap: 8px;
+  padding: 14px;
+  color: #9eb9d9;
+  border: 1px solid #1b5b9e;
+  border-radius: 4px;
+  background: #0c1824;
+  font-size: 0.7rem;
+}
+
+@media (max-width: 1250px) {
+  .flight-line-console {
+    grid-template-columns: 76px 270px minmax(0, 1fr);
+  }
+  .flight-line-console-nav span,
+  .flight-line-console-nav strong {
+    justify-content: center;
+    padding-inline: 4px;
+    font-size: 0.68rem;
+  }
+  .console-status-matrix {
+    overflow-x: auto;
+  }
+  .console-matrix-head,
+  .console-matrix-row {
+    min-width: 1000px;
+  }
+  .console-bottom-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,9 +1,20 @@
 # Gesamtkonzept V1: Administration, Flight Line und öffentliche Anzeigen
 
-- Status: Zur fachlichen Freigabe
+- Status: Freigegeben
 - Datum: 2026-07-16
-- Visuelle Referenz Terminal: `operations-v2-terminal-fids-concept.png`
-- Visuelle Referenz mobile Pause: `operations-v2-flight-line-assist-pause-concept.png`
+- Verbindliche visuelle Referenz Administration: `operations-v2-admin-approved.png`
+- Verbindliche visuelle Referenz Flight Line Supervisor:
+  `operations-v2-flight-line-supervisor-approved.png`
+- Verbindliche visuelle Referenz Flight Line Assist Tablet:
+  `operations-v2-flight-line-assist-tablet-approved.png`
+- Verbindliche visuelle Referenz Flight Line Assist Telefon und Pause:
+  `operations-v2-flight-line-assist-phone-approved.png`
+- Verbindliche visuelle Referenz FIDS Standard: `operations-v2-fids-standard-approved.png`
+- Verbindliche visuelle Referenz FIDS Terminal: `operations-v2-fids-terminal-approved.png`
+- Die älteren Dateien `v1-simplified-operations-approved.png`,
+  `operations-v2-terminal-fids-concept.png` und
+  `operations-v2-flight-line-assist-pause-concept.png` sind historische Zwischenstände und dürfen
+  nicht als visuelle Abnahmevorlage verwendet werden.
 - Ersetzt beziehungsweise konkretisiert: `v1-simplified-operations.md` für die beschriebenen
   Oberflächen
 - Betroffene Anforderungen: F-RES-060, F-SLT-020, F-SLT-030, F-SLT-070, F-BRD-010,
@@ -21,6 +32,10 @@ Der Leitstand besitzt nicht eine universelle Oberfläche, sondern vier klar getr
 
 Die Arbeitsflächen teilen Daten, Design-Tokens und Zustände, werden aber nie gleichzeitig als
 Dashboard nebeneinander dargestellt. Jede Route ist für genau eine Rolle und Blickdistanz optimiert.
+
+Die sechs oben genannten freigegebenen PNG-Dateien sind die visuelle Quelle der Wahrheit. Bei einer
+Abweichung zwischen historischen Entwürfen und diesen Dateien gelten ausschließlich die neuen
+freigegebenen Referenzen.
 
 ## 2. Gemeinsames visuelles System
 
