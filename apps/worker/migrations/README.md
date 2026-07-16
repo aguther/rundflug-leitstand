@@ -158,3 +158,12 @@ verhindert, dass zwei Assist-Geräte unbemerkt dasselbe Flugzeug betreuen, speic
 noch andere personenbezogene Daten und besitzt keine Freigabewirkung. Ein Rollback kann Tabelle und
 Index entfernen; vor Anwendung wird dennoch eine portable D1-Sicherung empfohlen. Beim Werksreset
 und beim Löschen der Veranstaltung werden alle Reservierungen entfernt.
+
+## 0034 – Automatischer Voraufruf
+
+Ergänzt Veranstaltung und Ressourcengruppen um verständliche Voraufruf-Parameter sowie
+Fluggruppen um den getrennten, technischen Zustand `precalled_at`. Der Voraufruf bindet kein
+Flugzeug und ersetzt weder `NEXT` noch eine menschliche operative Bestätigung. Jeder automatische
+Voraufruf erzeugt einen append-only Audit-Eintrag mit dem technischen Auslöser
+`AUTOMATIC_PRECALL`. Vor Anwendung ist eine portable D1-Sicherung erforderlich; ein Rollback
+erfolgt aus dieser Sicherung beziehungsweise mit D1 Time Travel.

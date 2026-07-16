@@ -33,6 +33,11 @@ export interface StoredEventRow {
   no_show_after_minutes?: number;
   max_ticket_deferrals?: number;
   notification_lead_minutes?: number;
+  automatic_precall_enabled?: number;
+  precall_lead_minutes?: number;
+  max_gate_wait_minutes?: number;
+  precall_min_quality?: "STABLE" | "CHANGING";
+  precall_gate_cooldown_minutes?: number;
   child_reference_weight_kg?: number;
   normal_reference_weight_kg?: number;
   heavy_reference_weight_kg?: number;

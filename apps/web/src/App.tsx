@@ -2807,6 +2807,13 @@ function AdminView() {
   const [noShowAfterMinutes, setNoShowAfterMinutes] = useState(10);
   const [maxTicketDeferrals, setMaxTicketDeferrals] = useState(2);
   const [notificationLeadMinutes, setNotificationLeadMinutes] = useState(15);
+  const [automaticPrecallEnabled, setAutomaticPrecallEnabled] = useState(true);
+  const [precallLeadMinutes, setPrecallLeadMinutes] = useState(15);
+  const [maximumGateWaitMinutes, setMaximumGateWaitMinutes] = useState(20);
+  const [precallMinimumQuality, setPrecallMinimumQuality] = useState<"STABLE" | "CHANGING">(
+    "CHANGING",
+  );
+  const [precallGateCooldownMinutes, setPrecallGateCooldownMinutes] = useState(2);
   const [childReferenceWeightKg, setChildReferenceWeightKg] = useState(35);
   const [normalReferenceWeightKg, setNormalReferenceWeightKg] = useState(80);
   const [heavyReferenceWeightKg, setHeavyReferenceWeightKg] = useState(110);
@@ -2872,6 +2879,7 @@ function AdminView() {
   const [resourceName, setResourceName] = useState("");
   const [resourceGateId, setResourceGateId] = useState("");
   const [resourcePlannedMinutes, setResourcePlannedMinutes] = useState(30);
+  const [resourceAutomaticPrecall, setResourceAutomaticPrecall] = useState(true);
   const [resourceAircraftIds, setResourceAircraftIds] = useState<string[]>([]);
   const [aircraftEditorId, setAircraftEditorId] = useState("new");
   const [aircraftRegistration, setAircraftRegistration] = useState("");
@@ -2917,6 +2925,7 @@ function AdminView() {
     setResourceName(entry?.name ?? "");
     setResourceGateId(entry?.gateId ?? board.gates.find((gate) => gate.active)?.id ?? "");
     setResourcePlannedMinutes(entry?.plannedRotationMinutes ?? 30);
+    setResourceAutomaticPrecall(entry?.automaticPrecallEnabled ?? true);
     setResourceAircraftIds(entry?.activeAircraftIds ?? []);
   }, [adminArea, board]);
 
@@ -3070,6 +3079,11 @@ function AdminView() {
     setNoShowAfterMinutes(board.event.noShowAfterMinutes);
     setMaxTicketDeferrals(board.event.maxTicketDeferrals);
     setNotificationLeadMinutes(board.event.notificationLeadMinutes);
+    setAutomaticPrecallEnabled(board.event.automaticPrecallEnabled);
+    setPrecallLeadMinutes(board.event.precallLeadMinutes);
+    setMaximumGateWaitMinutes(board.event.maximumGateWaitMinutes);
+    setPrecallMinimumQuality(board.event.precallMinimumQuality);
+    setPrecallGateCooldownMinutes(board.event.precallGateCooldownMinutes);
     setChildReferenceWeightKg(board.event.referenceWeightsKg.child);
     setNormalReferenceWeightKg(board.event.referenceWeightsKg.normal);
     setHeavyReferenceWeightKg(board.event.referenceWeightsKg.heavy);
@@ -3301,6 +3315,11 @@ function AdminView() {
             noShowAfterMinutes,
             maxTicketDeferrals,
             notificationLeadMinutes,
+            automaticPrecallEnabled,
+            precallLeadMinutes,
+            maximumGateWaitMinutes,
+            precallMinimumQuality,
+            precallGateCooldownMinutes,
             childReferenceWeightKg,
             normalReferenceWeightKg,
             heavyReferenceWeightKg,
@@ -3499,6 +3518,7 @@ function AdminView() {
     setResourceName(entry?.name ?? "");
     setResourceGateId(entry?.gateId ?? board?.gates.find((gate) => gate.active)?.id ?? "");
     setResourcePlannedMinutes(entry?.plannedRotationMinutes ?? 30);
+    setResourceAutomaticPrecall(entry?.automaticPrecallEnabled ?? true);
     setResourceAircraftIds(entry?.activeAircraftIds ?? []);
   }
 
@@ -3542,6 +3562,7 @@ function AdminView() {
             referenceCapacity: Math.max(1, ...selectedSeats),
             plannedRotationMinutes: resourcePlannedMinutes,
             compatibleAircraftTypes: [],
+            automaticPrecallEnabled: resourceAutomaticPrecall,
             aircraftIds: resourceAircraftIds,
             reason: MASTER_DATA_AUDIT_REASON,
             adminPin: adminPinRef.current,
@@ -4866,6 +4887,71 @@ function AdminView() {
                   onChange={(event) => setNotificationLeadMinutes(Number(event.target.value))}
                 />
               </label>
+              <label className="admin-check-row">
+                <input
+                  checked={automaticPrecallEnabled}
+                  onChange={(event) => setAutomaticPrecallEnabled(event.target.checked)}
+                  type="checkbox"
+                />
+                <FieldLabel
+                  label="Gruppen automatisch zum Gate voraufrufen"
+                  help="Ruft nur die nächste passende Gruppe anhand der Prognose zum Gate. Das bindet kein Flugzeug und ersetzt nicht die Bestätigung durch die Flight Line."
+                />
+              </label>
+              <label>
+                <FieldLabel
+                  label="Vorlauf am Gate (Min.)"
+                  help="Frühestens innerhalb dieses Zeitraums darf die nächste passende Gruppe automatisch GO TO GATE erhalten."
+                />
+                <input
+                  max="240"
+                  min="1"
+                  onChange={(event) => setPrecallLeadMinutes(Number(event.target.value))}
+                  type="number"
+                  value={precallLeadMinutes}
+                />
+              </label>
+              <label>
+                <FieldLabel
+                  label="Maximale erwartete Gate-Wartezeit (Min.)"
+                  help="Ist das obere Ende der Prognose größer, bleibt die Gruppe auf Warten und wird nicht vorschnell aufgerufen."
+                />
+                <input
+                  max="120"
+                  min="1"
+                  onChange={(event) => setMaximumGateWaitMinutes(Number(event.target.value))}
+                  type="number"
+                  value={maximumGateWaitMinutes}
+                />
+              </label>
+              <label>
+                <FieldLabel
+                  label="Erforderliche Prognosequalität"
+                  help="Stabil ist zurückhaltender. Veränderlich erlaubt Voraufrufe auch mit noch lernender, aber nicht unsicherer Prognose."
+                />
+                <select
+                  onChange={(event) =>
+                    setPrecallMinimumQuality(event.target.value as "STABLE" | "CHANGING")
+                  }
+                  value={precallMinimumQuality}
+                >
+                  <option value="STABLE">Nur stabil</option>
+                  <option value="CHANGING">Stabil oder veränderlich</option>
+                </select>
+              </label>
+              <label>
+                <FieldLabel
+                  label="Ruhezeit je Gate (Min.)"
+                  help="Verhindert, dass unmittelbar nacheinander mehrere Gruppen zum selben Gate aufgerufen werden."
+                />
+                <input
+                  max="60"
+                  min="0"
+                  onChange={(event) => setPrecallGateCooldownMinutes(Number(event.target.value))}
+                  type="number"
+                  value={precallGateCooldownMinutes}
+                />
+              </label>
               <label>
                 <FieldLabel
                   label="Referenzgewicht Kind (kg)"
@@ -5913,6 +5999,17 @@ function AdminView() {
                     max="600"
                     value={resourcePlannedMinutes}
                     onChange={(event) => setResourcePlannedMinutes(Number(event.target.value))}
+                  />
+                </label>
+                <label className="admin-check-row">
+                  <input
+                    checked={resourceAutomaticPrecall}
+                    onChange={(event) => setResourceAutomaticPrecall(event.target.checked)}
+                    type="checkbox"
+                  />
+                  <FieldLabel
+                    label="Automatischer Voraufruf für diese Gruppe"
+                    help="Kann für einzelne Ressourcengruppen abgeschaltet werden. NEXT und Flugzeugbindung bleiben immer manuell bestätigt."
                   />
                 </label>
                 <section className="resource-aircraft-selection">

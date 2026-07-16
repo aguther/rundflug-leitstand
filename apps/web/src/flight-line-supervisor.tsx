@@ -303,6 +303,9 @@ export function FlightLineSupervisorConsole({
                         {rotation.communicationLabel} · {rotation.ticketCount} Tickets
                       </strong>
                       <small>{rotation.gateLabel}</small>
+                      {rotation.precalledAt ? (
+                        <small>GO TO GATE · Gruppe ist vorgerufen</small>
+                      ) : null}
                     </>
                   ) : (
                     "–"
