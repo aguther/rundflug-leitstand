@@ -131,7 +131,6 @@ const masterDataItems: Array<{ id: MasterDataCategory; label: string }> = [
   { id: "gates", label: "Gates" },
   { id: "resource-groups", label: "Ressourcengruppen" },
   { id: "aircraft", label: "Flugzeuge" },
-  { id: "assignments", label: "Zuordnungen" },
   { id: "pilots", label: "Piloten" },
   { id: "products", label: "Produkte" },
 ];

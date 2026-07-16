@@ -3512,6 +3512,38 @@ p {
 .master-data-editor fieldset > .gate-display-filter {
   grid-column: 1 / -1;
 }
+.form-introduction,
+.resource-aircraft-selection {
+  grid-column: 1 / -1;
+}
+.form-introduction {
+  margin: 0;
+  color: var(--ui-muted);
+  line-height: 1.5;
+}
+.resource-aircraft-selection {
+  display: grid;
+  gap: 9px;
+  padding: 14px;
+  border: 1px solid var(--ui-border);
+  border-radius: 7px;
+  background: var(--ui-surface-subtle);
+}
+.resource-aircraft-selection h3,
+.resource-aircraft-selection p {
+  margin: 0;
+}
+.resource-aircraft-selection p {
+  color: var(--ui-muted);
+  font-size: 0.9rem;
+}
+.resource-aircraft-selection .checkbox-label {
+  min-height: 44px;
+  padding: 9px 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: 5px;
+  background: var(--ui-control);
+}
 .gate-display-filter h3,
 .gate-display-filter p {
   margin: 0;

@@ -2561,7 +2561,6 @@ function AdminView() {
   const [productResourceGroupId, setProductResourceGroupId] = useState("");
   const [productGateId, setProductGateId] = useState("");
   const [productPriceInput, setProductPriceInput] = useState("0,00 €");
-  const [productReferenceCapacity, setProductReferenceCapacity] = useState(1);
   const [productReferenceDuration, setProductReferenceDuration] = useState(20);
   const [productChildCompanion, setProductChildCompanion] = useState(false);
   const [productWeightClasses, setProductWeightClasses] = useState<string[]>(["NOT_CAPTURED"]);
@@ -2583,9 +2582,8 @@ function AdminView() {
   const [resourceEditorId, setResourceEditorId] = useState("new");
   const [resourceName, setResourceName] = useState("");
   const [resourceGateId, setResourceGateId] = useState("");
-  const [resourceReferenceCapacity, setResourceReferenceCapacity] = useState(1);
   const [resourcePlannedMinutes, setResourcePlannedMinutes] = useState(30);
-  const [resourceCompatibleTypes, setResourceCompatibleTypes] = useState("");
+  const [resourceAircraftIds, setResourceAircraftIds] = useState<string[]>([]);
   const [aircraftEditorId, setAircraftEditorId] = useState("new");
   const [aircraftRegistration, setAircraftRegistration] = useState("");
   const [aircraftType, setAircraftType] = useState("");
@@ -3012,7 +3010,6 @@ function AdminView() {
     setProductResourceGroupId(entry?.resourceGroupId ?? resourceGroups[0]?.id ?? "");
     setProductGateId(entry?.gateId ?? board?.gates.find((gate) => gate.active)?.id ?? "");
     setProductPriceInput(formatEuroInput(entry?.priceCents ?? 0));
-    setProductReferenceCapacity(entry?.referenceCapacity ?? 1);
     setProductReferenceDuration(entry?.referenceDurationMinutes ?? 20);
     setProductChildCompanion(entry?.childCompanionRequired ?? false);
     setProductWeightClasses(entry?.weightClasses ?? ["NOT_CAPTURED"]);
@@ -3141,7 +3138,9 @@ function AdminView() {
             code: productCode.trim().toUpperCase(),
             publicDescription: productDescription.trim(),
             priceCents: productPriceCents,
-            referenceCapacity: productReferenceCapacity,
+            referenceCapacity:
+              resourceGroups.find((group) => group.id === productResourceGroupId)
+                ?.referenceCapacity ?? 1,
             referenceDurationMinutes: productReferenceDuration,
             childCompanionRequired: productChildCompanion,
             weightClasses: productWeightClasses as Array<
@@ -3174,9 +3173,8 @@ function AdminView() {
     const entry = resourceGroups.find((group) => group.id === id);
     setResourceName(entry?.name ?? "");
     setResourceGateId(entry?.gateId ?? board?.gates.find((gate) => gate.active)?.id ?? "");
-    setResourceReferenceCapacity(entry?.referenceCapacity ?? 1);
     setResourcePlannedMinutes(entry?.plannedRotationMinutes ?? 30);
-    setResourceCompatibleTypes(entry?.compatibleAircraftTypes.join(", ") ?? "");
+    setResourceAircraftIds(entry?.activeAircraftIds ?? []);
   }
 
   function selectAircraftForEditing(id: string) {
@@ -3199,6 +3197,11 @@ function AdminView() {
     )
       return;
     try {
+      const resourceGroupId = resourceEditorId === "new" ? crypto.randomUUID() : resourceEditorId;
+      const selectedSeats =
+        board.aircraft
+          .filter((aircraft) => resourceAircraftIds.includes(aircraft.id))
+          .map((aircraft) => aircraft.passengerSeats) ?? [];
       await sendCommand(
         {
           commandId: crypto.randomUUID(),
@@ -3208,22 +3211,20 @@ function AdminView() {
           issuedAt: new Date().toISOString(),
           type: "UPSERT_RESOURCE_GROUP",
           payload: {
-            resourceGroupId: resourceEditorId === "new" ? crypto.randomUUID() : resourceEditorId,
+            resourceGroupId,
             name: resourceName.trim(),
             gateId: resourceGateId,
-            referenceCapacity: resourceReferenceCapacity,
+            referenceCapacity: Math.max(1, ...selectedSeats),
             plannedRotationMinutes: resourcePlannedMinutes,
-            compatibleAircraftTypes: resourceCompatibleTypes
-              .split(",")
-              .map((entry) => entry.trim())
-              .filter(Boolean),
+            compatibleAircraftTypes: [],
+            aircraftIds: resourceAircraftIds,
             reason: MASTER_DATA_AUDIT_REASON,
             adminPin: adminPinRef.current,
           },
         },
         deviceTokenFor(ADMIN_DEVICE_ID),
       );
-      setMessage("Ressourcengruppe wurde protokolliert gespeichert.");
+      setMessage("Ressourcengruppe und zugeordnete Flugzeuge wurden protokolliert gespeichert.");
       if (!adminModeUnlocked) setAdminPin("");
       selectResourceForEditing("new");
       setMasterEditorOpen(false);
@@ -3865,27 +3866,21 @@ function AdminView() {
       category: "gates",
     },
     {
-      id: "resource-groups",
-      label: "Ressourcengruppen",
-      complete: Boolean(board?.resourceGroups.length),
-      area: "master-data",
-      category: "resource-groups",
-    },
-    {
       id: "aircraft",
       label: "Flugzeuge",
       complete: Boolean(board?.aircraft.length),
       area: "master-data",
-      category: "assignments",
+      category: "aircraft",
     },
     {
-      id: "assignments",
-      label: "Zuordnungen",
+      id: "resource-groups",
+      label: "Ressourcengruppen",
       complete: Boolean(
-        board?.aircraft.length && board.aircraft.every((aircraft) => aircraft.resourceGroupId),
+        board?.resourceGroups.length &&
+          board.resourceGroups.every((group) => group.activeAircraftIds.length > 0),
       ),
       area: "master-data",
-      category: "aircraft",
+      category: "resource-groups",
     },
     {
       id: "pilots",
@@ -4698,8 +4693,6 @@ function AdminView() {
                   <thead>
                     <tr>
                       <th>Bezeichnung</th>
-                      <th>Art</th>
-                      <th>Sortierung</th>
                       <th>Status</th>
                       <th>Aktionen</th>
                     </tr>
@@ -4717,8 +4710,6 @@ function AdminView() {
                         tabIndex={0}
                       >
                         <td>{gate.label}</td>
-                        <td>{gate.gateType}</td>
-                        <td>{gate.sortOrder}</td>
                         <td>
                           <span className={`status-text ${gate.active ? "active" : "inactive"}`}>
                             {gate.active ? "Aktiv" : "Inaktiv"}
@@ -5088,38 +5079,17 @@ function AdminView() {
             <div className="master-data-columns">
               <fieldset hidden={masterDataCategory !== "gates"}>
                 <legend>Gate</legend>
+                <p className="form-introduction">
+                  Ein Gate ist der sichtbare Treff- oder Ausgabepunkt einer Ressourcengruppe. Für
+                  den normalen Betrieb genügt eine Bezeichnung; technische Gate-Arten sind nicht
+                  erforderlich.
+                </p>
                 <label>
                   <FieldLabel
                     label="Bezeichnung"
                     help="Kurzer, vor Ort eindeutig sichtbarer Name, zum Beispiel Eingang Halle oder Flight Line Nord."
                   />
                   <input value={gateLabel} onChange={(event) => setGateLabel(event.target.value)} />
-                </label>
-                <label>
-                  <FieldLabel
-                    label="Art"
-                    help="Flight Line steuert den operativen Ablauf, Boarding kennzeichnet einen Sammelpunkt und Nur Anzeige dient ausschließlich der Information."
-                  />
-                  <select
-                    value={gateType}
-                    onChange={(event) => setGateType(event.target.value as typeof gateType)}
-                  >
-                    <option value="FLIGHT_LINE">Flight Line</option>
-                    <option value="BOARDING">Boarding</option>
-                    <option value="DISPLAY_ONLY">Nur Anzeige</option>
-                  </select>
-                </label>
-                <label>
-                  <FieldLabel
-                    label="Position"
-                    help="Kleinere Zahlen erscheinen in Auswahllisten und Anzeigen weiter oben. Abstände wie 10, 20 und 30 erleichtern spätere Ergänzungen."
-                  />
-                  <input
-                    type="number"
-                    min="0"
-                    value={gateSortOrder}
-                    onChange={(event) => setGateSortOrder(Number(event.target.value))}
-                  />
                 </label>
                 <div className="gate-active-field">
                   <FieldLabel
@@ -5368,21 +5338,6 @@ function AdminView() {
                     </label>
                     <label>
                       <FieldLabel
-                        label="Referenzplätze"
-                        help="Ausgangswert für die Gruppenbildung; die konkrete Flugzeugkapazität bleibt maßgeblich."
-                      />
-                      <input
-                        type="number"
-                        min="1"
-                        max="100"
-                        value={productReferenceCapacity}
-                        onChange={(event) =>
-                          setProductReferenceCapacity(Number(event.target.value))
-                        }
-                      />
-                    </label>
-                    <label>
-                      <FieldLabel
                         label="Referenzdauer"
                         help="Planwert für den Kaltstart der Prognose, keine zugesagte Flugzeit."
                       />
@@ -5596,19 +5551,6 @@ function AdminView() {
                 </label>
                 <label>
                   <FieldLabel
-                    label="Referenzkapazität"
-                    help="Ausgangswert für Planung und Gruppierung; die konkrete Flugzeugkapazität bleibt maßgeblich."
-                  />
-                  <input
-                    type="number"
-                    min="1"
-                    max="100"
-                    value={resourceReferenceCapacity}
-                    onChange={(event) => setResourceReferenceCapacity(Number(event.target.value))}
-                  />
-                </label>
-                <label>
-                  <FieldLabel
                     label="Plan-Umlaufzeit (Min.)"
                     help="Initialer Zeitwert eines vollständigen Umlaufs für die Prognose."
                   />
@@ -5620,17 +5562,41 @@ function AdminView() {
                     onChange={(event) => setResourcePlannedMinutes(Number(event.target.value))}
                   />
                 </label>
-                <label>
-                  <FieldLabel
-                    label="Kompatible Typen"
-                    help="Optional zulässige Flugzeugtypen, durch Kommas getrennt. Leer bedeutet keine Typbeschränkung."
-                  />
-                  <input
-                    value={resourceCompatibleTypes}
-                    onChange={(event) => setResourceCompatibleTypes(event.target.value)}
-                    placeholder="leer = alle Typen"
-                  />
-                </label>
+                <section className="resource-aircraft-selection">
+                  <h3>Flugzeuge dieser Ressourcengruppe</h3>
+                  <p>
+                    Kapazität und passende Gruppengröße werden automatisch aus diesen Flugzeugen
+                    ermittelt.
+                  </p>
+                  {board?.aircraft.map((aircraft) => (
+                    <label className="checkbox-label" key={aircraft.id}>
+                      <input
+                        checked={resourceAircraftIds.includes(aircraft.id)}
+                        onChange={(event) =>
+                          setResourceAircraftIds((current) =>
+                            event.target.checked
+                              ? [...current, aircraft.id]
+                              : current.filter((id) => id !== aircraft.id),
+                          )
+                        }
+                        type="checkbox"
+                      />
+                      <span>
+                        <strong>{aircraft.registration}</strong> · {aircraft.aircraftType} ·{" "}
+                        {aircraft.passengerSeats} Plätze
+                        {aircraft.resourceGroupId && aircraft.resourceGroupId !== resourceEditorId
+                          ? ` · aktuell ${aircraft.resourceGroupName}`
+                          : ""}
+                      </span>
+                    </label>
+                  ))}
+                  {board?.aircraft.length === 0 ? (
+                    <ValidationHint>
+                      Zuerst mindestens ein Flugzeug anlegen; die Zuordnung kann anschließend hier
+                      erfolgen.
+                    </ValidationHint>
+                  ) : null}
+                </section>
                 {masterSubmitAttempted && (resourceName.trim().length < 2 || !resourceGateId) ? (
                   <ValidationHint tone="error">
                     Bezeichnung und Gate müssen für die Ressourcengruppe angegeben werden.

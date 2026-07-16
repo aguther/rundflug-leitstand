@@ -24,8 +24,8 @@ import {
   assertTicketNoShowAllowed,
   assessRemainingCapacity,
   type DeviceRole,
-  deriveResourceGroupCapacity,
   DomainRuleError,
+  deriveResourceGroupCapacity,
   estimateDuration,
   forecastQueueWindows,
   type OperationalCommandType,
@@ -339,8 +339,7 @@ export class EventCoordinator extends DurableObject<Env> {
             {
               error: {
                 code: "SALE_BLOCKED_NO_AIRCRAFT",
-                message:
-                  "Der Ressourcengruppe ist derzeit kein nutzbares Flugzeug zugeordnet.",
+                message: "Der Ressourcengruppe ist derzeit kein nutzbares Flugzeug zugeordnet.",
               },
             },
             { status: 409 },
@@ -2116,6 +2115,60 @@ export class EventCoordinator extends DurableObject<Env> {
           { status: 409 },
         );
       }
+      const desiredAircraftIds = [...new Set(command.payload.aircraftIds ?? [])];
+      const [availableAircraft, activeMemberships, activeRotations] = await Promise.all([
+        this.env.DB.prepare("SELECT id FROM aircraft").all<{ id: string }>(),
+        this.env.DB.prepare(
+          `SELECT id, aircraft_id, resource_group_id FROM resource_group_memberships
+            WHERE operation_day_id = ?1 AND active_until IS NULL`,
+        )
+          .bind(command.eventId)
+          .all<{ id: string; aircraft_id: string; resource_group_id: string }>(),
+        this.env.DB.prepare(
+          `SELECT aircraft_id FROM rotations WHERE operation_day_id = ?1
+            AND aircraft_id IS NOT NULL AND status IN ('CALLED', 'IN_FLIGHT', 'LANDED')`,
+        )
+          .bind(command.eventId)
+          .all<{ aircraft_id: string }>(),
+      ]);
+      const knownAircraftIds = new Set(availableAircraft.results.map((aircraft) => aircraft.id));
+      if (desiredAircraftIds.some((aircraftId) => !knownAircraftIds.has(aircraftId))) {
+        return json(
+          {
+            error: {
+              code: "RESOURCE_GROUP_AIRCRAFT_INVALID",
+              message: "Mindestens ein ausgewähltes Flugzeug ist nicht mehr verfügbar.",
+            },
+          },
+          { status: 409 },
+        );
+      }
+      const desiredAircraftIdSet = new Set(desiredAircraftIds);
+      const changedAircraftIds = new Set(
+        activeMemberships.results
+          .filter(
+            (membership) =>
+              (membership.resource_group_id === command.payload.resourceGroupId &&
+                !desiredAircraftIdSet.has(membership.aircraft_id)) ||
+              (desiredAircraftIdSet.has(membership.aircraft_id) &&
+                membership.resource_group_id !== command.payload.resourceGroupId),
+          )
+          .map((membership) => membership.aircraft_id),
+      );
+      const activeAircraftIds = new Set(
+        activeRotations.results.map((rotation) => rotation.aircraft_id),
+      );
+      if ([...changedAircraftIds].some((aircraftId) => activeAircraftIds.has(aircraftId))) {
+        return json(
+          {
+            error: {
+              code: "AIRCRAFT_LIFECYCLE_ACTIVE",
+              message: "Flugzeugzuordnungen sind während eines aktiven Umlaufs gesperrt.",
+            },
+          },
+          { status: 409 },
+        );
+      }
       eventType = "RESOURCE_GROUP_UPSERTED";
       aggregate = { type: "RESOURCE_GROUP", id: command.payload.resourceGroupId };
       auditPayload = {
@@ -2124,6 +2177,7 @@ export class EventCoordinator extends DurableObject<Env> {
         referenceCapacity: command.payload.referenceCapacity,
         plannedRotationMinutes: command.payload.plannedRotationMinutes,
         compatibleAircraftTypes: command.payload.compatibleAircraftTypes,
+        aircraftIds: desiredAircraftIds,
         reason: command.payload.reason,
       };
       mutations.push(
@@ -2149,6 +2203,49 @@ export class EventCoordinator extends DurableObject<Env> {
           now,
         ),
       );
+      if (command.payload.aircraftIds) {
+        for (const membership of activeMemberships.results) {
+          if (
+            membership.resource_group_id === command.payload.resourceGroupId &&
+            !desiredAircraftIdSet.has(membership.aircraft_id)
+          ) {
+            mutations.push(
+              this.env.DB.prepare(
+                "UPDATE resource_group_memberships SET active_until = ?1 WHERE id = ?2 AND active_until IS NULL",
+              ).bind(now, membership.id),
+            );
+          }
+        }
+        for (const aircraftId of desiredAircraftIds) {
+          const activeMembership = activeMemberships.results.find(
+            (membership) => membership.aircraft_id === aircraftId,
+          );
+          if (activeMembership?.resource_group_id === command.payload.resourceGroupId) continue;
+          if (activeMembership) {
+            mutations.push(
+              this.env.DB.prepare(
+                "UPDATE resource_group_memberships SET active_until = ?1 WHERE id = ?2 AND active_until IS NULL",
+              ).bind(now, activeMembership.id),
+            );
+          }
+          mutations.push(
+            this.env.DB.prepare(
+              `INSERT INTO resource_group_memberships
+                (id, operation_day_id, resource_group_id, aircraft_id, active_from, active_until,
+                 created_at, change_reason, changed_by_device_id)
+               VALUES (?1, ?2, ?3, ?4, ?5, NULL, ?5, ?6, ?7)`,
+            ).bind(
+              crypto.randomUUID(),
+              command.eventId,
+              command.payload.resourceGroupId,
+              aircraftId,
+              now,
+              command.payload.reason,
+              command.deviceId,
+            ),
+          );
+        }
+      }
     } else if (command.type === "UPSERT_AIRCRAFT") {
       const [duplicate, activeRotation] = await Promise.all([
         this.env.DB.prepare("SELECT id FROM aircraft WHERE registration = ?1 AND id <> ?2")
