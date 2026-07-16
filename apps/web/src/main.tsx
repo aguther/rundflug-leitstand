@@ -11,7 +11,15 @@ navigator.serviceWorker?.addEventListener("controllerchange", () => {
   window.location.reload();
 });
 
-registerSW({ immediate: true });
+registerSW({
+  immediate: true,
+  onRegisteredSW: (_swScriptUrl, registration) => {
+    // register() may defer another service-worker script check when deployments happen within the
+    // browser's update window. update() explicitly checks the current deployment while preserving
+    // the existing registration and Web-Push subscription.
+    void registration?.update();
+  },
+});
 
 const root = document.getElementById("root");
 if (!root) {
