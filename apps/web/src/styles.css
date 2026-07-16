@@ -4309,6 +4309,355 @@ p {
   }
 }
 
+/* Approved administration concept: fixed navigation, dense list and contextual editor. */
+.admin-shell {
+  min-height: 100dvh;
+  background:
+    radial-gradient(
+      circle at 76% 0%,
+      color-mix(in srgb, var(--ui-accent) 4%, transparent),
+      transparent 28%
+    ),
+    #0b0d0f;
+}
+.admin-shell > .app-header {
+  min-height: 58px;
+  padding: 0 20px;
+  border-bottom: 1px solid #282c31;
+  background: rgba(13, 15, 17, 0.96);
+}
+.admin-shell > .app-header > div:first-child {
+  gap: 10px;
+}
+.admin-shell > .app-header strong {
+  font-size: 0.98rem;
+}
+.admin-shell > .app-header span {
+  padding-left: 14px;
+  border-left: 1px solid #353a40;
+  color: #9299a3;
+  font-size: 0.85rem;
+}
+.admin-shell > .app-header nav {
+  display: none;
+}
+.admin-shell > footer {
+  display: none;
+}
+.admin-shell > .connection-warning,
+.admin-shell > .emergency-notice,
+.admin-shell > .interruption-notice,
+.admin-shell > .operational-notice {
+  min-height: 34px;
+  margin: 0;
+  padding: 7px 20px;
+  border-radius: 0;
+  font-size: 0.78rem;
+}
+.admin-layout {
+  width: 100%;
+  min-height: calc(100dvh - 58px);
+  margin: 0;
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.admin-side-nav {
+  min-width: 0;
+  min-height: calc(100dvh - 58px);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 24px 8px;
+  overflow: visible;
+  border-right: 1px solid #282c31;
+  border-bottom: 0;
+  background: rgba(13, 15, 17, 0.72);
+}
+.admin-side-nav::before {
+  content: "VERWALTUNG";
+  padding: 0 12px 8px;
+  color: #737a84;
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+.admin-side-nav button {
+  width: 100%;
+  min-height: 42px;
+  flex: 0 0 auto;
+  justify-content: flex-start;
+  padding: 9px 12px;
+  border: 0;
+  border-left: 2px solid transparent;
+  border-radius: 5px;
+  color: #b9c0c9;
+  font-size: 0.8rem;
+}
+.admin-side-nav button.active {
+  border: 0;
+  border-left: 2px solid #2684ff;
+  background: rgba(38, 132, 255, 0.13);
+  color: #4c9aff;
+}
+.admin-nav-icon {
+  width: 16px;
+  height: 16px;
+}
+.admin-workspace,
+.admin-workspace.master-data-active,
+.admin-workspace.master-data-active.editor-open {
+  position: relative;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: 0;
+  padding: 0;
+  background: rgba(10, 12, 14, 0.34);
+}
+.admin-workspace.master-data-active.editor-open {
+  grid-template-columns: minmax(500px, 1fr) minmax(380px, 440px);
+}
+.admin-workspace.master-data-active > .master-data-heading {
+  grid-column: 1;
+  grid-row: 1;
+  min-height: 68px;
+  display: flex;
+  align-items: center;
+  padding: 0 28px;
+  border-bottom: 1px solid #282c31;
+}
+.master-data-heading h1 {
+  margin: 0;
+  color: #f1f3f5;
+  font-size: 1rem;
+  font-weight: 700;
+}
+.master-data-heading h1 span {
+  margin: 0 8px;
+  color: #69717b;
+}
+.master-data-heading h1 strong {
+  color: #aeb5be;
+  font-weight: 500;
+}
+.admin-workspace.master-data-active > .admin-mode-bar {
+  position: absolute;
+  z-index: 6;
+  top: 12px;
+  right: 16px;
+  width: auto;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.admin-workspace.master-data-active > .admin-mode-bar > div:first-child,
+.admin-workspace.master-data-active > .admin-mode-bar > .admin-validation {
+  display: none;
+}
+.admin-workspace.master-data-active > .admin-mode-bar .secondary-action {
+  min-height: 38px;
+  padding: 7px 12px;
+  border-color: #383e45;
+  background: #171a1e;
+  font-size: 0.75rem;
+}
+.admin-workspace.master-data-active.editor-open > .admin-mode-bar {
+  display: none;
+}
+.admin-workspace.master-data-active > .master-data-nav {
+  grid-column: 1;
+  grid-row: 2;
+  min-height: 48px;
+  padding: 0 28px;
+  border-bottom: 1px solid #282c31;
+  background: transparent;
+}
+.admin-workspace.master-data-active > .master-data-nav button {
+  min-height: 48px;
+  flex: 0 0 auto;
+  padding: 8px 16px;
+  color: #aeb5be;
+  font-size: 0.76rem;
+}
+.admin-workspace.master-data-active > .master-data-nav button:first-child {
+  padding-left: 10px;
+}
+.admin-workspace.master-data-active > .master-data-nav button.active {
+  border-bottom-color: #2684ff;
+  color: #4c9aff;
+}
+.admin-workspace.master-data-active > .master-data-workspace {
+  grid-column: 1;
+  grid-row: 3;
+  align-content: start;
+  padding: 20px 22px;
+  border: 0;
+  background: transparent;
+}
+.admin-workspace.master-data-active > .master-data-workspace > * {
+  margin-right: 0;
+  margin-left: 0;
+}
+.admin-workspace.master-data-active .master-data-toolbar {
+  min-height: 48px;
+  padding: 0 0 14px;
+}
+.admin-workspace.master-data-active .master-data-search {
+  width: min(100%, 300px);
+}
+.admin-workspace.master-data-active .master-data-search input {
+  min-height: 38px;
+  padding-block: 7px;
+  background: #15181b;
+  font-size: 0.8rem;
+}
+.admin-workspace.master-data-active .master-data-toolbar > .primary-action {
+  min-height: 38px;
+  padding: 8px 14px;
+  font-size: 0.78rem;
+}
+.admin-workspace.master-data-active .master-data-table-scroll {
+  max-height: calc(100dvh - 270px);
+  margin: 0;
+  border: 1px solid #30353b;
+  border-radius: 5px;
+  background: rgba(17, 20, 23, 0.76);
+}
+.admin-workspace.master-data-active .master-data-table {
+  min-width: 520px;
+  font-size: 0.78rem;
+}
+.admin-workspace.master-data-active .resource-group-list-table {
+  min-width: 0;
+}
+.admin-workspace.master-data-active .master-data-table th {
+  height: 44px;
+  padding: 9px 12px;
+  background: #15191d;
+  color: #c8cdd3;
+  font-size: 0.68rem;
+}
+.admin-workspace.master-data-active .master-data-table td {
+  height: 52px;
+  padding: 9px 12px;
+  border-top-color: #30353b;
+}
+.admin-workspace.master-data-active .master-data-table tbody tr.selected {
+  box-shadow: inset 2px 0 #2684ff;
+  background: rgba(38, 132, 255, 0.1);
+}
+.admin-workspace.master-data-active.editor-open > .master-data-workspace {
+  border-right: 1px solid #282c31;
+}
+.admin-workspace.master-data-active > .master-data-drawer {
+  position: relative;
+  grid-column: 2;
+  grid-row: 1 / span 3;
+  min-width: 0;
+  max-height: calc(100dvh - 58px);
+  padding: 22px 20px;
+  overflow: auto;
+  border: 0;
+  border-left: 1px solid #282c31;
+  background: rgba(15, 17, 19, 0.98);
+}
+.admin-workspace.master-data-active .drawer-heading {
+  top: -22px;
+  margin: -22px -20px 14px;
+  padding: 20px;
+  border-bottom: 1px solid #282c31;
+  background: #0f1113;
+}
+.admin-workspace.master-data-active .drawer-heading h2 {
+  font-size: 1rem;
+}
+.admin-workspace.master-data-active .drawer-heading > button {
+  display: inline-flex;
+}
+.admin-workspace.master-data-active .master-data-drawer :is(input, select, textarea) {
+  min-height: 38px;
+  padding: 8px 10px;
+  font-size: 0.8rem;
+}
+.admin-workspace.master-data-active .master-data-drawer label,
+.admin-workspace.master-data-active .master-data-drawer legend {
+  font-size: 0.76rem;
+}
+
+@media (max-width: 900px) {
+  .admin-shell > .app-header {
+    min-height: 56px;
+    padding-inline: 14px;
+  }
+  .admin-layout {
+    width: 100%;
+    margin: 0;
+    grid-template-columns: 1fr;
+  }
+  .admin-side-nav {
+    min-height: 0;
+    flex-direction: row;
+    padding: 6px 8px;
+    overflow-x: auto;
+    border-right: 0;
+    border-bottom: 1px solid #282c31;
+  }
+  .admin-side-nav::before {
+    display: none;
+  }
+  .admin-side-nav button {
+    width: auto;
+    min-width: max-content;
+    border-left: 0;
+    border-bottom: 2px solid transparent;
+  }
+  .admin-side-nav button.active {
+    border-left: 0;
+    border-bottom: 2px solid #2684ff;
+  }
+  .admin-workspace.master-data-active,
+  .admin-workspace.master-data-active.editor-open {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto auto;
+  }
+  .admin-workspace.master-data-active > .master-data-heading {
+    min-height: 58px;
+    padding-inline: 16px;
+  }
+  .admin-workspace.master-data-active > .admin-mode-bar {
+    position: static;
+    grid-column: 1;
+    grid-row: 3;
+    padding: 8px 12px;
+    border-bottom: 1px solid #282c31;
+  }
+  .admin-workspace.master-data-active > .master-data-nav {
+    padding-inline: 6px;
+  }
+  .admin-workspace.master-data-active > .master-data-workspace {
+    grid-column: 1;
+    grid-row: 4;
+    padding: 14px 12px;
+  }
+  .admin-workspace.master-data-active > .master-data-drawer {
+    position: fixed;
+    z-index: 40;
+    inset: 56px 0 0;
+    grid-column: 1;
+    grid-row: auto;
+    max-height: none;
+    border-left: 0;
+  }
+}
+
 /* Flight Line Supervisor: aircraft-first operational workspace */
 .flight-supervisor {
   width: min(1720px, calc(100% - 32px));
