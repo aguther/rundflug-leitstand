@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 const mainSource = readFileSync(new URL("./main.tsx", import.meta.url), "utf8");
 const viteConfigSource = readFileSync(new URL("../vite.config.ts", import.meta.url), "utf8");
+const pushWorkerSource = readFileSync(new URL("../public/push-sw.js", import.meta.url), "utf8");
 
 describe("PWA deployment updates", () => {
   it("never serves the application shell for API navigations", () => {
@@ -13,5 +14,11 @@ describe("PWA deployment updates", () => {
     expect(mainSource).toContain('addEventListener("controllerchange"');
     expect(mainSource).toContain("reloadingForServiceWorkerUpdate = true");
     expect(mainSource).toContain("window.location.reload()");
+  });
+
+  it("always sends API requests directly to the network without dropping web push", () => {
+    expect(pushWorkerSource).toContain('url.pathname.startsWith("/api/")');
+    expect(pushWorkerSource).toContain('cache: "no-store"');
+    expect(pushWorkerSource).toContain('addEventListener("push"');
   });
 });

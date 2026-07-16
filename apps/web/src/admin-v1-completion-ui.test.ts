@@ -104,6 +104,14 @@ describe("V1 administration completion UI", () => {
     );
   });
 
+  it("keeps the manual board refresh touchable and exposes its loading state", () => {
+    expect(appSource).toContain("aria-busy={refreshing}");
+    expect(appSource).toContain("Betriebsstand wird geladen …");
+    expect(stylesSource).toMatch(
+      /\.admin-mode-bar > button \{[\s\S]*pointer-events: auto;[\s\S]*touch-action: manipulation;/,
+    );
+  });
+
   it("finishes a factory reset even when no service worker is registered", () => {
     expect(appSource).toContain("await navigator.serviceWorker?.getRegistration()");
     expect(appSource).toContain('window.location.replace("/setup")');

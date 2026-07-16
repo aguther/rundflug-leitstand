@@ -283,42 +283,50 @@ function useOperationBoard(deviceId: string) {
     error: null,
     lastConfirmedAt: null,
   });
+  const [refreshing, setRefreshing] = useState(false);
   const refresh = useCallback(async () => {
-    let deviceToken = deviceTokenFor(deviceId);
-    let outcome = await requestBoardSync(() => getOperationBoard(EVENT_ID, deviceId, deviceToken));
-    if (
-      outcome.type === "UNAVAILABLE" &&
-      outcome.message.includes("(403)") &&
-      !attemptedDeviceCredentialRecoveries.has(deviceId)
-    ) {
-      attemptedDeviceCredentialRecoveries.add(deviceId);
-      const role = deviceRoleFor(deviceId);
-      for (const candidate of deviceCredentialCandidates(window.localStorage, role, deviceId)) {
-        try {
-          const context = await getDeviceContext(deviceId, candidate);
-          if (role && context.role !== role) continue;
-          rememberDeviceCredential(window.localStorage, context.role, deviceId, candidate);
-          deviceToken = candidate;
-          if (context.eventId !== EVENT_ID) {
-            rememberActiveEvent(window.localStorage, context.eventId);
-            const target = new URL(window.location.href);
-            target.searchParams.set("event", context.eventId);
-            window.location.replace(target);
-            return;
+    setRefreshing(true);
+    try {
+      let deviceToken = deviceTokenFor(deviceId);
+      let outcome = await requestBoardSync(() =>
+        getOperationBoard(EVENT_ID, deviceId, deviceToken),
+      );
+      if (
+        outcome.type === "UNAVAILABLE" &&
+        outcome.message.includes("(403)") &&
+        !attemptedDeviceCredentialRecoveries.has(deviceId)
+      ) {
+        attemptedDeviceCredentialRecoveries.add(deviceId);
+        const role = deviceRoleFor(deviceId);
+        for (const candidate of deviceCredentialCandidates(window.localStorage, role, deviceId)) {
+          try {
+            const context = await getDeviceContext(deviceId, candidate);
+            if (role && context.role !== role) continue;
+            rememberDeviceCredential(window.localStorage, context.role, deviceId, candidate);
+            deviceToken = candidate;
+            if (context.eventId !== EVENT_ID) {
+              rememberActiveEvent(window.localStorage, context.eventId);
+              const target = new URL(window.location.href);
+              target.searchParams.set("event", context.eventId);
+              window.location.replace(target);
+              return;
+            }
+            outcome = await requestBoardSync(() =>
+              getOperationBoard(EVENT_ID, deviceId, deviceToken),
+            );
+            if (outcome.type === "CONFIRMED") break;
+          } catch {
+            // Try the next credential kept in this browser. Tokens are never logged or persisted anew
+            // unless the server confirms the device/role combination.
           }
-          outcome = await requestBoardSync(() =>
-            getOperationBoard(EVENT_ID, deviceId, deviceToken),
-          );
-          if (outcome.type === "CONFIRMED") break;
-        } catch {
-          // Try the next credential kept in this browser. Tokens are never logged or persisted anew
-          // unless the server confirms the device/role combination.
         }
       }
-    }
-    setState((current) => reduceBoardSyncState(current, outcome));
-    if (outcome.type === "CONFIRMED") {
-      void saveOperationBoard(EVENT_ID, deviceId, outcome.board, outcome.confirmedAt);
+      setState((current) => reduceBoardSyncState(current, outcome));
+      if (outcome.type === "CONFIRMED") {
+        void saveOperationBoard(EVENT_ID, deviceId, outcome.board, outcome.confirmedAt);
+      }
+    } finally {
+      setRefreshing(false);
     }
   }, [deviceId]);
   useEffect(() => {
@@ -377,7 +385,7 @@ function useOperationBoard(deviceId: string) {
       window.clearInterval(timer);
     };
   }, [refresh, deviceId]);
-  return { ...state, refresh };
+  return { ...state, refresh, refreshing };
 }
 
 function Shell({
@@ -2444,7 +2452,7 @@ function FidsView() {
 }
 
 function AdminView() {
-  const { board, error, lastConfirmedAt, refresh } = useOperationBoard(ADMIN_DEVICE_ID);
+  const { board, error, lastConfirmedAt, refresh, refreshing } = useOperationBoard(ADMIN_DEVICE_ID);
   const [adminArea, setAdminArea] = useState<AdminArea>("master-data");
   const [masterDataCategory, setMasterDataCategory] =
     useState<MasterDataCategory>("resource-groups");
@@ -4257,7 +4265,9 @@ function AdminView() {
               </button>
             ) : (
               <button
+                aria-busy={refreshing}
                 className="secondary-action"
+                disabled={refreshing}
                 onClick={() => {
                   if (deviceAuthorizationRejected) {
                     allowDeviceCredentialRecovery(ADMIN_DEVICE_ID);
@@ -4266,9 +4276,11 @@ function AdminView() {
                 }}
                 type="button"
               >
-                {deviceAuthorizationRejected
-                  ? "Gerätebindung erneut prüfen"
-                  : "Betriebsstand erneut laden"}
+                {refreshing
+                  ? "Betriebsstand wird geladen …"
+                  : deviceAuthorizationRejected
+                    ? "Gerätebindung erneut prüfen"
+                    : "Betriebsstand erneut laden"}
               </button>
             )}
             {!isAdministrator ? (
