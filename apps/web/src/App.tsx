@@ -72,6 +72,7 @@ import {
   eventLocalDateTimeToIso,
   formatEventLocalDateTime,
 } from "./event-time";
+import { FlightLineAssist } from "./flight-line-assist";
 import { expectedReviewAtFromPause } from "./flight-line-pause";
 import { FlightLineSupervisorConsole } from "./flight-line-supervisor";
 import { LocalizedDateInput, LocalizedDateTimeInput } from "./localized-date-input";
@@ -113,6 +114,7 @@ import { setupValidationMessages } from "./setup-validation";
 
 const EVENT_ID = resolveActiveEvent(window.location.search, window.localStorage);
 const KIOSK_MODE = new URLSearchParams(window.location.search).get("kiosk") === "1";
+const FLIGHT_LINE_ASSIST_MODE = window.location.pathname === "/flight-line/assist";
 const LOCAL_DEVELOPMENT =
   import.meta.env.DEV || ["localhost", "127.0.0.1"].includes(window.location.hostname);
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -1474,13 +1476,32 @@ function FlightLineView() {
     }
   }
 
+  const primaryFlightLineAction = action
+    ? {
+        label: action.label,
+        disabled:
+          action.command === "CALL_NEXT" &&
+          (!nextAircraftId ||
+            !nextPilotId ||
+            board?.event.emergencyMode ||
+            board?.event.status !== "ACTIVE" ||
+            board?.event.operationalInterrupted),
+        run: () => void advance(),
+      }
+    : null;
+
   return (
-    <Shell className="flight-line-shell" title="Flight Line">
+    <Shell
+      className={FLIGHT_LINE_ASSIST_MODE ? "flight-line-shell assist-shell" : "flight-line-shell"}
+      title={FLIGHT_LINE_ASSIST_MODE ? "Flight Line Assist" : "Flight Line"}
+    >
       <ConnectionNotice error={error} lastConfirmedAt={lastConfirmedAt} />
       <EmergencyNotice active={board?.event.emergencyMode ?? false} />
       <InterruptionNotice active={board?.event.operationalInterrupted ?? false} />
       <OperationalNotice note={board?.event.operationalNote} />
-      {board?.currentDeviceRole === "FLIGHT_LINE_LEAD" && !board.event.emergencyMode ? (
+      {!FLIGHT_LINE_ASSIST_MODE &&
+      board?.currentDeviceRole === "FLIGHT_LINE_LEAD" &&
+      !board.event.emergencyMode ? (
         <details className="emergency-control">
           <summary>Not-Halt</summary>
           <div className="emergency-control-body">
@@ -1503,23 +1524,26 @@ function FlightLineView() {
           </div>
         </details>
       ) : null}
-      {board ? (
+      {board && FLIGHT_LINE_ASSIST_MODE ? (
+        <FlightLineAssist
+          action={primaryFlightLineAction}
+          aircraft={operationalAircraft}
+          board={board}
+          message={message}
+          onAvailable={() => void setFlightLineAircraftState("AVAILABLE")}
+          onPause={() => setAircraftPauseOpen(true)}
+          onRefuel={() => void setFlightLineAircraftState("REFUELING")}
+          onSelectAircraft={(aircraftId) => {
+            setSelectedAircraftId(aircraftId);
+            setSelectedId(null);
+          }}
+          onUnavailable={() => void setFlightLineAircraftState("INACTIVE")}
+          selectedAircraft={selectedAircraft}
+          selectedRotation={selected}
+        />
+      ) : board ? (
         <FlightLineSupervisorConsole
-          action={
-            action
-              ? {
-                  label: action.label,
-                  disabled:
-                    action.command === "CALL_NEXT" &&
-                    (!nextAircraftId ||
-                      !nextPilotId ||
-                      board.event.emergencyMode ||
-                      board.event.status !== "ACTIVE" ||
-                      board.event.operationalInterrupted),
-                  run: () => void advance(),
-                }
-              : null
-          }
+          action={primaryFlightLineAction}
           aircraft={operationalAircraft}
           aircraftRotations={aircraftRotations ?? []}
           board={board}
@@ -1553,7 +1577,7 @@ function FlightLineView() {
         className={`flight-supervisor legacy-flight-line-overlay ${
           dispositionOpen ? "show-disposition" : "show-details"
         }`}
-        hidden={!dispositionOpen && !detailsOpen}
+        hidden={FLIGHT_LINE_ASSIST_MODE || (!dispositionOpen && !detailsOpen)}
       >
         <button
           aria-label="Erweiterte Flight-Line-Details schließen"
@@ -7477,7 +7501,7 @@ export function App() {
   if (path === "/setup") return <SetupView />;
   if (path === "/pair") return <PairDeviceView />;
   if (path === "/datenschutz") return <PrivacyView />;
-  if (path === "/flight-line") return <FlightLineView />;
+  if (path === "/flight-line" || path === "/flight-line/assist") return <FlightLineView />;
   if (path === "/fids") return <FidsView />;
   if (path === "/admin") return <AdminView />;
   return <CashierView />;
