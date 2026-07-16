@@ -28,7 +28,7 @@ das Sicherungs- und Wiederherstellungsverfahren in [backup-restore.md](backup-re
    Benachrichtigungsfristen sowie Planzeiten.
 3. Gates, Ressourcengruppen und Produkte einrichten. Jedes Produkt muss genau einer
    Ressourcengruppe zugeordnet sein.
-4. Flugzeuge und Piloten-IDs erfassen und Flugzeuge den Ressourcengruppen zuordnen.
+4. Flugzeuge und anonyme Pilotencodes erfassen und Flugzeuge den Ressourcengruppen zuordnen.
 5. Kassen-, Flight-Line- und Anzeigegeräte koppeln. Kopplungs-QR-Codes nur am vorgesehenen Gerät
    zeigen.
 6. Testticket mit synthetischen Daten verkaufen und den Ablauf bis `VERFÜGBAR` prüfen. Danach für
@@ -40,7 +40,9 @@ das Sicherungs- und Wiederherstellungsverfahren in [backup-restore.md](backup-re
 - Mindestens ein zweites Administrationsgerät ist einsatzbereit.
 - Kasse und Flight Line erreichen den Leitstand; öffentliche Anzeige und Ticketstatus laden.
 - Flugzeuge sind höchstens einer aktiven Ressourcengruppe zugeordnet.
-- Produkte, Preise, Gates, Kapazitäten und Verkaufsstatus sind geprüft.
+- Produkte, Preise, Gates und Verkaufsstatus sind geprüft; Kapazitäten werden aus den aktiven,
+  zugeordneten Flugzeugen abgeleitet.
+- Standard- oder Terminal-FIDS sowie Vorlauf und maximal akzeptable Gate-Wartezeit sind eingestellt.
 - Web-Push wurde auf einem echten Besuchergerät erlaubt und getestet.
 - Papier- und Offlineverfahren liegen bereit.
 
@@ -59,7 +61,7 @@ Diese Stufe übernimmt:
 - Veranstaltungsparameter und Planzeiten,
 - Gates, Ressourcengruppen und Produkte,
 - aktive Flugzeugzuordnungen,
-- Piloten-IDs,
+- Pilotencodes,
 - das aktuelle Administrationsgerät.
 
 Nicht übernommen werden Tickets, Ticketgruppen, Warteschlangenpositionen, Umläufe, Flugdaten,
@@ -69,7 +71,7 @@ starten mit gesperrtem Verkauf; der neue Tag startet in `PREPARATION`.
 ### Vollständig neu einrichten
 
 Diese Stufe übernimmt nur die neuen Veranstaltungsdaten, grundlegende Zeitparameter und das aktuelle
-Administrationsgerät. Gates, Ressourcengruppen, Produkte, Flugzeugzuordnungen, Piloten-IDs und alle
+Administrationsgerät. Gates, Ressourcengruppen, Produkte, Flugzeugzuordnungen, Pilotencodes und alle
 Betriebsdaten beginnen leer.
 
 ## 5. Nach dem Neustart

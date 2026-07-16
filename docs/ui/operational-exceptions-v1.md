@@ -19,8 +19,9 @@ Position nicht aufgrund unterschiedlicher Eintragszahlen.
 
 ## 1. Kasse: große Gruppe bewusst aufteilen
 
-Der Standardverkauf bleibt unverändert. Erst wenn die Gruppengröße die Referenzkapazität eines
-Umlaufs überschreitet, erscheint direkt unter dem Mengenzähler ein kompakter Hinweis.
+Der Standardverkauf bleibt unverändert. Erst wenn die Gruppengröße die größte Kapazität eines
+aktuell nutzbaren Flugzeugs der Ressourcengruppe überschreitet, erscheint direkt unter dem
+Mengenzähler ein kompakter Hinweis.
 
 ```text
 ┌ Gruppengröße ──────────────────────────────────────────────┐

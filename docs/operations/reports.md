@@ -4,11 +4,11 @@ Die administrative Historie liest ausschließlich das unveränderliche `operatio
 Sie kann nach Zeitraum, Ereignistyp, Bezugsart und Bezugs-ID gefiltert werden. Es werden höchstens
 1.000 Einträge je Anfrage ausgeliefert.
 
-Der CSV-Tagesbericht enthält klar getrennte Abschnitte für Tageskennzahlen, Kassen-Zählbericht,
+Der CSV-Tagesbericht enthält klar getrennte Abschnitte für Tageskennzahlen, Ticket-Zählbericht,
 Flüge, Prognoseentwicklung und besondere Ereignisse. Er weist Passagierzahlen, Kapazität und
 Auslastung, gemessene Boarding-, Flug-, Boden-, Umlauf- und Wartezeiten sowie die absoluten
 Abweichungen der Boarding-, Start- und Abschlussprognosen aus. Verkäufe und Stornos werden nach
-Produkt, Zahlart und Zahlstatus gruppiert; Beträge sind ausdrücklich informatorisch.
+Produkt gruppiert. Zahlart, Zahlstatus und Zahlungsbeträge werden nicht geführt oder exportiert.
 
 Der ticketgenaue Rohdatenexport enthält interne IDs, Produkt, Ressourcengruppe, Slotnummer, Umlauf,
 Flugzeug und anonymen Pilotencode. Öffentliche Ticketcodes, Zugangsschlüssel, PINs, Namen und

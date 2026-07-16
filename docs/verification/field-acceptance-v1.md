@@ -7,7 +7,7 @@ T-020 sowie die Generalprobe aus Kapitel 12 der Anforderungen.
 
 ## 1. Verbindliche Testbasis
 
-Die Abnahme verwendet ausschließlich synthetische, anonyme Ticket- und Piloten-IDs. Vor Beginn
+Die Abnahme verwendet ausschließlich synthetische, anonyme Ticket- und Pilotencodes. Vor Beginn
 wird ein portables Backup angelegt. Migrationen und Deployment sind eingefroren; am Abnahmetag
 findet keine geplante Wartung statt.
 
@@ -28,7 +28,7 @@ Originalhardware-Abnahme.
 
 1. Zentrale Cloudflare-Umgebung und D1-Migrationsstand prüfen.
 2. Eine synthetische Veranstaltung mit mindestens zwei Gates, zwei Ressourcengruppen, zwei
-   Produkten, drei Flugzeugen und drei Piloten-IDs vorbereiten.
+   Produkten, drei Flugzeugen und drei Pilotencodes vorbereiten.
 3. Je ein ADMIN-, CASHIER- und FLIGHT_LINE-Gerät koppeln; FIDS und öffentliches Ticketgerät öffnen.
 4. Web-Push auf mindestens einem echten Android- oder iOS-Gerät erlauben und Testzustellung prüfen.
 5. Light und Dark Theme sowie Hoch- und Querformat vorbereiten.
@@ -72,12 +72,14 @@ Eingriff der Testleitung ausführen:
 
 ### Flight Line
 
-- nächste Gruppe aufrufen, Boarding und Flugzustände fortschreiben,
+- im Supervisor den nächsten automatischen Gate-Voraufruf prüfen und `NEXT` menschlich bestätigen,
 - Flugzeug flexibel bestätigen,
 - Landung und Verfügbarkeit getrennt erfassen,
-- Blockierung und Pilotpause erkennen,
+- Blockierung und Pilotencode-Pause mit und ohne erwartete Dauer erkennen,
 - eine nach `IM FLUG` notwendige Manifestkorrektur ausschließlich über den administrativen
   Sonderweg durchführen.
+- in der mobilen Assist-Ansicht ein Flugzeug kurz reservieren und dessen beobachteten Status mit
+  großen Touch-Aktionen fortschreiben.
 
 ### Administration
 
@@ -89,8 +91,10 @@ Eingriff der Testleitung ausführen:
 
 ### Öffentliche Anzeige
 
-- FIDS in den Vollbildmodus bringen,
+- Standard-FIDS und vollständig englisches Terminal-FIDS getrennt in den Vollbildmodus bringen,
 - automatische Aktualisierung und Wiederverbindung prüfen,
+- prüfen, dass `DEPARTED` nach der konfigurierten Nachlaufzeit aus der Anzeige, nicht aber aus der
+  Historie verschwindet,
 - öffentlichen QR-Code öffnen und ausschließlich Zeitfenster beziehungsweise Wartepositionen
   erkennen, niemals garantierte Uhrzeiten.
 
@@ -106,7 +110,8 @@ Light und Dark geprüft:
 - keine horizontale Seitenverschiebung oder abgeschnittene Primäraktion,
 - große, eindeutig erreichbare Touch-Ziele,
 - höchstens eine hervorgehobene Primäraktion je Arbeitszustand,
-- verständliche deutsche Begriffe statt interner Codes,
+- verständliche deutsche Begriffe statt interner Codes; ausschließlich im Terminal-FIDS
+  durchgängig englische Flughafenbegriffe,
 - konsistente Statusfarbe plus Text/Symbol; Farbe ist nie alleiniger Informationsträger,
 - lesbarer Text, Fehler, Placeholder, Fokus und deaktivierter Zustand,
 - Dialogfokus liegt beim ersten sinnvollen Eingabefeld; Formulare lassen sich mit Enter auslösen,
@@ -116,7 +121,7 @@ Light und Dark geprüft:
 
 1. Während eines vorbereiteten Vorgangs Netzwerk trennen.
 2. Offline-/veralteten Zustand sichtbar bestätigen.
-3. Zulässige lokale Aktion erfassen; keine doppelte operative Zustandsänderung erzeugen.
+3. Nur einen vorbereitenden lokalen Kassenentwurf erfassen; operative Aktionen bleiben gesperrt.
 4. Netzwerk wiederherstellen und automatische Realtime-Wiederverbindung beobachten.
 5. Konflikt absichtlich mit einem zweiten Gerät erzeugen und prüfen, dass kein stale write still
    überschrieben wird.

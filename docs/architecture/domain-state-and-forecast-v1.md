@@ -84,6 +84,12 @@ Außerhalb eines aktiven Umlaufs kann ein verfügbares Flugzeug auf `REFUELING`,
 Block auf. Während `BOARDING`, `IN_FLIGHT` oder `LANDED` darf die Flottenverwaltung den
 Umlaufzustand nicht umgehen.
 
+Eine Pause kann ohne Endzeit oder mit einer unverbindlichen erwarteten Dauer erfasst werden. Ohne
+Endzeit bleibt die Ressource aus der vorausberechneten Kapazität entfernt. Mit Endzeit darf die
+Prognose die spätere Rückkehr einplanen; verfügbar wird das Flugzeug oder der Pilotencode trotzdem
+erst durch eine menschlich bestätigte Statusänderung. Das Überschreiten der erwarteten Endzeit löst
+keine automatische Freigabe aus.
+
 `SCHEDULE_AIRCRAFT_REFUEL` ist nur eine Vormerkung. `REFUELING` nimmt das Flugzeug tatsächlich aus
 der Disposition. Der Umlaufzähler wird erst beim bestätigten Abschluss erhöht und beim Übergang
 `REFUELING` → `AVAILABLE` zurückgesetzt.
@@ -163,6 +169,8 @@ Der Rechenlauf verwendet:
 - gespeicherte Ist-Zeiten laufender Umläufe;
 - bis zu zwölf jüngste abgeschlossene Vergleichsumläufe, bevorzugt für Produkt und Flugzeugtyp,
   sonst für das Produkt.
+- optionale erwartete Endzeiten aktiver Flugzeug- und Pilotencode-Pausen; Pausen ohne Endzeit
+  reduzieren die vorhergesagte Kapazität bis zur bestätigten Rückkehr.
 
 ### 5.3 Lernen aus Ist-Daten
 
@@ -206,6 +214,18 @@ Scheitert die Prognose, bleibt der bestätigte operative Zustand gültig; der Fe
 `FORECAST_RECALCULATION_FAILED` ohne Tickets, PIN oder Secrets protokolliert. Der nächste bestätigte
 Zustandswechsel startet einen neuen Lauf. Snapshots und Wiederherstellung sind in
 `docs/architecture/forecast-snapshots-v1.md` beschrieben.
+
+### 5.7 Automatischer Voraufruf und menschliche Bestätigung
+
+Der Prognoselauf kann eine noch ungebundene Fluggruppe automatisch auf `GO_TO_GATE` setzen. Dafür
+müssen Queueposition, Prognosequalität, verfügbare Ressourcenkapazität und die konfigurierte
+akzeptable Wartezeit am Gate zusammenpassen. Der Voraufruf bindet weder Flugzeug noch Pilotencode und
+ist reversibel, solange noch kein `NEXT` bestätigt wurde.
+
+`NEXT` bleibt eine bewusste Aktion der Flight Line. Erst diese Bestätigung wählt ein konkret
+passendes Flugzeug, bindet die Gruppe und startet Boarding. Gruppen werden beim Voraufruf und bei
+`NEXT` nie automatisch getrennt. Die Standardanzeige übersetzt den Voraufruf als „Bitte zum Gate“,
+das Terminalprofil ausschließlich als `GO TO GATE`.
 
 ## 6. Betreiberleitfaden
 

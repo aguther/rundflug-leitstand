@@ -10,11 +10,18 @@ Integrationslauf prüft Ticketstatus und FIDS rekursiv auf solche Felder und val
 nichtnegative Zeitfenster mit konsistenter Unter- und Obergrenze. Damit erscheint gegenüber Gästen
 keine einzelne Uhrzeit als feste Zusage.
 
-Zusätzlich prüft der Lauf den Ticketstatus ohne Anmeldung, die Vorbereitung aus Prognose und
-konfigurierter Vorlaufgrenze, den verbindlichen Aufruf, Boarding nach Check-in sowie die freiwillige
-Push-Registrierung. Ohne ausdrückliche Einwilligung wird sie abgelehnt. Einwilligungszeitpunkt und
-Löschzeitpunkt werden zurückgegeben, der Vorbereitungshinweis wird trotz Wiederholung nur einmal
-vorgemerkt und ein Widerruf löscht das Ziel unmittelbar.
+Zusätzlich prüft der Lauf den Ticketstatus ohne Anmeldung, den automatischen Voraufruf aus
+Queueposition, Prognosequalität und konfigurierter Gate-Wartezeit, den getrennten verbindlichen
+`NEXT`-Aufruf, Boarding nach Check-in sowie die freiwillige Push-Registrierung. Ohne ausdrückliche
+Einwilligung wird sie abgelehnt. Einwilligungszeitpunkt und Löschzeitpunkt werden zurückgegeben, der
+`GO_TO_GATE`-Hinweis wird trotz Wiederholung nur einmal vorgemerkt und ein Widerruf löscht das Ziel
+unmittelbar.
+
+Standard-FIDS und Terminal-FIDS werden getrennt geprüft. Das Standardprofil verwendet deutsche
+Handlungsbegriffe. Das Terminalprofil enthält in allen sichtbaren Zuständen ausschließlich englische
+Begriffe wie `GO TO GATE`, `BOARDING`, `DELAYED` und `DEPARTED`. Abgeschlossene Flüge bleiben für die
+konfigurierte Nachlaufzeit sichtbar und verschwinden danach nur aus der Anzeige; Historie und Audit
+bleiben unverändert. Der Standardwert beträgt fünf Minuten, zulässig sind eine bis fünfzehn Minuten.
 
 Der Referenzlauf lieferte die Ticketkennungen `PAN20-101/1` und `PAN20-101/2`, eine Neuverbindung nach
 14 Millisekunden und die abschließende Veranstaltungsversion 7.

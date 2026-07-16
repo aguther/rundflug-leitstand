@@ -6,6 +6,11 @@ Die öffentliche Monitoransicht wird mit folgender URL gestartet:
 https://<Worker-Domain>/fids?kiosk=1&event=<Veranstaltungs-ID>
 ```
 
+Das Displayprofil wird bevorzugt an der Displaykopplung gespeichert. Für Vorschau und gezielte
+Installation kann es über `style=standard` oder `style=terminal` gewählt werden. `standard` verwendet
+deutsche Begriffe. `terminal` verwendet ausschließlich englische beschreibende Begriffe wie
+`DEPARTURES`, `WAITING`, `GO TO GATE`, `BOARDING`, `DELAYED` und `DEPARTED`.
+
 `kiosk=1` blendet Navigation und Fußbereich aus. Die Ansicht zeigt ausschließlich Produkte,
 abgeleitete Ticket-/Fluggruppenkennungen, Gates, Zustände, zugeordnete Flugzeuge, Zeitfenster und den
 Flottenstatus. Private QR-Codes, Pilotencodes, Gerätekennungen und interne IDs werden nicht an die
@@ -25,7 +30,13 @@ Vor Veranstaltungsbeginn ist zu prüfen:
 - Nach einer kurzzeitigen Netzunterbrechung verbindet sich die Ansicht selbständig neu.
 - Im Notfallmodus werden keine operativen Gruppeninformationen angezeigt.
 - Es sind keine alten Tabs oder Ansichten einer anderen Veranstaltung geöffnet.
+- Eine synthetisch als abgeflogen markierte Zeile verschwindet nach der konfigurierten Nachlaufzeit
+  aus der Anzeige, bleibt aber in Ticketstatus und Historie erhalten.
 
 Die Ansicht empfängt über WebSocket nur ein minimales Versionssignal. Bei Verbindungsabbruch erfolgt
 eine begrenzte, exponentielle Neuverbindung; zusätzlich aktualisiert ein 15-Sekunden-Polling die Anzeige
 als Rückfallebene.
+
+Die Standard-Nachlaufzeit für `DEPARTED`/„Abgeflogen“ beträgt fünf Minuten und ist pro Display
+zwischen einer und 15 Minuten konfigurierbar. Ein vorübergehender Server- oder D1-Fehler leert die
+Anzeige nicht; der letzte bestätigte Stand bleibt mit sichtbarem Verbindungsstatus erhalten.

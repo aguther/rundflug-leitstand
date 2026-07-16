@@ -6,17 +6,17 @@ Automatisch extrahiert: **199 eindeutige Anforderungen**.
 
 | Priorität | Anzahl |
 |---|---:|
-| MUSS | 158 |
+| MUSS | 159 |
 | SOLL | 29 |
-| KANN | 12 |
+| KANN | 11 |
 
 ## Nach Ausbaustufe
 
 | Stufe | Anzahl |
 |---|---:|
-| V1 | 176 |
+| V1 | 177 |
 | V2 | 13 |
-| V3 | 9 |
+| V3 | 8 |
 | V4 | 1 |
 
 ## Nach Abschnitt

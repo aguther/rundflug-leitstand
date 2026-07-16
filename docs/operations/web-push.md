@@ -52,10 +52,11 @@ Registrierungs- und Zustellungstest in der Zielumgebung angewendet sein.
 
 ## Fachliche Auslösung
 
-Die Statusseite zeigt das vom Prognosemodell berechnete Zeitfenster. Sobald dessen obere Grenze die
-konfigurierte `notificationLeadMinutes`-Schwelle erreicht, wird einmalig „Bitte vorbereiten“
-vorgemerkt. Unsichere Prognosen, Unterbrechung und Notfallmodus erzeugen keinen Vorbereitungshinweis.
-`NEXT` erzeugt unabhängig davon den verbindlichen Aufruf „Bitte jetzt zur Flight Line kommen“.
+Die Statusseite zeigt das vom Prognosemodell berechnete Zeitfenster. Erreicht eine Gruppe unter
+Berücksichtigung von Queue-Position, Prognosequalität und maximaler Gate-Wartezeit den
+konfigurierten Vorlauf, wird einmalig „Bitte zum Gate“/`GO TO GATE` vorgemerkt. Unsichere Prognosen,
+Unterbrechung und Notfallmodus erzeugen keinen automatischen Voraufruf. `NEXT` bleibt davon getrennt
+und erzeugt nach menschlicher Bestätigung den verbindlichen Boardingaufruf.
 
 Die Kasse gibt zu jedem Ticket den nicht erratbaren Status-QR-Code aus. Der Gast kann ihn direkt an
 der Kasse mit dem eigenen Browser öffnen und dort Web-Push aktivieren; das Kassen- oder Helfergerät

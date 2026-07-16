@@ -9,7 +9,7 @@ von Verkauf über Aufruf, Start und Landung bis zum Abschluss aus. Der Lauf veri
 - paginierte und rollenbeschränkte Prognosehistorie,
 - spätere Verknüpfung der Snapshots mit bestätigten Boarding-, Start-, Lande- und Abschlusszeiten,
 - berechnete Prognoseabweichungen für alle vier Phasen,
-- vollständigen CSV-Tagesbericht mit Tageskennzahlen, Kassen-Zählbericht, Flügen,
+- vollständigen CSV-Tagesbericht mit Tageskennzahlen, Ticket-Zählbericht je Produkt, Flügen,
   Prognoseentwicklung und besonderen Ereignissen sowie
 - kompakten PDF-Tagesbericht aus denselben bestätigten Daten.
 

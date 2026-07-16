@@ -15,6 +15,10 @@ Während der gesamten Minute bleiben Board-Objekt, Event-Version und Zeitpunkt d
 Serverbestätigung unverändert erhalten. Der nächste erfolgreiche Abruf wird ohne Neustart übernommen,
 entfernt die Störungsmeldung und ersetzt den Stand nur bei gleicher oder neuerer Event-Version.
 
+Der gleiche Nachweis unterscheidet Transportfehler, HTTP-Fehler und D1-/Worker-Fehlerantworten. In
+allen Fällen bleibt der letzte bestätigte Stand sichtbar. Kasse, Flight Line und Administration
+blockieren Schreibaktionen, zeigen aber keine leeren Stammdaten als scheinbar bestätigten Zustand.
+
 `apps/web/src/api.test.ts` weist separat nach, dass operative Kommandos offline vor dem Transport
 abgelehnt werden. `apps/web/src/offline-store.test.ts` prüft Altersanzeige und sicheres Degradieren bei
 nicht verfügbarem Browserspeicher.

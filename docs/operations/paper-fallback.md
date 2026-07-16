@@ -16,7 +16,7 @@ Bei längerem Totalausfall werden keine unbestätigten digitalen Zustände als v
 - Jeder Papierverkauf erhält eine eindeutige, nicht personenbezogene Belegreferenz und fortlaufende
   Belegnummer.
 - Erfasst werden ausschließlich ursprünglicher Zeitpunkt, Belegfolge, Produkt, kontrollierte
-  Ticketcodes und rein informatorische Zahlungsangaben. Namen und Telefonnummern bleiben verboten.
+  Ticketcodes und Produktzuordnung. Namen, Telefonnummern und Zahlungsangaben bleiben verboten.
 - Umlaufereignisse beziehen sich auf dieselbe Belegreferenz und werden als Aufruf, `IM FLUG`,
   `GELANDET` und `ABGESCHLOSSEN` dokumentiert.
 - Kasse erfasst Papierverkäufe; Leiter Flight Line oder Administration erfasst Umlaufereignisse.
