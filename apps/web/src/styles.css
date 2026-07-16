@@ -3631,6 +3631,22 @@ p {
   border: 0;
   border-radius: 0;
 }
+.factory-reset-dialog .dialog-actions {
+  position: sticky;
+  z-index: 2;
+  bottom: -24px;
+  margin: auto -24px -24px;
+  padding: 16px 24px 24px;
+  border-top: 1px solid #d7e0ea;
+  background: #fff;
+  pointer-events: auto;
+}
+.factory-reset-dialog .dialog-actions > button {
+  position: relative;
+  z-index: 3;
+  pointer-events: auto;
+  touch-action: manipulation;
+}
 .factory-delete-summary {
   padding: 16px;
   border-top: 1px solid #d7e0ea;

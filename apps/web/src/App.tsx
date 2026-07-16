@@ -156,7 +156,7 @@ const aircraftStateLabel = {
 function FieldHelp({ label, help }: { label: string; help: string }) {
   return (
     <details className="field-info">
-      <summary aria-label={`Information zu ${label}`} title={help}>
+      <summary aria-label={`Information zu ${label}`} tabIndex={-1} title={help}>
         i
       </summary>
       <span role="note">{help}</span>
@@ -247,6 +247,7 @@ const CASHIER_DEVICE_ID = deviceIdForRole("CASHIER", "cashier-tablet-1");
 const FLIGHT_LINE_DEVICE_ID = deviceIdForRole("FLIGHT_LINE", "flight-line-tablet-1");
 const ADMIN_DEVICE_ID = deviceIdForRole("ADMIN", "technical-scaffold");
 const MASTER_DATA_AUDIT_REASON = "Administrative Stammdatenpflege";
+const OPERATIONAL_AUDIT_REASON = "Operative Änderung über Administration";
 const ADMIN_CONFIGURATION_AUDIT_REASON = "Administrative Konfigurationspflege";
 const MASTER_DATA_DELETE_REASON = "Administrative Stammdatenlöschung";
 type MasterDataDeleteTarget = {
@@ -2500,7 +2501,7 @@ function AdminView() {
   >("CASHIER");
   const [pairingQr, setPairingQr] = useState<string | null>(null);
   const [pairingUrl, setPairingUrl] = useState<string | null>(null);
-  const [pilotCode, setPilotCode] = useState("P-02");
+  const [pilotCode, setPilotCode] = useState("P-01");
   const [pilotNote, setPilotNote] = useState("");
   const [pilotEditorId, setPilotEditorId] = useState("new");
   const [refuelThreshold, setRefuelThreshold] = useState(5);
@@ -3391,7 +3392,7 @@ function AdminView() {
     resourceGroupId: string,
     status: "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED",
   ) {
-    if (!board || reason.trim().length < 3) return;
+    if (!board) return;
     try {
       await sendCommand(
         {
@@ -3401,12 +3402,16 @@ function AdminView() {
           expectedVersion: board.event.version,
           issuedAt: new Date().toISOString(),
           type: "SET_RESOURCE_GROUP_STATUS",
-          payload: { resourceGroupId, status, reason: reason.trim(), expectedReviewAt: null },
+          payload: {
+            resourceGroupId,
+            status,
+            reason: OPERATIONAL_AUDIT_REASON,
+            expectedReviewAt: null,
+          },
         },
         deviceTokenFor(ADMIN_DEVICE_ID),
       );
       setMessage(`Ressourcengruppe auf ${status} gesetzt.`);
-      setReason("");
       await refresh();
       await refreshHistory();
     } catch (cause) {
@@ -3448,7 +3453,7 @@ function AdminView() {
   }
 
   async function setEventInterruption(interrupted: boolean) {
-    if (!board || reason.trim().length < 3) return;
+    if (!board) return;
     try {
       await sendCommand(
         {
@@ -3458,7 +3463,11 @@ function AdminView() {
           expectedVersion: board.event.version,
           issuedAt: new Date().toISOString(),
           type: "SET_EVENT_INTERRUPTION",
-          payload: { interrupted, reason: reason.trim(), expectedReviewAt: null },
+          payload: {
+            interrupted,
+            reason: OPERATIONAL_AUDIT_REASON,
+            expectedReviewAt: null,
+          },
         },
         deviceTokenFor(ADMIN_DEVICE_ID),
       );
@@ -3479,7 +3488,7 @@ function AdminView() {
     saleEnabled: boolean,
     useEnteredClosingTime = false,
   ) {
-    if (!board || reason.trim().length < 3 || adminPinRef.current.length < 4) return;
+    if (!board || adminPinRef.current.length < 4) return;
     try {
       const configuredClosing =
         useEnteredClosingTime && saleClosesAt
@@ -3499,7 +3508,7 @@ function AdminView() {
             saleClosesAt: configuredClosing,
             warningThreshold: product.capacityWarningThreshold,
             criticalThreshold: product.capacityCriticalThreshold,
-            reason: reason.trim(),
+            reason: OPERATIONAL_AUDIT_REASON,
             adminPin: adminPinRef.current,
           },
         },
@@ -3517,7 +3526,7 @@ function AdminView() {
     aircraftId: string,
     state: "AVAILABLE" | "REFUELING" | "PAUSED" | "INTERRUPTED" | "INACTIVE",
   ) {
-    if (!board || reason.trim().length < 3) return;
+    if (!board) return;
     try {
       await sendCommand(
         {
@@ -3527,7 +3536,12 @@ function AdminView() {
           expectedVersion: board.event.version,
           issuedAt: new Date().toISOString(),
           type: "SET_AIRCRAFT_OPERATIONAL_STATE",
-          payload: { aircraftId, state, reason: reason.trim(), expectedReviewAt: null },
+          payload: {
+            aircraftId,
+            state,
+            reason: OPERATIONAL_AUDIT_REASON,
+            expectedReviewAt: null,
+          },
         },
         deviceTokenFor(ADMIN_DEVICE_ID),
       );
@@ -3542,7 +3556,7 @@ function AdminView() {
   }
 
   async function scheduleRefuel(aircraftId: string, planned: boolean) {
-    if (!board || reason.trim().length < 3) return;
+    if (!board) return;
     try {
       await sendCommand(
         {
@@ -3552,7 +3566,7 @@ function AdminView() {
           expectedVersion: board.event.version,
           issuedAt: new Date().toISOString(),
           type: "SCHEDULE_AIRCRAFT_REFUEL",
-          payload: { aircraftId, planned, reason: reason.trim() },
+          payload: { aircraftId, planned, reason: OPERATIONAL_AUDIT_REASON },
         },
         deviceTokenFor(ADMIN_DEVICE_ID),
       );
@@ -3565,7 +3579,7 @@ function AdminView() {
   }
 
   async function configureRefuelThreshold(aircraftId: string) {
-    if (!board || reason.trim().length < 3 || adminPinRef.current.length < 4) return;
+    if (!board || adminPinRef.current.length < 4) return;
     try {
       await sendCommand(
         {
@@ -3578,7 +3592,7 @@ function AdminView() {
           payload: {
             aircraftId,
             reminderThreshold: refuelThreshold,
-            reason: reason.trim(),
+            reason: OPERATIONAL_AUDIT_REASON,
             adminPin: adminPinRef.current,
           },
         },
@@ -3623,7 +3637,7 @@ function AdminView() {
       setMessage("Anonymer operativer Pilotencode wurde aktualisiert.");
       if (!adminModeUnlocked) setAdminPin("");
       setPilotEditorId("new");
-      setPilotCode("P-02");
+      setPilotCode("P-01");
       setPilotNote("");
       setMasterEditorOpen(false);
       await refresh();
@@ -3640,12 +3654,12 @@ function AdminView() {
     setMasterSubmitAttempted(false);
     setPilotEditorId(id);
     const entry = board?.pilots.find((pilot) => pilot.id === id);
-    setPilotCode(entry?.operationalCode ?? "P-02");
+    setPilotCode(entry?.operationalCode ?? "P-01");
     setPilotNote(entry?.operationalNote ?? "");
   }
 
   async function setPilotPause(pilotId: string, paused: boolean) {
-    if (!board || reason.trim().length < 3) return;
+    if (!board) return;
     try {
       await sendCommand(
         {
@@ -3655,7 +3669,12 @@ function AdminView() {
           expectedVersion: board.event.version,
           issuedAt: new Date().toISOString(),
           type: "SET_PILOT_PAUSE",
-          payload: { pilotId, paused, reason: reason.trim(), expectedReviewAt: null },
+          payload: {
+            pilotId,
+            paused,
+            reason: OPERATIONAL_AUDIT_REASON,
+            expectedReviewAt: null,
+          },
         },
         deviceTokenFor(ADMIN_DEVICE_ID),
       );
@@ -4244,31 +4263,11 @@ function AdminView() {
                 <ValidationHint>Gerätebindung und Betriebsstand werden geprüft.</ValidationHint>
               )
             ) : null}
-            {adminArea === "operations" ? (
-              <label>
-                <FieldLabel
-                  label="Begründung"
-                  help="Kurzer nachvollziehbarer Anlass für operative Änderungen. Er wird im Auditprotokoll gespeichert."
-                />
-                <input
-                  value={reason}
-                  onChange={(event) => setReason(event.target.value)}
-                  placeholder="Mindestens 3 Zeichen"
-                />
-              </label>
-            ) : null}
-            {adminArea === "operations" && reason.trim().length < 3 ? (
-              <ValidationHint tone="error">
-                Für operative Änderungen muss eine Begründung mit mindestens 3 Zeichen eingetragen
-                werden.
-              </ValidationHint>
-            ) : (
-              <ValidationHint>
-                {adminModeUnlocked
-                  ? "Änderungen sind freigeschaltet und werden protokolliert."
-                  : "Beim Auslösen einer administrativen Änderung erscheint die PIN-Abfrage."}
-              </ValidationHint>
-            )}
+            <ValidationHint>
+              {adminModeUnlocked
+                ? "Änderungen sind freigeschaltet und werden automatisch protokolliert."
+                : "Beim Auslösen einer administrativen Änderung erscheint die PIN-Abfrage."}
+            </ValidationHint>
           </section>
           <section className="reset-levels" hidden={adminArea !== "backup"}>
             {!isAdministrator ? (
@@ -5924,6 +5923,17 @@ function AdminView() {
           </section>
           <section className="admin-section" hidden={adminArea !== "operations"}>
             <h2>Notfallmodus</h2>
+            <label>
+              <FieldLabel
+                label="Begründung für den Notfallmodus"
+                help="Nur außergewöhnliche Eingriffe benötigen einen frei eingegebenen Grund. Normale Betriebsänderungen werden automatisch protokolliert."
+              />
+              <input
+                onChange={(event) => setReason(event.target.value)}
+                placeholder="Mindestens 3 Zeichen"
+                value={reason}
+              />
+            </label>
             {!board?.event.emergencyMode ? (
               <button
                 className="danger-action"
@@ -6093,7 +6103,6 @@ function AdminView() {
             </div>
             <button
               className="interrupt-action"
-              disabled={reason.trim().length < 3}
               onClick={() => setEventInterruption(!(board?.event.operationalInterrupted ?? false))}
               type="button"
             >
@@ -6135,7 +6144,7 @@ function AdminView() {
                   </div>
                   <div className="secondary-actions">
                     <button
-                      disabled={!isAdministrator || reason.trim().length < 3}
+                      disabled={!isAdministrator}
                       onClick={() =>
                         requestAdminAction(() =>
                           configureProductSales(product, !product.saleEnabled),
@@ -6146,7 +6155,7 @@ function AdminView() {
                       {product.saleEnabled ? "Verkauf sperren" : "Verkauf freigeben"}
                     </button>
                     <button
-                      disabled={!isAdministrator || reason.trim().length < 3 || !saleClosesAt}
+                      disabled={!isAdministrator || !saleClosesAt}
                       onClick={() =>
                         requestAdminAction(() =>
                           configureProductSales(product, product.saleEnabled, true),
@@ -6192,7 +6201,7 @@ function AdminView() {
                       disabled={
                         !["REFUELING", "PAUSED", "INACTIVE", "INTERRUPTED"].includes(
                           aircraft.operationalState,
-                        ) || reason.trim().length < 3
+                        )
                       }
                       onClick={() => setAircraftState(aircraft.id, "AVAILABLE")}
                       type="button"
@@ -6200,50 +6209,41 @@ function AdminView() {
                       Verfügbar
                     </button>
                     <button
-                      disabled={
-                        aircraft.operationalState !== "AVAILABLE" || reason.trim().length < 3
-                      }
+                      disabled={aircraft.operationalState !== "AVAILABLE"}
                       onClick={() => setAircraftState(aircraft.id, "PAUSED")}
                       type="button"
                     >
                       Pause
                     </button>
                     <button
-                      disabled={
-                        aircraft.operationalState !== "AVAILABLE" || reason.trim().length < 3
-                      }
+                      disabled={aircraft.operationalState !== "AVAILABLE"}
                       onClick={() => setAircraftState(aircraft.id, "REFUELING")}
                       type="button"
                     >
                       Tanken aktuell
                     </button>
                     <button
-                      disabled={
-                        aircraft.operationalState !== "AVAILABLE" || reason.trim().length < 3
-                      }
+                      disabled={aircraft.operationalState !== "AVAILABLE"}
                       onClick={() => setAircraftState(aircraft.id, "INACTIVE")}
                       type="button"
                     >
                       Inaktiv
                     </button>
                     <button
-                      disabled={
-                        aircraft.operationalState !== "AVAILABLE" || reason.trim().length < 3
-                      }
+                      disabled={aircraft.operationalState !== "AVAILABLE"}
                       onClick={() => setAircraftState(aircraft.id, "INTERRUPTED")}
                       type="button"
                     >
                       Unterbrechen
                     </button>
                     <button
-                      disabled={reason.trim().length < 3}
                       onClick={() => scheduleRefuel(aircraft.id, !aircraft.refuelPlanned)}
                       type="button"
                     >
                       {aircraft.refuelPlanned ? "Vormerkung aufheben" : "Tanken vormerken"}
                     </button>
                     <button
-                      disabled={!isAdministrator || reason.trim().length < 3}
+                      disabled={!isAdministrator}
                       onClick={() =>
                         requestAdminAction(() => configureRefuelThreshold(aircraft.id))
                       }
@@ -6284,7 +6284,7 @@ function AdminView() {
                       : "Aktuell keinem Umlauf zugeordnet"}
                   </span>
                   <button
-                    disabled={!pilot.active || reason.trim().length < 3}
+                    disabled={!pilot.active}
                     onClick={() => setPilotPause(pilot.id, !pilot.paused)}
                     type="button"
                   >
@@ -7095,7 +7095,8 @@ function AdminView() {
                       factoryResetPin.length < 4 ||
                       factoryResetConfirmation !== "WERKSZUSTAND"
                     }
-                    type="submit"
+                    onClick={() => void performFactoryReset()}
+                    type="button"
                   >
                     {factoryResetBusy
                       ? "System wird zurückgesetzt …"
