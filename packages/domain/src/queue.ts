@@ -31,6 +31,14 @@ export interface BookingGroupSplitPlan {
   splitAcknowledged: boolean;
 }
 
+export function deriveResourceGroupCapacity(passengerSeats: readonly number[]): number {
+  return passengerSeats.reduce(
+    (maximum, seats) =>
+      Number.isInteger(seats) && seats > 0 ? Math.max(maximum, seats) : maximum,
+    0,
+  );
+}
+
 export function planBookingGroupSplit(input: {
   groupSize: number;
   referenceCapacity: number;
@@ -74,7 +82,7 @@ export function planNextRotations(input: {
   });
   const availableAircraft = input.aircraft
     .filter((aircraft) => aircraft.available)
-    .sort((left, right) => left.id.localeCompare(right.id));
+    .sort((left, right) => left.capacity - right.capacity || left.id.localeCompare(right.id));
   const assignments = availableAircraft.map<QueueAssignment>((aircraft) => ({
     aircraftId: aircraft.id,
     groupIds: [],
