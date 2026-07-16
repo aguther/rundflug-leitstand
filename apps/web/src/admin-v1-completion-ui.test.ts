@@ -23,8 +23,10 @@ describe("V1 administration completion UI", () => {
 
   it("keeps recovery controls visible and transfers the anonymous admin credential on restart", () => {
     expect(appSource).toContain("Administrationszugang erneuern");
-    expect(appSource).toContain("Betriebsstand erneut laden");
-    expect(appSource).toContain("Das bedeutet nicht, dass die");
+    expect(appSource).toContain("Mit PIN anmelden");
+    expect(appSource).toContain("Erneut laden");
+    expect(appSource).toContain("vorhandene Betriebsdaten bleiben unverändert");
+    expect(appSource).toContain('className="secondary-actions admin-recovery-actions"');
     expect(appSource).toContain("attemptedDeviceCredentialRecoveries.has(deviceId)");
     expect(appSource).toContain("requestAdminDeviceRecovery()");
     expect(appSource).toContain("recoverAdminDevice(");

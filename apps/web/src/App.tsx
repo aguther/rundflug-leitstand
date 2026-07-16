@@ -4288,25 +4288,25 @@ function AdminView() {
                 {adminModeUnlocked ? "Bearbeitungsmodus sperren" : "Bearbeitungsmodus entsperren"}
               </button>
             ) : (
-              <button
-                aria-busy={refreshing}
-                className="secondary-action"
-                disabled={refreshing}
-                onClick={() => {
-                  if (deviceAuthorizationRejected) {
-                    requestAdminDeviceRecovery();
-                    return;
-                  }
-                  void refresh();
-                }}
-                type="button"
-              >
-                {refreshing
-                  ? "Betriebsstand wird geladen …"
-                  : deviceAuthorizationRejected
-                    ? "Administrationszugang erneuern"
-                    : "Betriebsstand erneut laden"}
-              </button>
+              <div className="secondary-actions admin-recovery-actions">
+                <button
+                  aria-busy={refreshing}
+                  className="secondary-action"
+                  disabled={refreshing}
+                  onClick={() => void refresh()}
+                  type="button"
+                >
+                  {refreshing ? "Betriebsstand wird geladen …" : "Erneut laden"}
+                </button>
+                <button
+                  className="secondary-action"
+                  disabled={refreshing}
+                  onClick={requestAdminDeviceRecovery}
+                  type="button"
+                >
+                  Mit PIN anmelden
+                </button>
+              </div>
             )}
             {!isAdministrator ? (
               deviceAuthorizationRejected ? (
@@ -4316,9 +4316,8 @@ function AdminView() {
                 </ValidationHint>
               ) : error ? (
                 <ValidationHint tone="error">
-                  Der Betriebsstand ist serverseitig nicht verfügbar. Das bedeutet nicht, dass die
-                  Gerätebindung verloren ist. PIN-Modus und Reset erscheinen wieder, sobald ein
-                  bestätigter Stand geladen wurde.
+                  Der Betriebsstand konnte nicht geladen werden. Erneut laden oder mit der
+                  Administrator-PIN anmelden; vorhandene Betriebsdaten bleiben unverändert.
                 </ValidationHint>
               ) : (
                 <ValidationHint>Gerätebindung und Betriebsstand werden geprüft.</ValidationHint>
