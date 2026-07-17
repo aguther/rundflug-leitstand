@@ -6,6 +6,7 @@ import { ThemeProvider } from "./design-system/theme";
 import "./design-system/tokens.css";
 import "./design-system/base.css";
 import "./styles.css";
+import "./features/admin/admin-v12.css";
 
 let reloadingForServiceWorkerUpdate = false;
 navigator.serviceWorker?.addEventListener("controllerchange", () => {

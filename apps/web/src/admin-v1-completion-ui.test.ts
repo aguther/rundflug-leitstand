@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import appSource from "./App.tsx?raw";
+import appSource from "./LegacyApp.tsx?raw";
 import adminUxSource from "./admin-ux.tsx?raw";
 
 const stylesSource = readFileSync(new URL("./styles.css", import.meta.url), "utf8");
@@ -41,11 +41,11 @@ describe("V1 administration completion UI", () => {
     expect(appSource).toContain("Bearbeitungsmodus entsperren");
   });
 
-  it("keeps one-time PIN actions usable without retaining the PIN", () => {
-    expect(appSource).toContain('const adminPinRef = useRef("")');
-    expect(appSource).toContain("adminPinRef.current = value");
-    expect(appSource.match(/adminPin: adminPinRef\.current/g)?.length).toBeGreaterThan(10);
-    expect(appSource).toContain('if (!adminModeUnlocked) setAdminPin("")');
+  it("uses the authenticated administrator session for normal changes", () => {
+    expect(appSource).toContain("const { session, logout } = useAuth()");
+    expect(appSource).toContain('useState(session?.account.role === "ADMIN" ? "000000" : "")');
+    expect(appSource).toContain('useState(session?.account.role === "ADMIN")');
+    expect(appSource).toContain("<AccountManagement />");
   });
 
   it("makes child guidance directly selectable and explains meaningful admin fields", () => {

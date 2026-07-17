@@ -1,0 +1,302 @@
+/* V1.2 administration surface — approved compact Cloudflare-inspired concept. */
+.app-shell.admin-shell {
+  min-height: 100dvh;
+  color: var(--ui-text);
+  background: var(--ui-bg);
+}
+
+.app-shell.admin-shell > .app-header {
+  min-height: var(--header-height);
+  padding: 0 18px;
+  border-bottom: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+}
+
+.app-shell.admin-shell > .app-header nav {
+  display: flex;
+}
+
+.admin-shell > .app-header > span {
+  color: var(--ui-muted);
+  border-left-color: var(--ui-border);
+}
+
+.admin-shell .admin-layout {
+  width: 100%;
+  min-height: calc(100dvh - var(--header-height));
+  margin: 0;
+  grid-template-columns: 208px minmax(0, 1fr);
+  color: var(--ui-text);
+  background: var(--ui-bg);
+}
+
+.admin-shell .admin-side-nav {
+  min-height: calc(100dvh - var(--header-height));
+  padding: 22px 8px;
+  border-color: var(--ui-border);
+  background: var(--ui-surface);
+}
+
+.admin-shell .admin-side-nav::before {
+  color: var(--ui-muted);
+}
+.admin-shell .admin-side-nav button {
+  color: var(--ui-muted);
+}
+.admin-shell .admin-side-nav button:hover {
+  color: var(--ui-text);
+  background: var(--ui-control-hover);
+}
+.admin-shell .admin-side-nav button.active {
+  color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+  border-left-color: var(--ui-accent);
+}
+
+.admin-shell .admin-workspace,
+.admin-shell .admin-workspace.master-data-active,
+.admin-shell .admin-workspace.master-data-active.editor-open {
+  color: var(--ui-text);
+  background: var(--ui-bg);
+}
+
+.admin-shell .admin-page-header {
+  min-height: 72px;
+  padding: 14px 24px;
+  border-bottom: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+}
+.admin-shell .admin-page-header h1 {
+  margin: 0;
+  font-size: 20px;
+}
+.admin-shell .admin-page-header p {
+  margin: 4px 0 0;
+  color: var(--ui-muted);
+  font-size: 13px;
+}
+.admin-shell .event-phase {
+  font-size: 12px;
+}
+
+.admin-shell .admin-mode-bar.unlocked {
+  display: none;
+}
+
+.admin-shell .admin-workspace.master-data-active > .master-data-heading {
+  min-height: 64px;
+  padding: 0 24px;
+  border-color: var(--ui-border);
+  background: var(--ui-surface);
+}
+.admin-shell .master-data-heading h1 {
+  color: var(--ui-text);
+}
+.admin-shell .master-data-heading h1 span,
+.admin-shell .master-data-heading h1 strong {
+  color: var(--ui-muted);
+}
+
+.admin-shell .admin-workspace.master-data-active > .master-data-nav {
+  min-height: 46px;
+  padding: 0 20px;
+  border-color: var(--ui-border);
+  background: var(--ui-surface);
+}
+.admin-shell .admin-workspace.master-data-active > .master-data-nav button {
+  min-height: 46px;
+  color: var(--ui-muted);
+}
+.admin-shell .admin-workspace.master-data-active > .master-data-nav button:hover {
+  color: var(--ui-text);
+}
+.admin-shell .admin-workspace.master-data-active > .master-data-nav button.active {
+  color: var(--ui-accent);
+  border-bottom-color: var(--ui-accent);
+}
+
+.admin-shell .admin-workspace.master-data-active > .master-data-workspace {
+  padding: 18px 20px;
+  background: var(--ui-bg);
+}
+.admin-shell .admin-workspace.master-data-active .master-data-search input {
+  color: var(--ui-text);
+  background: var(--ui-control);
+}
+.admin-shell .admin-workspace.master-data-active .master-data-table-scroll {
+  border-color: var(--ui-border);
+  background: var(--ui-surface);
+}
+.admin-shell .admin-workspace.master-data-active .master-data-table th {
+  color: var(--ui-muted);
+  background: var(--ui-surface-subtle);
+}
+.admin-shell .admin-workspace.master-data-active .master-data-table td {
+  height: 48px;
+  border-color: var(--ui-border);
+}
+.admin-shell .admin-workspace.master-data-active .master-data-table tbody tr:hover {
+  background: var(--ui-control-hover);
+}
+.admin-shell .admin-workspace.master-data-active .master-data-table tbody tr.selected {
+  color: var(--ui-text);
+  background: var(--ui-accent-soft);
+  box-shadow: inset 2px 0 var(--ui-accent);
+}
+
+.admin-shell .admin-workspace.master-data-active.editor-open {
+  grid-template-columns: minmax(480px, 1fr) minmax(360px, 420px);
+}
+.admin-shell .admin-workspace.master-data-active > .master-data-drawer {
+  max-height: calc(100dvh - var(--header-height));
+  padding: 18px;
+  color: var(--ui-text);
+  border-color: var(--ui-border);
+  background: var(--ui-surface);
+}
+.admin-shell .admin-workspace.master-data-active .drawer-heading {
+  top: -18px;
+  margin: -18px -18px 14px;
+  padding: 17px 18px;
+  border-color: var(--ui-border);
+  background: var(--ui-surface);
+}
+.admin-shell .admin-workspace.master-data-active .master-data-drawer :is(input, select, textarea) {
+  color: var(--ui-text);
+  border-color: var(--ui-border-strong);
+  background: var(--ui-control);
+}
+
+.admin-shell .reset-levels {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  padding: 18px 24px;
+}
+.admin-shell .reset-level-row {
+  min-height: 150px;
+  grid-template-columns: 1fr;
+  align-content: space-between;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-md);
+  background: var(--ui-surface);
+}
+.admin-shell .reset-level-row h2 {
+  margin: 0 0 6px;
+  font-size: 15px;
+}
+.admin-shell .reset-level-row p {
+  margin: 0;
+  color: var(--ui-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.admin-shell .reset-level-row > button {
+  width: 100%;
+  min-height: 38px;
+  justify-self: stretch;
+}
+.admin-shell .factory-reset-row {
+  border-color: color-mix(in srgb, var(--ui-danger) 45%, var(--ui-border));
+  background: var(--ui-danger-soft);
+}
+
+.admin-shell .restart-editor {
+  margin: 0 24px 24px;
+  padding: 18px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-md);
+  background: var(--ui-surface);
+}
+.admin-shell .section-heading-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+.admin-shell .section-heading-row h2 {
+  margin: 0;
+}
+.admin-shell .section-heading-row button {
+  min-height: 34px;
+  color: var(--ui-text);
+  border: 1px solid var(--ui-border);
+  background: var(--ui-control);
+}
+
+.admin-shell .metrics-grid {
+  padding: 18px 24px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+.admin-shell .metrics-grid > div {
+  min-height: 72px;
+  padding: 12px;
+  border: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+}
+
+@media (max-width: 1080px) {
+  .admin-shell .reset-levels {
+    grid-template-columns: 1fr;
+  }
+  .admin-shell .reset-level-row {
+    min-height: 0;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+  }
+  .admin-shell .reset-level-row > button {
+    width: auto;
+  }
+  .admin-shell .metrics-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .app-shell.admin-shell > .app-header nav {
+    display: none;
+  }
+  .admin-shell .admin-layout {
+    grid-template-columns: 1fr;
+  }
+  .admin-shell .admin-side-nav {
+    min-height: 0;
+    padding: 6px 8px;
+  }
+  .admin-shell .admin-workspace.master-data-active.editor-open {
+    grid-template-columns: 1fr;
+  }
+  .admin-shell .admin-workspace.master-data-active > .master-data-drawer {
+    inset: var(--header-height) 0 0;
+    max-height: none;
+  }
+}
+
+@media (max-width: 620px) {
+  .admin-shell .admin-page-header {
+    padding-inline: 16px;
+  }
+  .admin-shell .event-phase {
+    display: none;
+  }
+  .admin-shell .reset-levels {
+    padding: 12px;
+  }
+  .admin-shell .reset-level-row {
+    grid-template-columns: 1fr;
+  }
+  .admin-shell .reset-level-row > button {
+    width: 100%;
+  }
+  .admin-shell .restart-editor {
+    margin: 0 12px 16px;
+    padding: 14px;
+  }
+  .admin-shell .metrics-grid {
+    grid-template-columns: 1fr 1fr;
+    padding: 12px;
+  }
+}

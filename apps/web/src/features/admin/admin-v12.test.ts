@@ -1,0 +1,31 @@
+import { readFileSync } from "node:fs";
+import { describe, expect, it } from "vitest";
+import appSource from "../../LegacyApp.tsx?raw";
+import mainSource from "../../main.tsx?raw";
+
+const stylesSource = readFileSync(new URL("./admin-v12.css", import.meta.url), "utf8");
+
+describe("V1.2 compact administration", () => {
+  it("loads the semantic administration layer after the legacy styles", () => {
+    expect(mainSource.indexOf('import "./styles.css"')).toBeLessThan(
+      mainSource.indexOf('import "./features/admin/admin-v12.css"'),
+    );
+    expect(stylesSource).toContain("var(--ui-surface)");
+    expect(stylesSource).toContain("var(--ui-bg)");
+  });
+
+  it("uses a dense table with an editor drawer", () => {
+    expect(stylesSource).toContain("minmax(360px, 420px)");
+    expect(stylesSource).toContain("height: 48px");
+    expect(stylesSource).toContain(".master-data-drawer");
+  });
+
+  it("opens restart details only after choosing a reset level", () => {
+    expect(appSource).toContain(
+      "const [restartEditorOpen, setRestartEditorOpen] = useState(false)",
+    );
+    expect(appSource).toContain('hidden={adminArea !== "backup" || !restartEditorOpen}');
+    expect(appSource).toContain("setRestartEditorOpen(true)");
+    expect(appSource).toContain("setRestartEditorOpen(false)");
+  });
+});
