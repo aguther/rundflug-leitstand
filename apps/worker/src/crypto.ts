@@ -22,7 +22,9 @@ export async function verifyCredential(
   return difference === 0;
 }
 
-const PIN_HASH_ITERATIONS = 210_000;
+// Cloudflare Workers Web Crypto currently rejects PBKDF2 iteration counts above 100,000.
+// Keep the configured work factor at the platform maximum so setup and login use the same bound.
+const PIN_HASH_ITERATIONS = 100_000;
 
 function bytesToBase64Url(bytes: Uint8Array): string {
   let binary = "";
@@ -66,6 +68,7 @@ export async function verifyPin(pin: string, encoded: string): Promise<boolean> 
     algorithm !== "pbkdf2-sha256" ||
     !Number.isSafeInteger(iterations) ||
     iterations < 100_000 ||
+    iterations > PIN_HASH_ITERATIONS ||
     !rawSalt ||
     !rawExpected ||
     !/^\d{6,12}$/.test(pin)
