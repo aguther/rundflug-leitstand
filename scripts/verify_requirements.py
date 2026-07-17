@@ -30,8 +30,8 @@ def fail(message: str) -> None:
 
 def main() -> None:
     requirements = load_json_compatible_yaml(YAML_PATH)
-    if len(requirements) != 199:
-        fail(f"expected 199 requirements, found {len(requirements)}")
+    if len(requirements) != 207:
+        fail(f"expected 207 requirements, found {len(requirements)}")
 
     ids = [item["id"] for item in requirements]
     if len(ids) != len(set(ids)):
@@ -101,8 +101,8 @@ def main() -> None:
         fail(f"backlog packages missing from v1-initial.md: {missing_packages}")
 
     v1_must = [row for row in v1_rows if row["Priorität"] == "MUSS"]
-    if len(v1_must) != 158:
-        fail(f"expected 158 V1 MUSS requirements, found {len(v1_must)}")
+    if len(v1_must) != 166:
+        fail(f"expected 166 V1 MUSS requirements, found {len(v1_must)}")
 
     print(
         f"OK: {len(ids)} unique requirements, {len(v1_rows)} assigned V1 rows "
