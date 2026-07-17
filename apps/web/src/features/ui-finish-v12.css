@@ -47,32 +47,61 @@
   :is(.primary-action, .assist-claim, .assist-finish, .login-submit) {
   color: #fff;
   border: 1px solid color-mix(in srgb, var(--ui-accent) 78%, #063b7a);
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--ui-accent) 82%, white 18%) 0%,
-    var(--ui-accent) 48%,
-    color-mix(in srgb, var(--ui-accent) 78%, black 22%) 100%
-  );
+  background: var(--ui-accent);
   box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 25%),
-    0 1px 2px rgb(0 0 0 / 18%),
-    0 5px 14px color-mix(in srgb, var(--ui-accent) 22%, transparent);
+    inset 0 0 0 1px rgb(255 255 255 / 8%),
+    0 1px 2px rgb(0 0 0 / 16%);
   font-weight: 650;
-  text-shadow: 0 1px 1px rgb(0 0 0 / 18%);
 }
 
 :is(.app-shell, .flight-line-shell)
   :is(.primary-action, .assist-claim, .assist-finish, .login-submit):hover:not(:disabled) {
   border-color: color-mix(in srgb, var(--ui-accent-hover) 76%, white 8%);
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--ui-accent-hover) 80%, white 20%),
-    var(--ui-accent-hover)
-  );
+  background: var(--ui-accent-hover);
   box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 32%),
-    0 2px 4px rgb(0 0 0 / 20%),
-    0 8px 22px color-mix(in srgb, var(--ui-accent) 28%, transparent);
+    inset 0 0 0 1px rgb(255 255 255 / 12%),
+    0 2px 4px rgb(0 0 0 / 18%);
+}
+
+:is(.app-shell, .flight-line-shell)
+  :is(
+    .secondary-action,
+    .dialog-actions > button:not(.primary-action, .danger-action),
+    .editor-actions > button:not(.primary-action, .danger-action),
+    .table-action,
+    .table-overflow-action
+  ) {
+  min-height: var(--control-compact);
+  color: var(--ui-text);
+  border: 1px solid var(--ui-border-strong);
+  background: var(--ui-control);
+  box-shadow: inset 0 0 0 1px var(--ui-highlight);
+  font-weight: 600;
+}
+
+:is(.app-shell, .flight-line-shell)
+  :is(
+    .secondary-action,
+    .dialog-actions > button:not(.primary-action, .danger-action),
+    .editor-actions > button:not(.primary-action, .danger-action),
+    .table-action,
+    .table-overflow-action
+  ):hover:not(:disabled) {
+  color: var(--ui-text);
+  border-color: color-mix(in srgb, var(--ui-accent) 42%, var(--ui-border-strong));
+  background: var(--ui-control-hover);
+}
+
+:is(.app-shell, .flight-line-shell) .danger-action {
+  color: #fff;
+  border: 1px solid color-mix(in srgb, var(--ui-danger) 80%, black);
+  background: var(--ui-danger);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 8%);
+  font-weight: 650;
+}
+
+:is(.app-shell, .flight-line-shell) .danger-action:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--ui-danger) 86%, black);
 }
 
 .app-header {
@@ -126,11 +155,7 @@
 }
 
 .admin-shell .admin-workspace.master-data-active .master-data-table tbody tr.selected {
-  background: linear-gradient(
-    90deg,
-    color-mix(in srgb, var(--ui-accent-soft) 86%, var(--ui-surface)),
-    color-mix(in srgb, var(--ui-accent-soft) 44%, var(--ui-surface))
-  );
+  background: color-mix(in srgb, var(--ui-accent-soft) 68%, var(--ui-surface));
   box-shadow: inset 3px 0 0 var(--ui-accent);
 }
 
@@ -152,7 +177,7 @@
 
 .flight-line-console-header,
 .assist-header {
-  background: linear-gradient(180deg, var(--ui-surface-raised), var(--ui-surface));
+  background: var(--ui-surface);
   box-shadow: 0 8px 28px rgb(0 0 0 / 10%);
 }
 
@@ -166,11 +191,7 @@
 .console-toolbar details > summary {
   color: #fff;
   border-color: color-mix(in srgb, var(--ui-accent) 78%, #063b7a);
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--ui-accent) 82%, white 18%),
-    color-mix(in srgb, var(--ui-accent) 78%, black 22%)
-  );
+  background: var(--ui-accent);
   box-shadow:
     inset 0 1px 0 rgb(255 255 255 / 24%),
     0 5px 14px rgb(0 0 0 / 16%);
@@ -194,45 +215,26 @@
 
 .console-aircraft-rows > button.selected,
 .console-matrix-row.selected {
-  background: linear-gradient(
-    90deg,
-    color-mix(in srgb, var(--ui-accent-soft) 92%, var(--ui-surface)),
-    color-mix(in srgb, var(--ui-accent-soft) 54%, var(--ui-surface))
-  );
+  background: color-mix(in srgb, var(--ui-accent-soft) 72%, var(--ui-surface));
   box-shadow: inset 3px 0 0 var(--ui-accent);
 }
 
 .flight-assist {
-  background:
-    radial-gradient(
-      circle at 18% -12%,
-      color-mix(in srgb, var(--ui-accent) 9%, transparent),
-      transparent 34%
-    ),
-    radial-gradient(
-      circle at 84% 16%,
-      color-mix(in srgb, var(--ui-accent) 6%, transparent),
-      transparent 30%
-    ),
-    var(--ui-bg);
+  background: var(--ui-bg);
 }
 
 .assist-pick-list,
 .assist-current,
 .assist-gate-groups {
   border-radius: var(--radius-lg);
-  background: linear-gradient(145deg, var(--ui-surface-raised), var(--ui-surface));
+  background: var(--ui-surface);
   box-shadow: var(--ui-shadow-soft);
 }
 
 .assist-aircraft-cards article,
 .assist-current-summary {
   border-radius: var(--radius-md);
-  background: linear-gradient(
-    145deg,
-    color-mix(in srgb, var(--ui-surface-raised) 92%, var(--ui-accent-soft) 8%),
-    var(--ui-surface)
-  );
+  background: var(--ui-surface-raised);
   box-shadow:
     inset 0 1px 0 var(--ui-highlight),
     0 4px 14px rgb(0 0 0 / 7%);
@@ -273,18 +275,10 @@
 
 .assist-actions button {
   border-radius: var(--radius-sm);
-  background: linear-gradient(
-    180deg,
-    var(--ui-control),
-    color-mix(in srgb, var(--ui-control) 88%, black 12%)
-  );
+  background: var(--ui-control);
   box-shadow:
     inset 0 1px 0 var(--ui-highlight),
     0 1px 2px rgb(0 0 0 / 10%);
-}
-
-[data-theme="light"] .assist-actions button {
-  background: linear-gradient(180deg, #fff, #f2f4f7);
 }
 
 .flight-assist .assist-actions button:hover:not(:disabled) {

@@ -2,7 +2,13 @@ import { useEffect, useRef, useState } from "react";
 import { BrandMark } from "../../design-system/BrandMark";
 import { ThemeToggle } from "../../design-system/ThemeToggle";
 import { useAuth } from "./AuthContext";
-import { type LoginAccount, loadLoginAccounts, loginOperator, roleLabels } from "./api";
+import {
+  type LoginAccount,
+  loadLoginAccounts,
+  loginOperator,
+  loginRoleOrder,
+  roleLabels,
+} from "./api";
 import { operatorDeviceId } from "./device";
 import "./login.css";
 
@@ -79,11 +85,19 @@ export function LoginPage() {
             onChange={(event) => setAccountId(event.target.value)}
           >
             <option value="">Konto auswählen</option>
-            {accounts.map((account) => (
-              <option key={account.id} value={account.id}>
-                {account.loginCode} · {roleLabels[account.role]}
-              </option>
-            ))}
+            {loginRoleOrder.map((role) => {
+              const roleAccounts = accounts.filter((account) => account.role === role);
+              if (roleAccounts.length === 0) return null;
+              return (
+                <optgroup key={role} label={roleLabels[role]}>
+                  {roleAccounts.map((account) => (
+                    <option key={account.id} value={account.id}>
+                      {account.loginCode}
+                    </option>
+                  ))}
+                </optgroup>
+              );
+            })}
           </select>
           <label htmlFor="login-pin">PIN</label>
           <input

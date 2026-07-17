@@ -12,7 +12,7 @@ describe("V1.2 visual finish", () => {
   });
 
   it("provides polished controls, panels and responsive Assist actions", () => {
-    expect(stylesSource).toContain("linear-gradient(");
+    expect(stylesSource).not.toMatch(/(?:linear|radial)-gradient\(/);
     expect(stylesSource).toContain("var(--ui-shadow-soft)");
     expect(stylesSource).toContain(".assist-actions button");
     expect(stylesSource).toContain(".console-toolbar details > summary");

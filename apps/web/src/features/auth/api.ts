@@ -54,7 +54,7 @@ export async function createManagedAccount(input: CreateOperatorAccount): Promis
 
 export async function updateManagedAccount(
   accountId: string,
-  input: { active?: boolean; pin?: string },
+  input: { active?: boolean; pin?: string; revokeSessions?: true },
 ): Promise<void> {
   const response = await fetch(`/api/admin/operator-accounts/${encodeURIComponent(accountId)}`, {
     method: "PATCH",
@@ -74,3 +74,12 @@ export const roleLabels: Record<OperatorRole, string> = {
   FLIGHT_DIRECTOR: "Leitstand",
   DISPLAY: "Anzeige",
 };
+
+export const loginRoleOrder: readonly OperatorRole[] = [
+  "ADMIN",
+  "FLIGHT_DIRECTOR",
+  "FLIGHT_LINE_LEAD",
+  "FLIGHT_LINE",
+  "CASHIER",
+  "DISPLAY",
+];

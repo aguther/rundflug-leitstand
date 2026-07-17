@@ -95,12 +95,21 @@ export function FlightLineAssist({
   const [claimedAircraftId, setClaimedAircraftId] = useState<string | null>(
     ownServerClaim?.aircraftId ?? null,
   );
+  const [queueIndex, setQueueIndex] = useState(0);
   const [claimError, setClaimError] = useState<string | null>(null);
   const availableAircraft = aircraft.filter((entry) => {
     const claim = assistClaims.find((candidate) => candidate.aircraftId === entry.id);
     return !claim || claim.deviceId === deviceId || entry.id === claimedAircraftId;
   });
   const claimedAircraft = aircraft.find((entry) => entry.id === claimedAircraftId);
+  const normalizedQueueIndex =
+    availableAircraft.length === 0 ? 0 : queueIndex % availableAircraft.length;
+  const visibleAircraft = availableAircraft.length
+    ? [
+        ...availableAircraft.slice(normalizedQueueIndex),
+        ...availableAircraft.slice(0, normalizedQueueIndex),
+      ]
+    : [];
   const activeAircraft = claimedAircraft ?? selectedAircraft;
   const activeRotation = activeAircraft
     ? rotationForAircraft(activeAircraft, board.rotations, board.products)
@@ -199,7 +208,7 @@ export function FlightLineAssist({
             </button>
           </div>
           <div className="assist-aircraft-cards">
-            {availableAircraft.slice(0, 4).map((entry) => {
+            {visibleAircraft.slice(0, 4).map((entry) => {
               const rotation = rotationForAircraft(entry, board.rotations, board.products);
               const state = assistState(entry, rotation);
               const claimed = entry.id === claimedAircraftId;
@@ -228,8 +237,17 @@ export function FlightLineAssist({
             })}
           </div>
           {availableAircraft.length > 4 ? (
-            <button className="assist-more" type="button">
+            <button className="assist-more assist-more-desktop" type="button">
               Weitere anzeigen
+            </button>
+          ) : null}
+          {availableAircraft.length > 1 ? (
+            <button
+              className="assist-more assist-more-phone"
+              onClick={() => setQueueIndex((current) => (current + 1) % availableAircraft.length)}
+              type="button"
+            >
+              Nächstes Flugzeug
             </button>
           ) : null}
         </section>

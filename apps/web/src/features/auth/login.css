@@ -1,12 +1,6 @@
 .login-page {
   min-height: 100dvh;
-  background:
-    radial-gradient(
-      circle at 50% 0,
-      color-mix(in srgb, var(--ui-accent) 8%, transparent),
-      transparent 42%
-    ),
-    var(--ui-bg);
+  background: var(--ui-bg);
 }
 
 .login-topbar {

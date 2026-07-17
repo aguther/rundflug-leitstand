@@ -688,12 +688,16 @@ export type CreateOperatorAccount = z.infer<typeof createOperatorAccountSchema>;
 export const updateOperatorAccountSchema = z
   .object({
     active: z.boolean().optional(),
+    revokeSessions: z.literal(true).optional(),
     pin: z
       .string()
       .regex(/^\d{6,12}$/)
       .optional(),
   })
-  .refine((value) => value.active !== undefined || value.pin !== undefined);
+  .refine(
+    (value) =>
+      value.active !== undefined || value.pin !== undefined || value.revokeSessions === true,
+  );
 export type UpdateOperatorAccount = z.infer<typeof updateOperatorAccountSchema>;
 
 export const adminPinVerificationSchema = z.object({
