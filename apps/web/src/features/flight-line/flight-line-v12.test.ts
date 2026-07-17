@@ -30,4 +30,10 @@ describe("V1.2 Flight Line surfaces", () => {
     expect(stylesSource).toContain("--console-bg: var(--ui-bg)");
     expect(stylesSource).toContain("min-height: 34px");
   });
+
+  it("shows one actionable aircraft at a time on a phone", () => {
+    expect(assistSource).toContain("Nächstes Flugzeug");
+    expect(stylesSource).toContain(".assist-aircraft-cards article:nth-child(n + 2)");
+    expect(stylesSource).toContain(".assist-more-phone");
+  });
 });

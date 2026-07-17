@@ -490,7 +490,10 @@ app.patch("/api/admin/operator-accounts/:accountId", async (context) => {
   const result = await context.env.DB.prepare(
     `UPDATE operator_accounts
         SET active = COALESCE(?1, active), pin_hash = COALESCE(?2, pin_hash),
-            session_version = CASE WHEN ?1 = 0 OR ?2 IS NOT NULL THEN session_version + 1 ELSE session_version END,
+            session_version = CASE
+              WHEN ?1 = 0 OR ?2 IS NOT NULL OR ?5 = 1 THEN session_version + 1
+              ELSE session_version
+            END,
             failed_attempts = 0, locked_until = NULL, updated_at = ?3
       WHERE id = ?4`,
   )
@@ -499,6 +502,7 @@ app.patch("/api/admin/operator-accounts/:accountId", async (context) => {
       pinHash,
       now,
       accountId,
+      parsed.data.revokeSessions ? 1 : 0,
     )
     .run();
   if (!result.meta.changes) {

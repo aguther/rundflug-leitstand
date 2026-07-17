@@ -6704,13 +6704,13 @@ function AdminView() {
             ))}
           </section>
           <section className="admin-section" hidden={adminArea !== "backup"}>
-            <h2>Geräte ohne Helferkonten</h2>
+            <h2>Technische Geräte</h2>
             <div className="device-admin-context">
               <div>
                 <strong>Geräteänderung bestätigen</strong>
                 <span>
-                  Änderungen nutzen den Bearbeitungsmodus oder fragen die PIN direkt ab.
-                  Begründungen sind zusätzlich für Widerrufe erforderlich.
+                  Gerätebindungen werden durch das angemeldete Administrationskonto verwaltet.
+                  Begründungen sind nur für Widerrufe erforderlich.
                 </span>
               </div>
               <label>

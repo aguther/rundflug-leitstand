@@ -8,13 +8,7 @@
 
 .standard-fids {
   color: var(--ui-text);
-  background:
-    radial-gradient(
-      circle at 50% -20%,
-      color-mix(in srgb, var(--ui-accent) 12%, transparent),
-      transparent 48%
-    ),
-    var(--ui-bg);
+  background: var(--ui-bg);
 }
 
 .standard-fids header,

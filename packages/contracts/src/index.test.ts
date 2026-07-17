@@ -14,9 +14,16 @@ import {
   rotationOperationalSummarySchema,
   stageOutageRecoveryRequestSchema,
   ticketSearchResponseSchema,
+  updateOperatorAccountSchema,
 } from "./index";
 
 describe("commandEnvelopeSchema", () => {
+  it("allows an administrator to revoke account sessions without changing the PIN", () => {
+    expect(updateOperatorAccountSchema.parse({ revokeSessions: true })).toEqual({
+      revokeSessions: true,
+    });
+    expect(() => updateOperatorAccountSchema.parse({})).toThrow();
+  });
   it("accepts only a PIN and hashed client credential for admin recovery", () => {
     const parsed = adminDeviceRecoverySchema.parse({
       adminPin: "000000",

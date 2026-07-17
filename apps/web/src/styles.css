@@ -4563,13 +4563,7 @@ p {
 /* Approved administration concept: fixed navigation, dense list and contextual editor. */
 .admin-shell {
   min-height: 100dvh;
-  background:
-    radial-gradient(
-      circle at 76% 0%,
-      color-mix(in srgb, var(--ui-accent) 4%, transparent),
-      transparent 28%
-    ),
-    #0b0d0f;
+  background: #0b0d0f;
 }
 .admin-shell > .app-header {
   min-height: 58px;
@@ -5245,8 +5239,7 @@ p {
   grid-template-columns: 160px 310px minmax(0, 1fr);
   grid-template-rows: 62px minmax(0, 1fr);
   color: #e7eaee;
-  background:
-    radial-gradient(circle at 75% 10%, rgb(31 42 50 / 18%), transparent 32%), var(--console-bg);
+  background: var(--console-bg);
   font-family: Inter, "Segoe UI", Arial, sans-serif;
 }
 .flight-line-console-header {
@@ -5837,8 +5830,7 @@ p {
   margin: 0 auto;
   padding-bottom: 22px;
   color: #eef1f4;
-  background:
-    radial-gradient(circle at 76% 4%, rgba(38, 132, 255, 0.055), transparent 27%), #080a0c;
+  background: #080a0c;
 }
 .assist-header {
   min-height: 90px;
@@ -6044,7 +6036,7 @@ p {
   align-self: end;
   color: #fff;
   border-color: #277de1;
-  background: linear-gradient(180deg, #2684ff, #1265c5);
+  background: #2684ff;
 }
 .assist-more {
   width: 100%;
@@ -6106,7 +6098,7 @@ p {
   min-height: 54px;
   color: #fff;
   border-color: #277de1;
-  background: linear-gradient(180deg, #2684ff, #1265c5);
+  background: #2684ff;
 }
 .assist-empty {
   color: var(--assist-muted);

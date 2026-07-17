@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import appSource from "../App.tsx?raw";
 
 describe("V1.2 web architecture", () => {
   it("keeps App.tsx as composition glue", () => {
@@ -18,5 +19,11 @@ describe("V1.2 web architecture", () => {
     ]) {
       expect(() => readFileSync(new URL(relative, import.meta.url), "utf8")).not.toThrow();
     }
+  });
+
+  it("keeps anonymous FIDS and ticket views public while protecting internal workspaces", () => {
+    expect(appSource).toContain('pathname === "/fids"');
+    expect(appSource).toContain('pathname.startsWith("/fids/")');
+    expect(appSource).toContain("if (!session) return <LoginPage />");
   });
 });

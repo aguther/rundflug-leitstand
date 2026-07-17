@@ -168,6 +168,10 @@
   gap: 7px;
 }
 
+.assist-more-phone {
+  display: none;
+}
+
 .assist-header-tools .assist-device {
   min-height: 34px;
   display: inline-flex;
@@ -257,6 +261,15 @@
 }
 
 @media (max-width: 560px) {
+  .assist-aircraft-cards article:nth-child(n + 2),
+  .assist-more-desktop {
+    display: none;
+  }
+
+  .assist-more-phone {
+    display: block;
+    min-height: 48px;
+  }
   .assist-header-tools > a,
   .assist-device {
     display: none;

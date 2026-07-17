@@ -49,7 +49,7 @@ export function AccountManagement() {
 
   async function changeAccount(
     account: OperatorAccountSummary,
-    input: { active?: boolean; pin?: string },
+    input: { active?: boolean; pin?: string; revokeSessions?: true },
   ) {
     setBusy(true);
     setMessage(null);
@@ -175,6 +175,13 @@ export function AccountManagement() {
               />
             </label>
             <div className="dialog-actions">
+              <button
+                disabled={busy}
+                type="button"
+                onClick={() => void changeAccount(selected, { revokeSessions: true })}
+              >
+                Sitzungen widerrufen
+              </button>
               <button
                 type="button"
                 onClick={() => void changeAccount(selected, { active: !selected.active })}
