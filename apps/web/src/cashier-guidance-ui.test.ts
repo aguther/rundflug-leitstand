@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import appSource from "./LegacyApp.tsx?raw";
+import appSource from "./cashier-view.tsx?raw";
 
 describe("cashier child companion warning UI", () => {
   it("renders a prominent accessible and non-safety-related warning", () => {

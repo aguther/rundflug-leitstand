@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { expectedReviewAtFromPause } from "./flight-line-pause";
 import supervisorSource from "./flight-line-supervisor.tsx?raw";
-import appSource from "./LegacyApp.tsx?raw";
+import appSource from "./flight-line-view.tsx?raw";
 
 describe("Flight Line Supervisor", () => {
   it("keeps every aircraft visible and makes the aircraft the primary operational object", () => {

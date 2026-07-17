@@ -3,9 +3,9 @@ import { destinationsForRole, homeForRole, isDestinationActive } from "./app/nav
 import { AuthProvider, useAuth } from "./features/auth/AuthContext";
 import { LoginPage } from "./features/auth/LoginPage";
 
-const LegacyApp = lazy(async () => {
-  const module = await import("./LegacyApp");
-  return { default: module.LegacyApp };
+const FeatureRouter = lazy(async () => {
+  const module = await import("./FeatureRouter");
+  return { default: module.FeatureRouter };
 });
 
 function ApplicationLoading() {
@@ -32,7 +32,7 @@ function AuthenticatedApplication() {
   if (isPublicRoute(window.location.pathname))
     return (
       <Suspense fallback={<ApplicationLoading />}>
-        <LegacyApp />
+        <FeatureRouter />
       </Suspense>
     );
   if (loading)
@@ -58,7 +58,7 @@ function AuthenticatedApplication() {
   }
   return (
     <Suspense fallback={<ApplicationLoading />}>
-      <LegacyApp />
+      <FeatureRouter />
     </Suspense>
   );
 }

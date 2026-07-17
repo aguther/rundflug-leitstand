@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
+import routerSource from "./FeatureRouter.tsx?raw";
 import assistSource from "./flight-line-assist.tsx?raw";
-import appSource from "./LegacyApp.tsx?raw";
+import flightLineSource from "./flight-line-view.tsx?raw";
+import sharedSource from "./operation-workspace.tsx?raw";
+
+const appSource = `${routerSource}\n${flightLineSource}\n${sharedSource}`;
 
 describe("Flight Line Assist", () => {
   it("is directly addressable as a separate tablet and phone surface", () => {

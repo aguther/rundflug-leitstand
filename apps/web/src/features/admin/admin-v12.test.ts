@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import appSource from "../../LegacyApp.tsx?raw";
+import appSource from "../../admin-view.tsx?raw";
 import mainSource from "../../main.tsx?raw";
 
 const stylesSource = readFileSync(new URL("./admin-v12.css", import.meta.url), "utf8");
