@@ -17,9 +17,14 @@ type AssistIconName =
   | "aircraft"
   | "available"
   | "chevron"
+  | "device"
   | "finish"
+  | "gate"
+  | "group"
+  | "logout"
   | "pause"
   | "refuel"
+  | "refresh"
   | "unavailable";
 
 function AssistActionIcon({ name }: { name: AssistIconName }) {
@@ -42,6 +47,45 @@ function AssistActionIcon({ name }: { name: AssistIconName }) {
     return (
       <svg aria-hidden="true" viewBox="0 0 24 24">
         <path d="M5 21V4.5A1.5 1.5 0 0 1 6.5 3h7A1.5 1.5 0 0 1 15 4.5V21M4 21h12M7.5 7h5v4h-5zM15 7l3 3v7.5a1.5 1.5 0 0 0 3 0V9l-2-2" />
+      </svg>
+    );
+  }
+  if (name === "device") {
+    return (
+      <svg aria-hidden="true" viewBox="0 0 24 24">
+        <rect height="18" rx="2" width="12" x="6" y="3" />
+        <path d="M10 6h4M10 18h4" />
+      </svg>
+    );
+  }
+  if (name === "group") {
+    return (
+      <svg aria-hidden="true" viewBox="0 0 24 24">
+        <circle cx="9" cy="8" r="3" />
+        <circle cx="17" cy="9" r="2.5" />
+        <path d="M3.5 19c.3-4 2.1-6 5.5-6s5.2 2 5.5 6M14 14c3.3-.8 5.5 1 6 4.2" />
+      </svg>
+    );
+  }
+  if (name === "gate") {
+    return (
+      <svg aria-hidden="true" viewBox="0 0 24 24">
+        <path d="M5 21V4h11v17M5 21h14M9 8h3M9 12h3M16 9h3v8h-3" />
+      </svg>
+    );
+  }
+  if (name === "refresh") {
+    return (
+      <svg aria-hidden="true" viewBox="0 0 24 24">
+        <path d="M20 7v5h-5M4 17v-5h5" />
+        <path d="M18.2 9A7 7 0 0 0 6.3 6.3L4 9M5.8 15A7 7 0 0 0 17.7 17.7L20 15" />
+      </svg>
+    );
+  }
+  if (name === "logout") {
+    return (
+      <svg aria-hidden="true" viewBox="0 0 24 24">
+        <path d="M14 8V5H5v14h9v-3M11 12h9M17 9l3 3-3 3" />
       </svg>
     );
   }
@@ -249,7 +293,7 @@ export function FlightLineAssist({
           </div>
         </div>
         <div className="assist-live">
-          <span>●</span> Leitstand aktiv
+          <i /> Leitstand aktiv
         </div>
         <time>
           <strong>{eventTime(board)}</strong>
@@ -261,10 +305,18 @@ export function FlightLineAssist({
           {session && session.account.role !== "FLIGHT_LINE" ? (
             <a href="/flight-line">Supervisor</a>
           ) : null}
-          <span className="assist-device">▣ Gerät FL-03</span>
+          <span className="assist-device">
+            <AssistActionIcon name="device" />
+            <span>Gerät FL-03</span>
+          </span>
           <ThemeToggle />
-          <button onClick={() => void logout().then(() => window.location.reload())} type="button">
-            {session?.account.loginCode ?? "Abmelden"}
+          <button
+            className="assist-logout"
+            onClick={() => void logout().then(() => window.location.reload())}
+            type="button"
+          >
+            <AssistActionIcon name="logout" />
+            <span>{session?.account.loginCode ?? "Abmelden"}</span>
           </button>
         </div>
       </header>
@@ -283,7 +335,7 @@ export function FlightLineAssist({
               onClick={() => window.location.reload()}
               type="button"
             >
-              ↻
+              <AssistActionIcon name="refresh" />
             </button>
           </div>
           <div className="assist-aircraft-cards">
@@ -294,7 +346,9 @@ export function FlightLineAssist({
               return (
                 <article className={claimed ? "claimed" : ""} key={entry.id}>
                   <div className="assist-aircraft-title">
-                    <span aria-hidden="true">✈</span>
+                    <span aria-hidden="true">
+                      <AssistActionIcon name="aircraft" />
+                    </span>
                     <strong>{entry.registration}</strong>
                     <small className={claimed ? "busy" : "free"}>
                       {claimed ? "In Arbeit" : "Frei"}
@@ -302,9 +356,15 @@ export function FlightLineAssist({
                   </div>
                   <span className={`assist-state state-${state.key}`}>{state.label}</span>
                   <p>
-                    {rotation?.communicationLabel ?? "Keine Gruppe"} · {rotation?.ticketCount ?? 0}{" "}
-                    Tickets
-                    <span>{rotation?.gateLabel ?? entry.resourceGroupName}</span>
+                    <span className="assist-meta-item">
+                      <AssistActionIcon name="group" />
+                      {rotation?.communicationLabel ?? "Keine Gruppe"} ·{" "}
+                      {rotation?.ticketCount ?? 0} Tickets
+                    </span>
+                    <span className="assist-meta-item">
+                      <AssistActionIcon name="gate" />
+                      {rotation?.gateLabel ?? entry.resourceGroupName}
+                    </span>
                   </p>
                   {!claimed ? (
                     <button className="assist-claim" onClick={() => claim(entry)} type="button">
@@ -346,9 +406,15 @@ export function FlightLineAssist({
                   {activeState?.label}
                 </span>
                 <p>
-                  {activeRotation?.communicationLabel ?? "Keine Gruppe"} ·{" "}
-                  {activeRotation?.ticketCount ?? 0} Tickets
-                  <span>{activeRotation?.gateLabel ?? activeAircraft.resourceGroupName}</span>
+                  <span className="assist-meta-item">
+                    <AssistActionIcon name="group" />
+                    {activeRotation?.communicationLabel ?? "Keine Gruppe"} ·{" "}
+                    {activeRotation?.ticketCount ?? 0} Tickets
+                  </span>
+                  <span className="assist-meta-item">
+                    <AssistActionIcon name="gate" />
+                    {activeRotation?.gateLabel ?? activeAircraft.resourceGroupName}
+                  </span>
                 </p>
               </div>
               <h3>Nächste Aktion wählen</h3>
