@@ -13,6 +13,85 @@ type AssistAction = {
   run: () => void;
 } | null;
 
+type AssistIconName =
+  | "aircraft"
+  | "available"
+  | "chevron"
+  | "finish"
+  | "pause"
+  | "refuel"
+  | "unavailable";
+
+function AssistActionIcon({ name }: { name: AssistIconName }) {
+  if (name === "aircraft") {
+    return (
+      <svg aria-hidden="true" viewBox="0 0 24 24">
+        <path d="m3.5 13.3 7.1 1.1 3.8 6.1h2l-1.7-6.2 4.1-.7c1.4-.2 2.3-.9 2.3-1.8s-.9-1.6-2.3-1.8l-4.1-.7 1.7-6.2h-2l-3.8 6.1-7.1 1.1-1.8-2.1H.5l1 3.6-1 3.6h1.2z" />
+      </svg>
+    );
+  }
+  if (name === "available" || name === "finish") {
+    return (
+      <svg aria-hidden="true" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="9" />
+        <path d="m8 12 2.5 2.5L16.5 8.5" />
+      </svg>
+    );
+  }
+  if (name === "refuel") {
+    return (
+      <svg aria-hidden="true" viewBox="0 0 24 24">
+        <path d="M5 21V4.5A1.5 1.5 0 0 1 6.5 3h7A1.5 1.5 0 0 1 15 4.5V21M4 21h12M7.5 7h5v4h-5zM15 7l3 3v7.5a1.5 1.5 0 0 0 3 0V9l-2-2" />
+      </svg>
+    );
+  }
+  if (name === "pause") {
+    return (
+      <svg aria-hidden="true" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="9" />
+        <path d="M9.5 8.5v7M14.5 8.5v7" />
+      </svg>
+    );
+  }
+  if (name === "unavailable") {
+    return (
+      <svg aria-hidden="true" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="9" />
+        <path d="m5.7 5.7 12.6 12.6" />
+      </svg>
+    );
+  }
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24">
+      <path d="m9 5 7 7-7 7" />
+    </svg>
+  );
+}
+
+function AssistCommandContent({
+  icon,
+  label,
+  trailing = true,
+}: {
+  icon: AssistIconName;
+  label: string;
+  trailing?: boolean;
+}) {
+  return (
+    <>
+      <span className={`assist-command-icon icon-${icon}`}>
+        <AssistActionIcon name={icon} />
+      </span>
+      <span className="assist-command-label">{label}</span>
+      {trailing ? (
+        <span className="assist-command-chevron">
+          <AssistActionIcon name="chevron" />
+        </span>
+      ) : null}
+    </>
+  );
+}
+
 function rotationForAircraft(
   aircraft: Aircraft,
   rotations: Rotation[],
@@ -229,7 +308,7 @@ export function FlightLineAssist({
                   </p>
                   {!claimed ? (
                     <button className="assist-claim" onClick={() => claim(entry)} type="button">
-                      Übernehmen
+                      <AssistCommandContent icon="aircraft" label="Übernehmen" trailing={false} />
                     </button>
                   ) : null}
                 </article>
@@ -238,7 +317,7 @@ export function FlightLineAssist({
           </div>
           {availableAircraft.length > 4 ? (
             <button className="assist-more assist-more-desktop" type="button">
-              Weitere anzeigen
+              <AssistCommandContent icon="aircraft" label="Weitere anzeigen" />
             </button>
           ) : null}
           {availableAircraft.length > 1 ? (
@@ -247,7 +326,7 @@ export function FlightLineAssist({
               onClick={() => setQueueIndex((current) => (current + 1) % availableAircraft.length)}
               type="button"
             >
-              Nächstes Flugzeug
+              <AssistCommandContent icon="aircraft" label="Nächstes Flugzeug" />
             </button>
           ) : null}
         </section>
@@ -276,26 +355,32 @@ export function FlightLineAssist({
               <div className="assist-actions">
                 {action ? (
                   <button disabled={action.disabled} onClick={action.run} type="button">
-                    <span>✓</span>{" "}
-                    {action.label === "NEXT" ? "Go to Gate bestätigen" : action.label}
+                    <AssistCommandContent
+                      icon="available"
+                      label={action.label === "NEXT" ? "Go to Gate bestätigen" : action.label}
+                    />
                   </button>
                 ) : null}
                 <button onClick={onAvailable} type="button">
-                  <span>✓</span> Bereit
+                  <AssistCommandContent icon="available" label="Bereit" />
                 </button>
                 <button onClick={onRefuel} type="button">
-                  <span>▣</span> Tanken
+                  <AssistCommandContent icon="refuel" label="Tanken" />
                 </button>
                 <button className="pause" onClick={onPause} type="button">
-                  <span>Ⅱ</span> Pause
+                  <AssistCommandContent icon="pause" label="Pause" />
                 </button>
                 <button className="unavailable" onClick={onUnavailable} type="button">
-                  <span>⊘</span> Nicht verfügbar
+                  <AssistCommandContent icon="unavailable" label="Nicht verfügbar" />
                 </button>
               </div>
               <div className="assist-current-footer">
                 <button className="assist-finish" onClick={() => void finishClaim()} type="button">
-                  ✓ Betreuung abschließen
+                  <AssistCommandContent
+                    icon="finish"
+                    label="Betreuung abschließen"
+                    trailing={false}
+                  />
                 </button>
               </div>
             </>
