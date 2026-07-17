@@ -1,5 +1,8 @@
 import type { OperationBoard } from "@rundflug/contracts";
 import { useMemo, useState } from "react";
+import { BrandMark } from "./design-system/BrandMark";
+import { ThemeToggle } from "./design-system/ThemeToggle";
+import { useAuth } from "./features/auth/AuthContext";
 
 type Aircraft = OperationBoard["aircraft"][number];
 type Rotation = OperationBoard["rotations"][number];
@@ -105,6 +108,7 @@ export function FlightLineSupervisorConsole({
   onAvailable: () => void;
   onReleaseAssist: (aircraftId: string) => void;
 }) {
+  const { session, logout } = useAuth();
   const [search, setSearch] = useState("");
   const [resourceGroupId, setResourceGroupId] = useState("");
   const filteredAircraft = useMemo(() => {
@@ -135,7 +139,7 @@ export function FlightLineSupervisorConsole({
     <section className="flight-line-console">
       <header className="flight-line-console-header">
         <div className="flight-line-console-brand">
-          <span aria-hidden="true">✈</span>
+          <BrandMark />
           <div>
             <strong>Flight Line</strong>
             <small>Rundflug-Leitstand</small>
@@ -153,7 +157,11 @@ export function FlightLineSupervisorConsole({
           <span>Hinweise</span>
           <strong>{board.event.operationalNote ? "1" : "0"}</strong>
           <span className="console-online">● Online</span>
-          <span>Leitstand</span>
+          <a href="/flight-line/assist">Assist</a>
+          <ThemeToggle />
+          <button onClick={() => void logout().then(() => window.location.reload())} type="button">
+            {session?.account.loginCode ?? "Leitstand"}
+          </button>
         </div>
       </header>
 

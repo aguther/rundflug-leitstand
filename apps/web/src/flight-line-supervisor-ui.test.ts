@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import appSource from "./App.tsx?raw";
+import appSource from "./LegacyApp.tsx?raw";
 import { expectedReviewAtFromPause } from "./flight-line-pause";
 import supervisorSource from "./flight-line-supervisor.tsx?raw";
 

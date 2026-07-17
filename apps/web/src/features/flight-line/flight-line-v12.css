@@ -1,0 +1,268 @@
+/* V1.2 Flight Line: semantic theming plus independent Supervisor and Assist layouts. */
+.flight-line-shell {
+  --console-bg: var(--ui-bg);
+  --console-surface: var(--ui-surface);
+  --console-surface-raised: var(--ui-surface-raised);
+  --console-border: var(--ui-border);
+  --console-border-soft: var(--ui-border);
+  --console-muted: var(--ui-muted);
+  color: var(--ui-text);
+  background: var(--ui-bg);
+}
+
+.flight-line-console {
+  color: var(--ui-text);
+  background: var(--ui-bg);
+}
+
+.flight-line-console-header,
+.flight-line-console-nav,
+.console-aircraft-list,
+.console-aircraft-table-head,
+.console-matrix-head {
+  color: var(--ui-text);
+  border-color: var(--ui-border);
+  background: var(--ui-surface);
+}
+
+.flight-line-console-brand > .brand-mark,
+.assist-brand > .brand-mark {
+  width: 46px;
+  height: 46px;
+  padding: 7px;
+  color: var(--ui-accent);
+  border: 1px solid color-mix(in srgb, var(--ui-accent) 50%, var(--ui-border));
+  border-radius: 50%;
+  background: var(--ui-accent-soft);
+}
+
+.flight-line-console :is(.console-live-state, .console-header-context, .flight-line-console small) {
+  color: var(--ui-muted);
+}
+
+.console-header-context a,
+.console-header-context button,
+.assist-header-tools a,
+.assist-header-tools button {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 10px;
+  color: var(--ui-text);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-sm);
+  background: var(--ui-control);
+  font: inherit;
+  text-decoration: none;
+}
+
+.console-header-context .theme-toggle,
+.assist-header-tools .theme-toggle {
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0;
+}
+
+.flight-line-console-nav :is(span, strong) {
+  color: var(--ui-muted);
+}
+
+.flight-line-console-nav .active {
+  color: var(--ui-accent);
+  border-color: color-mix(in srgb, var(--ui-accent) 40%, var(--ui-border));
+  background: var(--ui-accent-soft);
+}
+
+.console-aircraft-search input,
+.console-resource-filter select,
+.console-detail-content select,
+.console-toolbar button,
+.console-toolbar summary,
+.matrix-details,
+.matrix-recommendation button {
+  color: var(--ui-text);
+  border-color: var(--ui-border);
+  background: var(--ui-control);
+}
+
+.console-aircraft-rows > button,
+.console-matrix-row,
+.console-next-groups > button,
+.matrix-recommendation {
+  color: var(--ui-text);
+  border-color: var(--ui-border);
+  background: var(--ui-surface);
+}
+
+.console-aircraft-rows > button:hover,
+.console-aircraft-rows > button.selected,
+.console-matrix-row.selected,
+.console-next-groups > button.selected {
+  color: var(--ui-text);
+  background: var(--ui-accent-soft);
+}
+
+.matrix-aircraft {
+  color: var(--ui-text);
+}
+
+.matrix-stage {
+  border-color: var(--ui-border-strong);
+  background: var(--ui-control);
+}
+
+.console-status-matrix,
+.console-next-groups,
+.console-aircraft-detail,
+.console-info-note {
+  color: var(--ui-text);
+  border-color: var(--ui-border);
+  background: var(--ui-surface);
+}
+
+.flight-assist {
+  --assist-border: var(--ui-border);
+  --assist-panel: var(--ui-surface);
+  --assist-panel-strong: var(--ui-surface-raised);
+  --assist-muted: var(--ui-muted);
+  --assist-blue: var(--ui-accent);
+  color: var(--ui-text);
+  background: var(--ui-bg);
+}
+
+.assist-shell,
+.assist-header,
+.assist-pick-list,
+.assist-current,
+.assist-gate-groups,
+.assist-aircraft-cards article,
+.assist-current-summary {
+  color: var(--ui-text);
+  border-color: var(--ui-border);
+  background: var(--ui-surface);
+}
+
+.assist-header {
+  grid-template-columns: minmax(250px, 1fr) auto auto minmax(320px, auto);
+}
+
+.assist-brand > .brand-mark {
+  flex: 0 0 auto;
+}
+
+.assist-live,
+.assist-device,
+.assist-actions button,
+.assist-section-heading > button,
+.assist-more {
+  color: var(--ui-text);
+  border-color: var(--ui-border);
+  background: var(--ui-control);
+}
+
+.assist-header-tools {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 7px;
+}
+
+.assist-header-tools .assist-device {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 10px;
+}
+
+.assist-claim,
+.assist-finish {
+  color: #fff;
+  background: var(--ui-accent);
+}
+
+.aircraft-pause-dialog {
+  color: var(--ui-text);
+  border-color: var(--ui-border);
+  background: var(--ui-surface-raised);
+}
+
+.aircraft-pause-dialog :is(input, button) {
+  color: var(--ui-text);
+  border-color: var(--ui-border-strong);
+  background: var(--ui-control);
+}
+
+.aircraft-pause-dialog .pause-primary-action {
+  color: #1a1200;
+  border-color: var(--ui-warning);
+  background: var(--ui-warning);
+}
+
+/* The full Supervisor stays available on iPad; secondary rails collapse, no workflow disappears. */
+@media (max-width: 1180px) {
+  .flight-line-console {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .flight-line-console-header {
+    grid-column: 1;
+    grid-template-columns: minmax(220px, 1fr) auto minmax(320px, auto);
+  }
+
+  .console-live-state {
+    display: none;
+  }
+
+  .flight-line-console-nav,
+  .console-aircraft-list {
+    display: none;
+  }
+
+  .flight-line-console-main {
+    grid-column: 1;
+    grid-row: 2;
+  }
+}
+
+@media (max-width: 820px) {
+  .assist-header {
+    grid-template-columns: 1fr auto;
+  }
+
+  .assist-header-tools {
+    gap: 5px;
+  }
+
+  .assist-header-tools > :is(a, button):not(.theme-toggle),
+  .assist-device {
+    font-size: 0;
+  }
+
+  .assist-header-tools > a::after {
+    content: "SUP";
+    font-size: 12px;
+  }
+
+  .assist-header-tools > button:not(.theme-toggle)::after {
+    content: "⇥";
+    font-size: 16px;
+  }
+
+  .assist-device::after {
+    content: "FL-03";
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 560px) {
+  .assist-header-tools > a,
+  .assist-device {
+    display: none;
+  }
+
+  .assist-aircraft-cards article {
+    min-height: 0;
+  }
+}

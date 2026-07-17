@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import appSource from "./App.tsx?raw";
+import appSource from "./LegacyApp.tsx?raw";
 import assistSource from "./flight-line-assist.tsx?raw";
 
 describe("Flight Line Assist", () => {

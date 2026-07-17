@@ -1,5 +1,8 @@
 import type { OperationBoard } from "@rundflug/contracts";
 import { useEffect, useState } from "react";
+import { BrandMark } from "./design-system/BrandMark";
+import { ThemeToggle } from "./design-system/ThemeToggle";
+import { useAuth } from "./features/auth/AuthContext";
 
 type Aircraft = OperationBoard["aircraft"][number];
 type Rotation = OperationBoard["rotations"][number];
@@ -86,6 +89,7 @@ export function FlightLineAssist({
   onClaim: (aircraftId: string) => Promise<void>;
   onRelease: (aircraftId: string) => Promise<void>;
 }) {
+  const { session, logout } = useAuth();
   const assistClaims = board.assistClaims ?? [];
   const ownServerClaim = assistClaims.find((claim) => claim.deviceId === deviceId);
   const [claimedAircraftId, setClaimedAircraftId] = useState<string | null>(
@@ -148,7 +152,7 @@ export function FlightLineAssist({
     <section className="flight-assist">
       <header className="assist-header">
         <div className="assist-brand">
-          <span aria-hidden="true">✈</span>
+          <BrandMark />
           <div>
             <strong>Flight Line Assist</strong>
             <small>
@@ -165,7 +169,16 @@ export function FlightLineAssist({
             {new Intl.DateTimeFormat("de-DE", { dateStyle: "medium" }).format(new Date())}
           </small>
         </time>
-        <span className="assist-device">▣ Gerät FL-03</span>
+        <div className="assist-header-tools">
+          {session && session.account.role !== "FLIGHT_LINE" ? (
+            <a href="/flight-line">Supervisor</a>
+          ) : null}
+          <span className="assist-device">▣ Gerät FL-03</span>
+          <ThemeToggle />
+          <button onClick={() => void logout().then(() => window.location.reload())} type="button">
+            {session?.account.loginCode ?? "Abmelden"}
+          </button>
+        </div>
       </header>
 
       {message || claimError ? <p className="assist-message">{claimError ?? message}</p> : null}
