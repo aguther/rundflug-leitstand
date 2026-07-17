@@ -1,4 +1,8 @@
 /* V1.2 visual finish: shared interaction quality layered after all legacy and feature styles. */
+.admin-shell [hidden] {
+  display: none;
+}
+
 :is(.app-shell, .flight-line-shell) button,
 :is(.app-shell, .flight-line-shell) summary,
 :is(.app-shell, .flight-line-shell) input,
@@ -136,6 +140,70 @@
 
 .admin-shell .admin-side-nav button.active {
   box-shadow: inset 3px 0 0 var(--ui-accent);
+}
+
+.admin-shell .admin-workspace button {
+  appearance: none;
+  font: inherit;
+}
+
+.admin-shell
+  .admin-section
+  button:not(
+    .primary-action,
+    .danger-action,
+    .admin-revoke-action,
+    .table-overflow-action,
+    .setup-checklist button
+  ) {
+  min-height: var(--control-compact);
+  padding: 7px 12px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--ui-text);
+  background: var(--ui-control);
+  box-shadow: inset 0 1px 0 var(--ui-highlight);
+  font-weight: 600;
+}
+
+.admin-shell
+  .admin-section
+  button:not(
+    .primary-action,
+    .danger-action,
+    .admin-revoke-action,
+    .table-overflow-action,
+    .setup-checklist button
+  ):hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--ui-accent) 42%, var(--ui-border-strong));
+  background: var(--ui-control-hover);
+}
+
+.admin-shell .admin-revoke-action {
+  min-height: 32px;
+  padding: 6px 10px;
+  border: 1px solid color-mix(in srgb, var(--ui-danger) 52%, var(--ui-border-strong));
+  border-radius: var(--radius-sm);
+  color: var(--ui-danger);
+  background: color-mix(in srgb, var(--ui-danger) 7%, var(--ui-control));
+  box-shadow: inset 0 1px 0 var(--ui-highlight);
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+
+.admin-shell .admin-revoke-action:hover:not(:disabled) {
+  border-color: var(--ui-danger);
+  background: color-mix(in srgb, var(--ui-danger) 13%, var(--ui-control));
+}
+
+.admin-shell .admin-section .setup-checklist button {
+  min-height: 36px;
+  padding: 5px 0;
+  border: 0;
+  border-radius: 0;
+  color: var(--ui-accent);
+  background: transparent;
+  box-shadow: none;
 }
 
 .admin-shell .admin-workspace.master-data-active .master-data-table-scroll,

@@ -53,6 +53,7 @@ const upsertProductPayloadSchema = z
     priceCents: z.number().int().min(0).max(1_000_000),
     referenceCapacity: z.number().int().min(1).max(100),
     referenceDurationMinutes: z.number().int().min(1).max(600),
+    promisedFlightMinutes: z.number().int().min(1).max(600),
     childCompanionRequired: z.boolean(),
     weightClasses: z
       .array(productWeightClassSchema)
@@ -829,6 +830,7 @@ export const productOperationalSummarySchema = z.object({
   saleEnabled: z.boolean(),
   referenceCapacity: z.number().int().positive(),
   referenceDurationMinutes: z.number().int().positive(),
+  promisedFlightMinutes: z.number().int().positive(),
   queuedTickets: z.number().int().nonnegative(),
   resourceGroupOpenTickets: z.number().int().nonnegative(),
   estimatedWaitLowerMinutes: z.number().int().nonnegative(),

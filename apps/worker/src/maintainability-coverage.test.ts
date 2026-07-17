@@ -116,6 +116,7 @@ describe("runtime configuration coverage", () => {
       "publicDescription",
       "referenceCapacity",
       "referenceDurationMinutes",
+      "promisedFlightMinutes",
       "weightClasses",
       "childCompanionRequired",
       "plannedRotationMinutes",
@@ -136,6 +137,8 @@ describe("runtime configuration coverage", () => {
     expect(coordinatorSource).toMatch(
       /PRODUCT_SALES_CONFIGURED[\s\S]*capacity_warning_threshold[\s\S]*capacity_critical_threshold/,
     );
-    expect(coordinatorSource).toMatch(/PRODUCT_UPSERTED[\s\S]*weight_classes_json/);
+    expect(coordinatorSource).toMatch(
+      /PRODUCT_UPSERTED[\s\S]*promised_flight_minutes[\s\S]*weight_classes_json/,
+    );
   });
 });

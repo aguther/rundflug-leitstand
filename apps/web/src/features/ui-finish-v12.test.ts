@@ -18,4 +18,10 @@ describe("V1.2 visual finish", () => {
     expect(stylesSource).toContain(".console-toolbar details > summary");
     expect(stylesSource).toContain(".admin-shell .admin-workspace.master-data-active");
   });
+
+  it("keeps inactive administration sections hidden and styles device actions", () => {
+    expect(stylesSource).toMatch(/\.admin-shell \[hidden\]\s*\{\s*display: none;/);
+    expect(stylesSource).toContain(".admin-revoke-action");
+    expect(stylesSource).toContain(".admin-section");
+  });
 });

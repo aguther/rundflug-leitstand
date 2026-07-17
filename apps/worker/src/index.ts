@@ -1014,9 +1014,11 @@ app.post("/api/admin/events/:sourceEventId/clone", async (context) => {
       context.env.DB.prepare(
         `INSERT INTO products
         (id, operation_day_id, resource_group_id, name, price_cents, sale_enabled, created_at,
-         updated_at, sale_closes_at, capacity_warning_threshold, capacity_critical_threshold,
-         code, public_description, child_companion_required, sort_order, weight_classes_json, gate_id)
-       VALUES (?1, ?2, ?3, ?4, ?5, 0, ?6, ?6, NULL, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)`,
+          updated_at, sale_closes_at, capacity_warning_threshold, capacity_critical_threshold,
+          code, public_description, child_companion_required, sort_order, weight_classes_json, gate_id,
+          reference_capacity, reference_duration_minutes, promised_flight_minutes)
+        VALUES (?1, ?2, ?3, ?4, ?5, 0, ?6, ?6, NULL, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14,
+          ?15, ?16, ?17)`,
       ).bind(
         productIds.get(String(row.id)),
         input.eventId,
@@ -1032,6 +1034,9 @@ app.post("/api/admin/events/:sourceEventId/clone", async (context) => {
         row.sort_order,
         row.weight_classes_json,
         row.gate_id ? gateIds.get(String(row.gate_id)) : null,
+        row.reference_capacity,
+        row.reference_duration_minutes,
+        row.promised_flight_minutes,
       ),
     ),
     ...(keepMasterData ? pilots.results : []).map((row) =>
@@ -1289,6 +1294,7 @@ app.get("/api/events/:eventId/operations", async (context) => {
         `SELECT p.id, p.code, p.name, p.public_description, p.resource_group_id, rg.name AS resource_group_name,
               rg.status AS resource_group_status, rg.operational_note AS resource_group_operational_note,
               p.price_cents, p.sale_enabled, p.reference_capacity, p.reference_duration_minutes,
+              p.promised_flight_minutes,
               p.sale_closes_at, p.capacity_warning_threshold, p.capacity_critical_threshold,
               p.child_companion_required, p.weight_classes_json, p.sort_order, p.gate_id,
               g.label AS gate_label,
@@ -1326,6 +1332,7 @@ app.get("/api/events/:eventId/operations", async (context) => {
           sale_enabled: number;
           reference_capacity: number;
           reference_duration_minutes: number;
+          promised_flight_minutes: number;
           queued_tickets: number;
           resource_group_open_tickets: number;
           sale_closes_at: string | null;
@@ -1802,6 +1809,7 @@ app.get("/api/events/:eventId/operations", async (context) => {
         saleEnabled: product.sale_enabled === 1,
         referenceCapacity: effectiveReferenceCapacity,
         referenceDurationMinutes: product.reference_duration_minutes,
+        promisedFlightMinutes: product.promised_flight_minutes,
         queuedTickets: product.queued_tickets,
         resourceGroupOpenTickets: product.resource_group_open_tickets,
         estimatedWaitLowerMinutes: forecast.lowerMinutes,

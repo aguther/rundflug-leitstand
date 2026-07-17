@@ -1820,6 +1820,7 @@ export class EventCoordinator extends DurableObject<Env> {
         priceCents: command.payload.priceCents,
         referenceCapacity: command.payload.referenceCapacity,
         referenceDurationMinutes: command.payload.referenceDurationMinutes,
+        promisedFlightMinutes: command.payload.promisedFlightMinutes,
         childCompanionRequired: command.payload.childCompanionRequired,
         weightClasses: command.payload.weightClasses,
         sortOrder: command.payload.sortOrder,
@@ -1829,13 +1830,15 @@ export class EventCoordinator extends DurableObject<Env> {
         `INSERT INTO products
           (id, operation_day_id, resource_group_id, gate_id, name, code, public_description,
            price_cents, sale_enabled, reference_capacity, reference_duration_minutes,
-           child_companion_required, weight_classes_json, sort_order, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 1, ?9, ?10, ?11, ?12, ?13, ?14, ?14)
+           promised_flight_minutes, child_companion_required, weight_classes_json, sort_order,
+           created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 1, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?15)
          ON CONFLICT(id) DO UPDATE SET resource_group_id = excluded.resource_group_id,
           gate_id = excluded.gate_id, name = excluded.name, code = excluded.code,
           public_description = excluded.public_description, price_cents = excluded.price_cents,
-          reference_capacity = excluded.reference_capacity,
-          reference_duration_minutes = excluded.reference_duration_minutes,
+           reference_capacity = excluded.reference_capacity,
+           reference_duration_minutes = excluded.reference_duration_minutes,
+           promised_flight_minutes = excluded.promised_flight_minutes,
           child_companion_required = excluded.child_companion_required,
           weight_classes_json = excluded.weight_classes_json, sort_order = excluded.sort_order,
           updated_at = excluded.updated_at
@@ -1851,6 +1854,7 @@ export class EventCoordinator extends DurableObject<Env> {
         command.payload.priceCents,
         command.payload.referenceCapacity,
         command.payload.referenceDurationMinutes,
+        command.payload.promisedFlightMinutes,
         command.payload.childCompanionRequired ? 1 : 0,
         JSON.stringify(command.payload.weightClasses),
         command.payload.sortOrder,

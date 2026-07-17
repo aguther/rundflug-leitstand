@@ -187,6 +187,7 @@ try {
     priceCents: duration * 200,
     referenceCapacity: 3,
     referenceDurationMinutes: duration,
+    promisedFlightMinutes: duration,
     childCompanionRequired: false,
     weightClasses: ["NOT_CAPTURED"],
     sortOrder: duration,

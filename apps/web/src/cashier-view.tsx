@@ -294,6 +294,7 @@ export function CashierView() {
               <span className="product-wait">
                 {entry.estimatedWaitLowerMinutes}–{entry.estimatedWaitUpperMinutes} Min.
               </span>
+              <span>Flugzeit ca. {entry.promisedFlightMinutes} Min.</span>
               <span>{entry.resourceGroupOpenTickets} Tickets in der Queue</span>
               {entry.resourceGroupOperationalNote ? (
                 <span>Betriebshinweis: {entry.resourceGroupOperationalNote}</span>
