@@ -8,9 +8,9 @@
   --space-4: 16px;
   --space-5: 20px;
   --space-6: 24px;
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
+  --radius-sm: 6px;
+  --radius-md: 9px;
+  --radius-lg: 13px;
   --control-compact: 34px;
   --control-default: 40px;
   --control-touch: 48px;
@@ -42,7 +42,9 @@
   --ui-disabled-text: #858990;
   --ui-purple-soft: #f0edff;
   --ui-purple-text: #51409a;
-  --ui-shadow: 0 12px 32px rgb(0 0 0 / 9%);
+  --ui-shadow: 0 18px 48px rgb(18 24 32 / 11%);
+  --ui-shadow-soft: 0 5px 18px rgb(18 24 32 / 8%);
+  --ui-highlight: rgb(255 255 255 / 72%);
   --ui-overlay: rgb(18 20 24 / 58%);
 }
 
@@ -72,6 +74,8 @@
   --ui-disabled-text: #777c84;
   --ui-purple-soft: #282340;
   --ui-purple-text: #c1b6ff;
-  --ui-shadow: 0 18px 48px rgb(0 0 0 / 35%);
+  --ui-shadow: 0 24px 64px rgb(0 0 0 / 48%);
+  --ui-shadow-soft: 0 8px 28px rgb(0 0 0 / 28%);
+  --ui-highlight: rgb(255 255 255 / 8%);
   --ui-overlay: rgb(0 0 0 / 72%);
 }
