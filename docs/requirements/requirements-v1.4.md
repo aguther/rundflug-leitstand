@@ -180,6 +180,19 @@ Jede Anforderung besitzt eine eindeutige ID, Priorität und Ausbaustufe. Für di
 | SOLL | Wichtig. Abweichung nur mit schriftlicher Begründung und Zustimmung des Auftraggebers. |
 | KANN | Wünschenswert. Umsetzung nach Aufwand-Nutzen-Abwägung. |
 
+## 1.7 Produktrelease V1.2
+
+Das Produktrelease V1.2 ersetzt die gerätezentrierte Bedienfreigabe durch anonyme, rollenbasierte
+Helferkonten und führt ein verbindliches, durchgängiges Bedien- und Designsystem ein. Die
+fachlichen V1-Invarianten bleiben unverändert. Als visuelle Referenzen gelten ausschließlich die
+freigegebenen Konzepte in `docs/ui/operations-v2-multi-surface-concept.md`; ältere Entwürfe sind
+historische Nachweise und keine Implementierungsvorgabe für V1.2.
+
+V1.2 umfasst insbesondere eine kompakte Cloudflare-inspirierte Administration, vollständige
+Light-/Dark-Themes, Kontenauswahl mit mindestens sechsstelliger PIN, rollenabhängige Navigation,
+eine vollständige Supervisor- sowie eine reduzierte Assist-Oberfläche der Flight Line und beide
+öffentlichen FIDS-Profile. Produktrelease und Dokumentversion werden unabhängig nummeriert.
+
 # 2 Produkteinsatz und Rollen
 
 ## 2.1 Anwendungsbereich und Betriebsumgebung
@@ -588,14 +601,17 @@ Die Besucheransicht beantwortet nur vier Fragen: Was habe ich gebucht? Wie ist m
 | --- | --- | --- | --- |
 | F-ADM-010 | Pflege der Veranstaltungsparameter einschließlich Verkaufszeiten, Betriebsende, Fristen, Ampelschwellen, Referenzgewichte, Benachrichtigungsvorlauf sowie Planwerte und Prognoseparameter. | MUSS | V1 |
 | F-ADM-020 | Stammdaten für Produkte, Ressourcengruppen, Flugzeuge, anonyme Pilotencodes und Gates sind auch während des Betriebs änderbar; Zuordnungen werden direkt an der Ressourcengruppe gepflegt. Änderungen werden protokolliert und wirken kontrolliert auf den Livezustand. | MUSS | V1 |
-| F-ADM-030 | Gerätekopplung ohne persönliche Helferkonten: Der Administrator koppelt ein Gerät per QR-Code mit einer festen Rolle für die Veranstaltung. Kopplungen sind einzeln widerrufbar. | MUSS | V1 |
+| F-ADM-030 | Anonyme Helferkonten besitzen einen systematisch erzeugten, rollenkennzeichnenden Anmeldecode, eine unveränderliche technische ID und mindestens eine serverseitig gespeicherte Rolle. Konten enthalten keine Namen, E-Mail-Adressen oder sonstige Personendaten. | MUSS | V1 |
 | F-ADM-040 | Geräteübersicht mit Rolle, Online-Status, letztem Kontakt und, soweit verfügbar, Akkustand. | SOLL | V1 |
-| F-ADM-050 | Kritische Aktionen wie Storno, Aufheben des Notfallmodus, Löschen von Stammdaten und wesentliche Live-Konfigurationsänderungen erfordern eine Administrator-PIN. | MUSS | V1 |
+| F-ADM-050 | Kritische Aktionen wie Storno, Aufheben des Notfallmodus, Löschen von Stammdaten und wesentliche Live-Konfigurationsänderungen erfordern eine aktive Sitzung mit passender Rolle und gegebenenfalls eine erneute PIN-Bestätigung desselben Kontos. Eine gemeinsame Administrator-PIN ist unzulässig. | MUSS | V1 |
 | F-ADM-060 | Kompakte Administrationsübersicht mit offenen Tickets, Durchsatz, mittleren Prozesszeiten, Prognosequalität sowie Geräte- und Benachrichtigungsstatus. Operative Flottensteuerung liegt in der Flight-Line-Supervisor-Ansicht. | SOLL | V1 |
 | F-ADM-070 | Trainingsmodus mit Beispieldaten und vollständiger Rücksetzung; Trainingsdaten dürfen nicht in Auswertungen einfließen. | KANN | V2 |
 | F-ADM-080 | Verwaltung mehrerer Veranstaltungen mit eventübergreifender Stammdatenbibliothek und Kopie einer Vorveranstaltung als Vorlage. | MUSS | V1 |
 | F-ADM-090 | Dashboard Flugleitung als primär lesende Gesamtsicht mit offenen Tickets, Ressourcenstatus, laufenden Flügen, Kapazität, Prognosen und Not-Halt. | SOLL | V1 |
 | F-ADM-100 | Die Administration verhindert technisch ungültige Ressourcengruppen-Zuordnungen und zeigt Konflikte vor dem Speichern verständlich an. | MUSS | V1 |
+| F-ADM-110 | Die Anmeldung zeigt alle aktiven, nach Rolle gruppierten Konten zur Auswahl und verlangt anschließend eine mindestens sechsstellige numerische PIN. Das PIN-Feld erhält den Fokus; Enter bestätigt. Konto oder PIN dürfen in Fehlermeldungen nicht einzeln als falsch offengelegt werden. | MUSS | V1 |
+| F-ADM-120 | Administratoren können Konten durch Rollenauswahl anlegen, aktivieren, deaktivieren, eine neue PIN setzen und alle Sitzungen eines Kontos widerrufen. Der Anmeldecode wird konfliktfrei aus Rolle und laufender Nummer erzeugt. | MUSS | V1 |
+| F-ADM-130 | Interne Oberflächen sind ohne gültige Sitzung nicht zugänglich. QR-Ticketstatus und öffentliche FIDS-Inhalte bleiben anonym öffentlich; Konfiguration und Aktivierung eines Displays benötigen ein berechtigtes Konto. | MUSS | V1 |
 
 ## 8.12 Schnittstellen und spätere Erweiterungen
 
@@ -626,7 +642,8 @@ Die folgenden Angaben definieren die fachlich zu führenden Daten. Die technisch
 | D-060 | Pilot: anonymer operativer Code, aktiv, aktuelle Zuordnung und optionale nicht personenbezogene Bemerkung; keine Namen, Lizenz- oder Dokumentendaten. | MUSS | V1 |
 | D-065 | Blockierung/Unterbrechung/Pause: Geltungsbereich, Typ, Beginn, optionaler erwarteter Rückkehr- oder Prüfzeitpunkt, Status, Grund und bestätigte Aufhebung. | MUSS | V1 |
 | D-070 | Gate/Flight Line: Bezeichnung, Art, zugeordnete Ressourcengruppen und Anzeigefilter. | MUSS | V1 |
-| D-080 | Gerät: Bezeichnung, Rolle, Kopplung, letzter Kontakt, aktiv und technische Statusinformationen. | MUSS | V1 |
+| D-080 | Gerät: unveränderliche technische ID, optionale Bezeichnung, letzter Kontakt, aktiv und technische Statusinformationen. Ein Gerät ist nicht selbst die Benutzeridentität. | MUSS | V1 |
+| D-085 | Helferkonto und Sitzung: nicht personenbezogene Konto-ID, rollenkennzeichnender Anmeldecode, Rollen, aktiver Status, gesalzener PIN-Hash, fehlgeschlagene Anmeldeversuche sowie widerrufbare Sitzung mit Geräte-ID, Erstell-, Ablauf-, Letztaktivitäts- und Widerrufszeitpunkt. PIN und Sitzungstoken werden niemals im Klartext gespeichert oder protokolliert. | MUSS | V1 |
 | D-090 | Ereignis: fortlaufende ID, Zeitstempel, Ereignistyp, Quelle, auslösendes Gerät, fachlicher Bezug, Nutzdaten und gegebenenfalls Korrekturbezug. | MUSS | V1 |
 | D-100 | Veranstaltung: Name, Datum, Flugplatz, Zeitzone, Parameter, Notfallstatus, Betriebsphasen und Archivkennzeichen. | MUSS | V1 |
 | D-110 | Benachrichtigungsregistrierung: Ticketbezug, Kanal, Zielkennung soweit erforderlich, Einwilligung, Status und Löschzeitpunkt. | MUSS | V1 |
@@ -645,6 +662,8 @@ Die folgenden Angaben definieren die fachlich zu führenden Daten. Die technisch
 | Q-UX-060 | Die deutsche Bedienoberfläche muss nach höchstens zehn Minuten Einweisung je Helferrolle sicher bedienbar sein. | MUSS | V1 |
 | Q-UX-070 | Umschaltbares helles und dunkles Farbschema für Sonne, Dämmerung und Abendbetrieb auf allen Bedienoberflächen. | MUSS | V1 |
 | Q-UX-080 | Öffentliche Ansichten formulieren handlungsorientiert und vermeiden interne Fachbegriffe, wenn diese für Gäste nicht erforderlich sind. | MUSS | V1 |
+| Q-UX-090 | Alle internen Desktop-Oberflächen verwenden die freigegebene kompakte Dichte: zentrale Tabellen und Primärabläufe passen bei 1366 × 768 und 1920 × 1080 ohne vermeidbares Seitenscrolling; Editoren erscheinen erst nach Neu oder Bearbeiten als Drawer oder Dialog. Öffentliche Distanzanzeigen sind davon ausgenommen. | MUSS | V1 |
+| Q-UX-100 | Supervisor und Flight Line Assist sind eigenständige, rollenberechtigte Oberflächen und werden nicht allein anhand der Bildschirmbreite gewählt. Supervisor bleibt auf Desktop und iPad vollständig; Assist ist auf iPad, iPad mini, iPhone und vergleichbaren Geräten touchoptimiert. | MUSS | V1 |
 
 ## 10.2 Zuverlässigkeit und Verbindungsverhalten
 
@@ -671,9 +690,10 @@ Die folgenden Angaben definieren die fachlich zu führenden Daten. Die technisch
 | ID | Anforderung | Priorität | Stufe |
 | --- | --- | --- | --- |
 | Q-SIC-010 | Sämtliche Kommunikation erfolgt verschlüsselt über HTTPS/TLS. | MUSS | V1 |
-| Q-SIC-020 | Schreibzugriff ist nur für gekoppelte Geräte mit rollenbezogener Berechtigung zulässig; jede Schreiboperation ist einem Gerät zuordenbar. | MUSS | V1 |
+| Q-SIC-020 | Schreibzugriff ist nur über eine gültige, serverseitig widerrufbare Sitzung eines rollenberechtigten Kontos zulässig; jede Schreiboperation ist Konto, Sitzung und Gerät zuordenbar. | MUSS | V1 |
 | Q-SIC-030 | Die öffentliche Status-Seite gibt ausschließlich Informationen zum jeweiligen nicht erratbaren Ticketcode preis. Aufzählbarkeit und automatisierte Fehlversuche werden begrenzt. | MUSS | V1 |
 | Q-SIC-040 | Es werden keine Werbung, kein Tracking und keine externen Analysedienste eingebunden. | MUSS | V1 |
+| Q-SIC-050 | PINs werden mit einem langsamen, gesalzenen Passwort-Hash gespeichert. Sitzungen verwenden nicht aus JavaScript lesbare Secure-/HttpOnly-/SameSite-Cookies, werden bei Inaktivität gesperrt und absolut befristet. Fehlversuche werden serverseitig pro Konto und Herkunft progressiv begrenzt. | MUSS | V1 |
 | Q-DSG-010 | Im Kernsystem werden keine Gastnamen oder sonstigen nicht erforderlichen Personendaten erfasst. Der Betrieb funktioniert vollständig ohne Telefonnummer. | MUSS | V1 |
 | Q-DSG-020 | Push-Registrierungen werden nach einer konfigurierbaren Frist nach Veranstaltungsende, standardmäßig sieben Tage, gelöscht oder irreversibel entkoppelt. V1 speichert keine Telefonnummern. | MUSS | V1 |
 | Q-DSG-030 | Einwilligungen werden mit Zeitpunkt und Kanal dokumentiert; Datenschutzhinweise sind auf der Status-Seite abrufbar. | MUSS | V1 |
@@ -689,6 +709,7 @@ Die folgenden Angaben definieren die fachlich zu führenden Daten. Die technisch
 | Q-WAR-030 | Laufende Grundbetriebskosten für Hosting, Domain und Zertifikate sollen ohne Mobilfunk- und volumenabhängige Versandkosten höchstens 15 Euro je Monat betragen. Abweichungen sind transparent zu begründen. | SOLL | V1 |
 | Q-WAR-040 | Die Architektur ermöglicht V2 bis V4 ohne Neuentwicklung des Kerns; insbesondere sind Ressourcengruppen, mehrere Produkte je Gruppe, Gates, Mehrveranstaltungsbetrieb, Sitzplätze und externe Ereignisquellen von Beginn an modelliert. | MUSS | V1 |
 | Q-WAR-050 | Prognoseverfahren, Zustandsautomaten und fachliche Invarianten sind in einer für Betreiber und zukünftige Entwickler nachvollziehbaren technischen Dokumentation beschrieben. | MUSS | V1 |
+| Q-WAR-060 | Die Webanwendung ist nach App-Shell, Designsystem, Authentifizierung und fachlichen Features modularisiert. `App.tsx` enthält ausschließlich Komposition und Routing; fachliche Oberflächen, API-Zugriff und Zustandslogik besitzen eindeutige Modulgrenzen. | MUSS | V1 |
 
 # 11 Technische Rahmenbedingungen
 

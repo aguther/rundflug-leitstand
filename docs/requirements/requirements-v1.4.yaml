@@ -1627,7 +1627,7 @@
   {
     "id": "F-ADM-030",
     "section": "8.11 Administration und Geräteverwaltung",
-    "requirement": "Gerätekopplung ohne persönliche Helferkonten: Der Administrator koppelt ein Gerät per QR-Code mit einer festen Rolle für die Veranstaltung. Kopplungen sind einzeln widerrufbar.",
+    "requirement": "Anonyme Helferkonten besitzen einen systematisch erzeugten, rollenkennzeichnenden Anmeldecode, eine unveränderliche technische ID und mindestens eine serverseitig gespeicherte Rolle. Konten enthalten keine Namen, E-Mail-Adressen oder sonstige Personendaten.",
     "priority": "MUSS",
     "stage": "V1",
     "implementation": {
@@ -1653,7 +1653,7 @@
   {
     "id": "F-ADM-050",
     "section": "8.11 Administration und Geräteverwaltung",
-    "requirement": "Kritische Aktionen wie Storno, Aufheben des Notfallmodus, Löschen von Stammdaten und wesentliche Live-Konfigurationsänderungen erfordern eine Administrator-PIN.",
+    "requirement": "Kritische Aktionen wie Storno, Aufheben des Notfallmodus, Löschen von Stammdaten und wesentliche Live-Konfigurationsänderungen erfordern eine aktive Sitzung mit passender Rolle und gegebenenfalls eine erneute PIN-Bestätigung desselben Kontos. Eine gemeinsame Administrator-PIN ist unzulässig.",
     "priority": "MUSS",
     "stage": "V1",
     "implementation": {
@@ -1978,7 +1978,7 @@
   {
     "id": "D-080",
     "section": "9 Datenanforderungen",
-    "requirement": "Gerät: Bezeichnung, Rolle, Kopplung, letzter Kontakt, aktiv und technische Statusinformationen.",
+    "requirement": "Gerät: unveränderliche technische ID, optionale Bezeichnung, letzter Kontakt, aktiv und technische Statusinformationen. Ein Gerät ist nicht selbst die Benutzeridentität.",
     "priority": "MUSS",
     "stage": "V1",
     "implementation": {
@@ -2277,7 +2277,7 @@
   {
     "id": "Q-SIC-020",
     "section": "10.4 Sicherheit, Datenschutz und Zugriffsschutz",
-    "requirement": "Schreibzugriff ist nur für gekoppelte Geräte mit rollenbezogener Berechtigung zulässig; jede Schreiboperation ist einem Gerät zuordenbar.",
+    "requirement": "Schreibzugriff ist nur über eine gültige, serverseitig widerrufbare Sitzung eines rollenberechtigten Kontos zulässig; jede Schreiboperation ist Konto, Sitzung und Gerät zuordenbar.",
     "priority": "MUSS",
     "stage": "V1",
     "implementation": {
@@ -2585,5 +2585,77 @@
       "status": "planned"
     },
     "tests": []
+  },
+  {
+    "id": "F-ADM-110",
+    "section": "8.11 Administration und Geräteverwaltung",
+    "requirement": "Die Anmeldung zeigt alle aktiven, nach Rolle gruppierten Konten zur Auswahl und verlangt anschließend eine mindestens sechsstellige numerische PIN. Das PIN-Feld erhält den Fokus; Enter bestätigt. Konto oder PIN dürfen in Fehlermeldungen nicht einzeln als falsch offengelegt werden.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": { "issue": "V12-02", "module": "apps/web, apps/worker", "status": "planned" },
+    "tests": ["Auth-API, Anmeldung und Browserabnahme"]
+  },
+  {
+    "id": "F-ADM-120",
+    "section": "8.11 Administration und Geräteverwaltung",
+    "requirement": "Administratoren können Konten durch Rollenauswahl anlegen, aktivieren, deaktivieren, eine neue PIN setzen und alle Sitzungen eines Kontos widerrufen. Der Anmeldecode wird konfliktfrei aus Rolle und laufender Nummer erzeugt.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": { "issue": "V12-02", "module": "apps/web, apps/worker", "status": "planned" },
+    "tests": ["Konten- und Sitzungsintegration"]
+  },
+  {
+    "id": "F-ADM-130",
+    "section": "8.11 Administration und Geräteverwaltung",
+    "requirement": "Interne Oberflächen sind ohne gültige Sitzung nicht zugänglich. QR-Ticketstatus und öffentliche FIDS-Inhalte bleiben anonym öffentlich; Konfiguration und Aktivierung eines Displays benötigen ein berechtigtes Konto.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": { "issue": "V12-02", "module": "apps/web, apps/worker", "status": "planned" },
+    "tests": ["Public-/Protected-Route-Integration"]
+  },
+  {
+    "id": "D-085",
+    "section": "9 Datenanforderungen",
+    "requirement": "Helferkonto und Sitzung: nicht personenbezogene Konto-ID, rollenkennzeichnender Anmeldecode, Rollen, aktiver Status, gesalzener PIN-Hash, fehlgeschlagene Anmeldeversuche sowie widerrufbare Sitzung mit Geräte-ID, Erstell-, Ablauf-, Letztaktivitäts- und Widerrufszeitpunkt. PIN und Sitzungstoken werden niemals im Klartext gespeichert oder protokolliert.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": { "issue": "V12-02", "module": "apps/worker/migrations", "status": "planned" },
+    "tests": ["Schema- und Datenschutzprüfung"]
+  },
+  {
+    "id": "Q-UX-090",
+    "section": "10.1 Bedienbarkeit und Oberfläche",
+    "requirement": "Alle internen Desktop-Oberflächen verwenden die freigegebene kompakte Dichte: zentrale Tabellen und Primärabläufe passen bei 1366 × 768 und 1920 × 1080 ohne vermeidbares Seitenscrolling; Editoren erscheinen erst nach Neu oder Bearbeiten als Drawer oder Dialog. Öffentliche Distanzanzeigen sind davon ausgenommen.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": { "issue": "V12-03", "module": "apps/web", "status": "planned" },
+    "tests": ["Browser- und Screenshotabnahme Desktop"]
+  },
+  {
+    "id": "Q-UX-100",
+    "section": "10.1 Bedienbarkeit und Oberfläche",
+    "requirement": "Supervisor und Flight Line Assist sind eigenständige, rollenberechtigte Oberflächen und werden nicht allein anhand der Bildschirmbreite gewählt. Supervisor bleibt auf Desktop und iPad vollständig; Assist ist auf iPad, iPad mini, iPhone und vergleichbaren Geräten touchoptimiert.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": { "issue": "V12-05, V12-06", "module": "apps/web", "status": "planned" },
+    "tests": ["Browserabnahme Desktop, iPad, iPad mini und iPhone"]
+  },
+  {
+    "id": "Q-SIC-050",
+    "section": "10.4 Sicherheit, Datenschutz und Zugriffsschutz",
+    "requirement": "PINs werden mit einem langsamen, gesalzenen Passwort-Hash gespeichert. Sitzungen verwenden nicht aus JavaScript lesbare Secure-/HttpOnly-/SameSite-Cookies, werden bei Inaktivität gesperrt und absolut befristet. Fehlversuche werden serverseitig pro Konto und Herkunft progressiv begrenzt.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": { "issue": "V12-02", "module": "apps/worker", "status": "planned" },
+    "tests": ["Security- und Session-Integration"]
+  },
+  {
+    "id": "Q-WAR-060",
+    "section": "10.5 Wartbarkeit, Erweiterbarkeit und Betriebskosten",
+    "requirement": "Die Webanwendung ist nach App-Shell, Designsystem, Authentifizierung und fachlichen Features modularisiert. App.tsx enthält ausschließlich Komposition und Routing; fachliche Oberflächen, API-Zugriff und Zustandslogik besitzen eindeutige Modulgrenzen.",
+    "priority": "MUSS",
+    "stage": "V1",
+    "implementation": { "issue": "V12-01", "module": "apps/web", "status": "planned" },
+    "tests": ["Architektur- und Importgrenzenprüfung"]
   }
 ]

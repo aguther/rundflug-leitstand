@@ -1,6 +1,6 @@
 # Gesamtkonzept V1: Administration, Flight Line und öffentliche Anzeigen
 
-- Status: Freigegeben
+- Status: Freigegeben und für Produktrelease V1.2 am 17. Juli 2026 erneut bestätigt
 - Datum: 2026-07-16
 - Verbindliche visuelle Referenz Administration: `operations-v2-admin-approved.png`
 - Verbindliche visuelle Referenz Flight Line Supervisor:
@@ -15,6 +15,9 @@
   `operations-v2-terminal-fids-concept.png` und
   `operations-v2-flight-line-assist-pause-concept.png` sind historische Zwischenstände und dürfen
   nicht als visuelle Abnahmevorlage verwendet werden.
+- Auch alle weiteren älteren Admin-, Flight-Line- und FIDS-Screenshots sind nur historische
+  Nachweise. Die oben genannten sechs Referenzen sind die ausschließliche visuelle
+  Implementierungsvorgabe für V1.2.
 - Ersetzt beziehungsweise konkretisiert: `v1-simplified-operations.md` für die beschriebenen
   Oberflächen
 - Betroffene Anforderungen: F-RES-060, F-SLT-020, F-SLT-030, F-SLT-070, F-BRD-010,
@@ -32,6 +35,13 @@ Der Leitstand besitzt nicht eine universelle Oberfläche, sondern vier klar getr
 
 Die Arbeitsflächen teilen Daten, Design-Tokens und Zustände, werden aber nie gleichzeitig als
 Dashboard nebeneinander dargestellt. Jede Route ist für genau eine Rolle und Blickdistanz optimiert.
+
+Supervisor und Assist werden nicht automatisch allein anhand der Bildschirmbreite gewählt. Ein
+Supervisor darf auf Desktop und iPad die vollständige Supervisor-Oberfläche nutzen und bei Bedarf
+bewusst zu Assist wechseln. Ein Assist-Konto erhält ausschließlich die vereinfachte Oberfläche.
+Assist ist auf dem Telefon einspaltig und auf Tablet beziehungsweise iPad mini zweispaltig; die
+vollständige Supervisor-Funktion bleibt auf dem iPad durch eine responsive Master-Detail-Anordnung
+erhalten.
 
 Die sechs oben genannten freigegebenen PNG-Dateien sind die visuelle Quelle der Wahrheit. Bei einer
 Abweichung zwischen historischen Entwürfen und diesen Dateien gelten ausschließlich die neuen
