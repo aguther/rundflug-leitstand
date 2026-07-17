@@ -1,5 +1,7 @@
 import type { PublicBoard } from "@rundflug/contracts";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { BrandMark } from "./design-system/BrandMark";
+import { ThemeToggle } from "./design-system/ThemeToggle";
 
 type DisplayMode = "standard" | "terminal";
 type PublicGroup = PublicBoard["groups"][number];
@@ -137,8 +139,8 @@ export function FidsDisplay({
     return (
       <main className="terminal-fids" data-display-mode="terminal">
         <header>
-          <div className="terminal-mark" aria-hidden="true">
-            ✈
+          <div className="terminal-mark">
+            <BrandMark />
           </div>
           <div className="terminal-title">
             <h1>RUNDFLUG-LEITSTAND</h1>
@@ -157,6 +159,7 @@ export function FidsDisplay({
           <a aria-current="page" href="/fids/terminal?kiosk=1">
             TERMINAL
           </a>
+          <ThemeToggle />
         </nav>
         {board?.emergencyMode || board?.operationalInterrupted ? (
           <div className="terminal-alert">OPERATIONS TEMPORARILY SUSPENDED</div>
@@ -192,8 +195,8 @@ export function FidsDisplay({
   return (
     <main className="standard-fids" data-display-mode="standard">
       <header>
-        <div className="standard-mark" aria-hidden="true">
-          ✈
+        <div className="standard-mark">
+          <BrandMark />
         </div>
         <div>
           <h1>Rundflug-Leitstand</h1>
@@ -212,6 +215,7 @@ export function FidsDisplay({
           Standard
         </a>
         <a href="/fids/terminal?kiosk=1">Terminal</a>
+        <ThemeToggle />
       </nav>
       {board?.emergencyMode || board?.operationalInterrupted ? (
         <div className="standard-alert">Der Rundflugbetrieb ist vorübergehend unterbrochen.</div>

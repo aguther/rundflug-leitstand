@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import appSource from "./App.tsx?raw";
 import displaySource from "./fids-display.tsx?raw";
+import appSource from "./LegacyApp.tsx?raw";
 
 describe("Standard- und Terminal-FIDS (F-MON-010/060, F-BEN-090)", () => {
   it("offers two directly addressable profiles backed by the same public board", () => {
