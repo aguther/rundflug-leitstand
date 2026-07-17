@@ -311,6 +311,7 @@ try {
       priceCents: 4500,
       referenceCapacity: 4,
       referenceDurationMinutes: 20,
+      promisedFlightMinutes: 20,
       childCompanionRequired: false,
       weightClasses: ["CHILD", "NORMAL", "HEAVY", "INDIVIDUAL"],
       sortOrder: 10,

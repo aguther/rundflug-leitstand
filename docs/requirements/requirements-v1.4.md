@@ -448,7 +448,7 @@ Die Besucheransicht beantwortet nur vier Fragen: Was habe ich gebucht? Wie ist m
 
 | ID | Anforderung | Priorität | Stufe |
 | --- | --- | --- | --- |
-| F-RES-010 | Jedes buchbare Produkt verwendet genau eine Ressourcengruppe. Produktmerkmale wie Bezeichnung, Preis, Referenzdauer, öffentliche Darstellung und Verkaufsregeln sind von der Ressourcengruppe getrennt zu führen. | MUSS | V1 |
+| F-RES-010 | Jedes buchbare Produkt verwendet genau eine Ressourcengruppe. Produktmerkmale wie Bezeichnung, Preis, prognostische Referenzdauer, davon getrennte zugesagte Flugzeit, öffentliche Darstellung und Verkaufsregeln sind von der Ressourcengruppe getrennt zu führen. Die zugesagte Flugzeit verändert keine operative Prognose. | MUSS | V1 |
 | F-RES-020 | Mehrere Produkte dürfen dieselbe Ressourcengruppe verwenden. Deren Nachfrage wird in einer gemeinsamen operativen Kapazität disponiert. | MUSS | V1 |
 | F-RES-030 | Eine Ressourcengruppe kann ein oder mehrere Flugzeuge enthalten. Standardmäßig besitzt jedes Flugzeug eine eigene Ressourcengruppe; die Zusammenfassung mehrerer Flugzeuge ist konfigurierbar. | MUSS | V1 |
 | F-RES-040 | Ein Flugzeug darf zu jedem Zeitpunkt höchstens einer aktiven Ressourcengruppe zugeordnet sein. Das System muss widersprüchliche Zuordnungen technisch verhindern. | MUSS | V1 |
@@ -633,7 +633,7 @@ Die folgenden Angaben definieren die fachlich zu führenden Daten. Die technisch
 | D-010 | Flugzeug: Kennzeichen, Typ, Passagierkapazität, maximale Passagierzuladung, Gate, Event- und Live-Status, aktueller Pilotencode, Zeitprofile, Tankhinweise, optionale geschätzte Pausendauer und aktive Ressourcengruppe. | MUSS | V1 |
 | D-015 | Ressourcengruppe: Bezeichnung, Status, zugehörige Produkte, Prognoseparameter, Gates, aktive Flugzeugzuordnungen und daraus abgeleitete Kapazitätsspanne. | MUSS | V1 |
 | D-016 | Ressourcengruppen-Zuordnung: Flugzeug, Ressourcengruppe, gültig ab/bis, aktiv, Änderungsgrund und Protokollbezug. | MUSS | V1 |
-| D-020 | Produkt: Bezeichnung, Kürzel, Preis, genau eine Ressourcengruppe, öffentliche Darstellung, Referenzdauer, Verkaufsregeln, Begleitpflicht und Sortierung; keine manuell gepflegte Referenzkapazität. | MUSS | V1 |
+| D-020 | Produkt: Bezeichnung, Kürzel, Preis, genau eine Ressourcengruppe, öffentliche Darstellung, prognostische Referenzdauer, zugesagte Flugzeit, Verkaufsregeln, Begleitpflicht und Sortierung; keine manuell gepflegte Referenzkapazität. | MUSS | V1 |
 | D-030 | Ticket: nicht erratbare Ticketnummer, Produkt, Fluggruppe beziehungsweise Queue-Position, Gruppen-ID, optionale Gewichtsklasse, Standby, Status und Verkaufszeitpunkt. Namen, Telefonnummern und Zahlungsdaten werden nicht im Ticketkern gespeichert; Web-Push-Registrierungen sind getrennt. | MUSS | V1 |
 | D-040 | Buchungsgruppe: Gruppen-ID, Größe, zugehörige Tickets, Gruppenbindung, Standby-Regel und gegebenenfalls Aufteilung auf unmittelbar aufeinanderfolgende Fluggruppen. | MUSS | V1 |
 | D-045 | Fluggruppe/Slot: stabile Tageskennung, Produkt, Ressourcengruppe, Tickets, Queue-Position, öffentliche Statusinformation, prognostizierte Zeitfenster und gegebenenfalls zugeordneter Umlauf. | MUSS | V1 |

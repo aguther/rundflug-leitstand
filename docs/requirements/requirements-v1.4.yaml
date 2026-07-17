@@ -223,7 +223,7 @@
   {
     "id": "F-RES-010",
     "section": "8.2 Produkte, Ressourcengruppen und Flugzeuge",
-    "requirement": "Jedes buchbare Produkt verwendet genau eine Ressourcengruppe. Produktmerkmale wie Bezeichnung, Preis, Referenzdauer, öffentliche Darstellung und Verkaufsregeln sind von der Ressourcengruppe getrennt zu führen.",
+    "requirement": "Jedes buchbare Produkt verwendet genau eine Ressourcengruppe. Produktmerkmale wie Bezeichnung, Preis, prognostische Referenzdauer, davon getrennte zugesagte Flugzeit, öffentliche Darstellung und Verkaufsregeln sind von der Ressourcengruppe getrennt zu führen. Die zugesagte Flugzeit verändert keine operative Prognose.",
     "priority": "MUSS",
     "stage": "V1",
     "implementation": {
@@ -1861,7 +1861,7 @@
   {
     "id": "D-020",
     "section": "9 Datenanforderungen",
-    "requirement": "Produkt: Bezeichnung, Kürzel, Preis, genau eine Ressourcengruppe, öffentliche Darstellung, Referenzdauer, Verkaufsregeln, Begleitpflicht und Sortierung; keine manuell gepflegte Referenzkapazität.",
+    "requirement": "Produkt: Bezeichnung, Kürzel, Preis, genau eine Ressourcengruppe, öffentliche Darstellung, prognostische Referenzdauer, zugesagte Flugzeit, Verkaufsregeln, Begleitpflicht und Sortierung; keine manuell gepflegte Referenzkapazität.",
     "priority": "MUSS",
     "stage": "V1",
     "implementation": {

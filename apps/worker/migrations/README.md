@@ -175,3 +175,12 @@ widerrufbare, gerätebezogene Browser-Sitzungen ein. PINs und Sitzungstoken werd
 gesalzene beziehungsweise kryptografische Hashes gespeichert. Bestehende Gerätebindungen bleiben
 für die kontrollierte Migration erhalten. Vor Anwendung ist eine portable D1-Sicherung erforderlich;
 ein Rollback erfolgt per D1 Time Travel oder Wiederherstellung dieser Sicherung.
+
+## 0036 – Zugesagte Produkt-Flugzeit
+
+Ergänzt Produkte additiv um die öffentlich kommunizierte Flugzeit in Minuten. Sie bleibt bewusst von
+der prognostischen Referenzdauer getrennt und besitzt keine flugbetriebliche Freigabewirkung.
+Bestehende Produkte übernehmen als sicheren Migrationsstart ihre bisherige Referenzdauer; neue
+Produkte erhalten ohne abweichende Eingabe 20 Minuten. Vor Anwendung ist eine portable D1-Sicherung
+erforderlich; ein Rollback erfolgt per D1 Time Travel oder Wiederherstellung dieser Sicherung, da D1
+die additive Spalte nicht einzeln zurückbauen kann.

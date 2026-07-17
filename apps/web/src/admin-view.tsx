@@ -212,6 +212,7 @@ export function AdminView() {
   const [productGateId, setProductGateId] = useState("");
   const [productPriceInput, setProductPriceInput] = useState("0,00 €");
   const [productReferenceDuration, setProductReferenceDuration] = useState(20);
+  const [productPromisedFlightMinutes, setProductPromisedFlightMinutes] = useState(20);
   const [productChildCompanion, setProductChildCompanion] = useState(false);
   const [productWeightClasses, setProductWeightClasses] = useState<string[]>(["NOT_CAPTURED"]);
   const [productSortOrder, setProductSortOrder] = useState(10);
@@ -700,6 +701,7 @@ export function AdminView() {
     setProductGateId(entry?.gateId ?? board?.gates.find((gate) => gate.active)?.id ?? "");
     setProductPriceInput(formatEuroInput(entry?.priceCents ?? 0));
     setProductReferenceDuration(entry?.referenceDurationMinutes ?? 20);
+    setProductPromisedFlightMinutes(entry?.promisedFlightMinutes ?? 20);
     setProductChildCompanion(entry?.childCompanionRequired ?? false);
     setProductWeightClasses(entry?.weightClasses ?? ["NOT_CAPTURED"]);
     setProductSortOrder(entry?.sortOrder ?? 10);
@@ -831,6 +833,7 @@ export function AdminView() {
               resourceGroups.find((group) => group.id === productResourceGroupId)
                 ?.referenceCapacity ?? 1,
             referenceDurationMinutes: productReferenceDuration,
+            promisedFlightMinutes: productPromisedFlightMinutes,
             childCompanionRequired: productChildCompanion,
             weightClasses: productWeightClasses as Array<
               "NOT_CAPTURED" | "CHILD" | "NORMAL" | "HEAVY" | "INDIVIDUAL"
@@ -3169,6 +3172,21 @@ export function AdminView() {
                     </label>
                     <label>
                       <FieldLabel
+                        label="Zugesagte Flugzeit (Min.)"
+                        help="Öffentlich kommunizierte reine Flugzeit des Produkts. Sie ändert die operative Prognose nicht."
+                      />
+                      <input
+                        type="number"
+                        min="1"
+                        max="600"
+                        value={productPromisedFlightMinutes}
+                        onChange={(event) =>
+                          setProductPromisedFlightMinutes(Number(event.target.value))
+                        }
+                      />
+                    </label>
+                    <label>
+                      <FieldLabel
                         label="Position in Anzeigen"
                         help="Legt nur die Reihenfolge in Kasse und Anzeigen fest. Queue und Priorität ändern sich dadurch nicht."
                       />
@@ -4186,6 +4204,7 @@ export function AdminView() {
                 </select>
               </label>
               <button
+                className="primary-action"
                 disabled={!isAdministrator || deviceLabel.trim().length < 2}
                 onClick={() => requestAdminAction(pairDevice)}
                 type="button"
@@ -4220,6 +4239,7 @@ export function AdminView() {
                   </time>
                   {device.active ? (
                     <button
+                      className="admin-revoke-action"
                       disabled={!isAdministrator || reason.trim().length < 3}
                       onClick={() => requestAdminAction(() => revokeDevice(device))}
                       type="button"
