@@ -24,6 +24,8 @@ export const FACTORY_RESET_DELETE_TABLES = [
   "pilots",
   "operational_events",
   "app_bootstrap",
+  "operator_sessions",
+  "operator_accounts",
   "resource_groups",
   "gates",
   "paired_devices",

@@ -133,25 +133,32 @@ export class EventCoordinator extends DurableObject<Env> {
         return json({ ...stored, duplicate: true });
       }
 
-      const device = await this.env.DB.prepare(
-        `SELECT role, credential_hash
-           FROM paired_devices
-          WHERE id = ?1 AND operation_day_id = ?2 AND active = 1`,
-      )
-        .bind(command.deviceId, command.eventId)
-        .first<{ role: DeviceRole; credential_hash: string | null }>();
-      if (
-        !device ||
-        !(await verifyCredential(request.headers.get("x-device-token"), device.credential_hash))
-      ) {
-        return json(
-          { error: { code: "DEVICE_NOT_PAIRED", message: "Gerät ist nicht aktiv gekoppelt." } },
-          { status: 401 },
-        );
+      const operatorRole = request.headers.get("x-operator-role") as DeviceRole | null;
+      const operatorDeviceId = request.headers.get("x-operator-device-id");
+      let device: { role: DeviceRole; credential_hash: string | null } | null = null;
+      if (operatorRole && operatorDeviceId === command.deviceId) {
+        device = { role: operatorRole, credential_hash: null };
+      } else {
+        device = await this.env.DB.prepare(
+          `SELECT role, credential_hash
+             FROM paired_devices
+            WHERE id = ?1 AND operation_day_id = ?2 AND active = 1`,
+        )
+          .bind(command.deviceId, command.eventId)
+          .first<{ role: DeviceRole; credential_hash: string | null }>();
+        if (
+          !device ||
+          !(await verifyCredential(request.headers.get("x-device-token"), device.credential_hash))
+        ) {
+          return json(
+            { error: { code: "DEVICE_NOT_PAIRED", message: "Gerät ist nicht aktiv gekoppelt." } },
+            { status: 401 },
+          );
+        }
+        await this.env.DB.prepare("UPDATE paired_devices SET last_seen_at = ?1 WHERE id = ?2")
+          .bind(new Date().toISOString(), command.deviceId)
+          .run();
       }
-      await this.env.DB.prepare("UPDATE paired_devices SET last_seen_at = ?1 WHERE id = ?2")
-        .bind(new Date().toISOString(), command.deviceId)
-        .run();
 
       if (command.type === "SET_OPERATIONAL_NOTE") {
         if (device.role !== "ADMIN") {
@@ -1256,15 +1263,6 @@ export class EventCoordinator extends DurableObject<Env> {
     >,
     current: StoredEventRow,
   ): Promise<Response> {
-    if (
-      (command.type === "UPSERT_PILOT" || command.type === "CONFIGURE_AIRCRAFT_REFUEL_THRESHOLD") &&
-      !(await verifyCredential(command.payload.adminPin, this.env.ADMIN_PIN_HASH))
-    ) {
-      return json(
-        { error: { code: "ADMIN_PIN_INVALID", message: "Administrator-PIN ist ungültig." } },
-        { status: 403 },
-      );
-    }
     const now = new Date().toISOString();
     const nextVersion = current.version + 1;
     const statements: D1PreparedStatement[] = [
@@ -1558,12 +1556,6 @@ export class EventCoordinator extends DurableObject<Env> {
     command: Extract<CommandEnvelope, { type: "CONFIGURE_PRODUCT_SALES" }>,
     current: StoredEventRow,
   ): Promise<Response> {
-    if (!(await verifyCredential(command.payload.adminPin, this.env.ADMIN_PIN_HASH))) {
-      return json(
-        { error: { code: "ADMIN_PIN_INVALID", message: "Administrator-PIN ist ungültig." } },
-        { status: 403 },
-      );
-    }
     if (command.payload.criticalThreshold > command.payload.warningThreshold) {
       return json(
         {
@@ -1656,12 +1648,6 @@ export class EventCoordinator extends DurableObject<Env> {
     command: Extract<CommandEnvelope, { type: "UPSERT_GATE" | "UPSERT_PRODUCT" }>,
     current: StoredEventRow,
   ): Promise<Response> {
-    if (!(await verifyCredential(command.payload.adminPin, this.env.ADMIN_PIN_HASH))) {
-      return json(
-        { error: { code: "ADMIN_PIN_INVALID", message: "Administrator-PIN ist ungültig." } },
-        { status: 403 },
-      );
-    }
     const now = new Date().toISOString();
     const nextVersion = current.version + 1;
     let eventType: "GATE_UPSERTED" | "PRODUCT_UPSERTED";
@@ -1924,12 +1910,6 @@ export class EventCoordinator extends DurableObject<Env> {
     command: Extract<CommandEnvelope, { type: "DELETE_MASTER_DATA" }>,
     current: StoredEventRow,
   ): Promise<Response> {
-    if (!(await verifyCredential(command.payload.adminPin, this.env.ADMIN_PIN_HASH))) {
-      return json(
-        { error: { code: "ADMIN_PIN_INVALID", message: "Administrator-PIN ist ungültig." } },
-        { status: 403 },
-      );
-    }
     if (current.status !== "PREPARATION") {
       return json(
         {
@@ -2216,12 +2196,6 @@ export class EventCoordinator extends DurableObject<Env> {
     >,
     current: StoredEventRow,
   ): Promise<Response> {
-    if (!(await verifyCredential(command.payload.adminPin, this.env.ADMIN_PIN_HASH))) {
-      return json(
-        { error: { code: "ADMIN_PIN_INVALID", message: "Administrator-PIN ist ungültig." } },
-        { status: 403 },
-      );
-    }
     const now = new Date().toISOString();
     const nextVersion = current.version + 1;
     let eventType:
@@ -2682,12 +2656,6 @@ export class EventCoordinator extends DurableObject<Env> {
     command: Extract<CommandEnvelope, { type: "SET_EVENT_LIFECYCLE" }>,
     current: StoredEventRow,
   ): Promise<Response> {
-    if (!(await verifyCredential(command.payload.adminPin, this.env.ADMIN_PIN_HASH))) {
-      return json(
-        { error: { code: "ADMIN_PIN_INVALID", message: "Administrator-PIN ist ungültig." } },
-        { status: 403 },
-      );
-    }
     const target = command.payload.status;
     const allowedTransitions: Record<StoredEventRow["status"], StoredEventRow["status"][]> = {
       PREPARATION: ["ACTIVE"],
@@ -2836,12 +2804,6 @@ export class EventCoordinator extends DurableObject<Env> {
     command: Extract<CommandEnvelope, { type: "CONFIGURE_EVENT_PARAMETERS" }>,
     current: StoredEventRow,
   ): Promise<Response> {
-    if (!(await verifyCredential(command.payload.adminPin, this.env.ADMIN_PIN_HASH))) {
-      return json(
-        { error: { code: "ADMIN_PIN_INVALID", message: "Administrator-PIN ist ungültig." } },
-        { status: 403 },
-      );
-    }
     const payload = command.payload;
     if (
       payload.saleOpensAt &&
@@ -2993,12 +2955,6 @@ export class EventCoordinator extends DurableObject<Env> {
     command: Extract<CommandEnvelope, { type: "PAIR_DEVICE" | "REVOKE_DEVICE" }>,
     current: StoredEventRow,
   ): Promise<Response> {
-    if (!(await verifyCredential(command.payload.adminPin, this.env.ADMIN_PIN_HASH))) {
-      return json(
-        { error: { code: "ADMIN_PIN_INVALID", message: "Administrator-PIN ist ungültig." } },
-        { status: 403 },
-      );
-    }
     const targetId = command.payload.pairedDeviceId;
     if (command.type === "REVOKE_DEVICE") {
       const target = await this.env.DB.prepare(
@@ -3351,12 +3307,6 @@ export class EventCoordinator extends DurableObject<Env> {
     command: Extract<CommandEnvelope, { type: "APPLY_OUTAGE_RECOVERY" }>,
     current: StoredEventRow,
   ): Promise<Response> {
-    if (!(await verifyCredential(command.payload.adminPin, this.env.ADMIN_PIN_HASH))) {
-      return json(
-        { error: { code: "ADMIN_PIN_INVALID", message: "Administrator-PIN ist ungültig." } },
-        { status: 403 },
-      );
-    }
     const batch = await this.env.DB.prepare(
       `SELECT id, status, created_by_device_id, approved_by_device_id,
               simulated_against_version, version
@@ -3952,12 +3902,6 @@ export class EventCoordinator extends DurableObject<Env> {
     command: Extract<CommandEnvelope, { type: "APPROVE_OUTAGE_RECOVERY" }>,
     current: StoredEventRow,
   ): Promise<Response> {
-    if (!(await verifyCredential(command.payload.adminPin, this.env.ADMIN_PIN_HASH))) {
-      return json(
-        { error: { code: "ADMIN_PIN_INVALID", message: "Administrator-PIN ist ungültig." } },
-        { status: 403 },
-      );
-    }
     const batch = await this.env.DB.prepare(
       `SELECT id, status, created_by_device_id, simulated_against_version, version
          FROM outage_recovery_batches
@@ -4689,12 +4633,6 @@ export class EventCoordinator extends DurableObject<Env> {
     command: Extract<CommandEnvelope, { type: "CORRECT_ROTATION_MANIFEST" }>,
     current: StoredEventRow,
   ): Promise<Response> {
-    if (!(await verifyCredential(command.payload.adminPin, this.env.ADMIN_PIN_HASH))) {
-      return json(
-        { error: { code: "ADMIN_PIN_INVALID", message: "Administrator-PIN ist ungültig." } },
-        { status: 403 },
-      );
-    }
     const group = await this.env.DB.prepare(
       `SELECT tg.id, tg.version, COUNT(t.id) AS group_size
          FROM ticket_groups tg
@@ -4902,15 +4840,6 @@ export class EventCoordinator extends DurableObject<Env> {
     >,
     current: StoredEventRow,
   ): Promise<Response> {
-    if (
-      (command.type === "CANCEL_TICKET_GROUP" || command.type === "REBOOK_TICKET_GROUP") &&
-      !(await verifyCredential(command.payload.adminPin, this.env.ADMIN_PIN_HASH))
-    ) {
-      return json(
-        { error: { code: "ADMIN_PIN_INVALID", message: "Administrator-PIN ist ungültig." } },
-        { status: 403 },
-      );
-    }
     const group = await this.env.DB.prepare(
       `SELECT tg.id, tg.product_id, tg.version, tg.deferral_count,
               p.resource_group_id, COUNT(t.id) AS group_size
@@ -5627,15 +5556,6 @@ export class EventCoordinator extends DurableObject<Env> {
     >,
     current: StoredEventRow,
   ): Promise<Response> {
-    if (
-      command.type === "CLEAR_EMERGENCY" &&
-      !(await verifyCredential(command.payload.adminPin, this.env.ADMIN_PIN_HASH))
-    ) {
-      return json(
-        { error: { code: "ADMIN_PIN_INVALID", message: "Administrator-PIN ist ungültig." } },
-        { status: 403 },
-      );
-    }
     if (
       command.type === "SET_RESOURCE_GROUP_STATUS" ||
       command.type === "SET_RESOURCE_GROUP_NOTICE"

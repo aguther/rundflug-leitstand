@@ -1,0 +1,115 @@
+.account-management {
+  padding: 20px 24px;
+}
+.account-management > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+.account-management h1,
+.account-management h2,
+.account-management p {
+  margin: 0;
+}
+.account-management header p {
+  margin-top: 4px;
+  color: var(--ui-muted);
+}
+.account-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 20px;
+  align-items: start;
+}
+.account-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-md);
+}
+.account-table-wrap table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.account-table-wrap th,
+.account-table-wrap td {
+  height: 44px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--ui-border);
+  text-align: left;
+  white-space: nowrap;
+}
+.account-table-wrap th {
+  color: var(--ui-muted);
+  background: var(--ui-surface-subtle);
+  font-size: 12px;
+}
+.account-table-wrap tr:last-child td {
+  border-bottom: 0;
+}
+.account-table-wrap button {
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-sm);
+  background: var(--ui-control);
+  color: var(--ui-text);
+  cursor: pointer;
+}
+.account-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.account-status::before {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ui-muted);
+  content: "";
+}
+.account-status.active {
+  color: var(--ui-success);
+}
+.account-status.active::before {
+  background: var(--ui-success);
+}
+.account-editor {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-md);
+  background: var(--ui-surface);
+}
+.account-editor label,
+.account-dialog label {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.account-editor select,
+.account-editor input,
+.account-dialog input {
+  min-height: 40px;
+  padding: 0 10px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--ui-text);
+  background: var(--ui-control);
+}
+.account-message {
+  margin-top: 14px;
+  color: var(--ui-muted);
+}
+.account-dialog header {
+  display: flex;
+  justify-content: space-between;
+}
+@media (max-width: 840px) {
+  .account-layout {
+    grid-template-columns: 1fr;
+  }
+  .account-management {
+    padding: 16px;
+  }
+}

@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { allowAdminDeviceRecoveryAttempt, allowUnknownTicketAttempt } from "./public-access";
+import {
+  allowAdminDeviceRecoveryAttempt,
+  allowLoginAttempt,
+  allowUnknownTicketAttempt,
+} from "./public-access";
 
 describe("public ticket access", () => {
   it("limits unknown-ticket attempts per requesting actor without persisting the address", async () => {
@@ -21,6 +25,20 @@ describe("public ticket access", () => {
       allowUnknownTicketAttempt({ limit }, new Request("https://example.test/status")),
     ).resolves.toBe(true);
     expect(limit.mock.calls[0]?.[0].key).toMatch(/^unknown-ticket:[a-f0-9]{64}$/);
+  });
+});
+
+describe("operator login access", () => {
+  it("combines account and edge actor without exposing either in the limiter key", async () => {
+    const limit = vi.fn().mockResolvedValue({ success: true });
+    const request = new Request("https://example.test/api/auth/login", {
+      headers: { "cf-connecting-ip": "192.0.2.40" },
+    });
+    await expect(allowLoginAttempt({ limit }, request, "account-secret-id")).resolves.toBe(true);
+    const key = limit.mock.calls[0]?.[0].key as string;
+    expect(key).toMatch(/^operator-login:[a-f0-9]{64}$/);
+    expect(key).not.toContain("192.0.2.40");
+    expect(key).not.toContain("account-secret-id");
   });
 });
 

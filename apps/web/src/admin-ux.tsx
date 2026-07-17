@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-export type AdminArea = "overview" | "setup" | "master-data" | "evaluation" | "backup";
+export type AdminArea = "overview" | "setup" | "master-data" | "users" | "evaluation" | "backup";
 export type MasterDataCategory =
   | "gates"
   | "resource-groups"
@@ -17,7 +17,7 @@ export type SetupStep = {
   category?: MasterDataCategory;
 };
 
-type LineIconName = "overview" | "setup" | "master-data" | "evaluation" | "backup";
+type LineIconName = "overview" | "setup" | "master-data" | "users" | "evaluation" | "backup";
 
 const iconPaths: Record<LineIconName, ReactNode> = {
   overview: (
@@ -36,6 +36,12 @@ const iconPaths: Record<LineIconName, ReactNode> = {
       <ellipse cx="12" cy="5" rx="8" ry="3" />
       <path d="M4 5v7c0 1.7 3.6 3 8 3s8-1.3 8-3V5" />
       <path d="M4 12v7c0 1.7 3.6 3 8 3s8-1.3 8-3v-7" />
+    </>
+  ),
+  users: (
+    <>
+      <circle cx="9" cy="8" r="3" />
+      <path d="M3.5 20v-2.5A4.5 4.5 0 0 1 8 13h2a4.5 4.5 0 0 1 4.5 4.5V20M16 9a3 3 0 0 1 0 6M18 20v-2a4 4 0 0 0-2-3.5" />
     </>
   ),
   evaluation: (
@@ -72,6 +78,7 @@ const navigationItems: Array<{ id: AdminArea; label: string; icon: LineIconName 
   { id: "overview", label: "Übersicht", icon: "overview" },
   { id: "setup", label: "Einrichtung", icon: "setup" },
   { id: "master-data", label: "Stammdaten", icon: "master-data" },
+  { id: "users", label: "Konten", icon: "users" },
   { id: "evaluation", label: "Auswertung", icon: "evaluation" },
   { id: "backup", label: "Sicherung & Reset", icon: "backup" },
 ];

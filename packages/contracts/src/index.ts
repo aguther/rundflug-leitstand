@@ -627,8 +627,8 @@ export type EventCatalogEntry = z.infer<typeof eventCatalogEntrySchema>;
 export type EventCatalog = z.infer<typeof eventCatalogSchema>;
 
 export const bootstrapRequestSchema = z.object({
-  setupCode: z.string().min(16).max(256),
-  adminPin: z.string().min(4).max(32),
+  setupCode: z.string().min(8).max(256),
+  adminPin: z.string().regex(/^\d{6,12}$/),
   eventId: z
     .string()
     .trim()
@@ -641,6 +641,60 @@ export const bootstrapRequestSchema = z.object({
   adminCredentialHash: z.string().regex(/^[a-f0-9]{64}$/),
 });
 export type BootstrapRequest = z.infer<typeof bootstrapRequestSchema>;
+
+export const operatorRoleSchema = z.enum([
+  "CASHIER",
+  "FLIGHT_LINE",
+  "FLIGHT_LINE_LEAD",
+  "FLIGHT_DIRECTOR",
+  "ADMIN",
+  "DISPLAY",
+]);
+export type OperatorRole = z.infer<typeof operatorRoleSchema>;
+
+export const operatorAccountSummarySchema = z.object({
+  id: z.uuid(),
+  loginCode: z.string().regex(/^[A-Z]+-\d{2,}$/),
+  role: operatorRoleSchema,
+  active: z.boolean(),
+});
+export type OperatorAccountSummary = z.infer<typeof operatorAccountSummarySchema>;
+
+export const operatorAccountCatalogSchema = z.object({
+  accounts: z.array(operatorAccountSummarySchema.omit({ active: true })),
+});
+export type OperatorAccountCatalog = z.infer<typeof operatorAccountCatalogSchema>;
+
+export const operatorLoginRequestSchema = z.object({
+  accountId: z.uuid(),
+  pin: z.string().regex(/^\d{6,12}$/),
+  deviceId: z.uuid(),
+});
+export type OperatorLoginRequest = z.infer<typeof operatorLoginRequestSchema>;
+
+export const operatorSessionSchema = z.object({
+  authenticated: z.literal(true),
+  account: operatorAccountSummarySchema.omit({ active: true }),
+  deviceId: z.uuid(),
+});
+export type OperatorSession = z.infer<typeof operatorSessionSchema>;
+
+export const createOperatorAccountSchema = z.object({
+  role: operatorRoleSchema,
+  pin: z.string().regex(/^\d{6,12}$/),
+});
+export type CreateOperatorAccount = z.infer<typeof createOperatorAccountSchema>;
+
+export const updateOperatorAccountSchema = z
+  .object({
+    active: z.boolean().optional(),
+    pin: z
+      .string()
+      .regex(/^\d{6,12}$/)
+      .optional(),
+  })
+  .refine((value) => value.active !== undefined || value.pin !== undefined);
+export type UpdateOperatorAccount = z.infer<typeof updateOperatorAccountSchema>;
 
 export const adminPinVerificationSchema = z.object({
   adminPin: z.string().min(4).max(32),

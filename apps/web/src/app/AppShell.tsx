@@ -1,7 +1,8 @@
 import { BrandMark } from "../design-system/BrandMark";
 import { ThemeToggle } from "../design-system/ThemeToggle";
+import { useAuth } from "../features/auth/AuthContext";
 import { useConnectivity } from "../shared/hooks/use-connectivity";
-import { appDestinations, isDestinationActive } from "./navigation";
+import { appDestinations, destinationsForRole, isDestinationActive } from "./navigation";
 
 export function AppShell({
   title,
@@ -15,7 +16,9 @@ export function AppShell({
   className?: string;
 }) {
   const online = useConnectivity();
+  const { session, logout } = useAuth();
   const pathname = window.location.pathname;
+  const destinations = session ? destinationsForRole(session.account.role) : appDestinations;
   return (
     <main className={`${kiosk ? "app-shell kiosk-shell" : "app-shell"} ${className}`.trim()}>
       <header className="app-header">
@@ -26,7 +29,7 @@ export function AppShell({
         </a>
         {!kiosk ? (
           <nav aria-label="Arbeitsbereiche">
-            {appDestinations.map((destination) => (
+            {destinations.map((destination) => (
               <a
                 aria-current={isDestinationActive(pathname, destination.href) ? "page" : undefined}
                 href={destination.href}
@@ -38,6 +41,15 @@ export function AppShell({
           </nav>
         ) : null}
         <ThemeToggle />
+        {session && !kiosk ? (
+          <button
+            className="app-account"
+            onClick={() => void logout().then(() => window.location.reload())}
+            type="button"
+          >
+            {session.account.loginCode}
+          </button>
+        ) : null}
       </header>
       {!online ? (
         <div className="connection-warning" role="status">

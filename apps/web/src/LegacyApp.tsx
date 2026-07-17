@@ -75,6 +75,9 @@ import {
   eventLocalDateTimeToIso,
   formatEventLocalDateTime,
 } from "./event-time";
+import { AccountManagement } from "./features/auth/AccountManagement";
+import { useAuth } from "./features/auth/AuthContext";
+import { operatorDeviceId } from "./features/auth/device";
 import { FidsDisplay } from "./fids-display";
 import { FlightLineAssist } from "./flight-line-assist";
 import { expectedReviewAtFromPause } from "./flight-line-pause";
@@ -235,6 +238,8 @@ function deviceTokenFor(deviceId: string): string {
 
 function deviceIdForRole(role: string, developmentId: string): string {
   if (LOCAL_DEVELOPMENT && EVENT_ID === "demo-2026") return developmentId;
+  const sessionDeviceId = operatorDeviceId();
+  if (sessionDeviceId) return sessionDeviceId;
   const pairedDeviceId =
     role === "CASHIER" || role === "FLIGHT_LINE"
       ? deviceIdForOperationalView(window.localStorage, role)
@@ -2517,7 +2522,7 @@ function SetupView() {
             </p>
             {status && !status.setupConfigured ? (
               <p className="connection-warning">
-                Cloudflare-Secrets für Einrichtungscode und Administrator-PIN fehlen noch.
+                Der einmalige Cloudflare-Einrichtungscode fehlt noch.
               </p>
             ) : null}
             <div className="setup-grid">
@@ -2551,18 +2556,20 @@ function SetupView() {
                   onChange={(event) => setSetupCode(event.target.value)}
                   autoComplete="off"
                 />
-                <small>Mindestens 16 Zeichen; exakt wie im Terminal eingegeben</small>
+                <small>Mindestens 8 Zeichen; exakt wie im Terminal eingegeben</small>
               </label>
               <label>
-                Administrator-PIN
+                Erste Administrator-PIN
                 <input
                   type="password"
                   inputMode="numeric"
                   value={adminPin}
-                  onChange={(event) => setAdminPin(event.target.value)}
+                  onChange={(event) => setAdminPin(event.target.value.replace(/\D/g, ""))}
+                  minLength={6}
+                  maxLength={12}
                   autoComplete="off"
                 />
-                <small>Mindestens 4 Zeichen</small>
+                <small>6–12 Ziffern; danach Anmeldung als ADMIN-01</small>
               </label>
             </div>
             <button
@@ -2656,18 +2663,19 @@ function FidsView() {
 }
 
 function AdminView() {
+  const { session, logout } = useAuth();
   const { board, error, lastConfirmedAt, refresh, refreshing } = useOperationBoard(ADMIN_DEVICE_ID);
   const [adminArea, setAdminArea] = useState<AdminArea>("master-data");
   const [masterDataCategory, setMasterDataCategory] =
     useState<MasterDataCategory>("resource-groups");
   const [reason, setReason] = useState("");
-  const [adminPin, setAdminPinState] = useState("");
-  const adminPinRef = useRef("");
+  const [adminPin, setAdminPinState] = useState(session?.account.role === "ADMIN" ? "000000" : "");
+  const adminPinRef = useRef(session?.account.role === "ADMIN" ? "000000" : "");
   const setAdminPin = useCallback((value: string) => {
     adminPinRef.current = value;
     setAdminPinState(value);
   }, []);
-  const [adminModeUnlocked, setAdminModeUnlocked] = useState(false);
+  const [adminModeUnlocked, setAdminModeUnlocked] = useState(session?.account.role === "ADMIN");
   const [adminPinDialog, setAdminPinDialog] = useState<"unlock" | "action" | "recover" | null>(
     null,
   );
@@ -2826,13 +2834,15 @@ function AdminView() {
   const [factoryResetBusy, setFactoryResetBusy] = useState(false);
   const [factoryResetError, setFactoryResetError] = useState<string | null>(null);
   const [factoryResetReason, setFactoryResetReason] = useState("");
-  const [factoryResetPin, setFactoryResetPin] = useState("");
+  const [factoryResetPin, setFactoryResetPin] = useState(
+    session?.account.role === "ADMIN" ? "000000" : "",
+  );
   const [factoryResetConfirmation, setFactoryResetConfirmation] = useState("");
   const [retainRecoveryBackup, setRetainRecoveryBackup] = useState(true);
   const [deleteAllBackups, setDeleteAllBackups] = useState(false);
   const [factoryResetCommandId, setFactoryResetCommandId] = useState(() => crypto.randomUUID());
   const resourceGroups = board?.resourceGroups ?? [];
-  const isAdministrator = board?.currentDeviceRole === "ADMIN";
+  const isAdministrator = session?.account.role === "ADMIN" || board?.currentDeviceRole === "ADMIN";
   const deviceAuthorizationRejected = isDeviceAuthorizationError(error);
   const productPriceCents = parseEuroToCents(productPriceInput);
   const manifestCandidates = manifestCorrectionCandidates(board?.rotations ?? []);
@@ -2863,31 +2873,11 @@ function AdminView() {
   }, [adminModeUnlocked, adminPinDialog, pendingMasterDelete]);
 
   useEffect(() => {
-    if (!adminModeUnlocked || !isAdministrator) return;
-    let timeout = window.setTimeout(() => undefined, 0);
-    const lockAfterInactivity = () => {
-      window.clearTimeout(timeout);
-      timeout = window.setTimeout(
-        () => {
-          setAdminModeUnlocked(false);
-          setAdminPin("");
-          setMessage("Bearbeitungsmodus wurde nach 15 Minuten Inaktivität gesperrt.");
-        },
-        15 * 60 * 1000,
-      );
-    };
-    const activityEvents = ["pointerdown", "keydown"] as const;
-    activityEvents.forEach((eventName) => {
-      window.addEventListener(eventName, lockAfterInactivity);
-    });
-    lockAfterInactivity();
-    return () => {
-      window.clearTimeout(timeout);
-      activityEvents.forEach((eventName) => {
-        window.removeEventListener(eventName, lockAfterInactivity);
-      });
-    };
-  }, [adminModeUnlocked, isAdministrator, setAdminPin]);
+    if (session?.account.role !== "ADMIN") return;
+    setAdminModeUnlocked(true);
+    setAdminPin("000000");
+    setFactoryResetPin("000000");
+  }, [session?.account.role, setAdminPin]);
 
   useEffect(() => {
     if (isAdministrator) return;
@@ -3078,7 +3068,10 @@ function AdminView() {
       setMessage("Für diese Änderung wird ein Administrationsgerät benötigt.");
       return;
     }
-    if (adminModeUnlocked && adminPinRef.current.length >= 4) {
+    if (
+      session?.account.role === "ADMIN" ||
+      (adminModeUnlocked && adminPinRef.current.length >= 4)
+    ) {
       void action();
       return;
     }
@@ -3091,6 +3084,11 @@ function AdminView() {
   function requestAdminModeUnlock() {
     if (!isAdministrator) {
       setMessage("Der Bearbeitungsmodus ist nur auf einem Administrationsgerät verfügbar.");
+      return;
+    }
+    if (session?.account.role === "ADMIN") {
+      setAdminModeUnlocked(true);
+      setAdminPin("000000");
       return;
     }
     pendingAdminActionRef.current = null;
@@ -4069,7 +4067,7 @@ function AdminView() {
     setFactoryResetError(null);
     setMessage(null);
     setFactoryResetReason("");
-    setFactoryResetPin("");
+    setFactoryResetPin(session?.account.role === "ADMIN" ? "000000" : "");
     setFactoryResetConfirmation("");
     setRetainRecoveryBackup(true);
     setDeleteAllBackups(false);
@@ -4188,6 +4186,10 @@ function AdminView() {
     "master-data": {
       title: "Stammdaten",
       description: "Ressourcen für den Flugtag verwalten.",
+    },
+    users: {
+      title: "Konten",
+      description: "Pseudonyme Arbeitskonten, Rollen und Sitzungen verwalten.",
     },
     evaluation: {
       title: "Auswertung",
@@ -4507,21 +4509,36 @@ function AdminView() {
           >
             <div>
               <strong>
-                {adminModeUnlocked ? "Bearbeitungsmodus aktiv" : "Administration gesperrt"}
+                {session?.account.role === "ADMIN"
+                  ? "Administration aktiv"
+                  : adminModeUnlocked
+                    ? "Bearbeitungsmodus aktiv"
+                    : "Administration gesperrt"}
               </strong>
               <span>
-                {adminModeUnlocked
-                  ? "Mehrere Änderungen sind möglich. Jede Änderung wird weiterhin einzeln protokolliert."
-                  : "Änderungen fragen die PIN einzeln ab oder können für diese Arbeitssitzung entsperrt werden."}
+                {session?.account.role === "ADMIN"
+                  ? `${session.account.loginCode} · Änderungen werden dem angemeldeten Konto und diesem Gerät zugeordnet.`
+                  : adminModeUnlocked
+                    ? "Mehrere Änderungen sind möglich. Jede Änderung wird weiterhin einzeln protokolliert."
+                    : "Änderungen fragen die PIN einzeln ab oder können für diese Arbeitssitzung entsperrt werden."}
               </span>
             </div>
             {isAdministrator ? (
               <button
                 className="secondary-action"
-                onClick={() => (adminModeUnlocked ? lockAdminMode() : requestAdminModeUnlock())}
+                onClick={() => {
+                  if (session?.account.role === "ADMIN") {
+                    void logout().then(() => window.location.reload());
+                  } else if (adminModeUnlocked) lockAdminMode();
+                  else requestAdminModeUnlock();
+                }}
                 type="button"
               >
-                {adminModeUnlocked ? "Bearbeitungsmodus sperren" : "Bearbeitungsmodus entsperren"}
+                {session?.account.role === "ADMIN"
+                  ? "Abmelden"
+                  : adminModeUnlocked
+                    ? "Bearbeitungsmodus sperren"
+                    : "Bearbeitungsmodus entsperren"}
               </button>
             ) : (
               <div className="secondary-actions admin-recovery-actions">
@@ -4560,9 +4577,11 @@ function AdminView() {
               )
             ) : null}
             <ValidationHint>
-              {adminModeUnlocked
-                ? "Änderungen sind freigeschaltet und werden automatisch protokolliert."
-                : "Beim Auslösen einer administrativen Änderung erscheint die PIN-Abfrage."}
+              {session?.account.role === "ADMIN"
+                ? "Die Anmeldung ersetzt wiederholte PIN-Abfragen. Jede Änderung bleibt einzeln protokolliert."
+                : adminModeUnlocked
+                  ? "Änderungen sind freigeschaltet und werden automatisch protokolliert."
+                  : "Beim Auslösen einer administrativen Änderung erscheint die PIN-Abfrage."}
             </ValidationHint>
           </section>
           {adminArea === "master-data" ? (
@@ -4573,6 +4592,7 @@ function AdminView() {
               </h1>
             </header>
           ) : null}
+          {adminArea === "users" ? <AccountManagement /> : null}
           <section className="reset-levels" hidden={adminArea !== "backup"}>
             {!isAdministrator ? (
               <ValidationHint tone="error">
@@ -7390,18 +7410,20 @@ function AdminView() {
                     value={factoryResetReason}
                   />
                 </label>
-                <label>
-                  <FieldLabel
-                    label="Administrator-PIN"
-                    help="Bestätigt die Berechtigung für diesen irreversiblen Vorgang. Die PIN wird nicht protokolliert."
-                  />
-                  <input
-                    autoComplete="current-password"
-                    onChange={(event) => setFactoryResetPin(event.target.value)}
-                    type="password"
-                    value={factoryResetPin}
-                  />
-                </label>
+                {session?.account.role !== "ADMIN" ? (
+                  <label>
+                    <FieldLabel
+                      label="Administrator-PIN"
+                      help="Bestätigt die Berechtigung für diesen irreversiblen Vorgang. Die PIN wird nicht protokolliert."
+                    />
+                    <input
+                      autoComplete="current-password"
+                      onChange={(event) => setFactoryResetPin(event.target.value)}
+                      type="password"
+                      value={factoryResetPin}
+                    />
+                  </label>
+                ) : null}
                 <label>
                   <FieldLabel
                     label="Sicherheitsbestätigung"

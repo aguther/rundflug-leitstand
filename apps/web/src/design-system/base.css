@@ -19,6 +19,14 @@ textarea {
   font: inherit;
 }
 
+.app-loading {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  color: var(--ui-muted);
+  background: var(--ui-bg);
+}
+
 :focus-visible {
   outline: 0;
   box-shadow: var(--focus-ring);
@@ -62,6 +70,16 @@ textarea {
 .app-header nav a[aria-current="page"] {
   color: var(--ui-accent);
   background: var(--ui-accent-soft);
+}
+
+.app-account {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-sm);
+  color: var(--ui-text);
+  background: var(--ui-control);
+  cursor: pointer;
 }
 
 @media (max-width: 760px) {

@@ -23,11 +23,11 @@ export function setupValidationMessages(values: SetupFormValues): string[] {
   if (values.aerodrome.trim().length < 2 || values.aerodrome.trim().length > 120) {
     messages.push("Der Flugplatz benötigt 2–120 Zeichen.");
   }
-  if (values.setupCode.length < 16 || values.setupCode.length > 256) {
-    messages.push("Der einmalige Einrichtungscode benötigt 16–256 Zeichen.");
+  if (values.setupCode.length < 8 || values.setupCode.length > 256) {
+    messages.push("Der einmalige Einrichtungscode benötigt 8–256 Zeichen.");
   }
-  if (values.adminPin.length < 4 || values.adminPin.length > 32) {
-    messages.push("Die Administrator-PIN benötigt 4–32 Zeichen.");
+  if (!/^\d{6,12}$/.test(values.adminPin)) {
+    messages.push("Die erste Administrator-PIN benötigt 6–12 Ziffern.");
   }
   return messages;
 }

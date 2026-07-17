@@ -28,3 +28,14 @@ export async function allowAdminDeviceRecoveryAttempt(
   });
   return result.success;
 }
+
+export async function allowLoginAttempt(
+  limiter: TicketAttemptRateLimiter,
+  request: Request,
+  accountId: string,
+): Promise<boolean> {
+  const result = await limiter.limit({
+    key: `operator-login:${await actorHash(request, accountId)}`,
+  });
+  return result.success;
+}
