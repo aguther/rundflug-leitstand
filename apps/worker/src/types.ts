@@ -1,6 +1,7 @@
 export interface Env {
   APP_ENV: "development" | "acceptance" | "production";
   DATA_JURISDICTION: "eu";
+  /** @deprecated Only read by the V1.1 compatibility routes during the V1.2 transition. */
   ADMIN_PIN_HASH: string;
   BOOTSTRAP_TOKEN?: string;
   VAPID_PUBLIC_KEY?: string;

@@ -59,14 +59,14 @@ async function putSecret(name, value) {
   });
 }
 
-const pin = await readHidden("Administrator-PIN (mindestens 4 Zeichen): ");
+const pin = await readHidden("Erste Administrator-PIN (6 bis 12 Ziffern): ");
 const pinConfirmation = await readHidden("Administrator-PIN wiederholen: ");
-if (pin.length < 4 || pin !== pinConfirmation) {
-  throw new Error("PIN ist zu kurz oder stimmt nicht überein.");
+if (!/^\d{6,12}$/.test(pin) || pin !== pinConfirmation) {
+  throw new Error("PIN muss aus 6 bis 12 Ziffern bestehen und übereinstimmen.");
 }
-const setupCode = await readHidden("Einmaliger Einrichtungscode (mindestens 16 Zeichen): ");
+const setupCode = await readHidden("Einmaliger Einrichtungscode (mindestens 8 Zeichen): ");
 const setupConfirmation = await readHidden("Einrichtungscode wiederholen: ");
-if (setupCode.length < 16 || setupCode !== setupConfirmation) {
+if (setupCode.length < 8 || setupCode !== setupConfirmation) {
   throw new Error("Einrichtungscode ist zu kurz oder stimmt nicht überein.");
 }
 

@@ -167,3 +167,11 @@ Flugzeug und ersetzt weder `NEXT` noch eine menschliche operative Bestätigung. 
 Voraufruf erzeugt einen append-only Audit-Eintrag mit dem technischen Auslöser
 `AUTOMATIC_PRECALL`. Vor Anwendung ist eine portable D1-Sicherung erforderlich; ein Rollback
 erfolgt aus dieser Sicherung beziehungsweise mit D1 Time Travel.
+
+## 0035 – Pseudonyme Helferkonten und Sitzungen
+
+Führt globale, nicht personenbezogene Helferkonten mit rollenkennzeichnendem Anmeldecode sowie
+widerrufbare, gerätebezogene Browser-Sitzungen ein. PINs und Sitzungstoken werden ausschließlich als
+gesalzene beziehungsweise kryptografische Hashes gespeichert. Bestehende Gerätebindungen bleiben
+für die kontrollierte Migration erhalten. Vor Anwendung ist eine portable D1-Sicherung erforderlich;
+ein Rollback erfolgt per D1 Time Travel oder Wiederherstellung dieser Sicherung.

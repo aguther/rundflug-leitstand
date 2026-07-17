@@ -19,7 +19,7 @@ import {
 describe("commandEnvelopeSchema", () => {
   it("accepts only a PIN and hashed client credential for admin recovery", () => {
     const parsed = adminDeviceRecoverySchema.parse({
-      adminPin: "0000",
+      adminPin: "000000",
       credentialHash: "a".repeat(64),
     });
     expect(parsed.credentialHash).toHaveLength(64);
@@ -51,7 +51,7 @@ describe("commandEnvelopeSchema", () => {
   it("accepts only anonymous, hashed first-run administration data", () => {
     const parsed = bootstrapRequestSchema.parse({
       setupCode: "synthetic-first-run-code",
-      adminPin: "0000",
+      adminPin: "000000",
       eventId: "synthetic-first-run",
       name: "Synthetischer Erststart",
       eventDate: "2026-07-12",

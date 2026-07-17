@@ -15,6 +15,8 @@ describe("factory reset", () => {
         "products",
         "aircraft",
         "paired_devices",
+        "operator_sessions",
+        "operator_accounts",
         "operational_events",
         "app_bootstrap",
         "operation_days",
@@ -27,6 +29,9 @@ describe("factory reset", () => {
     );
     expect(FACTORY_RESET_DELETE_TABLES.indexOf("app_bootstrap")).toBeLessThan(
       FACTORY_RESET_DELETE_TABLES.indexOf("paired_devices"),
+    );
+    expect(FACTORY_RESET_DELETE_TABLES.indexOf("operator_sessions")).toBeLessThan(
+      FACTORY_RESET_DELETE_TABLES.indexOf("operator_accounts"),
     );
   });
 

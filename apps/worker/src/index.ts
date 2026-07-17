@@ -4,6 +4,7 @@ import {
   adminPinVerificationSchema,
   bootstrapRequestSchema,
   cloneEventRequestSchema,
+  createOperatorAccountSchema,
   type FactoryResetResponse,
   factoryResetRequestSchema,
   forecastHistoryQuerySchema,
@@ -12,6 +13,8 @@ import {
   gateDisplayFilterSchema,
   operationalHistoryQuerySchema,
   operationalHistorySchema,
+  operatorLoginRequestSchema,
+  updateOperatorAccountSchema,
 } from "@rundflug/contracts";
 import {
   assessRemainingCapacity,
@@ -21,8 +24,17 @@ import {
 } from "@rundflug/domain";
 import { Hono } from "hono";
 import { secureHeaders } from "hono/secure-headers";
+import {
+  assertRole,
+  authorizeSession,
+  clearedSessionCookie,
+  nextLoginCode,
+  type OperatorRole,
+  sessionCookie,
+  sessionTimes,
+} from "./auth";
 import { createPortableBackup, operationDateInTimeZone } from "./backup";
-import { sha256Hex, verifyCredential } from "./crypto";
+import { hashPin, randomToken, sha256Hex, verifyCredential, verifyPin } from "./crypto";
 import { runD1ReadsSequentially } from "./d1-read-scheduler";
 import { dailyReportCsv, dailyReportPdfLines, loadDailyReport } from "./daily-report";
 import { EventCoordinator } from "./event-coordinator";
@@ -38,7 +50,11 @@ import {
   withGateDisplayFilterFallback,
 } from "./gate-display-filter-storage";
 import { buildOperationalHistoryStatement } from "./operational-history";
-import { allowAdminDeviceRecoveryAttempt, allowUnknownTicketAttempt } from "./public-access";
+import {
+  allowAdminDeviceRecoveryAttempt,
+  allowLoginAttempt,
+  allowUnknownTicketAttempt,
+} from "./public-access";
 import { createCsv, createTextPdf } from "./report";
 import { rowToSnapshot } from "./snapshot";
 import { httpsRedirectLocation } from "./transport-security";
@@ -77,7 +93,12 @@ async function authorizeDevice(
   eventId: string,
   deviceId: string | undefined,
   token: string | undefined,
+  request?: Request,
 ): Promise<{ role: string } | null> {
+  if (request) {
+    const actor = await authorizeSession(env, request);
+    if (actor) return { role: actor.role };
+  }
   if (!deviceId) return null;
   const device = await env.DB.prepare(
     "SELECT role, credential_hash FROM paired_devices WHERE id = ?1 AND operation_day_id = ?2 AND active = 1",
@@ -145,12 +166,12 @@ app.get("/api/setup/status", async (context) => {
     `SELECT
       (SELECT COUNT(*) FROM app_bootstrap) AS completed,
       (SELECT COUNT(*) FROM operation_days) AS events,
-      (SELECT COUNT(*) FROM paired_devices WHERE role = 'ADMIN' AND active = 1) AS admins`,
+      (SELECT COUNT(*) FROM operator_accounts WHERE role = 'ADMIN' AND active = 1) AS admins`,
   ).first<{ completed: number; events: number; admins: number }>();
   return context.json({
     setupRequired:
       (state?.completed ?? 0) === 0 && (state?.events ?? 0) === 0 && (state?.admins ?? 0) === 0,
-    setupConfigured: Boolean(context.env.BOOTSTRAP_TOKEN && context.env.ADMIN_PIN_HASH),
+    setupConfigured: Boolean(context.env.BOOTSTRAP_TOKEN),
   });
 });
 
@@ -162,7 +183,7 @@ app.post("/api/setup", async (context) => {
       400,
     );
   }
-  if (!context.env.BOOTSTRAP_TOKEN || !context.env.ADMIN_PIN_HASH) {
+  if (!context.env.BOOTSTRAP_TOKEN) {
     return context.json(
       {
         error: {
@@ -177,7 +198,7 @@ app.post("/api/setup", async (context) => {
     `SELECT
       (SELECT COUNT(*) FROM app_bootstrap) AS completed,
       (SELECT COUNT(*) FROM operation_days) AS events,
-      (SELECT COUNT(*) FROM paired_devices WHERE role = 'ADMIN' AND active = 1) AS admins`,
+      (SELECT COUNT(*) FROM operator_accounts WHERE role = 'ADMIN' AND active = 1) AS admins`,
   ).first<{ completed: number; events: number; admins: number }>();
   if ((state?.completed ?? 0) > 0 || (state?.events ?? 0) > 0 || (state?.admins ?? 0) > 0) {
     return context.json(
@@ -186,10 +207,7 @@ app.post("/api/setup", async (context) => {
     );
   }
   const setupTokenHash = await sha256Hex(context.env.BOOTSTRAP_TOKEN);
-  if (
-    !(await verifyCredential(parsed.data.setupCode, setupTokenHash)) ||
-    !(await verifyCredential(parsed.data.adminPin, context.env.ADMIN_PIN_HASH))
-  ) {
+  if (!(await verifyCredential(parsed.data.setupCode, setupTokenHash))) {
     return context.json(
       { error: { code: "SETUP_CREDENTIALS_INVALID", message: "Einrichtung nicht autorisiert." } },
       403,
@@ -197,6 +215,8 @@ app.post("/api/setup", async (context) => {
   }
   const input = parsed.data;
   const now = new Date().toISOString();
+  const adminAccountId = crypto.randomUUID();
+  const adminPinHash = await hashPin(input.adminPin);
   try {
     await context.env.DB.batch([
       context.env.DB.prepare(
@@ -214,6 +234,12 @@ app.post("/api/setup", async (context) => {
           (id, operation_day_id, label, role, active, paired_at, last_seen_at, credential_hash)
          VALUES (?1, ?2, 'Erstes Administrationsgerät', 'ADMIN', 1, ?3, ?3, ?4)`,
       ).bind(input.adminDeviceId, input.eventId, now, input.adminCredentialHash),
+      context.env.DB.prepare(
+        `INSERT INTO operator_accounts
+          (id, login_code, role, pin_hash, active, failed_attempts, session_version,
+           created_at, updated_at)
+         VALUES (?1, 'ADMIN-01', 'ADMIN', ?2, 1, 0, 1, ?3, ?3)`,
+      ).bind(adminAccountId, adminPinHash, now),
       context.env.DB.prepare(
         `INSERT INTO app_bootstrap (singleton, operation_day_id, admin_device_id, completed_at)
          VALUES (1, ?1, ?2, ?3)`,
@@ -244,7 +270,256 @@ app.post("/api/setup", async (context) => {
   return context.json({ eventId: input.eventId, adminDeviceId: input.adminDeviceId }, 201);
 });
 
+const LOGIN_ERROR = {
+  error: { code: "LOGIN_FAILED", message: "Konto oder PIN ist nicht gültig." },
+};
+
+app.get("/api/auth/accounts", async (context) => {
+  const rows = await context.env.DB.prepare(
+    `SELECT id, login_code, role FROM operator_accounts
+      WHERE active = 1 ORDER BY role, login_code`,
+  ).all<{ id: string; login_code: string; role: OperatorRole }>();
+  return context.json({
+    accounts: rows.results.map((row) => ({
+      id: row.id,
+      loginCode: row.login_code,
+      role: row.role,
+    })),
+  });
+});
+
+app.post("/api/auth/login", async (context) => {
+  const parsed = operatorLoginRequestSchema.safeParse(await context.req.json().catch(() => null));
+  if (!parsed.success) return context.json(LOGIN_ERROR, 401);
+  const { accountId, pin, deviceId } = parsed.data;
+  if (
+    !(await allowLoginAttempt(context.env.ADMIN_RECOVERY_RATE_LIMITER, context.req.raw, accountId))
+  ) {
+    return context.json(LOGIN_ERROR, 429, { "retry-after": "60" });
+  }
+
+  const now = new Date();
+  const account = await context.env.DB.prepare(
+    `SELECT id, login_code, role, pin_hash, active, failed_attempts, locked_until, session_version
+       FROM operator_accounts WHERE id = ?1`,
+  )
+    .bind(accountId)
+    .first<{
+      id: string;
+      login_code: string;
+      role: OperatorRole;
+      pin_hash: string;
+      active: number;
+      failed_attempts: number;
+      locked_until: string | null;
+      session_version: number;
+    }>();
+  const locked = account?.locked_until && Date.parse(account.locked_until) > now.getTime();
+  const valid =
+    Boolean(account?.active) &&
+    !locked &&
+    Boolean(account && (await verifyPin(pin, account.pin_hash)));
+  if (!account || !valid) {
+    if (account && !locked) {
+      const failedAttempts = account.failed_attempts + 1;
+      const lockedUntil =
+        failedAttempts >= 5 ? new Date(now.getTime() + 15 * 60_000).toISOString() : null;
+      await context.env.DB.prepare(
+        `UPDATE operator_accounts
+            SET failed_attempts = ?1, locked_until = ?2, updated_at = ?3
+          WHERE id = ?4`,
+      )
+        .bind(failedAttempts >= 5 ? 0 : failedAttempts, lockedUntil, now.toISOString(), account.id)
+        .run();
+    }
+    return context.json(LOGIN_ERROR, 401);
+  }
+
+  const sessionId = crypto.randomUUID();
+  const token = randomToken();
+  const tokenHash = await sha256Hex(token);
+  const times = sessionTimes(account.role, now);
+  const activeEvent = await context.env.DB.prepare(
+    `SELECT id FROM operation_days
+      ORDER BY CASE status WHEN 'ACTIVE' THEN 0 WHEN 'PREPARATION' THEN 1 ELSE 2 END,
+               event_date DESC LIMIT 1`,
+  ).first<{ id: string }>();
+  const statements = [
+    context.env.DB.prepare(
+      `UPDATE operator_accounts
+          SET failed_attempts = 0, locked_until = NULL, updated_at = ?1 WHERE id = ?2`,
+    ).bind(times.createdAt, account.id),
+    context.env.DB.prepare(
+      `INSERT INTO operator_sessions
+        (id, account_id, session_version, token_hash, device_id, created_at, last_seen_at,
+         idle_expires_at, absolute_expires_at, revoked_at)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?6, ?7, ?8, NULL)`,
+    ).bind(
+      sessionId,
+      account.id,
+      account.session_version,
+      tokenHash,
+      deviceId,
+      times.createdAt,
+      times.idleExpiresAt,
+      times.absoluteExpiresAt,
+    ),
+  ];
+  if (activeEvent) {
+    statements.push(
+      context.env.DB.prepare(
+        `INSERT INTO paired_devices
+          (id, operation_day_id, label, role, active, paired_at, last_seen_at, credential_hash)
+         VALUES (?1, ?2, ?3, ?4, 1, ?5, ?5, NULL)
+         ON CONFLICT(id) DO UPDATE SET
+           operation_day_id = excluded.operation_day_id,
+           label = excluded.label,
+           role = excluded.role,
+           active = 1,
+           last_seen_at = excluded.last_seen_at,
+           revoked_at = NULL,
+           credential_hash = NULL`,
+      ).bind(
+        deviceId,
+        activeEvent.id,
+        `${account.login_code} · Sitzung`,
+        account.role,
+        times.createdAt,
+      ),
+    );
+  }
+  await context.env.DB.batch(statements);
+  context.header("set-cookie", sessionCookie(token, context.req.raw, times.maxAgeSeconds));
+  return context.json({
+    authenticated: true,
+    account: { id: account.id, loginCode: account.login_code, role: account.role },
+    deviceId,
+  });
+});
+
+app.get("/api/auth/session", async (context) => {
+  const actor = await authorizeSession(context.env, context.req.raw);
+  if (!actor) {
+    return context.json(
+      { error: { code: "SESSION_REQUIRED", message: "Anmeldung erforderlich." } },
+      401,
+    );
+  }
+  return context.json({
+    authenticated: true,
+    account: { id: actor.accountId, loginCode: actor.loginCode, role: actor.role },
+    deviceId: actor.deviceId,
+  });
+});
+
+app.post("/api/auth/logout", async (context) => {
+  const actor = await authorizeSession(context.env, context.req.raw);
+  if (actor) {
+    await context.env.DB.prepare(
+      "UPDATE operator_sessions SET revoked_at = ?1 WHERE id = ?2 AND revoked_at IS NULL",
+    )
+      .bind(new Date().toISOString(), actor.sessionId)
+      .run();
+  }
+  context.header("set-cookie", clearedSessionCookie(context.req.raw));
+  return context.body(null, 204);
+});
+
+app.get("/api/admin/operator-accounts", async (context) => {
+  const actor = assertRole(await authorizeSession(context.env, context.req.raw), ["ADMIN"]);
+  if (!actor)
+    return context.json({ error: { code: "FORBIDDEN", message: "Nicht autorisiert." } }, 403);
+  const rows = await context.env.DB.prepare(
+    `SELECT id, login_code, role, active FROM operator_accounts ORDER BY role, login_code`,
+  ).all<{ id: string; login_code: string; role: OperatorRole; active: number }>();
+  return context.json({
+    accounts: rows.results.map((row) => ({
+      id: row.id,
+      loginCode: row.login_code,
+      role: row.role,
+      active: row.active === 1,
+    })),
+  });
+});
+
+app.post("/api/admin/operator-accounts", async (context) => {
+  const actor = assertRole(await authorizeSession(context.env, context.req.raw), ["ADMIN"]);
+  if (!actor)
+    return context.json({ error: { code: "FORBIDDEN", message: "Nicht autorisiert." } }, 403);
+  const parsed = createOperatorAccountSchema.safeParse(await context.req.json().catch(() => null));
+  if (!parsed.success) {
+    return context.json(
+      { error: { code: "INVALID_ACCOUNT", message: "Kontodaten sind ungültig." } },
+      400,
+    );
+  }
+  const id = crypto.randomUUID();
+  const loginCode = await nextLoginCode(context.env, parsed.data.role);
+  const pinHash = await hashPin(parsed.data.pin);
+  const now = new Date().toISOString();
+  await context.env.DB.prepare(
+    `INSERT INTO operator_accounts
+      (id, login_code, role, pin_hash, active, failed_attempts, session_version, created_at, updated_at)
+     VALUES (?1, ?2, ?3, ?4, 1, 0, 1, ?5, ?5)`,
+  )
+    .bind(id, loginCode, parsed.data.role, pinHash, now)
+    .run();
+  return context.json({ id, loginCode, role: parsed.data.role, active: true }, 201);
+});
+
+app.patch("/api/admin/operator-accounts/:accountId", async (context) => {
+  const actor = assertRole(await authorizeSession(context.env, context.req.raw), ["ADMIN"]);
+  if (!actor)
+    return context.json({ error: { code: "FORBIDDEN", message: "Nicht autorisiert." } }, 403);
+  const parsed = updateOperatorAccountSchema.safeParse(await context.req.json().catch(() => null));
+  if (!parsed.success) {
+    return context.json(
+      { error: { code: "INVALID_ACCOUNT", message: "Kontodaten sind ungültig." } },
+      400,
+    );
+  }
+  const accountId = context.req.param("accountId");
+  if (accountId === actor.accountId && parsed.data.active === false) {
+    return context.json(
+      { error: { code: "ACTIVE_SESSION_REQUIRED", message: "Das eigene Konto bleibt aktiv." } },
+      409,
+    );
+  }
+  const pinHash = parsed.data.pin ? await hashPin(parsed.data.pin) : null;
+  const now = new Date().toISOString();
+  const result = await context.env.DB.prepare(
+    `UPDATE operator_accounts
+        SET active = COALESCE(?1, active), pin_hash = COALESCE(?2, pin_hash),
+            session_version = CASE WHEN ?1 = 0 OR ?2 IS NOT NULL THEN session_version + 1 ELSE session_version END,
+            failed_attempts = 0, locked_until = NULL, updated_at = ?3
+      WHERE id = ?4`,
+  )
+    .bind(
+      parsed.data.active === undefined ? null : parsed.data.active ? 1 : 0,
+      pinHash,
+      now,
+      accountId,
+    )
+    .run();
+  if (!result.meta.changes) {
+    return context.json(
+      { error: { code: "ACCOUNT_NOT_FOUND", message: "Konto nicht gefunden." } },
+      404,
+    );
+  }
+  return context.json({ updated: true });
+});
+
 app.get("/api/device/context", async (context) => {
+  const actor = await authorizeSession(context.env, context.req.raw);
+  if (actor) {
+    const event = await context.env.DB.prepare(
+      `SELECT id FROM operation_days
+        ORDER BY CASE status WHEN 'ACTIVE' THEN 0 WHEN 'PREPARATION' THEN 1 ELSE 2 END,
+                 event_date DESC LIMIT 1`,
+    ).first<{ id: string }>();
+    if (event) return context.json({ eventId: event.id, role: actor.role });
+  }
   const deviceId = context.req.header("x-device-id");
   if (!deviceId) {
     return context.json(
@@ -284,10 +559,12 @@ app.post("/api/admin/events/:eventId/verify-pin", async (context) => {
     eventId,
     context.req.header("x-device-id"),
     context.req.header("x-device-token"),
+    context.req.raw,
   );
+  const actor = await authorizeSession(context.env, context.req.raw);
   if (
     authorized?.role !== "ADMIN" ||
-    !(await verifyCredential(parsed.data.adminPin, context.env.ADMIN_PIN_HASH))
+    (!actor && !(await verifyCredential(parsed.data.adminPin, context.env.ADMIN_PIN_HASH)))
   ) {
     return context.json(
       { error: { code: "ADMIN_REQUIRED", message: "Administrator-PIN ist nicht korrekt." } },
@@ -411,10 +688,12 @@ app.post("/api/admin/events/:eventId/factory-reset", async (context) => {
     input.eventId,
     context.req.header("x-device-id"),
     context.req.header("x-device-token"),
+    context.req.raw,
   );
+  const actor = await authorizeSession(context.env, context.req.raw);
   if (
     authorized?.role !== "ADMIN" ||
-    !(await verifyCredential(input.adminPin, context.env.ADMIN_PIN_HASH))
+    (!actor && !(await verifyCredential(input.adminPin, context.env.ADMIN_PIN_HASH)))
   ) {
     return context.json(
       { error: { code: "ADMIN_REQUIRED", message: "Administration erforderlich." } },
@@ -507,6 +786,7 @@ app.get("/api/admin/events", async (context) => {
         sourceEventId,
         context.req.header("x-device-id"),
         context.req.header("x-device-token"),
+        context.req.raw,
       )
     : null;
   if (device?.role !== "ADMIN") {
@@ -842,6 +1122,7 @@ app.put("/api/events/:eventId/assist-claims/:aircraftId", async (context) => {
     eventId,
     deviceId,
     context.req.header("x-device-token"),
+    context.req.raw,
   );
   if (!device || !deviceId || !["FLIGHT_LINE", "FLIGHT_LINE_LEAD", "ADMIN"].includes(device.role)) {
     return context.json(
@@ -926,6 +1207,7 @@ app.delete("/api/events/:eventId/assist-claims/:aircraftId", async (context) => 
     eventId,
     deviceId,
     context.req.header("x-device-token"),
+    context.req.raw,
   );
   if (!device || !deviceId || !["FLIGHT_LINE", "FLIGHT_LINE_LEAD", "ADMIN"].includes(device.role)) {
     return context.json(
@@ -953,31 +1235,19 @@ app.delete("/api/events/:eventId/assist-claims/:aircraftId", async (context) => 
 
 app.get("/api/events/:eventId/operations", async (context) => {
   const eventId = context.req.param("eventId");
-  const deviceId = context.req.header("x-device-id");
-  if (!deviceId) {
-    return context.json(
-      { error: { code: "DEVICE_REQUIRED", message: "Gekoppeltes Gerät erforderlich." } },
-      401,
-    );
-  }
-  const device = await context.env.DB.prepare(
-    "SELECT role, credential_hash FROM paired_devices WHERE id = ?1 AND operation_day_id = ?2 AND active = 1",
-  )
-    .bind(deviceId, eventId)
-    .first<{ role: string; credential_hash: string | null }>();
-  const credentialValid = await verifyCredential(
-    context.req.header("x-device-token") ?? null,
-    device?.credential_hash ?? null,
+  const device = await authorizeDevice(
+    context.env,
+    eventId,
+    context.req.header("x-device-id"),
+    context.req.header("x-device-token"),
+    context.req.raw,
   );
-  if (!device || !credentialValid || device.role === "DISPLAY") {
+  if (!device || device.role === "DISPLAY") {
     return context.json(
       { error: { code: "DEVICE_NOT_AUTHORIZED", message: "Gerät nicht berechtigt." } },
       403,
     );
   }
-  await context.env.DB.prepare("UPDATE paired_devices SET last_seen_at = ?1 WHERE id = ?2")
-    .bind(new Date().toISOString(), deviceId)
-    .run();
 
   const eventRow = await context.env.DB.prepare(
     `SELECT id, name, event_date, aerodrome, time_zone, status, archived_at, template_source_id,
@@ -1761,6 +2031,7 @@ app.get("/api/events/:eventId/tickets/search", async (context) => {
     eventId,
     context.req.header("x-device-id"),
     context.req.header("x-device-token"),
+    context.req.raw,
   );
   if (!device || !["CASHIER", "FLIGHT_LINE", "FLIGHT_LINE_LEAD", "ADMIN"].includes(device.role)) {
     return context.json(
@@ -1873,6 +2144,7 @@ app.get("/api/events/:eventId/history", async (context) => {
     eventId,
     context.req.header("x-device-id"),
     context.req.header("x-device-token"),
+    context.req.raw,
   );
   if (!device || !["ADMIN", "FLIGHT_LINE_LEAD", "FLIGHT_DIRECTOR"].includes(device.role)) {
     return context.json(
@@ -1942,6 +2214,7 @@ app.get("/api/events/:eventId/history/operations", async (context) => {
     eventId,
     context.req.header("x-device-id"),
     context.req.header("x-device-token"),
+    context.req.raw,
   );
   if (!device || !["ADMIN", "FLIGHT_LINE_LEAD", "FLIGHT_DIRECTOR"].includes(device.role)) {
     return context.json(
@@ -2060,6 +2333,7 @@ app.get("/api/events/:eventId/history/forecasts", async (context) => {
     eventId,
     context.req.header("x-device-id"),
     context.req.header("x-device-token"),
+    context.req.raw,
   );
   if (!device || !["ADMIN", "FLIGHT_LINE_LEAD", "FLIGHT_DIRECTOR"].includes(device.role)) {
     return context.json(
@@ -2182,6 +2456,7 @@ app.get("/api/events/:eventId/devices", async (context) => {
     eventId,
     context.req.header("x-device-id"),
     context.req.header("x-device-token"),
+    context.req.raw,
   );
   if (device?.role !== "ADMIN") {
     return context.json(
@@ -2225,6 +2500,7 @@ app.get("/api/events/:eventId/reports/daily.csv", async (context) => {
     eventId,
     context.req.header("x-device-id"),
     context.req.header("x-device-token"),
+    context.req.raw,
   );
   if (!device || !["ADMIN", "CASHIER"].includes(device.role)) {
     return context.json(
@@ -2256,6 +2532,7 @@ app.get("/api/events/:eventId/exports/tickets.csv", async (context) => {
     eventId,
     context.req.header("x-device-id"),
     context.req.header("x-device-token"),
+    context.req.raw,
   );
   if (!device || !["ADMIN", "CASHIER", "FLIGHT_DIRECTOR"].includes(device.role)) {
     return context.json(
@@ -2333,6 +2610,7 @@ app.get("/api/events/:eventId/reports/daily.pdf", async (context) => {
     eventId,
     context.req.header("x-device-id"),
     context.req.header("x-device-token"),
+    context.req.raw,
   );
   if (!device || !["ADMIN", "CASHIER", "FLIGHT_DIRECTOR"].includes(device.role)) {
     return context.json(
@@ -2784,6 +3062,13 @@ app.all("/api/public/events/:eventId/live", async (context) => {
 });
 
 app.all("/api/events/:eventId/live", async (context) => {
+  const actor = await authorizeSession(context.env, context.req.raw);
+  if (!actor && context.env.APP_ENV !== "development") {
+    return context.json(
+      { error: { code: "SESSION_REQUIRED", message: "Anmeldung erforderlich." } },
+      401,
+    );
+  }
   const eventId = context.req.param("eventId");
   const namespace = eventCoordinatorNamespace(context.env);
   const stub = namespace.get(namespace.idFromName(eventId));
@@ -2793,11 +3078,49 @@ app.all("/api/events/:eventId/live", async (context) => {
 
 app.post("/api/events/:eventId/commands", async (context) => {
   const eventId = context.req.param("eventId");
+  const actor = await authorizeSession(context.env, context.req.raw);
+  if (!actor && context.env.APP_ENV !== "development") {
+    return context.json(
+      { error: { code: "SESSION_REQUIRED", message: "Anmeldung erforderlich." } },
+      401,
+    );
+  }
   const namespace = eventCoordinatorNamespace(context.env);
   const stub = namespace.get(namespace.idFromName(eventId));
   const target = new URL(context.req.url);
   target.pathname = `/internal/events/${encodeURIComponent(eventId)}/command`;
-  const response = await stub.fetch(new Request(target, context.req.raw));
+  if (!actor) {
+    const response = await stub.fetch(new Request(target, context.req.raw));
+    return new Response(response.body, response);
+  }
+  const command = (await context.req.json().catch(() => null)) as Record<string, unknown> | null;
+  if (!command) {
+    return context.json(
+      { error: { code: "INVALID_COMMAND", message: "Kommando ist ungültig." } },
+      400,
+    );
+  }
+  const headers = new Headers(context.req.raw.headers);
+  for (const name of [
+    "x-device-token",
+    "x-operator-account-id",
+    "x-operator-session-id",
+    "x-operator-role",
+    "x-operator-device-id",
+  ])
+    headers.delete(name);
+  headers.set("content-type", "application/json");
+  headers.set("x-operator-account-id", actor.accountId);
+  headers.set("x-operator-session-id", actor.sessionId);
+  headers.set("x-operator-role", actor.role);
+  headers.set("x-operator-device-id", actor.deviceId);
+  const response = await stub.fetch(
+    new Request(target, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ ...command, deviceId: actor.deviceId }),
+    }),
+  );
   return new Response(response.body, response);
 });
 

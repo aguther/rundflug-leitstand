@@ -7,7 +7,7 @@ const validSetup = {
   eventDate: "2026-07-13",
   aerodrome: "EDXX",
   setupCode: "synthetic-code-16",
-  adminPin: "0000",
+  adminPin: "000000",
 };
 
 describe("setupValidationMessages", () => {
@@ -30,8 +30,8 @@ describe("setupValidationMessages", () => {
       "Die Bezeichnung benötigt 3–120 Zeichen.",
       "Bitte ein Veranstaltungsdatum auswählen.",
       "Der Flugplatz benötigt 2–120 Zeichen.",
-      "Der einmalige Einrichtungscode benötigt 16–256 Zeichen.",
-      "Die Administrator-PIN benötigt 4–32 Zeichen.",
+      "Der einmalige Einrichtungscode benötigt 8–256 Zeichen.",
+      "Die erste Administrator-PIN benötigt 6–12 Ziffern.",
     ]);
   });
 });
