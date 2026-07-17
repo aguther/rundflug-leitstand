@@ -1,6 +1,8 @@
 /* V1.2 administration surface — approved compact Cloudflare-inspired concept. */
 .app-shell.admin-shell {
-  min-height: 100dvh;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
   color: var(--ui-text);
   background: var(--ui-bg);
 }
@@ -23,7 +25,8 @@
 
 .admin-shell .admin-layout {
   width: 100%;
-  min-height: calc(100dvh - var(--header-height));
+  min-height: 0;
+  flex: 1 1 auto;
   margin: 0;
   grid-template-columns: 208px minmax(0, 1fr);
   color: var(--ui-text);
@@ -31,7 +34,7 @@
 }
 
 .admin-shell .admin-side-nav {
-  min-height: calc(100dvh - var(--header-height));
+  min-height: 0;
   padding: 22px 8px;
   border-color: var(--ui-border);
   background: var(--ui-surface);
@@ -58,6 +61,12 @@
 .admin-shell .admin-workspace.master-data-active.editor-open {
   color: var(--ui-text);
   background: var(--ui-bg);
+  min-height: 0;
+  overflow: auto;
+}
+
+.admin-shell > footer {
+  display: none;
 }
 
 .admin-shell .admin-page-header {
