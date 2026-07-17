@@ -456,7 +456,6 @@ function CashierView() {
   const [lastTicketGroupId, setLastTicketGroupId] = useState<string | null>(null);
   const [lastProductId, setLastProductId] = useState<string | null>(null);
   const [cancelReason, setCancelReason] = useState("");
-  const [correctionPin, setCorrectionPin] = useState("");
   const [rebookProductId, setRebookProductId] = useState("");
   const [ticketSearch, setTicketSearch] = useState("");
   const [ticketSearchResults, setTicketSearchResults] = useState<TicketSearchResult[]>([]);
@@ -588,7 +587,7 @@ function CashierView() {
           payload: {
             ticketGroupId: lastTicketGroupId,
             reason: cancelReason.trim(),
-            adminPin: correctionPin,
+            adminPin: "SESSION",
           },
         },
         deviceTokenFor(CASHIER_DEVICE_ID),
@@ -598,7 +597,6 @@ function CashierView() {
       setLastTicketGroupId(null);
       setLastProductId(null);
       setCancelReason("");
-      setCorrectionPin("");
       await refresh();
     } catch (reason) {
       setMessage(reason instanceof Error ? reason.message : "Storno fehlgeschlagen.");
@@ -620,14 +618,13 @@ function CashierView() {
             ticketGroupId: lastTicketGroupId,
             newProductId: rebookProductId,
             reason: cancelReason.trim(),
-            adminPin: correctionPin,
+            adminPin: "SESSION",
           },
         },
         deviceTokenFor(CASHIER_DEVICE_ID),
       );
       setMessage("Tickets umgebucht und in die neue Queue eingereiht.");
       setCancelReason("");
-      setCorrectionPin("");
       setRebookProductId("");
       setLastProductId(rebookProductId);
       await refresh();
@@ -669,7 +666,7 @@ function CashierView() {
   }
 
   return (
-    <Shell title="Kasse">
+    <Shell className="cashier-shell" title="Kasse">
       <ConnectionNotice error={error} lastConfirmedAt={lastConfirmedAt} />
       {pendingDraftCount > 0 ? (
         <div className="connection-warning" role="status">
@@ -890,16 +887,8 @@ function CashierView() {
                       placeholder="Mindestens 3 Zeichen"
                     />
                   </label>
-                  <label>
-                    Administrator-PIN für Storno/Umbuchung
-                    <input
-                      type="password"
-                      value={correctionPin}
-                      onChange={(event) => setCorrectionPin(event.target.value)}
-                    />
-                  </label>
                   <button
-                    disabled={cancelReason.trim().length < 3 || correctionPin.length < 4}
+                    disabled={cancelReason.trim().length < 3}
                     onClick={cancelLastSale}
                     type="button"
                   >
@@ -922,9 +911,7 @@ function CashierView() {
                     </select>
                   </label>
                   <button
-                    disabled={
-                      !rebookProductId || cancelReason.trim().length < 3 || correctionPin.length < 4
-                    }
+                    disabled={!rebookProductId || cancelReason.trim().length < 3}
                     onClick={rebookLastSale}
                     type="button"
                   >
