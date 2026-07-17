@@ -1,0 +1,161 @@
+/* V1.2 cashier: one compact sale flow instead of oversized cards. */
+.cashier-shell {
+  color: var(--ui-text);
+  background: var(--ui-bg);
+}
+
+.cashier-shell .cashier-workspace {
+  width: min(1180px, 100%);
+  gap: 10px;
+  padding: 14px 18px 18px;
+}
+
+.cashier-shell .product-strip {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: thin;
+}
+
+.cashier-shell .product-option {
+  min-width: 210px;
+  min-height: 70px;
+  gap: 2px;
+  padding: 10px 12px;
+  color: var(--ui-text);
+  border-color: var(--ui-border);
+  background: var(--ui-surface);
+}
+
+.cashier-shell .product-option.selected {
+  padding: 9px 11px;
+  border-color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+  box-shadow: inset 2px 0 var(--ui-accent);
+}
+
+.cashier-shell .product-option strong {
+  font-size: 14px;
+}
+
+.cashier-shell .product-option span {
+  color: var(--ui-muted);
+  font-size: 12px;
+}
+
+.cashier-shell .product-option .product-wait {
+  color: var(--ui-text);
+  font-size: 13px;
+}
+
+.cashier-shell .sale-editor {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+}
+
+.cashier-shell .sale-editor:has(.ticket-preview) {
+  grid-template-columns: minmax(360px, 0.82fr) minmax(430px, 1.18fr);
+}
+
+.cashier-shell :is(.group-size, .ticket-preview, .ticket-search) {
+  padding: 16px;
+  color: var(--ui-text);
+  border-color: var(--ui-border);
+  border-radius: var(--radius-md);
+  background: var(--ui-surface);
+}
+
+.cashier-shell .group-size h1 {
+  margin-bottom: 10px;
+  font-size: 18px;
+}
+
+.cashier-shell .stepper {
+  grid-template-columns: 44px 90px 44px;
+  justify-content: start;
+  gap: 8px;
+  margin: 8px 0 12px;
+}
+
+.cashier-shell .stepper button {
+  height: 44px;
+  color: var(--ui-accent);
+  border: 1px solid var(--ui-accent);
+  background: var(--ui-control);
+  font-size: 22px;
+}
+
+.cashier-shell .stepper output {
+  color: var(--ui-text);
+  font-size: 34px;
+}
+
+.cashier-shell :is(.ticket-code-mode, .preprinted-code-input) {
+  margin-top: 10px;
+  color: var(--ui-muted);
+  font-size: 13px;
+}
+
+.cashier-shell :is(select, input, textarea) {
+  color: var(--ui-text);
+  border-color: var(--ui-border-strong);
+  background: var(--ui-control);
+}
+
+.cashier-shell .weight-class-list {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-color: var(--ui-border);
+}
+
+.cashier-shell .ticket-search {
+  margin: 0;
+}
+
+.cashier-shell .ticket-search > summary {
+  color: var(--ui-text);
+  font-size: 14px;
+}
+
+.cashier-shell .primary-action {
+  min-height: 46px;
+  margin: 0;
+  color: #fff;
+  background: var(--ui-accent);
+}
+
+.cashier-shell .primary-action:hover:not(:disabled) {
+  background: var(--ui-accent-hover);
+}
+
+.cashier-shell .primary-action:disabled {
+  color: var(--ui-disabled-text);
+  border-color: var(--ui-border);
+  background: var(--ui-disabled);
+}
+
+@media (max-width: 760px) {
+  .cashier-shell .cashier-workspace {
+    padding: 10px;
+  }
+
+  .cashier-shell .product-option {
+    min-width: 180px;
+  }
+
+  .cashier-shell .sale-editor:has(.ticket-preview) {
+    grid-template-columns: 1fr;
+  }
+
+  .cashier-shell :is(.group-size, .ticket-preview, .ticket-search) {
+    padding: 13px;
+  }
+
+  .cashier-shell .primary-action {
+    position: sticky;
+    z-index: 10;
+    bottom: 8px;
+    box-shadow: var(--ui-shadow);
+  }
+}
