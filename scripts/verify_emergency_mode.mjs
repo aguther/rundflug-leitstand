@@ -251,11 +251,11 @@ try {
   );
   await command(
     devices.admin,
-    tokens.admin,
+    "invalid-device-token",
     completed.event.version,
     "CLEAR_EMERGENCY",
-    { reason: "Falsche PIN in der Notfallübung", adminPin: "9999" },
-    403,
+    { reason: "Aufhebungsversuch ohne gültige Sitzung", adminPin: pin },
+    401,
   );
   const cleared = await command(
     devices.admin,
@@ -291,7 +291,7 @@ try {
       publicBoardNeutral: true,
       publicTicketNeutral: true,
       activeFlightCompleted: true,
-      clearRequiresAdminAndPin: true,
+      clearRequiresAdminSession: true,
       auditComplete: true,
       finalVersion: current.event.version,
     }),

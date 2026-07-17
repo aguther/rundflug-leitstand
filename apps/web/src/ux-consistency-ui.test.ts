@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import appSource from "./App.tsx?raw";
+import appSource from "./LegacyApp.tsx?raw";
 
 const stylesSource = readFileSync(new URL("./styles.css", import.meta.url), "utf8");
 
@@ -13,10 +13,10 @@ describe("V1 UX consistency", () => {
     expect(appSource).toContain("predictionQualityLabel[product.predictionQuality]");
   });
 
-  it("keeps the session unlock secondary to the current editor action", () => {
-    expect(appSource).toContain(
-      '<button\n                className="secondary-action"\n                onClick={() => (adminModeUnlocked',
-    );
+  it("keeps account and session controls secondary to the current editor action", () => {
+    expect(appSource).toContain('className="secondary-action"');
+    expect(appSource).toContain('session?.account.role === "ADMIN"');
+    expect(appSource).toContain("void logout().then(() => window.location.reload())");
     expect(appSource).not.toContain(
       'className={adminModeUnlocked ? "secondary-action" : "primary-action"}',
     );

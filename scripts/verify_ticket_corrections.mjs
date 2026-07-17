@@ -169,12 +169,12 @@ try {
     403,
   );
   await post(
-    tokens.cashier,
+    "invalid-device-token",
     envelope(devices.cashier, cancelSale.event.version, "CANCEL_TICKET_GROUP", {
       ...cancelPayload,
-      adminPin: "9999",
+      adminPin: pin,
     }),
-    403,
+    401,
   );
   const cancelCommand = envelope(
     devices.cashier,
@@ -292,7 +292,7 @@ try {
       ok: true,
       requirements: ["F-KAS-070", "F-KAS-080", "F-HIS-010", "F-HIS-020"],
       verified: [
-        "role-and-pin-authorization",
+        "role-and-session-authorization",
         "reason-audit",
         "idempotency",
         "stale-write-rejection",

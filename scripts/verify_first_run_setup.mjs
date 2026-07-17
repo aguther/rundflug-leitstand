@@ -14,7 +14,7 @@ const migrate = spawnSync(process.execPath, [npmCli, "run", "db:migrate:local"],
 });
 if (migrate.status !== 0)
   throw new Error("Leere lokale Testdatenbank konnte nicht migriert werden.");
-const pin = String.fromCharCode(48).repeat(4);
+const pin = String.fromCharCode(48).repeat(6);
 const setupCode = ["synthetic", "first", "run", "setup", "code"].join("-");
 const deviceToken = ["synthetic", "bootstrap", "admin", "device", "token", "value"].join("-");
 const server = spawn(
@@ -120,7 +120,7 @@ try {
       method: "POST",
       headers: { "content-type": "application/json", "x-device-id": adminDeviceId },
       body: JSON.stringify({
-        adminPin: "9999",
+        adminPin: "999999",
         credentialHash: createHash("sha256").update(recoveredToken).digest("hex"),
       }),
     },

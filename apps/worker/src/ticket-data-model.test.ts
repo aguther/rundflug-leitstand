@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import anonymityDecision from "../../../docs/adr/0006-vollstaendig-anonyme-identitaeten.md?raw";
-import cashierSource from "../../web/src/App.tsx?raw";
+import cashierSource from "../../web/src/LegacyApp.tsx?raw";
 import initialMigration from "../migrations/0001_initial.sql?raw";
 import pushMigration from "../migrations/0006_web_push.sql?raw";
 import rotationMigration from "../migrations/0026_rotation_gate_and_note.sql?raw";

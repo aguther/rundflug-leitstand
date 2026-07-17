@@ -419,18 +419,18 @@ try {
     },
     403,
   );
-  const rejectedPinCorrection = await command(
+  const rejectedUnauthenticatedCorrection = await command(
     "technical-scaffold",
-    tokens.admin,
+    "invalid-device-token",
     lateMoveSource.event.version,
     "CORRECT_ROTATION_MANIFEST",
     {
       ticketGroupId: lateMoveSource.aggregate.id,
       targetRotationId: first.aggregate.relatedRotationId,
-      reason: "Korrekturversuch mit ungültiger Administrator-PIN",
-      adminPin: "9999",
+      reason: "Korrekturversuch ohne gültige Geräte- oder Kontositzung",
+      adminPin: pin,
     },
-    403,
+    401,
   );
   const correctionCommandId = randomUUID();
   const correctedManifest = await command(
@@ -484,7 +484,7 @@ try {
   );
   if (
     rejectedLeadCorrection.error?.code !== "ROLE_NOT_AUTHORIZED" ||
-    rejectedPinCorrection.error?.code !== "ADMIN_PIN_INVALID" ||
+    rejectedUnauthenticatedCorrection.error?.code !== "DEVICE_NOT_PAIRED" ||
     duplicateCorrection.duplicate !== true ||
     staleCorrection.error?.code !== "STALE_VERSION" ||
     correctedTarget?.ticketCount !== 5 ||
@@ -493,7 +493,16 @@ try {
     correctionAudit.payload.safetyApproval !== false ||
     correctionAudit.payload.capacityExceeded !== true
   ) {
-    throw new Error("Administrativer Manifest-Korrekturpfad ist nicht vollständig geschützt.");
+    throw new Error(
+      `Administrativer Manifest-Korrekturpfad ist nicht vollständig geschützt: ${JSON.stringify({
+        rejectedLeadCorrection,
+        rejectedUnauthenticatedCorrection,
+        duplicateCorrection,
+        staleCorrection,
+        correctedTicketCount: correctedTarget?.ticketCount,
+        correctionAudit,
+      })}`,
+    );
   }
   const rejectedOversize = await sell(
     correctedManifest.event.version,
@@ -711,7 +720,7 @@ try {
       manualMoveAuditRecorded: true,
       manualMoveAfterTakeoffRejected: true,
       administrativeManifestCorrection: true,
-      manifestCorrectionRoleAndPinProtected: true,
+      manifestCorrectionRoleAndSessionProtected: true,
       manifestCorrectionWholeGroupPreserved: true,
       manifestCorrectionCapacityDeviationAudited: true,
       manifestCorrectionIdempotent: true,
