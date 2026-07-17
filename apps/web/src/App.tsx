@@ -1,7 +1,20 @@
+import { lazy, Suspense } from "react";
 import { destinationsForRole, homeForRole, isDestinationActive } from "./app/navigation";
 import { AuthProvider, useAuth } from "./features/auth/AuthContext";
 import { LoginPage } from "./features/auth/LoginPage";
-import { LegacyApp } from "./LegacyApp";
+
+const LegacyApp = lazy(async () => {
+  const module = await import("./LegacyApp");
+  return { default: module.LegacyApp };
+});
+
+function ApplicationLoading() {
+  return (
+    <div className="app-loading" role="status">
+      Arbeitsbereich wird geladen …
+    </div>
+  );
+}
 
 function isPublicRoute(pathname: string): boolean {
   return (
@@ -16,7 +29,12 @@ function isPublicRoute(pathname: string): boolean {
 
 function AuthenticatedApplication() {
   const { session, loading } = useAuth();
-  if (isPublicRoute(window.location.pathname)) return <LegacyApp />;
+  if (isPublicRoute(window.location.pathname))
+    return (
+      <Suspense fallback={<ApplicationLoading />}>
+        <LegacyApp />
+      </Suspense>
+    );
   if (loading)
     return (
       <div className="app-loading" role="status">
@@ -38,15 +56,13 @@ function AuthenticatedApplication() {
       </div>
     );
   }
-  return <LegacyApp />;
+  return (
+    <Suspense fallback={<ApplicationLoading />}>
+      <LegacyApp />
+    </Suspense>
+  );
 }
 
-/**
- * Root composition for the V1.2 migration.
- *
- * Feature routes are moved out of LegacyApp one vertical slice at a time. Keeping this root free
- * from workflow state makes route guards, providers and code splitting independently testable.
- */
 export function App() {
   return (
     <AuthProvider>

@@ -8,6 +8,8 @@ describe("V1.2 web architecture", () => {
     expect(source.length).toBeLessThan(2_000);
     expect(source).not.toContain("sendCommand(");
     expect(source).not.toContain("useState(");
+    expect(source).toContain('import("./LegacyApp")');
+    expect(source).not.toContain('from "./LegacyApp"');
   });
 
   it("has explicit app-shell, theme and token modules", () => {
