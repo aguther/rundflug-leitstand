@@ -24,6 +24,9 @@ describe("Flight Line Assist", () => {
     expect(assistSource).toContain("Betreuung abschließen");
     expect(assistSource).toContain("AssistCommandContent");
     expect(assistSource).toContain('name="chevron"');
+    expect(assistSource).toContain('name="aircraft"');
+    expect(assistSource).toContain('name="group"');
+    expect(assistSource).toContain('name="gate"');
   });
 
   it("shows only anonymous operational identifiers and counts", () => {

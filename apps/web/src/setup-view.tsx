@@ -69,7 +69,7 @@ export function SetupView() {
 
   const setupAvailable = status?.setupRequired === true && status.setupConfigured;
   return (
-    <Shell title="Ersteinrichtung">
+    <Shell className="setup-shell" title="Ersteinrichtung">
       <section className="setup-page">
         <span className="eyebrow">Einmaliger Systemstart</span>
         <h1>Rundflug-Leitstand einrichten</h1>
