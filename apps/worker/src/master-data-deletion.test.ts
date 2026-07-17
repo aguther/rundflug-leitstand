@@ -13,11 +13,12 @@ describe("F-ADM-050 master-data deletion safeguards", () => {
     expect(domain).toContain('DELETE_MASTER_DATA: ["ADMIN"]');
   });
 
-  it("allows physical deletion only during preparation and blocks dependencies", () => {
+  it("allows physical deletion only for an authenticated administrator during preparation", () => {
     expect(coordinator).toContain('current.status !== "PREPARATION"');
     expect(coordinator).toContain("MASTER_DATA_DELETE_PHASE_LOCKED");
     expect(coordinator).toContain("MASTER_DATA_DELETE_BLOCKED");
-    expect(coordinator).toContain("verifyCredential(command.payload.adminPin");
+    expect(coordinator).toContain('request.headers.get("x-operator-role")');
+    expect(coordinator).toContain("operatorDeviceId === command.deviceId");
     expect(coordinator).toContain("current.version !== command.expectedVersion");
   });
 

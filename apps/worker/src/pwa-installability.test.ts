@@ -25,6 +25,6 @@ describe("V1 PWA installability", () => {
     expect(appleTouchIconUrl).toContain("app-icon-180.png");
     expect(iconSource).toContain('aria-label="Rundflug-Leitstand"');
     expect(iconSource).toContain("#102a43");
-    expect(iconSource).toContain("#3d9bff");
+    expect(iconSource).toContain("#2f8af5");
   });
 });

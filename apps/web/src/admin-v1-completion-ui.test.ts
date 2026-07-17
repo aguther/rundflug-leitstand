@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import appSource from "./LegacyApp.tsx?raw";
 import adminUxSource from "./admin-ux.tsx?raw";
+import appSource from "./LegacyApp.tsx?raw";
 
 const stylesSource = readFileSync(new URL("./styles.css", import.meta.url), "utf8");
 

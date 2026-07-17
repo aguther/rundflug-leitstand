@@ -44,7 +44,7 @@ if (forecastFixture.status !== 0) {
   throw new Error("Prognosehistorie für den Werksreset-Test konnte nicht angelegt werden.");
 }
 
-const pin = String.fromCharCode(48).repeat(4);
+const pin = String.fromCharCode(48).repeat(6);
 const setupCode = ["synthetic", "factory", "reset", "setup", "code"].join("-");
 const server = spawn(
   process.execPath,

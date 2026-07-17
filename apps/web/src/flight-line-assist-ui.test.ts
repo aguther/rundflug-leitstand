@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import appSource from "./LegacyApp.tsx?raw";
 import assistSource from "./flight-line-assist.tsx?raw";
+import appSource from "./LegacyApp.tsx?raw";
 
 describe("Flight Line Assist", () => {
   it("is directly addressable as a separate tablet and phone surface", () => {

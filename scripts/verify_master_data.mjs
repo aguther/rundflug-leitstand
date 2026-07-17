@@ -13,7 +13,7 @@ const reset = spawnSync(process.execPath, [npmCli, "run", "db:reset:local"], {
 });
 if (reset.status !== 0) throw new Error("Lokale Testdatenbank konnte nicht initialisiert werden.");
 
-const pin = String.fromCharCode(48).repeat(4);
+const pin = String.fromCharCode(48).repeat(6);
 const server = spawn(
   process.execPath,
   [
@@ -105,14 +105,16 @@ try {
     reason: "Synthetischer Löschtest",
     adminPin: pin,
   });
-  await admin(
+  await command(
+    devices.cashier,
+    tokens.cashier,
     result.event.version,
     "DELETE_MASTER_DATA",
     {
       entityType: "GATE",
       entityId: "gate-delete-test",
       reason: "Synthetischer Löschtest",
-      adminPin: "9999",
+      adminPin: pin,
     },
     403,
   );
