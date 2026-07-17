@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 import anonymityDecision from "../../../docs/adr/0006-vollstaendig-anonyme-identitaeten.md?raw";
-import cashierSource from "../../web/src/LegacyApp.tsx?raw";
+import cashierViewSource from "../../web/src/cashier-view.tsx?raw";
+import operationWorkspaceSource from "../../web/src/operation-workspace.tsx?raw";
 import initialMigration from "../migrations/0001_initial.sql?raw";
 import pushMigration from "../migrations/0006_web_push.sql?raw";
 import rotationMigration from "../migrations/0026_rotation_gate_and_note.sql?raw";
 import coordinator from "./event-coordinator.ts?raw";
 import worker from "./index.ts?raw";
+
+const cashierSource = `${cashierViewSource}\n${operationWorkspaceSource}`;
 
 describe("anonymous V1 ticket data model", () => {
   it("stores the complete operational ticket record without contact data", () => {

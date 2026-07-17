@@ -1,6 +1,11 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import appSource from "./LegacyApp.tsx?raw";
+import adminSource from "./admin-view.tsx?raw";
+import cashierSource from "./cashier-view.tsx?raw";
+import flightLineSource from "./flight-line-view.tsx?raw";
+import sharedSource from "./operation-workspace.tsx?raw";
+
+const appSource = `${sharedSource}\n${adminSource}\n${flightLineSource}\n${cashierSource}`;
 
 const stylesSource = readFileSync(new URL("./styles.css", import.meta.url), "utf8");
 

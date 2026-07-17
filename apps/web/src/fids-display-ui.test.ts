@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
+import routerSource from "./FeatureRouter.tsx?raw";
 import displaySource from "./fids-display.tsx?raw";
-import appSource from "./LegacyApp.tsx?raw";
+import fidsViewSource from "./fids-view.tsx?raw";
+
+const appSource = `${routerSource}\n${fidsViewSource}`;
 
 describe("Standard- und Terminal-FIDS (F-MON-010/060, F-BEN-090)", () => {
   it("offers two directly addressable profiles backed by the same public board", () => {
