@@ -2592,7 +2592,7 @@
     "requirement": "Die Anmeldung zeigt alle aktiven, nach Rolle gruppierten Konten zur Auswahl und verlangt anschließend eine mindestens sechsstellige numerische PIN. Das PIN-Feld erhält den Fokus; Enter bestätigt. Konto oder PIN dürfen in Fehlermeldungen nicht einzeln als falsch offengelegt werden.",
     "priority": "MUSS",
     "stage": "V1",
-    "implementation": { "issue": "V12-02", "module": "apps/web, apps/worker", "status": "planned" },
+    "implementation": { "issue": "V12-02", "module": "apps/web, apps/worker", "status": "implemented" },
     "tests": ["Auth-API, Anmeldung und Browserabnahme"]
   },
   {
@@ -2601,7 +2601,7 @@
     "requirement": "Administratoren können Konten durch Rollenauswahl anlegen, aktivieren, deaktivieren, eine neue PIN setzen und alle Sitzungen eines Kontos widerrufen. Der Anmeldecode wird konfliktfrei aus Rolle und laufender Nummer erzeugt.",
     "priority": "MUSS",
     "stage": "V1",
-    "implementation": { "issue": "V12-02", "module": "apps/web, apps/worker", "status": "planned" },
+    "implementation": { "issue": "V12-02", "module": "apps/web, apps/worker", "status": "implemented" },
     "tests": ["Konten- und Sitzungsintegration"]
   },
   {
@@ -2610,7 +2610,7 @@
     "requirement": "Interne Oberflächen sind ohne gültige Sitzung nicht zugänglich. QR-Ticketstatus und öffentliche FIDS-Inhalte bleiben anonym öffentlich; Konfiguration und Aktivierung eines Displays benötigen ein berechtigtes Konto.",
     "priority": "MUSS",
     "stage": "V1",
-    "implementation": { "issue": "V12-02", "module": "apps/web, apps/worker", "status": "planned" },
+    "implementation": { "issue": "V12-02", "module": "apps/web, apps/worker", "status": "implemented" },
     "tests": ["Public-/Protected-Route-Integration"]
   },
   {
@@ -2619,7 +2619,7 @@
     "requirement": "Helferkonto und Sitzung: nicht personenbezogene Konto-ID, rollenkennzeichnender Anmeldecode, Rollen, aktiver Status, gesalzener PIN-Hash, fehlgeschlagene Anmeldeversuche sowie widerrufbare Sitzung mit Geräte-ID, Erstell-, Ablauf-, Letztaktivitäts- und Widerrufszeitpunkt. PIN und Sitzungstoken werden niemals im Klartext gespeichert oder protokolliert.",
     "priority": "MUSS",
     "stage": "V1",
-    "implementation": { "issue": "V12-02", "module": "apps/worker/migrations", "status": "planned" },
+    "implementation": { "issue": "V12-02", "module": "apps/worker/migrations", "status": "implemented" },
     "tests": ["Schema- und Datenschutzprüfung"]
   },
   {
@@ -2628,7 +2628,7 @@
     "requirement": "Alle internen Desktop-Oberflächen verwenden die freigegebene kompakte Dichte: zentrale Tabellen und Primärabläufe passen bei 1366 × 768 und 1920 × 1080 ohne vermeidbares Seitenscrolling; Editoren erscheinen erst nach Neu oder Bearbeiten als Drawer oder Dialog. Öffentliche Distanzanzeigen sind davon ausgenommen.",
     "priority": "MUSS",
     "stage": "V1",
-    "implementation": { "issue": "V12-03", "module": "apps/web", "status": "planned" },
+    "implementation": { "issue": "V12-03", "module": "apps/web", "status": "implemented" },
     "tests": ["Browser- und Screenshotabnahme Desktop"]
   },
   {
@@ -2637,7 +2637,7 @@
     "requirement": "Supervisor und Flight Line Assist sind eigenständige, rollenberechtigte Oberflächen und werden nicht allein anhand der Bildschirmbreite gewählt. Supervisor bleibt auf Desktop und iPad vollständig; Assist ist auf iPad, iPad mini, iPhone und vergleichbaren Geräten touchoptimiert.",
     "priority": "MUSS",
     "stage": "V1",
-    "implementation": { "issue": "V12-05, V12-06", "module": "apps/web", "status": "planned" },
+    "implementation": { "issue": "V12-05, V12-06", "module": "apps/web", "status": "implemented" },
     "tests": ["Browserabnahme Desktop, iPad, iPad mini und iPhone"]
   },
   {
@@ -2646,7 +2646,7 @@
     "requirement": "PINs werden mit einem langsamen, gesalzenen Passwort-Hash gespeichert. Sitzungen verwenden nicht aus JavaScript lesbare Secure-/HttpOnly-/SameSite-Cookies, werden bei Inaktivität gesperrt und absolut befristet. Fehlversuche werden serverseitig pro Konto und Herkunft progressiv begrenzt.",
     "priority": "MUSS",
     "stage": "V1",
-    "implementation": { "issue": "V12-02", "module": "apps/worker", "status": "planned" },
+    "implementation": { "issue": "V12-02", "module": "apps/worker", "status": "implemented" },
     "tests": ["Security- und Session-Integration"]
   },
   {
@@ -2655,7 +2655,7 @@
     "requirement": "Die Webanwendung ist nach App-Shell, Designsystem, Authentifizierung und fachlichen Features modularisiert. App.tsx enthält ausschließlich Komposition und Routing; fachliche Oberflächen, API-Zugriff und Zustandslogik besitzen eindeutige Modulgrenzen.",
     "priority": "MUSS",
     "stage": "V1",
-    "implementation": { "issue": "V12-01", "module": "apps/web", "status": "planned" },
+    "implementation": { "issue": "V12-01", "module": "apps/web", "status": "in_progress" },
     "tests": ["Architektur- und Importgrenzenprüfung"]
   }
 ]
