@@ -2655,7 +2655,7 @@
     "requirement": "Die Webanwendung ist nach App-Shell, Designsystem, Authentifizierung und fachlichen Features modularisiert. App.tsx enthält ausschließlich Komposition und Routing; fachliche Oberflächen, API-Zugriff und Zustandslogik besitzen eindeutige Modulgrenzen.",
     "priority": "MUSS",
     "stage": "V1",
-    "implementation": { "issue": "V12-01", "module": "apps/web", "status": "in_progress" },
+    "implementation": { "issue": "V12-01", "module": "apps/web", "status": "implemented" },
     "tests": ["Architektur- und Importgrenzenprüfung"]
   }
 ]
