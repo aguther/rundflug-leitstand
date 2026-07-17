@@ -269,16 +269,127 @@
   border-radius: var(--radius-sm);
 }
 
+.assist-claim,
+.assist-finish,
+.assist-more,
+.assist-actions button {
+  font-family: inherit;
+  letter-spacing: 0;
+}
+
+.assist-claim,
+.assist-finish {
+  display: grid;
+  grid-template-columns: 24px auto;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+}
+
+.assist-more {
+  min-height: 46px;
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) 18px;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  color: var(--ui-text);
+  border: 1px solid var(--ui-border-strong);
+  background: var(--ui-control);
+  box-shadow:
+    inset 0 1px 0 var(--ui-highlight),
+    0 1px 2px rgb(0 0 0 / 10%);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-align: left;
+}
+
+.assist-more:hover:not(:disabled) {
+  color: var(--ui-accent);
+  border-color: color-mix(in srgb, var(--ui-accent) 44%, var(--ui-border-strong));
+  background: var(--ui-control-hover);
+}
+
+.assist-command-icon,
+.assist-command-chevron {
+  display: inline-grid;
+  place-items: center;
+  line-height: 0;
+}
+
+.assist-command-icon svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.assist-command-icon svg path:first-child:not(:only-child) {
+  fill: none;
+}
+
+.assist-command-icon.icon-aircraft svg {
+  fill: currentColor;
+  stroke: none;
+}
+
+.assist-command-chevron {
+  justify-self: end;
+  color: var(--ui-muted);
+}
+
+.assist-command-chevron svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.assist-command-label {
+  min-width: 0;
+  line-height: 1.25;
+}
+
 .assist-actions {
   gap: 6px;
 }
 
 .assist-actions button {
+  grid-template-columns: 42px minmax(0, 1fr) 18px;
   border-radius: var(--radius-sm);
   background: var(--ui-control);
   box-shadow:
     inset 0 1px 0 var(--ui-highlight),
     0 1px 2px rgb(0 0 0 / 10%);
+  font-size: 0.94rem;
+  font-weight: 560;
+}
+
+.assist-actions button .assist-command-icon {
+  width: 30px;
+  height: 30px;
+  justify-self: start;
+  border: 1px solid color-mix(in srgb, currentColor 58%, transparent);
+  border-radius: 50%;
+}
+
+.assist-actions button .assist-command-icon svg {
+  width: 19px;
+  height: 19px;
+}
+
+.assist-actions button .assist-command-chevron {
+  transition: transform 140ms ease;
+}
+
+.assist-actions button:hover:not(:disabled) .assist-command-chevron {
+  transform: translateX(2px);
 }
 
 .flight-assist .assist-actions button:hover:not(:disabled) {
@@ -324,6 +435,12 @@
   .assist-claim {
     min-height: 50px;
     font-weight: 650;
+  }
+
+  .assist-more-phone {
+    min-height: 50px;
+    margin-top: 12px;
+    font-size: 0.94rem;
   }
 }
 

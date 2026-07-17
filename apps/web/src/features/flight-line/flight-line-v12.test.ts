@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 import assistSource from "../../flight-line-assist.tsx?raw";
 import supervisorSource from "../../flight-line-supervisor.tsx?raw";
 
-const stylesSource = readFileSync(new URL("./flight-line-v12.css", import.meta.url), "utf8");
+const stylesSource = ["./flight-line-v12.css", "../ui-finish-v12.css"]
+  .map((path) => readFileSync(new URL(path, import.meta.url), "utf8"))
+  .join("\n");
 
 describe("V1.2 Flight Line surfaces", () => {
   it("keeps Supervisor and Assist as explicit independent workspaces", () => {
@@ -35,5 +37,7 @@ describe("V1.2 Flight Line surfaces", () => {
     expect(assistSource).toContain("Nächstes Flugzeug");
     expect(stylesSource).toContain(".assist-aircraft-cards article:nth-child(n + 2)");
     expect(stylesSource).toContain(".assist-more-phone");
+    expect(stylesSource).toContain(".assist-command-chevron");
+    expect(stylesSource).toContain("grid-template-columns: 42px minmax(0, 1fr) 18px");
   });
 });
