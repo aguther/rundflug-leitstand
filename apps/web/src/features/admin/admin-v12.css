@@ -173,6 +173,9 @@
   gap: 12px;
   padding: 18px 24px;
 }
+.admin-shell .reset-levels[hidden] {
+  display: none;
+}
 .admin-shell .reset-level-row {
   min-height: 150px;
   grid-template-columns: 1fr;

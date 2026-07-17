@@ -27,5 +27,6 @@ describe("V1.2 compact administration", () => {
     expect(appSource).toContain('hidden={adminArea !== "backup" || !restartEditorOpen}');
     expect(appSource).toContain("setRestartEditorOpen(true)");
     expect(appSource).toContain("setRestartEditorOpen(false)");
+    expect(stylesSource).toMatch(/\.admin-shell \.reset-levels\[hidden\]\s*\{\s*display: none;/);
   });
 });

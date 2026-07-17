@@ -10,6 +10,7 @@ import "./features/admin/admin-v12.css";
 import "./features/cashier/cashier-v12.css";
 import "./features/flight-line/flight-line-v12.css";
 import "./features/fids/fids-v12.css";
+import "./features/ui-finish-v12.css";
 
 let reloadingForServiceWorkerUpdate = false;
 navigator.serviceWorker?.addEventListener("controllerchange", () => {
