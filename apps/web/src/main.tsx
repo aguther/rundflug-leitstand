@@ -2,6 +2,9 @@ import { registerSW } from "virtual:pwa-register";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
+import { ThemeProvider } from "./design-system/theme";
+import "./design-system/tokens.css";
+import "./design-system/base.css";
 import "./styles.css";
 
 let reloadingForServiceWorkerUpdate = false;
@@ -28,6 +31,8 @@ if (!root) {
 
 createRoot(root).render(
   <StrictMode>
-    <App />
+    <ThemeProvider>
+      <App />
+    </ThemeProvider>
   </StrictMode>,
 );

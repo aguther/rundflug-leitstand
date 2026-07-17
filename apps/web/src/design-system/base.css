@@ -1,0 +1,76 @@
+html {
+  min-width: 320px;
+  background: var(--ui-bg);
+}
+
+body {
+  margin: 0;
+  color: var(--ui-text);
+  background: var(--ui-bg);
+  font-family: var(--font-ui);
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+:focus-visible {
+  outline: 0;
+  box-shadow: var(--focus-ring);
+}
+
+.app-brand {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--ui-text);
+  text-decoration: none;
+}
+
+.app-brand > span {
+  padding-left: var(--space-2);
+  border-left: 1px solid var(--ui-border-strong);
+}
+
+.brand-mark {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  overflow: visible;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.brand-mark-aircraft {
+  fill: var(--ui-accent);
+  stroke: var(--ui-accent);
+  stroke-width: 0.7;
+}
+
+.brand-mark-route {
+  stroke: var(--ui-accent);
+  stroke-width: 1.7;
+}
+
+.app-header nav a[aria-current="page"] {
+  color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+}
+
+@media (max-width: 760px) {
+  .app-header {
+    min-height: var(--header-height);
+  }
+
+  .app-brand > span,
+  .app-header nav {
+    display: none;
+  }
+}

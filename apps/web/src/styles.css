@@ -1,33 +1,6 @@
 /* biome-ignore-all lint/style/noDescendingSpecificity: V3 deliberately overrides the layered legacy stylesheet. */
 :root {
-  font-family:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  color: #102a43;
-  background: #eef2f6;
   font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  --ui-bg: #f4f7fa;
-  --ui-surface: #ffffff;
-  --ui-surface-subtle: #f8fafc;
-  --ui-text: #10213b;
-  --ui-muted: #607086;
-  --ui-border: #d9e1ea;
-  --ui-accent: #1769d2;
-  --ui-accent-soft: #edf5ff;
-  --ui-danger: #c82626;
-  --ui-danger-soft: #fff4f4;
-  --ui-warning: #c27a08;
-  --ui-warning-soft: #fff7e6;
-  --ui-warning-text: #6b3d00;
-  --ui-success-soft: #eaf6ef;
-  --ui-success-text: #176b42;
-  --ui-control: #ffffff;
-  --ui-control-hover: #eef4fb;
-  --ui-disabled: #e7edf3;
-  --ui-disabled-text: #718096;
-  --ui-purple-soft: #f0edff;
-  --ui-purple-text: #51409a;
-  --ui-shadow: 0 16px 44px rgb(15 37 64 / 10%);
 }
 
 /* Admin V3: approved compact, responsive light/dark surface language. */
@@ -1572,30 +1545,8 @@ footer {
   }
 }
 [data-theme="dark"] {
-  color: #eef4fb;
-  background: #07111e;
-  --ui-bg: #07111e;
-  --ui-surface: #0b1726;
-  --ui-surface-subtle: #101d2d;
-  --ui-text: #eef4fb;
-  --ui-muted: #93a4ba;
-  --ui-border: #26384b;
-  --ui-accent: #3b82f6;
-  --ui-accent-soft: #122c4d;
-  --ui-danger: #ef5b5b;
-  --ui-danger-soft: #2b151b;
-  --ui-warning: #f2b84b;
-  --ui-warning-soft: #2b2415;
-  --ui-warning-text: #f7d58f;
-  --ui-success-soft: #10271d;
-  --ui-success-text: #7edca6;
-  --ui-control: #101d2d;
-  --ui-control-hover: #16263a;
-  --ui-disabled: #182638;
-  --ui-disabled-text: #7f90a6;
-  --ui-purple-soft: #211d3a;
-  --ui-purple-text: #b9aaf5;
-  --ui-shadow: 0 20px 54px rgb(0 0 0 / 35%);
+  color: var(--ui-text);
+  background: var(--ui-bg);
 }
 .standard-fids > footer,
 .terminal-fids > footer {
