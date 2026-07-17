@@ -2829,6 +2829,7 @@ function AdminView() {
   const [newEventDate, setNewEventDate] = useState("");
   const [newEventAerodrome, setNewEventAerodrome] = useState("");
   const [restartMode, setRestartMode] = useState<"KEEP_MASTER_DATA" | "EMPTY">("KEEP_MASTER_DATA");
+  const [restartEditorOpen, setRestartEditorOpen] = useState(false);
   const [restartConfirmation, setRestartConfirmation] = useState("");
   const [factoryResetOpen, setFactoryResetOpen] = useState(false);
   const [factoryResetBusy, setFactoryResetBusy] = useState(false);
@@ -4613,6 +4614,7 @@ function AdminView() {
                 onClick={() => {
                   setRestartMode("KEEP_MASTER_DATA");
                   setRestartConfirmation("");
+                  setRestartEditorOpen(true);
                 }}
                 type="button"
               >
@@ -4632,6 +4634,7 @@ function AdminView() {
                 onClick={() => {
                   setRestartMode("EMPTY");
                   setRestartConfirmation("");
+                  setRestartEditorOpen(true);
                 }}
                 type="button"
               >
@@ -4656,8 +4659,16 @@ function AdminView() {
               </button>
             </div>
           </section>
-          <section className="admin-section" hidden={adminArea !== "backup"}>
-            <h2>Neuen Betriebsstand anlegen</h2>
+          <section
+            className="admin-section restart-editor"
+            hidden={adminArea !== "backup" || !restartEditorOpen}
+          >
+            <header className="section-heading-row">
+              <h2>Neuen Betriebsstand anlegen</h2>
+              <button onClick={() => setRestartEditorOpen(false)} type="button">
+                Schließen
+              </button>
+            </header>
             <p>
               Aktive Veranstaltung: <strong>{board?.event.name ?? EVENT_ID}</strong>. Ein Neustart
               legt eine neue Veranstaltung an. Der bisherige Stand bleibt für Audit, Berichte und
