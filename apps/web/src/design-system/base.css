@@ -157,14 +157,46 @@ body {
 
 @media (max-width: 560px) {
   .app-header {
+    width: 100%;
+    display: grid;
+    grid-template-columns: auto minmax(92px, 1fr) auto;
     gap: 8px;
     padding-inline: 10px;
   }
+  .app-header .app-brand {
+    margin-right: 0;
+  }
   .app-header .app-brand strong {
-    font-size: 0.92rem;
+    font-size: 0.82rem;
+  }
+  .app-header .brand-mark {
+    width: 32px;
+    height: 32px;
+  }
+  .app-header .view-switcher {
+    order: initial;
+    width: auto;
+    min-width: 0;
+  }
+  .app-header .view-switcher > summary {
+    min-width: 0;
+    padding-inline: 9px;
+  }
+  .app-header .view-switcher > summary > span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .app-header .view-switcher-prefix,
+  .app-header .theme-toggle {
+    display: none;
   }
   .app-header .app-account > span {
     display: none;
+  }
+  .app-header .app-account {
+    padding-inline: 8px;
   }
 }
 

@@ -588,6 +588,20 @@ export function FlightLineView() {
           }
           onGroupMissing={(ticketGroupId) => void updateGroupPresence(ticketGroupId, "MISSING")}
           onGroupRecall={(ticketGroupId) => void updateGroupPresence(ticketGroupId, "RECALL")}
+          onGroupDefer={(ticketGroupId) => {
+            const rotation = aircraftRotations?.find(
+              (entry) =>
+                entry.ticketGroupId === ticketGroupId ||
+                entry.bookingGroups.some((group) => group.id === ticketGroupId),
+            );
+            if (rotation) {
+              void mutateQueue(
+                "DEFER_TICKET_GROUP",
+                "Gruppe durch Flight Line Assist zurückgestellt",
+                rotation,
+              );
+            }
+          }}
           onToggleGroup={(ticketGroupId, isSelected) => {
             setSelectedQueueGroupIds((current) =>
               isSelected
