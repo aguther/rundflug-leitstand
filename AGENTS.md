@@ -74,6 +74,8 @@ npm run check
 ## Arbeitsmethode
 
 - Beginne mehrstufige Aufgaben mit einem aktualisierten Ausführungsplan.
+- Vom Auftraggeber beauftragte und vollständig geprüfte Korrekturen werden standardmäßig direkt auf
+  `main` committed und gepusht, sofern der Auftraggeber nicht ausdrücklich etwas anderes vorgibt.
 - Bearbeite pro Branch und Pull Request genau ein zusammenhängendes Ergebnis.
 - Referenziere Anforderungs-IDs in Issues, Tests und Pull Requests.
 - Ändere die binären Anforderungsquellen nicht im Rahmen von Feature-Arbeit.
