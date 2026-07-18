@@ -1,7 +1,7 @@
-import type { TicketSearchResult } from "@rundflug/contracts";
+import type { TicketGroupPrintData, TicketSearchResult } from "@rundflug/contracts";
 import QRCode from "qrcode";
 import { useEffect, useState } from "react";
-import { searchTickets, sendCommand } from "./api";
+import { getTicketGroupPrintData, searchTickets, sendCommand } from "./api";
 import { AppShell as Shell } from "./app/AppShell";
 import { requiresChildCompanionWarning } from "./cashier-guidance";
 import {
@@ -71,6 +71,45 @@ export function CashierView() {
     product?.childCompanionRequired ?? false,
     ticketDetails.map((detail) => detail.weightClass),
   );
+  async function printableTickets(data: TicketGroupPrintData): Promise<TicketReceipt[]> {
+    return Promise.all(
+      data.tickets.map(async (ticket) => {
+        const statusUrl = `${window.location.origin}/ticket/${encodeURIComponent(ticket.code)}`;
+        return {
+          code: ticket.code,
+          statusUrl,
+          qrDataUrl: await QRCode.toDataURL(statusUrl, {
+            errorCorrectionLevel: "M",
+            margin: 2,
+            width: 360,
+          }),
+          eventName: data.eventName,
+          productName: data.productName,
+          gateLabel: data.gateLabel,
+          communicationLabel: data.communicationLabel,
+          position: ticket.position,
+          groupSize: data.tickets.length,
+        };
+      }),
+    );
+  }
+
+  async function reopenTicketGroup(ticketGroupId: string) {
+    try {
+      const data = await getTicketGroupPrintData(
+        EVENT_ID,
+        ticketGroupId,
+        CASHIER_DEVICE_ID,
+        deviceTokenFor(CASHIER_DEVICE_ID),
+      );
+      setReceipt(await printableTickets(data));
+      setMessage("Ticketzettel stehen zum Scan oder erneuten Druck bereit.");
+    } catch (reason) {
+      setMessage(
+        reason instanceof Error ? reason.message : "Ticketzettel konnten nicht geladen werden.",
+      );
+    }
+  }
   useEffect(() => {
     if (serverConfirmed && pendingDraftCount === 0) return;
     const queue = appendCashierDraftRevision(readCashierDraftQueue(localStorage, draftQueueKey), {
@@ -137,24 +176,10 @@ export function CashierView() {
         },
         deviceTokenFor(CASHIER_DEVICE_ID),
       );
-      setReceipt(
-        await Promise.all(
-          codes.map(async (code) => {
-            const statusUrl = `${window.location.origin}/ticket/${encodeURIComponent(code)}`;
-            return {
-              code,
-              statusUrl,
-              qrDataUrl: await QRCode.toDataURL(statusUrl, {
-                errorCorrectionLevel: "M",
-                margin: 2,
-                width: 280,
-              }),
-            };
-          }),
-        ),
-      );
+      const soldTicketGroupId = saleResult.aggregate?.id ?? null;
+      if (soldTicketGroupId) await reopenTicketGroup(soldTicketGroupId);
       setPreprintedCodes("");
-      setLastTicketGroupId(saleResult.aggregate?.id ?? null);
+      setLastTicketGroupId(soldTicketGroupId);
       setLastProductId(product.id);
       setCorrectionTargetLabel("Letzter Verkauf");
       setMessage(`${codes.length} Ticket${codes.length === 1 ? "" : "s"} verkauft.`);
@@ -457,9 +482,28 @@ export function CashierView() {
                 <div className="receipt-list">
                   {receipt.map((ticket) => (
                     <article key={ticket.code} className="ticket-receipt">
+                      <header>
+                        <strong>{ticket.eventName}</strong>
+                        <span>{ticket.productName}</span>
+                      </header>
                       <img src={ticket.qrDataUrl} alt={`QR-Ticket ${ticket.code}`} />
-                      <code>{ticket.code}</code>
-                      <span>QR-Code öffnet den anonymen Ticketstatus.</span>
+                      <dl>
+                        <div>
+                          <dt>Ticket</dt>
+                          <dd>{ticket.code}</dd>
+                        </div>
+                        <div>
+                          <dt>Gruppe</dt>
+                          <dd>
+                            {ticket.communicationLabel} · {ticket.position}/{ticket.groupSize}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>Gate</dt>
+                          <dd>{ticket.gateLabel}</dd>
+                        </div>
+                      </dl>
+                      <span>QR-Code scannen, um den anonymen Ticketstatus zu öffnen.</span>
                     </article>
                   ))}
                   <button className="print-tickets" type="button" onClick={() => window.print()}>
@@ -475,6 +519,9 @@ export function CashierView() {
               {lastTicketGroupId ? (
                 <details className="correction-controls">
                   <summary>Verkauf korrigieren</summary>
+                  <button onClick={() => void reopenTicketGroup(lastTicketGroupId)} type="button">
+                    Ticketzettel anzeigen / nachdrucken
+                  </button>
                   <label>
                     Stornogrund
                     <input

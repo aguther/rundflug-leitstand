@@ -178,10 +178,8 @@ export function AdminView() {
   const [devices, setDevices] = useState<PairedDeviceSummary[]>([]);
   const [deviceLabel, setDeviceLabel] = useState("Kasse 2");
   const [deviceRole, setDeviceRole] = useState<
-    "CASHIER" | "FLIGHT_LINE" | "FLIGHT_LINE_LEAD" | "FLIGHT_DIRECTOR" | "ADMIN" | "DISPLAY"
+    "CASHIER" | "FLIGHT_LINE" | "FLIGHT_DIRECTOR" | "ADMIN"
   >("CASHIER");
-  const [displayGateId, setDisplayGateId] = useState("");
-  const [displayMode, setDisplayMode] = useState<"standard" | "terminal">("standard");
   const [pairingQr, setPairingQr] = useState<string | null>(null);
   const [pairingUrl, setPairingUrl] = useState<string | null>(null);
   const [pilotCode, setPilotCode] = useState("P-01");
@@ -661,10 +659,6 @@ export function AdminView() {
         role: deviceRole,
         event: EVENT_ID,
       });
-      if (deviceRole === "DISPLAY") {
-        if (displayGateId) params.set("gate", displayGateId);
-        params.set("style", displayMode);
-      }
       const url = `${window.location.origin}/pair#${params.toString()}`;
       setPairingUrl(url);
       setPairingQr(
@@ -710,6 +704,7 @@ export function AdminView() {
             plannedBoardingMinutes,
             plannedDeboardingMinutes,
             plannedBufferMinutes,
+            departedVisibilitySeconds: 15,
             reason: ADMIN_CONFIGURATION_AUDIT_REASON,
             adminPin: adminPinRef.current,
           },
@@ -4267,48 +4262,10 @@ export function AdminView() {
                 >
                   <option value="CASHIER">Kasse</option>
                   <option value="FLIGHT_LINE">Flight Line</option>
-                  <option value="FLIGHT_LINE_LEAD">Leitung Flight Line</option>
                   <option value="FLIGHT_DIRECTOR">Flugleitung</option>
-                  <option value="DISPLAY">Anzeige</option>
                   <option value="ADMIN">Administration</option>
                 </select>
               </label>
-              {deviceRole === "DISPLAY" ? (
-                <>
-                  <label>
-                    <FieldLabel
-                      label="Gebundene Anzeige"
-                      help="Die Anzeige bleibt bis zu einer neuen Kopplung auf diese Veranstaltung und optional dieses Gate festgelegt."
-                    />
-                    <select
-                      value={displayGateId}
-                      onChange={(event) => setDisplayGateId(event.target.value)}
-                    >
-                      <option value="">Gesamte Veranstaltung</option>
-                      {board?.gates
-                        .filter((gate) => gate.active)
-                        .map((gate) => (
-                          <option key={gate.id} value={gate.id}>
-                            {gate.label}
-                          </option>
-                        ))}
-                    </select>
-                  </label>
-                  <label>
-                    <FieldLabel
-                      label="Anzeigeprofil"
-                      help="Standard verwendet deutsche Begriffe; Terminal ist vollständig englisch."
-                    />
-                    <select
-                      value={displayMode}
-                      onChange={(event) => setDisplayMode(event.target.value as typeof displayMode)}
-                    >
-                      <option value="standard">Standard · Deutsch</option>
-                      <option value="terminal">Terminal · Englisch</option>
-                    </select>
-                  </label>
-                </>
-              ) : null}
               <button
                 className="primary-action"
                 disabled={!isAdministrator || deviceLabel.trim().length < 2}

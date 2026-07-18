@@ -29,9 +29,9 @@ import {
 
 const actionForState = {
   DRAFT: { label: "Belegung bestätigen & Boarding starten", command: "CALL_NEXT" },
-  CALLED: { label: "IM FLUG", command: "MARK_IN_FLIGHT" },
-  IN_FLIGHT: { label: "GELANDET", command: "MARK_LANDED" },
-  LANDED: { label: "VERFÜGBAR", command: "MARK_COMPLETED" },
+  CALLED: { label: "OFF-BLOCK", command: "MARK_OFF_BLOCK" },
+  IN_FLIGHT: { label: "ON-BLOCK", command: "MARK_ON_BLOCK" },
+  LANDED: { label: "Umlauf abschließen", command: "COMPLETE_TURNAROUND" },
   COMPLETED: null,
 } as const;
 
@@ -56,9 +56,7 @@ export function FlightLineView() {
     (rotation) => rotation.status !== "COMPLETED",
   );
   const operationalAircraft = board?.aircraft ?? [];
-  const canManageAircraft = ["FLIGHT_LINE_LEAD", "FLIGHT_DIRECTOR", "ADMIN"].includes(
-    board?.currentDeviceRole ?? "",
-  );
+  const canManageAircraft = ["FLIGHT_DIRECTOR", "ADMIN"].includes(board?.currentDeviceRole ?? "");
   const selectedAircraft =
     operationalAircraft.find((aircraft) => aircraft.id === selectedAircraftId) ??
     operationalAircraft[0];
@@ -126,7 +124,10 @@ export function FlightLineView() {
             ...commandBase,
             type: "CALL_NEXT",
             payload: {
-              rotationId: selected.id,
+              ticketGroupIds:
+                selected.bookingGroups.length > 0
+                  ? selected.bookingGroups.map((group) => group.id)
+                  : [selected.ticketGroupId],
               aircraftId: nextAircraftId,
               pilotId: nextPilotId,
             },
@@ -135,7 +136,13 @@ export function FlightLineView() {
         );
       } else {
         await sendCommand(
-          { ...commandBase, type: action.command, payload: { rotationId: selected.id } },
+          action.command === "COMPLETE_TURNAROUND"
+            ? {
+                ...commandBase,
+                type: "COMPLETE_TURNAROUND",
+                payload: { rotationId: selected.id, nextAircraftState: "AVAILABLE" },
+              }
+            : { ...commandBase, type: action.command, payload: { rotationId: selected.id } },
           deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
         );
       }
@@ -458,7 +465,7 @@ export function FlightLineView() {
       <InterruptionNotice active={board?.event.operationalInterrupted ?? false} />
       <OperationalNotice note={board?.event.operationalNote} />
       {!FLIGHT_LINE_ASSIST_MODE &&
-      board?.currentDeviceRole === "FLIGHT_LINE_LEAD" &&
+      board?.currentDeviceRole === "FLIGHT_DIRECTOR" &&
       !board.event.emergencyMode ? (
         <details className="emergency-control">
           <summary>Not-Halt</summary>
@@ -984,7 +991,7 @@ export function FlightLineView() {
                 bleiben verbunden
               </p>
               {selected.status === "DRAFT" &&
-              ["FLIGHT_LINE_LEAD", "ADMIN"].includes(board?.currentDeviceRole ?? "") ? (
+              ["FLIGHT_DIRECTOR", "ADMIN"].includes(board?.currentDeviceRole ?? "") ? (
                 <section>
                   <h3>Nutzbare Plätze</h3>
                   <div className="compact-stepper">

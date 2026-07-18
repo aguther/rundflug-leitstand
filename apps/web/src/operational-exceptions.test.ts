@@ -13,6 +13,7 @@ function rotation(input: Partial<Rotation> & Pick<Rotation, "id" | "ticketGroupI
   return {
     id: input.id,
     ticketGroupId: input.ticketGroupId,
+    bookingGroups: input.bookingGroups ?? [],
     flightGroupId: `fg-${input.id}`,
     communicationNumber: input.queuePosition ?? 101,
     communicationLabel: `PAN-${input.queuePosition ?? 101}`,

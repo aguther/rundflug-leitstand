@@ -13,11 +13,44 @@ import {
   publicTicketStatusSchema,
   rotationOperationalSummarySchema,
   stageOutageRecoveryRequestSchema,
+  ticketGroupPrintDataSchema,
   ticketSearchResponseSchema,
   updateOperatorAccountSchema,
 } from "./index";
 
 describe("commandEnvelopeSchema", () => {
+  it("accepts whole booking groups for an atomic multi-group call", () => {
+    const command = commandEnvelopeSchema.parse({
+      commandId: "00e971df-23d5-4d28-9107-92b447416200",
+      eventId: "demo-2026",
+      deviceId: "flight-line-1",
+      expectedVersion: 7,
+      issuedAt: "2026-07-11T12:00:00.000Z",
+      type: "CALL_NEXT",
+      payload: {
+        ticketGroupIds: ["group-2", "group-1"],
+        aircraftId: "aircraft-1",
+        pilotId: "pilot-1",
+      },
+    });
+    expect(command.type === "CALL_NEXT" && command.payload.ticketGroupIds).toEqual([
+      "group-2",
+      "group-1",
+    ]);
+  });
+
+  it("validates stored ticket codes only in the protected print DTO", () => {
+    expect(
+      ticketGroupPrintDataSchema.parse({
+        ticketGroupId: "group-1",
+        eventName: "Synthetischer Flugtag",
+        productName: "Panorama",
+        gateLabel: "Flight Line",
+        communicationLabel: "PAN-101",
+        tickets: [{ code: "ABCDE2345678", position: 1 }],
+      }).tickets[0]?.code,
+    ).toBe("ABCDE2345678");
+  });
   it("allows an administrator to revoke account sessions without changing the PIN", () => {
     expect(updateOperatorAccountSchema.parse({ revokeSessions: true })).toEqual({
       revokeSessions: true,
@@ -437,7 +470,11 @@ describe("commandEnvelopeSchema", () => {
       expectedVersion: 4,
       issuedAt: "2026-07-11T12:00:00.000Z",
       type: "CALL_NEXT",
-      payload: { rotationId: "rotation-1", aircraftId: "aircraft-1", pilotId: "pilot-code-1" },
+      payload: {
+        ticketGroupIds: ["ticket-group-1"],
+        aircraftId: "aircraft-1",
+        pilotId: "pilot-code-1",
+      },
     });
     expect(parsed.type).toBe("CALL_NEXT");
   });

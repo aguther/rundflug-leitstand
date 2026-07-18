@@ -33,7 +33,7 @@ VALUES
   ('cashier-tablet-1', 'demo-2026', 'Kasse 1', 'CASHIER', 1, '2026-07-11T08:00:00.000Z', '2026-07-11T08:00:00.000Z'),
   ('flight-line-tablet-1', 'demo-2026', 'Flight Line 1', 'FLIGHT_LINE', 1, '2026-07-11T08:00:00.000Z', '2026-07-11T08:00:00.000Z'),
   ('recovery-reviewer', 'demo-2026', 'Recovery Reviewer', 'ADMIN', 1, '2026-07-11T08:00:00.000Z', '2026-07-11T08:00:00.000Z'),
-  ('recovery-flight-lead', 'demo-2026', 'Recovery Flight Lead', 'FLIGHT_LINE_LEAD', 1, '2026-07-11T08:00:00.000Z', '2026-07-11T08:00:00.000Z');
+  ('recovery-flight-lead', 'demo-2026', 'Recovery Flight Lead', 'FLIGHT_DIRECTOR', 1, '2026-07-11T08:00:00.000Z', '2026-07-11T08:00:00.000Z');
 
 INSERT OR IGNORE INTO resource_groups (id, operation_day_id, name, status, gate_id, version, created_at, updated_at)
 VALUES ('rg-panorama', 'demo-2026', 'Panorama', 'ACTIVE', 'demo-2026-gate-main', 0, '2026-07-11T08:00:00.000Z', '2026-07-11T08:00:00.000Z');

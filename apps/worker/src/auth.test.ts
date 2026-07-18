@@ -14,10 +14,10 @@ describe("operator sessions", () => {
     expect(clearedSessionCookie(new Request("https://example.test/logout"))).toContain("Max-Age=0");
   });
 
-  it("gives displays a longer but still bounded session", () => {
+  it("expires every internal session exactly after 16 hours", () => {
     const now = new Date("2026-07-17T10:00:00.000Z");
-    expect(Date.parse(sessionTimes("DISPLAY", now).absoluteExpiresAt)).toBeGreaterThan(
-      Date.parse(sessionTimes("ADMIN", now).absoluteExpiresAt),
-    );
+    const times = sessionTimes("ADMIN", now);
+    expect(times.absoluteExpiresAt).toBe("2026-07-18T02:00:00.000Z");
+    expect(times.idleExpiresAt).toBe(times.absoluteExpiresAt);
   });
 });

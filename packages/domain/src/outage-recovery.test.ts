@@ -88,11 +88,11 @@ describe("outage recovery simulation", () => {
     expect(() => assertMayStageOutageRecoveryEntry("CASHIER", "ROTATION_CALLED")).toThrowError(
       /Leiter Flight Line/,
     );
-    expect(() => assertMayStageOutageRecoveryEntry("FLIGHT_LINE_LEAD", "PAPER_SALE")).toThrowError(
+    expect(() => assertMayStageOutageRecoveryEntry("FLIGHT_DIRECTOR", "PAPER_SALE")).toThrowError(
       /Kasse/,
     );
     expect(() =>
-      assertMayStageOutageRecoveryEntry("FLIGHT_LINE_LEAD", "ROTATION_LANDED"),
+      assertMayStageOutageRecoveryEntry("FLIGHT_DIRECTOR", "ROTATION_LANDED"),
     ).not.toThrow();
   });
 

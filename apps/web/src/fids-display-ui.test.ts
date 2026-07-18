@@ -22,9 +22,10 @@ describe("Standard- und Terminal-FIDS (F-MON-010/060, F-BEN-090)", () => {
     expect(displaySource).toContain("TIME WINDOWS ARE ESTIMATES");
   });
 
-  it("hides departed rows after a configurable one-to-fifteen-minute grace period", () => {
-    expect(displaySource).toContain("DEFAULT_DEPARTED_VISIBILITY_MINUTES = 5");
-    expect(displaySource).toContain("Math.min(15, Math.max(1, requestedVisibility))");
+  it("hides departed rows after the persisted 5-to-900-second grace period", () => {
+    expect(displaySource).toContain("board?.departedVisibilitySeconds");
+    expect(displaySource).toContain("Math.min(900, Math.max(5, requestedVisibilitySeconds))");
+    expect(displaySource).toContain('get("departedSeconds")');
     expect(displaySource).toContain("group.departedAt");
   });
 
