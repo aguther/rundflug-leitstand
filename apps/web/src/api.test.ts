@@ -55,6 +55,22 @@ describe("paired device context recovery", () => {
     });
   });
 
+  it("omits an empty legacy token for session-authenticated browser requests", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ eventId: "rundflug-2026", role: "ADMIN" }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await getDeviceContext("synthetic-session-device", "");
+
+    expect(fetchMock).toHaveBeenCalledWith("/api/device/context", {
+      headers: { "x-device-id": "synthetic-session-device" },
+    });
+  });
+
   it("renews an administration credential with PIN and a client-generated hash", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(
