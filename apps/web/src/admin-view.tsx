@@ -134,6 +134,7 @@ export function AdminView() {
   const [masterSearch, setMasterSearch] = useState("");
   const [masterPage, setMasterPage] = useState(0);
   const [masterPageSize, setMasterPageSize] = useState(10);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: changing a filter or page size intentionally resets pagination
   useEffect(() => {
     setMasterPage(0);
   }, [masterDataCategory, masterSearch, masterPageSize]);
@@ -1930,11 +1931,11 @@ export function AdminView() {
                 </div>
                 <div>
                   <strong>{board.metrics.averageRotationMinutes ?? "–"}</strong>
-                  <span>Ø NEXT–frei Min.</span>
+                  <span>Ø Boarding-Aufruf–frei Min.</span>
                 </div>
                 <div>
                   <strong>{board.metrics.averageWaitMinutes ?? "–"}</strong>
-                  <span>Ø Verkauf–NEXT Min.</span>
+                  <span>Ø Verkauf–Boarding-Aufruf Min.</span>
                 </div>
                 <div>
                   <strong>
@@ -2338,60 +2339,15 @@ export function AdminView() {
                   help="Ruft nur die nächste passende Gruppe anhand der Prognose zum Gate. Das bindet kein Flugzeug und ersetzt nicht die Bestätigung durch die Flight Line."
                 />
               </label>
-              <label>
-                <FieldLabel
-                  label="Vorlauf am Gate (Min.)"
-                  help="Frühestens innerhalb dieses Zeitraums darf die nächste passende Gruppe automatisch GO TO GATE erhalten."
-                />
-                <input
-                  max="240"
-                  min="1"
-                  onChange={(event) => setPrecallLeadMinutes(Number(event.target.value))}
-                  type="number"
-                  value={precallLeadMinutes}
-                />
-              </label>
-              <label>
-                <FieldLabel
-                  label="Maximale erwartete Gate-Wartezeit (Min.)"
-                  help="Ist das obere Ende der Prognose größer, bleibt die Gruppe auf Warten und wird nicht vorschnell aufgerufen."
-                />
-                <input
-                  max="120"
-                  min="1"
-                  onChange={(event) => setMaximumGateWaitMinutes(Number(event.target.value))}
-                  type="number"
-                  value={maximumGateWaitMinutes}
-                />
-              </label>
-              <label>
-                <FieldLabel
-                  label="Erforderliche Prognosequalität"
-                  help="Stabil ist zurückhaltender. Veränderlich erlaubt Voraufrufe auch mit noch lernender, aber nicht unsicherer Prognose."
-                />
-                <select
-                  onChange={(event) =>
-                    setPrecallMinimumQuality(event.target.value as "STABLE" | "CHANGING")
-                  }
-                  value={precallMinimumQuality}
-                >
-                  <option value="STABLE">Nur stabil</option>
-                  <option value="CHANGING">Stabil oder veränderlich</option>
-                </select>
-              </label>
-              <label>
-                <FieldLabel
-                  label="Ruhezeit je Gate (Min.)"
-                  help="Verhindert, dass unmittelbar nacheinander mehrere Gruppen zum selben Gate aufgerufen werden."
-                />
-                <input
-                  max="60"
-                  min="0"
-                  onChange={(event) => setPrecallGateCooldownMinutes(Number(event.target.value))}
-                  type="number"
-                  value={precallGateCooldownMinutes}
-                />
-              </label>
+              <div className="admin-info-note">
+                <strong>Adaptiver Voraufruf</strong>
+                <p>
+                  Das System lernt den passenden Vorlauf während des Veranstaltungstags aus den
+                  tatsächlichen Boarding- und Gate-Wartezeiten. Die Wartezeit am Gate ist ein
+                  weiches Optimierungsziel und keine harte Sperre. Unterbrechungen werden nicht als
+                  normale Abfertigungsdauer eingelernt.
+                </p>
+              </div>
               <label>
                 <FieldLabel
                   label="Referenzgewicht Kind (kg)"
@@ -2961,7 +2917,9 @@ export function AdminView() {
                   <button
                     aria-label="Nächste Seite"
                     disabled={masterPageClamped >= masterPageCount - 1}
-                    onClick={() => setMasterPage((value) => Math.min(masterPageCount - 1, value + 1))}
+                    onClick={() =>
+                      setMasterPage((value) => Math.min(masterPageCount - 1, value + 1))
+                    }
                     type="button"
                   >
                     ›
@@ -3510,7 +3468,7 @@ export function AdminView() {
                   />
                   <FieldLabel
                     label="Automatischer Voraufruf für diese Gruppe"
-                    help="Kann für einzelne Ressourcengruppen abgeschaltet werden. NEXT und Flugzeugbindung bleiben immer manuell bestätigt."
+                    help="Kann für einzelne Ressourcengruppen abgeschaltet werden. Belegung, Pilot und Boarding bleiben immer manuell bestätigt."
                   />
                 </label>
                 <section className="resource-aircraft-selection">

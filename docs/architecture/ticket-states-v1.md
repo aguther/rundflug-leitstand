@@ -9,7 +9,7 @@ handlungsorientierten Gastzustände ab.
 | Verkauft | append-only `TICKET_GROUP_SOLD`; anschließend operative Einreihung als `QUEUED` |
 | Wartend | `tickets.status = QUEUED` |
 | Voraufruf | idempotentes `AUTOMATIC_PRECALL` aus `QUEUED`, Prognosefenster, Queue-Position, Prognosequalität und maximaler Gate-Wartezeit; öffentlich `GO_TO_GATE` |
-| Bitte zur Flight Line | `CALLED` nach `CALL_NEXT` |
+| Boarding durch Flight Line bestätigt | `CALLED` nach `CALL_NEXT` |
 | Eingecheckt | `CHECKED_IN` bei Anwesenheitsbestätigung vor Aufruf |
 | Boarding | `BOARDING`, wenn ein eingechecktes Ticket aufgerufen ist |
 | Im Flug | `IN_FLIGHT` |
@@ -24,7 +24,8 @@ Check-in, Aufruf und Rücknahme halten Anwesenheits- und Ticketstatus zusammen. 
 `ABORT_ROTATION` setzen Tickets abhängig von bestätigter Anwesenheit auf `CHECKED_IN` oder `QUEUED`
 zurück. Ab `IN_FLIGHT` sind Anwesenheit und Besetzung gesperrt.
 
-Der Voraufruf bindet kein Flugzeug. Erst `CALL_NEXT` bestätigt Flugzeug und Boarding operativ. Nach
+Der Voraufruf bindet kein Flugzeug. Erst „Belegung bestätigen & Boarding starten“ (`CALL_NEXT`)
+bestätigt Flugzeug und Boarding operativ. Nach
 `IN_FLIGHT` bleibt die öffentliche FIDS-Zeile nur für die konfigurierte Nachlaufzeit als
 `DEPARTED`/„Abgeflogen“ sichtbar; das Ausblenden ändert keinen fachlichen Ticket- oder Umlaufstatus.
 

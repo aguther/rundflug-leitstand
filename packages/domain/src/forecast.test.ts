@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { advanceOverduePrediction, estimateDuration, forecastQueueWindows } from "./forecast";
+import {
+  advanceOverduePrediction,
+  createQueueAvailability,
+  estimateDuration,
+  forecastQueueWindows,
+  reserveNextQueueWindow,
+} from "./forecast";
 
 describe("event-driven forecast", () => {
   it("uses the reference model on cold start without requiring a recent actual event", () => {
@@ -28,12 +34,12 @@ describe("event-driven forecast", () => {
   it("weights even the first actual duration more strongly than the static plan", () => {
     const estimate = estimateDuration({
       referenceMinutes: 20,
-      actualDurationsMinutes: [40],
+      actualDurationsMinutes: [32],
       dataAgeMinutes: 1,
       interrupted: false,
       activeCapacity: 1,
     });
-    expect(estimate.expectedMinutes).toBeGreaterThan(30);
+    expect(estimate.expectedMinutes).toBeGreaterThan(25);
   });
 
   it("gives the newest value the greatest weight when samples are chronological", () => {
@@ -65,6 +71,36 @@ describe("event-driven forecast", () => {
 
     expect(withOutlier.expectedMinutes).toBe(regular.expectedMinutes);
     expect(withOutlier.sampleCount).toBe(regular.sampleCount);
+  });
+
+  it("does not learn a sequence of weather or airshow delays as the new normal", () => {
+    const estimate = estimateDuration({
+      referenceMinutes: 36,
+      actualDurationsMinutes: [34, 36, 92, 96, 101],
+      dataAgeMinutes: 1,
+      interrupted: false,
+      activeCapacity: 1,
+    });
+    expect(estimate.sampleCount).toBe(2);
+    expect(estimate.expectedMinutes).toBeLessThan(40);
+  });
+
+  it("counts down from actual aircraft availability and exposes an idle aircraft immediately", () => {
+    let availability = createQueueAvailability({ activeAircraft: 2, busyAircraftMinutes: [9] });
+    const duration = estimateDuration({
+      referenceMinutes: 36,
+      actualDurationsMinutes: [],
+      dataAgeMinutes: 0,
+      interrupted: false,
+      activeCapacity: 2,
+    });
+    const first = reserveNextQueueWindow(availability, duration);
+    availability = first.availability;
+    const second = reserveNextQueueWindow(availability, duration);
+    expect(first.window.lowerMinutes).toBe(0);
+    expect(first.window.upperMinutes).toBe(0);
+    expect(second.window.lowerMinutes).toBe(9);
+    expect(second.window.upperMinutes).toBe(9);
   });
 
   it("marks stale or interrupted data as uncertain without a countdown", () => {

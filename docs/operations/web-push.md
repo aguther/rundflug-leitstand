@@ -55,7 +55,8 @@ Registrierungs- und Zustellungstest in der Zielumgebung angewendet sein.
 Die Statusseite zeigt das vom Prognosemodell berechnete Zeitfenster. Erreicht eine Gruppe unter
 Berücksichtigung von Queue-Position, Prognosequalität und maximaler Gate-Wartezeit den
 konfigurierten Vorlauf, wird einmalig „Bitte zum Gate“/`GO TO GATE` vorgemerkt. Unsichere Prognosen,
-Unterbrechung und Notfallmodus erzeugen keinen automatischen Voraufruf. `NEXT` bleibt davon getrennt
+Unterbrechung und Notfallmodus erzeugen keinen automatischen Voraufruf. Die menschliche Bestätigung
+„Belegung bestätigen & Boarding starten“ (`CALL_NEXT`) bleibt davon getrennt
 und erzeugt nach menschlicher Bestätigung den verbindlichen Boardingaufruf.
 
 Die Kasse gibt zu jedem Ticket den nicht erratbaren Status-QR-Code aus. Der Gast kann ihn direkt an
