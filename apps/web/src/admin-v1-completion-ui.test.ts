@@ -103,8 +103,10 @@ describe("V1 administration completion UI", () => {
   });
 
   it("uses the approved compact list-and-editor administration as the default workspace", () => {
-    expect(appSource).toContain('useState<AdminArea>("master-data")');
-    expect(appSource).toContain('useState<MasterDataCategory>("resource-groups")');
+    expect(appSource).toContain("useState<AdminArea>(() => {");
+    expect(appSource).toContain(': "master-data";');
+    expect(appSource).toContain("useState<MasterDataCategory>(() => {");
+    expect(appSource).toContain(': "resource-groups";');
     expect(appSource).toContain("const [masterEditorOpen, setMasterEditorOpen] = useState(false);");
     expect(appSource).toContain('masterEditorOpen ? "editor-open" : "editor-closed"');
     expect(appSource).toContain("setMasterEditorOpen(false)");
