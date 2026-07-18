@@ -44,6 +44,23 @@
   color: var(--ui-muted);
   font-size: 14px;
 }
+
+.event-selection-page .login-panel {
+  max-width: 42rem;
+}
+
+.event-selection-page select {
+  min-height: 3rem;
+}
+
+.event-selection-logout {
+  width: 100%;
+  margin-top: var(--space-3);
+  border: 0;
+  background: transparent;
+  color: var(--color-text-muted);
+  text-decoration: underline;
+}
 .login-panel form {
   display: grid;
   gap: 8px;

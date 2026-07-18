@@ -384,10 +384,18 @@ export async function getPairedDevices(
   return body.devices;
 }
 
-export async function getPublicBoard(eventId: string, signal?: AbortSignal): Promise<PublicBoard> {
-  const response = await apiFetch(`/api/public/events/${encodeURIComponent(eventId)}/board`, {
-    ...(signal ? { signal } : {}),
-  });
+export async function getPublicBoard(
+  eventId: string,
+  gateId?: string | null,
+  signal?: AbortSignal,
+): Promise<PublicBoard> {
+  const query = gateId ? `?gateId=${encodeURIComponent(gateId)}` : "";
+  const response = await apiFetch(
+    `/api/public/events/${encodeURIComponent(eventId)}/board${query}`,
+    {
+      ...(signal ? { signal } : {}),
+    },
+  );
   if (!response.ok) throw new Error("Öffentliche Anzeige nicht verfügbar.");
   return publicBoardSchema.parse(await response.json());
 }

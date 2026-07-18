@@ -412,6 +412,47 @@ app.get("/api/auth/session", async (context) => {
   });
 });
 
+app.get("/api/auth/events", async (context) => {
+  const actor = await authorizeSession(context.env, context.req.raw);
+  if (!actor) {
+    return context.json(
+      { error: { code: "SESSION_REQUIRED", message: "Anmeldung erforderlich." } },
+      401,
+    );
+  }
+  const rows = await context.env.DB.prepare(
+    `SELECT id, name, event_date, aerodrome, time_zone, status, archived_at,
+            template_source_id, version
+       FROM operation_days
+      WHERE archived_at IS NULL
+      ORDER BY CASE status WHEN 'ACTIVE' THEN 0 WHEN 'PREPARATION' THEN 1 ELSE 2 END,
+               event_date DESC, name`,
+  ).all<{
+    id: string;
+    name: string;
+    event_date: string;
+    aerodrome: string;
+    time_zone: string;
+    status: string;
+    archived_at: string | null;
+    template_source_id: string | null;
+    version: number;
+  }>();
+  return context.json({
+    events: rows.results.map((row) => ({
+      eventId: row.id,
+      name: row.name,
+      eventDate: row.event_date,
+      aerodrome: row.aerodrome,
+      timeZone: row.time_zone,
+      status: row.status,
+      archivedAt: row.archived_at,
+      templateSourceId: row.template_source_id,
+      version: row.version,
+    })),
+  });
+});
+
 app.post("/api/auth/logout", async (context) => {
   const actor = await authorizeSession(context.env, context.req.raw);
   if (actor) {

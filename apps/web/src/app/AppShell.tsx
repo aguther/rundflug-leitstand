@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { BrandMark } from "../design-system/BrandMark";
 import { ThemeToggle } from "../design-system/ThemeToggle";
+import { activeEventLabel, forgetActiveEvent } from "../event-context";
 import { useAuth } from "../features/auth/AuthContext";
 import { useConnectivity } from "../shared/hooks/use-connectivity";
 import { appDestinations, destinationsForRole, isDestinationActive } from "./navigation";
@@ -35,6 +36,7 @@ export function AppShell({
   const { session, logout } = useAuth();
   const pathname = window.location.pathname;
   const destinations = session ? destinationsForRole(session.account.role) : appDestinations;
+  const eventLabel = activeEventLabel(window.localStorage);
   return (
     <main className={`${kiosk ? "app-shell kiosk-shell" : "app-shell"} ${className}`.trim()}>
       <header className="app-header">
@@ -58,6 +60,19 @@ export function AppShell({
         ) : null}
         {!kiosk ? <HeaderClock /> : null}
         <ThemeToggle />
+        {session && !kiosk && eventLabel ? (
+          <button
+            className="app-event"
+            onClick={() => {
+              forgetActiveEvent(window.localStorage);
+              window.location.reload();
+            }}
+            title="Veranstaltung wechseln"
+            type="button"
+          >
+            {eventLabel}
+          </button>
+        ) : null}
         {session && !kiosk ? (
           <button
             className="app-account"

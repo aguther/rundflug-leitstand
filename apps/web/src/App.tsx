@@ -1,6 +1,6 @@
 import { lazy, Suspense } from "react";
-import { destinationsForRole, homeForRole, isDestinationActive } from "./app/navigation";
 import { AuthProvider, useAuth } from "./features/auth/AuthContext";
+import { EventScopedApplication } from "./features/auth/EventScopedApplication";
 import { LoginPage } from "./features/auth/LoginPage";
 
 const FeatureRouter = lazy(async () => {
@@ -19,6 +19,7 @@ function ApplicationLoading() {
 function isPublicRoute(pathname: string): boolean {
   return (
     pathname === "/setup" ||
+    pathname === "/pair" ||
     pathname === "/privacy" ||
     pathname === "/datenschutz" ||
     pathname === "/fids" ||
@@ -42,25 +43,7 @@ function AuthenticatedApplication() {
       </div>
     );
   if (!session) return <LoginPage />;
-  const permitted = destinationsForRole(session.account.role).some((destination) =>
-    isDestinationActive(
-      window.location.pathname === "/" ? "/kasse" : window.location.pathname,
-      destination.href,
-    ),
-  );
-  if (!permitted) {
-    window.location.replace(homeForRole(session.account.role));
-    return (
-      <div className="app-loading" role="status">
-        Arbeitsbereich wird geöffnet …
-      </div>
-    );
-  }
-  return (
-    <Suspense fallback={<ApplicationLoading />}>
-      <FeatureRouter />
-    </Suspense>
-  );
+  return <EventScopedApplication session={session} />;
 }
 
 export function App() {

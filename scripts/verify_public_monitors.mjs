@@ -182,6 +182,9 @@ try {
       operationsEndAt: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString(),
       noShowAfterMinutes: 10,
       notificationLeadMinutes: 60,
+      // This scenario verifies the separate PREPARE/Web-Push threshold. Automatic GO TO GATE is
+      // covered independently and would intentionally supersede PREPARE for the first queue entry.
+      automaticPrecallEnabled: false,
       childReferenceWeightKg: 35,
       normalReferenceWeightKg: 80,
       heavyReferenceWeightKg: 110,
