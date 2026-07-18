@@ -60,13 +60,15 @@ describe("V1.2 Flight Line surfaces", () => {
     expect(assistSource).toContain("<StatusPill");
   });
 
-  it("implements the approved tablet workspace and claimed-aircraft phone flow", () => {
+  it("implements the approved tablet workspace and keeps the aircraft list on phones", () => {
     expect(assistSource).toContain("assist-v15-workspace");
     expect(assistSource).toContain("assist-v15-active-column");
-    expect(assistSource).toContain("assist-v15-phone-back");
+    expect(assistSource).toContain("listedAircraft.slice(0, visibleAircraftCount)");
+    expect(assistSource).toContain("Von dir übernommen");
+    expect(assistSource).not.toContain("assist-v15-phone-back");
     expect(assistSource).toContain("assist-v15-group-menu");
-    expect(stylesSource).toContain(".flight-assist-v15.has-claim .assist-v15-picker");
-    expect(stylesSource).toContain("@media (max-width: 720px)");
+    expect(stylesSource).toContain("@media (max-width: 760px)");
+    expect(stylesSource).toContain(".flight-assist-v15 .assist-v15-aircraft-list");
     expect(stylesSource).toContain(".assist-v15-group-popover");
   });
 

@@ -6,6 +6,6 @@ describe("cashier child companion warning UI", () => {
     expect(appSource).toContain('className="child-companion-warning" role="alert"');
     expect(appSource).toContain("Begleitung prüfen");
     expect(appSource).toContain("keine erwachsene Begleitperson");
-    expect(appSource).toContain("ohne flugbetriebliche Freigabewirkung");
+    expect(appSource).toMatch(/ohne flugbetriebliche\s+Freigabewirkung/);
   });
 });

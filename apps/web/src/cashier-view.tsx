@@ -515,7 +515,9 @@ export function CashierView() {
             <div className="child-companion-warning" role="alert">
               <strong>Begleitung prüfen</strong>
               <span>
-                In dieser Gruppe ist ein Kind erfasst, aber keine erwachsene Begleitperson.
+                In dieser Gruppe ist ein Kind erfasst, aber keine erwachsene Begleitperson. Dieser
+                Hinweis dient nur der organisatorischen Klärung und ist ohne flugbetriebliche
+                Freigabewirkung.
               </span>
             </div>
           ) : null}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import shellSource from "../../app/AppShell.tsx?raw";
+import headerSource from "../../app/AppHeader.tsx?raw";
 import navigationSource from "../../app/navigation.ts?raw";
 import appSource from "./EventScopedApplication.tsx?raw";
 import selectionSource from "./EventSelectionPage.tsx?raw";
@@ -14,9 +14,9 @@ describe("explicit event selection and display binding", () => {
   });
 
   it("keeps the current event visible and makes switching explicit", () => {
-    expect(shellSource).toContain("activeEventLabel");
-    expect(shellSource).toContain('title="Veranstaltung wechseln"');
-    expect(shellSource).toContain("forgetActiveEvent");
+    expect(headerSource).toContain("activeEventLabel");
+    expect(headerSource).toContain('title="Veranstaltung wechseln"');
+    expect(headerSource).toContain("forgetActiveEvent");
   });
 
   it("does not require administrators to pair a public display", () => {
