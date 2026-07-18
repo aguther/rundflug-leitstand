@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import assistSource from "../../flight-line-assist.tsx?raw";
 import supervisorSource from "../../flight-line-supervisor.tsx?raw";
+import viewSource from "../../flight-line-view.tsx?raw";
 
 const stylesSource = [
   "./flight-line-v12.css",
@@ -12,23 +13,38 @@ const stylesSource = [
   .join("\n");
 
 describe("V1.2 Flight Line surfaces", () => {
-  it("keeps Supervisor and Assist as explicit independent workspaces", () => {
-    expect(supervisorSource).toContain('href="/flight-line/assist"');
+  it("keeps Supervisor and Assist as explicit independent workspaces behind the shared shell", () => {
+    expect(viewSource).toContain("<FlightLineSupervisorConsole");
+    expect(viewSource).toContain("<FlightLineAssist");
     expect(assistSource).toContain('href="/flight-line"');
     expect(assistSource).toContain('session.account.role !== "FLIGHT_LINE"');
   });
 
-  it("uses the common brand and exposes theme switching in both headers", () => {
-    expect(supervisorSource).toContain("<BrandMark />");
+  it("does not duplicate the shared application header inside the Supervisor", () => {
+    expect(viewSource).toContain("<Shell");
+    expect(supervisorSource).not.toContain("<BrandMark");
+    expect(supervisorSource).not.toContain("<ThemeToggle");
+    expect(supervisorSource).not.toContain("flight-line-console-header");
     expect(assistSource).toContain("<BrandMark />");
-    expect(supervisorSource).toContain("<ThemeToggle />");
     expect(assistSource).toContain("<ThemeToggle />");
   });
 
-  it("keeps the complete Supervisor workflow on iPad without the desktop rails", () => {
-    expect(stylesSource).toContain("@media (max-width: 1180px)");
-    expect(stylesSource).toContain(".flight-line-console-main");
-    expect(stylesSource).toContain(".console-aircraft-list");
+  it("implements the V1.5 aircraft table with one expandable assignment workspace", () => {
+    expect(supervisorSource).toContain("flight-director-aircraft-row");
+    expect(supervisorSource).toContain("flight-director-assignment");
+    expect(supervisorSource).toContain("Buchungsgruppen zuweisen");
+    expect(supervisorSource).toContain("Gruppen bleiben vollständig zusammen");
+    expect(supervisorSource).not.toContain("sidebarNavItems");
+    expect(stylesSource).toContain(".flight-director-aircraft-head");
+    expect(stylesSource).toContain(".flight-director-assignment-body");
+  });
+
+  it("uses shared controls for operational actions and fields", () => {
+    expect(supervisorSource).toContain("Button,");
+    expect(supervisorSource).toContain("IconButton,");
+    expect(supervisorSource).toContain("SelectField,");
+    expect(supervisorSource).toContain("StatusPill,");
+    expect(supervisorSource).toContain("Tabs,");
   });
 
   it("uses semantic light and dark surfaces and touch-sized Assist actions", () => {
