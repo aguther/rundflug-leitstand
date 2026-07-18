@@ -48,10 +48,12 @@ function deviceHeaders(
   deviceToken: string,
   additional: Record<string, string> = {},
 ): Record<string, string> {
+  // A device ID without its credential is not authentication. Session-authenticated browsers stay
+  // on the plain same-origin request path; the Worker derives their device identity from the
+  // HttpOnly session. This also avoids WebKit's fragile custom-header PWA transport path.
   return {
     ...additional,
-    "x-device-id": deviceId,
-    ...(deviceToken ? { "x-device-token": deviceToken } : {}),
+    ...(deviceToken ? { "x-device-id": deviceId, "x-device-token": deviceToken } : {}),
   };
 }
 
@@ -89,9 +91,10 @@ export async function getDeviceContext(
   deviceId: string,
   deviceToken: string,
 ): Promise<{ eventId: string; role: string }> {
-  const response = await apiFetch("/api/device/context", {
-    headers: deviceHeaders(deviceId, deviceToken),
-  });
+  const response = await apiFetch(
+    "/api/device/context",
+    deviceToken ? { headers: deviceHeaders(deviceId, deviceToken) } : {},
+  );
   const body = (await response.json()) as {
     eventId?: string;
     role?: string;
@@ -498,7 +501,7 @@ export async function getOperationBoard(
   signal?: AbortSignal,
 ): Promise<OperationBoard> {
   const response = await apiFetch(`/api/events/${encodeURIComponent(eventId)}/operations`, {
-    headers: deviceHeaders(deviceId, deviceToken),
+    ...(deviceToken ? { headers: deviceHeaders(deviceId, deviceToken) } : {}),
     ...(signal ? { signal } : {}),
   });
   if (!response.ok) throw new Error(`Betriebsdaten nicht verfügbar (${response.status})`);

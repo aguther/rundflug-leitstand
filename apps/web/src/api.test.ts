@@ -4,6 +4,7 @@ import {
   factoryReset,
   getDeviceContext,
   getHealth,
+  getOperationBoard,
   getPushConfiguration,
   recoverAdminDevice,
   verifyAdminPin,
@@ -66,8 +67,33 @@ describe("paired device context recovery", () => {
 
     await getDeviceContext("synthetic-session-device", "");
 
-    expect(fetchMock).toHaveBeenCalledWith("/api/device/context", {
-      headers: { "x-device-id": "synthetic-session-device" },
+    expect(fetchMock).toHaveBeenCalledWith("/api/device/context", {});
+  });
+
+  it("[T-020] uses the cookie-only WebKit transport for session operation boards", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 503 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      getOperationBoard("synthetic-event", "synthetic-session-device", ""),
+    ).rejects.toThrowError("Betriebsdaten nicht verfügbar (503)");
+
+    expect(fetchMock).toHaveBeenCalledWith("/api/events/synthetic-event/operations", {});
+  });
+
+  it("[T-020] keeps both credential headers for anonymously paired operation boards", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 503 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      getOperationBoard("synthetic-event", "synthetic-paired-device", "synthetic-device-token"),
+    ).rejects.toThrowError("Betriebsdaten nicht verfügbar (503)");
+
+    expect(fetchMock).toHaveBeenCalledWith("/api/events/synthetic-event/operations", {
+      headers: {
+        "x-device-id": "synthetic-paired-device",
+        "x-device-token": "synthetic-device-token",
+      },
     });
   });
 
