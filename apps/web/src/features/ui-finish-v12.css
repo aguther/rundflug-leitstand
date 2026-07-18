@@ -108,12 +108,6 @@
   background: color-mix(in srgb, var(--ui-danger) 86%, black);
 }
 
-.app-header {
-  box-shadow:
-    0 1px 0 var(--ui-border),
-    0 6px 24px rgb(0 0 0 / 4%);
-}
-
 .app-account,
 .app-event,
 .theme-toggle,
