@@ -1,3 +1,13 @@
+import {
+  CalendarDays,
+  ChartNoAxesColumn,
+  ClipboardList,
+  Database,
+  Grid2X2,
+  type LucideIcon,
+  ShieldCheck,
+  UsersRound,
+} from "lucide-react";
 import type { ReactNode } from "react";
 
 export type AdminArea =
@@ -24,84 +34,14 @@ export type SetupStep = {
   category?: MasterDataCategory;
 };
 
-type LineIconName =
-  | "overview"
-  | "setup"
-  | "master-data"
-  | "users"
-  | "evaluation"
-  | "audit"
-  | "backup";
-
-const iconPaths: Record<LineIconName, ReactNode> = {
-  overview: (
-    <>
-      <path d="M3.5 10.5 12 3l8.5 7.5" />
-      <path d="M5.5 9.5V21h13V9.5M9.5 21v-6h5v6" />
-    </>
-  ),
-  setup: (
-    <>
-      <path d="m14.7 6.3 3-3a4.2 4.2 0 0 1-5.3 5.3L5.2 15.8a2.1 2.1 0 1 0 3 3l7.2-7.2a4.2 4.2 0 0 1 5.3-5.3l-3 3" />
-    </>
-  ),
-  "master-data": (
-    <>
-      <ellipse cx="12" cy="5" rx="8" ry="3" />
-      <path d="M4 5v7c0 1.7 3.6 3 8 3s8-1.3 8-3V5" />
-      <path d="M4 12v7c0 1.7 3.6 3 8 3s8-1.3 8-3v-7" />
-    </>
-  ),
-  users: (
-    <>
-      <circle cx="9" cy="8" r="3" />
-      <path d="M3.5 20v-2.5A4.5 4.5 0 0 1 8 13h2a4.5 4.5 0 0 1 4.5 4.5V20M16 9a3 3 0 0 1 0 6M18 20v-2a4 4 0 0 0-2-3.5" />
-    </>
-  ),
-  evaluation: (
-    <>
-      <path d="M4 20V10M10 20V4M16 20v-7M22 20V7" />
-      <path d="M2 20h22" />
-    </>
-  ),
-  audit: (
-    <>
-      <path d="M6 3h12v18H6zM9 8h6M9 12h6M9 16h4" />
-      <path d="m4 6 2 2M20 6l-2 2" />
-    </>
-  ),
-  backup: (
-    <>
-      <path d="M12 2 4.5 5v6c0 5 3.1 8.7 7.5 11 4.4-2.3 7.5-6 7.5-11V5L12 2Z" />
-      <path d="M9 12h6M12 9v6" />
-    </>
-  ),
-};
-
-function LineIcon({ name }: { name: LineIconName }) {
-  return (
-    <svg aria-hidden="true" className="admin-nav-icon" viewBox="0 0 24 24">
-      <g
-        fill="none"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.8"
-      >
-        {iconPaths[name]}
-      </g>
-    </svg>
-  );
-}
-
-const navigationItems: Array<{ id: AdminArea; label: string; icon: LineIconName }> = [
-  { id: "overview", label: "Übersicht", icon: "overview" },
-  { id: "setup", label: "Veranstaltung", icon: "setup" },
-  { id: "master-data", label: "Stammdaten", icon: "master-data" },
-  { id: "users", label: "Konten", icon: "users" },
-  { id: "evaluation", label: "Auswertung", icon: "evaluation" },
-  { id: "audit", label: "Audit", icon: "audit" },
-  { id: "backup", label: "Sicherung & Reset", icon: "backup" },
+const navigationItems: Array<{ id: AdminArea; label: string; Icon: LucideIcon }> = [
+  { id: "overview", label: "Übersicht", Icon: Grid2X2 },
+  { id: "setup", label: "Veranstaltung", Icon: CalendarDays },
+  { id: "master-data", label: "Stammdaten", Icon: Database },
+  { id: "users", label: "Konten", Icon: UsersRound },
+  { id: "evaluation", label: "Auswertung", Icon: ChartNoAxesColumn },
+  { id: "audit", label: "Audit", Icon: ClipboardList },
+  { id: "backup", label: "Sicherung & Reset", Icon: ShieldCheck },
 ];
 
 export function AdminNavigation({
@@ -113,16 +53,16 @@ export function AdminNavigation({
 }) {
   return (
     <nav aria-label="Administration" className="admin-side-nav">
-      {navigationItems.map((item) => (
+      {navigationItems.map(({ id, label, Icon }) => (
         <button
-          aria-current={activeArea === item.id ? "page" : undefined}
-          className={activeArea === item.id ? "active" : ""}
-          key={item.id}
-          onClick={() => onChange(item.id)}
+          aria-current={activeArea === id ? "page" : undefined}
+          className={activeArea === id ? "active" : ""}
+          key={id}
+          onClick={() => onChange(id)}
           type="button"
         >
-          <LineIcon name={item.icon} />
-          <span>{item.label}</span>
+          <Icon aria-hidden="true" className="admin-nav-icon" />
+          <span>{label}</span>
         </button>
       ))}
     </nav>
@@ -159,7 +99,7 @@ const masterDataItems: Array<{ id: MasterDataCategory; label: string }> = [
   { id: "gates", label: "Gates" },
   { id: "resource-groups", label: "Ressourcengruppen" },
   { id: "aircraft", label: "Flugzeuge" },
-  { id: "pilots", label: "Piloten" },
+  { id: "pilots", label: "Pilotencodes" },
   { id: "products", label: "Produkte" },
 ];
 
