@@ -11,22 +11,44 @@ describe("Flight Line Assist", () => {
     expect(appSource).toContain('window.location.pathname === "/flight-line/assist"');
     expect(appSource).toContain('path === "/flight-line/assist"');
     expect(appSource).toContain("<FlightLineAssist");
-    expect(assistSource).toContain('className="flight-assist"');
+    expect(assistSource).toContain("flight-assist-v15");
   });
 
   it("keeps the aircraft primary and exposes short operational actions", () => {
-    expect(assistSource).toContain("Jetzt betreuen");
+    expect(assistSource).toContain("Flugzeug übernehmen");
     expect(assistSource).toContain("Übernehmen");
-    expect(assistSource).toContain("Nächste Aktion wählen");
+    expect(assistSource).toContain("Buchungsgruppen auswählen & kombinieren");
     expect(assistSource).toContain("Tanken");
     expect(assistSource).toContain("Pause");
     expect(assistSource).toContain("Nicht verfügbar");
-    expect(assistSource).toContain("Betreuung abschließen");
-    expect(assistSource).toContain("AssistCommandContent");
-    expect(assistSource).toContain('name="chevron"');
-    expect(assistSource).toContain('name="aircraft"');
-    expect(assistSource).toContain('name="group"');
-    expect(assistSource).toContain('name="gate"');
+    expect(assistSource).toContain("Flugzeug freigeben");
+    expect(assistSource).toContain("StateFlow");
+    expect(assistSource).toContain("LifecycleFlow");
+  });
+
+  it("uses the shared design system and Lucide instead of a duplicated shell", () => {
+    expect(assistSource).toContain('from "lucide-react"');
+    expect(assistSource).toContain('from "./design-system/components"');
+    expect(assistSource).toContain("<Button");
+    expect(assistSource).toContain("<IconButton");
+    expect(assistSource).toContain("<PageHeader");
+    expect(assistSource).toContain("<Panel");
+    expect(assistSource).toContain("<StatusPill");
+    expect(assistSource).not.toContain("<svg");
+    expect(assistSource).not.toContain("assist-header");
+    expect(assistSource).not.toContain("<BrandMark");
+    expect(assistSource).not.toContain("<ThemeToggle");
+  });
+
+  it("offers manual presence, missing, recall and deferral actions", () => {
+    expect(assistSource).toContain("onGroupAttendance");
+    expect(assistSource).toContain("onGroupMissing");
+    expect(assistSource).toContain("onGroupRecall");
+    expect(assistSource).toContain("onGroupDefer");
+    expect(assistSource).toContain("Anwesend");
+    expect(assistSource).toContain("Nicht da");
+    expect(assistSource).toContain("Nachrufen");
+    expect(assistSource).toContain("Zurückstellen");
   });
 
   it("shows only anonymous operational identifiers and counts", () => {
