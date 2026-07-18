@@ -6,7 +6,6 @@ import type {
   OperationBoard,
 } from "@rundflug/contracts";
 import { CheckCircle2, Clock3, LockKeyhole, Plus, Trash2, Upload } from "lucide-react";
-import QRCode from "qrcode";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   manifestCorrectionCandidates,
@@ -21,7 +20,6 @@ import {
   type SetupStep,
   ValidationHint,
 } from "./admin-ux";
-import type { PairedDeviceSummary } from "./api";
 import {
   cloneEvent,
   deleteEvent,
@@ -34,17 +32,14 @@ import {
   getEventCatalog,
   getForecastHistory,
   getOperationalHistory,
-  getPairedDevices,
   getPushConfiguration,
   getSetupStatus,
-  recoverAdminDevice,
   removeEventLogo,
   sendCommand,
   uploadEventLogo,
   verifyAdminPin,
 } from "./api";
 import { AppShell as Shell } from "./app/AppShell";
-import { isDeviceAuthorizationError } from "./board-sync";
 import {
   Button,
   Field,
@@ -55,7 +50,6 @@ import {
   StatusPill,
   TextField,
 } from "./design-system/components";
-import { rememberDeviceCredential } from "./device-credentials";
 import { forgetActiveEvent, rememberActiveEvent } from "./event-context";
 import { eventLocalDateTimeToIso, formatEventLocalDateTime } from "./event-time";
 import { AccountManagement } from "./features/auth/AccountManagement";
@@ -72,7 +66,6 @@ import {
   aircraftStateLabel,
   ConnectionNotice,
   capacityLabel,
-  createDeviceToken,
   deviceTokenFor,
   EmergencyNotice,
   EVENT_ID,
@@ -87,7 +80,6 @@ import {
   OperationalNotice,
   predictionQualityLabel,
   rotationStatusLabel,
-  sha256HexBrowser,
   useOperationBoard,
 } from "./operation-workspace";
 import {
@@ -148,9 +140,7 @@ export function AdminView() {
     setAdminPinState(value);
   }, []);
   const [adminModeUnlocked, setAdminModeUnlocked] = useState(session?.account.role === "ADMIN");
-  const [adminPinDialog, setAdminPinDialog] = useState<"unlock" | "action" | "recover" | null>(
-    null,
-  );
+  const [adminPinDialog, setAdminPinDialog] = useState<"unlock" | "action" | null>(null);
   const [adminPinError, setAdminPinError] = useState<string | null>(null);
   const [adminPinBusy, setAdminPinBusy] = useState(false);
   const pendingAdminActionRef = useRef<(() => Promise<void>) | null>(null);
@@ -202,13 +192,6 @@ export function AdminView() {
   const [historyTicketId, setHistoryTicketId] = useState("");
   const [historyTicketGroupId, setHistoryTicketGroupId] = useState("");
   const [historyRotationId, setHistoryRotationId] = useState("");
-  const [devices, setDevices] = useState<PairedDeviceSummary[]>([]);
-  const [deviceLabel, setDeviceLabel] = useState("Kasse 2");
-  const [deviceRole, setDeviceRole] = useState<
-    "CASHIER" | "FLIGHT_LINE" | "FLIGHT_DIRECTOR" | "ADMIN"
-  >("CASHIER");
-  const [pairingQr, setPairingQr] = useState<string | null>(null);
-  const [pairingUrl, setPairingUrl] = useState<string | null>(null);
   const [pilotCode, setPilotCode] = useState("P-01");
   const [pilotNote, setPilotNote] = useState("");
   const [pilotEditorId, setPilotEditorId] = useState("new");
@@ -326,7 +309,6 @@ export function AdminView() {
   const [factoryResetCommandId, setFactoryResetCommandId] = useState(() => crypto.randomUUID());
   const resourceGroups = board?.resourceGroups ?? [];
   const isAdministrator = session?.account.role === "ADMIN" || board?.currentDeviceRole === "ADMIN";
-  const deviceAuthorizationRejected = isDeviceAuthorizationError(error);
   const productPriceCents = parseEuroToCents(productPriceInput);
   const manifestCandidates = manifestCorrectionCandidates(board?.rotations ?? []);
   const selectedManifestCandidate = manifestCandidates.find(
@@ -458,20 +440,10 @@ export function AdminView() {
       historyView,
     ],
   );
-  const refreshDevices = useCallback(async () => {
-    try {
-      setDevices(
-        await getPairedDevices(EVENT_ID, ADMIN_DEVICE_ID, deviceTokenFor(ADMIN_DEVICE_ID)),
-      );
-    } catch (cause) {
-      setMessage(cause instanceof Error ? cause.message : "Geräteübersicht nicht verfügbar.");
-    }
-  }, []);
   useEffect(() => {
     void refreshHistory();
     if (historyView !== "AUDIT") void refreshDetailedHistory(0);
-    if (isAdministrator) void refreshDevices();
-  }, [historyView, isAdministrator, refreshDevices, refreshDetailedHistory, refreshHistory]);
+  }, [historyView, refreshDetailedHistory, refreshHistory]);
   useEffect(() => {
     if (adminArea === "audit") setHistoryView("AUDIT");
     if (adminArea === "evaluation" && historyView === "AUDIT") setHistoryView("OPERATIONS");
@@ -525,7 +497,6 @@ export function AdminView() {
         timeZone: board?.event.timeZone ?? "Europe/Berlin",
         restartMode,
       });
-      rememberDeviceCredential(window.localStorage, "ADMIN", result.adminDeviceId, adminToken);
       rememberActiveEvent(window.localStorage, result.eventId);
       window.location.assign(`/admin?event=${encodeURIComponent(result.eventId)}`);
     } catch (cause) {
@@ -585,7 +556,7 @@ export function AdminView() {
 
   function requestAdminAction(action: () => Promise<void>) {
     if (!isAdministrator) {
-      setMessage("Für diese Änderung wird ein Administrationsgerät benötigt.");
+      setMessage("Für diese Änderung wird ein Administrationskonto benötigt.");
       return;
     }
     if (
@@ -603,7 +574,7 @@ export function AdminView() {
 
   function requestAdminModeUnlock() {
     if (!isAdministrator) {
-      setMessage("Der Bearbeitungsmodus ist nur auf einem Administrationsgerät verfügbar.");
+      setMessage("Der Bearbeitungsmodus ist nur mit einer Administrationssitzung verfügbar.");
       return;
     }
     if (session?.account.role === "ADMIN") {
@@ -617,36 +588,11 @@ export function AdminView() {
     setAdminPinDialog("unlock");
   }
 
-  function requestAdminDeviceRecovery() {
-    pendingAdminActionRef.current = null;
-    setAdminPin("");
-    setAdminPinError(null);
-    setAdminPinDialog("recover");
-  }
-
   async function confirmAdminPinDialog() {
     if (!adminPinDialog || adminPinBusy || adminPin.length < 4) return;
     setAdminPinBusy(true);
     setAdminPinError(null);
     try {
-      if (adminPinDialog === "recover") {
-        const recoveredDeviceId = ADMIN_DEVICE_ID.startsWith("unpaired-")
-          ? crypto.randomUUID()
-          : ADMIN_DEVICE_ID;
-        const token = createDeviceToken();
-        const result = await recoverAdminDevice(
-          EVENT_ID,
-          recoveredDeviceId,
-          adminPin,
-          await sha256HexBrowser(token),
-        );
-        rememberDeviceCredential(window.localStorage, "ADMIN", result.adminDeviceId, token);
-        rememberActiveEvent(window.localStorage, result.eventId);
-        setAdminPinDialog(null);
-        setAdminPin("");
-        window.location.reload();
-        return;
-      }
       await verifyAdminPin(EVENT_ID, ADMIN_DEVICE_ID, deviceTokenFor(ADMIN_DEVICE_ID), adminPin);
       if (adminPinDialog === "unlock") {
         setAdminModeUnlocked(true);
@@ -694,50 +640,6 @@ export function AdminView() {
       await refreshEvents();
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : "Statusänderung fehlgeschlagen.");
-    }
-  }
-
-  async function pairDevice() {
-    if (!board || deviceLabel.trim().length < 2 || adminPinRef.current.length < 4) return;
-    const pairedDeviceId = crypto.randomUUID();
-    const token = createDeviceToken();
-    try {
-      await sendCommand(
-        {
-          commandId: crypto.randomUUID(),
-          eventId: EVENT_ID,
-          deviceId: ADMIN_DEVICE_ID,
-          expectedVersion: board.event.version,
-          issuedAt: new Date().toISOString(),
-          type: "PAIR_DEVICE",
-          payload: {
-            pairedDeviceId,
-            label: deviceLabel.trim(),
-            role: deviceRole,
-            credentialHash: await sha256HexBrowser(token),
-            adminPin: adminPinRef.current,
-          },
-        },
-        deviceTokenFor(ADMIN_DEVICE_ID),
-      );
-      const params = new URLSearchParams({
-        device: pairedDeviceId,
-        token,
-        role: deviceRole,
-        event: EVENT_ID,
-      });
-      const url = `${window.location.origin}/pair#${params.toString()}`;
-      setPairingUrl(url);
-      setPairingQr(
-        await QRCode.toDataURL(url, { errorCorrectionLevel: "M", margin: 2, width: 320 }),
-      );
-      setMessage("Kopplung erstellt. QR-Code nur am vorgesehenen Gerät scannen.");
-      if (!adminModeUnlocked) setAdminPin("");
-      await refresh();
-      await refreshDevices();
-      await refreshHistory();
-    } catch (cause) {
-      setMessage(cause instanceof Error ? cause.message : "Gerätekopplung fehlgeschlagen.");
     }
   }
 
@@ -1152,35 +1054,6 @@ export function AdminView() {
     }
   }
 
-  async function revokeDevice(device: PairedDeviceSummary) {
-    if (!board || reason.trim().length < 3 || adminPinRef.current.length < 4) return;
-    try {
-      await sendCommand(
-        {
-          commandId: crypto.randomUUID(),
-          eventId: EVENT_ID,
-          deviceId: ADMIN_DEVICE_ID,
-          expectedVersion: board.event.version,
-          issuedAt: new Date().toISOString(),
-          type: "REVOKE_DEVICE",
-          payload: {
-            pairedDeviceId: device.id,
-            adminPin: adminPinRef.current,
-            reason: reason.trim(),
-          },
-        },
-        deviceTokenFor(ADMIN_DEVICE_ID),
-      );
-      setMessage("Gerätekopplung wurde sofort widerrufen.");
-      if (!adminModeUnlocked) setAdminPin("");
-      await refresh();
-      await refreshDevices();
-      await refreshHistory();
-    } catch (cause) {
-      setMessage(cause instanceof Error ? cause.message : "Widerruf fehlgeschlagen.");
-    }
-  }
-
   async function emergency(type: "TRIGGER_EMERGENCY" | "CLEAR_EMERGENCY") {
     if (
       !board ||
@@ -1572,7 +1445,7 @@ export function AdminView() {
   ) {
     setMasterSubmitAttempted(true);
     if (!isAdministrator) {
-      setMessage("Für Stammdatenänderungen wird ein Administrationsgerät benötigt.");
+      setMessage("Für Stammdatenänderungen wird ein Administrationskonto benötigt.");
       return;
     }
     if (!valid) return;
@@ -2076,7 +1949,7 @@ export function AdminView() {
                 </div>
                 <div>
                   <strong>{board.metrics.activeDevices}</strong>
-                  <span>Geräte online</span>
+                  <span>Aktive Sitzungen</span>
                 </div>
                 <div>
                   <strong>
@@ -2119,7 +1992,7 @@ export function AdminView() {
               </strong>
               <span>
                 {session?.account.role === "ADMIN"
-                  ? `${session.account.loginCode} · Änderungen werden dem angemeldeten Konto und diesem Gerät zugeordnet.`
+                  ? `${session.account.loginCode} · Änderungen werden dem angemeldeten Konto zugeordnet.`
                   : adminModeUnlocked
                     ? "Mehrere Änderungen sind möglich. Jede Änderung wird weiterhin einzeln protokolliert."
                     : "Änderungen fragen die PIN einzeln ab oder können für diese Arbeitssitzung entsperrt werden."}
@@ -2156,26 +2029,21 @@ export function AdminView() {
                 <button
                   className="secondary-action"
                   disabled={refreshing}
-                  onClick={requestAdminDeviceRecovery}
+                  onClick={() => void logout().then(() => window.location.reload())}
                   type="button"
                 >
-                  Mit PIN anmelden
+                  Mit Administrationskonto anmelden
                 </button>
               </div>
             )}
             {!isAdministrator ? (
-              deviceAuthorizationRejected ? (
+              error ? (
                 <ValidationHint tone="error">
-                  Dieses Browsergerät wurde nicht als Administration bestätigt. Mit der
-                  Administrator-PIN kann der Zugang auf diesem Gerät sicher erneuert werden.
-                </ValidationHint>
-              ) : error ? (
-                <ValidationHint tone="error">
-                  Der Betriebsstand konnte nicht geladen werden. Erneut laden oder mit der
-                  Administrator-PIN anmelden; vorhandene Betriebsdaten bleiben unverändert.
+                  Der Betriebsstand konnte nicht geladen werden. Erneut laden oder mit einem
+                  Administrationskonto anmelden; vorhandene Betriebsdaten bleiben unverändert.
                 </ValidationHint>
               ) : (
-                <ValidationHint>Gerätebindung und Betriebsstand werden geprüft.</ValidationHint>
+                <ValidationHint>Sitzung und Betriebsstand werden geprüft.</ValidationHint>
               )
             ) : null}
             <ValidationHint>
@@ -2198,7 +2066,7 @@ export function AdminView() {
           <section className="reset-levels" hidden={adminArea !== "backup"}>
             {!isAdministrator ? (
               <ValidationHint tone="error">
-                Reset ist sichtbar, bleibt aber gesperrt, bis dieses Administrationsgerät vom Server
+                Reset ist sichtbar, bleibt aber gesperrt, bis eine gültige Administrationssitzung
                 bestätigt wurde.
               </ValidationHint>
             ) : null}
@@ -2206,8 +2074,8 @@ export function AdminView() {
               <div>
                 <h2>Werkszustand herstellen</h2>
                 <p>
-                  Alle Anwendungsdaten, Stammdaten, Historien, Gerätebindungen und die
-                  Ersteinrichtung werden gelöscht. Danach startet das System wieder bei /setup.
+                  Alle Anwendungsdaten, Stammdaten, Historien, Sitzungen und die Ersteinrichtung
+                  werden gelöscht. Danach startet das System wieder bei /setup.
                 </p>
               </div>
               <button
@@ -2311,7 +2179,7 @@ export function AdminView() {
             <p className="help-text">
               {restartMode === "KEEP_MASTER_DATA"
                 ? "Übernommen werden Parameter, Gates, Ressourcengruppen, Produkte, Flugzeugzuordnungen und Piloten-IDs. Tickets, Gruppen, Umläufe und Flugdaten beginnen leer; Verkäufe bleiben zunächst gesperrt."
-                : "Nur Veranstaltungsdaten, Grundeinstellungen und dieses Administrationsgerät werden angelegt. Gates, Ressourcengruppen, Produkte, Flugzeugzuordnungen, Piloten-IDs und alle Betriebsdaten beginnen leer."}
+                : "Nur Veranstaltungsdaten, Grundeinstellungen und das erste Administrationskonto werden angelegt. Gates, Ressourcengruppen, Produkte, Flugzeugzuordnungen, Piloten-IDs und alle Betriebsdaten beginnen leer."}
             </p>
             <button
               type="button"
@@ -4429,102 +4297,6 @@ export function AdminView() {
               </div>
             ))}
           </section>
-          <section className="admin-section" hidden={adminArea !== "backup"}>
-            <h2>Technische Geräte</h2>
-            <div className="device-admin-context">
-              <div>
-                <strong>Geräteänderung bestätigen</strong>
-                <span>
-                  Gerätebindungen werden durch das angemeldete Administrationskonto verwaltet.
-                  Begründungen sind nur für Widerrufe erforderlich.
-                </span>
-              </div>
-              <label>
-                <FieldLabel
-                  label="Begründung"
-                  help="Wird nur beim Widerruf einer Gerätebindung verlangt und dauerhaft auditiert."
-                />
-                <input
-                  onChange={(event) => setReason(event.target.value)}
-                  placeholder="Für einen Widerruf"
-                  value={reason}
-                />
-              </label>
-            </div>
-            <div className="device-pairing-form">
-              <label>
-                <FieldLabel
-                  label="Technische Gerätebezeichnung"
-                  help="Erkennbare, nicht personenbezogene Bezeichnung wie „Kasse Eingang“ oder „Flight Line 2“."
-                />
-                <input
-                  value={deviceLabel}
-                  onChange={(event) => setDeviceLabel(event.target.value)}
-                />
-              </label>
-              <label>
-                <FieldLabel
-                  label="Feste Rolle"
-                  help="Legt die Berechtigungen dieses Geräts dauerhaft fest. Eine spätere Änderung erfordert eine neue Kopplung."
-                />
-                <select
-                  value={deviceRole}
-                  onChange={(event) => setDeviceRole(event.target.value as typeof deviceRole)}
-                >
-                  <option value="CASHIER">Kasse</option>
-                  <option value="FLIGHT_LINE">Flight Line</option>
-                  <option value="FLIGHT_DIRECTOR">Flugleitung</option>
-                  <option value="ADMIN">Administration</option>
-                </select>
-              </label>
-              <button
-                className="primary-action"
-                disabled={!isAdministrator || deviceLabel.trim().length < 2}
-                onClick={() => requestAdminAction(pairDevice)}
-                type="button"
-              >
-                QR-Kopplung erzeugen
-              </button>
-            </div>
-            {pairingQr && pairingUrl ? (
-              <div className="pairing-qr">
-                <img src={pairingQr} alt="QR-Code zur einmaligen Gerätekopplung" />
-                <p>
-                  Nur mit dem vorgesehenen Gerät scannen. Der QR-Code enthält dessen
-                  Zugangsschlüssel.
-                </p>
-                <a href={pairingUrl}>Kopplung auf diesem Gerät öffnen</a>
-              </div>
-            ) : null}
-            <div className="device-list">
-              {devices.map((device) => (
-                <div key={device.id}>
-                  <span className={device.online ? "online-dot online" : "online-dot"} />
-                  <strong>{device.label}</strong>
-                  <span>{device.role}</span>
-                  <span>
-                    {device.active ? (device.online ? "online" : "offline") : "widerrufen"}
-                  </span>
-                  <time dateTime={device.lastSeenAt}>
-                    zuletzt{" "}
-                    {new Date(device.lastSeenAt).toLocaleString("de-DE", {
-                      timeZone: board?.event.timeZone ?? "Europe/Berlin",
-                    })}
-                  </time>
-                  {device.active ? (
-                    <button
-                      className="admin-revoke-action"
-                      disabled={!isAdministrator || reason.trim().length < 3}
-                      onClick={() => requestAdminAction(() => revokeDevice(device))}
-                      type="button"
-                    >
-                      Widerrufen
-                    </button>
-                  ) : null}
-                </div>
-              ))}
-            </div>
-          </section>
           <section className="admin-section" hidden={adminArea !== "evaluation"}>
             <div className="section-heading">
               <h2>Audit und Tagesabschluss</h2>
@@ -4884,7 +4656,6 @@ export function AdminView() {
                     <span>
                       {entry.aggregateType} · Version {entry.aggregateVersion}
                     </span>
-                    <code>{entry.deviceId}</code>
                   </div>
                 ))}
                 {history.entries.length === 0 ? <p>Keine passenden Ereignisse.</p> : null}
@@ -4941,18 +4712,14 @@ export function AdminView() {
                 <div className="drawer-heading">
                   <div>
                     <h2 id="admin-pin-dialog-title">
-                      {adminPinDialog === "recover"
-                        ? "Administrationszugang erneuern"
-                        : adminPinDialog === "unlock"
-                          ? "Bearbeitungsmodus entsperren"
-                          : "Änderung bestätigen"}
+                      {adminPinDialog === "unlock"
+                        ? "Bearbeitungsmodus entsperren"
+                        : "Änderung bestätigen"}
                     </h2>
                     <p>
-                      {adminPinDialog === "recover"
-                        ? "Die Gerätebindung wird mit der Administrator-PIN neu ausgestellt. Vorhandene Betriebsdaten bleiben unverändert."
-                        : adminPinDialog === "unlock"
-                          ? "Die PIN gilt nur in diesem Browser-Tab und wird nach 15 Minuten Inaktivität verworfen."
-                          : "Diese einzelne Änderung wird nach erfolgreicher PIN-Prüfung ausgeführt und protokolliert."}
+                      {adminPinDialog === "unlock"
+                        ? "Die PIN gilt nur in diesem Browser-Tab und wird nach 15 Minuten Inaktivität verworfen."
+                        : "Diese einzelne Änderung wird nach erfolgreicher PIN-Prüfung ausgeführt und protokolliert."}
                     </p>
                   </div>
                   <button
@@ -4994,11 +4761,9 @@ export function AdminView() {
                   >
                     {adminPinBusy
                       ? "PIN wird geprüft …"
-                      : adminPinDialog === "recover"
-                        ? "Zugang erneuern"
-                        : adminPinDialog === "unlock"
-                          ? "Entsperren"
-                          : "Bestätigen"}
+                      : adminPinDialog === "unlock"
+                        ? "Entsperren"
+                        : "Bestätigen"}
                   </button>
                 </div>
               </form>
@@ -5023,7 +4788,7 @@ export function AdminView() {
                   <div>
                     <span className="danger-eyebrow">Endgültig löschen</span>
                     <h2 id="master-delete-title">{pendingMasterDelete.label} löschen?</h2>
-                    <p>Die Löschung wird mit Ihrer technischen Geräte-ID protokolliert.</p>
+                    <p>Die Löschung wird dem angemeldeten Konto zugeordnet und protokolliert.</p>
                   </div>
                   <button
                     aria-label="Löschen abbrechen"
@@ -5121,8 +4886,8 @@ export function AdminView() {
                   <ul>
                     <li>Alle Tickets, Warteschlangen, Umläufe und Flugdaten</li>
                     <li>Alle Stammdaten und Veranstaltungsparameter</li>
-                    <li>Alle Historien, Protokolle und Gerätebindungen</li>
-                    <li>Die Ersteinrichtung und lokalen Zugangsdaten</li>
+                    <li>Alle Historien, Protokolle und Sitzungen</li>
+                    <li>Die Ersteinrichtung</li>
                   </ul>
                 </div>
                 <label>

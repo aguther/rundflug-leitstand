@@ -1,11 +1,9 @@
 import { useEffect, useState } from "react";
 import { bootstrapSystem, getSetupStatus } from "./api";
 import { AppShell as Shell } from "./app/AppShell";
-import { rememberDeviceCredential } from "./device-credentials";
 import { rememberActiveEvent } from "./event-context";
 import { eventDateInTimeZone } from "./event-time";
 import { LocalizedDateInput } from "./localized-date-input";
-import { createDeviceToken, sha256HexBrowser } from "./operation-workspace";
 import { setupValidationMessages } from "./setup-validation";
 
 export function SetupView() {
@@ -45,8 +43,6 @@ export function SetupView() {
     }
     setBusy(true);
     try {
-      const adminDeviceId = crypto.randomUUID();
-      const token = createDeviceToken();
       const result = await bootstrapSystem({
         setupCode,
         adminPin,
@@ -55,10 +51,7 @@ export function SetupView() {
         eventDate,
         aerodrome: aerodrome.trim(),
         timeZone: "Europe/Berlin",
-        adminDeviceId,
-        adminCredentialHash: await sha256HexBrowser(token),
       });
-      rememberDeviceCredential(window.localStorage, "ADMIN", result.adminDeviceId, token);
       rememberActiveEvent(window.localStorage, result.eventId);
       window.location.assign(`/admin?event=${encodeURIComponent(result.eventId)}`);
     } catch (cause) {
@@ -83,7 +76,7 @@ export function SetupView() {
         ) : (
           <>
             <p>
-              Legt die erste Veranstaltung und dieses anonyme Administrationsgerät an. Es werden
+              Legt die erste Veranstaltung und das erste anonyme Administrationskonto an. Es werden
               keine Personen- oder Gastnamen erfasst.
             </p>
             {status && !status.setupConfigured ? (
