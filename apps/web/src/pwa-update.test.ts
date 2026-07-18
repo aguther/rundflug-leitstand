@@ -11,15 +11,13 @@ describe("PWA deployment updates", () => {
     expect(viteConfigSource).toContain("navigateFallbackDenylist: [/^\\/api(?:\\/|$)/]");
   });
 
-  it("reloads an open client once when a new service worker takes control", () => {
-    expect(mainSource).toContain('addEventListener("controllerchange"');
-    expect(mainSource).toContain("reloadingForServiceWorkerUpdate = true");
-    expect(mainSource).toContain("window.location.reload()");
-  });
-
-  it("checks for a new service worker on every app start without removing web push", () => {
-    expect(mainSource).toContain("onRegisteredSW:");
-    expect(mainSource).toContain("registration?.update()");
+  it("uses exactly one automatic update path without a WebKit reload loop", () => {
+    expect(viteConfigSource).toContain('registerType: "autoUpdate"');
+    expect(mainSource).toContain("registerSW({");
+    expect(mainSource).toContain("immediate: true");
+    expect(mainSource).not.toContain('addEventListener("controllerchange"');
+    expect(mainSource).not.toContain("window.location.reload()");
+    expect(mainSource).not.toContain("registration?.update()");
     expect(mainSource).not.toContain("registration?.unregister()");
   });
 
