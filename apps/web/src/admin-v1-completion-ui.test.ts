@@ -60,6 +60,21 @@ describe("V1 administration completion UI", () => {
     expect(stylesSource).toContain("pointer-events: none");
   });
 
+  it("keeps setup saving visible and every information hint bound to its field label", () => {
+    expect(appSource).toContain('className="parameter-section-heading"');
+    expect(appSource).toContain('className="primary-action parameter-save-action"');
+    expect(appSource).toContain("Veranstaltungsparameter speichern");
+    expect(appSource).toContain('className="field-info"');
+    expect(appSource).toContain("data-help={help}");
+    expect(appSource).toContain('aria-hidden="true" className="field-info"');
+    expect(appSource).not.toContain('<details className="field-info">');
+    expect(stylesSource).toContain("label:focus-within .field-info::after");
+    expect(stylesSource).toContain("visibility: hidden");
+    expect(stylesSource).toContain(".parameter-save-action");
+    expect(stylesSource).toContain(".admin-workspace:not(.master-data-active)");
+    expect(stylesSource).toContain("grid-auto-rows: max-content");
+  });
+
   it("keeps admin action feedback visible above dialogs and makes text part of the hit target", () => {
     expect(appSource).toContain("factoryResetError");
     expect(appSource).toContain('className="action-message admin-action-message"');

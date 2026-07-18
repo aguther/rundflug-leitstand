@@ -2254,7 +2254,17 @@ export function AdminView() {
             </button>
           </section>
           <section className="admin-section" hidden={adminArea !== "setup"}>
-            <h2>Veranstaltungsparameter</h2>
+            <div className="parameter-section-heading">
+              <h2>Veranstaltungsparameter</h2>
+              <button
+                className="primary-action parameter-save-action"
+                disabled={!isAdministrator || !operationsEndAt}
+                onClick={() => requestAdminAction(saveEventParameters)}
+                type="button"
+              >
+                Veranstaltungsparameter speichern
+              </button>
+            </div>
             <div className="parameter-grid">
               <LocalizedDateTimeInput
                 label="Verkaufsbeginn"
@@ -2464,14 +2474,6 @@ export function AdminView() {
             {!operationsEndAt ? (
               <ValidationHint tone="error">Ein Betriebsende muss festgelegt werden.</ValidationHint>
             ) : null}
-            <button
-              className="primary-action"
-              disabled={!isAdministrator || !operationsEndAt}
-              onClick={() => requestAdminAction(saveEventParameters)}
-              type="button"
-            >
-              Veranstaltungsparameter speichern
-            </button>
           </section>
           <section className="admin-section setup-release" hidden={adminArea !== "setup"}>
             <div className="section-heading">
@@ -3389,10 +3391,7 @@ export function AdminView() {
                         />
                         <span>Bei Kinderbuchungen auf Begleitung hinweisen</span>
                       </label>
-                      <FieldHelp
-                        label="Begleithinweis für Kinder"
-                        help="Aktiviert bei Bedarf automatisch die Gewichtsklasse „Kind“ und zeigt an der Kasse einen organisatorischen Hinweis, wenn keine passende Begleitung erfasst ist. Dies ist keine flugbetriebliche Freigabe."
-                      />
+                      <FieldHelp help="Aktiviert bei Bedarf automatisch die Gewichtsklasse „Kind“ und zeigt an der Kasse einen organisatorischen Hinweis, wenn keine passende Begleitung erfasst ist. Dies ist keine flugbetriebliche Freigabe." />
                     </div>
                     <span className="field-help">
                       Die Auswahl „Kind“ wird beim Aktivieren automatisch eingeschaltet.

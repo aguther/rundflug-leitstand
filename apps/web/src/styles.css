@@ -337,12 +337,9 @@
 .field-info {
   position: relative;
   display: inline-grid;
-  font-weight: 500;
-}
-.field-info summary {
+  flex: 0 0 auto;
   width: 19px;
   height: 19px;
-  display: grid;
   place-items: center;
   border: 1px solid var(--ui-border);
   border-radius: 50%;
@@ -351,18 +348,14 @@
   font-size: 0.72rem;
   font-weight: 850;
   line-height: 1;
-  list-style: none;
   cursor: help;
+  text-decoration: none;
 }
-.field-info summary::-webkit-details-marker {
-  display: none;
-}
-.field-info summary:hover,
-.field-info summary:focus-visible {
+.field-info:hover {
   color: var(--ui-accent);
   border-color: var(--ui-accent);
 }
-.field-info[open] > span {
+.field-info::after {
   position: absolute;
   z-index: 5;
   top: 26px;
@@ -374,9 +367,26 @@
   color: var(--ui-text);
   background: var(--ui-surface);
   box-shadow: var(--ui-shadow);
+  content: attr(data-help);
   font-size: 0.78rem;
   font-weight: 500;
   line-height: 1.45;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-2px);
+  visibility: hidden;
+  transition:
+    opacity 120ms ease,
+    transform 120ms ease,
+    visibility 0s linear 120ms;
+}
+.field-info:hover::after,
+.admin-section label:focus-within .field-info::after,
+.localized-input-field:focus-within .field-info::after {
+  opacity: 1;
+  transform: translateY(0);
+  visibility: visible;
+  transition-delay: 0s;
 }
 .field-error {
   color: var(--ui-danger);
@@ -2996,6 +3006,18 @@ p {
 .section-heading h2 {
   margin: 0;
 }
+.parameter-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.parameter-section-heading h2 {
+  margin: 0;
+}
+.parameter-save-action {
+  flex: 0 0 auto;
+}
 .section-heading button {
   min-height: 48px;
   padding: 10px 16px;
@@ -4104,6 +4126,13 @@ p {
   .setup-grid {
     grid-template-columns: 1fr;
   }
+  .parameter-section-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .parameter-save-action {
+    width: 100%;
+  }
   .app-header {
     align-items: flex-start;
   }
@@ -4659,10 +4688,17 @@ p {
   min-width: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: auto auto minmax(0, 1fr);
   gap: 0;
   padding: 0;
   background: rgba(10, 12, 14, 0.34);
+}
+.admin-workspace:not(.master-data-active) {
+  align-content: start;
+  grid-auto-rows: max-content;
+}
+.admin-workspace.master-data-active,
+.admin-workspace.master-data-active.editor-open {
+  grid-template-rows: auto auto minmax(0, 1fr);
 }
 .admin-workspace.master-data-active.editor-open {
   grid-template-columns: minmax(500px, 1fr) minmax(380px, 440px);
