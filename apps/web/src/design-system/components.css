@@ -1,0 +1,439 @@
+/* Shared design-system component primitives: Button, StatusPill, DataTable, SidePanel, ConfirmationDialog, PageHeader. */
+/* Token-driven only; no hardcoded colors so both themes work without a component-level branch. */
+
+.ds-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.ds-status-pill::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.ds-status-pill--success {
+  color: var(--ui-success-text, var(--ui-success));
+  border-color: color-mix(in srgb, var(--ui-success) 45%, var(--ui-border));
+  background: var(--ui-success-soft);
+}
+
+.ds-status-pill--warning {
+  color: var(--ui-warning-text, var(--ui-warning));
+  border-color: color-mix(in srgb, var(--ui-warning) 45%, var(--ui-border));
+  background: var(--ui-warning-soft);
+}
+
+.ds-status-pill--danger {
+  color: var(--ui-danger);
+  border-color: color-mix(in srgb, var(--ui-danger) 45%, var(--ui-border));
+  background: var(--ui-danger-soft);
+}
+
+.ds-status-pill--info {
+  color: var(--ui-accent);
+  border-color: color-mix(in srgb, var(--ui-accent) 45%, var(--ui-border));
+  background: var(--ui-accent-soft);
+}
+
+.ds-status-pill--neutral {
+  color: var(--ui-muted);
+  border-color: var(--ui-border);
+  background: var(--ui-surface-subtle);
+}
+
+.app-header-clock {
+  padding: 0 10px;
+  color: var(--ui-muted);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* PageHeader */
+
+.ds-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.ds-page-header-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-bottom: 4px;
+  color: var(--ui-muted);
+  font-size: 0.8rem;
+}
+
+.ds-page-header-eyebrow > span[aria-current="page"] {
+  color: var(--ui-text);
+  font-weight: 600;
+}
+
+.ds-page-header h1,
+.ds-page-header h2 {
+  margin: 0;
+  font-size: 1.3rem;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+}
+
+.ds-page-header p {
+  max-width: 640px;
+  margin: 4px 0 0;
+  color: var(--ui-muted);
+  font-size: 0.88rem;
+  line-height: 1.4;
+}
+
+.ds-page-header-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: var(--space-2);
+}
+
+/* DataTable */
+
+.ds-table-scroll {
+  overflow: auto;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-md);
+  background: var(--ui-surface);
+}
+
+.ds-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.ds-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--ui-border);
+  color: var(--ui-muted);
+  background: var(--ui-surface-subtle);
+  font-size: 0.76rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  text-align: left;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.ds-table tbody td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--ui-border);
+  color: var(--ui-text);
+  vertical-align: middle;
+}
+
+.ds-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.ds-table tbody tr {
+  transition: background-color 120ms ease;
+}
+
+.ds-table--clickable tbody tr {
+  cursor: pointer;
+}
+
+.ds-table--clickable tbody tr:hover {
+  background: color-mix(in srgb, var(--ui-accent-soft) 42%, var(--ui-surface));
+}
+
+.ds-table tbody tr.selected {
+  background: color-mix(in srgb, var(--ui-accent-soft) 68%, var(--ui-surface));
+  box-shadow: inset 3px 0 0 var(--ui-accent);
+}
+
+.ds-table-empty {
+  padding: 32px 14px;
+  color: var(--ui-muted);
+  font-size: 0.86rem;
+  text-align: center;
+}
+
+.ds-table-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.ds-table-icon-action {
+  width: 30px;
+  height: 30px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--ui-text);
+  background: var(--ui-control);
+}
+
+.ds-table-icon-action:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--ui-accent) 42%, var(--ui-border-strong));
+  background: var(--ui-control-hover);
+}
+
+.ds-table-icon-action svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.ds-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 10px 14px;
+  border-top: 1px solid var(--ui-border);
+  color: var(--ui-muted);
+  font-size: 0.82rem;
+}
+
+.ds-pagination-size {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ds-pagination-size select {
+  min-height: var(--control-compact);
+  padding: 4px 8px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--ui-text);
+  background: var(--ui-control);
+}
+
+.ds-pagination-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ds-pagination-nav button {
+  min-width: 30px;
+  min-height: 30px;
+  padding: 0 6px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--ui-text);
+  background: var(--ui-control);
+  font-weight: 600;
+}
+
+.ds-pagination-nav button:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--ui-accent) 42%, var(--ui-border-strong));
+  background: var(--ui-control-hover);
+}
+
+.ds-pagination-nav button:disabled {
+  color: var(--ui-disabled-text);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.ds-pagination-nav button.current {
+  color: #fff;
+  border-color: var(--ui-accent);
+  background: var(--ui-accent);
+}
+
+/* SidePanel (editor drawer) */
+
+.ds-sidepanel-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: none;
+  background: var(--ui-overlay);
+}
+
+.ds-sidepanel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 41;
+  width: min(420px, 100%);
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow);
+  transform: translateX(100%);
+  transition: transform 180ms ease;
+}
+
+.ds-sidepanel[data-open="true"] {
+  transform: translateX(0);
+}
+
+.ds-sidepanel[data-open="true"] ~ .ds-sidepanel-backdrop,
+.ds-sidepanel-backdrop[data-open="true"] {
+  display: block;
+}
+
+.ds-sidepanel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.ds-sidepanel-header h2 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 650;
+}
+
+.ds-sidepanel-close {
+  width: 34px;
+  height: 34px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 50%;
+  color: var(--ui-text);
+  background: var(--ui-control);
+  font-size: 1.1rem;
+}
+
+.ds-sidepanel-body {
+  flex: 1 1 auto;
+  overflow: auto;
+  padding: var(--space-4);
+}
+
+.ds-sidepanel-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border-top: 1px solid var(--ui-border);
+}
+
+@media (max-width: 760px) {
+  .ds-sidepanel {
+    inset: auto 0 0;
+    top: auto;
+    width: 100%;
+    max-height: 92dvh;
+    border-left: 0;
+    border-top: 1px solid var(--ui-border);
+    border-radius: 16px 16px 0 0;
+    transform: translateY(100%);
+  }
+
+  .ds-sidepanel[data-open="true"] {
+    transform: translateY(0);
+  }
+}
+
+/* ConfirmationDialog */
+
+.ds-confirm-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: var(--ui-overlay);
+}
+
+.ds-confirm-dialog {
+  width: min(440px, 100%);
+  padding: var(--space-5);
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--ui-surface-raised);
+  box-shadow: var(--ui-shadow);
+}
+
+.ds-confirm-dialog h2 {
+  margin: 0 0 var(--space-2);
+  font-size: 1.1rem;
+  font-weight: 650;
+}
+
+.ds-confirm-dialog p {
+  margin: 0 0 var(--space-4);
+  color: var(--ui-muted);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.ds-confirm-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+}
+
+.ds-confirm-actions button {
+  min-height: var(--control-touch);
+}
+
+/* Field helpers reused by SidePanel forms (kept in sync with FieldLabel/FieldHelp usage elsewhere) */
+
+.ds-field {
+  display: grid;
+  gap: 6px;
+  margin-bottom: var(--space-3);
+}
+
+.ds-field label {
+  color: var(--ui-text);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.ds-field small {
+  color: var(--ui-muted);
+  font-size: 0.75rem;
+  line-height: 1.35;
+}
+
+.ds-field input,
+.ds-field select,
+.ds-field textarea {
+  min-height: var(--control-default);
+  padding: 8px 10px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--ui-text);
+  background: var(--ui-control);
+}

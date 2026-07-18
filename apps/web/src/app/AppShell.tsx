@@ -1,8 +1,24 @@
+import { useEffect, useState } from "react";
 import { BrandMark } from "../design-system/BrandMark";
 import { ThemeToggle } from "../design-system/ThemeToggle";
 import { useAuth } from "../features/auth/AuthContext";
 import { useConnectivity } from "../shared/hooks/use-connectivity";
 import { appDestinations, destinationsForRole, isDestinationActive } from "./navigation";
+
+function HeaderClock() {
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 1000 * 15);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  return (
+    <time className="app-header-clock" dateTime={now.toISOString()}>
+      {now.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}
+    </time>
+  );
+}
 
 export function AppShell({
   title,
@@ -40,6 +56,7 @@ export function AppShell({
             ))}
           </nav>
         ) : null}
+        {!kiosk ? <HeaderClock /> : null}
         <ThemeToggle />
         {session && !kiosk ? (
           <button
