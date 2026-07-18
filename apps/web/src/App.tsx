@@ -19,7 +19,6 @@ function ApplicationLoading() {
 function isPublicRoute(pathname: string): boolean {
   return (
     pathname === "/setup" ||
-    pathname === "/pair" ||
     pathname === "/privacy" ||
     pathname === "/datenschutz" ||
     pathname === "/fids" ||

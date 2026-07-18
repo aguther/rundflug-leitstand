@@ -23,6 +23,10 @@ Automatisierte responsive Browserprüfungen ersetzen diese Prüfung auf echter A
 7. Ticketzettel anzeigen, QR-Code mit einem zweiten Gerät scannen und Nachdruck aus der Suche testen.
 8. Offline/Online-Wechsel durchführen; der letzte bestätigte Stand bleibt sichtbar und wird nach
    Reconnect abgeglichen.
+9. In den Safari-Webinformationen prüfen, dass Betriebsrequests nur das HttpOnly-Sitzungscookie und
+   keine `x-device-id`-/`x-device-token`-Header verwenden. Einen simulierten fehlgeschlagenen
+   Operations-GET über den GET-only-XHR-Fallback wiederholen; Schreibaktionen dürfen nicht
+   automatisch wiederholt werden.
 
 Abweichungen werden mit Gerät, iOS-Version, Route, Orientierung, reproduzierbaren Schritten und
 Screenshot dokumentiert.

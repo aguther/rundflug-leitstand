@@ -181,7 +181,6 @@ export function FlightLineAssist({
   onPause,
   onRefuel,
   onUnavailable,
-  deviceId,
   onClaim,
   onGroupAttendance,
   onGroupMissing,
@@ -201,7 +200,6 @@ export function FlightLineAssist({
   onPause: () => void;
   onRefuel: () => void;
   onUnavailable: () => void;
-  deviceId: string;
   onClaim: (aircraftId: string) => Promise<void>;
   onGroupAttendance: (ticketGroupId: string, checkedIn: boolean) => void;
   onGroupMissing: (ticketGroupId: string) => void;
@@ -214,7 +212,7 @@ export function FlightLineAssist({
   onTurnaroundNextStateChange: (state: "AVAILABLE" | "REFUELING" | "PAUSED" | "INACTIVE") => void;
 }) {
   const assistClaims = board.assistClaims ?? [];
-  const ownServerClaim = assistClaims.find((claim) => claim.deviceId === deviceId);
+  const ownServerClaim = assistClaims.find((claim) => claim.claimedByCurrentSession);
   const [claimedAircraftId, setClaimedAircraftId] = useState<string | null>(
     ownServerClaim?.aircraftId ?? null,
   );
@@ -223,7 +221,7 @@ export function FlightLineAssist({
   const [openGroupMenuId, setOpenGroupMenuId] = useState<string | null>(null);
   const availableAircraft = aircraft.filter((entry) => {
     const claim = assistClaims.find((candidate) => candidate.aircraftId === entry.id);
-    return !claim || claim.deviceId === deviceId || entry.id === claimedAircraftId;
+    return !claim || claim.claimedByCurrentSession || entry.id === claimedAircraftId;
   });
   const claimedAircraft = aircraft.find((entry) => entry.id === claimedAircraftId);
   const activeAircraft = claimedAircraft;

@@ -28,22 +28,15 @@ describe("V1 administration completion UI", () => {
     expect(appSource).toContain("requestAdminAction(correctRotationManifest)");
   });
 
-  it("keeps recovery controls visible and transfers the anonymous admin credential on restart", () => {
-    expect(appSource).toContain("Administrationszugang erneuern");
-    expect(appSource).toContain("Mit PIN anmelden");
+  it("uses account sessions instead of browser device recovery", () => {
+    expect(appSource).toContain("Mit Administrationskonto anmelden");
     expect(appSource).toContain("Erneut laden");
-    expect(appSource).toContain("vorhandene Betriebsdaten bleiben unverändert");
     expect(appSource).toContain('className="secondary-actions admin-recovery-actions"');
-    expect(appSource).toContain("attemptedDeviceCredentialRecoveries.has(deviceId)");
-    expect(appSource).toContain("requestAdminDeviceRecovery()");
-    expect(appSource).toContain("recoverAdminDevice(");
-    expect(appSource).toContain(
-      'rememberDeviceCredential(window.localStorage, "ADMIN", result.adminDeviceId, token)',
-    );
+    expect(appSource).not.toContain("attemptedDeviceCredentialRecoveries");
+    expect(appSource).not.toContain("recoverAdminDevice(");
+    expect(appSource).not.toContain("rememberDeviceCredential");
+    expect(appSource).toContain("Sitzung und Betriebsstand werden geprüft.");
     expect(appSource).toContain("Reset ist sichtbar, bleibt aber gesperrt");
-    expect(appSource).toContain(
-      'rememberDeviceCredential(window.localStorage, "ADMIN", result.adminDeviceId, adminToken)',
-    );
     expect(appSource).toContain("Bearbeitungsmodus entsperren");
   });
 

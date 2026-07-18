@@ -573,7 +573,6 @@ export function FlightLineView() {
           action={primaryFlightLineAction}
           aircraft={operationalAircraft}
           board={board}
-          deviceId={FLIGHT_LINE_DEVICE_ID}
           message={message}
           onClaim={async (aircraftId) => {
             await claimFlightLineAircraft(

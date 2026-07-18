@@ -2,11 +2,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   assertOperationalConnection,
   factoryReset,
-  getDeviceContext,
   getHealth,
   getOperationBoard,
   getPushConfiguration,
-  recoverAdminDevice,
+  sendCommand,
   verifyAdminPin,
 } from "./api";
 
@@ -25,113 +24,93 @@ describe("operational command connection policy", () => {
 });
 
 describe("network failure guidance", () => {
-  it("replaces the browser-specific fetch error with an actionable message", async () => {
+  it("replaces a complete transport failure with actionable guidance", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Failed to fetch")));
 
     await expect(getHealth()).rejects.toThrowError(
       "Server nicht erreichbar. Bitte Verbindung prüfen und die Seite neu laden.",
     );
   });
+
+  it("[T-020] retries a failed same-origin GET through WebKit's XHR transport", async () => {
+    class SuccessfulXmlHttpRequest {
+      status = 200;
+      statusText = "OK";
+      responseText = JSON.stringify({
+        ok: true,
+        service: "Rundflug-Leitstand",
+        environment: "production",
+        requirementsVersion: "1.4",
+        timestamp: "2026-07-18T12:00:00.000Z",
+      });
+      private listeners = new Map<string, () => void>();
+
+      open() {}
+      setRequestHeader() {}
+      getResponseHeader(name: string) {
+        return name.toLowerCase() === "content-type" ? "application/json" : null;
+      }
+      addEventListener(name: string, listener: () => void) {
+        this.listeners.set(name, listener);
+      }
+      send() {
+        this.listeners.get("load")?.();
+      }
+      abort() {
+        this.listeners.get("abort")?.();
+      }
+      withCredentials = false;
+    }
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Load failed")));
+    vi.stubGlobal("XMLHttpRequest", SuccessfulXmlHttpRequest);
+
+    await expect(getHealth()).resolves.toMatchObject({ ok: true, environment: "production" });
+  });
 });
 
-describe("paired device context recovery", () => {
-  it("recovers the event id without exposing the device token in the URL", async () => {
+describe("session-only browser transport", () => {
+  it("does not send the browser's legacy device ID or token with a production command", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ eventId: "rundflug-2026", role: "ADMIN" }), {
-        status: 200,
+      new Response(JSON.stringify({ error: { message: "synthetic rejection" } }), {
+        status: 409,
         headers: { "content-type": "application/json" },
       }),
     );
     vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("navigator", { onLine: true });
 
-    await expect(getDeviceContext("synthetic-device", "synthetic-secret-token")).resolves.toEqual({
-      eventId: "rundflug-2026",
-      role: "ADMIN",
-    });
-    expect(fetchMock).toHaveBeenCalledWith("/api/device/context", {
-      headers: {
-        "x-device-id": "synthetic-device",
-        "x-device-token": "synthetic-secret-token",
-      },
-    });
+    await expect(
+      sendCommand(
+        {
+          commandId: "550e8400-e29b-41d4-a716-446655440001",
+          eventId: "synthetic-event",
+          deviceId: "browser-controlled-device",
+          expectedVersion: 1,
+          issuedAt: "2026-07-18T12:00:00.000Z",
+          type: "SET_OPERATIONAL_NOTE",
+          payload: { note: "Synthetischer Hinweis" },
+        },
+        "browser-controlled-token",
+      ),
+    ).rejects.toThrowError("synthetic rejection");
+
+    const init = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    expect(init.headers).toEqual({ "content-type": "application/json" });
+    expect(JSON.parse(String(init.body))).not.toHaveProperty("deviceId");
   });
 
-  it("omits an empty legacy token for session-authenticated browser requests", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ eventId: "rundflug-2026", role: "ADMIN" }), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      }),
-    );
-    vi.stubGlobal("fetch", fetchMock);
-
-    await getDeviceContext("synthetic-session-device", "");
-
-    expect(fetchMock).toHaveBeenCalledWith("/api/device/context", {});
-  });
-
-  it("[T-020] uses the cookie-only WebKit transport for session operation boards", async () => {
+  it("[T-020] sends an operation-board request without device headers", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 503 }));
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(
-      getOperationBoard("synthetic-event", "synthetic-session-device", ""),
+      getOperationBoard("synthetic-event", "ignored-browser-device", "ignored-device-token"),
     ).rejects.toThrowError("Betriebsdaten nicht verfügbar (503)");
 
     expect(fetchMock).toHaveBeenCalledWith("/api/events/synthetic-event/operations", {});
   });
 
-  it("[T-020] keeps both credential headers for anonymously paired operation boards", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 503 }));
-    vi.stubGlobal("fetch", fetchMock);
-
-    await expect(
-      getOperationBoard("synthetic-event", "synthetic-paired-device", "synthetic-device-token"),
-    ).rejects.toThrowError("Betriebsdaten nicht verfügbar (503)");
-
-    expect(fetchMock).toHaveBeenCalledWith("/api/events/synthetic-event/operations", {
-      headers: {
-        "x-device-id": "synthetic-paired-device",
-        "x-device-token": "synthetic-device-token",
-      },
-    });
-  });
-
-  it("renews an administration credential with PIN and a client-generated hash", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          eventId: "rundflug-2026",
-          adminDeviceId: "synthetic-device",
-          role: "ADMIN",
-        }),
-        { status: 200, headers: { "content-type": "application/json" } },
-      ),
-    );
-    vi.stubGlobal("fetch", fetchMock);
-
-    await expect(
-      recoverAdminDevice("rundflug-2026", "synthetic-device", "0000", "a".repeat(64)),
-    ).resolves.toEqual({
-      eventId: "rundflug-2026",
-      adminDeviceId: "synthetic-device",
-      role: "ADMIN",
-    });
-    expect(fetchMock).toHaveBeenCalledWith(
-      "/api/admin/events/rundflug-2026/recover-device",
-      expect.objectContaining({
-        method: "POST",
-        cache: "no-store",
-        headers: expect.objectContaining({ "x-device-id": "synthetic-device" }),
-        body: JSON.stringify({ adminPin: "0000", credentialHash: "a".repeat(64) }),
-      }),
-    );
-    expect(fetchMock.mock.calls[0]?.[0]).not.toContain("0000");
-  });
-});
-
-describe("factory reset transport", () => {
-  it("authenticates the destructive request without putting credentials in the URL", async () => {
+  it("authenticates factory reset only through the HttpOnly session cookie", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(
         JSON.stringify({
@@ -144,8 +123,9 @@ describe("factory reset transport", () => {
       ),
     );
     vi.stubGlobal("fetch", fetchMock);
+
     await expect(
-      factoryReset("synthetic-event", "synthetic-admin", "synthetic-token", {
+      factoryReset("synthetic-event", "ignored-device", "ignored-token", {
         commandId: "550e8400-e29b-41d4-a716-446655440500",
         eventId: "synthetic-event",
         reason: "Entwicklungsstand neu aufbauen",
@@ -159,18 +139,12 @@ describe("factory reset transport", () => {
       "/api/admin/events/synthetic-event/factory-reset",
       expect.objectContaining({
         method: "POST",
-        headers: expect.objectContaining({
-          "x-device-id": "synthetic-admin",
-          "x-device-token": "synthetic-token",
-        }),
+        headers: { "content-type": "application/json" },
       }),
     );
-    expect(fetchMock.mock.calls[0]?.[0]).not.toContain("synthetic-token");
   });
-});
 
-describe("administrator edit mode transport", () => {
-  it("verifies the PIN with paired-device authentication and no URL credentials", async () => {
+  it("verifies an administrator PIN without a client device identity", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ valid: true }), {
         status: 200,
@@ -180,20 +154,16 @@ describe("administrator edit mode transport", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(
-      verifyAdminPin("synthetic-event", "synthetic-admin", "synthetic-token", "0000"),
+      verifyAdminPin("synthetic-event", "ignored-device", "ignored-token", "0000"),
     ).resolves.toBeUndefined();
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/admin/events/synthetic-event/verify-pin",
       expect.objectContaining({
         method: "POST",
-        headers: expect.objectContaining({
-          "x-device-id": "synthetic-admin",
-          "x-device-token": "synthetic-token",
-        }),
+        headers: { "content-type": "application/json" },
         body: JSON.stringify({ adminPin: "0000" }),
       }),
     );
-    expect(fetchMock.mock.calls[0]?.[0]).not.toContain("0000");
   });
 });
 

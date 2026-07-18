@@ -19,10 +19,6 @@ export type BoardSyncOutcome =
   | { type: "CONFIRMED"; board: OperationBoard; confirmedAt: string }
   | { type: "UNAVAILABLE"; message: string };
 
-export function isDeviceAuthorizationError(error: string | null): boolean {
-  return error !== null && /Betriebsdaten nicht verfügbar \((?:401|403)\)/.test(error);
-}
-
 export function reduceBoardSyncState(
   state: BoardSyncState,
   outcome: BoardSyncOutcome,

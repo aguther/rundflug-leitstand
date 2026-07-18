@@ -27,15 +27,11 @@ export async function loadSelectableEvents(): Promise<EventCatalog> {
   return eventCatalogSchema.parse(await response.json());
 }
 
-export async function loginOperator(
-  accountId: string,
-  pin: string,
-  deviceId: string,
-): Promise<OperatorSession> {
+export async function loginOperator(accountId: string, pin: string): Promise<OperatorSession> {
   const response = await fetch("/api/auth/login", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ accountId, pin, deviceId }),
+    body: JSON.stringify({ accountId, pin }),
   });
   if (!response.ok) throw new Error("Konto oder PIN ist nicht gültig.");
   return response.json() as Promise<OperatorSession>;

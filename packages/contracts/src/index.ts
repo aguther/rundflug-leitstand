@@ -665,8 +665,13 @@ export const bootstrapRequestSchema = z.object({
   eventDate: z.iso.date(),
   aerodrome: z.string().trim().min(2).max(120),
   timeZone: timeZoneSchema.default("Europe/Berlin"),
-  adminDeviceId: z.uuid(),
-  adminCredentialHash: z.string().regex(/^[a-f0-9]{64}$/),
+  // Temporary development-harness compatibility. Production creates the technical origin inside
+  // the Worker and never accepts it as browser-controlled authentication data.
+  adminDeviceId: z.uuid().optional(),
+  adminCredentialHash: z
+    .string()
+    .regex(/^[a-f0-9]{64}$/)
+    .optional(),
 });
 export type BootstrapRequest = z.infer<typeof bootstrapRequestSchema>;
 
@@ -689,14 +694,13 @@ export type OperatorAccountCatalog = z.infer<typeof operatorAccountCatalogSchema
 export const operatorLoginRequestSchema = z.object({
   accountId: z.uuid(),
   pin: z.string().regex(/^\d{6,12}$/),
-  deviceId: z.uuid(),
+  deviceId: z.uuid().optional(),
 });
 export type OperatorLoginRequest = z.infer<typeof operatorLoginRequestSchema>;
 
 export const operatorSessionSchema = z.object({
   authenticated: z.literal(true),
   account: operatorAccountSummarySchema.omit({ active: true }),
-  deviceId: z.uuid(),
 });
 export type OperatorSession = z.infer<typeof operatorSessionSchema>;
 
@@ -1031,7 +1035,7 @@ export const operationBoardSchema = z.object({
   assistClaims: z.array(
     z.object({
       aircraftId: z.string(),
-      deviceId: z.string(),
+      claimedByCurrentSession: z.boolean(),
       claimedAt: z.string(),
       expiresAt: z.string(),
     }),

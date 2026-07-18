@@ -194,7 +194,7 @@ export class EventCoordinator extends DurableObject<Env> {
           !(await verifyCredential(request.headers.get("x-device-token"), device.credential_hash))
         ) {
           return json(
-            { error: { code: "DEVICE_NOT_PAIRED", message: "Gerät ist nicht aktiv gekoppelt." } },
+            { error: { code: "DEVICE_NOT_PAIRED", message: "Sitzung ist nicht berechtigt." } },
             { status: 401 },
           );
         }
@@ -206,7 +206,7 @@ export class EventCoordinator extends DurableObject<Env> {
       if (command.type === "SET_OPERATIONAL_NOTE") {
         if (device.role !== "ADMIN") {
           return json(
-            { error: { code: "ROLE_NOT_AUTHORIZED", message: "Geräterolle nicht berechtigt." } },
+            { error: { code: "ROLE_NOT_AUTHORIZED", message: "Kontorolle nicht berechtigt." } },
             { status: 403 },
           );
         }
@@ -3101,7 +3101,7 @@ export class EventCoordinator extends DurableObject<Env> {
             {
               error: {
                 code: "LAST_ADMIN_DEVICE",
-                message: "Das letzte aktive Administrationsgerät kann nicht widerrufen werden.",
+                message: "Die letzte aktive Administrationssitzung kann nicht widerrufen werden.",
               },
             },
             { status: 409 },
@@ -3114,7 +3114,7 @@ export class EventCoordinator extends DurableObject<Env> {
         .first<{ id: string }>();
       if (existing) {
         return json(
-          { error: { code: "DEVICE_ID_EXISTS", message: "Geräte-ID ist bereits vergeben." } },
+          { error: { code: "DEVICE_ID_EXISTS", message: "Sitzungskennung ist bereits vergeben." } },
           { status: 409 },
         );
       }

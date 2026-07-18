@@ -1,6 +1,6 @@
 // Shared operational state and presentation primitives used by route features.
 import { useCallback, useEffect, useState } from "react";
-import { getDeviceContext, getOperationBoard } from "./api";
+import { getOperationBoard } from "./api";
 import {
   type BoardSyncState,
   nextBoardReconnectDelay,
@@ -9,14 +9,7 @@ import {
   reduceBoardSyncState,
   requestBoardSync,
 } from "./board-sync";
-import {
-  deviceCredentialCandidates,
-  deviceCredentialToken,
-  deviceIdForOperationalView,
-  rememberDeviceCredential,
-} from "./device-credentials";
-import { rememberActiveEvent, resolveActiveEvent } from "./event-context";
-import { operatorDeviceId } from "./features/auth/device";
+import { resolveActiveEvent } from "./event-context";
 import { confirmedStateLabel, loadOperationBoard, saveOperationBoard } from "./offline-store";
 import {
   isRealtimeStateChange,
@@ -91,7 +84,6 @@ export function FieldLabel({ label, help }: { label: string; help: string }) {
 }
 export type WeightClass = "NOT_CAPTURED" | "CHILD" | "NORMAL" | "HEAVY" | "INDIVIDUAL";
 export type GateDisplayStatus = "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
-export const attemptedDeviceCredentialRecoveries = new Set<string>();
 export type TicketDetail = {
   clientId: string;
   weightClass: WeightClass;
@@ -125,23 +117,7 @@ export function operationalTimeLabel(value: string | null, timeZone: string): st
   });
 }
 
-export function deviceRoleFor(deviceId: string): string | null {
-  for (const role of [
-    "ADMIN",
-    "CASHIER",
-    "FLIGHT_LINE",
-    "FLIGHT_DIRECTOR",
-    "FLIGHT_DIRECTOR",
-    "DISPLAY",
-  ]) {
-    if (window.localStorage.getItem(`device-id:${role}`) === deviceId) return role;
-  }
-  return null;
-}
-
 export function deviceTokenFor(deviceId: string): string {
-  const pairedToken = deviceCredentialToken(window.localStorage, deviceRoleFor(deviceId), deviceId);
-  if (pairedToken) return pairedToken;
   if (LOCAL_DEVELOPMENT && EVENT_ID === "demo-2026") {
     if (deviceId === "cashier-tablet-1") return "demo-cashier-device-token";
     if (deviceId === "flight-line-tablet-1") return "demo-flight-line-device-token";
@@ -153,17 +129,7 @@ export function deviceTokenFor(deviceId: string): string {
 
 export function deviceIdForRole(role: string, developmentId: string): string {
   if (LOCAL_DEVELOPMENT && EVENT_ID === "demo-2026") return developmentId;
-  const sessionDeviceId = operatorDeviceId();
-  if (sessionDeviceId) return sessionDeviceId;
-  const pairedDeviceId =
-    role === "CASHIER" || role === "FLIGHT_LINE"
-      ? deviceIdForOperationalView(window.localStorage, role)
-      : role === "FLIGHT_DIRECTOR"
-        ? (window.localStorage.getItem("device-id:FLIGHT_DIRECTOR") ??
-          deviceIdForOperationalView(window.localStorage, "FLIGHT_LINE"))
-        : window.localStorage.getItem(`device-id:${role}`);
-  if (pairedDeviceId) return pairedDeviceId;
-  return `unpaired-${role.toLowerCase()}`;
+  return `${role.toLowerCase()}-session`;
 }
 
 export const CASHIER_DEVICE_ID = deviceIdForRole("CASHIER", "cashier-tablet-1");
@@ -185,19 +151,6 @@ export function createTicketCode(): string {
   return Array.from(bytes, (value) => CODE_ALPHABET[value % CODE_ALPHABET.length]).join("");
 }
 
-export function createDeviceToken(): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(32));
-  return btoa(String.fromCharCode(...bytes))
-    .replaceAll("+", "-")
-    .replaceAll("/", "_")
-    .replaceAll("=", "");
-}
-
-export async function sha256HexBrowser(value: string): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
-  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
-}
-
 export function useOperationBoard(deviceId: string) {
   const [state, setState] = useState<BoardSyncState>({
     board: null,
@@ -208,40 +161,9 @@ export function useOperationBoard(deviceId: string) {
   const refresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      let deviceToken = deviceTokenFor(deviceId);
-      let outcome = await requestBoardSync(() =>
-        getOperationBoard(EVENT_ID, deviceId, deviceToken),
+      const outcome = await requestBoardSync(() =>
+        getOperationBoard(EVENT_ID, deviceId, deviceTokenFor(deviceId)),
       );
-      if (
-        outcome.type === "UNAVAILABLE" &&
-        outcome.message.includes("(403)") &&
-        !attemptedDeviceCredentialRecoveries.has(deviceId)
-      ) {
-        attemptedDeviceCredentialRecoveries.add(deviceId);
-        const role = deviceRoleFor(deviceId);
-        for (const candidate of deviceCredentialCandidates(window.localStorage, role, deviceId)) {
-          try {
-            const context = await getDeviceContext(deviceId, candidate);
-            if (role && context.role !== role) continue;
-            rememberDeviceCredential(window.localStorage, context.role, deviceId, candidate);
-            deviceToken = candidate;
-            if (context.eventId !== EVENT_ID) {
-              rememberActiveEvent(window.localStorage, context.eventId);
-              const target = new URL(window.location.href);
-              target.searchParams.set("event", context.eventId);
-              window.location.replace(target);
-              return;
-            }
-            outcome = await requestBoardSync(() =>
-              getOperationBoard(EVENT_ID, deviceId, deviceToken),
-            );
-            if (outcome.type === "CONFIRMED") break;
-          } catch {
-            // Try the next credential kept in this browser. Tokens are never logged or persisted anew
-            // unless the server confirms the device/role combination.
-          }
-        }
-      }
       setState((current) => reduceBoardSyncState(current, outcome));
       if (outcome.type === "CONFIRMED") {
         void saveOperationBoard(EVENT_ID, deviceId, outcome.board, outcome.confirmedAt);
