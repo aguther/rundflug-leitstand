@@ -5,6 +5,7 @@ import { App } from "./App";
 import { ThemeProvider } from "./design-system/theme";
 import "./design-system/tokens.css";
 import "./design-system/base.css";
+import "./design-system/components.css";
 import "./styles.css";
 import "./features/admin/admin-v12.css";
 import "./features/cashier/cashier-v12.css";
