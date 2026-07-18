@@ -8,7 +8,7 @@ describe("V1.2 FIDS concepts", () => {
   it("uses the common visual mark and keeps the two styles independently addressable", () => {
     expect(displaySource.match(/<BrandMark \/>/g)).toHaveLength(2);
     expect(displaySource).toContain('href="/fids/terminal?kiosk=1"');
-    expect(displaySource).toContain('href="/fids?kiosk=1"');
+    expect(displaySource).toContain('href="/fids?kiosk=1&style=standard"');
   });
 
   it("keeps terminal copy English and gives it a condensed split-flap treatment", () => {

@@ -82,7 +82,8 @@ textarea {
   background: var(--ui-accent-soft);
 }
 
-.app-account {
+.app-account,
+.app-event {
   min-height: 32px;
   padding: 0 10px;
   border: 1px solid var(--ui-border);
@@ -92,13 +93,21 @@ textarea {
   cursor: pointer;
 }
 
+.app-event {
+  max-width: 15rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 @media (max-width: 760px) {
   .app-header {
     min-height: var(--header-height);
   }
 
   .app-brand > span,
-  .app-header nav {
+  .app-header nav,
+  .app-event {
     display: none;
   }
 }

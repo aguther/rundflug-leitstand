@@ -43,6 +43,7 @@ describe("V1.2 web architecture", () => {
 
   it("keeps anonymous FIDS and ticket views public while protecting internal workspaces", () => {
     expect(appSource).toContain('pathname === "/fids"');
+    expect(appSource).toContain('pathname === "/pair"');
     expect(appSource).toContain('pathname.startsWith("/fids/")');
     expect(appSource).toContain("if (!session) return <LoginPage />");
   });

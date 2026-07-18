@@ -142,7 +142,9 @@ export function FidsDisplay({
           </div>
           <div className="terminal-title">
             <h1>RUNDFLUG-LEITSTAND</h1>
-            <strong>DEPARTURES</strong>
+            <strong>
+              DEPARTURES{board?.selectedGate ? ` · ${board.selectedGate.label.toUpperCase()}` : ""}
+            </strong>
           </div>
           <div className="terminal-clock">
             <b>{time}</b>
@@ -153,7 +155,7 @@ export function FidsDisplay({
           </div>
         </header>
         <nav className="fids-mode-switch" aria-label="Display style">
-          <a href="/fids?kiosk=1">STANDARD</a>
+          <a href="/fids?kiosk=1&style=standard">STANDARD</a>
           <a aria-current="page" href="/fids/terminal?kiosk=1">
             TERMINAL
           </a>
@@ -198,7 +200,7 @@ export function FidsDisplay({
         </div>
         <div>
           <h1>Rundflug-Leitstand</h1>
-          <p>Abflugtafel</p>
+          <p>{board?.selectedGate ? `Abflugtafel · ${board.selectedGate.label}` : "Abflugtafel"}</p>
         </div>
         <div className="standard-clock">
           <b>{time}</b>
@@ -209,7 +211,7 @@ export function FidsDisplay({
         </div>
       </header>
       <nav className="fids-mode-switch" aria-label="Darstellungsstil">
-        <a aria-current="page" href="/fids?kiosk=1">
+        <a aria-current="page" href="/fids?kiosk=1&style=standard">
           Standard
         </a>
         <a href="/fids/terminal?kiosk=1">Terminal</a>

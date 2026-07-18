@@ -22,7 +22,8 @@ describe("active event context", () => {
     expect(resolveActiveEvent("", storage)).toBe("event-from-pairing");
   });
 
-  it("uses the development fallback only without persisted context", () => {
-    expect(resolveActiveEvent("", memoryStorage())).toBe("demo-2026");
+  it("does not silently select a production event without persisted context", () => {
+    expect(resolveActiveEvent("", memoryStorage())).toBe("");
+    expect(resolveActiveEvent("", memoryStorage(), "demo-2026")).toBe("demo-2026");
   });
 });
