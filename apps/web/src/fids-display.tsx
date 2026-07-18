@@ -15,9 +15,7 @@ function groupCode(group: PublicGroup): string {
 function standardStatus(status: PublicGroup["status"]): string {
   if (status === "COME_TO_FLIGHT_LINE") return "GO TO GATE";
   if (status === "BOARDING") return "BOARDING";
-  if (status === "IN_FLIGHT") return "ABGEFLOGEN";
-  if (status === "LANDED") return "GELANDET";
-  if (status === "COMPLETED") return "ABGEFLOGEN";
+  if (status === "IN_FLIGHT" || status === "LANDED" || status === "COMPLETED") return "ABGEFLOGEN";
   if (status === "SERVICE_PAUSED") return "VERZÖGERT";
   return "WARTEN";
 }
