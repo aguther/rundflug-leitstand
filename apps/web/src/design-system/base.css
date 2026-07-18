@@ -76,13 +76,16 @@ body {
 .app-header .app-account {
   min-height: 40px;
   display: flex;
+  flex: 0 0 auto;
   align-items: center;
   gap: 8px;
   padding: 0 10px;
+  white-space: nowrap;
 }
 .app-header .app-account > span {
   color: var(--ui-text);
   font-size: 0.82rem;
+  white-space: nowrap;
 }
 .account-menu {
   position: relative;

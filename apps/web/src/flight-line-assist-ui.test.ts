@@ -1,8 +1,14 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import routerSource from "./FeatureRouter.tsx?raw";
 import assistSource from "./flight-line-assist.tsx?raw";
 import flightLineSource from "./flight-line-view.tsx?raw";
 import sharedSource from "./operation-workspace.tsx?raw";
+
+const assistStyles = readFileSync(
+  new URL("./features/flight-line/flight-line-assist-v15.css", import.meta.url),
+  "utf8",
+);
 
 const appSource = `${routerSource}\n${flightLineSource}\n${sharedSource}`;
 
@@ -22,8 +28,13 @@ describe("Flight Line Assist", () => {
     expect(assistSource).toContain("Pause");
     expect(assistSource).toContain("Nicht verfügbar");
     expect(assistSource).toContain("Flugzeug freigeben");
-    expect(assistSource).toContain("StateFlow");
     expect(assistSource).toContain("LifecycleFlow");
+    expect(assistSource).toContain('action?.command === "COMPLETE_TURNAROUND"');
+    expect(assistSource).toContain("Zustand nach Abschluss");
+    expect(assistSource).toContain("AircraftPickerMeta");
+    expect(assistSource).toContain("assist-v15-operational-state");
+    expect(assistStyles).toContain(".assist-v15-picker-meta");
+    expect(assistStyles).toContain("display: grid");
   });
 
   it("uses the shared design system and Lucide instead of a duplicated shell", () => {
@@ -49,6 +60,7 @@ describe("Flight Line Assist", () => {
     expect(assistSource).toContain("Nicht da");
     expect(assistSource).toContain("Nachrufen");
     expect(assistSource).toContain("Zurückstellen");
+    expect(assistSource).toContain("Anwesenheit aufheben");
   });
 
   it("shows only anonymous operational identifiers and counts", () => {
@@ -62,5 +74,23 @@ describe("Flight Line Assist", () => {
     expect(assistSource).toContain("25_000");
     expect(assistSource).toContain("await onClaim(entry.id)");
     expect(assistSource).toContain("await onRelease(claimedAircraftId)");
+  });
+
+  it("gates operational context behind the device claim and clears it on release", () => {
+    expect(assistSource).toContain("const activeAircraft = claimedAircraft");
+    expect(assistSource).toContain("const listedAircraft = availableAircraft");
+    expect(assistSource).toContain("Betreutes und weitere verfügbare Flugzeuge");
+    expect(assistStyles).not.toContain("has-claim .assist-v15-picker");
+    expect(assistSource).toContain("{claimedAircraft ? (");
+    expect(flightLineSource).toContain("setSelectedAircraftId(null)");
+    expect(flightLineSource).toContain("setSelectedQueueGroupIds([])");
+  });
+
+  it("uses stable grids and inline phone actions without overlay positioning", () => {
+    expect(assistStyles).toContain("grid-template-columns: 36px minmax(0, 1fr)");
+    expect(assistStyles).toContain("height: 150px");
+    expect(assistStyles).toContain("grid-column: 1 / -1");
+    expect(assistStyles).not.toContain("position: absolute");
+    expect(assistStyles).not.toContain("minmax(620px");
   });
 });
