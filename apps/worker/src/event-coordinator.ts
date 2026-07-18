@@ -493,6 +493,11 @@ export class EventCoordinator extends DurableObject<Env> {
         )
           .bind(command.eventId, product.resource_group_id)
           .first<{ next_number: number }>();
+        const ticketCommunicationRow = await this.env.DB.prepare(
+          "SELECT COALESCE(MAX(communication_number), 100) + 1 AS next_number FROM ticket_groups WHERE operation_day_id = ?1",
+        )
+          .bind(command.eventId)
+          .first<{ next_number: number }>();
         const now = new Date().toISOString();
         const nextVersion = current.version + 1;
         const ticketGroupId = crypto.randomUUID();
@@ -528,7 +533,7 @@ export class EventCoordinator extends DurableObject<Env> {
             command.eventId,
             product.id,
             queueRow?.next_sequence ?? 1,
-            primarySlot.communicationNumber,
+            ticketCommunicationRow?.next_number ?? 101,
             command.payload.standby ? 1 : 0,
             now,
           ),
@@ -3646,32 +3651,39 @@ export class EventCoordinator extends DurableObject<Env> {
         { status: 409 },
       );
     }
-    const [products, aircraftRows, pilotRows, existingReferences, queueRows, communicationRows] =
-      await Promise.all([
-        this.env.DB.prepare(
-          "SELECT id, resource_group_id, gate_id, price_cents FROM products WHERE operation_day_id = ?1",
-        )
-          .bind(command.eventId)
-          .all<{ id: string; resource_group_id: string; gate_id: string; price_cents: number }>(),
-        this.env.DB.prepare(
-          `SELECT a.id, a.passenger_seats, a.operational_state, membership.resource_group_id
+    const [
+      products,
+      aircraftRows,
+      pilotRows,
+      existingReferences,
+      queueRows,
+      communicationRows,
+      ticketCommunicationRow,
+    ] = await Promise.all([
+      this.env.DB.prepare(
+        "SELECT id, resource_group_id, gate_id, price_cents FROM products WHERE operation_day_id = ?1",
+      )
+        .bind(command.eventId)
+        .all<{ id: string; resource_group_id: string; gate_id: string; price_cents: number }>(),
+      this.env.DB.prepare(
+        `SELECT a.id, a.passenger_seats, a.operational_state, membership.resource_group_id
              FROM aircraft a
              JOIN resource_group_memberships membership
                ON membership.aircraft_id = a.id AND membership.active_until IS NULL
             WHERE membership.operation_day_id = ?1`,
-        )
-          .bind(command.eventId)
-          .all<{
-            id: string;
-            passenger_seats: number;
-            operational_state: string;
-            resource_group_id: string;
-          }>(),
-        this.env.DB.prepare("SELECT id, active, paused FROM pilots WHERE operation_day_id = ?1")
-          .bind(command.eventId)
-          .all<{ id: string; active: number; paused: number }>(),
-        this.env.DB.prepare(
-          `SELECT reference.paper_reference, reference.ticket_group_id, reference.rotation_id,
+      )
+        .bind(command.eventId)
+        .all<{
+          id: string;
+          passenger_seats: number;
+          operational_state: string;
+          resource_group_id: string;
+        }>(),
+      this.env.DB.prepare("SELECT id, active, paused FROM pilots WHERE operation_day_id = ?1")
+        .bind(command.eventId)
+        .all<{ id: string; active: number; paused: number }>(),
+      this.env.DB.prepare(
+        `SELECT reference.paper_reference, reference.ticket_group_id, reference.rotation_id,
                   reference.current_state, r.aircraft_id, r.pilot_id, fg.resource_group_id,
                   r.version, COUNT(rt.ticket_id) AS ticket_count
              FROM outage_recovery_references reference
@@ -3680,34 +3692,39 @@ export class EventCoordinator extends DurableObject<Env> {
              LEFT JOIN rotation_tickets rt ON rt.rotation_id = r.id AND rt.released_at IS NULL
             WHERE reference.operation_day_id = ?1
             GROUP BY reference.paper_reference`,
-        )
-          .bind(command.eventId)
-          .all<{
-            paper_reference: string;
-            ticket_group_id: string;
-            rotation_id: string;
-            current_state: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
-            aircraft_id: string | null;
-            pilot_id: string | null;
-            resource_group_id: string;
-            version: number;
-            ticket_count: number;
-          }>(),
-        this.env.DB.prepare(
-          `SELECT p.resource_group_id, COALESCE(MAX(tg.queue_sequence), 0) AS maximum
+      )
+        .bind(command.eventId)
+        .all<{
+          paper_reference: string;
+          ticket_group_id: string;
+          rotation_id: string;
+          current_state: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
+          aircraft_id: string | null;
+          pilot_id: string | null;
+          resource_group_id: string;
+          version: number;
+          ticket_count: number;
+        }>(),
+      this.env.DB.prepare(
+        `SELECT p.resource_group_id, COALESCE(MAX(tg.queue_sequence), 0) AS maximum
              FROM products p
              LEFT JOIN ticket_groups tg ON tg.product_id = p.id AND tg.operation_day_id = p.operation_day_id
             WHERE p.operation_day_id = ?1 GROUP BY p.resource_group_id`,
-        )
-          .bind(command.eventId)
-          .all<{ resource_group_id: string; maximum: number }>(),
-        this.env.DB.prepare(
-          `SELECT resource_group_id, COALESCE(MAX(communication_number), 100) AS maximum
+      )
+        .bind(command.eventId)
+        .all<{ resource_group_id: string; maximum: number }>(),
+      this.env.DB.prepare(
+        `SELECT resource_group_id, COALESCE(MAX(communication_number), 100) AS maximum
              FROM flight_groups WHERE operation_day_id = ?1 GROUP BY resource_group_id`,
-        )
-          .bind(command.eventId)
-          .all<{ resource_group_id: string; maximum: number }>(),
-      ]);
+      )
+        .bind(command.eventId)
+        .all<{ resource_group_id: string; maximum: number }>(),
+      this.env.DB.prepare(
+        "SELECT COALESCE(MAX(communication_number), 100) AS maximum FROM ticket_groups WHERE operation_day_id = ?1",
+      )
+        .bind(command.eventId)
+        .first<{ maximum: number }>(),
+    ]);
     const productById = new Map(products.results.map((product) => [product.id, product]));
     const aircraftById = new Map(aircraftRows.results.map((aircraft) => [aircraft.id, aircraft]));
     const pilotById = new Map(pilotRows.results.map((pilot) => [pilot.id, pilot]));
@@ -3715,6 +3732,7 @@ export class EventCoordinator extends DurableObject<Env> {
     const nextCommunication = new Map(
       communicationRows.results.map((row) => [row.resource_group_id, row.maximum]),
     );
+    let nextTicketCommunication = ticketCommunicationRow?.maximum ?? 100;
     type WorkingReference = {
       ticketGroupId: string;
       rotationId: string;
@@ -3778,6 +3796,7 @@ export class EventCoordinator extends DurableObject<Env> {
           nextQueue.set(product.resource_group_id, queueSequence);
           const communicationNumber = (nextCommunication.get(product.resource_group_id) ?? 100) + 1;
           nextCommunication.set(product.resource_group_id, communicationNumber);
+          nextTicketCommunication += 1;
           const ticketGroupId = crypto.randomUUID();
           const flightGroupId = crypto.randomUUID();
           const rotationId = crypto.randomUUID();
@@ -3797,13 +3816,15 @@ export class EventCoordinator extends DurableObject<Env> {
           statements.push(
             this.env.DB.prepare(
               `INSERT INTO ticket_groups
-                (id, operation_day_id, product_id, queue_sequence, standby, status, sold_at, version)
-               VALUES (?1, ?2, ?3, ?4, 0, 'QUEUED', ?5, 0)`,
+                (id, operation_day_id, product_id, queue_sequence, communication_number, standby,
+                 status, sold_at, version)
+               VALUES (?1, ?2, ?3, ?4, ?5, 0, 'QUEUED', ?6, 0)`,
             ).bind(
               ticketGroupId,
               command.eventId,
               product.id,
               queueSequence,
+              nextTicketCommunication,
               entry.original_occurred_at,
             ),
             this.env.DB.prepare(
@@ -6288,6 +6309,20 @@ export class EventCoordinator extends DurableObject<Env> {
             WHEN attendance_status = 'CHECKED_IN' THEN 'CHECKED_IN' ELSE 'QUEUED' END
           WHERE id IN (SELECT ticket_id FROM rotation_tickets WHERE rotation_id = ?1 AND released_at IS NULL)`,
       ).bind(rotation.id),
+      this.env.DB.prepare(
+        `UPDATE ticket_groups SET status = CASE
+            WHEN EXISTS (
+              SELECT 1 FROM tickets
+               WHERE ticket_group_id = ticket_groups.id AND attendance_status = 'CHECKED_IN'
+            ) THEN 'PRESENT' ELSE 'QUEUED' END,
+            version = version + 1
+          WHERE id IN (
+            SELECT DISTINCT t.ticket_group_id
+              FROM tickets t
+              JOIN rotation_tickets rt ON rt.ticket_id = t.id AND rt.released_at IS NULL
+             WHERE rt.rotation_id = ?1
+          )`,
+      ).bind(rotation.id),
     ];
     if (rotation.aircraft_id) {
       statements.push(
@@ -6392,6 +6427,23 @@ export class EventCoordinator extends DurableObject<Env> {
             SELECT ticket_id FROM rotation_tickets WHERE rotation_id = ?1 AND released_at IS NULL
           )`,
       ).bind(rotation.id),
+      this.env.DB.prepare(
+        `UPDATE ticket_groups SET status = CASE
+            WHEN EXISTS (
+              SELECT 1 FROM tickets
+               WHERE ticket_group_id = ticket_groups.id AND attendance_status = 'CHECKED_IN'
+            ) THEN 'PRESENT' ELSE 'QUEUED' END,
+            version = version + 1
+          WHERE id IN (
+            SELECT DISTINCT t.ticket_group_id
+              FROM tickets t
+              JOIN rotation_tickets rt ON rt.ticket_id = t.id AND rt.released_at IS NULL
+             WHERE rt.rotation_id = ?1
+          )`,
+      ).bind(rotation.id),
+      this.env.DB.prepare(
+        "UPDATE flight_groups SET status = 'DRAFT', version = version + 1, updated_at = ?1 WHERE id = (SELECT flight_group_id FROM rotations WHERE id = ?2)",
+      ).bind(now, rotation.id),
     ];
     if (rotation.aircraft_id) {
       statements.push(

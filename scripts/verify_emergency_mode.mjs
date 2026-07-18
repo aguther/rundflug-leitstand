@@ -156,14 +156,13 @@ try {
     },
   );
   const activeRotationId = firstSale.aggregate.relatedRotationId;
-  const waitingRotationId = waitingSale.aggregate.relatedRotationId;
   const called = await command(
     devices.flightLine,
     tokens.flightLine,
     waitingSale.event.version,
     "CALL_NEXT",
     {
-      rotationId: activeRotationId,
+      ticketGroupIds: [firstSale.aggregate.id],
       aircraftId: "aircraft-a",
       pilotId: "550e8400-e29b-41d4-a716-446655440100",
     },
@@ -172,7 +171,7 @@ try {
     devices.flightLine,
     tokens.flightLine,
     called.event.version,
-    "MARK_IN_FLIGHT",
+    "MARK_OFF_BLOCK",
     { rotationId: activeRotationId },
   );
   const triggered = await command(
@@ -204,7 +203,7 @@ try {
     triggered.event.version,
     "CALL_NEXT",
     {
-      rotationId: waitingRotationId,
+      ticketGroupIds: [waitingSale.aggregate.id],
       aircraftId: "aircraft-a",
       pilotId: "550e8400-e29b-41d4-a716-446655440100",
     },
@@ -231,15 +230,15 @@ try {
     devices.flightLine,
     tokens.flightLine,
     triggered.event.version,
-    "MARK_LANDED",
+    "MARK_ON_BLOCK",
     { rotationId: activeRotationId },
   );
   const completed = await command(
     devices.flightLine,
     tokens.flightLine,
     landed.event.version,
-    "MARK_COMPLETED",
-    { rotationId: activeRotationId },
+    "COMPLETE_TURNAROUND",
+    { rotationId: activeRotationId, nextAircraftState: "AVAILABLE" },
   );
   await command(
     devices.flightLead,

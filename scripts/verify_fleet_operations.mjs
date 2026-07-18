@@ -146,7 +146,7 @@ try {
     pausedAircraft.event.version,
     "CALL_NEXT",
     {
-      rotationId: sold.aggregate.relatedRotationId,
+      ticketGroupIds: [sold.aggregate.id],
       aircraftId: "aircraft-a",
       pilotId: "550e8400-e29b-41d4-a716-446655440199",
     },
@@ -184,7 +184,7 @@ try {
     },
   );
   const initialCall = await flight(restoredAircraft.event.version, "CALL_NEXT", {
-    rotationId: sold.aggregate.relatedRotationId,
+    ticketGroupIds: [sold.aggregate.id],
     aircraftId: "aircraft-a",
     pilotId: "550e8400-e29b-41d4-a716-446655440199",
   });
@@ -237,7 +237,7 @@ try {
     );
   }
   const called = await flight(replacementAssigned.event.version, "CALL_NEXT", {
-    rotationId: sold.aggregate.relatedRotationId,
+    ticketGroupIds: [sold.aggregate.id],
     aircraftId: "aircraft-replacement",
     pilotId: "550e8400-e29b-41d4-a716-446655440199",
   });
@@ -262,14 +262,15 @@ try {
     },
     409,
   );
-  const started = await flight(called.event.version, "MARK_IN_FLIGHT", {
+  const started = await flight(called.event.version, "MARK_OFF_BLOCK", {
     rotationId: sold.aggregate.relatedRotationId,
   });
-  const landed = await flight(started.event.version, "MARK_LANDED", {
+  const landed = await flight(started.event.version, "MARK_ON_BLOCK", {
     rotationId: sold.aggregate.relatedRotationId,
   });
-  const completed = await flight(landed.event.version, "MARK_COMPLETED", {
+  const completed = await flight(landed.event.version, "COMPLETE_TURNAROUND", {
     rotationId: sold.aggregate.relatedRotationId,
+    nextAircraftState: "AVAILABLE",
   });
   const pausedPilot = await admin(completed.event.version, "SET_PILOT_PAUSE", {
     pilotId: assignedPilot.id,
