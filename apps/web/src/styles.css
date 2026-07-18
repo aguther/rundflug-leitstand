@@ -5409,9 +5409,9 @@ p {
   font-size: 1.5rem;
   cursor: pointer;
 }
-.flight-line-shell > .app-header,
-.flight-line-shell > footer,
-.flight-line-shell > .operational-notice,
+.flight-line-shell.assist-shell > .app-header,
+.flight-line-shell.assist-shell > footer,
+.flight-line-shell.assist-shell > .operational-notice,
 .flight-line-shell > .emergency-control:not([open]) {
   display: none;
 }

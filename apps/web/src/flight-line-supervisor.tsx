@@ -1,11 +1,29 @@
 import type { OperationBoard } from "@rundflug/contracts";
+import {
+  Bell,
+  CheckCircle2,
+  ChevronDown,
+  Clock3,
+  Fuel,
+  Plane,
+  UserRoundX,
+  Users,
+} from "lucide-react";
 import { useMemo, useState } from "react";
-import { BrandMark } from "./design-system/BrandMark";
-import { ThemeToggle } from "./design-system/ThemeToggle";
-import { useAuth } from "./features/auth/AuthContext";
+import {
+  Button,
+  IconButton,
+  PageHeader,
+  Panel,
+  SearchField,
+  SelectField,
+  StatusPill,
+  Tabs,
+} from "./design-system/components";
 
 type Aircraft = OperationBoard["aircraft"][number];
 type Rotation = OperationBoard["rotations"][number];
+type QueueGroup = OperationBoard["queueGroups"][number];
 
 type SupervisorAction = {
   label: string;
@@ -13,69 +31,16 @@ type SupervisorAction = {
   run: () => void;
 } | null;
 
-const stages = [
-  ["ready", "Bereit"],
-  ["gate", "Go to Gate"],
-  ["boarding", "Boarding"],
-  ["off-block", "Off-Block"],
-  ["on-block", "On-Block"],
-  ["refueling", "Tanken"],
-  ["paused", "Pause"],
-  ["unavailable", "Nicht verfügbar"],
-] as const;
-
-function stageFor(aircraft: Aircraft, rotation: Rotation | undefined): string {
-  if (aircraft.operationalState === "REFUELING") return "refueling";
-  if (aircraft.operationalState === "PAUSED") return "paused";
-  if (["INTERRUPTED", "INACTIVE"].includes(aircraft.operationalState)) return "unavailable";
-  if (rotation?.status === "CALLED" || aircraft.operationalState === "BOARDING") return "boarding";
-  if (rotation?.status === "IN_FLIGHT" || aircraft.operationalState === "IN_FLIGHT") {
-    return "off-block";
-  }
-  if (rotation?.status === "LANDED" || aircraft.operationalState === "LANDED") return "on-block";
-  return "ready";
-}
-
-function stateLabel(aircraft: Aircraft, rotation: Rotation | undefined): string {
-  const stage = stageFor(aircraft, rotation);
-  return stages.find(([key]) => key === stage)?.[1] ?? "Bereit";
-}
-
-function formatTime(value: string | null, timeZone: string): string {
-  if (!value) return "–";
-  return new Intl.DateTimeFormat("de-DE", {
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone,
-  }).format(new Date(value));
-}
-
-type SidebarView = "fleet" | "groups" | "refueling" | "maintenance" | "activity";
-
-const sidebarNavItems: Array<{ id: SidebarView; label: string } | { href: string; label: string }> =
-  [
-    { id: "fleet", label: "Flight Line" },
-    { id: "groups", label: "Gruppen" },
-    { href: "/admin?area=master-data&section=gates", label: "Gates" },
-    { href: "/admin?area=master-data&section=resource-groups", label: "Ressourcen" },
-    { href: "/admin?area=master-data&section=pilots", label: "Piloten" },
-    { href: "/admin?area=master-data&section=aircraft", label: "Flugzeuge" },
-    { id: "refueling", label: "Tanken" },
-    { id: "maintenance", label: "Wartung" },
-    { id: "activity", label: "Abläufe" },
-    { href: "/admin?area=evaluation", label: "Berichte" },
-    { href: "/admin?area=setup", label: "Einstellungen" },
-  ];
-
-type DetailTab = "assignment" | "info" | "pilot" | "history" | "notes";
-
-const detailTabs: Array<{ id: DetailTab; label: string }> = [
-  { id: "assignment", label: "Vorgeschlagene Zuordnung" },
-  { id: "info", label: "Flugzeuginfo" },
-  { id: "pilot", label: "Pilot" },
-  { id: "history", label: "Historie" },
-  { id: "notes", label: "Notizen" },
-];
+const statusLabels = {
+  AVAILABLE: "Verfügbar",
+  BOARDING: "Boarding",
+  IN_FLIGHT: "Off-Block",
+  LANDED: "On-Block",
+  REFUELING: "Tanken",
+  PAUSED: "Pause",
+  INTERRUPTED: "Nicht verfügbar",
+  INACTIVE: "Nicht verfügbar",
+} as const;
 
 function suggestedRotationFor(
   aircraft: Aircraft,
@@ -96,26 +61,84 @@ function suggestedRotationFor(
   });
 }
 
+function statusFor(aircraft: Aircraft, rotation: Rotation | undefined) {
+  if (aircraft.operationalState !== "AVAILABLE") return aircraft.operationalState;
+  if (rotation?.status === "CALLED") return "BOARDING";
+  if (rotation?.status === "IN_FLIGHT") return "IN_FLIGHT";
+  if (rotation?.status === "LANDED") return "LANDED";
+  return "AVAILABLE";
+}
+
+function statusTone(status: string): "success" | "warning" | "danger" | "info" | "neutral" {
+  if (status === "AVAILABLE") return "success";
+  if (["BOARDING", "PAUSED"].includes(status)) return "warning";
+  if (["INTERRUPTED", "INACTIVE"].includes(status)) return "danger";
+  if (["IN_FLIGHT", "LANDED", "REFUELING"].includes(status)) return "info";
+  return "neutral";
+}
+
+function formatTime(value: string | null | undefined, timeZone: string): string {
+  if (!value) return "–";
+  return new Intl.DateTimeFormat("de-DE", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone,
+  }).format(new Date(value));
+}
+
+function rotationTime(rotation: Rotation | undefined, timeZone: string): string {
+  if (!rotation) return "Bereit für Belegung";
+  const timeline = rotation.timeline.actual;
+  if (rotation.status === "CALLED")
+    return `Boarding seit ${formatTime(timeline.boardingAt, timeZone)}`;
+  if (rotation.status === "IN_FLIGHT") {
+    return `Off-Block seit ${formatTime(timeline.departureAt, timeZone)}`;
+  }
+  if (rotation.status === "LANDED")
+    return `On-Block seit ${formatTime(timeline.landingAt, timeZone)}`;
+  return `${rotation.predictedLowerMinutes}–${rotation.predictedUpperMinutes} Min.`;
+}
+
+function nextStep(aircraft: Aircraft, rotation: Rotation | undefined): string {
+  if (aircraft.operationalState === "REFUELING") return "Auftanken";
+  if (aircraft.operationalState === "PAUSED") return "Rückkehr prüfen";
+  if (["INTERRUPTED", "INACTIVE"].includes(aircraft.operationalState)) return "Status prüfen";
+  if (!rotation || rotation.status === "DRAFT") return "Buchungsgruppen zuweisen";
+  if (rotation.status === "CALLED") return "Boarding abschließen";
+  if (rotation.status === "IN_FLIGHT") return "On-Block markieren";
+  if (rotation.status === "LANDED") return "Turnaround abschließen";
+  return "Bereit";
+}
+
+function actionLabel(rotation: Rotation | undefined): string {
+  if (!rotation || rotation.status === "DRAFT") return "Belegung zuweisen";
+  if (rotation.status === "CALLED") return "Off-Block";
+  if (rotation.status === "IN_FLIGHT") return "On-Block";
+  if (rotation.status === "LANDED") return "Umlauf abschließen";
+  return "Details";
+}
+
 export function FlightLineSupervisorConsole({
   board,
   aircraft,
   selectedAircraft,
   selectedRotation,
-  aircraftRotations,
   action,
   message,
   nextPilotId,
+  selectedQueueGroupIds,
   onPilotChange,
   onSelectAircraft,
-  onSelectRotation,
   onOpenDetails,
   onOpenDisposition,
   onPause,
   onRefuel,
   onUnavailable,
   onAvailable,
-  onDeferRotation,
-  onReleaseAssist,
+  onToggleGroup,
+  onGroupAttendance,
+  onGroupMissing,
+  onGroupRecall,
 }: {
   board: OperationBoard;
   aircraft: Aircraft[];
@@ -125,6 +148,7 @@ export function FlightLineSupervisorConsole({
   action: SupervisorAction;
   message: string | null;
   nextPilotId: string;
+  selectedQueueGroupIds: string[];
   onPilotChange: (pilotId: string) => void;
   onSelectAircraft: (aircraftId: string) => void;
   onSelectRotation: (rotationId: string) => void;
@@ -136,674 +160,457 @@ export function FlightLineSupervisorConsole({
   onAvailable: () => void;
   onDeferRotation: (rotation: Rotation) => void;
   onReleaseAssist: (aircraftId: string) => void;
+  onToggleGroup: (ticketGroupId: string, selected: boolean) => void;
+  onGroupAttendance: (ticketGroupId: string, checkedIn: boolean) => void;
+  onGroupMissing: (ticketGroupId: string) => void;
+  onGroupRecall: (ticketGroupId: string) => void;
 }) {
-  const { session, logout } = useAuth();
-  const [search, setSearch] = useState("");
   const [resourceGroupId, setResourceGroupId] = useState("");
-  const [sidebarView, setSidebarView] = useState<SidebarView>("fleet");
-  const [detailTab, setDetailTab] = useState<DetailTab>("assignment");
+  const [ticketSearch, setTicketSearch] = useState("");
+  const [bottomTab, setBottomTab] = useState<"current" | "history">("current");
   const filteredAircraft = useMemo(() => {
-    const normalizedSearch = search.trim().toLocaleLowerCase("de-DE");
     return aircraft.filter((entry) => {
-      const matchesResource = !resourceGroupId || entry.resourceGroupId === resourceGroupId;
-      const matchesSearch =
-        !normalizedSearch ||
-        `${entry.registration} ${entry.aircraftType} ${entry.resourceGroupName}`
-          .toLocaleLowerCase("de-DE")
-          .includes(normalizedSearch);
-      return matchesResource && matchesSearch;
+      return !resourceGroupId || entry.resourceGroupId === resourceGroupId;
     });
-  }, [aircraft, resourceGroupId, search]);
-  const currentTime = new Intl.DateTimeFormat("de-DE", {
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: board.event.timeZone,
-  }).format(new Date());
-  const eventDate = new Intl.DateTimeFormat("de-DE", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    timeZone: board.event.timeZone,
-  }).format(new Date(`${board.event.eventDate}T12:00:00Z`));
+  }, [aircraft, resourceGroupId]);
+
+  const compatibleGroups = board.queueGroups.filter(
+    (group) =>
+      group.resourceGroupId === selectedAircraft?.resourceGroupId &&
+      ["QUEUED", "PRESENT", "MISSING"].includes(group.status),
+  );
+  const selectedGroups = compatibleGroups.filter((group) =>
+    selectedQueueGroupIds.includes(group.id),
+  );
+  const selectedSeats = selectedGroups.reduce((total, group) => total + group.ticketCount, 0);
+  const history = board.rotations
+    .filter(
+      (rotation) => rotation.aircraftId === selectedAircraft?.id && rotation.status === "COMPLETED",
+    )
+    .slice(-10)
+    .reverse();
+  const ticketRows = board.rotations
+    .filter((rotation) => rotation.status !== "COMPLETED")
+    .flatMap((rotation) => rotation.bookingGroups.map((group) => ({ group, rotation })))
+    .filter(({ group, rotation }) => {
+      const query = ticketSearch.trim().toLocaleLowerCase("de-DE");
+      if (!query) return true;
+      return `${rotation.productCode}-${group.communicationNumber} ${rotation.productName} ${rotation.aircraftRegistration ?? ""}`
+        .toLocaleLowerCase("de-DE")
+        .includes(query);
+    })
+    .slice(0, 12);
+
+  function chooseAircraft(aircraftId: string) {
+    onSelectAircraft(aircraftId);
+  }
 
   return (
-    <section className="flight-line-console">
-      <header className="flight-line-console-header">
-        <div className="flight-line-console-brand">
-          <BrandMark />
-          <div>
-            <strong>Flight Line</strong>
-            <small>Rundflug-Leitstand</small>
-          </div>
-        </div>
-        <div className="console-live-state">
-          <span />
-          Leitstand aktiv
-        </div>
-        <time dateTime={new Date().toISOString()}>
-          <strong>{currentTime}</strong>
-          <small>{eventDate}</small>
-        </time>
-        <div className="console-header-context">
-          <span>Hinweise</span>
-          <strong>{board.event.operationalNote ? "1" : "0"}</strong>
-          <span className="console-online">● Online</span>
-          <a href="/flight-line/assist">Assist</a>
-          <ThemeToggle />
-          <button onClick={() => void logout().then(() => window.location.reload())} type="button">
-            {session?.account.loginCode ?? "Leitstand"}
-          </button>
-        </div>
-      </header>
-
-      <aside className="flight-line-console-nav" aria-label="Flight-Line-Bereiche">
-        {sidebarNavItems.map((item) =>
-          "href" in item ? (
-            <a href={item.href} key={item.label}>
-              {item.label}
-            </a>
-          ) : (
-            <button
-              className={sidebarView === item.id ? "active" : ""}
-              key={item.id}
-              onClick={() => setSidebarView(item.id)}
-              type="button"
-            >
-              {item.label}
-            </button>
-          ),
-        )}
-      </aside>
-
-      <aside className="console-aircraft-list">
-        <div className="console-panel-title">
-          <div>
-            <strong>Flugzeuge</strong>
+    <section className="flight-director-v15">
+      <PageHeader
+        actions={
+          <SelectField
+            aria-label="Ressourcengruppe filtern"
+            className="flight-director-resource-filter"
+            label="Ressource"
+            onChange={(event) => setResourceGroupId(event.target.value)}
+            value={resourceGroupId}
+          >
+            <option value="">Alle Ressourcen</option>
+            {board.resourceGroups.map((group) => (
+              <option key={group.id} value={group.id}>
+                {group.name}
+              </option>
+            ))}
+          </SelectField>
+        }
+        title={
+          <>
+            Flugzeuge <span className="flight-director-title-detail">– Übersicht</span>{" "}
             <small>{aircraft.length} insgesamt</small>
-          </div>
-          <label className="console-aircraft-search">
-            <span className="visually-hidden">Flugzeug suchen</span>
-            <input
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Suchen…"
-              type="search"
-              value={search}
-            />
-          </label>
-        </div>
-        <div className="console-aircraft-table-head">
-          <span>Flugzeug</span>
+          </>
+        }
+      />
+
+      {message ? <p className="action-message">{message}</p> : null}
+
+      <Panel className="flight-director-aircraft" padding="none">
+        <div className="flight-director-aircraft-head">
+          <span />
+          <span>Kennzeichen</span>
           <span>Plätze</span>
           <span>Ressource</span>
           <span>Status</span>
+          <span>Buchungsgruppen</span>
+          <span>Zeitplan</span>
+          <span>Nächster Schritt</span>
+          <span>Aktionen</span>
         </div>
-        <div className="console-aircraft-rows">
-          {filteredAircraft.map((entry) => {
-            const rotation = suggestedRotationFor(entry, board.rotations, board.products);
-            const selected = entry.id === selectedAircraft?.id;
-            return (
-              <button
-                className={selected ? "selected" : ""}
-                key={entry.id}
-                onClick={() => onSelectAircraft(entry.id)}
-                type="button"
-              >
-                <span>
+        {filteredAircraft.map((entry) => {
+          const rotation = suggestedRotationFor(entry, board.rotations, board.products);
+          const expanded = entry.id === selectedAircraft?.id;
+          const status = statusFor(entry, rotation);
+          const groups = rotation?.bookingGroups ?? [];
+          const productCode = rotation?.productCode ?? "";
+          return (
+            <article className={expanded ? "expanded" : ""} key={entry.id}>
+              <div className="flight-director-aircraft-row">
+                <IconButton
+                  label={`${entry.registration} ${expanded ? "zuklappen" : "aufklappen"}`}
+                  onClick={() => chooseAircraft(entry.id)}
+                  size="compact"
+                >
+                  <ChevronDown aria-hidden="true" className={expanded ? "expanded" : ""} />
+                </IconButton>
+                <button
+                  className="flight-director-aircraft-name"
+                  onClick={() => chooseAircraft(entry.id)}
+                  type="button"
+                >
                   <strong>{entry.registration}</strong>
                   <small>{entry.aircraftType}</small>
-                </span>
+                </button>
                 <span>{entry.passengerSeats}</span>
-                <span>{entry.resourceGroupName}</span>
-                <span className={`console-status status-${stageFor(entry, rotation)}`}>
-                  {stateLabel(entry, rotation)}
+                <span>{entry.resourceGroupName || "–"}</span>
+                <StatusPill tone={statusTone(status)}>
+                  {statusLabels[status as keyof typeof statusLabels] ?? status}
+                </StatusPill>
+                <span className="flight-director-group-chips">
+                  {groups.length > 0
+                    ? groups.map((group) => (
+                        <small key={group.id}>
+                          {productCode}-{String(group.communicationNumber).padStart(3, "0")} (
+                          {group.ticketCount})
+                        </small>
+                      ))
+                    : "–"}
                 </span>
-              </button>
-            );
-          })}
-        </div>
-        <small className="console-list-count">
-          {filteredAircraft.length} von {aircraft.length} Flugzeugen
-        </small>
-      </aside>
-
-      <main className="flight-line-console-main">
-        <div className="console-toolbar">
-          <div>
-            <strong>{selectedAircraft?.registration ?? "Flight Line"}</strong>
-            <small>Flugzeug übernehmen, passende Gruppe wählen und Boarding bestätigen</small>
-          </div>
-          <div>
-            <label className="console-resource-filter">
-              <span className="visually-hidden">Ressource filtern</span>
-              <select
-                onChange={(event) => setResourceGroupId(event.target.value)}
-                value={resourceGroupId}
-              >
-                <option value="">Alle Ressourcen</option>
-                {board.resourceGroups.map((group) => (
-                  <option key={group.id} value={group.id}>
-                    {group.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <details>
-              <summary>+ Aktion</summary>
-              <div>
-                <button onClick={onPause} type="button">
-                  Pause
-                </button>
-                <button onClick={onRefuel} type="button">
-                  Tanken
-                </button>
-                <button onClick={onUnavailable} type="button">
-                  Nicht verfügbar
-                </button>
-                <button onClick={onAvailable} type="button">
-                  Wieder verfügbar
-                </button>
-              </div>
-            </details>
-          </div>
-        </div>
-
-        <nav className="aircraft-selector-rail" aria-label="Flugzeug übernehmen">
-          {filteredAircraft.map((entry) => {
-            const rotation = suggestedRotationFor(entry, board.rotations, board.products);
-            return (
-              <button
-                aria-current={entry.id === selectedAircraft?.id ? "true" : undefined}
-                className={entry.id === selectedAircraft?.id ? "selected" : ""}
-                key={entry.id}
-                onClick={() => onSelectAircraft(entry.id)}
-                type="button"
-              >
-                <strong>{entry.registration}</strong>
-                <span>{stateLabel(entry, rotation)}</span>
-                <small>
-                  {entry.passengerSeats} Plätze · {entry.resourceGroupName}
-                </small>
-              </button>
-            );
-          })}
-        </nav>
-
-        {sidebarView !== "fleet" ? (
-          <SupervisorSidebarPanel
-            view={sidebarView}
-            board={board}
-            timeZone={board.event.timeZone}
-          />
-        ) : null}
-
-        <section
-          className="console-status-matrix"
-          aria-label="Flugzeugstatus"
-          hidden={sidebarView !== "fleet"}
-        >
-          <div className="console-matrix-head">
-            <span>Flugzeug</span>
-            <span>Status</span>
-            <span>Aktuelle Zuordnung</span>
-            {stages.map(([, label]) => (
-              <span key={label}>{label}</span>
-            ))}
-            <span>Aktionen</span>
-          </div>
-          {filteredAircraft.map((entry) => {
-            const rotation = suggestedRotationFor(entry, board.rotations, board.products);
-            const assistClaim = (board.assistClaims ?? []).find(
-              (claim) => claim.aircraftId === entry.id,
-            );
-            const currentStage = stageFor(entry, rotation);
-            const selected = entry.id === selectedAircraft?.id;
-            return (
-              <div
-                className={selected ? "console-matrix-row selected" : "console-matrix-row"}
-                key={entry.id}
-              >
-                <button
-                  className="matrix-aircraft"
-                  onClick={() => onSelectAircraft(entry.id)}
-                  type="button"
-                >
-                  <strong>{entry.registration}</strong>
-                  <small>{entry.aircraftType}</small>
-                </button>
-                <span className={`console-status status-${currentStage}`}>
-                  {stateLabel(entry, rotation)}
+                <span>{rotationTime(rotation, board.event.timeZone)}</span>
+                <span>{nextStep(entry, rotation)}</span>
+                <span className="flight-director-row-actions">
+                  <Button
+                    disabled={expanded && !action}
+                    onClick={() => {
+                      if (!expanded) chooseAircraft(entry.id);
+                      else if (action) action.run();
+                      else onOpenDetails();
+                    }}
+                    size="compact"
+                    variant={expanded && action ? "primary" : "secondary"}
+                  >
+                    {actionLabel(rotation)}
+                  </Button>
+                  {expanded ? (
+                    <Button onClick={onRefuel} size="compact">
+                      <Fuel aria-hidden="true" /> Tanken
+                    </Button>
+                  ) : null}
                 </span>
-                <span className="matrix-assignment">
-                  {rotation ? (
-                    <>
-                      <strong>
-                        {rotation.communicationLabel} · {rotation.ticketCount} Tickets
-                      </strong>
-                      <small>{rotation.gateLabel}</small>
-                      {rotation.precalledAt ? (
-                        <small>GO TO GATE · Gruppe ist vorgerufen</small>
-                      ) : null}
-                    </>
-                  ) : (
-                    "–"
-                  )}
-                  {assistClaim ? <small>Assist-Gerät betreut</small> : null}
-                </span>
-                {stages.map(([key, label]) => (
-                  <span
-                    className={
-                      key === currentStage ? `matrix-stage active stage-${key}` : "matrix-stage"
-                    }
-                    key={key}
-                    title={label}
-                  />
-                ))}
-                <button
-                  className="matrix-details"
-                  onClick={() => {
-                    onSelectAircraft(entry.id);
-                    onOpenDetails();
-                  }}
-                  type="button"
-                >
-                  Details
-                </button>
-                {selected && rotation ? (
-                  <div className="matrix-recommendation">
-                    <div>
-                      <small>Empfehlung</small>
-                      <strong>{rotation.communicationLabel} für dieses Flugzeug übernehmen</strong>
-                      <span>
-                        Vorgeschlagenes Zeitfenster bis{" "}
-                        {formatTime(rotation.timeline.predicted.boardingAt, board.event.timeZone)}
-                      </span>
-                    </div>
-                    <div>
-                      <small>Begründung (informativ)</small>
-                      <span>Flugzeug und Gruppe passen zur gemeinsamen Ressource.</span>
-                    </div>
-                    <div>
-                      <small>Bestätigung durch Operator erforderlich</small>
-                      <span>Keine automatische Zuweisung oder Sicherheitsentscheidung.</span>
-                    </div>
-                    {action ? (
-                      <button
-                        className="console-confirm"
-                        disabled={action.disabled}
-                        onClick={action.run}
-                        type="button"
-                      >
-                        {action.label}
-                      </button>
-                    ) : null}
-                    <button onClick={onOpenDisposition} type="button">
-                      Andere Gruppe
-                    </button>
-                    {assistClaim ? (
-                      <button onClick={() => onReleaseAssist(entry.id)} type="button">
-                        Assist freigeben
-                      </button>
-                    ) : null}
-                  </div>
-                ) : null}
               </div>
-            );
-          })}
-        </section>
 
-        <div className="console-bottom-grid" hidden={sidebarView !== "fleet"}>
-          <section className="console-next-groups aircraft-queue-panel">
-            <div className="console-panel-title">
-              <div>
-                <strong>
-                  Passende Queue für {selectedAircraft?.registration ?? "das Flugzeug"}
-                </strong>
-                <small>
-                  Die Reihenfolge ist eine Empfehlung; abwesende Gruppen können zurückgestellt
-                  werden.
-                </small>
-              </div>
-              <span className="automatic-gate-status">
-                <strong>
-                  {selectedRotation?.precalledAt
-                    ? "GO TO GATE ausgelöst"
-                    : "GO TO GATE automatisch aktiv"}
-                </strong>
-                <small>
-                  {selectedRotation?.precalledAt
-                    ? `${selectedRotation.communicationLabel} wurde automatisch zum Gate gerufen`
-                    : "Prognose wird laufend aus heutigen Ist-Zeiten aktualisiert"}
-                </small>
-              </span>
-            </div>
-            <div className="next-group-head">
-              <span>Pos.</span>
-              <span>Gruppe</span>
-              <span>Tickets</span>
-              <span>Anwesenheit</span>
-              <span>Erwartetes Fenster</span>
-              <span>Aktion</span>
-            </div>
-            {aircraftRotations.map((rotation, index) => (
-              <div
-                className={rotation.id === selectedRotation?.id ? "selected" : ""}
-                key={rotation.id}
-              >
-                <button
-                  className="queue-row-select"
-                  onClick={() => onSelectRotation(rotation.id)}
-                  type="button"
-                >
-                  <span>{index + 1}</span>
-                  <strong>{rotation.communicationLabel}</strong>
-                  <span>{rotation.ticketCount}</span>
-                  <span>
-                    {
-                      rotation.tickets.filter((ticket) => ticket.attendanceStatus === "CHECKED_IN")
-                        .length
-                    }
-                    /{rotation.ticketCount} anwesend
-                  </span>
-                  <span>
-                    {rotation.predictedLowerMinutes}–{rotation.predictedUpperMinutes} Min.
-                  </span>
-                </button>
-                <button
-                  className="queue-defer"
-                  onClick={() => onDeferRotation(rotation)}
-                  type="button"
-                >
-                  Zurückstellen
-                </button>
-              </div>
-            ))}
-            {aircraftRotations.length === 0 ? <p>Keine passende Gruppe wartet derzeit.</p> : null}
-            <small>
-              Letzte Aktualisierung: {formatTime(board.event.updatedAt, board.event.timeZone)}
-            </small>
-          </section>
-
-          <section className="console-aircraft-detail">
-            <div className="console-panel-title">
-              <strong>{selectedAircraft?.registration ?? "Kein Flugzeug"}</strong>
-              <small>{selectedAircraft?.aircraftType}</small>
-            </div>
-            <div role="tablist" aria-label="Flugzeugdetails">
-              {detailTabs.map((tab) => (
-                <button
-                  aria-selected={detailTab === tab.id}
-                  className={detailTab === tab.id ? "active" : ""}
-                  key={tab.id}
-                  onClick={() => setDetailTab(tab.id)}
-                  role="tab"
-                  type="button"
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-            {selectedAircraft ? (
-              <div className="console-detail-content" role="tabpanel">
-                {detailTab === "assignment" ? (
-                  <>
-                    <dl>
-                      <div>
-                        <dt>Gruppe</dt>
-                        <dd>
-                          {selectedRotation
-                            ? `${selectedRotation.communicationLabel} · ${selectedRotation.ticketCount} Tickets`
-                            : "–"}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt>Gate</dt>
-                        <dd>
-                          {selectedRotation?.gateLabel ??
-                            board.resourceGroups.find(
-                              (group) => group.id === selectedAircraft.resourceGroupId,
-                            )?.gateLabel ??
-                            "–"}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt>Vorgeschlagene Zeit</dt>
-                        <dd>
-                          {selectedRotation
-                            ? `${selectedRotation.predictedLowerMinutes}–${selectedRotation.predictedUpperMinutes} Min.`
-                            : "–"}
-                        </dd>
-                      </div>
-                    </dl>
-                    <div className="console-info-note">
-                      <strong>Hinweis</strong>
-                      <span>
-                        Diese Empfehlung ist informativ. Die finale Entscheidung liegt beim
-                        Operator.
-                      </span>
-                    </div>
-                    {selectedRotation?.status === "DRAFT" ? (
-                      <label className="aircraft-assignment-pilot">
-                        <span>Pilot für diese Belegung</span>
-                        <select
-                          aria-label="Pilotencode für die Belegung"
-                          value={nextPilotId}
-                          onChange={(event) => onPilotChange(event.target.value)}
-                        >
-                          <option value="">Pilot wählen</option>
-                          {board.pilots
-                            .filter((pilot) => pilot.active && !pilot.paused)
-                            .map((pilot) => (
-                              <option key={pilot.id} value={pilot.id}>
-                                {pilot.operationalCode}
-                              </option>
-                            ))}
-                        </select>
-                      </label>
-                    ) : null}
-                    {action ? (
-                      <button
-                        className="console-confirm assignment-confirm"
-                        disabled={action.disabled}
-                        onClick={action.run}
-                        type="button"
-                      >
-                        {action.label}
-                      </button>
-                    ) : null}
-                  </>
-                ) : null}
-                {detailTab === "info" ? (
-                  <dl>
+              {expanded ? (
+                <div className="flight-director-assignment">
+                  <header>
                     <div>
-                      <dt>Status</dt>
-                      <dd>{stateLabel(selectedAircraft, selectedRotation)}</dd>
+                      <Users aria-hidden="true" size={18} />
+                      <strong>Buchungsgruppen zuweisen</strong>
+                      <small>Gruppen bleiben vollständig zusammen.</small>
                     </div>
-                    <div>
-                      <dt>Ressource</dt>
-                      <dd>{selectedAircraft.resourceGroupName}</dd>
-                    </div>
-                    <div>
-                      <dt>Flugzeugtyp</dt>
-                      <dd>{selectedAircraft.aircraftType}</dd>
-                    </div>
-                    <div>
-                      <dt>Sitzplätze</dt>
-                      <dd>{selectedAircraft.passengerSeats}</dd>
-                    </div>
-                    <div>
-                      <dt>Umläufe seit Tanken</dt>
-                      <dd>{selectedAircraft.rotationsSinceRefuel}</dd>
-                    </div>
-                  </dl>
-                ) : null}
-                {detailTab === "pilot" ? (
-                  <dl>
-                    <div>
-                      <dt>Pilotencode</dt>
-                      <dd>
-                        {selectedRotation?.status === "DRAFT" ? (
-                          <select
-                            aria-label="Pilotencode für die Belegung"
-                            value={nextPilotId}
-                            onChange={(event) => onPilotChange(event.target.value)}
-                          >
-                            <option value="">Pilot wählen</option>
-                            {board.pilots
-                              .filter((pilot) => pilot.active && !pilot.paused)
-                              .map((pilot) => (
-                                <option key={pilot.id} value={pilot.id}>
-                                  {pilot.operationalCode}
-                                </option>
-                              ))}
-                          </select>
-                        ) : (
-                          (selectedRotation?.pilotOperationalCode ?? "–")
-                        )}
-                      </dd>
-                    </div>
-                  </dl>
-                ) : null}
-                {detailTab === "history" ? (
-                  <p className="console-info-note">
                     <span>
-                      Historie ist für dieses Flugzeug in der Flight-Line-Ansicht noch nicht
-                      verfügbar. Der vollständige Audit-Verlauf steht in der Administration unter
-                      Auswertung bereit.
+                      {selectedSeats} von {entry.passengerSeats} Plätzen ausgewählt
                     </span>
-                  </p>
-                ) : null}
-                {detailTab === "notes" ? (
-                  <p className="console-info-note">
-                    <span>Für dieses Flugzeug wurden noch keine Notizen hinterlegt.</span>
-                  </p>
-                ) : null}
-              </div>
-            ) : null}
-            {message ? (
-              <div className="action-message" role="status">
-                {message}
-              </div>
-            ) : null}
-          </section>
-        </div>
-      </main>
+                  </header>
+                  <div className="flight-director-assignment-body">
+                    <div className="flight-director-queue">
+                      {compatibleGroups.length > 0 ? (
+                        compatibleGroups.map((group) => (
+                          <QueueGroupRow
+                            capacity={entry.passengerSeats}
+                            group={group}
+                            key={group.id}
+                            onAttendance={onGroupAttendance}
+                            onMissing={onGroupMissing}
+                            onRecall={onGroupRecall}
+                            onToggle={onToggleGroup}
+                            selected={selectedQueueGroupIds.includes(group.id)}
+                            selectedSeats={selectedSeats}
+                          />
+                        ))
+                      ) : (
+                        <p>Keine passende Buchungsgruppe in der Warteschlange.</p>
+                      )}
+                    </div>
+                    <aside className="flight-director-selection">
+                      <div>
+                        <span>Ausgewählt</span>
+                        {selectedGroups.map((group) => (
+                          <strong key={group.id}>
+                            {group.productCode}-{String(group.communicationNumber).padStart(3, "0")}
+                            <small>{group.ticketCount} Plätze</small>
+                          </strong>
+                        ))}
+                        {selectedGroups.length === 0 ? (
+                          <small>Noch keine Gruppe gewählt</small>
+                        ) : null}
+                      </div>
+                      <SelectField
+                        label="Pilotencode"
+                        onChange={(event) => onPilotChange(event.target.value)}
+                        value={nextPilotId}
+                      >
+                        <option value="">Pilot wählen</option>
+                        {board.pilots
+                          .filter((pilot) => pilot.active && !pilot.paused)
+                          .map((pilot) => (
+                            <option key={pilot.id} value={pilot.id}>
+                              {pilot.operationalCode}
+                            </option>
+                          ))}
+                      </SelectField>
+                      <div className="flight-director-selection-total">
+                        <span>Gesamt</span>
+                        <strong>
+                          {selectedSeats} von {entry.passengerSeats} Plätzen
+                        </strong>
+                      </div>
+                      <Button
+                        disabled={
+                          !action ||
+                          action.disabled ||
+                          selectedSeats > entry.passengerSeats ||
+                          (selectedSeats === 0 && !selectedRotation)
+                        }
+                        onClick={() => action?.run()}
+                        size="touch"
+                        variant="primary"
+                      >
+                        <CheckCircle2 aria-hidden="true" />
+                        {action?.label ?? "Keine operative Aktion"}
+                      </Button>
+                      <div className="flight-director-secondary-actions">
+                        <Button onClick={onOpenDisposition} size="compact">
+                          Disposition
+                        </Button>
+                        <Button onClick={onPause} size="compact">
+                          Pause
+                        </Button>
+                        {entry.operationalState === "AVAILABLE" ? (
+                          <Button onClick={onUnavailable} size="compact" variant="danger">
+                            Nicht verfügbar
+                          </Button>
+                        ) : (
+                          <Button onClick={onAvailable} size="compact" variant="primary">
+                            Wieder verfügbar
+                          </Button>
+                        )}
+                      </div>
+                    </aside>
+                  </div>
+                </div>
+              ) : null}
+            </article>
+          );
+        })}
+      </Panel>
+
+      <div className="flight-director-bottom-grid">
+        <Panel className="flight-director-bottom" padding="none">
+          <Tabs
+            items={[
+              { value: "current", label: "Aktueller Umlauf" },
+              { value: "history", label: "Historie" },
+            ]}
+            label="Flugzeuginformationen"
+            onChange={setBottomTab}
+            value={bottomTab}
+          />
+          {bottomTab === "current" ? (
+            <CompactCurrentRotation rotation={selectedRotation} timeZone={board.event.timeZone} />
+          ) : (
+            <CompactHistory history={history} timeZone={board.event.timeZone} />
+          )}
+        </Panel>
+        <Panel className="flight-director-ticket-overview" padding="none">
+          <header>
+            <h2>
+              Verkaufte Tickets <small>alle Flugzeuge</small>
+            </h2>
+            <SearchField
+              label="Verkaufte Tickets suchen"
+              onChange={(event) => setTicketSearch(event.target.value)}
+              placeholder="Nach Ticket-ID oder Produkt suchen"
+              value={ticketSearch}
+            />
+          </header>
+          <CompactTickets rows={ticketRows} />
+        </Panel>
+      </div>
     </section>
   );
 }
 
-const rotationStatusLabel: Record<Rotation["status"], string> = {
-  DRAFT: "Wartet",
-  CALLED: "Aufgerufen",
-  IN_FLIGHT: "Im Flug",
-  LANDED: "Gelandet",
-  COMPLETED: "Abgeschlossen",
-};
+function QueueGroupRow({
+  group,
+  selected,
+  selectedSeats,
+  capacity,
+  onToggle,
+  onAttendance,
+  onMissing,
+  onRecall,
+}: {
+  group: QueueGroup;
+  selected: boolean;
+  selectedSeats: number;
+  capacity: number;
+  onToggle: (ticketGroupId: string, selected: boolean) => void;
+  onAttendance: (ticketGroupId: string, checkedIn: boolean) => void;
+  onMissing: (ticketGroupId: string) => void;
+  onRecall: (ticketGroupId: string) => void;
+}) {
+  const exceedsCapacity = !selected && selectedSeats + group.ticketCount > capacity;
+  const label = `${group.productCode}-${String(group.communicationNumber).padStart(3, "0")}`;
+  return (
+    <div className={selected ? "flight-director-queue-row selected" : "flight-director-queue-row"}>
+      <label>
+        <input
+          checked={selected}
+          disabled={group.status === "MISSING" || exceedsCapacity}
+          onChange={(event) => onToggle(group.id, event.target.checked)}
+          type="checkbox"
+        />
+        <strong>{label}</strong>
+      </label>
+      <span>
+        {group.ticketCount} Person{group.ticketCount === 1 ? "" : "en"}
+      </span>
+      <span>
+        {group.presentCount}/{group.ticketCount} anwesend
+      </span>
+      <div>
+        <Button
+          onClick={() => onAttendance(group.id, group.status !== "PRESENT")}
+          size="compact"
+          variant={group.status === "PRESENT" ? "primary" : "secondary"}
+        >
+          <CheckCircle2 aria-hidden="true" /> Anwesend
+        </Button>
+        <Button onClick={() => onMissing(group.id)} size="compact">
+          <UserRoundX aria-hidden="true" /> Nicht da
+        </Button>
+        <Button onClick={() => onRecall(group.id)} size="compact">
+          <Bell aria-hidden="true" /> Nachrufen
+        </Button>
+      </div>
+    </div>
+  );
+}
 
-function SupervisorSidebarPanel({
-  view,
-  board,
+function CompactCurrentRotation({
+  rotation,
   timeZone,
 }: {
-  view: Exclude<SidebarView, "fleet">;
-  board: OperationBoard;
+  rotation: Rotation | undefined;
   timeZone: string;
 }) {
-  if (view === "groups") {
-    const openRotations = board.rotations.filter((rotation) => rotation.status !== "COMPLETED");
+  if (!rotation) {
     return (
-      <section className="console-status-matrix" aria-label="Gruppen">
-        <div className="console-panel-title">
-          <strong>Gruppen</strong>
-          <small>{openRotations.length} in der Warteschlange oder in Betreuung</small>
-        </div>
-        <div className="next-group-head">
-          <span>Gruppe</span>
-          <span>Tickets</span>
-          <span>Produkt</span>
-          <span>Gate</span>
-          <span>Status</span>
-        </div>
-        {openRotations.map((rotation) => (
-          <div className="console-matrix-row" key={rotation.id}>
-            <strong>{rotation.communicationLabel}</strong>
-            <span>{rotation.ticketCount}</span>
-            <span>{rotation.productName}</span>
-            <span>{rotation.gateLabel}</span>
-            <span className={`console-status status-${rotation.status.toLowerCase()}`}>
-              {rotationStatusLabel[rotation.status]}
-            </span>
-          </div>
-        ))}
-        {openRotations.length === 0 ? <p>Keine Gruppe wartet derzeit.</p> : null}
-      </section>
-    );
-  }
-
-  if (view === "refueling" || view === "maintenance") {
-    const states: Aircraft["operationalState"][] =
-      view === "refueling" ? ["REFUELING"] : ["INACTIVE", "INTERRUPTED"];
-    const matches = board.aircraft.filter((entry) => states.includes(entry.operationalState));
-    return (
-      <section
-        className="console-status-matrix"
-        aria-label={view === "refueling" ? "Tanken" : "Wartung"}
-      >
-        <div className="console-panel-title">
-          <strong>{view === "refueling" ? "Tanken" : "Wartung"}</strong>
-          <small>{matches.length} Flugzeuge</small>
-        </div>
-        <div className="console-aircraft-table-head">
-          <span>Flugzeug</span>
-          <span>Ressource</span>
-          <span>Status</span>
-          <span>Seit</span>
-        </div>
-        {matches.map((entry) => (
-          <div className="console-matrix-row" key={entry.id}>
-            <strong>{entry.registration}</strong>
-            <span>{entry.resourceGroupName}</span>
-            <span className="console-status status-paused">{entry.operationalState}</span>
-            <span>–</span>
-          </div>
-        ))}
-        {matches.length === 0 ? (
-          <p>
-            {view === "refueling"
-              ? "Kein Flugzeug wird derzeit betankt."
-              : "Kein Flugzeug ist derzeit in Wartung oder unterbrochen."}
-          </p>
-        ) : null}
-      </section>
-    );
-  }
-
-  const recentRotations = [...board.rotations]
-    .filter((rotation) => rotation.calledAt)
-    .sort((a, b) => new Date(b.calledAt ?? 0).getTime() - new Date(a.calledAt ?? 0).getTime())
-    .slice(0, 20);
-  return (
-    <section className="console-status-matrix" aria-label="Abläufe">
-      <div className="console-panel-title">
-        <strong>Abläufe</strong>
-        <small>Letzte {recentRotations.length} aufgerufenen Gruppen</small>
+      <div className="flight-director-empty-detail">
+        <Plane aria-hidden="true" />
+        <span>Für das ausgewählte Flugzeug ist noch kein Umlauf belegt.</span>
       </div>
-      <div className="next-group-head">
-        <span>Gruppe</span>
+    );
+  }
+  return (
+    <dl className="flight-director-current-rotation">
+      <div>
+        <dt>Fluggruppe</dt>
+        <dd>{rotation.communicationLabel}</dd>
+      </div>
+      <div>
+        <dt>Status</dt>
+        <dd>{rotation.status}</dd>
+      </div>
+      <div>
+        <dt>Produkt</dt>
+        <dd>{rotation.productName}</dd>
+      </div>
+      <div>
+        <dt>Off-Block</dt>
+        <dd>{formatTime(rotation.timeline.actual.departureAt, timeZone)}</dd>
+      </div>
+      <div>
+        <dt>On-Block</dt>
+        <dd>{formatTime(rotation.timeline.actual.landingAt, timeZone)}</dd>
+      </div>
+      <div>
+        <dt>Pilot</dt>
+        <dd>{rotation.pilotOperationalCode ?? "–"}</dd>
+      </div>
+    </dl>
+  );
+}
+
+function CompactHistory({ history, timeZone }: { history: Rotation[]; timeZone: string }) {
+  return (
+    <div className="flight-director-compact-table">
+      <div className="flight-director-compact-head">
+        <span>Fluggruppe</span>
+        <span>Off-Block</span>
+        <span>On-Block</span>
+        <span>Pilot</span>
+        <span>Plätze</span>
+      </div>
+      {history.length > 0 ? (
+        history.map((rotation) => (
+          <div key={rotation.id}>
+            <strong>{rotation.communicationLabel}</strong>
+            <span>{formatTime(rotation.timeline.actual.departureAt, timeZone)}</span>
+            <span>{formatTime(rotation.timeline.actual.landingAt, timeZone)}</span>
+            <span>{rotation.pilotOperationalCode ?? "–"}</span>
+            <span>{rotation.ticketCount}</span>
+          </div>
+        ))
+      ) : (
+        <p>
+          <Clock3 aria-hidden="true" /> Noch keine abgeschlossenen Flüge.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function CompactTickets({
+  rows,
+}: {
+  rows: Array<{ group: Rotation["bookingGroups"][number]; rotation: Rotation }>;
+}) {
+  return (
+    <div className="flight-director-compact-table tickets">
+      <div className="flight-director-compact-head">
+        <span>Ticketgruppe</span>
+        <span>Personen</span>
         <span>Status</span>
         <span>Flugzeug</span>
-        <span>Aufgerufen</span>
+        <span>Produkt</span>
       </div>
-      {recentRotations.map((rotation) => (
-        <div className="console-matrix-row" key={rotation.id}>
-          <strong>{rotation.communicationLabel}</strong>
-          <span className={`console-status status-${rotation.status.toLowerCase()}`}>
-            {rotationStatusLabel[rotation.status]}
-          </span>
-          <span>{rotation.aircraftRegistration ?? "–"}</span>
-          <span>{formatTime(rotation.calledAt ?? null, timeZone)}</span>
-        </div>
-      ))}
-      {recentRotations.length === 0 ? <p>Noch keine Gruppe wurde aufgerufen.</p> : null}
-    </section>
+      {rows.length > 0 ? (
+        rows.map(({ group, rotation }) => (
+          <div key={`${rotation.id}-${group.id}`}>
+            <strong>
+              {rotation.productCode}-{String(group.communicationNumber).padStart(3, "0")}
+            </strong>
+            <span>{group.ticketCount}</span>
+            <span>{rotation.status}</span>
+            <span>{rotation.aircraftRegistration ?? "Noch offen"}</span>
+            <span>{rotation.productName}</span>
+          </div>
+        ))
+      ) : (
+        <p>
+          <Plane aria-hidden="true" /> Noch keine verkauften Tickets.
+        </p>
+      )}
+    </div>
   );
 }
