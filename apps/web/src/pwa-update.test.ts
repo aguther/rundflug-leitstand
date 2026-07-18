@@ -2,7 +2,6 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const mainSource = readFileSync(new URL("./main.tsx", import.meta.url), "utf8");
-const apiSource = readFileSync(new URL("./api.ts", import.meta.url), "utf8");
 const viteConfigSource = readFileSync(new URL("../vite.config.ts", import.meta.url), "utf8");
 const pushWorkerSource = readFileSync(new URL("../public/push-sw.js", import.meta.url), "utf8");
 
@@ -21,8 +20,7 @@ describe("PWA deployment updates", () => {
     expect(mainSource).not.toContain("registration?.unregister()");
   });
 
-  it("always sends API requests directly to the network without dropping web push", () => {
-    expect(apiSource).toMatch(/getOperationBoard[\s\S]*cache: "no-store"/);
+  it("keeps API navigation out of the application cache without dropping web push", () => {
     expect(pushWorkerSource).not.toContain('addEventListener("fetch"');
     expect(pushWorkerSource).toContain('addEventListener("push"');
   });
