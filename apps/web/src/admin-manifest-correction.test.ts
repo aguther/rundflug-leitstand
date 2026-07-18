@@ -23,6 +23,7 @@ function rotation(
     productName: "Synthetischer Rundflug",
     status,
     ticketGroupId,
+    bookingGroups: [],
     gateId: "gate-1",
     gateLabel: "Gate 1",
     aircraftId: null,

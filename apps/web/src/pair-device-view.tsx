@@ -14,7 +14,6 @@ export function PairDeviceView() {
   const roleTargets: Record<string, string> = {
     CASHIER: "/",
     FLIGHT_LINE: "/flight-line",
-    FLIGHT_LINE_LEAD: "/flight-line",
     FLIGHT_DIRECTOR: "/admin",
     ADMIN: "/admin",
     DISPLAY: "/fids?kiosk=1",
@@ -26,8 +25,7 @@ export function PairDeviceView() {
     role in roleTargets;
   const activate = () => {
     if (!valid) return;
-    const viewRole =
-      role === "FLIGHT_LINE_LEAD" ? "FLIGHT_LINE" : role === "FLIGHT_DIRECTOR" ? "ADMIN" : role;
+    const viewRole = role;
     rememberDeviceCredential(window.localStorage, viewRole, deviceId, token);
     rememberActiveEvent(window.localStorage, eventId);
     if (role === "DISPLAY") {

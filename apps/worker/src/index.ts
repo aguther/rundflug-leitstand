@@ -1174,7 +1174,7 @@ app.put("/api/events/:eventId/assist-claims/:aircraftId", async (context) => {
     context.req.header("x-device-token"),
     context.req.raw,
   );
-  if (!device || !deviceId || !["FLIGHT_LINE", "FLIGHT_LINE_LEAD", "ADMIN"].includes(device.role)) {
+  if (!device || !deviceId || !["FLIGHT_LINE", "FLIGHT_DIRECTOR", "ADMIN"].includes(device.role)) {
     return context.json(
       { error: { code: "DEVICE_NOT_AUTHORIZED", message: "Gerät nicht berechtigt." } },
       403,
@@ -1259,13 +1259,13 @@ app.delete("/api/events/:eventId/assist-claims/:aircraftId", async (context) => 
     context.req.header("x-device-token"),
     context.req.raw,
   );
-  if (!device || !deviceId || !["FLIGHT_LINE", "FLIGHT_LINE_LEAD", "ADMIN"].includes(device.role)) {
+  if (!device || !deviceId || !["FLIGHT_LINE", "FLIGHT_DIRECTOR", "ADMIN"].includes(device.role)) {
     return context.json(
       { error: { code: "DEVICE_NOT_AUTHORIZED", message: "Gerät nicht berechtigt." } },
       403,
     );
   }
-  if (["FLIGHT_LINE_LEAD", "ADMIN"].includes(device.role)) {
+  if (["FLIGHT_DIRECTOR", "ADMIN"].includes(device.role)) {
     await context.env.DB.prepare(
       `DELETE FROM flight_line_assist_claims
         WHERE operation_day_id = ?1 AND aircraft_id = ?2`,
@@ -1322,6 +1322,7 @@ app.get("/api/events/:eventId/operations", async (context) => {
   const [
     products,
     rotations,
+    queueGroupRows,
     durationRows,
     aircraftRows,
     fleetRows,
@@ -1492,6 +1493,24 @@ app.get("/api/events/:eventId/operations", async (context) => {
                 FROM rotation_tickets attendance_rt
                 JOIN tickets attendance_ticket ON attendance_ticket.id = attendance_rt.ticket_id
                WHERE attendance_rt.rotation_id = r.id AND attendance_rt.released_at IS NULL) AS tickets_json
+              ,(SELECT json_group_array(json_object(
+                  'id', grouped_tickets.ticket_group_id,
+                  'communicationNumber', grouped_tickets.communication_number,
+                  'ticketCount', grouped_tickets.ticket_count,
+                  'presentCount', grouped_tickets.present_count
+                ))
+                  FROM (
+                    SELECT grouped_ticket.ticket_group_id,
+                           grouped_group.communication_number,
+                           COUNT(*) AS ticket_count,
+                           SUM(CASE WHEN grouped_ticket.attendance_status = 'CHECKED_IN' THEN 1 ELSE 0 END)
+                             AS present_count
+                      FROM rotation_tickets grouped_rt
+                      JOIN tickets grouped_ticket ON grouped_ticket.id = grouped_rt.ticket_id
+                      JOIN ticket_groups grouped_group ON grouped_group.id = grouped_ticket.ticket_group_id
+                     WHERE grouped_rt.rotation_id = r.id AND grouped_rt.released_at IS NULL
+                     GROUP BY grouped_ticket.ticket_group_id, grouped_group.communication_number
+                  ) grouped_tickets) AS booking_groups_json
          FROM rotations r
          JOIN operation_days od ON od.id = r.operation_day_id
          JOIN flight_groups fg ON fg.id = r.flight_group_id
@@ -1555,6 +1574,37 @@ app.get("/api/events/:eventId/operations", async (context) => {
           prediction_upper_minutes: number | null;
           prediction_updated_at: string | null;
           tickets_json: string;
+          booking_groups_json: string;
+        }>(),
+    () =>
+      context.env.DB.prepare(
+        `SELECT tg.id, tg.communication_number, tg.queue_sequence, tg.status,
+                tg.recalled_at, tg.recall_count, p.id AS product_id, p.code AS product_code,
+                p.name AS product_name, p.resource_group_id, p.gate_id,
+                COUNT(t.id) AS ticket_count,
+                SUM(CASE WHEN t.attendance_status = 'CHECKED_IN' THEN 1 ELSE 0 END) AS present_count
+           FROM ticket_groups tg
+           JOIN products p ON p.id = tg.product_id
+           JOIN tickets t ON t.ticket_group_id = tg.id
+          WHERE tg.operation_day_id = ?1 AND tg.status IN ('QUEUED', 'PRESENT', 'MISSING')
+          GROUP BY tg.id, p.id
+          ORDER BY tg.queue_sequence`,
+      )
+        .bind(eventId)
+        .all<{
+          id: string;
+          communication_number: number;
+          queue_sequence: number;
+          status: string;
+          recalled_at: string | null;
+          recall_count: number;
+          product_id: string;
+          product_code: string;
+          product_name: string;
+          resource_group_id: string;
+          gate_id: string;
+          ticket_count: number;
+          present_count: number;
         }>(),
     () =>
       context.env.DB.prepare(
@@ -1899,6 +1949,7 @@ app.get("/api/events/:eventId/operations", async (context) => {
         productCode: rotation.product_code,
         productName: rotation.product_name,
         status: rotation.status,
+        bookingGroups: JSON.parse(rotation.booking_groups_json),
         ticketGroupId: rotation.ticket_group_id,
         gateId: rotation.gate_id,
         gateLabel: rotation.gate_label,
@@ -1995,6 +2046,21 @@ app.get("/api/events/:eventId/operations", async (context) => {
         }>,
       };
     }),
+    queueGroups: queueGroupRows.results.map((group) => ({
+      id: group.id,
+      communicationNumber: group.communication_number,
+      productId: group.product_id,
+      productCode: group.product_code,
+      productName: group.product_name,
+      resourceGroupId: group.resource_group_id,
+      gateId: group.gate_id,
+      queueSequence: group.queue_sequence,
+      status: group.status,
+      ticketCount: group.ticket_count,
+      presentCount: group.present_count,
+      recalledAt: group.recalled_at,
+      recallCount: group.recall_count,
+    })),
     aircraft: fleetRows.results.map((aircraft) => ({
       id: aircraft.id,
       registration: aircraft.registration,
@@ -2086,7 +2152,7 @@ app.get("/api/events/:eventId/tickets/search", async (context) => {
     context.req.header("x-device-token"),
     context.req.raw,
   );
-  if (!device || !["CASHIER", "FLIGHT_LINE", "FLIGHT_LINE_LEAD", "ADMIN"].includes(device.role)) {
+  if (!device || !["CASHIER", "FLIGHT_LINE", "FLIGHT_DIRECTOR", "ADMIN"].includes(device.role)) {
     return context.json(
       { error: { code: "DEVICE_NOT_AUTHORIZED", message: "Gerät nicht berechtigt." } },
       403,
@@ -2190,6 +2256,59 @@ app.get("/api/events/:eventId/tickets/search", async (context) => {
   });
 });
 
+app.get("/api/events/:eventId/ticket-groups/:ticketGroupId/print-data", async (context) => {
+  const eventId = context.req.param("eventId");
+  const device = await authorizeDevice(
+    context.env,
+    eventId,
+    context.req.header("x-device-id"),
+    context.req.header("x-device-token"),
+    context.req.raw,
+  );
+  if (!device || !["CASHIER", "ADMIN"].includes(device.role)) {
+    return context.json(
+      { error: { code: "DEVICE_NOT_AUTHORIZED", message: "Gerät nicht berechtigt." } },
+      403,
+    );
+  }
+  const ticketGroupId = context.req.param("ticketGroupId");
+  const rows = await context.env.DB.prepare(
+    `SELECT t.public_code, od.name AS event_name, p.name AS product_name, g.label AS gate_label,
+            p.code AS product_code, tg.communication_number
+       FROM ticket_groups tg
+       JOIN operation_days od ON od.id = tg.operation_day_id
+       JOIN products p ON p.id = tg.product_id
+       JOIN gates g ON g.id = p.gate_id
+       JOIN tickets t ON t.ticket_group_id = tg.id
+      WHERE tg.id = ?1 AND tg.operation_day_id = ?2 AND t.public_code IS NOT NULL
+      ORDER BY t.created_at, t.id`,
+  )
+    .bind(ticketGroupId, eventId)
+    .all<{
+      public_code: string;
+      event_name: string;
+      product_name: string;
+      gate_label: string;
+      product_code: string;
+      communication_number: number;
+    }>();
+  const first = rows.results[0];
+  if (!first) {
+    return context.json(
+      { error: { code: "TICKET_GROUP_NOT_FOUND", message: "Buchungsgruppe nicht gefunden." } },
+      404,
+    );
+  }
+  return context.json({
+    ticketGroupId,
+    eventName: first.event_name,
+    productName: first.product_name,
+    gateLabel: first.gate_label,
+    communicationLabel: `${first.product_code}-${String(first.communication_number).padStart(3, "0")}`,
+    tickets: rows.results.map((row, index) => ({ code: row.public_code, position: index + 1 })),
+  });
+});
+
 app.get("/api/events/:eventId/history", async (context) => {
   const eventId = context.req.param("eventId");
   const device = await authorizeDevice(
@@ -2199,7 +2318,7 @@ app.get("/api/events/:eventId/history", async (context) => {
     context.req.header("x-device-token"),
     context.req.raw,
   );
-  if (!device || !["ADMIN", "FLIGHT_LINE_LEAD", "FLIGHT_DIRECTOR"].includes(device.role)) {
+  if (!device || !["ADMIN", "FLIGHT_DIRECTOR"].includes(device.role)) {
     return context.json(
       { error: { code: "DEVICE_NOT_AUTHORIZED", message: "Gerät nicht berechtigt." } },
       403,
@@ -2269,7 +2388,7 @@ app.get("/api/events/:eventId/history/operations", async (context) => {
     context.req.header("x-device-token"),
     context.req.raw,
   );
-  if (!device || !["ADMIN", "FLIGHT_LINE_LEAD", "FLIGHT_DIRECTOR"].includes(device.role)) {
+  if (!device || !["ADMIN", "FLIGHT_DIRECTOR"].includes(device.role)) {
     return context.json(
       { error: { code: "DEVICE_NOT_AUTHORIZED", message: "Gerät nicht berechtigt." } },
       403,
@@ -2388,7 +2507,7 @@ app.get("/api/events/:eventId/history/forecasts", async (context) => {
     context.req.header("x-device-token"),
     context.req.raw,
   );
-  if (!device || !["ADMIN", "FLIGHT_LINE_LEAD", "FLIGHT_DIRECTOR"].includes(device.role)) {
+  if (!device || !["ADMIN", "FLIGHT_DIRECTOR"].includes(device.role)) {
     return context.json(
       { error: { code: "DEVICE_NOT_AUTHORIZED", message: "Gerät nicht berechtigt." } },
       403,
@@ -2951,7 +3070,7 @@ app.get("/api/public/events/:eventId/board", async (context) => {
   const eventId = context.req.param("eventId");
   const requestedGateId = context.req.query("gateId")?.trim() || null;
   const event = await context.env.DB.prepare(
-    "SELECT name, emergency_mode, operational_interrupted, operational_note, updated_at FROM operation_days WHERE id = ?1",
+    "SELECT name, emergency_mode, operational_interrupted, operational_note, departed_visibility_seconds, updated_at FROM operation_days WHERE id = ?1",
   )
     .bind(eventId)
     .first<{
@@ -2959,6 +3078,7 @@ app.get("/api/public/events/:eventId/board", async (context) => {
       emergency_mode: number;
       operational_interrupted: number;
       operational_note: string;
+      departed_visibility_seconds: number;
       updated_at: string;
     }>();
   if (!event) {
@@ -3063,6 +3183,7 @@ app.get("/api/public/events/:eventId/board", async (context) => {
     emergencyMode: event.emergency_mode === 1,
     operationalInterrupted: event.operational_interrupted === 1,
     operationalNotice: event.operational_note,
+    departedVisibilitySeconds: event.departed_visibility_seconds,
     updatedAt: event.updated_at,
     groups: event.emergency_mode
       ? []

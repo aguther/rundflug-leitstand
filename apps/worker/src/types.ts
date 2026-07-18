@@ -45,5 +45,6 @@ export interface StoredEventRow {
   planned_boarding_minutes?: number;
   planned_deboarding_minutes?: number;
   planned_buffer_minutes?: number;
+  departed_visibility_seconds?: number;
   updated_at: string;
 }

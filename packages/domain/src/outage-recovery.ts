@@ -43,7 +43,7 @@ export function assertMayStageOutageRecoveryEntry(
   const permitted =
     role === "ADMIN" ||
     (entryType === "PAPER_SALE" && role === "CASHIER") ||
-    (entryType !== "PAPER_SALE" && role === "FLIGHT_LINE_LEAD");
+    (entryType !== "PAPER_SALE" && role === "FLIGHT_DIRECTOR");
   if (!permitted) {
     throw new DomainRuleError(
       "OUTAGE_RECOVERY_ROLE_NOT_AUTHORIZED",

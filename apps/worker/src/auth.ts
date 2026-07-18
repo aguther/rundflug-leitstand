@@ -2,18 +2,9 @@ import { sha256Hex } from "./crypto";
 import type { Env } from "./types";
 
 export const SESSION_COOKIE = "rls_session";
-export const SESSION_IDLE_MINUTES = 30;
-export const SESSION_ABSOLUTE_HOURS = 12;
-export const DISPLAY_SESSION_ABSOLUTE_DAYS = 30;
+export const SESSION_ABSOLUTE_HOURS = 16;
 
-export const operatorRoles = [
-  "CASHIER",
-  "FLIGHT_LINE",
-  "FLIGHT_LINE_LEAD",
-  "FLIGHT_DIRECTOR",
-  "ADMIN",
-  "DISPLAY",
-] as const;
+export const operatorRoles = ["CASHIER", "FLIGHT_LINE", "FLIGHT_DIRECTOR", "ADMIN"] as const;
 export type OperatorRole = (typeof operatorRoles)[number];
 
 export type SessionActor = {
@@ -75,20 +66,17 @@ export async function authorizeSession(env: Env, request: Request): Promise<Sess
   if (
     !row ||
     row.session_version !== row.account_session_version ||
-    Date.parse(row.idle_expires_at) <= now.getTime() ||
     Date.parse(row.absolute_expires_at) <= now.getTime()
   ) {
     return null;
   }
 
   if (now.getTime() - Date.parse(row.last_seen_at) >= 5 * 60_000) {
-    const absoluteExpiry = Date.parse(row.absolute_expires_at);
-    const nextIdle = Math.min(absoluteExpiry, now.getTime() + SESSION_IDLE_MINUTES * 60_000);
     await env.DB.prepare(
       `UPDATE operator_sessions SET last_seen_at = ?1, idle_expires_at = ?2
         WHERE id = ?3 AND revoked_at IS NULL`,
     )
-      .bind(now.toISOString(), new Date(nextIdle).toISOString(), row.session_id)
+      .bind(now.toISOString(), row.absolute_expires_at, row.session_id)
       .run();
   }
 
@@ -108,19 +96,13 @@ export function assertRole(
   return actor && roles.includes(actor.role) ? actor : null;
 }
 
-export function sessionTimes(role: OperatorRole, now = new Date()) {
-  const absoluteExpiresAt =
-    role === "DISPLAY"
-      ? addMinutes(now, DISPLAY_SESSION_ABSOLUTE_DAYS * 24 * 60)
-      : addMinutes(now, SESSION_ABSOLUTE_HOURS * 60);
+export function sessionTimes(_role: OperatorRole, now = new Date()) {
+  const absoluteExpiresAt = addMinutes(now, SESSION_ABSOLUTE_HOURS * 60);
   return {
     createdAt: now.toISOString(),
-    idleExpiresAt: role === "DISPLAY" ? absoluteExpiresAt : addMinutes(now, SESSION_IDLE_MINUTES),
+    idleExpiresAt: absoluteExpiresAt,
     absoluteExpiresAt,
-    maxAgeSeconds:
-      role === "DISPLAY"
-        ? DISPLAY_SESSION_ABSOLUTE_DAYS * 24 * 60 * 60
-        : SESSION_ABSOLUTE_HOURS * 60 * 60,
+    maxAgeSeconds: SESSION_ABSOLUTE_HOURS * 60 * 60,
   };
 }
 
@@ -128,9 +110,7 @@ const ROLE_PREFIX: Record<OperatorRole, string> = {
   ADMIN: "ADMIN",
   CASHIER: "KASSE",
   FLIGHT_LINE: "FL",
-  FLIGHT_LINE_LEAD: "SUP",
   FLIGHT_DIRECTOR: "LEIT",
-  DISPLAY: "DISPLAY",
 };
 
 export async function nextLoginCode(env: Env, role: OperatorRole): Promise<string> {

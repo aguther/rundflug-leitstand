@@ -169,14 +169,28 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
   commandBaseSchema.extend({
     type: z.literal("CALL_NEXT"),
     payload: z.object({
-      rotationId: z.string().min(1).max(100),
+      ticketGroupIds: z.array(z.string().min(1).max(100)).min(1).max(12),
       aircraftId: z.string().min(1).max(100),
       pilotId: z.string().min(1).max(100),
     }),
   }),
   commandBaseSchema.extend({
-    type: z.enum(["MARK_IN_FLIGHT", "MARK_LANDED", "MARK_COMPLETED"]),
+    type: z.enum(["MARK_OFF_BLOCK", "MARK_ON_BLOCK"]),
     payload: z.object({ rotationId: z.string().min(1).max(100) }),
+  }),
+  commandBaseSchema.extend({
+    type: z.literal("COMPLETE_TURNAROUND"),
+    payload: z.object({
+      rotationId: z.string().min(1).max(100),
+      nextAircraftState: z.enum(["AVAILABLE", "REFUELING", "PAUSED", "INACTIVE"]),
+    }),
+  }),
+  commandBaseSchema.extend({
+    type: z.literal("CANCEL_ROTATION"),
+    payload: z.object({
+      rotationId: z.string().min(1).max(100),
+      reason: z.string().trim().min(3).max(240),
+    }),
   }),
   commandBaseSchema.extend({
     type: z.enum(["DEFER_TICKET_GROUP", "MARK_NO_SHOW"]),
@@ -275,14 +289,7 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
     payload: z.object({
       pairedDeviceId: z.uuid(),
       label: z.string().trim().min(2).max(80),
-      role: z.enum([
-        "CASHIER",
-        "FLIGHT_LINE",
-        "FLIGHT_LINE_LEAD",
-        "FLIGHT_DIRECTOR",
-        "ADMIN",
-        "DISPLAY",
-      ]),
+      role: z.enum(["CASHIER", "FLIGHT_LINE", "FLIGHT_DIRECTOR", "ADMIN"]),
       credentialHash: z.string().regex(/^[a-f0-9]{64}$/),
       adminPin: z.string().min(4).max(32),
     }),
@@ -369,6 +376,24 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
     }),
   }),
   commandBaseSchema.extend({
+    type: z.literal("SET_TICKET_GROUP_ATTENDANCE"),
+    payload: z.object({
+      ticketGroupId: z.string().min(1).max(100),
+      checkedIn: z.boolean(),
+    }),
+  }),
+  commandBaseSchema.extend({
+    type: z.literal("MARK_TICKET_GROUP_MISSING"),
+    payload: z.object({
+      ticketGroupId: z.string().min(1).max(100),
+      reason: z.string().trim().min(3).max(240),
+    }),
+  }),
+  commandBaseSchema.extend({
+    type: z.literal("RECALL_TICKET_GROUP"),
+    payload: z.object({ ticketGroupId: z.string().min(1).max(100) }),
+  }),
+  commandBaseSchema.extend({
     type: z.literal("MARK_TICKET_NO_SHOW"),
     payload: z.object({
       ticketId: z.string().min(1).max(100),
@@ -401,6 +426,7 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
       plannedBoardingMinutes: z.number().int().min(1).max(120),
       plannedDeboardingMinutes: z.number().int().min(1).max(120),
       plannedBufferMinutes: z.number().int().min(0).max(120),
+      departedVisibilitySeconds: z.number().int().min(5).max(900).default(15),
       reason: z.string().trim().min(3).max(240),
       adminPin: z.string().min(4).max(32),
     }),
@@ -607,6 +633,7 @@ export const eventSnapshotSchema = z.object({
   plannedBoardingMinutes: z.number().int().positive(),
   plannedDeboardingMinutes: z.number().int().positive(),
   plannedBufferMinutes: z.number().int().nonnegative(),
+  departedVisibilitySeconds: z.number().int().min(5).max(900).default(15),
   updatedAt: z.string(),
 });
 
@@ -643,14 +670,7 @@ export const bootstrapRequestSchema = z.object({
 });
 export type BootstrapRequest = z.infer<typeof bootstrapRequestSchema>;
 
-export const operatorRoleSchema = z.enum([
-  "CASHIER",
-  "FLIGHT_LINE",
-  "FLIGHT_LINE_LEAD",
-  "FLIGHT_DIRECTOR",
-  "ADMIN",
-  "DISPLAY",
-]);
+export const operatorRoleSchema = z.enum(["CASHIER", "FLIGHT_LINE", "FLIGHT_DIRECTOR", "ADMIN"]);
 export type OperatorRole = z.infer<typeof operatorRoleSchema>;
 
 export const operatorAccountSummarySchema = z.object({
@@ -734,6 +754,21 @@ export const ticketSearchResponseSchema = z.object({
 });
 export type TicketSearchResult = z.infer<typeof ticketSearchResultSchema>;
 export type TicketSearchResponse = z.infer<typeof ticketSearchResponseSchema>;
+
+export const ticketGroupPrintDataSchema = z.object({
+  ticketGroupId: z.string(),
+  eventName: z.string(),
+  productName: z.string(),
+  gateLabel: z.string(),
+  communicationLabel: z.string(),
+  tickets: z.array(
+    z.object({
+      code: z.string().min(12).max(32),
+      position: z.number().int().positive(),
+    }),
+  ),
+});
+export type TicketGroupPrintData = z.infer<typeof ticketGroupPrintDataSchema>;
 
 export const cloneEventRequestSchema = z.object({
   commandId: z.uuid(),
@@ -856,6 +891,16 @@ export const rotationOperationalSummarySchema = z.object({
   productCode: z.string(),
   productName: z.string(),
   status: z.enum(["DRAFT", "CALLED", "IN_FLIGHT", "LANDED", "COMPLETED"]),
+  bookingGroups: z
+    .array(
+      z.object({
+        id: z.string(),
+        communicationNumber: z.number().int().positive(),
+        ticketCount: z.number().int().positive(),
+        presentCount: z.number().int().nonnegative(),
+      }),
+    )
+    .default([]),
   ticketGroupId: z.string(),
   gateId: z.string().min(1),
   gateLabel: z.string().min(1),
@@ -959,16 +1004,29 @@ export const pilotOperationalSummarySchema = z.object({
 });
 
 export const operationBoardSchema = z.object({
-  currentDeviceRole: z.enum([
-    "CASHIER",
-    "FLIGHT_LINE",
-    "FLIGHT_LINE_LEAD",
-    "FLIGHT_DIRECTOR",
-    "ADMIN",
-  ]),
+  currentDeviceRole: z.enum(["CASHIER", "FLIGHT_LINE", "FLIGHT_DIRECTOR", "ADMIN"]),
   event: eventSnapshotSchema,
   products: z.array(productOperationalSummarySchema),
   rotations: z.array(rotationOperationalSummarySchema),
+  queueGroups: z
+    .array(
+      z.object({
+        id: z.string(),
+        communicationNumber: z.number().int().positive(),
+        productId: z.string(),
+        productCode: z.string(),
+        productName: z.string(),
+        resourceGroupId: z.string(),
+        gateId: z.string(),
+        queueSequence: z.number().int().positive(),
+        status: z.string(),
+        ticketCount: z.number().int().positive(),
+        presentCount: z.number().int().nonnegative(),
+        recalledAt: z.string().nullable(),
+        recallCount: z.number().int().nonnegative(),
+      }),
+    )
+    .default([]),
   aircraft: z.array(aircraftOperationalSummarySchema),
   assistClaims: z.array(
     z.object({
@@ -1058,6 +1116,7 @@ export const publicBoardSchema = z.object({
   emergencyMode: z.boolean(),
   operationalInterrupted: z.boolean(),
   operationalNotice: z.string(),
+  departedVisibilitySeconds: z.number().int().min(5).max(900).default(15),
   updatedAt: z.string(),
   groups: z.array(
     z

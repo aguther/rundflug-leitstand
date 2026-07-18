@@ -6,7 +6,7 @@ CREATE TABLE operator_accounts (
   id TEXT PRIMARY KEY,
   login_code TEXT NOT NULL UNIQUE,
   role TEXT NOT NULL CHECK (role IN (
-    'CASHIER', 'FLIGHT_LINE', 'FLIGHT_LINE_LEAD', 'FLIGHT_DIRECTOR', 'ADMIN', 'DISPLAY'
+    'CASHIER', 'FLIGHT_LINE', 'FLIGHT_DIRECTOR', 'ADMIN'
   )),
   pin_hash TEXT NOT NULL,
   active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1)),
@@ -41,4 +41,3 @@ CREATE INDEX idx_operator_sessions_account_active
 
 CREATE INDEX idx_operator_sessions_token_active
   ON operator_sessions(token_hash, revoked_at, idle_expires_at, absolute_expires_at);
-

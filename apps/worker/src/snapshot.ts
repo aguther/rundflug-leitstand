@@ -33,6 +33,7 @@ export function rowToSnapshot(row: StoredEventRow): EventSnapshot {
     plannedBoardingMinutes: row.planned_boarding_minutes ?? 8,
     plannedDeboardingMinutes: row.planned_deboarding_minutes ?? 5,
     plannedBufferMinutes: row.planned_buffer_minutes ?? 3,
+    departedVisibilitySeconds: row.departed_visibility_seconds ?? 15,
     updatedAt: row.updated_at,
   };
 }

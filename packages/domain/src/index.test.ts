@@ -27,7 +27,7 @@ describe("command authorization", () => {
 
   it("allows only flight-line roles and administrators to move whole ticket groups", () => {
     expect(() => assertRoleMayExecute("FLIGHT_LINE", "MOVE_TICKET_GROUP")).not.toThrow();
-    expect(() => assertRoleMayExecute("FLIGHT_LINE_LEAD", "MOVE_TICKET_GROUP")).not.toThrow();
+    expect(() => assertRoleMayExecute("FLIGHT_DIRECTOR", "MOVE_TICKET_GROUP")).not.toThrow();
     expect(() => assertRoleMayExecute("CASHIER", "MOVE_TICKET_GROUP")).toThrowError(
       /darf MOVE_TICKET_GROUP nicht/,
     );
@@ -35,13 +35,13 @@ describe("command authorization", () => {
 
   it("reserves post-departure manifest corrections for administrators", () => {
     expect(() => assertRoleMayExecute("ADMIN", "CORRECT_ROTATION_MANIFEST")).not.toThrow();
-    expect(() =>
-      assertRoleMayExecute("FLIGHT_LINE_LEAD", "CORRECT_ROTATION_MANIFEST"),
-    ).toThrowError(/darf CORRECT_ROTATION_MANIFEST nicht/);
+    expect(() => assertRoleMayExecute("FLIGHT_DIRECTOR", "CORRECT_ROTATION_MANIFEST")).toThrowError(
+      /darf CORRECT_ROTATION_MANIFEST nicht/,
+    );
   });
 
   it("rejects a display device for operational commands", () => {
-    expect(() => assertRoleMayExecute("DISPLAY", "CALL_NEXT")).toThrowError(/darf CALL_NEXT nicht/);
+    expect(() => assertRoleMayExecute("CASHIER", "CALL_NEXT")).toThrowError(/darf CALL_NEXT nicht/);
   });
 
   it("allows flight-line roles to abort a called rotation but not cashiers", () => {
@@ -72,7 +72,7 @@ describe("command authorization", () => {
       assertRoleMayExecute("FLIGHT_LINE", "SET_AIRCRAFT_OPERATIONAL_STATE"),
     ).toThrowError(/darf SET_AIRCRAFT_OPERATIONAL_STATE nicht/);
     expect(() =>
-      assertRoleMayExecute("FLIGHT_LINE_LEAD", "SET_AIRCRAFT_OPERATIONAL_STATE"),
+      assertRoleMayExecute("FLIGHT_DIRECTOR", "SET_AIRCRAFT_OPERATIONAL_STATE"),
     ).not.toThrow();
   });
 
@@ -85,7 +85,7 @@ describe("command authorization", () => {
 
   it("protects the refuel reminder threshold as administration", () => {
     expect(() =>
-      assertRoleMayExecute("FLIGHT_LINE_LEAD", "CONFIGURE_AIRCRAFT_REFUEL_THRESHOLD"),
+      assertRoleMayExecute("FLIGHT_DIRECTOR", "CONFIGURE_AIRCRAFT_REFUEL_THRESHOLD"),
     ).toThrowError(/darf CONFIGURE_AIRCRAFT_REFUEL_THRESHOLD nicht/);
     expect(() =>
       assertRoleMayExecute("ADMIN", "CONFIGURE_AIRCRAFT_REFUEL_THRESHOLD"),
@@ -94,7 +94,7 @@ describe("command authorization", () => {
 
   it("allows operational leads to publish non-safety resource notices", () => {
     expect(() =>
-      assertRoleMayExecute("FLIGHT_LINE_LEAD", "SET_RESOURCE_GROUP_NOTICE"),
+      assertRoleMayExecute("FLIGHT_DIRECTOR", "SET_RESOURCE_GROUP_NOTICE"),
     ).not.toThrow();
     expect(() => assertRoleMayExecute("CASHIER", "SET_RESOURCE_GROUP_NOTICE")).toThrowError(
       /darf SET_RESOURCE_GROUP_NOTICE nicht/,
@@ -179,7 +179,7 @@ describe("sale guard", () => {
 
   it("allows usable rotation capacity changes only for operational roles", () => {
     expect(() => assertRoleMayExecute("FLIGHT_LINE", "SET_ROTATION_CAPACITY")).not.toThrow();
-    expect(() => assertRoleMayExecute("FLIGHT_LINE_LEAD", "SET_ROTATION_CAPACITY")).not.toThrow();
+    expect(() => assertRoleMayExecute("FLIGHT_DIRECTOR", "SET_ROTATION_CAPACITY")).not.toThrow();
     expect(() => assertRoleMayExecute("ADMIN", "SET_ROTATION_CAPACITY")).not.toThrow();
     expect(() => assertRoleMayExecute("CASHIER", "SET_ROTATION_CAPACITY")).toThrowError(
       /darf SET_ROTATION_CAPACITY nicht/,
@@ -187,14 +187,14 @@ describe("sale guard", () => {
   });
 
   it("allows operational leads to interrupt the event without emergency semantics", () => {
-    expect(() => assertRoleMayExecute("FLIGHT_LINE_LEAD", "SET_EVENT_INTERRUPTION")).not.toThrow();
+    expect(() => assertRoleMayExecute("FLIGHT_DIRECTOR", "SET_EVENT_INTERRUPTION")).not.toThrow();
     expect(() => assertRoleMayExecute("CASHIER", "SET_EVENT_INTERRUPTION")).toThrowError(
       /darf SET_EVENT_INTERRUPTION nicht/,
     );
   });
 
   it("allows operational leads but not cashiers to manage anonymous pilot pauses", () => {
-    expect(() => assertRoleMayExecute("FLIGHT_LINE_LEAD", "SET_PILOT_PAUSE")).not.toThrow();
+    expect(() => assertRoleMayExecute("FLIGHT_DIRECTOR", "SET_PILOT_PAUSE")).not.toThrow();
     expect(() => assertRoleMayExecute("CASHIER", "SET_PILOT_PAUSE")).toThrowError(
       /darf SET_PILOT_PAUSE nicht/,
     );
@@ -265,10 +265,10 @@ describe("attendance authorization", () => {
   it("allows only operational flight-line roles to resolve attendance exceptions", () => {
     expect(() => assertRoleMayExecute("FLIGHT_LINE", "MARK_TICKET_NO_SHOW")).not.toThrow();
     expect(() =>
-      assertRoleMayExecute("FLIGHT_LINE_LEAD", "CONFIRM_ATTENDANCE_DECISION"),
+      assertRoleMayExecute("FLIGHT_DIRECTOR", "CONFIRM_ATTENDANCE_DECISION"),
     ).not.toThrow();
     expect(() => assertRoleMayExecute("CASHIER", "MARK_TICKET_NO_SHOW")).toThrow();
-    expect(() => assertRoleMayExecute("DISPLAY", "CONFIRM_ATTENDANCE_DECISION")).toThrow();
+    expect(() => assertRoleMayExecute("CASHIER", "CONFIRM_ATTENDANCE_DECISION")).toThrow();
   });
 });
 
@@ -314,7 +314,7 @@ describe("event parameter authorization", () => {
 describe("master data authorization", () => {
   it("restricts product and gate changes to administration", () => {
     expect(() => assertRoleMayExecute("ADMIN", "UPSERT_PRODUCT")).not.toThrow();
-    expect(() => assertRoleMayExecute("FLIGHT_LINE_LEAD", "UPSERT_GATE")).toThrow();
+    expect(() => assertRoleMayExecute("FLIGHT_DIRECTOR", "UPSERT_GATE")).toThrow();
   });
 });
 
