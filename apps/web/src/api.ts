@@ -403,7 +403,6 @@ export async function getOperationBoard(
   signal?: AbortSignal,
 ): Promise<OperationBoard> {
   const response = await apiFetch(`/api/events/${encodeURIComponent(eventId)}/operations`, {
-    cache: "no-store",
     headers: deviceHeaders(deviceId, deviceToken),
     ...(signal ? { signal } : {}),
   });
