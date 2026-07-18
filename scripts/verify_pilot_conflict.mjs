@@ -172,7 +172,7 @@ try {
     firstSale.event.version,
     "CALL_NEXT",
     {
-      rotationId: firstSale.aggregate.relatedRotationId,
+      ticketGroupIds: [firstSale.aggregate.id],
       aircraftId: "aircraft-too-small",
       pilotId: "550e8400-e29b-41d4-a716-446655440100",
     },
@@ -188,7 +188,7 @@ try {
     secondSale.event.version,
     "CALL_NEXT",
     {
-      rotationId: secondSale.aggregate.relatedRotationId,
+      ticketGroupIds: [secondSale.aggregate.id],
       aircraftId: "aircraft-b",
       pilotId: "550e8400-e29b-41d4-a716-446655440100",
     },
@@ -199,7 +199,7 @@ try {
     firstCall.event.version,
     "CALL_NEXT",
     {
-      rotationId: firstSale.aggregate.relatedRotationId,
+      ticketGroupIds: [firstSale.aggregate.id],
       aircraftId: "aircraft-a",
       pilotId: "550e8400-e29b-41d4-a716-446655440100",
     },
@@ -217,7 +217,7 @@ try {
     firstCall.event.version,
     "CALL_NEXT",
     {
-      rotationId: firstSale.aggregate.relatedRotationId,
+      ticketGroupIds: [firstSale.aggregate.id],
       aircraftId: "aircraft-a",
       pilotId: "550e8400-e29b-41d4-a716-446655440200",
     },
@@ -244,13 +244,16 @@ try {
     firstSale.aggregate.relatedRotationId,
     secondSale.aggregate.relatedRotationId,
   ]) {
-    for (const type of ["MARK_IN_FLIGHT", "MARK_LANDED", "MARK_COMPLETED"]) {
+    for (const type of ["MARK_OFF_BLOCK", "MARK_ON_BLOCK", "COMPLETE_TURNAROUND"]) {
       transition = await command(
         "flight-line-tablet-1",
         tokens.flightLine,
         transition.event.version,
         type,
-        { rotationId },
+        {
+          rotationId,
+          ...(type === "COMPLETE_TURNAROUND" ? { nextAircraftState: "AVAILABLE" } : {}),
+        },
       );
     }
   }
@@ -271,7 +274,7 @@ try {
     thirdSale.event.version,
     "CALL_NEXT",
     {
-      rotationId: thirdSale.aggregate.relatedRotationId,
+      ticketGroupIds: [thirdSale.aggregate.id],
       aircraftId: "aircraft-a",
       pilotId: "550e8400-e29b-41d4-a716-446655440100",
     },
@@ -291,13 +294,16 @@ try {
     throw new Error("Bewusster Pilotwechsel wurde nicht fortgeführt und vollständig auditiert.");
   }
   transition = changedPilot;
-  for (const type of ["MARK_IN_FLIGHT", "MARK_LANDED", "MARK_COMPLETED"]) {
+  for (const type of ["MARK_OFF_BLOCK", "MARK_ON_BLOCK", "COMPLETE_TURNAROUND"]) {
     transition = await command(
       "flight-line-tablet-1",
       tokens.flightLine,
       transition.event.version,
       type,
-      { rotationId: thirdSale.aggregate.relatedRotationId },
+      {
+        rotationId: thirdSale.aggregate.relatedRotationId,
+        ...(type === "COMPLETE_TURNAROUND" ? { nextAircraftState: "AVAILABLE" } : {}),
+      },
     );
   }
   const fourthSale = await sell(transition.event.version);

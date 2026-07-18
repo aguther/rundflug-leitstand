@@ -185,6 +185,7 @@ try {
     version = sold.event.version;
     soldRotations.push({
       id: sold.aggregate.relatedRotationId,
+      ticketGroupId: sold.aggregate.id,
       resourceGroupId:
         productId === "acceptance-product-b1" ? "acceptance-rg-b" : "acceptance-rg-a",
     });
@@ -201,22 +202,25 @@ try {
     const pilotId = `acceptance-pilot-0${(index % 3) + 1}`;
     const called = await post(
       envelope("acceptance-flight-line", version, "CALL_NEXT", {
-        rotationId: rotation.id,
+        ticketGroupIds: [rotation.ticketGroupId],
         aircraftId,
         pilotId,
       }),
     );
     version = called.event.version;
     const started = await post(
-      envelope("acceptance-flight-line", version, "MARK_IN_FLIGHT", { rotationId: rotation.id }),
+      envelope("acceptance-flight-line", version, "MARK_OFF_BLOCK", { rotationId: rotation.id }),
     );
     version = started.event.version;
     const landed = await post(
-      envelope("acceptance-flight-line", version, "MARK_LANDED", { rotationId: rotation.id }),
+      envelope("acceptance-flight-line", version, "MARK_ON_BLOCK", { rotationId: rotation.id }),
     );
     version = landed.event.version;
     const completed = await post(
-      envelope("acceptance-flight-line", version, "MARK_COMPLETED", { rotationId: rotation.id }),
+      envelope("acceptance-flight-line", version, "COMPLETE_TURNAROUND", {
+        rotationId: rotation.id,
+        nextAircraftState: "AVAILABLE",
+      }),
     );
     version = completed.event.version;
   }
@@ -259,9 +263,9 @@ try {
       eventHistoryResponse.ok &&
       counts.TICKET_GROUP_SOLD === 20 &&
       counts.FLIGHT_GROUP_CALLED === 20 &&
-      counts.ROTATION_STARTED === 20 &&
-      counts.ROTATION_LANDED === 20 &&
-      counts.ROTATION_COMPLETED === 20,
+      counts.MARK_OFF_BLOCK === 20 &&
+      counts.MARK_ON_BLOCK === 20 &&
+      counts.TURNAROUND_COMPLETED === 20,
   };
   if (Object.values(invariants).some((passed) => !passed)) {
     throw new Error(`V1-Abnahmetag unvollständig: ${JSON.stringify({ invariants, counts })}`);

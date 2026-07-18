@@ -11,7 +11,7 @@ const reset = spawnSync(process.execPath, [npmCli, "run", "db:reset:local"], {
   stdio: "ignore",
 });
 if (reset.status !== 0) throw new Error("Lokale Testdatenbank konnte nicht initialisiert werden.");
-const pin = String.fromCharCode(48).repeat(4);
+const pin = "0000";
 const server = spawn(
   process.execPath,
   [
@@ -30,9 +30,9 @@ const server = spawn(
 );
 const base = "http://127.0.0.1:8787";
 const tokens = {
-  admin: ["demo", "admin", "device", "token"].join("-"),
-  cashier: ["demo", "cashier", "device", "token"].join("-"),
-  flightLine: ["demo", "flight", "line", "device", "token"].join("-"),
+  admin: "demo-admin-device-token",
+  cashier: "demo-cashier-device-token",
+  flightLine: "demo-flight-line-device-token",
 };
 const waitForWorker = async () => {
   for (let attempt = 0; attempt < 40; attempt += 1) {
@@ -85,30 +85,15 @@ const ticketCode = () =>
     .toString("base64url")
     .toUpperCase()
     .replaceAll(/[01OI_-]/g, "A");
-const sell = (version, productId, size, oversizeSplitAcknowledged = false, expectedStatus = 200) =>
-  command(
-    "cashier-tablet-1",
-    tokens.cashier,
-    version,
-    "SELL_TICKET_GROUP",
-    {
-      productId,
-      publicTicketCodes: Array.from({ length: size }, ticketCode),
-      standby: false,
-      paymentStatus: "PAID",
-      paymentMethod: "CASH",
-      oversizeSplitAcknowledged,
-    },
-    expectedStatus,
-  );
-const search = async (groupId) => {
-  const query = new URLSearchParams({ q: groupId });
-  const response = await fetch(`${base}/api/events/demo-2026/tickets/search?${query}`, {
-    headers: { "x-device-id": "cashier-tablet-1", "x-device-token": tokens.cashier },
+const sell = (version, size) =>
+  command("cashier-tablet-1", tokens.cashier, version, "SELL_TICKET_GROUP", {
+    productId: "panorama-20",
+    publicTicketCodes: Array.from({ length: size }, ticketCode),
+    standby: false,
+    paymentStatus: "PAID",
+    paymentMethod: "CASH",
+    oversizeSplitAcknowledged: false,
   });
-  if (!response.ok) throw new Error(`Ticketsuche fehlgeschlagen (${response.status}).`);
-  return response.json();
-};
 const history = async (aggregateType, aggregateId) => {
   const query = new URLSearchParams({ aggregateType, aggregateId });
   const response = await fetch(`${base}/api/events/demo-2026/history?${query}`, {
@@ -137,7 +122,7 @@ try {
       plannedBoardingMinutes: 5,
       plannedDeboardingMinutes: 5,
       plannedBufferMinutes: 5,
-      reason: "Synthetischer Queue-Test",
+      reason: "Synthetischer V1.5-Gruppentest",
       adminPin: pin,
     },
   );
@@ -146,605 +131,177 @@ try {
     tokens.admin,
     result.event.version,
     "SET_EVENT_LIFECYCLE",
-    { status: "ACTIVE", reason: "Synthetischer Queue-Test", adminPin: pin },
+    { status: "ACTIVE", reason: "Synthetischer V1.5-Gruppentest", adminPin: pin },
   );
 
-  const first = await sell(result.event.version, "panorama-20", 3);
-  const second = await sell(first.event.version, "panorama-20", 1);
-  const overflow = await sell(second.event.version, "panorama-20", 1);
-  const otherProduct = await sell(overflow.event.version, "panorama-30", 1);
-  if (first.aggregate.relatedRotationId !== second.aggregate.relatedRotationId) {
-    throw new Error("Passende ganze Buchungsgruppe wurde nicht in den freien Platz aufgenommen.");
-  }
+  const pair = await sell(result.event.version, 2);
+  const single = await sell(pair.event.version, 1);
+  const triple = await sell(single.event.version, 3);
+  current = await board();
+  const groupIds = [pair.aggregate.id, single.aggregate.id, triple.aggregate.id];
+  const rotations = groupIds.map((groupId) =>
+    current.rotations.find((rotation) =>
+      rotation.bookingGroups.some((group) => group.id === groupId),
+    ),
+  );
   if (
-    overflow.aggregate.relatedRotationId === first.aggregate.relatedRotationId ||
-    otherProduct.aggregate.relatedRotationId === first.aggregate.relatedRotationId
+    new Set(rotations.map((rotation) => rotation?.id)).size !== 3 ||
+    rotations.map((rotation) => rotation?.ticketCount).join(",") !== "2,1,3" ||
+    current.queueGroups.filter((group) => groupIds.includes(group.id)).length !== 3
   ) {
-    throw new Error("Kapazitätsgrenze oder Produktbindung der Fluggruppe wurde verletzt.");
+    throw new Error("Verkäufe 2/1/3 blieben nicht als explizite ganze Gruppen sichtbar.");
   }
 
-  current = await board();
-  const packed = current.rotations.find(
-    (rotation) => rotation.id === first.aggregate.relatedRotationId,
-  );
-  const overflowRotation = current.rotations.find(
-    (rotation) => rotation.id === overflow.aggregate.relatedRotationId,
-  );
-  const otherRotation = current.rotations.find(
-    (rotation) => rotation.id === otherProduct.aggregate.relatedRotationId,
-  );
-  if (
-    packed?.ticketCount !== 4 ||
-    packed.communicationLabel !== "PAN20-101" ||
-    overflowRotation?.ticketCount !== 1 ||
-    otherRotation?.ticketCount !== 1
-  ) {
-    throw new Error("Ticketanzahl der automatisch gebildeten Fluggruppen ist inkonsistent.");
-  }
-  const [firstSearch, secondSearch] = await Promise.all([
-    search(first.aggregate.id),
-    search(second.aggregate.id),
-  ]);
-  const firstMatch = firstSearch.results.find(
-    (entry) => entry.ticketGroupId === first.aggregate.id,
-  );
-  const secondMatch = secondSearch.results.find(
-    (entry) => entry.ticketGroupId === second.aggregate.id,
-  );
-  if (
-    !firstMatch?.communicationLabel ||
-    firstMatch.communicationLabel !== secondMatch?.communicationLabel ||
-    firstMatch.communicationLabel !== packed.communicationLabel ||
-    firstMatch.groupSize !== 3 ||
-    secondMatch.groupSize !== 1
-  ) {
-    throw new Error(
-      "Stabile Kennung oder Gruppenschutz ist in der Ticketsuche nicht nachvollziehbar.",
-    );
-  }
-  const rejectedCashierMove = await command(
+  const wrongRole = await command(
     "cashier-tablet-1",
     tokens.cashier,
-    otherProduct.event.version,
-    "MOVE_TICKET_GROUP",
-    {
-      ticketGroupId: overflow.aggregate.id,
-      targetRotationId: first.aggregate.relatedRotationId,
-      reason: "Unzulässiger Kassentest",
-    },
-    403,
-  );
-  const rejectedCapacityMove = await command(
-    "flight-line-tablet-1",
-    tokens.flightLine,
-    otherProduct.event.version,
-    "MOVE_TICKET_GROUP",
-    {
-      ticketGroupId: overflow.aggregate.id,
-      targetRotationId: first.aggregate.relatedRotationId,
-      reason: "Unzulässiger Kapazitätstest",
-    },
-    409,
-  );
-  if (
-    rejectedCashierMove.error?.code !== "ROLE_NOT_AUTHORIZED" ||
-    rejectedCapacityMove.error?.code !== "MANUAL_GROUP_MOVE_CAPACITY_EXCEEDED"
-  ) {
-    throw new Error("Rolle oder Gruppenkapazität wurde bei manueller Umbesetzung nicht geschützt.");
-  }
-  const canceledPackedGroup = await command(
-    "cashier-tablet-1",
-    tokens.cashier,
-    otherProduct.event.version,
-    "CANCEL_TICKET_GROUP",
-    {
-      ticketGroupId: second.aggregate.id,
-      reason: "Synthetische Teilgruppen-Korrektur",
-      adminPin: pin,
-    },
-  );
-  current = await board();
-  const protectedRotation = current.rotations.find(
-    (rotation) => rotation.id === first.aggregate.relatedRotationId,
-  );
-  if (
-    canceledPackedGroup.event.version !== current.event.version ||
-    protectedRotation?.status !== "DRAFT" ||
-    protectedRotation.ticketCount !== 3
-  ) {
-    throw new Error("Korrektur einer Teilgruppe hat eine andere Buchungsgruppe mitgelöst.");
-  }
-  const calledTarget = await command(
-    "flight-line-tablet-1",
-    tokens.flightLine,
-    canceledPackedGroup.event.version,
+    triple.event.version,
     "CALL_NEXT",
     {
-      rotationId: first.aggregate.relatedRotationId,
+      ticketGroupIds: [pair.aggregate.id, single.aggregate.id],
       aircraftId: "aircraft-a",
       pilotId: "550e8400-e29b-41d4-a716-446655440100",
     },
-  );
-  const moveCommandId = randomUUID();
-  const movedAfterCall = await command(
-    "flight-line-tablet-1",
-    tokens.flightLine,
-    calledTarget.event.version,
-    "MOVE_TICKET_GROUP",
-    {
-      ticketGroupId: overflow.aggregate.id,
-      targetRotationId: first.aggregate.relatedRotationId,
-      reason: "Bestätigte manuelle Nachbesetzung",
-    },
-    200,
-    moveCommandId,
-  );
-  const duplicateMove = await command(
-    "flight-line-tablet-1",
-    tokens.flightLine,
-    calledTarget.event.version,
-    "MOVE_TICKET_GROUP",
-    {
-      ticketGroupId: overflow.aggregate.id,
-      targetRotationId: first.aggregate.relatedRotationId,
-      reason: "Bestätigte manuelle Nachbesetzung",
-    },
-    200,
-    moveCommandId,
-  );
-  const staleMove = await command(
-    "flight-line-tablet-1",
-    tokens.flightLine,
-    calledTarget.event.version,
-    "MOVE_TICKET_GROUP",
-    {
-      ticketGroupId: overflow.aggregate.id,
-      targetRotationId: first.aggregate.relatedRotationId,
-      reason: "Veralteter Parallelversuch",
-    },
-    409,
-  );
-  current = await board();
-  const manuallyFilledTarget = current.rotations.find(
-    (rotation) => rotation.id === first.aggregate.relatedRotationId,
-  );
-  const moveHistory = await history("TICKET_GROUP", overflow.aggregate.id);
-  const moveAudit = moveHistory.entries.find((entry) => entry.eventType === "TICKET_GROUP_MOVED");
-  if (
-    manuallyFilledTarget?.status !== "CALLED" ||
-    manuallyFilledTarget.ticketCount !== 4 ||
-    current.rotations.some((rotation) => rotation.id === overflow.aggregate.relatedRotationId) ||
-    moveAudit?.payload.reason !== "Bestätigte manuelle Nachbesetzung" ||
-    moveAudit.payload.changedAfterCall !== true ||
-    moveAudit.payload.manualDeviationFromAutomaticQueue !== true ||
-    duplicateMove.duplicate !== true ||
-    staleMove.error?.code !== "STALE_VERSION"
-  ) {
-    throw new Error("Bestätigte manuelle Nachbesetzung wurde nicht vollständig protokolliert.");
-  }
-  const presentTicketId = manuallyFilledTarget.tickets[0]?.id;
-  const missingTicketId = manuallyFilledTarget.tickets[1]?.id;
-  if (!presentTicketId || !missingTicketId) {
-    throw new Error("Synthetische Anwesenheitstickets fehlen.");
-  }
-  const checkedIn = await command(
-    "flight-line-tablet-1",
-    tokens.flightLine,
-    movedAfterCall.event.version,
-    "SET_TICKET_ATTENDANCE",
-    { ticketId: presentTicketId, checkedIn: true },
-  );
-  const attendanceDecisionId = randomUUID();
-  const attendanceDecision = await command(
-    "flight-line-tablet-1",
-    tokens.flightLine,
-    checkedIn.event.version,
-    "CONFIRM_ATTENDANCE_DECISION",
-    { rotationId: first.aggregate.relatedRotationId, decision: "LEAVE_SEAT_EMPTY" },
-    200,
-    attendanceDecisionId,
-  );
-  const duplicateAttendanceDecision = await command(
-    "flight-line-tablet-1",
-    tokens.flightLine,
-    checkedIn.event.version,
-    "CONFIRM_ATTENDANCE_DECISION",
-    { rotationId: first.aggregate.relatedRotationId, decision: "LEAVE_SEAT_EMPTY" },
-    200,
-    attendanceDecisionId,
-  );
-  const conflictingAttendanceDecision = await command(
-    "flight-line-tablet-1",
-    tokens.flightLine,
-    attendanceDecision.event.version,
-    "CONFIRM_ATTENDANCE_DECISION",
-    { rotationId: first.aggregate.relatedRotationId, decision: "FLY_WITH_PRESENT" },
-    409,
-  );
-  const earlyNoShow = await command(
-    "flight-line-tablet-1",
-    tokens.flightLine,
-    attendanceDecision.event.version,
-    "MARK_TICKET_NO_SHOW",
-    { ticketId: missingTicketId, reason: "Synthetischer Fristtest" },
-    409,
-  );
-  const attendanceHistory = await history("ROTATION", first.aggregate.relatedRotationId);
-  const attendanceAudit = attendanceHistory.entries.find(
-    (entry) => entry.eventType === "ATTENDANCE_EMPTY_SEAT_CONFIRMED",
-  );
-  if (
-    attendanceAudit?.payload.presentCount !== 1 ||
-    attendanceAudit.payload.missingCount !== 3 ||
-    attendanceAudit.payload.automaticReplacement !== false ||
-    duplicateAttendanceDecision.duplicate !== true ||
-    conflictingAttendanceDecision.error?.code !== "ATTENDANCE_DECISION_ALREADY_CONFIRMED" ||
-    earlyNoShow.error?.code !== "NO_SHOW_DEADLINE_NOT_REACHED"
-  ) {
-    throw new Error("Anwesenheitsentscheidung oder No-Show-Frist wurde nicht korrekt auditiert.");
-  }
-  const startedTarget = await command(
-    "flight-line-tablet-1",
-    tokens.flightLine,
-    attendanceDecision.event.version,
-    "MARK_IN_FLIGHT",
-    { rotationId: first.aggregate.relatedRotationId },
-  );
-  const lateMoveSource = await sell(startedTarget.event.version, "panorama-20", 1);
-  const rejectedLateMove = await command(
-    "flight-line-tablet-1",
-    tokens.flightLine,
-    lateMoveSource.event.version,
-    "MOVE_TICKET_GROUP",
-    {
-      ticketGroupId: lateMoveSource.aggregate.id,
-      targetRotationId: first.aggregate.relatedRotationId,
-      reason: "Unzulässiger später Test",
-    },
-    409,
-  );
-  if (rejectedLateMove.error?.code !== "MANUAL_GROUP_MOVE_TOO_LATE") {
-    throw new Error("Umbesetzung nach IM FLUG wurde nicht fachlich abgelehnt.");
-  }
-  const rejectedLeadCorrection = await command(
-    "flight-line-tablet-1",
-    tokens.flightLine,
-    lateMoveSource.event.version,
-    "CORRECT_ROTATION_MANIFEST",
-    {
-      ticketGroupId: lateMoveSource.aggregate.id,
-      targetRotationId: first.aggregate.relatedRotationId,
-      reason: "Unzulässiger Korrekturversuch ohne Administratorrolle",
-      adminPin: pin,
-    },
     403,
   );
-  const rejectedUnauthenticatedCorrection = await command(
-    "technical-scaffold",
-    "invalid-device-token",
-    lateMoveSource.event.version,
-    "CORRECT_ROTATION_MANIFEST",
+  const overCapacity = await command(
+    "flight-line-tablet-1",
+    tokens.flightLine,
+    triple.event.version,
+    "CALL_NEXT",
     {
-      ticketGroupId: lateMoveSource.aggregate.id,
-      targetRotationId: first.aggregate.relatedRotationId,
-      reason: "Korrekturversuch ohne gültige Geräte- oder Kontositzung",
-      adminPin: pin,
+      ticketGroupIds: [pair.aggregate.id, triple.aggregate.id],
+      aircraftId: "aircraft-a",
+      pilotId: "550e8400-e29b-41d4-a716-446655440100",
     },
-    401,
+    409,
   );
-  const correctionCommandId = randomUUID();
-  const correctedManifest = await command(
-    "technical-scaffold",
-    tokens.admin,
-    lateMoveSource.event.version,
-    "CORRECT_ROTATION_MANIFEST",
+  if (
+    wrongRole.error?.code !== "ROLE_NOT_AUTHORIZED" ||
+    overCapacity.error?.code !== "AIRCRAFT_CAPACITY_EXCEEDED"
+  ) {
+    throw new Error("Rolle oder Kapazität schützt die Gruppenkombination nicht.");
+  }
+
+  const callCommandId = randomUUID();
+  const called = await command(
+    "flight-line-tablet-1",
+    tokens.flightLine,
+    triple.event.version,
+    "CALL_NEXT",
     {
-      ticketGroupId: lateMoveSource.aggregate.id,
-      targetRotationId: first.aggregate.relatedRotationId,
-      reason: "Tatsächliche Gruppenbesetzung nach dem Start richtigstellen",
-      adminPin: pin,
-    },
-    200,
-    correctionCommandId,
-  );
-  const duplicateCorrection = await command(
-    "technical-scaffold",
-    tokens.admin,
-    lateMoveSource.event.version,
-    "CORRECT_ROTATION_MANIFEST",
-    {
-      ticketGroupId: lateMoveSource.aggregate.id,
-      targetRotationId: first.aggregate.relatedRotationId,
-      reason: "Tatsächliche Gruppenbesetzung nach dem Start richtigstellen",
-      adminPin: pin,
+      ticketGroupIds: [pair.aggregate.id, single.aggregate.id],
+      aircraftId: "aircraft-a",
+      pilotId: "550e8400-e29b-41d4-a716-446655440100",
     },
     200,
-    correctionCommandId,
+    callCommandId,
   );
-  const staleCorrection = await command(
-    "technical-scaffold",
-    tokens.admin,
-    lateMoveSource.event.version,
-    "CORRECT_ROTATION_MANIFEST",
+  const duplicate = await command(
+    "flight-line-tablet-1",
+    tokens.flightLine,
+    triple.event.version,
+    "CALL_NEXT",
     {
-      ticketGroupId: lateMoveSource.aggregate.id,
-      targetRotationId: first.aggregate.relatedRotationId,
-      reason: "Veralteten Korrekturstand sichtbar ablehnen",
-      adminPin: pin,
+      ticketGroupIds: [pair.aggregate.id, single.aggregate.id],
+      aircraftId: "aircraft-a",
+      pilotId: "550e8400-e29b-41d4-a716-446655440100",
+    },
+    200,
+    callCommandId,
+  );
+  const stale = await command(
+    "flight-line-tablet-1",
+    tokens.flightLine,
+    triple.event.version,
+    "CALL_NEXT",
+    {
+      ticketGroupIds: [triple.aggregate.id],
+      aircraftId: "aircraft-a",
+      pilotId: "550e8400-e29b-41d4-a716-446655440100",
     },
     409,
   );
   current = await board();
-  const correctedTarget = current.rotations.find(
-    (rotation) => rotation.id === first.aggregate.relatedRotationId,
-  );
-  const correctionHistory = await history("TICKET_GROUP", lateMoveSource.aggregate.id);
-  const correctionAudit = correctionHistory.entries.find(
-    (entry) => entry.eventType === "ROTATION_MANIFEST_CORRECTED",
+  const combined = current.rotations.find(
+    (rotation) => rotation.id === pair.aggregate.relatedRotationId,
   );
   if (
-    rejectedLeadCorrection.error?.code !== "ROLE_NOT_AUTHORIZED" ||
-    rejectedUnauthenticatedCorrection.error?.code !== "DEVICE_NOT_PAIRED" ||
-    duplicateCorrection.duplicate !== true ||
-    staleCorrection.error?.code !== "STALE_VERSION" ||
-    correctedTarget?.ticketCount !== 5 ||
-    correctionAudit?.payload.wholeGroupPreserved !== true ||
-    correctionAudit.payload.administrativeCorrection !== true ||
-    correctionAudit.payload.safetyApproval !== false ||
-    correctionAudit.payload.capacityExceeded !== true
+    combined?.ticketCount !== 3 ||
+    combined.bookingGroups.length !== 2 ||
+    combined.tickets.some((ticket) => ticket.status !== "BOARDING") ||
+    current.rotations.some((rotation) => rotation.id === single.aggregate.relatedRotationId) ||
+    duplicate.duplicate !== true ||
+    stale.error?.code !== "STALE_VERSION"
   ) {
     throw new Error(
-      `Administrativer Manifest-Korrekturpfad ist nicht vollständig geschützt: ${JSON.stringify({
-        rejectedLeadCorrection,
-        rejectedUnauthenticatedCorrection,
-        duplicateCorrection,
-        staleCorrection,
-        correctedTicketCount: correctedTarget?.ticketCount,
-        correctionAudit,
-      })}`,
+      "Atomare Kombination 2+1, Idempotenz oder stale-write-Schutz ist inkonsistent.",
     );
   }
-  const rejectedOversize = await sell(
-    correctedManifest.event.version,
-    "panorama-20",
-    5,
-    false,
-    409,
-  );
-  if (
-    rejectedOversize.error?.code !== "OVERSIZE_GROUP_SPLIT_CONFIRMATION_REQUIRED" ||
-    rejectedOversize.error.referenceCapacity !== 4 ||
-    rejectedOversize.error.requiredFlightGroupCount !== 2
-  ) {
-    throw new Error("Übergröße wurde ohne verständliche Bestätigungsvorgabe verarbeitet.");
-  }
-  const splitGroup = await sell(correctedManifest.event.version, "panorama-20", 5, true);
-  current = await board();
-  const splitRotations = current.rotations
-    .filter((rotation) => rotation.ticketGroupId === splitGroup.aggregate.id)
-    .sort((left, right) => left.communicationNumber - right.communicationNumber);
-  if (
-    splitRotations.length !== 2 ||
-    splitRotations[0]?.ticketCount !== 4 ||
-    splitRotations[1]?.ticketCount !== 1 ||
-    splitRotations[1].communicationNumber !== splitRotations[0].communicationNumber + 1
-  ) {
-    throw new Error("Bestätigte Übergröße wurde nicht auf unmittelbar folgende Slots verteilt.");
-  }
-  const splitSearch = await search(splitGroup.aggregate.id);
-  const splitMatch = splitSearch.results.find(
-    (entry) => entry.ticketGroupId === splitGroup.aggregate.id,
-  );
-  if (
-    splitSearch.results.length !== 1 ||
-    splitMatch?.groupSize !== 5 ||
-    splitMatch.communicationLabels.length !== 2 ||
-    splitMatch.communicationNumbers[1] !== splitMatch.communicationNumbers[0] + 1
-  ) {
-    throw new Error("Aufgeteilte Buchungsgruppe ist in der Ticketsuche nicht vollständig.");
-  }
-  const deferredSplit = await command(
+
+  const attendance = await command(
     "flight-line-tablet-1",
     tokens.flightLine,
-    splitGroup.event.version,
-    "DEFER_TICKET_GROUP",
-    {
-      ticketGroupId: splitGroup.aggregate.id,
-      reason: "Synthetischer Gruppenschutztest",
-    },
+    called.event.version,
+    "SET_TICKET_GROUP_ATTENDANCE",
+    { ticketGroupId: pair.aggregate.id, checkedIn: true },
   );
-  current = await board();
-  const reassignedSplitRotations = current.rotations
-    .filter((rotation) => rotation.ticketGroupId === splitGroup.aggregate.id)
-    .sort((left, right) => left.communicationNumber - right.communicationNumber);
-  if (
-    reassignedSplitRotations.length !== 2 ||
-    reassignedSplitRotations[0]?.ticketCount !== 4 ||
-    reassignedSplitRotations[1]?.ticketCount !== 1 ||
-    reassignedSplitRotations[1].communicationNumber !==
-      reassignedSplitRotations[0].communicationNumber + 1
-  ) {
-    throw new Error("Zurückstellung hat den Schutz der aufgeteilten Buchungsgruppe verletzt.");
-  }
-  const canceledSplit = await command(
-    "cashier-tablet-1",
-    tokens.cashier,
-    deferredSplit.event.version,
-    "CANCEL_TICKET_GROUP",
-    {
-      ticketGroupId: splitGroup.aggregate.id,
-      reason: "Synthetischer Gruppenschutztest",
-      adminPin: pin,
-    },
-  );
-  current = await board();
-  const canceledSplitSearch = await search(splitGroup.aggregate.id);
-  const canceledSplitMatch = canceledSplitSearch.results.find(
-    (entry) => entry.ticketGroupId === splitGroup.aggregate.id,
-  );
-  if (
-    current.event.version !== canceledSplit.event.version ||
-    current.rotations.some((rotation) => rotation.ticketGroupId === splitGroup.aggregate.id) ||
-    canceledSplitMatch?.groupStatus !== "CANCELED" ||
-    canceledSplitMatch.communicationLabels.length !== 0
-  ) {
-    throw new Error("Stornierung hat aktive Zuordnungen der aufgeteilten Gruppe hinterlassen.");
-  }
-  const capacitySeed = await sell(canceledSplit.event.version, "panorama-20", 1);
-  const capacityFill = await sell(capacitySeed.event.version, "panorama-20", 2);
-  const capacityOverflow = await sell(capacityFill.event.version, "panorama-20", 1);
-  if (
-    capacityFill.aggregate.relatedRotationId !== capacitySeed.aggregate.relatedRotationId ||
-    capacityOverflow.aggregate.relatedRotationId !== capacitySeed.aggregate.relatedRotationId
-  ) {
-    throw new Error("Synthetischer Kapazitätsumlauf wurde nicht wie erwartet gefüllt.");
-  }
-  const capacityCommandId = randomUUID();
-  const reducedCapacity = await command(
+  const recalled = await command(
     "flight-line-tablet-1",
     tokens.flightLine,
-    capacityOverflow.event.version,
-    "SET_ROTATION_CAPACITY",
-    {
-      rotationId: capacityFill.aggregate.relatedRotationId,
-      usableCapacity: 3,
-      reason: "Organisatorisch nur drei Plätze nutzbar",
-    },
-    200,
-    capacityCommandId,
+    attendance.event.version,
+    "RECALL_TICKET_GROUP",
+    { ticketGroupId: single.aggregate.id },
   );
-  const duplicateCapacity = await command(
+  const missing = await command(
     "flight-line-tablet-1",
     tokens.flightLine,
-    capacityOverflow.event.version,
-    "SET_ROTATION_CAPACITY",
-    {
-      rotationId: capacityFill.aggregate.relatedRotationId,
-      usableCapacity: 3,
-      reason: "Organisatorisch nur drei Plätze nutzbar",
-    },
-    200,
-    capacityCommandId,
+    recalled.event.version,
+    "MARK_TICKET_GROUP_MISSING",
+    { ticketGroupId: single.aggregate.id, reason: "Synthetisch nicht am Gate" },
   );
-  const staleCapacity = await command(
+  const attendanceHistory = await history("TICKET_GROUP", single.aggregate.id);
+  if (
+    !attendanceHistory.entries.some((entry) => entry.eventType === "TICKET_GROUP_RECALLED") ||
+    !attendanceHistory.entries.some((entry) => entry.eventType === "TICKET_GROUP_MARKED_MISSING")
+  ) {
+    throw new Error("Manuelle Anwesenheit, Nachruf oder Nicht-da-Audit fehlt.");
+  }
+
+  const started = await command(
     "flight-line-tablet-1",
     tokens.flightLine,
-    capacityOverflow.event.version,
-    "SET_ROTATION_CAPACITY",
+    missing.event.version,
+    "MARK_OFF_BLOCK",
+    { rotationId: combined.id },
+  );
+  const rejectedLateComposition = await command(
+    "flight-line-tablet-1",
+    tokens.flightLine,
+    started.event.version,
+    "CALL_NEXT",
     {
-      rotationId: capacityFill.aggregate.relatedRotationId,
-      usableCapacity: 2,
-      reason: "Veralteter Kapazitätsversuch",
+      ticketGroupIds: [triple.aggregate.id],
+      aircraftId: "aircraft-a",
+      pilotId: "550e8400-e29b-41d4-a716-446655440100",
     },
     409,
   );
-  const rejectedCashierCapacity = await command(
-    "cashier-tablet-1",
-    tokens.cashier,
-    reducedCapacity.event.version,
-    "SET_ROTATION_CAPACITY",
-    {
-      rotationId: capacityFill.aggregate.relatedRotationId,
-      usableCapacity: 2,
-      reason: "Unzulässiger Kassentest",
-    },
-    403,
-  );
-  const rejectedLateCapacity = await command(
-    "flight-line-tablet-1",
-    tokens.flightLine,
-    reducedCapacity.event.version,
-    "SET_ROTATION_CAPACITY",
-    {
-      rotationId: first.aggregate.relatedRotationId,
-      usableCapacity: 3,
-      reason: "Unzulässiger später Kapazitätstest",
-    },
-    409,
-  );
-  current = await board();
-  const reducedRotation = current.rotations.find(
-    (rotation) => rotation.id === capacityFill.aggregate.relatedRotationId,
-  );
-  const requeuedCapacityGroup = current.rotations.find(
-    (rotation) => rotation.ticketGroupId === capacityOverflow.aggregate.id,
-  );
-  const capacityHistory = await history("ROTATION", capacityFill.aggregate.relatedRotationId);
-  const capacityAudit = capacityHistory.entries.find(
-    (entry) => entry.eventType === "ROTATION_CAPACITY_CHANGED",
-  );
-  const capacitySearch = await search(capacityOverflow.aggregate.id);
-  const capacitySearchMatch = capacitySearch.results.find(
-    (entry) => entry.ticketGroupId === capacityOverflow.aggregate.id,
-  );
-  if (
-    reducedRotation?.ticketCount !== 3 ||
-    reducedRotation.baselineCapacity !== 4 ||
-    reducedRotation.usableCapacity !== 3 ||
-    reducedRotation.capacityReduced !== true ||
-    requeuedCapacityGroup?.ticketCount !== 1 ||
-    requeuedCapacityGroup.queuePosition >= reducedRotation.queuePosition ||
-    capacitySearchMatch?.queueSequence !== 1 ||
-    capacityAudit?.payload.reason !== "Organisatorisch nur drei Plätze nutzbar" ||
-    capacityAudit.payload.requeuedTicketGroupIds?.[0] !== capacityOverflow.aggregate.id ||
-    duplicateCapacity.duplicate !== true ||
-    staleCapacity.error?.code !== "STALE_VERSION" ||
-    rejectedCashierCapacity.error?.code !== "ROLE_NOT_AUTHORIZED" ||
-    rejectedLateCapacity.error?.code !== "ROTATION_CAPACITY_CHANGE_TOO_LATE"
-  ) {
-    throw new Error(
-      "Kapazitätsreduktion oder gruppenschützende Wiedereinreihung ist inkonsistent.",
-    );
+  if (rejectedLateComposition.error?.code !== "AIRCRAFT_NOT_AVAILABLE") {
+    throw new Error("Belegtes Flugzeug wurde für eine parallele Gruppe nicht gesperrt.");
   }
+
   console.log(
     JSON.stringify({
-      ok: true,
-      requirements: [
-        "F-SLT-010",
-        "F-SLT-020",
-        "F-SLT-030",
-        "F-SLT-040",
-        "F-SLT-050",
-        "F-SLT-060",
-        "F-SLT-100",
-        "F-BRD-080",
-        "F-BRD-085",
-      ],
-      packedTicketCount: packed.ticketCount,
-      remainingTicketsAfterPartialCancellation: protectedRotation.ticketCount,
-      stableCommunicationLabel: firstMatch.communicationLabel,
-      groupSizes: [firstMatch.groupSize, secondMatch.groupSize],
-      overflowSeparated: true,
-      differentProductSeparated: true,
-      manualMoveAfterCallConfirmed: true,
-      manualMoveAuditRecorded: true,
-      manualMoveAfterTakeoffRejected: true,
-      administrativeManifestCorrection: true,
-      manifestCorrectionRoleAndSessionProtected: true,
-      manifestCorrectionWholeGroupPreserved: true,
-      manifestCorrectionCapacityDeviationAudited: true,
-      manifestCorrectionIdempotent: true,
-      manifestCorrectionStaleWriteRejected: true,
-      manualMoveRoleProtected: true,
-      manualMoveCapacityProtected: true,
-      manualMoveIdempotent: true,
-      manualMoveStaleWriteRejected: true,
-      attendanceDecisionAudited: true,
-      attendanceDecisionIdempotent: true,
-      conflictingAttendanceDecisionRejected: true,
-      earlyNoShowRejected: true,
-      oversizeSplitRequiresConfirmation: true,
-      oversizeSplitSlotSizes: splitRotations.map((rotation) => rotation.ticketCount),
-      oversizeSplitCommunicationLabels: splitMatch.communicationLabels,
-      splitPreservedAfterDeferral: true,
-      splitCancellationReleasedAllAssignments: true,
-      usableCapacityReducedBeforeCall: true,
-      capacityQueueSuffixRequeuedAsWholeGroup: true,
-      capacityRequeueMovedToFront: true,
-      capacityChangeAuditRecorded: true,
-      capacityChangeIdempotent: true,
-      capacityChangeStaleWriteRejected: true,
-      capacityChangeAfterCallRejected: true,
+      explicitQueueGroups: true,
+      stableCommunicationIds: true,
+      wholeGroupCombination2Plus1: true,
+      capacityProtected: true,
+      wrongRoleRejected: true,
+      idempotentCall: true,
+      staleWriteRejected: true,
+      manualAttendanceAudited: true,
+      finalVersion: started.event.version,
     }),
   );
 } finally {
