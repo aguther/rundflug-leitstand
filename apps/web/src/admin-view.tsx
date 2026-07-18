@@ -84,9 +84,35 @@ import {
 export function AdminView() {
   const { session, logout } = useAuth();
   const { board, error, lastConfirmedAt, refresh, refreshing } = useOperationBoard(ADMIN_DEVICE_ID);
-  const [adminArea, setAdminArea] = useState<AdminArea>("master-data");
-  const [masterDataCategory, setMasterDataCategory] =
-    useState<MasterDataCategory>("resource-groups");
+  const initialAdminParams = useRef(new URLSearchParams(window.location.search)).current;
+  const [adminArea, setAdminArea] = useState<AdminArea>(() => {
+    const requestedArea = initialAdminParams.get("area");
+    const validAreas: AdminArea[] = [
+      "overview",
+      "setup",
+      "master-data",
+      "users",
+      "evaluation",
+      "backup",
+    ];
+    return (validAreas as string[]).includes(requestedArea ?? "")
+      ? (requestedArea as AdminArea)
+      : "master-data";
+  });
+  const [masterDataCategory, setMasterDataCategory] = useState<MasterDataCategory>(() => {
+    const requestedSection = initialAdminParams.get("section");
+    const validSections: MasterDataCategory[] = [
+      "gates",
+      "resource-groups",
+      "aircraft",
+      "assignments",
+      "pilots",
+      "products",
+    ];
+    return (validSections as string[]).includes(requestedSection ?? "")
+      ? (requestedSection as MasterDataCategory)
+      : "resource-groups";
+  });
   const [reason, setReason] = useState("");
   const [adminPin, setAdminPinState] = useState(session?.account.role === "ADMIN" ? "000000" : "");
   const adminPinRef = useRef(session?.account.role === "ADMIN" ? "000000" : "");
@@ -106,6 +132,11 @@ export function AdminView() {
   const initialMasterSelectionRef = useRef(false);
   const [masterSubmitAttempted, setMasterSubmitAttempted] = useState(false);
   const [masterSearch, setMasterSearch] = useState("");
+  const [masterPage, setMasterPage] = useState(0);
+  const [masterPageSize, setMasterPageSize] = useState(10);
+  useEffect(() => {
+    setMasterPage(0);
+  }, [masterDataCategory, masterSearch, masterPageSize]);
   const [pendingMasterDelete, setPendingMasterDelete] = useState<MasterDataDeleteTarget | null>(
     null,
   );
@@ -1781,6 +1812,25 @@ export function AdminView() {
       .toLocaleLowerCase("de-DE")
       .includes(normalizedMasterSearch),
   );
+  const activeMasterDataRows: { id: string }[] =
+    masterDataCategory === "gates"
+      ? visibleGates
+      : masterDataCategory === "resource-groups"
+        ? visibleResourceGroups
+        : masterDataCategory === "aircraft" || masterDataCategory === "assignments"
+          ? visibleAircraft
+          : masterDataCategory === "pilots"
+            ? visiblePilots
+            : visibleProducts;
+  const masterPageCount = Math.max(1, Math.ceil(activeMasterDataRows.length / masterPageSize));
+  const masterPageClamped = Math.min(masterPage, masterPageCount - 1);
+  const masterPageStart = masterPageClamped * masterPageSize;
+  const masterPageEnd = masterPageStart + masterPageSize;
+  const pagedGates = visibleGates.slice(masterPageStart, masterPageEnd);
+  const pagedResourceGroups = visibleResourceGroups.slice(masterPageStart, masterPageEnd);
+  const pagedAircraft = visibleAircraft.slice(masterPageStart, masterPageEnd);
+  const pagedPilots = visiblePilots.slice(masterPageStart, masterPageEnd);
+  const pagedProducts = visibleProducts.slice(masterPageStart, masterPageEnd);
   const selectedResourceAircraft = (board?.aircraft ?? []).filter((aircraft) =>
     resourceAircraftIds.includes(aircraft.id),
   );
@@ -2519,7 +2569,7 @@ export function AdminView() {
                     </tr>
                   </thead>
                   <tbody>
-                    {visibleGates.map((gate) => (
+                    {pagedGates.map((gate) => (
                       <tr
                         className={masterEditorOpen && gateEditorId === gate.id ? "selected" : ""}
                         key={gate.id}
@@ -2563,7 +2613,7 @@ export function AdminView() {
                     </tr>
                   </thead>
                   <tbody>
-                    {visibleResourceGroups.map((group) => (
+                    {pagedResourceGroups.map((group) => (
                       <tr
                         className={
                           masterEditorOpen && resourceEditorId === group.id ? "selected" : ""
@@ -2610,7 +2660,7 @@ export function AdminView() {
                     </tr>
                   </thead>
                   <tbody>
-                    {visibleAircraft.map((aircraft) => (
+                    {pagedAircraft.map((aircraft) => (
                       <tr
                         className={
                           masterEditorOpen && aircraftEditorId === aircraft.id ? "selected" : ""
@@ -2665,7 +2715,7 @@ export function AdminView() {
                     </tr>
                   </thead>
                   <tbody>
-                    {visibleAircraft.map((aircraft) => (
+                    {pagedAircraft.map((aircraft) => (
                       <tr
                         className={
                           masterEditorOpen && assignmentAircraftId === aircraft.id ? "selected" : ""
@@ -2725,7 +2775,7 @@ export function AdminView() {
                     </tr>
                   </thead>
                   <tbody>
-                    {visiblePilots.map((pilot) => (
+                    {pagedPilots.map((pilot) => (
                       <tr
                         className={masterEditorOpen && pilotEditorId === pilot.id ? "selected" : ""}
                         key={pilot.id}
@@ -2781,7 +2831,7 @@ export function AdminView() {
                     </tr>
                   </thead>
                   <tbody>
-                    {visibleProducts.map((product) => (
+                    {pagedProducts.map((product) => (
                       <tr
                         className={
                           masterEditorOpen && productEditorId === product.id ? "selected" : ""
@@ -2868,6 +2918,63 @@ export function AdminView() {
                 </div>
               ) : null}
             </div>
+            {activeMasterDataRows.length > 0 ? (
+              <div className="ds-pagination">
+                <div className="ds-pagination-size">
+                  <label htmlFor="master-data-page-size">Zeilen pro Seite</label>
+                  <select
+                    id="master-data-page-size"
+                    onChange={(event) => setMasterPageSize(Number(event.target.value))}
+                    value={masterPageSize}
+                  >
+                    <option value={10}>10</option>
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                  </select>
+                </div>
+                <span>
+                  {masterPageStart + 1}–{Math.min(activeMasterDataRows.length, masterPageEnd)} von{" "}
+                  {activeMasterDataRows.length}
+                </span>
+                <nav aria-label="Seitennavigation" className="ds-pagination-nav">
+                  <button
+                    aria-label="Erste Seite"
+                    disabled={masterPageClamped === 0}
+                    onClick={() => setMasterPage(0)}
+                    type="button"
+                  >
+                    «
+                  </button>
+                  <button
+                    aria-label="Vorherige Seite"
+                    disabled={masterPageClamped === 0}
+                    onClick={() => setMasterPage((value) => Math.max(0, value - 1))}
+                    type="button"
+                  >
+                    ‹
+                  </button>
+                  <button className="current" disabled type="button">
+                    {masterPageClamped + 1}
+                  </button>
+                  <button
+                    aria-label="Nächste Seite"
+                    disabled={masterPageClamped >= masterPageCount - 1}
+                    onClick={() => setMasterPage((value) => Math.min(masterPageCount - 1, value + 1))}
+                    type="button"
+                  >
+                    ›
+                  </button>
+                  <button
+                    aria-label="Letzte Seite"
+                    disabled={masterPageClamped >= masterPageCount - 1}
+                    onClick={() => setMasterPage(masterPageCount - 1)}
+                    type="button"
+                  >
+                    »
+                  </button>
+                </nav>
+              </div>
+            ) : null}
           </section>
           <section
             className="admin-section master-data-editor master-data-drawer"
