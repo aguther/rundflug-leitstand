@@ -23,8 +23,10 @@ import {
 import type { PairedDeviceSummary } from "./api";
 import {
   cloneEvent,
+  deleteEvent,
   downloadDailyPdf,
   downloadDailyReport,
+  downloadPerformanceProfile,
   downloadTicketRawData,
   factoryReset,
   getAuditHistory,
@@ -35,13 +37,15 @@ import {
   getPushConfiguration,
   getSetupStatus,
   recoverAdminDevice,
+  removeEventLogo,
   sendCommand,
+  uploadEventLogo,
   verifyAdminPin,
 } from "./api";
 import { AppShell as Shell } from "./app/AppShell";
 import { isDeviceAuthorizationError } from "./board-sync";
 import { rememberDeviceCredential } from "./device-credentials";
-import { rememberActiveEvent } from "./event-context";
+import { forgetActiveEvent, rememberActiveEvent } from "./event-context";
 import { eventLocalDateTimeToIso, formatEventLocalDateTime } from "./event-time";
 import { AccountManagement } from "./features/auth/AccountManagement";
 import { useAuth } from "./features/auth/AuthContext";
@@ -206,6 +210,8 @@ export function AdminView() {
   const [plannedBoardingMinutes, setPlannedBoardingMinutes] = useState(8);
   const [plannedDeboardingMinutes, setPlannedDeboardingMinutes] = useState(5);
   const [plannedBufferMinutes, setPlannedBufferMinutes] = useState(3);
+  const [departedVisibilitySeconds, setDepartedVisibilitySeconds] = useState(15);
+  const [eventLogoFile, setEventLogoFile] = useState<File | null>(null);
   const [pushConfigurationStatus, setPushConfigurationStatus] = useState<
     "loading" | "configured" | "missing" | "unavailable"
   >("loading");
@@ -460,6 +466,7 @@ export function AdminView() {
     setPlannedBoardingMinutes(board.event.plannedBoardingMinutes);
     setPlannedDeboardingMinutes(board.event.plannedDeboardingMinutes);
     setPlannedBufferMinutes(board.event.plannedBufferMinutes);
+    setDepartedVisibilitySeconds(board.event.departedVisibilitySeconds);
     setEventSettingsInitialized(true);
   }, [board, eventSettingsInitialized]);
 
@@ -496,6 +503,38 @@ export function AdminView() {
     } catch (cause) {
       setMessage(
         cause instanceof Error ? cause.message : "Veranstaltung konnte nicht angelegt werden.",
+      );
+    }
+  }
+
+  async function removeEvent(eventId: string, eventName: string) {
+    const confirmation = window.prompt(
+      `„${eventName}“ wird vollständig gelöscht. Zum Bestätigen die technische ID eingeben:`,
+    );
+    if (confirmation !== eventId) return;
+    const reason = window.prompt("Kurze Begründung für die Löschung:")?.trim() ?? "";
+    if (reason.length < 3) {
+      setMessage("Die Löschung benötigt eine Begründung mit mindestens drei Zeichen.");
+      return;
+    }
+    try {
+      const result = await deleteEvent(
+        EVENT_ID,
+        eventId,
+        ADMIN_DEVICE_ID,
+        deviceTokenFor(ADMIN_DEVICE_ID),
+        reason,
+      );
+      if (eventId === EVENT_ID) {
+        forgetActiveEvent(window.localStorage);
+        window.location.assign(result.setupRequired ? "/setup" : "/");
+        return;
+      }
+      setMessage("Veranstaltung vollständig gelöscht.");
+      await refreshEvents();
+    } catch (cause) {
+      setMessage(
+        cause instanceof Error ? cause.message : "Veranstaltung konnte nicht gelöscht werden.",
       );
     }
   }
@@ -704,7 +743,7 @@ export function AdminView() {
             plannedBoardingMinutes,
             plannedDeboardingMinutes,
             plannedBufferMinutes,
-            departedVisibilitySeconds: 15,
+            departedVisibilitySeconds,
             reason: ADMIN_CONFIGURATION_AUDIT_REASON,
             adminPin: adminPinRef.current,
           },
@@ -719,6 +758,34 @@ export function AdminView() {
       setMessage(
         cause instanceof Error ? cause.message : "Parameter konnten nicht gespeichert werden.",
       );
+    }
+  }
+
+  async function saveEventLogo() {
+    if (!board || !eventLogoFile) return;
+    try {
+      await uploadEventLogo(
+        EVENT_ID,
+        ADMIN_DEVICE_ID,
+        deviceTokenFor(ADMIN_DEVICE_ID),
+        board.event.version,
+        eventLogoFile,
+      );
+      setEventLogoFile(null);
+      setMessage("Veranstaltungslogo gespeichert. Die Ansichten verwenden es nach dem Neuladen.");
+      await refresh();
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : "Logo konnte nicht gespeichert werden.");
+    }
+  }
+
+  async function clearEventLogo() {
+    try {
+      await removeEventLogo(EVENT_ID, ADMIN_DEVICE_ID, deviceTokenFor(ADMIN_DEVICE_ID));
+      setMessage("Veranstaltungslogo entfernt. Das Flugzeugsymbol wird wieder verwendet.");
+      await refresh();
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : "Logo konnte nicht entfernt werden.");
     }
   }
 
@@ -1447,6 +1514,17 @@ export function AdminView() {
     }
   }
 
+  async function exportPerformanceProfile() {
+    try {
+      await downloadPerformanceProfile(EVENT_ID, ADMIN_DEVICE_ID, deviceTokenFor(ADMIN_DEVICE_ID));
+      setMessage("Kontextbezogenes Leistungsprofil wurde exportiert.");
+    } catch (cause) {
+      setMessage(
+        cause instanceof Error ? cause.message : "Leistungsprofil konnte nicht exportiert werden.",
+      );
+    }
+  }
+
   function requestMasterSave(
     action:
       | "gate"
@@ -2080,7 +2158,7 @@ export function AdminView() {
                 <h2>Betriebsdaten zurücksetzen</h2>
                 <p>
                   Einen neuen, leeren Betriebsstand mit bestehenden Stammdaten anlegen. Der
-                  bisherige Stand bleibt als Audit- und Wiederherstellungsquelle erhalten.
+                  bisherige Stand kann nach dem Export vollständig gelöscht werden.
                 </p>
               </div>
               <button
@@ -2145,21 +2223,29 @@ export function AdminView() {
             </header>
             <p>
               Aktive Veranstaltung: <strong>{board?.event.name ?? EVENT_ID}</strong>. Ein Neustart
-              legt eine neue Veranstaltung an. Der bisherige Stand bleibt für Audit, Berichte und
-              Wiederherstellung unverändert erhalten.
+              legt eine neue Veranstaltung an. Bestehende Veranstaltungen können nach dem Export
+              vollständig gelöscht werden.
             </p>
             <div className="event-catalog">
               {events.map((entry) => (
-                <a
-                  className={entry.eventId === EVENT_ID ? "current-event" : ""}
-                  href={`/admin?event=${encodeURIComponent(entry.eventId)}`}
-                  key={entry.eventId}
-                >
-                  <strong>{entry.name}</strong>
-                  <span>
-                    {entry.eventDate} · {entry.aerodrome || "Flugplatz offen"}
-                  </span>
-                </a>
+                <div className="event-catalog-entry" key={entry.eventId}>
+                  <a
+                    className={entry.eventId === EVENT_ID ? "current-event" : ""}
+                    href={`/admin?event=${encodeURIComponent(entry.eventId)}`}
+                  >
+                    <strong>{entry.name}</strong>
+                    <span>
+                      {entry.eventDate} · {entry.aerodrome || "Flugplatz offen"}
+                    </span>
+                  </a>
+                  <button
+                    className="danger-link-action"
+                    onClick={() => void removeEvent(entry.eventId, entry.name)}
+                    type="button"
+                  >
+                    Löschen
+                  </button>
+                </div>
               ))}
             </div>
             <div className="parameter-grid">
@@ -2265,6 +2351,34 @@ export function AdminView() {
                 type="button"
               >
                 Veranstaltungsparameter speichern
+              </button>
+            </div>
+            <div className="event-logo-editor">
+              <label>
+                <FieldLabel
+                  label="Veranstaltungslogo"
+                  help="PNG, JPEG, WebP oder sicheres SVG bis 1 MiB. Ohne Logo erscheint das Flugzeugsymbol."
+                />
+                <input
+                  accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                  onChange={(event) => setEventLogoFile(event.target.files?.[0] ?? null)}
+                  type="file"
+                />
+              </label>
+              <button
+                disabled={!eventLogoFile || !isAdministrator}
+                onClick={() => requestAdminAction(saveEventLogo)}
+                type="button"
+              >
+                Logo hochladen
+              </button>
+              <button
+                className="danger-link-action"
+                disabled={!isAdministrator}
+                onClick={() => requestAdminAction(clearEventLogo)}
+                type="button"
+              >
+                Logo entfernen
               </button>
             </div>
             <div className="parameter-grid">
@@ -2425,6 +2539,19 @@ export function AdminView() {
                   max="120"
                   value={plannedBufferMinutes}
                   onChange={(event) => setPlannedBufferMinutes(Number(event.target.value))}
+                />
+              </label>
+              <label>
+                <FieldLabel
+                  label="Abgeflogene Zeilen sichtbar (Sek.)"
+                  help="FIDS blendet abgeflogene Gruppen nach dieser Frist aus. Zulässig sind 5 bis 900 Sekunden."
+                />
+                <input
+                  type="number"
+                  min="5"
+                  max="900"
+                  value={departedVisibilitySeconds}
+                  onChange={(event) => setDepartedVisibilitySeconds(Number(event.target.value))}
                 />
               </label>
             </div>
@@ -4326,6 +4453,9 @@ export function AdminView() {
                 </button>
                 <button onClick={exportRawData} type="button">
                   Ticket-Rohdaten CSV
+                </button>
+                <button onClick={exportPerformanceProfile} type="button">
+                  Leistungsprofil JSON
                 </button>
               </div>
             </div>

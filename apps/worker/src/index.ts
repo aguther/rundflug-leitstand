@@ -38,6 +38,8 @@ import { hashPin, randomToken, sha256Hex, verifyCredential, verifyPin } from "./
 import { runD1ReadsSequentially } from "./d1-read-scheduler";
 import { dailyReportCsv, dailyReportPdfLines, loadDailyReport } from "./daily-report";
 import { EventCoordinator } from "./event-coordinator";
+import { eventDeletionStatements } from "./event-deletion";
+import { eventLogoExtension, validateEventLogo } from "./event-logo";
 import {
   clearFactoryResetCoordinators,
   factoryResetRequestHash,
@@ -94,10 +96,10 @@ async function authorizeDevice(
   deviceId: string | undefined,
   token: string | undefined,
   request?: Request,
-): Promise<{ role: string } | null> {
+): Promise<{ id: string; role: string } | null> {
   if (request) {
     const actor = await authorizeSession(env, request);
-    if (actor) return { role: actor.role };
+    if (actor) return { id: actor.deviceId, role: actor.role };
   }
   if (!deviceId) return null;
   const device = await env.DB.prepare(
@@ -109,7 +111,7 @@ async function authorizeDevice(
   await env.DB.prepare("UPDATE paired_devices SET last_seen_at = ?1 WHERE id = ?2")
     .bind(new Date().toISOString(), deviceId)
     .run();
-  return { role: device.role };
+  return { id: deviceId, role: device.role };
 }
 
 function eventCoordinatorNamespace(env: Env): DurableObjectNamespace {
@@ -1136,6 +1138,237 @@ app.post("/api/admin/events/:sourceEventId/clone", async (context) => {
   ];
   await context.env.DB.batch(statements);
   return context.json(responseBody, 201);
+});
+
+app.delete("/api/admin/events/:eventId", async (context) => {
+  const eventId = context.req.param("eventId");
+  const sourceEventId = context.req.header("x-event-id")?.trim() || eventId;
+  const device = await authorizeDevice(
+    context.env,
+    sourceEventId,
+    context.req.header("x-device-id"),
+    context.req.header("x-device-token"),
+    context.req.raw,
+  );
+  if (device?.role !== "ADMIN") {
+    return context.json(
+      { error: { code: "ADMIN_REQUIRED", message: "Administration erforderlich." } },
+      403,
+    );
+  }
+  const input = (await context.req.json().catch(() => null)) as {
+    confirmation?: string;
+    reason?: string;
+  } | null;
+  if (input?.confirmation !== eventId || (input.reason?.trim().length ?? 0) < 3) {
+    return context.json(
+      {
+        error: {
+          code: "EVENT_DELETE_CONFIRMATION_INVALID",
+          message: "Veranstaltungs-ID und Begründung müssen bestätigt werden.",
+        },
+      },
+      400,
+    );
+  }
+  const event = await context.env.DB.prepare(
+    "SELECT id, logo_object_key FROM operation_days WHERE id = ?1",
+  )
+    .bind(eventId)
+    .first<{ id: string; logo_object_key: string | null }>();
+  if (!event) {
+    return context.json(
+      { error: { code: "EVENT_NOT_FOUND", message: "Veranstaltung nicht gefunden." } },
+      404,
+    );
+  }
+  const count = await context.env.DB.prepare("SELECT COUNT(*) AS count FROM operation_days").first<{
+    count: number;
+  }>();
+  const lastEvent = (count?.count ?? 0) <= 1;
+  const coordinator = context.env.EVENT_COORDINATOR.get(
+    context.env.EVENT_COORDINATOR.idFromName(eventId),
+  );
+  const cleared = await coordinator.fetch(`https://internal/events/${eventId}/factory-reset`, {
+    method: "POST",
+  });
+  if (!cleared.ok) {
+    return context.json(
+      { error: { code: "EVENT_BUSY", message: "Veranstaltung konnte nicht geleert werden." } },
+      409,
+    );
+  }
+  const statements = eventDeletionStatements(context.env, eventId);
+  if (lastEvent) {
+    statements.push(
+      context.env.DB.prepare("DELETE FROM operator_sessions"),
+      context.env.DB.prepare("DELETE FROM operator_accounts"),
+      context.env.DB.prepare("DELETE FROM app_bootstrap"),
+    );
+  }
+  await context.env.DB.batch(statements);
+  if (event.logo_object_key) await context.env.BACKUPS.delete(event.logo_object_key);
+  return context.json({ deleted: true, eventId, setupRequired: lastEvent });
+});
+
+app.put("/api/admin/events/:eventId/logo", async (context) => {
+  const eventId = context.req.param("eventId");
+  const device = await authorizeDevice(
+    context.env,
+    eventId,
+    context.req.header("x-device-id"),
+    context.req.header("x-device-token"),
+    context.req.raw,
+  );
+  if (device?.role !== "ADMIN") {
+    return context.json(
+      { error: { code: "ADMIN_REQUIRED", message: "Administration erforderlich." } },
+      403,
+    );
+  }
+  const expectedVersion = Number(context.req.header("x-expected-version"));
+  const commandId = context.req.header("x-command-id")?.trim();
+  if (!commandId || !Number.isInteger(expectedVersion) || expectedVersion < 0) {
+    return context.json(
+      { error: { code: "INVALID_COMMAND", message: "Kommando-ID oder Version fehlt." } },
+      400,
+    );
+  }
+  const event = await context.env.DB.prepare(
+    "SELECT version, logo_object_key FROM operation_days WHERE id = ?1",
+  )
+    .bind(eventId)
+    .first<{ version: number; logo_object_key: string | null }>();
+  if (!event) {
+    return context.json(
+      { error: { code: "EVENT_NOT_FOUND", message: "Veranstaltung nicht gefunden." } },
+      404,
+    );
+  }
+  if (event.version !== expectedVersion) {
+    return context.json(
+      {
+        error: { code: "STALE_VERSION", message: "Veranstaltung wurde zwischenzeitlich geändert." },
+      },
+      409,
+    );
+  }
+  const bytes = new Uint8Array(await context.req.raw.arrayBuffer());
+  let mediaType: ReturnType<typeof validateEventLogo>;
+  try {
+    mediaType = validateEventLogo(bytes, context.req.header("content-type") ?? null);
+  } catch {
+    return context.json(
+      {
+        error: {
+          code: "EVENT_LOGO_INVALID",
+          message: "Logo muss ein sicheres PNG, JPEG, WebP oder SVG bis 1 MiB sein.",
+        },
+      },
+      400,
+    );
+  }
+  const now = new Date().toISOString();
+  const objectKey = `event-logos/${eventId}/${crypto.randomUUID()}.${eventLogoExtension(mediaType)}`;
+  await context.env.BACKUPS.put(objectKey, bytes, {
+    httpMetadata: { contentType: mediaType },
+    customMetadata: { eventId },
+  });
+  const response = { logoUrl: `/api/public/events/${encodeURIComponent(eventId)}/logo` };
+  try {
+    await context.env.DB.batch([
+      context.env.DB.prepare(
+        `UPDATE operation_days
+            SET logo_object_key = ?1, logo_media_type = ?2, logo_updated_at = ?3,
+                version = version + 1, updated_at = ?3
+          WHERE id = ?4 AND version = ?5`,
+      ).bind(objectKey, mediaType, now, eventId, expectedVersion),
+      context.env.DB.prepare(
+        `INSERT INTO operational_events
+          (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type,
+           aggregate_id, aggregate_version, payload_json)
+         VALUES (?1, ?2, 'EVENT_LOGO_CHANGED', ?3, ?4, 'OPERATION_DAY', ?2, ?5, ?6)`,
+      ).bind(
+        crypto.randomUUID(),
+        eventId,
+        now,
+        device.id,
+        expectedVersion + 1,
+        JSON.stringify({ mediaType }),
+      ),
+      context.env.DB.prepare(
+        `INSERT INTO idempotency_receipts
+          (command_id, operation_day_id, device_id, command_type, received_at, response_json)
+         VALUES (?1, ?2, ?3, 'SET_EVENT_LOGO', ?4, ?5)`,
+      ).bind(commandId, eventId, device.id, now, JSON.stringify(response)),
+      context.env.DB.prepare(
+        "INSERT INTO outbox (id, operation_day_id, topic, payload_json, created_at) VALUES (?1, ?2, 'EVENT_STATE_CHANGED', ?3, ?4)",
+      ).bind(crypto.randomUUID(), eventId, JSON.stringify(response), now),
+    ]);
+  } catch (cause) {
+    await context.env.BACKUPS.delete(objectKey);
+    throw cause;
+  }
+  if (event.logo_object_key) await context.env.BACKUPS.delete(event.logo_object_key);
+  return context.json(response);
+});
+
+app.delete("/api/admin/events/:eventId/logo", async (context) => {
+  const eventId = context.req.param("eventId");
+  const device = await authorizeDevice(
+    context.env,
+    eventId,
+    context.req.header("x-device-id"),
+    context.req.header("x-device-token"),
+    context.req.raw,
+  );
+  if (device?.role !== "ADMIN") {
+    return context.json(
+      { error: { code: "ADMIN_REQUIRED", message: "Administration erforderlich." } },
+      403,
+    );
+  }
+  const event = await context.env.DB.prepare(
+    "SELECT version, logo_object_key FROM operation_days WHERE id = ?1",
+  )
+    .bind(eventId)
+    .first<{ version: number; logo_object_key: string | null }>();
+  if (!event) return context.body(null, 404);
+  const now = new Date().toISOString();
+  await context.env.DB.batch([
+    context.env.DB.prepare(
+      `UPDATE operation_days SET logo_object_key = NULL, logo_media_type = NULL,
+          logo_updated_at = ?1, version = version + 1, updated_at = ?1 WHERE id = ?2`,
+    ).bind(now, eventId),
+    context.env.DB.prepare(
+      `INSERT INTO operational_events
+        (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type,
+         aggregate_id, aggregate_version, payload_json)
+       VALUES (?1, ?2, 'EVENT_LOGO_REMOVED', ?3, ?4, 'OPERATION_DAY', ?2, ?5, '{}')`,
+    ).bind(crypto.randomUUID(), eventId, now, device.id, event.version + 1),
+  ]);
+  if (event.logo_object_key) await context.env.BACKUPS.delete(event.logo_object_key);
+  return context.body(null, 204);
+});
+
+app.get("/api/public/events/:eventId/logo", async (context) => {
+  const eventId = context.req.param("eventId");
+  const event = await context.env.DB.prepare(
+    "SELECT logo_object_key, logo_media_type FROM operation_days WHERE id = ?1",
+  )
+    .bind(eventId)
+    .first<{ logo_object_key: string | null; logo_media_type: string | null }>();
+  if (!event?.logo_object_key || !event.logo_media_type) return context.body(null, 404);
+  const object = await context.env.BACKUPS.get(event.logo_object_key);
+  if (!object) return context.body(null, 404);
+  return new Response(object.body, {
+    headers: {
+      "content-type": event.logo_media_type,
+      "cache-control": "public, max-age=300",
+      "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'",
+      "x-content-type-options": "nosniff",
+    },
+  });
 });
 
 app.get("/api/events/:eventId/snapshot", async (context) => {
@@ -2695,6 +2928,118 @@ app.get("/api/events/:eventId/reports/daily.csv", async (context) => {
       "cache-control": "no-store",
     },
   });
+});
+
+app.get("/api/events/:eventId/exports/performance-profile.json", async (context) => {
+  const eventId = context.req.param("eventId");
+  const device = await authorizeDevice(
+    context.env,
+    eventId,
+    context.req.header("x-device-id"),
+    context.req.header("x-device-token"),
+    context.req.raw,
+  );
+  if (!device || !["ADMIN", "FLIGHT_DIRECTOR"].includes(device.role)) {
+    return context.json(
+      { error: { code: "DEVICE_NOT_AUTHORIZED", message: "Gerät nicht berechtigt." } },
+      403,
+    );
+  }
+  const event = await context.env.DB.prepare(
+    `SELECT name, event_date, aerodrome, time_zone, planned_boarding_minutes,
+            planned_deboarding_minutes, planned_buffer_minutes
+       FROM operation_days WHERE id = ?1`,
+  )
+    .bind(eventId)
+    .first<{
+      name: string;
+      event_date: string;
+      aerodrome: string;
+      time_zone: string;
+      planned_boarding_minutes: number;
+      planned_deboarding_minutes: number;
+      planned_buffer_minutes: number;
+    }>();
+  if (!event) {
+    return context.json(
+      { error: { code: "EVENT_NOT_FOUND", message: "Veranstaltung nicht gefunden." } },
+      404,
+    );
+  }
+  const groups = await context.env.DB.prepare(
+    `SELECT rg.id AS resource_group_id, rg.name AS resource_group_name,
+            COUNT(DISTINCT CASE WHEN r.status = 'COMPLETED' THEN r.id END) AS completed_rotations,
+            ROUND(AVG(CASE WHEN r.departed_at IS NOT NULL AND r.called_at IS NOT NULL
+              THEN (julianday(r.departed_at) - julianday(r.called_at)) * 1440 END), 1)
+              AS average_boarding_minutes,
+            ROUND(AVG(CASE WHEN r.landed_at IS NOT NULL AND r.departed_at IS NOT NULL
+              THEN (julianday(r.landed_at) - julianday(r.departed_at)) * 1440 END), 1)
+              AS average_flight_minutes,
+            ROUND(AVG(CASE WHEN r.completed_at IS NOT NULL AND r.landed_at IS NOT NULL
+              THEN (julianday(r.completed_at) - julianday(r.landed_at)) * 1440 END), 1)
+              AS average_turnaround_minutes,
+            GROUP_CONCAT(DISTINCT a.aircraft_type) AS aircraft_types,
+            GROUP_CONCAT(DISTINCT a.passenger_seats) AS passenger_seat_counts
+       FROM resource_groups rg
+       LEFT JOIN flight_groups fg ON fg.resource_group_id = rg.id
+       LEFT JOIN rotations r ON r.flight_group_id = fg.id
+       LEFT JOIN resource_group_memberships m
+         ON m.resource_group_id = rg.id AND m.operation_day_id = rg.operation_day_id
+       LEFT JOIN aircraft a ON a.id = m.aircraft_id
+      WHERE rg.operation_day_id = ?1
+      GROUP BY rg.id, rg.name
+      ORDER BY rg.name`,
+  )
+    .bind(eventId)
+    .all<{
+      resource_group_id: string;
+      resource_group_name: string;
+      completed_rotations: number;
+      average_boarding_minutes: number | null;
+      average_flight_minutes: number | null;
+      average_turnaround_minutes: number | null;
+      aircraft_types: string | null;
+      passenger_seat_counts: string | null;
+    }>();
+  return context.json(
+    {
+      schemaVersion: 1,
+      exportedAt: new Date().toISOString(),
+      context: {
+        eventName: event.name,
+        eventDate: event.event_date,
+        aerodrome: event.aerodrome,
+        timeZone: event.time_zone,
+      },
+      planningDefaults: {
+        boardingMinutes: event.planned_boarding_minutes,
+        deboardingMinutes: event.planned_deboarding_minutes,
+        bufferMinutes: event.planned_buffer_minutes,
+      },
+      resourceGroups: groups.results.map((group) => ({
+        id: group.resource_group_id,
+        name: group.resource_group_name,
+        completedRotations: group.completed_rotations,
+        aircraftTypes: group.aircraft_types?.split(",").sort() ?? [],
+        passengerSeatCounts:
+          group.passenger_seat_counts
+            ?.split(",")
+            .map(Number)
+            .filter(Number.isFinite)
+            .sort((left, right) => left - right) ?? [],
+        durationsMinutes: {
+          boarding: group.average_boarding_minutes,
+          flight: group.average_flight_minutes,
+          turnaround: group.average_turnaround_minutes,
+        },
+      })),
+    },
+    200,
+    {
+      "cache-control": "no-store",
+      "content-disposition": `attachment; filename="leistungsprofil-${eventId}.json"`,
+    },
+  );
 });
 
 app.get("/api/events/:eventId/exports/tickets.csv", async (context) => {

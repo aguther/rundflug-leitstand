@@ -56,6 +56,23 @@ textarea {
   stroke-linejoin: round;
 }
 
+.brand-mark.event-logo {
+  display: inline-grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.brand-mark.event-logo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.brand-mark.plane-mark {
+  color: var(--ui-accent);
+}
+
 .brand-mark-aircraft {
   fill: var(--ui-accent);
   stroke: var(--ui-accent);
