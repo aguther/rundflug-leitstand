@@ -1,4 +1,5 @@
 import type { PublicTicketStatus } from "@rundflug/contracts";
+import { Bell, Check, Clock3, Info, MapPin, RefreshCw, Ticket, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
   getPublicTicketStatus,
@@ -131,35 +132,111 @@ export function TicketStatusView({ code }: { code: string }) {
       setPushMessage(reason instanceof Error ? reason.message : "Web-Push ist nicht verfügbar.");
     }
   };
+  const progressStates = ["WAITING", "COME_TO_FLIGHT_LINE", "BOARDING", "IN_FLIGHT"] as const;
+  const progressIndex = status
+    ? Math.max(
+        0,
+        progressStates.indexOf(
+          status.status === "PREPARE"
+            ? "WAITING"
+            : status.status === "LANDED" || status.status === "COMPLETED"
+              ? "IN_FLIGHT"
+              : status.status === "SERVICE_PAUSED"
+                ? "WAITING"
+                : status.status,
+        ),
+      )
+    : 0;
   return (
     <Shell publicView title="Ticketstatus">
       <section className="ticket-status-page">
-        <span className="eyebrow">Ihr Ticketcode</span>
-        <code>{code}</code>
         {status ? (
           <>
-            <h1>
-              {status.productCode} · {status.productName}
-            </h1>
-            {status.publicDescription ? <p>{status.publicDescription}</p> : null}
-            <p>Gate: {status.gateLabel}</p>
-            <div className="public-status">
-              <span>Fluggruppe {status.communicationNumber}</span>
-              <strong>{publicStatusLabel[status.status]}</strong>
-            </div>
-            <p>{status.message}</p>
-            <OperationalNotice note={status.operationalNotice} />
-            {status.predictionQuality === "UNCERTAIN" ? (
-              <div className="uncertainty">Betrieb verzögert – bitte Status erneut prüfen</div>
-            ) : (
-              <div className="time-window">
-                Zeitfenster {status.waitLowerMinutes}–{status.waitUpperMinutes} Minuten
-              </div>
-            )}
-            <label className="push-toggle">
+            <header className="ticket-live-header">
               <span>
-                <strong>Web-Push</strong>
-                <small>Freiwillige Status-Updates für dieses Ticket</small>
+                <RefreshCw aria-hidden="true" />
+                <strong>Live</strong>
+              </span>
+              <small>Verbindung stabil</small>
+            </header>
+            <div className="ticket-identity">
+              <Ticket aria-hidden="true" />
+              <div>
+                <span>Fluggruppe {status.communicationNumber}</span>
+                <h1>{status.productName}</h1>
+                <code>{code}</code>
+              </div>
+            </div>
+            <section className="ticket-current-status">
+              <span className="eyebrow">Aktueller Status</span>
+              <strong>{publicStatusLabel[status.status]}</strong>
+              <p>{status.message}</p>
+            </section>
+            <section className="ticket-gate-callout">
+              <MapPin aria-hidden="true" />
+              <div>
+                <strong>Gate {status.gateLabel}</strong>
+                <span>
+                  {status.status === "COME_TO_FLIGHT_LINE" || status.status === "BOARDING"
+                    ? "Bitte jetzt zum Gate"
+                    : "Gate für Ihren Rundflug"}
+                </span>
+              </div>
+            </section>
+            <OperationalNotice note={status.operationalNotice} />
+            <div className="ticket-status-metrics">
+              <div>
+                <Clock3 aria-hidden="true" />
+                <span>Geschätztes Zeitfenster</span>
+                <strong>
+                  {status.predictionQuality === "UNCERTAIN"
+                    ? "Wird aktualisiert"
+                    : `${status.waitLowerMinutes}–${status.waitUpperMinutes} Min.`}
+                </strong>
+              </div>
+              <div>
+                <Users aria-hidden="true" />
+                <span>Position in der Warteschlange</span>
+                <strong>{status.queuePosition ?? "–"}</strong>
+              </div>
+            </div>
+            <section className="ticket-progress" aria-label="Statusübersicht">
+              {[
+                ["Warten", "WAITING"],
+                ["Bitte zum Gate", "COME_TO_FLIGHT_LINE"],
+                ["Boarding", "BOARDING"],
+                ["Abgeflogen", "IN_FLIGHT"],
+              ].map(([label, state], index) => (
+                <div
+                  className={
+                    index < progressIndex ? "done" : index === progressIndex ? "current" : ""
+                  }
+                  key={state}
+                >
+                  <span>{index < progressIndex ? <Check aria-hidden="true" /> : index + 1}</span>
+                  <strong>{label}</strong>
+                  <small>
+                    {index < progressIndex
+                      ? "Erledigt"
+                      : index === progressIndex
+                        ? "Aktuell"
+                        : "Ausstehend"}
+                  </small>
+                </div>
+              ))}
+            </section>
+            <div className="ticket-updated">
+              <Clock3 aria-hidden="true" /> Zuletzt aktualisiert{" "}
+              {new Date(status.updatedAt).toLocaleTimeString("de-DE", {
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </div>
+            <label className="push-toggle">
+              <Bell aria-hidden="true" />
+              <span>
+                <strong>Benachrichtigungen aktivieren</strong>
+                <small>Eine Mitteilung erhalten, wenn sich der Status ändert.</small>
               </span>
               <input
                 type="checkbox"
@@ -173,7 +250,7 @@ export function TicketStatusView({ code }: { code: string }) {
               </p>
             ) : null}
             <a className="privacy-link" href="/datenschutz">
-              Datenschutz &amp; Privatsphäre
+              <Info aria-hidden="true" /> Öffentlicher Ticketstatus · Datenschutz &amp; Privatsphäre
             </a>
           </>
         ) : (
