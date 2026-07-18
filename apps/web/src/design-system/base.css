@@ -94,9 +94,132 @@ textarea {
   opacity: 0.7;
 }
 
-.app-header nav a[aria-current="page"] {
-  color: var(--ui-accent);
+.view-switcher {
+  position: relative;
+  min-width: 250px;
+}
+
+.view-switcher > summary {
+  display: flex;
+  min-height: 42px;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 8px;
+  background: var(--ui-surface);
+  cursor: pointer;
+  list-style: none;
+}
+
+.view-switcher > summary::-webkit-details-marker {
+  display: none;
+}
+
+.view-switcher > summary > :last-child {
+  margin-left: auto;
+  transition: transform 160ms ease;
+}
+
+.view-switcher[open] > summary {
+  border-color: var(--ui-accent);
+  box-shadow: 0 0 0 2px var(--ui-accent-soft);
+}
+
+.view-switcher[open] > summary > :last-child {
+  transform: rotate(180deg);
+}
+
+.view-switcher-menu {
+  position: absolute;
+  z-index: 50;
+  top: calc(100% + 8px);
+  left: 0;
+  display: grid;
+  width: 360px;
+  max-width: min(90vw, 360px);
+  padding: 8px;
+  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  background: var(--ui-surface);
+  box-shadow: 0 18px 45px rgb(15 23 42 / 18%);
+}
+
+.view-switcher-menu > :is(a, span, button) {
+  display: grid;
+  min-height: 58px;
+  grid-template-columns: 26px 1fr 22px;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 7px;
+  color: var(--ui-text);
+  text-align: left;
+  text-decoration: none;
+}
+
+.view-switcher-menu > a:hover,
+.view-switcher-menu > a[aria-current="page"] {
   background: var(--ui-accent-soft);
+  color: var(--ui-accent);
+}
+
+.view-switcher-menu > :is(a, span) > span {
+  display: grid;
+  gap: 3px;
+}
+
+.view-switcher-menu small {
+  color: var(--ui-text-muted);
+  font-size: 0.76rem;
+}
+
+.view-switcher-locked {
+  color: var(--ui-text-muted);
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.view-switcher-menu > button {
+  grid-template-columns: 26px 1fr;
+  margin: 8px -8px -8px;
+  padding-inline: 18px;
+  border-top: 1px solid var(--ui-border);
+  border-radius: 0 0 8px 8px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.app-event,
+.app-connection {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.app-connection {
+  color: var(--ui-text-muted);
+  white-space: nowrap;
+}
+
+.app-connection.connected {
+  color: var(--ui-success);
+}
+
+@media (max-width: 900px) {
+  .view-switcher {
+    order: 10;
+    width: 100%;
+  }
+
+  .view-switcher-menu {
+    width: 100%;
+  }
+
+  .app-connection {
+    display: none;
+  }
 }
 
 .app-account,

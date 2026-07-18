@@ -1925,25 +1925,64 @@ p {
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: 12px;
 }
+.receipt-list > .print-tickets {
+  grid-column: 1 / -1;
+  min-height: 44px;
+  align-self: end;
+}
 .ticket-receipt {
   display: grid;
   justify-items: center;
-  gap: 8px;
-  padding: 14px;
-  border: 1px dashed #8093aa;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
   background: #fff;
+  color: #0f172a;
+  box-shadow: 0 8px 24px rgb(15 23 42 / 8%);
+}
+.ticket-receipt header {
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  text-align: center;
+}
+.ticket-receipt header strong {
+  font-size: 1rem;
+}
+.ticket-receipt header span {
+  color: #0f172a;
+  font-size: 0.88rem;
+  font-weight: 700;
 }
 .ticket-receipt img {
-  width: min(100%, 220px);
+  width: min(100%, 260px);
   height: auto;
 }
-.ticket-receipt code {
-  padding: 18px 12px;
-  background: #f8fafc;
-  text-align: center;
-  font-size: 1rem;
+.ticket-receipt dl {
+  display: grid;
+  width: 100%;
+  gap: 7px;
+  margin: 0;
+}
+.ticket-receipt dl > div {
+  display: grid;
+  grid-template-columns: 58px 1fr;
+  gap: 8px;
+}
+.ticket-receipt :is(dt, dd) {
+  margin: 0;
+}
+.ticket-receipt dt {
+  color: #64748b;
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.ticket-receipt dd {
+  overflow-wrap: anywhere;
+  font-size: 0.82rem;
   font-weight: 800;
-  letter-spacing: 0.04em;
 }
 .ticket-receipt span {
   text-align: center;
@@ -4340,6 +4379,10 @@ p {
   }
 }
 @media print {
+  @page {
+    size: 58mm 110mm;
+    margin: 3mm;
+  }
   body * {
     visibility: hidden;
   }
@@ -4352,6 +4395,21 @@ p {
     inset: 0;
     width: 100%;
     border: 0;
+  }
+  .receipt-list {
+    display: block;
+  }
+  .ticket-receipt {
+    width: 52mm;
+    min-height: 100mm;
+    padding: 2mm;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    break-after: page;
+  }
+  .ticket-receipt img {
+    width: 46mm;
   }
   .ticket-preview > h2,
   .ticket-preview > p,

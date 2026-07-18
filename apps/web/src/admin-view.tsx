@@ -97,11 +97,12 @@ export function AdminView() {
       "master-data",
       "users",
       "evaluation",
+      "audit",
       "backup",
     ];
     return (validAreas as string[]).includes(requestedArea ?? "")
       ? (requestedArea as AdminArea)
-      : "master-data";
+      : "overview";
   });
   const [masterDataCategory, setMasterDataCategory] = useState<MasterDataCategory>(() => {
     const requestedSection = initialAdminParams.get("section");
@@ -117,6 +118,13 @@ export function AdminView() {
       ? (requestedSection as MasterDataCategory)
       : "resource-groups";
   });
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    url.searchParams.set("area", adminArea);
+    if (adminArea === "master-data") url.searchParams.set("section", masterDataCategory);
+    else url.searchParams.delete("section");
+    window.history.replaceState(null, "", url);
+  }, [adminArea, masterDataCategory]);
   const [reason, setReason] = useState("");
   const [adminPin, setAdminPinState] = useState(session?.account.role === "ADMIN" ? "000000" : "");
   const adminPinRef = useRef(session?.account.role === "ADMIN" ? "000000" : "");
@@ -277,7 +285,7 @@ export function AdminView() {
   const [aircraftEditorId, setAircraftEditorId] = useState("new");
   const [aircraftRegistration, setAircraftRegistration] = useState("");
   const [aircraftType, setAircraftType] = useState("");
-  const [aircraftSeats, setAircraftSeats] = useState(4);
+  const [aircraftSeats, setAircraftSeats] = useState(3);
   const [aircraftMaximumPayload, setAircraftMaximumPayload] = useState("");
   const [assignmentAircraftId, setAssignmentAircraftId] = useState("");
   const [assignmentResourceGroupId, setAssignmentResourceGroupId] = useState("");
@@ -448,6 +456,10 @@ export function AdminView() {
     if (historyView !== "AUDIT") void refreshDetailedHistory(0);
     if (isAdministrator) void refreshDevices();
   }, [historyView, isAdministrator, refreshDevices, refreshDetailedHistory, refreshHistory]);
+  useEffect(() => {
+    if (adminArea === "audit") setHistoryView("AUDIT");
+    if (adminArea === "evaluation" && historyView === "AUDIT") setHistoryView("OPERATIONS");
+  }, [adminArea, historyView]);
   useEffect(() => {
     if (!board || eventSettingsInitialized) return;
     setSaleOpensAt(formatEventLocalDateTime(board.event.saleOpensAt, board.event.timeZone));
@@ -780,8 +792,14 @@ export function AdminView() {
   }
 
   async function clearEventLogo() {
+    if (!board) return;
     try {
-      await removeEventLogo(EVENT_ID, ADMIN_DEVICE_ID, deviceTokenFor(ADMIN_DEVICE_ID));
+      await removeEventLogo(
+        EVENT_ID,
+        ADMIN_DEVICE_ID,
+        deviceTokenFor(ADMIN_DEVICE_ID),
+        board.event.version,
+      );
       setMessage("Veranstaltungslogo entfernt. Das Flugzeugsymbol wird wieder verwendet.");
       await refresh();
     } catch (cause) {
@@ -977,7 +995,7 @@ export function AdminView() {
     const entry = board?.aircraft.find((aircraft) => aircraft.id === id);
     setAircraftRegistration(entry?.registration ?? "");
     setAircraftType(entry?.aircraftType ?? "");
-    setAircraftSeats(entry?.passengerSeats ?? 4);
+    setAircraftSeats(entry?.passengerSeats ?? 3);
     setAircraftMaximumPayload(entry?.maximumPassengerPayloadKg?.toString() ?? "");
   }
 
@@ -1659,7 +1677,7 @@ export function AdminView() {
   const setupSteps: SetupStep[] = [
     {
       id: "parameters",
-      label: "Parameter",
+      label: "Veranstaltung",
       complete: Boolean(board?.event.saleOpensAt && board.event.operationsEndAt),
       area: "setup",
     },
@@ -1714,7 +1732,7 @@ export function AdminView() {
       description: "Betriebsstatus, Kennzahlen und offene organisatorische Aufgaben.",
     },
     setup: {
-      title: "Einrichtung",
+      title: "Veranstaltung",
       description: "Das System Schritt für Schritt für den Rundflugbetrieb vorbereiten.",
     },
     "master-data": {
@@ -1728,6 +1746,10 @@ export function AdminView() {
     evaluation: {
       title: "Auswertung",
       description: "Verläufe, Berichte und seltene administrative Sonderfälle prüfen.",
+    },
+    audit: {
+      title: "Audit",
+      description: "Nachvollziehbare operative und administrative Änderungen prüfen.",
     },
     backup: {
       title: "Sicherung & Reset",
@@ -2146,14 +2168,17 @@ export function AdminView() {
             </header>
           ) : null}
           {adminArea === "users" ? <AccountManagement /> : null}
-          <section className="reset-levels" hidden={adminArea !== "backup"}>
+          <section
+            className="reset-levels"
+            hidden={adminArea !== "setup" && adminArea !== "backup"}
+          >
             {!isAdministrator ? (
               <ValidationHint tone="error">
                 Reset ist sichtbar, bleibt aber gesperrt, bis dieses Administrationsgerät vom Server
                 bestätigt wurde.
               </ValidationHint>
             ) : null}
-            <div className="reset-level-row">
+            <div className="reset-level-row" hidden={adminArea !== "setup"}>
               <div>
                 <h2>Betriebsdaten zurücksetzen</h2>
                 <p>
@@ -2173,7 +2198,7 @@ export function AdminView() {
                 Betriebsdaten zurücksetzen
               </button>
             </div>
-            <div className="reset-level-row">
+            <div className="reset-level-row" hidden={adminArea !== "setup"}>
               <div>
                 <h2>Neue Veranstaltung beginnen</h2>
                 <p>
@@ -2193,7 +2218,7 @@ export function AdminView() {
                 Neue Veranstaltung
               </button>
             </div>
-            <div className="reset-level-row factory-reset-row">
+            <div className="reset-level-row factory-reset-row" hidden={adminArea !== "backup"}>
               <div>
                 <h2>Werkszustand herstellen</h2>
                 <p>
@@ -2213,7 +2238,7 @@ export function AdminView() {
           </section>
           <section
             className="admin-section restart-editor"
-            hidden={adminArea !== "backup" || !restartEditorOpen}
+            hidden={adminArea !== "setup" || !restartEditorOpen}
           >
             <header className="section-heading-row">
               <h2>Neuen Betriebsstand anlegen</h2>
@@ -3943,7 +3968,10 @@ export function AdminView() {
               </div>
             ) : null}
           </section>
-          <section className="admin-section" hidden={adminArea !== "evaluation"}>
+          <section
+            className="admin-section"
+            hidden={!(["evaluation", "audit"] as AdminArea[]).includes(adminArea)}
+          >
             <h2>Notfallmodus</h2>
             <label>
               <FieldLabel

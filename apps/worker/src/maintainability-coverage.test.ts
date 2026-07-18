@@ -45,6 +45,7 @@ describe("V1 maintainability and portability boundaries", () => {
       "@biomejs/biome",
       "concurrently",
       "hono",
+      "lucide-react",
       "qrcode",
       "react",
       "react-dom",

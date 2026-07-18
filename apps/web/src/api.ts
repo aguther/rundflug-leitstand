@@ -282,10 +282,14 @@ export async function removeEventLogo(
   eventId: string,
   deviceId: string,
   deviceToken: string,
+  expectedVersion: number,
 ): Promise<void> {
   const response = await apiFetch(`/api/admin/events/${encodeURIComponent(eventId)}/logo`, {
     method: "DELETE",
-    headers: deviceHeaders(deviceId, deviceToken),
+    headers: deviceHeaders(deviceId, deviceToken, {
+      "x-command-id": crypto.randomUUID(),
+      "x-expected-version": String(expectedVersion),
+    }),
   });
   if (!response.ok) throw new Error("Veranstaltungslogo konnte nicht entfernt werden.");
 }
