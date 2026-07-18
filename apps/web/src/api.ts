@@ -228,6 +228,68 @@ export async function cloneEvent(
   return body as { eventId: string; adminDeviceId: string; templateSourceId: string };
 }
 
+export async function deleteEvent(
+  sourceEventId: string,
+  eventId: string,
+  deviceId: string,
+  deviceToken: string,
+  reason: string,
+): Promise<{ deleted: true; eventId: string; setupRequired: boolean }> {
+  const response = await apiFetch(`/api/admin/events/${encodeURIComponent(eventId)}`, {
+    method: "DELETE",
+    headers: deviceHeaders(deviceId, deviceToken, {
+      "content-type": "application/json",
+      "x-event-id": sourceEventId,
+    }),
+    body: JSON.stringify({ confirmation: eventId, reason }),
+  });
+  const body = (await response.json()) as {
+    deleted?: boolean;
+    eventId?: string;
+    setupRequired?: boolean;
+    error?: { message?: string };
+  };
+  if (!response.ok || body.deleted !== true || body.eventId !== eventId) {
+    throw new Error(body.error?.message ?? "Veranstaltung konnte nicht gelöscht werden.");
+  }
+  return body as { deleted: true; eventId: string; setupRequired: boolean };
+}
+
+export async function uploadEventLogo(
+  eventId: string,
+  deviceId: string,
+  deviceToken: string,
+  expectedVersion: number,
+  file: File,
+): Promise<{ logoUrl: string }> {
+  const response = await apiFetch(`/api/admin/events/${encodeURIComponent(eventId)}/logo`, {
+    method: "PUT",
+    headers: deviceHeaders(deviceId, deviceToken, {
+      "content-type": file.type,
+      "x-command-id": crypto.randomUUID(),
+      "x-expected-version": String(expectedVersion),
+    }),
+    body: file,
+  });
+  const body = (await response.json()) as { logoUrl?: string; error?: { message?: string } };
+  if (!response.ok || !body.logoUrl) {
+    throw new Error(body.error?.message ?? "Veranstaltungslogo konnte nicht gespeichert werden.");
+  }
+  return { logoUrl: body.logoUrl };
+}
+
+export async function removeEventLogo(
+  eventId: string,
+  deviceId: string,
+  deviceToken: string,
+): Promise<void> {
+  const response = await apiFetch(`/api/admin/events/${encodeURIComponent(eventId)}/logo`, {
+    method: "DELETE",
+    headers: deviceHeaders(deviceId, deviceToken),
+  });
+  if (!response.ok) throw new Error("Veranstaltungslogo konnte nicht entfernt werden.");
+}
+
 export async function factoryReset(
   eventId: string,
   deviceId: string,
@@ -362,6 +424,19 @@ export const downloadTicketRawData = (eventId: string, deviceId: string, deviceT
     deviceToken,
     "exports/tickets.csv",
     `rohdaten-tickets-${eventId}.csv`,
+  );
+
+export const downloadPerformanceProfile = (
+  eventId: string,
+  deviceId: string,
+  deviceToken: string,
+) =>
+  downloadProtectedFile(
+    eventId,
+    deviceId,
+    deviceToken,
+    "exports/performance-profile.json",
+    `leistungsprofil-${eventId}.json`,
   );
 
 export interface HealthResponse {
