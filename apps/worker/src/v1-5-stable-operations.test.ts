@@ -33,6 +33,17 @@ describe("V1.5 stable operations", () => {
     expect(route).not.toContain("console.");
   });
 
+  it("allows the protected cashier list to load the latest groups without a search term", () => {
+    const route = worker.match(
+      /app\.get\("\/api\/events\/:eventId\/tickets\/search"[\s\S]*?\n}\);/,
+    )?.[0];
+    expect(route).toBeTruthy();
+    expect(route).toContain('["CASHIER", "FLIGHT_LINE", "FLIGHT_DIRECTOR", "ADMIN"]');
+    expect(route).toContain("rawQuery.length === 1");
+    expect(route).toContain("?6 = ''");
+    expect(route).toContain("ORDER BY tg.sold_at DESC LIMIT 20");
+  });
+
   it("publishes explicit off-block, on-block and turnaround events", () => {
     expect(coordinator).toContain('MARK_OFF_BLOCK: "MARK_OFF_BLOCK"');
     expect(coordinator).toContain('MARK_ON_BLOCK: "MARK_ON_BLOCK"');

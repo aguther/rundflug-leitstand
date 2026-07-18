@@ -1,9 +1,33 @@
 import type { TicketGroupPrintData, TicketSearchResult } from "@rundflug/contracts";
+import {
+  CircleUserRound,
+  Filter,
+  Info,
+  Minus,
+  Plane,
+  Plus,
+  Printer,
+  RefreshCw,
+  Search,
+  Ticket,
+  Trash2,
+} from "lucide-react";
 import QRCode from "qrcode";
 import { useEffect, useState } from "react";
 import { getTicketGroupPrintData, searchTickets, sendCommand } from "./api";
 import { AppShell as Shell } from "./app/AppShell";
 import { requiresChildCompanionWarning } from "./cashier-guidance";
+import {
+  Button,
+  DataTable,
+  IconButton,
+  PageHeader,
+  Panel,
+  SelectField,
+  StatusPill,
+  Tabs,
+  TextField,
+} from "./design-system/components";
 import {
   appendCashierDraftRevision,
   cashierDraftQueueKey,
@@ -54,7 +78,7 @@ export function CashierView() {
   const [rebookProductId, setRebookProductId] = useState("");
   const [ticketSearch, setTicketSearch] = useState("");
   const [ticketSearchResults, setTicketSearchResults] = useState<TicketSearchResult[]>([]);
-  const [correctionTargetLabel, setCorrectionTargetLabel] = useState("Letzter Verkauf");
+  const [ticketListTab, setTicketListTab] = useState<"ACTIVE" | "CANCELLED">("ACTIVE");
   const [ticketDetails, setTicketDetails] = useState<TicketDetail[]>([]);
   const [oversizeSplitAcknowledged, setOversizeSplitAcknowledged] = useState(false);
   const product = board?.products.find((entry) => entry.id === productId) ?? board?.products[0];
@@ -71,6 +95,16 @@ export function CashierView() {
     product?.childCompanionRequired ?? false,
     ticketDetails.map((detail) => detail.weightClass),
   );
+  const selectedTicketGroup = ticketSearchResults.find(
+    (entry) => entry.ticketGroupId === lastTicketGroupId,
+  );
+  const visibleTicketGroups = ticketSearchResults.filter((entry) =>
+    ticketListTab === "CANCELLED"
+      ? entry.groupStatus === "CANCELLED"
+      : entry.groupStatus !== "CANCELLED",
+  );
+  const currency = (cents: number) =>
+    (cents / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
   async function printableTickets(data: TicketGroupPrintData): Promise<TicketReceipt[]> {
     return Promise.all(
       data.tickets.map(async (ticket) => {
@@ -134,6 +168,19 @@ export function CashierView() {
       }),
     );
   }, [product?.weightClasses, size]);
+  useEffect(() => {
+    if (!serverConfirmed) return;
+    void searchTickets(EVENT_ID, CASHIER_DEVICE_ID, deviceTokenFor(CASHIER_DEVICE_ID), "")
+      .then((response) => {
+        setTicketSearchResults(response.results);
+        const firstResult = response.results[0];
+        if (firstResult) {
+          setLastTicketGroupId(firstResult.ticketGroupId);
+          setLastProductId(firstResult.productId);
+        }
+      })
+      .catch(() => undefined);
+  }, [serverConfirmed]);
   async function sell() {
     if (!board || !product || busy) return;
     const codes =
@@ -181,7 +228,6 @@ export function CashierView() {
       setPreprintedCodes("");
       setLastTicketGroupId(soldTicketGroupId);
       setLastProductId(product.id);
-      setCorrectionTargetLabel("Letzter Verkauf");
       setMessage(`${codes.length} Ticket${codes.length === 1 ? "" : "s"} verkauft.`);
       writeCashierDraftQueue(localStorage, draftQueueKey, []);
       setPendingDraftCount(0);
@@ -276,9 +322,6 @@ export function CashierView() {
   function selectSearchResult(result: TicketSearchResult) {
     setLastTicketGroupId(result.ticketGroupId);
     setLastProductId(result.productId);
-    setCorrectionTargetLabel(
-      result.communicationLabels.join(" / ") || `Gruppe ${result.ticketGroupId.slice(0, 8)}`,
-    );
     setReceipt([]);
     setMessage(
       `${result.productName} · ${result.groupSize} Ticket${result.groupSize === 1 ? "" : "s"} ausgewählt.`,
@@ -298,342 +341,481 @@ export function CashierView() {
       <EmergencyNotice active={board?.event.emergencyMode ?? false} />
       <InterruptionNotice active={board?.event.operationalInterrupted ?? false} />
       <OperationalNotice note={board?.event.operationalNote} />
-      <section className="cashier-workspace">
-        <div className="product-strip">
-          {board?.products.map((entry) => (
-            <button
-              className={entry.id === product?.id ? "product-option selected" : "product-option"}
-              key={entry.id}
-              onClick={() => {
-                setProductId(entry.id);
-                setOversizeSplitAcknowledged(false);
-              }}
+      <section className="cashier-v15-workspace">
+        <Panel className="cashier-sale-panel" aria-labelledby="cashier-sale-title">
+          <PageHeader level={1} title="Tickets verkaufen" />
+          <div className="cashier-products">
+            {board?.products.map((entry) => {
+              const selected = entry.id === product?.id;
+              return (
+                <article
+                  className={selected ? "cashier-product selected" : "cashier-product"}
+                  key={entry.id}
+                >
+                  <button
+                    className="cashier-product-heading"
+                    onClick={() => {
+                      setProductId(entry.id);
+                      setOversizeSplitAcknowledged(false);
+                    }}
+                    type="button"
+                  >
+                    <Plane aria-hidden="true" />
+                    <span>
+                      <strong>{entry.name}</strong>
+                      <small>
+                        {entry.publicDescription ||
+                          `Flugzeit ca. ${entry.promisedFlightMinutes} Min.`}
+                      </small>
+                    </span>
+                    <span className="cashier-product-metric">
+                      <small>Wartezeit</small>
+                      <strong>
+                        {entry.estimatedWaitLowerMinutes}–{entry.estimatedWaitUpperMinutes} Min.
+                      </strong>
+                    </span>
+                    <span className="cashier-product-metric">
+                      <small>Kapazität</small>
+                      <strong>
+                        {entry.remainingSellableSeats}/{entry.projectedSeats}
+                      </strong>
+                    </span>
+                    <span className="cashier-product-price">
+                      <small>Preis / Person</small>
+                      <strong>{currency(entry.priceCents)}</strong>
+                    </span>
+                  </button>
+                  <div className="cashier-product-controls" aria-hidden={!selected}>
+                    <div>
+                      <span className="cashier-field-label">Gruppengröße</span>
+                      <div className="cashier-stepper">
+                        <IconButton
+                          aria-label="Gruppengröße verringern"
+                          label="Gruppengröße verringern"
+                          onClick={() => {
+                            setProductId(entry.id);
+                            setSize((value) => Math.max(1, value - 1));
+                            setOversizeSplitAcknowledged(false);
+                          }}
+                          type="button"
+                        >
+                          <Minus aria-hidden="true" size={18} />
+                        </IconButton>
+                        <output>{size}</output>
+                        <IconButton
+                          aria-label="Gruppengröße erhöhen"
+                          label="Gruppengröße erhöhen"
+                          onClick={() => {
+                            setProductId(entry.id);
+                            setSize((value) => Math.min(12, value + 1));
+                            setOversizeSplitAcknowledged(false);
+                          }}
+                          type="button"
+                        >
+                          <Plus aria-hidden="true" size={18} />
+                        </IconButton>
+                      </div>
+                    </div>
+                    <div className="cashier-weight-picker">
+                      <span className="cashier-field-label">Gewichtsklasse (pro Person)</span>
+                      <div>
+                        {(entry.weightClasses.length > 0
+                          ? entry.weightClasses
+                          : ["NOT_CAPTURED" as WeightClass]
+                        ).map((weightClass) => (
+                          <Button
+                            className={
+                              ticketDetails.every((detail) => detail.weightClass === weightClass)
+                                ? "selected"
+                                : ""
+                            }
+                            key={weightClass}
+                            onClick={() => {
+                              setProductId(entry.id);
+                              setTicketDetails((current) =>
+                                current.map((detail) => ({
+                                  ...detail,
+                                  weightClass,
+                                  individualWeightKg: weightClass === "INDIVIDUAL" ? 80 : null,
+                                })),
+                              );
+                            }}
+                            size="default"
+                            type="button"
+                            variant="secondary"
+                          >
+                            {weightClassLabel[weightClass]}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+          <div className="cashier-sale-options">
+            <Info aria-hidden="true" size={18} />
+            <span>Gewichtshinweise sind informativ; die Entscheidung liegt beim Piloten.</span>
+            <SelectField
+              label="Ticket-Ausgabe"
+              value={ticketCodeMode}
+              onChange={(event) =>
+                setTicketCodeMode(event.target.value as "GENERATED" | "PREPRINTED")
+              }
+            >
+              <option value="GENERATED">QR-Tickets erzeugen</option>
+              <option value="PREPRINTED">Vorgedruckte Codes scannen</option>
+            </SelectField>
+          </div>
+          {ticketCodeMode === "PREPRINTED" ? (
+            <label className="cashier-preprinted-codes">
+              Codes · einer pro Ticket
+              <textarea
+                rows={Math.min(5, Math.max(2, size))}
+                value={preprintedCodes}
+                onChange={(event) => setPreprintedCodes(event.target.value)}
+                placeholder="QR-Code scannen oder eingeben"
+              />
+            </label>
+          ) : null}
+          {product && splitPreview.required ? (
+            <div className="oversize-split-notice" role="status">
+              <div>
+                <strong>Aufteilung erforderlich</strong>
+                <span>
+                  {size} Tickets passen nicht gemeinsam in einen Umlauf mit{" "}
+                  {product.referenceCapacity} Plätzen. Vorgesehen:{" "}
+                  {splitPreview.slotSizes.join(" + ")} in {splitPreview.slotSizes.length}{" "}
+                  aufeinanderfolgenden Fluggruppen.
+                </span>
+                <small>Die gemeinsam verkaufte Buchungsgruppe bleibt vollständig verbunden.</small>
+              </div>
+              <label>
+                <input
+                  checked={oversizeSplitAcknowledged}
+                  onChange={(event) => setOversizeSplitAcknowledged(event.target.checked)}
+                  type="checkbox"
+                />
+                Aufteilung verstanden
+              </label>
+            </div>
+          ) : null}
+          {limitedLargeAircraft ? (
+            <div className="capacity-fit-notice" role="status">
+              <strong>Gemeinsamer Flug möglich</strong>
+              <span>
+                {fittingAircraft.length} von {productAircraft.length} Flugzeug
+                {productAircraft.length === 1 ? "" : "en"} passen für diese Gruppe. Dadurch kann die
+                Wartezeit etwas länger sein.
+              </span>
+            </div>
+          ) : null}
+          {childCompanionWarning ? (
+            <div className="child-companion-warning" role="alert">
+              <strong>Begleitung prüfen</strong>
+              <span>
+                In dieser Gruppe ist ein Kind erfasst, aber keine erwachsene Begleitperson.
+              </span>
+            </div>
+          ) : null}
+          <div className="cashier-information">
+            <Info aria-hidden="true" size={18} />
+            Preise dienen nur der Abstimmung; keine Zahlungsabwicklung im System.
+          </div>
+          <Button
+            className="cashier-sell-action"
+            disabled={
+              !serverConfirmed ||
+              !board ||
+              !product?.saleEnabled ||
+              product.resourceGroupStatus !== "ACTIVE" ||
+              !product.saleRecommended ||
+              product.remainingSellableSeats < size ||
+              board.event.emergencyMode ||
+              board.event.operationalInterrupted ||
+              ticketDetails.length !== size ||
+              (splitPreview.required && !oversizeSplitAcknowledged) ||
+              ticketDetails.some(
+                (detail) =>
+                  detail.weightClass === "INDIVIDUAL" &&
+                  ((detail.individualWeightKg ?? 0) < 15 || (detail.individualWeightKg ?? 0) > 250),
+              ) ||
+              busy
+            }
+            onClick={sell}
+            size="touch"
+            type="button"
+            variant="primary"
+          >
+            <Ticket aria-hidden="true" />
+            {busy
+              ? "Wird bestätigt …"
+              : splitPreview.required && !oversizeSplitAcknowledged
+                ? "Aufteilung bestätigen"
+                : `Tickets verkaufen`}
+            <small>
+              Gruppe mit {size} Person{size === 1 ? "" : "en"} · {product?.name} ·{" "}
+              {currency((product?.priceCents ?? 0) * size)}
+            </small>
+          </Button>
+        </Panel>
+
+        <Panel className="cashier-ticket-panel" padding="none" aria-label="Verkaufte Tickets">
+          <Tabs
+            label="Ticketstatus"
+            value={ticketListTab}
+            onChange={setTicketListTab}
+            items={[
+              { value: "ACTIVE", label: "Verkaufte Tickets" },
+              { value: "CANCELLED", label: "Stornierte Tickets" },
+            ]}
+          />
+          <div className="ds-toolbar cashier-ticket-toolbar">
+            <label className="ds-search-field">
+              <Search aria-hidden="true" size={18} />
+              <input
+                aria-label="Tickets suchen"
+                value={ticketSearch}
+                onChange={(event) => setTicketSearch(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") void runTicketSearch();
+                }}
+                placeholder="Suche (z. B. Gruppe, Produkt)"
+              />
+            </label>
+            <IconButton label="Filter" type="button">
+              <Filter aria-hidden="true" size={18} />
+            </IconButton>
+            <IconButton
+              label="Liste aktualisieren"
+              onClick={() =>
+                void searchTickets(
+                  EVENT_ID,
+                  CASHIER_DEVICE_ID,
+                  deviceTokenFor(CASHIER_DEVICE_ID),
+                  "",
+                ).then((response) => setTicketSearchResults(response.results))
+              }
               type="button"
             >
-              <span className="product-option-heading">
-                <strong>{entry.name}</strong>
-                <small>
-                  {entry.resourceGroupStatus === "ACTIVE" ? "Verkauf aktiv" : "Gesperrt"}
-                </small>
-              </span>
-              <span className="product-wait">
-                {entry.estimatedWaitLowerMinutes}–{entry.estimatedWaitUpperMinutes} Min.
-              </span>
-              <span>Flugzeit ca. {entry.promisedFlightMinutes} Min.</span>
-              <span>{entry.resourceGroupOpenTickets} Tickets in der Queue</span>
-              {entry.resourceGroupOperationalNote ? (
-                <span>Betriebshinweis: {entry.resourceGroupOperationalNote}</span>
-              ) : null}
-            </button>
-          ))}
-        </div>
-        <div className="sale-editor">
-          <section className="group-size" aria-labelledby="group-title">
-            <h1 id="group-title">Gruppengröße</h1>
-            <div className="stepper">
-              <button
-                type="button"
-                onClick={() => {
-                  setSize((value) => Math.max(1, value - 1));
-                  setOversizeSplitAcknowledged(false);
-                }}
-              >
-                −
-              </button>
-              <output>{size}</output>
-              <button
-                type="button"
-                onClick={() => {
-                  setSize((value) => Math.min(12, value + 1));
-                  setOversizeSplitAcknowledged(false);
-                }}
-              >
-                +
-              </button>
-            </div>
-            {product && splitPreview.required ? (
-              <div className="oversize-split-notice" role="status">
-                <div>
-                  <strong>Aufteilung erforderlich</strong>
-                  <span>
-                    {size} Tickets passen nicht gemeinsam in einen Umlauf mit{" "}
-                    {product.referenceCapacity} Plätzen. Vorgesehen:{" "}
-                    {splitPreview.slotSizes.join(" + ")} in {splitPreview.slotSizes.length}{" "}
-                    aufeinanderfolgenden Fluggruppen.
-                  </span>
-                  <small>
-                    Die gemeinsam verkaufte Buchungsgruppe bleibt vollständig verbunden.
-                  </small>
-                </div>
-                <label>
-                  <input
-                    checked={oversizeSplitAcknowledged}
-                    onChange={(event) => setOversizeSplitAcknowledged(event.target.checked)}
-                    type="checkbox"
-                  />
-                  Aufteilung verstanden
-                </label>
-              </div>
-            ) : null}
-            {limitedLargeAircraft ? (
-              <div className="capacity-fit-notice" role="status">
-                <strong>Gemeinsamer Flug möglich</strong>
-                <span>
-                  {fittingAircraft.length} von {productAircraft.length} Flugzeug
-                  {productAircraft.length === 1 ? "" : "en"} passen für diese Gruppe. Dadurch kann
-                  die Wartezeit etwas länger sein.
-                </span>
-              </div>
-            ) : null}
-            <p className="privacy-note">Anonymer Verkauf – keine Namen und Telefonnummern.</p>
-            <label className="ticket-code-mode">
-              Ticket-Ausgabe
-              <select
-                value={ticketCodeMode}
-                onChange={(event) =>
-                  setTicketCodeMode(event.target.value as "GENERATED" | "PREPRINTED")
-                }
-              >
-                <option value="GENERATED">QR-Tickets erzeugen</option>
-                <option value="PREPRINTED">Vorgedruckte Codes scannen</option>
-              </select>
-            </label>
-            {ticketCodeMode === "PREPRINTED" ? (
-              <label className="preprinted-code-input">
-                Codes · einer pro Ticket
-                <textarea
-                  rows={Math.min(6, Math.max(2, size))}
-                  value={preprintedCodes}
-                  onChange={(event) => setPreprintedCodes(event.target.value)}
-                  placeholder="QR-Code scannen oder eingeben"
-                />
-              </label>
-            ) : null}
-            {product &&
-            (product.weightClasses.length > 1 || product.weightClasses[0] !== "NOT_CAPTURED") ? (
-              <div className="weight-class-list">
-                <h2>Gewichtsklassen</h2>
-                {ticketDetails.map((detail, index) => (
-                  <div className="weight-class-row" key={detail.clientId}>
-                    <label>
-                      Ticket {index + 1}
-                      <select
-                        value={detail.weightClass}
-                        onChange={(event) => {
-                          const weightClass = event.target.value as WeightClass;
-                          setTicketDetails((current) =>
-                            current.map((entry, detailIndex) =>
-                              detailIndex === index
-                                ? {
-                                    ...entry,
-                                    weightClass,
-                                    individualWeightKg: weightClass === "INDIVIDUAL" ? 80 : null,
-                                  }
-                                : entry,
-                            ),
-                          );
-                        }}
-                      >
-                        {product.weightClasses.map((weightClass) => (
-                          <option value={weightClass} key={weightClass}>
-                            {weightClassLabel[weightClass]}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    {detail.weightClass === "INDIVIDUAL" ? (
-                      <label>
-                        kg
-                        <input
-                          type="number"
-                          min="15"
-                          max="250"
-                          value={detail.individualWeightKg ?? ""}
-                          onChange={(event) =>
-                            setTicketDetails((current) =>
-                              current.map((entry, detailIndex) =>
-                                detailIndex === index
-                                  ? { ...entry, individualWeightKg: Number(event.target.value) }
-                                  : entry,
-                              ),
-                            )
-                          }
-                        />
-                      </label>
-                    ) : null}
-                  </div>
-                ))}
-                {childCompanionWarning ? (
-                  <div className="child-companion-warning" role="alert">
-                    <strong>Begleitung prüfen</strong>
-                    <span>
-                      In dieser Gruppe ist ein Kind erfasst, aber keine erwachsene Begleitperson.
+              <RefreshCw aria-hidden="true" size={18} />
+            </IconButton>
+          </div>
+          <div className="cashier-ticket-table-wrap">
+            <DataTable
+              className="cashier-ticket-table"
+              columns={[
+                {
+                  key: "sold",
+                  header: "Verkauf",
+                  render: (result) =>
+                    new Date(result.soldAt).toLocaleTimeString("de-DE", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    }),
+                },
+                {
+                  key: "group",
+                  header: "Gruppe",
+                  render: (result) => `G-${String(result.queueSequence).padStart(4, "0")}`,
+                },
+                { key: "product", header: "Produkt", render: (result) => result.productName },
+                {
+                  key: "people",
+                  header: "Personen",
+                  render: (result) => (
+                    <span className="cashier-person-count">
+                      {result.groupSize}
+                      <CircleUserRound aria-hidden="true" size={15} />
                     </span>
-                    <small>Organisatorischer Hinweis ohne flugbetriebliche Freigabewirkung.</small>
-                  </div>
+                  ),
+                },
+                {
+                  key: "flight-group",
+                  header: "Fluggruppe",
+                  render: (result) => result.communicationLabels.join(" / ") || "–",
+                },
+                {
+                  key: "status",
+                  header: "Status",
+                  render: (result) => (
+                    <StatusPill tone={result.groupStatus === "CANCELLED" ? "danger" : "success"}>
+                      {result.groupStatus === "ACTIVE" ? "Gebucht" : result.groupStatus}
+                    </StatusPill>
+                  ),
+                },
+                {
+                  key: "total",
+                  header: "Summe",
+                  align: "right",
+                  render: (result) =>
+                    currency(
+                      (board?.products.find((entry) => entry.id === result.productId)?.priceCents ??
+                        0) * result.groupSize,
+                    ),
+                },
+              ]}
+              emptyLabel={
+                ticketListTab === "CANCELLED"
+                  ? "Keine stornierten Tickets vorhanden."
+                  : "Noch keine Tickets verkauft."
+              }
+              onRowClick={(result) => {
+                selectSearchResult(result);
+                void reopenTicketGroup(result.ticketGroupId);
+              }}
+              rowKey={(result) => result.ticketGroupId}
+              rows={visibleTicketGroups}
+              {...(lastTicketGroupId ? { selectedRowKey: lastTicketGroupId } : {})}
+            />
+          </div>
+          <section className="cashier-ticket-detail">
+            <header>
+              <div>
+                <h2>
+                  {selectedTicketGroup
+                    ? `Gruppe G-${String(selectedTicketGroup.queueSequence).padStart(4, "0")}`
+                    : "Ticketgruppe auswählen"}
+                </h2>
+                {selectedTicketGroup ? (
+                  <span>
+                    {selectedTicketGroup.groupSize} Person
+                    {selectedTicketGroup.groupSize === 1 ? "" : "en"}
+                  </span>
                 ) : null}
               </div>
+              {selectedTicketGroup ? (
+                <time>
+                  Verkauft:{" "}
+                  {new Date(selectedTicketGroup.soldAt).toLocaleTimeString("de-DE", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}{" "}
+                  Uhr
+                </time>
+              ) : null}
+            </header>
+            {message ? (
+              <div className="action-message" role="status">
+                {message}
+              </div>
             ) : null}
-          </section>
-          {receipt.length > 0 || message || lastTicketGroupId ? (
-            <section className="ticket-preview">
-              {receipt.length > 0 ? <h2>QR-Tickets</h2> : null}
-              {receipt.length > 0 ? (
-                <div className="receipt-list">
-                  {receipt.map((ticket) => (
-                    <article key={ticket.code} className="ticket-receipt">
-                      <header>
-                        <strong>{ticket.eventName}</strong>
-                        <span>{ticket.productName}</span>
-                      </header>
-                      <img src={ticket.qrDataUrl} alt={`QR-Ticket ${ticket.code}`} />
-                      <dl>
-                        <div>
-                          <dt>Ticket</dt>
-                          <dd>{ticket.code}</dd>
-                        </div>
-                        <div>
-                          <dt>Gruppe</dt>
-                          <dd>
-                            {ticket.communicationLabel} · {ticket.position}/{ticket.groupSize}
-                          </dd>
-                        </div>
-                        <div>
-                          <dt>Gate</dt>
-                          <dd>{ticket.gateLabel}</dd>
-                        </div>
-                      </dl>
-                      <span>QR-Code scannen, um den anonymen Ticketstatus zu öffnen.</span>
-                    </article>
-                  ))}
-                  <button className="print-tickets" type="button" onClick={() => window.print()}>
-                    QR-Tickets drucken
-                  </button>
+            <div className="cashier-ticket-detail-grid">
+              <dl>
+                <div>
+                  <dt>Produkt</dt>
+                  <dd>{selectedTicketGroup?.productName ?? "–"}</dd>
                 </div>
-              ) : null}
-              {message ? (
-                <div className="action-message" role="status">
-                  {message}
+                <div>
+                  <dt>Fluggruppe</dt>
+                  <dd>{selectedTicketGroup?.communicationLabels.join(" / ") || "–"}</dd>
                 </div>
-              ) : null}
-              {lastTicketGroupId ? (
-                <details className="correction-controls">
-                  <summary>Verkauf korrigieren</summary>
-                  <button onClick={() => void reopenTicketGroup(lastTicketGroupId)} type="button">
-                    Ticketzettel anzeigen / nachdrucken
-                  </button>
-                  <label>
-                    Stornogrund
-                    <input
-                      value={cancelReason}
-                      onChange={(event) => setCancelReason(event.target.value)}
-                      placeholder="Mindestens 3 Zeichen"
-                    />
-                  </label>
-                  <button
-                    disabled={cancelReason.trim().length < 3}
-                    onClick={cancelLastSale}
-                    type="button"
-                  >
-                    {correctionTargetLabel} stornieren
-                  </button>
-                  <label>
-                    Umbuchen auf
-                    <select
-                      value={rebookProductId}
-                      onChange={(event) => setRebookProductId(event.target.value)}
-                    >
-                      <option value="">Zielprodukt wählen</option>
-                      {board?.products
-                        .filter((entry) => entry.id !== lastProductId)
-                        .map((entry) => (
-                          <option key={entry.id} value={entry.id}>
-                            {entry.name}
-                          </option>
-                        ))}
-                    </select>
-                  </label>
-                  <button
-                    disabled={!rebookProductId || cancelReason.trim().length < 3}
-                    onClick={rebookLastSale}
-                    type="button"
-                  >
-                    Tickets umbuchen
-                  </button>
-                </details>
-              ) : null}
-            </section>
-          ) : null}
-        </div>
-        <details className="ticket-search">
-          <summary id="ticket-search-title">Bestehenden Verkauf suchen oder bearbeiten</summary>
-          <p>Ticket-/QR-Code, Gruppen-ID oder Fluggruppenkennung eingeben.</p>
-          <div className="ticket-search-input">
-            <input
-              aria-label="Suchbegriff"
-              value={ticketSearch}
-              onChange={(event) => setTicketSearch(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") void runTicketSearch();
-              }}
-              placeholder="z. B. PAN20-042"
-            />
-            <button
-              type="button"
-              onClick={() => void runTicketSearch()}
-              disabled={ticketSearch.trim().length < 2}
-            >
-              Suchen
-            </button>
-          </div>
-          {ticketSearchResults.length > 0 ? (
-            <div className="ticket-search-results">
-              {ticketSearchResults.map((result) => (
-                <button
-                  type="button"
-                  key={result.ticketGroupId}
-                  onClick={() => selectSearchResult(result)}
-                >
-                  <strong>{result.communicationLabels.join(" / ") || result.productCode}</strong>
-                  <span>
-                    {result.productName} · {result.groupSize} Ticket
-                    {result.groupSize === 1 ? "" : "s"}
+                <div>
+                  <dt>Status</dt>
+                  <dd>{selectedTicketGroup?.groupStatus ?? "–"}</dd>
+                </div>
+                <div>
+                  <dt>Summe</dt>
+                  <dd>
+                    {selectedTicketGroup
+                      ? currency(
+                          (board?.products.find(
+                            (entry) => entry.id === selectedTicketGroup.productId,
+                          )?.priceCents ?? 0) * selectedTicketGroup.groupSize,
+                        )
+                      : "–"}
+                  </dd>
+                </div>
+              </dl>
+              <div className="cashier-ticket-identifiers">
+                <strong>Tickets</strong>
+                {receipt.map((ticket) => (
+                  <span key={ticket.code}>
+                    <Ticket aria-hidden="true" size={18} />
+                    {ticket.code}
                   </span>
-                  <span>Status: {result.groupStatus}</span>
-                </button>
-              ))}
+                ))}
+              </div>
+              <div className="cashier-ticket-paper">
+                {receipt[0] ? (
+                  <article className="ticket-paper">
+                    <strong>Rundflug-Leitstand</strong>
+                    <small>{receipt[0].eventName}</small>
+                    <b>{receipt[0].code}</b>
+                    <img src={receipt[0].qrDataUrl} alt={`QR-Ticket ${receipt[0].code}`} />
+                    <dl>
+                      <div>
+                        <dt>Gruppe:</dt>
+                        <dd>{receipt[0].communicationLabel}</dd>
+                      </div>
+                      <div>
+                        <dt>Produkt:</dt>
+                        <dd>{receipt[0].productName}</dd>
+                      </div>
+                      <div>
+                        <dt>Eingang:</dt>
+                        <dd>{receipt[0].gateLabel}</dd>
+                      </div>
+                    </dl>
+                    <small>QR-Code für aktuellen Status scannen</small>
+                  </article>
+                ) : (
+                  <span>Ticketzettel wird nach Auswahl angezeigt.</span>
+                )}
+              </div>
             </div>
-          ) : null}
-        </details>
-        <button
-          className="primary-action"
-          disabled={
-            !serverConfirmed ||
-            !board ||
-            !product?.saleEnabled ||
-            product.resourceGroupStatus !== "ACTIVE" ||
-            !product.saleRecommended ||
-            product.remainingSellableSeats < size ||
-            board.event.emergencyMode ||
-            board.event.operationalInterrupted ||
-            ticketDetails.length !== size ||
-            (splitPreview.required && !oversizeSplitAcknowledged) ||
-            ticketDetails.some(
-              (detail) =>
-                detail.weightClass === "INDIVIDUAL" &&
-                ((detail.individualWeightKg ?? 0) < 15 || (detail.individualWeightKg ?? 0) > 250),
-            ) ||
-            busy
-          }
-          onClick={sell}
-          type="button"
-        >
-          {busy
-            ? "Wird bestätigt …"
-            : splitPreview.required && !oversizeSplitAcknowledged
-              ? "Aufteilung bestätigen"
-              : `Verkauf bestätigen · ${size} Ticket${size === 1 ? "" : "s"}`}
-        </button>
+            {lastTicketGroupId ? (
+              <details className="cashier-correction">
+                <summary>Verkauf bearbeiten</summary>
+                <div>
+                  <TextField
+                    label="Grund"
+                    value={cancelReason}
+                    onChange={(event) => setCancelReason(event.target.value)}
+                    placeholder="Mindestens 3 Zeichen"
+                  />
+                  <SelectField
+                    label="Umbuchen auf"
+                    value={rebookProductId}
+                    onChange={(event) => setRebookProductId(event.target.value)}
+                  >
+                    <option value="">Zielprodukt wählen</option>
+                    {board?.products
+                      .filter((entry) => entry.id !== lastProductId)
+                      .map((entry) => (
+                        <option key={entry.id} value={entry.id}>
+                          {entry.name}
+                        </option>
+                      ))}
+                  </SelectField>
+                </div>
+              </details>
+            ) : null}
+            <div className="cashier-ticket-actions">
+              <Button
+                variant="danger"
+                disabled={!lastTicketGroupId || cancelReason.trim().length < 3}
+                onClick={cancelLastSale}
+                type="button"
+              >
+                <Trash2 aria-hidden="true" size={18} />
+                Stornieren
+              </Button>
+              <Button
+                disabled={!rebookProductId || cancelReason.trim().length < 3}
+                onClick={rebookLastSale}
+                type="button"
+              >
+                Umbuchen
+              </Button>
+              <Button disabled={receipt.length === 0} onClick={() => window.print()} type="button">
+                <Printer aria-hidden="true" size={18} />
+                Ticketzettel erneut drucken
+              </Button>
+            </div>
+          </section>
+        </Panel>
       </section>
     </Shell>
   );
