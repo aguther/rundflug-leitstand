@@ -1,9 +1,33 @@
 /* V1.2 public boards: airport display and an independent English split-flap profile. */
+.standard-mark,
+.terminal-mark {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  flex: 0 0 auto;
+}
+
+.standard-mark {
+  border: 2px solid var(--ui-accent);
+  border-radius: 50%;
+  background: var(--ui-accent-soft);
+}
+
+.terminal-mark {
+  border-radius: var(--radius-lg);
+  background: #fb5c2b;
+}
+
 .standard-mark > .brand-mark,
 .terminal-mark > .brand-mark {
   width: 64%;
   height: 64%;
   color: currentColor;
+}
+
+.terminal-mark > .brand-mark {
+  color: #0a0a0a;
 }
 
 .standard-fids {
@@ -76,6 +100,10 @@
 
 .terminal-row {
   position: relative;
+}
+
+.terminal-fids .tone-standby {
+  color: #f4f4f5;
 }
 
 .terminal-row::after {
