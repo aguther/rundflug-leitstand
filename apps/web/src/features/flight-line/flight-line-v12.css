@@ -64,14 +64,52 @@
   padding: 0;
 }
 
-.flight-line-console-nav :is(span, strong) {
+.flight-line-console-nav :is(a, button, span, strong) {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
   color: var(--ui-muted);
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+}
+
+.flight-line-console-nav :is(a, button):hover {
+  color: var(--ui-text);
+  background: var(--ui-control-hover);
 }
 
 .flight-line-console-nav .active {
   color: var(--ui-accent);
   border-color: color-mix(in srgb, var(--ui-accent) 40%, var(--ui-border));
   background: var(--ui-accent-soft);
+}
+
+.console-aircraft-detail > nav button {
+  padding: 0;
+  align-self: stretch;
+  color: var(--ui-muted);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  font: inherit;
+  font-size: 0.7rem;
+}
+
+.console-aircraft-detail > nav button.active {
+  color: var(--ui-accent);
+  border-bottom-color: var(--ui-accent);
+}
+
+.console-aircraft-detail > nav button:hover:not(.active) {
+  color: var(--ui-text);
+}
+
+.console-detail-content {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .console-aircraft-search input,
