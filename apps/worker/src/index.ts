@@ -2418,7 +2418,7 @@ app.get("/api/events/:eventId/tickets/search", async (context) => {
     );
   }
   const rawQuery = context.req.query("q")?.trim() ?? "";
-  if (rawQuery.length < 2 || rawQuery.length > 200) {
+  if (rawQuery.length === 1 || rawQuery.length > 200) {
     return context.json({ results: [] });
   }
   let query = rawQuery;
@@ -2465,12 +2465,12 @@ app.get("/api/events/:eventId/tickets/search", async (context) => {
        LEFT JOIN rotations r ON r.id = rt.rotation_id
        LEFT JOIN flight_groups fg ON fg.id = r.flight_group_id
       WHERE tg.operation_day_id = ?1
-        AND (t.public_code_hash = ?2 OR tg.id LIKE ?3 OR CAST(fg.communication_number AS TEXT) = ?4
+        AND (?6 = '' OR t.public_code_hash = ?2 OR tg.id LIKE ?3 OR CAST(fg.communication_number AS TEXT) = ?4
              OR UPPER(p.code || '-' || printf('%03d', fg.communication_number)) = ?5)
       GROUP BY tg.id, tg.status, tg.queue_sequence, tg.standby, tg.sold_at, p.id, p.code, p.name
       ORDER BY tg.sold_at DESC LIMIT 20`,
   )
-    .bind(eventId, ticketHash, likeQuery, numericQuery, normalized)
+    .bind(eventId, ticketHash, likeQuery, numericQuery, normalized, normalized)
     .all<{
       ticket_group_id: string;
       group_status: string;
