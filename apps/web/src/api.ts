@@ -41,6 +41,18 @@ async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Promise<R
   }
 }
 
+function deviceHeaders(
+  deviceId: string,
+  deviceToken: string,
+  additional: Record<string, string> = {},
+): Record<string, string> {
+  return {
+    ...additional,
+    "x-device-id": deviceId,
+    ...(deviceToken ? { "x-device-token": deviceToken } : {}),
+  };
+}
+
 export async function getSetupStatus(): Promise<{
   setupRequired: boolean;
   setupConfigured: boolean;
@@ -76,7 +88,7 @@ export async function getDeviceContext(
   deviceToken: string,
 ): Promise<{ eventId: string; role: string }> {
   const response = await apiFetch("/api/device/context", {
-    headers: { "x-device-id": deviceId, "x-device-token": deviceToken },
+    headers: deviceHeaders(deviceId, deviceToken),
   });
   const body = (await response.json()) as {
     eventId?: string;
@@ -97,11 +109,7 @@ export async function verifyAdminPin(
 ): Promise<void> {
   const response = await apiFetch(`/api/admin/events/${encodeURIComponent(eventId)}/verify-pin`, {
     method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-device-id": deviceId,
-      "x-device-token": deviceToken,
-    },
+    headers: deviceHeaders(deviceId, deviceToken, { "content-type": "application/json" }),
     body: JSON.stringify({ adminPin }),
   });
   if (!response.ok) {
@@ -120,7 +128,7 @@ export async function claimFlightLineAircraft(
     `/api/events/${encodeURIComponent(eventId)}/assist-claims/${encodeURIComponent(aircraftId)}`,
     {
       method: "PUT",
-      headers: { "x-device-id": deviceId, "x-device-token": deviceToken },
+      headers: deviceHeaders(deviceId, deviceToken),
     },
   );
   const body = (await response.json()) as {
@@ -146,7 +154,7 @@ export async function releaseFlightLineAircraft(
     `/api/events/${encodeURIComponent(eventId)}/assist-claims/${encodeURIComponent(aircraftId)}`,
     {
       method: "DELETE",
-      headers: { "x-device-id": deviceId, "x-device-token": deviceToken },
+      headers: deviceHeaders(deviceId, deviceToken),
     },
   );
   if (!response.ok) {
@@ -163,7 +171,7 @@ export async function searchTickets(
 ): Promise<TicketSearchResponse> {
   const response = await apiFetch(
     `/api/events/${encodeURIComponent(eventId)}/tickets/search?q=${encodeURIComponent(query)}`,
-    { headers: { "x-device-id": deviceId, "x-device-token": deviceToken } },
+    { headers: deviceHeaders(deviceId, deviceToken) },
   );
   if (!response.ok) throw new Error("Ticketsuche nicht verfügbar.");
   return ticketSearchResponseSchema.parse(await response.json());
@@ -175,11 +183,7 @@ export async function getEventCatalog(
   deviceToken: string,
 ): Promise<EventCatalog> {
   const response = await apiFetch("/api/admin/events", {
-    headers: {
-      "x-event-id": sourceEventId,
-      "x-device-id": deviceId,
-      "x-device-token": deviceToken,
-    },
+    headers: deviceHeaders(deviceId, deviceToken, { "x-event-id": sourceEventId }),
   });
   if (!response.ok) throw new Error("Veranstaltungsliste nicht verfügbar.");
   return eventCatalogSchema.parse(await response.json());
@@ -193,11 +197,7 @@ export async function cloneEvent(
 ): Promise<{ eventId: string; adminDeviceId: string; templateSourceId: string }> {
   const response = await apiFetch(`/api/admin/events/${encodeURIComponent(sourceEventId)}/clone`, {
     method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-device-id": deviceId,
-      "x-device-token": deviceToken,
-    },
+    headers: deviceHeaders(deviceId, deviceToken, { "content-type": "application/json" }),
     body: JSON.stringify(input),
   });
   const body = (await response.json()) as {
@@ -222,11 +222,7 @@ export async function factoryReset(
     `/api/admin/events/${encodeURIComponent(eventId)}/factory-reset`,
     {
       method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-device-id": deviceId,
-        "x-device-token": deviceToken,
-      },
+      headers: deviceHeaders(deviceId, deviceToken, { "content-type": "application/json" }),
       body: JSON.stringify(input),
     },
   );
@@ -254,7 +250,7 @@ export async function getAuditHistory(
   const response = await apiFetch(
     `/api/events/${encodeURIComponent(eventId)}/history?${query.toString()}`,
     {
-      headers: { "x-device-id": deviceId, "x-device-token": deviceToken },
+      headers: deviceHeaders(deviceId, deviceToken),
     },
   );
   if (!response.ok) throw new Error("Audit-Historie nicht verfügbar.");
@@ -277,7 +273,7 @@ export async function getOperationalHistory(
 ): Promise<OperationalHistory> {
   const response = await apiFetch(
     `/api/events/${encodeURIComponent(eventId)}/history/operations?${historyQuery(filters)}`,
-    { headers: { "x-device-id": deviceId, "x-device-token": deviceToken } },
+    { headers: deviceHeaders(deviceId, deviceToken) },
   );
   if (!response.ok) throw new Error("Betriebshistorie nicht verfügbar.");
   return operationalHistorySchema.parse(await response.json());
@@ -291,7 +287,7 @@ export async function getForecastHistory(
 ): Promise<ForecastHistory> {
   const response = await apiFetch(
     `/api/events/${encodeURIComponent(eventId)}/history/forecasts?${historyQuery(filters)}`,
-    { headers: { "x-device-id": deviceId, "x-device-token": deviceToken } },
+    { headers: deviceHeaders(deviceId, deviceToken) },
   );
   if (!response.ok) throw new Error("Prognosehistorie nicht verfügbar.");
   return forecastHistorySchema.parse(await response.json());
@@ -303,7 +299,7 @@ export async function downloadDailyReport(
   deviceToken: string,
 ): Promise<void> {
   const response = await apiFetch(`/api/events/${encodeURIComponent(eventId)}/reports/daily.csv`, {
-    headers: { "x-device-id": deviceId, "x-device-token": deviceToken },
+    headers: deviceHeaders(deviceId, deviceToken),
   });
   if (!response.ok) throw new Error("Tagesbericht nicht verfügbar.");
   const blob = await response.blob();
@@ -323,7 +319,7 @@ async function downloadProtectedFile(
   filename: string,
 ): Promise<void> {
   const response = await apiFetch(`/api/events/${encodeURIComponent(eventId)}/${path}`, {
-    headers: { "x-device-id": deviceId, "x-device-token": deviceToken },
+    headers: deviceHeaders(deviceId, deviceToken),
   });
   if (!response.ok) throw new Error("Export nicht verfügbar.");
   const url = URL.createObjectURL(await response.blob());
@@ -377,7 +373,7 @@ export async function getPairedDevices(
   deviceToken: string,
 ): Promise<PairedDeviceSummary[]> {
   const response = await apiFetch(`/api/events/${encodeURIComponent(eventId)}/devices`, {
-    headers: { "x-device-id": deviceId, "x-device-token": deviceToken },
+    headers: deviceHeaders(deviceId, deviceToken),
   });
   if (!response.ok) throw new Error("Geräteübersicht nicht verfügbar.");
   const body = (await response.json()) as { devices: PairedDeviceSummary[] };
@@ -408,7 +404,7 @@ export async function getOperationBoard(
 ): Promise<OperationBoard> {
   const response = await apiFetch(`/api/events/${encodeURIComponent(eventId)}/operations`, {
     cache: "no-store",
-    headers: { "x-device-id": deviceId, "x-device-token": deviceToken },
+    headers: deviceHeaders(deviceId, deviceToken),
     ...(signal ? { signal } : {}),
   });
   if (!response.ok) throw new Error(`Betriebsdaten nicht verfügbar (${response.status})`);
@@ -449,7 +445,7 @@ export async function sendCommand(
   assertOperationalConnection(navigator.onLine);
   const response = await apiFetch(`/api/events/${encodeURIComponent(command.eventId)}/commands`, {
     method: "POST",
-    headers: { "content-type": "application/json", "x-device-token": deviceToken },
+    headers: deviceHeaders(command.deviceId, deviceToken, { "content-type": "application/json" }),
     body: JSON.stringify(command),
   });
   if (!response.ok) {
