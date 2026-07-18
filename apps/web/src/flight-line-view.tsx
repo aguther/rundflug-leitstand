@@ -522,6 +522,7 @@ export function FlightLineView() {
   const primaryFlightLineAction = action
     ? {
         label: action.label,
+        command: action.command,
         disabled:
           action.command === "CALL_NEXT" &&
           (!nextAircraftId ||
@@ -617,7 +618,6 @@ export function FlightLineView() {
               if (rotation) setSelectedId(rotation.id);
             }
           }}
-          onAvailable={() => void setFlightLineAircraftState("AVAILABLE")}
           onPause={openAircraftPauseDialog}
           onRefuel={() => void setFlightLineAircraftState("REFUELING")}
           onRelease={async (aircraftId) => {
@@ -627,6 +627,9 @@ export function FlightLineView() {
               FLIGHT_LINE_DEVICE_ID,
               deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
             );
+            setSelectedAircraftId(null);
+            setSelectedId(null);
+            setSelectedQueueGroupIds([]);
             await refresh();
           }}
           onSelectAircraft={(aircraftId) => {
@@ -635,9 +638,9 @@ export function FlightLineView() {
             setSelectedQueueGroupIds([]);
           }}
           onUnavailable={() => void setFlightLineAircraftState("INACTIVE")}
-          selectedAircraft={selectedAircraft}
           selectedQueueGroupIds={selectedQueueGroupIds}
-          selectedRotation={selected}
+          turnaroundNextState={turnaroundNextState}
+          onTurnaroundNextStateChange={setTurnaroundNextState}
         />
       ) : board ? (
         <FlightLineSupervisorConsole
