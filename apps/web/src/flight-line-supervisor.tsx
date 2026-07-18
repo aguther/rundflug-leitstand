@@ -50,6 +50,34 @@ function formatTime(value: string | null, timeZone: string): string {
   }).format(new Date(value));
 }
 
+type SidebarView = "fleet" | "groups" | "refueling" | "maintenance" | "activity";
+
+const sidebarNavItems: Array<
+  { id: SidebarView; label: string } | { href: string; label: string }
+> = [
+  { id: "fleet", label: "Flight Line" },
+  { id: "groups", label: "Gruppen" },
+  { href: "/admin?area=master-data&section=gates", label: "Gates" },
+  { href: "/admin?area=master-data&section=resource-groups", label: "Ressourcen" },
+  { href: "/admin?area=master-data&section=pilots", label: "Piloten" },
+  { href: "/admin?area=master-data&section=aircraft", label: "Flugzeuge" },
+  { id: "refueling", label: "Tanken" },
+  { id: "maintenance", label: "Wartung" },
+  { id: "activity", label: "Abläufe" },
+  { href: "/admin?area=evaluation", label: "Berichte" },
+  { href: "/admin?area=setup", label: "Einstellungen" },
+];
+
+type DetailTab = "assignment" | "info" | "pilot" | "history" | "notes";
+
+const detailTabs: Array<{ id: DetailTab; label: string }> = [
+  { id: "assignment", label: "Vorgeschlagene Zuordnung" },
+  { id: "info", label: "Flugzeuginfo" },
+  { id: "pilot", label: "Pilot" },
+  { id: "history", label: "Historie" },
+  { id: "notes", label: "Notizen" },
+];
+
 function suggestedRotationFor(
   aircraft: Aircraft,
   rotations: Rotation[],
@@ -111,6 +139,8 @@ export function FlightLineSupervisorConsole({
   const { session, logout } = useAuth();
   const [search, setSearch] = useState("");
   const [resourceGroupId, setResourceGroupId] = useState("");
+  const [sidebarView, setSidebarView] = useState<SidebarView>("fleet");
+  const [detailTab, setDetailTab] = useState<DetailTab>("assignment");
   const filteredAircraft = useMemo(() => {
     const normalizedSearch = search.trim().toLocaleLowerCase("de-DE");
     return aircraft.filter((entry) => {
@@ -166,17 +196,22 @@ export function FlightLineSupervisorConsole({
       </header>
 
       <aside className="flight-line-console-nav" aria-label="Flight-Line-Bereiche">
-        <strong className="active">Flight Line</strong>
-        <span>Gruppen</span>
-        <span>Gates</span>
-        <span>Ressourcen</span>
-        <span>Piloten</span>
-        <span>Flugzeuge</span>
-        <span>Tanken</span>
-        <span>Wartung</span>
-        <span>Abläufe</span>
-        <span>Berichte</span>
-        <span>Einstellungen</span>
+        {sidebarNavItems.map((item) =>
+          "href" in item ? (
+            <a href={item.href} key={item.label}>
+              {item.label}
+            </a>
+          ) : (
+            <button
+              className={sidebarView === item.id ? "active" : ""}
+              key={item.id}
+              onClick={() => setSidebarView(item.id)}
+              type="button"
+            >
+              {item.label}
+            </button>
+          ),
+        )}
       </aside>
 
       <aside className="console-aircraft-list">
@@ -271,7 +306,15 @@ export function FlightLineSupervisorConsole({
           </div>
         </div>
 
-        <section className="console-status-matrix" aria-label="Flugzeugstatus">
+        {sidebarView !== "fleet" ? (
+          <SupervisorSidebarPanel view={sidebarView} board={board} timeZone={board.event.timeZone} />
+        ) : null}
+
+        <section
+          className="console-status-matrix"
+          aria-label="Flugzeugstatus"
+          hidden={sidebarView !== "fleet"}
+        >
           <div className="console-matrix-head">
             <span>Flugzeug</span>
             <span>Status</span>
@@ -382,7 +425,7 @@ export function FlightLineSupervisorConsole({
           })}
         </section>
 
-        <div className="console-bottom-grid">
+        <div className="console-bottom-grid" hidden={sidebarView !== "fleet"}>
           <section className="console-next-groups">
             <div className="console-panel-title">
               <strong>Nächste Gruppen</strong>
@@ -422,82 +465,125 @@ export function FlightLineSupervisorConsole({
               <strong>{selectedAircraft?.registration ?? "Kein Flugzeug"}</strong>
               <small>{selectedAircraft?.aircraftType}</small>
             </div>
-            <nav>
-              <strong>Vorgeschlagene Zuordnung</strong>
-              <span>Flugzeuginfo</span>
-              <span>Pilot</span>
-              <span>Historie</span>
-              <span>Notizen</span>
+            <nav role="tablist" aria-label="Flugzeugdetails">
+              {detailTabs.map((tab) => (
+                <button
+                  aria-selected={detailTab === tab.id}
+                  className={detailTab === tab.id ? "active" : ""}
+                  key={tab.id}
+                  onClick={() => setDetailTab(tab.id)}
+                  role="tab"
+                  type="button"
+                >
+                  {tab.label}
+                </button>
+              ))}
             </nav>
             {selectedAircraft ? (
-              <div className="console-detail-content">
-                <dl>
-                  <div>
-                    <dt>Gruppe</dt>
-                    <dd>
-                      {selectedRotation
-                        ? `${selectedRotation.communicationLabel} · ${selectedRotation.ticketCount} Tickets`
-                        : "–"}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Gate</dt>
-                    <dd>
-                      {selectedRotation?.gateLabel ??
-                        board.resourceGroups.find(
-                          (group) => group.id === selectedAircraft.resourceGroupId,
-                        )?.gateLabel ??
-                        "–"}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Vorgeschlagene Zeit</dt>
-                    <dd>
-                      {selectedRotation
-                        ? `${selectedRotation.predictedLowerMinutes}–${selectedRotation.predictedUpperMinutes} Min.`
-                        : "–"}
-                    </dd>
-                  </div>
-                </dl>
-                <dl>
-                  <div>
-                    <dt>Status</dt>
-                    <dd>{stateLabel(selectedAircraft, selectedRotation)}</dd>
-                  </div>
-                  <div>
-                    <dt>Ressource</dt>
-                    <dd>{selectedAircraft.resourceGroupName}</dd>
-                  </div>
-                  <div>
-                    <dt>Pilotencode</dt>
-                    <dd>
-                      {selectedRotation?.status === "DRAFT" ? (
-                        <select
-                          aria-label="Pilotencode für NEXT"
-                          value={nextPilotId}
-                          onChange={(event) => onPilotChange(event.target.value)}
-                        >
-                          <option value="">Pilot wählen</option>
-                          {board.pilots
-                            .filter((pilot) => pilot.active && !pilot.paused)
-                            .map((pilot) => (
-                              <option key={pilot.id} value={pilot.id}>
-                                {pilot.operationalCode}
-                              </option>
-                            ))}
-                        </select>
-                      ) : (
-                        (selectedRotation?.pilotOperationalCode ?? "–")
-                      )}
-                    </dd>
-                  </div>
-                </dl>
-                <div className="console-info-note">
-                  <strong>Hinweis</strong>
-                  <span>
-                    Diese Empfehlung ist informativ. Die finale Entscheidung liegt beim Operator.
-                  </span>
-                </div>
+              <div className="console-detail-content" role="tabpanel">
+                {detailTab === "assignment" ? (
+                  <>
+                    <dl>
+                      <div>
+                        <dt>Gruppe</dt>
+                        <dd>
+                          {selectedRotation
+                            ? `${selectedRotation.communicationLabel} · ${selectedRotation.ticketCount} Tickets`
+                            : "–"}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Gate</dt>
+                        <dd>
+                          {selectedRotation?.gateLabel ??
+                            board.resourceGroups.find(
+                              (group) => group.id === selectedAircraft.resourceGroupId,
+                            )?.gateLabel ??
+                            "–"}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Vorgeschlagene Zeit</dt>
+                        <dd>
+                          {selectedRotation
+                            ? `${selectedRotation.predictedLowerMinutes}–${selectedRotation.predictedUpperMinutes} Min.`
+                            : "–"}
+                        </dd>
+                      </div>
+                    </dl>
+                    <div className="console-info-note">
+                      <strong>Hinweis</strong>
+                      <span>
+                        Diese Empfehlung ist informativ. Die finale Entscheidung liegt beim Operator.
+                      </span>
+                    </div>
+                  </>
+                ) : null}
+                {detailTab === "info" ? (
+                  <dl>
+                    <div>
+                      <dt>Status</dt>
+                      <dd>{stateLabel(selectedAircraft, selectedRotation)}</dd>
+                    </div>
+                    <div>
+                      <dt>Ressource</dt>
+                      <dd>{selectedAircraft.resourceGroupName}</dd>
+                    </div>
+                    <div>
+                      <dt>Flugzeugtyp</dt>
+                      <dd>{selectedAircraft.aircraftType}</dd>
+                    </div>
+                    <div>
+                      <dt>Sitzplätze</dt>
+                      <dd>{selectedAircraft.passengerSeats}</dd>
+                    </div>
+                    <div>
+                      <dt>Umläufe seit Tanken</dt>
+                      <dd>{selectedAircraft.rotationsSinceRefuel}</dd>
+                    </div>
+                  </dl>
+                ) : null}
+                {detailTab === "pilot" ? (
+                  <dl>
+                    <div>
+                      <dt>Pilotencode</dt>
+                      <dd>
+                        {selectedRotation?.status === "DRAFT" ? (
+                          <select
+                            aria-label="Pilotencode für NEXT"
+                            value={nextPilotId}
+                            onChange={(event) => onPilotChange(event.target.value)}
+                          >
+                            <option value="">Pilot wählen</option>
+                            {board.pilots
+                              .filter((pilot) => pilot.active && !pilot.paused)
+                              .map((pilot) => (
+                                <option key={pilot.id} value={pilot.id}>
+                                  {pilot.operationalCode}
+                                </option>
+                              ))}
+                          </select>
+                        ) : (
+                          (selectedRotation?.pilotOperationalCode ?? "–")
+                        )}
+                      </dd>
+                    </div>
+                  </dl>
+                ) : null}
+                {detailTab === "history" ? (
+                  <p className="console-info-note">
+                    <span>
+                      Historie ist für dieses Flugzeug in der Flight-Line-Ansicht noch nicht
+                      verfügbar. Der vollständige Audit-Verlauf steht in der Administration unter
+                      Auswertung bereit.
+                    </span>
+                  </p>
+                ) : null}
+                {detailTab === "notes" ? (
+                  <p className="console-info-note">
+                    <span>Für dieses Flugzeug wurden noch keine Notizen hinterlegt.</span>
+                  </p>
+                ) : null}
               </div>
             ) : null}
             {message ? (
@@ -508,6 +594,120 @@ export function FlightLineSupervisorConsole({
           </section>
         </div>
       </main>
+    </section>
+  );
+}
+
+const rotationStatusLabel: Record<Rotation["status"], string> = {
+  DRAFT: "Wartet",
+  CALLED: "Aufgerufen",
+  IN_FLIGHT: "Im Flug",
+  LANDED: "Gelandet",
+  COMPLETED: "Abgeschlossen",
+};
+
+function SupervisorSidebarPanel({
+  view,
+  board,
+  timeZone,
+}: {
+  view: Exclude<SidebarView, "fleet">;
+  board: OperationBoard;
+  timeZone: string;
+}) {
+  if (view === "groups") {
+    const openRotations = board.rotations.filter((rotation) => rotation.status !== "COMPLETED");
+    return (
+      <section className="console-status-matrix" aria-label="Gruppen">
+        <div className="console-panel-title">
+          <strong>Gruppen</strong>
+          <small>{openRotations.length} in der Warteschlange oder in Betreuung</small>
+        </div>
+        <div className="next-group-head">
+          <span>Gruppe</span>
+          <span>Tickets</span>
+          <span>Produkt</span>
+          <span>Gate</span>
+          <span>Status</span>
+        </div>
+        {openRotations.map((rotation) => (
+          <div className="console-matrix-row" key={rotation.id}>
+            <strong>{rotation.communicationLabel}</strong>
+            <span>{rotation.ticketCount}</span>
+            <span>{rotation.productName}</span>
+            <span>{rotation.gateLabel}</span>
+            <span className={`console-status status-${rotation.status.toLowerCase()}`}>
+              {rotationStatusLabel[rotation.status]}
+            </span>
+          </div>
+        ))}
+        {openRotations.length === 0 ? <p>Keine Gruppe wartet derzeit.</p> : null}
+      </section>
+    );
+  }
+
+  if (view === "refueling" || view === "maintenance") {
+    const states: Aircraft["operationalState"][] =
+      view === "refueling" ? ["REFUELING"] : ["INACTIVE", "INTERRUPTED"];
+    const matches = board.aircraft.filter((entry) => states.includes(entry.operationalState));
+    return (
+      <section className="console-status-matrix" aria-label={view === "refueling" ? "Tanken" : "Wartung"}>
+        <div className="console-panel-title">
+          <strong>{view === "refueling" ? "Tanken" : "Wartung"}</strong>
+          <small>{matches.length} Flugzeuge</small>
+        </div>
+        <div className="console-aircraft-table-head">
+          <span>Flugzeug</span>
+          <span>Ressource</span>
+          <span>Status</span>
+          <span>Seit</span>
+        </div>
+        {matches.map((entry) => (
+          <div className="console-matrix-row" key={entry.id}>
+            <strong>{entry.registration}</strong>
+            <span>{entry.resourceGroupName}</span>
+            <span className="console-status status-paused">{entry.operationalState}</span>
+            <span>–</span>
+          </div>
+        ))}
+        {matches.length === 0 ? (
+          <p>
+            {view === "refueling"
+              ? "Kein Flugzeug wird derzeit betankt."
+              : "Kein Flugzeug ist derzeit in Wartung oder unterbrochen."}
+          </p>
+        ) : null}
+      </section>
+    );
+  }
+
+  const recentRotations = [...board.rotations]
+    .filter((rotation) => rotation.calledAt)
+    .sort((a, b) => new Date(b.calledAt ?? 0).getTime() - new Date(a.calledAt ?? 0).getTime())
+    .slice(0, 20);
+  return (
+    <section className="console-status-matrix" aria-label="Abläufe">
+      <div className="console-panel-title">
+        <strong>Abläufe</strong>
+        <small>Letzte {recentRotations.length} aufgerufenen Gruppen</small>
+      </div>
+      <div className="next-group-head">
+        <span>Gruppe</span>
+        <span>Status</span>
+        <span>Flugzeug</span>
+        <span>Aufgerufen</span>
+      </div>
+      {recentRotations.map((rotation) => (
+        <div className="console-matrix-row" key={rotation.id}>
+          <strong>{rotation.communicationLabel}</strong>
+          <span className={`console-status status-${rotation.status.toLowerCase()}`}>
+            {rotationStatusLabel[rotation.status]}
+          </span>
+          <span>{rotation.aircraftRegistration ?? "–"}</span>
+          <span>{formatTime(rotation.calledAt ?? null, timeZone)}</span>
+        </div>
+      ))}
+      {recentRotations.length === 0 ? <p>Noch keine Gruppe wurde aufgerufen.</p> : null}
     </section>
   );
 }
