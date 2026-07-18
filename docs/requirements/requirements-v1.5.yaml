@@ -1,0 +1,60 @@
+- id: V15-AUTH-010
+  requirement: Interne Sitzungen gelten 16 Stunden absolut ohne Idle-Ablauf.
+  status: implemented
+- id: V15-NAV-010
+  requirement: Gemeinsamer Ansichtswechsler mit sichtbar gesperrten Zielen.
+  status: in_progress
+- id: V15-ROLE-010
+  requirement: Flugleitung und Betriebsleitung verwenden FLIGHT_DIRECTOR.
+  status: implemented
+- id: V15-QUE-010
+  requirement: Buchungsgruppen bleiben einzeln und besitzen stabile Kommunikationsnummern.
+  status: implemented
+- id: V15-QUE-020
+  requirement: Mehrgruppen-Aufrufe kombinieren nur vollständige kompatible Gruppen atomar.
+  status: implemented
+- id: V15-FLT-010
+  requirement: MARK_OFF_BLOCK, MARK_ON_BLOCK und expliziter Turnaround-Abschluss.
+  status: implemented
+- id: V15-FLT-020
+  requirement: Manuelle Anwesenheit und getrennte Gruppenaktionen ohne Scan.
+  status: implemented
+- id: V15-TKT-010
+  requirement: Ticketcodes bleiben bis zur Veranstaltungslöschung geschützt gespeichert.
+  status: implemented
+- id: V15-TKT-020
+  requirement: Geschützter Nachdruck als QR-Ticketzettel ohne Kassenbon-Darstellung.
+  status: implemented
+- id: V15-FIDS-010
+  requirement: Öffentliches FIDS benötigt keine Gerätekopplung.
+  status: implemented
+- id: V15-FIDS-020
+  requirement: Persistierte Ausblendfrist von 5 bis 900 Sekunden, Standard 15.
+  status: implemented
+- id: V15-BRAND-010
+  requirement: PNG, JPEG, WebP und sicheres SVG mit Plane-Fallback.
+  status: implemented
+- id: V15-EVT-010
+  requirement: Veranstaltungen können vollständig gelöscht werden.
+  status: implemented
+- id: V15-EVT-020
+  requirement: Nach Löschung der letzten Veranstaltung startet die Ersteinrichtung.
+  status: implemented
+- id: V15-EXP-010
+  requirement: Kontextbezogener anonymer Leistungsprofilexport.
+  status: implemented
+- id: V15-UI-010
+  requirement: Freigegebene V1.5-Konzeptserie ist visuell verbindlich.
+  status: in_progress
+- id: V15-UI-020
+  requirement: Ein-Bildschirm-Abläufe und eigenständige iPad-/iPhone-Layouts.
+  status: in_progress
+- id: V15-IOS-010
+  requirement: Manuelle Safari- und PWA-Abnahme auf realem iPhone und iPad.
+  status: documented
+- id: V15-OPS-010
+  requirement: Rolleneinweisungen und leicht löschbare synthetische Testveranstaltung.
+  status: documented
+- id: V15-ARCH-010
+  requirement: Bis zum Produktivbetrieb gilt eine Reset-first-Update-Strategie.
+  status: accepted

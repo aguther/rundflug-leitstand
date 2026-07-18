@@ -4,6 +4,8 @@
 - `requirements-v1.4.md` ist die fortgeschriebene Markdown-Fassung. Sie übernimmt freigegebene
   Auftraggeberentscheidungen aus den ADRs, ohne die binären Referenzen zu verändern.
 - `requirements-v1.4.yaml` enthält dieselben 199 Anforderungen strukturiert und konsolidiert.
+- `requirements-v1.5.md` und `.yaml` enthalten die freigegebene Feedback-Ausbaustufe. Sie
+  konkretisieren und überstimmen bei Widersprüchen die V1.4-Fassung.
 - `traceability.csv` verbindet Anforderungen später mit Issues, Modulen und Tests.
 - `open-questions.md` enthält noch zu entscheidende Fachfragen.
 

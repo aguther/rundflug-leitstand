@@ -1,17 +1,14 @@
 # Öffentliche Monitore im Kioskmodus
 
-Die öffentliche Monitoransicht wird im Regelbetrieb über einen administrativ erzeugten
-Display-Kopplungs-QR-Code eingerichtet. Die Kopplung speichert Veranstaltung, optionales Gate und
-Anzeigeprofil gemeinsam auf dem vorgesehenen Gerät. Danach genügt folgende feste Kiosk-URL:
+Die öffentliche Monitoransicht benötigt keine Gerätekopplung. Veranstaltung, optionales Gate und
+Anzeigeprofil werden in der festen Kiosk-URL angegeben:
 
 ```text
-https://<Worker-Domain>/fids?kiosk=1
+https://<Worker-Domain>/fids?kiosk=1&event=<Veranstaltungs-ID>
 ```
 
-Für Vorschau und kontrollierte manuelle Installation können die gebundenen Werte auch über
-`event=<Veranstaltungs-ID>`, `gateId=<Gate-ID>` sowie `style=standard` oder `style=terminal`
-angegeben werden. Ein Link ohne Veranstaltung und ohne vorhandene Kopplung zeigt ausschließlich
-einen Einrichtungshinweis. `standard` verwendet
+Optional werden `gateId=<Gate-ID>` sowie `style=standard` oder `style=terminal` ergänzt. Ein Link
+ohne Veranstaltung zeigt ausschließlich einen Einrichtungshinweis. `standard` verwendet
 deutsche Begriffe. `terminal` verwendet ausschließlich englische beschreibende Begriffe wie
 `DEPARTURES`, `WAITING`, `GO TO GATE`, `BOARDING`, `DELAYED` und `DEPARTED`.
 
@@ -30,7 +27,7 @@ Cloudflare-Konfiguration.
 Vor Veranstaltungsbeginn ist zu prüfen:
 
 - Browser und Monitor starten ohne Benutzereingriff und öffnen die richtige Veranstaltung.
-- Im FIDS-Kopf wird das bei der Kopplung gewählte Gate beziehungsweise die Gesamtansicht erkennbar.
+- Im FIDS-Kopf wird das in der URL gewählte Gate beziehungsweise die Gesamtansicht erkennbar.
 - Eine Teständerung erscheint ohne Neuladen innerhalb von zwei Sekunden.
 - Nach einer kurzzeitigen Netzunterbrechung verbindet sich die Ansicht selbständig neu.
 - Im Notfallmodus werden keine operativen Gruppeninformationen angezeigt.
@@ -42,6 +39,7 @@ Die Ansicht empfängt über WebSocket nur ein minimales Versionssignal. Bei Verb
 eine begrenzte, exponentielle Neuverbindung; zusätzlich aktualisiert ein 15-Sekunden-Polling die Anzeige
 als Rückfallebene.
 
-Die Standard-Nachlaufzeit für `DEPARTED`/„Abgeflogen“ beträgt fünf Minuten und ist pro Display
-zwischen einer und 15 Minuten konfigurierbar. Ein vorübergehender Server- oder D1-Fehler leert die
-Anzeige nicht; der letzte bestätigte Stand bleibt mit sichtbarem Verbindungsstatus erhalten.
+Die Standard-Nachlaufzeit für `DEPARTED`/„Abgeflogen“ beträgt 15 Sekunden und ist pro Veranstaltung
+zwischen 5 und 900 Sekunden konfigurierbar. Für eine administrative Vorschau kann `departedSeconds`
+in der URL gesetzt werden. Ein vorübergehender Server- oder D1-Fehler leert die Anzeige nicht; der
+letzte bestätigte Stand bleibt mit sichtbarem Verbindungsstatus erhalten.
