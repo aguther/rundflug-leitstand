@@ -69,14 +69,11 @@ export const aircraftStateLabel = {
   INACTIVE: "Kurzfristig inaktiv",
 } as const;
 
-export function FieldHelp({ label, help }: { label: string; help: string }) {
+export function FieldHelp({ help }: { help: string }) {
   return (
-    <details className="field-info">
-      <summary aria-label={`Information zu ${label}`} tabIndex={-1} title={help}>
-        i
-      </summary>
-      <span role="note">{help}</span>
-    </details>
+    <span aria-hidden="true" className="field-info" data-help={help} title={help}>
+      i
+    </span>
   );
 }
 
@@ -84,7 +81,7 @@ export function FieldLabel({ label, help }: { label: string; help: string }) {
   return (
     <span className="field-label-with-info">
       <span>{label}</span>
-      <FieldHelp label={label} help={help} />
+      <FieldHelp help={help} />
     </span>
   );
 }
