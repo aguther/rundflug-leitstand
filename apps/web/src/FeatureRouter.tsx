@@ -10,9 +10,6 @@ const FidsView = lazy(() => import("./fids-view").then((module) => ({ default: m
 const FlightLineView = lazy(() =>
   import("./flight-line-view").then((module) => ({ default: module.FlightLineView })),
 );
-const PairDeviceView = lazy(() =>
-  import("./pair-device-view").then((module) => ({ default: module.PairDeviceView })),
-);
 const PrivacyView = lazy(() =>
   import("./privacy-view").then((module) => ({ default: module.PrivacyView })),
 );
@@ -44,7 +41,6 @@ export function FeatureRouter() {
   let view: ReactNode = <CashierView />;
   if (ticketCode) view = <TicketStatusView code={ticketCode.toUpperCase()} />;
   else if (path === "/setup") view = <SetupView />;
-  else if (path === "/pair") view = <PairDeviceView />;
   else if (path === "/datenschutz") view = <PrivacyView />;
   else if (path === "/flight-line" || path === "/flight-line/assist") view = <FlightLineView />;
   else if (path === "/fids" || path === "/fids/terminal") view = <FidsView />;

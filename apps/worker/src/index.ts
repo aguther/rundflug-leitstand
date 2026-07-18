@@ -93,14 +93,15 @@ async function unknownTicketResponse(env: Env, request: Request): Promise<Respon
 async function authorizeDevice(
   env: Env,
   eventId: string,
-  deviceId: string | undefined,
-  token: string | undefined,
-  request?: Request,
+  request: Request,
 ): Promise<{ id: string; role: string } | null> {
-  if (request) {
-    const actor = await authorizeSession(env, request);
-    if (actor) return { id: actor.deviceId, role: actor.role };
-  }
+  const actor = await authorizeSession(env, request);
+  if (actor) return { id: actor.deviceId, role: actor.role };
+  // Production authorization is session-only. Legacy device credentials remain available solely
+  // to the synthetic local integration harness until those fixtures are migrated.
+  if (env.APP_ENV !== "development") return null;
+  const deviceId = request.headers.get("x-device-id") ?? undefined;
+  const token = request.headers.get("x-device-token") ?? undefined;
   if (!deviceId) return null;
   const device = await env.DB.prepare(
     "SELECT role, credential_hash FROM paired_devices WHERE id = ?1 AND operation_day_id = ?2 AND active = 1",
@@ -217,6 +218,12 @@ app.post("/api/setup", async (context) => {
   }
   const input = parsed.data;
   const now = new Date().toISOString();
+  const adminDeviceId =
+    context.env.APP_ENV === "development" && input.adminDeviceId
+      ? input.adminDeviceId
+      : crypto.randomUUID();
+  const adminCredentialHash =
+    context.env.APP_ENV === "development" ? (input.adminCredentialHash ?? null) : null;
   const adminAccountId = crypto.randomUUID();
   const adminPinHash = await hashPin(input.adminPin);
   try {
@@ -234,8 +241,8 @@ app.post("/api/setup", async (context) => {
       context.env.DB.prepare(
         `INSERT INTO paired_devices
           (id, operation_day_id, label, role, active, paired_at, last_seen_at, credential_hash)
-         VALUES (?1, ?2, 'Erstes Administrationsgerät', 'ADMIN', 1, ?3, ?3, ?4)`,
-      ).bind(input.adminDeviceId, input.eventId, now, input.adminCredentialHash),
+         VALUES (?1, ?2, 'Erste Administrationssitzung', 'ADMIN', 1, ?3, ?3, ?4)`,
+      ).bind(adminDeviceId, input.eventId, now, adminCredentialHash),
       context.env.DB.prepare(
         `INSERT INTO operator_accounts
           (id, login_code, role, pin_hash, active, failed_attempts, session_version,
@@ -245,7 +252,7 @@ app.post("/api/setup", async (context) => {
       context.env.DB.prepare(
         `INSERT INTO app_bootstrap (singleton, operation_day_id, admin_device_id, completed_at)
          VALUES (1, ?1, ?2, ?3)`,
-      ).bind(input.eventId, input.adminDeviceId, now),
+      ).bind(input.eventId, adminDeviceId, now),
       context.env.DB.prepare(
         `INSERT INTO operational_events
           (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type,
@@ -255,7 +262,7 @@ app.post("/api/setup", async (context) => {
         crypto.randomUUID(),
         input.eventId,
         now,
-        input.adminDeviceId,
+        adminDeviceId,
         JSON.stringify({ anonymousAdministration: true }),
       ),
       context.env.DB.prepare(
@@ -269,7 +276,13 @@ app.post("/api/setup", async (context) => {
       409,
     );
   }
-  return context.json({ eventId: input.eventId, adminDeviceId: input.adminDeviceId }, 201);
+  return context.json(
+    {
+      eventId: input.eventId,
+      ...(context.env.APP_ENV === "development" ? { adminDeviceId } : {}),
+    },
+    201,
+  );
 });
 
 const LOGIN_ERROR = {
@@ -293,7 +306,11 @@ app.get("/api/auth/accounts", async (context) => {
 app.post("/api/auth/login", async (context) => {
   const parsed = operatorLoginRequestSchema.safeParse(await context.req.json().catch(() => null));
   if (!parsed.success) return context.json(LOGIN_ERROR, 401);
-  const { accountId, pin, deviceId } = parsed.data;
+  const { accountId, pin } = parsed.data;
+  const deviceId =
+    context.env.APP_ENV === "development" && parsed.data.deviceId
+      ? parsed.data.deviceId
+      : crypto.randomUUID();
   if (
     !(await allowLoginAttempt(context.env.ADMIN_RECOVERY_RATE_LIMITER, context.req.raw, accountId))
   ) {
@@ -395,7 +412,6 @@ app.post("/api/auth/login", async (context) => {
   return context.json({
     authenticated: true,
     account: { id: account.id, loginCode: account.login_code, role: account.role },
-    deviceId,
   });
 });
 
@@ -410,7 +426,6 @@ app.get("/api/auth/session", async (context) => {
   return context.json({
     authenticated: true,
     account: { id: actor.accountId, loginCode: actor.loginCode, role: actor.role },
-    deviceId: actor.deviceId,
   });
 });
 
@@ -567,10 +582,16 @@ app.get("/api/device/context", async (context) => {
     ).first<{ id: string }>();
     if (event) return context.json({ eventId: event.id, role: actor.role });
   }
+  if (context.env.APP_ENV !== "development") {
+    return context.json(
+      { error: { code: "SESSION_REQUIRED", message: "Anmeldung erforderlich." } },
+      401,
+    );
+  }
   const deviceId = context.req.header("x-device-id");
   if (!deviceId) {
     return context.json(
-      { error: { code: "DEVICE_REQUIRED", message: "Gerätekopplung erforderlich." } },
+      { error: { code: "DEVICE_REQUIRED", message: "Gültige Sitzung erforderlich." } },
       403,
     );
   }
@@ -585,7 +606,7 @@ app.get("/api/device/context", async (context) => {
     !(await verifyCredential(context.req.header("x-device-token") ?? null, device.credential_hash))
   ) {
     return context.json(
-      { error: { code: "DEVICE_REQUIRED", message: "Gerätekopplung erforderlich." } },
+      { error: { code: "DEVICE_REQUIRED", message: "Gültige Sitzung erforderlich." } },
       403,
     );
   }
@@ -601,13 +622,7 @@ app.post("/api/admin/events/:eventId/verify-pin", async (context) => {
     );
   }
   const eventId = context.req.param("eventId");
-  const authorized = await authorizeDevice(
-    context.env,
-    eventId,
-    context.req.header("x-device-id"),
-    context.req.header("x-device-token"),
-    context.req.raw,
-  );
+  const authorized = await authorizeDevice(context.env, eventId, context.req.raw);
   const actor = await authorizeSession(context.env, context.req.raw);
   if (
     authorized?.role !== "ADMIN" ||
@@ -623,6 +638,12 @@ app.post("/api/admin/events/:eventId/verify-pin", async (context) => {
 });
 
 app.post("/api/admin/events/:eventId/recover-device", async (context) => {
+  if (context.env.APP_ENV !== "development") {
+    return context.json(
+      { error: { code: "SESSION_AUTH_ONLY", message: "Bitte erneut anmelden." } },
+      410,
+    );
+  }
   const eventId = context.req.param("eventId");
   const deviceId = context.req.header("x-device-id")?.trim() ?? "";
   const parsed = adminDeviceRecoverySchema.safeParse(await context.req.json().catch(() => null));
@@ -661,7 +682,7 @@ app.post("/api/admin/events/:eventId/recover-device", async (context) => {
       {
         error: {
           code: "ADMIN_RECOVERY_REJECTED",
-          message: "Geräte-ID oder PIN ist nicht korrekt.",
+          message: "Sitzung oder PIN ist nicht korrekt.",
         },
       },
       403,
@@ -679,7 +700,7 @@ app.post("/api/admin/events/:eventId/recover-device", async (context) => {
       : context.env.DB.prepare(
           `INSERT INTO paired_devices
             (id, operation_day_id, label, role, active, paired_at, last_seen_at, credential_hash)
-           VALUES (?1, ?2, 'Administrationsgerät', 'ADMIN', 1, ?3, ?3, ?4)`,
+           VALUES (?1, ?2, 'Administrationssitzung', 'ADMIN', 1, ?3, ?3, ?4)`,
         ).bind(deviceId, eventId, now, parsed.data.credentialHash),
     context.env.DB.prepare(
       `INSERT INTO operational_events
@@ -730,13 +751,7 @@ app.post("/api/admin/events/:eventId/factory-reset", async (context) => {
     return context.json(response);
   }
 
-  const authorized = await authorizeDevice(
-    context.env,
-    input.eventId,
-    context.req.header("x-device-id"),
-    context.req.header("x-device-token"),
-    context.req.raw,
-  );
+  const authorized = await authorizeDevice(context.env, input.eventId, context.req.raw);
   const actor = await authorizeSession(context.env, context.req.raw);
   if (
     authorized?.role !== "ADMIN" ||
@@ -826,16 +841,11 @@ app.post("/api/admin/events/:eventId/factory-reset", async (context) => {
 });
 
 app.get("/api/admin/events", async (context) => {
-  const sourceEventId = context.req.header("x-event-id");
-  const device = sourceEventId
-    ? await authorizeDevice(
-        context.env,
-        sourceEventId,
-        context.req.header("x-device-id"),
-        context.req.header("x-device-token"),
-        context.req.raw,
-      )
-    : null;
+  const device = await authorizeDevice(
+    context.env,
+    context.req.header("x-event-id") ?? "",
+    context.req.raw,
+  );
   if (device?.role !== "ADMIN") {
     return context.json(
       { error: { code: "ADMIN_REQUIRED", message: "Administration erforderlich." } },
@@ -874,24 +884,22 @@ app.get("/api/admin/events", async (context) => {
 
 app.post("/api/admin/events/:sourceEventId/clone", async (context) => {
   const sourceEventId = context.req.param("sourceEventId");
-  const sourceAdmin = await context.env.DB.prepare(
-    `SELECT role, credential_hash FROM paired_devices
-      WHERE id = ?1 AND operation_day_id = ?2 AND active = 1`,
-  )
-    .bind(context.req.header("x-device-id"), sourceEventId)
-    .first<{ role: string; credential_hash: string | null }>();
-  if (
-    sourceAdmin?.role !== "ADMIN" ||
-    !(await verifyCredential(
-      context.req.header("x-device-token") ?? null,
-      sourceAdmin.credential_hash,
-    ))
-  ) {
+  const sourceAdmin = await authorizeDevice(context.env, sourceEventId, context.req.raw);
+  if (sourceAdmin?.role !== "ADMIN") {
     return context.json(
       { error: { code: "ADMIN_REQUIRED", message: "Administration erforderlich." } },
       403,
     );
   }
+  const legacySourceCredential =
+    context.env.APP_ENV === "development"
+      ? await context.env.DB.prepare(
+          `SELECT credential_hash FROM paired_devices
+            WHERE id = ?1 AND operation_day_id = ?2 AND active = 1`,
+        )
+          .bind(sourceAdmin.id, sourceEventId)
+          .first<{ credential_hash: string | null }>()
+      : null;
   const parsed = cloneEventRequestSchema.safeParse(await context.req.json().catch(() => null));
   if (!parsed.success) {
     return context.json(
@@ -907,10 +915,7 @@ app.post("/api/admin/events/:sourceEventId/clone", async (context) => {
     .bind(input.commandId)
     .first<{ operation_day_id: string; device_id: string; response_json: string }>();
   if (receipt) {
-    if (
-      receipt.operation_day_id !== sourceEventId ||
-      receipt.device_id !== context.req.header("x-device-id")
-    ) {
+    if (receipt.operation_day_id !== sourceEventId || receipt.device_id !== sourceAdmin.id) {
       return context.json(
         { error: { code: "IDEMPOTENCY_CONFLICT", message: "Kommando-ID ist bereits belegt." } },
         409,
@@ -979,8 +984,8 @@ app.post("/api/admin/events/:sourceEventId/clone", async (context) => {
   const adminDeviceId = crypto.randomUUID();
   const responseBody = {
     eventId: input.eventId,
-    adminDeviceId,
     templateSourceId: sourceEventId,
+    ...(context.env.APP_ENV === "development" ? { adminDeviceId } : {}),
   };
   const statements = [
     context.env.DB.prepare(
@@ -1106,8 +1111,8 @@ app.post("/api/admin/events/:sourceEventId/clone", async (context) => {
     context.env.DB.prepare(
       `INSERT INTO paired_devices
         (id, operation_day_id, label, role, active, paired_at, last_seen_at, credential_hash)
-       VALUES (?1, ?2, 'Übernommenes Administrationsgerät', 'ADMIN', 1, ?3, ?3, ?4)`,
-    ).bind(adminDeviceId, input.eventId, now, sourceAdmin.credential_hash),
+       VALUES (?1, ?2, 'Übernommene Administrationssitzung', 'ADMIN', 1, ?3, ?3, ?4)`,
+    ).bind(adminDeviceId, input.eventId, now, legacySourceCredential?.credential_hash ?? null),
     context.env.DB.prepare(
       `INSERT INTO operational_events
         (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type,
@@ -1128,13 +1133,7 @@ app.post("/api/admin/events/:sourceEventId/clone", async (context) => {
       `INSERT INTO idempotency_receipts
         (command_id, operation_day_id, device_id, command_type, received_at, response_json)
        VALUES (?1, ?2, ?3, 'CREATE_EVENT_FROM_TEMPLATE', ?4, ?5)`,
-    ).bind(
-      input.commandId,
-      sourceEventId,
-      context.req.header("x-device-id"),
-      now,
-      JSON.stringify(responseBody),
-    ),
+    ).bind(input.commandId, sourceEventId, sourceAdmin.id, now, JSON.stringify(responseBody)),
   ];
   await context.env.DB.batch(statements);
   return context.json(responseBody, 201);
@@ -1143,13 +1142,7 @@ app.post("/api/admin/events/:sourceEventId/clone", async (context) => {
 app.delete("/api/admin/events/:eventId", async (context) => {
   const eventId = context.req.param("eventId");
   const sourceEventId = context.req.header("x-event-id")?.trim() || eventId;
-  const device = await authorizeDevice(
-    context.env,
-    sourceEventId,
-    context.req.header("x-device-id"),
-    context.req.header("x-device-token"),
-    context.req.raw,
-  );
+  const device = await authorizeDevice(context.env, sourceEventId, context.req.raw);
   if (device?.role !== "ADMIN") {
     return context.json(
       { error: { code: "ADMIN_REQUIRED", message: "Administration erforderlich." } },
@@ -1213,13 +1206,7 @@ app.delete("/api/admin/events/:eventId", async (context) => {
 
 app.put("/api/admin/events/:eventId/logo", async (context) => {
   const eventId = context.req.param("eventId");
-  const device = await authorizeDevice(
-    context.env,
-    eventId,
-    context.req.header("x-device-id"),
-    context.req.header("x-device-token"),
-    context.req.raw,
-  );
+  const device = await authorizeDevice(context.env, eventId, context.req.raw);
   if (device?.role !== "ADMIN") {
     return context.json(
       { error: { code: "ADMIN_REQUIRED", message: "Administration erforderlich." } },
@@ -1315,13 +1302,7 @@ app.put("/api/admin/events/:eventId/logo", async (context) => {
 
 app.delete("/api/admin/events/:eventId/logo", async (context) => {
   const eventId = context.req.param("eventId");
-  const device = await authorizeDevice(
-    context.env,
-    eventId,
-    context.req.header("x-device-id"),
-    context.req.header("x-device-token"),
-    context.req.raw,
-  );
+  const device = await authorizeDevice(context.env, eventId, context.req.raw);
   if (device?.role !== "ADMIN") {
     return context.json(
       { error: { code: "ADMIN_REQUIRED", message: "Administration erforderlich." } },
@@ -1425,20 +1406,19 @@ app.get("/api/events/:eventId/snapshot", async (context) => {
 app.put("/api/events/:eventId/assist-claims/:aircraftId", async (context) => {
   const eventId = context.req.param("eventId");
   const aircraftId = context.req.param("aircraftId");
-  const deviceId = context.req.header("x-device-id");
-  const device = await authorizeDevice(
-    context.env,
-    eventId,
-    deviceId,
-    context.req.header("x-device-token"),
-    context.req.raw,
-  );
-  if (!device || !deviceId || !["FLIGHT_LINE", "FLIGHT_DIRECTOR", "ADMIN"].includes(device.role)) {
+  const device = await authorizeDevice(context.env, eventId, context.req.raw);
+  if (!device || !["FLIGHT_LINE", "FLIGHT_DIRECTOR", "ADMIN"].includes(device.role)) {
     return context.json(
-      { error: { code: "DEVICE_NOT_AUTHORIZED", message: "Gerät nicht berechtigt." } },
+      {
+        error: {
+          code: "SESSION_NOT_AUTHORIZED",
+          message: "Sitzung für diese Ansicht nicht berechtigt.",
+        },
+      },
       403,
     );
   }
+  const deviceId = device.id;
   const aircraft = await context.env.DB.prepare(
     `SELECT a.id FROM aircraft a
       JOIN resource_group_memberships membership ON membership.aircraft_id = a.id
@@ -1501,7 +1481,7 @@ app.put("/api/events/:eventId/assist-claims/:aircraftId", async (context) => {
   }
   return context.json({
     aircraftId,
-    deviceId,
+    claimedByCurrentSession: true,
     claimedAt: claim.claimed_at,
     expiresAt: claim.expires_at,
   });
@@ -1510,20 +1490,19 @@ app.put("/api/events/:eventId/assist-claims/:aircraftId", async (context) => {
 app.delete("/api/events/:eventId/assist-claims/:aircraftId", async (context) => {
   const eventId = context.req.param("eventId");
   const aircraftId = context.req.param("aircraftId");
-  const deviceId = context.req.header("x-device-id");
-  const device = await authorizeDevice(
-    context.env,
-    eventId,
-    deviceId,
-    context.req.header("x-device-token"),
-    context.req.raw,
-  );
-  if (!device || !deviceId || !["FLIGHT_LINE", "FLIGHT_DIRECTOR", "ADMIN"].includes(device.role)) {
+  const device = await authorizeDevice(context.env, eventId, context.req.raw);
+  if (!device || !["FLIGHT_LINE", "FLIGHT_DIRECTOR", "ADMIN"].includes(device.role)) {
     return context.json(
-      { error: { code: "DEVICE_NOT_AUTHORIZED", message: "Gerät nicht berechtigt." } },
+      {
+        error: {
+          code: "SESSION_NOT_AUTHORIZED",
+          message: "Sitzung für diese Ansicht nicht berechtigt.",
+        },
+      },
       403,
     );
   }
+  const deviceId = device.id;
   if (["FLIGHT_DIRECTOR", "ADMIN"].includes(device.role)) {
     await context.env.DB.prepare(
       `DELETE FROM flight_line_assist_claims
@@ -1544,16 +1523,15 @@ app.delete("/api/events/:eventId/assist-claims/:aircraftId", async (context) => 
 
 app.get("/api/events/:eventId/operations", async (context) => {
   const eventId = context.req.param("eventId");
-  const device = await authorizeDevice(
-    context.env,
-    eventId,
-    context.req.header("x-device-id"),
-    context.req.header("x-device-token"),
-    context.req.raw,
-  );
+  const device = await authorizeDevice(context.env, eventId, context.req.raw);
   if (!device || device.role === "DISPLAY") {
     return context.json(
-      { error: { code: "DEVICE_NOT_AUTHORIZED", message: "Gerät nicht berechtigt." } },
+      {
+        error: {
+          code: "SESSION_NOT_AUTHORIZED",
+          message: "Sitzung für diese Ansicht nicht berechtigt.",
+        },
+      },
       403,
     );
   }
@@ -2339,7 +2317,7 @@ app.get("/api/events/:eventId/operations", async (context) => {
     })),
     assistClaims: assistClaims.map((claim) => ({
       aircraftId: claim.aircraft_id,
-      deviceId: claim.device_id,
+      claimedByCurrentSession: claim.device_id === device.id,
       claimedAt: claim.claimed_at,
       expiresAt: claim.expires_at,
     })),
@@ -2404,16 +2382,15 @@ app.get("/api/events/:eventId/operations", async (context) => {
 
 app.get("/api/events/:eventId/tickets/search", async (context) => {
   const eventId = context.req.param("eventId");
-  const device = await authorizeDevice(
-    context.env,
-    eventId,
-    context.req.header("x-device-id"),
-    context.req.header("x-device-token"),
-    context.req.raw,
-  );
+  const device = await authorizeDevice(context.env, eventId, context.req.raw);
   if (!device || !["CASHIER", "FLIGHT_LINE", "FLIGHT_DIRECTOR", "ADMIN"].includes(device.role)) {
     return context.json(
-      { error: { code: "DEVICE_NOT_AUTHORIZED", message: "Gerät nicht berechtigt." } },
+      {
+        error: {
+          code: "SESSION_NOT_AUTHORIZED",
+          message: "Sitzung für diese Ansicht nicht berechtigt.",
+        },
+      },
       403,
     );
   }
@@ -2517,16 +2494,15 @@ app.get("/api/events/:eventId/tickets/search", async (context) => {
 
 app.get("/api/events/:eventId/ticket-groups/:ticketGroupId/print-data", async (context) => {
   const eventId = context.req.param("eventId");
-  const device = await authorizeDevice(
-    context.env,
-    eventId,
-    context.req.header("x-device-id"),
-    context.req.header("x-device-token"),
-    context.req.raw,
-  );
+  const device = await authorizeDevice(context.env, eventId, context.req.raw);
   if (!device || !["CASHIER", "ADMIN"].includes(device.role)) {
     return context.json(
-      { error: { code: "DEVICE_NOT_AUTHORIZED", message: "Gerät nicht berechtigt." } },
+      {
+        error: {
+          code: "SESSION_NOT_AUTHORIZED",
+          message: "Sitzung für diese Ansicht nicht berechtigt.",
+        },
+      },
       403,
     );
   }
@@ -2570,16 +2546,15 @@ app.get("/api/events/:eventId/ticket-groups/:ticketGroupId/print-data", async (c
 
 app.get("/api/events/:eventId/history", async (context) => {
   const eventId = context.req.param("eventId");
-  const device = await authorizeDevice(
-    context.env,
-    eventId,
-    context.req.header("x-device-id"),
-    context.req.header("x-device-token"),
-    context.req.raw,
-  );
+  const device = await authorizeDevice(context.env, eventId, context.req.raw);
   if (!device || !["ADMIN", "FLIGHT_DIRECTOR"].includes(device.role)) {
     return context.json(
-      { error: { code: "DEVICE_NOT_AUTHORIZED", message: "Gerät nicht berechtigt." } },
+      {
+        error: {
+          code: "SESSION_NOT_AUTHORIZED",
+          message: "Sitzung für diese Ansicht nicht berechtigt.",
+        },
+      },
       403,
     );
   }
@@ -2640,16 +2615,15 @@ app.get("/api/events/:eventId/history", async (context) => {
 
 app.get("/api/events/:eventId/history/operations", async (context) => {
   const eventId = context.req.param("eventId");
-  const device = await authorizeDevice(
-    context.env,
-    eventId,
-    context.req.header("x-device-id"),
-    context.req.header("x-device-token"),
-    context.req.raw,
-  );
+  const device = await authorizeDevice(context.env, eventId, context.req.raw);
   if (!device || !["ADMIN", "FLIGHT_DIRECTOR"].includes(device.role)) {
     return context.json(
-      { error: { code: "DEVICE_NOT_AUTHORIZED", message: "Gerät nicht berechtigt." } },
+      {
+        error: {
+          code: "SESSION_NOT_AUTHORIZED",
+          message: "Sitzung für diese Ansicht nicht berechtigt.",
+        },
+      },
       403,
     );
   }
@@ -2759,16 +2733,15 @@ app.get("/api/events/:eventId/history/operations", async (context) => {
 
 app.get("/api/events/:eventId/history/forecasts", async (context) => {
   const eventId = context.req.param("eventId");
-  const device = await authorizeDevice(
-    context.env,
-    eventId,
-    context.req.header("x-device-id"),
-    context.req.header("x-device-token"),
-    context.req.raw,
-  );
+  const device = await authorizeDevice(context.env, eventId, context.req.raw);
   if (!device || !["ADMIN", "FLIGHT_DIRECTOR"].includes(device.role)) {
     return context.json(
-      { error: { code: "DEVICE_NOT_AUTHORIZED", message: "Gerät nicht berechtigt." } },
+      {
+        error: {
+          code: "SESSION_NOT_AUTHORIZED",
+          message: "Sitzung für diese Ansicht nicht berechtigt.",
+        },
+      },
       403,
     );
   }
@@ -2882,16 +2855,15 @@ app.get("/api/events/:eventId/history/forecasts", async (context) => {
 
 app.get("/api/events/:eventId/devices", async (context) => {
   const eventId = context.req.param("eventId");
-  const device = await authorizeDevice(
-    context.env,
-    eventId,
-    context.req.header("x-device-id"),
-    context.req.header("x-device-token"),
-    context.req.raw,
-  );
+  const device = await authorizeDevice(context.env, eventId, context.req.raw);
   if (device?.role !== "ADMIN") {
     return context.json(
-      { error: { code: "DEVICE_NOT_AUTHORIZED", message: "Gerät nicht berechtigt." } },
+      {
+        error: {
+          code: "SESSION_NOT_AUTHORIZED",
+          message: "Sitzung für diese Ansicht nicht berechtigt.",
+        },
+      },
       403,
     );
   }
@@ -2926,16 +2898,15 @@ app.get("/api/events/:eventId/devices", async (context) => {
 
 app.get("/api/events/:eventId/reports/daily.csv", async (context) => {
   const eventId = context.req.param("eventId");
-  const device = await authorizeDevice(
-    context.env,
-    eventId,
-    context.req.header("x-device-id"),
-    context.req.header("x-device-token"),
-    context.req.raw,
-  );
+  const device = await authorizeDevice(context.env, eventId, context.req.raw);
   if (!device || !["ADMIN", "CASHIER"].includes(device.role)) {
     return context.json(
-      { error: { code: "DEVICE_NOT_AUTHORIZED", message: "Gerät nicht berechtigt." } },
+      {
+        error: {
+          code: "SESSION_NOT_AUTHORIZED",
+          message: "Sitzung für diese Ansicht nicht berechtigt.",
+        },
+      },
       403,
     );
   }
@@ -2958,16 +2929,15 @@ app.get("/api/events/:eventId/reports/daily.csv", async (context) => {
 
 app.get("/api/events/:eventId/exports/performance-profile.json", async (context) => {
   const eventId = context.req.param("eventId");
-  const device = await authorizeDevice(
-    context.env,
-    eventId,
-    context.req.header("x-device-id"),
-    context.req.header("x-device-token"),
-    context.req.raw,
-  );
+  const device = await authorizeDevice(context.env, eventId, context.req.raw);
   if (!device || !["ADMIN", "FLIGHT_DIRECTOR"].includes(device.role)) {
     return context.json(
-      { error: { code: "DEVICE_NOT_AUTHORIZED", message: "Gerät nicht berechtigt." } },
+      {
+        error: {
+          code: "SESSION_NOT_AUTHORIZED",
+          message: "Sitzung für diese Ansicht nicht berechtigt.",
+        },
+      },
       403,
     );
   }
@@ -3070,16 +3040,15 @@ app.get("/api/events/:eventId/exports/performance-profile.json", async (context)
 
 app.get("/api/events/:eventId/exports/tickets.csv", async (context) => {
   const eventId = context.req.param("eventId");
-  const device = await authorizeDevice(
-    context.env,
-    eventId,
-    context.req.header("x-device-id"),
-    context.req.header("x-device-token"),
-    context.req.raw,
-  );
+  const device = await authorizeDevice(context.env, eventId, context.req.raw);
   if (!device || !["ADMIN", "CASHIER", "FLIGHT_DIRECTOR"].includes(device.role)) {
     return context.json(
-      { error: { code: "DEVICE_NOT_AUTHORIZED", message: "Gerät nicht berechtigt." } },
+      {
+        error: {
+          code: "SESSION_NOT_AUTHORIZED",
+          message: "Sitzung für diese Ansicht nicht berechtigt.",
+        },
+      },
       403,
     );
   }
@@ -3148,16 +3117,15 @@ app.get("/api/events/:eventId/exports/tickets.csv", async (context) => {
 
 app.get("/api/events/:eventId/reports/daily.pdf", async (context) => {
   const eventId = context.req.param("eventId");
-  const device = await authorizeDevice(
-    context.env,
-    eventId,
-    context.req.header("x-device-id"),
-    context.req.header("x-device-token"),
-    context.req.raw,
-  );
+  const device = await authorizeDevice(context.env, eventId, context.req.raw);
   if (!device || !["ADMIN", "CASHIER", "FLIGHT_DIRECTOR"].includes(device.role)) {
     return context.json(
-      { error: { code: "DEVICE_NOT_AUTHORIZED", message: "Gerät nicht berechtigt." } },
+      {
+        error: {
+          code: "SESSION_NOT_AUTHORIZED",
+          message: "Sitzung für diese Ansicht nicht berechtigt.",
+        },
+      },
       403,
     );
   }
@@ -3647,6 +3615,7 @@ app.post("/api/events/:eventId/commands", async (context) => {
   }
   const headers = new Headers(context.req.raw.headers);
   for (const name of [
+    "x-device-id",
     "x-device-token",
     "x-operator-account-id",
     "x-operator-session-id",

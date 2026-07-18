@@ -9,7 +9,6 @@ import {
   loginRoleOrder,
   roleLabels,
 } from "./api";
-import { operatorDeviceId } from "./device";
 import "./login.css";
 
 export function LoginPage() {
@@ -41,7 +40,7 @@ export function LoginPage() {
     setBusy(true);
     setError(null);
     try {
-      setSession(await loginOperator(accountId, pin, operatorDeviceId()));
+      setSession(await loginOperator(accountId, pin));
     } catch {
       setPin("");
       setError("Konto oder PIN ist nicht gültig.");

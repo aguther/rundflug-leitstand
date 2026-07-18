@@ -11,10 +11,11 @@ describe("anonyme Flight-Line-Assist-Betreuungsreservierung (F-INT-070)", () => 
     expect(workerSource).toContain("AIRCRAFT_ASSIST_CLAIMED");
   });
 
-  it("requires an authorized operational device and exposes only technical IDs", () => {
+  it("requires an authorized operational session without exposing its technical ID", () => {
     expect(workerSource).toContain('app.put("/api/events/:eventId/assist-claims/:aircraftId"');
     expect(workerSource).toContain('["FLIGHT_LINE", "FLIGHT_DIRECTOR", "ADMIN"]');
     expect(workerSource).toContain("assistClaims: assistClaims.map");
+    expect(workerSource).toContain("claimedByCurrentSession: claim.device_id === device.id");
     expect(migration).not.toMatch(/name|phone|email/i);
   });
 

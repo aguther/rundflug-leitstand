@@ -31,7 +31,6 @@ describe("V1.2 web architecture", () => {
       "cashier-view",
       "fids-view",
       "flight-line-view",
-      "pair-device-view",
       "privacy-view",
       "setup-view",
       "ticket-status-view",
@@ -43,7 +42,7 @@ describe("V1.2 web architecture", () => {
 
   it("keeps anonymous FIDS and ticket views public while protecting internal workspaces", () => {
     expect(appSource).toContain('pathname === "/fids"');
-    expect(appSource).toContain('pathname === "/pair"');
+    expect(appSource).not.toContain('pathname === "/pair"');
     expect(appSource).toContain('pathname.startsWith("/fids/")');
     expect(appSource).toContain("if (!session) return <LoginPage />");
   });

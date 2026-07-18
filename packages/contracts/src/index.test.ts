@@ -88,7 +88,7 @@ describe("commandEnvelopeSchema", () => {
       }),
     ).toThrow();
   });
-  it("accepts only anonymous, hashed first-run administration data", () => {
+  it("accepts first-run administration without browser-generated device credentials", () => {
     const parsed = bootstrapRequestSchema.parse({
       setupCode: "synthetic-first-run-code",
       adminPin: "000000",
@@ -97,11 +97,11 @@ describe("commandEnvelopeSchema", () => {
       eventDate: "2026-07-12",
       aerodrome: "EDQA",
       timeZone: "Europe/Berlin",
-      adminDeviceId: "550e8400-e29b-41d4-a716-446655440300",
-      adminCredentialHash: "a".repeat(64),
     });
     expect(parsed.eventId).toBe("synthetic-first-run");
     expect("guestName" in parsed).toBe(false);
+    expect("adminDeviceId" in parsed).toBe(false);
+    expect("adminCredentialHash" in parsed).toBe(false);
     expect(() =>
       bootstrapRequestSchema.parse({ ...parsed, adminCredentialHash: "clear-device-token" }),
     ).toThrow();

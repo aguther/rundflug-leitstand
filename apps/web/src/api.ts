@@ -33,12 +33,68 @@ import {
 
 const SERVER_UNREACHABLE_MESSAGE =
   "Server nicht erreichbar. Bitte Verbindung prüfen und die Seite neu laden.";
+const LEGACY_DEVELOPMENT_DEVICE_AUTH = import.meta.env.MODE === "development";
+
+function apiGetUrl(input: RequestInfo | URL, init?: RequestInit): string | null {
+  const method = (init?.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase();
+  if (method !== "GET") return null;
+  const value =
+    typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+  if (value.startsWith("/api/")) return value;
+  if (typeof window === "undefined") return null;
+  const url = new URL(value, window.location.href);
+  return url.origin === window.location.origin && url.pathname.startsWith("/api/")
+    ? url.toString()
+    : null;
+}
+
+function xhrApiGet(url: string, init?: RequestInit): Promise<Response> {
+  return new Promise((resolve, reject) => {
+    const request = new XMLHttpRequest();
+    request.open("GET", url, true);
+    request.withCredentials = true;
+    for (const [name, value] of new Headers(init?.headers)) request.setRequestHeader(name, value);
+    const abort = () => request.abort();
+    init?.signal?.addEventListener("abort", abort, { once: true });
+    request.addEventListener("load", () => {
+      init?.signal?.removeEventListener("abort", abort);
+      const contentType = request.getResponseHeader("content-type");
+      resolve(
+        new Response(request.responseText, {
+          status: request.status,
+          statusText: request.statusText,
+          ...(contentType ? { headers: { "content-type": contentType } } : {}),
+        }),
+      );
+    });
+    request.addEventListener("error", () => {
+      init?.signal?.removeEventListener("abort", abort);
+      reject(new TypeError("XMLHttpRequest failed"));
+    });
+    request.addEventListener("abort", () => {
+      init?.signal?.removeEventListener("abort", abort);
+      reject(new DOMException("The operation was aborted.", "AbortError"));
+    });
+    request.send();
+  });
+}
 
 async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   try {
     return await fetch(input, init);
   } catch (cause) {
     if (cause instanceof DOMException && cause.name === "AbortError") throw cause;
+    const fallbackUrl = apiGetUrl(input, init);
+    if (fallbackUrl && typeof XMLHttpRequest !== "undefined") {
+      try {
+        return await xhrApiGet(fallbackUrl, init);
+      } catch (fallbackCause) {
+        if (fallbackCause instanceof DOMException && fallbackCause.name === "AbortError") {
+          throw fallbackCause;
+        }
+        throw new Error(SERVER_UNREACHABLE_MESSAGE, { cause: fallbackCause });
+      }
+    }
     throw new Error(SERVER_UNREACHABLE_MESSAGE, { cause });
   }
 }
@@ -53,7 +109,9 @@ function deviceHeaders(
   // HttpOnly session. This also avoids WebKit's fragile custom-header PWA transport path.
   return {
     ...additional,
-    ...(deviceToken ? { "x-device-id": deviceId, "x-device-token": deviceToken } : {}),
+    ...(LEGACY_DEVELOPMENT_DEVICE_AUTH && deviceToken
+      ? { "x-device-id": deviceId, "x-device-token": deviceToken }
+      : {}),
   };
 }
 
@@ -68,9 +126,7 @@ export async function getSetupStatus(): Promise<{
   return response.json();
 }
 
-export async function bootstrapSystem(
-  input: BootstrapRequest,
-): Promise<{ eventId: string; adminDeviceId: string }> {
+export async function bootstrapSystem(input: BootstrapRequest): Promise<{ eventId: string }> {
   const response = await apiFetch("/api/setup", {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -78,32 +134,12 @@ export async function bootstrapSystem(
   });
   const body = (await response.json()) as {
     eventId?: string;
-    adminDeviceId?: string;
     error?: { message?: string };
   };
-  if (!response.ok || !body.eventId || !body.adminDeviceId) {
+  if (!response.ok || !body.eventId) {
     throw new Error(body.error?.message ?? "Ersteinrichtung fehlgeschlagen.");
   }
-  return { eventId: body.eventId, adminDeviceId: body.adminDeviceId };
-}
-
-export async function getDeviceContext(
-  deviceId: string,
-  deviceToken: string,
-): Promise<{ eventId: string; role: string }> {
-  const response = await apiFetch(
-    "/api/device/context",
-    deviceToken ? { headers: deviceHeaders(deviceId, deviceToken) } : {},
-  );
-  const body = (await response.json()) as {
-    eventId?: string;
-    role?: string;
-    error?: { message?: string };
-  };
-  if (!response.ok || !body.eventId || !body.role) {
-    throw new Error(body.error?.message ?? "Gerätekontext nicht verfügbar.");
-  }
-  return { eventId: body.eventId, role: body.role };
+  return { eventId: body.eventId };
 }
 
 export async function verifyAdminPin(
@@ -128,7 +164,12 @@ export async function claimFlightLineAircraft(
   aircraftId: string,
   deviceId: string,
   deviceToken: string,
-): Promise<{ aircraftId: string; deviceId: string; claimedAt: string; expiresAt: string }> {
+): Promise<{
+  aircraftId: string;
+  claimedByCurrentSession: true;
+  claimedAt: string;
+  expiresAt: string;
+}> {
   const response = await apiFetch(
     `/api/events/${encodeURIComponent(eventId)}/assist-claims/${encodeURIComponent(aircraftId)}`,
     {
@@ -138,15 +179,26 @@ export async function claimFlightLineAircraft(
   );
   const body = (await response.json()) as {
     aircraftId?: string;
-    deviceId?: string;
+    claimedByCurrentSession?: boolean;
     claimedAt?: string;
     expiresAt?: string;
     error?: { message?: string };
   };
-  if (!response.ok || !body.aircraftId || !body.deviceId || !body.claimedAt || !body.expiresAt) {
+  if (
+    !response.ok ||
+    !body.aircraftId ||
+    body.claimedByCurrentSession !== true ||
+    !body.claimedAt ||
+    !body.expiresAt
+  ) {
     throw new Error(body.error?.message ?? "Betreuung konnte nicht übernommen werden.");
   }
-  return body as { aircraftId: string; deviceId: string; claimedAt: string; expiresAt: string };
+  return body as {
+    aircraftId: string;
+    claimedByCurrentSession: true;
+    claimedAt: string;
+    expiresAt: string;
+  };
 }
 
 export async function releaseFlightLineAircraft(
@@ -213,7 +265,7 @@ export async function cloneEvent(
   deviceId: string,
   deviceToken: string,
   input: CloneEventRequest,
-): Promise<{ eventId: string; adminDeviceId: string; templateSourceId: string }> {
+): Promise<{ eventId: string; templateSourceId: string }> {
   const response = await apiFetch(`/api/admin/events/${encodeURIComponent(sourceEventId)}/clone`, {
     method: "POST",
     headers: deviceHeaders(deviceId, deviceToken, { "content-type": "application/json" }),
@@ -221,14 +273,13 @@ export async function cloneEvent(
   });
   const body = (await response.json()) as {
     eventId?: string;
-    adminDeviceId?: string;
     templateSourceId?: string;
     error?: { message?: string };
   };
-  if (!response.ok || !body.eventId || !body.adminDeviceId || !body.templateSourceId) {
+  if (!response.ok || !body.eventId || !body.templateSourceId) {
     throw new Error(body.error?.message ?? "Veranstaltung konnte nicht angelegt werden.");
   }
-  return body as { eventId: string; adminDeviceId: string; templateSourceId: string };
+  return body as { eventId: string; templateSourceId: string };
 }
 
 export async function deleteEvent(
@@ -454,30 +505,6 @@ export interface HealthResponse {
   timestamp: string;
 }
 
-export interface PairedDeviceSummary {
-  id: string;
-  label: string;
-  role: string;
-  active: boolean;
-  online: boolean;
-  pairedAt: string;
-  lastSeenAt: string;
-  revokedAt: string | null;
-}
-
-export async function getPairedDevices(
-  eventId: string,
-  deviceId: string,
-  deviceToken: string,
-): Promise<PairedDeviceSummary[]> {
-  const response = await apiFetch(`/api/events/${encodeURIComponent(eventId)}/devices`, {
-    headers: deviceHeaders(deviceId, deviceToken),
-  });
-  if (!response.ok) throw new Error("Geräteübersicht nicht verfügbar.");
-  const body = (await response.json()) as { devices: PairedDeviceSummary[] };
-  return body.devices;
-}
-
 export async function getPublicBoard(
   eventId: string,
   gateId?: string | null,
@@ -501,38 +528,13 @@ export async function getOperationBoard(
   signal?: AbortSignal,
 ): Promise<OperationBoard> {
   const response = await apiFetch(`/api/events/${encodeURIComponent(eventId)}/operations`, {
-    ...(deviceToken ? { headers: deviceHeaders(deviceId, deviceToken) } : {}),
+    ...(LEGACY_DEVELOPMENT_DEVICE_AUTH && deviceToken
+      ? { headers: deviceHeaders(deviceId, deviceToken) }
+      : {}),
     ...(signal ? { signal } : {}),
   });
   if (!response.ok) throw new Error(`Betriebsdaten nicht verfügbar (${response.status})`);
   return operationBoardSchema.parse(await response.json());
-}
-
-export async function recoverAdminDevice(
-  eventId: string,
-  deviceId: string,
-  adminPin: string,
-  credentialHash: string,
-): Promise<{ eventId: string; adminDeviceId: string; role: "ADMIN" }> {
-  const response = await apiFetch(
-    `/api/admin/events/${encodeURIComponent(eventId)}/recover-device`,
-    {
-      method: "POST",
-      cache: "no-store",
-      headers: { "content-type": "application/json", "x-device-id": deviceId },
-      body: JSON.stringify({ adminPin, credentialHash }),
-    },
-  );
-  const body = (await response.json()) as {
-    eventId?: string;
-    adminDeviceId?: string;
-    role?: "ADMIN";
-    error?: { message?: string };
-  };
-  if (!response.ok || !body.eventId || !body.adminDeviceId || body.role !== "ADMIN") {
-    throw new Error(body.error?.message ?? "Administrationsgerät konnte nicht erneuert werden.");
-  }
-  return { eventId: body.eventId, adminDeviceId: body.adminDeviceId, role: body.role };
 }
 
 export async function sendCommand(
@@ -540,10 +542,11 @@ export async function sendCommand(
   deviceToken: string,
 ): Promise<CommandResult> {
   assertOperationalConnection(navigator.onLine);
+  const { deviceId: _browserDeviceId, ...sessionCommand } = command;
   const response = await apiFetch(`/api/events/${encodeURIComponent(command.eventId)}/commands`, {
     method: "POST",
     headers: deviceHeaders(command.deviceId, deviceToken, { "content-type": "application/json" }),
-    body: JSON.stringify(command),
+    body: JSON.stringify(LEGACY_DEVELOPMENT_DEVICE_AUTH ? command : sessionCommand),
   });
   if (!response.ok) {
     const body = (await response.json()) as { error?: { message?: string } };
