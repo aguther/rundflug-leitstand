@@ -1,3 +1,4 @@
+import { CalendarDays, Clock3 } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 
 type LocalizedInputProps = {
@@ -57,16 +58,8 @@ export function replaceLocalTime(value: string, time: string): string {
 }
 
 function PickerIcon({ type }: { type: "date" | "time" }) {
-  return type === "date" ? (
-    <svg aria-hidden="true" viewBox="0 0 24 24">
-      <path d="M7 3v3M17 3v3M4 9h16M5 5h14a1 1 0 0 1 1 1v14H4V6a1 1 0 0 1 1-1Z" />
-    </svg>
-  ) : (
-    <svg aria-hidden="true" viewBox="0 0 24 24">
-      <circle cx="12" cy="12" r="9" />
-      <path d="M12 7v5l3 2" />
-    </svg>
-  );
+  const Icon = type === "date" ? CalendarDays : Clock3;
+  return <Icon aria-hidden="true" />;
 }
 
 function GermanDateControl({
