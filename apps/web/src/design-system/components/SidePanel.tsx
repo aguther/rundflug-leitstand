@@ -17,10 +17,21 @@ export function SidePanel({ open, title, onClose, children, footer }: SidePanelP
         onClick={onClose}
         aria-hidden="true"
       />
-      <aside className="ds-sidepanel" data-open={open} role="dialog" aria-modal="true" aria-label={typeof title === "string" ? title : undefined}>
+      <aside
+        className="ds-sidepanel"
+        data-open={open}
+        role="dialog"
+        aria-modal="true"
+        aria-label={typeof title === "string" ? title : undefined}
+      >
         <div className="ds-sidepanel-header">
           <h2>{title}</h2>
-          <button type="button" className="ds-sidepanel-close" onClick={onClose} aria-label="Schließen">
+          <button
+            type="button"
+            className="ds-sidepanel-close"
+            onClick={onClose}
+            aria-label="Schließen"
+          >
             ×
           </button>
         </div>

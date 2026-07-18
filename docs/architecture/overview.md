@@ -76,7 +76,7 @@ automatisch gesendet: Die Kasse prüft den Entwurf und bestätigt den Verkauf be
 Serverversion; erst nach erfolgreicher Bestätigung wird die Draft-Queue geleert.
 
 Operativ wirksame Kommandos werden gemäß OQ-01 nicht offline angenommen: Verkauf, Storno, Umbuchung,
-`NEXT`, `IM FLUG`, `GELANDET`, `ABGESCHLOSSEN`, Not-Halt und Stammdatenänderungen benötigen eine
+„Belegung bestätigen & Boarding starten“, `IM FLUG`, `GELANDET`, `ABGESCHLOSSEN`, Not-Halt und Stammdatenänderungen benötigen eine
 Serverbestätigung. Sie werden bei fehlender Verbindung gesperrt statt scheinbar erfolgreich in eine
 lokale Fachkommando-Queue gestellt. Bestätigte Kommandos enthalten weiterhin `commandId`, `eventId`,
 `expectedVersion`, Geräteidentität und Zeitpunkt; Konflikte werden sichtbar zurückgegeben und nicht

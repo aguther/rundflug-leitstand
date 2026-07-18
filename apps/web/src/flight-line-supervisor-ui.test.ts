@@ -8,9 +8,13 @@ describe("Flight Line Supervisor", () => {
     expect(appSource).toContain("const operationalAircraft = board?.aircraft ?? []");
     expect(appSource).toContain("<FlightLineSupervisorConsole");
     expect(supervisorSource).toContain('className="flight-line-console"');
-    expect(supervisorSource).toContain('className="console-status-matrix"');
-    expect(supervisorSource).toContain("Nächste Gruppen");
+    expect(supervisorSource).toContain('className="aircraft-selector-rail"');
+    expect(supervisorSource).toContain("Passende Queue für");
     expect(supervisorSource).toContain("Vorgeschlagene Zuordnung");
+    expect(supervisorSource).toContain("GO TO GATE automatisch aktiv");
+    expect(supervisorSource).toContain("Zurückstellen");
+    expect(appSource).toContain("Belegung bestätigen & Boarding starten");
+    expect(appSource).not.toContain('label: "NEXT"');
     expect(appSource).toContain("Wieder verfügbar");
   });
 

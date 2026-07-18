@@ -72,7 +72,7 @@ Eingriff der Testleitung ausführen:
 
 ### Flight Line
 
-- im Supervisor den nächsten automatischen Gate-Voraufruf prüfen und `NEXT` menschlich bestätigen,
+- im Supervisor den nächsten automatischen Gate-Voraufruf prüfen und die Belegung mit Boardingbeginn menschlich bestätigen,
 - Flugzeug flexibel bestätigen,
 - Landung und Verfügbarkeit getrennt erfassen,
 - Blockierung und Pilotencode-Pause mit und ohne erwartete Dauer erkennen,
@@ -136,7 +136,7 @@ deren offenes Risiko. Geprüft wurde lokal mit synthetischem Seed gegen den real
 
 - 30 aufeinanderfolgende Standardverkäufe: Median 581 ms, Maximum 843 ms, alle 30 unter 15 Sekunden,
   höchstens zwei Interaktionen und bei jedem Lauf ein neuer sichtbarer Beleg;
-- Flight-Line-Aktion `NEXT`: kein Bestätigungsdialog, Zustandswechsel nach 534 ms, sichtbare
+- Flight-Line-Aktion „Belegung bestätigen & Boarding starten“: kein zusätzlicher Bestätigungsdialog, Zustandswechsel nach 534 ms, sichtbare
   Rückgängig-Aktion und Wiederherstellung nach 309 ms;
 - Administration: PIN-Dialog setzt den Fokus unmittelbar in das Passwortfeld;
 - responsive Vorprüfung bei 430 × 900 und 1280 × 720 ohne horizontalen Seitenüberlauf;

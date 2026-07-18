@@ -4,7 +4,7 @@
 
 - Ein anonymer, veranstaltungsbezogener Pilotencode wird mit optionaler organisatorischer Bemerkung
   angelegt; Namen, Lizenz- oder Dokumentdaten sind weder im Kommando noch im operativen DTO enthalten.
-- Nach `NEXT` zeigt der Pilotencode seine aktuelle Fluggruppen-/Umlaufzuordnung. Eine Pause während
+- Nach „Belegung bestätigen & Boarding starten“ zeigt der Pilotencode seine aktuelle Fluggruppen-/Umlaufzuordnung. Eine Pause während
   des aktiven Umlaufs wird technisch abgelehnt.
 - Nach Abschluss kann die Pilotencode-Pause mit Grund sowie optionaler erwarteter Dauer gestartet und
   wieder aufgehoben werden; die aktuelle Umlaufzuordnung ist anschließend leer. Eine erwartete
@@ -18,7 +18,7 @@
 - Unterschiedliche Sitzplatzkapazitäten innerhalb derselben Ressourcengruppe bleiben zulässig. Der
   Kapazitäts-/Pilotkonflikttest weist nach, dass für eine Vierergruppe das früheste passende
   Vier-Sitz-Flugzeug vorgeschlagen und ein ebenfalls zugeordnetes Zwei-Sitz-Flugzeug weder
-  vorgeschlagen noch bei `NEXT` akzeptiert wird.
+  vorgeschlagen noch bei der Bestätigung von Belegung und Boarding akzeptiert wird.
 
 Der Referenzlauf endete konsistent mit Veranstaltungsversion 14. Die Daten sind organisatorische
 Hinweise und besitzen ausdrücklich keine Sicherheits- oder Freigabewirkung.

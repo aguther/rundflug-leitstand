@@ -548,7 +548,7 @@
   {
     "id": "F-EVT-040",
     "section": "8.4 Ereignisse und Flight-Line-/Boarding-Ablauf",
-    "requirement": "Das System darf aus einer Primäraktion mehrere fachliche Ereignisse ableiten, sofern diese Ableitung transparent und protokolliert ist, z. B. NEXT erzeugt Aufruf und Boardingbeginn.",
+    "requirement": "Das System darf aus einer Primäraktion mehrere fachliche Ereignisse ableiten, sofern diese Ableitung transparent und protokolliert ist, z. B. Belegung bestätigen und Boarding starten erzeugt Flugzeugbindung, verbindlichen Aufruf und Boardingbeginn.",
     "priority": "MUSS",
     "stage": "V1",
     "implementation": {
@@ -574,7 +574,7 @@
   {
     "id": "F-BRD-010",
     "section": "8.4 Ereignisse und Flight-Line-/Boarding-Ablauf",
-    "requirement": "Der Standardumlauf ist mit vier Primäraktionen durchführbar: NEXT, IM FLUG, GELANDET und ABGESCHLOSSEN/VERFÜGBAR. Flugzeug und Pilot werden vorgeschlagen; zusätzliche Interaktionen entstehen nur bei Abweichungen oder Sonderfällen.",
+    "requirement": "Der Standardumlauf wird flugzeugzentriert durchgeführt: verfügbares Flugzeug öffnen, passende ganze Gruppen aus der geordneten Queue übernehmen, Belegung bestätigen und Boarding starten, IM FLUG, GELANDET und ABGESCHLOSSEN/VERFÜGBAR. Pilot und Belegung werden vorgeschlagen; zusätzliche Interaktionen entstehen nur bei Abweichungen oder Sonderfällen.",
     "priority": "MUSS",
     "stage": "V1",
     "implementation": {
@@ -587,7 +587,7 @@
   {
     "id": "F-BRD-020",
     "section": "8.4 Ereignisse und Flight-Line-/Boarding-Ablauf",
-    "requirement": "NEXT übernimmt den aktuellen Vorschlag, setzt die Fluggruppe auf Bitte zur Flight Line/Boarding, startet die Boardingmessung und löst Monitore sowie Benachrichtigungen aus.",
+    "requirement": "Belegung bestätigen und Boarding starten bindet die ausgewählten ganzen Gruppen, das konkrete verfügbare Flugzeug und den anonymen Pilotencode, startet die Boardingmessung und löst Monitore sowie Benachrichtigungen aus. Die technische Kommandobezeichnung darf aus Kompatibilitätsgründen CALL_NEXT bleiben, wird aber nicht als Bedienwort angezeigt.",
     "priority": "MUSS",
     "stage": "V1",
     "implementation": {
@@ -938,7 +938,7 @@
   {
     "id": "F-PRG-020",
     "section": "8.6 Prognose, Disposition und Kapazität",
-    "requirement": "Nach jedem relevanten Ereignis werden erwartetes Boarding, Start, Landung, Abschluss, verbleibende Wartezeit und alle abhängigen Folgeflüge automatisch neu berechnet.",
+    "requirement": "Nach jedem relevanten Ereignis und während des aktiven Betriebs zusätzlich mindestens alle 30 Sekunden werden erwartetes Boarding, Start, Landung, Abschluss, verbleibende Wartezeit und alle abhängigen Folgeflüge automatisch neu berechnet.",
     "priority": "MUSS",
     "stage": "V1",
     "implementation": {
@@ -964,7 +964,7 @@
   {
     "id": "F-PRG-040",
     "section": "8.6 Prognose, Disposition und Kapazität",
-    "requirement": "Tatsächlich gemessene Ereignisdauern müssen stärker in die Prognose eingehen als statische Planwerte. Planwerte dienen als Start- und Rückfallwerte.",
+    "requirement": "Tatsächlich gemessene Ereignisdauern des aktuellen Veranstaltungstags müssen stärker in die Prognose eingehen als statische oder historische Planwerte. Frühere Vergleichswerte dienen nur als Kaltstart und werden durch bestätigte Tageswerte verdrängt.",
     "priority": "MUSS",
     "stage": "V1",
     "implementation": {
@@ -990,7 +990,7 @@
   {
     "id": "F-PRG-060",
     "section": "8.6 Prognose, Disposition und Kapazität",
-    "requirement": "Ausreißer, abgebrochene Flüge, aktive Unterbrechungen und fehlerhaft korrigierte Ereignisse dürfen Durchschnittswerte nicht unkontrolliert verzerren. Die Behandlung muss im Pflichtenheft nachvollziehbar beschrieben werden.",
+    "requirement": "Ausreißer, abgebrochene Flüge, fehlerhaft korrigierte Ereignisse sowie durch Wetter, Flugshow, Notfall oder andere Unterbrechungen außergewöhnlich verlängerte Umläufe dürfen die Normalprognose nicht unkontrolliert verzerren. Die aktuelle Verzögerung wirkt sofort auf offene Prognosen; überlappende Umläufe werden jedoch nicht als normale Lerndauer übernommen. Die Behandlung muss nachvollziehbar dokumentiert sein.",
     "priority": "SOLL",
     "stage": "V1",
     "implementation": {
@@ -1406,7 +1406,7 @@
   {
     "id": "F-BEN-030",
     "section": "8.9 Gastinformation und Benachrichtigung",
-    "requirement": "Das System löst aus Prognose, Queue-Position, Prognosequalität und maximal akzeptierter Gate-Wartezeit automatisch den Voraufruf Bitte zum Gate beziehungsweise GO TO GATE aus. Schwellen und Vorlauf sind konfigurierbar. NEXT bleibt davon getrennt, bindet erst nach menschlicher Bestätigung das Flugzeug und startet Boarding sowie den verbindlichen Aufruf.",
+    "requirement": "Das System prüft während des aktiven Betriebs regelmäßig und nach relevanten Ereignissen Prognose, reale Flugzeugverfügbarkeit, Queue-Position und Anwesenheitslage und löst daraus automatisch Bitte zum Gate beziehungsweise GO TO GATE aus. Der Zielvorlauf wird aus bestätigten Tageswerten adaptiv nachgeregelt; Gate-Wartezeit und Prognosequalität sind weiche Optimierungsgrößen und keine harten Auslösesperren. Die konkrete Flugzeugbelegung und der Boardingstart bleiben davon getrennt und werden erst menschlich bestätigt.",
     "priority": "MUSS",
     "stage": "V1",
     "implementation": {
@@ -1601,7 +1601,7 @@
   {
     "id": "F-ADM-010",
     "section": "8.11 Administration und Geräteverwaltung",
-    "requirement": "Pflege der Veranstaltungsparameter einschließlich Verkaufszeiten, Betriebsende, Fristen, Ampelschwellen, Referenzgewichte, Benachrichtigungsvorlauf sowie Planwerte und Prognoseparameter.",
+    "requirement": "Pflege der erforderlichen Veranstaltungsparameter einschließlich Verkaufszeiten, Betriebsende, Fristen, Ampelschwellen, Referenzgewichte, Benachrichtigungsvorlauf und fachlicher Planwerte. Technische Einzelschwellen für den adaptiven Voraufruf werden nicht regulär administriert; sichtbar bleiben nur dessen Aktivierung und verständliche Betriebsinformationen.",
     "priority": "MUSS",
     "stage": "V1",
     "implementation": {

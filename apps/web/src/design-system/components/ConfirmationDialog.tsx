@@ -25,12 +25,17 @@ export function ConfirmationDialog({
   if (!open) return null;
 
   return (
-    <div className="ds-confirm-backdrop" onClick={onCancel}>
+    <div className="ds-confirm-backdrop">
+      <button
+        aria-label={cancelLabel}
+        className="ds-confirm-backdrop-dismiss"
+        onClick={onCancel}
+        type="button"
+      />
       <form
         className="ds-confirm-dialog"
         role="alertdialog"
         aria-modal="true"
-        onClick={(event) => event.stopPropagation()}
         onSubmit={(event) => {
           event.preventDefault();
           onConfirm();

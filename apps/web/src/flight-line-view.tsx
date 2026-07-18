@@ -28,7 +28,7 @@ import {
 } from "./operational-exceptions";
 
 const actionForState = {
-  DRAFT: { label: "NEXT", command: "CALL_NEXT" },
+  DRAFT: { label: "Belegung bestätigen & Boarding starten", command: "CALL_NEXT" },
   CALLED: { label: "IM FLUG", command: "MARK_IN_FLIGHT" },
   IN_FLIGHT: { label: "GELANDET", command: "MARK_LANDED" },
   LANDED: { label: "VERFÜGBAR", command: "MARK_COMPLETED" },
@@ -225,11 +225,16 @@ export function FlightLineView() {
     }
   }
 
-  async function mutateQueue(type: "DEFER_TICKET_GROUP" | "MARK_NO_SHOW", reasonOverride?: string) {
+  async function mutateQueue(
+    type: "DEFER_TICKET_GROUP" | "MARK_NO_SHOW",
+    reasonOverride?: string,
+    targetRotation = selected,
+  ) {
     const effectiveReason = reasonOverride ?? queueReason.trim();
-    if (!board || !selected || effectiveReason.length < 3) return;
+    if (!board || !targetRotation || effectiveReason.length < 3) return;
     const movesToClarification =
-      type === "DEFER_TICKET_GROUP" && selected.deferralCount + 1 >= board.event.maxTicketDeferrals;
+      type === "DEFER_TICKET_GROUP" &&
+      targetRotation.deferralCount + 1 >= board.event.maxTicketDeferrals;
     try {
       await sendCommand(
         {
@@ -239,7 +244,7 @@ export function FlightLineView() {
           expectedVersion: board.event.version,
           issuedAt: new Date().toISOString(),
           type,
-          payload: { ticketGroupId: selected.ticketGroupId, reason: effectiveReason },
+          payload: { ticketGroupId: targetRotation.ticketGroupId, reason: effectiveReason },
         },
         deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
       );
@@ -374,7 +379,9 @@ export function FlightLineView() {
         },
         deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
       );
-      setMessage("NEXT wurde durch ein Korrekturereignis zurückgenommen.");
+      setMessage(
+        "Der bestätigte Boarding-Aufruf wurde durch ein Korrekturereignis zurückgenommen.",
+      );
       await refresh();
     } catch (reason) {
       setMessage(reason instanceof Error ? reason.message : "Rücknahme fehlgeschlagen.");
@@ -520,6 +527,13 @@ export function FlightLineView() {
           message={message}
           nextPilotId={nextPilotId}
           onAvailable={() => void setFlightLineAircraftState("AVAILABLE")}
+          onDeferRotation={(rotation) =>
+            void mutateQueue(
+              "DEFER_TICKET_GROUP",
+              "Gruppe bei Übernahme des Flugzeugs nicht vollständig anwesend",
+              rotation,
+            )
+          }
           onOpenDetails={() => setDetailsOpen(true)}
           onOpenDisposition={() => setDispositionOpen(true)}
           onPause={openAircraftPauseDialog}
@@ -750,7 +764,7 @@ export function FlightLineView() {
                     <dd>
                       {selected.aircraftRegistration ??
                         (selected.suggestedAircraftRegistration
-                          ? `Vorschlag ${selected.suggestedAircraftRegistration} · Bestätigung mit NEXT`
+                          ? `Vorschlag ${selected.suggestedAircraftRegistration} · Belegung muss bestätigt werden`
                           : "Kein kompatibles Flugzeug verfügbar")}
                     </dd>
                   </div>
@@ -769,7 +783,7 @@ export function FlightLineView() {
                     <label>
                       Anonymer Pilotencode
                       <select
-                        aria-label="Pilotencode für NEXT"
+                        aria-label="Pilotencode für die Belegung"
                         value={nextPilotId}
                         onChange={(event) => setNextPilotId(event.target.value)}
                       >
@@ -923,7 +937,7 @@ export function FlightLineView() {
                 selected.calledAt &&
                 Date.now() - Date.parse(selected.calledAt) <= 10_000 ? (
                   <button className="undo-action" onClick={revokeCall} type="button">
-                    NEXT rückgängig
+                    Boarding-Aufruf rückgängig
                   </button>
                 ) : null}
                 {action ? (

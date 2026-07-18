@@ -20,7 +20,7 @@ function selectRobustDurationSamples(
   referenceMinutes: number,
 ): number[] {
   const plausible = samples.filter(
-    (duration) => Number.isFinite(duration) && duration > 0 && duration <= referenceMinutes * 3,
+    (duration) => Number.isFinite(duration) && duration > 0 && duration <= referenceMinutes * 1.75,
   );
   if (plausible.length < 5) return plausible.slice(-12);
   const center = median(plausible);
@@ -28,6 +28,61 @@ function selectRobustDurationSamples(
   const medianAbsoluteDeviation = median(absoluteDeviations);
   const tolerance = Math.max(referenceMinutes * 0.5, medianAbsoluteDeviation * 3);
   return plausible.filter((duration) => Math.abs(duration - center) <= tolerance).slice(-12);
+}
+
+export interface QueueAvailabilityState {
+  lowerMinutes: number[];
+  upperMinutes: number[];
+}
+
+export function createQueueAvailability(input: {
+  activeAircraft: number;
+  busyAircraftMinutes: readonly number[];
+}): QueueAvailabilityState {
+  const capacity = Math.max(0, Math.floor(input.activeAircraft));
+  const busy = input.busyAircraftMinutes
+    .filter((value) => Number.isFinite(value) && value > 0)
+    .slice(0, capacity);
+  const idle = Array.from({ length: Math.max(0, capacity - busy.length) }, () => 0);
+  const slots = [...busy, ...idle];
+  slots.sort((left, right) => left - right);
+  return { lowerMinutes: [...slots], upperMinutes: [...slots] };
+}
+
+export function reserveNextQueueWindow(
+  availability: QueueAvailabilityState,
+  duration: DurationEstimate,
+): {
+  window: { lowerMinutes: number; upperMinutes: number; quality: PredictionQuality };
+  availability: QueueAvailabilityState;
+} {
+  if (availability.lowerMinutes.length === 0 || availability.upperMinutes.length === 0) {
+    return {
+      window: { lowerMinutes: 0, upperMinutes: 0, quality: "UNCERTAIN" },
+      availability,
+    };
+  }
+  const lower = Math.min(...availability.lowerMinutes);
+  const upper = Math.min(...availability.upperMinutes);
+  const lowerIndex = availability.lowerMinutes.indexOf(lower);
+  const upperIndex = availability.upperMinutes.indexOf(upper);
+  const nextLower = [...availability.lowerMinutes];
+  const nextUpper = [...availability.upperMinutes];
+  nextLower[lowerIndex] = lower + duration.lowerMinutes;
+  nextUpper[upperIndex] = upper + duration.upperMinutes;
+  nextLower.sort((left, right) => left - right);
+  nextUpper.sort((left, right) => left - right);
+  return {
+    window: {
+      lowerMinutes: Math.max(0, Math.round(lower)),
+      upperMinutes: Math.max(0, Math.round(upper)),
+      quality: duration.quality,
+    },
+    availability: {
+      lowerMinutes: nextLower,
+      upperMinutes: nextUpper,
+    },
+  };
 }
 
 export function advanceOverduePrediction(input: {

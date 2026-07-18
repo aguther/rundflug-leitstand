@@ -11,10 +11,8 @@ export interface AutomaticPrecallInput {
   groupSize: number;
   largestEligibleAircraftSeats: number;
   predictionQuality: PrecallQuality;
-  minimumQuality: Exclude<PrecallQuality, "UNCERTAIN">;
-  predictedUpperMinutes: number;
-  leadMinutes: number;
-  maximumGateWaitMinutes: number;
+  predictedBoardingMinutes: number;
+  adaptiveLeadMinutes: number;
   minutesSinceLastGatePrecall: number | null;
   gateCooldownMinutes: number;
 }
@@ -28,10 +26,29 @@ export interface AutomaticPrecallDecision {
     | "NOT_QUEUE_FRONT"
     | "ALREADY_PRECALLED"
     | "NO_FITTING_AIRCRAFT"
-    | "PREDICTION_UNCERTAIN"
     | "TOO_EARLY"
-    | "GATE_WAIT_TOO_LONG"
     | "GATE_COOLDOWN";
+}
+
+export function deriveAdaptivePrecallLeadMinutes(input: {
+  observedGateWaitMinutes: readonly number[];
+  desiredGateWaitMinutes?: number;
+  baselineLeadMinutes?: number;
+}): number {
+  const desired = input.desiredGateWaitMinutes ?? 8;
+  const baseline = input.baselineLeadMinutes ?? 12;
+  const samples = input.observedGateWaitMinutes
+    .filter((value) => Number.isFinite(value) && value >= 0 && value <= 60)
+    .slice(-8);
+  samples.sort((left, right) => left - right);
+  if (samples.length === 0) return baseline;
+  const middle = Math.floor(samples.length / 2);
+  const observedMedian =
+    samples.length % 2 === 1
+      ? (samples[middle] ?? desired)
+      : ((samples[middle - 1] ?? desired) + (samples[middle] ?? desired)) / 2;
+  const corrected = baseline + (desired - observedMedian) * 0.5;
+  return Math.round(Math.min(18, Math.max(6, corrected)));
 }
 
 export function decideAutomaticPrecall(input: AutomaticPrecallInput): AutomaticPrecallDecision {
@@ -44,17 +61,8 @@ export function decideAutomaticPrecall(input: AutomaticPrecallInput): AutomaticP
   if (input.groupSize < 1 || input.groupSize > input.largestEligibleAircraftSeats) {
     return { eligible: false, reason: "NO_FITTING_AIRCRAFT" };
   }
-  if (
-    input.predictionQuality === "UNCERTAIN" ||
-    (input.minimumQuality === "STABLE" && input.predictionQuality !== "STABLE")
-  ) {
-    return { eligible: false, reason: "PREDICTION_UNCERTAIN" };
-  }
-  if (input.predictedUpperMinutes > input.leadMinutes) {
+  if (input.predictedBoardingMinutes > input.adaptiveLeadMinutes) {
     return { eligible: false, reason: "TOO_EARLY" };
-  }
-  if (input.predictedUpperMinutes > input.maximumGateWaitMinutes) {
-    return { eligible: false, reason: "GATE_WAIT_TOO_LONG" };
   }
   if (
     input.minutesSinceLastGatePrecall !== null &&

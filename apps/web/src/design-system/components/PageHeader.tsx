@@ -8,7 +8,13 @@ export interface PageHeaderProps {
   level?: 1 | 2;
 }
 
-export function PageHeader({ title, description, breadcrumb, actions, level = 1 }: PageHeaderProps) {
+export function PageHeader({
+  title,
+  description,
+  breadcrumb,
+  actions,
+  level = 1,
+}: PageHeaderProps) {
   const Heading = level === 1 ? "h1" : "h2";
   return (
     <div className="ds-page-header">

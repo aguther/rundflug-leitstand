@@ -5760,7 +5760,7 @@ p {
   display: block;
   margin-top: 10px;
 }
-.console-aircraft-detail > nav {
+.console-aircraft-detail > [role="tablist"] {
   display: flex;
   gap: 24px;
   min-height: 34px;
@@ -5769,7 +5769,7 @@ p {
   color: #929aa3;
   font-size: 0.7rem;
 }
-.console-aircraft-detail > nav strong {
+.console-aircraft-detail > [role="tablist"] strong {
   align-self: stretch;
   display: flex;
   align-items: center;

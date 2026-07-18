@@ -52,21 +52,20 @@ function formatTime(value: string | null, timeZone: string): string {
 
 type SidebarView = "fleet" | "groups" | "refueling" | "maintenance" | "activity";
 
-const sidebarNavItems: Array<
-  { id: SidebarView; label: string } | { href: string; label: string }
-> = [
-  { id: "fleet", label: "Flight Line" },
-  { id: "groups", label: "Gruppen" },
-  { href: "/admin?area=master-data&section=gates", label: "Gates" },
-  { href: "/admin?area=master-data&section=resource-groups", label: "Ressourcen" },
-  { href: "/admin?area=master-data&section=pilots", label: "Piloten" },
-  { href: "/admin?area=master-data&section=aircraft", label: "Flugzeuge" },
-  { id: "refueling", label: "Tanken" },
-  { id: "maintenance", label: "Wartung" },
-  { id: "activity", label: "Abläufe" },
-  { href: "/admin?area=evaluation", label: "Berichte" },
-  { href: "/admin?area=setup", label: "Einstellungen" },
-];
+const sidebarNavItems: Array<{ id: SidebarView; label: string } | { href: string; label: string }> =
+  [
+    { id: "fleet", label: "Flight Line" },
+    { id: "groups", label: "Gruppen" },
+    { href: "/admin?area=master-data&section=gates", label: "Gates" },
+    { href: "/admin?area=master-data&section=resource-groups", label: "Ressourcen" },
+    { href: "/admin?area=master-data&section=pilots", label: "Piloten" },
+    { href: "/admin?area=master-data&section=aircraft", label: "Flugzeuge" },
+    { id: "refueling", label: "Tanken" },
+    { id: "maintenance", label: "Wartung" },
+    { id: "activity", label: "Abläufe" },
+    { href: "/admin?area=evaluation", label: "Berichte" },
+    { href: "/admin?area=setup", label: "Einstellungen" },
+  ];
 
 type DetailTab = "assignment" | "info" | "pilot" | "history" | "notes";
 
@@ -115,6 +114,7 @@ export function FlightLineSupervisorConsole({
   onRefuel,
   onUnavailable,
   onAvailable,
+  onDeferRotation,
   onReleaseAssist,
 }: {
   board: OperationBoard;
@@ -134,6 +134,7 @@ export function FlightLineSupervisorConsole({
   onRefuel: () => void;
   onUnavailable: () => void;
   onAvailable: () => void;
+  onDeferRotation: (rotation: Rotation) => void;
   onReleaseAssist: (aircraftId: string) => void;
 }) {
   const { session, logout } = useAuth();
@@ -268,8 +269,8 @@ export function FlightLineSupervisorConsole({
       <main className="flight-line-console-main">
         <div className="console-toolbar">
           <div>
-            <strong>Flight Line</strong>
-            <small>Überblick über den operativen Status aller Flugzeuge</small>
+            <strong>{selectedAircraft?.registration ?? "Flight Line"}</strong>
+            <small>Flugzeug übernehmen, passende Gruppe wählen und Boarding bestätigen</small>
           </div>
           <div>
             <label className="console-resource-filter">
@@ -306,8 +307,33 @@ export function FlightLineSupervisorConsole({
           </div>
         </div>
 
+        <nav className="aircraft-selector-rail" aria-label="Flugzeug übernehmen">
+          {filteredAircraft.map((entry) => {
+            const rotation = suggestedRotationFor(entry, board.rotations, board.products);
+            return (
+              <button
+                aria-current={entry.id === selectedAircraft?.id ? "true" : undefined}
+                className={entry.id === selectedAircraft?.id ? "selected" : ""}
+                key={entry.id}
+                onClick={() => onSelectAircraft(entry.id)}
+                type="button"
+              >
+                <strong>{entry.registration}</strong>
+                <span>{stateLabel(entry, rotation)}</span>
+                <small>
+                  {entry.passengerSeats} Plätze · {entry.resourceGroupName}
+                </small>
+              </button>
+            );
+          })}
+        </nav>
+
         {sidebarView !== "fleet" ? (
-          <SupervisorSidebarPanel view={sidebarView} board={board} timeZone={board.event.timeZone} />
+          <SupervisorSidebarPanel
+            view={sidebarView}
+            board={board}
+            timeZone={board.event.timeZone}
+          />
         ) : null}
 
         <section
@@ -386,7 +412,7 @@ export function FlightLineSupervisorConsole({
                   <div className="matrix-recommendation">
                     <div>
                       <small>Empfehlung</small>
-                      <strong>{rotation.communicationLabel} jetzt aufrufen</strong>
+                      <strong>{rotation.communicationLabel} für dieses Flugzeug übernehmen</strong>
                       <span>
                         Vorgeschlagenes Zeitfenster bis{" "}
                         {formatTime(rotation.timeline.predicted.boardingAt, board.event.timeZone)}
@@ -407,7 +433,7 @@ export function FlightLineSupervisorConsole({
                         onClick={action.run}
                         type="button"
                       >
-                        {action.label === "NEXT" ? "Bestätigen" : action.label}
+                        {action.label}
                       </button>
                     ) : null}
                     <button onClick={onOpenDisposition} type="button">
@@ -426,33 +452,70 @@ export function FlightLineSupervisorConsole({
         </section>
 
         <div className="console-bottom-grid" hidden={sidebarView !== "fleet"}>
-          <section className="console-next-groups">
+          <section className="console-next-groups aircraft-queue-panel">
             <div className="console-panel-title">
-              <strong>Nächste Gruppen</strong>
-              <small>{aircraftRotations.length} in Warteschlange</small>
+              <div>
+                <strong>
+                  Passende Queue für {selectedAircraft?.registration ?? "das Flugzeug"}
+                </strong>
+                <small>
+                  Die Reihenfolge ist eine Empfehlung; abwesende Gruppen können zurückgestellt
+                  werden.
+                </small>
+              </div>
+              <span className="automatic-gate-status">
+                <strong>
+                  {selectedRotation?.precalledAt
+                    ? "GO TO GATE ausgelöst"
+                    : "GO TO GATE automatisch aktiv"}
+                </strong>
+                <small>
+                  {selectedRotation?.precalledAt
+                    ? `${selectedRotation.communicationLabel} wurde automatisch zum Gate gerufen`
+                    : "Prognose wird laufend aus heutigen Ist-Zeiten aktualisiert"}
+                </small>
+              </span>
             </div>
             <div className="next-group-head">
+              <span>Pos.</span>
               <span>Gruppe</span>
               <span>Tickets</span>
-              <span>Status</span>
+              <span>Anwesenheit</span>
               <span>Erwartetes Fenster</span>
-              <span>Hinweis</span>
+              <span>Aktion</span>
             </div>
             {aircraftRotations.map((rotation, index) => (
-              <button
+              <div
                 className={rotation.id === selectedRotation?.id ? "selected" : ""}
                 key={rotation.id}
-                onClick={() => onSelectRotation(rotation.id)}
-                type="button"
               >
-                <strong>{rotation.communicationLabel}</strong>
-                <span>{rotation.ticketCount}</span>
-                <span>{index === 0 ? "Als Nächstes" : "Wartet"}</span>
-                <span>
-                  {rotation.predictedLowerMinutes}–{rotation.predictedUpperMinutes} Min.
-                </span>
-                <span>{rotation.gateLabel}</span>
-              </button>
+                <button
+                  className="queue-row-select"
+                  onClick={() => onSelectRotation(rotation.id)}
+                  type="button"
+                >
+                  <span>{index + 1}</span>
+                  <strong>{rotation.communicationLabel}</strong>
+                  <span>{rotation.ticketCount}</span>
+                  <span>
+                    {
+                      rotation.tickets.filter((ticket) => ticket.attendanceStatus === "CHECKED_IN")
+                        .length
+                    }
+                    /{rotation.ticketCount} anwesend
+                  </span>
+                  <span>
+                    {rotation.predictedLowerMinutes}–{rotation.predictedUpperMinutes} Min.
+                  </span>
+                </button>
+                <button
+                  className="queue-defer"
+                  onClick={() => onDeferRotation(rotation)}
+                  type="button"
+                >
+                  Zurückstellen
+                </button>
+              </div>
             ))}
             {aircraftRotations.length === 0 ? <p>Keine passende Gruppe wartet derzeit.</p> : null}
             <small>
@@ -465,7 +528,7 @@ export function FlightLineSupervisorConsole({
               <strong>{selectedAircraft?.registration ?? "Kein Flugzeug"}</strong>
               <small>{selectedAircraft?.aircraftType}</small>
             </div>
-            <nav role="tablist" aria-label="Flugzeugdetails">
+            <div role="tablist" aria-label="Flugzeugdetails">
               {detailTabs.map((tab) => (
                 <button
                   aria-selected={detailTab === tab.id}
@@ -478,7 +541,7 @@ export function FlightLineSupervisorConsole({
                   {tab.label}
                 </button>
               ))}
-            </nav>
+            </div>
             {selectedAircraft ? (
               <div className="console-detail-content" role="tabpanel">
                 {detailTab === "assignment" ? (
@@ -514,9 +577,39 @@ export function FlightLineSupervisorConsole({
                     <div className="console-info-note">
                       <strong>Hinweis</strong>
                       <span>
-                        Diese Empfehlung ist informativ. Die finale Entscheidung liegt beim Operator.
+                        Diese Empfehlung ist informativ. Die finale Entscheidung liegt beim
+                        Operator.
                       </span>
                     </div>
+                    {selectedRotation?.status === "DRAFT" ? (
+                      <label className="aircraft-assignment-pilot">
+                        <span>Pilot für diese Belegung</span>
+                        <select
+                          aria-label="Pilotencode für die Belegung"
+                          value={nextPilotId}
+                          onChange={(event) => onPilotChange(event.target.value)}
+                        >
+                          <option value="">Pilot wählen</option>
+                          {board.pilots
+                            .filter((pilot) => pilot.active && !pilot.paused)
+                            .map((pilot) => (
+                              <option key={pilot.id} value={pilot.id}>
+                                {pilot.operationalCode}
+                              </option>
+                            ))}
+                        </select>
+                      </label>
+                    ) : null}
+                    {action ? (
+                      <button
+                        className="console-confirm assignment-confirm"
+                        disabled={action.disabled}
+                        onClick={action.run}
+                        type="button"
+                      >
+                        {action.label}
+                      </button>
+                    ) : null}
                   </>
                 ) : null}
                 {detailTab === "info" ? (
@@ -550,7 +643,7 @@ export function FlightLineSupervisorConsole({
                       <dd>
                         {selectedRotation?.status === "DRAFT" ? (
                           <select
-                            aria-label="Pilotencode für NEXT"
+                            aria-label="Pilotencode für die Belegung"
                             value={nextPilotId}
                             onChange={(event) => onPilotChange(event.target.value)}
                           >
@@ -651,7 +744,10 @@ function SupervisorSidebarPanel({
       view === "refueling" ? ["REFUELING"] : ["INACTIVE", "INTERRUPTED"];
     const matches = board.aircraft.filter((entry) => states.includes(entry.operationalState));
     return (
-      <section className="console-status-matrix" aria-label={view === "refueling" ? "Tanken" : "Wartung"}>
+      <section
+        className="console-status-matrix"
+        aria-label={view === "refueling" ? "Tanken" : "Wartung"}
+      >
         <div className="console-panel-title">
           <strong>{view === "refueling" ? "Tanken" : "Wartung"}</strong>
           <small>{matches.length} Flugzeuge</small>

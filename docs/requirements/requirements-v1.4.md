@@ -33,9 +33,9 @@ Konsolidierte Leitentscheidungen
 | Fachliches Kernmodell | Produkt -> Ressourcengruppe -> Flugzeug. Mehrere Produkte dürfen dieselbe operative Kapazität nutzen. |
 | Queue und Slot | Eine operative Queue je Ressourcengruppe; stabile Fluggruppen-/Slotnummern je Produkt als Kommunikationsobjekt, nicht als feste Uhrzeit. |
 | Zeitmodell | Intern konkrete Prognosezeitpunkte plus Unsicherheit; öffentlich Countdown oder Zeitfenster, keine einzelne Uhrzeit als Zusage. |
-| Bedienung Flight Line | Vier Primäraktionen: NEXT, IM FLUG, GELANDET, ABGESCHLOSSEN/VERFÜGBAR. Optionaler Check-in per Scan. |
-| Automatisierung | Vor NEXT automatische Optimierung; ab NEXT nur Vorschläge und menschliche Bestätigung. Gruppen werden nie automatisch getrennt. |
-| Prognose | Reale Ereignisse wirken stärker als Planwerte; alle Folgeflüge werden nach relevanten Ereignissen neu disponiert. |
+| Bedienung Flight Line | Flugzeugzentrierte Abfertigung mit „Belegung bestätigen & Boarding starten“, IM FLUG, GELANDET und ABGESCHLOSSEN/VERFÜGBAR. Optionaler Check-in per Scan. |
+| Automatisierung | Automatisches adaptives GO TO GATE; die konkrete Flugzeugbelegung und das Boarding bleiben menschlich bestätigt. Gruppen werden nie automatisch getrennt. |
+| Prognose | Reale Tagesereignisse wirken stärker als Planwerte; Zeitablauf und relevante Ereignisse disponieren alle Folgeflüge neu. Außergewöhnliche Unterbrechungen werden nicht als Normaldauer gelernt. |
 | Sitzplatzkapazität | Aus der aktiven Flotte der Ressourcengruppe abgeleitete Kapazitätsspanne; konkrete Flugzeugkapazität ist für den Umlauf maßgeblich. |
 | Ticketbereitstellung | V1 unterstützt vorgedruckte QR-Tickets und druckbare/digitale Tickets; spezielle Bondrucker-Anbindung folgt in V2. |
 | Betriebsarchitektur | Zentrale EU-Cloud-PWA mit Offline-Queue für kurze Ausfälle; Papier-Rückfallebene für Totalausfall. |
@@ -202,10 +202,10 @@ Die Software wird bei ein- bis mehrtägigen Flugveranstaltungen auf Flugplätzen
 
 | Rolle | Aufgaben und Berechtigungen |
 | --- | --- |
-| Administrator | Event einrichten, Stammdaten und Ressourcengruppen pflegen, Geräte koppeln, Prognoseparameter verwalten, Vollzugriff und Aufhebung des Notfallmodus. |
+| Administrator | Event einrichten, Stammdaten und Ressourcengruppen pflegen, Geräte koppeln, wenige betriebliche Planwerte verwalten, Vollzugriff und Aufhebung des Notfallmodus. |
 | Kassenpersonal | Tickets verkaufen, optionale Angaben erfassen, Storno/Umbuchung/Klärung durchführen, aktuelle Prognose und Verkaufsempfehlung sehen. Keine Flugzeug- oder Pilotenzuordnung. |
 | Leiter Flight Line | Operative Queue überwachen, Systemvorschläge bestätigen oder anpassen, Ressourcenstatus setzen, Sonderfälle und Notfallmodus steuern. |
-| Flight-Line-/Boardingpersonal | NEXT, Check-in, IM FLUG, GELANDET, ABGESCHLOSSEN sowie Zurückstellung und No-Show im Standardbetrieb. |
+| Flight-Line-/Boardingpersonal | Flugzeugbelegung und Boarding bestätigen, Check-in, IM FLUG, GELANDET, ABGESCHLOSSEN sowie Zurückstellung und No-Show im Standardbetrieb. |
 | Flugleitung | Primär lesendes Dashboard mit Gesamtüberblick; Not-Halt erreichbar. Keine operative Detailbedienung, soweit nicht ausdrücklich freigegeben. |
 | Monitor | Kioskrolle ohne Bedienfunktion für FIDS- und Boardinganzeigen. |
 | Besucher | Keine interne Systemrolle. Zugriff auf eigene Status-Seite über nicht erratbaren QR-Code. |
@@ -246,14 +246,14 @@ Die fachliche Trennung dieser drei Ebenen ist verbindlich. Sie ermöglicht, mehr
 | Fluggruppe / Slot | Stabile, öffentlich kommunizierbare Passagierkohorte eines Produkts. Noch keine feste Maschine und keine feste Uhrzeit. |
 | Flug / Umlauf / Rotation | Konkreter operativer Vorgang mit Flugzeug, Pilot, Gate, Ereignissen und Ist-Zeiten. |
 
-| Verkauf Nachfrage | > | Queue Ressourcengruppe | > | Slot Fluggruppe | > | NEXT operativer Aufruf | > | Umlauf Flugzeug + Pilot | > | Abschluss Ist-Daten |
+| Verkauf Nachfrage | > | Queue Ressourcengruppe | > | automatisches GO TO GATE | > | Belegung Flugzeug + Pilot bestätigen | > | Boarding/Umlauf | > | Abschluss Ist-Daten |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 
 ## 3.3 Warteschlange und Dispositionsregeln
 
 Jede Ressourcengruppe besitzt eine operative Queue. Tickets bleiben ihrem Produkt zugeordnet, werden aber innerhalb der gemeinsamen Kapazität disponiert. In V1 gilt grundsätzlich First sold, first served über Produktgrenzen hinweg, ergänzt um Gruppenbindung, Passfähigkeit, Standby und bestätigte Sonderregeln.
-- Vor NEXT darf das System Fluggruppen automatisch bilden, Lücken schließen und noch ungebundene Gruppen einem anderen kompatiblen Flugzeug vorschlagen.
-- Ab NEXT werden keine Passagiere stillschweigend umgebucht; das System macht nur noch Vorschläge.
+- Vor der Belegungsbestätigung darf das System Fluggruppen automatisch bilden, Lücken schließen und noch ungebundene Gruppen einem anderen kompatiblen Flugzeug vorschlagen.
+- Ab der Belegungsbestätigung werden keine Passagiere stillschweigend umgebucht; das System macht nur noch Vorschläge.
 - Eine Fluggruppen-/Slotnummer bleibt als Kommunikationskennung stabil, auch wenn das konkrete Flugzeug wechselt.
 - Die konkrete Flugzeugzuordnung erfolgt so spät wie betrieblich sinnvoll.
 ## 3.4 Zentrale fachliche Invarianten
@@ -272,7 +272,7 @@ Jede Ressourcengruppe besitzt eine operative Queue. Tickets bleiben ihrem Produk
 Die operative Wahrheit entsteht aus Ereignissen. Helfer erfassen, was tatsächlich passiert ist; das System leitet daraus Zustände, Prognosen, Kapazität und Anzeigen ab. Historische Ereignisse werden nicht überschrieben. Fehleingaben werden durch Rücknahme- oder Korrekturereignisse nachvollziehbar berichtigt.
 | Primäraktion | Abgeleitete fachliche Ereignisse |
 | --- | --- |
-| NEXT | Fluggruppe aufgerufen; Boarding begonnen; Benachrichtigung ausgelöst; Prognose neu gerechnet. |
+| BELEGUNG BESTÄTIGEN & BOARDING STARTEN | Fluggruppe und konkretes Flugzeug gebunden; Boarding begonnen; Benachrichtigung ausgelöst; Prognose neu gerechnet. |
 | IM FLUG | Boarding abgeschlossen; Start/Abrollen erfasst; Besetzung fixiert. |
 | GELANDET | Landung/Zurückrollen erfasst; Flugzeit beendet; Deboarding begonnen. |
 | ABGESCHLOSSEN | Passagiere ausgestiegen; Umlauf beendet; Flugzeug verfügbar; Folgeprognose aktualisiert. |
@@ -330,7 +330,7 @@ Der Standardverkauf erfolgt auf einer einzigen Kassenansicht. Die Kasse wählt P
 
 | Schritt | Aktion des Personals | Automatische Reaktion |
 | --- | --- | --- |
-| 1 | NEXT an einer verfügbaren Maschine beziehungsweise auf dem vorgeschlagenen nächsten Umlauf. | Vorschlag wird übernommen; Aufruf, Boardingbeginn, Monitore und Benachrichtigung werden ausgelöst. |
+| 1 | Verfügbares Flugzeug öffnen, passende ganze Gruppen aus der Queue übernehmen und „Belegung bestätigen & Boarding starten“. | Flugzeug, Gruppen und Pilotencode werden verbindlich gebunden; Boarding, Monitore und Benachrichtigungen werden ausgelöst. |
 | Optional | Tickets scannen oder erschienene Gäste abhaken. | Anwesenheit wird dokumentiert; fehlende Gäste werden markiert. |
 | 2 | IM FLUG beim Abrollen beziehungsweise tatsächlichen Start des Umlaufs. | Besetzung wird fixiert; Boardingdauer endet; Flugzeit und Folgeprognose werden aktualisiert. |
 | 3 | GELANDET beim Zurückrollen beziehungsweise nach der Landung. | Flugzeit endet; Deboarding beginnt; ETA-Abweichung fließt sofort in Folgeprognosen ein. |
@@ -341,7 +341,7 @@ Der Standardverkauf erfolgt auf einer einzigen Kassenansicht. Die Kasse wählt P
 
 ## 5.4 No-Show, Nachbesetzung und Gruppenschutz
 
-Nach NEXT verändert das System die Besetzung nicht mehr selbstständig. Bei fehlenden Gästen schlägt es die vorderste passende Nachbesetzung vor. Das Personal entscheidet zwischen Nachbesetzen, Platz leer lassen, unvollständig fliegen oder die Gruppe gemeinsam zurückstellen. Gruppen werden niemals automatisch getrennt.
+Nach der Belegungsbestätigung verändert das System die Besetzung nicht mehr selbstständig. Bei fehlenden Gästen schlägt es die vorderste passende Nachbesetzung vor. Das Personal entscheidet zwischen Nachbesetzen, Platz leer lassen, unvollständig fliegen oder die Gruppe gemeinsam zurückstellen. Gruppen werden niemals automatisch getrennt.
 ## 5.5 Maschinenausfall, Pause, Tanken und Wetter
 
 Eine Störung wird als Status beziehungsweise Blockierung erfasst. Das System nimmt die betroffene Kapazität aus der Disposition, berechnet die Verfügbarkeit der verbleibenden Flugzeuge, ordnet noch nicht aufgerufene Fluggruppen neu zu und aktualisiert Kasse, Besucheranzeigen und Prognosen. Bereits aufgerufene Gruppen werden nur nach Bestätigung verändert.
@@ -362,10 +362,10 @@ Der Notfallmodus stoppt Verkauf und neue Aufrufe, neutralisiert öffentliche Anz
 Das System berechnet mindestens erwartetes Boarding, Start, Landung, Abschluss, nächste Flugzeugverfügbarkeit, verbleibende Wartezeit und Restkapazität. Eingangsgrößen sind Queue, Produkte, Ressourcengruppen, Flugzeuge, Piloten, Gates, aktive Blockierungen und sämtliche gemessenen Prozessereignisse.
 | Komponente | Beispielhafte Messgrenzen |
 | --- | --- |
-| Boardingdauer | NEXT bis IM FLUG |
+| Boardingdauer | Belegung/Boarding bestätigt bis IM FLUG |
 | Flugzeit | IM FLUG bis GELANDET |
 | Deboarding-/Bodenzeit | GELANDET bis ABGESCHLOSSEN |
-| Umlaufzeit | NEXT bis ABGESCHLOSSEN |
+| Umlaufzeit | Belegung/Boarding bestätigt bis ABGESCHLOSSEN |
 | Verfügbarkeit | Zeitpunkt ABGESCHLOSSEN zuzüglich aktiver Puffer oder Blockierungen |
 
 ## 6.2 Messwerte, Startwerte und Gewichtung
@@ -483,10 +483,10 @@ Die Besucheransicht beantwortet nur vier Fragen: Was habe ich gebucht? Wie ist m
 | F-EVT-010 | Alle fachlich relevanten Änderungen werden als Ereignisse mit Zeitstempel, Quelle, Gerät, Bezug und Nutzdaten erfasst. Der operative Zustand wird aus diesen Ereignissen abgeleitet. | MUSS | V1 |
 | F-EVT-020 | Ereignisse müssen idempotent verarbeitet werden. Doppel-Tipps, Wiederholungen nach Verbindungsstörungen oder parallele Eingaben dürfen keine doppelten Statuswechsel erzeugen. | MUSS | V1 |
 | F-EVT-030 | Fehleingaben werden nicht durch Überschreiben historischer Zeitstempel korrigiert, sondern durch ein nachvollziehbares Korrektur- oder Rücknahmeereignis. | MUSS | V1 |
-| F-EVT-040 | Das System darf aus einer Primäraktion mehrere fachliche Ereignisse ableiten, sofern diese Ableitung transparent und protokolliert ist, z. B. NEXT erzeugt Aufruf und Boardingbeginn. | MUSS | V1 |
+| F-EVT-040 | Das System darf aus einer Primäraktion mehrere fachliche Ereignisse ableiten, sofern diese Ableitung transparent und protokolliert ist, z. B. „Belegung bestätigen & Boarding starten“ erzeugt Flugzeugbindung, verbindlichen Aufruf und Boardingbeginn. | MUSS | V1 |
 | F-EVT-050 | Spätere automatische Quellen wie ADS-B dürfen Ereignisse vorschlagen oder plausibilisieren. Eine automatische Übernahme muss je Ereignistyp konfigurierbar sein. | SOLL | V3 |
-| F-BRD-010 | Der Standardumlauf ist mit vier Primäraktionen durchführbar: NEXT, IM FLUG, GELANDET und ABGESCHLOSSEN/VERFÜGBAR. Flugzeug und Pilot werden vorgeschlagen; zusätzliche Interaktionen entstehen nur bei Abweichungen oder Sonderfällen. | MUSS | V1 |
-| F-BRD-020 | NEXT übernimmt den aktuellen Vorschlag, setzt die Fluggruppe auf Bitte zur Flight Line/Boarding, startet die Boardingmessung und löst Monitore sowie Benachrichtigungen aus. | MUSS | V1 |
+| F-BRD-010 | Der Standardumlauf wird flugzeugzentriert durchgeführt: verfügbares Flugzeug öffnen, passende ganze Gruppen aus der geordneten Queue übernehmen, „Belegung bestätigen & Boarding starten“, IM FLUG, GELANDET und ABGESCHLOSSEN/VERFÜGBAR. Pilot und Belegung werden vorgeschlagen; zusätzliche Interaktionen entstehen nur bei Abweichungen oder Sonderfällen. | MUSS | V1 |
+| F-BRD-020 | „Belegung bestätigen & Boarding starten“ bindet die ausgewählten ganzen Gruppen, das konkrete verfügbare Flugzeug und den anonymen Pilotencode, startet die Boardingmessung und löst Monitore sowie Benachrichtigungen aus. Die technische Kommandobezeichnung darf aus Kompatibilitätsgründen `CALL_NEXT` bleiben, wird aber nicht als Bedienwort angezeigt. | MUSS | V1 |
 | F-BRD-025 | Check-in beziehungsweise Anwesenheit kann je Ticket per QR-Scan oder Antippen erfasst werden. Der Standardumlauf muss auch ohne Einzel-Scan vollständig bedienbar bleiben. | SOLL | V1 |
 | F-BRD-030 | Je Flugzeug ist ein aktueller Pilot hinterlegt und wird vorgeschlagen. Ein Pilotwechsel ist mit einer zusätzlichen Interaktion möglich und wird protokolliert. | MUSS | V1 |
 | F-BRD-040 | Ein Pilot darf zu keinem Zeitpunkt mehr als einen Umlauf in Boarding, Bereit oder Im Flug besitzen. Das System verhindert Konflikte technisch. | MUSS | V1 |
@@ -523,16 +523,16 @@ Die Besucheransicht beantwortet nur vier Fragen: Was habe ich gebucht? Wie ist m
 | ID | Anforderung | Priorität | Stufe |
 | --- | --- | --- | --- |
 | F-PRG-010 | Für alle relevanten Prozesspunkte unterscheidet das System Planzeit, Prognosezeit und Ist-Zeit. Diese Werte werden getrennt gespeichert und angezeigt. | MUSS | V1 |
-| F-PRG-020 | Nach jedem relevanten Ereignis werden erwartetes Boarding, Start, Landung, Abschluss, verbleibende Wartezeit und alle abhängigen Folgeflüge automatisch neu berechnet. | MUSS | V1 |
+| F-PRG-020 | Nach jedem relevanten Ereignis und während des aktiven Betriebs zusätzlich mindestens alle 30 Sekunden werden erwartetes Boarding, Start, Landung, Abschluss, verbleibende Wartezeit und alle abhängigen Folgeflüge automatisch neu berechnet. | MUSS | V1 |
 | F-PRG-030 | Die Prognose berücksichtigt mindestens Produktdauer, Flugzeugprofil, Boarding-, Flug-, Deboarding- und Pufferzeiten, aktuelle Flugzeugzustände, Pausen, Tanken, Unterbrechungen und Queue-Reihenfolge. | MUSS | V1 |
-| F-PRG-040 | Tatsächlich gemessene Ereignisdauern müssen stärker in die Prognose eingehen als statische Planwerte. Planwerte dienen als Start- und Rückfallwerte. | MUSS | V1 |
+| F-PRG-040 | Tatsächlich gemessene Ereignisdauern des aktuellen Veranstaltungstags müssen stärker in die Prognose eingehen als statische oder historische Planwerte. Frühere Vergleichswerte dienen nur als Kaltstart und werden durch bestätigte Tageswerte verdrängt. | MUSS | V1 |
 | F-PRG-050 | Bei wenigen oder fehlenden Tagesmesswerten verwendet das System einen nachvollziehbaren Kaltstart aus Stammdaten und historischen Parametern, ohne die Prognose als hochsicher darzustellen. | MUSS | V1 |
-| F-PRG-060 | Ausreißer, abgebrochene Flüge, aktive Unterbrechungen und fehlerhaft korrigierte Ereignisse dürfen Durchschnittswerte nicht unkontrolliert verzerren. Die Behandlung muss im Pflichtenheft nachvollziehbar beschrieben werden. | SOLL | V1 |
+| F-PRG-060 | Ausreißer, abgebrochene Flüge, fehlerhaft korrigierte Ereignisse sowie durch Wetter, Flugshow, Notfall oder andere Unterbrechungen außergewöhnlich verlängerte Umläufe dürfen die Normalprognose nicht unkontrolliert verzerren. Die aktuelle Verzögerung wirkt sofort auf offene Prognosen; überlappende Umläufe werden jedoch nicht als normale Lerndauer übernommen. Die Behandlung muss nachvollziehbar dokumentiert sein. | SOLL | V1 |
 | F-PRG-070 | Interne Rollen sehen konkrete Prognosezeitpunkte für Boarding, Start, Landung und Abschluss sowie die zugrunde liegende Unsicherheit. | MUSS | V1 |
 | F-PRG-080 | Gegenüber Gästen werden Countdown oder Zeitfenster kommuniziert. Eine einzelne exakte Uhrzeit darf nicht als feste Zusage erscheinen; ein ungefähres Uhrzeitfenster ist zulässig. | MUSS | V1 |
 | F-PRG-090 | Jede Prognose besitzt eine Qualitäts- oder Unsicherheitsangabe, z. B. hoch/mittel/gering oder ein Zeitintervall. Weit entfernte Fluggruppen erhalten breitere Intervalle. | SOLL | V1 |
 | F-PRG-100 | Das System erkennt Verspätungen und ungeplante Verlängerungen anhand ausbleibender Ereignisse und gemessener Abweichungen und aktualisiert den Folgeplan ohne manuelle Zeitkorrektur. | MUSS | V1 |
-| F-PRG-110 | Bei mehreren Flugzeugen einer Ressourcengruppe darf das System noch nicht festgelegte Fluggruppen auf ein früher verfügbares kompatibles Flugzeug umplanen. Ab NEXT sind Änderungen bestätigungspflichtig. | MUSS | V1 |
+| F-PRG-110 | Bei mehreren Flugzeugen einer Ressourcengruppe darf das System noch nicht festgelegte Fluggruppen auf ein früher verfügbares kompatibles Flugzeug umplanen. Ab der bestätigten Belegung sind Änderungen bestätigungspflichtig. | MUSS | V1 |
 | F-PRG-120 | Prognose-Snapshots werden zu definierten Zeitpunkten gespeichert, damit Prognosegüte und Entwicklung nach dem Event ausgewertet werden können. | SOLL | V1 |
 | F-PRG-130 | Operative Eingriffe erfolgen grundsätzlich über reale Zustände und Ereignisse wie Pause, Tanken, Blockierung oder Wetterunterbrechung. Das direkte Überschreiben einzelner Folgezeiten ist im Regelbetrieb nicht vorgesehen. | MUSS | V1 |
 | F-KAP-010 | Das System berechnet laufend die realistisch verbleibende Kapazität je Produkt und Ressourcengruppe aus aktiven Flugzeugen, Prognosedauern, verbleibender Betriebszeit, offenen Tickets und Blockierungen. | MUSS | V1 |
@@ -574,7 +574,7 @@ Die Besucheransicht beantwortet nur vier Fragen: Was habe ich gebucht? Wie ist m
 | --- | --- | --- | --- |
 | F-BEN-010 | Jedes Ticket verlinkt per QR-Code auf eine öffentliche Status-Seite ohne Anmeldung. Sie zeigt Produkt, Fluggruppe, öffentlichen Status, verbleibende Wartezeit beziehungsweise Zeitfenster, Position, Gate, Hinweise und Zeitpunkt der letzten Aktualisierung. | MUSS | V1 |
 | F-BEN-020 | Gäste können Web-Push-Benachrichtigungen je Ticket aktivieren, ohne App-Installation und ohne Telefonnummer. | MUSS | V1 |
-| F-BEN-030 | Das System löst aus Prognose, Queue-Position, Prognosequalität und maximal akzeptierter Gate-Wartezeit automatisch den Voraufruf „Bitte zum Gate“ beziehungsweise GO TO GATE aus. Schwellen und Vorlauf sind konfigurierbar. NEXT bleibt davon getrennt, bindet erst nach menschlicher Bestätigung das Flugzeug und startet Boarding sowie den verbindlichen Aufruf. | MUSS | V1 |
+| F-BEN-030 | Das System prüft während des aktiven Betriebs regelmäßig und nach relevanten Ereignissen Prognose, reale Flugzeugverfügbarkeit, Queue-Position und Anwesenheitslage und löst daraus automatisch „Bitte zum Gate“ beziehungsweise GO TO GATE aus. Der Zielvorlauf wird aus bestätigten Tageswerten adaptiv nachgeregelt; Gate-Wartezeit und Prognosequalität sind weiche Optimierungsgrößen und keine harten Auslösesperren. Die konkrete Flugzeugbelegung und der Boardingstart bleiben davon getrennt und werden erst menschlich bestätigt. | MUSS | V1 |
 | F-BEN-040 | Benachrichtigungen können alternativ an der Kasse für die Ticketnummer aktiviert werden. | MUSS | V1 |
 | F-BEN-050 | SMS als zusätzlicher Kanal über einen externen Versanddienst mit Warteschlange, Wiederholung und sichtbarem Versandstatus. | SOLL | V2 |
 | F-BEN-060 | Falls Telefon- oder Messenger-Kanäle in einer späteren Stufe ergänzt werden, erfordert jede Registrierung eine dokumentierte Einwilligung mit Zeitpunkt und Kanal. V1 erfasst keine Telefonnummern. | MUSS | V2 |
@@ -599,7 +599,7 @@ Die Besucheransicht beantwortet nur vier Fragen: Was habe ich gebucht? Wie ist m
 
 | ID | Anforderung | Priorität | Stufe |
 | --- | --- | --- | --- |
-| F-ADM-010 | Pflege der Veranstaltungsparameter einschließlich Verkaufszeiten, Betriebsende, Fristen, Ampelschwellen, Referenzgewichte, Benachrichtigungsvorlauf sowie Planwerte und Prognoseparameter. | MUSS | V1 |
+| F-ADM-010 | Pflege der erforderlichen Veranstaltungsparameter einschließlich Verkaufszeiten, Betriebsende, Fristen, Ampelschwellen, Referenzgewichte, Benachrichtigungsvorlauf und fachlicher Planwerte. Technische Einzelschwellen für den adaptiven Voraufruf werden nicht regulär administriert; sichtbar bleiben nur dessen Aktivierung und verständliche Betriebsinformationen. | MUSS | V1 |
 | F-ADM-020 | Stammdaten für Produkte, Ressourcengruppen, Flugzeuge, anonyme Pilotencodes und Gates sind auch während des Betriebs änderbar; Zuordnungen werden direkt an der Ressourcengruppe gepflegt. Änderungen werden protokolliert und wirken kontrolliert auf den Livezustand. | MUSS | V1 |
 | F-ADM-030 | Anonyme Helferkonten besitzen einen systematisch erzeugten, rollenkennzeichnenden Anmeldecode, eine unveränderliche technische ID und mindestens eine serverseitig gespeicherte Rolle. Konten enthalten keine Namen, E-Mail-Adressen oder sonstige Personendaten. | MUSS | V1 |
 | F-ADM-040 | Geräteübersicht mit Rolle, Online-Status, letztem Kontakt und, soweit verfügbar, Akkustand. | SOLL | V1 |
@@ -789,7 +789,7 @@ Die Abnahme umfasst einen simulierten Veranstaltungstag mit mindestens drei Flug
 | Planzeit | Aus Stammdaten abgeleiteter Referenzwert. |
 | Prognosezeit | Aktuell erwarteter Zeitpunkt aus Livezustand und Messdaten. |
 | Ist-Zeit | Tatsächlich erfasster Zeitpunkt eines Ereignisses. |
-| NEXT | Übernahme des aktuellen Vorschlags und Aufruf einer Fluggruppe; startet Boarding. |
+| Belegung bestätigen & Boarding starten | Menschliche Bestätigung ganzer Gruppen, des konkreten Flugzeugs und des anonymen Pilotencodes; startet Boarding. Intern darf das Kommando weiterhin `CALL_NEXT` heißen. |
 | Standby | Freiwillige Bereitschaft, bei passender freier Kapazität früher aufgerufen zu werden. |
 | No-Show | Aufgerufener Gast erscheint nicht innerhalb der Frist. Nachbesetzung erfolgt nur nach Personalentscheidung. |
 | Flight Line / Boarding | Operativer Bereich für Aufruf, Anwesenheit, Einstieg, Start-, Lande- und Abschlussereignisse. |
@@ -806,7 +806,7 @@ Die Abnahme umfasst einen simulierten Veranstaltungstag mit mindestens drei Flug
 | Queue | Je Kategorie. | Je Ressourcengruppe. | Queue je Ressourcengruppe; Produktkennungen bleiben sichtbar. |
 | Slot | Feste sichtbare Slotgruppe, weich behandelbar. | Dynamischer Flug ohne starre Zeit. | Slot als stabile Kommunikationskohorte; Maschine und Zeit dynamisch. |
 | Zeitangaben | Nur Zeitspannen, keine Uhrzeiten. | Plan-, Prognose- und Ist-Zeit mit erwarteten Boarding-/Startzeiten. | Intern konkrete Prognose; extern Fenster/Countdown. |
-| Flight-Line-Ereignisse | NEXT, Bestätigen, IM FLUG, GELANDET. | Check-in, Boarding, Start, Landung, Check-out. | Vier Primäraktionen: NEXT, IM FLUG, GELANDET, ABGESCHLOSSEN; Check-in optional. |
+| Flight-Line-Ereignisse | NEXT, Bestätigen, IM FLUG, GELANDET. | Check-in, Boarding, Start, Landung, Check-out. | Flugzeugzentrierte Belegungs-/Boardingbestätigung, IM FLUG, GELANDET, ABGESCHLOSSEN; Check-in optional. |
 | Mehrflugzeugbetrieb | Mehrere Maschinen in einer Kategorie, überwiegend sitzplatzhomogen. | Ressourcengruppe mit dynamischer Verteilung. | Mehrere Maschinen je Gruppe als V1-Kern; konkrete Kapazität entscheidet. |
 | Gewichtsdaten | Gewichtsklassen verpflichtend in V1. | Gewicht/Schwerpunkt als spätere Erweiterung. | Gewichtsklassen konfigurierbar; neutrale Schätzung, Schwerpunkt getrennt später. |
 | Ticket | Vorgedruckte QR-Tickets V1, Bondrucker V2. | Ticketdruck mit QR-Code. | V1 unterstützt vorgedruckt und druckbar/digital; Hardwareintegration V2. |

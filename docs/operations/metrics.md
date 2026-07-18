@@ -5,11 +5,11 @@ gehen nicht als Nullwert in einen Durchschnitt ein.
 
 | Kennzahl | Start | Ende |
 | --- | --- | --- |
-| Wartezeit | Verkauf der Ticketgruppe | `NEXT` / Aufruf |
-| Boardingdauer | `NEXT` / Aufruf | `IM FLUG` |
+| Wartezeit | Verkauf der Ticketgruppe | bestätigter Boarding-Aufruf (`CALL_NEXT`) |
+| Boardingdauer | bestätigter Boarding-Aufruf (`CALL_NEXT`) | `IM FLUG` |
 | Flugzeit | `IM FLUG` | `GELANDET` |
 | Bodenzeit | `GELANDET` | `ABGESCHLOSSEN/VERFÜGBAR` |
-| Umlaufzeit | `NEXT` / Aufruf | `ABGESCHLOSSEN/VERFÜGBAR` |
+| Umlaufzeit | bestätigter Boarding-Aufruf (`CALL_NEXT`) | `ABGESCHLOSSEN/VERFÜGBAR` |
 
 Der Produktpreis ist reine Produktinformation. Umsatz, Zahlart und Bezahlstatus sind keine
 Betriebskennzahlen des Rundflug-Leitstands. „Geräte online“ bedeutet einen bestätigten Kontakt

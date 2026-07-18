@@ -421,10 +421,7 @@ export function FlightLineAssist({
               <div className="assist-actions">
                 {action ? (
                   <button disabled={action.disabled} onClick={action.run} type="button">
-                    <AssistCommandContent
-                      icon="available"
-                      label={action.label === "NEXT" ? "Go to Gate bestätigen" : action.label}
-                    />
+                    <AssistCommandContent icon="available" label={action.label} />
                   </button>
                 ) : null}
                 <button onClick={onAvailable} type="button">
