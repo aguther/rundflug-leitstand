@@ -1,6 +1,6 @@
-/* biome-ignore-all lint/style/noDescendingSpecificity: this late V1.5 layer deliberately overrides legacy Assist CSS. */
-/* V1.5 Flight Line Assist layout. Controls and visual states come from the shared design system. */
+/* V1.5 Flight Line Assist. All selectors are rooted to keep legacy Assist CSS out. */
 .assist-shell {
+  min-width: 0;
   min-height: 100dvh;
   background: var(--ui-bg);
 }
@@ -10,16 +10,20 @@
   max-width: none;
 }
 
-.flight-assist-v15 {
+.flight-assist.flight-assist-v15 {
+  display: block;
   width: min(1480px, 100%);
-  min-height: auto;
+  max-width: 100%;
+  min-width: 0;
+  min-height: 0;
   margin: 0 auto;
   padding: var(--space-3);
+  overflow: visible;
   color: var(--ui-text);
   background: var(--ui-bg);
 }
 
-.assist-v15-message {
+.flight-assist-v15 .assist-v15-message {
   margin: 0 0 var(--space-3);
   padding: 8px 12px;
   border: 1px solid var(--ui-border);
@@ -28,26 +32,31 @@
   background: var(--ui-surface-raised);
 }
 
-.assist-v15-workspace {
+.flight-assist-v15 .assist-v15-workspace {
+  min-width: 0;
   display: grid;
-  grid-template-columns: minmax(300px, 0.34fr) minmax(620px, 1fr);
+  grid-template-columns: minmax(320px, 380px) minmax(0, 1fr);
   gap: var(--space-3);
   align-items: start;
 }
 
-.assist-v15-picker,
-.assist-v15-aircraft-panel,
-.assist-v15-groups {
+.flight-assist-v15 :is(.assist-v15-picker, .assist-v15-aircraft-panel, .assist-v15-groups) {
+  min-width: 0;
   padding: var(--space-3);
   border-radius: var(--radius-md);
   box-shadow: none;
 }
 
 .flight-assist-v15 .ds-page-header {
+  min-width: 0;
   min-height: 48px;
   margin-bottom: var(--space-3);
   padding: 0 0 var(--space-3);
   border-bottom: 1px solid var(--ui-border);
+}
+
+.flight-assist-v15 .ds-page-header > div:first-child {
+  min-width: 0;
 }
 
 .flight-assist-v15 .ds-page-header h2 {
@@ -60,29 +69,34 @@
   font-size: 0.78rem;
 }
 
-.assist-v15-aircraft-list {
+.flight-assist-v15 .assist-v15-aircraft-list {
+  min-width: 0;
   display: grid;
   gap: 8px;
 }
 
-.assist-v15-aircraft-list article {
+.flight-assist-v15 .assist-v15-aircraft-list article {
+  box-sizing: border-box;
   min-width: 0;
+  height: 150px;
+  min-height: 150px;
   display: grid;
-  grid-template-columns: 36px minmax(0, 1fr) auto;
-  grid-template-rows: auto auto;
-  gap: 4px 10px;
-  align-items: center;
+  grid-template-columns: 36px minmax(0, 1fr);
+  grid-template-rows: auto minmax(var(--control-compact), 1fr);
+  gap: 8px 10px;
+  align-items: start;
   padding: 10px;
   border: 1px solid var(--ui-border);
   border-radius: var(--radius-md);
   background: var(--ui-surface-raised);
 }
 
-.assist-v15-aircraft-list article.is-claimed {
+.flight-assist-v15 .assist-v15-aircraft-list article.is-claimed {
   border-color: var(--ui-accent);
+  background: var(--ui-accent-soft);
 }
 
-.assist-v15-plane-icon {
+.flight-assist-v15 .assist-v15-plane-icon {
   width: 36px;
   height: 36px;
   display: inline-grid;
@@ -94,90 +108,89 @@
   background: var(--ui-accent-soft);
 }
 
-.assist-v15-plane-icon svg {
+.flight-assist-v15 .assist-v15-plane-icon svg {
   width: 19px;
   height: 19px;
 }
 
-.assist-v15-aircraft-copy {
+.flight-assist-v15 .assist-v15-aircraft-copy {
   min-width: 0;
   display: grid;
   gap: 5px;
 }
 
-.assist-v15-aircraft-copy > div,
-.assist-v15-active-heading > div > div {
-  display: flex;
-  align-items: center;
+.flight-assist-v15 .assist-v15-aircraft-title {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(max-content, 1fr) auto;
   gap: 8px;
+  align-items: center;
 }
 
-.assist-v15-aircraft-copy strong {
+.flight-assist-v15 .assist-v15-aircraft-title strong {
+  min-width: max-content;
   font-size: 1rem;
   letter-spacing: 0.035em;
-}
-
-.assist-v15-aircraft-meta {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  overflow: hidden;
-  color: var(--ui-muted);
-  font-size: 0.72rem;
   white-space: nowrap;
 }
 
-.assist-v15-gate {
+.flight-assist-v15 .assist-v15-picker-meta {
+  min-width: 0;
+  display: grid;
+  justify-items: start;
+  gap: 3px;
+  color: var(--ui-muted);
+  font-size: 0.72rem;
+}
+
+.flight-assist-v15 .assist-v15-operational-state {
+  width: max-content;
+}
+
+.flight-assist-v15 .assist-v15-aircraft-meta {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px 6px;
+  color: var(--ui-muted);
+  font-size: 0.72rem;
+}
+
+.flight-assist-v15 .assist-v15-gate {
   min-width: 0;
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 
-.assist-v15-gate svg {
+.flight-assist-v15 .assist-v15-gate svg {
   width: 13px;
   height: 13px;
   flex: 0 0 auto;
 }
 
-.assist-v15-free {
-  grid-column: 3;
-  grid-row: 1;
-  align-self: start;
-  color: var(--ui-muted);
-  font-size: 0.73rem;
-  white-space: nowrap;
-}
-
-.assist-v15-free i {
-  width: 8px;
-  height: 8px;
-  display: inline-block;
-  margin-right: 4px;
-  border-radius: 50%;
-  background: var(--ui-success);
-}
-
-.assist-v15-aircraft-list article > .ds-button {
-  grid-column: 3;
+.flight-assist-v15 .assist-v15-claim {
+  grid-column: 2;
   grid-row: 2;
+  align-self: end;
+  justify-self: end;
 }
 
-.assist-v15-more {
+.flight-assist-v15 .assist-v15-more {
   width: 100%;
   margin-top: 8px;
 }
 
-.assist-v15-active-column {
+.flight-assist-v15 .assist-v15-active-column {
   min-width: 0;
   display: grid;
   gap: var(--space-3);
 }
 
-.assist-v15-active-heading {
+.flight-assist-v15 .assist-v15-active-heading {
+  min-width: 0;
   display: grid;
   grid-template-columns: 44px minmax(0, 1fr) auto;
   gap: 12px;
@@ -186,86 +199,137 @@
   border-bottom: 1px solid var(--ui-border);
 }
 
-.assist-v15-active-heading > .assist-v15-plane-icon {
+.flight-assist-v15 .assist-v15-active-heading > .assist-v15-plane-icon {
   width: 44px;
   height: 44px;
 }
 
-.assist-v15-active-heading > div {
+.flight-assist-v15 .assist-v15-active-heading > div {
   min-width: 0;
   display: grid;
   gap: 4px;
 }
 
-.assist-v15-active-heading > div > strong {
+.flight-assist-v15 .assist-v15-active-title {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+
+.flight-assist-v15 .assist-v15-active-title strong {
+  min-width: max-content;
   font-size: 1.35rem;
   letter-spacing: 0.04em;
+  white-space: nowrap;
 }
 
-.assist-v15-active-heading > div > .ds-status-pill {
-  position: absolute;
-  margin-left: 112px;
-  margin-top: 3px;
-}
-
-.assist-v15-state-flow {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 0;
-  padding-top: var(--space-3);
-}
-
-.assist-v15-state-segment,
-.assist-v15-lifecycle-segment {
+.flight-assist-v15 .assist-v15-state-flow {
   min-width: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 18px;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  margin: 0;
+  padding-top: var(--space-3);
+  padding-left: 0;
+  list-style: none;
+}
+
+.flight-assist-v15 .assist-v15-state-segment {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 16px;
   align-items: center;
 }
 
-.assist-v15-state-segment:last-child,
-.assist-v15-lifecycle-segment:last-child {
+.flight-assist-v15 .assist-v15-state-segment:last-child {
   grid-template-columns: minmax(0, 1fr);
 }
 
-.assist-v15-state-segment > svg,
-.assist-v15-lifecycle-segment > svg {
-  width: 16px;
-  height: 16px;
+.flight-assist-v15 .assist-v15-state-segment > svg {
+  width: 14px;
+  height: 14px;
   color: var(--ui-muted);
 }
 
-.assist-v15-state-step {
-  min-height: 74px;
+.flight-assist-v15 .assist-v15-state-step {
+  min-height: 62px;
   display: grid;
   place-items: center;
   align-content: center;
-  gap: 5px;
-  padding: 8px 4px;
+  gap: 4px;
+  padding: 6px 3px;
   border: 1px dashed var(--ui-border-strong);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   color: var(--ui-muted);
-  font-size: 0.75rem;
+  font-size: 0.68rem;
   text-align: center;
 }
 
-.assist-v15-state-step svg {
-  width: 24px;
-  height: 24px;
+.flight-assist-v15 .assist-v15-state-step svg {
+  width: 21px;
+  height: 21px;
 }
 
-.assist-v15-state-step.is-active {
+.flight-assist-v15 .assist-v15-state-step.is-active {
   border-style: solid;
   border-color: var(--ui-accent);
   color: var(--ui-accent);
   background: var(--ui-accent-soft);
 }
 
-.assist-v15-groups .ds-page-header {
+.flight-assist-v15 .assist-v15-lifecycle {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  padding-top: var(--space-3);
+}
+
+.flight-assist-v15 .assist-v15-lifecycle-segment {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 18px;
   align-items: center;
 }
 
-.assist-v15-capacity {
+.flight-assist-v15 .assist-v15-lifecycle-segment:last-child {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.flight-assist-v15 .assist-v15-lifecycle-segment span {
+  min-height: 34px;
+  display: grid;
+  place-items: center;
+  padding: 0 5px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-sm);
+  color: var(--ui-muted);
+  font-size: 0.72rem;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.flight-assist-v15 .assist-v15-lifecycle-segment span.is-active {
+  border-color: var(--ui-accent);
+  color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+}
+
+.flight-assist-v15 .assist-v15-lifecycle-segment > svg {
+  width: 16px;
+  height: 16px;
+  color: var(--ui-muted);
+}
+
+.flight-assist-v15 .assist-v15-groups .ds-page-header {
+  align-items: center;
+}
+
+.flight-assist-v15 .assist-v15-title-phone {
+  display: none;
+}
+
+.flight-assist-v15 .assist-v15-capacity {
   min-height: var(--control-default);
   display: inline-flex;
   align-items: center;
@@ -279,16 +343,16 @@
   white-space: nowrap;
 }
 
-.assist-v15-capacity svg {
+.flight-assist-v15 .assist-v15-capacity svg {
   width: 17px;
   height: 17px;
 }
 
-.assist-v15-group-section + .assist-v15-group-section {
+.flight-assist-v15 .assist-v15-group-section + .assist-v15-group-section {
   margin-top: 12px;
 }
 
-.assist-v15-group-section h3 {
+.flight-assist-v15 .assist-v15-group-section h3 {
   margin: 0 0 5px;
   color: var(--ui-muted);
   font-size: 0.68rem;
@@ -297,32 +361,31 @@
   text-transform: uppercase;
 }
 
-.assist-v15-group-list {
-  overflow: visible;
+.flight-assist-v15 .assist-v15-group-list {
+  min-width: 0;
   border: 1px solid var(--ui-border);
   border-radius: var(--radius-md);
 }
 
-.assist-v15-group-row {
-  position: relative;
-  min-height: 46px;
+.flight-assist-v15 .assist-v15-group-row {
+  min-width: 0;
   display: grid;
-  grid-template-columns: minmax(215px, 1fr) 86px auto;
+  grid-template-columns: minmax(180px, 1fr) 90px 406px;
   gap: 8px;
   align-items: center;
   padding: 5px 8px;
   background: var(--ui-surface-raised);
 }
 
-.assist-v15-group-row + .assist-v15-group-row {
+.flight-assist-v15 .assist-v15-group-row + .assist-v15-group-row {
   border-top: 1px solid var(--ui-border);
 }
 
-.assist-v15-group-row.is-selected {
+.flight-assist-v15 .assist-v15-group-row.is-selected {
   background: var(--ui-accent-soft);
 }
 
-.assist-v15-group-select {
+.flight-assist-v15 .assist-v15-group-select {
   min-width: 0;
   display: grid;
   grid-template-columns: 22px 18px minmax(54px, 1fr) auto;
@@ -330,52 +393,52 @@
   align-items: center;
 }
 
-.assist-v15-group-select input {
+.flight-assist-v15 .assist-v15-group-select input {
   width: 20px;
   height: 20px;
   margin: 0;
   accent-color: var(--ui-accent);
 }
 
-.assist-v15-group-select > svg {
+.flight-assist-v15 .assist-v15-group-select > svg {
   width: 18px;
   height: 18px;
   color: var(--ui-muted);
 }
 
-.assist-v15-group-select strong {
+.flight-assist-v15 .assist-v15-group-select strong {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.assist-v15-presence {
+.flight-assist-v15 .assist-v15-presence {
   color: var(--ui-muted);
   font-size: 0.72rem;
   text-align: right;
+  white-space: nowrap;
 }
 
-.assist-v15-group-actions {
-  display: flex;
-  justify-content: flex-end;
+.flight-assist-v15 .assist-v15-group-actions {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 92px 92px 100px 110px;
   gap: 3px;
 }
 
-.assist-v15-group-actions .ds-button {
+.flight-assist-v15 .assist-v15-group-actions .ds-button {
+  width: 100%;
   padding-inline: 7px;
   font-size: 0.7rem;
   font-weight: 600;
+  white-space: nowrap;
 }
 
-.assist-v15-group-menu,
-.assist-v15-lifecycle,
-.flight-assist-v15 .assist-v15-release-phone,
-.flight-assist-v15 .assist-v15-phone-back {
+.flight-assist-v15 :is(.assist-v15-group-menu, .assist-v15-group-popover) {
   display: none;
 }
 
-.assist-v15-no-groups,
-.assist-v15-empty {
+.flight-assist-v15 :is(.assist-v15-no-groups, .assist-v15-empty) {
   margin: 0;
   padding: 14px;
   color: var(--ui-muted);
@@ -383,13 +446,13 @@
   text-align: center;
 }
 
-.assist-v15-empty svg {
+.flight-assist-v15 .assist-v15-empty svg {
   width: 28px;
   height: 28px;
   margin-bottom: 6px;
 }
 
-.assist-v15-command-bar {
+.flight-assist-v15 .assist-v15-command-bar {
   display: grid;
   gap: 8px;
   margin-top: 12px;
@@ -397,12 +460,34 @@
   border-top: 1px solid var(--ui-border);
 }
 
-.assist-v15-command-bar > .ds-button--primary {
+.flight-assist-v15 .assist-v15-command-bar > .ds-button--primary {
   width: 100%;
 }
 
-.assist-v15-follow-up {
+.flight-assist-v15 .assist-v15-turnaround {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px;
+  margin: 0;
+  padding: 8px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-md);
+}
+
+.flight-assist-v15 .assist-v15-turnaround legend {
+  padding: 0 5px;
+  color: var(--ui-muted);
+  font-size: 0.72rem;
+}
+
+.flight-assist-v15 .assist-v15-turnaround .ds-button {
+  min-width: 0;
+}
+
+.flight-assist-v15 .assist-v15-follow-up {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: center;
   gap: 4px;
@@ -410,197 +495,169 @@
   font-size: 0.72rem;
 }
 
-.assist-v15-follow-up .ds-button {
+.flight-assist-v15 .assist-v15-follow-up .ds-button {
   color: var(--ui-muted);
 }
 
-@media (max-width: 1180px) {
-  .assist-v15-workspace {
-    grid-template-columns: minmax(280px, 0.36fr) minmax(0, 1fr);
+.flight-assist-v15 .assist-v15-release-phone {
+  display: none;
+}
+
+@media (max-width: 1280px) {
+  .flight-assist-v15 .assist-v15-workspace {
+    grid-template-columns: minmax(0, 1fr);
   }
 
-  .assist-v15-group-row {
-    grid-template-columns: minmax(190px, 1fr) 75px auto;
-  }
-
-  .assist-v15-group-actions .ds-button {
-    width: var(--control-compact);
-    padding: 0;
-    font-size: 0;
-  }
-
-  .assist-v15-group-actions .ds-button svg {
-    width: 15px;
-    height: 15px;
+  .flight-assist-v15 .assist-v15-aircraft-list {
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   }
 }
 
-@media (max-width: 720px) {
+@media (max-width: 760px) {
   .assist-shell > .operational-notice {
     font-size: 0.72rem;
   }
 
-  .flight-assist-v15 {
-    width: 100vw;
-    max-width: 100vw;
+  .flight-assist.flight-assist-v15 {
+    width: 100%;
+    max-width: 100%;
     padding: 12px;
     overflow-x: clip;
   }
 
-  .flight-assist-v15 .assist-v15-phone-back {
-    display: inline-flex;
-    margin-bottom: 8px;
-    padding-inline: 0;
-    color: var(--ui-accent);
-  }
-
-  .assist-v15-workspace {
-    display: block;
-  }
-
-  .flight-assist-v15.has-claim .assist-v15-picker {
-    display: none;
-  }
-
-  .assist-v15-picker {
-    margin-bottom: 12px;
-  }
-
-  .assist-v15-aircraft-list article {
-    grid-template-columns: 38px minmax(0, 1fr) auto;
-  }
-
-  .assist-v15-active-column {
-    width: calc(100vw - 24px);
-    max-width: calc(100vw - 24px);
-    gap: 12px;
-  }
-
-  .assist-v15-aircraft-panel,
-  .assist-v15-groups {
+  .flight-assist-v15 :is(.assist-v15-picker, .assist-v15-aircraft-panel, .assist-v15-groups) {
     padding: 14px;
   }
 
-  .assist-v15-active-heading {
+  .flight-assist-v15 .assist-v15-aircraft-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .flight-assist-v15 .assist-v15-active-heading {
     grid-template-columns: 44px minmax(0, 1fr);
   }
 
-  .assist-v15-active-heading > .ds-button {
+  .flight-assist-v15 .assist-v15-active-heading > .ds-button {
     display: none;
   }
 
-  .assist-v15-active-heading > div > strong {
-    font-size: 1.5rem;
+  .flight-assist-v15 .assist-v15-active-title strong {
+    font-size: 1.25rem;
   }
 
-  .assist-v15-active-heading > div > .ds-status-pill {
-    position: static;
-    width: max-content;
-    margin: 0;
-  }
-
-  .assist-v15-state-flow {
-    width: 100%;
-    min-width: 0;
-    overflow: hidden;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-  }
-
-  .assist-v15-state-segment {
+  .flight-assist-v15 .assist-v15-lifecycle-segment {
     grid-template-columns: minmax(0, 1fr) 12px;
   }
 
-  .assist-v15-state-step {
-    min-height: 88px;
-    padding-inline: 2px;
-    font-size: 0.65rem;
-  }
-
-  .assist-v15-state-segment > svg {
+  .flight-assist-v15 .assist-v15-lifecycle-segment > svg {
     width: 12px;
   }
 
-  .assist-v15-groups .ds-page-header {
+  .flight-assist-v15 .assist-v15-lifecycle-segment span {
+    padding-inline: 2px;
+    font-size: 0.64rem;
+  }
+
+  .flight-assist-v15 .assist-v15-state-flow {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .flight-assist-v15 .assist-v15-state-deboarding {
+    display: none;
+  }
+
+  .flight-assist-v15 .assist-v15-state-segment {
+    grid-template-columns: minmax(0, 1fr) 10px;
+  }
+
+  .flight-assist-v15 .assist-v15-state-segment > svg {
+    width: 10px;
+  }
+
+  .flight-assist-v15 .assist-v15-state-step {
+    min-height: 70px;
+    font-size: 0.61rem;
+  }
+
+  .flight-assist-v15 .assist-v15-groups .ds-page-header {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: start;
   }
 
-  .assist-v15-groups .ds-page-header > div:first-child {
-    min-width: 0;
+  .flight-assist-v15 .assist-v15-groups .ds-page-header h2 {
+    font-size: 1.12rem;
   }
 
-  .assist-v15-groups .ds-page-header h2 {
-    font-size: 1.25rem;
+  .flight-assist-v15 .assist-v15-title-wide {
+    display: none;
   }
 
-  .assist-v15-groups .ds-page-header-actions {
-    align-self: start;
+  .flight-assist-v15 .assist-v15-title-phone {
+    display: inline;
   }
 
-  .assist-v15-capacity {
+  .flight-assist-v15 .assist-v15-capacity {
     min-height: var(--control-touch);
     padding-inline: 9px;
     font-size: 0.74rem;
   }
 
-  .assist-v15-group-row {
-    min-height: 64px;
+  .flight-assist-v15 .assist-v15-group-row {
     grid-template-columns: minmax(0, 1fr) auto;
     gap: 8px;
     padding: 8px;
   }
 
-  .assist-v15-group-select {
-    grid-template-columns: 32px 24px minmax(52px, 1fr) auto;
+  .flight-assist-v15 .assist-v15-group-select {
+    grid-template-columns: 32px 22px minmax(48px, 1fr) auto;
+    gap: 6px;
   }
 
-  .assist-v15-group-select input {
+  .flight-assist-v15 .assist-v15-group-select input {
     width: 28px;
     height: 28px;
   }
 
-  .assist-v15-group-select > svg {
-    width: 22px;
-    height: 22px;
+  .flight-assist-v15 .assist-v15-group-select > svg {
+    width: 21px;
+    height: 21px;
   }
 
-  .assist-v15-group-select strong {
-    font-size: 1rem;
-  }
-
-  .assist-v15-presence,
-  .assist-v15-group-actions {
+  .flight-assist-v15 :is(.assist-v15-presence, .assist-v15-group-actions) {
     display: none;
   }
 
-  .assist-v15-group-menu {
-    position: relative;
+  .flight-assist-v15 .assist-v15-group-menu {
     display: block;
   }
 
-  .assist-v15-group-popover {
-    position: absolute;
-    z-index: 20;
-    top: calc(100% + 4px);
-    right: 0;
-    width: 190px;
+  .flight-assist-v15 .assist-v15-group-popover {
+    grid-column: 1 / -1;
     display: grid;
-    padding: 4px;
-    border: 1px solid var(--ui-border-strong);
-    border-radius: var(--radius-md);
-    background: var(--ui-surface-raised);
-    box-shadow: var(--shadow-lg);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px;
+    padding-top: 8px;
+    border-top: 1px solid var(--ui-border);
   }
 
-  .assist-v15-group-popover .ds-button {
+  .flight-assist-v15 .assist-v15-group-popover .ds-button {
     width: 100%;
+    min-width: 0;
     justify-content: flex-start;
-    border: 0;
   }
 
-  .assist-v15-follow-up {
+  .flight-assist-v15 .assist-v15-turnaround {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .flight-assist-v15 .assist-v15-follow-up {
     display: none;
+  }
+
+  .flight-assist-v15 .assist-v15-command-bar > .ds-button--primary {
+    font-size: 0.8rem;
+    white-space: nowrap;
   }
 
   .flight-assist-v15 .assist-v15-release-phone {
@@ -609,46 +666,22 @@
     border-color: transparent;
     background: transparent;
   }
-
-  .assist-v15-lifecycle {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    padding-top: 12px;
-    border-top: 1px solid var(--ui-border);
-  }
-
-  .assist-v15-lifecycle-segment {
-    grid-template-columns: minmax(0, 1fr) 12px;
-  }
-
-  .assist-v15-lifecycle-segment span {
-    color: var(--ui-muted);
-    font-size: 0.65rem;
-    text-align: center;
-  }
-
-  .assist-v15-lifecycle-segment span.is-active {
-    color: var(--ui-accent);
-  }
 }
 
 @media (max-width: 420px) {
-  .assist-v15-aircraft-meta span:nth-child(2),
-  .assist-v15-aircraft-meta span:nth-child(3),
-  .assist-v15-aircraft-meta span:nth-child(4) {
-    display: none;
+  .flight-assist-v15 .assist-v15-aircraft-title {
+    grid-template-columns: minmax(0, 1fr);
   }
 
-  .assist-v15-groups .ds-page-header {
+  .flight-assist-v15 .assist-v15-aircraft-title .ds-status-pill {
+    width: max-content;
+  }
+
+  .flight-assist-v15 .assist-v15-groups .ds-page-header {
     grid-template-columns: 1fr;
   }
 
-  .assist-v15-groups .ds-page-header-actions {
+  .flight-assist-v15 .assist-v15-groups .ds-page-header-actions {
     margin-top: 8px;
-  }
-
-  .assist-v15-group-select {
-    grid-template-columns: 28px 20px minmax(48px, 1fr) auto;
-    gap: 6px;
   }
 }
