@@ -85,7 +85,9 @@ const post = async (token, body, expectedStatus = 200) => {
     body: JSON.stringify(body),
   });
   if (response.status !== expectedStatus) {
-    throw new Error(`Kommando lieferte ${response.status} statt ${expectedStatus}.`);
+    throw new Error(
+      `Kommando lieferte ${response.status} statt ${expectedStatus}: ${await response.text()}`,
+    );
   }
   return response.json();
 };
@@ -305,7 +307,7 @@ try {
   await post(
     tokens.cashier,
     envelope("cashier-tablet-1", sold.event.version, "CALL_NEXT", {
-      rotationId,
+      ticketGroupIds: [sold.aggregate.id],
       aircraftId: "aircraft-a",
       pilotId: "550e8400-e29b-41d4-a716-446655440100",
     }),
@@ -363,7 +365,7 @@ try {
   const firstCall = await post(
     tokens.flightLine,
     envelope("flight-line-tablet-1", noted.event.version, "CALL_NEXT", {
-      rotationId,
+      ticketGroupIds: [sold.aggregate.id],
       aircraftId: "aircraft-a",
       pilotId: "550e8400-e29b-41d4-a716-446655440100",
     }),
@@ -380,9 +382,9 @@ try {
   if (
     current.rotations
       .find((rotation) => rotation.id === rotationId)
-      ?.tickets.some((ticket) => ticket.status !== "CALLED")
+      ?.tickets.some((ticket) => ticket.status !== "BOARDING")
   ) {
-    throw new Error("NEXT hat den Ticketstatus nicht auf CALLED gesetzt.");
+    throw new Error("NEXT hat den Ticketstatus nicht auf BOARDING gesetzt.");
   }
   const revoked = await post(
     tokens.flightLine,
@@ -431,7 +433,7 @@ try {
   const called = await post(
     tokens.flightLine,
     envelope("flight-line-tablet-1", checkedIn.event.version, "CALL_NEXT", {
-      rotationId,
+      ticketGroupIds: [sold.aggregate.id],
       aircraftId: "aircraft-a",
       pilotId: "550e8400-e29b-41d4-a716-446655440100",
     }),
@@ -439,16 +441,16 @@ try {
   current = await board("flight-line-tablet-1", tokens.flightLine);
   const boardingRotation = current.rotations.find((rotation) => rotation.id === rotationId);
   const boardingStatuses = boardingRotation?.tickets.map((ticket) => ticket.status).sort();
-  if (boardingStatuses?.join(",") !== "BOARDING,CALLED") {
+  if (boardingStatuses?.join(",") !== "BOARDING,BOARDING") {
     throw new Error(`NEXT bildet Check-in/Boarding nicht korrekt ab: ${boardingStatuses}`);
   }
   const started = await post(
     tokens.flightLine,
-    envelope("flight-line-tablet-1", called.event.version, "MARK_IN_FLIGHT", { rotationId }),
+    envelope("flight-line-tablet-1", called.event.version, "MARK_OFF_BLOCK", { rotationId }),
   );
   const landed = await post(
     tokens.flightLine,
-    envelope("flight-line-tablet-1", started.event.version, "MARK_LANDED", { rotationId }),
+    envelope("flight-line-tablet-1", started.event.version, "MARK_ON_BLOCK", { rotationId }),
   );
   current = await board("flight-line-tablet-1", tokens.flightLine);
   const landedAircraft = current.aircraft.find((aircraft) => aircraft.id === "aircraft-a");
@@ -461,7 +463,10 @@ try {
   }
   const completed = await post(
     tokens.flightLine,
-    envelope("flight-line-tablet-1", landed.event.version, "MARK_COMPLETED", { rotationId }),
+    envelope("flight-line-tablet-1", landed.event.version, "COMPLETE_TURNAROUND", {
+      rotationId,
+      nextAircraftState: "AVAILABLE",
+    }),
   );
   current = await board("flight-line-tablet-1", tokens.flightLine);
   const finalAircraft = current.aircraft.find((aircraft) => aircraft.id === "aircraft-a");

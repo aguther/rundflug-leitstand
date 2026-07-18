@@ -364,7 +364,7 @@ try {
     secondSale.event.version,
     "CALL_NEXT",
     {
-      rotationId: sold.aggregate.relatedRotationId,
+      ticketGroupIds: [sold.aggregate.id],
       aircraftId: "aircraft-a",
       pilotId: "550e8400-e29b-41d4-a716-446655440100",
     },
@@ -425,7 +425,7 @@ try {
     devices.flightLine,
     tokens.flightLine,
     attendance.event.version,
-    "MARK_IN_FLIGHT",
+    "MARK_OFF_BLOCK",
     { rotationId: sold.aggregate.relatedRotationId },
   );
   await flightRefresh;

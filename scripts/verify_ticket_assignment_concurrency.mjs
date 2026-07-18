@@ -152,7 +152,7 @@ try {
 
   const [callAttempt, deferAttempt] = await Promise.all([
     postCommand("admin", sold.event.version, "CALL_NEXT", {
-      rotationId: rotation.id,
+      ticketGroupIds: [sold.aggregate.id],
       aircraftId: "aircraft-a",
       pilotId: "550e8400-e29b-41d4-a716-446655440100",
     }),
