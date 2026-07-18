@@ -1,6 +1,7 @@
 import type { PublicBoard } from "@rundflug/contracts";
 import { useEffect, useState } from "react";
 import { getPublicBoard } from "./api";
+import { resolveDisplayBinding } from "./display-context";
 import { FidsDisplay } from "./fids-display";
 import { EVENT_ID } from "./operation-workspace";
 import {
@@ -10,6 +11,12 @@ import {
 } from "./realtime-heartbeat";
 
 export function FidsView() {
+  const displayBinding = resolveDisplayBinding(
+    window.location.search,
+    window.localStorage,
+    EVENT_ID,
+    window.location.pathname,
+  );
   const [board, setBoard] = useState<PublicBoard | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
@@ -22,8 +29,12 @@ export function FidsView() {
       if (heartbeatTimer !== null) window.clearInterval(heartbeatTimer);
       heartbeatTimer = null;
     };
+    if (!EVENT_ID) {
+      setError("Diese Anzeige ist noch keiner Veranstaltung zugeordnet.");
+      return;
+    }
     const refresh = () =>
-      getPublicBoard(EVENT_ID)
+      getPublicBoard(EVENT_ID, displayBinding.gateId)
         .then((nextBoard) => {
           if (active) {
             setBoard(nextBoard);
@@ -70,11 +81,6 @@ export function FidsView() {
       if (reconnectTimer !== null) window.clearTimeout(reconnectTimer);
       window.clearInterval(timer);
     };
-  }, []);
-  const mode =
-    window.location.pathname === "/fids/terminal" ||
-    new URLSearchParams(window.location.search).get("style") === "terminal"
-      ? "terminal"
-      : "standard";
-  return <FidsDisplay board={board} error={error} mode={mode} />;
+  }, [displayBinding.gateId]);
+  return <FidsDisplay board={board} error={error} mode={displayBinding.mode} />;
 }

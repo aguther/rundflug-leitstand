@@ -9,6 +9,7 @@ describe("Standard- und Terminal-FIDS (F-MON-010/060, F-BEN-090)", () => {
   it("offers two directly addressable profiles backed by the same public board", () => {
     expect(appSource).toContain('path === "/fids/terminal"');
     expect(appSource).toContain("<FidsDisplay board={board}");
+    expect(displaySource).toContain("board?.selectedGate");
     expect(displaySource).toContain('data-display-mode="standard"');
     expect(displaySource).toContain('data-display-mode="terminal"');
   });

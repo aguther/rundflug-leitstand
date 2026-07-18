@@ -24,7 +24,11 @@ import {
   sendRealtimeHeartbeat,
 } from "./realtime-heartbeat";
 
-export const EVENT_ID = resolveActiveEvent(window.location.search, window.localStorage);
+export const EVENT_ID = resolveActiveEvent(
+  window.location.search,
+  window.localStorage,
+  import.meta.env.DEV ? "demo-2026" : "",
+);
 export const FLIGHT_LINE_ASSIST_MODE = window.location.pathname === "/flight-line/assist";
 export const LOCAL_DEVELOPMENT =
   import.meta.env.DEV || ["localhost", "127.0.0.1"].includes(window.location.hostname);

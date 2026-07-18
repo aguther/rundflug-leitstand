@@ -1,10 +1,12 @@
 import type {
   CreateOperatorAccount,
+  EventCatalog,
   OperatorAccountCatalog,
   OperatorAccountSummary,
   OperatorRole,
   OperatorSession,
 } from "@rundflug/contracts";
+import { eventCatalogSchema } from "@rundflug/contracts";
 
 export async function loadLoginAccounts(): Promise<OperatorAccountCatalog["accounts"]> {
   const response = await fetch("/api/auth/accounts", { cache: "no-store" });
@@ -17,6 +19,12 @@ export async function loadOperatorSession(): Promise<OperatorSession | null> {
   if (response.status === 401) return null;
   if (!response.ok) throw new Error("Sitzung konnte nicht geprüft werden.");
   return response.json() as Promise<OperatorSession>;
+}
+
+export async function loadSelectableEvents(): Promise<EventCatalog> {
+  const response = await fetch("/api/auth/events", { cache: "no-store" });
+  if (!response.ok) throw new Error("Veranstaltungen konnten nicht geladen werden.");
+  return eventCatalogSchema.parse(await response.json());
 }
 
 export async function loginOperator(

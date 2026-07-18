@@ -1,5 +1,6 @@
 import { AppShell as Shell } from "./app/AppShell";
 import { rememberDeviceCredential } from "./device-credentials";
+import { rememberDisplayBinding } from "./display-context";
 import { rememberActiveEvent } from "./event-context";
 
 export function PairDeviceView() {
@@ -8,6 +9,8 @@ export function PairDeviceView() {
   const token = params.get("token") ?? "";
   const role = params.get("role") ?? "";
   const eventId = params.get("event") ?? "";
+  const gateId = params.get("gate")?.trim() || null;
+  const displayMode = params.get("style") === "terminal" ? "terminal" : "standard";
   const roleTargets: Record<string, string> = {
     CASHIER: "/",
     FLIGHT_LINE: "/flight-line",
@@ -27,8 +30,19 @@ export function PairDeviceView() {
       role === "FLIGHT_LINE_LEAD" ? "FLIGHT_LINE" : role === "FLIGHT_DIRECTOR" ? "ADMIN" : role;
     rememberDeviceCredential(window.localStorage, viewRole, deviceId, token);
     rememberActiveEvent(window.localStorage, eventId);
+    if (role === "DISPLAY") {
+      rememberDisplayBinding(window.localStorage, {
+        eventId,
+        gateId,
+        mode: displayMode,
+      });
+    }
     window.history.replaceState(null, "", "/pair");
-    window.location.assign(roleTargets[role] ?? "/");
+    const target =
+      role === "DISPLAY" && displayMode === "terminal"
+        ? "/fids/terminal?kiosk=1"
+        : (roleTargets[role] ?? "/");
+    window.location.assign(target);
   };
   return (
     <Shell title="Gerätekopplung">
@@ -39,6 +53,9 @@ export function PairDeviceView() {
           <>
             <p>
               Dieses Gerät erhält für den Veranstaltungstag die feste Rolle <strong>{role}</strong>.
+              {role === "DISPLAY" ? (
+                <> Anzeigeprofil und Gate-Filter werden mit dieser Kopplung dauerhaft übernommen.</>
+              ) : null}{" "}
               Es wird kein persönliches Helferkonto angelegt.
             </p>
             <button className="primary-action" onClick={activate} type="button">

@@ -115,6 +115,7 @@
 }
 
 .app-account,
+.app-event,
 .theme-toggle,
 .admin-shell .reset-level-row > button,
 .admin-shell .section-heading-row button,
@@ -125,6 +126,7 @@
 }
 
 .app-account:hover,
+.app-event:hover,
 .theme-toggle:hover,
 .admin-shell .reset-level-row > button:hover:not(:disabled),
 .cashier-shell .stepper button:hover:not(:disabled) {
