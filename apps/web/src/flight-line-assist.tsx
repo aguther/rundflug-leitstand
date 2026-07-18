@@ -413,7 +413,7 @@ export function FlightLineAssist({
             description={
               claimedAircraft
                 ? "Betreutes und weitere verfügbare Flugzeuge"
-                : "Verfügbare Flugzeuge für dieses Gerät"
+                : "Verfügbare Flugzeuge"
             }
             level={2}
             title="Flugzeug übernehmen"
