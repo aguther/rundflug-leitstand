@@ -42,6 +42,8 @@ describe("shared design-system component library", () => {
   it("provides shared fields and scrollbar-stable tabs", () => {
     expect(fieldSource).toContain("ds-field");
     expect(fieldSource).toContain("useId");
+    expect(fieldSource).toContain("SearchField");
+    expect(fieldSource).toContain("ds-search-control");
     expect(tabsSource).toContain('role="tablist"');
     expect(tabsSource).toContain('role="tab"');
     expect(stylesSource).toContain("scrollbar-width: none");

@@ -171,6 +171,14 @@
   color: var(--ui-text);
   background: transparent;
 }
+.ds-search-control {
+  display: block;
+  margin: 0;
+}
+.ds-search-control .ds-search-field {
+  width: 100%;
+  min-height: var(--control-default);
+}
 
 .ds-status-pill {
   display: inline-flex;

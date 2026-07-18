@@ -1,3 +1,4 @@
+import { Search } from "lucide-react";
 import { type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, useId } from "react";
 
 export interface FieldProps {
@@ -30,6 +31,24 @@ export function TextField({
       <span className="ds-field-label">{label}</span>
       <input {...input} id={id} />
       {help ? <small>{help}</small> : null}
+    </label>
+  );
+}
+
+export function SearchField({
+  label,
+  className = "",
+  ...input
+}: Omit<InputHTMLAttributes<HTMLInputElement>, "type"> & { label: ReactNode }) {
+  const generatedId = useId();
+  const id = input.id ?? generatedId;
+  return (
+    <label className={`ds-search-control ${className}`.trim()} htmlFor={id}>
+      <span className="visually-hidden">{label}</span>
+      <span className="ds-search-field">
+        <Search aria-hidden="true" size={17} />
+        <input {...input} id={id} type="search" />
+      </span>
     </label>
   );
 }

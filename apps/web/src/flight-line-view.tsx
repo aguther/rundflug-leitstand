@@ -633,6 +633,7 @@ export function FlightLineView() {
           board={board}
           message={message}
           nextPilotId={nextPilotId}
+          selectedQueueGroupIds={selectedQueueGroupIds}
           onAvailable={() => void setFlightLineAircraftState("AVAILABLE")}
           onDeferRotation={(rotation) =>
             void mutateQueue(
@@ -645,6 +646,11 @@ export function FlightLineView() {
           onOpenDisposition={() => setDispositionOpen(true)}
           onPause={openAircraftPauseDialog}
           onPilotChange={setNextPilotId}
+          onGroupAttendance={(ticketGroupId, checkedIn) =>
+            void setGroupAttendance(ticketGroupId, checkedIn)
+          }
+          onGroupMissing={(ticketGroupId) => void updateGroupPresence(ticketGroupId, "MISSING")}
+          onGroupRecall={(ticketGroupId) => void updateGroupPresence(ticketGroupId, "RECALL")}
           onRefuel={() => void setFlightLineAircraftState("REFUELING")}
           onReleaseAssist={(aircraftId) =>
             void releaseFlightLineAircraft(
@@ -667,6 +673,13 @@ export function FlightLineView() {
             if (rotation) setDispositionCapacity(rotation.usableCapacity);
             setMoveTargetId("");
             setMoveReason("");
+          }}
+          onToggleGroup={(ticketGroupId, isSelected) => {
+            setSelectedQueueGroupIds((current) =>
+              isSelected
+                ? [...new Set([...current, ticketGroupId])]
+                : current.filter((id) => id !== ticketGroupId),
+            );
           }}
           onUnavailable={() => void setFlightLineAircraftState("INACTIVE")}
           selectedAircraft={selectedAircraft}
