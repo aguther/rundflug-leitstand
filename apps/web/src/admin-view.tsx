@@ -5,6 +5,7 @@ import type {
   OperationalHistory,
   OperationBoard,
 } from "@rundflug/contracts";
+import { CheckCircle2, Clock3, LockKeyhole, Plus, Trash2, Upload } from "lucide-react";
 import QRCode from "qrcode";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -44,12 +45,26 @@ import {
 } from "./api";
 import { AppShell as Shell } from "./app/AppShell";
 import { isDeviceAuthorizationError } from "./board-sync";
+import {
+  Button,
+  Field,
+  PageHeader,
+  Panel,
+  SearchField,
+  SelectField,
+  StatusPill,
+  TextField,
+} from "./design-system/components";
 import { rememberDeviceCredential } from "./device-credentials";
 import { forgetActiveEvent, rememberActiveEvent } from "./event-context";
 import { eventLocalDateTimeToIso, formatEventLocalDateTime } from "./event-time";
 import { AccountManagement } from "./features/auth/AccountManagement";
 import { useAuth } from "./features/auth/AuthContext";
-import { LocalizedDateInput, LocalizedDateTimeInput } from "./localized-date-input";
+import {
+  formatGermanDate,
+  LocalizedDateInput,
+  LocalizedDateTimeInput,
+} from "./localized-date-input";
 import { clearOfflineOperationBoards } from "./offline-store";
 import {
   ADMIN_CONFIGURATION_AUDIT_REASON,
@@ -290,6 +305,7 @@ export function AdminView() {
   const [assignmentAircraftId, setAssignmentAircraftId] = useState("");
   const [assignmentResourceGroupId, setAssignmentResourceGroupId] = useState("");
   const [events, setEvents] = useState<EventCatalogEntry[]>([]);
+  const [eventSearch, setEventSearch] = useState("");
   const [newEventId, setNewEventId] = useState("");
   const [newEventName, setNewEventName] = useState("");
   const [newEventDate, setNewEventDate] = useState("");
@@ -1678,7 +1694,11 @@ export function AdminView() {
     {
       id: "parameters",
       label: "Veranstaltung",
-      complete: Boolean(board?.event.saleOpensAt && board.event.operationsEndAt),
+      complete: Boolean(
+        board &&
+          (board.event.status !== "PREPARATION" ||
+            (board.event.saleOpensAt && board.event.operationsEndAt)),
+      ),
       area: "setup",
     },
     {
@@ -1687,13 +1707,6 @@ export function AdminView() {
       complete: Boolean(board?.gates.some((gate) => gate.active)),
       area: "master-data",
       category: "gates",
-    },
-    {
-      id: "aircraft",
-      label: "Flugzeuge",
-      complete: Boolean(board?.aircraft.length),
-      area: "master-data",
-      category: "aircraft",
     },
     {
       id: "resource-groups",
@@ -1706,8 +1719,15 @@ export function AdminView() {
       category: "resource-groups",
     },
     {
+      id: "aircraft",
+      label: "Flugzeuge",
+      complete: Boolean(board?.aircraft.length),
+      area: "master-data",
+      category: "aircraft",
+    },
+    {
       id: "pilots",
-      label: "Piloten",
+      label: "Pilotencodes",
       complete: Boolean(board?.pilots.some((pilot) => pilot.active)),
       area: "master-data",
       category: "pilots",
@@ -1719,13 +1739,10 @@ export function AdminView() {
       area: "master-data",
       category: "products",
     },
-    {
-      id: "activation",
-      label: "Betriebsfreigabe",
-      complete: Boolean(board && board.event.status !== "PREPARATION"),
-      area: "setup",
-    },
   ];
+  const setupComplete = setupSteps.every((step) => step.complete);
+  const completedSetupSteps = setupSteps.filter((step) => step.complete).length;
+  const eventIsReleased = Boolean(board && board.event.status !== "PREPARATION");
   const adminAreaCopy: Record<AdminArea, { title: string; description: string }> = {
     overview: {
       title: "Übersicht",
@@ -1975,23 +1992,33 @@ export function AdminView() {
           className={`admin-workspace ${adminArea === "master-data" ? `master-data-active ${masterEditorOpen ? "editor-open" : "editor-closed"}` : ""}`}
         >
           {adminArea !== "master-data" ? (
-            <header className="admin-page-header">
-              <div>
-                <h1>{adminAreaCopy[adminArea].title}</h1>
-                <p>{adminAreaCopy[adminArea].description}</p>
-              </div>
-              <span className={`event-phase ${board?.event.status.toLowerCase() ?? "unknown"}`}>
-                {board?.event.status === "ACTIVE"
-                  ? "Betrieb aktiv"
-                  : board?.event.status === "PREPARATION"
-                    ? "Betrieb noch nicht freigegeben"
-                    : board?.event.status === "CLOSED"
-                      ? "Betrieb geschlossen"
-                      : error
-                        ? "Stand nicht verfügbar"
-                        : "Stand wird geladen"}
-              </span>
-            </header>
+            <PageHeader
+              actions={
+                <StatusPill
+                  tone={
+                    board?.event.status === "ACTIVE"
+                      ? "success"
+                      : board?.event.status === "PREPARATION"
+                        ? "warning"
+                        : error
+                          ? "danger"
+                          : "neutral"
+                  }
+                >
+                  {board?.event.status === "ACTIVE"
+                    ? "Betrieb aktiv"
+                    : board?.event.status === "PREPARATION"
+                      ? "Betrieb noch nicht freigegeben"
+                      : board?.event.status === "CLOSED"
+                        ? "Betrieb geschlossen"
+                        : error
+                          ? "Stand nicht verfügbar"
+                          : "Stand wird geladen"}
+                </StatusPill>
+              }
+              description={adminAreaCopy[adminArea].description}
+              title={adminAreaCopy[adminArea].title}
+            />
           ) : null}
           {adminArea === "setup" ? (
             <SetupProgress onSelect={openSetupStep} steps={setupSteps} />
@@ -2168,56 +2195,13 @@ export function AdminView() {
             </header>
           ) : null}
           {adminArea === "users" ? <AccountManagement /> : null}
-          <section
-            className="reset-levels"
-            hidden={adminArea !== "setup" && adminArea !== "backup"}
-          >
+          <section className="reset-levels" hidden={adminArea !== "backup"}>
             {!isAdministrator ? (
               <ValidationHint tone="error">
                 Reset ist sichtbar, bleibt aber gesperrt, bis dieses Administrationsgerät vom Server
                 bestätigt wurde.
               </ValidationHint>
             ) : null}
-            <div className="reset-level-row" hidden={adminArea !== "setup"}>
-              <div>
-                <h2>Betriebsdaten zurücksetzen</h2>
-                <p>
-                  Einen neuen, leeren Betriebsstand mit bestehenden Stammdaten anlegen. Der
-                  bisherige Stand kann nach dem Export vollständig gelöscht werden.
-                </p>
-              </div>
-              <button
-                disabled={!isAdministrator}
-                onClick={() => {
-                  setRestartMode("KEEP_MASTER_DATA");
-                  setRestartConfirmation("");
-                  setRestartEditorOpen(true);
-                }}
-                type="button"
-              >
-                Betriebsdaten zurücksetzen
-              </button>
-            </div>
-            <div className="reset-level-row" hidden={adminArea !== "setup"}>
-              <div>
-                <h2>Neue Veranstaltung beginnen</h2>
-                <p>
-                  Einen neuen Veranstaltungstag ohne bestehende Gates, Ressourcen, Flugzeuge,
-                  Pilotencodes oder Produkte beginnen.
-                </p>
-              </div>
-              <button
-                disabled={!isAdministrator}
-                onClick={() => {
-                  setRestartMode("EMPTY");
-                  setRestartConfirmation("");
-                  setRestartEditorOpen(true);
-                }}
-                type="button"
-              >
-                Neue Veranstaltung
-              </button>
-            </div>
             <div className="reset-level-row factory-reset-row" hidden={adminArea !== "backup"}>
               <div>
                 <h2>Werkszustand herstellen</h2>
@@ -2251,28 +2235,6 @@ export function AdminView() {
               legt eine neue Veranstaltung an. Bestehende Veranstaltungen können nach dem Export
               vollständig gelöscht werden.
             </p>
-            <div className="event-catalog">
-              {events.map((entry) => (
-                <div className="event-catalog-entry" key={entry.eventId}>
-                  <a
-                    className={entry.eventId === EVENT_ID ? "current-event" : ""}
-                    href={`/admin?event=${encodeURIComponent(entry.eventId)}`}
-                  >
-                    <strong>{entry.name}</strong>
-                    <span>
-                      {entry.eventDate} · {entry.aerodrome || "Flugplatz offen"}
-                    </span>
-                  </a>
-                  <button
-                    className="danger-link-action"
-                    onClick={() => void removeEvent(entry.eventId, entry.name)}
-                    type="button"
-                  >
-                    Löschen
-                  </button>
-                </div>
-              ))}
-            </div>
             <div className="parameter-grid">
               <label>
                 <FieldLabel
@@ -2366,274 +2328,368 @@ export function AdminView() {
               Sicheren Neustart anlegen
             </button>
           </section>
-          <section className="admin-section" hidden={adminArea !== "setup"}>
-            <div className="parameter-section-heading">
-              <h2>Veranstaltungsparameter</h2>
-              <button
-                className="primary-action parameter-save-action"
-                disabled={!isAdministrator || !operationsEndAt}
-                onClick={() => requestAdminAction(saveEventParameters)}
-                type="button"
-              >
-                Veranstaltungsparameter speichern
-              </button>
-            </div>
-            <div className="event-logo-editor">
-              <label>
-                <FieldLabel
+          <div className="event-setup-v15" hidden={adminArea !== "setup"}>
+            <Panel className="event-setup-details" padding="compact">
+              <PageHeader
+                actions={
+                  <Button
+                    disabled={!isAdministrator || !operationsEndAt}
+                    onClick={() => requestAdminAction(saveEventParameters)}
+                    size="compact"
+                    variant="primary"
+                  >
+                    Veranstaltungsparameter speichern
+                  </Button>
+                }
+                level={2}
+                title="Veranstaltung"
+              />
+              <div className="event-basics-grid">
+                <TextField label="Veranstaltungsname" readOnly value={board?.event.name ?? "–"} />
+                <TextField
+                  label="Datum"
+                  readOnly
+                  value={board?.event.eventDate ? formatGermanDate(board.event.eventDate) : "–"}
+                />
+                <TextField
+                  label="Phase"
+                  readOnly
+                  value={
+                    board?.event.status === "PREPARATION"
+                      ? "Vorbereitung"
+                      : board?.event.status === "ACTIVE"
+                        ? "Aktiv"
+                        : board?.event.status === "CLOSED"
+                          ? "Geschlossen"
+                          : "–"
+                  }
+                />
+                <TextField label="Zeitzone" readOnly value={board?.event.timeZone ?? "–"} />
+                <TextField
+                  className="event-aerodrome-field"
+                  label="Flugplatz"
+                  readOnly
+                  value={board?.event.aerodrome ?? "–"}
+                />
+              </div>
+              <div className="event-timing-grid">
+                <LocalizedDateTimeInput
+                  label="Verkaufsbeginn"
+                  value={saleOpensAt}
+                  onChange={setSaleOpensAt}
+                />
+                <LocalizedDateTimeInput
+                  label="Betriebsende"
+                  value={operationsEndAt}
+                  onChange={setOperationsEndAt}
+                />
+              </div>
+              <div className="event-logo-editor-v15">
+                <Field
+                  help="PNG, JPEG, WebP oder sicheres SVG bis 1 MiB."
                   label="Veranstaltungslogo"
-                  help="PNG, JPEG, WebP oder sicheres SVG bis 1 MiB. Ohne Logo erscheint das Flugzeugsymbol."
-                />
-                <input
-                  accept="image/png,image/jpeg,image/webp,image/svg+xml"
-                  onChange={(event) => setEventLogoFile(event.target.files?.[0] ?? null)}
-                  type="file"
-                />
-              </label>
-              <button
-                disabled={!eventLogoFile || !isAdministrator}
-                onClick={() => requestAdminAction(saveEventLogo)}
-                type="button"
-              >
-                Logo hochladen
-              </button>
-              <button
-                className="danger-link-action"
-                disabled={!isAdministrator}
-                onClick={() => requestAdminAction(clearEventLogo)}
-                type="button"
-              >
-                Logo entfernen
-              </button>
-            </div>
-            <div className="parameter-grid">
-              <LocalizedDateTimeInput
-                label="Verkaufsbeginn"
-                labelContent={
-                  <FieldLabel
-                    label="Verkaufsbeginn"
-                    help="Lokaler Zeitpunkt, ab dem Tickets verkauft werden dürfen. Eingabe im deutschen Datum und 24-Stunden-Format."
+                >
+                  <input
+                    accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                    onChange={(event) => setEventLogoFile(event.target.files?.[0] ?? null)}
+                    type="file"
                   />
-                }
-                value={saleOpensAt}
-                onChange={setSaleOpensAt}
-              />
-              <LocalizedDateTimeInput
-                label="Betriebsende"
-                labelContent={
-                  <FieldLabel
-                    label="Betriebsende"
-                    help="Geplantes lokales Ende des Rundflugbetriebs; Grundlage für Verkaufs- und Kapazitätsgrenzen."
+                </Field>
+                <Button
+                  disabled={!eventLogoFile || !isAdministrator}
+                  onClick={() => requestAdminAction(saveEventLogo)}
+                  size="compact"
+                >
+                  <Upload aria-hidden="true" /> Logo hochladen
+                </Button>
+                <Button
+                  disabled={!isAdministrator}
+                  onClick={() => requestAdminAction(clearEventLogo)}
+                  size="compact"
+                  variant="danger"
+                >
+                  <Trash2 aria-hidden="true" /> Entfernen
+                </Button>
+              </div>
+              {!operationsEndAt ? (
+                <ValidationHint tone="error">
+                  Ein Betriebsende muss festgelegt werden.
+                </ValidationHint>
+              ) : null}
+              <details className="event-advanced-settings">
+                <summary>Erweiterte Betriebsparameter</summary>
+                <div className="event-advanced-grid">
+                  <TextField
+                    label="No-Show nach Minuten"
+                    max="120"
+                    min="1"
+                    onChange={(event) => setNoShowAfterMinutes(Number(event.target.value))}
+                    type="number"
+                    value={noShowAfterMinutes}
                   />
+                  <TextField
+                    label="Klärung nach Zurückstellungen"
+                    max="10"
+                    min="1"
+                    onChange={(event) => setMaxTicketDeferrals(Number(event.target.value))}
+                    type="number"
+                    value={maxTicketDeferrals}
+                  />
+                  <TextField
+                    label="Benachrichtigungsvorlauf (Min.)"
+                    max="240"
+                    min="1"
+                    onChange={(event) => setNotificationLeadMinutes(Number(event.target.value))}
+                    type="number"
+                    value={notificationLeadMinutes}
+                  />
+                  <TextField
+                    label="Voraufruf (Min.)"
+                    max="240"
+                    min="1"
+                    onChange={(event) => setPrecallLeadMinutes(Number(event.target.value))}
+                    type="number"
+                    value={precallLeadMinutes}
+                  />
+                  <TextField
+                    label="Maximale Gate-Wartezeit (Min.)"
+                    max="120"
+                    min="1"
+                    onChange={(event) => setMaximumGateWaitMinutes(Number(event.target.value))}
+                    type="number"
+                    value={maximumGateWaitMinutes}
+                  />
+                  <SelectField
+                    label="Minimale Prognosequalität"
+                    onChange={(event) =>
+                      setPrecallMinimumQuality(event.target.value as "STABLE" | "CHANGING")
+                    }
+                    value={precallMinimumQuality}
+                  >
+                    <option value="CHANGING">Ändert sich</option>
+                    <option value="STABLE">Stabil</option>
+                  </SelectField>
+                  <TextField
+                    label="Gate-Sperrzeit (Min.)"
+                    max="60"
+                    min="0"
+                    onChange={(event) => setPrecallGateCooldownMinutes(Number(event.target.value))}
+                    type="number"
+                    value={precallGateCooldownMinutes}
+                  />
+                  <TextField
+                    label="Referenzgewicht Kind (kg)"
+                    max="300"
+                    min="1"
+                    onChange={(event) => setChildReferenceWeightKg(Number(event.target.value))}
+                    type="number"
+                    value={childReferenceWeightKg}
+                  />
+                  <TextField
+                    label="Referenzgewicht Normal (kg)"
+                    max="300"
+                    min="1"
+                    onChange={(event) => setNormalReferenceWeightKg(Number(event.target.value))}
+                    type="number"
+                    value={normalReferenceWeightKg}
+                  />
+                  <TextField
+                    label="Referenzgewicht Schwer (kg)"
+                    max="300"
+                    min="1"
+                    onChange={(event) => setHeavyReferenceWeightKg(Number(event.target.value))}
+                    type="number"
+                    value={heavyReferenceWeightKg}
+                  />
+                  <TextField
+                    label="Plan Boarding (Min.)"
+                    max="120"
+                    min="1"
+                    onChange={(event) => setPlannedBoardingMinutes(Number(event.target.value))}
+                    type="number"
+                    value={plannedBoardingMinutes}
+                  />
+                  <TextField
+                    label="Plan Ausstieg (Min.)"
+                    max="120"
+                    min="1"
+                    onChange={(event) => setPlannedDeboardingMinutes(Number(event.target.value))}
+                    type="number"
+                    value={plannedDeboardingMinutes}
+                  />
+                  <TextField
+                    label="Plan Puffer (Min.)"
+                    max="120"
+                    min="0"
+                    onChange={(event) => setPlannedBufferMinutes(Number(event.target.value))}
+                    type="number"
+                    value={plannedBufferMinutes}
+                  />
+                  <TextField
+                    label="Abgeflogene Zeilen sichtbar (Sek.)"
+                    max="900"
+                    min="5"
+                    onChange={(event) => setDepartedVisibilitySeconds(Number(event.target.value))}
+                    type="number"
+                    value={departedVisibilitySeconds}
+                  />
+                  <label className="event-precall-toggle">
+                    <input
+                      checked={automaticPrecallEnabled}
+                      onChange={(event) => setAutomaticPrecallEnabled(event.target.checked)}
+                      type="checkbox"
+                    />
+                    <span>Gruppen automatisch zum Gate voraufrufen</span>
+                  </label>
+                </div>
+              </details>
+            </Panel>
+
+            <Panel className="event-release-v15" padding="compact">
+              <PageHeader
+                actions={
+                  <StatusPill tone={eventIsReleased || setupComplete ? "success" : "warning"}>
+                    {eventIsReleased
+                      ? "Freigegeben"
+                      : `${completedSetupSteps}/${setupSteps.length} erledigt`}
+                  </StatusPill>
                 }
-                value={operationsEndAt}
-                onChange={setOperationsEndAt}
+                level={2}
+                title="Betriebsfreigabe"
               />
-              <label>
-                <FieldLabel
-                  label="No-Show nach Minuten"
-                  help="Frühester Zeitpunkt nach dem Aufruf, ab dem fehlende Tickets manuell als No-Show behandelt werden dürfen."
-                />
-                <input
-                  type="number"
-                  min="1"
-                  max="120"
-                  value={noShowAfterMinutes}
-                  onChange={(event) => setNoShowAfterMinutes(Number(event.target.value))}
-                />
-              </label>
-              <label>
-                <FieldLabel
-                  label="Klärung Kasse nach Zurückstellungen"
-                  help="Nach dieser Anzahl manueller Zurückstellungen wird die Gruppe zur Klärung an der Kasse markiert."
-                />
-                <input
-                  type="number"
-                  min="1"
-                  max="10"
-                  value={maxTicketDeferrals}
-                  onChange={(event) => setMaxTicketDeferrals(Number(event.target.value))}
-                />
-              </label>
-              <label>
-                <FieldLabel
-                  label="Benachrichtigungsvorlauf (Min.)"
-                  help="Bestimmt, wie früh ein freiwilliger Web-Push zur Vorbereitung ausgelöst werden kann."
-                />
-                <input
-                  type="number"
-                  min="1"
-                  max="240"
-                  value={notificationLeadMinutes}
-                  onChange={(event) => setNotificationLeadMinutes(Number(event.target.value))}
-                />
-              </label>
-              <label className="admin-check-row">
-                <input
-                  checked={automaticPrecallEnabled}
-                  onChange={(event) => setAutomaticPrecallEnabled(event.target.checked)}
-                  type="checkbox"
-                />
-                <FieldLabel
-                  label="Gruppen automatisch zum Gate voraufrufen"
-                  help="Ruft nur die nächste passende Gruppe anhand der Prognose zum Gate. Das bindet kein Flugzeug und ersetzt nicht die Bestätigung durch die Flight Line."
-                />
-              </label>
-              <div className="admin-info-note">
-                <strong>Adaptiver Voraufruf</strong>
-                <p>
-                  Das System lernt den passenden Vorlauf während des Veranstaltungstags aus den
-                  tatsächlichen Boarding- und Gate-Wartezeiten. Die Wartezeit am Gate ist ein
-                  weiches Optimierungsziel und keine harte Sperre. Unterbrechungen werden nicht als
-                  normale Abfertigungsdauer eingelernt.
+              {eventIsReleased ? (
+                <p className="event-release-ready">
+                  <CheckCircle2 aria-hidden="true" /> Der Veranstaltungsbetrieb ist freigegeben.
                 </p>
-              </div>
-              <label>
-                <FieldLabel
-                  label="Referenzgewicht Kind (kg)"
-                  help="Anonymer Rechenwert für Tickets der Gewichtsklasse Kind; keine flugbetriebliche Freigabe."
-                />
-                <input
-                  type="number"
-                  min="1"
-                  max="300"
-                  value={childReferenceWeightKg}
-                  onChange={(event) => setChildReferenceWeightKg(Number(event.target.value))}
-                />
-              </label>
-              <label>
-                <FieldLabel
-                  label="Referenzgewicht Normal (kg)"
-                  help="Anonymer Rechenwert für Tickets der Gewichtsklasse Normal; keine flugbetriebliche Freigabe."
-                />
-                <input
-                  type="number"
-                  min="1"
-                  max="300"
-                  value={normalReferenceWeightKg}
-                  onChange={(event) => setNormalReferenceWeightKg(Number(event.target.value))}
-                />
-              </label>
-              <label>
-                <FieldLabel
-                  label="Referenzgewicht Schwer (kg)"
-                  help="Anonymer Rechenwert für Tickets der Gewichtsklasse Schwer; keine flugbetriebliche Freigabe."
-                />
-                <input
-                  type="number"
-                  min="1"
-                  max="300"
-                  value={heavyReferenceWeightKg}
-                  onChange={(event) => setHeavyReferenceWeightKg(Number(event.target.value))}
-                />
-              </label>
-              <label>
-                <FieldLabel
-                  label="Plan Boarding (Min.)"
-                  help="Planwert für das Einsteigen zur initialen Prognose; tatsächliche Ereignisse ersetzen ihn im Betrieb."
-                />
-                <input
-                  type="number"
-                  min="1"
-                  max="120"
-                  value={plannedBoardingMinutes}
-                  onChange={(event) => setPlannedBoardingMinutes(Number(event.target.value))}
-                />
-              </label>
-              <label>
-                <FieldLabel
-                  label="Plan Ausstieg (Min.)"
-                  help="Planwert für Ausstieg und Bodenprozess nach der Landung."
-                />
-                <input
-                  type="number"
-                  min="1"
-                  max="120"
-                  value={plannedDeboardingMinutes}
-                  onChange={(event) => setPlannedDeboardingMinutes(Number(event.target.value))}
-                />
-              </label>
-              <label>
-                <FieldLabel
-                  label="Plan Puffer (Min.)"
-                  help="Zusätzlicher organisatorischer Zeitpuffer zwischen Umläufen."
-                />
-                <input
-                  type="number"
-                  min="0"
-                  max="120"
-                  value={plannedBufferMinutes}
-                  onChange={(event) => setPlannedBufferMinutes(Number(event.target.value))}
-                />
-              </label>
-              <label>
-                <FieldLabel
-                  label="Abgeflogene Zeilen sichtbar (Sek.)"
-                  help="FIDS blendet abgeflogene Gruppen nach dieser Frist aus. Zulässig sind 5 bis 900 Sekunden."
-                />
-                <input
-                  type="number"
-                  min="5"
-                  max="900"
-                  value={departedVisibilitySeconds}
-                  onChange={(event) => setDepartedVisibilitySeconds(Number(event.target.value))}
-                />
-              </label>
+              ) : !setupComplete ? (
+                <>
+                  <p>
+                    Die Veranstaltung ist noch nicht betriebsbereit. Bitte erledige die offenen
+                    Punkte, um den Betrieb freizugeben.
+                  </p>
+                  <ul className="event-release-missing">
+                    {setupSteps
+                      .filter((step) => !step.complete)
+                      .map((step) => (
+                        <li key={step.id}>
+                          <Clock3 aria-hidden="true" />
+                          <Button
+                            onClick={() => openSetupStep(step)}
+                            size="compact"
+                            variant="ghost"
+                          >
+                            {step.label} fehlt
+                          </Button>
+                        </li>
+                      ))}
+                  </ul>
+                </>
+              ) : (
+                <p className="event-release-ready">
+                  <CheckCircle2 aria-hidden="true" /> Alle Einrichtungsschritte sind abgeschlossen.
+                </p>
+              )}
+              {!eventIsReleased ? (
+                <div className="event-release-action">
+                  {!board ? (
+                    <p className="help-text">Der bestätigte Betriebsstand wird geladen.</p>
+                  ) : (
+                    <Button
+                      disabled={!isAdministrator || !setupComplete}
+                      onClick={() => requestAdminAction(() => setEventLifecycle("ACTIVE"))}
+                      variant="primary"
+                    >
+                      <LockKeyhole aria-hidden="true" /> Betrieb freigeben
+                    </Button>
+                  )}
+                </div>
+              ) : null}
+            </Panel>
+          </div>
+
+          <Panel className="event-catalog-v15" hidden={adminArea !== "setup"} padding="none">
+            <PageHeader
+              actions={
+                <div className="event-catalog-actions">
+                  <SearchField
+                    label="Veranstaltungen durchsuchen"
+                    onChange={(event) => setEventSearch(event.target.value)}
+                    placeholder="Veranstaltungen suchen …"
+                    value={eventSearch}
+                  />
+                  <Button
+                    disabled={!isAdministrator}
+                    onClick={() => {
+                      setRestartMode("EMPTY");
+                      setRestartConfirmation("");
+                      setRestartEditorOpen(true);
+                    }}
+                    variant="primary"
+                  >
+                    <Plus aria-hidden="true" /> Neue Veranstaltung
+                  </Button>
+                </div>
+              }
+              level={2}
+              title="Veranstaltungen"
+            />
+            <div className="event-catalog-table-wrap">
+              <table className="event-catalog-table">
+                <thead>
+                  <tr>
+                    <th>Veranstaltungsname</th>
+                    <th>Datum</th>
+                    <th>Phase</th>
+                    <th>Zeitzone</th>
+                    <th>Flugplatz</th>
+                    <th>
+                      <span className="visually-hidden">Aktionen</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {events
+                    .filter((entry) =>
+                      `${entry.name} ${entry.eventDate} ${entry.aerodrome}`
+                        .toLocaleLowerCase("de-DE")
+                        .includes(eventSearch.trim().toLocaleLowerCase("de-DE")),
+                    )
+                    .map((entry) => (
+                      <tr
+                        className={entry.eventId === EVENT_ID ? "is-current" : ""}
+                        key={entry.eventId}
+                      >
+                        <td>
+                          <a href={`/admin?event=${encodeURIComponent(entry.eventId)}&area=setup`}>
+                            {entry.name}
+                          </a>
+                        </td>
+                        <td>{formatGermanDate(entry.eventDate)}</td>
+                        <td>
+                          {entry.status === "PREPARATION"
+                            ? "Vorbereitung"
+                            : entry.status === "ACTIVE"
+                              ? "Aktiv"
+                              : "Geschlossen"}
+                        </td>
+                        <td>{entry.timeZone}</td>
+                        <td>{entry.aerodrome || "–"}</td>
+                        <td>
+                          <Button
+                            aria-label={`${entry.name} löschen`}
+                            onClick={() => void removeEvent(entry.eventId, entry.name)}
+                            size="compact"
+                            variant="danger"
+                          >
+                            <Trash2 aria-hidden="true" /> Löschen
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
             </div>
-            {!operationsEndAt ? (
-              <ValidationHint tone="error">Ein Betriebsende muss festgelegt werden.</ValidationHint>
-            ) : null}
-          </section>
-          <section className="admin-section setup-release" hidden={adminArea !== "setup"}>
-            <div className="section-heading">
-              <div>
-                <h2>Betriebsfreigabe</h2>
-                <p>Der Verkauf kann erst nach vollständiger Einrichtung gestartet werden.</p>
-              </div>
-              <strong>
-                {setupSteps.filter((step) => step.complete).length}/{setupSteps.length} Schritte
-              </strong>
-            </div>
-            <ul className="setup-checklist">
-              {setupSteps.slice(0, -1).map((step) => (
-                <li className={step.complete ? "complete" : "missing"} key={step.id}>
-                  <span aria-hidden="true">{step.complete ? "✓" : "–"}</span>
-                  <button onClick={() => openSetupStep(step)} type="button">
-                    {step.label}
-                  </button>
-                  <strong>{step.complete ? "Erledigt" : "Fehlt"}</strong>
-                </li>
-              ))}
-            </ul>
-            {setupSteps.slice(0, -1).some((step) => !step.complete) ? (
-              <ValidationHint tone="error">
-                Vor der Betriebsfreigabe müssen alle fehlenden Einrichtungsschritte abgeschlossen
-                werden.
-              </ValidationHint>
-            ) : (
-              <ValidationHint>
-                Alle Stammdaten sind vollständig. Der Betrieb kann freigegeben werden.
-              </ValidationHint>
-            )}
-            {!board ? (
-              <p className="help-text">Der bestätigte Betriebsstand wird geladen.</p>
-            ) : board.event.status === "PREPARATION" ? (
-              <button
-                className="primary-action release-action"
-                disabled={
-                  !isAdministrator || setupSteps.slice(0, -1).some((step) => !step.complete)
-                }
-                onClick={() => requestAdminAction(() => setEventLifecycle("ACTIVE"))}
-                type="button"
-              >
-                Veranstaltung aktivieren
-              </button>
-            ) : (
-              <p className="success-message">
-                Der Veranstaltungsbetrieb wurde bereits freigegeben.
-              </p>
-            )}
-          </section>
+          </Panel>
           <MasterDataNavigation
             activeCategory={masterDataCategory}
             counts={masterDataCounts}

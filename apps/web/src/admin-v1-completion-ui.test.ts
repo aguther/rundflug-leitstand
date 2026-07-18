@@ -6,7 +6,10 @@ import sharedSource from "./operation-workspace.tsx?raw";
 
 const appSource = `${adminViewSource}\n${sharedSource}`;
 
-const stylesSource = readFileSync(new URL("./styles.css", import.meta.url), "utf8");
+const stylesSource = [
+  readFileSync(new URL("./styles.css", import.meta.url), "utf8"),
+  readFileSync(new URL("./features/admin/admin-v15.css", import.meta.url), "utf8"),
+].join("\n");
 
 describe("V1 administration completion UI", () => {
   it("exposes typed gate display filters in the existing gate editor", () => {
@@ -61,8 +64,9 @@ describe("V1 administration completion UI", () => {
   });
 
   it("keeps setup saving visible and every information hint bound to its field label", () => {
-    expect(appSource).toContain('className="parameter-section-heading"');
-    expect(appSource).toContain('className="primary-action parameter-save-action"');
+    expect(appSource).toContain('<Panel className="event-setup-details"');
+    expect(appSource).toContain("<PageHeader");
+    expect(appSource).toContain("<Button");
     expect(appSource).toContain("Veranstaltungsparameter speichern");
     expect(appSource).toContain('className="field-info"');
     expect(appSource).toContain("data-help={help}");
@@ -70,7 +74,8 @@ describe("V1 administration completion UI", () => {
     expect(appSource).not.toContain('<details className="field-info">');
     expect(stylesSource).toContain("label:focus-within .field-info::after");
     expect(stylesSource).toContain("visibility: hidden");
-    expect(stylesSource).toContain(".parameter-save-action");
+    expect(stylesSource).toContain(".event-setup-v15 .ds-page-header");
+    expect(stylesSource).toContain(".event-setup-v15 .ds-page-header-actions .ds-button");
     expect(stylesSource).toContain(".admin-workspace:not(.master-data-active)");
     expect(stylesSource).toContain("grid-auto-rows: max-content");
   });
