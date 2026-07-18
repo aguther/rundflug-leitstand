@@ -1,6 +1,177 @@
 /* Shared design-system component primitives: Button, StatusPill, DataTable, SidePanel, ConfirmationDialog, PageHeader. */
 /* Token-driven only; no hardcoded colors so both themes work without a component-level branch. */
 
+/* Buttons and icon buttons */
+.ds-button,
+.ds-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--radius-md);
+  color: var(--ui-text);
+  background: var(--ui-control);
+  font-weight: 650;
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease,
+    color 120ms ease;
+}
+.ds-button--compact,
+.ds-icon-button--compact {
+  min-height: var(--control-compact);
+  padding: 6px 10px;
+  font-size: 0.8rem;
+}
+.ds-button--default,
+.ds-icon-button--default {
+  min-height: var(--control-default);
+  padding: 8px 13px;
+  font-size: 0.86rem;
+}
+.ds-button--touch,
+.ds-icon-button--touch {
+  min-height: var(--control-touch);
+  padding: 10px 16px;
+  font-size: 0.92rem;
+}
+.ds-icon-button {
+  width: var(--control-default);
+  padding: 0;
+  flex: 0 0 auto;
+}
+.ds-icon-button--compact {
+  width: var(--control-compact);
+}
+.ds-icon-button--touch {
+  width: var(--control-touch);
+}
+.ds-button svg,
+.ds-icon-button svg {
+  width: 1.15em;
+  height: 1.15em;
+}
+.ds-button--primary {
+  border-color: var(--ui-accent);
+  color: #fff;
+  background: var(--ui-accent);
+}
+.ds-button--primary:hover:not(:disabled) {
+  background: var(--ui-accent-hover);
+}
+.ds-button--secondary:hover:not(:disabled),
+.ds-icon-button:hover:not(:disabled) {
+  border-color: var(--ui-accent);
+  color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+}
+.ds-button--danger {
+  border-color: var(--ui-danger);
+  color: var(--ui-danger);
+  background: var(--ui-control);
+}
+.ds-button--danger:hover:not(:disabled) {
+  color: #fff;
+  background: var(--ui-danger);
+}
+.ds-button--ghost {
+  border-color: transparent;
+  background: transparent;
+}
+.ds-button:disabled,
+.ds-icon-button:disabled {
+  border-color: var(--ui-border);
+  color: var(--ui-disabled-text);
+  background: var(--ui-disabled);
+  cursor: not-allowed;
+}
+
+/* Panels */
+.ds-panel {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-lg);
+  color: var(--ui-text);
+  background: var(--ui-surface);
+}
+.ds-panel--none {
+  padding: 0;
+}
+.ds-panel--compact {
+  padding: var(--space-3);
+}
+.ds-panel--default {
+  padding: var(--space-4);
+}
+
+/* Tabs */
+.ds-tabs {
+  display: flex;
+  padding-inline: var(--space-3);
+  overflow-x: auto;
+  scrollbar-width: none;
+  border-bottom: 1px solid var(--ui-border);
+}
+.ds-tabs::-webkit-scrollbar {
+  display: none;
+}
+.ds-tabs > button {
+  min-height: 48px;
+  padding: 0 24px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--ui-muted);
+  background: transparent;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.ds-tabs > button:hover {
+  color: var(--ui-text);
+}
+.ds-tabs > button.active,
+.ds-tabs > button[aria-selected="true"] {
+  border-bottom-color: var(--ui-accent);
+  color: var(--ui-accent);
+}
+
+/* Toolbars and search controls */
+.ds-toolbar {
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--ui-border);
+}
+.ds-search-field {
+  min-width: 220px;
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--radius-md);
+  color: var(--ui-muted);
+  background: var(--ui-control);
+}
+.ds-search-field:focus-within {
+  border-color: var(--ui-accent);
+  box-shadow: var(--focus-ring);
+}
+.ds-search-field input {
+  width: 100%;
+  min-height: 38px;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  color: var(--ui-text);
+  background: transparent;
+}
+
 .ds-status-pill {
   display: inline-flex;
   align-items: center;
@@ -428,6 +599,12 @@
 }
 
 .ds-field label {
+  color: var(--ui-text);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.ds-field-label {
   color: var(--ui-text);
   font-size: 0.85rem;
   font-weight: 600;

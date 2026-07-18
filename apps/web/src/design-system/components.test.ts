@@ -4,6 +4,8 @@ import mainSource from "../main.tsx?raw";
 
 const stylesSource = readFileSync(new URL("./components.css", import.meta.url), "utf8");
 const buttonSource = readFileSync(new URL("./components/Button.tsx", import.meta.url), "utf8");
+const fieldSource = readFileSync(new URL("./components/Field.tsx", import.meta.url), "utf8");
+const tabsSource = readFileSync(new URL("./components/Tabs.tsx", import.meta.url), "utf8");
 const tableSource = readFileSync(new URL("./components/DataTable.tsx", import.meta.url), "utf8");
 const sidePanelSource = readFileSync(
   new URL("./components/SidePanel.tsx", import.meta.url),
@@ -19,19 +21,31 @@ const confirmSource = readFileSync(
 );
 
 describe("shared design-system component library", () => {
-  it("loads components.css after base.css and before the legacy stylesheet", () => {
+  it("loads the central component layers after legacy view styles", () => {
     expect(mainSource.indexOf('import "./design-system/base.css"')).toBeLessThan(
       mainSource.indexOf('import "./design-system/components.css"'),
     );
-    expect(mainSource.indexOf('import "./design-system/components.css"')).toBeLessThan(
-      mainSource.indexOf('import "./styles.css"'),
+    expect(mainSource.indexOf('import "./styles.css"')).toBeLessThan(
+      mainSource.indexOf('import "./design-system/base.css"'),
     );
   });
 
-  it("Button reuses the existing action button classes instead of inventing new ones", () => {
-    expect(buttonSource).toContain("primary-action");
-    expect(buttonSource).toContain("secondary-action");
-    expect(buttonSource).toContain("danger-action");
+  it("Button exposes shared variants and sizes instead of view-specific classes", () => {
+    expect(buttonSource).toContain("ds-button--primary");
+    expect(buttonSource).toContain("ds-button--secondary");
+    expect(buttonSource).toContain("ds-button--danger");
+    expect(buttonSource).toContain('type ButtonSize = "compact" | "default" | "touch"');
+    expect(buttonSource).toMatch(/ds-button--\$\{size\}/);
+    expect(stylesSource).toContain(".ds-button--compact");
+  });
+
+  it("provides shared fields and scrollbar-stable tabs", () => {
+    expect(fieldSource).toContain("ds-field");
+    expect(fieldSource).toContain("useId");
+    expect(tabsSource).toContain('role="tablist"');
+    expect(tabsSource).toContain('role="tab"');
+    expect(stylesSource).toContain("scrollbar-width: none");
+    expect(stylesSource).toContain(".ds-tabs::-webkit-scrollbar");
   });
 
   it("StatusPill exposes a tone-based API backed by semantic tokens", () => {
