@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import adminSource from "../admin-view.tsx?raw";
 import ticketStatusSource from "../ticket-status-view.tsx?raw";
+import headerSource from "./AppHeader.tsx?raw";
 import shellSource from "./AppShell.tsx?raw";
 import { appDestinations, isDestinationActive } from "./navigation";
 
@@ -22,15 +23,24 @@ describe("V1.2 app navigation", () => {
   });
 
   it("keeps unauthorized destinations visible and locked in the common switcher", () => {
-    expect(shellSource).toContain("appDestinations.map");
-    expect(shellSource).toContain('aria-disabled="true"');
-    expect(shellSource).toContain("Andere Rolle erforderlich");
-    expect(shellSource).toContain("view-switcher-menu");
+    expect(headerSource).toContain("appDestinations.map");
+    expect(headerSource).toContain('aria-disabled="true"');
+    expect(headerSource).toContain("Andere Rolle erforderlich");
+    expect(headerSource).toContain("view-switcher-menu");
+  });
+
+  it("separates the account menu from the view switcher", () => {
+    expect(shellSource).toContain("<AppHeader");
+    expect(headerSource).toContain('className="account-menu"');
+    expect(headerSource).toContain('className="account-menu-popover"');
+    expect(headerSource).toContain("Abmelden");
+    expect(headerSource).not.toContain('querySelector(".view-switcher")');
   });
 
   it("keeps public ticket status free of internal account navigation", () => {
     expect(ticketStatusSource).toContain("<Shell publicView");
-    expect(shellSource).toContain("!publicView && session");
+    expect(shellSource).toContain("publicView={publicView}");
+    expect(headerSource).toContain("!kiosk && !publicView && session");
   });
 
   it("persists the selected administration area in the URL", () => {
