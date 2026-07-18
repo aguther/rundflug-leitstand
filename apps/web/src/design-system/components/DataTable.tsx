@@ -47,7 +47,9 @@ export function DataTable<Row>({
   }, [rows, paginated, currentPage, rowsPerPage]);
 
   const from = paginated && rows.length > 0 ? currentPage * rowsPerPage + 1 : 0;
-  const to = paginated ? Math.min(rows.length, currentPage * rowsPerPage + rowsPerPage) : rows.length;
+  const to = paginated
+    ? Math.min(rows.length, currentPage * rowsPerPage + rowsPerPage)
+    : rows.length;
 
   return (
     <div className={`ds-table-scroll ${className}`.trim()}>
@@ -55,7 +57,10 @@ export function DataTable<Row>({
         <thead>
           <tr>
             {columns.map((column) => (
-              <th key={column.key} style={{ width: column.width, textAlign: column.align ?? "left" }}>
+              <th
+                key={column.key}
+                style={{ width: column.width, textAlign: column.align ?? "left" }}
+              >
                 {column.header}
               </th>
             ))}
@@ -117,7 +122,12 @@ export function DataTable<Row>({
             {from}–{to} von {rows.length}
           </span>
           <nav className="ds-pagination-nav" aria-label="Seitennavigation">
-            <button type="button" disabled={currentPage === 0} onClick={() => setPage(0)} aria-label="Erste Seite">
+            <button
+              type="button"
+              disabled={currentPage === 0}
+              onClick={() => setPage(0)}
+              aria-label="Erste Seite"
+            >
               «
             </button>
             <button

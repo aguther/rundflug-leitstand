@@ -9,5 +9,7 @@ export interface StatusPillProps {
 }
 
 export function StatusPill({ tone, children, className = "" }: StatusPillProps) {
-  return <span className={`ds-status-pill ds-status-pill--${tone} ${className}`.trim()}>{children}</span>;
+  return (
+    <span className={`ds-status-pill ds-status-pill--${tone} ${className}`.trim()}>{children}</span>
+  );
 }

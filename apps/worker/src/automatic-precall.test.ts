@@ -22,4 +22,27 @@ describe("persistierter automatischer Voraufruf (F-BEN-030)", () => {
     expect(coordinatorSource).toContain("precall_trigger = ?1");
     expect(coordinatorSource).toContain("'SYSTEM', 'FLIGHT_GROUP'");
   });
+
+  it("re-evaluates active events independently of operator commands", () => {
+    expect(coordinatorSource).toContain("async alarm(): Promise<void>");
+    expect(coordinatorSource).toContain('"AUTOMATIC_FORECAST_TICK"');
+    expect(coordinatorSource).toContain("FORECAST_TICK_INTERVAL_MS = 30_000");
+    expect(coordinatorSource).toContain("this.ctx.storage.setAlarm");
+  });
+
+  it("treats gate wait as an adaptive target rather than a hard stop", () => {
+    const decision = coordinatorSource.slice(
+      coordinatorSource.indexOf("const precallDecision"),
+      coordinatorSource.indexOf("if (precallDecision.eligible)"),
+    );
+    expect(decision).toContain("adaptiveLeadMinutes");
+    expect(decision).not.toContain("maximumGateWaitMinutes");
+    expect(decision).not.toContain("precallMinimumQuality");
+  });
+
+  it("excludes rotations overlapping event interruptions from the normal learning basis", () => {
+    expect(coordinatorSource).toContain("EVENT_OPERATION_INTERRUPTED");
+    expect(coordinatorSource).toContain("EVENT_OPERATION_RESUMED");
+    expect(coordinatorSource).toContain("EMERGENCY_MODE_CLEARED");
+  });
 });

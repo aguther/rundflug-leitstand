@@ -5,9 +5,18 @@ import mainSource from "../main.tsx?raw";
 const stylesSource = readFileSync(new URL("./components.css", import.meta.url), "utf8");
 const buttonSource = readFileSync(new URL("./components/Button.tsx", import.meta.url), "utf8");
 const tableSource = readFileSync(new URL("./components/DataTable.tsx", import.meta.url), "utf8");
-const sidePanelSource = readFileSync(new URL("./components/SidePanel.tsx", import.meta.url), "utf8");
-const statusPillSource = readFileSync(new URL("./components/StatusPill.tsx", import.meta.url), "utf8");
-const confirmSource = readFileSync(new URL("./components/ConfirmationDialog.tsx", import.meta.url), "utf8");
+const sidePanelSource = readFileSync(
+  new URL("./components/SidePanel.tsx", import.meta.url),
+  "utf8",
+);
+const statusPillSource = readFileSync(
+  new URL("./components/StatusPill.tsx", import.meta.url),
+  "utf8",
+);
+const confirmSource = readFileSync(
+  new URL("./components/ConfirmationDialog.tsx", import.meta.url),
+  "utf8",
+);
 
 describe("shared design-system component library", () => {
   it("loads components.css after base.css and before the legacy stylesheet", () => {

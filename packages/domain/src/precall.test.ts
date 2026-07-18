@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { type AutomaticPrecallInput, decideAutomaticPrecall } from "./precall";
+import {
+  type AutomaticPrecallInput,
+  decideAutomaticPrecall,
+  deriveAdaptivePrecallLeadMinutes,
+} from "./precall";
 
 const eligible: AutomaticPrecallInput = {
   enabled: true,
@@ -12,16 +16,14 @@ const eligible: AutomaticPrecallInput = {
   groupSize: 3,
   largestEligibleAircraftSeats: 3,
   predictionQuality: "CHANGING",
-  minimumQuality: "CHANGING",
-  predictedUpperMinutes: 12,
-  leadMinutes: 15,
-  maximumGateWaitMinutes: 20,
+  predictedBoardingMinutes: 12,
+  adaptiveLeadMinutes: 15,
   minutesSinceLastGatePrecall: 5,
   gateCooldownMinutes: 2,
 };
 
 describe("automatischer Voraufruf (F-BEN-030)", () => {
-  it("allows only the first fitting group inside both time limits", () => {
+  it("allows only the first fitting group inside the adaptive lead", () => {
     expect(decideAutomaticPrecall(eligible)).toEqual({ eligible: true, reason: "ELIGIBLE" });
     expect(decideAutomaticPrecall({ ...eligible, firstWaitingGroup: false }).reason).toBe(
       "NOT_QUEUE_FRONT",
@@ -31,19 +33,24 @@ describe("automatischer Voraufruf (F-BEN-030)", () => {
     );
   });
 
-  it("blocks uncertain, premature, long-wait and gate-cooldown calls", () => {
-    expect(decideAutomaticPrecall({ ...eligible, predictionQuality: "UNCERTAIN" }).reason).toBe(
-      "PREDICTION_UNCERTAIN",
+  it("does not turn uncertainty or a soft gate-wait target into a hard block", () => {
+    expect(decideAutomaticPrecall({ ...eligible, predictionQuality: "UNCERTAIN" }).eligible).toBe(
+      true,
     );
-    expect(decideAutomaticPrecall({ ...eligible, predictedUpperMinutes: 16 }).reason).toBe(
+    expect(decideAutomaticPrecall({ ...eligible, predictedBoardingMinutes: 16 }).reason).toBe(
       "TOO_EARLY",
     );
-    expect(
-      decideAutomaticPrecall({ ...eligible, leadMinutes: 30, predictedUpperMinutes: 21 }).reason,
-    ).toBe("GATE_WAIT_TOO_LONG");
     expect(decideAutomaticPrecall({ ...eligible, minutesSinceLastGatePrecall: 1 }).reason).toBe(
       "GATE_COOLDOWN",
     );
+  });
+
+  it("learns a bounded lead from observed precall-to-boarding waits", () => {
+    expect(deriveAdaptivePrecallLeadMinutes({ observedGateWaitMinutes: [] })).toBe(12);
+    expect(deriveAdaptivePrecallLeadMinutes({ observedGateWaitMinutes: [18, 20, 22, 120] })).toBe(
+      6,
+    );
+    expect(deriveAdaptivePrecallLeadMinutes({ observedGateWaitMinutes: [2, 3, 4] })).toBe(15);
   });
 
   it("never treats a precall as an aircraft assignment", () => {
