@@ -6,6 +6,7 @@ import viewSource from "../../flight-line-view.tsx?raw";
 
 const stylesSource = [
   "./flight-line-v12.css",
+  "./flight-line-assist-v15.css",
   "../ui-finish-v12.css",
   "../operations-finish-v12.css",
 ]
@@ -16,8 +17,9 @@ describe("V1.2 Flight Line surfaces", () => {
   it("keeps Supervisor and Assist as explicit independent workspaces behind the shared shell", () => {
     expect(viewSource).toContain("<FlightLineSupervisorConsole");
     expect(viewSource).toContain("<FlightLineAssist");
-    expect(assistSource).toContain('href="/flight-line"');
-    expect(assistSource).toContain('session.account.role !== "FLIGHT_LINE"');
+    expect(viewSource).toContain(
+      'title={FLIGHT_LINE_ASSIST_MODE ? "Flight Line Assist" : "Flight Line"}',
+    );
   });
 
   it("does not duplicate the shared application header inside the Supervisor", () => {
@@ -25,8 +27,9 @@ describe("V1.2 Flight Line surfaces", () => {
     expect(supervisorSource).not.toContain("<BrandMark");
     expect(supervisorSource).not.toContain("<ThemeToggle");
     expect(supervisorSource).not.toContain("flight-line-console-header");
-    expect(assistSource).toContain("<BrandMark />");
-    expect(assistSource).toContain("<ThemeToggle />");
+    expect(assistSource).not.toContain("<BrandMark");
+    expect(assistSource).not.toContain("<ThemeToggle");
+    expect(assistSource).not.toContain("assist-header");
   });
 
   it("implements the V1.5 aircraft table with one expandable assignment workspace", () => {
@@ -47,18 +50,24 @@ describe("V1.2 Flight Line surfaces", () => {
     expect(supervisorSource).toContain("Tabs,");
   });
 
-  it("uses semantic light and dark surfaces and touch-sized Assist actions", () => {
+  it("uses semantic light and dark surfaces and central Assist actions", () => {
     expect(stylesSource).toContain("--assist-panel: var(--ui-surface)");
     expect(stylesSource).toContain("--console-bg: var(--ui-bg)");
-    expect(stylesSource).toContain("min-height: 34px");
+    expect(assistSource).toContain("<Button");
+    expect(assistSource).toContain("<IconButton");
+    expect(assistSource).toContain("<PageHeader");
+    expect(assistSource).toContain("<Panel");
+    expect(assistSource).toContain("<StatusPill");
   });
 
-  it("shows one actionable aircraft at a time on a phone", () => {
-    expect(assistSource).toContain("Nächstes Flugzeug");
-    expect(stylesSource).toContain(".assist-aircraft-cards article:nth-child(n + 2)");
-    expect(stylesSource).toContain(".assist-more-phone");
-    expect(stylesSource).toContain(".assist-command-chevron");
-    expect(stylesSource).toContain("grid-template-columns: 42px minmax(0, 1fr) 18px");
+  it("implements the approved tablet workspace and claimed-aircraft phone flow", () => {
+    expect(assistSource).toContain("assist-v15-workspace");
+    expect(assistSource).toContain("assist-v15-active-column");
+    expect(assistSource).toContain("assist-v15-phone-back");
+    expect(assistSource).toContain("assist-v15-group-menu");
+    expect(stylesSource).toContain(".flight-assist-v15.has-claim .assist-v15-picker");
+    expect(stylesSource).toContain("@media (max-width: 720px)");
+    expect(stylesSource).toContain(".assist-v15-group-popover");
   });
 
   it("applies the approved operations finish without leaking into unrelated views", () => {

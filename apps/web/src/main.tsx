@@ -11,6 +11,7 @@ import "./features/flight-line/flight-line-v12.css";
 import "./features/fids/fids-v12.css";
 import "./features/ui-finish-v12.css";
 import "./features/operations-finish-v12.css";
+import "./features/flight-line/flight-line-assist-v15.css";
 import "./design-system/base.css";
 import "./design-system/components.css";
 

@@ -53,7 +53,10 @@ export function AppHeader({ title, kiosk = false, publicView = false }: AppHeade
         <details className="view-switcher">
           <summary>
             <Monitor aria-hidden="true" size={20} />
-            <span>Ansicht: {currentDestination?.label ?? title}</span>
+            <span>
+              <span className="view-switcher-prefix">Ansicht: </span>
+              {currentDestination?.label ?? title}
+            </span>
             <ChevronDown aria-hidden="true" size={18} />
           </summary>
           <div className="view-switcher-menu">

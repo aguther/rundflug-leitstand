@@ -1,140 +1,35 @@
 import type { OperationBoard } from "@rundflug/contracts";
+import {
+  ArrowLeft,
+  Ban,
+  BellRing,
+  Check,
+  CheckCircle2,
+  ChevronDown,
+  ChevronRight,
+  Fuel,
+  MapPin,
+  MoreHorizontal,
+  Pause,
+  Plane,
+  RefreshCw,
+  RotateCcw,
+  UnlockKeyhole,
+  UserCheck,
+  Users,
+} from "lucide-react";
 import { useEffect, useState } from "react";
-import { BrandMark } from "./design-system/BrandMark";
-import { ThemeToggle } from "./design-system/ThemeToggle";
-import { useAuth } from "./features/auth/AuthContext";
+import { Button, IconButton, PageHeader, Panel, StatusPill } from "./design-system/components";
 
 type Aircraft = OperationBoard["aircraft"][number];
 type Rotation = OperationBoard["rotations"][number];
+type QueueGroup = OperationBoard["queueGroups"][number];
 
 type AssistAction = {
   label: string;
   disabled: boolean;
   run: () => void;
 } | null;
-
-type AssistIconName =
-  | "aircraft"
-  | "available"
-  | "chevron"
-  | "device"
-  | "finish"
-  | "gate"
-  | "group"
-  | "logout"
-  | "pause"
-  | "refuel"
-  | "refresh"
-  | "unavailable";
-
-function AssistActionIcon({ name }: { name: AssistIconName }) {
-  if (name === "aircraft") {
-    return (
-      <svg aria-hidden="true" viewBox="0 0 24 24">
-        <path d="m3.5 13.3 7.1 1.1 3.8 6.1h2l-1.7-6.2 4.1-.7c1.4-.2 2.3-.9 2.3-1.8s-.9-1.6-2.3-1.8l-4.1-.7 1.7-6.2h-2l-3.8 6.1-7.1 1.1-1.8-2.1H.5l1 3.6-1 3.6h1.2z" />
-      </svg>
-    );
-  }
-  if (name === "available" || name === "finish") {
-    return (
-      <svg aria-hidden="true" viewBox="0 0 24 24">
-        <circle cx="12" cy="12" r="9" />
-        <path d="m8 12 2.5 2.5L16.5 8.5" />
-      </svg>
-    );
-  }
-  if (name === "refuel") {
-    return (
-      <svg aria-hidden="true" viewBox="0 0 24 24">
-        <path d="M5 21V4.5A1.5 1.5 0 0 1 6.5 3h7A1.5 1.5 0 0 1 15 4.5V21M4 21h12M7.5 7h5v4h-5zM15 7l3 3v7.5a1.5 1.5 0 0 0 3 0V9l-2-2" />
-      </svg>
-    );
-  }
-  if (name === "device") {
-    return (
-      <svg aria-hidden="true" viewBox="0 0 24 24">
-        <rect height="18" rx="2" width="12" x="6" y="3" />
-        <path d="M10 6h4M10 18h4" />
-      </svg>
-    );
-  }
-  if (name === "group") {
-    return (
-      <svg aria-hidden="true" viewBox="0 0 24 24">
-        <circle cx="9" cy="8" r="3" />
-        <circle cx="17" cy="9" r="2.5" />
-        <path d="M3.5 19c.3-4 2.1-6 5.5-6s5.2 2 5.5 6M14 14c3.3-.8 5.5 1 6 4.2" />
-      </svg>
-    );
-  }
-  if (name === "gate") {
-    return (
-      <svg aria-hidden="true" viewBox="0 0 24 24">
-        <path d="M5 21V4h11v17M5 21h14M9 8h3M9 12h3M16 9h3v8h-3" />
-      </svg>
-    );
-  }
-  if (name === "refresh") {
-    return (
-      <svg aria-hidden="true" viewBox="0 0 24 24">
-        <path d="M20 7v5h-5M4 17v-5h5" />
-        <path d="M18.2 9A7 7 0 0 0 6.3 6.3L4 9M5.8 15A7 7 0 0 0 17.7 17.7L20 15" />
-      </svg>
-    );
-  }
-  if (name === "logout") {
-    return (
-      <svg aria-hidden="true" viewBox="0 0 24 24">
-        <path d="M14 8V5H5v14h9v-3M11 12h9M17 9l3 3-3 3" />
-      </svg>
-    );
-  }
-  if (name === "pause") {
-    return (
-      <svg aria-hidden="true" viewBox="0 0 24 24">
-        <circle cx="12" cy="12" r="9" />
-        <path d="M9.5 8.5v7M14.5 8.5v7" />
-      </svg>
-    );
-  }
-  if (name === "unavailable") {
-    return (
-      <svg aria-hidden="true" viewBox="0 0 24 24">
-        <circle cx="12" cy="12" r="9" />
-        <path d="m5.7 5.7 12.6 12.6" />
-      </svg>
-    );
-  }
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24">
-      <path d="m9 5 7 7-7 7" />
-    </svg>
-  );
-}
-
-function AssistCommandContent({
-  icon,
-  label,
-  trailing = true,
-}: {
-  icon: AssistIconName;
-  label: string;
-  trailing?: boolean;
-}) {
-  return (
-    <>
-      <span className={`assist-command-icon icon-${icon}`}>
-        <AssistActionIcon name={icon} />
-      </span>
-      <span className="assist-command-label">{label}</span>
-      {trailing ? (
-        <span className="assist-command-chevron">
-          <AssistActionIcon name="chevron" />
-        </span>
-      ) : null}
-    </>
-  );
-}
 
 function rotationForAircraft(
   aircraft: Aircraft,
@@ -162,7 +57,7 @@ function assistState(aircraft: Aircraft, rotation: Rotation | undefined) {
     return { key: "unavailable", label: "Nicht verfügbar" };
   }
   if (rotation?.status === "IN_FLIGHT" || aircraft.operationalState === "IN_FLIGHT") {
-    return { key: "in-flight", label: "Im Flug" };
+    return { key: "in-flight", label: "Off-Block" };
   }
   if (rotation?.status === "LANDED" || aircraft.operationalState === "LANDED") {
     return { key: "on-block", label: "On-Block" };
@@ -170,15 +65,85 @@ function assistState(aircraft: Aircraft, rotation: Rotation | undefined) {
   if (rotation?.status === "CALLED" || aircraft.operationalState === "BOARDING") {
     return { key: "boarding", label: "Boarding" };
   }
-  return { key: "ready", label: "Bereit" };
+  return { key: "ready", label: "Verfügbar" };
 }
 
-function eventTime(board: OperationBoard): string {
-  return new Intl.DateTimeFormat("de-DE", {
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: board.event.timeZone,
-  }).format(new Date());
+function groupLabel(group: QueueGroup) {
+  return `${group.productCode}-${String(group.communicationNumber).padStart(3, "0")}`;
+}
+
+function stateTone(key: string): "success" | "warning" | "danger" | "info" | "neutral" {
+  if (["ready", "on-block"].includes(key)) return "success";
+  if (["paused", "refueling"].includes(key)) return "warning";
+  if (key === "unavailable") return "danger";
+  if (["boarding", "in-flight"].includes(key)) return "info";
+  return "neutral";
+}
+
+function AircraftMeta({
+  aircraft,
+  rotation,
+}: {
+  aircraft: Aircraft;
+  rotation: Rotation | undefined;
+}) {
+  return (
+    <span className="assist-v15-aircraft-meta">
+      <span>{aircraft.passengerSeats} Plätze</span>
+      <span>·</span>
+      <span>{rotation?.communicationLabel ?? "Keine Gruppe"}</span>
+      <span>·</span>
+      <span className="assist-v15-gate">
+        <MapPin aria-hidden="true" />
+        {rotation?.gateLabel ?? aircraft.resourceGroupName}
+      </span>
+    </span>
+  );
+}
+
+function StateFlow({ activeKey }: { activeKey: string }) {
+  const steps = [
+    { key: "on-block", label: "On-Block", Icon: CheckCircle2 },
+    { key: "ready", label: "Verfügbar", Icon: UserCheck },
+    { key: "refueling", label: "Tanken", Icon: Fuel },
+    { key: "paused", label: "Pause", Icon: Pause },
+    { key: "unavailable", label: "Nicht verfügbar", Icon: Ban },
+  ];
+  return (
+    <div className="assist-v15-state-flow">
+      {steps.map(({ key, label, Icon }, index) => (
+        <div className="assist-v15-state-segment" key={key}>
+          <div className={`assist-v15-state-step ${key === activeKey ? "is-active" : ""}`}>
+            <Icon aria-hidden="true" />
+            <span>{label}</span>
+          </div>
+          {index < steps.length - 1 ? <ChevronRight aria-hidden="true" /> : null}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function LifecycleFlow({ activeKey }: { activeKey: string }) {
+  const steps = ["Boarding", "Off-Block", "On-Block", "Verfügbar"];
+  const normalized =
+    activeKey === "in-flight"
+      ? "Off-Block"
+      : activeKey === "on-block"
+        ? "On-Block"
+        : activeKey === "ready"
+          ? "Verfügbar"
+          : "Boarding";
+  return (
+    <div className="assist-v15-lifecycle">
+      {steps.map((step, index) => (
+        <div className="assist-v15-lifecycle-segment" key={step}>
+          <span className={step === normalized ? "is-active" : ""}>{step}</span>
+          {index < steps.length - 1 ? <ChevronRight aria-hidden="true" /> : null}
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export function FlightLineAssist({
@@ -198,6 +163,7 @@ export function FlightLineAssist({
   onGroupAttendance,
   onGroupMissing,
   onGroupRecall,
+  onGroupDefer,
   onToggleGroup,
   onRelease,
   selectedQueueGroupIds,
@@ -218,43 +184,34 @@ export function FlightLineAssist({
   onGroupAttendance: (ticketGroupId: string, checkedIn: boolean) => void;
   onGroupMissing: (ticketGroupId: string) => void;
   onGroupRecall: (ticketGroupId: string) => void;
+  onGroupDefer: (ticketGroupId: string) => void;
   onToggleGroup: (ticketGroupId: string, selected: boolean) => void;
   onRelease: (aircraftId: string) => Promise<void>;
   selectedQueueGroupIds: string[];
 }) {
-  const { session, logout } = useAuth();
   const assistClaims = board.assistClaims ?? [];
   const ownServerClaim = assistClaims.find((claim) => claim.deviceId === deviceId);
   const [claimedAircraftId, setClaimedAircraftId] = useState<string | null>(
     ownServerClaim?.aircraftId ?? null,
   );
-  const [queueIndex, setQueueIndex] = useState(0);
+  const [visibleAircraftCount, setVisibleAircraftCount] = useState(5);
   const [claimError, setClaimError] = useState<string | null>(null);
+  const [openGroupMenuId, setOpenGroupMenuId] = useState<string | null>(null);
   const availableAircraft = aircraft.filter((entry) => {
     const claim = assistClaims.find((candidate) => candidate.aircraftId === entry.id);
     return !claim || claim.deviceId === deviceId || entry.id === claimedAircraftId;
   });
   const claimedAircraft = aircraft.find((entry) => entry.id === claimedAircraftId);
-  const normalizedQueueIndex =
-    availableAircraft.length === 0 ? 0 : queueIndex % availableAircraft.length;
-  const visibleAircraft = availableAircraft.length
-    ? [
-        ...availableAircraft.slice(normalizedQueueIndex),
-        ...availableAircraft.slice(0, normalizedQueueIndex),
-      ]
-    : [];
   const activeAircraft = claimedAircraft ?? selectedAircraft;
   const activeRotation = activeAircraft
     ? rotationForAircraft(activeAircraft, board.rotations, board.products)
     : selectedRotation;
   const activeState = activeAircraft ? assistState(activeAircraft, activeRotation) : null;
-  const waitingGroups = board.queueGroups
-    .filter(
-      (group) =>
-        (!activeAircraft || group.resourceGroupId === activeAircraft.resourceGroupId) &&
-        ["QUEUED", "PRESENT", "MISSING"].includes(group.status),
-    )
-    .slice(0, 3);
+  const waitingGroups = board.queueGroups.filter(
+    (group) =>
+      (!activeAircraft || group.resourceGroupId === activeAircraft.resourceGroupId) &&
+      ["QUEUED", "PRESENT", "MISSING"].includes(group.status),
+  );
   const selectedSeatCount = waitingGroups
     .filter((group) => selectedQueueGroupIds.includes(group.id))
     .reduce((sum, group) => sum + group.ticketCount, 0);
@@ -297,242 +254,288 @@ export function FlightLineAssist({
     }
   }
 
-  return (
-    <section className="flight-assist">
-      <header className="assist-header">
-        <div className="assist-brand">
-          <BrandMark />
-          <div>
-            <strong>Flight Line Assist</strong>
-            <small>
-              <i /> Verbunden
-            </small>
-          </div>
-        </div>
-        <div className="assist-live">
-          <i /> Leitstand aktiv
-        </div>
-        <time>
-          <strong>{eventTime(board)}</strong>
-          <small>
-            {new Intl.DateTimeFormat("de-DE", { dateStyle: "medium" }).format(new Date())}
-          </small>
-        </time>
-        <div className="assist-header-tools">
-          {session && session.account.role !== "FLIGHT_LINE" ? (
-            <a href="/flight-line">Supervisor</a>
-          ) : null}
-          <span className="assist-device">
-            <AssistActionIcon name="device" />
-            <span>Gerät FL-03</span>
-          </span>
-          <ThemeToggle />
-          <button
-            className="assist-logout"
-            onClick={() => void logout().then(() => window.location.reload())}
-            type="button"
-          >
-            <AssistActionIcon name="logout" />
-            <span>{session?.account.loginCode ?? "Abmelden"}</span>
-          </button>
-        </div>
-      </header>
+  function runGroupAction(groupId: string, callback: (ticketGroupId: string) => void) {
+    callback(groupId);
+    setOpenGroupMenuId(null);
+  }
 
-      {message || claimError ? <p className="assist-message">{claimError ?? message}</p> : null}
-
-      <div className="assist-main-grid">
-        <section className="assist-pick-list">
-          <div className="assist-section-heading">
-            <div>
-              <h1>Jetzt betreuen</h1>
-              <p>Unübernommene oder dringende Flugzeuge</p>
-            </div>
-            <button
-              aria-label="Ansicht aktualisieren"
-              onClick={() => window.location.reload()}
-              type="button"
+  function renderGroup(group: QueueGroup) {
+    const selected = selectedQueueGroupIds.includes(group.id);
+    const capacityExceeded =
+      !selected && selectedSeatCount + group.ticketCount > (activeAircraft?.passengerSeats ?? 0);
+    return (
+      <div className={`assist-v15-group-row ${selected ? "is-selected" : ""}`} key={group.id}>
+        <label className="assist-v15-group-select">
+          <input
+            checked={selected}
+            disabled={group.status === "MISSING" || capacityExceeded}
+            onChange={(event) => onToggleGroup(group.id, event.target.checked)}
+            type="checkbox"
+          />
+          <Users aria-hidden="true" />
+          <strong>{groupLabel(group)}</strong>
+          <StatusPill tone={group.status === "MISSING" ? "danger" : selected ? "info" : "neutral"}>
+            {group.ticketCount} {group.ticketCount === 1 ? "Person" : "Personen"}
+          </StatusPill>
+        </label>
+        <span className="assist-v15-presence">
+          {group.status === "PRESENT"
+            ? "Anwesend"
+            : group.status === "MISSING"
+              ? "Nicht da"
+              : `${group.presentCount}/${group.ticketCount} vor Ort`}
+        </span>
+        <div className="assist-v15-group-actions">
+          {group.status !== "PRESENT" ? (
+            <Button
+              onClick={() => onGroupAttendance(group.id, true)}
+              size="compact"
+              variant="ghost"
             >
-              <AssistActionIcon name="refresh" />
-            </button>
-          </div>
-          <div className="assist-aircraft-cards">
-            {visibleAircraft.slice(0, 4).map((entry) => {
+              <UserCheck aria-hidden="true" /> Anwesend
+            </Button>
+          ) : null}
+          <Button onClick={() => onGroupMissing(group.id)} size="compact" variant="danger">
+            <Ban aria-hidden="true" /> Nicht da
+          </Button>
+          <Button onClick={() => onGroupRecall(group.id)} size="compact" variant="ghost">
+            <BellRing aria-hidden="true" /> Nachrufen
+          </Button>
+          <Button onClick={() => onGroupDefer(group.id)} size="compact" variant="ghost">
+            <RotateCcw aria-hidden="true" /> Zurückstellen
+          </Button>
+        </div>
+        <div className="assist-v15-group-menu">
+          <IconButton
+            aria-expanded={openGroupMenuId === group.id}
+            label={`Aktionen für ${groupLabel(group)}`}
+            onClick={() =>
+              setOpenGroupMenuId((current) => (current === group.id ? null : group.id))
+            }
+            size="touch"
+          >
+            <MoreHorizontal aria-hidden="true" />
+          </IconButton>
+          {openGroupMenuId === group.id ? (
+            <div className="assist-v15-group-popover">
+              {group.status !== "PRESENT" ? (
+                <Button
+                  onClick={() => runGroupAction(group.id, (id) => onGroupAttendance(id, true))}
+                  size="touch"
+                  variant="ghost"
+                >
+                  <UserCheck aria-hidden="true" /> Anwesend
+                </Button>
+              ) : null}
+              <Button
+                onClick={() => runGroupAction(group.id, onGroupMissing)}
+                size="touch"
+                variant="ghost"
+              >
+                <Ban aria-hidden="true" /> Nicht da
+              </Button>
+              <Button
+                onClick={() => runGroupAction(group.id, onGroupRecall)}
+                size="touch"
+                variant="ghost"
+              >
+                <BellRing aria-hidden="true" /> Nachrufen
+              </Button>
+              <Button
+                onClick={() => runGroupAction(group.id, onGroupDefer)}
+                size="touch"
+                variant="ghost"
+              >
+                <RotateCcw aria-hidden="true" /> Zurückstellen
+              </Button>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <section className={`flight-assist flight-assist-v15 ${claimedAircraft ? "has-claim" : ""}`}>
+      {message || claimError ? (
+        <p className="assist-v15-message" role="status">
+          {claimError ?? message}
+        </p>
+      ) : null}
+
+      {claimedAircraft ? (
+        <Button
+          className="assist-v15-phone-back"
+          onClick={() => void finishClaim()}
+          variant="ghost"
+        >
+          <ArrowLeft aria-hidden="true" /> Anderes Flugzeug
+        </Button>
+      ) : null}
+
+      <div className="assist-v15-workspace">
+        <Panel className="assist-v15-picker" padding="compact">
+          <PageHeader
+            actions={
+              <IconButton
+                label="Flugzeugliste aktualisieren"
+                onClick={() => window.location.reload()}
+              >
+                <RefreshCw aria-hidden="true" />
+              </IconButton>
+            }
+            description="Nicht übernommene Flugzeuge"
+            level={2}
+            title="Flugzeug übernehmen"
+          />
+          <div className="assist-v15-aircraft-list">
+            {availableAircraft.slice(0, visibleAircraftCount).map((entry) => {
               const rotation = rotationForAircraft(entry, board.rotations, board.products);
               const state = assistState(entry, rotation);
               const claimed = entry.id === claimedAircraftId;
               return (
-                <article className={claimed ? "claimed" : ""} key={entry.id}>
-                  <div className="assist-aircraft-title">
-                    <span aria-hidden="true">
-                      <AssistActionIcon name="aircraft" />
-                    </span>
-                    <strong>{entry.registration}</strong>
-                    <small className={claimed ? "busy" : "free"}>
-                      {claimed ? "In Arbeit" : "Frei"}
-                    </small>
+                <article className={claimed ? "is-claimed" : ""} key={entry.id}>
+                  <span className="assist-v15-plane-icon">
+                    <Plane aria-hidden="true" />
+                  </span>
+                  <div className="assist-v15-aircraft-copy">
+                    <div>
+                      <strong>{entry.registration}</strong>
+                      <StatusPill tone={stateTone(state.key)}>{state.label}</StatusPill>
+                    </div>
+                    <AircraftMeta aircraft={entry} rotation={rotation} />
                   </div>
-                  <span className={`assist-state state-${state.key}`}>{state.label}</span>
-                  <p>
-                    <span className="assist-meta-item">
-                      <AssistActionIcon name="group" />
-                      {rotation?.communicationLabel ?? "Keine Gruppe"} ·{" "}
-                      {rotation?.ticketCount ?? 0} Tickets
-                    </span>
-                    <span className="assist-meta-item">
-                      <AssistActionIcon name="gate" />
-                      {rotation?.gateLabel ?? entry.resourceGroupName}
-                    </span>
-                  </p>
+                  <span className="assist-v15-free">
+                    <i /> {claimed ? "Von dir übernommen" : "Frei"}
+                  </span>
                   {!claimed ? (
-                    <button className="assist-claim" onClick={() => claim(entry)} type="button">
-                      <AssistCommandContent icon="aircraft" label="Übernehmen" trailing={false} />
-                    </button>
+                    <Button onClick={() => void claim(entry)} size="compact" variant="primary">
+                      Übernehmen
+                    </Button>
                   ) : null}
                 </article>
               );
             })}
           </div>
-          {availableAircraft.length > 4 ? (
-            <button className="assist-more assist-more-desktop" type="button">
-              <AssistCommandContent icon="aircraft" label="Weitere anzeigen" />
-            </button>
-          ) : null}
-          {availableAircraft.length > 1 ? (
-            <button
-              className="assist-more assist-more-phone"
-              onClick={() => setQueueIndex((current) => (current + 1) % availableAircraft.length)}
-              type="button"
+          {visibleAircraftCount < availableAircraft.length ? (
+            <Button
+              className="assist-v15-more"
+              onClick={() => setVisibleAircraftCount((current) => current + 5)}
+              variant="ghost"
             >
-              <AssistCommandContent icon="aircraft" label="Nächstes Flugzeug" />
-            </button>
+              <ChevronDown aria-hidden="true" /> Weitere anzeigen
+            </Button>
           ) : null}
-        </section>
+        </Panel>
 
-        <section className={claimedAircraftId ? "assist-current has-claim" : "assist-current"}>
-          <div className="assist-section-heading">
-            <div>
-              <h2>Betreutes Flugzeug</h2>
-              <p>Deine aktuelle Betreuung auf diesem Gerät</p>
-            </div>
-          </div>
-          {activeAircraft ? (
-            <>
-              <div className="assist-current-summary">
-                <strong>{activeAircraft.registration}</strong>
-                <span className={`assist-state state-${activeState?.key}`}>
-                  {activeState?.label}
+        <div className="assist-v15-active-column">
+          <Panel className="assist-v15-aircraft-panel" padding="compact">
+            {activeAircraft ? (
+              <>
+                <div className="assist-v15-active-heading">
+                  <span className="assist-v15-plane-icon">
+                    <Plane aria-hidden="true" />
+                  </span>
+                  <div>
+                    <strong>{activeAircraft.registration}</strong>
+                    {claimedAircraft ? (
+                      <StatusPill tone="info">Von dir übernommen</StatusPill>
+                    ) : null}
+                    <AircraftMeta aircraft={activeAircraft} rotation={activeRotation} />
+                  </div>
+                  {claimedAircraft ? (
+                    <Button onClick={() => void finishClaim()} size="compact" variant="danger">
+                      <UnlockKeyhole aria-hidden="true" /> Flugzeug freigeben
+                    </Button>
+                  ) : null}
+                </div>
+                <StateFlow activeKey={activeState?.key ?? "ready"} />
+              </>
+            ) : (
+              <div className="assist-v15-empty">
+                <Plane aria-hidden="true" />
+                <p>Ein Flugzeug auswählen und übernehmen.</p>
+              </div>
+            )}
+          </Panel>
+
+          <Panel className="assist-v15-groups" padding="compact">
+            <PageHeader
+              actions={
+                <span className="assist-v15-capacity">
+                  <Users aria-hidden="true" /> {selectedSeatCount} von{" "}
+                  {activeAircraft?.passengerSeats ?? 0} Plätzen
                 </span>
-                <p>
-                  <span className="assist-meta-item">
-                    <AssistActionIcon name="group" />
-                    {activeRotation?.communicationLabel ?? "Keine Gruppe"} ·{" "}
-                    {activeRotation?.ticketCount ?? 0} Tickets
-                  </span>
-                  <span className="assist-meta-item">
-                    <AssistActionIcon name="gate" />
-                    {activeRotation?.gateLabel ?? activeAircraft.resourceGroupName}
-                  </span>
-                </p>
-              </div>
-              <h3>Nächste Aktion wählen</h3>
-              <div className="assist-actions">
-                {action ? (
-                  <button disabled={action.disabled} onClick={action.run} type="button">
-                    <AssistCommandContent icon="available" label={action.label} />
-                  </button>
+              }
+              description="Wähle vollständige Gruppen aus und kombiniere bis zur verfügbaren Platzzahl."
+              level={2}
+              title="Buchungsgruppen auswählen & kombinieren"
+            />
+            <div className="assist-v15-group-section">
+              <h3>Ausgewählt ({selectedQueueGroupIds.length} Gruppen)</h3>
+              <div className="assist-v15-group-list">
+                {waitingGroups
+                  .filter((group) => selectedQueueGroupIds.includes(group.id))
+                  .map(renderGroup)}
+                {selectedQueueGroupIds.length === 0 ? (
+                  <p className="assist-v15-no-groups">Noch keine Gruppe ausgewählt.</p>
                 ) : null}
-                <button onClick={onAvailable} type="button">
-                  <AssistCommandContent icon="available" label="Bereit" />
-                </button>
-                <button onClick={onRefuel} type="button">
-                  <AssistCommandContent icon="refuel" label="Tanken" />
-                </button>
-                <button className="pause" onClick={onPause} type="button">
-                  <AssistCommandContent icon="pause" label="Pause" />
-                </button>
-                <button className="unavailable" onClick={onUnavailable} type="button">
-                  <AssistCommandContent icon="unavailable" label="Nicht verfügbar" />
-                </button>
               </div>
-              <div className="assist-current-footer">
-                <button className="assist-finish" onClick={() => void finishClaim()} type="button">
-                  <AssistCommandContent
-                    icon="finish"
-                    label="Betreuung abschließen"
-                    trailing={false}
-                  />
-                </button>
-              </div>
-            </>
-          ) : (
-            <p className="assist-empty">Ein Flugzeug auswählen und übernehmen.</p>
-          )}
-        </section>
-      </div>
-
-      <section className="assist-gate-groups">
-        <div className="assist-section-heading">
-          <div>
-            <h2>Gruppen auswählen</h2>
-            <p>
-              Vollständige Gruppen · {selectedSeatCount} von {activeAircraft?.passengerSeats ?? 0}{" "}
-              Plätzen
-            </p>
-          </div>
-        </div>
-        {waitingGroups.map((group) => (
-          <div
-            className={selectedQueueGroupIds.includes(group.id) ? "selected" : ""}
-            key={group.id}
-          >
-            <label>
-              <input
-                checked={selectedQueueGroupIds.includes(group.id)}
-                disabled={
-                  group.status === "MISSING" ||
-                  (!selectedQueueGroupIds.includes(group.id) &&
-                    selectedSeatCount + group.ticketCount > (activeAircraft?.passengerSeats ?? 0))
-                }
-                onChange={(event) => onToggleGroup(group.id, event.target.checked)}
-                type="checkbox"
-              />
-              <strong>
-                {group.productCode}-{String(group.communicationNumber).padStart(3, "0")}
-              </strong>
-            </label>
-            <span>
-              {group.status === "PRESENT"
-                ? "Anwesend"
-                : group.status === "MISSING"
-                  ? "Nicht da"
-                  : "Wartet"}
-            </span>
-            <span>
-              {group.presentCount} / {group.ticketCount} Tickets vor Ort
-            </span>
-            <span>{group.productName}</span>
-            <div className="assist-group-actions">
-              <button
-                onClick={() => onGroupAttendance(group.id, group.status !== "PRESENT")}
-                type="button"
-              >
-                {group.status === "PRESENT" ? "Anwesenheit aufheben" : "Anwesend"}
-              </button>
-              <button
-                className="unavailable"
-                onClick={() => onGroupMissing(group.id)}
-                type="button"
-              >
-                Nicht da
-              </button>
-              <button onClick={() => onGroupRecall(group.id)} type="button">
-                Nachrufen{group.recallCount > 0 ? ` (${group.recallCount})` : ""}
-              </button>
             </div>
-          </div>
-        ))}
-        {waitingGroups.length === 0 ? <p>Aktuell wartet keine Gruppe am Gate.</p> : null}
-      </section>
+            <div className="assist-v15-group-section">
+              <h3>Verfügbare Alternativen</h3>
+              <div className="assist-v15-group-list">
+                {waitingGroups
+                  .filter((group) => !selectedQueueGroupIds.includes(group.id))
+                  .map(renderGroup)}
+                {waitingGroups.length === selectedQueueGroupIds.length ? (
+                  <p className="assist-v15-no-groups">Keine weitere passende Gruppe.</p>
+                ) : null}
+              </div>
+            </div>
+            <div className="assist-v15-command-bar">
+              {action ? (
+                <Button
+                  disabled={action.disabled}
+                  onClick={action.run}
+                  size="touch"
+                  variant="primary"
+                >
+                  <Check aria-hidden="true" /> {action.label}
+                </Button>
+              ) : (
+                <Button disabled size="touch" variant="primary">
+                  <Check aria-hidden="true" /> Nächste Aktion noch nicht verfügbar
+                </Button>
+              )}
+              <Button
+                className="assist-v15-release-phone"
+                onClick={() => void finishClaim()}
+                size="touch"
+                variant="danger"
+              >
+                <UnlockKeyhole aria-hidden="true" /> Flugzeug freigeben
+              </Button>
+              <div className="assist-v15-follow-up">
+                <span>Anschließende Schritte:</span>
+                <Button onClick={onAvailable} size="compact" variant="ghost">
+                  <UserCheck aria-hidden="true" /> Verfügbar
+                </Button>
+                <Button onClick={onRefuel} size="compact" variant="ghost">
+                  <Fuel aria-hidden="true" /> Tanken
+                </Button>
+                <Button onClick={onPause} size="compact" variant="ghost">
+                  <Pause aria-hidden="true" /> Pause
+                </Button>
+                <Button onClick={onUnavailable} size="compact" variant="ghost">
+                  <Ban aria-hidden="true" /> Nicht verfügbar
+                </Button>
+              </div>
+              <LifecycleFlow activeKey={activeState?.key ?? "boarding"} />
+            </div>
+          </Panel>
+        </div>
+      </div>
     </section>
   );
 }

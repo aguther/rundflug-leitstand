@@ -5409,9 +5409,6 @@ p {
   font-size: 1.5rem;
   cursor: pointer;
 }
-.flight-line-shell.assist-shell > .app-header,
-.flight-line-shell.assist-shell > footer,
-.flight-line-shell.assist-shell > .operational-notice,
 .flight-line-shell > .emergency-control:not([open]) {
   display: none;
 }
@@ -5998,7 +5995,6 @@ p {
   min-height: 100dvh;
   background: #080a0c;
 }
-.assist-shell > .app-header,
 .assist-shell > footer {
   display: none;
 }

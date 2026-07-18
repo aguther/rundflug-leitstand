@@ -1,0 +1,654 @@
+/* biome-ignore-all lint/style/noDescendingSpecificity: this late V1.5 layer deliberately overrides legacy Assist CSS. */
+/* V1.5 Flight Line Assist layout. Controls and visual states come from the shared design system. */
+.assist-shell {
+  min-height: 100dvh;
+  background: var(--ui-bg);
+}
+
+.assist-shell > .operational-notice {
+  width: 100%;
+  max-width: none;
+}
+
+.flight-assist-v15 {
+  width: min(1480px, 100%);
+  min-height: auto;
+  margin: 0 auto;
+  padding: var(--space-3);
+  color: var(--ui-text);
+  background: var(--ui-bg);
+}
+
+.assist-v15-message {
+  margin: 0 0 var(--space-3);
+  padding: 8px 12px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-md);
+  color: var(--ui-text);
+  background: var(--ui-surface-raised);
+}
+
+.assist-v15-workspace {
+  display: grid;
+  grid-template-columns: minmax(300px, 0.34fr) minmax(620px, 1fr);
+  gap: var(--space-3);
+  align-items: start;
+}
+
+.assist-v15-picker,
+.assist-v15-aircraft-panel,
+.assist-v15-groups {
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  box-shadow: none;
+}
+
+.flight-assist-v15 .ds-page-header {
+  min-height: 48px;
+  margin-bottom: var(--space-3);
+  padding: 0 0 var(--space-3);
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.flight-assist-v15 .ds-page-header h2 {
+  font-size: 1rem;
+  line-height: 1.25;
+}
+
+.flight-assist-v15 .ds-page-header p {
+  margin-top: 2px;
+  font-size: 0.78rem;
+}
+
+.assist-v15-aircraft-list {
+  display: grid;
+  gap: 8px;
+}
+
+.assist-v15-aircraft-list article {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  gap: 4px 10px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-md);
+  background: var(--ui-surface-raised);
+}
+
+.assist-v15-aircraft-list article.is-claimed {
+  border-color: var(--ui-accent);
+}
+
+.assist-v15-plane-icon {
+  width: 36px;
+  height: 36px;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border: 1px solid var(--ui-accent);
+  border-radius: 50%;
+  color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+}
+
+.assist-v15-plane-icon svg {
+  width: 19px;
+  height: 19px;
+}
+
+.assist-v15-aircraft-copy {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.assist-v15-aircraft-copy > div,
+.assist-v15-active-heading > div > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.assist-v15-aircraft-copy strong {
+  font-size: 1rem;
+  letter-spacing: 0.035em;
+}
+
+.assist-v15-aircraft-meta {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  color: var(--ui-muted);
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+.assist-v15-gate {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.assist-v15-gate svg {
+  width: 13px;
+  height: 13px;
+  flex: 0 0 auto;
+}
+
+.assist-v15-free {
+  grid-column: 3;
+  grid-row: 1;
+  align-self: start;
+  color: var(--ui-muted);
+  font-size: 0.73rem;
+  white-space: nowrap;
+}
+
+.assist-v15-free i {
+  width: 8px;
+  height: 8px;
+  display: inline-block;
+  margin-right: 4px;
+  border-radius: 50%;
+  background: var(--ui-success);
+}
+
+.assist-v15-aircraft-list article > .ds-button {
+  grid-column: 3;
+  grid-row: 2;
+}
+
+.assist-v15-more {
+  width: 100%;
+  margin-top: 8px;
+}
+
+.assist-v15-active-column {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-3);
+}
+
+.assist-v15-active-heading {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 2px 2px var(--space-3);
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.assist-v15-active-heading > .assist-v15-plane-icon {
+  width: 44px;
+  height: 44px;
+}
+
+.assist-v15-active-heading > div {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.assist-v15-active-heading > div > strong {
+  font-size: 1.35rem;
+  letter-spacing: 0.04em;
+}
+
+.assist-v15-active-heading > div > .ds-status-pill {
+  position: absolute;
+  margin-left: 112px;
+  margin-top: 3px;
+}
+
+.assist-v15-state-flow {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0;
+  padding-top: var(--space-3);
+}
+
+.assist-v15-state-segment,
+.assist-v15-lifecycle-segment {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 18px;
+  align-items: center;
+}
+
+.assist-v15-state-segment:last-child,
+.assist-v15-lifecycle-segment:last-child {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.assist-v15-state-segment > svg,
+.assist-v15-lifecycle-segment > svg {
+  width: 16px;
+  height: 16px;
+  color: var(--ui-muted);
+}
+
+.assist-v15-state-step {
+  min-height: 74px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 5px;
+  padding: 8px 4px;
+  border: 1px dashed var(--ui-border-strong);
+  border-radius: var(--radius-md);
+  color: var(--ui-muted);
+  font-size: 0.75rem;
+  text-align: center;
+}
+
+.assist-v15-state-step svg {
+  width: 24px;
+  height: 24px;
+}
+
+.assist-v15-state-step.is-active {
+  border-style: solid;
+  border-color: var(--ui-accent);
+  color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+}
+
+.assist-v15-groups .ds-page-header {
+  align-items: center;
+}
+
+.assist-v15-capacity {
+  min-height: var(--control-default);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 10px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--radius-md);
+  color: var(--ui-text);
+  background: var(--ui-control);
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.assist-v15-capacity svg {
+  width: 17px;
+  height: 17px;
+}
+
+.assist-v15-group-section + .assist-v15-group-section {
+  margin-top: 12px;
+}
+
+.assist-v15-group-section h3 {
+  margin: 0 0 5px;
+  color: var(--ui-muted);
+  font-size: 0.68rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.assist-v15-group-list {
+  overflow: visible;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-md);
+}
+
+.assist-v15-group-row {
+  position: relative;
+  min-height: 46px;
+  display: grid;
+  grid-template-columns: minmax(215px, 1fr) 86px auto;
+  gap: 8px;
+  align-items: center;
+  padding: 5px 8px;
+  background: var(--ui-surface-raised);
+}
+
+.assist-v15-group-row + .assist-v15-group-row {
+  border-top: 1px solid var(--ui-border);
+}
+
+.assist-v15-group-row.is-selected {
+  background: var(--ui-accent-soft);
+}
+
+.assist-v15-group-select {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 22px 18px minmax(54px, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.assist-v15-group-select input {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  accent-color: var(--ui-accent);
+}
+
+.assist-v15-group-select > svg {
+  width: 18px;
+  height: 18px;
+  color: var(--ui-muted);
+}
+
+.assist-v15-group-select strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.assist-v15-presence {
+  color: var(--ui-muted);
+  font-size: 0.72rem;
+  text-align: right;
+}
+
+.assist-v15-group-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 3px;
+}
+
+.assist-v15-group-actions .ds-button {
+  padding-inline: 7px;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.assist-v15-group-menu,
+.assist-v15-lifecycle,
+.flight-assist-v15 .assist-v15-release-phone,
+.flight-assist-v15 .assist-v15-phone-back {
+  display: none;
+}
+
+.assist-v15-no-groups,
+.assist-v15-empty {
+  margin: 0;
+  padding: 14px;
+  color: var(--ui-muted);
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+.assist-v15-empty svg {
+  width: 28px;
+  height: 28px;
+  margin-bottom: 6px;
+}
+
+.assist-v15-command-bar {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--ui-border);
+}
+
+.assist-v15-command-bar > .ds-button--primary {
+  width: 100%;
+}
+
+.assist-v15-follow-up {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  color: var(--ui-muted);
+  font-size: 0.72rem;
+}
+
+.assist-v15-follow-up .ds-button {
+  color: var(--ui-muted);
+}
+
+@media (max-width: 1180px) {
+  .assist-v15-workspace {
+    grid-template-columns: minmax(280px, 0.36fr) minmax(0, 1fr);
+  }
+
+  .assist-v15-group-row {
+    grid-template-columns: minmax(190px, 1fr) 75px auto;
+  }
+
+  .assist-v15-group-actions .ds-button {
+    width: var(--control-compact);
+    padding: 0;
+    font-size: 0;
+  }
+
+  .assist-v15-group-actions .ds-button svg {
+    width: 15px;
+    height: 15px;
+  }
+}
+
+@media (max-width: 720px) {
+  .assist-shell > .operational-notice {
+    font-size: 0.72rem;
+  }
+
+  .flight-assist-v15 {
+    width: 100vw;
+    max-width: 100vw;
+    padding: 12px;
+    overflow-x: clip;
+  }
+
+  .flight-assist-v15 .assist-v15-phone-back {
+    display: inline-flex;
+    margin-bottom: 8px;
+    padding-inline: 0;
+    color: var(--ui-accent);
+  }
+
+  .assist-v15-workspace {
+    display: block;
+  }
+
+  .flight-assist-v15.has-claim .assist-v15-picker {
+    display: none;
+  }
+
+  .assist-v15-picker {
+    margin-bottom: 12px;
+  }
+
+  .assist-v15-aircraft-list article {
+    grid-template-columns: 38px minmax(0, 1fr) auto;
+  }
+
+  .assist-v15-active-column {
+    width: calc(100vw - 24px);
+    max-width: calc(100vw - 24px);
+    gap: 12px;
+  }
+
+  .assist-v15-aircraft-panel,
+  .assist-v15-groups {
+    padding: 14px;
+  }
+
+  .assist-v15-active-heading {
+    grid-template-columns: 44px minmax(0, 1fr);
+  }
+
+  .assist-v15-active-heading > .ds-button {
+    display: none;
+  }
+
+  .assist-v15-active-heading > div > strong {
+    font-size: 1.5rem;
+  }
+
+  .assist-v15-active-heading > div > .ds-status-pill {
+    position: static;
+    width: max-content;
+    margin: 0;
+  }
+
+  .assist-v15-state-flow {
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .assist-v15-state-segment {
+    grid-template-columns: minmax(0, 1fr) 12px;
+  }
+
+  .assist-v15-state-step {
+    min-height: 88px;
+    padding-inline: 2px;
+    font-size: 0.65rem;
+  }
+
+  .assist-v15-state-segment > svg {
+    width: 12px;
+  }
+
+  .assist-v15-groups .ds-page-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+  }
+
+  .assist-v15-groups .ds-page-header > div:first-child {
+    min-width: 0;
+  }
+
+  .assist-v15-groups .ds-page-header h2 {
+    font-size: 1.25rem;
+  }
+
+  .assist-v15-groups .ds-page-header-actions {
+    align-self: start;
+  }
+
+  .assist-v15-capacity {
+    min-height: var(--control-touch);
+    padding-inline: 9px;
+    font-size: 0.74rem;
+  }
+
+  .assist-v15-group-row {
+    min-height: 64px;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .assist-v15-group-select {
+    grid-template-columns: 32px 24px minmax(52px, 1fr) auto;
+  }
+
+  .assist-v15-group-select input {
+    width: 28px;
+    height: 28px;
+  }
+
+  .assist-v15-group-select > svg {
+    width: 22px;
+    height: 22px;
+  }
+
+  .assist-v15-group-select strong {
+    font-size: 1rem;
+  }
+
+  .assist-v15-presence,
+  .assist-v15-group-actions {
+    display: none;
+  }
+
+  .assist-v15-group-menu {
+    position: relative;
+    display: block;
+  }
+
+  .assist-v15-group-popover {
+    position: absolute;
+    z-index: 20;
+    top: calc(100% + 4px);
+    right: 0;
+    width: 190px;
+    display: grid;
+    padding: 4px;
+    border: 1px solid var(--ui-border-strong);
+    border-radius: var(--radius-md);
+    background: var(--ui-surface-raised);
+    box-shadow: var(--shadow-lg);
+  }
+
+  .assist-v15-group-popover .ds-button {
+    width: 100%;
+    justify-content: flex-start;
+    border: 0;
+  }
+
+  .assist-v15-follow-up {
+    display: none;
+  }
+
+  .flight-assist-v15 .assist-v15-release-phone {
+    width: 100%;
+    display: inline-flex;
+    border-color: transparent;
+    background: transparent;
+  }
+
+  .assist-v15-lifecycle {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    padding-top: 12px;
+    border-top: 1px solid var(--ui-border);
+  }
+
+  .assist-v15-lifecycle-segment {
+    grid-template-columns: minmax(0, 1fr) 12px;
+  }
+
+  .assist-v15-lifecycle-segment span {
+    color: var(--ui-muted);
+    font-size: 0.65rem;
+    text-align: center;
+  }
+
+  .assist-v15-lifecycle-segment span.is-active {
+    color: var(--ui-accent);
+  }
+}
+
+@media (max-width: 420px) {
+  .assist-v15-aircraft-meta span:nth-child(2),
+  .assist-v15-aircraft-meta span:nth-child(3),
+  .assist-v15-aircraft-meta span:nth-child(4) {
+    display: none;
+  }
+
+  .assist-v15-groups .ds-page-header {
+    grid-template-columns: 1fr;
+  }
+
+  .assist-v15-groups .ds-page-header-actions {
+    margin-top: 8px;
+  }
+
+  .assist-v15-group-select {
+    grid-template-columns: 28px 20px minmax(48px, 1fr) auto;
+    gap: 6px;
+  }
+}
