@@ -1328,24 +1328,50 @@ app.delete("/api/admin/events/:eventId/logo", async (context) => {
       403,
     );
   }
+  const expectedVersion = Number(context.req.header("x-expected-version"));
+  const commandId = context.req.header("x-command-id")?.trim();
+  if (!commandId || !Number.isInteger(expectedVersion) || expectedVersion < 0) {
+    return context.json(
+      { error: { code: "INVALID_COMMAND", message: "Kommando-ID oder Version fehlt." } },
+      400,
+    );
+  }
   const event = await context.env.DB.prepare(
     "SELECT version, logo_object_key FROM operation_days WHERE id = ?1",
   )
     .bind(eventId)
     .first<{ version: number; logo_object_key: string | null }>();
   if (!event) return context.body(null, 404);
+  if (event.version !== expectedVersion) {
+    return context.json(
+      {
+        error: { code: "STALE_VERSION", message: "Veranstaltung wurde zwischenzeitlich geändert." },
+      },
+      409,
+    );
+  }
   const now = new Date().toISOString();
+  const response = { removed: true };
   await context.env.DB.batch([
     context.env.DB.prepare(
       `UPDATE operation_days SET logo_object_key = NULL, logo_media_type = NULL,
-          logo_updated_at = ?1, version = version + 1, updated_at = ?1 WHERE id = ?2`,
-    ).bind(now, eventId),
+          logo_updated_at = ?1, version = version + 1, updated_at = ?1
+        WHERE id = ?2 AND version = ?3`,
+    ).bind(now, eventId, expectedVersion),
     context.env.DB.prepare(
       `INSERT INTO operational_events
         (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type,
          aggregate_id, aggregate_version, payload_json)
        VALUES (?1, ?2, 'EVENT_LOGO_REMOVED', ?3, ?4, 'OPERATION_DAY', ?2, ?5, '{}')`,
     ).bind(crypto.randomUUID(), eventId, now, device.id, event.version + 1),
+    context.env.DB.prepare(
+      `INSERT INTO idempotency_receipts
+        (command_id, operation_day_id, device_id, command_type, received_at, response_json)
+       VALUES (?1, ?2, ?3, 'REMOVE_EVENT_LOGO', ?4, ?5)`,
+    ).bind(commandId, eventId, device.id, now, JSON.stringify(response)),
+    context.env.DB.prepare(
+      "INSERT INTO outbox (id, operation_day_id, topic, payload_json, created_at) VALUES (?1, ?2, 'EVENT_STATE_CHANGED', ?3, ?4)",
+    ).bind(crypto.randomUUID(), eventId, JSON.stringify(response), now),
   ]);
   if (event.logo_object_key) await context.env.BACKUPS.delete(event.logo_object_key);
   return context.body(null, 204);

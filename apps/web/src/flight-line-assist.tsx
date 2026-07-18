@@ -195,7 +195,12 @@ export function FlightLineAssist({
   onAvailable,
   deviceId,
   onClaim,
+  onGroupAttendance,
+  onGroupMissing,
+  onGroupRecall,
+  onToggleGroup,
   onRelease,
+  selectedQueueGroupIds,
 }: {
   board: OperationBoard;
   aircraft: Aircraft[];
@@ -210,7 +215,12 @@ export function FlightLineAssist({
   onAvailable: () => void;
   deviceId: string;
   onClaim: (aircraftId: string) => Promise<void>;
+  onGroupAttendance: (ticketGroupId: string, checkedIn: boolean) => void;
+  onGroupMissing: (ticketGroupId: string) => void;
+  onGroupRecall: (ticketGroupId: string) => void;
+  onToggleGroup: (ticketGroupId: string, selected: boolean) => void;
   onRelease: (aircraftId: string) => Promise<void>;
+  selectedQueueGroupIds: string[];
 }) {
   const { session, logout } = useAuth();
   const assistClaims = board.assistClaims ?? [];
@@ -238,9 +248,16 @@ export function FlightLineAssist({
     ? rotationForAircraft(activeAircraft, board.rotations, board.products)
     : selectedRotation;
   const activeState = activeAircraft ? assistState(activeAircraft, activeRotation) : null;
-  const waitingGroups = board.rotations
-    .filter((rotation) => ["DRAFT", "CALLED"].includes(rotation.status))
+  const waitingGroups = board.queueGroups
+    .filter(
+      (group) =>
+        (!activeAircraft || group.resourceGroupId === activeAircraft.resourceGroupId) &&
+        ["QUEUED", "PRESENT", "MISSING"].includes(group.status),
+    )
     .slice(0, 3);
+  const selectedSeatCount = waitingGroups
+    .filter((group) => selectedQueueGroupIds.includes(group.id))
+    .reduce((sum, group) => sum + group.ticketCount, 0);
 
   useEffect(() => {
     if (!claimedAircraftId && ownServerClaim) setClaimedAircraftId(ownServerClaim.aircraftId);
@@ -456,25 +473,62 @@ export function FlightLineAssist({
       <section className="assist-gate-groups">
         <div className="assist-section-heading">
           <div>
-            <h2>Am Gate</h2>
-            <p>Gruppenübersicht</p>
+            <h2>Gruppen auswählen</h2>
+            <p>
+              Vollständige Gruppen · {selectedSeatCount} von {activeAircraft?.passengerSeats ?? 0}{" "}
+              Plätzen
+            </p>
           </div>
         </div>
-        {waitingGroups.map((rotation) => (
-          <div key={rotation.id}>
-            <strong>{rotation.communicationLabel}</strong>
+        {waitingGroups.map((group) => (
+          <div
+            className={selectedQueueGroupIds.includes(group.id) ? "selected" : ""}
+            key={group.id}
+          >
+            <label>
+              <input
+                checked={selectedQueueGroupIds.includes(group.id)}
+                disabled={
+                  group.status === "MISSING" ||
+                  (!selectedQueueGroupIds.includes(group.id) &&
+                    selectedSeatCount + group.ticketCount > (activeAircraft?.passengerSeats ?? 0))
+                }
+                onChange={(event) => onToggleGroup(group.id, event.target.checked)}
+                type="checkbox"
+              />
+              <strong>
+                {group.productCode}-{String(group.communicationNumber).padStart(3, "0")}
+              </strong>
+            </label>
             <span>
-              {rotation.status === "CALLED"
-                ? "Boarding"
-                : rotation.precalledAt
-                  ? "GO TO GATE"
+              {group.status === "PRESENT"
+                ? "Anwesend"
+                : group.status === "MISSING"
+                  ? "Nicht da"
                   : "Wartet"}
             </span>
             <span>
-              {rotation.ticketCount} / {rotation.ticketCount} Tickets vor Ort
+              {group.presentCount} / {group.ticketCount} Tickets vor Ort
             </span>
-            <span>{rotation.gateLabel}</span>
-            <button type="button">Gruppe nachrufen</button>
+            <span>{group.productName}</span>
+            <div className="assist-group-actions">
+              <button
+                onClick={() => onGroupAttendance(group.id, group.status !== "PRESENT")}
+                type="button"
+              >
+                {group.status === "PRESENT" ? "Anwesenheit aufheben" : "Anwesend"}
+              </button>
+              <button
+                className="unavailable"
+                onClick={() => onGroupMissing(group.id)}
+                type="button"
+              >
+                Nicht da
+              </button>
+              <button onClick={() => onGroupRecall(group.id)} type="button">
+                Nachrufen{group.recallCount > 0 ? ` (${group.recallCount})` : ""}
+              </button>
+            </div>
           </div>
         ))}
         {waitingGroups.length === 0 ? <p>Aktuell wartet keine Gruppe am Gate.</p> : null}

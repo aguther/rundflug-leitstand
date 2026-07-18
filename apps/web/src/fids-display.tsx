@@ -6,7 +6,7 @@ import { ThemeToggle } from "./design-system/ThemeToggle";
 type DisplayMode = "standard" | "terminal";
 type PublicGroup = PublicBoard["groups"][number];
 
-const DEFAULT_DEPARTED_VISIBILITY_MINUTES = 5;
+const DEFAULT_DEPARTED_VISIBILITY_SECONDS = 15;
 
 function groupCode(group: PublicGroup): string {
   return `${group.productCode}-${String(group.communicationNumber).padStart(3, "0")}`;
@@ -113,7 +113,7 @@ export function FidsDisplay({
   );
   const departedVisibilitySeconds = Number.isFinite(requestedVisibilitySeconds)
     ? Math.min(900, Math.max(5, requestedVisibilitySeconds))
-    : (board?.departedVisibilitySeconds ?? DEFAULT_DEPARTED_VISIBILITY_MINUTES * 60);
+    : (board?.departedVisibilitySeconds ?? DEFAULT_DEPARTED_VISIBILITY_SECONDS);
   const groups = useVisibleGroups(board?.groups ?? [], departedVisibilitySeconds);
 
   useEffect(() => {

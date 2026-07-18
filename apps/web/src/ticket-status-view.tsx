@@ -132,7 +132,7 @@ export function TicketStatusView({ code }: { code: string }) {
     }
   };
   return (
-    <Shell title="Ticketstatus">
+    <Shell publicView title="Ticketstatus">
       <section className="ticket-status-page">
         <span className="eyebrow">Ihr Ticketcode</span>
         <code>{code}</code>

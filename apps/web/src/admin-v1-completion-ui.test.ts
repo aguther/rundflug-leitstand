@@ -117,9 +117,9 @@ describe("V1 administration completion UI", () => {
     expect(appSource).toContain("Endgültig löschen");
   });
 
-  it("uses the approved compact list-and-editor administration as the default workspace", () => {
+  it("opens the approved overview and keeps the compact list-and-editor workspace", () => {
     expect(appSource).toContain("useState<AdminArea>(() => {");
-    expect(appSource).toContain(': "master-data";');
+    expect(appSource).toContain(': "overview";');
     expect(appSource).toContain("useState<MasterDataCategory>(() => {");
     expect(appSource).toContain(': "resource-groups";');
     expect(appSource).toContain("const [masterEditorOpen, setMasterEditorOpen] = useState(false);");

@@ -44,6 +44,10 @@ export function FlightLineView() {
   const [emergencyReason, setEmergencyReason] = useState("");
   const [nextAircraftId, setNextAircraftId] = useState("");
   const [nextPilotId, setNextPilotId] = useState("");
+  const [turnaroundNextState, setTurnaroundNextState] = useState<
+    "AVAILABLE" | "REFUELING" | "PAUSED" | "INACTIVE"
+  >("AVAILABLE");
+  const [selectedQueueGroupIds, setSelectedQueueGroupIds] = useState<string[]>([]);
   const [dispositionOpen, setDispositionOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [dispositionCapacity, setDispositionCapacity] = useState(1);
@@ -81,6 +85,15 @@ export function FlightLineView() {
   const missingTickets =
     selected?.tickets.filter((ticket) => ticket.attendanceStatus !== "CHECKED_IN") ?? [];
   const replacement = selected ? replacementSuggestion(selected, operationalRotations ?? []) : null;
+  const compatibleQueueGroups =
+    board?.queueGroups.filter(
+      (group) =>
+        group.resourceGroupId === selectedAircraft?.resourceGroupId &&
+        ["QUEUED", "PRESENT", "MISSING"].includes(group.status),
+    ) ?? [];
+  const selectedQueueSeatCount = compatibleQueueGroups
+    .filter((group) => selectedQueueGroupIds.includes(group.id))
+    .reduce((sum, group) => sum + group.ticketCount, 0);
   useEffect(() => {
     if (!selectedAircraftId && operationalAircraft[0]) {
       setSelectedAircraftId(operationalAircraft[0].id);
@@ -125,9 +138,11 @@ export function FlightLineView() {
             type: "CALL_NEXT",
             payload: {
               ticketGroupIds:
-                selected.bookingGroups.length > 0
-                  ? selected.bookingGroups.map((group) => group.id)
-                  : [selected.ticketGroupId],
+                selectedQueueGroupIds.length > 0
+                  ? selectedQueueGroupIds
+                  : selected.bookingGroups.length > 0
+                    ? selected.bookingGroups.map((group) => group.id)
+                    : [selected.ticketGroupId],
               aircraftId: nextAircraftId,
               pilotId: nextPilotId,
             },
@@ -140,7 +155,7 @@ export function FlightLineView() {
             ? {
                 ...commandBase,
                 type: "COMPLETE_TURNAROUND",
-                payload: { rotationId: selected.id, nextAircraftState: "AVAILABLE" },
+                payload: { rotationId: selected.id, nextAircraftState: turnaroundNextState },
               }
             : { ...commandBase, type: action.command, payload: { rotationId: selected.id } },
           deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
@@ -150,6 +165,69 @@ export function FlightLineView() {
       await refresh();
     } catch (reason) {
       setMessage(reason instanceof Error ? reason.message : "Aktion fehlgeschlagen.");
+    }
+  }
+
+  async function setGroupAttendance(ticketGroupId: string, checkedIn: boolean) {
+    if (!board) return;
+    try {
+      await sendCommand(
+        {
+          commandId: crypto.randomUUID(),
+          eventId: EVENT_ID,
+          deviceId: FLIGHT_LINE_DEVICE_ID,
+          expectedVersion: board.event.version,
+          issuedAt: new Date().toISOString(),
+          type: "SET_TICKET_GROUP_ATTENDANCE",
+          payload: { ticketGroupId, checkedIn },
+        },
+        deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
+      );
+      setMessage(
+        checkedIn ? "Gruppe als anwesend markiert." : "Anwesenheit der Gruppe aufgehoben.",
+      );
+      await refresh();
+    } catch (reason) {
+      setMessage(
+        reason instanceof Error ? reason.message : "Anwesenheit konnte nicht geändert werden.",
+      );
+    }
+  }
+
+  async function updateGroupPresence(ticketGroupId: string, action: "MISSING" | "RECALL") {
+    if (!board) return;
+    const reason =
+      action === "MISSING" ? (window.prompt("Kurzer Grund für „Nicht da“:")?.trim() ?? "") : "";
+    if (action === "MISSING" && reason.length < 3) return;
+    try {
+      await sendCommand(
+        action === "MISSING"
+          ? {
+              commandId: crypto.randomUUID(),
+              eventId: EVENT_ID,
+              deviceId: FLIGHT_LINE_DEVICE_ID,
+              expectedVersion: board.event.version,
+              issuedAt: new Date().toISOString(),
+              type: "MARK_TICKET_GROUP_MISSING",
+              payload: { ticketGroupId, reason },
+            }
+          : {
+              commandId: crypto.randomUUID(),
+              eventId: EVENT_ID,
+              deviceId: FLIGHT_LINE_DEVICE_ID,
+              expectedVersion: board.event.version,
+              issuedAt: new Date().toISOString(),
+              type: "RECALL_TICKET_GROUP",
+              payload: { ticketGroupId },
+            },
+        deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
+      );
+      setMessage(action === "MISSING" ? "Gruppe als nicht da markiert." : "Gruppe nachgerufen.");
+      await refresh();
+    } catch (reason) {
+      setMessage(
+        reason instanceof Error ? reason.message : "Gruppenstatus konnte nicht geändert werden.",
+      );
     }
   }
 
@@ -505,6 +583,26 @@ export function FlightLineView() {
             );
             await refresh();
           }}
+          onGroupAttendance={(ticketGroupId, checkedIn) =>
+            void setGroupAttendance(ticketGroupId, checkedIn)
+          }
+          onGroupMissing={(ticketGroupId) => void updateGroupPresence(ticketGroupId, "MISSING")}
+          onGroupRecall={(ticketGroupId) => void updateGroupPresence(ticketGroupId, "RECALL")}
+          onToggleGroup={(ticketGroupId, isSelected) => {
+            setSelectedQueueGroupIds((current) =>
+              isSelected
+                ? [...new Set([...current, ticketGroupId])]
+                : current.filter((id) => id !== ticketGroupId),
+            );
+            if (isSelected) {
+              const rotation = aircraftRotations?.find(
+                (entry) =>
+                  entry.ticketGroupId === ticketGroupId ||
+                  entry.bookingGroups.some((group) => group.id === ticketGroupId),
+              );
+              if (rotation) setSelectedId(rotation.id);
+            }
+          }}
           onAvailable={() => void setFlightLineAircraftState("AVAILABLE")}
           onPause={openAircraftPauseDialog}
           onRefuel={() => void setFlightLineAircraftState("REFUELING")}
@@ -520,9 +618,11 @@ export function FlightLineView() {
           onSelectAircraft={(aircraftId) => {
             setSelectedAircraftId(aircraftId);
             setSelectedId(null);
+            setSelectedQueueGroupIds([]);
           }}
           onUnavailable={() => void setFlightLineAircraftState("INACTIVE")}
           selectedAircraft={selectedAircraft}
+          selectedQueueGroupIds={selectedQueueGroupIds}
           selectedRotation={selected}
         />
       ) : board ? (
@@ -557,6 +657,7 @@ export function FlightLineView() {
           onSelectAircraft={(aircraftId) => {
             setSelectedAircraftId(aircraftId);
             setSelectedId(null);
+            setSelectedQueueGroupIds([]);
             setDispositionOpen(false);
             setDetailsOpen(false);
           }}
@@ -605,6 +706,7 @@ export function FlightLineView() {
                 onClick={() => {
                   setSelectedAircraftId(aircraft.id);
                   setSelectedId(null);
+                  setSelectedQueueGroupIds([]);
                   setDispositionOpen(false);
                 }}
                 type="button"
@@ -627,6 +729,93 @@ export function FlightLineView() {
                 ? `Nächste Gruppen für ${selectedAircraft.registration}`
                 : "Flugzeuge"}
             </h1>
+            {selectedAircraft && compatibleQueueGroups.length > 0 ? (
+              <section className="queue-group-selector" aria-labelledby="queue-groups-title">
+                <header>
+                  <div>
+                    <h2 id="queue-groups-title">Gruppen auswählen</h2>
+                    <p>Nur vollständige Gruppen werden gemeinsam aufgerufen.</p>
+                  </div>
+                  <strong>
+                    {selectedQueueSeatCount} von {selectedAircraft.passengerSeats} Plätzen
+                  </strong>
+                </header>
+                <div className="queue-group-options">
+                  {compatibleQueueGroups.map((group) => {
+                    const selectedGroup = selectedQueueGroupIds.includes(group.id);
+                    const exceedsCapacity =
+                      !selectedGroup &&
+                      selectedQueueSeatCount + group.ticketCount > selectedAircraft.passengerSeats;
+                    return (
+                      <article
+                        className={
+                          selectedGroup ? "queue-group-option selected" : "queue-group-option"
+                        }
+                        key={group.id}
+                      >
+                        <label>
+                          <input
+                            checked={selectedGroup}
+                            disabled={group.status === "MISSING" || exceedsCapacity}
+                            onChange={(event) => {
+                              setSelectedQueueGroupIds((current) =>
+                                event.target.checked
+                                  ? [...current, group.id]
+                                  : current.filter((id) => id !== group.id),
+                              );
+                              if (event.target.checked) {
+                                const rotation = aircraftRotations?.find(
+                                  (entry) =>
+                                    entry.ticketGroupId === group.id ||
+                                    entry.bookingGroups.some(
+                                      (bookingGroup) => bookingGroup.id === group.id,
+                                    ),
+                                );
+                                if (rotation) setSelectedId(rotation.id);
+                              }
+                            }}
+                            type="checkbox"
+                          />
+                          <span>
+                            <strong>
+                              {group.productCode}-
+                              {String(group.communicationNumber).padStart(3, "0")}
+                            </strong>
+                            <small>
+                              {group.ticketCount} Person{group.ticketCount === 1 ? "" : "en"} ·{" "}
+                              {group.presentCount}/{group.ticketCount} anwesend
+                            </small>
+                          </span>
+                        </label>
+                        <div className="queue-group-actions">
+                          <button
+                            onClick={() =>
+                              void setGroupAttendance(group.id, group.status !== "PRESENT")
+                            }
+                            type="button"
+                          >
+                            {group.status === "PRESENT" ? "Anwesenheit aufheben" : "Anwesend"}
+                          </button>
+                          <button
+                            className="danger-link-action"
+                            onClick={() => void updateGroupPresence(group.id, "MISSING")}
+                            type="button"
+                          >
+                            Nicht da
+                          </button>
+                          <button
+                            onClick={() => void updateGroupPresence(group.id, "RECALL")}
+                            type="button"
+                          >
+                            Nachrufen{group.recallCount > 0 ? ` (${group.recallCount})` : ""}
+                          </button>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              </section>
+            ) : null}
             {aircraftRotations?.map((rotation) => {
               const segmentLabel = sharedGroupSegmentLabel(rotation, operationalRotations ?? []);
               return (
@@ -903,7 +1092,23 @@ export function FlightLineView() {
                   </small>
                 </section>
                 {selected.status === "LANDED" ? (
-                  <p className="landed-warning">Gelandet · noch nicht verfügbar</p>
+                  <div className="landed-warning">
+                    <p>Gelandet · noch nicht verfügbar</p>
+                    <label>
+                      Zustand nach dem Turnaround
+                      <select
+                        onChange={(event) =>
+                          setTurnaroundNextState(event.target.value as typeof turnaroundNextState)
+                        }
+                        value={turnaroundNextState}
+                      >
+                        <option value="AVAILABLE">Verfügbar</option>
+                        <option value="REFUELING">Tanken</option>
+                        <option value="PAUSED">Pause</option>
+                        <option value="INACTIVE">Nicht verfügbar</option>
+                      </select>
+                    </label>
+                  </div>
                 ) : null}
                 {selected.status === "DRAFT" || selected.status === "CALLED" ? (
                   <div className="correction-controls">
