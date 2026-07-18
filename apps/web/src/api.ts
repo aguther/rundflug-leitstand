@@ -25,7 +25,9 @@ import {
   type PublicTicketStatus,
   publicBoardSchema,
   publicTicketStatusSchema,
+  type TicketGroupPrintData,
   type TicketSearchResponse,
+  ticketGroupPrintDataSchema,
   ticketSearchResponseSchema,
 } from "@rundflug/contracts";
 
@@ -175,6 +177,20 @@ export async function searchTickets(
   );
   if (!response.ok) throw new Error("Ticketsuche nicht verfügbar.");
   return ticketSearchResponseSchema.parse(await response.json());
+}
+
+export async function getTicketGroupPrintData(
+  eventId: string,
+  ticketGroupId: string,
+  deviceId: string,
+  deviceToken: string,
+): Promise<TicketGroupPrintData> {
+  const response = await apiFetch(
+    `/api/events/${encodeURIComponent(eventId)}/ticket-groups/${encodeURIComponent(ticketGroupId)}/print-data`,
+    { headers: deviceHeaders(deviceId, deviceToken) },
+  );
+  if (!response.ok) throw new Error("Ticketzettel konnten nicht geladen werden.");
+  return ticketGroupPrintDataSchema.parse(await response.json());
 }
 
 export async function getEventCatalog(

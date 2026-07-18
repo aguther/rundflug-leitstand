@@ -413,31 +413,20 @@ export class EventCoordinator extends DurableObject<Env> {
           );
         }
 
-        let splitPlan: ReturnType<typeof planBookingGroupSplit>;
-        try {
-          splitPlan = planBookingGroupSplit({
-            groupSize: command.payload.publicTicketCodes.length,
-            referenceCapacity: effectiveGroupCapacity,
-            splitAcknowledged: command.payload.oversizeSplitAcknowledged,
-          });
-        } catch (reason: unknown) {
-          if (!(reason instanceof DomainRuleError)) throw reason;
+        if (command.payload.publicTicketCodes.length > effectiveGroupCapacity) {
           return json(
             {
               error: {
-                code: reason.code,
-                message: reason.message,
+                code: "BOOKING_GROUP_TOO_LARGE",
+                message: "Die Gruppe passt nicht gemeinsam in ein verfügbares Flugzeug.",
                 referenceCapacity: effectiveGroupCapacity,
                 groupSize: command.payload.publicTicketCodes.length,
-                requiredFlightGroupCount: Math.ceil(
-                  command.payload.publicTicketCodes.length / effectiveGroupCapacity,
-                ),
               },
             },
             { status: 409 },
           );
         }
-        const requiredFlightGroupCount = splitPlan.slotSizes.length;
+        const requiredFlightGroupCount = 1;
 
         const normalizedCodes = command.payload.publicTicketCodes.map(assertPublicTicketCode);
         if (new Set(normalizedCodes).size !== normalizedCodes.length) {
@@ -498,55 +487,20 @@ export class EventCoordinator extends DurableObject<Env> {
         )
           .bind(command.eventId, product.resource_group_id)
           .first<{ next_sequence: number }>();
-        const splitAcrossFlightGroups = requiredFlightGroupCount > 1;
-        const openFlightGroup = splitAcrossFlightGroups
-          ? null
-          : await this.env.DB.prepare(
-              `SELECT r.id AS rotation_id, fg.id AS flight_group_id
-                 FROM rotations r
-                 JOIN flight_groups fg ON fg.id = r.flight_group_id
-                 JOIN rotation_tickets rt ON rt.rotation_id = r.id AND rt.released_at IS NULL
-                 JOIN tickets t ON t.id = rt.ticket_id
-                 JOIN ticket_groups tg ON tg.id = t.ticket_group_id
-                WHERE r.operation_day_id = ?1 AND fg.resource_group_id = ?2
-                  AND r.status = 'DRAFT' AND r.called_at IS NULL
-                GROUP BY r.id, fg.id
-               HAVING COUNT(DISTINCT tg.product_id) = 1 AND MIN(tg.product_id) = ?3
-                  AND COUNT(rt.ticket_id) + ?4 <= ?5
-                ORDER BY fg.communication_number
-                LIMIT 1`,
-            )
-              .bind(
-                command.eventId,
-                product.resource_group_id,
-                product.id,
-                normalizedCodes.length,
-                effectiveGroupCapacity,
-              )
-              .first<{ rotation_id: string; flight_group_id: string }>();
-        const communicationRow = openFlightGroup
-          ? null
-          : await this.env.DB.prepare(
-              "SELECT COALESCE(MAX(communication_number), 100) + 1 AS next_number FROM flight_groups WHERE operation_day_id = ?1 AND resource_group_id = ?2",
-            )
-              .bind(command.eventId, product.resource_group_id)
-              .first<{ next_number: number }>();
+        const splitAcrossFlightGroups = false;
+        const communicationRow = await this.env.DB.prepare(
+          "SELECT COALESCE(MAX(communication_number), 100) + 1 AS next_number FROM flight_groups WHERE operation_day_id = ?1 AND resource_group_id = ?2",
+        )
+          .bind(command.eventId, product.resource_group_id)
+          .first<{ next_number: number }>();
         const now = new Date().toISOString();
         const nextVersion = current.version + 1;
         const ticketGroupId = crypto.randomUUID();
-        const slots = openFlightGroup
-          ? [
-              {
-                flightGroupId: openFlightGroup.flight_group_id,
-                rotationId: openFlightGroup.rotation_id,
-                communicationNumber: null,
-              },
-            ]
-          : Array.from({ length: requiredFlightGroupCount }, (_, index) => ({
-              flightGroupId: crypto.randomUUID(),
-              rotationId: crypto.randomUUID(),
-              communicationNumber: (communicationRow?.next_number ?? 101) + index,
-            }));
+        const slots = Array.from({ length: requiredFlightGroupCount }, (_, index) => ({
+          flightGroupId: crypto.randomUUID(),
+          rotationId: crypto.randomUUID(),
+          communicationNumber: (communicationRow?.next_number ?? 101) + index,
+        }));
         const primarySlot = slots[0];
         if (!primarySlot) throw new Error("Mindestens ein Fluggruppen-Slot wurde erwartet.");
         const ticketIds = hashes.map(() => crypto.randomUUID());
@@ -567,37 +521,37 @@ export class EventCoordinator extends DurableObject<Env> {
             "UPDATE operation_days SET version = ?1, updated_at = ?2 WHERE id = ?3 AND version = ?4",
           ).bind(nextVersion, now, command.eventId, current.version),
           this.env.DB.prepare(`INSERT INTO ticket_groups
-            (id, operation_day_id, product_id, queue_sequence, standby, status, sold_at, version)
-            VALUES (?1, ?2, ?3, ?4, ?5, 'QUEUED', ?6, 0)`).bind(
+            (id, operation_day_id, product_id, queue_sequence, communication_number, standby,
+             status, sold_at, version)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'QUEUED', ?7, 0)`).bind(
             ticketGroupId,
             command.eventId,
             product.id,
             queueRow?.next_sequence ?? 1,
+            primarySlot.communicationNumber,
             command.payload.standby ? 1 : 0,
             now,
           ),
-          ...(openFlightGroup
-            ? []
-            : slots.flatMap((slot) => [
-                this.env.DB.prepare(`INSERT INTO flight_groups
+          ...slots.flatMap((slot) => [
+            this.env.DB.prepare(`INSERT INTO flight_groups
                   (id, operation_day_id, resource_group_id, communication_number, status, version, created_at, updated_at)
                   VALUES (?1, ?2, ?3, ?4, 'DRAFT', 0, ?5, ?5)`).bind(
-                  slot.flightGroupId,
-                  command.eventId,
-                  product.resource_group_id,
-                  slot.communicationNumber,
-                  now,
-                ),
-                this.env.DB.prepare(`INSERT INTO rotations
+              slot.flightGroupId,
+              command.eventId,
+              product.resource_group_id,
+              slot.communicationNumber,
+              now,
+            ),
+            this.env.DB.prepare(`INSERT INTO rotations
                   (id, operation_day_id, flight_group_id, gate_id, status, version, created_at, updated_at)
                   VALUES (?1, ?2, ?3, ?4, 'DRAFT', 0, ?5, ?5)`).bind(
-                  slot.rotationId,
-                  command.eventId,
-                  slot.flightGroupId,
-                  product.gate_id,
-                  now,
-                ),
-              ])),
+              slot.rotationId,
+              command.eventId,
+              slot.flightGroupId,
+              product.gate_id,
+              now,
+            ),
+          ]),
           ...hashes.flatMap((hash, index) => {
             const slotIndex = splitAcrossFlightGroups
               ? Math.floor(index / effectiveGroupCapacity)
@@ -606,12 +560,13 @@ export class EventCoordinator extends DurableObject<Env> {
             if (!ticketSlot) throw new Error("Fluggruppen-Slot für Ticket fehlt.");
             return [
               this.env.DB.prepare(`INSERT INTO tickets
-                (id, ticket_group_id, public_code_hash, status, weight_class, individual_weight_kg,
-                 payment_status, payment_method, price_cents, created_at)
-                VALUES (?1, ?2, ?3, 'QUEUED', ?4, ?5, ?6, ?7, ?8, ?9)`).bind(
+                (id, ticket_group_id, public_code_hash, public_code, status, weight_class,
+                 individual_weight_kg, payment_status, payment_method, price_cents, created_at)
+                VALUES (?1, ?2, ?3, ?4, 'QUEUED', ?5, ?6, ?7, ?8, ?9, ?10)`).bind(
                 ticketIds[index],
                 ticketGroupId,
                 hash,
+                normalizedCodes[index],
                 ticketDetails[index]?.weightClass,
                 ticketDetails[index]?.individualWeightKg,
                 command.payload.paymentStatus,
@@ -643,8 +598,8 @@ export class EventCoordinator extends DurableObject<Env> {
               weightClasses: ticketDetails.map((detail) => detail.weightClass),
               paymentStatus: command.payload.paymentStatus,
               paymentMethod: command.payload.paymentMethod,
-              joinedExistingFlightGroup: openFlightGroup !== null,
-              oversizeSplitAcknowledged: splitAcrossFlightGroups,
+              joinedExistingFlightGroup: false,
+              oversizeSplitAcknowledged: false,
             }),
           ),
           this.env.DB.prepare(`INSERT INTO idempotency_receipts
@@ -756,9 +711,10 @@ export class EventCoordinator extends DurableObject<Env> {
         }
         if (
           command.type === "CALL_NEXT" ||
-          command.type === "MARK_IN_FLIGHT" ||
-          command.type === "MARK_LANDED" ||
-          command.type === "MARK_COMPLETED"
+          command.type === "MARK_OFF_BLOCK" ||
+          command.type === "MARK_ON_BLOCK" ||
+          command.type === "COMPLETE_TURNAROUND" ||
+          command.type === "CANCEL_ROTATION"
         ) {
           if (command.type === "CALL_NEXT" && current.status !== "ACTIVE") {
             return json(
@@ -794,6 +750,15 @@ export class EventCoordinator extends DurableObject<Env> {
             );
           }
           return this.handleRotationTransition(command, current);
+        }
+        if (command.type === "SET_TICKET_GROUP_ATTENDANCE") {
+          return this.handleTicketGroupAttendance(command, current);
+        }
+        if (
+          command.type === "MARK_TICKET_GROUP_MISSING" ||
+          command.type === "RECALL_TICKET_GROUP"
+        ) {
+          return this.handleTicketGroupPresence(command, current);
         }
         return json(
           { error: { code: "COMMAND_NOT_IMPLEMENTED", message: "Kommando nicht implementiert." } },
@@ -3007,6 +2972,7 @@ export class EventCoordinator extends DurableObject<Env> {
         planned_boarding_minutes: payload.plannedBoardingMinutes,
         planned_deboarding_minutes: payload.plannedDeboardingMinutes,
         planned_buffer_minutes: payload.plannedBufferMinutes,
+        departed_visibility_seconds: payload.departedVisibilitySeconds,
         updated_at: now,
       }),
       eventType: "EVENT_PARAMETERS_CONFIGURED",
@@ -3031,6 +2997,7 @@ export class EventCoordinator extends DurableObject<Env> {
       plannedBoardingMinutes: payload.plannedBoardingMinutes,
       plannedDeboardingMinutes: payload.plannedDeboardingMinutes,
       plannedBufferMinutes: payload.plannedBufferMinutes,
+      departedVisibilitySeconds: payload.departedVisibilitySeconds,
       reason: payload.reason,
     };
     await this.env.DB.batch([
@@ -3043,7 +3010,8 @@ export class EventCoordinator extends DurableObject<Env> {
           child_reference_weight_kg = ?11, normal_reference_weight_kg = ?12,
           heavy_reference_weight_kg = ?13, planned_boarding_minutes = ?14,
           planned_deboarding_minutes = ?15, planned_buffer_minutes = ?16,
-          version = ?17, updated_at = ?18 WHERE id = ?19 AND version = ?20`,
+          departed_visibility_seconds = ?17,
+          version = ?18, updated_at = ?19 WHERE id = ?20 AND version = ?21`,
       ).bind(
         payload.saleOpensAt,
         payload.operationsEndAt,
@@ -3061,6 +3029,7 @@ export class EventCoordinator extends DurableObject<Env> {
         payload.plannedBoardingMinutes,
         payload.plannedDeboardingMinutes,
         payload.plannedBufferMinutes,
+        payload.departedVisibilitySeconds,
         nextVersion,
         now,
         command.eventId,
@@ -3220,10 +3189,39 @@ export class EventCoordinator extends DurableObject<Env> {
   private async handleRotationTransition(
     command: Extract<
       CommandEnvelope,
-      { type: "CALL_NEXT" | "MARK_IN_FLIGHT" | "MARK_LANDED" | "MARK_COMPLETED" }
+      {
+        type:
+          | "CALL_NEXT"
+          | "MARK_OFF_BLOCK"
+          | "MARK_ON_BLOCK"
+          | "COMPLETE_TURNAROUND"
+          | "CANCEL_ROTATION";
+      }
     >,
     current: StoredEventRow,
   ): Promise<Response> {
+    const primaryAssignment =
+      command.type === "CALL_NEXT"
+        ? await this.env.DB.prepare(
+            `SELECT r.id AS rotation_id
+               FROM ticket_groups tg
+               JOIN tickets t ON t.ticket_group_id = tg.id
+               JOIN rotation_tickets rt ON rt.ticket_id = t.id AND rt.released_at IS NULL
+               JOIN rotations r ON r.id = rt.rotation_id
+              WHERE tg.operation_day_id = ?1 AND tg.id = ?2
+              LIMIT 1`,
+          )
+            .bind(command.eventId, command.payload.ticketGroupIds[0])
+            .first<{ rotation_id: string }>()
+        : null;
+    const rotationId =
+      command.type === "CALL_NEXT" ? primaryAssignment?.rotation_id : command.payload.rotationId;
+    if (!rotationId) {
+      return json(
+        { error: { code: "ROTATION_NOT_FOUND", message: "Keine ausgewählte Gruppe gefunden." } },
+        { status: 404 },
+      );
+    }
     const rotation = await this.env.DB.prepare(
       `SELECT r.id, r.status, r.version, r.aircraft_id, r.pilot_id,
               rg.status AS resource_group_status
@@ -3232,10 +3230,10 @@ export class EventCoordinator extends DurableObject<Env> {
          JOIN resource_groups rg ON rg.id = fg.resource_group_id
         WHERE r.id = ?1 AND r.operation_day_id = ?2`,
     )
-      .bind(command.payload.rotationId, command.eventId)
+      .bind(rotationId, command.eventId)
       .first<{
         id: string;
-        status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
+        status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED" | "CANCELED";
         version: number;
         aircraft_id: string | null;
         pilot_id: string | null;
@@ -3247,6 +3245,12 @@ export class EventCoordinator extends DurableObject<Env> {
         { status: 404 },
       );
     let previousAircraftPilotId: string | null = null;
+    let selectedGroups: Array<{
+      ticket_group_id: string;
+      rotation_id: string;
+      resource_group_id: string;
+      ticket_count: number;
+    }> = [];
     if (command.type === "CALL_NEXT") {
       if (rotation.resource_group_status !== "ACTIVE") {
         return json(
@@ -3259,9 +3263,65 @@ export class EventCoordinator extends DurableObject<Env> {
           { status: 409 },
         );
       }
+      const distinctGroupIds = [...new Set(command.payload.ticketGroupIds)];
+      if (distinctGroupIds.length !== command.payload.ticketGroupIds.length) {
+        return json(
+          {
+            error: {
+              code: "DUPLICATE_TICKET_GROUP",
+              message: "Eine Gruppe wurde mehrfach gewählt.",
+            },
+          },
+          { status: 400 },
+        );
+      }
+      const placeholders = distinctGroupIds.map((_, index) => `?${index + 2}`).join(", ");
+      const groupResult = await this.env.DB.prepare(
+        `SELECT tg.id AS ticket_group_id, r.id AS rotation_id,
+                p.resource_group_id, COUNT(t.id) AS ticket_count
+           FROM ticket_groups tg
+           JOIN products p ON p.id = tg.product_id
+           JOIN tickets t ON t.ticket_group_id = tg.id
+           JOIN rotation_tickets rt ON rt.ticket_id = t.id AND rt.released_at IS NULL
+           JOIN rotations r ON r.id = rt.rotation_id
+          WHERE tg.operation_day_id = ?1 AND tg.id IN (${placeholders})
+            AND tg.status IN ('QUEUED', 'PRESENT')
+            AND r.status = 'DRAFT'
+          GROUP BY tg.id, r.id, p.resource_group_id`,
+      )
+        .bind(command.eventId, ...distinctGroupIds)
+        .all<{
+          ticket_group_id: string;
+          rotation_id: string;
+          resource_group_id: string;
+          ticket_count: number;
+        }>();
+      selectedGroups = groupResult.results;
+      if (selectedGroups.length !== distinctGroupIds.length) {
+        return json(
+          {
+            error: {
+              code: "TICKET_GROUP_NOT_AVAILABLE",
+              message: "Mindestens eine Gruppe ist nicht mehr in der Warteschlange verfügbar.",
+            },
+          },
+          { status: 409 },
+        );
+      }
+      if (new Set(selectedGroups.map((group) => group.resource_group_id)).size !== 1) {
+        return json(
+          {
+            error: {
+              code: "RESOURCE_GROUP_MISMATCH",
+              message: "Ausgewählte Gruppen gehören nicht zur gleichen Ressourcengruppe.",
+            },
+          },
+          { status: 409 },
+        );
+      }
       const candidate = await this.env.DB.prepare(
         `SELECT a.id, a.passenger_seats, a.operational_state,
-                membership.current_pilot_id, COUNT(rt.ticket_id) AS ticket_count
+                membership.current_pilot_id
            FROM rotations r
            JOIN flight_groups fg ON fg.id = r.flight_group_id
            JOIN resource_group_memberships membership
@@ -3269,7 +3329,6 @@ export class EventCoordinator extends DurableObject<Env> {
             AND membership.operation_day_id = r.operation_day_id
             AND membership.active_until IS NULL
            JOIN aircraft a ON a.id = membership.aircraft_id
-           LEFT JOIN rotation_tickets rt ON rt.rotation_id = r.id AND rt.released_at IS NULL
           WHERE r.id = ?1 AND a.id = ?2
           GROUP BY a.id`,
       )
@@ -3278,7 +3337,6 @@ export class EventCoordinator extends DurableObject<Env> {
           id: string;
           passenger_seats: number;
           operational_state: string;
-          ticket_count: number;
           current_pilot_id: string | null;
         }>();
       if (candidate?.operational_state !== "AVAILABLE") {
@@ -3287,7 +3345,11 @@ export class EventCoordinator extends DurableObject<Env> {
           { status: 409 },
         );
       }
-      if (candidate.ticket_count > candidate.passenger_seats) {
+      const selectedTicketCount = selectedGroups.reduce(
+        (sum, group) => sum + Number(group.ticket_count),
+        0,
+      );
+      if (selectedTicketCount > candidate.passenger_seats) {
         return json(
           {
             error: {
@@ -3325,15 +3387,17 @@ export class EventCoordinator extends DurableObject<Env> {
     }
     const target = {
       CALL_NEXT: "CALLED",
-      MARK_IN_FLIGHT: "IN_FLIGHT",
-      MARK_LANDED: "LANDED",
-      MARK_COMPLETED: "COMPLETED",
+      MARK_OFF_BLOCK: "IN_FLIGHT",
+      MARK_ON_BLOCK: "LANDED",
+      COMPLETE_TURNAROUND: "COMPLETED",
+      CANCEL_ROTATION: "CANCELED",
     } as const;
     const timestampColumn = {
       CALL_NEXT: "called_at",
-      MARK_IN_FLIGHT: "departed_at",
-      MARK_LANDED: "landed_at",
-      MARK_COMPLETED: "completed_at",
+      MARK_OFF_BLOCK: "departed_at",
+      MARK_ON_BLOCK: "landed_at",
+      COMPLETE_TURNAROUND: "completed_at",
+      CANCEL_ROTATION: "completed_at",
     } as const;
     let nextState: typeof rotation.status;
     try {
@@ -3347,9 +3411,10 @@ export class EventCoordinator extends DurableObject<Env> {
     const nextVersion = current.version + 1;
     const eventType = {
       CALL_NEXT: "FLIGHT_GROUP_CALLED",
-      MARK_IN_FLIGHT: "ROTATION_STARTED",
-      MARK_LANDED: "ROTATION_LANDED",
-      MARK_COMPLETED: "ROTATION_COMPLETED",
+      MARK_OFF_BLOCK: "MARK_OFF_BLOCK",
+      MARK_ON_BLOCK: "MARK_ON_BLOCK",
+      COMPLETE_TURNAROUND: "TURNAROUND_COMPLETED",
+      CANCEL_ROTATION: "ROTATION_CANCELED",
     } as const;
     const result: CommandResult = {
       accepted: true,
@@ -3374,29 +3439,63 @@ export class EventCoordinator extends DurableObject<Env> {
         { status: 409 },
       );
     }
-    const aircraftState = {
+    const aircraftState =
+      command.type === "COMPLETE_TURNAROUND"
+        ? command.payload.nextAircraftState
+        : {
+            CALL_NEXT: "BOARDING",
+            MARK_OFF_BLOCK: "IN_FLIGHT",
+            MARK_ON_BLOCK: "LANDED",
+            CANCEL_ROTATION: "AVAILABLE",
+          }[command.type];
+    const groupMoveStatements =
+      command.type === "CALL_NEXT"
+        ? selectedGroups
+            .filter((group) => group.rotation_id !== rotation.id)
+            .flatMap((group) => [
+              this.env.DB.prepare(
+                "UPDATE rotation_tickets SET released_at = ?1 WHERE rotation_id = ?2 AND released_at IS NULL",
+              ).bind(now, group.rotation_id),
+              this.env.DB.prepare(
+                `INSERT INTO rotation_tickets (rotation_id, ticket_id, assigned_at)
+                 SELECT ?1, id, ?2 FROM tickets WHERE ticket_group_id = ?3`,
+              ).bind(rotation.id, now, group.ticket_group_id),
+              this.env.DB.prepare(
+                "UPDATE rotations SET status = 'CANCELED', completed_at = ?1, version = version + 1, updated_at = ?1 WHERE id = ?2 AND status = 'DRAFT'",
+              ).bind(now, group.rotation_id),
+              this.env.DB.prepare(
+                "UPDATE flight_groups SET status = 'CANCELED', version = version + 1, updated_at = ?1 WHERE id = (SELECT flight_group_id FROM rotations WHERE id = ?2)",
+              ).bind(now, group.rotation_id),
+            ])
+        : [];
+    const groupStatus = {
       CALL_NEXT: "BOARDING",
-      MARK_IN_FLIGHT: "IN_FLIGHT",
-      MARK_LANDED: "LANDED",
-      MARK_COMPLETED: "AVAILABLE",
-    } as const;
+      MARK_OFF_BLOCK: "IN_FLIGHT",
+      MARK_ON_BLOCK: "LANDED",
+      COMPLETE_TURNAROUND: "COMPLETED",
+      CANCEL_ROTATION: "QUEUED",
+    }[command.type];
     await this.env.DB.batch([
       this.env.DB.prepare(
         "UPDATE operation_days SET version = ?1, updated_at = ?2 WHERE id = ?3 AND version = ?4",
       ).bind(nextVersion, now, command.eventId, current.version),
+      ...groupMoveStatements,
       this.env.DB.prepare(
         `UPDATE rotations SET status = ?1, ${timestampColumn[command.type]} = ?2, aircraft_id = ?3,
                 pilot_id = ?4, version = version + 1, updated_at = ?2
           WHERE id = ?5 AND version = ?6`,
       ).bind(nextState, now, selectedAircraftId, selectedPilotId, rotation.id, rotation.version),
       this.env.DB.prepare(
+        "UPDATE flight_groups SET status = ?1, version = version + 1, updated_at = ?2 WHERE id = (SELECT flight_group_id FROM rotations WHERE id = ?3)",
+      ).bind(nextState, now, rotation.id),
+      this.env.DB.prepare(
         `UPDATE aircraft SET operational_state = ?1, updated_at = ?2,
                 rotations_since_refuel = rotations_since_refuel + ?4 WHERE id = ?3`,
       ).bind(
-        aircraftState[command.type],
+        aircraftState,
         now,
         selectedAircraftId,
-        command.type === "MARK_COMPLETED" ? 1 : 0,
+        command.type === "COMPLETE_TURNAROUND" ? 1 : 0,
       ),
       this.env.DB.prepare(
         `UPDATE resource_group_memberships SET current_pilot_id = ?1
@@ -3405,14 +3504,23 @@ export class EventCoordinator extends DurableObject<Env> {
       ).bind(selectedPilotId, command.eventId, selectedAircraftId, command.type),
       this.env.DB.prepare(
         `UPDATE tickets SET status = CASE
-            WHEN ?1 = 'CALL_NEXT' AND attendance_status = 'CHECKED_IN' THEN 'BOARDING'
-            WHEN ?1 = 'CALL_NEXT' THEN 'CALLED'
+            WHEN ?1 = 'CALL_NEXT' THEN 'BOARDING'
+            WHEN ?1 = 'CANCEL_ROTATION' THEN 'QUEUED'
             ELSE ?2
           END
           WHERE id IN (
             SELECT ticket_id FROM rotation_tickets WHERE rotation_id = ?3 AND released_at IS NULL
           )`,
       ).bind(command.type, nextState, rotation.id),
+      this.env.DB.prepare(
+        `UPDATE ticket_groups SET status = ?1, version = version + 1
+          WHERE id IN (
+            SELECT DISTINCT t.ticket_group_id
+              FROM tickets t
+              JOIN rotation_tickets rt ON rt.ticket_id = t.id AND rt.released_at IS NULL
+             WHERE rt.rotation_id = ?2
+          )`,
+      ).bind(groupStatus, rotation.id),
       this.env.DB.prepare(`INSERT INTO operational_events (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type, aggregate_id, aggregate_version, payload_json)
         VALUES (?1, ?2, ?3, ?4, ?5, 'ROTATION', ?6, ?7, ?8)`).bind(
         crypto.randomUUID(),
@@ -3444,9 +3552,17 @@ export class EventCoordinator extends DurableObject<Env> {
         "INSERT INTO outbox (id, operation_day_id, topic, payload_json, created_at) VALUES (?1, ?2, 'EVENT_STATE_CHANGED', ?3, ?4)",
       ).bind(crypto.randomUUID(), command.eventId, JSON.stringify(result), now),
     ]);
-    this.ctx.waitUntil(
-      sendRotationPushNotifications(this.env, rotation.id, eventType[command.type]),
-    );
+    const pushEvent = {
+      CALL_NEXT: "FLIGHT_GROUP_CALLED",
+      MARK_OFF_BLOCK: "ROTATION_STARTED",
+      MARK_ON_BLOCK: "ROTATION_LANDED",
+      COMPLETE_TURNAROUND: "ROTATION_COMPLETED",
+      CANCEL_ROTATION: null,
+    } as const;
+    const notification = pushEvent[command.type];
+    if (notification) {
+      this.ctx.waitUntil(sendRotationPushNotifications(this.env, rotation.id, notification));
+    }
     this.broadcast(result);
     return json(result);
   }
@@ -3603,7 +3719,7 @@ export class EventCoordinator extends DurableObject<Env> {
       ticketGroupId: string;
       rotationId: string;
       flightGroupId?: string;
-      state: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
+      state: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED" | "CANCELED";
       resourceGroupId: string;
       ticketCount: number;
       rotationVersion: number;
@@ -5399,6 +5515,178 @@ export class EventCoordinator extends DurableObject<Env> {
           ticketStatusFrom: ticket.status,
           ticketStatusTo: nextTicketStatus,
         }),
+      ),
+      this.env.DB.prepare(
+        `INSERT INTO idempotency_receipts
+          (command_id, operation_day_id, device_id, command_type, received_at, response_json)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)`,
+      ).bind(
+        command.commandId,
+        command.eventId,
+        command.deviceId,
+        command.type,
+        now,
+        JSON.stringify(result),
+      ),
+      this.env.DB.prepare(
+        "INSERT INTO outbox (id, operation_day_id, topic, payload_json, created_at) VALUES (?1, ?2, 'EVENT_STATE_CHANGED', ?3, ?4)",
+      ).bind(crypto.randomUUID(), command.eventId, JSON.stringify(result), now),
+    ]);
+    this.broadcast(result);
+    return json(result);
+  }
+
+  private async handleTicketGroupAttendance(
+    command: Extract<CommandEnvelope, { type: "SET_TICKET_GROUP_ATTENDANCE" }>,
+    current: StoredEventRow,
+  ): Promise<Response> {
+    const group = await this.env.DB.prepare(
+      `SELECT tg.id, tg.status, tg.version, r.status AS rotation_status
+         FROM ticket_groups tg
+         JOIN tickets t ON t.ticket_group_id = tg.id
+         JOIN rotation_tickets rt ON rt.ticket_id = t.id AND rt.released_at IS NULL
+         JOIN rotations r ON r.id = rt.rotation_id
+        WHERE tg.id = ?1 AND tg.operation_day_id = ?2
+        LIMIT 1`,
+    )
+      .bind(command.payload.ticketGroupId, command.eventId)
+      .first<{ id: string; status: string; version: number; rotation_status: string }>();
+    if (!group) {
+      return json(
+        { error: { code: "TICKET_GROUP_NOT_FOUND", message: "Buchungsgruppe nicht gefunden." } },
+        { status: 404 },
+      );
+    }
+    if (!["DRAFT", "CALLED"].includes(group.rotation_status)) {
+      return json(
+        {
+          error: {
+            code: "ATTENDANCE_LOCKED",
+            message: "Die Anwesenheit kann nach Off-Block nicht mehr geändert werden.",
+          },
+        },
+        { status: 409 },
+      );
+    }
+    const now = new Date().toISOString();
+    const nextVersion = current.version + 1;
+    const checkedIn = command.payload.checkedIn;
+    const ticketStatus = checkedIn
+      ? group.rotation_status === "DRAFT"
+        ? "CHECKED_IN"
+        : "BOARDING"
+      : group.rotation_status === "DRAFT"
+        ? "QUEUED"
+        : "CALLED";
+    const eventType = checkedIn ? "TICKET_GROUP_CHECKED_IN" : "TICKET_GROUP_CHECK_IN_REVOKED";
+    const result: CommandResult = {
+      accepted: true,
+      duplicate: false,
+      event: rowToSnapshot({ ...current, version: nextVersion, updated_at: now }),
+      eventType,
+      aggregate: { type: "TICKET_GROUP", id: group.id },
+    };
+    await this.env.DB.batch([
+      this.env.DB.prepare(
+        "UPDATE operation_days SET version = ?1, updated_at = ?2 WHERE id = ?3 AND version = ?4",
+      ).bind(nextVersion, now, command.eventId, current.version),
+      this.env.DB.prepare(
+        "UPDATE ticket_groups SET status = ?1, version = version + 1 WHERE id = ?2 AND version = ?3",
+      ).bind(checkedIn ? "PRESENT" : "QUEUED", group.id, group.version),
+      this.env.DB.prepare(
+        "UPDATE tickets SET attendance_status = ?1, status = ?2 WHERE ticket_group_id = ?3",
+      ).bind(checkedIn ? "CHECKED_IN" : "NOT_CHECKED_IN", ticketStatus, group.id),
+      this.env.DB.prepare(
+        `INSERT INTO operational_events
+          (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type,
+           aggregate_id, aggregate_version, payload_json)
+         VALUES (?1, ?2, ?3, ?4, ?5, 'TICKET_GROUP', ?6, ?7, ?8)`,
+      ).bind(
+        crypto.randomUUID(),
+        command.eventId,
+        eventType,
+        now,
+        command.deviceId,
+        group.id,
+        group.version + 1,
+        JSON.stringify({ checkedIn }),
+      ),
+      this.env.DB.prepare(
+        `INSERT INTO idempotency_receipts
+          (command_id, operation_day_id, device_id, command_type, received_at, response_json)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)`,
+      ).bind(
+        command.commandId,
+        command.eventId,
+        command.deviceId,
+        command.type,
+        now,
+        JSON.stringify(result),
+      ),
+      this.env.DB.prepare(
+        "INSERT INTO outbox (id, operation_day_id, topic, payload_json, created_at) VALUES (?1, ?2, 'EVENT_STATE_CHANGED', ?3, ?4)",
+      ).bind(crypto.randomUUID(), command.eventId, JSON.stringify(result), now),
+    ]);
+    this.broadcast(result);
+    return json(result);
+  }
+
+  private async handleTicketGroupPresence(
+    command: Extract<
+      CommandEnvelope,
+      { type: "MARK_TICKET_GROUP_MISSING" | "RECALL_TICKET_GROUP" }
+    >,
+    current: StoredEventRow,
+  ): Promise<Response> {
+    const group = await this.env.DB.prepare(
+      "SELECT id, status, version, recall_count FROM ticket_groups WHERE id = ?1 AND operation_day_id = ?2",
+    )
+      .bind(command.payload.ticketGroupId, command.eventId)
+      .first<{ id: string; status: string; version: number; recall_count: number }>();
+    if (!group) {
+      return json(
+        { error: { code: "TICKET_GROUP_NOT_FOUND", message: "Buchungsgruppe nicht gefunden." } },
+        { status: 404 },
+      );
+    }
+    const now = new Date().toISOString();
+    const nextVersion = current.version + 1;
+    const recalled = command.type === "RECALL_TICKET_GROUP";
+    const eventType = recalled ? "TICKET_GROUP_RECALLED" : "TICKET_GROUP_MARKED_MISSING";
+    const result: CommandResult = {
+      accepted: true,
+      duplicate: false,
+      event: rowToSnapshot({ ...current, version: nextVersion, updated_at: now }),
+      eventType,
+      aggregate: { type: "TICKET_GROUP", id: group.id },
+    };
+    await this.env.DB.batch([
+      this.env.DB.prepare(
+        "UPDATE operation_days SET version = ?1, updated_at = ?2 WHERE id = ?3 AND version = ?4",
+      ).bind(nextVersion, now, command.eventId, current.version),
+      recalled
+        ? this.env.DB.prepare(
+            "UPDATE ticket_groups SET status = 'QUEUED', recalled_at = ?1, recall_count = recall_count + 1, version = version + 1 WHERE id = ?2 AND version = ?3",
+          ).bind(now, group.id, group.version)
+        : this.env.DB.prepare(
+            "UPDATE ticket_groups SET status = 'MISSING', version = version + 1 WHERE id = ?1 AND version = ?2",
+          ).bind(group.id, group.version),
+      this.env.DB.prepare(
+        `INSERT INTO operational_events
+          (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type,
+           aggregate_id, aggregate_version, payload_json)
+         VALUES (?1, ?2, ?3, ?4, ?5, 'TICKET_GROUP', ?6, ?7, ?8)`,
+      ).bind(
+        crypto.randomUUID(),
+        command.eventId,
+        eventType,
+        now,
+        command.deviceId,
+        group.id,
+        group.version + 1,
+        JSON.stringify(
+          recalled ? { recallCount: group.recall_count + 1 } : { reason: command.payload.reason },
+        ),
       ),
       this.env.DB.prepare(
         `INSERT INTO idempotency_receipts

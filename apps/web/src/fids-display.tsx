@@ -66,7 +66,7 @@ function terminalGate(label: string): string {
 
 function useVisibleGroups(
   groups: PublicBoard["groups"],
-  departedVisibilityMinutes: number,
+  departedVisibilitySeconds: number,
 ): PublicBoard["groups"] {
   const locallyObservedDeparture = useRef(new Map<string, number>());
   const [now, setNow] = useState(Date.now());
@@ -92,9 +92,9 @@ function useVisibleGroups(
         ? persistedDeparture
         : (locallyObservedDeparture.current.get(code) ?? now);
       locallyObservedDeparture.current.set(code, firstSeen);
-      return now - firstSeen < departedVisibilityMinutes * 60_000;
+      return now - firstSeen < departedVisibilitySeconds * 1_000;
     });
-  }, [departedVisibilityMinutes, groups, now]);
+  }, [departedVisibilitySeconds, groups, now]);
 }
 
 export function FidsDisplay({
@@ -107,14 +107,14 @@ export function FidsDisplay({
   mode: DisplayMode;
 }) {
   const [clock, setClock] = useState(new Date());
-  const requestedVisibility = Number.parseInt(
-    new URLSearchParams(window.location.search).get("departedMinutes") ?? "",
+  const requestedVisibilitySeconds = Number.parseInt(
+    new URLSearchParams(window.location.search).get("departedSeconds") ?? "",
     10,
   );
-  const departedVisibilityMinutes = Number.isFinite(requestedVisibility)
-    ? Math.min(15, Math.max(1, requestedVisibility))
-    : DEFAULT_DEPARTED_VISIBILITY_MINUTES;
-  const groups = useVisibleGroups(board?.groups ?? [], departedVisibilityMinutes);
+  const departedVisibilitySeconds = Number.isFinite(requestedVisibilitySeconds)
+    ? Math.min(900, Math.max(5, requestedVisibilitySeconds))
+    : (board?.departedVisibilitySeconds ?? DEFAULT_DEPARTED_VISIBILITY_MINUTES * 60);
+  const groups = useVisibleGroups(board?.groups ?? [], departedVisibilitySeconds);
 
   useEffect(() => {
     const timer = window.setInterval(() => setClock(new Date()), 1_000);

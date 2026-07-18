@@ -8,7 +8,7 @@ D1.
 
 Geprüft werden:
 
-- Auslösung durch ein gekoppeltes Gerät mit der Rolle `FLIGHT_LINE_LEAD`,
+- Auslösung durch ein gekoppeltes Gerät mit der Rolle `FLIGHT_DIRECTOR`,
 - sofortige und versionsstabile Sperre weiterer Verkäufe und Aufrufe,
 - neutrale öffentliche FIDS-Antwort ohne Gruppen,
 - neutraler individueller Ticketstatus `SERVICE_PAUSED` ohne Queue-Position, Wartezeit oder Aufruf,

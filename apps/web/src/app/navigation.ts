@@ -12,15 +12,19 @@ export const appDestinations: AppDestination[] = [
   {
     href: "/flight-line",
     label: "Flight Line",
-    shortLabel: "Supervisor",
-    roles: ["FLIGHT_LINE_LEAD", "FLIGHT_DIRECTOR", "ADMIN"],
+    shortLabel: "Flugleitung",
+    roles: ["FLIGHT_DIRECTOR", "ADMIN"],
   },
   {
     href: "/flight-line/assist",
     label: "Assist",
-    roles: ["FLIGHT_LINE", "FLIGHT_LINE_LEAD", "FLIGHT_DIRECTOR", "ADMIN"],
+    roles: ["FLIGHT_LINE", "FLIGHT_DIRECTOR", "ADMIN"],
   },
-  { href: "/fids", label: "FIDS", roles: ["DISPLAY", "FLIGHT_DIRECTOR", "ADMIN"] },
+  {
+    href: "/fids",
+    label: "FIDS",
+    roles: ["CASHIER", "FLIGHT_LINE", "FLIGHT_DIRECTOR", "ADMIN"],
+  },
   { href: "/admin", label: "Administration", shortLabel: "Admin", roles: ["ADMIN"] },
 ];
 

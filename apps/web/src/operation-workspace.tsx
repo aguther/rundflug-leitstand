@@ -97,7 +97,17 @@ export type TicketDetail = {
   weightClass: WeightClass;
   individualWeightKg: number | null;
 };
-export type TicketReceipt = { code: string; statusUrl: string; qrDataUrl: string };
+export type TicketReceipt = {
+  code: string;
+  statusUrl: string;
+  qrDataUrl: string;
+  eventName: string;
+  productName: string;
+  gateLabel: string;
+  communicationLabel: string;
+  position: number;
+  groupSize: number;
+};
 export const weightClassLabel: Record<WeightClass, string> = {
   NOT_CAPTURED: "Nicht erfassen",
   CHILD: "Kind",
@@ -120,7 +130,7 @@ export function deviceRoleFor(deviceId: string): string | null {
     "ADMIN",
     "CASHIER",
     "FLIGHT_LINE",
-    "FLIGHT_LINE_LEAD",
+    "FLIGHT_DIRECTOR",
     "FLIGHT_DIRECTOR",
     "DISPLAY",
   ]) {
@@ -148,8 +158,8 @@ export function deviceIdForRole(role: string, developmentId: string): string {
   const pairedDeviceId =
     role === "CASHIER" || role === "FLIGHT_LINE"
       ? deviceIdForOperationalView(window.localStorage, role)
-      : role === "FLIGHT_LINE_LEAD"
-        ? (window.localStorage.getItem("device-id:FLIGHT_LINE_LEAD") ??
+      : role === "FLIGHT_DIRECTOR"
+        ? (window.localStorage.getItem("device-id:FLIGHT_DIRECTOR") ??
           deviceIdForOperationalView(window.localStorage, "FLIGHT_LINE"))
         : window.localStorage.getItem(`device-id:${role}`);
   if (pairedDeviceId) return pairedDeviceId;
@@ -157,7 +167,7 @@ export function deviceIdForRole(role: string, developmentId: string): string {
 }
 
 export const CASHIER_DEVICE_ID = deviceIdForRole("CASHIER", "cashier-tablet-1");
-export const FLIGHT_LINE_DEVICE_ID = deviceIdForRole("FLIGHT_LINE_LEAD", "recovery-flight-lead");
+export const FLIGHT_LINE_DEVICE_ID = deviceIdForRole("FLIGHT_DIRECTOR", "recovery-flight-lead");
 export const ADMIN_DEVICE_ID = deviceIdForRole("ADMIN", "technical-scaffold");
 export const MASTER_DATA_AUDIT_REASON = "Administrative Stammdatenpflege";
 export const OPERATIONAL_AUDIT_REASON = "Operative Änderung über Administration";

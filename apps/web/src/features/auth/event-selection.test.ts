@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
-import adminSource from "../../admin-view.tsx?raw";
 import shellSource from "../../app/AppShell.tsx?raw";
-import pairSource from "../../pair-device-view.tsx?raw";
+import navigationSource from "../../app/navigation.ts?raw";
 import appSource from "./EventScopedApplication.tsx?raw";
 import selectionSource from "./EventSelectionPage.tsx?raw";
 
@@ -20,10 +19,7 @@ describe("explicit event selection and display binding", () => {
     expect(shellSource).toContain("forgetActiveEvent");
   });
 
-  it("includes the selected gate and profile in display pairing", () => {
-    expect(adminSource).toContain('params.set("gate", displayGateId)');
-    expect(adminSource).toContain('params.set("style", displayMode)');
-    expect(pairSource).toContain("rememberDisplayBinding");
-    expect(pairSource).toContain('role === "DISPLAY"');
+  it("does not require administrators to pair a public display", () => {
+    expect(navigationSource).toContain('href: "/fids"');
   });
 });

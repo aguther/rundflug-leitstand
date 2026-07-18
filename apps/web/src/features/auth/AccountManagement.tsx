@@ -3,14 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { createManagedAccount, loadManagedAccounts, roleLabels, updateManagedAccount } from "./api";
 import "./accounts.css";
 
-const assignableRoles: OperatorRole[] = [
-  "CASHIER",
-  "FLIGHT_LINE",
-  "FLIGHT_LINE_LEAD",
-  "FLIGHT_DIRECTOR",
-  "ADMIN",
-  "DISPLAY",
-];
+const assignableRoles: OperatorRole[] = ["CASHIER", "FLIGHT_LINE", "FLIGHT_DIRECTOR", "ADMIN"];
 
 export function AccountManagement() {
   const [accounts, setAccounts] = useState<OperatorAccountSummary[]>([]);
