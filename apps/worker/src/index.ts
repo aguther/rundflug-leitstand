@@ -71,6 +71,14 @@ import {
 
 const app = new Hono<{ Bindings: Env }>();
 
+function eventRoutes<const Suffix extends string>(
+  suffix: Suffix,
+): [`/api/control/:eventId${Suffix}`, `/api/events/:eventId${Suffix}`] {
+  const controlPath = `/api/control/:eventId${suffix}` as `/api/control/:eventId${Suffix}`;
+  const legacyPath = `/api/events/:eventId${suffix}` as `/api/events/:eventId${Suffix}`;
+  return [controlPath, legacyPath];
+}
+
 app.use("*", async (context, next) => {
   const redirectLocation = httpsRedirectLocation(context.req.url, context.env.APP_ENV);
   if (redirectLocation) return context.redirect(redirectLocation, 308);
@@ -1378,7 +1386,7 @@ app.get("/api/public/events/:eventId/logo", async (context) => {
   });
 });
 
-app.get("/api/events/:eventId/snapshot", async (context) => {
+app.on("GET", eventRoutes("/snapshot"), async (context) => {
   const row = await context.env.DB.prepare(
     `SELECT id, name, event_date, aerodrome, time_zone, status, archived_at, template_source_id,
             emergency_mode, operational_interrupted, version,
@@ -1403,7 +1411,7 @@ app.get("/api/events/:eventId/snapshot", async (context) => {
   return context.json(rowToSnapshot(row));
 });
 
-app.put("/api/events/:eventId/assist-claims/:aircraftId", async (context) => {
+app.on("PUT", eventRoutes("/assist-claims/:aircraftId"), async (context) => {
   const eventId = context.req.param("eventId");
   const aircraftId = context.req.param("aircraftId");
   const device = await authorizeDevice(context.env, eventId, context.req.raw);
@@ -1487,7 +1495,7 @@ app.put("/api/events/:eventId/assist-claims/:aircraftId", async (context) => {
   });
 });
 
-app.delete("/api/events/:eventId/assist-claims/:aircraftId", async (context) => {
+app.on("DELETE", eventRoutes("/assist-claims/:aircraftId"), async (context) => {
   const eventId = context.req.param("eventId");
   const aircraftId = context.req.param("aircraftId");
   const device = await authorizeDevice(context.env, eventId, context.req.raw);
@@ -1521,7 +1529,7 @@ app.delete("/api/events/:eventId/assist-claims/:aircraftId", async (context) => 
   return context.body(null, 204);
 });
 
-app.get("/api/events/:eventId/operations", async (context) => {
+app.on("GET", eventRoutes("/operations"), async (context) => {
   const eventId = context.req.param("eventId");
   const device = await authorizeDevice(context.env, eventId, context.req.raw);
   if (!device || device.role === "DISPLAY") {
@@ -2380,7 +2388,7 @@ app.get("/api/events/:eventId/operations", async (context) => {
   });
 });
 
-app.get("/api/events/:eventId/tickets/search", async (context) => {
+app.on("GET", eventRoutes("/tickets/search"), async (context) => {
   const eventId = context.req.param("eventId");
   const device = await authorizeDevice(context.env, eventId, context.req.raw);
   if (!device || !["CASHIER", "FLIGHT_LINE", "FLIGHT_DIRECTOR", "ADMIN"].includes(device.role)) {
@@ -2492,7 +2500,7 @@ app.get("/api/events/:eventId/tickets/search", async (context) => {
   });
 });
 
-app.get("/api/events/:eventId/ticket-groups/:ticketGroupId/print-data", async (context) => {
+app.on("GET", eventRoutes("/ticket-groups/:ticketGroupId/print-data"), async (context) => {
   const eventId = context.req.param("eventId");
   const device = await authorizeDevice(context.env, eventId, context.req.raw);
   if (!device || !["CASHIER", "ADMIN"].includes(device.role)) {
@@ -2544,7 +2552,7 @@ app.get("/api/events/:eventId/ticket-groups/:ticketGroupId/print-data", async (c
   });
 });
 
-app.get("/api/events/:eventId/history", async (context) => {
+app.on("GET", eventRoutes("/history"), async (context) => {
   const eventId = context.req.param("eventId");
   const device = await authorizeDevice(context.env, eventId, context.req.raw);
   if (!device || !["ADMIN", "FLIGHT_DIRECTOR"].includes(device.role)) {
@@ -2613,7 +2621,7 @@ app.get("/api/events/:eventId/history", async (context) => {
   });
 });
 
-app.get("/api/events/:eventId/history/operations", async (context) => {
+app.on("GET", eventRoutes("/history/operations"), async (context) => {
   const eventId = context.req.param("eventId");
   const device = await authorizeDevice(context.env, eventId, context.req.raw);
   if (!device || !["ADMIN", "FLIGHT_DIRECTOR"].includes(device.role)) {
@@ -2731,7 +2739,7 @@ app.get("/api/events/:eventId/history/operations", async (context) => {
   );
 });
 
-app.get("/api/events/:eventId/history/forecasts", async (context) => {
+app.on("GET", eventRoutes("/history/forecasts"), async (context) => {
   const eventId = context.req.param("eventId");
   const device = await authorizeDevice(context.env, eventId, context.req.raw);
   if (!device || !["ADMIN", "FLIGHT_DIRECTOR"].includes(device.role)) {
@@ -2853,7 +2861,7 @@ app.get("/api/events/:eventId/history/forecasts", async (context) => {
   );
 });
 
-app.get("/api/events/:eventId/devices", async (context) => {
+app.on("GET", eventRoutes("/devices"), async (context) => {
   const eventId = context.req.param("eventId");
   const device = await authorizeDevice(context.env, eventId, context.req.raw);
   if (device?.role !== "ADMIN") {
@@ -2896,7 +2904,7 @@ app.get("/api/events/:eventId/devices", async (context) => {
   });
 });
 
-app.get("/api/events/:eventId/reports/daily.csv", async (context) => {
+app.on("GET", eventRoutes("/reports/daily.csv"), async (context) => {
   const eventId = context.req.param("eventId");
   const device = await authorizeDevice(context.env, eventId, context.req.raw);
   if (!device || !["ADMIN", "CASHIER"].includes(device.role)) {
@@ -2927,7 +2935,7 @@ app.get("/api/events/:eventId/reports/daily.csv", async (context) => {
   });
 });
 
-app.get("/api/events/:eventId/exports/performance-profile.json", async (context) => {
+app.on("GET", eventRoutes("/exports/performance-profile.json"), async (context) => {
   const eventId = context.req.param("eventId");
   const device = await authorizeDevice(context.env, eventId, context.req.raw);
   if (!device || !["ADMIN", "FLIGHT_DIRECTOR"].includes(device.role)) {
@@ -3038,7 +3046,7 @@ app.get("/api/events/:eventId/exports/performance-profile.json", async (context)
   );
 });
 
-app.get("/api/events/:eventId/exports/tickets.csv", async (context) => {
+app.on("GET", eventRoutes("/exports/tickets.csv"), async (context) => {
   const eventId = context.req.param("eventId");
   const device = await authorizeDevice(context.env, eventId, context.req.raw);
   if (!device || !["ADMIN", "CASHIER", "FLIGHT_DIRECTOR"].includes(device.role)) {
@@ -3115,7 +3123,7 @@ app.get("/api/events/:eventId/exports/tickets.csv", async (context) => {
   );
 });
 
-app.get("/api/events/:eventId/reports/daily.pdf", async (context) => {
+app.on("GET", eventRoutes("/reports/daily.pdf"), async (context) => {
   const eventId = context.req.param("eventId");
   const device = await authorizeDevice(context.env, eventId, context.req.raw);
   if (!device || !["ADMIN", "CASHIER", "FLIGHT_DIRECTOR"].includes(device.role)) {
@@ -3574,7 +3582,7 @@ app.all("/api/public/events/:eventId/live", async (context) => {
   return new Response(response.body, response);
 });
 
-app.all("/api/events/:eventId/live", async (context) => {
+app.on("GET", eventRoutes("/live"), async (context) => {
   const actor = await authorizeSession(context.env, context.req.raw);
   if (!actor && context.env.APP_ENV !== "development") {
     return context.json(
@@ -3589,7 +3597,7 @@ app.all("/api/events/:eventId/live", async (context) => {
   return new Response(response.body, response);
 });
 
-app.post("/api/events/:eventId/commands", async (context) => {
+app.on("POST", eventRoutes("/commands"), async (context) => {
   const eventId = context.req.param("eventId");
   const actor = await authorizeSession(context.env, context.req.raw);
   if (!actor && context.env.APP_ENV !== "development") {
