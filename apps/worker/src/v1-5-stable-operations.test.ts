@@ -24,9 +24,10 @@ describe("V1.5 stable operations", () => {
   });
 
   it("exposes stored codes only through the cashier/admin print route", () => {
-    const route = worker.match(
-      /app\.get\("\/api\/events\/:eventId\/ticket-groups\/:ticketGroupId\/print-data"[\s\S]*?\n}\);/,
-    )?.[0];
+    const route = worker.slice(
+      worker.indexOf('eventRoutes("/ticket-groups/:ticketGroupId/print-data")'),
+      worker.indexOf('eventRoutes("/history")'),
+    );
     expect(route).toBeTruthy();
     expect(route).toContain('["CASHIER", "ADMIN"]');
     expect(route).toContain("t.public_code");
@@ -34,9 +35,10 @@ describe("V1.5 stable operations", () => {
   });
 
   it("allows the protected cashier list to load the latest groups without a search term", () => {
-    const route = worker.match(
-      /app\.get\("\/api\/events\/:eventId\/tickets\/search"[\s\S]*?\n}\);/,
-    )?.[0];
+    const route = worker.slice(
+      worker.indexOf('eventRoutes("/tickets/search")'),
+      worker.indexOf('eventRoutes("/ticket-groups/:ticketGroupId/print-data")'),
+    );
     expect(route).toBeTruthy();
     expect(route).toContain('["CASHIER", "FLIGHT_LINE", "FLIGHT_DIRECTOR", "ADMIN"]');
     expect(route).toContain("rawQuery.length === 1");

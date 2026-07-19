@@ -48,7 +48,7 @@ const tokens = {
   flightLine: ["demo", "flight", "line", "device", "token"].join("-"),
 };
 const board = async (deviceId, token) => {
-  const response = await fetch(`${base}/api/events/demo-2026/operations`, {
+  const response = await fetch(`${base}/api/control/demo-2026/operations`, {
     headers: { "x-device-id": deviceId, "x-device-token": token },
   });
   if (!response.ok) throw new Error(`Board-Abruf fehlgeschlagen (${response.status}).`);
@@ -56,7 +56,7 @@ const board = async (deviceId, token) => {
 };
 const history = async (aggregateId) => {
   const query = new URLSearchParams({ aggregateType: "ROTATION", aggregateId });
-  const response = await fetch(`${base}/api/events/demo-2026/history?${query}`, {
+  const response = await fetch(`${base}/api/control/demo-2026/history?${query}`, {
     headers: { "x-device-id": "technical-scaffold", "x-device-token": tokens.admin },
   });
   if (!response.ok) throw new Error(`Historien-Abruf fehlgeschlagen (${response.status}).`);
@@ -64,7 +64,7 @@ const history = async (aggregateId) => {
 };
 const forecastHistory = async (filters, deviceId = "technical-scaffold", token = tokens.admin) => {
   const query = new URLSearchParams(filters);
-  const response = await fetch(`${base}/api/events/demo-2026/history/forecasts?${query}`, {
+  const response = await fetch(`${base}/api/control/demo-2026/history/forecasts?${query}`, {
     headers: { "x-device-id": deviceId, "x-device-token": token },
   });
   return { response, body: await response.json() };
@@ -79,7 +79,7 @@ const envelope = (deviceId, expectedVersion, type, payload) => ({
   payload,
 });
 const post = async (token, body, expectedStatus = 200) => {
-  const response = await fetch(`${base}/api/events/demo-2026/commands`, {
+  const response = await fetch(`${base}/api/control/demo-2026/commands`, {
     method: "POST",
     headers: { "content-type": "application/json", "x-device-token": token },
     body: JSON.stringify(body),
@@ -533,7 +533,7 @@ try {
   if (invalidForecastRange.response.status !== 400) {
     throw new Error("Umgekehrter Prognosezeitraum wurde nicht abgelehnt.");
   }
-  const dailyCsvResponse = await fetch(`${base}/api/events/demo-2026/reports/daily.csv`, {
+  const dailyCsvResponse = await fetch(`${base}/api/control/demo-2026/reports/daily.csv`, {
     headers: { "x-device-id": "technical-scaffold", "x-device-token": tokens.admin },
   });
   const dailyCsv = await dailyCsvResponse.text();
@@ -549,7 +549,7 @@ try {
   ) {
     throw new Error("Der vollständige CSV-Tagesbericht enthält nicht alle V1-Abschnitte.");
   }
-  const dailyPdfResponse = await fetch(`${base}/api/events/demo-2026/reports/daily.pdf`, {
+  const dailyPdfResponse = await fetch(`${base}/api/control/demo-2026/reports/daily.pdf`, {
     headers: { "x-device-id": "technical-scaffold", "x-device-token": tokens.admin },
   });
   const dailyPdf = new Uint8Array(await dailyPdfResponse.arrayBuffer());
@@ -560,7 +560,7 @@ try {
   ) {
     throw new Error("Der archivfähige PDF-Tagesbericht konnte nicht vollständig erzeugt werden.");
   }
-  const devicesResponse = await fetch(`${base}/api/events/demo-2026/devices`, {
+  const devicesResponse = await fetch(`${base}/api/control/demo-2026/devices`, {
     headers: { "x-device-id": "technical-scaffold", "x-device-token": tokens.admin },
   });
   const deviceBody = await devicesResponse.json();

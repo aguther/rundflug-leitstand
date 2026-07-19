@@ -27,6 +27,11 @@ Automatisierte responsive Browserprüfungen ersetzen diese Prüfung auf echter A
    keine `x-device-id`-/`x-device-token`-Header verwenden. Einen simulierten fehlgeschlagenen
    Operations-GET über den GET-only-XHR-Fallback wiederholen; Schreibaktionen dürfen nicht
    automatisch wiederholt werden.
+10. Einen verbreiteten Inhalts-/Tracking-Blocker aktivieren und Anmeldung, Veranstaltungsauswahl,
+    initialen Betriebsstand, manuellen Refresh, eine synthetische Schreibaktion sowie Reconnect
+    wiederholen. Geschützte Betriebsrequests und der operative WebSocket müssen ausschließlich unter
+    `/api/control/:eventId/...` laufen; öffentliche FIDS- und Ticketpfade bleiben unter
+    `/api/public/...`.
 
 Abweichungen werden mit Gerät, iOS-Version, Route, Orientierung, reproduzierbaren Schritten und
 Screenshot dokumentiert.

@@ -35,6 +35,10 @@ const SERVER_UNREACHABLE_MESSAGE =
   "Server nicht erreichbar. Bitte Verbindung prüfen und die Seite neu laden.";
 const LEGACY_DEVELOPMENT_DEVICE_AUTH = import.meta.env.MODE === "development";
 
+export function controlApiPath(eventId: string, suffix: `/${string}`): string {
+  return `/api/control/${encodeURIComponent(eventId)}${suffix}`;
+}
+
 function apiGetUrl(input: RequestInfo | URL, init?: RequestInit): string | null {
   const method = (init?.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase();
   if (method !== "GET") return null;
@@ -171,7 +175,7 @@ export async function claimFlightLineAircraft(
   expiresAt: string;
 }> {
   const response = await apiFetch(
-    `/api/events/${encodeURIComponent(eventId)}/assist-claims/${encodeURIComponent(aircraftId)}`,
+    controlApiPath(eventId, `/assist-claims/${encodeURIComponent(aircraftId)}`),
     {
       method: "PUT",
       headers: deviceHeaders(deviceId, deviceToken),
@@ -208,7 +212,7 @@ export async function releaseFlightLineAircraft(
   deviceToken: string,
 ): Promise<void> {
   const response = await apiFetch(
-    `/api/events/${encodeURIComponent(eventId)}/assist-claims/${encodeURIComponent(aircraftId)}`,
+    controlApiPath(eventId, `/assist-claims/${encodeURIComponent(aircraftId)}`),
     {
       method: "DELETE",
       headers: deviceHeaders(deviceId, deviceToken),
@@ -227,7 +231,7 @@ export async function searchTickets(
   query: string,
 ): Promise<TicketSearchResponse> {
   const response = await apiFetch(
-    `/api/events/${encodeURIComponent(eventId)}/tickets/search?q=${encodeURIComponent(query)}`,
+    controlApiPath(eventId, `/tickets/search?q=${encodeURIComponent(query)}`),
     { headers: deviceHeaders(deviceId, deviceToken) },
   );
   if (!response.ok) throw new Error("Ticketsuche nicht verfügbar.");
@@ -241,7 +245,7 @@ export async function getTicketGroupPrintData(
   deviceToken: string,
 ): Promise<TicketGroupPrintData> {
   const response = await apiFetch(
-    `/api/events/${encodeURIComponent(eventId)}/ticket-groups/${encodeURIComponent(ticketGroupId)}/print-data`,
+    controlApiPath(eventId, `/ticket-groups/${encodeURIComponent(ticketGroupId)}/print-data`),
     { headers: deviceHeaders(deviceId, deviceToken) },
   );
   if (!response.ok) throw new Error("Ticketzettel konnten nicht geladen werden.");
@@ -383,12 +387,9 @@ export async function getAuditHistory(
 ): Promise<AuditHistory> {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(filters)) if (value) query.set(key, value);
-  const response = await apiFetch(
-    `/api/events/${encodeURIComponent(eventId)}/history?${query.toString()}`,
-    {
-      headers: deviceHeaders(deviceId, deviceToken),
-    },
-  );
+  const response = await apiFetch(controlApiPath(eventId, `/history?${query.toString()}`), {
+    headers: deviceHeaders(deviceId, deviceToken),
+  });
   if (!response.ok) throw new Error("Audit-Historie nicht verfügbar.");
   return auditHistorySchema.parse(await response.json());
 }
@@ -408,7 +409,7 @@ export async function getOperationalHistory(
   filters: Partial<OperationalHistoryQuery> = {},
 ): Promise<OperationalHistory> {
   const response = await apiFetch(
-    `/api/events/${encodeURIComponent(eventId)}/history/operations?${historyQuery(filters)}`,
+    controlApiPath(eventId, `/history/operations?${historyQuery(filters)}`),
     { headers: deviceHeaders(deviceId, deviceToken) },
   );
   if (!response.ok) throw new Error("Betriebshistorie nicht verfügbar.");
@@ -422,7 +423,7 @@ export async function getForecastHistory(
   filters: Partial<ForecastHistoryQuery> = {},
 ): Promise<ForecastHistory> {
   const response = await apiFetch(
-    `/api/events/${encodeURIComponent(eventId)}/history/forecasts?${historyQuery(filters)}`,
+    controlApiPath(eventId, `/history/forecasts?${historyQuery(filters)}`),
     { headers: deviceHeaders(deviceId, deviceToken) },
   );
   if (!response.ok) throw new Error("Prognosehistorie nicht verfügbar.");
@@ -434,7 +435,7 @@ export async function downloadDailyReport(
   deviceId: string,
   deviceToken: string,
 ): Promise<void> {
-  const response = await apiFetch(`/api/events/${encodeURIComponent(eventId)}/reports/daily.csv`, {
+  const response = await apiFetch(controlApiPath(eventId, "/reports/daily.csv"), {
     headers: deviceHeaders(deviceId, deviceToken),
   });
   if (!response.ok) throw new Error("Tagesbericht nicht verfügbar.");
@@ -454,7 +455,7 @@ async function downloadProtectedFile(
   path: string,
   filename: string,
 ): Promise<void> {
-  const response = await apiFetch(`/api/events/${encodeURIComponent(eventId)}/${path}`, {
+  const response = await apiFetch(controlApiPath(eventId, `/${path}`), {
     headers: deviceHeaders(deviceId, deviceToken),
   });
   if (!response.ok) throw new Error("Export nicht verfügbar.");
@@ -527,7 +528,7 @@ export async function getOperationBoard(
   deviceToken: string,
   signal?: AbortSignal,
 ): Promise<OperationBoard> {
-  const response = await apiFetch(`/api/events/${encodeURIComponent(eventId)}/operations`, {
+  const response = await apiFetch(controlApiPath(eventId, "/operations"), {
     ...(LEGACY_DEVELOPMENT_DEVICE_AUTH && deviceToken
       ? { headers: deviceHeaders(deviceId, deviceToken) }
       : {}),
@@ -543,7 +544,7 @@ export async function sendCommand(
 ): Promise<CommandResult> {
   assertOperationalConnection(navigator.onLine);
   const { deviceId: _browserDeviceId, ...sessionCommand } = command;
-  const response = await apiFetch(`/api/events/${encodeURIComponent(command.eventId)}/commands`, {
+  const response = await apiFetch(controlApiPath(command.eventId, "/commands"), {
     method: "POST",
     headers: deviceHeaders(command.deviceId, deviceToken, { "content-type": "application/json" }),
     body: JSON.stringify(LEGACY_DEVELOPMENT_DEVICE_AUTH ? command : sessionCommand),
@@ -635,7 +636,10 @@ export async function getHealth(signal?: AbortSignal): Promise<HealthResponse> {
 }
 
 export async function getDemoSnapshot(signal?: AbortSignal): Promise<EventSnapshot> {
-  const response = await apiFetch("/api/events/demo-2026/snapshot", signal ? { signal } : {});
+  const response = await apiFetch(
+    controlApiPath("demo-2026", "/snapshot"),
+    signal ? { signal } : {},
+  );
   if (!response.ok) {
     throw new Error(`Demo-Snapshot nicht verfügbar (${response.status})`);
   }

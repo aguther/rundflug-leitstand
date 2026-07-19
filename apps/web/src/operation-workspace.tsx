@@ -185,7 +185,7 @@ export function useOperationBoard(deviceId: string) {
     const connect = () => {
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
       socket = new WebSocket(
-        `${protocol}//${window.location.host}/api/public/events/${encodeURIComponent(EVENT_ID)}/live`,
+        `${protocol}//${window.location.host}/api/control/${encodeURIComponent(EVENT_ID)}/live`,
       );
       socket.addEventListener("open", () => {
         reconnectDelay = OPERATION_BOARD_RECONNECT_INITIAL_MS;
