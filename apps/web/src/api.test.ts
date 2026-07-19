@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   assertOperationalConnection,
+  controlApiPath,
   factoryReset,
   getHealth,
   getOperationBoard,
@@ -8,6 +9,8 @@ import {
   sendCommand,
   verifyAdminPin,
 } from "./api";
+import apiSource from "./api.ts?raw";
+import operationWorkspaceSource from "./operation-workspace.tsx?raw";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -68,6 +71,24 @@ describe("network failure guidance", () => {
   });
 });
 
+describe("content-blocker-neutral operational routing", () => {
+  it("[T-020] keeps every browser-side private event request off the blocked /api/event prefix", () => {
+    const easyPrivacyWorkerRule = /^https?:\/\/[^/]*workers\.dev\/api\/event/i;
+    const workerOrigin = "https://rundflug-leitstand.synthetic.workers.dev";
+
+    expect(`${workerOrigin}${controlApiPath("synthetic event", "/operations")}`).toBe(
+      `${workerOrigin}/api/control/synthetic%20event/operations`,
+    );
+    expect(`${workerOrigin}${controlApiPath("synthetic event", "/operations")}`).not.toMatch(
+      easyPrivacyWorkerRule,
+    );
+    expect(`${workerOrigin}/api/events/synthetic-event/operations`).toMatch(easyPrivacyWorkerRule);
+    expect(apiSource).not.toContain("/api/events/");
+    expect(operationWorkspaceSource).toContain("/api/control/");
+    expect(operationWorkspaceSource).not.toContain("/api/public/events/");
+  });
+});
+
 describe("session-only browser transport", () => {
   it("does not send the browser's legacy device ID or token with a production command", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
@@ -107,7 +128,7 @@ describe("session-only browser transport", () => {
       getOperationBoard("synthetic-event", "ignored-browser-device", "ignored-device-token"),
     ).rejects.toThrowError("Betriebsdaten nicht verfügbar (503)");
 
-    expect(fetchMock).toHaveBeenCalledWith("/api/events/synthetic-event/operations", {});
+    expect(fetchMock).toHaveBeenCalledWith("/api/control/synthetic-event/operations", {});
   });
 
   it("authenticates factory reset only through the HttpOnly session cookie", async () => {

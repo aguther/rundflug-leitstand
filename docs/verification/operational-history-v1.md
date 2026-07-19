@@ -1,6 +1,6 @@
 # Verifikation operative Historie V1
 
-Die geschützte Abfrage `GET /api/events/:eventId/history/operations` stellt die dauerhafte
+Die geschützte Abfrage `GET /api/control/:eventId/history/operations` stellt die dauerhafte
 operative Historie für Flüge, Fluggruppen und anonyme Tickets bereit. Sie unterstützt die Filter
 aus F-HIS-010:
 

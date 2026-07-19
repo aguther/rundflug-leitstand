@@ -16,8 +16,8 @@ describe("serverseitige Sitzungsautorisierung (ADR-0010, Q-SIC-020, T-020)", () 
 
   it("derives Assist ownership from the authorized session actor", () => {
     const route = workerSource.slice(
-      workerSource.indexOf('app.put("/api/events/:eventId/assist-claims/:aircraftId"'),
-      workerSource.indexOf('app.delete("/api/events/:eventId/assist-claims/:aircraftId"'),
+      workerSource.indexOf('app.on("PUT", eventRoutes("/assist-claims/:aircraftId")'),
+      workerSource.indexOf('app.on("DELETE", eventRoutes("/assist-claims/:aircraftId")'),
     );
     expect(route).toContain("const deviceId = device.id");
     expect(route).toContain("claimedByCurrentSession: true");
@@ -26,7 +26,7 @@ describe("serverseitige Sitzungsautorisierung (ADR-0010, Q-SIC-020, T-020)", () 
 
   it("removes browser device credentials and injects the session origin into commands", () => {
     const route = workerSource.slice(
-      workerSource.indexOf('app.post("/api/events/:eventId/commands"'),
+      workerSource.indexOf('app.on("POST", eventRoutes("/commands")'),
       workerSource.indexOf("app.notFound"),
     );
     expect(route).toContain('"x-device-id"');
