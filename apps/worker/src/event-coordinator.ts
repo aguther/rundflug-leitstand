@@ -413,20 +413,20 @@ export class EventCoordinator extends DurableObject<Env> {
           );
         }
 
-        if (command.payload.publicTicketCodes.length > effectiveGroupCapacity) {
-          return json(
-            {
-              error: {
-                code: "BOOKING_GROUP_TOO_LARGE",
-                message: "Die Gruppe passt nicht gemeinsam in ein verfügbares Flugzeug.",
-                referenceCapacity: effectiveGroupCapacity,
-                groupSize: command.payload.publicTicketCodes.length,
-              },
-            },
-            { status: 409 },
-          );
+        let splitPlan: ReturnType<typeof planBookingGroupSplit>;
+        try {
+          splitPlan = planBookingGroupSplit({
+            groupSize: command.payload.publicTicketCodes.length,
+            referenceCapacity: effectiveGroupCapacity,
+            splitAcknowledged: command.payload.oversizeSplitAcknowledged,
+          });
+        } catch (reason: unknown) {
+          if (reason instanceof DomainRuleError) {
+            return json({ error: { code: reason.code, message: reason.message } }, { status: 409 });
+          }
+          throw reason;
         }
-        const requiredFlightGroupCount = 1;
+        const requiredFlightGroupCount = splitPlan.slotSizes.length;
 
         const normalizedCodes = command.payload.publicTicketCodes.map(assertPublicTicketCode);
         if (new Set(normalizedCodes).size !== normalizedCodes.length) {
@@ -487,7 +487,7 @@ export class EventCoordinator extends DurableObject<Env> {
         )
           .bind(command.eventId, product.resource_group_id)
           .first<{ next_sequence: number }>();
-        const splitAcrossFlightGroups = false;
+        const splitAcrossFlightGroups = splitPlan.splitAcknowledged;
         const communicationRow = await this.env.DB.prepare(
           "SELECT COALESCE(MAX(communication_number), 100) + 1 AS next_number FROM flight_groups WHERE operation_day_id = ?1 AND resource_group_id = ?2",
         )
@@ -604,7 +604,8 @@ export class EventCoordinator extends DurableObject<Env> {
               paymentStatus: command.payload.paymentStatus,
               paymentMethod: command.payload.paymentMethod,
               joinedExistingFlightGroup: false,
-              oversizeSplitAcknowledged: false,
+              oversizeSplitAcknowledged: splitPlan.splitAcknowledged,
+              slotSizes: splitPlan.slotSizes,
             }),
           ),
           this.env.DB.prepare(`INSERT INTO idempotency_receipts
@@ -708,7 +709,6 @@ export class EventCoordinator extends DurableObject<Env> {
         }
         if (
           command.type === "CANCEL_TICKET_GROUP" ||
-          command.type === "REBOOK_TICKET_GROUP" ||
           command.type === "DEFER_TICKET_GROUP" ||
           command.type === "MARK_NO_SHOW"
         ) {
@@ -5120,7 +5120,7 @@ export class EventCoordinator extends DurableObject<Env> {
     command: Extract<
       CommandEnvelope,
       {
-        type: "CANCEL_TICKET_GROUP" | "REBOOK_TICKET_GROUP" | "DEFER_TICKET_GROUP" | "MARK_NO_SHOW";
+        type: "CANCEL_TICKET_GROUP" | "DEFER_TICKET_GROUP" | "MARK_NO_SHOW";
       }
     >,
     current: StoredEventRow,
@@ -5205,11 +5205,9 @@ export class EventCoordinator extends DurableObject<Env> {
           action:
             command.type === "CANCEL_TICKET_GROUP"
               ? "CANCEL"
-              : command.type === "REBOOK_TICKET_GROUP"
-                ? "REBOOK"
-                : command.type === "MARK_NO_SHOW"
-                  ? "NO_SHOW"
-                  : "DEFER",
+              : command.type === "MARK_NO_SHOW"
+                ? "NO_SHOW"
+                : "DEFER",
         });
       }
     } catch (reason: unknown) {
@@ -5219,52 +5217,16 @@ export class EventCoordinator extends DurableObject<Env> {
       throw reason;
     }
 
-    let targetProductId = group.product_id;
-    let targetResourceGroupId = group.resource_group_id;
-    let targetGateId: string | null = null;
-    let targetPriceCents: number | null = null;
-    let targetReferenceCapacity = 0;
-    if (command.type === "REBOOK_TICKET_GROUP") {
-      const target = await this.env.DB.prepare(
-        "SELECT id, resource_group_id, gate_id, price_cents, reference_capacity FROM products WHERE id = ?1 AND operation_day_id = ?2 AND sale_enabled = 1",
-      )
-        .bind(command.payload.newProductId, command.eventId)
-        .first<{
-          id: string;
-          resource_group_id: string;
-          gate_id: string;
-          price_cents: number;
-          reference_capacity: number;
-        }>();
-      if (!target) {
-        return json(
-          {
-            error: {
-              code: "TARGET_PRODUCT_NOT_AVAILABLE",
-              message: "Zielprodukt ist nicht verfügbar.",
-            },
-          },
-          { status: 409 },
-        );
-      }
-      targetProductId = target.id;
-      targetResourceGroupId = target.resource_group_id;
-      targetGateId = target.gate_id;
-      targetPriceCents = target.price_cents;
-      targetReferenceCapacity = target.reference_capacity;
-    } else {
-      const currentProduct = await this.env.DB.prepare(
-        "SELECT gate_id, reference_capacity FROM products WHERE id = ?1 AND operation_day_id = ?2",
-      )
-        .bind(targetProductId, command.eventId)
-        .first<{ gate_id: string; reference_capacity: number }>();
-      targetGateId = currentProduct?.gate_id ?? null;
-      targetReferenceCapacity = currentProduct?.reference_capacity ?? 0;
-    }
-    if (
-      (command.type === "REBOOK_TICKET_GROUP" || command.type === "DEFER_TICKET_GROUP") &&
-      !targetGateId
-    ) {
+    const targetProductId = group.product_id;
+    const targetResourceGroupId = group.resource_group_id;
+    const currentProduct = await this.env.DB.prepare(
+      "SELECT gate_id, reference_capacity FROM products WHERE id = ?1 AND operation_day_id = ?2",
+    )
+      .bind(targetProductId, command.eventId)
+      .first<{ gate_id: string; reference_capacity: number }>();
+    const targetGateId = currentProduct?.gate_id ?? null;
+    const targetReferenceCapacity = currentProduct?.reference_capacity ?? 0;
+    if (command.type === "DEFER_TICKET_GROUP" && !targetGateId) {
       return json(
         {
           error: {
@@ -5285,7 +5247,6 @@ export class EventCoordinator extends DurableObject<Env> {
       nextDeferralCount >= (current.max_ticket_deferrals ?? 2);
     const eventType = {
       CANCEL_TICKET_GROUP: "TICKET_GROUP_CANCELED",
-      REBOOK_TICKET_GROUP: "TICKET_GROUP_REBOOKED",
       DEFER_TICKET_GROUP: "TICKET_GROUP_DEFERRED",
       MARK_NO_SHOW: "TICKET_GROUP_NO_SHOW",
     } as const;
@@ -5381,13 +5342,9 @@ export class EventCoordinator extends DurableObject<Env> {
           group.id,
           group.version,
         ),
-        targetPriceCents === null
-          ? this.env.DB.prepare(
-              "UPDATE tickets SET status = 'QUEUED' WHERE ticket_group_id = ?1",
-            ).bind(group.id)
-          : this.env.DB.prepare(
-              "UPDATE tickets SET status = 'QUEUED', price_cents = ?1 WHERE ticket_group_id = ?2",
-            ).bind(targetPriceCents, group.id),
+        this.env.DB.prepare("UPDATE tickets SET status = 'QUEUED' WHERE ticket_group_id = ?1").bind(
+          group.id,
+        ),
       );
       for (const slot of reassignmentSlots) {
         statements.push(

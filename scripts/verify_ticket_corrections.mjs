@@ -90,6 +90,14 @@ const history = async (ticketGroupId) => {
   if (!response.ok) throw new Error(`Historien-Abruf fehlgeschlagen (${response.status}).`);
   return response.json();
 };
+const ticketSearch = async (status, query) => {
+  const params = new URLSearchParams({ status, q: query, limit: "20" });
+  const response = await fetch(`${base}/api/events/demo-2026/tickets/search?${params}`, {
+    headers: { "x-device-id": devices.cashier, "x-device-token": tokens.cashier },
+  });
+  if (!response.ok) throw new Error(`Ticketsuche fehlgeschlagen (${response.status}).`);
+  return response.json();
+};
 const operationalHistory = async (filters, device = "admin", expectedStatus = 200) => {
   const query = new URLSearchParams(filters);
   const response = await fetch(`${base}/api/events/demo-2026/history/operations?${query}`, {
@@ -115,15 +123,16 @@ const ticketCode = () =>
     .toString("base64url")
     .toUpperCase()
     .replaceAll(/[01OI_-]/g, "A");
-const sale = (version) =>
+const sale = (version, count = 2, oversizeSplitAcknowledged = false) =>
   post(
     tokens.cashier,
     envelope(devices.cashier, version, "SELL_TICKET_GROUP", {
       productId: "panorama-20",
-      publicTicketCodes: [ticketCode(), ticketCode()],
+      publicTicketCodes: Array.from({ length: count }, ticketCode),
       standby: false,
       paymentStatus: "PAID",
       paymentMethod: "CASH",
+      oversizeSplitAcknowledged,
     }),
   );
 
@@ -158,6 +167,10 @@ try {
 
   const cancelSale = await sale(result.event.version);
   const cancelGroupId = cancelSale.aggregate.id;
+  const boardWithSale = await board();
+  const capacityWithSale = boardWithSale.products.find(
+    (entry) => entry.id === "panorama-20",
+  )?.remainingSellableSeats;
   const cancelPayload = {
     ticketGroupId: cancelGroupId,
     reason: "Synthetisches Storno",
@@ -214,54 +227,66 @@ try {
       "Stornierte Tickets oder freigegebene Umlaufzuordnungen fehlen in der Fachhistorie.",
     );
   }
+  const boardAfterCancel = await board();
+  const capacityAfterCancel = boardAfterCancel.products.find(
+    (entry) => entry.id === "panorama-20",
+  )?.remainingSellableSeats;
+  if (
+    capacityWithSale === undefined ||
+    capacityAfterCancel === undefined ||
+    capacityAfterCancel < capacityWithSale + 2
+  ) {
+    throw new Error("Storno hat die verkaufte Kapazität nicht unmittelbar freigegeben.");
+  }
+  const canceledSearch = await ticketSearch("CANCELED", cancelGroupId);
+  const canceledListEntry = canceledSearch.results.find(
+    (entry) => entry.ticketGroupId === cancelGroupId,
+  );
+  if (canceledListEntry?.groupStatus !== "CANCELED" || !canceledListEntry.bookingGroupLabel) {
+    throw new Error("Stornierte Buchungsgruppe fehlt in der aktuellen Kassenliste.");
+  }
 
-  const rebookSale = await sale(canceled.event.version);
-  const rebookGroupId = rebookSale.aggregate.id;
   await post(
     tokens.cashier,
     envelope(devices.cashier, canceled.event.version, "REBOOK_TICKET_GROUP", {
-      ticketGroupId: rebookGroupId,
+      ticketGroupId: cancelGroupId,
       newProductId: "panorama-30",
-      reason: "Veralteter Umbuchungsversuch",
+      reason: "Nicht mehr unterstützte Umbuchung",
       adminPin: pin,
     }),
-    409,
+    400,
   );
-  const rebooked = await post(
-    tokens.cashier,
-    envelope(devices.cashier, rebookSale.event.version, "REBOOK_TICKET_GROUP", {
-      ticketGroupId: rebookGroupId,
-      newProductId: "panorama-30",
-      reason: "Synthetische Umbuchung",
-      adminPin: pin,
-    }),
-  );
+
+  const resale = await sale(canceled.event.version);
+  const resaleGroupId = resale.aggregate.id;
+  if (resaleGroupId === cancelGroupId) {
+    throw new Error("Neuverkauf hat die stornierte Buchungsgruppe wiederverwendet.");
+  }
   current = await board();
   const newRotation = current.rotations.find(
-    (entry) => entry.ticketGroupId === rebookGroupId && entry.status === "DRAFT",
+    (entry) => entry.ticketGroupId === resaleGroupId && entry.status === "DRAFT",
   );
-  const rebookProduct = current.products.find((entry) => entry.id === "panorama-30");
-  if (newRotation?.productName !== "30 Min. Panorama") {
-    throw new Error("Umbuchung hat die Gruppe nicht korrekt in die Ziel-Queue neu eingereiht.");
+  const resaleProduct = current.products.find((entry) => entry.id === "panorama-20");
+  if (newRotation?.productName !== "20 Min. Panorama") {
+    throw new Error("Neuverkauf wurde nicht als neue aktive Buchungsgruppe eingereiht.");
   }
-  if (!rebookProduct) throw new Error("Synthetisches Zielprodukt fehlt in der Operationssicht.");
-  const rebookAudit = await history(rebookGroupId);
-  const rebookEvent = rebookAudit.entries.find(
-    (entry) => entry.eventType === "TICKET_GROUP_REBOOKED",
+  if (!resaleProduct)
+    throw new Error("Synthetisches Verkaufsprodukt fehlt in der Operationssicht.");
+  const activeSearch = await ticketSearch("ACTIVE", resaleGroupId);
+  const activeListEntry = activeSearch.results.find(
+    (entry) => entry.ticketGroupId === resaleGroupId,
   );
   if (
-    rebookEvent?.payload?.reason !== "Synthetische Umbuchung" ||
-    rebookEvent?.payload?.targetProductId !== "panorama-30"
+    !activeListEntry ||
+    activeListEntry.queueSequence <= canceledListEntry.queueSequence ||
+    activeListEntry.groupStatus !== "QUEUED"
   ) {
-    throw new Error("Umbuchungsziel oder Grund fehlt im Audit-Eintrag.");
+    throw new Error("Neuverkauf steht nicht mit neuer aktueller Queue-Position am Queue-Ende.");
   }
-  if (rebooked.event.version !== current.event.version) {
-    throw new Error("Bestätigte Umbuchung und Operationssicht haben abweichende Versionen.");
-  }
-  const rebookedHistory = await operationalHistory({
-    productId: "panorama-30",
-    resourceGroupId: rebookProduct.resourceGroupId,
-    ticketGroupId: rebookGroupId,
+  const resaleHistory = await operationalHistory({
+    productId: "panorama-20",
+    resourceGroupId: resaleProduct.resourceGroupId,
+    ticketGroupId: resaleGroupId,
     communicationNumber: String(newRotation.communicationNumber),
     ticketStatus: "QUEUED",
     rotationStatus: "DRAFT",
@@ -269,14 +294,42 @@ try {
     offset: "0",
   });
   if (
-    rebookedHistory.total !== 2 ||
-    rebookedHistory.entries.length !== 1 ||
-    rebookedHistory.entries[0]?.communicationLabel !== newRotation.communicationLabel ||
-    rebookedHistory.entries[0]?.productId !== "panorama-30"
+    resaleHistory.total !== 2 ||
+    resaleHistory.entries.length !== 1 ||
+    resaleHistory.entries[0]?.communicationLabel !== newRotation.communicationLabel ||
+    resaleHistory.entries[0]?.productId !== "panorama-20"
   ) {
     throw new Error(
       "Produkt-, Ressourcen-, Slot- oder Statusfilter der Fachhistorie sind inkonsistent.",
     );
+  }
+  await post(
+    tokens.cashier,
+    envelope(devices.cashier, resale.event.version, "SELL_TICKET_GROUP", {
+      productId: "panorama-20",
+      publicTicketCodes: Array.from({ length: 5 }, ticketCode),
+      standby: false,
+      paymentStatus: "PAID",
+      paymentMethod: "CASH",
+      oversizeSplitAcknowledged: false,
+    }),
+    409,
+  );
+  const splitSale = await sale(resale.event.version, 5, true);
+  current = await board();
+  const splitRotations = current.rotations.filter(
+    (entry) => entry.ticketGroupId === splitSale.aggregate.id && entry.status === "DRAFT",
+  );
+  if (splitRotations.length !== 2) {
+    throw new Error("Informierter Verkauf über Referenzkapazität erzeugte nicht zwei Fluggruppen.");
+  }
+  const splitHistory = await history(splitSale.aggregate.id);
+  const splitEvent = splitHistory.entries.find((entry) => entry.eventType === "TICKET_GROUP_SOLD");
+  if (
+    splitEvent?.payload?.oversizeSplitAcknowledged !== true ||
+    JSON.stringify(splitEvent.payload.slotSizes) !== JSON.stringify([4, 1])
+  ) {
+    throw new Error("Aufteilung und Auswirkungen fehlen im Audit des Verkaufs.");
   }
   await operationalHistory(
     {
@@ -286,18 +339,28 @@ try {
     "admin",
     400,
   );
-  await operationalHistory({ ticketGroupId: rebookGroupId }, "cashier", 403);
+  await operationalHistory({ ticketGroupId: resaleGroupId }, "cashier", 403);
   console.log(
     JSON.stringify({
       ok: true,
-      requirements: ["F-KAS-070", "F-KAS-080", "F-HIS-010", "F-HIS-020"],
+      requirements: [
+        "F-KAS-070",
+        "V16-KAS-010",
+        "V16-KAS-020",
+        "V16-KAS-040",
+        "V16-KAS-050",
+        "F-HIS-020",
+      ],
       verified: [
         "role-and-session-authorization",
         "reason-audit",
         "idempotency",
         "stale-write-rejection",
         "rotation-release",
-        "target-queue-reentry",
+        "capacity-release",
+        "rebooking-rejected",
+        "cancel-and-resale-new-queue-entry",
+        "informed-capacity-split-without-extra-confirmation",
         "authorized-paginated-operational-history",
         "entity-status-and-time-filter-validation",
       ],

@@ -581,7 +581,7 @@
   font-weight: 650;
 }
 
-.ds-confirm-dialog p {
+.ds-confirm-body {
   margin: 0 0 var(--space-4);
   color: var(--ui-muted);
   font-size: 0.9rem;

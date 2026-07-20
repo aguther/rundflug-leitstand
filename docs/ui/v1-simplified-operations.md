@@ -34,8 +34,9 @@ Der Standardverkauf bleibt vollständig auf einem Bildschirm:
 Ein Produkt zeigt kompakt Wartezeit, Verfügbarkeit und realistisch verbleibende Kapazität. Passt eine
 Gruppe nur in einen Teil der Flotte, erscheint ein Hinweis auf die voraussichtlich längere Wartezeit.
 Eine Teilungswarnung erscheint ausschließlich, wenn kein aktives kompatibles Flugzeug die Gruppe als
-Ganzes aufnehmen kann. Zahlungsstatus und Zahlart werden nicht erfasst. Suche, Storno und Umbuchung
-liegen hinter der klar getrennten Sekundäraktion „Bestehenden Verkauf bearbeiten“.
+Ganzes aufnehmen kann. Zahlungsstatus und Zahlart werden nicht erfasst. Suche, Storno und Nachdruck
+liegen in der klar getrennten Liste bestehender Verkäufe. Korrekturen erfolgen durch Storno und
+bewussten Neuverkauf; eine neue Umbuchungsaktion gibt es nicht.
 
 ## Flight Line `/flight-line`
 

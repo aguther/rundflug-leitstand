@@ -1,3 +1,4 @@
+import { REQUIREMENTS_VERSION } from "@rundflug/config";
 import { sha256Hex } from "./crypto";
 import type { Env } from "./types";
 
@@ -31,7 +32,7 @@ export interface PortableBackup {
   format: "rundflug-leitstand-portable-backup";
   formatVersion: 1;
   createdAt: string;
-  requirementsVersion: "1.4";
+  requirementsVersion: string;
   reason: BackupReason;
   tables: Record<string, unknown[]>;
 }
@@ -72,7 +73,7 @@ export async function createPortableBackup(
     format: "rundflug-leitstand-portable-backup",
     formatVersion: 1,
     createdAt,
-    requirementsVersion: "1.4",
+    requirementsVersion: REQUIREMENTS_VERSION,
     reason,
     tables,
   };

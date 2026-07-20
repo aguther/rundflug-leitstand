@@ -35,6 +35,13 @@ VALUES
   ('recovery-reviewer', 'demo-2026', 'Recovery Reviewer', 'ADMIN', 1, '2026-07-11T08:00:00.000Z', '2026-07-11T08:00:00.000Z'),
   ('recovery-flight-lead', 'demo-2026', 'Recovery Flight Lead', 'FLIGHT_DIRECTOR', 1, '2026-07-11T08:00:00.000Z', '2026-07-11T08:00:00.000Z');
 
+INSERT OR IGNORE INTO operator_accounts
+  (id, login_code, role, pin_hash, active, failed_attempts, session_version, created_at, updated_at)
+VALUES
+  ('550e8400-e29b-41d4-a716-446655440201', 'KASSE-01', 'CASHIER',
+   'pbkdf2-sha256$100000$cnVuZGZsdWctZGVtby12MTY$U2I1_Hn6O7SffZkc-j1tL18gzQoLy7fsSSGAgRu51Ow',
+   1, 0, 1, '2026-07-11T08:00:00.000Z', '2026-07-11T08:00:00.000Z');
+
 INSERT OR IGNORE INTO resource_groups (id, operation_day_id, name, status, gate_id, version, created_at, updated_at)
 VALUES ('rg-panorama', 'demo-2026', 'Panorama', 'ACTIVE', 'demo-2026-gate-main', 0, '2026-07-11T08:00:00.000Z', '2026-07-11T08:00:00.000Z');
 

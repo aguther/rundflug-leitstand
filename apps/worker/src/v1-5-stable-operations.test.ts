@@ -42,8 +42,10 @@ describe("V1.5 stable operations", () => {
     expect(route).toBeTruthy();
     expect(route).toContain('["CASHIER", "FLIGHT_LINE", "FLIGHT_DIRECTOR", "ADMIN"]');
     expect(route).toContain("rawQuery.length === 1");
-    expect(route).toContain("?6 = ''");
-    expect(route).toContain("ORDER BY tg.sold_at DESC LIMIT 20");
+    expect(route).toContain("ticketSearchRequestSchema.safeParse");
+    expect(route).toContain("tg.status <> 'CANCELED'");
+    expect(route).toContain("ORDER BY tg.sold_at DESC, tg.id DESC");
+    expect(route).toContain("nextCursor");
   });
 
   it("publishes explicit off-block, on-block and turnaround events", () => {

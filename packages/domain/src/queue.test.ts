@@ -85,7 +85,7 @@ describe("resource-group queue planning", () => {
 
   it("rejects queue mutations once a rotation is in flight", () => {
     expect(() =>
-      assertQueueMutationAllowed({ rotationState: "IN_FLIGHT", action: "REBOOK" }),
+      assertQueueMutationAllowed({ rotationState: "IN_FLIGHT", action: "CANCEL" }),
     ).toThrowError(/nach IM FLUG/);
   });
 

@@ -1,0 +1,11 @@
+ID,Modul,Tests,Status
+V16-REL-010,packages/config und scripts/verify_requirements.py,Requirements- und Versionsverifikation,umgesetzt
+V16-KAS-010,apps/web/src/cashier-view.tsx,apps/web/src/cashier-v1-6.test.ts,umgesetzt
+V16-KAS-015,apps/web/src/cashier-view.tsx und cashier-v12.css,Komponententest und Browserabnahme mit drei Produkten,umgesetzt
+V16-KAS-020,apps/web/src/features/cashier/cashier-v12.css,apps/web/src/cashier-v1-6.test.ts und Browserabnahme,umgesetzt
+V16-KAS-030,apps/web/src/cashier-view.tsx und apps/worker/src/index.ts,Contracts- Worker- und Browsertests,umgesetzt
+V16-KAS-040,apps/worker/src/event-coordinator.ts und apps/web/src/cashier-view.tsx,scripts/verify_ticket_corrections.mjs und Browserabnahme,umgesetzt
+V16-KAS-050,packages/contracts packages/domain apps/worker und apps/web,Contracts- Domain- und Integrationstests,umgesetzt
+V16-TKT-010,apps/web/src/cashier-view.tsx und cashier-v12.css,Druckmarkup- und Browserabnahme,umgesetzt
+V16-TKT-020,apps/web/src/cashier-view.tsx,Druckbereitschafts- und Browsertests,umgesetzt
+V16-UI-010,docs/ui/v1.6.0-cashier-concept.md,visuelle Browserabnahme,umgesetzt

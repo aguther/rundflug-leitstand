@@ -1,6 +1,6 @@
 {
   "name": "@rundflug/web",
-  "version": "0.1.0",
+  "version": "1.6.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -9,8 +9,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@rundflug/config": "0.1.0",
-    "@rundflug/contracts": "0.1.0",
+    "@rundflug/config": "1.6.0",
+    "@rundflug/contracts": "1.6.0",
     "lucide-react": "^1.25.0",
     "qrcode": "^1.5.4",
     "react": "19.2.7",
