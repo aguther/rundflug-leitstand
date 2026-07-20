@@ -107,6 +107,8 @@
 .flight-director-aircraft-name {
   min-width: 0;
   display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  align-items: center;
   gap: 2px;
   padding: 0;
   border: 0;
@@ -115,12 +117,82 @@
   text-align: left;
   cursor: pointer;
 }
+.flight-director-aircraft-name > svg {
+  width: 18px;
+  height: 18px;
+  color: var(--ui-muted);
+}
+.flight-director-aircraft-name > span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
 .flight-director-aircraft-name strong {
   font-size: 0.9rem;
 }
 .flight-director-aircraft-name small,
-.flight-director-aircraft-row > span {
+.flight-director-aircraft-resource,
+.flight-director-timeline,
+.flight-director-next-step {
   color: var(--ui-muted);
+}
+
+.flight-director-progress {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  align-items: center;
+  padding-inline: 6px;
+}
+
+.flight-director-progress > span {
+  position: relative;
+  width: 11px;
+  height: 11px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 50%;
+  background: var(--ui-surface);
+}
+
+.flight-director-progress > span:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  left: 10px;
+  width: 20px;
+  height: 1px;
+  background: var(--ui-border-strong);
+}
+
+.flight-director-progress > span.done,
+.flight-director-progress > span.current {
+  border-color: var(--ui-success);
+  box-shadow: inset 0 0 0 3px var(--ui-surface);
+  background: var(--ui-success);
+}
+
+.flight-director-progress > span.current {
+  border-color: var(--ui-accent);
+  outline: 2px solid var(--ui-accent);
+  outline-offset: 1px;
+  background: var(--ui-accent);
+}
+
+.flight-director-progress:is(.state-available, .state-landed) > span.current {
+  border-color: var(--ui-success);
+  outline-color: var(--ui-success);
+  background: var(--ui-success);
+}
+
+.flight-director-progress:is(.state-paused, .state-boarding) > span.current {
+  border-color: var(--ui-warning);
+  outline-color: var(--ui-warning);
+  background: var(--ui-warning);
+}
+
+.flight-director-progress:is(.state-inactive, .state-interrupted) > span.current {
+  border-color: var(--ui-danger);
+  outline-color: var(--ui-danger);
+  background: var(--ui-danger);
 }
 .flight-director-group-chips {
   display: flex;
@@ -408,6 +480,450 @@
   }
   .flight-director-resource-filter {
     width: 100%;
+  }
+}
+
+/* V1.6.1 supervisor: one compact table, no expanding aircraft rows. */
+.flight-director-v15 {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.ds-panel.flight-director-aircraft {
+  height: clamp(260px, 43vh, 470px);
+  min-height: 230px;
+  flex: 1 1 360px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  touch-action: pan-x pan-y;
+  -webkit-overflow-scrolling: touch;
+}
+
+.flight-director-aircraft-table {
+  min-width: 1250px;
+}
+
+.flight-director-aircraft-head,
+.flight-director-aircraft-row {
+  min-width: 1250px;
+  grid-template-columns: 120px 110px 122px 62px 150px 130px 140px minmax(350px, 1fr);
+  gap: 10px;
+  padding: 7px 10px;
+}
+
+.flight-director-aircraft-head {
+  min-height: 38px;
+}
+
+.flight-director-aircraft-row {
+  min-height: 58px;
+  border-bottom: 1px solid var(--ui-border);
+  color: var(--ui-text);
+  cursor: default;
+}
+
+.flight-director-aircraft-row.selected {
+  background: var(--ui-accent-soft);
+  box-shadow: inset 3px 0 var(--ui-accent);
+}
+
+.flight-director-aircraft-row:last-child {
+  border-bottom: 0;
+}
+
+.flight-director-aircraft-resource,
+.flight-director-aircraft-status {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.flight-director-aircraft-resource small,
+.flight-director-aircraft-status small {
+  overflow: hidden;
+  color: var(--ui-muted);
+  font-size: 0.68rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.flight-director-aircraft-status .ds-status-pill {
+  width: max-content;
+  max-width: 100%;
+  color: inherit;
+}
+
+.flight-director-aircraft-status .ds-status-pill--success {
+  color: var(--ui-success-text, var(--ui-success));
+}
+
+.flight-director-aircraft-status .ds-status-pill--warning {
+  color: var(--ui-warning-text, var(--ui-warning));
+}
+
+.flight-director-aircraft-status .ds-status-pill--danger {
+  color: var(--ui-danger);
+}
+
+.flight-director-aircraft-status .ds-status-pill--info {
+  color: var(--ui-accent);
+}
+
+.flight-director-pilot-code {
+  color: var(--ui-text);
+  text-align: center;
+}
+
+.flight-director-timeline,
+.flight-director-next-step {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.flight-director-row-actions {
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.flight-director-row-actions > .ds-button {
+  min-width: 130px;
+  border-color: var(--ui-accent);
+  color: var(--ui-accent);
+  background: var(--ui-control);
+  box-shadow: none;
+}
+
+.flight-director-row-actions > .ds-button:hover:not(:disabled) {
+  color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+}
+
+.flight-director-row-actions .ds-icon-button svg {
+  transform: none;
+}
+
+.flight-director-row-actions .ds-icon-button:first-of-type svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.flight-director-bottom-grid {
+  min-height: 190px;
+  flex: 0 1 270px;
+}
+
+.flight-director-current-rotation {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 8px;
+}
+
+.flight-director-current-rotation > div {
+  padding: 8px;
+}
+
+.flight-director-current-content {
+  height: calc(100% - 39px);
+  min-width: 620px;
+  overflow: auto;
+}
+
+.flight-director-current-timeline {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(100px, 1fr));
+  padding: 4px 18px 12px;
+}
+
+.flight-director-current-timeline > span {
+  position: relative;
+  display: grid;
+  gap: 5px;
+  color: var(--ui-muted);
+  font-size: 0.68rem;
+}
+
+.flight-director-current-timeline > span:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  top: 27px;
+  left: 12px;
+  width: calc(100% - 12px);
+  height: 1px;
+  background: var(--ui-border-strong);
+}
+
+.flight-director-current-timeline i {
+  z-index: 1;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--ui-border-strong);
+  border-radius: 50%;
+  background: var(--ui-surface);
+}
+
+.flight-director-current-timeline .reached {
+  color: var(--ui-text);
+}
+
+.flight-director-current-timeline .reached i {
+  border-color: var(--ui-success);
+  box-shadow: inset 0 0 0 3px var(--ui-surface);
+  background: var(--ui-success);
+}
+
+.flight-director-compact-table.history .flight-director-compact-head,
+.flight-director-compact-table.history > div:not(.flight-director-compact-head) {
+  min-width: 760px;
+  grid-template-columns: minmax(190px, 1.5fr) 0.65fr repeat(4, 0.7fr);
+}
+
+.flight-director-assignment-dialog {
+  display: grid;
+  grid-template-columns: minmax(560px, 1fr) 270px;
+  gap: 14px;
+}
+
+.ds-modal-dialog:has(.flight-director-assignment-dialog) {
+  width: min(920px, 100%);
+}
+
+.flight-director-assignment-dialog .flight-director-queue {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-md);
+}
+
+.flight-director-assignment-dialog .flight-director-queue-row {
+  grid-template-columns: 120px 72px 94px minmax(250px, 1fr);
+}
+
+.flight-director-assignment-dialog .flight-director-queue-row .ds-button {
+  padding-inline: 7px;
+  font-size: 0.74rem;
+  white-space: nowrap;
+}
+
+.flight-director-dialog-warning,
+.flight-director-dialog-pilot {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--ui-warning) 45%, var(--ui-border));
+  border-radius: var(--radius-sm);
+  color: var(--ui-warning-text, var(--ui-warning));
+  background: var(--ui-warning-soft);
+  font-size: 0.76rem;
+  line-height: 1.4;
+}
+
+.flight-director-dialog-pilot {
+  border-color: color-mix(in srgb, var(--ui-success) 45%, var(--ui-border));
+  color: var(--ui-success-text, var(--ui-success));
+  background: var(--ui-success-soft);
+}
+
+.flight-director-dialog-pilot svg {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.flight-director-pilot-options {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.flight-director-dialog-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.flight-director-dialog-title svg {
+  width: 25px;
+  height: 25px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.flight-director-pilot-current {
+  margin: 0 0 10px;
+  padding: 0 0 10px;
+  border-bottom: 1px solid var(--ui-border);
+  color: var(--ui-muted);
+  font-size: 0.78rem;
+}
+
+.flight-director-pilot-current strong {
+  color: var(--ui-text);
+}
+
+.ds-modal-dialog:has(.flight-director-pilot-options) {
+  width: min(520px, 100%);
+}
+
+.flight-director-pilot-options > label {
+  min-height: 60px;
+  display: grid;
+  grid-template-columns: auto 24px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-md);
+  background: var(--ui-control);
+  cursor: pointer;
+}
+
+.flight-director-pilot-options > label:has(input:checked) {
+  border-color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+  box-shadow: inset 3px 0 var(--ui-accent);
+}
+
+.flight-director-pilot-options > label.disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.flight-director-pilot-options input {
+  width: 19px;
+  height: 19px;
+}
+
+.flight-director-pilot-options svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.flight-director-pilot-options span {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.flight-director-pilot-options small {
+  overflow: hidden;
+  color: var(--ui-muted);
+  font-size: 0.72rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 1250px) {
+  .flight-line-shell {
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  @supports (height: 100dvh) {
+    .flight-line-shell {
+      height: 100dvh;
+    }
+  }
+
+  .flight-director-v15 {
+    overflow: hidden;
+  }
+
+  .ds-panel.flight-director-aircraft {
+    max-height: none;
+  }
+
+  .flight-director-bottom-grid {
+    min-height: 185px;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+@media (max-height: 820px) and (min-width: 801px) {
+  .flight-line-shell {
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  @supports (height: 100dvh) {
+    .flight-line-shell {
+      height: 100dvh;
+    }
+  }
+
+  .flight-director-v15 {
+    overflow: hidden;
+  }
+
+  .ds-panel.flight-director-aircraft {
+    max-height: none;
+  }
+
+  .flight-director-bottom-grid {
+    min-height: 185px;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 800px) {
+  .flight-line-shell {
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+  }
+
+  .flight-director-v15 {
+    overflow: visible;
+  }
+
+  .flight-director-bottom-grid {
+    min-height: 440px;
+    grid-template-columns: 1fr;
+  }
+
+  .flight-director-assignment-dialog {
+    grid-template-columns: 1fr;
+  }
+
+  .flight-director-assignment-dialog .flight-director-queue-row {
+    grid-template-columns: 1fr auto;
+  }
+
+  .flight-director-assignment-dialog .flight-director-queue-row > span {
+    display: none;
+  }
+
+  .flight-director-assignment-dialog .flight-director-queue-row > div {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 560px) {
+  .flight-director-pilot-options {
+    grid-template-columns: 1fr;
   }
 }
 

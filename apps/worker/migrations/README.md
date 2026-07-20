@@ -191,3 +191,11 @@ Ergänzt ausschließlich einen Index über Veranstaltung, Verkaufszeit und techn
 Anwendung wird eine portable D1-Sicherung erzeugt. Ein Rollback kann den Index
 `idx_ticket_groups_cashier_list` gefahrlos entfernen; operative Daten und Auditereignisse werden
 dabei nicht verändert.
+
+## 0038 – Zeitpunkt des Flugzeug-Zustandswechsels
+
+Ergänzt Flugzeuge additiv um `operational_state_changed_at` und befüllt Altbestände aus dem jüngsten
+zuordenbaren Status- oder Umlaufereignis, ersatzweise aus dem jüngsten Ist-Umlaufzeitpunkt oder
+`aircraft.updated_at`. Reine Stammdaten- und Tankplanänderungen verändern den Wert nicht. Vor
+Anwendung wird eine portable D1-/R2-Sicherung erzeugt. Wiederherstellung erfolgt per D1 Time Travel
+oder aus dieser Sicherung, weil D1 die additive Spalte nicht ohne Tabellenneuaufbau entfernt.

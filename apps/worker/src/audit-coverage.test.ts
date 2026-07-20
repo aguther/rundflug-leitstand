@@ -21,6 +21,7 @@ const requiredAuditEvents = [
   "TICKET_GROUP_MOVED",
   "ROTATION_MANIFEST_CORRECTED",
   "PILOT_CONFIGURATION_CHANGED",
+  "AIRCRAFT_PILOT_CHANGED",
   "AIRCRAFT_RESOURCE_GROUP_ASSIGNED",
   "AIRCRAFT_REFUEL_PLANNED",
   "EVENT_OPERATION_INTERRUPTED",
@@ -32,7 +33,7 @@ const requiredAuditEvents = [
 describe("append-only operational audit coverage", () => {
   it("keeps every F-HIS-020 minimum event in the command coordinator", () => {
     for (const eventType of requiredAuditEvents) expect(coordinator).toContain(eventType);
-    expect(coordinator).toContain("pilotChanged");
+    expect(coordinator).toContain("previousRotationPilotId");
   });
 
   it("keeps historical rebooking events readable after V16-KAS-050 removed new rebooking", () => {

@@ -50,12 +50,20 @@ const board = async () => {
   if (!response.ok) throw new Error(`Board-Abruf fehlgeschlagen (${response.status}).`);
   return response.json();
 };
-const command = async (deviceId, token, expectedVersion, type, payload, expectedStatus = 200) => {
+const command = async (
+  deviceId,
+  token,
+  expectedVersion,
+  type,
+  payload,
+  expectedStatus = 200,
+  commandId = randomUUID(),
+) => {
   const response = await fetch(`${base}/api/events/demo-2026/commands`, {
     method: "POST",
     headers: { "content-type": "application/json", "x-device-token": token },
     body: JSON.stringify({
-      commandId: randomUUID(),
+      commandId,
       eventId: "demo-2026",
       deviceId,
       expectedVersion,
@@ -87,8 +95,8 @@ const sell = (version) =>
     paymentStatus: "PAID",
     paymentMethod: "CASH",
   });
-const history = async (rotationId) => {
-  const query = new URLSearchParams({ aggregateType: "ROTATION", aggregateId: rotationId });
+const history = async (aggregateType, aggregateId) => {
+  const query = new URLSearchParams({ aggregateType, aggregateId });
   const response = await fetch(`${base}/api/events/demo-2026/history?${query}`, {
     headers: { "x-device-id": "technical-scaffold", "x-device-token": tokens.admin },
   });
@@ -139,6 +147,34 @@ try {
     reason: "Synthetischer Pilotenkonflikttest",
     adminPin: pin,
   });
+  result = await admin(result.event.version, "UPSERT_PILOT", {
+    pilotId: "550e8400-e29b-41d4-a716-446655440300",
+    operationalCode: "P-03",
+    operationalNote: "",
+    active: false,
+    reason: "Synthetischer Pilotenkonflikttest",
+    adminPin: pin,
+  });
+  current = await board();
+  const stateChangedAtBeforeMasterData = current.aircraft.find(
+    (aircraft) => aircraft.id === "aircraft-a",
+  )?.operationalStateChangedAt;
+  if (!stateChangedAtBeforeMasterData) {
+    throw new Error("Zeitpunkt des operativen Flugzeugstatus fehlt in der Operationssicht.");
+  }
+  result = await admin(result.event.version, "CONFIGURE_AIRCRAFT_REFUEL_THRESHOLD", {
+    aircraftId: "aircraft-a",
+    reminderThreshold: 4,
+    reason: "Synthetischer Stammdaten-Zeitstempeltest",
+    adminPin: pin,
+  });
+  current = await board();
+  if (
+    current.aircraft.find((aircraft) => aircraft.id === "aircraft-a")?.operationalStateChangedAt !==
+    stateChangedAtBeforeMasterData
+  ) {
+    throw new Error("Reine Stammdatenänderung hat den operativen Statuszeitpunkt verändert.");
+  }
   result = await admin(result.event.version, "CONFIGURE_EVENT_PARAMETERS", {
     saleOpensAt: null,
     operationsEndAt: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString(),
@@ -157,6 +193,48 @@ try {
     status: "ACTIVE",
     reason: "Synthetischer Pilotenkonflikttest",
     adminPin: pin,
+  });
+  const inactivePilot = await command(
+    "technical-scaffold",
+    tokens.admin,
+    result.event.version,
+    "ASSIGN_AIRCRAFT_PILOT",
+    {
+      aircraftId: "aircraft-a",
+      pilotId: "550e8400-e29b-41d4-a716-446655440300",
+      reassign: false,
+    },
+    409,
+  );
+  if (inactivePilot.error?.code !== "PILOT_NOT_AVAILABLE") {
+    throw new Error("Inaktiver Pilotencode wurde nicht abgewiesen.");
+  }
+  result = await admin(result.event.version, "SET_PILOT_PAUSE", {
+    pilotId: "550e8400-e29b-41d4-a716-446655440200",
+    paused: true,
+    reason: "Synthetischer Pausentest",
+    expectedReviewAt: null,
+  });
+  const pausedPilot = await command(
+    "technical-scaffold",
+    tokens.admin,
+    result.event.version,
+    "ASSIGN_AIRCRAFT_PILOT",
+    {
+      aircraftId: "aircraft-a",
+      pilotId: "550e8400-e29b-41d4-a716-446655440200",
+      reassign: false,
+    },
+    409,
+  );
+  if (pausedPilot.error?.code !== "PILOT_NOT_AVAILABLE") {
+    throw new Error("Pausierter Pilotencode wurde nicht abgewiesen.");
+  }
+  result = await admin(result.event.version, "SET_PILOT_PAUSE", {
+    pilotId: "550e8400-e29b-41d4-a716-446655440200",
+    paused: false,
+    reason: "Synthetischer Pausentest beendet",
+    expectedReviewAt: null,
   });
   const firstSale = await sell(result.event.version);
   current = await board();
@@ -182,10 +260,15 @@ try {
     throw new Error("Konkrete Flugzeugkapazität wurde beim NEXT nicht hart durchgesetzt.");
   }
   const secondSale = await sell(firstSale.event.version);
+  const firstPilotAssignment = await admin(secondSale.event.version, "ASSIGN_AIRCRAFT_PILOT", {
+    aircraftId: "aircraft-b",
+    pilotId: "550e8400-e29b-41d4-a716-446655440100",
+    reassign: true,
+  });
   const firstCall = await command(
     "flight-line-tablet-1",
     tokens.flightLine,
-    secondSale.event.version,
+    firstPilotAssignment.event.version,
     "CALL_NEXT",
     {
       ticketGroupIds: [secondSale.aggregate.id],
@@ -194,27 +277,32 @@ try {
     },
   );
   const conflict = await command(
-    "flight-line-tablet-1",
-    tokens.flightLine,
+    "technical-scaffold",
+    tokens.admin,
     firstCall.event.version,
-    "CALL_NEXT",
+    "ASSIGN_AIRCRAFT_PILOT",
     {
-      ticketGroupIds: [firstSale.aggregate.id],
       aircraftId: "aircraft-a",
       pilotId: "550e8400-e29b-41d4-a716-446655440100",
+      reassign: false,
     },
     409,
   );
-  if (conflict.error?.code !== "PILOT_NOT_AVAILABLE") {
+  if (conflict.error?.code !== "PILOT_ASSIGNED_ACTIVE_ROTATION") {
     throw new Error(
       "Parallele Pilotenzuordnung wurde nicht mit dem erwarteten Konflikt abgewiesen.",
     );
   }
+  const secondPilotAssignment = await admin(firstCall.event.version, "ASSIGN_AIRCRAFT_PILOT", {
+    aircraftId: "aircraft-a",
+    pilotId: "550e8400-e29b-41d4-a716-446655440200",
+    reassign: false,
+  });
   await new Promise((resolvePromise) => setTimeout(resolvePromise, 20));
   const secondCall = await command(
     "flight-line-tablet-1",
     tokens.flightLine,
-    firstCall.event.version,
+    secondPilotAssignment.event.version,
     "CALL_NEXT",
     {
       ticketGroupIds: [firstSale.aggregate.id],
@@ -268,7 +356,7 @@ try {
   ) {
     throw new Error("Zuletzt bestätigter Pilotencode wird für das Flugzeug nicht vorgeschlagen.");
   }
-  const changedPilot = await command(
+  const mismatchedCall = await command(
     "flight-line-tablet-1",
     tokens.flightLine,
     thirdSale.event.version,
@@ -278,23 +366,144 @@ try {
       aircraftId: "aircraft-a",
       pilotId: "550e8400-e29b-41d4-a716-446655440100",
     },
+    409,
+  );
+  if (mismatchedCall.error?.code !== "AIRCRAFT_PILOT_ASSIGNMENT_MISMATCH") {
+    throw new Error("NEXT hat einen nicht am Flugzeug zugewiesenen Pilotencode akzeptiert.");
+  }
+  const beforeAssignmentHistory = await history("AIRCRAFT", "aircraft-a");
+  const unconfirmedReassignment = await command(
+    "technical-scaffold",
+    tokens.admin,
+    thirdSale.event.version,
+    "ASSIGN_AIRCRAFT_PILOT",
+    {
+      aircraftId: "aircraft-a",
+      pilotId: "550e8400-e29b-41d4-a716-446655440100",
+      reassign: false,
+    },
+    409,
+  );
+  if (unconfirmedReassignment.error?.code !== "PILOT_REASSIGN_CONFIRMATION_REQUIRED") {
+    throw new Error("Pilotenumhängen wurde ohne separate Bestätigung zugelassen.");
+  }
+  const assignmentCommandId = randomUUID();
+  const confirmedReassignment = await command(
+    "technical-scaffold",
+    tokens.admin,
+    thirdSale.event.version,
+    "ASSIGN_AIRCRAFT_PILOT",
+    {
+      aircraftId: "aircraft-a",
+      pilotId: "550e8400-e29b-41d4-a716-446655440100",
+      reassign: true,
+    },
+    200,
+    assignmentCommandId,
+  );
+  const assignmentReplay = await command(
+    "technical-scaffold",
+    tokens.admin,
+    thirdSale.event.version,
+    "ASSIGN_AIRCRAFT_PILOT",
+    {
+      aircraftId: "aircraft-a",
+      pilotId: "550e8400-e29b-41d4-a716-446655440100",
+      reassign: true,
+    },
+    200,
+    assignmentCommandId,
+  );
+  if (
+    assignmentReplay.duplicate !== true ||
+    assignmentReplay.event.version !== confirmedReassignment.event.version
+  ) {
+    throw new Error("Wiederholte Pilotenzuweisung war nicht idempotent.");
+  }
+  const afterAssignmentHistory = await history("AIRCRAFT", "aircraft-a");
+  const pilotAuditCountBefore = beforeAssignmentHistory.entries.filter(
+    (entry) => entry.eventType === "AIRCRAFT_PILOT_CHANGED",
+  ).length;
+  const pilotAuditCountAfter = afterAssignmentHistory.entries.filter(
+    (entry) => entry.eventType === "AIRCRAFT_PILOT_CHANGED",
+  ).length;
+  if (pilotAuditCountAfter !== pilotAuditCountBefore + 1) {
+    throw new Error("Pilotenzuweisung erzeugte nicht genau einen Audit-Eintrag.");
+  }
+  const staleAssignment = await command(
+    "technical-scaffold",
+    tokens.admin,
+    thirdSale.event.version,
+    "ASSIGN_AIRCRAFT_PILOT",
+    {
+      aircraftId: "aircraft-a",
+      pilotId: "550e8400-e29b-41d4-a716-446655440200",
+      reassign: false,
+    },
+    409,
+  );
+  if (staleAssignment.error?.code !== "STALE_VERSION") {
+    throw new Error("Veraltete Pilotenzuweisung wurde nicht als stale write abgewiesen.");
+  }
+  const changedPilot = await command(
+    "flight-line-tablet-1",
+    tokens.flightLine,
+    confirmedReassignment.event.version,
+    "CALL_NEXT",
+    {
+      ticketGroupIds: [thirdSale.aggregate.id],
+      aircraftId: "aircraft-a",
+      pilotId: "550e8400-e29b-41d4-a716-446655440100",
+    },
   );
   current = await board();
   const changedAircraft = current.aircraft.find((aircraft) => aircraft.id === "aircraft-a");
-  const changeHistory = await history(thirdSale.aggregate.relatedRotationId);
-  const callAudit = changeHistory.entries.find(
-    (entry) => entry.eventType === "FLIGHT_GROUP_CALLED",
-  );
   if (
     changedPilot.event.version !== current.event.version ||
-    changedAircraft?.currentPilotId !== "550e8400-e29b-41d4-a716-446655440100" ||
-    callAudit?.payload?.previousAircraftPilotId !== "550e8400-e29b-41d4-a716-446655440200" ||
-    callAudit.payload.pilotChanged !== true
+    changedAircraft?.currentPilotId !== "550e8400-e29b-41d4-a716-446655440100"
   ) {
-    throw new Error("Bewusster Pilotwechsel wurde nicht fortgeführt und vollständig auditiert.");
+    throw new Error("Bestätigter Pilotencode wurde beim Boarding nicht fortgeführt.");
   }
-  transition = changedPilot;
-  for (const type of ["MARK_OFF_BLOCK", "MARK_ON_BLOCK", "COMPLETE_TURNAROUND"]) {
+  const boardingPilotChange = await admin(changedPilot.event.version, "ASSIGN_AIRCRAFT_PILOT", {
+    aircraftId: "aircraft-a",
+    pilotId: "550e8400-e29b-41d4-a716-446655440200",
+    reassign: false,
+  });
+  current = await board();
+  const boardingRotation = current.rotations.find(
+    (rotation) => rotation.id === thirdSale.aggregate.relatedRotationId,
+  );
+  if (
+    boardingRotation?.pilotId !== "550e8400-e29b-41d4-a716-446655440200" ||
+    current.aircraft.find((aircraft) => aircraft.id === "aircraft-a")?.currentPilotId !==
+      "550e8400-e29b-41d4-a716-446655440200"
+  ) {
+    throw new Error("Pilotwechsel während Boarding wurde nicht atomar fortgeführt.");
+  }
+  const offblock = await command(
+    "flight-line-tablet-1",
+    tokens.flightLine,
+    boardingPilotChange.event.version,
+    "MARK_OFF_BLOCK",
+    { rotationId: thirdSale.aggregate.relatedRotationId },
+  );
+  const blockedAfterOffblock = await command(
+    "technical-scaffold",
+    tokens.admin,
+    offblock.event.version,
+    "ASSIGN_AIRCRAFT_PILOT",
+    {
+      aircraftId: "aircraft-a",
+      pilotId: "550e8400-e29b-41d4-a716-446655440100",
+      reassign: false,
+    },
+    409,
+  );
+  if (blockedAfterOffblock.error?.code !== "AIRCRAFT_PILOT_CHANGE_BLOCKED") {
+    throw new Error("Pilotwechsel wurde ab Offblock nicht gesperrt.");
+  }
+  transition = offblock;
+  for (const type of ["MARK_ON_BLOCK", "COMPLETE_TURNAROUND"]) {
     transition = await command(
       "flight-line-tablet-1",
       tokens.flightLine,
@@ -313,7 +522,7 @@ try {
   );
   if (
     fourthProposal?.suggestedAircraftId !== "aircraft-a" ||
-    fourthProposal.suggestedPilotId !== "550e8400-e29b-41d4-a716-446655440100"
+    fourthProposal.suggestedPilotId !== "550e8400-e29b-41d4-a716-446655440200"
   ) {
     throw new Error(
       "Geänderter Pilotencode wird beim Folgeumlauf nicht fortgeführt vorgeschlagen.",
@@ -322,15 +531,31 @@ try {
   console.log(
     JSON.stringify({
       ok: true,
-      requirements: ["F-BRD-030", "F-BRD-040", "F-PRG-110", "F-SLT-070", "F-SLT-120"],
+      requirements: [
+        "F-BRD-030",
+        "F-BRD-040",
+        "F-PRG-110",
+        "F-SLT-070",
+        "F-SLT-120",
+        "V161-FL-030",
+      ],
       samePilotConflictRejected: true,
+      inactivePilotRejected: true,
+      pausedPilotRejected: true,
       undersizedAircraftNotSuggested: true,
       undersizedAircraftCallRejected: true,
       differentPilotsAccepted: true,
       activeRotations: active.length,
       earliestBusyAircraftSuggested: true,
       rememberedPilotSuggested: true,
-      pilotChangeAudited: true,
+      reassignConfirmationRequired: true,
+      reassignReplayIdempotent: true,
+      exactlyOnePilotAuditEvent: true,
+      stalePilotWriteRejected: true,
+      callNextAssignmentMismatchRejected: true,
+      boardingPilotChangeAccepted: true,
+      offblockPilotChangeBlocked: true,
+      masterDataPreservesStateTimestamp: true,
       changedPilotSuggestedNext: true,
     }),
   );

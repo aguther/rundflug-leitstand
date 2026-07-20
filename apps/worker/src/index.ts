@@ -1907,6 +1907,7 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
       context.env.DB.prepare(
         `SELECT a.id, a.registration, a.aircraft_type, a.passenger_seats,
               a.maximum_passenger_payload_kg, a.operational_state,
+              COALESCE(a.operational_state_changed_at, a.updated_at) AS operational_state_changed_at,
               a.refuel_planned, a.rotations_since_refuel, a.refuel_reminder_threshold,
               a.operational_interrupted,
               m.resource_group_id, rg.name AS resource_group_name,
@@ -1930,6 +1931,7 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
           passenger_seats: number;
           maximum_passenger_payload_kg: number | null;
           operational_state: string;
+          operational_state_changed_at: string;
           refuel_planned: number;
           rotations_since_refuel: number;
           refuel_reminder_threshold: number;
@@ -2348,6 +2350,7 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
       maximumPassengerPayloadKg: aircraft.maximum_passenger_payload_kg,
       operationalState:
         aircraft.operational_interrupted === 1 ? "INTERRUPTED" : aircraft.operational_state,
+      operationalStateChangedAt: aircraft.operational_state_changed_at,
       resourceGroupId: aircraft.resource_group_id ?? "",
       resourceGroupName: aircraft.resource_group_name ?? "Nicht zugeordnet",
       refuelPlanned: aircraft.refuel_planned === 1,

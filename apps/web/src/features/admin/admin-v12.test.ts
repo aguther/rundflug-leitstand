@@ -33,6 +33,5 @@ describe("V1.2 compact administration", () => {
   it("uses the desktop viewport without an avoidable page-level scrollbar", () => {
     expect(stylesSource).toContain("height: 100dvh");
     expect(stylesSource).toContain("overflow: hidden");
-    expect(stylesSource).toContain(".admin-shell > footer");
   });
 });

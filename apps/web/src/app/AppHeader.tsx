@@ -1,3 +1,4 @@
+import { APP_VERSION } from "@rundflug/config";
 import {
   CalendarDays,
   Check,
@@ -5,6 +6,7 @@ import {
   Circle,
   CircleUserRound,
   Headphones,
+  Info,
   LockKeyhole,
   LogOut,
   Monitor,
@@ -112,6 +114,21 @@ export function AppHeader({ title, kiosk = false, publicView = false }: AppHeade
           <Circle aria-hidden="true" fill="currentColor" size={12} />
           {online ? "Verbunden" : "Offline"}
         </span>
+      ) : null}
+      {!kiosk ? (
+        <details className="app-info-menu">
+          <summary
+            aria-label={`Informationen zu Rundflug-Leitstand Version ${APP_VERSION}`}
+            className="app-info"
+          >
+            <Info aria-hidden="true" size={20} />
+          </summary>
+          <div className="app-info-popover">
+            <strong>Rundflug-Leitstand</strong>
+            <span>Version {APP_VERSION}</span>
+            <small>Rundflug-Leitstand · Version {APP_VERSION}</small>
+          </div>
+        </details>
       ) : null}
       <ThemeToggle />
       {session && !kiosk && !publicView ? (

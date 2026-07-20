@@ -8,29 +8,38 @@ describe("Flight Line Supervisor", () => {
     expect(appSource).toContain("const operationalAircraft = board?.aircraft ?? []");
     expect(appSource).toContain("<FlightLineSupervisorConsole");
     expect(supervisorSource).toContain('className="flight-director-v15"');
-    expect(supervisorSource).toContain('className="flight-director-aircraft-row"');
-    expect(supervisorSource).toContain('className="flight-director-assignment"');
+    expect(supervisorSource).toContain("flight-director-aircraft-row selected");
+    expect(supervisorSource).toContain("<ModalDialog");
     expect(supervisorSource).toContain("Buchungsgruppen zuweisen");
     expect(supervisorSource).toContain("Gruppen bleiben vollständig zusammen");
-    expect(supervisorSource).toContain("Disposition");
+    expect(supervisorSource).toContain("Pilot zuweisen");
     expect(supervisorSource).not.toContain("flight-line-console-header");
     expect(supervisorSource).not.toContain("aircraft-selector-rail");
+    expect(supervisorSource).not.toContain("expanded");
     expect(appSource).toContain("Belegung bestätigen & Boarding starten");
     expect(appSource).not.toContain('label: "NEXT"');
-    expect(appSource).toContain("Wieder verfügbar");
+    expect(supervisorSource).toContain("Verfügbar setzen");
   });
 
-  it("uses real controls for search, resource filtering and alternate group selection", () => {
+  it("uses real controls for search, resource filtering and separate pilot assignment", () => {
     expect(supervisorSource).toContain("<SearchField");
     expect(supervisorSource).toContain("Alle Ressourcen");
-    expect(supervisorSource).toContain("onOpenDisposition");
-    expect(supervisorSource).toContain("onOpenDetails");
+    expect(supervisorSource).toContain("onAssignPilot");
+    expect(supervisorSource).not.toContain("PILOT_REASSIGN_CONFIRMATION_REQUIRED");
+    expect(supervisorSource).toContain("Vor Belegung bitte über „Pilot zuweisen“");
+    expect(appSource).not.toContain('className="pilot-assignment"');
   });
 
   it("keeps current rotation and sold tickets visible side by side like the approved concept", () => {
     expect(supervisorSource).toContain('className="flight-director-bottom-grid"');
     expect(supervisorSource).toContain("Aktueller Umlauf");
     expect(supervisorSource).toContain("Verkaufte Tickets");
+    expect(supervisorSource).toContain("Boarding");
+    expect(supervisorSource).toContain("Offblock");
+    expect(supervisorSource).toContain("Onblock");
+    expect(supervisorSource).toContain("Abschluss / Folgestatus");
+    expect(supervisorSource).toContain("rotationStateLabels[rotation.status]");
+    expect(supervisorSource).not.toContain("<dd>{rotation.status}</dd>");
     expect(supervisorSource).not.toContain('{ value: "tickets", label: "Verkaufte Tickets" }');
   });
 

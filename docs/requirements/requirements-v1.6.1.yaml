@@ -9,3 +9,18 @@ requirements:
   - id: V161-UI-020
     requirement: Genau ein Scroll-Eigentümer für Ticketliste und cursorbasiertes Nachladen.
     status: implemented
+  - id: V161-UI-030
+    requirement: Globaler Footer entfällt; Version 1.6.1 steht zugänglich in der oberen Navigation.
+    status: implemented
+  - id: V161-FL-010
+    requirement: Kompakte scrollbare Flugzeugtabelle mit deutschem Status, Zustandszeit und iPad-Darstellung.
+    status: implemented
+  - id: V161-FL-020
+    requirement: Zeilenaktionen und Buchungsgruppenbelegung im zentrierten Dialog ohne Zeilenaufklappung.
+    status: implemented
+  - id: V161-FL-030
+    requirement: Separate konfliktgeprüfte und auditierte Pilotzuweisung bis Offblock.
+    status: implemented
+  - id: V161-FL-040
+    requirement: Vollständige deutschsprachige Zeitlinie für aktuellen Umlauf und eine Historienzeile je Umlauf.
+    status: implemented
