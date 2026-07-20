@@ -549,11 +549,10 @@ export function CashierView() {
                     aria-expanded={selected}
                     className="cashier-product-heading"
                     onClick={(event) => {
-                      const productCard =
-                        event.currentTarget.closest<HTMLElement>(".cashier-product");
+                      const productHeading = event.currentTarget;
                       setProductId(entry.id);
                       requestAnimationFrame(() =>
-                        productCard?.scrollIntoView({ block: "nearest" }),
+                        productHeading.scrollIntoView({ block: "start", inline: "nearest" }),
                       );
                     }}
                     type="button"

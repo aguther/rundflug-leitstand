@@ -1,0 +1,11 @@
+version: 1.6.1
+requirements:
+  - id: V161-REL-010
+    requirement: Repository und Laufzeit verwenden konsistent Release 1.6.1.
+    status: implemented
+  - id: V161-UI-010
+    requirement: Zweispaltige Kasse ohne horizontales Abschneiden im iPad-Landscape-Bereich.
+    status: implemented
+  - id: V161-UI-020
+    requirement: Genau ein Scroll-Eigentümer für Ticketliste und cursorbasiertes Nachladen.
+    status: implemented

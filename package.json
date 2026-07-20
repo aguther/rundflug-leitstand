@@ -1,6 +1,6 @@
 {
   "name": "rundflug-leitstand",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "private": true,
   "description": "Cloudflare-native start repository for the Rundflug-Leitstand.",
   "type": "module",

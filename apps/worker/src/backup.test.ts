@@ -7,13 +7,13 @@ describe("portable backup format", () => {
       format: "rundflug-leitstand-portable-backup",
       formatVersion: 1,
       createdAt: "2026-07-11T02:15:00.000Z",
-      requirementsVersion: "1.6.0",
+      requirementsVersion: "1.6.1",
       reason: "DAILY",
       tables: { tickets: [{ id: "synthetic-ticket", status: "QUEUED" }] },
     });
     expect(JSON.parse(serialized)).toMatchObject({
       formatVersion: 1,
-      requirementsVersion: "1.6.0",
+      requirementsVersion: "1.6.1",
     });
     expect(serialized).not.toContain("guestName");
     expect(serialized).not.toContain("phone");

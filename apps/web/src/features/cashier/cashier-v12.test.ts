@@ -4,7 +4,7 @@ import appSource from "../../cashier-view.tsx?raw";
 
 const stylesSource = readFileSync(new URL("./cashier-v12.css", import.meta.url), "utf8");
 
-describe("V1.6.0 cashier", () => {
+describe("V1.6.1 cashier", () => {
   it("uses the authenticated cashier session without another PIN prompt", () => {
     expect(appSource).toContain('className="cashier-shell"');
     expect(appSource).not.toContain("Administrator-PIN für Storno/Umbuchung");

@@ -1,0 +1,4 @@
+ID,Modul,Tests,Status
+V161-REL-010,packages/config und scripts/verify_requirements.py,Requirements- und Versionsverifikation,umgesetzt
+V161-UI-010,apps/web/src/cashier-view.tsx und cashier-v12.css,Komponententest und Browserabnahme bei 1194×679 sowie Tablet-Portrait,umgesetzt
+V161-UI-020,apps/web/src/features/cashier/cashier-v12.css,Komponententest und Browserabnahme mit gefüllter und leerer Ticketliste,umgesetzt
