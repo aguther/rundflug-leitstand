@@ -3,15 +3,15 @@
 ## Mission
 
 Implementiere die Ausbaustufe V1 des Rundflug-Leitstands gemäß Release
-`docs/requirements/requirements-v1.6.0.md`. Das System ist kein einfaches Ticketing, sondern koordiniert
+`docs/requirements/requirements-v1.6.1.md`. Das System ist kein einfaches Ticketing, sondern koordiniert
 Verkauf, Ressourcengruppen-Queues, Flight-Line-Ereignisse, Prognosen, öffentliche Statusanzeigen und
 Auditierung.
 
 ## Quellen der Wahrheit
 
-1. `docs/requirements/requirements-v1.6.0.md`
-2. `docs/requirements/requirements-v1.6.0.yaml`
-3. die fortgeltenden Basiskataloge V1.4 und V1.5 in `docs/requirements/`
+1. `docs/requirements/requirements-v1.6.1.md`
+2. `docs/requirements/requirements-v1.6.1.yaml`
+3. die fortgeltenden Kataloge V1.4, V1.5 und V1.6.0 in `docs/requirements/`
 4. freigegebene ADRs in `docs/adr/`
 5. automatisierte Tests
 6. diese `AGENTS.md`
