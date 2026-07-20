@@ -75,7 +75,8 @@ als ausstehend und ohne operative Wirkung gekennzeichnet. Nach Wiederverbindung 
 automatisch gesendet: Die Kasse prüft den Entwurf und bestätigt den Verkauf bewusst gegen die aktuelle
 Serverversion; erst nach erfolgreicher Bestätigung wird die Draft-Queue geleert.
 
-Operativ wirksame Kommandos werden gemäß OQ-01 nicht offline angenommen: Verkauf, Storno, Umbuchung,
+Operativ wirksame Kommandos werden gemäß OQ-01 nicht offline angenommen: Verkauf, Storno und der
+bewusste Neuverkauf nach einer Korrektur,
 „Belegung bestätigen & Boarding starten“, `IM FLUG`, `GELANDET`, `ABGESCHLOSSEN`, Not-Halt und Stammdatenänderungen benötigen eine
 Serverbestätigung. Sie werden bei fehlender Verbindung gesperrt statt scheinbar erfolgreich in eine
 lokale Fachkommando-Queue gestellt. Bestätigte Kommandos enthalten weiterhin `commandId`, `eventId`,

@@ -1,4 +1,4 @@
-import { APP_NAME, REQUIREMENTS_VERSION } from "@rundflug/config";
+import { APP_NAME, APP_VERSION, REQUIREMENTS_VERSION } from "@rundflug/config";
 import {
   adminDeviceRecoverySchema,
   adminPinVerificationSchema,
@@ -14,6 +14,7 @@ import {
   operationalHistoryQuerySchema,
   operationalHistorySchema,
   operatorLoginRequestSchema,
+  ticketSearchRequestSchema,
   updateOperatorAccountSchema,
 } from "@rundflug/contracts";
 import {
@@ -77,6 +78,38 @@ function eventRoutes<const Suffix extends string>(
   const controlPath = `/api/control/:eventId${suffix}` as `/api/control/:eventId${Suffix}`;
   const legacyPath = `/api/events/:eventId${suffix}` as `/api/events/:eventId${Suffix}`;
   return [controlPath, legacyPath];
+}
+
+interface TicketSearchCursor {
+  soldAt: string;
+  id: string;
+}
+
+function encodeTicketSearchCursor(cursor: TicketSearchCursor): string {
+  return btoa(JSON.stringify(cursor)).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
+}
+
+function decodeTicketSearchCursor(value: string | undefined): TicketSearchCursor | null {
+  if (!value) return null;
+  try {
+    const base64 = value.replaceAll("-", "+").replaceAll("_", "/");
+    const parsed = JSON.parse(atob(base64.padEnd(Math.ceil(base64.length / 4) * 4, "="))) as {
+      soldAt?: unknown;
+      id?: unknown;
+    };
+    if (
+      typeof parsed.soldAt !== "string" ||
+      Number.isNaN(Date.parse(parsed.soldAt)) ||
+      typeof parsed.id !== "string" ||
+      parsed.id.length === 0 ||
+      parsed.id.length > 100
+    ) {
+      return null;
+    }
+    return { soldAt: parsed.soldAt, id: parsed.id };
+  } catch {
+    return null;
+  }
 }
 
 app.use("*", async (context, next) => {
@@ -158,6 +191,7 @@ app.get("/api/health", (context) =>
   context.json({
     ok: true,
     service: APP_NAME,
+    applicationVersion: APP_VERSION,
     environment: context.env.APP_ENV,
     requirementsVersion: REQUIREMENTS_VERSION,
     timestamp: new Date().toISOString(),
@@ -2402,9 +2436,31 @@ app.on("GET", eventRoutes("/tickets/search"), async (context) => {
       403,
     );
   }
-  const rawQuery = context.req.query("q")?.trim() ?? "";
+  const searchParams = new URL(context.req.url).searchParams;
+  const parsedRequest = ticketSearchRequestSchema.safeParse({
+    q: searchParams.get("q") ?? "",
+    status: searchParams.get("status") ?? "ACTIVE",
+    limit: searchParams.has("limit") ? Number(searchParams.get("limit")) : 20,
+    ...(searchParams.has("cursor") ? { cursor: searchParams.get("cursor") ?? "" } : {}),
+    ticketGroupIds: searchParams.getAll("id"),
+  });
+  if (!parsedRequest.success) {
+    return context.json(
+      { error: { code: "INVALID_TICKET_SEARCH", message: "Ticketsuche ist ungültig." } },
+      400,
+    );
+  }
+  const request = parsedRequest.data;
+  const rawQuery = request.q;
   if (rawQuery.length === 1 || rawQuery.length > 200) {
-    return context.json({ results: [] });
+    return context.json({ results: [], nextCursor: null });
+  }
+  const cursor = decodeTicketSearchCursor(request.cursor);
+  if (request.cursor && !cursor) {
+    return context.json(
+      { error: { code: "INVALID_TICKET_SEARCH_CURSOR", message: "Listencursor ist ungültig." } },
+      400,
+    );
   }
   let query = rawQuery;
   try {
@@ -2416,17 +2472,55 @@ app.on("GET", eventRoutes("/tickets/search"), async (context) => {
   const normalized = query.trim().toUpperCase();
   const ticketHash = await sha256Hex(normalized);
   const likeQuery = `%${query.trim()}%`;
-  const numericQuery = /^\d+$/.test(normalized) ? String(Number(normalized)) : "";
+  const numericText = normalized.replace(/^G-?/, "");
+  const numericQuery = /^\d+$/.test(numericText) ? String(Number(numericText)) : "";
+  const conditions = ["tg.operation_day_id = ?1"];
+  const bindings: Array<string | number> = [eventId];
+  const bind = (value: string | number) => {
+    bindings.push(value);
+    return `?${bindings.length}`;
+  };
+  if (request.ticketGroupIds.length > 0) {
+    const placeholders = request.ticketGroupIds.map((id) => bind(id));
+    conditions.push(`tg.id IN (${placeholders.join(", ")})`);
+  } else {
+    conditions.push(
+      request.status === "CANCELED" ? "tg.status = 'CANCELED'" : "tg.status <> 'CANCELED'",
+    );
+  }
+  if (normalized) {
+    const ticketHashPlaceholder = bind(ticketHash);
+    const likePlaceholder = bind(likeQuery);
+    const numericPlaceholder = bind(numericQuery);
+    const normalizedPlaceholder = bind(normalized);
+    conditions.push(
+      `(EXISTS (SELECT 1 FROM tickets searched_ticket
+                  WHERE searched_ticket.ticket_group_id = tg.id
+                    AND searched_ticket.public_code_hash = ${ticketHashPlaceholder})
+        OR tg.id LIKE ${likePlaceholder}
+        OR CAST(tg.communication_number AS TEXT) = ${numericPlaceholder}
+        OR EXISTS (SELECT 1 FROM tickets searched_ticket
+                    JOIN rotation_tickets searched_rt ON searched_rt.ticket_id = searched_ticket.id
+                    JOIN rotations searched_rotation ON searched_rotation.id = searched_rt.rotation_id
+                    JOIN flight_groups searched_fg ON searched_fg.id = searched_rotation.flight_group_id
+                   WHERE searched_ticket.ticket_group_id = tg.id
+                     AND (CAST(searched_fg.communication_number AS TEXT) = ${numericPlaceholder}
+                       OR UPPER(p.code || '-' || printf('%03d', searched_fg.communication_number)) = ${normalizedPlaceholder})))`,
+    );
+  }
+  if (cursor) {
+    const soldAtPlaceholder = bind(cursor.soldAt);
+    const idPlaceholder = bind(cursor.id);
+    conditions.push(
+      `(tg.sold_at < ${soldAtPlaceholder} OR (tg.sold_at = ${soldAtPlaceholder} AND tg.id < ${idPlaceholder}))`,
+    );
+  }
+  const effectiveLimit =
+    request.ticketGroupIds.length > 0 ? Math.min(request.ticketGroupIds.length, 50) : request.limit;
+  const limitPlaceholder = bind(effectiveLimit + 1);
   const rows = await context.env.DB.prepare(
     `SELECT tg.id AS ticket_group_id, tg.status AS group_status,
-            (SELECT MIN(COALESCE(group_fg.queue_position, tg.queue_sequence))
-               FROM tickets queue_ticket
-               JOIN rotation_tickets queue_rt
-                 ON queue_rt.ticket_id = queue_ticket.id AND queue_rt.released_at IS NULL
-               JOIN rotations queue_rotation ON queue_rotation.id = queue_rt.rotation_id
-               JOIN flight_groups group_fg ON group_fg.id = queue_rotation.flight_group_id
-              WHERE queue_ticket.ticket_group_id = tg.id) AS queue_sequence,
-            tg.standby,
+            tg.queue_sequence, tg.communication_number AS booking_group_number, tg.standby,
             tg.sold_at, p.id AS product_id, p.code AS product_code, p.name AS product_name,
             (SELECT COUNT(*) FROM tickets group_ticket WHERE group_ticket.ticket_group_id = tg.id)
               AS group_size,
@@ -2445,21 +2539,15 @@ app.on("GET", eventRoutes("/tickets/search"), async (context) => {
               WHERE grouped_ticket.ticket_group_id = tg.id) AS rotation_statuses
        FROM ticket_groups tg
        JOIN products p ON p.id = tg.product_id
-       JOIN tickets t ON t.ticket_group_id = tg.id
-       LEFT JOIN rotation_tickets rt ON rt.ticket_id = t.id AND rt.released_at IS NULL
-       LEFT JOIN rotations r ON r.id = rt.rotation_id
-       LEFT JOIN flight_groups fg ON fg.id = r.flight_group_id
-      WHERE tg.operation_day_id = ?1
-        AND (?6 = '' OR t.public_code_hash = ?2 OR tg.id LIKE ?3 OR CAST(fg.communication_number AS TEXT) = ?4
-             OR UPPER(p.code || '-' || printf('%03d', fg.communication_number)) = ?5)
-      GROUP BY tg.id, tg.status, tg.queue_sequence, tg.standby, tg.sold_at, p.id, p.code, p.name
-      ORDER BY tg.sold_at DESC LIMIT 20`,
+      WHERE ${conditions.join(" AND ")}
+      ORDER BY tg.sold_at DESC, tg.id DESC LIMIT ${limitPlaceholder}`,
   )
-    .bind(eventId, ticketHash, likeQuery, numericQuery, normalized, normalized)
+    .bind(...bindings)
     .all<{
       ticket_group_id: string;
       group_status: string;
       queue_sequence: number;
+      booking_group_number: number;
       standby: number;
       sold_at: string;
       product_id: string;
@@ -2469,8 +2557,10 @@ app.on("GET", eventRoutes("/tickets/search"), async (context) => {
       communication_numbers: string | null;
       rotation_statuses: string | null;
     }>();
+  const page = rows.results.slice(0, effectiveLimit);
+  const last = page.at(-1);
   return context.json({
-    results: rows.results.map((row) => {
+    results: page.map((row) => {
       const communicationNumbers = (row.communication_numbers?.split(",") ?? [])
         .map(Number)
         .filter(Number.isInteger)
@@ -2487,6 +2577,8 @@ app.on("GET", eventRoutes("/tickets/search"), async (context) => {
         groupStatus: row.group_status,
         groupSize: row.group_size,
         queueSequence: row.queue_sequence,
+        bookingGroupNumber: row.booking_group_number,
+        bookingGroupLabel: `G-${String(row.booking_group_number).padStart(4, "0")}`,
         standby: row.standby === 1,
         soldAt: row.sold_at,
         communicationNumber: communicationNumbers[0] ?? null,
@@ -2497,6 +2589,10 @@ app.on("GET", eventRoutes("/tickets/search"), async (context) => {
         rotationStatuses,
       };
     }),
+    nextCursor:
+      request.ticketGroupIds.length === 0 && rows.results.length > effectiveLimit && last
+        ? encodeTicketSearchCursor({ soldAt: last.sold_at, id: last.ticket_group_id })
+        : null,
   });
 });
 
@@ -2517,7 +2613,7 @@ app.on("GET", eventRoutes("/ticket-groups/:ticketGroupId/print-data"), async (co
   const ticketGroupId = context.req.param("ticketGroupId");
   const rows = await context.env.DB.prepare(
     `SELECT t.public_code, od.name AS event_name, p.name AS product_name, g.label AS gate_label,
-            p.code AS product_code, tg.communication_number
+            p.code AS product_code, tg.communication_number, tg.status AS group_status
        FROM ticket_groups tg
        JOIN operation_days od ON od.id = tg.operation_day_id
        JOIN products p ON p.id = tg.product_id
@@ -2534,12 +2630,24 @@ app.on("GET", eventRoutes("/ticket-groups/:ticketGroupId/print-data"), async (co
       gate_label: string;
       product_code: string;
       communication_number: number;
+      group_status: string;
     }>();
   const first = rows.results[0];
   if (!first) {
     return context.json(
       { error: { code: "TICKET_GROUP_NOT_FOUND", message: "Buchungsgruppe nicht gefunden." } },
       404,
+    );
+  }
+  if (first.group_status === "CANCELED") {
+    return context.json(
+      {
+        error: {
+          code: "TICKET_GROUP_CANCELED",
+          message: "Stornierte Tickets werden nicht erneut ausgegeben.",
+        },
+      },
+      409,
     );
   }
   return context.json({

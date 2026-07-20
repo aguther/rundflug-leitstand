@@ -30,7 +30,10 @@
 }
 
 .cashier-products {
-  overflow: hidden;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-gutter: stable;
   border: 1px solid var(--ui-border);
   border-radius: 7px;
 }
@@ -44,7 +47,7 @@
 
 .cashier-product-heading {
   width: 100%;
-  min-height: 94px;
+  min-height: 80px;
   display: grid;
   grid-template-columns: 44px minmax(135px, 1.5fr) minmax(80px, 0.8fr) minmax(72px, 0.7fr) minmax(
       86px,
@@ -52,7 +55,7 @@
     );
   align-items: center;
   gap: 12px;
-  padding: 14px 16px;
+  padding: 10px 14px;
   border: 0;
   color: var(--ui-text);
   background: transparent;
@@ -61,8 +64,8 @@
 }
 
 .cashier-product-heading > svg {
-  width: 34px;
-  height: 34px;
+  width: 30px;
+  height: 30px;
   color: var(--ui-accent);
   stroke-width: 1.7;
 }
@@ -90,15 +93,17 @@
   font-size: 1.1rem;
 }
 
+.cashier-product-body {
+  display: grid;
+  grid-template-rows: auto 4.75rem 56px;
+  gap: 8px;
+  padding: 0 14px 12px;
+}
+
 .cashier-product-controls {
   display: grid;
   grid-template-columns: 170px 1fr;
   gap: 18px;
-  padding: 0 16px 16px;
-}
-
-.cashier-product:not(.selected) .cashier-product-controls {
-  opacity: 0.62;
 }
 .cashier-field-label {
   display: block;
@@ -185,8 +190,64 @@
   resize: vertical;
   padding: 8px;
 }
-.cashier-sale-panel :is(.oversize-split-notice, .capacity-fit-notice, .child-companion-warning) {
+.cashier-product-guidance {
+  block-size: 4.75rem;
+  display: grid;
+  grid-template-columns: 20px 1fr;
+  align-content: center;
+  gap: 8px;
+  padding: 8px 10px;
+  overflow: auto;
+  border: 1px solid var(--ui-border);
+  border-radius: 6px;
+  color: var(--ui-muted);
+  background: var(--ui-surface-subtle);
+}
+.cashier-product-guidance svg {
+  margin-top: 2px;
+}
+.cashier-product-guidance > div {
+  display: grid;
+  align-content: center;
+  gap: 5px;
+}
+.cashier-product-guidance strong,
+.cashier-product-guidance span {
+  display: block;
+}
+.cashier-product-guidance strong {
+  color: var(--ui-text);
+  font-size: 0.8rem;
+}
+.cashier-product-guidance span {
+  font-size: 0.72rem;
+  line-height: 1.3;
+}
+.cashier-product-guidance.warning {
+  border-color: color-mix(in srgb, var(--ui-warning) 55%, var(--ui-border));
+  color: var(--ui-warning-text);
+  background: var(--ui-warning-soft);
+}
+.cashier-secondary-guidance {
+  block-size: 4.75rem;
   margin-top: 10px;
+}
+.cashier-secondary-guidance > div {
+  block-size: 100%;
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  margin: 0;
+  padding: 10px 12px;
+  overflow: auto;
+  border: 1px solid var(--ui-border);
+  border-radius: 6px;
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+.cashier-guidance-neutral {
+  color: var(--ui-muted);
+  background: var(--ui-surface-subtle);
 }
 .cashier-information {
   margin-top: auto;
@@ -198,24 +259,24 @@
 }
 
 .cashier-sell-action {
-  min-height: 78px;
+  min-height: 56px;
   display: grid;
   grid-template-columns: auto auto;
   place-content: center;
   column-gap: 10px;
-  margin-top: 14px;
+  margin-top: 0;
   border: 1px solid var(--ui-accent);
   border-radius: 6px;
   color: #fff;
   background: var(--ui-accent);
-  font-size: 1.05rem;
+  font-size: 0.9rem;
   font-weight: 700;
   cursor: pointer;
 }
 .cashier-sell-action small {
   grid-column: 1 / -1;
-  margin-top: 5px;
-  font-size: 0.72rem;
+  margin-top: 2px;
+  font-size: 0.68rem;
   font-weight: 500;
 }
 .cashier-sell-action:disabled {
@@ -327,13 +388,25 @@
   flex-direction: column;
   gap: 10px;
 }
-.cashier-ticket-identifiers > span {
+.cashier-ticket-identifiers > button {
   display: flex;
   align-items: center;
   gap: 8px;
+  width: 100%;
   padding-top: 10px;
   border-top: 1px solid var(--ui-border);
+  border-right: 0;
+  border-bottom: 0;
+  border-left: 0;
+  color: var(--ui-text);
+  background: transparent;
   font-size: 0.74rem;
+  text-align: left;
+  cursor: pointer;
+}
+.cashier-ticket-identifiers > button.selected {
+  color: var(--ui-accent);
+  font-weight: 700;
 }
 .cashier-ticket-paper {
   display: grid;
@@ -346,7 +419,7 @@
   text-align: center;
 }
 .ticket-paper {
-  width: 155px;
+  width: 190px;
   display: grid;
   justify-items: center;
   padding: 8px;
@@ -357,27 +430,28 @@
   text-align: center;
 }
 .ticket-paper > small {
-  font-size: 8px;
+  font-size: 11px;
+  line-height: 1.35;
 }
 .ticket-paper > b {
-  margin-top: 5px;
-  font-size: 10px;
+  margin-top: 8px;
+  font-size: 14px;
 }
 .ticket-paper > img {
-  width: 92px;
-  height: 92px;
+  width: 104px;
+  height: 104px;
 }
 .ticket-paper dl {
   width: 100%;
   margin: 4px 0;
   padding-top: 4px;
   border-top: 1px dashed #6b7280;
-  font-size: 7px;
+  font-size: 11px;
   text-align: left;
 }
 .ticket-paper dl > div {
   display: grid;
-  grid-template-columns: 42px 1fr;
+  grid-template-columns: 58px 1fr;
 }
 .ticket-paper dd {
   margin: 0;
@@ -403,9 +477,28 @@
 }
 .cashier-ticket-actions {
   display: grid;
-  grid-template-columns: 0.75fr 1fr 1.35fr;
+  grid-template-columns: 0.85fr 1.4fr;
   gap: 7px;
   margin-top: 10px;
+}
+
+.cashier-ticket-list-sentinel {
+  padding: 8px 12px;
+  color: var(--ui-muted);
+  font-size: 0.72rem;
+  text-align: center;
+}
+
+.ticket-print-document {
+  display: none;
+}
+
+.cashier-cancel-dialog-body {
+  display: grid;
+  gap: 12px;
+}
+.cashier-cancel-dialog-body p {
+  margin: 0;
 }
 
 @media (max-width: 1100px) {
@@ -448,7 +541,13 @@
   }
   .cashier-product-controls {
     grid-template-columns: 1fr;
+  }
+  .cashier-product-body {
+    grid-template-rows: auto 5.75rem 56px;
     padding: 0 10px 12px;
+  }
+  .cashier-product-guidance {
+    block-size: 5.75rem;
   }
   .cashier-sale-options {
     align-items: flex-start;
@@ -477,23 +576,53 @@
 }
 
 @media print {
-  .cashier-shell > :not(.cashier-v15-workspace),
-  .cashier-sale-panel,
-  .cashier-ticket-panel > :not(.cashier-ticket-detail),
-  .cashier-ticket-detail > :not(.cashier-ticket-detail-grid),
-  .cashier-ticket-detail-grid > :not(.cashier-ticket-paper) {
+  html,
+  body,
+  #root {
+    width: 52mm;
+    min-width: 0;
+    margin: 0;
+    background: #fff;
+  }
+  .cashier-shell {
+    width: 52mm;
+    height: auto;
+    min-height: 0;
+    display: block;
+    margin: 0;
+    overflow: visible;
+    background: #fff;
+  }
+  .cashier-shell > *:not(.ticket-print-document) {
     display: none;
   }
-  .cashier-v15-workspace,
-  .cashier-ticket-panel,
-  .cashier-ticket-detail,
-  .cashier-ticket-detail-grid {
+  .cashier-shell > .ticket-print-document {
+    position: static;
+    inset: auto;
+    width: 52mm;
     display: block;
-    padding: 0;
-    border: 0;
   }
-  .ticket-paper {
-    width: 58mm;
+  .ticket-print-document .ticket-paper {
+    width: 52mm;
+    min-height: 100mm;
+    padding: 2mm;
     border: 0;
+    break-after: page;
+  }
+  .ticket-print-document .ticket-paper:last-child {
+    break-after: auto;
+  }
+  .ticket-print-document .ticket-paper > img {
+    width: 44mm;
+    height: 44mm;
+  }
+  .ticket-print-document .ticket-paper > small {
+    font-size: 9pt;
+  }
+  .ticket-print-document .ticket-paper > b {
+    font-size: 12pt;
+  }
+  .ticket-print-document .ticket-paper dl {
+    font-size: 9pt;
   }
 }

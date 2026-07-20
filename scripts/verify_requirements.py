@@ -18,6 +18,53 @@ ALLOWED_STATUSES = {"geplant", "in Arbeit", "umgesetzt", "abgenommen", "entfäll
 BACKLOG_PATTERN = re.compile(r"^BP-(?:0[1-9]|1[0-2])$")
 
 
+def verify_release_version() -> str:
+    root_package = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
+    version = root_package["version"]
+    package_paths = sorted(
+        [*(ROOT / "apps").glob("*/package.json"), *(ROOT / "packages").glob("*/package.json")]
+    )
+    mismatches = [
+        str(path.relative_to(ROOT))
+        for path in package_paths
+        if json.loads(path.read_text(encoding="utf-8"))["version"] != version
+    ]
+    if mismatches:
+        fail(f"workspace package versions differ from {version}: {mismatches}")
+
+    versioned_paths = [
+        ROOT / f"docs/requirements/requirements-v{version}.md",
+        ROOT / f"docs/requirements/requirements-v{version}.yaml",
+        ROOT / f"docs/requirements/traceability-v{version}.csv",
+        ROOT / f"docs/ui/v{version}-cashier-concept.md",
+    ]
+    missing = [str(path.relative_to(ROOT)) for path in versioned_paths if not path.exists()]
+    if missing:
+        fail(f"release {version} is missing version-aligned artifacts: {missing}")
+
+    release_yaml = versioned_paths[1].read_text(encoding="utf-8")
+    if not release_yaml.startswith(f"version: {version}\n"):
+        fail(f"requirements-v{version}.yaml does not declare version {version}")
+    release_ids = re.findall(r"^  - id: ([A-Z0-9-]+)$", release_yaml, re.MULTILINE)
+    with versioned_paths[2].open(newline="", encoding="utf-8-sig") as handle:
+        trace_ids = [row["ID"] for row in csv.DictReader(handle)]
+    if release_ids != trace_ids:
+        fail(f"release {version} requirements and traceability IDs differ")
+
+    config_source = (ROOT / "packages/config/src/index.ts").read_text(encoding="utf-8")
+    worker_source = (ROOT / "apps/worker/src/index.ts").read_text(encoding="utf-8")
+    backup_source = (ROOT / "apps/worker/src/backup.ts").read_text(encoding="utf-8")
+    if 'APP_VERSION = rootPackage.version' not in config_source:
+        fail("runtime application version is not derived from the root package")
+    if "REQUIREMENTS_VERSION = APP_VERSION" not in config_source:
+        fail("runtime requirements version is not aligned with the application version")
+    if "applicationVersion: APP_VERSION" not in worker_source:
+        fail("health endpoint does not expose the application version")
+    if "requirementsVersion: REQUIREMENTS_VERSION" not in backup_source:
+        fail("portable backups do not use the aligned requirements version")
+    return version
+
+
 def load_json_compatible_yaml(path: Path):
     # The generated YAML is intentionally valid JSON as well, avoiding a runtime PyYAML dependency.
     return json.loads(path.read_text(encoding="utf-8"))
@@ -29,6 +76,7 @@ def fail(message: str) -> None:
 
 
 def main() -> None:
+    release_version = verify_release_version()
     requirements = load_json_compatible_yaml(YAML_PATH)
     if len(requirements) != 207:
         fail(f"expected 207 requirements, found {len(requirements)}")
@@ -105,8 +153,8 @@ def main() -> None:
         fail(f"expected 166 V1 MUSS requirements, found {len(v1_must)}")
 
     print(
-        f"OK: {len(ids)} unique requirements, {len(v1_rows)} assigned V1 rows "
-        f"and {len(v1_must)} assigned V1 MUSS rows"
+        f"OK: release {release_version}, {len(ids)} unique requirements, "
+        f"{len(v1_rows)} assigned V1 rows and {len(v1_must)} assigned V1 MUSS rows"
     )
 
 

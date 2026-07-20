@@ -1,7 +1,11 @@
-import type { TicketGroupPrintData, TicketSearchResult } from "@rundflug/contracts";
+import type {
+  TicketGroupOperationalStatus,
+  TicketGroupPrintData,
+  TicketSearchResult,
+} from "@rundflug/contracts";
 import {
+  AlertTriangle,
   CircleUserRound,
-  Filter,
   Info,
   Minus,
   Plane,
@@ -13,12 +17,13 @@ import {
   Trash2,
 } from "lucide-react";
 import QRCode from "qrcode";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { getTicketGroupPrintData, searchTickets, sendCommand } from "./api";
 import { AppShell as Shell } from "./app/AppShell";
 import { requiresChildCompanionWarning } from "./cashier-guidance";
 import {
   Button,
+  ConfirmationDialog,
   DataTable,
   IconButton,
   PageHeader,
@@ -53,6 +58,52 @@ import {
 import { oversizeSplitPreview } from "./operational-exceptions";
 import { useConnectivity } from "./shared/hooks/use-connectivity";
 
+const ticketGroupStatusLabel: Record<TicketGroupOperationalStatus, string> = {
+  QUEUED: "Wartet",
+  PRESENT: "Anwesend",
+  CALLED: "Aufgerufen",
+  BOARDING: "Boarding",
+  IN_FLIGHT: "Im Flug",
+  LANDED: "Gelandet",
+  COMPLETED: "Abgeschlossen",
+  NO_SHOW: "Nicht erschienen",
+  CANCELED: "Storniert",
+  CLARIFICATION: "Klärung erforderlich",
+  MISSING: "Nicht da",
+};
+
+function TicketPaper({ ticket }: { ticket: TicketReceipt }) {
+  return (
+    <article className="ticket-paper">
+      <strong>Rundflug-Leitstand</strong>
+      <small>{ticket.eventName}</small>
+      <b>{ticket.code}</b>
+      <img src={ticket.qrDataUrl} alt={`QR-Ticket ${ticket.code}`} />
+      <dl>
+        <div>
+          <dt>Gruppe:</dt>
+          <dd>{ticket.communicationLabel}</dd>
+        </div>
+        <div>
+          <dt>Ticket:</dt>
+          <dd>
+            {ticket.position} von {ticket.groupSize}
+          </dd>
+        </div>
+        <div>
+          <dt>Produkt:</dt>
+          <dd>{ticket.productName}</dd>
+        </div>
+        <div>
+          <dt>Eingang:</dt>
+          <dd>{ticket.gateLabel}</dd>
+        </div>
+      </dl>
+      <small>QR-Code für aktuellen Status scannen</small>
+    </article>
+  );
+}
+
 export function CashierView() {
   const { board, error, lastConfirmedAt, refresh } = useOperationBoard(CASHIER_DEVICE_ID);
   const online = useConnectivity();
@@ -67,20 +118,29 @@ export function CashierView() {
     return initialDraft?.size ?? 1;
   });
   const [pendingDraftCount, setPendingDraftCount] = useState(initialDraftQueue.length);
-  const [busy, setBusy] = useState(false);
+  const [busyProductId, setBusyProductId] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<TicketReceipt[]>([]);
   const [ticketCodeMode, setTicketCodeMode] = useState<"GENERATED" | "PREPRINTED">("GENERATED");
   const [preprintedCodes, setPreprintedCodes] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [lastTicketGroupId, setLastTicketGroupId] = useState<string | null>(null);
-  const [lastProductId, setLastProductId] = useState<string | null>(null);
   const [cancelReason, setCancelReason] = useState("");
-  const [rebookProductId, setRebookProductId] = useState("");
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [cancelBusy, setCancelBusy] = useState(false);
   const [ticketSearch, setTicketSearch] = useState("");
+  const [ticketSearchQuery, setTicketSearchQuery] = useState("");
   const [ticketSearchResults, setTicketSearchResults] = useState<TicketSearchResult[]>([]);
-  const [ticketListTab, setTicketListTab] = useState<"ACTIVE" | "CANCELLED">("ACTIVE");
+  const [ticketListTab, setTicketListTab] = useState<"ACTIVE" | "CANCELED">("ACTIVE");
+  const [ticketListNextCursor, setTicketListNextCursor] = useState<string | null>(null);
+  const [ticketListLoading, setTicketListLoading] = useState(false);
   const [ticketDetails, setTicketDetails] = useState<TicketDetail[]>([]);
-  const [oversizeSplitAcknowledged, setOversizeSplitAcknowledged] = useState(false);
+  const [selectedReceiptIndex, setSelectedReceiptIndex] = useState(0);
+  const ticketListRequestRef = useRef(0);
+  const ticketListSentinelRef = useRef<HTMLDivElement | null>(null);
+  const printDocumentRef = useRef<HTMLDivElement | null>(null);
+  const ticketListResultCountRef = useRef(0);
+  const ticketListNextCursorRef = useRef<string | null>(null);
+  const lastTicketListBoardVersionRef = useRef<number | null>(null);
   const product = board?.products.find((entry) => entry.id === productId) ?? board?.products[0];
   const splitPreview = oversizeSplitPreview(size, product?.referenceCapacity ?? size);
   const productAircraft =
@@ -99,9 +159,9 @@ export function CashierView() {
     (entry) => entry.ticketGroupId === lastTicketGroupId,
   );
   const visibleTicketGroups = ticketSearchResults.filter((entry) =>
-    ticketListTab === "CANCELLED"
-      ? entry.groupStatus === "CANCELLED"
-      : entry.groupStatus !== "CANCELLED",
+    ticketListTab === "CANCELED"
+      ? entry.groupStatus === "CANCELED"
+      : entry.groupStatus !== "CANCELED",
   );
   const currency = (cents: number) =>
     (cents / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
@@ -128,7 +188,82 @@ export function CashierView() {
     );
   }
 
-  async function reopenTicketGroup(ticketGroupId: string) {
+  const loadTicketList = useCallback(
+    async ({
+      append = false,
+      preserveLoaded = false,
+      status = ticketListTab,
+      query = ticketSearchQuery,
+    }: {
+      append?: boolean;
+      preserveLoaded?: boolean;
+      status?: "ACTIVE" | "CANCELED";
+      query?: string;
+    } = {}) => {
+      if (!serverConfirmed) return;
+      const requestId = ++ticketListRequestRef.current;
+      setTicketListLoading(true);
+      try {
+        const response = await searchTickets(
+          EVENT_ID,
+          CASHIER_DEVICE_ID,
+          deviceTokenFor(CASHIER_DEVICE_ID),
+          {
+            q: query,
+            status,
+            limit: preserveLoaded
+              ? Math.min(Math.max(ticketListResultCountRef.current, 20), 50)
+              : 20,
+            ...(append && ticketListNextCursorRef.current
+              ? { cursor: ticketListNextCursorRef.current }
+              : {}),
+          },
+        );
+        if (requestId !== ticketListRequestRef.current) return;
+        setTicketSearchResults((current) => {
+          let nextResults: TicketSearchResult[];
+          if (append) {
+            const known = new Set(current.map((entry) => entry.ticketGroupId));
+            nextResults = [
+              ...current,
+              ...response.results.filter((entry) => !known.has(entry.ticketGroupId)),
+            ];
+          } else if (!preserveLoaded) {
+            nextResults = response.results;
+          } else {
+            const updatedIds = new Set(response.results.map((entry) => entry.ticketGroupId));
+            const matchingStatus = (entry: TicketSearchResult) =>
+              status === "CANCELED"
+                ? entry.groupStatus === "CANCELED"
+                : entry.groupStatus !== "CANCELED";
+            nextResults = [
+              ...response.results,
+              ...current.filter(
+                (entry) => !updatedIds.has(entry.ticketGroupId) && matchingStatus(entry),
+              ),
+            ];
+          }
+          ticketListResultCountRef.current = nextResults.length;
+          return nextResults;
+        });
+        ticketListNextCursorRef.current = response.nextCursor;
+        setTicketListNextCursor(response.nextCursor);
+        const firstResult = response.results[0];
+        if (!append && firstResult) {
+          setLastTicketGroupId((current) => current ?? firstResult.ticketGroupId);
+        }
+      } catch (reason) {
+        if (requestId === ticketListRequestRef.current) {
+          setMessage(reason instanceof Error ? reason.message : "Ticketliste nicht verfügbar.");
+        }
+      } finally {
+        if (requestId === ticketListRequestRef.current) setTicketListLoading(false);
+      }
+    },
+    [serverConfirmed, ticketListTab, ticketSearchQuery],
+  );
+
+  async function reopenTicketGroup(ticketGroupId: string): Promise<boolean> {
     try {
       const data = await getTicketGroupPrintData(
         EVENT_ID,
@@ -136,12 +271,17 @@ export function CashierView() {
         CASHIER_DEVICE_ID,
         deviceTokenFor(CASHIER_DEVICE_ID),
       );
-      setReceipt(await printableTickets(data));
-      setMessage("Ticketzettel stehen zum Scan oder erneuten Druck bereit.");
+      const prepared = await printableTickets(data);
+      if (prepared.length === 0) throw new Error("Ticketdokument enthält keine Tickets.");
+      setReceipt(prepared);
+      setSelectedReceiptIndex(0);
+      return true;
     } catch (reason) {
+      setReceipt([]);
       setMessage(
         reason instanceof Error ? reason.message : "Ticketzettel konnten nicht geladen werden.",
       );
+      return false;
     }
   }
   useEffect(() => {
@@ -170,19 +310,48 @@ export function CashierView() {
   }, [product?.weightClasses, size]);
   useEffect(() => {
     if (!serverConfirmed) return;
-    void searchTickets(EVENT_ID, CASHIER_DEVICE_ID, deviceTokenFor(CASHIER_DEVICE_ID), "")
-      .then((response) => {
-        setTicketSearchResults(response.results);
-        const firstResult = response.results[0];
-        if (firstResult) {
-          setLastTicketGroupId(firstResult.ticketGroupId);
-          setLastProductId(firstResult.productId);
+    void loadTicketList();
+  }, [loadTicketList, serverConfirmed]);
+  useEffect(() => {
+    const boardVersion = board?.event.version ?? null;
+    if (boardVersion === null) return;
+    if (lastTicketListBoardVersionRef.current === null) {
+      lastTicketListBoardVersionRef.current = boardVersion;
+      return;
+    }
+    if (lastTicketListBoardVersionRef.current === boardVersion) return;
+    lastTicketListBoardVersionRef.current = boardVersion;
+    void loadTicketList({ preserveLoaded: true });
+  }, [board?.event.version, loadTicketList]);
+  useEffect(() => {
+    const refreshOnFocus = () => {
+      if (document.visibilityState === "visible") void loadTicketList({ preserveLoaded: true });
+    };
+    window.addEventListener("focus", refreshOnFocus);
+    document.addEventListener("visibilitychange", refreshOnFocus);
+    return () => {
+      window.removeEventListener("focus", refreshOnFocus);
+      document.removeEventListener("visibilitychange", refreshOnFocus);
+    };
+  }, [loadTicketList]);
+  useEffect(() => {
+    const sentinel = ticketListSentinelRef.current;
+    if (!sentinel || !ticketListNextCursor) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting) && !ticketListLoading) {
+          void loadTicketList({ append: true });
         }
-      })
-      .catch(() => undefined);
-  }, [serverConfirmed]);
-  async function sell() {
-    if (!board || !product || busy) return;
+      },
+      { root: sentinel.parentElement, rootMargin: "120px" },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [loadTicketList, ticketListLoading, ticketListNextCursor]);
+
+  async function sell(saleProduct: NonNullable<typeof product>) {
+    if (!board || busyProductId) return;
+    const saleSplitPreview = oversizeSplitPreview(size, saleProduct.referenceCapacity);
     const codes =
       ticketCodeMode === "GENERATED"
         ? Array.from({ length: size }, createTicketCode)
@@ -201,7 +370,8 @@ export function CashierView() {
       );
       return;
     }
-    setBusy(true);
+    setProductId(saleProduct.id);
+    setBusyProductId(saleProduct.id);
     try {
       const saleResult = await sendCommand(
         {
@@ -212,35 +382,39 @@ export function CashierView() {
           issuedAt: new Date().toISOString(),
           type: "SELL_TICKET_GROUP",
           payload: {
-            productId: product.id,
+            productId: saleProduct.id,
             publicTicketCodes: codes,
             ticketDetails,
             standby: false,
             paymentStatus: "INFORMATIONAL_ONLY",
             paymentMethod: null,
-            oversizeSplitAcknowledged,
+            oversizeSplitAcknowledged: saleSplitPreview.required,
           },
         },
         deviceTokenFor(CASHIER_DEVICE_ID),
       );
       const soldTicketGroupId = saleResult.aggregate?.id ?? null;
-      if (soldTicketGroupId) await reopenTicketGroup(soldTicketGroupId);
+      const printPrepared = soldTicketGroupId ? await reopenTicketGroup(soldTicketGroupId) : false;
       setPreprintedCodes("");
       setLastTicketGroupId(soldTicketGroupId);
-      setLastProductId(product.id);
-      setMessage(`${codes.length} Ticket${codes.length === 1 ? "" : "s"} verkauft.`);
+      setMessage(
+        `${codes.length} Ticket${codes.length === 1 ? "" : "s"} verkauft.${
+          printPrepared ? "" : " Druckvorbereitung fehlgeschlagen; Nachdruck bleibt möglich."
+        }`,
+      );
       writeCashierDraftQueue(localStorage, draftQueueKey, []);
       setPendingDraftCount(0);
-      await refresh();
+      await Promise.all([refresh(), loadTicketList({ preserveLoaded: true })]);
     } catch (reason) {
       setMessage(reason instanceof Error ? reason.message : "Verkauf fehlgeschlagen.");
     } finally {
-      setBusy(false);
+      setBusyProductId(null);
     }
   }
 
   async function cancelLastSale() {
-    if (!board || !lastTicketGroupId || cancelReason.trim().length < 3) return;
+    if (!board || !lastTicketGroupId || cancelReason.trim().length < 3 || cancelBusy) return;
+    setCancelBusy(true);
     try {
       await sendCommand(
         {
@@ -258,74 +432,75 @@ export function CashierView() {
         },
         deviceTokenFor(CASHIER_DEVICE_ID),
       );
-      setMessage("Verkauf storniert und protokolliert.");
+      setMessage("Verkauf storniert und Kapazität freigegeben.");
       setReceipt([]);
-      setLastTicketGroupId(null);
-      setLastProductId(null);
       setCancelReason("");
-      await refresh();
+      setCancelDialogOpen(false);
+      setTicketListTab("CANCELED");
+      await Promise.all([
+        refresh(),
+        loadTicketList({ status: "CANCELED", query: ticketSearchQuery }),
+      ]);
     } catch (reason) {
       setMessage(reason instanceof Error ? reason.message : "Storno fehlgeschlagen.");
-    }
-  }
-
-  async function rebookLastSale() {
-    if (!board || !lastTicketGroupId || !rebookProductId || cancelReason.trim().length < 3) return;
-    try {
-      await sendCommand(
-        {
-          commandId: crypto.randomUUID(),
-          eventId: EVENT_ID,
-          deviceId: CASHIER_DEVICE_ID,
-          expectedVersion: board.event.version,
-          issuedAt: new Date().toISOString(),
-          type: "REBOOK_TICKET_GROUP",
-          payload: {
-            ticketGroupId: lastTicketGroupId,
-            newProductId: rebookProductId,
-            reason: cancelReason.trim(),
-            adminPin: "SESSION",
-          },
-        },
-        deviceTokenFor(CASHIER_DEVICE_ID),
-      );
-      setMessage("Tickets umgebucht und in die neue Queue eingereiht.");
-      setCancelReason("");
-      setRebookProductId("");
-      setLastProductId(rebookProductId);
-      await refresh();
-    } catch (reason) {
-      setMessage(reason instanceof Error ? reason.message : "Umbuchung fehlgeschlagen.");
+    } finally {
+      setCancelBusy(false);
     }
   }
 
   async function runTicketSearch() {
-    if (ticketSearch.trim().length < 2) return;
-    try {
-      const response = await searchTickets(
-        EVENT_ID,
-        CASHIER_DEVICE_ID,
-        deviceTokenFor(CASHIER_DEVICE_ID),
-        ticketSearch.trim(),
-      );
-      setTicketSearchResults(response.results);
-      setMessage(
-        response.results.length === 0
-          ? "Kein passendes Ticket gefunden."
-          : `${response.results.length} Buchungsgruppe${response.results.length === 1 ? "" : "n"} gefunden.`,
-      );
-    } catch (reason) {
-      setMessage(reason instanceof Error ? reason.message : "Ticketsuche fehlgeschlagen.");
+    const query = ticketSearch.trim();
+    if (query.length === 1) {
+      setMessage("Für die Suche mindestens zwei Zeichen eingeben.");
+      return;
     }
+    setTicketSearchQuery(query);
+    await loadTicketList({ query });
   }
 
   function selectSearchResult(result: TicketSearchResult) {
     setLastTicketGroupId(result.ticketGroupId);
-    setLastProductId(result.productId);
     setReceipt([]);
     setMessage(
       `${result.productName} · ${result.groupSize} Ticket${result.groupSize === 1 ? "" : "s"} ausgewählt.`,
     );
+  }
+
+  async function printTicketDocument() {
+    if (receipt.length === 0 || selectedTicketGroup?.groupStatus === "CANCELED") {
+      setMessage("Für diese Buchungsgruppe steht kein druckbares Ticketdokument bereit.");
+      return;
+    }
+    const documentRoot = printDocumentRef.current;
+    if (!documentRoot) {
+      setMessage("Ticketdokument konnte nicht vorbereitet werden.");
+      return;
+    }
+    try {
+      const images = Array.from(documentRoot.querySelectorAll("img"));
+      if (images.length !== receipt.length)
+        throw new Error("QR-Codes sind noch nicht vollständig.");
+      await Promise.all(
+        images.map(async (image) => {
+          if (!image.complete) {
+            await new Promise<void>((resolve, reject) => {
+              image.addEventListener("load", () => resolve(), { once: true });
+              image.addEventListener("error", () => reject(new Error("QR-Code fehlt.")), {
+                once: true,
+              });
+            });
+          }
+          if (image.naturalWidth === 0) throw new Error("QR-Code konnte nicht dargestellt werden.");
+          await image.decode?.();
+        }),
+      );
+      window.print();
+      setMessage("Druckdialog geöffnet. Der Verkauf bleibt unabhängig vom Ausdruck gültig.");
+    } catch (reason) {
+      setMessage(
+        reason instanceof Error ? reason.message : "Ticketdokument konnte nicht gedruckt werden.",
+      );
+    }
   }
 
   return (
@@ -347,16 +522,39 @@ export function CashierView() {
           <div className="cashier-products">
             {board?.products.map((entry) => {
               const selected = entry.id === product?.id;
+              const entrySplitPreview = oversizeSplitPreview(size, entry.referenceCapacity);
+              const saleDisabled =
+                !serverConfirmed ||
+                !board ||
+                !entry.saleEnabled ||
+                entry.resourceGroupStatus !== "ACTIVE" ||
+                !entry.saleRecommended ||
+                entry.remainingSellableSeats < size ||
+                board.event.emergencyMode ||
+                board.event.operationalInterrupted ||
+                ticketDetails.length !== size ||
+                ticketDetails.some(
+                  (detail) =>
+                    detail.weightClass === "INDIVIDUAL" &&
+                    ((detail.individualWeightKg ?? 0) < 15 ||
+                      (detail.individualWeightKg ?? 0) > 250),
+                ) ||
+                busyProductId !== null;
               return (
                 <article
                   className={selected ? "cashier-product selected" : "cashier-product"}
                   key={entry.id}
                 >
                   <button
+                    aria-expanded={selected}
                     className="cashier-product-heading"
-                    onClick={() => {
+                    onClick={(event) => {
+                      const productCard =
+                        event.currentTarget.closest<HTMLElement>(".cashier-product");
                       setProductId(entry.id);
-                      setOversizeSplitAcknowledged(false);
+                      requestAnimationFrame(() =>
+                        productCard?.scrollIntoView({ block: "nearest" }),
+                      );
                     }}
                     type="button"
                   >
@@ -385,71 +583,116 @@ export function CashierView() {
                       <strong>{currency(entry.priceCents)}</strong>
                     </span>
                   </button>
-                  <div className="cashier-product-controls" aria-hidden={!selected}>
-                    <div>
-                      <span className="cashier-field-label">Gruppengröße</span>
-                      <div className="cashier-stepper">
-                        <IconButton
-                          aria-label="Gruppengröße verringern"
-                          label="Gruppengröße verringern"
-                          onClick={() => {
-                            setProductId(entry.id);
-                            setSize((value) => Math.max(1, value - 1));
-                            setOversizeSplitAcknowledged(false);
-                          }}
-                          type="button"
-                        >
-                          <Minus aria-hidden="true" size={18} />
-                        </IconButton>
-                        <output>{size}</output>
-                        <IconButton
-                          aria-label="Gruppengröße erhöhen"
-                          label="Gruppengröße erhöhen"
-                          onClick={() => {
-                            setProductId(entry.id);
-                            setSize((value) => Math.min(12, value + 1));
-                            setOversizeSplitAcknowledged(false);
-                          }}
-                          type="button"
-                        >
-                          <Plus aria-hidden="true" size={18} />
-                        </IconButton>
+                  {selected ? (
+                    <div className="cashier-product-body">
+                      <div className="cashier-product-controls">
+                        <div>
+                          <span className="cashier-field-label">Gruppengröße</span>
+                          <div className="cashier-stepper">
+                            <IconButton
+                              aria-label="Gruppengröße verringern"
+                              label="Gruppengröße verringern"
+                              onClick={() => setSize((value) => Math.max(1, value - 1))}
+                              type="button"
+                            >
+                              <Minus aria-hidden="true" size={18} />
+                            </IconButton>
+                            <output>{size}</output>
+                            <IconButton
+                              aria-label="Gruppengröße erhöhen"
+                              label="Gruppengröße erhöhen"
+                              onClick={() => setSize((value) => Math.min(12, value + 1))}
+                              type="button"
+                            >
+                              <Plus aria-hidden="true" size={18} />
+                            </IconButton>
+                          </div>
+                        </div>
+                        <div className="cashier-weight-picker">
+                          <span className="cashier-field-label">Gewichtsklasse (pro Person)</span>
+                          <div>
+                            {(entry.weightClasses.length > 0
+                              ? entry.weightClasses
+                              : ["NOT_CAPTURED" as WeightClass]
+                            ).map((weightClass) => (
+                              <Button
+                                className={
+                                  ticketDetails.every(
+                                    (detail) => detail.weightClass === weightClass,
+                                  )
+                                    ? "selected"
+                                    : ""
+                                }
+                                key={weightClass}
+                                onClick={() =>
+                                  setTicketDetails((current) =>
+                                    current.map((detail) => ({
+                                      ...detail,
+                                      weightClass,
+                                      individualWeightKg: weightClass === "INDIVIDUAL" ? 80 : null,
+                                    })),
+                                  )
+                                }
+                                size="default"
+                                type="button"
+                                variant="secondary"
+                              >
+                                {weightClassLabel[weightClass]}
+                              </Button>
+                            ))}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                    <div className="cashier-weight-picker">
-                      <span className="cashier-field-label">Gewichtsklasse (pro Person)</span>
-                      <div>
-                        {(entry.weightClasses.length > 0
-                          ? entry.weightClasses
-                          : ["NOT_CAPTURED" as WeightClass]
-                        ).map((weightClass) => (
-                          <Button
-                            className={
-                              ticketDetails.every((detail) => detail.weightClass === weightClass)
-                                ? "selected"
-                                : ""
-                            }
-                            key={weightClass}
-                            onClick={() => {
-                              setProductId(entry.id);
-                              setTicketDetails((current) =>
-                                current.map((detail) => ({
-                                  ...detail,
-                                  weightClass,
-                                  individualWeightKg: weightClass === "INDIVIDUAL" ? 80 : null,
-                                })),
-                              );
-                            }}
-                            size="default"
-                            type="button"
-                            variant="secondary"
-                          >
-                            {weightClassLabel[weightClass]}
-                          </Button>
-                        ))}
+                      <div
+                        className={`cashier-product-guidance ${
+                          entrySplitPreview.required ? "warning" : "neutral"
+                        }`}
+                        role="status"
+                      >
+                        {entrySplitPreview.required ? (
+                          <>
+                            <AlertTriangle aria-hidden="true" size={20} />
+                            <div>
+                              <strong>Aufteilung erforderlich</strong>
+                              <span>
+                                {size} Tickets bei {entry.referenceCapacity} Plätzen:{" "}
+                                {entrySplitPreview.slotSizes.join(" + ")} in{" "}
+                                {entrySplitPreview.slotSizes.length} aufeinanderfolgenden
+                                Fluggruppen. Die Buchungsgruppe bleibt verbunden.
+                              </span>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <Info aria-hidden="true" size={20} />
+                            <div>
+                              <strong>Passt in einen Umlauf</strong>
+                              <span>
+                                {size} von {entry.referenceCapacity} Referenzplätzen. Die konkrete
+                                Flugzeugzuordnung bleibt bis zur Bestätigung flexibel.
+                              </span>
+                            </div>
+                          </>
+                        )}
                       </div>
+                      <Button
+                        className="cashier-sell-action"
+                        disabled={saleDisabled}
+                        onClick={() => void sell(entry)}
+                        size="touch"
+                        type="button"
+                        variant="primary"
+                      >
+                        <Ticket aria-hidden="true" />
+                        {busyProductId === entry.id
+                          ? "Wird bestätigt …"
+                          : `${size} Ticket${size === 1 ? "" : "s"} verkaufen`}
+                        <small>
+                          {entry.name} · {currency(entry.priceCents * size)}
+                        </small>
+                      </Button>
                     </div>
-                  </div>
+                  ) : null}
                 </article>
               );
             })}
@@ -479,88 +722,34 @@ export function CashierView() {
               />
             </label>
           ) : null}
-          {product && splitPreview.required ? (
-            <div className="oversize-split-notice" role="status">
-              <div>
-                <strong>Aufteilung erforderlich</strong>
+          <div className="cashier-secondary-guidance">
+            {childCompanionWarning ? (
+              <div className="child-companion-warning" role="alert">
+                <strong>Begleitung prüfen</strong>
                 <span>
-                  {size} Tickets passen nicht gemeinsam in einen Umlauf mit{" "}
-                  {product.referenceCapacity} Plätzen. Vorgesehen:{" "}
-                  {splitPreview.slotSizes.join(" + ")} in {splitPreview.slotSizes.length}{" "}
-                  aufeinanderfolgenden Fluggruppen.
+                  Für das Kind ist keine erwachsene Begleitperson erfasst. Nur organisatorisch
+                  klären; der Hinweis bleibt ohne flugbetriebliche Freigabewirkung.
                 </span>
-                <small>Die gemeinsam verkaufte Buchungsgruppe bleibt vollständig verbunden.</small>
               </div>
-              <label>
-                <input
-                  checked={oversizeSplitAcknowledged}
-                  onChange={(event) => setOversizeSplitAcknowledged(event.target.checked)}
-                  type="checkbox"
-                />
-                Aufteilung verstanden
-              </label>
-            </div>
-          ) : null}
-          {limitedLargeAircraft ? (
-            <div className="capacity-fit-notice" role="status">
-              <strong>Gemeinsamer Flug möglich</strong>
-              <span>
-                {fittingAircraft.length} von {productAircraft.length} Flugzeug
-                {productAircraft.length === 1 ? "" : "en"} passen für diese Gruppe. Dadurch kann die
-                Wartezeit etwas länger sein.
-              </span>
-            </div>
-          ) : null}
-          {childCompanionWarning ? (
-            <div className="child-companion-warning" role="alert">
-              <strong>Begleitung prüfen</strong>
-              <span>
-                In dieser Gruppe ist ein Kind erfasst, aber keine erwachsene Begleitperson. Dieser
-                Hinweis dient nur der organisatorischen Klärung und ist ohne flugbetriebliche
-                Freigabewirkung.
-              </span>
-            </div>
-          ) : null}
+            ) : limitedLargeAircraft ? (
+              <div className="capacity-fit-notice" role="status">
+                <strong>Gemeinsamer Flug möglich</strong>
+                <span>
+                  {fittingAircraft.length} von {productAircraft.length} Flugzeug
+                  {productAircraft.length === 1 ? "" : "en"} passen; die Wartezeit kann länger sein.
+                </span>
+              </div>
+            ) : (
+              <div className="cashier-guidance-neutral" role="status">
+                <strong>Organisatorischer Hinweis</strong>
+                <span>Gewichtshinweise unterstützen nur die Abstimmung mit dem Piloten.</span>
+              </div>
+            )}
+          </div>
           <div className="cashier-information">
             <Info aria-hidden="true" size={18} />
             Preise dienen nur der Abstimmung; keine Zahlungsabwicklung im System.
           </div>
-          <Button
-            className="cashier-sell-action"
-            disabled={
-              !serverConfirmed ||
-              !board ||
-              !product?.saleEnabled ||
-              product.resourceGroupStatus !== "ACTIVE" ||
-              !product.saleRecommended ||
-              product.remainingSellableSeats < size ||
-              board.event.emergencyMode ||
-              board.event.operationalInterrupted ||
-              ticketDetails.length !== size ||
-              (splitPreview.required && !oversizeSplitAcknowledged) ||
-              ticketDetails.some(
-                (detail) =>
-                  detail.weightClass === "INDIVIDUAL" &&
-                  ((detail.individualWeightKg ?? 0) < 15 || (detail.individualWeightKg ?? 0) > 250),
-              ) ||
-              busy
-            }
-            onClick={sell}
-            size="touch"
-            type="button"
-            variant="primary"
-          >
-            <Ticket aria-hidden="true" />
-            {busy
-              ? "Wird bestätigt …"
-              : splitPreview.required && !oversizeSplitAcknowledged
-                ? "Aufteilung bestätigen"
-                : `Tickets verkaufen`}
-            <small>
-              Gruppe mit {size} Person{size === 1 ? "" : "en"} · {product?.name} ·{" "}
-              {currency((product?.priceCents ?? 0) * size)}
-            </small>
-          </Button>
         </Panel>
 
         <Panel className="cashier-ticket-panel" padding="none" aria-label="Verkaufte Tickets">
@@ -570,7 +759,7 @@ export function CashierView() {
             onChange={setTicketListTab}
             items={[
               { value: "ACTIVE", label: "Verkaufte Tickets" },
-              { value: "CANCELLED", label: "Stornierte Tickets" },
+              { value: "CANCELED", label: "Stornierte Tickets" },
             ]}
           />
           <div className="ds-toolbar cashier-ticket-toolbar">
@@ -586,19 +775,9 @@ export function CashierView() {
                 placeholder="Suche (z. B. Gruppe, Produkt)"
               />
             </label>
-            <IconButton label="Filter" type="button">
-              <Filter aria-hidden="true" size={18} />
-            </IconButton>
             <IconButton
               label="Liste aktualisieren"
-              onClick={() =>
-                void searchTickets(
-                  EVENT_ID,
-                  CASHIER_DEVICE_ID,
-                  deviceTokenFor(CASHIER_DEVICE_ID),
-                  "",
-                ).then((response) => setTicketSearchResults(response.results))
-              }
+              onClick={() => void loadTicketList({ preserveLoaded: true })}
               type="button"
             >
               <RefreshCw aria-hidden="true" size={18} />
@@ -620,7 +799,7 @@ export function CashierView() {
                 {
                   key: "group",
                   header: "Gruppe",
-                  render: (result) => `G-${String(result.queueSequence).padStart(4, "0")}`,
+                  render: (result) => result.bookingGroupLabel,
                 },
                 { key: "product", header: "Produkt", render: (result) => result.productName },
                 {
@@ -642,8 +821,8 @@ export function CashierView() {
                   key: "status",
                   header: "Status",
                   render: (result) => (
-                    <StatusPill tone={result.groupStatus === "CANCELLED" ? "danger" : "success"}>
-                      {result.groupStatus === "ACTIVE" ? "Gebucht" : result.groupStatus}
+                    <StatusPill tone={result.groupStatus === "CANCELED" ? "danger" : "success"}>
+                      {ticketGroupStatusLabel[result.groupStatus]}
                     </StatusPill>
                   ),
                 },
@@ -659,25 +838,36 @@ export function CashierView() {
                 },
               ]}
               emptyLabel={
-                ticketListTab === "CANCELLED"
+                ticketListTab === "CANCELED"
                   ? "Keine stornierten Tickets vorhanden."
                   : "Noch keine Tickets verkauft."
               }
               onRowClick={(result) => {
                 selectSearchResult(result);
-                void reopenTicketGroup(result.ticketGroupId);
+                if (result.groupStatus !== "CANCELED") {
+                  void reopenTicketGroup(result.ticketGroupId).then((prepared) => {
+                    if (prepared) setMessage("Ticketzettel stehen zum Nachdruck bereit.");
+                  });
+                }
               }}
               rowKey={(result) => result.ticketGroupId}
               rows={visibleTicketGroups}
               {...(lastTicketGroupId ? { selectedRowKey: lastTicketGroupId } : {})}
             />
+            <div className="cashier-ticket-list-sentinel" ref={ticketListSentinelRef}>
+              {ticketListLoading
+                ? "Liste wird aktualisiert …"
+                : ticketListNextCursor
+                  ? "Weitere Buchungsgruppen werden beim Scrollen geladen."
+                  : "Listenende"}
+            </div>
           </div>
           <section className="cashier-ticket-detail">
             <header>
               <div>
                 <h2>
                   {selectedTicketGroup
-                    ? `Gruppe G-${String(selectedTicketGroup.queueSequence).padStart(4, "0")}`
+                    ? `Gruppe ${selectedTicketGroup.bookingGroupLabel}`
                     : "Ticketgruppe auswählen"}
                 </h2>
                 {selectedTicketGroup ? (
@@ -715,7 +905,11 @@ export function CashierView() {
                 </div>
                 <div>
                   <dt>Status</dt>
-                  <dd>{selectedTicketGroup?.groupStatus ?? "–"}</dd>
+                  <dd>
+                    {selectedTicketGroup
+                      ? ticketGroupStatusLabel[selectedTicketGroup.groupStatus]
+                      : "–"}
+                  </dd>
                 </div>
                 <div>
                   <dt>Summe</dt>
@@ -732,86 +926,43 @@ export function CashierView() {
               </dl>
               <div className="cashier-ticket-identifiers">
                 <strong>Tickets</strong>
-                {receipt.map((ticket) => (
-                  <span key={ticket.code}>
+                {receipt.map((ticket, index) => (
+                  <button
+                    className={index === selectedReceiptIndex ? "selected" : ""}
+                    key={ticket.code}
+                    onClick={() => setSelectedReceiptIndex(index)}
+                    type="button"
+                  >
                     <Ticket aria-hidden="true" size={18} />
-                    {ticket.code}
-                  </span>
+                    <span>
+                      {ticket.position} von {ticket.groupSize} · {ticket.code}
+                    </span>
+                  </button>
                 ))}
               </div>
               <div className="cashier-ticket-paper">
-                {receipt[0] ? (
-                  <article className="ticket-paper">
-                    <strong>Rundflug-Leitstand</strong>
-                    <small>{receipt[0].eventName}</small>
-                    <b>{receipt[0].code}</b>
-                    <img src={receipt[0].qrDataUrl} alt={`QR-Ticket ${receipt[0].code}`} />
-                    <dl>
-                      <div>
-                        <dt>Gruppe:</dt>
-                        <dd>{receipt[0].communicationLabel}</dd>
-                      </div>
-                      <div>
-                        <dt>Produkt:</dt>
-                        <dd>{receipt[0].productName}</dd>
-                      </div>
-                      <div>
-                        <dt>Eingang:</dt>
-                        <dd>{receipt[0].gateLabel}</dd>
-                      </div>
-                    </dl>
-                    <small>QR-Code für aktuellen Status scannen</small>
-                  </article>
+                {receipt[selectedReceiptIndex] ? (
+                  <TicketPaper ticket={receipt[selectedReceiptIndex]} />
                 ) : (
                   <span>Ticketzettel wird nach Auswahl angezeigt.</span>
                 )}
               </div>
             </div>
-            {lastTicketGroupId ? (
-              <details className="cashier-correction">
-                <summary>Verkauf bearbeiten</summary>
-                <div>
-                  <TextField
-                    label="Grund"
-                    value={cancelReason}
-                    onChange={(event) => setCancelReason(event.target.value)}
-                    placeholder="Mindestens 3 Zeichen"
-                  />
-                  <SelectField
-                    label="Umbuchen auf"
-                    value={rebookProductId}
-                    onChange={(event) => setRebookProductId(event.target.value)}
-                  >
-                    <option value="">Zielprodukt wählen</option>
-                    {board?.products
-                      .filter((entry) => entry.id !== lastProductId)
-                      .map((entry) => (
-                        <option key={entry.id} value={entry.id}>
-                          {entry.name}
-                        </option>
-                      ))}
-                  </SelectField>
-                </div>
-              </details>
-            ) : null}
             <div className="cashier-ticket-actions">
               <Button
                 variant="danger"
-                disabled={!lastTicketGroupId || cancelReason.trim().length < 3}
-                onClick={cancelLastSale}
+                disabled={!lastTicketGroupId || selectedTicketGroup?.groupStatus === "CANCELED"}
+                onClick={() => setCancelDialogOpen(true)}
                 type="button"
               >
                 <Trash2 aria-hidden="true" size={18} />
                 Stornieren
               </Button>
               <Button
-                disabled={!rebookProductId || cancelReason.trim().length < 3}
-                onClick={rebookLastSale}
+                disabled={receipt.length === 0 || selectedTicketGroup?.groupStatus === "CANCELED"}
+                onClick={() => void printTicketDocument()}
                 type="button"
               >
-                Umbuchen
-              </Button>
-              <Button disabled={receipt.length === 0} onClick={() => window.print()} type="button">
                 <Printer aria-hidden="true" size={18} />
                 Ticketzettel erneut drucken
               </Button>
@@ -819,6 +970,41 @@ export function CashierView() {
           </section>
         </Panel>
       </section>
+      <div className="ticket-print-document" ref={printDocumentRef} aria-hidden="true">
+        {receipt.map((ticket) => (
+          <TicketPaper key={ticket.code} ticket={ticket} />
+        ))}
+      </div>
+      <ConfirmationDialog
+        open={cancelDialogOpen}
+        title="Tickets stornieren"
+        body={
+          <div className="cashier-cancel-dialog-body">
+            <p>
+              {selectedTicketGroup?.bookingGroupLabel ?? "Buchungsgruppe"} ·{" "}
+              {selectedTicketGroup?.groupSize ?? 0} Ticket
+              {selectedTicketGroup?.groupSize === 1 ? "" : "s"}. Die aktive Belegung wird gelöst und
+              die Kapazität sofort freigegeben.
+            </p>
+            <TextField
+              autoFocus
+              label="Grund"
+              value={cancelReason}
+              onChange={(event) => setCancelReason(event.target.value)}
+              placeholder="Mindestens 3 Zeichen"
+            />
+          </div>
+        }
+        confirmDisabled={cancelReason.trim().length < 3 || cancelBusy}
+        confirmLabel={cancelBusy ? "Wird storniert …" : "Stornieren"}
+        danger
+        onCancel={() => {
+          if (cancelBusy) return;
+          setCancelDialogOpen(false);
+          setCancelReason("");
+        }}
+        onConfirm={() => void cancelLastSale()}
+      />
     </Shell>
   );
 }

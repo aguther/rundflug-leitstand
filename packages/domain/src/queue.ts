@@ -114,7 +114,7 @@ export function planNextRotations(input: {
 
 export function assertQueueMutationAllowed(input: {
   rotationState: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
-  action: "CANCEL" | "REBOOK" | "DEFER" | "NO_SHOW";
+  action: "CANCEL" | "DEFER" | "NO_SHOW";
 }): void {
   if (
     input.rotationState === "IN_FLIGHT" ||

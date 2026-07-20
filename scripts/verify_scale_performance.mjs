@@ -85,8 +85,8 @@ SELECT printf('perf-rotation-%03d', value), 'perf-current', printf('perf-flight-
 
 WITH RECURSIVE n(value) AS (SELECT 1 UNION ALL SELECT value + 1 FROM n WHERE value < 1000)
 INSERT INTO ticket_groups
-  (id, operation_day_id, product_id, queue_sequence, standby, status, sold_at, version)
-SELECT printf('perf-ticket-group-%04d', value), 'perf-current', 'perf-product', value, 0, 'QUEUED',
+  (id, operation_day_id, product_id, queue_sequence, communication_number, standby, status, sold_at, version)
+SELECT printf('perf-ticket-group-%04d', value), 'perf-current', 'perf-product', value, value, 0, 'QUEUED',
        datetime('2026-07-14T06:00:00.000Z', printf('+%d seconds', value)), 0 FROM n;
 
 WITH RECURSIVE n(value) AS (SELECT 1 UNION ALL SELECT value + 1 FROM n WHERE value < 1000)
@@ -258,6 +258,38 @@ try {
     throw new Error("Paginierte Historie verarbeitet 1.000 Tickets nicht vollständig.");
   }
 
+  const cashierPageOne = await timedJson(
+    `${base}/api/events/perf-current/tickets/search?status=ACTIVE&limit=50&q=`,
+    { headers: headers(2) },
+  );
+  if (
+    !cashierPageOne.response.ok ||
+    cashierPageOne.body.results.length !== 50 ||
+    !cashierPageOne.body.nextCursor ||
+    cashierPageOne.body.results[0]?.bookingGroupLabel !== "G-1000"
+  ) {
+    throw new Error("Erste cursorbasierte Kassenseite ist im Mengengerüst unvollständig.");
+  }
+  const cashierPageTwo = await timedJson(
+    `${base}/api/events/perf-current/tickets/search?status=ACTIVE&limit=50&q=&cursor=${encodeURIComponent(cashierPageOne.body.nextCursor)}`,
+    { headers: headers(2) },
+  );
+  const firstPageIds = new Set(cashierPageOne.body.results.map((entry) => entry.ticketGroupId));
+  if (
+    !cashierPageTwo.response.ok ||
+    cashierPageTwo.body.results.length !== 50 ||
+    cashierPageTwo.body.results.some((entry) => firstPageIds.has(entry.ticketGroupId))
+  ) {
+    throw new Error("Zweite cursorbasierte Kassenseite enthält Lücken oder Duplikate.");
+  }
+  const revalidation = await timedJson(
+    `${base}/api/events/perf-current/tickets/search?status=ACTIVE&limit=20&q=&id=perf-ticket-group-1000&id=perf-ticket-group-0951`,
+    { headers: headers(2) },
+  );
+  if (!revalidation.response.ok || revalidation.body.results.length !== 2) {
+    throw new Error("Gezielte Revalidierung sichtbarer Kassenzeilen ist unvollständig.");
+  }
+
   const forecastSignal = waitForForecast(sockets[0]);
   const command = {
     commandId: randomUUID(),
@@ -290,6 +322,9 @@ try {
     initialOperationsUnderTwoSeconds: initial.elapsedMs < 2_000,
     parallelDeviceP95UnderTwoSeconds: percentile95(parallelTimes) < 2_000,
     historyUnderTwoSeconds: history.elapsedMs < 2_000,
+    cashierPaginationUnderTwoSeconds:
+      cashierPageOne.elapsedMs < 2_000 && cashierPageTwo.elapsedMs < 2_000,
+    cashierRevalidationUnderTwoSeconds: revalidation.elapsedMs < 2_000,
     saleUnderTwoSeconds: sale.elapsedMs < 2_000,
     forecastFor300RotationsUnderTwoSeconds: forecastElapsedMs < 2_000,
   };
@@ -302,7 +337,7 @@ try {
   console.log(
     JSON.stringify({
       ok: true,
-      requirements: ["Q-PER-010-server", "Q-PER-020", "Q-PER-030"],
+      requirements: ["Q-PER-010-server", "Q-PER-020", "Q-PER-030", "V16-KAS-030"],
       dataset: {
         connectedDevices: 20,
         tickets: 1000,
@@ -314,6 +349,9 @@ try {
         operations: Math.round(initial.elapsedMs),
         parallelDeviceP95: Math.round(percentile95(parallelTimes)),
         operationalHistory: Math.round(history.elapsedMs),
+        cashierPageOne: Math.round(cashierPageOne.elapsedMs),
+        cashierPageTwo: Math.round(cashierPageTwo.elapsedMs),
+        cashierRevalidation: Math.round(revalidation.elapsedMs),
         standardSale: Math.round(sale.elapsedMs),
         forecastFor300Rotations: Math.round(forecastElapsedMs),
       },

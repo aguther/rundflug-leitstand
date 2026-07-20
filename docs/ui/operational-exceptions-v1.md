@@ -1,6 +1,7 @@
 # Bedienkonzept operative Sonderfälle V1
 
-Status: **fachlich und visuell freigegeben am 14. Juli 2026**
+Status: **für die Kassenaufteilung durch das freigegebene Kassenkonzept 1.6.0 ersetzt**. Die übrigen
+Flight-Line- und Historienfestlegungen gelten fort.
 
 Betroffene Anforderungen: F-SLT-020, F-SLT-040, F-SLT-050, F-SLT-060, F-BRD-080,
 F-BRD-085, Q-UX-010, Q-UX-020, Q-UX-030 und Q-UX-040.
@@ -32,14 +33,14 @@ Mengenzähler ein kompakter Hinweis.
 │  4 Plätzen. Vorgesehen: 4 + 3 in zwei aufeinanderfolgenden │
 │  Fluggruppen.                                              │
 │                                                            │
-│  [ Aufteilung verstanden ]                                 │
-│                                     [ 7 Tickets erstellen ]│
+│                                     [ 7 Tickets verkaufen ]│
 └────────────────────────────────────────────────────────────┘
 ```
 
-- Die Aktion bleibt bis zur einmaligen Bestätigung deaktiviert und nennt sichtbar den Grund.
-- Es gibt keinen modalen Dialog. Die Bestätigung gehört zum Verkaufskontext und wird mit dem
-  bestehenden Verkaufskommando atomar übertragen.
+- Der Hinweis ist passiv und dauerhaft in einer geometrisch reservierten Fläche sichtbar. Es gibt
+  weder Checkbox noch zusätzlichen Bestätigungsdialog.
+- Der bewusste Klick auf „Tickets verkaufen“ übernimmt die sichtbare Aufteilung zusammen mit dem
+  bestehenden Verkaufskommando atomar.
 - Die gemeinsam verkaufte Buchungsgruppe bleibt erhalten. Die beiden Fluggruppen werden unmittelbar
   aufeinanderfolgend angelegt und in Kasse sowie Flight Line mit „gemeinsame Gruppe 1/2“ und „2/2“
   gekennzeichnet.

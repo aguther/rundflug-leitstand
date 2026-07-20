@@ -13,8 +13,9 @@ aus F-HIS-010:
 - Gate und Umlauf als zusätzliche operative Bezüge.
 
 Die Antwort ist mit `limit` und `offset` paginiert und enthält eine Gesamtzahl. Auch gelöste
-Ticket-Umlauf-Zuordnungen bleiben sichtbar, damit Storno und Umbuchung die Historie nicht
-überschreiben. Filterwerte werden ausschließlich als gebundene D1-Parameter verarbeitet.
+Ticket-Umlauf-Zuordnungen bleiben sichtbar, damit Storno sowie historische Umbuchungsereignisse die
+Historie nicht überschreiben. Neue Korrekturen erfolgen durch Storno und Neuverkauf. Filterwerte
+werden ausschließlich als gebundene D1-Parameter verarbeitet.
 
 Zugriff erhalten Administration, Flight-Line-Leitung und Flugleitung. Kassen-Geräte werden mit
 `403` abgewiesen. Umgekehrte Zeiträume, unbekannte Statuswerte und andere ungültige Filter werden
@@ -22,7 +23,8 @@ mit `400` abgewiesen.
 
 `npm run test:ticket-corrections` verifiziert mit synthetischen Daten:
 
-- Storno und Umbuchung einschließlich freigegebener historischer Zuordnungen,
+- Storno und Neuverkauf einschließlich freigegebener historischer Zuordnungen sowie Lesbarkeit
+  vorhandener Umbuchungsereignisse,
 - Filterung nach Produkt, Ressourcengruppe, Fluggruppe, Status und Ticketgruppe,
 - Pagination und Gesamtzahl,
 - Rollenprüfung und Zeitbereichsvalidierung sowie

@@ -1,0 +1,32 @@
+version: 1.6.0
+requirements:
+  - id: V16-REL-010
+    requirement: Repository und Laufzeit verwenden konsistent Release 1.6.0.
+    status: implemented
+  - id: V16-KAS-010
+    requirement: Produktbezogene idempotente Verkaufsaktion an stabiler Position.
+    status: implemented
+  - id: V16-KAS-015
+    requirement: Vollständig bedienbare kompakte Produktliste auch bei mehr als zwei Produkten.
+    status: implemented
+  - id: V16-KAS-020
+    requirement: Dauerhaft reservierte Hinweisfläche ohne Layoutsprung.
+    status: implemented
+  - id: V16-KAS-030
+    requirement: Aktuelle cursorbasierte Kassenliste mit gezielter Revalidierung.
+    status: implemented
+  - id: V16-KAS-040
+    requirement: Zuverlässiger auditierter Storno mit unmittelbarer Kapazitätsfreigabe.
+    status: implemented
+  - id: V16-KAS-050
+    requirement: Keine neue Umbuchung; Korrektur durch Storno und Neuverkauf.
+    status: implemented
+  - id: V16-TKT-010
+    requirement: Gemeinsames lesbares 58-mm-Dokument für Vorschau und Druck.
+    status: implemented
+  - id: V16-TKT-020
+    requirement: Druck nur bei vollständigen Daten; Verkauf bleibt unabhängig gültig.
+    status: implemented
+  - id: V16-UI-010
+    requirement: Verbindliches Kassenkonzept für Release 1.6.0.
+    status: implemented

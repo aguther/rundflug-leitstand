@@ -8,6 +8,7 @@ export interface ConfirmationDialogProps {
   confirmLabel: string;
   cancelLabel?: string;
   danger?: boolean;
+  confirmDisabled?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -19,6 +20,7 @@ export function ConfirmationDialog({
   confirmLabel,
   cancelLabel = "Abbrechen",
   danger = false,
+  confirmDisabled = false,
   onConfirm,
   onCancel,
 }: ConfirmationDialogProps) {
@@ -42,12 +44,17 @@ export function ConfirmationDialog({
         }}
       >
         <h2>{title}</h2>
-        <p>{body}</p>
+        <div className="ds-confirm-body">{body}</div>
         <div className="ds-confirm-actions">
           <Button type="button" variant="secondary" onClick={onCancel}>
             {cancelLabel}
           </Button>
-          <Button type="submit" variant={danger ? "danger" : "primary"} autoFocus>
+          <Button
+            type="submit"
+            variant={danger ? "danger" : "primary"}
+            disabled={confirmDisabled}
+            autoFocus={!confirmDisabled}
+          >
             {confirmLabel}
           </Button>
         </div>

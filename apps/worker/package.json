@@ -1,6 +1,6 @@
 {
   "name": "@rundflug/worker",
-  "version": "0.1.0",
+  "version": "1.6.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -9,9 +9,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@rundflug/config": "0.1.0",
-    "@rundflug/contracts": "0.1.0",
-    "@rundflug/domain": "0.1.0",
+    "@rundflug/config": "1.6.0",
+    "@rundflug/contracts": "1.6.0",
+    "@rundflug/domain": "1.6.0",
     "hono": "4.12.29",
     "zod": "4.4.3"
   }

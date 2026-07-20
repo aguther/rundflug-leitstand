@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import initialMigration from "../migrations/0001_initial.sql?raw";
+import dailyReport from "./daily-report.ts?raw";
 import coordinator from "./event-coordinator.ts?raw";
 
 const requiredAuditEvents = [
   "TICKET_GROUP_SOLD",
   "TICKET_GROUP_CANCELED",
-  "TICKET_GROUP_REBOOKED",
   "FLIGHT_GROUP_CALLED",
   "TICKET_CHECKED_IN",
   "ROTATION_STARTED",
@@ -33,6 +33,11 @@ describe("append-only operational audit coverage", () => {
   it("keeps every F-HIS-020 minimum event in the command coordinator", () => {
     for (const eventType of requiredAuditEvents) expect(coordinator).toContain(eventType);
     expect(coordinator).toContain("pilotChanged");
+  });
+
+  it("keeps historical rebooking events readable after V16-KAS-050 removed new rebooking", () => {
+    expect(coordinator).not.toContain("REBOOK_TICKET_GROUP");
+    expect(dailyReport).toContain("TICKET_GROUP_REBOOKED");
   });
 
   it("prevents updates and deletes at the D1 source of truth", () => {
