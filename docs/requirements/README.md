@@ -9,6 +9,8 @@
 - `requirements-v1.6.0.md` und `.yaml` beschreiben den zum Applikationsrelease `1.6.0` gehörenden
   Kassen- und Druckumfang. Die vollständige Releaseversion ist für Anwendung, Requirements,
   Traceability und UI-Referenzen identisch.
+- `requirements-v1.6.1.md` und `.yaml` ergänzen die kompatible Renderingkorrektur für iPad und
+  Desktop. Sie sind die aktuelle Releasefassung und übernehmen im Übrigen V1.6.0 unverändert.
 - `traceability.csv` verbindet Anforderungen später mit Issues, Modulen und Tests.
 - `open-questions.md` enthält noch zu entscheidende Fachfragen.
 

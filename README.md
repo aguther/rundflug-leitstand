@@ -1,6 +1,6 @@
 # Rundflug-Leitstand
 
-Aktueller Applikations- und Anforderungsstand: **1.6.0**.
+Aktueller Applikations- und Anforderungsstand: **1.6.1**.
 
 In Entwicklung befindliche V1 eines webbasierten Operations-Management-Systems zur Organisation
 von Rundflügen auf Flugplatzfesten und Fly-Ins. Der aktuelle Stand läuft als nicht produktive
