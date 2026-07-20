@@ -1,5 +1,7 @@
 # Rundflug-Leitstand
 
+Aktueller Applikations- und Anforderungsstand: **1.6.0**.
+
 In Entwicklung befindliche V1 eines webbasierten Operations-Management-Systems zur Organisation
 von Rundflügen auf Flugplatzfesten und Fly-Ins. Der aktuelle Stand läuft als nicht produktive
 Cloudflare-Abnahmeumgebung; die Produktivfreigabe erfolgt erst nach vollständiger V1-Abnahme.
@@ -9,6 +11,9 @@ React-PWA, Cloudflare Worker, D1-/Durable-Object-Kommandoverarbeitung, R2-Sicher
 Qualitätsprüfungen. Kasse, Flight Line, Administration, öffentliche Monitore, anonymer QR-Status,
 Web-Push, Offline-Überbrückung und Betriebsberichte sind als V1-Bausteine vorhanden; noch offene
 Abnahmepunkte sind in `docs/requirements/traceability.csv` sichtbar.
+
+Die Root-Version in `package.json` ist die gemeinsame Source of Truth für Anwendung, Pakete,
+Laufzeitmetadaten und die aktuelle Requirements-/Traceability-Fassung.
 
 ## Zielarchitektur
 

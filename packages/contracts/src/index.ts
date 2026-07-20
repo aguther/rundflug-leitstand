@@ -208,15 +208,6 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
     }),
   }),
   commandBaseSchema.extend({
-    type: z.literal("REBOOK_TICKET_GROUP"),
-    payload: z.object({
-      ticketGroupId: z.string().min(1).max(100),
-      newProductId: z.string().min(1).max(100),
-      reason: z.string().trim().min(3).max(240),
-      adminPin: z.string().min(4).max(32),
-    }),
-  }),
-  commandBaseSchema.extend({
     type: z.literal("MOVE_TICKET_GROUP"),
     payload: z.object({
       ticketGroupId: z.string().min(1).max(100),
@@ -736,14 +727,44 @@ export const adminDeviceRecoverySchema = z.object({
 });
 export type AdminDeviceRecovery = z.infer<typeof adminDeviceRecoverySchema>;
 
+export const ticketGroupOperationalStatusSchema = z.enum([
+  "QUEUED",
+  "PRESENT",
+  "CALLED",
+  "BOARDING",
+  "IN_FLIGHT",
+  "LANDED",
+  "COMPLETED",
+  "NO_SHOW",
+  "CANCELED",
+  "CLARIFICATION",
+  "MISSING",
+]);
+export type TicketGroupOperationalStatus = z.infer<typeof ticketGroupOperationalStatusSchema>;
+
+export const ticketSearchRequestSchema = z
+  .object({
+    q: z.string().trim().max(200).default(""),
+    status: z.enum(["ACTIVE", "CANCELED"]).default("ACTIVE"),
+    limit: z.number().int().min(1).max(50).default(20),
+    cursor: z.string().min(1).max(500).optional(),
+    ticketGroupIds: z.array(z.string().min(1).max(100)).max(50).default([]),
+  })
+  .refine((value) => value.ticketGroupIds.length === 0 || !value.cursor, {
+    message: "ID-Revalidierung und Cursor können nicht kombiniert werden.",
+  });
+export type TicketSearchRequest = z.infer<typeof ticketSearchRequestSchema>;
+
 export const ticketSearchResultSchema = z.object({
   ticketGroupId: z.string(),
   productId: z.string(),
   productCode: z.string(),
   productName: z.string(),
-  groupStatus: z.string(),
+  groupStatus: ticketGroupOperationalStatusSchema,
   groupSize: z.number().int().positive(),
   queueSequence: z.number().int().positive(),
+  bookingGroupNumber: z.number().int().positive(),
+  bookingGroupLabel: z.string(),
   standby: z.boolean(),
   soldAt: z.string(),
   communicationNumber: z.number().int().positive().nullable(),
@@ -754,7 +775,8 @@ export const ticketSearchResultSchema = z.object({
   rotationStatuses: z.array(z.string()),
 });
 export const ticketSearchResponseSchema = z.object({
-  results: z.array(ticketSearchResultSchema).max(20),
+  results: z.array(ticketSearchResultSchema).max(50),
+  nextCursor: z.string().nullable(),
 });
 export type TicketSearchResult = z.infer<typeof ticketSearchResultSchema>;
 export type TicketSearchResponse = z.infer<typeof ticketSearchResponseSchema>;

@@ -109,7 +109,8 @@ Die ausführliche Zuordnung steht in `docs/architecture/ticket-states-v1.md`. We
 - `CALLED`, `IN_FLIGHT`, `LANDED` und `COMPLETED` folgen dem bestätigten Umlauf;
 - Rückstellung reiht die vollständige Gruppe erneut ein oder führt nach der konfigurierten Grenze
   zu `CLARIFICATION`;
-- Storno, Umbuchung, Rückstellung und No-Show sind ab `IN_FLIGHT` unzulässig;
+- Storno, Rückstellung und No-Show sind ab `IN_FLIGHT` unzulässig; neue Umbuchungen existieren nicht,
+  Korrekturen erfolgen durch Storno und Neuverkauf;
 - Korrekturen erzeugen neue Ereignisse; bestehende Audit-Einträge werden nicht verändert.
 
 ### 3.6 Papier-Nacherfassung

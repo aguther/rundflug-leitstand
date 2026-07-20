@@ -184,3 +184,10 @@ Bestehende Produkte übernehmen als sicheren Migrationsstart ihre bisherige Refe
 Produkte erhalten ohne abweichende Eingabe 20 Minuten. Vor Anwendung ist eine portable D1-Sicherung
 erforderlich; ein Rollback erfolgt per D1 Time Travel oder Wiederherstellung dieser Sicherung, da D1
 die additive Spalte nicht einzeln zurückbauen kann.
+
+## 0037 – Cursorbasierte Kassenliste
+
+Ergänzt ausschließlich einen Index über Veranstaltung, Verkaufszeit und technische ID. Vor
+Anwendung wird eine portable D1-Sicherung erzeugt. Ein Rollback kann den Index
+`idx_ticket_groups_cashier_list` gefahrlos entfernen; operative Daten und Auditereignisse werden
+dabei nicht verändert.

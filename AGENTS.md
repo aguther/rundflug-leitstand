@@ -2,18 +2,19 @@
 
 ## Mission
 
-Implementiere die Ausbaustufe V1 des Rundflug-Leitstands gemäß
-`docs/requirements/requirements-v1.4.md`. Das System ist kein einfaches Ticketing, sondern koordiniert
+Implementiere die Ausbaustufe V1 des Rundflug-Leitstands gemäß Release
+`docs/requirements/requirements-v1.6.0.md`. Das System ist kein einfaches Ticketing, sondern koordiniert
 Verkauf, Ressourcengruppen-Queues, Flight-Line-Ereignisse, Prognosen, öffentliche Statusanzeigen und
 Auditierung.
 
 ## Quellen der Wahrheit
 
-1. `docs/requirements/requirements-v1.4.md`
-2. `docs/requirements/requirements-v1.4.yaml`
-3. freigegebene ADRs in `docs/adr/`
-4. automatisierte Tests
-5. diese `AGENTS.md`
+1. `docs/requirements/requirements-v1.6.0.md`
+2. `docs/requirements/requirements-v1.6.0.yaml`
+3. die fortgeltenden Basiskataloge V1.4 und V1.5 in `docs/requirements/`
+4. freigegebene ADRs in `docs/adr/`
+5. automatisierte Tests
+6. diese `AGENTS.md`
 
 Binäre PDF-/DOCX-Dateien dienen als unveränderte Referenz. Ändere keine Anforderung stillschweigend.
 Dokumentiere Unklarheiten in `docs/requirements/open-questions.md`.
@@ -27,7 +28,8 @@ Dokumentiere Unklarheiten in `docs/requirements/open-questions.md`.
   keine dauerhafte Flugzeugbindung.
 - Die konkrete Flugzeugzuordnung bleibt bis zur operativen Bestätigung flexibel.
 - Ein Ticket darf höchstens einem nicht abgeschlossenen Umlauf zugeordnet sein.
-- Gruppen werden niemals automatisch getrennt.
+- Gruppen werden niemals automatisch getrennt. Eine beim Verkauf sichtbar ausgewiesene Aufteilung
+  entsteht nur durch die bewusste Verkaufsaktion; die Buchungsgruppe bleibt dabei verbunden.
 - Nach `NEXT` beziehungsweise Aufruf erfolgt keine automatische Umbesetzung. Das System darf nur einen
   Vorschlag zur menschlichen Bestätigung machen.
 - Ist-Ereignisse treiben die Prognose. Planzeit, Prognosezeit und Ist-Zeit bleiben getrennt.

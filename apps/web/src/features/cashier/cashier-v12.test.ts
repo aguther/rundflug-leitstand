@@ -4,10 +4,12 @@ import appSource from "../../cashier-view.tsx?raw";
 
 const stylesSource = readFileSync(new URL("./cashier-v12.css", import.meta.url), "utf8");
 
-describe("V1.2 cashier", () => {
+describe("V1.6.0 cashier", () => {
   it("uses the authenticated cashier session without another PIN prompt", () => {
     expect(appSource).toContain('className="cashier-shell"');
     expect(appSource).not.toContain("Administrator-PIN für Storno/Umbuchung");
+    expect(appSource).not.toContain("REBOOK_TICKET_GROUP");
+    expect(appSource).not.toContain(">Umbuchen<");
     expect(appSource).toContain('adminPin: "SESSION"');
   });
 
@@ -24,7 +26,25 @@ describe("V1.2 cashier", () => {
   it("keeps correction actions compact instead of stretching them into implicit grid rows", () => {
     expect(stylesSource).toMatch(/\.cashier-ticket-detail\s*\{[^}]*display:\s*flex;/s);
     expect(stylesSource).toContain("flex: 1 1 auto");
-    expect(stylesSource).toContain("grid-template-columns: 0.75fr 1fr 1.35fr");
+    expect(stylesSource).toContain("grid-template-columns: 0.85fr 1.4fr");
+  });
+
+  it("keeps product guidance and the product sale action geometrically stable", () => {
+    expect(appSource).toContain("cashier-product-guidance");
+    expect(appSource).toContain("Passt in einen Umlauf");
+    expect(appSource).toContain("Aufteilung erforderlich");
+    expect(appSource).not.toContain("Aufteilung verstanden");
+    expect(appSource).toContain("onClick={() => void sell(entry)}");
+    expect(stylesSource).toContain("grid-template-rows: auto 4.75rem 56px");
+    expect(stylesSource).toContain("block-size: 4.75rem");
+  });
+
+  it("renders one shared ticket component for preview and every print page", () => {
+    expect(appSource).toContain("function TicketPaper");
+    expect(appSource).toContain('className="ticket-print-document"');
+    expect(appSource).toContain("images.length !== receipt.length");
+    expect(stylesSource).toContain("break-after: page");
+    expect(stylesSource).toContain("width: 44mm");
   });
 
   it("falls back to natural document flow on tablet-sized stacked layouts", () => {

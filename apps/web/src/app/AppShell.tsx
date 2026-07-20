@@ -1,3 +1,4 @@
+import { APP_VERSION } from "@rundflug/config";
 import { useConnectivity } from "../shared/hooks/use-connectivity";
 import { AppHeader } from "./AppHeader";
 
@@ -25,7 +26,9 @@ export function AppShell({
       ) : null}
       {children}
       {!kiosk ? (
-        <footer>Keine flugbetriebliche oder sicherheitsrelevante Freigabewirkung.</footer>
+        <footer>
+          Keine flugbetriebliche oder sicherheitsrelevante Freigabewirkung. · Version {APP_VERSION}
+        </footer>
       ) : null}
     </main>
   );

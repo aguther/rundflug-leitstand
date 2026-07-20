@@ -1,7 +1,7 @@
 # Priorisierter V1-Backlog
 
 Die Pakete sind in Abhängigkeitsreihenfolge priorisiert und liefern jeweils ein sichtbares,
-überprüfbares Ergebnis. Die vollständige Einzelzuordnung aller 177 V1-Anforderungen steht in
+überprüfbares Ergebnis. Die vollständige Einzelzuordnung aller 185 V1-Anforderungen steht in
 `docs/requirements/traceability.csv`; die folgenden ID-Listen benennen die fachlichen Schwerpunkte.
 Offene Fragen werden nicht als Annahmen entschieden.
 
@@ -10,10 +10,10 @@ Offene Fragen werden nicht als Annahmen entschieden.
 **Ziel/Ergebnis:** Formal und fachlich prüfbarer V1-Katalog mit Risikoregister, höchstens zwölf
 blockierenden Fragen und durchgängiger Zuordnung zu Paketen und Tests.
 
-- **Anforderungen:** alle 177 V1-IDs; besonders Q-WAR-050, T-080.
+- **Anforderungen:** alle 185 V1-IDs; besonders Q-WAR-050, T-080.
 - **Abhängigkeiten:** keine.
 - **Blocker:** keine; verwaltet OQ-01 bis OQ-12.
-- **Akzeptanz:** 199 eindeutige YAML-/CSV-IDs; alle 158 V1-MUSS-IDs besitzen Paket und Testnachweis;
+- **Akzeptanz:** 207 eindeutige YAML-/CSV-IDs; alle 166 V1-MUSS-IDs besitzen Paket und Testnachweis;
   `npm run requirements:verify` ist erfolgreich.
 
 ## BP-02 – Geräteidentität, Rollen und auditierte Kommandoannahme
@@ -54,14 +54,15 @@ ABGESCHLOSSEN`; operative und öffentliche Ansicht aktualisieren sich live.
   F-PRG-010, F-PRG-020, F-BEN-010, Q-UX-010, Q-UX-020, Q-UX-040, Q-UX-050,
   Q-UX-060, Q-PER-010, Q-SIC-030.
 - **Abhängigkeiten:** BP-02, BP-03.
-- **Blocker:** OQ-02, OQ-09, OQ-10; Offline, Push, No-Show, Umbuchung und komplexe Optimierung folgen.
+- **Blocker:** OQ-02, OQ-09, OQ-10; Offline, Push, No-Show, Korrektur durch Storno/Neuverkauf und
+  komplexe Optimierung folgen.
 - **Akzeptanz:** Verkauf unter sechs Interaktionen; vier Primäraktionen; `GELANDET` gibt das Flugzeug
   nicht frei; Plan/Prognose/Ist bleiben getrennt; Doppel-Tipps und stale writes erzeugen keine Dublette.
 
 ## BP-05 – Queue, Fluggruppenbildung, Gruppenschutz und Sonderfälle
 
 **Ziel/Ergebnis:** Gemeinsame Ressourcengruppen-Queue disponiert mehrere Produkte nach
-Verkaufsreihenfolge; Gruppen, No-Show, Nachbesetzung, Zurückstellung, Storno und Umbuchung bleiben
+Verkaufsreihenfolge; Gruppen, No-Show, Nachbesetzung, Zurückstellung sowie Storno/Neuverkauf bleiben
 explizit und auditiert.
 
 - **Anforderungen:** F-KAS-070, F-KAS-080, F-SLT-020, F-SLT-050 bis F-SLT-120, F-BRD-025,

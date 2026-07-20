@@ -14,6 +14,7 @@ import {
   rotationOperationalSummarySchema,
   stageOutageRecoveryRequestSchema,
   ticketGroupPrintDataSchema,
+  ticketSearchRequestSchema,
   ticketSearchResponseSchema,
   updateOperatorAccountSchema,
 } from "./index";
@@ -816,9 +817,11 @@ describe("commandEnvelopeSchema", () => {
           productId: "synthetic-product",
           productCode: "PAN20",
           productName: "Panorama",
-          groupStatus: "WAITING",
+          groupStatus: "QUEUED",
           groupSize: 2,
           queueSequence: 4,
+          bookingGroupNumber: 104,
+          bookingGroupLabel: "G-0104",
           standby: false,
           soldAt: "2026-07-11T12:00:00.000Z",
           communicationNumber: 42,
@@ -829,6 +832,7 @@ describe("commandEnvelopeSchema", () => {
           rotationStatuses: ["DRAFT"],
         },
       ],
+      nextCursor: "synthetic-cursor",
     });
     expect(parsed.results).toHaveLength(1);
     const result = parsed.results[0];
@@ -836,6 +840,31 @@ describe("commandEnvelopeSchema", () => {
     if (!result) throw new Error("Synthetischer Suchtreffer fehlt.");
     expect("publicCode" in result).toBe(false);
     expect("guestName" in result).toBe(false);
+  });
+
+  it("validates cursor pagination and rejects the removed rebooking command", () => {
+    expect(
+      ticketSearchRequestSchema.parse({ q: "G-0104", status: "ACTIVE", limit: 50 }),
+    ).toMatchObject({ q: "G-0104", status: "ACTIVE", limit: 50 });
+    expect(() =>
+      ticketSearchRequestSchema.parse({ cursor: "cursor", ticketGroupIds: ["group-1"] }),
+    ).toThrow();
+    expect(() =>
+      commandEnvelopeSchema.parse({
+        commandId: "750fa7d8-234b-4a8b-bd4a-91b1294c78b3",
+        eventId: "synthetic-event",
+        deviceId: "cashier-1",
+        expectedVersion: 3,
+        issuedAt: "2026-07-20T12:00:00.000Z",
+        type: "REBOOK_TICKET_GROUP",
+        payload: {
+          ticketGroupId: "group-1",
+          newProductId: "product-2",
+          reason: "Nicht mehr zulässig",
+          adminPin: "SESSION",
+        },
+      }),
+    ).toThrow();
   });
 
   it("validates an auditable event lifecycle command", () => {

@@ -4481,6 +4481,15 @@ p {
   body * {
     visibility: hidden;
   }
+  .ticket-print-document,
+  .ticket-print-document * {
+    visibility: visible;
+  }
+  .ticket-print-document {
+    position: absolute;
+    inset: 0;
+    width: 52mm;
+  }
   .ticket-preview,
   .ticket-preview * {
     visibility: visible;

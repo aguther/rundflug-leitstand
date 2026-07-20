@@ -9,7 +9,8 @@ wieder verfügbaren Rundflug.
 
 Vor Beginn:
 - Lies AGENTS.md.
-- Ermittle aus requirements-v1.4.yaml die konkreten Anforderungs-IDs.
+- Ermittle aus `requirements-v1.6.0.yaml` und den fortgeltenden Basiskatalogen die konkreten
+  Anforderungs-IDs.
 - Aktualisiere traceability.csv.
 - Stelle blockierende Fachfragen, bevor du Annahmen über Statusübergänge triffst.
 

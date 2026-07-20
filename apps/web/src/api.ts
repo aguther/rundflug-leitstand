@@ -26,6 +26,7 @@ import {
   publicBoardSchema,
   publicTicketStatusSchema,
   type TicketGroupPrintData,
+  type TicketSearchRequest,
   type TicketSearchResponse,
   ticketGroupPrintDataSchema,
   ticketSearchResponseSchema,
@@ -228,12 +229,18 @@ export async function searchTickets(
   eventId: string,
   deviceId: string,
   deviceToken: string,
-  query: string,
+  input: string | Partial<TicketSearchRequest>,
 ): Promise<TicketSearchResponse> {
-  const response = await apiFetch(
-    controlApiPath(eventId, `/tickets/search?q=${encodeURIComponent(query)}`),
-    { headers: deviceHeaders(deviceId, deviceToken) },
-  );
+  const options = typeof input === "string" ? { q: input } : input;
+  const params = new URLSearchParams();
+  params.set("q", options.q ?? "");
+  params.set("status", options.status ?? "ACTIVE");
+  params.set("limit", String(options.limit ?? 20));
+  if (options.cursor) params.set("cursor", options.cursor);
+  for (const ticketGroupId of options.ticketGroupIds ?? []) params.append("id", ticketGroupId);
+  const response = await apiFetch(controlApiPath(eventId, `/tickets/search?${params.toString()}`), {
+    headers: deviceHeaders(deviceId, deviceToken),
+  });
   if (!response.ok) throw new Error("Ticketsuche nicht verfügbar.");
   return ticketSearchResponseSchema.parse(await response.json());
 }
@@ -501,6 +508,7 @@ export const downloadPerformanceProfile = (
 export interface HealthResponse {
   ok: boolean;
   service: string;
+  applicationVersion: string;
   environment: string;
   requirementsVersion: string;
   timestamp: string;
