@@ -2,3 +2,8 @@ ID,Modul,Tests,Status
 V161-REL-010,packages/config und scripts/verify_requirements.py,Requirements- und Versionsverifikation,umgesetzt
 V161-UI-010,apps/web/src/cashier-view.tsx und cashier-v12.css,Komponententest und Browserabnahme bei 1194×679 sowie Tablet-Portrait,umgesetzt
 V161-UI-020,apps/web/src/features/cashier/cashier-v12.css,Komponententest und Browserabnahme mit gefüllter und leerer Ticketliste,umgesetzt
+V161-UI-030,apps/web/src/app/AppShell.tsx und AppHeader.tsx,apps/web/src/app/navigation.test.ts und Browserabnahme,umgesetzt
+V161-FL-010,apps/web/src/flight-line-supervisor.tsx und flight-line-v12.css sowie apps/worker/migrations/0038_aircraft_state_changed_at.sql,Contract-/Migration-/UI-Tests und Browserabnahme Desktop/iPad,umgesetzt
+V161-FL-020,apps/web/src/flight-line-supervisor.tsx und design-system/components/ModalDialog.tsx,Flight-Line- und Designsystemtests sowie Fokusabnahme,umgesetzt
+V161-FL-030,packages/contracts und packages/domain sowie apps/worker/src/event-coordinator.ts,Contract-/Rollen-/Worker-Tests und test:pilot-conflict,umgesetzt
+V161-FL-040,packages/domain/src/index.ts und apps/web/src/flight-line-supervisor.tsx,Domain- und Flight-Line-UI-Tests sowie Browserablauf,umgesetzt

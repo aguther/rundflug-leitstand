@@ -8,6 +8,20 @@ export type AircraftOperationalState =
   | "PAUSED"
   | "INACTIVE";
 
+export type AircraftDisplayState = AircraftOperationalState | "INTERRUPTED";
+
+export const aircraftOperationalStateLabels: Readonly<Record<AircraftDisplayState, string>> = {
+  AVAILABLE: "Verfügbar",
+  BOARDING: "Boarding",
+  IN_FLIGHT: "Im Flug",
+  LANDED: "Gelandet",
+  TURNAROUND: "Turnaround",
+  REFUELING: "Tanken",
+  PAUSED: "Pause",
+  INTERRUPTED: "Nicht verfügbar",
+  INACTIVE: "Nicht verfügbar",
+};
+
 export class DomainRuleError extends Error {
   readonly code: string;
 
@@ -109,6 +123,15 @@ export function assertTicketNoShowAllowed(input: {
 
 export type RotationState = "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED" | "CANCELED";
 
+export const rotationStateLabels: Readonly<Record<RotationState, string>> = {
+  DRAFT: "Wartend",
+  CALLED: "Boarding",
+  IN_FLIGHT: "Im Flug",
+  LANDED: "Gelandet",
+  COMPLETED: "Abgeschlossen",
+  CANCELED: "Storniert",
+};
+
 const allowedRotationTransitions: Readonly<Record<RotationState, readonly RotationState[]>> = {
   DRAFT: ["CALLED"],
   CALLED: ["IN_FLIGHT", "DRAFT", "CANCELED"],
@@ -134,6 +157,7 @@ export type OperationalCommandType =
   | "SET_ROTATION_NOTE"
   | "SET_ROTATION_CAPACITY"
   | "SELL_TICKET_GROUP"
+  | "ASSIGN_AIRCRAFT_PILOT"
   | "CALL_NEXT"
   | "MARK_OFF_BLOCK"
   | "MARK_ON_BLOCK"
@@ -181,6 +205,7 @@ const commandRoles: Readonly<Record<OperationalCommandType, readonly DeviceRole[
   SET_ROTATION_NOTE: ["FLIGHT_LINE", "FLIGHT_DIRECTOR", "ADMIN"],
   SET_ROTATION_CAPACITY: ["FLIGHT_LINE", "FLIGHT_DIRECTOR", "ADMIN"],
   SELL_TICKET_GROUP: ["CASHIER", "ADMIN"],
+  ASSIGN_AIRCRAFT_PILOT: ["FLIGHT_DIRECTOR", "ADMIN"],
   CALL_NEXT: ["FLIGHT_LINE", "FLIGHT_DIRECTOR", "ADMIN"],
   MARK_OFF_BLOCK: ["FLIGHT_LINE", "FLIGHT_DIRECTOR", "ADMIN"],
   MARK_ON_BLOCK: ["FLIGHT_LINE", "FLIGHT_DIRECTOR", "ADMIN"],

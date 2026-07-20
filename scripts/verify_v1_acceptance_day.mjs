@@ -200,6 +200,14 @@ try {
           ? "acceptance-aircraft-a1"
           : "acceptance-aircraft-a2";
     const pilotId = `acceptance-pilot-0${(index % 3) + 1}`;
+    const pilotAssigned = await post(
+      envelope("acceptance-admin", version, "ASSIGN_AIRCRAFT_PILOT", {
+        aircraftId,
+        pilotId,
+        reassign: true,
+      }),
+    );
+    version = pilotAssigned.event.version;
     const called = await post(
       envelope("acceptance-flight-line", version, "CALL_NEXT", {
         ticketGroupIds: [rotation.ticketGroupId],
@@ -262,6 +270,7 @@ try {
     auditComplete:
       eventHistoryResponse.ok &&
       counts.TICKET_GROUP_SOLD === 20 &&
+      counts.AIRCRAFT_PILOT_CHANGED === 20 &&
       counts.FLIGHT_GROUP_CALLED === 20 &&
       counts.MARK_OFF_BLOCK === 20 &&
       counts.MARK_ON_BLOCK === 20 &&

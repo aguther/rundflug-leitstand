@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   adminDeviceRecoverySchema,
+  aircraftOperationalSummarySchema,
   bootstrapRequestSchema,
   cloneEventRequestSchema,
   commandEnvelopeSchema,
@@ -20,6 +21,19 @@ import {
 } from "./index";
 
 describe("commandEnvelopeSchema", () => {
+  it("validates an explicit anonymous pilot assignment with reassign confirmation", () => {
+    const command = commandEnvelopeSchema.parse({
+      commandId: "00e971df-23d5-4d28-9107-92b447416299",
+      eventId: "demo-2026",
+      deviceId: "flight-director-1",
+      expectedVersion: 8,
+      issuedAt: "2026-07-20T12:00:00.000Z",
+      type: "ASSIGN_AIRCRAFT_PILOT",
+      payload: { aircraftId: "aircraft-1", pilotId: "pilot-1", reassign: false },
+    });
+    expect(command.type).toBe("ASSIGN_AIRCRAFT_PILOT");
+  });
+
   it("accepts whole booking groups for an atomic multi-group call", () => {
     const command = commandEnvelopeSchema.parse({
       commandId: "00e971df-23d5-4d28-9107-92b447416200",
@@ -1002,6 +1016,34 @@ describe("commandEnvelopeSchema", () => {
     });
     expect(parsed.type).toBe("SET_ROTATION_CAPACITY");
     expect(JSON.stringify(parsed)).not.toMatch(/safe|freigabe|gewicht|zuladung/i);
+  });
+});
+
+describe("aircraftOperationalSummarySchema", () => {
+  const aircraft = {
+    id: "aircraft-1",
+    registration: "D-TEST",
+    aircraftType: "SYNTHETIC",
+    passengerSeats: 4,
+    maximumPassengerPayloadKg: null,
+    operationalState: "AVAILABLE",
+    operationalStateChangedAt: "2026-07-20T12:00:00.000Z",
+    resourceGroupId: "rg-1",
+    resourceGroupName: "Rundflug",
+    refuelPlanned: false,
+    rotationsSinceRefuel: 0,
+    refuelReminderThreshold: 5,
+    expectedReviewAt: null,
+    currentPilotId: null,
+    currentPilotOperationalCode: null,
+  } as const;
+
+  it("requires the persisted operational state transition timestamp", () => {
+    expect(aircraftOperationalSummarySchema.parse(aircraft).operationalStateChangedAt).toBe(
+      aircraft.operationalStateChangedAt,
+    );
+    const { operationalStateChangedAt: _omitted, ...withoutTimestamp } = aircraft;
+    expect(() => aircraftOperationalSummarySchema.parse(withoutTimestamp)).toThrow();
   });
 });
 
