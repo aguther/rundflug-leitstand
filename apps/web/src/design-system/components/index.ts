@@ -8,6 +8,8 @@ export type { FieldProps } from "./Field";
 export { Field, SearchField, SelectField, TextField } from "./Field";
 export type { IconButtonProps } from "./IconButton";
 export { IconButton } from "./IconButton";
+export type { ModalDialogProps } from "./ModalDialog";
+export { ModalDialog } from "./ModalDialog";
 export type { PageHeaderProps } from "./PageHeader";
 export { PageHeader } from "./PageHeader";
 export type { PanelProps } from "./Panel";

@@ -19,6 +19,7 @@ const confirmSource = readFileSync(
   new URL("./components/ConfirmationDialog.tsx", import.meta.url),
   "utf8",
 );
+const modalSource = readFileSync(new URL("./components/ModalDialog.tsx", import.meta.url), "utf8");
 
 describe("shared design-system component library", () => {
   it("loads the central component layers after legacy view styles", () => {
@@ -72,9 +73,15 @@ describe("shared design-system component library", () => {
     expect(stylesSource).toMatch(/@media \(max-width: 760px\) \{\s*\.ds-sidepanel \{/);
   });
 
-  it("ConfirmationDialog auto-focuses its primary action and submits on Enter", () => {
+  it("ConfirmationDialog reuses the focus-managed modal primitive", () => {
     expect(confirmSource).toContain("autoFocus");
-    expect(confirmSource).toContain("onSubmit");
+    expect(confirmSource).toContain("<ModalDialog");
+    expect(modalSource).toContain('event.key === "Escape"');
+    expect(modalSource).toContain('event.key !== "Tab"');
+    expect(modalSource).toContain("previousFocus?.focus()");
+    expect(modalSource).toContain("ds-modal-backdrop-dismiss");
+    expect(stylesSource).toContain(".ds-modal-body");
+    expect(stylesSource).toContain("overflow: auto");
   });
 
   it("stays token-driven and free of gradients, matching the non-tactile surfaces it serves", () => {

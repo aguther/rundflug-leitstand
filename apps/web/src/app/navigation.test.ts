@@ -37,6 +37,13 @@ describe("V1.2 app navigation", () => {
     expect(headerSource).not.toContain('querySelector(".view-switcher")');
   });
 
+  it("moves release information into the header and removes the global footer", () => {
+    expect(headerSource).toContain("Rundflug-Leitstand · Version {APP_VERSION}");
+    expect(headerSource).toContain('className="app-info-menu"');
+    expect(shellSource).not.toContain("<footer>");
+    expect(shellSource).not.toContain("Keine flugbetriebliche");
+  });
+
   it("keeps public ticket status free of internal account navigation", () => {
     expect(ticketStatusSource).toContain("<Shell publicView");
     expect(shellSource).toContain("publicView={publicView}");

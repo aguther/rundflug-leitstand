@@ -4,7 +4,8 @@ Automatisch extrahiert: **207 eindeutige Anforderungen**.
 
 Die Zahlen unten beschreiben den unveränderten Basiskatalog V1.4. Die verbindlichen
 Releasekonkretisierungen für Anwendungsversion 1.6.1 stehen in `requirements-v1.6.1.md` und
-`requirements-v1.6.1.yaml`; sie übernehmen den Funktionsumfang von V1.6.0 unverändert.
+`requirements-v1.6.1.yaml`; sie ergänzen die Kassenkorrektur und Flight-Line-Überarbeitung und
+übernehmen den übrigen Funktionsumfang von V1.6.0 unverändert.
 
 ## Nach Priorität
 
@@ -52,7 +53,7 @@ Releasekonkretisierungen für Anwendungsversion 1.6.1 stehen in `requirements-v1
 - `requirements-v1.4.md`: durchsuchbare Lesefassung des gesamten Lastenhefts.
 - `requirements-v1.4.yaml`: maschinenlesbarer Katalog; bewusst auch valides JSON.
 - `requirements-v1.6.0.md` und `.yaml`: fortgeltender Kassen- und Druckumfang.
-- `requirements-v1.6.1.md` und `.yaml`: aktuelle Renderingkorrekturen zur Anwendungsversion 1.6.1.
+- `requirements-v1.6.1.md` und `.yaml`: aktuelle Kassen- und Flight-Line-Korrekturen zu 1.6.1.
 - `traceability-v1.6.1.csv`: aktuelle Release-Traceability.
 - `traceability.csv`: Zuordnung zu Issues, Modulen, Tests und Umsetzungsstatus.
 - `Lastenheft_Rundflug-Leitstand_v1.4_konsolidiert.pdf`: unveränderte Referenz.

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  aircraftOperationalStateLabels,
   assertGroupIsNotAutomaticallySplit,
   assertPublicTicketCode,
   assertRoleMayExecute,
@@ -7,6 +8,7 @@ import {
   assertSingleActiveResourceGroup,
   assertTicketNoShowAllowed,
   DomainRuleError,
+  rotationStateLabels,
   transitionAircraft,
   transitionRotation,
 } from "./index";
@@ -83,6 +85,14 @@ describe("command authorization", () => {
     expect(() => assertRoleMayExecute("ADMIN", "UPSERT_PILOT")).not.toThrow();
   });
 
+  it("allows only flight direction and administration to assign an aircraft pilot", () => {
+    expect(() => assertRoleMayExecute("FLIGHT_DIRECTOR", "ASSIGN_AIRCRAFT_PILOT")).not.toThrow();
+    expect(() => assertRoleMayExecute("ADMIN", "ASSIGN_AIRCRAFT_PILOT")).not.toThrow();
+    expect(() => assertRoleMayExecute("FLIGHT_LINE", "ASSIGN_AIRCRAFT_PILOT")).toThrowError(
+      /darf ASSIGN_AIRCRAFT_PILOT nicht/,
+    );
+  });
+
   it("protects the refuel reminder threshold as administration", () => {
     expect(() =>
       assertRoleMayExecute("FLIGHT_DIRECTOR", "CONFIGURE_AIRCRAFT_REFUEL_THRESHOLD"),
@@ -106,6 +116,18 @@ describe("command authorization", () => {
     expect(() => assertRoleMayExecute("FLIGHT_DIRECTOR", "CLEAR_EMERGENCY")).toThrowError(
       /darf CLEAR_EMERGENCY nicht/,
     );
+  });
+});
+
+describe("German operational status labels", () => {
+  it("never exposes technical aircraft or rotation states", () => {
+    expect(aircraftOperationalStateLabels.IN_FLIGHT).toBe("Im Flug");
+    expect(aircraftOperationalStateLabels.INTERRUPTED).toBe("Nicht verfügbar");
+    expect(rotationStateLabels.CALLED).toBe("Boarding");
+    expect(rotationStateLabels.COMPLETED).toBe("Abgeschlossen");
+    expect(
+      Object.values({ ...aircraftOperationalStateLabels, ...rotationStateLabels }),
+    ).not.toContain("IN_FLIGHT");
   });
 });
 

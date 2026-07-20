@@ -24,8 +24,10 @@ def backup_tables() -> list[str]:
     return re.findall(r'"([a-z_]+)"', match.group(1))
 
 
-def apply_schema(connection: sqlite3.Connection) -> None:
+def apply_schema(connection: sqlite3.Connection, through: str | None = None) -> None:
     for migration in sorted(MIGRATIONS.glob("[0-9][0-9][0-9][0-9]_*.sql")):
+        if through is not None and migration.name > through:
+            continue
         connection.executescript(migration.read_text(encoding="utf-8"))
 
 
@@ -150,8 +152,58 @@ def restore_backup(connection: sqlite3.Connection, serialized: str, checksum: st
     connection.commit()
 
 
+def verify_aircraft_state_backfill() -> None:
+    connection = sqlite3.connect(":memory:")
+    apply_schema(connection, "0037_cashier_ticket_search.sql")
+    seed_source(connection)
+    connection.execute(
+        "INSERT INTO aircraft (id,registration,aircraft_type,passenger_seats,created_at,updated_at) "
+        "VALUES (?,?,?,?,?,?)",
+        (
+            "fallback-aircraft",
+            "D-FALL",
+            "TEST",
+            2,
+            "2026-07-11T07:00:00.000Z",
+            "2026-07-11T07:30:00.000Z",
+        ),
+    )
+    connection.execute(
+        "INSERT INTO operational_events "
+        "(id,operation_day_id,event_type,occurred_at,device_id,aggregate_type,aggregate_id,aggregate_version,payload_json) "
+        "VALUES (?,?,?,?,?,?,?,?,?)",
+        (
+            "synthetic-offblock",
+            "synthetic-event",
+            "MARK_OFF_BLOCK",
+            "2026-07-11T09:00:00.000Z",
+            "synthetic-admin",
+            "ROTATION",
+            "synthetic-rotation",
+            1,
+            "{}",
+        ),
+    )
+    migration = MIGRATIONS / "0038_aircraft_state_changed_at.sql"
+    connection.executescript(migration.read_text(encoding="utf-8"))
+    event_backfill = connection.execute(
+        "SELECT operational_state_changed_at FROM aircraft WHERE id = ?",
+        ("synthetic-aircraft",),
+    ).fetchone()
+    fallback_backfill = connection.execute(
+        "SELECT operational_state_changed_at FROM aircraft WHERE id = ?",
+        ("fallback-aircraft",),
+    ).fetchone()
+    if event_backfill != ("2026-07-11T09:00:00.000Z",):
+        raise AssertionError("Statuszeitpunkt wurde nicht aus dem jüngsten Umlaufereignis befüllt")
+    if fallback_backfill != ("2026-07-11T07:30:00.000Z",):
+        raise AssertionError("Statuszeitpunkt verwendet updated_at nicht als Fallback")
+    connection.close()
+
+
 def main() -> None:
     started = time.monotonic()
+    verify_aircraft_state_backfill()
     tables = backup_tables()
     source = sqlite3.connect(":memory:")
     target = sqlite3.connect(":memory:")

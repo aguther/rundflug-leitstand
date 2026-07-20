@@ -1,3 +1,4 @@
+import type { OperationBoard } from "@rundflug/contracts";
 import { useEffect, useState } from "react";
 import { ValidationHint } from "./admin-ux";
 import { claimFlightLineAircraft, releaseFlightLineAircraft, sendCommand } from "./api";
@@ -29,11 +30,14 @@ import {
 
 const actionForState = {
   DRAFT: { label: "Belegung bestätigen & Boarding starten", command: "CALL_NEXT" },
-  CALLED: { label: "OFF-BLOCK", command: "MARK_OFF_BLOCK" },
-  IN_FLIGHT: { label: "ON-BLOCK", command: "MARK_ON_BLOCK" },
+  CALLED: { label: "Offblock", command: "MARK_OFF_BLOCK" },
+  IN_FLIGHT: { label: "Onblock", command: "MARK_ON_BLOCK" },
   LANDED: { label: "Umlauf abschließen", command: "COMPLETE_TURNAROUND" },
   COMPLETED: null,
 } as const;
+
+type Rotation = OperationBoard["rotations"][number];
+type Aircraft = OperationBoard["aircraft"][number];
 
 export function FlightLineView() {
   const { board, error, lastConfirmedAt, refresh } = useOperationBoard(FLIGHT_LINE_DEVICE_ID);
@@ -43,7 +47,6 @@ export function FlightLineView() {
   const [queueReason, setQueueReason] = useState("");
   const [emergencyReason, setEmergencyReason] = useState("");
   const [nextAircraftId, setNextAircraftId] = useState("");
-  const [nextPilotId, setNextPilotId] = useState("");
   const [turnaroundNextState, setTurnaroundNextState] = useState<
     "AVAILABLE" | "REFUELING" | "PAUSED" | "INACTIVE"
   >("AVAILABLE");
@@ -102,13 +105,7 @@ export function FlightLineView() {
   useEffect(() => {
     if (selected?.status !== "DRAFT") return;
     setNextAircraftId(selectedAircraft?.id ?? selected.suggestedAircraftId ?? "");
-    setNextPilotId(selected.suggestedPilotId ?? "");
-  }, [
-    selected?.status,
-    selected?.suggestedAircraftId,
-    selected?.suggestedPilotId,
-    selectedAircraft?.id,
-  ]);
+  }, [selected?.status, selected?.suggestedAircraftId, selectedAircraft?.id]);
   useEffect(() => {
     setDispositionCapacity(selected?.usableCapacity ?? 1);
     setMoveTargetId("");
@@ -121,8 +118,13 @@ export function FlightLineView() {
       Date.now() - Date.parse(selected.calledAt) >= board.event.noShowAfterMinutes * 60_000,
   );
 
-  async function advance() {
-    if (!board || !selected || !action) return;
+  async function advance(
+    rotationOverride: Rotation | undefined = selected,
+    aircraftOverride: Aircraft | undefined = selectedAircraft,
+  ) {
+    const selectedRotation = rotationOverride;
+    const selectedAction = selectedRotation ? actionForState[selectedRotation.status] : null;
+    if (!board || !selectedRotation || !selectedAction) return;
     try {
       const commandBase = {
         commandId: crypto.randomUUID(),
@@ -131,7 +133,13 @@ export function FlightLineView() {
         expectedVersion: board.event.version,
         issuedAt: new Date().toISOString(),
       };
-      if (action.command === "CALL_NEXT") {
+      if (selectedAction.command === "CALL_NEXT") {
+        const assignedPilotId = aircraftOverride?.currentPilotId;
+        if (!aircraftOverride?.id || !assignedPilotId) {
+          throw new Error(
+            "Vor Belegung bitte über „Pilot zuweisen“ einen Pilotencode am Flugzeug hinterlegen.",
+          );
+        }
         await sendCommand(
           {
             ...commandBase,
@@ -140,28 +148,35 @@ export function FlightLineView() {
               ticketGroupIds:
                 selectedQueueGroupIds.length > 0
                   ? selectedQueueGroupIds
-                  : selected.bookingGroups.length > 0
-                    ? selected.bookingGroups.map((group) => group.id)
-                    : [selected.ticketGroupId],
-              aircraftId: nextAircraftId,
-              pilotId: nextPilotId,
+                  : selectedRotation.bookingGroups.length > 0
+                    ? selectedRotation.bookingGroups.map((group) => group.id)
+                    : [selectedRotation.ticketGroupId],
+              aircraftId: aircraftOverride.id,
+              pilotId: assignedPilotId,
             },
           },
           deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
         );
       } else {
         await sendCommand(
-          action.command === "COMPLETE_TURNAROUND"
+          selectedAction.command === "COMPLETE_TURNAROUND"
             ? {
                 ...commandBase,
                 type: "COMPLETE_TURNAROUND",
-                payload: { rotationId: selected.id, nextAircraftState: turnaroundNextState },
+                payload: {
+                  rotationId: selectedRotation.id,
+                  nextAircraftState: turnaroundNextState,
+                },
               }
-            : { ...commandBase, type: action.command, payload: { rotationId: selected.id } },
+            : {
+                ...commandBase,
+                type: selectedAction.command,
+                payload: { rotationId: selectedRotation.id },
+              },
           deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
         );
       }
-      setMessage(`${action.label} bestätigt.`);
+      setMessage(`${selectedAction.label} bestätigt.`);
       await refresh();
     } catch (reason) {
       setMessage(reason instanceof Error ? reason.message : "Aktion fehlgeschlagen.");
@@ -234,8 +249,9 @@ export function FlightLineView() {
   async function setFlightLineAircraftState(
     state: "AVAILABLE" | "REFUELING" | "PAUSED" | "INTERRUPTED" | "INACTIVE",
     expectedReviewAt: string | null = null,
+    aircraftOverride: Aircraft | undefined = selectedAircraft,
   ) {
-    if (!board || !selectedAircraft) return;
+    if (!board || !aircraftOverride) return;
     const reasonByState = {
       AVAILABLE: "Flugzeug durch Flight Line wieder verfügbar gemeldet",
       REFUELING: "Tanken durch Flight Line begonnen",
@@ -253,7 +269,7 @@ export function FlightLineView() {
           issuedAt: new Date().toISOString(),
           type: "SET_AIRCRAFT_OPERATIONAL_STATE",
           payload: {
-            aircraftId: selectedAircraft.id,
+            aircraftId: aircraftOverride.id,
             state,
             reason: reasonByState[state],
             expectedReviewAt,
@@ -263,8 +279,8 @@ export function FlightLineView() {
       );
       setMessage(
         state === "AVAILABLE"
-          ? `${selectedAircraft.registration} ist wieder verfügbar.`
-          : `${selectedAircraft.registration}: ${aircraftStateLabel[state]}.`,
+          ? `${aircraftOverride.registration} ist wieder verfügbar.`
+          : `${aircraftOverride.registration}: ${aircraftStateLabel[state]}.`,
       );
       setAircraftPauseOpen(false);
       await refresh();
@@ -281,10 +297,39 @@ export function FlightLineView() {
     void setFlightLineAircraftState("PAUSED", expectedReviewAt);
   }
 
-  function openAircraftPauseDialog() {
+  function openAircraftPauseDialog(aircraftId?: string) {
+    if (aircraftId) setSelectedAircraftId(aircraftId);
     setAircraftPauseMinutes("");
     setAircraftPauseUnknown(false);
     setAircraftPauseOpen(true);
+  }
+
+  async function assignAircraftPilot(aircraftId: string, pilotId: string, reassign: boolean) {
+    if (!board) return;
+    try {
+      await sendCommand(
+        {
+          commandId: crypto.randomUUID(),
+          eventId: EVENT_ID,
+          deviceId: FLIGHT_LINE_DEVICE_ID,
+          expectedVersion: board.event.version,
+          issuedAt: new Date().toISOString(),
+          type: "ASSIGN_AIRCRAFT_PILOT",
+          payload: { aircraftId, pilotId, reassign },
+        },
+        deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
+      );
+      const aircraftEntry = board.aircraft.find((entry) => entry.id === aircraftId);
+      const pilot = board.pilots.find((entry) => entry.id === pilotId);
+      setMessage(
+        `${pilot?.operationalCode ?? "Pilotencode"} wurde ${aircraftEntry?.registration ?? "dem Flugzeug"} zugewiesen.`,
+      );
+      await refresh();
+    } catch (reason) {
+      const message = reason instanceof Error ? reason.message : "Pilotzuweisung fehlgeschlagen.";
+      setMessage(message);
+      throw reason;
+    }
   }
 
   async function triggerEmergency() {
@@ -526,7 +571,7 @@ export function FlightLineView() {
         disabled:
           action.command === "CALL_NEXT" &&
           (!nextAircraftId ||
-            !nextPilotId ||
+            !selectedAircraft?.currentPilotId ||
             board?.event.emergencyMode ||
             board?.event.status !== "ACTIVE" ||
             board?.event.operationalInterrupted),
@@ -643,52 +688,34 @@ export function FlightLineView() {
         />
       ) : board ? (
         <FlightLineSupervisorConsole
-          action={primaryFlightLineAction}
           aircraft={operationalAircraft}
-          aircraftRotations={aircraftRotations ?? []}
           board={board}
           message={message}
-          nextPilotId={nextPilotId}
           selectedQueueGroupIds={selectedQueueGroupIds}
-          onAvailable={() => void setFlightLineAircraftState("AVAILABLE")}
-          onDeferRotation={(rotation) =>
-            void mutateQueue(
-              "DEFER_TICKET_GROUP",
-              "Gruppe bei Übernahme des Flugzeugs nicht vollständig anwesend",
-              rotation,
-            )
-          }
-          onOpenDetails={() => setDetailsOpen(true)}
-          onOpenDisposition={() => setDispositionOpen(true)}
-          onPause={openAircraftPauseDialog}
-          onPilotChange={setNextPilotId}
+          onAssignPilot={assignAircraftPilot}
+          onConfirmAssignment={() => void advance()}
+          onRunRotation={(rotation) => {
+            const rotationAircraft = operationalAircraft.find(
+              (entry) => entry.id === rotation.aircraftId,
+            );
+            void advance(rotation, rotationAircraft);
+          }}
+          onPauseAircraft={openAircraftPauseDialog}
           onGroupAttendance={(ticketGroupId, checkedIn) =>
             void setGroupAttendance(ticketGroupId, checkedIn)
           }
           onGroupMissing={(ticketGroupId) => void updateGroupPresence(ticketGroupId, "MISSING")}
           onGroupRecall={(ticketGroupId) => void updateGroupPresence(ticketGroupId, "RECALL")}
-          onRefuel={() => void setFlightLineAircraftState("REFUELING")}
-          onReleaseAssist={(aircraftId) =>
-            void releaseFlightLineAircraft(
-              EVENT_ID,
-              aircraftId,
-              FLIGHT_LINE_DEVICE_ID,
-              deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
-            ).then(refresh)
-          }
+          onSetAircraftState={(aircraftId, state) => {
+            const aircraftEntry = operationalAircraft.find((entry) => entry.id === aircraftId);
+            void setFlightLineAircraftState(state, null, aircraftEntry);
+          }}
           onSelectAircraft={(aircraftId) => {
             setSelectedAircraftId(aircraftId);
             setSelectedId(null);
             setSelectedQueueGroupIds([]);
             setDispositionOpen(false);
             setDetailsOpen(false);
-          }}
-          onSelectRotation={(rotationId) => {
-            const rotation = aircraftRotations?.find((entry) => entry.id === rotationId);
-            setSelectedId(rotationId);
-            if (rotation) setDispositionCapacity(rotation.usableCapacity);
-            setMoveTargetId("");
-            setMoveReason("");
           }}
           onToggleGroup={(ticketGroupId, isSelected) => {
             setSelectedQueueGroupIds((current) =>
@@ -697,9 +724,7 @@ export function FlightLineView() {
                 : current.filter((id) => id !== ticketGroupId),
             );
           }}
-          onUnavailable={() => void setFlightLineAircraftState("INACTIVE")}
           selectedAircraft={selectedAircraft}
-          selectedRotation={selected}
         />
       ) : null}
       <section
@@ -919,7 +944,7 @@ export function FlightLineView() {
                     <span>Flottenstatus wird durch die Flight-Line-Leitung gesteuert.</span>
                   ) : selectedAircraft.operationalState === "AVAILABLE" ? (
                     <>
-                      <button onClick={openAircraftPauseDialog} type="button">
+                      <button onClick={() => openAircraftPauseDialog()} type="button">
                         Pause
                       </button>
                       <button
@@ -1000,36 +1025,6 @@ export function FlightLineView() {
                     </div>
                   ) : null}
                 </dl>
-                {selected.status === "DRAFT" ? (
-                  <details className="pilot-assignment">
-                    <summary>
-                      Pilotzuordnung · {selected.suggestedPilotOperationalCode ?? "noch offen"}
-                    </summary>
-                    <label>
-                      Anonymer Pilotencode
-                      <select
-                        aria-label="Pilotencode für die Belegung"
-                        value={nextPilotId}
-                        onChange={(event) => setNextPilotId(event.target.value)}
-                      >
-                        <option value="">Pilotencode wählen</option>
-                        {board?.pilots
-                          .filter(
-                            (pilot) =>
-                              pilot.active &&
-                              !pilot.paused &&
-                              (!pilot.currentRotationId || pilot.currentRotationId === selected.id),
-                          )
-                          .map((pilot) => (
-                            <option value={pilot.id} key={pilot.id}>
-                              {pilot.operationalCode}
-                              {pilot.id === selected.suggestedPilotId ? " · Vorschlag" : ""}
-                            </option>
-                          ))}
-                      </select>
-                    </label>
-                  </details>
-                ) : null}
                 <p className="safety-disclaimer">
                   Nur organisatorische Schätzung aus konfigurierten Referenzgewichten. Die Bewertung
                   und Entscheidung liegt ausschließlich beim Piloten; keine Sicherheits- oder
@@ -1187,12 +1182,12 @@ export function FlightLineView() {
                     disabled={
                       action.command === "CALL_NEXT" &&
                       (!nextAircraftId ||
-                        !nextPilotId ||
+                        !selectedAircraft?.currentPilotId ||
                         board?.event.emergencyMode ||
                         board?.event.status !== "ACTIVE" ||
                         board?.event.operationalInterrupted)
                     }
-                    onClick={advance}
+                    onClick={() => void advance()}
                     type="button"
                   >
                     {action.label}

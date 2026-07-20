@@ -183,7 +183,16 @@ try {
       expectedReviewAt: null,
     },
   );
-  const initialCall = await flight(restoredAircraft.event.version, "CALL_NEXT", {
+  const initialPilotAssignment = await admin(
+    restoredAircraft.event.version,
+    "ASSIGN_AIRCRAFT_PILOT",
+    {
+      aircraftId: "aircraft-a",
+      pilotId: "550e8400-e29b-41d4-a716-446655440199",
+      reassign: false,
+    },
+  );
+  const initialCall = await flight(initialPilotAssignment.event.version, "CALL_NEXT", {
     ticketGroupIds: [sold.aggregate.id],
     aircraftId: "aircraft-a",
     pilotId: "550e8400-e29b-41d4-a716-446655440199",
@@ -222,6 +231,15 @@ try {
       adminPin: pin,
     },
   );
+  const replacementPilotAssigned = await admin(
+    replacementAssigned.event.version,
+    "ASSIGN_AIRCRAFT_PILOT",
+    {
+      aircraftId: "aircraft-replacement",
+      pilotId: "550e8400-e29b-41d4-a716-446655440199",
+      reassign: true,
+    },
+  );
   current = await board(devices.flightLine, tokens.flightLine);
   const replacementProposal = current.rotations.find(
     (entry) => entry.id === sold.aggregate.relatedRotationId,
@@ -236,7 +254,7 @@ try {
       "Ausfall hat die Gruppe nicht geschützt oder ein Flugzeug ohne Personalentscheidung zugeordnet.",
     );
   }
-  const called = await flight(replacementAssigned.event.version, "CALL_NEXT", {
+  const called = await flight(replacementPilotAssigned.event.version, "CALL_NEXT", {
     ticketGroupIds: [sold.aggregate.id],
     aircraftId: "aircraft-replacement",
     pilotId: "550e8400-e29b-41d4-a716-446655440199",

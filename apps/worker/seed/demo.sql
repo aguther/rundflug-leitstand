@@ -45,8 +45,10 @@ VALUES
 INSERT OR IGNORE INTO resource_groups (id, operation_day_id, name, status, gate_id, version, created_at, updated_at)
 VALUES ('rg-panorama', 'demo-2026', 'Panorama', 'ACTIVE', 'demo-2026-gate-main', 0, '2026-07-11T08:00:00.000Z', '2026-07-11T08:00:00.000Z');
 
-INSERT OR IGNORE INTO aircraft (id, registration, aircraft_type, passenger_seats, created_at, updated_at)
-VALUES ('aircraft-a', 'D-EDEM', 'SYNTHETIC-DEMO', 4, '2026-07-11T08:00:00.000Z', '2026-07-11T08:00:00.000Z');
+INSERT OR IGNORE INTO aircraft
+  (id, registration, aircraft_type, passenger_seats, operational_state_changed_at, created_at, updated_at)
+VALUES ('aircraft-a', 'D-EDEM', 'SYNTHETIC-DEMO', 4, '2026-07-11T08:00:00.000Z',
+        '2026-07-11T08:00:00.000Z', '2026-07-11T08:00:00.000Z');
 
 INSERT OR IGNORE INTO resource_group_memberships
   (id, operation_day_id, resource_group_id, aircraft_id, active_from, active_until, created_at)
@@ -56,6 +58,10 @@ INSERT OR IGNORE INTO pilots
   (id, operation_day_id, operational_code, active, created_at, updated_at)
 VALUES ('550e8400-e29b-41d4-a716-446655440100', 'demo-2026', 'P-01', 1,
         '2026-07-11T08:00:00.000Z', '2026-07-11T08:00:00.000Z');
+
+UPDATE resource_group_memberships
+   SET current_pilot_id = '550e8400-e29b-41d4-a716-446655440100'
+ WHERE id = 'membership-a' AND current_pilot_id IS NULL;
 
 INSERT OR IGNORE INTO products
   (id, operation_day_id, resource_group_id, gate_id, name, code, price_cents, sale_enabled, reference_capacity,

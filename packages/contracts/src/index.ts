@@ -167,6 +167,14 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
     }),
   }),
   commandBaseSchema.extend({
+    type: z.literal("ASSIGN_AIRCRAFT_PILOT"),
+    payload: z.object({
+      aircraftId: z.string().min(1).max(100),
+      pilotId: z.string().min(1).max(100),
+      reassign: z.boolean(),
+    }),
+  }),
+  commandBaseSchema.extend({
     type: z.literal("CALL_NEXT"),
     payload: z.object({
       ticketGroupIds: z.array(z.string().min(1).max(100)).min(1).max(12),
@@ -1008,6 +1016,7 @@ export const aircraftOperationalSummarySchema = z.object({
     "INTERRUPTED",
     "INACTIVE",
   ]),
+  operationalStateChangedAt: z.string(),
   resourceGroupId: z.string(),
   resourceGroupName: z.string(),
   refuelPlanned: z.boolean(),

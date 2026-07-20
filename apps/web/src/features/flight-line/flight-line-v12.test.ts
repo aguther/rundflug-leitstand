@@ -32,14 +32,16 @@ describe("V1.2 Flight Line surfaces", () => {
     expect(assistSource).not.toContain("assist-header");
   });
 
-  it("implements the V1.5 aircraft table with one expandable assignment workspace", () => {
+  it("implements the V1.6.1 compact aircraft table with centered dialogs", () => {
     expect(supervisorSource).toContain("flight-director-aircraft-row");
-    expect(supervisorSource).toContain("flight-director-assignment");
+    expect(supervisorSource).toContain("ModalDialog");
     expect(supervisorSource).toContain("Buchungsgruppen zuweisen");
     expect(supervisorSource).toContain("Gruppen bleiben vollständig zusammen");
+    expect(supervisorSource).not.toContain("expanded");
+    expect(viewSource).not.toContain('className="pilot-assignment"');
     expect(supervisorSource).not.toContain("sidebarNavItems");
     expect(stylesSource).toContain(".flight-director-aircraft-head");
-    expect(stylesSource).toContain(".flight-director-assignment-body");
+    expect(stylesSource).toContain(".flight-director-assignment-dialog");
   });
 
   it("uses shared controls for operational actions and fields", () => {
@@ -70,6 +72,19 @@ describe("V1.2 Flight Line surfaces", () => {
     expect(stylesSource).toContain("@media (max-width: 760px)");
     expect(stylesSource).toContain(".flight-assist-v15 .assist-v15-aircraft-list");
     expect(stylesSource).toContain(".assist-v15-group-popover");
+  });
+
+  it("keeps iPad viewports inside the shell with one scrollable aircraft table", () => {
+    expect(stylesSource).toContain(".flight-director-aircraft-table");
+    expect(stylesSource).toContain(".ds-panel.flight-director-aircraft");
+    expect(stylesSource).toContain("-webkit-overflow-scrolling: touch");
+    expect(stylesSource).toContain("touch-action: pan-x pan-y");
+    expect(stylesSource).toMatch(
+      /@media \(max-width: 1250px\)[\s\S]*\.flight-line-shell[\s\S]*overflow: hidden/,
+    );
+    expect(stylesSource).toContain("@media (max-height: 820px) and (min-width: 801px)");
+    expect(stylesSource).toContain("overscroll-behavior: contain");
+    expect(stylesSource).not.toContain(".flight-director-aircraft-row > span {");
   });
 
   it("applies the approved operations finish without leaking into unrelated views", () => {

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Button } from "./Button";
+import { ModalDialog } from "./ModalDialog";
 
 export interface ConfirmationDialogProps {
   open: boolean;
@@ -24,41 +25,31 @@ export function ConfirmationDialog({
   onConfirm,
   onCancel,
 }: ConfirmationDialogProps) {
-  if (!open) return null;
-
   return (
-    <div className="ds-confirm-backdrop">
-      <button
-        aria-label={cancelLabel}
-        className="ds-confirm-backdrop-dismiss"
-        onClick={onCancel}
-        type="button"
-      />
-      <form
-        className="ds-confirm-dialog"
-        role="alertdialog"
-        aria-modal="true"
-        onSubmit={(event) => {
-          event.preventDefault();
-          onConfirm();
-        }}
-      >
-        <h2>{title}</h2>
-        <div className="ds-confirm-body">{body}</div>
+    <ModalDialog
+      footer={
         <div className="ds-confirm-actions">
           <Button type="button" variant="secondary" onClick={onCancel}>
             {cancelLabel}
           </Button>
           <Button
-            type="submit"
+            type="button"
             variant={danger ? "danger" : "primary"}
             disabled={confirmDisabled}
             autoFocus={!confirmDisabled}
+            onClick={onConfirm}
           >
             {confirmLabel}
           </Button>
         </div>
-      </form>
-    </div>
+      }
+      onClose={onCancel}
+      open={open}
+      role="alertdialog"
+      size="compact"
+      title={title}
+    >
+      <div className="ds-confirm-body">{body}</div>
+    </ModalDialog>
   );
 }
