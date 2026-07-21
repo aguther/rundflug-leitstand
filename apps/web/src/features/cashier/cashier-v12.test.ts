@@ -4,7 +4,7 @@ import appSource from "../../cashier-view.tsx?raw";
 
 const stylesSource = readFileSync(new URL("./cashier-v12.css", import.meta.url), "utf8");
 
-describe("V1.6.1 cashier", () => {
+describe("V1.7.0 cashier", () => {
   it("uses the authenticated cashier session without another PIN prompt", () => {
     expect(appSource).toContain('className="cashier-shell"');
     expect(appSource).not.toContain("Administrator-PIN für Storno/Umbuchung");
@@ -29,18 +29,18 @@ describe("V1.6.1 cashier", () => {
     expect(stylesSource).toContain("grid-template-columns: 0.85fr 1.4fr");
   });
 
-  it("keeps product guidance and the product sale action geometrically stable", () => {
-    expect(appSource).toContain("cashier-product-guidance");
-    expect(appSource).toContain("Passt in einen Umlauf");
-    expect(appSource).toContain("Aufteilung erforderlich");
-    expect(appSource).not.toContain("Aufteilung verstanden");
+  it("keeps every split warning and product sale action geometrically stable", () => {
+    expect(appSource).toContain("cashier-split-line");
+    expect(appSource).toContain("Aufteilung:");
+    expect(appSource).not.toContain("cashier-product-body");
     expect(appSource).toContain("onClick={() => void sell(entry)}");
-    expect(stylesSource).toContain("grid-template-rows: auto 4.75rem 56px");
-    expect(stylesSource).toContain("block-size: 4.75rem");
+    expect(stylesSource).toContain("block-size: 2.8rem");
+    expect(stylesSource).toContain("minmax(126px, auto)");
   });
 
   it("renders one shared ticket component for preview and every print page", () => {
     expect(appSource).toContain("function TicketPaper");
+    expect(appSource).toContain("function QrScanDialog");
     expect(appSource).toContain('className="ticket-print-document"');
     expect(appSource).toContain("images.length !== receipt.length");
     expect(stylesSource).toContain("break-after: page");

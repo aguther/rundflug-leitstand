@@ -40,6 +40,7 @@ import {
   verifyAdminPin,
 } from "./api";
 import { AppShell as Shell } from "./app/AppShell";
+import { PageNotice } from "./app/PageNotifications";
 import {
   Button,
   Field,
@@ -69,7 +70,6 @@ import {
   deviceTokenFor,
   EmergencyNotice,
   EVENT_ID,
-  FieldHelp,
   FieldLabel,
   type GateDisplayStatus,
   InterruptionNotice,
@@ -82,15 +82,7 @@ import {
   rotationStatusLabel,
   useOperationBoard,
 } from "./operation-workspace";
-import {
-  formatEuroInput,
-  parseEuroToCents,
-  productPositionOptions,
-  setWeightCaptureMode,
-  toggleWeightClass,
-  weightCaptureEnabled,
-  weightClassesForChildCompanion,
-} from "./product-editor";
+import { formatEuroInput, parseEuroToCents, productPositionOptions } from "./product-editor";
 
 export function AdminView() {
   const { session, logout } = useAuth();
@@ -843,7 +835,6 @@ export function AdminView() {
       !board ||
       !productResourceGroupId ||
       !productGateId ||
-      productWeightClasses.length === 0 ||
       productPriceCents === null ||
       adminPinRef.current.length < 4
     )
@@ -1491,11 +1482,7 @@ export function AdminView() {
               ? "product-resource-group"
               : !productGateId
                 ? "product-gate"
-                : productWeightClasses.length === 0
-                  ? "product-weight-capture"
-                  : productChildCompanion && !productWeightClasses.includes("CHILD")
-                    ? "product-child-companion"
-                    : null;
+                : null;
     if (invalidFieldId) {
       window.requestAnimationFrame(() => document.getElementById(invalidFieldId)?.focus());
       return;
@@ -1849,16 +1836,23 @@ export function AdminView() {
   };
 
   return (
-    <Shell className="admin-shell" title="Administration">
-      <ConnectionNotice error={error} lastConfirmedAt={lastConfirmedAt} />
-      {setupRequired ? (
-        <div className="connection-warning" role="status">
-          Dieses System ist noch nicht eingerichtet. <a href="/setup">Ersteinrichtung öffnen</a>
-        </div>
-      ) : null}
-      <EmergencyNotice active={board?.event.emergencyMode ?? false} />
-      <InterruptionNotice active={board?.event.operationalInterrupted ?? false} />
-      <OperationalNotice note={board?.event.operationalNote} />
+    <Shell
+      className="admin-shell"
+      title="Administration"
+      notifications={
+        <>
+          <ConnectionNotice error={error} lastConfirmedAt={lastConfirmedAt} />
+          {setupRequired ? (
+            <PageNotice noticeKey="setup-required" tone="warning">
+              Dieses System ist noch nicht eingerichtet. <a href="/setup">Ersteinrichtung öffnen</a>
+            </PageNotice>
+          ) : null}
+          <EmergencyNotice active={board?.event.emergencyMode ?? false} />
+          <InterruptionNotice active={board?.event.operationalInterrupted ?? false} />
+          <OperationalNotice note={board?.event.operationalNote} />
+        </>
+      }
+    >
       <section className="admin-layout">
         <AdminNavigation activeArea={adminArea} onChange={setAdminArea} />
         <div
@@ -3345,92 +3339,6 @@ export function AdminView() {
                         ))}
                       </select>
                     </label>
-                  </div>
-                </section>
-                <section className="product-editor-section product-weight-section">
-                  <h3>Angaben beim Verkauf</h3>
-                  <FieldLabel
-                    label="Gewichtserfassung"
-                    help="Aktivierte Klassen werden an der Kasse je anonymem Ticket abgefragt. Es werden keine Namen erfasst."
-                  />
-                  <div className="weight-capture-mode" id="product-weight-capture">
-                    <label>
-                      <input
-                        checked={!weightCaptureEnabled(productWeightClasses)}
-                        name="product-weight-mode"
-                        onChange={() => {
-                          setProductWeightClasses(setWeightCaptureMode(false));
-                          setProductChildCompanion(false);
-                        }}
-                        type="radio"
-                      />
-                      <span>Keine Gewichtserfassung</span>
-                    </label>
-                    <label>
-                      <input
-                        checked={weightCaptureEnabled(productWeightClasses)}
-                        name="product-weight-mode"
-                        onChange={() => setProductWeightClasses(setWeightCaptureMode(true))}
-                        type="radio"
-                      />
-                      <span>Gewichtsklassen erfassen</span>
-                    </label>
-                  </div>
-                  {weightCaptureEnabled(productWeightClasses) ? (
-                    <div className="weight-class-options">
-                      {(
-                        [
-                          ["CHILD", "Kind"],
-                          ["NORMAL", "Standard"],
-                          ["HEAVY", "Schwer"],
-                          ["INDIVIDUAL", "Individuelles Gewicht"],
-                        ] as const
-                      ).map(([weightClass, label]) => (
-                        <label key={weightClass}>
-                          <input
-                            type="checkbox"
-                            checked={productWeightClasses.includes(weightClass)}
-                            onChange={(event) => {
-                              const checked = event.target.checked;
-                              setProductWeightClasses((current) =>
-                                toggleWeightClass(current, weightClass, checked),
-                              );
-                              if (weightClass === "CHILD" && !checked)
-                                setProductChildCompanion(false);
-                            }}
-                          />
-                          <span>{label}</span>
-                        </label>
-                      ))}
-                    </div>
-                  ) : null}
-                  {masterSubmitAttempted && productWeightClasses.length === 0 ? (
-                    <span className="field-error">Mindestens eine Gewichtsklasse auswählen.</span>
-                  ) : null}
-                  <div className="checkbox-field">
-                    <div className="checkbox-field-heading">
-                      <label className="checkbox-label">
-                        <input
-                          id="product-child-companion"
-                          type="checkbox"
-                          checked={productChildCompanion}
-                          onChange={(event) => {
-                            const checked = event.target.checked;
-                            setProductChildCompanion(checked);
-                            if (checked) {
-                              setProductWeightClasses((current) =>
-                                weightClassesForChildCompanion(current, true),
-                              );
-                            }
-                          }}
-                        />
-                        <span>Bei Kinderbuchungen auf Begleitung hinweisen</span>
-                      </label>
-                      <FieldHelp help="Aktiviert bei Bedarf automatisch die Gewichtsklasse „Kind“ und zeigt an der Kasse einen organisatorischen Hinweis, wenn keine passende Begleitung erfasst ist. Dies ist keine flugbetriebliche Freigabe." />
-                    </div>
-                    <span className="field-help">
-                      Die Auswahl „Kind“ wird beim Aktivieren automatisch eingeschaltet.
-                    </span>
                   </div>
                 </section>
                 <div className="editor-actions product-editor-actions">

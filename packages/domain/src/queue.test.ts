@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   assertManualGroupMoveAllowed,
   assertQueueMutationAllowed,
+  deriveBookingGroupOperationalStatus,
   deriveResourceGroupCapacity,
   planBookingGroupSplit,
   planNextRotations,
@@ -81,6 +82,33 @@ describe("resource-group queue planning", () => {
     expect(
       planBookingGroupSplit({ groupSize: 4, referenceCapacity: 4, splitAcknowledged: false }),
     ).toEqual({ slotSizes: [4], splitAcknowledged: false });
+  });
+
+  it("keeps a split booking group queued until its final segment has been called", () => {
+    expect(
+      deriveBookingGroupOperationalStatus({
+        rotationStates: ["COMPLETED", "DRAFT"],
+        pendingSegmentPresent: false,
+      }),
+    ).toBe("QUEUED");
+    expect(
+      deriveBookingGroupOperationalStatus({
+        rotationStates: ["IN_FLIGHT", "DRAFT"],
+        pendingSegmentPresent: true,
+      }),
+    ).toBe("PRESENT");
+    expect(
+      deriveBookingGroupOperationalStatus({
+        rotationStates: ["COMPLETED", "CALLED"],
+        pendingSegmentPresent: false,
+      }),
+    ).toBe("BOARDING");
+    expect(
+      deriveBookingGroupOperationalStatus({
+        rotationStates: ["COMPLETED", "COMPLETED"],
+        pendingSegmentPresent: false,
+      }),
+    ).toBe("COMPLETED");
   });
 
   it("rejects queue mutations once a rotation is in flight", () => {

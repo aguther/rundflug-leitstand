@@ -42,9 +42,9 @@ describe("network failure guidance", () => {
       responseText = JSON.stringify({
         ok: true,
         service: "Rundflug-Leitstand",
-        applicationVersion: "1.6.1",
+        applicationVersion: "1.7.0",
         environment: "production",
-        requirementsVersion: "1.6.1",
+        requirementsVersion: "1.7.0",
         timestamp: "2026-07-18T12:00:00.000Z",
       });
       private listeners = new Map<string, () => void>();

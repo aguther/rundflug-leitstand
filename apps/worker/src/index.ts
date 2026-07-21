@@ -1857,16 +1857,60 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
         }>(),
     () =>
       context.env.DB.prepare(
-        `SELECT tg.id, tg.communication_number, tg.queue_sequence, tg.status,
+        `WITH segment_stats AS (
+           SELECT segment_ticket.ticket_group_id, segment_rotation.id AS rotation_id,
+                  segment_rotation.status,
+                  COALESCE(segment_group.queue_position, segment_group.communication_number)
+                    AS segment_order,
+                  segment_group.communication_number,
+                  COUNT(*) AS ticket_count,
+                  SUM(CASE WHEN segment_ticket.attendance_status = 'CHECKED_IN' THEN 1 ELSE 0 END)
+                    AS present_count
+             FROM rotation_tickets segment_assignment
+             JOIN tickets segment_ticket ON segment_ticket.id = segment_assignment.ticket_id
+             JOIN rotations segment_rotation ON segment_rotation.id = segment_assignment.rotation_id
+             JOIN flight_groups segment_group ON segment_group.id = segment_rotation.flight_group_id
+            WHERE segment_assignment.released_at IS NULL
+              AND segment_rotation.operation_day_id = ?1
+              AND segment_rotation.status <> 'CANCELED'
+            GROUP BY segment_ticket.ticket_group_id, segment_rotation.id, segment_rotation.status,
+                     segment_group.queue_position, segment_group.communication_number
+         ), ranked_segments AS (
+           SELECT segment_stats.*,
+                  ROW_NUMBER() OVER (
+                    PARTITION BY ticket_group_id
+                    ORDER BY segment_order, communication_number, rotation_id
+                  ) AS segment_index,
+                  COUNT(*) OVER (PARTITION BY ticket_group_id) AS segment_count
+             FROM segment_stats
+         ), next_draft_segments AS (
+           SELECT ranked_drafts.*
+             FROM (
+               SELECT ranked_segments.*,
+                      ROW_NUMBER() OVER (
+                        PARTITION BY ticket_group_id ORDER BY segment_index
+                      ) AS draft_rank
+                 FROM ranked_segments
+                WHERE status = 'DRAFT'
+             ) ranked_drafts
+            WHERE ranked_drafts.draft_rank = 1
+         )
+         SELECT tg.id, tg.communication_number, tg.queue_sequence, tg.status,
                 tg.recalled_at, tg.recall_count, p.id AS product_id, p.code AS product_code,
                 p.name AS product_name, p.resource_group_id, p.gate_id,
                 COUNT(t.id) AS ticket_count,
-                SUM(CASE WHEN t.attendance_status = 'CHECKED_IN' THEN 1 ELSE 0 END) AS present_count
+                SUM(CASE WHEN t.attendance_status = 'CHECKED_IN' THEN 1 ELSE 0 END) AS present_count,
+                next_segment.ticket_count AS next_segment_ticket_count,
+                next_segment.present_count AS next_segment_present_count,
+                next_segment.segment_index,
+                next_segment.segment_count
            FROM ticket_groups tg
            JOIN products p ON p.id = tg.product_id
            JOIN tickets t ON t.ticket_group_id = tg.id
+           JOIN next_draft_segments next_segment ON next_segment.ticket_group_id = tg.id
           WHERE tg.operation_day_id = ?1 AND tg.status IN ('QUEUED', 'PRESENT', 'MISSING')
-          GROUP BY tg.id, p.id
+          GROUP BY tg.id, p.id, next_segment.ticket_count, next_segment.present_count,
+                   next_segment.segment_index, next_segment.segment_count
           ORDER BY tg.queue_sequence`,
       )
         .bind(eventId)
@@ -1884,6 +1928,10 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
           gate_id: string;
           ticket_count: number;
           present_count: number;
+          next_segment_ticket_count: number;
+          next_segment_present_count: number;
+          segment_index: number;
+          segment_count: number;
         }>(),
     () =>
       context.env.DB.prepare(
@@ -2339,6 +2387,10 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
       status: group.status,
       ticketCount: group.ticket_count,
       presentCount: group.present_count,
+      nextSegmentTicketCount: group.next_segment_ticket_count,
+      nextSegmentPresentCount: group.next_segment_present_count,
+      segmentIndex: group.segment_index,
+      segmentCount: group.segment_count,
       recalledAt: group.recalled_at,
       recallCount: group.recall_count,
     })),

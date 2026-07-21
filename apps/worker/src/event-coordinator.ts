@@ -443,6 +443,7 @@ export class EventCoordinator extends DurableObject<Env> {
         const allowedWeightClasses = JSON.parse(product.weight_classes_json) as Array<
           "NOT_CAPTURED" | "CHILD" | "NORMAL" | "HEAVY" | "INDIVIDUAL"
         >;
+        const ticketDetailsProvided = command.payload.ticketDetails !== undefined;
         const ticketDetails =
           command.payload.ticketDetails ??
           normalizedCodes.map(() => ({
@@ -461,6 +462,7 @@ export class EventCoordinator extends DurableObject<Env> {
           );
         }
         if (
+          ticketDetailsProvided &&
           ticketDetails.some(
             (detail) =>
               !allowedWeightClasses.includes(detail.weightClass) ||
@@ -3429,7 +3431,12 @@ export class EventCoordinator extends DurableObject<Env> {
                JOIN tickets t ON t.ticket_group_id = tg.id
                JOIN rotation_tickets rt ON rt.ticket_id = t.id AND rt.released_at IS NULL
                JOIN rotations r ON r.id = rt.rotation_id
+               JOIN flight_groups fg ON fg.id = r.flight_group_id
               WHERE tg.operation_day_id = ?1 AND tg.id = ?2
+                AND r.status = 'DRAFT'
+              GROUP BY r.id, fg.queue_position, fg.communication_number
+              ORDER BY COALESCE(fg.queue_position, fg.communication_number),
+                       fg.communication_number, r.id
               LIMIT 1`,
           )
             .bind(command.eventId, command.payload.ticketGroupIds[0])
@@ -3504,9 +3511,26 @@ export class EventCoordinator extends DurableObject<Env> {
            JOIN tickets t ON t.ticket_group_id = tg.id
            JOIN rotation_tickets rt ON rt.ticket_id = t.id AND rt.released_at IS NULL
            JOIN rotations r ON r.id = rt.rotation_id
+           JOIN flight_groups fg ON fg.id = r.flight_group_id
           WHERE tg.operation_day_id = ?1 AND tg.id IN (${placeholders})
             AND tg.status IN ('QUEUED', 'PRESENT')
             AND r.status = 'DRAFT'
+            AND r.id = (
+              SELECT candidate_rotation.id
+                FROM tickets candidate_ticket
+                JOIN rotation_tickets candidate_assignment
+                  ON candidate_assignment.ticket_id = candidate_ticket.id
+                 AND candidate_assignment.released_at IS NULL
+                JOIN rotations candidate_rotation ON candidate_rotation.id = candidate_assignment.rotation_id
+                JOIN flight_groups candidate_group ON candidate_group.id = candidate_rotation.flight_group_id
+               WHERE candidate_ticket.ticket_group_id = tg.id
+                 AND candidate_rotation.status = 'DRAFT'
+               GROUP BY candidate_rotation.id, candidate_group.queue_position,
+                        candidate_group.communication_number
+               ORDER BY COALESCE(candidate_group.queue_position, candidate_group.communication_number),
+                        candidate_group.communication_number, candidate_rotation.id
+               LIMIT 1
+            )
           GROUP BY tg.id, r.id, p.resource_group_id`,
       )
         .bind(command.eventId, ...distinctGroupIds)
@@ -3685,27 +3709,38 @@ export class EventCoordinator extends DurableObject<Env> {
             .filter((group) => group.rotation_id !== rotation.id)
             .flatMap((group) => [
               this.env.DB.prepare(
-                "UPDATE rotation_tickets SET released_at = ?1 WHERE rotation_id = ?2 AND released_at IS NULL",
-              ).bind(now, group.rotation_id),
+                `UPDATE rotation_tickets SET released_at = ?1
+                  WHERE rotation_id = ?2 AND released_at IS NULL
+                    AND ticket_id IN (SELECT id FROM tickets WHERE ticket_group_id = ?3)`,
+              ).bind(now, group.rotation_id, group.ticket_group_id),
               this.env.DB.prepare(
                 `INSERT INTO rotation_tickets (rotation_id, ticket_id, assigned_at)
-                 SELECT ?1, id, ?2 FROM tickets WHERE ticket_group_id = ?3`,
-              ).bind(rotation.id, now, group.ticket_group_id),
+                 SELECT ?1, moved_assignment.ticket_id, ?2
+                   FROM rotation_tickets moved_assignment
+                   JOIN tickets moved_ticket ON moved_ticket.id = moved_assignment.ticket_id
+                  WHERE moved_assignment.rotation_id = ?3
+                    AND moved_assignment.released_at = ?2
+                    AND moved_ticket.ticket_group_id = ?4`,
+              ).bind(rotation.id, now, group.rotation_id, group.ticket_group_id),
               this.env.DB.prepare(
-                "UPDATE rotations SET status = 'CANCELED', completed_at = ?1, version = version + 1, updated_at = ?1 WHERE id = ?2 AND status = 'DRAFT'",
+                `UPDATE rotations SET status = 'CANCELED', completed_at = ?1,
+                        version = version + 1, updated_at = ?1
+                  WHERE id = ?2 AND status = 'DRAFT'
+                    AND NOT EXISTS (
+                      SELECT 1 FROM rotation_tickets remaining_assignment
+                       WHERE remaining_assignment.rotation_id = rotations.id
+                         AND remaining_assignment.released_at IS NULL
+                    )`,
               ).bind(now, group.rotation_id),
               this.env.DB.prepare(
-                "UPDATE flight_groups SET status = 'CANCELED', version = version + 1, updated_at = ?1 WHERE id = (SELECT flight_group_id FROM rotations WHERE id = ?2)",
+                `UPDATE flight_groups SET status = 'CANCELED', version = version + 1, updated_at = ?1
+                  WHERE id = (
+                    SELECT flight_group_id FROM rotations
+                     WHERE id = ?2 AND status = 'CANCELED'
+                  )`,
               ).bind(now, group.rotation_id),
             ])
         : [];
-    const groupStatus = {
-      CALL_NEXT: "BOARDING",
-      MARK_OFF_BLOCK: "IN_FLIGHT",
-      MARK_ON_BLOCK: "LANDED",
-      COMPLETE_TURNAROUND: "COMPLETED",
-      CANCEL_ROTATION: "QUEUED",
-    }[command.type];
     await this.env.DB.batch([
       this.env.DB.prepare(
         "UPDATE operation_days SET version = ?1, updated_at = ?2 WHERE id = ?3 AND version = ?4",
@@ -3742,14 +3777,72 @@ export class EventCoordinator extends DurableObject<Env> {
           )`,
       ).bind(command.type, nextState, rotation.id),
       this.env.DB.prepare(
-        `UPDATE ticket_groups SET status = ?1, version = version + 1
+        `UPDATE ticket_groups SET status = CASE
+            WHEN ticket_groups.status IN ('MISSING', 'CLARIFICATION') THEN ticket_groups.status
+            WHEN EXISTS (
+              SELECT 1 FROM tickets segment_ticket
+              JOIN rotation_tickets segment_assignment
+                ON segment_assignment.ticket_id = segment_ticket.id
+               AND segment_assignment.released_at IS NULL
+              JOIN rotations segment_rotation ON segment_rotation.id = segment_assignment.rotation_id
+              WHERE segment_ticket.ticket_group_id = ticket_groups.id
+                AND segment_rotation.status = 'DRAFT'
+            ) THEN CASE WHEN EXISTS (
+              SELECT 1 FROM tickets pending_ticket
+              JOIN rotation_tickets pending_assignment
+                ON pending_assignment.ticket_id = pending_ticket.id
+               AND pending_assignment.released_at IS NULL
+              JOIN rotations pending_rotation ON pending_rotation.id = pending_assignment.rotation_id
+              WHERE pending_ticket.ticket_group_id = ticket_groups.id
+                AND pending_rotation.status = 'DRAFT'
+                AND pending_ticket.attendance_status = 'CHECKED_IN'
+            ) THEN 'PRESENT' ELSE 'QUEUED' END
+            WHEN EXISTS (
+              SELECT 1 FROM tickets segment_ticket
+              JOIN rotation_tickets segment_assignment
+                ON segment_assignment.ticket_id = segment_ticket.id
+               AND segment_assignment.released_at IS NULL
+              JOIN rotations segment_rotation ON segment_rotation.id = segment_assignment.rotation_id
+              WHERE segment_ticket.ticket_group_id = ticket_groups.id
+                AND segment_rotation.status = 'CALLED'
+            ) THEN 'BOARDING'
+            WHEN EXISTS (
+              SELECT 1 FROM tickets segment_ticket
+              JOIN rotation_tickets segment_assignment
+                ON segment_assignment.ticket_id = segment_ticket.id
+               AND segment_assignment.released_at IS NULL
+              JOIN rotations segment_rotation ON segment_rotation.id = segment_assignment.rotation_id
+              WHERE segment_ticket.ticket_group_id = ticket_groups.id
+                AND segment_rotation.status = 'IN_FLIGHT'
+            ) THEN 'IN_FLIGHT'
+            WHEN EXISTS (
+              SELECT 1 FROM tickets segment_ticket
+              JOIN rotation_tickets segment_assignment
+                ON segment_assignment.ticket_id = segment_ticket.id
+               AND segment_assignment.released_at IS NULL
+              JOIN rotations segment_rotation ON segment_rotation.id = segment_assignment.rotation_id
+              WHERE segment_ticket.ticket_group_id = ticket_groups.id
+                AND segment_rotation.status = 'LANDED'
+            ) THEN 'LANDED'
+            WHEN EXISTS (
+              SELECT 1 FROM tickets segment_ticket
+              JOIN rotation_tickets segment_assignment
+                ON segment_assignment.ticket_id = segment_ticket.id
+               AND segment_assignment.released_at IS NULL
+              JOIN rotations segment_rotation ON segment_rotation.id = segment_assignment.rotation_id
+              WHERE segment_ticket.ticket_group_id = ticket_groups.id
+                AND segment_rotation.status = 'COMPLETED'
+            ) THEN 'COMPLETED'
+            ELSE 'CANCELED'
+          END,
+          version = version + 1
           WHERE id IN (
             SELECT DISTINCT t.ticket_group_id
               FROM tickets t
               JOIN rotation_tickets rt ON rt.ticket_id = t.id AND rt.released_at IS NULL
-             WHERE rt.rotation_id = ?2
-          )`,
-      ).bind(groupStatus, rotation.id),
+             WHERE rt.rotation_id = ?1
+           )`,
+      ).bind(rotation.id),
       this.env.DB.prepare(`INSERT INTO operational_events (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type, aggregate_id, aggregate_version, payload_json)
         VALUES (?1, ?2, ?3, ?4, ?5, 'ROTATION', ?6, ?7, ?8)`).bind(
         crypto.randomUUID(),

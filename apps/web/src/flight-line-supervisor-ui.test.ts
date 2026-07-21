@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { expectedReviewAtFromPause } from "./flight-line-pause";
+import sharedSource from "./flight-line-shared.tsx?raw";
 import supervisorSource from "./flight-line-supervisor.tsx?raw";
 import appSource from "./flight-line-view.tsx?raw";
+
+const flightLineSource = `${supervisorSource}\n${sharedSource}`;
 
 describe("Flight Line Supervisor", () => {
   it("keeps every aircraft visible and makes the aircraft the primary operational object", () => {
@@ -18,7 +21,7 @@ describe("Flight Line Supervisor", () => {
     expect(supervisorSource).not.toContain("expanded");
     expect(appSource).toContain("Belegung bestätigen & Boarding starten");
     expect(appSource).not.toContain('label: "NEXT"');
-    expect(supervisorSource).toContain("Verfügbar setzen");
+    expect(flightLineSource).toContain("Verfügbar setzen");
   });
 
   it("uses real controls for search, resource filtering and separate pilot assignment", () => {
@@ -34,10 +37,10 @@ describe("Flight Line Supervisor", () => {
     expect(supervisorSource).toContain('className="flight-director-bottom-grid"');
     expect(supervisorSource).toContain("Aktueller Umlauf");
     expect(supervisorSource).toContain("Verkaufte Tickets");
-    expect(supervisorSource).toContain("Boarding");
-    expect(supervisorSource).toContain("Offblock");
-    expect(supervisorSource).toContain("Onblock");
-    expect(supervisorSource).toContain("Abschluss / Folgestatus");
+    expect(flightLineSource).toContain("Boarding");
+    expect(flightLineSource).toContain("Offblock");
+    expect(flightLineSource).toContain("Onblock");
+    expect(flightLineSource).toContain("Abschluss / Folgestatus");
     expect(supervisorSource).toContain("rotationStateLabels[rotation.status]");
     expect(supervisorSource).not.toContain("<dd>{rotation.status}</dd>");
     expect(supervisorSource).not.toContain('{ value: "tickets", label: "Verkaufte Tickets" }');
