@@ -65,5 +65,8 @@
     "vitest": "4.1.10",
     "wrangler": "4.110.0"
   },
+  "overrides": {
+    "shell-quote": "1.10.0"
+  },
   "packageManager": "npm@10.9.2"
 }
