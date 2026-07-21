@@ -22,7 +22,7 @@ import QRCode from "qrcode";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getTicketGroupPrintData, searchTickets, sendCommand } from "./api";
 import { AppShell as Shell } from "./app/AppShell";
-import { PageNotice } from "./app/PageNotifications";
+import { PageNotice, useActionMessageBridge } from "./app/PageNotifications";
 import {
   Button,
   ConfirmationDialog,
@@ -188,6 +188,7 @@ export function CashierView() {
   const [busyProductId, setBusyProductId] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<TicketReceipt[]>([]);
   const [message, setMessage] = useState<string | null>(null);
+  useActionMessageBridge(message, setMessage);
   const [lastTicketGroupId, setLastTicketGroupId] = useState<string | null>(null);
   const [cancelReason, setCancelReason] = useState("");
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
@@ -792,11 +793,6 @@ export function CashierView() {
                 </time>
               ) : null}
             </header>
-            {message ? (
-              <div className="action-message" role="status">
-                {message}
-              </div>
-            ) : null}
             <div className="cashier-ticket-detail-grid">
               <dl>
                 <div>

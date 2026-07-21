@@ -20,6 +20,9 @@ Kompatibilität bestehen; es gibt keine Migration und keine neue Abhängigkeit.
 | V17-UI-030 | Das Ansichtsmenü bleibt bis 320 CSS-Pixel vollständig innerhalb des Viewports. Menüzeilen ordnen Symbol, umbrechbaren Text und Status beziehungsweise Auswahlhaken ohne Abschneiden an; Touchziele sind mindestens 44 Pixel hoch und Fokusdarstellung sowie Light-/Dark-Theme bleiben erhalten. | MUSS |
 | V17-FL-010 | Assist zeigt ohne eigenen Claim ausschließlich die scrollbare Flugzeugauswahl und nach erfolgreicher Übernahme ausschließlich die Arbeitsansicht dieses Flugzeugs. Der Server-Claim stellt den Modus nach Reload wieder her. Nur die manuelle Aktion „Flugzeug freigeben“ beendet regulär den Claim, leert Flugzeug- und Gruppenauswahl und kehrt zur Liste zurück; Claim-Verlust oder -Widerruf erzwingt die Rückkehr mit verständlichem Hinweis. | MUSS |
 | V17-FL-020 | Assist verwendet für Flugzeugstatus, Statuszeit, Pilotencode, Ist-Zeitlinie, Umlaufhistorie und Zustandsaktionen dieselbe Präsentations- und Bedienlogik wie der Supervisor. `FLIGHT_LINE` darf zulässige, erwartungsversionierte und idempotente Flugzeugzustandswechsel einschließlich `INACTIVE` nach `AVAILABLE` ausführen; Pilotwechsel bleibt gemäß `V161-FL-030` ausschließlich Flugleitung und Administration vorbehalten. | MUSS |
+| V17-FL-030 | Assist und Supervisor verwenden eine gemeinsame Ist-Zeitlinie mit den Stationen Boarding, Off-Block, On-Block und Verfügbar sowie einem davon nicht verbundenen Endpunkt Nicht verfügbar. Tanken wird gelb beziehungsweise orange, Pause violett und eine unspezifische Nichtverfügbarkeit rot dargestellt. Dieselbe Farbe kennzeichnet Status, aktuellen Zeitlinienpunkt und aktive Icon-Aktion. Pilotenanzeige und Pilotwechsel verwenden konsistent User- beziehungsweise User-Pen-Symbole; Primäraktionen besitzen je Ansicht eine zustandsunabhängig feste Breite, ein eindeutiges Symbol und einen kompakten Text. | MUSS |
+| V17-UI-040 | Transiente Aktionsrückmeldungen erscheinen ansichtsübergreifend als gestapelte Nachrichten rechts oben. Erfolg und Information verschwinden nach fünf Sekunden, Aktionsfehler nach zehn Sekunden; Hover und Tastaturfokus pausieren die Frist. Offlinezustand, unbestätigter Verbindungsstand, Notfallmodus, Betriebsunterbrechung, Betriebshinweise und notwendige Einrichtungswarnungen bleiben bis zur Zustandsänderung oder manuellen Schließung sichtbar. | MUSS |
+| V17-UI-050 | Die scrollbare Assist-Flugzeugauswahl verwendet auf Desktop eine schmale, abgerundete und themefähige Scrollbar. Touchgeräte ohne internen Listen-Scrollbereich behalten den Dokument-Scroll; bei 320 CSS-Pixeln entsteht kein horizontaler Dokumentüberlauf. | SOLL |
 
 ## Ablösung und Fortgeltung
 
@@ -50,5 +53,11 @@ Kompatibilität bestehen; es gibt keine Migration und keine neue Abhängigkeit.
   kein Layoutsprung, Schließen funktioniert und geänderte Meldungen erscheinen erneut.
 - Assist bei 390×844, 430×932, 768×1024, 1024×768 und 1536×1024: Übernahme, exklusive
   Arbeitsansicht, Nicht verfügbar/Verfügbar, Tanken, Pause, Umlaufzeitlinie und manuelle Freigabe.
+- Gemeinsame Flight-Line-Zeitlinie bei Boarding, Off-Block, On-Block, Turnaround, Verfügbar,
+  Tanken, Pause und Nicht verfügbar: durchgehende Rail bis Verfügbar, kein Strich zum separaten
+  Endpunkt Nicht verfügbar und identische aktive Farben in Status, Timeline und Aktion.
+- Aktionsrückmeldungen aus Flight Line, Kasse, Administration, Einrichtung und Kontenverwaltung:
+  fünf beziehungsweise zehn Sekunden, pausierbar per Hover/Fokus; betriebliche Dauermeldungen
+  bleiben davon unberührt.
 - Ansichtsmenü bei 320, 390 und 430 Pixeln ohne horizontalen Dokumentüberlauf oder abgeschnittenen
   Auswahlhaken.

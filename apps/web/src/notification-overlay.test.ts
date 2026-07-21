@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import appShellSource from "./app/AppShell.tsx?raw";
+import { inferActionNoticeTone } from "./app/PageNotifications";
 import noticesSource from "./app/PageNotifications.tsx?raw";
 import cashierSource from "./cashier-view.tsx?raw";
 import flightLineSource from "./flight-line-view.tsx?raw";
@@ -20,5 +21,22 @@ describe("cross-surface page notifications", () => {
     expect(noticesSource).toContain("dismissedKey === noticeKey");
     expect(noticesSource).toContain('aria-label="Meldung schließen"');
     expect(noticesSource).toContain("setDismissedKey(noticeKey)");
+  });
+
+  it("auto-dismisses action messages while persistent operational notices keep no timer", () => {
+    expect(noticesSource).toContain("ActionNotificationProvider");
+    expect(noticesSource).toContain("ActionNotificationStack");
+    expect(noticesSource).toContain("10_000 : 5_000");
+    expect(noticesSource).toContain("onPointerEnter");
+    expect(noticesSource).toContain("onFocusCapture");
+    expect(appShellSource).toContain("<ActionNotificationStack />");
+    expect(appShellSource).not.toContain("autoDismissMs={");
+    expect(inferActionNoticeTone("Belegung bestätigt.")).toBe("success");
+    expect(inferActionNoticeTone("Aktion fehlgeschlagen.")).toBe("danger");
+  });
+
+  it("routes action feedback out of the Flight-Line document flow", () => {
+    expect(flightLineSource).toContain("useActionMessageBridge(message, setMessage)");
+    expect(flightLineSource).not.toContain('className="action-message"');
   });
 });

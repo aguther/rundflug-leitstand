@@ -36,3 +36,12 @@ requirements:
   - id: V17-FL-020
     requirement: Assist teilt Status Zeitlinie Historie und Zustandsaktionen mit Supervisor; FLIGHT_LINE darf Flugzeugzustände aber keine Piloten ändern.
     status: implemented
+  - id: V17-FL-030
+    requirement: Assist und Supervisor teilen eine verbundene Ist-Zeitlinie kompakte Aktionen semantische Unterzustandsfarben und konsistente Pilotenicons.
+    status: implemented
+  - id: V17-UI-040
+    requirement: Transiente Aktionsmeldungen verschwinden zeitgesteuert; betriebliche Zustandsmeldungen bleiben persistent.
+    status: implemented
+  - id: V17-UI-050
+    requirement: Die scrollbare Assist-Flugzeugauswahl verwendet eine schmale themefähige Desktop-Scrollbar ohne mobilen Dokumentüberlauf.
+    status: implemented

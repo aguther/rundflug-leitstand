@@ -1,6 +1,17 @@
 import type { OperationBoard } from "@rundflug/contracts";
 import { aircraftOperationalStateLabels, rotationStateLabels } from "@rundflug/domain";
-import { Clock3, Plane } from "lucide-react";
+import {
+  Check,
+  CircleCheckBig,
+  Clock3,
+  Plane,
+  PlaneLanding,
+  PlaneTakeoff,
+  RotateCcw,
+  User,
+  UserCheck,
+  UserPen,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button, ConfirmationDialog, ModalDialog } from "./design-system/components";
 
@@ -9,15 +20,8 @@ export type FlightLineRotation = OperationBoard["rotations"][number];
 export type FlightLineFleetState = "AVAILABLE" | "REFUELING" | "PAUSED" | "INACTIVE";
 export type FlightLineStatusTone = "success" | "warning" | "danger" | "info" | "neutral";
 
-export function PilotCapIcon({ className }: { className?: string }) {
-  return (
-    <svg aria-hidden="true" className={className} fill="none" viewBox="0 0 24 24">
-      <path d="M4 14.5c1.8-4.9 4.6-7.4 8-7.4s6.2 2.5 8 7.4" />
-      <path d="M3.2 15c2.5 1.2 5.4 1.8 8.8 1.8s6.3-.6 8.8-1.8" />
-      <path d="M9.2 7.9 12 4.8l2.8 3.1M12 5v3" />
-    </svg>
-  );
-}
+export const PilotIcon = User;
+export const PilotChangeIcon = UserPen;
 
 export function operationalRotationForAircraft(
   aircraft: FlightLineAircraft,
@@ -95,6 +99,10 @@ export function flightLineStatusTone(status: string): FlightLineStatusTone {
   return "neutral";
 }
 
+export function flightLineStateClass(status: string): string {
+  return `flight-line-state-${status.toLocaleLowerCase("en-US")}`;
+}
+
 export function formatFlightLineTime(value: string | null | undefined, timeZone: string): string {
   if (!value) return "–";
   return new Intl.DateTimeFormat("de-DE", {
@@ -133,40 +141,117 @@ export function timelineSummary(
   return `Abschluss ${formatFlightLineTime(timeline.completionAt, timeZone)}`;
 }
 
+export type FlightProgressStepKey =
+  | "boarding"
+  | "offblock"
+  | "onblock"
+  | "available"
+  | "unavailable";
+
+export interface FlightProgressStep {
+  key: FlightProgressStepKey;
+  label: string;
+  time: string | null | undefined;
+  reached: boolean;
+  current: boolean;
+  connectorReached: boolean;
+}
+
+export function flightProgressSteps(
+  aircraft: FlightLineAircraft,
+  rotation: FlightLineRotation | undefined,
+): FlightProgressStep[] {
+  const status = visibleAircraftState(aircraft, rotation);
+  const timeline = rotation?.timeline.actual;
+  const unavailable = ["REFUELING", "PAUSED", "INTERRUPTED", "INACTIVE"].includes(status);
+  const current: FlightProgressStepKey | null = unavailable
+    ? "unavailable"
+    : status === "BOARDING"
+      ? "boarding"
+      : status === "IN_FLIGHT"
+        ? "offblock"
+        : status === "LANDED"
+          ? "onblock"
+          : status === "AVAILABLE"
+            ? "available"
+            : null;
+  const availableReached =
+    status === "AVAILABLE" &&
+    (!rotation || rotation.status === "DRAFT" || rotation.status === "COMPLETED");
+  const reached = {
+    boarding: Boolean(timeline?.boardingAt),
+    offblock: Boolean(timeline?.departureAt),
+    onblock: Boolean(timeline?.landingAt),
+    available: availableReached,
+    unavailable,
+  } as const;
+  const steps: Array<
+    Omit<FlightProgressStep, "current" | "connectorReached"> & { key: FlightProgressStepKey }
+  > = [
+    { key: "boarding", label: "Boarding", time: timeline?.boardingAt, reached: reached.boarding },
+    { key: "offblock", label: "Off-Block", time: timeline?.departureAt, reached: reached.offblock },
+    { key: "onblock", label: "On-Block", time: timeline?.landingAt, reached: reached.onblock },
+    {
+      key: "available",
+      label: "Verfügbar",
+      time: availableReached ? aircraft.operationalStateChangedAt : null,
+      reached: reached.available,
+    },
+    {
+      key: "unavailable",
+      label: "Nicht verfügbar",
+      time: unavailable ? aircraft.operationalStateChangedAt : null,
+      reached: reached.unavailable,
+    },
+  ];
+  return steps.map((step, index) => ({
+    ...step,
+    current: current === step.key,
+    connectorReached:
+      step.key !== "unavailable" &&
+      step.key !== "available" &&
+      step.reached &&
+      Boolean(steps[index + 1]?.reached),
+  }));
+}
+
 export function FlightProgress({
   aircraft,
   rotation,
   timeZone,
+  variant = "compact",
 }: {
   aircraft: FlightLineAircraft;
   rotation: FlightLineRotation | undefined;
   timeZone: string;
+  variant?: "compact" | "detailed";
 }) {
   const status = visibleAircraftState(aircraft, rotation);
-  const currentIndex = {
-    AVAILABLE: 0,
-    BOARDING: 1,
-    IN_FLIGHT: 2,
-    LANDED: 3,
-    TURNAROUND: 4,
-    REFUELING: 3,
-    PAUSED: 1,
-    INTERRUPTED: 1,
-    INACTIVE: 1,
-  }[status];
+  const steps = flightProgressSteps(aircraft, rotation);
   return (
-    <span
-      aria-label={timelineSummary(rotation, timeZone)}
-      className={`flight-director-progress state-${status.toLocaleLowerCase("en-US")}`}
-      role="img"
+    <ol
+      aria-label={`Ist-Zeitlinie · ${aircraftStatusLabel(aircraft, rotation)} seit ${formatFlightLineTime(
+        aircraft.operationalStateChangedAt,
+        timeZone,
+      )}`}
+      className={`flight-director-progress flight-director-progress--${variant} state-${status.toLocaleLowerCase("en-US")}`}
     >
-      {["bereit", "boarding", "offblock", "onblock", "abschluss"].map((step, index) => (
-        <span
-          className={index === currentIndex ? "current" : index < currentIndex ? "done" : ""}
-          key={step}
-        />
+      {steps.map((step) => (
+        <li
+          aria-current={step.current ? "step" : undefined}
+          aria-label={`${step.label}: ${step.time ? formatFlightLineTime(step.time, timeZone) : step.current ? "aktuell" : step.reached ? "erreicht" : "ausstehend"}`}
+          className={`${step.reached ? "reached" : ""} ${step.current ? "current" : ""} ${step.connectorReached ? "connector-reached" : ""}`.trim()}
+          data-step={step.key}
+          key={step.key}
+        >
+          <span className="flight-director-progress-label">{step.label}</span>
+          <span className="flight-director-progress-node" aria-hidden="true">
+            {step.reached && !step.current ? <Check /> : null}
+          </span>
+          <small>{formatFlightLineTime(step.time, timeZone)}</small>
+        </li>
       ))}
-    </span>
+    </ol>
   );
 }
 
@@ -205,10 +290,34 @@ export function primaryAircraftActionLabel(
   return "Keine Aktion";
 }
 
+export function primaryAircraftActionPresentation(
+  aircraft: FlightLineAircraft,
+  rotation: FlightLineRotation | undefined,
+) {
+  if (
+    ["REFUELING", "PAUSED", "INTERRUPTED", "INACTIVE", "TURNAROUND"].includes(
+      aircraft.operationalState,
+    )
+  ) {
+    return { Icon: RotateCcw, shortLabel: "Verfügbar setzen" };
+  }
+  if (!rotation || rotation.status === "DRAFT") {
+    return { Icon: UserCheck, shortLabel: "Boarding starten" };
+  }
+  if (rotation.status === "CALLED") return { Icon: PlaneTakeoff, shortLabel: "Off-Block" };
+  if (rotation.status === "IN_FLIGHT") return { Icon: PlaneLanding, shortLabel: "On-Block" };
+  if (rotation.status === "LANDED") {
+    return { Icon: CircleCheckBig, shortLabel: "Umlauf abschließen" };
+  }
+  return { Icon: CircleCheckBig, shortLabel: "Keine Aktion" };
+}
+
 export function CompactCurrentRotation({
+  aircraft,
   rotation,
   timeZone,
 }: {
+  aircraft: FlightLineAircraft | undefined;
   rotation: FlightLineRotation | undefined;
   timeZone: string;
 }) {
@@ -236,20 +345,16 @@ export function CompactCurrentRotation({
           <dd>{rotation.pilotOperationalCode ?? "–"}</dd>
         </div>
       </dl>
-      <section className="flight-director-current-timeline" aria-label="Umlaufzeitlinie">
-        {[
-          ["Boarding", rotation.timeline.actual.boardingAt],
-          ["Offblock", rotation.timeline.actual.departureAt],
-          ["Onblock", rotation.timeline.actual.landingAt],
-          ["Abschluss / Folgestatus", rotation.timeline.actual.completionAt],
-        ].map(([label, value]) => (
-          <span className={value ? "reached" : ""} key={label}>
-            <strong>{label}</strong>
-            <i aria-hidden="true" />
-            <small>{formatFlightLineTime(value, timeZone)}</small>
-          </span>
-        ))}
-      </section>
+      {aircraft ? (
+        <section className="flight-director-current-timeline" aria-label="Umlaufzeitlinie">
+          <FlightProgress
+            aircraft={aircraft}
+            rotation={rotation}
+            timeZone={timeZone}
+            variant="detailed"
+          />
+        </section>
+      ) : null}
     </div>
   );
 }
@@ -361,7 +466,7 @@ export function PilotAssignmentDialogs({
         open={open}
         title={
           <span className="flight-director-dialog-title">
-            <PilotCapIcon /> Pilot zuweisen{aircraft ? ` · ${aircraft.registration}` : ""}
+            <PilotChangeIcon /> Pilot zuweisen{aircraft ? ` · ${aircraft.registration}` : ""}
           </span>
         }
       >
@@ -386,7 +491,7 @@ export function PilotAssignmentDialogs({
                   onChange={() => setPilotId(pilot.id)}
                   type="radio"
                 />
-                <PilotCapIcon />
+                <PilotIcon />
                 <span>
                   <strong>{pilot.operationalCode}</strong>
                   <small>

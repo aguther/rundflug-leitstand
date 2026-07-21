@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { ValidationHint } from "./admin-ux";
 import { claimFlightLineAircraft, releaseFlightLineAircraft, sendCommand } from "./api";
 import { AppShell as Shell } from "./app/AppShell";
+import { useActionMessageBridge } from "./app/PageNotifications";
 import { FlightLineAssist } from "./flight-line-assist";
 import { expectedReviewAtFromPause } from "./flight-line-pause";
 import { FlightLineSupervisorConsole } from "./flight-line-supervisor";
@@ -53,6 +54,7 @@ export function FlightLineView() {
   const [selectedAircraftId, setSelectedAircraftId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  useActionMessageBridge(message, setMessage);
   const [queueReason, setQueueReason] = useState("");
   const [emergencyReason, setEmergencyReason] = useState("");
   const [nextAircraftId, setNextAircraftId] = useState("");
@@ -626,7 +628,6 @@ export function FlightLineView() {
           aircraft={operationalAircraft}
           board={board}
           canAssignPilot={canManageAircraft}
-          message={message}
           onAssignPilot={assignAircraftPilot}
           onClaim={async (aircraftId) => {
             await claimFlightLineAircraft(
@@ -712,7 +713,6 @@ export function FlightLineView() {
         <FlightLineSupervisorConsole
           aircraft={operationalAircraft}
           board={board}
-          message={message}
           selectedQueueGroupIds={selectedQueueGroupIds}
           onAssignPilot={assignAircraftPilot}
           onConfirmAssignment={() => void advance()}
@@ -1196,11 +1196,6 @@ export function FlightLineView() {
                         </button>
                       ) : null}
                     </div>
-                  </div>
-                ) : null}
-                {message ? (
-                  <div className="action-message" role="status">
-                    {message}
                   </div>
                 ) : null}
                 {selected.status === "CALLED" &&

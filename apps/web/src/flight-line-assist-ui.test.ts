@@ -41,6 +41,13 @@ describe("Flight Line Assist", () => {
     expect(assistSource).toContain("assist-v15-operational-state");
     expect(assistStyles).toContain(".assist-v15-picker-meta");
     expect(assistStyles).toContain("display: grid");
+    expect(assistSource).toContain(
+      'aria-pressed={activeAircraft.operationalState === "REFUELING"}',
+    );
+    expect(assistSource).toContain("PilotChangeIcon");
+    expect(assistSource).toContain("primaryAircraftActionPresentation");
+    expect(assistStyles).toContain("scrollbar-width: thin");
+    expect(assistStyles).toContain("::-webkit-scrollbar-thumb");
   });
 
   it("uses the shared design system and Lucide instead of a duplicated shell", () => {

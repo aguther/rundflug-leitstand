@@ -21,14 +21,17 @@ import {
   type FlightLineFleetState,
   FlightProgress,
   flightLineGroupLabel,
+  flightLineStateClass,
   flightLineStatusTone,
   formatFlightLineTime,
   latestRotationForAircraft,
   nextAircraftStep,
   operationalRotationForAircraft,
   PilotAssignmentDialogs,
-  PilotCapIcon,
+  PilotChangeIcon,
+  PilotIcon,
   primaryAircraftActionLabel,
+  primaryAircraftActionPresentation,
   rotationHistoryForAircraft,
   visibleAircraftState,
 } from "./flight-line-shared";
@@ -49,7 +52,6 @@ export function FlightLineSupervisorConsole({
   board,
   aircraft,
   selectedAircraft,
-  message,
   selectedQueueGroupIds,
   onAssignPilot,
   onConfirmAssignment,
@@ -65,7 +67,6 @@ export function FlightLineSupervisorConsole({
   board: OperationBoard;
   aircraft: Aircraft[];
   selectedAircraft: Aircraft | undefined;
-  message: string | null;
   selectedQueueGroupIds: string[];
   onAssignPilot: (aircraftId: string, pilotId: string, reassign: boolean) => Promise<void>;
   onConfirmAssignment: () => void;
@@ -181,8 +182,6 @@ export function FlightLineSupervisorConsole({
         }
       />
 
-      {message ? <p className="action-message">{message}</p> : null}
-
       <Panel className="flight-director-aircraft" padding="none">
         <section className="flight-director-aircraft-table" aria-label="Flugzeuge">
           <div className="flight-director-aircraft-head">
@@ -201,6 +200,8 @@ export function FlightLineSupervisorConsole({
             const isSelected = entry.id === selectedAircraft?.id;
             const pilotChangeAllowed = !rotation || ["DRAFT", "CALLED"].includes(rotation.status);
             const startBlockAllowed = entry.operationalState === "AVAILABLE";
+            const primaryPresentation = primaryAircraftActionPresentation(entry, rotation);
+            const PrimaryActionIcon = primaryPresentation.Icon;
             return (
               <div
                 className={
@@ -226,7 +227,10 @@ export function FlightLineSupervisorConsole({
                   <small>{entry.resourceGroupName}</small>
                 </span>
                 <span className="flight-director-aircraft-status">
-                  <StatusPill tone={flightLineStatusTone(status)}>
+                  <StatusPill
+                    className={flightLineStateClass(status)}
+                    tone={flightLineStatusTone(status)}
+                  >
                     {aircraftStatusLabel(entry, rotation)}
                   </StatusPill>
                   <small>
@@ -235,6 +239,7 @@ export function FlightLineSupervisorConsole({
                   </small>
                 </span>
                 <span className="flight-director-pilot-code">
+                  <PilotIcon aria-hidden="true" />
                   <strong>{entry.currentPilotOperationalCode ?? "–"}</strong>
                 </span>
                 <span className="flight-director-group-chips">
@@ -260,15 +265,18 @@ export function FlightLineSupervisorConsole({
                 </span>
                 <span className="flight-director-row-actions">
                   <Button
+                    aria-label={primaryAircraftActionLabel(entry, rotation)}
                     disabled={rotation?.status === "COMPLETED"}
                     onClick={(event) => {
                       event.stopPropagation();
                       runPrimary(entry, rotation);
                     }}
-                    size="compact"
+                    size="touch"
+                    title={primaryAircraftActionLabel(entry, rotation)}
                     variant="primary"
                   >
-                    {primaryAircraftActionLabel(entry, rotation)}
+                    <PrimaryActionIcon aria-hidden="true" />
+                    {primaryPresentation.shortLabel}
                   </Button>
                   <IconButton
                     disabled={!pilotChangeAllowed}
@@ -277,43 +285,49 @@ export function FlightLineSupervisorConsole({
                       event.stopPropagation();
                       openPilot(entry);
                     }}
-                    size="compact"
+                    size="touch"
                     type="button"
                   >
-                    <PilotCapIcon />
+                    <PilotChangeIcon aria-hidden="true" />
                   </IconButton>
                   <IconButton
+                    aria-pressed={entry.operationalState === "REFUELING"}
+                    className="flight-line-status-action state-refueling"
                     disabled={!startBlockAllowed}
                     label={`${entry.registration} zum Tanken setzen`}
                     onClick={(event) => {
                       event.stopPropagation();
                       onSetAircraftState(entry.id, "REFUELING");
                     }}
-                    size="compact"
+                    size="touch"
                     type="button"
                   >
                     <Fuel aria-hidden="true" />
                   </IconButton>
                   <IconButton
+                    aria-pressed={entry.operationalState === "PAUSED"}
+                    className="flight-line-status-action state-paused"
                     disabled={!startBlockAllowed}
                     label={`${entry.registration} in Pause setzen`}
                     onClick={(event) => {
                       event.stopPropagation();
                       onPauseAircraft(entry.id);
                     }}
-                    size="compact"
+                    size="touch"
                     type="button"
                   >
                     <Coffee aria-hidden="true" />
                   </IconButton>
                   <IconButton
+                    aria-pressed={["INACTIVE", "INTERRUPTED"].includes(entry.operationalState)}
+                    className="flight-line-status-action state-inactive"
                     disabled={!startBlockAllowed}
                     label={`${entry.registration} nicht verfügbar setzen`}
                     onClick={(event) => {
                       event.stopPropagation();
                       onSetAircraftState(entry.id, "INACTIVE");
                     }}
-                    size="compact"
+                    size="touch"
                     type="button"
                   >
                     <CircleOff aria-hidden="true" />
@@ -337,7 +351,11 @@ export function FlightLineSupervisorConsole({
             value={bottomTab}
           />
           {bottomTab === "current" ? (
-            <CompactCurrentRotation rotation={currentRotation} timeZone={board.event.timeZone} />
+            <CompactCurrentRotation
+              aircraft={selectedAircraft}
+              rotation={currentRotation}
+              timeZone={board.event.timeZone}
+            />
           ) : (
             <CompactHistory history={history} timeZone={board.event.timeZone} />
           )}
@@ -444,7 +462,8 @@ export function FlightLineSupervisorConsole({
               </p>
             ) : (
               <p className="flight-director-dialog-pilot">
-                <PilotCapIcon /> Pilot {selectedAircraft.currentPilotOperationalCode}
+                <PilotIcon aria-hidden="true" /> Pilot{" "}
+                {selectedAircraft.currentPilotOperationalCode}
               </p>
             )}
           </aside>

@@ -40,7 +40,9 @@ describe("Flight Line Supervisor", () => {
     expect(flightLineSource).toContain("Boarding");
     expect(flightLineSource).toContain("Offblock");
     expect(flightLineSource).toContain("Onblock");
-    expect(flightLineSource).toContain("Abschluss / Folgestatus");
+    expect(flightLineSource).toContain("Nicht verfügbar");
+    expect(flightLineSource).toContain("PilotChangeIcon");
+    expect(flightLineSource).toContain("primaryAircraftActionPresentation");
     expect(supervisorSource).toContain("rotationStateLabels[rotation.status]");
     expect(supervisorSource).not.toContain("<dd>{rotation.status}</dd>");
     expect(supervisorSource).not.toContain('{ value: "tickets", label: "Verkaufte Tickets" }');

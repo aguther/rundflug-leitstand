@@ -2,8 +2,8 @@ import type { OperationBoard } from "@rundflug/contracts";
 import {
   Ban,
   BellRing,
-  Check,
   ChevronDown,
+  CircleCheckBig,
   CircleOff,
   Coffee,
   Fuel,
@@ -17,6 +17,7 @@ import {
   Users,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useActionMessageBridge } from "./app/PageNotifications";
 import {
   Button,
   IconButton,
@@ -32,13 +33,16 @@ import {
   CompactHistory,
   type FlightLineFleetState,
   FlightProgress,
+  flightLineStateClass,
   flightLineStatusTone,
   formatFlightLineTime,
   latestRotationForAircraft,
   operationalRotationForAircraft,
   PilotAssignmentDialogs,
-  PilotCapIcon,
+  PilotChangeIcon,
+  PilotIcon,
   primaryAircraftActionLabel,
+  primaryAircraftActionPresentation,
   rotationHistoryForAircraft,
   visibleAircraftState,
 } from "./flight-line-shared";
@@ -71,7 +75,10 @@ function AircraftPickerMeta({
   const status = visibleAircraftState(aircraft, rotation);
   return (
     <div className="assist-v15-picker-meta">
-      <StatusPill className="assist-v15-operational-state" tone={flightLineStatusTone(status)}>
+      <StatusPill
+        className={`assist-v15-operational-state ${flightLineStateClass(status)}`}
+        tone={flightLineStatusTone(status)}
+      >
         {aircraftStatusLabel(aircraft, rotation)}
       </StatusPill>
       <span>
@@ -90,7 +97,6 @@ export function FlightLineAssist({
   board,
   aircraft,
   canAssignPilot,
-  message,
   onAssignPilot,
   onClaim,
   onClaimUnavailable,
@@ -111,7 +117,6 @@ export function FlightLineAssist({
   board: OperationBoard;
   aircraft: Aircraft[];
   canAssignPilot: boolean;
-  message: string | null;
   onAssignPilot: (aircraftId: string, pilotId: string, reassign: boolean) => Promise<void>;
   onClaim: (aircraftId: string) => Promise<void>;
   onClaimUnavailable: () => void;
@@ -138,6 +143,7 @@ export function FlightLineAssist({
   const [releasing, setReleasing] = useState(false);
   const [visibleAircraftCount, setVisibleAircraftCount] = useState(5);
   const [claimError, setClaimError] = useState<string | null>(null);
+  useActionMessageBridge(claimError, setClaimError);
   const [openGroupMenuId, setOpenGroupMenuId] = useState<string | null>(null);
   const [detailTab, setDetailTab] = useState<"current" | "history">("current");
   const [pilotOpen, setPilotOpen] = useState(false);
@@ -195,6 +201,10 @@ export function FlightLineAssist({
     (!assignedRotation || assignedRotation.status === "DRAFT");
   const pilotChangeAllowed =
     canAssignPilot && (!assignedRotation || ["DRAFT", "CALLED"].includes(assignedRotation.status));
+  const primaryPresentation = activeAircraft
+    ? primaryAircraftActionPresentation(activeAircraft, activeRotation)
+    : null;
+  const PrimaryActionIcon = primaryPresentation?.Icon;
 
   useEffect(() => {
     if (!ownServerClaim) return;
@@ -387,11 +397,6 @@ export function FlightLineAssist({
   if (!activeAircraft) {
     return (
       <section className="flight-assist flight-assist-v15 is-selection-mode">
-        {message || claimError ? (
-          <p className="assist-v15-message" role="status">
-            {claimError ?? message}
-          </p>
-        ) : null}
         <Panel className="assist-v15-picker" padding="compact">
           <PageHeader
             actions={
@@ -456,12 +461,6 @@ export function FlightLineAssist({
 
   return (
     <section className="flight-assist flight-assist-v15 has-claim is-work-mode">
-      {message || claimError ? (
-        <p className="assist-v15-message" role="status">
-          {claimError ?? message}
-        </p>
-      ) : null}
-
       <div className="assist-v15-active-column">
         <Panel className="assist-v15-aircraft-panel" padding="compact">
           <div className="assist-v15-active-heading">
@@ -471,7 +470,10 @@ export function FlightLineAssist({
             <div>
               <div className="assist-v15-active-title">
                 <strong>{activeAircraft.registration}</strong>
-                <StatusPill tone={flightLineStatusTone(visibleStatus)}>
+                <StatusPill
+                  className={flightLineStateClass(visibleStatus)}
+                  tone={flightLineStatusTone(visibleStatus)}
+                >
                   {aircraftStatusLabel(activeAircraft, assignedRotation)}
                 </StatusPill>
               </div>
@@ -491,11 +493,12 @@ export function FlightLineAssist({
             </div>
             <div className="assist-v15-active-tools">
               <span className="assist-v15-pilot-code">
-                <PilotCapIcon /> Pilot {activeAircraft.currentPilotOperationalCode ?? "–"}
+                <PilotIcon aria-hidden="true" /> Pilot{" "}
+                {activeAircraft.currentPilotOperationalCode ?? "–"}
               </span>
               {pilotChangeAllowed ? (
                 <Button onClick={() => setPilotOpen(true)} size="compact" variant="ghost">
-                  <PilotCapIcon /> Pilot wechseln
+                  <PilotChangeIcon aria-hidden="true" /> Pilot wechseln
                 </Button>
               ) : null}
               <Button
@@ -514,6 +517,7 @@ export function FlightLineAssist({
               aircraft={activeAircraft}
               rotation={assignedRotation ?? displayedRotation}
               timeZone={board.event.timeZone}
+              variant="detailed"
             />
           </div>
         </Panel>
@@ -524,62 +528,75 @@ export function FlightLineAssist({
               <fieldset className="assist-v15-turnaround">
                 <legend>Zustand nach Abschluss</legend>
                 {[
-                  { state: "AVAILABLE" as const, label: "Verfügbar", Icon: UserCheck },
+                  { state: "AVAILABLE" as const, label: "Verfügbar", Icon: CircleCheckBig },
                   { state: "REFUELING" as const, label: "Tanken", Icon: Fuel },
                   { state: "PAUSED" as const, label: "Pause", Icon: Coffee },
                   { state: "INACTIVE" as const, label: "Nicht verfügbar", Icon: CircleOff },
                 ].map(({ state, label, Icon }) => (
-                  <Button
+                  <IconButton
                     aria-pressed={turnaroundNextState === state}
+                    className={`flight-line-status-action state-${state.toLocaleLowerCase("en-US")}`}
                     key={state}
+                    label={`Folgestatus ${label}`}
                     onClick={() => onTurnaroundNextStateChange(state)}
-                    size="compact"
-                    variant={turnaroundNextState === state ? "secondary" : "ghost"}
+                    size="touch"
                   >
-                    <Icon aria-hidden="true" /> {label}
-                  </Button>
+                    <Icon aria-hidden="true" />
+                  </IconButton>
                 ))}
               </fieldset>
             ) : null}
             <Button
-              className="assist-v15-primary-action"
-              disabled={primaryDisabled}
-              onClick={runPrimary}
-              size="touch"
-              variant="primary"
-            >
-              <Check aria-hidden="true" />
-              {primaryAircraftActionLabel(
+              aria-label={primaryAircraftActionLabel(
                 activeAircraft,
                 activeRotation,
                 "Belegung bestätigen & Boarding starten",
               )}
+              className="assist-v15-primary-action"
+              disabled={primaryDisabled}
+              onClick={runPrimary}
+              size="touch"
+              title={primaryAircraftActionLabel(
+                activeAircraft,
+                activeRotation,
+                "Belegung bestätigen & Boarding starten",
+              )}
+              variant="primary"
+            >
+              {PrimaryActionIcon ? <PrimaryActionIcon aria-hidden="true" /> : null}
+              {primaryPresentation?.shortLabel}
             </Button>
             <fieldset className="assist-v15-secondary-actions" aria-label="Flugzeugstatus">
-              <Button
+              <IconButton
+                aria-pressed={activeAircraft.operationalState === "REFUELING"}
+                className="flight-line-status-action state-refueling"
                 disabled={!secondaryAllowed}
+                label="Tanken"
                 onClick={() => onSetAircraftState(activeAircraft.id, "REFUELING")}
                 size="touch"
-                variant="ghost"
               >
-                <Fuel aria-hidden="true" /> Tanken
-              </Button>
-              <Button
+                <Fuel aria-hidden="true" />
+              </IconButton>
+              <IconButton
+                aria-pressed={activeAircraft.operationalState === "PAUSED"}
+                className="flight-line-status-action state-paused"
                 disabled={!secondaryAllowed}
+                label="Pause"
                 onClick={() => onPause(activeAircraft.id)}
                 size="touch"
-                variant="ghost"
               >
-                <Coffee aria-hidden="true" /> Pause
-              </Button>
-              <Button
+                <Coffee aria-hidden="true" />
+              </IconButton>
+              <IconButton
+                aria-pressed={["INACTIVE", "INTERRUPTED"].includes(activeAircraft.operationalState)}
+                className="flight-line-status-action state-inactive"
                 disabled={!secondaryAllowed}
+                label="Nicht verfügbar"
                 onClick={() => onSetAircraftState(activeAircraft.id, "INACTIVE")}
                 size="touch"
-                variant="ghost"
               >
-                <CircleOff aria-hidden="true" /> Nicht verfügbar
-              </Button>
+                <CircleOff aria-hidden="true" />
+              </IconButton>
             </fieldset>
           </div>
           <Tabs
@@ -594,6 +611,7 @@ export function FlightLineAssist({
           <div className="assist-v15-rotation-detail">
             {detailTab === "current" ? (
               <CompactCurrentRotation
+                aircraft={activeAircraft}
                 rotation={displayedRotation}
                 timeZone={board.event.timeZone}
               />

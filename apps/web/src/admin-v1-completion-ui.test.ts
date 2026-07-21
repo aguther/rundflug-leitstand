@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import adminUxSource from "./admin-ux.tsx?raw";
 import adminViewSource from "./admin-view.tsx?raw";
+import notificationsSource from "./app/PageNotifications.tsx?raw";
 import sharedSource from "./operation-workspace.tsx?raw";
 
 const appSource = `${adminViewSource}\n${sharedSource}`;
@@ -72,15 +73,15 @@ describe("V1 administration completion UI", () => {
     expect(stylesSource).toContain("grid-auto-rows: max-content");
   });
 
-  it("keeps admin action feedback visible above dialogs and makes text part of the hit target", () => {
+  it("routes admin action feedback through the global auto-dismissing notification stack", () => {
     expect(appSource).toContain("factoryResetError");
-    expect(appSource).toContain('className="action-message admin-action-message"');
+    expect(appSource).toContain("useActionMessageBridge(message, setMessage)");
     expect(stylesSource).toContain(".admin-workspace button > span");
-    expect(stylesSource).toContain(".admin-action-message");
-    expect(stylesSource).toContain("z-index: 90");
+    expect(stylesSource).toContain(".page-notification-region");
     expect(stylesSource).toContain("top: 76px");
-    expect(appSource).toContain('aria-label="Hinweis schließen"');
-    expect(appSource).toContain("6_000");
+    expect(notificationsSource).toContain("export function ActionNotificationStack()");
+    expect(notificationsSource).toContain('aria-label="Meldung schließen"');
+    expect(notificationsSource).toContain('notice.tone === "danger" ? 10_000 : 5_000');
   });
 
   it("distinguishes missing Web Push setup from zero active subscriptions", () => {
