@@ -3,7 +3,7 @@ import migration from "../migrations/0038_aircraft_state_changed_at.sql?raw";
 import coordinator from "./event-coordinator.ts?raw";
 import worker from "./index.ts?raw";
 
-describe("V1.6.1 aircraft pilot assignment", () => {
+describe("V1.7.0 aircraft pilot assignment", () => {
   it("persists and projects the last real aircraft-state transition", () => {
     expect(migration).toContain("ADD COLUMN operational_state_changed_at TEXT");
     expect(migration).toContain("MAX(oe.occurred_at)");

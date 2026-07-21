@@ -1,0 +1,13 @@
+ID,Modul,Tests,Status
+V17-REL-010,packages/config und scripts/verify_requirements.py,Requirements- und Versionsverifikation,umgesetzt
+V17-KAS-010,apps/web/src/cashier-view.tsx und features/cashier/cashier-v12.css,cashier-v1-6.test.ts und Browserabnahme mit drei Produkten,umgesetzt
+V17-KAS-020,apps/web/src/cashier-view.tsx und features/cashier/cashier-v12.css,cashier-v1-6.test.ts und responsive Browserabnahme,umgesetzt
+V17-KAS-030,apps/web/src/cashier-view.tsx und admin-view.tsx sowie apps/worker/src/event-coordinator.ts,cashier-guidance-ui.test.ts und Worker-Gesamttest,umgesetzt
+V17-KAS-040,apps/web/src/cashier-view.tsx,cashier-v1-6.test.ts und Verkaufsablauf im Browser,umgesetzt
+V17-OPS-010,packages/domain/src/queue.ts packages/contracts und apps/worker/src/event-coordinator.ts sowie index.ts,queue.test.ts split-booking-group.test.ts und scripts/verify_queue_grouping.mjs mit 4→3+1-Integration,umgesetzt
+V17-TKT-010,apps/web/src/cashier-view.tsx und features/cashier/cashier-v12.css,cashier-v1-6.test.ts Drucktest und Browserdialog,umgesetzt
+V17-UI-010,apps/web/src/features/cashier/cashier-v12.css,cashier-v1-6.test.ts und Browserabnahme 1194×679,umgesetzt
+V17-UI-020,apps/web/src/app/PageNotifications.tsx AppShell.tsx und operation-workspace.tsx,notification-overlay.test.ts und Browserabnahme gestapelter Meldungen,umgesetzt
+V17-UI-030,apps/web/src/app/AppHeader.tsx und design-system/base.css,apps/web/src/app/navigation.test.ts und Browserabnahme bei 320/390/430 Pixeln,umgesetzt
+V17-FL-010,apps/web/src/flight-line-assist.tsx und flight-line-view.tsx,Assist-Komponententests und Browserablauf für Claim/Wiederherstellung/Freigabe,umgesetzt
+V17-FL-020,packages/domain/src/index.ts apps/worker/src/event-coordinator.ts und apps/web/src/flight-line-shared.tsx,Domain-/Worker-/UI-Tests test:fleet-operations und vollständiger Browserablauf,umgesetzt

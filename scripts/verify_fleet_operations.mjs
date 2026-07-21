@@ -55,12 +55,20 @@ const board = async (deviceId, token) => {
   if (!response.ok) throw new Error(`Board-Abruf fehlgeschlagen (${response.status}).`);
   return response.json();
 };
-const command = async (deviceId, token, expectedVersion, type, payload, expectedStatus = 200) => {
+const command = async (
+  deviceId,
+  token,
+  expectedVersion,
+  type,
+  payload,
+  expectedStatus = 200,
+  commandId = randomUUID(),
+) => {
   const response = await fetch(`${base}/api/events/demo-2026/commands`, {
     method: "POST",
     headers: { "content-type": "application/json", "x-device-token": token },
     body: JSON.stringify({
-      commandId: randomUUID(),
+      commandId,
       eventId: "demo-2026",
       deviceId,
       expectedVersion,
@@ -88,8 +96,8 @@ const code = () =>
     .replaceAll(/[01OI_-]/g, "A");
 const admin = (version, type, payload, expectedStatus) =>
   command(devices.admin, tokens.admin, version, type, payload, expectedStatus);
-const flight = (version, type, payload, expectedStatus) =>
-  command(devices.flightLine, tokens.flightLine, version, type, payload, expectedStatus);
+const flight = (version, type, payload, expectedStatus, commandId) =>
+  command(devices.flightLine, tokens.flightLine, version, type, payload, expectedStatus, commandId);
 
 try {
   await waitForWorker();
@@ -136,12 +144,88 @@ try {
     },
   );
   const reviewAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
-  const pausedAircraft = await admin(sold.event.version, "SET_AIRCRAFT_OPERATIONAL_STATE", {
-    aircraftId: "aircraft-a",
-    state: "PAUSED",
-    reason: "Synthetische Flugzeugpause",
-    expectedReviewAt: reviewAt,
-  });
+  const inactiveCommandId = randomUUID();
+  const inactiveByFlightLine = await flight(
+    sold.event.version,
+    "SET_AIRCRAFT_OPERATIONAL_STATE",
+    {
+      aircraftId: "aircraft-a",
+      state: "INACTIVE",
+      reason: "Synthetischer Assist-Test Nicht verfügbar",
+      expectedReviewAt: reviewAt,
+    },
+    200,
+    inactiveCommandId,
+  );
+  const duplicateInactive = await flight(
+    sold.event.version,
+    "SET_AIRCRAFT_OPERATIONAL_STATE",
+    {
+      aircraftId: "aircraft-a",
+      state: "INACTIVE",
+      reason: "Synthetischer Assist-Test Nicht verfügbar",
+      expectedReviewAt: reviewAt,
+    },
+    200,
+    inactiveCommandId,
+  );
+  if (
+    !duplicateInactive.duplicate ||
+    duplicateInactive.event.version !== inactiveByFlightLine.event.version
+  ) {
+    throw new Error("Idempotente Flugzeugstatusänderung wurde nicht als Duplikat bestätigt.");
+  }
+  await flight(
+    sold.event.version,
+    "SET_AIRCRAFT_OPERATIONAL_STATE",
+    {
+      aircraftId: "aircraft-a",
+      state: "AVAILABLE",
+      reason: "Synthetischer stale Assist-Test",
+      expectedReviewAt: null,
+    },
+    409,
+  );
+  const availableAfterInactive = await flight(
+    inactiveByFlightLine.event.version,
+    "SET_AIRCRAFT_OPERATIONAL_STATE",
+    {
+      aircraftId: "aircraft-a",
+      state: "AVAILABLE",
+      reason: "Synthetischer Assist-Test wieder verfügbar",
+      expectedReviewAt: null,
+    },
+  );
+  const refuelingAircraft = await flight(
+    availableAfterInactive.event.version,
+    "SET_AIRCRAFT_OPERATIONAL_STATE",
+    {
+      aircraftId: "aircraft-a",
+      state: "REFUELING",
+      reason: "Synthetischer Assist-Test Tanken",
+      expectedReviewAt: null,
+    },
+  );
+  const availableAfterRefueling = await flight(
+    refuelingAircraft.event.version,
+    "SET_AIRCRAFT_OPERATIONAL_STATE",
+    {
+      aircraftId: "aircraft-a",
+      state: "AVAILABLE",
+      reason: "Synthetischer Assist-Test Tanken abgeschlossen",
+      expectedReviewAt: null,
+    },
+  );
+  const pausedAircraft = await flight(
+    availableAfterRefueling.event.version,
+    "SET_AIRCRAFT_OPERATIONAL_STATE",
+    {
+      aircraftId: "aircraft-a",
+      state: "PAUSED",
+      reason: "Synthetische Flugzeugpause",
+      expectedReviewAt: reviewAt,
+    },
+  );
   await flight(
     pausedAircraft.event.version,
     "CALL_NEXT",
@@ -173,7 +257,7 @@ try {
       `Flugzeugqueue, Prüfzeitpunkt oder automatische Neuplanung fehlt: ${JSON.stringify({ pausedSummary, predictionQuality: affectedRotation?.timeline.predictionQuality })}`,
     );
   }
-  const restoredAircraft = await admin(
+  const restoredAircraft = await flight(
     pausedAircraft.event.version,
     "SET_AIRCRAFT_OPERATIONAL_STATE",
     {
@@ -347,6 +431,11 @@ try {
         entry.eventType === "AIRCRAFT_OPERATIONAL_STATE_CHANGED" &&
         entry.payload.expectedReviewAt === reviewAt,
     ) ||
+    aircraftHistory.entries.filter(
+      (entry) =>
+        entry.eventType === "AIRCRAFT_OPERATIONAL_STATE_CHANGED" &&
+        entry.payload.reason === "Synthetischer Assist-Test Nicht verfügbar",
+    ).length !== 1 ||
     rotationHistory.entries.filter((entry) => entry.eventType === "FLIGHT_GROUP_CALLED").length !==
       2 ||
     !rotationHistory.entries.some(
@@ -366,6 +455,9 @@ try {
       pilotPauseAndResumeAudited: true,
       aircraftQueueVisible: true,
       aircraftPauseBlocksCall: true,
+      flightLineAircraftStateAuthorized: true,
+      aircraftStateIdempotencyAndStaleWriteVerified: true,
+      inactiveAvailableRefuelingAndPauseVerified: true,
       aircraftStatusReplansForecast: true,
       aircraftFailureOnlyProposesReplacement: true,
       replacementConfirmedBySecondCall: true,

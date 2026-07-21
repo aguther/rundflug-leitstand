@@ -1,21 +1,58 @@
 import { spawn, spawnSync } from "node:child_process";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { rm } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const npmCli = process.env.npm_execpath;
-if (!npmCli) throw new Error("npm-Ausführungspfad fehlt.");
-const reset = spawnSync(process.execPath, [npmCli, "run", "db:reset:local"], {
-  cwd: root,
-  stdio: "ignore",
-});
-if (reset.status !== 0) throw new Error("Lokale Testdatenbank konnte nicht initialisiert werden.");
+const wranglerBin = resolve(root, "node_modules", "wrangler", "bin", "wrangler.js");
+const stateDirectory = resolve(root, ".wrangler", "queue-grouping-state");
+await rm(stateDirectory, { force: true, recursive: true });
+const initializeD1 = (args) =>
+  spawnSync(
+    process.execPath,
+    [
+      wranglerBin,
+      "d1",
+      ...args,
+      "--local",
+      "--persist-to",
+      stateDirectory,
+      "--config",
+      "wrangler.jsonc",
+    ],
+    { cwd: root, stdio: "ignore" },
+  );
+const migrate = initializeD1(["migrations", "apply", "DB"]);
+const seed = initializeD1(["execute", "DB", "--file", "apps/worker/seed/demo.sql"]);
+if (migrate.status !== 0 || seed.status !== 0) {
+  throw new Error("Isolierte lokale Testdatenbank konnte nicht initialisiert werden.");
+}
+const constrainAircraft = spawnSync(
+  process.execPath,
+  [
+    wranglerBin,
+    "d1",
+    "execute",
+    "DB",
+    "--local",
+    "--persist-to",
+    stateDirectory,
+    "--config",
+    "wrangler.jsonc",
+    "--command",
+    "UPDATE aircraft SET passenger_seats = 3 WHERE id = 'aircraft-a'",
+  ],
+  { cwd: root, stdio: "ignore" },
+);
+if (constrainAircraft.status !== 0) {
+  throw new Error("Synthetische Flugzeugkapazität konnte nicht auf drei Plätze gesetzt werden.");
+}
 const pin = "0000";
 const server = spawn(
   process.execPath,
   [
-    resolve(root, "node_modules", "wrangler", "bin", "wrangler.js"),
+    wranglerBin,
     "dev",
     "--config",
     "wrangler.jsonc",
@@ -25,10 +62,14 @@ const server = spawn(
     "DATA_JURISDICTION:eu",
     "--var",
     `ADMIN_PIN_HASH:${createHash("sha256").update(pin).digest("hex")}`,
+    "--persist-to",
+    stateDirectory,
+    "--port",
+    "8794",
   ],
   { cwd: root, stdio: "ignore", windowsHide: true },
 );
-const base = "http://127.0.0.1:8787";
+const base = "http://127.0.0.1:8794";
 const tokens = {
   admin: "demo-admin-device-token",
   cashier: "demo-cashier-device-token",
@@ -49,6 +90,15 @@ const board = async () => {
   });
   if (!response.ok) throw new Error(`Board-Abruf fehlgeschlagen (${response.status}).`);
   return response.json();
+};
+const ticketGroupSearch = async (ticketGroupId) => {
+  const query = new URLSearchParams({ id: ticketGroupId, limit: "20", q: "", status: "ACTIVE" });
+  const response = await fetch(`${base}/api/control/demo-2026/tickets/search?${query}`, {
+    headers: { "x-device-id": "cashier-tablet-1", "x-device-token": tokens.cashier },
+  });
+  if (!response.ok) throw new Error(`Ticketsuche fehlgeschlagen (${response.status}).`);
+  const result = await response.json();
+  return result.results.find((entry) => entry.ticketGroupId === ticketGroupId);
 };
 const command = async (
   deviceId,
@@ -85,14 +135,14 @@ const ticketCode = () =>
     .toString("base64url")
     .toUpperCase()
     .replaceAll(/[01OI_-]/g, "A");
-const sell = (version, size) =>
+const sell = (version, size, oversizeSplitAcknowledged = false) =>
   command("cashier-tablet-1", tokens.cashier, version, "SELL_TICKET_GROUP", {
     productId: "panorama-20",
     publicTicketCodes: Array.from({ length: size }, ticketCode),
     standby: false,
     paymentStatus: "PAID",
     paymentMethod: "CASH",
-    oversizeSplitAcknowledged: false,
+    oversizeSplitAcknowledged,
   });
 const history = async (aggregateType, aggregateId) => {
   const query = new URLSearchParams({ aggregateType, aggregateId });
@@ -122,7 +172,7 @@ try {
       plannedBoardingMinutes: 5,
       plannedDeboardingMinutes: 5,
       plannedBufferMinutes: 5,
-      reason: "Synthetischer V1.5-Gruppentest",
+      reason: "Synthetischer V1.7-Gruppentest",
       adminPin: pin,
     },
   );
@@ -131,7 +181,131 @@ try {
     tokens.admin,
     result.event.version,
     "SET_EVENT_LIFECYCLE",
-    { status: "ACTIVE", reason: "Synthetischer V1.5-Gruppentest", adminPin: pin },
+    { status: "ACTIVE", reason: "Synthetischer V1.7-Gruppentest", adminPin: pin },
+  );
+
+  const oversized = await sell(result.event.version, 4, true);
+  current = await board();
+  const initialOversizedQueue = current.queueGroups.find(
+    (group) => group.id === oversized.aggregate.id,
+  );
+  if (
+    initialOversizedQueue?.ticketCount !== 4 ||
+    initialOversizedQueue.nextSegmentTicketCount !== 3 ||
+    initialOversizedQueue.segmentIndex !== 1 ||
+    initialOversizedQueue.segmentCount !== 2
+  ) {
+    throw new Error(
+      `Die Vierergruppe wird nicht als nächster Abschnitt 3 von 4 angeboten: ${JSON.stringify(initialOversizedQueue)}`,
+    );
+  }
+
+  const firstSegmentCalled = await command(
+    "flight-line-tablet-1",
+    tokens.flightLine,
+    oversized.event.version,
+    "CALL_NEXT",
+    {
+      ticketGroupIds: [oversized.aggregate.id],
+      aircraftId: "aircraft-a",
+      pilotId: "550e8400-e29b-41d4-a716-446655440100",
+    },
+  );
+  current = await board();
+  const oversizedRotationsAfterFirstCall = current.rotations.filter((rotation) =>
+    rotation.bookingGroups.some((group) => group.id === oversized.aggregate.id),
+  );
+  const calledOversizedSegment = oversizedRotationsAfterFirstCall.find(
+    (rotation) => rotation.status === "CALLED",
+  );
+  const draftOversizedSegment = oversizedRotationsAfterFirstCall.find(
+    (rotation) => rotation.status === "DRAFT",
+  );
+  const remainingOversizedQueue = current.queueGroups.find(
+    (group) => group.id === oversized.aggregate.id,
+  );
+  if (
+    calledOversizedSegment?.ticketCount !== 3 ||
+    draftOversizedSegment?.ticketCount !== 1 ||
+    remainingOversizedQueue?.ticketCount !== 4 ||
+    remainingOversizedQueue.nextSegmentTicketCount !== 1 ||
+    remainingOversizedQueue.segmentIndex !== 2 ||
+    remainingOversizedQueue.segmentCount !== 2 ||
+    remainingOversizedQueue.status !== "QUEUED"
+  ) {
+    throw new Error(
+      "Nach dem ersten Aufruf bleibt die verbundene Restgruppe 1 von 4 inkonsistent.",
+    );
+  }
+
+  const firstSegmentStarted = await command(
+    "flight-line-tablet-1",
+    tokens.flightLine,
+    firstSegmentCalled.event.version,
+    "MARK_OFF_BLOCK",
+    { rotationId: calledOversizedSegment.id },
+  );
+  const firstSegmentLanded = await command(
+    "flight-line-tablet-1",
+    tokens.flightLine,
+    firstSegmentStarted.event.version,
+    "MARK_ON_BLOCK",
+    { rotationId: calledOversizedSegment.id },
+  );
+  const firstSegmentCompleted = await command(
+    "flight-line-tablet-1",
+    tokens.flightLine,
+    firstSegmentLanded.event.version,
+    "COMPLETE_TURNAROUND",
+    { rotationId: calledOversizedSegment.id, nextAircraftState: "AVAILABLE" },
+  );
+  const secondSegmentCalled = await command(
+    "flight-line-tablet-1",
+    tokens.flightLine,
+    firstSegmentCompleted.event.version,
+    "CALL_NEXT",
+    {
+      ticketGroupIds: [oversized.aggregate.id],
+      aircraftId: "aircraft-a",
+      pilotId: "550e8400-e29b-41d4-a716-446655440100",
+    },
+  );
+  current = await board();
+  const secondCalledOversizedSegment = current.rotations.find(
+    (rotation) =>
+      rotation.status === "CALLED" &&
+      rotation.bookingGroups.some((group) => group.id === oversized.aggregate.id),
+  );
+  const oversizedTicketGroupAfterSecondCall = await ticketGroupSearch(oversized.aggregate.id);
+  if (
+    secondCalledOversizedSegment?.ticketCount !== 1 ||
+    current.queueGroups.some((group) => group.id === oversized.aggregate.id) ||
+    oversizedTicketGroupAfterSecondCall?.groupStatus !== "BOARDING"
+  ) {
+    throw new Error(
+      `Der zweite Abschnitt 1 von 4 wurde nicht mit verbundenem Gruppenstatus aufgerufen: ${JSON.stringify({ secondCalledOversizedSegment, oversizedTicketGroupAfterSecondCall, queue: current.queueGroups.filter((group) => group.id === oversized.aggregate.id) })}`,
+    );
+  }
+  const secondSegmentStarted = await command(
+    "flight-line-tablet-1",
+    tokens.flightLine,
+    secondSegmentCalled.event.version,
+    "MARK_OFF_BLOCK",
+    { rotationId: secondCalledOversizedSegment.id },
+  );
+  const secondSegmentLanded = await command(
+    "flight-line-tablet-1",
+    tokens.flightLine,
+    secondSegmentStarted.event.version,
+    "MARK_ON_BLOCK",
+    { rotationId: secondCalledOversizedSegment.id },
+  );
+  result = await command(
+    "flight-line-tablet-1",
+    tokens.flightLine,
+    secondSegmentLanded.event.version,
+    "COMPLETE_TURNAROUND",
+    { rotationId: secondCalledOversizedSegment.id, nextAircraftState: "AVAILABLE" },
   );
 
   const pair = await sell(result.event.version, 2);
@@ -295,6 +469,8 @@ try {
     JSON.stringify({
       explicitQueueGroups: true,
       stableCommunicationIds: true,
+      oversizedGroupThreePlusOne: true,
+      connectedStatusAcrossSegments: true,
       wholeGroupCombination2Plus1: true,
       capacityProtected: true,
       wrongRoleRejected: true,

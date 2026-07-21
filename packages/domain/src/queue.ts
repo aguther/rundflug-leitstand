@@ -31,6 +31,47 @@ export interface BookingGroupSplitPlan {
   splitAcknowledged: boolean;
 }
 
+export type BookingGroupRotationState =
+  | "DRAFT"
+  | "CALLED"
+  | "IN_FLIGHT"
+  | "LANDED"
+  | "COMPLETED"
+  | "CANCELED";
+
+export type BookingGroupOperationalStatus =
+  | "QUEUED"
+  | "PRESENT"
+  | "BOARDING"
+  | "IN_FLIGHT"
+  | "LANDED"
+  | "COMPLETED"
+  | "CANCELED"
+  | "MISSING"
+  | "CLARIFICATION";
+
+export function deriveBookingGroupOperationalStatus(input: {
+  rotationStates: readonly BookingGroupRotationState[];
+  pendingSegmentPresent: boolean;
+  preservedStatus?: "MISSING" | "CLARIFICATION" | null;
+}): BookingGroupOperationalStatus {
+  if (input.preservedStatus) return input.preservedStatus;
+  if (input.rotationStates.includes("DRAFT")) {
+    return input.pendingSegmentPresent ? "PRESENT" : "QUEUED";
+  }
+  if (input.rotationStates.includes("CALLED")) return "BOARDING";
+  if (input.rotationStates.includes("IN_FLIGHT")) return "IN_FLIGHT";
+  if (input.rotationStates.includes("LANDED")) return "LANDED";
+  if (input.rotationStates.includes("COMPLETED")) return "COMPLETED";
+  if (
+    input.rotationStates.length > 0 &&
+    input.rotationStates.every((state) => state === "CANCELED")
+  ) {
+    return "CANCELED";
+  }
+  return "QUEUED";
+}
+
 export function deriveResourceGroupCapacity(passengerSeats: readonly number[]): number {
   return passengerSeats.reduce(
     (maximum, seats) => (Number.isInteger(seats) && seats > 0 ? Math.max(maximum, seats) : maximum),

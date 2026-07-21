@@ -1,0 +1,38 @@
+version: 1.7.0
+requirements:
+  - id: V17-REL-010
+    requirement: Repository und Laufzeit verwenden konsistent Release 1.7.0.
+    status: implemented
+  - id: V17-KAS-010
+    requirement: Kompakte feste Produktzeilen mit gemeinsamem Gruppenzähler und eigener Verkaufsaktion.
+    status: implemented
+  - id: V17-KAS-020
+    requirement: Geometrisch reservierte Aufteilungswarnung ohne wiederholte Bestätigung.
+    status: implemented
+  - id: V17-KAS-030
+    requirement: Operativ ausgeblendete Gewichtserfassung und ausschließlich generierte QR-Tickets bei erhaltener Vertragskompatibilität.
+    status: implemented
+  - id: V17-KAS-040
+    requirement: Gruppenzähler springt ausschließlich nach bestätigtem Verkauf auf eins zurück.
+    status: implemented
+  - id: V17-OPS-010
+    requirement: Kapazitäts- und statuskonsistenter segmentweiser Aufruf bewusst aufgeteilter Buchungsgruppen.
+    status: implemented
+  - id: V17-TKT-010
+    requirement: Vollständige Ticketvorschau ohne Scrollbereich und zugänglicher QR-Scan-Dialog.
+    status: implemented
+  - id: V17-UI-010
+    requirement: Sichtbarer Abstand zwischen Ticketstatus und Summe im iPad-Landscape-Layout.
+    status: implemented
+  - id: V17-UI-020
+    requirement: Schließbare gestapelte Top-Meldungen als layoutneutrale Seitenüberlagerung.
+    status: implemented
+  - id: V17-UI-030
+    requirement: Responsives Ansichtsmenü bleibt bis 320 CSS-Pixel vollständig und zugänglich im Viewport.
+    status: implemented
+  - id: V17-FL-010
+    requirement: Assist trennt Claim-Auswahl und Flugzeug-Arbeitsansicht mit ausschließlich manueller regulärer Freigabe.
+    status: implemented
+  - id: V17-FL-020
+    requirement: Assist teilt Status Zeitlinie Historie und Zustandsaktionen mit Supervisor; FLIGHT_LINE darf Flugzeugzustände aber keine Piloten ändern.
+    status: implemented

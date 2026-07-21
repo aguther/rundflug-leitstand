@@ -10,8 +10,11 @@
   Kassen- und Druckumfang. Die vollständige Releaseversion ist für Anwendung, Requirements,
   Traceability und UI-Referenzen identisch.
 - `requirements-v1.6.1.md` und `.yaml` ergänzen die kompatible Kassen-Renderingkorrektur sowie die
-  kompakte, auch auf iPads nutzbare Flight Line. Sie sind die aktuelle Releasefassung und übernehmen
-  im Übrigen V1.6.0 unverändert.
+  kompakte, auch auf iPads nutzbare Flight Line.
+- `requirements-v1.7.0.md` und `.yaml` beschreiben die aktuelle kompakte Kasse, den segmentweisen
+  Aufruf aufgeteilter Gruppen, die QR-Scan-Vergrößerung, layoutneutrale schließbare Meldungen sowie
+  die getrennte Assist-Auswahl und -Arbeitsansicht. Sie sind die aktuelle Releasefassung und
+  übernehmen im Übrigen V1.6.1 unverändert.
 - `traceability.csv` verbindet Anforderungen später mit Issues, Modulen und Tests.
 - `open-questions.md` enthält noch zu entscheidende Fachfragen.
 

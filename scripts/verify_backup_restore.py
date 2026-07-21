@@ -121,7 +121,7 @@ def export_backup(connection: sqlite3.Connection, tables: list[str]) -> tuple[st
         "format": "rundflug-leitstand-portable-backup",
         "formatVersion": 1,
         "createdAt": "2026-07-11T02:15:00.000Z",
-        "requirementsVersion": "1.6.1",
+        "requirementsVersion": "1.7.0",
         "reason": "PRE_EVENT",
         "tables": {
             table: [dict(row) for row in connection.execute(f'SELECT * FROM "{table}"')]

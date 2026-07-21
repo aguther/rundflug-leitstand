@@ -47,13 +47,12 @@ describe("V1 administration completion UI", () => {
     expect(appSource).toContain("<AccountManagement />");
   });
 
-  it("makes child guidance directly selectable and explains meaningful admin fields", () => {
-    expect(appSource).not.toContain('disabled={!productWeightClasses.includes("CHILD")}');
-    expect(appSource).toContain("weightClassesForChildCompanion(current, true)");
-    expect(appSource).toContain("Bei Kinderbuchungen auf Begleitung hinweisen");
-    expect(appSource.match(/<FieldLabel/g)?.length).toBeGreaterThan(35);
-    expect(stylesSource).toContain(".product-weight-section .checkbox-label > span");
-    expect(stylesSource).toContain("pointer-events: none");
+  it("suspends product weight controls while retaining compatible product payloads", () => {
+    expect(appSource).not.toContain('label="Gewichtserfassung"');
+    expect(appSource).not.toContain("Bei Kinderbuchungen auf Begleitung hinweisen");
+    expect(appSource).toContain("weightClasses: productWeightClasses");
+    expect(appSource).toContain("childCompanionRequired: productChildCompanion");
+    expect(appSource.match(/<FieldLabel/g)?.length).toBeGreaterThan(30);
   });
 
   it("keeps setup saving visible and every information hint bound to its field label", () => {

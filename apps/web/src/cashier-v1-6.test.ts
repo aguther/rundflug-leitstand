@@ -5,7 +5,7 @@ import cashierSource from "./cashier-view.tsx?raw";
 
 const styles = readFileSync(new URL("./features/cashier/cashier-v12.css", import.meta.url), "utf8");
 
-describe("cashier release 1.6.1 acceptance coverage", () => {
+describe("cashier release 1.7.0 acceptance coverage", () => {
   it("refreshes and paginates the operational ticket list", () => {
     expect(apiSource).toContain('params.set("status"');
     expect(apiSource).toContain('params.set("cursor"');
@@ -16,35 +16,39 @@ describe("cashier release 1.6.1 acceptance coverage", () => {
     expect(cashierSource).toContain("preserveLoaded: true");
   });
 
-  it("uses the canonical canceled status and keeps a canceled selection", () => {
-    expect(cashierSource).toContain('"ACTIVE" | "CANCELED"');
-    expect(cashierSource).toContain('setTicketListTab("CANCELED")');
-    expect(cashierSource).not.toContain("setLastTicketGroupId(null)");
-    expect(cashierSource).toContain("ConfirmationDialog");
-    expect(cashierSource).toContain("Kapazität sofort freigegeben");
-  });
-
-  it("reserves layout space at desktop and narrow widths", () => {
-    expect(styles).toContain("grid-template-rows: auto 4.75rem 56px");
-    expect(styles).toContain("grid-template-rows: auto 5.75rem 56px");
-    expect(styles).toContain("block-size: 4.75rem");
-  });
-
-  it("keeps product selection usable beyond two products", () => {
+  it("uses compact product rows and one shared group-size control", () => {
+    expect(cashierSource).toContain('className="cashier-group-size"');
+    expect(cashierSource).toContain('className="cashier-product-row"');
     expect(cashierSource).toContain("board?.products.map");
-    expect(cashierSource).toContain('scrollIntoView({ block: "start", inline: "nearest" })');
-    expect(cashierSource).toContain("aria-expanded={selected}");
-    expect(styles).toContain("scrollbar-gutter: stable");
-    expect(styles).toContain("overflow: auto");
+    expect(cashierSource).not.toContain("aria-expanded");
+    expect(cashierSource).not.toContain("scrollIntoView");
+    expect(cashierSource).not.toContain("cashier-product-body");
+    expect(cashierSource).not.toContain("Gewichtsklasse (pro Person)");
+    expect(cashierSource).not.toContain("Ticket-Ausgabe");
+  });
+
+  it("reserves the split-warning line without expanding a product", () => {
+    expect(cashierSource).toContain("cashier-split-line");
+    expect(cashierSource).toContain("aufeinanderfolgenden Fluggruppen");
+    expect(styles).toMatch(/\.cashier-split-line \{[\s\S]*?block-size: 2\.8rem;/);
+    expect(styles).toContain("-webkit-line-clamp: 2");
+  });
+
+  it("resets the ticket count only on the successful sale path", () => {
+    const successStart = cashierSource.indexOf("const soldTicketGroupId");
+    const reset = cashierSource.indexOf("setSize(1)", successStart);
+    const catchBlock = cashierSource.indexOf("} catch (reason)", successStart);
+    expect(reset).toBeGreaterThan(successStart);
+    expect(reset).toBeLessThan(catchBlock);
   });
 
   it("fits the complete cashier workspace into the iPad landscape band", () => {
     expect(styles).toMatch(/@media \(min-width: 1101px\) and \(max-width: 1250px\)/);
     expect(styles).toMatch(
-      /grid-template-columns:\s*32px minmax\(90px, 1\.3fr\)[\s\S]*?minmax\(\s*72px,\s*0\.8fr\s*\)/,
+      /grid-template-columns:[\s\S]*?26px minmax\(82px, 1\.24fr\)[\s\S]*?minmax\(112px, auto\)/,
     );
     expect(styles).toMatch(
-      /@media \(min-width: 1101px\)[\s\S]*?\.cashier-ticket-table \.ds-table \{[\s\S]*?min-width: 590px;/,
+      /@media \(min-width: 1101px\)[\s\S]*?\.cashier-ticket-table \.ds-table \{[\s\S]*?min-width: 600px;/,
     );
   });
 
@@ -55,5 +59,15 @@ describe("cashier release 1.6.1 acceptance coverage", () => {
     expect(styles).toMatch(
       /\.cashier-ticket-table\.ds-table-scroll \{[\s\S]*?height: auto;[\s\S]*?overflow: visible;/,
     );
+  });
+
+  it("shows a complete compact preview and a dedicated QR scan dialog", () => {
+    expect(cashierSource).toContain("function QrScanDialog");
+    expect(cashierSource).toContain("dialog.showModal()");
+    expect(cashierSource).toContain("QR-Code vergrößern");
+    expect(cashierSource).toContain("width: 768");
+    expect(styles).toMatch(/\.cashier-ticket-paper \{[\s\S]*?overflow: hidden;/);
+    expect(styles).toContain(".ticket-paper-preview");
+    expect(styles).toContain(".qr-scan-dialog::backdrop");
   });
 });

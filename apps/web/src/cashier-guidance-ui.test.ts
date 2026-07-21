@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
-import appSource from "./cashier-view.tsx?raw";
+import adminSource from "./admin-view.tsx?raw";
+import cashierSource from "./cashier-view.tsx?raw";
 
-describe("cashier child companion warning UI", () => {
-  it("renders a prominent accessible and non-safety-related warning", () => {
-    expect(appSource).toContain('className="child-companion-warning" role="alert"');
-    expect(appSource).toContain("Begleitung prüfen");
-    expect(appSource).toContain("keine erwachsene Begleitperson");
-    expect(appSource).toMatch(/ohne flugbetriebliche\s+Freigabewirkung/);
+describe("cashier operational weight suspension", () => {
+  it("removes weight capture from cashier and product management without deleting payload storage", () => {
+    expect(cashierSource).not.toContain("Gewichtsklasse (pro Person)");
+    expect(cashierSource).not.toContain("ticketDetails,");
+    expect(adminSource).not.toContain('label="Gewichtserfassung"');
+    expect(adminSource).toContain("weightClasses: productWeightClasses");
+    expect(adminSource).toContain("childCompanionRequired: productChildCompanion");
   });
 });

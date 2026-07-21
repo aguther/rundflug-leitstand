@@ -20,6 +20,15 @@ describe("aircraft lifecycle", () => {
     expect(transitionAircraft("LANDED", "TURNAROUND")).toBe("TURNAROUND");
     expect(transitionAircraft("TURNAROUND", "AVAILABLE")).toBe("AVAILABLE");
   });
+
+  it("supports reversible operational blocks without bypassing the lifecycle", () => {
+    expect(transitionAircraft("AVAILABLE", "INACTIVE")).toBe("INACTIVE");
+    expect(transitionAircraft("INACTIVE", "AVAILABLE")).toBe("AVAILABLE");
+    expect(transitionAircraft("AVAILABLE", "PAUSED")).toBe("PAUSED");
+    expect(transitionAircraft("PAUSED", "AVAILABLE")).toBe("AVAILABLE");
+    expect(transitionAircraft("AVAILABLE", "REFUELING")).toBe("REFUELING");
+    expect(transitionAircraft("REFUELING", "AVAILABLE")).toBe("AVAILABLE");
+  });
 });
 
 describe("command authorization", () => {
@@ -68,11 +77,11 @@ describe("command authorization", () => {
     expect(() => assertRoleMayExecute("ADMIN", "REVOKE_DEVICE")).not.toThrow();
   });
 
-  it("separates refuel planning from capacity-removing fleet states", () => {
+  it("lets Flight Line control reversible aircraft blocks but not fleet configuration", () => {
     expect(() => assertRoleMayExecute("FLIGHT_LINE", "SCHEDULE_AIRCRAFT_REFUEL")).not.toThrow();
     expect(() =>
       assertRoleMayExecute("FLIGHT_LINE", "SET_AIRCRAFT_OPERATIONAL_STATE"),
-    ).toThrowError(/darf SET_AIRCRAFT_OPERATIONAL_STATE nicht/);
+    ).not.toThrow();
     expect(() =>
       assertRoleMayExecute("FLIGHT_DIRECTOR", "SET_AIRCRAFT_OPERATIONAL_STATE"),
     ).not.toThrow();

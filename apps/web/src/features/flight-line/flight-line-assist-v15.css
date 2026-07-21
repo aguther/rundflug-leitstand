@@ -1,4 +1,4 @@
-/* V1.5 Flight Line Assist. All selectors are rooted to keep legacy Assist CSS out. */
+/* V1.7.0 Flight Line Assist. Selection and aircraft work are intentionally exclusive. */
 .assist-shell {
   min-width: 0;
   min-height: 100dvh;
@@ -11,14 +11,13 @@
 }
 
 .flight-assist.flight-assist-v15 {
-  display: block;
+  box-sizing: border-box;
   width: min(1480px, 100%);
   max-width: 100%;
   min-width: 0;
   min-height: 0;
   margin: 0 auto;
   padding: var(--space-3);
-  overflow: visible;
   color: var(--ui-text);
   background: var(--ui-bg);
 }
@@ -26,25 +25,25 @@
 .flight-assist-v15 .assist-v15-message {
   margin: 0 0 var(--space-3);
   padding: 8px 12px;
+  overflow-wrap: anywhere;
   border: 1px solid var(--ui-border);
   border-radius: var(--radius-md);
   color: var(--ui-text);
   background: var(--ui-surface-raised);
 }
 
-.flight-assist-v15 .assist-v15-workspace {
-  min-width: 0;
-  display: grid;
-  grid-template-columns: minmax(320px, 380px) minmax(0, 1fr);
-  gap: var(--space-3);
-  align-items: start;
-}
-
-.flight-assist-v15 :is(.assist-v15-picker, .assist-v15-aircraft-panel, .assist-v15-groups) {
+.flight-assist-v15
+  :is(.assist-v15-picker, .assist-v15-aircraft-panel, .assist-v15-operations, .assist-v15-groups) {
+  box-sizing: border-box;
   min-width: 0;
   padding: var(--space-3);
   border-radius: var(--radius-md);
   box-shadow: none;
+}
+
+.flight-assist-v15.is-selection-mode .assist-v15-picker {
+  width: min(560px, 100%);
+  margin-inline: auto;
 }
 
 .flight-assist-v15 .ds-page-header {
@@ -71,34 +70,32 @@
 
 .flight-assist-v15 .assist-v15-aircraft-list {
   min-width: 0;
+  max-height: calc(100dvh - 230px);
   display: grid;
   gap: 8px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .flight-assist-v15 .assist-v15-aircraft-list article {
   box-sizing: border-box;
   min-width: 0;
-  height: 150px;
   min-height: 150px;
   display: grid;
-  grid-template-columns: 36px minmax(0, 1fr);
+  grid-template-columns: 40px minmax(0, 1fr);
   grid-template-rows: auto minmax(var(--control-compact), 1fr);
   gap: 8px 10px;
   align-items: start;
-  padding: 10px;
+  padding: 12px;
   border: 1px solid var(--ui-border);
   border-radius: var(--radius-md);
   background: var(--ui-surface-raised);
 }
 
-.flight-assist-v15 .assist-v15-aircraft-list article.is-claimed {
-  border-color: var(--ui-accent);
-  background: var(--ui-accent-soft);
-}
-
 .flight-assist-v15 .assist-v15-plane-icon {
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   display: inline-grid;
   place-items: center;
   flex: 0 0 auto;
@@ -109,8 +106,8 @@
 }
 
 .flight-assist-v15 .assist-v15-plane-icon svg {
-  width: 19px;
-  height: 19px;
+  width: 21px;
+  height: 21px;
 }
 
 .flight-assist-v15 .assist-v15-aircraft-copy {
@@ -121,15 +118,15 @@
 
 .flight-assist-v15 .assist-v15-aircraft-title {
   min-width: 0;
-  display: grid;
-  grid-template-columns: minmax(max-content, 1fr) auto;
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: center;
 }
 
 .flight-assist-v15 .assist-v15-aircraft-title strong {
   min-width: max-content;
-  font-size: 1rem;
+  font-size: 1.08rem;
   letter-spacing: 0.035em;
   white-space: nowrap;
 }
@@ -143,18 +140,12 @@
   font-size: 0.72rem;
 }
 
-.flight-assist-v15 .assist-v15-operational-state {
-  width: max-content;
+.flight-assist-v15 .assist-v15-picker-meta small {
+  color: var(--ui-muted);
 }
 
-.flight-assist-v15 .assist-v15-aircraft-meta {
-  min-width: 0;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 3px 6px;
-  color: var(--ui-muted);
-  font-size: 0.72rem;
+.flight-assist-v15 .assist-v15-operational-state {
+  width: max-content;
 }
 
 .flight-assist-v15 .assist-v15-gate {
@@ -192,7 +183,7 @@
 .flight-assist-v15 .assist-v15-active-heading {
   min-width: 0;
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) auto;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
   gap: 12px;
   align-items: center;
   padding: 2px 2px var(--space-3);
@@ -200,14 +191,12 @@
 }
 
 .flight-assist-v15 .assist-v15-active-heading > .assist-v15-plane-icon {
-  width: 44px;
-  height: 44px;
+  width: 48px;
+  height: 48px;
 }
 
 .flight-assist-v15 .assist-v15-active-heading > div {
   min-width: 0;
-  display: grid;
-  gap: 4px;
 }
 
 .flight-assist-v15 .assist-v15-active-title {
@@ -225,100 +214,141 @@
   white-space: nowrap;
 }
 
-.flight-assist-v15 .assist-v15-state-flow {
+.flight-assist-v15 .assist-v15-aircraft-meta {
   min-width: 0;
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  margin: 0;
-  padding-top: var(--space-3);
-  padding-left: 0;
-  list-style: none;
-}
-
-.flight-assist-v15 .assist-v15-state-segment {
-  min-width: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 16px;
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-}
-
-.flight-assist-v15 .assist-v15-state-segment:last-child {
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.flight-assist-v15 .assist-v15-state-segment > svg {
-  width: 14px;
-  height: 14px;
-  color: var(--ui-muted);
-}
-
-.flight-assist-v15 .assist-v15-state-step {
-  min-height: 62px;
-  display: grid;
-  place-items: center;
-  align-content: center;
-  gap: 4px;
-  padding: 6px 3px;
-  border: 1px dashed var(--ui-border-strong);
-  border-radius: var(--radius-sm);
-  color: var(--ui-muted);
-  font-size: 0.68rem;
-  text-align: center;
-}
-
-.flight-assist-v15 .assist-v15-state-step svg {
-  width: 21px;
-  height: 21px;
-}
-
-.flight-assist-v15 .assist-v15-state-step.is-active {
-  border-style: solid;
-  border-color: var(--ui-accent);
-  color: var(--ui-accent);
-  background: var(--ui-accent-soft);
-}
-
-.flight-assist-v15 .assist-v15-lifecycle {
-  min-width: 0;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  padding-top: var(--space-3);
-}
-
-.flight-assist-v15 .assist-v15-lifecycle-segment {
-  min-width: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 18px;
-  align-items: center;
-}
-
-.flight-assist-v15 .assist-v15-lifecycle-segment:last-child {
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.flight-assist-v15 .assist-v15-lifecycle-segment span {
-  min-height: 34px;
-  display: grid;
-  place-items: center;
-  padding: 0 5px;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--radius-sm);
+  gap: 3px 6px;
+  margin-top: 4px;
   color: var(--ui-muted);
   font-size: 0.72rem;
-  text-align: center;
+}
+
+.flight-assist-v15 .assist-v15-active-tools {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.flight-assist-v15 .assist-v15-pilot-code {
+  min-height: var(--control-compact);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding-inline: 9px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-sm);
+  color: var(--ui-text);
+  background: var(--ui-control);
+  font-size: 0.76rem;
+  font-weight: 650;
   white-space: nowrap;
 }
 
-.flight-assist-v15 .assist-v15-lifecycle-segment span.is-active {
-  border-color: var(--ui-accent);
-  color: var(--ui-accent);
-  background: var(--ui-accent-soft);
+.flight-assist-v15 .assist-v15-pilot-code svg {
+  width: 17px;
+  height: 17px;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
 }
 
-.flight-assist-v15 .assist-v15-lifecycle-segment > svg {
-  width: 16px;
-  height: 16px;
+.flight-assist-v15 .assist-v15-progress-row {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(180px, 1fr);
+  gap: 14px;
+  align-items: center;
+  padding-top: var(--space-3);
   color: var(--ui-muted);
+  font-size: 0.72rem;
+}
+
+.flight-assist-v15 .assist-v15-progress-row .flight-director-progress {
+  width: 100%;
+}
+
+.flight-assist-v15 .assist-v15-action-bar {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(300px, 1fr) auto;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.flight-assist-v15 .assist-v15-primary-action {
+  width: 100%;
+}
+
+.flight-assist-v15 .assist-v15-secondary-actions {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.flight-assist-v15 .assist-v15-turnaround {
+  min-width: 0;
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px;
+  margin: 0;
+  padding: 8px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-md);
+}
+
+.flight-assist-v15 .assist-v15-turnaround legend {
+  padding: 0 5px;
+  color: var(--ui-muted);
+  font-size: 0.72rem;
+}
+
+.flight-assist-v15 .assist-v15-turnaround .ds-button {
+  min-width: 0;
+}
+
+.flight-assist-v15 .assist-v15-operations > .ds-tabs {
+  margin-inline: -4px;
+}
+
+.flight-assist-v15 .assist-v15-rotation-detail {
+  min-width: 0;
+  min-height: 145px;
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  border-top: 0;
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+}
+
+.flight-assist-v15 .flight-director-current-content {
+  width: 100%;
+  height: auto;
+  min-width: 0;
+  overflow: visible;
+}
+
+.flight-assist-v15 .flight-director-current-timeline {
+  grid-template-columns: repeat(4, minmax(70px, 1fr));
+}
+
+.flight-assist-v15 .flight-director-compact-table.history {
+  overflow: auto;
+}
+
+.flight-assist-v15 .flight-director-compact-table.history .flight-director-compact-head,
+.flight-assist-v15 .flight-director-compact-table.history > div:not(.flight-director-compact-head) {
+  min-width: 700px;
 }
 
 .flight-assist-v15 .assist-v15-groups .ds-page-header {
@@ -363,6 +393,7 @@
 
 .flight-assist-v15 .assist-v15-group-list {
   min-width: 0;
+  overflow: hidden;
   border: 1px solid var(--ui-border);
   border-radius: var(--radius-md);
 }
@@ -438,7 +469,7 @@
   display: none;
 }
 
-.flight-assist-v15 :is(.assist-v15-no-groups, .assist-v15-empty) {
+.flight-assist-v15 .assist-v15-no-groups {
   margin: 0;
   padding: 14px;
   color: var(--ui-muted);
@@ -446,70 +477,30 @@
   text-align: center;
 }
 
-.flight-assist-v15 .assist-v15-empty svg {
-  width: 28px;
-  height: 28px;
-  margin-bottom: 6px;
-}
-
-.flight-assist-v15 .assist-v15-command-bar {
-  display: grid;
-  gap: 8px;
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid var(--ui-border);
-}
-
-.flight-assist-v15 .assist-v15-command-bar > .ds-button--primary {
-  width: 100%;
-}
-
-.flight-assist-v15 .assist-v15-turnaround {
-  min-width: 0;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 5px;
-  margin: 0;
-  padding: 8px;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--radius-md);
-}
-
-.flight-assist-v15 .assist-v15-turnaround legend {
-  padding: 0 5px;
-  color: var(--ui-muted);
-  font-size: 0.72rem;
-}
-
-.flight-assist-v15 .assist-v15-turnaround .ds-button {
-  min-width: 0;
-}
-
-.flight-assist-v15 .assist-v15-follow-up {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  color: var(--ui-muted);
-  font-size: 0.72rem;
-}
-
-.flight-assist-v15 .assist-v15-follow-up .ds-button {
-  color: var(--ui-muted);
-}
-
 .flight-assist-v15 .assist-v15-release-phone {
   display: none;
 }
 
-@media (max-width: 1280px) {
-  .flight-assist-v15 .assist-v15-workspace {
-    grid-template-columns: minmax(0, 1fr);
+@media (max-width: 980px) {
+  .flight-assist-v15 .assist-v15-active-heading {
+    grid-template-columns: 48px minmax(0, 1fr);
   }
 
-  .flight-assist-v15 .assist-v15-aircraft-list {
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  .flight-assist-v15 .assist-v15-active-tools {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+
+  .flight-assist-v15 .assist-v15-group-row {
+    grid-template-columns: minmax(180px, 1fr) 90px auto;
+  }
+
+  .flight-assist-v15 .assist-v15-group-actions {
+    display: none;
+  }
+
+  .flight-assist-v15 .assist-v15-group-menu {
+    display: block;
   }
 }
 
@@ -520,24 +511,27 @@
 
   .flight-assist.flight-assist-v15 {
     width: 100%;
-    max-width: 100%;
     padding: 12px;
     overflow-x: clip;
   }
 
-  .flight-assist-v15 :is(.assist-v15-picker, .assist-v15-aircraft-panel, .assist-v15-groups) {
+  .flight-assist-v15
+    :is(
+      .assist-v15-picker,
+      .assist-v15-aircraft-panel,
+      .assist-v15-operations,
+      .assist-v15-groups
+    ) {
     padding: 14px;
   }
 
   .flight-assist-v15 .assist-v15-aircraft-list {
-    grid-template-columns: minmax(0, 1fr);
+    max-height: none;
+    overflow: visible;
+    scrollbar-gutter: auto;
   }
 
-  .flight-assist-v15 .assist-v15-active-heading {
-    grid-template-columns: 44px minmax(0, 1fr);
-  }
-
-  .flight-assist-v15 .assist-v15-active-heading > .ds-button {
+  .flight-assist-v15 .assist-v15-active-tools > .ds-button--danger {
     display: none;
   }
 
@@ -545,38 +539,112 @@
     font-size: 1.25rem;
   }
 
-  .flight-assist-v15 .assist-v15-lifecycle-segment {
-    grid-template-columns: minmax(0, 1fr) 12px;
+  .flight-assist-v15 .assist-v15-progress-row {
+    grid-template-columns: 1fr;
+    gap: 7px;
   }
 
-  .flight-assist-v15 .assist-v15-lifecycle-segment > svg {
-    width: 12px;
+  .flight-assist-v15 .assist-v15-action-bar {
+    grid-template-columns: 1fr;
   }
 
-  .flight-assist-v15 .assist-v15-lifecycle-segment span {
-    padding-inline: 2px;
-    font-size: 0.64rem;
+  .flight-assist-v15 .assist-v15-secondary-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    justify-content: stretch;
   }
 
-  .flight-assist-v15 .assist-v15-state-flow {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+  .flight-assist-v15 .assist-v15-secondary-actions .ds-button {
+    min-width: 0;
+    padding-inline: 5px;
+    font-size: 0.72rem;
   }
 
-  .flight-assist-v15 .assist-v15-state-deboarding {
+  .flight-assist-v15 .assist-v15-primary-action {
+    font-size: 0.8rem;
+    white-space: normal;
+  }
+
+  .flight-assist-v15 .assist-v15-turnaround {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .flight-assist-v15 .assist-v15-rotation-detail {
+    min-height: 0;
+  }
+
+  .flight-assist-v15 .flight-director-current-rotation {
+    grid-template-columns: 1fr;
+  }
+
+  .flight-assist-v15 .flight-director-current-timeline {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    padding-inline: 12px;
+  }
+
+  .flight-assist-v15 .flight-director-current-timeline > span {
+    min-width: 0;
+    font-size: 0.62rem;
+  }
+
+  .flight-assist-v15 .flight-director-current-timeline > span strong,
+  .flight-assist-v15 .flight-director-current-timeline > span small {
+    overflow-wrap: anywhere;
+  }
+
+  .flight-assist-v15 .flight-director-compact-table.history {
+    overflow: visible;
+  }
+
+  .flight-assist-v15 .flight-director-compact-table.history .flight-director-compact-head {
     display: none;
   }
 
-  .flight-assist-v15 .assist-v15-state-segment {
-    grid-template-columns: minmax(0, 1fr) 10px;
+  .flight-assist-v15
+    .flight-director-compact-table.history
+    > div:not(.flight-director-compact-head) {
+    min-width: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 7px 12px;
+    padding: 12px;
   }
 
-  .flight-assist-v15 .assist-v15-state-segment > svg {
-    width: 10px;
+  .flight-assist-v15 .flight-director-compact-table.history > div > strong {
+    grid-column: 1 / -1;
   }
 
-  .flight-assist-v15 .assist-v15-state-step {
-    min-height: 70px;
-    font-size: 0.61rem;
+  .flight-assist-v15 .flight-director-compact-table.history > div > span {
+    display: grid;
+    grid-template-columns: minmax(58px, auto) auto;
+    gap: 8px;
+    color: var(--ui-text);
+    text-align: right;
+  }
+
+  .flight-assist-v15 .flight-director-compact-table.history > div > span::before {
+    color: var(--ui-muted);
+    text-align: left;
+  }
+
+  .flight-assist-v15 .flight-director-compact-table.history > div > span:nth-child(2)::before {
+    content: "Pilot";
+  }
+
+  .flight-assist-v15 .flight-director-compact-table.history > div > span:nth-child(3)::before {
+    content: "Boarding";
+  }
+
+  .flight-assist-v15 .flight-director-compact-table.history > div > span:nth-child(4)::before {
+    content: "Offblock";
+  }
+
+  .flight-assist-v15 .flight-director-compact-table.history > div > span:nth-child(5)::before {
+    content: "Onblock";
+  }
+
+  .flight-assist-v15 .flight-director-compact-table.history > div > span:nth-child(6)::before {
+    content: "Abschluss";
   }
 
   .flight-assist-v15 .assist-v15-groups .ds-page-header {
@@ -624,12 +692,8 @@
     height: 21px;
   }
 
-  .flight-assist-v15 :is(.assist-v15-presence, .assist-v15-group-actions) {
+  .flight-assist-v15 .assist-v15-presence {
     display: none;
-  }
-
-  .flight-assist-v15 .assist-v15-group-menu {
-    display: block;
   }
 
   .flight-assist-v15 .assist-v15-group-popover {
@@ -647,34 +711,36 @@
     justify-content: flex-start;
   }
 
-  .flight-assist-v15 .assist-v15-turnaround {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .flight-assist-v15 .assist-v15-follow-up {
-    display: none;
-  }
-
-  .flight-assist-v15 .assist-v15-command-bar > .ds-button--primary {
-    font-size: 0.8rem;
-    white-space: nowrap;
-  }
-
   .flight-assist-v15 .assist-v15-release-phone {
     width: 100%;
     display: inline-flex;
+    margin-top: 14px;
     border-color: transparent;
     background: transparent;
   }
 }
 
 @media (max-width: 420px) {
-  .flight-assist-v15 .assist-v15-aircraft-title {
-    grid-template-columns: minmax(0, 1fr);
+  .flight-assist-v15 .assist-v15-active-heading {
+    grid-template-columns: 40px minmax(0, 1fr);
+    gap: 9px;
   }
 
-  .flight-assist-v15 .assist-v15-aircraft-title .ds-status-pill {
-    width: max-content;
+  .flight-assist-v15 .assist-v15-active-heading > .assist-v15-plane-icon {
+    width: 40px;
+    height: 40px;
+  }
+
+  .flight-assist-v15 .assist-v15-active-tools {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .flight-assist-v15 .assist-v15-pilot-code,
+  .flight-assist-v15 .assist-v15-active-tools .ds-button {
+    width: 100%;
+    box-sizing: border-box;
+    justify-content: center;
   }
 
   .flight-assist-v15 .assist-v15-groups .ds-page-header {
@@ -683,5 +749,22 @@
 
   .flight-assist-v15 .assist-v15-groups .ds-page-header-actions {
     margin-top: 8px;
+  }
+
+  .flight-assist-v15 .assist-v15-secondary-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .flight-assist-v15 .assist-v15-group-select {
+    grid-template-columns: 30px 20px minmax(42px, 1fr);
+  }
+
+  .flight-assist-v15 .assist-v15-group-select .ds-status-pill {
+    grid-column: 2 / -1;
+    width: max-content;
+  }
+
+  .flight-assist-v15 .assist-v15-group-popover {
+    grid-template-columns: 1fr;
   }
 }

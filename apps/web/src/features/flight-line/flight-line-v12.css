@@ -483,7 +483,7 @@
   }
 }
 
-/* V1.6.1 supervisor: one compact table, no expanding aircraft rows. */
+/* V1.7.0 supervisor: one compact table, no expanding aircraft rows. */
 .flight-director-v15 {
   min-width: 0;
   min-height: 0;

@@ -1,6 +1,7 @@
 // Shared operational state and presentation primitives used by route features.
 import { useCallback, useEffect, useState } from "react";
 import { getOperationBoard } from "./api";
+import { PageNotice } from "./app/PageNotifications";
 import {
   type BoardSyncState,
   nextBoardReconnectDelay,
@@ -239,34 +240,36 @@ export function ConnectionNotice({
   lastConfirmedAt?: string | null;
 }) {
   return error ? (
-    <div className="connection-warning">
+    <PageNotice noticeKey={`connection:${lastConfirmedAt ?? "none"}:${error}`} tone="warning">
       Möglicherweise veraltet
       {lastConfirmedAt ? ` · ${confirmedStateLabel(lastConfirmedAt)}` : " · kein bestätigter Stand"}
       {` · ${error}`}
-    </div>
+    </PageNotice>
   ) : null;
 }
 
 export function EmergencyNotice({ active }: { active: boolean }) {
   return active ? (
-    <div className="emergency-notice">Notfallmodus aktiv · keine Verkäufe oder neuen Aufrufe</div>
+    <PageNotice noticeKey="emergency-active" tone="danger">
+      <strong>Notfallmodus aktiv</strong> · keine Verkäufe oder neuen Aufrufe
+    </PageNotice>
   ) : null;
 }
 
 export function InterruptionNotice({ active }: { active: boolean }) {
   return active ? (
-    <div className="interruption-notice">
-      Flugbetrieb unterbrochen · keine Verkäufe oder neuen Aufrufe; laufende Flüge bleiben
-      dokumentierbar
-    </div>
+    <PageNotice noticeKey="operation-interrupted" tone="warning">
+      <strong>Flugbetrieb unterbrochen</strong> · keine Verkäufe oder neuen Aufrufe; laufende Flüge
+      bleiben dokumentierbar
+    </PageNotice>
   ) : null;
 }
 
 export function OperationalNotice({ note }: { note: string | null | undefined }) {
   return note ? (
-    <div className="operational-notice">
+    <PageNotice noticeKey={`operational-note:${note}`} tone="info">
       <strong>Betriebshinweis:</strong> {note}
       <small>Organisatorische Information ohne Sicherheits- oder Freigabewirkung.</small>
-    </div>
+    </PageNotice>
   ) : null;
 }
