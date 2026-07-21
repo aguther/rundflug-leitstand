@@ -38,6 +38,15 @@ const actionForState = {
 
 type Rotation = OperationBoard["rotations"][number];
 type Aircraft = OperationBoard["aircraft"][number];
+type QueueGroup = OperationBoard["queueGroups"][number];
+
+function queuedSegmentTicketCount(group: QueueGroup): number {
+  return group.nextSegmentTicketCount ?? group.ticketCount;
+}
+
+function queuedSegmentPresentCount(group: QueueGroup): number {
+  return group.nextSegmentPresentCount ?? group.presentCount;
+}
 
 export function FlightLineView() {
   const { board, error, lastConfirmedAt, refresh } = useOperationBoard(FLIGHT_LINE_DEVICE_ID);
@@ -64,9 +73,13 @@ export function FlightLineView() {
   );
   const operationalAircraft = board?.aircraft ?? [];
   const canManageAircraft = ["FLIGHT_DIRECTOR", "ADMIN"].includes(board?.currentDeviceRole ?? "");
+  const claimedAssistAircraftId = board?.assistClaims?.find(
+    (claim) => claim.claimedByCurrentSession,
+  )?.aircraftId;
   const selectedAircraft =
-    operationalAircraft.find((aircraft) => aircraft.id === selectedAircraftId) ??
-    operationalAircraft[0];
+    operationalAircraft.find(
+      (aircraft) => aircraft.id === (selectedAircraftId ?? claimedAssistAircraftId),
+    ) ?? (FLIGHT_LINE_ASSIST_MODE ? undefined : operationalAircraft[0]);
   const aircraftRotations = operationalRotations?.filter((rotation) => {
     if (!selectedAircraft) return false;
     if (rotation.aircraftId) return rotation.aircraftId === selectedAircraft.id;
@@ -96,12 +109,18 @@ export function FlightLineView() {
     ) ?? [];
   const selectedQueueSeatCount = compatibleQueueGroups
     .filter((group) => selectedQueueGroupIds.includes(group.id))
-    .reduce((sum, group) => sum + group.ticketCount, 0);
+    .reduce((sum, group) => sum + queuedSegmentTicketCount(group), 0);
   useEffect(() => {
+    if (FLIGHT_LINE_ASSIST_MODE) {
+      if (claimedAssistAircraftId && selectedAircraftId !== claimedAssistAircraftId) {
+        setSelectedAircraftId(claimedAssistAircraftId);
+      }
+      return;
+    }
     if (!selectedAircraftId && operationalAircraft[0]) {
       setSelectedAircraftId(operationalAircraft[0].id);
     }
-  }, [operationalAircraft, selectedAircraftId]);
+  }, [claimedAssistAircraftId, operationalAircraft, selectedAircraftId]);
   useEffect(() => {
     if (selected?.status !== "DRAFT") return;
     setNextAircraftId(selectedAircraft?.id ?? selected.suggestedAircraftId ?? "");
@@ -564,30 +583,19 @@ export function FlightLineView() {
     }
   }
 
-  const primaryFlightLineAction = action
-    ? {
-        label: action.label,
-        command: action.command,
-        disabled:
-          action.command === "CALL_NEXT" &&
-          (!nextAircraftId ||
-            !selectedAircraft?.currentPilotId ||
-            board?.event.emergencyMode ||
-            board?.event.status !== "ACTIVE" ||
-            board?.event.operationalInterrupted),
-        run: () => void advance(),
-      }
-    : null;
-
   return (
     <Shell
       className={FLIGHT_LINE_ASSIST_MODE ? "flight-line-shell assist-shell" : "flight-line-shell"}
       title={FLIGHT_LINE_ASSIST_MODE ? "Flight Line Assist" : "Flight Line"}
+      notifications={
+        <>
+          <ConnectionNotice error={error} lastConfirmedAt={lastConfirmedAt} />
+          <EmergencyNotice active={board?.event.emergencyMode ?? false} />
+          <InterruptionNotice active={board?.event.operationalInterrupted ?? false} />
+          <OperationalNotice note={board?.event.operationalNote} />
+        </>
+      }
     >
-      <ConnectionNotice error={error} lastConfirmedAt={lastConfirmedAt} />
-      <EmergencyNotice active={board?.event.emergencyMode ?? false} />
-      <InterruptionNotice active={board?.event.operationalInterrupted ?? false} />
-      <OperationalNotice note={board?.event.operationalNote} />
       {!FLIGHT_LINE_ASSIST_MODE &&
       board?.currentDeviceRole === "FLIGHT_DIRECTOR" &&
       !board.event.emergencyMode ? (
@@ -615,10 +623,11 @@ export function FlightLineView() {
       ) : null}
       {board && FLIGHT_LINE_ASSIST_MODE ? (
         <FlightLineAssist
-          action={primaryFlightLineAction}
           aircraft={operationalAircraft}
           board={board}
+          canAssignPilot={canManageAircraft}
           message={message}
+          onAssignPilot={assignAircraftPilot}
           onClaim={async (aircraftId) => {
             await claimFlightLineAircraft(
               EVENT_ID,
@@ -627,6 +636,11 @@ export function FlightLineView() {
               deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
             );
             await refresh();
+          }}
+          onClaimUnavailable={() => {
+            setSelectedAircraftId(null);
+            setSelectedId(null);
+            setSelectedQueueGroupIds([]);
           }}
           onGroupAttendance={(ticketGroupId, checkedIn) =>
             void setGroupAttendance(ticketGroupId, checkedIn)
@@ -663,7 +677,6 @@ export function FlightLineView() {
             }
           }}
           onPause={openAircraftPauseDialog}
-          onRefuel={() => void setFlightLineAircraftState("REFUELING")}
           onRelease={async (aircraftId) => {
             await releaseFlightLineAircraft(
               EVENT_ID,
@@ -681,7 +694,16 @@ export function FlightLineView() {
             setSelectedId(null);
             setSelectedQueueGroupIds([]);
           }}
-          onUnavailable={() => void setFlightLineAircraftState("INACTIVE")}
+          onRunRotation={(rotation) => {
+            const rotationAircraft = operationalAircraft.find(
+              (entry) => entry.id === selectedAircraft?.id,
+            );
+            void advance(rotation, rotationAircraft);
+          }}
+          onSetAircraftState={(aircraftId, state) => {
+            const aircraftEntry = operationalAircraft.find((entry) => entry.id === aircraftId);
+            void setFlightLineAircraftState(state, null, aircraftEntry);
+          }}
           selectedQueueGroupIds={selectedQueueGroupIds}
           turnaroundNextState={turnaroundNextState}
           onTurnaroundNextStateChange={setTurnaroundNextState}
@@ -799,7 +821,8 @@ export function FlightLineView() {
                     const selectedGroup = selectedQueueGroupIds.includes(group.id);
                     const exceedsCapacity =
                       !selectedGroup &&
-                      selectedQueueSeatCount + group.ticketCount > selectedAircraft.passengerSeats;
+                      selectedQueueSeatCount + queuedSegmentTicketCount(group) >
+                        selectedAircraft.passengerSeats;
                     return (
                       <article
                         className={
@@ -836,8 +859,19 @@ export function FlightLineView() {
                               {String(group.communicationNumber).padStart(3, "0")}
                             </strong>
                             <small>
-                              {group.ticketCount} Person{group.ticketCount === 1 ? "" : "en"} ·{" "}
-                              {group.presentCount}/{group.ticketCount} anwesend
+                              {group.segmentCount && group.segmentCount > 1 ? (
+                                <>
+                                  {queuedSegmentTicketCount(group)} von {group.ticketCount} Personen
+                                  · Teil {group.segmentIndex ?? 1}/{group.segmentCount} ·{" "}
+                                </>
+                              ) : (
+                                <>
+                                  {queuedSegmentTicketCount(group)} Person
+                                  {queuedSegmentTicketCount(group) === 1 ? "" : "en"} ·{" "}
+                                </>
+                              )}
+                              {queuedSegmentPresentCount(group)}/{queuedSegmentTicketCount(group)}{" "}
+                              anwesend
                             </small>
                           </span>
                         </label>

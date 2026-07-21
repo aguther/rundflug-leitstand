@@ -1,9 +1,12 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import adminSource from "../admin-view.tsx?raw";
 import ticketStatusSource from "../ticket-status-view.tsx?raw";
 import headerSource from "./AppHeader.tsx?raw";
 import shellSource from "./AppShell.tsx?raw";
 import { appDestinations, isDestinationActive } from "./navigation";
+
+const baseStyles = readFileSync(new URL("../design-system/base.css", import.meta.url), "utf8");
 
 describe("V1.2 app navigation", () => {
   it("exposes every approved internal work surface", () => {
@@ -27,6 +30,17 @@ describe("V1.2 app navigation", () => {
     expect(headerSource).toContain('aria-disabled="true"');
     expect(headerSource).toContain("Andere Rolle erforderlich");
     expect(headerSource).toContain("view-switcher-menu");
+  });
+
+  it("keeps the view switcher within narrow viewports with wrapped text and an inset check", () => {
+    expect(baseStyles).toContain("grid-template-columns: 26px minmax(0, 1fr) 22px");
+    expect(baseStyles).toContain("@media (max-width: 560px)");
+    expect(baseStyles).toContain("position: fixed");
+    expect(baseStyles).toContain("env(safe-area-inset-right");
+    expect(baseStyles).toContain("env(safe-area-inset-left");
+    expect(baseStyles).toContain("width: auto");
+    expect(baseStyles).toContain("overflow-wrap: anywhere");
+    expect(baseStyles).toContain("justify-self: end");
   });
 
   it("separates the account menu from the view switcher", () => {

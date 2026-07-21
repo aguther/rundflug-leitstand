@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import routerSource from "./FeatureRouter.tsx?raw";
 import assistSource from "./flight-line-assist.tsx?raw";
+import sharedFlightLineSource from "./flight-line-shared.tsx?raw";
 import flightLineSource from "./flight-line-view.tsx?raw";
 import sharedSource from "./operation-workspace.tsx?raw";
 
@@ -20,7 +21,7 @@ describe("Flight Line Assist", () => {
     expect(assistSource).toContain("flight-assist-v15");
   });
 
-  it("keeps the aircraft primary and exposes short operational actions", () => {
+  it("uses the shared status timeline and exposes state-dependent operational actions", () => {
     expect(assistSource).toContain("Flugzeug übernehmen");
     expect(assistSource).toContain("Übernehmen");
     expect(assistSource).toContain("Buchungsgruppen auswählen & kombinieren");
@@ -28,9 +29,14 @@ describe("Flight Line Assist", () => {
     expect(assistSource).toContain("Pause");
     expect(assistSource).toContain("Nicht verfügbar");
     expect(assistSource).toContain("Flugzeug freigeben");
-    expect(assistSource).toContain("LifecycleFlow");
-    expect(assistSource).toContain('action?.command === "COMPLETE_TURNAROUND"');
+    expect(assistSource).toContain("FlightProgress");
+    expect(assistSource).toContain("CompactCurrentRotation");
+    expect(assistSource).toContain("CompactHistory");
+    expect(assistSource).toContain('activeRotation?.status === "LANDED"');
     expect(assistSource).toContain("Zustand nach Abschluss");
+    expect(assistSource).toContain('onSetAircraftState(activeAircraft.id, "AVAILABLE")');
+    expect(assistSource).toContain("!requiresAvailableReset &&");
+    expect(assistSource).toContain("Coffee");
     expect(assistSource).toContain("AircraftPickerMeta");
     expect(assistSource).toContain("assist-v15-operational-state");
     expect(assistStyles).toContain(".assist-v15-picker-meta");
@@ -49,6 +55,8 @@ describe("Flight Line Assist", () => {
     expect(assistSource).not.toContain("assist-header");
     expect(assistSource).not.toContain("<BrandMark");
     expect(assistSource).not.toContain("<ThemeToggle");
+    expect(sharedFlightLineSource).toContain("PilotAssignmentDialogs");
+    expect(sharedFlightLineSource).toContain("primaryAircraftActionLabel");
   });
 
   it("offers manual presence, missing, recall and deferral actions", () => {
@@ -76,19 +84,22 @@ describe("Flight Line Assist", () => {
     expect(assistSource).toContain("await onRelease(claimedAircraftId)");
   });
 
-  it("gates operational context behind the device claim and clears it on release", () => {
-    expect(assistSource).toContain("const activeAircraft = claimedAircraft");
-    expect(assistSource).toContain("const listedAircraft = availableAircraft");
-    expect(assistSource).toContain("Betreutes und weitere verfügbare Flugzeuge");
-    expect(assistStyles).not.toContain("has-claim .assist-v15-picker");
-    expect(assistSource).toContain("{claimedAircraft ? (");
+  it("renders exclusive selection and work modes and clears state on release or claim loss", () => {
+    expect(assistSource).toContain("if (!activeAircraft)");
+    expect(assistSource).toContain("is-selection-mode");
+    expect(assistSource).toContain("is-work-mode");
+    expect(assistSource).toContain("serverClaimSeen");
+    expect(assistSource).toContain("Die Flugzeugübernahme ist abgelaufen oder wurde aufgehoben");
+    expect(assistSource).toContain("onClaimUnavailable");
+    expect(assistSource).not.toContain("assist-v15-workspace");
     expect(flightLineSource).toContain("setSelectedAircraftId(null)");
     expect(flightLineSource).toContain("setSelectedQueueGroupIds([])");
+    expect(flightLineSource).toContain("claimedAssistAircraftId");
   });
 
   it("uses stable grids and inline phone actions without overlay positioning", () => {
-    expect(assistStyles).toContain("grid-template-columns: 36px minmax(0, 1fr)");
-    expect(assistStyles).toContain("height: 150px");
+    expect(assistStyles).toContain("grid-template-columns: 40px minmax(0, 1fr)");
+    expect(assistStyles).toContain("min-height: 150px");
     expect(assistStyles).toContain("grid-column: 1 / -1");
     expect(assistStyles).not.toContain("position: absolute");
     expect(assistStyles).not.toContain("minmax(620px");

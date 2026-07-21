@@ -1,4 +1,4 @@
-/* V1.5 cashier — approved one-screen sales and ticket workspace. */
+/* V1.7 cashier — compact product sales, stable notices and ticket workspace. */
 .cashier-shell {
   height: 100dvh;
   min-height: 100dvh;
@@ -25,8 +25,52 @@
   padding: 16px;
 }
 
-.cashier-sale-panel > .ds-page-header {
-  margin-bottom: 18px;
+.cashier-sale-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+.cashier-sale-heading > .ds-page-header {
+  min-width: 0;
+  margin: 0;
+}
+.cashier-group-size {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 10px;
+}
+.cashier-field-label {
+  color: var(--ui-muted);
+  font-size: 0.72rem;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.cashier-stepper {
+  width: 122px;
+  display: grid;
+  grid-template-columns: 36px 1fr 36px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.cashier-stepper .ds-icon-button {
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
+  border: 0;
+  border-radius: 0;
+}
+.cashier-stepper output {
+  display: grid;
+  place-items: center;
+  border-inline: 1px solid var(--ui-border);
+  color: var(--ui-text);
+  font-size: 1rem;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
 }
 
 .cashier-products {
@@ -36,261 +80,109 @@
   scrollbar-gutter: stable;
   border: 1px solid var(--ui-border);
   border-radius: 7px;
+  background: var(--ui-surface);
 }
-
 .cashier-product + .cashier-product {
   border-top: 1px solid var(--ui-border);
 }
-.cashier-product.selected {
-  background: color-mix(in srgb, var(--ui-accent-soft) 24%, var(--ui-surface));
-}
-
-.cashier-product-heading {
-  width: 100%;
-  min-height: 80px;
+.cashier-product-row {
+  min-height: 76px;
   display: grid;
-  grid-template-columns: 44px minmax(135px, 1.5fr) minmax(80px, 0.8fr) minmax(72px, 0.7fr) minmax(
-      86px,
-      0.75fr
-    );
+  grid-template-columns:
+    34px minmax(120px, 1.4fr) minmax(72px, 0.7fr) minmax(68px, 0.66fr)
+    minmax(78px, 0.7fr) minmax(126px, auto);
   align-items: center;
-  gap: 12px;
-  padding: 10px 14px;
-  border: 0;
-  color: var(--ui-text);
-  background: transparent;
-  text-align: left;
-  cursor: pointer;
+  gap: 10px;
+  padding: 9px 12px 7px;
 }
-
-.cashier-product-heading > svg {
-  width: 30px;
-  height: 30px;
+.cashier-product-row > svg {
+  width: 28px;
+  height: 28px;
   color: var(--ui-accent);
   stroke-width: 1.7;
 }
-.cashier-product-heading > span {
+.cashier-product-row > span {
   min-width: 0;
   display: grid;
-  gap: 5px;
+  gap: 4px;
 }
-.cashier-product-heading small {
+.cashier-product-row small {
   color: var(--ui-muted);
-  font-size: 0.72rem;
+  font-size: 0.66rem;
   font-weight: 500;
+  line-height: 1.2;
 }
-.cashier-product-heading strong {
-  font-size: 0.88rem;
+.cashier-product-row strong {
+  font-size: 0.78rem;
+  line-height: 1.2;
 }
-.cashier-product-heading > span:nth-child(2) strong {
-  font-size: 1rem;
+.cashier-product-name strong {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 0.94rem;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.cashier-product-name small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .cashier-product-price {
   text-align: right;
 }
 .cashier-product-price strong {
   color: var(--ui-accent);
-  font-size: 1.1rem;
-}
-
-.cashier-product-body {
-  display: grid;
-  grid-template-rows: auto 4.75rem 56px;
-  gap: 8px;
-  padding: 0 14px 12px;
-}
-
-.cashier-product-controls {
-  display: grid;
-  grid-template-columns: 170px 1fr;
-  gap: 18px;
-}
-.cashier-field-label {
-  display: block;
-  margin-bottom: 8px;
-  font-size: 0.78rem;
-  font-weight: 650;
-}
-.cashier-stepper {
-  width: 160px;
-  display: grid;
-  grid-template-columns: 44px 1fr 44px;
-  border: 1px solid var(--ui-border-strong);
-  border-radius: 6px;
-  overflow: hidden;
-}
-.cashier-stepper .ds-icon-button {
-  width: 44px;
-  height: 42px;
-  min-height: 42px;
-  border: 0;
-  border-radius: 0;
-}
-.cashier-stepper output {
-  display: grid;
-  place-items: center;
-  border-inline: 1px solid var(--ui-border);
-  color: var(--ui-text);
-  font-size: 1.2rem;
-  font-weight: 700;
-}
-.cashier-weight-picker > div {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 7px;
-}
-.cashier-weight-picker .ds-button {
-  min-height: 42px;
-}
-.cashier-weight-picker .ds-button.selected {
-  border-color: var(--ui-accent);
-  color: var(--ui-accent);
-  background: var(--ui-accent-soft);
-  box-shadow: inset 0 0 0 1px var(--ui-accent);
-}
-
-.cashier-sale-options,
-.cashier-information {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--ui-muted);
-  font-size: 0.78rem;
-}
-
-.cashier-sale-options {
-  margin-top: 14px;
-}
-.cashier-sale-options > .ds-field {
-  min-width: 220px;
-  display: flex;
-  grid-template-columns: auto 1fr;
-  align-items: center;
-  gap: 8px;
-  margin: 0 0 0 auto;
-}
-.cashier-sale-options select,
-.cashier-preprinted-codes textarea,
-.cashier-correction input,
-.cashier-correction select {
-  min-height: 40px;
-  border: 1px solid var(--ui-border);
-  border-radius: 6px;
-  color: var(--ui-text);
-  background: var(--ui-control);
-}
-.cashier-preprinted-codes {
-  display: grid;
-  gap: 6px;
-  margin-top: 10px;
-  font-size: 0.78rem;
-  font-weight: 650;
-}
-.cashier-preprinted-codes textarea {
-  resize: vertical;
-  padding: 8px;
-}
-.cashier-product-guidance {
-  block-size: 4.75rem;
-  display: grid;
-  grid-template-columns: 20px 1fr;
-  align-content: center;
-  gap: 8px;
-  padding: 8px 10px;
-  overflow: auto;
-  border: 1px solid var(--ui-border);
-  border-radius: 6px;
-  color: var(--ui-muted);
-  background: var(--ui-surface-subtle);
-}
-.cashier-product-guidance svg {
-  margin-top: 2px;
-}
-.cashier-product-guidance > div {
-  display: grid;
-  align-content: center;
-  gap: 5px;
-}
-.cashier-product-guidance strong,
-.cashier-product-guidance span {
-  display: block;
-}
-.cashier-product-guidance strong {
-  color: var(--ui-text);
-  font-size: 0.8rem;
-}
-.cashier-product-guidance span {
-  font-size: 0.72rem;
-  line-height: 1.3;
-}
-.cashier-product-guidance.warning {
-  border-color: color-mix(in srgb, var(--ui-warning) 55%, var(--ui-border));
-  color: var(--ui-warning-text);
-  background: var(--ui-warning-soft);
-}
-.cashier-secondary-guidance {
-  block-size: 4.75rem;
-  margin-top: 10px;
-}
-.cashier-secondary-guidance > div {
-  block-size: 100%;
-  display: grid;
-  align-content: center;
-  gap: 4px;
-  margin: 0;
-  padding: 10px 12px;
-  overflow: auto;
-  border: 1px solid var(--ui-border);
-  border-radius: 6px;
-  font-size: 0.76rem;
-  line-height: 1.35;
-}
-.cashier-guidance-neutral {
-  color: var(--ui-muted);
-  background: var(--ui-surface-subtle);
-}
-.cashier-information {
-  margin-top: auto;
-  padding: 12px;
-  border: 1px solid color-mix(in srgb, var(--ui-accent) 35%, var(--ui-border));
-  border-radius: 6px;
-  color: var(--ui-accent);
-  background: color-mix(in srgb, var(--ui-accent-soft) 35%, transparent);
-}
-
-.cashier-sell-action {
-  min-height: 56px;
-  display: grid;
-  grid-template-columns: auto auto;
-  place-content: center;
-  column-gap: 10px;
-  margin-top: 0;
-  border: 1px solid var(--ui-accent);
-  border-radius: 6px;
-  color: #fff;
-  background: var(--ui-accent);
   font-size: 0.9rem;
-  font-weight: 700;
-  cursor: pointer;
+  white-space: nowrap;
 }
-.cashier-sell-action small {
-  grid-column: 1 / -1;
-  margin-top: 2px;
-  font-size: 0.68rem;
-  font-weight: 500;
+.cashier-sell-action.ds-button {
+  min-width: 0;
+  min-height: 40px;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 750;
+  line-height: 1.15;
+  white-space: normal;
 }
-.cashier-sell-action:disabled {
-  border-color: var(--ui-border);
-  color: var(--ui-disabled-text);
-  background: var(--ui-disabled);
-  cursor: not-allowed;
+.cashier-sell-action span {
+  min-width: 0;
+}
+.cashier-split-line {
+  block-size: 2.8rem;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 12px;
+  overflow: hidden;
+  border-top: 1px solid color-mix(in srgb, var(--ui-border) 75%, transparent);
+  color: transparent;
+  background: var(--ui-surface-subtle);
+  font-size: 0.66rem;
+  line-height: 1.25;
+}
+.cashier-split-line.warning {
+  color: var(--ui-warning-text);
+  background: color-mix(in srgb, var(--ui-warning-soft) 72%, var(--ui-surface));
+}
+.cashier-split-line > svg {
+  flex: 0 0 auto;
+}
+.cashier-split-line > span {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .cashier-ticket-panel {
   height: 100%;
   min-height: 0;
   display: grid;
-  grid-template-rows: auto auto minmax(190px, 0.7fr) minmax(310px, 1.3fr);
+  grid-template-rows: auto auto minmax(190px, 0.7fr) minmax(300px, 1.3fr);
 }
 .cashier-ticket-table-wrap {
   min-height: 0;
@@ -312,6 +204,12 @@
   padding: 9px 10px;
   white-space: nowrap;
 }
+.cashier-ticket-table .ds-table :is(th, td):nth-child(6) {
+  padding-right: 14px;
+}
+.cashier-ticket-table .ds-table :is(th, td):nth-child(7) {
+  padding-left: 14px;
+}
 .cashier-person-count {
   display: inline-flex;
   align-items: center;
@@ -322,26 +220,31 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  padding: 14px;
-  overflow: auto;
+  padding: 12px 14px;
+  overflow: hidden;
 }
 .cashier-ticket-detail > header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 .cashier-ticket-detail > header > div {
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 10px;
 }
 .cashier-ticket-detail h2 {
   margin: 0;
+  overflow: hidden;
   font-size: 1.05rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .cashier-ticket-detail header span {
+  flex: 0 0 auto;
   padding: 3px 7px;
   border: 1px solid var(--ui-accent);
   border-radius: 5px;
@@ -349,76 +252,110 @@
   font-size: 0.7rem;
 }
 .cashier-ticket-detail time {
+  flex: 0 0 auto;
   color: var(--ui-muted);
   font-size: 0.72rem;
 }
 .cashier-ticket-detail .action-message {
   margin: 0 0 8px;
-  padding: 7px 9px;
+  padding: 6px 9px;
+  font-size: 0.72rem;
 }
 .cashier-ticket-detail-grid {
-  min-height: 180px;
+  min-height: 172px;
   flex: 1 1 auto;
   display: grid;
-  grid-template-columns: minmax(150px, 0.72fr) minmax(190px, 1fr) minmax(180px, 0.78fr);
-  gap: 10px;
+  grid-template-columns: minmax(132px, 0.7fr) minmax(170px, 0.95fr) minmax(160px, 0.72fr);
+  gap: 8px;
+  overflow: hidden;
 }
 .cashier-ticket-detail-grid > * {
+  min-width: 0;
+  min-height: 0;
   margin: 0;
-  padding: 12px;
-  overflow: auto;
+  padding: 10px;
   border: 1px solid var(--ui-border);
   border-radius: 6px;
 }
+.cashier-ticket-detail-grid > dl {
+  overflow: hidden;
+}
 .cashier-ticket-detail-grid > dl > div {
   display: grid;
-  grid-template-columns: 78px 1fr;
-  gap: 8px;
-  padding-block: 6px;
+  grid-template-columns: 66px minmax(0, 1fr);
+  gap: 7px;
+  padding-block: 5px;
 }
 .cashier-ticket-detail-grid dt {
   color: var(--ui-muted);
-  font-size: 0.72rem;
+  font-size: 0.68rem;
 }
 .cashier-ticket-detail-grid dd {
+  min-width: 0;
   margin: 0;
-  font-size: 0.75rem;
+  overflow-wrap: anywhere;
+  font-size: 0.72rem;
   font-weight: 650;
 }
 .cashier-ticket-identifiers {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .cashier-ticket-identifiers > button {
+  width: 100%;
   display: flex;
   align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding-top: 10px;
+  gap: 7px;
+  padding: 8px 0 0;
   border-top: 1px solid var(--ui-border);
   border-right: 0;
   border-bottom: 0;
   border-left: 0;
   color: var(--ui-text);
   background: transparent;
-  font-size: 0.74rem;
+  font-size: 0.7rem;
   text-align: left;
   cursor: pointer;
 }
+.cashier-ticket-identifiers > button span {
+  overflow-wrap: anywhere;
+}
 .cashier-ticket-identifiers > button.selected {
   color: var(--ui-accent);
-  font-weight: 700;
+  font-weight: 750;
 }
 .cashier-ticket-paper {
+  position: relative;
   display: grid;
   place-items: center;
+  overflow: hidden;
   background: var(--ui-surface-subtle);
 }
 .cashier-ticket-paper > span {
   color: var(--ui-muted);
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   text-align: center;
+}
+.cashier-ticket-enlarge {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 7px;
+  border: 1px solid var(--ui-accent);
+  border-radius: 5px;
+  color: var(--ui-accent);
+  background: color-mix(in srgb, var(--ui-surface-raised) 94%, transparent);
+  box-shadow: 0 4px 14px rgb(0 0 0 / 22%);
+  font-size: 0.62rem;
+  font-weight: 750;
+  cursor: pointer;
 }
 .ticket-paper {
   width: 190px;
@@ -459,35 +396,129 @@
   margin: 0;
   font-weight: 700;
 }
-.cashier-correction {
-  margin-top: 8px;
-  font-size: 0.75rem;
+.ticket-paper-preview {
+  width: 132px;
+  padding: 4px;
 }
-.cashier-correction summary {
-  color: var(--ui-accent);
-  cursor: pointer;
+.ticket-paper-preview > strong {
+  font-size: 0.62rem;
+  line-height: 1;
 }
-.cashier-correction > div {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  margin-top: 8px;
+.ticket-paper-preview > small {
+  font-size: 6px;
+  line-height: 1;
 }
-.cashier-correction label {
-  display: grid;
-  gap: 4px;
+.ticket-paper-preview > b {
+  margin-top: 2px;
+  font-size: 8px;
+  line-height: 1;
 }
+.ticket-paper-preview > img {
+  width: 54px;
+  height: 54px;
+}
+.ticket-paper-preview dl {
+  margin: 1px 0;
+  padding-top: 1px;
+  font-size: 6px;
+  line-height: 1.05;
+}
+.ticket-paper-preview dl > div {
+  grid-template-columns: 34px minmax(0, 1fr);
+}
+.ticket-paper-preview dl :is(dt, dd) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .cashier-ticket-actions {
   display: grid;
   grid-template-columns: 0.85fr 1.4fr;
   gap: 7px;
-  margin-top: 10px;
+  margin-top: 8px;
 }
-
 .cashier-ticket-list-sentinel {
   padding: 8px 12px;
   color: var(--ui-muted);
   font-size: 0.72rem;
+  text-align: center;
+}
+.cashier-cancel-dialog-body {
+  display: grid;
+  gap: 12px;
+}
+.cashier-cancel-dialog-body p {
+  margin: 0;
+}
+
+.qr-scan-dialog {
+  width: min(560px, calc(100vw - 28px));
+  max-width: none;
+  max-height: calc(100dvh - 28px);
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 10px;
+  color: var(--ui-text);
+  background: var(--ui-surface-raised);
+  box-shadow: 0 30px 90px rgb(0 0 0 / 55%);
+}
+.qr-scan-dialog::backdrop {
+  background: rgb(0 0 0 / 68%);
+  backdrop-filter: blur(8px);
+}
+.qr-scan-dialog-content {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  padding: 18px;
+}
+.qr-scan-dialog-content > header {
+  width: 100%;
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.qr-scan-dialog-content > header > div {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+.qr-scan-dialog-content > header span {
+  color: var(--ui-muted);
+  font-size: 0.78rem;
+}
+.qr-scan-dialog-content > header strong {
+  overflow-wrap: anywhere;
+  font-size: 1.05rem;
+}
+.qr-scan-dialog-content > header button {
+  width: 40px;
+  min-height: 40px;
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 6px;
+  color: var(--ui-text);
+  background: var(--ui-control);
+  cursor: pointer;
+}
+.qr-scan-dialog-content > img {
+  width: min(70vmin, 430px);
+  height: min(70vmin, 430px);
+  max-width: 100%;
+  border: 12px solid #fff;
+  background: #fff;
+  image-rendering: pixelated;
+}
+.qr-scan-dialog-content > p {
+  margin: 0;
+  color: var(--ui-muted);
+  font-size: 0.82rem;
   text-align: center;
 }
 
@@ -495,12 +526,25 @@
   display: none;
 }
 
-.cashier-cancel-dialog-body {
-  display: grid;
-  gap: 12px;
-}
-.cashier-cancel-dialog-body p {
-  margin: 0;
+@media (min-width: 1251px) and (max-width: 1450px) {
+  .cashier-product-row {
+    grid-template-columns:
+      28px minmax(105px, 1.35fr) minmax(64px, 0.7fr) minmax(60px, 0.66fr)
+      minmax(72px, 0.7fr) minmax(112px, auto);
+    gap: 7px;
+    padding-inline: 10px;
+  }
+  .cashier-product-row > svg {
+    width: 25px;
+    height: 25px;
+  }
+  .cashier-product-name strong {
+    font-size: 0.88rem;
+  }
+  .cashier-sell-action.ds-button {
+    padding-inline: 8px;
+    font-size: 0.68rem;
+  }
 }
 
 @media (min-width: 1101px) and (max-width: 1250px) {
@@ -512,61 +556,61 @@
   .cashier-sale-panel {
     padding: 12px;
   }
-  .cashier-sale-panel > .ds-page-header {
-    margin-bottom: 12px;
+  .cashier-sale-heading {
+    gap: 8px;
+    margin-bottom: 10px;
   }
-  .cashier-product-heading {
-    grid-template-columns: 32px minmax(90px, 1.3fr) minmax(62px, 0.8fr) minmax(58px, 0.72fr) minmax(
-        72px,
-        0.8fr
-      );
+  .cashier-group-size {
     gap: 6px;
-    padding: 8px;
-  }
-  .cashier-product-heading > svg {
-    width: 26px;
-    height: 26px;
-  }
-  .cashier-product-heading small {
-    font-size: 0.66rem;
-    line-height: 1.2;
-  }
-  .cashier-product-heading strong {
-    font-size: 0.78rem;
-  }
-  .cashier-product-heading > span:nth-child(2) strong {
-    font-size: 0.9rem;
-  }
-  .cashier-product-price strong {
-    font-size: 0.92rem;
-  }
-  .cashier-product-body {
-    padding-inline: 10px;
-  }
-  .cashier-product-controls {
-    grid-template-columns: 150px minmax(0, 1fr);
-    gap: 10px;
   }
   .cashier-stepper {
-    width: 145px;
+    width: 108px;
+    grid-template-columns: 32px 1fr 32px;
   }
-  .cashier-weight-picker .ds-button {
-    padding-inline: 10px;
+  .cashier-stepper .ds-icon-button {
+    width: 32px;
+    height: 34px;
+    min-height: 34px;
   }
-  .cashier-sale-options {
-    gap: 6px;
-    font-size: 0.72rem;
+  .cashier-product-row {
+    grid-template-columns:
+      26px minmax(82px, 1.24fr) minmax(55px, 0.72fr) minmax(53px, 0.66fr)
+      minmax(60px, 0.72fr) minmax(112px, auto);
+    gap: 5px;
+    padding-inline: 8px;
   }
-  .cashier-sale-options > .ds-field {
-    min-width: 180px;
+  .cashier-product-row > svg {
+    width: 23px;
+    height: 23px;
+  }
+  .cashier-product-row small {
+    font-size: 0.6rem;
+  }
+  .cashier-product-row strong {
+    font-size: 0.7rem;
+  }
+  .cashier-product-name strong {
+    font-size: 0.82rem;
+  }
+  .cashier-product-price strong {
+    font-size: 0.78rem;
+  }
+  .cashier-sell-action.ds-button {
+    padding-inline: 7px;
+    font-size: 0.66rem;
+  }
+  .cashier-split-line {
+    padding-inline: 8px;
+    font-size: 0.61rem;
   }
   .cashier-ticket-table .ds-table {
-    min-width: 590px;
+    min-width: 600px;
     table-layout: fixed;
     font-size: 0.7rem;
   }
   .cashier-ticket-table .ds-table :is(th, td) {
-    padding: 8px 6px;
+    padding-block: 8px;
+    padding-inline: 6px;
   }
   .cashier-ticket-table .ds-table :is(th, td):nth-child(1) {
     width: 10%;
@@ -575,20 +619,32 @@
     width: 11%;
   }
   .cashier-ticket-table .ds-table :is(th, td):nth-child(3) {
-    width: 22%;
+    width: 18%;
     white-space: normal;
   }
   .cashier-ticket-table .ds-table :is(th, td):nth-child(4) {
     width: 12%;
   }
   .cashier-ticket-table .ds-table :is(th, td):nth-child(5) {
-    width: 16%;
+    width: 14%;
   }
   .cashier-ticket-table .ds-table :is(th, td):nth-child(6) {
-    width: 18%;
+    width: 23%;
+    padding-right: 14px;
   }
   .cashier-ticket-table .ds-table :is(th, td):nth-child(7) {
-    width: 11%;
+    width: 12%;
+    padding-left: 14px;
+  }
+  .cashier-ticket-detail {
+    padding: 10px 12px;
+  }
+  .cashier-ticket-detail-grid {
+    grid-template-columns: minmax(118px, 0.68fr) minmax(145px, 0.9fr) minmax(142px, 0.72fr);
+    gap: 7px;
+  }
+  .cashier-ticket-detail-grid > * {
+    padding: 8px;
   }
 }
 
@@ -601,17 +657,11 @@
     grid-template-columns: 1fr;
   }
   .cashier-sale-panel {
-    min-height: 650px;
+    min-height: 470px;
   }
   .cashier-ticket-panel {
     min-height: 700px;
   }
-}
-
-.cashier-shell > footer {
-  flex: 0 0 28px;
-  min-height: 28px;
-  padding-block: 6px;
 }
 
 @media (max-width: 700px) {
@@ -622,47 +672,58 @@
     min-height: 0;
     padding: 12px;
   }
-  .cashier-product-heading {
-    grid-template-columns: 34px 1fr auto;
-    min-height: 82px;
-    padding: 10px;
+  .cashier-sale-heading {
+    align-items: stretch;
+    flex-direction: column;
   }
-  .cashier-product-heading .cashier-product-metric {
+  .cashier-group-size {
+    justify-content: space-between;
+  }
+  .cashier-product-row {
+    grid-template-columns: 30px minmax(0, 1fr) minmax(108px, auto);
+    min-height: 72px;
+    padding: 8px;
+  }
+  .cashier-product-row .cashier-product-metric,
+  .cashier-product-row .cashier-product-price {
     display: none;
   }
-  .cashier-product-controls {
-    grid-template-columns: 1fr;
-  }
-  .cashier-product-body {
-    grid-template-rows: auto 5.75rem 56px;
-    padding: 0 10px 12px;
-  }
-  .cashier-product-guidance {
-    block-size: 5.75rem;
-  }
-  .cashier-sale-options {
-    align-items: flex-start;
-    flex-wrap: wrap;
-  }
-  .cashier-sale-options > .ds-field {
-    width: 100%;
-    margin-left: 0;
+  .cashier-split-line {
+    block-size: 3.4rem;
+    padding-inline: 8px;
   }
   .cashier-ticket-panel {
     min-height: 760px;
-    grid-template-rows: auto auto 240px 1fr;
+    grid-template-rows: auto auto 240px minmax(430px, 1fr);
   }
-  .cashier-ticket-table {
+  .cashier-ticket-table .ds-table {
     min-width: 700px;
   }
+  .cashier-ticket-detail {
+    overflow: visible;
+  }
   .cashier-ticket-detail-grid {
+    min-height: 0;
+    flex: 0 0 auto;
     grid-template-columns: 1fr;
+    overflow: visible;
+  }
+  .cashier-ticket-detail-grid > * {
+    min-height: 160px;
+  }
+  .cashier-ticket-paper {
+    min-height: 210px;
   }
   .cashier-ticket-actions {
     grid-template-columns: 1fr;
   }
-  .cashier-correction > div {
-    grid-template-columns: 1fr;
+  .qr-scan-dialog-content {
+    padding: 14px;
+  }
+  .qr-scan-dialog-content > img {
+    width: min(82vw, 430px);
+    height: min(82vw, 430px);
+    border-width: 8px;
   }
 }
 

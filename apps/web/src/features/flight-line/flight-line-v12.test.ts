@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import assistSource from "../../flight-line-assist.tsx?raw";
+import sharedSource from "../../flight-line-shared.tsx?raw";
 import supervisorSource from "../../flight-line-supervisor.tsx?raw";
 import viewSource from "../../flight-line-view.tsx?raw";
 
@@ -32,7 +33,7 @@ describe("V1.2 Flight Line surfaces", () => {
     expect(assistSource).not.toContain("assist-header");
   });
 
-  it("implements the V1.6.1 compact aircraft table with centered dialogs", () => {
+  it("implements the V1.7.0 compact aircraft table with centered dialogs", () => {
     expect(supervisorSource).toContain("flight-director-aircraft-row");
     expect(supervisorSource).toContain("ModalDialog");
     expect(supervisorSource).toContain("Buchungsgruppen zuweisen");
@@ -50,6 +51,10 @@ describe("V1.2 Flight Line surfaces", () => {
     expect(supervisorSource).toContain("SelectField,");
     expect(supervisorSource).toContain("StatusPill,");
     expect(supervisorSource).toContain("Tabs,");
+    expect(supervisorSource).toContain("PilotAssignmentDialogs");
+    expect(assistSource).toContain("PilotAssignmentDialogs");
+    expect(sharedSource).toContain("CompactCurrentRotation");
+    expect(sharedSource).toContain("CompactHistory");
   });
 
   it("uses semantic light and dark surfaces and central Assist actions", () => {
@@ -62,12 +67,13 @@ describe("V1.2 Flight Line surfaces", () => {
     expect(assistSource).toContain("<StatusPill");
   });
 
-  it("implements the approved tablet workspace and keeps the aircraft list on phones", () => {
-    expect(assistSource).toContain("assist-v15-workspace");
+  it("implements exclusive aircraft selection and work modes on every viewport", () => {
+    expect(assistSource).toContain("if (!activeAircraft)");
+    expect(assistSource).toContain("is-selection-mode");
+    expect(assistSource).toContain("is-work-mode");
     expect(assistSource).toContain("assist-v15-active-column");
-    expect(assistSource).toContain("listedAircraft.slice(0, visibleAircraftCount)");
-    expect(assistSource).toContain("Von dir übernommen");
-    expect(assistSource).not.toContain("assist-v15-phone-back");
+    expect(assistSource).toContain("availableAircraft.slice(0, visibleAircraftCount)");
+    expect(assistSource).not.toContain("assist-v15-workspace");
     expect(assistSource).toContain("assist-v15-group-menu");
     expect(stylesSource).toContain("@media (max-width: 760px)");
     expect(stylesSource).toContain(".flight-assist-v15 .assist-v15-aircraft-list");
