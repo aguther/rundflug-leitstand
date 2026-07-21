@@ -199,3 +199,12 @@ zuordenbaren Status- oder Umlaufereignis, ersatzweise aus dem jüngsten Ist-Umla
 `aircraft.updated_at`. Reine Stammdaten- und Tankplanänderungen verändern den Wert nicht. Vor
 Anwendung wird eine portable D1-/R2-Sicherung erzeugt. Wiederherstellung erfolgt per D1 Time Travel
 oder aus dieser Sicherung, weil D1 die additive Spalte nicht ohne Tabellenneuaufbau entfernt.
+
+## 0039 – Loginbasierte Flight-Line-Betreuung
+
+Ersetzt die kurzlebige gerätegebundene Assist-Reservierung durch eine 30 Minuten gültige,
+versionierte Reservierung des pseudonymen Operator-Kontos. Bestehende Claims werden wegen ihrer
+rein ephemeren Natur bewusst verworfen. Pro Veranstaltung kann ein Operator genau ein Flugzeug und
+ein Flugzeug genau einen Operator beanspruchen. Fremdübernahmen werden nur mit der erwarteten
+Claim-Revision ausgeführt und auditiert. Vor Anwendung ist eine portable D1-Sicherung erforderlich;
+ein Rollback erfolgt per D1 Time Travel oder aus dieser Sicherung.

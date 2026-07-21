@@ -33,9 +33,9 @@ describe("Flight Line Supervisor", () => {
     expect(appSource).not.toContain('className="pilot-assignment"');
   });
 
-  it("keeps current rotation and sold tickets visible side by side like the approved concept", () => {
-    expect(supervisorSource).toContain('className="flight-director-bottom-grid"');
-    expect(supervisorSource).toContain("Aktueller Umlauf");
+  it("keeps the current rotation in the aircraft row and sold tickets full width", () => {
+    expect(supervisorSource).toContain('className="flight-director-bottom-grid is-ticket-only"');
+    expect(supervisorSource).toContain('className="flight-director-timeline"');
     expect(supervisorSource).toContain("Verkaufte Tickets");
     expect(flightLineSource).toContain("Boarding");
     expect(flightLineSource).toContain("Offblock");
@@ -44,17 +44,21 @@ describe("Flight Line Supervisor", () => {
     expect(flightLineSource).toContain("PilotChangeIcon");
     expect(flightLineSource).toContain("primaryAircraftActionPresentation");
     expect(supervisorSource).toContain("rotationStateLabels[rotation.status]");
+    expect(supervisorSource).not.toContain("Nächster Schritt");
+    expect(supervisorSource).not.toContain("<span>Status</span>");
     expect(supervisorSource).not.toContain("<dd>{rotation.status}</dd>");
     expect(supervisorSource).not.toContain('{ value: "tickets", label: "Verkaufte Tickets" }');
   });
 
   it("supports an optional pause estimate without automatic release", () => {
-    expect(expectedReviewAtFromPause("20", false, Date.parse("2026-07-16T10:00:00.000Z"))).toBe(
+    expect(expectedReviewAtFromPause(20, Date.parse("2026-07-16T10:00:00.000Z"))).toBe(
       "2026-07-16T10:20:00.000Z",
     );
-    expect(expectedReviewAtFromPause("20", true)).toBeNull();
-    expect(expectedReviewAtFromPause("0", false)).toBeNull();
-    expect(appSource).toContain("Das Flugzeug wird nicht automatisch freigegeben");
+    expect(expectedReviewAtFromPause(null)).toBeNull();
+    expect(appSource).toContain("([10, 20, 30] as const)");
+    expect(appSource).toContain("{minutes} Min.");
+    expect(appSource).toContain("Dauer unbekannt");
+    expect(appSource).not.toContain("Pause starten");
     expect(appSource).toContain('type: "SET_AIRCRAFT_OPERATIONAL_STATE"');
   });
 });

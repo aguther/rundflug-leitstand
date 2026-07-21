@@ -11,7 +11,7 @@ describe("V1.7.0 aircraft pilot assignment", () => {
     expect(worker).toContain("operationalStateChangedAt: aircraft.operational_state_changed_at");
     expect(coordinator).toContain("WHEN operational_state <> ?1 THEN ?2");
     expect(coordinator).toContain(
-      '"UPDATE aircraft SET refuel_reminder_threshold = ?1, updated_at = ?2 WHERE id = ?3"',
+      '"UPDATE aircraft SET refuel_reminder_threshold = ?1, version = version + 1, updated_at = ?2 WHERE id = ?3"',
     );
   });
 

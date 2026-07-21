@@ -1,0 +1,13 @@
+ID,Modul,Tests,Status
+V171-REL-010,packages/config und scripts/verify_requirements.py,Requirements- und Versionsverifikation,umgesetzt
+V171-HEAD-010,apps/web/src/app/AppHeader.tsx und design-system/base.css,Header-UI-Tests und Browserabnahme,umgesetzt
+V171-TIM-010,apps/web/src/flight-line-shared.tsx und Flight-Line-CSS,flight-line-shared.test.ts und Browserabnahme,umgesetzt
+V171-AST-010,apps/web/src/flight-line-assist.tsx und flight-line-assist-v15.css,flight-line-assist-ui.test.ts und Browserabnahme,umgesetzt
+V171-ACT-010,apps/web/src/flight-line-assist.tsx und flight-line-supervisor.tsx,Flight-Line-UI-Tests und responsive Browserabnahme,umgesetzt
+V171-CLM-010,Contracts Migration Worker und Assist,flight-line-assist-claims.test.ts und Sitzungsautorisierungstests,umgesetzt
+V171-ABT-010,packages/domain Contracts und apps/worker/src/event-coordinator.ts,Domain- Contract- und technical-rotation-abort.test.ts,umgesetzt
+V171-PAU-010,apps/web/src/flight-line-view.tsx und flight-line-pause.ts,flight-line-supervisor-ui.test.ts und mobile Browserabnahme,umgesetzt
+V171-SUP-010,apps/web/src/flight-line-supervisor.tsx und Flight-Line-CSS,Supervisor-UI-Test und Desktop-Browserabnahme,umgesetzt
+V171-TKT-010,apps/worker/src/index.ts und flight-line-supervisor.tsx,Supervisor-UI-Test und Browserabnahme,umgesetzt
+V171-MSG-010,apps/web/src/flight-line-view.tsx und PageNotifications,UI-Quelltests und Browserabnahme,umgesetzt
+V171-QA-010,Workspace-Test- und Buildskripte,Vollständiger Check und Browserabnahme,umgesetzt

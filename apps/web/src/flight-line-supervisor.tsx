@@ -1,6 +1,15 @@
 import type { OperationBoard } from "@rundflug/contracts";
 import { rotationStateLabels } from "@rundflug/domain";
-import { Bell, CheckCircle2, CircleOff, Coffee, Fuel, Plane, UserRoundX } from "lucide-react";
+import {
+  Bell,
+  CheckCircle2,
+  CircleOff,
+  Coffee,
+  Fuel,
+  History,
+  Plane,
+  UserRoundX,
+} from "lucide-react";
 import { useMemo, useState } from "react";
 import {
   Button,
@@ -10,22 +19,13 @@ import {
   Panel,
   SearchField,
   SelectField,
-  StatusPill,
-  Tabs,
 } from "./design-system/components";
 import {
   activeRotationForAircraft,
-  aircraftStatusLabel,
-  CompactCurrentRotation,
   CompactHistory,
   type FlightLineFleetState,
   FlightProgress,
   flightLineGroupLabel,
-  flightLineStateClass,
-  flightLineStatusTone,
-  formatFlightLineTime,
-  latestRotationForAircraft,
-  nextAircraftStep,
   operationalRotationForAircraft,
   PilotAssignmentDialogs,
   PilotChangeIcon,
@@ -33,7 +33,6 @@ import {
   primaryAircraftActionLabel,
   primaryAircraftActionPresentation,
   rotationHistoryForAircraft,
-  visibleAircraftState,
 } from "./flight-line-shared";
 
 type Aircraft = OperationBoard["aircraft"][number];
@@ -81,9 +80,9 @@ export function FlightLineSupervisorConsole({
 }) {
   const [resourceGroupId, setResourceGroupId] = useState("");
   const [ticketSearch, setTicketSearch] = useState("");
-  const [bottomTab, setBottomTab] = useState<"current" | "history">("current");
   const [assignmentOpen, setAssignmentOpen] = useState(false);
   const [pilotOpen, setPilotOpen] = useState(false);
+  const [historyAircraftId, setHistoryAircraftId] = useState<string | null>(null);
 
   const filteredAircraft = useMemo(
     () => aircraft.filter((entry) => !resourceGroupId || entry.resourceGroupId === resourceGroupId),
@@ -91,9 +90,6 @@ export function FlightLineSupervisorConsole({
   );
   const activeRotation = selectedAircraft
     ? activeRotationForAircraft(selectedAircraft.id, board.rotations)
-    : undefined;
-  const currentRotation = selectedAircraft
-    ? latestRotationForAircraft(selectedAircraft.id, board.rotations)
     : undefined;
   const compatibleGroups = board.queueGroups.filter(
     (group) =>
@@ -115,11 +111,17 @@ export function FlightLineSupervisorConsole({
     board.event.emergencyMode ||
     board.event.status !== "ACTIVE" ||
     board.event.operationalInterrupted;
-  const history = selectedAircraft
-    ? rotationHistoryForAircraft(selectedAircraft.id, board.rotations)
+  const historyAircraft = aircraft.find((entry) => entry.id === historyAircraftId);
+  const history = historyAircraftId
+    ? rotationHistoryForAircraft(historyAircraftId, board.rotations)
     : [];
   const ticketRows = board.rotations
     .flatMap((rotation) => rotation.bookingGroups.map((group) => ({ group, rotation })))
+    .sort(
+      (left, right) =>
+        right.group.soldAt.localeCompare(left.group.soldAt) ||
+        right.group.id.localeCompare(left.group.id),
+    )
     .filter(({ group, rotation }) => {
       const query = ticketSearch.trim().toLocaleLowerCase("de-DE");
       if (!query) return true;
@@ -187,19 +189,19 @@ export function FlightLineSupervisorConsole({
           <div className="flight-director-aircraft-head">
             <span>Flugzeug</span>
             <span>Plätze · Ressource</span>
-            <span>Status</span>
             <span>Pilot</span>
             <span>Buchungsgruppen</span>
             <span>Zeitverlauf</span>
-            <span>Nächster Schritt</span>
             <span>Aktionen</span>
           </div>
           {filteredAircraft.map((entry) => {
             const rotation = operationalRotationForAircraft(entry, board.rotations, board.products);
-            const status = visibleAircraftState(entry, rotation);
             const isSelected = entry.id === selectedAircraft?.id;
             const pilotChangeAllowed = !rotation || ["DRAFT", "CALLED"].includes(rotation.status);
             const startBlockAllowed = entry.operationalState === "AVAILABLE";
+            const unavailableAllowed =
+              startBlockAllowed ||
+              Boolean(rotation && ["CALLED", "IN_FLIGHT"].includes(rotation.status));
             const primaryPresentation = primaryAircraftActionPresentation(entry, rotation);
             const PrimaryActionIcon = primaryPresentation.Icon;
             return (
@@ -226,21 +228,21 @@ export function FlightLineSupervisorConsole({
                   <strong>{entry.passengerSeats}</strong>
                   <small>{entry.resourceGroupName}</small>
                 </span>
-                <span className="flight-director-aircraft-status">
-                  <StatusPill
-                    className={flightLineStateClass(status)}
-                    tone={flightLineStatusTone(status)}
-                  >
-                    {aircraftStatusLabel(entry, rotation)}
-                  </StatusPill>
-                  <small>
-                    seit{" "}
-                    {formatFlightLineTime(entry.operationalStateChangedAt, board.event.timeZone)}
-                  </small>
-                </span>
                 <span className="flight-director-pilot-code">
                   <PilotIcon aria-hidden="true" />
                   <strong>{entry.currentPilotOperationalCode ?? "–"}</strong>
+                  <IconButton
+                    disabled={!pilotChangeAllowed}
+                    label={`Pilot für ${entry.registration} zuweisen`}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      openPilot(entry);
+                    }}
+                    size="compact"
+                    type="button"
+                  >
+                    <PilotChangeIcon aria-hidden="true" />
+                  </IconButton>
                 </span>
                 <span className="flight-director-group-chips">
                   {rotation && rotation.status !== "DRAFT" ? (
@@ -258,42 +260,26 @@ export function FlightLineSupervisorConsole({
                     aircraft={entry}
                     rotation={rotation}
                     timeZone={board.event.timeZone}
+                    variant="detailed"
                   />
                 </span>
-                <span className="flight-director-next-step">
-                  {nextAircraftStep(entry, rotation)}
-                </span>
                 <span className="flight-director-row-actions">
-                  <Button
-                    aria-label={primaryAircraftActionLabel(entry, rotation)}
+                  <IconButton
+                    label={primaryAircraftActionLabel(entry, rotation)}
                     disabled={rotation?.status === "COMPLETED"}
                     onClick={(event) => {
                       event.stopPropagation();
                       runPrimary(entry, rotation);
                     }}
                     size="touch"
-                    title={primaryAircraftActionLabel(entry, rotation)}
-                    variant="primary"
-                  >
-                    <PrimaryActionIcon aria-hidden="true" />
-                    {primaryPresentation.shortLabel}
-                  </Button>
-                  <IconButton
-                    disabled={!pilotChangeAllowed}
-                    label={`Pilot für ${entry.registration} zuweisen`}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      openPilot(entry);
-                    }}
-                    size="touch"
                     type="button"
                   >
-                    <PilotChangeIcon aria-hidden="true" />
+                    <PrimaryActionIcon aria-hidden="true" />
                   </IconButton>
                   <IconButton
                     aria-pressed={entry.operationalState === "REFUELING"}
                     className="flight-line-status-action state-refueling"
-                    disabled={!startBlockAllowed}
+                    disabled={!unavailableAllowed}
                     label={`${entry.registration} zum Tanken setzen`}
                     onClick={(event) => {
                       event.stopPropagation();
@@ -332,6 +318,17 @@ export function FlightLineSupervisorConsole({
                   >
                     <CircleOff aria-hidden="true" />
                   </IconButton>
+                  <IconButton
+                    label={`Historie für ${entry.registration} anzeigen`}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setHistoryAircraftId(entry.id);
+                    }}
+                    size="touch"
+                    type="button"
+                  >
+                    <History aria-hidden="true" />
+                  </IconButton>
                 </span>
               </div>
             );
@@ -339,27 +336,7 @@ export function FlightLineSupervisorConsole({
         </section>
       </Panel>
 
-      <div className="flight-director-bottom-grid">
-        <Panel className="flight-director-bottom" padding="none">
-          <Tabs
-            items={[
-              { value: "current", label: "Aktueller Umlauf" },
-              { value: "history", label: "Historie" },
-            ]}
-            label="Flugzeuginformationen"
-            onChange={setBottomTab}
-            value={bottomTab}
-          />
-          {bottomTab === "current" ? (
-            <CompactCurrentRotation
-              aircraft={selectedAircraft}
-              rotation={currentRotation}
-              timeZone={board.event.timeZone}
-            />
-          ) : (
-            <CompactHistory history={history} timeZone={board.event.timeZone} />
-          )}
-        </Panel>
+      <div className="flight-director-bottom-grid is-ticket-only">
         <Panel className="flight-director-ticket-overview" padding="none">
           <header>
             <h2>
@@ -375,6 +352,25 @@ export function FlightLineSupervisorConsole({
           <CompactTickets rows={ticketRows} />
         </Panel>
       </div>
+
+      <ModalDialog
+        description={
+          historyAircraft ? `Abgeschlossene Umläufe von ${historyAircraft.registration}` : undefined
+        }
+        footer={
+          <Button onClick={() => setHistoryAircraftId(null)} type="button" variant="secondary">
+            Schließen
+          </Button>
+        }
+        onClose={() => setHistoryAircraftId(null)}
+        open={historyAircraftId !== null}
+        size="wide"
+        title="Historie anzeigen"
+      >
+        <div className="flight-director-history-dialog">
+          <CompactHistory history={history} timeZone={board.event.timeZone} />
+        </div>
+      </ModalDialog>
 
       <ModalDialog
         description={
@@ -559,7 +555,7 @@ function CompactTickets({
       <div className="flight-director-compact-head">
         <span>Ticketgruppe</span>
         <span>Personen</span>
-        <span>Status</span>
+        <span>Umlaufstatus</span>
         <span>Flugzeug</span>
         <span>Produkt</span>
       </div>

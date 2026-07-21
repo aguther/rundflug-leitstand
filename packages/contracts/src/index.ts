@@ -368,6 +368,15 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
     }),
   }),
   commandBaseSchema.extend({
+    type: z.literal("ABORT_ROTATION_TO_QUEUE_AND_MARK_AIRCRAFT_UNAVAILABLE"),
+    payload: z.object({
+      rotationId: z.string().min(1).max(100),
+      expectedRotationVersion: z.number().int().nonnegative(),
+      expectedAircraftVersion: z.number().int().nonnegative(),
+      reason: z.string().trim().min(3).max(500),
+    }),
+  }),
+  commandBaseSchema.extend({
     type: z.literal("SET_TICKET_ATTENDANCE"),
     payload: z.object({
       ticketId: z.string().min(1).max(100),
@@ -918,6 +927,7 @@ export const productOperationalSummarySchema = z.object({
 
 export const rotationOperationalSummarySchema = z.object({
   id: z.string(),
+  version: z.number().int().nonnegative(),
   flightGroupId: z.string(),
   communicationNumber: z.number().int().positive(),
   communicationLabel: z.string().regex(/^[A-Z0-9-]+-\d{3,}$/),
@@ -930,6 +940,7 @@ export const rotationOperationalSummarySchema = z.object({
       z.object({
         id: z.string(),
         communicationNumber: z.number().int().positive(),
+        soldAt: z.string(),
         ticketCount: z.number().int().positive(),
         presentCount: z.number().int().nonnegative(),
       }),
@@ -1001,6 +1012,7 @@ export const rotationOperationalSummarySchema = z.object({
 
 export const aircraftOperationalSummarySchema = z.object({
   id: z.string(),
+  version: z.number().int().nonnegative(),
   registration: z.string(),
   aircraftType: z.string(),
   passengerSeats: z.number().int().positive(),
@@ -1070,7 +1082,9 @@ export const operationBoardSchema = z.object({
   assistClaims: z.array(
     z.object({
       aircraftId: z.string(),
-      claimedByCurrentSession: z.boolean(),
+      claimedByCurrentOperator: z.boolean(),
+      ownerLoginCode: z.string(),
+      revision: z.number().int().positive(),
       claimedAt: z.string(),
       expiresAt: z.string(),
     }),
@@ -1117,6 +1131,27 @@ export const operationBoardSchema = z.object({
   }),
 });
 export type OperationBoard = z.infer<typeof operationBoardSchema>;
+
+export const assistClaimMutationSchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("ACQUIRE_OR_RENEW") }).strict(),
+  z
+    .object({
+      action: z.literal("TAKEOVER"),
+      expectedRevision: z.number().int().positive(),
+    })
+    .strict(),
+]);
+export type AssistClaimMutation = z.infer<typeof assistClaimMutationSchema>;
+
+export const assistClaimSchema = z.object({
+  aircraftId: z.string(),
+  claimedByCurrentOperator: z.boolean(),
+  ownerLoginCode: z.string(),
+  revision: z.number().int().positive(),
+  claimedAt: z.string(),
+  expiresAt: z.string(),
+});
+export type AssistClaim = z.infer<typeof assistClaimSchema>;
 
 export const publicTicketStatusSchema = z
   .object({

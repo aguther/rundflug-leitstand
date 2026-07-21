@@ -15,6 +15,7 @@ function rotation(
 ): Rotation {
   return {
     id,
+    version: 0,
     flightGroupId: `flight-${id}`,
     communicationNumber,
     communicationLabel: `SYN-${String(communicationNumber).padStart(3, "0")}`,

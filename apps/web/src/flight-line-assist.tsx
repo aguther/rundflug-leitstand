@@ -16,10 +16,12 @@ import {
   UserCheck,
   Users,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { FlightLineAssistClaimConflictError } from "./api";
 import { useActionMessageBridge } from "./app/PageNotifications";
 import {
   Button,
+  ConfirmationDialog,
   IconButton,
   PageHeader,
   Panel,
@@ -32,7 +34,6 @@ import {
   CompactCurrentRotation,
   CompactHistory,
   type FlightLineFleetState,
-  FlightProgress,
   flightLineStateClass,
   flightLineStatusTone,
   formatFlightLineTime,
@@ -118,7 +119,7 @@ export function FlightLineAssist({
   aircraft: Aircraft[];
   canAssignPilot: boolean;
   onAssignPilot: (aircraftId: string, pilotId: string, reassign: boolean) => Promise<void>;
-  onClaim: (aircraftId: string) => Promise<void>;
+  onClaim: (aircraftId: string, expectedTakeoverRevision?: number) => Promise<void>;
   onClaimUnavailable: () => void;
   onGroupAttendance: (ticketGroupId: string, checkedIn: boolean) => void;
   onGroupMissing: (ticketGroupId: string) => void;
@@ -135,7 +136,7 @@ export function FlightLineAssist({
   onTurnaroundNextStateChange: (state: "AVAILABLE" | "REFUELING" | "PAUSED" | "INACTIVE") => void;
 }) {
   const assistClaims = board.assistClaims ?? [];
-  const ownServerClaim = assistClaims.find((claim) => claim.claimedByCurrentSession);
+  const ownServerClaim = assistClaims.find((claim) => claim.claimedByCurrentOperator);
   const [claimedAircraftId, setClaimedAircraftId] = useState<string | null>(
     ownServerClaim?.aircraftId ?? null,
   );
@@ -147,11 +148,12 @@ export function FlightLineAssist({
   const [openGroupMenuId, setOpenGroupMenuId] = useState<string | null>(null);
   const [detailTab, setDetailTab] = useState<"current" | "history">("current");
   const [pilotOpen, setPilotOpen] = useState(false);
+  const [takeoverClaim, setTakeoverClaim] = useState<OperationBoard["assistClaims"][number] | null>(
+    null,
+  );
+  const lastActivityAt = useRef(Date.now());
 
-  const availableAircraft = aircraft.filter((entry) => {
-    const claim = assistClaims.find((candidate) => candidate.aircraftId === entry.id);
-    return !claim || claim.claimedByCurrentSession || entry.id === claimedAircraftId;
-  });
+  const availableAircraft = aircraft;
   const activeAircraft = aircraft.find((entry) => entry.id === claimedAircraftId);
   const activeRotation = activeAircraft
     ? operationalRotationForAircraft(activeAircraft, board.rotations, board.products)
@@ -214,18 +216,38 @@ export function FlightLineAssist({
 
   useEffect(() => {
     if (releasing || !serverClaimSeen || ownServerClaim || !claimedAircraftId) return;
+    const externalClaim = assistClaims.find((claim) => claim.aircraftId === claimedAircraftId);
     setClaimedAircraftId(null);
     setServerClaimSeen(false);
     setOpenGroupMenuId(null);
     setClaimError(
-      "Die Flugzeugübernahme ist abgelaufen oder wurde aufgehoben. Bitte erneut auswählen.",
+      externalClaim
+        ? `${externalClaim.ownerLoginCode} hat die Betreuung dieses Flugzeugs übernommen.`
+        : "Die Flugzeugübernahme ist nach längerer Inaktivität abgelaufen. Bitte erneut auswählen.",
     );
     onClaimUnavailable();
-  }, [claimedAircraftId, onClaimUnavailable, ownServerClaim, releasing, serverClaimSeen]);
+  }, [
+    assistClaims,
+    claimedAircraftId,
+    onClaimUnavailable,
+    ownServerClaim,
+    releasing,
+    serverClaimSeen,
+  ]);
 
   useEffect(() => {
     if (!claimedAircraftId) return;
+    const noteActivity = () => {
+      lastActivityAt.current = Date.now();
+    };
+    window.addEventListener("pointerdown", noteActivity, { passive: true });
+    window.addEventListener("keydown", noteActivity);
     const renewal = window.setInterval(() => {
+      if (
+        document.visibilityState !== "visible" ||
+        Date.now() - lastActivityAt.current > 10 * 60_000
+      )
+        return;
       void onClaim(claimedAircraftId).catch(() => {
         setClaimedAircraftId(null);
         setServerClaimSeen(false);
@@ -234,8 +256,12 @@ export function FlightLineAssist({
         );
         onClaimUnavailable();
       });
-    }, 25_000);
-    return () => window.clearInterval(renewal);
+    }, 5 * 60_000);
+    return () => {
+      window.clearInterval(renewal);
+      window.removeEventListener("pointerdown", noteActivity);
+      window.removeEventListener("keydown", noteActivity);
+    };
   }, [claimedAircraftId, onClaim, onClaimUnavailable]);
 
   async function claim(entry: Aircraft) {
@@ -245,6 +271,31 @@ export function FlightLineAssist({
       setClaimError(null);
       onSelectAircraft(entry.id);
     } catch (cause) {
+      if (cause instanceof FlightLineAssistClaimConflictError) {
+        setTakeoverClaim(cause.claim);
+        return;
+      }
+      setClaimError(
+        cause instanceof Error ? cause.message : "Betreuung konnte nicht übernommen werden.",
+      );
+    }
+  }
+
+  async function takeover() {
+    if (!takeoverClaim) return;
+    try {
+      await onClaim(takeoverClaim.aircraftId, takeoverClaim.revision);
+      setClaimedAircraftId(takeoverClaim.aircraftId);
+      setServerClaimSeen(true);
+      setClaimError(null);
+      onSelectAircraft(takeoverClaim.aircraftId);
+      setTakeoverClaim(null);
+    } catch (cause) {
+      if (cause instanceof FlightLineAssistClaimConflictError) {
+        setTakeoverClaim(cause.claim);
+        setClaimError("Die Betreuung hat sich zwischenzeitlich geändert. Bitte erneut prüfen.");
+        return;
+      }
       setClaimError(
         cause instanceof Error ? cause.message : "Betreuung konnte nicht übernommen werden.",
       );
@@ -418,6 +469,9 @@ export function FlightLineAssist({
                 board.rotations,
                 board.products,
               );
+              const existingClaim = assistClaims.find(
+                (candidate) => candidate.aircraftId === entry.id,
+              );
               return (
                 <article key={entry.id}>
                   <span className="assist-v15-plane-icon">
@@ -432,14 +486,23 @@ export function FlightLineAssist({
                       rotation={rotation}
                       timeZone={board.event.timeZone}
                     />
+                    {existingClaim && !existingClaim.claimedByCurrentOperator ? (
+                      <small className="assist-v15-claim-owner">
+                        Betreut von {existingClaim.ownerLoginCode}
+                      </small>
+                    ) : null}
                   </div>
                   <Button
                     className="assist-v15-claim"
                     onClick={() => void claim(entry)}
                     size="compact"
-                    variant="primary"
+                    variant={
+                      existingClaim && !existingClaim.claimedByCurrentOperator ? "ghost" : "primary"
+                    }
                   >
-                    Übernehmen
+                    {existingClaim && !existingClaim.claimedByCurrentOperator
+                      ? "Bewusst übernehmen"
+                      : "Übernehmen"}
                   </Button>
                 </article>
               );
@@ -493,14 +556,18 @@ export function FlightLineAssist({
             </div>
             <div className="assist-v15-active-tools">
               <span className="assist-v15-pilot-code">
-                <PilotIcon aria-hidden="true" /> Pilot{" "}
-                {activeAircraft.currentPilotOperationalCode ?? "–"}
+                <PilotIcon aria-hidden="true" />
+                <strong>{activeAircraft.currentPilotOperationalCode ?? "–"}</strong>
+                {pilotChangeAllowed ? (
+                  <IconButton
+                    label={`Pilot für ${activeAircraft.registration} wechseln`}
+                    onClick={() => setPilotOpen(true)}
+                    size="compact"
+                  >
+                    <PilotChangeIcon aria-hidden="true" />
+                  </IconButton>
+                ) : null}
               </span>
-              {pilotChangeAllowed ? (
-                <Button onClick={() => setPilotOpen(true)} size="compact" variant="ghost">
-                  <PilotChangeIcon aria-hidden="true" /> Pilot wechseln
-                </Button>
-              ) : null}
               <Button
                 disabled={releasing}
                 onClick={() => void finishClaim()}
@@ -510,15 +577,6 @@ export function FlightLineAssist({
                 <UnlockKeyhole aria-hidden="true" /> Flugzeug freigeben
               </Button>
             </div>
-          </div>
-          <div className="assist-v15-progress-row">
-            <span>Ist-Zeitlinie</span>
-            <FlightProgress
-              aircraft={activeAircraft}
-              rotation={assignedRotation ?? displayedRotation}
-              timeZone={board.event.timeZone}
-              variant="detailed"
-            />
           </div>
         </Panel>
 
@@ -546,8 +604,8 @@ export function FlightLineAssist({
                 ))}
               </fieldset>
             ) : null}
-            <Button
-              aria-label={primaryAircraftActionLabel(
+            <IconButton
+              label={primaryAircraftActionLabel(
                 activeAircraft,
                 activeRotation,
                 "Belegung bestätigen & Boarding starten",
@@ -556,16 +614,9 @@ export function FlightLineAssist({
               disabled={primaryDisabled}
               onClick={runPrimary}
               size="touch"
-              title={primaryAircraftActionLabel(
-                activeAircraft,
-                activeRotation,
-                "Belegung bestätigen & Boarding starten",
-              )}
-              variant="primary"
             >
               {PrimaryActionIcon ? <PrimaryActionIcon aria-hidden="true" /> : null}
-              {primaryPresentation?.shortLabel}
-            </Button>
+            </IconButton>
             <fieldset className="assist-v15-secondary-actions" aria-label="Flugzeugstatus">
               <IconButton
                 aria-pressed={activeAircraft.operationalState === "REFUELING"}
@@ -684,6 +735,19 @@ export function FlightLineAssist({
           open={pilotOpen}
         />
       ) : null}
+      <ConfirmationDialog
+        body={
+          takeoverClaim
+            ? `Das Flugzeug wird derzeit von ${takeoverClaim.ownerLoginCode} betreut. Möchtest du die Übernahme wirklich überschreiben?`
+            : ""
+        }
+        cancelLabel="Abbrechen"
+        confirmLabel="Trotzdem übernehmen"
+        onCancel={() => setTakeoverClaim(null)}
+        onConfirm={() => void takeover()}
+        open={takeoverClaim !== null}
+        title="Flugzeug bereits übernommen"
+      />
     </section>
   );
 }

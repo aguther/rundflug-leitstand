@@ -1,9 +1,7 @@
 export function expectedReviewAtFromPause(
-  minutesInput: string,
-  durationUnknown: boolean,
+  minutes: 10 | 20 | 30 | null,
   now = Date.now(),
 ): string | null {
-  const minutes = Number(minutesInput);
-  if (durationUnknown || !Number.isFinite(minutes) || minutes <= 0) return null;
+  if (minutes === null) return null;
   return new Date(now + minutes * 60_000).toISOString();
 }

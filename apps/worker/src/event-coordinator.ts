@@ -1,5 +1,7 @@
 import { DurableObject } from "cloudflare:workers";
 import {
+  type AssistClaim,
+  assistClaimMutationSchema,
   type CommandEnvelope,
   type CommandResult,
   commandEnvelopeSchema,
@@ -21,6 +23,7 @@ import {
   assertQueueMutationAllowed,
   assertRoleMayExecute,
   assertSaleAllowed,
+  assertTechnicalRotationAbortAllowed,
   assertTicketNoShowAllowed,
   assessRemainingCapacity,
   createQueueAvailability,
@@ -34,6 +37,7 @@ import {
   type OperationalCommandType,
   planBookingGroupSplit,
   planRotationCapacityReduction,
+  planTechnicalRotationAbortQueueBlock,
   reserveNextQueueWindow,
   simulateOutageRecovery,
   transitionAircraft,
@@ -47,6 +51,7 @@ import { queueEligiblePreparationNotifications, sendRotationPushNotifications } 
 const JSON_HEADERS = { "content-type": "application/json; charset=utf-8" } as const;
 const FORECAST_TICK_INTERVAL_MS = 30_000;
 const SYSTEM_GATE_COOLDOWN_MINUTES = 2;
+const ASSIST_CLAIM_TTL_MS = 30 * 60_000;
 
 function json(data: unknown, init: ResponseInit = {}): Response {
   const headers = new Headers(init.headers);
@@ -72,6 +77,12 @@ export class EventCoordinator extends DurableObject<Env> {
     }
     if (request.method === "POST" && url.pathname.endsWith("/command")) {
       return this.handleCommand(request);
+    }
+    if (
+      (request.method === "PUT" || request.method === "DELETE") &&
+      url.pathname.includes("/assist-claims/")
+    ) {
+      return this.handleAssistClaim(request, url);
     }
     return json(
       { error: { code: "NOT_FOUND", message: "Durable-Object-Route nicht gefunden." } },
@@ -139,6 +150,258 @@ export class EventCoordinator extends DurableObject<Env> {
     this.ctx.acceptWebSocket(server);
     server.send(JSON.stringify({ type: "connected", timestamp: new Date().toISOString() }));
     return new Response(null, { status: 101, webSocket: client });
+  }
+
+  private async handleAssistClaim(request: Request, url: URL): Promise<Response> {
+    const eventId = this.eventIdFromPath(url.pathname);
+    const segments = url.pathname.split("/").filter(Boolean);
+    const claimIndex = segments.indexOf("assist-claims");
+    const aircraftId = claimIndex >= 0 ? segments[claimIndex + 1] : null;
+    const accountId = request.headers.get("x-operator-account-id");
+    const loginCode = request.headers.get("x-operator-login-code");
+    const deviceId = request.headers.get("x-operator-device-id");
+    const role = request.headers.get("x-operator-role") as DeviceRole | null;
+    if (!eventId || !aircraftId || !accountId || !loginCode || !deviceId || !role) {
+      return json(
+        { error: { code: "SESSION_NOT_AUTHORIZED", message: "Anmeldung erforderlich." } },
+        { status: 401 },
+      );
+    }
+    if (!["FLIGHT_LINE", "FLIGHT_DIRECTOR", "ADMIN"].includes(role)) {
+      return json(
+        { error: { code: "ROLE_NOT_AUTHORIZED", message: "Sitzung ist nicht berechtigt." } },
+        { status: 403 },
+      );
+    }
+
+    const aircraft = await this.env.DB.prepare(
+      `SELECT a.id, od.version AS event_version
+         FROM aircraft a
+         JOIN resource_group_memberships membership ON membership.aircraft_id = a.id
+         JOIN operation_days od ON od.id = membership.operation_day_id
+        WHERE a.id = ?1 AND membership.operation_day_id = ?2
+          AND membership.active_until IS NULL`,
+    )
+      .bind(aircraftId, eventId)
+      .first<{ id: string; event_version: number }>();
+    if (!aircraft) {
+      return json(
+        { error: { code: "AIRCRAFT_NOT_FOUND", message: "Flugzeug nicht gefunden." } },
+        { status: 404 },
+      );
+    }
+
+    const now = new Date();
+    const nowIso = now.toISOString();
+    const expiresAt = new Date(now.getTime() + ASSIST_CLAIM_TTL_MS).toISOString();
+    const current = await this.env.DB.prepare(
+      `SELECT claim.operator_account_id, claim.claimed_at, claim.expires_at, claim.revision,
+              account.login_code
+         FROM flight_line_assist_claims claim
+         JOIN operator_accounts account ON account.id = claim.operator_account_id
+        WHERE claim.operation_day_id = ?1 AND claim.aircraft_id = ?2`,
+    )
+      .bind(eventId, aircraftId)
+      .first<{
+        operator_account_id: string;
+        claimed_at: string;
+        expires_at: string;
+        revision: number;
+        login_code: string;
+      }>();
+    const active = current && Date.parse(current.expires_at) > now.getTime() ? current : null;
+
+    if (request.method === "DELETE") {
+      if (!active || active.operator_account_id !== accountId)
+        return new Response(null, { status: 204 });
+      const nextRevision = active.revision + 1;
+      const payload = {
+        action: "RELEASED",
+        aircraftId,
+        ownerLoginCode: loginCode,
+        revision: nextRevision,
+      };
+      await this.env.DB.batch([
+        this.env.DB.prepare(
+          `DELETE FROM flight_line_assist_claims
+            WHERE operation_day_id = ?1 AND aircraft_id = ?2
+              AND operator_account_id = ?3 AND revision = ?4`,
+        ).bind(eventId, aircraftId, accountId, active.revision),
+        this.env.DB.prepare(
+          `INSERT INTO operational_events
+            (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type,
+             aggregate_id, aggregate_version, payload_json)
+           VALUES (?1, ?2, 'AIRCRAFT_ASSIST_CLAIM_RELEASED', ?3, ?4,
+                   'AIRCRAFT', ?5, ?6, ?7)`,
+        ).bind(
+          crypto.randomUUID(),
+          eventId,
+          nowIso,
+          deviceId,
+          aircraftId,
+          nextRevision,
+          JSON.stringify(payload),
+        ),
+        this.env.DB.prepare(
+          `INSERT INTO outbox (id, operation_day_id, topic, payload_json, created_at)
+           VALUES (?1, ?2, 'ASSIST_CLAIM_CHANGED', ?3, ?4)`,
+        ).bind(crypto.randomUUID(), eventId, JSON.stringify(payload), nowIso),
+      ]);
+      this.broadcastBoardRefresh(aircraft.event_version, "AIRCRAFT_ASSIST_CLAIM_RELEASED");
+      return new Response(null, { status: 204 });
+    }
+
+    const parsed = assistClaimMutationSchema.safeParse(await request.json().catch(() => null));
+    if (!parsed.success) {
+      return json(
+        { error: { code: "INVALID_ASSIST_CLAIM", message: "Übernahmedaten sind ungültig." } },
+        { status: 400 },
+      );
+    }
+
+    if (active?.operator_account_id === accountId) {
+      const revision = active.revision + 1;
+      await this.env.DB.prepare(
+        `UPDATE flight_line_assist_claims
+            SET expires_at = ?1, revision = ?2
+          WHERE operation_day_id = ?3 AND aircraft_id = ?4
+            AND operator_account_id = ?5 AND revision = ?6`,
+      )
+        .bind(expiresAt, revision, eventId, aircraftId, accountId, active.revision)
+        .run();
+      const response: AssistClaim = {
+        aircraftId,
+        claimedByCurrentOperator: true,
+        ownerLoginCode: loginCode,
+        revision,
+        claimedAt: active.claimed_at,
+        expiresAt,
+      };
+      return json(response);
+    }
+
+    if (active) {
+      const conflict = {
+        aircraftId,
+        claimedByCurrentOperator: false,
+        ownerLoginCode: active.login_code,
+        revision: active.revision,
+        claimedAt: active.claimed_at,
+        expiresAt: active.expires_at,
+      } satisfies AssistClaim;
+      if (parsed.data.action !== "TAKEOVER" || parsed.data.expectedRevision !== active.revision) {
+        return json(
+          {
+            claim: conflict,
+            error: {
+              code:
+                parsed.data.action === "TAKEOVER"
+                  ? "AIRCRAFT_ASSIST_CLAIM_CHANGED"
+                  : "AIRCRAFT_ASSIST_CLAIMED",
+              message: `Dieses Flugzeug wird derzeit von ${active.login_code} betreut.`,
+            },
+          },
+          { status: 409 },
+        );
+      }
+
+      const revision = active.revision + 1;
+      const payload = {
+        action: "TAKEN_OVER",
+        aircraftId,
+        previousOwnerLoginCode: active.login_code,
+        ownerLoginCode: loginCode,
+        revision,
+      };
+      await this.env.DB.batch([
+        this.env.DB.prepare(
+          `UPDATE flight_line_assist_claims
+              SET operator_account_id = ?1, claimed_at = ?2, expires_at = ?3, revision = ?4
+            WHERE operation_day_id = ?5 AND aircraft_id = ?6 AND revision = ?7`,
+        ).bind(accountId, nowIso, expiresAt, revision, eventId, aircraftId, active.revision),
+        this.env.DB.prepare(
+          `INSERT INTO operational_events
+            (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type,
+             aggregate_id, aggregate_version, payload_json)
+           VALUES (?1, ?2, 'AIRCRAFT_ASSIST_CLAIM_TAKEN_OVER', ?3, ?4,
+                   'AIRCRAFT', ?5, ?6, ?7)`,
+        ).bind(
+          crypto.randomUUID(),
+          eventId,
+          nowIso,
+          deviceId,
+          aircraftId,
+          revision,
+          JSON.stringify(payload),
+        ),
+        this.env.DB.prepare(
+          `INSERT INTO outbox (id, operation_day_id, topic, payload_json, created_at)
+           VALUES (?1, ?2, 'ASSIST_CLAIM_CHANGED', ?3, ?4)`,
+        ).bind(crypto.randomUUID(), eventId, JSON.stringify(payload), nowIso),
+      ]);
+      this.broadcastBoardRefresh(aircraft.event_version, "AIRCRAFT_ASSIST_CLAIM_TAKEN_OVER");
+      return json({
+        aircraftId,
+        claimedByCurrentOperator: true,
+        ownerLoginCode: loginCode,
+        revision,
+        claimedAt: nowIso,
+        expiresAt,
+      } satisfies AssistClaim);
+    }
+
+    const revision = (current?.revision ?? 0) + 1;
+    const payload = {
+      action: "ACQUIRED",
+      aircraftId,
+      ownerLoginCode: loginCode,
+      revision,
+    };
+    await this.env.DB.batch([
+      this.env.DB.prepare(
+        `DELETE FROM flight_line_assist_claims
+          WHERE operation_day_id = ?1 AND operator_account_id = ?2 AND expires_at <= ?3`,
+      ).bind(eventId, accountId, nowIso),
+      this.env.DB.prepare(
+        `INSERT INTO flight_line_assist_claims
+          (operation_day_id, aircraft_id, operator_account_id, claimed_at, expires_at, revision)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+         ON CONFLICT(operation_day_id, aircraft_id) DO UPDATE SET
+           operator_account_id = excluded.operator_account_id,
+           claimed_at = excluded.claimed_at,
+           expires_at = excluded.expires_at,
+           revision = excluded.revision
+         WHERE flight_line_assist_claims.expires_at <= excluded.claimed_at`,
+      ).bind(eventId, aircraftId, accountId, nowIso, expiresAt, revision),
+      this.env.DB.prepare(
+        `INSERT INTO operational_events
+          (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type,
+           aggregate_id, aggregate_version, payload_json)
+         VALUES (?1, ?2, 'AIRCRAFT_ASSIST_CLAIM_ACQUIRED', ?3, ?4,
+                 'AIRCRAFT', ?5, ?6, ?7)`,
+      ).bind(
+        crypto.randomUUID(),
+        eventId,
+        nowIso,
+        deviceId,
+        aircraftId,
+        revision,
+        JSON.stringify(payload),
+      ),
+      this.env.DB.prepare(
+        `INSERT INTO outbox (id, operation_day_id, topic, payload_json, created_at)
+         VALUES (?1, ?2, 'ASSIST_CLAIM_CHANGED', ?3, ?4)`,
+      ).bind(crypto.randomUUID(), eventId, JSON.stringify(payload), nowIso),
+    ]);
+    this.broadcastBoardRefresh(aircraft.event_version, "AIRCRAFT_ASSIST_CLAIM_ACQUIRED");
+    return json({
+      aircraftId,
+      claimedByCurrentOperator: true,
+      ownerLoginCode: loginCode,
+      revision,
+      claimedAt: nowIso,
+      expiresAt,
+    } satisfies AssistClaim);
   }
 
   private async handleCommand(request: Request): Promise<Response> {
@@ -226,6 +489,7 @@ export class EventCoordinator extends DurableObject<Env> {
         }
       }
 
+      const operatorAccountId = request.headers.get("x-operator-account-id");
       const current = await this.env.DB.prepare(
         `SELECT id, name, event_date, aerodrome, time_zone, status, archived_at, template_source_id,
                 emergency_mode, operational_interrupted, version,
@@ -258,6 +522,70 @@ export class EventCoordinator extends DurableObject<Env> {
           },
           { status: 409 },
         );
+      }
+
+      const commandNow = new Date();
+      const activeOperatorClaim = operatorAccountId
+        ? await this.env.DB.prepare(
+            `SELECT aircraft_id, revision
+               FROM flight_line_assist_claims
+              WHERE operation_day_id = ?1 AND operator_account_id = ?2 AND expires_at > ?3`,
+          )
+            .bind(command.eventId, operatorAccountId, commandNow.toISOString())
+            .first<{ aircraft_id: string; revision: number }>()
+        : null;
+      // Production commands always carry a session actor. The actor-less branch is retained only
+      // for the development integration scaffold, which is already blocked by the public route in
+      // every non-development environment.
+      if (device.role === "FLIGHT_LINE" && operatorAccountId) {
+        if (!activeOperatorClaim) {
+          return json(
+            {
+              error: {
+                code: "AIRCRAFT_ASSIST_CLAIM_REQUIRED",
+                message: "Die Flugzeugübernahme ist abgelaufen oder wurde extern übernommen.",
+              },
+            },
+            { status: 409 },
+          );
+        }
+        const payload = command.payload as Record<string, unknown>;
+        let targetAircraftId = typeof payload.aircraftId === "string" ? payload.aircraftId : null;
+        if (!targetAircraftId && typeof payload.rotationId === "string") {
+          const targetRotation = await this.env.DB.prepare(
+            "SELECT aircraft_id FROM rotations WHERE id = ?1 AND operation_day_id = ?2",
+          )
+            .bind(payload.rotationId, command.eventId)
+            .first<{ aircraft_id: string | null }>();
+          targetAircraftId = targetRotation?.aircraft_id ?? null;
+        }
+        if (targetAircraftId && targetAircraftId !== activeOperatorClaim.aircraft_id) {
+          return json(
+            {
+              error: {
+                code: "AIRCRAFT_ASSIST_CLAIM_MISMATCH",
+                message: "Dieses Flugzeug wird nicht mehr von diesem Login betreut.",
+              },
+            },
+            { status: 409 },
+          );
+        }
+      }
+      if (operatorAccountId && activeOperatorClaim) {
+        await this.env.DB.prepare(
+          `UPDATE flight_line_assist_claims
+              SET expires_at = ?1, revision = revision + 1
+            WHERE operation_day_id = ?2 AND operator_account_id = ?3
+              AND revision = ?4 AND expires_at > ?5`,
+        )
+          .bind(
+            new Date(commandNow.getTime() + ASSIST_CLAIM_TTL_MS).toISOString(),
+            command.eventId,
+            operatorAccountId,
+            activeOperatorClaim.revision,
+            commandNow.toISOString(),
+          )
+          .run();
       }
 
       if (command.type === "SELL_TICKET_GROUP") {
@@ -691,6 +1019,9 @@ export class EventCoordinator extends DurableObject<Env> {
         if (command.type === "ABORT_ROTATION") {
           return this.handleAbortRotation(command, current);
         }
+        if (command.type === "ABORT_ROTATION_TO_QUEUE_AND_MARK_AIRCRAFT_UNAVAILABLE") {
+          return this.handleTechnicalRotationAbort(command, current);
+        }
         if (command.type === "SET_TICKET_ATTENDANCE") {
           return this.handleTicketAttendance(command, current);
         }
@@ -869,6 +1200,21 @@ export class EventCoordinator extends DurableObject<Env> {
     const broadcast = JSON.stringify({
       type: "event-state-changed",
       eventVersion: result.event.version,
+    });
+    for (const socket of this.ctx.getWebSockets()) {
+      try {
+        socket.send(broadcast);
+      } catch {
+        socket.close(1011, "Broadcast fehlgeschlagen");
+      }
+    }
+  }
+
+  private broadcastBoardRefresh(eventVersion: number, eventType: string): void {
+    const broadcast = JSON.stringify({
+      type: "event-state-changed",
+      eventType,
+      eventVersion,
     });
     for (const socket of this.ctx.getWebSockets()) {
       try {
@@ -1517,7 +1863,7 @@ export class EventCoordinator extends DurableObject<Env> {
       if (command.type === "CONFIGURE_AIRCRAFT_REFUEL_THRESHOLD") {
         statements.push(
           this.env.DB.prepare(
-            "UPDATE aircraft SET refuel_reminder_threshold = ?1, updated_at = ?2 WHERE id = ?3",
+            "UPDATE aircraft SET refuel_reminder_threshold = ?1, version = version + 1, updated_at = ?2 WHERE id = ?3",
           ).bind(command.payload.reminderThreshold, now, aircraft.id),
         );
         eventType = "AIRCRAFT_REFUEL_THRESHOLD_CONFIGURED";
@@ -1529,7 +1875,7 @@ export class EventCoordinator extends DurableObject<Env> {
       } else if (command.type === "SCHEDULE_AIRCRAFT_REFUEL") {
         statements.push(
           this.env.DB.prepare(
-            "UPDATE aircraft SET refuel_planned = ?1, updated_at = ?2 WHERE id = ?3",
+            "UPDATE aircraft SET refuel_planned = ?1, version = version + 1, updated_at = ?2 WHERE id = ?3",
           ).bind(command.payload.planned ? 1 : 0, now, aircraft.id),
         );
         eventType = command.payload.planned
@@ -1574,7 +1920,8 @@ export class EventCoordinator extends DurableObject<Env> {
             `UPDATE aircraft SET operational_state = ?1, operational_state_changed_at = ?4,
                     rotations_since_refuel = ?2,
                     refuel_planned = CASE WHEN ?1 = 'REFUELING' THEN 0 ELSE refuel_planned END,
-                    operational_interrupted = ?3, updated_at = ?4 WHERE id = ?5`,
+                    operational_interrupted = ?3, version = version + 1,
+                    updated_at = ?4 WHERE id = ?5`,
           ).bind(
             nextState,
             resetCounter,
@@ -2746,7 +3093,7 @@ export class EventCoordinator extends DurableObject<Env> {
            ON CONFLICT(id) DO UPDATE SET registration = excluded.registration,
             aircraft_type = excluded.aircraft_type, passenger_seats = excluded.passenger_seats,
             maximum_passenger_payload_kg = excluded.maximum_passenger_payload_kg,
-            updated_at = excluded.updated_at`,
+            version = aircraft.version + 1, updated_at = excluded.updated_at`,
         ).bind(
           command.payload.aircraftId,
           command.payload.registration,
@@ -3758,7 +4105,7 @@ export class EventCoordinator extends DurableObject<Env> {
         `UPDATE aircraft SET operational_state = ?1,
                 operational_state_changed_at = CASE
                   WHEN operational_state <> ?1 THEN ?2 ELSE operational_state_changed_at END,
-                updated_at = ?2,
+                version = version + 1, updated_at = ?2,
                 rotations_since_refuel = rotations_since_refuel + ?4 WHERE id = ?3`,
       ).bind(
         aircraftState,
@@ -4388,7 +4735,7 @@ export class EventCoordinator extends DurableObject<Env> {
             `UPDATE aircraft SET operational_state = ?1,
                     operational_state_changed_at = CASE
                       WHEN operational_state <> ?1 THEN ?2 ELSE operational_state_changed_at END,
-                    updated_at = ?2 WHERE id = ?3`,
+                    version = version + 1, updated_at = ?2 WHERE id = ?3`,
           ).bind(aircraftState, now, reference.aircraftId),
         );
       }
@@ -4396,6 +4743,7 @@ export class EventCoordinator extends DurableObject<Env> {
         statements.push(
           this.env.DB.prepare(
             `UPDATE aircraft SET rotations_since_refuel = rotations_since_refuel + ?1,
+                    version = version + 1,
                     updated_at = ?2 WHERE id = ?3`,
           ).bind(completedCount, now, aircraftId),
         );
@@ -4923,7 +5271,7 @@ export class EventCoordinator extends DurableObject<Env> {
                   operational_state_changed_at = CASE
                     WHEN operational_state <> 'AVAILABLE' THEN ?1
                     ELSE operational_state_changed_at END,
-                  updated_at = ?1 WHERE id = ?2`,
+                  version = version + 1, updated_at = ?1 WHERE id = ?2`,
         ).bind(now, rotation.aircraft_id),
       );
     }
@@ -5190,7 +5538,7 @@ export class EventCoordinator extends DurableObject<Env> {
                     operational_state_changed_at = CASE
                       WHEN operational_state <> 'AVAILABLE' THEN ?1
                       ELSE operational_state_changed_at END,
-                    updated_at = ?1 WHERE id = ?2`,
+                    version = version + 1, updated_at = ?1 WHERE id = ?2`,
           ).bind(now, source.aircraft_id),
         );
       }
@@ -5608,7 +5956,7 @@ export class EventCoordinator extends DurableObject<Env> {
                     operational_state_changed_at = CASE
                       WHEN operational_state <> 'AVAILABLE' THEN ?1
                       ELSE operational_state_changed_at END,
-                    updated_at = ?1 WHERE id = ?2`,
+                    version = version + 1, updated_at = ?1 WHERE id = ?2`,
           ).bind(now, rotation.aircraft_id),
         );
       }
@@ -6114,7 +6462,7 @@ export class EventCoordinator extends DurableObject<Env> {
                       operational_state_changed_at = CASE
                         WHEN operational_state <> 'AVAILABLE' THEN ?1
                         ELSE operational_state_changed_at END,
-                      updated_at = ?1 WHERE id = ?2`,
+                      version = version + 1, updated_at = ?1 WHERE id = ?2`,
             ).bind(now, ticket.aircraft_id),
           );
         }
@@ -6522,6 +6870,256 @@ export class EventCoordinator extends DurableObject<Env> {
     return json(result);
   }
 
+  private async handleTechnicalRotationAbort(
+    command: Extract<
+      CommandEnvelope,
+      { type: "ABORT_ROTATION_TO_QUEUE_AND_MARK_AIRCRAFT_UNAVAILABLE" }
+    >,
+    current: StoredEventRow,
+  ): Promise<Response> {
+    const rotation = await this.env.DB.prepare(
+      `SELECT r.id, r.status, r.version, r.aircraft_id, a.version AS aircraft_version, r.pilot_id,
+              r.called_at, r.departed_at, r.landed_at, r.completed_at,
+              fg.id AS flight_group_id, fg.resource_group_id
+         FROM rotations r
+         JOIN flight_groups fg ON fg.id = r.flight_group_id
+         LEFT JOIN aircraft a ON a.id = r.aircraft_id
+        WHERE r.id = ?1 AND r.operation_day_id = ?2`,
+    )
+      .bind(command.payload.rotationId, command.eventId)
+      .first<{
+        id: string;
+        status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED" | "CANCELED";
+        version: number;
+        aircraft_id: string | null;
+        aircraft_version: number | null;
+        pilot_id: string | null;
+        called_at: string | null;
+        departed_at: string | null;
+        landed_at: string | null;
+        completed_at: string | null;
+        flight_group_id: string;
+        resource_group_id: string;
+      }>();
+    if (!rotation) {
+      return json(
+        { error: { code: "ROTATION_NOT_FOUND", message: "Umlauf nicht gefunden." } },
+        { status: 404 },
+      );
+    }
+    try {
+      assertTechnicalRotationAbortAllowed(rotation.status);
+    } catch (reason: unknown) {
+      if (reason instanceof DomainRuleError) {
+        return json({ error: { code: reason.code, message: reason.message } }, { status: 409 });
+      }
+      throw reason;
+    }
+    if (!rotation.aircraft_id) {
+      return json(
+        {
+          error: {
+            code: "AIRCRAFT_ASSIGNMENT_REQUIRED",
+            message: "Dem Umlauf ist kein Flugzeug zugeordnet.",
+          },
+        },
+        { status: 409 },
+      );
+    }
+    if (
+      rotation.version !== command.payload.expectedRotationVersion ||
+      rotation.aircraft_version !== command.payload.expectedAircraftVersion
+    ) {
+      return json(
+        {
+          error: {
+            code: "STALE_AGGREGATE_VERSION",
+            message: "Umlauf oder Flugzeug wurde zwischenzeitlich geändert.",
+            currentRotationVersion: rotation.version,
+            currentAircraftVersion: rotation.aircraft_version,
+          },
+        },
+        { status: 409 },
+      );
+    }
+
+    const segmentRows = await this.env.DB.prepare(
+      `SELECT tg.id AS ticket_group_id, tg.queue_sequence, MIN(rt.assigned_at) AS assigned_at
+         FROM rotation_tickets rt
+         JOIN tickets t ON t.id = rt.ticket_id
+         JOIN ticket_groups tg ON tg.id = t.ticket_group_id
+        WHERE rt.rotation_id = ?1 AND rt.released_at IS NULL
+        GROUP BY tg.id, tg.queue_sequence
+        ORDER BY tg.queue_sequence, assigned_at, tg.id`,
+    )
+      .bind(rotation.id)
+      .all<{ ticket_group_id: string; queue_sequence: number; assigned_at: string }>();
+    if (segmentRows.results.length === 0) {
+      return json(
+        {
+          error: {
+            code: "ROTATION_WITHOUT_TICKETS",
+            message: "Der Umlauf enthält keine rückstellbare Buchungsgruppe.",
+          },
+        },
+        { status: 409 },
+      );
+    }
+
+    const now = new Date().toISOString();
+    const nextVersion = current.version + 1;
+    const queueBlock = planTechnicalRotationAbortQueueBlock(
+      segmentRows.results.map((segment) => ({
+        id: segment.ticket_group_id,
+        queueSequence: segment.queue_sequence,
+        assignedAt: segment.assigned_at,
+      })),
+    );
+    const ticketGroupIds = queueBlock.map((segment) => segment.id);
+    const placeholders = ticketGroupIds.map((_, index) => `?${index + 4}`).join(", ");
+    const result: CommandResult = {
+      accepted: true,
+      duplicate: false,
+      event: rowToSnapshot({ ...current, version: nextVersion, updated_at: now }),
+      eventType: "ROTATION_ABORTED_TO_QUEUE_AIRCRAFT_UNAVAILABLE",
+      aggregate: { type: "ROTATION", id: rotation.id },
+    };
+    const statements: D1PreparedStatement[] = [
+      this.env.DB.prepare(
+        "UPDATE operation_days SET version = ?1, updated_at = ?2 WHERE id = ?3 AND version = ?4",
+      ).bind(nextVersion, now, command.eventId, current.version),
+      this.env.DB.prepare(
+        `UPDATE ticket_groups SET queue_sequence = queue_sequence + ?1
+          WHERE operation_day_id = ?2
+            AND product_id IN (
+              SELECT id FROM products WHERE operation_day_id = ?2 AND resource_group_id = ?3
+            )
+            AND status IN ('QUEUED', 'PRESENT')
+            AND id NOT IN (${placeholders})`,
+      ).bind(100000, command.eventId, rotation.resource_group_id, ...ticketGroupIds),
+      this.env.DB.prepare(
+        `UPDATE ticket_groups SET queue_sequence = queue_sequence - ?1
+          WHERE operation_day_id = ?2
+            AND product_id IN (
+              SELECT id FROM products WHERE operation_day_id = ?2 AND resource_group_id = ?3
+            )
+            AND status IN ('QUEUED', 'PRESENT')
+            AND id NOT IN (${placeholders}) AND queue_sequence >= 100000`,
+      ).bind(
+        100000 - ticketGroupIds.length,
+        command.eventId,
+        rotation.resource_group_id,
+        ...ticketGroupIds,
+      ),
+      this.env.DB.prepare(
+        `UPDATE flight_groups
+            SET queue_position = COALESCE(queue_position, communication_number) + 1,
+                version = version + 1,
+                updated_at = ?1
+          WHERE operation_day_id = ?2 AND resource_group_id = ?3
+            AND id <> ?4 AND status = 'DRAFT'`,
+      ).bind(now, command.eventId, rotation.resource_group_id, rotation.flight_group_id),
+      this.env.DB.prepare(
+        `UPDATE rotations
+            SET status = 'DRAFT', aircraft_id = NULL, pilot_id = NULL,
+                called_at = NULL, departed_at = NULL, landed_at = NULL, completed_at = NULL,
+                version = version + 1, updated_at = ?1
+          WHERE id = ?2 AND version = ?3`,
+      ).bind(now, rotation.id, rotation.version),
+      this.env.DB.prepare(
+        `UPDATE flight_groups
+            SET status = 'DRAFT', queue_position = 1, version = version + 1, updated_at = ?1
+          WHERE id = ?2`,
+      ).bind(now, rotation.flight_group_id),
+      this.env.DB.prepare(
+        `UPDATE tickets SET status = CASE
+            WHEN attendance_status = 'CHECKED_IN' THEN 'CHECKED_IN' ELSE 'QUEUED' END
+          WHERE id IN (
+            SELECT ticket_id FROM rotation_tickets
+             WHERE rotation_id = ?1 AND released_at IS NULL
+          )`,
+      ).bind(rotation.id),
+      this.env.DB.prepare(
+        `UPDATE ticket_groups SET status = CASE
+            WHEN EXISTS (
+              SELECT 1 FROM tickets
+               WHERE ticket_group_id = ticket_groups.id AND attendance_status = 'CHECKED_IN'
+            ) THEN 'PRESENT' ELSE 'QUEUED' END,
+            version = version + 1
+          WHERE id IN (${ticketGroupIds.map((_, index) => `?${index + 1}`).join(", ")})`,
+      ).bind(...ticketGroupIds),
+      this.env.DB.prepare(
+        `UPDATE aircraft SET operational_state = 'INACTIVE',
+                operational_state_changed_at = CASE
+                  WHEN operational_state <> 'INACTIVE' THEN ?1 ELSE operational_state_changed_at END,
+                version = version + 1, updated_at = ?1
+          WHERE id = ?2 AND version = ?3`,
+      ).bind(now, rotation.aircraft_id, command.payload.expectedAircraftVersion),
+    ];
+    queueBlock.forEach((segment) => {
+      statements.push(
+        this.env.DB.prepare("UPDATE ticket_groups SET queue_sequence = ?1 WHERE id = ?2").bind(
+          segment.queueSequence,
+          segment.id,
+        ),
+      );
+    });
+    const auditPayload = {
+      reason: command.payload.reason,
+      fromStatus: rotation.status,
+      aircraftId: rotation.aircraft_id,
+      pilotId: rotation.pilot_id,
+      ticketGroupIds,
+      returnedToQueueSequences: ticketGroupIds.map((ticketGroupId, index) => ({
+        ticketGroupId,
+        queueSequence: index + 1,
+      })),
+      previousActuals: {
+        boardingAt: rotation.called_at,
+        departureAt: rotation.departed_at,
+        landingAt: rotation.landed_at,
+        completionAt: rotation.completed_at,
+      },
+      aircraftOperationalState: "INACTIVE",
+    };
+    statements.push(
+      this.env.DB.prepare(
+        `INSERT INTO operational_events
+          (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type,
+           aggregate_id, aggregate_version, payload_json)
+         VALUES (?1, ?2, 'ROTATION_ABORTED_TO_QUEUE_AIRCRAFT_UNAVAILABLE', ?3, ?4,
+                 'ROTATION', ?5, ?6, ?7)`,
+      ).bind(
+        crypto.randomUUID(),
+        command.eventId,
+        now,
+        command.deviceId,
+        rotation.id,
+        rotation.version + 1,
+        JSON.stringify(auditPayload),
+      ),
+      this.env.DB.prepare(
+        `INSERT INTO idempotency_receipts
+          (command_id, operation_day_id, device_id, command_type, received_at, response_json)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)`,
+      ).bind(
+        command.commandId,
+        command.eventId,
+        command.deviceId,
+        command.type,
+        now,
+        JSON.stringify(result),
+      ),
+      this.env.DB.prepare(
+        `INSERT INTO outbox (id, operation_day_id, topic, payload_json, created_at)
+         VALUES (?1, ?2, 'EVENT_STATE_CHANGED', ?3, ?4)`,
+      ).bind(crypto.randomUUID(), command.eventId, JSON.stringify(result), now),
+    );
+    await this.env.DB.batch(statements);
+    this.broadcast(result);
+    return json(result);
+  }
+
   private async handleAbortRotation(
     command: Extract<CommandEnvelope, { type: "ABORT_ROTATION" }>,
     current: StoredEventRow,
@@ -6620,9 +7218,9 @@ export class EventCoordinator extends DurableObject<Env> {
         this.env.DB.prepare(
           `UPDATE aircraft SET operational_state = 'AVAILABLE',
                   operational_state_changed_at = CASE
-                    WHEN operational_state <> 'AVAILABLE' THEN ?1
-                    ELSE operational_state_changed_at END,
-                  updated_at = ?1 WHERE id = ?2`,
+                  WHEN operational_state <> 'AVAILABLE' THEN ?1
+                  ELSE operational_state_changed_at END,
+                  version = version + 1, updated_at = ?1 WHERE id = ?2`,
         ).bind(now, rotation.aircraft_id),
       );
     }
@@ -6745,9 +7343,9 @@ export class EventCoordinator extends DurableObject<Env> {
         this.env.DB.prepare(
           `UPDATE aircraft SET operational_state = 'AVAILABLE',
                   operational_state_changed_at = CASE
-                    WHEN operational_state <> 'AVAILABLE' THEN ?1
-                    ELSE operational_state_changed_at END,
-                  updated_at = ?1 WHERE id = ?2`,
+                  WHEN operational_state <> 'AVAILABLE' THEN ?1
+                  ELSE operational_state_changed_at END,
+                  version = version + 1, updated_at = ?1 WHERE id = ?2`,
         ).bind(now, rotation.aircraft_id),
       );
     }

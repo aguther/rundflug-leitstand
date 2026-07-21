@@ -29,7 +29,7 @@ describe("Flight Line Assist", () => {
     expect(assistSource).toContain("Pause");
     expect(assistSource).toContain("Nicht verfügbar");
     expect(assistSource).toContain("Flugzeug freigeben");
-    expect(assistSource).toContain("FlightProgress");
+    expect(sharedFlightLineSource).toContain("FlightProgress");
     expect(assistSource).toContain("CompactCurrentRotation");
     expect(assistSource).toContain("CompactHistory");
     expect(assistSource).toContain('activeRotation?.status === "LANDED"');
@@ -84,9 +84,11 @@ describe("Flight Line Assist", () => {
     expect(assistSource).not.toMatch(/guestName|phoneNumber|payment/i);
   });
 
-  it("renews and releases the anonymous server claim", () => {
+  it("renews and releases the login-owned server claim", () => {
     expect(assistSource).toContain("board.assistClaims");
-    expect(assistSource).toContain("25_000");
+    expect(assistSource).toContain("5 * 60_000");
+    expect(assistSource).toContain("10 * 60_000");
+    expect(assistSource).toContain("claimedByCurrentOperator");
     expect(assistSource).toContain("await onClaim(entry.id)");
     expect(assistSource).toContain("await onRelease(claimedAircraftId)");
   });
@@ -96,7 +98,7 @@ describe("Flight Line Assist", () => {
     expect(assistSource).toContain("is-selection-mode");
     expect(assistSource).toContain("is-work-mode");
     expect(assistSource).toContain("serverClaimSeen");
-    expect(assistSource).toContain("Die Flugzeugübernahme ist abgelaufen oder wurde aufgehoben");
+    expect(assistSource).toContain("hat die Betreuung dieses Flugzeugs übernommen");
     expect(assistSource).toContain("onClaimUnavailable");
     expect(assistSource).not.toContain("assist-v15-workspace");
     expect(flightLineSource).toContain("setSelectedAircraftId(null)");
@@ -105,8 +107,8 @@ describe("Flight Line Assist", () => {
   });
 
   it("uses stable grids and inline phone actions without overlay positioning", () => {
-    expect(assistStyles).toContain("grid-template-columns: 40px minmax(0, 1fr)");
-    expect(assistStyles).toContain("min-height: 150px");
+    expect(assistStyles).toContain("grid-template-columns: 42px minmax(0, 1fr) auto");
+    expect(assistStyles).toContain("min-height: 210px");
     expect(assistStyles).toContain("grid-column: 1 / -1");
     expect(assistStyles).not.toContain("position: absolute");
     expect(assistStyles).not.toContain("minmax(620px");
