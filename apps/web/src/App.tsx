@@ -1,4 +1,5 @@
 import { lazy, Suspense } from "react";
+import { ActionNotificationProvider } from "./app/PageNotifications";
 import { AuthProvider, useAuth } from "./features/auth/AuthContext";
 import { EventScopedApplication } from "./features/auth/EventScopedApplication";
 import { LoginPage } from "./features/auth/LoginPage";
@@ -47,8 +48,10 @@ function AuthenticatedApplication() {
 
 export function App() {
   return (
-    <AuthProvider>
-      <AuthenticatedApplication />
-    </AuthProvider>
+    <ActionNotificationProvider>
+      <AuthProvider>
+        <AuthenticatedApplication />
+      </AuthProvider>
+    </ActionNotificationProvider>
   );
 }

@@ -1,5 +1,6 @@
 import type { OperatorAccountSummary, OperatorRole } from "@rundflug/contracts";
 import { useCallback, useEffect, useState } from "react";
+import { useActionMessageBridge } from "../../app/PageNotifications";
 import { createManagedAccount, loadManagedAccounts, roleLabels, updateManagedAccount } from "./api";
 import "./accounts.css";
 
@@ -13,6 +14,7 @@ export function AccountManagement() {
   const [resetPin, setResetPin] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  useActionMessageBridge(message, setMessage);
 
   const refresh = useCallback(async () => {
     try {
@@ -130,11 +132,6 @@ export function AccountManagement() {
           </button>
         </form>
       </div>
-      {message ? (
-        <p className="account-message" role="status">
-          {message}
-        </p>
-      ) : null}
       {selected ? (
         <div className="modal-backdrop">
           <form

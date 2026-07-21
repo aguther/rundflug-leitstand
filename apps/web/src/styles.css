@@ -1613,7 +1613,7 @@ input:focus-visible {
   z-index: 60;
   top: 76px;
   right: max(12px, env(safe-area-inset-right));
-  width: min(660px, calc(100vw - 24px));
+  width: min(420px, calc(100vw - 24px));
   max-height: calc(100dvh - 92px);
   display: grid;
   gap: 8px;
@@ -1639,6 +1639,13 @@ input:focus-visible {
   box-shadow: 0 12px 34px rgb(0 0 0 / 28%);
   backdrop-filter: blur(12px);
   pointer-events: auto;
+  animation: page-notification-in 160ms ease-out;
+}
+.page-notification-success {
+  border-color: color-mix(in srgb, var(--ui-success) 58%, var(--ui-border));
+  border-left-color: var(--ui-success);
+  color: var(--ui-success-text, var(--ui-success));
+  background: color-mix(in srgb, var(--ui-success-soft) 95%, transparent);
 }
 .page-notification-info {
   border-color: color-mix(in srgb, var(--ui-accent) 58%, var(--ui-border));
@@ -1691,6 +1698,21 @@ input:focus-visible {
 }
 .page-notification-close:hover {
   background: color-mix(in srgb, currentColor 10%, transparent);
+}
+@keyframes page-notification-in {
+  from {
+    opacity: 0;
+    transform: translate3d(12px, -4px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .page-notification {
+    animation: none;
+  }
 }
 .app-header {
   min-height: 68px;
@@ -2114,33 +2136,6 @@ p {
   padding: 13px 16px;
   background: #eaf3ff;
   border-left: 4px solid #1769d2;
-}
-.admin-action-message {
-  position: fixed;
-  z-index: 90;
-  right: 20px;
-  top: 76px;
-  width: min(520px, calc(100vw - 40px));
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: start;
-  gap: 12px;
-  margin: 0;
-  border: 1px solid color-mix(in srgb, var(--ui-accent) 45%, var(--ui-border));
-  border-left-width: 4px;
-  border-radius: 8px;
-  box-shadow: var(--ui-shadow);
-}
-.admin-action-message > button {
-  width: 32px;
-  min-height: 32px;
-  padding: 0;
-  border: 1px solid currentColor;
-  border-radius: 6px;
-  color: inherit;
-  background: transparent;
-  font-size: 1.15rem;
-  line-height: 1;
 }
 .correction-controls {
   margin: 18px 0;

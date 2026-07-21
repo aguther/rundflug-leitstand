@@ -5,8 +5,10 @@ import {
   type FlightLineRotation,
   flightLineGroupLabel,
   flightLineStatusTone,
+  flightProgressSteps,
   latestRotationForAircraft,
   primaryAircraftActionLabel,
+  primaryAircraftActionPresentation,
   rotationHistoryForAircraft,
   visibleAircraftState,
 } from "./flight-line-shared";
@@ -41,6 +43,48 @@ describe("gemeinsame Flight-Line-Präsentationslogik", () => {
     expect(
       primaryAircraftActionLabel({ ...aircraft, operationalState: "INACTIVE" }, undefined),
     ).toBe("Verfügbar setzen");
+    expect(
+      primaryAircraftActionPresentation(aircraft, rotation("called", "CALLED")).shortLabel,
+    ).toBe("Off-Block");
+  });
+
+  it("uses four connected actual stations and one independent unavailable endpoint", () => {
+    const completed = {
+      ...rotation("completed", "COMPLETED"),
+      timeline: {
+        actual: {
+          boardingAt: "2026-07-21T08:00:00.000Z",
+          departureAt: "2026-07-21T08:05:00.000Z",
+          landingAt: "2026-07-21T08:25:00.000Z",
+          completionAt: "2026-07-21T08:30:00.000Z",
+        },
+      },
+    } as FlightLineRotation;
+    const available = flightProgressSteps(
+      { ...aircraft, operationalStateChangedAt: "2026-07-21T08:30:00.000Z" },
+      completed,
+    );
+    expect(available.map((step) => step.key)).toEqual([
+      "boarding",
+      "offblock",
+      "onblock",
+      "available",
+      "unavailable",
+    ]);
+    expect(available.find((step) => step.key === "available")?.current).toBe(true);
+    expect(available.find((step) => step.key === "available")?.connectorReached).toBe(false);
+    expect(available.find((step) => step.key === "unavailable")?.reached).toBe(false);
+
+    const paused = flightProgressSteps(
+      {
+        ...aircraft,
+        operationalState: "PAUSED",
+        operationalStateChangedAt: "2026-07-21T08:31:00.000Z",
+      },
+      completed,
+    );
+    expect(paused.find((step) => step.key === "unavailable")?.current).toBe(true);
+    expect(paused.find((step) => step.key === "available")?.current).toBe(false);
   });
 
   it("selects the active or latest completed rotation and keeps one history item per rotation", () => {

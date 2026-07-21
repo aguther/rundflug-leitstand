@@ -11,3 +11,6 @@ V17-UI-020,apps/web/src/app/PageNotifications.tsx AppShell.tsx und operation-wor
 V17-UI-030,apps/web/src/app/AppHeader.tsx und design-system/base.css,apps/web/src/app/navigation.test.ts und Browserabnahme bei 320/390/430 Pixeln,umgesetzt
 V17-FL-010,apps/web/src/flight-line-assist.tsx und flight-line-view.tsx,Assist-Komponententests und Browserablauf für Claim/Wiederherstellung/Freigabe,umgesetzt
 V17-FL-020,packages/domain/src/index.ts apps/worker/src/event-coordinator.ts und apps/web/src/flight-line-shared.tsx,Domain-/Worker-/UI-Tests test:fleet-operations und vollständiger Browserablauf,umgesetzt
+V17-FL-030,apps/web/src/flight-line-shared.tsx flight-line-assist.tsx flight-line-supervisor.tsx und Flight-Line-CSS,flight-line-shared.test.ts UI-Tests und responsive Browserabnahme,umgesetzt
+V17-UI-040,apps/web/src/app/PageNotifications.tsx und aktionsauslösende Ansichten,notification-overlay.test.ts mit Timeout- und Routing-Prüfung sowie Browserabnahme,umgesetzt
+V17-UI-050,apps/web/src/features/flight-line/flight-line-assist-v15.css,flight-line-assist-ui.test.ts und Browserabnahme Desktop/Mobil,umgesetzt
