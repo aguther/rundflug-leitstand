@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { bootstrapSystem, getSetupStatus } from "./api";
 import { AppShell as Shell } from "./app/AppShell";
+import { useActionMessageBridge } from "./app/PageNotifications";
 import { rememberActiveEvent } from "./event-context";
 import { eventDateInTimeZone } from "./event-time";
 import { LocalizedDateInput } from "./localized-date-input";
@@ -18,6 +19,7 @@ export function SetupView() {
   const [setupCode, setSetupCode] = useState("");
   const [adminPin, setAdminPin] = useState("");
   const [message, setMessage] = useState<string | null>(null);
+  useActionMessageBridge(message, setMessage);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     void getSetupStatus()
@@ -141,11 +143,6 @@ export function SetupView() {
             </button>
           </>
         )}
-        {message ? (
-          <p className="action-message" role="status">
-            {message}
-          </p>
-        ) : null}
       </section>
     </Shell>
   );

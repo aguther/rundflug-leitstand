@@ -1,6 +1,6 @@
 import { useConnectivity } from "../shared/hooks/use-connectivity";
 import { AppHeader } from "./AppHeader";
-import { PageNotice, PageNotificationRegion } from "./PageNotifications";
+import { ActionNotificationStack, PageNotice, PageNotificationRegion } from "./PageNotifications";
 
 export function AppShell({
   title,
@@ -28,6 +28,7 @@ export function AppShell({
           </PageNotice>
         ) : null}
         {notifications}
+        <ActionNotificationStack />
       </PageNotificationRegion>
       {children}
     </main>

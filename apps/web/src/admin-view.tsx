@@ -40,7 +40,7 @@ import {
   verifyAdminPin,
 } from "./api";
 import { AppShell as Shell } from "./app/AppShell";
-import { PageNotice } from "./app/PageNotifications";
+import { PageNotice, useActionMessageBridge } from "./app/PageNotifications";
 import {
   Button,
   Field,
@@ -152,6 +152,7 @@ export function AdminView() {
   );
   const [saleClosesAt, setSaleClosesAt] = useState("");
   const [message, setMessage] = useState<string | null>(null);
+  useActionMessageBridge(message, setMessage);
   const [setupRequired, setSetupRequired] = useState(false);
   const [history, setHistory] = useState<AuditHistory>({ entries: [] });
   const [historyView, setHistoryView] = useState<"OPERATIONS" | "FORECASTS" | "AUDIT">(
@@ -213,11 +214,6 @@ export function AdminView() {
   const [pushConfigurationStatus, setPushConfigurationStatus] = useState<
     "loading" | "configured" | "missing" | "unavailable"
   >("loading");
-  useEffect(() => {
-    if (!message) return;
-    const timeout = window.setTimeout(() => setMessage(null), 6_000);
-    return () => window.clearTimeout(timeout);
-  }, [message]);
   useEffect(() => {
     const controller = new AbortController();
     void getPushConfiguration(controller.signal)
@@ -4894,14 +4890,6 @@ export function AdminView() {
                   </button>
                 </div>
               </form>
-            </div>
-          ) : null}
-          {message ? (
-            <div className="action-message admin-action-message" role="status">
-              <span>{message}</span>
-              <button aria-label="Hinweis schließen" onClick={() => setMessage(null)} type="button">
-                ×
-              </button>
             </div>
           ) : null}
         </div>
