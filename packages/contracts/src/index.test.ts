@@ -921,9 +921,38 @@ describe("commandEnvelopeSchema", () => {
     ).toThrow();
   });
 
+  it("requires aggregate versions and a reason for a technical rotation abort", () => {
+    const command = {
+      commandId: "d37fd013-b250-4e72-a5fd-39551088043d",
+      eventId: "synthetic-event",
+      deviceId: "synthetic-flight-line",
+      expectedVersion: 9,
+      issuedAt: "2026-07-21T12:00:00.000Z",
+      type: "ABORT_ROTATION_TO_QUEUE_AND_MARK_AIRCRAFT_UNAVAILABLE",
+      payload: {
+        rotationId: "synthetic-rotation",
+        expectedRotationVersion: 3,
+        expectedAircraftVersion: 7,
+        reason: "Technisches Problem beim Run-Up",
+      },
+    } as const;
+    expect(commandEnvelopeSchema.parse(command).type).toBe(
+      "ABORT_ROTATION_TO_QUEUE_AND_MARK_AIRCRAFT_UNAVAILABLE",
+    );
+    expect(() =>
+      commandEnvelopeSchema.parse({
+        ...command,
+        payload: { ...command.payload, reason: "" },
+      }),
+    ).toThrow();
+    const { expectedAircraftVersion: _omitted, ...stalePayload } = command.payload;
+    expect(() => commandEnvelopeSchema.parse({ ...command, payload: stalePayload })).toThrow();
+  });
+
   it("keeps plan, forecast and actual rotation timestamps separate", () => {
     const parsed = rotationOperationalSummarySchema.parse({
       id: "synthetic-rotation",
+      version: 4,
       flightGroupId: "synthetic-flight-group",
       communicationNumber: 42,
       communicationLabel: "PAN-042",
@@ -1022,6 +1051,7 @@ describe("commandEnvelopeSchema", () => {
 describe("aircraftOperationalSummarySchema", () => {
   const aircraft = {
     id: "aircraft-1",
+    version: 2,
     registration: "D-TEST",
     aircraftType: "SYNTHETIC",
     passengerSeats: 4,

@@ -49,8 +49,9 @@ describe("V1.2 Flight Line surfaces", () => {
     expect(supervisorSource).toContain("Button,");
     expect(supervisorSource).toContain("IconButton,");
     expect(supervisorSource).toContain("SelectField,");
-    expect(supervisorSource).toContain("StatusPill,");
-    expect(supervisorSource).toContain("Tabs,");
+    expect(supervisorSource).toContain("ModalDialog,");
+    expect(supervisorSource).not.toContain("StatusPill,");
+    expect(supervisorSource).not.toContain("Tabs,");
     expect(supervisorSource).toContain("PilotAssignmentDialogs");
     expect(assistSource).toContain("PilotAssignmentDialogs");
     expect(sharedSource).toContain("CompactCurrentRotation");

@@ -240,6 +240,98 @@ body {
   }
 }
 
+/* V1.7.1: operational headers stay on one line; FIDS keeps its established header. */
+.app-header.app-header--compact {
+  min-width: 0;
+  flex-wrap: nowrap;
+  gap: 8px;
+  padding: 7px 10px;
+}
+
+.app-header.app-header--compact .app-brand {
+  min-width: 0;
+  flex: 1 1 auto;
+  margin-right: 0;
+  overflow: hidden;
+}
+
+.app-header.app-header--compact .app-brand strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-header.app-header--compact .view-switcher {
+  width: auto;
+  min-width: 40px;
+  flex: 0 0 40px;
+  order: initial;
+}
+
+.app-header.app-header--compact .view-switcher > summary {
+  width: 40px;
+  min-width: 40px;
+  min-height: 40px;
+  justify-content: center;
+  padding: 0;
+}
+
+.app-header.app-header--compact .app-event {
+  width: 40px;
+  min-width: 40px;
+  min-height: 40px;
+  justify-content: center;
+  margin-left: 0;
+  padding: 0;
+}
+
+.app-header.app-header--compact .app-event > span,
+.app-header.app-header--compact .app-connection > span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.app-header.app-header--compact .app-connection {
+  min-width: 24px;
+  justify-content: center;
+  padding-inline: 4px;
+}
+
+@media (max-width: 760px) {
+  .app-header.app-header--compact {
+    width: 100%;
+    display: flex;
+    grid-template-columns: none;
+  }
+
+  .app-header.app-header--compact .app-brand {
+    flex: 0 1 auto;
+  }
+
+  .app-header.app-header--compact .app-brand strong {
+    display: none;
+  }
+
+  .app-header.app-header--compact .theme-toggle {
+    display: none;
+  }
+
+  .app-header.app-header--compact .account-menu {
+    margin-left: auto;
+  }
+}
+
+@media (max-width: 420px) {
+  .app-header.app-header--compact .app-account > span,
+  .app-header.app-header--compact .app-account > :last-child {
+    display: none;
+  }
+}
+
 button,
 input,
 select,

@@ -1,9 +1,9 @@
 import type { OperationBoard } from "@rundflug/contracts";
 import { useEffect, useState } from "react";
-import { ValidationHint } from "./admin-ux";
 import { claimFlightLineAircraft, releaseFlightLineAircraft, sendCommand } from "./api";
 import { AppShell as Shell } from "./app/AppShell";
 import { useActionMessageBridge } from "./app/PageNotifications";
+import { Button, ModalDialog } from "./design-system/components";
 import { FlightLineAssist } from "./flight-line-assist";
 import { expectedReviewAtFromPause } from "./flight-line-pause";
 import { FlightLineSupervisorConsole } from "./flight-line-supervisor";
@@ -68,15 +68,20 @@ export function FlightLineView() {
   const [moveTargetId, setMoveTargetId] = useState("");
   const [moveReason, setMoveReason] = useState("");
   const [aircraftPauseOpen, setAircraftPauseOpen] = useState(false);
-  const [aircraftPauseMinutes, setAircraftPauseMinutes] = useState("");
-  const [aircraftPauseUnknown, setAircraftPauseUnknown] = useState(false);
+  const [technicalAbort, setTechnicalAbort] = useState<{
+    rotationId: string;
+    rotationVersion: number;
+    aircraftId: string;
+    aircraftVersion: number;
+  } | null>(null);
+  const [technicalAbortReason, setTechnicalAbortReason] = useState("");
   const operationalRotations = board?.rotations.filter(
     (rotation) => rotation.status !== "COMPLETED",
   );
   const operationalAircraft = board?.aircraft ?? [];
   const canManageAircraft = ["FLIGHT_DIRECTOR", "ADMIN"].includes(board?.currentDeviceRole ?? "");
   const claimedAssistAircraftId = board?.assistClaims?.find(
-    (claim) => claim.claimedByCurrentSession,
+    (claim) => claim.claimedByCurrentOperator,
   )?.aircraftId;
   const selectedAircraft =
     operationalAircraft.find(
@@ -197,7 +202,6 @@ export function FlightLineView() {
           deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
         );
       }
-      setMessage(`${selectedAction.label} bestätigt.`);
       await refresh();
     } catch (reason) {
       setMessage(reason instanceof Error ? reason.message : "Aktion fehlgeschlagen.");
@@ -218,9 +222,6 @@ export function FlightLineView() {
           payload: { ticketGroupId, checkedIn },
         },
         deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
-      );
-      setMessage(
-        checkedIn ? "Gruppe als anwesend markiert." : "Anwesenheit der Gruppe aufgehoben.",
       );
       await refresh();
     } catch (reason) {
@@ -258,7 +259,6 @@ export function FlightLineView() {
             },
         deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
       );
-      setMessage(action === "MISSING" ? "Gruppe als nicht da markiert." : "Gruppe nachgerufen.");
       await refresh();
     } catch (reason) {
       setMessage(
@@ -298,11 +298,6 @@ export function FlightLineView() {
         },
         deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
       );
-      setMessage(
-        state === "AVAILABLE"
-          ? `${aircraftOverride.registration} ist wieder verfügbar.`
-          : `${aircraftOverride.registration}: ${aircraftStateLabel[state]}.`,
-      );
       setAircraftPauseOpen(false);
       await refresh();
     } catch (cause) {
@@ -312,17 +307,37 @@ export function FlightLineView() {
     }
   }
 
-  function startAircraftPause() {
+  function startAircraftPause(minutes: 10 | 20 | 30 | null) {
     if (!selectedAircraft) return;
-    const expectedReviewAt = expectedReviewAtFromPause(aircraftPauseMinutes, aircraftPauseUnknown);
+    const expectedReviewAt = expectedReviewAtFromPause(minutes);
     void setFlightLineAircraftState("PAUSED", expectedReviewAt);
   }
 
   function openAircraftPauseDialog(aircraftId?: string) {
     if (aircraftId) setSelectedAircraftId(aircraftId);
-    setAircraftPauseMinutes("");
-    setAircraftPauseUnknown(false);
     setAircraftPauseOpen(true);
+  }
+
+  function requestAircraftState(
+    aircraftId: string,
+    state: "AVAILABLE" | "REFUELING" | "PAUSED" | "INACTIVE",
+  ) {
+    const aircraftEntry = operationalAircraft.find((entry) => entry.id === aircraftId);
+    const rotation = operationalRotations?.find(
+      (entry) => entry.aircraftId === aircraftId && ["CALLED", "IN_FLIGHT"].includes(entry.status),
+    );
+    if (state === "INACTIVE" && rotation && aircraftEntry) {
+      setSelectedAircraftId(aircraftId);
+      setTechnicalAbort({
+        aircraftId,
+        aircraftVersion: aircraftEntry.version,
+        rotationId: rotation.id,
+        rotationVersion: rotation.version,
+      });
+      setTechnicalAbortReason("");
+      return;
+    }
+    void setFlightLineAircraftState(state, null, aircraftEntry);
   }
 
   async function assignAircraftPilot(aircraftId: string, pilotId: string, reassign: boolean) {
@@ -339,11 +354,6 @@ export function FlightLineView() {
           payload: { aircraftId, pilotId, reassign },
         },
         deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
-      );
-      const aircraftEntry = board.aircraft.find((entry) => entry.id === aircraftId);
-      const pilot = board.pilots.find((entry) => entry.id === pilotId);
-      setMessage(
-        `${pilot?.operationalCode ?? "Pilotencode"} wurde ${aircraftEntry?.registration ?? "dem Flugzeug"} zugewiesen.`,
       );
       await refresh();
     } catch (reason) {
@@ -383,9 +393,6 @@ export function FlightLineView() {
   ) {
     const effectiveReason = reasonOverride ?? queueReason.trim();
     if (!board || !targetRotation || effectiveReason.length < 3) return;
-    const movesToClarification =
-      type === "DEFER_TICKET_GROUP" &&
-      targetRotation.deferralCount + 1 >= board.event.maxTicketDeferrals;
     try {
       await sendCommand(
         {
@@ -398,13 +405,6 @@ export function FlightLineView() {
           payload: { ticketGroupId: targetRotation.ticketGroupId, reason: effectiveReason },
         },
         deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
-      );
-      setMessage(
-        type === "MARK_NO_SHOW"
-          ? "No-Show protokolliert."
-          : movesToClarification
-            ? "Höchstzahl erreicht · Fluggruppe zur Klärung an die Kasse gegeben."
-            : "Fluggruppe zurückgestellt.",
       );
       setQueueReason("");
       setSelectedId(null);
@@ -433,7 +433,6 @@ export function FlightLineView() {
         },
         deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
       );
-      setMessage("Nutzbare Kapazität übernommen; betroffene Gruppen wurden gemeinsam neu gereiht.");
       await refresh();
     } catch (reason) {
       setMessage(reason instanceof Error ? reason.message : "Kapazitätsänderung fehlgeschlagen.");
@@ -455,7 +454,6 @@ export function FlightLineView() {
         },
         deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
       );
-      setMessage("Die gesamte Buchungsgruppe wurde verschoben und protokolliert.");
       setMoveReason("");
       await refresh();
     } catch (cause) {
@@ -481,7 +479,6 @@ export function FlightLineView() {
         },
         deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
       );
-      setMessage("Das fehlende anonyme Ticket wurde als No-Show protokolliert.");
       await refresh();
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : "No-Show konnte nicht gesetzt werden.");
@@ -502,11 +499,6 @@ export function FlightLineView() {
           payload: { rotationId: selected.id, decision },
         },
         deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
-      );
-      setMessage(
-        decision === "FLY_WITH_PRESENT"
-          ? `Entscheidung für ${presentCount} anwesende Tickets dokumentiert.`
-          : "Entscheidung für freie Plätze dokumentiert.",
       );
       setDispositionOpen(false);
       await refresh();
@@ -555,11 +547,41 @@ export function FlightLineView() {
         },
         deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
       );
-      setMessage("Umlauf abgebrochen; die Gruppe steht wieder vorn in ihrer Produkt-Queue.");
       setQueueReason("");
       await refresh();
     } catch (reason) {
       setMessage(reason instanceof Error ? reason.message : "Umlaufabbruch fehlgeschlagen.");
+    }
+  }
+
+  async function abortTechnicalRotation() {
+    if (!board || !technicalAbort || technicalAbortReason.trim().length < 3) return;
+    try {
+      await sendCommand(
+        {
+          commandId: crypto.randomUUID(),
+          eventId: EVENT_ID,
+          deviceId: FLIGHT_LINE_DEVICE_ID,
+          expectedVersion: board.event.version,
+          issuedAt: new Date().toISOString(),
+          type: "ABORT_ROTATION_TO_QUEUE_AND_MARK_AIRCRAFT_UNAVAILABLE",
+          payload: {
+            rotationId: technicalAbort.rotationId,
+            expectedRotationVersion: technicalAbort.rotationVersion,
+            expectedAircraftVersion: technicalAbort.aircraftVersion,
+            reason: technicalAbortReason.trim(),
+          },
+        },
+        deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
+      );
+      setTechnicalAbort(null);
+      setTechnicalAbortReason("");
+      setSelectedQueueGroupIds([]);
+      await refresh();
+    } catch (reason) {
+      setMessage(
+        reason instanceof Error ? reason.message : "Technischer Umlaufabbruch fehlgeschlagen.",
+      );
     }
   }
 
@@ -578,7 +600,6 @@ export function FlightLineView() {
         },
         deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
       );
-      setMessage(checkedIn ? "Ticket als anwesend markiert." : "Anwesenheit zurückgenommen.");
       await refresh();
     } catch (reason) {
       setMessage(reason instanceof Error ? reason.message : "Anwesenheitsabgleich fehlgeschlagen.");
@@ -629,12 +650,13 @@ export function FlightLineView() {
           board={board}
           canAssignPilot={canManageAircraft}
           onAssignPilot={assignAircraftPilot}
-          onClaim={async (aircraftId) => {
+          onClaim={async (aircraftId, expectedTakeoverRevision) => {
             await claimFlightLineAircraft(
               EVENT_ID,
               aircraftId,
               FLIGHT_LINE_DEVICE_ID,
               deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
+              expectedTakeoverRevision,
             );
             await refresh();
           }}
@@ -702,8 +724,7 @@ export function FlightLineView() {
             void advance(rotation, rotationAircraft);
           }}
           onSetAircraftState={(aircraftId, state) => {
-            const aircraftEntry = operationalAircraft.find((entry) => entry.id === aircraftId);
-            void setFlightLineAircraftState(state, null, aircraftEntry);
+            requestAircraftState(aircraftId, state);
           }}
           selectedQueueGroupIds={selectedQueueGroupIds}
           turnaroundNextState={turnaroundNextState}
@@ -729,8 +750,7 @@ export function FlightLineView() {
           onGroupMissing={(ticketGroupId) => void updateGroupPresence(ticketGroupId, "MISSING")}
           onGroupRecall={(ticketGroupId) => void updateGroupPresence(ticketGroupId, "RECALL")}
           onSetAircraftState={(aircraftId, state) => {
-            const aircraftEntry = operationalAircraft.find((entry) => entry.id === aircraftId);
-            void setFlightLineAircraftState(state, null, aircraftEntry);
+            requestAircraftState(aircraftId, state);
           }}
           onSelectAircraft={(aircraftId) => {
             setSelectedAircraftId(aircraftId);
@@ -1406,87 +1426,71 @@ export function FlightLineView() {
           ) : null}
         </section>
       </section>
-      {aircraftPauseOpen && selectedAircraft ? (
-        <div className="modal-backdrop">
-          <form
-            aria-labelledby="aircraft-pause-title"
-            aria-modal="true"
-            className="confirmation-dialog aircraft-pause-dialog"
-            onSubmit={(event) => {
-              event.preventDefault();
-              startAircraftPause();
-            }}
-            role="dialog"
+      <ModalDialog
+        footer={
+          <Button onClick={() => setAircraftPauseOpen(false)} type="button" variant="secondary">
+            Abbrechen
+          </Button>
+        }
+        onClose={() => setAircraftPauseOpen(false)}
+        open={aircraftPauseOpen && Boolean(selectedAircraft)}
+        size="compact"
+        title={selectedAircraft ? `Pause für ${selectedAircraft.registration}` : "Pause"}
+      >
+        <div className="aircraft-pause-options">
+          {([10, 20, 30] as const).map((minutes) => (
+            <Button
+              key={minutes}
+              onClick={() => startAircraftPause(minutes)}
+              size="touch"
+              type="button"
+              variant="primary"
+            >
+              {minutes} Min.
+            </Button>
+          ))}
+          <Button
+            onClick={() => startAircraftPause(null)}
+            size="touch"
+            type="button"
+            variant="secondary"
           >
-            <div className="drawer-heading">
-              <div>
-                <h2 id="aircraft-pause-title">Pause für {selectedAircraft.registration}</h2>
-                <p>Die Dauer verbessert nur die Wartezeitprognose.</p>
-              </div>
-              <button
-                aria-label="Pausendialog schließen"
-                onClick={() => setAircraftPauseOpen(false)}
-                type="button"
-              >
-                ×
-              </button>
-            </div>
-            <fieldset disabled={aircraftPauseUnknown}>
-              <legend>Geschätzte Dauer (optional)</legend>
-              <div className="pause-duration-presets">
-                {[10, 20, 30].map((minutes) => (
-                  <button
-                    className={aircraftPauseMinutes === String(minutes) ? "selected" : ""}
-                    key={minutes}
-                    onClick={() => setAircraftPauseMinutes(String(minutes))}
-                    type="button"
-                  >
-                    {minutes} Min.
-                  </button>
-                ))}
-              </div>
-              <label>
-                Andere Dauer
-                <input
-                  min={1}
-                  onChange={(event) => setAircraftPauseMinutes(event.target.value)}
-                  placeholder="Minuten"
-                  type="number"
-                  value={aircraftPauseMinutes}
-                />
-              </label>
-            </fieldset>
-            <label className="checkbox-label">
-              <input
-                checked={aircraftPauseUnknown}
-                onChange={(event) => setAircraftPauseUnknown(event.target.checked)}
-                type="checkbox"
-              />
-              Dauer noch unbekannt
-            </label>
-            <ValidationHint>
-              Das Flugzeug wird nicht automatisch freigegeben. „Wieder verfügbar“ bleibt eine
-              bewusste Bestätigung der Flight Line.
-            </ValidationHint>
-            <div className="dialog-actions">
-              <button onClick={() => setAircraftPauseOpen(false)} type="button">
-                Abbrechen
-              </button>
-              <button
-                className="pause-primary-action"
-                disabled={
-                  !aircraftPauseUnknown &&
-                  (!Number.isFinite(Number(aircraftPauseMinutes)) ||
-                    Number(aircraftPauseMinutes) < 1)
-                }
-                type="submit"
-              >
-                Pause starten
-              </button>
-            </div>
-          </form>
+            Dauer unbekannt
+          </Button>
         </div>
-      ) : null}
+      </ModalDialog>
+      <ModalDialog
+        description="Alle Gäste dieses Umlaufs werden mit ihren vollständigen Gruppen ganz vorne in die Warteschlange zurückgestellt. Das Flugzeug wird nicht verfügbar."
+        footer={
+          <>
+            <Button onClick={() => setTechnicalAbort(null)} type="button" variant="secondary">
+              Abbrechen
+            </Button>
+            <Button
+              disabled={technicalAbortReason.trim().length < 3}
+              onClick={() => void abortTechnicalRotation()}
+              type="button"
+              variant="danger"
+            >
+              Abbrechen &amp; nicht verfügbar
+            </Button>
+          </>
+        }
+        onClose={() => setTechnicalAbort(null)}
+        open={technicalAbort !== null}
+        size="compact"
+        title="Umlauf abbrechen?"
+      >
+        <label className="technical-abort-reason">
+          Grund
+          <input
+            maxLength={500}
+            onChange={(event) => setTechnicalAbortReason(event.target.value)}
+            placeholder="z. B. technisches Problem beim Run-Up"
+            value={technicalAbortReason}
+          />
+        </label>
+      </ModalDialog>
     </Shell>
   );
 }

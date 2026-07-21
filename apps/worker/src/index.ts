@@ -135,9 +135,21 @@ async function authorizeDevice(
   env: Env,
   eventId: string,
   request: Request,
-): Promise<{ id: string; role: string } | null> {
+): Promise<{
+  id: string;
+  role: string;
+  accountId: string | null;
+  loginCode: string | null;
+} | null> {
   const actor = await authorizeSession(env, request);
-  if (actor) return { id: actor.deviceId, role: actor.role };
+  if (actor) {
+    return {
+      id: actor.deviceId,
+      role: actor.role,
+      accountId: actor.accountId,
+      loginCode: actor.loginCode,
+    };
+  }
   // Production authorization is session-only. Legacy device credentials remain available solely
   // to the synthetic local integration harness until those fixtures are migrated.
   if (env.APP_ENV !== "development") return null;
@@ -153,7 +165,7 @@ async function authorizeDevice(
   await env.DB.prepare("UPDATE paired_devices SET last_seen_at = ?1 WHERE id = ?2")
     .bind(new Date().toISOString(), deviceId)
     .run();
-  return { id: deviceId, role: device.role };
+  return { id: deviceId, role: device.role, accountId: null, loginCode: null };
 }
 
 function eventCoordinatorNamespace(env: Env): DurableObjectNamespace {
@@ -1448,8 +1460,8 @@ app.on("GET", eventRoutes("/snapshot"), async (context) => {
 app.on("PUT", eventRoutes("/assist-claims/:aircraftId"), async (context) => {
   const eventId = context.req.param("eventId");
   const aircraftId = context.req.param("aircraftId");
-  const device = await authorizeDevice(context.env, eventId, context.req.raw);
-  if (!device || !["FLIGHT_LINE", "FLIGHT_DIRECTOR", "ADMIN"].includes(device.role)) {
+  const actor = await authorizeSession(context.env, context.req.raw);
+  if (!actor || !["FLIGHT_LINE", "FLIGHT_DIRECTOR", "ADMIN"].includes(actor.role)) {
     return context.json(
       {
         error: {
@@ -1460,80 +1472,28 @@ app.on("PUT", eventRoutes("/assist-claims/:aircraftId"), async (context) => {
       403,
     );
   }
-  const deviceId = device.id;
-  const aircraft = await context.env.DB.prepare(
-    `SELECT a.id FROM aircraft a
-      JOIN resource_group_memberships membership ON membership.aircraft_id = a.id
-     WHERE a.id = ?1 AND membership.operation_day_id = ?2 AND membership.active_until IS NULL`,
-  )
-    .bind(aircraftId, eventId)
-    .first<{ id: string }>();
-  if (!aircraft) {
-    return context.json(
-      { error: { code: "AIRCRAFT_NOT_FOUND", message: "Flugzeug nicht gefunden." } },
-      404,
-    );
-  }
-  const claimedAt = new Date().toISOString();
-  const expiresAt = new Date(Date.now() + 45_000).toISOString();
-  try {
-    await context.env.DB.prepare(
-      `INSERT INTO flight_line_assist_claims
-        (operation_day_id, aircraft_id, device_id, claimed_at, expires_at)
-       VALUES (?1, ?2, ?3, ?4, ?5)
-       ON CONFLICT(operation_day_id, aircraft_id) DO UPDATE SET
-         device_id = excluded.device_id,
-         claimed_at = excluded.claimed_at,
-         expires_at = excluded.expires_at
-       WHERE flight_line_assist_claims.device_id = excluded.device_id
-          OR flight_line_assist_claims.expires_at <= excluded.claimed_at`,
-    )
-      .bind(eventId, aircraftId, deviceId, claimedAt, expiresAt)
-      .run();
-  } catch (cause) {
-    if (String(cause).includes("no such table: flight_line_assist_claims")) {
-      return context.json(
-        {
-          error: {
-            code: "ASSIST_MIGRATION_REQUIRED",
-            message: "Flight Line Assist wird nach Cloudflare-Migration 0033 verfügbar.",
-          },
-        },
-        503,
-      );
-    }
-    throw cause;
-  }
-  const claim = await context.env.DB.prepare(
-    `SELECT device_id, claimed_at, expires_at FROM flight_line_assist_claims
-      WHERE operation_day_id = ?1 AND aircraft_id = ?2`,
-  )
-    .bind(eventId, aircraftId)
-    .first<{ device_id: string; claimed_at: string; expires_at: string }>();
-  if (!claim || claim.device_id !== deviceId) {
-    return context.json(
-      {
-        error: {
-          code: "AIRCRAFT_ASSIST_CLAIMED",
-          message: "Dieses Flugzeug wird bereits von einem anderen Assist-Gerät betreut.",
-        },
-      },
-      409,
-    );
-  }
-  return context.json({
-    aircraftId,
-    claimedByCurrentSession: true,
-    claimedAt: claim.claimed_at,
-    expiresAt: claim.expires_at,
-  });
+  const namespace = eventCoordinatorNamespace(context.env);
+  const stub = namespace.get(namespace.idFromName(eventId));
+  const target = new URL(context.req.url);
+  target.pathname = `/internal/events/${encodeURIComponent(eventId)}/assist-claims/${encodeURIComponent(aircraftId)}`;
+  const headers = new Headers({ "content-type": "application/json" });
+  headers.set("x-operator-account-id", actor.accountId);
+  headers.set("x-operator-login-code", actor.loginCode);
+  headers.set("x-operator-session-id", actor.sessionId);
+  headers.set("x-operator-role", actor.role);
+  headers.set("x-operator-device-id", actor.deviceId);
+  const body = await context.req.json().catch(() => ({ action: "ACQUIRE_OR_RENEW" }));
+  const response = await stub.fetch(
+    new Request(target, { method: "PUT", headers, body: JSON.stringify(body) }),
+  );
+  return new Response(response.body, response);
 });
 
 app.on("DELETE", eventRoutes("/assist-claims/:aircraftId"), async (context) => {
   const eventId = context.req.param("eventId");
   const aircraftId = context.req.param("aircraftId");
-  const device = await authorizeDevice(context.env, eventId, context.req.raw);
-  if (!device || !["FLIGHT_LINE", "FLIGHT_DIRECTOR", "ADMIN"].includes(device.role)) {
+  const actor = await authorizeSession(context.env, context.req.raw);
+  if (!actor || !["FLIGHT_LINE", "FLIGHT_DIRECTOR", "ADMIN"].includes(actor.role)) {
     return context.json(
       {
         error: {
@@ -1544,23 +1504,18 @@ app.on("DELETE", eventRoutes("/assist-claims/:aircraftId"), async (context) => {
       403,
     );
   }
-  const deviceId = device.id;
-  if (["FLIGHT_DIRECTOR", "ADMIN"].includes(device.role)) {
-    await context.env.DB.prepare(
-      `DELETE FROM flight_line_assist_claims
-        WHERE operation_day_id = ?1 AND aircraft_id = ?2`,
-    )
-      .bind(eventId, aircraftId)
-      .run();
-  } else {
-    await context.env.DB.prepare(
-      `DELETE FROM flight_line_assist_claims
-        WHERE operation_day_id = ?1 AND aircraft_id = ?2 AND device_id = ?3`,
-    )
-      .bind(eventId, aircraftId, deviceId)
-      .run();
-  }
-  return context.body(null, 204);
+  const namespace = eventCoordinatorNamespace(context.env);
+  const stub = namespace.get(namespace.idFromName(eventId));
+  const target = new URL(context.req.url);
+  target.pathname = `/internal/events/${encodeURIComponent(eventId)}/assist-claims/${encodeURIComponent(aircraftId)}`;
+  const headers = new Headers();
+  headers.set("x-operator-account-id", actor.accountId);
+  headers.set("x-operator-login-code", actor.loginCode);
+  headers.set("x-operator-session-id", actor.sessionId);
+  headers.set("x-operator-role", actor.role);
+  headers.set("x-operator-device-id", actor.deviceId);
+  const response = await stub.fetch(new Request(target, { method: "DELETE", headers }));
+  return new Response(response.body, response);
 });
 
 app.on("GET", eventRoutes("/operations"), async (context) => {
@@ -1662,7 +1617,7 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
         }>(),
     () =>
       context.env.DB.prepare(
-        `SELECT r.id, r.flight_group_id, fg.resource_group_id, fg.communication_number,
+        `SELECT r.id, r.version, r.flight_group_id, fg.resource_group_id, fg.communication_number,
               COALESCE(fg.queue_position, fg.communication_number) AS queue_position,
               r.status, r.aircraft_id, r.usable_capacity, fg.precalled_at,
               COALESCE(r.gate_id, MIN(p.gate_id), '') AS gate_id,
@@ -1775,12 +1730,14 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
               ,(SELECT json_group_array(json_object(
                   'id', grouped_tickets.ticket_group_id,
                   'communicationNumber', grouped_tickets.communication_number,
+                  'soldAt', grouped_tickets.sold_at,
                   'ticketCount', grouped_tickets.ticket_count,
                   'presentCount', grouped_tickets.present_count
                 ))
                   FROM (
                     SELECT grouped_ticket.ticket_group_id,
                            grouped_group.communication_number,
+                           grouped_group.sold_at,
                            COUNT(*) AS ticket_count,
                            SUM(CASE WHEN grouped_ticket.attendance_status = 'CHECKED_IN' THEN 1 ELSE 0 END)
                              AS present_count
@@ -1788,7 +1745,8 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
                       JOIN tickets grouped_ticket ON grouped_ticket.id = grouped_rt.ticket_id
                       JOIN ticket_groups grouped_group ON grouped_group.id = grouped_ticket.ticket_group_id
                      WHERE grouped_rt.rotation_id = r.id AND grouped_rt.released_at IS NULL
-                     GROUP BY grouped_ticket.ticket_group_id, grouped_group.communication_number
+                     GROUP BY grouped_ticket.ticket_group_id, grouped_group.communication_number,
+                              grouped_group.sold_at
                   ) grouped_tickets) AS booking_groups_json
          FROM rotations r
          JOIN operation_days od ON od.id = r.operation_day_id
@@ -1810,6 +1768,7 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
         .bind(eventId)
         .all<{
           id: string;
+          version: number;
           flight_group_id: string;
           resource_group_id: string;
           communication_number: number;
@@ -1953,7 +1912,7 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
         .all<{ resource_group_id: string; passenger_seats: number; refuel_planned: number }>(),
     () =>
       context.env.DB.prepare(
-        `SELECT a.id, a.registration, a.aircraft_type, a.passenger_seats,
+        `SELECT a.id, a.version, a.registration, a.aircraft_type, a.passenger_seats,
               a.maximum_passenger_payload_kg, a.operational_state,
               COALESCE(a.operational_state_changed_at, a.updated_at) AS operational_state_changed_at,
               a.refuel_planned, a.rotations_since_refuel, a.refuel_reminder_threshold,
@@ -1974,6 +1933,7 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
         .bind(eventId)
         .all<{
           id: string;
+          version: number;
           registration: string;
           aircraft_type: string;
           passenger_seats: number;
@@ -2120,23 +2080,29 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
 
   let assistClaims: Array<{
     aircraft_id: string;
-    device_id: string;
+    operator_account_id: string;
+    login_code: string;
     claimed_at: string;
     expires_at: string;
+    revision: number;
   }> = [];
   try {
     const claims = await context.env.DB.prepare(
-      `SELECT aircraft_id, device_id, claimed_at, expires_at
-         FROM flight_line_assist_claims
-        WHERE operation_day_id = ?1 AND expires_at > ?2
-        ORDER BY claimed_at`,
+      `SELECT claim.aircraft_id, claim.operator_account_id, account.login_code,
+              claim.claimed_at, claim.expires_at, claim.revision
+         FROM flight_line_assist_claims claim
+         JOIN operator_accounts account ON account.id = claim.operator_account_id
+        WHERE claim.operation_day_id = ?1 AND claim.expires_at > ?2
+        ORDER BY claim.claimed_at`,
     )
       .bind(eventId, new Date().toISOString())
       .all<{
         aircraft_id: string;
-        device_id: string;
+        operator_account_id: string;
+        login_code: string;
         claimed_at: string;
         expires_at: string;
+        revision: number;
       }>();
     assistClaims = claims.results;
   } catch (cause) {
@@ -2271,6 +2237,7 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
       );
       return {
         id: rotation.id,
+        version: rotation.version,
         flightGroupId: rotation.flight_group_id,
         communicationNumber: rotation.communication_number,
         communicationLabel: `${rotation.product_code}-${String(rotation.communication_number).padStart(3, "0")}`,
@@ -2396,6 +2363,7 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
     })),
     aircraft: fleetRows.results.map((aircraft) => ({
       id: aircraft.id,
+      version: aircraft.version,
       registration: aircraft.registration,
       aircraftType: aircraft.aircraft_type,
       passengerSeats: aircraft.passenger_seats,
@@ -2414,7 +2382,10 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
     })),
     assistClaims: assistClaims.map((claim) => ({
       aircraftId: claim.aircraft_id,
-      claimedByCurrentSession: claim.device_id === device.id,
+      claimedByCurrentOperator:
+        device.accountId !== null && claim.operator_account_id === device.accountId,
+      ownerLoginCode: claim.login_code,
+      revision: claim.revision,
       claimedAt: claim.claimed_at,
       expiresAt: claim.expires_at,
     })),
@@ -3789,6 +3760,7 @@ app.on("POST", eventRoutes("/commands"), async (context) => {
     "x-device-id",
     "x-device-token",
     "x-operator-account-id",
+    "x-operator-login-code",
     "x-operator-session-id",
     "x-operator-role",
     "x-operator-device-id",
@@ -3796,6 +3768,7 @@ app.on("POST", eventRoutes("/commands"), async (context) => {
     headers.delete(name);
   headers.set("content-type", "application/json");
   headers.set("x-operator-account-id", actor.accountId);
+  headers.set("x-operator-login-code", actor.loginCode);
   headers.set("x-operator-session-id", actor.sessionId);
   headers.set("x-operator-role", actor.role);
   headers.set("x-operator-device-id", actor.deviceId);

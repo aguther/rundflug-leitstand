@@ -12,6 +12,7 @@ type Rotation = OperationBoard["rotations"][number];
 function rotation(input: Partial<Rotation> & Pick<Rotation, "id" | "ticketGroupId">): Rotation {
   return {
     id: input.id,
+    version: 0,
     ticketGroupId: input.ticketGroupId,
     bookingGroups: input.bookingGroups ?? [],
     flightGroupId: `fg-${input.id}`,

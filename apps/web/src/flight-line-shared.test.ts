@@ -48,7 +48,7 @@ describe("gemeinsame Flight-Line-Präsentationslogik", () => {
     ).toBe("Off-Block");
   });
 
-  it("uses four connected actual stations and one independent unavailable endpoint", () => {
+  it("uses independent availability endpoints around the three connected actual stations", () => {
     const completed = {
       ...rotation("completed", "COMPLETED"),
       timeline: {
@@ -65,14 +65,15 @@ describe("gemeinsame Flight-Line-Präsentationslogik", () => {
       completed,
     );
     expect(available.map((step) => step.key)).toEqual([
+      "available",
       "boarding",
       "offblock",
       "onblock",
-      "available",
       "unavailable",
     ]);
     expect(available.find((step) => step.key === "available")?.current).toBe(true);
     expect(available.find((step) => step.key === "available")?.connectorReached).toBe(false);
+    expect(available.find((step) => step.key === "onblock")?.connectorReached).toBe(false);
     expect(available.find((step) => step.key === "unavailable")?.reached).toBe(false);
 
     const paused = flightProgressSteps(

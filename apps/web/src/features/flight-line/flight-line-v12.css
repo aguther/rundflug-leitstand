@@ -1038,6 +1038,179 @@
   }
 }
 
+/* V1.7.1 shared timeline and supervisor table. */
+.flight-director-progress {
+  grid-template-columns: repeat(5, minmax(42px, 1fr));
+  column-gap: 10px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.flight-director-progress > li {
+  grid-template-rows: minmax(16px, auto) 18px 16px;
+  align-items: center;
+}
+
+.flight-director-progress > li[data-step="available"] {
+  margin-right: 8px;
+}
+
+.flight-director-progress > li[data-step="unavailable"] {
+  margin-left: 8px;
+}
+
+.flight-director-progress-label,
+.flight-director-progress--detailed small {
+  white-space: nowrap;
+}
+
+.flight-director-progress > li[data-step="onblock"] .flight-director-progress-node::after {
+  content: none;
+}
+
+.flight-director-progress
+  > li:is([data-step="boarding"], [data-step="offblock"])
+  .flight-director-progress-node::after {
+  top: 50%;
+  left: 14px;
+  width: calc((100cqi - 40px) / 5 + 10px);
+  transform: translateY(-50%);
+}
+
+.flight-director-progress--detailed {
+  min-height: 64px;
+}
+
+.flight-director-progress--detailed > li {
+  gap: 3px;
+}
+
+.flight-director-aircraft-table,
+.flight-director-aircraft-head,
+.flight-director-aircraft-row {
+  min-width: 1220px;
+}
+
+.flight-director-aircraft-head,
+.flight-director-aircraft-row {
+  grid-template-columns: 120px 105px 145px 145px minmax(410px, 1fr) 268px;
+  gap: 10px;
+}
+
+.flight-director-aircraft-row {
+  min-height: 102px;
+}
+
+.flight-director-pilot-code {
+  min-width: 0;
+  justify-content: flex-start;
+  white-space: nowrap;
+}
+
+.flight-director-pilot-code strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.flight-director-pilot-code .ds-icon-button {
+  flex: 0 0 auto;
+}
+
+.flight-director-timeline {
+  overflow: visible;
+  white-space: normal;
+}
+
+.flight-director-row-actions {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(5, var(--control-touch));
+  gap: 5px;
+}
+
+.flight-director-row-actions .ds-icon-button {
+  width: var(--control-touch);
+  min-width: var(--control-touch);
+  height: var(--control-touch);
+}
+
+@media (max-width: 700px) {
+  .flight-director-aircraft-head {
+    display: grid;
+  }
+
+  .flight-director-aircraft-row > .flight-director-group-chips:nth-child(4) {
+    display: flex;
+  }
+
+  .flight-director-aircraft-row > .flight-director-timeline:nth-child(5) {
+    display: block;
+  }
+
+  .flight-director-aircraft-row > .flight-director-row-actions {
+    grid-column: auto;
+  }
+}
+
+.flight-director-bottom-grid.is-ticket-only {
+  min-height: 190px;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.flight-director-history-dialog {
+  max-height: min(62vh, 560px);
+  overflow: auto;
+  scrollbar-gutter: stable;
+}
+
+.aircraft-pause-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.aircraft-pause-options > :last-child {
+  grid-column: 1 / -1;
+}
+
+.technical-abort-reason {
+  display: grid;
+  gap: 6px;
+  font-weight: 650;
+}
+
+.technical-abort-reason input {
+  width: 100%;
+  min-height: var(--control-touch);
+  box-sizing: border-box;
+  padding-inline: 10px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--ui-text);
+  background: var(--ui-control);
+}
+
+@media (max-width: 800px) {
+  .flight-director-bottom-grid.is-ticket-only {
+    min-height: 360px;
+  }
+
+  .aircraft-pause-options {
+    grid-template-columns: 1fr;
+  }
+
+  .aircraft-pause-options > :last-child {
+    grid-column: auto;
+  }
+
+  .ds-modal-dialog:has(.aircraft-pause-options) {
+    max-height: calc(100dvh - 20px);
+  }
+}
+
 @media (max-width: 560px) {
   .flight-director-pilot-options {
     grid-template-columns: 1fr;

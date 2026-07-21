@@ -19,8 +19,9 @@ describe("serverseitige Sitzungsautorisierung (ADR-0010, Q-SIC-020, T-020)", () 
       workerSource.indexOf('app.on("PUT", eventRoutes("/assist-claims/:aircraftId")'),
       workerSource.indexOf('app.on("DELETE", eventRoutes("/assist-claims/:aircraftId")'),
     );
-    expect(route).toContain("const deviceId = device.id");
-    expect(route).toContain("claimedByCurrentSession: true");
+    expect(route).toContain("const actor = await authorizeSession");
+    expect(route).toContain('headers.set("x-operator-account-id", actor.accountId)');
+    expect(route).toContain('headers.set("x-operator-login-code", actor.loginCode)');
     expect(route).not.toContain('context.req.header("x-device-id")');
   });
 

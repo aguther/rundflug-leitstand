@@ -1,5 +1,7 @@
 import {
+  type AssistClaim,
   type AuditHistory,
+  assistClaimSchema,
   auditHistorySchema,
   type BootstrapRequest,
   type CloneEventRequest,
@@ -35,6 +37,16 @@ import {
 const SERVER_UNREACHABLE_MESSAGE =
   "Server nicht erreichbar. Bitte Verbindung prüfen und die Seite neu laden.";
 const LEGACY_DEVELOPMENT_DEVICE_AUTH = import.meta.env.MODE === "development";
+
+export class FlightLineAssistClaimConflictError extends Error {
+  constructor(
+    message: string,
+    readonly claim: AssistClaim,
+  ) {
+    super(message);
+    this.name = "FlightLineAssistClaimConflictError";
+  }
+}
 
 export function controlApiPath(eventId: string, suffix: `/${string}`): string {
   return `/api/control/${encodeURIComponent(eventId)}${suffix}`;
@@ -169,41 +181,41 @@ export async function claimFlightLineAircraft(
   aircraftId: string,
   deviceId: string,
   deviceToken: string,
-): Promise<{
-  aircraftId: string;
-  claimedByCurrentSession: true;
-  claimedAt: string;
-  expiresAt: string;
-}> {
+  expectedTakeoverRevision?: number,
+): Promise<AssistClaim & { claimedByCurrentOperator: true }> {
   const response = await apiFetch(
     controlApiPath(eventId, `/assist-claims/${encodeURIComponent(aircraftId)}`),
     {
       method: "PUT",
-      headers: deviceHeaders(deviceId, deviceToken),
+      headers: deviceHeaders(deviceId, deviceToken, { "content-type": "application/json" }),
+      body: JSON.stringify(
+        expectedTakeoverRevision
+          ? { action: "TAKEOVER", expectedRevision: expectedTakeoverRevision }
+          : { action: "ACQUIRE_OR_RENEW" },
+      ),
     },
   );
   const body = (await response.json()) as {
-    aircraftId?: string;
-    claimedByCurrentSession?: boolean;
-    claimedAt?: string;
-    expiresAt?: string;
-    error?: { message?: string };
+    claim?: unknown;
+    error?: { code?: string; message?: string };
   };
-  if (
-    !response.ok ||
-    !body.aircraftId ||
-    body.claimedByCurrentSession !== true ||
-    !body.claimedAt ||
-    !body.expiresAt
-  ) {
+  if (response.status === 409 && body.claim) {
+    const conflict = assistClaimSchema.safeParse(body.claim);
+    if (conflict.success) {
+      throw new FlightLineAssistClaimConflictError(
+        body.error?.message ?? "Das Flugzeug wird bereits betreut.",
+        conflict.data,
+      );
+    }
+  }
+  if (!response.ok) {
     throw new Error(body.error?.message ?? "Betreuung konnte nicht übernommen werden.");
   }
-  return body as {
-    aircraftId: string;
-    claimedByCurrentSession: true;
-    claimedAt: string;
-    expiresAt: string;
-  };
+  const claim = assistClaimSchema.parse(body);
+  if (!claim.claimedByCurrentOperator) {
+    throw new Error("Betreuung wurde nicht dem aktuellen Login zugeordnet.");
+  }
+  return claim as AssistClaim & { claimedByCurrentOperator: true };
 }
 
 export async function releaseFlightLineAircraft(
