@@ -188,15 +188,15 @@ export function flightProgressSteps(
   const steps: Array<
     Omit<FlightProgressStep, "current" | "connectorReached"> & { key: FlightProgressStepKey }
   > = [
-    { key: "boarding", label: "Boarding", time: timeline?.boardingAt, reached: reached.boarding },
-    { key: "offblock", label: "Off-Block", time: timeline?.departureAt, reached: reached.offblock },
-    { key: "onblock", label: "On-Block", time: timeline?.landingAt, reached: reached.onblock },
     {
       key: "available",
       label: "Verfügbar",
       time: availableReached ? aircraft.operationalStateChangedAt : null,
       reached: reached.available,
     },
+    { key: "boarding", label: "Boarding", time: timeline?.boardingAt, reached: reached.boarding },
+    { key: "offblock", label: "Off-Block", time: timeline?.departureAt, reached: reached.offblock },
+    { key: "onblock", label: "On-Block", time: timeline?.landingAt, reached: reached.onblock },
     {
       key: "unavailable",
       label: "Nicht verfügbar",
@@ -208,8 +208,7 @@ export function flightProgressSteps(
     ...step,
     current: current === step.key,
     connectorReached:
-      step.key !== "unavailable" &&
-      step.key !== "available" &&
+      (step.key === "boarding" || step.key === "offblock") &&
       step.reached &&
       Boolean(steps[index + 1]?.reached),
   }));
@@ -321,14 +320,28 @@ export function CompactCurrentRotation({
   rotation: FlightLineRotation | undefined;
   timeZone: string;
 }) {
-  if (!rotation) {
-    return (
+  if (!rotation)
+    return aircraft ? (
+      <div className="flight-director-current-content is-empty">
+        <div className="flight-director-empty-detail">
+          <Plane aria-hidden="true" />
+          <span>Für das ausgewählte Flugzeug ist noch kein Umlauf belegt.</span>
+        </div>
+        <section className="flight-director-current-timeline" aria-label="Umlaufzeitlinie">
+          <FlightProgress
+            aircraft={aircraft}
+            rotation={undefined}
+            timeZone={timeZone}
+            variant="detailed"
+          />
+        </section>
+      </div>
+    ) : (
       <div className="flight-director-empty-detail">
         <Plane aria-hidden="true" />
-        <span>Für das ausgewählte Flugzeug ist noch kein Umlauf belegt.</span>
+        <span>Kein Flugzeug ausgewählt.</span>
       </div>
     );
-  }
   return (
     <div className="flight-director-current-content">
       <dl className="flight-director-current-rotation">

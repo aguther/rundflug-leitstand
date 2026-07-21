@@ -6,8 +6,10 @@ import {
   assertRoleMayExecute,
   assertSaleAllowed,
   assertSingleActiveResourceGroup,
+  assertTechnicalRotationAbortAllowed,
   assertTicketNoShowAllowed,
   DomainRuleError,
+  planTechnicalRotationAbortQueueBlock,
   rotationStateLabels,
   transitionAircraft,
   transitionRotation,
@@ -282,6 +284,35 @@ describe("rotation lifecycle", () => {
   it("does not equate landed with completed", () => {
     expect(transitionRotation("IN_FLIGHT", "LANDED")).toBe("LANDED");
     expect(transitionRotation("LANDED", "COMPLETED")).toBe("COMPLETED");
+  });
+
+  it("allows an exceptional technical abort during boarding and after off-block", () => {
+    expect(() => assertTechnicalRotationAbortAllowed("CALLED")).not.toThrow();
+    expect(() => assertTechnicalRotationAbortAllowed("IN_FLIGHT")).not.toThrow();
+  });
+
+  it("rejects a technical abort before boarding and after on-block", () => {
+    expect(() => assertTechnicalRotationAbortAllowed("DRAFT")).toThrowError(
+      /nur während Boarding oder nach Off-Block/,
+    );
+    expect(() => assertTechnicalRotationAbortAllowed("LANDED")).toThrowError(
+      /nur während Boarding oder nach Off-Block/,
+    );
+  });
+
+  it("returns multiple groups as one stable block at the front of the queue", () => {
+    expect(
+      planTechnicalRotationAbortQueueBlock([
+        { id: "group-c", queueSequence: 8, assignedAt: "2026-07-21T10:03:00.000Z" },
+        { id: "group-a", queueSequence: 4, assignedAt: "2026-07-21T10:01:00.000Z" },
+        { id: "group-b", queueSequence: 4, assignedAt: "2026-07-21T10:02:00.000Z" },
+      ]),
+    ).toEqual([
+      { id: "group-a", queueSequence: 1 },
+      { id: "group-b", queueSequence: 2 },
+      { id: "group-c", queueSequence: 3 },
+    ]);
+    expect(() => planTechnicalRotationAbortQueueBlock([])).toThrow("keine rückstellbare");
   });
 });
 

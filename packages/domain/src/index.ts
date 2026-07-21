@@ -151,6 +151,34 @@ export function transitionRotation(current: RotationState, next: RotationState):
   return next;
 }
 
+export function assertTechnicalRotationAbortAllowed(current: RotationState): void {
+  if (current !== "CALLED" && current !== "IN_FLIGHT") {
+    throw new DomainRuleError(
+      "TECHNICAL_ROTATION_ABORT_NOT_ALLOWED",
+      "Ein technischer Umlaufabbruch ist nur während Boarding oder nach Off-Block zulässig.",
+    );
+  }
+}
+
+export function planTechnicalRotationAbortQueueBlock(
+  entries: ReadonlyArray<{ id: string; queueSequence: number; assignedAt: string }>,
+): Array<{ id: string; queueSequence: number }> {
+  if (entries.length === 0) {
+    throw new DomainRuleError(
+      "ROTATION_WITHOUT_TICKETS",
+      "Der Umlauf enthält keine rückstellbare Buchungsgruppe.",
+    );
+  }
+  return [...entries]
+    .sort(
+      (left, right) =>
+        left.queueSequence - right.queueSequence ||
+        left.assignedAt.localeCompare(right.assignedAt) ||
+        left.id.localeCompare(right.id),
+    )
+    .map((entry, index) => ({ id: entry.id, queueSequence: index + 1 }));
+}
+
 export type DeviceRole = "CASHIER" | "FLIGHT_LINE" | "FLIGHT_DIRECTOR" | "ADMIN";
 
 export type OperationalCommandType =
@@ -183,6 +211,7 @@ export type OperationalCommandType =
   | "SET_RESOURCE_GROUP_NOTICE"
   | "REVOKE_CALL"
   | "ABORT_ROTATION"
+  | "ABORT_ROTATION_TO_QUEUE_AND_MARK_AIRCRAFT_UNAVAILABLE"
   | "SET_TICKET_ATTENDANCE"
   | "SET_TICKET_GROUP_ATTENDANCE"
   | "MARK_TICKET_GROUP_MISSING"
@@ -231,6 +260,11 @@ const commandRoles: Readonly<Record<OperationalCommandType, readonly DeviceRole[
   SET_RESOURCE_GROUP_NOTICE: ["FLIGHT_DIRECTOR", "ADMIN"],
   REVOKE_CALL: ["FLIGHT_LINE", "FLIGHT_DIRECTOR", "ADMIN"],
   ABORT_ROTATION: ["FLIGHT_LINE", "FLIGHT_DIRECTOR", "ADMIN"],
+  ABORT_ROTATION_TO_QUEUE_AND_MARK_AIRCRAFT_UNAVAILABLE: [
+    "FLIGHT_LINE",
+    "FLIGHT_DIRECTOR",
+    "ADMIN",
+  ],
   SET_TICKET_ATTENDANCE: ["FLIGHT_LINE", "FLIGHT_DIRECTOR", "ADMIN"],
   SET_TICKET_GROUP_ATTENDANCE: ["FLIGHT_LINE", "FLIGHT_DIRECTOR", "ADMIN"],
   MARK_TICKET_GROUP_MISSING: ["FLIGHT_LINE", "FLIGHT_DIRECTOR", "ADMIN"],

@@ -1,0 +1,38 @@
+version: 1.7.1
+requirements:
+  - id: V171-REL-010
+    requirement: Repository und Laufzeit verwenden konsistent Release 1.7.1.
+    status: implemented
+  - id: V171-HEAD-010
+    requirement: Einzeilige Kopfzeile außer FIDS mit iconbasiertem geschlossenem Ansichtsumschalter.
+    status: implemented
+  - id: V171-TIM-010
+    requirement: Gemeinsame achsengleiche fünfstufige Zeitlinie ohne Status-Hintergrundfläche.
+    status: implemented
+  - id: V171-AST-010
+    requirement: Fester scrollbarerer Assist-Umlaufblock und einzeilige Pilotverwaltung.
+    status: implemented
+  - id: V171-ACT-010
+    requirement: Stabile zugängliche Icon-Aktionsreihen in Assist und Supervisor.
+    status: implemented
+  - id: V171-CLM-010
+    requirement: Loginbasierte 30-Minuten-Claims mit Aktivitätsverlängerung und revisionierter Übernahme.
+    status: implemented
+  - id: V171-ABT-010
+    requirement: Atomarer technischer Umlaufabbruch mit Queue-Rückstellung und INACTIVE-Flugzeug.
+    status: implemented
+  - id: V171-PAU-010
+    requirement: Kompakter Pausendialog mit vier unmittelbar ausführenden Daueraktionen.
+    status: implemented
+  - id: V171-SUP-010
+    requirement: Supervisor-Tabelle ohne Status und Nächster Schritt mit Zeilenzeitlinie und Historienmodal.
+    status: implemented
+  - id: V171-TKT-010
+    requirement: Verkaufte Ticketgruppen nach soldAt und ID absteigend bei unveränderter Suche.
+    status: implemented
+  - id: V171-MSG-010
+    requirement: Keine Erfolgstoasts für erwartete lokale Standardaktionen.
+    status: implemented
+  - id: V171-QA-010
+    requirement: Automatisierte und visuelle Abnahme der mobilen und Desktop-Layouts sowie Fachkonflikte.
+    status: implemented

@@ -40,26 +40,34 @@ export function AppHeader({ title, kiosk = false, publicView = false }: AppHeade
   const online = useConnectivity();
   const { session, logout } = useAuth();
   const pathname = window.location.pathname;
+  const fidsView = pathname === "/fids" || pathname.startsWith("/fids/");
   const eventLabel = activeEventLabel(window.localStorage);
   const currentDestination = appDestinations.find((destination) =>
     isDestinationActive(pathname, destination.href),
   );
+  const CurrentDestinationIcon = currentDestination
+    ? destinationIcons[currentDestination.href as keyof typeof destinationIcons]
+    : Monitor;
 
   return (
-    <header className="app-header">
+    <header className={`app-header ${fidsView ? "app-header--fids" : "app-header--compact"}`}>
       <a aria-label="Rundflug-Leitstand" className="app-brand" href="/">
         <BrandMark />
-        <strong>Rundflug-Leitstand</strong>
+        <strong>{fidsView ? "Rundflug-Leitstand" : (eventLabel ?? title)}</strong>
       </a>
       {!kiosk && !publicView && session ? (
         <details className="view-switcher">
-          <summary>
-            <Monitor aria-hidden="true" size={20} />
-            <span>
-              <span className="view-switcher-prefix">Ansicht: </span>
-              {currentDestination?.label ?? title}
-            </span>
-            <ChevronDown aria-hidden="true" size={18} />
+          <summary aria-label={`Ansicht wechseln: ${currentDestination?.label ?? title}`}>
+            <CurrentDestinationIcon aria-hidden="true" size={20} />
+            {fidsView ? (
+              <>
+                <span>
+                  <span className="view-switcher-prefix">Ansicht: </span>
+                  {currentDestination?.label ?? title}
+                </span>
+                <ChevronDown aria-hidden="true" size={18} />
+              </>
+            ) : null}
           </summary>
           <div className="view-switcher-menu">
             {appDestinations.map((destination) => {
@@ -106,13 +114,13 @@ export function AppHeader({ title, kiosk = false, publicView = false }: AppHeade
           type="button"
         >
           <CalendarDays aria-hidden="true" size={18} />
-          {eventLabel}
+          <span>{eventLabel}</span>
         </button>
       ) : null}
       {!kiosk ? (
         <span className={online ? "app-connection connected" : "app-connection"}>
           <Circle aria-hidden="true" fill="currentColor" size={12} />
-          {online ? "Verbunden" : "Offline"}
+          <span>{online ? "Verbunden" : "Offline"}</span>
         </span>
       ) : null}
       {!kiosk ? (
