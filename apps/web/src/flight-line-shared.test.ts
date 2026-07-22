@@ -1,10 +1,15 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import {
   aircraftStatusLabel,
+  CompactCurrentRotation,
   type FlightLineAircraft,
   type FlightLineRotation,
+  FlightProgress,
   flightLineGroupLabel,
   flightLineStatusTone,
+  flightProgressIconForStep,
   flightProgressSteps,
   latestRotationForAircraft,
   primaryAircraftActionLabel,
@@ -85,7 +90,58 @@ describe("gemeinsame Flight-Line-Präsentationslogik", () => {
       completed,
     );
     expect(paused.find((step) => step.key === "unavailable")?.current).toBe(true);
+    expect(paused.find((step) => step.key === "unavailable")?.icon).toBe("coffee");
+    expect(paused.find((step) => step.key === "unavailable")?.label).toBe("Pause");
     expect(paused.find((step) => step.key === "available")?.current).toBe(false);
+  });
+
+  it("maps the shared timeline icons including the operational unavailable reason", () => {
+    expect(flightProgressIconForStep("available", "AVAILABLE")).toBe("circle-check");
+    expect(flightProgressIconForStep("boarding", "BOARDING")).toBe("tickets-plane");
+    expect(flightProgressIconForStep("offblock", "IN_FLIGHT")).toBe("plane-takeoff");
+    expect(flightProgressIconForStep("onblock", "LANDED")).toBe("plane-landing");
+    expect(flightProgressIconForStep("unavailable", "REFUELING")).toBe("fuel");
+    expect(flightProgressIconForStep("unavailable", "PAUSED")).toBe("coffee");
+    expect(flightProgressIconForStep("unavailable", "INACTIVE")).toBe("circle-x");
+  });
+
+  it("renders icon-only timeline stations and keeps missing time slots visibly empty", () => {
+    const markup = renderToStaticMarkup(
+      createElement(FlightProgress, {
+        aircraft,
+        rotation: undefined,
+        timeZone: "Europe/Berlin",
+        variant: "detailed",
+      }),
+    );
+
+    expect(markup).toContain('data-icon="circle-check"');
+    expect(markup).toContain('data-icon="tickets-plane"');
+    expect(markup).toContain('data-icon="plane-takeoff"');
+    expect(markup).toContain('data-icon="plane-landing"');
+    expect(markup).toContain('data-icon="circle-x"');
+    expect(markup.match(/<small><\/small>/g)).toHaveLength(5);
+    expect(markup).not.toContain("flight-director-progress-label");
+  });
+
+  it("keeps the regular current-rotation layout when no rotation exists yet", () => {
+    const markup = renderToStaticMarkup(
+      createElement(CompactCurrentRotation, {
+        aircraft: {
+          ...aircraft,
+          operationalStateChangedAt: "2026-07-21T08:00:00.000Z",
+        },
+        rotation: undefined,
+        timeZone: "Europe/Berlin",
+      }),
+    );
+
+    expect(markup).toContain('class="flight-director-current-rotation"');
+    expect(markup.match(/<dd><\/dd>/g)).toHaveLength(3);
+    expect(markup).toContain('aria-label="Umlaufzeitlinie"');
+    expect(markup).toContain("10:00");
+    expect(markup).toContain('aria-current="step"');
+    expect(markup).not.toContain("noch kein Umlauf belegt");
   });
 
   it("selects the active or latest completed rotation and keeps one history item per rotation", () => {
