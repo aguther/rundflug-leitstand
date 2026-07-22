@@ -22,7 +22,6 @@ import {
   operationalRotationForAircraft,
   PilotAssignmentDialogs,
   PilotChangeIcon,
-  PilotIcon,
   primaryAircraftActionLabel,
   primaryAircraftActionPresentation,
   rotationHistoryForAircraft,
@@ -36,9 +35,14 @@ function queuedSegmentTicketCount(group: QueueGroup): number {
   return group.nextSegmentTicketCount ?? group.ticketCount;
 }
 
-export type TicketRow = { group: Rotation["bookingGroups"][number]; rotation: Rotation };
+export type TicketRow = {
+  group: Rotation["bookingGroups"][number];
+  rotation: Rotation;
+  queue: { resourceGroupName: string; sequence: number } | null;
+};
 export type TicketSortKey =
   | "ticketGroup"
+  | "queue"
   | "people"
   | "status"
   | "aircraft"
@@ -55,6 +59,7 @@ export type TicketSort = {
 
 const ticketColumns: Array<{ key: TicketSortKey; label: string }> = [
   { key: "ticketGroup", label: "Ticketgruppe" },
+  { key: "queue", label: "Queue" },
   { key: "people", label: "Personen" },
   { key: "status", label: "Umlaufstatus" },
   { key: "aircraft", label: "Flugzeug" },
@@ -84,7 +89,9 @@ function ticketSortValue(row: TicketRow, key: TicketSortKey): string | number | 
   const { group, rotation } = row;
   switch (key) {
     case "ticketGroup":
-      return flightLineGroupLabel(rotation.productCode, group.communicationNumber);
+      return group.communicationNumber;
+    case "queue":
+      return row.queue ? `${row.queue.resourceGroupName}\u0000${row.queue.sequence}` : null;
     case "people":
       return group.ticketCount;
     case "status":
@@ -206,19 +213,45 @@ export function FlightLineSupervisorConsole({
     : [];
   const ticketRows = useMemo(() => {
     const query = ticketSearch.trim().toLocaleLowerCase("de-DE");
+    const queueByGroupId = new Map(board.queueGroups.map((group) => [group.id, group]));
+    const resourceGroupNameById = new Map(
+      board.resourceGroups.map((group) => [group.id, group.name]),
+    );
     const filteredRows = board.rotations
-      .flatMap((rotation) => rotation.bookingGroups.map((group) => ({ group, rotation })))
+      .flatMap((rotation) =>
+        rotation.bookingGroups.map((group) => {
+          const queueGroup = queueByGroupId.get(group.id);
+          return {
+            group,
+            rotation,
+            queue: queueGroup
+              ? {
+                  resourceGroupName:
+                    resourceGroupNameById.get(queueGroup.resourceGroupId) ?? queueGroup.productCode,
+                  sequence: queueGroup.queueSequence,
+                }
+              : null,
+          };
+        }),
+      )
       .filter(({ rotation }) => !onlyOpenTickets || rotation.status !== "COMPLETED")
-      .filter(({ group, rotation }) => {
+      .filter(({ group, queue, rotation }) => {
         if (!query) return true;
-        return `${flightLineGroupLabel(rotation.productCode, group.communicationNumber)} ${rotation.productName} ${rotation.aircraftRegistration ?? ""}`
+        return `${flightLineGroupLabel(rotation.productCode, group.communicationNumber)} ${rotation.productName} ${rotation.aircraftRegistration ?? ""} ${queue?.resourceGroupName ?? ""} ${queue?.sequence ?? ""}`
           .toLocaleLowerCase("de-DE")
           .includes(query);
       });
     return filteredRows
       .sort((left, right) => compareTicketRows(left, right, ticketSort))
       .slice(0, 30);
-  }, [board.rotations, onlyOpenTickets, ticketSearch, ticketSort]);
+  }, [
+    board.queueGroups,
+    board.resourceGroups,
+    board.rotations,
+    onlyOpenTickets,
+    ticketSearch,
+    ticketSort,
+  ]);
 
   function selectAircraft(aircraftId: string) {
     onSelectAircraft(aircraftId);
@@ -282,7 +315,10 @@ export function FlightLineSupervisorConsole({
             <span className="flight-director-pilot-action-head">
               <span className="sr-only">Pilot wechseln</span>
             </span>
-            <span>Buchungsgruppen</span>
+            <span className="flight-director-group-head">
+              <span>Buchungs-</span>
+              <span>gruppen</span>
+            </span>
             <span>Zeitverlauf</span>
             <span>Aktionen</span>
           </div>
@@ -309,7 +345,6 @@ export function FlightLineSupervisorConsole({
                   <small>{entry.resourceGroupName}</small>
                 </span>
                 <span className="flight-director-pilot-code">
-                  <PilotIcon aria-hidden="true" />
                   <strong>{entry.currentPilotOperationalCode ?? "–"}</strong>
                 </span>
                 <span className="flight-director-pilot-action">
@@ -535,9 +570,10 @@ function CompactTickets({
         })}
       </div>
       {rows.length > 0 ? (
-        rows.map(({ group, rotation }) => (
+        rows.map(({ group, queue, rotation }) => (
           <div key={`${rotation.id}-${group.id}`}>
             <strong>{flightLineGroupLabel(rotation.productCode, group.communicationNumber)}</strong>
+            <span>{queue ? `${queue.resourceGroupName} · ${queue.sequence}` : "–"}</span>
             <span>{group.ticketCount}</span>
             <span>{rotationStateLabels[rotation.status]}</span>
             <span>{rotation.aircraftRegistration ?? "Noch offen"}</span>

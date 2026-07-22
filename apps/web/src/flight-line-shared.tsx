@@ -16,7 +16,7 @@ import {
   UserRoundX,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Button, ConfirmationDialog, ModalDialog } from "./design-system/components";
+import { Button, ConfirmationDialog, IconButton, ModalDialog } from "./design-system/components";
 
 export type FlightLineAircraft = OperationBoard["aircraft"][number];
 export type FlightLineRotation = OperationBoard["rotations"][number];
@@ -155,6 +155,7 @@ export type FlightProgressStepKey =
 export interface FlightProgressStep {
   key: FlightProgressStepKey;
   label: string;
+  shortLabel?: string;
   time: string | null | undefined;
   reached: boolean;
   current: boolean;
@@ -204,6 +205,7 @@ export function flightProgressSteps(
     {
       key: "unavailable",
       label: "Nicht verfügbar",
+      shortLabel: "Nicht verf.",
       time: unavailable ? aircraft.operationalStateChangedAt : null,
       reached: reached.unavailable,
     },
@@ -247,7 +249,14 @@ export function FlightProgress({
           data-step={step.key}
           key={step.key}
         >
-          <span className="flight-director-progress-label">{step.label}</span>
+          <span className="flight-director-progress-label">
+            <span>{step.label}</span>
+            {step.shortLabel ? (
+              <span aria-hidden="true" className="flight-director-progress-label-short">
+                {step.shortLabel}
+              </span>
+            ) : null}
+          </span>
           <span className="flight-director-progress-node" aria-hidden="true">
             {step.reached && !step.current ? <Check /> : null}
           </span>
@@ -290,6 +299,7 @@ function AssignmentQueueRow({
   const segmentTicketCount = queuedSegmentTicketCount(group);
   const segmentPresentCount = queuedSegmentPresentCount(group);
   const exceedsCapacity = !selected && selectedSeats + segmentTicketCount > capacity;
+  const communicationLabel = flightLineGroupLabel(group.productCode, group.communicationNumber);
   return (
     <div
       className={`${selected ? "flight-director-queue-row selected" : "flight-director-queue-row"}${onDefer ? " has-defer" : ""}`}
@@ -301,8 +311,51 @@ function AssignmentQueueRow({
           onChange={(event) => onToggle(group.id, event.target.checked)}
           type="checkbox"
         />
-        <strong>{flightLineGroupLabel(group.productCode, group.communicationNumber)}</strong>
+        <strong>{communicationLabel}</strong>
       </label>
+      <div className="flight-director-queue-actions">
+        <IconButton
+          aria-pressed={group.status === "PRESENT"}
+          className="flight-director-attendance-action"
+          label={
+            group.status === "PRESENT"
+              ? `Anwesenheit für ${communicationLabel} aufheben`
+              : `${communicationLabel} anwesend`
+          }
+          onClick={() => onAttendance(group.id, group.status !== "PRESENT")}
+          size="touch"
+          type="button"
+        >
+          <CheckCircle2 aria-hidden="true" />
+        </IconButton>
+        <IconButton
+          className="flight-director-missing-action"
+          label={`${communicationLabel} nicht da`}
+          onClick={() => onMissing(group.id)}
+          size="touch"
+          type="button"
+        >
+          <UserRoundX aria-hidden="true" />
+        </IconButton>
+        <IconButton
+          label={`${communicationLabel} nachrufen`}
+          onClick={() => onRecall(group.id)}
+          size="touch"
+          type="button"
+        >
+          <Bell aria-hidden="true" />
+        </IconButton>
+        {onDefer ? (
+          <IconButton
+            label={`${communicationLabel} zurückstellen`}
+            onClick={() => onDefer(group.id)}
+            size="touch"
+            type="button"
+          >
+            <RotateCcw aria-hidden="true" />
+          </IconButton>
+        ) : null}
+      </div>
       <span>
         {group.segmentCount && group.segmentCount > 1 ? (
           <>
@@ -318,27 +371,6 @@ function AssignmentQueueRow({
       <span>
         {segmentPresentCount}/{segmentTicketCount} anwesend
       </span>
-      <div>
-        <Button
-          onClick={() => onAttendance(group.id, group.status !== "PRESENT")}
-          size="compact"
-          type="button"
-          variant={group.status === "PRESENT" ? "primary" : "secondary"}
-        >
-          <CheckCircle2 aria-hidden="true" /> Anwesend
-        </Button>
-        <Button onClick={() => onMissing(group.id)} size="compact" type="button">
-          <UserRoundX aria-hidden="true" /> Nicht da
-        </Button>
-        <Button onClick={() => onRecall(group.id)} size="compact" type="button">
-          <Bell aria-hidden="true" /> Nachrufen
-        </Button>
-        {onDefer ? (
-          <Button onClick={() => onDefer(group.id)} size="compact" type="button">
-            <RotateCcw aria-hidden="true" /> Zurückstellen
-          </Button>
-        ) : null}
-      </div>
     </div>
   );
 }

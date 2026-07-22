@@ -446,11 +446,12 @@ body {
   .app-header.app-header--compact .app-connection {
     min-width: 24px;
     display: inline-flex;
+    margin-left: auto;
     padding-inline: 4px;
   }
 
   .app-header.app-header--compact .account-menu {
-    margin-left: auto;
+    margin-left: 0;
   }
 }
 
@@ -596,9 +597,10 @@ textarea {
   position: absolute;
   z-index: 70;
   top: calc(100% + 8px);
-  left: 0;
+  right: 0;
+  left: auto;
   display: grid;
-  width: 360px;
+  width: min(360px, calc(100vw - 24px));
   max-width: min(90vw, 360px);
   padding: 8px;
   border: 1px solid var(--ui-border);
@@ -690,7 +692,9 @@ textarea {
   }
 
   .view-switcher-menu {
-    width: 100%;
+    right: 0;
+    left: auto;
+    width: min(360px, calc(100vw - 24px));
   }
 
   .app-connection {

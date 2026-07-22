@@ -72,10 +72,13 @@ describe("Flight Line Assist", () => {
     expect(assistSource).toContain("onGroupMissing");
     expect(assistSource).toContain("onGroupRecall");
     expect(assistSource).toContain("onGroupDefer");
-    expect(assistFlowSource).toContain("Anwesend");
-    expect(assistFlowSource).toContain("Nicht da");
-    expect(assistFlowSource).toContain("Nachrufen");
-    expect(assistFlowSource).toContain("Zurückstellen");
+    expect(sharedFlightLineSource).toMatch(/\$\{communicationLabel\} anwesend/);
+    expect(sharedFlightLineSource).toMatch(/\$\{communicationLabel\} nicht da/);
+    expect(sharedFlightLineSource).toMatch(/\$\{communicationLabel\} nachrufen/);
+    expect(sharedFlightLineSource).toMatch(/\$\{communicationLabel\} zurückstellen/);
+    expect(sharedFlightLineSource).toContain('className="flight-director-queue-actions"');
+    expect(sharedFlightLineSource).toContain("<IconButton");
+    expect(sharedFlightLineSource).not.toContain('<CheckCircle2 aria-hidden="true" /> Anwesend');
   });
 
   it("shows only anonymous operational identifiers and counts", () => {
