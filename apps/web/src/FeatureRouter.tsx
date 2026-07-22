@@ -43,7 +43,7 @@ export function FeatureRouter() {
   else if (path === "/setup") view = <SetupView />;
   else if (path === "/datenschutz") view = <PrivacyView />;
   else if (path === "/flight-line" || path === "/flight-line/assist") view = <FlightLineView />;
-  else if (path === "/fids" || path === "/fids/terminal") view = <FidsView />;
+  else if (path === "/fids") view = <FidsView />;
   else if (path === "/admin") view = <AdminView />;
   return <FeatureBoundary>{view}</FeatureBoundary>;
 }

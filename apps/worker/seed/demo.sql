@@ -40,6 +40,9 @@ INSERT OR IGNORE INTO operator_accounts
 VALUES
   ('550e8400-e29b-41d4-a716-446655440201', 'KASSE-01', 'CASHIER',
    'pbkdf2-sha256$100000$cnVuZGZsdWctZGVtby12MTY$U2I1_Hn6O7SffZkc-j1tL18gzQoLy7fsSSGAgRu51Ow',
+   1, 0, 1, '2026-07-11T08:00:00.000Z', '2026-07-11T08:00:00.000Z'),
+  ('550e8400-e29b-41d4-a716-446655440202', 'DISPLAY-01', 'DISPLAY',
+   'pbkdf2-sha256$100000$cnVuZGZsdWctZGVtby12MTY$U2I1_Hn6O7SffZkc-j1tL18gzQoLy7fsSSGAgRu51Ow',
    1, 0, 1, '2026-07-11T08:00:00.000Z', '2026-07-11T08:00:00.000Z');
 
 INSERT OR IGNORE INTO resource_groups (id, operation_day_id, name, short_code, status, gate_id, version, created_at, updated_at)

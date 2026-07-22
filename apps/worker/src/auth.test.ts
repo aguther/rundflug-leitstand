@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clearedSessionCookie, sessionCookie, sessionTimes } from "./auth";
+import { clearedSessionCookie, operatorRoles, sessionCookie, sessionTimes } from "./auth";
 
 describe("operator sessions", () => {
   it("uses an HttpOnly strict secure cookie on HTTPS", () => {
@@ -19,5 +19,14 @@ describe("operator sessions", () => {
     const times = sessionTimes("ADMIN", now);
     expect(times.absoluteExpiresAt).toBe("2026-07-18T02:00:00.000Z");
     expect(times.idleExpiresAt).toBe(times.absoluteExpiresAt);
+  });
+
+  it("keeps DISPLAY sessions for 90 days without an earlier idle expiry", () => {
+    expect(operatorRoles).toContain("DISPLAY");
+    const now = new Date("2026-07-17T10:00:00.000Z");
+    const times = sessionTimes("DISPLAY", now);
+    expect(times.absoluteExpiresAt).toBe("2026-10-15T10:00:00.000Z");
+    expect(times.idleExpiresAt).toBe(times.absoluteExpiresAt);
+    expect(times.maxAgeSeconds).toBe(90 * 24 * 60 * 60);
   });
 });

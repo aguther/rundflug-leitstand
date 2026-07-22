@@ -6,6 +6,7 @@ import {
   cloneEventRequestSchema,
   createOperatorAccountSchema,
   type FactoryResetResponse,
+  type FidsPreferences,
   factoryResetRequestSchema,
   forecastHistoryQuerySchema,
   forecastHistorySchema,
@@ -199,6 +200,28 @@ app.use("/api/*", async (context, next) => {
   await next();
   context.header("cache-control", "no-store");
 });
+
+for (const protectedPrefix of ["/api/control/*", "/api/events/*"] as const) {
+  app.use(protectedPrefix, async (context, next) => {
+    if (context.req.path.endsWith("/fids/preferences")) {
+      await next();
+      return;
+    }
+    const actor = await authorizeSession(context.env, context.req.raw);
+    if (actor?.role === "DISPLAY") {
+      return context.json(
+        {
+          error: {
+            code: "SESSION_NOT_AUTHORIZED",
+            message: "Display-Konten dürfen ausschließlich die FIDS-Anzeige verwenden.",
+          },
+        },
+        403,
+      );
+    }
+    await next();
+  });
+}
 
 app.get("/api/health", (context) =>
   context.json({
@@ -1517,6 +1540,78 @@ app.on("DELETE", eventRoutes("/assist-claims/:aircraftId"), async (context) => {
   headers.set("x-operator-role", actor.role);
   headers.set("x-operator-device-id", actor.deviceId);
   const response = await stub.fetch(new Request(target, { method: "DELETE", headers }));
+  return new Response(response.body, response);
+});
+
+app.on("GET", eventRoutes("/fids/preferences"), async (context) => {
+  const eventId = context.req.param("eventId");
+  const actor = await authorizeSession(context.env, context.req.raw);
+  if (actor?.role !== "DISPLAY") {
+    return context.json(
+      {
+        error: {
+          code: "SESSION_NOT_AUTHORIZED",
+          message: "Sitzung für diese Ansicht nicht berechtigt.",
+        },
+      },
+      403,
+    );
+  }
+  const event = await context.env.DB.prepare("SELECT id FROM operation_days WHERE id = ?1")
+    .bind(eventId)
+    .first<{ id: string }>();
+  if (!event) {
+    return context.json(
+      { error: { code: "EVENT_NOT_FOUND", message: "Veranstaltung nicht gefunden." } },
+      404,
+    );
+  }
+  const stored = await context.env.DB.prepare(
+    `SELECT visible_rows, layout, theme, version
+       FROM fids_preferences
+      WHERE operator_account_id = ?1 AND operation_day_id = ?2`,
+  )
+    .bind(actor.accountId, eventId)
+    .first<{
+      visible_rows: number;
+      layout: FidsPreferences["layout"];
+      theme: FidsPreferences["theme"];
+      version: number;
+    }>();
+  return context.json({
+    visibleRows: stored?.visible_rows ?? 8,
+    layout: stored?.layout ?? "SINGLE",
+    theme: stored?.theme ?? "SYSTEM",
+    version: stored?.version ?? 0,
+  } satisfies FidsPreferences);
+});
+
+app.on("PUT", eventRoutes("/fids/preferences"), async (context) => {
+  const eventId = context.req.param("eventId");
+  const actor = await authorizeSession(context.env, context.req.raw);
+  if (actor?.role !== "DISPLAY") {
+    return context.json(
+      {
+        error: {
+          code: "SESSION_NOT_AUTHORIZED",
+          message: "Sitzung für diese Ansicht nicht berechtigt.",
+        },
+      },
+      403,
+    );
+  }
+  const namespace = eventCoordinatorNamespace(context.env);
+  const stub = namespace.get(namespace.idFromName(eventId));
+  const target = new URL(context.req.url);
+  target.pathname = `/internal/events/${encodeURIComponent(eventId)}/fids/preferences`;
+  const headers = new Headers({ "content-type": "application/json" });
+  headers.set("x-operator-account-id", actor.accountId);
+  headers.set("x-operator-login-code", actor.loginCode);
+  headers.set("x-operator-session-id", actor.sessionId);
+  headers.set("x-operator-role", actor.role);
+  headers.set("x-operator-device-id", actor.deviceId);
+  const body = await context.req.text();
+  const response = await stub.fetch(new Request(target, { method: "PUT", headers, body }));
   return new Response(response.body, response);
 });
 
@@ -3657,14 +3752,22 @@ app.get("/api/public/events/:eventId/board", async (context) => {
         AND (r.status NOT IN ('IN_FLIGHT', 'LANDED', 'COMPLETED') OR r.departed_at > ?5)
       GROUP BY r.id, tg.id
       ORDER BY CASE
-                 WHEN r.status = 'CALLED'
-                   OR (r.status = 'DRAFT' AND fg.precalled_at IS NOT NULL) THEN 0
+                 WHEN rg.status = 'ACTIVE'
+                   AND (r.status = 'CALLED'
+                     OR (r.status = 'DRAFT' AND fg.precalled_at IS NOT NULL)) THEN 0
                  WHEN r.status = 'DRAFT' THEN 1
                  ELSE 2
                END,
+               CASE
+                 WHEN rg.status = 'ACTIVE'
+                   AND (r.status = 'CALLED'
+                     OR (r.status = 'DRAFT' AND fg.precalled_at IS NOT NULL))
+                   THEN COALESCE(fg.queue_position, fg.communication_number)
+               END,
+               CASE WHEN r.status = 'DRAFT'
+                 THEN COALESCE(fg.queue_position, fg.communication_number) END,
                CASE WHEN r.status IN ('IN_FLIGHT', 'LANDED', 'COMPLETED')
                  THEN r.departed_at END DESC,
-               COALESCE(fg.queue_position, fg.communication_number),
                COALESCE(tg.communication_number, fg.communication_number)
       LIMIT 20`,
   )

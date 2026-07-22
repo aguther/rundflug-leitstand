@@ -179,7 +179,7 @@ export function planTechnicalRotationAbortQueueBlock(
     .map((entry, index) => ({ id: entry.id, queueSequence: index + 1 }));
 }
 
-export type DeviceRole = "CASHIER" | "FLIGHT_LINE" | "FLIGHT_DIRECTOR" | "ADMIN";
+export type DeviceRole = "CASHIER" | "FLIGHT_LINE" | "FLIGHT_DIRECTOR" | "ADMIN" | "DISPLAY";
 
 export type OperationalCommandType =
   | "SET_ROTATION_NOTE"

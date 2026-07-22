@@ -10,17 +10,15 @@ function memoryStorage() {
 }
 
 describe("display binding", () => {
-  it("keeps event, gate, and profile together", () => {
+  it("keeps event and gate together", () => {
     const storage = memoryStorage();
     rememberDisplayBinding(storage, {
       eventId: "event-a",
       gateId: "gate-2",
-      mode: "terminal",
     });
     expect(resolveDisplayBinding("", storage, "event-a")).toEqual({
       eventId: "event-a",
       gateId: "gate-2",
-      mode: "terminal",
     });
   });
 
@@ -29,21 +27,18 @@ describe("display binding", () => {
     rememberDisplayBinding(storage, {
       eventId: "event-a",
       gateId: "gate-2",
-      mode: "terminal",
     });
     expect(resolveDisplayBinding("", storage, "event-b")).toEqual({
       eventId: "event-b",
       gateId: null,
-      mode: "standard",
     });
   });
 
-  it("accepts an explicit gate and mode from a configured display URL", () => {
+  it("accepts an explicit gate and ignores obsolete terminal styling", () => {
     const storage = memoryStorage();
     expect(resolveDisplayBinding("?gateId=gate-main&style=terminal", storage, "event-a")).toEqual({
       eventId: "event-a",
       gateId: "gate-main",
-      mode: "terminal",
     });
     expect(resolveDisplayBinding("", storage, "event-a").gateId).toBe("gate-main");
   });

@@ -23,7 +23,7 @@ export const appDestinations: AppDestination[] = [
   {
     href: "/fids",
     label: "FIDS",
-    roles: ["CASHIER", "FLIGHT_LINE", "FLIGHT_DIRECTOR", "ADMIN"],
+    roles: ["DISPLAY"],
   },
   { href: "/admin", label: "Administration", shortLabel: "Admin", roles: ["ADMIN"] },
 ];
@@ -38,6 +38,7 @@ export function homeForRole(role: OperatorRole): string {
     FLIGHT_LINE: "/flight-line/assist",
     FLIGHT_DIRECTOR: "/flight-line",
     ADMIN: "/admin",
+    DISPLAY: "/fids",
   };
   return roleHomes[role];
 }

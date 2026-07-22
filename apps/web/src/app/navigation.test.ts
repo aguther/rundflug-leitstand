@@ -30,6 +30,8 @@ describe("V1.2 app navigation", () => {
     expect(homeForRole("FLIGHT_LINE")).toBe("/flight-line/assist");
     expect(homeForRole("FLIGHT_DIRECTOR")).toBe("/flight-line");
     expect(homeForRole("ADMIN")).toBe("/admin");
+    expect(homeForRole("DISPLAY")).toBe("/fids");
+    expect(appDestinations.find((entry) => entry.href === "/fids")?.roles).toEqual(["DISPLAY"]);
   });
 
   it("keeps unauthorized destinations visible and locked in the common switcher", () => {

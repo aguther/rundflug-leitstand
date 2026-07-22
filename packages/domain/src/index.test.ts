@@ -54,7 +54,10 @@ describe("command authorization", () => {
   });
 
   it("rejects a display device for operational commands", () => {
-    expect(() => assertRoleMayExecute("CASHIER", "CALL_NEXT")).toThrowError(/darf CALL_NEXT nicht/);
+    expect(() => assertRoleMayExecute("DISPLAY", "CALL_NEXT")).toThrowError(/darf CALL_NEXT nicht/);
+    expect(() => assertRoleMayExecute("DISPLAY", "SELL_TICKET_GROUP")).toThrowError(
+      /darf SELL_TICKET_GROUP nicht/,
+    );
   });
 
   it("allows flight-line roles to abort a called rotation but not cashiers", () => {

@@ -4,23 +4,26 @@ import displaySource from "../../fids-display.tsx?raw";
 
 const stylesSource = readFileSync(new URL("./fids-v12.css", import.meta.url), "utf8");
 
-describe("V1.2 FIDS concepts", () => {
-  it("uses the common visual mark and keeps the two styles independently addressable", () => {
-    expect(displaySource.match(/<BrandMark \/>/g)).toHaveLength(2);
-    expect(displaySource).toContain('href="/fids/terminal?kiosk=1"');
-    expect(displaySource).toContain('href="/fids?kiosk=1&style=standard"');
+describe("V1.7.3 FIDS concept fidelity", () => {
+  it("matches the approved header, table and restrained settings control hierarchy", () => {
+    expect(displaySource.match(/<BrandMark \/>/g)).toHaveLength(1);
+    expect(displaySource).toContain('className="fids-title"');
+    expect(displaySource).toContain('className="fids-footer-copy"');
+    expect(displaySource).toContain('aria-label="FIDS-Einstellungen öffnen"');
+    expect(stylesSource).toContain("opacity: 0.62");
   });
 
-  it("keeps terminal copy English and gives it a condensed split-flap treatment", () => {
-    expect(displaySource).toContain("DEPARTURES");
-    expect(displaySource).toContain("NEW WINDOW TO FOLLOW");
-    expect(stylesSource).toContain('"Bahnschrift Condensed"');
-    expect(stylesSource).toContain(".terminal-row::after");
+  it("supports system, light and dark without a second display profile", () => {
+    expect(stylesSource).toContain('data-fids-theme="light"');
+    expect(stylesSource).toContain('data-fids-theme="system"');
+    expect(stylesSource).toContain("prefers-color-scheme: light");
+    expect(stylesSource).not.toContain(".terminal-fids");
   });
 
-  it("supports the shared light and dark theme in the standard display", () => {
-    expect(displaySource.match(/<ThemeToggle \/>/g)).toHaveLength(2);
-    expect(stylesSource).toContain("var(--ui-bg)");
-    expect(stylesSource).toContain("var(--ui-surface)");
+  it("combines group and flight on compact displays without horizontal overflow", () => {
+    expect(displaySource).toContain("<small>{group.productName}</small>");
+    expect(stylesSource).toContain("@media (max-width: 900px)");
+    expect(stylesSource).toContain("overflow-wrap: anywhere");
+    expect(stylesSource).not.toContain("overflow-x: auto");
   });
 });

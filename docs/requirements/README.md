@@ -16,9 +16,12 @@
   die getrennte Assist-Auswahl und -Arbeitsansicht.
 - `requirements-v1.7.1.md` und `.yaml` ergänzen die loginbasierte Flugzeugübernahme, den technischen
   Umlaufabbruch und die stabile kompakte Flight-Line-Bedienung.
-- `requirements-v1.7.2.md` und `.yaml` sind die aktuelle Releasefassung. Sie dokumentieren die
+- `requirements-v1.7.2.md` und `.yaml` dokumentieren die
   kompatiblen Fokus-, Kassen-, Tabellen-, Zeitlinien-, Abschluss- und Assist-Korrekturen und
   übernehmen im Übrigen V1.7.1 unverändert.
+- `requirements-v1.7.3.md` und `.yaml` sind die aktuelle Releasefassung. Sie dokumentieren das
+  geschützte Standard-FIDS, Display-Konten, langlebige Sitzungen, kontobezogene Einstellungen und
+  die globale Handlungspriorität.
 - `traceability.csv` verbindet Anforderungen später mit Issues, Modulen und Tests.
 - `open-questions.md` enthält noch zu entscheidende Fachfragen.
 

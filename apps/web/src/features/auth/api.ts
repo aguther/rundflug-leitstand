@@ -75,6 +75,7 @@ export const roleLabels: Record<OperatorRole, string> = {
   CASHIER: "Kasse",
   FLIGHT_LINE: "Flight Line Assist",
   FLIGHT_DIRECTOR: "Flugleitung",
+  DISPLAY: "FIDS-Anzeige",
 };
 
 export const loginRoleOrder: readonly OperatorRole[] = [
@@ -82,4 +83,5 @@ export const loginRoleOrder: readonly OperatorRole[] = [
   "FLIGHT_DIRECTOR",
   "FLIGHT_LINE",
   "CASHIER",
+  "DISPLAY",
 ];

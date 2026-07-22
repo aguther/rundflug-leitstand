@@ -1,5 +1,21 @@
 # Backup und Wiederherstellung
 
+## Migrationsnotiz 0041 – Display-Konten und FIDS-Einstellungen
+
+Migration `0041_fids_display_accounts_and_preferences.sql` baut `operator_accounts` bei
+deaktivierter Fremdschlüsselprüfung in eine strukturgleiche Tabelle mit zusätzlicher Rolle
+`DISPLAY` um, kopiert alle bestehenden Konten, stellt Tabellenname und Index wieder her und legt
+anschließend `fids_preferences` an. Ein automatisierter SQLite-Test prüft Bestandserhalt,
+Sitzungsreferenzen, Rollen- und Werte-Checks sowie `PRAGMA foreign_key_check`.
+
+Unmittelbar vor dem Remote-Lauf werden D1-Time-Travel-Zeitpunkt und Sicherungsstatus dokumentiert.
+Bei einem fehlgeschlagenen Rollout wird zuerst die vorherige Worker-Version wiederhergestellt und
+D1 per Time Travel auf den Zeitpunkt vor 0041 zurückgesetzt. Ein manueller Drop der umgebauten
+Kontentabelle in der laufenden Datenbank ist unzulässig. Portable R2-Backups enthalten wie bisher
+weder `operator_accounts` noch `operator_sessions` und schließen deshalb auch
+`fids_preferences` bewusst aus; diese drei Tabellen werden gemeinsam über D1 Time Travel
+wiederhergestellt.
+
 ## Migrationsnotiz 0031 – Gate-Anzeigefilter
 
 Migration `0031_gate_display_filters.sql` ergänzt ausschließlich die nicht-nullbare Spalte

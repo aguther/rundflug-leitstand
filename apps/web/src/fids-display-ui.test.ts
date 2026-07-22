@@ -1,35 +1,101 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import appSource from "./App.tsx?raw";
 import routerSource from "./FeatureRouter.tsx?raw";
+import eventScopedSource from "./features/auth/EventScopedApplication.tsx?raw";
+import settingsSource from "./features/fids/FidsSettingsDialog.tsx?raw";
 import displaySource from "./fids-display.tsx?raw";
 import fidsViewSource from "./fids-view.tsx?raw";
 
-const appSource = `${routerSource}\n${fidsViewSource}`;
+const stylesSource = readFileSync(new URL("./features/fids/fids-v12.css", import.meta.url), "utf8");
 
-describe("Standard- und Terminal-FIDS (F-MON-010/060, F-BEN-090)", () => {
-  it("offers two directly addressable profiles backed by the same public board", () => {
-    expect(appSource).toContain('path === "/fids/terminal"');
-    expect(appSource).toContain("<FidsDisplay board={board}");
-    expect(displaySource).toContain("board?.selectedGate");
-    expect(displaySource).toContain('data-display-mode="standard"');
-    expect(displaySource).toContain('data-display-mode="terminal"');
+describe("FIDS V1.7.3 UI", () => {
+  it("protects the FIDS application and normalizes obsolete terminal links", () => {
+    expect(
+      appSource.slice(
+        appSource.indexOf("function isPublicRoute"),
+        appSource.indexOf("function AuthenticatedApplication"),
+      ),
+    ).not.toContain("/fids");
+    expect(routerSource).toContain('path === "/fids"');
+    expect(routerSource).not.toContain('path === "/fids/terminal"');
+    expect(eventScopedSource).toContain('window.location.pathname === "/fids/terminal"');
+    expect(eventScopedSource).toContain('normalized.pathname = "/fids"');
+    expect(eventScopedSource).toContain('normalized.searchParams.delete("style")');
   });
 
-  it("uses only the approved English descriptive status terms in terminal mode", () => {
-    for (const term of ["DEPARTURES", "WAITING", "GO TO GATE", "BOARDING", "DELAYED", "DEPARTED"]) {
-      expect(displaySource).toContain(term);
+  it("uses the event name, full-size mark and only the standard German board", () => {
+    expect(displaySource).toContain("board?.eventName");
+    expect(displaySource).toContain("<BrandMark />");
+    expect(displaySource).toContain("GO TO GATE");
+    expect(displaySource).toContain("Bitte QR-Ticket bereithalten");
+    expect(displaySource).not.toMatch(/terminalStatus|DEPARTURES|ThemeToggle/);
+    expect(stylesSource).toContain(".standard-mark > .brand-mark");
+    expect(stylesSource).toMatch(
+      /\.standard-mark > \.brand-mark \{[\s\S]*?width: 100%;[\s\S]*?height: 100%;/,
+    );
+  });
+
+  it("applies the exact row limit and row-major double-column distribution", () => {
+    expect(displaySource).toContain(".slice(0, visibleRows)");
+    expect(displaySource).toContain("index % 2 === 0");
+    expect(displaySource).toContain("index % 2 === 1");
+    expect(stylesSource).toContain("@media (min-width: 1280px)");
+    expect(stylesSource).toContain('data-fids-layout="double"');
+    expect(stylesSource).toContain("repeat(var(--fids-single-rows)");
+    expect(stylesSource).toContain("repeat(var(--fids-double-rows)");
+  });
+
+  it("keeps the settings dialog open until a confirmed save and exposes only approved choices", () => {
+    const saveHandler = settingsSource.slice(
+      settingsSource.indexOf("const save = async"),
+      settingsSource.indexOf("return ("),
+    );
+    expect(saveHandler.indexOf("await onSave(draft)")).toBeLessThan(
+      saveHandler.indexOf("onClose();"),
+    );
+    for (const copy of [
+      "Angezeigte Zeilen",
+      "Eine Spalte",
+      "Zwei Spalten",
+      "System",
+      "Hell",
+      "Dunkel",
+      "Abmelden",
+      "Abbrechen",
+      "Speichern",
+    ]) {
+      expect(settingsSource).toContain(copy);
     }
-    expect(displaySource).toContain("PLEASE KEEP YOUR QR TICKET READY");
-    expect(displaySource).toContain("TIME WINDOWS ARE ESTIMATES");
+    expect(fidsViewSource).toContain("expectedVersion: preferences.version");
+    expect(settingsSource).toContain("editablePreferences(preferences)");
+    expect(settingsSource).toContain("visibleRows: preferences.visibleRows");
+    expect(settingsSource).not.toContain("useState<EditableFidsPreferences>(preferences)");
+    expect(settingsSource).toContain("if (open) setError(null)");
   });
 
-  it("hides departed rows after the persisted 5-to-900-second grace period", () => {
-    expect(displaySource).toContain("board?.departedVisibilitySeconds");
-    expect(displaySource).toContain("Math.min(900, Math.max(5, requestedVisibilitySeconds))");
-    expect(displaySource).toContain('get("departedSeconds")');
-    expect(displaySource).toContain("group.departedAt");
+  it("binds the shell to 100dvh without document or table scrolling", () => {
+    expect(stylesSource).toContain("height: 100dvh");
+    expect(stylesSource).toContain("overflow: hidden");
+    expect(stylesSource).toContain("width: 44px");
+    expect(stylesSource).toContain("height: 44px");
   });
 
-  it("shows no personal or ticket-secret data", () => {
-    expect(displaySource).not.toMatch(/guestName|phoneNumber|publicCode|ticketLabels/i);
+  it("renders no personal, private-ticket or session data", () => {
+    expect(displaySource).not.toMatch(
+      /guestName|phoneNumber|publicCode|ticketLabels|sessionId|operatorAccountId/i,
+    );
+  });
+
+  it("keeps the last confirmed board during reconnect and polling failures", () => {
+    const refreshFlow = fidsViewSource.slice(
+      fidsViewSource.indexOf("const refresh = () =>"),
+      fidsViewSource.indexOf("const connect = () =>"),
+    );
+    expect(refreshFlow).toContain("setBoard(nextBoard)");
+    expect(refreshFlow).toContain("setError(");
+    expect(refreshFlow).not.toContain("setBoard(null)");
+    expect(fidsViewSource).toContain("new WebSocket(");
+    expect(fidsViewSource).toContain("window.setInterval(refresh, 15_000)");
   });
 });

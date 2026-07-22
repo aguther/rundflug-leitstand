@@ -10,6 +10,9 @@ describe("disposable event lifecycle", () => {
     expect(deletion.indexOf("DELETE FROM tickets WHERE")).toBeLessThan(
       deletion.indexOf("DELETE FROM ticket_groups WHERE"),
     );
+    expect(deletion.indexOf("DELETE FROM fids_preferences")).toBeLessThan(
+      deletion.indexOf("DELETE FROM operation_days WHERE"),
+    );
     expect(deletion.trim()).toContain('"DELETE FROM operation_days WHERE id = ?1"');
   });
 

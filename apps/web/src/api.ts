@@ -14,9 +14,11 @@ import {
   eventSnapshotSchema,
   type FactoryResetRequest,
   type FactoryResetResponse,
+  type FidsPreferences,
   type ForecastHistory,
   type ForecastHistoryQuery,
   factoryResetResponseSchema,
+  fidsPreferencesSchema,
   forecastHistorySchema,
   type OperationalHistory,
   type OperationalHistoryQuery,
@@ -32,6 +34,7 @@ import {
   type TicketSearchResponse,
   ticketGroupPrintDataSchema,
   ticketSearchResponseSchema,
+  type UpdateFidsPreferences,
 } from "@rundflug/contracts";
 
 const SERVER_UNREACHABLE_MESSAGE =
@@ -540,6 +543,37 @@ export async function getPublicBoard(
   );
   if (!response.ok) throw new Error("Öffentliche Anzeige nicht verfügbar.");
   return publicBoardSchema.parse(await response.json());
+}
+
+export async function getFidsPreferences(eventId: string): Promise<FidsPreferences> {
+  const response = await apiFetch(controlApiPath(eventId, "/fids/preferences"), {
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as {
+      error?: { message?: string };
+    } | null;
+    throw new Error(body?.error?.message ?? "FIDS-Einstellungen nicht verfügbar.");
+  }
+  return fidsPreferencesSchema.parse(await response.json());
+}
+
+export async function updateFidsPreferences(
+  eventId: string,
+  input: UpdateFidsPreferences,
+): Promise<FidsPreferences> {
+  const response = await apiFetch(controlApiPath(eventId, "/fids/preferences"), {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as {
+      error?: { message?: string };
+    } | null;
+    throw new Error(body?.error?.message ?? "FIDS-Einstellungen konnten nicht gespeichert werden.");
+  }
+  return fidsPreferencesSchema.parse(await response.json());
 }
 
 export async function getOperationBoard(

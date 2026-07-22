@@ -2,6 +2,7 @@ import type { Env } from "./types";
 
 export function eventDeletionStatements(env: Env, eventId: string): D1PreparedStatement[] {
   return [
+    env.DB.prepare("DELETE FROM fids_preferences WHERE operation_day_id = ?1").bind(eventId),
     env.DB.prepare("DELETE FROM flight_line_assist_claims WHERE operation_day_id = ?1").bind(
       eventId,
     ),

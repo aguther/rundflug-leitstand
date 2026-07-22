@@ -6,10 +6,12 @@ import {
   cloneEventRequestSchema,
   commandEnvelopeSchema,
   factoryResetRequestSchema,
+  fidsPreferencesSchema,
   forecastHistoryQuerySchema,
   forecastHistorySchema,
   operationalHistoryQuerySchema,
   operationalHistorySchema,
+  operatorRoleSchema,
   publicBoardSchema,
   publicTicketStatusSchema,
   rotationOperationalSummarySchema,
@@ -17,6 +19,7 @@ import {
   ticketGroupPrintDataSchema,
   ticketSearchRequestSchema,
   ticketSearchResponseSchema,
+  updateFidsPreferencesSchema,
   updateOperatorAccountSchema,
 } from "./index";
 
@@ -71,6 +74,26 @@ describe("commandEnvelopeSchema", () => {
       revokeSessions: true,
     });
     expect(() => updateOperatorAccountSchema.parse({})).toThrow();
+  });
+  it("validates versioned FIDS preferences and the DISPLAY role", () => {
+    expect(operatorRoleSchema.parse("DISPLAY")).toBe("DISPLAY");
+    expect(
+      fidsPreferencesSchema.parse({
+        visibleRows: 8,
+        layout: "DOUBLE",
+        theme: "SYSTEM",
+        version: 3,
+      }),
+    ).toEqual({ visibleRows: 8, layout: "DOUBLE", theme: "SYSTEM", version: 3 });
+    expect(() =>
+      updateFidsPreferencesSchema.parse({
+        commandId: "550e8400-e29b-41d4-a716-446655440500",
+        expectedVersion: 0,
+        visibleRows: 21,
+        layout: "SINGLE",
+        theme: "DARK",
+      }),
+    ).toThrow();
   });
   it("accepts only a PIN and hashed client credential for admin recovery", () => {
     const parsed = adminDeviceRecoverySchema.parse({

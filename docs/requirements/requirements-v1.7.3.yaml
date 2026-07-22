@@ -1,0 +1,35 @@
+version: 1.7.3
+requirements:
+  - id: V173-REL-010
+    requirement: Repository und Laufzeit verwenden konsistent Release 1.7.3.
+    status: implemented
+  - id: V173-FID-010
+    requirement: Standard-FIDS mit Veranstaltungsname, großem Logo oder Plane-Fallback und kompatibler Normalisierung aller Terminallinks.
+    status: implemented
+  - id: V173-PRI-010
+    requirement: Aktive GO-TO-GATE- und BOARDING-Gruppen bilden unabhängig von Ressource und Produkt einen stabil queue-sortierten obersten Block; pausierte Gruppen sind verzögert.
+    status: implemented
+  - id: V173-LAY-010
+    requirement: Überlauffreie 100dvh-Anzeige mit exakt 4 bis 20 skalierten Zeilen, kompakter schmaler Ansicht und zeilenweise verteilter Zweispaltenansicht ab 1280 Pixel.
+    status: implemented
+  - id: V173-SET-010
+    requirement: Zugänglicher dezenter Einstellungsbutton und bestätigungsgebundener Dialog für Zeilen, Layout, Theme und Abmeldung.
+    status: implemented
+  - id: V173-AUT-010
+    requirement: DISPLAY-Konten sind administrierbar und dürfen ausschließlich die geschützte FIDS-Anwendung sowie deren Einstellungen verwenden.
+    status: implemented
+  - id: V173-SES-010
+    requirement: DISPLAY-Sitzungen laufen absolut 90 Tage ohne früheren Idle-Ablauf; andere Rollen bleiben bei 16 Stunden und alle Widerrufswege wirken sofort.
+    status: implemented
+  - id: V173-API-010
+    requirement: Versionierter FidsPreferences-Vertrag und kontobezogene GET-/PUT-Endpunkte; Public Board und Logo bleiben anonym.
+    status: implemented
+  - id: V173-DAT-010
+    requirement: Präferenzupdates sind je Konto und Veranstaltung serialisiert, versioniert, idempotent, auditiert und atomar mit nicht sensitiver Outbox gespeichert.
+    status: implemented
+  - id: V173-OPS-010
+    requirement: Migration 0041, D1-Time-Travel-Wiederherstellung, Löschreihenfolge und bewusster Ausschluss aus portablen Backups sind dokumentiert.
+    status: implemented
+  - id: V173-QA-010
+    requirement: Automatisierte und visuelle Abnahme deckt Rollen, Persistenz, Priorität, Themes, Viewports, Zeilenzahlen, Überlauf, Realtime und Offline-Stand ab.
+    status: implemented
