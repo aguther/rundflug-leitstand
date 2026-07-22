@@ -33,7 +33,13 @@ export function destinationsForRole(role: OperatorRole): AppDestination[] {
 }
 
 export function homeForRole(role: OperatorRole): string {
-  return destinationsForRole(role)[0]?.href ?? "/";
+  const roleHomes: Record<OperatorRole, string> = {
+    CASHIER: "/kasse",
+    FLIGHT_LINE: "/flight-line/assist",
+    FLIGHT_DIRECTOR: "/flight-line",
+    ADMIN: "/admin",
+  };
+  return roleHomes[role];
 }
 
 export function isDestinationActive(pathname: string, href: string): boolean {

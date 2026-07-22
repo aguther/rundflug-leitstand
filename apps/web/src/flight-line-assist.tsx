@@ -1,20 +1,14 @@
 import type { OperationBoard } from "@rundflug/contracts";
 import {
-  Ban,
-  BellRing,
   ChevronDown,
   CircleCheckBig,
   CircleOff,
   Coffee,
   Fuel,
   MapPin,
-  MoreHorizontal,
   Plane,
   RefreshCw,
-  RotateCcw,
   UnlockKeyhole,
-  UserCheck,
-  Users,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { FlightLineAssistClaimConflictError } from "./api";
@@ -31,6 +25,7 @@ import {
 import {
   activeRotationForAircraft,
   aircraftStatusLabel,
+  BookingGroupAssignmentDialog,
   CompactCurrentRotation,
   CompactHistory,
   type FlightLineFleetState,
@@ -50,19 +45,6 @@ import {
 
 type Aircraft = OperationBoard["aircraft"][number];
 type Rotation = OperationBoard["rotations"][number];
-type QueueGroup = OperationBoard["queueGroups"][number];
-
-function queuedSegmentTicketCount(group: QueueGroup): number {
-  return group.nextSegmentTicketCount ?? group.ticketCount;
-}
-
-function queuedSegmentPresentCount(group: QueueGroup): number {
-  return group.nextSegmentPresentCount ?? group.presentCount;
-}
-
-function groupLabel(group: QueueGroup) {
-  return `${group.productCode}-${String(group.communicationNumber).padStart(3, "0")}`;
-}
 
 function AircraftPickerMeta({
   aircraft,
@@ -145,9 +127,9 @@ export function FlightLineAssist({
   const [visibleAircraftCount, setVisibleAircraftCount] = useState(5);
   const [claimError, setClaimError] = useState<string | null>(null);
   useActionMessageBridge(claimError, setClaimError);
-  const [openGroupMenuId, setOpenGroupMenuId] = useState<string | null>(null);
   const [detailTab, setDetailTab] = useState<"current" | "history">("current");
   const [pilotOpen, setPilotOpen] = useState(false);
+  const [assignmentOpen, setAssignmentOpen] = useState(false);
   const [takeoverClaim, setTakeoverClaim] = useState<OperationBoard["assistClaims"][number] | null>(
     null,
   );
@@ -177,9 +159,6 @@ export function FlightLineAssist({
           ["QUEUED", "PRESENT", "MISSING"].includes(group.status),
       )
     : [];
-  const selectedSeatCount = waitingGroups
-    .filter((group) => selectedQueueGroupIds.includes(group.id))
-    .reduce((sum, group) => sum + queuedSegmentTicketCount(group), 0);
   const assignmentReady =
     activeAircraft?.operationalState === "AVAILABLE" && activeRotation?.status === "DRAFT";
   const requiresAvailableReset = Boolean(
@@ -193,7 +172,6 @@ export function FlightLineAssist({
     (!requiresAvailableReset &&
       !assignedRotation &&
       (activeRotation?.status !== "DRAFT" ||
-        selectedQueueGroupIds.length === 0 ||
         !activeAircraft.currentPilotId ||
         board.event.emergencyMode ||
         board.event.status !== "ACTIVE" ||
@@ -222,7 +200,7 @@ export function FlightLineAssist({
     const externalClaim = assistClaims.find((claim) => claim.aircraftId === claimedAircraftId);
     setClaimedAircraftId(null);
     setServerClaimSeen(false);
-    setOpenGroupMenuId(null);
+    setAssignmentOpen(false);
     setClaimError(
       externalClaim
         ? `${externalClaim.ownerLoginCode} hat die Betreuung dieses Flugzeugs übernommen.`
@@ -312,8 +290,8 @@ export function FlightLineAssist({
       await onRelease(claimedAircraftId);
       setClaimedAircraftId(null);
       setServerClaimSeen(false);
-      setOpenGroupMenuId(null);
       setPilotOpen(false);
+      setAssignmentOpen(false);
       setClaimError(null);
     } catch (cause) {
       setClaimError(
@@ -330,122 +308,11 @@ export function FlightLineAssist({
       onSetAircraftState(activeAircraft.id, "AVAILABLE");
       return;
     }
+    if (activeRotation?.status === "DRAFT") {
+      setAssignmentOpen(true);
+      return;
+    }
     if (activeRotation) onRunRotation(activeRotation);
-  }
-
-  function runGroupAction(groupId: string, callback: (ticketGroupId: string) => void) {
-    callback(groupId);
-    setOpenGroupMenuId(null);
-  }
-
-  function renderGroup(group: QueueGroup) {
-    const selected = selectedQueueGroupIds.includes(group.id);
-    const segmentTicketCount = queuedSegmentTicketCount(group);
-    const segmentPresentCount = queuedSegmentPresentCount(group);
-    const capacityExceeded =
-      !selected && selectedSeatCount + segmentTicketCount > (activeAircraft?.passengerSeats ?? 0);
-    return (
-      <div className={`assist-v15-group-row ${selected ? "is-selected" : ""}`} key={group.id}>
-        <label className="assist-v15-group-select">
-          <input
-            checked={selected}
-            disabled={!assignmentReady || group.status === "MISSING" || capacityExceeded}
-            onChange={(event) => onToggleGroup(group.id, event.target.checked)}
-            type="checkbox"
-          />
-          <Users aria-hidden="true" />
-          <strong>{groupLabel(group)}</strong>
-          <StatusPill tone={group.status === "MISSING" ? "danger" : selected ? "info" : "neutral"}>
-            {group.segmentCount && group.segmentCount > 1
-              ? `${segmentTicketCount} von ${group.ticketCount} · Teil ${group.segmentIndex ?? 1}/${group.segmentCount}`
-              : `${segmentTicketCount} ${segmentTicketCount === 1 ? "Person" : "Personen"}`}
-          </StatusPill>
-        </label>
-        <span className="assist-v15-presence">
-          {group.status === "PRESENT"
-            ? "Anwesend"
-            : group.status === "MISSING"
-              ? "Nicht da"
-              : `${segmentPresentCount}/${segmentTicketCount} vor Ort`}
-        </span>
-        <div className="assist-v15-group-actions">
-          <Button
-            aria-label={group.status === "PRESENT" ? "Anwesenheit aufheben" : "Anwesend"}
-            onClick={() => onGroupAttendance(group.id, group.status !== "PRESENT")}
-            size="compact"
-            title={group.status === "PRESENT" ? "Anwesenheit aufheben" : undefined}
-            variant="ghost"
-          >
-            {group.status === "PRESENT" ? (
-              <RotateCcw aria-hidden="true" />
-            ) : (
-              <UserCheck aria-hidden="true" />
-            )}
-            {group.status === "PRESENT" ? "Aufheben" : "Anwesend"}
-          </Button>
-          <Button onClick={() => onGroupMissing(group.id)} size="compact" variant="danger">
-            <Ban aria-hidden="true" /> Nicht da
-          </Button>
-          <Button onClick={() => onGroupRecall(group.id)} size="compact" variant="ghost">
-            <BellRing aria-hidden="true" /> Nachrufen
-          </Button>
-          <Button onClick={() => onGroupDefer(group.id)} size="compact" variant="ghost">
-            <RotateCcw aria-hidden="true" /> Zurückstellen
-          </Button>
-        </div>
-        <div className="assist-v15-group-menu">
-          <IconButton
-            aria-expanded={openGroupMenuId === group.id}
-            label={`Aktionen für ${groupLabel(group)}`}
-            onClick={() =>
-              setOpenGroupMenuId((current) => (current === group.id ? null : group.id))
-            }
-            size="touch"
-          >
-            <MoreHorizontal aria-hidden="true" />
-          </IconButton>
-        </div>
-        {openGroupMenuId === group.id ? (
-          <div className="assist-v15-group-popover">
-            <Button
-              onClick={() =>
-                runGroupAction(group.id, (id) => onGroupAttendance(id, group.status !== "PRESENT"))
-              }
-              size="touch"
-              variant="ghost"
-            >
-              {group.status === "PRESENT" ? (
-                <RotateCcw aria-hidden="true" />
-              ) : (
-                <UserCheck aria-hidden="true" />
-              )}
-              {group.status === "PRESENT" ? "Anwesenheit aufheben" : "Anwesend"}
-            </Button>
-            <Button
-              onClick={() => runGroupAction(group.id, onGroupMissing)}
-              size="touch"
-              variant="ghost"
-            >
-              <Ban aria-hidden="true" /> Nicht da
-            </Button>
-            <Button
-              onClick={() => runGroupAction(group.id, onGroupRecall)}
-              size="touch"
-              variant="ghost"
-            >
-              <BellRing aria-hidden="true" /> Nachrufen
-            </Button>
-            <Button
-              onClick={() => runGroupAction(group.id, onGroupDefer)}
-              size="touch"
-              variant="ghost"
-            >
-              <RotateCcw aria-hidden="true" /> Zurückstellen
-            </Button>
-          </div>
-        ) : null}
-      </div>
-    );
   }
 
   if (!activeAircraft) {
@@ -684,50 +551,25 @@ export function FlightLineAssist({
             ) : null}
           </div>
         </Panel>
-
-        <Panel className="assist-v15-groups" padding="compact">
-          <PageHeader
-            actions={
-              <span className="assist-v15-capacity">
-                <Users aria-hidden="true" /> {selectedSeatCount} von {activeAircraft.passengerSeats}{" "}
-                Plätzen
-              </span>
-            }
-            description="Wähle vollständige Gruppen aus und kombiniere bis zur verfügbaren Platzzahl."
-            level={2}
-            title={
-              <>
-                <span className="assist-v15-title-wide">
-                  Buchungsgruppen auswählen & kombinieren
-                </span>
-                <span className="assist-v15-title-phone">Gruppen auswählen</span>
-              </>
-            }
-          />
-          <div className="assist-v15-group-section">
-            <h3>Ausgewählt ({selectedQueueGroupIds.length} Gruppen)</h3>
-            <div className="assist-v15-group-list">
-              {waitingGroups
-                .filter((group) => selectedQueueGroupIds.includes(group.id))
-                .map(renderGroup)}
-              {selectedQueueGroupIds.length === 0 ? (
-                <p className="assist-v15-no-groups">Noch keine Gruppe ausgewählt.</p>
-              ) : null}
-            </div>
-          </div>
-          <div className="assist-v15-group-section">
-            <h3>Verfügbare Alternativen</h3>
-            <div className="assist-v15-group-list">
-              {waitingGroups
-                .filter((group) => !selectedQueueGroupIds.includes(group.id))
-                .map(renderGroup)}
-              {waitingGroups.length === selectedQueueGroupIds.length ? (
-                <p className="assist-v15-no-groups">Keine weitere passende Gruppe.</p>
-              ) : null}
-            </div>
-          </div>
-        </Panel>
       </div>
+
+      <BookingGroupAssignmentDialog
+        aircraft={activeAircraft}
+        confirmDisabled={!assignmentReady || primaryDisabled}
+        groups={waitingGroups}
+        onAttendance={onGroupAttendance}
+        onClose={() => setAssignmentOpen(false)}
+        onConfirm={() => {
+          if (activeRotation) onRunRotation(activeRotation);
+          setAssignmentOpen(false);
+        }}
+        onDefer={onGroupDefer}
+        onMissing={onGroupMissing}
+        onRecall={onGroupRecall}
+        onToggle={onToggleGroup}
+        open={assignmentOpen}
+        selectedQueueGroupIds={selectedQueueGroupIds}
+      />
 
       {canAssignPilot ? (
         <PilotAssignmentDialogs

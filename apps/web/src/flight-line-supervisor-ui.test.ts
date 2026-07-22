@@ -14,9 +14,9 @@ describe("Flight Line Supervisor", () => {
     expect(supervisorSource).toContain('className="flight-director-aircraft-row"');
     expect(supervisorSource).not.toContain("flight-director-aircraft-row selected");
     expect(supervisorSource).toContain("<ModalDialog");
-    expect(supervisorSource).toContain("Buchungsgruppen zuweisen");
-    expect(supervisorSource).toContain("Gruppen bleiben vollständig zusammen");
-    expect(supervisorSource).toContain("Pilot zuweisen");
+    expect(flightLineSource).toContain("Buchungsgruppen zuweisen");
+    expect(flightLineSource).toContain("Gruppen bleiben vollständig zusammen");
+    expect(flightLineSource).toContain("Pilot zuweisen");
     expect(supervisorSource).not.toContain("flight-line-console-header");
     expect(supervisorSource).not.toContain("aircraft-selector-rail");
     expect(supervisorSource).not.toContain("expanded");
@@ -30,7 +30,7 @@ describe("Flight Line Supervisor", () => {
     expect(supervisorSource).toContain("Alle Ressourcen");
     expect(supervisorSource).toContain("onAssignPilot");
     expect(supervisorSource).not.toContain("PILOT_REASSIGN_CONFIRMATION_REQUIRED");
-    expect(supervisorSource).toContain("Vor Belegung bitte über „Pilot zuweisen“");
+    expect(flightLineSource).toContain("Vor Belegung bitte über „Pilot zuweisen“");
     expect(appSource).not.toContain('className="pilot-assignment"');
   });
 
@@ -59,6 +59,15 @@ describe("Flight Line Supervisor", () => {
     expect(supervisorSource).toContain("On-Block");
     expect(supervisorSource).toContain("formatFlightLineTime");
     expect(supervisorSource).toContain('rotation.status !== "COMPLETED"');
+    expect(supervisorSource).toContain("nextTicketSort");
+    expect(supervisorSource).toContain("aria-pressed={active}");
+    expect(supervisorSource).toContain('className="flight-director-pilot-action"');
+  });
+
+  it("shares assignment UI without repeating the assigned pilot", () => {
+    expect(supervisorSource).toContain("BookingGroupAssignmentDialog");
+    expect(sharedSource).toContain("BookingGroupAssignmentDialog");
+    expect(sharedSource).not.toContain("flight-director-dialog-pilot");
   });
 
   it("allows the audited unavailable flow during boarding and off-block", () => {

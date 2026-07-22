@@ -175,7 +175,7 @@
 }
 
 .flight-director-progress
-  > li:not([data-step="available"]):not([data-step="unavailable"])
+  > li:is([data-step="boarding"], [data-step="offblock"])
   .flight-director-progress-node::after {
   content: "";
   position: absolute;
@@ -284,7 +284,7 @@
 }
 
 .flight-director-progress--detailed
-  > li:not([data-step="available"]):not([data-step="unavailable"])
+  > li:is([data-step="boarding"], [data-step="offblock"])
   .flight-director-progress-node::after {
   left: 14px;
   width: calc((100cqi - 16px) / 4);
@@ -852,8 +852,12 @@
   white-space: nowrap;
 }
 
-.flight-director-dialog-warning,
-.flight-director-dialog-pilot {
+.flight-director-assignment-dialog .flight-director-queue-row.has-defer .ds-button {
+  padding-inline: 5px;
+  font-size: 0.7rem;
+}
+
+.flight-director-dialog-warning {
   display: flex;
   align-items: flex-start;
   gap: 8px;
@@ -865,23 +869,6 @@
   background: var(--ui-warning-soft);
   font-size: 0.76rem;
   line-height: 1.4;
-}
-
-.flight-director-dialog-pilot {
-  border-color: color-mix(in srgb, var(--ui-success) 45%, var(--ui-border));
-  color: var(--ui-success-text, var(--ui-success));
-  background: var(--ui-success-soft);
-}
-
-.flight-director-dialog-pilot svg {
-  width: 20px;
-  height: 20px;
-  flex: 0 0 auto;
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 1.8;
 }
 
 .flight-director-pilot-options {
@@ -1060,6 +1047,12 @@
     justify-content: flex-start;
     flex-wrap: wrap;
   }
+
+  .flight-director-assignment-dialog .flight-director-queue {
+    max-height: min(52dvh, 460px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
 }
 
 /* V1.7.1 shared timeline and supervisor table. */
@@ -1113,12 +1106,12 @@
 .flight-director-aircraft-table,
 .flight-director-aircraft-head,
 .flight-director-aircraft-row {
-  min-width: 1220px;
+  min-width: 1240px;
 }
 
 .flight-director-aircraft-head,
 .flight-director-aircraft-row {
-  grid-template-columns: 120px 105px 145px 145px minmax(410px, 1fr) 268px;
+  grid-template-columns: 120px 105px 100px 44px 145px minmax(410px, 1fr) 268px;
   gap: 10px;
 }
 
@@ -1147,6 +1140,23 @@
   transform: none;
 }
 
+.flight-director-pilot-action,
+.flight-director-pilot-action-head {
+  min-width: 0;
+  display: grid;
+  place-items: center;
+}
+
+.flight-director-pilot-action .ds-icon-button {
+  width: var(--control-compact);
+  min-width: var(--control-compact);
+  height: var(--control-compact);
+}
+
+.flight-director-pilot-action .ds-icon-button svg {
+  transform: none;
+}
+
 .flight-director-timeline {
   overflow: visible;
   white-space: normal;
@@ -1170,11 +1180,11 @@
     display: grid;
   }
 
-  .flight-director-aircraft-row > .flight-director-group-chips:nth-child(4) {
+  .flight-director-aircraft-row > .flight-director-group-chips:nth-child(5) {
     display: flex;
   }
 
-  .flight-director-aircraft-row > .flight-director-timeline:nth-child(5) {
+  .flight-director-aircraft-row > .flight-director-timeline:nth-child(6) {
     display: block;
   }
 
@@ -1195,6 +1205,42 @@
       4,
       88px
     );
+}
+
+.flight-director-compact-table.tickets .flight-director-compact-head > span {
+  min-width: 0;
+}
+
+.flight-director-compact-table.tickets .flight-director-compact-head button {
+  width: 100%;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  font-weight: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.flight-director-compact-table.tickets .flight-director-compact-head button:hover,
+.flight-director-compact-table.tickets .flight-director-compact-head button:focus-visible {
+  color: var(--ui-accent);
+}
+
+.flight-director-compact-table.tickets .flight-director-compact-head button:focus-visible {
+  outline: 2px solid var(--ui-accent);
+  outline-offset: 2px;
+}
+
+.flight-director-compact-table.tickets .flight-director-compact-head button svg {
+  width: 13px;
+  height: 13px;
+  flex: 0 0 auto;
 }
 
 .flight-director-history-dialog {
