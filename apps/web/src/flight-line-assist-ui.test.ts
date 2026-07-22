@@ -71,6 +71,14 @@ describe("Flight Line Assist", () => {
     expect(sharedFlightLineSource).toContain("primaryAircraftActionLabel");
   });
 
+  it("V161-FL-020: uses the generic pilot assignment confirmation in Assist", () => {
+    expect(assistSource).toContain("<PilotAssignmentDialogs");
+    expect(sharedFlightLineSource).toMatch(
+      /onClick=\{\(\) => void submitPilotAssignment\(\)\}[\s\S]*?>\s*Pilot zuweisen\s*<\/Button>/,
+    );
+    expect(sharedFlightLineSource).not.toContain('?.operationalCode ?? ""} zuweisen');
+  });
+
   it("offers manual presence, missing, recall and deferral actions", () => {
     expect(assistSource).toContain("onGroupAttendance");
     expect(assistSource).toContain("onGroupMissing");
