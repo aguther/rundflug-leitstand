@@ -14,7 +14,6 @@ import {
 } from "@rundflug/contracts";
 import {
   type AircraftOperationalState,
-  advanceOverduePrediction,
   assertManualGroupMoveAllowed,
   assertMayStageOutageRecoveryEntry,
   assertOutageRecoveryApplication,
@@ -26,19 +25,16 @@ import {
   assertTechnicalRotationAbortAllowed,
   assertTicketNoShowAllowed,
   assessRemainingCapacity,
-  createQueueAvailability,
+  calculateForecastTimelines,
   type DeviceRole,
   DomainRuleError,
   decideAutomaticPrecall,
   deriveAdaptivePrecallLeadMinutes,
   deriveResourceGroupCapacity,
-  estimateDuration,
-  forecastQueueWindows,
   type OperationalCommandType,
   planBookingGroupSplit,
   planRotationCapacityReduction,
   planTechnicalRotationAbortQueueBlock,
-  reserveNextQueueWindow,
   simulateOutageRecovery,
   transitionAircraft,
   transitionRotation,
@@ -1376,8 +1372,6 @@ export class EventCoordinator extends DurableObject<Env> {
 
     const now = new Date();
     const nowIso = now.toISOString();
-    const addMinutes = (value: string | Date, minutes: number) =>
-      new Date(new Date(value).getTime() + minutes * 60_000).toISOString();
     const capacities = new Map(
       capacityRows.results.map((row) => [
         row.resource_group_id,
@@ -1390,47 +1384,47 @@ export class EventCoordinator extends DurableObject<Env> {
     const adaptiveLeadMinutes = deriveAdaptivePrecallLeadMinutes({
       observedGateWaitMinutes: [...gateWaitRows.results].reverse().map((row) => row.minutes),
     });
-    const busyAircraftMinutes = new Map<string, number[]>();
-    for (const rotation of rotationRows.results) {
-      if (rotation.status === "DRAFT") continue;
-      let predictedCompletion = rotation.predicted_completion_at
-        ? Date.parse(rotation.predicted_completion_at)
-        : Number.NaN;
-      if (
-        rotation.predicted_departure_at &&
-        rotation.predicted_landing_at &&
-        rotation.predicted_completion_at
-      ) {
-        predictedCompletion = Date.parse(
-          advanceOverduePrediction({
-            status: rotation.status,
-            now: nowIso,
-            predictedDepartureAt: rotation.predicted_departure_at,
-            predictedLandingAt: rotation.predicted_landing_at,
-            predictedCompletionAt: rotation.predicted_completion_at,
-          }).predictedCompletionAt,
-        );
-      }
-      const fallback =
-        event.planned_boarding_minutes +
-        rotation.reference_duration_minutes +
-        event.planned_deboarding_minutes +
-        event.planned_buffer_minutes;
-      const remaining = Number.isFinite(predictedCompletion)
-        ? Math.max(0, (predictedCompletion - now.getTime()) / 60_000)
-        : fallback;
-      const values = busyAircraftMinutes.get(rotation.resource_group_id) ?? [];
-      values.push(remaining);
-      busyAircraftMinutes.set(rotation.resource_group_id, values);
-    }
-    const queueAvailability = new Map(
-      [...capacities.entries()].map(([resourceGroupId, activeAircraft]) => [
+    const projections = calculateForecastTimelines({
+      event: {
+        eventId,
+        now: nowIso,
+        operationalInterrupted: event.operational_interrupted === 1,
+        emergencyMode: event.emergency_mode === 1,
+        plannedBoardingMinutes: event.planned_boarding_minutes,
+        plannedDeboardingMinutes: event.planned_deboarding_minutes,
+        plannedBufferMinutes: event.planned_buffer_minutes,
+      },
+      capacities: [...capacities.entries()].map(([resourceGroupId, activeAircraft]) => ({
         resourceGroupId,
-        createQueueAvailability({
-          activeAircraft,
-          busyAircraftMinutes: busyAircraftMinutes.get(resourceGroupId) ?? [],
-        }),
-      ]),
+        activeAircraft,
+      })),
+      durationSamples: durationRows.results.map((row) => ({
+        minutes: row.minutes,
+        completedAt: row.completed_at,
+        eventId: row.operation_day_id,
+        productCode: row.product_code,
+        aircraftType: row.aircraft_type,
+      })),
+      rotations: rotationRows.results.map((rotation) => ({
+        id: rotation.id,
+        status: rotation.status,
+        createdAt: rotation.created_at,
+        calledAt: rotation.called_at,
+        departedAt: rotation.departed_at,
+        landedAt: rotation.landed_at,
+        resourceGroupId: rotation.resource_group_id,
+        resourceGroupStatus: rotation.resource_group_status,
+        queueSequence: rotation.queue_sequence,
+        referenceDurationMinutes: rotation.reference_duration_minutes,
+        productCode: rotation.product_code,
+        aircraftType: rotation.aircraft_type,
+        predictedDepartureAt: rotation.predicted_departure_at,
+        predictedLandingAt: rotation.predicted_landing_at,
+        predictedCompletionAt: rotation.predicted_completion_at,
+      })),
+    });
+    const projectionByRotationId = new Map(
+      projections.map((projection) => [projection.rotationId, projection]),
     );
     const lastGatePrecall = new Map<string, number>();
     for (const rotation of rotationRows.results) {
@@ -1452,60 +1446,8 @@ export class EventCoordinator extends DurableObject<Env> {
     }> = [];
     const statements: D1PreparedStatement[] = [];
     for (const rotation of rotationRows.results) {
-      const boarding = event.planned_boarding_minutes;
-      const deboarding = event.planned_deboarding_minutes;
-      const buffer = event.planned_buffer_minutes;
-      const referenceTotal = boarding + rotation.reference_duration_minutes + deboarding + buffer;
-      const activeCapacity = capacities.get(rotation.resource_group_id) ?? 0;
-      const allProductHistory = durationRows.results.filter(
-        (row) => row.product_code === rotation.product_code,
-      );
-      const currentDayProductHistory = allProductHistory.filter(
-        (row) => row.operation_day_id === eventId,
-      );
-      const productHistory =
-        currentDayProductHistory.length > 0 ? currentDayProductHistory : allProductHistory;
-      const aircraftHistory = rotation.aircraft_type
-        ? productHistory.filter((row) => row.aircraft_type === rotation.aircraft_type)
-        : [];
-      const selectedHistory = (aircraftHistory.length > 0 ? aircraftHistory : productHistory).slice(
-        0,
-        12,
-      );
-      const dataBasisScope =
-        selectedHistory.length === 0
-          ? "REFERENCE_ONLY"
-          : aircraftHistory.length > 0
-            ? "AIRCRAFT_PRODUCT_HISTORY"
-            : "PRODUCT_HISTORY";
-      const actualDurations = [...selectedHistory].reverse().map((row) => row.minutes);
-      const lastActualAt = selectedHistory[0]?.completed_at;
-      const dataAgeMinutes = lastActualAt
-        ? Math.max(0, (now.getTime() - Date.parse(lastActualAt)) / 60_000)
-        : 0;
-      const estimate = estimateDuration({
-        referenceMinutes: referenceTotal,
-        actualDurationsMinutes: actualDurations,
-        dataAgeMinutes,
-        interrupted:
-          event.operational_interrupted === 1 ||
-          event.emergency_mode === 1 ||
-          rotation.resource_group_status !== "ACTIVE",
-        activeCapacity,
-      });
-      let window = forecastQueueWindows({
-        queueSequence: rotation.queue_sequence,
-        activeAircraft: activeCapacity,
-        duration: estimate,
-      });
-      if (rotation.status === "DRAFT") {
-        const availability =
-          queueAvailability.get(rotation.resource_group_id) ??
-          createQueueAvailability({ activeAircraft: activeCapacity, busyAircraftMinutes: [] });
-        const reservation = reserveNextQueueWindow(availability, estimate);
-        window = reservation.window;
-        queueAvailability.set(rotation.resource_group_id, reservation.availability);
-      }
+      const projection = projectionByRotationId.get(rotation.id);
+      if (!projection) throw new Error(`Forecast projection missing for rotation ${rotation.id}.`);
       const firstWaitingGroup =
         rotation.status === "DRAFT" && !evaluatedResourceGroups.has(rotation.resource_group_id);
       if (rotation.status === "DRAFT") evaluatedResourceGroups.add(rotation.resource_group_id);
@@ -1520,8 +1462,10 @@ export class EventCoordinator extends DurableObject<Env> {
         alreadyPrecalled: rotation.precalled_at !== null,
         groupSize: rotation.ticket_count,
         largestEligibleAircraftSeats: maximumSeats.get(rotation.resource_group_id) ?? 0,
-        predictionQuality: estimate.quality,
-        predictedBoardingMinutes: Math.round((window.lowerMinutes + window.upperMinutes) / 2),
+        predictionQuality: projection.predictionQuality,
+        predictedBoardingMinutes: Math.round(
+          (projection.predictionLowerMinutes + projection.predictionUpperMinutes) / 2,
+        ),
         adaptiveLeadMinutes,
         minutesSinceLastGatePrecall:
           lastGateCallAt === undefined
@@ -1535,41 +1479,11 @@ export class EventCoordinator extends DurableObject<Env> {
           rotationId: rotation.id,
           expectedVersion: rotation.flight_group_version,
           gateId: rotation.gate_id,
-          predictionUpperMinutes: window.upperMinutes,
-          predictionQuality: estimate.quality,
+          predictionUpperMinutes: projection.predictionUpperMinutes,
+          predictionQuality: projection.predictionQuality,
           adaptiveLeadMinutes,
         });
         if (rotation.gate_id) lastGatePrecall.set(rotation.gate_id, now.getTime());
-      }
-      const planOffset =
-        Math.floor(Math.max(0, rotation.queue_sequence - 1) / Math.max(1, activeCapacity)) *
-        referenceTotal;
-      const plannedBoardingAt = addMinutes(rotation.created_at, planOffset);
-      const plannedDepartureAt = addMinutes(plannedBoardingAt, boarding);
-      const plannedLandingAt = addMinutes(plannedDepartureAt, rotation.reference_duration_minutes);
-      const plannedCompletionAt = addMinutes(plannedLandingAt, deboarding + buffer);
-      let predictedBoardingAt = addMinutes(now, window.lowerMinutes);
-      if (rotation.called_at) predictedBoardingAt = rotation.called_at;
-      let predictedDepartureAt = addMinutes(predictedBoardingAt, boarding);
-      if (rotation.departed_at) predictedDepartureAt = rotation.departed_at;
-      const expectedFlightMinutes = Math.max(
-        rotation.reference_duration_minutes,
-        estimate.expectedMinutes - boarding - deboarding - buffer,
-      );
-      let predictedLandingAt = addMinutes(predictedDepartureAt, expectedFlightMinutes);
-      if (rotation.landed_at) predictedLandingAt = rotation.landed_at;
-      let predictedCompletionAt = addMinutes(predictedLandingAt, deboarding + buffer);
-      if (rotation.status !== "DRAFT") {
-        const advanced = advanceOverduePrediction({
-          status: rotation.status,
-          now: nowIso,
-          predictedDepartureAt,
-          predictedLandingAt,
-          predictedCompletionAt,
-        });
-        predictedDepartureAt = advanced.predictedDepartureAt;
-        predictedLandingAt = advanced.predictedLandingAt;
-        predictedCompletionAt = advanced.predictedCompletionAt;
       }
       statements.push(
         this.env.DB.prepare(
@@ -1584,17 +1498,17 @@ export class EventCoordinator extends DurableObject<Env> {
             prediction_upper_minutes = ?11, prediction_updated_at = ?12
            WHERE id = ?13`,
         ).bind(
-          plannedBoardingAt,
-          plannedDepartureAt,
-          plannedLandingAt,
-          plannedCompletionAt,
-          predictedBoardingAt,
-          predictedDepartureAt,
-          predictedLandingAt,
-          predictedCompletionAt,
-          estimate.quality,
-          window.lowerMinutes,
-          window.upperMinutes,
+          projection.plannedBoardingAt,
+          projection.plannedDepartureAt,
+          projection.plannedLandingAt,
+          projection.plannedCompletionAt,
+          projection.predictedBoardingAt,
+          projection.predictedDepartureAt,
+          projection.predictedLandingAt,
+          projection.predictedCompletionAt,
+          projection.predictionQuality,
+          projection.predictionLowerMinutes,
+          projection.predictionUpperMinutes,
           nowIso,
           rotation.id,
         ),
@@ -1611,19 +1525,19 @@ export class EventCoordinator extends DurableObject<Env> {
           rotation.id,
           event.version,
           nowIso,
-          estimate.quality,
-          window.lowerMinutes,
-          window.upperMinutes,
-          predictedBoardingAt,
-          predictedDepartureAt,
-          predictedLandingAt,
-          predictedCompletionAt,
+          projection.predictionQuality,
+          projection.predictionLowerMinutes,
+          projection.predictionUpperMinutes,
+          projection.predictedBoardingAt,
+          projection.predictedDepartureAt,
+          projection.predictedLandingAt,
+          projection.predictedCompletionAt,
           triggerEventType,
-          dataBasisScope,
-          selectedHistory.length,
-          dataAgeMinutes,
-          activeCapacity,
-          referenceTotal,
+          projection.dataBasisScope,
+          projection.sampleSize,
+          projection.dataAgeMinutes,
+          projection.activeCapacity,
+          projection.referenceDurationMinutes,
         ),
       );
     }

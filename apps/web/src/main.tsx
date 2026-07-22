@@ -1,4 +1,3 @@
-import { registerSW } from "virtual:pwa-register";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
@@ -16,9 +15,13 @@ import "./features/flight-line/flight-line-assist-v15.css";
 import "./design-system/base.css";
 import "./design-system/components.css";
 
-registerSW({
-  immediate: true,
-});
+if (import.meta.env.MODE !== "simulator") {
+  void import("virtual:pwa-register").then(({ registerSW }) => {
+    registerSW({
+      immediate: true,
+    });
+  });
+}
 
 const root = document.getElementById("root");
 if (!root) {
