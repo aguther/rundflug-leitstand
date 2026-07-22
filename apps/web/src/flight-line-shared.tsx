@@ -714,9 +714,7 @@ export function PilotAssignmentDialogs({
               type="button"
               variant="primary"
             >
-              {pilotId
-                ? `Pilot ${board.pilots.find((entry) => entry.id === pilotId)?.operationalCode ?? ""} zuweisen`
-                : "Pilot zuweisen"}
+              Pilot zuweisen
             </Button>
           </>
         }
