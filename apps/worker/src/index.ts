@@ -3305,7 +3305,8 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
   const row = await context.env.DB.prepare(
     `SELECT p.name AS product_name, p.code AS product_code, p.public_description,
             g.label AS gate_label,
-            fg.communication_number, fg.precalled_at, r.status, tg.operation_day_id,
+            COALESCE(tg.communication_number, fg.communication_number) AS communication_number,
+            fg.precalled_at, r.status, tg.operation_day_id,
             COALESCE(fg.queue_position, tg.queue_sequence) AS queue_sequence,
             t.attendance_status,
             r.prediction_quality, r.prediction_lower_minutes, r.prediction_upper_minutes,
@@ -3606,7 +3607,8 @@ app.get("/api/public/events/:eventId/board", async (context) => {
     `SELECT COALESCE(MIN(p.name), 'Rundflug') AS product_name,
             COALESCE(MIN(p.code), 'RF') AS product_code,
             COALESCE(MIN(g.label), 'Flight Line') AS gate_label,
-            fg.communication_number, fg.precalled_at,
+            COALESCE(tg.communication_number, fg.communication_number) AS communication_number,
+            fg.precalled_at,
             COALESCE(fg.queue_position, fg.communication_number) AS queue_position, r.status,
             MIN(a.registration) AS aircraft_registration,
             MIN(a.operational_state) AS aircraft_operational_state,
@@ -3628,7 +3630,7 @@ app.get("/api/public/events/:eventId/board", async (context) => {
         AND (?3 = '[]' OR p.id IN (SELECT value FROM json_each(?3)))
         AND (?4 = '[]' OR r.status IN (SELECT value FROM json_each(?4)))
         AND (r.status NOT IN ('IN_FLIGHT', 'LANDED', 'COMPLETED') OR r.departed_at > ?5)
-      GROUP BY r.id
+      GROUP BY r.id, tg.id
       ORDER BY CASE
                  WHEN r.status = 'CALLED'
                    OR (r.status = 'DRAFT' AND fg.precalled_at IS NOT NULL) THEN 0
@@ -3637,7 +3639,8 @@ app.get("/api/public/events/:eventId/board", async (context) => {
                END,
                CASE WHEN r.status IN ('IN_FLIGHT', 'LANDED', 'COMPLETED')
                  THEN r.departed_at END DESC,
-               COALESCE(fg.queue_position, fg.communication_number), fg.communication_number
+               COALESCE(fg.queue_position, fg.communication_number),
+               COALESCE(tg.communication_number, fg.communication_number)
       LIMIT 20`,
   )
     .bind(eventId, requestedGateId, productFilterJson, statusFilterJson, departedVisibilityCutoff)

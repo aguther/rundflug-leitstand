@@ -9,6 +9,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const npmCli = process.env.npm_execpath;
 if (!npmCli) throw new Error("npm-Ausführungspfad fehlt.");
 const wranglerCli = resolve(root, "node_modules", "wrangler", "bin", "wrangler.js");
+const port = Number.parseInt(process.env.PUBLIC_MONITORS_TEST_PORT ?? "8787", 10);
 const reset = spawnSync(process.execPath, [npmCli, "run", "db:reset:local"], {
   cwd: root,
   stdio: "ignore",
@@ -22,6 +23,7 @@ const staleDepartureTimestamp = "2026-07-11T08:30:00.000Z";
 const staleDepartureSql = staleDepartureCommunicationNumbers
   .map((communicationNumber) => {
     const suffix = String(communicationNumber);
+    const flightGroupCommunicationNumber = communicationNumber - 1_000;
     return `
       INSERT INTO ticket_groups
         (id, operation_day_id, product_id, queue_sequence, communication_number, standby,
@@ -42,8 +44,8 @@ const staleDepartureSql = staleDepartureCommunicationNumbers
          created_at, updated_at, queue_position)
       VALUES
         ('fids-history-flight-group-${suffix}', 'demo-2026', 'rg-panorama',
-         ${communicationNumber}, 'COMPLETED', 0, '${staleDepartureTimestamp}',
-         '${staleDepartureTimestamp}', ${communicationNumber});
+         ${flightGroupCommunicationNumber}, 'COMPLETED', 0, '${staleDepartureTimestamp}',
+         '${staleDepartureTimestamp}', ${flightGroupCommunicationNumber});
       INSERT INTO rotations
         (id, operation_day_id, flight_group_id, status, departed_at, landed_at, completed_at,
          version, created_at, updated_at, gate_id)
@@ -100,6 +102,8 @@ const server = spawn(
     "dev",
     "--config",
     "wrangler.jsonc",
+    "--port",
+    String(port),
     "--var",
     "APP_ENV:development",
     "--var",
@@ -109,8 +113,8 @@ const server = spawn(
   ],
   { cwd: root, stdio: "ignore", windowsHide: true },
 );
-const base = "http://127.0.0.1:8787";
-const wsBase = "ws://127.0.0.1:8787";
+const base = `http://127.0.0.1:${port}`;
+const wsBase = `ws://127.0.0.1:${port}`;
 const tokens = {
   admin: ["demo", "admin", "device", "token"].join("-"),
   cashier: ["demo", "cashier", "device", "token"].join("-"),
@@ -358,8 +362,19 @@ try {
     throw new Error("Abgelaufene Abflugzeilen verdrängen weiterhin kommende FIDS-Gruppen.");
   }
   const group = publicBoard.groups.find((entry) => entry.ticketLabels.length === 2);
+  const soldOperationBoard = await operationBoard(devices.flightLine, tokens.flightLine);
+  const soldRotation = soldOperationBoard.rotations.find(
+    (rotation) => rotation.id === sold.aggregate.relatedRotationId,
+  );
+  const stableBookingNumber = soldRotation?.bookingGroups.find(
+    (bookingGroup) => bookingGroup.id === sold.aggregate.id,
+  )?.communicationNumber;
   const serializedBoard = JSON.stringify(publicBoard);
   if (
+    !stableBookingNumber ||
+    soldRotation.communicationNumber === stableBookingNumber ||
+    group?.communicationNumber !== stableBookingNumber ||
+    initialTicketStatus.communicationNumber !== stableBookingNumber ||
     group?.ticketLabels.length !== 2 ||
     group.ticketLabels.some((label) => !label.startsWith("PAN20-")) ||
     group.gateLabel !== "Flight Line 1" ||
@@ -367,7 +382,22 @@ try {
     privateCodes.some((code) => serializedBoard.includes(code)) ||
     /pilot/i.test(serializedBoard)
   ) {
-    throw new Error("FIDS-Ticketlabels sind unvollständig oder enthalten vertrauliche Daten.");
+    throw new Error(
+      `FIDS-Ticketlabels sind unvollständig oder inkonsistent: ${JSON.stringify({
+        stableBookingNumber,
+        rotationCommunicationNumber: soldRotation?.communicationNumber,
+        boardCommunicationNumber: group?.communicationNumber,
+        ticketStatusCommunicationNumber: initialTicketStatus.communicationNumber,
+        ticketLabelCount: group?.ticketLabels.length,
+        ticketLabelsUseProductPrefix: group?.ticketLabels.every((label) =>
+          label.startsWith("PAN20-"),
+        ),
+        gateLabel: group?.gateLabel,
+        ticketGateLabel: initialTicketStatus.gateLabel,
+        privateCodeExposed: privateCodes.some((code) => serializedBoard.includes(code)),
+        pilotDataExposed: /pilot/i.test(serializedBoard),
+      })}`,
+    );
   }
   const alternateGate = await command(
     devices.admin,
