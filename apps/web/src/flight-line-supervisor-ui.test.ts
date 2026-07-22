@@ -39,6 +39,13 @@ describe("Flight Line Supervisor", () => {
     expect(appSource).not.toContain('className="pilot-assignment"');
   });
 
+  it("V161-FL-020: keeps the pilot assignment confirmation free of the selected pilot code", () => {
+    expect(sharedSource).toMatch(
+      /onClick=\{\(\) => void submitPilotAssignment\(\)\}[\s\S]*?>\s*Pilot zuweisen\s*<\/Button>/,
+    );
+    expect(sharedSource).not.toContain('?.operationalCode ?? ""} zuweisen');
+  });
+
   it("keeps the current rotation in the aircraft row and sold tickets full width", () => {
     expect(supervisorSource).toContain('className="flight-director-bottom-grid is-ticket-only"');
     expect(supervisorSource).toContain('className="flight-director-timeline"');
