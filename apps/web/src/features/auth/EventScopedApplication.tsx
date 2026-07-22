@@ -46,6 +46,19 @@ export function EventScopedApplication({ session }: { session: OperatorSession }
   const selectedEvent = events.find((entry) => entry.eventId === requestedEventId);
   if (!selectedEvent) return <EventSelectionPage events={events} session={session} />;
   rememberActiveEvent(window.localStorage, selectedEvent.eventId, selectedEvent.name);
+  if (
+    window.location.pathname === "/fids/terminal" ||
+    new URLSearchParams(window.location.search).get("style") === "terminal"
+  ) {
+    const normalized = new URL(window.location.href);
+    normalized.pathname = "/fids";
+    normalized.searchParams.delete("style");
+    window.history.replaceState(
+      null,
+      "",
+      `${normalized.pathname}${normalized.search}${normalized.hash}`,
+    );
+  }
   if (window.location.pathname === "/") {
     window.location.replace(homeForRole(session.account.role));
     return <Loading>Arbeitsbereich wird geöffnet …</Loading>;

@@ -40,10 +40,10 @@ describe("V1.2 web architecture", () => {
     }
   });
 
-  it("keeps anonymous FIDS and ticket views public while protecting internal workspaces", () => {
-    expect(appSource).toContain('pathname === "/fids"');
+  it("keeps only ticket views public while protecting FIDS and internal workspaces", () => {
+    expect(appSource).not.toContain('pathname === "/fids"');
     expect(appSource).not.toContain('pathname === "/pair"');
-    expect(appSource).toContain('pathname.startsWith("/fids/")');
+    expect(appSource).not.toContain('pathname.startsWith("/fids/")');
     expect(appSource).toContain("if (!session) return <LoginPage />");
   });
 });

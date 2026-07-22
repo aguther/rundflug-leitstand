@@ -687,8 +687,39 @@ export const bootstrapRequestSchema = z.object({
 });
 export type BootstrapRequest = z.infer<typeof bootstrapRequestSchema>;
 
-export const operatorRoleSchema = z.enum(["CASHIER", "FLIGHT_LINE", "FLIGHT_DIRECTOR", "ADMIN"]);
+export const operatorRoleSchema = z.enum([
+  "CASHIER",
+  "FLIGHT_LINE",
+  "FLIGHT_DIRECTOR",
+  "ADMIN",
+  "DISPLAY",
+]);
 export type OperatorRole = z.infer<typeof operatorRoleSchema>;
+
+export const fidsLayoutSchema = z.enum(["SINGLE", "DOUBLE"]);
+export type FidsLayout = z.infer<typeof fidsLayoutSchema>;
+
+export const fidsThemeSchema = z.enum(["SYSTEM", "LIGHT", "DARK"]);
+export type FidsTheme = z.infer<typeof fidsThemeSchema>;
+
+export const fidsPreferencesSchema = z
+  .object({
+    visibleRows: z.number().int().min(4).max(20),
+    layout: fidsLayoutSchema,
+    theme: fidsThemeSchema,
+    version: z.number().int().min(0),
+  })
+  .strict();
+export type FidsPreferences = z.infer<typeof fidsPreferencesSchema>;
+
+export const updateFidsPreferencesSchema = fidsPreferencesSchema
+  .omit({ version: true })
+  .extend({
+    commandId: z.uuid(),
+    expectedVersion: z.number().int().min(0),
+  })
+  .strict();
+export type UpdateFidsPreferences = z.infer<typeof updateFidsPreferencesSchema>;
 
 export const operatorAccountSummarySchema = z.object({
   id: z.uuid(),
