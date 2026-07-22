@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   advanceOverduePrediction,
+  calculateForecastTimelines,
   createQueueAvailability,
   estimateDuration,
   forecastQueueWindows,
@@ -211,5 +212,191 @@ describe("event-driven forecast", () => {
     expect(forecasts).toHaveLength(300);
     expect(forecasts.at(-1)?.upperMinutes).toBeGreaterThan(0);
     expect(elapsed).toBeLessThan(2_000);
+  });
+
+  it("projects active availability and queued rotations with an explicit clock", () => {
+    const projections = calculateForecastTimelines({
+      event: {
+        eventId: "event-current",
+        now: "2026-07-22T10:00:00.000Z",
+        operationalInterrupted: false,
+        emergencyMode: false,
+        plannedBoardingMinutes: 5,
+        plannedDeboardingMinutes: 5,
+        plannedBufferMinutes: 2,
+      },
+      capacities: [{ resourceGroupId: "rg-1", activeAircraft: 2 }],
+      durationSamples: [],
+      rotations: [
+        {
+          id: "active",
+          status: "IN_FLIGHT",
+          createdAt: "2026-07-22T09:00:00.000Z",
+          calledAt: "2026-07-22T09:40:00.000Z",
+          departedAt: "2026-07-22T09:50:00.000Z",
+          landedAt: null,
+          resourceGroupId: "rg-1",
+          resourceGroupStatus: "ACTIVE",
+          queueSequence: 1,
+          referenceDurationMinutes: 20,
+          productCode: "PAN",
+          aircraftType: "SYN-A",
+          predictedDepartureAt: "2026-07-22T09:50:00.000Z",
+          predictedLandingAt: "2026-07-22T10:12:00.000Z",
+          predictedCompletionAt: "2026-07-22T10:19:00.000Z",
+        },
+        {
+          id: "first-draft",
+          status: "DRAFT",
+          createdAt: "2026-07-22T09:45:00.000Z",
+          calledAt: null,
+          departedAt: null,
+          landedAt: null,
+          resourceGroupId: "rg-1",
+          resourceGroupStatus: "ACTIVE",
+          queueSequence: 2,
+          referenceDurationMinutes: 20,
+          productCode: "PAN",
+          aircraftType: null,
+          predictedDepartureAt: null,
+          predictedLandingAt: null,
+          predictedCompletionAt: null,
+        },
+        {
+          id: "second-draft",
+          status: "DRAFT",
+          createdAt: "2026-07-22T09:46:00.000Z",
+          calledAt: null,
+          departedAt: null,
+          landedAt: null,
+          resourceGroupId: "rg-1",
+          resourceGroupStatus: "ACTIVE",
+          queueSequence: 3,
+          referenceDurationMinutes: 20,
+          productCode: "PAN",
+          aircraftType: null,
+          predictedDepartureAt: null,
+          predictedLandingAt: null,
+          predictedCompletionAt: null,
+        },
+      ],
+    });
+
+    expect(projections.map((projection) => projection.rotationId)).toEqual([
+      "active",
+      "first-draft",
+      "second-draft",
+    ]);
+    expect(projections[1]).toMatchObject({
+      predictionLowerMinutes: 0,
+      predictionUpperMinutes: 0,
+      predictionQuality: "CHANGING",
+      predictedBoardingAt: "2026-07-22T10:00:00.000Z",
+      dataBasisScope: "REFERENCE_ONLY",
+      activeCapacity: 2,
+    });
+    expect(projections[2]).toMatchObject({
+      predictionLowerMinutes: 19,
+      predictionUpperMinutes: 19,
+      predictedBoardingAt: "2026-07-22T10:19:00.000Z",
+    });
+  });
+
+  it("prefers current-day aircraft/product samples and preserves the current quality rules", () => {
+    const projection = calculateForecastTimelines({
+      event: {
+        eventId: "event-current",
+        now: "2026-07-22T10:00:00.000Z",
+        operationalInterrupted: false,
+        emergencyMode: false,
+        plannedBoardingMinutes: 5,
+        plannedDeboardingMinutes: 5,
+        plannedBufferMinutes: 2,
+      },
+      capacities: [{ resourceGroupId: "rg-1", activeAircraft: 1 }],
+      durationSamples: [
+        ...[31, 32, 33, 32, 31].map((minutes, index) => ({
+          minutes,
+          completedAt: `2026-07-22T09:5${index + 5}:00.000Z`,
+          eventId: "event-current",
+          productCode: "PAN",
+          aircraftType: "SYN-A",
+        })),
+        {
+          minutes: 48,
+          completedAt: "2026-07-21T12:00:00.000Z",
+          eventId: "event-old",
+          productCode: "PAN",
+          aircraftType: "SYN-A",
+        },
+      ],
+      rotations: [
+        {
+          id: "draft",
+          status: "DRAFT",
+          createdAt: "2026-07-22T09:55:00.000Z",
+          calledAt: null,
+          departedAt: null,
+          landedAt: null,
+          resourceGroupId: "rg-1",
+          resourceGroupStatus: "ACTIVE",
+          queueSequence: 1,
+          referenceDurationMinutes: 20,
+          productCode: "PAN",
+          aircraftType: "SYN-A",
+          predictedDepartureAt: null,
+          predictedLandingAt: null,
+          predictedCompletionAt: null,
+        },
+      ],
+    })[0];
+
+    expect(projection).toMatchObject({
+      predictionQuality: "STABLE",
+      dataBasisScope: "AIRCRAFT_PRODUCT_HISTORY",
+      sampleSize: 5,
+      dataAgeMinutes: 1,
+    });
+  });
+
+  it("marks every projection uncertain during an interruption without publishing a countdown", () => {
+    const projection = calculateForecastTimelines({
+      event: {
+        eventId: "event-current",
+        now: "2026-07-22T10:00:00.000Z",
+        operationalInterrupted: true,
+        emergencyMode: false,
+        plannedBoardingMinutes: 5,
+        plannedDeboardingMinutes: 5,
+        plannedBufferMinutes: 2,
+      },
+      capacities: [{ resourceGroupId: "rg-1", activeAircraft: 2 }],
+      durationSamples: [],
+      rotations: [
+        {
+          id: "draft",
+          status: "DRAFT",
+          createdAt: "2026-07-22T09:55:00.000Z",
+          calledAt: null,
+          departedAt: null,
+          landedAt: null,
+          resourceGroupId: "rg-1",
+          resourceGroupStatus: "ACTIVE",
+          queueSequence: 1,
+          referenceDurationMinutes: 20,
+          productCode: "PAN",
+          aircraftType: null,
+          predictedDepartureAt: null,
+          predictedLandingAt: null,
+          predictedCompletionAt: null,
+        },
+      ],
+    })[0];
+
+    expect(projection).toMatchObject({
+      predictionQuality: "UNCERTAIN",
+      predictionLowerMinutes: 0,
+      predictionUpperMinutes: 0,
+    });
   });
 });

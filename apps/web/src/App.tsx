@@ -4,6 +4,10 @@ import { AuthProvider, useAuth } from "./features/auth/AuthContext";
 import { EventScopedApplication } from "./features/auth/EventScopedApplication";
 import { LoginPage } from "./features/auth/LoginPage";
 
+const ForecastSimulationView = lazy(
+  () => import("./features/forecast-simulation/ForecastSimulationView"),
+);
+
 const FeatureRouter = lazy(async () => {
   const module = await import("./FeatureRouter");
   return { default: module.FeatureRouter };
@@ -47,6 +51,13 @@ function AuthenticatedApplication() {
 }
 
 export function App() {
+  if (import.meta.env.MODE === "simulator" && window.location.pathname === "/simulation") {
+    return (
+      <Suspense fallback={<ApplicationLoading />}>
+        <ForecastSimulationView />
+      </Suspense>
+    );
+  }
   return (
     <ActionNotificationProvider>
       <AuthProvider>
