@@ -9,7 +9,6 @@ import {
   CircleUserRound,
   Maximize2,
   Minus,
-  Plane,
   Plus,
   Printer,
   RefreshCw,
@@ -600,7 +599,6 @@ export function CashierView() {
               return (
                 <article className="cashier-product" key={entry.id}>
                   <div className="cashier-product-row">
-                    <Plane aria-hidden="true" />
                     <span className="cashier-product-name">
                       <strong>{entry.name}</strong>
                       <small>

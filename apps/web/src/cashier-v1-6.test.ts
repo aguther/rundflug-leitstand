@@ -45,8 +45,9 @@ describe("cashier release 1.7.0 acceptance coverage", () => {
   it("fits the complete cashier workspace into the iPad landscape band", () => {
     expect(styles).toMatch(/@media \(min-width: 1101px\) and \(max-width: 1250px\)/);
     expect(styles).toMatch(
-      /grid-template-columns:[\s\S]*?26px minmax\(82px, 1\.24fr\)[\s\S]*?122px/,
+      /@media \(min-width: 1101px\)[\s\S]*?\.cashier-product-row \{[\s\S]*?minmax\(0, 1\.3fr\)[\s\S]*?minmax\(104px, 0\.9fr\)/,
     );
+    expect(cashierSource).not.toContain('<Plane aria-hidden="true" />');
     expect(styles).toMatch(
       /@media \(min-width: 1101px\)[\s\S]*?\.cashier-ticket-table \.ds-table \{[\s\S]*?min-width: 600px;/,
     );

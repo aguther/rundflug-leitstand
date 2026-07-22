@@ -1,5 +1,5 @@
 import type { OperationBoard } from "@rundflug/contracts";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { claimFlightLineAircraft, releaseFlightLineAircraft, sendCommand } from "./api";
 import { AppShell as Shell } from "./app/AppShell";
 import { useActionMessageBridge } from "./app/PageNotifications";
@@ -40,6 +40,7 @@ const actionForState = {
 type Rotation = OperationBoard["rotations"][number];
 type Aircraft = OperationBoard["aircraft"][number];
 type QueueGroup = OperationBoard["queueGroups"][number];
+type TurnaroundNextState = "AVAILABLE" | "REFUELING" | "PAUSED" | "INACTIVE";
 
 function queuedSegmentTicketCount(group: QueueGroup): number {
   return group.nextSegmentTicketCount ?? group.ticketCount;
@@ -59,9 +60,9 @@ export function FlightLineView() {
   const [queueReason, setQueueReason] = useState("");
   const [emergencyReason, setEmergencyReason] = useState("");
   const [nextAircraftId, setNextAircraftId] = useState("");
-  const [turnaroundNextState, setTurnaroundNextState] = useState<
-    "AVAILABLE" | "REFUELING" | "PAUSED" | "INACTIVE"
-  >("AVAILABLE");
+  const [turnaroundNextState, setTurnaroundNextState] = useState<TurnaroundNextState>("AVAILABLE");
+  const [busyRotationIds, setBusyRotationIds] = useState<ReadonlySet<string>>(() => new Set());
+  const busyRotationIdsRef = useRef(new Set<string>());
   const [selectedQueueGroupIds, setSelectedQueueGroupIds] = useState<string[]>([]);
   const [dispositionOpen, setDispositionOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -148,10 +149,14 @@ export function FlightLineView() {
   async function advance(
     rotationOverride: Rotation | undefined = selected,
     aircraftOverride: Aircraft | undefined = selectedAircraft,
+    nextAircraftState: TurnaroundNextState = turnaroundNextState,
   ) {
     const selectedRotation = rotationOverride;
     const selectedAction = selectedRotation ? actionForState[selectedRotation.status] : null;
     if (!board || !selectedRotation || !selectedAction) return;
+    if (busyRotationIdsRef.current.has(selectedRotation.id)) return;
+    busyRotationIdsRef.current.add(selectedRotation.id);
+    setBusyRotationIds(new Set(busyRotationIdsRef.current));
     try {
       const commandBase = {
         commandId: crypto.randomUUID(),
@@ -192,7 +197,7 @@ export function FlightLineView() {
                 type: "COMPLETE_TURNAROUND",
                 payload: {
                   rotationId: selectedRotation.id,
-                  nextAircraftState: turnaroundNextState,
+                  nextAircraftState,
                 },
               }
             : {
@@ -206,6 +211,9 @@ export function FlightLineView() {
       await refresh();
     } catch (reason) {
       setMessage(reason instanceof Error ? reason.message : "Aktion fehlgeschlagen.");
+    } finally {
+      busyRotationIdsRef.current.delete(selectedRotation.id);
+      setBusyRotationIds(new Set(busyRotationIdsRef.current));
     }
   }
 
@@ -663,6 +671,7 @@ export function FlightLineView() {
         <FlightLineAssist
           aircraft={operationalAircraft}
           board={board}
+          busyRotationIds={busyRotationIds}
           canAssignPilot={canManageAircraft}
           onAssignPilot={assignAircraftPilot}
           onClaim={async (aircraftId, expectedTakeoverRevision) => {
@@ -704,6 +713,7 @@ export function FlightLineView() {
             }
           }}
           onPause={openAircraftPauseDialog}
+          onRefresh={refresh}
           onRelease={async (aircraftId) => {
             await releaseFlightLineAircraft(
               EVENT_ID,
@@ -721,31 +731,30 @@ export function FlightLineView() {
             setSelectedId(null);
             setSelectedQueueGroupIds([]);
           }}
-          onRunRotation={(rotation) => {
+          onRunRotation={(rotation, nextAircraftState) => {
             const rotationAircraft = operationalAircraft.find(
-              (entry) => entry.id === selectedAircraft?.id,
+              (entry) => entry.id === rotation.aircraftId,
             );
-            void advance(rotation, rotationAircraft);
+            return advance(rotation, rotationAircraft, nextAircraftState);
           }}
           onSetAircraftState={(aircraftId, state) => {
             requestAircraftState(aircraftId, state);
           }}
           selectedQueueGroupIds={selectedQueueGroupIds}
-          turnaroundNextState={turnaroundNextState}
-          onTurnaroundNextStateChange={setTurnaroundNextState}
         />
       ) : board ? (
         <FlightLineSupervisorConsole
           aircraft={operationalAircraft}
           board={board}
+          busyRotationIds={busyRotationIds}
           selectedQueueGroupIds={selectedQueueGroupIds}
           onAssignPilot={assignAircraftPilot}
           onConfirmAssignment={() => void advance()}
-          onRunRotation={(rotation) => {
+          onRunRotation={(rotation, nextAircraftState) => {
             const rotationAircraft = operationalAircraft.find(
               (entry) => entry.id === rotation.aircraftId,
             );
-            void advance(rotation, rotationAircraft);
+            return advance(rotation, rotationAircraft, nextAircraftState);
           }}
           onPauseAircraft={openAircraftPauseDialog}
           onGroupAttendance={(ticketGroupId, checkedIn) =>

@@ -512,6 +512,7 @@
   min-height: 40px;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 7px;
   padding-inline: 9px;
   color: var(--ui-text);
@@ -1080,15 +1081,21 @@
 
 /* V1.7.1 shared timeline and supervisor table. */
 .flight-director-progress {
+  --progress-gap: 10px;
+  --progress-node-size: 26px;
+  --progress-icon-size: 24px;
+  --progress-line-offset: 15px;
+  --progress-line-span: 30px;
+  --progress-line-top: 13px;
   grid-template-columns: repeat(5, minmax(42px, 1fr));
-  column-gap: 10px;
+  column-gap: var(--progress-gap);
   border: 0;
   background: transparent;
   box-shadow: none;
 }
 
 .flight-director-progress > li {
-  grid-template-rows: minmax(16px, auto) 18px 16px;
+  grid-template-rows: 26px 16px;
   align-items: center;
 }
 
@@ -1100,101 +1107,133 @@
   margin-left: 8px;
 }
 
-.flight-director-progress-label,
-.flight-director-progress--detailed small {
-  white-space: nowrap;
-}
-
-.flight-director-progress-label-short {
-  display: none;
-}
-
-.flight-director-progress > li[data-step="onblock"] .flight-director-progress-node::after {
-  content: none;
-}
-
 .flight-director-progress
   > li:is([data-step="boarding"], [data-step="offblock"])
   .flight-director-progress-node::after {
-  top: 50%;
-  left: 14px;
-  width: calc((100cqi - 40px) / 5 + 10px);
+  content: none;
+}
+
+.flight-director-progress > li:is([data-step="boarding"], [data-step="offblock"])::after {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  top: var(--progress-line-top);
+  left: calc(50% + var(--progress-line-offset));
+  width: calc(100% + var(--progress-gap) - var(--progress-line-span));
+  height: 1px;
+  background: var(--ui-border-strong);
   transform: translateY(-50%);
 }
 
+.flight-director-progress > li.connector-reached::after {
+  background: var(--ui-success);
+}
+
+.flight-director-progress-node,
+.flight-director-progress > li.current .flight-director-progress-node,
+.flight-director-progress > li.reached:not(.current) .flight-director-progress-node {
+  width: var(--progress-node-size);
+  height: var(--progress-node-size);
+  border: 0;
+  color: var(--ui-muted);
+  background: transparent;
+}
+
+.flight-director-progress--detailed .flight-director-progress-node {
+  width: var(--progress-node-size);
+  height: var(--progress-node-size);
+}
+
+.flight-director-progress-node > svg {
+  width: var(--progress-icon-size);
+  height: var(--progress-icon-size);
+  stroke-width: 1.9;
+}
+
+.flight-director-progress > li.reached:not(.current) .flight-director-progress-node {
+  color: var(--ui-success);
+}
+
+.flight-director-progress > li.current .flight-director-progress-node {
+  color: var(--progress-current);
+}
+
+.flight-director-progress > li.current .flight-director-progress-node::before {
+  content: none;
+}
+
+.flight-director-progress--detailed small {
+  min-height: 17px;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
 .flight-director-progress--detailed {
-  min-height: 64px;
+  min-height: 48px;
 }
 
 .flight-director-progress--detailed > li {
-  gap: 3px;
+  gap: 2px;
 }
 
 .flight-director-aircraft-table,
 .flight-director-aircraft-head,
 .flight-director-aircraft-row {
-  min-width: 1120px;
+  min-width: 1040px;
 }
 
 .flight-director-aircraft-head,
 .flight-director-aircraft-row {
-  grid-template-columns: 100px 80px 90px 44px 135px minmax(390px, 1fr) 268px;
+  grid-template-columns: 100px 104px 126px minmax(320px, 1fr) 314px;
   gap: 10px;
 }
 
 .flight-director-aircraft-row {
-  min-height: 102px;
+  min-height: 88px;
 }
 
-.flight-director-pilot-code {
+.flight-director-aircraft-details {
   min-width: 0;
-  justify-content: flex-start;
-  white-space: nowrap;
+  display: grid;
+  align-content: center;
+  gap: 3px;
 }
 
-.flight-director-pilot-code strong {
+.flight-director-aircraft-details :is(strong, small) {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.flight-director-pilot-code .ds-icon-button {
-  flex: 0 0 auto;
+.flight-director-aircraft-details small {
+  color: var(--ui-muted);
+  font-size: 0.65rem;
 }
 
-.flight-director-pilot-code .ds-icon-button svg {
-  transform: none;
-}
-
-.flight-director-pilot-action,
-.flight-director-pilot-action-head {
+.flight-director-column-icon {
   min-width: 0;
-  display: grid;
-  place-items: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.flight-director-pilot-action .ds-icon-button {
-  width: var(--control-compact);
-  min-width: var(--control-compact);
-  height: var(--control-compact);
-  border-color: var(--ui-border-strong);
-  background: var(--ui-control);
-}
-
-.flight-director-pilot-action .ds-icon-button svg {
-  transform: none;
+.flight-director-column-icon > svg {
+  width: 17px;
+  height: 17px;
 }
 
 .flight-director-timeline {
+  align-self: center;
   overflow: visible;
   white-space: normal;
+  transform: translateY(11px);
 }
 
 .flight-director-row-actions {
   min-width: 0;
   display: grid;
-  grid-template-columns: repeat(5, var(--control-touch));
+  grid-template-columns: repeat(6, var(--control-touch));
   gap: 5px;
 }
 
@@ -1211,7 +1250,7 @@
   line-height: 1.05;
 }
 
-@media (min-width: 960px) and (max-width: 1180px) {
+@media (min-width: 768px) and (max-width: 1180px) {
   .ds-panel.flight-director-aircraft {
     overflow-x: hidden;
     touch-action: pan-y;
@@ -1227,7 +1266,7 @@
 
   .flight-director-aircraft-head,
   .flight-director-aircraft-row {
-    grid-template-columns: 68px 48px 48px 36px 55px minmax(190px, 1fr) 236px;
+    grid-template-columns: 66px 68px 66px minmax(150px, 1fr) 308px;
     gap: 4px;
     padding-inline: 6px;
   }
@@ -1240,7 +1279,7 @@
     font-size: 0.72rem;
   }
 
-  .flight-director-aircraft-resource small,
+  .flight-director-aircraft-details small,
   .flight-director-aircraft-name small {
     font-size: 0.58rem;
   }
@@ -1254,8 +1293,9 @@
   }
 
   .flight-director-progress {
+    --progress-gap: 2px;
     grid-template-columns: repeat(5, minmax(0, 1fr));
-    column-gap: 2px;
+    column-gap: var(--progress-gap);
   }
 
   .flight-director-progress > li:is([data-step="available"], [data-step="unavailable"]) {
@@ -1264,17 +1304,6 @@
 
   .flight-director-progress--detailed > li {
     font-size: 0.58rem;
-  }
-
-  .flight-director-progress
-    > li[data-step="unavailable"]
-    .flight-director-progress-label
-    > span:first-child {
-    display: none;
-  }
-
-  .flight-director-progress > li[data-step="unavailable"] .flight-director-progress-label-short {
-    display: inline;
   }
 
   .flight-director-row-actions {
@@ -1296,11 +1325,11 @@
     display: grid;
   }
 
-  .flight-director-aircraft-row > .flight-director-group-chips:nth-child(5) {
+  .flight-director-aircraft-row > .flight-director-group-chips:nth-child(3) {
     display: flex;
   }
 
-  .flight-director-aircraft-row > .flight-director-timeline:nth-child(6) {
+  .flight-director-aircraft-row > .flight-director-timeline:nth-child(4) {
     display: block;
   }
 
@@ -1316,10 +1345,23 @@
 
 .flight-director-compact-table.tickets .flight-director-compact-head,
 .flight-director-compact-table.tickets > div:not(.flight-director-compact-head) {
-  min-width: 1240px;
+  min-width: 720px;
   grid-template-columns:
-    minmax(112px, 1.05fr) minmax(116px, 0.9fr) 64px 108px 102px
-    minmax(150px, 1.25fr) 120px repeat(4, 88px);
+    minmax(64px, 0.8fr) minmax(72px, 0.8fr) 40px minmax(66px, 0.7fr)
+    minmax(60px, 0.7fr) minmax(84px, 1fr) 70px repeat(4, 48px);
+  gap: 4px;
+  padding-inline: 6px;
+}
+
+.flight-director-compact-table.tickets {
+  scrollbar-gutter: stable;
+}
+
+.flight-director-compact-table.tickets > div:not(.flight-director-compact-head) > * {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .flight-director-compact-table.tickets .flight-director-compact-head > span {
@@ -1338,7 +1380,7 @@
   background: transparent;
   font: inherit;
   font-weight: inherit;
-  text-align: left;
+  text-align: center;
   cursor: pointer;
 }
 

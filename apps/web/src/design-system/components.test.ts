@@ -49,6 +49,7 @@ describe("shared design-system component library", () => {
     expect(tabsSource).toContain('role="tab"');
     expect(stylesSource).toContain("scrollbar-width: none");
     expect(stylesSource).toContain(".ds-tabs::-webkit-scrollbar");
+    expect(stylesSource).toMatch(/\.ds-search-field input:focus-visible\s*\{\s*box-shadow: none;/);
   });
 
   it("StatusPill exposes a tone-based API backed by semantic tokens", () => {

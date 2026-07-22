@@ -1,6 +1,27 @@
 import type { OperationBoard } from "@rundflug/contracts";
 import { rotationStateLabels } from "@rundflug/domain";
-import { ArrowDown, ArrowUp, CircleOff, Coffee, Fuel, History, Plane } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import {
+  Activity,
+  ArrowDown,
+  ArrowUp,
+  CircleCheck,
+  CircleX,
+  Clock3,
+  Coffee,
+  Fuel,
+  History,
+  Info,
+  ListOrdered,
+  Plane,
+  PlaneLanding,
+  PlaneTakeoff,
+  Settings2,
+  Tag,
+  Tickets,
+  TicketsPlane,
+  Users,
+} from "lucide-react";
 import { useMemo, useState } from "react";
 import {
   Button,
@@ -30,6 +51,7 @@ import {
 type Aircraft = OperationBoard["aircraft"][number];
 type Rotation = OperationBoard["rotations"][number];
 type QueueGroup = OperationBoard["queueGroups"][number];
+type TurnaroundNextState = "AVAILABLE" | "REFUELING" | "PAUSED" | "INACTIVE";
 
 function queuedSegmentTicketCount(group: QueueGroup): number {
   return group.nextSegmentTicketCount ?? group.ticketCount;
@@ -57,18 +79,18 @@ export type TicketSort = {
   direction: "ascending" | "descending";
 } | null;
 
-const ticketColumns: Array<{ key: TicketSortKey; label: string }> = [
-  { key: "ticketGroup", label: "Ticketgruppe" },
-  { key: "queue", label: "Queue" },
-  { key: "people", label: "Personen" },
-  { key: "status", label: "Umlaufstatus" },
-  { key: "aircraft", label: "Flugzeug" },
-  { key: "product", label: "Produkt" },
-  { key: "window", label: "Zeitfenster" },
-  { key: "boarding", label: "Boarding" },
-  { key: "offblock", label: "Off-Block" },
-  { key: "onblock", label: "On-Block" },
-  { key: "completion", label: "Abschluss" },
+const ticketColumns: Array<{ key: TicketSortKey; label: string; Icon: LucideIcon }> = [
+  { key: "ticketGroup", label: "Ticketgruppe", Icon: Tickets },
+  { key: "queue", label: "Queue", Icon: ListOrdered },
+  { key: "people", label: "Personen", Icon: Users },
+  { key: "status", label: "Umlaufstatus", Icon: Activity },
+  { key: "aircraft", label: "Flugzeug", Icon: Plane },
+  { key: "product", label: "Produkt", Icon: Tag },
+  { key: "window", label: "Zeitfenster", Icon: Clock3 },
+  { key: "boarding", label: "Boarding", Icon: TicketsPlane },
+  { key: "offblock", label: "Off-Block", Icon: PlaneTakeoff },
+  { key: "onblock", label: "On-Block", Icon: PlaneLanding },
+  { key: "completion", label: "Abschluss", Icon: CircleCheck },
 ];
 
 const ticketCollator = new Intl.Collator("de-DE", { numeric: true, sensitivity: "base" });
@@ -147,6 +169,7 @@ export function FlightLineSupervisorConsole({
   selectedAircraft,
   selectedQueueGroupIds,
   onAssignPilot,
+  busyRotationIds,
   onConfirmAssignment,
   onRunRotation,
   onSetAircraftState,
@@ -163,8 +186,9 @@ export function FlightLineSupervisorConsole({
   selectedAircraft: Aircraft | undefined;
   selectedQueueGroupIds: string[];
   onAssignPilot: (aircraftId: string, pilotId: string, reassign: boolean) => Promise<void>;
+  busyRotationIds?: ReadonlySet<string>;
   onConfirmAssignment: () => void;
-  onRunRotation: (rotation: Rotation) => void;
+  onRunRotation: (rotation: Rotation, nextAircraftState?: TurnaroundNextState) => Promise<void>;
   onSetAircraftState: (aircraftId: string, state: FlightLineFleetState) => void;
   onPauseAircraft: (aircraftId: string) => void;
   onSelectAircraft: (aircraftId: string) => void;
@@ -176,7 +200,7 @@ export function FlightLineSupervisorConsole({
 }) {
   const [resourceGroupId, setResourceGroupId] = useState("");
   const [ticketSearch, setTicketSearch] = useState("");
-  const [onlyOpenTickets, setOnlyOpenTickets] = useState(false);
+  const [onlyOpenTickets, setOnlyOpenTickets] = useState(true);
   const [ticketSort, setTicketSort] = useState<TicketSort>(null);
   const [assignmentOpen, setAssignmentOpen] = useState(false);
   const [pilotOpen, setPilotOpen] = useState(false);
@@ -278,7 +302,7 @@ export function FlightLineSupervisorConsole({
       setAssignmentOpen(true);
       return;
     }
-    onRunRotation(rotation);
+    void onRunRotation(rotation, rotation.status === "LANDED" ? "AVAILABLE" : undefined);
   }
 
   return (
@@ -311,16 +335,26 @@ export function FlightLineSupervisorConsole({
       <Panel className="flight-director-aircraft" padding="none">
         <section className="flight-director-aircraft-table" aria-label="Flugzeuge">
           <div className="flight-director-aircraft-head">
-            <span>Flugzeug</span>
-            <span>Plätze · Ressource</span>
-            <span>Pilot</span>
-            <span aria-hidden="true" className="flight-director-pilot-action-head" />
-            <span className="flight-director-group-head">
-              <span>Buchungs-</span>
-              <span>gruppen</span>
+            <span className="flight-director-column-icon" title="Flugzeug">
+              <Plane aria-hidden="true" />
+              <span className="visually-hidden">Flugzeug</span>
             </span>
-            <span>Zeitverlauf</span>
-            <span>Aktionen</span>
+            <span className="flight-director-column-icon" title="Details">
+              <Info aria-hidden="true" />
+              <span className="visually-hidden">Details</span>
+            </span>
+            <span className="flight-director-column-icon" title="Buchungsgruppen">
+              <Tickets aria-hidden="true" />
+              <span className="visually-hidden">Buchungsgruppen</span>
+            </span>
+            <span className="flight-director-column-icon" title="Zeitverlauf">
+              <Clock3 aria-hidden="true" />
+              <span className="visually-hidden">Zeitverlauf</span>
+            </span>
+            <span className="flight-director-column-icon" title="Aktionen">
+              <Settings2 aria-hidden="true" />
+              <span className="visually-hidden">Aktionen</span>
+            </span>
           </div>
           {filteredAircraft.map((entry) => {
             const rotation = operationalRotationForAircraft(entry, board.rotations, board.products);
@@ -328,7 +362,9 @@ export function FlightLineSupervisorConsole({
             const startBlockAllowed = entry.operationalState === "AVAILABLE";
             const unavailableAllowed =
               startBlockAllowed ||
-              Boolean(rotation && ["CALLED", "IN_FLIGHT"].includes(rotation.status));
+              Boolean(rotation && ["CALLED", "IN_FLIGHT", "LANDED"].includes(rotation.status));
+            const turnaroundActionAllowed = rotation?.status === "LANDED";
+            const actionBusy = rotation ? Boolean(busyRotationIds?.has(rotation.id)) : false;
             const primaryPresentation = primaryAircraftActionPresentation(entry, rotation);
             const PrimaryActionIcon = primaryPresentation.Icon;
             return (
@@ -339,26 +375,10 @@ export function FlightLineSupervisorConsole({
                     <small>{entry.aircraftType}</small>
                   </span>
                 </span>
-                <span className="flight-director-aircraft-resource">
-                  <strong>{entry.passengerSeats}</strong>
+                <span className="flight-director-aircraft-details">
+                  <small>{entry.passengerSeats} Plätze</small>
                   <small title={entry.resourceGroupName}>{entry.resourceGroupShortCode}</small>
-                </span>
-                <span className="flight-director-pilot-code">
                   <strong>{entry.currentPilotOperationalCode ?? "–"}</strong>
-                </span>
-                <span className="flight-director-pilot-action">
-                  <IconButton
-                    disabled={!pilotChangeAllowed}
-                    label={`Pilot für ${entry.registration} zuweisen`}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      openPilot(entry);
-                    }}
-                    size="compact"
-                    type="button"
-                  >
-                    <PilotChangeIcon aria-hidden="true" />
-                  </IconButton>
                 </span>
                 <span className="flight-director-group-chips">
                   {rotation && rotation.status !== "DRAFT" ? (
@@ -382,7 +402,7 @@ export function FlightLineSupervisorConsole({
                 <span className="flight-director-row-actions">
                   <IconButton
                     label={primaryAircraftActionLabel(entry, rotation)}
-                    disabled={rotation?.status === "COMPLETED"}
+                    disabled={rotation?.status === "COMPLETED" || actionBusy}
                     onClick={(event) => {
                       event.stopPropagation();
                       runPrimary(entry, rotation);
@@ -395,11 +415,15 @@ export function FlightLineSupervisorConsole({
                   <IconButton
                     aria-pressed={entry.operationalState === "REFUELING"}
                     className="flight-line-status-action state-refueling"
-                    disabled={!startBlockAllowed}
+                    disabled={(!startBlockAllowed && !turnaroundActionAllowed) || actionBusy}
                     label={`${entry.registration} zum Tanken setzen`}
                     onClick={(event) => {
                       event.stopPropagation();
-                      onSetAircraftState(entry.id, "REFUELING");
+                      if (turnaroundActionAllowed && rotation) {
+                        void onRunRotation(rotation, "REFUELING");
+                      } else {
+                        onSetAircraftState(entry.id, "REFUELING");
+                      }
                     }}
                     size="touch"
                     type="button"
@@ -409,11 +433,15 @@ export function FlightLineSupervisorConsole({
                   <IconButton
                     aria-pressed={entry.operationalState === "PAUSED"}
                     className="flight-line-status-action state-paused"
-                    disabled={!startBlockAllowed}
+                    disabled={(!startBlockAllowed && !turnaroundActionAllowed) || actionBusy}
                     label={`${entry.registration} in Pause setzen`}
                     onClick={(event) => {
                       event.stopPropagation();
-                      onPauseAircraft(entry.id);
+                      if (turnaroundActionAllowed && rotation) {
+                        void onRunRotation(rotation, "PAUSED");
+                      } else {
+                        onPauseAircraft(entry.id);
+                      }
                     }}
                     size="touch"
                     type="button"
@@ -423,16 +451,32 @@ export function FlightLineSupervisorConsole({
                   <IconButton
                     aria-pressed={["INACTIVE", "INTERRUPTED"].includes(entry.operationalState)}
                     className="flight-line-status-action state-inactive"
-                    disabled={!unavailableAllowed}
+                    disabled={!unavailableAllowed || actionBusy}
                     label={`${entry.registration} nicht verfügbar setzen`}
                     onClick={(event) => {
                       event.stopPropagation();
-                      onSetAircraftState(entry.id, "INACTIVE");
+                      if (turnaroundActionAllowed && rotation) {
+                        void onRunRotation(rotation, "INACTIVE");
+                      } else {
+                        onSetAircraftState(entry.id, "INACTIVE");
+                      }
                     }}
                     size="touch"
                     type="button"
                   >
-                    <CircleOff aria-hidden="true" />
+                    <CircleX aria-hidden="true" />
+                  </IconButton>
+                  <IconButton
+                    disabled={!pilotChangeAllowed || actionBusy}
+                    label={`Pilot für ${entry.registration} zuweisen`}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      openPilot(entry);
+                    }}
+                    size="touch"
+                    type="button"
+                  >
+                    <PilotChangeIcon aria-hidden="true" />
                   </IconButton>
                   <IconButton
                     label={`Historie für ${entry.registration} anzeigen`}
@@ -548,15 +592,18 @@ function CompactTickets({
       <div className="flight-director-compact-head">
         {ticketColumns.map((column) => {
           const active = sort?.key === column.key;
+          const HeaderIcon = column.Icon;
           return (
             <span key={column.key}>
               <button
                 aria-label={`${column.label} sortieren · ${active ? (sort.direction === "ascending" ? "aufsteigend" : "absteigend") : "Standardsortierung"}`}
                 aria-pressed={active}
                 onClick={() => onSort(column.key)}
+                title={column.label}
                 type="button"
               >
-                <span>{column.label}</span>
+                <HeaderIcon aria-hidden="true" />
+                <span className="visually-hidden">{column.label}</span>
                 {active ? (
                   sort.direction === "ascending" ? (
                     <ArrowUp aria-hidden="true" />

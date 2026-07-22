@@ -65,6 +65,7 @@ describe("Flight Line Supervisor", () => {
 
   it("shows forecast and actual ticket timing with an open-only filter", () => {
     expect(supervisorSource).toContain("onlyOpenTickets");
+    expect(supervisorSource).toContain("useState(true)");
     expect(supervisorSource).toContain("Nur offene Tickets");
     expect(supervisorSource).toContain("Zeitfenster");
     expect(supervisorSource).toContain("Off-Block");
@@ -73,8 +74,8 @@ describe("Flight Line Supervisor", () => {
     expect(supervisorSource).toContain('rotation.status !== "COMPLETED"');
     expect(supervisorSource).toContain("nextTicketSort");
     expect(supervisorSource).toContain("aria-pressed={active}");
-    expect(supervisorSource).toContain('className="flight-director-pilot-action"');
-    expect(supervisorSource).toContain('{ key: "queue", label: "Queue" }');
+    expect(supervisorSource).toContain('className="flight-director-aircraft-details"');
+    expect(supervisorSource).toContain('{ key: "queue", label: "Queue", Icon: ListOrdered }');
     expect(supervisorSource).toContain("queueGroup.queueSequence");
     expect(supervisorSource).toContain("return group.communicationNumber;");
     expect(supervisorSource).not.toContain('<PilotIcon aria-hidden="true" />');
@@ -91,17 +92,48 @@ describe("Flight Line Supervisor", () => {
     expect(supervisorSource).toMatch(/flight-director-aircraft-name">\s*<span>/);
     expect(supervisorSource).toContain("entry.resourceGroupShortCode");
     expect(supervisorSource).not.toContain("Pilot wechseln");
-    expect(flightLineStyles).toContain("min-width: 1120px");
-    expect(flightLineStyles).toContain("flight-director-progress-label-short");
+    expect(flightLineStyles).toContain("min-width: 1040px");
+    expect(flightLineStyles).toContain("@media (min-width: 768px) and (max-width: 1180px)");
+    expect(flightLineStyles).toContain("grid-template-columns: repeat(6, var(--control-touch))");
   });
 
   it("allows the audited unavailable flow during boarding and off-block", () => {
-    expect(supervisorSource).toContain('["CALLED", "IN_FLIGHT"].includes(rotation.status)');
-    expect(supervisorSource).toContain("disabled={!unavailableAllowed}");
-    expect(supervisorSource).toMatch(
-      /className="flight-line-status-action state-refueling"[\s\S]*?disabled={!startBlockAllowed}/,
+    expect(supervisorSource).toContain(
+      '["CALLED", "IN_FLIGHT", "LANDED"].includes(rotation.status)',
     );
+    expect(supervisorSource).toContain("disabled={!unavailableAllowed || actionBusy}");
+    expect(supervisorSource).toMatch(
+      /className="flight-line-status-action state-refueling"[\s\S]*?turnaroundActionAllowed/,
+    );
+    expect(supervisorSource).toContain('onRunRotation(rotation, "REFUELING")');
+    expect(supervisorSource).toContain('onRunRotation(rotation, "PAUSED")');
+    expect(supervisorSource).toContain('onRunRotation(rotation, "INACTIVE")');
     expect(appSource).toContain("ABORT_ROTATION_TO_QUEUE_AND_MARK_AIRCRAFT_UNAVAILABLE");
+  });
+
+  it("uses accessible icon headers and a scrollbar-stable compact ticket table", () => {
+    expect(supervisorSource).toContain('title="Buchungsgruppen"');
+    expect(supervisorSource).toContain("HeaderIcon");
+    expect(supervisorSource).toContain("title={column.label}");
+    expect(flightLineStyles).toContain("min-width: 720px");
+    expect(flightLineStyles).toContain("scrollbar-gutter: stable");
+  });
+
+  it("draws timeline connectors only in the gaps between the three center icons", () => {
+    expect(flightLineStyles).toContain("--progress-node-size: 26px");
+    expect(flightLineStyles).toContain("--progress-line-offset: 15px");
+    expect(flightLineStyles).toContain("left: calc(50% + var(--progress-line-offset))");
+    expect(flightLineStyles).toContain(
+      "width: calc(100% + var(--progress-gap) - var(--progress-line-span))",
+    );
+    expect(flightLineStyles).toContain(
+      ".flight-director-progress--detailed .flight-director-progress-node",
+    );
+    expect(flightLineStyles).toContain("font-size: 0.75rem");
+    expect(flightLineStyles).toContain("transform: translateY(11px)");
+    expect(flightLineStyles).toMatch(
+      /li:is\(\[data-step="boarding"\], \[data-step="offblock"\]\)::after/,
+    );
   });
 
   it("supports an optional pause estimate without automatic release", () => {

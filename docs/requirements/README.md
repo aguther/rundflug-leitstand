@@ -13,8 +13,12 @@
   kompakte, auch auf iPads nutzbare Flight Line.
 - `requirements-v1.7.0.md` und `.yaml` beschreiben die aktuelle kompakte Kasse, den segmentweisen
   Aufruf aufgeteilter Gruppen, die QR-Scan-Vergrößerung, layoutneutrale schließbare Meldungen sowie
-  die getrennte Assist-Auswahl und -Arbeitsansicht. Sie sind die aktuelle Releasefassung und
-  übernehmen im Übrigen V1.6.1 unverändert.
+  die getrennte Assist-Auswahl und -Arbeitsansicht.
+- `requirements-v1.7.1.md` und `.yaml` ergänzen die loginbasierte Flugzeugübernahme, den technischen
+  Umlaufabbruch und die stabile kompakte Flight-Line-Bedienung.
+- `requirements-v1.7.2.md` und `.yaml` sind die aktuelle Releasefassung. Sie dokumentieren die
+  kompatiblen Fokus-, Kassen-, Tabellen-, Zeitlinien-, Abschluss- und Assist-Korrekturen und
+  übernehmen im Übrigen V1.7.1 unverändert.
 - `traceability.csv` verbindet Anforderungen später mit Issues, Modulen und Tests.
 - `open-questions.md` enthält noch zu entscheidende Fachfragen.
 

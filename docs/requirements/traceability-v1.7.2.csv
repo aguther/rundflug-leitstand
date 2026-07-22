@@ -1,0 +1,11 @@
+ID,Modul,Tests,Status
+V172-REL-010,package.json Workspace-Pakete und scripts/verify_requirements.py,Requirements- und Versionsverifikation,umgesetzt
+V172-FOC-010,apps/web/src/design-system/components.css,design-system/components.test.ts und Browserabnahme mit Tastaturfokus,umgesetzt
+V172-CAS-010,apps/web/src/cashier-view.tsx und features/cashier/cashier-v12.css,cashier-v12.test.ts und responsive Browserabnahme,umgesetzt
+V172-SUP-010,apps/web/src/flight-line-supervisor.tsx und features/flight-line/flight-line-v12.css,flight-line-supervisor-ui.test.ts und Supervisor-Browserabnahme,umgesetzt
+V172-TKT-010,apps/web/src/flight-line-supervisor.tsx und features/flight-line/flight-line-v12.css,flight-line-supervisor-ui.test.ts und Ticketlisten-Browserabnahme,umgesetzt
+V172-TIM-010,apps/web/src/flight-line-shared.tsx und Flight-Line-CSS,flight-line-shared.test.ts und Browserabnahme aller Endzustände,umgesetzt
+V172-ACT-010,apps/web/src/flight-line-view.tsx flight-line-assist.tsx und flight-line-supervisor.tsx,Assist- und Supervisor-UI-Tests sowie Browserabnahme der vier Abschlusswege,umgesetzt
+V172-AST-010,apps/web/src/flight-line-assist.tsx und features/flight-line/flight-line-assist-v15.css,flight-line-assist-ui.test.ts und Browserabnahme ab 320×568,umgesetzt
+V172-CLM-010,apps/web/src/flight-line-assist.tsx und Assist-CSS,flight-line-assist-ui.test.ts und Browserabnahme für Übernahme sowie Aktualisieren,umgesetzt
+V172-QA-010,Workspace-Test- und Buildskripte sowie UI-Konzepte,Vollständiger Check und Light-/Dark-Browserabnahme,umgesetzt
