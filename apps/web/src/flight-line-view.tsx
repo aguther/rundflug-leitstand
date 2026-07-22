@@ -391,6 +391,7 @@ export function FlightLineView() {
     type: "DEFER_TICKET_GROUP" | "MARK_NO_SHOW",
     reasonOverride?: string,
     targetRotation = selected,
+    targetTicketGroupId?: string,
   ) {
     const effectiveReason = reasonOverride ?? queueReason.trim();
     if (!board || !targetRotation || effectiveReason.length < 3) return;
@@ -403,7 +404,10 @@ export function FlightLineView() {
           expectedVersion: board.event.version,
           issuedAt: new Date().toISOString(),
           type,
-          payload: { ticketGroupId: targetRotation.ticketGroupId, reason: effectiveReason },
+          payload: {
+            ticketGroupId: targetTicketGroupId ?? targetRotation.ticketGroupId,
+            reason: effectiveReason,
+          },
         },
         deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
       );
@@ -413,6 +417,15 @@ export function FlightLineView() {
     } catch (reason) {
       setMessage(reason instanceof Error ? reason.message : "Queue-Aktion fehlgeschlagen.");
     }
+  }
+
+  function deferTicketGroup(ticketGroupId: string, reason: string) {
+    const rotation = board?.rotations.find(
+      (entry) =>
+        entry.ticketGroupId === ticketGroupId ||
+        entry.bookingGroups.some((group) => group.id === ticketGroupId),
+    );
+    if (rotation) void mutateQueue("DEFER_TICKET_GROUP", reason, rotation, ticketGroupId);
   }
 
   async function setRotationCapacity() {
@@ -673,18 +686,7 @@ export function FlightLineView() {
           onGroupMissing={(ticketGroupId) => void updateGroupPresence(ticketGroupId, "MISSING")}
           onGroupRecall={(ticketGroupId) => void updateGroupPresence(ticketGroupId, "RECALL")}
           onGroupDefer={(ticketGroupId) => {
-            const rotation = aircraftRotations?.find(
-              (entry) =>
-                entry.ticketGroupId === ticketGroupId ||
-                entry.bookingGroups.some((group) => group.id === ticketGroupId),
-            );
-            if (rotation) {
-              void mutateQueue(
-                "DEFER_TICKET_GROUP",
-                "Gruppe durch Flight Line Assist zurückgestellt",
-                rotation,
-              );
-            }
+            deferTicketGroup(ticketGroupId, "Gruppe durch Flight Line Assist zurückgestellt");
           }}
           onToggleGroup={(ticketGroupId, isSelected) => {
             setSelectedQueueGroupIds((current) =>
@@ -751,6 +753,9 @@ export function FlightLineView() {
           }
           onGroupMissing={(ticketGroupId) => void updateGroupPresence(ticketGroupId, "MISSING")}
           onGroupRecall={(ticketGroupId) => void updateGroupPresence(ticketGroupId, "RECALL")}
+          onGroupDefer={(ticketGroupId) =>
+            deferTicketGroup(ticketGroupId, "Gruppe durch Flight Line Supervisor zurückgestellt")
+          }
           onSetAircraftState={(aircraftId, state) => {
             requestAircraftState(aircraftId, state);
           }}

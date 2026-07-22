@@ -6,11 +6,28 @@ export interface CashierDraft {
 export interface CashierDraftRevision {
   id: string;
   createdAt: string;
+  source: "OFFLINE_USER_EDIT";
   draft: CashierDraft;
 }
 
 export function cashierDraftQueueKey(eventId: string, deviceId: string): string {
+  return `cashier-draft-queue:v2:${eventId}:${deviceId}`;
+}
+
+export function legacyCashierDraftQueueKey(eventId: string, deviceId: string): string {
   return `cashier-draft-queue:v1:${eventId}:${deviceId}`;
+}
+
+export function shouldPersistCashierDraft({
+  hasPendingDraft,
+  online,
+  connectionError,
+}: {
+  hasPendingDraft: boolean;
+  online: boolean;
+  connectionError: unknown;
+}): boolean {
+  return hasPendingDraft || !online || connectionError !== null;
 }
 
 export function appendCashierDraftRevision(
@@ -24,7 +41,7 @@ export function appendCashierDraftRevision(
     const current = queue.at(-1);
     return current ? [current] : [];
   }
-  return [{ id, createdAt, draft }];
+  return [{ id, createdAt, source: "OFFLINE_USER_EDIT", draft }];
 }
 
 export function readCashierDraftQueue(
@@ -41,6 +58,7 @@ export function readCashierDraftQueue(
         typeof candidate.id === "string" &&
         typeof candidate.createdAt === "string" &&
         Number.isFinite(Date.parse(candidate.createdAt)) &&
+        candidate.source === "OFFLINE_USER_EDIT" &&
         typeof candidate.draft?.productId === "string" &&
         Number.isInteger(candidate.draft.size) &&
         (candidate.draft.size ?? 0) >= 1 &&

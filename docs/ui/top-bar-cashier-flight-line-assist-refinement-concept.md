@@ -273,3 +273,23 @@ Die Arbeitsansicht besteht aus drei klar getrennten Panels:
 
 Dieses Dokument ist die freigegebene visuelle und interaktive Spezifikation für die anschließende
 Implementierung und Browserabnahme.
+
+## 8. Freigegebene Korrekturen vom 22. Juli 2026
+
+- Die Kasse erzeugt beim bloßen Öffnen und während der ersten Serverbestätigung keinen
+  Offline-Entwurf. Nur eine bewusste lokale Änderung während eines echten Verbindungsfehlers oder
+  die Bearbeitung eines bereits vorhandenen V2-Entwurfs wird gespeichert und gemeldet.
+- Die Supervisor-Zeile verzichtet auf das Flugzeugsymbol. Unter der Sitzplatzzahl steht das stabile,
+  administrierbare Ressourcengruppen-Kurzzeichen; der Langname bleibt als Zusatzinformation
+  verfügbar. Der Pilotwechsel besitzt keinen wiederholenden Spaltentext.
+- Auf Tabletbreite lautet der letzte Zeitlinienschritt sichtbar „Nicht verf.“. Tanken ist ab
+  Off-Block gesperrt, während „Nicht verfügbar“ den technischen Pflichtgrund-Abbruch weiterhin
+  anbietet.
+- Zurückstellen ist im gemeinsamen Zuweisungsdialog für Assist und Supervisor identisch vorhanden.
+  Auf reinen Touchgeräten bleibt kein Hover-Farbzustand zurück; nur ein tatsächlich aktiver,
+  gedrückter Zustand bleibt farblich markiert.
+- Die Administration verwendet ohne eigene Geometrie-Overrides dieselbe Top-Leiste wie die übrigen
+  internen Sichten.
+- Der technische Abbruch verschiebt vor der Rückstellung sämtliche historischen und aktuellen
+  Queue-Sequenzen in einen kollisionsfreien Bereich. Rückstellung, Umlaufreset, Flugzeugstatus,
+  Audit, Idempotenzbeleg und Outbox bleiben Bestandteil desselben D1-Batches.

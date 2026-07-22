@@ -2890,7 +2890,7 @@ export class EventCoordinator extends DurableObject<Env> {
     const mutations: D1PreparedStatement[] = [];
 
     if (command.type === "UPSERT_RESOURCE_GROUP") {
-      const [gate, duplicate] = await Promise.all([
+      const [gate, duplicateName, duplicateShortCode] = await Promise.all([
         this.env.DB.prepare(
           "SELECT id FROM gates WHERE id = ?1 AND operation_day_id = ?2 AND active = 1",
         )
@@ -2901,15 +2901,26 @@ export class EventCoordinator extends DurableObject<Env> {
         )
           .bind(command.eventId, command.payload.name, command.payload.resourceGroupId)
           .first<{ id: string }>(),
+        this.env.DB.prepare(
+          "SELECT id FROM resource_groups WHERE operation_day_id = ?1 AND short_code = ?2 AND id <> ?3",
+        )
+          .bind(command.eventId, command.payload.shortCode, command.payload.resourceGroupId)
+          .first<{ id: string }>(),
       ]);
-      if (!gate || duplicate) {
+      if (!gate || duplicateName || duplicateShortCode) {
         return json(
           {
             error: {
-              code: duplicate ? "RESOURCE_GROUP_NAME_EXISTS" : "GATE_NOT_AVAILABLE",
-              message: duplicate
+              code: duplicateName
+                ? "RESOURCE_GROUP_NAME_EXISTS"
+                : duplicateShortCode
+                  ? "RESOURCE_GROUP_SHORT_CODE_EXISTS"
+                  : "GATE_NOT_AVAILABLE",
+              message: duplicateName
                 ? "Ressourcengruppen-Bezeichnung ist bereits vergeben."
-                : "Das ausgewählte Gate ist nicht aktiv verfügbar.",
+                : duplicateShortCode
+                  ? "Ressourcengruppen-Kurzzeichen ist bereits vergeben."
+                  : "Das ausgewählte Gate ist nicht aktiv verfügbar.",
             },
           },
           { status: 409 },
@@ -2973,6 +2984,7 @@ export class EventCoordinator extends DurableObject<Env> {
       aggregate = { type: "RESOURCE_GROUP", id: command.payload.resourceGroupId };
       auditPayload = {
         name: command.payload.name,
+        shortCode: command.payload.shortCode,
         gateId: command.payload.gateId,
         referenceCapacity: command.payload.referenceCapacity,
         plannedRotationMinutes: command.payload.plannedRotationMinutes,
@@ -2984,11 +2996,12 @@ export class EventCoordinator extends DurableObject<Env> {
       mutations.push(
         this.env.DB.prepare(
           `INSERT INTO resource_groups
-            (id, operation_day_id, name, status, gate_id, reference_capacity,
+            (id, operation_day_id, name, short_code, status, gate_id, reference_capacity,
              planned_rotation_minutes, compatible_aircraft_types_json, automatic_precall_enabled,
              version, created_at, updated_at)
-           VALUES (?1, ?2, ?3, 'ACTIVE', ?4, ?5, ?6, ?7, ?8, 0, ?9, ?9)
-           ON CONFLICT(id) DO UPDATE SET name = excluded.name, gate_id = excluded.gate_id,
+           VALUES (?1, ?2, ?3, ?4, 'ACTIVE', ?5, ?6, ?7, ?8, ?9, 0, ?10, ?10)
+           ON CONFLICT(id) DO UPDATE SET name = excluded.name, short_code = excluded.short_code,
+            gate_id = excluded.gate_id,
             reference_capacity = excluded.reference_capacity,
             planned_rotation_minutes = excluded.planned_rotation_minutes,
             compatible_aircraft_types_json = excluded.compatible_aircraft_types_json,
@@ -2999,6 +3012,7 @@ export class EventCoordinator extends DurableObject<Env> {
           command.payload.resourceGroupId,
           command.eventId,
           command.payload.name,
+          command.payload.shortCode,
           command.payload.gateId,
           command.payload.referenceCapacity,
           command.payload.plannedRotationMinutes,
@@ -6966,6 +6980,17 @@ export class EventCoordinator extends DurableObject<Env> {
       );
     }
 
+    const queueMaximum = await this.env.DB.prepare(
+      `SELECT COALESCE(MAX(tg.queue_sequence), 0) AS maximum_queue_sequence
+         FROM ticket_groups tg
+        WHERE tg.operation_day_id = ?1
+          AND tg.product_id IN (
+            SELECT id FROM products WHERE operation_day_id = ?1 AND resource_group_id = ?2
+          )`,
+    )
+      .bind(command.eventId, rotation.resource_group_id)
+      .first<{ maximum_queue_sequence: number }>();
+
     const now = new Date().toISOString();
     const nextVersion = current.version + 1;
     const queueBlock = planTechnicalRotationAbortQueueBlock(
@@ -6976,6 +7001,7 @@ export class EventCoordinator extends DurableObject<Env> {
       })),
     );
     const ticketGroupIds = queueBlock.map((segment) => segment.id);
+    const parkingOffset = (queueMaximum?.maximum_queue_sequence ?? 0) + ticketGroupIds.length + 1;
     const placeholders = ticketGroupIds.map((_, index) => `?${index + 4}`).join(", ");
     const result: CommandResult = {
       accepted: true,
@@ -6993,20 +7019,17 @@ export class EventCoordinator extends DurableObject<Env> {
           WHERE operation_day_id = ?2
             AND product_id IN (
               SELECT id FROM products WHERE operation_day_id = ?2 AND resource_group_id = ?3
-            )
-            AND status IN ('QUEUED', 'PRESENT')
-            AND id NOT IN (${placeholders})`,
-      ).bind(100000, command.eventId, rotation.resource_group_id, ...ticketGroupIds),
+            )`,
+      ).bind(parkingOffset, command.eventId, rotation.resource_group_id),
       this.env.DB.prepare(
         `UPDATE ticket_groups SET queue_sequence = queue_sequence - ?1
           WHERE operation_day_id = ?2
             AND product_id IN (
               SELECT id FROM products WHERE operation_day_id = ?2 AND resource_group_id = ?3
             )
-            AND status IN ('QUEUED', 'PRESENT')
-            AND id NOT IN (${placeholders}) AND queue_sequence >= 100000`,
+            AND id NOT IN (${placeholders}) AND queue_sequence >= ?1`,
       ).bind(
-        100000 - ticketGroupIds.length,
+        parkingOffset - ticketGroupIds.length,
         command.eventId,
         rotation.resource_group_id,
         ...ticketGroupIds,

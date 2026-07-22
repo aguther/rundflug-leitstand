@@ -12,8 +12,11 @@ describe("technical rotation abort to queue", () => {
     const handler = technicalAbortHandler();
     expect(handler).toContain("assertTechnicalRotationAbortAllowed(rotation.status)");
     expect(handler).toContain("ORDER BY tg.queue_sequence, assigned_at, tg.id");
+    expect(handler).toContain("COALESCE(MAX(tg.queue_sequence), 0)");
+    expect(handler).toContain("const parkingOffset");
     expect(handler).toContain("queue_sequence = queue_sequence + ?1");
-    expect(handler).toContain("status IN ('QUEUED', 'PRESENT')");
+    expect(handler).not.toContain("100000");
+    expect(handler).not.toContain("AND status IN ('QUEUED', 'PRESENT')");
     expect(handler).toContain("queue_sequence = ?1 WHERE id = ?2");
     expect(handler).toContain("SET status = 'DRAFT', aircraft_id = NULL, pilot_id = NULL");
     expect(handler).toContain("operational_state = 'INACTIVE'");

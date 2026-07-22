@@ -4,10 +4,28 @@ import {
   cashierDraftQueueKey,
   latestCashierDraft,
   readCashierDraftQueue,
+  shouldPersistCashierDraft,
   writeCashierDraftQueue,
 } from "./offline-drafts";
 
 describe("cashier offline draft queue", () => {
+  it("does not create a draft merely because backend confirmation is still pending", () => {
+    expect(
+      shouldPersistCashierDraft({
+        hasPendingDraft: false,
+        online: true,
+        connectionError: null,
+      }),
+    ).toBe(false);
+    expect(
+      shouldPersistCashierDraft({
+        hasPendingDraft: false,
+        online: false,
+        connectionError: null,
+      }),
+    ).toBe(true);
+  });
+
   it("keeps only the current reversible draft without treating UI clicks as commands", () => {
     const first = appendCashierDraftRevision(
       [],
@@ -64,10 +82,12 @@ describe("cashier offline draft queue", () => {
 
     writeCashierDraftQueue(storage, key, queue);
     expect(readCashierDraftQueue(storage, key)).toEqual(queue);
+    expect(queue[0]?.source).toBe("OFFLINE_USER_EDIT");
+    expect(key).toContain("cashier-draft-queue:v2:");
     expect(key).toContain("event-a:cashier-a");
   });
 
-  it("collapses legacy revision histories to their newest valid draft", () => {
+  it("ignores legacy revisions that were not created by an offline user edit", () => {
     const storage = {
       getItem: () =>
         JSON.stringify([
@@ -84,6 +104,6 @@ describe("cashier offline draft queue", () => {
         ]),
     };
 
-    expect(readCashierDraftQueue(storage, "legacy").map((entry) => entry.id)).toEqual(["current"]);
+    expect(readCashierDraftQueue(storage, "legacy")).toEqual([]);
   });
 });

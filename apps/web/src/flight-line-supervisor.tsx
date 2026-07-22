@@ -156,6 +156,7 @@ export function FlightLineSupervisorConsole({
   onGroupAttendance,
   onGroupMissing,
   onGroupRecall,
+  onGroupDefer,
 }: {
   board: OperationBoard;
   aircraft: Aircraft[];
@@ -171,6 +172,7 @@ export function FlightLineSupervisorConsole({
   onGroupAttendance: (ticketGroupId: string, checkedIn: boolean) => void;
   onGroupMissing: (ticketGroupId: string) => void;
   onGroupRecall: (ticketGroupId: string) => void;
+  onGroupDefer: (ticketGroupId: string) => void;
 }) {
   const [resourceGroupId, setResourceGroupId] = useState("");
   const [ticketSearch, setTicketSearch] = useState("");
@@ -312,9 +314,7 @@ export function FlightLineSupervisorConsole({
             <span>Flugzeug</span>
             <span>Plätze · Ressource</span>
             <span>Pilot</span>
-            <span className="flight-director-pilot-action-head">
-              <span className="sr-only">Pilot wechseln</span>
-            </span>
+            <span aria-hidden="true" className="flight-director-pilot-action-head" />
             <span className="flight-director-group-head">
               <span>Buchungs-</span>
               <span>gruppen</span>
@@ -334,7 +334,6 @@ export function FlightLineSupervisorConsole({
             return (
               <div className="flight-director-aircraft-row" key={entry.id}>
                 <span className="flight-director-aircraft-name">
-                  <Plane aria-hidden="true" />
                   <span>
                     <strong>{entry.registration}</strong>
                     <small>{entry.aircraftType}</small>
@@ -342,7 +341,7 @@ export function FlightLineSupervisorConsole({
                 </span>
                 <span className="flight-director-aircraft-resource">
                   <strong>{entry.passengerSeats}</strong>
-                  <small>{entry.resourceGroupName}</small>
+                  <small title={entry.resourceGroupName}>{entry.resourceGroupShortCode}</small>
                 </span>
                 <span className="flight-director-pilot-code">
                   <strong>{entry.currentPilotOperationalCode ?? "–"}</strong>
@@ -396,7 +395,7 @@ export function FlightLineSupervisorConsole({
                   <IconButton
                     aria-pressed={entry.operationalState === "REFUELING"}
                     className="flight-line-status-action state-refueling"
-                    disabled={!unavailableAllowed}
+                    disabled={!startBlockAllowed}
                     label={`${entry.registration} zum Tanken setzen`}
                     onClick={(event) => {
                       event.stopPropagation();
@@ -509,6 +508,7 @@ export function FlightLineSupervisorConsole({
         groups={compatibleGroups}
         onClose={() => setAssignmentOpen(false)}
         onAttendance={onGroupAttendance}
+        onDefer={onGroupDefer}
         onConfirm={() => {
           onConfirmAssignment();
           setAssignmentOpen(false);

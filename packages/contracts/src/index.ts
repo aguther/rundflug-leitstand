@@ -461,6 +461,10 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
     payload: z.object({
       resourceGroupId: z.string().min(1).max(100),
       name: z.string().trim().min(2).max(100),
+      shortCode: z
+        .string()
+        .trim()
+        .regex(/^[A-Z0-9-]{2,8}$/),
       gateId: z.string().min(1).max(100),
       referenceCapacity: z.number().int().min(1).max(100),
       plannedRotationMinutes: z.number().int().min(1).max(600),
@@ -1031,6 +1035,7 @@ export const aircraftOperationalSummarySchema = z.object({
   operationalStateChangedAt: z.string(),
   resourceGroupId: z.string(),
   resourceGroupName: z.string(),
+  resourceGroupShortCode: z.string(),
   refuelPlanned: z.boolean(),
   rotationsSinceRefuel: z.number().int().nonnegative(),
   refuelReminderThreshold: z.number().int().positive(),
@@ -1105,6 +1110,7 @@ export const operationBoardSchema = z.object({
     z.object({
       id: z.string(),
       name: z.string(),
+      shortCode: z.string(),
       status: z.enum(["ACTIVE", "PAUSED", "INTERRUPTED", "ENDED"]),
       gateId: z.string(),
       gateLabel: z.string(),

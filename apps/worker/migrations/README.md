@@ -208,3 +208,10 @@ rein ephemeren Natur bewusst verworfen. Pro Veranstaltung kann ein Operator gena
 ein Flugzeug genau einen Operator beanspruchen. Fremdübernahmen werden nur mit der erwarteten
 Claim-Revision ausgeführt und auditiert. Vor Anwendung ist eine portable D1-Sicherung erforderlich;
 ein Rollback erfolgt per D1 Time Travel oder aus dieser Sicherung.
+
+## 0040 – Ressourcengruppen-Kurzzeichen
+
+Ergänzt Ressourcengruppen um ein veranstaltungsweit eindeutiges, stabiles Kurzzeichen. Bestände
+werden deterministisch als `RG001`, `RG002` und fortlaufend je Veranstaltung befüllt; anschließend
+sichert ein eindeutiger Index die Zuordnung. Vor Anwendung ist eine portable D1-Sicherung
+erforderlich. Ein Rollback erfolgt per D1 Time Travel oder Wiederherstellung dieser Sicherung.

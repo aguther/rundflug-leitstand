@@ -4846,27 +4846,6 @@ p {
   min-height: 100dvh;
   background: #0b0d0f;
 }
-.admin-shell > .app-header {
-  min-height: 58px;
-  padding: 0 20px;
-  border-bottom: 1px solid #282c31;
-  background: rgba(13, 15, 17, 0.96);
-}
-.admin-shell > .app-header > div:first-child {
-  gap: 10px;
-}
-.admin-shell > .app-header strong {
-  font-size: 0.98rem;
-}
-.admin-shell > .app-header span {
-  padding-left: 14px;
-  border-left: 1px solid #353a40;
-  color: #9299a3;
-  font-size: 0.85rem;
-}
-.admin-shell > .app-header nav {
-  display: none;
-}
 .admin-shell > footer {
   display: none;
 }
@@ -5126,10 +5105,6 @@ p {
 }
 
 @media (max-width: 900px) {
-  .admin-shell > .app-header {
-    min-height: 56px;
-    padding-inline: 14px;
-  }
   .admin-layout {
     width: 100%;
     margin: 0;

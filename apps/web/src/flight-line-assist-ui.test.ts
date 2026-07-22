@@ -10,6 +10,10 @@ const assistStyles = readFileSync(
   new URL("./features/flight-line/flight-line-assist-v15.css", import.meta.url),
   "utf8",
 );
+const sharedFlightLineStyles = readFileSync(
+  new URL("./features/flight-line/flight-line-v12.css", import.meta.url),
+  "utf8",
+);
 
 const appSource = `${routerSource}\n${flightLineSource}\n${sharedSource}`;
 const assistFlowSource = `${assistSource}\n${sharedFlightLineSource}`;
@@ -138,5 +142,12 @@ describe("Flight Line Assist", () => {
     );
     expect(assistSource).toContain("disabled={!unavailableAllowed}");
     expect(flightLineSource).toContain("ABORT_ROTATION_TO_QUEUE_AND_MARK_AIRCRAFT_UNAVAILABLE");
+  });
+
+  it("clears transient touch hover colors while preserving pressed states", () => {
+    expect(sharedFlightLineStyles).toContain("@media (hover: none)");
+    expect(sharedFlightLineStyles).toContain(
+      '.assist-v15-action-bar .ds-icon-button:hover:not(:disabled):not([aria-pressed="true"])',
+    );
   });
 });

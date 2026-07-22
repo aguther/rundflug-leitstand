@@ -265,6 +265,7 @@ export function AdminView() {
   const [manifestCorrectionReason, setManifestCorrectionReason] = useState("");
   const [resourceEditorId, setResourceEditorId] = useState("new");
   const [resourceName, setResourceName] = useState("");
+  const [resourceShortCode, setResourceShortCode] = useState("");
   const [resourceGateId, setResourceGateId] = useState("");
   const [resourcePlannedMinutes, setResourcePlannedMinutes] = useState(30);
   const [resourceAutomaticPrecall, setResourceAutomaticPrecall] = useState(true);
@@ -314,6 +315,7 @@ export function AdminView() {
     const entry = board.resourceGroups[0];
     setResourceEditorId(entry?.id ?? "new");
     setResourceName(entry?.name ?? "");
+    setResourceShortCode(entry?.shortCode ?? "");
     setResourceGateId(entry?.gateId ?? board.gates.find((gate) => gate.active)?.id ?? "");
     setResourcePlannedMinutes(entry?.plannedRotationMinutes ?? 30);
     setResourceAutomaticPrecall(entry?.automaticPrecallEnabled ?? true);
@@ -888,6 +890,7 @@ export function AdminView() {
     setResourceEditorId(id);
     const entry = resourceGroups.find((group) => group.id === id);
     setResourceName(entry?.name ?? "");
+    setResourceShortCode(entry?.shortCode ?? "");
     setResourceGateId(entry?.gateId ?? board?.gates.find((gate) => gate.active)?.id ?? "");
     setResourcePlannedMinutes(entry?.plannedRotationMinutes ?? 30);
     setResourceAutomaticPrecall(entry?.automaticPrecallEnabled ?? true);
@@ -910,6 +913,7 @@ export function AdminView() {
       !board ||
       !resourceGateId ||
       resourceName.trim().length < 2 ||
+      !/^[A-Z0-9-]{2,8}$/.test(resourceShortCode.trim().toUpperCase()) ||
       adminPinRef.current.length < 4
     )
       return;
@@ -930,6 +934,7 @@ export function AdminView() {
           payload: {
             resourceGroupId,
             name: resourceName.trim(),
+            shortCode: resourceShortCode.trim().toUpperCase(),
             gateId: resourceGateId,
             referenceCapacity: Math.max(1, ...selectedSeats),
             plannedRotationMinutes: resourcePlannedMinutes,
@@ -3413,6 +3418,23 @@ export function AdminView() {
                 </label>
                 <label>
                   <FieldLabel
+                    label="Kurzzeichen"
+                    help="Eindeutiges Kürzel mit 2 bis 8 Großbuchstaben, Ziffern oder Bindestrichen für kompakte operative Ansichten."
+                  />
+                  <input
+                    autoCapitalize="characters"
+                    maxLength={8}
+                    placeholder="z. B. PA"
+                    value={resourceShortCode}
+                    onChange={(event) =>
+                      setResourceShortCode(
+                        event.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, ""),
+                      )
+                    }
+                  />
+                </label>
+                <label>
+                  <FieldLabel
                     label="Gate"
                     help="Standardmäßiger Treffpunkt für Produkte und Umläufe dieser Ressourcengruppe."
                   />
@@ -3502,9 +3524,13 @@ export function AdminView() {
                     {selectedResourceCapacity || "–"} Personen ohne Teilung
                   </span>
                 </section>
-                {masterSubmitAttempted && (resourceName.trim().length < 2 || !resourceGateId) ? (
+                {masterSubmitAttempted &&
+                (resourceName.trim().length < 2 ||
+                  !/^[A-Z0-9-]{2,8}$/.test(resourceShortCode.trim().toUpperCase()) ||
+                  !resourceGateId) ? (
                   <ValidationHint tone="error">
-                    Bezeichnung und Gate müssen für die Ressourcengruppe angegeben werden.
+                    Bezeichnung, gültiges Kurzzeichen und Gate müssen für die Ressourcengruppe
+                    angegeben werden.
                   </ValidationHint>
                 ) : null}
                 <button
@@ -3513,7 +3539,9 @@ export function AdminView() {
                   onClick={() =>
                     requestMasterSave(
                       "resource-group",
-                      resourceName.trim().length >= 2 && Boolean(resourceGateId),
+                      resourceName.trim().length >= 2 &&
+                        /^[A-Z0-9-]{2,8}$/.test(resourceShortCode.trim().toUpperCase()) &&
+                        Boolean(resourceGateId),
                     )
                   }
                   type="button"

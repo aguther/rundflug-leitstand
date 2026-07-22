@@ -38,7 +38,9 @@ import {
   appendCashierDraftRevision,
   cashierDraftQueueKey,
   latestCashierDraft,
+  legacyCashierDraftQueueKey,
   readCashierDraftQueue,
+  shouldPersistCashierDraft,
   writeCashierDraftQueue,
 } from "./offline-drafts";
 import {
@@ -336,15 +338,26 @@ export function CashierView() {
       return false;
     }
   }
-  useEffect(() => {
-    if (serverConfirmed && pendingDraftCount === 0) return;
+  function changeGroupSize(nextSize: number) {
+    setSize(nextSize);
+    if (
+      !shouldPersistCashierDraft({
+        hasPendingDraft: pendingDraftCount > 0,
+        online,
+        connectionError: error,
+      })
+    )
+      return;
     const queue = appendCashierDraftRevision(readCashierDraftQueue(localStorage, draftQueueKey), {
       productId,
-      size,
+      size: nextSize,
     });
     writeCashierDraftQueue(localStorage, draftQueueKey, queue);
     setPendingDraftCount(queue.length);
-  }, [draftQueueKey, pendingDraftCount, productId, serverConfirmed, size]);
+  }
+  useEffect(() => {
+    localStorage.removeItem(legacyCashierDraftQueueKey(EVENT_ID, CASHIER_DEVICE_ID));
+  }, []);
   useEffect(() => {
     if (!serverConfirmed) return;
     void loadTicketList();
@@ -553,7 +566,7 @@ export function CashierView() {
                 <IconButton
                   aria-label="Gruppengröße verringern"
                   label="Gruppengröße verringern"
-                  onClick={() => setSize((value) => Math.max(1, value - 1))}
+                  onClick={() => changeGroupSize(Math.max(1, size - 1))}
                   type="button"
                 >
                   <Minus aria-hidden="true" size={18} />
@@ -562,7 +575,7 @@ export function CashierView() {
                 <IconButton
                   aria-label="Gruppengröße erhöhen"
                   label="Gruppengröße erhöhen"
-                  onClick={() => setSize((value) => Math.min(12, value + 1))}
+                  onClick={() => changeGroupSize(Math.min(12, size + 1))}
                   type="button"
                 >
                   <Plus aria-hidden="true" size={18} />

@@ -374,7 +374,69 @@ try {
     rotationId: sold.aggregate.relatedRotationId,
     nextAircraftState: "AVAILABLE",
   });
-  const pausedPilot = await admin(completed.event.version, "SET_PILOT_PAUSE", {
+  const returnedSale = await command(
+    devices.cashier,
+    tokens.cashier,
+    completed.event.version,
+    "SELL_TICKET_GROUP",
+    {
+      productId: "panorama-20",
+      publicTicketCodes: [code()],
+      standby: false,
+      paymentStatus: "PAID",
+      paymentMethod: "CASH",
+    },
+  );
+  const returnedCall = await flight(returnedSale.event.version, "CALL_NEXT", {
+    ticketGroupIds: [returnedSale.aggregate.id],
+    aircraftId: "aircraft-replacement",
+    pilotId: assignedPilot.id,
+  });
+  const returnedOffBlock = await flight(returnedCall.event.version, "MARK_OFF_BLOCK", {
+    rotationId: returnedSale.aggregate.relatedRotationId,
+  });
+  current = await board(devices.flightLine, tokens.flightLine);
+  const rotationBeforeTechnicalAbort = current.rotations.find(
+    (entry) => entry.id === returnedSale.aggregate.relatedRotationId,
+  );
+  const aircraftBeforeTechnicalAbort = current.aircraft.find(
+    (entry) => entry.id === "aircraft-replacement",
+  );
+  if (!rotationBeforeTechnicalAbort || !aircraftBeforeTechnicalAbort) {
+    throw new Error("Umlauf oder Flugzeug für technischen Abbruch fehlt.");
+  }
+  const technicalAbort = await flight(
+    returnedOffBlock.event.version,
+    "ABORT_ROTATION_TO_QUEUE_AND_MARK_AIRCRAFT_UNAVAILABLE",
+    {
+      rotationId: rotationBeforeTechnicalAbort.id,
+      expectedRotationVersion: rotationBeforeTechnicalAbort.version,
+      expectedAircraftVersion: aircraftBeforeTechnicalAbort.version,
+      reason: "Synthetischer Fehler beim Run-Up",
+    },
+  );
+  current = await board(devices.flightLine, tokens.flightLine);
+  const returnedQueueGroup = current.queueGroups.find(
+    (entry) => entry.id === returnedSale.aggregate.id,
+  );
+  const returnedRotation = current.rotations.find(
+    (entry) => entry.id === returnedSale.aggregate.relatedRotationId,
+  );
+  const unavailableReplacement = current.aircraft.find(
+    (entry) => entry.id === "aircraft-replacement",
+  );
+  if (
+    returnedQueueGroup?.queueSequence !== 1 ||
+    !["QUEUED", "PRESENT"].includes(returnedQueueGroup.status) ||
+    returnedRotation?.status !== "DRAFT" ||
+    returnedRotation.aircraftId !== null ||
+    unavailableReplacement?.operationalState !== "INACTIVE"
+  ) {
+    throw new Error(
+      "Technischer Abbruch hat Queue, Umlauf oder Flugzeug inkonsistent hinterlassen.",
+    );
+  }
+  const pausedPilot = await admin(technicalAbort.event.version, "SET_PILOT_PAUSE", {
     pilotId: assignedPilot.id,
     paused: true,
     reason: "Synthetische Pilotenpause",

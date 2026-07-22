@@ -42,12 +42,12 @@ VALUES
   ('acceptance-gate-b', '${eventId}', 'Flight Line B', 'FLIGHT_LINE', 1, 20, '${now}', '${now}');
 
 INSERT INTO resource_groups
-  (id, operation_day_id, name, status, gate_id, reference_capacity, planned_rotation_minutes,
+  (id, operation_day_id, name, short_code, status, gate_id, reference_capacity, planned_rotation_minutes,
    compatible_aircraft_types_json, version, created_at, updated_at)
 VALUES
-  ('acceptance-rg-a', '${eventId}', 'Ressource A', 'ACTIVE', 'acceptance-gate-a', 4, 30,
+  ('acceptance-rg-a', '${eventId}', 'Ressource A', 'RA', 'ACTIVE', 'acceptance-gate-a', 4, 30,
    '["SYN-A"]', 0, '${now}', '${now}'),
-  ('acceptance-rg-b', '${eventId}', 'Ressource B', 'ACTIVE', 'acceptance-gate-b', 4, 35,
+  ('acceptance-rg-b', '${eventId}', 'Ressource B', 'RB', 'ACTIVE', 'acceptance-gate-b', 4, 35,
    '["SYN-B"]', 0, '${now}', '${now}');
 
 INSERT INTO products

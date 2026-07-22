@@ -1098,13 +1098,14 @@ app.post("/api/admin/events/:sourceEventId/clone", async (context) => {
     ...(keepMasterData ? groups.results : []).map((row) =>
       context.env.DB.prepare(
         `INSERT INTO resource_groups
-        (id, operation_day_id, name, status, version, created_at, updated_at, gate_id,
+        (id, operation_day_id, name, short_code, status, version, created_at, updated_at, gate_id,
          reference_capacity, planned_rotation_minutes, compatible_aircraft_types_json)
-       VALUES (?1, ?2, ?3, 'ACTIVE', 0, ?4, ?4, ?5, ?6, ?7, ?8)`,
+       VALUES (?1, ?2, ?3, ?4, 'ACTIVE', 0, ?5, ?5, ?6, ?7, ?8, ?9)`,
       ).bind(
         groupIds.get(String(row.id)),
         input.eventId,
         row.name,
+        row.short_code,
         now,
         row.gate_id ? gateIds.get(String(row.gate_id)) : null,
         row.reference_capacity,
@@ -1918,6 +1919,7 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
               a.refuel_planned, a.rotations_since_refuel, a.refuel_reminder_threshold,
               a.operational_interrupted,
               m.resource_group_id, rg.name AS resource_group_name,
+              rg.short_code AS resource_group_short_code,
               m.current_pilot_id, current_pilot.operational_code AS current_pilot_operational_code,
               (SELECT b.expected_review_at FROM operational_blocks b
                 WHERE b.operation_day_id = m.operation_day_id AND b.scope_type = 'AIRCRAFT'
@@ -1946,6 +1948,7 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
           operational_interrupted: number;
           resource_group_id: string | null;
           resource_group_name: string | null;
+          resource_group_short_code: string | null;
           current_pilot_id: string | null;
           current_pilot_operational_code: string | null;
           expected_review_at: string | null;
@@ -2001,7 +2004,7 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
       }),
     () =>
       context.env.DB.prepare(
-        `SELECT rg.id, rg.name, rg.status, rg.gate_id, g.label AS gate_label,
+        `SELECT rg.id, rg.name, rg.short_code, rg.status, rg.gate_id, g.label AS gate_label,
               rg.reference_capacity, rg.planned_rotation_minutes,
               rg.compatible_aircraft_types_json, rg.automatic_precall_enabled,
               COALESCE((SELECT json_group_array(m.aircraft_id)
@@ -2015,6 +2018,7 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
         .all<{
           id: string;
           name: string;
+          short_code: string;
           status: "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED";
           gate_id: string;
           gate_label: string;
@@ -2373,6 +2377,7 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
       operationalStateChangedAt: aircraft.operational_state_changed_at,
       resourceGroupId: aircraft.resource_group_id ?? "",
       resourceGroupName: aircraft.resource_group_name ?? "Nicht zugeordnet",
+      resourceGroupShortCode: aircraft.resource_group_short_code ?? "–",
       refuelPlanned: aircraft.refuel_planned === 1,
       rotationsSinceRefuel: aircraft.rotations_since_refuel,
       refuelReminderThreshold: aircraft.refuel_reminder_threshold,
@@ -2421,6 +2426,7 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
       return {
         id: group.id,
         name: group.name,
+        shortCode: group.short_code,
         status: group.status,
         gateId: group.gate_id,
         gateLabel: group.gate_label,

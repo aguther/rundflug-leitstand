@@ -107,7 +107,7 @@
 .flight-director-aircraft-name {
   min-width: 0;
   display: grid;
-  grid-template-columns: 22px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   align-items: center;
   gap: 2px;
   padding: 0;
@@ -116,11 +116,6 @@
   background: transparent;
   text-align: left;
   cursor: default;
-}
-.flight-director-aircraft-name > svg {
-  width: 18px;
-  height: 18px;
-  color: var(--ui-muted);
 }
 .flight-director-aircraft-name > span {
   min-width: 0;
@@ -1138,12 +1133,12 @@
 .flight-director-aircraft-table,
 .flight-director-aircraft-head,
 .flight-director-aircraft-row {
-  min-width: 1240px;
+  min-width: 1120px;
 }
 
 .flight-director-aircraft-head,
 .flight-director-aircraft-row {
-  grid-template-columns: 120px 105px 100px 44px 145px minmax(410px, 1fr) 268px;
+  grid-template-columns: 100px 80px 90px 44px 135px minmax(390px, 1fr) 268px;
   gap: 10px;
 }
 
@@ -1232,7 +1227,7 @@
 
   .flight-director-aircraft-head,
   .flight-director-aircraft-row {
-    grid-template-columns: 74px 58px 48px 36px 55px minmax(180px, 1fr) 236px;
+    grid-template-columns: 68px 48px 48px 36px 55px minmax(190px, 1fr) 236px;
     gap: 4px;
     padding-inline: 6px;
   }
@@ -1243,15 +1238,6 @@
 
   .flight-director-aircraft-row {
     font-size: 0.72rem;
-  }
-
-  .flight-director-aircraft-name {
-    grid-template-columns: 18px minmax(0, 1fr);
-  }
-
-  .flight-director-aircraft-name > svg {
-    width: 15px;
-    height: 15px;
   }
 
   .flight-director-aircraft-resource small,
@@ -1297,7 +1283,8 @@
 }
 
 @media (hover: none) {
-  .flight-director-aircraft-row .ds-icon-button:hover:not(:disabled):not([aria-pressed="true"]) {
+  .flight-director-aircraft-row .ds-icon-button:hover:not(:disabled):not([aria-pressed="true"]),
+  .assist-v15-action-bar .ds-icon-button:hover:not(:disabled):not([aria-pressed="true"]) {
     border-color: var(--ui-border-strong);
     color: var(--ui-text);
     background: var(--ui-control);
