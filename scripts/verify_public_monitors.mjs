@@ -1,6 +1,8 @@
 import { spawn, spawnSync } from "node:child_process";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
-import { dirname, resolve } from "node:path";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -12,6 +14,82 @@ const reset = spawnSync(process.execPath, [npmCli, "run", "db:reset:local"], {
   stdio: "ignore",
 });
 if (reset.status !== 0) throw new Error("Lokale Testdatenbank konnte nicht initialisiert werden.");
+
+// F-MON-010: Alte Abflugzeilen dürfen das FIDS-Limit nicht belegen und dadurch kommende
+// Fluggruppen verdrängen. 21 Zeilen reproduzieren die frühere LIMIT-20-Regression.
+const staleDepartureCommunicationNumbers = Array.from({ length: 21 }, (_, index) => 8_000 + index);
+const staleDepartureTimestamp = "2026-07-11T08:30:00.000Z";
+const staleDepartureSql = staleDepartureCommunicationNumbers
+  .map((communicationNumber) => {
+    const suffix = String(communicationNumber);
+    return `
+      INSERT INTO ticket_groups
+        (id, operation_day_id, product_id, queue_sequence, communication_number, standby,
+         status, sold_at, version)
+      VALUES
+        ('fids-history-ticket-group-${suffix}', 'demo-2026', 'panorama-20',
+         ${communicationNumber}, ${communicationNumber}, 0, 'COMPLETED',
+         '${staleDepartureTimestamp}', 0);
+      INSERT INTO tickets
+        (id, ticket_group_id, public_code_hash, status, weight_class, individual_weight_kg,
+         payment_status, price_cents, created_at)
+      VALUES
+        ('fids-history-ticket-${suffix}', 'fids-history-ticket-group-${suffix}',
+         'fids-history-hash-${suffix}', 'COMPLETED', 'NOT_CAPTURED', NULL, 'PAID', 0,
+         '${staleDepartureTimestamp}');
+      INSERT INTO flight_groups
+        (id, operation_day_id, resource_group_id, communication_number, status, version,
+         created_at, updated_at, queue_position)
+      VALUES
+        ('fids-history-flight-group-${suffix}', 'demo-2026', 'rg-panorama',
+         ${communicationNumber}, 'COMPLETED', 0, '${staleDepartureTimestamp}',
+         '${staleDepartureTimestamp}', ${communicationNumber});
+      INSERT INTO rotations
+        (id, operation_day_id, flight_group_id, status, departed_at, landed_at, completed_at,
+         version, created_at, updated_at, gate_id)
+      VALUES
+        ('fids-history-rotation-${suffix}', 'demo-2026', 'fids-history-flight-group-${suffix}',
+         'COMPLETED', '${staleDepartureTimestamp}', '${staleDepartureTimestamp}',
+         '${staleDepartureTimestamp}', 0, '${staleDepartureTimestamp}',
+         '${staleDepartureTimestamp}', 'demo-2026-gate-main');
+      INSERT INTO rotation_tickets (rotation_id, ticket_id, assigned_at)
+      VALUES
+        ('fids-history-rotation-${suffix}', 'fids-history-ticket-${suffix}',
+         '${staleDepartureTimestamp}');`;
+  })
+  .join("\n");
+const historySeedDirectory = mkdtempSync(join(tmpdir(), "rundflug-fids-history-"));
+const historySeedFile = join(historySeedDirectory, "history.sql");
+const historySeed = (() => {
+  try {
+    writeFileSync(historySeedFile, staleDepartureSql, "utf8");
+    return spawnSync(
+      process.execPath,
+      [
+        wranglerCli,
+        "d1",
+        "execute",
+        "DB",
+        "--local",
+        "--config",
+        "wrangler.jsonc",
+        "--file",
+        historySeedFile,
+      ],
+      { cwd: root, encoding: "utf8" },
+    );
+  } finally {
+    rmSync(historySeedDirectory, { recursive: true, force: true });
+  }
+})();
+if (historySeed.status !== 0) {
+  const detail =
+    historySeed.error?.message ??
+    historySeed.stderr?.trim() ??
+    historySeed.stdout?.trim() ??
+    "unbekannter Fehler";
+  throw new Error(`Synthetische FIDS-Abflughistorie konnte nicht angelegt werden: ${detail}`);
+}
 
 const pin = String.fromCharCode(48).repeat(4);
 const pinHash = createHash("sha256").update(pin).digest("hex");
@@ -272,6 +350,13 @@ try {
   }
   let publicBoard = await board();
   assertPublicTimeCommunication(publicBoard, "FIDS");
+  if (
+    publicBoard.groups.some((entry) =>
+      staleDepartureCommunicationNumbers.includes(entry.communicationNumber),
+    )
+  ) {
+    throw new Error("Abgelaufene Abflugzeilen verdrängen weiterhin kommende FIDS-Gruppen.");
+  }
   const group = publicBoard.groups.find((entry) => entry.ticketLabels.length === 2);
   const serializedBoard = JSON.stringify(publicBoard);
   if (
@@ -461,6 +546,7 @@ try {
       aircraftVisibleAfterAssignment: true,
       fleetStatusVisible: true,
       multipleUpcomingGroupsVisible: true,
+      staleDeparturesDoNotDisplaceUpcomingGroups: true,
       noExactPublicPredictionTimestamps: true,
       publicWaitWindowsConsistent: true,
       historicalRotationGatePreserved: true,

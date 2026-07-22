@@ -3599,6 +3599,9 @@ app.get("/api/public/events/:eventId/board", async (context) => {
     : { productIds: [], rotationStatuses: [] };
   const productFilterJson = JSON.stringify(displayFilter.productIds);
   const statusFilterJson = JSON.stringify(displayFilter.rotationStatuses);
+  const departedVisibilityCutoff = new Date(
+    Date.now() - event.departed_visibility_seconds * 1_000,
+  ).toISOString();
   const rows = await context.env.DB.prepare(
     `SELECT COALESCE(MIN(p.name), 'Rundflug') AS product_name,
             COALESCE(MIN(p.code), 'RF') AS product_code,
@@ -3624,12 +3627,20 @@ app.get("/api/public/events/:eventId/board", async (context) => {
         AND (?2 IS NULL OR g.id = ?2)
         AND (?3 = '[]' OR p.id IN (SELECT value FROM json_each(?3)))
         AND (?4 = '[]' OR r.status IN (SELECT value FROM json_each(?4)))
+        AND (r.status NOT IN ('IN_FLIGHT', 'LANDED', 'COMPLETED') OR r.departed_at > ?5)
       GROUP BY r.id
-      ORDER BY CASE WHEN r.status = 'DRAFT' THEN 1 ELSE 0 END,
+      ORDER BY CASE
+                 WHEN r.status = 'CALLED'
+                   OR (r.status = 'DRAFT' AND fg.precalled_at IS NOT NULL) THEN 0
+                 WHEN r.status = 'DRAFT' THEN 1
+                 ELSE 2
+               END,
+               CASE WHEN r.status IN ('IN_FLIGHT', 'LANDED', 'COMPLETED')
+                 THEN r.departed_at END DESC,
                COALESCE(fg.queue_position, fg.communication_number), fg.communication_number
       LIMIT 20`,
   )
-    .bind(eventId, requestedGateId, productFilterJson, statusFilterJson)
+    .bind(eventId, requestedGateId, productFilterJson, statusFilterJson, departedVisibilityCutoff)
     .all<{
       product_name: string;
       product_code: string;
