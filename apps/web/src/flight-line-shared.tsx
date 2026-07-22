@@ -1,5 +1,5 @@
 import type { OperationBoard } from "@rundflug/contracts";
-import { aircraftOperationalStateLabels, rotationStateLabels } from "@rundflug/domain";
+import { aircraftOperationalStateLabels } from "@rundflug/domain";
 import {
   Bell,
   CheckCircle2,
@@ -606,20 +606,13 @@ export function CompactCurrentRotation({
       </div>
     );
   }
+  const bookingGroupLabels = rotation ? rotationGroupLabels(rotation) : "";
   return (
     <div className="flight-director-current-content">
-      <dl className="flight-director-current-rotation">
-        <div>
-          <dt>Status</dt>
-          <dd>{rotation ? rotationStateLabels[rotation.status] : ""}</dd>
-        </div>
+      <dl className="flight-director-current-rotation is-booking-groups-only">
         <div>
           <dt>Buchungsgruppen</dt>
-          <dd>{rotation ? rotationGroupLabels(rotation) : ""}</dd>
-        </div>
-        <div>
-          <dt>Pilot</dt>
-          <dd>{rotation?.pilotOperationalCode ?? ""}</dd>
+          <dd title={bookingGroupLabels || undefined}>{bookingGroupLabels}</dd>
         </div>
       </dl>
       <section className="flight-director-current-timeline" aria-label="Umlaufzeitlinie">

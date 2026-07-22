@@ -409,6 +409,9 @@ export function FlightLineAssist({
                   </div>
                   <Button
                     aria-busy={isClaiming}
+                    aria-label={
+                      isClaiming ? `Übernahme läuft für ${entry.registration}` : undefined
+                    }
                     className={`assist-v15-claim${
                       existingClaim && !existingClaim.claimedByCurrentOperator
                         ? " assist-v15-claim--takeover"
@@ -426,10 +429,7 @@ export function FlightLineAssist({
                     }
                   >
                     {isClaiming ? (
-                      <>
-                        <LoaderCircle aria-hidden="true" className="assist-v15-spinner" />
-                        Wird übernommen …
-                      </>
+                      <LoaderCircle aria-hidden="true" className="assist-v15-spinner" />
                     ) : existingClaim && !existingClaim.claimedByCurrentOperator ? (
                       "Bewusst übernehmen"
                     ) : (

@@ -221,8 +221,7 @@
 }
 
 .flight-assist-v15 .assist-v15-claim[aria-busy="true"] {
-  gap: 6px;
-  padding-inline: 6px;
+  justify-content: center;
   border-color: var(--ui-accent);
   color: #fff;
   background: var(--ui-accent);
@@ -240,7 +239,10 @@
 }
 
 .flight-assist-v15 .assist-v15-spinner {
+  width: 18px;
+  height: 18px;
   flex: 0 0 auto;
+  margin: 0;
   animation: assist-v15-spin 800ms linear infinite;
 }
 
@@ -454,6 +456,35 @@
   height: auto;
   min-width: 0;
   overflow: visible;
+}
+
+.flight-assist-v15 .flight-director-current-rotation.is-booking-groups-only {
+  grid-template-columns: minmax(0, 1fr);
+  padding: 8px 12px 0;
+}
+
+.flight-assist-v15 .flight-director-current-rotation.is-booking-groups-only > div {
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 4px;
+  padding: 6px 2px 8px;
+}
+
+.flight-assist-v15 .flight-director-current-rotation.is-booking-groups-only dt {
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+
+.flight-assist-v15 .flight-director-current-rotation.is-booking-groups-only dd {
+  min-width: 0;
+  min-height: 2.3em;
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 0.82rem;
+  line-height: 1.15;
+  overflow-wrap: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .flight-assist-v15 .flight-director-current-timeline {
@@ -1025,39 +1056,21 @@
     font-size: 0.75rem;
   }
 
-  .flight-assist-v15 .flight-director-current-rotation {
-    grid-template-columns: minmax(0, 1fr);
+  .flight-assist-v15 .flight-director-current-rotation.is-booking-groups-only {
     gap: 0;
-    padding: 4px 8px;
+    padding: 4px 8px 0;
   }
 
-  .flight-assist-v15 .flight-director-current-rotation > div {
-    min-width: 0;
-    grid-template-columns: 112px minmax(0, 1fr);
-    align-items: center;
-    gap: 8px;
-    padding: 3px 2px;
+  .flight-assist-v15 .flight-director-current-rotation.is-booking-groups-only > div {
+    padding: 4px 2px 6px;
   }
 
-  .flight-assist-v15 .flight-director-current-rotation dt {
-    font-size: 0.62rem;
-    white-space: nowrap;
+  .flight-assist-v15 .flight-director-current-rotation.is-booking-groups-only dt {
+    font-size: 0.72rem;
   }
 
-  .flight-assist-v15 .flight-director-current-rotation dd {
-    min-width: 0;
-    align-self: center;
-    text-align: left;
-    overflow-wrap: anywhere;
-  }
-
-  .flight-assist-v15 .flight-director-current-rotation > div:nth-child(2) {
-    min-height: 34px;
-  }
-
-  .flight-assist-v15 .flight-director-current-rotation > div:nth-child(2) dd {
-    min-height: 2.3em;
-    line-height: 1.15;
+  .flight-assist-v15 .flight-director-current-rotation.is-booking-groups-only dd {
+    font-size: 0.78rem;
   }
 }
 

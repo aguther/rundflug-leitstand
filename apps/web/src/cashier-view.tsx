@@ -631,7 +631,7 @@ export function CashierView() {
                       type="button"
                       variant="primary"
                     >
-                      <Ticket aria-hidden="true" size={16} />
+                      <Ticket aria-hidden="true" size={20} />
                       <span className="cashier-sell-copy">
                         <span>
                           {busyProductId === entry.id
