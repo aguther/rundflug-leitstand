@@ -29,10 +29,10 @@ VALUES
    '2026-07-14T06:00:00.000Z', '2026-07-14T06:00:00.000Z');
 
 INSERT INTO resource_groups
-  (id, operation_day_id, name, status, gate_id, reference_capacity, planned_rotation_minutes,
+  (id, operation_day_id, name, short_code, status, gate_id, reference_capacity, planned_rotation_minutes,
    compatible_aircraft_types_json, version, created_at, updated_at)
 VALUES
-  ('perf-rg', 'perf-current', 'Synthetische Ressource', 'ACTIVE', 'perf-gate', 4, 35,
+  ('perf-rg', 'perf-current', 'Synthetische Ressource', 'SR', 'ACTIVE', 'perf-gate', 4, 35,
    '["SYNTHETIC-PERF"]', 0, '2026-07-14T06:00:00.000Z', '2026-07-14T06:00:00.000Z');
 
 INSERT INTO products

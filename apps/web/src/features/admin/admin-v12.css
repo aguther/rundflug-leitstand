@@ -7,22 +7,6 @@
   background: var(--ui-bg);
 }
 
-.app-shell.admin-shell > .app-header {
-  min-height: var(--header-height);
-  padding: 0 18px;
-  border-bottom: 1px solid var(--ui-border);
-  background: var(--ui-surface);
-}
-
-.app-shell.admin-shell > .app-header nav {
-  display: flex;
-}
-
-.admin-shell > .app-header > span {
-  color: var(--ui-muted);
-  border-left-color: var(--ui-border);
-}
-
 .admin-shell .admin-layout {
   width: 100%;
   min-height: 0;
@@ -268,9 +252,6 @@
 }
 
 @media (max-width: 900px) {
-  .app-shell.admin-shell > .app-header nav {
-    display: none;
-  }
   .admin-shell .admin-layout {
     grid-template-columns: 1fr;
   }

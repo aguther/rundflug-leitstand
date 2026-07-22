@@ -4,8 +4,14 @@ import appSource from "../../admin-view.tsx?raw";
 import mainSource from "../../main.tsx?raw";
 
 const stylesSource = readFileSync(new URL("./admin-v12.css", import.meta.url), "utf8");
+const legacyStylesSource = readFileSync(new URL("../../styles.css", import.meta.url), "utf8");
 
 describe("V1.2 compact administration", () => {
+  it("inherits the shared application header without admin-only geometry overrides", () => {
+    expect(stylesSource).not.toContain(".app-shell.admin-shell > .app-header");
+    expect(legacyStylesSource).not.toContain(".admin-shell > .app-header");
+  });
+
   it("loads the semantic administration layer after the legacy styles", () => {
     expect(mainSource.indexOf('import "./styles.css"')).toBeLessThan(
       mainSource.indexOf('import "./features/admin/admin-v12.css"'),

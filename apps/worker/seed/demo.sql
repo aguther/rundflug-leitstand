@@ -42,8 +42,8 @@ VALUES
    'pbkdf2-sha256$100000$cnVuZGZsdWctZGVtby12MTY$U2I1_Hn6O7SffZkc-j1tL18gzQoLy7fsSSGAgRu51Ow',
    1, 0, 1, '2026-07-11T08:00:00.000Z', '2026-07-11T08:00:00.000Z');
 
-INSERT OR IGNORE INTO resource_groups (id, operation_day_id, name, status, gate_id, version, created_at, updated_at)
-VALUES ('rg-panorama', 'demo-2026', 'Panorama', 'ACTIVE', 'demo-2026-gate-main', 0, '2026-07-11T08:00:00.000Z', '2026-07-11T08:00:00.000Z');
+INSERT OR IGNORE INTO resource_groups (id, operation_day_id, name, short_code, status, gate_id, version, created_at, updated_at)
+VALUES ('rg-panorama', 'demo-2026', 'Panorama', 'PA', 'ACTIVE', 'demo-2026-gate-main', 0, '2026-07-11T08:00:00.000Z', '2026-07-11T08:00:00.000Z');
 
 INSERT OR IGNORE INTO aircraft
   (id, registration, aircraft_type, passenger_seats, operational_state_changed_at, created_at, updated_at)
