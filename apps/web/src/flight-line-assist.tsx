@@ -19,20 +19,15 @@ import {
   IconButton,
   PageHeader,
   Panel,
-  StatusPill,
   Tabs,
 } from "./design-system/components";
 import {
   activeRotationForAircraft,
-  aircraftStatusLabel,
   BookingGroupAssignmentDialog,
   CompactCurrentRotation,
   CompactHistory,
+  CurrentAircraftStateMarker,
   type FlightLineFleetState,
-  flightLineStateClass,
-  flightLineStatusTone,
-  formatFlightLineTime,
-  latestRotationForAircraft,
   operationalRotationForAircraft,
   PilotAssignmentDialogs,
   PilotChangeIcon,
@@ -40,7 +35,6 @@ import {
   primaryAircraftActionLabel,
   primaryAircraftActionPresentation,
   rotationHistoryForAircraft,
-  visibleAircraftState,
 } from "./flight-line-shared";
 
 type Aircraft = OperationBoard["aircraft"][number];
@@ -50,21 +44,12 @@ type TurnaroundNextState = "AVAILABLE" | "REFUELING" | "PAUSED" | "INACTIVE";
 function AircraftPickerMeta({
   aircraft,
   rotation,
-  timeZone,
 }: {
   aircraft: Aircraft;
   rotation: Rotation | undefined;
-  timeZone: string;
 }) {
-  const status = visibleAircraftState(aircraft, rotation);
   return (
     <div className="assist-v15-picker-meta">
-      <StatusPill
-        className={`assist-v15-operational-state ${flightLineStateClass(status)}`}
-        tone={flightLineStatusTone(status)}
-      >
-        {aircraftStatusLabel(aircraft, rotation)}
-      </StatusPill>
       <span>
         {rotation?.communicationLabel ?? "Keine Gruppe"} · {aircraft.passengerSeats} Plätze
       </span>
@@ -72,7 +57,6 @@ function AircraftPickerMeta({
         <MapPin aria-hidden="true" />
         {rotation?.gateLabel ?? aircraft.resourceGroupName}
       </span>
-      <small>seit {formatFlightLineTime(aircraft.operationalStateChangedAt, timeZone)}</small>
     </div>
   );
 }
@@ -147,15 +131,9 @@ export function FlightLineAssist({
   const assignedRotation = activeAircraft
     ? activeRotationForAircraft(activeAircraft.id, board.rotations)
     : undefined;
-  const displayedRotation = activeAircraft
-    ? latestRotationForAircraft(activeAircraft.id, board.rotations)
-    : undefined;
   const history = activeAircraft
     ? rotationHistoryForAircraft(activeAircraft.id, board.rotations)
     : [];
-  const visibleStatus = activeAircraft
-    ? visibleAircraftState(activeAircraft, assignedRotation)
-    : "AVAILABLE";
   const waitingGroups = activeAircraft
     ? board.queueGroups.filter(
         (group) =>
@@ -396,46 +374,49 @@ export function FlightLineAssist({
                     <div className="assist-v15-aircraft-title">
                       <strong>{entry.registration}</strong>
                     </div>
-                    <AircraftPickerMeta
-                      aircraft={entry}
-                      rotation={rotation}
-                      timeZone={board.event.timeZone}
-                    />
+                    <AircraftPickerMeta aircraft={entry} rotation={rotation} />
                     {existingClaim && !existingClaim.claimedByCurrentOperator ? (
                       <small className="assist-v15-claim-owner">
                         Betreut von {existingClaim.ownerLoginCode}
                       </small>
                     ) : null}
                   </div>
-                  <Button
-                    aria-busy={isClaiming}
-                    aria-label={
-                      isClaiming ? `Übernahme läuft für ${entry.registration}` : undefined
-                    }
-                    className={`assist-v15-claim${
-                      existingClaim && !existingClaim.claimedByCurrentOperator
-                        ? " assist-v15-claim--takeover"
-                        : ""
-                    }`}
-                    disabled={claimingAircraftId !== null}
-                    onClick={() => void claim(entry)}
-                    size="compact"
-                    variant={
-                      isClaiming
-                        ? "primary"
-                        : existingClaim && !existingClaim.claimedByCurrentOperator
-                          ? "ghost"
-                          : "primary"
-                    }
-                  >
-                    {isClaiming ? (
-                      <LoaderCircle aria-hidden="true" className="assist-v15-spinner" />
-                    ) : existingClaim && !existingClaim.claimedByCurrentOperator ? (
-                      "Bewusst übernehmen"
-                    ) : (
-                      "Übernehmen"
-                    )}
-                  </Button>
+                  <div className="assist-v15-claim-zone">
+                    <CurrentAircraftStateMarker
+                      aircraft={entry}
+                      rotation={rotation}
+                      timeZone={board.event.timeZone}
+                    />
+                    <Button
+                      aria-busy={isClaiming}
+                      aria-label={
+                        isClaiming ? `Übernahme läuft für ${entry.registration}` : undefined
+                      }
+                      className={`assist-v15-claim${
+                        existingClaim && !existingClaim.claimedByCurrentOperator
+                          ? " assist-v15-claim--takeover"
+                          : ""
+                      }`}
+                      disabled={claimingAircraftId !== null}
+                      onClick={() => void claim(entry)}
+                      size="compact"
+                      variant={
+                        isClaiming
+                          ? "primary"
+                          : existingClaim && !existingClaim.claimedByCurrentOperator
+                            ? "ghost"
+                            : "primary"
+                      }
+                    >
+                      {isClaiming ? (
+                        <LoaderCircle aria-hidden="true" className="assist-v15-spinner" />
+                      ) : existingClaim && !existingClaim.claimedByCurrentOperator ? (
+                        "Bewusst übernehmen"
+                      ) : (
+                        "Übernehmen"
+                      )}
+                    </Button>
+                  </div>
                 </article>
               );
             })}
@@ -465,25 +446,11 @@ export function FlightLineAssist({
             <div>
               <div className="assist-v15-active-title">
                 <strong>{activeAircraft.registration}</strong>
-                <StatusPill
-                  className={flightLineStateClass(visibleStatus)}
-                  tone={flightLineStatusTone(visibleStatus)}
-                >
-                  {aircraftStatusLabel(activeAircraft, assignedRotation)}
-                </StatusPill>
               </div>
               <span className="assist-v15-aircraft-meta">
                 <span>{activeAircraft.passengerSeats} Plätze</span>
                 <span>·</span>
                 <span>{activeAircraft.resourceGroupName}</span>
-                <span>·</span>
-                <small>
-                  seit{" "}
-                  {formatFlightLineTime(
-                    activeAircraft.operationalStateChangedAt,
-                    board.event.timeZone,
-                  )}
-                </small>
               </span>
             </div>
             <div className="assist-v15-active-tools">
@@ -584,7 +551,7 @@ export function FlightLineAssist({
         <Panel className="assist-v15-rotation-panel" padding="compact">
           <Tabs
             items={[
-              { value: "current", label: "Aktueller Umlauf" },
+              { value: "current", label: "Aktuell" },
               { value: "history", label: "Historie" },
             ]}
             label="Flugzeuginformationen"
@@ -598,7 +565,7 @@ export function FlightLineAssist({
             >
               <CompactCurrentRotation
                 aircraft={activeAircraft}
-                rotation={displayedRotation}
+                rotation={assignedRotation}
                 timeZone={board.event.timeZone}
               />
             </div>
