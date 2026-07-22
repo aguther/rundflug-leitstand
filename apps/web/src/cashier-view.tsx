@@ -73,8 +73,7 @@ const ticketGroupStatusLabel: Record<TicketGroupOperationalStatus, string> = {
 function TicketPaper({ compact = false, ticket }: { compact?: boolean; ticket: TicketReceipt }) {
   return (
     <article className={compact ? "ticket-paper ticket-paper-preview" : "ticket-paper"}>
-      <strong>Rundflug-Leitstand</strong>
-      <small>{ticket.eventName}</small>
+      <strong>{ticket.eventName}</strong>
       <b>{ticket.code}</b>
       <img src={ticket.qrDataUrl} alt={`QR-Ticket ${ticket.code}`} />
       <dl>
@@ -172,9 +171,10 @@ function QrScanDialog({
 }
 
 export function CashierView() {
-  const { board, error, lastConfirmedAt, refresh } = useOperationBoard(CASHIER_DEVICE_ID);
+  const { board, error, lastConfirmedAt, backendConfirmed, refresh } =
+    useOperationBoard(CASHIER_DEVICE_ID);
   const online = useConnectivity();
-  const serverConfirmed = online && error === null;
+  const serverConfirmed = online && backendConfirmed && error === null;
   const draftQueueKey = cashierDraftQueueKey(EVENT_ID, CASHIER_DEVICE_ID);
   const initialDraftQueue = readCashierDraftQueue(localStorage, draftQueueKey);
   const initialDraft = latestCashierDraft(initialDraftQueue);
@@ -522,6 +522,7 @@ export function CashierView() {
   return (
     <Shell
       className="cashier-shell"
+      connection={{ backendConfirmed, error, lastConfirmedAt }}
       title="Kasse"
       notifications={
         <>
@@ -620,10 +621,17 @@ export function CashierView() {
                       variant="primary"
                     >
                       <Ticket aria-hidden="true" size={16} />
-                      <span>
-                        {busyProductId === entry.id
-                          ? "Wird bestätigt …"
-                          : `${size} Ticket${size === 1 ? "" : "s"} · ${currency(entry.priceCents * size)}`}
+                      <span className="cashier-sell-copy">
+                        <span>
+                          {busyProductId === entry.id
+                            ? "Verkauf"
+                            : `${size} Ticket${size === 1 ? "" : "s"}`}
+                        </span>
+                        <span>
+                          {busyProductId === entry.id
+                            ? "wird bestätigt …"
+                            : currency(entry.priceCents * size)}
+                        </span>
                       </span>
                     </Button>
                   </div>

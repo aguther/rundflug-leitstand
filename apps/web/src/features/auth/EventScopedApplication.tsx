@@ -46,11 +46,12 @@ export function EventScopedApplication({ session }: { session: OperatorSession }
   const selectedEvent = events.find((entry) => entry.eventId === requestedEventId);
   if (!selectedEvent) return <EventSelectionPage events={events} session={session} />;
   rememberActiveEvent(window.localStorage, selectedEvent.eventId, selectedEvent.name);
+  if (window.location.pathname === "/") {
+    window.location.replace(homeForRole(session.account.role));
+    return <Loading>Arbeitsbereich wird geöffnet …</Loading>;
+  }
   const permitted = destinationsForRole(session.account.role).some((destination) =>
-    isDestinationActive(
-      window.location.pathname === "/" ? "/kasse" : window.location.pathname,
-      destination.href,
-    ),
+    isDestinationActive(window.location.pathname, destination.href),
   );
   if (!permitted) {
     window.location.replace(homeForRole(session.account.role));

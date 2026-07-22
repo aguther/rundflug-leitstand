@@ -24,7 +24,7 @@ import { ThemeToggle } from "../design-system/ThemeToggle";
 import { useTheme } from "../design-system/theme";
 import { activeEventLabel, forgetActiveEvent } from "../event-context";
 import { useAuth } from "../features/auth/AuthContext";
-import { useConnectivity } from "../shared/hooks/use-connectivity";
+import type { ConnectionStatus } from "../shared/hooks/use-connectivity";
 import { appDestinations, isDestinationActive } from "./navigation";
 
 const destinationIcons = {
@@ -45,10 +45,22 @@ export interface AppHeaderProps {
   title: string;
   kiosk?: boolean;
   publicView?: boolean;
+  connectionStatus?: ConnectionStatus;
 }
 
-export function AppHeader({ title, kiosk = false, publicView = false }: AppHeaderProps) {
-  const online = useConnectivity();
+const connectionLabels: Record<ConnectionStatus, string> = {
+  checking: "Verbindung wird geprüft",
+  connected: "Verbunden",
+  degraded: "Verbindung gestört",
+  offline: "Offline",
+};
+
+export function AppHeader({
+  title,
+  kiosk = false,
+  publicView = false,
+  connectionStatus = "connected",
+}: AppHeaderProps) {
   const { session, logout } = useAuth();
   const { preference, setPreference } = useTheme();
   const [infoOpen, setInfoOpen] = useState(false);
@@ -104,6 +116,17 @@ export function AppHeader({ title, kiosk = false, publicView = false }: AppHeade
             {brandContent}
           </a>
         )}
+        {!kiosk && !publicView && session ? (
+          <span
+            aria-label={connectionLabels[connectionStatus]}
+            className={`app-connection ${connectionStatus}`}
+            role="status"
+            title={connectionLabels[connectionStatus]}
+          >
+            <Circle aria-hidden="true" fill="currentColor" size={12} />
+            <span>{connectionLabels[connectionStatus]}</span>
+          </span>
+        ) : null}
         {!kiosk && !publicView && session ? (
           <details
             className="view-switcher"
@@ -177,12 +200,6 @@ export function AppHeader({ title, kiosk = false, publicView = false }: AppHeade
             <CalendarDays aria-hidden="true" size={18} />
             <span>{eventLabel}</span>
           </button>
-        ) : null}
-        {!kiosk ? (
-          <span className={online ? "app-connection connected" : "app-connection"}>
-            <Circle aria-hidden="true" fill="currentColor" size={12} />
-            <span>{online ? "Verbunden" : "Offline"}</span>
-          </span>
         ) : null}
         {fidsView && !kiosk ? (
           <details className="app-info-menu">

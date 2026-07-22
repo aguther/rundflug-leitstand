@@ -409,20 +409,10 @@ body {
   padding: 0;
 }
 
-.app-header.app-header--compact .app-event > span,
-.app-header.app-header--compact .app-connection > span {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-}
-
 .app-header.app-header--compact .app-connection {
-  min-width: 24px;
+  min-width: max-content;
   justify-content: center;
-  padding-inline: 4px;
+  padding-inline: 6px;
 }
 
 @media (max-width: 760px) {
@@ -442,6 +432,21 @@ body {
 
   .app-header.app-header--compact .theme-toggle {
     display: none;
+  }
+
+  .app-header.app-header--compact .app-connection > span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .app-header.app-header--compact .app-connection {
+    min-width: 24px;
+    display: inline-flex;
+    padding-inline: 4px;
   }
 
   .app-header.app-header--compact .account-menu {
@@ -664,6 +669,18 @@ textarea {
 
 .app-connection.connected {
   color: var(--ui-success);
+}
+
+.app-connection.checking {
+  color: var(--ui-text-muted);
+}
+
+.app-connection.degraded {
+  color: var(--ui-warning-text, var(--ui-warning));
+}
+
+.app-connection.offline {
+  color: var(--ui-danger);
 }
 
 @media (max-width: 900px) {

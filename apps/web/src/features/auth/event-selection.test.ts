@@ -22,4 +22,9 @@ describe("explicit event selection and display binding", () => {
   it("does not require administrators to pair a public display", () => {
     expect(navigationSource).toContain('href: "/fids"');
   });
+
+  it("redirects the standard address to the explicit home for the signed-in role", () => {
+    expect(appSource).toContain('window.location.pathname === "/"');
+    expect(appSource).toContain("window.location.replace(homeForRole(session.account.role))");
+  });
 });

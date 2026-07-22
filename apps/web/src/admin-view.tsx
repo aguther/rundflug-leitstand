@@ -86,7 +86,8 @@ import { formatEuroInput, parseEuroToCents, productPositionOptions } from "./pro
 
 export function AdminView() {
   const { session, logout } = useAuth();
-  const { board, error, lastConfirmedAt, refresh, refreshing } = useOperationBoard(ADMIN_DEVICE_ID);
+  const { board, error, lastConfirmedAt, backendConfirmed, refresh, refreshing } =
+    useOperationBoard(ADMIN_DEVICE_ID);
   const initialAdminParams = useRef(new URLSearchParams(window.location.search)).current;
   const [adminArea, setAdminArea] = useState<AdminArea>(() => {
     const requestedArea = initialAdminParams.get("area");
@@ -1834,6 +1835,7 @@ export function AdminView() {
   return (
     <Shell
       className="admin-shell"
+      connection={{ backendConfirmed, error, lastConfirmedAt }}
       title="Administration"
       notifications={
         <>

@@ -69,8 +69,17 @@ describe("cashier release 1.7.0 acceptance coverage", () => {
     expect(styles).toMatch(/\.cashier-ticket-paper \{[\s\S]*?overflow: hidden;/);
     expect(styles).toContain(".ticket-paper-preview");
     expect(styles).toContain(".qr-scan-dialog::backdrop");
-    expect(styles).toMatch(/\.ticket-paper-preview \{[\s\S]*?width: 176px;/);
+    expect(styles).toMatch(/\.ticket-paper-preview \{[\s\S]*?width: min\(260px,/);
     expect(styles).toMatch(/\.cashier-ticket-enlarge \{[\s\S]*?width: 40px;/);
+    expect(cashierSource).toContain("<strong>{ticket.eventName}</strong>");
+    expect(cashierSource).not.toContain("<strong>Rundflug-Leitstand</strong>");
+  });
+
+  it("keeps large sale totals in a stable two-line label", () => {
+    expect(cashierSource).toContain('className="cashier-sell-copy"');
+    expect(styles).toMatch(/\.cashier-sell-action\.ds-button \{[\s\S]*?height: 48px;/);
+    expect(styles).toMatch(/\.cashier-sell-copy \{[\s\S]*?grid-template-rows: repeat\(2,/);
+    expect(styles).toContain("font-variant-numeric: tabular-nums");
   });
 
   it("uses visible selection state instead of informational selection toasts", () => {

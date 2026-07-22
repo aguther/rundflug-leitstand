@@ -36,8 +36,8 @@ describe("V1.2 Flight Line surfaces", () => {
   it("implements the V1.7.0 compact aircraft table with centered dialogs", () => {
     expect(supervisorSource).toContain("flight-director-aircraft-row");
     expect(supervisorSource).toContain("ModalDialog");
-    expect(supervisorSource).toContain("Buchungsgruppen zuweisen");
-    expect(supervisorSource).toContain("Gruppen bleiben vollständig zusammen");
+    expect(sharedSource).toContain("Buchungsgruppen zuweisen");
+    expect(sharedSource).toContain("Gruppen bleiben vollständig zusammen");
     expect(supervisorSource).not.toContain("expanded");
     expect(viewSource).not.toContain('className="pilot-assignment"');
     expect(supervisorSource).not.toContain("sidebarNavItems");
@@ -75,7 +75,8 @@ describe("V1.2 Flight Line surfaces", () => {
     expect(assistSource).toContain("assist-v15-active-column");
     expect(assistSource).toContain("availableAircraft.slice(0, visibleAircraftCount)");
     expect(assistSource).not.toContain("assist-v15-workspace");
-    expect(assistSource).toContain("assist-v15-group-menu");
+    expect(assistSource).not.toContain('className="assist-v15-groups"');
+    expect(assistSource).toContain("BookingGroupAssignmentDialog");
     expect(stylesSource).toContain("@media (max-width: 760px)");
     expect(stylesSource).toContain(".flight-assist-v15 .assist-v15-aircraft-list");
     expect(stylesSource).toContain(".assist-v15-group-popover");

@@ -50,7 +50,8 @@ function queuedSegmentPresentCount(group: QueueGroup): number {
 }
 
 export function FlightLineView() {
-  const { board, error, lastConfirmedAt, refresh } = useOperationBoard(FLIGHT_LINE_DEVICE_ID);
+  const { board, error, lastConfirmedAt, backendConfirmed, refresh } =
+    useOperationBoard(FLIGHT_LINE_DEVICE_ID);
   const [selectedAircraftId, setSelectedAircraftId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -609,6 +610,7 @@ export function FlightLineView() {
   return (
     <Shell
       className={FLIGHT_LINE_ASSIST_MODE ? "flight-line-shell assist-shell" : "flight-line-shell"}
+      connection={{ backendConfirmed, error, lastConfirmedAt }}
       title={FLIGHT_LINE_ASSIST_MODE ? "Flight Line Assist" : "Flight Line"}
       notifications={
         <>

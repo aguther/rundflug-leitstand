@@ -4,7 +4,7 @@ import adminSource from "../admin-view.tsx?raw";
 import ticketStatusSource from "../ticket-status-view.tsx?raw";
 import headerSource from "./AppHeader.tsx?raw";
 import shellSource from "./AppShell.tsx?raw";
-import { appDestinations, isDestinationActive } from "./navigation";
+import { appDestinations, homeForRole, isDestinationActive } from "./navigation";
 
 const baseStyles = readFileSync(new URL("../design-system/base.css", import.meta.url), "utf8");
 
@@ -23,6 +23,13 @@ describe("V1.2 app navigation", () => {
     expect(isDestinationActive("/flight-line", "/flight-line")).toBe(true);
     expect(isDestinationActive("/flight-line/assist", "/flight-line")).toBe(false);
     expect(isDestinationActive("/flight-line/assist", "/flight-line/assist")).toBe(true);
+  });
+
+  it("opens the role-specific operational home from the standard address", () => {
+    expect(homeForRole("CASHIER")).toBe("/kasse");
+    expect(homeForRole("FLIGHT_LINE")).toBe("/flight-line/assist");
+    expect(homeForRole("FLIGHT_DIRECTOR")).toBe("/flight-line");
+    expect(homeForRole("ADMIN")).toBe("/admin");
   });
 
   it("keeps unauthorized destinations visible and locked in the common switcher", () => {

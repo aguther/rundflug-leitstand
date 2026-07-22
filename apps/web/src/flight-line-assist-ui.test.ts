@@ -12,6 +12,7 @@ const assistStyles = readFileSync(
 );
 
 const appSource = `${routerSource}\n${flightLineSource}\n${sharedSource}`;
+const assistFlowSource = `${assistSource}\n${sharedFlightLineSource}`;
 
 describe("Flight Line Assist", () => {
   it("is directly addressable as a separate tablet and phone surface", () => {
@@ -24,7 +25,7 @@ describe("Flight Line Assist", () => {
   it("uses the shared status timeline and exposes state-dependent operational actions", () => {
     expect(assistSource).toContain("Flugzeug übernehmen");
     expect(assistSource).toContain("Übernehmen");
-    expect(assistSource).toContain("Buchungsgruppen auswählen & kombinieren");
+    expect(assistSource).toContain("BookingGroupAssignmentDialog");
     expect(assistSource).toContain("Tanken");
     expect(assistSource).toContain("Pause");
     expect(assistSource).toContain("Nicht verfügbar");
@@ -71,16 +72,15 @@ describe("Flight Line Assist", () => {
     expect(assistSource).toContain("onGroupMissing");
     expect(assistSource).toContain("onGroupRecall");
     expect(assistSource).toContain("onGroupDefer");
-    expect(assistSource).toContain("Anwesend");
-    expect(assistSource).toContain("Nicht da");
-    expect(assistSource).toContain("Nachrufen");
-    expect(assistSource).toContain("Zurückstellen");
-    expect(assistSource).toContain("Anwesenheit aufheben");
+    expect(assistFlowSource).toContain("Anwesend");
+    expect(assistFlowSource).toContain("Nicht da");
+    expect(assistFlowSource).toContain("Nachrufen");
+    expect(assistFlowSource).toContain("Zurückstellen");
   });
 
   it("shows only anonymous operational identifiers and counts", () => {
     expect(assistSource).toContain("communicationLabel");
-    expect(assistSource).toContain("ticketCount");
+    expect(assistFlowSource).toContain("ticketCount");
     expect(assistSource).not.toMatch(/guestName|phoneNumber|payment/i);
   });
 
@@ -101,6 +101,8 @@ describe("Flight Line Assist", () => {
     expect(assistSource).toContain("hat die Betreuung dieses Flugzeugs übernommen");
     expect(assistSource).toContain("onClaimUnavailable");
     expect(assistSource).not.toContain("assist-v15-workspace");
+    expect(assistSource).not.toContain('className="assist-v15-groups"');
+    expect(assistSource).toContain("setAssignmentOpen(true)");
     expect(flightLineSource).toContain("setSelectedAircraftId(null)");
     expect(flightLineSource).toContain("setSelectedQueueGroupIds([])");
     expect(flightLineSource).toContain("claimedAssistAircraftId");
@@ -124,6 +126,7 @@ describe("Flight Line Assist", () => {
     expect(assistSource).not.toContain("assist-v15-release-phone");
     expect(assistSource).toContain("assist-v15-current-pane");
     expect(assistSource).toContain("assist-v15-history-pane");
+    expect(assistSource).toContain("BookingGroupAssignmentDialog");
   });
 
   it("allows the shared unavailable abort during boarding and off-block", () => {
