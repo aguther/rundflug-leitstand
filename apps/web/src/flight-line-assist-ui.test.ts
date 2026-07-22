@@ -106,11 +106,31 @@ describe("Flight Line Assist", () => {
     expect(flightLineSource).toContain("claimedAssistAircraftId");
   });
 
-  it("uses stable grids and inline phone actions without overlay positioning", () => {
+  it("uses stable grids and a history overlay constrained by the current rotation", () => {
     expect(assistStyles).toContain("grid-template-columns: 42px minmax(0, 1fr) auto");
-    expect(assistStyles).toContain("min-height: 210px");
+    expect(assistStyles).toContain(".assist-v15-current-pane");
+    expect(assistStyles).toContain(".assist-v15-history-pane");
+    expect(assistStyles).toContain("height: auto");
     expect(assistStyles).toContain("grid-column: 1 / -1");
-    expect(assistStyles).not.toContain("position: absolute");
+    expect(assistStyles).toContain("position: absolute");
     expect(assistStyles).not.toContain("minmax(620px");
+  });
+
+  it("separates header, actions and natural-height rotation details", () => {
+    expect(assistSource).toContain('className="assist-v15-aircraft-panel"');
+    expect(assistSource).toContain('className="assist-v15-actions"');
+    expect(assistSource).toContain('className="assist-v15-rotation-panel"');
+    expect(assistSource).toContain('className="assist-v15-release"');
+    expect(assistSource).not.toContain("assist-v15-release-phone");
+    expect(assistSource).toContain("assist-v15-current-pane");
+    expect(assistSource).toContain("assist-v15-history-pane");
+  });
+
+  it("allows the shared unavailable abort during boarding and off-block", () => {
+    expect(assistSource).toContain(
+      'assignedRotation && ["CALLED", "IN_FLIGHT"].includes(assignedRotation.status)',
+    );
+    expect(assistSource).toContain("disabled={!unavailableAllowed}");
+    expect(flightLineSource).toContain("ABORT_ROTATION_TO_QUEUE_AND_MARK_AIRCRAFT_UNAVAILABLE");
   });
 });

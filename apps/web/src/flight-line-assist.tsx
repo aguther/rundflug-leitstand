@@ -201,6 +201,9 @@ export function FlightLineAssist({
   const secondaryAllowed =
     activeAircraft?.operationalState === "AVAILABLE" &&
     (!assignedRotation || assignedRotation.status === "DRAFT");
+  const unavailableAllowed =
+    secondaryAllowed ||
+    Boolean(assignedRotation && ["CALLED", "IN_FLIGHT"].includes(assignedRotation.status));
   const pilotChangeAllowed =
     canAssignPilot && (!assignedRotation || ["DRAFT", "CALLED"].includes(assignedRotation.status));
   const primaryPresentation = activeAircraft
@@ -568,19 +571,20 @@ export function FlightLineAssist({
                   </IconButton>
                 ) : null}
               </span>
-              <Button
-                disabled={releasing}
-                onClick={() => void finishClaim()}
-                size="compact"
-                variant="danger"
-              >
-                <UnlockKeyhole aria-hidden="true" /> Flugzeug freigeben
-              </Button>
             </div>
+            <Button
+              className="assist-v15-release"
+              disabled={releasing}
+              onClick={() => void finishClaim()}
+              size="compact"
+              variant="danger"
+            >
+              <UnlockKeyhole aria-hidden="true" /> <span>Flugzeug freigeben</span>
+            </Button>
           </div>
         </Panel>
 
-        <Panel className="assist-v15-operations" padding="compact">
+        <Panel className="assist-v15-actions" padding="compact">
           <div className="assist-v15-action-bar">
             {activeRotation?.status === "LANDED" ? (
               <fieldset className="assist-v15-turnaround">
@@ -641,7 +645,7 @@ export function FlightLineAssist({
               <IconButton
                 aria-pressed={["INACTIVE", "INTERRUPTED"].includes(activeAircraft.operationalState)}
                 className="flight-line-status-action state-inactive"
-                disabled={!secondaryAllowed}
+                disabled={!unavailableAllowed}
                 label="Nicht verfügbar"
                 onClick={() => onSetAircraftState(activeAircraft.id, "INACTIVE")}
                 size="touch"
@@ -650,6 +654,9 @@ export function FlightLineAssist({
               </IconButton>
             </fieldset>
           </div>
+        </Panel>
+
+        <Panel className="assist-v15-rotation-panel" padding="compact">
           <Tabs
             items={[
               { value: "current", label: "Aktueller Umlauf" },
@@ -659,16 +666,22 @@ export function FlightLineAssist({
             onChange={setDetailTab}
             value={detailTab}
           />
-          <div className="assist-v15-rotation-detail">
-            {detailTab === "current" ? (
+          <div className={`assist-v15-rotation-detail is-${detailTab}`}>
+            <div
+              aria-hidden={detailTab === "history" ? "true" : undefined}
+              className="assist-v15-current-pane"
+            >
               <CompactCurrentRotation
                 aircraft={activeAircraft}
                 rotation={displayedRotation}
                 timeZone={board.event.timeZone}
               />
-            ) : (
-              <CompactHistory history={history} timeZone={board.event.timeZone} />
-            )}
+            </div>
+            {detailTab === "history" ? (
+              <div className="assist-v15-history-pane">
+                <CompactHistory history={history} timeZone={board.event.timeZone} />
+              </div>
+            ) : null}
           </div>
         </Panel>
 
@@ -713,15 +726,6 @@ export function FlightLineAssist({
               ) : null}
             </div>
           </div>
-          <Button
-            className="assist-v15-release-phone"
-            disabled={releasing}
-            onClick={() => void finishClaim()}
-            size="touch"
-            variant="danger"
-          >
-            <UnlockKeyhole aria-hidden="true" /> Flugzeug freigeben
-          </Button>
         </Panel>
       </div>
 

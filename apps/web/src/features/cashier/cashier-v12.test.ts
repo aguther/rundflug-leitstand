@@ -35,7 +35,8 @@ describe("V1.7.0 cashier", () => {
     expect(appSource).not.toContain("cashier-product-body");
     expect(appSource).toContain("onClick={() => void sell(entry)}");
     expect(stylesSource).toContain("block-size: 2.8rem");
-    expect(stylesSource).toContain("minmax(126px, auto)");
+    expect(stylesSource).toMatch(/minmax\(78px, 0\.7fr\) 148px/);
+    expect(stylesSource).toMatch(/\.cashier-sell-action\.ds-button \{[\s\S]*?width: 100%;/);
   });
 
   it("renders one shared ticket component for preview and every print page", () => {
