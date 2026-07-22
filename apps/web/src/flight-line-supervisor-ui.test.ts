@@ -62,6 +62,10 @@ describe("Flight Line Supervisor", () => {
     expect(supervisorSource).toContain("nextTicketSort");
     expect(supervisorSource).toContain("aria-pressed={active}");
     expect(supervisorSource).toContain('className="flight-director-pilot-action"');
+    expect(supervisorSource).toContain('{ key: "queue", label: "Queue" }');
+    expect(supervisorSource).toContain("queueGroup.queueSequence");
+    expect(supervisorSource).toContain("return group.communicationNumber;");
+    expect(supervisorSource).not.toContain('<PilotIcon aria-hidden="true" />');
   });
 
   it("shares assignment UI without repeating the assigned pilot", () => {

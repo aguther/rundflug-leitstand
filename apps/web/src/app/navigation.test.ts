@@ -48,6 +48,8 @@ describe("V1.2 app navigation", () => {
     expect(baseStyles).toContain("width: auto");
     expect(baseStyles).toContain("overflow-wrap: anywhere");
     expect(baseStyles).toContain("justify-self: end");
+    expect(baseStyles).toMatch(/\.view-switcher-menu \{[\s\S]*?right: 0;[\s\S]*?left: auto;/);
+    expect(baseStyles).toContain("width: min(360px, calc(100vw - 24px))");
   });
 
   it("separates the account menu from the view switcher", () => {

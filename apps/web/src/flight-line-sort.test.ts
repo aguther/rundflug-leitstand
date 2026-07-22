@@ -11,22 +11,28 @@ function row({
   people,
   product,
   offblock,
+  communicationNumber,
+  productCode = "RN",
+  queue = null,
 }: {
   id: string;
   people: number;
   product: string;
   offblock?: string;
+  communicationNumber?: number;
+  productCode?: string;
+  queue?: TicketRow["queue"];
 }): TicketRow {
   return {
     group: {
       id: `group-${id}`,
-      communicationNumber: Number(id),
+      communicationNumber: communicationNumber ?? Number(id),
       soldAt: `2026-07-22T08:0${id}:00.000Z`,
       ticketCount: people,
     },
     rotation: {
       id: `rotation-${id}`,
-      productCode: "RN",
+      productCode,
       productName: product,
       status: "IN_FLIGHT",
       aircraftRegistration: `D-E00${id}`,
@@ -34,6 +40,7 @@ function row({
       predictedUpperMinutes: Number(id) * 10 + 5,
       timeline: { actual: { departureAt: offblock } },
     },
+    queue,
   } as TicketRow;
 }
 
@@ -69,6 +76,51 @@ describe("sold ticket sorting", () => {
     expect(
       compareTicketRows(first, second, { key: "offblock", direction: "ascending" }),
     ).toBeLessThan(0);
+  });
+
+  it("sorts ticket groups by communication number without the product prefix", () => {
+    const lowerNumber = row({
+      id: "1",
+      communicationNumber: 2,
+      people: 1,
+      product: "Rundflug",
+      productCode: "ZZ",
+    });
+    const higherNumber = row({
+      id: "2",
+      communicationNumber: 10,
+      people: 1,
+      product: "Rundflug",
+      productCode: "AA",
+    });
+    expect(
+      compareTicketRows(lowerNumber, higherNumber, {
+        key: "ticketGroup",
+        direction: "ascending",
+      }),
+    ).toBeLessThan(0);
+  });
+
+  it("sorts current queue positions by resource group and sequence", () => {
+    const first = row({
+      id: "1",
+      people: 1,
+      product: "Rundflug",
+      queue: { resourceGroupName: "Panorama", sequence: 2 },
+    });
+    const later = row({
+      id: "2",
+      people: 1,
+      product: "Rundflug",
+      queue: { resourceGroupName: "Panorama", sequence: 10 },
+    });
+    const noLongerQueued = row({ id: "3", people: 1, product: "Rundflug" });
+    expect(compareTicketRows(first, later, { key: "queue", direction: "ascending" })).toBeLessThan(
+      0,
+    );
+    expect(
+      compareTicketRows(noLongerQueued, later, { key: "queue", direction: "descending" }),
+    ).toBeGreaterThan(0);
   });
 
   it("keeps missing values at the end in both directions", () => {
