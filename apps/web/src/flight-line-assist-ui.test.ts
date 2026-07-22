@@ -46,7 +46,11 @@ describe("Flight Line Assist", () => {
     expect(assistSource).toContain("!requiresAvailableReset &&");
     expect(assistSource).toContain("Coffee");
     expect(assistSource).toContain("AircraftPickerMeta");
-    expect(assistSource).toContain("assist-v15-operational-state");
+    expect(assistSource).toContain("CurrentAircraftStateMarker");
+    expect(assistSource).not.toContain("assist-v15-operational-state");
+    expect(assistSource).toContain('{ value: "current", label: "Aktuell" }');
+    expect(assistSource).toContain("rotation={assignedRotation}");
+    expect(assistSource).not.toContain("latestRotationForAircraft");
     expect(assistStyles).toContain(".assist-v15-picker-meta");
     expect(assistStyles).toContain("display: grid");
     expect(assistSource).toContain(
@@ -61,6 +65,8 @@ describe("Flight Line Assist", () => {
     expect(assistSource).toContain('" assist-v15-claim--takeover"');
     expect(assistSource).toMatch(/isClaiming\s*\? "primary"/);
     expect(assistStyles).toContain("width: 164px");
+    expect(assistStyles).toContain(".assist-v15-claim-zone");
+    expect(assistStyles).toContain("grid-template-rows: minmax(46px, 1fr) var(--control-compact)");
     expect(assistStyles).toContain("height: var(--control-compact)");
     expect(assistStyles).toContain("max-height: var(--control-compact)");
     expect(assistStyles).toContain('.assist-v15-claim[aria-busy="true"]');
@@ -86,7 +92,7 @@ describe("Flight Line Assist", () => {
     expect(assistSource).toContain("<IconButton");
     expect(assistSource).toContain("<PageHeader");
     expect(assistSource).toContain("<Panel");
-    expect(assistSource).toContain("<StatusPill");
+    expect(assistSource).not.toContain("<StatusPill");
     expect(assistSource).not.toContain("<svg");
     expect(assistSource).not.toContain("assist-header");
     expect(assistSource).not.toContain("<BrandMark");

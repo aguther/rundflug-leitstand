@@ -16,13 +16,13 @@ requirements:
     requirement: Initial offene Tickets sowie kompakte Ticketmatrix mit stabiler Scrollbar und Symbolköpfen.
     status: implemented
   - id: V172-TIM-010
-    requirement: Gemeinsame symbolische Zeitlinie mit Verbindungen nur zwischen Symbolkanten, gut lesbaren stabilen Zeitplätzen und dynamischem Endpunkt.
+    requirement: Gemeinsame symbolische Zeitlinie mit Verbindungen nur zwischen Symbolkanten, gut lesbaren stabilen Zeitplätzen und einem nach Umlaufabschluss allein sichtbaren aktuellen Folgezustand.
     status: implemented
   - id: V172-ACT-010
     requirement: Vier direkte Abschlussaktionen mit serverseitig gesperrter Aktionsgruppe.
     status: implemented
   - id: V172-AST-010
-    requirement: Kompakte Assist-Arbeitsansicht mit 56-Pixel-Aktionen, getrennter Pilotverwaltung und einer vergrößerten Buchungsgruppenübersicht für bis zu sechs Gruppen in höchstens zwei stabil reservierten Zeilen; redundante Status- und Pilotfelder entfallen.
+    requirement: Kompakte Assist-Arbeitsansicht mit aktuellem operativem Umlauf, Symbol-Zeit-Markern in Auswahl und Historie, 56-Pixel-Aktionen, getrennter Pilotverwaltung und stabiler Buchungsgruppenübersicht; redundante Status- und Zustandszeitangaben entfallen.
     status: implemented
   - id: V172-CLM-010
     requirement: Gelbe ungefüllte bewusste Übernahme, blau gefüllter größenstabiler Pendingzustand mit ausschließlich mittigem Spinner und neutraler Touch-Hover beim Aktualisieren.

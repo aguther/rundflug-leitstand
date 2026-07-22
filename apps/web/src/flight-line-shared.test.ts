@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 import {
   aircraftStatusLabel,
   CompactCurrentRotation,
+  CompactHistory,
+  CurrentAircraftStateMarker,
   type FlightLineAircraft,
   type FlightLineRotation,
   FlightProgress,
@@ -95,6 +97,42 @@ describe("gemeinsame Flight-Line-Präsentationslogik", () => {
     expect(paused.find((step) => step.key === "available")?.current).toBe(false);
   });
 
+  it("clears completed rotation events once the aircraft enters a fleet follow-up state", () => {
+    const available = flightProgressSteps(
+      {
+        ...aircraft,
+        operationalState: "AVAILABLE",
+        operationalStateChangedAt: "2026-07-21T08:30:00.000Z",
+      },
+      undefined,
+    );
+
+    expect(available.filter((step) => step.reached).map((step) => step.key)).toEqual(["available"]);
+    expect(available.find((step) => step.key === "available")?.time).toBe(
+      "2026-07-21T08:30:00.000Z",
+    );
+    expect(available.slice(1).every((step) => !step.time)).toBe(true);
+
+    for (const [state, icon] of [
+      ["REFUELING", "fuel"],
+      ["PAUSED", "coffee"],
+      ["INACTIVE", "circle-x"],
+      ["INTERRUPTED", "circle-x"],
+    ] as const) {
+      const steps = flightProgressSteps(
+        {
+          ...aircraft,
+          operationalState: state,
+          operationalStateChangedAt: "2026-07-21T08:31:00.000Z",
+        },
+        undefined,
+      );
+      expect(steps.filter((step) => step.reached).map((step) => step.key)).toEqual(["unavailable"]);
+      expect(steps.find((step) => step.current)?.icon).toBe(icon);
+      expect(steps.slice(0, 4).every((step) => !step.time)).toBe(true);
+    }
+  });
+
   it("maps the shared timeline icons including the operational unavailable reason", () => {
     expect(flightProgressIconForStep("available", "AVAILABLE")).toBe("circle-check");
     expect(flightProgressIconForStep("boarding", "BOARDING")).toBe("tickets-plane");
@@ -122,6 +160,71 @@ describe("gemeinsame Flight-Line-Präsentationslogik", () => {
     expect(markup).toContain('data-icon="circle-x"');
     expect(markup.match(/<small><\/small>/g)).toHaveLength(5);
     expect(markup).not.toContain("flight-director-progress-label");
+  });
+
+  it("renders the current aircraft state as one accessible icon with its time", () => {
+    const availableMarkup = renderToStaticMarkup(
+      createElement(CurrentAircraftStateMarker, {
+        aircraft: {
+          ...aircraft,
+          operationalStateChangedAt: "2026-07-21T08:30:00.000Z",
+        },
+        rotation: undefined,
+        timeZone: "Europe/Berlin",
+      }),
+    );
+    expect(availableMarkup).toContain('data-icon="circle-check"');
+    expect(availableMarkup).toContain('aria-label="Verfügbar · 10:30"');
+
+    const pausedMarkup = renderToStaticMarkup(
+      createElement(CurrentAircraftStateMarker, {
+        aircraft: {
+          ...aircraft,
+          operationalState: "PAUSED",
+          operationalStateChangedAt: "2026-07-21T08:31:00.000Z",
+        },
+        rotation: undefined,
+        timeZone: "Europe/Berlin",
+      }),
+    );
+    expect(pausedMarkup).toContain('data-icon="coffee"');
+    expect(pausedMarkup).toContain('aria-label="Pause · 10:31"');
+  });
+
+  it("renders accessible icon headings and unchanged values in the rotation history", () => {
+    const completed = {
+      ...rotation("completed", "COMPLETED"),
+      productCode: "RN",
+      communicationLabel: "RN-007",
+      pilotOperationalCode: "P-01",
+      bookingGroups: [{ id: "group-1", communicationNumber: 7 }],
+      timeline: {
+        actual: {
+          boardingAt: "2026-07-21T08:00:00.000Z",
+          departureAt: "2026-07-21T08:05:00.000Z",
+          landingAt: "2026-07-21T08:25:00.000Z",
+          completionAt: "2026-07-21T08:30:00.000Z",
+        },
+      },
+    } as FlightLineRotation;
+    const markup = renderToStaticMarkup(
+      createElement(CompactHistory, { history: [completed], timeZone: "Europe/Berlin" }),
+    );
+
+    for (const label of [
+      "Buchungsgruppen",
+      "Pilot",
+      "Boarding",
+      "Off-Block",
+      "On-Block",
+      "Abschluss",
+    ]) {
+      expect(markup).toContain(`title="${label}"`);
+      expect(markup).toContain(`>${label}</span>`);
+    }
+    expect(markup).toContain("RN-007");
+    expect(markup).toContain("P-01");
+    expect(markup).toContain("10:30");
   });
 
   it("keeps the regular current-rotation layout when no rotation exists yet", () => {

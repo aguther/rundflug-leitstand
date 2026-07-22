@@ -65,7 +65,7 @@ describe("V1.2 Flight Line surfaces", () => {
     expect(assistSource).toContain("<IconButton");
     expect(assistSource).toContain("<PageHeader");
     expect(assistSource).toContain("<Panel");
-    expect(assistSource).toContain("<StatusPill");
+    expect(assistSource).not.toContain("<StatusPill");
   });
 
   it("implements exclusive aircraft selection and work modes on every viewport", () => {
