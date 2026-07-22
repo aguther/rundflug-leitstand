@@ -49,7 +49,14 @@ export default defineConfig(({ mode }) => {
     plugins: simulator ? [react()] : [react(), ...operationalPwa],
     resolve: {
       alias: simulator
-        ? []
+        ? [
+            {
+              find: "virtual:pwa-register",
+              replacement: fileURLToPath(
+                new URL("./src/app/pwa-register-disabled.ts", import.meta.url),
+              ),
+            },
+          ]
         : [
             {
               find: "./features/forecast-simulation/ForecastSimulationView",
