@@ -3,8 +3,15 @@ import type { Env } from "./types";
 
 export const SESSION_COOKIE = "rls_session";
 export const SESSION_ABSOLUTE_HOURS = 16;
+export const DISPLAY_SESSION_ABSOLUTE_DAYS = 90;
 
-export const operatorRoles = ["CASHIER", "FLIGHT_LINE", "FLIGHT_DIRECTOR", "ADMIN"] as const;
+export const operatorRoles = [
+  "CASHIER",
+  "FLIGHT_LINE",
+  "FLIGHT_DIRECTOR",
+  "ADMIN",
+  "DISPLAY",
+] as const;
 export type OperatorRole = (typeof operatorRoles)[number];
 
 export type SessionActor = {
@@ -96,13 +103,17 @@ export function assertRole(
   return actor && roles.includes(actor.role) ? actor : null;
 }
 
-export function sessionTimes(_role: OperatorRole, now = new Date()) {
-  const absoluteExpiresAt = addMinutes(now, SESSION_ABSOLUTE_HOURS * 60);
+export function sessionTimes(role: OperatorRole, now = new Date()) {
+  const maxAgeSeconds =
+    role === "DISPLAY"
+      ? DISPLAY_SESSION_ABSOLUTE_DAYS * 24 * 60 * 60
+      : SESSION_ABSOLUTE_HOURS * 60 * 60;
+  const absoluteExpiresAt = addMinutes(now, maxAgeSeconds / 60);
   return {
     createdAt: now.toISOString(),
     idleExpiresAt: absoluteExpiresAt,
     absoluteExpiresAt,
-    maxAgeSeconds: SESSION_ABSOLUTE_HOURS * 60 * 60,
+    maxAgeSeconds,
   };
 }
 
@@ -111,6 +122,7 @@ const ROLE_PREFIX: Record<OperatorRole, string> = {
   CASHIER: "KASSE",
   FLIGHT_LINE: "FL",
   FLIGHT_DIRECTOR: "LEIT",
+  DISPLAY: "DISPLAY",
 };
 
 export async function nextLoginCode(env: Env, role: OperatorRole): Promise<string> {

@@ -4,7 +4,13 @@ import { useActionMessageBridge } from "../../app/PageNotifications";
 import { createManagedAccount, loadManagedAccounts, roleLabels, updateManagedAccount } from "./api";
 import "./accounts.css";
 
-const assignableRoles: OperatorRole[] = ["CASHIER", "FLIGHT_LINE", "FLIGHT_DIRECTOR", "ADMIN"];
+const assignableRoles: OperatorRole[] = [
+  "CASHIER",
+  "FLIGHT_LINE",
+  "FLIGHT_DIRECTOR",
+  "ADMIN",
+  "DISPLAY",
+];
 
 export function AccountManagement() {
   const [accounts, setAccounts] = useState<OperatorAccountSummary[]>([]);
