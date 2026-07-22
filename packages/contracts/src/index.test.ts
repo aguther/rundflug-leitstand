@@ -1060,6 +1060,7 @@ describe("aircraftOperationalSummarySchema", () => {
     operationalStateChangedAt: "2026-07-20T12:00:00.000Z",
     resourceGroupId: "rg-1",
     resourceGroupName: "Rundflug",
+    resourceGroupShortCode: "RF",
     refuelPlanned: false,
     rotationsSinceRefuel: 0,
     refuelReminderThreshold: 5,

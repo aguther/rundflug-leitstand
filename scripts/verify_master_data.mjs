@@ -158,6 +158,7 @@ try {
   result = await admin(result.event.version, "UPSERT_RESOURCE_GROUP", {
     resourceGroupId: "resource-shared-test",
     name: "Gemeinsame Panorama-Flotte",
+    shortCode: "GPF",
     gateId: "gate-resource-test",
     referenceCapacity: 3,
     plannedRotationMinutes: 35,
@@ -166,6 +167,23 @@ try {
     reason: "Synthetischer Stammdatentest",
     adminPin: pin,
   });
+  await admin(
+    result.event.version,
+    "UPSERT_RESOURCE_GROUP",
+    {
+      resourceGroupId: "resource-duplicate-short-code",
+      name: "Andere synthetische Ressource",
+      shortCode: "GPF",
+      gateId: "gate-resource-test",
+      referenceCapacity: 3,
+      plannedRotationMinutes: 35,
+      compatibleAircraftTypes: [],
+      aircraftIds: [],
+      reason: "Doppeltes synthetisches Kurzzeichen ablehnen",
+      adminPin: pin,
+    },
+    409,
+  );
   await admin(
     result.event.version,
     "DELETE_MASTER_DATA",
@@ -351,7 +369,11 @@ try {
     updatedProduct?.name !== "Test Panorama 20 aktualisiert" ||
     updatedProduct.priceCents !== 4550 ||
     sharedGroup?.activeAircraftIds.length !== 2 ||
+    sharedGroup.shortCode !== "GPF" ||
     sharedGroup.gateId !== "gate-resource-test" ||
+    board.aircraft
+      .filter((aircraft) => sharedGroup.activeAircraftIds.includes(aircraft.id))
+      .some((aircraft) => aircraft.resourceGroupShortCode !== "GPF") ||
     !sharedGate?.assignedResourceGroupIds.includes("resource-shared-test") ||
     sharedGate.displayFilter.productIds[0] !== "product-shared-20" ||
     sharedGate.displayFilter.rotationStatuses[0] !== "DRAFT"
@@ -428,6 +450,7 @@ try {
     !resourceHistory.entries.some(
       (entry) =>
         entry.eventType === "RESOURCE_GROUP_UPSERTED" &&
+        entry.payload.shortCode === "GPF" &&
         entry.payload.aircraftIds?.includes("aircraft-shared-a") &&
         entry.payload.aircraftIds?.includes("aircraft-shared-b"),
     ) ||
@@ -444,6 +467,7 @@ try {
       sharedQueueDemandVisible: true,
       twoAircraftInResourceGroup: true,
       compatibilityAndGateConfigured: true,
+      resourceGroupShortCodeProjectedAndUnique: true,
       gateAssignmentsProjected: true,
       gateDisplayFilterAppliedPublicly: true,
       invalidGateDisplayReferenceRejected: true,

@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { expectedReviewAtFromPause } from "./flight-line-pause";
 import sharedSource from "./flight-line-shared.tsx?raw";
@@ -5,6 +6,10 @@ import supervisorSource from "./flight-line-supervisor.tsx?raw";
 import appSource from "./flight-line-view.tsx?raw";
 
 const flightLineSource = `${supervisorSource}\n${sharedSource}`;
+const flightLineStyles = readFileSync(
+  new URL("./features/flight-line/flight-line-v12.css", import.meta.url),
+  "utf8",
+);
 
 describe("Flight Line Supervisor", () => {
   it("keeps every aircraft visible and makes the aircraft the primary operational object", () => {
@@ -72,11 +77,23 @@ describe("Flight Line Supervisor", () => {
     expect(supervisorSource).toContain("BookingGroupAssignmentDialog");
     expect(sharedSource).toContain("BookingGroupAssignmentDialog");
     expect(sharedSource).not.toContain("flight-director-dialog-pilot");
+    expect(supervisorSource).toContain("onDefer={onGroupDefer}");
+  });
+
+  it("keeps the compact tablet row free of decorative and repeated content", () => {
+    expect(supervisorSource).toMatch(/flight-director-aircraft-name">\s*<span>/);
+    expect(supervisorSource).toContain("entry.resourceGroupShortCode");
+    expect(supervisorSource).not.toContain("Pilot wechseln");
+    expect(flightLineStyles).toContain("min-width: 1120px");
+    expect(flightLineStyles).toContain("flight-director-progress-label-short");
   });
 
   it("allows the audited unavailable flow during boarding and off-block", () => {
     expect(supervisorSource).toContain('["CALLED", "IN_FLIGHT"].includes(rotation.status)');
     expect(supervisorSource).toContain("disabled={!unavailableAllowed}");
+    expect(supervisorSource).toMatch(
+      /className="flight-line-status-action state-refueling"[\s\S]*?disabled={!startBlockAllowed}/,
+    );
     expect(appSource).toContain("ABORT_ROTATION_TO_QUEUE_AND_MARK_AIRCRAFT_UNAVAILABLE");
   });
 
