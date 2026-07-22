@@ -54,7 +54,8 @@ describe("Flight Line Assist", () => {
     );
     expect(assistSource).toContain("PilotChangeIcon");
     expect(assistSource).toContain("primaryAircraftActionPresentation");
-    expect(assistSource).toContain("Wird übernommen …");
+    expect(assistSource).not.toContain("Wird übernommen …");
+    expect(assistSource).toContain("Übernahme läuft für");
     expect(assistSource).toContain("claimingAircraftId");
     expect(assistSource).toContain("aria-busy={isClaiming}");
     expect(assistSource).toContain('" assist-v15-claim--takeover"');
@@ -69,13 +70,10 @@ describe("Flight Line Assist", () => {
     expect(assistStyles).toContain("border-color: var(--ui-warning)");
     expect(assistStyles).toContain("--progress-node-size: 28px");
     expect(assistStyles).toContain("font-size: 0.75rem");
-    expect(assistStyles).toContain("grid-template-columns: 112px minmax(0, 1fr)");
-    expect(assistStyles).toContain("align-items: center");
-    expect(assistStyles).toContain("align-self: center");
-    expect(assistStyles).toContain("overflow-wrap: anywhere");
-    expect(assistStyles).toContain(".flight-director-current-rotation > div:nth-child(2) dd");
+    expect(assistStyles).toContain("justify-content: center");
+    expect(assistStyles).toContain(".flight-director-current-rotation.is-booking-groups-only");
     expect(assistStyles).toContain("min-height: 2.3em");
-    expect(assistStyles).not.toContain("max-height: 2.3em");
+    expect(assistStyles).toContain("-webkit-line-clamp: 2");
     expect(assistStyles).toContain("grid-template-columns: repeat(4, 56px)");
     expect(assistStyles).toContain("scrollbar-width: thin");
     expect(assistStyles).toContain("::-webkit-scrollbar-thumb");
