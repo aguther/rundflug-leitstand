@@ -23,6 +23,8 @@ describe("local-only forecast simulation surface", () => {
     expect(webPackage.scripts.simulator).toContain("--host 127.0.0.1");
     expect(viteConfigSource).toContain("disabled.tsx");
     expect(viteConfigSource).toContain("plugins: simulator ? [react()]");
+    expect(viteConfigSource).toContain('find: "virtual:pwa-register"');
+    expect(viteConfigSource).toContain("pwa-register-disabled.ts");
     expect(viteConfigSource).toContain("proxy: simulator");
   });
 
