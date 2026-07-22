@@ -17,20 +17,54 @@ mit der vorhandenen Queue-Planung disponiert. Die Preset-Baseline ist als exakte
 
 | Preset | erzeugte / abgeschlossene Umläufe | Boarding-Fenster getroffen | Median absolut | P90 absolut | Ø Fensterbreite | max. Reaktion |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Normalbetrieb | 32 / 25 | 0 % | 0,5 Min. | 23,6 Min. | 0 Min. | 29,648 Sek. |
-| Stoßlast | 68 / 25 | 0 % | 0,5 Min. | 21,7 Min. | 0 Min. | 29,648 Sek. |
-| Flugzeugausfall | 32 / 20 | 0 % | 1,0 Min. | 13,0 Min. | 0 Min. | 29,648 Sek. |
-| Betriebsunterbrechung | 32 / 26 | 0 % | 0,5 Min. | 23,7 Min. | 0,8 Min. | 29,648 Sek. |
+| Normalbetrieb | 32 / 25 | 0 % | 0,5 Min. | 28,3 Min. | 0 Min. | 29,648 Sek. |
+| Stoßlast | 68 / 25 | 0 % | 0,5 Min. | 24,5 Min. | 0 Min. | 29,648 Sek. |
+| Flugzeugausfall | 32 / 20 | 0 % | 1,0 Min. | 16,3 Min. | 0 Min. | 29,648 Sek. |
+| Betriebsunterbrechung | 32 / 26 | 0 % | 0,5 Min. | 30,1 Min. | 0,4 Min. | 29,648 Sek. |
 
 Die Baseline zeigt damit transparent, dass die aktuelle Prognoseformel für die meisten
 Boarding-Prognosen Punktfenster statt praktisch nutzbarer Zeitspannen erzeugt. Die niedrige
 Trefferquote ist kein Zielwert und wird nicht beschönigt: Der Simulator erfüllt gerade den Zweck,
-diesen fehlenden operativen Mehrwert messbar zu machen. Eine Änderung der Formel ist nicht Teil
-dieses Stands und muss gegen diese Baseline separat bewertet werden.
+diesen fehlenden operativen Mehrwert messbar zu machen. Die Korrektur der Freshness-Semantik macht
+mehr Rohprognosen sichtbar, verbessert aber nicht automatisch deren Genauigkeit: Das Boarding-P90
+steigt in allen vier Presets und bleibt ausdrücklich ein diagnostischer Befund.
 
 Alle vier Presets weisen `0` dargestellte Countdowns während `UNCERTAIN` aus. Ereignisbedingte
 Neuberechnungen erfolgen im 30-Sekunden-Raster und liegen mit maximal 29,648 Sekunden innerhalb des
 harten Prüfkriteriums.
+
+## Korrektur der falschen Unterdrückung
+
+Vor der Korrektur waren im Normalbetrieb 1.108 von 1.507 für tatsächlich aufgerufene Umläufe
+auswertbaren DRAFT-Snapshots `UNCERTAIN`. 1.050 davon wurden ausschließlich unterdrückt, weil der
+letzte abgeschlossene Lernumlauf mehr als fünf Minuten zurücklag. Ihr Medianfehler betrug trotzdem
+nur acht Minuten; P90 lag bei 25,5 Minuten.
+
+Nach der Korrektur enthält der vollständige Normalbetrieb 3.106 stabile, 713 veränderliche und 58
+unsichere Snapshots. Sämtliche 58 Unsicherheiten beruhen auf tatsächlich fehlender aktiver
+Kapazität; `STALE_PREDICTION` tritt im vollständig lokal und alle 30 Sekunden neu berechneten Lauf
+nicht auf. Lernwertalter über fünf Minuten erzeugt bei positiver Kapazität keine Unterdrückung mehr.
+
+Die festen Boarding-Horizonte zeigen folgenden Vorher-/Nachher-Vergleich; angegeben sind
+Median/P90 des absoluten Fehlers in Minuten:
+
+| Preset | Horizont | vorher | nachher |
+| --- | ---: | ---: | ---: |
+| Normalbetrieb | 15 Min. | 7,0 / 36,0 | 7,0 / 40,0 |
+| Normalbetrieb | 30 Min. | 14,0 / 25,0 | 10,0 / 25,0 |
+| Normalbetrieb | 60 Min. | 29,5 / 29,9 | 22,5 / 22,9 |
+| Stoßlast | 15 Min. | 8,0 / 30,4 | 8,0 / 30,4 |
+| Stoßlast | 30 Min. | 8,5 / 27,5 | 8,0 / 27,5 |
+| Stoßlast | 60 Min. | 23,0 / 35,4 | 20,0 / 33,6 |
+| Flugzeugausfall | 15 Min. | 8,5 / 22,0 | 8,5 / 25,5 |
+| Flugzeugausfall | 30 Min. | 9,0 / 20,0 | 10,0 / 21,0 |
+| Flugzeugausfall | 60 Min. | 28,0 / 50,4 | 25,0 / 54,4 |
+| Betriebsunterbrechung | 15 Min. | 10,0 / 21,8 | 10,0 / 26,6 |
+| Betriebsunterbrechung | 30 Min. | 14,0 / 28,4 | 11,0 / 28,4 |
+| Betriebsunterbrechung | 60 Min. | 7,0 / 21,4 | 22,0 / 27,6 |
+
+Die kleinen Stichproben bei langen Horizonten, insbesondere im Unterbrechungspreset, erlauben
+keine belastbare Aussage über eine generelle Verbesserung oder Verschlechterung der Formel.
 
 ## Messmethode
 
@@ -49,10 +83,8 @@ harten Prüfkriteriums.
 
 ## Bekannte Grenzen
 
-- `docs/architecture/domain-state-and-forecast-v1.md` beschreibt noch eine Ausreißergrenze von
-  `3×` Referenzdauer. Implementierung und Baseline verwenden unverändert die in
-  `forecast-sample-policy-v1.md` festgelegte Grenze von `1,75×`. Dieser Widerspruch wird hier bewusst
-  dokumentiert und nicht durch eine versteckte Algorithmusänderung aufgelöst.
+- Ausreißer oberhalb `1,75×` Referenzdauer werden weiterhin unverändert verworfen. Die
+  Freshness-Korrektur ändert weder diese Grenze noch Median-/MAD-Filter oder Gewichtung.
 - Der Simulator bildet einen unmittelbar reagierenden idealisierten Bedienablauf ab. Er trifft keine
   flugbetriebliche, technische, sicherheitsrelevante oder luftrechtliche Entscheidung.
 - Der CSV-Import kalibriert ausschließlich die Zeitverteilungen. Ohne Queue- und Snapshot-Historie
@@ -67,18 +99,20 @@ harten Prüfkriteriums.
 ## Browserabnahme
 
 Die freigegebenen Konzepte unter `docs/ui/forecast-simulator-*-approved.png` wurden im lokalen
-Vite-Modus mit dem In-App-Browser gegen die gerenderte Anwendung verglichen:
+Vite-Modus mit dem In-App-Browser gegen die gerenderte Anwendung verglichen. Die Funktionsprüfung
+erfolgte bei 1280×720; ergänzende Headless-Aufnahmen belegen das Layout bei 1536×1024 und 1280×800.
+Light und Dark Mode wurden jeweils im In-App-Browser geprüft:
 
-- 1536×1024, Light und Dark Mode;
-- 1280×800, Light und Dark Mode;
-- Hauptansicht bei virtueller Zeit 11:40 sowie geöffneter Szenarioeditor;
-- kein horizontaler Dokument- oder Arbeitsbereichsüberlauf in beiden Viewports;
-- ungültige Verteilung `Boarding 13/7/12` sperrt „Übernehmen & neu starten“, `4/7/12` gibt den
-  Befehl wieder frei;
-- ausgewählte unsichere Fluggruppe zeigt ausdrücklich „Countdown unterdrückt“;
-- Detaildialog enthält MAE, Median, P90 und Bias für Boarding, Start, Landung und Abschluss sowie
-  Horizonte, Reaktionszeit und Qualitätsverteilung;
-- keine Browserfehler oder Warnungen;
+- Normalbetrieb bei virtueller Zeit 11:40 mit einem mehr als fünf Minuten alten Lernwert zeigt die
+  reguläre Boarding-Prognose und keine Unterdrückung;
+- eine ausgewählte Fluggruppe während der Betriebsunterbrechung zeigt keinen Countdown, aber die
+  klar bezeichnete Rohprognose und die Gründe „Betrieb unterbrochen“ sowie „Ressourcengruppe nicht
+  aktiv“;
+- die Detailansicht enthält Rohzeiten aller Phasen, Stichprobengröße, Lernwertalter, aktive
+  Kapazität und Unterdrückungsgrund; die Auswertung enthält zusätzlich deren Verteilung;
+- kein horizontaler Dokument- oder Arbeitsbereichsüberlauf in den geprüften Viewports;
+- eine vollständig neu geladene Browserseite enthält sinnvollen Anwendungsinhalt, kein
+  Framework-Fehleroverlay und keine Konsolenfehler oder -warnungen;
 - Netzwerkaufzeichnung nach Reload: ausschließlich lokale Vite-Modul- und HMR-Verbindungen,
   keine externe URL, kein `/api/`-Aufruf und kein Service-Worker-Modul.
 

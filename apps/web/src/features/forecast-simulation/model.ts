@@ -1,4 +1,8 @@
-import type { ForecastRotationStatus, PredictionQuality } from "@rundflug/domain";
+import type {
+  ForecastRotationStatus,
+  ForecastUncertaintyReason,
+  PredictionQuality,
+} from "@rundflug/domain";
 
 export interface TriangularDistribution {
   minimum: number;
@@ -103,6 +107,7 @@ export interface SimulationForecastSnapshot {
   sampleSize: number;
   dataAgeMinutes: number;
   activeCapacity: number;
+  uncertaintyReasons: ForecastUncertaintyReason[];
   countdownDisplayed: boolean;
 }
 
@@ -148,6 +153,7 @@ export interface SimulationMetrics {
   completion: ForecastMetricSummary;
   horizons: Record<"15" | "30" | "60", ForecastMetricSummary>;
   qualities: Record<PredictionQuality, number>;
+  uncertaintyReasons: Record<ForecastUncertaintyReason, number>;
   uncertainCountdownViolations: number;
   maximumEventReactionSeconds: number;
 }
@@ -159,6 +165,20 @@ export interface SimulationResult {
   events: SimulationEvent[];
   snapshots: SimulationForecastSnapshot[];
   metrics: SimulationMetrics;
+}
+
+export const FORECAST_UNCERTAINTY_REASON_LABELS: Record<ForecastUncertaintyReason, string> = {
+  OPERATION_INTERRUPTED: "Betrieb unterbrochen",
+  EMERGENCY_MODE: "Notfallmodus",
+  RESOURCE_GROUP_INACTIVE: "Ressourcengruppe nicht aktiv",
+  NO_ACTIVE_CAPACITY: "keine aktive Kapazität",
+  STALE_PREDICTION: "Prognose älter als fünf Minuten",
+};
+
+export function forecastUncertaintyLabel(reasons: readonly ForecastUncertaintyReason[]): string {
+  return reasons.length === 0
+    ? "nicht näher bestimmt"
+    : reasons.map((reason) => FORECAST_UNCERTAINTY_REASON_LABELS[reason]).join(", ");
 }
 
 export const DEFAULT_PHASES: SimulationConfig["phases"] = {
