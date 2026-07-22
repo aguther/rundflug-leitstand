@@ -1,0 +1,32 @@
+version: 1.7.2
+requirements:
+  - id: V172-REL-010
+    requirement: Repository und Laufzeit verwenden konsistent Release 1.7.2.
+    status: implemented
+  - id: V172-FOC-010
+    requirement: Suchfelder verwenden genau einen zugänglichen Fokusrahmen am äußeren Container.
+    status: implemented
+  - id: V172-CAS-010
+    requirement: Kassenprodukte ohne Flugzeugsymbol und ohne horizontalen Überlauf.
+    status: implemented
+  - id: V172-SUP-010
+    requirement: Responsive Supervisor-Flugzeugtabelle mit kompakter Detailspalte, sechs Aktionen und größenstabil mittig ausgerichteter Zeitlinie.
+    status: implemented
+  - id: V172-TKT-010
+    requirement: Initial offene Tickets sowie kompakte Ticketmatrix mit stabiler Scrollbar und Symbolköpfen.
+    status: implemented
+  - id: V172-TIM-010
+    requirement: Gemeinsame symbolische Zeitlinie mit Verbindungen nur zwischen Symbolkanten, gut lesbaren stabilen Zeitplätzen und dynamischem Endpunkt.
+    status: implemented
+  - id: V172-ACT-010
+    requirement: Vier direkte Abschlussaktionen mit serverseitig gesperrter Aktionsgruppe.
+    status: implemented
+  - id: V172-AST-010
+    requirement: Kompakte Assist-Arbeitsansicht mit 56-Pixel-Aktionen, getrennter Pilotverwaltung und mobil ausgerichteter Umlaufdarstellung mit zwei stabilen Buchungsgruppen-Zeilen.
+    status: implemented
+  - id: V172-CLM-010
+    requirement: Gelbe ungefüllte bewusste Übernahme, blau gefüllter größenstabiler Pendingzustand und neutraler Touch-Hover beim Aktualisieren.
+    status: implemented
+  - id: V172-QA-010
+    requirement: Automatisierte und visuelle Abnahme der festgelegten Light- und Dark-Viewports.
+    status: implemented

@@ -34,8 +34,10 @@ describe("V1.7.0 cashier", () => {
     expect(appSource).toContain("Aufteilung:");
     expect(appSource).not.toContain("cashier-product-body");
     expect(appSource).toContain("onClick={() => void sell(entry)}");
+    expect(appSource).not.toContain('<Plane aria-hidden="true" />');
     expect(stylesSource).toContain("block-size: 2.8rem");
-    expect(stylesSource).toMatch(/minmax\(78px, 0\.7fr\) 148px/);
+    expect(stylesSource).toContain("overflow-x: clip");
+    expect(stylesSource).toMatch(/minmax\(0, 1\.5fr\)[\s\S]*?minmax\(118px, 1fr\)/);
     expect(stylesSource).toMatch(/\.cashier-sell-action\.ds-button \{[\s\S]*?width: 100%;/);
   });
 

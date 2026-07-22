@@ -38,7 +38,10 @@ describe("Flight Line Assist", () => {
     expect(assistSource).toContain("CompactCurrentRotation");
     expect(assistSource).toContain("CompactHistory");
     expect(assistSource).toContain('activeRotation?.status === "LANDED"');
-    expect(assistSource).toContain("Zustand nach Abschluss");
+    expect(assistSource).not.toContain("Zustand nach Abschluss");
+    expect(assistSource).toContain('onRunRotation(activeRotation, "REFUELING")');
+    expect(assistSource).toContain('onRunRotation(activeRotation, "PAUSED")');
+    expect(assistSource).toContain('onRunRotation(activeRotation, "INACTIVE")');
     expect(assistSource).toContain('onSetAircraftState(activeAircraft.id, "AVAILABLE")');
     expect(assistSource).toContain("!requiresAvailableReset &&");
     expect(assistSource).toContain("Coffee");
@@ -51,6 +54,29 @@ describe("Flight Line Assist", () => {
     );
     expect(assistSource).toContain("PilotChangeIcon");
     expect(assistSource).toContain("primaryAircraftActionPresentation");
+    expect(assistSource).toContain("Wird übernommen …");
+    expect(assistSource).toContain("claimingAircraftId");
+    expect(assistSource).toContain("aria-busy={isClaiming}");
+    expect(assistSource).toContain('" assist-v15-claim--takeover"');
+    expect(assistSource).toMatch(/isClaiming\s*\? "primary"/);
+    expect(assistStyles).toContain("width: 164px");
+    expect(assistStyles).toContain("height: var(--control-compact)");
+    expect(assistStyles).toContain("max-height: var(--control-compact)");
+    expect(assistStyles).toContain('.assist-v15-claim[aria-busy="true"]');
+    expect(assistStyles).toContain("white-space: nowrap");
+    expect(assistStyles).toContain("cursor: wait");
+    expect(assistStyles).toContain(".assist-v15-claim--takeover:not(:disabled)");
+    expect(assistStyles).toContain("border-color: var(--ui-warning)");
+    expect(assistStyles).toContain("--progress-node-size: 28px");
+    expect(assistStyles).toContain("font-size: 0.75rem");
+    expect(assistStyles).toContain("grid-template-columns: 112px minmax(0, 1fr)");
+    expect(assistStyles).toContain("align-items: center");
+    expect(assistStyles).toContain("align-self: center");
+    expect(assistStyles).toContain("overflow-wrap: anywhere");
+    expect(assistStyles).toContain(".flight-director-current-rotation > div:nth-child(2) dd");
+    expect(assistStyles).toContain("min-height: 2.3em");
+    expect(assistStyles).not.toContain("max-height: 2.3em");
+    expect(assistStyles).toContain("grid-template-columns: repeat(4, 56px)");
     expect(assistStyles).toContain("scrollbar-width: thin");
     expect(assistStyles).toContain("::-webkit-scrollbar-thumb");
   });
@@ -128,7 +154,6 @@ describe("Flight Line Assist", () => {
     expect(assistStyles).toContain(".assist-v15-current-pane");
     expect(assistStyles).toContain(".assist-v15-history-pane");
     expect(assistStyles).toContain("height: auto");
-    expect(assistStyles).toContain("grid-column: 1 / -1");
     expect(assistStyles).toContain("position: absolute");
     expect(assistStyles).not.toContain("minmax(620px");
   });
@@ -146,9 +171,9 @@ describe("Flight Line Assist", () => {
 
   it("allows the shared unavailable abort during boarding and off-block", () => {
     expect(assistSource).toContain(
-      'assignedRotation && ["CALLED", "IN_FLIGHT"].includes(assignedRotation.status)',
+      'assignedRotation && ["CALLED", "IN_FLIGHT", "LANDED"].includes(assignedRotation.status)',
     );
-    expect(assistSource).toContain("disabled={!unavailableAllowed}");
+    expect(assistSource).toContain("disabled={!unavailableAllowed || actionBusy}");
     expect(flightLineSource).toContain("ABORT_ROTATION_TO_QUEUE_AND_MARK_AIRCRAFT_UNAVAILABLE");
   });
 

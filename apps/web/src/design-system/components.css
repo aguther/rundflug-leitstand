@@ -171,6 +171,9 @@
   color: var(--ui-text);
   background: transparent;
 }
+.ds-search-field input:focus-visible {
+  box-shadow: none;
+}
 .ds-search-control {
   display: block;
   margin: 0;
