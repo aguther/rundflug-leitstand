@@ -18,6 +18,7 @@ import {
   updateOperatorAccountSchema,
 } from "@rundflug/contracts";
 import {
+  assessForecastFreshness,
   assessRemainingCapacity,
   deriveResourceGroupCapacity,
   estimateDuration,
@@ -2117,7 +2118,7 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
   const activePilotCount = pilotRows.results.filter(
     (pilot) => pilot.active === 1 && pilot.paused === 0,
   ).length;
-  const dataAgeMinutes = Math.max(0, (Date.now() - Date.parse(eventRow.updated_at)) / 60_000);
+  const forecastReadAt = new Date().toISOString();
   const operationsEnd = eventRow.operations_end_at ? Date.parse(eventRow.operations_end_at) : 0;
   const remainingOperatingMinutes = Math.max(0, (operationsEnd - Date.now()) / 60_000);
 
@@ -2152,7 +2153,6 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
           (eventRow.planned_deboarding_minutes ?? 5) +
           (eventRow.planned_buffer_minutes ?? 3),
         actualDurationsMinutes: actualDurations,
-        dataAgeMinutes,
         interrupted:
           product.resource_group_status !== "ACTIVE" ||
           eventRow.emergency_mode === 1 ||
@@ -2239,6 +2239,21 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
           pilot.paused === 0 &&
           pilot.current_rotation_id === null,
       );
+      const forecastFreshness = assessForecastFreshness({
+        predictionQuality: rotation.prediction_quality,
+        predictionUpdatedAt: rotation.prediction_updated_at,
+        now: forecastReadAt,
+      });
+      const resourceGroupStatus = products.results.find(
+        (product) => product.resource_group_id === rotation.resource_group_id,
+      )?.resource_group_status;
+      const effectivePredictionQuality =
+        eventRow.emergency_mode === 1 ||
+        eventRow.operational_interrupted === 1 ||
+        resourceGroupStatus !== "ACTIVE" ||
+        effectiveActiveCapacity === 0
+          ? "UNCERTAIN"
+          : forecastFreshness.quality;
       return {
         id: rotation.id,
         version: rotation.version,
@@ -2281,7 +2296,6 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
                 (eventRow.planned_deboarding_minutes ?? 5) +
                 (eventRow.planned_buffer_minutes ?? 3),
               actualDurationsMinutes: actualDurations,
-              dataAgeMinutes,
               interrupted: eventRow.emergency_mode === 1 || eventRow.operational_interrupted === 1,
               activeCapacity: effectiveActiveCapacity,
             }),
@@ -2298,7 +2312,6 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
                 (eventRow.planned_deboarding_minutes ?? 5) +
                 (eventRow.planned_buffer_minutes ?? 3),
               actualDurationsMinutes: actualDurations,
-              dataAgeMinutes,
               interrupted: eventRow.emergency_mode === 1 || eventRow.operational_interrupted === 1,
               activeCapacity: effectiveActiveCapacity,
             }),
@@ -2326,7 +2339,7 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
             landingAt: rotation.landed_at,
             completionAt: rotation.completed_at,
           },
-          predictionQuality: rotation.prediction_quality,
+          predictionQuality: effectivePredictionQuality,
           predictionUpdatedAt: rotation.prediction_updated_at,
         },
         tickets: JSON.parse(rotation.tickets_json) as Array<{
@@ -3310,6 +3323,7 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
             COALESCE(fg.queue_position, tg.queue_sequence) AS queue_sequence,
             t.attendance_status,
             r.prediction_quality, r.prediction_lower_minutes, r.prediction_upper_minutes,
+            r.prediction_updated_at,
             od.operational_note AS event_operational_note, od.operational_interrupted,
             od.emergency_mode, od.notification_lead_minutes,
             rg.status AS resource_group_status,
@@ -3340,6 +3354,7 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
       prediction_quality: "STABLE" | "CHANGING" | "UNCERTAIN" | null;
       prediction_lower_minutes: number | null;
       prediction_upper_minutes: number | null;
+      prediction_updated_at: string | null;
       updated_at: string;
       event_operational_note: string;
       resource_group_operational_note: string;
@@ -3351,11 +3366,22 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
   if (!row) {
     return unknownTicketResponse(context.env, context.req.raw);
   }
+  const forecastFreshness = assessForecastFreshness({
+    predictionQuality: row.prediction_quality,
+    predictionUpdatedAt: row.prediction_updated_at,
+    now: new Date().toISOString(),
+  });
+  const effectivePredictionQuality =
+    row.emergency_mode === 1 ||
+    row.operational_interrupted === 1 ||
+    row.resource_group_status !== "ACTIVE"
+      ? "UNCERTAIN"
+      : forecastFreshness.quality;
   const prepare =
     row.status === "DRAFT" &&
     row.resource_group_status === "ACTIVE" &&
     row.operational_interrupted === 0 &&
-    row.prediction_quality !== "UNCERTAIN" &&
+    effectivePredictionQuality !== "UNCERTAIN" &&
     row.prediction_upper_minutes !== null &&
     row.prediction_upper_minutes <= row.notification_lead_minutes;
   const publicState = {
@@ -3392,22 +3418,19 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
       row.emergency_mode === 0 &&
       row.resource_group_status === "ACTIVE" &&
       row.status === "DRAFT" &&
-      row.operational_interrupted === 0
+      row.operational_interrupted === 0 &&
+      effectivePredictionQuality !== "UNCERTAIN"
         ? (row.prediction_lower_minutes ?? Math.max(0, (row.queue_sequence - 1) * 20))
         : 0,
     waitUpperMinutes:
       row.emergency_mode === 0 &&
       row.resource_group_status === "ACTIVE" &&
       row.status === "DRAFT" &&
-      row.operational_interrupted === 0
+      row.operational_interrupted === 0 &&
+      effectivePredictionQuality !== "UNCERTAIN"
         ? (row.prediction_upper_minutes ?? row.queue_sequence * 30)
         : 0,
-    predictionQuality:
-      row.emergency_mode === 1 ||
-      row.operational_interrupted === 1 ||
-      row.resource_group_status !== "ACTIVE"
-        ? "UNCERTAIN"
-        : (row.prediction_quality ?? "CHANGING"),
+    predictionQuality: effectivePredictionQuality,
     message:
       row.emergency_mode === 1
         ? "Organisatorischer Betrieb pausiert – bitte später erneut prüfen."
@@ -3415,7 +3438,9 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
           ? "Flugbetrieb für dieses Produkt pausiert – bitte Status erneut prüfen."
           : row.operational_interrupted === 1
             ? "Flugbetrieb unterbrochen – bitte Status erneut prüfen."
-            : message[row.status],
+            : forecastFreshness.reason === "STALE_PREDICTION"
+              ? "Prognose wird aktualisiert – bitte Status erneut prüfen."
+              : message[row.status],
     operationalNotice: row.resource_group_operational_note || row.event_operational_note,
     updatedAt: row.updated_at,
   });

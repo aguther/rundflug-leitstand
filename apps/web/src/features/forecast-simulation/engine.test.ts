@@ -37,7 +37,7 @@ describe("local forecast simulation", () => {
         completed: 25,
         windowCoverage: 0,
         boardingMedian: 0.5,
-        boardingP90: 23.6,
+        boardingP90: 28.3,
         averageWindowWidth: 0,
         maximumReactionSeconds: 29.648,
         uncertainCountdownViolations: 0,
@@ -47,7 +47,7 @@ describe("local forecast simulation", () => {
         completed: 25,
         windowCoverage: 0,
         boardingMedian: 0.5,
-        boardingP90: 21.7,
+        boardingP90: 24.5,
         averageWindowWidth: 0,
         maximumReactionSeconds: 29.648,
         uncertainCountdownViolations: 0,
@@ -57,7 +57,7 @@ describe("local forecast simulation", () => {
         completed: 20,
         windowCoverage: 0,
         boardingMedian: 1,
-        boardingP90: 13,
+        boardingP90: 16.3,
         averageWindowWidth: 0,
         maximumReactionSeconds: 29.648,
         uncertainCountdownViolations: 0,
@@ -67,8 +67,8 @@ describe("local forecast simulation", () => {
         completed: 26,
         windowCoverage: 0,
         boardingMedian: 0.5,
-        boardingP90: 23.7,
-        averageWindowWidth: 0.8,
+        boardingP90: 30.1,
+        averageWindowWidth: 0.4,
         maximumReactionSeconds: 29.648,
         uncertainCountdownViolations: 0,
       },
@@ -116,6 +116,31 @@ describe("local forecast simulation", () => {
     expect(timestamps).toEqual([...timestamps].sort((left, right) => left - right));
     expect(result.metrics.maximumEventReactionSeconds).toBeLessThanOrEqual(30);
     expect(result.metrics.uncertainCountdownViolations).toBe(0);
+  });
+
+  it("never suppresses a fresh forecast only because the latest learning sample is old", () => {
+    const result = runSimulation(simulationConfigForPreset("NORMAL"));
+    const oldLearningSnapshots = result.snapshots.filter(
+      (snapshot) => snapshot.dataAgeMinutes > 5 && snapshot.activeCapacity > 0,
+    );
+
+    expect(oldLearningSnapshots.length).toBeGreaterThan(0);
+    expect(oldLearningSnapshots.every((snapshot) => snapshot.quality !== "UNCERTAIN")).toBe(true);
+    expect(result.metrics.uncertaintyReasons.STALE_PREDICTION).toBe(0);
+  });
+
+  it("retains diagnostic raw times and reasons while hard uncertainty hides the countdown", () => {
+    const result = runSimulation(simulationConfigForPreset("OPERATION_INTERRUPTION"));
+    const uncertain = result.snapshots.find(
+      (snapshot) =>
+        snapshot.quality === "UNCERTAIN" &&
+        snapshot.uncertaintyReasons.includes("OPERATION_INTERRUPTED"),
+    );
+
+    expect(uncertain).toMatchObject({ countdownDisplayed: false });
+    expect(Date.parse(uncertain?.predictedBoardingAt ?? "")).not.toBeNaN();
+    expect(Date.parse(uncertain?.predictedCompletionAt ?? "")).not.toBeNaN();
+    expect(result.metrics.uncertaintyReasons.OPERATION_INTERRUPTED).toBeGreaterThan(0);
   });
 
   it("applies manual incidents only after an active rotation reaches a safe boundary", () => {

@@ -1,5 +1,20 @@
 export type PredictionQuality = "STABLE" | "CHANGING" | "UNCERTAIN";
 
+export const FORECAST_FRESHNESS_MAX_AGE_MINUTES = 5;
+
+export type ForecastUncertaintyReason =
+  | "OPERATION_INTERRUPTED"
+  | "EMERGENCY_MODE"
+  | "RESOURCE_GROUP_INACTIVE"
+  | "NO_ACTIVE_CAPACITY"
+  | "STALE_PREDICTION";
+
+export interface ForecastFreshnessAssessment {
+  quality: PredictionQuality;
+  reason: Extract<ForecastUncertaintyReason, "STALE_PREDICTION"> | null;
+  ageMinutes: number | null;
+}
+
 export interface DurationEstimate {
   expectedMinutes: number;
   lowerMinutes: number;
@@ -74,6 +89,7 @@ export interface ForecastTimelineProjection {
   dataAgeMinutes: number;
   activeCapacity: number;
   referenceDurationMinutes: number;
+  uncertaintyReasons: ForecastUncertaintyReason[];
 }
 
 export interface ForecastTimelinesInput {
@@ -206,7 +222,6 @@ export function advanceOverduePrediction(input: {
 export function estimateDuration(input: {
   referenceMinutes: number;
   actualDurationsMinutes: readonly number[];
-  dataAgeMinutes: number;
   interrupted: boolean;
   activeCapacity: number;
 }): DurationEstimate {
@@ -214,11 +229,7 @@ export function estimateDuration(input: {
     input.actualDurationsMinutes,
     input.referenceMinutes,
   );
-  if (
-    input.interrupted ||
-    input.activeCapacity === 0 ||
-    (validSamples.length > 0 && input.dataAgeMinutes > 5)
-  ) {
+  if (input.interrupted || input.activeCapacity === 0) {
     return {
       expectedMinutes: Math.round(input.referenceMinutes),
       lowerMinutes: Math.max(0, Math.round(input.referenceMinutes - 10)),
@@ -258,6 +269,31 @@ export function estimateDuration(input: {
     quality,
     sampleCount: validSamples.length,
   };
+}
+
+export function assessForecastFreshness(input: {
+  predictionQuality: PredictionQuality | null;
+  predictionUpdatedAt: string | null;
+  now: string;
+  maximumAgeMinutes?: number;
+}): ForecastFreshnessAssessment {
+  const nowMs = Date.parse(input.now);
+  if (!Number.isFinite(nowMs)) throw new Error("Forecast freshness time is invalid.");
+  const maximumAgeMinutes = input.maximumAgeMinutes ?? FORECAST_FRESHNESS_MAX_AGE_MINUTES;
+  if (!Number.isFinite(maximumAgeMinutes) || maximumAgeMinutes < 0) {
+    throw new Error("Forecast freshness maximum age is invalid.");
+  }
+  const updatedAtMs = input.predictionUpdatedAt
+    ? Date.parse(input.predictionUpdatedAt)
+    : Number.NaN;
+  if (input.predictionQuality === null || !Number.isFinite(updatedAtMs)) {
+    return { quality: "UNCERTAIN", reason: "STALE_PREDICTION", ageMinutes: null };
+  }
+  const ageMinutes = Math.max(0, (nowMs - updatedAtMs) / 60_000);
+  if (ageMinutes > maximumAgeMinutes) {
+    return { quality: "UNCERTAIN", reason: "STALE_PREDICTION", ageMinutes };
+  }
+  return { quality: input.predictionQuality, reason: null, ageMinutes };
 }
 
 export function forecastQueueWindows(input: {
@@ -373,14 +409,17 @@ export function calculateForecastTimelines(
     const dataAgeMinutes = lastActualAt
       ? Math.max(0, (now.getTime() - Date.parse(lastActualAt)) / 60_000)
       : 0;
+    const uncertaintyReasons: ForecastUncertaintyReason[] = [];
+    if (input.event.operationalInterrupted) uncertaintyReasons.push("OPERATION_INTERRUPTED");
+    if (input.event.emergencyMode) uncertaintyReasons.push("EMERGENCY_MODE");
+    if (rotation.resourceGroupStatus !== "ACTIVE") {
+      uncertaintyReasons.push("RESOURCE_GROUP_INACTIVE");
+    }
+    if (activeCapacity === 0) uncertaintyReasons.push("NO_ACTIVE_CAPACITY");
     const estimate = estimateDuration({
       referenceMinutes: referenceTotal,
       actualDurationsMinutes: actualDurations,
-      dataAgeMinutes,
-      interrupted:
-        input.event.operationalInterrupted ||
-        input.event.emergencyMode ||
-        rotation.resourceGroupStatus !== "ACTIVE",
+      interrupted: uncertaintyReasons.some((reason) => reason !== "NO_ACTIVE_CAPACITY"),
       activeCapacity,
     });
     let window = forecastQueueWindows({
@@ -444,6 +483,7 @@ export function calculateForecastTimelines(
       dataAgeMinutes,
       activeCapacity,
       referenceDurationMinutes: referenceTotal,
+      uncertaintyReasons,
     };
   });
 }

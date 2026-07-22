@@ -21,6 +21,7 @@ import { CalibrationCsvError, calibrateFromCsv } from "./csv-calibration";
 import { calculateSimulationMetrics, runSimulation } from "./engine";
 import { ForecastTimeline } from "./ForecastTimeline";
 import {
+  forecastUncertaintyLabel,
   type ManualIncident,
   SIMULATION_PRESET_LABELS,
   type SimulationConfig,
@@ -175,7 +176,7 @@ function safeExport(
   manualIncidents: readonly ManualIncident[],
 ) {
   return {
-    schema: "rundflug-forecast-simulation/v1",
+    schema: "rundflug-forecast-simulation/v2",
     scenario: result.config,
     seed: result.config.seed,
     manualIncidents,
@@ -259,7 +260,15 @@ export function ForecastSimulationView() {
       }),
     [visibleEvents, visibleRotations, visibleSnapshots],
   );
+  const latestVisibleSnapshotByRotation = useMemo(() => {
+    const snapshots = new Map<string, SimulationForecastSnapshot>();
+    for (const snapshot of visibleSnapshots) snapshots.set(snapshot.rotationId, snapshot);
+    return snapshots;
+  }, [visibleSnapshots]);
   const selectedRotation = result.rotations.find((entry) => entry.id === selectedRotationId);
+  const selectedSnapshot = selectedRotationId
+    ? latestVisibleSnapshotByRotation.get(selectedRotationId)
+    : undefined;
 
   const inject = (
     type: ManualIncident["type"],
@@ -655,6 +664,66 @@ export function ForecastSimulationView() {
             );
           })}
         </div>
+        {selectedSnapshot ? (
+          <section className="sim-raw-forecast" aria-label="Diagnostischer Prognose-Snapshot">
+            <header>
+              <div>
+                <h3>Aktueller Prognose-Snapshot</h3>
+                <p>{formatTime(selectedSnapshot.capturedAt)} · nur interne Diagnose</p>
+              </div>
+              <strong data-quality={selectedSnapshot.quality}>
+                {selectedSnapshot.quality === "STABLE"
+                  ? "Stabil"
+                  : selectedSnapshot.quality === "CHANGING"
+                    ? "Veränderlich"
+                    : "Unsicher"}
+              </strong>
+            </header>
+            <dl>
+              <div>
+                <dt>Rohwert Boarding</dt>
+                <dd>{formatTime(selectedSnapshot.predictedBoardingAt)}</dd>
+              </div>
+              <div>
+                <dt>Rohwert Start</dt>
+                <dd>{formatTime(selectedSnapshot.predictedDepartureAt)}</dd>
+              </div>
+              <div>
+                <dt>Rohwert Landung</dt>
+                <dd>{formatTime(selectedSnapshot.predictedLandingAt)}</dd>
+              </div>
+              <div>
+                <dt>Rohwert Abschluss</dt>
+                <dd>{formatTime(selectedSnapshot.predictedCompletionAt)}</dd>
+              </div>
+              <div>
+                <dt>Stichprobe</dt>
+                <dd>n={selectedSnapshot.sampleSize}</dd>
+              </div>
+              <div>
+                <dt>Lernwertalter</dt>
+                <dd>{metric(selectedSnapshot.dataAgeMinutes, " Min.")}</dd>
+              </div>
+              <div>
+                <dt>Aktive Kapazität</dt>
+                <dd>{selectedSnapshot.activeCapacity}</dd>
+              </div>
+              <div>
+                <dt>Unterdrückungsgrund</dt>
+                <dd>
+                  {selectedSnapshot.uncertaintyReasons.length === 0
+                    ? "keiner"
+                    : forecastUncertaintyLabel(selectedSnapshot.uncertaintyReasons)}
+                </dd>
+              </div>
+            </dl>
+            {selectedSnapshot.quality === "UNCERTAIN" ? (
+              <p className="sim-raw-forecast-warning">
+                Countdown unterdrückt · Rohwerte nicht als operative Zeit freigegeben.
+              </p>
+            ) : null}
+          </section>
+        ) : null}
         <div className="sim-detail-diagnostics">
           <article>
             <h3>Horizonte Boarding</h3>
@@ -670,6 +739,14 @@ export function ForecastSimulationView() {
               Qualität: {visibleMetrics.qualities.STABLE} stabil ·{" "}
               {visibleMetrics.qualities.CHANGING} veränderlich ·{" "}
               {visibleMetrics.qualities.UNCERTAIN} unsicher
+            </p>
+            <p className="sim-diagnostic-reasons">
+              Unterdrückungsgründe: Betrieb{" "}
+              {visibleMetrics.uncertaintyReasons.OPERATION_INTERRUPTED}
+              {" · "}Notfall {visibleMetrics.uncertaintyReasons.EMERGENCY_MODE}
+              {" · "}Ressourcengruppe {visibleMetrics.uncertaintyReasons.RESOURCE_GROUP_INACTIVE}
+              {" · "}Kapazität {visibleMetrics.uncertaintyReasons.NO_ACTIVE_CAPACITY}
+              {" · "}veraltet {visibleMetrics.uncertaintyReasons.STALE_PREDICTION}
             </p>
           </article>
         </div>

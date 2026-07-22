@@ -177,8 +177,9 @@ Der Rechenlauf verwendet:
 
 Nur `COMPLETED`-Umläufe mit `called_at` und `completed_at` liefern Messwerte. Der Referenzwert erhält
 Gewicht 1; reale Werte erhalten in zeitlicher Folge Gewichte ab 2, sodass jüngere Messungen stärker
-wirken. Nicht endliche, nicht positive oder mehr als dreifach über dem Referenzwert liegende Werte
-werden entfernt. Ab fünf plausiblen Werten begrenzt Median Absolute Deviation weitere Ausreißer.
+wirken. Nicht endliche, nicht positive oder mehr als das 1,75-Fache des Referenzwerts betragende
+Werte werden entfernt. Ab fünf plausiblen Werten begrenzt Median Absolute Deviation weitere
+Ausreißer. Das Alter des jüngsten Messwerts bleibt diagnostisch und ist kein Unsicherheitsauslöser.
 
 Details und Begründung stehen in `docs/architecture/forecast-sample-policy-v1.md`; die reine Logik
 liegt in `packages/domain/src/forecast.ts`.
@@ -189,12 +190,14 @@ liegt in `packages/domain/src/forecast.ts`.
 | --- | --- | --- |
 | `STABLE` | mindestens fünf robuste Werte und mittlere absolute Abweichung höchstens fünf Minuten | engeres Intervall möglich |
 | `CHANGING` | Kaltstart oder noch schwankende Messwerte | breiteres Zeitfenster |
-| `UNCERTAIN` | Unterbrechung, Notfall, inaktive Ressourcengruppe, keine aktive Kapazität oder veraltete Tagesmessung | kein scheinpräziser Countdown |
+| `UNCERTAIN` | Unterbrechung, Notfall, inaktive Ressourcengruppe, keine aktive Kapazität oder mehr als fünf Minuten alte persistierte Prognose | kein scheinpräziser Countdown |
 
 Bei `STABLE` verwendet die Dauerschätzung ±5 Minuten, sonst ±10 Minuten. Das Queuefenster wird mit
 der Zahl paralleler Ressourcen und den vollständigen Zyklen vor der Gruppe verbreitert. Ist ein
 erwartetes Ereignis überfällig, verschiebt `advanceOverduePrediction` alle davon abhängigen
 Zeitpunkte nach vorn, statt einen bereits vergangenen Zeitpunkt weiter anzuzeigen.
+Die Freshness-Prüfung verwendet ausschließlich `prediction_updated_at`; der Zeitpunkt des letzten
+Lernumlaufs und `operation_days.updated_at` besitzen keine Freshness-Semantik.
 
 ### 5.5 Kapazität
 

@@ -1,3 +1,4 @@
+import { assessForecastFreshness } from "@rundflug/domain";
 import type { Env } from "./types";
 import { buildWebPushRequest } from "./web-push-request";
 
@@ -24,14 +25,27 @@ export function shouldQueuePreparationNotification(input: {
   interrupted: boolean;
   status: string;
   predictionQuality: string | null;
+  predictionUpdatedAt: string | null;
   predictionUpperMinutes: number | null;
   notificationLeadMinutes: number;
+  now: string;
 }): boolean {
+  const predictionQuality =
+    input.predictionQuality === "STABLE" || input.predictionQuality === "CHANGING"
+      ? input.predictionQuality
+      : input.predictionQuality === "UNCERTAIN"
+        ? "UNCERTAIN"
+        : null;
+  const freshness = assessForecastFreshness({
+    predictionQuality,
+    predictionUpdatedAt: input.predictionUpdatedAt,
+    now: input.now,
+  });
   return (
     !input.emergencyMode &&
     !input.interrupted &&
     input.status === "DRAFT" &&
-    input.predictionQuality !== "UNCERTAIN" &&
+    freshness.quality !== "UNCERTAIN" &&
     input.predictionUpperMinutes !== null &&
     input.predictionUpperMinutes <= input.notificationLeadMinutes
   );
@@ -163,6 +177,7 @@ export async function queueEligiblePreparationNotifications(
 ): Promise<number> {
   const rows = await env.DB.prepare(
     `SELECT r.id, r.status, r.prediction_quality, r.prediction_upper_minutes,
+            r.prediction_updated_at,
             od.notification_lead_minutes, od.operational_interrupted, od.emergency_mode
        FROM rotations r
        JOIN operation_days od ON od.id = r.operation_day_id
@@ -174,18 +189,22 @@ export async function queueEligiblePreparationNotifications(
       status: string;
       prediction_quality: string | null;
       prediction_upper_minutes: number | null;
+      prediction_updated_at: string | null;
       notification_lead_minutes: number;
       operational_interrupted: number;
       emergency_mode: number;
     }>();
+  const now = new Date().toISOString();
   const eligible = rows.results.filter((row) =>
     shouldQueuePreparationNotification({
       emergencyMode: row.emergency_mode === 1,
       interrupted: row.operational_interrupted === 1,
       status: row.status,
       predictionQuality: row.prediction_quality,
+      predictionUpdatedAt: row.prediction_updated_at,
       predictionUpperMinutes: row.prediction_upper_minutes,
       notificationLeadMinutes: row.notification_lead_minutes,
+      now,
     }),
   );
   const queued = await Promise.all(

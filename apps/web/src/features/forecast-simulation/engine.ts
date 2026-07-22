@@ -1,6 +1,7 @@
 import {
   calculateForecastTimelines,
   type ForecastRotationStatus,
+  type ForecastUncertaintyReason,
   type PredictionQuality,
   planNextRotations,
 } from "@rundflug/domain";
@@ -363,9 +364,17 @@ export function calculateSimulationMetrics(input: {
   }
 
   const qualities: Record<PredictionQuality, number> = { STABLE: 0, CHANGING: 0, UNCERTAIN: 0 };
+  const uncertaintyReasons: Record<ForecastUncertaintyReason, number> = {
+    OPERATION_INTERRUPTED: 0,
+    EMERGENCY_MODE: 0,
+    RESOURCE_GROUP_INACTIVE: 0,
+    NO_ACTIVE_CAPACITY: 0,
+    STALE_PREDICTION: 0,
+  };
   let uncertainCountdownViolations = 0;
   for (const snapshot of input.snapshots) {
     qualities[snapshot.quality] += 1;
+    for (const reason of snapshot.uncertaintyReasons) uncertaintyReasons[reason] += 1;
     if (snapshot.quality === "UNCERTAIN" && snapshot.countdownDisplayed) {
       uncertainCountdownViolations += 1;
     }
@@ -397,6 +406,7 @@ export function calculateSimulationMetrics(input: {
       "60": metricSummary(horizonErrors["60"]),
     },
     qualities,
+    uncertaintyReasons,
     uncertainCountdownViolations,
     maximumEventReactionSeconds: reactionSeconds.length === 0 ? 0 : Math.max(...reactionSeconds),
   };
@@ -799,6 +809,7 @@ export function runSimulation(
         sampleSize: projection.sampleSize,
         dataAgeMinutes: projection.dataAgeMinutes,
         activeCapacity: projection.activeCapacity,
+        uncertaintyReasons: projection.uncertaintyReasons,
         countdownDisplayed: projection.predictionQuality !== "UNCERTAIN",
       });
     }
