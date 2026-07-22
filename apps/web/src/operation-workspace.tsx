@@ -159,6 +159,7 @@ export function useOperationBoard(deviceId: string) {
     lastConfirmedAt: null,
   });
   const [refreshing, setRefreshing] = useState(false);
+  const [backendConfirmed, setBackendConfirmed] = useState(false);
   const refresh = useCallback(async () => {
     setRefreshing(true);
     try {
@@ -167,6 +168,7 @@ export function useOperationBoard(deviceId: string) {
       );
       setState((current) => reduceBoardSyncState(current, outcome));
       if (outcome.type === "CONFIRMED") {
+        setBackendConfirmed(true);
         void saveOperationBoard(EVENT_ID, deviceId, outcome.board, outcome.confirmedAt);
       }
     } finally {
@@ -229,7 +231,7 @@ export function useOperationBoard(deviceId: string) {
       window.clearInterval(timer);
     };
   }, [refresh, deviceId]);
-  return { ...state, refresh, refreshing };
+  return { ...state, backendConfirmed, refresh, refreshing };
 }
 
 export function ConnectionNotice({

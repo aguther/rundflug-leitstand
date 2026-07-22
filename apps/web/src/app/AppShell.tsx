@@ -1,4 +1,4 @@
-import { useConnectivity } from "../shared/hooks/use-connectivity";
+import { resolveConnectionStatus, useConnectivity } from "../shared/hooks/use-connectivity";
 import { AppHeader } from "./AppHeader";
 import { ActionNotificationStack, PageNotice, PageNotificationRegion } from "./PageNotifications";
 
@@ -9,6 +9,7 @@ export function AppShell({
   publicView = false,
   className = "",
   notifications,
+  connection,
 }: {
   title: string;
   children: React.ReactNode;
@@ -16,13 +17,30 @@ export function AppShell({
   publicView?: boolean;
   className?: string;
   notifications?: React.ReactNode;
+  connection?: {
+    error: string | null;
+    lastConfirmedAt: string | null;
+    backendConfirmed: boolean;
+  };
 }) {
   const online = useConnectivity();
+  const connectionStatus = resolveConnectionStatus({
+    online,
+    error: connection?.error,
+    lastConfirmedAt: connection?.lastConfirmedAt,
+    backendConfirmed: connection?.backendConfirmed,
+    tracksBackend: connection !== undefined,
+  });
   return (
     <main className={`${kiosk ? "app-shell kiosk-shell" : "app-shell"} ${className}`.trim()}>
-      <AppHeader kiosk={kiosk} publicView={publicView} title={title} />
+      <AppHeader
+        connectionStatus={connectionStatus}
+        kiosk={kiosk}
+        publicView={publicView}
+        title={title}
+      />
       <PageNotificationRegion>
-        {!online ? (
+        {connectionStatus === "offline" ? (
           <PageNotice noticeKey="app-offline" tone="warning">
             Offline · letzter bestätigter Stand bleibt sichtbar; operative Aktionen sind gesperrt.
           </PageNotice>

@@ -1,7 +1,9 @@
 import type { OperationBoard } from "@rundflug/contracts";
 import { aircraftOperationalStateLabels, rotationStateLabels } from "@rundflug/domain";
 import {
+  Bell,
   Check,
+  CheckCircle2,
   CircleCheckBig,
   Clock3,
   Plane,
@@ -11,12 +13,14 @@ import {
   User,
   UserCheck,
   UserPen,
+  UserRoundX,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button, ConfirmationDialog, ModalDialog } from "./design-system/components";
 
 export type FlightLineAircraft = OperationBoard["aircraft"][number];
 export type FlightLineRotation = OperationBoard["rotations"][number];
+export type FlightLineQueueGroup = OperationBoard["queueGroups"][number];
 export type FlightLineFleetState = "AVAILABLE" | "REFUELING" | "PAUSED" | "INACTIVE";
 export type FlightLineStatusTone = "success" | "warning" | "danger" | "info" | "neutral";
 
@@ -251,6 +255,215 @@ export function FlightProgress({
         </li>
       ))}
     </ol>
+  );
+}
+
+function queuedSegmentTicketCount(group: FlightLineQueueGroup): number {
+  return group.nextSegmentTicketCount ?? group.ticketCount;
+}
+
+function queuedSegmentPresentCount(group: FlightLineQueueGroup): number {
+  return group.nextSegmentPresentCount ?? group.presentCount;
+}
+
+function AssignmentQueueRow({
+  group,
+  selected,
+  selectedSeats,
+  capacity,
+  onToggle,
+  onAttendance,
+  onMissing,
+  onRecall,
+  onDefer,
+}: {
+  group: FlightLineQueueGroup;
+  selected: boolean;
+  selectedSeats: number;
+  capacity: number;
+  onToggle: (ticketGroupId: string, selected: boolean) => void;
+  onAttendance: (ticketGroupId: string, checkedIn: boolean) => void;
+  onMissing: (ticketGroupId: string) => void;
+  onRecall: (ticketGroupId: string) => void;
+  onDefer?: ((ticketGroupId: string) => void) | undefined;
+}) {
+  const segmentTicketCount = queuedSegmentTicketCount(group);
+  const segmentPresentCount = queuedSegmentPresentCount(group);
+  const exceedsCapacity = !selected && selectedSeats + segmentTicketCount > capacity;
+  return (
+    <div
+      className={`${selected ? "flight-director-queue-row selected" : "flight-director-queue-row"}${onDefer ? " has-defer" : ""}`}
+    >
+      <label>
+        <input
+          checked={selected}
+          disabled={group.status === "MISSING" || exceedsCapacity}
+          onChange={(event) => onToggle(group.id, event.target.checked)}
+          type="checkbox"
+        />
+        <strong>{flightLineGroupLabel(group.productCode, group.communicationNumber)}</strong>
+      </label>
+      <span>
+        {group.segmentCount && group.segmentCount > 1 ? (
+          <>
+            {segmentTicketCount} von {group.ticketCount} Personen · Teil {group.segmentIndex ?? 1}/
+            {group.segmentCount}
+          </>
+        ) : (
+          <>
+            {segmentTicketCount} Person{segmentTicketCount === 1 ? "" : "en"}
+          </>
+        )}
+      </span>
+      <span>
+        {segmentPresentCount}/{segmentTicketCount} anwesend
+      </span>
+      <div>
+        <Button
+          onClick={() => onAttendance(group.id, group.status !== "PRESENT")}
+          size="compact"
+          type="button"
+          variant={group.status === "PRESENT" ? "primary" : "secondary"}
+        >
+          <CheckCircle2 aria-hidden="true" /> Anwesend
+        </Button>
+        <Button onClick={() => onMissing(group.id)} size="compact" type="button">
+          <UserRoundX aria-hidden="true" /> Nicht da
+        </Button>
+        <Button onClick={() => onRecall(group.id)} size="compact" type="button">
+          <Bell aria-hidden="true" /> Nachrufen
+        </Button>
+        {onDefer ? (
+          <Button onClick={() => onDefer(group.id)} size="compact" type="button">
+            <RotateCcw aria-hidden="true" /> Zurückstellen
+          </Button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+export function BookingGroupAssignmentDialog({
+  aircraft,
+  groups,
+  selectedQueueGroupIds,
+  confirmDisabled,
+  open,
+  onClose,
+  onConfirm,
+  onToggle,
+  onAttendance,
+  onMissing,
+  onRecall,
+  onDefer,
+}: {
+  aircraft: FlightLineAircraft | undefined;
+  groups: FlightLineQueueGroup[];
+  selectedQueueGroupIds: string[];
+  confirmDisabled: boolean;
+  open: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  onToggle: (ticketGroupId: string, selected: boolean) => void;
+  onAttendance: (ticketGroupId: string, checkedIn: boolean) => void;
+  onMissing: (ticketGroupId: string) => void;
+  onRecall: (ticketGroupId: string) => void;
+  onDefer?: (ticketGroupId: string) => void;
+}) {
+  const selectedGroups = groups.filter((group) => selectedQueueGroupIds.includes(group.id));
+  const selectedSeats = selectedGroups.reduce(
+    (total, group) => total + queuedSegmentTicketCount(group),
+    0,
+  );
+  const capacity = aircraft?.passengerSeats ?? 0;
+  const capacityExceeded = selectedSeats > capacity;
+  return (
+    <ModalDialog
+      description={
+        aircraft
+          ? `${aircraft.registration} · ${aircraft.passengerSeats} Plätze · Gruppen bleiben vollständig zusammen.`
+          : undefined
+      }
+      footer={
+        <>
+          <Button onClick={onClose} type="button" variant="secondary">
+            Abbrechen
+          </Button>
+          <Button
+            disabled={confirmDisabled || selectedSeats === 0 || capacityExceeded}
+            onClick={onConfirm}
+            type="button"
+            variant="primary"
+          >
+            <CheckCircle2 aria-hidden="true" /> Belegung bestätigen & Boarding starten
+          </Button>
+        </>
+      }
+      onClose={onClose}
+      open={open}
+      size="wide"
+      title="Buchungsgruppen zuweisen"
+    >
+      <div className="flight-director-assignment-dialog">
+        <section className="flight-director-queue">
+          {groups.length > 0 ? (
+            groups.map((group) => (
+              <AssignmentQueueRow
+                capacity={capacity}
+                group={group}
+                key={group.id}
+                onAttendance={onAttendance}
+                onDefer={onDefer}
+                onMissing={onMissing}
+                onRecall={onRecall}
+                onToggle={onToggle}
+                selected={selectedQueueGroupIds.includes(group.id)}
+                selectedSeats={selectedSeats}
+              />
+            ))
+          ) : (
+            <p>Keine passende Buchungsgruppe in der Warteschlange.</p>
+          )}
+        </section>
+        <aside className="flight-director-selection">
+          <div>
+            <span>Ausgewählt</span>
+            {selectedGroups.length > 0 ? (
+              selectedGroups.map((group) => (
+                <strong key={group.id}>
+                  {flightLineGroupLabel(group.productCode, group.communicationNumber)}
+                  <small>
+                    {queuedSegmentTicketCount(group)}
+                    {group.segmentCount && group.segmentCount > 1
+                      ? ` von ${group.ticketCount} · Teil ${group.segmentIndex ?? 1}/${group.segmentCount}`
+                      : ""}{" "}
+                    Pers.
+                  </small>
+                </strong>
+              ))
+            ) : (
+              <small>Noch keine Gruppe gewählt</small>
+            )}
+          </div>
+          <div className="flight-director-selection-total">
+            <span>Gesamt</span>
+            <strong>
+              {selectedSeats} von {capacity} Plätzen
+            </strong>
+          </div>
+          {capacityExceeded ? (
+            <p className="flight-director-dialog-warning">
+              Die Auswahl überschreitet die Kapazität.
+            </p>
+          ) : null}
+          {!aircraft?.currentPilotId ? (
+            <p className="flight-director-dialog-warning">
+              Vor Belegung bitte über „Pilot zuweisen“ einen Pilotencode am Flugzeug hinterlegen.
+            </p>
+          ) : null}
+        </aside>
+      </div>
+    </ModalDialog>
   );
 }
 

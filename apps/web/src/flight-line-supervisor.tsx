@@ -1,15 +1,6 @@
 import type { OperationBoard } from "@rundflug/contracts";
 import { rotationStateLabels } from "@rundflug/domain";
-import {
-  Bell,
-  CheckCircle2,
-  CircleOff,
-  Coffee,
-  Fuel,
-  History,
-  Plane,
-  UserRoundX,
-} from "lucide-react";
+import { ArrowDown, ArrowUp, CircleOff, Coffee, Fuel, History, Plane } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
   Button,
@@ -22,6 +13,7 @@ import {
 } from "./design-system/components";
 import {
   activeRotationForAircraft,
+  BookingGroupAssignmentDialog,
   CompactHistory,
   type FlightLineFleetState,
   FlightProgress,
@@ -44,8 +36,102 @@ function queuedSegmentTicketCount(group: QueueGroup): number {
   return group.nextSegmentTicketCount ?? group.ticketCount;
 }
 
-function queuedSegmentPresentCount(group: QueueGroup): number {
-  return group.nextSegmentPresentCount ?? group.presentCount;
+export type TicketRow = { group: Rotation["bookingGroups"][number]; rotation: Rotation };
+export type TicketSortKey =
+  | "ticketGroup"
+  | "people"
+  | "status"
+  | "aircraft"
+  | "product"
+  | "window"
+  | "boarding"
+  | "offblock"
+  | "onblock"
+  | "completion";
+export type TicketSort = {
+  key: TicketSortKey;
+  direction: "ascending" | "descending";
+} | null;
+
+const ticketColumns: Array<{ key: TicketSortKey; label: string }> = [
+  { key: "ticketGroup", label: "Ticketgruppe" },
+  { key: "people", label: "Personen" },
+  { key: "status", label: "Umlaufstatus" },
+  { key: "aircraft", label: "Flugzeug" },
+  { key: "product", label: "Produkt" },
+  { key: "window", label: "Zeitfenster" },
+  { key: "boarding", label: "Boarding" },
+  { key: "offblock", label: "Off-Block" },
+  { key: "onblock", label: "On-Block" },
+  { key: "completion", label: "Abschluss" },
+];
+
+const ticketCollator = new Intl.Collator("de-DE", { numeric: true, sensitivity: "base" });
+
+export function nextTicketSort(current: TicketSort, key: TicketSortKey): TicketSort {
+  if (!current || current.key !== key) return { key, direction: "ascending" };
+  if (current.direction === "ascending") return { key, direction: "descending" };
+  return null;
+}
+
+function optionalTimestamp(value: string | null | undefined): number | null {
+  if (!value) return null;
+  const timestamp = Date.parse(value);
+  return Number.isNaN(timestamp) ? null : timestamp;
+}
+
+function ticketSortValue(row: TicketRow, key: TicketSortKey): string | number | null {
+  const { group, rotation } = row;
+  switch (key) {
+    case "ticketGroup":
+      return flightLineGroupLabel(rotation.productCode, group.communicationNumber);
+    case "people":
+      return group.ticketCount;
+    case "status":
+      return rotationStateLabels[rotation.status];
+    case "aircraft":
+      return rotation.aircraftRegistration;
+    case "product":
+      return rotation.productName;
+    case "window":
+      return rotation.timeline.actual.departureAt ? null : rotation.predictedLowerMinutes;
+    case "boarding":
+      return optionalTimestamp(rotation.timeline.actual.boardingAt);
+    case "offblock":
+      return optionalTimestamp(rotation.timeline.actual.departureAt);
+    case "onblock":
+      return optionalTimestamp(rotation.timeline.actual.landingAt);
+    case "completion":
+      return optionalTimestamp(rotation.timeline.actual.completionAt);
+  }
+}
+
+export function compareTicketRows(left: TicketRow, right: TicketRow, sort: TicketSort): number {
+  if (!sort) {
+    return (
+      right.group.soldAt.localeCompare(left.group.soldAt) ||
+      right.group.id.localeCompare(left.group.id)
+    );
+  }
+  const leftValue = ticketSortValue(left, sort.key);
+  const rightValue = ticketSortValue(right, sort.key);
+  if (leftValue === null && rightValue !== null) return 1;
+  if (leftValue !== null && rightValue === null) return -1;
+  if (leftValue === null && rightValue === null) {
+    return (
+      right.group.soldAt.localeCompare(left.group.soldAt) ||
+      right.group.id.localeCompare(left.group.id)
+    );
+  }
+  const comparison =
+    typeof leftValue === "number" && typeof rightValue === "number"
+      ? leftValue - rightValue
+      : ticketCollator.compare(String(leftValue), String(rightValue));
+  if (comparison !== 0) return sort.direction === "ascending" ? comparison : -comparison;
+  return (
+    right.group.soldAt.localeCompare(left.group.soldAt) ||
+    right.group.id.localeCompare(left.group.id)
+  );
 }
 
 export function FlightLineSupervisorConsole({
@@ -82,6 +168,7 @@ export function FlightLineSupervisorConsole({
   const [resourceGroupId, setResourceGroupId] = useState("");
   const [ticketSearch, setTicketSearch] = useState("");
   const [onlyOpenTickets, setOnlyOpenTickets] = useState(false);
+  const [ticketSort, setTicketSort] = useState<TicketSort>(null);
   const [assignmentOpen, setAssignmentOpen] = useState(false);
   const [pilotOpen, setPilotOpen] = useState(false);
   const [historyAircraftId, setHistoryAircraftId] = useState<string | null>(null);
@@ -119,7 +206,7 @@ export function FlightLineSupervisorConsole({
     : [];
   const ticketRows = useMemo(() => {
     const query = ticketSearch.trim().toLocaleLowerCase("de-DE");
-    return board.rotations
+    const filteredRows = board.rotations
       .flatMap((rotation) => rotation.bookingGroups.map((group) => ({ group, rotation })))
       .filter(({ rotation }) => !onlyOpenTickets || rotation.status !== "COMPLETED")
       .filter(({ group, rotation }) => {
@@ -127,14 +214,11 @@ export function FlightLineSupervisorConsole({
         return `${flightLineGroupLabel(rotation.productCode, group.communicationNumber)} ${rotation.productName} ${rotation.aircraftRegistration ?? ""}`
           .toLocaleLowerCase("de-DE")
           .includes(query);
-      })
-      .sort(
-        (left, right) =>
-          right.group.soldAt.localeCompare(left.group.soldAt) ||
-          right.group.id.localeCompare(left.group.id),
-      )
+      });
+    return filteredRows
+      .sort((left, right) => compareTicketRows(left, right, ticketSort))
       .slice(0, 30);
-  }, [board.rotations, onlyOpenTickets, ticketSearch]);
+  }, [board.rotations, onlyOpenTickets, ticketSearch, ticketSort]);
 
   function selectAircraft(aircraftId: string) {
     onSelectAircraft(aircraftId);
@@ -195,6 +279,9 @@ export function FlightLineSupervisorConsole({
             <span>Flugzeug</span>
             <span>Plätze · Ressource</span>
             <span>Pilot</span>
+            <span className="flight-director-pilot-action-head">
+              <span className="sr-only">Pilot wechseln</span>
+            </span>
             <span>Buchungsgruppen</span>
             <span>Zeitverlauf</span>
             <span>Aktionen</span>
@@ -224,6 +311,8 @@ export function FlightLineSupervisorConsole({
                 <span className="flight-director-pilot-code">
                   <PilotIcon aria-hidden="true" />
                   <strong>{entry.currentPilotOperationalCode ?? "–"}</strong>
+                </span>
+                <span className="flight-director-pilot-action">
                   <IconButton
                     disabled={!pilotChangeAllowed}
                     label={`Pilot für ${entry.registration} zuweisen`}
@@ -351,7 +440,12 @@ export function FlightLineSupervisorConsole({
               <span>Nur offene Tickets</span>
             </label>
           </header>
-          <CompactTickets rows={ticketRows} timeZone={board.event.timeZone} />
+          <CompactTickets
+            onSort={(key) => setTicketSort((current) => nextTicketSort(current, key))}
+            rows={ticketRows}
+            sort={ticketSort}
+            timeZone={board.event.timeZone}
+          />
         </Panel>
       </div>
 
@@ -374,99 +468,22 @@ export function FlightLineSupervisorConsole({
         </div>
       </ModalDialog>
 
-      <ModalDialog
-        description={
-          selectedAircraft
-            ? `${selectedAircraft.registration} · ${selectedAircraft.passengerSeats} Plätze · Gruppen bleiben vollständig zusammen.`
-            : undefined
-        }
-        footer={
-          <>
-            <Button onClick={() => setAssignmentOpen(false)} type="button">
-              Abbrechen
-            </Button>
-            <Button
-              disabled={assignmentBlocked}
-              onClick={() => {
-                onConfirmAssignment();
-                setAssignmentOpen(false);
-              }}
-              type="button"
-              variant="primary"
-            >
-              <CheckCircle2 aria-hidden="true" /> Belegung bestätigen & Boarding starten
-            </Button>
-          </>
-        }
+      <BookingGroupAssignmentDialog
+        aircraft={selectedAircraft}
+        confirmDisabled={assignmentBlocked}
+        groups={compatibleGroups}
         onClose={() => setAssignmentOpen(false)}
+        onAttendance={onGroupAttendance}
+        onConfirm={() => {
+          onConfirmAssignment();
+          setAssignmentOpen(false);
+        }}
+        onMissing={onGroupMissing}
+        onRecall={onGroupRecall}
+        onToggle={onToggleGroup}
         open={assignmentOpen}
-        size="wide"
-        title="Buchungsgruppen zuweisen"
-      >
-        <div className="flight-director-assignment-dialog">
-          <section className="flight-director-queue">
-            {compatibleGroups.length > 0 ? (
-              compatibleGroups.map((group) => (
-                <QueueGroupRow
-                  capacity={selectedAircraft?.passengerSeats ?? 0}
-                  group={group}
-                  key={group.id}
-                  onAttendance={onGroupAttendance}
-                  onMissing={onGroupMissing}
-                  onRecall={onGroupRecall}
-                  onToggle={onToggleGroup}
-                  selected={selectedQueueGroupIds.includes(group.id)}
-                  selectedSeats={selectedSeats}
-                />
-              ))
-            ) : (
-              <p>Keine passende Buchungsgruppe in der Warteschlange.</p>
-            )}
-          </section>
-          <aside className="flight-director-selection">
-            <div>
-              <span>Ausgewählt</span>
-              {selectedGroups.length > 0 ? (
-                selectedGroups.map((group) => (
-                  <strong key={group.id}>
-                    {flightLineGroupLabel(group.productCode, group.communicationNumber)}
-                    <small>
-                      {queuedSegmentTicketCount(group)}
-                      {group.segmentCount && group.segmentCount > 1
-                        ? ` von ${group.ticketCount} · Teil ${group.segmentIndex ?? 1}/${group.segmentCount}`
-                        : ""}{" "}
-                      Pers.
-                    </small>
-                  </strong>
-                ))
-              ) : (
-                <small>Noch keine Gruppe gewählt</small>
-              )}
-            </div>
-            <div className="flight-director-selection-total">
-              <span>Gesamt</span>
-              <strong>
-                {selectedSeats} von {selectedAircraft?.passengerSeats ?? 0} Plätzen
-              </strong>
-            </div>
-            {capacityExceeded ? (
-              <p className="flight-director-dialog-warning">
-                Die Auswahl überschreitet die Kapazität.
-              </p>
-            ) : null}
-            {!selectedAircraft?.currentPilotId ? (
-              <p className="flight-director-dialog-warning">
-                Vor Belegung bitte über „Pilot zuweisen“ einen Pilotencode am Flugzeug hinterlegen.
-              </p>
-            ) : (
-              <p className="flight-director-dialog-pilot">
-                <PilotIcon aria-hidden="true" /> Pilot{" "}
-                {selectedAircraft.currentPilotOperationalCode}
-              </p>
-            )}
-          </aside>
-        </div>
-      </ModalDialog>
+        selectedQueueGroupIds={selectedQueueGroupIds}
+      />
 
       <PilotAssignmentDialogs
         aircraft={selectedAircraft}
@@ -480,93 +497,42 @@ export function FlightLineSupervisorConsole({
   );
 }
 
-function QueueGroupRow({
-  group,
-  selected,
-  selectedSeats,
-  capacity,
-  onToggle,
-  onAttendance,
-  onMissing,
-  onRecall,
-}: {
-  group: QueueGroup;
-  selected: boolean;
-  selectedSeats: number;
-  capacity: number;
-  onToggle: (ticketGroupId: string, selected: boolean) => void;
-  onAttendance: (ticketGroupId: string, checkedIn: boolean) => void;
-  onMissing: (ticketGroupId: string) => void;
-  onRecall: (ticketGroupId: string) => void;
-}) {
-  const segmentTicketCount = queuedSegmentTicketCount(group);
-  const segmentPresentCount = queuedSegmentPresentCount(group);
-  const exceedsCapacity = !selected && selectedSeats + segmentTicketCount > capacity;
-  return (
-    <div className={selected ? "flight-director-queue-row selected" : "flight-director-queue-row"}>
-      <label>
-        <input
-          checked={selected}
-          disabled={group.status === "MISSING" || exceedsCapacity}
-          onChange={(event) => onToggle(group.id, event.target.checked)}
-          type="checkbox"
-        />
-        <strong>{flightLineGroupLabel(group.productCode, group.communicationNumber)}</strong>
-      </label>
-      <span>
-        {group.segmentCount && group.segmentCount > 1 ? (
-          <>
-            {segmentTicketCount} von {group.ticketCount} Personen · Teil {group.segmentIndex ?? 1}/
-            {group.segmentCount}
-          </>
-        ) : (
-          <>
-            {segmentTicketCount} Person{segmentTicketCount === 1 ? "" : "en"}
-          </>
-        )}
-      </span>
-      <span>
-        {segmentPresentCount}/{segmentTicketCount} anwesend
-      </span>
-      <div>
-        <Button
-          onClick={() => onAttendance(group.id, group.status !== "PRESENT")}
-          size="compact"
-          variant={group.status === "PRESENT" ? "primary" : "secondary"}
-        >
-          <CheckCircle2 aria-hidden="true" /> Anwesend
-        </Button>
-        <Button onClick={() => onMissing(group.id)} size="compact">
-          <UserRoundX aria-hidden="true" /> Nicht da
-        </Button>
-        <Button onClick={() => onRecall(group.id)} size="compact">
-          <Bell aria-hidden="true" /> Nachrufen
-        </Button>
-      </div>
-    </div>
-  );
-}
-
 function CompactTickets({
   rows,
   timeZone,
+  sort,
+  onSort,
 }: {
-  rows: Array<{ group: Rotation["bookingGroups"][number]; rotation: Rotation }>;
+  rows: TicketRow[];
   timeZone: string;
+  sort: TicketSort;
+  onSort: (key: TicketSortKey) => void;
 }) {
   return (
     <div className="flight-director-compact-table tickets">
       <div className="flight-director-compact-head">
-        <span>Ticketgruppe</span>
-        <span>Personen</span>
-        <span>Umlaufstatus</span>
-        <span>Flugzeug</span>
-        <span>Produkt</span>
-        <span>Zeitfenster</span>
-        <span>Boarding</span>
-        <span>Off-Block</span>
-        <span>On-Block</span>
-        <span>Abschluss</span>
+        {ticketColumns.map((column) => {
+          const active = sort?.key === column.key;
+          return (
+            <span key={column.key}>
+              <button
+                aria-label={`${column.label} sortieren · ${active ? (sort.direction === "ascending" ? "aufsteigend" : "absteigend") : "Standardsortierung"}`}
+                aria-pressed={active}
+                onClick={() => onSort(column.key)}
+                type="button"
+              >
+                <span>{column.label}</span>
+                {active ? (
+                  sort.direction === "ascending" ? (
+                    <ArrowUp aria-hidden="true" />
+                  ) : (
+                    <ArrowDown aria-hidden="true" />
+                  )
+                ) : null}
+              </button>
+            </span>
+          );
+        })}
       </div>
       {rows.length > 0 ? (
         rows.map(({ group, rotation }) => (

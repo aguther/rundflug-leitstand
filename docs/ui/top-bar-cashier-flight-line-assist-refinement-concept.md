@@ -16,7 +16,7 @@ Top-Leiste ausdrücklich ausgenommen.
 ### Aufbau
 
 ```text
-[Logo] Veranstaltungsname                    [aktuelle Sicht] [●] [Benutzer ▾]
+[Logo] Veranstaltungsname                    [● Verbunden] [aktuelle Sicht] [Benutzer ▾]
 ```
 
 - Das Logo und der Veranstaltungsname bilden links eine statische Kennzeichnung. Sie sind in den
@@ -27,8 +27,11 @@ Top-Leiste ausdrücklich ausgenommen.
 - Das Symbol sitzt in einem eigenen, optisch zentrierten Icon-Container. Nur ein tatsächlich
   vorhandener Chevron darf gedreht werden; das Sichtensymbol selbst verändert beim Öffnen weder
   Ausrichtung noch Position.
-- Der Verbindungsindikator bleibt als kompakter Punkt sichtbar. Auf kleinen Mobilgeräten darf sein
-  Text weiterhin visuell verborgen werden.
+- Der Verbindungsindikator steht vor dem Ansichtswechsler. Auf Desktop zeigt er Punkt und Text, auf
+  kleinen Mobilgeräten nur den Punkt; die Reihenfolge bleibt auf allen Breakpoints identisch.
+- Der Indikator unterscheidet `Prüfen`, `Verbunden`, `Gestört` und `Offline`. Ein wiederhergestellter
+  Cache oder der Zustand von `navigator.onLine` allein darf keine bestätigte Backendverbindung
+  vortäuschen.
 - Veranstaltungsauswahl, Darstellung, Produktinformation und Abmeldung werden im Benutzermenü
   gebündelt. Separate Kalender-, Info- und Theme-Schaltflächen entfallen.
 
@@ -69,6 +72,9 @@ Darstellung
 
 - Für jede interne Route wird die Icon-Zuordnung automatisiert geprüft, insbesondere die getrennten
   Pfade `/flight-line` und `/flight-line/assist` sowie Unterpfade der Administration.
+- Die Standardadresse wird nach der angemeldeten Rolle kanonisch weitergeleitet: Kasse zu `/kasse`,
+  Flight Line zu `/flight-line/assist`, Supervisor zu `/flight-line` und Administration zu
+  `/admin`. FIDS behält seinen direkten öffentlichen Einstieg.
 - Geöffnetes Ansichts- oder Benutzermenü verändert das Sichtensymbol nicht.
 - Auf Desktop bleibt der Login-Code sichtbar; auf sehr schmalen Geräten genügt im Header das
   Benutzersymbol, während das geöffnete Menü weiterhin Code und Rolle nennt.
@@ -96,10 +102,12 @@ Darstellung
 ### Ticketvorschau
 
 - Die vollständige Vorschau nutzt den vorhandenen Bereich deutlich besser aus. Der Zettel wächst
-  auf ungefähr 176 bis 190 CSS-Pixel Breite und wird nur reduziert, wenn die Spalte diese Breite
+  bis auf ungefähr 260 CSS-Pixel Breite und wird nur reduziert, wenn die Spalte diese Breite
   tatsächlich nicht bereitstellt. Er bleibt vollständig und ohne eigenen Scrollbereich sichtbar.
 - QR-Code und Beschriftungen wachsen proportional innerhalb der Bildschirmvorschau. Das
   unveränderte 58-mm-Druckdokument bleibt davon getrennt.
+- Der Veranstaltungsname ist die Titelzeile des Zettels; die generische Beschriftung
+  „Rundflug-Leitstand“ entfällt.
 - Die Aktion zum Öffnen des Scan-Dialogs zeigt nur noch das Vergrößerungssymbol. Sie behält einen
   eindeutigen zugänglichen Namen und Tooltip und erfüllt auf Touchgeräten ein 44-Pixel-Touchziel.
 
@@ -114,6 +122,8 @@ Darstellung
   dauerhaften visuellen Auswahlzustand zu erzeugen.
 - Das `UserPen`-Symbol für Pilotenzuweisung/-wechsel wird in seiner nativen aufrechten Orientierung
   dargestellt. Allgemeine Zeilen-CSS darf keine Aktionssymbole drehen.
+- Der Pilotencode und die Pilotwechselaktion belegen getrennte Rasterspalten. Dadurch stehen alle
+  Pilotwechselaktionen unabhängig von der Länge des Pilotencodes exakt untereinander.
 
 ### Verkaufte Tickets
 
@@ -126,7 +136,9 @@ Verkaufte Tickets · alle Flugzeuge    [Suche …]  [ ] Nur offene Tickets
 - Die Suche erhält eine begrenzte Breite, statt die komplette Panelbreite zu belegen.
 - „Nur offene Tickets“ ist eine echte Checkbox und standardmäßig deaktiviert. Aktiviert blendet sie
   abgeschlossene Umläufe aus; Suche und Checkbox wirken gemeinsam.
-- Sortierung nach Verkaufszeit und ID sowie das bestehende Zeilenlimit bleiben erhalten.
+- Jeder Spaltenkopf ist eine dreistufige Sortieraktion: aufsteigend, absteigend und anschließend
+  wieder Standardsortierung. Fehlende Werte stehen in beiden Richtungen am Ende; bei Gleichstand
+  gilt weiterhin die stabile Standardsortierung nach Verkaufszeit und ID.
 - Die Tabelle zeigt folgende Spalten:
 
 ```text
@@ -139,6 +151,10 @@ Boarding | Off-Block | On-Block | Abschluss
   Ist-Zeiten im Veranstaltungstimezone-Format oder einen Gedankenstrich.
 - Der Tabellenkopf bleibt innerhalb des Ticketbereichs stehen. Bei zu geringer Breite scrollt nur
   die Tabelle horizontal; die Seite selbst erhält keinen horizontalen Überlauf.
+- Zwischen `On-Block` und `Nicht verfügbar` wird keine Verbindungslinie gezeichnet. Nicht verfügbar
+  bleibt ein eigenständiger Folgezustand nach dem Turnaround.
+- Der Zuweisungsdialog zeigt keine redundante Bestätigung des bereits zugeordneten Piloten. Ein
+  notwendiger Hinweis auf einen fehlenden Piloten bleibt erhalten.
 
 ### Nicht verfügbar bei aktivem Umlauf
 
@@ -187,6 +203,11 @@ Die Arbeitsansicht besteht aus drei klar getrennten Panels:
   einen vertikalen Scrollbalken.
 - Auf Mobilgeräten wird der aktuelle Umlauf responsiv gestapelt; kein Zeitlinienlabel und kein
   Touchziel erzeugt horizontalen Dokumentüberlauf.
+- Die bisher dauerhaft sichtbare Gruppenauswahl entfällt. Die Primäraktion öffnet denselben modalen
+  Zuweisungsdialog wie die Supervisor-Sicht; Auswahl, Anwesenheit, Nachrufen und Zurückstellen bleiben
+  im Dialog verfügbar, ohne den Ein-Bildschirm-Ablauf zu verlängern.
+- Auch in Assist endet die gezeichnete Zeitlinie bei `On-Block`; zu `Nicht verfügbar` besteht keine
+  Verbindungslinie.
 
 ### Nicht verfügbar bei aktivem Umlauf
 
