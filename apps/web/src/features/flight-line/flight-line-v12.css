@@ -1168,6 +1168,56 @@
   white-space: nowrap;
 }
 
+.flight-director-current-state-marker {
+  --progress-current: var(--ui-accent);
+  --progress-icon-size: 26px;
+  --progress-node-size: 28px;
+  min-width: 0;
+  display: grid;
+  grid-template-rows: var(--progress-node-size) 18px;
+  place-items: center;
+  gap: 4px;
+  color: var(--progress-current);
+}
+
+.flight-director-current-state-marker .flight-director-progress-node {
+  width: var(--progress-node-size);
+  height: var(--progress-node-size);
+  color: var(--progress-current);
+}
+
+.flight-director-current-state-marker small {
+  min-height: 18px;
+  color: var(--ui-muted);
+  font-size: 0.75rem;
+  line-height: 18px;
+  white-space: nowrap;
+}
+
+.flight-director-current-state-marker.state-boarding {
+  --progress-current: var(--ui-warning);
+}
+
+.flight-director-current-state-marker:is(.state-available, .state-landed) {
+  --progress-current: var(--ui-success);
+}
+
+.flight-director-current-state-marker.state-refueling {
+  --progress-current: var(--ui-warning);
+}
+
+.flight-director-current-state-marker.state-paused {
+  --progress-current: var(--ui-pause);
+}
+
+.flight-director-current-state-marker:is(.state-inactive, .state-interrupted) {
+  --progress-current: var(--ui-danger);
+}
+
+.flight-director-history-cell-icon {
+  display: none;
+}
+
 .flight-director-progress--detailed {
   min-height: 48px;
 }

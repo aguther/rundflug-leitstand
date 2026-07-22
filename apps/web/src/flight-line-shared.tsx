@@ -8,10 +8,12 @@ import {
   Clock3,
   Coffee,
   Fuel,
+  type LucideIcon,
   Plane,
   PlaneLanding,
   PlaneTakeoff,
   RotateCcw,
+  Tickets,
   TicketsPlane,
   User,
   UserCheck,
@@ -196,6 +198,50 @@ const flightProgressIcons = {
   fuel: Fuel,
   coffee: Coffee,
 } as const;
+
+const historyColumns: Array<{ label: string; Icon: LucideIcon }> = [
+  { label: "Buchungsgruppen", Icon: Tickets },
+  { label: "Pilot", Icon: User },
+  { label: "Boarding", Icon: TicketsPlane },
+  { label: "Off-Block", Icon: PlaneTakeoff },
+  { label: "On-Block", Icon: PlaneLanding },
+  { label: "Abschluss", Icon: CircleCheck },
+];
+
+export function CurrentAircraftStateMarker({
+  aircraft,
+  rotation,
+  timeZone,
+}: {
+  aircraft: FlightLineAircraft;
+  rotation: FlightLineRotation | undefined;
+  timeZone: string;
+}) {
+  const status = visibleAircraftState(aircraft, rotation);
+  const currentStep = flightProgressSteps(aircraft, rotation).find((step) => step.current);
+  if (!currentStep) return null;
+
+  const CurrentIcon = flightProgressIcons[currentStep.icon];
+  const formattedTime = currentStep.time ? formatFlightLineTime(currentStep.time, timeZone) : "";
+  const accessibleLabel = formattedTime
+    ? `${currentStep.label} · ${formattedTime}`
+    : currentStep.label;
+
+  return (
+    <div
+      aria-label={accessibleLabel}
+      className={`flight-director-current-state-marker state-${status.toLocaleLowerCase("en-US")}`}
+      data-icon={currentStep.icon}
+      role="img"
+      title={accessibleLabel}
+    >
+      <span className="flight-director-progress-node" aria-hidden="true">
+        <CurrentIcon />
+      </span>
+      <small>{formattedTime}</small>
+    </div>
+  );
+}
 
 export function flightProgressSteps(
   aircraft: FlightLineAircraft,
@@ -637,22 +683,40 @@ export function CompactHistory({
   return (
     <div className="flight-director-compact-table history">
       <div className="flight-director-compact-head">
-        <span>Buchungsgruppen</span>
-        <span>Pilot</span>
-        <span>Boarding</span>
-        <span>Offblock</span>
-        <span>Onblock</span>
-        <span>Abschluss</span>
+        {historyColumns.map(({ label, Icon }) => (
+          <span className="flight-director-column-icon" key={label} title={label}>
+            <Icon aria-hidden="true" />
+            <span className="visually-hidden">{label}</span>
+          </span>
+        ))}
       </div>
       {history.length > 0 ? (
         history.map((rotation) => (
           <div key={rotation.id}>
-            <strong>{rotationGroupLabels(rotation)}</strong>
-            <span>{rotation.pilotOperationalCode ?? "–"}</span>
-            <span>{formatFlightLineTime(rotation.timeline.actual.boardingAt, timeZone)}</span>
-            <span>{formatFlightLineTime(rotation.timeline.actual.departureAt, timeZone)}</span>
-            <span>{formatFlightLineTime(rotation.timeline.actual.landingAt, timeZone)}</span>
-            <span>{formatFlightLineTime(rotation.timeline.actual.completionAt, timeZone)}</span>
+            <strong>
+              <HistoryCellIcon Icon={Tickets} label="Buchungsgruppen" />
+              <span>{rotationGroupLabels(rotation)}</span>
+            </strong>
+            <span>
+              <HistoryCellIcon Icon={User} label="Pilot" />
+              <span>{rotation.pilotOperationalCode ?? "–"}</span>
+            </span>
+            <span>
+              <HistoryCellIcon Icon={TicketsPlane} label="Boarding" />
+              <span>{formatFlightLineTime(rotation.timeline.actual.boardingAt, timeZone)}</span>
+            </span>
+            <span>
+              <HistoryCellIcon Icon={PlaneTakeoff} label="Off-Block" />
+              <span>{formatFlightLineTime(rotation.timeline.actual.departureAt, timeZone)}</span>
+            </span>
+            <span>
+              <HistoryCellIcon Icon={PlaneLanding} label="On-Block" />
+              <span>{formatFlightLineTime(rotation.timeline.actual.landingAt, timeZone)}</span>
+            </span>
+            <span>
+              <HistoryCellIcon Icon={CircleCheck} label="Abschluss" />
+              <span>{formatFlightLineTime(rotation.timeline.actual.completionAt, timeZone)}</span>
+            </span>
           </div>
         ))
       ) : (
@@ -661,6 +725,15 @@ export function CompactHistory({
         </p>
       )}
     </div>
+  );
+}
+
+function HistoryCellIcon({ Icon, label }: { Icon: LucideIcon; label: string }) {
+  return (
+    <span className="flight-director-history-cell-icon" title={label}>
+      <Icon aria-hidden="true" />
+      <span className="visually-hidden">{label}</span>
+    </span>
   );
 }
 
