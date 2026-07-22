@@ -136,12 +136,38 @@ describe("gemeinsame Flight-Line-Präsentationslogik", () => {
       }),
     );
 
-    expect(markup).toContain('class="flight-director-current-rotation"');
-    expect(markup.match(/<dd><\/dd>/g)).toHaveLength(3);
+    expect(markup).toContain('class="flight-director-current-rotation is-booking-groups-only"');
+    expect(markup.match(/<dd><\/dd>/g)).toHaveLength(1);
+    expect(markup).toContain("Buchungsgruppen");
+    expect(markup).not.toContain("<dt>Status</dt>");
+    expect(markup).not.toContain("<dt>Pilot</dt>");
     expect(markup).toContain('aria-label="Umlaufzeitlinie"');
     expect(markup).toContain("10:00");
     expect(markup).toContain('aria-current="step"');
     expect(markup).not.toContain("noch kein Umlauf belegt");
+  });
+
+  it("renders up to six booking groups in the stable Assist summary", () => {
+    const currentRotation = {
+      ...rotation("rotation-active", "IN_FLIGHT"),
+      productCode: "RN",
+      communicationLabel: "RN-001",
+      timeline: { actual: {} },
+      bookingGroups: Array.from({ length: 6 }, (_, index) => ({
+        communicationNumber: index + 1,
+      })),
+    } as FlightLineRotation;
+    const markup = renderToStaticMarkup(
+      createElement(CompactCurrentRotation, {
+        aircraft,
+        rotation: currentRotation,
+        timeZone: "Europe/Berlin",
+      }),
+    );
+
+    expect(markup).toContain("RN-001, RN-002, RN-003, RN-004, RN-005, RN-006");
+    expect(markup).not.toContain("<dt>Status</dt>");
+    expect(markup).not.toContain("<dt>Pilot</dt>");
   });
 
   it("selects the active or latest completed rotation and keeps one history item per rotation", () => {

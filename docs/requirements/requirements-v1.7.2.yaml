@@ -7,7 +7,7 @@ requirements:
     requirement: Suchfelder verwenden genau einen zugänglichen Fokusrahmen am äußeren Container.
     status: implemented
   - id: V172-CAS-010
-    requirement: Kassenprodukte ohne Flugzeugsymbol und ohne horizontalen Überlauf.
+    requirement: Kassenprodukte ohne Flugzeugsymbol und ohne horizontalen Überlauf; das vergrößerte, optisch nach links versetzte Ticketsymbol bleibt auch auf schmalen Ansichten layoutstabil.
     status: implemented
   - id: V172-SUP-010
     requirement: Responsive Supervisor-Flugzeugtabelle mit kompakter Detailspalte, sechs Aktionen und größenstabil mittig ausgerichteter Zeitlinie.
@@ -22,10 +22,10 @@ requirements:
     requirement: Vier direkte Abschlussaktionen mit serverseitig gesperrter Aktionsgruppe.
     status: implemented
   - id: V172-AST-010
-    requirement: Kompakte Assist-Arbeitsansicht mit 56-Pixel-Aktionen, getrennter Pilotverwaltung und mobil ausgerichteter Umlaufdarstellung mit zwei stabilen Buchungsgruppen-Zeilen.
+    requirement: Kompakte Assist-Arbeitsansicht mit 56-Pixel-Aktionen, getrennter Pilotverwaltung und einer vergrößerten Buchungsgruppenübersicht für bis zu sechs Gruppen in höchstens zwei stabil reservierten Zeilen; redundante Status- und Pilotfelder entfallen.
     status: implemented
   - id: V172-CLM-010
-    requirement: Gelbe ungefüllte bewusste Übernahme, blau gefüllter größenstabiler Pendingzustand und neutraler Touch-Hover beim Aktualisieren.
+    requirement: Gelbe ungefüllte bewusste Übernahme, blau gefüllter größenstabiler Pendingzustand mit ausschließlich mittigem Spinner und neutraler Touch-Hover beim Aktualisieren.
     status: implemented
   - id: V172-QA-010
     requirement: Automatisierte und visuelle Abnahme der festgelegten Light- und Dark-Viewports.

@@ -147,9 +147,6 @@
   line-height: 1.1;
   white-space: nowrap;
 }
-.cashier-sell-action > svg {
-  flex: 0 0 auto;
-}
 .cashier-sell-copy {
   min-width: 0;
   display: grid;
@@ -184,6 +181,12 @@
 }
 .cashier-split-line > svg {
   flex: 0 0 auto;
+}
+.cashier-sell-action.ds-button > svg {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  transform: translateX(-3px);
 }
 .cashier-split-line > span {
   display: -webkit-box;
@@ -563,6 +566,14 @@
   .cashier-sell-action.ds-button {
     padding-inline: 8px;
     font-size: 0.68rem;
+  }
+}
+
+@media (max-width: 1250px) {
+  .cashier-sell-action.ds-button > svg {
+    width: 18px;
+    height: 18px;
+    transform: translateX(-1px);
   }
 }
 
