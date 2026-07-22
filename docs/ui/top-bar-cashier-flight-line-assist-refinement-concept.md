@@ -243,6 +243,32 @@ Die Arbeitsansicht besteht aus drei klar getrennten Panels:
   `ABORT_ROTATION_TO_QUEUE_AND_MARK_AIRCRAFT_UNAVAILABLE` bleibt die einzige Ausführung.
 - Der Entwurf ändert keine Rollenberechtigung, Idempotenz-, Versions-, Audit- oder Outbox-Grenze.
 
+## 7. Freigegebene iPad- und Queue-Ergänzung
+
+- Die Supervisor-Flugzeugzeile bleibt auch auf dem iPad einzeilig. Für Tabletbreiten bis 1180
+  CSS-Pixel
+  entfallen das Personen-Icon vor dem Pilotencode und unnötige Spaltenbreite; Pilotencode,
+  Pilotwechsel, Buchungsgruppen, Zeitlinie und fünf 44-Pixel-Aktionen bleiben erhalten.
+- Die einzeilige Flugzeugliste wird ab 1024 CSS-Pixel ohne horizontalen Scroll abgenommen; auf
+  schmaleren Supervisor-Ansichten bleiben alle Inhalte erreichbar.
+- „Buchungsgruppen“ darf im Tabellenkopf zweizeilig stehen. Der letzte Zeitlinienschritt wird auf
+  Tabletbreite sichtbar als „Nicht verf.“ abgekürzt; der zugängliche Name bleibt „Nicht verfügbar“.
+- Die Aktionsicons im Supervisor erhalten denselben sichtbaren Rahmen und Kontrollhintergrund wie
+  in Assist. Reine Touchgeräte übernehmen nach einer Zustandsänderung keinen stehenbleibenden
+  Hover-Zustand.
+- Die verkaufte Ticketliste erhält nach „Ticketgruppe“ die sortierbare Spalte „Queue“. Aktuell
+  wartende Gruppen zeigen Ressourcengruppenname und `queueSequence`, zum Beispiel `Panorama · 3`;
+  nicht mehr wartende Gruppen zeigen einen Gedankenstrich und stehen bei Sortierung am Ende.
+- `queueSequence` ist eine operative Reihenfolge innerhalb einer Ressourcengruppe und unabhängig
+  von der stabilen Kommunikationsnummer. Die Spalte „Ticketgruppe“ sortiert deshalb separat rein
+  numerisch nach `communicationNumber`, ohne Produktpräfix.
+- Das Ansichtsmenü wird rechts am Auslöser und innerhalb des Viewports verankert. Auf Mobilgeräten
+  bilden Verbindungspunkt, Ansichtswechsel und Benutzerkonto wie auf Desktop eine gemeinsame rechte
+  Kontrollgruppe.
+- Die Gruppenaktionen im gemeinsamen Zuweisungsdialog sind 44-Pixel-Iconbuttons rechts neben
+  Checkbox und Gruppenkennung. Anwesend, Nicht da, Nachrufen und – in Assist – Zurückstellen behalten
+  vollständige zugängliche Namen und Tooltips; Personen- und Anwesenheitszahlen stehen darunter.
+
 ## Freigabeentscheidung
 
 Dieses Dokument ist die freigegebene visuelle und interaktive Spezifikation für die anschließende
