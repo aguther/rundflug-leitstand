@@ -28,8 +28,11 @@ Parametern neu.
   manuell injizierbar. Flugzeugereignisse warten bei einem laufenden Umlauf bis zur nächsten
   organisatorisch zulässigen Grenze.
 - Eine temporäre Flugzeugsperre endet erst mit dem synthetischen bestätigten Rückkehrereignis.
-- Bei Prognosequalität `UNCERTAIN` zeigt die Oberfläche keinen Countdown, bewahrt die numerischen
-  Rohwerte aber für die Diagnose im Export.
+- Bei Prognosequalität `UNCERTAIN` zeigt die Oberfläche keinen Countdown. Auswahlzusammenfassung
+  und Detaildialog kennzeichnen die numerischen Rohwerte ausdrücklich als nicht freigegebene
+  Diagnose und nennen Unterdrückungsgrund, Lernwertalter, Stichprobengröße und aktive Kapazität.
+- Der lokale JSON-Export `rundflug-forecast-simulation/v2` enthält Rohwerte und explizite
+  Unterdrückungsgründe; sie besitzen keine operative oder öffentliche Zeitsemantik.
 - CSV-Kalibrierung und JSON-Export bleiben vollständig lokal. Es gibt keinen Upload und keine
   dauerhafte Browser-Speicherung.
 - Light und Dark Mode verwenden die bestehenden Design-Tokens. Bei schmaleren Viewports scrollt der

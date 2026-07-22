@@ -53,8 +53,10 @@ describe("prognosebasierte Web-Push-Vorbereitung", () => {
     interrupted: false,
     status: "DRAFT",
     predictionQuality: "CHANGING",
+    predictionUpdatedAt: "2026-07-22T09:59:00.000Z",
     predictionUpperMinutes: 15,
     notificationLeadMinutes: 20,
+    now: "2026-07-22T10:00:00.000Z",
   };
 
   it("verwendet die konfigurierte Vorlaufgrenze", () => {
@@ -71,5 +73,23 @@ describe("prognosebasierte Web-Push-Vorbereitung", () => {
     expect(shouldQueuePreparationNotification({ ...eligible, interrupted: true })).toBe(false);
     expect(shouldQueuePreparationNotification({ ...eligible, emergencyMode: true })).toBe(false);
     expect(shouldQueuePreparationNotification({ ...eligible, status: "CALLED" })).toBe(false);
+  });
+
+  it("unterdrückt Vorbereitung bei einer mehr als fünf Minuten alten Prognose", () => {
+    expect(
+      shouldQueuePreparationNotification({
+        ...eligible,
+        predictionUpdatedAt: "2026-07-22T09:55:00.000Z",
+      }),
+    ).toBe(true);
+    expect(
+      shouldQueuePreparationNotification({
+        ...eligible,
+        predictionUpdatedAt: "2026-07-22T09:54:59.999Z",
+      }),
+    ).toBe(false);
+    expect(shouldQueuePreparationNotification({ ...eligible, predictionUpdatedAt: null })).toBe(
+      false,
+    );
   });
 });

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   advanceOverduePrediction,
+  assessForecastFreshness,
   calculateForecastTimelines,
   createQueueAvailability,
   estimateDuration,
@@ -13,7 +14,6 @@ describe("event-driven forecast", () => {
     const estimate = estimateDuration({
       referenceMinutes: 20,
       actualDurationsMinutes: [],
-      dataAgeMinutes: 120,
       interrupted: false,
       activeCapacity: 1,
     });
@@ -24,7 +24,6 @@ describe("event-driven forecast", () => {
     const estimate = estimateDuration({
       referenceMinutes: 20,
       actualDurationsMinutes: [18, 20, 21, 22, 22, 23],
-      dataAgeMinutes: 1,
       interrupted: false,
       activeCapacity: 1,
     });
@@ -36,7 +35,6 @@ describe("event-driven forecast", () => {
     const estimate = estimateDuration({
       referenceMinutes: 20,
       actualDurationsMinutes: [32],
-      dataAgeMinutes: 1,
       interrupted: false,
       activeCapacity: 1,
     });
@@ -47,7 +45,6 @@ describe("event-driven forecast", () => {
     const estimate = estimateDuration({
       referenceMinutes: 20,
       actualDurationsMinutes: [10, 30],
-      dataAgeMinutes: 1,
       interrupted: false,
       activeCapacity: 1,
     });
@@ -58,14 +55,12 @@ describe("event-driven forecast", () => {
     const regular = estimateDuration({
       referenceMinutes: 20,
       actualDurationsMinutes: [19, 20, 20, 21, 22],
-      dataAgeMinutes: 1,
       interrupted: false,
       activeCapacity: 1,
     });
     const withOutlier = estimateDuration({
       referenceMinutes: 20,
       actualDurationsMinutes: [19, 20, 20, 21, 22, 55],
-      dataAgeMinutes: 1,
       interrupted: false,
       activeCapacity: 1,
     });
@@ -78,7 +73,6 @@ describe("event-driven forecast", () => {
     const estimate = estimateDuration({
       referenceMinutes: 36,
       actualDurationsMinutes: [34, 36, 92, 96, 101],
-      dataAgeMinutes: 1,
       interrupted: false,
       activeCapacity: 1,
     });
@@ -91,7 +85,6 @@ describe("event-driven forecast", () => {
     const duration = estimateDuration({
       referenceMinutes: 36,
       actualDurationsMinutes: [],
-      dataAgeMinutes: 0,
       interrupted: false,
       activeCapacity: 2,
     });
@@ -104,29 +97,56 @@ describe("event-driven forecast", () => {
     expect(second.window.upperMinutes).toBe(9);
   });
 
-  it("marks stale or interrupted data as uncertain without a countdown", () => {
+  it("keeps old learning samples diagnostic without making a fresh estimate uncertain", () => {
     const estimate = estimateDuration({
       referenceMinutes: 20,
       actualDurationsMinutes: [20, 21],
-      dataAgeMinutes: 6,
       interrupted: false,
       activeCapacity: 1,
     });
-    expect(estimate.quality).toBe("UNCERTAIN");
+    expect(estimate.quality).toBe("CHANGING");
     expect(
       forecastQueueWindows({ queueSequence: 4, activeAircraft: 1, duration: estimate }),
     ).toEqual({
-      lowerMinutes: 0,
-      upperMinutes: 0,
-      quality: "UNCERTAIN",
+      lowerMinutes: 33,
+      upperMinutes: 124,
+      quality: "CHANGING",
     });
+  });
+
+  it("uses the last successful prediction update for the five-minute freshness boundary", () => {
+    expect(
+      assessForecastFreshness({
+        predictionQuality: "STABLE",
+        predictionUpdatedAt: "2026-07-22T09:55:00.000Z",
+        now: "2026-07-22T10:00:00.000Z",
+      }),
+    ).toEqual({ quality: "STABLE", reason: null, ageMinutes: 5 });
+    expect(
+      assessForecastFreshness({
+        predictionQuality: "STABLE",
+        predictionUpdatedAt: "2026-07-22T09:54:59.999Z",
+        now: "2026-07-22T10:00:00.000Z",
+      }),
+    ).toMatchObject({ quality: "UNCERTAIN", reason: "STALE_PREDICTION" });
+  });
+
+  it("treats missing or invalid persisted prediction timestamps as stale", () => {
+    for (const predictionUpdatedAt of [null, "invalid"]) {
+      expect(
+        assessForecastFreshness({
+          predictionQuality: "CHANGING",
+          predictionUpdatedAt,
+          now: "2026-07-22T10:00:00.000Z",
+        }),
+      ).toEqual({ quality: "UNCERTAIN", reason: "STALE_PREDICTION", ageMinutes: null });
+    }
   });
 
   it("widens the uncertainty interval for flight groups farther back in the queue", () => {
     const duration = estimateDuration({
       referenceMinutes: 20,
       actualDurationsMinutes: [18, 20, 21, 22, 22, 23],
-      dataAgeMinutes: 1,
       interrupted: false,
       activeCapacity: 3,
     });
@@ -200,7 +220,6 @@ describe("event-driven forecast", () => {
     const estimate = estimateDuration({
       referenceMinutes: 20,
       actualDurationsMinutes: [18, 19, 20, 21, 22, 20, 19, 21, 20, 22, 21, 20],
-      dataAgeMinutes: 1,
       interrupted: false,
       activeCapacity: 3,
     });
@@ -302,7 +321,7 @@ describe("event-driven forecast", () => {
     });
   });
 
-  it("prefers current-day aircraft/product samples and preserves the current quality rules", () => {
+  it("keeps robust current-day samples stable even when their age exceeds five minutes", () => {
     const projection = calculateForecastTimelines({
       event: {
         eventId: "event-current",
@@ -317,7 +336,7 @@ describe("event-driven forecast", () => {
       durationSamples: [
         ...[31, 32, 33, 32, 31].map((minutes, index) => ({
           minutes,
-          completedAt: `2026-07-22T09:5${index + 5}:00.000Z`,
+          completedAt: `2026-07-22T08:5${index + 5}:00.000Z`,
           eventId: "event-current",
           productCode: "PAN",
           aircraftType: "SYN-A",
@@ -355,7 +374,8 @@ describe("event-driven forecast", () => {
       predictionQuality: "STABLE",
       dataBasisScope: "AIRCRAFT_PRODUCT_HISTORY",
       sampleSize: 5,
-      dataAgeMinutes: 1,
+      dataAgeMinutes: 61,
+      uncertaintyReasons: [],
     });
   });
 
@@ -397,6 +417,47 @@ describe("event-driven forecast", () => {
       predictionQuality: "UNCERTAIN",
       predictionLowerMinutes: 0,
       predictionUpperMinutes: 0,
+      uncertaintyReasons: ["OPERATION_INTERRUPTED"],
+    });
+  });
+
+  it("reports every hard operational uncertainty reason explicitly", () => {
+    const projection = calculateForecastTimelines({
+      event: {
+        eventId: "event-current",
+        now: "2026-07-22T10:00:00.000Z",
+        operationalInterrupted: false,
+        emergencyMode: true,
+        plannedBoardingMinutes: 5,
+        plannedDeboardingMinutes: 5,
+        plannedBufferMinutes: 2,
+      },
+      capacities: [{ resourceGroupId: "rg-1", activeAircraft: 0 }],
+      durationSamples: [],
+      rotations: [
+        {
+          id: "draft",
+          status: "DRAFT",
+          createdAt: "2026-07-22T09:55:00.000Z",
+          calledAt: null,
+          departedAt: null,
+          landedAt: null,
+          resourceGroupId: "rg-1",
+          resourceGroupStatus: "PAUSED",
+          queueSequence: 1,
+          referenceDurationMinutes: 20,
+          productCode: "PAN",
+          aircraftType: null,
+          predictedDepartureAt: null,
+          predictedLandingAt: null,
+          predictedCompletionAt: null,
+        },
+      ],
+    })[0];
+
+    expect(projection).toMatchObject({
+      predictionQuality: "UNCERTAIN",
+      uncertaintyReasons: ["EMERGENCY_MODE", "RESOURCE_GROUP_INACTIVE", "NO_ACTIVE_CAPACITY"],
     });
   });
 });

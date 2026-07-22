@@ -62,6 +62,11 @@ describe("local-only forecast simulation surface", () => {
     ]) {
       expect(editorSource).toContain(label);
     }
+    expect(viewSource).toContain('schema: "rundflug-forecast-simulation/v2"');
+    expect(viewSource).toContain("Aktueller Prognose-Snapshot");
+    expect(viewSource).toContain("Unterdrückungsgründe");
+    expect(viewSource).toContain("Rohwerte nicht als operative Zeit freigegeben");
+    expect(stylesSource).toContain(".sim-raw-forecast");
   });
 
   it("keeps narrow layouts inside an internal scroll container", () => {

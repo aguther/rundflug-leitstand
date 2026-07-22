@@ -24,6 +24,12 @@ Bei einer aktiven Unterbrechung, im Notfallmodus, bei inaktiver Ressourcengruppe
 Kapazität wird nicht aus Messwerten fortgeschrieben. Die Prognose fällt auf den Planwert zurück und
 kennzeichnet das Ergebnis als `UNCERTAIN`; öffentliche Ansichten zeigen dann keinen Countdown.
 
+Das Alter des jüngsten abgeschlossenen Lernumlaufs bleibt als `dataAgeMinutes` diagnostisch
+sichtbar, beeinflusst aber weder `STABLE` noch `CHANGING` und erzeugt allein niemals `UNCERTAIN`.
+Die technische Aktualität einer persistierten Prognose wird separat über `prediction_updated_at`
+bewertet. Fehlt dieser Zeitpunkt, ist er ungültig oder liegt er mehr als fünf Minuten zurück, gilt
+die gespeicherte Prognose als `UNCERTAIN`, bis eine erfolgreiche Neuberechnung vorliegt.
+
 Korrekturen verändern das append-only Ereignisprotokoll nicht. Nur der daraus bestätigte aktuelle
 Umlaufzustand entscheidet, ob eine Dauer als abgeschlossener Messwert berücksichtigt wird.
 

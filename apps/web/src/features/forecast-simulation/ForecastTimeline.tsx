@@ -1,4 +1,9 @@
-import type { SimulationForecastSnapshot, SimulationResult, SimulationRotation } from "./model";
+import {
+  forecastUncertaintyLabel,
+  type SimulationForecastSnapshot,
+  type SimulationResult,
+  type SimulationRotation,
+} from "./model";
 
 const MINUTE_MS = 60_000;
 const WINDOW_MINUTES = 180;
@@ -212,7 +217,7 @@ export function ForecastTimeline({
             <i>·</i>
             <span>
               {selectedSnapshot?.quality === "UNCERTAIN"
-                ? "Prognose unsicher – Countdown unterdrückt"
+                ? `Rohprognose Boarding ${formatTime(selectedSnapshot.predictedBoardingAt)} · nicht freigegeben · ${forecastUncertaintyLabel(selectedSnapshot.uncertaintyReasons)}`
                 : selectedSnapshot
                   ? `Prognose Boarding ${formatTime(selectedSnapshot.predictedBoardingAt)}`
                   : "Noch keine Prognose"}
