@@ -480,9 +480,6 @@ export function CashierView() {
   function selectSearchResult(result: TicketSearchResult) {
     setLastTicketGroupId(result.ticketGroupId);
     setReceipt([]);
-    setMessage(
-      `${result.productName} · ${result.groupSize} Ticket${result.groupSize === 1 ? "" : "s"} ausgewählt.`,
-    );
   }
 
   async function printTicketDocument() {
@@ -750,9 +747,7 @@ export function CashierView() {
               onRowClick={(result) => {
                 selectSearchResult(result);
                 if (result.groupStatus !== "CANCELED") {
-                  void reopenTicketGroup(result.ticketGroupId).then((prepared) => {
-                    if (prepared) setMessage("Ticketzettel stehen zum Nachdruck bereit.");
-                  });
+                  void reopenTicketGroup(result.ticketGroupId);
                 }
               }}
               rowKey={(result) => result.ticketGroupId}
@@ -849,9 +844,9 @@ export function CashierView() {
                       className="cashier-ticket-enlarge"
                       onClick={() => setQrScanOpen(true)}
                       type="button"
+                      title="QR-Code vergrößern"
                     >
                       <Maximize2 aria-hidden="true" size={15} />
-                      QR-Code vergrößern
                     </button>
                   </>
                 ) : (

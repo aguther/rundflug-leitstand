@@ -11,7 +11,8 @@ describe("Flight Line Supervisor", () => {
     expect(appSource).toContain("const operationalAircraft = board?.aircraft ?? []");
     expect(appSource).toContain("<FlightLineSupervisorConsole");
     expect(supervisorSource).toContain('className="flight-director-v15"');
-    expect(supervisorSource).toContain("flight-director-aircraft-row selected");
+    expect(supervisorSource).toContain('className="flight-director-aircraft-row"');
+    expect(supervisorSource).not.toContain("flight-director-aircraft-row selected");
     expect(supervisorSource).toContain("<ModalDialog");
     expect(supervisorSource).toContain("Buchungsgruppen zuweisen");
     expect(supervisorSource).toContain("Gruppen bleiben vollständig zusammen");
@@ -48,6 +49,22 @@ describe("Flight Line Supervisor", () => {
     expect(supervisorSource).not.toContain("<span>Status</span>");
     expect(supervisorSource).not.toContain("<dd>{rotation.status}</dd>");
     expect(supervisorSource).not.toContain('{ value: "tickets", label: "Verkaufte Tickets" }');
+  });
+
+  it("shows forecast and actual ticket timing with an open-only filter", () => {
+    expect(supervisorSource).toContain("onlyOpenTickets");
+    expect(supervisorSource).toContain("Nur offene Tickets");
+    expect(supervisorSource).toContain("Zeitfenster");
+    expect(supervisorSource).toContain("Off-Block");
+    expect(supervisorSource).toContain("On-Block");
+    expect(supervisorSource).toContain("formatFlightLineTime");
+    expect(supervisorSource).toContain('rotation.status !== "COMPLETED"');
+  });
+
+  it("allows the audited unavailable flow during boarding and off-block", () => {
+    expect(supervisorSource).toContain('["CALLED", "IN_FLIGHT"].includes(rotation.status)');
+    expect(supervisorSource).toContain("disabled={!unavailableAllowed}");
+    expect(appSource).toContain("ABORT_ROTATION_TO_QUEUE_AND_MARK_AIRCRAFT_UNAVAILABLE");
   });
 
   it("supports an optional pause estimate without automatic release", () => {

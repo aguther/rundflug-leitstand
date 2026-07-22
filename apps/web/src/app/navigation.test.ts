@@ -45,10 +45,27 @@ describe("V1.2 app navigation", () => {
 
   it("separates the account menu from the view switcher", () => {
     expect(shellSource).toContain("<AppHeader");
-    expect(headerSource).toContain('className="account-menu"');
-    expect(headerSource).toContain('className="account-menu-popover"');
+    expect(headerSource).toContain("account-menu--integrated");
+    expect(headerSource).toContain("account-menu-popover--integrated");
     expect(headerSource).toContain("Abmelden");
     expect(headerSource).not.toContain('querySelector(".view-switcher")');
+  });
+
+  it("keeps operational branding static and integrates event, theme and about actions", () => {
+    expect(headerSource).toContain('<div className="app-brand">');
+    expect(headerSource).toContain("Veranstaltung wechseln");
+    expect(headerSource).toContain("account-theme-options");
+    expect(headerSource).toContain("setPreference(value)");
+    expect(headerSource).toContain("Über Rundflug-Leitstand");
+    expect(headerSource).toContain("<ModalDialog");
+  });
+
+  it("centers the current-view icon and rotates only the explicit chevron", () => {
+    expect(headerSource).toContain('className="view-switcher-icon"');
+    expect(headerSource).toContain('className="view-switcher-chevron"');
+    expect(baseStyles).toContain(".view-switcher-icon");
+    expect(baseStyles).toContain(".view-switcher[open] > summary > .view-switcher-chevron");
+    expect(baseStyles).not.toContain(".view-switcher[open] > summary > :last-child");
   });
 
   it("moves release information into the header and removes the global footer", () => {
