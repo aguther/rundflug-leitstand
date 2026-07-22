@@ -90,7 +90,7 @@
   display: grid;
   grid-template-columns:
     34px minmax(120px, 1.4fr) minmax(72px, 0.7fr) minmax(68px, 0.66fr)
-    minmax(78px, 0.7fr) minmax(126px, auto);
+    minmax(78px, 0.7fr) 148px;
   align-items: center;
   gap: 10px;
   padding: 9px 12px 7px;
@@ -137,6 +137,7 @@
   white-space: nowrap;
 }
 .cashier-sell-action.ds-button {
+  width: 100%;
   min-width: 0;
   min-height: 40px;
   justify-content: center;
@@ -265,7 +266,7 @@
   min-height: 172px;
   flex: 1 1 auto;
   display: grid;
-  grid-template-columns: minmax(132px, 0.7fr) minmax(170px, 0.95fr) minmax(160px, 0.72fr);
+  grid-template-columns: minmax(132px, 0.7fr) minmax(170px, 0.95fr) minmax(196px, 0.78fr);
   gap: 8px;
   overflow: hidden;
 }
@@ -343,11 +344,13 @@
   position: absolute;
   right: 6px;
   bottom: 6px;
-  min-height: 30px;
+  width: 40px;
+  height: 40px;
+  min-height: 40px;
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 5px 7px;
+  justify-content: center;
+  padding: 0;
   border: 1px solid var(--ui-accent);
   border-radius: 5px;
   color: var(--ui-accent);
@@ -397,34 +400,36 @@
   font-weight: 700;
 }
 .ticket-paper-preview {
-  width: 132px;
-  padding: 4px;
+  width: 176px;
+  max-width: calc(100% - 8px);
+  box-sizing: border-box;
+  padding: 6px;
 }
 .ticket-paper-preview > strong {
-  font-size: 0.62rem;
+  font-size: 0.72rem;
   line-height: 1;
 }
 .ticket-paper-preview > small {
-  font-size: 6px;
-  line-height: 1;
+  font-size: 7.5px;
+  line-height: 1.1;
 }
 .ticket-paper-preview > b {
-  margin-top: 2px;
-  font-size: 8px;
+  margin-top: 4px;
+  font-size: 10px;
   line-height: 1;
 }
 .ticket-paper-preview > img {
-  width: 54px;
-  height: 54px;
+  width: 88px;
+  height: 88px;
 }
 .ticket-paper-preview dl {
-  margin: 1px 0;
-  padding-top: 1px;
-  font-size: 6px;
-  line-height: 1.05;
+  margin: 3px 0;
+  padding-top: 3px;
+  font-size: 7.5px;
+  line-height: 1.12;
 }
 .ticket-paper-preview dl > div {
-  grid-template-columns: 34px minmax(0, 1fr);
+  grid-template-columns: 42px minmax(0, 1fr);
 }
 .ticket-paper-preview dl :is(dt, dd) {
   overflow: hidden;
@@ -530,7 +535,7 @@
   .cashier-product-row {
     grid-template-columns:
       28px minmax(105px, 1.35fr) minmax(64px, 0.7fr) minmax(60px, 0.66fr)
-      minmax(72px, 0.7fr) minmax(112px, auto);
+      minmax(72px, 0.7fr) 136px;
     gap: 7px;
     padding-inline: 10px;
   }
@@ -575,7 +580,7 @@
   .cashier-product-row {
     grid-template-columns:
       26px minmax(82px, 1.24fr) minmax(55px, 0.72fr) minmax(53px, 0.66fr)
-      minmax(60px, 0.72fr) minmax(112px, auto);
+      minmax(60px, 0.72fr) 122px;
     gap: 5px;
     padding-inline: 8px;
   }
@@ -640,7 +645,7 @@
     padding: 10px 12px;
   }
   .cashier-ticket-detail-grid {
-    grid-template-columns: minmax(118px, 0.68fr) minmax(145px, 0.9fr) minmax(142px, 0.72fr);
+    grid-template-columns: minmax(118px, 0.68fr) minmax(145px, 0.9fr) minmax(196px, 0.72fr);
     gap: 7px;
   }
   .cashier-ticket-detail-grid > * {
@@ -680,7 +685,7 @@
     justify-content: space-between;
   }
   .cashier-product-row {
-    grid-template-columns: 30px minmax(0, 1fr) minmax(108px, auto);
+    grid-template-columns: 30px minmax(0, 1fr) 126px;
     min-height: 72px;
     padding: 8px;
   }
@@ -713,6 +718,11 @@
   }
   .cashier-ticket-paper {
     min-height: 210px;
+  }
+  .cashier-ticket-enlarge {
+    width: 44px;
+    height: 44px;
+    min-height: 44px;
   }
   .cashier-ticket-actions {
     grid-template-columns: 1fr;

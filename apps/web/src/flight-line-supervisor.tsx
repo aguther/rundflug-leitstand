@@ -26,6 +26,7 @@ import {
   type FlightLineFleetState,
   FlightProgress,
   flightLineGroupLabel,
+  formatFlightLineTime,
   operationalRotationForAircraft,
   PilotAssignmentDialogs,
   PilotChangeIcon,
@@ -80,6 +81,7 @@ export function FlightLineSupervisorConsole({
 }) {
   const [resourceGroupId, setResourceGroupId] = useState("");
   const [ticketSearch, setTicketSearch] = useState("");
+  const [onlyOpenTickets, setOnlyOpenTickets] = useState(false);
   const [assignmentOpen, setAssignmentOpen] = useState(false);
   const [pilotOpen, setPilotOpen] = useState(false);
   const [historyAircraftId, setHistoryAircraftId] = useState<string | null>(null);
@@ -115,21 +117,24 @@ export function FlightLineSupervisorConsole({
   const history = historyAircraftId
     ? rotationHistoryForAircraft(historyAircraftId, board.rotations)
     : [];
-  const ticketRows = board.rotations
-    .flatMap((rotation) => rotation.bookingGroups.map((group) => ({ group, rotation })))
-    .sort(
-      (left, right) =>
-        right.group.soldAt.localeCompare(left.group.soldAt) ||
-        right.group.id.localeCompare(left.group.id),
-    )
-    .filter(({ group, rotation }) => {
-      const query = ticketSearch.trim().toLocaleLowerCase("de-DE");
-      if (!query) return true;
-      return `${flightLineGroupLabel(rotation.productCode, group.communicationNumber)} ${rotation.productName} ${rotation.aircraftRegistration ?? ""}`
-        .toLocaleLowerCase("de-DE")
-        .includes(query);
-    })
-    .slice(0, 30);
+  const ticketRows = useMemo(() => {
+    const query = ticketSearch.trim().toLocaleLowerCase("de-DE");
+    return board.rotations
+      .flatMap((rotation) => rotation.bookingGroups.map((group) => ({ group, rotation })))
+      .filter(({ rotation }) => !onlyOpenTickets || rotation.status !== "COMPLETED")
+      .filter(({ group, rotation }) => {
+        if (!query) return true;
+        return `${flightLineGroupLabel(rotation.productCode, group.communicationNumber)} ${rotation.productName} ${rotation.aircraftRegistration ?? ""}`
+          .toLocaleLowerCase("de-DE")
+          .includes(query);
+      })
+      .sort(
+        (left, right) =>
+          right.group.soldAt.localeCompare(left.group.soldAt) ||
+          right.group.id.localeCompare(left.group.id),
+      )
+      .slice(0, 30);
+  }, [board.rotations, onlyOpenTickets, ticketSearch]);
 
   function selectAircraft(aircraftId: string) {
     onSelectAircraft(aircraftId);
@@ -196,7 +201,6 @@ export function FlightLineSupervisorConsole({
           </div>
           {filteredAircraft.map((entry) => {
             const rotation = operationalRotationForAircraft(entry, board.rotations, board.products);
-            const isSelected = entry.id === selectedAircraft?.id;
             const pilotChangeAllowed = !rotation || ["DRAFT", "CALLED"].includes(rotation.status);
             const startBlockAllowed = entry.operationalState === "AVAILABLE";
             const unavailableAllowed =
@@ -205,25 +209,14 @@ export function FlightLineSupervisorConsole({
             const primaryPresentation = primaryAircraftActionPresentation(entry, rotation);
             const PrimaryActionIcon = primaryPresentation.Icon;
             return (
-              <div
-                className={
-                  isSelected
-                    ? "flight-director-aircraft-row selected"
-                    : "flight-director-aircraft-row"
-                }
-                key={entry.id}
-              >
-                <button
-                  className="flight-director-aircraft-name"
-                  onClick={() => selectAircraft(entry.id)}
-                  type="button"
-                >
+              <div className="flight-director-aircraft-row" key={entry.id}>
+                <span className="flight-director-aircraft-name">
                   <Plane aria-hidden="true" />
                   <span>
                     <strong>{entry.registration}</strong>
                     <small>{entry.aircraftType}</small>
                   </span>
-                </button>
+                </span>
                 <span className="flight-director-aircraft-resource">
                   <strong>{entry.passengerSeats}</strong>
                   <small>{entry.resourceGroupName}</small>
@@ -307,7 +300,7 @@ export function FlightLineSupervisorConsole({
                   <IconButton
                     aria-pressed={["INACTIVE", "INTERRUPTED"].includes(entry.operationalState)}
                     className="flight-line-status-action state-inactive"
-                    disabled={!startBlockAllowed}
+                    disabled={!unavailableAllowed}
                     label={`${entry.registration} nicht verfügbar setzen`}
                     onClick={(event) => {
                       event.stopPropagation();
@@ -343,13 +336,22 @@ export function FlightLineSupervisorConsole({
               Verkaufte Tickets <small>alle Flugzeuge</small>
             </h2>
             <SearchField
+              className="flight-director-ticket-search"
               label="Verkaufte Tickets suchen"
               onChange={(event) => setTicketSearch(event.target.value)}
               placeholder="Nach Ticket-ID oder Produkt suchen"
               value={ticketSearch}
             />
+            <label className="flight-director-open-filter">
+              <input
+                checked={onlyOpenTickets}
+                onChange={(event) => setOnlyOpenTickets(event.target.checked)}
+                type="checkbox"
+              />
+              <span>Nur offene Tickets</span>
+            </label>
           </header>
-          <CompactTickets rows={ticketRows} />
+          <CompactTickets rows={ticketRows} timeZone={board.event.timeZone} />
         </Panel>
       </div>
 
@@ -547,8 +549,10 @@ function QueueGroupRow({
 
 function CompactTickets({
   rows,
+  timeZone,
 }: {
   rows: Array<{ group: Rotation["bookingGroups"][number]; rotation: Rotation }>;
+  timeZone: string;
 }) {
   return (
     <div className="flight-director-compact-table tickets">
@@ -558,6 +562,11 @@ function CompactTickets({
         <span>Umlaufstatus</span>
         <span>Flugzeug</span>
         <span>Produkt</span>
+        <span>Zeitfenster</span>
+        <span>Boarding</span>
+        <span>Off-Block</span>
+        <span>On-Block</span>
+        <span>Abschluss</span>
       </div>
       {rows.length > 0 ? (
         rows.map(({ group, rotation }) => (
@@ -567,6 +576,15 @@ function CompactTickets({
             <span>{rotationStateLabels[rotation.status]}</span>
             <span>{rotation.aircraftRegistration ?? "Noch offen"}</span>
             <span>{rotation.productName}</span>
+            <span>
+              {rotation.timeline.actual.departureAt
+                ? "–"
+                : `${rotation.predictedLowerMinutes}–${rotation.predictedUpperMinutes} Min.`}
+            </span>
+            <span>{formatFlightLineTime(rotation.timeline.actual.boardingAt, timeZone)}</span>
+            <span>{formatFlightLineTime(rotation.timeline.actual.departureAt, timeZone)}</span>
+            <span>{formatFlightLineTime(rotation.timeline.actual.landingAt, timeZone)}</span>
+            <span>{formatFlightLineTime(rotation.timeline.actual.completionAt, timeZone)}</span>
           </div>
         ))
       ) : (

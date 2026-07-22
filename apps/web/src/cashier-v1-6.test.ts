@@ -45,7 +45,7 @@ describe("cashier release 1.7.0 acceptance coverage", () => {
   it("fits the complete cashier workspace into the iPad landscape band", () => {
     expect(styles).toMatch(/@media \(min-width: 1101px\) and \(max-width: 1250px\)/);
     expect(styles).toMatch(
-      /grid-template-columns:[\s\S]*?26px minmax\(82px, 1\.24fr\)[\s\S]*?minmax\(112px, auto\)/,
+      /grid-template-columns:[\s\S]*?26px minmax\(82px, 1\.24fr\)[\s\S]*?122px/,
     );
     expect(styles).toMatch(
       /@media \(min-width: 1101px\)[\s\S]*?\.cashier-ticket-table \.ds-table \{[\s\S]*?min-width: 600px;/,
@@ -69,5 +69,14 @@ describe("cashier release 1.7.0 acceptance coverage", () => {
     expect(styles).toMatch(/\.cashier-ticket-paper \{[\s\S]*?overflow: hidden;/);
     expect(styles).toContain(".ticket-paper-preview");
     expect(styles).toContain(".qr-scan-dialog::backdrop");
+    expect(styles).toMatch(/\.ticket-paper-preview \{[\s\S]*?width: 176px;/);
+    expect(styles).toMatch(/\.cashier-ticket-enlarge \{[\s\S]*?width: 40px;/);
+  });
+
+  it("uses visible selection state instead of informational selection toasts", () => {
+    expect(cashierSource).not.toContain("Tickets ausgewählt.");
+    expect(cashierSource).not.toContain("Ticketzettel stehen zum Nachdruck bereit.");
+    expect(cashierSource).toContain("selectedRowKey");
+    expect(cashierSource).toContain('title="QR-Code vergrößern"');
   });
 });
