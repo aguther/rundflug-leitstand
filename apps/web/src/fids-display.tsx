@@ -1,6 +1,14 @@
 import type { FidsPreferences, PublicBoard } from "@rundflug/contracts";
 import { formatBookingGroupLabel } from "@rundflug/domain";
-import { ArrowRight, Check, Clock3, Plane, QrCode, Settings, UsersRound } from "lucide-react";
+import {
+  CircleArrowRight,
+  Clock3,
+  PlaneTakeoff,
+  QrCode,
+  Settings,
+  TicketsPlane,
+  Users,
+} from "lucide-react";
 import type { CSSProperties } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BrandMark } from "./design-system/BrandMark";
@@ -25,10 +33,10 @@ function statusPresentation(status: PublicGroup["status"]): {
   icon: typeof Clock3;
 } {
   if (status === "COME_TO_FLIGHT_LINE")
-    return { label: "GO TO GATE", tone: "gate", icon: ArrowRight };
-  if (status === "BOARDING") return { label: "BOARDING", tone: "boarding", icon: Plane };
+    return { label: "GO TO GATE", tone: "gate", icon: CircleArrowRight };
+  if (status === "BOARDING") return { label: "BOARDING", tone: "boarding", icon: TicketsPlane };
   if (status === "IN_FLIGHT" || status === "LANDED" || status === "COMPLETED") {
-    return { label: "ABGEFLOGEN", tone: "departed", icon: Check };
+    return { label: "ABGEFLOGEN", tone: "departed", icon: PlaneTakeoff };
   }
   if (status === "SERVICE_PAUSED") return { label: "VERZÖGERT", tone: "delayed", icon: Clock3 };
   return { label: "WARTEN", tone: "standby", icon: Clock3 };
@@ -82,9 +90,7 @@ function Status({ group }: { group: PublicGroup }) {
   const Icon = presentation.icon;
   return (
     <strong className={`fids-status tone-${presentation.tone}`}>
-      <span className="fids-status-icon">
-        <Icon aria-hidden="true" />
-      </span>
+      <Icon aria-hidden="true" className="fids-status-icon" />
       <span>{presentation.label}</span>
     </strong>
   );
@@ -93,7 +99,7 @@ function Status({ group }: { group: PublicGroup }) {
 function GroupCell({ group }: { group: PublicGroup }) {
   return (
     <div className="fids-group-cell">
-      <UsersRound aria-hidden="true" />
+      <Users aria-hidden="true" />
       <span>
         <strong>{groupCode(group)}</strong>
         <small>{group.productName}</small>

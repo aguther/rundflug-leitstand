@@ -102,6 +102,20 @@ describe("FIDS V1.7.3 UI", () => {
     );
   });
 
+  it("uses the approved unframed status symbols and keeps passive information neutral", () => {
+    expect(displaySource).toContain("CircleArrowRight");
+    expect(displaySource).toContain("TicketsPlane");
+    expect(displaySource).toContain("PlaneTakeoff");
+    expect(displaySource).toContain('return { label: "WARTEN", tone: "standby", icon: Clock3 }');
+    expect(displaySource).toContain('<Users aria-hidden="true" />');
+    expect(displaySource).toContain('<Icon aria-hidden="true" className="fids-status-icon" />');
+    expect(stylesSource).not.toMatch(/\.fids-status-icon \{[^}]*border:/);
+    expect(stylesSource).toMatch(/\.tone-standby \{\s*color: var\(--fids-text\);/);
+    expect(stylesSource).toMatch(
+      /\.standard-fids \.fids-footer-copy > i \{[\s\S]*?background: var\(--fids-muted\);/,
+    );
+  });
+
   it("renders no personal, private-ticket or session data", () => {
     expect(displaySource).not.toMatch(
       /guestName|phoneNumber|publicCode|ticketLabels|sessionId|operatorAccountId/i,
