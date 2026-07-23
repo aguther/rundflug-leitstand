@@ -10,6 +10,9 @@ const FidsView = lazy(() => import("./fids-view").then((module) => ({ default: m
 const FlightLineView = lazy(() =>
   import("./flight-line-view").then((module) => ({ default: module.FlightLineView })),
 );
+const ForecastSimulationView = lazy(
+  () => import("./features/forecast-simulation/ForecastSimulationView"),
+);
 const PrivacyView = lazy(() =>
   import("./privacy-view").then((module) => ({ default: module.PrivacyView })),
 );
@@ -51,5 +54,6 @@ export function FeatureRouter() {
   else if (path === "/flight-line" || path === "/flight-line/assist") view = <FlightLineView />;
   else if (path === "/fids") view = <FidsView />;
   else if (path === "/admin") view = <AdminView />;
+  else if (path === "/simulation") view = <ForecastSimulationView />;
   return <FeatureBoundary>{view}</FeatureBoundary>;
 }

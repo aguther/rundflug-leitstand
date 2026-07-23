@@ -1,13 +1,21 @@
-# Verifikation lokaler Prognose-Simulator V1
+# Verifikation Prognose-Simulator V1
 
-Stand: 22. Juli 2026
+Stand: 23. Juli 2026
 
 ## Zweck und Ausführung
 
-Der Simulator wird mit `npm run simulator` ausschließlich auf `127.0.0.1` gestartet. Er verwendet
-dieselbe reine Funktion `calculateForecastTimelines` aus `packages/domain` wie der Event
+Der lokale Simulator wird mit `npm run simulator` ausschließlich auf `127.0.0.1` gestartet. Er
+verwendet dieselbe reine Funktion `calculateForecastTimelines` aus `packages/domain` wie der Event
 Coordinator. D1-Abfragen, Snapshot-Persistenz, Realtime, Authentifizierung, Service Worker und
-Cloudflare-Ressourcen sind im Simulatormodus nicht beteiligt.
+Cloudflare-Ressourcen sind in diesem lokalen Simulatormodus nicht beteiligt.
+
+Der normale Cloudflare-Build enthält denselben Simulator zusätzlich als lazy Route `/simulation`.
+Der Einstieg liegt ausschließlich unter **Administration → Auswertung**, öffnet einen neuen Tab und
+wird über die vorhandene Sitzung auf die Rolle `ADMIN` begrenzt. Die bestehende Sitzungs- und
+Veranstaltungsauswahl darf beim Einstieg D1 lesen; die Simulation selbst verwendet weiterhin
+ausschließlich synthetische Eingaben im Browser. CSV-Inhalte, Konfiguration und Ergebnisse werden
+nicht an die API übertragen und nicht persistiert. Simulator-Chunks und -Styles sind vom
+PWA-Precache ausgeschlossen.
 
 Alle hier genannten Läufe verwenden die freigegebenen Standardparameter und Seed `20260722` für
 10:00–18:00 Uhr Europe/Berlin. Die Nachfrage erzeugt synthetische, ungeteilte Vierergruppen und wird
@@ -169,6 +177,8 @@ Light und Dark Mode wurden jeweils im In-App-Browser geprüft:
 - Netzwerkaufzeichnung nach Reload: ausschließlich lokale Vite-Modul- und HMR-Verbindungen,
   keine externe URL, kein `/api/`-Aufruf und kein Service-Worker-Modul.
 
-Der normale Produktionsbuild ersetzt den Simulatorimport per Vite-Alias durch ein leeres Modul. Er
-enthält weder Simulator-JavaScript noch dessen Styles; Route, Navigation und PWA-Precache können den
-Simulator daher nicht erreichen.
+Der normale Produktionsbuild enthält den Simulator als separaten Lazy-Chunk. Die Route ist nicht
+Teil des allgemeinen Ansichtswechslers und wird erst nach erfolgreicher Anmeldung,
+Veranstaltungsauswahl und Rollenprüfung gerendert. Nicht angemeldete Aufrufe zeigen die Anmeldung;
+andere Rollen werden auf ihren jeweiligen Arbeitsbereich zurückgeführt. Die Simulator-Artefakte
+werden nicht in den PWA-Precache aufgenommen und daher erst beim bewussten Admin-Aufruf geladen.

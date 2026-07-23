@@ -5,7 +5,16 @@ import type {
   OperationalHistory,
   OperationBoard,
 } from "@rundflug/contracts";
-import { CheckCircle2, Clock3, LockKeyhole, Plus, Trash2, Upload } from "lucide-react";
+import {
+  CheckCircle2,
+  Clock3,
+  ExternalLink,
+  FlaskConical,
+  LockKeyhole,
+  Plus,
+  Trash2,
+  Upload,
+} from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   manifestCorrectionCandidates,
@@ -3837,6 +3846,35 @@ export function AdminView() {
                 </button>
               </div>
             ) : null}
+          </section>
+          <section
+            className="admin-section admin-simulator-launch"
+            hidden={adminArea !== "evaluation"}
+          >
+            <div className="admin-simulator-launch-copy">
+              <span aria-hidden="true" className="admin-simulator-launch-icon">
+                <FlaskConical />
+              </span>
+              <div>
+                <div className="admin-simulator-launch-title">
+                  <h2>Prognose-Simulator</h2>
+                  <span>Nur Simulation</span>
+                </div>
+                <p>
+                  Synthetische Szenarien, Prognoseparameter und A/B-Vergleiche vollständig im
+                  Browser untersuchen. Es werden keine Betriebsdaten verwendet oder gespeichert.
+                </p>
+              </div>
+            </div>
+            <a
+              className="admin-simulator-launch-action"
+              href="/simulation"
+              rel="noopener"
+              target="_blank"
+            >
+              Prognose-Simulator öffnen
+              <ExternalLink aria-hidden="true" />
+            </a>
           </section>
           <section
             className="admin-section"

@@ -31,6 +31,7 @@ describe("V1.2 web architecture", () => {
       "cashier-view",
       "fids-view",
       "flight-line-view",
+      "features/forecast-simulation/ForecastSimulationView",
       "privacy-view",
       "setup-view",
       "ticket-status-view",
@@ -45,5 +46,13 @@ describe("V1.2 web architecture", () => {
     expect(appSource).not.toContain('pathname === "/pair"');
     expect(appSource).not.toContain('pathname.startsWith("/fids/")');
     expect(appSource).toContain("if (!session) return <LoginPage />");
+  });
+
+  it("routes the hosted simulator through the authenticated application", () => {
+    expect(featureRouterSource).toContain('path === "/simulation"');
+    expect(appSource).toContain('import.meta.env.MODE === "simulator"');
+    expect(appSource.indexOf('import.meta.env.MODE === "simulator"')).toBeLessThan(
+      appSource.indexOf("<AuthProvider>"),
+    );
   });
 });

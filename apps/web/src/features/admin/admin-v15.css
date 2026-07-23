@@ -93,6 +93,99 @@
   color: var(--ui-text);
 }
 
+.admin-shell .admin-simulator-launch {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 20px;
+  border-color: color-mix(in srgb, var(--ui-accent) 32%, var(--ui-border));
+  background: color-mix(in srgb, var(--ui-accent-soft) 34%, var(--ui-surface));
+}
+
+.admin-shell .admin-simulator-launch-copy {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.admin-shell .admin-simulator-launch-copy p {
+  max-width: 760px;
+  margin: 5px 0 0;
+  color: var(--ui-muted);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.admin-shell .admin-simulator-launch-icon {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: var(--radius-md);
+  color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+}
+
+.admin-shell .admin-simulator-launch-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.admin-shell .admin-simulator-launch-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.admin-shell .admin-simulator-launch-title h2 {
+  margin: 0;
+  font-size: 0.96rem;
+}
+
+.admin-shell .admin-simulator-launch-title span {
+  padding: 3px 7px;
+  border: 1px solid color-mix(in srgb, var(--ui-warning) 48%, var(--ui-border));
+  border-radius: 999px;
+  color: var(--ui-warning-text);
+  background: var(--ui-warning-soft);
+  font-size: 0.68rem;
+  font-weight: 750;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.admin-shell .admin-simulator-launch-action {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 14px;
+  border: 1px solid var(--ui-accent);
+  border-radius: var(--radius-md);
+  color: #fff;
+  background: var(--ui-accent);
+  font-size: 0.78rem;
+  font-weight: 750;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.admin-shell .admin-simulator-launch-action:hover {
+  background: color-mix(in srgb, var(--ui-accent) 84%, #000);
+}
+
+.admin-shell .admin-simulator-launch-action:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--ui-accent) 30%, transparent);
+  outline-offset: 2px;
+}
+
+.admin-shell .admin-simulator-launch-action svg {
+  width: 17px;
+  height: 17px;
+}
+
 .event-setup-v15 {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(330px, 0.82fr);
@@ -419,6 +512,14 @@
   .event-catalog-v15 {
     margin-right: 12px;
     margin-left: 12px;
+  }
+
+  .admin-shell .admin-simulator-launch {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-shell .admin-simulator-launch-action {
+    width: 100%;
   }
 
   .event-setup-v15 .ds-page-header {

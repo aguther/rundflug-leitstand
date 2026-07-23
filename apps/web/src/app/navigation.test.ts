@@ -9,6 +9,7 @@ import {
   destinationsForRole,
   homeForRole,
   isDestinationActive,
+  mayOpenEventRoute,
 } from "./navigation";
 
 const baseStyles = readFileSync(new URL("../design-system/base.css", import.meta.url), "utf8");
@@ -28,6 +29,15 @@ describe("V1.2 app navigation", () => {
     expect(isDestinationActive("/flight-line", "/flight-line")).toBe(true);
     expect(isDestinationActive("/flight-line/assist", "/flight-line")).toBe(false);
     expect(isDestinationActive("/flight-line/assist", "/flight-line/assist")).toBe(true);
+  });
+
+  it("keeps the standalone simulator route ADMIN-only and out of the global switcher", () => {
+    expect(mayOpenEventRoute("ADMIN", "/simulation")).toBe(true);
+    expect(mayOpenEventRoute("CASHIER", "/simulation")).toBe(false);
+    expect(mayOpenEventRoute("FLIGHT_LINE", "/simulation")).toBe(false);
+    expect(mayOpenEventRoute("FLIGHT_DIRECTOR", "/simulation")).toBe(false);
+    expect(mayOpenEventRoute("DISPLAY", "/simulation")).toBe(false);
+    expect(appDestinations.some((entry) => entry.href === "/simulation")).toBe(false);
   });
 
   it("opens the role-specific operational home from the standard address", () => {
@@ -110,5 +120,13 @@ describe("V1.2 app navigation", () => {
     expect(adminSource).toContain('url.searchParams.set("area", adminArea)');
     expect(adminSource).toContain('url.searchParams.set("section", masterDataCategory)');
     expect(adminSource).toContain('window.history.replaceState(null, "", url)');
+  });
+
+  it("launches the synthetic simulator from evaluation in a separate tab", () => {
+    expect(adminSource).toContain("Prognose-Simulator öffnen");
+    expect(adminSource).toContain('href="/simulation"');
+    expect(adminSource).toContain('target="_blank"');
+    expect(adminSource).toContain('rel="noopener"');
+    expect(adminSource).toContain("keine Betriebsdaten verwendet oder gespeichert");
   });
 });
