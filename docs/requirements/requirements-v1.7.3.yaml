@@ -31,7 +31,7 @@ requirements:
     requirement: Migration 0041, D1-Time-Travel-Wiederherstellung, Löschreihenfolge und bewusster Ausschluss aus portablen Backups sind dokumentiert.
     status: implemented
   - id: V173-AST-010
-    requirement: Mobile Assist-Auswahl mit Ressourcengruppe und Plätzen statt unverbindlicher Fluggruppenkennung, optionaler eigener Ressourcenzeile, Zustandsmarker auf Höhe der vergrößerten Flugzeugdetails, vollbreitem größenstabilem Übernahmebutton, gleichmäßig zweispaltiger Historie mit linksbündig beginnenden Symbolen und Werten ohne horizontalen Überlauf sowie gesperrten Aktionen während der Flugzeugfreigabe.
+    requirement: Mobile Assist-Auswahl mit Ressourcengruppe und Plätzen statt unverbindlicher Fluggruppenkennung, optionaler eigener Ressourcenzeile, vertikal zum linken Detailblock zentrierter Zustandssymbolachse mit stabiler Zeit darunter, neutraler Markerfläche und allein zustandsfarbigem Symbol samt Zeit, vollbreitem größenstabilem Übernahmebutton, gleichmäßig zweispaltiger Historie mit linksbündig beginnenden Symbolen und Werten ohne horizontalen Überlauf sowie gesperrten Aktionen während der Flugzeugfreigabe.
     status: implemented
   - id: V173-QA-010
     requirement: Automatisierte und visuelle Abnahme deckt Rollen, Persistenz, Priorität, Themes, Viewports, Zeilenzahlen, Überlauf, Realtime und Offline-Stand ab.
