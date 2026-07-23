@@ -19,9 +19,12 @@
 - `requirements-v1.7.2.md` und `.yaml` dokumentieren die
   kompatiblen Fokus-, Kassen-, Tabellen-, Zeitlinien-, Abschluss- und Assist-Korrekturen und
   übernehmen im Übrigen V1.7.1 unverändert.
-- `requirements-v1.7.3.md` und `.yaml` sind die aktuelle Releasefassung. Sie dokumentieren das
+- `requirements-v1.7.3.md` und `.yaml` dokumentieren das
   geschützte Standard-FIDS, Display-Konten, langlebige Sitzungen, kontobezogene Einstellungen und
   die globale Handlungspriorität.
+- `requirements-v1.8.0.md` und `.yaml` sind die aktuelle Releasefassung. Sie dokumentieren den
+  einheitlichen Busy Indicator, absolute prognostizierte Zeitfenster, die freigegebenen
+  Kassen-/Flight-Line-Deltas sowie einen öffentlichen Gruppen-QR-Code.
 - `traceability.csv` verbindet Anforderungen später mit Issues, Modulen und Tests.
 - `open-questions.md` enthält noch zu entscheidende Fachfragen.
 

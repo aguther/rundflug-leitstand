@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { bootstrapSystem, getSetupStatus } from "./api";
 import { AppShell as Shell } from "./app/AppShell";
 import { useActionMessageBridge } from "./app/PageNotifications";
+import { Button } from "./design-system/components";
 import { rememberActiveEvent } from "./event-context";
 import { eventDateInTimeZone } from "./event-time";
 import { LocalizedDateInput } from "./localized-date-input";
@@ -133,14 +134,16 @@ export function SetupView() {
                 <small>6–12 Ziffern; danach Anmeldung als ADMIN-01</small>
               </label>
             </div>
-            <button
+            <Button
+              busy={busy}
               className="primary-action"
               type="button"
-              disabled={!setupAvailable || busy}
+              disabled={!setupAvailable}
               onClick={() => void submitSetup()}
+              variant="primary"
             >
-              {busy ? "Einrichtung läuft …" : "System einmalig einrichten"}
-            </button>
+              System einmalig einrichten
+            </Button>
           </>
         )}
       </section>

@@ -215,3 +215,12 @@ Ergänzt Ressourcengruppen um ein veranstaltungsweit eindeutiges, stabiles Kurzz
 werden deterministisch als `RG001`, `RG002` und fortlaufend je Veranstaltung befüllt; anschließend
 sichert ein eindeutiger Index die Zuordnung. Vor Anwendung ist eine portable D1-Sicherung
 erforderlich. Ein Rollback erfolgt per D1 Time Travel oder Wiederherstellung dieser Sicherung.
+
+## 0042 – Öffentlicher Gruppencode und gruppenbezogenes Web-Push
+
+Ergänzt jede öffentliche Buchungsgruppe um einen gehashten, geschützt gespeicherten Statuscode.
+Bestandsgruppen übernehmen deterministisch den ältesten vorhandenen Ticketcode, sodass bestehende
+Links unverändert funktionieren. Push-Abonnements werden zusätzlich der Buchungsgruppe zugeordnet
+und reagieren damit auf jeden aktuellen Teilflug. Vor Anwendung ist eine D1-Time-Travel-Marke oder
+vollständige D1-Sicherung verpflichtend. Die Wiederherstellung erfolgt per D1 Time Travel oder aus
+dieser Sicherung, weil D1 die additiven Spalten nicht ohne Tabellenneuaufbau entfernen kann.

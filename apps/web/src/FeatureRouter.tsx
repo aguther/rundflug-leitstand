@@ -19,6 +19,9 @@ const SetupView = lazy(() =>
 const TicketStatusView = lazy(() =>
   import("./ticket-status-view").then((module) => ({ default: module.TicketStatusView })),
 );
+const GroupStatusView = lazy(() =>
+  import("./group-status-view").then((module) => ({ default: module.GroupStatusView })),
+);
 
 function FeatureBoundary({ children }: { children: ReactNode }) {
   return (
@@ -38,8 +41,11 @@ export function FeatureRouter() {
   const path = window.location.pathname;
   const ticketMatch = path.match(/^\/ticket\/([A-Za-z2-9]{12,32})$/);
   const ticketCode = ticketMatch?.[1];
+  const groupMatch = path.match(/^\/gruppe\/([A-Za-z2-9]{12,32})$/);
+  const groupCode = groupMatch?.[1];
   let view: ReactNode = <CashierView />;
-  if (ticketCode) view = <TicketStatusView code={ticketCode.toUpperCase()} />;
+  if (groupCode) view = <GroupStatusView code={groupCode.toUpperCase()} />;
+  else if (ticketCode) view = <TicketStatusView code={ticketCode.toUpperCase()} />;
   else if (path === "/setup") view = <SetupView />;
   else if (path === "/datenschutz") view = <PrivacyView />;
   else if (path === "/flight-line" || path === "/flight-line/assist") view = <FlightLineView />;

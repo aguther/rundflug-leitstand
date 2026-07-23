@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { BrandMark } from "../design-system/BrandMark";
-import { ModalDialog } from "../design-system/components";
+import { BusyIndicator, ModalDialog } from "../design-system/components";
 import { ThemeToggle } from "../design-system/ThemeToggle";
 import { useTheme } from "../design-system/theme";
 import { activeEventLabel, forgetActiveEvent } from "../event-context";
@@ -64,6 +64,7 @@ export function AppHeader({
   const { session, logout } = useAuth();
   const { preference, setPreference } = useTheme();
   const [infoOpen, setInfoOpen] = useState(false);
+  const [logoutBusy, setLogoutBusy] = useState(false);
   const viewSwitcherRef = useRef<HTMLDetailsElement>(null);
   const accountMenuRef = useRef<HTMLDetailsElement>(null);
   const accountSummaryRef = useRef<HTMLElement>(null);
@@ -105,6 +106,17 @@ export function AppHeader({
       document.removeEventListener("keydown", closeMenusWithEscape);
     };
   }, []);
+
+  async function logoutAndReload() {
+    if (logoutBusy) return;
+    setLogoutBusy(true);
+    try {
+      await logout();
+      window.location.reload();
+    } finally {
+      setLogoutBusy(false);
+    }
+  }
 
   return (
     <>
@@ -235,11 +247,15 @@ export function AppHeader({
                 <strong>{session.account.loginCode}</strong>
                 <small>{session.account.role}</small>
                 <button
-                  onClick={() => void logout().then(() => window.location.reload())}
+                  aria-busy={logoutBusy || undefined}
+                  aria-label={logoutBusy ? "Abmeldung wird ausgeführt" : undefined}
+                  disabled={logoutBusy}
+                  onClick={() => void logoutAndReload()}
                   type="button"
                 >
                   <LogOut aria-hidden="true" size={18} />
                   Abmelden
+                  {logoutBusy ? <BusyIndicator label="Abmeldung wird ausgeführt" /> : null}
                 </button>
               </div>
             ) : (
@@ -298,14 +314,18 @@ export function AppHeader({
                   </span>
                 </button>
                 <button
+                  aria-busy={logoutBusy || undefined}
+                  aria-label={logoutBusy ? "Abmeldung wird ausgeführt" : undefined}
                   className="account-menu-action account-menu-logout"
-                  onClick={() => void logout().then(() => window.location.reload())}
+                  disabled={logoutBusy}
+                  onClick={() => void logoutAndReload()}
                   type="button"
                 >
                   <LogOut aria-hidden="true" size={19} />
                   <span>
                     <strong>Abmelden</strong>
                   </span>
+                  {logoutBusy ? <BusyIndicator label="Abmeldung wird ausgeführt" /> : null}
                 </button>
               </div>
             )}

@@ -1397,12 +1397,18 @@
 
 .flight-director-compact-table.tickets .flight-director-compact-head,
 .flight-director-compact-table.tickets > div:not(.flight-director-compact-head) {
-  min-width: 720px;
+  min-width: 940px;
   grid-template-columns:
-    minmax(64px, 0.8fr) minmax(72px, 0.8fr) 40px minmax(66px, 0.7fr)
-    minmax(60px, 0.7fr) minmax(84px, 1fr) 70px repeat(4, 48px);
+    minmax(76px, 0.8fr) minmax(76px, 0.8fr) minmax(72px, 0.8fr) 44px 44px
+    minmax(72px, 0.7fr) minmax(90px, 1fr) 46px minmax(104px, 1fr) repeat(4, 50px);
   gap: 4px;
   padding-inline: 6px;
+}
+
+.flight-director-phase-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .flight-director-compact-table.tickets {

@@ -1,6 +1,7 @@
 import type { OperatorAccountSummary, OperatorRole } from "@rundflug/contracts";
 import { useCallback, useEffect, useState } from "react";
 import { useActionMessageBridge } from "../../app/PageNotifications";
+import { Button } from "../../design-system/components";
 import { createManagedAccount, loadManagedAccounts, roleLabels, updateManagedAccount } from "./api";
 import "./accounts.css";
 
@@ -18,7 +19,7 @@ export function AccountManagement() {
   const [pin, setPin] = useState("");
   const [selected, setSelected] = useState<OperatorAccountSummary | null>(null);
   const [resetPin, setResetPin] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [busyAction, setBusyAction] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   useActionMessageBridge(message, setMessage);
 
@@ -33,8 +34,8 @@ export function AccountManagement() {
 
   async function createAccount(event: React.FormEvent) {
     event.preventDefault();
-    if (!/^\d{6,12}$/.test(pin) || busy) return;
-    setBusy(true);
+    if (!/^\d{6,12}$/.test(pin) || busyAction) return;
+    setBusyAction("create");
     setMessage(null);
     try {
       await createManagedAccount({ role, pin });
@@ -44,15 +45,17 @@ export function AccountManagement() {
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : "Konto konnte nicht angelegt werden.");
     } finally {
-      setBusy(false);
+      setBusyAction(null);
     }
   }
 
   async function changeAccount(
     account: OperatorAccountSummary,
     input: { active?: boolean; pin?: string; revokeSessions?: true },
+    action: "revoke" | "toggle" | "pin",
   ) {
-    setBusy(true);
+    if (busyAction) return;
+    setBusyAction(action);
     setMessage(null);
     try {
       await updateManagedAccount(account.id, input);
@@ -63,7 +66,7 @@ export function AccountManagement() {
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : "Konto konnte nicht geändert werden.");
     } finally {
-      setBusy(false);
+      setBusyAction(null);
     }
   }
 
@@ -133,9 +136,15 @@ export function AccountManagement() {
               placeholder="6–12 Ziffern"
             />
           </label>
-          <button className="primary-action" disabled={pin.length < 6 || busy} type="submit">
+          <Button
+            busy={busyAction === "create"}
+            className="primary-action"
+            disabled={pin.length < 6 || busyAction !== null}
+            type="submit"
+            variant="primary"
+          >
             Konto anlegen
-          </button>
+          </Button>
         </form>
       </div>
       {selected ? (
@@ -144,7 +153,7 @@ export function AccountManagement() {
             className="confirmation-dialog account-dialog"
             onSubmit={(event) => {
               event.preventDefault();
-              if (resetPin.length >= 6) void changeAccount(selected, { pin: resetPin });
+              if (resetPin.length >= 6) void changeAccount(selected, { pin: resetPin }, "pin");
             }}
             role="dialog"
             aria-modal="true"
@@ -171,26 +180,31 @@ export function AccountManagement() {
               />
             </label>
             <div className="dialog-actions">
-              <button
-                disabled={busy}
+              <Button
+                busy={busyAction === "revoke"}
+                disabled={busyAction !== null}
                 type="button"
-                onClick={() => void changeAccount(selected, { revokeSessions: true })}
+                onClick={() => void changeAccount(selected, { revokeSessions: true }, "revoke")}
               >
                 Sitzungen widerrufen
-              </button>
-              <button
+              </Button>
+              <Button
+                busy={busyAction === "toggle"}
+                disabled={busyAction !== null}
                 type="button"
-                onClick={() => void changeAccount(selected, { active: !selected.active })}
+                onClick={() => void changeAccount(selected, { active: !selected.active }, "toggle")}
               >
                 {selected.active ? "Deaktivieren" : "Aktivieren"}
-              </button>
-              <button
+              </Button>
+              <Button
+                busy={busyAction === "pin"}
                 className="primary-action"
-                disabled={resetPin.length < 6 || busy}
+                disabled={resetPin.length < 6 || busyAction !== null}
                 type="submit"
+                variant="primary"
               >
                 PIN ändern
-              </button>
+              </Button>
             </div>
           </form>
         </div>
