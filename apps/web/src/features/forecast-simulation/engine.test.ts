@@ -26,6 +26,7 @@ describe("local forecast simulation", () => {
               averageWindowWidth: result.metrics.boarding.averageWindowWidthMinutes,
               maximumReactionSeconds: result.metrics.maximumEventReactionSeconds,
               uncertainCountdownViolations: result.metrics.uncertainCountdownViolations,
+              precall: result.metrics.precall,
             },
           ];
         },
@@ -41,6 +42,15 @@ describe("local forecast simulation", () => {
         averageWindowWidth: 0,
         maximumReactionSeconds: 29.648,
         uncertainCountdownViolations: 0,
+        precall: {
+          eligibleGroups: 28,
+          precalledGroups: 26,
+          coveragePercent: 92.86,
+          medianGateWaitMinutes: 9.5,
+          p90GateWaitMinutes: 29,
+          sameTickCount: 6,
+          uncertainPrecallCount: 0,
+        },
       },
       PEAK_LOAD: {
         generated: 68,
@@ -51,6 +61,15 @@ describe("local forecast simulation", () => {
         averageWindowWidth: 0,
         maximumReactionSeconds: 29.648,
         uncertainCountdownViolations: 0,
+        precall: {
+          eligibleGroups: 28,
+          precalledGroups: 26,
+          coveragePercent: 92.86,
+          medianGateWaitMinutes: 12.25,
+          p90GateWaitMinutes: 29,
+          sameTickCount: 5,
+          uncertainPrecallCount: 0,
+        },
       },
       AIRCRAFT_FAILURE: {
         generated: 32,
@@ -61,6 +80,15 @@ describe("local forecast simulation", () => {
         averageWindowWidth: 0,
         maximumReactionSeconds: 29.648,
         uncertainCountdownViolations: 0,
+        precall: {
+          eligibleGroups: 21,
+          precalledGroups: 20,
+          coveragePercent: 95.24,
+          medianGateWaitMinutes: 9.5,
+          p90GateWaitMinutes: 26.35,
+          sameTickCount: 4,
+          uncertainPrecallCount: 0,
+        },
       },
       OPERATION_INTERRUPTION: {
         generated: 32,
@@ -71,6 +99,15 @@ describe("local forecast simulation", () => {
         averageWindowWidth: 0.4,
         maximumReactionSeconds: 29.648,
         uncertainCountdownViolations: 0,
+        precall: {
+          eligibleGroups: 28,
+          precalledGroups: 26,
+          coveragePercent: 92.86,
+          medianGateWaitMinutes: 8.25,
+          p90GateWaitMinutes: 26,
+          sameTickCount: 7,
+          uncertainPrecallCount: 0,
+        },
       },
     });
   });
@@ -116,6 +153,53 @@ describe("local forecast simulation", () => {
     expect(timestamps).toEqual([...timestamps].sort((left, right) => left - right));
     expect(result.metrics.maximumEventReactionSeconds).toBeLessThanOrEqual(30);
     expect(result.metrics.uncertainCountdownViolations).toBe(0);
+  });
+
+  it("records automatic GO TO GATE before boarding without an aircraft binding", () => {
+    const result = runSimulation(shortNormalConfig());
+    const precalls = result.events.filter((event) => event.type === "FLIGHT_GROUP_PRECALLED");
+
+    expect(precalls.length).toBeGreaterThan(0);
+    for (const precall of precalls) {
+      expect(precall.aircraftId).toBeNull();
+      const rotation = result.rotations.find((entry) => entry.id === precall.rotationId);
+      expect(rotation).toMatchObject({
+        precalledAt: precall.occurredAt,
+        precallTrigger: "AUTOMATIC_PRECALL",
+      });
+      expect(rotation?.precallPredictionQuality).not.toBeNull();
+      expect(Date.parse(rotation?.precallPredictedBoardingAt ?? "")).not.toBeNaN();
+      expect(rotation?.precallAdaptiveLeadMinutes).toBeGreaterThanOrEqual(6);
+      expect(rotation?.precallAdaptiveLeadMinutes).toBeLessThanOrEqual(18);
+      expect(rotation?.aircraftId).not.toBeNull();
+      expect(Date.parse(rotation?.calledAt ?? "")).toBeGreaterThanOrEqual(
+        Date.parse(precall.occurredAt),
+      );
+      const sameTickEvents = result.events.filter(
+        (event) => event.rotationId === rotation?.id && event.occurredAt === precall.occurredAt,
+      );
+      const sameTickTypes = sameTickEvents.map((event) => event.type);
+      if (sameTickTypes.includes("ROTATION_CALLED")) {
+        expect(sameTickTypes.indexOf("FLIGHT_GROUP_PRECALLED")).toBeLessThan(
+          sameTickTypes.indexOf("ROTATION_CALLED"),
+        );
+      }
+    }
+    expect(result.metrics.precall.precalledGroups).toBe(
+      result.rotations.filter((rotation) => rotation.precalledAt && rotation.calledAt).length,
+    );
+    expect(result.metrics.precall.coveragePercent).not.toBeNull();
+  });
+
+  it("can disable automatic GO TO GATE without changing the queue execution", () => {
+    const config = shortNormalConfig();
+    config.automaticPrecallEnabled = false;
+    const result = runSimulation(config);
+
+    expect(result.events.some((event) => event.type === "FLIGHT_GROUP_PRECALLED")).toBe(false);
+    expect(result.rotations.every((rotation) => rotation.precalledAt === null)).toBe(true);
+    expect(result.metrics.precall.precalledGroups).toBe(0);
+    expect(result.rotations.some((rotation) => rotation.calledAt)).toBe(true);
   });
 
   it("never suppresses a fresh forecast only because the latest learning sample is old", () => {
