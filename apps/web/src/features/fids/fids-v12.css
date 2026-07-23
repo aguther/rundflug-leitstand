@@ -7,6 +7,9 @@
   --fids-muted: #9aa4b3;
   --fids-border: #344252;
   --fids-accent: #ffc400;
+  --fids-ui-accent: #2f8af5;
+  --fids-ui-accent-hover: #58a2fa;
+  --fids-ui-accent-soft: #142c48;
   --fids-blue: #5598ff;
   --fids-cyan: #22d3ee;
   --fids-orange: #ff632c;
@@ -33,6 +36,9 @@
   --fids-muted: #536579;
   --fids-border: #9aabba;
   --fids-accent: #9b6500;
+  --fids-ui-accent: #0867d9;
+  --fids-ui-accent-hover: #0758ba;
+  --fids-ui-accent-soft: #e8f2ff;
   --fids-blue: #185db9;
   --fids-cyan: #007895;
   --fids-orange: #c53d10;
@@ -49,6 +55,9 @@
     --fids-muted: #536579;
     --fids-border: #9aabba;
     --fids-accent: #9b6500;
+    --fids-ui-accent: #0867d9;
+    --fids-ui-accent-hover: #0758ba;
+    --fids-ui-accent-soft: #e8f2ff;
     --fids-blue: #185db9;
     --fids-cyan: #007895;
     --fids-orange: #c53d10;
@@ -76,23 +85,24 @@
   height: clamp(52px, min(8.2vw, 14dvh), 140px);
   flex: 0 0 auto;
   place-items: center;
-  overflow: hidden;
-  border: clamp(3px, 0.35vw, 6px) solid var(--fids-accent);
-  border-radius: 50%;
-  color: var(--fids-accent);
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  color: var(--fids-ui-accent);
   background: transparent;
 }
 
 .standard-mark > .brand-mark {
   width: 100%;
   height: 100%;
-  padding: 8%;
+  padding: 0;
   color: currentcolor;
   object-fit: contain;
 }
 
 .standard-fids .standard-mark > .brand-mark.plane-mark {
-  color: var(--fids-accent);
+  color: var(--fids-ui-accent);
+  stroke-width: 1.35;
 }
 
 .standard-mark > .event-logo {
@@ -270,15 +280,15 @@
 }
 
 .fids-group-cell {
-  gap: clamp(4px, 1vw, 18px);
+  gap: clamp(4px, 0.7vw, 12px);
 }
 
 .fids-group-cell > svg {
-  width: clamp(13px, 1.6em, 46px);
-  height: clamp(13px, 1.6em, 46px);
+  width: 1em;
+  height: 1em;
   flex: 0 0 auto;
   color: var(--fids-blue);
-  stroke-width: 2.7;
+  stroke-width: 2.2;
 }
 
 .fids-group-cell > span {
@@ -313,7 +323,7 @@
 }
 
 .fids-status {
-  gap: clamp(3px, 0.75vw, 14px);
+  gap: clamp(3px, 0.55vw, 10px);
   font-size: 1.04em;
   letter-spacing: 0.035em;
   white-space: nowrap;
@@ -321,8 +331,8 @@
 
 .fids-status-icon {
   display: grid;
-  width: clamp(14px, 1.62em, 52px);
-  height: clamp(14px, 1.62em, 52px);
+  width: 1em;
+  height: 1em;
   flex: 0 0 auto;
   place-items: center;
   border: max(1px, 0.08em) solid currentcolor;
@@ -330,9 +340,9 @@
 }
 
 .fids-status-icon svg {
-  width: 62%;
-  height: 62%;
-  stroke-width: 2.7;
+  width: 60%;
+  height: 60%;
+  stroke-width: 2.25;
 }
 
 .fids-window {
@@ -463,7 +473,7 @@
 }
 
 .fids-settings-button:focus-visible {
-  box-shadow: 0 0 0 3px var(--fids-accent);
+  box-shadow: 0 0 0 3px var(--fids-ui-accent);
 }
 
 @media (min-width: 1280px) {
@@ -666,7 +676,7 @@
 
 .fids-row-stepper button:focus-visible,
 .fids-settings-options label:has(input:focus-visible) {
-  outline: 3px solid color-mix(in srgb, var(--fids-blue) 75%, transparent);
+  outline: 3px solid color-mix(in srgb, var(--fids-ui-accent) 75%, transparent);
   outline-offset: 2px;
 }
 
@@ -718,8 +728,8 @@
 }
 
 .fids-settings-options label:has(input:checked) {
-  border-color: #2ea8ff;
-  background: rgb(18 91 151 / 16%);
+  border-color: var(--fids-ui-accent);
+  background: var(--fids-ui-accent-soft);
 }
 
 .fids-settings-options input {
@@ -727,7 +737,7 @@
   height: 24px;
   flex: 0 0 auto;
   margin: 0;
-  accent-color: #2ea8ff;
+  accent-color: var(--fids-ui-accent);
 }
 
 .fids-settings-options span {
@@ -769,9 +779,14 @@
 }
 
 .standard-fids .fids-settings-actions .ds-button--primary {
-  border-color: var(--fids-accent);
-  color: #101010;
-  background: var(--fids-accent);
+  border-color: var(--fids-ui-accent);
+  color: #fff;
+  background: var(--fids-ui-accent);
+}
+
+.standard-fids .fids-settings-actions .ds-button--primary:hover:not(:disabled) {
+  border-color: var(--fids-ui-accent-hover);
+  background: var(--fids-ui-accent-hover);
 }
 
 .standard-fids .fids-settings-actions .ds-button--secondary {
