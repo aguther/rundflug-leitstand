@@ -1174,11 +1174,12 @@
   --progress-icon-size: 26px;
   --progress-node-size: 28px;
   min-width: 0;
+  position: relative;
   display: grid;
-  grid-template-rows: var(--progress-node-size) 18px;
+  grid-template-rows: var(--progress-node-size);
   place-items: center;
-  gap: 4px;
   color: var(--progress-current);
+  background: transparent;
 }
 
 .flight-director-current-state-marker .flight-director-progress-node {
@@ -1189,6 +1190,10 @@
 
 .flight-director-current-state-marker small {
   min-height: 18px;
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
   color: var(--ui-muted);
   font-size: 0.75rem;
   line-height: 18px;

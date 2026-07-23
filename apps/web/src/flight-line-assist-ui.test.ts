@@ -84,6 +84,15 @@ describe("Flight Line Assist", () => {
     expect(assistStyles).toContain("border-color: var(--ui-warning)");
     expect(assistStyles).toContain("--progress-node-size: 28px");
     expect(assistStyles).toContain("font-size: 0.75rem");
+    expect(sharedFlightLineStyles).toMatch(
+      /\.flight-director-current-state-marker \{[\s\S]*?position: relative;[\s\S]*?grid-template-rows: var\(--progress-node-size\);[\s\S]*?background: transparent;/,
+    );
+    expect(sharedFlightLineStyles).toMatch(
+      /\.flight-director-current-state-marker small \{[\s\S]*?position: absolute;[\s\S]*?top: calc\(100% \+ 4px\);/,
+    );
+    expect(assistStyles).toMatch(
+      /@media \(min-width: 561px\) \{[\s\S]*?article > \.flight-director-current-state-marker \{[\s\S]*?align-self: center;/,
+    );
     expect(assistStyles).toContain("justify-content: center");
     expect(assistStyles).toContain(".flight-director-current-rotation.is-booking-groups-only");
     expect(assistStyles).toContain("min-height: 2.3em");

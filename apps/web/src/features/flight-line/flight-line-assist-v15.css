@@ -238,7 +238,7 @@
   .flight-assist-v15 .assist-v15-aircraft-list article > .flight-director-current-state-marker {
     grid-column: 3;
     grid-row: 1;
-    align-self: stretch;
+    align-self: center;
   }
 
   .flight-assist-v15 .assist-v15-claim {
