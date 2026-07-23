@@ -43,6 +43,7 @@ import {
   transitionRotation,
 } from "@rundflug/domain";
 import { sha256Hex, verifyCredential } from "./crypto";
+import { mayAccessFids } from "./fids-authorization";
 import { rowToSnapshot, safeErrorMessage } from "./snapshot";
 import type { Env, StoredEventRow } from "./types";
 import { queueEligiblePreparationNotifications, sendRotationPushNotifications } from "./web-push";
@@ -127,7 +128,7 @@ export class EventCoordinator extends DurableObject<Env> {
     const sessionId = request.headers.get("x-operator-session-id");
     const deviceId = request.headers.get("x-operator-device-id");
     const role = request.headers.get("x-operator-role");
-    if (!eventId || !accountId || !loginCode || !sessionId || !deviceId || role !== "DISPLAY") {
+    if (!eventId || !accountId || !loginCode || !sessionId || !deviceId || !mayAccessFids(role)) {
       return json(
         {
           error: {

@@ -16,7 +16,7 @@ requirements:
     requirement: Zugänglicher dezenter Einstellungsbutton und bestätigungsgebundener Dialog für Zeilen, Layout, Theme und Abmeldung.
     status: implemented
   - id: V173-AUT-010
-    requirement: DISPLAY-Konten sind administrierbar und dürfen ausschließlich die geschützte FIDS-Anwendung sowie deren Einstellungen verwenden.
+    requirement: DISPLAY-Konten sind administrierbar und bleiben auf FIDS beschränkt; ADMIN-Konten dürfen FIDS zusätzlich zu ihren Administrationsansichten und mit unveränderter Startseite verwenden.
     status: implemented
   - id: V173-SES-010
     requirement: DISPLAY-Sitzungen laufen absolut 90 Tage ohne früheren Idle-Ablauf; andere Rollen bleiben bei 16 Stunden und alle Widerrufswege wirken sofort.
