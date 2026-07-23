@@ -767,7 +767,7 @@
 }
 
 .forecast-simulator .ds-sidepanel {
-  width: min(536px, 100%);
+  width: min(760px, 100%);
 }
 
 .forecast-simulator .ds-sidepanel[data-open="false"] {
@@ -785,11 +785,252 @@
   font-weight: 400;
 }
 
+.sim-editor-tabs {
+  position: sticky;
+  z-index: 2;
+  top: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 14px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-md);
+  background: var(--ui-surface);
+}
+
+.sim-editor-tabs button {
+  min-height: 42px;
+  padding: 6px 10px;
+  border: 0;
+  border-right: 1px solid var(--ui-border);
+  color: var(--ui-muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.sim-editor-tabs button:last-child {
+  border-right: 0;
+}
+
+.sim-editor-tabs button[aria-current="page"] {
+  color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+  font-weight: 700;
+}
+
+.sim-editor-tab-content {
+  min-width: 0;
+}
+
 .sim-editor-card {
   margin-bottom: 16px;
   border: 1px solid var(--ui-border);
   border-radius: var(--radius-lg);
   background: var(--ui-surface);
+}
+
+.sim-editor-section-heading {
+  min-height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.sim-editor-section-heading h3,
+.sim-editor-section-heading p {
+  margin: 0;
+}
+
+.sim-editor-section-heading h3 {
+  font-size: 14px;
+}
+
+.sim-editor-section-heading p {
+  margin-top: 4px;
+  color: var(--ui-muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.sim-editor-section-heading .ds-button {
+  flex: 0 0 auto;
+}
+
+.sim-parameter-tag {
+  flex: 0 0 auto;
+  padding: 3px 7px;
+  border-radius: var(--radius-pill);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.035em;
+  text-transform: uppercase;
+}
+
+.sim-parameter-tag--admin {
+  color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+}
+
+.sim-parameter-tag--simulation {
+  color: var(--ui-success-text);
+  background: var(--ui-success-soft);
+}
+
+.sim-parameter-tag--experiment {
+  color: var(--ui-warning-text);
+  background: var(--ui-warning-soft);
+}
+
+.sim-admin-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding: 14px;
+}
+
+.sim-admin-grid .sim-form-field,
+.sim-demand-editor,
+.sim-batch-config > .sim-form-field {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+  color: var(--ui-muted);
+  font-size: 11px;
+}
+
+.sim-admin-grid input[type="text"] {
+  min-height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-sm);
+  color: var(--ui-text);
+  background: var(--ui-control);
+}
+
+.sim-admin-grid .sim-input-unit,
+.sim-demand-editor .sim-input-unit {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+}
+
+.sim-toggle-list {
+  display: grid;
+}
+
+.sim-toggle-list > div {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--ui-border);
+  font-size: 12px;
+}
+
+.sim-toggle-list > div:last-child {
+  border-bottom: 0;
+}
+
+.sim-demand-editor {
+  grid-template-columns: 130px minmax(0, 220px);
+  align-items: center;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.sim-experiment-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 11px 12px;
+  border: 1px solid var(--ui-warning);
+  border-radius: var(--radius-md);
+  color: var(--ui-warning-text);
+  background: var(--ui-warning-soft);
+}
+
+.sim-experiment-warning p {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.sim-tuning-table {
+  min-width: 0;
+}
+
+.sim-tuning-head,
+.sim-tuning-row {
+  display: grid;
+  grid-template-columns: minmax(210px, 1fr) 88px 110px 34px;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.sim-tuning-head {
+  color: var(--ui-muted);
+  background: var(--ui-surface-subtle);
+  font-size: 10px;
+}
+
+.sim-tuning-row:last-child {
+  border-bottom: 0;
+}
+
+.sim-tuning-row > div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.sim-tuning-row strong {
+  font-size: 12px;
+}
+
+.sim-tuning-row small {
+  color: var(--ui-muted);
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.sim-tuning-row output {
+  color: var(--ui-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.sim-tuning-row > button {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--ui-muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.sim-tuning-row > button:hover {
+  border-color: var(--ui-border);
+  color: var(--ui-accent);
+}
+
+.sim-tuning-row > button svg {
+  width: 15px;
+}
+
+.sim-batch-config > .sim-form-field {
+  grid-template-columns: minmax(0, 1fr) 110px;
+  align-items: center;
+  padding: 14px;
 }
 
 .sim-editor-card > h3 {
@@ -979,6 +1220,69 @@
 
 .sim-editor-errors p {
   margin: 3px 0;
+}
+
+.sim-comparison-progress {
+  display: grid;
+  gap: 10px;
+  padding: 20px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-md);
+  background: var(--ui-surface-subtle);
+}
+
+.sim-comparison-progress progress {
+  width: 100%;
+  accent-color: var(--ui-accent);
+}
+
+.sim-comparison-progress p,
+.sim-comparison-summary {
+  margin: 0;
+  color: var(--ui-muted);
+  font-size: 12px;
+}
+
+.sim-comparison-summary {
+  margin-bottom: 12px;
+}
+
+.sim-comparison-table-wrap {
+  max-height: 58dvh;
+  overflow: auto;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-md);
+}
+
+.sim-comparison-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sim-comparison-table th,
+.sim-comparison-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--ui-border);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.sim-comparison-table :is(th, td):nth-child(-n + 2) {
+  text-align: left;
+}
+
+.sim-comparison-table thead th {
+  position: sticky;
+  z-index: 1;
+  top: 0;
+  color: var(--ui-muted);
+  background: var(--ui-surface-subtle);
+}
+
+.sim-comparison-table tbody tr:last-child :is(th, td) {
+  border-bottom: 0;
 }
 
 .sim-detail-grid,

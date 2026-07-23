@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   type AutomaticPrecallInput,
+  DEFAULT_PRECALL_TUNING_PROFILE,
   decideAutomaticPrecall,
   deriveAdaptivePrecallLeadMinutes,
 } from "./precall";
@@ -51,6 +52,29 @@ describe("automatischer Voraufruf (F-BEN-030)", () => {
       6,
     );
     expect(deriveAdaptivePrecallLeadMinutes({ observedGateWaitMinutes: [2, 3, 4] })).toBe(15);
+  });
+
+  it("keeps production defaults identical and applies a local experimental profile", () => {
+    const input = { observedGateWaitMinutes: [2, 3, 4] };
+    expect(
+      deriveAdaptivePrecallLeadMinutes({
+        ...input,
+        tuning: { ...DEFAULT_PRECALL_TUNING_PROFILE },
+      }),
+    ).toBe(deriveAdaptivePrecallLeadMinutes(input));
+    expect(
+      deriveAdaptivePrecallLeadMinutes({
+        ...input,
+        tuning: {
+          ...DEFAULT_PRECALL_TUNING_PROFILE,
+          baselineLeadMinutes: 20,
+          correctionFactor: 1,
+          minimumLeadMinutes: 2,
+          maximumLeadMinutes: 30,
+          observationSampleLimit: 2,
+        },
+      }),
+    ).toBe(25);
   });
 
   it("never treats a precall as an aircraft assignment", () => {

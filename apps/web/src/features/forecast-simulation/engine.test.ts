@@ -38,7 +38,7 @@ describe("local forecast simulation", () => {
         completed: 25,
         windowCoverage: 0,
         boardingMedian: 0.5,
-        boardingP90: 28.3,
+        boardingP90: 27.3,
         averageWindowWidth: 0,
         maximumReactionSeconds: 29.648,
         uncertainCountdownViolations: 0,
@@ -48,7 +48,7 @@ describe("local forecast simulation", () => {
           coveragePercent: 92.86,
           medianGateWaitMinutes: 9.5,
           p90GateWaitMinutes: 29,
-          sameTickCount: 6,
+          sameTickCount: 5,
           uncertainPrecallCount: 0,
         },
       },
@@ -57,7 +57,7 @@ describe("local forecast simulation", () => {
         completed: 25,
         windowCoverage: 0,
         boardingMedian: 0.5,
-        boardingP90: 24.5,
+        boardingP90: 23.5,
         averageWindowWidth: 0,
         maximumReactionSeconds: 29.648,
         uncertainCountdownViolations: 0,
@@ -66,7 +66,7 @@ describe("local forecast simulation", () => {
           precalledGroups: 26,
           coveragePercent: 92.86,
           medianGateWaitMinutes: 12.25,
-          p90GateWaitMinutes: 29,
+          p90GateWaitMinutes: 29.5,
           sameTickCount: 5,
           uncertainPrecallCount: 0,
         },
@@ -75,8 +75,8 @@ describe("local forecast simulation", () => {
         generated: 32,
         completed: 20,
         windowCoverage: 0,
-        boardingMedian: 1,
-        boardingP90: 16.3,
+        boardingMedian: 0.5,
+        boardingP90: 15.3,
         averageWindowWidth: 0,
         maximumReactionSeconds: 29.648,
         uncertainCountdownViolations: 0,
@@ -86,7 +86,7 @@ describe("local forecast simulation", () => {
           coveragePercent: 95.24,
           medianGateWaitMinutes: 9.5,
           p90GateWaitMinutes: 26.35,
-          sameTickCount: 4,
+          sameTickCount: 3,
           uncertainPrecallCount: 0,
         },
       },
@@ -95,7 +95,7 @@ describe("local forecast simulation", () => {
         completed: 26,
         windowCoverage: 0,
         boardingMedian: 0.5,
-        boardingP90: 30.1,
+        boardingP90: 28.7,
         averageWindowWidth: 0.4,
         maximumReactionSeconds: 29.648,
         uncertainCountdownViolations: 0,
@@ -104,8 +104,8 @@ describe("local forecast simulation", () => {
           precalledGroups: 26,
           coveragePercent: 92.86,
           medianGateWaitMinutes: 8.25,
-          p90GateWaitMinutes: 26,
-          sameTickCount: 7,
+          p90GateWaitMinutes: 26.75,
+          sameTickCount: 6,
           uncertainPrecallCount: 0,
         },
       },
@@ -120,6 +120,33 @@ describe("local forecast simulation", () => {
     expect(JSON.stringify(second)).toBe(JSON.stringify(first));
     expect(first.rotations.length).toBeGreaterThan(0);
     expect(first.snapshots.length).toBeGreaterThan(0);
+  });
+
+  it("separates Admin plan values from the simulated real duration", () => {
+    const baselineConfig = shortNormalConfig();
+    const changedPlan = structuredClone(baselineConfig);
+    changedPlan.adminParameters.productReferenceDurationMinutes = 35;
+    const baseline = runSimulation(baselineConfig);
+    const candidate = runSimulation(changedPlan);
+
+    expect(candidate.rotations[0]?.flightMinutes).toBe(baseline.rotations[0]?.flightMinutes);
+    expect(candidate.snapshots[0]?.predictedLandingAt).not.toBe(
+      baseline.snapshots[0]?.predictedLandingAt,
+    );
+  });
+
+  it("uses pilots, seats and aircraft type from the effective Admin profile", () => {
+    const config = shortNormalConfig();
+    config.adminParameters.activePilotCount = 1;
+    config.adminParameters.passengerSeats = 3;
+    config.adminParameters.aircraftType = "SYN-TUNING";
+    const result = runSimulation(config);
+
+    expect(result.aircraft).toHaveLength(3);
+    expect(result.aircraft.every((aircraft) => aircraft.capacity === 3)).toBe(true);
+    expect(result.aircraft.every((aircraft) => aircraft.aircraftType === "SYN-TUNING")).toBe(true);
+    expect(result.rotations.every((rotation) => rotation.passengerCount === 3)).toBe(true);
+    expect(result.snapshots.every((snapshot) => snapshot.activeCapacity <= 1)).toBe(true);
   });
 
   it("uses the triangular inverse distribution at its exact boundaries and mode", () => {
@@ -193,7 +220,7 @@ describe("local forecast simulation", () => {
 
   it("can disable automatic GO TO GATE without changing the queue execution", () => {
     const config = shortNormalConfig();
-    config.automaticPrecallEnabled = false;
+    config.adminParameters.eventAutomaticPrecallEnabled = false;
     const result = runSimulation(config);
 
     expect(result.events.some((event) => event.type === "FLIGHT_GROUP_PRECALLED")).toBe(false);
@@ -254,11 +281,11 @@ describe("local forecast simulation", () => {
 
   it("generates every configured automatic aircraft interruption at a completion boundary", () => {
     const config = shortNormalConfig();
-    config.incidents.refueling.everyRotations = 1;
-    config.incidents.plannedPause.everyOperatingMinutes = 1;
-    config.incidents.unplannedPause.ratePerOperatingHour = 1_000;
-    config.incidents.technicalDefect.ratePerOperatingHour = 1_000;
-    config.incidents.technicalDefect.dayOutageProbability = 1;
+    config.realityModel.incidents.refueling.everyRotations = 1;
+    config.realityModel.incidents.plannedPause.everyOperatingMinutes = 1;
+    config.realityModel.incidents.unplannedPause.ratePerOperatingHour = 1_000;
+    config.realityModel.incidents.technicalDefect.ratePerOperatingHour = 1_000;
+    config.realityModel.incidents.technicalDefect.dayOutageProbability = 1;
     const result = runSimulation(config);
     const types = new Set(result.events.map((event) => event.type));
 
@@ -275,9 +302,9 @@ describe("local forecast simulation", () => {
     const outage = runSimulation(simulationConfigForPreset("AIRCRAFT_FAILURE"));
     const interruption = runSimulation(simulationConfigForPreset("OPERATION_INTERRUPTION"));
 
-    expect(normal.config.aircraftCount).toBe(3);
-    expect(normal.config.demandPersonsPerHour).toBe(18);
-    expect(peak.config.demandPersonsPerHour).toBe(36);
+    expect(normal.config.adminParameters.aircraftCount).toBe(3);
+    expect(normal.config.realityModel.demandPersonsPerHour).toBe(18);
+    expect(peak.config.realityModel.demandPersonsPerHour).toBe(36);
     expect(outage.events.some((event) => event.type === "AIRCRAFT_DAY_OUT")).toBe(true);
     const interruptedAt = interruption.events.find((event) => event.type === "EVENT_INTERRUPTED");
     const resumedAt = interruption.events.find((event) => event.type === "EVENT_RESUMED");
