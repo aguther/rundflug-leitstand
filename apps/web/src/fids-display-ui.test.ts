@@ -24,7 +24,7 @@ describe("FIDS V1.7.3 UI", () => {
     expect(eventScopedSource).toContain('normalized.searchParams.delete("style")');
   });
 
-  it("uses the event name, full-size mark and only the standard German board", () => {
+  it("uses the event name, unframed full-size mark and only the standard German board", () => {
     expect(displaySource).toContain("board?.eventName");
     expect(displaySource).toContain("<BrandMark />");
     expect(displaySource).toContain(
@@ -37,6 +37,12 @@ describe("FIDS V1.7.3 UI", () => {
     expect(stylesSource).toContain(".standard-mark > .brand-mark");
     expect(stylesSource).toMatch(
       /\.standard-mark > \.brand-mark \{[\s\S]*?width: 100%;[\s\S]*?height: 100%;/,
+    );
+    expect(stylesSource).toMatch(
+      /\.standard-mark \{[\s\S]*?overflow: visible;[\s\S]*?border: 0;[\s\S]*?border-radius: 0;/,
+    );
+    expect(stylesSource).toMatch(
+      /\.standard-fids \.standard-mark > \.brand-mark\.plane-mark \{[\s\S]*?color: var\(--fids-ui-accent\);[\s\S]*?stroke-width: 1\.35;/,
     );
   });
 
@@ -83,6 +89,17 @@ describe("FIDS V1.7.3 UI", () => {
     expect(stylesSource).toContain("overflow: hidden");
     expect(stylesSource).toContain("width: 44px");
     expect(stylesSource).toContain("height: 44px");
+  });
+
+  it("keeps table symbols at text height and uses the application accent for controls", () => {
+    expect(stylesSource).toMatch(
+      /\.fids-group-cell > svg \{[\s\S]*?width: 1em;[\s\S]*?height: 1em;/,
+    );
+    expect(stylesSource).toMatch(/\.fids-status-icon \{[\s\S]*?width: 1em;[\s\S]*?height: 1em;/);
+    expect(stylesSource).toContain("--fids-ui-accent: #2f8af5");
+    expect(stylesSource).toMatch(
+      /\.standard-fids \.fids-settings-actions \.ds-button--primary \{[\s\S]*?background: var\(--fids-ui-accent\);/,
+    );
   });
 
   it("renders no personal, private-ticket or session data", () => {

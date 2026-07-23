@@ -11,6 +11,8 @@ describe("V1.7.3 FIDS concept fidelity", () => {
     expect(displaySource).toContain('className="fids-footer-copy"');
     expect(displaySource).toContain('aria-label="FIDS-Einstellungen öffnen"');
     expect(stylesSource).toContain("opacity: 0.62");
+    expect(stylesSource).toContain("border-radius: 0");
+    expect(stylesSource).toContain("stroke-width: 1.35");
   });
 
   it("supports system, light and dark without a second display profile", () => {
