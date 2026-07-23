@@ -1,6 +1,6 @@
 # Prognose-Simulator – freigegebenes UI-Konzept
 
-Stand: 22. Juli 2026
+Stand: 23. Juli 2026
 
 Die folgenden vier Desktop-Konzepte sind die verbindliche visuelle Spezifikation für den lokalen
 Prognose-Simulator:
@@ -12,6 +12,8 @@ Prognose-Simulator:
 
 Die beiden Verlaufsbilder wurden am 23. Juli 2026 freigegeben; ihre fachlichen Details sind in der
 [Verlaufsauswertung](forecast-simulator-history-approved.md) festgehalten.
+Die am 23. Juli 2026 beauftragte Erweiterung des Szenarioeditors und der A/B-Auswertung ist im
+[Tuning-Konzept](forecast-simulator-tuning-approved.md) verbindlich beschrieben.
 
 ## Verbindliche Struktur
 
@@ -21,10 +23,10 @@ Auswertungszeile aus Fehlerdiagramm und vier Boarding-Kennzahlen. Die virtuelle 
 Element der Bedienzeile. Der Warnhinweis „Nur Simulation – keine Betriebsdaten“ bleibt permanent im
 Kopf sichtbar.
 
-Der Konfigurationsbereich öffnet als rechter Seiteneditor. Zeitphasen und Betriebsereignisse bleiben
-in getrennten, tabellarisch aufgebauten Bereichen. Jede Dauer verwendet die Spalten Minimum,
-typisch und Maximum. Das Übernehmen startet den Lauf vollständig mit demselben Seed und den neuen
-Parametern neu.
+Der Konfigurationsbereich öffnet als rechter Seiteneditor mit den Registern `Betrieb`,
+`Simulierte Realität` und `Prognose-Labor`. Admin-Planwerte und reale Dreiecksverteilungen bleiben
+getrennt. Das Übernehmen startet den Lauf vollständig mit demselben Seed und den neuen Parametern
+neu.
 
 Die `Verlaufsauswertung` öffnet als breiter Dialog mit den Registern `Fluggruppen` und `Flugzeuge`.
 Die Gruppenansicht zeigt jeden einzelnen Prognosesnapshot samt realisierten Meilensteinen. Die
@@ -39,12 +41,14 @@ bestätigte Rückkehrereignisse.
   organisatorisch zulässigen Grenze.
 - Eine temporäre Flugzeugsperre endet erst mit dem synthetischen bestätigten Rückkehrereignis.
 - Der automatische Voraufruf `GO TO GATE` verwendet dieselbe adaptive Domain-Logik wie der Worker.
-  Er wird als eigener Zeitpunkt vor Boarding festgehalten und bindet noch kein Flugzeug. Im
-  Szenarioeditor ist nur seine Aktivierung konfigurierbar.
+  Er wird als eigener Zeitpunkt vor Boarding festgehalten und bindet noch kein Flugzeug. Die
+  produktionsnahen Betriebsparameter enthalten nur die Aktivierung; technische Werte sind deutlich
+  als lokales Experiment gekennzeichnet.
 - Bei Prognosequalität `UNCERTAIN` zeigt die Oberfläche keinen Countdown. Auswahlzusammenfassung
   und Detaildialog kennzeichnen die numerischen Rohwerte ausdrücklich als nicht freigegebene
   Diagnose und nennen Unterdrückungsgrund, Lernwertalter, Stichprobengröße und aktive Kapazität.
-- Der lokale JSON-Export `rundflug-forecast-simulation/v3` enthält Rohwerte, explizite
+- Der lokale JSON-Export `rundflug-forecast-simulation/v4` enthält getrennte Admin-, Realitäts- und
+  Tuningparameter, einen optionalen A/B-Vergleich, Rohwerte, explizite
   Unterdrückungsgründe, Voraufrufdiagnostik sowie die normalisierte Flugzeug- und Ereignishistorie;
   sie besitzen keine operative oder öffentliche Zeitsemantik.
 - CSV-Kalibrierung und JSON-Export bleiben vollständig lokal. Es gibt keinen Upload und keine

@@ -29,7 +29,6 @@ const MINUTE_MS = 60_000;
 const PRODUCT_ID = "SYNTHETIC_ROUND_TRIP";
 const RESOURCE_GROUP_ID = "SIMULATION_FLEET";
 const EVENT_ID = "LOCAL_SIMULATION";
-const SYSTEM_GATE_COOLDOWN_MINUTES = 2;
 
 interface RuntimeRotation extends SimulationRotation {
   status: ForecastRotationStatus | "COMPLETED";
@@ -119,12 +118,12 @@ function roundedTick(value: number): number {
   return Math.ceil(value / TICK_MS) * TICK_MS;
 }
 
-function createAircraft(count: number): RuntimeAircraft[] {
-  return Array.from({ length: count }, (_, index) => ({
+function createAircraft(config: SimulationConfig): RuntimeAircraft[] {
+  return Array.from({ length: config.adminParameters.aircraftCount }, (_, index) => ({
     id: `aircraft-${index + 1}`,
     registration: `D-SIM${String(index + 1).padStart(2, "0")}`,
-    aircraftType: "Simulation 4S",
-    capacity: 4,
+    aircraftType: config.adminParameters.aircraftType,
+    capacity: config.adminParameters.passengerSeats,
     state: "AVAILABLE",
     activeRotationId: null,
     blockedUntilMs: null,
@@ -136,10 +135,11 @@ function createAircraft(count: number): RuntimeAircraft[] {
 }
 
 function createDemand(config: SimulationConfig): RuntimeRotation[] {
-  if (config.demandPersonsPerHour === 0) return [];
+  if (config.realityModel.demandPersonsPerHour === 0) return [];
   const startMs = Date.parse(config.startAt);
   const endMs = Date.parse(config.endAt);
-  const groupRatePerHour = config.demandPersonsPerHour / 4;
+  const groupSize = config.adminParameters.passengerSeats;
+  const groupRatePerHour = config.realityModel.demandPersonsPerHour / groupSize;
   const random = mulberry32(hashSeed(config.seed, "demand"));
   const rotations: RuntimeRotation[] = [];
   let arrivalMs = startMs;
@@ -152,7 +152,7 @@ function createDemand(config: SimulationConfig): RuntimeRotation[] {
     rotations.push({
       id,
       communicationNumber: sequence,
-      passengerCount: 4,
+      passengerCount: groupSize,
       createdAt: iso(roundedTick(arrivalMs)),
       precalledAt: null,
       precallTrigger: null,
@@ -455,9 +455,9 @@ export function runSimulation(
   if (validationErrors.length > 0) throw new Error(validationErrors.join(" "));
   const startMs = Date.parse(config.startAt);
   const endMs = Date.parse(config.endAt);
-  const aircraft = createAircraft(config.aircraftCount);
+  const aircraft = createAircraft(config);
   for (const entry of aircraft) {
-    entry.nextPauseAtMinutes = config.incidents.plannedPause.everyOperatingMinutes;
+    entry.nextPauseAtMinutes = config.realityModel.incidents.plannedPause.everyOperatingMinutes;
   }
   const rotations = createDemand(config);
   const events: SimulationEvent[] = [];
@@ -529,18 +529,19 @@ export function runSimulation(
         .filter((rotation) => rotation.status === "DRAFT")
         .map((rotation, index) => [rotation.id, index + 1]),
     );
-    const activeCapacity = aircraft.filter(
-      (entry) => entry.state === "AVAILABLE" || entry.state === "ACTIVE",
-    ).length;
+    const activeCapacity = Math.min(
+      config.adminParameters.activePilotCount,
+      aircraft.filter((entry) => entry.state === "AVAILABLE" || entry.state === "ACTIVE").length,
+    );
     return calculateForecastTimelines({
       event: {
         eventId: EVENT_ID,
         now: iso(nowMs),
         operationalInterrupted,
         emergencyMode: false,
-        plannedBoardingMinutes: config.phases.boarding.typical,
-        plannedDeboardingMinutes: config.phases.deboarding.typical,
-        plannedBufferMinutes: config.phases.buffer.typical,
+        plannedBoardingMinutes: config.adminParameters.plannedBoardingMinutes,
+        plannedDeboardingMinutes: config.adminParameters.plannedDeboardingMinutes,
+        plannedBufferMinutes: config.adminParameters.plannedBufferMinutes,
       },
       rotations: open.map((rotation) => ({
         id: rotation.id,
@@ -552,7 +553,7 @@ export function runSimulation(
         resourceGroupId: RESOURCE_GROUP_ID,
         resourceGroupStatus: operationalInterrupted ? "INTERRUPTED" : "ACTIVE",
         queueSequence: rotation.status === "DRAFT" ? (draftSequence.get(rotation.id) ?? 1) : 1,
-        referenceDurationMinutes: config.phases.flight.typical,
+        referenceDurationMinutes: config.adminParameters.productReferenceDurationMinutes,
         productCode: PRODUCT_ID,
         aircraftType: rotation.aircraftId
           ? (aircraft.find((entry) => entry.id === rotation.aircraftId)?.aircraftType ?? null)
@@ -563,6 +564,7 @@ export function runSimulation(
       })),
       durationSamples,
       capacities: [{ resourceGroupId: RESOURCE_GROUP_ID, activeAircraft: activeCapacity }],
+      tuning: config.forecastTuning.forecast,
     });
   };
 
@@ -684,8 +686,8 @@ export function runSimulation(
         );
 
         if (
-          config.incidents.refueling.enabled &&
-          entry.completedRotations % config.incidents.refueling.everyRotations === 0
+          config.realityModel.incidents.refueling.enabled &&
+          entry.completedRotations % config.realityModel.incidents.refueling.everyRotations === 0
         ) {
           entry.pendingBlocks.push({
             key: `${rotation.id}:refueling`,
@@ -693,14 +695,14 @@ export function runSimulation(
             durationMinutes: deterministicSample(
               config.seed,
               `${rotation.id}:refueling-duration`,
-              config.incidents.refueling.duration,
+              config.realityModel.incidents.refueling.duration,
             ),
             dayOutage: false,
             source: "AUTOMATIC",
           });
         }
         if (
-          config.incidents.plannedPause.enabled &&
+          config.realityModel.incidents.plannedPause.enabled &&
           entry.operatingMinutes >= entry.nextPauseAtMinutes
         ) {
           entry.pendingBlocks.push({
@@ -709,18 +711,22 @@ export function runSimulation(
             durationMinutes: deterministicSample(
               config.seed,
               `${rotation.id}:planned-pause-duration`,
-              config.incidents.plannedPause.duration,
+              config.realityModel.incidents.plannedPause.duration,
             ),
             dayOutage: false,
             source: "AUTOMATIC",
           });
-          entry.nextPauseAtMinutes += config.incidents.plannedPause.everyOperatingMinutes;
+          entry.nextPauseAtMinutes +=
+            config.realityModel.incidents.plannedPause.everyOperatingMinutes;
         }
         const unplannedProbability =
           1 -
-          Math.exp(-config.incidents.unplannedPause.ratePerOperatingHour * (operatingMinutes / 60));
+          Math.exp(
+            -config.realityModel.incidents.unplannedPause.ratePerOperatingHour *
+              (operatingMinutes / 60),
+          );
         if (
-          config.incidents.unplannedPause.enabled &&
+          config.realityModel.incidents.unplannedPause.enabled &&
           deterministicChance(config.seed, `${rotation.id}:unplanned-pause-chance`) <
             unplannedProbability
         ) {
@@ -730,7 +736,7 @@ export function runSimulation(
             durationMinutes: deterministicSample(
               config.seed,
               `${rotation.id}:unplanned-pause-duration`,
-              config.incidents.unplannedPause.duration,
+              config.realityModel.incidents.unplannedPause.duration,
             ),
             dayOutage: false,
             source: "AUTOMATIC",
@@ -739,22 +745,23 @@ export function runSimulation(
         const defectProbability =
           1 -
           Math.exp(
-            -config.incidents.technicalDefect.ratePerOperatingHour * (operatingMinutes / 60),
+            -config.realityModel.incidents.technicalDefect.ratePerOperatingHour *
+              (operatingMinutes / 60),
           );
         if (
-          config.incidents.technicalDefect.enabled &&
+          config.realityModel.incidents.technicalDefect.enabled &&
           deterministicChance(config.seed, `${rotation.id}:defect-chance`) < defectProbability
         ) {
           const dayOutage =
             deterministicChance(config.seed, `${rotation.id}:day-outage-chance`) <
-            config.incidents.technicalDefect.dayOutageProbability;
+            config.realityModel.incidents.technicalDefect.dayOutageProbability;
           entry.pendingBlocks.push({
             key: `${rotation.id}:technical-defect`,
             state: dayOutage ? "DAY_OUT" : "TECHNICAL_DEFECT",
             durationMinutes: deterministicSample(
               config.seed,
               `${rotation.id}:technical-defect-duration`,
-              config.incidents.technicalDefect.duration,
+              config.realityModel.incidents.technicalDefect.duration,
             ),
             dayOutage,
             source: "AUTOMATIC",
@@ -786,6 +793,7 @@ export function runSimulation(
         );
         const adaptiveLeadMinutes = deriveAdaptivePrecallLeadMinutes({
           observedGateWaitMinutes,
+          tuning: config.forecastTuning.precall,
         });
         const latestPrecallAt = rotations.reduce<number | null>((latest, rotation) => {
           if (!rotation.precalledAt) return latest;
@@ -796,11 +804,11 @@ export function runSimulation(
           .filter((entry) => entry.state === "AVAILABLE" || entry.state === "ACTIVE")
           .reduce((maximum, entry) => Math.max(maximum, entry.capacity), 0);
         const decision = decideAutomaticPrecall({
-          enabled: config.automaticPrecallEnabled,
+          enabled: config.adminParameters.eventAutomaticPrecallEnabled,
           eventActive: true,
           operationsAvailable: !operationalInterrupted,
           resourceGroupActive: !operationalInterrupted,
-          resourceGroupEnabled: true,
+          resourceGroupEnabled: config.adminParameters.resourceGroupAutomaticPrecallEnabled,
           firstWaitingGroup: true,
           alreadyPrecalled: firstWaitingRotation.precalledAt !== null,
           groupSize: firstWaitingRotation.passengerCount,
@@ -812,7 +820,7 @@ export function runSimulation(
           adaptiveLeadMinutes,
           minutesSinceLastGatePrecall:
             latestPrecallAt === null ? null : Math.max(0, (nowMs - latestPrecallAt) / MINUTE_MS),
-          gateCooldownMinutes: SYSTEM_GATE_COOLDOWN_MINUTES,
+          gateCooldownMinutes: config.forecastTuning.precall.gateCooldownMinutes,
         });
         if (decision.eligible) {
           firstWaitingRotation.precalledAt = iso(nowMs);
@@ -864,22 +872,22 @@ export function runSimulation(
         rotation.boardingMinutes = deterministicSample(
           config.seed,
           `${rotation.id}:boarding`,
-          config.phases.boarding,
+          config.realityModel.phases.boarding,
         );
         rotation.flightMinutes = deterministicSample(
           config.seed,
           `${rotation.id}:flight`,
-          config.phases.flight,
+          config.realityModel.phases.flight,
         );
         rotation.deboardingMinutes = deterministicSample(
           config.seed,
           `${rotation.id}:deboarding`,
-          config.phases.deboarding,
+          config.realityModel.phases.deboarding,
         );
         rotation.bufferMinutes = deterministicSample(
           config.seed,
           `${rotation.id}:buffer`,
-          config.phases.buffer,
+          config.realityModel.phases.buffer,
         );
         entry.state = "ACTIVE";
         entry.activeRotationId = rotation.id;

@@ -184,6 +184,11 @@ Ausreißer. Das Alter des jüngsten Messwerts bleibt diagnostisch und ist kein U
 Details und Begründung stehen in `docs/architecture/forecast-sample-policy-v1.md`; die reine Logik
 liegt in `packages/domain/src/forecast.ts`.
 
+Die benannten Produktionskonstanten werden zusätzlich als optionales `ForecastTuningProfile`
+bereitgestellt. Ein fehlendes Profil ist charakterisiert und liefert bitgenau das bisherige
+Verhalten. Produktive Worker-Aufrufe bleiben profilfrei; lokale Kandidatenwerte werden weder
+persistiert noch über HTTP transportiert.
+
 ### 5.4 Qualitätsstufen und Intervalle
 
 | Qualität | Bedeutung | Öffentliche Wirkung |

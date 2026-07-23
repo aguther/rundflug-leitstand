@@ -40,7 +40,7 @@ export interface CalibrationResult {
   format: "REDUCED" | "DAILY_REPORT";
   validRows: number;
   excludedRows: number;
-  suggestedPhases: SimulationConfig["phases"];
+  suggestedPhases: SimulationConfig["realityModel"]["phases"];
 }
 
 export class CalibrationCsvError extends Error {

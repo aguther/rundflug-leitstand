@@ -17,10 +17,10 @@ mit der vorhandenen Queue-Planung disponiert. Die Preset-Baseline ist als exakte
 
 | Preset | erzeugte / abgeschlossene Umläufe | Boarding-Fenster getroffen | Median absolut | P90 absolut | Ø Fensterbreite | max. Reaktion |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Normalbetrieb | 32 / 25 | 0 % | 0,5 Min. | 28,3 Min. | 0 Min. | 29,648 Sek. |
-| Stoßlast | 68 / 25 | 0 % | 0,5 Min. | 24,5 Min. | 0 Min. | 29,648 Sek. |
-| Flugzeugausfall | 32 / 20 | 0 % | 1,0 Min. | 16,3 Min. | 0 Min. | 29,648 Sek. |
-| Betriebsunterbrechung | 32 / 26 | 0 % | 0,5 Min. | 30,1 Min. | 0,4 Min. | 29,648 Sek. |
+| Normalbetrieb | 32 / 25 | 0 % | 0,5 Min. | 27,3 Min. | 0 Min. | 29,648 Sek. |
+| Stoßlast | 68 / 25 | 0 % | 0,5 Min. | 23,5 Min. | 0 Min. | 29,648 Sek. |
+| Flugzeugausfall | 32 / 20 | 0 % | 0,5 Min. | 15,3 Min. | 0 Min. | 29,648 Sek. |
+| Betriebsunterbrechung | 32 / 26 | 0 % | 0,5 Min. | 28,7 Min. | 0,4 Min. | 29,648 Sek. |
 
 Die Baseline zeigt damit transparent, dass die aktuelle Prognoseformel für die meisten
 Boarding-Prognosen Punktfenster statt praktisch nutzbarer Zeitspannen erzeugt. Die niedrige
@@ -43,15 +43,41 @@ operative Sperrgründe und fehlende passende Kapazität bleiben es.
 
 | Preset | voraufgerufen / aufgerufen | Abdeckung | Median Gate → Boarding | P90 | gleicher 30-Sek.-Tick | bei `UNCERTAIN` |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Normalbetrieb | 26 / 28 | 92,86 % | 9,5 Min. | 29,0 Min. | 6 | 0 |
-| Stoßlast | 26 / 28 | 92,86 % | 12,25 Min. | 29,0 Min. | 5 | 0 |
-| Flugzeugausfall | 20 / 21 | 95,24 % | 9,5 Min. | 26,35 Min. | 4 | 0 |
-| Betriebsunterbrechung | 26 / 28 | 92,86 % | 8,25 Min. | 26,0 Min. | 7 | 0 |
+| Normalbetrieb | 26 / 28 | 92,86 % | 9,5 Min. | 29,0 Min. | 5 | 0 |
+| Stoßlast | 26 / 28 | 92,86 % | 12,25 Min. | 29,5 Min. | 5 | 0 |
+| Flugzeugausfall | 20 / 21 | 95,24 % | 9,5 Min. | 26,35 Min. | 3 | 0 |
+| Betriebsunterbrechung | 26 / 28 | 92,86 % | 8,25 Min. | 26,75 Min. | 6 | 0 |
 
 Nicht jeder bis zum Simulationsende aufgerufene Umlauf besitzt einen Voraufruf: Ein bestätigter
 Boardingbeginn bleibt fachlich auch ohne vorherigen Voraufruf möglich, beispielsweise wenn mehrere
 Flugzeuge im selben Tick frei werden oder der gemeinsame Gate-Cooldown noch läuft. Die Kennzahl ist
 daher diagnostisch und kein Freigabekriterium.
+
+## Admin-Planwerte und A/B-Labor
+
+Die aktuelle Baseline trennt erstmals die tatsächlich verwendeten Admin-Planwerte
+`8/20/5/3` Minuten für Boarding, Produkt-Referenzdauer, Ausstieg und Puffer von den realen
+Dreiecksverteilungen. Änderungen der Realität verändern nicht mehr gleichzeitig die
+Prognosegrundlage. Aktive Prognosekapazität ist das Minimum aus verfügbaren Flugzeugen und aktiven
+Piloten.
+
+Der Standardvergleich verwendet 25 aufeinanderfolgende Seeds ab `20260722`. Sind Kandidat und
+Produktionsprofil identisch, liefern sämtliche Vergleichskennzahlen exakt Delta `0`. Die
+seedübergreifenden Mediane der wichtigsten Baselinewerte lauten:
+
+| Kennzahl | Baseline |
+| --- | ---: |
+| Boarding Median absolut | 0,5 Min. |
+| Boarding P90 absolut | 23,0 Min. |
+| Boarding Bias | +5,96 Min. |
+| Boarding Fensterbreite | 0 Min. |
+| P90 bei 60 / 30 / 15 Minuten Horizont | 50,3 / 28,2 / 23,0 Min. |
+| Off-Block / On-Block / Abschluss P90 | 2,33 / 6,94 / 0,45 Min. |
+| Countdowns bei `UNCERTAIN` | 0 |
+| GO TO GATE → Boarding Median / P90 | 7,5 / 26,6 Min. |
+
+Der Vergleich läuft abbrechbar in einem lokalen Browser-Worker. Er bewertet keine Variante
+automatisch als Gewinner.
 
 ## Korrektur der falschen Unterdrückung
 
@@ -109,13 +135,13 @@ keine belastbare Aussage über eine generelle Verbesserung oder Verschlechterung
   flugbetriebliche, technische, sicherheitsrelevante oder luftrechtliche Entscheidung.
 - Der CSV-Import kalibriert ausschließlich die Zeitverteilungen. Ohne Queue- und Snapshot-Historie
   rekonstruiert er keinen historischen Veranstaltungstag.
-- Synthetische Gruppen besitzen derzeit vier Personen passend zur Kapazität der synthetischen
-  Flugzeuge. Der Gruppenschutz und die Queue-Planung werden dadurch geprüft, nicht unterschiedliche
-  reale Produkt- oder Flottenkonfigurationen.
+- Synthetische Gruppen füllen derzeit jeweils die konfigurierte Sitzplatzzahl eines einheitlichen
+  Flugzeugtyps. Der Gruppenschutz und die Queue-Planung werden dadurch geprüft; mehrere Produkte
+  oder Ressourcengruppen werden noch nicht modelliert.
 - Exportiert werden nur Szenario, Seed, synthetisches Ereignisledger, Flugzeuge, Umläufe,
   Prognosesnapshots und Kennzahlen. Ticketcodes, Namen, Telefonnummern, PINs und Secrets sind weder
   Teil des Modells noch des Exports. Das Format trägt die Kennung
-  `rundflug-forecast-simulation/v3`.
+  `rundflug-forecast-simulation/v4`.
 
 ## Browserabnahme
 

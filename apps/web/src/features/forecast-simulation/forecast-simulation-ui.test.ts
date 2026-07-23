@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 const appSource = readFileSync(new URL("../../App.tsx", import.meta.url), "utf8");
 const mainSource = readFileSync(new URL("../../main.tsx", import.meta.url), "utf8");
+const adminSource = readFileSync(new URL("../../admin-view.tsx", import.meta.url), "utf8");
 const viewSource = readFileSync(new URL("./ForecastSimulationView.tsx", import.meta.url), "utf8");
 const editorSource = readFileSync(new URL("./ScenarioEditor.tsx", import.meta.url), "utf8");
 const historySource = readFileSync(
@@ -68,7 +69,11 @@ describe("local-only forecast simulation surface", () => {
     ]) {
       expect(editorSource).toContain(label);
     }
-    expect(viewSource).toContain('schema: "rundflug-forecast-simulation/v3"');
+    expect(viewSource).toContain('schema: "rundflug-forecast-simulation/v4"');
+    expect(editorSource).toContain("Admin-Planwert");
+    expect(editorSource).toContain("Prognose-Labor");
+    expect(viewSource).toContain("Baseline und Kandidat vergleichen");
+    expect(viewSource).toContain("comparison-worker.ts");
     expect(viewSource).toContain("SimulationHistoryDialog");
     expect(historySource).toContain("Alle Prognose-Snapshots");
     expect(historySource).toContain("GO TO GATE erfasst");
@@ -88,5 +93,25 @@ describe("local-only forecast simulation surface", () => {
     expect(stylesSource).toContain("overflow-x: auto");
     expect(stylesSource).toContain(".sim-workspace");
     expect(stylesSource).toContain("overflow: auto");
+  });
+
+  it("removes deprecated precall controls while preserving their legacy payload values", () => {
+    for (const label of [
+      'label="Voraufruf (Min.)"',
+      'label="Maximale Gate-Wartezeit (Min.)"',
+      'label="Minimale Prognosequalität"',
+      'label="Gate-Sperrzeit (Min.)"',
+    ]) {
+      expect(adminSource).not.toContain(label);
+    }
+    for (const legacyValue of [
+      "precallLeadMinutes,",
+      "maximumGateWaitMinutes,",
+      "precallMinimumQuality,",
+      "precallGateCooldownMinutes,",
+    ]) {
+      expect(adminSource).toContain(legacyValue);
+    }
+    expect(adminSource).toContain("Gruppen automatisch zum Gate voraufrufen");
   });
 });

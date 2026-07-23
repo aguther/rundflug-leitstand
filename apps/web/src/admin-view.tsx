@@ -47,7 +47,6 @@ import {
   PageHeader,
   Panel,
   SearchField,
-  SelectField,
   StatusPill,
   TextField,
 } from "./design-system/components";
@@ -2307,40 +2306,6 @@ export function AdminView() {
                     onChange={(event) => setNotificationLeadMinutes(Number(event.target.value))}
                     type="number"
                     value={notificationLeadMinutes}
-                  />
-                  <TextField
-                    label="Voraufruf (Min.)"
-                    max="240"
-                    min="1"
-                    onChange={(event) => setPrecallLeadMinutes(Number(event.target.value))}
-                    type="number"
-                    value={precallLeadMinutes}
-                  />
-                  <TextField
-                    label="Maximale Gate-Wartezeit (Min.)"
-                    max="120"
-                    min="1"
-                    onChange={(event) => setMaximumGateWaitMinutes(Number(event.target.value))}
-                    type="number"
-                    value={maximumGateWaitMinutes}
-                  />
-                  <SelectField
-                    label="Minimale Prognosequalität"
-                    onChange={(event) =>
-                      setPrecallMinimumQuality(event.target.value as "STABLE" | "CHANGING")
-                    }
-                    value={precallMinimumQuality}
-                  >
-                    <option value="CHANGING">Ändert sich</option>
-                    <option value="STABLE">Stabil</option>
-                  </SelectField>
-                  <TextField
-                    label="Gate-Sperrzeit (Min.)"
-                    max="60"
-                    min="0"
-                    onChange={(event) => setPrecallGateCooldownMinutes(Number(event.target.value))}
-                    type="number"
-                    value={precallGateCooldownMinutes}
                   />
                   <TextField
                     label="Referenzgewicht Kind (kg)"

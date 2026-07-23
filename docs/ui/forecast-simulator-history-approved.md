@@ -90,7 +90,8 @@ erhalten.
 
 ## Export und Kennzahlen
 
-Der JSON-Export wird auf `rundflug-forecast-simulation/v3` angehoben. Er enthält zusätzlich die
+Die Verlaufserweiterung hob den JSON-Export zunächst auf `rundflug-forecast-simulation/v3` an.
+Mit dem später freigegebenen Tuning-Labor gilt `rundflug-forecast-simulation/v4`. Er enthält die
 Voraufruffelder und `FLIGHT_GROUP_PRECALLED`-Ereignisse. Die vorhandenen Rotationen,
 Prognosesnapshots, Flugzeuge und Störungsereignisse bleiben die normalisierte Datengrundlage; Namen,
 Telefonnummern, Ticketcodes, PINs und Secrets bleiben ausgeschlossen.
