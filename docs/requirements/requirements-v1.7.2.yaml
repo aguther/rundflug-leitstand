@@ -13,7 +13,7 @@ requirements:
     requirement: Responsive Supervisor-Flugzeugtabelle mit kompakter Detailspalte, sechs Aktionen und größenstabil mittig ausgerichteter Zeitlinie.
     status: implemented
   - id: V172-TKT-010
-    requirement: Initial offene Tickets sowie kompakte Ticketmatrix mit stabiler Scrollbar und Symbolköpfen.
+    requirement: Initial offene Tickets sowie kompakte Ticketmatrix mit stabiler Scrollbar, Symbolköpfen und unveränderter vertikaler Kopfposition beim Filtern.
     status: implemented
   - id: V172-TIM-010
     requirement: Gemeinsame symbolische Zeitlinie mit Verbindungen nur zwischen Symbolkanten, gut lesbaren stabilen Zeitplätzen und einem nach Umlaufabschluss allein sichtbaren aktuellen Folgezustand.

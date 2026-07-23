@@ -121,6 +121,9 @@ describe("Flight Line Supervisor", () => {
     expect(supervisorSource).toContain("title={column.label}");
     expect(flightLineStyles).toContain("min-width: 720px");
     expect(flightLineStyles).toContain("scrollbar-gutter: stable");
+    expect(flightLineStyles).toMatch(
+      /\.flight-director-ticket-overview > header \{[\s\S]*?flex: 0 0 auto;/,
+    );
   });
 
   it("draws timeline connectors only in the gaps between the three center icons", () => {

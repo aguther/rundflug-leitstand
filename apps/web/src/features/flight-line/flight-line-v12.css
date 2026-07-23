@@ -482,6 +482,7 @@
 }
 .flight-director-ticket-overview > header {
   min-height: 58px;
+  flex: 0 0 auto;
   display: grid;
   grid-template-columns: minmax(180px, 1fr) minmax(240px, 360px) auto;
   align-items: center;
