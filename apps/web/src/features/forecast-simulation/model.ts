@@ -22,6 +22,7 @@ export interface SimulationConfig {
   endAt: string;
   aircraftCount: number;
   demandPersonsPerHour: number;
+  automaticPrecallEnabled: boolean;
   phases: {
     boarding: TriangularDistribution;
     flight: TriangularDistribution;
@@ -81,6 +82,11 @@ export interface SimulationRotation {
   communicationNumber: number;
   passengerCount: number;
   createdAt: string;
+  precalledAt: string | null;
+  precallTrigger: "AUTOMATIC_PRECALL" | null;
+  precallPredictionQuality: PredictionQuality | null;
+  precallPredictedBoardingAt: string | null;
+  precallAdaptiveLeadMinutes: number | null;
   aircraftId: string | null;
   calledAt: string | null;
   departedAt: string | null;
@@ -112,6 +118,7 @@ export interface SimulationForecastSnapshot {
 }
 
 export type SimulationEventType =
+  | "FLIGHT_GROUP_PRECALLED"
   | "ROTATION_CALLED"
   | "ROTATION_DEPARTED"
   | "ROTATION_LANDED"
@@ -154,6 +161,15 @@ export interface SimulationMetrics {
   horizons: Record<"15" | "30" | "60", ForecastMetricSummary>;
   qualities: Record<PredictionQuality, number>;
   uncertaintyReasons: Record<ForecastUncertaintyReason, number>;
+  precall: {
+    eligibleGroups: number;
+    precalledGroups: number;
+    coveragePercent: number | null;
+    medianGateWaitMinutes: number | null;
+    p90GateWaitMinutes: number | null;
+    sameTickCount: number;
+    uncertainPrecallCount: number;
+  };
   uncertainCountdownViolations: number;
   maximumEventReactionSeconds: number;
 }
@@ -223,6 +239,7 @@ const BASE_CONFIG: SimulationConfig = {
   endAt: "2026-07-22T16:00:00.000Z",
   aircraftCount: 3,
   demandPersonsPerHour: 18,
+  automaticPrecallEnabled: true,
   phases: DEFAULT_PHASES,
   incidents: DEFAULT_INCIDENTS,
 };

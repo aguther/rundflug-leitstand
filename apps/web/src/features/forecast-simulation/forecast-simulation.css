@@ -598,6 +598,12 @@
   background: var(--ui-accent-soft);
 }
 
+.sim-queue-list button[data-precalled="true"] {
+  border-color: var(--ui-accent);
+  color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+}
+
 .sim-queue-list button small {
   font-size: 10px;
 }
@@ -851,6 +857,26 @@
   font-size: 10px;
 }
 
+.sim-precall-config {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  padding: 14px;
+}
+
+.sim-precall-config h3,
+.sim-precall-config p {
+  margin: 0;
+}
+
+.sim-precall-config p {
+  margin-top: 5px;
+  color: var(--ui-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
 .sim-incident-head,
 .sim-incident-row {
   grid-template-columns: 96px 42px minmax(0, 1fr);
@@ -1085,12 +1111,678 @@
   gap: 7px;
 }
 
+.forecast-simulator .ds-modal-dialog:has(.sim-history-dialog) {
+  width: min(1450px, calc(100vw - 48px));
+  height: min(915px, calc(100dvh - 48px));
+  max-height: calc(100dvh - 48px);
+}
+
+.forecast-simulator .ds-modal-dialog:has(.sim-history-dialog) .ds-modal-header {
+  min-height: 62px;
+}
+
+.forecast-simulator .ds-modal-dialog:has(.sim-history-dialog) .ds-modal-body {
+  padding: 0;
+  overflow: hidden;
+}
+
+.forecast-simulator .ds-modal-dialog:has(.sim-history-dialog) .ds-modal-footer {
+  min-height: 60px;
+  align-items: center;
+}
+
+.sim-history-dialog {
+  height: 100%;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: 48px minmax(0, 1fr);
+}
+
+.sim-history-tabs {
+  display: flex;
+  align-items: end;
+  gap: 10px;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.sim-history-tabs button {
+  min-width: 100px;
+  height: 48px;
+  padding: 0 12px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--ui-muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.sim-history-tabs button[aria-selected="true"] {
+  border-bottom-color: var(--ui-accent);
+  color: var(--ui-accent);
+}
+
+.sim-group-history-layout,
+.sim-aircraft-history-layout {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 274px minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.sim-history-rail {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: 12px;
+  overflow: hidden;
+  padding: 20px 16px;
+  border-right: 1px solid var(--ui-border);
+  background: color-mix(in srgb, var(--ui-surface-subtle) 64%, transparent);
+}
+
+.sim-aircraft-history-layout .sim-history-rail {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.sim-history-rail h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.sim-history-search {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-md);
+  background: var(--ui-control);
+}
+
+.sim-history-search svg {
+  width: 17px;
+  color: var(--ui-muted);
+}
+
+.sim-history-search input {
+  min-width: 0;
+  flex: 1 1 auto;
+  border: 0;
+  outline: 0;
+  color: var(--ui-text);
+  background: transparent;
+}
+
+.sim-history-rail-list {
+  min-height: 0;
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  overflow-y: auto;
+}
+
+.sim-history-rail-list > button {
+  min-height: 66px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-md);
+  color: var(--ui-text);
+  background: var(--ui-surface);
+  text-align: left;
+  cursor: pointer;
+}
+
+.sim-history-rail-list > button[aria-current="true"] {
+  border-color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+}
+
+.sim-history-rail-list > button :is(svg, b) {
+  justify-self: end;
+  color: var(--ui-success);
+}
+
+.sim-history-rail-list > button span,
+.sim-history-rail-list > button small {
+  color: var(--ui-muted);
+  font-size: 11px;
+}
+
+.sim-history-rail-list > button small {
+  justify-self: end;
+}
+
+.sim-group-history-content,
+.sim-aircraft-history-content {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.sim-history-title-row {
+  min-height: 62px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 20px 6px;
+}
+
+.sim-history-title-row > div {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sim-history-title-row h3,
+.sim-aircraft-summary h3 {
+  margin: 0;
+  font-size: 21px;
+}
+
+.sim-history-title-row span {
+  color: var(--ui-success-text);
+}
+
+.sim-history-title-row button,
+.sim-aircraft-history-tables td button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-sm);
+  color: var(--ui-accent);
+  background: transparent;
+  cursor: pointer;
+}
+
+.sim-history-title-row button {
+  border-color: transparent;
+  font-size: 13px;
+}
+
+.sim-history-title-row svg {
+  width: 16px;
+}
+
+.sim-history-milestones {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin: 0;
+  padding: 12px 24px 18px;
+  border-bottom: 1px solid var(--ui-border);
+  list-style: none;
+}
+
+.sim-history-milestones li {
+  position: relative;
+  min-width: 0;
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  color: var(--ui-muted);
+  text-align: center;
+}
+
+.sim-history-milestones li::before {
+  position: absolute;
+  z-index: 0;
+  top: 8px;
+  right: 50%;
+  width: 100%;
+  height: 1px;
+  background: var(--ui-border-strong);
+  content: "";
+}
+
+.sim-history-milestones li:first-child::before {
+  display: none;
+}
+
+.sim-history-milestones li > span {
+  z-index: 1;
+  width: 17px;
+  height: 17px;
+  display: block;
+  border: 2px solid var(--ui-border-strong);
+  border-radius: 50%;
+  background: var(--ui-surface);
+}
+
+.sim-history-milestones li[data-complete="true"] > span {
+  border-color: var(--ui-accent);
+  background: var(--ui-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-accent) 18%, transparent);
+}
+
+.sim-history-milestones li[data-phase="landing"][data-complete="true"] > span {
+  border-color: var(--ui-success);
+  background: var(--ui-success);
+}
+
+.sim-history-milestones strong,
+.sim-history-milestones time,
+.sim-history-milestones small {
+  font-size: 11px;
+}
+
+.sim-history-milestones strong {
+  margin-top: 3px;
+  color: var(--ui-text);
+}
+
+.sim-history-milestones small {
+  line-height: 1.25;
+}
+
+.sim-history-section {
+  min-width: 0;
+}
+
+.sim-history-section h4 {
+  margin: 0;
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--ui-border);
+  font-size: 14px;
+}
+
+.sim-history-chart-section {
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.sim-history-chart-wrap {
+  padding: 8px 16px 4px;
+}
+
+.sim-history-chart-legend,
+.sim-aircraft-history-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px 16px;
+  color: var(--ui-muted);
+  font-size: 10px;
+}
+
+.sim-history-chart-legend span,
+.sim-aircraft-history-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sim-history-chart-legend span::before,
+.sim-aircraft-history-legend span::before {
+  width: 18px;
+  height: 3px;
+  display: inline-block;
+  background: var(--ui-muted);
+  content: "";
+}
+
+.sim-history-chart-legend [data-series="boarding"]::before,
+.sim-aircraft-history-legend [data-phase="boarding"]::before {
+  background: #2f86ff;
+}
+
+.sim-history-chart-legend [data-series="departure"]::before {
+  background: #22bfd6;
+}
+
+.sim-history-chart-legend [data-series="landing"]::before,
+.sim-aircraft-history-legend [data-phase="flight"]::before {
+  background: #65b64c;
+}
+
+.sim-history-chart-legend [data-series="completion"]::before,
+.sim-aircraft-history-legend [data-phase="ground"]::before {
+  background: #949da4;
+}
+
+.sim-history-chart {
+  width: 100%;
+  height: 245px;
+  overflow: visible;
+}
+
+.sim-history-chart text {
+  fill: var(--ui-muted);
+  font-size: 10px;
+}
+
+.sim-history-chart-grid {
+  stroke: var(--ui-border);
+}
+
+.sim-history-chart-line {
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.sim-history-chart-boarding {
+  stroke: #2f86ff;
+}
+
+.sim-history-chart-departure {
+  stroke: #22bfd6;
+}
+
+.sim-history-chart-landing {
+  stroke: #65b64c;
+}
+
+.sim-history-chart-completion {
+  stroke: #949da4;
+}
+
+.sim-history-chart-actual {
+  stroke-dasharray: 5 6;
+  stroke-width: 1.5;
+}
+
+.sim-history-chart-precall {
+  stroke: var(--ui-text);
+  stroke-dasharray: 3 4;
+}
+
+.sim-history-chart .sim-history-chart-precall-label {
+  fill: var(--ui-text);
+}
+
+.sim-history-snapshot-section {
+  min-height: 260px;
+}
+
+.sim-history-table-wrap {
+  max-width: 100%;
+  max-height: 290px;
+  overflow: auto;
+}
+
+.sim-history-table-wrap table {
+  width: 100%;
+  min-width: 880px;
+  border-collapse: collapse;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.sim-history-table-wrap th,
+.sim-history-table-wrap td {
+  padding: 8px 10px;
+  border-right: 1px solid var(--ui-border);
+  border-bottom: 1px solid var(--ui-border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.sim-history-table-wrap th {
+  position: sticky;
+  z-index: 2;
+  top: 0;
+  color: var(--ui-muted);
+  background: var(--ui-surface-subtle);
+  font-weight: 550;
+}
+
+.sim-history-quality::before {
+  width: 7px;
+  height: 7px;
+  display: inline-block;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--ui-success);
+  content: "";
+}
+
+.sim-history-quality[data-quality="CHANGING"]::before {
+  background: var(--ui-accent);
+}
+
+.sim-history-quality[data-quality="UNCERTAIN"]::before {
+  background: var(--ui-warning);
+}
+
+.sim-history-forecast-value,
+.sim-aircraft-history-tables td:has(small) {
+  display: grid;
+  gap: 2px;
+}
+
+.sim-history-forecast-value small,
+.sim-aircraft-history-tables td small {
+  color: var(--ui-warning-text);
+  font-size: 9px;
+}
+
+.sim-history-empty {
+  min-height: 220px;
+  display: grid;
+  place-items: center;
+  color: var(--ui-muted);
+}
+
+.sim-aircraft-history-content {
+  padding: 0 16px 16px;
+}
+
+.sim-aircraft-summary {
+  min-height: 88px;
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+}
+
+.sim-aircraft-summary > div span {
+  display: block;
+  margin-top: 5px;
+  color: var(--ui-muted);
+}
+
+.sim-aircraft-summary dl {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(100px, 1fr));
+  margin: 0;
+}
+
+.sim-aircraft-summary dl div {
+  min-width: 100px;
+  padding: 4px 20px;
+  border-left: 1px solid var(--ui-border);
+  text-align: center;
+}
+
+.sim-aircraft-summary :is(dt, dd) {
+  margin: 0;
+}
+
+.sim-aircraft-summary dd {
+  font-size: 22px;
+  font-weight: 650;
+}
+
+.sim-aircraft-summary dt {
+  margin-top: 4px;
+  color: var(--ui-muted);
+  font-size: 10px;
+}
+
+.sim-aircraft-history-note {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 16px;
+  padding: 9px 12px;
+  border: 1px solid var(--ui-accent);
+  border-radius: var(--radius-sm);
+  color: var(--ui-text);
+  background: var(--ui-accent-soft);
+  font-size: 11px;
+}
+
+.sim-aircraft-history-note svg {
+  width: 18px;
+  color: var(--ui-accent);
+}
+
+.sim-aircraft-history-timeline {
+  min-width: 840px;
+  padding: 12px 0;
+}
+
+.sim-aircraft-history-scale {
+  position: relative;
+  height: 28px;
+  border-bottom: 1px solid var(--ui-border-strong);
+}
+
+.sim-aircraft-history-scale time {
+  position: absolute;
+  bottom: 7px;
+  color: var(--ui-muted);
+  font-size: 10px;
+  transform: translateX(-50%);
+}
+
+.sim-aircraft-history-scale time:first-child {
+  transform: none;
+}
+
+.sim-aircraft-history-scale time:last-child {
+  transform: translateX(-100%);
+}
+
+.sim-aircraft-history-track {
+  position: relative;
+  height: 114px;
+  margin-top: 12px;
+  background: repeating-linear-gradient(
+    90deg,
+    transparent 0,
+    transparent calc(12.5% - 1px),
+    var(--ui-border) 12.5%
+  );
+}
+
+.sim-aircraft-rotation-block,
+.sim-aircraft-incident-block {
+  position: absolute;
+  top: 18px;
+  height: 42px;
+  overflow: visible;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--ui-surface-subtle);
+}
+
+.sim-aircraft-rotation-block {
+  min-width: 4px;
+  padding: 0;
+}
+
+.sim-aircraft-rotation-block b {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 0;
+  color: var(--ui-text);
+  font-size: 10px;
+}
+
+.sim-aircraft-phase {
+  position: absolute;
+  inset-block: 0;
+}
+
+.sim-aircraft-phase--boarding {
+  left: 0;
+  background: #2f86ff;
+}
+
+.sim-aircraft-phase--flight {
+  background: #65b64c;
+}
+
+.sim-aircraft-phase--ground {
+  background: #6f787f;
+}
+
+.sim-aircraft-incident-block {
+  top: 72px;
+  height: 28px;
+  overflow: hidden;
+  padding: 6px;
+  border: 1px solid var(--ui-warning);
+  color: var(--ui-text);
+  background: color-mix(in srgb, var(--ui-warning-soft) 90%, var(--ui-surface));
+  font-size: 9px;
+  white-space: nowrap;
+}
+
+.sim-aircraft-incident-block[data-event="TECHNICAL_DEFECT_REPORTED"],
+.sim-aircraft-incident-block[data-event="AIRCRAFT_DAY_OUT"] {
+  border-color: var(--ui-danger);
+  background: var(--ui-danger-soft);
+}
+
+.sim-aircraft-history-legend {
+  margin-top: 8px;
+}
+
+.sim-aircraft-history-tables {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.sim-aircraft-history-tables .sim-history-section {
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-md);
+}
+
+.sim-aircraft-history-tables .sim-history-table-wrap {
+  max-height: 300px;
+}
+
+.sim-aircraft-history-tables table {
+  min-width: 680px;
+}
+
+.sim-aircraft-history-tables .sim-history-section:last-child table {
+  min-width: 440px;
+}
+
 @media (max-width: 1280px) {
   .sim-raw-forecast dl {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .sim-layout {
     grid-template-columns: 220px minmax(0, 1fr);
+  }
+
+  .forecast-simulator .ds-modal-dialog:has(.sim-history-dialog) {
+    width: calc(100vw - 24px);
+    height: calc(100dvh - 24px);
+    max-height: calc(100dvh - 24px);
+  }
+
+  .sim-group-history-layout,
+  .sim-aircraft-history-layout {
+    grid-template-columns: 230px minmax(0, 1fr);
+  }
+
+  .sim-aircraft-history-content {
+    overflow-x: auto;
   }
 
   .sim-app-header {

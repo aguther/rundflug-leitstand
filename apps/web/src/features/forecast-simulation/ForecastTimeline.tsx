@@ -59,13 +59,13 @@ export function ForecastTimeline({
   result,
   selectedRotationId,
   onSelectRotation,
-  onShowDetails,
+  onShowHistory,
 }: {
   currentMs: number;
   result: SimulationResult;
   selectedRotationId: string | null;
   onSelectRotation: (rotationId: string) => void;
-  onShowDetails: () => void;
+  onShowHistory: () => void;
 }) {
   const simulationStart = Date.parse(result.config.startAt);
   const simulationEnd = Date.parse(result.config.endAt);
@@ -199,13 +199,22 @@ export function ForecastTimeline({
           ) : null}
           {queue.slice(0, 20).map((rotation, index) => (
             <button
+              data-precalled={
+                rotation.precalledAt && Date.parse(rotation.precalledAt) <= currentMs
+                  ? "true"
+                  : undefined
+              }
               data-selected={rotation.id === selectedRotationId}
               key={rotation.id}
               onClick={() => onSelectRotation(rotation.id)}
               type="button"
             >
               <strong>{rotation.communicationNumber}</strong>
-              <small>{index + 1}</small>
+              <small>
+                {rotation.precalledAt && Date.parse(rotation.precalledAt) <= currentMs
+                  ? "Gate"
+                  : index + 1}
+              </small>
             </button>
           ))}
         </div>
@@ -226,6 +235,12 @@ export function ForecastTimeline({
             <span>
               Ist {statusAt(selected, currentMs) === "COMPLETED" ? "abgeschlossen" : "noch offen"}
             </span>
+            {selected.precalledAt && Date.parse(selected.precalledAt) <= currentMs ? (
+              <>
+                <i>·</i>
+                <span>GO TO GATE {formatTime(selected.precalledAt)} · systemseitig</span>
+              </>
+            ) : null}
             <i>·</i>
             <span>
               Qualität{" "}
@@ -239,8 +254,8 @@ export function ForecastTimeline({
         ) : (
           <span>Fluggruppe auswählen, um Prognose und Ist-Verlauf zu vergleichen.</span>
         )}
-        <button disabled={!selected} onClick={onShowDetails} type="button">
-          Details anzeigen
+        <button disabled={!selected} onClick={onShowHistory} type="button">
+          Verlauf anzeigen
         </button>
       </div>
     </section>

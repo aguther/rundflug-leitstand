@@ -33,6 +33,26 @@ Alle vier Presets weisen `0` dargestellte Countdowns während `UNCERTAIN` aus. E
 Neuberechnungen erfolgen im 30-Sekunden-Raster und liegen mit maximal 29,648 Sekunden innerhalb des
 harten Prüfkriteriums.
 
+## Automatischer Voraufruf
+
+Der Simulator verwendet für `GO TO GATE` dieselben reinen Domain-Funktionen
+`deriveAdaptivePrecallLeadMinutes` und `decideAutomaticPrecall` wie der Worker. Jeder Voraufruf wird
+vor der Flugzeugbindung mit Trigger, Prognosequalität, prognostiziertem Boarding und adaptivem
+Vorlauf protokolliert. Prognoseunsicherheit ist entsprechend ADR-0012 keine harte Auslösesperre;
+operative Sperrgründe und fehlende passende Kapazität bleiben es.
+
+| Preset | voraufgerufen / aufgerufen | Abdeckung | Median Gate → Boarding | P90 | gleicher 30-Sek.-Tick | bei `UNCERTAIN` |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Normalbetrieb | 26 / 28 | 92,86 % | 9,5 Min. | 29,0 Min. | 6 | 0 |
+| Stoßlast | 26 / 28 | 92,86 % | 12,25 Min. | 29,0 Min. | 5 | 0 |
+| Flugzeugausfall | 20 / 21 | 95,24 % | 9,5 Min. | 26,35 Min. | 4 | 0 |
+| Betriebsunterbrechung | 26 / 28 | 92,86 % | 8,25 Min. | 26,0 Min. | 7 | 0 |
+
+Nicht jeder bis zum Simulationsende aufgerufene Umlauf besitzt einen Voraufruf: Ein bestätigter
+Boardingbeginn bleibt fachlich auch ohne vorherigen Voraufruf möglich, beispielsweise wenn mehrere
+Flugzeuge im selben Tick frei werden oder der gemeinsame Gate-Cooldown noch läuft. Die Kennzahl ist
+daher diagnostisch und kein Freigabekriterium.
+
 ## Korrektur der falschen Unterdrückung
 
 Vor der Korrektur waren im Normalbetrieb 1.108 von 1.507 für tatsächlich aufgerufene Umläufe
@@ -92,9 +112,10 @@ keine belastbare Aussage über eine generelle Verbesserung oder Verschlechterung
 - Synthetische Gruppen besitzen derzeit vier Personen passend zur Kapazität der synthetischen
   Flugzeuge. Der Gruppenschutz und die Queue-Planung werden dadurch geprüft, nicht unterschiedliche
   reale Produkt- oder Flottenkonfigurationen.
-- Exportiert werden nur Szenario, Seed, synthetisches Ereignisledger, Umläufe, Prognosesnapshots und
-  Kennzahlen. Ticketcodes, Namen, Telefonnummern, PINs und Secrets sind weder Teil des Modells noch
-  des Exports.
+- Exportiert werden nur Szenario, Seed, synthetisches Ereignisledger, Flugzeuge, Umläufe,
+  Prognosesnapshots und Kennzahlen. Ticketcodes, Namen, Telefonnummern, PINs und Secrets sind weder
+  Teil des Modells noch des Exports. Das Format trägt die Kennung
+  `rundflug-forecast-simulation/v3`.
 
 ## Browserabnahme
 
@@ -110,6 +131,12 @@ Light und Dark Mode wurden jeweils im In-App-Browser geprüft:
   aktiv“;
 - die Detailansicht enthält Rohzeiten aller Phasen, Stichprobengröße, Lernwertalter, aktive
   Kapazität und Unterdrückungsgrund; die Auswertung enthält zusätzlich deren Verteilung;
+- die Verlaufsauswertung zeigt für eine abgeschlossene Gruppe 149 einzelne Snapshots, darunter 69
+  DRAFT-Snapshots, ohne sie auf die 60-/30-/15-Minuten-Messpunkte zu reduzieren;
+- `GO TO GATE` erscheint als eigener systemseitiger Meilenstein vor der Flugzeugbindung; ein
+  Wechsel von der Flugzeughistorie zur zugehörigen Gruppe erhält diese Trennung;
+- die Flugzeugansicht zeigt gebundene Umläufe mit Boarding, Off-Block, On-Block und Abschluss sowie
+  Tanken, geplante Pause und jeweils das bestätigte Rückkehrereignis;
 - kein horizontaler Dokument- oder Arbeitsbereichsüberlauf in den geprüften Viewports;
 - eine vollständig neu geladene Browserseite enthält sinnvollen Anwendungsinhalt, kein
   Framework-Fehleroverlay und keine Konsolenfehler oder -warnungen;

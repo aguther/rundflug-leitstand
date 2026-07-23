@@ -161,6 +161,21 @@ export function ScenarioEditor({
         <p className="sim-editor-hint">Es gilt Minimum ≤ typisch ≤ Maximum.</p>
       </section>
 
+      <section className="sim-editor-card sim-precall-config">
+        <div>
+          <h3>Automatischer Voraufruf</h3>
+          <p>
+            Aktiviert den systemseitigen Hinweis „GO TO GATE“. Die Flugzeugbindung erfolgt weiterhin
+            erst beim bestätigten Boardingbeginn.
+          </p>
+        </div>
+        <Toggle
+          checked={config.automaticPrecallEnabled}
+          label="Automatischen Voraufruf aktivieren"
+          onChange={(automaticPrecallEnabled) => onChange({ ...config, automaticPrecallEnabled })}
+        />
+      </section>
+
       <section className="sim-editor-card">
         <h3>Betriebsereignisse</h3>
         <div className="sim-incident-head">
