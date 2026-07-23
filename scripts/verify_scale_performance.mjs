@@ -266,7 +266,7 @@ try {
     !cashierPageOne.response.ok ||
     cashierPageOne.body.results.length !== 50 ||
     !cashierPageOne.body.nextCursor ||
-    cashierPageOne.body.results[0]?.bookingGroupLabel !== "G-1000"
+    cashierPageOne.body.results[0]?.bookingGroupLabel !== "G-PERF-1000"
   ) {
     throw new Error("Erste cursorbasierte Kassenseite ist im Mengengerüst unvollständig.");
   }

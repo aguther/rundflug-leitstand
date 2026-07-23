@@ -63,6 +63,7 @@ export function buildOperationalHistoryStatement(
             r.status AS rotation_status,
             fg.id AS flight_group_id,
             fg.communication_number,
+            flight_rg.short_code AS resource_group_short_code,
             p.id AS product_id,
             p.code AS product_code,
             p.name AS product_name,
@@ -87,6 +88,7 @@ export function buildOperationalHistoryStatement(
        LEFT JOIN rotation_tickets rt ON rt.ticket_id = t.id
        LEFT JOIN rotations r ON r.id = rt.rotation_id
        LEFT JOIN flight_groups fg ON fg.id = r.flight_group_id
+       LEFT JOIN resource_groups flight_rg ON flight_rg.id = fg.resource_group_id
        LEFT JOIN gates g ON g.id = COALESCE(r.gate_id, p.gate_id)
        LEFT JOIN aircraft a ON a.id = r.aircraft_id
        LEFT JOIN pilots pl ON pl.id = r.pilot_id

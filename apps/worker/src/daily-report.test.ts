@@ -35,7 +35,7 @@ const report: DailyReportData = {
   ],
   flightRows: [
     {
-      communication_label: "SYN-001",
+      communication_label: "F-RG001-001",
       status: "COMPLETED",
       aircraft_registration: "D-TEST",
       pilot_code: "P-01",
@@ -55,7 +55,7 @@ const report: DailyReportData = {
   ],
   forecastRows: [
     {
-      communication_label: "SYN-001",
+      communication_label: "F-RG001-001",
       snapshot_count: 5,
       first_captured_at: "2026-07-11T07:30:00.000Z",
       last_captured_at: "2026-07-11T08:06:00.000Z",
@@ -83,7 +83,7 @@ describe("complete daily report", () => {
     expect(csv).toContain("FLÜGE");
     expect(csv).toContain("PROGNOSEENTWICKLUNG");
     expect(csv).toContain("BESONDERE EREIGNISSE");
-    expect(csv).toContain("SYN-001;COMPLETED;D-TEST;P-01;3;4;75");
+    expect(csv).toContain("F-RG001-001;COMPLETED;D-TEST;P-01;3;4;75");
     expect(csv).toContain("TICKET_GROUP_DEFERRED;ROTATION;rotation-synthetic");
     expect(csv).not.toMatch(/guest|phone|telefon/i);
   });

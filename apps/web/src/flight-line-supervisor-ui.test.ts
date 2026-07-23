@@ -50,6 +50,10 @@ describe("Flight Line Supervisor", () => {
     expect(supervisorSource).toContain('className="flight-director-bottom-grid is-ticket-only"');
     expect(supervisorSource).toContain('className="flight-director-timeline"');
     expect(supervisorSource).toContain("Verkaufte Tickets");
+    expect(supervisorSource).toContain(
+      "formatBookingGroupLabel(rotation.productCode, group.communicationNumber)",
+    );
+    expect(supervisorSource).toContain("{rotation.communicationLabel})");
     expect(flightLineSource).toContain("Boarding");
     expect(flightLineSource).toContain("Offblock");
     expect(flightLineSource).toContain("Onblock");

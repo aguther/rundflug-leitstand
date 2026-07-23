@@ -54,15 +54,15 @@ Auswirkungszusammenfassung; erst darunter folgen zulässige Aktionen.
 
 ```text
 ┌ Laufende Fluggruppen ───────────────────────────────┬ Disposition ───────────────┐
-│ PAN20-108  ·  Bereit  ·  4/4     [Aufrufen] [···]   │ PAN20-108 · vor Aufruf      │
-│ PAN20-109  ·  Wartet  ·  3/4              [···]    │                             │
-│ PAN20-110  ·  Wartet  ·  4/4              [···]    │ Nutzbare Plätze             │
+│ F-RG020-108 · Bereit · 4/4      [Aufrufen] [···]    │ F-RG020-108 · vor Aufruf    │
+│ F-RG020-109 · Wartet · 3/4                [···]     │                             │
+│ F-RG020-110 · Wartet · 4/4                [···]     │ Nutzbare Plätze             │
 │                                                     │ [ − ]  4  [ + ]             │
 │                                                     │ Keine Gruppe betroffen.     │
 │                                                     │ [Kapazität übernehmen]      │
 │                                                     │ ─────────────────────────── │
 │                                                     │ Gruppe verschieben          │
-│                                                     │ Ziel [PAN20-109 · 1 Platz ▾]│
+│                                                     │ Ziel [F-RG020-109 · 1 Pl. ▾]│
 │                                                     │ Ganze Gruppe, keine Trennung│
 │                                                     │ [Verschiebung übernehmen]   │
 └─────────────────────────────────────────────────────┴─────────────────────────────┘
@@ -96,14 +96,14 @@ Im Status `CALLED` oder `BOARDING` zeigt der Kontextbereich die anonyme Anwesenh
 nicht als Personenliste.
 
 ```text
-┌ Gruppe PAN20-108 · aufgerufen ─────────────────────────────┐
+┌ Fluggruppe F-RG020-108 · aufgerufen ───────────────────────┐
 │  Anwesend 3 von 4       Frist noch 02:14                   │
 │                                                            │
 │  [ Gemeinsam zurückstellen ]                              │
 │  [ Mit 3 Personen fliegen ]                               │
 │  [ Fehlenden Platz leer lassen ]                          │
 │                                                            │
-│  Ersatzvorschlag: Gruppe G-184 · 1 Ticket · eingecheckt   │
+│  Ersatzvorschlag: Gruppe G-PAN20-0184 · 1 Ticket · da     │
 │  [ Ersatz übernehmen ]                                    │
 └────────────────────────────────────────────────────────────┘
 ```
