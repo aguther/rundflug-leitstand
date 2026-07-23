@@ -4,7 +4,12 @@ import adminSource from "../admin-view.tsx?raw";
 import ticketStatusSource from "../ticket-status-view.tsx?raw";
 import headerSource from "./AppHeader.tsx?raw";
 import shellSource from "./AppShell.tsx?raw";
-import { appDestinations, homeForRole, isDestinationActive } from "./navigation";
+import {
+  appDestinations,
+  destinationsForRole,
+  homeForRole,
+  isDestinationActive,
+} from "./navigation";
 
 const baseStyles = readFileSync(new URL("../design-system/base.css", import.meta.url), "utf8");
 
@@ -31,7 +36,16 @@ describe("V1.2 app navigation", () => {
     expect(homeForRole("FLIGHT_DIRECTOR")).toBe("/flight-line");
     expect(homeForRole("ADMIN")).toBe("/admin");
     expect(homeForRole("DISPLAY")).toBe("/fids");
-    expect(appDestinations.find((entry) => entry.href === "/fids")?.roles).toEqual(["DISPLAY"]);
+    expect(appDestinations.find((entry) => entry.href === "/fids")?.roles).toEqual([
+      "DISPLAY",
+      "ADMIN",
+    ]);
+    expect(destinationsForRole("ADMIN").some((entry) => entry.href === "/fids")).toBe(true);
+    expect(destinationsForRole("CASHIER").some((entry) => entry.href === "/fids")).toBe(false);
+    expect(destinationsForRole("FLIGHT_LINE").some((entry) => entry.href === "/fids")).toBe(false);
+    expect(destinationsForRole("FLIGHT_DIRECTOR").some((entry) => entry.href === "/fids")).toBe(
+      false,
+    );
   });
 
   it("keeps unauthorized destinations visible and locked in the common switcher", () => {
