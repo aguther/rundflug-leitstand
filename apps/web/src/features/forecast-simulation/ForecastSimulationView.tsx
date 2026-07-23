@@ -17,6 +17,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button, ModalDialog } from "../../design-system/components";
 import { ThemeToggle } from "../../design-system/ThemeToggle";
+import type { BatchComparisonResult } from "./comparison";
 import { CalibrationCsvError, calibrateFromCsv } from "./csv-calibration";
 import { calculateSimulationMetrics, runSimulation } from "./engine";
 import { ForecastTimeline } from "./ForecastTimeline";
@@ -176,17 +177,22 @@ function MetricCard({ label, value, hint }: { label: string; value: string; hint
 function safeExport(
   result: ReturnType<typeof runSimulation>,
   manualIncidents: readonly ManualIncident[],
+  comparison: BatchComparisonResult | null,
 ) {
   return {
-    schema: "rundflug-forecast-simulation/v3",
+    schema: "rundflug-forecast-simulation/v4",
     scenario: result.config,
     seed: result.config.seed,
+    adminParameters: result.config.adminParameters,
+    realityModel: result.config.realityModel,
+    forecastTuning: result.config.forecastTuning,
     manualIncidents,
     syntheticEventLedger: result.events,
     forecastSnapshots: result.snapshots,
     aircraft: result.aircraft,
     rotations: result.rotations,
     metrics: result.metrics,
+    batchComparison: comparison,
   };
 }
 
@@ -206,8 +212,14 @@ export function ForecastSimulationView() {
   );
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [comparisonOpen, setComparisonOpen] = useState(false);
+  const [comparisonResult, setComparisonResult] = useState<BatchComparisonResult | null>(null);
+  const [comparisonProgress, setComparisonProgress] = useState({ completed: 0, total: 0 });
+  const [comparisonError, setComparisonError] = useState<string | null>(null);
+  const [comparisonRunning, setComparisonRunning] = useState(false);
   const [importMessage, setImportMessage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const comparisonWorkerRef = useRef<Worker | null>(null);
   const editorErrors = validateSimulationConfig(editorConfig);
   const simulationEnd = Date.parse(config.endAt);
 
@@ -226,6 +238,13 @@ export function ForecastSimulationView() {
     }, 100);
     return () => window.clearInterval(timer);
   }, [running, simulationEnd, speed]);
+
+  useEffect(
+    () => () => {
+      comparisonWorkerRef.current?.terminate();
+    },
+    [],
+  );
 
   const restart = (nextConfig = config, incidents: readonly ManualIncident[] = []) => {
     const nextResult = runSimulation(nextConfig, incidents);
@@ -294,8 +313,14 @@ export function ForecastSimulationView() {
   const handleCsv = async (file: File | undefined) => {
     if (!file) return;
     try {
-      const calibration = calibrateFromCsv(await file.text(), config.phases.buffer);
-      const nextConfig = { ...config, phases: calibration.suggestedPhases };
+      const calibration = calibrateFromCsv(await file.text(), config.realityModel.phases.buffer);
+      const nextConfig = {
+        ...config,
+        realityModel: {
+          ...config.realityModel,
+          phases: calibration.suggestedPhases,
+        },
+      };
       restart(nextConfig);
       setImportMessage(
         `${calibration.validRows} Umläufe kalibriert, ${calibration.excludedRows} ausgeschlossen. Puffer blieb unverändert.`,
@@ -312,15 +337,70 @@ export function ForecastSimulationView() {
   };
 
   const exportResult = () => {
-    const blob = new Blob([JSON.stringify(safeExport(result, manualIncidents), null, 2)], {
-      type: "application/json;charset=utf-8",
-    });
+    const blob = new Blob(
+      [JSON.stringify(safeExport(result, manualIncidents, comparisonResult), null, 2)],
+      {
+        type: "application/json;charset=utf-8",
+      },
+    );
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
     anchor.download = `prognose-simulation-${config.seed}.json`;
     anchor.click();
     URL.revokeObjectURL(url);
+  };
+
+  const cancelComparison = () => {
+    comparisonWorkerRef.current?.terminate();
+    comparisonWorkerRef.current = null;
+    setComparisonRunning(false);
+  };
+
+  const startComparison = () => {
+    cancelComparison();
+    setComparisonOpen(true);
+    setComparisonResult(null);
+    setComparisonError(null);
+    setComparisonProgress({ completed: 0, total: config.forecastTuning.comparisonRuns });
+    setComparisonRunning(true);
+    const worker = new Worker(new URL("./comparison-worker.ts", import.meta.url), {
+      type: "module",
+    });
+    comparisonWorkerRef.current = worker;
+    worker.onmessage = (
+      event: MessageEvent<
+        | { type: "progress"; completedRuns: number; totalRuns: number }
+        | { type: "result"; result: BatchComparisonResult }
+        | { type: "error"; message: string }
+      >,
+    ) => {
+      if (event.data.type === "progress") {
+        setComparisonProgress({
+          completed: event.data.completedRuns,
+          total: event.data.totalRuns,
+        });
+        return;
+      }
+      if (event.data.type === "result") {
+        setComparisonResult(event.data.result);
+      } else {
+        setComparisonError(event.data.message);
+      }
+      worker.terminate();
+      comparisonWorkerRef.current = null;
+      setComparisonRunning(false);
+    };
+    worker.onerror = () => {
+      setComparisonError("Der lokale A/B-Vergleich ist fehlgeschlagen.");
+      worker.terminate();
+      comparisonWorkerRef.current = null;
+      setComparisonRunning(false);
+    };
+    worker.postMessage({
+      config: structuredClone(config),
+      manualIncidents: structuredClone(manualIncidents),
+    });
   };
 
   return (
@@ -361,12 +441,18 @@ export function ForecastSimulationView() {
           <section>
             <span>Flugzeuge</span>
             <div className="sim-stepper">
-              <output>{config.aircraftCount}</output>
+              <output>{config.adminParameters.aircraftCount}</output>
               <button
                 aria-label="Ein Flugzeug entfernen"
-                disabled={config.aircraftCount <= 1}
+                disabled={config.adminParameters.aircraftCount <= 1}
                 onClick={() =>
-                  applyQuickConfig({ ...config, aircraftCount: config.aircraftCount - 1 })
+                  applyQuickConfig({
+                    ...config,
+                    adminParameters: {
+                      ...config.adminParameters,
+                      aircraftCount: config.adminParameters.aircraftCount - 1,
+                    },
+                  })
                 }
                 type="button"
               >
@@ -374,9 +460,15 @@ export function ForecastSimulationView() {
               </button>
               <button
                 aria-label="Ein Flugzeug hinzufügen"
-                disabled={config.aircraftCount >= 12}
+                disabled={config.adminParameters.aircraftCount >= 12}
                 onClick={() =>
-                  applyQuickConfig({ ...config, aircraftCount: config.aircraftCount + 1 })
+                  applyQuickConfig({
+                    ...config,
+                    adminParameters: {
+                      ...config.adminParameters,
+                      aircraftCount: config.adminParameters.aircraftCount + 1,
+                    },
+                  })
                 }
                 type="button"
               >
@@ -393,10 +485,13 @@ export function ForecastSimulationView() {
                 onChange={(event) => {
                   const value = event.currentTarget.valueAsNumber;
                   if (Number.isFinite(value))
-                    applyQuickConfig({ ...config, demandPersonsPerHour: value });
+                    applyQuickConfig({
+                      ...config,
+                      realityModel: { ...config.realityModel, demandPersonsPerHour: value },
+                    });
                 }}
                 type="number"
-                value={config.demandPersonsPerHour}
+                value={config.realityModel.demandPersonsPerHour}
               />
               <span>Pers./Std.</span>
             </div>
@@ -519,7 +614,7 @@ export function ForecastSimulationView() {
               <Button
                 onClick={() =>
                   inject("UNPLANNED_PAUSE", {
-                    durationMinutes: config.incidents.unplannedPause.duration.typical,
+                    durationMinutes: config.realityModel.incidents.unplannedPause.duration.typical,
                   })
                 }
               >
@@ -528,7 +623,7 @@ export function ForecastSimulationView() {
               <Button
                 onClick={() =>
                   inject("REFUELING", {
-                    durationMinutes: config.incidents.refueling.duration.typical,
+                    durationMinutes: config.realityModel.incidents.refueling.duration.typical,
                   })
                 }
               >
@@ -537,7 +632,7 @@ export function ForecastSimulationView() {
               <Button
                 onClick={() =>
                   inject("TECHNICAL_DEFECT", {
-                    durationMinutes: config.incidents.technicalDefect.duration.typical,
+                    durationMinutes: config.realityModel.incidents.technicalDefect.duration.typical,
                   })
                 }
               >
@@ -600,6 +695,7 @@ export function ForecastSimulationView() {
           <div className="sim-export-row">
             <Button onClick={() => setDetailsOpen(true)}>Kennzahlen im Detail</Button>
             <Button onClick={() => setHistoryOpen(true)}>Lauf auswerten</Button>
+            <Button onClick={startComparison}>Baseline und Kandidat vergleichen</Button>
             <Button onClick={exportResult}>
               <Download aria-hidden="true" /> Ergebnis exportieren
             </Button>
@@ -780,6 +876,96 @@ export function ForecastSimulationView() {
             </p>
           </article>
         </div>
+      </ModalDialog>
+
+      <ModalDialog
+        description="Produktions-Baseline und lokaler Kandidat verwenden dieselben Seeds und Szenarien."
+        footer={
+          <>
+            {comparisonRunning ? (
+              <Button onClick={cancelComparison}>Vergleich abbrechen</Button>
+            ) : (
+              <Button onClick={startComparison}>Erneut ausführen</Button>
+            )}
+            <Button
+              onClick={() => {
+                cancelComparison();
+                setComparisonOpen(false);
+              }}
+              variant="primary"
+            >
+              Schließen
+            </Button>
+          </>
+        }
+        onClose={() => {
+          cancelComparison();
+          setComparisonOpen(false);
+        }}
+        open={comparisonOpen}
+        size="wide"
+        title="A/B-Prognosevergleich"
+      >
+        {comparisonRunning ? (
+          <section className="sim-comparison-progress" aria-live="polite">
+            <strong>
+              Seed-Lauf {comparisonProgress.completed} von {comparisonProgress.total}
+            </strong>
+            <progress
+              max={Math.max(1, comparisonProgress.total)}
+              value={comparisonProgress.completed}
+            />
+            <p>Die Berechnung läuft ausschließlich lokal in einem Browser-Worker.</p>
+          </section>
+        ) : null}
+        {comparisonError ? (
+          <p className="sim-editor-errors" role="alert">
+            {comparisonError}
+          </p>
+        ) : null}
+        {comparisonResult ? (
+          <>
+            <p className="sim-comparison-summary">
+              Median je Kennzahl über {comparisonResult.runCount} Läufe ab Seed{" "}
+              {comparisonResult.seedStart}. Ein positives Delta bedeutet Kandidat minus Baseline.
+            </p>
+            <div className="sim-comparison-table-wrap">
+              <table className="sim-comparison-table">
+                <thead>
+                  <tr>
+                    <th>Kategorie</th>
+                    <th>Kennzahl</th>
+                    <th>Baseline</th>
+                    <th>Kandidat</th>
+                    <th>Delta</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {comparisonResult.rows.map((row) => (
+                    <tr key={row.id}>
+                      <td>{row.category}</td>
+                      <th scope="row">{row.label}</th>
+                      <td>{metric(row.baseline, row.unit ? ` ${row.unit}` : "")}</td>
+                      <td>{metric(row.candidate, row.unit ? ` ${row.unit}` : "")}</td>
+                      <td>
+                        {row.delta === null
+                          ? "–"
+                          : `${row.delta > 0 ? "+" : ""}${metric(
+                              row.delta,
+                              row.unit ? ` ${row.unit}` : "",
+                            )}`}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="sim-editor-hint">
+              Die Tabelle spricht keine automatische Empfehlung aus: Fehler, Fensterbreite, Qualität
+              und Gate-Wartezeit sind getrennte Zielgrößen.
+            </p>
+          </>
+        ) : null}
       </ModalDialog>
     </div>
   );

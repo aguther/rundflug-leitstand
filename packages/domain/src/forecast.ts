@@ -2,6 +2,34 @@ export type PredictionQuality = "STABLE" | "CHANGING" | "UNCERTAIN";
 
 export const FORECAST_FRESHNESS_MAX_AGE_MINUTES = 5;
 
+export interface ForecastTuningProfile {
+  maximumSamples: number;
+  referenceWeight: number;
+  firstSampleWeight: number;
+  recencyWeightIncrement: number;
+  referenceOutlierMultiplier: number;
+  madMultiplier: number;
+  minimumMadToleranceRatio: number;
+  stableMinimumSamples: number;
+  stableMaximumMeanDeviationMinutes: number;
+  stableMarginMinutes: number;
+  changingMarginMinutes: number;
+}
+
+export const DEFAULT_FORECAST_TUNING_PROFILE: Readonly<ForecastTuningProfile> = Object.freeze({
+  maximumSamples: 12,
+  referenceWeight: 1,
+  firstSampleWeight: 2,
+  recencyWeightIncrement: 1,
+  referenceOutlierMultiplier: 1.75,
+  madMultiplier: 3,
+  minimumMadToleranceRatio: 0.5,
+  stableMinimumSamples: 5,
+  stableMaximumMeanDeviationMinutes: 5,
+  stableMarginMinutes: 5,
+  changingMarginMinutes: 10,
+});
+
 export type ForecastUncertaintyReason =
   | "OPERATION_INTERRUPTED"
   | "EMERGENCY_MODE"
@@ -97,6 +125,7 @@ export interface ForecastTimelinesInput {
   rotations: readonly ForecastTimelineRotationInput[];
   durationSamples: readonly ForecastTimelineDurationSample[];
   capacities: readonly ForecastTimelineCapacityInput[];
+  tuning?: ForecastTuningProfile;
 }
 
 function median(values: readonly number[]): number {
@@ -109,16 +138,27 @@ function median(values: readonly number[]): number {
 function selectRobustDurationSamples(
   samples: readonly number[],
   referenceMinutes: number,
+  tuning: ForecastTuningProfile,
 ): number[] {
   const plausible = samples.filter(
-    (duration) => Number.isFinite(duration) && duration > 0 && duration <= referenceMinutes * 1.75,
+    (duration) =>
+      Number.isFinite(duration) &&
+      duration > 0 &&
+      duration <= referenceMinutes * tuning.referenceOutlierMultiplier,
   );
-  if (plausible.length < 5) return plausible.slice(-12);
+  if (plausible.length < tuning.stableMinimumSamples) {
+    return plausible.slice(-tuning.maximumSamples);
+  }
   const center = median(plausible);
   const absoluteDeviations = plausible.map((duration) => Math.abs(duration - center));
   const medianAbsoluteDeviation = median(absoluteDeviations);
-  const tolerance = Math.max(referenceMinutes * 0.5, medianAbsoluteDeviation * 3);
-  return plausible.filter((duration) => Math.abs(duration - center) <= tolerance).slice(-12);
+  const tolerance = Math.max(
+    referenceMinutes * tuning.minimumMadToleranceRatio,
+    medianAbsoluteDeviation * tuning.madMultiplier,
+  );
+  return plausible
+    .filter((duration) => Math.abs(duration - center) <= tolerance)
+    .slice(-tuning.maximumSamples);
 }
 
 export interface QueueAvailabilityState {
@@ -224,16 +264,19 @@ export function estimateDuration(input: {
   actualDurationsMinutes: readonly number[];
   interrupted: boolean;
   activeCapacity: number;
+  tuning?: ForecastTuningProfile;
 }): DurationEstimate {
+  const tuning = input.tuning ?? DEFAULT_FORECAST_TUNING_PROFILE;
   const validSamples = selectRobustDurationSamples(
     input.actualDurationsMinutes,
     input.referenceMinutes,
+    tuning,
   );
   if (input.interrupted || input.activeCapacity === 0) {
     return {
       expectedMinutes: Math.round(input.referenceMinutes),
-      lowerMinutes: Math.max(0, Math.round(input.referenceMinutes - 10)),
-      upperMinutes: Math.round(input.referenceMinutes + 10),
+      lowerMinutes: Math.max(0, Math.round(input.referenceMinutes - tuning.changingMarginMinutes)),
+      upperMinutes: Math.round(input.referenceMinutes + tuning.changingMarginMinutes),
       quality: "UNCERTAIN",
       sampleCount: validSamples.length,
     };
@@ -241,17 +284,17 @@ export function estimateDuration(input: {
   if (validSamples.length === 0) {
     return {
       expectedMinutes: Math.round(input.referenceMinutes),
-      lowerMinutes: Math.max(0, Math.round(input.referenceMinutes - 10)),
-      upperMinutes: Math.round(input.referenceMinutes + 10),
+      lowerMinutes: Math.max(0, Math.round(input.referenceMinutes - tuning.changingMarginMinutes)),
+      upperMinutes: Math.round(input.referenceMinutes + tuning.changingMarginMinutes),
       quality: "CHANGING",
       sampleCount: 0,
     };
   }
 
-  let weightedSum = input.referenceMinutes;
-  let weightSum = 1;
+  let weightedSum = input.referenceMinutes * tuning.referenceWeight;
+  let weightSum = tuning.referenceWeight;
   for (const [index, duration] of validSamples.entries()) {
-    const weight = index + 2;
+    const weight = tuning.firstSampleWeight + index * tuning.recencyWeightIncrement;
     weightedSum += duration * weight;
     weightSum += weight;
   }
@@ -260,8 +303,11 @@ export function estimateDuration(input: {
     validSamples.reduce((sum, duration) => sum + Math.abs(duration - expectedMinutes), 0) /
     validSamples.length;
   const quality: PredictionQuality =
-    validSamples.length >= 5 && meanDeviation <= 5 ? "STABLE" : "CHANGING";
-  const margin = quality === "STABLE" ? 5 : 10;
+    validSamples.length >= tuning.stableMinimumSamples &&
+    meanDeviation <= tuning.stableMaximumMeanDeviationMinutes
+      ? "STABLE"
+      : "CHANGING";
+  const margin = quality === "STABLE" ? tuning.stableMarginMinutes : tuning.changingMarginMinutes;
   return {
     expectedMinutes,
     lowerMinutes: Math.max(0, expectedMinutes - margin),
@@ -325,6 +371,7 @@ export function calculateForecastTimelines(
 ): ForecastTimelineProjection[] {
   const now = new Date(input.event.now);
   if (!Number.isFinite(now.getTime())) throw new Error("Forecast time is invalid.");
+  const tuning = input.tuning ?? DEFAULT_FORECAST_TUNING_PROFILE;
   const capacities = new Map(
     input.capacities.map((entry) => [
       entry.resourceGroupId,
@@ -396,7 +443,7 @@ export function calculateForecastTimelines(
       : [];
     const selectedHistory = (aircraftHistory.length > 0 ? aircraftHistory : productHistory).slice(
       0,
-      12,
+      tuning.maximumSamples,
     );
     const dataBasisScope: ForecastDataBasisScope =
       selectedHistory.length === 0
@@ -421,6 +468,7 @@ export function calculateForecastTimelines(
       actualDurationsMinutes: actualDurations,
       interrupted: uncertaintyReasons.some((reason) => reason !== "NO_ACTIVE_CAPACITY"),
       activeCapacity,
+      tuning,
     });
     let window = forecastQueueWindows({
       queueSequence: rotation.queueSequence,

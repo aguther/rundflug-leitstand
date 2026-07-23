@@ -9,12 +9,23 @@ Kaltstart und werden verdrängt, sobald für das aktuelle, üblicherweise eintä
 Tageswerte vorliegen. Pro Produkt und – sofern verfügbar – Flugzeugtyp werden höchstens die zwölf
 jüngsten Werte gewichtet.
 
+Die Konstanten sind als `DEFAULT_FORECAST_TUNING_PROFILE` in der reinen Domain-Logik benannt.
+`calculateForecastTimelines` und `estimateDuration` akzeptieren optional ein vollständiges
+Tuningprofil. Ohne Profil gilt unverändert die Produktions-Baseline. Der Worker übergibt bewusst
+kein Profil; ausschließlich der lokale Simulator darf Kandidatenwerte zu Diagnose- und
+Vergleichszwecken einsetzen.
+
 Nicht endliche, nicht positive oder mehr als das 1,75-Fache des Referenzwerts betragende Dauern werden
 verworfen. Dadurch werden Serien außergewöhnlicher Verzögerungen durch Wetter, Flugshow oder andere
 Sperrzeiten nicht als neue Normaldauer gelernt. Ab fünf plausiblen Werten entfernt eine robuste
 Median-/MAD-Regel zusätzlich einzelne
 statistische Ausreißer. Die Toleranz ist mindestens die Hälfte des Referenzwertes, damit normale
 operative Schwankungen nicht vorschnell verworfen werden.
+
+Das Standardprofil enthält außerdem Referenzgewicht `1`, erstes Ist-Gewicht `2`, einen Zuwachs von
+`1` je neuerem Messwert, mindestens fünf Werte und höchstens fünf Minuten mittlere Abweichung für
+`STABLE` sowie Margen von fünf beziehungsweise zehn Minuten. Freshness, operative Sperrgründe,
+Tageswertvorrang und Queue-/Gruppenschutz sind keine Tuningparameter.
 
 Umläufe, deren Zeitlinie eine bestätigte Veranstaltungsunterbrechung oder einen Notfall überlappt,
 werden bereits bei der Messwertauswahl ausgeschlossen. Die aktuelle Unterbrechung wirkt trotzdem

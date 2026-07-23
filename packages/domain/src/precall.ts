@@ -1,5 +1,25 @@
 export type PrecallQuality = "STABLE" | "CHANGING" | "UNCERTAIN";
 
+export interface PrecallTuningProfile {
+  desiredGateWaitMinutes: number;
+  baselineLeadMinutes: number;
+  minimumLeadMinutes: number;
+  maximumLeadMinutes: number;
+  correctionFactor: number;
+  observationSampleLimit: number;
+  gateCooldownMinutes: number;
+}
+
+export const DEFAULT_PRECALL_TUNING_PROFILE: Readonly<PrecallTuningProfile> = Object.freeze({
+  desiredGateWaitMinutes: 8,
+  baselineLeadMinutes: 12,
+  minimumLeadMinutes: 6,
+  maximumLeadMinutes: 18,
+  correctionFactor: 0.5,
+  observationSampleLimit: 8,
+  gateCooldownMinutes: 2,
+});
+
 export interface AutomaticPrecallInput {
   enabled: boolean;
   eventActive: boolean;
@@ -34,12 +54,14 @@ export function deriveAdaptivePrecallLeadMinutes(input: {
   observedGateWaitMinutes: readonly number[];
   desiredGateWaitMinutes?: number;
   baselineLeadMinutes?: number;
+  tuning?: PrecallTuningProfile;
 }): number {
-  const desired = input.desiredGateWaitMinutes ?? 8;
-  const baseline = input.baselineLeadMinutes ?? 12;
+  const tuning = input.tuning ?? DEFAULT_PRECALL_TUNING_PROFILE;
+  const desired = input.desiredGateWaitMinutes ?? tuning.desiredGateWaitMinutes;
+  const baseline = input.baselineLeadMinutes ?? tuning.baselineLeadMinutes;
   const samples = input.observedGateWaitMinutes
     .filter((value) => Number.isFinite(value) && value >= 0 && value <= 60)
-    .slice(-8);
+    .slice(-tuning.observationSampleLimit);
   samples.sort((left, right) => left - right);
   if (samples.length === 0) return baseline;
   const middle = Math.floor(samples.length / 2);
@@ -47,8 +69,10 @@ export function deriveAdaptivePrecallLeadMinutes(input: {
     samples.length % 2 === 1
       ? (samples[middle] ?? desired)
       : ((samples[middle - 1] ?? desired) + (samples[middle] ?? desired)) / 2;
-  const corrected = baseline + (desired - observedMedian) * 0.5;
-  return Math.round(Math.min(18, Math.max(6, corrected)));
+  const corrected = baseline + (desired - observedMedian) * tuning.correctionFactor;
+  return Math.round(
+    Math.min(tuning.maximumLeadMinutes, Math.max(tuning.minimumLeadMinutes, corrected)),
+  );
 }
 
 export function decideAutomaticPrecall(input: AutomaticPrecallInput): AutomaticPrecallDecision {

@@ -1,8 +1,11 @@
 import type {
   ForecastRotationStatus,
+  ForecastTuningProfile,
   ForecastUncertaintyReason,
+  PrecallTuningProfile,
   PredictionQuality,
 } from "@rundflug/domain";
+import { DEFAULT_FORECAST_TUNING_PROFILE, DEFAULT_PRECALL_TUNING_PROFILE } from "@rundflug/domain";
 
 export interface TriangularDistribution {
   minimum: number;
@@ -15,14 +18,21 @@ export interface SimulationIncidentPolicy {
   duration: TriangularDistribution;
 }
 
-export interface SimulationConfig {
-  preset: SimulationPresetId;
-  seed: number;
-  startAt: string;
-  endAt: string;
+export interface SimulationAdminParameters {
+  plannedBoardingMinutes: number;
+  productReferenceDurationMinutes: number;
+  plannedDeboardingMinutes: number;
+  plannedBufferMinutes: number;
+  eventAutomaticPrecallEnabled: boolean;
+  resourceGroupAutomaticPrecallEnabled: boolean;
   aircraftCount: number;
+  aircraftType: string;
+  passengerSeats: number;
+  activePilotCount: number;
+}
+
+export interface SimulationRealityModel {
   demandPersonsPerHour: number;
-  automaticPrecallEnabled: boolean;
   phases: {
     boarding: TriangularDistribution;
     flight: TriangularDistribution;
@@ -38,6 +48,22 @@ export interface SimulationConfig {
       dayOutageProbability: number;
     };
   };
+}
+
+export interface SimulationForecastTuning {
+  forecast: ForecastTuningProfile;
+  precall: PrecallTuningProfile;
+  comparisonRuns: number;
+}
+
+export interface SimulationConfig {
+  preset: SimulationPresetId;
+  seed: number;
+  startAt: string;
+  endAt: string;
+  adminParameters: SimulationAdminParameters;
+  realityModel: SimulationRealityModel;
+  forecastTuning: SimulationForecastTuning;
 }
 
 export type SimulationPresetId =
@@ -197,14 +223,14 @@ export function forecastUncertaintyLabel(reasons: readonly ForecastUncertaintyRe
     : reasons.map((reason) => FORECAST_UNCERTAINTY_REASON_LABELS[reason]).join(", ");
 }
 
-export const DEFAULT_PHASES: SimulationConfig["phases"] = {
+export const DEFAULT_PHASES: SimulationRealityModel["phases"] = {
   boarding: { minimum: 4, typical: 7, maximum: 12 },
   flight: { minimum: 15, typical: 20, maximum: 28 },
   deboarding: { minimum: 3, typical: 6, maximum: 12 },
   buffer: { minimum: 2, typical: 4, maximum: 8 },
 };
 
-const DEFAULT_INCIDENTS: SimulationConfig["incidents"] = {
+const DEFAULT_INCIDENTS: SimulationRealityModel["incidents"] = {
   refueling: {
     enabled: true,
     everyRotations: 5,
@@ -237,16 +263,37 @@ const BASE_CONFIG: SimulationConfig = {
   seed: 20260722,
   startAt: "2026-07-22T08:00:00.000Z",
   endAt: "2026-07-22T16:00:00.000Z",
-  aircraftCount: 3,
-  demandPersonsPerHour: 18,
-  automaticPrecallEnabled: true,
-  phases: DEFAULT_PHASES,
-  incidents: DEFAULT_INCIDENTS,
+  adminParameters: {
+    plannedBoardingMinutes: 8,
+    productReferenceDurationMinutes: 20,
+    plannedDeboardingMinutes: 5,
+    plannedBufferMinutes: 3,
+    eventAutomaticPrecallEnabled: true,
+    resourceGroupAutomaticPrecallEnabled: true,
+    aircraftCount: 3,
+    aircraftType: "Simulation 4S",
+    passengerSeats: 4,
+    activePilotCount: 3,
+  },
+  realityModel: {
+    demandPersonsPerHour: 18,
+    phases: DEFAULT_PHASES,
+    incidents: DEFAULT_INCIDENTS,
+  },
+  forecastTuning: {
+    forecast: { ...DEFAULT_FORECAST_TUNING_PROFILE },
+    precall: { ...DEFAULT_PRECALL_TUNING_PROFILE },
+    comparisonRuns: 25,
+  },
 };
 
 export const SIMULATION_PRESETS: Readonly<Record<SimulationPresetId, SimulationConfig>> = {
   NORMAL: cloneConfig(BASE_CONFIG),
-  PEAK_LOAD: { ...cloneConfig(BASE_CONFIG), preset: "PEAK_LOAD", demandPersonsPerHour: 36 },
+  PEAK_LOAD: {
+    ...cloneConfig(BASE_CONFIG),
+    preset: "PEAK_LOAD",
+    realityModel: { ...cloneConfig(BASE_CONFIG).realityModel, demandPersonsPerHour: 36 },
+  },
   AIRCRAFT_FAILURE: { ...cloneConfig(BASE_CONFIG), preset: "AIRCRAFT_FAILURE" },
   OPERATION_INTERRUPTION: { ...cloneConfig(BASE_CONFIG), preset: "OPERATION_INTERRUPTION" },
 };
@@ -283,46 +330,127 @@ export function validateDistribution(
 export function validateSimulationConfig(config: SimulationConfig): string[] {
   const errors: string[] = [];
   for (const [label, distribution, allowZero] of [
-    ["Boarding", config.phases.boarding, false],
-    ["Flug", config.phases.flight, false],
-    ["Deboarding", config.phases.deboarding, false],
-    ["Puffer", config.phases.buffer, true],
-    ["Tanken", config.incidents.refueling.duration, false],
-    ["Geplante Pause", config.incidents.plannedPause.duration, false],
-    ["Ungeplante Pause", config.incidents.unplannedPause.duration, false],
-    ["Technischer Defekt", config.incidents.technicalDefect.duration, false],
+    ["Boarding", config.realityModel.phases.boarding, false],
+    ["Flug", config.realityModel.phases.flight, false],
+    ["Deboarding", config.realityModel.phases.deboarding, false],
+    ["Puffer", config.realityModel.phases.buffer, true],
+    ["Tanken", config.realityModel.incidents.refueling.duration, false],
+    ["Geplante Pause", config.realityModel.incidents.plannedPause.duration, false],
+    ["Ungeplante Pause", config.realityModel.incidents.unplannedPause.duration, false],
+    ["Technischer Defekt", config.realityModel.incidents.technicalDefect.duration, false],
   ] as const) {
     if (validateDistribution(distribution, allowZero))
       errors.push(`${label}: ungültige Verteilung.`);
   }
   if (
-    !Number.isInteger(config.aircraftCount) ||
-    config.aircraftCount < 1 ||
-    config.aircraftCount > 12
+    !Number.isInteger(config.adminParameters.aircraftCount) ||
+    config.adminParameters.aircraftCount < 1 ||
+    config.adminParameters.aircraftCount > 12
   )
     errors.push("Die Zahl der Flugzeuge muss zwischen 1 und 12 liegen.");
-  if (!Number.isFinite(config.demandPersonsPerHour) || config.demandPersonsPerHour < 0)
+  if (
+    !Number.isInteger(config.adminParameters.passengerSeats) ||
+    config.adminParameters.passengerSeats < 1 ||
+    config.adminParameters.passengerSeats > 100
+  )
+    errors.push("Die Sitzplatzzahl muss zwischen 1 und 100 liegen.");
+  if (
+    !Number.isInteger(config.adminParameters.activePilotCount) ||
+    config.adminParameters.activePilotCount < 0 ||
+    config.adminParameters.activePilotCount > 100
+  )
+    errors.push("Die aktive Pilotenkapazität muss zwischen 0 und 100 liegen.");
+  if (config.adminParameters.aircraftType.trim().length < 2)
+    errors.push("Der Flugzeugtyp muss mindestens zwei Zeichen lang sein.");
+  for (const [label, value, minimum] of [
+    ["Plan Boarding", config.adminParameters.plannedBoardingMinutes, 1],
+    ["Produkt-Referenzdauer", config.adminParameters.productReferenceDurationMinutes, 1],
+    ["Plan Ausstieg", config.adminParameters.plannedDeboardingMinutes, 1],
+    ["Plan Puffer", config.adminParameters.plannedBufferMinutes, 0],
+  ] as const) {
+    if (!Number.isInteger(value) || value < minimum || value > 600) {
+      errors.push(`${label} muss eine ganze Minute zwischen ${minimum} und 600 sein.`);
+    }
+  }
+  if (
+    !Number.isFinite(config.realityModel.demandPersonsPerHour) ||
+    config.realityModel.demandPersonsPerHour < 0
+  )
     errors.push("Die Nachfrage darf nicht negativ sein.");
   if (!Number.isInteger(config.seed) || config.seed < 1 || config.seed > 4_294_967_295)
     errors.push("Der Seed muss eine positive 32-Bit-Ganzzahl sein.");
   if (Date.parse(config.startAt) >= Date.parse(config.endAt))
     errors.push("Das Simulationsende muss nach dem Beginn liegen.");
-  if (config.incidents.refueling.enabled && config.incidents.refueling.everyRotations < 1)
+  if (
+    config.realityModel.incidents.refueling.enabled &&
+    config.realityModel.incidents.refueling.everyRotations < 1
+  )
     errors.push("Das Tankintervall muss mindestens einen Umlauf betragen.");
   if (
-    config.incidents.plannedPause.enabled &&
-    config.incidents.plannedPause.everyOperatingMinutes < 1
+    config.realityModel.incidents.plannedPause.enabled &&
+    config.realityModel.incidents.plannedPause.everyOperatingMinutes < 1
   )
     errors.push("Das Pausenintervall muss mindestens eine Betriebsminute betragen.");
   if (
-    config.incidents.unplannedPause.ratePerOperatingHour < 0 ||
-    config.incidents.technicalDefect.ratePerOperatingHour < 0
+    config.realityModel.incidents.unplannedPause.ratePerOperatingHour < 0 ||
+    config.realityModel.incidents.technicalDefect.ratePerOperatingHour < 0
   )
     errors.push("Ereignisraten dürfen nicht negativ sein.");
   if (
-    config.incidents.technicalDefect.dayOutageProbability < 0 ||
-    config.incidents.technicalDefect.dayOutageProbability > 1
+    config.realityModel.incidents.technicalDefect.dayOutageProbability < 0 ||
+    config.realityModel.incidents.technicalDefect.dayOutageProbability > 1
   )
     errors.push("Die Tagesausfallwahrscheinlichkeit muss zwischen 0 und 100 Prozent liegen.");
+  const forecast = config.forecastTuning.forecast;
+  if (
+    !Number.isInteger(forecast.maximumSamples) ||
+    forecast.maximumSamples < 1 ||
+    forecast.maximumSamples > 100
+  )
+    errors.push("Die maximale Lernstichprobe muss zwischen 1 und 100 liegen.");
+  if (
+    forecast.referenceWeight <= 0 ||
+    forecast.firstSampleWeight <= 0 ||
+    forecast.recencyWeightIncrement < 0
+  )
+    errors.push("Prognosegewichte müssen positiv sein; der Gewichtszuwachs darf null sein.");
+  if (
+    forecast.referenceOutlierMultiplier < 1 ||
+    forecast.madMultiplier < 0 ||
+    forecast.minimumMadToleranceRatio < 0
+  )
+    errors.push("Die Ausreißer- und MAD-Parameter sind ungültig.");
+  if (
+    !Number.isInteger(forecast.stableMinimumSamples) ||
+    forecast.stableMinimumSamples < 1 ||
+    forecast.stableMinimumSamples > forecast.maximumSamples
+  )
+    errors.push("Die stabile Mindeststichprobe muss zur maximalen Stichprobe passen.");
+  if (
+    forecast.stableMaximumMeanDeviationMinutes < 0 ||
+    forecast.stableMarginMinutes < 0 ||
+    forecast.changingMarginMinutes < 0
+  )
+    errors.push("Qualitätsgrenzen und Prognosemargen dürfen nicht negativ sein.");
+  const precall = config.forecastTuning.precall;
+  if (
+    precall.desiredGateWaitMinutes < 0 ||
+    precall.baselineLeadMinutes < 0 ||
+    precall.minimumLeadMinutes < 0 ||
+    precall.maximumLeadMinutes < precall.minimumLeadMinutes ||
+    precall.correctionFactor < 0 ||
+    !Number.isInteger(precall.observationSampleLimit) ||
+    precall.observationSampleLimit < 1 ||
+    precall.observationSampleLimit > 100 ||
+    precall.gateCooldownMinutes < 0 ||
+    precall.gateCooldownMinutes > 60
+  )
+    errors.push("Die experimentellen Voraufrufparameter sind ungültig.");
+  if (
+    !Number.isInteger(config.forecastTuning.comparisonRuns) ||
+    config.forecastTuning.comparisonRuns < 5 ||
+    config.forecastTuning.comparisonRuns > 100
+  )
+    errors.push("Der A/B-Vergleich muss zwischen 5 und 100 Läufe verwenden.");
   return errors;
 }

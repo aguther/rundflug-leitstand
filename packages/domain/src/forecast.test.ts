@@ -4,6 +4,7 @@ import {
   assessForecastFreshness,
   calculateForecastTimelines,
   createQueueAvailability,
+  DEFAULT_FORECAST_TUNING_PROFILE,
   estimateDuration,
   forecastQueueWindows,
   reserveNextQueueWindow,
@@ -49,6 +50,72 @@ describe("event-driven forecast", () => {
       activeCapacity: 1,
     });
     expect(estimate.expectedMinutes).toBe(22);
+  });
+
+  it("keeps the explicit production tuning profile bit-identical to omitted tuning", () => {
+    const input = {
+      referenceMinutes: 20,
+      actualDurationsMinutes: [18, 20, 21, 22, 22, 23],
+      interrupted: false,
+      activeCapacity: 1,
+    };
+    expect(estimateDuration({ ...input, tuning: { ...DEFAULT_FORECAST_TUNING_PROFILE } })).toEqual(
+      estimateDuration(input),
+    );
+  });
+
+  it("applies experimental weights, sample limits, quality thresholds and margins", () => {
+    const weighted = estimateDuration({
+      referenceMinutes: 20,
+      actualDurationsMinutes: [10, 30],
+      interrupted: false,
+      activeCapacity: 1,
+      tuning: {
+        ...DEFAULT_FORECAST_TUNING_PROFILE,
+        referenceWeight: 10,
+        firstSampleWeight: 1,
+        recencyWeightIncrement: 0,
+      },
+    });
+    expect(weighted.expectedMinutes).toBe(20);
+
+    const changing = estimateDuration({
+      referenceMinutes: 20,
+      actualDurationsMinutes: [18, 19, 20, 21, 22, 23],
+      interrupted: false,
+      activeCapacity: 1,
+      tuning: {
+        ...DEFAULT_FORECAST_TUNING_PROFILE,
+        maximumSamples: 3,
+        stableMinimumSamples: 3,
+        stableMaximumMeanDeviationMinutes: 0,
+        changingMarginMinutes: 17,
+      },
+    });
+    expect(changing.quality).toBe("CHANGING");
+    expect(changing.sampleCount).toBe(3);
+    expect(changing.lowerMinutes).toBe(changing.expectedMinutes - 17);
+    expect(changing.upperMinutes).toBe(changing.expectedMinutes + 17);
+  });
+
+  it("opens the reference outlier boundary only for an explicit candidate profile", () => {
+    const input = {
+      referenceMinutes: 20,
+      actualDurationsMinutes: [19, 20, 21, 34, 36],
+      interrupted: false,
+      activeCapacity: 1,
+    };
+    const baseline = estimateDuration(input);
+    const candidate = estimateDuration({
+      ...input,
+      tuning: {
+        ...DEFAULT_FORECAST_TUNING_PROFILE,
+        referenceOutlierMultiplier: 2,
+        stableMinimumSamples: 6,
+      },
+    });
+    expect(baseline.sampleCount).toBe(4);
+    expect(candidate.sampleCount).toBe(5);
   });
 
   it("rejects a single statistical outlier without changing the learned duration", () => {
