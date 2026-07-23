@@ -9,7 +9,6 @@ import {
   type FlightLineAircraft,
   type FlightLineRotation,
   FlightProgress,
-  flightLineGroupLabel,
   flightLineStatusTone,
   flightProgressIconForStep,
   flightProgressSteps,
@@ -195,7 +194,7 @@ describe("gemeinsame Flight-Line-Präsentationslogik", () => {
     const completed = {
       ...rotation("completed", "COMPLETED"),
       productCode: "RN",
-      communicationLabel: "RN-007",
+      communicationLabel: "F-RG001-007",
       pilotOperationalCode: "P-01",
       bookingGroups: [{ id: "group-1", communicationNumber: 7 }],
       timeline: {
@@ -222,7 +221,7 @@ describe("gemeinsame Flight-Line-Präsentationslogik", () => {
       expect(markup).toContain(`title="${label}"`);
       expect(markup).toContain(`>${label}</span>`);
     }
-    expect(markup).toContain("RN-007");
+    expect(markup).toContain("G-RN-0007");
     expect(markup).toContain("P-01");
     expect(markup).toContain("10:30");
   });
@@ -254,7 +253,7 @@ describe("gemeinsame Flight-Line-Präsentationslogik", () => {
     const currentRotation = {
       ...rotation("rotation-active", "IN_FLIGHT"),
       productCode: "RN",
-      communicationLabel: "RN-001",
+      communicationLabel: "F-RG001-001",
       timeline: { actual: {} },
       bookingGroups: Array.from({ length: 6 }, (_, index) => ({
         communicationNumber: index + 1,
@@ -268,7 +267,7 @@ describe("gemeinsame Flight-Line-Präsentationslogik", () => {
       }),
     );
 
-    expect(markup).toContain("RN-001, RN-002, RN-003, RN-004, RN-005, RN-006");
+    expect(markup).toContain("G-RN-0001, G-RN-0002, G-RN-0003, G-RN-0004, G-RN-0005, G-RN-0006");
     expect(markup).not.toContain("<dt>Status</dt>");
     expect(markup).not.toContain("<dt>Pilot</dt>");
   });
@@ -280,9 +279,5 @@ describe("gemeinsame Flight-Line-Präsentationslogik", () => {
     expect(rotationHistoryForAircraft(aircraft.id, [first, second])).toEqual([second, first]);
     const active = rotation("active", "IN_FLIGHT");
     expect(latestRotationForAircraft(aircraft.id, [first, active, second])).toBe(active);
-  });
-
-  it("formats stable anonymous group labels", () => {
-    expect(flightLineGroupLabel("RN", 7)).toBe("RN-007");
   });
 });

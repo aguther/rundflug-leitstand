@@ -4,6 +4,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const port = Number(process.env.MASTER_DATA_TEST_PORT ?? "18787");
 const npmCli = process.env.npm_execpath;
 if (!npmCli) throw new Error("npm-Ausführungspfad fehlt.");
 const wranglerCli = resolve(root, "node_modules", "wrangler", "bin", "wrangler.js");
@@ -27,10 +28,12 @@ const server = spawn(
     "DATA_JURISDICTION:eu",
     "--var",
     `ADMIN_PIN_HASH:${createHash("sha256").update(pin).digest("hex")}`,
+    "--port",
+    String(port),
   ],
   { cwd: root, stdio: "ignore", windowsHide: true },
 );
-const base = "http://127.0.0.1:8787";
+const base = `http://127.0.0.1:${port}`;
 const tokens = {
   admin: ["demo", "admin", "device", "token"].join("-"),
   cashier: ["demo", "cashier", "device", "token"].join("-"),
@@ -73,7 +76,10 @@ const command = async (deviceId, token, expectedVersion, type, payload, expected
     }),
   });
   if (response.status !== expectedStatus) {
-    throw new Error(`${type} lieferte ${response.status} statt ${expectedStatus}.`);
+    const body = await response.text();
+    throw new Error(
+      `${type} lieferte ${response.status} statt ${expectedStatus}: ${body || "leere Antwort"}`,
+    );
   }
   return response.json();
 };

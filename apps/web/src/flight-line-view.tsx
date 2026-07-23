@@ -1,4 +1,5 @@
 import type { OperationBoard } from "@rundflug/contracts";
+import { formatBookingGroupLabel } from "@rundflug/domain";
 import { useEffect, useRef, useState } from "react";
 import { claimFlightLineAircraft, releaseFlightLineAircraft, sendCommand } from "./api";
 import { AppShell as Shell } from "./app/AppShell";
@@ -891,8 +892,10 @@ export function FlightLineView() {
                           />
                           <span>
                             <strong>
-                              {group.productCode}-
-                              {String(group.communicationNumber).padStart(3, "0")}
+                              {formatBookingGroupLabel(
+                                group.productCode,
+                                group.communicationNumber,
+                              )}
                             </strong>
                             <small>
                               {group.segmentCount && group.segmentCount > 1 ? (

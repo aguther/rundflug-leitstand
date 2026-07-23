@@ -36,6 +36,9 @@ describe("forecast history query", () => {
   it("compares every forecast phase with confirmed actual timestamps", () => {
     const statement = buildForecastHistoryStatement("event-1", { limit: 100, offset: 0 });
 
+    expect(statement.sql).toContain("rg.short_code AS resource_group_short_code");
+    expect(statement.sql).toContain("JOIN resource_groups rg ON rg.id = fg.resource_group_id");
+    expect(statement.sql).not.toContain("MIN(p.code)");
     expect(statement.sql).toContain("boarding_deviation_minutes");
     expect(statement.sql).toContain("departure_deviation_minutes");
     expect(statement.sql).toContain("landing_deviation_minutes");

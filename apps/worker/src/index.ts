@@ -24,6 +24,8 @@ import {
   deriveResourceGroupCapacity,
   estimateDuration,
   forecastQueueWindows,
+  formatBookingGroupLabel,
+  formatFlightGroupLabel,
 } from "@rundflug/domain";
 import { Hono } from "hono";
 import { secureHeaders } from "hono/secure-headers";
@@ -1715,7 +1717,8 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
         }>(),
     () =>
       context.env.DB.prepare(
-        `SELECT r.id, r.version, r.flight_group_id, fg.resource_group_id, fg.communication_number,
+        `SELECT r.id, r.version, r.flight_group_id, fg.resource_group_id,
+              rotation_rg.short_code AS resource_group_short_code, fg.communication_number,
               COALESCE(fg.queue_position, fg.communication_number) AS queue_position,
               r.status, r.aircraft_id, r.usable_capacity, fg.precalled_at,
               COALESCE(r.gate_id, MIN(p.gate_id), '') AS gate_id,
@@ -1869,6 +1872,7 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
           version: number;
           flight_group_id: string;
           resource_group_id: string;
+          resource_group_short_code: string;
           communication_number: number;
           queue_position: number;
           status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
@@ -2355,7 +2359,10 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
         version: rotation.version,
         flightGroupId: rotation.flight_group_id,
         communicationNumber: rotation.communication_number,
-        communicationLabel: `${rotation.product_code}-${String(rotation.communication_number).padStart(3, "0")}`,
+        communicationLabel: formatFlightGroupLabel(
+          rotation.resource_group_short_code,
+          rotation.communication_number,
+        ),
         queuePosition: rotation.queue_position,
         productCode: rotation.product_code,
         productName: rotation.product_name,
@@ -2613,7 +2620,7 @@ app.on("GET", eventRoutes("/tickets/search"), async (context) => {
   const normalized = query.trim().toUpperCase();
   const ticketHash = await sha256Hex(normalized);
   const likeQuery = `%${query.trim()}%`;
-  const numericText = normalized.replace(/^G-?/, "");
+  const numericText = normalized.replace(/^[GF]-?/, "");
   const numericQuery = /^\d+$/.test(numericText) ? String(Number(numericText)) : "";
   const conditions = ["tg.operation_day_id = ?1"];
   const bindings: Array<string | number> = [eventId];
@@ -2640,12 +2647,21 @@ app.on("GET", eventRoutes("/tickets/search"), async (context) => {
                     AND searched_ticket.public_code_hash = ${ticketHashPlaceholder})
         OR tg.id LIKE ${likePlaceholder}
         OR CAST(tg.communication_number AS TEXT) = ${numericPlaceholder}
+        OR UPPER('G-' || p.code || '-' || printf('%04d', tg.communication_number))
+             = ${normalizedPlaceholder}
+        OR UPPER('G-' || printf('%04d', tg.communication_number)) = ${normalizedPlaceholder}
+        OR UPPER(p.code || '-' || printf('%03d', tg.communication_number))
+             = ${normalizedPlaceholder}
         OR EXISTS (SELECT 1 FROM tickets searched_ticket
                     JOIN rotation_tickets searched_rt ON searched_rt.ticket_id = searched_ticket.id
                     JOIN rotations searched_rotation ON searched_rotation.id = searched_rt.rotation_id
                     JOIN flight_groups searched_fg ON searched_fg.id = searched_rotation.flight_group_id
+                    JOIN resource_groups searched_rg ON searched_rg.id = searched_fg.resource_group_id
                    WHERE searched_ticket.ticket_group_id = tg.id
                      AND (CAST(searched_fg.communication_number AS TEXT) = ${numericPlaceholder}
+                       OR UPPER('F-' || searched_rg.short_code || '-' ||
+                                printf('%03d', searched_fg.communication_number))
+                            = ${normalizedPlaceholder}
                        OR UPPER(p.code || '-' || printf('%03d', searched_fg.communication_number)) = ${normalizedPlaceholder})))`,
     );
   }
@@ -2663,6 +2679,7 @@ app.on("GET", eventRoutes("/tickets/search"), async (context) => {
     `SELECT tg.id AS ticket_group_id, tg.status AS group_status,
             tg.queue_sequence, tg.communication_number AS booking_group_number, tg.standby,
             tg.sold_at, p.id AS product_id, p.code AS product_code, p.name AS product_name,
+            rg.short_code AS resource_group_short_code,
             (SELECT COUNT(*) FROM tickets group_ticket WHERE group_ticket.ticket_group_id = tg.id)
               AS group_size,
             (SELECT GROUP_CONCAT(DISTINCT group_fg.communication_number)
@@ -2680,6 +2697,7 @@ app.on("GET", eventRoutes("/tickets/search"), async (context) => {
               WHERE grouped_ticket.ticket_group_id = tg.id) AS rotation_statuses
        FROM ticket_groups tg
        JOIN products p ON p.id = tg.product_id
+       JOIN resource_groups rg ON rg.id = p.resource_group_id
       WHERE ${conditions.join(" AND ")}
       ORDER BY tg.sold_at DESC, tg.id DESC LIMIT ${limitPlaceholder}`,
   )
@@ -2694,6 +2712,7 @@ app.on("GET", eventRoutes("/tickets/search"), async (context) => {
       product_id: string;
       product_code: string;
       product_name: string;
+      resource_group_short_code: string;
       group_size: number;
       communication_numbers: string | null;
       rotation_statuses: string | null;
@@ -2706,8 +2725,8 @@ app.on("GET", eventRoutes("/tickets/search"), async (context) => {
         .map(Number)
         .filter(Number.isInteger)
         .sort((left, right) => left - right);
-      const communicationLabels = communicationNumbers.map(
-        (number) => `${row.product_code}-${String(number).padStart(3, "0")}`,
+      const communicationLabels = communicationNumbers.map((number) =>
+        formatFlightGroupLabel(row.resource_group_short_code, number),
       );
       const rotationStatuses = (row.rotation_statuses?.split(",") ?? []).sort();
       return {
@@ -2719,7 +2738,7 @@ app.on("GET", eventRoutes("/tickets/search"), async (context) => {
         groupSize: row.group_size,
         queueSequence: row.queue_sequence,
         bookingGroupNumber: row.booking_group_number,
-        bookingGroupLabel: `G-${String(row.booking_group_number).padStart(4, "0")}`,
+        bookingGroupLabel: formatBookingGroupLabel(row.product_code, row.booking_group_number),
         standby: row.standby === 1,
         soldAt: row.sold_at,
         communicationNumber: communicationNumbers[0] ?? null,
@@ -2796,7 +2815,7 @@ app.on("GET", eventRoutes("/ticket-groups/:ticketGroupId/print-data"), async (co
     eventName: first.event_name,
     productName: first.product_name,
     gateLabel: first.gate_label,
-    communicationLabel: `${first.product_code}-${String(first.communication_number).padStart(3, "0")}`,
+    communicationLabel: formatBookingGroupLabel(first.product_code, first.communication_number),
     tickets: rows.results.map((row, index) => ({ code: row.public_code, position: index + 1 })),
   });
 });
@@ -2927,6 +2946,7 @@ app.on("GET", eventRoutes("/history/operations"), async (context) => {
       rotation_status: string | null;
       flight_group_id: string | null;
       communication_number: number | null;
+      resource_group_short_code: string | null;
       product_id: string;
       product_code: string;
       product_name: string;
@@ -2961,9 +2981,9 @@ app.on("GET", eventRoutes("/history/operations"), async (context) => {
         flightGroupId: row.flight_group_id,
         communicationNumber: row.communication_number,
         communicationLabel:
-          row.communication_number === null
+          row.communication_number === null || row.resource_group_short_code === null
             ? null
-            : `${row.product_code}-${String(row.communication_number).padStart(3, "0")}`,
+            : formatFlightGroupLabel(row.resource_group_short_code, row.communication_number),
         productId: row.product_id,
         productCode: row.product_code,
         productName: row.product_name,
@@ -3030,7 +3050,7 @@ app.on("GET", eventRoutes("/history/forecasts"), async (context) => {
       rotation_id: string;
       flight_group_id: string;
       communication_number: number;
-      product_code: string;
+      resource_group_short_code: string;
       aircraft_id: string | null;
       aircraft_registration: string | null;
       pilot_id: string | null;
@@ -3068,7 +3088,10 @@ app.on("GET", eventRoutes("/history/forecasts"), async (context) => {
         rotationId: row.rotation_id,
         flightGroupId: row.flight_group_id,
         communicationNumber: row.communication_number,
-        communicationLabel: `${row.product_code}-${String(row.communication_number).padStart(3, "0")}`,
+        communicationLabel: formatFlightGroupLabel(
+          row.resource_group_short_code,
+          row.communication_number,
+        ),
         aircraftId: row.aircraft_id,
         aircraftRegistration: row.aircraft_registration,
         pilotId: row.pilot_id,
@@ -3825,7 +3848,7 @@ app.get("/api/public/events/:eventId/board", async (context) => {
           ticketLabels: Array.from(
             { length: row.ticket_count },
             (_, ticketIndex) =>
-              `${row.product_code}-${String(row.communication_number).padStart(3, "0")}/${ticketIndex + 1}`,
+              `${formatBookingGroupLabel(row.product_code, row.communication_number)}/${ticketIndex + 1}`,
           ),
           aircraftRegistration: row.aircraft_registration,
           departedAt: row.departed_at,

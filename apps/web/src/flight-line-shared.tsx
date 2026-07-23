@@ -1,5 +1,5 @@
 import type { OperationBoard } from "@rundflug/contracts";
-import { aircraftOperationalStateLabels } from "@rundflug/domain";
+import { aircraftOperationalStateLabels, formatBookingGroupLabel } from "@rundflug/domain";
 import {
   Bell,
   CheckCircle2,
@@ -121,15 +121,11 @@ export function formatFlightLineTime(value: string | null | undefined, timeZone:
   }).format(new Date(value));
 }
 
-export function flightLineGroupLabel(productCode: string, communicationNumber: number): string {
-  return `${productCode}-${String(communicationNumber).padStart(3, "0")}`;
-}
-
 export function rotationGroupLabels(rotation: FlightLineRotation): string {
   const labels = rotation.bookingGroups.map((group) =>
-    flightLineGroupLabel(rotation.productCode, group.communicationNumber),
+    formatBookingGroupLabel(rotation.productCode, group.communicationNumber),
   );
-  return labels.length > 0 ? labels.join(", ") : rotation.communicationLabel;
+  return labels.length > 0 ? labels.join(", ") : "";
 }
 
 export function timelineSummary(
@@ -378,7 +374,7 @@ function AssignmentQueueRow({
   const segmentTicketCount = queuedSegmentTicketCount(group);
   const segmentPresentCount = queuedSegmentPresentCount(group);
   const exceedsCapacity = !selected && selectedSeats + segmentTicketCount > capacity;
-  const communicationLabel = flightLineGroupLabel(group.productCode, group.communicationNumber);
+  const communicationLabel = formatBookingGroupLabel(group.productCode, group.communicationNumber);
   return (
     <div
       className={`${selected ? "flight-director-queue-row selected" : "flight-director-queue-row"}${onDefer ? " has-defer" : ""}`}
@@ -542,7 +538,7 @@ export function BookingGroupAssignmentDialog({
             {selectedGroups.length > 0 ? (
               selectedGroups.map((group) => (
                 <strong key={group.id}>
-                  {flightLineGroupLabel(group.productCode, group.communicationNumber)}
+                  {formatBookingGroupLabel(group.productCode, group.communicationNumber)}
                   <small>
                     {queuedSegmentTicketCount(group)}
                     {group.segmentCount && group.segmentCount > 1

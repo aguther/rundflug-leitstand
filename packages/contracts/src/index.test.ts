@@ -64,7 +64,7 @@ describe("commandEnvelopeSchema", () => {
         eventName: "Synthetischer Flugtag",
         productName: "Panorama",
         gateLabel: "Flight Line",
-        communicationLabel: "PAN-101",
+        communicationLabel: "G-PAN-0101",
         tickets: [{ code: "ABCDE2345678", position: 1 }],
       }).tickets[0]?.code,
     ).toBe("ABCDE2345678");
@@ -565,7 +565,7 @@ describe("commandEnvelopeSchema", () => {
           productCode: "PAN",
           gateLabel: "Flight Line 1",
           communicationNumber: 101,
-          ticketLabels: ["PAN-101/1"],
+          ticketLabels: ["G-PAN-0101/1"],
           aircraftRegistration: null,
           departedAt: null,
           status: "WAITING",
@@ -858,13 +858,13 @@ describe("commandEnvelopeSchema", () => {
           groupSize: 2,
           queueSequence: 4,
           bookingGroupNumber: 104,
-          bookingGroupLabel: "G-0104",
+          bookingGroupLabel: "G-PAN20-0104",
           standby: false,
           soldAt: "2026-07-11T12:00:00.000Z",
           communicationNumber: 42,
-          communicationLabel: "PAN20-042",
+          communicationLabel: "F-RG020-042",
           communicationNumbers: [42, 43],
-          communicationLabels: ["PAN20-042", "PAN20-043"],
+          communicationLabels: ["F-RG020-042", "F-RG020-043"],
           rotationStatus: "DRAFT",
           rotationStatuses: ["DRAFT"],
         },
@@ -881,8 +881,8 @@ describe("commandEnvelopeSchema", () => {
 
   it("validates cursor pagination and rejects the removed rebooking command", () => {
     expect(
-      ticketSearchRequestSchema.parse({ q: "G-0104", status: "ACTIVE", limit: 50 }),
-    ).toMatchObject({ q: "G-0104", status: "ACTIVE", limit: 50 });
+      ticketSearchRequestSchema.parse({ q: "G-PAN20-0104", status: "ACTIVE", limit: 50 }),
+    ).toMatchObject({ q: "G-PAN20-0104", status: "ACTIVE", limit: 50 });
     expect(() =>
       ticketSearchRequestSchema.parse({ cursor: "cursor", ticketGroupIds: ["group-1"] }),
     ).toThrow();
@@ -978,7 +978,7 @@ describe("commandEnvelopeSchema", () => {
       version: 4,
       flightGroupId: "synthetic-flight-group",
       communicationNumber: 42,
-      communicationLabel: "PAN-042",
+      communicationLabel: "F-RG020-042",
       queuePosition: 3,
       productCode: "PAN",
       productName: "Panorama",
@@ -1145,7 +1145,7 @@ describe("operational history contracts", () => {
           rotationStatus: "COMPLETED",
           flightGroupId: "flight-group-synthetic-1",
           communicationNumber: 123,
-          communicationLabel: "SYN-123",
+          communicationLabel: "F-RG001-123",
           productId: "product-synthetic",
           productCode: "SYN",
           productName: "Synthetischer Rundflug",
@@ -1169,7 +1169,7 @@ describe("operational history contracts", () => {
       offset: 0,
     });
 
-    expect(parsed.entries[0]?.communicationLabel).toBe("SYN-123");
+    expect(parsed.entries[0]?.communicationLabel).toBe("F-RG001-123");
     expect(JSON.stringify(parsed)).not.toMatch(/guest|phone|telefon/i);
   });
 });
@@ -1201,7 +1201,7 @@ describe("forecast history contracts", () => {
           rotationId: "rotation-synthetic",
           flightGroupId: "flight-group-synthetic",
           communicationNumber: 42,
-          communicationLabel: "SYN-042",
+          communicationLabel: "F-RG001-042",
           aircraftId: "aircraft-synthetic",
           aircraftRegistration: "D-TEST",
           pilotId: "pilot-synthetic",

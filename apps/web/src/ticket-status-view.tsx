@@ -1,4 +1,5 @@
 import type { PublicTicketStatus } from "@rundflug/contracts";
+import { formatBookingGroupLabel } from "@rundflug/domain";
 import { Bell, Check, Clock3, Info, MapPin, RefreshCw, Ticket, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
@@ -162,7 +163,9 @@ export function TicketStatusView({ code }: { code: string }) {
             <div className="ticket-identity">
               <Ticket aria-hidden="true" />
               <div>
-                <span>Fluggruppe {status.communicationNumber}</span>
+                <span>
+                  Gruppe {formatBookingGroupLabel(status.productCode, status.communicationNumber)}
+                </span>
                 <h1>{status.productName}</h1>
                 <code>{code}</code>
               </div>

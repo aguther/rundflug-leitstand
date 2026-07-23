@@ -1,5 +1,5 @@
 import type { OperationBoard } from "@rundflug/contracts";
-import { rotationStateLabels } from "@rundflug/domain";
+import { formatBookingGroupLabel, rotationStateLabels } from "@rundflug/domain";
 import type { LucideIcon } from "lucide-react";
 import {
   Activity,
@@ -38,7 +38,6 @@ import {
   CompactHistory,
   type FlightLineFleetState,
   FlightProgress,
-  flightLineGroupLabel,
   formatFlightLineTime,
   operationalRotationForAircraft,
   PilotAssignmentDialogs,
@@ -263,7 +262,7 @@ export function FlightLineSupervisorConsole({
       .filter(({ rotation }) => !onlyOpenTickets || rotation.status !== "COMPLETED")
       .filter(({ group, queue, rotation }) => {
         if (!query) return true;
-        return `${flightLineGroupLabel(rotation.productCode, group.communicationNumber)} ${rotation.productName} ${rotation.aircraftRegistration ?? ""} ${queue?.resourceGroupName ?? ""} ${queue?.sequence ?? ""}`
+        return `${formatBookingGroupLabel(rotation.productCode, group.communicationNumber)} ${rotation.communicationLabel} ${rotation.productName} ${rotation.aircraftRegistration ?? ""} ${queue?.resourceGroupName ?? ""} ${queue?.sequence ?? ""}`
           .toLocaleLowerCase("de-DE")
           .includes(query);
       });
@@ -384,7 +383,7 @@ export function FlightLineSupervisorConsole({
                   {rotation && rotation.status !== "DRAFT" ? (
                     rotation.bookingGroups.map((group) => (
                       <small key={group.id}>
-                        {flightLineGroupLabel(rotation.productCode, group.communicationNumber)}
+                        {formatBookingGroupLabel(rotation.productCode, group.communicationNumber)}
                       </small>
                     ))
                   ) : (
@@ -619,7 +618,10 @@ function CompactTickets({
       {rows.length > 0 ? (
         rows.map(({ group, queue, rotation }) => (
           <div key={`${rotation.id}-${group.id}`}>
-            <strong>{flightLineGroupLabel(rotation.productCode, group.communicationNumber)}</strong>
+            <strong>
+              {formatBookingGroupLabel(rotation.productCode, group.communicationNumber)} (
+              {rotation.communicationLabel})
+            </strong>
             <span>{queue ? `${queue.resourceGroupName} · ${queue.sequence}` : "–"}</span>
             <span>{group.ticketCount}</span>
             <span>{rotationStateLabels[rotation.status]}</span>
