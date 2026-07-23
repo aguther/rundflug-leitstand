@@ -827,7 +827,7 @@
     align-items: center;
     gap: 8px;
     color: var(--ui-text);
-    text-align: right;
+    text-align: left;
   }
 
   .flight-assist-v15 .flight-director-history-cell-icon {
@@ -848,7 +848,7 @@
     > span:last-child {
     min-width: 0;
     overflow-wrap: anywhere;
-    text-align: right;
+    text-align: left;
   }
 
   .flight-assist-v15 .assist-v15-groups .ds-page-header {
