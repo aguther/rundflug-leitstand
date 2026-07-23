@@ -23,8 +23,10 @@ Begriffe wie `GO TO GATE`, `BOARDING`, `DELAYED` und `DEPARTED`. Abgeschlossene 
 konfigurierte Nachlaufzeit sichtbar und verschwinden danach nur aus der Anzeige; Historie und Audit
 bleiben unverändert. Der Standardwert beträgt fünf Minuten, zulässig sind eine bis fünfzehn Minuten.
 
-Der Referenzlauf lieferte die Ticketkennungen `PAN20-101/1` und `PAN20-101/2`, eine Neuverbindung nach
-14 Millisekunden und die abschließende Veranstaltungsversion 7.
+Der Referenzlauf liefert öffentliche Ticketkennungen im Format `G-PAN20-0101/1` und
+`G-PAN20-0101/2`. Die zugehörige operative Kennung verwendet das Format `F-PA-…`; beide vollständigen
+Kennungen führen in der internen Ticketsuche zur selben Buchungsgruppe. Neuverbindung und
+abschließende Veranstaltungsversion werden weiterhin im automatisierten Lauf erfasst.
 
 Die Browserprüfung erfolgte im Kioskmodus auf Desktopbreite und mit 430 × 900 Pixeln. Produkt, Gruppe,
 Tickets, Status, Gate, Flugzeug, Zeitfenster und Flottenzeile blieben in beiden Ansichten sichtbar. Der

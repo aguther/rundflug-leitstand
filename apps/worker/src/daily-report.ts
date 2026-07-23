@@ -174,11 +174,7 @@ export async function loadDailyReport(
       .all<CashRow>(),
     db
       .prepare(
-        `SELECT COALESCE((SELECT MIN(p.code) FROM rotation_tickets label_rt
-                          JOIN tickets label_t ON label_t.id = label_rt.ticket_id
-                          JOIN ticket_groups label_tg ON label_tg.id = label_t.ticket_group_id
-                          JOIN products p ON p.id = label_tg.product_id
-                         WHERE label_rt.rotation_id = r.id), 'FG') || '-' ||
+        `SELECT 'F-' || rg.short_code || '-' ||
                        printf('%03d', fg.communication_number) AS communication_label,
                 r.status, a.registration AS aircraft_registration,
                 pl.operational_code AS pilot_code,
@@ -199,6 +195,7 @@ export async function loadDailyReport(
                 ROUND(AVG(CASE WHEN r.called_at IS NULL THEN NULL
                   ELSE (julianday(r.called_at) - julianday(tg.sold_at)) * 1440.0 END), 1) AS wait_minutes
            FROM rotations r JOIN flight_groups fg ON fg.id = r.flight_group_id
+           JOIN resource_groups rg ON rg.id = fg.resource_group_id
            LEFT JOIN aircraft a ON a.id = r.aircraft_id
            LEFT JOIN pilots pl ON pl.id = r.pilot_id
            LEFT JOIN rotation_tickets rt ON rt.rotation_id = r.id
@@ -211,11 +208,7 @@ export async function loadDailyReport(
       .all<FlightRow>(),
     db
       .prepare(
-        `SELECT COALESCE((SELECT MIN(p.code) FROM rotation_tickets label_rt
-                          JOIN tickets label_t ON label_t.id = label_rt.ticket_id
-                          JOIN ticket_groups label_tg ON label_tg.id = label_t.ticket_group_id
-                          JOIN products p ON p.id = label_tg.product_id
-                         WHERE label_rt.rotation_id = r.id), 'FG') || '-' ||
+        `SELECT 'F-' || rg.short_code || '-' ||
                        printf('%03d', fg.communication_number) AS communication_label,
                 COUNT(*) AS snapshot_count, MIN(fs.captured_at) AS first_captured_at,
                 MAX(fs.captured_at) AS last_captured_at,
@@ -227,6 +220,7 @@ export async function loadDailyReport(
                   AS average_completion_deviation_minutes
            FROM forecast_snapshots fs JOIN rotations r ON r.id = fs.rotation_id
            JOIN flight_groups fg ON fg.id = r.flight_group_id
+           JOIN resource_groups rg ON rg.id = fg.resource_group_id
           WHERE fs.operation_day_id = ?1 GROUP BY fs.rotation_id
           ORDER BY MIN(fs.captured_at), fs.rotation_id`,
       )

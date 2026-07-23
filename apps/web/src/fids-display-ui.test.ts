@@ -27,9 +27,13 @@ describe("FIDS V1.7.3 UI", () => {
   it("uses the event name, full-size mark and only the standard German board", () => {
     expect(displaySource).toContain("board?.eventName");
     expect(displaySource).toContain("<BrandMark />");
+    expect(displaySource).toContain(
+      "formatBookingGroupLabel(group.productCode, group.communicationNumber)",
+    );
     expect(displaySource).toContain("GO TO GATE");
     expect(displaySource).toContain("Bitte QR-Ticket bereithalten");
     expect(displaySource).not.toMatch(/terminalStatus|DEPARTURES|ThemeToggle/);
+    expect(displaySource).not.toContain("formatFlightGroupLabel");
     expect(stylesSource).toContain(".standard-mark > .brand-mark");
     expect(stylesSource).toMatch(
       /\.standard-mark > \.brand-mark \{[\s\S]*?width: 100%;[\s\S]*?height: 100%;/,

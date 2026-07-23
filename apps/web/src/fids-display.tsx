@@ -1,4 +1,5 @@
 import type { FidsPreferences, PublicBoard } from "@rundflug/contracts";
+import { formatBookingGroupLabel } from "@rundflug/domain";
 import { ArrowRight, Check, Clock3, Plane, QrCode, Settings, UsersRound } from "lucide-react";
 import type { CSSProperties } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -11,7 +12,11 @@ type EditableFidsPreferences = Pick<FidsPreferences, "visibleRows" | "layout" | 
 const DEFAULT_DEPARTED_VISIBILITY_SECONDS = 15;
 
 function groupCode(group: PublicGroup): string {
-  return `${group.productCode}-${String(group.communicationNumber).padStart(3, "0")}`;
+  return formatBookingGroupLabel(group.productCode, group.communicationNumber);
+}
+
+function groupRowKey(group: PublicGroup): string {
+  return JSON.stringify(group);
 }
 
 function statusPresentation(status: PublicGroup["status"]): {
@@ -118,7 +123,7 @@ function FidsTable({ groups, compact }: { groups: PublicBoard["groups"]; compact
       </div>
       <div className="fids-table-body">
         {groups.map((group) => (
-          <div className="fids-row" key={groupCode(group)}>
+          <div className="fids-row" key={groupRowKey(group)}>
             <GroupCell group={group} />
             {!compact ? <span className="fids-product-cell">{group.productName}</span> : null}
             <span className="fids-gate-cell">{group.gateLabel || "–"}</span>

@@ -30,13 +30,7 @@ export function buildForecastHistoryStatement(
     bindings,
     sql: `SELECT fs.id AS snapshot_id, fs.rotation_id, r.flight_group_id,
                  fg.communication_number,
-                 COALESCE((
-                   SELECT MIN(p.code) FROM rotation_tickets rt
-                   JOIN tickets t ON t.id = rt.ticket_id
-                   JOIN ticket_groups tg ON tg.id = t.ticket_group_id
-                   JOIN products p ON p.id = tg.product_id
-                  WHERE rt.rotation_id = r.id
-                 ), 'FG') AS product_code,
+                 rg.short_code AS resource_group_short_code,
                  r.aircraft_id, a.registration AS aircraft_registration,
                  r.pilot_id, pl.operational_code AS pilot_operational_code,
                  fs.operation_day_version, fs.captured_at, fs.trigger_event_type,
@@ -62,6 +56,7 @@ export function buildForecastHistoryStatement(
             FROM forecast_snapshots fs
             JOIN rotations r ON r.id = fs.rotation_id
             JOIN flight_groups fg ON fg.id = r.flight_group_id
+            JOIN resource_groups rg ON rg.id = fg.resource_group_id
             LEFT JOIN aircraft a ON a.id = r.aircraft_id
             LEFT JOIN pilots pl ON pl.id = r.pilot_id
            WHERE ${clauses.join(" AND ")}

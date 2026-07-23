@@ -2,13 +2,13 @@ ID,Modul,Tests,Status
 V15-AUTH-010,apps/worker/src/auth.ts,apps/worker/src/auth.test.ts,umgesetzt
 V15-NAV-010,apps/web/src/app,apps/web/src/features/auth/event-selection.test.ts,in Arbeit
 V15-ROLE-010,packages/domain und apps/worker,packages/domain/src/index.test.ts,umgesetzt
-V15-QUE-010,apps/worker/src/event-coordinator.ts,apps/worker/src/v1-5-stable-operations.test.ts,umgesetzt
+V15-QUE-010,apps/worker/src/event-coordinator.ts packages/domain/src/communication-labels.ts und ADR-0022,Domain- und stabile Operations-/Kennungstests,umgesetzt
 V15-QUE-020,apps/worker/src/event-coordinator.ts,apps/worker/src/v1-5-stable-operations.test.ts,umgesetzt
 V15-FLT-010,packages/contracts und packages/domain,packages/contracts/src/index.test.ts,umgesetzt
 V15-FLT-020,apps/worker/src/event-coordinator.ts,apps/worker/src/v1-5-stable-operations.test.ts,umgesetzt
 V15-TKT-010,apps/worker/migrations/0036_v1_5_stable_operations.sql,apps/worker/src/v1-5-stable-operations.test.ts,umgesetzt
 V15-TKT-020,apps/web/src/cashier-view.tsx,apps/worker/src/v1-5-stable-operations.test.ts,umgesetzt
-V15-FIDS-010,apps/worker/src/index.ts,apps/web/src/features/auth/event-selection.test.ts,umgesetzt
+V15-FIDS-010,apps/worker/src/index.ts apps/web/src/fids-display.tsx und ADR-0022,PublicBoard- Integrations- und Browser-Kennungstest,umgesetzt
 V15-FIDS-020,apps/web/src/fids-display.tsx,apps/web/src/fids-display-ui.test.ts,umgesetzt
 V15-BRAND-010,apps/worker/src/event-logo.ts,apps/worker/src/event-logo.test.ts,umgesetzt
 V15-EVT-010,apps/worker/src/event-deletion.ts,apps/worker/src/event-deletion.test.ts,umgesetzt

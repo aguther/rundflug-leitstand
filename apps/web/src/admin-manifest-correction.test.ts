@@ -18,7 +18,7 @@ function rotation(
     version: 0,
     flightGroupId: `flight-${id}`,
     communicationNumber,
-    communicationLabel: `SYN-${String(communicationNumber).padStart(3, "0")}`,
+    communicationLabel: `F-RG001-${String(communicationNumber).padStart(3, "0")}`,
     queuePosition: communicationNumber,
     productCode: "SYN",
     productName: "Synthetischer Rundflug",

@@ -147,13 +147,26 @@ const operationBoard = async (device, token) => {
   if (!response.ok) throw new Error(`Operativer Board-Abruf fehlgeschlagen (${response.status}).`);
   return response.json();
 };
+const searchTickets = async (query) => {
+  const response = await fetch(
+    `${base}/api/events/demo-2026/tickets/search?status=ACTIVE&limit=20&q=${encodeURIComponent(query)}`,
+    {
+      headers: {
+        "x-device-id": devices.cashier,
+        "x-device-token": tokens.cashier,
+      },
+    },
+  );
+  if (!response.ok) throw new Error(`Ticketsuche fehlgeschlagen (${response.status}).`);
+  return response.json();
+};
 const ticketStatus = async (code) => {
   const response = await fetch(`${base}/api/public/tickets/${code}`);
   if (!response.ok)
     throw new Error(`Öffentlicher Ticketstatus fehlgeschlagen (${response.status}).`);
   return response.json();
 };
-const command = async (device, token, expectedVersion, type, payload) => {
+const command = async (device, token, expectedVersion, type, payload, staleRetries = 0) => {
   const response = await fetch(`${base}/api/events/demo-2026/commands`, {
     method: "POST",
     headers: { "content-type": "application/json", "x-device-token": token },
@@ -167,8 +180,19 @@ const command = async (device, token, expectedVersion, type, payload) => {
       payload,
     }),
   });
-  if (!response.ok) throw new Error(`${type} fehlgeschlagen (${response.status}).`);
-  return response.json();
+  const body = await response.json();
+  if (
+    response.status === 409 &&
+    body.error?.code === "STALE_VERSION" &&
+    Number.isInteger(body.error.currentVersion) &&
+    staleRetries < 3
+  ) {
+    return command(device, token, body.error.currentVersion, type, payload, staleRetries + 1);
+  }
+  if (!response.ok) {
+    throw new Error(`${type} fehlgeschlagen (${response.status}): ${JSON.stringify(body)}`);
+  }
+  return body;
 };
 const connectRealtime = () =>
   new Promise((resolvePromise, reject) => {
@@ -369,14 +393,25 @@ try {
   const stableBookingNumber = soldRotation?.bookingGroups.find(
     (bookingGroup) => bookingGroup.id === sold.aggregate.id,
   )?.communicationNumber;
+  const bookingGroupLabel = stableBookingNumber
+    ? `G-${soldRotation.productCode}-${String(stableBookingNumber).padStart(4, "0")}`
+    : "";
+  const flightGroupLabel = soldRotation?.communicationLabel ?? "";
+  const [bookingSearch, flightSearch] = await Promise.all([
+    searchTickets(bookingGroupLabel),
+    searchTickets(flightGroupLabel),
+  ]);
   const serializedBoard = JSON.stringify(publicBoard);
   if (
     !stableBookingNumber ||
     soldRotation.communicationNumber === stableBookingNumber ||
+    !flightGroupLabel.startsWith("F-PA-") ||
+    bookingSearch.results[0]?.bookingGroupLabel !== bookingGroupLabel ||
+    flightSearch.results[0]?.bookingGroupLabel !== bookingGroupLabel ||
     group?.communicationNumber !== stableBookingNumber ||
     initialTicketStatus.communicationNumber !== stableBookingNumber ||
     group?.ticketLabels.length !== 2 ||
-    group.ticketLabels.some((label) => !label.startsWith("PAN20-")) ||
+    group.ticketLabels.some((label) => !label.startsWith("G-PAN20-")) ||
     group.gateLabel !== "Flight Line 1" ||
     initialTicketStatus.gateLabel !== "Flight Line 1" ||
     privateCodes.some((code) => serializedBoard.includes(code)) ||
@@ -385,12 +420,16 @@ try {
     throw new Error(
       `FIDS-Ticketlabels sind unvollständig oder inkonsistent: ${JSON.stringify({
         stableBookingNumber,
+        bookingGroupLabel,
+        flightGroupLabel,
+        bookingSearchMatched: bookingSearch.results[0]?.bookingGroupLabel === bookingGroupLabel,
+        flightSearchMatched: flightSearch.results[0]?.bookingGroupLabel === bookingGroupLabel,
         rotationCommunicationNumber: soldRotation?.communicationNumber,
         boardCommunicationNumber: group?.communicationNumber,
         ticketStatusCommunicationNumber: initialTicketStatus.communicationNumber,
         ticketLabelCount: group?.ticketLabels.length,
         ticketLabelsUseProductPrefix: group?.ticketLabels.every((label) =>
-          label.startsWith("PAN20-"),
+          label.startsWith("G-PAN20-"),
         ),
         gateLabel: group?.gateLabel,
         ticketGateLabel: initialTicketStatus.gateLabel,
@@ -563,6 +602,9 @@ try {
   process.stdout.write(
     JSON.stringify({
       ticketLabels: group.ticketLabels,
+      bookingGroupLabel,
+      flightGroupLabel,
+      bookingAndFlightLabelsSearchable: true,
       privateCodesHidden: true,
       publicTicketStatusWithoutLogin: true,
       preparationFromForecast: true,

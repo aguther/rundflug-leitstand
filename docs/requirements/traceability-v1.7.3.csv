@@ -1,6 +1,6 @@
 ID,Modul,Tests,Status
 V173-REL-010,package.json Workspace-Pakete und scripts/verify_requirements.py,Requirements- und Versionsverifikation,umgesetzt
-V173-FID-010,apps/web/src/fids-display.tsx FeatureRouter.tsx und EventScopedApplication.tsx,fids-display-ui.test.ts und Browser-Konzeptvergleich,umgesetzt
+V173-FID-010,apps/web/src/fids-display.tsx FeatureRouter.tsx EventScopedApplication.tsx und ADR-0022,fids-display-ui.test.ts G-Kennungstest und Browser-Konzeptvergleich,umgesetzt
 V173-PRI-010,apps/worker/src/index.ts,public-board-priority.test.ts und Mehrressourcen-Abnahme,umgesetzt
 V173-LAY-010,apps/web/src/fids-display.tsx und features/fids/fids-v12.css,fids-display-ui.test.ts fids-v12.test.ts und Viewport-Abnahme,umgesetzt
 V173-SET-010,apps/web/src/features/fids/FidsSettingsDialog.tsx und fids-view.tsx,fids-display-ui.test.ts und Dialog-Browserabnahme,umgesetzt
@@ -10,4 +10,4 @@ V173-API-010,packages/contracts/src/index.ts apps/worker/src/index.ts und apps/w
 V173-DAT-010,apps/worker/src/event-coordinator.ts event-deletion.ts und factory-reset.ts,fids-preferences.test.ts event-deletion.test.ts factory-reset.test.ts,umgesetzt
 V173-OPS-010,apps/worker/migrations/0041_fids_display_accounts_and_preferences.sql und docs/operations,SQLite-Migrationsintegration und Backup-Dokumentationsprüfung,umgesetzt
 V173-AST-010,apps/web/src/flight-line-assist.tsx und features/flight-line/flight-line-assist-v15.css,flight-line-assist-ui.test.ts und mobile Browserabnahme,umgesetzt
-V173-QA-010,Workspace-Test- und Buildskripte sowie docs/ui/v1.7.3-fids-concept.md,Vollständiger Check und Browserabnahme,umgesetzt
+V173-QA-010,Workspace-Test- und Buildskripte sowie docs/ui/v1.7.3-fids-concept.md und v1.7.3-communication-labels-concept.md,Vollständiger Check und Browserabnahme,umgesetzt

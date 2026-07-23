@@ -66,6 +66,10 @@ describe("operational history query", () => {
     expect(statement.bindings).toEqual(["event-1", 100, 0]);
     expect(statement.sql).toContain("LEFT JOIN rotation_tickets rt ON rt.ticket_id = t.id");
     expect(statement.sql).not.toContain("rt.released_at IS NULL");
+    expect(statement.sql).toContain("flight_rg.short_code AS resource_group_short_code");
+    expect(statement.sql).toContain(
+      "LEFT JOIN resource_groups flight_rg ON flight_rg.id = fg.resource_group_id",
+    );
     expect(statement.sql).toContain("COUNT(*) OVER() AS total_count");
     expect(statement.sql).toContain("LIMIT ?2 OFFSET ?3");
   });

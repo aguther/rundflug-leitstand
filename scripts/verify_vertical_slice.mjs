@@ -4,6 +4,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const port = Number(process.env.VERTICAL_SLICE_TEST_PORT ?? "18786");
 const npmCli = process.env.npm_execpath;
 if (!npmCli) throw new Error("npm-Ausführungspfad fehlt.");
 const wranglerCli = resolve(root, "node_modules", "wrangler", "bin", "wrangler.js");
@@ -28,11 +29,13 @@ const server = spawn(
     "DATA_JURISDICTION:eu",
     "--var",
     `ADMIN_PIN_HASH:${pinHash}`,
+    "--port",
+    String(port),
   ],
   { cwd: root, stdio: "ignore", windowsHide: true },
 );
-const base = "http://127.0.0.1:8787";
-const wsBase = "ws://127.0.0.1:8787";
+const base = `http://127.0.0.1:${port}`;
+const wsBase = `ws://127.0.0.1:${port}`;
 const waitForWorker = async () => {
   for (let attempt = 0; attempt < 40; attempt += 1) {
     try {
