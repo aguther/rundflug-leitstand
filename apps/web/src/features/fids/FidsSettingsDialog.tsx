@@ -34,6 +34,7 @@ export function FidsSettingsDialog({
     editablePreferences(preferences),
   );
   const [saving, setSaving] = useState(false);
+  const [logoutBusy, setLogoutBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { visibleRows, layout, theme } = preferences;
 
@@ -69,6 +70,14 @@ export function FidsSettingsDialog({
       );
     } finally {
       setSaving(false);
+    }
+  };
+  const logout = async () => {
+    setLogoutBusy(true);
+    try {
+      await onLogout();
+    } finally {
+      setLogoutBusy(false);
     }
   };
 
@@ -162,8 +171,9 @@ export function FidsSettingsDialog({
         <div className="fids-settings-actions">
           <Button
             className="fids-logout-button"
-            disabled={saving}
-            onClick={() => void onLogout()}
+            disabled={saving || logoutBusy}
+            busy={logoutBusy}
+            onClick={() => void logout()}
             type="button"
             variant="ghost"
           >
@@ -174,8 +184,14 @@ export function FidsSettingsDialog({
             <Button disabled={saving} onClick={close} type="button" variant="secondary">
               Abbrechen
             </Button>
-            <Button disabled={saving} onClick={() => void save()} type="button" variant="primary">
-              {saving ? "Speichert …" : "Speichern"}
+            <Button
+              busy={saving}
+              disabled={logoutBusy}
+              onClick={() => void save()}
+              type="button"
+              variant="primary"
+            >
+              Speichern
             </Button>
           </div>
         </div>

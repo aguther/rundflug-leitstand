@@ -320,7 +320,7 @@ export function FlightLineView() {
   function startAircraftPause(minutes: 10 | 20 | 30 | null) {
     if (!selectedAircraft) return;
     const expectedReviewAt = expectedReviewAtFromPause(minutes);
-    void setFlightLineAircraftState("PAUSED", expectedReviewAt);
+    return setFlightLineAircraftState("PAUSED", expectedReviewAt);
   }
 
   function openAircraftPauseDialog(aircraftId?: string) {
@@ -328,7 +328,7 @@ export function FlightLineView() {
     setAircraftPauseOpen(true);
   }
 
-  function requestAircraftState(
+  async function requestAircraftState(
     aircraftId: string,
     state: "AVAILABLE" | "REFUELING" | "PAUSED" | "INACTIVE",
   ) {
@@ -347,7 +347,7 @@ export function FlightLineView() {
       setTechnicalAbortReason("");
       return;
     }
-    void setFlightLineAircraftState(state, null, aircraftEntry);
+    await setFlightLineAircraftState(state, null, aircraftEntry);
   }
 
   async function assignAircraftPilot(aircraftId: string, pilotId: string, reassign: boolean) {
@@ -428,13 +428,13 @@ export function FlightLineView() {
     }
   }
 
-  function deferTicketGroup(ticketGroupId: string, reason: string) {
+  async function deferTicketGroup(ticketGroupId: string, reason: string) {
     const rotation = board?.rotations.find(
       (entry) =>
         entry.ticketGroupId === ticketGroupId ||
         entry.bookingGroups.some((group) => group.id === ticketGroupId),
     );
-    if (rotation) void mutateQueue("DEFER_TICKET_GROUP", reason, rotation, ticketGroupId);
+    if (rotation) await mutateQueue("DEFER_TICKET_GROUP", reason, rotation, ticketGroupId);
   }
 
   async function setRotationCapacity() {
@@ -690,14 +690,12 @@ export function FlightLineView() {
             setSelectedId(null);
             setSelectedQueueGroupIds([]);
           }}
-          onGroupAttendance={(ticketGroupId, checkedIn) =>
-            void setGroupAttendance(ticketGroupId, checkedIn)
+          onGroupAttendance={setGroupAttendance}
+          onGroupMissing={(ticketGroupId) => updateGroupPresence(ticketGroupId, "MISSING")}
+          onGroupRecall={(ticketGroupId) => updateGroupPresence(ticketGroupId, "RECALL")}
+          onGroupDefer={(ticketGroupId) =>
+            deferTicketGroup(ticketGroupId, "Gruppe durch Flight Line Assist zurückgestellt")
           }
-          onGroupMissing={(ticketGroupId) => void updateGroupPresence(ticketGroupId, "MISSING")}
-          onGroupRecall={(ticketGroupId) => void updateGroupPresence(ticketGroupId, "RECALL")}
-          onGroupDefer={(ticketGroupId) => {
-            deferTicketGroup(ticketGroupId, "Gruppe durch Flight Line Assist zurückgestellt");
-          }}
           onToggleGroup={(ticketGroupId, isSelected) => {
             setSelectedQueueGroupIds((current) =>
               isSelected
@@ -738,9 +736,7 @@ export function FlightLineView() {
             );
             return advance(rotation, rotationAircraft, nextAircraftState);
           }}
-          onSetAircraftState={(aircraftId, state) => {
-            requestAircraftState(aircraftId, state);
-          }}
+          onSetAircraftState={requestAircraftState}
           selectedQueueGroupIds={selectedQueueGroupIds}
         />
       ) : board ? (
@@ -750,7 +746,7 @@ export function FlightLineView() {
           busyRotationIds={busyRotationIds}
           selectedQueueGroupIds={selectedQueueGroupIds}
           onAssignPilot={assignAircraftPilot}
-          onConfirmAssignment={() => void advance()}
+          onConfirmAssignment={() => advance()}
           onRunRotation={(rotation, nextAircraftState) => {
             const rotationAircraft = operationalAircraft.find(
               (entry) => entry.id === rotation.aircraftId,
@@ -758,17 +754,13 @@ export function FlightLineView() {
             return advance(rotation, rotationAircraft, nextAircraftState);
           }}
           onPauseAircraft={openAircraftPauseDialog}
-          onGroupAttendance={(ticketGroupId, checkedIn) =>
-            void setGroupAttendance(ticketGroupId, checkedIn)
-          }
-          onGroupMissing={(ticketGroupId) => void updateGroupPresence(ticketGroupId, "MISSING")}
-          onGroupRecall={(ticketGroupId) => void updateGroupPresence(ticketGroupId, "RECALL")}
+          onGroupAttendance={setGroupAttendance}
+          onGroupMissing={(ticketGroupId) => updateGroupPresence(ticketGroupId, "MISSING")}
+          onGroupRecall={(ticketGroupId) => updateGroupPresence(ticketGroupId, "RECALL")}
           onGroupDefer={(ticketGroupId) =>
             deferTicketGroup(ticketGroupId, "Gruppe durch Flight Line Supervisor zurückgestellt")
           }
-          onSetAircraftState={(aircraftId, state) => {
-            requestAircraftState(aircraftId, state);
-          }}
+          onSetAircraftState={requestAircraftState}
           onSelectAircraft={(aircraftId) => {
             setSelectedAircraftId(aircraftId);
             setSelectedId(null);
@@ -1487,7 +1479,7 @@ export function FlightLineView() {
             </Button>
             <Button
               disabled={technicalAbortReason.trim().length < 3}
-              onClick={() => void abortTechnicalRotation()}
+              onClick={abortTechnicalRotation}
               type="button"
               variant="danger"
             >

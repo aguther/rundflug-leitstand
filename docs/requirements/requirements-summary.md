@@ -1,10 +1,11 @@
-# Anforderungskatalog – Basis v1.4, aktueller Release 1.7.3
+# Anforderungskatalog – Basis v1.4, aktueller Release 1.8.0
 
 Automatisch extrahiert: **207 eindeutige Anforderungen**.
 
 Die Zahlen unten beschreiben den unveränderten Basiskatalog V1.4. Die verbindlichen
-Releasekonkretisierungen für Anwendungsversion 1.7.3 stehen in `requirements-v1.7.3.md` und
-`requirements-v1.7.3.yaml`; sie ergänzen das kontogebundene Standard-FIDS und übernehmen den
+Releasekonkretisierungen für Anwendungsversion 1.8.0 stehen in `requirements-v1.8.0.md` und
+`requirements-v1.8.0.yaml`; sie ergänzen Busy Indicator, absolute Zeitfenster und Gruppenticket und
+übernehmen den
 übrigen Funktionsumfang von V1.7.2 unverändert.
 
 ## Nach Priorität
@@ -54,8 +55,10 @@ Releasekonkretisierungen für Anwendungsversion 1.7.3 stehen in `requirements-v1
 - `requirements-v1.4.yaml`: maschinenlesbarer Katalog; bewusst auch valides JSON.
 - `requirements-v1.6.0.md` und `.yaml`: fortgeltender Kassen- und Druckumfang.
 - `requirements-v1.6.1.md` und `.yaml`: fortgeltende Kassen- und Flight-Line-Korrekturen zu 1.6.1.
-- `requirements-v1.7.3.md` und `.yaml`: aktuelle FIDS-, Auth- und UI-Erweiterungen.
-- `traceability-v1.7.3.csv`: aktuelle Release-Traceability.
+- `requirements-v1.7.3.md` und `.yaml`: FIDS-, Auth- und UI-Erweiterungen.
+- `requirements-v1.8.0.md` und `.yaml`: aktuelle Busy-, Zeitfenster-, Kassen-, Flight-Line- und
+  Gruppenticket-Erweiterungen.
+- `traceability-v1.8.0.csv`: aktuelle Release-Traceability.
 - `traceability.csv`: Zuordnung zu Issues, Modulen, Tests und Umsetzungsstatus.
 - `Lastenheft_Rundflug-Leitstand_v1.4_konsolidiert.pdf`: unveränderte Referenz.
 - `Lastenheft_Rundflug-Leitstand_v1.4_konsolidiert.docx`: unveränderte Referenz.

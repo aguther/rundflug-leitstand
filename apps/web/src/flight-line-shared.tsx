@@ -366,10 +366,10 @@ function AssignmentQueueRow({
   selectedSeats: number;
   capacity: number;
   onToggle: (ticketGroupId: string, selected: boolean) => void;
-  onAttendance: (ticketGroupId: string, checkedIn: boolean) => void;
-  onMissing: (ticketGroupId: string) => void;
-  onRecall: (ticketGroupId: string) => void;
-  onDefer?: ((ticketGroupId: string) => void) | undefined;
+  onAttendance: (ticketGroupId: string, checkedIn: boolean) => void | Promise<void>;
+  onMissing: (ticketGroupId: string) => void | Promise<void>;
+  onRecall: (ticketGroupId: string) => void | Promise<void>;
+  onDefer?: ((ticketGroupId: string) => void | Promise<void>) | undefined;
 }) {
   const segmentTicketCount = queuedSegmentTicketCount(group);
   const segmentPresentCount = queuedSegmentPresentCount(group);
@@ -470,12 +470,12 @@ export function BookingGroupAssignmentDialog({
   confirmDisabled: boolean;
   open: boolean;
   onClose: () => void;
-  onConfirm: () => void;
+  onConfirm: () => void | Promise<void>;
   onToggle: (ticketGroupId: string, selected: boolean) => void;
-  onAttendance: (ticketGroupId: string, checkedIn: boolean) => void;
-  onMissing: (ticketGroupId: string) => void;
-  onRecall: (ticketGroupId: string) => void;
-  onDefer?: (ticketGroupId: string) => void;
+  onAttendance: (ticketGroupId: string, checkedIn: boolean) => void | Promise<void>;
+  onMissing: (ticketGroupId: string) => void | Promise<void>;
+  onRecall: (ticketGroupId: string) => void | Promise<void>;
+  onDefer?: (ticketGroupId: string) => void | Promise<void>;
 }) {
   const selectedGroups = groups.filter((group) => selectedQueueGroupIds.includes(group.id));
   const selectedSeats = selectedGroups.reduce(
@@ -789,7 +789,7 @@ export function PilotAssignmentDialogs({
             </Button>
             <Button
               disabled={!pilotId}
-              onClick={() => void submitPilotAssignment()}
+              onClick={submitPilotAssignment}
               type="button"
               variant="primary"
             >
@@ -855,12 +855,11 @@ export function PilotAssignmentDialogs({
         }
         confirmLabel="Pilot wechseln"
         onCancel={() => setReassign(null)}
-        onConfirm={() => {
+        onConfirm={async () => {
           if (!reassign || !aircraft) return;
-          void onAssignPilot(aircraft.id, reassign.pilotId, true).then(() => {
-            setReassign(null);
-            onClose();
-          });
+          await onAssignPilot(aircraft.id, reassign.pilotId, true);
+          setReassign(null);
+          onClose();
         }}
         open={reassign !== null}
         title="Pilotzuweisung wechseln?"

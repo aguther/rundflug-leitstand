@@ -26,6 +26,7 @@ function isPublicRoute(pathname: string): boolean {
     pathname === "/setup" ||
     pathname === "/privacy" ||
     pathname === "/datenschutz" ||
+    /^\/gruppe\/[A-Za-z2-9]{12,32}$/.test(pathname) ||
     /^\/ticket\/[A-Za-z2-9]{12,32}$/.test(pathname)
   );
 }

@@ -100,8 +100,27 @@ export async function sendRotationPushNotifications(
        (id, operation_day_id, subscription_id, rotation_id, notification_type, status, queued_at)
      SELECT lower(hex(randomblob(16))), w.operation_day_id, w.id, ?1, ?2, 'PENDING', ?3
        FROM web_push_subscriptions w
-       JOIN rotation_tickets rt ON rt.ticket_id = w.ticket_id AND rt.released_at IS NULL
-      WHERE rt.rotation_id = ?1 AND w.status = 'ACTIVE' AND w.delete_after > ?3
+      WHERE w.status = 'ACTIVE' AND w.delete_after > ?3
+        AND (
+          EXISTS (
+            SELECT 1 FROM rotation_tickets direct_rt
+             WHERE direct_rt.ticket_id = w.ticket_id
+               AND direct_rt.released_at IS NULL
+               AND direct_rt.rotation_id = ?1
+          )
+          OR (
+            w.ticket_group_id IS NOT NULL
+            AND EXISTS (
+              SELECT 1
+                FROM tickets group_ticket
+                JOIN rotation_tickets group_rt
+                  ON group_rt.ticket_id = group_ticket.id
+                 AND group_rt.released_at IS NULL
+               WHERE group_ticket.ticket_group_id = w.ticket_group_id
+                 AND group_rt.rotation_id = ?1
+            )
+          )
+        )
      ON CONFLICT(subscription_id, rotation_id, notification_type) DO NOTHING`,
   )
     .bind(rotationId, eventType, now)

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { BrandMark } from "../../design-system/BrandMark";
+import { Button } from "../../design-system/components";
 import { ThemeToggle } from "../../design-system/ThemeToggle";
 import { useAuth } from "./AuthContext";
 import {
@@ -17,6 +18,7 @@ export function LoginPage() {
   const [accountId, setAccountId] = useState("");
   const [pin, setPin] = useState("");
   const [busy, setBusy] = useState(false);
+  const [refreshBusy, setRefreshBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const accountRef = useRef<HTMLSelectElement>(null);
   const pinRef = useRef<HTMLInputElement>(null);
@@ -50,6 +52,15 @@ export function LoginPage() {
     }
   }
 
+  async function retryConnection() {
+    setRefreshBusy(true);
+    try {
+      await refresh();
+    } finally {
+      setRefreshBusy(false);
+    }
+  }
+
   return (
     <main className="login-page">
       <header className="login-topbar">
@@ -70,9 +81,14 @@ export function LoginPage() {
         {unavailable ? (
           <div className="login-message login-message-error" role="alert">
             <span>Server nicht erreichbar.</span>
-            <button type="button" onClick={() => void refresh()}>
+            <Button
+              busy={refreshBusy}
+              type="button"
+              onClick={() => void retryConnection()}
+              variant="secondary"
+            >
               Erneut prüfen
-            </button>
+            </Button>
           </div>
         ) : null}
         <form onSubmit={(event) => void submit(event)}>
@@ -117,13 +133,15 @@ export function LoginPage() {
               {error}
             </p>
           ) : null}
-          <button
+          <Button
+            busy={busy}
             className="login-submit"
             type="submit"
-            disabled={!accountId || pin.length < 6 || busy}
+            disabled={!accountId || pin.length < 6}
+            variant="primary"
           >
-            {busy ? "Anmeldung läuft …" : "Anmelden"}
-          </button>
+            Anmelden
+          </Button>
         </form>
         <p className="login-privacy">Keine Namen · keine personenbezogenen Profile</p>
       </section>

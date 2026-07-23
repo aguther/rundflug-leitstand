@@ -39,10 +39,10 @@ describe("Flight Line Assist", () => {
     expect(assistSource).toContain("CompactHistory");
     expect(assistSource).toContain('activeRotation?.status === "LANDED"');
     expect(assistSource).not.toContain("Zustand nach Abschluss");
-    expect(assistSource).toContain('onRunRotation(activeRotation, "REFUELING")');
-    expect(assistSource).toContain('onRunRotation(activeRotation, "PAUSED")');
-    expect(assistSource).toContain('onRunRotation(activeRotation, "INACTIVE")');
-    expect(assistSource).toContain('onSetAircraftState(activeAircraft.id, "AVAILABLE")');
+    expect(assistSource).toContain('runRotationAction("refueling", activeRotation, "REFUELING")');
+    expect(assistSource).toContain('runRotationAction("paused", activeRotation, "PAUSED")');
+    expect(assistSource).toContain('runRotationAction("inactive", activeRotation, "INACTIVE")');
+    expect(assistSource).toContain('runAircraftStateAction("primary", "AVAILABLE")');
     expect(assistSource).toContain("!requiresAvailableReset &&");
     expect(assistSource).toContain("Coffee");
     expect(assistSource).toContain("AircraftPickerMeta");
@@ -64,9 +64,11 @@ describe("Flight Line Assist", () => {
     expect(assistSource).not.toContain("Wird übernommen …");
     expect(assistSource).toContain("Übernahme läuft für");
     expect(assistSource).toContain("claimingAircraftId");
-    expect(assistSource).toContain("aria-busy={isClaiming}");
+    expect(assistSource).toContain("busy={isClaiming}");
     expect(assistSource).toContain('" assist-v15-claim--takeover"');
-    expect(assistSource).toMatch(/isClaiming\s*\? "primary"/);
+    expect(assistSource).toContain(
+      ["busyLabel={`Übernahme läuft für $", "{entry.registration}`}"].join(""),
+    );
     expect(assistStyles).toContain("width: 164px");
     expect(assistSource).not.toContain("assist-v15-claim-zone");
     expect(assistStyles).not.toContain(".assist-v15-claim-zone");
@@ -124,7 +126,7 @@ describe("Flight Line Assist", () => {
   it("V161-FL-020: uses the generic pilot assignment confirmation in Assist", () => {
     expect(assistSource).toContain("<PilotAssignmentDialogs");
     expect(sharedFlightLineSource).toMatch(
-      /onClick=\{\(\) => void submitPilotAssignment\(\)\}[\s\S]*?>\s*Pilot zuweisen\s*<\/Button>/,
+      /onClick=\{submitPilotAssignment\}[\s\S]*?>\s*Pilot zuweisen\s*<\/Button>/,
     );
     expect(sharedFlightLineSource).not.toContain('?.operationalCode ?? ""} zuweisen');
   });

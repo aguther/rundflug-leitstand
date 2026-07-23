@@ -1,13 +1,7 @@
-import type { PublicTicketStatus } from "@rundflug/contracts";
-import { formatBookingGroupLabel } from "@rundflug/domain";
-import { Bell, Check, Clock3, Info, MapPin, RefreshCw, Ticket, Users } from "lucide-react";
+import type { PublicGroupStatus } from "@rundflug/contracts";
+import { Bell, Clock3, Info, MapPin, RefreshCw, Ticket, Users } from "lucide-react";
 import { useEffect, useState } from "react";
-import {
-  getPublicTicketStatus,
-  getPushPublicKey,
-  registerTicketPush,
-  revokeTicketPush,
-} from "./api";
+import { getPublicGroupStatus, getPushPublicKey, registerGroupPush, revokeGroupPush } from "./api";
 import { AppShell as Shell } from "./app/AppShell";
 import {
   nextBoardReconnectDelay,
@@ -22,26 +16,47 @@ import {
 } from "./realtime-heartbeat";
 import { formatAbsoluteTimeWindow } from "./time-window";
 
-export function TicketStatusView({ code }: { code: string }) {
-  const [status, setStatus] = useState<PublicTicketStatus | null>(null);
+type GroupPart = PublicGroupStatus["parts"][number];
+
+function partWindow(part: GroupPart, timeZone: string): string {
+  return formatAbsoluteTimeWindow({
+    lowerAt: part.boardingWindowLowerAt,
+    upperAt: part.boardingWindowUpperAt,
+    timeZone,
+    quality: part.predictionQuality,
+    phase:
+      part.status === "COME_TO_FLIGHT_LINE" || part.status === "BOARDING"
+        ? "NOW"
+        : ["IN_FLIGHT", "LANDED", "COMPLETED"].includes(part.status)
+          ? "FINISHED"
+          : "FORECAST",
+  });
+}
+
+export function GroupStatusView({ code }: { code: string }) {
+  const [status, setStatus] = useState<PublicGroupStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [push, setPush] = useState(false);
   const [pushMessage, setPushMessage] = useState<string | null>(null);
+
   useEffect(() => {
     let active = true;
     let socket: WebSocket | null = null;
     let reconnectTimer: number | null = null;
     let heartbeatTimer: number | null = null;
     let reconnectDelay = OPERATION_BOARD_RECONNECT_INITIAL_MS;
+    const controller = new AbortController();
     const stopHeartbeat = () => {
       if (heartbeatTimer !== null) window.clearInterval(heartbeatTimer);
       heartbeatTimer = null;
     };
-    const controller = new AbortController();
     const refresh = () =>
-      getPublicTicketStatus(code, controller.signal)
+      getPublicGroupStatus(code, controller.signal)
         .then((nextStatus) => {
-          if (active) setStatus(nextStatus);
+          if (active) {
+            setStatus(nextStatus);
+            setError(null);
+          }
           return nextStatus;
         })
         .catch((reason) => {
@@ -87,13 +102,12 @@ export function TicketStatusView({ code }: { code: string }) {
       window.clearInterval(timer);
     };
   }, [code]);
+
   useEffect(() => {
     navigator.serviceWorker?.ready
       .then((registration) => registration.pushManager.getSubscription())
       .then((subscription) =>
-        setPush(
-          Boolean(subscription) && window.localStorage.getItem(`ticket-push:${code}`) === "1",
-        ),
+        setPush(Boolean(subscription) && localStorage.getItem(`group-push:${code}`) === "1"),
       )
       .catch(() => undefined);
   }, [code]);
@@ -108,10 +122,10 @@ export function TicketStatusView({ code }: { code: string }) {
       const existing = await registration.pushManager.getSubscription();
       if (!enabled) {
         if (existing) {
-          await revokeTicketPush(code, existing.endpoint);
+          await revokeGroupPush(code, existing.endpoint);
           await existing.unsubscribe();
         }
-        window.localStorage.removeItem(`ticket-push:${code}`);
+        localStorage.removeItem(`group-push:${code}`);
         setPush(false);
         setPushMessage("Web-Push wurde deaktiviert; das Push-Ziel wird gelöscht.");
         return;
@@ -125,33 +139,19 @@ export function TicketStatusView({ code }: { code: string }) {
           userVisibleOnly: true,
           applicationServerKey: publicKey,
         }));
-      await registerTicketPush(code, subscription);
-      window.localStorage.setItem(`ticket-push:${code}`, "1");
+      await registerGroupPush(code, subscription);
+      localStorage.setItem(`group-push:${code}`, "1");
       setPush(true);
-      setPushMessage("Web-Push ist für dieses Ticket aktiviert.");
+      setPushMessage("Web-Push ist für diese Gruppe aktiviert.");
     } catch (reason) {
       setPush(false);
       setPushMessage(reason instanceof Error ? reason.message : "Web-Push ist nicht verfügbar.");
     }
   };
-  const progressStates = ["WAITING", "COME_TO_FLIGHT_LINE", "BOARDING", "IN_FLIGHT"] as const;
-  const progressIndex = status
-    ? Math.max(
-        0,
-        progressStates.indexOf(
-          status.status === "PREPARE"
-            ? "WAITING"
-            : status.status === "LANDED" || status.status === "COMPLETED"
-              ? "IN_FLIGHT"
-              : status.status === "SERVICE_PAUSED"
-                ? "WAITING"
-                : status.status,
-        ),
-      )
-    : 0;
+
   return (
-    <Shell publicView title="Ticketstatus">
-      <section className="ticket-status-page">
+    <Shell publicView title="Gruppenstatus">
+      <section className="ticket-status-page group-status-page">
         {status ? (
           <>
             <header className="ticket-live-header">
@@ -164,92 +164,61 @@ export function TicketStatusView({ code }: { code: string }) {
             <div className="ticket-identity">
               <Ticket aria-hidden="true" />
               <div>
-                <span>
-                  Gruppe {formatBookingGroupLabel(status.productCode, status.communicationNumber)}
-                </span>
+                <span>Gruppe {status.bookingGroupLabel}</span>
                 <h1>{status.productName}</h1>
-                <code>{code}</code>
+                <small>
+                  {status.groupSize} Person{status.groupSize === 1 ? "" : "en"}
+                </small>
               </div>
             </div>
-            <section className="ticket-current-status">
-              <span className="eyebrow">Aktueller Status</span>
-              <strong>{publicStatusLabel[status.status]}</strong>
-              <p>{status.message}</p>
-            </section>
-            <section className="ticket-gate-callout">
-              <MapPin aria-hidden="true" />
-              <div>
-                <strong>Gate {status.gateLabel}</strong>
-                <span>
-                  {status.status === "COME_TO_FLIGHT_LINE" || status.status === "BOARDING"
-                    ? "Bitte jetzt zum Gate"
-                    : "Gate für Ihren Rundflug"}
-                </span>
-              </div>
-            </section>
             <OperationalNotice note={status.operationalNotice} />
-            <div className="ticket-status-metrics">
-              <div>
-                <Clock3 aria-hidden="true" />
-                <span>Geschätztes Zeitfenster</span>
-                <strong>
-                  {formatAbsoluteTimeWindow({
-                    lowerAt: status.boardingWindowLowerAt,
-                    upperAt: status.boardingWindowUpperAt,
-                    timeZone: status.timeZone,
-                    quality: status.predictionQuality,
-                    phase:
-                      status.status === "COME_TO_FLIGHT_LINE" || status.status === "BOARDING"
-                        ? "NOW"
-                        : ["IN_FLIGHT", "LANDED", "COMPLETED"].includes(status.status)
-                          ? "FINISHED"
-                          : "FORECAST",
-                  })}
-                </strong>
-              </div>
-              <div>
-                <Users aria-hidden="true" />
-                <span>Position in der Warteschlange</span>
-                <strong>{status.queuePosition ?? "–"}</strong>
-              </div>
-            </div>
-            <section className="ticket-progress" aria-label="Statusübersicht">
-              {[
-                ["Warten", "WAITING"],
-                ["Bitte zum Gate", "COME_TO_FLIGHT_LINE"],
-                ["Boarding", "BOARDING"],
-                ["Abgeflogen", "IN_FLIGHT"],
-              ].map(([label, state], index) => (
-                <div
-                  className={
-                    index < progressIndex ? "done" : index === progressIndex ? "current" : ""
-                  }
-                  key={state}
-                >
-                  <span>{index < progressIndex ? <Check aria-hidden="true" /> : index + 1}</span>
-                  <strong>{label}</strong>
-                  <small>
-                    {index < progressIndex
-                      ? "Erledigt"
-                      : index === progressIndex
-                        ? "Aktuell"
-                        : "Ausstehend"}
-                  </small>
-                </div>
+            <div className="group-status-parts">
+              {status.parts.map((part) => (
+                <article className="group-status-part" key={part.partNumber}>
+                  <header>
+                    <strong>
+                      {part.partCount > 1
+                        ? `Teilflug ${part.partNumber} von ${part.partCount}`
+                        : "Ihr Rundflug"}
+                    </strong>
+                    <span>
+                      <Users aria-hidden="true" />
+                      {part.passengerCount} Person{part.passengerCount === 1 ? "" : "en"}
+                    </span>
+                  </header>
+                  <section className="ticket-current-status">
+                    <span className="eyebrow">Aktueller Status</span>
+                    <strong>{publicStatusLabel[part.status]}</strong>
+                    <p>{part.message}</p>
+                  </section>
+                  <div className="ticket-status-metrics">
+                    <div>
+                      <MapPin aria-hidden="true" />
+                      <span>Gate</span>
+                      <strong>{part.gateLabel || "–"}</strong>
+                    </div>
+                    <div>
+                      <Clock3 aria-hidden="true" />
+                      <span>Geschätztes Zeitfenster</span>
+                      <strong>{partWindow(part, status.timeZone)}</strong>
+                    </div>
+                  </div>
+                </article>
               ))}
-            </section>
+            </div>
             <div className="ticket-updated">
               <Clock3 aria-hidden="true" /> Zuletzt aktualisiert{" "}
               {new Date(status.updatedAt).toLocaleTimeString("de-DE", {
                 hour: "2-digit",
                 minute: "2-digit",
+                timeZone: status.timeZone,
               })}
             </div>
             <label className="push-toggle">
               <Bell aria-hidden="true" />
               <span>
                 <strong>Benachrichtigungen aktivieren</strong>
-                <small>Eine Mitteilung erhalten, wenn sich der Status ändert.</small>
+                <small>Eine Mitteilung erhalten, wenn sich ein Teilflug ändert.</small>
               </span>
               <input
                 type="checkbox"
@@ -263,7 +232,8 @@ export function TicketStatusView({ code }: { code: string }) {
               </p>
             ) : null}
             <a className="privacy-link" href="/datenschutz">
-              <Info aria-hidden="true" /> Öffentlicher Ticketstatus · Datenschutz &amp; Privatsphäre
+              <Info aria-hidden="true" /> Öffentlicher Gruppenstatus · Datenschutz &amp;
+              Privatsphäre
             </a>
           </>
         ) : (

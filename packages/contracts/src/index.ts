@@ -149,6 +149,10 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
     type: z.literal("SELL_TICKET_GROUP"),
     payload: z.object({
       productId: z.string().min(1).max(100),
+      publicGroupCode: z
+        .string()
+        .regex(/^[A-Z2-9]{12,32}$/)
+        .optional(),
       publicTicketCodes: z.array(z.string().min(12).max(32)).min(1).max(12),
       ticketDetails: z
         .array(
@@ -537,6 +541,10 @@ export const outageRecoveryEntrySchema = z.discriminatedUnion("type", [
     payload: z
       .object({
         productId: z.string().min(1).max(100),
+        publicGroupCode: z
+          .string()
+          .regex(/^[A-Z2-9]{12,32}$/)
+          .optional(),
         publicTicketCodes: z
           .array(z.string().regex(/^[A-Z2-9]{12,32}$/))
           .min(1)
@@ -565,6 +573,10 @@ export type OutageRecoveryEntryContract = z.infer<typeof outageRecoveryEntrySche
 export const storedOutagePaperSalePayloadSchema = z
   .object({
     productId: z.string().min(1).max(100),
+    publicGroupCodeHash: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/)
+      .optional(),
     publicTicketCodeHashes: z
       .array(z.string().regex(/^[a-f0-9]{64}$/))
       .min(1)
@@ -839,12 +851,8 @@ export const ticketGroupPrintDataSchema = z.object({
   productName: z.string(),
   gateLabel: z.string(),
   communicationLabel: z.string(),
-  tickets: z.array(
-    z.object({
-      code: z.string().min(12).max(32),
-      position: z.number().int().positive(),
-    }),
-  ),
+  code: z.string().regex(/^[A-Z2-9]{12,32}$/),
+  groupSize: z.number().int().positive(),
 });
 export type TicketGroupPrintData = z.infer<typeof ticketGroupPrintDataSchema>;
 
@@ -948,8 +956,8 @@ export const productOperationalSummarySchema = z.object({
   resourceGroupOpenTickets: z.number().int().nonnegative(),
   estimatedWaitLowerMinutes: z.number().int().nonnegative(),
   estimatedWaitUpperMinutes: z.number().int().nonnegative(),
-  nextBoardingWindowLowerAt: z.string().nullable(),
-  nextBoardingWindowUpperAt: z.string().nullable(),
+  nextBoardingWindowLowerAt: z.iso.datetime().nullable(),
+  nextBoardingWindowUpperAt: z.iso.datetime().nullable(),
   remainingSellableSeats: z.number().int().nonnegative(),
   projectedSeats: z.number().int().nonnegative(),
   capacityStatus: z.enum(["AVAILABLE", "LIMITED", "MANUAL_REVIEW", "SOLD_OUT"]),
@@ -999,6 +1007,8 @@ export const rotationOperationalSummarySchema = z.object({
   estimatedPassengerPayloadKg: z.number().positive().nullable(),
   predictedLowerMinutes: z.number().int().nonnegative(),
   predictedUpperMinutes: z.number().int().nonnegative(),
+  boardingWindowLowerAt: z.iso.datetime().nullable(),
+  boardingWindowUpperAt: z.iso.datetime().nullable(),
   precalledAt: z.string().nullable().optional(),
   calledAt: z.string().nullable(),
   deferralCount: z.number().int().nonnegative(),
@@ -1211,6 +1221,9 @@ export const publicTicketStatusSchema = z
     queuePosition: z.number().int().positive().nullable(),
     waitLowerMinutes: z.number().int().nonnegative(),
     waitUpperMinutes: z.number().int().nonnegative(),
+    boardingWindowLowerAt: z.iso.datetime().nullable(),
+    boardingWindowUpperAt: z.iso.datetime().nullable(),
+    timeZone: timeZoneSchema,
     predictionQuality: z.enum(["STABLE", "CHANGING", "UNCERTAIN"]),
     message: z.string(),
     operationalNotice: z.string(),
@@ -1221,6 +1234,7 @@ export type PublicTicketStatus = z.infer<typeof publicTicketStatusSchema>;
 
 export const publicBoardSchema = z.object({
   eventName: z.string(),
+  timeZone: timeZoneSchema,
   selectedGate: z
     .object({ id: z.string(), label: z.string(), displayFilter: gateDisplayFilterSchema })
     .nullable(),
@@ -1250,6 +1264,9 @@ export const publicBoardSchema = z.object({
         ]),
         waitLowerMinutes: z.number().int().nonnegative(),
         waitUpperMinutes: z.number().int().nonnegative(),
+        boardingWindowLowerAt: z.iso.datetime().nullable(),
+        boardingWindowUpperAt: z.iso.datetime().nullable(),
+        predictionQuality: z.enum(["STABLE", "CHANGING", "UNCERTAIN"]),
         operationalNotice: z.string(),
       })
       .strict(),
@@ -1273,6 +1290,47 @@ export const publicBoardSchema = z.object({
   ),
 });
 export type PublicBoard = z.infer<typeof publicBoardSchema>;
+
+const publicGroupPartSchema = z
+  .object({
+    partNumber: z.number().int().positive(),
+    partCount: z.number().int().positive(),
+    passengerCount: z.number().int().positive(),
+    gateLabel: z.string(),
+    status: z.enum([
+      "WAITING",
+      "PREPARE",
+      "COME_TO_FLIGHT_LINE",
+      "BOARDING",
+      "IN_FLIGHT",
+      "LANDED",
+      "COMPLETED",
+      "SERVICE_PAUSED",
+    ]),
+    queuePosition: z.number().int().positive().nullable(),
+    boardingWindowLowerAt: z.iso.datetime().nullable(),
+    boardingWindowUpperAt: z.iso.datetime().nullable(),
+    predictionQuality: z.enum(["STABLE", "CHANGING", "UNCERTAIN"]),
+    message: z.string(),
+  })
+  .strict();
+
+export const publicGroupStatusSchema = z
+  .object({
+    eventId: z.string(),
+    eventName: z.string(),
+    bookingGroupLabel: z.string(),
+    groupSize: z.number().int().positive(),
+    productName: z.string(),
+    productCode: z.string(),
+    publicDescription: z.string(),
+    timeZone: timeZoneSchema,
+    operationalNotice: z.string(),
+    updatedAt: z.string(),
+    parts: z.array(publicGroupPartSchema).min(1),
+  })
+  .strict();
+export type PublicGroupStatus = z.infer<typeof publicGroupStatusSchema>;
 
 export const auditEntrySchema = z.object({
   sequence: z.number().int().positive(),

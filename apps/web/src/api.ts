@@ -26,8 +26,10 @@ import {
   operationalHistorySchema,
   operationBoardSchema,
   type PublicBoard,
+  type PublicGroupStatus,
   type PublicTicketStatus,
   publicBoardSchema,
+  publicGroupStatusSchema,
   publicTicketStatusSchema,
   type TicketGroupPrintData,
   type TicketSearchRequest,
@@ -625,6 +627,17 @@ export async function getPublicTicketStatus(
   return publicTicketStatusSchema.parse(await response.json());
 }
 
+export async function getPublicGroupStatus(
+  groupCode: string,
+  signal?: AbortSignal,
+): Promise<PublicGroupStatus> {
+  const response = await apiFetch(`/api/public/groups/${encodeURIComponent(groupCode)}`, {
+    ...(signal ? { signal } : {}),
+  });
+  if (!response.ok) throw new Error("Gruppe nicht gefunden.");
+  return publicGroupStatusSchema.parse(await response.json());
+}
+
 export type PushConfiguration =
   | { configured: true; publicKey: string; retentionDays: number }
   | { configured: false };
@@ -672,6 +685,33 @@ export async function registerTicketPush(
 export async function revokeTicketPush(ticketCode: string, endpoint: string): Promise<void> {
   const response = await apiFetch(
     `/api/public/tickets/${encodeURIComponent(ticketCode)}/push-subscriptions`,
+    {
+      method: "DELETE",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ endpoint }),
+    },
+  );
+  if (!response.ok) throw new Error("Web-Push konnte nicht deaktiviert werden.");
+}
+
+export async function registerGroupPush(
+  groupCode: string,
+  subscription: PushSubscription,
+): Promise<void> {
+  const response = await apiFetch(
+    `/api/public/groups/${encodeURIComponent(groupCode)}/push-subscriptions`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ consent: true, ...subscription.toJSON() }),
+    },
+  );
+  if (!response.ok) throw new Error("Web-Push konnte nicht aktiviert werden.");
+}
+
+export async function revokeGroupPush(groupCode: string, endpoint: string): Promise<void> {
+  const response = await apiFetch(
+    `/api/public/groups/${encodeURIComponent(groupCode)}/push-subscriptions`,
     {
       method: "DELETE",
       headers: { "content-type": "application/json" },

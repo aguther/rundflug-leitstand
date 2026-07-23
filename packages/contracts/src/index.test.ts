@@ -13,6 +13,7 @@ import {
   operationalHistorySchema,
   operatorRoleSchema,
   publicBoardSchema,
+  publicGroupStatusSchema,
   publicTicketStatusSchema,
   rotationOperationalSummarySchema,
   stageOutageRecoveryRequestSchema,
@@ -65,8 +66,9 @@ describe("commandEnvelopeSchema", () => {
         productName: "Panorama",
         gateLabel: "Flight Line",
         communicationLabel: "G-PAN-0101",
-        tickets: [{ code: "ABCDE2345678", position: 1 }],
-      }).tickets[0]?.code,
+        code: "ABCDE2345678",
+        groupSize: 1,
+      }).code,
     ).toBe("ABCDE2345678");
   });
   it("allows an administrator to revoke account sessions without changing the PIN", () => {
@@ -547,6 +549,9 @@ describe("commandEnvelopeSchema", () => {
       queuePosition: 1,
       waitLowerMinutes: 0,
       waitUpperMinutes: 30,
+      boardingWindowLowerAt: "2026-07-11T12:00:00.000Z",
+      boardingWindowUpperAt: "2026-07-11T12:30:00.000Z",
+      timeZone: "Europe/Berlin",
       predictionQuality: "CHANGING",
       message: "Bitte Status prüfen.",
       operationalNotice: "",
@@ -554,6 +559,7 @@ describe("commandEnvelopeSchema", () => {
     });
     const board = publicBoardSchema.parse({
       eventName: "Demo",
+      timeZone: "Europe/Berlin",
       selectedGate: null,
       emergencyMode: false,
       operationalInterrupted: false,
@@ -571,6 +577,9 @@ describe("commandEnvelopeSchema", () => {
           status: "WAITING",
           waitLowerMinutes: 0,
           waitUpperMinutes: 30,
+          boardingWindowLowerAt: "2026-07-11T12:00:00.000Z",
+          boardingWindowUpperAt: "2026-07-11T12:30:00.000Z",
+          predictionQuality: "CHANGING",
           operationalNotice: "",
         },
       ],
@@ -606,6 +615,49 @@ describe("commandEnvelopeSchema", () => {
         message: "Organisatorischer Betrieb pausiert – bitte später erneut prüfen.",
       }).status,
     ).toBe("SERVICE_PAUSED");
+  });
+
+  it("validates an anonymous split-group status without internal flight-group identifiers", () => {
+    const status = publicGroupStatusSchema.parse({
+      eventId: "event-1",
+      eventName: "Synthetischer Flugtag",
+      bookingGroupLabel: "G-PAN-0101",
+      groupSize: 5,
+      productName: "Panorama",
+      productCode: "PAN",
+      publicDescription: "Panoramaflug",
+      timeZone: "Europe/Berlin",
+      operationalNotice: "",
+      updatedAt: "2026-07-23T12:00:00.000Z",
+      parts: [
+        {
+          partNumber: 1,
+          partCount: 2,
+          passengerCount: 3,
+          gateLabel: "Flight Line 1",
+          status: "WAITING",
+          queuePosition: 1,
+          boardingWindowLowerAt: "2026-07-23T12:20:00.000Z",
+          boardingWindowUpperAt: "2026-07-23T12:40:00.000Z",
+          predictionQuality: "STABLE",
+          message: "Bitte Status regelmäßig prüfen.",
+        },
+        {
+          partNumber: 2,
+          partCount: 2,
+          passengerCount: 2,
+          gateLabel: "Flight Line 1",
+          status: "COME_TO_FLIGHT_LINE",
+          queuePosition: 2,
+          boardingWindowLowerAt: null,
+          boardingWindowUpperAt: null,
+          predictionQuality: "CHANGING",
+          message: "Bitte jetzt zum angegebenen Gate kommen.",
+        },
+      ],
+    });
+    expect(status.parts.map((part) => part.passengerCount)).toEqual([3, 2]);
+    expect(JSON.stringify(status)).not.toMatch(/flightGroup|communicationNumber/);
   });
 
   it("requires an administrator PIN in the clear-emergency contract", () => {
@@ -1001,6 +1053,8 @@ describe("commandEnvelopeSchema", () => {
       estimatedPassengerPayloadKg: 107,
       predictedLowerMinutes: 0,
       predictedUpperMinutes: 25,
+      boardingWindowLowerAt: null,
+      boardingWindowUpperAt: null,
       calledAt: "2026-07-11T12:05:00.000Z",
       deferralCount: 0,
       operationalNote: "Nur organisatorischer Testhinweis",

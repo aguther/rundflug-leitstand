@@ -4,7 +4,6 @@ import {
   CircleX,
   Coffee,
   Fuel,
-  LoaderCircle,
   MapPin,
   Plane,
   RefreshCw,
@@ -91,16 +90,16 @@ export function FlightLineAssist({
   onAssignPilot: (aircraftId: string, pilotId: string, reassign: boolean) => Promise<void>;
   onClaim: (aircraftId: string, expectedTakeoverRevision?: number) => Promise<void>;
   onClaimUnavailable: () => void;
-  onGroupAttendance: (ticketGroupId: string, checkedIn: boolean) => void;
-  onGroupMissing: (ticketGroupId: string) => void;
-  onGroupRecall: (ticketGroupId: string) => void;
-  onGroupDefer: (ticketGroupId: string) => void;
+  onGroupAttendance: (ticketGroupId: string, checkedIn: boolean) => void | Promise<void>;
+  onGroupMissing: (ticketGroupId: string) => void | Promise<void>;
+  onGroupRecall: (ticketGroupId: string) => void | Promise<void>;
+  onGroupDefer: (ticketGroupId: string) => void | Promise<void>;
   onPause: (aircraftId: string) => void;
   onRefresh: () => Promise<void>;
   onRelease: (aircraftId: string) => Promise<void>;
   onRunRotation: (rotation: Rotation, nextAircraftState?: TurnaroundNextState) => Promise<void>;
   onSelectAircraft: (aircraftId: string) => void;
-  onSetAircraftState: (aircraftId: string, state: FlightLineFleetState) => void;
+  onSetAircraftState: (aircraftId: string, state: FlightLineFleetState) => Promise<void>;
   onToggleGroup: (ticketGroupId: string, selected: boolean) => void;
   selectedQueueGroupIds: string[];
 }) {
@@ -112,6 +111,9 @@ export function FlightLineAssist({
   const [serverClaimSeen, setServerClaimSeen] = useState(Boolean(ownServerClaim));
   const [releasing, setReleasing] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [pendingRotationAction, setPendingRotationAction] = useState<
+    "primary" | "refueling" | "paused" | "inactive" | null
+  >(null);
   const [claimingAircraftId, setClaimingAircraftId] = useState<string | null>(null);
   const claimingAircraftIdRef = useRef<string | null>(null);
   const [visibleAircraftCount, setVisibleAircraftCount] = useState(5);
@@ -316,18 +318,44 @@ export function FlightLineAssist({
     }
   }
 
+  async function runRotationAction(
+    action: "primary" | "refueling" | "paused" | "inactive",
+    rotation: Rotation,
+    nextAircraftState?: TurnaroundNextState,
+  ) {
+    setPendingRotationAction(action);
+    try {
+      await onRunRotation(rotation, nextAircraftState);
+    } finally {
+      setPendingRotationAction(null);
+    }
+  }
+
+  async function runAircraftStateAction(
+    action: "primary" | "refueling" | "inactive",
+    state: FlightLineFleetState,
+  ) {
+    if (!activeAircraft) return;
+    setPendingRotationAction(action);
+    try {
+      await onSetAircraftState(activeAircraft.id, state);
+    } finally {
+      setPendingRotationAction(null);
+    }
+  }
+
   function runPrimary() {
     if (!activeAircraft) return;
     if (requiresAvailableReset) {
-      onSetAircraftState(activeAircraft.id, "AVAILABLE");
-      return;
+      return runAircraftStateAction("primary", "AVAILABLE");
     }
     if (activeRotation?.status === "DRAFT") {
       setAssignmentOpen(true);
       return;
     }
     if (activeRotation) {
-      void onRunRotation(
+      return runRotationAction(
+        "primary",
         activeRotation,
         activeRotation.status === "LANDED" ? "AVAILABLE" : undefined,
       );
@@ -341,16 +369,11 @@ export function FlightLineAssist({
           <PageHeader
             actions={
               <IconButton
-                aria-busy={refreshing}
-                disabled={refreshing}
+                busy={refreshing}
                 label="Flugzeugliste aktualisieren"
                 onClick={() => void refreshAircraftList()}
               >
-                {refreshing ? (
-                  <LoaderCircle aria-hidden="true" className="assist-v15-spinner" />
-                ) : (
-                  <RefreshCw aria-hidden="true" />
-                )}
+                <RefreshCw aria-hidden="true" />
               </IconButton>
             }
             description="Verfügbare Flugzeuge"
@@ -390,10 +413,8 @@ export function FlightLineAssist({
                     timeZone={board.event.timeZone}
                   />
                   <Button
-                    aria-busy={isClaiming}
-                    aria-label={
-                      isClaiming ? `Übernahme läuft für ${entry.registration}` : undefined
-                    }
+                    busy={isClaiming}
+                    busyLabel={`Übernahme läuft für ${entry.registration}`}
                     className={`assist-v15-claim${
                       existingClaim && !existingClaim.claimedByCurrentOperator
                         ? " assist-v15-claim--takeover"
@@ -403,20 +424,12 @@ export function FlightLineAssist({
                     onClick={() => void claim(entry)}
                     size="compact"
                     variant={
-                      isClaiming
-                        ? "primary"
-                        : existingClaim && !existingClaim.claimedByCurrentOperator
-                          ? "ghost"
-                          : "primary"
+                      existingClaim && !existingClaim.claimedByCurrentOperator ? "ghost" : "primary"
                     }
                   >
-                    {isClaiming ? (
-                      <LoaderCircle aria-hidden="true" className="assist-v15-spinner" />
-                    ) : existingClaim && !existingClaim.claimedByCurrentOperator ? (
-                      "Bewusst übernehmen"
-                    ) : (
-                      "Übernehmen"
-                    )}
+                    {existingClaim && !existingClaim.claimedByCurrentOperator
+                      ? "Bewusst übernehmen"
+                      : "Übernehmen"}
                   </Button>
                 </article>
               );
@@ -472,7 +485,7 @@ export function FlightLineAssist({
             </div>
             <Button
               className="assist-v15-release"
-              disabled={releasing}
+              busy={releasing}
               onClick={() => void finishClaim()}
               size="compact"
               variant="danger"
@@ -492,6 +505,7 @@ export function FlightLineAssist({
               )}
               className="assist-v15-primary-action"
               disabled={primaryDisabled || actionBusy}
+              busy={pendingRotationAction === "primary"}
               onClick={runPrimary}
               size="touch"
             >
@@ -503,14 +517,15 @@ export function FlightLineAssist({
                 className="flight-line-status-action state-refueling"
                 disabled={(!secondaryAllowed && !turnaroundActionAllowed) || actionBusy}
                 label="Tanken"
-                onClick={() => {
+                onClick={async () => {
                   if (turnaroundActionAllowed && activeRotation) {
-                    void onRunRotation(activeRotation, "REFUELING");
+                    await runRotationAction("refueling", activeRotation, "REFUELING");
                   } else {
-                    onSetAircraftState(activeAircraft.id, "REFUELING");
+                    await runAircraftStateAction("refueling", "REFUELING");
                   }
                 }}
                 size="touch"
+                busy={pendingRotationAction === "refueling"}
               >
                 <Fuel aria-hidden="true" />
               </IconButton>
@@ -521,12 +536,13 @@ export function FlightLineAssist({
                 label="Pause"
                 onClick={() => {
                   if (turnaroundActionAllowed && activeRotation) {
-                    void onRunRotation(activeRotation, "PAUSED");
+                    void runRotationAction("paused", activeRotation, "PAUSED");
                   } else {
                     onPause(activeAircraft.id);
                   }
                 }}
                 size="touch"
+                busy={pendingRotationAction === "paused"}
               >
                 <Coffee aria-hidden="true" />
               </IconButton>
@@ -535,14 +551,15 @@ export function FlightLineAssist({
                 className="flight-line-status-action state-inactive"
                 disabled={!unavailableAllowed || actionBusy}
                 label="Nicht verfügbar"
-                onClick={() => {
+                onClick={async () => {
                   if (turnaroundActionAllowed && activeRotation) {
-                    void onRunRotation(activeRotation, "INACTIVE");
+                    await runRotationAction("inactive", activeRotation, "INACTIVE");
                   } else {
-                    onSetAircraftState(activeAircraft.id, "INACTIVE");
+                    await runAircraftStateAction("inactive", "INACTIVE");
                   }
                 }}
                 size="touch"
+                busy={pendingRotationAction === "inactive"}
               >
                 <CircleX aria-hidden="true" />
               </IconButton>
@@ -586,8 +603,8 @@ export function FlightLineAssist({
         groups={waitingGroups}
         onAttendance={onGroupAttendance}
         onClose={() => setAssignmentOpen(false)}
-        onConfirm={() => {
-          if (activeRotation) void onRunRotation(activeRotation);
+        onConfirm={async () => {
+          if (activeRotation) await onRunRotation(activeRotation);
           setAssignmentOpen(false);
         }}
         onDefer={onGroupDefer}
@@ -616,6 +633,7 @@ export function FlightLineAssist({
         }
         cancelLabel="Abbrechen"
         confirmLabel="Trotzdem übernehmen"
+        confirmBusy={claimingAircraftId === takeoverClaim?.aircraftId}
         onCancel={() => setTakeoverClaim(null)}
         onConfirm={() => void takeover()}
         open={takeoverClaim !== null}

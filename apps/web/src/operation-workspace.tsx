@@ -98,7 +98,6 @@ export type TicketReceipt = {
   productName: string;
   gateLabel: string;
   communicationLabel: string;
-  position: number;
   groupSize: number;
 };
 export const weightClassLabel: Record<WeightClass, string> = {

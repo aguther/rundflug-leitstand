@@ -218,6 +218,7 @@ export function ForecastSimulationView() {
   const [comparisonError, setComparisonError] = useState<string | null>(null);
   const [comparisonRunning, setComparisonRunning] = useState(false);
   const [importMessage, setImportMessage] = useState<string | null>(null);
+  const [importingCsv, setImportingCsv] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const comparisonWorkerRef = useRef<Worker | null>(null);
   const editorErrors = validateSimulationConfig(editorConfig);
@@ -312,6 +313,7 @@ export function ForecastSimulationView() {
 
   const handleCsv = async (file: File | undefined) => {
     if (!file) return;
+    setImportingCsv(true);
     try {
       const calibration = calibrateFromCsv(await file.text(), config.realityModel.phases.buffer);
       const nextConfig = {
@@ -332,6 +334,7 @@ export function ForecastSimulationView() {
           : "Die Datei konnte nicht gelesen werden.",
       );
     } finally {
+      setImportingCsv(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
@@ -535,7 +538,11 @@ export function ForecastSimulationView() {
             ref={fileInputRef}
             type="file"
           />
-          <Button className="sim-full-button" onClick={() => fileInputRef.current?.click()}>
+          <Button
+            busy={importingCsv}
+            className="sim-full-button"
+            onClick={() => fileInputRef.current?.click()}
+          >
             <Upload aria-hidden="true" /> CSV importieren
           </Button>
           <Button className="sim-full-button" onClick={() => restart(config)} variant="primary">

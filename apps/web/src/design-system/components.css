@@ -4,6 +4,7 @@
 /* Buttons and icon buttons */
 .ds-button,
 .ds-icon-button {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -53,6 +54,35 @@
   width: 1.15em;
   height: 1.15em;
 }
+.ds-button-content {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: inherit;
+}
+.ds-button-content--hidden {
+  visibility: hidden;
+}
+.ds-busy-indicator {
+  position: absolute;
+  inset: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.ds-busy-indicator svg {
+  animation: ds-busy-spin 800ms linear infinite;
+}
+@keyframes ds-busy-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ds-busy-indicator svg {
+    animation: none;
+  }
+}
 .ds-button--primary {
   border-color: var(--ui-accent);
   color: #fff;
@@ -86,6 +116,27 @@
   color: var(--ui-disabled-text);
   background: var(--ui-disabled);
   cursor: not-allowed;
+}
+.ds-button[aria-busy="true"],
+.ds-icon-button[aria-busy="true"] {
+  cursor: wait;
+}
+.ds-button--primary[aria-busy="true"] {
+  border-color: var(--ui-accent);
+  color: #fff;
+  background: var(--ui-accent);
+}
+.ds-button--secondary[aria-busy="true"],
+.ds-button--ghost[aria-busy="true"],
+.ds-icon-button[aria-busy="true"] {
+  border-color: var(--ui-border-strong);
+  color: var(--ui-text);
+  background: var(--ui-control);
+}
+.ds-button--danger[aria-busy="true"] {
+  border-color: var(--ui-danger);
+  color: var(--ui-danger);
+  background: var(--ui-control);
 }
 
 /* Panels */

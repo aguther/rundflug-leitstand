@@ -919,6 +919,23 @@ export class EventCoordinator extends DurableObject<Env> {
         const requiredFlightGroupCount = splitPlan.slotSizes.length;
 
         const normalizedCodes = command.payload.publicTicketCodes.map(assertPublicTicketCode);
+        const normalizedGroupCode = assertPublicTicketCode(
+          command.payload.publicGroupCode ?? normalizedCodes[0] ?? "",
+        );
+        if (
+          command.payload.publicGroupCode !== undefined &&
+          normalizedCodes.includes(normalizedGroupCode)
+        ) {
+          return json(
+            {
+              error: {
+                code: "DUPLICATE_GROUP_CODE",
+                message: "Gruppen- und interne Ticketcodes müssen verschieden sein.",
+              },
+            },
+            { status: 409 },
+          );
+        }
         if (new Set(normalizedCodes).size !== normalizedCodes.length) {
           return json(
             {
@@ -971,6 +988,26 @@ export class EventCoordinator extends DurableObject<Env> {
           );
         }
         const hashes = await Promise.all(normalizedCodes.map(sha256Hex));
+        const groupCodeHash = await sha256Hex(normalizedGroupCode);
+        const existingPublicCode = await this.env.DB.prepare(
+          `SELECT 1 AS found FROM ticket_groups WHERE public_status_code_hash = ?1
+           UNION ALL
+           SELECT 1 AS found FROM tickets WHERE public_code_hash = ?1
+           LIMIT 1`,
+        )
+          .bind(groupCodeHash)
+          .first<{ found: number }>();
+        if (existingPublicCode) {
+          return json(
+            {
+              error: {
+                code: "DUPLICATE_GROUP_CODE",
+                message: "Der öffentliche Gruppencode wurde bereits verwendet.",
+              },
+            },
+            { status: 409 },
+          );
+        }
         const queueRow = await this.env.DB.prepare(
           `SELECT COALESCE(MAX(tg.queue_sequence), 0) + 1 AS next_sequence
              FROM ticket_groups tg
@@ -1019,8 +1056,8 @@ export class EventCoordinator extends DurableObject<Env> {
           ).bind(nextVersion, now, command.eventId, current.version),
           this.env.DB.prepare(`INSERT INTO ticket_groups
             (id, operation_day_id, product_id, queue_sequence, communication_number, standby,
-             status, sold_at, version)
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'QUEUED', ?7, 0)`).bind(
+             status, sold_at, version, public_status_code_hash, public_status_code)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'QUEUED', ?7, 0, ?8, ?9)`).bind(
             ticketGroupId,
             command.eventId,
             product.id,
@@ -1028,6 +1065,8 @@ export class EventCoordinator extends DurableObject<Env> {
             ticketCommunicationRow?.next_number ?? 101,
             command.payload.standby ? 1 : 0,
             now,
+            groupCodeHash,
+            normalizedGroupCode,
           ),
           ...slots.flatMap((slot) => [
             this.env.DB.prepare(`INSERT INTO flight_groups
@@ -4573,8 +4612,8 @@ export class EventCoordinator extends DurableObject<Env> {
             this.env.DB.prepare(
               `INSERT INTO ticket_groups
                 (id, operation_day_id, product_id, queue_sequence, communication_number, standby,
-                 status, sold_at, version)
-               VALUES (?1, ?2, ?3, ?4, ?5, 0, 'QUEUED', ?6, 0)`,
+                 status, sold_at, version, public_status_code_hash)
+               VALUES (?1, ?2, ?3, ?4, ?5, 0, 'QUEUED', ?6, 0, ?7)`,
             ).bind(
               ticketGroupId,
               command.eventId,
@@ -4582,6 +4621,7 @@ export class EventCoordinator extends DurableObject<Env> {
               queueSequence,
               nextTicketCommunication,
               entry.original_occurred_at,
+              payload.publicGroupCodeHash ?? payload.publicTicketCodeHashes[0],
             ),
             this.env.DB.prepare(
               `INSERT INTO flight_groups
@@ -5100,6 +5140,12 @@ export class EventCoordinator extends DurableObject<Env> {
           entry.type === "PAPER_SALE"
             ? await Promise.all(entry.payload.publicTicketCodes.map(sha256Hex))
             : [];
+        const groupCodeHash =
+          entry.type === "PAPER_SALE"
+            ? await sha256Hex(
+                entry.payload.publicGroupCode ?? entry.payload.publicTicketCodes[0] ?? "",
+              )
+            : undefined;
         return {
           entry,
           ticketKeys,
@@ -5107,6 +5153,7 @@ export class EventCoordinator extends DurableObject<Env> {
             entry.type === "PAPER_SALE"
               ? {
                   productId: entry.payload.productId,
+                  publicGroupCodeHash: groupCodeHash,
                   publicTicketCodeHashes: ticketKeys,
                   paymentStatus: entry.payload.paymentStatus,
                   paymentMethod: entry.payload.paymentMethod,

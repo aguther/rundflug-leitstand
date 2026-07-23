@@ -13,6 +13,8 @@ function row({
   offblock,
   communicationNumber,
   productCode = "RN",
+  flightGroupNumber,
+  goToGate = false,
   queue = null,
 }: {
   id: string;
@@ -21,6 +23,8 @@ function row({
   offblock?: string;
   communicationNumber?: number;
   productCode?: string;
+  flightGroupNumber?: number;
+  goToGate?: boolean;
   queue?: TicketRow["queue"];
 }): TicketRow {
   return {
@@ -32,12 +36,14 @@ function row({
     },
     rotation: {
       id: `rotation-${id}`,
+      communicationNumber: flightGroupNumber ?? Number(id),
       productCode,
       productName: product,
       status: "IN_FLIGHT",
       aircraftRegistration: `D-E00${id}`,
       predictedLowerMinutes: Number(id) * 10,
       predictedUpperMinutes: Number(id) * 10 + 5,
+      precalledAt: goToGate ? "2026-07-22T08:00:00.000Z" : null,
       timeline: { actual: { departureAt: offblock } },
     },
     queue,
@@ -75,6 +81,30 @@ describe("sold ticket sorting", () => {
     ).toBeLessThan(0);
     expect(
       compareTicketRows(first, second, { key: "offblock", direction: "ascending" }),
+    ).toBeLessThan(0);
+  });
+
+  it("sorts the separate flight-group and GoToGate-Aktiv columns", () => {
+    const inactive = row({
+      id: "1",
+      people: 2,
+      product: "Panorama",
+      flightGroupNumber: 104,
+    });
+    const active = row({
+      id: "2",
+      people: 2,
+      product: "Panorama",
+      flightGroupNumber: 103,
+      goToGate: true,
+    });
+    active.rotation.status = "DRAFT";
+    inactive.rotation.status = "DRAFT";
+    expect(
+      compareTicketRows(active, inactive, { key: "flightGroup", direction: "ascending" }),
+    ).toBeLessThan(0);
+    expect(
+      compareTicketRows(inactive, active, { key: "goToGate", direction: "ascending" }),
     ).toBeLessThan(0);
   });
 

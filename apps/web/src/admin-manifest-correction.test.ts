@@ -42,6 +42,8 @@ function rotation(
     estimatedPassengerPayloadKg: null,
     predictedLowerMinutes: 5,
     predictedUpperMinutes: 15,
+    boardingWindowLowerAt: null,
+    boardingWindowUpperAt: null,
     calledAt: null,
     deferralCount: 0,
     operationalNote: "",

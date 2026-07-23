@@ -1,0 +1,32 @@
+version: 1.8.0
+requirements:
+  - id: V18-REL-010
+    requirement: Repository und Laufzeit verwenden konsistent Release 1.8.0.
+    status: implemented
+  - id: V18-BSY-010
+    requirement: Der auslösende asynchrone Button zeigt den größenstabilen zugänglichen Busy Indicator; andere gesperrte Buttons behalten ihren Inhalt.
+    status: implemented
+  - id: V18-TIM-010
+    requirement: Kasse, Flight Line, FIDS und öffentliche Statusseiten zeigen prognostizierte Zeitfenster als absolute Veranstaltungszeiten.
+    status: implemented
+  - id: V18-CAS-010
+    requirement: Kassenliste und Detail entsprechen dem freigegebenen Delta mit Fluggruppenzeilen, Phasensymbolen, GoToGate-Aktiv, absolutem Fenster und Ticket drucken.
+    status: implemented
+  - id: V18-FLT-010
+    requirement: Verkaufte Tickets in Flight Line verwenden die verbindliche dreizehnspaltige Reihenfolge mit getrennten G- und F-Kennungen.
+    status: implemented
+  - id: V18-GRP-010
+    requirement: Eine Buchungsgruppe besitzt genau einen öffentlichen Gruppen-QR-Code und einen aggregierten Status für alle Teilflüge.
+    status: implemented
+  - id: V18-API-010
+    requirement: Verträge liefern ISO-Zeitfenster und Zeitzone; Gruppenroute und Legacy-Ticketroute bleiben parallel verfügbar.
+    status: implemented
+  - id: V18-DAT-010
+    requirement: Migration 0042 speichert Gruppencode und Push-Zuordnung geschützt, füllt Bestände kompatibel und hält Codes aus Audit und Outbox.
+    status: implemented
+  - id: V18-OPS-010
+    requirement: ADR und Migrationsnotiz dokumentieren Rückwärtskompatibilität und Wiederherstellung.
+    status: implemented
+  - id: V18-QA-010
+    requirement: Automatisierte und visuelle Abnahme deckt Busy, Zeitfenster, Tabellen, Gruppendruck, Splitstatus, Push, Legacy und Geheimhaltung ab.
+    status: implemented

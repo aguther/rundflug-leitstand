@@ -135,6 +135,8 @@ export function AdminView() {
   const [adminPinDialog, setAdminPinDialog] = useState<"unlock" | "action" | null>(null);
   const [adminPinError, setAdminPinError] = useState<string | null>(null);
   const [adminPinBusy, setAdminPinBusy] = useState(false);
+  const [busyActionKey, setBusyActionKey] = useState<string | null>(null);
+  const [logoutBusy, setLogoutBusy] = useState(false);
   const pendingAdminActionRef = useRef<(() => Promise<void>) | null>(null);
   const adminPinInputRef = useRef<HTMLInputElement>(null);
   const [masterEditorOpen, setMasterEditorOpen] = useState(false);
@@ -150,6 +152,25 @@ export function AdminView() {
   const [pendingMasterDelete, setPendingMasterDelete] = useState<MasterDataDeleteTarget | null>(
     null,
   );
+  async function runBusyAction(key: string, action: () => Promise<void>) {
+    if (busyActionKey) return;
+    setBusyActionKey(key);
+    try {
+      await action();
+    } finally {
+      setBusyActionKey(null);
+    }
+  }
+
+  async function logoutAndReload() {
+    setLogoutBusy(true);
+    try {
+      await logout();
+      window.location.reload();
+    } finally {
+      setLogoutBusy(false);
+    }
+  }
   const [saleClosesAt, setSaleClosesAt] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   useActionMessageBridge(message, setMessage);
@@ -544,7 +565,7 @@ export function AdminView() {
     pendingAdminActionRef.current = null;
   }
 
-  function requestAdminAction(action: () => Promise<void>) {
+  function requestAdminAction(action: () => Promise<void>): void | Promise<void> {
     if (!isAdministrator) {
       setMessage("Für diese Änderung wird ein Administrationskonto benötigt.");
       return;
@@ -553,8 +574,7 @@ export function AdminView() {
       session?.account.role === "ADMIN" ||
       (adminModeUnlocked && adminPinRef.current.length >= 4)
     ) {
-      void action();
-      return;
+      return action();
     }
     pendingAdminActionRef.current = action;
     setAdminPin("");
@@ -1441,33 +1461,35 @@ export function AdminView() {
       return;
     }
     if (!valid) return;
-    requestAdminAction(async () => {
-      if (action === "gate") await saveGate();
-      if (action === "resource-group") await saveResourceGroup();
-      if (action === "aircraft") await saveAircraft();
-      if (action === "assignment") await assignAircraft();
-      if (action === "product") await saveProduct();
-      if (action === "pilot") {
-        const existing = board?.pilots.find((pilot) => pilot.id === pilotEditorId);
-        await upsertPilot(
-          pilotEditorId === "new" ? crypto.randomUUID() : pilotEditorId,
-          pilotCode,
-          pilotNote,
-          existing?.active ?? true,
-        );
-      }
-      if (action === "pilot-toggle") {
-        const existing = board?.pilots.find((pilot) => pilot.id === pilotEditorId);
-        if (existing) {
+    requestAdminAction(() =>
+      runBusyAction(`master-${action}`, async () => {
+        if (action === "gate") await saveGate();
+        if (action === "resource-group") await saveResourceGroup();
+        if (action === "aircraft") await saveAircraft();
+        if (action === "assignment") await assignAircraft();
+        if (action === "product") await saveProduct();
+        if (action === "pilot") {
+          const existing = board?.pilots.find((pilot) => pilot.id === pilotEditorId);
           await upsertPilot(
-            existing.id,
-            existing.operationalCode,
-            existing.operationalNote,
-            !existing.active,
+            pilotEditorId === "new" ? crypto.randomUUID() : pilotEditorId,
+            pilotCode,
+            pilotNote,
+            existing?.active ?? true,
           );
         }
-      }
-    });
+        if (action === "pilot-toggle") {
+          const existing = board?.pilots.find((pilot) => pilot.id === pilotEditorId);
+          if (existing) {
+            await upsertPilot(
+              existing.id,
+              existing.operationalCode,
+              existing.operationalNote,
+              !existing.active,
+            );
+          }
+        }
+      }),
+    );
   }
 
   function requestProductSave() {
@@ -1995,11 +2017,12 @@ export function AdminView() {
               </span>
             </div>
             {isAdministrator ? (
-              <button
+              <Button
+                busy={session?.account.role === "ADMIN" && logoutBusy}
                 className="secondary-action"
                 onClick={() => {
                   if (session?.account.role === "ADMIN") {
-                    void logout().then(() => window.location.reload());
+                    void logoutAndReload();
                   } else if (adminModeUnlocked) lockAdminMode();
                   else requestAdminModeUnlock();
                 }}
@@ -2010,26 +2033,26 @@ export function AdminView() {
                   : adminModeUnlocked
                     ? "Bearbeitungsmodus sperren"
                     : "Bearbeitungsmodus entsperren"}
-              </button>
+              </Button>
             ) : (
               <div className="secondary-actions admin-recovery-actions">
-                <button
-                  aria-busy={refreshing}
+                <Button
+                  busy={refreshing}
                   className="secondary-action"
-                  disabled={refreshing}
                   onClick={() => void refresh()}
                   type="button"
                 >
-                  {refreshing ? "Betriebsstand wird geladen …" : "Erneut laden"}
-                </button>
-                <button
+                  Erneut laden
+                </Button>
+                <Button
+                  busy={logoutBusy}
                   className="secondary-action"
                   disabled={refreshing}
-                  onClick={() => void logout().then(() => window.location.reload())}
+                  onClick={() => void logoutAndReload()}
                   type="button"
                 >
                   Mit Administrationskonto anmelden
-                </button>
+                </Button>
               </div>
             )}
             {!isAdministrator ? (
@@ -2177,7 +2200,8 @@ export function AdminView() {
                 ? "Übernommen werden Parameter, Gates, Ressourcengruppen, Produkte, Flugzeugzuordnungen und Piloten-IDs. Tickets, Gruppen, Umläufe und Flugdaten beginnen leer; Verkäufe bleiben zunächst gesperrt."
                 : "Nur Veranstaltungsdaten, Grundeinstellungen und das erste Administrationskonto werden angelegt. Gates, Ressourcengruppen, Produkte, Flugzeugzuordnungen, Piloten-IDs und alle Betriebsdaten beginnen leer."}
             </p>
-            <button
+            <Button
+              busy={busyActionKey === "create-event"}
               type="button"
               disabled={
                 !isAdministrator ||
@@ -2187,10 +2211,10 @@ export function AdminView() {
                 !newEventDate ||
                 newEventAerodrome.trim().length < 2
               }
-              onClick={() => void createEventFromTemplate()}
+              onClick={() => void runBusyAction("create-event", createEventFromTemplate)}
             >
               Sicheren Neustart anlegen
-            </button>
+            </Button>
           </section>
           <div className="event-setup-v15" hidden={adminArea !== "setup"}>
             <Panel className="event-setup-details" padding="compact">
@@ -2198,7 +2222,12 @@ export function AdminView() {
                 actions={
                   <Button
                     disabled={!isAdministrator || !operationsEndAt}
-                    onClick={() => requestAdminAction(saveEventParameters)}
+                    busy={busyActionKey === "event-parameters"}
+                    onClick={() =>
+                      requestAdminAction(() =>
+                        runBusyAction("event-parameters", saveEventParameters),
+                      )
+                    }
                     size="compact"
                     variant="primary"
                   >
@@ -2261,14 +2290,20 @@ export function AdminView() {
                 </Field>
                 <Button
                   disabled={!eventLogoFile || !isAdministrator}
-                  onClick={() => requestAdminAction(saveEventLogo)}
+                  busy={busyActionKey === "event-logo"}
+                  onClick={() =>
+                    requestAdminAction(() => runBusyAction("event-logo", saveEventLogo))
+                  }
                   size="compact"
                 >
                   <Upload aria-hidden="true" /> Logo hochladen
                 </Button>
                 <Button
                   disabled={!isAdministrator}
-                  onClick={() => requestAdminAction(clearEventLogo)}
+                  busy={busyActionKey === "clear-event-logo"}
+                  onClick={() =>
+                    requestAdminAction(() => runBusyAction("clear-event-logo", clearEventLogo))
+                  }
                   size="compact"
                   variant="danger"
                 >
@@ -2507,7 +2542,12 @@ export function AdminView() {
                         <td>
                           <Button
                             aria-label={`${entry.name} löschen`}
-                            onClick={() => void removeEvent(entry.eventId, entry.name)}
+                            busy={busyActionKey === `delete-event-${entry.eventId}`}
+                            onClick={() =>
+                              void runBusyAction(`delete-event-${entry.eventId}`, () =>
+                                removeEvent(entry.eventId, entry.name),
+                              )
+                            }
                             size="compact"
                             variant="danger"
                           >
@@ -3122,14 +3162,15 @@ export function AdminView() {
                     Die Gate-Bezeichnung muss mindestens 2 Zeichen lang sein.
                   </ValidationHint>
                 ) : null}
-                <button
+                <Button
+                  busy={busyActionKey === "master-gate"}
                   className="primary-action"
                   disabled={!isAdministrator}
                   onClick={() => requestMasterSave("gate", gateLabel.trim().length >= 2)}
                   type="button"
                 >
                   Gate speichern
-                </button>
+                </Button>
                 {gateEditorId !== "new" ? (
                   <div className="master-delete-zone">
                     <div>
@@ -3313,14 +3354,15 @@ export function AdminView() {
                   <button onClick={() => setMasterEditorOpen(false)} type="button">
                     Abbrechen
                   </button>
-                  <button
+                  <Button
+                    busy={busyActionKey === "master-product"}
                     className="primary-action"
                     disabled={!isAdministrator}
                     onClick={requestProductSave}
                     type="button"
                   >
                     <span>Produkt speichern</span>
-                  </button>
+                  </Button>
                 </div>
                 {productEditorId !== "new" ? (
                   <div className="master-delete-zone">
@@ -3498,7 +3540,8 @@ export function AdminView() {
                     angegeben werden.
                   </ValidationHint>
                 ) : null}
-                <button
+                <Button
+                  busy={busyActionKey === "master-resource-group"}
                   className="primary-action"
                   disabled={!isAdministrator}
                   onClick={() =>
@@ -3512,7 +3555,7 @@ export function AdminView() {
                   type="button"
                 >
                   Ressourcengruppe speichern
-                </button>
+                </Button>
                 {resourceEditorId !== "new" ? (
                   <div className="master-delete-zone">
                     <div>
@@ -3585,7 +3628,8 @@ export function AdminView() {
                     Kennzeichen und Flugzeugtyp müssen mindestens 2 Zeichen lang sein.
                   </ValidationHint>
                 ) : null}
-                <button
+                <Button
+                  busy={busyActionKey === "master-aircraft"}
                   className="primary-action"
                   disabled={!isAdministrator}
                   onClick={() =>
@@ -3597,7 +3641,7 @@ export function AdminView() {
                   type="button"
                 >
                   Flugzeug speichern
-                </button>
+                </Button>
                 {aircraftEditorId !== "new" ? (
                   <div className="master-delete-zone">
                     <div>
@@ -3663,7 +3707,8 @@ export function AdminView() {
                     Flugzeug und neue Ressourcengruppe müssen ausgewählt werden.
                   </ValidationHint>
                 ) : null}
-                <button
+                <Button
+                  busy={busyActionKey === "master-assignment"}
                   className="primary-action"
                   disabled={!isAdministrator}
                   onClick={() =>
@@ -3675,7 +3720,7 @@ export function AdminView() {
                   type="button"
                 >
                   Zuordnung ändern
-                </button>
+                </Button>
                 {assignmentAircraftId &&
                 board?.aircraft.find((entry) => entry.id === assignmentAircraftId)
                   ?.resourceGroupId ? (
@@ -3752,19 +3797,21 @@ export function AdminView() {
               </ValidationHint>
             ) : null}
             <div className="editor-actions">
-              <button
+              <Button
+                busy={busyActionKey === "master-pilot"}
                 className="primary-action"
                 disabled={!isAdministrator}
                 onClick={() => requestMasterSave("pilot", /^[A-Z0-9-]{2,12}$/.test(pilotCode))}
                 type="button"
               >
                 {pilotEditorId === "new" ? "Pilotencode anlegen" : "Änderungen speichern"}
-              </button>
+              </Button>
               <button onClick={() => setMasterEditorOpen(false)} type="button">
                 Abbrechen
               </button>
               {pilotEditorId !== "new" ? (
-                <button
+                <Button
+                  busy={busyActionKey === "master-pilot-toggle"}
                   disabled={!isAdministrator}
                   onClick={() => requestMasterSave("pilot-toggle", true)}
                   type="button"
@@ -3772,7 +3819,7 @@ export function AdminView() {
                   {board?.pilots.find((pilot) => pilot.id === pilotEditorId)?.active
                     ? "Deaktivieren"
                     : "Aktivieren"}
-                </button>
+                </Button>
               ) : null}
             </div>
             {pilotEditorId !== "new" ? (
@@ -3808,23 +3855,33 @@ export function AdminView() {
               />
             </label>
             {!board?.event.emergencyMode ? (
-              <button
+              <Button
+                busy={busyActionKey === "emergency-trigger"}
                 className="danger-action"
-                disabled={reason.trim().length < 3}
-                onClick={() => emergency("TRIGGER_EMERGENCY")}
+                disabled={reason.trim().length < 3 || busyActionKey !== null}
+                onClick={() =>
+                  runBusyAction("emergency-trigger", () => emergency("TRIGGER_EMERGENCY"))
+                }
                 type="button"
+                variant="danger"
               >
                 Not-Halt auslösen
-              </button>
+              </Button>
             ) : (
-              <button
+              <Button
+                busy={busyActionKey === "emergency-clear"}
                 className="danger-action"
-                disabled={!isAdministrator || reason.trim().length < 3}
-                onClick={() => requestAdminAction(() => emergency("CLEAR_EMERGENCY"))}
+                disabled={!isAdministrator || reason.trim().length < 3 || busyActionKey !== null}
+                onClick={() =>
+                  requestAdminAction(() =>
+                    runBusyAction("emergency-clear", () => emergency("CLEAR_EMERGENCY")),
+                  )
+                }
                 type="button"
+                variant="danger"
               >
                 Notfallmodus aufheben
-              </button>
+              </Button>
             )}
           </section>
           <section className="admin-section" hidden={adminArea !== "evaluation"}>
@@ -3933,19 +3990,26 @@ export function AdminView() {
                 </div>
               </div>
             ) : null}
-            <button
+            <Button
+              busy={busyActionKey === "manifest-correction"}
               className="primary-action manifest-correction-action"
               disabled={
+                busyActionKey !== null ||
                 !isAdministrator ||
                 !manifestTicketGroupId ||
                 !manifestTargetRotationId ||
                 manifestCorrectionReason.trim().length < 10
               }
-              onClick={() => requestAdminAction(correctRotationManifest)}
+              onClick={() =>
+                requestAdminAction(() =>
+                  runBusyAction("manifest-correction", correctRotationManifest),
+                )
+              }
               type="button"
+              variant="primary"
             >
               Besetzung protokolliert korrigieren
-            </button>
+            </Button>
             {manifestCandidates.length === 0 ? (
               <p className="help-text">Aktuell ist keine Korrektur nach Flugstart erforderlich.</p>
             ) : null}
@@ -3965,24 +4029,41 @@ export function AdminView() {
               />
             </label>
             <div className="secondary-actions notice-actions">
-              <button onClick={() => setNotice()} type="button">
+              <Button
+                busy={busyActionKey === "notice-event"}
+                disabled={busyActionKey !== null && busyActionKey !== "notice-event"}
+                onClick={() => runBusyAction("notice-event", () => setNotice())}
+                type="button"
+              >
                 Für gesamte Veranstaltung veröffentlichen
-              </button>
+              </Button>
               {resourceGroups.map((group) => (
-                <button key={group.id} onClick={() => setNotice(group.id)} type="button">
+                <Button
+                  busy={busyActionKey === `notice-${group.id}`}
+                  disabled={busyActionKey !== null && busyActionKey !== `notice-${group.id}`}
+                  key={group.id}
+                  onClick={() => runBusyAction(`notice-${group.id}`, () => setNotice(group.id))}
+                  type="button"
+                >
                   Für {group.name} veröffentlichen
-                </button>
+                </Button>
               ))}
             </div>
-            <button
+            <Button
+              busy={busyActionKey === "event-interruption"}
               className="interrupt-action"
-              onClick={() => setEventInterruption(!(board?.event.operationalInterrupted ?? false))}
+              disabled={busyActionKey !== null && busyActionKey !== "event-interruption"}
+              onClick={() =>
+                runBusyAction("event-interruption", () =>
+                  setEventInterruption(!(board?.event.operationalInterrupted ?? false)),
+                )
+              }
               type="button"
             >
               {board?.event.operationalInterrupted
                 ? "Veranstaltungsbetrieb fortsetzen"
                 : "Veranstaltungsbetrieb unterbrechen"}
-            </button>
+            </Button>
             <p>Hinweise stoppen keinen Flugbetrieb. Unterbrechungen werden separat gesetzt.</p>
           </section>
           <section className="admin-section" hidden={adminArea !== "evaluation"}>
@@ -4016,28 +4097,34 @@ export function AdminView() {
                     <span>Prognose {predictionQualityLabel[product.predictionQuality]}</span>
                   </div>
                   <div className="secondary-actions">
-                    <button
-                      disabled={!isAdministrator}
+                    <Button
+                      busy={busyActionKey === `product-${product.id}-sales`}
+                      disabled={!isAdministrator || busyActionKey !== null}
                       onClick={() =>
                         requestAdminAction(() =>
-                          configureProductSales(product, !product.saleEnabled),
+                          runBusyAction(`product-${product.id}-sales`, () =>
+                            configureProductSales(product, !product.saleEnabled),
+                          ),
                         )
                       }
                       type="button"
                     >
                       {product.saleEnabled ? "Verkauf sperren" : "Verkauf freigeben"}
-                    </button>
-                    <button
-                      disabled={!isAdministrator || !saleClosesAt}
+                    </Button>
+                    <Button
+                      busy={busyActionKey === `product-${product.id}-closing`}
+                      disabled={!isAdministrator || !saleClosesAt || busyActionKey !== null}
                       onClick={() =>
                         requestAdminAction(() =>
-                          configureProductSales(product, product.saleEnabled, true),
+                          runBusyAction(`product-${product.id}-closing`, () =>
+                            configureProductSales(product, product.saleEnabled, true),
+                          ),
                         )
                       }
                       type="button"
                     >
                       Verkaufsschluss setzen
-                    </button>
+                    </Button>
                   </div>
                 </div>
               ))}
@@ -4070,60 +4157,97 @@ export function AdminView() {
                     ) : null}
                   </div>
                   <div className="secondary-actions fleet-actions">
-                    <button
+                    <Button
+                      busy={busyActionKey === `aircraft-${aircraft.id}-available`}
                       disabled={
+                        busyActionKey !== null ||
                         !["REFUELING", "PAUSED", "INACTIVE", "INTERRUPTED"].includes(
                           aircraft.operationalState,
                         )
                       }
-                      onClick={() => setAircraftState(aircraft.id, "AVAILABLE")}
+                      onClick={() =>
+                        runBusyAction(`aircraft-${aircraft.id}-available`, () =>
+                          setAircraftState(aircraft.id, "AVAILABLE"),
+                        )
+                      }
                       type="button"
                     >
                       Verfügbar
-                    </button>
-                    <button
-                      disabled={aircraft.operationalState !== "AVAILABLE"}
-                      onClick={() => setAircraftState(aircraft.id, "PAUSED")}
+                    </Button>
+                    <Button
+                      busy={busyActionKey === `aircraft-${aircraft.id}-paused`}
+                      disabled={busyActionKey !== null || aircraft.operationalState !== "AVAILABLE"}
+                      onClick={() =>
+                        runBusyAction(`aircraft-${aircraft.id}-paused`, () =>
+                          setAircraftState(aircraft.id, "PAUSED"),
+                        )
+                      }
                       type="button"
                     >
                       Pause
-                    </button>
-                    <button
-                      disabled={aircraft.operationalState !== "AVAILABLE"}
-                      onClick={() => setAircraftState(aircraft.id, "REFUELING")}
+                    </Button>
+                    <Button
+                      busy={busyActionKey === `aircraft-${aircraft.id}-refueling`}
+                      disabled={busyActionKey !== null || aircraft.operationalState !== "AVAILABLE"}
+                      onClick={() =>
+                        runBusyAction(`aircraft-${aircraft.id}-refueling`, () =>
+                          setAircraftState(aircraft.id, "REFUELING"),
+                        )
+                      }
                       type="button"
                     >
                       Tanken aktuell
-                    </button>
-                    <button
-                      disabled={aircraft.operationalState !== "AVAILABLE"}
-                      onClick={() => setAircraftState(aircraft.id, "INACTIVE")}
+                    </Button>
+                    <Button
+                      busy={busyActionKey === `aircraft-${aircraft.id}-inactive`}
+                      disabled={busyActionKey !== null || aircraft.operationalState !== "AVAILABLE"}
+                      onClick={() =>
+                        runBusyAction(`aircraft-${aircraft.id}-inactive`, () =>
+                          setAircraftState(aircraft.id, "INACTIVE"),
+                        )
+                      }
                       type="button"
                     >
                       Inaktiv
-                    </button>
-                    <button
-                      disabled={aircraft.operationalState !== "AVAILABLE"}
-                      onClick={() => setAircraftState(aircraft.id, "INTERRUPTED")}
+                    </Button>
+                    <Button
+                      busy={busyActionKey === `aircraft-${aircraft.id}-interrupted`}
+                      disabled={busyActionKey !== null || aircraft.operationalState !== "AVAILABLE"}
+                      onClick={() =>
+                        runBusyAction(`aircraft-${aircraft.id}-interrupted`, () =>
+                          setAircraftState(aircraft.id, "INTERRUPTED"),
+                        )
+                      }
                       type="button"
                     >
                       Unterbrechen
-                    </button>
-                    <button
-                      onClick={() => scheduleRefuel(aircraft.id, !aircraft.refuelPlanned)}
+                    </Button>
+                    <Button
+                      busy={busyActionKey === `aircraft-${aircraft.id}-schedule-refuel`}
+                      disabled={busyActionKey !== null}
+                      onClick={() =>
+                        runBusyAction(`aircraft-${aircraft.id}-schedule-refuel`, () =>
+                          scheduleRefuel(aircraft.id, !aircraft.refuelPlanned),
+                        )
+                      }
                       type="button"
                     >
                       {aircraft.refuelPlanned ? "Vormerkung aufheben" : "Tanken vormerken"}
-                    </button>
-                    <button
-                      disabled={!isAdministrator}
+                    </Button>
+                    <Button
+                      busy={busyActionKey === `aircraft-${aircraft.id}-threshold`}
+                      disabled={!isAdministrator || busyActionKey !== null}
                       onClick={() =>
-                        requestAdminAction(() => configureRefuelThreshold(aircraft.id))
+                        requestAdminAction(() =>
+                          runBusyAction(`aircraft-${aircraft.id}-threshold`, () =>
+                            configureRefuelThreshold(aircraft.id),
+                          ),
+                        )
                       }
                       type="button"
                     >
                       Schwelle {refuelThreshold} setzen
-                    </button>
+                    </Button>
                   </div>
                 </div>
               ))}
@@ -4156,13 +4280,18 @@ export function AdminView() {
                       ? `Aktuell Fluggruppe ${pilot.currentCommunicationNumber}`
                       : "Aktuell keinem Umlauf zugeordnet"}
                   </span>
-                  <button
-                    disabled={!pilot.active}
-                    onClick={() => setPilotPause(pilot.id, !pilot.paused)}
+                  <Button
+                    busy={busyActionKey === `pilot-${pilot.id}-pause`}
+                    disabled={!pilot.active || busyActionKey !== null}
+                    onClick={() =>
+                      runBusyAction(`pilot-${pilot.id}-pause`, () =>
+                        setPilotPause(pilot.id, !pilot.paused),
+                      )
+                    }
                     type="button"
                   >
                     {pilot.paused ? "Pause beenden" : "Pause starten"}
-                  </button>
+                  </Button>
                 </div>
               ))}
             </div>
@@ -4176,22 +4305,54 @@ export function AdminView() {
                   <span>{group.status}</span>
                 </div>
                 <div className="secondary-actions">
-                  <button onClick={() => setResourceStatus(group.id, "PAUSED")} type="button">
+                  <Button
+                    busy={busyActionKey === `resource-${group.id}-paused`}
+                    disabled={busyActionKey !== null}
+                    onClick={() =>
+                      runBusyAction(`resource-${group.id}-paused`, () =>
+                        setResourceStatus(group.id, "PAUSED"),
+                      )
+                    }
+                    type="button"
+                  >
                     Pausieren
-                  </button>
-                  <button onClick={() => setResourceStatus(group.id, "INTERRUPTED")} type="button">
+                  </Button>
+                  <Button
+                    busy={busyActionKey === `resource-${group.id}-interrupted`}
+                    disabled={busyActionKey !== null}
+                    onClick={() =>
+                      runBusyAction(`resource-${group.id}-interrupted`, () =>
+                        setResourceStatus(group.id, "INTERRUPTED"),
+                      )
+                    }
+                    type="button"
+                  >
                     Unterbrechen
-                  </button>
-                  <button onClick={() => setResourceStatus(group.id, "ACTIVE")} type="button">
+                  </Button>
+                  <Button
+                    busy={busyActionKey === `resource-${group.id}-active`}
+                    disabled={busyActionKey !== null}
+                    onClick={() =>
+                      runBusyAction(`resource-${group.id}-active`, () =>
+                        setResourceStatus(group.id, "ACTIVE"),
+                      )
+                    }
+                    type="button"
+                  >
                     Aktivieren
-                  </button>
-                  <button
-                    disabled={group.status === "ENDED"}
-                    onClick={() => setResourceStatus(group.id, "ENDED")}
+                  </Button>
+                  <Button
+                    busy={busyActionKey === `resource-${group.id}-ended`}
+                    disabled={group.status === "ENDED" || busyActionKey !== null}
+                    onClick={() =>
+                      runBusyAction(`resource-${group.id}-ended`, () =>
+                        setResourceStatus(group.id, "ENDED"),
+                      )
+                    }
                     type="button"
                   >
                     Beenden
-                  </button>
+                  </Button>
                 </div>
               </div>
             ))}
@@ -4200,18 +4361,34 @@ export function AdminView() {
             <div className="section-heading">
               <h2>Audit und Tagesabschluss</h2>
               <div className="report-actions">
-                <button onClick={exportDailyReport} type="button">
+                <Button
+                  busy={busyActionKey === "export-daily-csv"}
+                  onClick={() => void runBusyAction("export-daily-csv", exportDailyReport)}
+                  type="button"
+                >
                   CSV-Tagesbericht
-                </button>
-                <button onClick={exportDailyPdf} type="button">
+                </Button>
+                <Button
+                  busy={busyActionKey === "export-daily-pdf"}
+                  onClick={() => void runBusyAction("export-daily-pdf", exportDailyPdf)}
+                  type="button"
+                >
                   PDF-Tagesbericht
-                </button>
-                <button onClick={exportRawData} type="button">
+                </Button>
+                <Button
+                  busy={busyActionKey === "export-raw-data"}
+                  onClick={() => void runBusyAction("export-raw-data", exportRawData)}
+                  type="button"
+                >
                   Ticket-Rohdaten CSV
-                </button>
-                <button onClick={exportPerformanceProfile} type="button">
+                </Button>
+                <Button
+                  busy={busyActionKey === "export-performance"}
+                  onClick={() => void runBusyAction("export-performance", exportPerformanceProfile)}
+                  type="button"
+                >
                   Leistungsprofil JSON
-                </button>
+                </Button>
               </div>
             </div>
             <div className="history-tabs" role="tablist" aria-label="Verlaufsansicht">
@@ -4562,13 +4739,18 @@ export function AdminView() {
             )}
             {historyView !== "AUDIT" ? (
               <div className="history-pagination">
-                <button
-                  disabled={historyOffset === 0}
-                  onClick={() => void refreshDetailedHistory(Math.max(0, historyOffset - 50))}
+                <Button
+                  busy={busyActionKey === "history-previous"}
+                  disabled={historyOffset === 0 || busyActionKey !== null}
+                  onClick={() =>
+                    runBusyAction("history-previous", () =>
+                      refreshDetailedHistory(Math.max(0, historyOffset - 50)),
+                    )
+                  }
                   type="button"
                 >
                   Zurück
-                </button>
+                </Button>
                 <span>
                   {historyOffset + 1}–
                   {Math.min(
@@ -4578,18 +4760,22 @@ export function AdminView() {
                   von{" "}
                   {historyView === "OPERATIONS" ? operationalHistory.total : forecastHistory.total}
                 </span>
-                <button
+                <Button
+                  busy={busyActionKey === "history-next"}
                   disabled={
+                    busyActionKey !== null ||
                     historyOffset + 50 >=
-                    (historyView === "OPERATIONS"
-                      ? operationalHistory.total
-                      : forecastHistory.total)
+                      (historyView === "OPERATIONS"
+                        ? operationalHistory.total
+                        : forecastHistory.total)
                   }
-                  onClick={() => void refreshDetailedHistory(historyOffset + 50)}
+                  onClick={() =>
+                    runBusyAction("history-next", () => refreshDetailedHistory(historyOffset + 50))
+                  }
                   type="button"
                 >
                   Weiter
-                </button>
+                </Button>
               </div>
             ) : null}
           </section>
@@ -4653,17 +4839,15 @@ export function AdminView() {
                   <button disabled={adminPinBusy} onClick={closeAdminPinDialog} type="button">
                     Abbrechen
                   </button>
-                  <button
+                  <Button
+                    busy={adminPinBusy}
                     className="primary-action"
-                    disabled={adminPin.length < 4 || adminPinBusy}
+                    disabled={adminPin.length < 4}
                     type="submit"
+                    variant="primary"
                   >
-                    {adminPinBusy
-                      ? "PIN wird geprüft …"
-                      : adminPinDialog === "unlock"
-                        ? "Entsperren"
-                        : "Bestätigen"}
-                  </button>
+                    {adminPinDialog === "unlock" ? "Entsperren" : "Bestätigen"}
+                  </Button>
                 </div>
               </form>
             </div>
@@ -4679,7 +4863,7 @@ export function AdminView() {
                 }}
                 onSubmit={(event) => {
                   event.preventDefault();
-                  void confirmMasterDelete();
+                  void runBusyAction("master-delete", confirmMasterDelete);
                 }}
                 role="dialog"
               >
@@ -4739,7 +4923,8 @@ export function AdminView() {
                   <button onClick={() => setPendingMasterDelete(null)} type="button">
                     Abbrechen
                   </button>
-                  <button
+                  <Button
+                    busy={busyActionKey === "master-delete"}
                     className="danger-action"
                     disabled={
                       board?.event.status !== "PREPARATION" ||
@@ -4747,9 +4932,10 @@ export function AdminView() {
                       adminPin.length < 4
                     }
                     type="submit"
+                    variant="danger"
                   >
                     Endgültig löschen
-                  </button>
+                  </Button>
                 </div>
               </form>
             </div>
@@ -4868,21 +5054,20 @@ export function AdminView() {
                   >
                     Abbrechen
                   </button>
-                  <button
+                  <Button
+                    busy={factoryResetBusy}
                     className="danger-action"
                     disabled={
-                      factoryResetBusy ||
                       factoryResetReason.trim().length < 3 ||
                       factoryResetPin.length < 4 ||
                       factoryResetConfirmation !== "WERKSZUSTAND"
                     }
                     onClick={() => void performFactoryReset()}
                     type="button"
+                    variant="danger"
                   >
-                    {factoryResetBusy
-                      ? "System wird zurückgesetzt …"
-                      : "Alles löschen und neu starten"}
-                  </button>
+                    Alles löschen und neu starten
+                  </Button>
                 </div>
               </form>
             </div>

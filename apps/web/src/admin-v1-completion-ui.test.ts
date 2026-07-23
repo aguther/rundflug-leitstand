@@ -26,7 +26,7 @@ describe("V1 administration completion UI", () => {
     expect(appSource).toContain('type: "CORRECT_ROTATION_MANIFEST"');
     expect(appSource).toContain("Nur Administration");
     expect(appSource).toContain("keine flugbetriebliche oder");
-    expect(appSource).toContain("requestAdminAction(correctRotationManifest)");
+    expect(appSource).toContain('runBusyAction("manifest-correction", correctRotationManifest)');
   });
 
   it("uses account sessions instead of browser device recovery", () => {
@@ -143,8 +143,8 @@ describe("V1 administration completion UI", () => {
   });
 
   it("keeps the manual board refresh touchable and exposes its loading state", () => {
-    expect(appSource).toContain("aria-busy={refreshing}");
-    expect(appSource).toContain("Betriebsstand wird geladen …");
+    expect(appSource).toContain("busy={refreshing}");
+    expect(appSource).toContain("Erneut laden");
     expect(stylesSource).toMatch(
       /\.admin-mode-bar > button \{[\s\S]*pointer-events: auto;[\s\S]*touch-action: manipulation;/,
     );

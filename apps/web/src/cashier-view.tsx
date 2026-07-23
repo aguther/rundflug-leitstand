@@ -1,19 +1,22 @@
-import type {
-  OperationBoard,
-  TicketGroupOperationalStatus,
-  TicketGroupPrintData,
-  TicketSearchResult,
-} from "@rundflug/contracts";
+import type { OperationBoard, TicketGroupPrintData, TicketSearchResult } from "@rundflug/contracts";
 import {
   AlertTriangle,
+  Check,
+  CircleArrowRight,
+  CircleCheck,
   CircleUserRound,
+  Clock3,
   Maximize2,
   Minus,
+  PlaneLanding,
+  PlaneTakeoff,
   Plus,
   Printer,
   RefreshCw,
   Search,
+  Tag,
   Ticket,
+  TicketsPlane,
   Trash2,
   X,
 } from "lucide-react";
@@ -29,7 +32,6 @@ import {
   IconButton,
   PageHeader,
   Panel,
-  StatusPill,
   Tabs,
   TextField,
 } from "./design-system/components";
@@ -56,37 +58,22 @@ import {
 } from "./operation-workspace";
 import { oversizeSplitPreview } from "./operational-exceptions";
 import { useConnectivity } from "./shared/hooks/use-connectivity";
-
-const ticketGroupStatusLabel: Record<TicketGroupOperationalStatus, string> = {
-  QUEUED: "Wartet",
-  PRESENT: "Anwesend",
-  CALLED: "Aufgerufen",
-  BOARDING: "Boarding",
-  IN_FLIGHT: "Im Flug",
-  LANDED: "Gelandet",
-  COMPLETED: "Abgeschlossen",
-  NO_SHOW: "Nicht erschienen",
-  CANCELED: "Storniert",
-  CLARIFICATION: "Klärung erforderlich",
-  MISSING: "Nicht da",
-};
+import { formatAbsoluteTimeWindow } from "./time-window";
 
 function TicketPaper({ compact = false, ticket }: { compact?: boolean; ticket: TicketReceipt }) {
   return (
     <article className={compact ? "ticket-paper ticket-paper-preview" : "ticket-paper"}>
       <strong>{ticket.eventName}</strong>
       <b>{ticket.code}</b>
-      <img src={ticket.qrDataUrl} alt={`QR-Ticket ${ticket.code}`} />
+      <img src={ticket.qrDataUrl} alt={`QR-Code der Gruppe ${ticket.communicationLabel}`} />
       <dl>
         <div>
           <dt>Gruppe:</dt>
           <dd>{ticket.communicationLabel}</dd>
         </div>
         <div>
-          <dt>Ticket:</dt>
-          <dd>
-            {ticket.position} von {ticket.groupSize}
-          </dd>
+          <dt>Personen:</dt>
+          <dd>{ticket.groupSize}</dd>
         </div>
         <div>
           <dt>Produkt:</dt>
@@ -97,7 +84,7 @@ function TicketPaper({ compact = false, ticket }: { compact?: boolean; ticket: T
           <dd>{ticket.gateLabel}</dd>
         </div>
       </dl>
-      <small>QR-Code für aktuellen Status scannen</small>
+      <small>Gruppenstatus über QR-Code öffnen</small>
     </article>
   );
 }
@@ -149,11 +136,11 @@ function QrScanDialog({
         <div className="qr-scan-dialog-content">
           <header>
             <div>
-              <span id="qr-scan-dialog-title">QR-Ticket scannen</span>
+              <span id="qr-scan-dialog-title">Gruppenstatus scannen</span>
               <strong>{ticket.code}</strong>
             </div>
             <button
-              aria-label="QR-Ticket schließen"
+              aria-label="Gruppen-QR-Code schließen"
               onClick={onClose}
               ref={closeButtonRef}
               type="button"
@@ -161,9 +148,12 @@ function QrScanDialog({
               <X aria-hidden="true" size={22} />
             </button>
           </header>
-          <img src={ticket.qrDataUrl} alt={`QR-Ticket ${ticket.code} in Großansicht`} />
+          <img
+            src={ticket.qrDataUrl}
+            alt={`QR-Code der Gruppe ${ticket.communicationLabel} in Großansicht`}
+          />
           <p id="qr-scan-dialog-description">
-            Ticket {ticket.position} von {ticket.groupSize} · {ticket.productName}
+            {ticket.communicationLabel} · {ticket.groupSize} Personen · {ticket.productName}
           </p>
         </div>
       ) : null}
@@ -187,7 +177,7 @@ export function CashierView() {
   });
   const [pendingDraftCount, setPendingDraftCount] = useState(initialDraftQueue.length);
   const [busyProductId, setBusyProductId] = useState<string | null>(null);
-  const [receipt, setReceipt] = useState<TicketReceipt[]>([]);
+  const [receipt, setReceipt] = useState<TicketReceipt | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   useActionMessageBridge(message, setMessage);
   const [lastTicketGroupId, setLastTicketGroupId] = useState<string | null>(null);
@@ -200,8 +190,9 @@ export function CashierView() {
   const [ticketListTab, setTicketListTab] = useState<"ACTIVE" | "CANCELED">("ACTIVE");
   const [ticketListNextCursor, setTicketListNextCursor] = useState<string | null>(null);
   const [ticketListLoading, setTicketListLoading] = useState(false);
-  const [selectedReceiptIndex, setSelectedReceiptIndex] = useState(0);
   const [qrScanOpen, setQrScanOpen] = useState(false);
+  const [printBusy, setPrintBusy] = useState(false);
+  const [manualRefreshBusy, setManualRefreshBusy] = useState(false);
   const ticketListRequestRef = useRef(0);
   const ticketListSentinelRef = useRef<HTMLDivElement | null>(null);
   const printDocumentRef = useRef<HTMLDivElement | null>(null);
@@ -211,6 +202,10 @@ export function CashierView() {
   const selectedTicketGroup = ticketSearchResults.find(
     (entry) => entry.ticketGroupId === lastTicketGroupId,
   );
+  const selectedRotations =
+    board?.rotations.filter((rotation) =>
+      rotation.bookingGroups.some((group) => group.id === lastTicketGroupId),
+    ) ?? [];
   const visibleTicketGroups = ticketSearchResults.filter((entry) =>
     ticketListTab === "CANCELED"
       ? entry.groupStatus === "CANCELED"
@@ -218,27 +213,22 @@ export function CashierView() {
   );
   const currency = (cents: number) =>
     (cents / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
-  async function printableTickets(data: TicketGroupPrintData): Promise<TicketReceipt[]> {
-    return Promise.all(
-      data.tickets.map(async (ticket) => {
-        const statusUrl = `${window.location.origin}/ticket/${encodeURIComponent(ticket.code)}`;
-        return {
-          code: ticket.code,
-          statusUrl,
-          qrDataUrl: await QRCode.toDataURL(statusUrl, {
-            errorCorrectionLevel: "M",
-            margin: 2,
-            width: 768,
-          }),
-          eventName: data.eventName,
-          productName: data.productName,
-          gateLabel: data.gateLabel,
-          communicationLabel: data.communicationLabel,
-          position: ticket.position,
-          groupSize: data.tickets.length,
-        };
+  async function printableTicket(data: TicketGroupPrintData): Promise<TicketReceipt> {
+    const statusUrl = `${window.location.origin}/gruppe/${encodeURIComponent(data.code)}`;
+    return {
+      code: data.code,
+      statusUrl,
+      qrDataUrl: await QRCode.toDataURL(statusUrl, {
+        errorCorrectionLevel: "M",
+        margin: 2,
+        width: 768,
       }),
-    );
+      eventName: data.eventName,
+      productName: data.productName,
+      gateLabel: data.gateLabel,
+      communicationLabel: data.communicationLabel,
+      groupSize: data.groupSize,
+    };
   }
 
   const loadTicketList = useCallback(
@@ -324,13 +314,11 @@ export function CashierView() {
         CASHIER_DEVICE_ID,
         deviceTokenFor(CASHIER_DEVICE_ID),
       );
-      const prepared = await printableTickets(data);
-      if (prepared.length === 0) throw new Error("Ticketdokument enthält keine Tickets.");
+      const prepared = await printableTicket(data);
       setReceipt(prepared);
-      setSelectedReceiptIndex(0);
       return true;
     } catch (reason) {
-      setReceipt([]);
+      setReceipt(null);
       setMessage(
         reason instanceof Error ? reason.message : "Ticketzettel konnten nicht geladen werden.",
       );
@@ -402,6 +390,7 @@ export function CashierView() {
     if (!board || busyProductId) return;
     const saleSplitPreview = oversizeSplitPreview(size, saleProduct.referenceCapacity);
     const codes = Array.from({ length: size }, createTicketCode);
+    const groupCode = createTicketCode();
     setProductId(saleProduct.id);
     setBusyProductId(saleProduct.id);
     try {
@@ -415,6 +404,7 @@ export function CashierView() {
           type: "SELL_TICKET_GROUP",
           payload: {
             productId: saleProduct.id,
+            publicGroupCode: groupCode,
             publicTicketCodes: codes,
             standby: false,
             paymentStatus: "INFORMATIONAL_ONLY",
@@ -464,7 +454,7 @@ export function CashierView() {
         deviceTokenFor(CASHIER_DEVICE_ID),
       );
       setMessage("Verkauf storniert und Kapazität freigegeben.");
-      setReceipt([]);
+      setReceipt(null);
       setCancelReason("");
       setCancelDialogOpen(false);
       setTicketListTab("CANCELED");
@@ -491,11 +481,11 @@ export function CashierView() {
 
   function selectSearchResult(result: TicketSearchResult) {
     setLastTicketGroupId(result.ticketGroupId);
-    setReceipt([]);
+    setReceipt(null);
   }
 
   async function printTicketDocument() {
-    if (receipt.length === 0 || selectedTicketGroup?.groupStatus === "CANCELED") {
+    if (!receipt || selectedTicketGroup?.groupStatus === "CANCELED") {
       setMessage("Für diese Buchungsgruppe steht kein druckbares Ticketdokument bereit.");
       return;
     }
@@ -504,10 +494,10 @@ export function CashierView() {
       setMessage("Ticketdokument konnte nicht vorbereitet werden.");
       return;
     }
+    setPrintBusy(true);
     try {
       const images = Array.from(documentRoot.querySelectorAll("img"));
-      if (images.length !== receipt.length)
-        throw new Error("QR-Codes sind noch nicht vollständig.");
+      if (images.length !== 1) throw new Error("QR-Code ist noch nicht vollständig.");
       await Promise.all(
         images.map(async (image) => {
           if (!image.complete) {
@@ -528,7 +518,61 @@ export function CashierView() {
       setMessage(
         reason instanceof Error ? reason.message : "Ticketdokument konnte nicht gedruckt werden.",
       );
+    } finally {
+      setPrintBusy(false);
     }
+  }
+
+  async function refreshTicketList() {
+    setManualRefreshBusy(true);
+    try {
+      await loadTicketList({ preserveLoaded: true });
+    } finally {
+      setManualRefreshBusy(false);
+    }
+  }
+
+  function rotationStatusIcon(rotation: OperationBoard["rotations"][number]) {
+    const props = { "aria-hidden": true, size: 17 } as const;
+    switch (rotation.status) {
+      case "DRAFT":
+        return <Clock3 {...props} />;
+      case "CALLED":
+        return <TicketsPlane {...props} />;
+      case "IN_FLIGHT":
+        return <PlaneTakeoff {...props} />;
+      case "LANDED":
+        return <PlaneLanding {...props} />;
+      case "COMPLETED":
+        return <CircleCheck {...props} />;
+    }
+  }
+
+  function rotationStatusLabel(status: OperationBoard["rotations"][number]["status"]) {
+    return {
+      DRAFT: "Wartet",
+      CALLED: "Boarding",
+      IN_FLIGHT: "Im Flug",
+      LANDED: "Gelandet",
+      COMPLETED: "Abgeschlossen",
+    }[status];
+  }
+
+  function rotationTimeWindow(rotation: OperationBoard["rotations"][number]) {
+    return formatAbsoluteTimeWindow({
+      lowerAt: rotation.boardingWindowLowerAt,
+      upperAt: rotation.boardingWindowUpperAt,
+      timeZone: board?.event.timeZone ?? "Europe/Berlin",
+      variant: "compact",
+      quality: rotation.timeline.predictionQuality,
+      phase:
+        rotation.status === "CALLED" ||
+        (rotation.status === "DRAFT" && Boolean(rotation.precalledAt))
+          ? "NOW"
+          : rotation.status === "DRAFT"
+            ? "FORECAST"
+            : "FINISHED",
+    });
   }
 
   return (
@@ -607,9 +651,14 @@ export function CashierView() {
                       </small>
                     </span>
                     <span className="cashier-product-metric">
-                      <small>Wartezeit</small>
+                      <small>Zeitfenster</small>
                       <strong>
-                        {entry.estimatedWaitLowerMinutes}–{entry.estimatedWaitUpperMinutes} Min.
+                        {formatAbsoluteTimeWindow({
+                          lowerAt: entry.nextBoardingWindowLowerAt,
+                          upperAt: entry.nextBoardingWindowUpperAt,
+                          timeZone: board.event.timeZone,
+                          quality: entry.predictionQuality,
+                        })}
                       </strong>
                     </span>
                     <span className="cashier-product-metric">
@@ -627,6 +676,8 @@ export function CashierView() {
                       aria-label={`${size} Ticket${size === 1 ? "" : "s"} für ${entry.name} verkaufen, ${currency(entry.priceCents * size)}`}
                       className="cashier-sell-action"
                       disabled={saleDisabled}
+                      busy={busyProductId === entry.id}
+                      busyLabel={`${size} Ticket${size === 1 ? "" : "s"} für ${entry.name} werden verkauft`}
                       onClick={() => void sell(entry)}
                       type="button"
                       variant="primary"
@@ -634,15 +685,9 @@ export function CashierView() {
                       <Ticket aria-hidden="true" size={20} />
                       <span className="cashier-sell-copy">
                         <span>
-                          {busyProductId === entry.id
-                            ? "Verkauf"
-                            : `${size} Ticket${size === 1 ? "" : "s"}`}
+                          {size} Ticket{size === 1 ? "" : "s"}
                         </span>
-                        <span>
-                          {busyProductId === entry.id
-                            ? "wird bestätigt …"
-                            : currency(entry.priceCents * size)}
-                        </span>
+                        <span>{currency(entry.priceCents * size)}</span>
                       </span>
                     </Button>
                   </div>
@@ -698,7 +743,8 @@ export function CashierView() {
             </label>
             <IconButton
               label="Liste aktualisieren"
-              onClick={() => void loadTicketList({ preserveLoaded: true })}
+              busy={manualRefreshBusy}
+              onClick={() => void refreshTicketList()}
               type="button"
             >
               <RefreshCw aria-hidden="true" size={18} />
@@ -731,20 +777,6 @@ export function CashierView() {
                       {result.groupSize}
                       <CircleUserRound aria-hidden="true" size={15} />
                     </span>
-                  ),
-                },
-                {
-                  key: "flight-group",
-                  header: "Fluggruppe",
-                  render: (result) => result.communicationLabels.join(" / ") || "–",
-                },
-                {
-                  key: "status",
-                  header: "Status",
-                  render: (result) => (
-                    <StatusPill tone={result.groupStatus === "CANCELED" ? "danger" : "success"}>
-                      {ticketGroupStatusLabel[result.groupStatus]}
-                    </StatusPill>
                   ),
                 },
                 {
@@ -808,58 +840,78 @@ export function CashierView() {
               ) : null}
             </header>
             <div className="cashier-ticket-detail-grid">
-              <dl>
-                <div>
-                  <dt>Produkt</dt>
-                  <dd>{selectedTicketGroup?.productName ?? "–"}</dd>
-                </div>
-                <div>
-                  <dt>Fluggruppe</dt>
-                  <dd>{selectedTicketGroup?.communicationLabels.join(" / ") || "–"}</dd>
-                </div>
-                <div>
-                  <dt>Status</dt>
-                  <dd>
-                    {selectedTicketGroup
-                      ? ticketGroupStatusLabel[selectedTicketGroup.groupStatus]
-                      : "–"}
-                  </dd>
-                </div>
-                <div>
-                  <dt>Summe</dt>
-                  <dd>
-                    {selectedTicketGroup
-                      ? currency(
-                          (board?.products.find(
-                            (entry) => entry.id === selectedTicketGroup.productId,
-                          )?.priceCents ?? 0) * selectedTicketGroup.groupSize,
-                        )
-                      : "–"}
-                  </dd>
-                </div>
-              </dl>
-              <div className="cashier-ticket-identifiers">
-                <strong>Tickets</strong>
-                {receipt.map((ticket, index) => (
-                  <button
-                    className={index === selectedReceiptIndex ? "selected" : ""}
-                    key={ticket.code}
-                    onClick={() => setSelectedReceiptIndex(index)}
-                    type="button"
-                  >
-                    <Ticket aria-hidden="true" size={18} />
-                    <span>
-                      {ticket.position} von {ticket.groupSize} · {ticket.code}
-                    </span>
-                  </button>
-                ))}
+              <div className="cashier-flight-groups">
+                <DataTable
+                  columns={[
+                    {
+                      key: "flight-group",
+                      header: (
+                        <span className="cashier-icon-heading" title="Fluggruppe">
+                          <Tag aria-hidden="true" size={17} />
+                          <span className="visually-hidden">Fluggruppe</span>
+                        </span>
+                      ),
+                      render: (rotation) => rotation.communicationLabel,
+                    },
+                    {
+                      key: "people",
+                      header: "Personen",
+                      align: "center",
+                      render: (rotation) =>
+                        rotation.bookingGroups.find(
+                          (group) => group.id === selectedTicketGroup?.ticketGroupId,
+                        )?.ticketCount ?? 0,
+                    },
+                    {
+                      key: "status",
+                      header: "Status",
+                      align: "center",
+                      render: (rotation) => (
+                        <span
+                          className="cashier-phase-icon"
+                          role="img"
+                          aria-label={rotationStatusLabel(rotation.status)}
+                          title={rotationStatusLabel(rotation.status)}
+                        >
+                          {rotationStatusIcon(rotation)}
+                        </span>
+                      ),
+                    },
+                    {
+                      key: "go-to-gate",
+                      header: (
+                        <span className="cashier-icon-heading" title="GoToGate-Aktiv">
+                          <CircleArrowRight aria-hidden="true" size={17} />
+                          <span className="visually-hidden">GoToGate-Aktiv</span>
+                        </span>
+                      ),
+                      align: "center",
+                      render: (rotation) =>
+                        rotation.status === "DRAFT" && rotation.precalledAt ? (
+                          <Check aria-label="GoToGate-Aktiv" size={18} />
+                        ) : null,
+                    },
+                    {
+                      key: "time-window",
+                      header: "Zeitfenster",
+                      render: rotationTimeWindow,
+                    },
+                  ]}
+                  emptyLabel={
+                    selectedTicketGroup
+                      ? "Keine aktive Fluggruppe vorhanden."
+                      : "Ticketgruppe auswählen."
+                  }
+                  rowKey={(rotation) => rotation.id}
+                  rows={selectedRotations}
+                />
               </div>
               <div className="cashier-ticket-paper">
-                {receipt[selectedReceiptIndex] ? (
+                {receipt ? (
                   <>
-                    <TicketPaper compact ticket={receipt[selectedReceiptIndex]} />
+                    <TicketPaper compact ticket={receipt} />
                     <button
-                      aria-label={`QR-Ticket ${receipt[selectedReceiptIndex].code} vergrößern`}
+                      aria-label={`QR-Code der Gruppe ${receipt.communicationLabel} vergrößern`}
                       className="cashier-ticket-enlarge"
                       onClick={() => setQrScanOpen(true)}
                       type="button"
@@ -884,26 +936,25 @@ export function CashierView() {
                 Stornieren
               </Button>
               <Button
-                disabled={receipt.length === 0 || selectedTicketGroup?.groupStatus === "CANCELED"}
+                disabled={!receipt || selectedTicketGroup?.groupStatus === "CANCELED"}
+                busy={printBusy}
                 onClick={() => void printTicketDocument()}
                 type="button"
               >
                 <Printer aria-hidden="true" size={18} />
-                Ticketzettel erneut drucken
+                Ticket drucken
               </Button>
             </div>
           </section>
         </Panel>
       </section>
       <div className="ticket-print-document" ref={printDocumentRef} aria-hidden="true">
-        {receipt.map((ticket) => (
-          <TicketPaper key={ticket.code} ticket={ticket} />
-        ))}
+        {receipt ? <TicketPaper ticket={receipt} /> : null}
       </div>
       <QrScanDialog
         onClose={() => setQrScanOpen(false)}
-        open={qrScanOpen && Boolean(receipt[selectedReceiptIndex])}
-        ticket={receipt[selectedReceiptIndex]}
+        open={qrScanOpen && Boolean(receipt)}
+        ticket={receipt ?? undefined}
       />
       <ConfirmationDialog
         open={cancelDialogOpen}
@@ -925,8 +976,9 @@ export function CashierView() {
             />
           </div>
         }
-        confirmDisabled={cancelReason.trim().length < 3 || cancelBusy}
-        confirmLabel={cancelBusy ? "Wird storniert …" : "Stornieren"}
+        confirmDisabled={cancelReason.trim().length < 3}
+        confirmBusy={cancelBusy}
+        confirmLabel="Stornieren"
         danger
         onCancel={() => {
           if (cancelBusy) return;

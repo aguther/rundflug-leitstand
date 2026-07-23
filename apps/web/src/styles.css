@@ -3634,6 +3634,34 @@ p {
 .ticket-status-metrics svg { grid-row: 1 / 3; color: #1769d2; }
 .ticket-status-metrics span { color: #425a70; font-weight: 700; }
 .ticket-status-metrics strong { color: #1769d2; font-size: 1.55rem; }
+
+.group-status-parts {
+  display: grid;
+  gap: 18px;
+}
+.group-status-part {
+  overflow: hidden;
+  border: 1px solid #d5dee8;
+  border-radius: 14px;
+  background: #fff;
+}
+.group-status-part > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid #d5dee8;
+}
+.group-status-part > header span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #425a70;
+}
+.group-status-part .ticket-current-status {
+  border-radius: 0;
+}
 .ticket-progress { display: grid; grid-template-columns: repeat(4, 1fr); margin: 28px 0; }
 .ticket-progress > div { position: relative; display: grid; justify-items: center; gap: 7px; text-align: center; color: #708296; }
 .ticket-progress > div::after { position: absolute; top: 18px; left: 64%; width: 72%; height: 3px; background: #cbd5e1; content: ""; }

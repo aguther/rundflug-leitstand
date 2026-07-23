@@ -49,7 +49,7 @@ describe("cashier release 1.7.0 acceptance coverage", () => {
     );
     expect(cashierSource).not.toContain('<Plane aria-hidden="true" />');
     expect(styles).toMatch(
-      /@media \(min-width: 1101px\)[\s\S]*?\.cashier-ticket-table \.ds-table \{[\s\S]*?min-width: 600px;/,
+      /@media \(min-width: 1101px\)[\s\S]*?\.cashier-ticket-table \.ds-table \{[\s\S]*?min-width: 520px;/,
     );
   });
 

@@ -39,6 +39,8 @@ function rotation(input: Partial<Rotation> & Pick<Rotation, "id" | "ticketGroupI
     estimatedPassengerPayloadKg: null,
     predictedLowerMinutes: 0,
     predictedUpperMinutes: 0,
+    boardingWindowLowerAt: null,
+    boardingWindowUpperAt: null,
     calledAt: null,
     deferralCount: 0,
     operationalNote: "",

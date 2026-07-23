@@ -1,0 +1,11 @@
+ID,Modul,Tests,Status
+V18-REL-010,package.json Workspace-Pakete und packages/config,Requirements- und Versionsverifikation,umgesetzt
+V18-BSY-010,apps/web/src/design-system/components und asynchrone Anwendungsaktionen,components.test.ts sowie UI-Quelltests und Browserabnahme,umgesetzt
+V18-TIM-010,apps/web/src/time-window.ts sowie Kasse Flight Line FIDS und öffentliche Statusseiten,time-window.test.ts Contracttests und Browserabnahme,umgesetzt
+V18-CAS-010,apps/web/src/cashier-view.tsx und cashier-v12.css,cashier-v1-6.test.ts cashier-v12.test.ts und Browserabnahme,umgesetzt
+V18-FLT-010,apps/web/src/flight-line-supervisor.tsx und flight-line-v12.css,flight-line-sort.test.ts flight-line-supervisor-ui.test.ts und Browserabnahme,umgesetzt
+V18-GRP-010,apps/worker/src/index.ts apps/web/src/group-status-view.tsx und cashier-view.tsx,Contract- Worker- und UI-Tests sowie Splitgruppenabnahme,umgesetzt
+V18-API-010,packages/contracts/src/index.ts apps/worker/src/index.ts und apps/web/src/api.ts,Contract- und API-Tests,umgesetzt
+V18-DAT-010,apps/worker/migrations/0042_group_status_codes_and_push.sql event-coordinator.ts und web-push.ts,Migrations- Push- und Geheimhaltungstests,umgesetzt
+V18-OPS-010,docs/adr/0023-oeffentlicher-gruppencode.md und apps/worker/migrations/README.md,Requirements-Verifikation und Diffprüfung,umgesetzt
+V18-QA-010,Workspace-Prüfskripte und docs/ui/v1.8.0-*-concept.md,Vollständiger Check und Browserabnahme,umgesetzt

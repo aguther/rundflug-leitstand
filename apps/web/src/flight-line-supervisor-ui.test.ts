@@ -41,7 +41,7 @@ describe("Flight Line Supervisor", () => {
 
   it("V161-FL-020: keeps the pilot assignment confirmation free of the selected pilot code", () => {
     expect(sharedSource).toMatch(
-      /onClick=\{\(\) => void submitPilotAssignment\(\)\}[\s\S]*?>\s*Pilot zuweisen\s*<\/Button>/,
+      /onClick=\{submitPilotAssignment\}[\s\S]*?>\s*Pilot zuweisen\s*<\/Button>/,
     );
     expect(sharedSource).not.toContain('?.operationalCode ?? ""} zuweisen');
   });
@@ -53,14 +53,14 @@ describe("Flight Line Supervisor", () => {
     expect(supervisorSource).toContain(
       "formatBookingGroupLabel(rotation.productCode, group.communicationNumber)",
     );
-    expect(supervisorSource).toContain("{rotation.communicationLabel})");
+    expect(supervisorSource).toContain("<span>{rotation.communicationLabel}</span>");
     expect(flightLineSource).toContain("Boarding");
     expect(flightLineSource).toContain("Offblock");
     expect(flightLineSource).toContain("Onblock");
     expect(flightLineSource).toContain("Nicht verfügbar");
     expect(flightLineSource).toContain("PilotChangeIcon");
     expect(flightLineSource).toContain("primaryAircraftActionPresentation");
-    expect(supervisorSource).toContain("rotationStateLabels[rotation.status]");
+    expect(supervisorSource).toContain("phaseIcon(rotation)");
     expect(supervisorSource).not.toContain("Nächster Schritt");
     expect(supervisorSource).not.toContain("<span>Status</span>");
     expect(supervisorSource).not.toContain("<dd>{rotation.status}</dd>");
@@ -109,17 +109,19 @@ describe("Flight Line Supervisor", () => {
     expect(supervisorSource).toMatch(
       /className="flight-line-status-action state-refueling"[\s\S]*?turnaroundActionAllowed/,
     );
-    expect(supervisorSource).toContain('onRunRotation(rotation, "REFUELING")');
-    expect(supervisorSource).toContain('onRunRotation(rotation, "PAUSED")');
-    expect(supervisorSource).toContain('onRunRotation(rotation, "INACTIVE")');
+    expect(supervisorSource).toContain('runRotationAction(rotation, "refueling", "REFUELING")');
+    expect(supervisorSource).toContain('runRotationAction(rotation, "paused", "PAUSED")');
+    expect(supervisorSource).toContain('runRotationAction(rotation, "inactive", "INACTIVE")');
     expect(appSource).toContain("ABORT_ROTATION_TO_QUEUE_AND_MARK_AIRCRAFT_UNAVAILABLE");
   });
 
   it("uses accessible icon headers and a scrollbar-stable compact ticket table", () => {
-    expect(supervisorSource).toContain('title="Buchungsgruppen"');
+    expect(supervisorSource).toContain('label: "Ticketgruppe"');
+    expect(supervisorSource).toContain('label: "Fluggruppe"');
+    expect(supervisorSource).toContain('label: "GoToGate-Aktiv"');
     expect(supervisorSource).toContain("HeaderIcon");
     expect(supervisorSource).toContain("title={column.label}");
-    expect(flightLineStyles).toContain("min-width: 720px");
+    expect(flightLineStyles).toContain("min-width: 940px");
     expect(flightLineStyles).toContain("scrollbar-gutter: stable");
     expect(flightLineStyles).toMatch(
       /\.flight-director-ticket-overview > header \{[\s\S]*?flex: 0 0 auto;/,

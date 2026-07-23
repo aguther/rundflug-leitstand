@@ -13,6 +13,7 @@ import type { CSSProperties } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BrandMark } from "./design-system/BrandMark";
 import { FidsSettingsDialog } from "./features/fids/FidsSettingsDialog";
+import { formatAbsoluteTimeWindow } from "./time-window";
 
 type PublicGroup = PublicBoard["groups"][number];
 type EditableFidsPreferences = Pick<FidsPreferences, "visibleRows" | "layout" | "theme">;
@@ -42,11 +43,19 @@ function statusPresentation(status: PublicGroup["status"]): {
   return { label: "WARTEN", tone: "standby", icon: Clock3 };
 }
 
-function timeWindow(group: PublicGroup): string {
-  if (group.status === "COME_TO_FLIGHT_LINE" || group.status === "BOARDING") return "Jetzt";
-  if (["IN_FLIGHT", "LANDED", "COMPLETED"].includes(group.status)) return "–";
-  if (group.status === "SERVICE_PAUSED") return "neues Fenster folgt";
-  return `ca. ${group.waitLowerMinutes}–${group.waitUpperMinutes} Min.`;
+function timeWindow(group: PublicGroup, timeZone: string): string {
+  return formatAbsoluteTimeWindow({
+    lowerAt: group.boardingWindowLowerAt,
+    upperAt: group.boardingWindowUpperAt,
+    timeZone,
+    quality: group.predictionQuality,
+    phase:
+      group.status === "COME_TO_FLIGHT_LINE" || group.status === "BOARDING"
+        ? "NOW"
+        : ["IN_FLIGHT", "LANDED", "COMPLETED"].includes(group.status)
+          ? "FINISHED"
+          : "FORECAST",
+  });
 }
 
 function useVisibleGroups(
@@ -108,7 +117,15 @@ function GroupCell({ group }: { group: PublicGroup }) {
   );
 }
 
-function FidsTable({ groups, compact }: { groups: PublicBoard["groups"]; compact: boolean }) {
+function FidsTable({
+  groups,
+  compact,
+  timeZone,
+}: {
+  groups: PublicBoard["groups"];
+  compact: boolean;
+  timeZone: string;
+}) {
   return (
     <div className={`fids-table ${compact ? "fids-table--compact" : "fids-table--wide"}`}>
       <div className="fids-grid-head" aria-hidden="true">
@@ -135,7 +152,7 @@ function FidsTable({ groups, compact }: { groups: PublicBoard["groups"]; compact
             <span className="fids-gate-cell">{group.gateLabel || "–"}</span>
             <Status group={group} />
             <strong className={`fids-window tone-${statusPresentation(group.status).tone}`}>
-              {timeWindow(group)}
+              {timeWindow(group, timeZone)}
             </strong>
           </div>
         ))}
@@ -228,11 +245,15 @@ export function FidsDisplay({
           <div className="standard-alert">Der Rundflugbetrieb ist vorübergehend unterbrochen.</div>
         ) : null}
         <div className="fids-single-board">
-          <FidsTable compact={false} groups={groups} />
+          <FidsTable
+            compact={false}
+            groups={groups}
+            timeZone={board?.timeZone ?? "Europe/Berlin"}
+          />
         </div>
         <div className="fids-double-board">
-          <FidsTable compact groups={leftColumn} />
-          <FidsTable compact groups={rightColumn} />
+          <FidsTable compact groups={leftColumn} timeZone={board?.timeZone ?? "Europe/Berlin"} />
+          <FidsTable compact groups={rightColumn} timeZone={board?.timeZone ?? "Europe/Berlin"} />
         </div>
         {groups.length === 0 ? (
           <div className="standard-empty">{error ?? "Aktuell keine Gruppen auf der Anzeige."}</div>

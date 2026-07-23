@@ -117,6 +117,31 @@ function decodeTicketSearchCursor(value: string | undefined): TicketSearchCursor
   }
 }
 
+function predictedBoardingWindow(input: {
+  status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
+  quality: "STABLE" | "CHANGING" | "UNCERTAIN";
+  predictedBoardingAt: string | null;
+  lowerMinutes: number;
+  upperMinutes: number;
+  referenceAt: string;
+}): { lowerAt: string | null; upperAt: string | null } {
+  if (input.status !== "DRAFT" || input.quality === "UNCERTAIN") {
+    return { lowerAt: null, upperAt: null };
+  }
+  const referenceMs = Date.parse(input.referenceAt);
+  const storedLowerMs = input.predictedBoardingAt
+    ? Date.parse(input.predictedBoardingAt)
+    : Number.NaN;
+  const lowerMs = Number.isFinite(storedLowerMs)
+    ? storedLowerMs
+    : referenceMs + input.lowerMinutes * 60_000;
+  const widthMinutes = Math.max(0, input.upperMinutes - input.lowerMinutes);
+  return {
+    lowerAt: new Date(lowerMs).toISOString(),
+    upperAt: new Date(lowerMs + widthMinutes * 60_000).toISOString(),
+  };
+}
+
 app.use("*", async (context, next) => {
   const redirectLocation = httpsRedirectLocation(context.req.url, context.env.APP_ENV);
   if (redirectLocation) return context.redirect(redirectLocation, 308);
@@ -2354,6 +2379,32 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
         effectiveActiveCapacity === 0
           ? "UNCERTAIN"
           : forecastFreshness.quality;
+      const fallbackWindow = forecastQueueWindows({
+        queueSequence: index + 1,
+        activeAircraft: effectiveActiveCapacity,
+        duration: estimateDuration({
+          referenceMinutes:
+            rotation.reference_duration_minutes +
+            (eventRow.planned_boarding_minutes ?? 8) +
+            (eventRow.planned_deboarding_minutes ?? 5) +
+            (eventRow.planned_buffer_minutes ?? 3),
+          actualDurationsMinutes: actualDurations,
+          interrupted: eventRow.emergency_mode === 1 || eventRow.operational_interrupted === 1,
+          activeCapacity: effectiveActiveCapacity,
+        }),
+      });
+      const predictedLowerMinutes =
+        rotation.prediction_lower_minutes ?? fallbackWindow.lowerMinutes;
+      const predictedUpperMinutes =
+        rotation.prediction_upper_minutes ?? fallbackWindow.upperMinutes;
+      const boardingWindow = predictedBoardingWindow({
+        status: rotation.status,
+        quality: effectivePredictionQuality,
+        predictedBoardingAt: rotation.predicted_boarding_at,
+        lowerMinutes: predictedLowerMinutes,
+        upperMinutes: predictedUpperMinutes,
+        referenceAt: forecastReadAt,
+      });
       return {
         id: rotation.id,
         version: rotation.version,
@@ -2387,38 +2438,10 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
           rotation.usable_capacity !== null &&
           rotation.usable_capacity < rotation.baseline_capacity,
         estimatedPassengerPayloadKg: rotation.estimated_passenger_payload_kg,
-        predictedLowerMinutes:
-          rotation.prediction_lower_minutes ??
-          forecastQueueWindows({
-            queueSequence: index + 1,
-            activeAircraft: effectiveActiveCapacity,
-            duration: estimateDuration({
-              referenceMinutes:
-                rotation.reference_duration_minutes +
-                (eventRow.planned_boarding_minutes ?? 8) +
-                (eventRow.planned_deboarding_minutes ?? 5) +
-                (eventRow.planned_buffer_minutes ?? 3),
-              actualDurationsMinutes: actualDurations,
-              interrupted: eventRow.emergency_mode === 1 || eventRow.operational_interrupted === 1,
-              activeCapacity: effectiveActiveCapacity,
-            }),
-          }).lowerMinutes,
-        predictedUpperMinutes:
-          rotation.prediction_upper_minutes ??
-          forecastQueueWindows({
-            queueSequence: index + 1,
-            activeAircraft: effectiveActiveCapacity,
-            duration: estimateDuration({
-              referenceMinutes:
-                rotation.reference_duration_minutes +
-                (eventRow.planned_boarding_minutes ?? 8) +
-                (eventRow.planned_deboarding_minutes ?? 5) +
-                (eventRow.planned_buffer_minutes ?? 3),
-              actualDurationsMinutes: actualDurations,
-              interrupted: eventRow.emergency_mode === 1 || eventRow.operational_interrupted === 1,
-              activeCapacity: effectiveActiveCapacity,
-            }),
-          }).upperMinutes,
+        predictedLowerMinutes,
+        predictedUpperMinutes,
+        boardingWindowLowerAt: boardingWindow.lowerAt,
+        boardingWindowUpperAt: boardingWindow.upperAt,
         precalledAt: rotation.precalled_at,
         calledAt: rotation.called_at,
         deferralCount: rotation.deferral_count,
@@ -2645,6 +2668,7 @@ app.on("GET", eventRoutes("/tickets/search"), async (context) => {
       `(EXISTS (SELECT 1 FROM tickets searched_ticket
                   WHERE searched_ticket.ticket_group_id = tg.id
                     AND searched_ticket.public_code_hash = ${ticketHashPlaceholder})
+        OR tg.public_status_code_hash = ${ticketHashPlaceholder}
         OR tg.id LIKE ${likePlaceholder}
         OR CAST(tg.communication_number AS TEXT) = ${numericPlaceholder}
         OR UPPER('G-' || p.code || '-' || printf('%04d', tg.communication_number))
@@ -2771,29 +2795,35 @@ app.on("GET", eventRoutes("/ticket-groups/:ticketGroupId/print-data"), async (co
     );
   }
   const ticketGroupId = context.req.param("ticketGroupId");
-  const rows = await context.env.DB.prepare(
-    `SELECT t.public_code, od.name AS event_name, p.name AS product_name, g.label AS gate_label,
-            p.code AS product_code, tg.communication_number, tg.status AS group_status
+  const first = await context.env.DB.prepare(
+    `SELECT COALESCE(tg.public_status_code,
+                     (SELECT legacy.public_code
+                        FROM tickets legacy
+                       WHERE legacy.ticket_group_id = tg.id AND legacy.public_code IS NOT NULL
+                       ORDER BY legacy.created_at, legacy.id LIMIT 1)) AS public_code,
+            od.name AS event_name, p.name AS product_name, g.label AS gate_label,
+            p.code AS product_code, tg.communication_number, tg.status AS group_status,
+            COUNT(t.id) AS group_size
        FROM ticket_groups tg
        JOIN operation_days od ON od.id = tg.operation_day_id
        JOIN products p ON p.id = tg.product_id
        JOIN gates g ON g.id = p.gate_id
        JOIN tickets t ON t.ticket_group_id = tg.id
-      WHERE tg.id = ?1 AND tg.operation_day_id = ?2 AND t.public_code IS NOT NULL
-      ORDER BY t.created_at, t.id`,
+      WHERE tg.id = ?1 AND tg.operation_day_id = ?2
+      GROUP BY tg.id`,
   )
     .bind(ticketGroupId, eventId)
-    .all<{
-      public_code: string;
+    .first<{
+      public_code: string | null;
       event_name: string;
       product_name: string;
       gate_label: string;
       product_code: string;
       communication_number: number;
       group_status: string;
+      group_size: number;
     }>();
-  const first = rows.results[0];
-  if (!first) {
+  if (!first?.public_code) {
     return context.json(
       { error: { code: "TICKET_GROUP_NOT_FOUND", message: "Buchungsgruppe nicht gefunden." } },
       404,
@@ -2816,7 +2846,8 @@ app.on("GET", eventRoutes("/ticket-groups/:ticketGroupId/print-data"), async (co
     productName: first.product_name,
     gateLabel: first.gate_label,
     communicationLabel: formatBookingGroupLabel(first.product_code, first.communication_number),
-    tickets: rows.results.map((row, index) => ({ code: row.public_code, position: index + 1 })),
+    code: first.public_code,
+    groupSize: first.group_size,
   });
 });
 
@@ -3441,8 +3472,10 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
             fg.precalled_at, r.status, tg.operation_day_id,
             COALESCE(fg.queue_position, tg.queue_sequence) AS queue_sequence,
             t.attendance_status,
-            r.prediction_quality, r.prediction_lower_minutes, r.prediction_upper_minutes,
+            r.predicted_boarding_at, r.prediction_quality,
+            r.prediction_lower_minutes, r.prediction_upper_minutes,
             r.prediction_updated_at,
+            od.name AS event_name, od.time_zone,
             od.operational_note AS event_operational_note, od.operational_interrupted,
             od.emergency_mode, od.notification_lead_minutes,
             rg.status AS resource_group_status,
@@ -3470,11 +3503,14 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
       operation_day_id: string;
       queue_sequence: number;
       attendance_status: "NOT_CHECKED_IN" | "CHECKED_IN";
+      predicted_boarding_at: string | null;
       prediction_quality: "STABLE" | "CHANGING" | "UNCERTAIN" | null;
       prediction_lower_minutes: number | null;
       prediction_upper_minutes: number | null;
       prediction_updated_at: string | null;
       updated_at: string;
+      event_name: string;
+      time_zone: string;
       event_operational_note: string;
       resource_group_operational_note: string;
       operational_interrupted: number;
@@ -3521,6 +3557,16 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
     LANDED: "Der Flug ist gelandet.",
     COMPLETED: "Der Rundflug ist abgeschlossen.",
   } as const;
+  const lowerMinutes = row.prediction_lower_minutes ?? Math.max(0, (row.queue_sequence - 1) * 20);
+  const upperMinutes = row.prediction_upper_minutes ?? row.queue_sequence * 30;
+  const boardingWindow = predictedBoardingWindow({
+    status: row.status,
+    quality: effectivePredictionQuality,
+    predictedBoardingAt: row.predicted_boarding_at,
+    lowerMinutes,
+    upperMinutes,
+    referenceAt: new Date().toISOString(),
+  });
   return context.json({
     eventId: row.operation_day_id,
     productName: row.product_name,
@@ -3539,7 +3585,7 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
       row.status === "DRAFT" &&
       row.operational_interrupted === 0 &&
       effectivePredictionQuality !== "UNCERTAIN"
-        ? (row.prediction_lower_minutes ?? Math.max(0, (row.queue_sequence - 1) * 20))
+        ? lowerMinutes
         : 0,
     waitUpperMinutes:
       row.emergency_mode === 0 &&
@@ -3547,8 +3593,11 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
       row.status === "DRAFT" &&
       row.operational_interrupted === 0 &&
       effectivePredictionQuality !== "UNCERTAIN"
-        ? (row.prediction_upper_minutes ?? row.queue_sequence * 30)
+        ? upperMinutes
         : 0,
+    boardingWindowLowerAt: boardingWindow.lowerAt,
+    boardingWindowUpperAt: boardingWindow.upperAt,
+    timeZone: row.time_zone,
     predictionQuality: effectivePredictionQuality,
     message:
       row.emergency_mode === 1
@@ -3562,6 +3611,190 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
               : message[row.status],
     operationalNotice: row.resource_group_operational_note || row.event_operational_note,
     updatedAt: row.updated_at,
+  });
+});
+
+app.get("/api/public/groups/:groupCode", async (context) => {
+  const groupCode = context.req.param("groupCode").trim().toUpperCase();
+  if (!/^[A-Z2-9]{12,32}$/.test(groupCode)) {
+    return unknownTicketResponse(context.env, context.req.raw);
+  }
+  const group = await context.env.DB.prepare(
+    `SELECT tg.id, tg.communication_number, tg.operation_day_id,
+            p.name AS product_name, p.code AS product_code, p.public_description,
+            od.name AS event_name, od.time_zone, od.operational_note AS event_operational_note,
+            od.operational_interrupted, od.emergency_mode, od.notification_lead_minutes,
+            od.updated_at, rg.status AS resource_group_status,
+            rg.operational_note AS resource_group_operational_note,
+            (SELECT COUNT(*) FROM tickets t WHERE t.ticket_group_id = tg.id) AS group_size
+       FROM ticket_groups tg
+       JOIN products p ON p.id = tg.product_id
+       JOIN resource_groups rg ON rg.id = p.resource_group_id
+       JOIN operation_days od ON od.id = tg.operation_day_id
+      WHERE tg.public_status_code_hash = ?1 AND tg.status <> 'CANCELED'`,
+  )
+    .bind(await sha256Hex(groupCode))
+    .first<{
+      id: string;
+      communication_number: number;
+      operation_day_id: string;
+      product_name: string;
+      product_code: string;
+      public_description: string;
+      event_name: string;
+      time_zone: string;
+      event_operational_note: string;
+      operational_interrupted: number;
+      emergency_mode: number;
+      notification_lead_minutes: number;
+      updated_at: string;
+      resource_group_status: "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED";
+      resource_group_operational_note: string;
+      group_size: number;
+    }>();
+  if (!group) {
+    return unknownTicketResponse(context.env, context.req.raw);
+  }
+
+  const rotations = await context.env.DB.prepare(
+    `SELECT r.id, r.status, r.predicted_boarding_at, r.prediction_quality,
+            r.prediction_lower_minutes, r.prediction_upper_minutes, r.prediction_updated_at,
+            fg.precalled_at, COALESCE(fg.queue_position, fg.communication_number) AS queue_position,
+            g.label AS gate_label, COUNT(t.id) AS passenger_count,
+            SUM(CASE WHEN t.attendance_status = 'CHECKED_IN' THEN 1 ELSE 0 END) AS present_count
+       FROM rotation_tickets rt
+       JOIN tickets t ON t.id = rt.ticket_id
+       JOIN rotations r ON r.id = rt.rotation_id
+       JOIN flight_groups fg ON fg.id = r.flight_group_id
+       JOIN ticket_groups part_tg ON part_tg.id = t.ticket_group_id
+       JOIN products part_product ON part_product.id = part_tg.product_id
+       JOIN gates g ON g.id = COALESCE(r.gate_id, part_product.gate_id)
+      WHERE t.ticket_group_id = ?1 AND rt.released_at IS NULL AND r.status <> 'CANCELED'
+      GROUP BY r.id
+      ORDER BY COALESCE(fg.queue_position, fg.communication_number), r.created_at, r.id`,
+  )
+    .bind(group.id)
+    .all<{
+      id: string;
+      status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
+      predicted_boarding_at: string | null;
+      prediction_quality: "STABLE" | "CHANGING" | "UNCERTAIN" | null;
+      prediction_lower_minutes: number | null;
+      prediction_upper_minutes: number | null;
+      prediction_updated_at: string | null;
+      precalled_at: string | null;
+      queue_position: number;
+      gate_label: string;
+      passenger_count: number;
+      present_count: number;
+    }>();
+  if (rotations.results.length === 0) {
+    return unknownTicketResponse(context.env, context.req.raw);
+  }
+
+  const readAt = new Date().toISOString();
+  const partCount = rotations.results.length;
+  const parts = rotations.results.map((rotation, index) => {
+    const freshness = assessForecastFreshness({
+      predictionQuality: rotation.prediction_quality,
+      predictionUpdatedAt: rotation.prediction_updated_at,
+      now: readAt,
+    });
+    const predictionQuality =
+      group.emergency_mode === 1 ||
+      group.operational_interrupted === 1 ||
+      group.resource_group_status !== "ACTIVE"
+        ? "UNCERTAIN"
+        : freshness.quality;
+    const lowerMinutes =
+      rotation.prediction_lower_minutes ?? Math.max(0, (rotation.queue_position - 1) * 20);
+    const upperMinutes =
+      rotation.prediction_upper_minutes ?? Math.max(lowerMinutes, rotation.queue_position * 30);
+    const prepare =
+      rotation.status === "DRAFT" &&
+      predictionQuality !== "UNCERTAIN" &&
+      upperMinutes <= group.notification_lead_minutes;
+    const status =
+      group.emergency_mode === 1 ||
+      group.operational_interrupted === 1 ||
+      group.resource_group_status !== "ACTIVE"
+        ? ("SERVICE_PAUSED" as const)
+        : rotation.status === "DRAFT"
+          ? rotation.precalled_at
+            ? ("COME_TO_FLIGHT_LINE" as const)
+            : prepare
+              ? ("PREPARE" as const)
+              : ("WAITING" as const)
+          : rotation.status === "CALLED"
+            ? rotation.present_count === rotation.passenger_count
+              ? ("BOARDING" as const)
+              : ("COME_TO_FLIGHT_LINE" as const)
+            : rotation.status;
+    const publicStatus =
+      status === "IN_FLIGHT" ||
+      status === "LANDED" ||
+      status === "COMPLETED" ||
+      status === "SERVICE_PAUSED" ||
+      status === "WAITING" ||
+      status === "PREPARE" ||
+      status === "COME_TO_FLIGHT_LINE" ||
+      status === "BOARDING"
+        ? status
+        : "WAITING";
+    const boardingWindow = predictedBoardingWindow({
+      status: rotation.status,
+      quality: predictionQuality,
+      predictedBoardingAt: rotation.predicted_boarding_at,
+      lowerMinutes,
+      upperMinutes,
+      referenceAt: readAt,
+    });
+    const message =
+      group.emergency_mode === 1
+        ? "Organisatorischer Betrieb pausiert – bitte später erneut prüfen."
+        : group.resource_group_status !== "ACTIVE"
+          ? "Flugbetrieb für dieses Produkt pausiert – bitte Status erneut prüfen."
+          : group.operational_interrupted === 1
+            ? "Flugbetrieb unterbrochen – bitte Status erneut prüfen."
+            : freshness.reason === "STALE_PREDICTION"
+              ? "Prognose wird aktualisiert – bitte Status erneut prüfen."
+              : publicStatus === "COME_TO_FLIGHT_LINE" || publicStatus === "BOARDING"
+                ? "Bitte jetzt zum angegebenen Gate kommen."
+                : publicStatus === "PREPARE"
+                  ? "Bitte auf den bevorstehenden Aufruf vorbereiten."
+                  : publicStatus === "IN_FLIGHT"
+                    ? "Der Flug läuft."
+                    : publicStatus === "LANDED"
+                      ? "Der Flug ist gelandet."
+                      : publicStatus === "COMPLETED"
+                        ? "Der Rundflug ist abgeschlossen."
+                        : "Bitte Status regelmäßig prüfen.";
+    return {
+      partNumber: index + 1,
+      partCount,
+      passengerCount: rotation.passenger_count,
+      gateLabel: rotation.gate_label,
+      status: publicStatus,
+      queuePosition: rotation.status === "DRAFT" ? rotation.queue_position : null,
+      boardingWindowLowerAt: boardingWindow.lowerAt,
+      boardingWindowUpperAt: boardingWindow.upperAt,
+      predictionQuality,
+      message,
+    };
+  });
+
+  return context.json({
+    eventId: group.operation_day_id,
+    eventName: group.event_name,
+    bookingGroupLabel: formatBookingGroupLabel(group.product_code, group.communication_number),
+    groupSize: group.group_size,
+    productName: group.product_name,
+    productCode: group.product_code,
+    publicDescription: group.public_description,
+    timeZone: group.time_zone,
+    operationalNotice: group.resource_group_operational_note || group.event_operational_note,
+    updatedAt: group.updated_at,
+    parts,
   });
 });
 
@@ -3601,7 +3834,8 @@ app.post("/api/public/tickets/:ticketCode/push-subscriptions", async (context) =
     );
   }
   const ticket = await context.env.DB.prepare(
-    `SELECT t.id, tg.operation_day_id, od.operations_end_at, rt.rotation_id FROM tickets t
+    `SELECT t.id, tg.id AS ticket_group_id, tg.operation_day_id,
+            od.operations_end_at, rt.rotation_id FROM tickets t
        JOIN ticket_groups tg ON tg.id = t.ticket_group_id
        JOIN operation_days od ON od.id = tg.operation_day_id
        JOIN rotation_tickets rt ON rt.ticket_id = t.id AND rt.released_at IS NULL
@@ -3610,6 +3844,7 @@ app.post("/api/public/tickets/:ticketCode/push-subscriptions", async (context) =
     .bind(await sha256Hex(ticketCode))
     .first<{
       id: string;
+      ticket_group_id: string;
       operation_day_id: string;
       operations_end_at: string | null;
       rotation_id: string;
@@ -3646,10 +3881,12 @@ app.post("/api/public/tickets/:ticketCode/push-subscriptions", async (context) =
   }
   await context.env.DB.prepare(
     `INSERT INTO web_push_subscriptions
-       (id, operation_day_id, ticket_id, endpoint, p256dh, auth, consented_at, delete_after, status, updated_at)
-     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'ACTIVE', ?7)
+       (id, operation_day_id, ticket_id, ticket_group_id, endpoint, p256dh, auth,
+        consented_at, delete_after, status, updated_at)
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 'ACTIVE', ?8)
      ON CONFLICT(endpoint) DO UPDATE SET ticket_id = excluded.ticket_id,
-       operation_day_id = excluded.operation_day_id, p256dh = excluded.p256dh, auth = excluded.auth,
+       ticket_group_id = excluded.ticket_group_id, operation_day_id = excluded.operation_day_id,
+       p256dh = excluded.p256dh, auth = excluded.auth,
        consented_at = excluded.consented_at, delete_after = excluded.delete_after,
        status = 'ACTIVE', updated_at = excluded.updated_at`,
   )
@@ -3657,6 +3894,7 @@ app.post("/api/public/tickets/:ticketCode/push-subscriptions", async (context) =
       crypto.randomUUID(),
       ticket.operation_day_id,
       ticket.id,
+      ticket.ticket_group_id,
       body.endpoint,
       body.keys.p256dh,
       body.keys.auth,
@@ -3669,6 +3907,123 @@ app.post("/api/public/tickets/:ticketCode/push-subscriptions", async (context) =
     ticket.operation_day_id,
     ticket.rotation_id,
   );
+  return context.json(
+    {
+      active: true,
+      consentedAt: now.toISOString(),
+      deleteAfter,
+      preparationQueued: preparationQueued > 0,
+    },
+    201,
+  );
+});
+
+app.post("/api/public/groups/:groupCode/push-subscriptions", async (context) => {
+  const groupCode = context.req.param("groupCode").trim().toUpperCase();
+  if (!/^[A-Z2-9]{12,32}$/.test(groupCode)) {
+    return unknownTicketResponse(context.env, context.req.raw);
+  }
+  const body = await context.req.json<{
+    consent?: boolean;
+    endpoint?: string;
+    keys?: { p256dh?: string; auth?: string };
+  }>();
+  if (
+    body.consent !== true ||
+    typeof body.endpoint !== "string" ||
+    !isAllowedPushEndpoint(body.endpoint) ||
+    typeof body.keys?.p256dh !== "string" ||
+    typeof body.keys.auth !== "string"
+  ) {
+    return context.json(
+      { error: { code: "INVALID_PUSH_SUBSCRIPTION", message: "Push-Einwilligung ist ungültig." } },
+      400,
+    );
+  }
+  const group = await context.env.DB.prepare(
+    `SELECT tg.id, tg.operation_day_id, od.operations_end_at,
+            (SELECT t.id FROM tickets t WHERE t.ticket_group_id = tg.id
+              ORDER BY t.created_at, t.id LIMIT 1) AS representative_ticket_id
+       FROM ticket_groups tg
+       JOIN operation_days od ON od.id = tg.operation_day_id
+      WHERE tg.public_status_code_hash = ?1 AND tg.status <> 'CANCELED'`,
+  )
+    .bind(await sha256Hex(groupCode))
+    .first<{
+      id: string;
+      operation_day_id: string;
+      operations_end_at: string | null;
+      representative_ticket_id: string | null;
+    }>();
+  if (!group?.representative_ticket_id) {
+    return unknownTicketResponse(context.env, context.req.raw);
+  }
+  if (!group.operations_end_at) {
+    return context.json(
+      {
+        error: {
+          code: "PUSH_RETENTION_UNCONFIGURED",
+          message: "Web-Push ist erst nach Festlegung des Veranstaltungsendes verfügbar.",
+        },
+      },
+      409,
+    );
+  }
+  const now = new Date();
+  const deleteAfter = pushDeleteAfter(
+    group.operations_end_at,
+    pushRetentionDays(context.env.PUSH_RETENTION_DAYS),
+  );
+  if (Date.parse(deleteAfter) <= now.getTime()) {
+    return context.json(
+      {
+        error: {
+          code: "PUSH_RETENTION_EXPIRED",
+          message: "Für diese Veranstaltung werden keine Push-Ziele mehr gespeichert.",
+        },
+      },
+      409,
+    );
+  }
+  await context.env.DB.prepare(
+    `INSERT INTO web_push_subscriptions
+       (id, operation_day_id, ticket_id, ticket_group_id, endpoint, p256dh, auth,
+        consented_at, delete_after, status, updated_at)
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 'ACTIVE', ?8)
+     ON CONFLICT(endpoint) DO UPDATE SET ticket_id = excluded.ticket_id,
+       ticket_group_id = excluded.ticket_group_id, operation_day_id = excluded.operation_day_id,
+       p256dh = excluded.p256dh, auth = excluded.auth,
+       consented_at = excluded.consented_at, delete_after = excluded.delete_after,
+       status = 'ACTIVE', updated_at = excluded.updated_at`,
+  )
+    .bind(
+      crypto.randomUUID(),
+      group.operation_day_id,
+      group.representative_ticket_id,
+      group.id,
+      body.endpoint,
+      body.keys.p256dh,
+      body.keys.auth,
+      now.toISOString(),
+      deleteAfter,
+    )
+    .run();
+  const rotationRows = await context.env.DB.prepare(
+    `SELECT DISTINCT rt.rotation_id
+       FROM rotation_tickets rt
+       JOIN tickets t ON t.id = rt.ticket_id
+      WHERE t.ticket_group_id = ?1 AND rt.released_at IS NULL`,
+  )
+    .bind(group.id)
+    .all<{ rotation_id: string }>();
+  let preparationQueued = 0;
+  for (const rotation of rotationRows.results) {
+    preparationQueued += await queueEligiblePreparationNotifications(
+      context.env,
+      group.operation_day_id,
+      rotation.rotation_id,
+    );
+  }
   return context.json(
     {
       active: true,
@@ -3698,15 +4053,36 @@ app.delete("/api/public/tickets/:ticketCode/push-subscriptions", async (context)
   return context.body(null, 204);
 });
 
+app.delete("/api/public/groups/:groupCode/push-subscriptions", async (context) => {
+  const groupCode = context.req.param("groupCode").trim().toUpperCase();
+  const body = await context.req.json<{ endpoint?: string }>();
+  if (!/^[A-Z2-9]{12,32}$/.test(groupCode) || typeof body.endpoint !== "string") {
+    return context.json(
+      { error: { code: "INVALID_REQUEST", message: "Abmeldung ist ungültig." } },
+      400,
+    );
+  }
+  await context.env.DB.prepare(
+    `DELETE FROM web_push_subscriptions
+      WHERE endpoint = ?1 AND ticket_group_id IN (
+        SELECT id FROM ticket_groups WHERE public_status_code_hash = ?2
+      )`,
+  )
+    .bind(body.endpoint, await sha256Hex(groupCode))
+    .run();
+  return context.body(null, 204);
+});
+
 app.get("/api/public/events/:eventId/board", async (context) => {
   const eventId = context.req.param("eventId");
   const requestedGateId = context.req.query("gateId")?.trim() || null;
   const event = await context.env.DB.prepare(
-    "SELECT name, emergency_mode, operational_interrupted, operational_note, departed_visibility_seconds, updated_at FROM operation_days WHERE id = ?1",
+    "SELECT name, time_zone, emergency_mode, operational_interrupted, operational_note, departed_visibility_seconds, updated_at FROM operation_days WHERE id = ?1",
   )
     .bind(eventId)
     .first<{
       name: string;
+      time_zone: string;
       emergency_mode: number;
       operational_interrupted: number;
       operational_note: string;
@@ -3754,6 +4130,8 @@ app.get("/api/public/events/:eventId/board", async (context) => {
             COALESCE(tg.communication_number, fg.communication_number) AS communication_number,
             fg.precalled_at,
             COALESCE(fg.queue_position, fg.communication_number) AS queue_position, r.status,
+            r.predicted_boarding_at, r.prediction_quality, r.prediction_lower_minutes,
+            r.prediction_upper_minutes, r.prediction_updated_at,
             MIN(a.registration) AS aircraft_registration,
             MIN(a.operational_state) AS aircraft_operational_state,
             r.departed_at,
@@ -3804,6 +4182,11 @@ app.get("/api/public/events/:eventId/board", async (context) => {
       precalled_at: string | null;
       queue_position: number;
       status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
+      predicted_boarding_at: string | null;
+      prediction_quality: "STABLE" | "CHANGING" | "UNCERTAIN" | null;
+      prediction_lower_minutes: number | null;
+      prediction_upper_minutes: number | null;
+      prediction_updated_at: string | null;
       aircraft_registration: string | null;
       aircraft_operational_state: string | null;
       departed_at: string | null;
@@ -3828,8 +4211,10 @@ app.get("/api/public/events/:eventId/board", async (context) => {
     LANDED: "LANDED",
     COMPLETED: "COMPLETED",
   } as const;
+  const boardReadAt = new Date().toISOString();
   return context.json({
     eventName: event.name,
+    timeZone: event.time_zone,
     selectedGate: selectedGate
       ? { id: selectedGate.id, label: selectedGate.label, displayFilter }
       : null,
@@ -3840,36 +4225,60 @@ app.get("/api/public/events/:eventId/board", async (context) => {
     updatedAt: event.updated_at,
     groups: event.emergency_mode
       ? []
-      : rows.results.map((row, index) => ({
-          productName: row.product_name,
-          productCode: row.product_code,
-          gateLabel: row.gate_label,
-          communicationNumber: row.communication_number,
-          ticketLabels: Array.from(
-            { length: row.ticket_count },
-            (_, ticketIndex) =>
-              `${formatBookingGroupLabel(row.product_code, row.communication_number)}/${ticketIndex + 1}`,
-          ),
-          aircraftRegistration: row.aircraft_registration,
-          departedAt: row.departed_at,
-          status:
-            row.resource_group_status !== "ACTIVE"
-              ? "SERVICE_PAUSED"
-              : row.status === "DRAFT" && row.precalled_at !== null
-                ? "COME_TO_FLIGHT_LINE"
-                : row.status === "CALLED" && row.aircraft_operational_state === "BOARDING"
-                  ? "BOARDING"
-                  : publicState[row.status],
-          waitLowerMinutes:
+      : rows.results.map((row, index) => {
+          const forecastFreshness = assessForecastFreshness({
+            predictionQuality: row.prediction_quality,
+            predictionUpdatedAt: row.prediction_updated_at,
+            now: boardReadAt,
+          });
+          const predictionQuality =
             event.operational_interrupted === 1 || row.resource_group_status !== "ACTIVE"
-              ? 0
-              : index * 20,
-          waitUpperMinutes:
-            event.operational_interrupted === 1 || row.resource_group_status !== "ACTIVE"
-              ? 0
-              : (index + 1) * 30,
-          operationalNotice: row.resource_group_operational_note,
-        })),
+              ? "UNCERTAIN"
+              : forecastFreshness.quality;
+          const waitLowerMinutes = row.prediction_lower_minutes ?? index * 20;
+          const waitUpperMinutes = row.prediction_upper_minutes ?? (index + 1) * 30;
+          const boardingWindow = predictedBoardingWindow({
+            status: row.status,
+            quality: predictionQuality,
+            predictedBoardingAt: row.predicted_boarding_at,
+            lowerMinutes: waitLowerMinutes,
+            upperMinutes: waitUpperMinutes,
+            referenceAt: boardReadAt,
+          });
+          return {
+            productName: row.product_name,
+            productCode: row.product_code,
+            gateLabel: row.gate_label,
+            communicationNumber: row.communication_number,
+            ticketLabels: Array.from(
+              { length: row.ticket_count },
+              (_, ticketIndex) =>
+                `${formatBookingGroupLabel(row.product_code, row.communication_number)}/${ticketIndex + 1}`,
+            ),
+            aircraftRegistration: row.aircraft_registration,
+            departedAt: row.departed_at,
+            status:
+              row.resource_group_status !== "ACTIVE"
+                ? "SERVICE_PAUSED"
+                : row.status === "DRAFT" && row.precalled_at !== null
+                  ? "COME_TO_FLIGHT_LINE"
+                  : row.status === "CALLED" && row.aircraft_operational_state === "BOARDING"
+                    ? "BOARDING"
+                    : publicState[row.status],
+            waitLowerMinutes:
+              event.operational_interrupted === 1 || row.resource_group_status !== "ACTIVE"
+                ? 0
+                : waitLowerMinutes,
+            waitUpperMinutes:
+              event.operational_interrupted === 1 || row.resource_group_status !== "ACTIVE"
+                ? 0
+                : waitUpperMinutes,
+            boardingWindowLowerAt: boardingWindow.lowerAt,
+            boardingWindowUpperAt: boardingWindow.upperAt,
+            predictionQuality,
+            operationalNotice: row.resource_group_operational_note,
+          };
+        }),
     fleet: event.emergency_mode
       ? []
       : fleet.results.map((aircraft) => ({
