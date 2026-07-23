@@ -48,3 +48,10 @@ export function isDestinationActive(pathname: string, href: string): boolean {
   if (href === "/fids") return pathname === href || pathname.startsWith("/fids/");
   return pathname === href || pathname.startsWith(`${href}/`);
 }
+
+export function mayOpenEventRoute(role: OperatorRole, pathname: string): boolean {
+  if (pathname === "/simulation") return role === "ADMIN";
+  return destinationsForRole(role).some((destination) =>
+    isDestinationActive(pathname, destination.href),
+  );
+}

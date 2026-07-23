@@ -40,6 +40,11 @@ const operationalPwa = VitePWA({
     navigateFallback: "/index.html",
     navigateFallbackDenylist: [/^\/api(?:\/|$)/],
     importScripts: ["/push-sw.js"],
+    globIgnores: [
+      "**/ForecastSimulationView-*.js",
+      "**/ForecastSimulationView-*.css",
+      "**/comparison-worker-*.js",
+    ],
   },
 });
 
@@ -57,14 +62,7 @@ export default defineConfig(({ mode }) => {
               ),
             },
           ]
-        : [
-            {
-              find: "./features/forecast-simulation/ForecastSimulationView",
-              replacement: fileURLToPath(
-                new URL("./src/features/forecast-simulation/disabled.tsx", import.meta.url),
-              ),
-            },
-          ],
+        : [],
     },
     server: {
       port: 5173,

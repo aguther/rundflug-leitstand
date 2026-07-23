@@ -83,6 +83,36 @@
   color: var(--ui-muted);
 }
 
+.sim-admin-return {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 11px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-md);
+  color: var(--ui-text);
+  background: var(--ui-control);
+  font-weight: 650;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.sim-admin-return:hover {
+  border-color: var(--ui-accent);
+  color: var(--ui-accent);
+  background: var(--ui-control-hover);
+}
+
+.sim-admin-return:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--ui-accent) 30%, transparent);
+  outline-offset: 2px;
+}
+
+.sim-admin-return svg {
+  width: 17px;
+}
+
 .sim-layout {
   width: 100%;
   min-height: 0;

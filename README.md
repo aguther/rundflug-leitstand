@@ -55,9 +55,9 @@ Danach:
 
 Vite leitet `/api` und WebSocket-Verbindungen im Entwicklungsbetrieb an Wrangler weiter.
 
-### Lokaler Prognose-Simulator
+### Prognose-Simulator lokal und in der Abnahmeumgebung
 
-Der Prognose-Simulator benötigt weder Worker noch D1, Anmeldung oder Cloudflare-Ressourcen:
+Der lokale Prognose-Simulator benötigt weder Worker noch D1, Anmeldung oder Cloudflare-Ressourcen:
 
 ```bash
 npm run simulator
@@ -65,7 +65,15 @@ npm run simulator
 
 Vite öffnet `http://127.0.0.1:5173/simulation`. Die Route ist ausschließlich im Vite-Modus
 `simulator` aktiv, verarbeitet CSV-Dateien nur im Browser und führt selbst keine Netzwerkzugriffe
-aus. Ein normaler Entwicklungs- oder Produktionsbuild schaltet die Route nicht frei.
+aus.
+
+Der normale Cloudflare-Build stellt dieselbe Oberfläche zusätzlich lazy unter `/simulation` bereit.
+Sie wird aus **Administration → Auswertung** in einem neuen Tab geöffnet und durch die vorhandene
+Anmeldung sowie die Rolle `ADMIN` geschützt. Die anfängliche Sitzungs- und Veranstaltungsauswahl
+verwendet die bestehende API; Simulationskonfiguration, CSV-Inhalte, A/B-Vergleiche und Ergebnisse
+bleiben danach vollständig im Browser und werden weder in D1 noch in Durable Objects, KV oder R2
+gespeichert. Der Simulator erscheint bewusst nicht im allgemeinen Ansichtswechsler und wird nicht
+für alle PWA-Installationen vorab gecacht.
 
 Die vollständige Checkliste für Einrichtung, Betriebsbeginn und einen gestuften sicheren Neustart
 steht in [docs/operations/betriebsstart-und-neustart.md](docs/operations/betriebsstart-und-neustart.md).
