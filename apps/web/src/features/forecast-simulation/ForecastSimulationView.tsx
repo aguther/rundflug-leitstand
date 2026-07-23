@@ -1,5 +1,6 @@
 import {
   AlertTriangle,
+  ArrowLeft,
   Clock3,
   Coffee,
   Download,
@@ -39,6 +40,13 @@ import "./forecast-simulation.css";
 const MINUTE_MS = 60_000;
 const TICK_MS = 30_000;
 const SPEEDS = [1, 10, 60, 300] as const;
+const HOSTED_SIMULATOR = import.meta.env.MODE !== "simulator";
+
+function createComparisonWorker(): Worker {
+  return new Worker(new URL("./comparison-worker.ts", import.meta.url), {
+    type: "module",
+  });
+}
 
 const timeFormatter = new Intl.DateTimeFormat("de-DE", {
   hour: "2-digit",
@@ -240,12 +248,14 @@ export function ForecastSimulationView() {
     return () => window.clearInterval(timer);
   }, [running, simulationEnd, speed]);
 
-  useEffect(
-    () => () => {
-      comparisonWorkerRef.current?.terminate();
-    },
-    [],
-  );
+  useEffect(() => {
+    const worker = createComparisonWorker();
+    comparisonWorkerRef.current = worker;
+    return () => {
+      worker.terminate();
+      if (comparisonWorkerRef.current === worker) comparisonWorkerRef.current = null;
+    };
+  }, []);
 
   const restart = (nextConfig = config, incidents: readonly ManualIncident[] = []) => {
     const nextResult = runSimulation(nextConfig, incidents);
@@ -361,15 +371,13 @@ export function ForecastSimulationView() {
   };
 
   const startComparison = () => {
-    cancelComparison();
+    if (comparisonRunning) cancelComparison();
     setComparisonOpen(true);
     setComparisonResult(null);
     setComparisonError(null);
     setComparisonProgress({ completed: 0, total: config.forecastTuning.comparisonRuns });
     setComparisonRunning(true);
-    const worker = new Worker(new URL("./comparison-worker.ts", import.meta.url), {
-      type: "module",
-    });
+    const worker = comparisonWorkerRef.current ?? createComparisonWorker();
     comparisonWorkerRef.current = worker;
     worker.onmessage = (
       event: MessageEvent<
@@ -389,9 +397,9 @@ export function ForecastSimulationView() {
         setComparisonResult(event.data.result);
       } else {
         setComparisonError(event.data.message);
+        worker.terminate();
+        comparisonWorkerRef.current = null;
       }
-      worker.terminate();
-      comparisonWorkerRef.current = null;
       setComparisonRunning(false);
     };
     worker.onerror = () => {
@@ -422,6 +430,12 @@ export function ForecastSimulationView() {
           <Clock3 aria-hidden="true" />
           Synthetischer Lauf
         </div>
+        {HOSTED_SIMULATOR ? (
+          <a className="sim-admin-return" href="/admin?area=evaluation">
+            <ArrowLeft aria-hidden="true" />
+            Administration
+          </a>
+        ) : null}
         <ThemeToggle />
       </header>
 
