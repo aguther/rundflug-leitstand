@@ -41,22 +41,24 @@ type Aircraft = OperationBoard["aircraft"][number];
 type Rotation = OperationBoard["rotations"][number];
 type TurnaroundNextState = "AVAILABLE" | "REFUELING" | "PAUSED" | "INACTIVE";
 
-function AircraftPickerMeta({
+export function AircraftPickerMeta({
   aircraft,
-  rotation,
+  gateLabel,
 }: {
   aircraft: Aircraft;
-  rotation: Rotation | undefined;
+  gateLabel?: string | undefined;
 }) {
   return (
     <div className="assist-v15-picker-meta">
       <span>
-        {rotation?.communicationLabel ?? "Keine Gruppe"} · {aircraft.passengerSeats} Plätze
+        {aircraft.resourceGroupName} · {aircraft.passengerSeats} Plätze
       </span>
-      <span className="assist-v15-gate">
-        <MapPin aria-hidden="true" />
-        {rotation?.gateLabel ?? aircraft.resourceGroupName}
-      </span>
+      {gateLabel ? (
+        <span className="assist-v15-gate">
+          <MapPin aria-hidden="true" />
+          {gateLabel}
+        </span>
+      ) : null}
     </div>
   );
 }
@@ -375,7 +377,7 @@ export function FlightLineAssist({
                     <div className="assist-v15-aircraft-title">
                       <strong>{entry.registration}</strong>
                     </div>
-                    <AircraftPickerMeta aircraft={entry} rotation={rotation} />
+                    <AircraftPickerMeta aircraft={entry} gateLabel={rotation?.gateLabel} />
                     {existingClaim && !existingClaim.claimedByCurrentOperator ? (
                       <small className="assist-v15-claim-owner">
                         Betreut von {existingClaim.ownerLoginCode}

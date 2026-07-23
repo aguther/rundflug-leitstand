@@ -46,6 +46,9 @@ describe("Flight Line Assist", () => {
     expect(assistSource).toContain("!requiresAvailableReset &&");
     expect(assistSource).toContain("Coffee");
     expect(assistSource).toContain("AircraftPickerMeta");
+    expect(assistSource).toContain("{aircraft.resourceGroupName}");
+    expect(assistSource).toContain("gateLabel ? (");
+    expect(assistSource).not.toContain("rotation?.communicationLabel");
     expect(assistSource).toContain("CurrentAircraftStateMarker");
     expect(assistSource).not.toContain("assist-v15-operational-state");
     expect(assistSource).toContain('{ value: "current", label: "Aktuell" }');
@@ -129,7 +132,9 @@ describe("Flight Line Assist", () => {
   });
 
   it("shows only anonymous operational identifiers and counts", () => {
-    expect(assistSource).toContain("communicationLabel");
+    expect(assistSource).not.toContain("communicationLabel");
+    expect(sharedFlightLineSource).toContain("formatBookingGroupLabel");
+    expect(sharedFlightLineSource).toContain("<span>{rotationGroupLabels(rotation)}</span>");
     expect(assistFlowSource).toContain("ticketCount");
     expect(assistSource).not.toMatch(/guestName|phoneNumber|payment/i);
   });
