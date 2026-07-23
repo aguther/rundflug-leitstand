@@ -10,7 +10,7 @@ requirements:
     requirement: Aktive GO-TO-GATE- und BOARDING-Gruppen bilden unabhängig von Ressource und Produkt einen stabil queue-sortierten obersten Block; pausierte Gruppen sind verzögert.
     status: implemented
   - id: V173-LAY-010
-    requirement: Überlauffreie 100dvh-Anzeige mit exakt 4 bis 20 skalierten Zeilen, höchstens texthohen Tabellensymbolen, kompakter schmaler Ansicht und zeilenweise verteilter Zweispaltenansicht ab 1280 Pixel.
+    requirement: Überlauffreie 100dvh-Anzeige mit exakt 4 bis 20 skalierten Zeilen, höchstens texthohen und ungefassten Lucide-Symbolen (users, clock-3, circle-arrow-right, tickets-plane, plane-takeoff), neutralem WARTEN und dezentem neutralem Footer-Trenner, kompakter schmaler Ansicht und zeilenweise verteilter Zweispaltenansicht ab 1280 Pixel.
     status: implemented
   - id: V173-SET-010
     requirement: Zugänglicher dezenter Einstellungsbutton und bestätigungsgebundener Dialog für Zeilen, Layout, Theme und Abmeldung in der blauen UI-Akzentfarbe der Anwendung.

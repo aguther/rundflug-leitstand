@@ -330,19 +330,10 @@
 }
 
 .fids-status-icon {
-  display: grid;
   width: 1em;
   height: 1em;
   flex: 0 0 auto;
-  place-items: center;
-  border: max(1px, 0.08em) solid currentcolor;
-  border-radius: 50%;
-}
-
-.fids-status-icon svg {
-  width: 60%;
-  height: 60%;
-  stroke-width: 2.25;
+  stroke-width: 2;
 }
 
 .fids-window {
@@ -356,7 +347,7 @@
   color: var(--fids-cyan);
 }
 .tone-standby {
-  color: var(--fids-blue);
+  color: var(--fids-text);
 }
 .tone-delayed {
   color: var(--fids-orange);
@@ -430,11 +421,12 @@
 }
 
 .standard-fids .fids-footer-copy > i {
-  width: 0.42em;
-  height: 0.42em;
+  width: 0.3em;
+  height: 0.3em;
   flex: 0 0 auto;
   border-radius: 50%;
-  background: var(--fids-accent);
+  background: var(--fids-muted);
+  opacity: 0.55;
 }
 
 .fids-settings-button {

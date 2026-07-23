@@ -28,4 +28,25 @@ describe("V1.7.3 FIDS concept fidelity", () => {
     expect(stylesSource).toContain("overflow-wrap: anywhere");
     expect(stylesSource).not.toContain("overflow-x: auto");
   });
+
+  it("uses the approved unframed Lucide symbols and neutral passive information", () => {
+    for (const icon of ["Users", "Clock3", "CircleArrowRight", "TicketsPlane", "PlaneTakeoff"]) {
+      expect(displaySource).toContain(icon);
+    }
+    expect(displaySource).toContain("icon: CircleArrowRight");
+    expect(displaySource).toContain("icon: TicketsPlane");
+    expect(displaySource).toContain("icon: PlaneTakeoff");
+    expect(displaySource).toContain('return { label: "WARTEN", tone: "standby", icon: Clock3 }');
+    expect(displaySource).toContain('<Users aria-hidden="true" />');
+    expect(displaySource).toContain('<Icon aria-hidden="true" className="fids-status-icon" />');
+    expect(displaySource).not.toContain('<span className="fids-status-icon">');
+    expect(stylesSource).toMatch(
+      /\.fids-status-icon \{[\s\S]*?width: 1em;[\s\S]*?height: 1em;[\s\S]*?stroke-width: 2;/,
+    );
+    expect(stylesSource).not.toMatch(/\.fids-status-icon \{[^}]*border:/);
+    expect(stylesSource).toMatch(/\.tone-standby \{\s*color: var\(--fids-text\);/);
+    expect(stylesSource).toMatch(
+      /\.standard-fids \.fids-footer-copy > i \{[\s\S]*?background: var\(--fids-muted\);[\s\S]*?opacity: 0\.55;/,
+    );
+  });
 });
