@@ -177,6 +177,12 @@ describe("Flight Line Assist", () => {
     expect(assistStyles).toContain("height: auto");
     expect(assistStyles).toContain("position: absolute");
     expect(assistStyles).toContain("grid-template-columns: repeat(2, minmax(0, 1fr))");
+    expect(assistStyles).toMatch(
+      /\.flight-assist-v15 \.flight-director-compact-table\.history > div > span \{[\s\S]*?text-align: left;/,
+    );
+    expect(assistStyles).toMatch(
+      /\.flight-director-compact-table\.history[\s\S]*?> span:last-child \{[\s\S]*?text-align: left;/,
+    );
     expect(assistStyles).not.toContain("minmax(620px");
   });
 
