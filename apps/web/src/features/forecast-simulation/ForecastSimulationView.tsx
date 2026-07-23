@@ -32,6 +32,7 @@ import {
   validateSimulationConfig,
 } from "./model";
 import { ScenarioEditor } from "./ScenarioEditor";
+import { SimulationHistoryDialog } from "./SimulationHistoryDialog";
 import "./forecast-simulation.css";
 
 const MINUTE_MS = 60_000;
@@ -64,6 +65,7 @@ function rotationsAt(
 ): SimulationRotation[] {
   return rotations.map((rotation) => ({
     ...rotation,
+    precalledAt: milestoneVisible(rotation.precalledAt, nowMs),
     calledAt: milestoneVisible(rotation.calledAt, nowMs),
     departedAt: milestoneVisible(rotation.departedAt, nowMs),
     landedAt: milestoneVisible(rotation.landedAt, nowMs),
@@ -176,12 +178,13 @@ function safeExport(
   manualIncidents: readonly ManualIncident[],
 ) {
   return {
-    schema: "rundflug-forecast-simulation/v2",
+    schema: "rundflug-forecast-simulation/v3",
     scenario: result.config,
     seed: result.config.seed,
     manualIncidents,
     syntheticEventLedger: result.events,
     forecastSnapshots: result.snapshots,
+    aircraft: result.aircraft,
     rotations: result.rotations,
     metrics: result.metrics,
   };
@@ -202,6 +205,7 @@ export function ForecastSimulationView() {
     structuredClone(initialConfig),
   );
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [importMessage, setImportMessage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const editorErrors = validateSimulationConfig(editorConfig);
@@ -557,7 +561,7 @@ export function ForecastSimulationView() {
               const rotation = result.rotations.find((entry) => entry.id === rotationId);
               if (rotation?.aircraftId) setSelectedAircraftId(rotation.aircraftId);
             }}
-            onShowDetails={() => setDetailsOpen(true)}
+            onShowHistory={() => setHistoryOpen(true)}
             result={result}
             selectedRotationId={selectedRotationId}
           />
@@ -594,6 +598,8 @@ export function ForecastSimulationView() {
             </div>
           </section>
           <div className="sim-export-row">
+            <Button onClick={() => setDetailsOpen(true)}>Kennzahlen im Detail</Button>
+            <Button onClick={() => setHistoryOpen(true)}>Lauf auswerten</Button>
             <Button onClick={exportResult}>
               <Download aria-hidden="true" /> Ergebnis exportieren
             </Button>
@@ -615,6 +621,16 @@ export function ForecastSimulationView() {
         onChange={setEditorConfig}
         onClose={() => setEditorOpen(false)}
         open={editorOpen}
+      />
+
+      <SimulationHistoryDialog
+        initialAircraftId={selectedAircraftId}
+        initialRotationId={selectedRotationId}
+        onClose={() => setHistoryOpen(false)}
+        onExport={exportResult}
+        open={historyOpen}
+        result={result}
+        visibleAt={visibleAt}
       />
 
       <ModalDialog
@@ -735,6 +751,20 @@ export function ForecastSimulationView() {
             <h3>Diagnostik</h3>
             <p>Reaktionszeit max.: {metric(visibleMetrics.maximumEventReactionSeconds, " Sek.")}</p>
             <p>Countdowns bei UNCERTAIN: {visibleMetrics.uncertainCountdownViolations}</p>
+            <p>
+              GO TO GATE: {visibleMetrics.precall.precalledGroups}/
+              {visibleMetrics.precall.eligibleGroups} Gruppen ·{" "}
+              {metric(visibleMetrics.precall.coveragePercent, " %")}
+            </p>
+            <p>
+              GO TO GATE → Boarding: Median{" "}
+              {metric(visibleMetrics.precall.medianGateWaitMinutes, " Min.")} · P90{" "}
+              {metric(visibleMetrics.precall.p90GateWaitMinutes, " Min.")}
+            </p>
+            <p>
+              Gleicher Tick: {visibleMetrics.precall.sameTickCount} · bei UNCERTAIN:{" "}
+              {visibleMetrics.precall.uncertainPrecallCount}
+            </p>
             <p>
               Qualität: {visibleMetrics.qualities.STABLE} stabil ·{" "}
               {visibleMetrics.qualities.CHANGING} veränderlich ·{" "}

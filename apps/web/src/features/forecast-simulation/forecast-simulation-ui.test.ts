@@ -5,6 +5,10 @@ const appSource = readFileSync(new URL("../../App.tsx", import.meta.url), "utf8"
 const mainSource = readFileSync(new URL("../../main.tsx", import.meta.url), "utf8");
 const viewSource = readFileSync(new URL("./ForecastSimulationView.tsx", import.meta.url), "utf8");
 const editorSource = readFileSync(new URL("./ScenarioEditor.tsx", import.meta.url), "utf8");
+const historySource = readFileSync(
+  new URL("./SimulationHistoryDialog.tsx", import.meta.url),
+  "utf8",
+);
 const stylesSource = readFileSync(new URL("./forecast-simulation.css", import.meta.url), "utf8");
 const viteConfigSource = readFileSync(new URL("../../../vite.config.ts", import.meta.url), "utf8");
 const webPackage = JSON.parse(
@@ -29,7 +33,7 @@ describe("local-only forecast simulation surface", () => {
   });
 
   it("contains no browser network or persistence call in the simulator feature", () => {
-    const allSources = `${viewSource}\n${editorSource}`;
+    const allSources = `${viewSource}\n${editorSource}\n${historySource}`;
     expect(allSources).not.toMatch(/\bfetch\s*\(/);
     expect(allSources).not.toMatch(/\bWebSocket\b/);
     expect(allSources).not.toMatch(/localStorage|sessionStorage|\/api\//);
@@ -46,6 +50,7 @@ describe("local-only forecast simulation surface", () => {
       "Start",
       "Landung",
       "Abschluss",
+      "Lauf auswerten",
     ]) {
       expect(viewSource).toContain(label);
     }
@@ -59,10 +64,19 @@ describe("local-only forecast simulation surface", () => {
       "Ungeplante Pause",
       "Technischer Defekt",
       "Tagesausfall",
+      "Automatischer Voraufruf",
     ]) {
       expect(editorSource).toContain(label);
     }
-    expect(viewSource).toContain('schema: "rundflug-forecast-simulation/v2"');
+    expect(viewSource).toContain('schema: "rundflug-forecast-simulation/v3"');
+    expect(viewSource).toContain("SimulationHistoryDialog");
+    expect(historySource).toContain("Alle Prognose-Snapshots");
+    expect(historySource).toContain("GO TO GATE erfasst");
+    expect(historySource).toContain("systemseitig · noch ohne Flugzeugbindung");
+    expect(historySource).toContain("Prognosen vor Boarding gehören zur Fluggruppe");
+    expect(historySource).toContain("Realisierte Umläufe");
+    expect(historySource).toContain("Sperren und Rückkehrereignisse");
+    expect(historySource).toContain("Gruppe öffnen");
     expect(viewSource).toContain("Aktueller Prognose-Snapshot");
     expect(viewSource).toContain("Unterdrückungsgründe");
     expect(viewSource).toContain("Rohwerte nicht als operative Zeit freigegeben");

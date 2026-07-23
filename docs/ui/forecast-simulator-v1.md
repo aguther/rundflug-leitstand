@@ -2,11 +2,16 @@
 
 Stand: 22. Juli 2026
 
-Die folgenden beiden Desktop-Konzepte sind die verbindliche visuelle Spezifikation für den lokalen
+Die folgenden vier Desktop-Konzepte sind die verbindliche visuelle Spezifikation für den lokalen
 Prognose-Simulator:
 
 - [Hauptansicht](forecast-simulator-main-approved.png)
 - [Szenario-Konfiguration](forecast-simulator-scenario-approved.png)
+- [Verlauf einer Fluggruppe](forecast-simulator-group-history-approved.png)
+- [Tagesverlauf eines Flugzeugs](forecast-simulator-aircraft-history-approved.png)
+
+Die beiden Verlaufsbilder wurden am 23. Juli 2026 freigegeben; ihre fachlichen Details sind in der
+[Verlaufsauswertung](forecast-simulator-history-approved.md) festgehalten.
 
 ## Verbindliche Struktur
 
@@ -21,6 +26,11 @@ in getrennten, tabellarisch aufgebauten Bereichen. Jede Dauer verwendet die Spal
 typisch und Maximum. Das Übernehmen startet den Lauf vollständig mit demselben Seed und den neuen
 Parametern neu.
 
+Die `Verlaufsauswertung` öffnet als breiter Dialog mit den Registern `Fluggruppen` und `Flugzeuge`.
+Die Gruppenansicht zeigt jeden einzelnen Prognosesnapshot samt realisierten Meilensteinen. Die
+Flugzeugansicht zeigt ausschließlich ab bestätigtem Boarding gebundene Umläufe sowie Sperren und
+bestätigte Rückkehrereignisse.
+
 ## Verhalten
 
 - `Start`, `Pause`, `+5 Min.` sowie 1×, 10×, 60× und 300× steuern ausschließlich die virtuelle Zeit.
@@ -28,11 +38,15 @@ Parametern neu.
   manuell injizierbar. Flugzeugereignisse warten bei einem laufenden Umlauf bis zur nächsten
   organisatorisch zulässigen Grenze.
 - Eine temporäre Flugzeugsperre endet erst mit dem synthetischen bestätigten Rückkehrereignis.
+- Der automatische Voraufruf `GO TO GATE` verwendet dieselbe adaptive Domain-Logik wie der Worker.
+  Er wird als eigener Zeitpunkt vor Boarding festgehalten und bindet noch kein Flugzeug. Im
+  Szenarioeditor ist nur seine Aktivierung konfigurierbar.
 - Bei Prognosequalität `UNCERTAIN` zeigt die Oberfläche keinen Countdown. Auswahlzusammenfassung
   und Detaildialog kennzeichnen die numerischen Rohwerte ausdrücklich als nicht freigegebene
   Diagnose und nennen Unterdrückungsgrund, Lernwertalter, Stichprobengröße und aktive Kapazität.
-- Der lokale JSON-Export `rundflug-forecast-simulation/v2` enthält Rohwerte und explizite
-  Unterdrückungsgründe; sie besitzen keine operative oder öffentliche Zeitsemantik.
+- Der lokale JSON-Export `rundflug-forecast-simulation/v3` enthält Rohwerte, explizite
+  Unterdrückungsgründe, Voraufrufdiagnostik sowie die normalisierte Flugzeug- und Ereignishistorie;
+  sie besitzen keine operative oder öffentliche Zeitsemantik.
 - CSV-Kalibrierung und JSON-Export bleiben vollständig lokal. Es gibt keinen Upload und keine
   dauerhafte Browser-Speicherung.
 - Light und Dark Mode verwenden die bestehenden Design-Tokens. Bei schmaleren Viewports scrollt der
