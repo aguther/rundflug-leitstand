@@ -65,7 +65,12 @@ describe("Flight Line Assist", () => {
     expect(assistSource).toContain('" assist-v15-claim--takeover"');
     expect(assistSource).toMatch(/isClaiming\s*\? "primary"/);
     expect(assistStyles).toContain("width: 164px");
-    expect(assistStyles).toContain(".assist-v15-claim-zone");
+    expect(assistSource).not.toContain("assist-v15-claim-zone");
+    expect(assistStyles).not.toContain(".assist-v15-claim-zone");
+    expect(assistStyles).toContain("grid-template-columns: 40px minmax(0, 1fr) 48px");
+    expect(assistStyles).toContain("grid-column: 1 / -1");
+    expect(assistStyles).toContain("width: 100%");
+    expect(assistStyles).toContain("font-size: 0.82rem");
     expect(assistStyles).toContain("grid-template-rows: minmax(46px, 1fr) var(--control-compact)");
     expect(assistStyles).toContain("height: var(--control-compact)");
     expect(assistStyles).toContain("max-height: var(--control-compact)");
@@ -136,6 +141,13 @@ describe("Flight Line Assist", () => {
     expect(assistSource).toContain("claimedByCurrentOperator");
     expect(assistSource).toContain("await onClaim(entry.id)");
     expect(assistSource).toContain("await onRelease(claimedAircraftId)");
+    expect(assistSource).toMatch(
+      /const actionBusy =\s*releasing \|\|[\s\S]*busyRotationIds\?\.has/,
+    );
+    expect(assistSource).toContain("aria-busy={releasing}");
+    expect(assistSource).toMatch(
+      /disabled=\{releasing\}[\s\S]*label=\{`Pilot für \$\{activeAircraft\.registration\} wechseln`\}/,
+    );
   });
 
   it("renders exclusive selection and work modes and clears state on release or claim loss", () => {
@@ -159,6 +171,7 @@ describe("Flight Line Assist", () => {
     expect(assistStyles).toContain(".assist-v15-history-pane");
     expect(assistStyles).toContain("height: auto");
     expect(assistStyles).toContain("position: absolute");
+    expect(assistStyles).toContain("grid-template-columns: repeat(2, minmax(0, 1fr))");
     expect(assistStyles).not.toContain("minmax(620px");
   });
 

@@ -30,6 +30,9 @@ requirements:
   - id: V173-OPS-010
     requirement: Migration 0041, D1-Time-Travel-Wiederherstellung, Löschreihenfolge und bewusster Ausschluss aus portablen Backups sind dokumentiert.
     status: implemented
+  - id: V173-AST-010
+    requirement: Mobile Assist-Auswahl mit Zustandsmarker auf Höhe der vergrößerten Flugzeugdetails, vollbreitem größenstabilem Übernahmebutton, gleichmäßig zweispaltiger Historie ohne horizontalen Überlauf und gesperrten Aktionen während der Flugzeugfreigabe.
+    status: implemented
   - id: V173-QA-010
     requirement: Automatisierte und visuelle Abnahme deckt Rollen, Persistenz, Priorität, Themes, Viewports, Zeilenzahlen, Überlauf, Realtime und Offline-Stand ab.
     status: implemented

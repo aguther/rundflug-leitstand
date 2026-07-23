@@ -9,4 +9,5 @@ V173-SES-010,apps/worker/src/auth.ts und Loginroute,auth.test.ts und Sitzungswid
 V173-API-010,packages/contracts/src/index.ts apps/worker/src/index.ts und apps/web/src/api.ts,Contract- und fids-preferences.test.ts,umgesetzt
 V173-DAT-010,apps/worker/src/event-coordinator.ts event-deletion.ts und factory-reset.ts,fids-preferences.test.ts event-deletion.test.ts factory-reset.test.ts,umgesetzt
 V173-OPS-010,apps/worker/migrations/0041_fids_display_accounts_and_preferences.sql und docs/operations,SQLite-Migrationsintegration und Backup-Dokumentationsprüfung,umgesetzt
+V173-AST-010,apps/web/src/flight-line-assist.tsx und features/flight-line/flight-line-assist-v15.css,flight-line-assist-ui.test.ts und mobile Browserabnahme,umgesetzt
 V173-QA-010,Workspace-Test- und Buildskripte sowie docs/ui/v1.7.3-fids-concept.md,Vollständiger Check und Browserabnahme,umgesetzt

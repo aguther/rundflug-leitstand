@@ -124,10 +124,10 @@
 .flight-assist-v15 .assist-v15-aircraft-list article {
   box-sizing: border-box;
   min-width: 0;
-  min-height: 150px;
+  min-height: 0;
   display: grid;
-  grid-template-columns: 40px minmax(0, 1fr);
-  grid-template-rows: auto minmax(var(--control-compact), 1fr);
+  grid-template-columns: 40px minmax(0, 1fr) 48px;
+  grid-template-rows: minmax(50px, auto) var(--control-compact);
   gap: 8px 10px;
   align-items: start;
   padding: 12px;
@@ -180,7 +180,8 @@
   justify-items: start;
   gap: 3px;
   color: var(--ui-muted);
-  font-size: 0.72rem;
+  font-size: 0.82rem;
+  line-height: 1.35;
 }
 
 .flight-assist-v15 .assist-v15-picker-meta small {
@@ -196,35 +197,27 @@
 }
 
 .flight-assist-v15 .assist-v15-gate svg {
-  width: 13px;
-  height: 13px;
+  width: 14px;
+  height: 14px;
   flex: 0 0 auto;
 }
 
-.flight-assist-v15 .assist-v15-claim-zone {
-  width: 164px;
-  min-width: 164px;
-  min-height: 92px;
-  grid-column: 2;
-  grid-row: 2;
-  align-self: stretch;
-  justify-self: end;
-  display: grid;
-  grid-template-rows: minmax(46px, 1fr) var(--control-compact);
-  justify-items: center;
-  gap: 6px;
-}
-
-.flight-assist-v15 .assist-v15-claim-zone .flight-director-current-state-marker {
+.flight-assist-v15 .assist-v15-aircraft-list article > .flight-director-current-state-marker {
+  grid-column: 3;
+  grid-row: 1;
   align-self: center;
 }
 
 .flight-assist-v15 .assist-v15-claim {
-  width: 164px;
-  min-width: 164px;
+  width: 100%;
+  min-width: 0;
   height: var(--control-compact);
   min-height: var(--control-compact);
   max-height: var(--control-compact);
+  grid-column: 1 / -1;
+  grid-row: 2;
+  justify-self: stretch;
+  align-self: end;
   box-sizing: border-box;
   white-space: nowrap;
   overflow: hidden;
@@ -234,7 +227,7 @@
   .flight-assist-v15 .assist-v15-aircraft-list article {
     min-height: 150px;
     grid-template-columns: 40px minmax(0, 1fr) 164px;
-    grid-template-rows: minmax(0, 1fr);
+    grid-template-rows: minmax(46px, 1fr) var(--control-compact);
     align-items: stretch;
   }
 
@@ -242,10 +235,18 @@
     align-self: start;
   }
 
-  .flight-assist-v15 .assist-v15-claim-zone {
-    min-height: 0;
+  .flight-assist-v15 .assist-v15-aircraft-list article > .flight-director-current-state-marker {
     grid-column: 3;
     grid-row: 1;
+    align-self: stretch;
+  }
+
+  .flight-assist-v15 .assist-v15-claim {
+    width: 164px;
+    min-width: 164px;
+    grid-column: 3;
+    grid-row: 2;
+    justify-self: end;
   }
 }
 
@@ -807,7 +808,7 @@
     > div:not(.flight-director-compact-head) {
     min-width: 0;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 7px 12px;
     padding: 12px;
   }

@@ -173,7 +173,8 @@ export function FlightLineAssist({
     ? primaryAircraftActionPresentation(activeAircraft, activeRotation)
     : null;
   const PrimaryActionIcon = primaryPresentation?.Icon;
-  const actionBusy = activeRotation ? Boolean(busyRotationIds?.has(activeRotation.id)) : false;
+  const actionBusy =
+    releasing || (activeRotation ? Boolean(busyRotationIds?.has(activeRotation.id)) : false);
 
   useEffect(() => {
     if (!ownServerClaim) return;
@@ -381,42 +382,40 @@ export function FlightLineAssist({
                       </small>
                     ) : null}
                   </div>
-                  <div className="assist-v15-claim-zone">
-                    <CurrentAircraftStateMarker
-                      aircraft={entry}
-                      rotation={rotation}
-                      timeZone={board.event.timeZone}
-                    />
-                    <Button
-                      aria-busy={isClaiming}
-                      aria-label={
-                        isClaiming ? `Übernahme läuft für ${entry.registration}` : undefined
-                      }
-                      className={`assist-v15-claim${
-                        existingClaim && !existingClaim.claimedByCurrentOperator
-                          ? " assist-v15-claim--takeover"
-                          : ""
-                      }`}
-                      disabled={claimingAircraftId !== null}
-                      onClick={() => void claim(entry)}
-                      size="compact"
-                      variant={
-                        isClaiming
-                          ? "primary"
-                          : existingClaim && !existingClaim.claimedByCurrentOperator
-                            ? "ghost"
-                            : "primary"
-                      }
-                    >
-                      {isClaiming ? (
-                        <LoaderCircle aria-hidden="true" className="assist-v15-spinner" />
-                      ) : existingClaim && !existingClaim.claimedByCurrentOperator ? (
-                        "Bewusst übernehmen"
-                      ) : (
-                        "Übernehmen"
-                      )}
-                    </Button>
-                  </div>
+                  <CurrentAircraftStateMarker
+                    aircraft={entry}
+                    rotation={rotation}
+                    timeZone={board.event.timeZone}
+                  />
+                  <Button
+                    aria-busy={isClaiming}
+                    aria-label={
+                      isClaiming ? `Übernahme läuft für ${entry.registration}` : undefined
+                    }
+                    className={`assist-v15-claim${
+                      existingClaim && !existingClaim.claimedByCurrentOperator
+                        ? " assist-v15-claim--takeover"
+                        : ""
+                    }`}
+                    disabled={claimingAircraftId !== null}
+                    onClick={() => void claim(entry)}
+                    size="compact"
+                    variant={
+                      isClaiming
+                        ? "primary"
+                        : existingClaim && !existingClaim.claimedByCurrentOperator
+                          ? "ghost"
+                          : "primary"
+                    }
+                  >
+                    {isClaiming ? (
+                      <LoaderCircle aria-hidden="true" className="assist-v15-spinner" />
+                    ) : existingClaim && !existingClaim.claimedByCurrentOperator ? (
+                      "Bewusst übernehmen"
+                    ) : (
+                      "Übernehmen"
+                    )}
+                  </Button>
                 </article>
               );
             })}
@@ -460,6 +459,7 @@ export function FlightLineAssist({
               </span>
               {pilotChangeAllowed ? (
                 <IconButton
+                  disabled={releasing}
                   label={`Pilot für ${activeAircraft.registration} wechseln`}
                   onClick={() => setPilotOpen(true)}
                   size="compact"
@@ -481,7 +481,7 @@ export function FlightLineAssist({
         </Panel>
 
         <Panel className="assist-v15-actions" padding="compact">
-          <div className="assist-v15-action-bar">
+          <div aria-busy={releasing} className="assist-v15-action-bar">
             <IconButton
               label={primaryAircraftActionLabel(
                 activeAircraft,
