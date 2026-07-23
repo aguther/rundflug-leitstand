@@ -4,16 +4,16 @@ requirements:
     requirement: Repository und Laufzeit verwenden konsistent Release 1.7.3.
     status: implemented
   - id: V173-FID-010
-    requirement: Standard-FIDS mit Veranstaltungsname, großem Logo oder Plane-Fallback und kompatibler Normalisierung aller Terminallinks.
+    requirement: Standard-FIDS mit Veranstaltungsname, rahmenlosem großem Logo oder freiem schlankem Plane-Fallback in blauer Markenfarbe und kompatibler Normalisierung aller Terminallinks.
     status: implemented
   - id: V173-PRI-010
     requirement: Aktive GO-TO-GATE- und BOARDING-Gruppen bilden unabhängig von Ressource und Produkt einen stabil queue-sortierten obersten Block; pausierte Gruppen sind verzögert.
     status: implemented
   - id: V173-LAY-010
-    requirement: Überlauffreie 100dvh-Anzeige mit exakt 4 bis 20 skalierten Zeilen, kompakter schmaler Ansicht und zeilenweise verteilter Zweispaltenansicht ab 1280 Pixel.
+    requirement: Überlauffreie 100dvh-Anzeige mit exakt 4 bis 20 skalierten Zeilen, höchstens texthohen Tabellensymbolen, kompakter schmaler Ansicht und zeilenweise verteilter Zweispaltenansicht ab 1280 Pixel.
     status: implemented
   - id: V173-SET-010
-    requirement: Zugänglicher dezenter Einstellungsbutton und bestätigungsgebundener Dialog für Zeilen, Layout, Theme und Abmeldung.
+    requirement: Zugänglicher dezenter Einstellungsbutton und bestätigungsgebundener Dialog für Zeilen, Layout, Theme und Abmeldung in der blauen UI-Akzentfarbe der Anwendung.
     status: implemented
   - id: V173-AUT-010
     requirement: DISPLAY-Konten sind administrierbar und bleiben auf FIDS beschränkt; ADMIN-Konten dürfen FIDS zusätzlich zu ihren Administrationsansichten und mit unveränderter Startseite verwenden.
