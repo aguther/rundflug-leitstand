@@ -182,7 +182,7 @@
 .cashier-split-line > svg {
   flex: 0 0 auto;
 }
-.cashier-sell-action.ds-button > svg {
+.cashier-sell-action.ds-button > .ds-button-content > svg {
   width: 20px;
   height: 20px;
   flex: 0 0 auto;
@@ -214,18 +214,12 @@
   border-radius: 0;
 }
 .cashier-ticket-table .ds-table {
-  min-width: 680px;
+  min-width: 520px;
   font-size: 0.76rem;
 }
 .cashier-ticket-table .ds-table :is(th, td) {
   padding: 9px 10px;
   white-space: nowrap;
-}
-.cashier-ticket-table .ds-table :is(th, td):nth-child(6) {
-  padding-right: 14px;
-}
-.cashier-ticket-table .ds-table :is(th, td):nth-child(7) {
-  padding-left: 14px;
 }
 .cashier-person-count {
   display: inline-flex;
@@ -282,7 +276,7 @@
   min-height: 172px;
   flex: 1 1 auto;
   display: grid;
-  grid-template-columns: minmax(132px, 0.7fr) minmax(170px, 0.95fr) minmax(196px, 0.78fr);
+  grid-template-columns: minmax(0, 1.65fr) minmax(196px, 0.78fr);
   gap: 8px;
   overflow: hidden;
 }
@@ -294,55 +288,31 @@
   border: 1px solid var(--ui-border);
   border-radius: 6px;
 }
-.cashier-ticket-detail-grid > dl {
-  overflow: hidden;
+.cashier-flight-groups {
+  padding: 0;
+  overflow: auto;
 }
-.cashier-ticket-detail-grid > dl > div {
-  display: grid;
-  grid-template-columns: 66px minmax(0, 1fr);
-  gap: 7px;
-  padding-block: 5px;
+.cashier-flight-groups .ds-table-scroll {
+  height: 100%;
+  border: 0;
+  border-radius: 0;
 }
-.cashier-ticket-detail-grid dt {
-  color: var(--ui-muted);
-  font-size: 0.68rem;
-}
-.cashier-ticket-detail-grid dd {
-  min-width: 0;
-  margin: 0;
-  overflow-wrap: anywhere;
-  font-size: 0.72rem;
-  font-weight: 650;
-}
-.cashier-ticket-identifiers {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-}
-.cashier-ticket-identifiers > button {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 8px 0 0;
-  border-top: 1px solid var(--ui-border);
-  border-right: 0;
-  border-bottom: 0;
-  border-left: 0;
-  color: var(--ui-text);
-  background: transparent;
+.cashier-flight-groups .ds-table {
+  min-width: 520px;
   font-size: 0.7rem;
-  text-align: left;
-  cursor: pointer;
 }
-.cashier-ticket-identifiers > button span {
-  overflow-wrap: anywhere;
+.cashier-flight-groups .ds-table :is(th, td) {
+  padding: 9px 8px;
+  white-space: nowrap;
 }
-.cashier-ticket-identifiers > button.selected {
-  color: var(--ui-accent);
-  font-weight: 750;
+.cashier-icon-heading,
+.cashier-phase-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.cashier-phase-icon {
+  color: var(--ui-text);
 }
 .cashier-ticket-paper {
   position: relative;
@@ -570,7 +540,7 @@
 }
 
 @media (max-width: 1250px) {
-  .cashier-sell-action.ds-button > svg {
+  .cashier-sell-action.ds-button > .ds-button-content > svg {
     width: 18px;
     height: 18px;
     transform: translateX(-1px);
@@ -630,7 +600,7 @@
     font-size: 0.61rem;
   }
   .cashier-ticket-table .ds-table {
-    min-width: 600px;
+    min-width: 520px;
     table-layout: fixed;
     font-size: 0.7rem;
   }
@@ -654,19 +624,11 @@
   .cashier-ticket-table .ds-table :is(th, td):nth-child(5) {
     width: 14%;
   }
-  .cashier-ticket-table .ds-table :is(th, td):nth-child(6) {
-    width: 23%;
-    padding-right: 14px;
-  }
-  .cashier-ticket-table .ds-table :is(th, td):nth-child(7) {
-    width: 12%;
-    padding-left: 14px;
-  }
   .cashier-ticket-detail {
     padding: 10px 12px;
   }
   .cashier-ticket-detail-grid {
-    grid-template-columns: minmax(118px, 0.68fr) minmax(145px, 0.9fr) minmax(196px, 0.72fr);
+    grid-template-columns: minmax(0, 1.65fr) minmax(196px, 0.72fr);
     gap: 7px;
   }
   .cashier-ticket-detail-grid > * {

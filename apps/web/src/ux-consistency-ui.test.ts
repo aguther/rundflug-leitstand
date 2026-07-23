@@ -21,7 +21,7 @@ describe("V1 UX consistency", () => {
   it("keeps account and session controls secondary to the current editor action", () => {
     expect(appSource).toContain('className="secondary-action"');
     expect(appSource).toContain('session?.account.role === "ADMIN"');
-    expect(appSource).toContain("void logout().then(() => window.location.reload())");
+    expect(appSource).toContain("void logoutAndReload()");
     expect(appSource).not.toContain(
       'className={adminModeUnlocked ? "secondary-action" : "primary-action"}',
     );

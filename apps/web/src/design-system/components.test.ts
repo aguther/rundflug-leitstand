@@ -4,6 +4,10 @@ import mainSource from "../main.tsx?raw";
 
 const stylesSource = readFileSync(new URL("./components.css", import.meta.url), "utf8");
 const buttonSource = readFileSync(new URL("./components/Button.tsx", import.meta.url), "utf8");
+const iconButtonSource = readFileSync(
+  new URL("./components/IconButton.tsx", import.meta.url),
+  "utf8",
+);
 const fieldSource = readFileSync(new URL("./components/Field.tsx", import.meta.url), "utf8");
 const tabsSource = readFileSync(new URL("./components/Tabs.tsx", import.meta.url), "utf8");
 const tableSource = readFileSync(new URL("./components/DataTable.tsx", import.meta.url), "utf8");
@@ -38,6 +42,19 @@ describe("shared design-system component library", () => {
     expect(buttonSource).toContain('type ButtonSize = "compact" | "default" | "touch"');
     expect(buttonSource).toMatch(/ds-button--\$\{size\}/);
     expect(stylesSource).toContain(".ds-button--compact");
+  });
+
+  it("shows the busy indicator only inside the initiating button without changing its width", () => {
+    expect(buttonSource).toContain("busy?: boolean");
+    expect(buttonSource).toContain("aria-busy={effectiveBusy || undefined}");
+    expect(buttonSource).toContain("disabled={disabled || effectiveBusy}");
+    expect(buttonSource).toContain("Promise.resolve(result).then");
+    expect(buttonSource).toContain("const contentLabel = visibleText(children)");
+    expect(iconButtonSource).toContain("busy?: boolean");
+    expect(stylesSource).toContain(".ds-button-content--hidden");
+    expect(stylesSource).toContain("visibility: hidden");
+    expect(stylesSource).toContain("@media (prefers-reduced-motion: reduce)");
+    expect(stylesSource).toContain("animation: none");
   });
 
   it("provides shared fields and scrollbar-stable tabs", () => {

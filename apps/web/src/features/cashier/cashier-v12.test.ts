@@ -41,7 +41,7 @@ describe("V1.7.0 cashier", () => {
     expect(stylesSource).toMatch(/minmax\(0, 1\.5fr\)[\s\S]*?minmax\(118px, 1fr\)/);
     expect(stylesSource).toMatch(/\.cashier-sell-action\.ds-button \{[\s\S]*?width: 100%;/);
     expect(stylesSource).toMatch(
-      /\.cashier-sell-action\.ds-button > svg \{[\s\S]*?width: 20px;[\s\S]*?transform: translateX\(-3px\);/,
+      /\.cashier-sell-action\.ds-button > \.ds-button-content > svg \{[\s\S]*?width: 20px;[\s\S]*?transform: translateX\(-3px\);/,
     );
   });
 
@@ -49,7 +49,7 @@ describe("V1.7.0 cashier", () => {
     expect(appSource).toContain("function TicketPaper");
     expect(appSource).toContain("function QrScanDialog");
     expect(appSource).toContain('className="ticket-print-document"');
-    expect(appSource).toContain("images.length !== receipt.length");
+    expect(appSource).toContain("images.length !== 1");
     expect(stylesSource).toContain("break-after: page");
     expect(stylesSource).toContain("width: 44mm");
   });

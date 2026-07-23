@@ -1,3 +1,5 @@
+export type { BusyIndicatorProps } from "./BusyIndicator";
+export { BusyIndicator } from "./BusyIndicator";
 export type { ButtonProps } from "./Button";
 export { Button } from "./Button";
 export type { ConfirmationDialogProps } from "./ConfirmationDialog";

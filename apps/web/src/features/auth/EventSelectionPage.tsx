@@ -1,6 +1,7 @@
 import type { EventCatalogEntry, OperatorSession } from "@rundflug/contracts";
 import { useState } from "react";
 import { BrandMark } from "../../design-system/BrandMark";
+import { Button } from "../../design-system/components";
 import { ThemeToggle } from "../../design-system/ThemeToggle";
 import { rememberActiveEvent } from "../../event-context";
 import { useAuth } from "./AuthContext";
@@ -21,6 +22,17 @@ export function EventSelectionPage({
 }) {
   const { logout } = useAuth();
   const [eventId, setEventId] = useState(events.length === 1 ? (events[0]?.eventId ?? "") : "");
+  const [logoutBusy, setLogoutBusy] = useState(false);
+
+  async function logoutAndReload() {
+    setLogoutBusy(true);
+    try {
+      await logout();
+      window.location.reload();
+    } finally {
+      setLogoutBusy(false);
+    }
+  }
 
   function openEvent(event: React.FormEvent) {
     event.preventDefault();
@@ -77,13 +89,15 @@ export function EventSelectionPage({
             Keine aktive oder vorbereitete Veranstaltung verfügbar.
           </p>
         )}
-        <button
+        <Button
+          busy={logoutBusy}
           className="event-selection-logout"
-          onClick={() => void logout().then(() => window.location.reload())}
+          onClick={() => void logoutAndReload()}
           type="button"
+          variant="ghost"
         >
           Mit anderem Konto anmelden
-        </button>
+        </Button>
       </section>
     </main>
   );

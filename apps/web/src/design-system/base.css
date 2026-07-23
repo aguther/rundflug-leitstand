@@ -177,6 +177,19 @@ body {
   color: var(--ui-danger);
   background: var(--ui-danger-soft);
 }
+.account-menu-popover button[aria-busy="true"] {
+  position: relative;
+  cursor: wait;
+}
+.account-menu-popover button[aria-busy="true"] > :not(.ds-busy-indicator) {
+  visibility: hidden;
+}
+.account-menu-popover button > .ds-busy-indicator,
+.account-menu-popover--integrated .account-menu-action > .ds-busy-indicator {
+  position: absolute;
+  inset: 0;
+  display: flex;
+}
 
 .account-menu-popover--integrated {
   width: min(320px, calc(100vw - 24px));

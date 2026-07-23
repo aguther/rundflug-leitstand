@@ -166,6 +166,12 @@ const ticketStatus = async (code) => {
     throw new Error(`Öffentlicher Ticketstatus fehlgeschlagen (${response.status}).`);
   return response.json();
 };
+const groupStatus = async (code) => {
+  const response = await fetch(`${base}/api/public/groups/${code}`);
+  if (!response.ok)
+    throw new Error(`Öffentlicher Gruppenstatus fehlgeschlagen (${response.status}).`);
+  return response.json();
+};
 const command = async (device, token, expectedVersion, type, payload, staleRetries = 0) => {
   const response = await fetch(`${base}/api/events/demo-2026/commands`, {
     method: "POST",
@@ -261,13 +267,38 @@ const assertPublicTimeCommunication = (payload, label) => {
   if (
     windows.some(
       (entry) =>
-        !Number.isInteger(entry.waitLowerMinutes) ||
-        !Number.isInteger(entry.waitUpperMinutes) ||
-        entry.waitLowerMinutes < 0 ||
-        entry.waitUpperMinutes < entry.waitLowerMinutes,
+        ("waitLowerMinutes" in entry || "waitUpperMinutes" in entry) &&
+        (!Number.isInteger(entry.waitLowerMinutes) ||
+          !Number.isInteger(entry.waitUpperMinutes) ||
+          entry.waitLowerMinutes < 0 ||
+          entry.waitUpperMinutes < entry.waitLowerMinutes),
     )
   ) {
     throw new Error(`${label} veröffentlicht kein konsistentes Wartezeitfenster.`);
+  }
+  if (!payload.timeZone || typeof payload.timeZone !== "string") {
+    throw new Error(`${label} veröffentlicht keine Veranstaltungszeitzone.`);
+  }
+  for (const entry of windows) {
+    const lower = entry.boardingWindowLowerAt;
+    const upper = entry.boardingWindowUpperAt;
+    const windowExpected =
+      entry.predictionQuality !== "UNCERTAIN" && ["WAITING", "PREPARE"].includes(entry.status);
+    if (windowExpected) {
+      if (
+        typeof lower !== "string" ||
+        typeof upper !== "string" ||
+        !Number.isFinite(Date.parse(lower)) ||
+        !Number.isFinite(Date.parse(upper)) ||
+        Date.parse(upper) < Date.parse(lower)
+      ) {
+        throw new Error(`${label} veröffentlicht kein absolutes ISO-Zeitfenster.`);
+      }
+    } else if (lower !== null || upper !== null) {
+      throw new Error(
+        `${label} veröffentlicht ein Zeitfenster für einen nicht prognostizierten Zustand.`,
+      );
+    }
   }
 };
 
@@ -310,6 +341,7 @@ try {
   );
   socket = await connectRealtime();
   const privateCodes = [ticketCode(), ticketCode()];
+  const publicGroupCode = ticketCode();
   const saleRefresh = nextRefresh(socket);
   const sold = await command(
     devices.cashier,
@@ -318,6 +350,7 @@ try {
     "SELL_TICKET_GROUP",
     {
       productId: "panorama-20",
+      publicGroupCode,
       publicTicketCodes: privateCodes,
       standby: false,
       paymentStatus: "PAID",
@@ -343,6 +376,22 @@ try {
     );
   }
   assertPublicTimeCommunication(initialTicketStatus, "Ticketstatus");
+  const initialGroupStatus = await groupStatus(publicGroupCode);
+  if (
+    initialGroupStatus.groupSize !== 2 ||
+    initialGroupStatus.parts.length !== 1 ||
+    initialGroupStatus.parts[0]?.passengerCount !== 2 ||
+    "communicationLabel" in initialGroupStatus.parts[0]
+  ) {
+    throw new Error("Der öffentliche Gruppenstatus aggregiert die Buchungsgruppe nicht korrekt.");
+  }
+  assertPublicTimeCommunication(
+    {
+      timeZone: initialGroupStatus.timeZone,
+      groups: initialGroupStatus.parts,
+    },
+    "Gruppenstatus",
+  );
   const pushEndpoint = `https://fcm.googleapis.com/fcm/send/synthetic-${randomUUID()}`;
   const registerPush = async (consent) => {
     const response = await fetch(
@@ -375,6 +424,33 @@ try {
     throw new Error(
       "Push-Einwilligung oder deduplizierter Vorbereitungshinweis ist unvollständig.",
     );
+  }
+  const groupPushEndpoint = `https://fcm.googleapis.com/fcm/send/synthetic-group-${randomUUID()}`;
+  const registerGroupPush = async (consent) => {
+    const response = await fetch(
+      `${base}/api/public/groups/${publicGroupCode}/push-subscriptions`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          consent,
+          endpoint: groupPushEndpoint,
+          keys: { p256dh: "synthetic-group-p256dh", auth: "synthetic-group-auth" },
+        }),
+      },
+    );
+    return { response, body: await response.json() };
+  };
+  const rejectedGroupConsent = await registerGroupPush(false);
+  const firstGroupConsent = await registerGroupPush(true);
+  const duplicateGroupConsent = await registerGroupPush(true);
+  if (
+    rejectedGroupConsent.response.status !== 400 ||
+    firstGroupConsent.response.status !== 201 ||
+    firstGroupConsent.body.preparationQueued !== true ||
+    duplicateGroupConsent.body.preparationQueued !== false
+  ) {
+    throw new Error("Gruppenbezogene Push-Einwilligung oder Deduplizierung ist unvollständig.");
   }
   let publicBoard = await board();
   assertPublicTimeCommunication(publicBoard, "FIDS");
@@ -414,7 +490,7 @@ try {
     group.ticketLabels.some((label) => !label.startsWith("G-PAN20-")) ||
     group.gateLabel !== "Flight Line 1" ||
     initialTicketStatus.gateLabel !== "Flight Line 1" ||
-    privateCodes.some((code) => serializedBoard.includes(code)) ||
+    [...privateCodes, publicGroupCode].some((code) => serializedBoard.includes(code)) ||
     /pilot/i.test(serializedBoard)
   ) {
     throw new Error(
@@ -433,15 +509,48 @@ try {
         ),
         gateLabel: group?.gateLabel,
         ticketGateLabel: initialTicketStatus.gateLabel,
-        privateCodeExposed: privateCodes.some((code) => serializedBoard.includes(code)),
+        privateCodeExposed: [...privateCodes, publicGroupCode].some((code) =>
+          serializedBoard.includes(code),
+        ),
         pilotDataExposed: /pilot/i.test(serializedBoard),
       })}`,
+    );
+  }
+  const splitPrivateCodes = Array.from({ length: 5 }, ticketCode);
+  const splitGroupCode = ticketCode();
+  const splitSaleRefresh = nextRefresh(socket);
+  const splitSale = await command(
+    devices.cashier,
+    tokens.cashier,
+    sold.event.version,
+    "SELL_TICKET_GROUP",
+    {
+      productId: "panorama-20",
+      publicGroupCode: splitGroupCode,
+      publicTicketCodes: splitPrivateCodes,
+      standby: false,
+      paymentStatus: "PAID",
+      paymentMethod: "CASH",
+      oversizeSplitAcknowledged: true,
+    },
+  );
+  await splitSaleRefresh;
+  const splitStatus = await groupStatus(splitGroupCode);
+  if (
+    splitStatus.groupSize !== 5 ||
+    splitStatus.parts.length !== 2 ||
+    splitStatus.parts.some((part) => part.partCount !== 2) ||
+    splitStatus.parts.reduce((sum, part) => sum + part.passengerCount, 0) !== 5 ||
+    splitStatus.parts.some((part) => "communicationLabel" in part || "flightGroup" in part)
+  ) {
+    throw new Error(
+      "Der öffentliche Gruppenstatus bildet eine bewusste Aufteilung nicht korrekt ab.",
     );
   }
   const alternateGate = await command(
     devices.admin,
     tokens.admin,
-    sold.event.version,
+    splitSale.event.version,
     "UPSERT_GATE",
     {
       gateId: "demo-2026-gate-alternate",
@@ -599,6 +708,17 @@ try {
     },
   );
   if (revokePush.status !== 204) throw new Error("Push-Widerruf wurde nicht unmittelbar gelöscht.");
+  const revokeGroupPush = await fetch(
+    `${base}/api/public/groups/${publicGroupCode}/push-subscriptions`,
+    {
+      method: "DELETE",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ endpoint: groupPushEndpoint }),
+    },
+  );
+  if (revokeGroupPush.status !== 204) {
+    throw new Error("Gruppen-Push-Widerruf wurde nicht unmittelbar gelöscht.");
+  }
   process.stdout.write(
     JSON.stringify({
       ticketLabels: group.ticketLabels,
@@ -607,9 +727,12 @@ try {
       bookingAndFlightLabelsSearchable: true,
       privateCodesHidden: true,
       publicTicketStatusWithoutLogin: true,
+      publicGroupStatusWithoutLogin: true,
+      splitGroupStatusAggregated: true,
       preparationFromForecast: true,
       explicitPushConsentRequired: true,
       preparationPushDeduplicated: true,
+      groupPushCoversBookingGroup: true,
       consentTimestampAndDeletionRecorded: true,
       pushRevocationDeleted: true,
       bindingCallVisible: true,
@@ -619,8 +742,8 @@ try {
       fleetStatusVisible: true,
       multipleUpcomingGroupsVisible: true,
       staleDeparturesDoNotDisplaceUpcomingGroups: true,
-      noExactPublicPredictionTimestamps: true,
-      publicWaitWindowsConsistent: true,
+      absolutePublicTimeWindows: true,
+      compatiblePublicWaitWindowsConsistent: true,
       historicalRotationGatePreserved: true,
       realtimeUnderTwoSeconds: true,
       reconnectMilliseconds,
