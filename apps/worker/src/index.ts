@@ -49,6 +49,7 @@ import {
   factoryResetStatements,
   finishR2Cleanup,
 } from "./factory-reset";
+import { mayAccessFids } from "./fids-authorization";
 import { buildForecastHistoryStatement } from "./forecast-history";
 import {
   EMPTY_GATE_DISPLAY_FILTER_JSON,
@@ -1546,7 +1547,7 @@ app.on("DELETE", eventRoutes("/assist-claims/:aircraftId"), async (context) => {
 app.on("GET", eventRoutes("/fids/preferences"), async (context) => {
   const eventId = context.req.param("eventId");
   const actor = await authorizeSession(context.env, context.req.raw);
-  if (actor?.role !== "DISPLAY") {
+  if (!actor || !mayAccessFids(actor.role)) {
     return context.json(
       {
         error: {
@@ -1589,7 +1590,7 @@ app.on("GET", eventRoutes("/fids/preferences"), async (context) => {
 app.on("PUT", eventRoutes("/fids/preferences"), async (context) => {
   const eventId = context.req.param("eventId");
   const actor = await authorizeSession(context.env, context.req.raw);
-  if (actor?.role !== "DISPLAY") {
+  if (!actor || !mayAccessFids(actor.role)) {
     return context.json(
       {
         error: {

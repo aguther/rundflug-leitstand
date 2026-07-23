@@ -23,7 +23,7 @@ export const appDestinations: AppDestination[] = [
   {
     href: "/fids",
     label: "FIDS",
-    roles: ["DISPLAY"],
+    roles: ["DISPLAY", "ADMIN"],
   },
   { href: "/admin", label: "Administration", shortLabel: "Admin", roles: ["ADMIN"] },
 ];

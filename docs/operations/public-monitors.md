@@ -1,7 +1,8 @@
 # FIDS-Monitore mit Display-Konto
 
-Die FIDS-Webanwendung ist ab Release 1.7.3 ausschließlich mit einem aktiven Konto der Rolle
-`DISPLAY` erreichbar. Die feste Anzeige-URL lautet:
+Die FIDS-Webanwendung ist ab Release 1.7.3 mit einem aktiven Konto der Rolle `DISPLAY` oder `ADMIN`
+erreichbar. Für dauerhaft betriebene Monitore ist ein eigenes Display-Konto vorgesehen. Die feste
+Anzeige-URL lautet:
 
 ```text
 https://<Worker-Domain>/fids?event=<Veranstaltungs-ID>
@@ -14,8 +15,9 @@ mehr.
 
 Die anonym lesbaren Endpunkte `/api/public/events/:eventId/board` und
 `/api/public/events/:eventId/logo` bleiben für bestehende Besucherintegrationen verfügbar. Die
-FIDS-Seite selbst sowie GET und PUT der FIDS-Einstellungen benötigen jedoch eine gültige
-Display-Sitzung. Display-Konten haben keinen Zugriff auf Kasse, Flight Line oder Administration.
+FIDS-Seite selbst sowie GET und PUT der FIDS-Einstellungen benötigen jedoch eine gültige Display-
+oder Administrator-Sitzung. Display-Konten haben keinen Zugriff auf Kasse, Flight Line oder
+Administration. Administratoren behalten `/admin` als Startseite und dürfen FIDS zusätzlich öffnen.
 
 ## Konto und Anmeldung
 
@@ -25,7 +27,8 @@ Display-Sitzung. Display-Konten haben keinen Zugriff auf Kasse, Flight Line oder
 4. Browser in Vollbild-/Kioskmodus versetzen. Ruhezustand und Bildschirmschoner für den
    Veranstaltungstag deaktivieren.
 
-Die Sitzung läuft absolut 90 Tage und besitzt keinen früheren Idle-Ablauf. Abmeldung,
+Die Display-Sitzung läuft absolut 90 Tage und besitzt keinen früheren Idle-Ablauf. Für
+Administrator-Sitzungen gilt weiterhin die reguläre Laufzeit von 16 Stunden. Abmeldung,
 Kontodeaktivierung, PIN-Wechsel oder administrativer Sitzungswiderruf beenden die Berechtigung
 sofort. Die PIN wird weder in der URL noch im lokalen Speicher abgelegt.
 
@@ -39,9 +42,9 @@ Der dezente Zahnradbutton rechts unten öffnet die kontobezogenen Einstellungen:
 - Abmelden.
 
 Speichern wird erst nach Serverbestätigung wirksam. Bei einem Versionskonflikt oder Fehler bleibt
-der Dialog offen. Einstellungen gelten genau für das angemeldete Display-Konto und die aktuelle
-Veranstaltung. Unter 1280 Pixel bleibt eine Zweispaltenwahl gespeichert, wird aber vorübergehend in
-einer Spalte angezeigt.
+der Dialog offen. Einstellungen gelten genau für das angemeldete Display- oder Administratorkonto
+und die aktuelle Veranstaltung. Unter 1280 Pixel bleibt eine Zweispaltenwahl gespeichert, wird
+aber vorübergehend in einer Spalte angezeigt.
 
 ## Vor Veranstaltungsbeginn prüfen
 

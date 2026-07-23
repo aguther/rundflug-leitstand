@@ -6,6 +6,7 @@ import { DatabaseSync } from "node:sqlite";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import coordinatorSource from "./event-coordinator.ts?raw";
+import { fidsOperatorRoles, mayAccessFids } from "./fids-authorization";
 import workerSource from "./index.ts?raw";
 
 const migrationsDirectory = fileURLToPath(new URL("../migrations/", import.meta.url));
@@ -75,15 +76,24 @@ describe("FIDS V1.7.3 persistence and authorization", () => {
     database.close();
   });
 
-  it("derives the preference owner exclusively from a DISPLAY session", () => {
+  it("allows DISPLAY and ADMIN sessions while rejecting all other FIDS roles", () => {
+    expect(fidsOperatorRoles).toEqual(["DISPLAY", "ADMIN"]);
+    expect(mayAccessFids("DISPLAY")).toBe(true);
+    expect(mayAccessFids("ADMIN")).toBe(true);
+    expect(mayAccessFids("CASHIER")).toBe(false);
+    expect(mayAccessFids("FLIGHT_LINE")).toBe(false);
+    expect(mayAccessFids("FLIGHT_DIRECTOR")).toBe(false);
+    expect(mayAccessFids(null)).toBe(false);
+
     const route = workerSource.slice(
       workerSource.indexOf('app.on("GET", eventRoutes("/fids/preferences")'),
       workerSource.indexOf('app.on("GET", eventRoutes("/operations")'),
     );
-    expect(route).toContain('actor?.role !== "DISPLAY"');
+    expect(route).toContain("!actor || !mayAccessFids(actor.role)");
     expect(route).toContain("actor.accountId");
     expect(route).toContain('headers.set("x-operator-session-id", actor.sessionId)');
     expect(route).not.toContain('context.req.header("x-operator-account-id")');
+    expect(coordinatorSource).toContain("!mayAccessFids(role)");
     expect(workerSource).toContain('actor?.role === "DISPLAY"');
     expect(workerSource).toContain('context.req.path.endsWith("/fids/preferences")');
   });
