@@ -21,6 +21,13 @@ Standalone-Darstellung und eine Berechtigungsanfrage nach direkter Nutzerinterak
 - Ein dynamisches Manifest verwendet den exakten relativen Statuspfad als `id` und `start_url`.
   Dadurch öffnet jede installierte Web-App wieder genau das installierte Ticket beziehungsweise die
   Gruppe und nicht die Loginroute.
+- `name`, `short_name` und der Apple-App-Titel verwenden die Ticketgruppenkennung; ein eigenes
+  Ticket-Symbol ersetzt auf öffentlichen Statusinstallationen das allgemeine Leitstand-Symbol.
+  Die Metadaten werden für Ticket-/Gruppenrouten serverseitig in den ersten HTML-Stream geschrieben,
+  damit die Installationsauswahl nicht vom späteren React-Render abhängt.
+- Kasse, Flight Line, Assist, FIDS und Admin besitzen getrennte statische Manifeste und Symbole.
+  Auch deren Metadaten werden auf der jeweiligen Einstiegsroute in den ersten HTML-Stream
+  geschrieben; `id` und `start_url` entsprechen der Oberfläche.
 - Auf iPhone/iPad bleibt Push im normalen Browser deaktiviert. Im Standalone-Modus wird der
   vorhandene W3C-Push-Ablauf verwendet. Die Ausnahme konkretisiert F-BEN-020 nur für die technisch
   durch iOS vorgegebene Plattformgrenze; unterstützte Desktop- und Android-Browser bleiben
@@ -42,5 +49,6 @@ Tabellenneuaufbau entfernt. Push-Daten werden bewusst nicht aus portablen Backup
 betroffene Gäste erteilen die Einwilligung erneut.
 
 Die automatisierte Abnahme deckt Statuscopy, Manifestpfade, Zieltypen, Bestandsmigration,
-Widerruf und fehlende Code-/PII-Exposition ab. Die reale iPhone-Zustellung bleibt eine
-Originalhardwareprüfung und darf durch Desktop-Emulation nicht als bestanden markiert werden.
+ansichtsspezifische Installationsprofile, Widerruf und fehlende Code-/PII-Exposition ab. Die reale
+iPhone-Zustellung bleibt eine Originalhardwareprüfung und darf durch Desktop-Emulation nicht als
+bestanden markiert werden.

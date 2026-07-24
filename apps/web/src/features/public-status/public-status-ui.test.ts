@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import header from "../../app/AppHeader.tsx?raw";
+import installMetadata from "../../app/install-metadata.ts?raw";
 import brand from "../../design-system/BrandMark.tsx?raw";
 import groupStatus from "../../group-status-view.tsx?raw";
 import ticketStatus from "../../ticket-status-view.tsx?raw";
@@ -34,16 +35,22 @@ describe("mobiler öffentlicher Status V1.8", () => {
   });
 
   it("bindet das exakte dynamische Manifest und führt iPhone-Browsernutzer", () => {
-    expect(manifestHook).toContain(["/api/public/pwa-manifest/", "{target}/"].join("$"));
+    expect(installMetadata).toContain(["/api/public/pwa-manifest/", "{target}/"].join("$"));
+    expect(installMetadata).toContain("/icons/ticket-icon-180.png");
+    expect(manifestHook).toContain("bookingGroupLabel");
     expect(pushHook).toContain(
       "Auf dem iPhone: Zum Home-Bildschirm hinzufügen, dann Benachrichtigungen aktivieren.",
     );
     expect(pushHook).toContain("(display-mode: standalone)");
   });
 
-  it("behält nur den kleinen abrufbaren Datenschutzhinweis", () => {
+  it("öffnet den kleinen Datenschutzhinweis als schließbaren Dialog", () => {
     expect(content).toContain('className="public-privacy-link"');
-    expect(content).toMatch(/className="public-privacy-link"[\s\S]*Datenschutz[\s\S]*<\/a>/);
+    expect(content).toMatch(/className="public-privacy-link"[\s\S]*Datenschutz[\s\S]*<\/button>/);
+    expect(content).toContain("<ModalDialog");
+    expect(content).toContain('closeLabel="Datenschutz schließen"');
+    expect(content).toContain("keine Namen, Telefonnummern");
+    expect(content).not.toContain('href="/datenschutz"');
     expect(content).not.toContain("Datenschutz &amp; Privatsphäre");
   });
 

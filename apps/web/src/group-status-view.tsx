@@ -24,7 +24,7 @@ export function GroupStatusView({ code }: { code: string }) {
   const [status, setStatus] = useState<PublicGroupStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const push = usePublicPush("group", code);
-  usePublicStatusManifest("group", code);
+  usePublicStatusManifest("group", code, status?.bookingGroupLabel);
 
   useEffect(() => {
     let active = true;

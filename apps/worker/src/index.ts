@@ -142,6 +142,149 @@ function predictedBoardingWindow(input: {
   };
 }
 
+type PublicStatusInstallTarget = "ticket" | "group";
+
+interface AppInstallProfile {
+  manifestHref: string;
+  appleTouchIconHref: string;
+  title: string;
+}
+
+const PUBLIC_STATUS_CODE_PATTERN = /^[A-Z2-9]{12,32}$/;
+
+const INTERNAL_APP_INSTALL_PROFILES = {
+  "/kasse": {
+    manifestHref: "/manifests/kasse.webmanifest",
+    appleTouchIconHref: "/icons/kasse-icon-180.png",
+    title: "Kasse · Rundflug-Leitstand",
+  },
+  "/flight-line": {
+    manifestHref: "/manifests/flight-line.webmanifest",
+    appleTouchIconHref: "/icons/flight-line-icon-180.png",
+    title: "Flight Line · Rundflug-Leitstand",
+  },
+  "/flight-line/assist": {
+    manifestHref: "/manifests/assist.webmanifest",
+    appleTouchIconHref: "/icons/assist-icon-180.png",
+    title: "Assist · Rundflug-Leitstand",
+  },
+  "/fids": {
+    manifestHref: "/manifests/fids.webmanifest",
+    appleTouchIconHref: "/icons/fids-icon-180.png",
+    title: "FIDS · Rundflug-Leitstand",
+  },
+  "/fids/terminal": {
+    manifestHref: "/manifests/fids.webmanifest",
+    appleTouchIconHref: "/icons/fids-icon-180.png",
+    title: "FIDS · Rundflug-Leitstand",
+  },
+  "/admin": {
+    manifestHref: "/manifests/admin.webmanifest",
+    appleTouchIconHref: "/icons/admin-icon-180.png",
+    title: "Admin · Rundflug-Leitstand",
+  },
+} satisfies Record<string, AppInstallProfile>;
+
+function escapeHtmlAttribute(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
+async function publicStatusInstallTitle(
+  db: D1Database,
+  target: PublicStatusInstallTarget,
+  code: string,
+): Promise<string> {
+  const codeHash = await sha256Hex(code);
+  const row =
+    target === "ticket"
+      ? await db
+          .prepare(
+            `SELECT p.code AS product_code, tg.communication_number
+               FROM tickets t
+               JOIN ticket_groups tg ON tg.id = t.ticket_group_id
+               JOIN products p ON p.id = tg.product_id
+              WHERE t.public_code_hash = ?1 AND tg.status <> 'CANCELED'
+              LIMIT 1`,
+          )
+          .bind(codeHash)
+          .first<{ product_code: string; communication_number: number }>()
+      : await db
+          .prepare(
+            `SELECT p.code AS product_code, tg.communication_number
+               FROM ticket_groups tg
+               JOIN products p ON p.id = tg.product_id
+              WHERE tg.public_status_code_hash = ?1 AND tg.status <> 'CANCELED'
+              LIMIT 1`,
+          )
+          .bind(codeHash)
+          .first<{ product_code: string; communication_number: number }>();
+  return row
+    ? formatBookingGroupLabel(row.product_code, row.communication_number)
+    : target === "group"
+      ? "Gruppenstatus"
+      : "Ticketstatus";
+}
+
+async function installableAppShellResponse(
+  env: Env,
+  request: Request,
+  profile: AppInstallProfile,
+): Promise<Response> {
+  const assetResponse = await env.ASSETS.fetch(request);
+  if (!assetResponse.headers.get("content-type")?.includes("text/html")) return assetResponse;
+
+  const headers = new Headers(assetResponse.headers);
+  headers.set("cache-control", "private, no-store");
+  const htmlResponse = new Response(assetResponse.body, {
+    status: assetResponse.status,
+    statusText: assetResponse.statusText,
+    headers,
+  });
+  const appleTitle = profile.title.split(" · ", 1)[0] ?? profile.title;
+  const headMetadata = [
+    `<link rel="manifest" href="${escapeHtmlAttribute(profile.manifestHref)}">`,
+    `<link rel="apple-touch-icon" href="${escapeHtmlAttribute(profile.appleTouchIconHref)}">`,
+    `<meta name="apple-mobile-web-app-title" content="${escapeHtmlAttribute(appleTitle)}">`,
+    '<meta name="apple-mobile-web-app-capable" content="yes">',
+  ].join("");
+  return new HTMLRewriter()
+    .on('link[rel="manifest"]', {
+      element(element) {
+        element.remove();
+      },
+    })
+    .on('link[rel="apple-touch-icon"]', {
+      element(element) {
+        element.remove();
+      },
+    })
+    .on('meta[name="apple-mobile-web-app-title"]', {
+      element(element) {
+        element.remove();
+      },
+    })
+    .on('meta[name="apple-mobile-web-app-capable"]', {
+      element(element) {
+        element.remove();
+      },
+    })
+    .on("title", {
+      element(element) {
+        element.setInnerContent(profile.title);
+      },
+    })
+    .on("head", {
+      element(element) {
+        element.append(headMetadata, { html: true });
+      },
+    })
+    .transform(htmlResponse);
+}
+
 app.use("*", async (context, next) => {
   const redirectLocation = httpsRedirectLocation(context.req.url, context.env.APP_ENV);
   if (redirectLocation) return context.redirect(redirectLocation, 308);
@@ -3459,23 +3602,24 @@ app.on("GET", eventRoutes("/reports/daily.pdf"), async (context) => {
   );
 });
 
-app.get("/api/public/pwa-manifest/:target/:code", (context) => {
+app.get("/api/public/pwa-manifest/:target/:code", async (context) => {
   const target = context.req.param("target").trim().toLowerCase();
   const code = context.req.param("code").trim().toUpperCase();
-  if ((target !== "ticket" && target !== "group") || !/^[A-Z2-9]{12,32}$/.test(code)) {
+  if ((target !== "ticket" && target !== "group") || !PUBLIC_STATUS_CODE_PATTERN.test(code)) {
     return context.json(
       { error: { code: "PUBLIC_TARGET_NOT_FOUND", message: "Statusseite nicht gefunden." } },
       404,
     );
   }
   const targetPath = target === "group" ? `/gruppe/${code}` : `/ticket/${code}`;
+  const installTitle = await publicStatusInstallTitle(context.env.DB, target, code);
   return new Response(
     JSON.stringify({
       id: targetPath,
       start_url: targetPath,
       scope: "/",
-      name: target === "group" ? "Rundflug-Gruppenstatus" : "Rundflug-Ticketstatus",
-      short_name: "Rundflug",
+      name: installTitle,
+      short_name: installTitle,
       description: "Aktueller öffentlicher Rundflug-Status",
       lang: "de",
       display: "standalone",
@@ -3483,19 +3627,19 @@ app.get("/api/public/pwa-manifest/:target/:code", (context) => {
       theme_color: "#ffffff",
       icons: [
         {
-          src: "/icons/app-icon-192.png",
+          src: "/icons/ticket-icon-192.png",
           sizes: "192x192",
           type: "image/png",
           purpose: "any",
         },
         {
-          src: "/icons/app-icon-512.png",
+          src: "/icons/ticket-icon-512.png",
           sizes: "512x512",
           type: "image/png",
           purpose: "any",
         },
         {
-          src: "/icons/app-icon-512-maskable.png",
+          src: "/icons/ticket-icon-512.png",
           sizes: "512x512",
           type: "image/png",
           purpose: "maskable",
@@ -3511,6 +3655,26 @@ app.get("/api/public/pwa-manifest/:target/:code", (context) => {
     },
   );
 });
+
+for (const [path, profile] of Object.entries(INTERNAL_APP_INSTALL_PROFILES)) {
+  app.get(path, (context) => installableAppShellResponse(context.env, context.req.raw, profile));
+}
+
+for (const target of ["ticket", "group"] as const) {
+  const route = target === "group" ? "/gruppe/:code" : "/ticket/:code";
+  app.get(route, async (context) => {
+    const code = context.req.param("code").trim().toUpperCase();
+    if (!PUBLIC_STATUS_CODE_PATTERN.test(code)) {
+      return context.env.ASSETS.fetch(context.req.raw);
+    }
+    const installTitle = await publicStatusInstallTitle(context.env.DB, target, code);
+    return installableAppShellResponse(context.env, context.req.raw, {
+      manifestHref: `/api/public/pwa-manifest/${target}/${code}`,
+      appleTouchIconHref: "/icons/ticket-icon-180.png",
+      title: `${installTitle} · Rundflug`,
+    });
+  });
+}
 
 app.get("/api/public/tickets/:ticketCode", async (context) => {
   const ticketCode = context.req.param("ticketCode").trim().toUpperCase();

@@ -8,7 +8,10 @@ Status: Automatisierte Abnahme erfolgreich; Originalhardware-Abnahme in HTTPS-St
   Symbole; PREPARE wird als WARTEN und eine Unterbrechung als VERZÖGERT projiziert.
 - GO TO GATE und BOARDING besitzen getrennte Copy.
 - Jedes dynamische Manifest enthält den exakten Ticket-/Gruppenpfad als `id` und `start_url`,
-  `scope: "/"`, `display: "standalone"` und die bestehenden App-Icons.
+  `scope: "/"`, `display: "standalone"`, die Ticketgruppe als Namen und ein Ticket-Icon.
+- Ticket-/Gruppenroute, Manifest, Apple-Touch-Icon und Apple-App-Titel werden schon im ersten
+  HTML-Dokument verbunden. Kasse, Flight Line, Assist, FIDS und Admin besitzen entsprechend eigene
+  Manifeste, Icons und Startpfade.
 - Ticket- und Gruppenregistrierungen speichern `target_kind`; Migration 0043 führt Bestände auf
   `GROUP` zurück.
 - Push-Nutzlast und Service Worker akzeptieren ausschließlich relative Ticket-/Gruppenpfade.
@@ -38,8 +41,9 @@ Verwendet werden ausschließlich synthetische Codes und die HTTPS-Abnahmeumgebun
 
 1. Ticket-/Gruppenroute auf einem iPhone im normalen Safari-Tab öffnen. Der Push-Schalter muss
    deaktiviert sein und exakt auf `Zum Home-Bildschirm hinzufügen` verweisen.
-2. Über Teilen zum Home-Bildschirm hinzufügen. Das neue Symbol muss ohne Umweg über `/` oder Login
-   exakt dieselbe Statusroute im Standalone-Modus öffnen.
+2. Über Teilen zum Home-Bildschirm hinzufügen. Titel und Symbol müssen Ticketgruppe und Ticket
+   eindeutig erkennen lassen. Das neue Symbol muss ohne Umweg über `/` oder Login exakt dieselbe
+   Statusroute im Standalone-Modus öffnen.
 3. Benachrichtigungen durch direkte Betätigung des Schalters erlauben.
 4. Einen synthetischen Statuswechsel bis GO TO GATE auslösen und den exakten Text
    `Bitte jetzt zum Gate kommen.` in der Benachrichtigung prüfen.
@@ -48,5 +52,7 @@ Verwendet werden ausschließlich synthetische Codes und die HTTPS-Abnahmeumgebun
 7. Safari prüfen; Vivaldi zusätzlich prüfen, sofern dessen Teilen-Menü auf dem Testgerät
    `Zum Home-Bildschirm` anbietet.
 8. Gerät, iOS-Version, Browser, Uhrzeit, Route und Screenshots protokollieren.
+9. Kasse, Flight Line, Assist, FIDS und Admin jeweils separat hinzufügen und prüfen, dass Name,
+   Symbol und geöffnete Startansicht dem gewählten Profil entsprechen.
 
 Ein erfolgreicher Desktop-/Emulationstest ersetzt diese Prüfung nicht.

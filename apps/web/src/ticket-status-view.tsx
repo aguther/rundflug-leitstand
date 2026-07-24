@@ -25,7 +25,10 @@ export function TicketStatusView({ code }: { code: string }) {
   const [status, setStatus] = useState<PublicTicketStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const push = usePublicPush("ticket", code);
-  usePublicStatusManifest("ticket", code);
+  const bookingGroupLabel = status
+    ? formatBookingGroupLabel(status.productCode, status.communicationNumber)
+    : undefined;
+  usePublicStatusManifest("ticket", code, bookingGroupLabel);
 
   useEffect(() => {
     let active = true;
@@ -102,10 +105,7 @@ export function TicketStatusView({ code }: { code: string }) {
         {status ? (
           <>
             <PublicStatusIdentity
-              bookingGroupLabel={formatBookingGroupLabel(
-                status.productCode,
-                status.communicationNumber,
-              )}
+              bookingGroupLabel={bookingGroupLabel ?? ""}
               productName={status.productName}
             />
             <div className="public-status-parts">
