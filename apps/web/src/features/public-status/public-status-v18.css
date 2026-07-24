@@ -9,7 +9,9 @@
   --public-accent: #1f6fe5;
   --public-live: #168b55;
   --public-warning: #a45b09;
-  min-height: 100dvh;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
   color: var(--public-text);
   background: var(--public-bg);
 }
@@ -102,9 +104,24 @@
 
 .public-status-page {
   width: min(760px, 100%);
+  min-height: 0;
+  flex: 1 1 auto;
   margin: 0 auto;
   padding: 22px max(18px, env(safe-area-inset-right))
     max(24px, calc(env(safe-area-inset-bottom) + 16px)) max(18px, env(safe-area-inset-left));
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+}
+
+body:has(> #root > .public-status-shell) {
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+
+#root:has(> .public-status-shell) {
+  height: 100%;
+  min-height: 0;
 }
 
 .public-status-summary {
