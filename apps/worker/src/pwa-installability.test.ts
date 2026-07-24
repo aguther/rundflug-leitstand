@@ -1,11 +1,18 @@
 import { describe, expect, it } from "vitest";
+import wranglerConfig from "../../../wrangler.jsonc?raw";
 import indexHtml from "../../web/index.html?raw";
 import iconSource from "../../web/public/icons/app-icon.svg?raw";
 import appleTouchIconUrl from "../../web/public/icons/app-icon-180.png?url";
 import icon192Url from "../../web/public/icons/app-icon-192.png?url";
 import icon512Url from "../../web/public/icons/app-icon-512.png?url";
 import icon512MaskableUrl from "../../web/public/icons/app-icon-512-maskable.png?url";
+import adminManifest from "../../web/public/manifests/admin.webmanifest?raw";
+import assistManifest from "../../web/public/manifests/assist.webmanifest?raw";
+import fidsManifest from "../../web/public/manifests/fids.webmanifest?raw";
+import flightLineManifest from "../../web/public/manifests/flight-line.webmanifest?raw";
+import kasseManifest from "../../web/public/manifests/kasse.webmanifest?raw";
 import viteConfig from "../../web/vite.config.ts?raw";
+import worker from "./index.ts?raw";
 
 describe("V1 PWA installability", () => {
   it("ships standalone manifest metadata and complete install icons", () => {
@@ -26,5 +33,41 @@ describe("V1 PWA installability", () => {
     expect(iconSource).toContain('aria-label="Rundflug-Leitstand"');
     expect(iconSource).toContain("#102a43");
     expect(iconSource).toContain("#2f8af5");
+  });
+
+  it.each([
+    [kasseManifest, "/kasse", "kasse"],
+    [flightLineManifest, "/flight-line", "flight-line"],
+    [assistManifest, "/flight-line/assist", "assist"],
+    [fidsManifest, "/fids", "fids"],
+    [adminManifest, "/admin", "admin"],
+  ])("liefert für %s einen eigenen Startpfad und ein eindeutiges Icon", (raw, path, iconName) => {
+    const manifest = JSON.parse(raw) as {
+      id: string;
+      start_url: string;
+      display: string;
+      icons: Array<{ src: string }>;
+    };
+    expect(manifest.id).toBe(path);
+    expect(manifest.start_url).toBe(path);
+    expect(manifest.display).toBe("standalone");
+    expect(manifest.icons.every((icon) => icon.src.includes(`/${iconName}-icon-`))).toBe(true);
+  });
+
+  it("schreibt die Installationsmetadaten für alle Hauptansichten in den ersten HTML-Stream", () => {
+    for (const path of [
+      '"/kasse"',
+      '"/flight-line"',
+      '"/flight-line/assist"',
+      '"/fids"',
+      '"/admin"',
+    ]) {
+      expect(worker).toContain(path);
+    }
+    for (const path of ["/kasse", "/flight-line/*", "/fids/*", "/admin"]) {
+      expect(wranglerConfig).toContain(path);
+    }
+    expect(worker).toContain("INTERNAL_APP_INSTALL_PROFILES");
+    expect(worker).toContain("installableAppShellResponse");
   });
 });

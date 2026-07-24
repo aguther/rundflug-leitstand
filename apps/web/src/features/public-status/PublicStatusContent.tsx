@@ -13,6 +13,8 @@ import {
   TicketsPlane,
   Users,
 } from "lucide-react";
+import { useState } from "react";
+import { ModalDialog } from "../../design-system/components";
 import { formatAbsoluteTimeWindow } from "../../time-window";
 import {
   PUBLIC_STATUS_PRESENTATIONS,
@@ -158,43 +160,68 @@ export function PublicStatusFooter({
   push: ReturnType<typeof import("./use-public-push").usePublicPush>;
   pushDescription: string;
 }) {
+  const [privacyOpen, setPrivacyOpen] = useState(false);
   return (
-    <footer className="public-status-footer">
-      <div className="public-status-updated">
-        <Clock3 aria-hidden="true" />
-        <span>
-          Zuletzt aktualisiert{" "}
-          <strong>
-            {new Date(updatedAt).toLocaleTimeString("de-DE", {
-              hour: "2-digit",
-              minute: "2-digit",
-              timeZone,
-            })}
-          </strong>
-        </span>
-      </div>
-      <label className="public-push-toggle">
-        <Bell aria-hidden="true" />
-        <span>
-          <strong>Benachrichtigungen</strong>
-          <small>{pushDescription}</small>
-        </span>
-        <input
-          checked={push.enabled}
-          disabled={push.disabled}
-          onChange={(event) => void push.change(event.target.checked)}
-          type="checkbox"
-        />
-      </label>
-      {push.message ? (
-        <p className="public-push-message" role="status">
-          {push.message}
-        </p>
-      ) : null}
-      <a className="public-privacy-link" href="/datenschutz">
-        Datenschutz
-      </a>
-    </footer>
+    <>
+      <footer className="public-status-footer">
+        <div className="public-status-updated">
+          <Clock3 aria-hidden="true" />
+          <span>
+            Zuletzt aktualisiert{" "}
+            <strong>
+              {new Date(updatedAt).toLocaleTimeString("de-DE", {
+                hour: "2-digit",
+                minute: "2-digit",
+                timeZone,
+              })}
+            </strong>
+          </span>
+        </div>
+        <label className="public-push-toggle">
+          <Bell aria-hidden="true" />
+          <span>
+            <strong>Benachrichtigungen</strong>
+            <small>{pushDescription}</small>
+          </span>
+          <input
+            checked={push.enabled}
+            disabled={push.disabled}
+            onChange={(event) => void push.change(event.target.checked)}
+            type="checkbox"
+          />
+        </label>
+        {push.message ? (
+          <p className="public-push-message" role="status">
+            {push.message}
+          </p>
+        ) : null}
+        <button className="public-privacy-link" onClick={() => setPrivacyOpen(true)} type="button">
+          Datenschutz
+        </button>
+      </footer>
+      <ModalDialog
+        closeLabel="Datenschutz schließen"
+        description="Datensparsame öffentliche Statusanzeige"
+        onClose={() => setPrivacyOpen(false)}
+        open={privacyOpen}
+        size="compact"
+        title="Datenschutz"
+      >
+        <div className="public-privacy-copy">
+          <p>
+            Für den Abruf dieser Statusseite werden keine Namen, Telefonnummern oder sonstigen
+            Kontaktdaten von Gästen erfasst oder gespeichert. Der Zugriff erfolgt ausschließlich
+            über den zufälligen Ticket- oder Gruppencode.
+          </p>
+          <p>
+            Nur wenn Sie Benachrichtigungen aktivieren, speichert das System die technisch
+            erforderliche pseudonyme Browser-Push-Adresse, die Push-Schlüssel und den
+            Einwilligungszeitpunkt. Diese Daten dienen ausschließlich den Statushinweisen und werden
+            bei Deaktivierung oder nach Ablauf der Veranstaltungsfrist gelöscht.
+          </p>
+        </div>
+      </ModalDialog>
+    </>
   );
 }
 

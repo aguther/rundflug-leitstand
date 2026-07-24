@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Rundflug-Kasse">
+  <rect width="512" height="512" rx="104" fill="#102a43"/>
+  <circle cx="256" cy="256" r="154" fill="#2f8af5"/>
+  <g transform="translate(112 112) scale(12)" fill="none" stroke="#ffffff" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8">
+    <path d="m3.173 8.18 11-5a2 2 0 0 1 2.647.993L18.56 8"/>
+    <path d="M6 10V8M6 14v1M6 19v2"/>
+    <rect x="2" y="8" width="20" height="13" rx="2"/>
+  </g>
+</svg>

@@ -422,9 +422,57 @@
   display: inline-flex;
   align-items: center;
   justify-self: start;
+  padding: 0;
+  border: 0;
   color: var(--public-muted);
+  background: transparent;
+  cursor: pointer;
   font-size: 0.78rem;
+  font-weight: 650;
+  text-decoration: underline;
   text-underline-offset: 3px;
+}
+
+.public-status-shell .ds-modal-backdrop {
+  padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right))
+    max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  background: color-mix(in srgb, var(--public-text) 46%, transparent);
+}
+
+.public-status-shell .ds-modal-dialog {
+  border-color: var(--public-border);
+  border-radius: 14px;
+  color: var(--public-text);
+  background: var(--public-surface);
+  box-shadow: 0 18px 54px color-mix(in srgb, var(--public-text) 22%, transparent);
+}
+
+.public-status-shell .ds-modal-header {
+  min-height: 64px;
+  border-color: var(--public-border);
+}
+
+.public-status-shell .ds-modal-header p,
+.public-privacy-copy {
+  color: var(--public-muted);
+}
+
+.public-status-shell .ds-modal-header .ds-icon-button {
+  width: 44px;
+  height: 44px;
+  color: var(--public-text);
+  background: var(--public-surface-raised);
+}
+
+.public-privacy-copy {
+  display: grid;
+  gap: 14px;
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.public-privacy-copy p {
+  margin: 0;
 }
 
 .public-status-loading {

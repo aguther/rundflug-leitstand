@@ -1,6 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
+import { applyInitialInstallMetadata } from "./app/install-metadata";
 import { applyInitialTheme, ThemeProvider } from "./design-system/theme";
 import "./design-system/tokens.css";
 import "./styles.css";
@@ -16,6 +17,7 @@ import "./design-system/base.css";
 import "./design-system/components.css";
 import "./features/public-status/public-status-v18.css";
 
+applyInitialInstallMetadata();
 applyInitialTheme();
 
 if (import.meta.env.MODE !== "simulator") {
