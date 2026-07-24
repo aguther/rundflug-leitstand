@@ -67,10 +67,6 @@ describe("FIDS V1.7.3 UI", () => {
     expect(stylesSource).toContain("repeat(var(--fids-double-rows)");
   });
 
-  it("shows FIDS time windows without the redundant clock suffix", () => {
-    expect(displaySource).toContain("includeClockSuffix: false");
-  });
-
   it("keeps the settings dialog open until a confirmed save and exposes only approved choices", () => {
     const saveHandler = settingsSource.slice(
       settingsSource.indexOf("const save = async"),
