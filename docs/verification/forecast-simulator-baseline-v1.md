@@ -1,6 +1,6 @@
 # Verifikation Prognose-Simulator V1
 
-Stand: 23. Juli 2026
+Stand: 24. Juli 2026
 
 ## Zweck und Ausführung
 
@@ -153,6 +153,28 @@ keine belastbare Aussage über eine generelle Verbesserung oder Verschlechterung
   Teil des Modells noch des Exports. Das Format trägt die Kennung
   `rundflug-forecast-simulation/v4`.
 
+## Simuliertes Live-FIDS
+
+Die Hauptansicht öffnet über `FIDS öffnen` genau ein separates, fokussierbares Browserfenster. Das
+Fenster wird als React-Portal direkt aus dem lokalen Simulatorzustand gerendert und besitzt keine
+eigene Route, Authentifizierung, API-Abfrage, WebSocket-Verbindung, Browser-Persistenz oder
+Service-Worker-Registrierung. Ein blockiertes Pop-up wird in der Hauptansicht verständlich gemeldet.
+
+Die Projektion verwendet den bestehenden `PublicBoard`-Vertrag ausschließlich im Speicher. Sie
+berücksichtigt nur Gruppen, Meilensteine und den letzten Prognosesnapshot bis zum sichtbaren
+30-Sekunden-Tick. DRAFT-Gruppen erscheinen als `WARTEN` oder nach Voraufruf als `GO TO GATE`,
+aufgerufene Gruppen als `BOARDING`; Abflug, Landung und Abschluss werden im FIDS einheitlich als
+`ABGEFLOGEN` präsentiert. Bei Unterbrechung zeigt die Anzeige den bestehenden roten
+Betriebshinweis, setzt die Prognosequalität auf `UNCERTAIN` und veröffentlicht kein numerisches
+Zeitfenster.
+
+Die Anzeige verwendet ausschließlich synthetische `G-SIM-####`-Kennungen, `Rundflug Simulation`
+und `Flight Line 1`. Sie besitzt acht Zeilen, einspaltiges Layout und keine Einstellungen.
+`LIVE-SIMULATION`, `Virtuelle Zeit` und der permanente Hinweis
+`Nur Simulation – keine Betriebsdaten` verhindern eine Verwechslung mit Betriebsdaten.
+Abflugtransitionen bleiben auch bei 60× oder 300× für 15 Sekunden realer Betrachtungszeit sichtbar;
+Neustart, Rücksprung und ein neu berechnetes Ergebnis löschen diese Anzeigehistorie.
+
 ## Browserabnahme
 
 Die freigegebenen Konzepte unter `docs/ui/forecast-simulator-*-approved.png` wurden im lokalen
@@ -174,6 +196,11 @@ Light und Dark Mode wurden jeweils im In-App-Browser geprüft:
 - die Flugzeugansicht zeigt gebundene Umläufe mit Boarding, Off-Block, On-Block und Abschluss sowie
   Tanken, geplante Pause und jeweils das bestätigte Rückkehrereignis;
 - kein horizontaler Dokument- oder Arbeitsbereichsüberlauf in den geprüften Viewports;
+- das FIDS-Pop-out folgt Start, Pause, `+5 Min.`, Szenariowechsel und Betriebsunterbrechung, ohne die
+  Bedienung des Simulatorfensters zu blockieren;
+- ein zweiter Klick auf `FIDS öffnen` fokussiert das vorhandene Fenster und erzeugt kein Duplikat;
+- das simulierte FIDS zeigt bei 1920 × 1080 und 1280 × 720 weder Dokument- noch Tabellen-Scrollbars
+  und bleibt in heller wie dunkler Darstellung lesbar;
 - eine vollständig neu geladene Browserseite enthält sinnvollen Anwendungsinhalt, kein
   Framework-Fehleroverlay und keine Konsolenfehler oder -warnungen;
 - Netzwerkaufzeichnung nach Reload: ausschließlich lokale Vite-Modul- und HMR-Verbindungen,
