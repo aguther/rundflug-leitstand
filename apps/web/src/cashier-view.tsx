@@ -420,22 +420,26 @@ export function CashierView() {
         deviceTokenFor(CASHIER_DEVICE_ID),
       );
       const soldTicketGroupId = saleResult.aggregate?.id ?? null;
+      lastTicketListBoardVersionRef.current = saleResult.event.version;
       confirmEvent(saleResult.event);
       setLastTicketGroupId(soldTicketGroupId);
       setMessage(`${codes.length} Ticket${codes.length === 1 ? "" : "s"} verkauft.`);
       writeCashierDraftQueue(localStorage, draftQueueKey, []);
       setPendingDraftCount(0);
       setSize(1);
-      if (soldTicketGroupId) {
-        void reopenTicketGroup(soldTicketGroupId, saleResult.saleReceipt).then((printPrepared) => {
-          if (!printPrepared) {
-            setMessage(
-              `${codes.length} Ticket${codes.length === 1 ? "" : "s"} verkauft. Druckvorbereitung fehlgeschlagen; Nachdruck bleibt möglich.`,
-            );
-          }
-        });
+      const printPreparation = soldTicketGroupId
+        ? reopenTicketGroup(soldTicketGroupId, saleResult.saleReceipt)
+        : Promise.resolve(true);
+      const [printPrepared] = await Promise.all([
+        printPreparation,
+        refresh(saleResult.event.version),
+        loadTicketList({ preserveLoaded: true }),
+      ]);
+      if (!printPrepared) {
+        setMessage(
+          `${codes.length} Ticket${codes.length === 1 ? "" : "s"} verkauft. Druckvorbereitung fehlgeschlagen; Nachdruck bleibt möglich.`,
+        );
       }
-      void refresh(saleResult.event.version);
     } catch (reason) {
       setMessage(reason instanceof Error ? reason.message : "Verkauf fehlgeschlagen.");
     } finally {

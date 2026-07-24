@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import cashier from "./cashier-view.tsx?raw";
 import publicStatusContent from "./features/public-status/PublicStatusContent.tsx?raw";
 import flightLine from "./flight-line-supervisor.tsx?raw";
+import flightLineView from "./flight-line-view.tsx?raw";
 import groupStatus from "./group-status-view.tsx?raw";
 
 const button = readFileSync(
@@ -36,6 +37,28 @@ describe("V1.8 approved UI deltas", () => {
     expect(cashier).toContain("Ticket drucken");
     expect(cashier).not.toContain("Ticketzettel erneut drucken");
     expect(cashier).toContain("publicGroupCode: groupCode");
+  });
+
+  it("keeps each busy indicator until its visible follow-up state is projected", () => {
+    const rotationAction = flightLineView.slice(
+      flightLineView.indexOf("async function advance("),
+      flightLineView.indexOf("async function setGroupAttendance("),
+    );
+    const aircraftAction = flightLineView.slice(
+      flightLineView.indexOf("async function setFlightLineAircraftState("),
+      flightLineView.indexOf("function startAircraftPause("),
+    );
+    const ticketSale = cashier.slice(
+      cashier.indexOf("async function sell("),
+      cashier.indexOf("async function cancelLastSale("),
+    );
+
+    expect(rotationAction).toContain("await refresh(result.event.version)");
+    expect(aircraftAction).toContain("await refresh(result.event.version)");
+    expect(ticketSale).toContain("const [printPrepared] = await Promise.all([");
+    expect(ticketSale).toContain("refresh(saleResult.event.version)");
+    expect(ticketSale).toContain("loadTicketList({ preserveLoaded: true })");
+    expect(`${rotationAction}\n${aircraftAction}\n${ticketSale}`).not.toContain("void refresh(");
   });
 
   it("keeps the exact Flight Line column order and semantics", () => {
