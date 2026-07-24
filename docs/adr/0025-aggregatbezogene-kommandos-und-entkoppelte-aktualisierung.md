@@ -38,11 +38,14 @@ werden nicht unkontrolliert parallel ausgeführt.
   Projektion die bestätigte Version noch nicht erreicht, folgt höchstens ein weiterer Abruf.
 - Die UI übernimmt aus der Kommandobestätigung ausschließlich den bestätigten Event-Metadatensatz.
   Fachliche Flugzeug-, Umlauf- und Queuezustände bleiben serverseitige Projektionen und werden nicht
-  optimistisch erfunden.
+  optimistisch erfunden. Die betroffene lokale Busy-Anzeige bleibt bis zur sichtbaren Projektion
+  dieser Bestätigung oder einer erklärenden Fehlermeldung aktiv; andere Aggregate bleiben
+  bedienbar.
 - Ein Verkauf liefert die geschützten Druckdaten bereits in seiner idempotenten
-  Kommandobestätigung. QR-Erzeugung, Druckdialog und Listenaktualisierung laufen danach im
-  Hintergrund. Der öffentliche Gruppencode wird weder in Outbox noch Audit oder Anwendungslog
-  aufgenommen.
+  Kommandobestätigung. Operationsabruf, QR-Erzeugung, Druckdialog und Listenaktualisierung laufen
+  danach parallel. Die Verkaufs-Busy-Anzeige endet erst mit deren sichtbarem Erfolg oder einer
+  erklärenden Fehlermeldung. Der öffentliche Gruppencode wird weder in Outbox noch Audit oder
+  Anwendungslog aufgenommen.
 - `Server-Timing` trennt Warteschlangen- und Kommandozeit; Browser-Performance-Einträge messen
   Operationsabrufe und operative Kommandos. Langsame Kommandos werden nur mit Dauer und stabilem
   Diagnosecode, ohne IDs, Codes oder personenbezogene Daten protokolliert.
