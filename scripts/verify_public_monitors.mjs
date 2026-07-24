@@ -438,9 +438,16 @@ try {
     groupManifest.id !== `/gruppe/${publicGroupCode}` ||
     groupManifest.start_url !== `/gruppe/${publicGroupCode}` ||
     ticketManifest.scope !== "/" ||
-    ticketManifest.display !== "standalone"
+    ticketManifest.display !== "standalone" ||
+    ticketManifest.name !== initialGroupStatus.bookingGroupLabel ||
+    ticketManifest.short_name !== initialGroupStatus.bookingGroupLabel ||
+    groupManifest.name !== initialGroupStatus.bookingGroupLabel ||
+    groupManifest.short_name !== initialGroupStatus.bookingGroupLabel ||
+    ticketManifest.icons?.some((icon) => !icon.src.startsWith("/icons/ticket-icon-"))
   ) {
-    throw new Error("Das dynamische PWA-Manifest öffnet nicht den exakten öffentlichen Status.");
+    throw new Error(
+      "Das dynamische PWA-Manifest öffnet nicht den exakten öffentlichen Status mit Ticketgruppenname und Ticket-Icon.",
+    );
   }
   const interrupted = await command(
     devices.admin,

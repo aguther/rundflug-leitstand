@@ -36,4 +36,5 @@ Browserkonsole blieb ohne Fehler und Warnungen.
 Die Ticketstatusseite wurde zusätzlich auf Desktop und 430 × 900 Pixeln geprüft. Ein bereits
 geöffnetes Ticket wechselte nach dem operativen Aufruf innerhalb von 188 Millisekunden ohne Neuladen
 auf „Bitte zur Flight Line“. Produkt, Gate, handlungsorientierter Status, Web-Push und
-Datenschutzhinweis blieben auf beiden Breiten sichtbar; die Browserkonsole blieb sauber.
+Datenschutzhinweis blieben auf beiden Breiten sichtbar. Der Hinweis öffnet als schließbarer Dialog,
+ohne die Ticketroute zu verlassen; die Browserkonsole blieb sauber.

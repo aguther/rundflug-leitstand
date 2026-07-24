@@ -1,0 +1,26 @@
+{
+  "id": "/flight-line/assist",
+  "start_url": "/flight-line/assist",
+  "scope": "/",
+  "name": "Rundflug – Assist",
+  "short_name": "Assist",
+  "description": "Mobile Assistenzansicht des Rundflug-Leitstands",
+  "lang": "de",
+  "display": "standalone",
+  "background_color": "#f4f7fb",
+  "theme_color": "#102a43",
+  "icons": [
+    {
+      "src": "/icons/assist-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/assist-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
