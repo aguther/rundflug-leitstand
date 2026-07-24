@@ -2,11 +2,13 @@ import { describe, expect, it, vi } from "vitest";
 import type { Env } from "./types";
 import {
   isAllowedPushEndpoint,
+  publicPushPayload,
   publicPushTargetPath,
   purgeExpiredPushSubscriptions,
   pushDeleteAfter,
   pushMessageFor,
   pushRetentionDays,
+  pushUrgencyFor,
   shouldQueuePreparationNotification,
 } from "./web-push";
 
@@ -51,6 +53,23 @@ describe("Web-Push-Endpunkte", () => {
   it("verwendet die freigegebene GO-TO-GATE-Copy", () => {
     expect(pushMessageFor("FLIGHT_GROUP_CALLED")).toBe("Bitte jetzt zum Gate kommen.");
     expect(pushMessageFor("ROTATION_STARTED")).toBe("Ihr Rundflug ist gestartet.");
+    expect(pushUrgencyFor("FLIGHT_GROUP_CALLED")).toBe("high");
+    expect(pushUrgencyFor("ROTATION_STARTED")).toBe("normal");
+  });
+
+  it("liefert einen deklarativen, service-worker-unabhängigen iOS-Payload", () => {
+    const payload = JSON.parse(publicPushPayload("FLIGHT_GROUP_CALLED", "/gruppe/NPQRSTUVWXYZ2"));
+    expect(payload).toEqual({
+      web_push: 8030,
+      notification: {
+        title: "Rundflug-Leitstand",
+        lang: "de",
+        dir: "ltr",
+        body: "Bitte jetzt zum Gate kommen.",
+        navigate: "/gruppe/NPQRSTUVWXYZ2",
+        data: { url: "/gruppe/NPQRSTUVWXYZ2" },
+      },
+    });
   });
 });
 

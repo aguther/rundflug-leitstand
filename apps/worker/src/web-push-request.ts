@@ -14,6 +14,7 @@ export interface WebPushRequestInput {
     privateKey: string;
   };
   ttl: number;
+  urgency?: "very-low" | "low" | "normal" | "high";
   now?: Date;
 }
 
@@ -225,6 +226,7 @@ export async function buildWebPushRequest(input: WebPushRequestInput): Promise<W
       "Content-Encoding": "aes128gcm",
       "Content-Type": "application/octet-stream",
       TTL: String(input.ttl),
+      Urgency: input.urgency ?? "normal",
     },
     body: await createEncryptedBody(data, receiverPublicBytes, authSecret),
   };

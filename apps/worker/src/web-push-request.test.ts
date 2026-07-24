@@ -79,6 +79,7 @@ describe("native Web Push request", () => {
       p256dh: encodeBase64Url(receiverPublic),
       auth: encodeBase64Url(authSecret),
       ttl: 300,
+      urgency: "high",
       vapid: {
         subject: "mailto:betrieb@example.invalid",
         publicKey: encodeBase64Url(vapidPublic),
@@ -90,6 +91,7 @@ describe("native Web Push request", () => {
     expect(request.method).toBe("POST");
     expect(request.headers["Content-Encoding"]).toBe("aes128gcm");
     expect(request.headers.TTL).toBe("300");
+    expect(request.headers.Urgency).toBe("high");
     expect(request.body.byteLength).toBeLessThanOrEqual(4_096);
     expect(new DataView(request.body.buffer, 16, 4).getUint32(0)).toBe(4_096);
     expect(request.body[20]).toBe(65);

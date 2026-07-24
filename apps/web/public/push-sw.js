@@ -4,17 +4,38 @@ function safePublicStatusPath(value) {
   return typeof value === "string" && self.PUBLIC_STATUS_PATH.test(value) ? value : null;
 }
 
-self.addEventListener("push", (event) => {
-  const message = event.data?.json() ?? {
-    title: "Rundflug-Leitstand",
-    body: "Der Status Ihres Tickets hat sich geändert.",
+function pushMessage(data) {
+  const notification =
+    data?.web_push === 8030 && data.notification && typeof data.notification === "object"
+      ? data.notification
+      : data;
+  return {
+    title: typeof notification?.title === "string" ? notification.title : "Rundflug-Leitstand",
+    body:
+      typeof notification?.body === "string"
+        ? notification.body
+        : "Der Status Ihres Tickets hat sich geändert.",
+    url:
+      typeof notification?.navigate === "string"
+        ? notification.navigate
+        : (notification?.data?.url ?? notification?.url),
   };
+}
+
+self.addEventListener("push", (event) => {
+  let data;
+  try {
+    data = event.data?.json();
+  } catch {
+    data = undefined;
+  }
+  const message = pushMessage(data);
   const targetPath = safePublicStatusPath(message.url);
   event.waitUntil(
     self.registration.showNotification(message.title, {
       body: message.body,
       data: targetPath ? { url: targetPath } : {},
-      tag: "rundflug-ticket-status",
+      lang: "de",
     }),
   );
 });
