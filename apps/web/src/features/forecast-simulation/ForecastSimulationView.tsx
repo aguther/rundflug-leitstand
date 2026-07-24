@@ -5,6 +5,7 @@ import {
   Coffee,
   Download,
   Fuel,
+  Monitor,
   Pause,
   Plane,
   Play,
@@ -34,6 +35,7 @@ import {
   validateSimulationConfig,
 } from "./model";
 import { ScenarioEditor } from "./ScenarioEditor";
+import { SimulationFidsPopout, type SimulationFidsPopoutHandle } from "./SimulationFidsPopout";
 import { SimulationHistoryDialog } from "./SimulationHistoryDialog";
 import "./forecast-simulation.css";
 
@@ -227,8 +229,10 @@ export function ForecastSimulationView() {
   const [comparisonRunning, setComparisonRunning] = useState(false);
   const [importMessage, setImportMessage] = useState<string | null>(null);
   const [importingCsv, setImportingCsv] = useState(false);
+  const [fidsWindowError, setFidsWindowError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const comparisonWorkerRef = useRef<Worker | null>(null);
+  const fidsPopoutRef = useRef<SimulationFidsPopoutHandle>(null);
   const editorErrors = validateSimulationConfig(editorConfig);
   const simulationEnd = Date.parse(config.endAt);
 
@@ -426,6 +430,10 @@ export function ForecastSimulationView() {
           <AlertTriangle aria-hidden="true" />
           Nur Simulation – keine Betriebsdaten
         </div>
+        <Button className="sim-fids-button" onClick={() => fidsPopoutRef.current?.open()}>
+          <Monitor aria-hidden="true" />
+          FIDS öffnen
+        </Button>
         <div className="sim-run-label">
           <Clock3 aria-hidden="true" />
           Synthetischer Lauf
@@ -438,6 +446,11 @@ export function ForecastSimulationView() {
         ) : null}
         <ThemeToggle />
       </header>
+      {fidsWindowError ? (
+        <p className="sim-fids-window-error" role="alert">
+          {fidsWindowError}
+        </p>
+      ) : null}
 
       <main className="sim-layout">
         <aside className="sim-sidebar">
@@ -738,6 +751,14 @@ export function ForecastSimulationView() {
         onChange={setEditorConfig}
         onClose={() => setEditorOpen(false)}
         open={editorOpen}
+      />
+
+      <SimulationFidsPopout
+        clockMs={currentMs}
+        onWindowError={setFidsWindowError}
+        ref={fidsPopoutRef}
+        result={result}
+        visibleAt={visibleAt}
       />
 
       <SimulationHistoryDialog

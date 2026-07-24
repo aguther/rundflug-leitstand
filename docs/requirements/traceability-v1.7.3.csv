@@ -2,7 +2,7 @@ ID,Modul,Tests,Status
 V173-REL-010,package.json Workspace-Pakete und scripts/verify_requirements.py,Requirements- und Versionsverifikation,umgesetzt
 V173-FID-010,apps/web/src/fids-display.tsx FeatureRouter.tsx EventScopedApplication.tsx und ADR-0022,fids-display-ui.test.ts G-Kennungstest und Browser-Konzeptvergleich,umgesetzt
 V173-PRI-010,apps/worker/src/index.ts,public-board-priority.test.ts und Mehrressourcen-Abnahme,umgesetzt
-V173-LAY-010,apps/web/src/fids-display.tsx und features/fids/fids-v12.css,fids-display-ui.test.ts fids-v12.test.ts und Viewport-Abnahme,umgesetzt
+V173-LAY-010,apps/web/src/fids-display.tsx features/fids/fids-v12.css und forecast-simulation/simulation-fids.ts,fids-display-ui.test.ts fids-v12.test.ts simulation-fids.test.ts und Produktions-/Simulator-Viewport-Abnahme,umgesetzt
 V173-SET-010,apps/web/src/features/fids/FidsSettingsDialog.tsx und fids-view.tsx,fids-display-ui.test.ts und Dialog-Browserabnahme,umgesetzt
 V173-AUT-010,packages/contracts apps/worker/src/auth.ts apps/worker/src/index.ts und Web-Navigation,Contract- Domain- Auth- Navigations- und Autorisierungstests,umgesetzt
 V173-SES-010,apps/worker/src/auth.ts und Loginroute,auth.test.ts und Sitzungswiderrufstests,umgesetzt

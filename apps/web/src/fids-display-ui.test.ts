@@ -46,6 +46,17 @@ describe("FIDS V1.7.3 UI", () => {
     );
   });
 
+  it("keeps the production wrapper while exposing a controlled presentation for simulation", () => {
+    expect(displaySource).toContain("export function FidsBoardPresentation");
+    expect(displaySource).toContain("connectionLabel");
+    expect(displaySource).toContain("connectionTone");
+    expect(displaySource).toContain("simulationBanner");
+    expect(displaySource).toContain("footerNote");
+    expect(displaySource).toContain("filterDeparted = true");
+    expect(displaySource).toContain("<FidsSettingsDialog");
+    expect(displaySource).toContain("onOpenSettings={() => setSettingsOpen(true)}");
+  });
+
   it("applies the exact row limit and row-major double-column distribution", () => {
     expect(displaySource).toContain(".slice(0, visibleRows)");
     expect(displaySource).toContain("index % 2 === 0");
@@ -54,6 +65,10 @@ describe("FIDS V1.7.3 UI", () => {
     expect(stylesSource).toContain('data-fids-layout="double"');
     expect(stylesSource).toContain("repeat(var(--fids-single-rows)");
     expect(stylesSource).toContain("repeat(var(--fids-double-rows)");
+  });
+
+  it("shows FIDS time windows without the redundant clock suffix", () => {
+    expect(displaySource).toContain("includeClockSuffix: false");
   });
 
   it("keeps the settings dialog open until a confirmed save and exposes only approved choices", () => {
