@@ -22,8 +22,8 @@ dieselben reinen Domain-Funktionen wie der Worker:
 
 - `deriveAdaptivePrecallLeadMinutes` für den aus bisherigen Gate-Wartezeiten des aktuellen Laufs
   abgeleiteten Zielvorlauf;
-- `decideAutomaticPrecall` für Aktivierung, Betriebszustand, Queue-Spitze, Gruppengröße,
-  verfügbare Kapazität und Gate-Cooldown.
+- `selectAutomaticPrecalls` für Aktivierung, Betriebszustand, zusammenhängendes Queue-Präfix,
+  Gruppengröße, verfügbare Kapazität und den vor dem Lauf gespeicherten Gate-Cooldown.
 
 Der Standardlauf aktiviert den automatischen Voraufruf. Im Szenarioeditor ist nur diese fachliche
 Aktivierung konfigurierbar; technische Einzelschwellen werden entsprechend ADR-0012 nicht als
@@ -38,9 +38,10 @@ Ein erfolgreicher Voraufruf erzeugt:
 - das chronologische Ledger-Ereignis `FLIGHT_GROUP_PRECALLED`.
 
 `GO TO GATE` bindet weder Flugzeug noch Pilot. Die Flugzeugbindung entsteht weiterhin erst beim
-simulierten bestätigten Boardingbeginn (`calledAt` / `ROTATION_CALLED`). Liegen Voraufruf und
-Boarding mangels sinnvoller Vorlaufzeit auf demselben 30-Sekunden-Tick, werden beide getrennt und in
-fachlich richtiger Reihenfolge festgehalten.
+simulierten bestätigten Boardingbeginn (`calledAt` / `ROTATION_CALLED`). Mehrere berechtigte Gruppen
+dürfen im selben 30-Sekunden-Tick gemeinsam voraufgerufen werden. Liegen Voraufruf und Boarding
+mangels sinnvoller Vorlaufzeit auf demselben Tick, werden beide getrennt und in fachlich richtiger
+Reihenfolge festgehalten.
 
 ## Fluggruppenansicht
 

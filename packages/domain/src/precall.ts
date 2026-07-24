@@ -26,7 +26,6 @@ export interface AutomaticPrecallInput {
   operationsAvailable: boolean;
   resourceGroupActive: boolean;
   resourceGroupEnabled: boolean;
-  firstWaitingGroup: boolean;
   alreadyPrecalled: boolean;
   groupSize: number;
   largestEligibleAircraftSeats: number;
@@ -48,6 +47,16 @@ export interface AutomaticPrecallDecision {
     | "NO_FITTING_AIRCRAFT"
     | "TOO_EARLY"
     | "GATE_COOLDOWN";
+}
+
+export interface AutomaticPrecallQueueEntry extends AutomaticPrecallInput {
+  id: string;
+  resourceGroupId: string;
+}
+
+export interface AutomaticPrecallQueueDecision extends AutomaticPrecallDecision {
+  id: string;
+  resourceGroupId: string;
 }
 
 export function deriveAdaptivePrecallLeadMinutes(input: {
@@ -80,7 +89,6 @@ export function decideAutomaticPrecall(input: AutomaticPrecallInput): AutomaticP
   if (!input.eventActive || !input.operationsAvailable || !input.resourceGroupActive) {
     return { eligible: false, reason: "OPERATIONS_BLOCKED" };
   }
-  if (!input.firstWaitingGroup) return { eligible: false, reason: "NOT_QUEUE_FRONT" };
   if (input.alreadyPrecalled) return { eligible: false, reason: "ALREADY_PRECALLED" };
   if (input.groupSize < 1 || input.groupSize > input.largestEligibleAircraftSeats) {
     return { eligible: false, reason: "NO_FITTING_AIRCRAFT" };
@@ -95,4 +103,34 @@ export function decideAutomaticPrecall(input: AutomaticPrecallInput): AutomaticP
     return { eligible: false, reason: "GATE_COOLDOWN" };
   }
   return { eligible: true, reason: "ELIGIBLE" };
+}
+
+/**
+ * Evaluates queue entries in their caller-provided stable order. A resource group's first
+ * ineligible, not-yet-precalled entry closes that queue prefix for the current forecast run.
+ * Already-precalled entries keep their place without blocking eligible followers.
+ */
+export function selectAutomaticPrecalls(
+  entries: readonly AutomaticPrecallQueueEntry[],
+): AutomaticPrecallQueueDecision[] {
+  const blockedResourceGroups = new Set<string>();
+  return entries.map((entry) => {
+    if (blockedResourceGroups.has(entry.resourceGroupId)) {
+      return {
+        id: entry.id,
+        resourceGroupId: entry.resourceGroupId,
+        eligible: false,
+        reason: "NOT_QUEUE_FRONT",
+      };
+    }
+    const decision = decideAutomaticPrecall(entry);
+    if (!decision.eligible && decision.reason !== "ALREADY_PRECALLED") {
+      blockedResourceGroups.add(entry.resourceGroupId);
+    }
+    return {
+      id: entry.id,
+      resourceGroupId: entry.resourceGroupId,
+      ...decision,
+    };
+  });
 }
