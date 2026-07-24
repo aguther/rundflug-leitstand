@@ -28,6 +28,11 @@ Standalone-Darstellung und eine Berechtigungsanfrage nach direkter Nutzerinterak
 - Kasse, Flight Line, Assist, FIDS und Admin besitzen getrennte statische Manifeste und Symbole.
   Auch deren Metadaten werden auf der jeweiligen Einstiegsroute in den ersten HTML-Stream
   geschrieben; `id` und `start_url` entsprechen der Oberfläche.
+- Der generische Workbox-Navigationsfallback darf Ticket, Gruppe und die installierbaren
+  Betriebsoberflächen nicht aus dem vorgecachten `index.html` bedienen. Diese Navigationen gehen
+  immer zum Worker, damit der Browser bereits beim Parsen des ersten Dokuments das seitenspezifische
+  Manifest auswählt. Eine spätere Änderung des Manifest-Links durch React ist nur ein Fallback und
+  nicht Teil der Installationskorrektheit.
 - Auf iPhone/iPad bleibt Push im normalen Browser deaktiviert. Im Standalone-Modus wird der
   vorhandene W3C-Push-Ablauf verwendet. Die Ausnahme konkretisiert F-BEN-020 nur für die technisch
   durch iOS vorgegebene Plattformgrenze; unterstützte Desktop- und Android-Browser bleiben
