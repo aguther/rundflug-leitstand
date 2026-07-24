@@ -78,11 +78,16 @@ describe("V1.7.0 cashier", () => {
     expect(stylesSource).not.toContain("break-after: page");
     expect(stylesSource).toContain("width: 48mm");
     expect(stylesSource).toMatch(
+      /html,[\s\S]*?body,[\s\S]*?#root \{[\s\S]*?width: 100% !important;/,
+    );
+    expect(stylesSource).toMatch(/\.cashier-shell \{[\s\S]*?width: 100%;/);
+    expect(stylesSource).toMatch(
       /\.cashier-shell > \*:not\(\.ticket-print-document\) \{[\s\S]*?display: none !important;/,
     );
     expect(stylesSource).toMatch(
-      /\.cashier-shell > \.ticket-print-document \{[\s\S]*?justify-content: center;/,
+      /\.cashier-shell > \.ticket-print-document \{[\s\S]*?width: 100%;[\s\S]*?justify-content: center;/,
     );
+    expect(stylesSource).toMatch(/\.ticket-print-document \.ticket-paper \{[\s\S]*?width: 52mm;/);
     expect(stylesSource).toMatch(
       /\.ticket-print-document \.ticket-paper dl > div \{[\s\S]*?grid-template-columns: 18mm minmax\(0, 1fr\);[\s\S]*?column-gap: 1mm;/,
     );
