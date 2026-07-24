@@ -2203,35 +2203,33 @@ export function AdminView() {
       <section className="admin-layout">
         <AdminNavigation activeArea={adminArea} onChange={setAdminArea} />
         <div className={`admin-workspace ${masterDataStepActive ? "master-data-active" : ""}`}>
-          {!masterDataStepActive ? (
-            <PageHeader
-              actions={
-                <StatusPill
-                  tone={
-                    board?.event.status === "ACTIVE"
-                      ? "success"
-                      : board?.event.status === "PREPARATION"
-                        ? "warning"
-                        : error
-                          ? "danger"
-                          : "neutral"
-                  }
-                >
-                  {board?.event.status === "ACTIVE"
-                    ? "Betrieb aktiv"
+          <PageHeader
+            actions={
+              <StatusPill
+                tone={
+                  board?.event.status === "ACTIVE"
+                    ? "success"
                     : board?.event.status === "PREPARATION"
-                      ? "Betrieb noch nicht freigegeben"
-                      : board?.event.status === "CLOSED"
-                        ? "Betrieb geschlossen"
-                        : error
-                          ? "Stand nicht verfügbar"
-                          : "Stand wird geladen"}
-                </StatusPill>
-              }
-              description={adminAreaCopy[adminArea].description}
-              title={adminAreaCopy[adminArea].title}
-            />
-          ) : null}
+                      ? "warning"
+                      : error
+                        ? "danger"
+                        : "neutral"
+                }
+              >
+                {board?.event.status === "ACTIVE"
+                  ? "Betrieb aktiv"
+                  : board?.event.status === "PREPARATION"
+                    ? "Betrieb noch nicht freigegeben"
+                    : board?.event.status === "CLOSED"
+                      ? "Betrieb geschlossen"
+                      : error
+                        ? "Stand nicht verfügbar"
+                        : "Stand wird geladen"}
+              </StatusPill>
+            }
+            description={adminAreaCopy[adminArea].description}
+            title={adminAreaCopy[adminArea].title}
+          />
           {adminArea === "events" ? (
             <Panel className="event-catalog-v15 event-catalog-primary" padding="none">
               <PageHeader
