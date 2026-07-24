@@ -65,7 +65,6 @@ function timeWindow(group: PublicGroup, timeZone: string): string {
     upperAt: group.boardingWindowUpperAt,
     timeZone,
     quality: group.predictionQuality,
-    includeClockSuffix: false,
     phase:
       group.status === "COME_TO_FLIGHT_LINE" || group.status === "BOARDING"
         ? "NOW"
