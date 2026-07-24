@@ -1,7 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
-import { ThemeProvider } from "./design-system/theme";
+import { applyInitialTheme, ThemeProvider } from "./design-system/theme";
 import "./design-system/tokens.css";
 import "./styles.css";
 import "./features/admin/admin-v12.css";
@@ -14,6 +14,9 @@ import "./features/admin/admin-v15.css";
 import "./features/flight-line/flight-line-assist-v15.css";
 import "./design-system/base.css";
 import "./design-system/components.css";
+import "./features/public-status/public-status-v18.css";
+
+applyInitialTheme();
 
 if (import.meta.env.MODE !== "simulator") {
   void import("virtual:pwa-register").then(({ registerSW }) => {

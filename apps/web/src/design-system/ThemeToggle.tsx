@@ -6,19 +6,24 @@ const LABEL = {
   dark: "Dunkle Darstellung aktiv. Zur Systemdarstellung wechseln",
 } as const;
 
-export function ThemeToggle() {
-  const { preference, resolved, cycle } = useTheme();
+export function ThemeToggle({ binary = false }: { binary?: boolean }) {
+  const { preference, resolved, cycle, setPreference } = useTheme();
+  const label = binary
+    ? resolved === "dark"
+      ? "Dunkle Darstellung aktiv. Zu Hell wechseln"
+      : "Helle Darstellung aktiv. Zu Dunkel wechseln"
+    : LABEL[preference];
   return (
     <button
-      aria-label={LABEL[preference]}
+      aria-label={label}
       className="theme-toggle"
       data-preference={preference}
-      onClick={cycle}
-      title={LABEL[preference]}
+      onClick={binary ? () => setPreference(resolved === "dark" ? "light" : "dark") : cycle}
+      title={label}
       type="button"
     >
       <svg aria-hidden="true" viewBox="0 0 24 24">
-        {preference === "system" ? (
+        {!binary && preference === "system" ? (
           <>
             <rect height="13" rx="2" width="18" x="3" y="3" />
             <path d="M8 21h8M12 16v5" />

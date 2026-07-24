@@ -7,6 +7,7 @@ export function AppShell({
   children,
   kiosk = false,
   publicView = false,
+  publicEvent,
   className = "",
   notifications,
   connection,
@@ -15,6 +16,10 @@ export function AppShell({
   children: React.ReactNode;
   kiosk?: boolean;
   publicView?: boolean;
+  publicEvent?: {
+    eventId: string;
+    eventName: string;
+  };
   className?: string;
   notifications?: React.ReactNode;
   connection?: {
@@ -36,6 +41,7 @@ export function AppShell({
       <AppHeader
         connectionStatus={connectionStatus}
         kiosk={kiosk}
+        {...(publicEvent ? { publicEvent } : {})}
         publicView={publicView}
         title={title}
       />

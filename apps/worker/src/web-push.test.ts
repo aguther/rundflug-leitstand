@@ -2,8 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 import type { Env } from "./types";
 import {
   isAllowedPushEndpoint,
+  publicPushTargetPath,
   purgeExpiredPushSubscriptions,
   pushDeleteAfter,
+  pushMessageFor,
   pushRetentionDays,
   shouldQueuePreparationNotification,
 } from "./web-push";
@@ -17,8 +19,38 @@ describe("Web-Push-Endpunkte", () => {
     expect(isAllowedPushEndpoint("https://wns2-db5p.notify.windows.com/w/?token=synthetic")).toBe(
       true,
     );
+    expect(isAllowedPushEndpoint("https://web.push.apple.com/QD/synthetic")).toBe(true);
     expect(isAllowedPushEndpoint("https://example.invalid/internal")).toBe(false);
     expect(isAllowedPushEndpoint("https://fcm.googleapis.com.example.invalid/attack")).toBe(false);
+  });
+
+  it("erzeugt ausschließlich kanonische relative Ticket- und Gruppenpfade", () => {
+    expect(
+      publicPushTargetPath({
+        targetKind: "TICKET",
+        ticketCode: "ABCDEFGHJKLM",
+        groupCode: "NPQRSTUVWXYZ2",
+      }),
+    ).toBe("/ticket/ABCDEFGHJKLM");
+    expect(
+      publicPushTargetPath({
+        targetKind: "GROUP",
+        ticketCode: "ABCDEFGHJKLM",
+        groupCode: "NPQRSTUVWXYZ2",
+      }),
+    ).toBe("/gruppe/NPQRSTUVWXYZ2");
+    expect(
+      publicPushTargetPath({
+        targetKind: "GROUP",
+        ticketCode: "ABCDEFGHJKLM",
+        groupCode: "../admin",
+      }),
+    ).toBeNull();
+  });
+
+  it("verwendet die freigegebene GO-TO-GATE-Copy", () => {
+    expect(pushMessageFor("FLIGHT_GROUP_CALLED")).toBe("Bitte jetzt zum Gate kommen.");
+    expect(pushMessageFor("ROTATION_STARTED")).toBe("Ihr Rundflug ist gestartet.");
   });
 });
 

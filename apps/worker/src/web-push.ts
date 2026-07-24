@@ -8,17 +8,36 @@ interface StoredPushSubscription {
   endpoint: string;
   p256dh: string;
   auth: string;
+  target_kind: "TICKET" | "GROUP";
+  ticket_public_code: string;
+  group_public_code: string | null;
 }
 
 const DEFAULT_PUSH_RETENTION_DAYS = 7;
 const PUSH_MESSAGES = {
   PREPARE_FOR_FLIGHT: "Bitte auf den bevorstehenden Aufruf vorbereiten.",
-  FLIGHT_GROUP_CALLED: "Bitte jetzt zum angegebenen Gate kommen.",
-  ROTATION_STARTED: "Ihr Rundflug hat begonnen.",
+  FLIGHT_GROUP_CALLED: "Bitte jetzt zum Gate kommen.",
+  ROTATION_STARTED: "Ihr Rundflug ist gestartet.",
   ROTATION_LANDED: "Ihr Rundflug ist gelandet.",
   ROTATION_COMPLETED: "Ihr Rundflug ist abgeschlossen.",
 } as const;
 export type PushNotificationType = keyof typeof PUSH_MESSAGES;
+
+export function pushMessageFor(eventType: PushNotificationType): string {
+  return PUSH_MESSAGES[eventType];
+}
+
+const PUBLIC_CODE_PATTERN = /^[A-Z2-9]{12,32}$/;
+
+export function publicPushTargetPath(input: {
+  targetKind: "TICKET" | "GROUP";
+  ticketCode: string;
+  groupCode: string | null;
+}): string | null {
+  const code = input.targetKind === "GROUP" ? input.groupCode : input.ticketCode;
+  if (!code || !PUBLIC_CODE_PATTERN.test(code)) return null;
+  return input.targetKind === "GROUP" ? `/gruppe/${code}` : `/ticket/${code}`;
+}
 
 export function shouldQueuePreparationNotification(input: {
   emergencyMode: boolean;
@@ -133,19 +152,37 @@ export async function sendRotationPushNotifications(
     privateKey: env.VAPID_PRIVATE_KEY,
   };
   const subscriptions = await env.DB.prepare(
-    `SELECT d.id AS delivery_id, w.id, w.endpoint, w.p256dh, w.auth
+    `SELECT d.id AS delivery_id, w.id, w.endpoint, w.p256dh, w.auth, w.target_kind,
+            t.public_code AS ticket_public_code,
+            tg.public_status_code AS group_public_code
        FROM web_push_deliveries d
        JOIN web_push_subscriptions w ON w.id = d.subscription_id
+       JOIN tickets t ON t.id = w.ticket_id
+       LEFT JOIN ticket_groups tg ON tg.id = w.ticket_group_id
       WHERE d.rotation_id = ?1 AND d.notification_type = ?2 AND d.status = 'PENDING'
-        AND w.status = 'ACTIVE' AND w.delete_after > ?3`,
+        AND w.status = 'ACTIVE' AND w.delete_after > ?3
+        AND (
+          (w.target_kind = 'TICKET' AND t.public_code IS NOT NULL)
+          OR (w.target_kind = 'GROUP' AND tg.public_status_code IS NOT NULL)
+        )`,
   )
     .bind(rotationId, eventType, now)
     .all<StoredPushSubscription>();
-  const messageBody = PUSH_MESSAGES[eventType];
+  const messageBody = pushMessageFor(eventType);
   await Promise.allSettled(
     subscriptions.results.map(async (subscription) => {
+      const targetPath = publicPushTargetPath({
+        targetKind: subscription.target_kind,
+        ticketCode: subscription.ticket_public_code,
+        groupCode: subscription.group_public_code,
+      });
+      if (!targetPath) return;
       const payload = await buildWebPushRequest({
-        data: JSON.stringify({ title: "Rundflug-Leitstand", body: messageBody, url: "/" }),
+        data: JSON.stringify({
+          title: "Rundflug-Leitstand",
+          body: messageBody,
+          url: targetPath,
+        }),
         endpoint: subscription.endpoint,
         p256dh: subscription.p256dh,
         auth: subscription.auth,
