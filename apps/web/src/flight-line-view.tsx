@@ -226,7 +226,7 @@ export function FlightLineView() {
         );
       }
       confirmEvent(result.event);
-      void refresh(result.event.version);
+      await refresh(result.event.version);
     } catch (reason) {
       setMessage(reason instanceof Error ? reason.message : "Aktion fehlgeschlagen.");
     } finally {
@@ -335,7 +335,7 @@ export function FlightLineView() {
       );
       setAircraftPauseOpen(false);
       confirmEvent(result.event);
-      void refresh(result.event.version);
+      await refresh(result.event.version);
     } catch (cause) {
       setMessage(
         cause instanceof Error ? cause.message : "Flugzeugstatus konnte nicht geändert werden.",
