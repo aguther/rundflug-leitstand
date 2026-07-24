@@ -1,6 +1,6 @@
 // Shared operational state and presentation primitives used by route features.
 import type { CommandResult } from "@rundflug/contracts";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { getOperationBoard } from "./api";
 import { PageNotice } from "./app/PageNotifications";
 import {
@@ -69,10 +69,28 @@ export const aircraftStateLabel = {
 } as const;
 
 export function FieldHelp({ help }: { help: string }) {
+  const [open, setOpen] = useState(false);
+  const tooltipId = useId();
   return (
-    <span aria-hidden="true" className="field-info" data-help={help} title={help}>
+    <button
+      aria-describedby={open ? tooltipId : undefined}
+      aria-expanded={open}
+      aria-label={`Hilfe: ${help}`}
+      className={`field-info ${open ? "is-open" : ""}`}
+      onBlur={() => setOpen(false)}
+      onClick={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        setOpen((value) => !value);
+      }}
+      onMouseDown={(event) => event.preventDefault()}
+      type="button"
+    >
       i
-    </span>
+      <span className="field-info-tooltip" id={tooltipId} role="tooltip">
+        {help}
+      </span>
+    </button>
   );
 }
 

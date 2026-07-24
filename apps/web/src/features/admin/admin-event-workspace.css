@@ -1,0 +1,244 @@
+.admin-flow-panel {
+  margin: 0 22px 12px;
+  padding: 18px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-md);
+  background: var(--ui-surface);
+}
+
+.admin-flow-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.admin-flow-heading h2,
+.admin-flow-heading p {
+  margin: 0;
+}
+
+.admin-flow-heading h2 {
+  font-size: 1rem;
+}
+
+.admin-flow-heading p {
+  margin-top: 4px;
+  color: var(--ui-muted);
+  font-size: 0.76rem;
+}
+
+.admin-flow-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  color: var(--ui-muted);
+  font-size: 0.74rem;
+  font-weight: 650;
+}
+
+.admin-flow-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.admin-flow-legend span::before {
+  width: 18px;
+  height: 3px;
+  border-radius: 2px;
+  background: currentColor;
+  content: "";
+}
+
+.admin-flow-legend .sold {
+  color: var(--ui-accent);
+}
+
+.admin-flow-legend .completed {
+  color: var(--ui-success);
+}
+
+.admin-flow-legend .open::before {
+  height: 10px;
+  background: color-mix(in srgb, var(--ui-accent) 18%, transparent);
+}
+
+.admin-flow-chart {
+  width: 100%;
+  min-height: 250px;
+  margin-top: 10px;
+  overflow: visible;
+}
+
+.admin-flow-grid-line {
+  stroke: var(--ui-border);
+  stroke-width: 1;
+}
+
+.admin-flow-axis-label {
+  fill: var(--ui-muted);
+  font-size: 12px;
+}
+
+.admin-flow-open-area {
+  fill: color-mix(in srgb, var(--ui-accent) 15%, transparent);
+}
+
+.admin-flow-line {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 3;
+}
+
+.admin-flow-line.sold {
+  stroke: var(--ui-accent);
+}
+
+.admin-flow-line.completed {
+  stroke: var(--ui-success);
+}
+
+.admin-flow-now-line {
+  stroke: var(--ui-border-strong);
+  stroke-dasharray: 4 5;
+  stroke-width: 1;
+}
+
+.admin-flow-placeholder {
+  height: 250px;
+  margin-top: 12px;
+  border-radius: var(--radius-sm);
+  background: var(--ui-surface-subtle);
+}
+
+.admin-shell .setup-progress {
+  grid-template-columns: repeat(8, minmax(104px, 1fr));
+  overflow-x: auto;
+}
+
+.admin-shell .event-catalog-primary {
+  margin: 0 22px 12px;
+}
+
+.admin-shell .event-setup-v15.single-panel {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.admin-shell .event-setup-v15.single-panel > [hidden] {
+  display: none;
+}
+
+.admin-sort-button {
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+}
+
+.admin-sort-button span {
+  color: var(--ui-muted);
+  font-size: 0.7rem;
+}
+
+.event-catalog-empty {
+  margin: 0;
+  padding: 18px;
+  color: var(--ui-muted);
+}
+
+.template-import-dialog {
+  display: grid;
+  gap: 12px;
+}
+
+.template-counts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.template-counts span {
+  display: grid;
+  gap: 2px;
+  padding: 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-sm);
+  background: var(--ui-surface-subtle);
+  color: var(--ui-muted);
+  font-size: 0.74rem;
+}
+
+.template-counts strong {
+  color: var(--ui-text);
+  font-size: 1rem;
+}
+
+.ds-modal-body .master-data-columns,
+.ds-modal-body .resource-master-grid,
+.ds-modal-body .compact-editor-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.ds-modal-body .master-data-columns > fieldset,
+.ds-modal-body .resource-master-grid > fieldset {
+  min-width: 0;
+  grid-column: 1 / -1;
+}
+
+.ds-modal-body .master-data-columns fieldset[hidden],
+.ds-modal-body .resource-master-grid fieldset[hidden] {
+  display: none;
+}
+
+.admin-shell .admin-workspace.master-data-active {
+  display: block;
+}
+
+.admin-shell .admin-workspace.master-data-active > .master-data-workspace {
+  min-height: auto;
+}
+
+@media (max-width: 700px) {
+  .admin-flow-panel {
+    margin-inline: 12px;
+    padding: 14px;
+  }
+
+  .admin-flow-heading {
+    display: grid;
+  }
+
+  .admin-flow-legend {
+    justify-content: flex-start;
+  }
+
+  .admin-flow-chart {
+    min-height: 210px;
+  }
+
+  .admin-shell .event-catalog-primary {
+    margin-inline: 12px;
+  }
+
+  .template-counts,
+  .ds-modal-body .master-data-columns,
+  .ds-modal-body .resource-master-grid,
+  .ds-modal-body .compact-editor-grid {
+    grid-template-columns: 1fr;
+  }
+}

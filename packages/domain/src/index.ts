@@ -182,6 +182,7 @@ export function planTechnicalRotationAbortQueueBlock(
 export type DeviceRole = "CASHIER" | "FLIGHT_LINE" | "FLIGHT_DIRECTOR" | "ADMIN" | "DISPLAY";
 
 export type OperationalCommandType =
+  | "SET_OPERATIONAL_NOTE"
   | "SET_ROTATION_NOTE"
   | "SET_ROTATION_CAPACITY"
   | "SELL_TICKET_GROUP"
@@ -231,6 +232,7 @@ export type OperationalCommandType =
   | "APPLY_OUTAGE_RECOVERY";
 
 const commandRoles: Readonly<Record<OperationalCommandType, readonly DeviceRole[]>> = {
+  SET_OPERATIONAL_NOTE: ["FLIGHT_DIRECTOR", "ADMIN"],
   SET_ROTATION_NOTE: ["FLIGHT_LINE", "FLIGHT_DIRECTOR", "ADMIN"],
   SET_ROTATION_CAPACITY: ["FLIGHT_LINE", "FLIGHT_DIRECTOR", "ADMIN"],
   SELL_TICKET_GROUP: ["CASHIER", "ADMIN"],

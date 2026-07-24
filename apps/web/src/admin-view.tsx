@@ -1,10 +1,14 @@
 import type {
+  AdminEventFlow,
   AuditHistory,
   EventCatalogEntry,
   ForecastHistory,
+  MasterDataTemplate,
+  MasterDataTemplateValidation,
   OperationalHistory,
   OperationBoard,
 } from "@rundflug/contracts";
+import { masterDataTemplateSchema } from "@rundflug/contracts";
 import {
   CheckCircle2,
   Clock3,
@@ -22,9 +26,9 @@ import {
 } from "./admin-manifest-correction";
 import {
   type AdminArea,
+  type AdminEventStep,
   AdminNavigation,
   type MasterDataCategory,
-  MasterDataNavigation,
   SetupProgress,
   type SetupStep,
   ValidationHint,
@@ -34,18 +38,22 @@ import {
   deleteEvent,
   downloadDailyPdf,
   downloadDailyReport,
+  downloadMasterDataTemplate,
   downloadPerformanceProfile,
   downloadTicketRawData,
   factoryReset,
+  getAdminEventFlow,
   getAuditHistory,
   getEventCatalog,
   getForecastHistory,
   getOperationalHistory,
   getPushConfiguration,
   getSetupStatus,
+  importMasterDataTemplate,
   removeEventLogo,
   sendCommand,
   uploadEventLogo,
+  validateMasterDataTemplate,
   verifyAdminPin,
 } from "./api";
 import { AppShell as Shell } from "./app/AppShell";
@@ -53,6 +61,7 @@ import { PageNotice, useActionMessageBridge } from "./app/PageNotifications";
 import {
   Button,
   Field,
+  ModalDialog,
   PageHeader,
   Panel,
   SearchField,
@@ -61,6 +70,7 @@ import {
 } from "./design-system/components";
 import { forgetActiveEvent, rememberActiveEvent } from "./event-context";
 import { eventLocalDateTimeToIso, formatEventLocalDateTime } from "./event-time";
+import { AdminEventFlowChart } from "./features/admin/AdminEventFlowChart";
 import { AccountManagement } from "./features/auth/AccountManagement";
 import { useAuth } from "./features/auth/AuthContext";
 import {
@@ -92,6 +102,36 @@ import {
 } from "./operation-workspace";
 import { formatEuroInput, parseEuroToCents, productPositionOptions } from "./product-editor";
 
+const adminTableCollator = new Intl.Collator("de-DE", {
+  numeric: true,
+  sensitivity: "base",
+});
+
+function SortableTableHeading({
+  active,
+  direction,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  direction: "asc" | "desc" | null;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <th
+      aria-sort={active && direction ? (direction === "asc" ? "ascending" : "descending") : "none"}
+    >
+      <button className="admin-sort-button" onClick={onClick} type="button">
+        {label}
+        <span aria-hidden="true">
+          {active && direction ? (direction === "asc" ? "↑" : "↓") : "↕"}
+        </span>
+      </button>
+    </th>
+  );
+}
+
 export function AdminView() {
   const { session, logout } = useAuth();
   const { board, error, lastConfirmedAt, backendConfirmed, refresh, refreshing } =
@@ -99,18 +139,38 @@ export function AdminView() {
   const initialAdminParams = useRef(new URLSearchParams(window.location.search)).current;
   const [adminArea, setAdminArea] = useState<AdminArea>(() => {
     const requestedArea = initialAdminParams.get("area");
-    const validAreas: AdminArea[] = [
-      "overview",
-      "setup",
-      "master-data",
-      "users",
-      "evaluation",
-      "audit",
-      "backup",
-    ];
+    const validAreas: AdminArea[] = ["overview", "events", "users", "evaluation", "backup"];
+    if (["setup", "master-data", "audit"].includes(requestedArea ?? "")) return "events";
     return (validAreas as string[]).includes(requestedArea ?? "")
       ? (requestedArea as AdminArea)
       : "overview";
+  });
+  const [eventStep, setEventStep] = useState<AdminEventStep>(() => {
+    const requestedArea = initialAdminParams.get("area");
+    const requestedStep = initialAdminParams.get("step");
+    const legacySection = initialAdminParams.get("section");
+    const validSteps: AdminEventStep[] = [
+      "event",
+      "gates",
+      "resource-groups",
+      "aircraft",
+      "pilots",
+      "products",
+      "operations",
+      "completion",
+    ];
+    if ((validSteps as string[]).includes(requestedStep ?? "")) {
+      return requestedStep as AdminEventStep;
+    }
+    if (requestedArea === "audit") return "completion";
+    if (requestedArea === "master-data") {
+      if (legacySection === "assignments") return "aircraft";
+      if ((validSteps as string[]).includes(legacySection ?? "")) {
+        return legacySection as AdminEventStep;
+      }
+      return "resource-groups";
+    }
+    return "event";
   });
   const [masterDataCategory, setMasterDataCategory] = useState<MasterDataCategory>(() => {
     const requestedSection = initialAdminParams.get("section");
@@ -127,12 +187,20 @@ export function AdminView() {
       : "resource-groups";
   });
   useEffect(() => {
+    if (["gates", "resource-groups", "aircraft", "pilots", "products"].includes(eventStep)) {
+      setMasterDataCategory(eventStep as MasterDataCategory);
+      setMasterEditorOpen(false);
+      setMasterSearch("");
+    }
+  }, [eventStep]);
+  useEffect(() => {
     const url = new URL(window.location.href);
     url.searchParams.set("area", adminArea);
-    if (adminArea === "master-data") url.searchParams.set("section", masterDataCategory);
-    else url.searchParams.delete("section");
+    if (adminArea === "events") url.searchParams.set("step", eventStep);
+    else url.searchParams.delete("step");
+    url.searchParams.delete("section");
     window.history.replaceState(null, "", url);
-  }, [adminArea, masterDataCategory]);
+  }, [adminArea, eventStep]);
   const [reason, setReason] = useState("");
   const [adminPin, setAdminPinState] = useState(session?.account.role === "ADMIN" ? "000000" : "");
   const adminPinRef = useRef(session?.account.role === "ADMIN" ? "000000" : "");
@@ -152,6 +220,11 @@ export function AdminView() {
   const initialMasterSelectionRef = useRef(false);
   const [masterSubmitAttempted, setMasterSubmitAttempted] = useState(false);
   const [masterSearch, setMasterSearch] = useState("");
+  const [masterSort, setMasterSort] = useState<{
+    category: MasterDataCategory;
+    key: string;
+    direction: "asc" | "desc" | null;
+  }>({ category: "resource-groups", key: "name", direction: null });
   const [masterPage, setMasterPage] = useState(0);
   const [masterPageSize, setMasterPageSize] = useState(10);
   // biome-ignore lint/correctness/useExhaustiveDependencies: changing a filter or page size intentionally resets pagination
@@ -307,7 +380,22 @@ export function AdminView() {
   const [assignmentAircraftId, setAssignmentAircraftId] = useState("");
   const [assignmentResourceGroupId, setAssignmentResourceGroupId] = useState("");
   const [events, setEvents] = useState<EventCatalogEntry[]>([]);
+  const [eventFlow, setEventFlow] = useState<AdminEventFlow | null>(null);
+  const [eventFlowError, setEventFlowError] = useState<string | null>(null);
+  const [eventFlowLoading, setEventFlowLoading] = useState(true);
   const [eventSearch, setEventSearch] = useState("");
+  const [eventSort, setEventSort] = useState<{
+    key: "name" | "eventDate" | "status" | "aerodrome";
+    direction: "asc" | "desc" | null;
+  }>({ key: "eventDate", direction: null });
+  const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
+  const [templateFileName, setTemplateFileName] = useState("");
+  const [templateDraft, setTemplateDraft] = useState<MasterDataTemplate | null>(null);
+  const [templateValidation, setTemplateValidation] = useState<MasterDataTemplateValidation | null>(
+    null,
+  );
+  const [templateError, setTemplateError] = useState<string | null>(null);
+  const [templateBusy, setTemplateBusy] = useState(false);
   const [newEventId, setNewEventId] = useState("");
   const [newEventName, setNewEventName] = useState("");
   const [newEventDate, setNewEventDate] = useState("");
@@ -337,9 +425,41 @@ export function AdminView() {
     board?.rotations ?? [],
     selectedManifestCandidate,
   );
+  const eventVersion = board?.event.version;
 
   useEffect(() => {
-    if (initialMasterSelectionRef.current || adminArea !== "master-data" || !board) return;
+    if (eventVersion === undefined || adminArea !== "overview" || !isAdministrator) return;
+    const controller = new AbortController();
+    setEventFlowLoading(true);
+    setEventFlowError(null);
+    void getAdminEventFlow(
+      EVENT_ID,
+      ADMIN_DEVICE_ID,
+      deviceTokenFor(ADMIN_DEVICE_ID),
+      controller.signal,
+    )
+      .then(setEventFlow)
+      .catch((cause) => {
+        if (!(cause instanceof DOMException && cause.name === "AbortError")) {
+          setEventFlowError(
+            cause instanceof Error ? cause.message : "Ticketverlauf nicht verfügbar.",
+          );
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setEventFlowLoading(false);
+      });
+    return () => controller.abort();
+  }, [adminArea, eventVersion, isAdministrator]);
+
+  useEffect(() => {
+    if (
+      initialMasterSelectionRef.current ||
+      adminArea !== "events" ||
+      !["gates", "resource-groups", "aircraft", "pilots", "products"].includes(eventStep) ||
+      !board
+    )
+      return;
     initialMasterSelectionRef.current = true;
     const entry = board.resourceGroups[0];
     setResourceEditorId(entry?.id ?? "new");
@@ -349,7 +469,7 @@ export function AdminView() {
     setResourcePlannedMinutes(entry?.plannedRotationMinutes ?? 30);
     setResourceAutomaticPrecall(entry?.automaticPrecallEnabled ?? true);
     setResourceAircraftIds(entry?.activeAircraftIds ?? []);
-  }, [adminArea, board]);
+  }, [adminArea, board, eventStep]);
 
   useEffect(() => {
     if (!adminPinDialog && (!pendingMasterDelete || adminModeUnlocked)) return;
@@ -465,9 +585,9 @@ export function AdminView() {
     if (historyView !== "AUDIT") void refreshDetailedHistory(0);
   }, [historyView, refreshDetailedHistory, refreshHistory]);
   useEffect(() => {
-    if (adminArea === "audit") setHistoryView("AUDIT");
-    if (adminArea === "evaluation" && historyView === "AUDIT") setHistoryView("OPERATIONS");
-  }, [adminArea, historyView]);
+    if (adminArea === "events" && eventStep === "completion" && historyView === "AUDIT") return;
+    if (adminArea !== "events" && historyView === "AUDIT") setHistoryView("OPERATIONS");
+  }, [adminArea, eventStep, historyView]);
   useEffect(() => {
     if (!board || eventSettingsInitialized) return;
     setSaleOpensAt(formatEventLocalDateTime(board.event.saleOpensAt, board.event.timeZone));
@@ -503,6 +623,83 @@ export function AdminView() {
   useEffect(() => {
     void refreshEvents();
   }, [refreshEvents]);
+
+  async function exportMasterDataTemplate() {
+    await downloadMasterDataTemplate(EVENT_ID, ADMIN_DEVICE_ID, deviceTokenFor(ADMIN_DEVICE_ID));
+    setMessage("Stammdatenvorlage wurde als versionierte JSON-Datei exportiert.");
+  }
+
+  async function readMasterDataTemplate(file: File | null) {
+    setTemplateDraft(null);
+    setTemplateValidation(null);
+    setTemplateError(null);
+    setTemplateFileName(file?.name ?? "");
+    if (!file) return;
+    if (file.size > 1_048_576) {
+      setTemplateError("Die Vorlagendatei darf höchstens 1 MiB groß sein.");
+      return;
+    }
+    setTemplateBusy(true);
+    try {
+      const parsedJson = JSON.parse(await file.text()) as unknown;
+      const parsedTemplate = masterDataTemplateSchema.safeParse(parsedJson);
+      if (!parsedTemplate.success) {
+        throw new Error(parsedTemplate.error.issues[0]?.message ?? "Ungültige Vorlage.");
+      }
+      setTemplateDraft(parsedTemplate.data);
+      const validation = await validateMasterDataTemplate(
+        EVENT_ID,
+        ADMIN_DEVICE_ID,
+        deviceTokenFor(ADMIN_DEVICE_ID),
+        parsedTemplate.data,
+      );
+      setTemplateValidation(validation);
+    } catch (cause) {
+      setTemplateError(
+        cause instanceof Error ? cause.message : "Die Vorlagendatei konnte nicht gelesen werden.",
+      );
+    } finally {
+      setTemplateBusy(false);
+    }
+  }
+
+  async function applyMasterDataTemplate() {
+    if (
+      !board ||
+      !templateDraft ||
+      !templateValidation?.valid ||
+      !templateValidation.targetEligible
+    ) {
+      return;
+    }
+    setTemplateBusy(true);
+    setTemplateError(null);
+    try {
+      const result = await importMasterDataTemplate(
+        EVENT_ID,
+        ADMIN_DEVICE_ID,
+        deviceTokenFor(ADMIN_DEVICE_ID),
+        {
+          commandId: crypto.randomUUID(),
+          expectedVersion: board.event.version,
+          template: templateDraft,
+        },
+      );
+      setTemplateDialogOpen(false);
+      setMessage(
+        `Stammdatenvorlage importiert: ${result.counts.gates} Gates, ${result.counts.resourceGroups} Ressourcengruppen, ${result.counts.aircraft} Flugzeuge, ${result.counts.pilots} Pilotencodes und ${result.counts.products} Produkte.`,
+      );
+      await Promise.all([refresh(), refreshEvents(), refreshHistory()]);
+    } catch (cause) {
+      setTemplateError(
+        cause instanceof Error
+          ? cause.message
+          : "Stammdatenvorlage konnte nicht importiert werden.",
+      );
+    } finally {
+      setTemplateBusy(false);
+    }
+  }
 
   async function createEventFromTemplate() {
     try {
@@ -1584,20 +1781,18 @@ export function AdminView() {
 
   const setupSteps: SetupStep[] = [
     {
-      id: "parameters",
+      id: "event",
       label: "Veranstaltung",
       complete: Boolean(
         board &&
           (board.event.status !== "PREPARATION" ||
             (board.event.saleOpensAt && board.event.operationsEndAt)),
       ),
-      area: "setup",
     },
     {
       id: "gates",
       label: "Gates",
       complete: Boolean(board?.gates.some((gate) => gate.active)),
-      area: "master-data",
       category: "gates",
     },
     {
@@ -1607,46 +1802,48 @@ export function AdminView() {
         board?.resourceGroups.length &&
           board.resourceGroups.every((group) => group.activeAircraftIds.length > 0),
       ),
-      area: "master-data",
       category: "resource-groups",
     },
     {
       id: "aircraft",
       label: "Flugzeuge",
       complete: Boolean(board?.aircraft.length),
-      area: "master-data",
       category: "aircraft",
     },
     {
       id: "pilots",
       label: "Pilotencodes",
       complete: Boolean(board?.pilots.some((pilot) => pilot.active)),
-      area: "master-data",
       category: "pilots",
     },
     {
       id: "products",
       label: "Produkte",
       complete: Boolean(board?.products.length),
-      area: "master-data",
       category: "products",
     },
+    {
+      id: "operations",
+      label: "Betrieb",
+      complete: board?.event.status === "CLOSED" || board?.event.status === "ARCHIVED",
+    },
+    {
+      id: "completion",
+      label: "Abschluss",
+      complete: board?.event.status === "ARCHIVED",
+    },
   ];
-  const setupComplete = setupSteps.every((step) => step.complete);
-  const completedSetupSteps = setupSteps.filter((step) => step.complete).length;
+  const setupComplete = setupSteps.slice(0, 6).every((step) => step.complete);
+  const completedSetupSteps = setupSteps.slice(0, 6).filter((step) => step.complete).length;
   const eventIsReleased = Boolean(board && board.event.status !== "PREPARATION");
   const adminAreaCopy: Record<AdminArea, { title: string; description: string }> = {
     overview: {
       title: "Übersicht",
       description: "Betriebsstatus, Kennzahlen und offene organisatorische Aufgaben.",
     },
-    setup: {
-      title: "Veranstaltung",
-      description: "Das System Schritt für Schritt für den Rundflugbetrieb vorbereiten.",
-    },
-    "master-data": {
-      title: "Stammdaten",
-      description: "Ressourcen für den Flugtag verwalten.",
+    events: {
+      title: "Veranstaltungen",
+      description: "Veranstaltung auswählen, vorbereiten, betreiben und abschließen.",
     },
     users: {
       title: "Konten",
@@ -1654,11 +1851,7 @@ export function AdminView() {
     },
     evaluation: {
       title: "Auswertung",
-      description: "Verläufe, Berichte und seltene administrative Sonderfälle prüfen.",
-    },
-    audit: {
-      title: "Audit",
-      description: "Nachvollziehbare operative und administrative Änderungen prüfen.",
+      description: "Synthetische Prognoseszenarien im Simulator untersuchen.",
     },
     backup: {
       title: "Sicherung & Reset",
@@ -1667,7 +1860,8 @@ export function AdminView() {
   };
 
   function openSetupStep(step: SetupStep) {
-    setAdminArea(step.area);
+    setAdminArea("events");
+    setEventStep(step.id);
     if (step.category) setMasterDataCategory(step.category);
   }
 
@@ -1793,35 +1987,125 @@ export function AdminView() {
     }
   }
 
-  const masterDataCounts: Record<MasterDataCategory, number> = {
-    gates: board?.gates.length ?? 0,
-    "resource-groups": resourceGroups.length,
-    aircraft: board?.aircraft.length ?? 0,
-    assignments: board?.aircraft.filter((aircraft) => aircraft.resourceGroupId).length ?? 0,
-    pilots: board?.pilots.length ?? 0,
-    products: board?.products.length ?? 0,
-  };
+  function sortMasterRows<T extends { id: string }>(
+    category: MasterDataCategory,
+    rows: readonly T[],
+    valueFor: (row: T, key: string) => string | number,
+  ): T[] {
+    if (masterSort.category !== category || masterSort.direction === null) return [...rows];
+    return rows.toSorted((left, right) => {
+      const leftValue = valueFor(left, masterSort.key);
+      const rightValue = valueFor(right, masterSort.key);
+      const comparison =
+        typeof leftValue === "number" && typeof rightValue === "number"
+          ? leftValue - rightValue
+          : adminTableCollator.compare(String(leftValue), String(rightValue));
+      return masterSort.direction === "asc" ? comparison : -comparison;
+    });
+  }
+
+  function toggleMasterSort(key: string) {
+    setMasterSort((current) =>
+      current.category === masterDataCategory && current.key === key
+        ? {
+            ...current,
+            direction:
+              current.direction === "asc" ? "desc" : current.direction === "desc" ? null : "asc",
+          }
+        : { category: masterDataCategory, key, direction: "asc" },
+    );
+  }
+
   const normalizedMasterSearch = masterSearch.trim().toLocaleLowerCase("de-DE");
-  const visibleGates = (board?.gates ?? []).filter((gate) =>
-    `${gate.label} ${gate.gateType}`.toLocaleLowerCase("de-DE").includes(normalizedMasterSearch),
+  const visibleGates = sortMasterRows(
+    "gates",
+    (board?.gates ?? []).filter((gate) =>
+      `${gate.label} ${gate.gateType}`.toLocaleLowerCase("de-DE").includes(normalizedMasterSearch),
+    ),
+    (gate, key) =>
+      key === "status"
+        ? Number(gate.active)
+        : key === "sortOrder"
+          ? gate.sortOrder
+          : key === "type"
+            ? gate.gateType
+            : gate.label,
   );
-  const visibleResourceGroups = resourceGroups.filter((group) =>
-    `${group.name} ${group.gateLabel}`.toLocaleLowerCase("de-DE").includes(normalizedMasterSearch),
+  const visibleResourceGroups = sortMasterRows(
+    "resource-groups",
+    resourceGroups.filter((group) =>
+      `${group.name} ${group.gateLabel}`
+        .toLocaleLowerCase("de-DE")
+        .includes(normalizedMasterSearch),
+    ),
+    (group, key) =>
+      key === "status"
+        ? group.status
+        : key === "gate"
+          ? group.gateLabel
+          : key === "capacity"
+            ? group.referenceCapacity
+            : key === "aircraft"
+              ? group.activeAircraftIds.length
+              : group.name,
   );
-  const visibleAircraft = (board?.aircraft ?? []).filter((aircraft) =>
-    `${aircraft.registration} ${aircraft.aircraftType} ${aircraft.resourceGroupName}`
-      .toLocaleLowerCase("de-DE")
-      .includes(normalizedMasterSearch),
+  const visibleAircraft = sortMasterRows(
+    "aircraft",
+    (board?.aircraft ?? []).filter((aircraft) =>
+      `${aircraft.registration} ${aircraft.aircraftType} ${aircraft.resourceGroupName}`
+        .toLocaleLowerCase("de-DE")
+        .includes(normalizedMasterSearch),
+    ),
+    (aircraft, key) =>
+      key === "type"
+        ? aircraft.aircraftType
+        : key === "seats"
+          ? aircraft.passengerSeats
+          : key === "group"
+            ? aircraft.resourceGroupName
+            : key === "pilot"
+              ? (aircraft.currentPilotOperationalCode ?? "")
+              : key === "status"
+                ? aircraft.operationalState
+                : aircraft.registration,
   );
-  const visiblePilots = (board?.pilots ?? []).filter((pilot) =>
-    `${pilot.operationalCode} ${pilot.operationalNote}`
-      .toLocaleLowerCase("de-DE")
-      .includes(normalizedMasterSearch),
+  const visiblePilots = sortMasterRows(
+    "pilots",
+    (board?.pilots ?? []).filter((pilot) =>
+      `${pilot.operationalCode} ${pilot.operationalNote}`
+        .toLocaleLowerCase("de-DE")
+        .includes(normalizedMasterSearch),
+    ),
+    (pilot, key) =>
+      key === "note"
+        ? pilot.operationalNote
+        : key === "status"
+          ? Number(pilot.active) + Number(pilot.paused)
+          : key === "rotation"
+            ? (pilot.currentCommunicationNumber ?? 0)
+            : pilot.operationalCode,
   );
-  const visibleProducts = (board?.products ?? []).filter((product) =>
-    `${product.code} ${product.name} ${product.resourceGroupName} ${product.gateLabel}`
-      .toLocaleLowerCase("de-DE")
-      .includes(normalizedMasterSearch),
+  const visibleProducts = sortMasterRows(
+    "products",
+    (board?.products ?? []).filter((product) =>
+      `${product.code} ${product.name} ${product.resourceGroupName} ${product.gateLabel}`
+        .toLocaleLowerCase("de-DE")
+        .includes(normalizedMasterSearch),
+    ),
+    (product, key) =>
+      key === "name"
+        ? product.name
+        : key === "group"
+          ? product.resourceGroupName
+          : key === "gate"
+            ? product.gateLabel
+            : key === "price"
+              ? product.priceCents
+              : key === "duration"
+                ? product.referenceDurationMinutes
+                : key === "status"
+                  ? Number(product.saleEnabled)
+                  : product.code,
   );
   const activeMasterDataRows: { id: string }[] =
     masterDataCategory === "gates"
@@ -1866,6 +2150,36 @@ export function AdminView() {
     pilots: "Pilotencodes",
     products: "Produkte",
   };
+  const masterDataStepActive =
+    adminArea === "events" &&
+    ["gates", "resource-groups", "aircraft", "pilots", "products"].includes(eventStep);
+  const filteredEvents = events.filter((entry) =>
+    `${entry.name} ${entry.eventDate} ${entry.aerodrome}`
+      .toLocaleLowerCase("de-DE")
+      .includes(eventSearch.trim().toLocaleLowerCase("de-DE")),
+  );
+  const visibleEvents =
+    eventSort.direction === null
+      ? filteredEvents
+      : filteredEvents.toSorted((left, right) => {
+          const comparison = adminTableCollator.compare(
+            String(left[eventSort.key]),
+            String(right[eventSort.key]),
+          );
+          return eventSort.direction === "asc" ? comparison : -comparison;
+        });
+
+  function toggleEventSort(key: typeof eventSort.key) {
+    setEventSort((current) =>
+      current.key === key
+        ? {
+            key,
+            direction:
+              current.direction === "asc" ? "desc" : current.direction === "desc" ? null : "asc",
+          }
+        : { key, direction: "asc" },
+    );
+  }
 
   return (
     <Shell
@@ -1888,10 +2202,8 @@ export function AdminView() {
     >
       <section className="admin-layout">
         <AdminNavigation activeArea={adminArea} onChange={setAdminArea} />
-        <div
-          className={`admin-workspace ${adminArea === "master-data" ? `master-data-active ${masterEditorOpen ? "editor-open" : "editor-closed"}` : ""}`}
-        >
-          {adminArea !== "master-data" ? (
+        <div className={`admin-workspace ${masterDataStepActive ? "master-data-active" : ""}`}>
+          {!masterDataStepActive ? (
             <PageHeader
               actions={
                 <StatusPill
@@ -1920,14 +2232,168 @@ export function AdminView() {
               title={adminAreaCopy[adminArea].title}
             />
           ) : null}
-          {adminArea === "setup" ? (
-            <SetupProgress onSelect={openSetupStep} steps={setupSteps} />
+          {adminArea === "events" ? (
+            <Panel className="event-catalog-v15 event-catalog-primary" padding="none">
+              <PageHeader
+                actions={
+                  <div className="event-catalog-actions">
+                    <SearchField
+                      label="Veranstaltungen durchsuchen"
+                      onChange={(event) => setEventSearch(event.target.value)}
+                      placeholder="Veranstaltungen suchen …"
+                      value={eventSearch}
+                    />
+                    <Button
+                      busy={busyActionKey === "export-master-data-template"}
+                      disabled={!board || busyActionKey !== null}
+                      onClick={() =>
+                        void runBusyAction("export-master-data-template", exportMasterDataTemplate)
+                      }
+                      size="compact"
+                    >
+                      Stammdaten exportieren
+                    </Button>
+                    <Button
+                      disabled={!board || !isAdministrator}
+                      onClick={() => {
+                        setTemplateDraft(null);
+                        setTemplateValidation(null);
+                        setTemplateError(null);
+                        setTemplateFileName("");
+                        setTemplateDialogOpen(true);
+                      }}
+                      size="compact"
+                    >
+                      Stammdaten importieren
+                    </Button>
+                    <Button
+                      disabled={!isAdministrator}
+                      onClick={() => {
+                        setRestartMode("EMPTY");
+                        setRestartConfirmation("");
+                        setRestartEditorOpen(true);
+                      }}
+                      size="compact"
+                      variant="primary"
+                    >
+                      <Plus aria-hidden="true" /> Neue Veranstaltung
+                    </Button>
+                  </div>
+                }
+                level={2}
+                title="Veranstaltungen"
+              />
+              <div className="event-catalog-table-wrap">
+                <table className="event-catalog-table">
+                  <thead>
+                    <tr>
+                      {(
+                        [
+                          ["name", "Veranstaltungsname"],
+                          ["eventDate", "Datum"],
+                          ["status", "Phase"],
+                          ["aerodrome", "Flugplatz"],
+                        ] as const
+                      ).map(([key, label]) => (
+                        <th
+                          aria-sort={
+                            eventSort.key === key && eventSort.direction
+                              ? eventSort.direction === "asc"
+                                ? "ascending"
+                                : "descending"
+                              : "none"
+                          }
+                          key={key}
+                        >
+                          <button
+                            className="admin-sort-button"
+                            onClick={() => toggleEventSort(key)}
+                            type="button"
+                          >
+                            {label}
+                            <span aria-hidden="true">
+                              {eventSort.key === key && eventSort.direction
+                                ? eventSort.direction === "asc"
+                                  ? "↑"
+                                  : "↓"
+                                : "↕"}
+                            </span>
+                          </button>
+                        </th>
+                      ))}
+                      <th>Zeitzone</th>
+                      <th>
+                        <span className="visually-hidden">Aktionen</span>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visibleEvents.map((entry) => (
+                      <tr
+                        aria-selected={entry.eventId === EVENT_ID}
+                        className={entry.eventId === EVENT_ID ? "is-current" : ""}
+                        key={entry.eventId}
+                      >
+                        <td>
+                          <a
+                            href={`/admin?event=${encodeURIComponent(entry.eventId)}&area=events&step=${eventStep}`}
+                          >
+                            {entry.name}
+                          </a>
+                        </td>
+                        <td>{formatGermanDate(entry.eventDate)}</td>
+                        <td>
+                          {entry.status === "PREPARATION"
+                            ? "Vorbereitung"
+                            : entry.status === "ACTIVE"
+                              ? "Aktiv"
+                              : entry.status === "CLOSED"
+                                ? "Geschlossen"
+                                : "Archiviert"}
+                        </td>
+                        <td>{entry.aerodrome || "–"}</td>
+                        <td>{entry.timeZone}</td>
+                        <td>
+                          <Button
+                            aria-label={`${entry.name} löschen`}
+                            busy={busyActionKey === `delete-event-${entry.eventId}`}
+                            onClick={() =>
+                              void runBusyAction(`delete-event-${entry.eventId}`, () =>
+                                removeEvent(entry.eventId, entry.name),
+                              )
+                            }
+                            size="compact"
+                            variant="danger"
+                          >
+                            <Trash2 aria-hidden="true" /> Löschen
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {visibleEvents.length === 0 ? (
+                  <p className="event-catalog-empty">Keine passende Veranstaltung gefunden.</p>
+                ) : null}
+              </div>
+            </Panel>
+          ) : null}
+          {adminArea === "events" ? (
+            <SetupProgress currentStepId={eventStep} onSelect={openSetupStep} steps={setupSteps} />
           ) : null}
           {board?.currentDeviceRole === "FLIGHT_DIRECTOR" ? (
             <div className="readonly-banner">Flugleitungsansicht · primär lesend</div>
           ) : null}
           {board ? (
             <>
+              <div hidden={adminArea !== "overview"}>
+                <AdminEventFlowChart
+                  error={eventFlowError}
+                  flow={eventFlow}
+                  loading={eventFlowLoading}
+                  timeZone={board.event.timeZone}
+                />
+              </div>
               <section
                 aria-label="Betriebskennzahlen"
                 className="metrics-grid"
@@ -2082,7 +2548,7 @@ export function AdminView() {
                   : "Beim Auslösen einer administrativen Änderung erscheint die PIN-Abfrage."}
             </ValidationHint>
           </section>
-          {adminArea === "master-data" ? (
+          {masterDataStepActive ? (
             <header className="master-data-heading">
               <h1>
                 Stammdaten <span aria-hidden="true">›</span>{" "}
@@ -2118,7 +2584,7 @@ export function AdminView() {
           </section>
           <section
             className="admin-section restart-editor"
-            hidden={adminArea !== "setup" || !restartEditorOpen}
+            hidden={adminArea !== "events" || !restartEditorOpen}
           >
             <header className="section-heading-row">
               <h2>Neuen Betriebsstand anlegen</h2>
@@ -2225,8 +2691,11 @@ export function AdminView() {
               Sicheren Neustart anlegen
             </Button>
           </section>
-          <div className="event-setup-v15" hidden={adminArea !== "setup"}>
-            <Panel className="event-setup-details" padding="compact">
+          <div
+            className="event-setup-v15 single-panel"
+            hidden={adminArea !== "events" || !["event", "operations"].includes(eventStep)}
+          >
+            <Panel className="event-setup-details" hidden={eventStep !== "event"} padding="compact">
               <PageHeader
                 actions={
                   <Button
@@ -2419,22 +2888,40 @@ export function AdminView() {
               </details>
             </Panel>
 
-            <Panel className="event-release-v15" padding="compact">
+            <Panel
+              className="event-release-v15"
+              hidden={eventStep !== "operations"}
+              padding="compact"
+            >
               <PageHeader
                 actions={
                   <StatusPill tone={eventIsReleased || setupComplete ? "success" : "warning"}>
-                    {eventIsReleased
-                      ? "Freigegeben"
-                      : `${completedSetupSteps}/${setupSteps.length} erledigt`}
+                    {eventIsReleased ? "Freigegeben" : `${completedSetupSteps}/6 erledigt`}
                   </StatusPill>
                 }
                 level={2}
                 title="Betriebsfreigabe"
               />
               {eventIsReleased ? (
-                <p className="event-release-ready">
-                  <CheckCircle2 aria-hidden="true" /> Der Veranstaltungsbetrieb ist freigegeben.
-                </p>
+                <>
+                  <p className="event-release-ready">
+                    <CheckCircle2 aria-hidden="true" />{" "}
+                    {board?.event.status === "ACTIVE"
+                      ? "Der Veranstaltungsbetrieb ist freigegeben."
+                      : "Der Veranstaltungsbetrieb ist geschlossen."}
+                  </p>
+                  {board?.event.status === "ACTIVE" ? (
+                    <div className="event-release-action">
+                      <Button
+                        disabled={!isAdministrator}
+                        onClick={() => requestAdminAction(() => setEventLifecycle("CLOSED"))}
+                        variant="danger"
+                      >
+                        Betrieb beenden
+                      </Button>
+                    </div>
+                  ) : null}
+                </>
               ) : !setupComplete ? (
                 <>
                   <p>
@@ -2481,7 +2968,7 @@ export function AdminView() {
             </Panel>
           </div>
 
-          <Panel className="event-catalog-v15" hidden={adminArea !== "setup"} padding="none">
+          <Panel className="event-catalog-v15" hidden padding="none">
             <PageHeader
               actions={
                 <div className="event-catalog-actions">
@@ -2534,7 +3021,9 @@ export function AdminView() {
                         key={entry.eventId}
                       >
                         <td>
-                          <a href={`/admin?event=${encodeURIComponent(entry.eventId)}&area=setup`}>
+                          <a
+                            href={`/admin?event=${encodeURIComponent(entry.eventId)}&area=events&step=event`}
+                          >
                             {entry.name}
                           </a>
                         </td>
@@ -2569,17 +3058,7 @@ export function AdminView() {
               </table>
             </div>
           </Panel>
-          <MasterDataNavigation
-            activeCategory={masterDataCategory}
-            counts={masterDataCounts}
-            onChange={(category) => {
-              setMasterDataCategory(category);
-              setMasterSearch("");
-              setMasterSubmitAttempted(false);
-              setMasterEditorOpen(false);
-            }}
-          />
-          <section className="master-data-workspace" hidden={adminArea !== "master-data"}>
+          <section className="master-data-workspace" hidden={!masterDataStepActive}>
             {["aircraft", "assignments"].includes(masterDataCategory) &&
             resourceGroups.length === 0 ? (
               <ValidationHint>
@@ -2609,9 +3088,32 @@ export function AdminView() {
                 <table className="master-data-table">
                   <thead>
                     <tr>
-                      <th>Bezeichnung</th>
-                      <th>Status</th>
-                      <th>Aktionen</th>
+                      <SortableTableHeading
+                        active={masterSort.category === "gates" && masterSort.key === "label"}
+                        direction={masterSort.direction}
+                        label="Bezeichnung"
+                        onClick={() => toggleMasterSort("label")}
+                      />
+                      <SortableTableHeading
+                        active={masterSort.category === "gates" && masterSort.key === "type"}
+                        direction={masterSort.direction}
+                        label="Typ"
+                        onClick={() => toggleMasterSort("type")}
+                      />
+                      <SortableTableHeading
+                        active={masterSort.category === "gates" && masterSort.key === "status"}
+                        direction={masterSort.direction}
+                        label="Status"
+                        onClick={() => toggleMasterSort("status")}
+                      />
+                      <SortableTableHeading
+                        active={masterSort.category === "gates" && masterSort.key === "sortOrder"}
+                        direction={masterSort.direction}
+                        label="Sortierung"
+                        onClick={() => toggleMasterSort("sortOrder")}
+                      />
+                      <th>Ressourcengruppen</th>
+                      <th>Displayfilter</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -2627,23 +3129,17 @@ export function AdminView() {
                         tabIndex={0}
                       >
                         <td>{gate.label}</td>
+                        <td>{gate.gateType}</td>
                         <td>
                           <span className={`status-text ${gate.active ? "active" : "inactive"}`}>
                             {gate.active ? "Aktiv" : "Inaktiv"}
                           </span>
                         </td>
+                        <td>{gate.sortOrder}</td>
+                        <td>{gate.assignedResourceGroupIds.length}</td>
                         <td>
-                          <button
-                            aria-label={`${gate.label} öffnen`}
-                            className="table-overflow-action"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              selectGateForEditing(gate.id);
-                            }}
-                            type="button"
-                          >
-                            ⋯
-                          </button>
+                          {gate.displayFilter.productIds.length} Produkte ·{" "}
+                          {gate.displayFilter.rotationStatuses.length} Status
                         </td>
                       </tr>
                     ))}
@@ -2654,8 +3150,48 @@ export function AdminView() {
                 <table className="master-data-table resource-group-list-table">
                   <thead>
                     <tr>
-                      <th>Ressourcengruppe</th>
-                      <th>Status</th>
+                      <SortableTableHeading
+                        active={
+                          masterSort.category === "resource-groups" && masterSort.key === "name"
+                        }
+                        direction={masterSort.direction}
+                        label="Ressourcengruppe"
+                        onClick={() => toggleMasterSort("name")}
+                      />
+                      <SortableTableHeading
+                        active={
+                          masterSort.category === "resource-groups" && masterSort.key === "status"
+                        }
+                        direction={masterSort.direction}
+                        label="Status"
+                        onClick={() => toggleMasterSort("status")}
+                      />
+                      <SortableTableHeading
+                        active={
+                          masterSort.category === "resource-groups" && masterSort.key === "gate"
+                        }
+                        direction={masterSort.direction}
+                        label="Gate"
+                        onClick={() => toggleMasterSort("gate")}
+                      />
+                      <SortableTableHeading
+                        active={
+                          masterSort.category === "resource-groups" && masterSort.key === "aircraft"
+                        }
+                        direction={masterSort.direction}
+                        label="Flugzeuge"
+                        onClick={() => toggleMasterSort("aircraft")}
+                      />
+                      <SortableTableHeading
+                        active={
+                          masterSort.category === "resource-groups" && masterSort.key === "capacity"
+                        }
+                        direction={masterSort.direction}
+                        label="Kapazität"
+                        onClick={() => toggleMasterSort("capacity")}
+                      />
+                      <th>Plan / Voraufruf</th>
+                      <th>Produkte</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -2674,12 +3210,7 @@ export function AdminView() {
                       >
                         <td>
                           <strong>{group.name}</strong>
-                          <small>
-                            {group.activeAircraftIds.length} Flugzeug
-                            {group.activeAircraftIds.length === 1 ? "" : "e"} · Kapazität{" "}
-                            {group.referenceCapacity}{" "}
-                            {group.referenceCapacity === 1 ? "Platz" : "Plätze"} · {group.gateLabel}
-                          </small>
+                          <small>{group.shortCode}</small>
                         </td>
                         <td>
                           <span
@@ -2687,6 +3218,22 @@ export function AdminView() {
                           >
                             {group.status === "ACTIVE" ? "Aktiv" : group.status}
                           </span>
+                        </td>
+                        <td>{group.gateLabel}</td>
+                        <td>
+                          {(board?.aircraft ?? [])
+                            .filter((aircraft) => group.activeAircraftIds.includes(aircraft.id))
+                            .map((aircraft) => aircraft.registration)
+                            .join(", ") || "Keine"}
+                        </td>
+                        <td>{group.referenceCapacity}</td>
+                        <td>
+                          {group.plannedRotationMinutes} Min. ·{" "}
+                          {group.automaticPrecallEnabled ? "automatisch" : "manuell"}
+                        </td>
+                        <td>
+                          {board?.products.filter((product) => product.resourceGroupId === group.id)
+                            .length ?? 0}
                         </td>
                       </tr>
                     ))}
@@ -2697,12 +3244,45 @@ export function AdminView() {
                 <table className="master-data-table">
                   <thead>
                     <tr>
-                      <th>Kennung</th>
-                      <th>Flugzeugtyp</th>
-                      <th>Sitzplätze</th>
-                      <th>Ressourcengruppe</th>
-                      <th>Status</th>
-                      <th>Aktionen</th>
+                      <SortableTableHeading
+                        active={
+                          masterSort.category === "aircraft" && masterSort.key === "registration"
+                        }
+                        direction={masterSort.direction}
+                        label="Kennung"
+                        onClick={() => toggleMasterSort("registration")}
+                      />
+                      <SortableTableHeading
+                        active={masterSort.category === "aircraft" && masterSort.key === "type"}
+                        direction={masterSort.direction}
+                        label="Flugzeugtyp"
+                        onClick={() => toggleMasterSort("type")}
+                      />
+                      <SortableTableHeading
+                        active={masterSort.category === "aircraft" && masterSort.key === "seats"}
+                        direction={masterSort.direction}
+                        label="Sitzplätze"
+                        onClick={() => toggleMasterSort("seats")}
+                      />
+                      <th>Max. Zuladung</th>
+                      <SortableTableHeading
+                        active={masterSort.category === "aircraft" && masterSort.key === "group"}
+                        direction={masterSort.direction}
+                        label="Ressourcengruppe"
+                        onClick={() => toggleMasterSort("group")}
+                      />
+                      <SortableTableHeading
+                        active={masterSort.category === "aircraft" && masterSort.key === "pilot"}
+                        direction={masterSort.direction}
+                        label="Pilotencode"
+                        onClick={() => toggleMasterSort("pilot")}
+                      />
+                      <SortableTableHeading
+                        active={masterSort.category === "aircraft" && masterSort.key === "status"}
+                        direction={masterSort.direction}
+                        label="Status"
+                        onClick={() => toggleMasterSort("status")}
+                      />
                     </tr>
                   </thead>
                   <tbody>
@@ -2724,26 +3304,19 @@ export function AdminView() {
                         </td>
                         <td>{aircraft.aircraftType}</td>
                         <td>{aircraft.passengerSeats}</td>
+                        <td>
+                          {aircraft.maximumPassengerPayloadKg
+                            ? `${aircraft.maximumPassengerPayloadKg} kg`
+                            : "Nicht erfasst"}
+                        </td>
                         <td>{aircraft.resourceGroupName || "Nicht zugeordnet"}</td>
+                        <td>{aircraft.currentPilotOperationalCode || "Nicht zugeordnet"}</td>
                         <td>
                           <span
                             className={`status-text ${aircraft.operationalState === "INACTIVE" ? "inactive" : "active"}`}
                           >
                             {aircraftStateLabel[aircraft.operationalState]}
                           </span>
-                        </td>
-                        <td>
-                          <button
-                            aria-label={`${aircraft.registration} öffnen`}
-                            className="table-overflow-action"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              selectAircraftForEditing(aircraft.id);
-                            }}
-                            type="button"
-                          >
-                            ⋯
-                          </button>
                         </td>
                       </tr>
                     ))}
@@ -2757,7 +3330,6 @@ export function AdminView() {
                       <th>Flugzeug</th>
                       <th>Flugzeugtyp</th>
                       <th>Aktuelle Ressourcengruppe</th>
-                      <th>Aktionen</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -2788,22 +3360,6 @@ export function AdminView() {
                         </td>
                         <td>{aircraft.aircraftType}</td>
                         <td>{aircraft.resourceGroupName || "Nicht zugeordnet"}</td>
-                        <td>
-                          <button
-                            aria-label={`Zuordnung von ${aircraft.registration} öffnen`}
-                            className="table-overflow-action"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setAssignmentAircraftId(aircraft.id);
-                              setAssignmentResourceGroupId(aircraft.resourceGroupId);
-                              setMasterSubmitAttempted(false);
-                              setMasterEditorOpen(true);
-                            }}
-                            type="button"
-                          >
-                            ⋯
-                          </button>
-                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -2813,11 +3369,30 @@ export function AdminView() {
                 <table className="master-data-table">
                   <thead>
                     <tr>
-                      <th>Operativer Code</th>
-                      <th>Organisatorische Bemerkung</th>
-                      <th>Status</th>
-                      <th>Aktueller Umlauf</th>
-                      <th>Aktionen</th>
+                      <SortableTableHeading
+                        active={masterSort.category === "pilots" && masterSort.key === "code"}
+                        direction={masterSort.direction}
+                        label="Operativer Code"
+                        onClick={() => toggleMasterSort("code")}
+                      />
+                      <SortableTableHeading
+                        active={masterSort.category === "pilots" && masterSort.key === "note"}
+                        direction={masterSort.direction}
+                        label="Organisatorische Bemerkung"
+                        onClick={() => toggleMasterSort("note")}
+                      />
+                      <SortableTableHeading
+                        active={masterSort.category === "pilots" && masterSort.key === "status"}
+                        direction={masterSort.direction}
+                        label="Status"
+                        onClick={() => toggleMasterSort("status")}
+                      />
+                      <SortableTableHeading
+                        active={masterSort.category === "pilots" && masterSort.key === "rotation"}
+                        direction={masterSort.direction}
+                        label="Aktueller Umlauf"
+                        onClick={() => toggleMasterSort("rotation")}
+                      />
                     </tr>
                   </thead>
                   <tbody>
@@ -2838,26 +3413,13 @@ export function AdminView() {
                         <td>{pilot.operationalNote || "Keine Bemerkung"}</td>
                         <td>
                           <span className={`status-text ${pilot.active ? "active" : "inactive"}`}>
-                            {pilot.active ? "Aktiv" : "Inaktiv"}
+                            {pilot.active ? (pilot.paused ? "Pause" : "Aktiv") : "Inaktiv"}
                           </span>
                         </td>
                         <td>
                           {pilot.currentCommunicationNumber
                             ? `Fluggruppe ${pilot.currentCommunicationNumber}`
                             : "Nicht zugeordnet"}
-                        </td>
-                        <td>
-                          <button
-                            aria-label={`${pilot.operationalCode} öffnen`}
-                            className="table-overflow-action"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              selectPilotForEditing(pilot.id);
-                            }}
-                            type="button"
-                          >
-                            ⋯
-                          </button>
                         </td>
                       </tr>
                     ))}
@@ -2868,12 +3430,48 @@ export function AdminView() {
                 <table className="master-data-table">
                   <thead>
                     <tr>
-                      <th>Kürzel</th>
-                      <th>Bezeichnung</th>
-                      <th>Ressourcengruppe</th>
-                      <th>Gate</th>
-                      <th>Status</th>
-                      <th>Aktionen</th>
+                      <SortableTableHeading
+                        active={masterSort.category === "products" && masterSort.key === "code"}
+                        direction={masterSort.direction}
+                        label="Kürzel"
+                        onClick={() => toggleMasterSort("code")}
+                      />
+                      <SortableTableHeading
+                        active={masterSort.category === "products" && masterSort.key === "name"}
+                        direction={masterSort.direction}
+                        label="Bezeichnung"
+                        onClick={() => toggleMasterSort("name")}
+                      />
+                      <SortableTableHeading
+                        active={masterSort.category === "products" && masterSort.key === "group"}
+                        direction={masterSort.direction}
+                        label="Ressourcengruppe"
+                        onClick={() => toggleMasterSort("group")}
+                      />
+                      <SortableTableHeading
+                        active={masterSort.category === "products" && masterSort.key === "gate"}
+                        direction={masterSort.direction}
+                        label="Gate"
+                        onClick={() => toggleMasterSort("gate")}
+                      />
+                      <SortableTableHeading
+                        active={masterSort.category === "products" && masterSort.key === "price"}
+                        direction={masterSort.direction}
+                        label="Preis"
+                        onClick={() => toggleMasterSort("price")}
+                      />
+                      <SortableTableHeading
+                        active={masterSort.category === "products" && masterSort.key === "duration"}
+                        direction={masterSort.direction}
+                        label="Referenzdauer"
+                        onClick={() => toggleMasterSort("duration")}
+                      />
+                      <SortableTableHeading
+                        active={masterSort.category === "products" && masterSort.key === "status"}
+                        direction={masterSort.direction}
+                        label="Status"
+                        onClick={() => toggleMasterSort("status")}
+                      />
                     </tr>
                   </thead>
                   <tbody>
@@ -2897,24 +3495,18 @@ export function AdminView() {
                         <td>{product.resourceGroupName}</td>
                         <td>{product.gateLabel}</td>
                         <td>
+                          {(product.priceCents / 100).toLocaleString("de-DE", {
+                            style: "currency",
+                            currency: "EUR",
+                          })}
+                        </td>
+                        <td>{product.referenceDurationMinutes} Min.</td>
+                        <td>
                           <span
                             className={`status-text ${product.saleEnabled ? "active" : "inactive"}`}
                           >
                             {product.saleEnabled ? "Verkauf aktiv" : "Verkauf gesperrt"}
                           </span>
-                        </td>
-                        <td>
-                          <button
-                            aria-label={`${product.name} öffnen`}
-                            className="table-overflow-action"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              selectProductForEditing(product.id);
-                            }}
-                            type="button"
-                          >
-                            ⋯
-                          </button>
                         </td>
                       </tr>
                     ))}
@@ -3024,32 +3616,24 @@ export function AdminView() {
               </div>
             ) : null}
           </section>
-          <section
-            className="admin-section master-data-editor master-data-drawer"
-            hidden={
-              adminArea !== "master-data" ||
-              !masterEditorOpen ||
-              !["gates", "products"].includes(masterDataCategory)
+          <ModalDialog
+            onClose={() => setMasterEditorOpen(false)}
+            open={
+              masterDataStepActive &&
+              masterEditorOpen &&
+              ["gates", "products"].includes(masterDataCategory)
+            }
+            size="wide"
+            title={
+              masterDataCategory === "gates"
+                ? gateEditorId === "new"
+                  ? "Gate anlegen"
+                  : "Gate bearbeiten"
+                : productEditorId === "new"
+                  ? "Produkt anlegen"
+                  : "Produkt bearbeiten"
             }
           >
-            <div className="drawer-heading">
-              <h2>
-                {masterDataCategory === "gates"
-                  ? gateEditorId === "new"
-                    ? "Gate anlegen"
-                    : "Gate bearbeiten"
-                  : productEditorId === "new"
-                    ? "Produkt anlegen"
-                    : "Produkt bearbeiten"}
-              </h2>
-              <button
-                aria-label="Editor schließen"
-                onClick={() => setMasterEditorOpen(false)}
-                type="button"
-              >
-                ×
-              </button>
-            </div>
             <div className="master-data-columns">
               <fieldset hidden={masterDataCategory !== "gates"}>
                 <legend>Gate</legend>
@@ -3390,35 +3974,27 @@ export function AdminView() {
                 ) : null}
               </fieldset>
             </div>
-          </section>
-          <section
-            className="admin-section master-data-editor master-data-drawer"
-            hidden={
-              adminArea !== "master-data" ||
-              !masterEditorOpen ||
-              !["resource-groups", "aircraft", "assignments"].includes(masterDataCategory)
+          </ModalDialog>
+          <ModalDialog
+            onClose={() => setMasterEditorOpen(false)}
+            open={
+              masterDataStepActive &&
+              masterEditorOpen &&
+              ["resource-groups", "aircraft", "assignments"].includes(masterDataCategory)
+            }
+            size="wide"
+            title={
+              masterDataCategory === "resource-groups"
+                ? resourceEditorId === "new"
+                  ? "Ressourcengruppe anlegen"
+                  : "Ressourcengruppe bearbeiten"
+                : masterDataCategory === "assignments"
+                  ? "Zuordnung ändern"
+                  : aircraftEditorId === "new"
+                    ? "Flugzeug anlegen"
+                    : "Flugzeug bearbeiten"
             }
           >
-            <div className="drawer-heading">
-              <h2>
-                {masterDataCategory === "resource-groups"
-                  ? resourceEditorId === "new"
-                    ? "Ressourcengruppe anlegen"
-                    : "Ressourcengruppe bearbeiten"
-                  : masterDataCategory === "assignments"
-                    ? "Zuordnung ändern"
-                    : aircraftEditorId === "new"
-                      ? "Flugzeug anlegen"
-                      : "Flugzeug bearbeiten"}
-              </h2>
-              <button
-                aria-label="Editor schließen"
-                onClick={() => setMasterEditorOpen(false)}
-                type="button"
-              >
-                ×
-              </button>
-            </div>
             <div className="resource-master-grid">
               <fieldset hidden={masterDataCategory !== "resource-groups"}>
                 <legend>Ressourcengruppe</legend>
@@ -3755,23 +4331,13 @@ export function AdminView() {
                 ) : null}
               </fieldset>
             </div>
-          </section>
-          <section
-            className="admin-section master-data-editor master-data-drawer"
-            hidden={
-              adminArea !== "master-data" || !masterEditorOpen || masterDataCategory !== "pilots"
-            }
+          </ModalDialog>
+          <ModalDialog
+            onClose={() => setMasterEditorOpen(false)}
+            open={masterDataStepActive && masterEditorOpen && masterDataCategory === "pilots"}
+            size="wide"
+            title={pilotEditorId === "new" ? "Pilotencode anlegen" : "Pilotencode bearbeiten"}
           >
-            <div className="drawer-heading">
-              <h2>{pilotEditorId === "new" ? "Pilotencode anlegen" : "Pilotencode bearbeiten"}</h2>
-              <button
-                aria-label="Editor schließen"
-                onClick={() => setMasterEditorOpen(false)}
-                type="button"
-              >
-                ×
-              </button>
-            </div>
             <div className="parameter-grid compact-editor-grid">
               <label>
                 <FieldLabel
@@ -3846,7 +4412,7 @@ export function AdminView() {
                 </button>
               </div>
             ) : null}
-          </section>
+          </ModalDialog>
           <section
             className="admin-section admin-simulator-launch"
             hidden={adminArea !== "evaluation"}
@@ -3878,7 +4444,7 @@ export function AdminView() {
           </section>
           <section
             className="admin-section"
-            hidden={!(["evaluation", "audit"] as AdminArea[]).includes(adminArea)}
+            hidden={adminArea !== "events" || eventStep !== "operations"}
           >
             <h2>Notfallmodus</h2>
             <label>
@@ -3922,7 +4488,7 @@ export function AdminView() {
               </Button>
             )}
           </section>
-          <section className="admin-section" hidden={adminArea !== "evaluation"}>
+          <section className="admin-section" hidden>
             <h2>Laufende Umläufe</h2>
             <div className="active-rotation-list">
               {board?.rotations
@@ -3942,7 +4508,7 @@ export function AdminView() {
           </section>
           <section
             className="admin-section manifest-correction"
-            hidden={adminArea !== "evaluation"}
+            hidden={adminArea !== "events" || eventStep !== "completion"}
           >
             <div className="section-heading">
               <div>
@@ -4052,7 +4618,7 @@ export function AdminView() {
               <p className="help-text">Aktuell ist keine Korrektur nach Flugstart erforderlich.</p>
             ) : null}
           </section>
-          <section className="admin-section" hidden={adminArea !== "evaluation"}>
+          <section className="admin-section" hidden>
             <h2>Betriebs- und Wetterhinweise</h2>
             <label>
               <FieldLabel
@@ -4104,7 +4670,10 @@ export function AdminView() {
             </Button>
             <p>Hinweise stoppen keinen Flugbetrieb. Unterbrechungen werden separat gesetzt.</p>
           </section>
-          <section className="admin-section" hidden={adminArea !== "evaluation"}>
+          <section
+            className="admin-section"
+            hidden={adminArea !== "events" || eventStep !== "operations"}
+          >
             <h2>Kapazität und Verkaufsempfehlung</h2>
             <LocalizedDateTimeInput
               label="Neuer harter Verkaufsschluss"
@@ -4168,7 +4737,7 @@ export function AdminView() {
               ))}
             </div>
           </section>
-          <section className="admin-section" hidden={adminArea !== "evaluation"}>
+          <section className="admin-section" hidden>
             <h2>Flotte, Tanken und Pausen</h2>
             <p className="safety-disclaimer">
               Ausschließlich organisatorische Hinweise – keine flugbetriebliche oder
@@ -4334,7 +4903,7 @@ export function AdminView() {
               ))}
             </div>
           </section>
-          <section className="admin-section" hidden={adminArea !== "evaluation"}>
+          <section className="admin-section" hidden>
             <h2>Ressourcengruppen</h2>
             {resourceGroups.map((group) => (
               <div className="resource-control" key={group.id}>
@@ -4395,7 +4964,10 @@ export function AdminView() {
               </div>
             ))}
           </section>
-          <section className="admin-section" hidden={adminArea !== "evaluation"}>
+          <section
+            className="admin-section"
+            hidden={adminArea !== "events" || eventStep !== "completion"}
+          >
             <div className="section-heading">
               <h2>Audit und Tagesabschluss</h2>
               <div className="report-actions">
@@ -4978,6 +5550,103 @@ export function AdminView() {
               </form>
             </div>
           ) : null}
+          <ModalDialog
+            description="Versionierte Stammdaten werden geprüft und ausschließlich atomar in eine leere Veranstaltung in Vorbereitung importiert."
+            footer={
+              <>
+                <Button
+                  disabled={templateBusy}
+                  onClick={() => setTemplateDialogOpen(false)}
+                  type="button"
+                >
+                  Abbrechen
+                </Button>
+                <Button
+                  busy={templateBusy}
+                  disabled={
+                    !templateDraft ||
+                    !templateValidation?.valid ||
+                    !templateValidation.targetEligible
+                  }
+                  onClick={() => void applyMasterDataTemplate()}
+                  type="button"
+                  variant="primary"
+                >
+                  Vorlage importieren
+                </Button>
+              </>
+            }
+            onClose={() => {
+              if (!templateBusy) setTemplateDialogOpen(false);
+            }}
+            open={templateDialogOpen}
+            size="wide"
+            title="Stammdatenvorlage importieren"
+          >
+            <div className="template-import-dialog">
+              <Field
+                help="JSON-Datei im Format rundflug-master-data-template, Version 1, höchstens 1 MiB."
+                label="Vorlagendatei"
+              >
+                <input
+                  accept="application/json,.json"
+                  disabled={templateBusy}
+                  onChange={(event) => void readMasterDataTemplate(event.target.files?.[0] ?? null)}
+                  type="file"
+                />
+              </Field>
+              {templateFileName ? <p className="help-text">{templateFileName}</p> : null}
+              {templateBusy ? <p role="status">Vorlage wird geprüft …</p> : null}
+              {templateError ? <ValidationHint tone="error">{templateError}</ValidationHint> : null}
+              {templateValidation ? (
+                <>
+                  <div className="template-counts">
+                    <span className="visually-hidden">Inhalt der Vorlage:</span>
+                    <span>
+                      <strong>{templateValidation.counts.gates}</strong> Gates
+                    </span>
+                    <span>
+                      <strong>{templateValidation.counts.resourceGroups}</strong> Gruppen
+                    </span>
+                    <span>
+                      <strong>{templateValidation.counts.aircraft}</strong> Flugzeuge
+                    </span>
+                    <span>
+                      <strong>{templateValidation.counts.assignments}</strong> Zuordnungen
+                    </span>
+                    <span>
+                      <strong>{templateValidation.counts.pilots}</strong> Pilotencodes
+                    </span>
+                    <span>
+                      <strong>{templateValidation.counts.products}</strong> Produkte
+                    </span>
+                  </div>
+                  {!templateValidation.targetEligible ? (
+                    <ValidationHint tone="error">
+                      Das Ziel muss leer und im Status Vorbereitung sein. Vorhandene Stammdaten
+                      werden weder zusammengeführt noch ersetzt.
+                    </ValidationHint>
+                  ) : null}
+                  {templateValidation.errors.map((entry) => (
+                    <ValidationHint key={`${entry.path}-${entry.message}`} tone="error">
+                      {entry.path}: {entry.message}
+                    </ValidationHint>
+                  ))}
+                  {templateValidation.warnings.map((warning) => (
+                    <ValidationHint key={warning} tone="warning">
+                      {warning}
+                    </ValidationHint>
+                  ))}
+                  {templateValidation.valid && templateValidation.targetEligible ? (
+                    <ValidationHint>
+                      Die Vorlage ist gültig. Der Import erzeugt neue veranstaltungsbezogene
+                      Kennungen und genau einen auditierten Versionssprung.
+                    </ValidationHint>
+                  ) : null}
+                </>
+              ) : null}
+            </div>
+          </ModalDialog>
           {factoryResetOpen ? (
             <div className="modal-backdrop factory-reset-backdrop">
               <form

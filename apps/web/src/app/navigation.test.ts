@@ -121,7 +121,8 @@ describe("V1.2 app navigation", () => {
 
   it("persists the selected administration area in the URL", () => {
     expect(adminSource).toContain('url.searchParams.set("area", adminArea)');
-    expect(adminSource).toContain('url.searchParams.set("section", masterDataCategory)');
+    expect(adminSource).toContain('url.searchParams.set("step", eventStep)');
+    expect(adminSource).toContain('url.searchParams.delete("section")');
     expect(adminSource).toContain('window.history.replaceState(null, "", url)');
   });
 

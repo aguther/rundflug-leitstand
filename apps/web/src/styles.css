@@ -350,12 +350,15 @@
   line-height: 1;
   cursor: help;
   text-decoration: none;
+  padding: 0;
 }
-.field-info:hover {
+.field-info:hover,
+.field-info:focus-visible,
+.field-info.is-open {
   color: var(--ui-accent);
   border-color: var(--ui-accent);
 }
-.field-info::after {
+.field-info-tooltip {
   position: absolute;
   z-index: 5;
   top: 26px;
@@ -367,7 +370,6 @@
   color: var(--ui-text);
   background: var(--ui-surface);
   box-shadow: var(--ui-shadow);
-  content: attr(data-help);
   font-size: 0.78rem;
   font-weight: 500;
   line-height: 1.45;
@@ -380,9 +382,9 @@
     transform 120ms ease,
     visibility 0s linear 120ms;
 }
-.field-info:hover::after,
-.admin-section label:focus-within .field-info::after,
-.localized-input-field:focus-within .field-info::after {
+.field-info:hover .field-info-tooltip,
+.field-info:focus-visible .field-info-tooltip,
+.field-info.is-open .field-info-tooltip {
   opacity: 1;
   transform: translateY(0);
   visibility: visible;
