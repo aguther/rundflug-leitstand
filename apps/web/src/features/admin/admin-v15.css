@@ -1,6 +1,6 @@
 /* biome-ignore-all lint/style/noDescendingSpecificity: this V1.5 layer deliberately replaces legacy Admin layout rules. */
 /* V1.5 Administration: compact structure built from the shared PageHeader, Panel, Field and Button primitives. */
-.admin-shell .admin-workspace:not(.master-data-active) > .ds-page-header {
+.admin-shell .admin-workspace > .ds-page-header {
   min-height: 64px;
   align-items: center;
   margin: 0;
@@ -9,11 +9,11 @@
   background: var(--ui-surface);
 }
 
-.admin-shell .admin-workspace:not(.master-data-active) > .ds-page-header h1 {
+.admin-shell .admin-workspace > .ds-page-header h1 {
   font-size: 1.2rem;
 }
 
-.admin-shell .admin-workspace:not(.master-data-active) > .ds-page-header p {
+.admin-shell .admin-workspace > .ds-page-header p {
   margin-top: 2px;
   font-size: 0.78rem;
 }
@@ -503,7 +503,7 @@
 }
 
 @media (max-width: 620px) {
-  .admin-shell .admin-workspace:not(.master-data-active) > .ds-page-header {
+  .admin-shell .admin-workspace > .ds-page-header {
     padding-inline: 12px;
   }
 

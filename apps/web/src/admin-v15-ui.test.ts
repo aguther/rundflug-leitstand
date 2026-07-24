@@ -65,6 +65,24 @@ describe("V1.5 administration UI", () => {
     expect(chartSource).toContain("const HEIGHT = 210");
   });
 
+  it("keeps the area header mounted with the same geometry on master-data steps", () => {
+    const workspaceHeader = adminViewSource.slice(
+      adminViewSource.indexOf("<div className={`admin-workspace "),
+      adminViewSource.indexOf('{adminArea === "events" ? ('),
+    );
+
+    expect(workspaceHeader).toContain("<PageHeader");
+    expect(workspaceHeader).not.toContain("{!masterDataStepActive ? (");
+    expect(adminStyles).toContain(".admin-shell .admin-workspace > .ds-page-header");
+    expect(adminEventStyles).toContain(".admin-shell .admin-workspace > .ds-page-header");
+    expect(adminStyles).not.toContain(
+      ".admin-workspace:not(.master-data-active) > .ds-page-header",
+    );
+    expect(adminEventStyles).not.toContain(
+      ".admin-workspace:not(.master-data-active) > .ds-page-header",
+    );
+  });
+
   it("implements the event-scoped information architecture and legacy URL redirects", () => {
     for (const navigationItem of [
       '{ id: "overview", label: "Übersicht"',
