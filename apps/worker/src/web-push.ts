@@ -27,6 +27,10 @@ export function pushMessageFor(eventType: PushNotificationType): string {
   return PUSH_MESSAGES[eventType];
 }
 
+export function pushUrgencyFor(eventType: PushNotificationType): "normal" | "high" {
+  return eventType === "FLIGHT_GROUP_CALLED" ? "high" : "normal";
+}
+
 const PUBLIC_CODE_PATTERN = /^[A-Z2-9]{12,32}$/;
 
 export function publicPushTargetPath(input: {
@@ -37,6 +41,20 @@ export function publicPushTargetPath(input: {
   const code = input.targetKind === "GROUP" ? input.groupCode : input.ticketCode;
   if (!code || !PUBLIC_CODE_PATTERN.test(code)) return null;
   return input.targetKind === "GROUP" ? `/gruppe/${code}` : `/ticket/${code}`;
+}
+
+export function publicPushPayload(eventType: PushNotificationType, targetPath: string): string {
+  return JSON.stringify({
+    web_push: 8030,
+    notification: {
+      title: "Rundflug-Leitstand",
+      lang: "de",
+      dir: "ltr",
+      body: pushMessageFor(eventType),
+      navigate: targetPath,
+      data: { url: targetPath },
+    },
+  });
 }
 
 export function shouldQueuePreparationNotification(input: {
@@ -168,7 +186,6 @@ export async function sendRotationPushNotifications(
   )
     .bind(rotationId, eventType, now)
     .all<StoredPushSubscription>();
-  const messageBody = pushMessageFor(eventType);
   await Promise.allSettled(
     subscriptions.results.map(async (subscription) => {
       const targetPath = publicPushTargetPath({
@@ -178,15 +195,12 @@ export async function sendRotationPushNotifications(
       });
       if (!targetPath) return;
       const payload = await buildWebPushRequest({
-        data: JSON.stringify({
-          title: "Rundflug-Leitstand",
-          body: messageBody,
-          url: targetPath,
-        }),
+        data: publicPushPayload(eventType, targetPath),
         endpoint: subscription.endpoint,
         p256dh: subscription.p256dh,
         auth: subscription.auth,
         ttl: 300,
+        urgency: pushUrgencyFor(eventType),
         vapid,
       });
       const requestBody = new ArrayBuffer(payload.body.byteLength);
