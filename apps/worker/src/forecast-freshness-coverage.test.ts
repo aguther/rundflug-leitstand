@@ -39,6 +39,6 @@ describe("persisted forecast freshness", () => {
     expect(recalculation).toContain("const nowIso = now.toISOString()");
     expect(recalculation).toContain("calculateForecastTimelines");
     expect(recalculation).toContain("prediction_updated_at = ?12");
-    expect(recalculation).toContain("decideAutomaticPrecall");
+    expect(recalculation).toContain("selectAutomaticPrecalls");
   });
 });

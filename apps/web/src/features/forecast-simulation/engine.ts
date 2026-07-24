@@ -1,11 +1,11 @@
 import {
   calculateForecastTimelines,
-  decideAutomaticPrecall,
   deriveAdaptivePrecallLeadMinutes,
   type ForecastRotationStatus,
   type ForecastUncertaintyReason,
   type PredictionQuality,
   planNextRotations,
+  selectAutomaticPrecalls,
 } from "@rundflug/domain";
 
 import type {
@@ -778,64 +778,78 @@ export function runSimulation(
     }
 
     const precallProjections = calculateCurrentProjections(nowMs, operationalInterrupted);
-    const firstWaitingRotation = rotations.find(
+    const waitingRotations = rotations.filter(
       (rotation) => rotation.status === "DRAFT" && Date.parse(rotation.createdAt) <= nowMs,
     );
-    if (firstWaitingRotation) {
-      const projection = precallProjections.find(
-        (candidate) => candidate.rotationId === firstWaitingRotation.id,
+    if (waitingRotations.length > 0) {
+      const observedGateWaitMinutes = rotations.flatMap((rotation) =>
+        rotation.precalledAt && rotation.calledAt
+          ? [(Date.parse(rotation.calledAt) - Date.parse(rotation.precalledAt)) / MINUTE_MS]
+          : [],
       );
-      if (projection) {
-        const observedGateWaitMinutes = rotations.flatMap((rotation) =>
-          rotation.precalledAt && rotation.calledAt
-            ? [(Date.parse(rotation.calledAt) - Date.parse(rotation.precalledAt)) / MINUTE_MS]
-            : [],
+      const adaptiveLeadMinutes = deriveAdaptivePrecallLeadMinutes({
+        observedGateWaitMinutes,
+        tuning: config.forecastTuning.precall,
+      });
+      const latestPrecallAt = rotations.reduce<number | null>((latest, rotation) => {
+        if (!rotation.precalledAt) return latest;
+        const value = Date.parse(rotation.precalledAt);
+        return latest === null ? value : Math.max(latest, value);
+      }, null);
+      const largestEligibleAircraftSeats = aircraft
+        .filter((entry) => entry.state === "AVAILABLE" || entry.state === "ACTIVE")
+        .reduce((maximum, entry) => Math.max(maximum, entry.capacity), 0);
+      const projectionByRotationId = new Map(
+        precallProjections.map((projection) => [projection.rotationId, projection]),
+      );
+      const rotationById = new Map(waitingRotations.map((rotation) => [rotation.id, rotation]));
+      const decisions = selectAutomaticPrecalls(
+        waitingRotations.flatMap((rotation) => {
+          const projection = projectionByRotationId.get(rotation.id);
+          if (!projection) return [];
+          return [
+            {
+              id: rotation.id,
+              resourceGroupId: RESOURCE_GROUP_ID,
+              enabled: config.adminParameters.eventAutomaticPrecallEnabled,
+              eventActive: true,
+              operationsAvailable: !operationalInterrupted,
+              resourceGroupActive: !operationalInterrupted,
+              resourceGroupEnabled: config.adminParameters.resourceGroupAutomaticPrecallEnabled,
+              alreadyPrecalled: rotation.precalledAt !== null,
+              groupSize: rotation.passengerCount,
+              largestEligibleAircraftSeats,
+              predictionQuality: projection.predictionQuality,
+              predictedBoardingMinutes: Math.round(
+                (projection.predictionLowerMinutes + projection.predictionUpperMinutes) / 2,
+              ),
+              adaptiveLeadMinutes,
+              minutesSinceLastGatePrecall:
+                latestPrecallAt === null
+                  ? null
+                  : Math.max(0, (nowMs - latestPrecallAt) / MINUTE_MS),
+              gateCooldownMinutes: config.forecastTuning.precall.gateCooldownMinutes,
+            },
+          ];
+        }),
+      );
+      for (const decision of decisions) {
+        if (!decision.eligible) continue;
+        const rotation = rotationById.get(decision.id);
+        const projection = projectionByRotationId.get(decision.id);
+        if (!rotation || !projection) continue;
+        rotation.precalledAt = iso(nowMs);
+        rotation.precallTrigger = "AUTOMATIC_PRECALL";
+        rotation.precallPredictionQuality = projection.predictionQuality;
+        rotation.precallPredictedBoardingAt = projection.predictedBoardingAt;
+        rotation.precallAdaptiveLeadMinutes = adaptiveLeadMinutes;
+        recordEvent(
+          "FLIGHT_GROUP_PRECALLED",
+          nowMs,
+          null,
+          rotation.id,
+          `Automatischer GO TO GATE · Prognose ${projection.predictedBoardingAt} · Qualität ${projection.predictionQuality} · Vorlauf ${adaptiveLeadMinutes} Minuten · noch ohne Flugzeugbindung.`,
         );
-        const adaptiveLeadMinutes = deriveAdaptivePrecallLeadMinutes({
-          observedGateWaitMinutes,
-          tuning: config.forecastTuning.precall,
-        });
-        const latestPrecallAt = rotations.reduce<number | null>((latest, rotation) => {
-          if (!rotation.precalledAt) return latest;
-          const value = Date.parse(rotation.precalledAt);
-          return latest === null ? value : Math.max(latest, value);
-        }, null);
-        const largestEligibleAircraftSeats = aircraft
-          .filter((entry) => entry.state === "AVAILABLE" || entry.state === "ACTIVE")
-          .reduce((maximum, entry) => Math.max(maximum, entry.capacity), 0);
-        const decision = decideAutomaticPrecall({
-          enabled: config.adminParameters.eventAutomaticPrecallEnabled,
-          eventActive: true,
-          operationsAvailable: !operationalInterrupted,
-          resourceGroupActive: !operationalInterrupted,
-          resourceGroupEnabled: config.adminParameters.resourceGroupAutomaticPrecallEnabled,
-          firstWaitingGroup: true,
-          alreadyPrecalled: firstWaitingRotation.precalledAt !== null,
-          groupSize: firstWaitingRotation.passengerCount,
-          largestEligibleAircraftSeats,
-          predictionQuality: projection.predictionQuality,
-          predictedBoardingMinutes: Math.round(
-            (projection.predictionLowerMinutes + projection.predictionUpperMinutes) / 2,
-          ),
-          adaptiveLeadMinutes,
-          minutesSinceLastGatePrecall:
-            latestPrecallAt === null ? null : Math.max(0, (nowMs - latestPrecallAt) / MINUTE_MS),
-          gateCooldownMinutes: config.forecastTuning.precall.gateCooldownMinutes,
-        });
-        if (decision.eligible) {
-          firstWaitingRotation.precalledAt = iso(nowMs);
-          firstWaitingRotation.precallTrigger = "AUTOMATIC_PRECALL";
-          firstWaitingRotation.precallPredictionQuality = projection.predictionQuality;
-          firstWaitingRotation.precallPredictedBoardingAt = projection.predictedBoardingAt;
-          firstWaitingRotation.precallAdaptiveLeadMinutes = adaptiveLeadMinutes;
-          recordEvent(
-            "FLIGHT_GROUP_PRECALLED",
-            nowMs,
-            null,
-            firstWaitingRotation.id,
-            `Automatischer GO TO GATE · Prognose ${projection.predictedBoardingAt} · Qualität ${projection.predictionQuality} · Vorlauf ${adaptiveLeadMinutes} Minuten · noch ohne Flugzeugbindung.`,
-          );
-        }
       }
     }
 

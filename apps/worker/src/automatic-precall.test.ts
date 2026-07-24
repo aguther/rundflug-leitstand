@@ -5,7 +5,7 @@ import coordinatorSource from "./event-coordinator.ts?raw";
 describe("persistierter automatischer Voraufruf (F-BEN-030)", () => {
   it("stores a distinct precall without binding an aircraft or changing the rotation", () => {
     expect(migration).toContain("ALTER TABLE flight_groups ADD COLUMN precalled_at TEXT");
-    expect(coordinatorSource).toContain("decideAutomaticPrecall");
+    expect(coordinatorSource).toContain("selectAutomaticPrecalls");
     expect(coordinatorSource).toContain("FLIGHT_GROUP_PRECALLED");
     expect(coordinatorSource).toContain('trigger: "AUTOMATIC_PRECALL"');
     const persistence = coordinatorSource.slice(
@@ -21,6 +21,7 @@ describe("persistierter automatischer Voraufruf (F-BEN-030)", () => {
     expect(coordinatorSource).toContain("version = ?6 AND precalled_at IS NULL");
     expect(coordinatorSource).toContain("precall_trigger = ?1");
     expect(coordinatorSource).toContain("'SYSTEM', 'FLIGHT_GROUP'");
+    expect(coordinatorSource).toContain("blockedResourceGroups.add(candidate.resourceGroupId)");
   });
 
   it("re-evaluates active events independently of operator commands", () => {
@@ -32,12 +33,24 @@ describe("persistierter automatischer Voraufruf (F-BEN-030)", () => {
 
   it("treats gate wait as an adaptive target rather than a hard stop", () => {
     const decision = coordinatorSource.slice(
-      coordinatorSource.indexOf("const precallDecision"),
-      coordinatorSource.indexOf("if (precallDecision.eligible)"),
+      coordinatorSource.indexOf("const precallQueueEntries"),
+      coordinatorSource.indexOf("const precallCandidates"),
     );
     expect(decision).toContain("adaptiveLeadMinutes");
+    expect(decision).toContain("minutesSinceLastGatePrecall");
     expect(decision).not.toContain("maximumGateWaitMinutes");
     expect(decision).not.toContain("precallMinimumQuality");
+  });
+
+  it("selects the stable queue batch from one forecast and gate-cooldown snapshot", () => {
+    const recalculation = coordinatorSource.slice(
+      coordinatorSource.indexOf("private async recalculateForecastTimelines"),
+      coordinatorSource.indexOf("private async persistAutomaticPrecalls"),
+    );
+    expect(recalculation).toContain("const precallQueueEntries");
+    expect(recalculation).toContain("selectAutomaticPrecalls(precallQueueEntries)");
+    expect(recalculation).toContain("const lastGatePrecall");
+    expect(recalculation).not.toContain("lastGatePrecall.set(rotation.gate_id, now.getTime())");
   });
 
   it("excludes rotations overlapping event interruptions from the normal learning basis", () => {
