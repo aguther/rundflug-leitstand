@@ -1,8 +1,8 @@
 import type { AdminEventFlow } from "@rundflug/contracts";
 
 const WIDTH = 960;
-const HEIGHT = 320;
-const PADDING = { top: 26, right: 28, bottom: 44, left: 52 };
+const HEIGHT = 210;
+const PADDING = { top: 18, right: 24, bottom: 34, left: 44 };
 
 function coordinates(
   flow: AdminEventFlow,
@@ -79,7 +79,22 @@ export function AdminEventFlowChart({
     .join(" ");
   const finalPoint = flow.points.at(-1);
   const yTicks = [...new Set([0, Math.ceil(maximum / 2), maximum])].sort((a, b) => a - b);
-  const xTicks = [flow.from, flow.observedUntil, flow.plannedUntil];
+  const from = Date.parse(flow.from);
+  const plannedUntil = Date.parse(flow.plannedUntil);
+  const observedUntil = Date.parse(flow.observedUntil);
+  const span = Math.max(1, plannedUntil - from);
+  const observedDistanceFromEdge =
+    (Math.min(observedUntil - from, plannedUntil - observedUntil) / span) *
+    (WIDTH - PADDING.left - PADDING.right);
+  const xTicks = [
+    ...new Set([
+      flow.from,
+      ...(observedUntil > from && observedUntil < plannedUntil && observedDistanceFromEdge >= 64
+        ? [flow.observedUntil]
+        : []),
+      flow.plannedUntil,
+    ]),
+  ];
 
   return (
     <section className="admin-flow-panel">
@@ -125,8 +140,6 @@ export function AdminEventFlowChart({
           );
         })}
         {xTicks.map((tick, index) => {
-          const from = Date.parse(flow.from);
-          const span = Math.max(1, Date.parse(flow.plannedUntil) - from);
           const x =
             PADDING.left +
             ((Date.parse(tick) - from) / span) * (WIDTH - PADDING.left - PADDING.right);

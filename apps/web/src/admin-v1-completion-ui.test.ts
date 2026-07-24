@@ -64,9 +64,12 @@ describe("V1 administration completion UI", () => {
     expect(appSource).toContain("className={`field-info");
     expect(appSource).toContain("aria-label={`Hilfe:");
     expect(appSource).toContain('role="tooltip"');
+    expect(appSource).toContain('<Info aria-hidden="true" />');
     expect(appSource).toContain("onBlur={() => setOpen(false)}");
+    expect(appSource).not.toContain("onMouseDown={(event) => event.preventDefault()}");
     expect(appSource).not.toContain('<details className="field-info">');
     expect(stylesSource).toContain(".field-info:focus-visible .field-info-tooltip");
+    expect(stylesSource).toContain(".field-info > svg");
     expect(stylesSource).not.toContain("label:focus-within .field-info");
     expect(stylesSource).toContain("visibility: hidden");
     expect(stylesSource).toContain(".event-setup-v15 .ds-page-header");

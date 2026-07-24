@@ -1,6 +1,6 @@
 .admin-flow-panel {
-  margin: 0 22px 12px;
-  padding: 18px;
+  margin: 0 16px 8px;
+  padding: 12px 14px;
   border: 1px solid var(--ui-border);
   border-radius: var(--radius-md);
   background: var(--ui-surface);
@@ -10,7 +10,7 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 20px;
+  gap: 14px;
 }
 
 .admin-flow-heading h2,
@@ -23,7 +23,7 @@
 }
 
 .admin-flow-heading p {
-  margin-top: 4px;
+  margin-top: 2px;
   color: var(--ui-muted);
   font-size: 0.76rem;
 }
@@ -32,7 +32,7 @@
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 12px;
+  gap: 10px;
   margin: 0;
   padding: 0;
   border: 0;
@@ -70,8 +70,8 @@
 
 .admin-flow-chart {
   width: 100%;
-  min-height: 250px;
-  margin-top: 10px;
+  min-height: 0;
+  margin-top: 4px;
   overflow: visible;
 }
 
@@ -111,23 +111,189 @@
 }
 
 .admin-flow-placeholder {
-  height: 250px;
-  margin-top: 12px;
+  height: 190px;
+  margin-top: 8px;
   border-radius: var(--radius-sm);
   background: var(--ui-surface-subtle);
 }
 
 .admin-shell .setup-progress {
+  min-height: 48px;
   grid-template-columns: repeat(8, minmax(104px, 1fr));
+  margin: 8px 16px;
+  padding: 0;
   overflow-x: auto;
 }
 
+.admin-shell .setup-progress li {
+  min-height: 46px;
+  border-left: 1px solid var(--ui-border);
+}
+
+.admin-shell .setup-progress li:first-child {
+  border-left: 0;
+}
+
+.admin-shell .setup-progress li::before {
+  display: none;
+}
+
+.admin-shell .setup-progress button {
+  min-height: 46px;
+  gap: 7px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 0;
+  outline: 0;
+  box-shadow: none;
+  line-height: 1.2;
+}
+
+.admin-shell .setup-progress li.current button {
+  background: color-mix(in srgb, var(--ui-accent-soft) 54%, transparent);
+  box-shadow: inset 0 -2px var(--ui-accent);
+}
+
+.admin-shell .setup-progress button:focus-visible {
+  outline: 0;
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--ui-accent) 75%, transparent);
+}
+
+.admin-shell .setup-progress li.current button:focus-visible {
+  box-shadow:
+    inset 0 -2px var(--ui-accent),
+    inset 0 0 0 2px color-mix(in srgb, var(--ui-accent) 75%, transparent);
+}
+
+.admin-shell .setup-step-number {
+  width: 22px;
+  height: 22px;
+}
+
+.admin-shell button.field-info,
+.admin-shell .admin-section button.field-info {
+  width: 18px;
+  height: 18px;
+  min-height: 18px;
+  padding: 0;
+  border: 1px solid var(--ui-border);
+  border-radius: 50%;
+  background: var(--ui-surface-subtle);
+  box-shadow: none;
+}
+
+.admin-shell .field-info:hover,
+.admin-shell .field-info:focus-visible,
+.admin-shell .field-info.is-open {
+  border-color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+  box-shadow: none;
+}
+
 .admin-shell .event-catalog-primary {
-  margin: 0 22px 12px;
+  margin: 0 16px 8px;
+}
+
+.admin-shell .event-catalog-v15 > .ds-page-header {
+  min-height: 38px;
+  padding: 5px 10px;
+}
+
+.admin-shell .event-catalog-actions {
+  gap: 6px;
+  margin-top: 0;
+}
+
+.admin-shell .event-catalog-actions .ds-search-control {
+  width: 220px;
+}
+
+.admin-shell .event-catalog-actions :is(.ds-button, .ds-input) {
+  min-height: 32px;
+}
+
+.admin-shell .event-catalog-table th,
+.admin-shell .event-catalog-table td {
+  height: 32px;
+  padding: 4px 9px;
+}
+
+.admin-shell .event-catalog-table .ds-button {
+  min-height: 28px;
+  padding-block: 3px;
 }
 
 .admin-shell .event-setup-v15.single-panel {
   grid-template-columns: minmax(0, 1fr);
+  margin: 0 16px 8px;
+}
+
+.admin-shell .event-setup-v15 .ds-panel {
+  padding: 10px;
+}
+
+.admin-shell .event-setup-v15 .ds-page-header {
+  min-height: 36px;
+  margin: -10px -10px 8px;
+  padding: 6px 10px;
+}
+
+.admin-shell .event-setup-v15 .ds-page-header-actions .ds-button {
+  min-height: 32px;
+  padding-block: 4px;
+}
+
+.admin-shell .event-basics-grid {
+  gap: 5px;
+}
+
+.admin-shell .event-basics-grid .ds-field {
+  grid-template-columns: 124px minmax(0, 1fr);
+}
+
+.admin-shell .event-basics-grid :is(.ds-input, input[readonly]),
+.admin-shell .event-timing-grid input,
+.admin-shell .event-logo-editor-v15 :is(input, .ds-button) {
+  min-height: 34px;
+}
+
+.admin-shell .event-timing-grid {
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+}
+
+.admin-shell .event-logo-editor-v15,
+.admin-shell .event-advanced-settings {
+  margin-top: 8px;
+}
+
+.admin-shell .event-advanced-settings > summary {
+  min-height: 32px;
+}
+
+.admin-shell .event-release-v15 {
+  display: grid;
+  grid-template-columns: minmax(210px, 0.42fr) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.admin-shell .event-release-v15 > .ds-page-header {
+  min-height: 34px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.admin-shell .event-release-v15 > p {
+  margin: 0;
+}
+
+.admin-shell .event-release-v15 .event-release-action {
+  margin: 0;
+  padding: 0;
+  border: 0;
 }
 
 .admin-shell .event-setup-v15.single-panel > [hidden] {
@@ -186,22 +352,142 @@
   font-size: 1rem;
 }
 
-.ds-modal-body .master-data-columns,
-.ds-modal-body .resource-master-grid,
-.ds-modal-body .compact-editor-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+.admin-shell .ds-modal-dialog--wide {
+  width: min(880px, 100%);
 }
 
-.ds-modal-body .master-data-columns > fieldset,
-.ds-modal-body .resource-master-grid > fieldset {
+.admin-shell .ds-modal-header {
+  min-height: 52px;
+  align-items: center;
+  padding: 10px 16px;
+}
+
+.admin-shell .ds-modal-header h2 {
+  font-size: 1rem;
+}
+
+.admin-shell .ds-modal-body {
+  padding: 14px 16px;
+}
+
+.admin-shell .ds-modal-body .master-data-columns,
+.admin-shell .ds-modal-body .resource-master-grid,
+.admin-shell .ds-modal-body .compact-editor-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.admin-shell .ds-modal-body .master-data-columns > fieldset,
+.admin-shell .ds-modal-body .resource-master-grid > fieldset {
   min-width: 0;
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.admin-shell .ds-modal-body :is(.master-data-columns, .resource-master-grid) legend {
+  grid-column: 1 / -1;
+  margin-bottom: 2px;
+  padding: 0;
+  font-size: 0.9rem;
+}
+
+.admin-shell .ds-modal-body :is(.master-data-columns, .resource-master-grid) label {
+  gap: 5px;
+  font-size: 0.76rem;
+}
+
+.admin-shell
+  .ds-modal-body
+  :is(.master-data-columns, .resource-master-grid)
+  :is(input:not([type="checkbox"]), select, textarea) {
+  min-height: 34px;
+  padding: 6px 9px;
+  font-size: 0.8rem;
+}
+
+.admin-shell
+  .ds-modal-body
+  :is(
+    .form-introduction,
+    .gate-display-filter,
+    .resource-aircraft-selection,
+    .derived-resource-summary,
+    .admin-check-row,
+    .master-delete-zone,
+    .admin-validation
+  ) {
   grid-column: 1 / -1;
 }
 
-.ds-modal-body .master-data-columns fieldset[hidden],
-.ds-modal-body .resource-master-grid fieldset[hidden] {
+.admin-shell .ds-modal-body .form-introduction {
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.admin-shell .ds-modal-body :is(.gate-display-filter, .resource-aircraft-selection) {
+  gap: 7px;
+  padding: 10px;
+}
+
+.admin-shell .ds-modal-body :is(.gate-display-filter, .resource-aircraft-selection) h3 {
+  font-size: 0.86rem;
+}
+
+.admin-shell .ds-modal-body :is(.gate-display-filter, .resource-aircraft-selection) p {
+  font-size: 0.75rem;
+  line-height: 1.35;
+}
+
+.admin-shell .ds-modal-body .resource-aircraft-selection {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.admin-shell .ds-modal-body .resource-aircraft-selection :is(h3, p) {
+  grid-column: 1 / -1;
+}
+
+.admin-shell .ds-modal-body .resource-aircraft-selection .checkbox-label {
+  min-height: 34px;
+  padding: 6px 8px;
+  font-size: 0.76rem;
+}
+
+.admin-shell .ds-modal-body .derived-resource-summary {
+  gap: 3px;
+  padding: 9px 10px;
+  font-size: 0.76rem;
+}
+
+.admin-shell .ds-modal-body :is(.master-data-columns, .resource-master-grid) > .primary-action,
+.admin-shell
+  .ds-modal-body
+  :is(.master-data-columns, .resource-master-grid)
+  fieldset
+  > .primary-action {
+  width: auto;
+  min-height: 34px;
+  grid-column: 1 / -1;
+  justify-self: end;
+  padding: 6px 14px;
+}
+
+.admin-shell .ds-modal-body .master-delete-zone {
+  margin-top: 4px;
+  padding: 10px 0 0;
+}
+
+.admin-shell .ds-modal-body .master-delete-zone span {
+  font-size: 0.74rem;
+}
+
+.admin-shell .ds-modal-body .master-data-columns fieldset[hidden],
+.admin-shell .ds-modal-body .resource-master-grid fieldset[hidden] {
   display: none;
 }
 
@@ -211,6 +497,231 @@
 
 .admin-shell .admin-workspace.master-data-active > .master-data-workspace {
   min-height: auto;
+  padding: 10px 16px 12px;
+}
+
+.admin-shell .admin-workspace.master-data-active .master-data-toolbar {
+  min-height: 36px;
+  padding-bottom: 8px;
+}
+
+.admin-shell .admin-workspace.master-data-active .master-data-table-scroll {
+  height: auto;
+  max-height: min(360px, calc(100dvh - 300px));
+  align-self: start;
+}
+
+.admin-shell .admin-workspace.master-data-active .master-data-table th {
+  height: 34px;
+  padding: 6px 10px;
+}
+
+.admin-shell .admin-workspace.master-data-active .master-data-table td {
+  height: 40px;
+  padding: 6px 10px;
+}
+
+.admin-shell .admin-workspace:not(.master-data-active) > .ds-page-header {
+  min-height: 56px;
+  padding: 9px 16px;
+}
+
+.admin-shell .admin-workspace:not(.master-data-active) > .ds-page-header h1 {
+  min-height: 24px;
+  display: flex;
+  align-items: center;
+  font-size: 1.08rem;
+  line-height: 1.2;
+}
+
+.admin-shell .metrics-grid {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 7px;
+  padding: 0 16px 8px;
+}
+
+.admin-shell .metrics-grid > div {
+  min-height: 54px;
+  padding: 8px 10px;
+}
+
+.admin-shell .metrics-grid strong {
+  font-size: 1.05rem;
+}
+
+.admin-shell .metrics-grid span {
+  margin-top: 2px;
+  font-size: 0.72rem;
+}
+
+.admin-shell .admin-workspace:not(.master-data-active) > .admin-section:not([hidden]) {
+  gap: 10px;
+  margin: 0 16px 8px;
+  padding: 14px;
+}
+
+.admin-shell .admin-workspace {
+  overflow-x: hidden;
+}
+
+.admin-shell .admin-workspace:not(.master-data-active) > .admin-section:not([hidden]) h2 {
+  margin: 0;
+  font-size: 0.96rem;
+}
+
+.admin-shell
+  .admin-workspace:not(.master-data-active)
+  > .admin-section:not([hidden])
+  :is(input, select) {
+  min-height: 36px;
+  padding: 7px 9px;
+}
+
+.admin-shell .admin-workspace:not(.master-data-active) > .admin-section:not([hidden]) textarea {
+  min-height: 72px;
+  padding: 8px 9px;
+}
+
+.admin-shell
+  .admin-workspace:not(.master-data-active)
+  > .admin-section:not([hidden])
+  :is(.danger-action, .primary-action, .ds-button) {
+  min-height: 34px;
+  padding-block: 6px;
+}
+
+.admin-shell .capacity-overview {
+  gap: 7px;
+}
+
+.admin-shell .capacity-row {
+  gap: 10px;
+  padding: 9px 10px;
+}
+
+.admin-shell .capacity-row span {
+  margin-top: 2px;
+  font-size: 0.74rem;
+}
+
+.admin-shell .admin-emergency-section {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+}
+
+.admin-shell .admin-emergency-section > h2 {
+  grid-column: 1 / -1;
+}
+
+.admin-shell .admin-emergency-section > .danger-action {
+  min-width: 180px;
+}
+
+.admin-shell .admin-capacity-section {
+  grid-template-columns: auto minmax(360px, 1fr);
+  align-items: end;
+}
+
+.admin-shell .admin-capacity-section > .capacity-overview {
+  grid-column: 1 / -1;
+}
+
+.admin-shell .admin-capacity-section .capacity-row > .secondary-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 6px;
+}
+
+.admin-shell .admin-capacity-section .capacity-row > .secondary-actions .ds-button {
+  padding-inline: 8px;
+  font-size: 0.7rem;
+  white-space: nowrap;
+}
+
+.admin-shell .history-filters {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+  margin: 8px 0;
+  padding: 10px;
+}
+
+.admin-shell .history-filters > .localized-input-field {
+  grid-column: span 2;
+}
+
+.admin-shell .history-table-wrap {
+  min-height: 220px;
+  max-height: 320px;
+}
+
+.admin-shell .manifest-correction {
+  gap: 10px;
+}
+
+.admin-shell .manifest-correction > .section-heading {
+  min-height: 0;
+  padding: 10px 12px;
+}
+
+.admin-shell .manifest-correction > .section-heading p {
+  margin-top: 2px;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.admin-shell .manifest-correction > .admin-validation {
+  min-height: 0;
+  padding: 8px 10px;
+  font-size: 0.78rem;
+}
+
+.admin-shell .manifest-correction-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.admin-shell .manifest-correction-grid > .manifest-reason-field {
+  grid-column: 3 / -1;
+}
+
+.admin-shell
+  .admin-workspace:not(.master-data-active)
+  > .admin-section:not([hidden])
+  .manifest-reason-field
+  textarea {
+  min-height: 68px;
+}
+
+.admin-shell .manifest-correction-preview {
+  gap: 10px;
+  padding: 10px;
+}
+
+.admin-shell .manifest-correction > .help-text {
+  margin: 0;
+}
+
+@media (max-width: 1400px) {
+  .admin-shell .history-filters {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1200px) {
+  .admin-shell .metrics-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .admin-shell .history-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-shell .history-filters > .localized-input-field {
+    grid-column: span 2;
+  }
 }
 
 @media (max-width: 700px) {
@@ -228,7 +739,7 @@
   }
 
   .admin-flow-chart {
-    min-height: 210px;
+    min-height: 0;
   }
 
   .admin-shell .event-catalog-primary {
@@ -236,9 +747,57 @@
   }
 
   .template-counts,
-  .ds-modal-body .master-data-columns,
-  .ds-modal-body .resource-master-grid,
-  .ds-modal-body .compact-editor-grid {
+  .admin-shell .ds-modal-body .master-data-columns,
+  .admin-shell .ds-modal-body .resource-master-grid,
+  .admin-shell .ds-modal-body .compact-editor-grid,
+  .admin-shell .ds-modal-body .master-data-columns > fieldset,
+  .admin-shell .ds-modal-body .resource-master-grid > fieldset {
     grid-template-columns: 1fr;
+  }
+
+  .admin-shell .ds-modal-body .resource-aircraft-selection {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-shell .metrics-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding-inline: 12px;
+  }
+
+  .admin-shell .admin-workspace:not(.master-data-active) > .admin-section:not([hidden]) {
+    margin-inline: 12px;
+  }
+
+  .admin-shell .event-release-v15,
+  .admin-shell .admin-emergency-section,
+  .admin-shell .admin-capacity-section {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-shell .event-release-v15 > .ds-page-header,
+  .admin-shell .admin-emergency-section > h2,
+  .admin-shell .admin-capacity-section > .capacity-overview {
+    grid-column: 1;
+  }
+
+  .admin-shell .history-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-shell .history-filters > .localized-input-field {
+    grid-column: 1;
+  }
+
+  .admin-shell .history-table-wrap {
+    min-height: 240px;
+    max-height: 360px;
+  }
+
+  .admin-shell .manifest-correction-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-shell .manifest-correction-grid > .manifest-reason-field {
+    grid-column: 1;
   }
 }

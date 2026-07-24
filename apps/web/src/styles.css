@@ -338,41 +338,46 @@
   position: relative;
   display: inline-grid;
   flex: 0 0 auto;
-  width: 19px;
-  height: 19px;
+  width: 18px;
+  height: 18px;
   place-items: center;
+  min-height: 18px;
   border: 1px solid var(--ui-border);
   border-radius: 50%;
   color: var(--ui-muted);
   background: var(--ui-surface-subtle);
-  font-size: 0.72rem;
-  font-weight: 850;
-  line-height: 1;
-  cursor: help;
+  line-height: 0;
+  cursor: pointer;
   text-decoration: none;
   padding: 0;
+}
+.field-info > svg {
+  width: 12px;
+  height: 12px;
+  stroke-width: 2;
 }
 .field-info:hover,
 .field-info:focus-visible,
 .field-info.is-open {
   color: var(--ui-accent);
   border-color: var(--ui-accent);
+  background: var(--ui-accent-soft);
 }
 .field-info-tooltip {
   position: absolute;
   z-index: 5;
-  top: 26px;
-  left: -8px;
-  width: min(280px, calc(100vw - 48px));
-  padding: 10px 12px;
+  top: calc(100% + 7px);
+  left: -7px;
+  width: min(230px, calc(100vw - 32px));
+  padding: 8px 10px;
   border: 1px solid var(--ui-border);
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   color: var(--ui-text);
-  background: var(--ui-surface);
+  background: var(--ui-surface-raised);
   box-shadow: var(--ui-shadow);
-  font-size: 0.78rem;
-  font-weight: 500;
-  line-height: 1.45;
+  font-size: 0.72rem;
+  font-weight: 550;
+  line-height: 1.4;
   opacity: 0;
   pointer-events: none;
   transform: translateY(-2px);

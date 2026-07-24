@@ -1,5 +1,6 @@
 // Shared operational state and presentation primitives used by route features.
 import type { CommandResult } from "@rundflug/contracts";
+import { Info } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { getOperationBoard } from "./api";
 import { PageNotice } from "./app/PageNotifications";
@@ -83,10 +84,9 @@ export function FieldHelp({ help }: { help: string }) {
         event.stopPropagation();
         setOpen((value) => !value);
       }}
-      onMouseDown={(event) => event.preventDefault()}
       type="button"
     >
-      i
+      <Info aria-hidden="true" />
       <span className="field-info-tooltip" id={tooltipId} role="tooltip">
         {help}
       </span>
