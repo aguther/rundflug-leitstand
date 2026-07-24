@@ -9,9 +9,14 @@ if (!npmCli) throw new Error("npm-Ausführungspfad fehlt.");
 const wranglerCli = resolve(root, "node_modules", "wrangler", "bin", "wrangler.js");
 const reset = spawnSync(process.execPath, [npmCli, "run", "db:reset:local"], {
   cwd: root,
-  stdio: "ignore",
+  encoding: "utf8",
+  maxBuffer: 10 * 1024 * 1024,
 });
-if (reset.status !== 0) throw new Error("Lokale Testdatenbank konnte nicht initialisiert werden.");
+if (reset.status !== 0) {
+  throw new Error(
+    `Lokale Testdatenbank konnte nicht initialisiert werden: ${(reset.stderr || reset.stdout || reset.error?.message || "unbekannter Fehler").slice(-4_000)}`,
+  );
+}
 
 const pin = "0000";
 const server = spawn(
@@ -91,9 +96,9 @@ const code = () =>
     .toString("base64url")
     .toUpperCase()
     .replaceAll(/[01OI_-]/g, "A");
-const salePayload = () => ({
+const salePayload = (ticketCount = 1) => ({
   productId: "panorama-20",
-  publicTicketCodes: [code()],
+  publicTicketCodes: Array.from({ length: ticketCount }, code),
   standby: false,
   paymentStatus: "PAID",
   paymentMethod: "CASH",
@@ -222,11 +227,60 @@ try {
     "CONFIGURE_EVENT_PARAMETERS",
     eventParameters({ operationsEndAt: new Date(Date.now() + 60_000).toISOString() }),
   );
-  await expectBlocked(result.event.version, "SALE_BLOCKED_CAPACITY");
+  const nearEndSale = await command(
+    "cashier",
+    result.event.version,
+    "SELL_TICKET_GROUP",
+    salePayload(),
+  );
+
+  let temporaryStateVersion = nearEndSale.event.version;
+  for (const state of ["PAUSED", "REFUELING", "INACTIVE"]) {
+    const stateChanged = await command(
+      "admin",
+      temporaryStateVersion,
+      "SET_AIRCRAFT_OPERATIONAL_STATE",
+      {
+        aircraftId: "aircraft-a",
+        state,
+        reason: `Synthetischer temporärer Zustand ${state}`,
+        expectedReviewAt: null,
+      },
+    );
+    const advisoryBoard = await board();
+    const advisoryProduct = advisoryBoard.products.find((entry) => entry.id === "panorama-20");
+    if (
+      advisoryProduct?.referenceCapacity !== 4 ||
+      advisoryProduct.remainingSellableSeats !== 0 ||
+      advisoryProduct.saleRecommended !== false
+    ) {
+      throw new Error(
+        `Temporärer Zustand ${state} trennt Gruppenkapazität und Prognosehinweis nicht korrekt: ${JSON.stringify(advisoryProduct)}`,
+      );
+    }
+    const soldDuringTemporaryState = await command(
+      "cashier",
+      stateChanged.event.version,
+      "SELL_TICKET_GROUP",
+      salePayload(state === "PAUSED" ? 3 : 1),
+    );
+    const restored = await command(
+      "admin",
+      soldDuringTemporaryState.event.version,
+      "SET_AIRCRAFT_OPERATIONAL_STATE",
+      {
+        aircraftId: "aircraft-a",
+        state: "AVAILABLE",
+        reason: `Synthetischer temporärer Zustand ${state} beendet`,
+        expectedReviewAt: null,
+      },
+    );
+    temporaryStateVersion = restored.event.version;
+  }
 
   result = await command(
     "admin",
-    result.event.version,
+    temporaryStateVersion,
     "CONFIGURE_EVENT_PARAMETERS",
     eventParameters(),
   );
@@ -248,7 +302,9 @@ try {
       resourceGroupBlocked: true,
       interruptionBlocked: true,
       emergencyBlocked: true,
-      insufficientCapacityBlocked: true,
+      nearEndCapacityAdvisory: true,
+      temporaryAircraftStatesRemainSellable: true,
+      assignedGroupCapacityRemainsStable: true,
       validSaleAccepted: true,
       cashierCannotAssignAircraftOrPilot: true,
     }),

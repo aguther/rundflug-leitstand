@@ -22,6 +22,7 @@ import {
   Plus,
   Printer,
   RefreshCw,
+  RotateCcw,
   Search,
   Sigma,
   Tag,
@@ -475,7 +476,6 @@ export function CashierView() {
       setMessage(`${codes.length} Ticket${codes.length === 1 ? "" : "s"} verkauft.`);
       writeCashierDraftQueue(localStorage, draftQueueKey, []);
       setPendingDraftCount(0);
-      setSize(1);
       const printPreparation = soldTicketGroupId
         ? reopenTicketGroup(soldTicketGroupId, saleResult.saleReceipt)
         : Promise.resolve(true);
@@ -687,6 +687,18 @@ export function CashierView() {
                   <Plus aria-hidden="true" size={18} />
                 </IconButton>
               </div>
+              <Button
+                aria-label="Gruppengröße auf 1 zurücksetzen"
+                className="cashier-size-reset"
+                disabled={size === 1 || busyProductId !== null}
+                onClick={() => changeGroupSize(1)}
+                size="compact"
+                type="button"
+                variant="secondary"
+              >
+                <RotateCcw aria-hidden="true" size={16} />
+                <span className="cashier-size-reset-label">Zurücksetzen</span>
+              </Button>
             </div>
           </div>
           <div className="cashier-products">
@@ -698,8 +710,6 @@ export function CashierView() {
                 !board ||
                 !entry.saleEnabled ||
                 entry.resourceGroupStatus !== "ACTIVE" ||
-                !entry.saleRecommended ||
-                entry.remainingSellableSeats < size ||
                 board.event.emergencyMode ||
                 board.event.operationalInterrupted ||
                 busyProductId !== null;

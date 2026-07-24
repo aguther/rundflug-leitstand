@@ -25,9 +25,12 @@
 - `requirements-v1.8.0.md` und `.yaml` dokumentieren den
   einheitlichen Busy Indicator, absolute prognostizierte Zeitfenster, die freigegebenen
   Kassen-/Flight-Line-Deltas sowie einen öffentlichen Gruppen-QR-Code.
-- `requirements-v1.9.0.md` und `.yaml` sind die aktuelle Releasefassung. Sie dokumentieren das
+- `requirements-v1.9.0.md` und `.yaml` dokumentieren das
   vereinfachte Favicon, Kassenabschluss und offene Tickets, POS-58-Druck sowie die kanonischen
   Ansichten Flight Director und Flight Line.
+- `requirements-v1.9.1.md` und `.yaml` sind die aktuelle Releasefassung. Sie dokumentieren die
+  Trennung von Verkauf und temporärer Prognosekapazität, stabile Gruppenkapazität,
+  POS-58-/iPhone-Korrekturen, Personenreset und das kompaktere FIDS-Zeitfenster.
 - `traceability.csv` verbindet Anforderungen später mit Issues, Modulen und Tests.
 - `open-questions.md` enthält noch zu entscheidende Fachfragen.
 

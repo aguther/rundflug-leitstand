@@ -37,12 +37,12 @@ export const PUBLIC_STATUS_PRESENTATIONS: Record<PublicStatus, PublicStatusPrese
     defaultMessage: "Bitte am Gate zum Einstieg bereithalten.",
   },
   IN_FLIGHT: {
-    label: "OFF-BLOCK",
+    label: "IM FLUG",
     iconName: "PlaneTakeoff",
     defaultMessage: "Ihr Rundflug ist gestartet.",
   },
   LANDED: {
-    label: "ON-BLOCK",
+    label: "GELANDET",
     iconName: "PlaneLanding",
     defaultMessage: "Ihr Rundflug ist gelandet.",
   },

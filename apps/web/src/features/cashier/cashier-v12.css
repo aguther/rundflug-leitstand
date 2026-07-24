@@ -1,3 +1,4 @@
+/* biome-ignore-all lint/complexity/noImportantStyles: POS-58 print isolation must override the interactive application cascade. */
 /* V1.7 cashier — compact product sales, stable notices and ticket workspace. */
 .cashier-shell {
   height: 100dvh;
@@ -71,6 +72,11 @@
   font-size: 1rem;
   font-weight: 750;
   font-variant-numeric: tabular-nums;
+}
+.cashier-size-reset.ds-button {
+  min-height: 36px;
+  padding-inline: 10px;
+  white-space: nowrap;
 }
 
 .cashier-products {
@@ -384,6 +390,7 @@
 .ticket-paper dl > div {
   display: grid;
   grid-template-columns: 58px 1fr;
+  column-gap: 4px;
 }
 .ticket-paper dd {
   margin: 0;
@@ -575,6 +582,11 @@
     height: 34px;
     min-height: 34px;
   }
+  .cashier-size-reset.ds-button {
+    min-height: 34px;
+    padding-inline: 8px;
+    font-size: 0.72rem;
+  }
   .cashier-product-row {
     grid-template-columns:
       minmax(0, 1.3fr) minmax(0, 0.7fr) minmax(0, 0.66fr)
@@ -726,6 +738,16 @@
   }
 }
 
+@media (max-width: 400px) {
+  .cashier-size-reset-label {
+    display: none;
+  }
+  .cashier-size-reset.ds-button {
+    width: 36px;
+    padding: 0;
+  }
+}
+
 @media print {
   @page {
     margin: 0;
@@ -734,9 +756,12 @@
   body,
   #root {
     width: 58mm;
+    height: auto !important;
     min-width: 0;
+    min-height: 0 !important;
     margin: 0;
     padding: 0;
+    overflow: visible !important;
     background: #fff;
   }
   .cashier-shell {
@@ -749,37 +774,45 @@
     background: #fff;
   }
   .cashier-shell > *:not(.ticket-print-document) {
-    display: none;
+    display: none !important;
   }
   .cashier-shell > .ticket-print-document {
     position: static;
     inset: auto;
     width: 58mm;
-    display: block;
+    display: flex !important;
+    justify-content: center;
     margin: 0;
-    padding: 0 3mm;
+    padding: 0;
   }
   .ticket-print-document .ticket-paper {
     width: 52mm;
     min-height: 0;
-    margin: 0;
-    padding: 2mm;
+    margin: 0 auto;
+    padding: 1mm;
     border: 0;
     border-radius: 0;
     box-shadow: none;
     break-after: auto;
   }
   .ticket-print-document .ticket-paper > img {
-    width: 44mm;
-    height: 44mm;
+    width: 48mm;
+    height: 48mm;
+  }
+  .ticket-print-document .ticket-paper > strong {
+    font-size: 13pt;
   }
   .ticket-print-document .ticket-paper > small {
-    font-size: 9pt;
+    font-size: 9.5pt;
   }
   .ticket-print-document .ticket-paper > b {
-    font-size: 12pt;
+    font-size: 13pt;
   }
   .ticket-print-document .ticket-paper dl {
-    font-size: 9pt;
+    font-size: 10pt;
+  }
+  .ticket-print-document .ticket-paper dl > div {
+    grid-template-columns: 18mm minmax(0, 1fr);
+    column-gap: 1mm;
   }
 }

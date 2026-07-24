@@ -9,6 +9,7 @@ export interface AbsoluteTimeWindowInput {
   variant?: TimeWindowVariant;
   phase?: TimeWindowPhase;
   quality?: TimeWindowQuality | null;
+  includeClockSuffix?: boolean;
 }
 
 interface LocalDateTime {
@@ -68,9 +69,11 @@ export function formatAbsoluteTimeWindow(input: AbsoluteTimeWindowInput): string
 
   if (sameLocalDate(lower, upper)) {
     const window = `${timeLabel(lower)} – ${timeLabel(upper)}`;
-    return variant === "compact" ? window : `ca. ${window} Uhr`;
+    if (variant === "compact") return window;
+    return `ca. ${window}${input.includeClockSuffix === false ? "" : " Uhr"}`;
   }
 
   const window = `${dateLabel(lower)} ${timeLabel(lower)} – ${dateLabel(upper)} ${timeLabel(upper)}`;
-  return variant === "compact" ? window : `ca. ${window} Uhr`;
+  if (variant === "compact") return window;
+  return `ca. ${window}${input.includeClockSuffix === false ? "" : " Uhr"}`;
 }
