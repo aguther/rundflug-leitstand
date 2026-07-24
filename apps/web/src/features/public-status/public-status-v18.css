@@ -236,11 +236,19 @@
 
 .public-status-action strong {
   min-width: 0;
+  flex: 1 1 auto;
   color: inherit;
   font-size: clamp(2rem, 10vw, 3.85rem);
   line-height: 0.96;
   letter-spacing: -0.035em;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+}
+
+.public-fit-text {
+  width: 100%;
+  min-width: 0;
+  display: block;
+  white-space: nowrap;
 }
 
 .public-status-part[data-status="SERVICE_PAUSED"] .public-status-action {
@@ -258,7 +266,7 @@
 
 .public-status-details {
   display: grid;
-  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   margin: 0;
   border-top: 1px solid var(--public-border);
 }
@@ -276,25 +284,31 @@
 .public-status-details dt {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: clamp(4px, 1.5vw, 7px);
   color: var(--public-muted);
-  font-size: 0.8rem;
+  font-size: clamp(0.5rem, 2.5vw, 0.8rem);
   font-weight: 720;
+  white-space: nowrap;
+}
+
+.public-status-details dt .public-fit-text {
+  flex: 1 1 auto;
 }
 
 .public-status-details dt svg {
-  width: 19px;
-  height: 19px;
+  width: clamp(16px, 4.8vw, 19px);
+  height: clamp(16px, 4.8vw, 19px);
+  flex: 0 0 auto;
   color: var(--public-accent);
 }
 
 .public-status-details dd {
   margin: 5px 0 0 26px;
   color: var(--public-text);
-  font-size: clamp(1.02rem, 4.5vw, 1.34rem);
+  font-size: clamp(0.8rem, 4vw, 1.34rem);
   font-weight: 820;
   line-height: 1.2;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
 }
 
 .public-status-footer {
@@ -509,14 +523,6 @@
 
   .public-status-action {
     gap: 9px;
-  }
-
-  .public-status-action strong {
-    font-size: clamp(1.88rem, 10vw, 2.8rem);
-  }
-
-  .public-status-details {
-    grid-template-columns: minmax(0, 0.72fr) minmax(0, 1.28fr);
   }
 
   .public-status-details > div + div {

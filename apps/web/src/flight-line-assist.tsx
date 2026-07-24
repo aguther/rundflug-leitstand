@@ -484,13 +484,15 @@ export function FlightLineAssist({
               ) : null}
             </div>
             <Button
+              aria-label="Flugzeug freigeben"
               className="assist-v15-release"
               busy={releasing}
               onClick={() => void finishClaim()}
               size="compact"
               variant="danger"
             >
-              <UnlockKeyhole aria-hidden="true" /> <span>Flugzeug freigeben</span>
+              <UnlockKeyhole aria-hidden="true" />{" "}
+              <span className="assist-v15-release-label">Flugzeug freigeben</span>
             </Button>
           </div>
         </Panel>

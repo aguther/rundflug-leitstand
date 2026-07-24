@@ -34,6 +34,20 @@ describe("mobiler öffentlicher Status V1.8", () => {
     expect(content).not.toContain("Position in der Warteschlange");
   });
 
+  it("hält Status, Gate und Zeitfenster einzeilig in gleich breiten Feldern", () => {
+    expect(content).toContain("function AutoFitText");
+    expect(content).toContain("<AutoFitText>{presentation.label}</AutoFitText>");
+    expect(content).toContain("<AutoFitText>{gateLabel}</AutoFitText>");
+    expect(content).toContain("<AutoFitText>{windowLabel}</AutoFitText>");
+    expect(content).toContain("requiredWidth > availableWidth");
+    expect(styles).toMatch(/\.public-fit-text \{[\s\S]*?white-space: nowrap;/);
+    expect(styles).toMatch(
+      /\.public-status-details \{[\s\S]*?grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/,
+    );
+    expect(styles).toMatch(/\.public-status-details dt \{[\s\S]*?white-space: nowrap;/);
+    expect(styles).toMatch(/\.public-status-details dd \{[\s\S]*?white-space: nowrap;/);
+  });
+
   it("bindet das exakte dynamische Manifest und führt iPhone-Browsernutzer", () => {
     expect(installMetadata).toContain(["/api/public/pwa-manifest/", "{target}/"].join("$"));
     expect(installMetadata).toContain("/icons/ticket-icon-180.png");

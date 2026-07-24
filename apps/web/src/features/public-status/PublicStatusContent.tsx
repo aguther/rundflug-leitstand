@@ -13,7 +13,7 @@ import {
   TicketsPlane,
   Users,
 } from "lucide-react";
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { ModalDialog } from "../../design-system/components";
 import { formatAbsoluteTimeWindow } from "../../time-window";
 import {
@@ -31,6 +31,49 @@ const STATUS_ICONS: Record<PublicStatusIconName, LucideIcon> = {
   PlaneLanding,
   CircleCheck,
 };
+
+function AutoFitText({ children }: { children: string }) {
+  const textRef = useRef<HTMLSpanElement>(null);
+  const text = children;
+
+  useLayoutEffect(() => {
+    const element = textRef.current;
+    if (!element || element.textContent !== text) return;
+    element.style.removeProperty("font-size");
+    const baseFontSize = Number.parseFloat(getComputedStyle(element).fontSize);
+    let lastWidth = -1;
+    let stopped = false;
+
+    const fit = (force = false) => {
+      const availableWidth = element.clientWidth;
+      if (!availableWidth || (!force && Math.abs(availableWidth - lastWidth) < 0.5)) return;
+      lastWidth = availableWidth;
+      element.style.fontSize = `${baseFontSize}px`;
+      const requiredWidth = element.scrollWidth;
+      if (requiredWidth > availableWidth) {
+        element.style.fontSize = `${Math.max(1, baseFontSize * (availableWidth / requiredWidth))}px`;
+      }
+    };
+
+    const observer = new ResizeObserver(() => fit());
+    observer.observe(element);
+    fit(true);
+    void document.fonts?.ready.then(() => {
+      if (!stopped) fit(true);
+    });
+
+    return () => {
+      stopped = true;
+      observer.disconnect();
+    };
+  }, [text]);
+
+  return (
+    <span className="public-fit-text" ref={textRef}>
+      {children}
+    </span>
+  );
+}
 
 interface StatusPart {
   status: PublicStatus;
@@ -108,6 +151,8 @@ export function PublicStatusPart({
   const presentation = PUBLIC_STATUS_PRESENTATIONS[part.status];
   const StatusIcon = STATUS_ICONS[presentation.iconName];
   const multipleParts = Boolean(partCount && partCount > 1 && partNumber && passengerCount);
+  const gateLabel = part.gateLabel || "–";
+  const windowLabel = statusWindow(part, timeZone);
   return (
     <article className="public-status-part" data-status={part.status}>
       {multipleParts ? (
@@ -125,7 +170,9 @@ export function PublicStatusPart({
         <span className="public-status-eyebrow">Aktueller Status</span>
         <div className="public-status-action">
           <StatusIcon aria-hidden="true" />
-          <strong>{presentation.label}</strong>
+          <strong>
+            <AutoFitText>{presentation.label}</AutoFitText>
+          </strong>
         </div>
         <p>{publicStatusMessage(part.status, part.message, pauseReason)}</p>
       </section>
@@ -133,16 +180,20 @@ export function PublicStatusPart({
         <div>
           <dt>
             <MapPin aria-hidden="true" />
-            Gate
+            <AutoFitText>Gate</AutoFitText>
           </dt>
-          <dd>{part.gateLabel || "–"}</dd>
+          <dd>
+            <AutoFitText>{gateLabel}</AutoFitText>
+          </dd>
         </div>
         <div>
           <dt>
             <Clock3 aria-hidden="true" />
-            Geschätztes Zeitfenster
+            <AutoFitText>Geschätztes Zeitfenster</AutoFitText>
           </dt>
-          <dd>{statusWindow(part, timeZone)}</dd>
+          <dd>
+            <AutoFitText>{windowLabel}</AutoFitText>
+          </dd>
         </div>
       </dl>
     </article>

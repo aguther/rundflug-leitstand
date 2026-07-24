@@ -205,6 +205,10 @@ describe("Flight Line Assist", () => {
     expect(assistSource).toContain('className="assist-v15-actions"');
     expect(assistSource).toContain('className="assist-v15-rotation-panel"');
     expect(assistSource).toContain('className="assist-v15-release"');
+    expect(assistSource).toContain('aria-label="Flugzeug freigeben"');
+    expect(assistSource).toContain('className="assist-v15-release-label"');
+    expect(assistStyles).toContain(".assist-v15-release-label");
+    expect(assistStyles).not.toContain(".assist-v15-release span");
     expect(assistSource).not.toContain("assist-v15-release-phone");
     expect(assistSource).toContain("assist-v15-current-pane");
     expect(assistSource).toContain("assist-v15-history-pane");

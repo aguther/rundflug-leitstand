@@ -1046,8 +1046,13 @@
     padding: 0;
   }
 
-  .flight-assist-v15 .assist-v15-release span {
+  .flight-assist-v15 .assist-v15-release-label {
     display: none;
+  }
+
+  .flight-assist-v15 .assist-v15-release svg {
+    width: 20px;
+    height: 20px;
   }
 
   .flight-assist-v15 .assist-v15-pilot-code {
