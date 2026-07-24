@@ -82,11 +82,22 @@ const upsertProductPayloadSchema = z
     }
   });
 
+export const commandPreconditionSchema = z
+  .object({
+    aggregateType: z.enum(["ROTATION", "AIRCRAFT"]),
+    aggregateId: z.string().min(1).max(100),
+    expectedVersion: z.number().int().nonnegative(),
+  })
+  .strict();
+export type CommandPrecondition = z.infer<typeof commandPreconditionSchema>;
+
 const commandBaseSchema = z.object({
   commandId: z.uuid(),
   eventId: z.string().min(1).max(100),
   deviceId: z.string().min(1).max(100),
   expectedVersion: z.number().int().nonnegative(),
+  observedEventVersion: z.number().int().nonnegative().optional(),
+  preconditions: z.array(commandPreconditionSchema).length(1).optional(),
   issuedAt: z.iso.datetime(),
 });
 
@@ -921,6 +932,7 @@ export const commandResultSchema = z.object({
       relatedRotationId: z.string().optional(),
     })
     .optional(),
+  saleReceipt: ticketGroupPrintDataSchema.optional(),
 });
 export type CommandResult = z.infer<typeof commandResultSchema>;
 
@@ -1150,6 +1162,7 @@ export const operationBoardSchema = z.object({
   resourceGroups: z.array(
     z.object({
       id: z.string(),
+      version: z.number().int().nonnegative(),
       name: z.string(),
       shortCode: z.string(),
       status: z.enum(["ACTIVE", "PAUSED", "INTERRUPTED", "ENDED"]),

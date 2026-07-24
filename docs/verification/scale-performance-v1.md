@@ -43,6 +43,36 @@ Event-Handler-Laufzeit, sondern die nächste darstellbare Reaktion erfasst.
 Auf Mobil blieb die Seitenbreite bei exakt 430 Pixeln. Zusammen mit dem serverseitigen
 Standardverkauf von 89 ms sind damit beide Grenzwerte aus Q-PER-010 nachgewiesen.
 
+## Nachmessung der entkoppelten Aktionspfade
+
+Am 24. Juli 2026 wurde derselbe lokale Worker-/D1-Skalierungslauf vor und nach ADR-0025 ausgeführt.
+Die absoluten Werte hängen von der lokalen Maschine ab; aussagekräftig sind daher insbesondere der
+gleiche Datensatz und derselbe Testablauf.
+
+| Messpunkt | Vorher | Nachher | Grenze |
+| --- | ---: | ---: | ---: |
+| Operationssicht | 116 ms | 97 ms | < 2.000 ms |
+| 20 parallele Geräte, p95 | 1.180 ms | 1.061 ms | < 2.000 ms |
+| serverseitige Verkaufsbestätigung | 119 ms | 36 ms | < 2.000 ms |
+| persistierte Forecast-Aktualisierung für 300 Umläufe | 119 ms | 289 ms | < 2.000 ms |
+
+Die Forecast-Zeit enthält nun absichtlich ein 150-ms-Entprellfenster. Sie liegt nicht mehr im
+Bestätigungspfad des Verkaufs und bleibt einschließlich Entprellung deutlich unter Q-PER-030.
+Der Test verlangt zusätzlich `Server-Timing` für Operationsprojektion sowie getrennte
+Kommando-Warte- und Ausführungszeit.
+
+`npm run test:fleet-operations` prüft ergänzend den Parallelitätsvertrag gegen den echten Worker und
+lokale D1: Zwei Flugzeugkommandos mit derselben beobachteten Veranstaltungsversion werden für
+verschiedene Flugzeuge beide geordnet akzeptiert. Ein anschließender Schreibversuch mit veralteter
+Version desselben Flugzeugs wird mit HTTP 409 abgelehnt. Damit werden F-INT-070 und Q-ZUV-040
+gemeinsam nachgewiesen.
+
+Die Browser-Abnahme gegen den echten lokalen Worker und D1 bestätigte am selben Tag die sichtbaren
+Endzustände: Verkauf einschließlich aktualisierter Liste und vorbereitetem Gruppen-QR nach rund
+312 ms, Flugzeugstatus `REFUELING` nach rund 295 ms. Beide Zeiten enthalten Serverrunde und
+Browser-Automation und sind daher nicht mit der oben separat gemessenen lokalen
+Eingabereaktionsgrenze gleichzusetzen. In Kasse und Flight Line traten keine Browserfehler auf.
+
 Nicht durch diese lokalen Läufe ersetzt werden der zwölfstündige Langlauf, die
 Cloudflare-Verfügbarkeitsmessung oder die Generalprobe auf Originalhardware. Diese Nachweise bleiben
 eigene Abnahmepunkte.

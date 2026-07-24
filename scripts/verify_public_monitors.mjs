@@ -268,23 +268,30 @@ const connectRealtime = () =>
   });
 const nextRefresh = (socket) =>
   new Promise((resolvePromise, reject) => {
-    const timeout = setTimeout(
-      () => reject(new Error("Realtime-Aktualisierung überschritt zwei Sekunden.")),
-      2_000,
-    );
-    socket.addEventListener(
-      "message",
-      (event) => {
-        const message = JSON.parse(String(event.data));
+    const onMessage = (event) => {
+      let message;
+      try {
+        message = JSON.parse(String(event.data));
+      } catch {
         clearTimeout(timeout);
-        if (message.type !== "event-state-changed" || !Number.isInteger(message.eventVersion)) {
-          reject(new Error("Realtime-Nachricht ist nicht minimal oder formal ungültig."));
-          return;
-        }
-        resolvePromise(message.eventVersion);
-      },
-      { once: true },
-    );
+        socket.removeEventListener("message", onMessage);
+        reject(new Error("Realtime-Nachricht ist nicht formal gültig."));
+        return;
+      }
+      if (message.type !== "event-state-changed") return;
+      clearTimeout(timeout);
+      socket.removeEventListener("message", onMessage);
+      if (!Number.isInteger(message.eventVersion)) {
+        reject(new Error("Realtime-Nachricht ist nicht minimal oder formal ungültig."));
+        return;
+      }
+      resolvePromise(message.eventVersion);
+    };
+    const timeout = setTimeout(() => {
+      socket.removeEventListener("message", onMessage);
+      reject(new Error("Realtime-Aktualisierung überschritt zwei Sekunden."));
+    }, 2_000);
+    socket.addEventListener("message", onMessage);
   });
 const ticketCode = () =>
   randomBytes(12)

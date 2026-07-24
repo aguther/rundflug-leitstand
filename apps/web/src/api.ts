@@ -121,6 +121,19 @@ async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Promise<R
   }
 }
 
+function recordApiTiming(name: string, startedAt: number, detail?: Record<string, string>): void {
+  if (typeof performance === "undefined" || typeof performance.measure !== "function") return;
+  try {
+    performance.measure(name, {
+      start: startedAt,
+      end: performance.now(),
+      detail,
+    });
+  } catch {
+    // Older browsers still execute the request; timing is diagnostic only.
+  }
+}
+
 function deviceHeaders(
   deviceId: string,
   deviceToken: string,
@@ -584,12 +597,14 @@ export async function getOperationBoard(
   deviceToken: string,
   signal?: AbortSignal,
 ): Promise<OperationBoard> {
+  const startedAt = performance.now();
   const response = await apiFetch(controlApiPath(eventId, "/operations"), {
     ...(LEGACY_DEVELOPMENT_DEVICE_AUTH && deviceToken
       ? { headers: deviceHeaders(deviceId, deviceToken) }
       : {}),
     ...(signal ? { signal } : {}),
   });
+  recordApiTiming("rundflug:operations-snapshot", startedAt);
   if (!response.ok) throw new Error(`Betriebsdaten nicht verfügbar (${response.status})`);
   return operationBoardSchema.parse(await response.json());
 }
@@ -599,12 +614,14 @@ export async function sendCommand(
   deviceToken: string,
 ): Promise<CommandResult> {
   assertOperationalConnection(navigator.onLine);
+  const startedAt = performance.now();
   const { deviceId: _browserDeviceId, ...sessionCommand } = command;
   const response = await apiFetch(controlApiPath(command.eventId, "/commands"), {
     method: "POST",
     headers: deviceHeaders(command.deviceId, deviceToken, { "content-type": "application/json" }),
     body: JSON.stringify(LEGACY_DEVELOPMENT_DEVICE_AUTH ? command : sessionCommand),
   });
+  recordApiTiming("rundflug:operational-command", startedAt, { commandType: command.type });
   if (!response.ok) {
     const body = (await response.json()) as { error?: { message?: string } };
     throw new Error(body.error?.message ?? `Kommando abgelehnt (${response.status})`);
