@@ -1,0 +1,8 @@
+ID,Modul,Tests,Status
+V19-REL-010,package.json Workspace-Pakete packages/config und Releaseunterlagen,Requirements- und Versionsverifikation,umgesetzt
+V19-BRN-010,apps/web/public/icons/app-icon.svg und Rastervarianten,pwa-installability.test.ts sowie visuelle Kleinformatabnahme,umgesetzt
+V19-CAS-010,apps/web/src/cashier-view.tsx cashier-guidance.ts und cashier-v12.css,cashier-guidance.test.ts v19-ui.test.ts cashier-v12.test.ts und Browserabnahme,umgesetzt
+V19-PRN-010,apps/web/src/features/cashier/cashier-v12.css und styles.css,v19-ui.test.ts cashier-v12.test.ts und 58x100-mm-Print-to-PDF; physische POS-58-Prüfung extern,umgesetzt
+V19-RTE-010,apps/web Router Navigation Installationsmetadaten Workerprofile und PWA-Manifeste,navigation.test.ts install-metadata.test.ts pwa-installability.test.ts und Browserabnahme,umgesetzt
+V19-API-010,packages/contracts/src/index.ts apps/worker/src/ticket-search.ts und index.ts,index.test.ts ticket-search.test.ts und Worker-Quelltests,umgesetzt
+V19-QA-010,Workspace-Prüfskripte und docs/ui/v1.9.0-*-concept.md,Vollständiger Check und responsive Browserabnahme,umgesetzt

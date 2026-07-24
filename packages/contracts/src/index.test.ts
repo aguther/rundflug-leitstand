@@ -1016,6 +1016,9 @@ describe("commandEnvelopeSchema", () => {
     expect(
       ticketSearchRequestSchema.parse({ q: "G-PAN20-0104", status: "ACTIVE", limit: 50 }),
     ).toMatchObject({ q: "G-PAN20-0104", status: "ACTIVE", limit: 50 });
+    expect(ticketSearchRequestSchema.parse({ status: "OPEN" })).toMatchObject({
+      status: "OPEN",
+    });
     expect(() =>
       ticketSearchRequestSchema.parse({ cursor: "cursor", ticketGroupIds: ["group-1"] }),
     ).toThrow();

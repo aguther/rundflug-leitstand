@@ -14,12 +14,12 @@ const stylesSource = [
   .map((path) => readFileSync(new URL(path, import.meta.url), "utf8"))
   .join("\n");
 
-describe("V1.2 Flight Line surfaces", () => {
+describe("V1.9 Flight Director and Flight Line surfaces", () => {
   it("keeps Supervisor and Assist as explicit independent workspaces behind the shared shell", () => {
     expect(viewSource).toContain("<FlightLineSupervisorConsole");
     expect(viewSource).toContain("<FlightLineAssist");
     expect(viewSource).toContain(
-      'title={FLIGHT_LINE_ASSIST_MODE ? "Flight Line Assist" : "Flight Line"}',
+      'title={FLIGHT_LINE_ASSIST_MODE ? "Flight Line" : "Flight Director"}',
     );
   });
 

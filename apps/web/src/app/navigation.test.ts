@@ -18,17 +18,19 @@ describe("V1.2 app navigation", () => {
   it("exposes every approved internal work surface", () => {
     expect(appDestinations.map((entry) => entry.href)).toEqual([
       "/kasse",
+      "/flight-director",
       "/flight-line",
-      "/flight-line/assist",
       "/fids",
       "/admin",
     ]);
   });
 
-  it("does not confuse the supervisor route with assist", () => {
+  it("keeps Flight Director and Flight Line distinct and removes the old assist route", () => {
+    expect(isDestinationActive("/flight-director", "/flight-director")).toBe(true);
+    expect(isDestinationActive("/flight-line", "/flight-director")).toBe(false);
     expect(isDestinationActive("/flight-line", "/flight-line")).toBe(true);
     expect(isDestinationActive("/flight-line/assist", "/flight-line")).toBe(false);
-    expect(isDestinationActive("/flight-line/assist", "/flight-line/assist")).toBe(true);
+    expect(mayOpenEventRoute("FLIGHT_LINE", "/flight-line/assist")).toBe(false);
   });
 
   it("keeps the standalone simulator route ADMIN-only and out of the global switcher", () => {
@@ -42,8 +44,8 @@ describe("V1.2 app navigation", () => {
 
   it("opens the role-specific operational home from the standard address", () => {
     expect(homeForRole("CASHIER")).toBe("/kasse");
-    expect(homeForRole("FLIGHT_LINE")).toBe("/flight-line/assist");
-    expect(homeForRole("FLIGHT_DIRECTOR")).toBe("/flight-line");
+    expect(homeForRole("FLIGHT_LINE")).toBe("/flight-line");
+    expect(homeForRole("FLIGHT_DIRECTOR")).toBe("/flight-director");
     expect(homeForRole("ADMIN")).toBe("/admin");
     expect(homeForRole("DISPLAY")).toBe("/fids");
     expect(appDestinations.find((entry) => entry.href === "/fids")?.roles).toEqual([

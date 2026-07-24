@@ -820,7 +820,7 @@ export type TicketGroupOperationalStatus = z.infer<typeof ticketGroupOperational
 export const ticketSearchRequestSchema = z
   .object({
     q: z.string().trim().max(200).default(""),
-    status: z.enum(["ACTIVE", "CANCELED"]).default("ACTIVE"),
+    status: z.enum(["ACTIVE", "OPEN", "CANCELED"]).default("ACTIVE"),
     limit: z.number().int().min(1).max(50).default(20),
     cursor: z.string().min(1).max(500).optional(),
     ticketGroupIds: z.array(z.string().min(1).max(100)).max(50).default([]),

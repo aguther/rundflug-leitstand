@@ -659,7 +659,7 @@ export function FlightLineView() {
     <Shell
       className={FLIGHT_LINE_ASSIST_MODE ? "flight-line-shell assist-shell" : "flight-line-shell"}
       connection={{ backendConfirmed, error, lastConfirmedAt }}
-      title={FLIGHT_LINE_ASSIST_MODE ? "Flight Line Assist" : "Flight Line"}
+      title={FLIGHT_LINE_ASSIST_MODE ? "Flight Line" : "Flight Director"}
       notifications={
         <>
           <ConnectionNotice error={error} lastConfirmedAt={lastConfirmedAt} />
@@ -720,7 +720,7 @@ export function FlightLineView() {
           onGroupMissing={(ticketGroupId) => updateGroupPresence(ticketGroupId, "MISSING")}
           onGroupRecall={(ticketGroupId) => updateGroupPresence(ticketGroupId, "RECALL")}
           onGroupDefer={(ticketGroupId) =>
-            deferTicketGroup(ticketGroupId, "Gruppe durch Flight Line Assist zurückgestellt")
+            deferTicketGroup(ticketGroupId, "Gruppe durch Flight Line zurückgestellt")
           }
           onToggleGroup={(ticketGroupId, isSelected) => {
             setSelectedQueueGroupIds((current) =>
@@ -784,7 +784,7 @@ export function FlightLineView() {
           onGroupMissing={(ticketGroupId) => updateGroupPresence(ticketGroupId, "MISSING")}
           onGroupRecall={(ticketGroupId) => updateGroupPresence(ticketGroupId, "RECALL")}
           onGroupDefer={(ticketGroupId) =>
-            deferTicketGroup(ticketGroupId, "Gruppe durch Flight Line Supervisor zurückgestellt")
+            deferTicketGroup(ticketGroupId, "Gruppe durch Flight Director zurückgestellt")
           }
           onSetAircraftState={requestAircraftState}
           onSelectAircraft={(aircraftId) => {
