@@ -10,14 +10,13 @@ export type AppDestination = {
 export const appDestinations: AppDestination[] = [
   { href: "/kasse", label: "Kasse", roles: ["CASHIER", "ADMIN"] },
   {
-    href: "/flight-line",
-    label: "Flight Line",
-    shortLabel: "Flugleitung",
+    href: "/flight-director",
+    label: "Flight Director",
     roles: ["FLIGHT_DIRECTOR", "ADMIN"],
   },
   {
-    href: "/flight-line/assist",
-    label: "Assist",
+    href: "/flight-line",
+    label: "Flight Line",
     roles: ["FLIGHT_LINE", "FLIGHT_DIRECTOR", "ADMIN"],
   },
   {
@@ -35,8 +34,8 @@ export function destinationsForRole(role: OperatorRole): AppDestination[] {
 export function homeForRole(role: OperatorRole): string {
   const roleHomes: Record<OperatorRole, string> = {
     CASHIER: "/kasse",
-    FLIGHT_LINE: "/flight-line/assist",
-    FLIGHT_DIRECTOR: "/flight-line",
+    FLIGHT_LINE: "/flight-line",
+    FLIGHT_DIRECTOR: "/flight-director",
     ADMIN: "/admin",
     DISPLAY: "/fids",
   };
@@ -44,7 +43,7 @@ export function homeForRole(role: OperatorRole): string {
 }
 
 export function isDestinationActive(pathname: string, href: string): boolean {
-  if (href === "/flight-line") return pathname === href;
+  if (href === "/flight-director" || href === "/flight-line") return pathname === href;
   if (href === "/fids") return pathname === href || pathname.startsWith("/fids/");
   return pathname === href || pathname.startsWith(`${href}/`);
 }

@@ -4,8 +4,12 @@ import { installMetadataForPath, publicStatusInstallMetadata } from "./install-m
 describe("ansichtsspezifische Installationsmetadaten", () => {
   it.each([
     ["/kasse", "/manifests/kasse.webmanifest", "/icons/kasse-icon-180.png"],
-    ["/flight-line", "/manifests/flight-line.webmanifest", "/icons/flight-line-icon-180.png"],
-    ["/flight-line/assist", "/manifests/assist.webmanifest", "/icons/assist-icon-180.png"],
+    [
+      "/flight-director",
+      "/manifests/flight-director.webmanifest",
+      "/icons/flight-line-icon-180.png",
+    ],
+    ["/flight-line", "/manifests/flight-line.webmanifest", "/icons/assist-icon-180.png"],
     ["/fids", "/manifests/fids.webmanifest", "/icons/fids-icon-180.png"],
     ["/fids/terminal", "/manifests/fids.webmanifest", "/icons/fids-icon-180.png"],
     ["/admin", "/manifests/admin.webmanifest", "/icons/admin-icon-180.png"],
@@ -14,6 +18,10 @@ describe("ansichtsspezifische Installationsmetadaten", () => {
       manifestHref,
       appleTouchIconHref: iconHref,
     });
+  });
+
+  it("registriert den alten Assist-Pfad nicht mehr", () => {
+    expect(installMetadataForPath("/flight-line/assist")).toBeNull();
   });
 
   it("bindet öffentliche Codes nur in das seitenspezifische Manifest ein", () => {

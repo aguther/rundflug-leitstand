@@ -11,7 +11,7 @@ const flightLineStyles = readFileSync(
   "utf8",
 );
 
-describe("Flight Line Supervisor", () => {
+describe("Flight Director", () => {
   it("keeps every aircraft visible and makes the aircraft the primary operational object", () => {
     expect(appSource).toContain("const operationalAircraft = board?.aircraft ?? []");
     expect(appSource).toContain("<FlightLineSupervisorConsole");

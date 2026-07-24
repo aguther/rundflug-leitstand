@@ -42,7 +42,7 @@ const operationalPwa = VitePWA({
       /^\/api(?:\/|$)/,
       /^\/(?:ticket|gruppe)\//,
       /^\/(?:kasse|admin|fids)(?:\/|$)/,
-      /^\/flight-line(?:\/|$)/,
+      /^\/(?:flight-director|flight-line)(?:\/|$)/,
     ],
     importScripts: ["/push-sw.js"],
     globIgnores: [

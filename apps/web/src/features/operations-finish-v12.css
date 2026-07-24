@@ -1,4 +1,4 @@
-/* Operations finish: scoped fidelity layer for first-run setup and Flight Line Assist. */
+/* Operations finish: scoped fidelity layer for first-run setup and Flight Line. */
 /* biome-ignore-all lint/style/noDescendingSpecificity: Setup and Assist are independent, root-scoped surfaces that intentionally share semantic elements. */
 
 .setup-shell {

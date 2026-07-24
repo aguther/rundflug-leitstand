@@ -17,8 +17,8 @@
       "/ticket/*",
       "/gruppe/*",
       "/kasse",
+      "/flight-director",
       "/flight-line",
-      "/flight-line/*",
       "/fids",
       "/fids/*",
       "/admin"

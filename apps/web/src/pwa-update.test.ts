@@ -10,7 +10,7 @@ describe("PWA deployment updates", () => {
     expect(viteConfigSource).toContain("/^\\/api(?:\\/|$)/");
     expect(viteConfigSource).toContain("/^\\/(?:ticket|gruppe)\\//");
     expect(viteConfigSource).toContain("/^\\/(?:kasse|admin|fids)(?:\\/|$)/");
-    expect(viteConfigSource).toContain("/^\\/flight-line(?:\\/|$)/");
+    expect(viteConfigSource).toContain("/^\\/(?:flight-director|flight-line)(?:\\/|$)/");
   });
 
   it("uses exactly one automatic update path without a WebKit reload loop", () => {

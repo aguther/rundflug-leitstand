@@ -7,8 +7,8 @@ import icon192Url from "../../web/public/icons/app-icon-192.png?url";
 import icon512Url from "../../web/public/icons/app-icon-512.png?url";
 import icon512MaskableUrl from "../../web/public/icons/app-icon-512-maskable.png?url";
 import adminManifest from "../../web/public/manifests/admin.webmanifest?raw";
-import assistManifest from "../../web/public/manifests/assist.webmanifest?raw";
 import fidsManifest from "../../web/public/manifests/fids.webmanifest?raw";
+import flightDirectorManifest from "../../web/public/manifests/flight-director.webmanifest?raw";
 import flightLineManifest from "../../web/public/manifests/flight-line.webmanifest?raw";
 import kasseManifest from "../../web/public/manifests/kasse.webmanifest?raw";
 import viteConfig from "../../web/vite.config.ts?raw";
@@ -26,19 +26,20 @@ describe("V1 PWA installability", () => {
     expect(icon512MaskableUrl).toContain("app-icon-512-maskable.png");
   });
 
-  it("exposes browser and iOS metadata using the established anonymous brand mark", () => {
+  it("exposes browser and iOS metadata using the simplified plane brand mark", () => {
     expect(indexHtml).toContain('rel="apple-touch-icon"');
     expect(indexHtml).toContain('name="theme-color"');
     expect(appleTouchIconUrl).toContain("app-icon-180.png");
     expect(iconSource).toContain('aria-label="Rundflug-Leitstand"');
-    expect(iconSource).toContain("#102a43");
+    expect(iconSource).toContain("#151618");
     expect(iconSource).toContain("#2f8af5");
+    expect(iconSource).not.toContain("<circle");
   });
 
   it.each([
     [kasseManifest, "/kasse", "kasse"],
-    [flightLineManifest, "/flight-line", "flight-line"],
-    [assistManifest, "/flight-line/assist", "assist"],
+    [flightDirectorManifest, "/flight-director", "flight-line"],
+    [flightLineManifest, "/flight-line", "assist"],
     [fidsManifest, "/fids", "fids"],
     [adminManifest, "/admin", "admin"],
   ])("liefert für %s einen eigenen Startpfad und ein eindeutiges Icon", (raw, path, iconName) => {
@@ -57,16 +58,18 @@ describe("V1 PWA installability", () => {
   it("schreibt die Installationsmetadaten für alle Hauptansichten in den ersten HTML-Stream", () => {
     for (const path of [
       '"/kasse"',
+      '"/flight-director"',
       '"/flight-line"',
-      '"/flight-line/assist"',
       '"/fids"',
       '"/admin"',
     ]) {
       expect(worker).toContain(path);
     }
-    for (const path of ["/kasse", "/flight-line/*", "/fids/*", "/admin"]) {
+    for (const path of ["/kasse", "/flight-director", "/flight-line", "/fids/*", "/admin"]) {
       expect(wranglerConfig).toContain(path);
     }
+    expect(worker).not.toContain('"/flight-line/assist"');
+    expect(wranglerConfig).not.toContain('"/flight-line/*"');
     expect(worker).toContain("INTERNAL_APP_INSTALL_PROFILES");
     expect(worker).toContain("installableAppShellResponse");
   });
@@ -74,6 +77,6 @@ describe("V1 PWA installability", () => {
   it("umgeht für installierbare Routen den generischen Workbox-Navigationsfallback", () => {
     expect(viteConfig).toContain("/^\\/(?:ticket|gruppe)\\//");
     expect(viteConfig).toContain("/^\\/(?:kasse|admin|fids)(?:\\/|$)/");
-    expect(viteConfig).toContain("/^\\/flight-line(?:\\/|$)/");
+    expect(viteConfig).toContain("/^\\/(?:flight-director|flight-line)(?:\\/|$)/");
   });
 });

@@ -67,6 +67,7 @@ import {
 } from "./public-access";
 import { createCsv, createTextPdf } from "./report";
 import { rowToSnapshot } from "./snapshot";
+import { ticketSearchStatusCondition } from "./ticket-search";
 import { httpsRedirectLocation } from "./transport-security";
 import type { Env, StoredEventRow } from "./types";
 import {
@@ -163,15 +164,15 @@ const INTERNAL_APP_INSTALL_PROFILES = {
     appleTouchIconHref: "/icons/kasse-icon-180.png",
     title: "Kasse · Rundflug-Leitstand",
   },
+  "/flight-director": {
+    manifestHref: "/manifests/flight-director.webmanifest",
+    appleTouchIconHref: "/icons/flight-line-icon-180.png",
+    title: "Flight Director · Rundflug-Leitstand",
+  },
   "/flight-line": {
     manifestHref: "/manifests/flight-line.webmanifest",
-    appleTouchIconHref: "/icons/flight-line-icon-180.png",
-    title: "Flight Line · Rundflug-Leitstand",
-  },
-  "/flight-line/assist": {
-    manifestHref: "/manifests/assist.webmanifest",
     appleTouchIconHref: "/icons/assist-icon-180.png",
-    title: "Assist · Rundflug-Leitstand",
+    title: "Flight Line · Rundflug-Leitstand",
   },
   "/fids": {
     manifestHref: "/manifests/fids.webmanifest",
@@ -2819,9 +2820,7 @@ app.on("GET", eventRoutes("/tickets/search"), async (context) => {
     const placeholders = request.ticketGroupIds.map((id) => bind(id));
     conditions.push(`tg.id IN (${placeholders.join(", ")})`);
   } else {
-    conditions.push(
-      request.status === "CANCELED" ? "tg.status = 'CANCELED'" : "tg.status <> 'CANCELED'",
-    );
+    conditions.push(ticketSearchStatusCondition(request.status));
   }
   if (normalized) {
     const ticketHashPlaceholder = bind(ticketHash);

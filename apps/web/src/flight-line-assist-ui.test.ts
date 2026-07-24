@@ -18,10 +18,11 @@ const sharedFlightLineStyles = readFileSync(
 const appSource = `${routerSource}\n${flightLineSource}\n${sharedSource}`;
 const assistFlowSource = `${assistSource}\n${sharedFlightLineSource}`;
 
-describe("Flight Line Assist", () => {
+describe("Flight Line", () => {
   it("is directly addressable as a separate tablet and phone surface", () => {
-    expect(appSource).toContain('window.location.pathname === "/flight-line/assist"');
-    expect(appSource).toContain('path === "/flight-line/assist"');
+    expect(appSource).toContain('window.location.pathname === "/flight-line"');
+    expect(appSource).toContain('path === "/flight-line"');
+    expect(appSource).not.toContain('path === "/flight-line/assist"');
     expect(appSource).toContain("<FlightLineAssist");
     expect(assistSource).toContain("flight-assist-v15");
   });

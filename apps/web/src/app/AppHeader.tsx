@@ -29,8 +29,8 @@ import { appDestinations, isDestinationActive } from "./navigation";
 
 const destinationIcons = {
   "/kasse": Tickets,
-  "/flight-line": Users,
-  "/flight-line/assist": Headphones,
+  "/flight-director": Users,
+  "/flight-line": Headphones,
   "/fids": Plane,
   "/admin": Settings,
 } as const;
