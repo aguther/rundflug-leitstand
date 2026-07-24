@@ -6,8 +6,11 @@ const viteConfigSource = readFileSync(new URL("../vite.config.ts", import.meta.u
 const pushWorkerSource = readFileSync(new URL("../public/push-sw.js", import.meta.url), "utf8");
 
 describe("PWA deployment updates", () => {
-  it("never serves the application shell for API navigations", () => {
-    expect(viteConfigSource).toContain("navigateFallbackDenylist: [/^\\/api(?:\\/|$)/]");
+  it("never serves the generic application shell for API or installable-route navigations", () => {
+    expect(viteConfigSource).toContain("/^\\/api(?:\\/|$)/");
+    expect(viteConfigSource).toContain("/^\\/(?:ticket|gruppe)\\//");
+    expect(viteConfigSource).toContain("/^\\/(?:kasse|admin|fids)(?:\\/|$)/");
+    expect(viteConfigSource).toContain("/^\\/flight-line(?:\\/|$)/");
   });
 
   it("uses exactly one automatic update path without a WebKit reload loop", () => {
