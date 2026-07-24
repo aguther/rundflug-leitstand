@@ -150,6 +150,7 @@
     .danger-action,
     .admin-revoke-action,
     .table-overflow-action,
+    .field-info,
     .setup-checklist button
   ) {
   min-height: var(--control-compact);
@@ -169,6 +170,7 @@
     .danger-action,
     .admin-revoke-action,
     .table-overflow-action,
+    .field-info,
     .setup-checklist button
   ):hover:not(:disabled) {
   border-color: color-mix(in srgb, var(--ui-accent) 42%, var(--ui-border-strong));
