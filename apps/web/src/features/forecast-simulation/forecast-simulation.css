@@ -83,6 +83,43 @@
   color: var(--ui-muted);
 }
 
+.sim-fids-button.ds-button {
+  min-height: 40px;
+  flex: 0 0 auto;
+  padding-inline: 11px;
+  border-color: color-mix(in srgb, var(--ui-accent) 70%, var(--ui-border));
+  color: var(--ui-text);
+  background: var(--ui-control);
+  white-space: nowrap;
+}
+
+.sim-fids-button.ds-button:hover:not(:disabled) {
+  color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+}
+
+.sim-fids-button svg {
+  width: 17px;
+  height: 17px;
+}
+
+.sim-fids-window-error {
+  position: fixed;
+  z-index: 80;
+  top: 68px;
+  right: 16px;
+  max-width: min(460px, calc(100vw - 32px));
+  margin: 0;
+  padding: 10px 13px;
+  border: 1px solid var(--ui-danger);
+  border-radius: var(--radius-md);
+  color: var(--ui-danger);
+  background: var(--ui-danger-soft);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 18%);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 .sim-admin-return {
   min-height: 40px;
   display: inline-flex;

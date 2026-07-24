@@ -1,6 +1,7 @@
 import type { FidsPreferences, PublicBoard } from "@rundflug/contracts";
 import { formatBookingGroupLabel } from "@rundflug/domain";
 import {
+  AlertTriangle,
   CircleArrowRight,
   Clock3,
   PlaneTakeoff,
@@ -9,7 +10,7 @@ import {
   TicketsPlane,
   Users,
 } from "lucide-react";
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BrandMark } from "./design-system/BrandMark";
 import { FidsSettingsDialog } from "./features/fids/FidsSettingsDialog";
@@ -19,6 +20,21 @@ type PublicGroup = PublicBoard["groups"][number];
 type EditableFidsPreferences = Pick<FidsPreferences, "visibleRows" | "layout" | "theme">;
 
 const DEFAULT_DEPARTED_VISIBILITY_SECONDS = 15;
+
+export interface FidsBoardPresentationProps {
+  board: PublicBoard | null;
+  error: string | null;
+  preferences: FidsPreferences;
+  clock: Date;
+  connectionLabel: string;
+  connectionTone: "connected" | "offline" | "simulation";
+  subtitle?: string;
+  simulationBanner?: string;
+  footerNote?: string;
+  filterDeparted?: boolean;
+  onOpenSettings?: () => void;
+  children?: ReactNode;
+}
 
 function groupCode(group: PublicGroup): string {
   return formatBookingGroupLabel(group.productCode, group.communicationNumber);
@@ -49,6 +65,7 @@ function timeWindow(group: PublicGroup, timeZone: string): string {
     upperAt: group.boardingWindowUpperAt,
     timeZone,
     quality: group.predictionQuality,
+    includeClockSuffix: false,
     phase:
       group.status === "COME_TO_FLIGHT_LINE" || group.status === "BOARDING"
         ? "NOW"
@@ -62,16 +79,19 @@ function useVisibleGroups(
   groups: PublicBoard["groups"],
   departedVisibilitySeconds: number,
   visibleRows: number,
+  filterDeparted: boolean,
 ): PublicBoard["groups"] {
   const locallyObservedDeparture = useRef(new Map<string, number>());
   const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
+    if (!filterDeparted) return;
     const timer = window.setInterval(() => setNow(Date.now()), 1_000);
     return () => window.clearInterval(timer);
-  }, []);
+  }, [filterDeparted]);
 
   return useMemo(() => {
+    if (!filterDeparted) return groups.slice(0, visibleRows);
     const currentCodes = new Set(groups.map(groupCode));
     for (const code of locallyObservedDeparture.current.keys()) {
       if (!currentCodes.has(code)) locallyObservedDeparture.current.delete(code);
@@ -91,7 +111,7 @@ function useVisibleGroups(
         return now - firstSeen < departedVisibilitySeconds * 1_000;
       })
       .slice(0, visibleRows);
-  }, [departedVisibilitySeconds, groups, now, visibleRows]);
+  }, [departedVisibilitySeconds, filterDeparted, groups, now, visibleRows]);
 }
 
 function Status({ group }: { group: PublicGroup }) {
@@ -161,23 +181,20 @@ function FidsTable({
   );
 }
 
-export function FidsDisplay({
+export function FidsBoardPresentation({
   board,
   error,
   preferences,
-  accountCode,
-  onSavePreferences,
-  onLogout,
-}: {
-  board: PublicBoard | null;
-  error: string | null;
-  preferences: FidsPreferences;
-  accountCode: string;
-  onSavePreferences: (next: EditableFidsPreferences) => Promise<void>;
-  onLogout: () => Promise<void>;
-}) {
-  const [clock, setClock] = useState(new Date());
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  clock,
+  connectionLabel,
+  connectionTone,
+  subtitle,
+  simulationBanner,
+  footerNote,
+  filterDeparted = true,
+  onOpenSettings,
+  children,
+}: FidsBoardPresentationProps) {
   const requestedVisibilitySeconds = Number.parseInt(
     new URLSearchParams(window.location.search).get("departedSeconds") ?? "",
     10,
@@ -189,25 +206,21 @@ export function FidsDisplay({
     board?.groups ?? [],
     departedVisibilitySeconds,
     preferences.visibleRows,
+    filterDeparted,
   );
   const leftColumn = groups.filter((_, index) => index % 2 === 0);
   const rightColumn = groups.filter((_, index) => index % 2 === 1);
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setClock(new Date()), 1_000);
-    return () => window.clearInterval(timer);
-  }, []);
-
-  const connected = Boolean(board) && !error;
   const time = new Intl.DateTimeFormat("de-DE", {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
+    timeZone: board?.timeZone ?? "Europe/Berlin",
   }).format(clock);
   const date = new Intl.DateTimeFormat("de-DE", {
     day: "2-digit",
     month: "long",
     year: "numeric",
+    timeZone: board?.timeZone ?? "Europe/Berlin",
   }).format(clock);
   const style = {
     "--fids-single-rows": preferences.visibleRows,
@@ -219,23 +232,33 @@ export function FidsDisplay({
     <main
       className="standard-fids"
       data-fids-layout={preferences.layout.toLowerCase()}
+      data-fids-mode={simulationBanner ? "simulation" : "standard"}
       data-fids-theme={preferences.theme.toLowerCase()}
       data-testid="fids-display"
       style={style}
     >
+      {simulationBanner ? (
+        <div className="fids-simulation-banner">
+          <AlertTriangle aria-hidden="true" />
+          <span>{simulationBanner}</span>
+        </div>
+      ) : null}
       <header className="fids-header">
         <div className="standard-mark">
           <BrandMark />
         </div>
         <div className="fids-title">
           <h1>{eventName}</h1>
-          <p>{board?.selectedGate ? `Abflugtafel · ${board.selectedGate.label}` : "Abflugtafel"}</p>
+          <p>
+            {subtitle ??
+              (board?.selectedGate ? `Abflugtafel · ${board.selectedGate.label}` : "Abflugtafel")}
+          </p>
         </div>
         <div className="standard-clock">
           <b>{time}</b>
           <span>{date}</span>
-          <em className={connected ? "connected" : "offline"}>
-            <i aria-hidden="true" /> {connected ? "VERBUNDEN" : "OFFLINE"}
+          <em className={connectionTone}>
+            <i aria-hidden="true" /> {connectionLabel}
           </em>
         </div>
       </header>
@@ -267,26 +290,73 @@ export function FidsDisplay({
           </span>
           <i aria-hidden="true" />
           <span>Zeitfenster sind Prognosen</span>
+          {footerNote ? (
+            <>
+              <i aria-hidden="true" />
+              <span>{footerNote}</span>
+            </>
+          ) : null}
         </div>
-        <button
-          aria-label="FIDS-Einstellungen öffnen"
-          className="fids-settings-button"
-          onClick={() => setSettingsOpen(true)}
-          type="button"
-        >
-          <Settings aria-hidden="true" />
-        </button>
+        {onOpenSettings ? (
+          <button
+            aria-label="FIDS-Einstellungen öffnen"
+            className="fids-settings-button"
+            onClick={onOpenSettings}
+            type="button"
+          >
+            <Settings aria-hidden="true" />
+          </button>
+        ) : null}
       </footer>
 
+      {children}
+    </main>
+  );
+}
+
+export function FidsDisplay({
+  board,
+  error,
+  preferences,
+  accountCode,
+  onSavePreferences,
+  onLogout,
+}: {
+  board: PublicBoard | null;
+  error: string | null;
+  preferences: FidsPreferences;
+  accountCode: string;
+  onSavePreferences: (next: EditableFidsPreferences) => Promise<void>;
+  onLogout: () => Promise<void>;
+}) {
+  const [clock, setClock] = useState(new Date());
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setClock(new Date()), 1_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const connected = Boolean(board) && !error;
+  return (
+    <FidsBoardPresentation
+      board={board}
+      clock={clock}
+      connectionLabel={connected ? "VERBUNDEN" : "OFFLINE"}
+      connectionTone={connected ? "connected" : "offline"}
+      error={error}
+      onOpenSettings={() => setSettingsOpen(true)}
+      preferences={preferences}
+    >
       <FidsSettingsDialog
         accountCode={accountCode}
-        eventName={eventName}
+        eventName={board?.eventName ?? "Veranstaltung"}
         onClose={() => setSettingsOpen(false)}
         onLogout={onLogout}
         onSave={onSavePreferences}
         open={settingsOpen}
         preferences={preferences}
       />
-    </main>
+    </FidsBoardPresentation>
   );
 }

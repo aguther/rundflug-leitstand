@@ -2,10 +2,12 @@
 
 Stand: 23. Juli 2026
 
-Die folgenden vier Desktop-Konzepte sind die verbindliche visuelle Spezifikation für den lokalen
+Die folgenden sechs Desktop-Konzepte sind die verbindliche visuelle Spezifikation für den lokalen
 Prognose-Simulator:
 
 - [Hauptansicht](forecast-simulator-main-approved.png)
+- [FIDS-Einstieg in der Hauptansicht](forecast-simulator-fids-entry-approved.png)
+- [Simuliertes Live-FIDS](forecast-simulator-fids-approved.png)
 - [Szenario-Konfiguration](forecast-simulator-scenario-approved.png)
 - [Verlauf einer Fluggruppe](forecast-simulator-group-history-approved.png)
 - [Tagesverlauf eines Flugzeugs](forecast-simulator-aircraft-history-approved.png)
@@ -33,9 +35,22 @@ Die Gruppenansicht zeigt jeden einzelnen Prognosesnapshot samt realisierten Meil
 Flugzeugansicht zeigt ausschließlich ab bestätigtem Boarding gebundene Umläufe sowie Sperren und
 bestätigte Rückkehrereignisse.
 
+Das simulierte FIDS wird über `FIDS öffnen` im Kopf der Hauptansicht als separates, skalierbares
+Browserfenster geöffnet. Es kann neben dem Simulator oder auf einem zweiten Bildschirm stehen und
+verwendet den bestehenden FIDS-Aufbau mit synthetischen `G-SIM-####`-Kennungen, dem aktuellen
+Szenarionamen, acht Zeilen und einspaltigem Layout. Der kompakte Hinweis
+`Nur Simulation – keine Betriebsdaten`, `LIVE-SIMULATION` und `Virtuelle Zeit` grenzen die Anzeige
+dauerhaft vom operativen FIDS ab. Ein Einstellungszugang ist in dieser Variante nicht vorhanden.
+
 ## Verhalten
 
 - `Start`, `Pause`, `+5 Min.` sowie 1×, 10×, 60× und 300× steuern ausschließlich die virtuelle Zeit.
+- Das simulierte FIDS folgt derselben virtuellen Zeit und ausschließlich bereits sichtbaren
+  Gruppen-, Meilenstein- und Prognosedaten. Wiederholtes Öffnen fokussiert dasselbe Fenster; beim
+  Verlassen des Simulators wird es geschlossen.
+- Ein beobachteter Abflug bleibt unabhängig von der Simulationsgeschwindigkeit 15 Sekunden realer
+  Betrachtungszeit als `ABGEFLOGEN` sichtbar. Neustart, Rücksprung oder neu berechnetes Ergebnis
+  verwerfen diese reine Anzeigehistorie.
 - Tanken, ungeplante Pause, technischer Defekt, Tagesausfall und globale Betriebsunterbrechung sind
   manuell injizierbar. Flugzeugereignisse warten bei einem laufenden Umlauf bis zur nächsten
   organisatorisch zulässigen Grenze.
@@ -53,6 +68,9 @@ bestätigte Rückkehrereignisse.
   sie besitzen keine operative oder öffentliche Zeitsemantik.
 - CSV-Kalibrierung und JSON-Export bleiben vollständig lokal. Es gibt keinen Upload und keine
   dauerhafte Browser-Speicherung.
+- Auch das FIDS-Pop-out wird direkt aus dem React-Zustand des Simulatorfensters gerendert. Es
+  verwendet keine zusätzliche Route, API, WebSocket-Verbindung, BroadcastChannel- oder
+  Service-Worker-Kommunikation.
 - Light und Dark Mode verwenden die bestehenden Design-Tokens. Bei schmaleren Viewports scrollt der
   Arbeitsbereich intern; der Dokumentkörper erhält keinen horizontalen Überlauf.
 

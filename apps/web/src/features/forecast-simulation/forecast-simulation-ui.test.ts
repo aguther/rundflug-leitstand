@@ -15,6 +15,11 @@ const historySource = readFileSync(
   new URL("./SimulationHistoryDialog.tsx", import.meta.url),
   "utf8",
 );
+const fidsPopoutSource = readFileSync(
+  new URL("./SimulationFidsPopout.tsx", import.meta.url),
+  "utf8",
+);
+const fidsProjectionSource = readFileSync(new URL("./simulation-fids.ts", import.meta.url), "utf8");
 const stylesSource = readFileSync(new URL("./forecast-simulation.css", import.meta.url), "utf8");
 const viteConfigSource = readFileSync(new URL("../../../vite.config.ts", import.meta.url), "utf8");
 const webPackage = JSON.parse(
@@ -50,12 +55,33 @@ describe("local and hosted forecast simulation surface", () => {
   });
 
   it("contains no browser network or persistence call in the simulator feature", () => {
-    const allSources = `${viewSource}\n${editorSource}\n${historySource}`;
+    const allSources = `${viewSource}\n${editorSource}\n${historySource}\n${fidsPopoutSource}\n${fidsProjectionSource}`;
     expect(allSources).not.toMatch(/\bfetch\s*\(/);
     expect(allSources).not.toMatch(/\bWebSocket\b/);
     expect(allSources).not.toMatch(
-      /localStorage|sessionStorage|indexedDB|caches\.|serviceWorker|\/api\/|\bD1\b|DurableObject|\bKV\b|\bR2\b/,
+      /localStorage|sessionStorage|indexedDB|caches\.|serviceWorker|BroadcastChannel|\/api\/|\bD1\b|DurableObject|\bKV\b|\bR2\b/,
     );
+  });
+
+  it("opens one local live FIDS pop-out and keeps production settings out of it", () => {
+    expect(viewSource).toContain("FIDS öffnen");
+    expect(viewSource).toContain("<Monitor");
+    expect(viewSource).toContain("fidsPopoutRef.current?.open()");
+    expect(fidsPopoutSource).toContain('window.open("", POPUP_NAME, POPUP_FEATURES)');
+    expect(fidsPopoutSource).toContain("current.focus()");
+    expect(fidsPopoutSource).toContain("createPortal(");
+    expect(fidsPopoutSource).toContain("<FidsBoardPresentation");
+    expect(fidsPopoutSource).toContain("POPUP_STYLE_PATHS");
+    expect(fidsPopoutSource).toContain("/features/fids/fids-v12.css");
+    expect(fidsPopoutSource).toContain('source.getAttribute("data-vite-dev-id")');
+    expect(fidsPopoutSource).toContain('source.href.includes("/assets/ForecastSimulationView-")');
+    expect(fidsPopoutSource).toContain('target.title = "Simuliertes FIDS · Rundflug-Leitstand"');
+    expect(fidsPopoutSource).toContain('connectionLabel="LIVE-SIMULATION"');
+    expect(fidsPopoutSource).toContain('simulationBanner="Nur Simulation – keine Betriebsdaten"');
+    expect(fidsPopoutSource).toContain('footerNote="Virtuelle Zeit"');
+    expect(fidsPopoutSource).toContain("Das FIDS-Fenster wurde blockiert");
+    expect(fidsPopoutSource).not.toContain("FidsSettingsDialog");
+    expect(fidsPopoutSource).not.toContain("onOpenSettings");
   });
 
   it("exposes playback, incident injection, calibration, export and every configurable distribution", () => {
