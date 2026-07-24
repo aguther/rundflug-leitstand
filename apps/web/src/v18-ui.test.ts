@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import cashier from "./cashier-view.tsx?raw";
+import publicStatusContent from "./features/public-status/PublicStatusContent.tsx?raw";
 import flightLine from "./flight-line-supervisor.tsx?raw";
 import groupStatus from "./group-status-view.tsx?raw";
 
@@ -64,11 +65,9 @@ describe("V1.8 approved UI deltas", () => {
   });
 
   it("shows split parts without an internal F identifier", () => {
-    expect(groupStatus).toContain(
-      ["Teilflug $", "{part.partNumber} von $", "{part.partCount}"].join(""),
-    );
+    expect(publicStatusContent).toContain("Teilflug {partNumber} von {partCount}");
     expect(groupStatus).toContain("part.passengerCount");
-    expect(groupStatus).toContain("part.gateLabel");
+    expect(publicStatusContent).toContain("part.gateLabel");
     expect(groupStatus).not.toContain("communicationLabel");
   });
 });

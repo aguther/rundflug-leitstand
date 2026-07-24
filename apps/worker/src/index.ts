@@ -3459,6 +3459,59 @@ app.on("GET", eventRoutes("/reports/daily.pdf"), async (context) => {
   );
 });
 
+app.get("/api/public/pwa-manifest/:target/:code", (context) => {
+  const target = context.req.param("target").trim().toLowerCase();
+  const code = context.req.param("code").trim().toUpperCase();
+  if ((target !== "ticket" && target !== "group") || !/^[A-Z2-9]{12,32}$/.test(code)) {
+    return context.json(
+      { error: { code: "PUBLIC_TARGET_NOT_FOUND", message: "Statusseite nicht gefunden." } },
+      404,
+    );
+  }
+  const targetPath = target === "group" ? `/gruppe/${code}` : `/ticket/${code}`;
+  return new Response(
+    JSON.stringify({
+      id: targetPath,
+      start_url: targetPath,
+      scope: "/",
+      name: target === "group" ? "Rundflug-Gruppenstatus" : "Rundflug-Ticketstatus",
+      short_name: "Rundflug",
+      description: "Aktueller öffentlicher Rundflug-Status",
+      lang: "de",
+      display: "standalone",
+      background_color: "#f4f7fb",
+      theme_color: "#ffffff",
+      icons: [
+        {
+          src: "/icons/app-icon-192.png",
+          sizes: "192x192",
+          type: "image/png",
+          purpose: "any",
+        },
+        {
+          src: "/icons/app-icon-512.png",
+          sizes: "512x512",
+          type: "image/png",
+          purpose: "any",
+        },
+        {
+          src: "/icons/app-icon-512-maskable.png",
+          sizes: "512x512",
+          type: "image/png",
+          purpose: "maskable",
+        },
+      ],
+    }),
+    {
+      headers: {
+        "cache-control": "private, no-store",
+        "content-type": "application/manifest+json; charset=utf-8",
+        "x-content-type-options": "nosniff",
+      },
+    },
+  );
+});
+
 app.get("/api/public/tickets/:ticketCode", async (context) => {
   const ticketCode = context.req.param("ticketCode").trim().toUpperCase();
   if (!/^[A-Z2-9]{12,32}$/.test(ticketCode)) {
@@ -3548,14 +3601,17 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
   } as const;
   const message = {
     DRAFT: row.precalled_at
-      ? "Bitte jetzt zum angegebenen Gate kommen."
+      ? "Bitte jetzt zum Gate kommen."
       : prepare
-        ? "Bitte auf den bevorstehenden Aufruf vorbereiten."
+        ? "Ihr Aufruf steht bevor. Bitte bereithalten."
         : "Bitte Status regelmäßig prüfen.",
-    CALLED: "Bitte jetzt zur Flight Line kommen.",
-    IN_FLIGHT: "Der Flug läuft.",
-    LANDED: "Der Flug ist gelandet.",
-    COMPLETED: "Der Rundflug ist abgeschlossen.",
+    CALLED:
+      row.attendance_status === "CHECKED_IN"
+        ? "Bitte am Gate zum Einstieg bereithalten."
+        : "Bitte jetzt zum Gate kommen.",
+    IN_FLIGHT: "Ihr Rundflug ist gestartet.",
+    LANDED: "Ihr Rundflug ist gelandet.",
+    COMPLETED: "Ihr Rundflug ist abgeschlossen.",
   } as const;
   const lowerMinutes = row.prediction_lower_minutes ?? Math.max(0, (row.queue_sequence - 1) * 20);
   const upperMinutes = row.prediction_upper_minutes ?? row.queue_sequence * 30;
@@ -3569,13 +3625,16 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
   });
   return context.json({
     eventId: row.operation_day_id,
+    eventName: row.event_name,
     productName: row.product_name,
     productCode: row.product_code,
     publicDescription: row.public_description,
     gateLabel: row.gate_label,
     communicationNumber: row.communication_number,
     status:
-      row.emergency_mode === 1 || row.resource_group_status !== "ACTIVE"
+      row.emergency_mode === 1 ||
+      row.operational_interrupted === 1 ||
+      row.resource_group_status !== "ACTIVE"
         ? "SERVICE_PAUSED"
         : publicState[row.status],
     queuePosition: row.emergency_mode === 0 && row.status === "DRAFT" ? row.queue_sequence : null,
@@ -3758,17 +3817,19 @@ app.get("/api/public/groups/:groupCode", async (context) => {
             ? "Flugbetrieb unterbrochen – bitte Status erneut prüfen."
             : freshness.reason === "STALE_PREDICTION"
               ? "Prognose wird aktualisiert – bitte Status erneut prüfen."
-              : publicStatus === "COME_TO_FLIGHT_LINE" || publicStatus === "BOARDING"
-                ? "Bitte jetzt zum angegebenen Gate kommen."
-                : publicStatus === "PREPARE"
-                  ? "Bitte auf den bevorstehenden Aufruf vorbereiten."
-                  : publicStatus === "IN_FLIGHT"
-                    ? "Der Flug läuft."
-                    : publicStatus === "LANDED"
-                      ? "Der Flug ist gelandet."
-                      : publicStatus === "COMPLETED"
-                        ? "Der Rundflug ist abgeschlossen."
-                        : "Bitte Status regelmäßig prüfen.";
+              : publicStatus === "COME_TO_FLIGHT_LINE"
+                ? "Bitte jetzt zum Gate kommen."
+                : publicStatus === "BOARDING"
+                  ? "Bitte am Gate zum Einstieg bereithalten."
+                  : publicStatus === "PREPARE"
+                    ? "Ihr Aufruf steht bevor. Bitte bereithalten."
+                    : publicStatus === "IN_FLIGHT"
+                      ? "Ihr Rundflug ist gestartet."
+                      : publicStatus === "LANDED"
+                        ? "Ihr Rundflug ist gelandet."
+                        : publicStatus === "COMPLETED"
+                          ? "Ihr Rundflug ist abgeschlossen."
+                          : "Bitte Status regelmäßig prüfen.";
     return {
       partNumber: index + 1,
       partCount,
@@ -3881,12 +3942,12 @@ app.post("/api/public/tickets/:ticketCode/push-subscriptions", async (context) =
   }
   await context.env.DB.prepare(
     `INSERT INTO web_push_subscriptions
-       (id, operation_day_id, ticket_id, ticket_group_id, endpoint, p256dh, auth,
+       (id, operation_day_id, ticket_id, ticket_group_id, target_kind, endpoint, p256dh, auth,
         consented_at, delete_after, status, updated_at)
-     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 'ACTIVE', ?8)
+     VALUES (?1, ?2, ?3, ?4, 'TICKET', ?5, ?6, ?7, ?8, ?9, 'ACTIVE', ?8)
      ON CONFLICT(endpoint) DO UPDATE SET ticket_id = excluded.ticket_id,
        ticket_group_id = excluded.ticket_group_id, operation_day_id = excluded.operation_day_id,
-       p256dh = excluded.p256dh, auth = excluded.auth,
+       target_kind = excluded.target_kind, p256dh = excluded.p256dh, auth = excluded.auth,
        consented_at = excluded.consented_at, delete_after = excluded.delete_after,
        status = 'ACTIVE', updated_at = excluded.updated_at`,
   )
@@ -3987,12 +4048,12 @@ app.post("/api/public/groups/:groupCode/push-subscriptions", async (context) => 
   }
   await context.env.DB.prepare(
     `INSERT INTO web_push_subscriptions
-       (id, operation_day_id, ticket_id, ticket_group_id, endpoint, p256dh, auth,
+       (id, operation_day_id, ticket_id, ticket_group_id, target_kind, endpoint, p256dh, auth,
         consented_at, delete_after, status, updated_at)
-     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 'ACTIVE', ?8)
+     VALUES (?1, ?2, ?3, ?4, 'GROUP', ?5, ?6, ?7, ?8, ?9, 'ACTIVE', ?8)
      ON CONFLICT(endpoint) DO UPDATE SET ticket_id = excluded.ticket_id,
        ticket_group_id = excluded.ticket_group_id, operation_day_id = excluded.operation_day_id,
-       p256dh = excluded.p256dh, auth = excluded.auth,
+       target_kind = excluded.target_kind, p256dh = excluded.p256dh, auth = excluded.auth,
        consented_at = excluded.consented_at, delete_after = excluded.delete_after,
        status = 'ACTIVE', updated_at = excluded.updated_at`,
   )
@@ -4046,7 +4107,8 @@ app.delete("/api/public/tickets/:ticketCode/push-subscriptions", async (context)
   }
   await context.env.DB.prepare(
     `DELETE FROM web_push_subscriptions
-      WHERE endpoint = ?1 AND ticket_id IN (SELECT id FROM tickets WHERE public_code_hash = ?2)`,
+      WHERE endpoint = ?1 AND target_kind = 'TICKET'
+        AND ticket_id IN (SELECT id FROM tickets WHERE public_code_hash = ?2)`,
   )
     .bind(body.endpoint, await sha256Hex(ticketCode))
     .run();
@@ -4064,7 +4126,7 @@ app.delete("/api/public/groups/:groupCode/push-subscriptions", async (context) =
   }
   await context.env.DB.prepare(
     `DELETE FROM web_push_subscriptions
-      WHERE endpoint = ?1 AND ticket_group_id IN (
+      WHERE endpoint = ?1 AND target_kind = 'GROUP' AND ticket_group_id IN (
         SELECT id FROM ticket_groups WHERE public_status_code_hash = ?2
       )`,
   )

@@ -224,3 +224,12 @@ Links unverändert funktionieren. Push-Abonnements werden zusätzlich der Buchun
 und reagieren damit auf jeden aktuellen Teilflug. Vor Anwendung ist eine D1-Time-Travel-Marke oder
 vollständige D1-Sicherung verpflichtend. Die Wiederherstellung erfolgt per D1 Time Travel oder aus
 dieser Sicherung, weil D1 die additiven Spalten nicht ohne Tabellenneuaufbau entfernen kann.
+
+## 0043 – Kanonischer Zieltyp für Web-Push
+
+Ergänzt Web-Push-Abonnements um `target_kind` (`TICKET` oder `GROUP`). Bestehende Ziele werden auf
+den seit V1.8 kanonischen Gruppenstatus zurückgeführt; neue Einwilligungen speichern ihren
+tatsächlichen Typ. Der Versand leitet daraus serverseitig ausschließlich relative öffentliche
+Statuspfade ab. Vor Anwendung wird eine D1-Time-Travel-Marke oder vollständige D1-Sicherung
+angelegt. Ein Rollback erfolgt per D1 Time Travel oder aus dieser Sicherung. Push-Abonnements
+bleiben aus portablen R2-Backups ausgeschlossen und werden im Wiederherstellungsfall neu erteilt.

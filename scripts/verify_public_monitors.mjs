@@ -1,20 +1,50 @@
 import { spawn, spawnSync } from "node:child_process";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { rm } from "node:fs/promises";
+import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const npmCli = process.env.npm_execpath;
-if (!npmCli) throw new Error("npm-Ausführungspfad fehlt.");
 const wranglerCli = resolve(root, "node_modules", "wrangler", "bin", "wrangler.js");
-const port = Number.parseInt(process.env.PUBLIC_MONITORS_TEST_PORT ?? "8787", 10);
-const reset = spawnSync(process.execPath, [npmCli, "run", "db:reset:local"], {
-  cwd: root,
-  stdio: "ignore",
-});
-if (reset.status !== 0) throw new Error("Lokale Testdatenbank konnte nicht initialisiert werden.");
+const stateDirectory = mkdtempSync(resolve(root, ".wrangler", "public-monitors-"));
+const localD1Arguments = ["--local", "--persist-to", stateDirectory, "--config", "wrangler.jsonc"];
+const migrate = spawnSync(
+  process.execPath,
+  [wranglerCli, "d1", "migrations", "apply", "DB", ...localD1Arguments],
+  { cwd: root, stdio: "ignore" },
+);
+const seed = spawnSync(
+  process.execPath,
+  [wranglerCli, "d1", "execute", "DB", "--file", "apps/worker/seed/demo.sql", ...localD1Arguments],
+  { cwd: root, stdio: "ignore" },
+);
+if (migrate.status !== 0 || seed.status !== 0) {
+  throw new Error("Isolierte lokale Testdatenbank konnte nicht initialisiert werden.");
+}
+const availableLocalPort = () =>
+  new Promise((resolvePromise, reject) => {
+    const probe = createServer();
+    probe.unref();
+    probe.once("error", reject);
+    probe.listen(0, "127.0.0.1", () => {
+      const address = probe.address();
+      if (!address || typeof address === "string") {
+        probe.close();
+        reject(new Error("Freier lokaler Testport konnte nicht ermittelt werden."));
+        return;
+      }
+      probe.close((error) => {
+        if (error) reject(error);
+        else resolvePromise(address.port);
+      });
+    });
+  });
+const port = process.env.PUBLIC_MONITORS_TEST_PORT
+  ? Number.parseInt(process.env.PUBLIC_MONITORS_TEST_PORT, 10)
+  : await availableLocalPort();
 
 // F-MON-010: Alte Abflugzeilen dürfen das FIDS-Limit nicht belegen und dadurch kommende
 // Fluggruppen verdrängen. 21 Zeilen reproduzieren die frühere LIMIT-20-Regression.
@@ -73,6 +103,8 @@ const historySeed = (() => {
         "execute",
         "DB",
         "--local",
+        "--persist-to",
+        stateDirectory,
         "--config",
         "wrangler.jsonc",
         "--file",
@@ -102,6 +134,8 @@ const server = spawn(
     "dev",
     "--config",
     "wrangler.jsonc",
+    "--persist-to",
+    stateDirectory,
     "--port",
     String(port),
     "--var",
@@ -170,6 +204,13 @@ const groupStatus = async (code) => {
   const response = await fetch(`${base}/api/public/groups/${code}`);
   if (!response.ok)
     throw new Error(`Öffentlicher Gruppenstatus fehlgeschlagen (${response.status}).`);
+  return response.json();
+};
+const publicManifest = async (target, code) => {
+  const response = await fetch(`${base}/api/public/pwa-manifest/${target}/${code}`);
+  if (!response.ok || response.headers.get("content-type")?.includes("manifest+json") !== true) {
+    throw new Error(`Öffentliches PWA-Manifest fehlt (${response.status}).`);
+  }
   return response.json();
 };
 const command = async (device, token, expectedVersion, type, payload, staleRetries = 0) => {
@@ -378,6 +419,8 @@ try {
   assertPublicTimeCommunication(initialTicketStatus, "Ticketstatus");
   const initialGroupStatus = await groupStatus(publicGroupCode);
   if (
+    initialTicketStatus.eventName !== "Synthetischer Flugtag 2026" ||
+    initialGroupStatus.eventName !== "Synthetischer Flugtag 2026" ||
     initialGroupStatus.groupSize !== 2 ||
     initialGroupStatus.parts.length !== 1 ||
     initialGroupStatus.parts[0]?.passengerCount !== 2 ||
@@ -385,6 +428,53 @@ try {
   ) {
     throw new Error("Der öffentliche Gruppenstatus aggregiert die Buchungsgruppe nicht korrekt.");
   }
+  const [ticketManifest, groupManifest] = await Promise.all([
+    publicManifest("ticket", privateCodes[0]),
+    publicManifest("group", publicGroupCode),
+  ]);
+  if (
+    ticketManifest.id !== `/ticket/${privateCodes[0]}` ||
+    ticketManifest.start_url !== `/ticket/${privateCodes[0]}` ||
+    groupManifest.id !== `/gruppe/${publicGroupCode}` ||
+    groupManifest.start_url !== `/gruppe/${publicGroupCode}` ||
+    ticketManifest.scope !== "/" ||
+    ticketManifest.display !== "standalone"
+  ) {
+    throw new Error("Das dynamische PWA-Manifest öffnet nicht den exakten öffentlichen Status.");
+  }
+  const interrupted = await command(
+    devices.admin,
+    tokens.admin,
+    sold.event.version,
+    "SET_EVENT_INTERRUPTION",
+    {
+      interrupted: true,
+      reason: "Synthetischer öffentlicher Pausentest",
+      expectedReviewAt: null,
+    },
+  );
+  const [pausedTicketStatus, pausedGroupStatus] = await Promise.all([
+    ticketStatus(privateCodes[0]),
+    groupStatus(publicGroupCode),
+  ]);
+  if (
+    pausedTicketStatus.status !== "SERVICE_PAUSED" ||
+    pausedGroupStatus.parts.some((part) => part.status !== "SERVICE_PAUSED") ||
+    pausedTicketStatus.message !== "Flugbetrieb unterbrochen – bitte Status erneut prüfen."
+  ) {
+    throw new Error("Ticket und Gruppe projizieren die Betriebsunterbrechung nicht als VERZÖGERT.");
+  }
+  const resumed = await command(
+    devices.admin,
+    tokens.admin,
+    interrupted.event.version,
+    "SET_EVENT_INTERRUPTION",
+    {
+      interrupted: false,
+      reason: "Synthetischer öffentlicher Pausentest beendet",
+      expectedReviewAt: null,
+    },
+  );
   assertPublicTimeCommunication(
     {
       timeZone: initialGroupStatus.timeZone,
@@ -451,6 +541,37 @@ try {
     duplicateGroupConsent.body.preparationQueued !== false
   ) {
     throw new Error("Gruppenbezogene Push-Einwilligung oder Deduplizierung ist unvollständig.");
+  }
+  const targetQuery = spawnSync(
+    process.execPath,
+    [
+      wranglerCli,
+      "d1",
+      "execute",
+      "DB",
+      "--local",
+      "--persist-to",
+      stateDirectory,
+      "--config",
+      "wrangler.jsonc",
+      "--command",
+      `SELECT endpoint, target_kind FROM web_push_subscriptions
+        WHERE endpoint IN ('${pushEndpoint}', '${groupPushEndpoint}') ORDER BY endpoint`,
+      "--json",
+    ],
+    { cwd: root, encoding: "utf8" },
+  );
+  if (targetQuery.status !== 0) {
+    throw new Error(
+      "Push-Zieltypen konnten nicht aus der lokalen D1-Testdatenbank gelesen werden.",
+    );
+  }
+  const targetRows = JSON.parse(targetQuery.stdout).flatMap((entry) => entry.results ?? []);
+  if (
+    targetRows.find((row) => row.endpoint === pushEndpoint)?.target_kind !== "TICKET" ||
+    targetRows.find((row) => row.endpoint === groupPushEndpoint)?.target_kind !== "GROUP"
+  ) {
+    throw new Error("Ticket- und Gruppen-Push speichern nicht ihren tatsächlichen Zieltyp.");
   }
   let publicBoard = await board();
   assertPublicTimeCommunication(publicBoard, "FIDS");
@@ -522,7 +643,7 @@ try {
   const splitSale = await command(
     devices.cashier,
     tokens.cashier,
-    sold.event.version,
+    resumed.event.version,
     "SELL_TICKET_GROUP",
     {
       productId: "panorama-20",
@@ -648,7 +769,7 @@ try {
   assertPublicTimeCommunication(calledTicketStatus, "aufgerufener Ticketstatus");
   if (
     calledTicketStatus.status !== "COME_TO_FLIGHT_LINE" ||
-    calledTicketStatus.message !== "Bitte jetzt zur Flight Line kommen."
+    calledTicketStatus.message !== "Bitte jetzt zum Gate kommen."
   ) {
     throw new Error(
       `Verbindlicher Aufruf fehlt im öffentlichen Ticketstatus: ${JSON.stringify(calledTicketStatus)}`,
@@ -670,7 +791,12 @@ try {
   const boardingTicketStatuses = await Promise.all(privateCodes.map((code) => ticketStatus(code)));
   if (
     boardingTicketStatuses.filter((status) => status.status === "BOARDING").length !== 1 ||
-    boardingTicketStatuses.filter((status) => status.status === "COME_TO_FLIGHT_LINE").length !== 1
+    boardingTicketStatuses.filter((status) => status.status === "COME_TO_FLIGHT_LINE").length !==
+      1 ||
+    boardingTicketStatuses.find((status) => status.status === "BOARDING")?.message !==
+      "Bitte am Gate zum Einstieg bereithalten." ||
+    boardingTicketStatuses.find((status) => status.status === "COME_TO_FLIGHT_LINE")?.message !==
+      "Bitte jetzt zum Gate kommen."
   ) {
     throw new Error(
       `Der Check-in wird nicht ticketgenau öffentlich projiziert: ${JSON.stringify(
@@ -728,11 +854,13 @@ try {
       privateCodesHidden: true,
       publicTicketStatusWithoutLogin: true,
       publicGroupStatusWithoutLogin: true,
+      exactPublicManifestStartPaths: true,
       splitGroupStatusAggregated: true,
       preparationFromForecast: true,
       explicitPushConsentRequired: true,
       preparationPushDeduplicated: true,
       groupPushCoversBookingGroup: true,
+      pushTargetKindsPersisted: true,
       consentTimestampAndDeletionRecorded: true,
       pushRevocationDeleted: true,
       bindingCallVisible: true,
@@ -758,4 +886,10 @@ try {
   } else {
     server.kill();
   }
+  await rm(stateDirectory, {
+    force: true,
+    maxRetries: 5,
+    recursive: true,
+    retryDelay: 100,
+  });
 }

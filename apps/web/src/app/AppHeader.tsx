@@ -45,6 +45,10 @@ export interface AppHeaderProps {
   title: string;
   kiosk?: boolean;
   publicView?: boolean;
+  publicEvent?: {
+    eventId: string;
+    eventName: string;
+  };
   connectionStatus?: ConnectionStatus;
 }
 
@@ -59,6 +63,7 @@ export function AppHeader({
   title,
   kiosk = false,
   publicView = false,
+  publicEvent,
   connectionStatus = "connected",
 }: AppHeaderProps) {
   const { session, logout } = useAuth();
@@ -80,8 +85,14 @@ export function AppHeader({
   const internalOperationalView = Boolean(session && !kiosk && !publicView && !fidsView);
   const brandContent = (
     <>
-      <BrandMark />
-      <strong>{fidsView ? "Rundflug-Leitstand" : (eventLabel ?? title)}</strong>
+      <BrandMark
+        {...(publicEvent
+          ? { alt: `Logo ${publicEvent.eventName}`, eventId: publicEvent.eventId }
+          : {})}
+      />
+      <strong>
+        {publicEvent?.eventName ?? (fidsView ? "Rundflug-Leitstand" : (eventLabel ?? title))}
+      </strong>
     </>
   );
 
@@ -120,8 +131,12 @@ export function AppHeader({
 
   return (
     <>
-      <header className={`app-header ${fidsView ? "app-header--fids" : "app-header--compact"}`}>
-        {internalOperationalView ? (
+      <header
+        className={`app-header ${
+          publicView ? "app-header--public" : fidsView ? "app-header--fids" : "app-header--compact"
+        }`}
+      >
+        {internalOperationalView || publicView ? (
           <div className="app-brand">{brandContent}</div>
         ) : (
           <a aria-label="Rundflug-Leitstand" className="app-brand" href="/">
@@ -229,6 +244,7 @@ export function AppHeader({
           </details>
         ) : null}
         {fidsView ? <ThemeToggle /> : null}
+        {publicView ? <ThemeToggle binary /> : null}
         {session && !kiosk && !publicView ? (
           <details
             className={`account-menu ${fidsView ? "account-menu--legacy" : "account-menu--integrated"}`}
