@@ -779,14 +779,23 @@ try {
   ) {
     throw new Error("Boardingaufruf, Flugzeug oder Flottenstatus fehlt im FIDS.");
   }
-  const calledTicketStatus = await ticketStatus(privateCodes[0]);
+  // F-BRD-020 / F-BEN-010: CALL_NEXT bestätigt den Boardingbeginn für den gesamten Umlauf.
+  // Der öffentliche Status darf deshalb nicht von optional gepflegter Einzelanwesenheit abhängen.
+  const [calledTicketStatus, calledGroupStatus] = await Promise.all([
+    ticketStatus(privateCodes[0]),
+    groupStatus(publicGroupCode),
+  ]);
   assertPublicTimeCommunication(calledTicketStatus, "aufgerufener Ticketstatus");
   if (
-    calledTicketStatus.status !== "COME_TO_FLIGHT_LINE" ||
-    calledTicketStatus.message !== "Bitte jetzt zum Gate kommen."
+    calledTicketStatus.status !== "BOARDING" ||
+    calledTicketStatus.message !== "Bitte am Gate zum Einstieg bereithalten." ||
+    calledGroupStatus.parts.some((part) => part.status !== "BOARDING")
   ) {
     throw new Error(
-      `Verbindlicher Aufruf fehlt im öffentlichen Ticketstatus: ${JSON.stringify(calledTicketStatus)}`,
+      `Boardingbeginn fehlt im öffentlichen Ticket-/Gruppenstatus: ${JSON.stringify({
+        ticket: calledTicketStatus.status,
+        group: calledGroupStatus.parts.map((part) => part.status),
+      })}`,
     );
   }
   const calledOperationBoard = await operationBoard(devices.flightLine, tokens.flightLine);
@@ -804,16 +813,14 @@ try {
   await attendanceRefresh;
   const boardingTicketStatuses = await Promise.all(privateCodes.map((code) => ticketStatus(code)));
   if (
-    boardingTicketStatuses.filter((status) => status.status === "BOARDING").length !== 1 ||
-    boardingTicketStatuses.filter((status) => status.status === "COME_TO_FLIGHT_LINE").length !==
-      1 ||
-    boardingTicketStatuses.find((status) => status.status === "BOARDING")?.message !==
-      "Bitte am Gate zum Einstieg bereithalten." ||
-    boardingTicketStatuses.find((status) => status.status === "COME_TO_FLIGHT_LINE")?.message !==
-      "Bitte jetzt zum Gate kommen."
+    boardingTicketStatuses.some(
+      (status) =>
+        status.status !== "BOARDING" ||
+        status.message !== "Bitte am Gate zum Einstieg bereithalten.",
+    )
   ) {
     throw new Error(
-      `Der Check-in wird nicht ticketgenau öffentlich projiziert: ${JSON.stringify(
+      `Optionale Einzelanwesenheit verändert den öffentlichen Boardingstatus: ${JSON.stringify(
         boardingTicketStatuses.map((status) => status.status),
       )}`,
     );

@@ -346,4 +346,5 @@ export * from "./communication-labels";
 export * from "./forecast";
 export * from "./outage-recovery";
 export * from "./precall";
+export * from "./public-status";
 export * from "./queue";

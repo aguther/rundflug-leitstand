@@ -17,6 +17,22 @@ describe("öffentlicher Status V1.8", () => {
     expect(worker).not.toContain('"Bitte jetzt zum angegebenen Gate kommen."');
   });
 
+  it("leitet BOARDING für Ticket und Buchungsgruppe aus CALLED statt Anwesenheit ab", () => {
+    const ticketHandler = worker.slice(
+      worker.indexOf('app.get("/api/public/tickets/:ticketCode"'),
+      worker.indexOf('app.get("/api/public/groups/:groupCode"'),
+    );
+    const groupHandler = worker.slice(
+      worker.indexOf('app.get("/api/public/groups/:groupCode"'),
+      worker.indexOf('app.get("/api/public/push/config"'),
+    );
+
+    expect(ticketHandler).toContain("derivePublicRotationStatus({");
+    expect(ticketHandler).not.toContain("attendance_status");
+    expect(groupHandler).toContain("derivePublicRotationStatus({");
+    expect(groupHandler).not.toContain("present_count");
+  });
+
   it("liefert ein installationsfähiges Manifest für den exakten Statuspfad", () => {
     expect(worker).toContain('app.get("/api/public/pwa-manifest/:target/:code"');
     expect(worker).toContain("id: targetPath");
