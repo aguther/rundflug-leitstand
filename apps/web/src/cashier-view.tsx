@@ -1,30 +1,43 @@
-import type { OperationBoard, TicketGroupPrintData, TicketSearchResult } from "@rundflug/contracts";
+import type {
+  OperationBoard,
+  TicketGroupPrintData,
+  TicketSearchRequest,
+  TicketSearchResult,
+} from "@rundflug/contracts";
 import {
+  Activity,
   AlertTriangle,
   Check,
   CircleArrowRight,
   CircleCheck,
-  CircleUserRound,
+  CircleEllipsis,
   Clock3,
+  Coins,
+  Flag,
   Maximize2,
   Minus,
+  Package,
   PlaneLanding,
   PlaneTakeoff,
   Plus,
   Printer,
   RefreshCw,
   Search,
+  Sigma,
   Tag,
   Ticket,
+  Tickets,
   TicketsPlane,
   Trash2,
+  Users,
   X,
 } from "lucide-react";
 import QRCode from "qrcode";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { getTicketGroupPrintData, searchTickets, sendCommand } from "./api";
 import { AppShell as Shell } from "./app/AppShell";
 import { PageNotice, useActionMessageBridge } from "./app/PageNotifications";
+import { cashierTicketCompletionIndicator } from "./cashier-guidance";
 import {
   Button,
   ConfirmationDialog,
@@ -59,6 +72,38 @@ import {
 import { oversizeSplitPreview } from "./operational-exceptions";
 import { useConnectivity } from "./shared/hooks/use-connectivity";
 import { formatAbsoluteTimeWindow } from "./time-window";
+
+type TicketListTab = TicketSearchRequest["status"];
+
+function TableIconHeader({ children, label }: { children: ReactNode; label: string }) {
+  return (
+    <span className="cashier-icon-heading" title={label}>
+      {children}
+      <span className="visually-hidden">{label}</span>
+    </span>
+  );
+}
+
+function CashierCompletionIcon({ result }: { result: TicketSearchResult }) {
+  const indicator = cashierTicketCompletionIndicator(result.groupStatus, result.rotationStatuses);
+  if (indicator === "NONE") return null;
+  const completed = indicator === "COMPLETED";
+  const label = completed ? "Alle Fluggruppen abgeschlossen" : "Boarding oder Flugbetrieb begonnen";
+  return (
+    <span
+      aria-label={label}
+      className={`cashier-completion-icon${completed ? " is-complete" : ""}`}
+      role="img"
+      title={label}
+    >
+      {completed ? (
+        <CircleCheck aria-hidden="true" size={17} />
+      ) : (
+        <CircleEllipsis aria-hidden="true" size={17} />
+      )}
+    </span>
+  );
+}
 
 function TicketPaper({ compact = false, ticket }: { compact?: boolean; ticket: TicketReceipt }) {
   return (
@@ -187,7 +232,7 @@ export function CashierView() {
   const [ticketSearch, setTicketSearch] = useState("");
   const [ticketSearchQuery, setTicketSearchQuery] = useState("");
   const [ticketSearchResults, setTicketSearchResults] = useState<TicketSearchResult[]>([]);
-  const [ticketListTab, setTicketListTab] = useState<"ACTIVE" | "CANCELED">("ACTIVE");
+  const [ticketListTab, setTicketListTab] = useState<TicketListTab>("ACTIVE");
   const [ticketListNextCursor, setTicketListNextCursor] = useState<string | null>(null);
   const [ticketListLoading, setTicketListLoading] = useState(false);
   const [qrScanOpen, setQrScanOpen] = useState(false);
@@ -209,7 +254,9 @@ export function CashierView() {
   const visibleTicketGroups = ticketSearchResults.filter((entry) =>
     ticketListTab === "CANCELED"
       ? entry.groupStatus === "CANCELED"
-      : entry.groupStatus !== "CANCELED",
+      : ticketListTab === "OPEN"
+        ? entry.groupStatus !== "CANCELED" && entry.groupStatus !== "COMPLETED"
+        : entry.groupStatus !== "CANCELED",
   );
   const currency = (cents: number) =>
     (cents / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
@@ -240,7 +287,7 @@ export function CashierView() {
     }: {
       append?: boolean;
       preserveLoaded?: boolean;
-      status?: "ACTIVE" | "CANCELED";
+      status?: TicketListTab;
       query?: string;
     } = {}) => {
       if (!serverConfirmed) return;
@@ -278,7 +325,9 @@ export function CashierView() {
             const matchingStatus = (entry: TicketSearchResult) =>
               status === "CANCELED"
                 ? entry.groupStatus === "CANCELED"
-                : entry.groupStatus !== "CANCELED";
+                : status === "OPEN"
+                  ? entry.groupStatus !== "CANCELED" && entry.groupStatus !== "COMPLETED"
+                  : entry.groupStatus !== "CANCELED";
             nextResults = [
               ...response.results,
               ...current.filter(
@@ -736,9 +785,14 @@ export function CashierView() {
           <Tabs
             label="Ticketstatus"
             value={ticketListTab}
-            onChange={setTicketListTab}
+            onChange={(nextTab) => {
+              setTicketListTab(nextTab);
+              setLastTicketGroupId(null);
+              setReceipt(null);
+            }}
             items={[
               { value: "ACTIVE", label: "Verkaufte Tickets" },
+              { value: "OPEN", label: "Offene Tickets" },
               { value: "CANCELED", label: "Stornierte Tickets" },
             ]}
           />
@@ -770,7 +824,11 @@ export function CashierView() {
               columns={[
                 {
                   key: "sold",
-                  header: "Verkauf",
+                  header: (
+                    <TableIconHeader label="Verkauf">
+                      <Coins aria-hidden="true" size={17} />
+                    </TableIconHeader>
+                  ),
                   render: (result) =>
                     new Date(result.soldAt).toLocaleTimeString("de-DE", {
                       hour: "2-digit",
@@ -779,23 +837,48 @@ export function CashierView() {
                 },
                 {
                   key: "group",
-                  header: "Gruppe",
+                  header: (
+                    <TableIconHeader label="Gruppe">
+                      <Tickets aria-hidden="true" size={17} />
+                    </TableIconHeader>
+                  ),
                   render: (result) => result.bookingGroupLabel,
                 },
-                { key: "product", header: "Produkt", render: (result) => result.productName },
+                {
+                  key: "product",
+                  header: (
+                    <TableIconHeader label="Produkt">
+                      <Package aria-hidden="true" size={17} />
+                    </TableIconHeader>
+                  ),
+                  render: (result) => result.productName,
+                },
                 {
                   key: "people",
-                  header: "Personen",
-                  render: (result) => (
-                    <span className="cashier-person-count">
-                      {result.groupSize}
-                      <CircleUserRound aria-hidden="true" size={15} />
-                    </span>
+                  header: (
+                    <TableIconHeader label="Personen">
+                      <Users aria-hidden="true" size={17} />
+                    </TableIconHeader>
                   ),
+                  render: (result) => result.groupSize,
+                },
+                {
+                  key: "completion",
+                  header: (
+                    <TableIconHeader label="Abgeschlossen">
+                      <Flag aria-hidden="true" size={17} />
+                    </TableIconHeader>
+                  ),
+                  align: "center",
+                  render: (result) => <CashierCompletionIcon result={result} />,
                 },
                 {
                   key: "total",
-                  header: "Summe",
+                  header: (
+                    <TableIconHeader label="Summe">
+                      <Sigma aria-hidden="true" size={17} />
+                    </TableIconHeader>
+                  ),
                   align: "right",
                   render: (result) =>
                     currency(
@@ -807,7 +890,9 @@ export function CashierView() {
               emptyLabel={
                 ticketListTab === "CANCELED"
                   ? "Keine stornierten Tickets vorhanden."
-                  : "Noch keine Tickets verkauft."
+                  : ticketListTab === "OPEN"
+                    ? "Keine offenen Tickets vorhanden."
+                    : "Noch keine Tickets verkauft."
               }
               onRowClick={(result) => {
                 selectSearchResult(result);
@@ -860,16 +945,19 @@ export function CashierView() {
                     {
                       key: "flight-group",
                       header: (
-                        <span className="cashier-icon-heading" title="Fluggruppe">
+                        <TableIconHeader label="Fluggruppe">
                           <Tag aria-hidden="true" size={17} />
-                          <span className="visually-hidden">Fluggruppe</span>
-                        </span>
+                        </TableIconHeader>
                       ),
                       render: (rotation) => rotation.communicationLabel,
                     },
                     {
                       key: "people",
-                      header: "Personen",
+                      header: (
+                        <TableIconHeader label="Personen">
+                          <Users aria-hidden="true" size={17} />
+                        </TableIconHeader>
+                      ),
                       align: "center",
                       render: (rotation) =>
                         rotation.bookingGroups.find(
@@ -878,11 +966,17 @@ export function CashierView() {
                     },
                     {
                       key: "status",
-                      header: "Status",
+                      header: (
+                        <TableIconHeader label="Status">
+                          <Activity aria-hidden="true" size={17} />
+                        </TableIconHeader>
+                      ),
                       align: "center",
                       render: (rotation) => (
                         <span
-                          className="cashier-phase-icon"
+                          className={`cashier-phase-icon${
+                            rotation.status === "COMPLETED" ? " is-complete" : ""
+                          }`}
                           role="img"
                           aria-label={rotationStatusLabel(rotation.status)}
                           title={rotationStatusLabel(rotation.status)}
@@ -894,10 +988,9 @@ export function CashierView() {
                     {
                       key: "go-to-gate",
                       header: (
-                        <span className="cashier-icon-heading" title="GoToGate-Aktiv">
+                        <TableIconHeader label="GoToGate-Aktiv">
                           <CircleArrowRight aria-hidden="true" size={17} />
-                          <span className="visually-hidden">GoToGate-Aktiv</span>
-                        </span>
+                        </TableIconHeader>
                       ),
                       align: "center",
                       render: (rotation) =>
@@ -907,7 +1000,11 @@ export function CashierView() {
                     },
                     {
                       key: "time-window",
-                      header: "Zeitfenster",
+                      header: (
+                        <TableIconHeader label="Zeitfenster">
+                          <Clock3 aria-hidden="true" size={17} />
+                        </TableIconHeader>
+                      ),
                       render: rotationTimeWindow,
                     },
                   ]}

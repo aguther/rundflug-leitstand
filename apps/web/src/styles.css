@@ -4591,57 +4591,6 @@ p {
     scroll-behavior: auto;
   }
 }
-@media print {
-  @page {
-    size: 58mm 110mm;
-    margin: 3mm;
-  }
-  body * {
-    visibility: hidden;
-  }
-  .ticket-print-document,
-  .ticket-print-document * {
-    visibility: visible;
-  }
-  .ticket-print-document {
-    position: absolute;
-    inset: 0;
-    width: 52mm;
-  }
-  .ticket-preview,
-  .ticket-preview * {
-    visibility: visible;
-  }
-  .ticket-preview {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    border: 0;
-  }
-  .receipt-list {
-    display: block;
-  }
-  .ticket-receipt {
-    width: 52mm;
-    min-height: 100mm;
-    padding: 2mm;
-    border: 0;
-    border-radius: 0;
-    box-shadow: none;
-    break-after: page;
-  }
-  .ticket-receipt img {
-    width: 46mm;
-  }
-  .ticket-preview > h2,
-  .ticket-preview > p,
-  .ticket-preview .action-message,
-  .ticket-preview .correction-controls,
-  .print-tickets {
-    display: none;
-  }
-}
-
 [hidden][hidden] {
   display: none;
 }
@@ -5194,7 +5143,7 @@ p {
   }
 }
 
-/* Flight Line Supervisor: aircraft-first operational workspace */
+/* Flight Director: aircraft-first operational workspace */
 .flight-supervisor {
   width: min(1720px, calc(100% - 32px));
   margin: 16px auto 32px;
@@ -5437,7 +5386,7 @@ p {
   }
 }
 
-/* Flight Line Supervisor – approved dense console concept (2026-07-16) */
+/* Flight Director – approved dense console concept (2026-07-16) */
 .flight-line-shell {
   min-height: 100dvh;
   color: #e7eaee;
@@ -6092,7 +6041,7 @@ p {
   }
 }
 
-/* Flight Line Assist: the approved tablet and phone surface. */
+/* Flight Line: the approved tablet and phone surface. */
 .assist-shell {
   min-height: 100dvh;
   background: #080a0c;

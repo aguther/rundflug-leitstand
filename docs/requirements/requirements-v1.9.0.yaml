@@ -1,0 +1,23 @@
+version: 1.9.0
+requirements:
+  - id: V19-REL-010
+    requirement: Repository und Laufzeit verwenden konsistent Release 1.9.0.
+    status: implemented
+  - id: V19-BRN-010
+    requirement: Das generische App-Icon verwendet in allen synchronen Varianten ein blaues Plane-Outline auf dunklem Hintergrund.
+    status: implemented
+  - id: V19-CAS-010
+    requirement: Kassenbuttons, Symbolköpfe, Personenanzeige, Abschlussstatus und der servergestützte Tab Offene Tickets entsprechen dem freigegebenen Delta.
+    status: implemented
+  - id: V19-PRN-010
+    requirement: POS-58 druckt das Gruppenticket ohne Vorlauf oder feste Rollenlänge aus genau einer Druckregelquelle.
+    status: implemented
+  - id: V19-RTE-010
+    requirement: Flight Director liegt unter /flight-director und Flight Line unter /flight-line; der alte Assist-Pfad entfällt ohne Weiterleitung.
+    status: implemented
+  - id: V19-API-010
+    requirement: Die Ticketsuche filtert OPEN serverseitig vor Cursor und Pagination ohne neue Domänen- oder Datenbankzustände.
+    status: implemented
+  - id: V19-QA-010
+    requirement: Automatisierte und visuelle Abnahme deckt Favicon, Kasse, Druck, Statuslogik, neue Routen und entfernte Legacy-Metadaten ab.
+    status: implemented

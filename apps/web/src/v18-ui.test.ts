@@ -32,7 +32,7 @@ describe("V1.8 approved UI deltas", () => {
     const list = cashier.slice(listStart, listEnd);
     expect(list).not.toContain('key: "flight-group"');
     expect(list).not.toContain('key: "status"');
-    expect(cashier).toContain('title="GoToGate-Aktiv"');
+    expect(cashier).toContain('label="GoToGate-Aktiv"');
     expect(cashier).toContain('rotation.status === "DRAFT" && rotation.precalledAt');
     expect(cashier).toContain("Ticket drucken");
     expect(cashier).not.toContain("Ticketzettel erneut drucken");

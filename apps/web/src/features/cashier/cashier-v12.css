@@ -147,14 +147,20 @@
   line-height: 1.1;
   white-space: nowrap;
 }
+.cashier-sell-action.ds-button > .ds-button-content {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: 0;
+}
 .cashier-sell-copy {
   min-width: 0;
   display: grid;
   grid-template-rows: repeat(2, minmax(0, 1fr));
-  justify-items: start;
+  place-items: center;
   gap: 2px;
   font-variant-numeric: tabular-nums;
-  text-align: left;
+  text-align: center;
 }
 .cashier-sell-copy > span {
   min-width: 0;
@@ -185,8 +191,7 @@
 .cashier-sell-action.ds-button > .ds-button-content > svg {
   width: 20px;
   height: 20px;
-  flex: 0 0 auto;
-  transform: translateX(-3px);
+  justify-self: center;
 }
 .cashier-split-line > span {
   display: -webkit-box;
@@ -214,19 +219,13 @@
   border-radius: 0;
 }
 .cashier-ticket-table .ds-table {
-  min-width: 520px;
+  min-width: 600px;
   font-size: 0.76rem;
 }
 .cashier-ticket-table .ds-table :is(th, td) {
   padding: 9px 10px;
   white-space: nowrap;
 }
-.cashier-person-count {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-}
-
 .cashier-ticket-detail {
   min-height: 0;
   display: flex;
@@ -306,13 +305,18 @@
   white-space: nowrap;
 }
 .cashier-icon-heading,
-.cashier-phase-icon {
+.cashier-phase-icon,
+.cashier-completion-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
 }
 .cashier-phase-icon {
   color: var(--ui-text);
+}
+.cashier-phase-icon.is-complete,
+.cashier-completion-icon.is-complete {
+  color: var(--ui-success);
 }
 .cashier-ticket-paper {
   position: relative;
@@ -543,7 +547,6 @@
   .cashier-sell-action.ds-button > .ds-button-content > svg {
     width: 18px;
     height: 18px;
-    transform: translateX(-1px);
   }
 }
 
@@ -600,7 +603,7 @@
     font-size: 0.61rem;
   }
   .cashier-ticket-table .ds-table {
-    min-width: 520px;
+    min-width: 600px;
     table-layout: fixed;
     font-size: 0.7rem;
   }
@@ -609,20 +612,23 @@
     padding-inline: 6px;
   }
   .cashier-ticket-table .ds-table :is(th, td):nth-child(1) {
-    width: 10%;
-  }
-  .cashier-ticket-table .ds-table :is(th, td):nth-child(2) {
     width: 11%;
   }
+  .cashier-ticket-table .ds-table :is(th, td):nth-child(2) {
+    width: 16%;
+  }
   .cashier-ticket-table .ds-table :is(th, td):nth-child(3) {
-    width: 18%;
+    width: 24%;
     white-space: normal;
   }
   .cashier-ticket-table .ds-table :is(th, td):nth-child(4) {
     width: 12%;
   }
   .cashier-ticket-table .ds-table :is(th, td):nth-child(5) {
-    width: 14%;
+    width: 15%;
+  }
+  .cashier-ticket-table .ds-table :is(th, td):nth-child(6) {
+    width: 22%;
   }
   .cashier-ticket-detail {
     padding: 10px 12px;
@@ -721,16 +727,20 @@
 }
 
 @media print {
+  @page {
+    margin: 0;
+  }
   html,
   body,
   #root {
-    width: 52mm;
+    width: 58mm;
     min-width: 0;
     margin: 0;
+    padding: 0;
     background: #fff;
   }
   .cashier-shell {
-    width: 52mm;
+    width: 58mm;
     height: auto;
     min-height: 0;
     display: block;
@@ -744,17 +754,19 @@
   .cashier-shell > .ticket-print-document {
     position: static;
     inset: auto;
-    width: 52mm;
+    width: 58mm;
     display: block;
+    margin: 0;
+    padding: 0 3mm;
   }
   .ticket-print-document .ticket-paper {
     width: 52mm;
-    min-height: 100mm;
+    min-height: 0;
+    margin: 0;
     padding: 2mm;
     border: 0;
-    break-after: page;
-  }
-  .ticket-print-document .ticket-paper:last-child {
+    border-radius: 0;
+    box-shadow: none;
     break-after: auto;
   }
   .ticket-print-document .ticket-paper > img {

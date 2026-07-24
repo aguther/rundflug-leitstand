@@ -51,7 +51,7 @@ export function FeatureRouter() {
   else if (ticketCode) view = <TicketStatusView code={ticketCode.toUpperCase()} />;
   else if (path === "/setup") view = <SetupView />;
   else if (path === "/datenschutz") view = <PrivacyView />;
-  else if (path === "/flight-line" || path === "/flight-line/assist") view = <FlightLineView />;
+  else if (path === "/flight-director" || path === "/flight-line") view = <FlightLineView />;
   else if (path === "/fids") view = <FidsView />;
   else if (path === "/admin") view = <AdminView />;
   else if (path === "/simulation") view = <ForecastSimulationView />;

@@ -73,8 +73,8 @@ export type LoginAccount = Pick<OperatorAccountSummary, "id" | "loginCode" | "ro
 export const roleLabels: Record<OperatorRole, string> = {
   ADMIN: "Administration",
   CASHIER: "Kasse",
-  FLIGHT_LINE: "Flight Line Assist",
-  FLIGHT_DIRECTOR: "Flugleitung",
+  FLIGHT_LINE: "Flight Line",
+  FLIGHT_DIRECTOR: "Flight Director",
   DISPLAY: "FIDS-Anzeige",
 };
 

@@ -14,17 +14,17 @@ const INTERNAL_INSTALL_METADATA: Record<string, InstallMetadata> = {
     documentTitle: "Kasse · Rundflug-Leitstand",
     appleTitle: "Kasse",
   },
+  "/flight-director": {
+    manifestHref: "/manifests/flight-director.webmanifest",
+    appleTouchIconHref: "/icons/flight-line-icon-180.png",
+    documentTitle: "Flight Director · Rundflug-Leitstand",
+    appleTitle: "Flight Director",
+  },
   "/flight-line": {
     manifestHref: "/manifests/flight-line.webmanifest",
-    appleTouchIconHref: "/icons/flight-line-icon-180.png",
+    appleTouchIconHref: "/icons/assist-icon-180.png",
     documentTitle: "Flight Line · Rundflug-Leitstand",
     appleTitle: "Flight Line",
-  },
-  "/flight-line/assist": {
-    manifestHref: "/manifests/assist.webmanifest",
-    appleTouchIconHref: "/icons/assist-icon-180.png",
-    documentTitle: "Assist · Rundflug-Leitstand",
-    appleTitle: "Assist",
   },
   "/fids": {
     manifestHref: "/manifests/fids.webmanifest",
