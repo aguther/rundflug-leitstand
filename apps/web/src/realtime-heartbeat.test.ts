@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   isRealtimeStateChange,
   REALTIME_HEARTBEAT_INTERVAL_MS,
+  realtimeStateChangeVersion,
   sendRealtimeHeartbeat,
 } from "./realtime-heartbeat";
 
@@ -25,7 +26,13 @@ describe("realtime heartbeat", () => {
   });
 
   it("refreshes for state changes and unknown compatible messages", () => {
-    expect(isRealtimeStateChange(JSON.stringify({ type: "event-state-changed" }))).toBe(true);
+    const stateChange = JSON.stringify({ type: "event-state-changed", eventVersion: 17 });
+    expect(isRealtimeStateChange(stateChange)).toBe(true);
+    expect(realtimeStateChangeVersion(stateChange)).toBe(17);
+    expect(realtimeStateChangeVersion(JSON.stringify({ type: "event-state-changed" }))).toBeNull();
+    expect(
+      realtimeStateChangeVersion(JSON.stringify({ type: "forecast-updated", eventVersion: 17 })),
+    ).toBeNull();
     expect(isRealtimeStateChange("future-compatible-message")).toBe(true);
     expect(isRealtimeStateChange(new ArrayBuffer(0))).toBe(true);
   });

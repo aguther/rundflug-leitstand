@@ -5,6 +5,7 @@ import {
   bootstrapRequestSchema,
   cloneEventRequestSchema,
   commandEnvelopeSchema,
+  commandResultSchema,
   factoryResetRequestSchema,
   fidsPreferencesSchema,
   forecastHistoryQuerySchema,
@@ -25,6 +26,84 @@ import {
 } from "./index";
 
 describe("commandEnvelopeSchema", () => {
+  it("accepts aggregate preconditions for independent operational commands", () => {
+    const command = commandEnvelopeSchema.parse({
+      commandId: "c7686b45-39dd-4bb8-b4da-49308c6643cf",
+      eventId: "event-1",
+      deviceId: "flight-line-1",
+      expectedVersion: 17,
+      observedEventVersion: 17,
+      issuedAt: "2026-07-24T05:00:00.000Z",
+      type: "MARK_OFF_BLOCK",
+      preconditions: [
+        {
+          aggregateType: "ROTATION",
+          aggregateId: "rotation-1",
+          expectedVersion: 3,
+        },
+      ],
+      payload: { rotationId: "rotation-1" },
+    });
+
+    expect(command.preconditions).toEqual([
+      {
+        aggregateType: "ROTATION",
+        aggregateId: "rotation-1",
+        expectedVersion: 3,
+      },
+    ]);
+  });
+
+  it("carries protected sale print data in the accepted command receipt", () => {
+    const result = commandResultSchema.parse({
+      accepted: true,
+      duplicate: false,
+      event: {
+        eventId: "event-1",
+        name: "Synthetischer Flugtag",
+        eventDate: "2026-07-24",
+        aerodrome: "EDSY",
+        timeZone: "Europe/Berlin",
+        status: "ACTIVE",
+        archivedAt: null,
+        templateSourceId: null,
+        operationalInterrupted: false,
+        emergencyMode: false,
+        version: 18,
+        operationalNote: "",
+        saleOpensAt: null,
+        operationsEndAt: null,
+        noShowAfterMinutes: 10,
+        maxTicketDeferrals: 3,
+        notificationLeadMinutes: 10,
+        automaticPrecallEnabled: false,
+        precallLeadMinutes: 15,
+        maximumGateWaitMinutes: 30,
+        precallMinimumQuality: "CHANGING",
+        precallGateCooldownMinutes: 2,
+        referenceWeightsKg: { child: 35, normal: 75, heavy: 95 },
+        plannedBoardingMinutes: 5,
+        plannedDeboardingMinutes: 5,
+        plannedBufferMinutes: 5,
+        departedVisibilitySeconds: 15,
+        updatedAt: "2026-07-24T05:00:01.000Z",
+      },
+      eventType: "TICKET_GROUP_SOLD",
+      aggregate: { type: "TICKET_GROUP", id: "group-1", relatedRotationId: "rotation-1" },
+      saleReceipt: {
+        ticketGroupId: "group-1",
+        eventName: "Synthetischer Flugtag",
+        productName: "Panorama",
+        gateLabel: "Flight Line",
+        communicationLabel: "G-PAN-0101",
+        code: "ABCDE2345678",
+        groupSize: 1,
+      },
+    });
+
+    expect(result.saleReceipt?.communicationLabel).toBe("G-PAN-0101");
+  });
+
   it("validates an explicit anonymous pilot assignment with reassign confirmation", () => {
     const command = commandEnvelopeSchema.parse({
       commandId: "00e971df-23d5-4d28-9107-92b447416299",

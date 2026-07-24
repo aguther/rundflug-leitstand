@@ -35,6 +35,7 @@ import {
   clearedSessionCookie,
   nextLoginCode,
   type OperatorRole,
+  type SessionActor,
   sessionCookie,
   sessionTimes,
 } from "./auth";
@@ -75,7 +76,10 @@ import {
   queueEligiblePreparationNotifications,
 } from "./web-push";
 
-const app = new Hono<{ Bindings: Env }>();
+const app = new Hono<{
+  Bindings: Env;
+  Variables: { sessionActor: SessionActor | null };
+}>();
 
 function eventRoutes<const Suffix extends string>(
   suffix: Suffix,
@@ -308,13 +312,15 @@ async function authorizeDevice(
   env: Env,
   eventId: string,
   request: Request,
+  preauthorizedActor?: SessionActor | null,
 ): Promise<{
   id: string;
   role: string;
   accountId: string | null;
   loginCode: string | null;
 } | null> {
-  const actor = await authorizeSession(env, request);
+  const actor =
+    preauthorizedActor === undefined ? await authorizeSession(env, request) : preauthorizedActor;
   if (actor) {
     return {
       id: actor.deviceId,
@@ -379,6 +385,7 @@ for (const protectedPrefix of ["/api/control/*", "/api/events/*"] as const) {
       return;
     }
     const actor = await authorizeSession(context.env, context.req.raw);
+    context.set("sessionActor", actor);
     if (actor?.role === "DISPLAY") {
       return context.json(
         {
@@ -1787,8 +1794,14 @@ app.on("PUT", eventRoutes("/fids/preferences"), async (context) => {
 });
 
 app.on("GET", eventRoutes("/operations"), async (context) => {
+  const requestStartedAt = performance.now();
   const eventId = context.req.param("eventId");
-  const device = await authorizeDevice(context.env, eventId, context.req.raw);
+  const device = await authorizeDevice(
+    context.env,
+    eventId,
+    context.req.raw,
+    context.get("sessionActor"),
+  );
   if (!device || device.role === "DISPLAY") {
     return context.json(
       {
@@ -2273,7 +2286,7 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
       }),
     () =>
       context.env.DB.prepare(
-        `SELECT rg.id, rg.name, rg.short_code, rg.status, rg.gate_id, g.label AS gate_label,
+        `SELECT rg.id, rg.version, rg.name, rg.short_code, rg.status, rg.gate_id, g.label AS gate_label,
               rg.reference_capacity, rg.planned_rotation_minutes,
               rg.compatible_aircraft_types_json, rg.automatic_precall_enabled,
               COALESCE((SELECT json_group_array(m.aircraft_id)
@@ -2286,6 +2299,7 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
         .bind(eventId)
         .all<{
           id: string;
+          version: number;
           name: string;
           short_code: string;
           status: "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED";
@@ -2390,7 +2404,7 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
   const operationsEnd = eventRow.operations_end_at ? Date.parse(eventRow.operations_end_at) : 0;
   const remainingOperatingMinutes = Math.max(0, (operationsEnd - Date.now()) / 60_000);
 
-  return context.json({
+  const response = context.json({
     currentDeviceRole: device.role,
     event: rowToSnapshot(eventRow),
     products: products.results.map((product) => {
@@ -2707,6 +2721,7 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
       );
       return {
         id: group.id,
+        version: group.version,
         name: group.name,
         shortCode: group.short_code,
         status: group.status,
@@ -2734,6 +2749,11 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
       activePushSubscriptions: metricsRow?.active_push_subscriptions ?? 0,
     },
   });
+  response.headers.set(
+    "server-timing",
+    `operations;dur=${(performance.now() - requestStartedAt).toFixed(1)}`,
+  );
+  return response;
 });
 
 app.on("GET", eventRoutes("/tickets/search"), async (context) => {
@@ -4540,7 +4560,7 @@ app.on("GET", eventRoutes("/live"), async (context) => {
 
 app.on("POST", eventRoutes("/commands"), async (context) => {
   const eventId = context.req.param("eventId");
-  const actor = await authorizeSession(context.env, context.req.raw);
+  const actor = context.get("sessionActor");
   if (!actor && context.env.APP_ENV !== "development") {
     return context.json(
       { error: { code: "SESSION_REQUIRED", message: "Anmeldung erforderlich." } },

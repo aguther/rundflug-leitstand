@@ -236,6 +236,9 @@ try {
   ) {
     throw new Error("Skalierungsdatensatz ist in der Operationssicht unvollständig.");
   }
+  if (!initial.response.headers.get("server-timing")?.includes("operations;dur=")) {
+    throw new Error("Server-Timing für den Betriebsstand fehlt.");
+  }
 
   sockets.push(...(await Promise.all(Array.from({ length: 20 }, () => connect()))));
   const parallel = await Promise.all(
@@ -315,6 +318,13 @@ try {
   if (!sale.response.ok || sale.body.eventType !== "TICKET_GROUP_SOLD") {
     throw new Error(`Standardverkauf schlug im Mengengerüst fehl: ${JSON.stringify(sale.body)}`);
   }
+  const commandServerTiming = sale.response.headers.get("server-timing") ?? "";
+  if (
+    !commandServerTiming.includes("command-queue;dur=") ||
+    !commandServerTiming.includes("command;dur=")
+  ) {
+    throw new Error("Server-Timing für das operative Kommando fehlt.");
+  }
   await forecastSignal;
   const forecastElapsedMs = performance.now() - saleStartedAt;
 
@@ -356,6 +366,7 @@ try {
         forecastFor300Rotations: Math.round(forecastElapsedMs),
       },
       thresholds,
+      serverTimingExposed: true,
     }),
   );
 } finally {

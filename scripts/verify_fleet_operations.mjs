@@ -63,6 +63,7 @@ const command = async (
   payload,
   expectedStatus = 200,
   commandId = randomUUID(),
+  consistency = {},
 ) => {
   const response = await fetch(`${base}/api/events/demo-2026/commands`, {
     method: "POST",
@@ -72,6 +73,7 @@ const command = async (
       eventId: "demo-2026",
       deviceId,
       expectedVersion,
+      ...consistency,
       issuedAt: new Date().toISOString(),
       type,
       payload,
@@ -110,6 +112,22 @@ try {
     reason: "Synthetischer Flottentest",
     adminPin: pin,
   });
+  result = await admin(result.event.version, "UPSERT_AIRCRAFT", {
+    aircraftId: "aircraft-b",
+    registration: "D-PARB",
+    aircraftType: "SYNTHETIC-DEMO",
+    passengerSeats: 4,
+    maximumPassengerPayloadKg: null,
+    reason: "Synthetisches Parallelflugzeug",
+    adminPin: pin,
+  });
+  result = await admin(result.event.version, "ASSIGN_AIRCRAFT_RESOURCE_GROUP", {
+    aircraftId: "aircraft-b",
+    resourceGroupId: "rg-panorama",
+    effectiveAt: new Date().toISOString(),
+    reason: "Synthetisches Parallelflugzeug",
+    adminPin: pin,
+  });
   result = await admin(result.event.version, "CONFIGURE_EVENT_PARAMETERS", {
     saleOpensAt: null,
     operationsEndAt: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString(),
@@ -143,10 +161,160 @@ try {
       paymentMethod: "CASH",
     },
   );
+  current = await board(devices.flightLine, tokens.flightLine);
+  const parallelAircraftA = current.aircraft.find((entry) => entry.id === "aircraft-a");
+  const parallelAircraftB = current.aircraft.find((entry) => entry.id === "aircraft-b");
+  if (!parallelAircraftA || !parallelAircraftB) {
+    throw new Error("Flugzeuge für den Parallelitätstest fehlen.");
+  }
+  const parallelObservedVersion = current.event.version;
+  const [parallelRefuel, parallelPause] = await Promise.all([
+    command(
+      devices.flightLine,
+      tokens.flightLine,
+      parallelObservedVersion,
+      "SET_AIRCRAFT_OPERATIONAL_STATE",
+      {
+        aircraftId: parallelAircraftA.id,
+        state: "REFUELING",
+        reason: "Synthetischer paralleler Tankvorgang",
+        expectedReviewAt: null,
+      },
+      200,
+      randomUUID(),
+      {
+        observedEventVersion: parallelObservedVersion,
+        preconditions: [
+          {
+            aggregateType: "AIRCRAFT",
+            aggregateId: parallelAircraftA.id,
+            expectedVersion: parallelAircraftA.version,
+          },
+        ],
+      },
+    ),
+    command(
+      devices.flightLine,
+      tokens.flightLine,
+      parallelObservedVersion,
+      "SET_AIRCRAFT_OPERATIONAL_STATE",
+      {
+        aircraftId: parallelAircraftB.id,
+        state: "PAUSED",
+        reason: "Synthetische parallele Flugzeugpause",
+        expectedReviewAt: null,
+      },
+      200,
+      randomUUID(),
+      {
+        observedEventVersion: parallelObservedVersion,
+        preconditions: [
+          {
+            aggregateType: "AIRCRAFT",
+            aggregateId: parallelAircraftB.id,
+            expectedVersion: parallelAircraftB.version,
+          },
+        ],
+      },
+    ),
+  ]);
+  if (
+    parallelRefuel.event.version === parallelPause.event.version ||
+    !parallelRefuel.accepted ||
+    !parallelPause.accepted
+  ) {
+    throw new Error("Unabhängige Flugzeugkommandos wurden nicht geordnet akzeptiert.");
+  }
+  current = await board(devices.flightLine, tokens.flightLine);
+  const changedAircraftA = current.aircraft.find((entry) => entry.id === "aircraft-a");
+  const changedAircraftB = current.aircraft.find((entry) => entry.id === "aircraft-b");
+  if (
+    changedAircraftA?.operationalState !== "REFUELING" ||
+    changedAircraftB?.operationalState !== "PAUSED"
+  ) {
+    throw new Error("Parallele Flugzeugzustände wurden nicht konsistent persistiert.");
+  }
+  const restoreObservedVersion = current.event.version;
+  await Promise.all([
+    command(
+      devices.flightLine,
+      tokens.flightLine,
+      restoreObservedVersion,
+      "SET_AIRCRAFT_OPERATIONAL_STATE",
+      {
+        aircraftId: changedAircraftA.id,
+        state: "AVAILABLE",
+        reason: "Synthetischen parallelen Tankvorgang beenden",
+        expectedReviewAt: null,
+      },
+      200,
+      randomUUID(),
+      {
+        observedEventVersion: restoreObservedVersion,
+        preconditions: [
+          {
+            aggregateType: "AIRCRAFT",
+            aggregateId: changedAircraftA.id,
+            expectedVersion: changedAircraftA.version,
+          },
+        ],
+      },
+    ),
+    command(
+      devices.flightLine,
+      tokens.flightLine,
+      restoreObservedVersion,
+      "SET_AIRCRAFT_OPERATIONAL_STATE",
+      {
+        aircraftId: changedAircraftB.id,
+        state: "INACTIVE",
+        reason: "Synthetisches Parallelflugzeug nach Parallelitätstest stilllegen",
+        expectedReviewAt: null,
+      },
+      200,
+      randomUUID(),
+      {
+        observedEventVersion: restoreObservedVersion,
+        preconditions: [
+          {
+            aggregateType: "AIRCRAFT",
+            aggregateId: changedAircraftB.id,
+            expectedVersion: changedAircraftB.version,
+          },
+        ],
+      },
+    ),
+  ]);
+  current = await board(devices.flightLine, tokens.flightLine);
+  await command(
+    devices.flightLine,
+    tokens.flightLine,
+    current.event.version,
+    "SET_AIRCRAFT_OPERATIONAL_STATE",
+    {
+      aircraftId: changedAircraftA.id,
+      state: "PAUSED",
+      reason: "Synthetischer Konflikttest auf demselben Flugzeug",
+      expectedReviewAt: null,
+    },
+    409,
+    randomUUID(),
+    {
+      observedEventVersion: current.event.version,
+      preconditions: [
+        {
+          aggregateType: "AIRCRAFT",
+          aggregateId: changedAircraftA.id,
+          expectedVersion: changedAircraftA.version,
+        },
+      ],
+    },
+  );
+  const parallelBaselineVersion = current.event.version;
   const reviewAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
   const inactiveCommandId = randomUUID();
   const inactiveByFlightLine = await flight(
-    sold.event.version,
+    parallelBaselineVersion,
     "SET_AIRCRAFT_OPERATIONAL_STATE",
     {
       aircraftId: "aircraft-a",
@@ -158,7 +326,7 @@ try {
     inactiveCommandId,
   );
   const duplicateInactive = await flight(
-    sold.event.version,
+    parallelBaselineVersion,
     "SET_AIRCRAFT_OPERATIONAL_STATE",
     {
       aircraftId: "aircraft-a",
@@ -519,6 +687,8 @@ try {
       aircraftPauseBlocksCall: true,
       flightLineAircraftStateAuthorized: true,
       aircraftStateIdempotencyAndStaleWriteVerified: true,
+      independentAircraftCommandsAcceptedFromSameObservedVersion: true,
+      staleSameAircraftCommandRejected: true,
       inactiveAvailableRefuelingAndPauseVerified: true,
       aircraftStatusReplansForecast: true,
       aircraftFailureOnlyProposesReplacement: true,

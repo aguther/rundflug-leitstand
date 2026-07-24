@@ -1,4 +1,4 @@
-import type { OperationBoard } from "@rundflug/contracts";
+import type { CommandResult, OperationBoard } from "@rundflug/contracts";
 import { formatBookingGroupLabel } from "@rundflug/domain";
 import { useEffect, useRef, useState } from "react";
 import { claimFlightLineAircraft, releaseFlightLineAircraft, sendCommand } from "./api";
@@ -52,7 +52,7 @@ function queuedSegmentPresentCount(group: QueueGroup): number {
 }
 
 export function FlightLineView() {
-  const { board, error, lastConfirmedAt, backendConfirmed, refresh } =
+  const { board, error, lastConfirmedAt, backendConfirmed, confirmEvent, refresh } =
     useOperationBoard(FLIGHT_LINE_DEVICE_ID);
   const [selectedAircraftId, setSelectedAircraftId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -164,8 +164,10 @@ export function FlightLineView() {
         eventId: EVENT_ID,
         deviceId: FLIGHT_LINE_DEVICE_ID,
         expectedVersion: board.event.version,
+        observedEventVersion: board.event.version,
         issuedAt: new Date().toISOString(),
       };
+      let result: CommandResult;
       if (selectedAction.command === "CALL_NEXT") {
         const assignedPilotId = aircraftOverride?.currentPilotId;
         if (!aircraftOverride?.id || !assignedPilotId) {
@@ -173,7 +175,7 @@ export function FlightLineView() {
             "Vor Belegung bitte über „Pilot zuweisen“ einen Pilotencode am Flugzeug hinterlegen.",
           );
         }
-        await sendCommand(
+        result = await sendCommand(
           {
             ...commandBase,
             type: "CALL_NEXT",
@@ -191,10 +193,17 @@ export function FlightLineView() {
           deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
         );
       } else {
-        await sendCommand(
+        result = await sendCommand(
           selectedAction.command === "COMPLETE_TURNAROUND"
             ? {
                 ...commandBase,
+                preconditions: [
+                  {
+                    aggregateType: "ROTATION" as const,
+                    aggregateId: selectedRotation.id,
+                    expectedVersion: selectedRotation.version,
+                  },
+                ],
                 type: "COMPLETE_TURNAROUND",
                 payload: {
                   rotationId: selectedRotation.id,
@@ -203,13 +212,21 @@ export function FlightLineView() {
               }
             : {
                 ...commandBase,
+                preconditions: [
+                  {
+                    aggregateType: "ROTATION" as const,
+                    aggregateId: selectedRotation.id,
+                    expectedVersion: selectedRotation.version,
+                  },
+                ],
                 type: selectedAction.command,
                 payload: { rotationId: selectedRotation.id },
               },
           deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
         );
       }
-      await refresh();
+      confirmEvent(result.event);
+      void refresh(result.event.version);
     } catch (reason) {
       setMessage(reason instanceof Error ? reason.message : "Aktion fehlgeschlagen.");
     } finally {
@@ -291,12 +308,20 @@ export function FlightLineView() {
       INACTIVE: "Flugzeug durch Flight Line vorübergehend inaktiv gemeldet",
     } as const;
     try {
-      await sendCommand(
+      const result = await sendCommand(
         {
           commandId: crypto.randomUUID(),
           eventId: EVENT_ID,
           deviceId: FLIGHT_LINE_DEVICE_ID,
           expectedVersion: board.event.version,
+          observedEventVersion: board.event.version,
+          preconditions: [
+            {
+              aggregateType: "AIRCRAFT",
+              aggregateId: aircraftOverride.id,
+              expectedVersion: aircraftOverride.version,
+            },
+          ],
           issuedAt: new Date().toISOString(),
           type: "SET_AIRCRAFT_OPERATIONAL_STATE",
           payload: {
@@ -309,7 +334,8 @@ export function FlightLineView() {
         deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
       );
       setAircraftPauseOpen(false);
-      await refresh();
+      confirmEvent(result.event);
+      void refresh(result.event.version);
     } catch (cause) {
       setMessage(
         cause instanceof Error ? cause.message : "Flugzeugstatus konnte nicht geändert werden.",

@@ -22,10 +22,21 @@ export function sendRealtimeHeartbeat(socket: RealtimeSocket | null): boolean {
 }
 
 export function isRealtimeStateChange(data: unknown): boolean {
-  if (typeof data !== "string") return true;
+  return realtimeStateChangeVersion(data) !== false;
+}
+
+export function realtimeStateChangeVersion(data: unknown): number | null | false {
+  if (typeof data !== "string") return null;
   try {
-    return JSON.parse(data)?.type === "event-state-changed";
+    const parsed = JSON.parse(data) as { type?: unknown; eventVersion?: unknown };
+    if (parsed.type === "forecast-updated") return null;
+    if (parsed.type !== "event-state-changed") return false;
+    return typeof parsed.eventVersion === "number" &&
+      Number.isInteger(parsed.eventVersion) &&
+      parsed.eventVersion >= 0
+      ? parsed.eventVersion
+      : null;
   } catch {
-    return true;
+    return null;
   }
 }

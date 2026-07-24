@@ -3,6 +3,7 @@ import {
   type AssistClaim,
   assistClaimMutationSchema,
   type CommandEnvelope,
+  type CommandPrecondition,
   type CommandResult,
   commandEnvelopeSchema,
   commandResultSchema,
@@ -34,6 +35,7 @@ import {
   DomainRuleError,
   deriveAdaptivePrecallLeadMinutes,
   deriveResourceGroupCapacity,
+  formatBookingGroupLabel,
   type OperationalCommandType,
   planBookingGroupSplit,
   planRotationCapacityReduction,
@@ -51,6 +53,7 @@ import { queueEligiblePreparationNotifications, sendRotationPushNotifications } 
 
 const JSON_HEADERS = { "content-type": "application/json; charset=utf-8" } as const;
 const FORECAST_TICK_INTERVAL_MS = 30_000;
+const FORECAST_COMMAND_DEBOUNCE_MS = 150;
 const SYSTEM_GATE_COOLDOWN_MINUTES = 2;
 const ASSIST_CLAIM_TTL_MS = 30 * 60_000;
 
@@ -61,6 +64,10 @@ function json(data: unknown, init: ResponseInit = {}): Response {
 }
 
 export class EventCoordinator extends DurableObject<Env> {
+  private commandTail: Promise<void> = Promise.resolve();
+  private forecastWork: Promise<void> | null = null;
+  private pendingForecast: { eventId: string; triggerEventType: string } | null = null;
+
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
     if (request.headers.get("Upgrade")?.toLowerCase() === "websocket") {
@@ -77,7 +84,7 @@ export class EventCoordinator extends DurableObject<Env> {
       return json({ reset: true });
     }
     if (request.method === "POST" && url.pathname.endsWith("/command")) {
-      return this.handleCommand(request);
+      return this.enqueueCommand(request);
     }
     if (request.method === "PUT" && url.pathname.endsWith("/fids/preferences")) {
       return this.handleFidsPreferences(request, url);
@@ -94,6 +101,42 @@ export class EventCoordinator extends DurableObject<Env> {
     );
   }
 
+  private enqueueCommand(request: Request): Promise<Response> {
+    const enqueuedAt = performance.now();
+    const task = this.commandTail.then(async () => {
+      const startedAt = performance.now();
+      const response = await this.handleCommand(request);
+      const completedAt = performance.now();
+      const queueDuration = startedAt - enqueuedAt;
+      const commandDuration = completedAt - startedAt;
+      const headers = new Headers(response.headers);
+      headers.set(
+        "server-timing",
+        `command-queue;dur=${queueDuration.toFixed(1)}, command;dur=${commandDuration.toFixed(1)}`,
+      );
+      if (queueDuration + commandDuration >= 500) {
+        console.log(
+          JSON.stringify({
+            level: "info",
+            code: "SLOW_OPERATIONAL_COMMAND",
+            queueDurationMs: Math.round(queueDuration),
+            commandDurationMs: Math.round(commandDuration),
+          }),
+        );
+      }
+      return new Response(response.body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers,
+      });
+    });
+    this.commandTail = task.then(
+      () => undefined,
+      () => undefined,
+    );
+    return task;
+  }
+
   async alarm(): Promise<void> {
     const eventId = await this.ctx.storage.get<string>("eventId");
     if (!eventId) return;
@@ -102,7 +145,7 @@ export class EventCoordinator extends DurableObject<Env> {
         .bind(eventId)
         .first<{ status: "PREPARATION" | "ACTIVE" | "CLOSED" | "ARCHIVED" }>();
       if (event?.status !== "ACTIVE") return;
-      await this.recalculateForecastTimelines(eventId, "AUTOMATIC_FORECAST_TICK");
+      await this.scheduleForecastRecalculation(eventId, "AUTOMATIC_FORECAST_TICK");
     } catch (reason: unknown) {
       console.error(
         JSON.stringify({
@@ -567,6 +610,121 @@ export class EventCoordinator extends DurableObject<Env> {
     } satisfies AssistClaim);
   }
 
+  private scopedCommandTarget(
+    command: CommandEnvelope,
+  ): Pick<CommandPrecondition, "aggregateType" | "aggregateId"> | null {
+    switch (command.type) {
+      case "MARK_OFF_BLOCK":
+      case "MARK_ON_BLOCK":
+      case "COMPLETE_TURNAROUND":
+      case "CANCEL_ROTATION":
+        return { aggregateType: "ROTATION", aggregateId: command.payload.rotationId };
+      case "SET_AIRCRAFT_OPERATIONAL_STATE":
+      case "SCHEDULE_AIRCRAFT_REFUEL":
+      case "CONFIGURE_AIRCRAFT_REFUEL_THRESHOLD":
+        return { aggregateType: "AIRCRAFT", aggregateId: command.payload.aircraftId };
+      default:
+        return null;
+    }
+  }
+
+  private async validateCommandVersion(
+    command: CommandEnvelope,
+    current: StoredEventRow,
+  ): Promise<Response | null> {
+    const target = this.scopedCommandTarget(command);
+    const preconditions = command.preconditions;
+    if (!preconditions) {
+      if (current.version === command.expectedVersion) return null;
+      return json(
+        {
+          error: {
+            code: "STALE_VERSION",
+            message: "Der Zustand wurde zwischenzeitlich geändert.",
+            currentVersion: current.version,
+          },
+        },
+        { status: 409 },
+      );
+    }
+    if (
+      !target ||
+      preconditions.length !== 1 ||
+      preconditions[0]?.aggregateType !== target.aggregateType ||
+      preconditions[0].aggregateId !== target.aggregateId
+    ) {
+      return json(
+        {
+          error: {
+            code: "INVALID_PRECONDITION",
+            message: "Die Aggregatversion passt nicht zum Kommandoziel.",
+          },
+        },
+        { status: 400 },
+      );
+    }
+    const observedEventVersion = command.observedEventVersion ?? command.expectedVersion;
+    if (observedEventVersion > current.version) {
+      return json(
+        {
+          error: {
+            code: "FUTURE_VERSION",
+            message: "Der beobachtete Veranstaltungsstand liegt vor dem Serverstand.",
+            currentVersion: current.version,
+          },
+        },
+        { status: 409 },
+      );
+    }
+    const precondition = preconditions[0];
+    const aggregate =
+      precondition.aggregateType === "ROTATION"
+        ? await this.env.DB.prepare(
+            "SELECT version FROM rotations WHERE id = ?1 AND operation_day_id = ?2",
+          )
+            .bind(precondition.aggregateId, command.eventId)
+            .first<{ version: number }>()
+        : await this.env.DB.prepare(
+            `SELECT a.version
+               FROM aircraft a
+              WHERE a.id = ?1
+                AND EXISTS (
+                  SELECT 1 FROM resource_group_memberships membership
+                   WHERE membership.aircraft_id = a.id
+                     AND membership.operation_day_id = ?2
+                )`,
+          )
+            .bind(precondition.aggregateId, command.eventId)
+            .first<{ version: number }>();
+    if (!aggregate) {
+      return json(
+        {
+          error: {
+            code: "AGGREGATE_NOT_FOUND",
+            message: "Das Kommandoziel wurde nicht gefunden.",
+          },
+        },
+        { status: 404 },
+      );
+    }
+    if (aggregate.version === precondition.expectedVersion) return null;
+    return json(
+      {
+        error: {
+          code: "STALE_AGGREGATE_VERSION",
+          message: "Dieses Flugzeug oder dieser Umlauf wurde zwischenzeitlich geändert.",
+          currentVersion: current.version,
+          conflict: {
+            aggregateType: precondition.aggregateType,
+            aggregateId: precondition.aggregateId,
+            currentAggregateVersion: aggregate.version,
+          },
+        },
+      },
+      { status: 409 },
+    );
+  }
+
   private async handleCommand(request: Request): Promise<Response> {
     let command: CommandEnvelope;
     try {
@@ -674,18 +832,8 @@ export class EventCoordinator extends DurableObject<Env> {
           { status: 404 },
         );
       }
-      if (current.version !== command.expectedVersion) {
-        return json(
-          {
-            error: {
-              code: "STALE_VERSION",
-              message: "Der Zustand wurde zwischenzeitlich geändert.",
-              currentVersion: current.version,
-            },
-          },
-          { status: 409 },
-        );
-      }
+      const versionConflict = await this.validateCommandVersion(command, current);
+      if (versionConflict) return versionConflict;
 
       const commandNow = new Date();
       const activeOperatorClaim = operatorAccountId
@@ -753,19 +901,24 @@ export class EventCoordinator extends DurableObject<Env> {
 
       if (command.type === "SELL_TICKET_GROUP") {
         const product = await this.env.DB.prepare(
-          `SELECT p.id, p.resource_group_id, p.gate_id, p.price_cents, p.sale_enabled, p.sale_closes_at,
+          `SELECT p.id, p.code, p.name, p.resource_group_id, p.gate_id, g.label AS gate_label,
+                  p.price_cents, p.sale_enabled, p.sale_closes_at,
                   p.reference_duration_minutes, p.weight_classes_json, p.capacity_warning_threshold,
                   p.capacity_critical_threshold, p.reference_capacity,
                   rg.status AS resource_group_status
              FROM products p
              JOIN resource_groups rg ON rg.id = p.resource_group_id
+             JOIN gates g ON g.id = p.gate_id
             WHERE p.id = ?1 AND p.operation_day_id = ?2`,
         )
           .bind(command.payload.productId, command.eventId)
           .first<{
             id: string;
+            code: string;
+            name: string;
             resource_group_id: string;
             gate_id: string;
+            gate_label: string;
             price_cents: number;
             sale_enabled: number;
             sale_closes_at: string | null;
@@ -1031,6 +1184,7 @@ export class EventCoordinator extends DurableObject<Env> {
         const now = new Date().toISOString();
         const nextVersion = current.version + 1;
         const ticketGroupId = crypto.randomUUID();
+        const ticketCommunicationNumber = ticketCommunicationRow?.next_number ?? 101;
         const slots = Array.from({ length: requiredFlightGroupCount }, (_, index) => ({
           flightGroupId: crypto.randomUUID(),
           rotationId: crypto.randomUUID(),
@@ -1050,6 +1204,22 @@ export class EventCoordinator extends DurableObject<Env> {
             id: ticketGroupId,
             relatedRotationId: primarySlot.rotationId,
           },
+          saleReceipt: {
+            ticketGroupId,
+            eventName: current.name,
+            productName: product.name,
+            gateLabel: product.gate_label,
+            communicationLabel: formatBookingGroupLabel(product.code, ticketCommunicationNumber),
+            code: normalizedGroupCode,
+            groupSize: normalizedCodes.length,
+          },
+        };
+        const stateChangeResult: CommandResult = {
+          accepted: result.accepted,
+          duplicate: result.duplicate,
+          event: result.event,
+          eventType: result.eventType,
+          aggregate: result.aggregate,
         };
         const statements = [
           this.env.DB.prepare(
@@ -1063,7 +1233,7 @@ export class EventCoordinator extends DurableObject<Env> {
             command.eventId,
             product.id,
             queueRow?.next_sequence ?? 1,
-            ticketCommunicationRow?.next_number ?? 101,
+            ticketCommunicationNumber,
             command.payload.standby ? 1 : 0,
             now,
             groupCodeHash,
@@ -1152,7 +1322,7 @@ export class EventCoordinator extends DurableObject<Env> {
           ),
           this.env.DB.prepare(
             "INSERT INTO outbox (id, operation_day_id, topic, payload_json, created_at) VALUES (?1, ?2, 'EVENT_STATE_CHANGED', ?3, ?4)",
-          ).bind(crypto.randomUUID(), command.eventId, JSON.stringify(result), now),
+          ).bind(crypto.randomUUID(), command.eventId, JSON.stringify(stateChangeResult), now),
         ];
         await this.env.DB.batch(statements);
         this.broadcast(result);
@@ -1385,20 +1555,7 @@ export class EventCoordinator extends DurableObject<Env> {
 
   private broadcast(result: CommandResult): void {
     this.ctx.waitUntil(this.ensureForecastAlarm(result.event.eventId));
-    this.ctx.waitUntil(
-      this.recalculateForecastTimelines(result.event.eventId, result.eventType).catch(
-        (reason: unknown) => {
-          console.error(
-            JSON.stringify({
-              level: "error",
-              code: "FORECAST_RECALCULATION_FAILED",
-              eventId: result.event.eventId,
-              message: safeErrorMessage(reason),
-            }),
-          );
-        },
-      ),
-    );
+    this.ctx.waitUntil(this.scheduleForecastRecalculation(result.event.eventId, result.eventType));
     const broadcast = JSON.stringify({
       type: "event-state-changed",
       eventVersion: result.event.version,
@@ -1409,6 +1566,39 @@ export class EventCoordinator extends DurableObject<Env> {
       } catch {
         socket.close(1011, "Broadcast fehlgeschlagen");
       }
+    }
+  }
+
+  private scheduleForecastRecalculation(eventId: string, triggerEventType: string): Promise<void> {
+    this.pendingForecast = { eventId, triggerEventType };
+    if (this.forecastWork) return this.forecastWork;
+    const work = this.runForecastRecalculationQueue();
+    this.forecastWork = work;
+    return work;
+  }
+
+  private async runForecastRecalculationQueue(): Promise<void> {
+    try {
+      await scheduler.wait(FORECAST_COMMAND_DEBOUNCE_MS);
+      while (this.pendingForecast) {
+        const requested = this.pendingForecast;
+        this.pendingForecast = null;
+        try {
+          await this.recalculateForecastTimelines(requested.eventId, requested.triggerEventType);
+        } catch (reason: unknown) {
+          console.error(
+            JSON.stringify({
+              level: "error",
+              code: "FORECAST_RECALCULATION_FAILED",
+              eventId: requested.eventId,
+              message: safeErrorMessage(reason),
+            }),
+          );
+        }
+        if (this.pendingForecast) await scheduler.wait(FORECAST_COMMAND_DEBOUNCE_MS);
+      }
+    } finally {
+      this.forecastWork = null;
     }
   }
 

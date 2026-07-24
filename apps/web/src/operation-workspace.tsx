@@ -1,20 +1,21 @@
 // Shared operational state and presentation primitives used by route features.
-import { useCallback, useEffect, useState } from "react";
+import type { CommandResult } from "@rundflug/contracts";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getOperationBoard } from "./api";
 import { PageNotice } from "./app/PageNotifications";
 import {
   type BoardSyncState,
+  createBoardSyncCoordinator,
   nextBoardReconnectDelay,
   OPERATION_BOARD_POLL_INTERVAL_MS,
   OPERATION_BOARD_RECONNECT_INITIAL_MS,
   reduceBoardSyncState,
-  requestBoardSync,
 } from "./board-sync";
 import { resolveActiveEvent } from "./event-context";
 import { confirmedStateLabel, loadOperationBoard, saveOperationBoard } from "./offline-store";
 import {
-  isRealtimeStateChange,
   REALTIME_HEARTBEAT_INTERVAL_MS,
+  realtimeStateChangeVersion,
   sendRealtimeHeartbeat,
 } from "./realtime-heartbeat";
 
@@ -159,21 +160,50 @@ export function useOperationBoard(deviceId: string) {
   });
   const [refreshing, setRefreshing] = useState(false);
   const [backendConfirmed, setBackendConfirmed] = useState(false);
-  const refresh = useCallback(async () => {
-    setRefreshing(true);
-    try {
-      const outcome = await requestBoardSync(() =>
+  const latestVersionRef = useRef(-1);
+  const activeRefreshCallersRef = useRef(0);
+  const syncCoordinator = useMemo(
+    () =>
+      createBoardSyncCoordinator(() =>
         getOperationBoard(EVENT_ID, deviceId, deviceTokenFor(deviceId)),
-      );
-      setState((current) => reduceBoardSyncState(current, outcome));
-      if (outcome.type === "CONFIRMED") {
-        setBackendConfirmed(true);
-        void saveOperationBoard(EVENT_ID, deviceId, outcome.board, outcome.confirmedAt);
+      ),
+    [deviceId],
+  );
+  const refresh = useCallback(
+    async (minimumVersion = 0) => {
+      activeRefreshCallersRef.current += 1;
+      setRefreshing(true);
+      try {
+        const outcome = await syncCoordinator.request(minimumVersion);
+        setState((current) => reduceBoardSyncState(current, outcome));
+        if (outcome.type === "CONFIRMED") {
+          latestVersionRef.current = Math.max(
+            latestVersionRef.current,
+            outcome.board.event.version,
+          );
+          setBackendConfirmed(true);
+          void saveOperationBoard(EVENT_ID, deviceId, outcome.board, outcome.confirmedAt);
+        }
+      } finally {
+        activeRefreshCallersRef.current -= 1;
+        if (activeRefreshCallersRef.current === 0) setRefreshing(false);
       }
-    } finally {
-      setRefreshing(false);
-    }
-  }, [deviceId]);
+    },
+    [deviceId, syncCoordinator],
+  );
+  const confirmEvent = useCallback((event: CommandResult["event"]) => {
+    latestVersionRef.current = Math.max(latestVersionRef.current, event.version);
+    const confirmedAt = new Date().toISOString();
+    setState((current) => {
+      if (!current.board || current.board.event.version >= event.version) return current;
+      return {
+        board: { ...current.board, event },
+        lastConfirmedAt: confirmedAt,
+        error: null,
+      };
+    });
+    setBackendConfirmed(true);
+  }, []);
   useEffect(() => {
     let active = true;
     let socket: WebSocket | null = null;
@@ -199,7 +229,10 @@ export function useOperationBoard(deviceId: string) {
         void refresh();
       });
       socket.addEventListener("message", (event) => {
-        if (isRealtimeStateChange(event.data)) void refresh();
+        const changedVersion = realtimeStateChangeVersion(event.data);
+        if (changedVersion === false) return;
+        if (changedVersion !== null && changedVersion <= latestVersionRef.current) return;
+        void refresh(changedVersion ?? 0);
       });
       socket.addEventListener("close", () => {
         stopHeartbeat();
@@ -230,7 +263,7 @@ export function useOperationBoard(deviceId: string) {
       window.clearInterval(timer);
     };
   }, [refresh, deviceId]);
-  return { ...state, backendConfirmed, refresh, refreshing };
+  return { ...state, backendConfirmed, confirmEvent, refresh, refreshing };
 }
 
 export function ConnectionNotice({
