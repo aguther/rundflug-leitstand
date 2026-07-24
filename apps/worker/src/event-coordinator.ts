@@ -17,6 +17,7 @@ import {
 } from "@rundflug/contracts";
 import {
   type AircraftOperationalState,
+  type AutomaticPrecallQueueEntry,
   assertManualGroupMoveAllowed,
   assertMayStageOutageRecoveryEntry,
   assertOutageRecoveryApplication,
@@ -31,13 +32,13 @@ import {
   calculateForecastTimelines,
   type DeviceRole,
   DomainRuleError,
-  decideAutomaticPrecall,
   deriveAdaptivePrecallLeadMinutes,
   deriveResourceGroupCapacity,
   type OperationalCommandType,
   planBookingGroupSplit,
   planRotationCapacityReduction,
   planTechnicalRotationAbortQueueBlock,
+  selectAutomaticPrecalls,
   simulateOutageRecovery,
   transitionAircraft,
   transitionRotation,
@@ -1639,56 +1640,58 @@ export class EventCoordinator extends DurableObject<Env> {
         Math.max(lastGatePrecall.get(rotation.gate_id) ?? 0, Date.parse(rotation.precalled_at)),
       );
     }
-    const evaluatedResourceGroups = new Set<string>();
-    const precallCandidates: Array<{
-      flightGroupId: string;
-      rotationId: string;
-      expectedVersion: number;
-      gateId: string | null;
-      predictionUpperMinutes: number;
-      predictionQuality: "STABLE" | "CHANGING" | "UNCERTAIN";
-      adaptiveLeadMinutes: number;
-    }> = [];
+    const precallQueueEntries: AutomaticPrecallQueueEntry[] = [];
+    const precallCandidateByRotationId = new Map<
+      string,
+      {
+        flightGroupId: string;
+        rotationId: string;
+        resourceGroupId: string;
+        expectedVersion: number;
+        gateId: string | null;
+        predictionUpperMinutes: number;
+        predictionQuality: "STABLE" | "CHANGING" | "UNCERTAIN";
+        adaptiveLeadMinutes: number;
+      }
+    >();
     const statements: D1PreparedStatement[] = [];
     for (const rotation of rotationRows.results) {
       const projection = projectionByRotationId.get(rotation.id);
       if (!projection) throw new Error(`Forecast projection missing for rotation ${rotation.id}.`);
-      const firstWaitingGroup =
-        rotation.status === "DRAFT" && !evaluatedResourceGroups.has(rotation.resource_group_id);
-      if (rotation.status === "DRAFT") evaluatedResourceGroups.add(rotation.resource_group_id);
-      const lastGateCallAt = rotation.gate_id ? lastGatePrecall.get(rotation.gate_id) : undefined;
-      const precallDecision = decideAutomaticPrecall({
-        enabled: event.automatic_precall_enabled === 1,
-        eventActive: event.status === "ACTIVE",
-        operationsAvailable: event.operational_interrupted === 0 && event.emergency_mode === 0,
-        resourceGroupActive: rotation.resource_group_status === "ACTIVE",
-        resourceGroupEnabled: rotation.resource_group_precall_enabled === 1,
-        firstWaitingGroup,
-        alreadyPrecalled: rotation.precalled_at !== null,
-        groupSize: rotation.ticket_count,
-        largestEligibleAircraftSeats: maximumSeats.get(rotation.resource_group_id) ?? 0,
-        predictionQuality: projection.predictionQuality,
-        predictedBoardingMinutes: Math.round(
-          (projection.predictionLowerMinutes + projection.predictionUpperMinutes) / 2,
-        ),
-        adaptiveLeadMinutes,
-        minutesSinceLastGatePrecall:
-          lastGateCallAt === undefined
-            ? null
-            : Math.max(0, (now.getTime() - lastGateCallAt) / 60_000),
-        gateCooldownMinutes: SYSTEM_GATE_COOLDOWN_MINUTES,
-      });
-      if (precallDecision.eligible) {
-        precallCandidates.push({
+      if (rotation.status === "DRAFT") {
+        const lastGateCallAt = rotation.gate_id ? lastGatePrecall.get(rotation.gate_id) : undefined;
+        precallQueueEntries.push({
+          id: rotation.id,
+          resourceGroupId: rotation.resource_group_id,
+          enabled: event.automatic_precall_enabled === 1,
+          eventActive: event.status === "ACTIVE",
+          operationsAvailable: event.operational_interrupted === 0 && event.emergency_mode === 0,
+          resourceGroupActive: rotation.resource_group_status === "ACTIVE",
+          resourceGroupEnabled: rotation.resource_group_precall_enabled === 1,
+          alreadyPrecalled: rotation.precalled_at !== null,
+          groupSize: rotation.ticket_count,
+          largestEligibleAircraftSeats: maximumSeats.get(rotation.resource_group_id) ?? 0,
+          predictionQuality: projection.predictionQuality,
+          predictedBoardingMinutes: Math.round(
+            (projection.predictionLowerMinutes + projection.predictionUpperMinutes) / 2,
+          ),
+          adaptiveLeadMinutes,
+          minutesSinceLastGatePrecall:
+            lastGateCallAt === undefined
+              ? null
+              : Math.max(0, (now.getTime() - lastGateCallAt) / 60_000),
+          gateCooldownMinutes: SYSTEM_GATE_COOLDOWN_MINUTES,
+        });
+        precallCandidateByRotationId.set(rotation.id, {
           flightGroupId: rotation.flight_group_id,
           rotationId: rotation.id,
+          resourceGroupId: rotation.resource_group_id,
           expectedVersion: rotation.flight_group_version,
           gateId: rotation.gate_id,
           predictionUpperMinutes: projection.predictionUpperMinutes,
           predictionQuality: projection.predictionQuality,
           adaptiveLeadMinutes,
         });
-        if (rotation.gate_id) lastGatePrecall.set(rotation.gate_id, now.getTime());
       }
       statements.push(
         this.env.DB.prepare(
@@ -1746,6 +1749,21 @@ export class EventCoordinator extends DurableObject<Env> {
         ),
       );
     }
+    const precallCandidates: Array<{
+      flightGroupId: string;
+      rotationId: string;
+      resourceGroupId: string;
+      expectedVersion: number;
+      gateId: string | null;
+      predictionUpperMinutes: number;
+      predictionQuality: "STABLE" | "CHANGING" | "UNCERTAIN";
+      adaptiveLeadMinutes: number;
+    }> = selectAutomaticPrecalls(precallQueueEntries).flatMap((decision) => {
+      if (!decision.eligible) return [];
+      const candidate = precallCandidateByRotationId.get(decision.id);
+      if (!candidate) throw new Error(`Precall candidate missing for rotation ${decision.id}.`);
+      return [candidate];
+    });
     for (let index = 0; index < statements.length; index += 80) {
       await this.env.DB.batch(statements.slice(index, index + 80));
     }
@@ -1771,6 +1789,7 @@ export class EventCoordinator extends DurableObject<Env> {
     candidates: Array<{
       flightGroupId: string;
       rotationId: string;
+      resourceGroupId: string;
       expectedVersion: number;
       gateId: string | null;
       predictionUpperMinutes: number;
@@ -1779,7 +1798,9 @@ export class EventCoordinator extends DurableObject<Env> {
     }>,
     now: string,
   ): Promise<void> {
+    const blockedResourceGroups = new Set<string>();
     for (const candidate of candidates) {
+      if (blockedResourceGroups.has(candidate.resourceGroupId)) continue;
       const systemCommandId = crypto.randomUUID();
       const nextVersion = candidate.expectedVersion + 1;
       const payload = JSON.stringify({
@@ -1827,9 +1848,11 @@ export class EventCoordinator extends DurableObject<Env> {
       )
         .bind(candidate.flightGroupId, systemCommandId)
         .first<{ persisted: number }>();
-      if (persisted) {
-        await sendRotationPushNotifications(this.env, candidate.rotationId, "FLIGHT_GROUP_CALLED");
+      if (!persisted) {
+        blockedResourceGroups.add(candidate.resourceGroupId);
+        continue;
       }
+      await sendRotationPushNotifications(this.env, candidate.rotationId, "FLIGHT_GROUP_CALLED");
     }
   }
 

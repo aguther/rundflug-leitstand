@@ -44,10 +44,10 @@ describe("local forecast simulation", () => {
         uncertainCountdownViolations: 0,
         precall: {
           eligibleGroups: 28,
-          precalledGroups: 26,
-          coveragePercent: 92.86,
-          medianGateWaitMinutes: 9.5,
-          p90GateWaitMinutes: 29,
+          precalledGroups: 27,
+          coveragePercent: 96.43,
+          medianGateWaitMinutes: 16.5,
+          p90GateWaitMinutes: 28.4,
           sameTickCount: 5,
           uncertainPrecallCount: 0,
         },
@@ -65,9 +65,9 @@ describe("local forecast simulation", () => {
           eligibleGroups: 28,
           precalledGroups: 26,
           coveragePercent: 92.86,
-          medianGateWaitMinutes: 12.25,
-          p90GateWaitMinutes: 29.5,
-          sameTickCount: 5,
+          medianGateWaitMinutes: 19,
+          p90GateWaitMinutes: 33.5,
+          sameTickCount: 2,
           uncertainPrecallCount: 0,
         },
       },
@@ -84,8 +84,8 @@ describe("local forecast simulation", () => {
           eligibleGroups: 21,
           precalledGroups: 20,
           coveragePercent: 95.24,
-          medianGateWaitMinutes: 9.5,
-          p90GateWaitMinutes: 26.35,
+          medianGateWaitMinutes: 17.5,
+          p90GateWaitMinutes: 26.4,
           sameTickCount: 3,
           uncertainPrecallCount: 0,
         },
@@ -101,10 +101,10 @@ describe("local forecast simulation", () => {
         uncertainCountdownViolations: 0,
         precall: {
           eligibleGroups: 28,
-          precalledGroups: 26,
-          coveragePercent: 92.86,
-          medianGateWaitMinutes: 8.25,
-          p90GateWaitMinutes: 26.75,
+          precalledGroups: 27,
+          coveragePercent: 96.43,
+          medianGateWaitMinutes: 16.5,
+          p90GateWaitMinutes: 31.5,
           sameTickCount: 6,
           uncertainPrecallCount: 0,
         },
@@ -216,6 +216,38 @@ describe("local forecast simulation", () => {
       result.rotations.filter((rotation) => rotation.precalledAt && rotation.calledAt).length,
     );
     expect(result.metrics.precall.coveragePercent).not.toBeNull();
+  });
+
+  it("records queue-sorted parallel GO TO GATE events in the same forecast tick", () => {
+    const config = simulationConfigForPreset("NORMAL");
+    config.endAt = "2026-07-22T08:01:00.000Z";
+    config.realityModel.demandPersonsPerHour = 7_200;
+    config.realityModel.incidents.refueling.enabled = false;
+    config.realityModel.incidents.plannedPause.enabled = false;
+    config.realityModel.incidents.unplannedPause.enabled = false;
+    config.realityModel.incidents.technicalDefect.enabled = false;
+    const result = runSimulation(config);
+    const precallsByTick = new Map<string, typeof result.events>();
+    for (const event of result.events.filter(
+      (candidate) => candidate.type === "FLIGHT_GROUP_PRECALLED",
+    )) {
+      const events = precallsByTick.get(event.occurredAt) ?? [];
+      events.push(event);
+      precallsByTick.set(event.occurredAt, events);
+    }
+    const parallelBatch = [...precallsByTick.values()].find((events) => events.length >= 2);
+
+    expect(parallelBatch).toHaveLength(3);
+    expect(parallelBatch?.every((event) => event.aircraftId === null)).toBe(true);
+    const communicationNumbers = parallelBatch?.map((event) => {
+      const rotation = result.rotations.find((candidate) => candidate.id === event.rotationId);
+      return rotation?.communicationNumber ?? Number.MAX_SAFE_INTEGER;
+    });
+    expect(communicationNumbers).toEqual(
+      [...(communicationNumbers ?? [])].sort((left, right) => left - right),
+    );
+    const fourth = result.rotations.find((rotation) => rotation.communicationNumber === 4);
+    expect(fourth).toMatchObject({ precalledAt: null, aircraftId: null, calledAt: null });
   });
 
   it("can disable automatic GO TO GATE without changing the queue execution", () => {

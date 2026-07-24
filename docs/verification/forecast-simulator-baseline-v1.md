@@ -44,17 +44,19 @@ harten Prüfkriteriums.
 ## Automatischer Voraufruf
 
 Der Simulator verwendet für `GO TO GATE` dieselben reinen Domain-Funktionen
-`deriveAdaptivePrecallLeadMinutes` und `decideAutomaticPrecall` wie der Worker. Jeder Voraufruf wird
-vor der Flugzeugbindung mit Trigger, Prognosequalität, prognostiziertem Boarding und adaptivem
-Vorlauf protokolliert. Prognoseunsicherheit ist entsprechend ADR-0012 keine harte Auslösesperre;
-operative Sperrgründe und fehlende passende Kapazität bleiben es.
+`deriveAdaptivePrecallLeadMinutes` und `selectAutomaticPrecalls` wie der Worker. Alle queue-stabilen
+Gruppen innerhalb des gemeinsamen Prognosefensters können im selben 30-Sekunden-Tick voraufgerufen
+werden; ein vorhandener Voraufruf blockiert Nachfolger nicht. Jeder Voraufruf wird vor der
+Flugzeugbindung mit Trigger, Prognosequalität, prognostiziertem Boarding und adaptivem Vorlauf
+protokolliert. Prognoseunsicherheit ist entsprechend ADR-0012 keine harte Auslösesperre; operative
+Sperrgründe, ein ungeeigneter vorderer Queue-Eintrag und fehlende passende Kapazität bleiben es.
 
 | Preset | voraufgerufen / aufgerufen | Abdeckung | Median Gate → Boarding | P90 | gleicher 30-Sek.-Tick | bei `UNCERTAIN` |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Normalbetrieb | 26 / 28 | 92,86 % | 9,5 Min. | 29,0 Min. | 5 | 0 |
-| Stoßlast | 26 / 28 | 92,86 % | 12,25 Min. | 29,5 Min. | 5 | 0 |
-| Flugzeugausfall | 20 / 21 | 95,24 % | 9,5 Min. | 26,35 Min. | 3 | 0 |
-| Betriebsunterbrechung | 26 / 28 | 92,86 % | 8,25 Min. | 26,75 Min. | 6 | 0 |
+| Normalbetrieb | 27 / 28 | 96,43 % | 16,5 Min. | 28,4 Min. | 5 | 0 |
+| Stoßlast | 26 / 28 | 92,86 % | 19,0 Min. | 33,5 Min. | 2 | 0 |
+| Flugzeugausfall | 20 / 21 | 95,24 % | 17,5 Min. | 26,4 Min. | 3 | 0 |
+| Betriebsunterbrechung | 27 / 28 | 96,43 % | 16,5 Min. | 31,5 Min. | 6 | 0 |
 
 Nicht jeder bis zum Simulationsende aufgerufene Umlauf besitzt einen Voraufruf: Ein bestätigter
 Boardingbeginn bleibt fachlich auch ohne vorherigen Voraufruf möglich, beispielsweise wenn mehrere
@@ -82,7 +84,7 @@ seedübergreifenden Mediane der wichtigsten Baselinewerte lauten:
 | P90 bei 60 / 30 / 15 Minuten Horizont | 50,3 / 28,2 / 23,0 Min. |
 | Off-Block / On-Block / Abschluss P90 | 2,33 / 6,94 / 0,45 Min. |
 | Countdowns bei `UNCERTAIN` | 0 |
-| GO TO GATE → Boarding Median / P90 | 7,5 / 26,6 Min. |
+| GO TO GATE → Boarding Median / P90 | 12,0 / 32,45 Min. |
 
 Der Vergleich läuft abbrechbar in einem lokalen Browser-Worker. Er bewertet keine Variante
 automatisch als Gewinner.
