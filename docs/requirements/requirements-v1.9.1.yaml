@@ -1,0 +1,23 @@
+version: 1.9.1
+requirements:
+  - id: V191-REL-010
+    requirement: Repository, Laufzeit, Requirements, Traceability und UI-Konzept verwenden konsistent Release 1.9.1.
+    status: implemented
+  - id: V191-CAS-010
+    requirement: Temporäre Kapazitäts- und Prognosezustände bleiben Hinweise und sperren keinen ausdrücklich freigegebenen Verkauf; die Gruppengröße bleibt nach Verkauf erhalten und besitzt einen Reset auf 1.
+    status: implemented
+  - id: V191-GRP-010
+    requirement: Verkauf und Aufteilungsanzeige leiten die Gruppenkapazität aus aktiven Ressourcengruppenzuordnungen statt temporären Flugzeugzuständen ab.
+    status: implemented
+  - id: V191-PRN-010
+    requirement: POS-58 druckt ausschließlich das vergrößerte, auf der Rollenachse zentrierte Ticket ohne Vorlauf oder feste Rollenlänge; Direktdruck wird betrieblich konfiguriert.
+    status: implemented
+  - id: V191-PUB-010
+    requirement: Öffentliche Status-PWAs vermeiden leeren iPhone-Überlauf und bezeichnen IN_FLIGHT als IM FLUG sowie LANDED als GELANDET.
+    status: implemented
+  - id: V191-FID-010
+    requirement: FIDS-Zeitfenster werden ohne nachgestelltes Wort Uhr dargestellt.
+    status: implemented
+  - id: V191-QA-010
+    requirement: Automatisierte, visuelle und Druckabnahmen decken das vollständige freigegebene Korrekturdelta ab.
+    status: implemented

@@ -48,6 +48,25 @@ describe("V1.7.0 cashier", () => {
     );
   });
 
+  it("keeps the selected group size after a sale and exposes an explicit reset", () => {
+    expect(appSource).not.toContain("setSize(1);");
+    expect(appSource).toContain('aria-label="Gruppengröße auf 1 zurücksetzen"');
+    expect(appSource).toContain("onClick={() => changeGroupSize(1)}");
+    expect(appSource).toContain("disabled={size === 1 || busyProductId !== null}");
+    expect(appSource).toContain("Zurücksetzen");
+  });
+
+  it("keeps forecast capacity advisory instead of disabling an explicitly enabled sale", () => {
+    const disabledRule = appSource.slice(
+      appSource.indexOf("const saleDisabled ="),
+      appSource.indexOf("return (", appSource.indexOf("const saleDisabled =")),
+    );
+    expect(disabledRule).not.toContain("saleRecommended");
+    expect(disabledRule).not.toContain("remainingSellableSeats");
+    expect(disabledRule).toContain('entry.resourceGroupStatus !== "ACTIVE"');
+    expect(disabledRule).toContain("board.event.emergencyMode");
+  });
+
   it("renders one shared ticket component without fixed POS-58 paper length", () => {
     expect(appSource).toContain("function TicketPaper");
     expect(appSource).toContain("function QrScanDialog");
@@ -57,7 +76,16 @@ describe("V1.7.0 cashier", () => {
     expect(stylesSource).not.toContain("min-height: 100mm");
     expect(stylesSource).not.toContain("size: 58mm 110mm");
     expect(stylesSource).not.toContain("break-after: page");
-    expect(stylesSource).toContain("width: 44mm");
+    expect(stylesSource).toContain("width: 48mm");
+    expect(stylesSource).toMatch(
+      /\.cashier-shell > \*:not\(\.ticket-print-document\) \{[\s\S]*?display: none !important;/,
+    );
+    expect(stylesSource).toMatch(
+      /\.cashier-shell > \.ticket-print-document \{[\s\S]*?justify-content: center;/,
+    );
+    expect(stylesSource).toMatch(
+      /\.ticket-print-document \.ticket-paper dl > div \{[\s\S]*?grid-template-columns: 18mm minmax\(0, 1fr\);[\s\S]*?column-gap: 1mm;/,
+    );
   });
 
   it("falls back to natural document flow on tablet-sized stacked layouts", () => {

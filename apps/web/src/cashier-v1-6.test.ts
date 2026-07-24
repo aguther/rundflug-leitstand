@@ -34,12 +34,10 @@ describe("cashier release 1.7.0 acceptance coverage", () => {
     expect(styles).toContain("-webkit-line-clamp: 2");
   });
 
-  it("resets the ticket count only on the successful sale path", () => {
-    const successStart = cashierSource.indexOf("const soldTicketGroupId");
-    const reset = cashierSource.indexOf("setSize(1)", successStart);
-    const catchBlock = cashierSource.indexOf("} catch (reason)", successStart);
-    expect(reset).toBeGreaterThan(successStart);
-    expect(reset).toBeLessThan(catchBlock);
+  it("preserves the ticket count after a sale and resets only on explicit request", () => {
+    expect(cashierSource).not.toContain("setSize(1)");
+    expect(cashierSource).toContain('aria-label="Gruppengröße auf 1 zurücksetzen"');
+    expect(cashierSource).toContain("onClick={() => changeGroupSize(1)}");
   });
 
   it("fits the complete cashier workspace into the iPad landscape band", () => {

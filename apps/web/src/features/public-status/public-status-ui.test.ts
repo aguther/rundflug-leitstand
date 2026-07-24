@@ -77,4 +77,14 @@ describe("mobiler öffentlicher Status V1.8", () => {
     expect(styles).toContain("min-height: 44px");
     expect(styles).not.toContain("linear-gradient");
   });
+
+  it("bindet die installierte iPhone-Ansicht an den sichtbaren Viewport ohne Leerscrollen", () => {
+    expect(styles).toMatch(
+      /\.public-status-shell \{[\s\S]*?height: 100dvh;[\s\S]*?min-height: 0;[\s\S]*?overflow: hidden;/,
+    );
+    expect(styles).toContain("body:has(> #root > .public-status-shell)");
+    expect(styles).toMatch(
+      /\.public-status-page \{[\s\S]*?flex: 1 1 auto;[\s\S]*?overflow-y: auto;/,
+    );
+  });
 });

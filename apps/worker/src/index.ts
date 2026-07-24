@@ -2976,13 +2976,20 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
         .all<{ duration_minutes: number }>(),
     () =>
       context.env.DB.prepare(
-        `SELECT m.resource_group_id, a.passenger_seats, a.refuel_planned FROM aircraft a
+        `SELECT m.resource_group_id, a.passenger_seats, a.refuel_planned,
+                a.operational_state, a.operational_interrupted
+           FROM aircraft a
          JOIN resource_group_memberships m ON m.aircraft_id = a.id
-        WHERE m.operation_day_id = ?1 AND m.active_until IS NULL
-          AND a.operational_state NOT IN ('INACTIVE', 'PAUSED', 'REFUELING')`,
+        WHERE m.operation_day_id = ?1 AND m.active_until IS NULL`,
       )
         .bind(eventId)
-        .all<{ resource_group_id: string; passenger_seats: number; refuel_planned: number }>(),
+        .all<{
+          resource_group_id: string;
+          passenger_seats: number;
+          refuel_planned: number;
+          operational_state: string;
+          operational_interrupted: number;
+        }>(),
     () =>
       context.env.DB.prepare(
         `SELECT a.id, a.version, a.registration, a.aircraft_type, a.passenger_seats,
@@ -3200,20 +3207,26 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
     currentDeviceRole: device.role,
     event: rowToSnapshot(eventRow),
     products: products.results.map((product) => {
-      const allGroupAircraftSeats = aircraftRows.results
-        .filter((aircraft) => aircraft.resource_group_id === product.resource_group_id)
-        .map((aircraft) => aircraft.passenger_seats);
-      const groupAircraftSeats = allGroupAircraftSeats.slice(0, activePilotCount);
+      const assignedGroupAircraft = aircraftRows.results.filter(
+        (aircraft) => aircraft.resource_group_id === product.resource_group_id,
+      );
+      const operationalGroupAircraft = assignedGroupAircraft.filter(
+        (aircraft) =>
+          !["INACTIVE", "PAUSED", "REFUELING"].includes(aircraft.operational_state) &&
+          aircraft.operational_interrupted === 0,
+      );
+      const allGroupAircraftSeats = assignedGroupAircraft.map(
+        (aircraft) => aircraft.passenger_seats,
+      );
+      const groupAircraftSeats = operationalGroupAircraft
+        .map((aircraft) => aircraft.passenger_seats)
+        .slice(0, activePilotCount);
       const effectiveReferenceCapacity = Math.max(
         1,
         deriveResourceGroupCapacity(allGroupAircraftSeats),
       );
-      const reservedRefuelSeats = aircraftRows.results
-        .filter(
-          (aircraft) =>
-            aircraft.resource_group_id === product.resource_group_id &&
-            aircraft.refuel_planned === 1,
-        )
+      const reservedRefuelSeats = operationalGroupAircraft
+        .filter((aircraft) => aircraft.refuel_planned === 1)
         .reduce((sum, aircraft) => sum + aircraft.passenger_seats, 0);
       const activeAircraft = groupAircraftSeats.length;
       const queueSequence = Math.max(
@@ -3300,7 +3313,10 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
     }),
     rotations: rotations.results.map((rotation, index) => {
       const activeAircraft = aircraftRows.results.filter(
-        (aircraft) => aircraft.resource_group_id === rotation.resource_group_id,
+        (aircraft) =>
+          aircraft.resource_group_id === rotation.resource_group_id &&
+          !["INACTIVE", "PAUSED", "REFUELING"].includes(aircraft.operational_state) &&
+          aircraft.operational_interrupted === 0,
       ).length;
       const effectiveActiveCapacity = Math.min(activeAircraft, activePilotCount);
       const suggestedAircraft = fleetRows.results.find(

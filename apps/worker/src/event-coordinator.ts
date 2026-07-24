@@ -29,7 +29,6 @@ import {
   assertSaleAllowed,
   assertTechnicalRotationAbortAllowed,
   assertTicketNoShowAllowed,
-  assessRemainingCapacity,
   calculateForecastTimelines,
   type DeviceRole,
   DomainRuleError,
@@ -893,9 +892,7 @@ export class EventCoordinator extends DurableObject<Env> {
       if (command.type === "SELL_TICKET_GROUP") {
         const product = await this.env.DB.prepare(
           `SELECT p.id, p.code, p.name, p.resource_group_id, p.gate_id, g.label AS gate_label,
-                  p.price_cents, p.sale_enabled, p.sale_closes_at,
-                  p.reference_duration_minutes, p.weight_classes_json, p.capacity_warning_threshold,
-                  p.capacity_critical_threshold, p.reference_capacity,
+                  p.price_cents, p.sale_enabled, p.sale_closes_at, p.weight_classes_json,
                   rg.status AS resource_group_status
              FROM products p
              JOIN resource_groups rg ON rg.id = p.resource_group_id
@@ -913,11 +910,7 @@ export class EventCoordinator extends DurableObject<Env> {
             price_cents: number;
             sale_enabled: number;
             sale_closes_at: string | null;
-            reference_duration_minutes: number;
             weight_classes_json: string;
-            capacity_warning_threshold: number;
-            capacity_critical_threshold: number;
-            reference_capacity: number;
             resource_group_status: "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED";
           }>();
         if (!product) {
@@ -964,29 +957,6 @@ export class EventCoordinator extends DurableObject<Env> {
           }
           throw reason;
         }
-        const [aircraftRows, openTicketRow, pilotCountRow] = await Promise.all([
-          this.env.DB.prepare(
-            `SELECT a.passenger_seats, a.refuel_planned FROM aircraft a
-               JOIN resource_group_memberships m ON m.aircraft_id = a.id
-              WHERE m.operation_day_id = ?1 AND m.resource_group_id = ?2 AND m.active_until IS NULL
-                AND a.operational_state NOT IN ('INACTIVE', 'PAUSED', 'REFUELING')`,
-          )
-            .bind(command.eventId, product.resource_group_id)
-            .all<{ passenger_seats: number; refuel_planned: number }>(),
-          this.env.DB.prepare(
-            `SELECT COUNT(*) AS open_tickets FROM tickets t
-               JOIN ticket_groups tg ON tg.id = t.ticket_group_id
-               JOIN products p ON p.id = tg.product_id
-              WHERE p.resource_group_id = ?1 AND t.status = 'QUEUED'`,
-          )
-            .bind(product.resource_group_id)
-            .first<{ open_tickets: number }>(),
-          this.env.DB.prepare(
-            "SELECT COUNT(*) AS count FROM pilots WHERE operation_day_id = ?1 AND active = 1 AND paused = 0",
-          )
-            .bind(command.eventId)
-            .first<{ count: number }>(),
-        ]);
         if (!current.operations_end_at) {
           return json(
             {
@@ -998,27 +968,14 @@ export class EventCoordinator extends DurableObject<Env> {
             { status: 409 },
           );
         }
-        const capacity = assessRemainingCapacity({
-          remainingOperatingMinutes: Math.max(
-            0,
-            (Date.parse(current.operations_end_at) - Date.now()) / 60_000,
-          ),
-          expectedRotationMinutes:
-            product.reference_duration_minutes +
-            (current.planned_boarding_minutes ?? 8) +
-            (current.planned_deboarding_minutes ?? 5) +
-            (current.planned_buffer_minutes ?? 3),
-          activeAircraftSeats: aircraftRows.results
-            .map((row) => row.passenger_seats)
-            .slice(0, pilotCountRow?.count ?? 0),
-          reservedSeats: aircraftRows.results
-            .filter((row) => row.refuel_planned === 1)
-            .reduce((sum, row) => sum + row.passenger_seats, 0),
-          openTickets: openTicketRow?.open_tickets ?? 0,
-          predictionQuality: "CHANGING",
-          warningThreshold: product.capacity_warning_threshold,
-          criticalThreshold: product.capacity_critical_threshold,
-        });
+        const aircraftRows = await this.env.DB.prepare(
+          `SELECT a.passenger_seats FROM aircraft a
+             JOIN resource_group_memberships m ON m.aircraft_id = a.id
+            WHERE m.operation_day_id = ?1 AND m.resource_group_id = ?2
+              AND m.active_until IS NULL`,
+        )
+          .bind(command.eventId, product.resource_group_id)
+          .all<{ passenger_seats: number }>();
         const effectiveGroupCapacity = deriveResourceGroupCapacity(
           aircraftRows.results.map((row) => row.passenger_seats),
         );
@@ -1027,27 +984,12 @@ export class EventCoordinator extends DurableObject<Env> {
             {
               error: {
                 code: "SALE_BLOCKED_NO_AIRCRAFT",
-                message: "Der Ressourcengruppe ist derzeit kein nutzbares Flugzeug zugeordnet.",
+                message: "Der Ressourcengruppe ist kein aktives Flugzeug zugeordnet.",
               },
             },
             { status: 409 },
           );
         }
-        if (
-          !capacity.saleRecommended ||
-          capacity.remainingSellableSeats < command.payload.publicTicketCodes.length
-        ) {
-          return json(
-            {
-              error: {
-                code: "SALE_BLOCKED_CAPACITY",
-                message: "Verbleibende Kapazität reicht für diesen Verkauf nicht sicher aus.",
-              },
-            },
-            { status: 409 },
-          );
-        }
-
         let splitPlan: ReturnType<typeof planBookingGroupSplit>;
         try {
           splitPlan = planBookingGroupSplit({

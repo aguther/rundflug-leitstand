@@ -10,6 +10,9 @@ describe("formatAbsoluteTimeWindow", () => {
       quality: "STABLE" as const,
     };
     expect(formatAbsoluteTimeWindow(window)).toBe("ca. 14:20 – 14:40 Uhr");
+    expect(formatAbsoluteTimeWindow({ ...window, includeClockSuffix: false })).toBe(
+      "ca. 14:20 – 14:40",
+    );
     expect(formatAbsoluteTimeWindow({ ...window, variant: "compact" })).toBe("14:20 – 14:40");
   });
 
