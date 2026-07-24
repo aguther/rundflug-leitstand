@@ -1,6 +1,8 @@
 import {
+  type AdminEventFlow,
   type AssistClaim,
   type AuditHistory,
+  adminEventFlowSchema,
   assistClaimSchema,
   auditHistorySchema,
   type BootstrapRequest,
@@ -20,6 +22,13 @@ import {
   factoryResetResponseSchema,
   fidsPreferencesSchema,
   forecastHistorySchema,
+  type ImportMasterDataTemplateRequest,
+  type ImportMasterDataTemplateResponse,
+  importMasterDataTemplateResponseSchema,
+  type MasterDataTemplate,
+  type MasterDataTemplateValidation,
+  masterDataTemplateSchema,
+  masterDataTemplateValidationSchema,
   type OperationalHistory,
   type OperationalHistoryQuery,
   type OperationBoard,
@@ -299,6 +308,88 @@ export async function getEventCatalog(
   });
   if (!response.ok) throw new Error("Veranstaltungsliste nicht verfügbar.");
   return eventCatalogSchema.parse(await response.json());
+}
+
+export async function getAdminEventFlow(
+  eventId: string,
+  deviceId: string,
+  deviceToken: string,
+  signal?: AbortSignal,
+): Promise<AdminEventFlow> {
+  const response = await apiFetch(
+    `/api/admin/events/${encodeURIComponent(eventId)}/flow?bucketMinutes=15`,
+    {
+      headers: deviceHeaders(deviceId, deviceToken),
+      ...(signal ? { signal } : {}),
+    },
+  );
+  if (!response.ok) throw new Error("Ticketverlauf nicht verfügbar.");
+  return adminEventFlowSchema.parse(await response.json());
+}
+
+export async function downloadMasterDataTemplate(
+  eventId: string,
+  deviceId: string,
+  deviceToken: string,
+): Promise<void> {
+  const response = await apiFetch(
+    `/api/admin/events/${encodeURIComponent(eventId)}/master-data-template`,
+    { headers: deviceHeaders(deviceId, deviceToken) },
+  );
+  if (!response.ok) throw new Error("Stammdatenvorlage nicht verfügbar.");
+  const template = masterDataTemplateSchema.parse(await response.json());
+  const url = URL.createObjectURL(
+    new Blob([`${JSON.stringify(template, null, 2)}\n`], { type: "application/json" }),
+  );
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `stammdaten-${eventId}.json`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+export async function validateMasterDataTemplate(
+  eventId: string,
+  deviceId: string,
+  deviceToken: string,
+  template: MasterDataTemplate,
+): Promise<MasterDataTemplateValidation> {
+  const response = await apiFetch(
+    `/api/admin/events/${encodeURIComponent(eventId)}/master-data-template/validate`,
+    {
+      method: "POST",
+      headers: deviceHeaders(deviceId, deviceToken, { "content-type": "application/json" }),
+      body: JSON.stringify({ template }),
+    },
+  );
+  const body = (await response.json()) as unknown;
+  if (!response.ok) {
+    const error = body as { error?: { message?: string } };
+    throw new Error(error.error?.message ?? "Stammdatenvorlage ist ungültig.");
+  }
+  return masterDataTemplateValidationSchema.parse(body);
+}
+
+export async function importMasterDataTemplate(
+  eventId: string,
+  deviceId: string,
+  deviceToken: string,
+  input: ImportMasterDataTemplateRequest,
+): Promise<ImportMasterDataTemplateResponse> {
+  const response = await apiFetch(
+    `/api/admin/events/${encodeURIComponent(eventId)}/master-data-template/import`,
+    {
+      method: "POST",
+      headers: deviceHeaders(deviceId, deviceToken, { "content-type": "application/json" }),
+      body: JSON.stringify(input),
+    },
+  );
+  const body = (await response.json()) as unknown;
+  if (!response.ok) {
+    const error = body as { error?: { message?: string } };
+    throw new Error(error.error?.message ?? "Stammdatenvorlage konnte nicht importiert werden.");
+  }
+  return importMasterDataTemplateResponseSchema.parse(body);
 }
 
 export async function cloneEvent(

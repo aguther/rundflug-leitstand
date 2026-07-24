@@ -52,6 +52,193 @@
   height: var(--control-default);
 }
 
+.flight-director-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.flight-director-operational-summary {
+  max-width: min(34vw, 420px);
+  overflow: hidden;
+  padding: 7px 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: 999px;
+  background: var(--ui-surface-raised);
+  color: var(--ui-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.flight-director-operational-summary.tone-critical {
+  border-color: var(--ui-danger);
+  background: color-mix(in srgb, var(--ui-danger) 14%, var(--ui-surface));
+  color: var(--ui-danger);
+}
+
+.flight-director-operational-summary.tone-warning {
+  border-color: var(--ui-warning);
+  background: color-mix(in srgb, var(--ui-warning) 14%, var(--ui-surface));
+  color: var(--ui-text);
+}
+
+.flight-director-operational-summary.tone-notice {
+  border-color: var(--ui-accent);
+  background: color-mix(in srgb, var(--ui-accent) 10%, var(--ui-surface));
+  color: var(--ui-text);
+}
+
+.flight-director-operations-dialog {
+  display: grid;
+  gap: 16px;
+}
+
+.flight-director-operations-dialog .ds-tabs {
+  overflow-x: auto;
+}
+
+.flight-director-operation-reason {
+  display: grid;
+  gap: 6px;
+  color: var(--ui-muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.flight-director-operation-reason input,
+.flight-director-operation-panel input,
+.flight-director-operation-panel select,
+.flight-director-operation-panel textarea,
+.flight-director-emergency-panel input {
+  width: 100%;
+}
+
+.flight-director-operation-panel {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.flight-director-operation-panel > section,
+.flight-director-emergency-panel {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-md);
+  background: var(--ui-surface);
+}
+
+.flight-director-operation-panel h3,
+.flight-director-emergency-panel h3 {
+  margin: 0;
+}
+
+.flight-director-operation-panel p,
+.flight-director-emergency-panel p {
+  margin: 0;
+  color: var(--ui-muted);
+}
+
+.flight-director-operation-panel label,
+.flight-director-emergency-panel label {
+  display: grid;
+  gap: 6px;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.flight-director-operation-panel textarea {
+  resize: vertical;
+}
+
+.flight-director-operation-panel .flight-director-interruption {
+  grid-column: 1 / -1;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+}
+
+.flight-director-operation-panel .flight-director-interruption h3,
+.flight-director-operation-panel .flight-director-interruption p {
+  grid-column: 1;
+}
+
+.flight-director-operation-panel .flight-director-interruption .ds-button {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+}
+
+.flight-director-operation-list {
+  display: grid;
+  gap: 8px;
+}
+
+.flight-director-operation-list > article {
+  display: grid;
+  grid-template-columns: minmax(170px, 1fr) auto minmax(260px, auto);
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-md);
+  background: var(--ui-surface);
+}
+
+.flight-director-operation-list > article > div:first-child {
+  display: grid;
+  gap: 2px;
+}
+
+.flight-director-operation-list small,
+.flight-director-operation-list span {
+  color: var(--ui-muted);
+}
+
+.flight-director-operation-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.operation-status {
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: var(--ui-surface-raised);
+  color: var(--ui-muted);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.operation-status.status-active {
+  background: color-mix(in srgb, var(--ui-success) 16%, var(--ui-surface));
+  color: var(--ui-success);
+}
+
+.operation-status.status-paused,
+.operation-status.status-interrupted {
+  background: color-mix(in srgb, var(--ui-warning) 16%, var(--ui-surface));
+  color: var(--ui-text);
+}
+
+.operation-status.status-ended {
+  background: color-mix(in srgb, var(--ui-muted) 14%, var(--ui-surface));
+}
+
+.flight-director-emergency-panel > div {
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  background: var(--ui-surface-raised);
+}
+
+.flight-director-emergency-panel > div.active {
+  border: 1px solid var(--ui-danger);
+  background: color-mix(in srgb, var(--ui-danger) 12%, var(--ui-surface));
+}
+
 .flight-director-v15 > .action-message {
   margin: 0;
   padding: 8px 10px;
@@ -2141,5 +2328,68 @@
 
   .assist-aircraft-cards article {
     min-height: 0;
+  }
+}
+
+@media (max-width: 800px) {
+  .flight-director-header-actions {
+    width: 100%;
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+
+  .flight-director-operational-summary {
+    width: 100%;
+    max-width: none;
+  }
+
+  .flight-director-header-actions .flight-director-resource-filter {
+    min-width: 0;
+    flex: 1 1 100%;
+  }
+
+  .flight-director-operation-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .flight-director-operation-panel .flight-director-interruption {
+    grid-column: auto;
+    grid-template-columns: 1fr;
+  }
+
+  .flight-director-operation-panel .flight-director-interruption .ds-button {
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  .flight-director-operation-list > article {
+    grid-template-columns: 1fr auto;
+  }
+
+  .flight-director-operation-actions,
+  .flight-director-operation-list > article > .ds-button {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 480px) {
+  .flight-director-header-actions > .ds-button {
+    flex: 1 1 auto;
+  }
+
+  .flight-director-operation-list > article {
+    grid-template-columns: 1fr;
+  }
+
+  .flight-director-operation-list .operation-status,
+  .flight-director-operation-actions,
+  .flight-director-operation-list > article > .ds-button {
+    grid-column: 1;
+  }
+
+  .flight-director-operation-actions .ds-button {
+    flex: 1 1 45%;
   }
 }

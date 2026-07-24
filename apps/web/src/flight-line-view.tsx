@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { claimFlightLineAircraft, releaseFlightLineAircraft, sendCommand } from "./api";
 import { AppShell as Shell } from "./app/AppShell";
 import { useActionMessageBridge } from "./app/PageNotifications";
-import { Button, ModalDialog } from "./design-system/components";
+import { Button, ModalDialog, Tabs } from "./design-system/components";
 import { FlightLineAssist } from "./flight-line-assist";
 import { expectedReviewAtFromPause } from "./flight-line-pause";
 import { FlightLineSupervisorConsole } from "./flight-line-supervisor";
@@ -42,6 +42,13 @@ type Rotation = OperationBoard["rotations"][number];
 type Aircraft = OperationBoard["aircraft"][number];
 type QueueGroup = OperationBoard["queueGroups"][number];
 type TurnaroundNextState = "AVAILABLE" | "REFUELING" | "PAUSED" | "INACTIVE";
+type OperationsTab = "notices" | "resources" | "pilots" | "emergency";
+const operationsTabs: Array<{ value: OperationsTab; label: string }> = [
+  { value: "notices", label: "Hinweise" },
+  { value: "resources", label: "Ressourcengruppen" },
+  { value: "pilots", label: "Pilotenpausen" },
+  { value: "emergency", label: "Not-Halt" },
+];
 
 function queuedSegmentTicketCount(group: QueueGroup): number {
   return group.nextSegmentTicketCount ?? group.ticketCount;
@@ -60,6 +67,16 @@ export function FlightLineView() {
   useActionMessageBridge(message, setMessage);
   const [queueReason, setQueueReason] = useState("");
   const [emergencyReason, setEmergencyReason] = useState("");
+  const [operationsOpen, setOperationsOpen] = useState(false);
+  const [operationsTab, setOperationsTab] = useState<OperationsTab>("notices");
+  const [operationsBusy, setOperationsBusy] = useState(false);
+  const [operationalNotice, setOperationalNotice] = useState("");
+  const [resourceNotice, setResourceNotice] = useState("");
+  const [operationsReason, setOperationsReason] = useState(
+    "Operative Entscheidung Flight Director",
+  );
+  const [filteredResourceGroupId, setFilteredResourceGroupId] = useState("");
+  const [operationsResourceGroupId, setOperationsResourceGroupId] = useState("");
   const [nextAircraftId, setNextAircraftId] = useState("");
   const [turnaroundNextState, setTurnaroundNextState] = useState<TurnaroundNextState>("AVAILABLE");
   const [busyRotationIds, setBusyRotationIds] = useState<ReadonlySet<string>>(() => new Set());
@@ -83,6 +100,25 @@ export function FlightLineView() {
   );
   const operationalAircraft = board?.aircraft ?? [];
   const canManageAircraft = ["FLIGHT_DIRECTOR", "ADMIN"].includes(board?.currentDeviceRole ?? "");
+  const selectedOperationalResourceGroup = board?.resourceGroups.find(
+    (group) => group.id === filteredResourceGroupId,
+  );
+  const operationalSummary = board?.event.emergencyMode
+    ? "Not-Halt aktiv"
+    : board?.event.operationalInterrupted
+      ? "Betrieb unterbrochen"
+      : board?.event.operationalNote
+        ? board.event.operationalNote
+        : selectedOperationalResourceGroup?.operationalNote
+          ? selectedOperationalResourceGroup.operationalNote
+          : "Betrieb normal";
+  const operationalSummaryTone = board?.event.emergencyMode
+    ? "critical"
+    : board?.event.operationalInterrupted
+      ? "warning"
+      : board?.event.operationalNote || selectedOperationalResourceGroup?.operationalNote
+        ? "notice"
+        : "normal";
   const claimedAssistAircraftId = board?.assistClaims?.find(
     (claim) => claim.claimedByCurrentOperator,
   )?.aircraftId;
@@ -422,6 +458,165 @@ export function FlightLineView() {
     }
   }
 
+  function openOperationsDialog() {
+    if (!board || !canManageAircraft) return;
+    const resourceGroupId = filteredResourceGroupId || board.resourceGroups[0]?.id || "";
+    setOperationalNotice(board.event.operationalNote);
+    setOperationsResourceGroupId(resourceGroupId);
+    setResourceNotice(
+      board.resourceGroups.find((group) => group.id === resourceGroupId)?.operationalNote ?? "",
+    );
+    setOperationsTab(board.event.emergencyMode ? "emergency" : "notices");
+    setOperationsOpen(true);
+  }
+
+  async function setEventNotice() {
+    if (!board) return;
+    setOperationsBusy(true);
+    try {
+      await sendCommand(
+        {
+          commandId: crypto.randomUUID(),
+          eventId: EVENT_ID,
+          deviceId: FLIGHT_LINE_DEVICE_ID,
+          expectedVersion: board.event.version,
+          issuedAt: new Date().toISOString(),
+          type: "SET_OPERATIONAL_NOTE",
+          payload: { note: operationalNotice.trim() },
+        },
+        deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
+      );
+      setMessage("Veranstaltungsweiter Betriebshinweis veröffentlicht.");
+      await refresh();
+    } catch (reason) {
+      setMessage(reason instanceof Error ? reason.message : "Betriebshinweis fehlgeschlagen.");
+    } finally {
+      setOperationsBusy(false);
+    }
+  }
+
+  async function setResourceNoticeCommand() {
+    if (!board || !operationsResourceGroupId) return;
+    setOperationsBusy(true);
+    try {
+      await sendCommand(
+        {
+          commandId: crypto.randomUUID(),
+          eventId: EVENT_ID,
+          deviceId: FLIGHT_LINE_DEVICE_ID,
+          expectedVersion: board.event.version,
+          issuedAt: new Date().toISOString(),
+          type: "SET_RESOURCE_GROUP_NOTICE",
+          payload: {
+            resourceGroupId: operationsResourceGroupId,
+            note: resourceNotice.trim(),
+          },
+        },
+        deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
+      );
+      setMessage("Hinweis der Ressourcengruppe veröffentlicht.");
+      await refresh();
+    } catch (reason) {
+      setMessage(reason instanceof Error ? reason.message : "Gruppenhinweis fehlgeschlagen.");
+    } finally {
+      setOperationsBusy(false);
+    }
+  }
+
+  async function setEventInterruption(interrupted: boolean) {
+    if (!board || operationsReason.trim().length < 3) return;
+    setOperationsBusy(true);
+    try {
+      await sendCommand(
+        {
+          commandId: crypto.randomUUID(),
+          eventId: EVENT_ID,
+          deviceId: FLIGHT_LINE_DEVICE_ID,
+          expectedVersion: board.event.version,
+          issuedAt: new Date().toISOString(),
+          type: "SET_EVENT_INTERRUPTION",
+          payload: {
+            interrupted,
+            reason: operationsReason.trim(),
+            expectedReviewAt: null,
+          },
+        },
+        deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
+      );
+      setMessage(interrupted ? "Betrieb unterbrochen." : "Betrieb fortgesetzt.");
+      await refresh();
+    } catch (reason) {
+      setMessage(
+        reason instanceof Error ? reason.message : "Betriebsstatus konnte nicht geändert werden.",
+      );
+    } finally {
+      setOperationsBusy(false);
+    }
+  }
+
+  async function setResourceGroupStatus(
+    resourceGroupId: string,
+    status: "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED",
+  ) {
+    if (!board || operationsReason.trim().length < 3) return;
+    setOperationsBusy(true);
+    try {
+      await sendCommand(
+        {
+          commandId: crypto.randomUUID(),
+          eventId: EVENT_ID,
+          deviceId: FLIGHT_LINE_DEVICE_ID,
+          expectedVersion: board.event.version,
+          issuedAt: new Date().toISOString(),
+          type: "SET_RESOURCE_GROUP_STATUS",
+          payload: {
+            resourceGroupId,
+            status,
+            reason: operationsReason.trim(),
+            expectedReviewAt: null,
+          },
+        },
+        deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
+      );
+      setMessage(`Ressourcengruppe auf ${status} gesetzt.`);
+      await refresh();
+    } catch (reason) {
+      setMessage(reason instanceof Error ? reason.message : "Statusänderung fehlgeschlagen.");
+    } finally {
+      setOperationsBusy(false);
+    }
+  }
+
+  async function setPilotPause(pilotId: string, paused: boolean) {
+    if (!board || operationsReason.trim().length < 3) return;
+    setOperationsBusy(true);
+    try {
+      await sendCommand(
+        {
+          commandId: crypto.randomUUID(),
+          eventId: EVENT_ID,
+          deviceId: FLIGHT_LINE_DEVICE_ID,
+          expectedVersion: board.event.version,
+          issuedAt: new Date().toISOString(),
+          type: "SET_PILOT_PAUSE",
+          payload: {
+            pilotId,
+            paused,
+            reason: operationsReason.trim(),
+            expectedReviewAt: null,
+          },
+        },
+        deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
+      );
+      setMessage(paused ? "Pilotenpause gestartet." : "Pilotenpause beendet.");
+      await refresh();
+    } catch (reason) {
+      setMessage(reason instanceof Error ? reason.message : "Pilotenpause fehlgeschlagen.");
+    } finally {
+      setOperationsBusy(false);
+    }
+  }
+
   async function mutateQueue(
     type: "DEFER_TICKET_GROUP" | "MARK_NO_SHOW",
     reasonOverride?: string,
@@ -669,31 +864,6 @@ export function FlightLineView() {
         </>
       }
     >
-      {!FLIGHT_LINE_ASSIST_MODE &&
-      board?.currentDeviceRole === "FLIGHT_DIRECTOR" &&
-      !board.event.emergencyMode ? (
-        <details className="emergency-control">
-          <summary>Not-Halt</summary>
-          <div className="emergency-control-body">
-            <label>
-              <span id="flight-line-emergency-title">Begründung</span>
-              <input
-                value={emergencyReason}
-                onChange={(event) => setEmergencyReason(event.target.value)}
-                placeholder="Grund eingeben"
-              />
-            </label>
-            <button
-              className="danger-action"
-              disabled={emergencyReason.trim().length < 3}
-              onClick={triggerEmergency}
-              type="button"
-            >
-              Not-Halt auslösen
-            </button>
-          </div>
-        </details>
-      ) : null}
       {board && FLIGHT_LINE_ASSIST_MODE ? (
         <FlightLineAssist
           aircraft={operationalAircraft}
@@ -770,6 +940,11 @@ export function FlightLineView() {
           aircraft={operationalAircraft}
           board={board}
           busyRotationIds={busyRotationIds}
+          canManageOperations={canManageAircraft}
+          operationalSummary={operationalSummary}
+          operationalSummaryTone={operationalSummaryTone}
+          onOpenOperations={openOperationsDialog}
+          onResourceGroupChange={setFilteredResourceGroupId}
           selectedQueueGroupIds={selectedQueueGroupIds}
           onAssignPilot={assignAircraftPilot}
           onConfirmAssignment={() => advance()}
@@ -1463,6 +1638,227 @@ export function FlightLineView() {
           ) : null}
         </section>
       </section>
+      <ModalDialog
+        description="Organisatorische Betriebslage steuern. Keine Aktion besitzt flugbetriebliche oder sicherheitsbezogene Freigabewirkung."
+        footer={
+          <Button onClick={() => setOperationsOpen(false)} type="button" variant="secondary">
+            Schließen
+          </Button>
+        }
+        onClose={() => setOperationsOpen(false)}
+        open={operationsOpen && Boolean(board) && canManageAircraft}
+        size="wide"
+        title="Betrieb steuern"
+      >
+        {board ? (
+          <div className="flight-director-operations-dialog">
+            <Tabs
+              items={operationsTabs}
+              label="Betriebssteuerung"
+              onChange={setOperationsTab}
+              value={operationsTab}
+            />
+            <label className="flight-director-operation-reason">
+              Begründung für Zustandsänderungen
+              <input
+                maxLength={240}
+                onChange={(event) => setOperationsReason(event.target.value)}
+                value={operationsReason}
+              />
+            </label>
+            {operationsTab === "notices" ? (
+              <div className="flight-director-operation-panel" role="tabpanel">
+                <section>
+                  <h3>Veranstaltungsweiter Hinweis</h3>
+                  <p>Hat in der Betriebslage Vorrang vor Hinweisen einzelner Ressourcengruppen.</p>
+                  <label>
+                    Hinweis
+                    <textarea
+                      maxLength={240}
+                      onChange={(event) => setOperationalNotice(event.target.value)}
+                      rows={3}
+                      value={operationalNotice}
+                    />
+                  </label>
+                  <Button
+                    disabled={operationsBusy}
+                    onClick={setEventNotice}
+                    type="button"
+                    variant="primary"
+                  >
+                    Hinweis veröffentlichen
+                  </Button>
+                </section>
+                <section>
+                  <h3>Hinweis einer Ressourcengruppe</h3>
+                  <label>
+                    Ressourcengruppe
+                    <select
+                      onChange={(event) => {
+                        const resourceGroupId = event.target.value;
+                        setOperationsResourceGroupId(resourceGroupId);
+                        setResourceNotice(
+                          board.resourceGroups.find((group) => group.id === resourceGroupId)
+                            ?.operationalNote ?? "",
+                        );
+                      }}
+                      value={operationsResourceGroupId}
+                    >
+                      {board.resourceGroups.map((group) => (
+                        <option key={group.id} value={group.id}>
+                          {group.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Hinweis
+                    <textarea
+                      maxLength={240}
+                      onChange={(event) => setResourceNotice(event.target.value)}
+                      rows={3}
+                      value={resourceNotice}
+                    />
+                  </label>
+                  <Button
+                    disabled={operationsBusy || !operationsResourceGroupId}
+                    onClick={setResourceNoticeCommand}
+                    type="button"
+                    variant="primary"
+                  >
+                    Gruppenhinweis veröffentlichen
+                  </Button>
+                </section>
+                <section className="flight-director-interruption">
+                  <h3>Veranstaltungsbetrieb</h3>
+                  <p>
+                    Aktuell:{" "}
+                    <strong>
+                      {board.event.operationalInterrupted ? "unterbrochen" : "laufend"}
+                    </strong>
+                  </p>
+                  <Button
+                    disabled={operationsBusy || operationsReason.trim().length < 3}
+                    onClick={() => setEventInterruption(!board.event.operationalInterrupted)}
+                    type="button"
+                    variant={board.event.operationalInterrupted ? "primary" : "danger"}
+                  >
+                    {board.event.operationalInterrupted
+                      ? "Betrieb fortsetzen"
+                      : "Betrieb unterbrechen"}
+                  </Button>
+                </section>
+              </div>
+            ) : null}
+            {operationsTab === "resources" ? (
+              <div className="flight-director-operation-list" role="tabpanel">
+                {board.resourceGroups.map((group) => (
+                  <article key={group.id}>
+                    <div>
+                      <strong>{group.name}</strong>
+                      <span>{group.shortCode}</span>
+                      <small>{group.activeAircraftIds.length} Flugzeuge</small>
+                    </div>
+                    <span className={`operation-status status-${group.status.toLowerCase()}`}>
+                      {group.status}
+                    </span>
+                    <div className="flight-director-operation-actions">
+                      {(["ACTIVE", "PAUSED", "INTERRUPTED", "ENDED"] as const).map((status) => (
+                        <Button
+                          disabled={
+                            operationsBusy ||
+                            operationsReason.trim().length < 3 ||
+                            group.status === status
+                          }
+                          key={status}
+                          onClick={() => setResourceGroupStatus(group.id, status)}
+                          size="compact"
+                          type="button"
+                          variant={status === "ENDED" ? "danger" : "secondary"}
+                        >
+                          {status === "ACTIVE"
+                            ? "Aktiv"
+                            : status === "PAUSED"
+                              ? "Pause"
+                              : status === "INTERRUPTED"
+                                ? "Unterbrochen"
+                                : "Beendet"}
+                        </Button>
+                      ))}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : null}
+            {operationsTab === "pilots" ? (
+              <div className="flight-director-operation-list" role="tabpanel">
+                {board.pilots
+                  .filter((pilot) => pilot.active)
+                  .map((pilot) => (
+                    <article key={pilot.id}>
+                      <div>
+                        <strong>{pilot.operationalCode}</strong>
+                        <span>
+                          {pilot.currentCommunicationNumber
+                            ? `Umlauf ${pilot.currentCommunicationNumber}`
+                            : "Kein aktiver Umlauf"}
+                        </span>
+                        <small>{pilot.operationalNote || "Kein Organisationshinweis"}</small>
+                      </div>
+                      <span
+                        className={`operation-status ${pilot.paused ? "status-paused" : "status-active"}`}
+                      >
+                        {pilot.paused ? "PAUSE" : "AKTIV"}
+                      </span>
+                      <Button
+                        disabled={operationsBusy || operationsReason.trim().length < 3}
+                        onClick={() => setPilotPause(pilot.id, !pilot.paused)}
+                        type="button"
+                        variant={pilot.paused ? "primary" : "secondary"}
+                      >
+                        {pilot.paused ? "Pause beenden" : "Pause starten"}
+                      </Button>
+                    </article>
+                  ))}
+              </div>
+            ) : null}
+            {operationsTab === "emergency" ? (
+              <div className="flight-director-emergency-panel" role="tabpanel">
+                <div className={board.event.emergencyMode ? "active" : ""}>
+                  <strong>
+                    {board.event.emergencyMode ? "Not-Halt aktiv" : "Kein Not-Halt aktiv"}
+                  </strong>
+                  <p>
+                    Der Not-Halt stoppt operative Kommandos. Die Aufhebung bleibt ausschließlich im
+                    Admin-Bereich möglich.
+                  </p>
+                </div>
+                {!board.event.emergencyMode ? (
+                  <>
+                    <label>
+                      Begründung
+                      <input
+                        maxLength={240}
+                        onChange={(event) => setEmergencyReason(event.target.value)}
+                        placeholder="Mindestens 3 Zeichen"
+                        value={emergencyReason}
+                      />
+                    </label>
+                    <Button
+                      disabled={operationsBusy || emergencyReason.trim().length < 3}
+                      onClick={triggerEmergency}
+                      type="button"
+                      variant="danger"
+                    >
+                      Not-Halt auslösen
+                    </Button>
+                  </>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </ModalDialog>
       <ModalDialog
         footer={
           <Button onClick={() => setAircraftPauseOpen(false)} type="button" variant="secondary">

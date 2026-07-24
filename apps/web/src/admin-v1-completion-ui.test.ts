@@ -57,15 +57,17 @@ describe("V1 administration completion UI", () => {
   });
 
   it("keeps setup saving visible and every information hint bound to its field label", () => {
-    expect(appSource).toContain('<Panel className="event-setup-details"');
+    expect(appSource).toContain('className="event-setup-details"');
     expect(appSource).toContain("<PageHeader");
     expect(appSource).toContain("<Button");
     expect(appSource).toContain("Veranstaltungsparameter speichern");
-    expect(appSource).toContain('className="field-info"');
-    expect(appSource).toContain("data-help={help}");
-    expect(appSource).toContain('aria-hidden="true" className="field-info"');
+    expect(appSource).toContain("className={`field-info");
+    expect(appSource).toContain("aria-label={`Hilfe:");
+    expect(appSource).toContain('role="tooltip"');
+    expect(appSource).toContain("onBlur={() => setOpen(false)}");
     expect(appSource).not.toContain('<details className="field-info">');
-    expect(stylesSource).toContain("label:focus-within .field-info::after");
+    expect(stylesSource).toContain(".field-info:focus-visible .field-info-tooltip");
+    expect(stylesSource).not.toContain("label:focus-within .field-info");
     expect(stylesSource).toContain("visibility: hidden");
     expect(stylesSource).toContain(".event-setup-v15 .ds-page-header");
     expect(stylesSource).toContain(".event-setup-v15 .ds-page-header-actions .ds-button");
@@ -115,19 +117,17 @@ describe("V1 administration completion UI", () => {
     expect(appSource).toContain("Endgültig löschen");
   });
 
-  it("opens the approved overview and keeps the compact list-and-editor workspace", () => {
+  it("opens the approved overview and uses centered responsive master-data dialogs", () => {
     expect(appSource).toContain("useState<AdminArea>(() => {");
     expect(appSource).toContain(': "overview";');
     expect(appSource).toContain("useState<MasterDataCategory>(() => {");
     expect(appSource).toContain(': "resource-groups";');
     expect(appSource).toContain("const [masterEditorOpen, setMasterEditorOpen] = useState(false);");
-    expect(appSource).toContain('masterEditorOpen ? "editor-open" : "editor-closed"');
     expect(appSource).toContain("setMasterEditorOpen(false)");
-    expect(appSource).toContain("master-data-active ${masterEditorOpen");
     expect(appSource).toContain("Zusammenfassung (abgeleitet)");
-    expect(stylesSource).toContain(".admin-workspace.master-data-active > .master-data-workspace");
-    expect(stylesSource).toContain(".admin-workspace.master-data-active > .master-data-drawer");
-    expect(stylesSource).toContain(".admin-workspace.master-data-active.editor-open");
+    expect(appSource.match(/<ModalDialog/g)?.length).toBeGreaterThanOrEqual(4);
+    expect(appSource.match(/size="wide"/g)?.length).toBeGreaterThanOrEqual(4);
+    expect(appSource).not.toContain('<aside className="master-data-drawer"');
     expect(stylesSource).toContain("grid-template-columns: minmax(0, 1fr)");
     expect(stylesSource).toContain("max-height: none");
   });
@@ -136,10 +136,10 @@ describe("V1 administration completion UI", () => {
     expect(adminUxSource).toContain('{ id: "evaluation", label: "Auswertung"');
     expect(adminUxSource).not.toContain('label: "Betrieb"');
     expect(appSource).toContain('title: "Auswertung"');
-    expect(appSource).toContain("Verläufe, Berichte und seltene administrative Sonderfälle");
-    expect(appSource).toContain(
-      '<section className="admin-section" hidden={adminArea !== "evaluation"}>',
-    );
+    expect(appSource).toContain("Prognose-Simulator");
+    expect(appSource).toContain("Nur Simulation");
+    expect(appSource).toContain('className="admin-section admin-simulator-launch"');
+    expect(appSource).toContain('hidden={adminArea !== "events" || eventStep !== "completion"}');
   });
 
   it("keeps the manual board refresh touchable and exposes its loading state", () => {

@@ -1,6 +1,7 @@
 import { APP_NAME, APP_VERSION, REQUIREMENTS_VERSION } from "@rundflug/config";
 import {
   adminDeviceRecoverySchema,
+  adminEventFlowSchema,
   adminPinVerificationSchema,
   bootstrapRequestSchema,
   cloneEventRequestSchema,
@@ -12,6 +13,13 @@ import {
   forecastHistorySchema,
   type GateDisplayFilter,
   gateDisplayFilterSchema,
+  importMasterDataTemplateRequestSchema,
+  importMasterDataTemplateResponseSchema,
+  type MasterDataTemplate,
+  type MasterDataTemplateCounts,
+  masterDataTemplateSchema,
+  masterDataTemplateValidationRequestSchema,
+  masterDataTemplateValidationSchema,
   operationalHistoryQuerySchema,
   operationalHistorySchema,
   operatorLoginRequestSchema,
@@ -30,6 +38,7 @@ import {
 } from "@rundflug/domain";
 import { Hono } from "hono";
 import { secureHeaders } from "hono/secure-headers";
+import { buildAdminEventFlow } from "./admin-event-flow";
 import {
   assertRole,
   authorizeSession,
@@ -121,6 +130,126 @@ function decodeTicketSearchCursor(value: string | undefined): TicketSearchCursor
   } catch {
     return null;
   }
+}
+
+const MASTER_DATA_TEMPLATE_BODY_LIMIT_BYTES = 1_250_000;
+
+function masterDataTemplateCounts(template: MasterDataTemplate): MasterDataTemplateCounts {
+  return {
+    gates: template.gates.length,
+    resourceGroups: template.resourceGroups.length,
+    aircraft: template.aircraft.length,
+    assignments: template.assignments.length,
+    pilots: template.pilots.length,
+    products: template.products.length,
+  };
+}
+
+function parseGateDisplayFilterJson(value: string): GateDisplayFilter {
+  try {
+    const parsed = gateDisplayFilterSchema.safeParse(JSON.parse(value));
+    if (parsed.success) return parsed.data;
+  } catch {
+    // A malformed legacy filter is exported as an empty, valid filter.
+  }
+  return { productIds: [], rotationStatuses: [] };
+}
+
+async function boundedJsonBody(request: Request): Promise<unknown> {
+  const declaredLength = Number(request.headers.get("content-length") ?? "0");
+  if (Number.isFinite(declaredLength) && declaredLength > MASTER_DATA_TEMPLATE_BODY_LIMIT_BYTES) {
+    throw new Error("TEMPLATE_TOO_LARGE");
+  }
+  const text = await request.text();
+  if (new TextEncoder().encode(text).byteLength > MASTER_DATA_TEMPLATE_BODY_LIMIT_BYTES) {
+    throw new Error("TEMPLATE_TOO_LARGE");
+  }
+  return JSON.parse(text);
+}
+
+interface MasterDataTemplateTargetRow {
+  status: string;
+  version: number;
+  gates: number;
+  resource_groups: number;
+  memberships: number;
+  pilots: number;
+  products: number;
+}
+
+function templateTargetEligible(target: MasterDataTemplateTargetRow | null): boolean {
+  return Boolean(
+    target &&
+      target.status === "PREPARATION" &&
+      target.gates === 0 &&
+      target.resource_groups === 0 &&
+      target.memberships === 0 &&
+      target.pilots === 0 &&
+      target.products === 0,
+  );
+}
+
+async function loadTemplateTarget(
+  database: D1Database,
+  eventId: string,
+): Promise<MasterDataTemplateTargetRow | null> {
+  return database
+    .prepare(
+      `SELECT od.status, od.version,
+              (SELECT COUNT(*) FROM gates WHERE operation_day_id = od.id) AS gates,
+              (SELECT COUNT(*) FROM resource_groups WHERE operation_day_id = od.id) AS resource_groups,
+              (SELECT COUNT(*) FROM resource_group_memberships
+                WHERE operation_day_id = od.id AND active_until IS NULL) AS memberships,
+              (SELECT COUNT(*) FROM pilots WHERE operation_day_id = od.id) AS pilots,
+              (SELECT COUNT(*) FROM products WHERE operation_day_id = od.id) AS products
+         FROM operation_days od WHERE od.id = ?1`,
+    )
+    .bind(eventId)
+    .first<MasterDataTemplateTargetRow>();
+}
+
+interface ExistingTemplateAircraftRow {
+  id: string;
+  registration: string;
+  aircraft_type: string;
+  passenger_seats: number;
+  maximum_passenger_payload_kg: number | null;
+  refuel_reminder_threshold: number;
+}
+
+async function validateTemplateAircraft(
+  database: D1Database,
+  template: MasterDataTemplate,
+): Promise<{
+  existingByRegistration: Map<string, ExistingTemplateAircraftRow>;
+  errors: Array<{ path: string; message: string }>;
+}> {
+  const existingByRegistration = new Map<string, ExistingTemplateAircraftRow>();
+  const errors: Array<{ path: string; message: string }> = [];
+  for (const [index, aircraft] of template.aircraft.entries()) {
+    const existing = await database
+      .prepare(
+        `SELECT id, registration, aircraft_type, passenger_seats,
+                maximum_passenger_payload_kg, refuel_reminder_threshold
+           FROM aircraft WHERE registration = ?1`,
+      )
+      .bind(aircraft.registration)
+      .first<ExistingTemplateAircraftRow>();
+    if (!existing) continue;
+    existingByRegistration.set(existing.registration, existing);
+    if (
+      existing.aircraft_type !== aircraft.aircraftType ||
+      existing.passenger_seats !== aircraft.passengerSeats ||
+      existing.maximum_passenger_payload_kg !== aircraft.maximumPassengerPayloadKg ||
+      existing.refuel_reminder_threshold !== aircraft.refuelReminderThreshold
+    ) {
+      errors.push({
+        path: `aircraft.${index}`,
+        message: `Flugzeug ${aircraft.registration} existiert bereits mit abweichenden Stammdaten.`,
+      });
+    }
+  }
+  return { existingByRegistration, errors };
 }
 
 function predictedBoardingWindow(input: {
@@ -1138,6 +1267,665 @@ app.get("/api/admin/events", async (context) => {
       version: row.version,
     })),
   });
+});
+
+app.get("/api/admin/events/:eventId/flow", async (context) => {
+  const eventId = context.req.param("eventId");
+  const device = await authorizeDevice(context.env, eventId, context.req.raw);
+  if (device?.role !== "ADMIN") {
+    return context.json(
+      { error: { code: "ADMIN_REQUIRED", message: "Administration erforderlich." } },
+      403,
+    );
+  }
+  const event = await context.env.DB.prepare(
+    `SELECT id, event_date, time_zone, sale_opens_at, operations_end_at
+       FROM operation_days WHERE id = ?1`,
+  )
+    .bind(eventId)
+    .first<{
+      id: string;
+      event_date: string;
+      time_zone: string;
+      sale_opens_at: string | null;
+      operations_end_at: string | null;
+    }>();
+  if (!event) {
+    return context.json(
+      { error: { code: "EVENT_NOT_FOUND", message: "Veranstaltung nicht gefunden." } },
+      404,
+    );
+  }
+  const tickets = await context.env.DB.prepare(
+    `SELECT tg.sold_at,
+            CASE WHEN r.status = 'COMPLETED' THEN r.completed_at ELSE NULL END AS completed_at
+       FROM tickets t
+       JOIN ticket_groups tg ON tg.id = t.ticket_group_id
+       LEFT JOIN rotation_tickets rt ON rt.ticket_id = t.id AND rt.released_at IS NULL
+       LEFT JOIN rotations r ON r.id = rt.rotation_id
+      WHERE tg.operation_day_id = ?1 AND t.status <> 'CANCELED'
+      ORDER BY tg.sold_at, t.id`,
+  )
+    .bind(eventId)
+    .all<{ sold_at: string; completed_at: string | null }>();
+  const requestedBucketMinutes = Number(context.req.query("bucketMinutes") ?? "15");
+  const flow = buildAdminEventFlow({
+    eventId,
+    eventDate: event.event_date,
+    timeZone: event.time_zone,
+    saleOpensAt: event.sale_opens_at,
+    operationsEndAt: event.operations_end_at,
+    observedAt: new Date().toISOString(),
+    requestedBucketMinutes: Number.isFinite(requestedBucketMinutes) ? requestedBucketMinutes : 15,
+    tickets: tickets.results.map((ticket) => ({
+      soldAt: ticket.sold_at,
+      completedAt: ticket.completed_at,
+    })),
+  });
+  return context.json(adminEventFlowSchema.parse(flow));
+});
+
+app.get("/api/admin/events/:eventId/master-data-template", async (context) => {
+  const eventId = context.req.param("eventId");
+  const device = await authorizeDevice(context.env, eventId, context.req.raw);
+  if (device?.role !== "ADMIN") {
+    return context.json(
+      { error: { code: "ADMIN_REQUIRED", message: "Administration erforderlich." } },
+      403,
+    );
+  }
+  const event = await context.env.DB.prepare(
+    `SELECT name, version, no_show_after_minutes, max_ticket_deferrals,
+            notification_lead_minutes, automatic_precall_enabled, precall_lead_minutes,
+            max_gate_wait_minutes, precall_min_quality, precall_gate_cooldown_minutes,
+            child_reference_weight_kg, normal_reference_weight_kg, heavy_reference_weight_kg,
+            planned_boarding_minutes, planned_deboarding_minutes, planned_buffer_minutes,
+            departed_visibility_seconds
+       FROM operation_days WHERE id = ?1`,
+  )
+    .bind(eventId)
+    .first<Record<string, string | number | null>>();
+  if (!event) {
+    return context.json(
+      { error: { code: "EVENT_NOT_FOUND", message: "Veranstaltung nicht gefunden." } },
+      404,
+    );
+  }
+  const [gates, resourceGroups, products, pilots, assignments] = await Promise.all([
+    context.env.DB.prepare(
+      `SELECT id, label, gate_type, active, sort_order, display_filter_json
+         FROM gates WHERE operation_day_id = ?1 ORDER BY sort_order, label, id`,
+    )
+      .bind(eventId)
+      .all<Record<string, string | number>>(),
+    context.env.DB.prepare(
+      `SELECT id, name, short_code, gate_id, reference_capacity, planned_rotation_minutes,
+              compatible_aircraft_types_json, automatic_precall_enabled
+         FROM resource_groups WHERE operation_day_id = ?1 ORDER BY name, id`,
+    )
+      .bind(eventId)
+      .all<Record<string, string | number>>(),
+    context.env.DB.prepare(
+      `SELECT id, resource_group_id, gate_id, name, code, public_description, price_cents,
+              reference_capacity, reference_duration_minutes, promised_flight_minutes,
+              child_companion_required, weight_classes_json, sort_order,
+              capacity_warning_threshold, capacity_critical_threshold
+         FROM products WHERE operation_day_id = ?1 ORDER BY sort_order, name, id`,
+    )
+      .bind(eventId)
+      .all<Record<string, string | number>>(),
+    context.env.DB.prepare(
+      `SELECT id, operational_code, operational_note, active
+         FROM pilots WHERE operation_day_id = ?1 ORDER BY operational_code, id`,
+    )
+      .bind(eventId)
+      .all<Record<string, string | number>>(),
+    context.env.DB.prepare(
+      `SELECT m.aircraft_id, m.resource_group_id, a.registration, a.aircraft_type,
+              a.passenger_seats, a.maximum_passenger_payload_kg, a.refuel_reminder_threshold
+         FROM resource_group_memberships m
+         JOIN aircraft a ON a.id = m.aircraft_id
+        WHERE m.operation_day_id = ?1 AND m.active_until IS NULL
+        ORDER BY a.registration, a.id`,
+    )
+      .bind(eventId)
+      .all<Record<string, string | number | null>>(),
+  ]);
+  const gateKeys = new Map(
+    gates.results.map((gate, index) => [String(gate.id), `gate-${index + 1}`]),
+  );
+  const resourceGroupKeys = new Map(
+    resourceGroups.results.map((group, index) => [String(group.id), `resource-group-${index + 1}`]),
+  );
+  const productKeys = new Map(
+    products.results.map((product, index) => [String(product.id), `product-${index + 1}`]),
+  );
+  const aircraftRows = [
+    ...new Map(
+      assignments.results.map((assignment) => [String(assignment.aircraft_id), assignment]),
+    ).values(),
+  ];
+  const aircraftKeys = new Map(
+    aircraftRows.map((aircraft, index) => [String(aircraft.aircraft_id), `aircraft-${index + 1}`]),
+  );
+  const template = masterDataTemplateSchema.parse({
+    format: "rundflug-master-data-template",
+    formatVersion: 1,
+    exportedAt: new Date().toISOString(),
+    source: { name: event.name, version: Number(event.version) },
+    eventParameters: {
+      noShowAfterMinutes: Number(event.no_show_after_minutes),
+      maxTicketDeferrals: Number(event.max_ticket_deferrals),
+      notificationLeadMinutes: Number(event.notification_lead_minutes),
+      automaticPrecallEnabled: Boolean(event.automatic_precall_enabled),
+      precallLeadMinutes: Number(event.precall_lead_minutes),
+      maximumGateWaitMinutes: Number(event.max_gate_wait_minutes),
+      precallMinimumQuality: String(event.precall_min_quality),
+      precallGateCooldownMinutes: Number(event.precall_gate_cooldown_minutes),
+      referenceWeightsKg: {
+        child: Number(event.child_reference_weight_kg),
+        normal: Number(event.normal_reference_weight_kg),
+        heavy: Number(event.heavy_reference_weight_kg),
+      },
+      plannedBoardingMinutes: Number(event.planned_boarding_minutes),
+      plannedDeboardingMinutes: Number(event.planned_deboarding_minutes),
+      plannedBufferMinutes: Number(event.planned_buffer_minutes),
+      departedVisibilitySeconds: Number(event.departed_visibility_seconds),
+    },
+    gates: gates.results.map((gate) => {
+      const displayFilter = parseGateDisplayFilterJson(String(gate.display_filter_json));
+      return {
+        key: gateKeys.get(String(gate.id)),
+        label: String(gate.label),
+        gateType: String(gate.gate_type),
+        active: Boolean(gate.active),
+        sortOrder: Number(gate.sort_order),
+        displayFilter: {
+          productKeys: displayFilter.productIds.flatMap((productId) => {
+            const productKey = productKeys.get(productId);
+            return productKey ? [productKey] : [];
+          }),
+          rotationStatuses: displayFilter.rotationStatuses,
+        },
+      };
+    }),
+    resourceGroups: resourceGroups.results.map((group) => ({
+      key: resourceGroupKeys.get(String(group.id)),
+      name: String(group.name),
+      shortCode: String(group.short_code),
+      gateKey: gateKeys.get(String(group.gate_id)),
+      referenceCapacity: Number(group.reference_capacity),
+      plannedRotationMinutes: Number(group.planned_rotation_minutes),
+      compatibleAircraftTypes: JSON.parse(String(group.compatible_aircraft_types_json)),
+      automaticPrecallEnabled: Boolean(group.automatic_precall_enabled),
+    })),
+    aircraft: aircraftRows.map((aircraft) => ({
+      key: aircraftKeys.get(String(aircraft.aircraft_id)),
+      registration: String(aircraft.registration),
+      aircraftType: String(aircraft.aircraft_type),
+      passengerSeats: Number(aircraft.passenger_seats),
+      maximumPassengerPayloadKg:
+        aircraft.maximum_passenger_payload_kg === null
+          ? null
+          : Number(aircraft.maximum_passenger_payload_kg),
+      refuelReminderThreshold: Number(aircraft.refuel_reminder_threshold),
+    })),
+    assignments: assignments.results.map((assignment) => ({
+      aircraftKey: aircraftKeys.get(String(assignment.aircraft_id)),
+      resourceGroupKey: resourceGroupKeys.get(String(assignment.resource_group_id)),
+    })),
+    pilots: pilots.results.map((pilot, index) => ({
+      key: `pilot-${index + 1}`,
+      operationalCode: String(pilot.operational_code),
+      operationalNote: String(pilot.operational_note),
+      active: Boolean(pilot.active),
+    })),
+    products: products.results.map((product) => ({
+      key: productKeys.get(String(product.id)),
+      resourceGroupKey: resourceGroupKeys.get(String(product.resource_group_id)),
+      gateKey: gateKeys.get(String(product.gate_id)),
+      name: String(product.name),
+      code: String(product.code),
+      publicDescription: String(product.public_description),
+      priceCents: Number(product.price_cents),
+      referenceCapacity: Number(product.reference_capacity),
+      referenceDurationMinutes: Number(product.reference_duration_minutes),
+      promisedFlightMinutes: Number(product.promised_flight_minutes),
+      childCompanionRequired: Boolean(product.child_companion_required),
+      weightClasses: JSON.parse(String(product.weight_classes_json)),
+      sortOrder: Number(product.sort_order),
+      capacityWarningThreshold: Number(product.capacity_warning_threshold),
+      capacityCriticalThreshold: Number(product.capacity_critical_threshold),
+    })),
+  });
+  return context.json(template, 200, {
+    "content-disposition": `attachment; filename="stammdaten-${eventId}.json"`,
+  });
+});
+
+app.post("/api/admin/events/:eventId/master-data-template/validate", async (context) => {
+  const eventId = context.req.param("eventId");
+  const device = await authorizeDevice(context.env, eventId, context.req.raw);
+  if (device?.role !== "ADMIN") {
+    return context.json(
+      { error: { code: "ADMIN_REQUIRED", message: "Administration erforderlich." } },
+      403,
+    );
+  }
+  let body: unknown;
+  try {
+    body = await boundedJsonBody(context.req.raw);
+  } catch (cause) {
+    return context.json(
+      {
+        error: {
+          code:
+            cause instanceof Error && cause.message === "TEMPLATE_TOO_LARGE"
+              ? "TEMPLATE_TOO_LARGE"
+              : "TEMPLATE_INVALID",
+          message: "Die Vorlagendatei ist ungültig oder größer als 1 MiB.",
+        },
+      },
+      400,
+    );
+  }
+  const parsed = masterDataTemplateValidationRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return context.json(
+      {
+        error: {
+          code: "TEMPLATE_INVALID",
+          message: parsed.error.issues[0]?.message ?? "Ungültige Vorlage.",
+        },
+      },
+      400,
+    );
+  }
+  const target = await loadTemplateTarget(context.env.DB, eventId);
+  if (!target) {
+    return context.json(
+      { error: { code: "EVENT_NOT_FOUND", message: "Veranstaltung nicht gefunden." } },
+      404,
+    );
+  }
+  const aircraftValidation = await validateTemplateAircraft(context.env.DB, parsed.data.template);
+  const response = masterDataTemplateValidationSchema.parse({
+    valid: aircraftValidation.errors.length === 0,
+    targetEligible: templateTargetEligible(target),
+    counts: masterDataTemplateCounts(parsed.data.template),
+    errors: aircraftValidation.errors,
+    warnings:
+      aircraftValidation.existingByRegistration.size > 0
+        ? [
+            `${aircraftValidation.existingByRegistration.size} bestehende Flugzeuge werden anhand ihrer Kennung wiederverwendet.`,
+          ]
+        : [],
+  });
+  return context.json(response);
+});
+
+app.post("/api/admin/events/:eventId/master-data-template/import", async (context) => {
+  const eventId = context.req.param("eventId");
+  const device = await authorizeDevice(context.env, eventId, context.req.raw);
+  if (device?.role !== "ADMIN") {
+    return context.json(
+      { error: { code: "ADMIN_REQUIRED", message: "Administration erforderlich." } },
+      403,
+    );
+  }
+  let body: unknown;
+  try {
+    body = await boundedJsonBody(context.req.raw);
+  } catch (cause) {
+    return context.json(
+      {
+        error: {
+          code:
+            cause instanceof Error && cause.message === "TEMPLATE_TOO_LARGE"
+              ? "TEMPLATE_TOO_LARGE"
+              : "TEMPLATE_INVALID",
+          message: "Die Vorlagendatei ist ungültig oder größer als 1 MiB.",
+        },
+      },
+      400,
+    );
+  }
+  const parsed = importMasterDataTemplateRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return context.json(
+      {
+        error: {
+          code: "TEMPLATE_INVALID",
+          message: parsed.error.issues[0]?.message ?? "Ungültige Vorlage.",
+        },
+      },
+      400,
+    );
+  }
+  const input = parsed.data;
+  const priorReceipt = await context.env.DB.prepare(
+    `SELECT operation_day_id, device_id, response_json
+       FROM idempotency_receipts WHERE command_id = ?1`,
+  )
+    .bind(input.commandId)
+    .first<{ operation_day_id: string; device_id: string; response_json: string }>();
+  if (priorReceipt) {
+    if (priorReceipt.operation_day_id !== eventId || priorReceipt.device_id !== device.id) {
+      return context.json(
+        { error: { code: "IDEMPOTENCY_CONFLICT", message: "Kommando-ID ist bereits belegt." } },
+        409,
+      );
+    }
+    const stored = importMasterDataTemplateResponseSchema.parse(
+      JSON.parse(priorReceipt.response_json),
+    );
+    return context.json({ ...stored, duplicate: true });
+  }
+  const target = await loadTemplateTarget(context.env.DB, eventId);
+  if (!target) {
+    return context.json(
+      { error: { code: "EVENT_NOT_FOUND", message: "Veranstaltung nicht gefunden." } },
+      404,
+    );
+  }
+  if (target.version !== input.expectedVersion) {
+    return context.json(
+      {
+        error: { code: "STALE_VERSION", message: "Veranstaltung wurde zwischenzeitlich geändert." },
+      },
+      409,
+    );
+  }
+  if (!templateTargetEligible(target)) {
+    return context.json(
+      {
+        error: {
+          code: "TEMPLATE_TARGET_NOT_EMPTY",
+          message: "Import ist nur in eine leere Veranstaltung in Vorbereitung möglich.",
+        },
+      },
+      409,
+    );
+  }
+  const aircraftValidation = await validateTemplateAircraft(context.env.DB, input.template);
+  if (aircraftValidation.errors.length > 0) {
+    return context.json(
+      {
+        error: {
+          code: "TEMPLATE_AIRCRAFT_CONFLICT",
+          message: aircraftValidation.errors[0]?.message,
+        },
+      },
+      409,
+    );
+  }
+
+  const now = new Date().toISOString();
+  const gateIds = new Map(input.template.gates.map((entry) => [entry.key, crypto.randomUUID()]));
+  const resourceGroupIds = new Map(
+    input.template.resourceGroups.map((entry) => [entry.key, crypto.randomUUID()]),
+  );
+  const productIds = new Map(
+    input.template.products.map((entry) => [entry.key, crypto.randomUUID()]),
+  );
+  const aircraftIds = new Map(
+    input.template.aircraft.map((entry) => [
+      entry.key,
+      aircraftValidation.existingByRegistration.get(entry.registration)?.id ?? crypto.randomUUID(),
+    ]),
+  );
+  const counts = masterDataTemplateCounts(input.template);
+  const responseBody = importMasterDataTemplateResponseSchema.parse({
+    accepted: true,
+    duplicate: false,
+    eventId,
+    version: input.expectedVersion + 1,
+    counts,
+  });
+  const receiptGuard = `EXISTS (
+    SELECT 1 FROM idempotency_receipts
+     WHERE operation_day_id = ?1 AND command_id = ?2
+  )`;
+  const statements: D1PreparedStatement[] = [
+    context.env.DB.prepare(
+      `INSERT INTO idempotency_receipts
+        (command_id, operation_day_id, device_id, command_type, received_at, response_json)
+       SELECT ?1, ?2, ?3, 'IMPORT_MASTER_DATA_TEMPLATE', ?4, ?5
+        WHERE EXISTS (
+          SELECT 1 FROM operation_days
+           WHERE id = ?2 AND version = ?6 AND status = 'PREPARATION'
+        )`,
+    ).bind(
+      input.commandId,
+      eventId,
+      device.id,
+      now,
+      JSON.stringify(responseBody),
+      input.expectedVersion,
+    ),
+  ];
+  for (const aircraft of input.template.aircraft) {
+    if (aircraftValidation.existingByRegistration.has(aircraft.registration)) continue;
+    statements.push(
+      context.env.DB.prepare(
+        `INSERT INTO aircraft
+          (id, registration, aircraft_type, passenger_seats, created_at, updated_at,
+           maximum_passenger_payload_kg, refuel_reminder_threshold)
+         SELECT ?3, ?4, ?5, ?6, ?7, ?7, ?8, ?9 WHERE ${receiptGuard}`,
+      ).bind(
+        eventId,
+        input.commandId,
+        aircraftIds.get(aircraft.key),
+        aircraft.registration,
+        aircraft.aircraftType,
+        aircraft.passengerSeats,
+        now,
+        aircraft.maximumPassengerPayloadKg,
+        aircraft.refuelReminderThreshold,
+      ),
+    );
+  }
+  for (const gate of input.template.gates) {
+    statements.push(
+      context.env.DB.prepare(
+        `INSERT INTO gates
+          (id, operation_day_id, label, gate_type, active, sort_order, display_filter_json,
+           created_at, updated_at)
+         SELECT ?3, ?1, ?4, ?5, ?6, ?7, ?8, ?9, ?9 WHERE ${receiptGuard}`,
+      ).bind(
+        eventId,
+        input.commandId,
+        gateIds.get(gate.key),
+        gate.label,
+        gate.gateType,
+        gate.active ? 1 : 0,
+        gate.sortOrder,
+        JSON.stringify({
+          productIds: gate.displayFilter.productKeys.map((key) => productIds.get(key)),
+          rotationStatuses: gate.displayFilter.rotationStatuses,
+        }),
+        now,
+      ),
+    );
+  }
+  for (const group of input.template.resourceGroups) {
+    statements.push(
+      context.env.DB.prepare(
+        `INSERT INTO resource_groups
+          (id, operation_day_id, name, short_code, status, version, created_at, updated_at,
+           gate_id, reference_capacity, planned_rotation_minutes,
+           compatible_aircraft_types_json, automatic_precall_enabled)
+         SELECT ?3, ?1, ?4, ?5, 'ACTIVE', 0, ?6, ?6, ?7, ?8, ?9, ?10, ?11
+          WHERE ${receiptGuard}`,
+      ).bind(
+        eventId,
+        input.commandId,
+        resourceGroupIds.get(group.key),
+        group.name,
+        group.shortCode,
+        now,
+        gateIds.get(group.gateKey),
+        group.referenceCapacity,
+        group.plannedRotationMinutes,
+        JSON.stringify(group.compatibleAircraftTypes),
+        group.automaticPrecallEnabled ? 1 : 0,
+      ),
+    );
+  }
+  for (const product of input.template.products) {
+    statements.push(
+      context.env.DB.prepare(
+        `INSERT INTO products
+          (id, operation_day_id, resource_group_id, name, price_cents, sale_enabled,
+           created_at, updated_at, capacity_warning_threshold, capacity_critical_threshold,
+           code, public_description, child_companion_required, sort_order, weight_classes_json,
+           gate_id, reference_capacity, reference_duration_minutes, promised_flight_minutes)
+         SELECT ?3, ?1, ?4, ?5, ?6, 0, ?7, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14,
+                ?15, ?16, ?17, ?18 WHERE ${receiptGuard}`,
+      ).bind(
+        eventId,
+        input.commandId,
+        productIds.get(product.key),
+        resourceGroupIds.get(product.resourceGroupKey),
+        product.name,
+        product.priceCents,
+        now,
+        product.capacityWarningThreshold,
+        product.capacityCriticalThreshold,
+        product.code,
+        product.publicDescription,
+        product.childCompanionRequired ? 1 : 0,
+        product.sortOrder,
+        JSON.stringify(product.weightClasses),
+        gateIds.get(product.gateKey),
+        product.referenceCapacity,
+        product.referenceDurationMinutes,
+        product.promisedFlightMinutes,
+      ),
+    );
+  }
+  for (const pilot of input.template.pilots) {
+    statements.push(
+      context.env.DB.prepare(
+        `INSERT INTO pilots
+          (id, operation_day_id, operational_code, operational_note, active, created_at, updated_at)
+         SELECT ?3, ?1, ?4, ?5, ?6, ?7, ?7 WHERE ${receiptGuard}`,
+      ).bind(
+        eventId,
+        input.commandId,
+        crypto.randomUUID(),
+        pilot.operationalCode,
+        pilot.operationalNote,
+        pilot.active ? 1 : 0,
+        now,
+      ),
+    );
+  }
+  for (const assignment of input.template.assignments) {
+    statements.push(
+      context.env.DB.prepare(
+        `INSERT INTO resource_group_memberships
+          (id, operation_day_id, resource_group_id, aircraft_id, active_from, created_at,
+           change_reason, changed_by_device_id)
+         SELECT ?3, ?1, ?4, ?5, ?6, ?6, 'Stammdatenvorlage importiert', ?7
+          WHERE ${receiptGuard}`,
+      ).bind(
+        eventId,
+        input.commandId,
+        crypto.randomUUID(),
+        resourceGroupIds.get(assignment.resourceGroupKey),
+        aircraftIds.get(assignment.aircraftKey),
+        now,
+        device.id,
+      ),
+    );
+  }
+  const parameters = input.template.eventParameters;
+  statements.push(
+    context.env.DB.prepare(
+      `INSERT INTO operational_events
+        (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type,
+         aggregate_id, aggregate_version, payload_json)
+       SELECT ?3, ?1, 'MASTER_DATA_TEMPLATE_IMPORTED', ?4, ?5, 'OPERATION_DAY', ?1, ?6, ?7
+        WHERE ${receiptGuard}`,
+    ).bind(
+      eventId,
+      input.commandId,
+      crypto.randomUUID(),
+      now,
+      device.id,
+      input.expectedVersion + 1,
+      JSON.stringify({ formatVersion: input.template.formatVersion, counts }),
+    ),
+    context.env.DB.prepare(
+      `INSERT INTO outbox (id, operation_day_id, topic, payload_json, created_at)
+       SELECT ?3, ?1, 'MASTER_DATA_TEMPLATE_IMPORTED', ?4, ?5 WHERE ${receiptGuard}`,
+    ).bind(
+      eventId,
+      input.commandId,
+      crypto.randomUUID(),
+      JSON.stringify({ eventId, version: input.expectedVersion + 1, counts }),
+      now,
+    ),
+    context.env.DB.prepare(
+      `UPDATE operation_days
+          SET no_show_after_minutes = ?3, max_ticket_deferrals = ?4,
+              notification_lead_minutes = ?5, automatic_precall_enabled = ?6,
+              precall_lead_minutes = ?7, max_gate_wait_minutes = ?8,
+              precall_min_quality = ?9, precall_gate_cooldown_minutes = ?10,
+              child_reference_weight_kg = ?11, normal_reference_weight_kg = ?12,
+              heavy_reference_weight_kg = ?13, planned_boarding_minutes = ?14,
+              planned_deboarding_minutes = ?15, planned_buffer_minutes = ?16,
+              departed_visibility_seconds = ?17, version = version + 1, updated_at = ?18
+        WHERE id = ?1 AND version = ?2 AND status = 'PREPARATION'
+          AND EXISTS (
+            SELECT 1 FROM idempotency_receipts
+             WHERE operation_day_id = ?1 AND command_id = ?19
+          )`,
+    ).bind(
+      eventId,
+      input.expectedVersion,
+      parameters.noShowAfterMinutes,
+      parameters.maxTicketDeferrals,
+      parameters.notificationLeadMinutes,
+      parameters.automaticPrecallEnabled ? 1 : 0,
+      parameters.precallLeadMinutes,
+      parameters.maximumGateWaitMinutes,
+      parameters.precallMinimumQuality,
+      parameters.precallGateCooldownMinutes,
+      parameters.referenceWeightsKg.child,
+      parameters.referenceWeightsKg.normal,
+      parameters.referenceWeightsKg.heavy,
+      parameters.plannedBoardingMinutes,
+      parameters.plannedDeboardingMinutes,
+      parameters.plannedBufferMinutes,
+      parameters.departedVisibilitySeconds,
+      now,
+      input.commandId,
+    ),
+  );
+  const results = await context.env.DB.batch(statements);
+  const updateResult = results.at(-1);
+  if (updateResult?.meta.changes !== 1) {
+    const concurrentReceipt = await context.env.DB.prepare(
+      "SELECT response_json, device_id FROM idempotency_receipts WHERE command_id = ?1",
+    )
+      .bind(input.commandId)
+      .first<{ response_json: string; device_id: string }>();
+    if (concurrentReceipt?.device_id === device.id) {
+      const stored = importMasterDataTemplateResponseSchema.parse(
+        JSON.parse(concurrentReceipt.response_json),
+      );
+      return context.json({ ...stored, duplicate: true });
+    }
+    return context.json(
+      {
+        error: { code: "STALE_VERSION", message: "Veranstaltung wurde zwischenzeitlich geändert." },
+      },
+      409,
+    );
+  }
+  return context.json(responseBody, 201);
 });
 
 app.post("/api/admin/events/:sourceEventId/clone", async (context) => {
@@ -2288,7 +3076,8 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
       }),
     () =>
       context.env.DB.prepare(
-        `SELECT rg.id, rg.version, rg.name, rg.short_code, rg.status, rg.gate_id, g.label AS gate_label,
+        `SELECT rg.id, rg.version, rg.name, rg.short_code, rg.status, rg.operational_note,
+              rg.gate_id, g.label AS gate_label,
               rg.reference_capacity, rg.planned_rotation_minutes,
               rg.compatible_aircraft_types_json, rg.automatic_precall_enabled,
               COALESCE((SELECT json_group_array(m.aircraft_id)
@@ -2305,6 +3094,7 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
           name: string;
           short_code: string;
           status: "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED";
+          operational_note: string;
           gate_id: string;
           gate_label: string;
           reference_capacity: number;
@@ -2727,6 +3517,7 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
         name: group.name,
         shortCode: group.short_code,
         status: group.status,
+        operationalNote: group.operational_note,
         gateId: group.gate_id,
         gateLabel: group.gate_label,
         referenceCapacity: effectiveReferenceCapacity,

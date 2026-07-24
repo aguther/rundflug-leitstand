@@ -787,27 +787,18 @@ export class EventCoordinator extends DurableObject<Env> {
           .run();
       }
 
-      if (command.type === "SET_OPERATIONAL_NOTE") {
-        if (device.role !== "ADMIN") {
-          return json(
-            { error: { code: "ROLE_NOT_AUTHORIZED", message: "Kontorolle nicht berechtigt." } },
-            { status: 403 },
-          );
-        }
-      } else {
-        try {
-          assertRoleMayExecute(device.role, command.type as OperationalCommandType);
-          if (command.type === "STAGE_OUTAGE_RECOVERY") {
-            for (const entry of command.payload.entries) {
-              assertMayStageOutageRecoveryEntry(device.role, entry.type);
-            }
+      try {
+        assertRoleMayExecute(device.role, command.type as OperationalCommandType);
+        if (command.type === "STAGE_OUTAGE_RECOVERY") {
+          for (const entry of command.payload.entries) {
+            assertMayStageOutageRecoveryEntry(device.role, entry.type);
           }
-        } catch (reason: unknown) {
-          if (reason instanceof DomainRuleError) {
-            return json({ error: { code: reason.code, message: reason.message } }, { status: 403 });
-          }
-          throw reason;
         }
+      } catch (reason: unknown) {
+        if (reason instanceof DomainRuleError) {
+          return json({ error: { code: reason.code, message: reason.message } }, { status: 403 });
+        }
+        throw reason;
       }
 
       const operatorAccountId = request.headers.get("x-operator-account-id");

@@ -179,6 +179,11 @@ export function FlightLineSupervisorConsole({
   aircraft,
   selectedAircraft,
   selectedQueueGroupIds,
+  operationalSummary,
+  operationalSummaryTone,
+  canManageOperations,
+  onOpenOperations,
+  onResourceGroupChange,
   onAssignPilot,
   busyRotationIds,
   onConfirmAssignment,
@@ -196,6 +201,11 @@ export function FlightLineSupervisorConsole({
   aircraft: Aircraft[];
   selectedAircraft: Aircraft | undefined;
   selectedQueueGroupIds: string[];
+  operationalSummary: string;
+  operationalSummaryTone: "critical" | "warning" | "notice" | "normal";
+  canManageOperations: boolean;
+  onOpenOperations: () => void;
+  onResourceGroupChange: (resourceGroupId: string) => void;
   onAssignPilot: (aircraftId: string, pilotId: string, reassign: boolean) => Promise<void>;
   busyRotationIds?: ReadonlySet<string>;
   onConfirmAssignment: () => Promise<void>;
@@ -362,20 +372,39 @@ export function FlightLineSupervisorConsole({
     <section className="flight-director-v15">
       <PageHeader
         actions={
-          <SelectField
-            aria-label="Ressourcengruppe filtern"
-            className="flight-director-resource-filter"
-            label="Ressource"
-            onChange={(event) => setResourceGroupId(event.target.value)}
-            value={resourceGroupId}
-          >
-            <option value="">Alle Ressourcen</option>
-            {board.resourceGroups.map((group) => (
-              <option key={group.id} value={group.id}>
-                {group.name}
-              </option>
-            ))}
-          </SelectField>
+          <div className="flight-director-header-actions">
+            <span
+              aria-live="polite"
+              className={`flight-director-operational-summary tone-${operationalSummaryTone}`}
+            >
+              {operationalSummary}
+            </span>
+            <Button
+              disabled={!canManageOperations}
+              onClick={onOpenOperations}
+              type="button"
+              variant="secondary"
+            >
+              Betrieb
+            </Button>
+            <SelectField
+              aria-label="Ressourcengruppe filtern"
+              className="flight-director-resource-filter"
+              label="Ressource"
+              onChange={(event) => {
+                setResourceGroupId(event.target.value);
+                onResourceGroupChange(event.target.value);
+              }}
+              value={resourceGroupId}
+            >
+              <option value="">Alle Ressourcen</option>
+              {board.resourceGroups.map((group) => (
+                <option key={group.id} value={group.id}>
+                  {group.name}
+                </option>
+              ))}
+            </SelectField>
+          </div>
         }
         title={
           <>
