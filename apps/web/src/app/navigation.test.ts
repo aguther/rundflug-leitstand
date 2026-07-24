@@ -111,7 +111,8 @@ describe("V1.2 app navigation", () => {
   });
 
   it("keeps public ticket status free of internal account navigation", () => {
-    expect(ticketStatusSource).toContain("<Shell publicView");
+    expect(ticketStatusSource).toContain("<Shell");
+    expect(ticketStatusSource).toContain("publicView");
     expect(shellSource).toContain("publicView={publicView}");
     expect(headerSource).toContain("!kiosk && !publicView && session");
   });

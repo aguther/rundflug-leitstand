@@ -22,6 +22,19 @@ function systemTheme(): ResolvedTheme {
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
+function applyTheme(preference: ThemePreference, resolved: ResolvedTheme): void {
+  document.documentElement.dataset.theme = resolved;
+  document.documentElement.dataset.themePreference = preference;
+  document.documentElement.style.colorScheme = resolved;
+  const themeColor = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+  themeColor?.setAttribute("content", resolved === "dark" ? "#121c2a" : "#ffffff");
+}
+
+export function applyInitialTheme(): void {
+  const preference = storedPreference();
+  applyTheme(preference, preference === "system" ? systemTheme() : preference);
+}
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [preference, setPreference] = useState<ThemePreference>(storedPreference);
   const [system, setSystem] = useState<ResolvedTheme>(systemTheme);
@@ -35,10 +48,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    document.documentElement.dataset.theme = resolved;
-    document.documentElement.dataset.themePreference = preference;
-    document.documentElement.style.colorScheme = resolved;
-    window.localStorage.setItem(STORAGE_KEY, preference);
+    applyTheme(preference, resolved);
+    if (preference === "system") window.localStorage.removeItem(STORAGE_KEY);
+    else window.localStorage.setItem(STORAGE_KEY, preference);
   }, [preference, resolved]);
 
   const value = useMemo<ThemeContextValue>(

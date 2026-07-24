@@ -1203,6 +1203,7 @@ export type AssistClaim = z.infer<typeof assistClaimSchema>;
 export const publicTicketStatusSchema = z
   .object({
     eventId: z.string(),
+    eventName: z.string(),
     productName: z.string(),
     productCode: z.string(),
     publicDescription: z.string(),

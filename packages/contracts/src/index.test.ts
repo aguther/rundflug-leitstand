@@ -540,6 +540,7 @@ describe("commandEnvelopeSchema", () => {
   it("keeps public DTOs free of aircraft and guest identity", () => {
     const status = publicTicketStatusSchema.parse({
       eventId: "event-1",
+      eventName: "Synthetischer Flugtag",
       productName: "Panorama",
       productCode: "PAN",
       publicDescription: "Panoramaflug",
@@ -557,6 +558,7 @@ describe("commandEnvelopeSchema", () => {
       operationalNotice: "",
       updatedAt: "2026-07-11T12:00:00.000Z",
     });
+    expect(status.eventName).toBe("Synthetischer Flugtag");
     const board = publicBoardSchema.parse({
       eventName: "Demo",
       timeZone: "Europe/Berlin",

@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import cashier from "../../web/src/cashier-view.tsx?raw";
+import publicStatusContent from "../../web/src/features/public-status/PublicStatusContent.tsx?raw";
 import groupStatus from "../../web/src/group-status-view.tsx?raw";
 import migration from "../migrations/0042_group_status_codes_and_push.sql?raw";
+import targetMigration from "../migrations/0043_web_push_target_kind.sql?raw";
 import coordinator from "./event-coordinator.ts?raw";
 import worker from "./index.ts?raw";
 import webPush from "./web-push.ts?raw";
@@ -33,9 +35,7 @@ describe("V1.8 public group ticket", () => {
     expect(worker).toContain('app.get("/api/public/groups/:groupCode"');
     expect(worker).toContain("partNumber: index + 1");
     expect(worker).toContain("passengerCount: rotation.passenger_count");
-    expect(groupStatus).toContain(
-      ["`Teilflug $", "{part.partNumber} von $", "{part.partCount}`"].join(""),
-    );
+    expect(publicStatusContent).toContain("Teilflug {partNumber} von {partCount}");
     expect(groupStatus).not.toContain("communicationLabel");
     expect(groupStatus).not.toContain("flightGroup");
   });
@@ -45,6 +45,16 @@ describe("V1.8 public group ticket", () => {
     expect(worker).toContain('app.post("/api/public/groups/:groupCode/push-subscriptions"');
     expect(webPush).toContain("group_ticket.ticket_group_id = w.ticket_group_id");
     expect(webPush).toContain("group_rt.rotation_id = ?1");
+  });
+
+  it("migrates existing subscriptions to canonical group targets", () => {
+    expect(targetMigration).toContain("target_kind TEXT NOT NULL DEFAULT 'GROUP'");
+    expect(targetMigration).toContain("CHECK (target_kind IN ('TICKET', 'GROUP'))");
+    expect(targetMigration).toContain("D1 Time Travel");
+    expect(targetMigration).toContain("aus portablen R2-Backups ausgeschlossen");
+    expect(worker).toContain("'TICKET'");
+    expect(worker).toContain("'GROUP'");
+    expect(webPush).toContain("publicPushTargetPath");
   });
 
   it("does not put the public group code into audit or outbox payloads", () => {
