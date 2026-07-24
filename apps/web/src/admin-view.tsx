@@ -4443,7 +4443,7 @@ export function AdminView() {
             </a>
           </section>
           <section
-            className="admin-section"
+            className="admin-section admin-emergency-section"
             hidden={adminArea !== "events" || eventStep !== "operations"}
           >
             <h2>Notfallmodus</h2>
@@ -4671,7 +4671,7 @@ export function AdminView() {
             <p>Hinweise stoppen keinen Flugbetrieb. Unterbrechungen werden separat gesetzt.</p>
           </section>
           <section
-            className="admin-section"
+            className="admin-section admin-capacity-section"
             hidden={adminArea !== "events" || eventStep !== "operations"}
           >
             <h2>Kapazität und Verkaufsempfehlung</h2>

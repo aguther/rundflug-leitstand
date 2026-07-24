@@ -9,6 +9,10 @@ const adminStyles = readFileSync(
   new URL("./features/admin/admin-v15.css", import.meta.url),
   "utf8",
 );
+const adminEventStyles = readFileSync(
+  new URL("./features/admin/admin-event-workspace.css", import.meta.url),
+  "utf8",
+);
 
 describe("V1.5 administration UI", () => {
   it("uses one compact setup flow and the shared design-system primitives", () => {
@@ -43,6 +47,22 @@ describe("V1.5 administration UI", () => {
     expect(adminStyles).toContain("overflow-x: auto");
     expect(adminStyles).toContain("scrollbar-width: none");
     expect(adminStyles).toContain("flex-direction: column");
+  });
+
+  it("keeps the event workspace dense and gives setup focus a stable footprint", () => {
+    expect(adminEventStyles).toContain(".setup-progress li::before");
+    expect(adminEventStyles).toContain("display: none");
+    expect(adminEventStyles).toContain(".setup-progress button:focus-visible");
+    expect(adminEventStyles).toContain("min-height: 46px");
+    expect(adminEventStyles).toContain("height: auto");
+    expect(adminEventStyles).toContain("width: min(880px, 100%)");
+    expect(adminEventStyles).toContain("grid-template-columns: repeat(6, minmax(0, 1fr))");
+    expect(adminEventStyles).toContain(".admin-shell .history-table-wrap");
+    expect(adminEventStyles).toContain("min-height: 220px");
+    expect(adminEventStyles).toContain(
+      ".admin-shell .manifest-correction-grid > .manifest-reason-field",
+    );
+    expect(chartSource).toContain("const HEIGHT = 210");
   });
 
   it("implements the event-scoped information architecture and legacy URL redirects", () => {
