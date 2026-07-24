@@ -19,7 +19,9 @@ Offizielle Referenz:
 1. POS-58 im Betriebssystem installieren und als Standarddrucker festlegen.
 2. Im Druckertreiber 58-mm-Rollenpapier, den tatsächlich bedruckbaren Bereich und die gewünschte
    Schneideoption als Standard konfigurieren. Skalierung oder zusätzliche Treiberränder
-   deaktivieren.
+   deaktivieren. Die Druckansicht belegt die gesamte vom Treiber gemeldete Papierbreite und
+   zentriert darin den 52-mm-Ticketinhalt; deshalb muss der Treiber die physische Rollenbreite
+   korrekt und ohne asymmetrischen Zusatzrand melden.
 3. Auf dem verwalteten Windows-Kassenrechner Microsoft Edge 144 oder neuer einsetzen.
 4. Die verpflichtende Edge-Richtlinie `SilentPrintingEnabled` über die betriebliche
    Gruppenrichtlinien-/MDM-Verwaltung aktivieren.
