@@ -1,7 +1,8 @@
 import type { OperationBoard } from "@rundflug/contracts";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   type BoardSyncState,
+  createBoardSyncCoordinator,
   nextBoardReconnectDelay,
   OPERATION_BOARD_POLL_INTERVAL_MS,
   OPERATION_BOARD_RECONNECT_INITIAL_MS,
@@ -80,5 +81,57 @@ describe("operation board reconnection", () => {
 
     expect(state.board).toBe(currentBoard);
     expect(state.lastConfirmedAt).toBe("2026-07-12T06:00:10.000Z");
+  });
+
+  it("coalesces simultaneous refreshes and waits for the requested version", async () => {
+    let resolveFirst: ((board: OperationBoard) => void) | undefined;
+    const first = new Promise<OperationBoard>((resolve) => {
+      resolveFirst = resolve;
+    });
+    const load = vi
+      .fn<() => Promise<OperationBoard>>()
+      .mockReturnValueOnce(first)
+      .mockResolvedValueOnce({ event: { version: 12 } } as OperationBoard);
+    const coordinator = createBoardSyncCoordinator(load);
+
+    const initial = coordinator.request(11);
+    const concurrent = coordinator.request(12);
+    resolveFirst?.({ event: { version: 11 } } as OperationBoard);
+
+    await expect(initial).resolves.toMatchObject({
+      type: "CONFIRMED",
+      board: { event: { version: 12 } },
+    });
+    await expect(concurrent).resolves.toMatchObject({
+      type: "CONFIRMED",
+      board: { event: { version: 12 } },
+    });
+    expect(load).toHaveBeenCalledTimes(2);
+  });
+
+  it("reuses a confirmed snapshot for duplicate command and websocket refreshes", async () => {
+    const load = vi
+      .fn<() => Promise<OperationBoard>>()
+      .mockResolvedValue({ event: { version: 7 } } as OperationBoard);
+    const coordinator = createBoardSyncCoordinator(load);
+
+    await coordinator.request(7);
+    await coordinator.request(7);
+
+    expect(load).toHaveBeenCalledOnce();
+  });
+
+  it("stops after one follow-up when a replica has not reached the requested version", async () => {
+    const load = vi
+      .fn<() => Promise<OperationBoard>>()
+      .mockResolvedValue({ event: { version: 6 } } as OperationBoard);
+    const coordinator = createBoardSyncCoordinator(load);
+
+    await expect(coordinator.request(7)).resolves.toMatchObject({
+      type: "CONFIRMED",
+      board: { event: { version: 6 } },
+    });
+
+    expect(load).toHaveBeenCalledTimes(2);
   });
 });

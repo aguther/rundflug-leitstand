@@ -14,12 +14,16 @@ describe("V1.7.0 Flight-Line-Flugzeugzustände", () => {
     const duplicateCheck = coordinator.indexOf(
       "SELECT response_json FROM idempotency_receipts WHERE command_id = ?1",
     );
-    const staleCheck = coordinator.indexOf("current.version !== command.expectedVersion");
+    const staleCheck = coordinator.indexOf(
+      "const versionConflict = await this.validateCommandVersion(command, current)",
+    );
     const handler = coordinator.indexOf("private async handleFleetAdministration");
     expect(duplicateCheck).toBeGreaterThan(0);
     expect(staleCheck).toBeGreaterThan(duplicateCheck);
     expect(handler).toBeGreaterThan(staleCheck);
     expect(coordinator).toContain('code: "STALE_VERSION"');
+    expect(coordinator).toContain('code: "STALE_AGGREGATE_VERSION"');
+    expect(coordinator).toContain("private commandTail: Promise<void>");
     expect(coordinator).toContain("duplicate: true");
   });
 

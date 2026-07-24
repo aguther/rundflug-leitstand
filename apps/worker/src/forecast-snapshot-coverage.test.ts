@@ -8,8 +8,10 @@ import coordinatorSource from "./event-coordinator.ts?raw";
 describe("forecast snapshot retention", () => {
   it("captures a versioned timeline after persisted state changes", () => {
     expect(coordinatorSource).toMatch(
-      /private broadcast\([\s\S]*waitUntil\([\s\S]*recalculateForecastTimelines\(result\.event\.eventId, result\.eventType\)/,
+      /private broadcast\([\s\S]*waitUntil\([\s\S]*scheduleForecastRecalculation\(result\.event\.eventId, result\.eventType\)/,
     );
+    expect(coordinatorSource).toContain("FORECAST_COMMAND_DEBOUNCE_MS = 150");
+    expect(coordinatorSource).toContain("private forecastWork: Promise<void> | null");
     expect(coordinatorSource).toMatch(
       /INSERT INTO forecast_snapshots[\s\S]*operation_day_version[\s\S]*predicted_boarding_at[\s\S]*predicted_departure_at[\s\S]*predicted_landing_at[\s\S]*predicted_completion_at/,
     );

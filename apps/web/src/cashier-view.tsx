@@ -162,7 +162,7 @@ function QrScanDialog({
 }
 
 export function CashierView() {
-  const { board, error, lastConfirmedAt, backendConfirmed, refresh } =
+  const { board, error, lastConfirmedAt, backendConfirmed, confirmEvent, refresh } =
     useOperationBoard(CASHIER_DEVICE_ID);
   const online = useConnectivity();
   const serverConfirmed = online && backendConfirmed && error === null;
@@ -306,14 +306,19 @@ export function CashierView() {
     [serverConfirmed, ticketListTab, ticketSearchQuery],
   );
 
-  async function reopenTicketGroup(ticketGroupId: string): Promise<boolean> {
+  async function reopenTicketGroup(
+    ticketGroupId: string,
+    confirmedPrintData?: TicketGroupPrintData,
+  ): Promise<boolean> {
     try {
-      const data = await getTicketGroupPrintData(
-        EVENT_ID,
-        ticketGroupId,
-        CASHIER_DEVICE_ID,
-        deviceTokenFor(CASHIER_DEVICE_ID),
-      );
+      const data =
+        confirmedPrintData ??
+        (await getTicketGroupPrintData(
+          EVENT_ID,
+          ticketGroupId,
+          CASHIER_DEVICE_ID,
+          deviceTokenFor(CASHIER_DEVICE_ID),
+        ));
       const prepared = await printableTicket(data);
       setReceipt(prepared);
       return true;
@@ -415,17 +420,22 @@ export function CashierView() {
         deviceTokenFor(CASHIER_DEVICE_ID),
       );
       const soldTicketGroupId = saleResult.aggregate?.id ?? null;
-      const printPrepared = soldTicketGroupId ? await reopenTicketGroup(soldTicketGroupId) : false;
+      confirmEvent(saleResult.event);
       setLastTicketGroupId(soldTicketGroupId);
-      setMessage(
-        `${codes.length} Ticket${codes.length === 1 ? "" : "s"} verkauft.${
-          printPrepared ? "" : " Druckvorbereitung fehlgeschlagen; Nachdruck bleibt möglich."
-        }`,
-      );
+      setMessage(`${codes.length} Ticket${codes.length === 1 ? "" : "s"} verkauft.`);
       writeCashierDraftQueue(localStorage, draftQueueKey, []);
       setPendingDraftCount(0);
       setSize(1);
-      await Promise.all([refresh(), loadTicketList({ preserveLoaded: true })]);
+      if (soldTicketGroupId) {
+        void reopenTicketGroup(soldTicketGroupId, saleResult.saleReceipt).then((printPrepared) => {
+          if (!printPrepared) {
+            setMessage(
+              `${codes.length} Ticket${codes.length === 1 ? "" : "s"} verkauft. Druckvorbereitung fehlgeschlagen; Nachdruck bleibt möglich.`,
+            );
+          }
+        });
+      }
+      void refresh(saleResult.event.version);
     } catch (reason) {
       setMessage(reason instanceof Error ? reason.message : "Verkauf fehlgeschlagen.");
     } finally {

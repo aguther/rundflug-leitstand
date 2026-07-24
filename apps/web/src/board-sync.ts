@@ -46,3 +46,64 @@ export async function requestBoardSync(
     };
   }
 }
+
+export interface BoardSyncCoordinator {
+  request(minimumVersion?: number): Promise<BoardSyncOutcome>;
+}
+
+/**
+ * Coalesces WebSocket, command-confirmation and polling refreshes into one board request.
+ * A refresh that arrives while another request is running only causes one follow-up request,
+ * and only when the first response did not yet reach the requested event version.
+ */
+export function createBoardSyncCoordinator(
+  load: () => Promise<OperationBoard>,
+  now: () => Date = () => new Date(),
+): BoardSyncCoordinator {
+  let inFlight: Promise<BoardSyncOutcome> | null = null;
+  let requestedMinimumVersion = 0;
+  let lastConfirmed: Extract<BoardSyncOutcome, { type: "CONFIRMED" }> | null = null;
+
+  const run = async (): Promise<BoardSyncOutcome> => {
+    let outcome: BoardSyncOutcome = {
+      type: "UNAVAILABLE",
+      message: "Betriebsdaten nicht verfügbar.",
+    };
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const targetVersion = requestedMinimumVersion;
+      requestedMinimumVersion = 0;
+      outcome = await requestBoardSync(load, now);
+      if (outcome.type !== "CONFIRMED") return outcome;
+      if (!lastConfirmed || outcome.board.event.version >= lastConfirmed.board.event.version) {
+        lastConfirmed = outcome;
+      }
+      const latestTargetVersion = Math.max(targetVersion, requestedMinimumVersion);
+      if (outcome.board.event.version >= latestTargetVersion) {
+        requestedMinimumVersion = 0;
+        return lastConfirmed;
+      }
+      requestedMinimumVersion = latestTargetVersion;
+    }
+    requestedMinimumVersion = 0;
+    return lastConfirmed ?? outcome;
+  };
+
+  return {
+    request(minimumVersion = 0) {
+      if (
+        minimumVersion > 0 &&
+        lastConfirmed &&
+        lastConfirmed.board.event.version >= minimumVersion
+      ) {
+        return Promise.resolve(lastConfirmed);
+      }
+      requestedMinimumVersion = Math.max(requestedMinimumVersion, minimumVersion);
+      if (!inFlight) {
+        inFlight = run().finally(() => {
+          inFlight = null;
+        });
+      }
+      return inFlight;
+    },
+  };
+}
