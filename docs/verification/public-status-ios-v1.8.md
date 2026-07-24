@@ -12,6 +12,9 @@ Status: Automatisierte Abnahme erfolgreich; Originalhardware-Abnahme in HTTPS-St
 - Ticket-/Gruppenroute, Manifest, Apple-Touch-Icon und Apple-App-Titel werden schon im ersten
   HTML-Dokument verbunden. Kasse, Flight Line, Assist, FIDS und Admin besitzen entsprechend eigene
   Manifeste, Icons und Startpfade.
+- Der Workbox-Navigationsfallback schließt alle installierbaren Ticket-, Gruppen- und
+  Betriebsrouten aus. Damit kann der vorgecachete generische App-Shell weder `Leitstand` noch `/`
+  als Installationsprofil unterschieben.
 - Ticket- und Gruppenregistrierungen speichern `target_kind`; Migration 0043 führt Bestände auf
   `GROUP` zurück.
 - Push-Nutzlast und Service Worker akzeptieren ausschließlich relative Ticket-/Gruppenpfade.

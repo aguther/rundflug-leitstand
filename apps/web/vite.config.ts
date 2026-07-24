@@ -38,7 +38,12 @@ const operationalPwa = VitePWA({
   },
   workbox: {
     navigateFallback: "/index.html",
-    navigateFallbackDenylist: [/^\/api(?:\/|$)/],
+    navigateFallbackDenylist: [
+      /^\/api(?:\/|$)/,
+      /^\/(?:ticket|gruppe)\//,
+      /^\/(?:kasse|admin|fids)(?:\/|$)/,
+      /^\/flight-line(?:\/|$)/,
+    ],
     importScripts: ["/push-sw.js"],
     globIgnores: [
       "**/ForecastSimulationView-*.js",

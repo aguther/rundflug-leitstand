@@ -70,4 +70,10 @@ describe("V1 PWA installability", () => {
     expect(worker).toContain("INTERNAL_APP_INSTALL_PROFILES");
     expect(worker).toContain("installableAppShellResponse");
   });
+
+  it("umgeht für installierbare Routen den generischen Workbox-Navigationsfallback", () => {
+    expect(viteConfig).toContain("/^\\/(?:ticket|gruppe)\\//");
+    expect(viteConfig).toContain("/^\\/(?:kasse|admin|fids)(?:\\/|$)/");
+    expect(viteConfig).toContain("/^\\/flight-line(?:\\/|$)/");
+  });
 });
