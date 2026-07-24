@@ -21,6 +21,7 @@ import {
 import {
   assessForecastFreshness,
   assessRemainingCapacity,
+  derivePublicRotationStatus,
   deriveResourceGroupCapacity,
   estimateDuration,
   forecastQueueWindows,
@@ -3708,7 +3709,6 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
             COALESCE(tg.communication_number, fg.communication_number) AS communication_number,
             fg.precalled_at, r.status, tg.operation_day_id,
             COALESCE(fg.queue_position, tg.queue_sequence) AS queue_sequence,
-            t.attendance_status,
             r.predicted_boarding_at, r.prediction_quality,
             r.prediction_lower_minutes, r.prediction_upper_minutes,
             r.prediction_updated_at,
@@ -3739,7 +3739,6 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
       status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
       operation_day_id: string;
       queue_sequence: number;
-      attendance_status: "NOT_CHECKED_IN" | "CHECKED_IN";
       predicted_boarding_at: string | null;
       prediction_quality: "STABLE" | "CHANGING" | "UNCERTAIN" | null;
       prediction_lower_minutes: number | null;
@@ -3776,23 +3775,15 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
     effectivePredictionQuality !== "UNCERTAIN" &&
     row.prediction_upper_minutes !== null &&
     row.prediction_upper_minutes <= row.notification_lead_minutes;
-  const publicState = {
-    DRAFT: row.precalled_at ? "COME_TO_FLIGHT_LINE" : prepare ? "PREPARE" : "WAITING",
-    CALLED: row.attendance_status === "CHECKED_IN" ? "BOARDING" : "COME_TO_FLIGHT_LINE",
-    IN_FLIGHT: "IN_FLIGHT",
-    LANDED: "LANDED",
-    COMPLETED: "COMPLETED",
-  } as const;
+  const publicStatus = derivePublicRotationStatus({
+    rotationState: row.status,
+    draftStatus: row.precalled_at ? "COME_TO_FLIGHT_LINE" : prepare ? "PREPARE" : "WAITING",
+  });
   const message = {
-    DRAFT: row.precalled_at
-      ? "Bitte jetzt zum Gate kommen."
-      : prepare
-        ? "Ihr Aufruf steht bevor. Bitte bereithalten."
-        : "Bitte Status regelmäßig prüfen.",
-    CALLED:
-      row.attendance_status === "CHECKED_IN"
-        ? "Bitte am Gate zum Einstieg bereithalten."
-        : "Bitte jetzt zum Gate kommen.",
+    WAITING: "Bitte Status regelmäßig prüfen.",
+    PREPARE: "Ihr Aufruf steht bevor. Bitte bereithalten.",
+    COME_TO_FLIGHT_LINE: "Bitte jetzt zum Gate kommen.",
+    BOARDING: "Bitte am Gate zum Einstieg bereithalten.",
     IN_FLIGHT: "Ihr Rundflug ist gestartet.",
     LANDED: "Ihr Rundflug ist gelandet.",
     COMPLETED: "Ihr Rundflug ist abgeschlossen.",
@@ -3820,7 +3811,7 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
       row.operational_interrupted === 1 ||
       row.resource_group_status !== "ACTIVE"
         ? "SERVICE_PAUSED"
-        : publicState[row.status],
+        : publicStatus,
     queuePosition: row.emergency_mode === 0 && row.status === "DRAFT" ? row.queue_sequence : null,
     waitLowerMinutes:
       row.emergency_mode === 0 &&
@@ -3851,7 +3842,7 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
             ? "Flugbetrieb unterbrochen – bitte Status erneut prüfen."
             : forecastFreshness.reason === "STALE_PREDICTION"
               ? "Prognose wird aktualisiert – bitte Status erneut prüfen."
-              : message[row.status],
+              : message[publicStatus],
     operationalNotice: row.resource_group_operational_note || row.event_operational_note,
     updatedAt: row.updated_at,
   });
@@ -3903,8 +3894,7 @@ app.get("/api/public/groups/:groupCode", async (context) => {
     `SELECT r.id, r.status, r.predicted_boarding_at, r.prediction_quality,
             r.prediction_lower_minutes, r.prediction_upper_minutes, r.prediction_updated_at,
             fg.precalled_at, COALESCE(fg.queue_position, fg.communication_number) AS queue_position,
-            g.label AS gate_label, COUNT(t.id) AS passenger_count,
-            SUM(CASE WHEN t.attendance_status = 'CHECKED_IN' THEN 1 ELSE 0 END) AS present_count
+            g.label AS gate_label, COUNT(t.id) AS passenger_count
        FROM rotation_tickets rt
        JOIN tickets t ON t.id = rt.ticket_id
        JOIN rotations r ON r.id = rt.rotation_id
@@ -3929,7 +3919,6 @@ app.get("/api/public/groups/:groupCode", async (context) => {
       queue_position: number;
       gate_label: string;
       passenger_count: number;
-      present_count: number;
     }>();
   if (rotations.results.length === 0) {
     return unknownTicketResponse(context.env, context.req.raw);
@@ -3957,33 +3946,16 @@ app.get("/api/public/groups/:groupCode", async (context) => {
       rotation.status === "DRAFT" &&
       predictionQuality !== "UNCERTAIN" &&
       upperMinutes <= group.notification_lead_minutes;
-    const status =
+    const lifecycleStatus = derivePublicRotationStatus({
+      rotationState: rotation.status,
+      draftStatus: rotation.precalled_at ? "COME_TO_FLIGHT_LINE" : prepare ? "PREPARE" : "WAITING",
+    });
+    const publicStatus =
       group.emergency_mode === 1 ||
       group.operational_interrupted === 1 ||
       group.resource_group_status !== "ACTIVE"
         ? ("SERVICE_PAUSED" as const)
-        : rotation.status === "DRAFT"
-          ? rotation.precalled_at
-            ? ("COME_TO_FLIGHT_LINE" as const)
-            : prepare
-              ? ("PREPARE" as const)
-              : ("WAITING" as const)
-          : rotation.status === "CALLED"
-            ? rotation.present_count === rotation.passenger_count
-              ? ("BOARDING" as const)
-              : ("COME_TO_FLIGHT_LINE" as const)
-            : rotation.status;
-    const publicStatus =
-      status === "IN_FLIGHT" ||
-      status === "LANDED" ||
-      status === "COMPLETED" ||
-      status === "SERVICE_PAUSED" ||
-      status === "WAITING" ||
-      status === "PREPARE" ||
-      status === "COME_TO_FLIGHT_LINE" ||
-      status === "BOARDING"
-        ? status
-        : "WAITING";
+        : lifecycleStatus;
     const boardingWindow = predictedBoardingWindow({
       status: rotation.status,
       quality: predictionQuality,
@@ -4379,7 +4351,6 @@ app.get("/api/public/events/:eventId/board", async (context) => {
             r.predicted_boarding_at, r.prediction_quality, r.prediction_lower_minutes,
             r.prediction_upper_minutes, r.prediction_updated_at,
             MIN(a.registration) AS aircraft_registration,
-            MIN(a.operational_state) AS aircraft_operational_state,
             r.departed_at,
             COUNT(rt.ticket_id) AS ticket_count,
             rg.status AS resource_group_status,
@@ -4434,7 +4405,6 @@ app.get("/api/public/events/:eventId/board", async (context) => {
       prediction_upper_minutes: number | null;
       prediction_updated_at: string | null;
       aircraft_registration: string | null;
-      aircraft_operational_state: string | null;
       departed_at: string | null;
       ticket_count: number;
       resource_group_status: "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED";
@@ -4450,13 +4420,6 @@ app.get("/api/public/events/:eventId/board", async (context) => {
   )
     .bind(eventId)
     .all<{ registration: string; operational_state: string; refuel_planned: number }>();
-  const publicState = {
-    DRAFT: "WAITING",
-    CALLED: "COME_TO_FLIGHT_LINE",
-    IN_FLIGHT: "IN_FLIGHT",
-    LANDED: "LANDED",
-    COMPLETED: "COMPLETED",
-  } as const;
   const boardReadAt = new Date().toISOString();
   return context.json({
     eventName: event.name,
@@ -4506,11 +4469,10 @@ app.get("/api/public/events/:eventId/board", async (context) => {
             status:
               row.resource_group_status !== "ACTIVE"
                 ? "SERVICE_PAUSED"
-                : row.status === "DRAFT" && row.precalled_at !== null
-                  ? "COME_TO_FLIGHT_LINE"
-                  : row.status === "CALLED" && row.aircraft_operational_state === "BOARDING"
-                    ? "BOARDING"
-                    : publicState[row.status],
+                : derivePublicRotationStatus({
+                    rotationState: row.status,
+                    draftStatus: row.precalled_at !== null ? "COME_TO_FLIGHT_LINE" : "WAITING",
+                  }),
             waitLowerMinutes:
               event.operational_interrupted === 1 || row.resource_group_status !== "ACTIVE"
                 ? 0
