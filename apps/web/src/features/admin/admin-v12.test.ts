@@ -30,7 +30,7 @@ describe("V1.2 compact administration", () => {
     expect(appSource).toContain(
       "const [restartEditorOpen, setRestartEditorOpen] = useState(false)",
     );
-    expect(appSource).toContain('hidden={adminArea !== "setup" || !restartEditorOpen}');
+    expect(appSource).toContain('hidden={adminArea !== "events" || !restartEditorOpen}');
     expect(appSource).toContain("setRestartEditorOpen(true)");
     expect(appSource).toContain("setRestartEditorOpen(false)");
     expect(stylesSource).toMatch(/\.admin-shell \.reset-levels\[hidden\]\s*\{\s*display: none;/);

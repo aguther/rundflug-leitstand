@@ -153,7 +153,26 @@ describe("Flight Director", () => {
     expect(appSource).toContain("([10, 20, 30] as const)");
     expect(appSource).toContain("{minutes} Min.");
     expect(appSource).toContain("Dauer unbekannt");
-    expect(appSource).not.toContain("Pause starten");
+    expect(appSource).toContain("Pilotenpause gestartet.");
+    expect(appSource).not.toContain("setTimeout");
     expect(appSource).toContain('type: "SET_AIRCRAFT_OPERATIONAL_STATE"');
+  });
+
+  it("centralizes Flight Director controls in the prioritized operations dialog", () => {
+    expect(supervisorSource).toContain("operationalSummary");
+    expect(supervisorSource).toContain("Betrieb");
+    expect(appSource).toContain(
+      'type OperationsTab = "notices" | "resources" | "pilots" | "emergency"',
+    );
+    expect(appSource).toContain("Not-Halt aktiv");
+    expect(appSource).toContain("Betrieb unterbrochen");
+    expect(appSource).toContain("Betrieb normal");
+    expect(appSource).toContain('type: "SET_OPERATIONAL_NOTE"');
+    expect(appSource).toContain('type: "SET_RESOURCE_GROUP_NOTICE"');
+    expect(appSource).toContain('type: "SET_RESOURCE_GROUP_STATUS"');
+    expect(appSource).toContain('type: "SET_PILOT_PAUSE"');
+    expect(appSource).toContain("Die Aufhebung bleibt ausschließlich");
+    expect(appSource).toContain("Admin-Bereich möglich.");
+    expect(appSource).not.toContain('<details className="emergency-control">');
   });
 });

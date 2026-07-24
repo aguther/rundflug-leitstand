@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import adminUxSource from "./admin-ux.tsx?raw";
 import adminViewSource from "./admin-view.tsx?raw";
+import apiSource from "./api.ts?raw";
+import chartSource from "./features/admin/AdminEventFlowChart.tsx?raw";
 
 const adminStyles = readFileSync(
   new URL("./features/admin/admin-v15.css", import.meta.url),
@@ -11,7 +13,7 @@ const adminStyles = readFileSync(
 describe("V1.5 administration UI", () => {
   it("uses one compact setup flow and the shared design-system primitives", () => {
     expect(adminViewSource.match(/<SetupProgress/g)).toHaveLength(1);
-    expect(adminViewSource).toContain('className="event-setup-v15"');
+    expect(adminViewSource).toContain('className="event-setup-v15 single-panel"');
     expect(adminViewSource).toContain('className="event-release-v15"');
     expect(adminViewSource).toContain('className="event-catalog-v15"');
     expect(adminViewSource).toContain("<PageHeader");
@@ -41,5 +43,62 @@ describe("V1.5 administration UI", () => {
     expect(adminStyles).toContain("overflow-x: auto");
     expect(adminStyles).toContain("scrollbar-width: none");
     expect(adminStyles).toContain("flex-direction: column");
+  });
+
+  it("implements the event-scoped information architecture and legacy URL redirects", () => {
+    for (const navigationItem of [
+      '{ id: "overview", label: "Übersicht"',
+      '{ id: "events", label: "Veranstaltungen"',
+      '{ id: "users", label: "Konten"',
+      '{ id: "evaluation", label: "Auswertung"',
+      '{ id: "backup", label: "Sicherung & Reset"',
+    ]) {
+      expect(adminUxSource).toContain(navigationItem);
+    }
+    for (const step of [
+      'id: "event"',
+      'id: "gates"',
+      'id: "resource-groups"',
+      'id: "aircraft"',
+      'id: "pilots"',
+      'id: "products"',
+      'id: "operations"',
+      'id: "completion"',
+    ]) {
+      expect(adminViewSource).toContain(step);
+    }
+    expect(adminViewSource).toContain(
+      'if (["setup", "master-data", "audit"].includes(requestedArea ?? "")) return "events";',
+    );
+    expect(adminViewSource).toContain('if (requestedArea === "audit") return "completion";');
+  });
+
+  it("uses event-only flow data and a strict preview-before-import workflow", () => {
+    expect(adminViewSource).toContain("<AdminEventFlowChart");
+    expect(chartSource).toContain("<svg");
+    expect(chartSource).toContain("soldTickets");
+    expect(chartSource).toContain("completedTickets");
+    expect(chartSource).toContain("openTickets");
+    expect(apiSource).toContain("/flow");
+    expect(apiSource).toContain("/master-data-template/validate");
+    expect(apiSource).toContain("/master-data-template/import");
+    expect(adminViewSource).toContain("Vorlage importieren");
+    expect(adminViewSource).toContain("templateValidation.counts");
+    expect(adminViewSource).toContain('size="wide"');
+  });
+
+  it("opens master-data editors from rows without a redundant actions column", () => {
+    const masterDataTables = adminViewSource.slice(
+      adminViewSource.indexOf('<section className="master-data-workspace"'),
+      adminViewSource.indexOf('hidden={eventStep !== "completion"}'),
+    );
+
+    expect(masterDataTables).not.toContain("<th>Aktionen</th>");
+    expect(masterDataTables).not.toContain("table-overflow-action");
+    expect(masterDataTables).toContain("onClick={() => selectGateForEditing(gate.id)}");
+    expect(masterDataTables).toContain("onClick={() => selectResourceForEditing(group.id)}");
+    expect(masterDataTables).toContain("onClick={() => selectAircraftForEditing(aircraft.id)}");
+    expect(masterDataTables).toContain("onClick={() => selectPilotForEditing(pilot.id)}");
+    expect(masterDataTables).toContain("onClick={() => selectProductForEditing(product.id)}");
   });
 });

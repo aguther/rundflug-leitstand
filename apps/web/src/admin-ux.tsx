@@ -1,8 +1,6 @@
 import {
   CalendarDays,
   ChartNoAxesColumn,
-  ClipboardList,
-  Database,
   Grid2X2,
   type LucideIcon,
   ShieldCheck,
@@ -10,14 +8,16 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 
-export type AdminArea =
-  | "overview"
-  | "setup"
-  | "master-data"
-  | "users"
-  | "evaluation"
-  | "audit"
-  | "backup";
+export type AdminArea = "overview" | "events" | "users" | "evaluation" | "backup";
+export type AdminEventStep =
+  | "event"
+  | "gates"
+  | "resource-groups"
+  | "aircraft"
+  | "pilots"
+  | "products"
+  | "operations"
+  | "completion";
 export type MasterDataCategory =
   | "gates"
   | "resource-groups"
@@ -27,20 +27,17 @@ export type MasterDataCategory =
   | "products";
 
 export type SetupStep = {
-  id: string;
+  id: AdminEventStep;
   label: string;
   complete: boolean;
-  area: AdminArea;
   category?: MasterDataCategory;
 };
 
 const navigationItems: Array<{ id: AdminArea; label: string; Icon: LucideIcon }> = [
   { id: "overview", label: "Übersicht", Icon: Grid2X2 },
-  { id: "setup", label: "Veranstaltung", Icon: CalendarDays },
-  { id: "master-data", label: "Stammdaten", Icon: Database },
+  { id: "events", label: "Veranstaltungen", Icon: CalendarDays },
   { id: "users", label: "Konten", Icon: UsersRound },
   { id: "evaluation", label: "Auswertung", Icon: ChartNoAxesColumn },
-  { id: "audit", label: "Audit", Icon: ClipboardList },
   { id: "backup", label: "Sicherung & Reset", Icon: ShieldCheck },
 ];
 
@@ -71,13 +68,21 @@ export function AdminNavigation({
 
 export function SetupProgress({
   steps,
+  currentStepId,
   onSelect,
 }: {
   steps: SetupStep[];
+  currentStepId?: AdminEventStep;
   onSelect: (step: SetupStep) => void;
 }) {
   const firstIncomplete = steps.findIndex((step) => !step.complete);
-  const currentIndex = firstIncomplete === -1 ? steps.length - 1 : firstIncomplete;
+  const requestedIndex = currentStepId ? steps.findIndex((step) => step.id === currentStepId) : -1;
+  const currentIndex =
+    requestedIndex >= 0
+      ? requestedIndex
+      : firstIncomplete === -1
+        ? steps.length - 1
+        : firstIncomplete;
   return (
     <ol aria-label="Einrichtungsfortschritt" className="setup-progress">
       {steps.map((step, index) => {
