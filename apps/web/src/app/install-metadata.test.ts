@@ -3,20 +3,47 @@ import { installMetadataForPath, publicStatusInstallMetadata } from "./install-m
 
 describe("ansichtsspezifische Installationsmetadaten", () => {
   it.each([
-    ["/kasse", "/manifests/kasse.webmanifest", "/icons/kasse-icon-180.png"],
+    [
+      "/kasse",
+      "/manifests/kasse.webmanifest",
+      "/icons/pwa/kasse/favicon.svg",
+      "/icons/pwa/kasse/apple-touch-icon-180.png",
+    ],
     [
       "/flight-director",
       "/manifests/flight-director.webmanifest",
-      "/icons/flight-line-icon-180.png",
+      "/icons/pwa/flight-director/favicon.svg",
+      "/icons/pwa/flight-director/apple-touch-icon-180.png",
     ],
-    ["/flight-line", "/manifests/flight-line.webmanifest", "/icons/assist-icon-180.png"],
-    ["/fids", "/manifests/fids.webmanifest", "/icons/fids-icon-180.png"],
-    ["/fids/terminal", "/manifests/fids.webmanifest", "/icons/fids-icon-180.png"],
-    ["/admin", "/manifests/admin.webmanifest", "/icons/admin-icon-180.png"],
-  ])("ordnet %s ein eigenes Manifest und Symbol zu", (path, manifestHref, iconHref) => {
+    [
+      "/flight-line",
+      "/manifests/flight-line.webmanifest",
+      "/icons/pwa/flight-line/favicon.svg",
+      "/icons/pwa/flight-line/apple-touch-icon-180.png",
+    ],
+    [
+      "/fids",
+      "/manifests/fids.webmanifest",
+      "/icons/pwa/fids/favicon.svg",
+      "/icons/pwa/fids/apple-touch-icon-180.png",
+    ],
+    [
+      "/fids/terminal",
+      "/manifests/fids.webmanifest",
+      "/icons/pwa/fids/favicon.svg",
+      "/icons/pwa/fids/apple-touch-icon-180.png",
+    ],
+    [
+      "/admin",
+      "/manifests/admin.webmanifest",
+      "/icons/pwa/admin/favicon.svg",
+      "/icons/pwa/admin/apple-touch-icon-180.png",
+    ],
+  ])("ordnet %s ein eigenes Manifest, Favicon und App-Symbol zu", (path, manifestHref, faviconHref, appleTouchIconHref) => {
     expect(installMetadataForPath(path)).toMatchObject({
       manifestHref,
-      appleTouchIconHref: iconHref,
+      faviconHref,
+      appleTouchIconHref,
     });
   });
 
@@ -27,11 +54,13 @@ describe("ansichtsspezifische Installationsmetadaten", () => {
   it("bindet öffentliche Codes nur in das seitenspezifische Manifest ein", () => {
     expect(installMetadataForPath("/ticket/ABCDE2345678")).toMatchObject({
       manifestHref: "/api/public/pwa-manifest/ticket/ABCDE2345678",
-      appleTouchIconHref: "/icons/ticket-icon-180.png",
+      faviconHref: "/icons/pwa/ticket/favicon.svg",
+      appleTouchIconHref: "/icons/pwa/ticket/apple-touch-icon-180.png",
     });
     expect(installMetadataForPath("/gruppe/FGHJK2345678")).toMatchObject({
       manifestHref: "/api/public/pwa-manifest/group/FGHJK2345678",
-      appleTouchIconHref: "/icons/ticket-icon-180.png",
+      faviconHref: "/icons/pwa/ticket/favicon.svg",
+      appleTouchIconHref: "/icons/pwa/ticket/apple-touch-icon-180.png",
     });
   });
 

@@ -29,4 +29,7 @@ zweizeiliger Wortmarke und entfernen die bisherige redundante Textwiederholung.
 Die Marke verwendet im hellen Theme Tinte `#0D1B26`, im dunklen Theme `#E6EDF3` und für Rundkurs
 und Knoten `#FFB020`. Barlow Condensed 200/400 wird lokal aus der PWA geladen. Kompakte Marken sind
 bei sichtbarem Nachbartitel dekorativ; der vollständige Lockup besitzt genau den zugänglichen Namen
-„Rundflug Leitstand“. Generische und ansichtsspezifische PWA-Icons bleiben unverändert.
+„Rundflug Leitstand“.
+
+Die damalige Festlegung unveränderter PWA-Icons wurde am 25. Juli 2026 durch die
+[freigegebene App-Icon-Familie](app-icon-family.md) ersetzt.

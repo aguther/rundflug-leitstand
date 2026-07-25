@@ -1,0 +1,334 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rundflug Leitstand — Icon-Set</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@200;400;500&family=Barlow:wght@400;500&family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --nacht:#0A121A; --panel:#14212C; --papier:#F2F5F7;
+    --tin:#0D1B26; --akz:#FFB020; --hell:#E6EDF3; --radar:#46A6BC;
+    --linie:rgba(255,255,255,.10); --dim:rgba(230,237,243,.55);
+    --display:"Barlow Condensed",ui-sans-serif,sans-serif;
+    --body:"Barlow",ui-sans-serif,-apple-system,sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--nacht);color:var(--hell);font-family:var(--body);line-height:1.55}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 28px 96px}
+  .kopf{border-bottom:1px solid var(--linie);margin-bottom:56px}
+  .kopf .wrap{padding:60px 28px 48px}
+  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--akz);margin:0 0 24px}
+  h1{font-family:var(--display);text-transform:uppercase;font-weight:400;font-size:clamp(34px,5.4vw,56px);line-height:.95;margin:0}
+  h1 b{font-weight:500}
+  .kopf p{color:var(--dim);max-width:56ch;margin:20px 0 0}
+
+  .abschnitt{margin-bottom:72px}
+  .titel{display:flex;align-items:baseline;gap:14px;border-bottom:1px solid var(--linie);padding-bottom:10px;margin-bottom:26px}
+  .titel h2{font-family:var(--display);text-transform:uppercase;letter-spacing:.09em;font-weight:500;font-size:20px;margin:0}
+  .titel span{font-family:var(--mono);font-size:11px;color:var(--dim);margin-left:auto}
+  .lead{color:var(--dim);max-width:66ch;margin:-4px 0 24px;font-size:15px}
+
+  .karten{display:grid;gap:14px}
+  .karte{background:var(--papier);color:var(--tin);border-radius:4px;padding:20px 24px;
+         display:grid;grid-template-columns:120px 150px 1fr auto;gap:24px;align-items:center}
+  @media(max-width:820px){.karte{grid-template-columns:100px 1fr;gap:18px}.karte .app{display:none}}
+  .buehne{display:grid;place-items:center;background:#fff;border:1px solid rgba(13,27,38,.09);border-radius:3px;height:120px}
+  .mini{display:flex;align-items:flex-end;gap:16px}
+  .mini div{display:grid;justify-items:center;gap:7px}
+  .mini span{font-family:var(--mono);font-size:10px;color:rgba(13,27,38,.45)}
+  .karte h3{font-family:var(--display);text-transform:uppercase;letter-spacing:.05em;font-weight:500;font-size:22px;margin:0 0 4px;line-height:1}
+  .basis{margin:0;font-family:var(--mono);font-size:11px;color:rgba(13,27,38,.5)}
+  .basis code{background:rgba(13,27,38,.06);padding:1px 5px;border-radius:2px}
+  .app svg{display:block;border-radius:14px}
+
+  .navs{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  @media(max-width:760px){.navs{grid-template-columns:1fr}}
+  .nav{background:#1B2733;border:1px solid var(--linie);border-radius:4px;padding:14px}
+  .nav h4{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;
+          color:var(--dim);margin:4px 8px 12px;font-weight:400}
+  .nav ul{list-style:none;margin:0;padding:0}
+  .nav li{display:flex;align-items:center;gap:14px;padding:11px 12px;border-radius:4px;
+          font-family:var(--display);font-size:19px;letter-spacing:.01em;color:#DCE4EC}
+  .nav li:first-child{background:#254B7A;color:#fff}
+  .nav li svg{flex:0 0 auto;opacity:.92}
+  .urteil{margin:14px 4px 0;font-size:13.5px;color:var(--dim)}
+
+  .liste{margin:0;padding:0;list-style:none;background:var(--panel);border:1px solid var(--linie);border-radius:4px;padding:8px 28px}
+  .liste li{display:grid;grid-template-columns:150px 1fr;gap:16px;padding:12px 0;border-top:1px solid var(--linie);font-size:14.5px}
+  .liste li:first-child{border-top:0}
+  .liste b{font-family:var(--mono);font-weight:400;font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--radar);padding-top:3px}
+  .liste span{color:var(--dim)}
+  code{font-family:var(--mono);font-size:12.5px;background:rgba(255,255,255,.06);padding:1px 5px;border-radius:2px}
+</style>
+
+<header class="kopf"><div class="wrap">
+  <p class="eyebrow">Icon-Set · 252 Dateien · alles aus einer Geometrie</p>
+  <h1><b>Rundflug</b> Leitstand<br>Icons</h1>
+  <p>Sechs Marken, jeweils als SVG, PNG in acht Größen, Favicon-Satz sowie App-Symbol
+     für iOS und Android. Jede Modul-Marke setzt eine Lucide-Glyphe in denselben
+     offenen Bogen mit Knoten.</p>
+</div></header>
+
+<main class="wrap">
+
+  <section class="abschnitt">
+    <div class="titel"><h2>Die Familie</h2><span>Bogen konstant · Glyphe wechselt</span></div>
+    <div class="karten">
+      <article class="karte">
+        <div class="buehne"><svg xmlns="http://www.w3.org/2000/svg" width="88" height="88" viewBox="0 0 48 48" role="img" aria-label="Rundflug Leitstand">
+  <path d="M32.54 4.82A21 21 0 1 0 43.18 15.46" fill="none" stroke="var(--akz)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><g transform="translate(9.6000 9.6000) scale(1.2)" fill="none" stroke="var(--tin)" stroke-width="2.0" stroke-linecap="round" stroke-linejoin="round"><path d="M3 22h18"/><path d="M6.36 17.4 4 17l-2-4 1.1-.55a2 2 0 0 1 1.8 0l.17.1a2 2 0 0 0 1.8 0L8 12 5 6l.9-.45a2 2 0 0 1 2.09.2l4.02 3a2 2 0 0 0 2.1.2l4.19-2.06a2.41 2.41 0 0 1 1.73-.17L21 7a1.4 1.4 0 0 1 .87 1.99l-.38.76c-.23.46-.6.84-1.07 1.08L7.58 17.2a2 2 0 0 1-1.22.18Z"/></g><circle cx="38.85" cy="9.15" r="2.24" fill="var(--akz)"/>
+</svg>
+</div>
+        <div class="mini">
+          <div><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 48 48" role="img" aria-label="Rundflug Leitstand">
+  <path d="M32.54 4.82A21 21 0 1 0 43.18 15.46" fill="none" stroke="var(--akz)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><g transform="translate(9.6000 9.6000) scale(1.2)" fill="none" stroke="var(--tin)" stroke-width="2.0" stroke-linecap="round" stroke-linejoin="round"><path d="M3 22h18"/><path d="M6.36 17.4 4 17l-2-4 1.1-.55a2 2 0 0 1 1.8 0l.17.1a2 2 0 0 0 1.8 0L8 12 5 6l.9-.45a2 2 0 0 1 2.09.2l4.02 3a2 2 0 0 0 2.1.2l4.19-2.06a2.41 2.41 0 0 1 1.73-.17L21 7a1.4 1.4 0 0 1 .87 1.99l-.38.76c-.23.46-.6.84-1.07 1.08L7.58 17.2a2 2 0 0 1-1.22.18Z"/></g><circle cx="38.85" cy="9.15" r="2.24" fill="var(--akz)"/>
+</svg>
+<span>32</span></div>
+          <div><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 48 48" role="img" aria-label="Rundflug Leitstand">
+  <path d="M32.54 4.82A21 21 0 1 0 43.18 15.46" fill="none" stroke="var(--akz)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><g transform="translate(9.6000 9.6000) scale(1.2)" fill="none" stroke="var(--tin)" stroke-width="2.0" stroke-linecap="round" stroke-linejoin="round"><path d="M3 22h18"/><path d="M6.36 17.4 4 17l-2-4 1.1-.55a2 2 0 0 1 1.8 0l.17.1a2 2 0 0 0 1.8 0L8 12 5 6l.9-.45a2 2 0 0 1 2.09.2l4.02 3a2 2 0 0 0 2.1.2l4.19-2.06a2.41 2.41 0 0 1 1.73-.17L21 7a1.4 1.4 0 0 1 .87 1.99l-.38.76c-.23.46-.6.84-1.07 1.08L7.58 17.2a2 2 0 0 1-1.22.18Z"/></g><circle cx="38.85" cy="9.15" r="2.24" fill="var(--akz)"/>
+</svg>
+<span>24</span></div>
+          <div><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 48 48" role="img" aria-label="Rundflug Leitstand">
+  <path d="M32.54 4.82A21 21 0 1 0 43.18 15.46" fill="none" stroke="var(--akz)" stroke-width="4.0" stroke-linecap="round" stroke-linejoin="round"/><g transform="translate(9.6000 9.6000) scale(1.2)" fill="none" stroke="var(--tin)" stroke-width="3.3333" stroke-linecap="round" stroke-linejoin="round"><path d="M3 22h18"/><path d="M6.36 17.4 4 17l-2-4 1.1-.55a2 2 0 0 1 1.8 0l.17.1a2 2 0 0 0 1.8 0L8 12 5 6l.9-.45a2 2 0 0 1 2.09.2l4.02 3a2 2 0 0 0 2.1.2l4.19-2.06a2.41 2.41 0 0 1 1.73-.17L21 7a1.4 1.4 0 0 1 .87 1.99l-.38.76c-.23.46-.6.84-1.07 1.08L7.58 17.2a2 2 0 0 1-1.22.18Z"/></g><circle cx="38.85" cy="9.15" r="3.4" fill="var(--akz)"/>
+</svg>
+<span>16</span></div>
+        </div>
+        <div class="txt">
+          <h3>Rundflug Leitstand</h3>
+          <p class="basis">lucide <code>plane-takeoff</code></p>
+        </div>
+        <div class="app"><svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 512 512" role="img" aria-label="Rundflug Leitstand">
+  <rect width="72" height="72" rx="114" fill="#0D1B26"/>
+  <g transform="translate(106.2400 106.2400) scale(6.240000)"><path d="M32.54 4.82A21 21 0 1 0 43.18 15.46" fill="none" stroke="#FFB020" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><g transform="translate(9.6000 9.6000) scale(1.2)" fill="none" stroke="#E6EDF3" stroke-width="2.0" stroke-linecap="round" stroke-linejoin="round"><path d="M3 22h18"/><path d="M6.36 17.4 4 17l-2-4 1.1-.55a2 2 0 0 1 1.8 0l.17.1a2 2 0 0 0 1.8 0L8 12 5 6l.9-.45a2 2 0 0 1 2.09.2l4.02 3a2 2 0 0 0 2.1.2l4.19-2.06a2.41 2.41 0 0 1 1.73-.17L21 7a1.4 1.4 0 0 1 .87 1.99l-.38.76c-.23.46-.6.84-1.07 1.08L7.58 17.2a2 2 0 0 1-1.22.18Z"/></g><circle cx="38.85" cy="9.15" r="2.24" fill="#FFB020"/></g>
+</svg>
+</div>
+      </article>
+      <article class="karte">
+        <div class="buehne"><svg xmlns="http://www.w3.org/2000/svg" width="88" height="88" viewBox="0 0 48 48" role="img" aria-label="Kasse">
+  <path d="M32.54 4.82A21 21 0 1 0 43.18 15.46" fill="none" stroke="var(--akz)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><g transform="translate(10.8000 10.8000) scale(1.1)" fill="none" stroke="var(--tin)" stroke-width="2.1818" stroke-linecap="round" stroke-linejoin="round"><path d="m3.173 8.18 11-5a2 2 0 0 1 2.647.993L18.56 8"/><path d="M6 10V8"/><path d="M6 14v1"/><path d="M6 19v2"/><rect x="2" y="8" width="20" height="13" rx="2"/></g><circle cx="38.85" cy="9.15" r="2.24" fill="var(--akz)"/>
+</svg>
+</div>
+        <div class="mini">
+          <div><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 48 48" role="img" aria-label="Kasse">
+  <path d="M32.54 4.82A21 21 0 1 0 43.18 15.46" fill="none" stroke="var(--akz)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><g transform="translate(10.8000 10.8000) scale(1.1)" fill="none" stroke="var(--tin)" stroke-width="2.1818" stroke-linecap="round" stroke-linejoin="round"><path d="m3.173 8.18 11-5a2 2 0 0 1 2.647.993L18.56 8"/><path d="M6 10V8"/><path d="M6 14v1"/><path d="M6 19v2"/><rect x="2" y="8" width="20" height="13" rx="2"/></g><circle cx="38.85" cy="9.15" r="2.24" fill="var(--akz)"/>
+</svg>
+<span>32</span></div>
+          <div><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 48 48" role="img" aria-label="Kasse">
+  <path d="M32.54 4.82A21 21 0 1 0 43.18 15.46" fill="none" stroke="var(--akz)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><g transform="translate(10.8000 10.8000) scale(1.1)" fill="none" stroke="var(--tin)" stroke-width="2.1818" stroke-linecap="round" stroke-linejoin="round"><path d="m3.173 8.18 11-5a2 2 0 0 1 2.647.993L18.56 8"/><path d="M6 10V8"/><path d="M6 14v1"/><path d="M6 19v2"/><rect x="2" y="8" width="20" height="13" rx="2"/></g><circle cx="38.85" cy="9.15" r="2.24" fill="var(--akz)"/>
+</svg>
+<span>24</span></div>
+          <div><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 48 48" role="img" aria-label="Kasse">
+  <path d="M32.54 4.82A21 21 0 1 0 43.18 15.46" fill="none" stroke="var(--akz)" stroke-width="4.0" stroke-linecap="round" stroke-linejoin="round"/><g transform="translate(10.8000 10.8000) scale(1.1)" fill="none" stroke="var(--tin)" stroke-width="3.6364" stroke-linecap="round" stroke-linejoin="round"><path d="m3.173 8.18 11-5a2 2 0 0 1 2.647.993L18.56 8"/><path d="M6 10V8"/><path d="M6 14v1"/><path d="M6 19v2"/><rect x="2" y="8" width="20" height="13" rx="2"/></g><circle cx="38.85" cy="9.15" r="3.4" fill="var(--akz)"/>
+</svg>
+<span>16</span></div>
+        </div>
+        <div class="txt">
+          <h3>Kasse</h3>
+          <p class="basis">lucide <code>tickets</code></p>
+        </div>
+        <div class="app"><svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 512 512" role="img" aria-label="Kasse">
+  <rect width="72" height="72" rx="114" fill="#0D1B26"/>
+  <g transform="translate(106.2400 106.2400) scale(6.240000)"><path d="M32.54 4.82A21 21 0 1 0 43.18 15.46" fill="none" stroke="#FFB020" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><g transform="translate(10.8000 10.8000) scale(1.1)" fill="none" stroke="#E6EDF3" stroke-width="2.1818" stroke-linecap="round" stroke-linejoin="round"><path d="m3.173 8.18 11-5a2 2 0 0 1 2.647.993L18.56 8"/><path d="M6 10V8"/><path d="M6 14v1"/><path d="M6 19v2"/><rect x="2" y="8" width="20" height="13" rx="2"/></g><circle cx="38.85" cy="9.15" r="2.24" fill="#FFB020"/></g>
+</svg>
+</div>
+      </article>
+      <article class="karte">
+        <div class="buehne"><svg xmlns="http://www.w3.org/2000/svg" width="88" height="88" viewBox="0 0 48 48" role="img" aria-label="Flight Director">
+  <path d="M32.54 4.82A21 21 0 1 0 43.18 15.46" fill="none" stroke="var(--akz)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><g transform="translate(10.8000 10.8000) scale(1.1)" fill="none" stroke="var(--tin)" stroke-width="2.1818" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><path d="M16 3.128a4 4 0 0 1 0 7.744"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><circle cx="9" cy="7" r="4"/></g><circle cx="38.85" cy="9.15" r="2.24" fill="var(--akz)"/>
+</svg>
+</div>
+        <div class="mini">
+          <div><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 48 48" role="img" aria-label="Flight Director">
+  <path d="M32.54 4.82A21 21 0 1 0 43.18 15.46" fill="none" stroke="var(--akz)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><g transform="translate(10.8000 10.8000) scale(1.1)" fill="none" stroke="var(--tin)" stroke-width="2.1818" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><path d="M16 3.128a4 4 0 0 1 0 7.744"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><circle cx="9" cy="7" r="4"/></g><circle cx="38.85" cy="9.15" r="2.24" fill="var(--akz)"/>
+</svg>
+<span>32</span></div>
+          <div><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 48 48" role="img" aria-label="Flight Director">
+  <path d="M32.54 4.82A21 21 0 1 0 43.18 15.46" fill="none" stroke="var(--akz)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><g transform="translate(10.8000 10.8000) scale(1.1)" fill="none" stroke="var(--tin)" stroke-width="2.1818" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><path d="M16 3.128a4 4 0 0 1 0 7.744"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><circle cx="9" cy="7" r="4"/></g><circle cx="38.85" cy="9.15" r="2.24" fill="var(--akz)"/>
+</svg>
+<span>24</span></div>
+          <div><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 48 48" role="img" aria-label="Flight Director">
+  <path d="M32.54 4.82A21 21 0 1 0 43.18 15.46" fill="none" stroke="var(--akz)" stroke-width="4.0" stroke-linecap="round" stroke-linejoin="round"/><g transform="translate(10.8000 10.8000) scale(1.1)" fill="none" stroke="var(--tin)" stroke-width="3.6364" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><path d="M16 3.128a4 4 0 0 1 0 7.744"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><circle cx="9" cy="7" r="4"/></g><circle cx="38.85" cy="9.15" r="3.4" fill="var(--akz)"/>
+</svg>
+<span>16</span></div>
+        </div>
+        <div class="txt">
+          <h3>Flight Director</h3>
+          <p class="basis">lucide <code>users</code></p>
+        </div>
+        <div class="app"><svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 512 512" role="img" aria-label="Flight Director">
+  <rect width="72" height="72" rx="114" fill="#0D1B26"/>
+  <g transform="translate(106.2400 106.2400) scale(6.240000)"><path d="M32.54 4.82A21 21 0 1 0 43.18 15.46" fill="none" stroke="#FFB020" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><g transform="translate(10.8000 10.8000) scale(1.1)" fill="none" stroke="#E6EDF3" stroke-width="2.1818" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><path d="M16 3.128a4 4 0 0 1 0 7.744"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><circle cx="9" cy="7" r="4"/></g><circle cx="38.85" cy="9.15" r="2.24" fill="#FFB020"/></g>
+</svg>
+</div>
+      </article>
+      <article class="karte">
+        <div class="buehne"><svg xmlns="http://www.w3.org/2000/svg" width="88" height="88" viewBox="0 0 48 48" role="img" aria-label="Flight Line">
+  <path d="M32.54 4.82A21 21 0 1 0 43.18 15.46" fill="none" stroke="var(--akz)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><g transform="translate(10.8000 10.8000) scale(1.1)" fill="none" stroke="var(--tin)" stroke-width="2.1818" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/></g><circle cx="38.85" cy="9.15" r="2.24" fill="var(--akz)"/>
+</svg>
+</div>
+        <div class="mini">
+          <div><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 48 48" role="img" aria-label="Flight Line">
+  <path d="M32.54 4.82A21 21 0 1 0 43.18 15.46" fill="none" stroke="var(--akz)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><g transform="translate(10.8000 10.8000) scale(1.1)" fill="none" stroke="var(--tin)" stroke-width="2.1818" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/></g><circle cx="38.85" cy="9.15" r="2.24" fill="var(--akz)"/>
+</svg>
+<span>32</span></div>
+          <div><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 48 48" role="img" aria-label="Flight Line">
+  <path d="M32.54 4.82A21 21 0 1 0 43.18 15.46" fill="none" stroke="var(--akz)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><g transform="translate(10.8000 10.8000) scale(1.1)" fill="none" stroke="var(--tin)" stroke-width="2.1818" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/></g><circle cx="38.85" cy="9.15" r="2.24" fill="var(--akz)"/>
+</svg>
+<span>24</span></div>
+          <div><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 48 48" role="img" aria-label="Flight Line">
+  <path d="M32.54 4.82A21 21 0 1 0 43.18 15.46" fill="none" stroke="var(--akz)" stroke-width="4.0" stroke-linecap="round" stroke-linejoin="round"/><g transform="translate(10.8000 10.8000) scale(1.1)" fill="none" stroke="var(--tin)" stroke-width="3.6364" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/></g><circle cx="38.85" cy="9.15" r="3.4" fill="var(--akz)"/>
+</svg>
+<span>16</span></div>
+        </div>
+        <div class="txt">
+          <h3>Flight Line</h3>
+          <p class="basis">lucide <code>headphones</code></p>
+        </div>
+        <div class="app"><svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 512 512" role="img" aria-label="Flight Line">
+  <rect width="72" height="72" rx="114" fill="#0D1B26"/>
+  <g transform="translate(106.2400 106.2400) scale(6.240000)"><path d="M32.54 4.82A21 21 0 1 0 43.18 15.46" fill="none" stroke="#FFB020" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><g transform="translate(10.8000 10.8000) scale(1.1)" fill="none" stroke="#E6EDF3" stroke-width="2.1818" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/></g><circle cx="38.85" cy="9.15" r="2.24" fill="#FFB020"/></g>
+</svg>
+</div>
+      </article>
+      <article class="karte">
+        <div class="buehne"><svg xmlns="http://www.w3.org/2000/svg" width="88" height="88" viewBox="0 0 48 48" role="img" aria-label="FIDS">
+  <path d="M32.54 4.82A21 21 0 1 0 43.18 15.46" fill="none" stroke="var(--akz)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><g transform="translate(10.8000 10.8000) scale(1.1)" fill="none" stroke="var(--tin)" stroke-width="2.1818" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></g><circle cx="38.85" cy="9.15" r="2.24" fill="var(--akz)"/>
+</svg>
+</div>
+        <div class="mini">
+          <div><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 48 48" role="img" aria-label="FIDS">
+  <path d="M32.54 4.82A21 21 0 1 0 43.18 15.46" fill="none" stroke="var(--akz)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><g transform="translate(10.8000 10.8000) scale(1.1)" fill="none" stroke="var(--tin)" stroke-width="2.1818" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></g><circle cx="38.85" cy="9.15" r="2.24" fill="var(--akz)"/>
+</svg>
+<span>32</span></div>
+          <div><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 48 48" role="img" aria-label="FIDS">
+  <path d="M32.54 4.82A21 21 0 1 0 43.18 15.46" fill="none" stroke="var(--akz)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><g transform="translate(10.8000 10.8000) scale(1.1)" fill="none" stroke="var(--tin)" stroke-width="2.1818" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></g><circle cx="38.85" cy="9.15" r="2.24" fill="var(--akz)"/>
+</svg>
+<span>24</span></div>
+          <div><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 48 48" role="img" aria-label="FIDS">
+  <path d="M32.54 4.82A21 21 0 1 0 43.18 15.46" fill="none" stroke="var(--akz)" stroke-width="4.0" stroke-linecap="round" stroke-linejoin="round"/><g transform="translate(10.8000 10.8000) scale(1.1)" fill="none" stroke="var(--tin)" stroke-width="3.6364" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></g><circle cx="38.85" cy="9.15" r="3.4" fill="var(--akz)"/>
+</svg>
+<span>16</span></div>
+        </div>
+        <div class="txt">
+          <h3>FIDS</h3>
+          <p class="basis">lucide <code>monitor</code></p>
+        </div>
+        <div class="app"><svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 512 512" role="img" aria-label="FIDS">
+  <rect width="72" height="72" rx="114" fill="#0D1B26"/>
+  <g transform="translate(106.2400 106.2400) scale(6.240000)"><path d="M32.54 4.82A21 21 0 1 0 43.18 15.46" fill="none" stroke="#FFB020" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><g transform="translate(10.8000 10.8000) scale(1.1)" fill="none" stroke="#E6EDF3" stroke-width="2.1818" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></g><circle cx="38.85" cy="9.15" r="2.24" fill="#FFB020"/></g>
+</svg>
+</div>
+      </article>
+      <article class="karte">
+        <div class="buehne"><svg xmlns="http://www.w3.org/2000/svg" width="88" height="88" viewBox="0 0 48 48" role="img" aria-label="Ticket">
+  <path d="M32.54 4.82A21 21 0 1 0 43.18 15.46" fill="none" stroke="var(--akz)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><g transform="translate(10.8000 10.8000) scale(1.1)" fill="none" stroke="var(--tin)" stroke-width="2.1818" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2"/><path d="M13 11v2"/><path d="M13 17v2"/></g><circle cx="38.85" cy="9.15" r="2.24" fill="var(--akz)"/>
+</svg>
+</div>
+        <div class="mini">
+          <div><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 48 48" role="img" aria-label="Ticket">
+  <path d="M32.54 4.82A21 21 0 1 0 43.18 15.46" fill="none" stroke="var(--akz)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><g transform="translate(10.8000 10.8000) scale(1.1)" fill="none" stroke="var(--tin)" stroke-width="2.1818" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2"/><path d="M13 11v2"/><path d="M13 17v2"/></g><circle cx="38.85" cy="9.15" r="2.24" fill="var(--akz)"/>
+</svg>
+<span>32</span></div>
+          <div><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 48 48" role="img" aria-label="Ticket">
+  <path d="M32.54 4.82A21 21 0 1 0 43.18 15.46" fill="none" stroke="var(--akz)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><g transform="translate(10.8000 10.8000) scale(1.1)" fill="none" stroke="var(--tin)" stroke-width="2.1818" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2"/><path d="M13 11v2"/><path d="M13 17v2"/></g><circle cx="38.85" cy="9.15" r="2.24" fill="var(--akz)"/>
+</svg>
+<span>24</span></div>
+          <div><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 48 48" role="img" aria-label="Ticket">
+  <path d="M32.54 4.82A21 21 0 1 0 43.18 15.46" fill="none" stroke="var(--akz)" stroke-width="4.0" stroke-linecap="round" stroke-linejoin="round"/><g transform="translate(10.8000 10.8000) scale(1.1)" fill="none" stroke="var(--tin)" stroke-width="3.6364" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2"/><path d="M13 11v2"/><path d="M13 17v2"/></g><circle cx="38.85" cy="9.15" r="3.4" fill="var(--akz)"/>
+</svg>
+<span>16</span></div>
+        </div>
+        <div class="txt">
+          <h3>Ticket</h3>
+          <p class="basis">lucide <code>ticket</code></p>
+        </div>
+        <div class="app"><svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 512 512" role="img" aria-label="Ticket">
+  <rect width="72" height="72" rx="114" fill="#0D1B26"/>
+  <g transform="translate(106.2400 106.2400) scale(6.240000)"><path d="M32.54 4.82A21 21 0 1 0 43.18 15.46" fill="none" stroke="#FFB020" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><g transform="translate(10.8000 10.8000) scale(1.1)" fill="none" stroke="#E6EDF3" stroke-width="2.1818" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2"/><path d="M13 11v2"/><path d="M13 17v2"/></g><circle cx="38.85" cy="9.15" r="2.24" fill="#FFB020"/></g>
+</svg>
+</div>
+      </article>
+      <article class="karte">
+        <div class="buehne"><svg xmlns="http://www.w3.org/2000/svg" width="88" height="88" viewBox="0 0 48 48" role="img" aria-label="Administration">
+  <path d="M32.54 4.82A21 21 0 1 0 43.18 15.46" fill="none" stroke="var(--akz)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><g transform="translate(10.8000 10.8000) scale(1.1)" fill="none" stroke="var(--tin)" stroke-width="2.1818" stroke-linecap="round" stroke-linejoin="round"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></g><circle cx="38.85" cy="9.15" r="2.24" fill="var(--akz)"/>
+</svg>
+</div>
+        <div class="mini">
+          <div><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 48 48" role="img" aria-label="Administration">
+  <path d="M32.54 4.82A21 21 0 1 0 43.18 15.46" fill="none" stroke="var(--akz)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><g transform="translate(10.8000 10.8000) scale(1.1)" fill="none" stroke="var(--tin)" stroke-width="2.1818" stroke-linecap="round" stroke-linejoin="round"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></g><circle cx="38.85" cy="9.15" r="2.24" fill="var(--akz)"/>
+</svg>
+<span>32</span></div>
+          <div><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 48 48" role="img" aria-label="Administration">
+  <path d="M32.54 4.82A21 21 0 1 0 43.18 15.46" fill="none" stroke="var(--akz)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><g transform="translate(10.8000 10.8000) scale(1.1)" fill="none" stroke="var(--tin)" stroke-width="2.1818" stroke-linecap="round" stroke-linejoin="round"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></g><circle cx="38.85" cy="9.15" r="2.24" fill="var(--akz)"/>
+</svg>
+<span>24</span></div>
+          <div><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 48 48" role="img" aria-label="Administration">
+  <path d="M32.54 4.82A21 21 0 1 0 43.18 15.46" fill="none" stroke="var(--akz)" stroke-width="4.0" stroke-linecap="round" stroke-linejoin="round"/><g transform="translate(10.8000 10.8000) scale(1.1)" fill="none" stroke="var(--tin)" stroke-width="3.6364" stroke-linecap="round" stroke-linejoin="round"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></g><circle cx="38.85" cy="9.15" r="3.4" fill="var(--akz)"/>
+</svg>
+<span>16</span></div>
+        </div>
+        <div class="txt">
+          <h3>Administration</h3>
+          <p class="basis">lucide <code>settings</code></p>
+        </div>
+        <div class="app"><svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 512 512" role="img" aria-label="Administration">
+  <rect width="72" height="72" rx="114" fill="#0D1B26"/>
+  <g transform="translate(106.2400 106.2400) scale(6.240000)"><path d="M32.54 4.82A21 21 0 1 0 43.18 15.46" fill="none" stroke="#FFB020" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><g transform="translate(10.8000 10.8000) scale(1.1)" fill="none" stroke="#E6EDF3" stroke-width="2.1818" stroke-linecap="round" stroke-linejoin="round"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></g><circle cx="38.85" cy="9.15" r="2.24" fill="#FFB020"/></g>
+</svg>
+</div>
+      </article>
+    </div>
+  </section>
+
+  <section class="abschnitt">
+    <div class="titel"><h2>In der Navigation</h2><span>Empfehlung links</span></div>
+    <p class="lead">Ein wichtiger Punkt für den Einbau: in der Seitenleiste gehören die
+       <em>puren</em> Lucide-Glyphen, nicht die gerahmten. Fünf Ringe untereinander sehen
+       auf den ersten Blick alle gleich aus – der Rahmen kostet genau die Unterscheidbarkeit,
+       für die Navigationsicons da sind. Die gerahmte Fassung ist für App-Symbol, Favicon
+       und Kacheln gedacht, wo jedes Icon allein steht.</p>
+    <div class="navs">
+      <div class="nav">
+        <h4>pur — Navigation</h4>
+        <ul><li><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3.173 8.18 11-5a2 2 0 0 1 2.647.993L18.56 8"/><path d="M6 10V8"/><path d="M6 14v1"/><path d="M6 19v2"/><rect x="2" y="8" width="20" height="13" rx="2"/></svg><span>Kasse</span></li><li><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><path d="M16 3.128a4 4 0 0 1 0 7.744"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><circle cx="9" cy="7" r="4"/></svg><span>Flight Director</span></li><li><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/></svg><span>Flight Line</span></li><li><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg><span>FIDS</span></li><li><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2"/><path d="M13 11v2"/><path d="M13 17v2"/></svg><span>Ticket</span></li><li><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></svg><span>Administration</span></li></ul>
+        <p class="urteil">Auf einen Blick unterscheidbar.</p>
+      </div>
+      <div class="nav">
+        <h4>gerahmt — nicht in Listen</h4>
+        <ul><li><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 48 48" role="img" aria-label="Kasse">
+  <path d="M32.54 4.82A21 21 0 1 0 43.18 15.46" fill="none" stroke="var(--akz)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><g transform="translate(10.8000 10.8000) scale(1.1)" fill="none" stroke="currentColor" stroke-width="2.1818" stroke-linecap="round" stroke-linejoin="round"><path d="m3.173 8.18 11-5a2 2 0 0 1 2.647.993L18.56 8"/><path d="M6 10V8"/><path d="M6 14v1"/><path d="M6 19v2"/><rect x="2" y="8" width="20" height="13" rx="2"/></g><circle cx="38.85" cy="9.15" r="2.24" fill="var(--akz)"/>
+</svg>
+<span>Kasse</span></li><li><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 48 48" role="img" aria-label="Flight Director">
+  <path d="M32.54 4.82A21 21 0 1 0 43.18 15.46" fill="none" stroke="var(--akz)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><g transform="translate(10.8000 10.8000) scale(1.1)" fill="none" stroke="currentColor" stroke-width="2.1818" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><path d="M16 3.128a4 4 0 0 1 0 7.744"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><circle cx="9" cy="7" r="4"/></g><circle cx="38.85" cy="9.15" r="2.24" fill="var(--akz)"/>
+</svg>
+<span>Flight Director</span></li><li><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 48 48" role="img" aria-label="Flight Line">
+  <path d="M32.54 4.82A21 21 0 1 0 43.18 15.46" fill="none" stroke="var(--akz)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><g transform="translate(10.8000 10.8000) scale(1.1)" fill="none" stroke="currentColor" stroke-width="2.1818" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/></g><circle cx="38.85" cy="9.15" r="2.24" fill="var(--akz)"/>
+</svg>
+<span>Flight Line</span></li><li><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 48 48" role="img" aria-label="FIDS">
+  <path d="M32.54 4.82A21 21 0 1 0 43.18 15.46" fill="none" stroke="var(--akz)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><g transform="translate(10.8000 10.8000) scale(1.1)" fill="none" stroke="currentColor" stroke-width="2.1818" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></g><circle cx="38.85" cy="9.15" r="2.24" fill="var(--akz)"/>
+</svg>
+<span>FIDS</span></li><li><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 48 48" role="img" aria-label="Ticket">
+  <path d="M32.54 4.82A21 21 0 1 0 43.18 15.46" fill="none" stroke="var(--akz)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><g transform="translate(10.8000 10.8000) scale(1.1)" fill="none" stroke="currentColor" stroke-width="2.1818" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2"/><path d="M13 11v2"/><path d="M13 17v2"/></g><circle cx="38.85" cy="9.15" r="2.24" fill="var(--akz)"/>
+</svg>
+<span>Ticket</span></li><li><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 48 48" role="img" aria-label="Administration">
+  <path d="M32.54 4.82A21 21 0 1 0 43.18 15.46" fill="none" stroke="var(--akz)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><g transform="translate(10.8000 10.8000) scale(1.1)" fill="none" stroke="currentColor" stroke-width="2.1818" stroke-linecap="round" stroke-linejoin="round"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></g><circle cx="38.85" cy="9.15" r="2.24" fill="var(--akz)"/>
+</svg>
+<span>Administration</span></li></ul>
+        <p class="urteil">Der Ring dominiert, die Glyphe wird zum Detail.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="abschnitt">
+    <div class="titel"><h2>Aufbau</h2><span>je Ordner identisch</span></div>
+    <ul class="liste">
+      <li><b>svg/</b><span><code>icon.svg</code> einfarbig über <code>currentColor</code>, dazu zweifarbig, negativ, klein, favicon, app-icon und maskable.</span></li>
+      <li><b>png-icon/</b><span>16 bis 512 px, je einmal für hellen und für dunklen Grund. Unter 24 px greift automatisch die kräftigere Fassung.</span></li>
+      <li><b>favicon/</b><span>16/32/48/96 px, <code>favicon.ico</code> mit drei Größen sowie <code>apple-touch-icon-180.png</code>.</span></li>
+      <li><b>app-ios/</b><span>120/152/167/180/1024 px, deckend und ohne Eckenrundung – iOS legt die Maske selbst an.</span></li>
+      <li><b>app-android/</b><span>48 bis 512 px mit Eckradius, dazu <code>maskable</code> in 192 und 512 mit Sicherheitszone.</span></li>
+    </ul>
+  </section>
+
+</main>

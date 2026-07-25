@@ -1,0 +1,16 @@
+{
+  "name": "Rundflug Leitstand — Flight Director",
+  "short_name": "Flight Director",
+  "id": "/flight-director/",
+  "start_url": "/flight-director/",
+  "scope": "/flight-director/",
+  "background_color": "#0D1B26",
+  "theme_color": "#0D1B26",
+  "display": "standalone",
+  "icons": [
+    { "src": "/flight-director/icons/android/icon-192.png",     "sizes": "192x192", "type": "image/png" },
+    { "src": "/flight-director/icons/android/icon-512.png",     "sizes": "512x512", "type": "image/png" },
+    { "src": "/flight-director/icons/android/maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/flight-director/icons/android/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

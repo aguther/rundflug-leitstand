@@ -1,0 +1,16 @@
+{
+  "name": "Rundflug Leitstand — FIDS",
+  "short_name": "FIDS",
+  "id": "/fids/",
+  "start_url": "/fids/",
+  "scope": "/fids/",
+  "background_color": "#0D1B26",
+  "theme_color": "#0D1B26",
+  "display": "standalone",
+  "icons": [
+    { "src": "/fids/icons/android/icon-192.png",     "sizes": "192x192", "type": "image/png" },
+    { "src": "/fids/icons/android/icon-512.png",     "sizes": "512x512", "type": "image/png" },
+    { "src": "/fids/icons/android/maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/fids/icons/android/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

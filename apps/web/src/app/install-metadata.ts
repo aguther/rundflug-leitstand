@@ -2,6 +2,7 @@ export type PublicStatusTarget = "ticket" | "group";
 
 interface InstallMetadata {
   manifestHref: string;
+  faviconHref: string;
   appleTouchIconHref: string;
   documentTitle: string;
   appleTitle: string;
@@ -10,31 +11,36 @@ interface InstallMetadata {
 const INTERNAL_INSTALL_METADATA: Record<string, InstallMetadata> = {
   "/kasse": {
     manifestHref: "/manifests/kasse.webmanifest",
-    appleTouchIconHref: "/icons/kasse-icon-180.png",
+    faviconHref: "/icons/pwa/kasse/favicon.svg",
+    appleTouchIconHref: "/icons/pwa/kasse/apple-touch-icon-180.png",
     documentTitle: "Kasse · Rundflug-Leitstand",
     appleTitle: "Kasse",
   },
   "/flight-director": {
     manifestHref: "/manifests/flight-director.webmanifest",
-    appleTouchIconHref: "/icons/flight-line-icon-180.png",
+    faviconHref: "/icons/pwa/flight-director/favicon.svg",
+    appleTouchIconHref: "/icons/pwa/flight-director/apple-touch-icon-180.png",
     documentTitle: "Flight Director · Rundflug-Leitstand",
     appleTitle: "Flight Director",
   },
   "/flight-line": {
     manifestHref: "/manifests/flight-line.webmanifest",
-    appleTouchIconHref: "/icons/assist-icon-180.png",
+    faviconHref: "/icons/pwa/flight-line/favicon.svg",
+    appleTouchIconHref: "/icons/pwa/flight-line/apple-touch-icon-180.png",
     documentTitle: "Flight Line · Rundflug-Leitstand",
     appleTitle: "Flight Line",
   },
   "/fids": {
     manifestHref: "/manifests/fids.webmanifest",
-    appleTouchIconHref: "/icons/fids-icon-180.png",
+    faviconHref: "/icons/pwa/fids/favicon.svg",
+    appleTouchIconHref: "/icons/pwa/fids/apple-touch-icon-180.png",
     documentTitle: "FIDS · Rundflug-Leitstand",
     appleTitle: "FIDS",
   },
   "/admin": {
     manifestHref: "/manifests/admin.webmanifest",
-    appleTouchIconHref: "/icons/admin-icon-180.png",
+    faviconHref: "/icons/pwa/admin/favicon.svg",
+    appleTouchIconHref: "/icons/pwa/admin/apple-touch-icon-180.png",
     documentTitle: "Admin · Rundflug-Leitstand",
     appleTitle: "Admin",
   },
@@ -60,6 +66,9 @@ function ensureMeta(documentRef: Document, name: string): HTMLMetaElement {
 
 export function applyInstallMetadata(metadata: InstallMetadata, documentRef = document): void {
   ensureLink(documentRef, "manifest").href = metadata.manifestHref;
+  const favicon = ensureLink(documentRef, "icon");
+  favicon.href = metadata.faviconHref;
+  favicon.type = "image/svg+xml";
   ensureLink(documentRef, "apple-touch-icon").href = metadata.appleTouchIconHref;
   ensureMeta(documentRef, "apple-mobile-web-app-title").content = metadata.appleTitle;
   ensureMeta(documentRef, "apple-mobile-web-app-capable").content = "yes";
@@ -75,7 +84,8 @@ export function publicStatusInstallMetadata(
   const appTitle = bookingGroupLabel ?? fallbackTitle;
   return {
     manifestHref: `/api/public/pwa-manifest/${target}/${encodeURIComponent(code)}`,
-    appleTouchIconHref: "/icons/ticket-icon-180.png",
+    faviconHref: "/icons/pwa/ticket/favicon.svg",
+    appleTouchIconHref: "/icons/pwa/ticket/apple-touch-icon-180.png",
     documentTitle: `${appTitle} · Rundflug`,
     appleTitle: appTitle,
   };
