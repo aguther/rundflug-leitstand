@@ -2,6 +2,7 @@ import type {
   AdminEventFlow,
   AuditHistory,
   EventCatalogEntry,
+  EventLogoTheme,
   ForecastHistory,
   MasterDataTemplate,
   MasterDataTemplateValidation,
@@ -17,7 +18,6 @@ import {
   LockKeyhole,
   Plus,
   Trash2,
-  Upload,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -72,6 +72,7 @@ import {
 import { forgetActiveEvent, rememberActiveEvent } from "./event-context";
 import { eventLocalDateTimeToIso, formatEventLocalDateTime } from "./event-time";
 import { AdminEventFlowChart } from "./features/admin/AdminEventFlowChart";
+import { EventLogoEditor } from "./features/admin/EventLogoEditor";
 import { AccountManagement } from "./features/auth/AccountManagement";
 import { useAuth } from "./features/auth/AuthContext";
 import {
@@ -108,6 +109,14 @@ const adminTableCollator = new Intl.Collator("de-DE", {
   numeric: true,
   sensitivity: "base",
 });
+const EMPTY_EVENT_LOGO_FILES: Record<EventLogoTheme, File | null> = {
+  light: null,
+  dark: null,
+};
+const NO_EVENT_LOGO_VARIANTS: Record<EventLogoTheme, boolean> = {
+  light: false,
+  dark: false,
+};
 
 function SortableTableHeading({
   active,
@@ -320,7 +329,9 @@ export function AdminView() {
   const [plannedDeboardingMinutes, setPlannedDeboardingMinutes] = useState(5);
   const [plannedBufferMinutes, setPlannedBufferMinutes] = useState(3);
   const [departedVisibilitySeconds, setDepartedVisibilitySeconds] = useState(15);
-  const [eventLogoFile, setEventLogoFile] = useState<File | null>(null);
+  const [eventLogoFiles, setEventLogoFiles] = useState<Record<EventLogoTheme, File | null>>(() => ({
+    ...EMPTY_EVENT_LOGO_FILES,
+  }));
   const [pushConfigurationStatus, setPushConfigurationStatus] = useState<
     "loading" | "configured" | "missing" | "unavailable"
   >("loading");
@@ -968,25 +979,29 @@ export function AdminView() {
     }
   }
 
-  async function saveEventLogo() {
-    if (!board || !eventLogoFile) return;
+  async function saveEventLogo(theme: EventLogoTheme) {
+    const file = eventLogoFiles[theme];
+    if (!board || !file) return;
     try {
       await uploadEventLogo(
         EVENT_ID,
         ADMIN_DEVICE_ID,
         deviceTokenFor(ADMIN_DEVICE_ID),
         board.event.version,
-        eventLogoFile,
+        theme,
+        file,
       );
-      setEventLogoFile(null);
-      setMessage("Veranstaltungslogo gespeichert. Die Ansichten verwenden es nach dem Neuladen.");
+      setEventLogoFiles((current) => ({ ...current, [theme]: null }));
+      setMessage(
+        `Logo für das ${theme === "light" ? "helle" : "dunkle"} Theme gespeichert. Die Ansichten verwenden es nach dem Neuladen.`,
+      );
       await refresh();
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : "Logo konnte nicht gespeichert werden.");
     }
   }
 
-  async function clearEventLogo() {
+  async function clearEventLogo(theme: EventLogoTheme) {
     if (!board) return;
     try {
       await removeEventLogo(
@@ -994,8 +1009,11 @@ export function AdminView() {
         ADMIN_DEVICE_ID,
         deviceTokenFor(ADMIN_DEVICE_ID),
         board.event.version,
+        theme,
       );
-      setMessage("Veranstaltungslogo entfernt. Das Flugzeugsymbol wird wieder verwendet.");
+      setMessage(
+        `Logo für das ${theme === "light" ? "helle" : "dunkle"} Theme entfernt. Fehlt die andere Variante ebenfalls, wird die Rundflug-Leitstand-Marke verwendet.`,
+      );
       await refresh();
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : "Logo konnte nicht entfernt werden.");
@@ -3113,39 +3131,27 @@ export function AdminView() {
                   onChange={setOperationsEndAt}
                 />
               </div>
-              <div className="event-logo-editor-v15">
-                <Field
-                  help="PNG, JPEG, WebP oder sicheres SVG bis 1 MiB."
-                  label="Veranstaltungslogo"
-                >
-                  <input
-                    accept="image/png,image/jpeg,image/webp,image/svg+xml"
-                    onChange={(event) => setEventLogoFile(event.target.files?.[0] ?? null)}
-                    type="file"
-                  />
-                </Field>
-                <Button
-                  disabled={!eventLogoFile || !isAdministrator}
-                  busy={busyActionKey === "event-logo"}
-                  onClick={() =>
-                    requestAdminAction(() => runBusyAction("event-logo", saveEventLogo))
-                  }
-                  size="compact"
-                >
-                  <Upload aria-hidden="true" /> Logo hochladen
-                </Button>
-                <Button
-                  disabled={!isAdministrator}
-                  busy={busyActionKey === "clear-event-logo"}
-                  onClick={() =>
-                    requestAdminAction(() => runBusyAction("clear-event-logo", clearEventLogo))
-                  }
-                  size="compact"
-                  variant="danger"
-                >
-                  <Trash2 aria-hidden="true" /> Entfernen
-                </Button>
-              </div>
+              <EventLogoEditor
+                administrator={isAdministrator}
+                busyActionKey={busyActionKey}
+                eventId={EVENT_ID}
+                eventVersion={board?.event.version ?? 0}
+                files={eventLogoFiles}
+                logoVariants={board?.event.logoVariants ?? NO_EVENT_LOGO_VARIANTS}
+                onFileChange={(theme, file) =>
+                  setEventLogoFiles((current) => ({ ...current, [theme]: file }))
+                }
+                onRemove={(theme) =>
+                  requestAdminAction(() =>
+                    runBusyAction(`clear-event-logo-${theme}`, () => clearEventLogo(theme)),
+                  )
+                }
+                onUpload={(theme) =>
+                  requestAdminAction(() =>
+                    runBusyAction(`event-logo-${theme}`, () => saveEventLogo(theme)),
+                  )
+                }
+              />
               {!operationsEndAt ? (
                 <ValidationHint tone="error">
                   Ein Betriebsende muss festgelegt werden.

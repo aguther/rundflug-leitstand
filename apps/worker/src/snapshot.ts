@@ -34,6 +34,10 @@ export function rowToSnapshot(row: StoredEventRow): EventSnapshot {
     plannedDeboardingMinutes: row.planned_deboarding_minutes ?? 5,
     plannedBufferMinutes: row.planned_buffer_minutes ?? 3,
     departedVisibilitySeconds: row.departed_visibility_seconds ?? 15,
+    logoVariants: {
+      light: Boolean(row.logo_object_key),
+      dark: Boolean(row.logo_dark_object_key),
+    },
     updatedAt: row.updated_at,
   };
 }

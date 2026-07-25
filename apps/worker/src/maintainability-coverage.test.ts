@@ -35,6 +35,7 @@ describe("V1 maintainability and portability boundaries", () => {
   it("uses a deliberately small allowlist of common open-source runtime and build dependencies", () => {
     const allowed = new Set([
       "@cloudflare/workers-types",
+      "@fontsource/barlow-condensed",
       "@rundflug/config",
       "@rundflug/contracts",
       "@rundflug/domain",

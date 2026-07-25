@@ -13,6 +13,7 @@ import {
 import type { CSSProperties, ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BrandMark } from "./design-system/BrandMark";
+import { useTheme } from "./design-system/theme";
 import { FidsSettingsDialog } from "./features/fids/FidsSettingsDialog";
 import { formatAbsoluteTimeWindow } from "./time-window";
 
@@ -195,6 +196,9 @@ export function FidsBoardPresentation({
   onOpenSettings,
   children,
 }: FidsBoardPresentationProps) {
+  const { system: systemTheme } = useTheme();
+  const logoTheme =
+    preferences.theme === "SYSTEM" ? systemTheme : preferences.theme === "DARK" ? "dark" : "light";
   const requestedVisibilitySeconds = Number.parseInt(
     new URLSearchParams(window.location.search).get("departedSeconds") ?? "",
     10,
@@ -245,7 +249,7 @@ export function FidsBoardPresentation({
       ) : null}
       <header className="fids-header">
         <div className="standard-mark">
-          <BrandMark />
+          <BrandMark theme={logoTheme} />
         </div>
         <div className="fids-title">
           <h1>{eventName}</h1>

@@ -6,13 +6,13 @@ const stylesSource = readFileSync(new URL("./fids-v12.css", import.meta.url), "u
 
 describe("V1.7.3 FIDS concept fidelity", () => {
   it("matches the approved header, table and restrained settings control hierarchy", () => {
-    expect(displaySource.match(/<BrandMark \/>/g)).toHaveLength(1);
+    expect(displaySource.match(/<BrandMark theme=\{logoTheme\} \/>/g)).toHaveLength(1);
     expect(displaySource).toContain('className="fids-title"');
     expect(displaySource).toContain('className="fids-footer-copy"');
     expect(displaySource).toContain('aria-label="FIDS-Einstellungen öffnen"');
     expect(stylesSource).toContain("opacity: 0.62");
     expect(stylesSource).toContain("border-radius: 0");
-    expect(stylesSource).toContain("stroke-width: 1.35");
+    expect(stylesSource).toContain("--brand-accent: #ffb020");
   });
 
   it("supports system, light and dark without a second display profile", () => {

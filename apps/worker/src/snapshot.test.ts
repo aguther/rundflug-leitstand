@@ -35,4 +35,23 @@ describe("rowToSnapshot", () => {
     expect(snapshot.emergencyMode).toBe(false);
     expect(snapshot.operationalInterrupted).toBe(true);
   });
+
+  it("reports independently stored light and dark logo variants", () => {
+    const snapshot = rowToSnapshot({
+      id: "demo-2026",
+      name: "Demo",
+      event_date: "2026-07-11",
+      time_zone: "Europe/Berlin",
+      status: "ACTIVE",
+      emergency_mode: 0,
+      operational_interrupted: 0,
+      version: 4,
+      operational_note: "",
+      logo_object_key: "event-logos/demo-2026/light.svg",
+      logo_dark_object_key: null,
+      updated_at: "2026-07-11T10:00:00.000Z",
+    });
+
+    expect(snapshot.logoVariants).toEqual({ light: true, dark: false });
+  });
 });

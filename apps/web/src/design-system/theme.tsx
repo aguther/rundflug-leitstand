@@ -1,11 +1,12 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 
 export type ThemePreference = "system" | "light" | "dark";
-type ResolvedTheme = "light" | "dark";
+export type ResolvedTheme = "light" | "dark";
 
 type ThemeContextValue = {
   preference: ThemePreference;
   resolved: ResolvedTheme;
+  system: ResolvedTheme;
   setPreference: (theme: ThemePreference) => void;
   cycle: () => void;
 };
@@ -57,13 +58,14 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     () => ({
       preference,
       resolved,
+      system,
       setPreference,
       cycle: () =>
         setPreference((current) =>
           current === "system" ? "light" : current === "light" ? "dark" : "system",
         ),
     }),
-    [preference, resolved],
+    [preference, resolved, system],
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;

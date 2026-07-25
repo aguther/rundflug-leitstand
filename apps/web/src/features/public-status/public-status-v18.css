@@ -83,12 +83,13 @@
   object-fit: contain;
 }
 
-.app-header--public .plane-mark {
+.app-header--public .fallback-mark {
   width: 52px;
   height: 52px;
   padding: 10px;
   border: 1px solid var(--public-border);
   border-radius: 10px;
+  color: var(--brand-ink);
   background: var(--public-surface-raised);
 }
 

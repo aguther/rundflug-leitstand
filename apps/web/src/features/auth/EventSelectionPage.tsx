@@ -1,6 +1,6 @@
 import type { EventCatalogEntry, OperatorSession } from "@rundflug/contracts";
 import { useState } from "react";
-import { BrandMark } from "../../design-system/BrandMark";
+import { BrandLockup, BrandMark } from "../../design-system/BrandMark";
 import { Button } from "../../design-system/components";
 import { ThemeToggle } from "../../design-system/ThemeToggle";
 import { rememberActiveEvent } from "../../event-context";
@@ -47,9 +47,8 @@ export function EventSelectionPage({
   return (
     <main className="login-page event-selection-page">
       <header className="login-topbar">
-        <a className="app-brand" href="/" aria-label="Rundflug-Leitstand">
-          <BrandMark />
-          <strong>Rundflug-Leitstand</strong>
+        <a className="app-brand" href="/">
+          <BrandLockup />
         </a>
         <ThemeToggle />
       </header>

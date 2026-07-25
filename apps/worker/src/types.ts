@@ -46,5 +46,7 @@ export interface StoredEventRow {
   planned_deboarding_minutes?: number;
   planned_buffer_minutes?: number;
   departed_visibility_seconds?: number;
+  logo_object_key?: string | null;
+  logo_dark_object_key?: string | null;
   updated_at: string;
 }
