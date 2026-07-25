@@ -810,7 +810,7 @@ export class EventCoordinator extends DurableObject<Env> {
                 automatic_precall_enabled, precall_lead_minutes, max_gate_wait_minutes,
                 precall_min_quality, precall_gate_cooldown_minutes,
                 heavy_reference_weight_kg, planned_boarding_minutes, planned_deboarding_minutes,
-                planned_buffer_minutes, updated_at
+                planned_buffer_minutes, logo_object_key, logo_dark_object_key, updated_at
            FROM operation_days
           WHERE id = ?1`,
       )

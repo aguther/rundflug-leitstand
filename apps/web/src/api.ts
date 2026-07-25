@@ -11,6 +11,7 @@ import {
   type CommandResult,
   commandResultSchema,
   type EventCatalog,
+  type EventLogoTheme,
   type EventSnapshot,
   eventCatalogSchema,
   eventSnapshotSchema,
@@ -446,22 +447,30 @@ export async function uploadEventLogo(
   deviceId: string,
   deviceToken: string,
   expectedVersion: number,
+  theme: EventLogoTheme,
   file: File,
-): Promise<{ logoUrl: string }> {
-  const response = await apiFetch(`/api/admin/events/${encodeURIComponent(eventId)}/logo`, {
-    method: "PUT",
-    headers: deviceHeaders(deviceId, deviceToken, {
-      "content-type": file.type,
-      "x-command-id": crypto.randomUUID(),
-      "x-expected-version": String(expectedVersion),
-    }),
-    body: file,
-  });
-  const body = (await response.json()) as { logoUrl?: string; error?: { message?: string } };
+): Promise<{ logoUrl: string; theme: EventLogoTheme }> {
+  const response = await apiFetch(
+    `/api/admin/events/${encodeURIComponent(eventId)}/logo?theme=${theme}`,
+    {
+      method: "PUT",
+      headers: deviceHeaders(deviceId, deviceToken, {
+        "content-type": file.type,
+        "x-command-id": crypto.randomUUID(),
+        "x-expected-version": String(expectedVersion),
+      }),
+      body: file,
+    },
+  );
+  const body = (await response.json()) as {
+    logoUrl?: string;
+    theme?: EventLogoTheme;
+    error?: { message?: string };
+  };
   if (!response.ok || !body.logoUrl) {
     throw new Error(body.error?.message ?? "Veranstaltungslogo konnte nicht gespeichert werden.");
   }
-  return { logoUrl: body.logoUrl };
+  return { logoUrl: body.logoUrl, theme: body.theme ?? theme };
 }
 
 export async function removeEventLogo(
@@ -469,15 +478,24 @@ export async function removeEventLogo(
   deviceId: string,
   deviceToken: string,
   expectedVersion: number,
+  theme: EventLogoTheme,
 ): Promise<void> {
-  const response = await apiFetch(`/api/admin/events/${encodeURIComponent(eventId)}/logo`, {
-    method: "DELETE",
-    headers: deviceHeaders(deviceId, deviceToken, {
-      "x-command-id": crypto.randomUUID(),
-      "x-expected-version": String(expectedVersion),
-    }),
-  });
-  if (!response.ok) throw new Error("Veranstaltungslogo konnte nicht entfernt werden.");
+  const response = await apiFetch(
+    `/api/admin/events/${encodeURIComponent(eventId)}/logo?theme=${theme}`,
+    {
+      method: "DELETE",
+      headers: deviceHeaders(deviceId, deviceToken, {
+        "x-command-id": crypto.randomUUID(),
+        "x-expected-version": String(expectedVersion),
+      }),
+    },
+  );
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as {
+      error?: { message?: string };
+    } | null;
+    throw new Error(body?.error?.message ?? "Veranstaltungslogo konnte nicht entfernt werden.");
+  }
 }
 
 export async function factoryReset(

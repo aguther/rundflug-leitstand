@@ -14,6 +14,8 @@
   --fids-cyan: #22d3ee;
   --fids-orange: #ff632c;
   --fids-green: #4ade80;
+  --brand-ink: #e6edf3;
+  --brand-accent: #ffb020;
   --fids-chrome-height: 150px;
   position: fixed;
   inset: 0;
@@ -51,6 +53,7 @@
   --fids-cyan: #007895;
   --fids-orange: #c53d10;
   --fids-green: #087c46;
+  --brand-ink: #0d1b26;
   color-scheme: light;
 }
 
@@ -70,6 +73,7 @@
     --fids-cyan: #007895;
     --fids-orange: #c53d10;
     --fids-green: #087c46;
+    --brand-ink: #0d1b26;
     color-scheme: light;
   }
 }
@@ -131,9 +135,8 @@
   object-fit: contain;
 }
 
-.standard-fids .standard-mark > .brand-mark.plane-mark {
-  color: var(--fids-ui-accent);
-  stroke-width: 1.35;
+.standard-fids .standard-mark > .brand-mark.fallback-mark {
+  color: var(--brand-ink);
 }
 
 .standard-mark > .event-logo {

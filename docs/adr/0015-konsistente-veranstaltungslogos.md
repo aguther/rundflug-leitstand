@@ -2,8 +2,9 @@
 
 - Status: Akzeptiert
 - Datum: 2026-07-18
+- Ergänzt: 2026-07-25
 - Entscheidung: Auftraggeber
-- Betroffene Anforderungen: V15-BRAND-010
+- Betroffene Anforderungen: V15-BRAND-010, V173-FID-010
 
 ## Kontext
 
@@ -20,8 +21,16 @@ Idempotenzbeleg und Outbox gemeinsam aktualisiert. Bei D1-Fehlern wird das neue 
 alte Objekt wird erst nach erfolgreicher Umschaltung gelöscht. Öffentliche Auslieferung setzt
 `nosniff` und eine restriktive Content-Security-Policy.
 
+Je Veranstaltung werden unabhängige Varianten für das helle und dunkle Theme gespeichert. Die
+bisherigen Spalten und die parameterlose Route bleiben die helle Variante. Eine angeforderte, nicht
+vorhandene Variante fällt auf die vorhandene Gegenvariante zurück. Upload und Entfernen sind je
+Variante versioniert, idempotent und auditiert; R2-Objekte werden erst nach erfolgreicher
+Umschaltung beziehungsweise Entfernung des D1-Verweises gelöscht.
+
 ## Folgen
 
-Oberflächen laden das veranstaltungsbezogene Logo über eine stabile öffentliche Route. Ohne Logo
-oder bei Ladefehler verwenden sie das einfache Plane-Symbol. Veranstaltungslöschung entfernt auch
-das referenzierte Objekt.
+Oberflächen laden das veranstaltungsbezogene Logo über eine stabile öffentliche Route mit
+`theme=light|dark`. Das FIDS verwendet seine eigene aufgelöste Theme-Einstellung. Ohne beide
+Veranstaltungslogos oder bei Ladefehler verwenden kompakte Flächen die freigegebene
+Rundflug-Leitstand-Marke; reine Produktflächen dürfen Marke und Wortmarke gemeinsam zeigen.
+Veranstaltungslöschung entfernt beide referenzierten Objekte.

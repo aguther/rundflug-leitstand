@@ -26,7 +26,8 @@ describe("FIDS V1.7.3 UI", () => {
 
   it("uses the event name, unframed full-size mark and only the standard German board", () => {
     expect(displaySource).toContain("board?.eventName");
-    expect(displaySource).toContain("<BrandMark />");
+    expect(displaySource).toContain("<BrandMark theme={logoTheme} />");
+    expect(displaySource).toContain('preferences.theme === "SYSTEM"');
     expect(displaySource).toContain(
       "formatBookingGroupLabel(group.productCode, group.communicationNumber)",
     );
@@ -42,7 +43,7 @@ describe("FIDS V1.7.3 UI", () => {
       /\.standard-mark \{[\s\S]*?overflow: visible;[\s\S]*?border: 0;[\s\S]*?border-radius: 0;/,
     );
     expect(stylesSource).toMatch(
-      /\.standard-fids \.standard-mark > \.brand-mark\.plane-mark \{[\s\S]*?color: var\(--fids-ui-accent\);[\s\S]*?stroke-width: 1\.35;/,
+      /\.standard-fids \.standard-mark > \.brand-mark\.fallback-mark \{[\s\S]*?color: var\(--brand-ink\);/,
     );
   });
 
