@@ -61,6 +61,7 @@ import { AppShell as Shell } from "./app/AppShell";
 import { PageNotice, useActionMessageBridge } from "./app/PageNotifications";
 import {
   Button,
+  CheckboxField,
   Field,
   ModalDialog,
   PageHeader,
@@ -91,6 +92,7 @@ import {
   EmergencyNotice,
   EVENT_ID,
   FieldGroupLabel,
+  FieldHelp,
   FieldLabel,
   type GateDisplayStatus,
   InterruptionNotice,
@@ -4029,14 +4031,11 @@ export function AdminView() {
                     label="Status"
                     help="Nur aktive Gates stehen für neue Zuordnungen und öffentliche Anzeigen zur Verfügung."
                   />
-                  <label className="checkbox-label">
-                    <input
-                      type="checkbox"
-                      checked={gateActive}
-                      onChange={(event) => setGateActive(event.target.checked)}
-                    />
-                    <span>Gate ist aktiv</span>
-                  </label>
+                  <CheckboxField
+                    checked={gateActive}
+                    label="Gate ist aktiv"
+                    onChange={(event) => setGateActive(event.target.checked)}
+                  />
                 </div>
                 <section
                   className="gate-display-filter"
@@ -4058,20 +4057,18 @@ export function AdminView() {
                     </strong>
                     <div className="gate-filter-options">
                       {board?.products.map((product) => (
-                        <label className="checkbox-label" key={product.id}>
-                          <input
-                            checked={gateDisplayProductIds.includes(product.id)}
-                            onChange={() =>
-                              setGateDisplayProductIds((current) =>
-                                current.includes(product.id)
-                                  ? current.filter((id) => id !== product.id)
-                                  : [...current, product.id],
-                              )
-                            }
-                            type="checkbox"
-                          />
-                          <span>{product.name}</span>
-                        </label>
+                        <CheckboxField
+                          checked={gateDisplayProductIds.includes(product.id)}
+                          key={product.id}
+                          label={product.name}
+                          onChange={() =>
+                            setGateDisplayProductIds((current) =>
+                              current.includes(product.id)
+                                ? current.filter((id) => id !== product.id)
+                                : [...current, product.id],
+                            )
+                          }
+                        />
                       ))}
                       {board?.products.length === 0 ? (
                         <span className="help-text">Noch keine Produkte angelegt.</span>
@@ -4095,20 +4092,18 @@ export function AdminView() {
                           ["COMPLETED", "Abgeschlossen"],
                         ] as const
                       ).map(([status, label]) => (
-                        <label className="checkbox-label" key={status}>
-                          <input
-                            checked={gateDisplayRotationStatuses.includes(status)}
-                            onChange={() =>
-                              setGateDisplayRotationStatuses((current) =>
-                                current.includes(status)
-                                  ? current.filter((entry) => entry !== status)
-                                  : [...current, status],
-                              )
-                            }
-                            type="checkbox"
-                          />
-                          <span>{label}</span>
-                        </label>
+                        <CheckboxField
+                          checked={gateDisplayRotationStatuses.includes(status)}
+                          key={status}
+                          label={label}
+                          onChange={() =>
+                            setGateDisplayRotationStatuses((current) =>
+                              current.includes(status)
+                                ? current.filter((entry) => entry !== status)
+                                : [...current, status],
+                            )
+                          }
+                        />
                       ))}
                     </div>
                   </div>
@@ -4406,19 +4401,16 @@ export function AdminView() {
                     onChange={(event) => setResourcePlannedMinutes(Number(event.target.value))}
                   />
                 </div>
-                <div className="admin-check-row">
-                  <input
-                    checked={resourceAutomaticPrecall}
-                    id="resource-automatic-precall"
-                    onChange={(event) => setResourceAutomaticPrecall(event.target.checked)}
-                    type="checkbox"
-                  />
-                  <FieldLabel
-                    htmlFor="resource-automatic-precall"
-                    label="Automatischer Voraufruf für diese Gruppe"
-                    help="Kann für einzelne Ressourcengruppen abgeschaltet werden. Belegung, Pilot und Boarding bleiben immer manuell bestätigt."
-                  />
-                </div>
+                <CheckboxField
+                  checked={resourceAutomaticPrecall}
+                  className="resource-automatic-precall"
+                  id="resource-automatic-precall"
+                  label="Automatischer Voraufruf für diese Gruppe"
+                  onChange={(event) => setResourceAutomaticPrecall(event.target.checked)}
+                  trailing={
+                    <FieldHelp help="Kann für einzelne Ressourcengruppen abgeschaltet werden. Belegung, Pilot und Boarding bleiben immer manuell bestätigt." />
+                  }
+                />
                 <section className="resource-aircraft-selection">
                   <h3>Flugzeuge dieser Ressourcengruppe</h3>
                   <p>
@@ -4426,26 +4418,26 @@ export function AdminView() {
                     ermittelt.
                   </p>
                   {board?.aircraft.map((aircraft) => (
-                    <label className="checkbox-label" key={aircraft.id}>
-                      <input
-                        checked={resourceAircraftIds.includes(aircraft.id)}
-                        onChange={(event) =>
-                          setResourceAircraftIds((current) =>
-                            event.target.checked
-                              ? [...current, aircraft.id]
-                              : current.filter((id) => id !== aircraft.id),
-                          )
-                        }
-                        type="checkbox"
-                      />
-                      <span>
+                    <CheckboxField
+                      checked={resourceAircraftIds.includes(aircraft.id)}
+                      key={aircraft.id}
+                      label={
+                        <span>
                         <strong>{aircraft.registration}</strong> · {aircraft.aircraftType} ·{" "}
                         {aircraft.passengerSeats} Plätze
                         {aircraft.resourceGroupId && aircraft.resourceGroupId !== resourceEditorId
                           ? ` · aktuell ${aircraft.resourceGroupName}`
                           : ""}
-                      </span>
-                    </label>
+                        </span>
+                      }
+                      onChange={(event) =>
+                        setResourceAircraftIds((current) =>
+                          event.target.checked
+                            ? [...current, aircraft.id]
+                            : current.filter((id) => id !== aircraft.id),
+                        )
+                      }
+                    />
                   ))}
                   {board?.aircraft.length === 0 ? (
                     <ValidationHint>

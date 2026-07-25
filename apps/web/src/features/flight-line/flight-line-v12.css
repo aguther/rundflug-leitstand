@@ -119,13 +119,11 @@
   background: var(--ui-surface);
 }
 
-.flight-director-operation-panel .ds-field,
-.flight-director-resource-notice-editor .ds-field {
+.flight-director-notice-editor .ds-field {
   margin: 0;
 }
 
-.flight-director-operation-panel textarea,
-.flight-director-resource-notice-editor textarea {
+.flight-director-notice-editor textarea {
   width: 100%;
   min-height: 112px;
   resize: vertical;
@@ -159,7 +157,7 @@
 
 .flight-director-operation-list > article {
   display: grid;
-  grid-template-columns: minmax(170px, 1fr) auto minmax(260px, auto) minmax(150px, auto);
+  grid-template-columns: minmax(170px, 1fr) auto minmax(0, auto);
   align-items: center;
   gap: 12px;
   padding: 12px;
@@ -180,11 +178,14 @@
 
 .flight-director-operation-actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 6px;
 }
 
-.flight-director-resource-notice-action {
+.flight-director-notice-action {
+  inline-size: 11.5rem;
+  flex: 0 0 11.5rem;
   white-space: nowrap;
 }
 
@@ -224,37 +225,23 @@
   background: color-mix(in srgb, var(--ui-danger) 12%, var(--ui-surface));
 }
 
-.flight-director-event-notice {
-  gap: 14px;
+.flight-director-event-notice-summary {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
 }
 
-.flight-director-published-notice {
+.flight-director-notice-editor {
   display: grid;
-  gap: 12px;
-  padding: 14px;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--radius-sm);
-  background: var(--ui-surface-subtle);
+  gap: 16px;
 }
 
-.flight-director-published-notice > p {
-  color: var(--ui-text);
-  white-space: pre-wrap;
-}
-
-.flight-director-published-notice > div,
 .flight-director-notice-edit-actions {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
 }
 
-.flight-director-resource-notice-editor {
-  display: grid;
-  gap: 16px;
-}
-
-.flight-director-resource-notice-context {
+.flight-director-notice-context {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
@@ -265,7 +252,7 @@
   background: var(--ui-surface-subtle);
 }
 
-.flight-director-resource-notice-context span {
+.flight-director-notice-context span {
   color: var(--ui-muted);
 }
 
@@ -2396,11 +2383,9 @@
     grid-template-columns: 1fr auto;
   }
 
-  .flight-director-operation-actions,
-  .flight-director-operation-list > article > .ds-button {
+  .flight-director-operation-actions {
     grid-column: 1 / -1;
     justify-content: flex-start;
-    flex-wrap: wrap;
   }
 }
 
@@ -2414,12 +2399,29 @@
   }
 
   .flight-director-operation-list .operation-status,
-  .flight-director-operation-actions,
-  .flight-director-operation-list > article > .ds-button {
+  .flight-director-operation-actions {
     grid-column: 1;
   }
 
+  .flight-director-event-notice-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .flight-director-event-notice-summary .flight-director-notice-action {
+    inline-size: 100%;
+  }
+
+  .flight-director-operation-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .flight-director-operation-actions .ds-button {
-    flex: 1 1 45%;
+    width: 100%;
+  }
+
+  .flight-director-operation-actions .flight-director-notice-action {
+    inline-size: 100%;
+    grid-column: 1 / -1;
   }
 }

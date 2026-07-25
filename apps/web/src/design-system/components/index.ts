@@ -6,8 +6,15 @@ export type { ConfirmationDialogProps } from "./ConfirmationDialog";
 export { ConfirmationDialog } from "./ConfirmationDialog";
 export type { DataTableColumn, DataTableProps } from "./DataTable";
 export { DataTable } from "./DataTable";
-export type { FieldProps } from "./Field";
-export { Field, SearchField, SelectField, TextAreaField, TextField } from "./Field";
+export type { CheckboxFieldProps, FieldProps } from "./Field";
+export {
+  CheckboxField,
+  Field,
+  SearchField,
+  SelectField,
+  TextAreaField,
+  TextField,
+} from "./Field";
 export type { IconButtonProps } from "./IconButton";
 export { IconButton } from "./IconButton";
 export type { ModalDialogProps } from "./ModalDialog";

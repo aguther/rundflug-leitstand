@@ -14,12 +14,48 @@ export interface FieldProps {
   className?: string;
 }
 
+export interface CheckboxFieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "type"> {
+  label: ReactNode;
+  trailing?: ReactNode;
+}
+
 export function Field({ label, help, children, className = "" }: FieldProps) {
   return (
     <div className={`ds-field ${className}`.trim()}>
       <span className="ds-field-label">{label}</span>
       {children}
       {help ? <small>{help}</small> : null}
+    </div>
+  );
+}
+
+export function CheckboxField({
+  label,
+  trailing,
+  className = "",
+  checked,
+  disabled,
+  id: providedId,
+  ...input
+}: CheckboxFieldProps) {
+  const generatedId = useId();
+  const id = providedId ?? generatedId;
+  return (
+    <div
+      className={[
+        "ds-checkbox-field",
+        checked ? "ds-checkbox-field--selected" : "",
+        disabled ? "ds-checkbox-field--disabled" : "",
+        className,
+      ]
+        .filter(Boolean)
+        .join(" ")}
+    >
+      <label className="ds-checkbox-field-label" htmlFor={id}>
+        <input {...input} checked={checked} disabled={disabled} id={id} type="checkbox" />
+        <span>{label}</span>
+      </label>
+      {trailing ? <span className="ds-checkbox-field-trailing">{trailing}</span> : null}
     </div>
   );
 }

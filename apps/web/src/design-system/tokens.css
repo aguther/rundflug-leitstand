@@ -14,6 +14,7 @@
   --control-compact: 34px;
   --control-default: 40px;
   --control-touch: 48px;
+  --control-checkbox: 20px;
   --header-height: 56px;
   --focus-ring: 0 0 0 2px var(--ui-bg), 0 0 0 4px var(--ui-accent);
 

@@ -5,6 +5,7 @@ import { Button, ModalDialog, Tabs, TextAreaField } from "../../design-system/co
 type OperationsTab = "operations" | "resources";
 type ResourceGroup = OperationBoard["resourceGroups"][number];
 type ResourceGroupStatus = "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED";
+type NoticeEditorTarget = { kind: "event" } | { kind: "resource"; resourceGroupId: string };
 
 const operationsTabs: Array<{ value: OperationsTab; label: string }> = [
   { value: "operations", label: "Betrieb" },
@@ -15,8 +16,8 @@ const resourceStatusActions: Array<{ status: ResourceGroupStatus; label: string 
   { status: "ACTIVE", label: "Aktiv" },
   { status: "PAUSED", label: "Pause" },
   { status: "INTERRUPTED", label: "Unterbrochen" },
-  { status: "ENDED", label: "Beendet" },
 ];
+const endedStatusAction = { status: "ENDED", label: "Beendet" } as const;
 
 export interface FlightDirectorOperationsDialogProps {
   busy: boolean;
@@ -31,6 +32,63 @@ export interface FlightDirectorOperationsDialogProps {
   onSetEventInterruption: (interrupted: boolean) => Promise<void>;
   onSetResourceGroupStatus: (resourceGroupId: string, status: ResourceGroupStatus) => Promise<void>;
   onTriggerEmergency: () => Promise<void>;
+}
+
+interface OperationalNoticeEditorProps {
+  busy: boolean;
+  context?: { name: string; shortCode: string };
+  draft: string;
+  help: string;
+  published: boolean;
+  onChange: (draft: string) => void;
+  onDelete: () => Promise<void>;
+  onSave: () => Promise<void>;
+}
+
+function OperationalNoticeEditor({
+  busy,
+  context,
+  draft,
+  help,
+  published,
+  onChange,
+  onDelete,
+  onSave,
+}: OperationalNoticeEditorProps) {
+  return (
+    <div className="flight-director-notice-editor">
+      {context ? (
+        <div className="flight-director-notice-context">
+          <strong>{context.name}</strong>
+          <span>{context.shortCode}</span>
+        </div>
+      ) : null}
+      <TextAreaField
+        autoFocus
+        help={help}
+        label="Hinweis"
+        maxLength={240}
+        onChange={(event) => onChange(event.target.value)}
+        rows={4}
+        value={draft}
+      />
+      <div className="flight-director-notice-edit-actions">
+        {published ? (
+          <Button disabled={busy} onClick={onDelete} type="button" variant="danger">
+            Löschen
+          </Button>
+        ) : null}
+        <Button
+          disabled={busy || draft.trim().length === 0}
+          onClick={onSave}
+          type="button"
+          variant="primary"
+        >
+          {published ? "Speichern" : "Hinweis veröffentlichen"}
+        </Button>
+      </div>
+    </div>
+  );
 }
 
 export function FlightDirectorOperationsDialog({
@@ -48,191 +106,139 @@ export function FlightDirectorOperationsDialog({
   onTriggerEmergency,
 }: FlightDirectorOperationsDialogProps) {
   const [tab, setTab] = useState<OperationsTab>("operations");
-  const [eventDraft, setEventDraft] = useState(eventNotice);
-  const [eventEditing, setEventEditing] = useState(false);
-  const [selectedResourceGroupId, setSelectedResourceGroupId] = useState<string | null>(null);
-  const [resourceDraft, setResourceDraft] = useState("");
+  const [noticeTarget, setNoticeTarget] = useState<NoticeEditorTarget | null>(null);
+  const [noticeDraft, setNoticeDraft] = useState("");
   const openedRef = useRef(false);
   const selectedResourceGroup =
-    resourceGroups.find((group) => group.id === selectedResourceGroupId) ?? null;
+    noticeTarget?.kind === "resource"
+      ? (resourceGroups.find((group) => group.id === noticeTarget.resourceGroupId) ?? null)
+      : null;
+  const noticeEditorOpen = noticeTarget?.kind === "event" || selectedResourceGroup !== null;
   const publishedEventNotice = eventNotice.trim();
-  const eventEditorVisible = eventEditing || publishedEventNotice.length === 0;
+  const publishedNotice =
+    noticeTarget?.kind === "event"
+      ? publishedEventNotice
+      : (selectedResourceGroup?.operationalNote?.trim() ?? "");
 
   useEffect(() => {
     if (open && !openedRef.current) {
       setTab("operations");
-      setEventDraft(eventNotice);
-      setEventEditing(false);
-      setSelectedResourceGroupId(null);
-      setResourceDraft("");
+      setNoticeTarget(null);
+      setNoticeDraft("");
     }
     openedRef.current = open;
-  }, [eventNotice, open]);
+  }, [open]);
 
-  useEffect(() => {
-    if (open && !eventEditing) setEventDraft(eventNotice);
-  }, [eventEditing, eventNotice, open]);
+  function editEventNotice() {
+    setNoticeTarget({ kind: "event" });
+    setNoticeDraft(eventNotice);
+  }
 
   function editResourceNotice(group: ResourceGroup) {
-    setSelectedResourceGroupId(group.id);
-    setResourceDraft(group.operationalNote ?? "");
+    setNoticeTarget({ kind: "resource", resourceGroupId: group.id });
+    setNoticeDraft(group.operationalNote ?? "");
   }
 
-  function returnToResources() {
-    setSelectedResourceGroupId(null);
-    setResourceDraft("");
-    setTab("resources");
+  function returnFromNoticeEditor() {
+    const nextTab = noticeTarget?.kind === "resource" ? "resources" : "operations";
+    setNoticeTarget(null);
+    setNoticeDraft("");
+    setTab(nextTab);
   }
 
-  async function publishEventNotice() {
-    const saved = await onPublishEventNotice(eventDraft.trim());
-    if (saved) setEventEditing(false);
+  async function saveNotice() {
+    if (!noticeTarget) return;
+    const saved =
+      noticeTarget.kind === "event"
+        ? await onPublishEventNotice(noticeDraft.trim())
+        : await onPublishResourceNotice(noticeTarget.resourceGroupId, noticeDraft.trim());
+    if (saved) returnFromNoticeEditor();
   }
 
-  async function deleteEventNotice() {
-    const saved = await onPublishEventNotice("");
-    if (saved) {
-      setEventDraft("");
-      setEventEditing(false);
-    }
-  }
-
-  async function publishResourceNotice() {
-    if (!selectedResourceGroup) return;
-    const saved = await onPublishResourceNotice(selectedResourceGroup.id, resourceDraft.trim());
-    if (saved) returnToResources();
-  }
-
-  async function deleteResourceNotice() {
-    if (!selectedResourceGroup) return;
-    const saved = await onPublishResourceNotice(selectedResourceGroup.id, "");
-    if (saved) returnToResources();
+  async function deleteNotice() {
+    if (!noticeTarget) return;
+    const saved =
+      noticeTarget.kind === "event"
+        ? await onPublishEventNotice("")
+        : await onPublishResourceNotice(noticeTarget.resourceGroupId, "");
+    if (saved) returnFromNoticeEditor();
   }
 
   return (
     <ModalDialog
       description={
-        selectedResourceGroup
-          ? "Der Hinweis gilt ausschließlich für diese Ressourcengruppe."
-          : "Organisatorische Betriebslage steuern. Keine Aktion besitzt flugbetriebliche oder sicherheitsbezogene Freigabewirkung."
+        noticeTarget?.kind === "event"
+          ? "Der Hinweis gilt veranstaltungsweit und hat Vorrang vor Hinweisen einzelner Ressourcengruppen."
+          : selectedResourceGroup
+            ? "Der Hinweis gilt ausschließlich für diese Ressourcengruppe."
+            : "Organisatorische Betriebslage steuern. Keine Aktion besitzt flugbetriebliche oder sicherheitsbezogene Freigabewirkung."
       }
       footer={
         <Button
-          onClick={selectedResourceGroup ? returnToResources : onClose}
+          onClick={noticeEditorOpen ? returnFromNoticeEditor : onClose}
           type="button"
           variant="secondary"
         >
-          {selectedResourceGroup ? "Zurück" : "Schließen"}
+          {noticeEditorOpen ? "Zurück" : "Schließen"}
         </Button>
       }
       onClose={onClose}
       open={open}
       size="wide"
       title={
-        selectedResourceGroup ? `Hinweis für ${selectedResourceGroup.name}` : "Betrieb steuern"
+        noticeTarget?.kind === "event"
+          ? "Veranstaltungsweiter Hinweis"
+          : selectedResourceGroup
+            ? `Hinweis für ${selectedResourceGroup.name}`
+            : "Betrieb steuern"
       }
     >
-      {selectedResourceGroup ? (
-        <div className="flight-director-resource-notice-editor">
-          <div className="flight-director-resource-notice-context">
-            <strong>{selectedResourceGroup.name}</strong>
-            <span>{selectedResourceGroup.shortCode}</span>
-          </div>
-          <TextAreaField
-            autoFocus
-            help="Maximal 240 Zeichen. Der Hinweis wird in den operativen Ansichten dieser Ressourcengruppe angezeigt."
-            label="Hinweis"
-            maxLength={240}
-            onChange={(event) => setResourceDraft(event.target.value)}
-            rows={4}
-            value={resourceDraft}
-          />
-          <div className="flight-director-notice-edit-actions">
-            {selectedResourceGroup.operationalNote ? (
-              <Button disabled={busy} onClick={deleteResourceNotice} type="button" variant="danger">
-                Löschen
-              </Button>
-            ) : null}
-            <Button
-              disabled={busy || resourceDraft.trim().length === 0}
-              onClick={publishResourceNotice}
-              type="button"
-              variant="primary"
-            >
-              {selectedResourceGroup.operationalNote ? "Speichern" : "Hinweis veröffentlichen"}
-            </Button>
-          </div>
-        </div>
+      {noticeEditorOpen ? (
+        <OperationalNoticeEditor
+          busy={busy}
+          draft={noticeDraft}
+          help={
+            noticeTarget?.kind === "event"
+              ? "Maximal 240 Zeichen. Der Hinweis wird veranstaltungsweit veröffentlicht."
+              : "Maximal 240 Zeichen. Der Hinweis wird in den operativen Ansichten dieser Ressourcengruppe angezeigt."
+          }
+          onChange={setNoticeDraft}
+          onDelete={deleteNotice}
+          onSave={saveNotice}
+          published={publishedNotice.length > 0}
+          {...(selectedResourceGroup
+            ? {
+                context: {
+                  name: selectedResourceGroup.name,
+                  shortCode: selectedResourceGroup.shortCode,
+                },
+              }
+            : {})}
+        />
       ) : (
         <div className="flight-director-operations-dialog">
           <Tabs items={operationsTabs} label="Betriebssteuerung" onChange={setTab} value={tab} />
           {tab === "operations" ? (
             <div className="flight-director-operation-panel" role="tabpanel">
-              <section className="flight-director-event-notice">
+              <section className="flight-director-event-notice-summary">
                 <div>
                   <h3>Veranstaltungsweiter Hinweis</h3>
-                  <p>Hat in der Betriebslage Vorrang vor Hinweisen einzelner Ressourcengruppen.</p>
+                  <p>
+                    {publishedEventNotice
+                      ? "Hinweis veröffentlicht"
+                      : "Kein Hinweis veröffentlicht"}
+                  </p>
                 </div>
-                {eventEditorVisible ? (
-                  <>
-                    <TextAreaField
-                      help="Maximal 240 Zeichen. Der Hinweis wird veranstaltungsweit veröffentlicht."
-                      label="Hinweis"
-                      maxLength={240}
-                      onChange={(event) => setEventDraft(event.target.value)}
-                      rows={4}
-                      value={eventDraft}
-                    />
-                    <div className="flight-director-notice-edit-actions">
-                      {publishedEventNotice ? (
-                        <Button
-                          disabled={busy}
-                          onClick={() => {
-                            setEventDraft(eventNotice);
-                            setEventEditing(false);
-                          }}
-                          type="button"
-                          variant="secondary"
-                        >
-                          Abbrechen
-                        </Button>
-                      ) : null}
-                      <Button
-                        disabled={busy || eventDraft.trim().length === 0}
-                        onClick={publishEventNotice}
-                        type="button"
-                        variant="primary"
-                      >
-                        {publishedEventNotice ? "Speichern" : "Hinweis veröffentlichen"}
-                      </Button>
-                    </div>
-                  </>
-                ) : (
-                  <div className="flight-director-published-notice">
-                    <p>{publishedEventNotice}</p>
-                    <div>
-                      <Button
-                        disabled={busy}
-                        onClick={() => {
-                          setEventDraft(eventNotice);
-                          setEventEditing(true);
-                        }}
-                        type="button"
-                        variant="secondary"
-                      >
-                        Bearbeiten
-                      </Button>
-                      <Button
-                        disabled={busy}
-                        onClick={deleteEventNotice}
-                        type="button"
-                        variant="danger"
-                      >
-                        Löschen
-                      </Button>
-                    </div>
-                  </div>
-                )}
+                <Button
+                  className="flight-director-notice-action"
+                  disabled={busy}
+                  onClick={editEventNotice}
+                  size="compact"
+                  type="button"
+                  variant="secondary"
+                >
+                  {publishedEventNotice ? "Hinweis bearbeiten" : "Hinweis veröffentlichen"}
+                </Button>
               </section>
               <section className="flight-director-interruption">
                 <div>
@@ -293,22 +299,31 @@ export function FlightDirectorOperationsDialog({
                         onClick={() => onSetResourceGroupStatus(group.id, status)}
                         size="compact"
                         type="button"
-                        variant={status === "ENDED" ? "danger" : "secondary"}
+                        variant="secondary"
                       >
                         {label}
                       </Button>
                     ))}
+                    <Button
+                      className="flight-director-notice-action"
+                      disabled={busy}
+                      onClick={() => editResourceNotice(group)}
+                      size="compact"
+                      type="button"
+                      variant="secondary"
+                    >
+                      {group.operationalNote ? "Hinweis bearbeiten" : "Hinweis veröffentlichen"}
+                    </Button>
+                    <Button
+                      disabled={busy || group.status === endedStatusAction.status}
+                      onClick={() => onSetResourceGroupStatus(group.id, endedStatusAction.status)}
+                      size="compact"
+                      type="button"
+                      variant="danger"
+                    >
+                      {endedStatusAction.label}
+                    </Button>
                   </div>
-                  <Button
-                    className="flight-director-resource-notice-action"
-                    disabled={busy}
-                    onClick={() => editResourceNotice(group)}
-                    size="compact"
-                    type="button"
-                    variant="secondary"
-                  >
-                    {group.operationalNote ? "Hinweis bearbeiten" : "Hinweis veröffentlichen"}
-                  </Button>
                 </article>
               ))}
             </div>
