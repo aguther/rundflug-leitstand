@@ -98,6 +98,9 @@ describe("shared design-system component library", () => {
     expect(modalSource).toContain('event.key !== "Tab"');
     expect(modalSource).toContain("previousFocus?.focus()");
     expect(modalSource).toContain("ds-modal-backdrop-dismiss");
+    expect(modalSource).toContain("initialFocusSelector");
+    expect(modalSource).toContain("bodyClassName");
+    expect(modalSource).toContain("footerClassName");
     expect(stylesSource).toContain(".ds-modal-body");
     expect(stylesSource).toContain("overflow: auto");
   });

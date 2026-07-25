@@ -18,6 +18,10 @@ export interface ModalDialogProps {
   description?: ReactNode;
   children: ReactNode;
   footer?: ReactNode;
+  className?: string;
+  bodyClassName?: string;
+  footerClassName?: string;
+  initialFocusSelector?: string;
   size?: "compact" | "default" | "wide";
   role?: "dialog" | "alertdialog";
   closeLabel?: string;
@@ -30,6 +34,10 @@ export function ModalDialog({
   description,
   children,
   footer,
+  className = "",
+  bodyClassName = "",
+  footerClassName = "",
+  initialFocusSelector,
   size = "default",
   role = "dialog",
   closeLabel = "Dialog schließen",
@@ -52,7 +60,10 @@ export function ModalDialog({
     document.body.style.overflow = "hidden";
     const dialog = dialogRef.current;
     const focusable = dialog?.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR);
-    (focusable?.[0] ?? dialog)?.focus();
+    const requestedInitialFocus = initialFocusSelector
+      ? dialog?.querySelector<HTMLElement>(initialFocusSelector)
+      : null;
+    (requestedInitialFocus ?? focusable?.[0] ?? dialog)?.focus();
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -83,7 +94,7 @@ export function ModalDialog({
       document.body.style.overflow = previousOverflow;
       previousFocus?.focus();
     };
-  }, [open]);
+  }, [initialFocusSelector, open]);
 
   if (!open) return null;
 
@@ -99,7 +110,7 @@ export function ModalDialog({
         aria-describedby={description ? descriptionId : undefined}
         aria-labelledby={titleId}
         aria-modal="true"
-        className={`ds-modal-dialog ds-modal-dialog--${size}`}
+        className={`ds-modal-dialog ds-modal-dialog--${size} ${className}`.trim()}
         open
         ref={dialogRef}
         role={role}
@@ -114,8 +125,10 @@ export function ModalDialog({
             <X aria-hidden="true" />
           </IconButton>
         </header>
-        <div className="ds-modal-body">{children}</div>
-        {footer ? <footer className="ds-modal-footer">{footer}</footer> : null}
+        <div className={`ds-modal-body ${bodyClassName}`.trim()}>{children}</div>
+        {footer ? (
+          <footer className={`ds-modal-footer ${footerClassName}`.trim()}>{footer}</footer>
+        ) : null}
       </dialog>
     </div>
   );

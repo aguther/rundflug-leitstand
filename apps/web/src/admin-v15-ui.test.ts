@@ -56,6 +56,7 @@ describe("V1.5 administration UI", () => {
     expect(adminEventStyles).toContain("min-height: 46px");
     expect(adminEventStyles).toContain("height: auto");
     expect(adminEventStyles).toContain("width: min(880px, 100%)");
+    expect(adminEventStyles).toContain("width: min(1260px, calc(100vw - 32px))");
     expect(adminEventStyles).toContain("grid-template-columns: repeat(6, minmax(0, 1fr))");
     expect(adminEventStyles).toContain(".admin-shell .history-table-wrap");
     expect(adminEventStyles).toContain("min-height: 220px");
@@ -81,6 +82,13 @@ describe("V1.5 administration UI", () => {
     expect(adminEventStyles).not.toContain(
       ".admin-workspace:not(.master-data-active) > .ds-page-header",
     );
+    expect(adminEventStyles).toContain(
+      ".admin-shell .admin-workspace,\n.admin-shell .admin-workspace.master-data-active",
+    );
+    expect(adminViewSource).not.toContain('className="master-data-heading"');
+    expect(adminViewSource).not.toContain("Stammdaten <span");
+    expect(adminUxSource).toContain('aria-current={current ? "step" : undefined}');
+    expect(adminUxSource).toContain('step.complete ? "complete" : "pending"');
   });
 
   it("implements the event-scoped information architecture and legacy URL redirects", () => {

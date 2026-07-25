@@ -6,7 +6,7 @@ import {
   ShieldCheck,
   UsersRound,
 } from "lucide-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useCallback } from "react";
 
 export type AdminArea = "overview" | "events" | "users" | "evaluation" | "backup";
 export type AdminEventStep =
@@ -75,6 +75,13 @@ export function SetupProgress({
   currentStepId?: AdminEventStep;
   onSelect: (step: SetupStep) => void;
 }) {
+  const currentButtonRef = useCallback((element: HTMLButtonElement | null) => {
+    element?.scrollIntoView({
+      behavior: "auto",
+      block: "nearest",
+      inline: "nearest",
+    });
+  }, []);
   const firstIncomplete = steps.findIndex((step) => !step.complete);
   const requestedIndex = currentStepId ? steps.findIndex((step) => step.id === currentStepId) : -1;
   const currentIndex =
@@ -83,13 +90,22 @@ export function SetupProgress({
       : firstIncomplete === -1
         ? steps.length - 1
         : firstIncomplete;
+
   return (
     <ol aria-label="Einrichtungsfortschritt" className="setup-progress">
       {steps.map((step, index) => {
-        const state = step.complete ? "complete" : index === currentIndex ? "current" : "pending";
+        const current = index === currentIndex;
+        const state = [step.complete ? "complete" : "pending", current ? "current" : ""]
+          .filter(Boolean)
+          .join(" ");
         return (
           <li className={state} key={step.id}>
-            <button onClick={() => onSelect(step)} type="button">
+            <button
+              aria-current={current ? "step" : undefined}
+              onClick={() => onSelect(step)}
+              ref={current ? currentButtonRef : undefined}
+              type="button"
+            >
               <span className="setup-step-number">{step.complete ? "✓" : index + 1}</span>
               <span>{step.label}</span>
             </button>

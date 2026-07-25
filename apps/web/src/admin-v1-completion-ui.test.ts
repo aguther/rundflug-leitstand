@@ -65,10 +65,21 @@ describe("V1 administration completion UI", () => {
     expect(appSource).toContain("aria-label={`Hilfe:");
     expect(appSource).toContain('role="tooltip"');
     expect(appSource).toContain('<Info aria-hidden="true" />');
-    expect(appSource).toContain("onBlur={() => setOpen(false)}");
+    expect(appSource).toContain("onBlur={close}");
+    expect(appSource).toContain('document.addEventListener("pointerdown", handlePointerDown)');
+    expect(appSource).toContain("onPointerEnter");
+    expect(appSource).toContain("onPointerLeave");
+    expect(appSource).toContain('if (event.key !== "Escape") return;');
+    expect(appSource).toContain("aria-describedby={open ? tooltipId : undefined}");
+    expect(appSource).toContain("<label htmlFor={htmlFor}>{label}</label>");
+    expect(appSource).toContain("export function FieldGroupLabel");
+    expect(adminViewSource).not.toMatch(/<label[^>]*>\s*<Field(?:Label|GroupLabel)/);
+    expect(adminViewSource.match(/htmlFor="/g)?.length).toBeGreaterThan(30);
     expect(appSource).not.toContain("onMouseDown={(event) => event.preventDefault()}");
     expect(appSource).not.toContain('<details className="field-info">');
-    expect(stylesSource).toContain(".field-info:focus-visible .field-info-tooltip");
+    expect(stylesSource).toContain(".field-info.is-open .field-info-tooltip");
+    expect(stylesSource).not.toContain(".field-info:focus-visible .field-info-tooltip");
+    expect(stylesSource).not.toContain(".field-info:hover .field-info-tooltip");
     expect(stylesSource).toContain(".field-info > svg");
     expect(stylesSource).not.toContain("label:focus-within .field-info");
     expect(stylesSource).toContain("visibility: hidden");
@@ -98,26 +109,25 @@ describe("V1 administration completion UI", () => {
   it("keeps every master-data category operable from create through delete or removal", () => {
     for (const label of [
       "Gate anlegen",
-      "Gate speichern",
-      "Gate löschen",
       "Ressourcengruppe anlegen",
-      "Ressourcengruppe speichern",
-      "Ressourcengruppe löschen",
       "Flugzeug anlegen",
-      "Flugzeug speichern",
-      "Flugzeug löschen",
       "Zuordnung ändern",
-      "Zuordnung entfernen",
       "Pilotencode anlegen",
-      "Änderungen speichern",
-      "Pilotencode löschen",
       "Produkt anlegen",
-      "Produkt speichern",
-      "Produkt löschen",
     ]) {
       expect(appSource).toContain(label);
     }
+    expect(appSource).toContain("masterEditorFooter");
+    expect(appSource).toContain("masterEditorMobileFurtherActions");
+    expect(appSource).toContain("master-editor-status-section");
+    expect(appSource).toContain("Speichern");
+    expect(appSource).toContain("Abbrechen");
+    expect(appSource).toContain("Löschen");
     expect(appSource).toContain("Endgültig löschen");
+    expect(appSource).not.toContain(">Gate speichern<");
+    expect(appSource).not.toContain(">Ressourcengruppe speichern<");
+    expect(appSource).not.toContain(">Flugzeug speichern<");
+    expect(appSource).not.toContain(">Produkt speichern<");
   });
 
   it("opens the approved overview and uses centered responsive master-data dialogs", () => {
@@ -133,6 +143,19 @@ describe("V1 administration completion UI", () => {
     expect(appSource).not.toContain('<aside className="master-data-drawer"');
     expect(stylesSource).toContain("grid-template-columns: minmax(0, 1fr)");
     expect(stylesSource).toContain("max-height: none");
+  });
+
+  it("guards dirty editors and transitions to destructive confirmation without stacked dialogs", () => {
+    expect(appSource).toContain("hasMasterEditorChanges(");
+    expect(appSource).toContain("function requestMasterEditorClose()");
+    expect(appSource).toContain("setDiscardMasterChangesOpen(true)");
+    expect(appSource).toContain('title="Änderungen verwerfen?"');
+    expect(appSource).toContain("Weiter bearbeiten");
+    expect(appSource).toContain("function cancelMasterDelete()");
+    expect(appSource).toContain("setPendingMasterDelete(null)");
+    expect(appSource).toContain("setMasterEditorOpen(true)");
+    expect(appSource).toContain('initialFocusSelector="[data-master-delete-cancel]"');
+    expect(appSource).toContain('role="alertdialog"');
   });
 
   it("separates administrative evaluation from operational flight-line work", () => {
