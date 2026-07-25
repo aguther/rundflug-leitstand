@@ -139,7 +139,11 @@ describe("V1 administration completion UI", () => {
     expect(appSource).toContain("setMasterEditorOpen(false)");
     expect(appSource).toContain("Zusammenfassung (abgeleitet)");
     expect(appSource.match(/<ModalDialog/g)?.length).toBeGreaterThanOrEqual(4);
-    expect(appSource.match(/size="wide"/g)?.length).toBeGreaterThanOrEqual(4);
+    expect(appSource.match(/size="wide"/g)?.length).toBeGreaterThanOrEqual(2);
+    expect(appSource.match(/size="default"/g)?.length).toBeGreaterThanOrEqual(2);
+    expect(appSource).toContain(
+      'size={masterDataCategory === "resource-groups" ? "wide" : "default"}',
+    );
     expect(appSource).not.toContain('<aside className="master-data-drawer"');
     expect(stylesSource).toContain("grid-template-columns: minmax(0, 1fr)");
     expect(stylesSource).toContain("max-height: none");

@@ -50,7 +50,7 @@ describe("V1.9 Flight Director and Flight Line surfaces", () => {
     expect(supervisorSource).toContain("IconButton,");
     expect(supervisorSource).toContain("SelectField,");
     expect(supervisorSource).toContain("ModalDialog,");
-    expect(supervisorSource).not.toContain("StatusPill,");
+    expect(supervisorSource).toContain("StatusPill,");
     expect(supervisorSource).not.toContain("Tabs,");
     expect(supervisorSource).toContain("PilotAssignmentDialogs");
     expect(assistSource).toContain("PilotAssignmentDialogs");

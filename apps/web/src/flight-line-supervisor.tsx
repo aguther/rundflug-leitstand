@@ -34,6 +34,7 @@ import {
   Panel,
   SearchField,
   SelectField,
+  StatusPill,
 } from "./design-system/components";
 import {
   activeRotationForAircraft,
@@ -373,12 +374,21 @@ export function FlightLineSupervisorConsole({
       <PageHeader
         actions={
           <div className="flight-director-header-actions">
-            <span
+            <StatusPill
               aria-live="polite"
               className={`flight-director-operational-summary tone-${operationalSummaryTone}`}
+              tone={
+                operationalSummaryTone === "critical"
+                  ? "danger"
+                  : operationalSummaryTone === "warning"
+                    ? "warning"
+                    : operationalSummaryTone === "notice"
+                      ? "info"
+                      : "neutral"
+              }
             >
               {operationalSummary}
-            </span>
+            </StatusPill>
             <Button
               disabled={!canManageOperations}
               onClick={onOpenOperations}
