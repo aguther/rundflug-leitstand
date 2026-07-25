@@ -24,6 +24,7 @@ import {
   manifestCorrectionCandidates,
   manifestCorrectionTargets,
 } from "./admin-manifest-correction";
+import { createMasterEditorSnapshot, hasMasterEditorChanges } from "./admin-master-editor-state";
 import {
   type AdminArea,
   type AdminEventStep,
@@ -88,6 +89,7 @@ import {
   deviceTokenFor,
   EmergencyNotice,
   EVENT_ID,
+  FieldGroupLabel,
   FieldLabel,
   type GateDisplayStatus,
   InterruptionNotice,
@@ -189,6 +191,9 @@ export function AdminView() {
   useEffect(() => {
     if (["gates", "resource-groups", "aircraft", "pilots", "products"].includes(eventStep)) {
       setMasterDataCategory(eventStep as MasterDataCategory);
+      initialMasterEditorSnapshotRef.current = null;
+      setDiscardMasterChangesOpen(false);
+      setMasterSubmitAttempted(false);
       setMasterEditorOpen(false);
       setMasterSearch("");
     }
@@ -217,6 +222,8 @@ export function AdminView() {
   const pendingAdminActionRef = useRef<(() => Promise<void>) | null>(null);
   const adminPinInputRef = useRef<HTMLInputElement>(null);
   const [masterEditorOpen, setMasterEditorOpen] = useState(false);
+  const [discardMasterChangesOpen, setDiscardMasterChangesOpen] = useState(false);
+  const initialMasterEditorSnapshotRef = useRef<string | null>(null);
   const initialMasterSelectionRef = useRef(false);
   const [masterSubmitAttempted, setMasterSubmitAttempted] = useState(false);
   const [masterSearch, setMasterSearch] = useState("");
@@ -379,6 +386,60 @@ export function AdminView() {
   const [aircraftMaximumPayload, setAircraftMaximumPayload] = useState("");
   const [assignmentAircraftId, setAssignmentAircraftId] = useState("");
   const [assignmentResourceGroupId, setAssignmentResourceGroupId] = useState("");
+  const currentMasterEditorSnapshot =
+    masterDataCategory === "gates"
+      ? createMasterEditorSnapshot([
+          "gates",
+          gateLabel,
+          gateType,
+          gateActive,
+          gateSortOrder,
+          gateDisplayProductIds,
+          gateDisplayRotationStatuses,
+        ])
+      : masterDataCategory === "products"
+        ? createMasterEditorSnapshot([
+            "products",
+            productName,
+            productCode,
+            productDescription,
+            productResourceGroupId,
+            productGateId,
+            productPriceInput,
+            productReferenceDuration,
+            productPromisedFlightMinutes,
+            productChildCompanion,
+            productWeightClasses,
+            productSortOrder,
+          ])
+        : masterDataCategory === "resource-groups"
+          ? createMasterEditorSnapshot([
+              "resource-groups",
+              resourceName,
+              resourceShortCode,
+              resourceGateId,
+              resourcePlannedMinutes,
+              resourceAutomaticPrecall,
+              resourceAircraftIds,
+            ])
+          : masterDataCategory === "aircraft"
+            ? createMasterEditorSnapshot([
+                "aircraft",
+                aircraftRegistration,
+                aircraftType,
+                aircraftSeats,
+                aircraftMaximumPayload,
+              ])
+            : masterDataCategory === "assignments"
+              ? createMasterEditorSnapshot([
+                  "assignments",
+                  assignmentAircraftId,
+                  assignmentResourceGroupId,
+                ])
+              : createMasterEditorSnapshot(["pilots", pilotCode, pilotNote]);
+  const masterEditorDirty =
+    masterEditorOpen &&
+    hasMasterEditorChanges(initialMasterEditorSnapshotRef.current, currentMasterEditorSnapshot);
   const [events, setEvents] = useState<EventCatalogEntry[]>([]);
   const [eventFlow, setEventFlow] = useState<AdminEventFlow | null>(null);
   const [eventFlowError, setEventFlowError] = useState<string | null>(null);
@@ -472,10 +533,10 @@ export function AdminView() {
   }, [adminArea, board, eventStep]);
 
   useEffect(() => {
-    if (!adminPinDialog && (!pendingMasterDelete || adminModeUnlocked)) return;
+    if (!adminPinDialog) return;
     const frame = window.requestAnimationFrame(() => adminPinInputRef.current?.focus());
     return () => window.cancelAnimationFrame(frame);
-  }, [adminModeUnlocked, adminPinDialog, pendingMasterDelete]);
+  }, [adminPinDialog]);
 
   useEffect(() => {
     if (session?.account.role !== "ADMIN") return;
@@ -942,34 +1003,74 @@ export function AdminView() {
   }
 
   function selectProductForEditing(id: string) {
-    setMasterEditorOpen(true);
-    setMasterSubmitAttempted(false);
-    setProductEditorId(id);
     const entry = board?.products.find((product) => product.id === id);
-    setProductName(entry?.name ?? "");
-    setProductCode(entry?.code ?? "");
-    setProductDescription(entry?.publicDescription ?? "");
-    setProductResourceGroupId(entry?.resourceGroupId ?? resourceGroups[0]?.id ?? "");
-    setProductGateId(entry?.gateId ?? board?.gates.find((gate) => gate.active)?.id ?? "");
-    setProductPriceInput(formatEuroInput(entry?.priceCents ?? 0));
-    setProductReferenceDuration(entry?.referenceDurationMinutes ?? 20);
-    setProductPromisedFlightMinutes(entry?.promisedFlightMinutes ?? 20);
-    setProductChildCompanion(entry?.childCompanionRequired ?? false);
-    setProductWeightClasses(entry?.weightClasses ?? ["NOT_CAPTURED"]);
-    setProductSortOrder(entry?.sortOrder ?? 10);
+    const nextName = entry?.name ?? "";
+    const nextCode = entry?.code ?? "";
+    const nextDescription = entry?.publicDescription ?? "";
+    const nextResourceGroupId = entry?.resourceGroupId ?? resourceGroups[0]?.id ?? "";
+    const nextGateId = entry?.gateId ?? board?.gates.find((gate) => gate.active)?.id ?? "";
+    const nextPriceInput = formatEuroInput(entry?.priceCents ?? 0);
+    const nextReferenceDuration = entry?.referenceDurationMinutes ?? 20;
+    const nextPromisedFlightMinutes = entry?.promisedFlightMinutes ?? 20;
+    const nextChildCompanion = entry?.childCompanionRequired ?? false;
+    const nextWeightClasses = entry?.weightClasses ?? ["NOT_CAPTURED"];
+    const nextSortOrder = entry?.sortOrder ?? 10;
+    initialMasterEditorSnapshotRef.current = createMasterEditorSnapshot([
+      "products",
+      nextName,
+      nextCode,
+      nextDescription,
+      nextResourceGroupId,
+      nextGateId,
+      nextPriceInput,
+      nextReferenceDuration,
+      nextPromisedFlightMinutes,
+      nextChildCompanion,
+      nextWeightClasses,
+      nextSortOrder,
+    ]);
+    setProductEditorId(id);
+    setProductName(nextName);
+    setProductCode(nextCode);
+    setProductDescription(nextDescription);
+    setProductResourceGroupId(nextResourceGroupId);
+    setProductGateId(nextGateId);
+    setProductPriceInput(nextPriceInput);
+    setProductReferenceDuration(nextReferenceDuration);
+    setProductPromisedFlightMinutes(nextPromisedFlightMinutes);
+    setProductChildCompanion(nextChildCompanion);
+    setProductWeightClasses(nextWeightClasses);
+    setProductSortOrder(nextSortOrder);
+    setMasterSubmitAttempted(false);
+    setMasterEditorOpen(true);
   }
 
   function selectGateForEditing(id: string) {
-    setMasterEditorOpen(true);
-    setMasterSubmitAttempted(false);
-    setGateEditorId(id);
     const entry = board?.gates.find((gate) => gate.id === id);
-    setGateLabel(entry?.label ?? "");
-    setGateType(entry?.gateType ?? "FLIGHT_LINE");
-    setGateActive(entry?.active ?? true);
-    setGateSortOrder(entry?.sortOrder ?? 10);
-    setGateDisplayProductIds(entry?.displayFilter.productIds ?? []);
-    setGateDisplayRotationStatuses(entry?.displayFilter.rotationStatuses ?? []);
+    const nextLabel = entry?.label ?? "";
+    const nextType = entry?.gateType ?? "FLIGHT_LINE";
+    const nextActive = entry?.active ?? true;
+    const nextSortOrder = entry?.sortOrder ?? 10;
+    const nextProductIds = entry?.displayFilter.productIds ?? [];
+    const nextRotationStatuses = entry?.displayFilter.rotationStatuses ?? [];
+    initialMasterEditorSnapshotRef.current = createMasterEditorSnapshot([
+      "gates",
+      nextLabel,
+      nextType,
+      nextActive,
+      nextSortOrder,
+      nextProductIds,
+      nextRotationStatuses,
+    ]);
+    setGateEditorId(id);
+    setGateLabel(nextLabel);
+    setGateType(nextType);
+    setGateActive(nextActive);
+    setGateSortOrder(nextSortOrder);
+    setGateDisplayProductIds(nextProductIds);
+    setGateDisplayRotationStatuses(nextRotationStatuses);
+    setMasterSubmitAttempted(false);
+    setMasterEditorOpen(true);
   }
 
   async function saveGate() {
@@ -1001,7 +1102,7 @@ export function AdminView() {
       );
       setMessage("Gate-Stammdaten wurden protokolliert gespeichert.");
       if (!adminModeUnlocked) setAdminPin("");
-      setMasterEditorOpen(false);
+      finishMasterEditor();
       setGateEditorId("new");
       setGateLabel("");
       await refresh();
@@ -1099,7 +1200,7 @@ export function AdminView() {
       setMessage("Produktstammdaten wurden protokolliert gespeichert.");
       if (!adminModeUnlocked) setAdminPin("");
       selectProductForEditing("new");
-      setMasterEditorOpen(false);
+      finishMasterEditor();
       await refresh();
       await refreshHistory();
     } catch (cause) {
@@ -1110,27 +1211,65 @@ export function AdminView() {
   }
 
   function selectResourceForEditing(id: string) {
-    setMasterEditorOpen(true);
-    setMasterSubmitAttempted(false);
-    setResourceEditorId(id);
     const entry = resourceGroups.find((group) => group.id === id);
-    setResourceName(entry?.name ?? "");
-    setResourceShortCode(entry?.shortCode ?? "");
-    setResourceGateId(entry?.gateId ?? board?.gates.find((gate) => gate.active)?.id ?? "");
-    setResourcePlannedMinutes(entry?.plannedRotationMinutes ?? 30);
-    setResourceAutomaticPrecall(entry?.automaticPrecallEnabled ?? true);
-    setResourceAircraftIds(entry?.activeAircraftIds ?? []);
+    const nextName = entry?.name ?? "";
+    const nextShortCode = entry?.shortCode ?? "";
+    const nextGateId = entry?.gateId ?? board?.gates.find((gate) => gate.active)?.id ?? "";
+    const nextPlannedMinutes = entry?.plannedRotationMinutes ?? 30;
+    const nextAutomaticPrecall = entry?.automaticPrecallEnabled ?? true;
+    const nextAircraftIds = entry?.activeAircraftIds ?? [];
+    initialMasterEditorSnapshotRef.current = createMasterEditorSnapshot([
+      "resource-groups",
+      nextName,
+      nextShortCode,
+      nextGateId,
+      nextPlannedMinutes,
+      nextAutomaticPrecall,
+      nextAircraftIds,
+    ]);
+    setResourceEditorId(id);
+    setResourceName(nextName);
+    setResourceShortCode(nextShortCode);
+    setResourceGateId(nextGateId);
+    setResourcePlannedMinutes(nextPlannedMinutes);
+    setResourceAutomaticPrecall(nextAutomaticPrecall);
+    setResourceAircraftIds(nextAircraftIds);
+    setMasterSubmitAttempted(false);
+    setMasterEditorOpen(true);
   }
 
   function selectAircraftForEditing(id: string) {
-    setMasterEditorOpen(true);
-    setMasterSubmitAttempted(false);
-    setAircraftEditorId(id);
     const entry = board?.aircraft.find((aircraft) => aircraft.id === id);
-    setAircraftRegistration(entry?.registration ?? "");
-    setAircraftType(entry?.aircraftType ?? "");
-    setAircraftSeats(entry?.passengerSeats ?? 3);
-    setAircraftMaximumPayload(entry?.maximumPassengerPayloadKg?.toString() ?? "");
+    const nextRegistration = entry?.registration ?? "";
+    const nextType = entry?.aircraftType ?? "";
+    const nextSeats = entry?.passengerSeats ?? 3;
+    const nextMaximumPayload = entry?.maximumPassengerPayloadKg?.toString() ?? "";
+    initialMasterEditorSnapshotRef.current = createMasterEditorSnapshot([
+      "aircraft",
+      nextRegistration,
+      nextType,
+      nextSeats,
+      nextMaximumPayload,
+    ]);
+    setAircraftEditorId(id);
+    setAircraftRegistration(nextRegistration);
+    setAircraftType(nextType);
+    setAircraftSeats(nextSeats);
+    setAircraftMaximumPayload(nextMaximumPayload);
+    setMasterSubmitAttempted(false);
+    setMasterEditorOpen(true);
+  }
+
+  function selectAssignmentForEditing(aircraftId: string, resourceGroupId: string) {
+    initialMasterEditorSnapshotRef.current = createMasterEditorSnapshot([
+      "assignments",
+      aircraftId,
+      resourceGroupId,
+    ]);
+    setAssignmentAircraftId(aircraftId);
+    setAssignmentResourceGroupId(resourceGroupId);
+    setMasterSubmitAttempted(false);
+    setMasterEditorOpen(true);
   }
 
   async function saveResourceGroup() {
@@ -1175,7 +1314,7 @@ export function AdminView() {
       setMessage("Ressourcengruppe und zugeordnete Flugzeuge wurden protokolliert gespeichert.");
       if (!adminModeUnlocked) setAdminPin("");
       selectResourceForEditing("new");
-      setMasterEditorOpen(false);
+      finishMasterEditor();
       await refresh();
       await refreshHistory();
     } catch (cause) {
@@ -1221,7 +1360,7 @@ export function AdminView() {
       setMessage("Flugzeugstammdaten wurden protokolliert gespeichert.");
       if (!adminModeUnlocked) setAdminPin("");
       selectAircraftForEditing("new");
-      setMasterEditorOpen(false);
+      finishMasterEditor();
       await refresh();
       await refreshHistory();
     } catch (cause) {
@@ -1262,7 +1401,7 @@ export function AdminView() {
         "Flugzeugzuordnung wurde historisiert geändert; Queue und Prognose werden neu berechnet.",
       );
       if (!adminModeUnlocked) setAdminPin("");
-      setMasterEditorOpen(false);
+      finishMasterEditor();
       await refresh();
       await refreshHistory();
     } catch (cause) {
@@ -1565,7 +1704,7 @@ export function AdminView() {
       setPilotEditorId("new");
       setPilotCode("P-01");
       setPilotNote("");
-      setMasterEditorOpen(false);
+      finishMasterEditor();
       await refresh();
       await refreshHistory();
     } catch (cause) {
@@ -1576,12 +1715,19 @@ export function AdminView() {
   }
 
   function selectPilotForEditing(id: string) {
-    setMasterEditorOpen(true);
-    setMasterSubmitAttempted(false);
-    setPilotEditorId(id);
     const entry = board?.pilots.find((pilot) => pilot.id === id);
-    setPilotCode(entry?.operationalCode ?? "P-01");
-    setPilotNote(entry?.operationalNote ?? "");
+    const nextCode = entry?.operationalCode ?? "P-01";
+    const nextNote = entry?.operationalNote ?? "";
+    initialMasterEditorSnapshotRef.current = createMasterEditorSnapshot([
+      "pilots",
+      nextCode,
+      nextNote,
+    ]);
+    setPilotEditorId(id);
+    setPilotCode(nextCode);
+    setPilotNote(nextNote);
+    setMasterSubmitAttempted(false);
+    setMasterEditorOpen(true);
   }
 
   async function setPilotPause(pilotId: string, paused: boolean) {
@@ -1660,13 +1806,19 @@ export function AdminView() {
       | "pilot-toggle"
       | "product",
     valid: boolean,
+    invalidFieldId?: string,
   ) {
     setMasterSubmitAttempted(true);
     if (!isAdministrator) {
       setMessage("Für Stammdatenänderungen wird ein Administrationskonto benötigt.");
       return;
     }
-    if (!valid) return;
+    if (!valid) {
+      if (invalidFieldId) {
+        window.requestAnimationFrame(() => document.getElementById(invalidFieldId)?.focus());
+      }
+      return;
+    }
     requestAdminAction(() =>
       runBusyAction(`master-${action}`, async () => {
         if (action === "gate") await saveGate();
@@ -1717,6 +1869,74 @@ export function AdminView() {
       return;
     }
     requestMasterSave("product", true);
+  }
+
+  function finishMasterEditor() {
+    initialMasterEditorSnapshotRef.current = null;
+    setDiscardMasterChangesOpen(false);
+    setMasterSubmitAttempted(false);
+    setMasterEditorOpen(false);
+  }
+
+  function requestMasterEditorClose() {
+    if (masterEditorDirty) {
+      setMasterEditorOpen(false);
+      setDiscardMasterChangesOpen(true);
+      return;
+    }
+    finishMasterEditor();
+  }
+
+  function continueMasterEditing() {
+    setDiscardMasterChangesOpen(false);
+    setMasterEditorOpen(true);
+  }
+
+  function discardMasterChanges() {
+    finishMasterEditor();
+  }
+
+  function requestCurrentMasterSave() {
+    if (masterDataCategory === "gates") {
+      requestMasterSave("gate", gateLabel.trim().length >= 2, "gate-label");
+      return;
+    }
+    if (masterDataCategory === "products") {
+      requestProductSave();
+      return;
+    }
+    if (masterDataCategory === "resource-groups") {
+      const invalidFieldId =
+        resourceName.trim().length < 2
+          ? "resource-name"
+          : !/^[A-Z0-9-]{2,8}$/.test(resourceShortCode.trim().toUpperCase())
+            ? "resource-short-code"
+            : !resourceGateId
+              ? "resource-gate"
+              : undefined;
+      requestMasterSave("resource-group", !invalidFieldId, invalidFieldId);
+      return;
+    }
+    if (masterDataCategory === "aircraft") {
+      const invalidFieldId =
+        aircraftRegistration.trim().length < 3
+          ? "aircraft-registration"
+          : aircraftType.trim().length < 2
+            ? "aircraft-type"
+            : undefined;
+      requestMasterSave("aircraft", !invalidFieldId, invalidFieldId);
+      return;
+    }
+    if (masterDataCategory === "assignments") {
+      const invalidFieldId = !assignmentAircraftId
+        ? "assignment-aircraft"
+        : !assignmentResourceGroupId
+          ? "assignment-resource-group"
+          : undefined;
+      requestMasterSave("assignment", !invalidFieldId, invalidFieldId);
+      return;
+    }
+    requestMasterSave("pilot", /^[A-Z0-9-]{2,12}$/.test(pilotCode), "pilot-operational-code");
   }
 
   function openFactoryReset() {
@@ -1870,8 +2090,15 @@ export function AdminView() {
     if (masterDataCategory === "resource-groups") selectResourceForEditing("new");
     if (masterDataCategory === "aircraft") selectAircraftForEditing("new");
     if (masterDataCategory === "assignments") {
-      setAssignmentAircraftId(board?.aircraft[0]?.id ?? "");
-      setAssignmentResourceGroupId(board?.aircraft[0]?.resourceGroupId ?? "");
+      const nextAircraftId = board?.aircraft[0]?.id ?? "";
+      const nextResourceGroupId = board?.aircraft[0]?.resourceGroupId ?? "";
+      initialMasterEditorSnapshotRef.current = createMasterEditorSnapshot([
+        "assignments",
+        nextAircraftId,
+        nextResourceGroupId,
+      ]);
+      setAssignmentAircraftId(nextAircraftId);
+      setAssignmentResourceGroupId(nextResourceGroupId);
       setMasterSubmitAttempted(false);
       setMasterEditorOpen(true);
     }
@@ -1945,6 +2172,12 @@ export function AdminView() {
       label,
       blockers: masterDataDeletionBlockers(entityType, entityId),
     });
+    setMasterEditorOpen(false);
+  }
+
+  function cancelMasterDelete() {
+    setPendingMasterDelete(null);
+    setMasterEditorOpen(true);
   }
 
   async function confirmMasterDelete() {
@@ -1976,7 +2209,7 @@ export function AdminView() {
       );
       setMessage(`${pendingMasterDelete.label} wurde gelöscht und die Löschung protokolliert.`);
       setPendingMasterDelete(null);
-      setMasterEditorOpen(false);
+      finishMasterEditor();
       if (!adminModeUnlocked) setAdminPin("");
       await refresh();
       await refreshHistory();
@@ -2142,17 +2375,142 @@ export function AdminView() {
     pilots: "Pilotencode",
     products: "Produkt",
   };
-  const masterDataSectionLabel: Record<MasterDataCategory, string> = {
-    gates: "Gates",
-    "resource-groups": "Ressourcengruppen",
-    aircraft: "Flugzeuge",
-    assignments: "Zuordnungen",
-    pilots: "Pilotencodes",
-    products: "Produkte",
-  };
   const masterDataStepActive =
     adminArea === "events" &&
     ["gates", "resource-groups", "aircraft", "pilots", "products"].includes(eventStep);
+  const currentPilot = board?.pilots.find((pilot) => pilot.id === pilotEditorId);
+  const masterEditorDeleteAction: {
+    entityType: MasterDataDeleteTarget["entityType"];
+    entityId: string;
+    label: string;
+    description: string;
+  } | null =
+    masterDataCategory === "gates" && gateEditorId !== "new"
+      ? {
+          entityType: "GATE",
+          entityId: gateEditorId,
+          label: gateLabel,
+          description: "Nur in der Vorbereitung und ohne operative Verwendung möglich.",
+        }
+      : masterDataCategory === "resource-groups" && resourceEditorId !== "new"
+        ? {
+            entityType: "RESOURCE_GROUP",
+            entityId: resourceEditorId,
+            label: resourceName,
+            description: "Produkte und Flugzeugzuordnungen müssen vorher entfernt sein.",
+          }
+        : masterDataCategory === "aircraft" && aircraftEditorId !== "new"
+          ? {
+              entityType: "AIRCRAFT",
+              entityId: aircraftEditorId,
+              label: aircraftRegistration,
+              description: "Eine bestehende Zuordnung muss zuerst entfernt werden.",
+            }
+          : masterDataCategory === "assignments" &&
+              assignmentAircraftId &&
+              board?.aircraft.find((entry) => entry.id === assignmentAircraftId)?.resourceGroupId
+            ? {
+                entityType: "ASSIGNMENT",
+                entityId: assignmentAircraftId,
+                label: `Zuordnung ${board?.aircraft.find((entry) => entry.id === assignmentAircraftId)?.registration ?? ""}`,
+                description: "Das Flugzeug und die Ressourcengruppe bleiben erhalten.",
+              }
+            : masterDataCategory === "pilots" && pilotEditorId !== "new"
+              ? {
+                  entityType: "PILOT",
+                  entityId: pilotEditorId,
+                  label: pilotCode,
+                  description: "Nur ohne Umlauf oder Flugzeugbindung möglich.",
+                }
+              : masterDataCategory === "products" && productEditorId !== "new"
+                ? {
+                    entityType: "PRODUCT",
+                    entityId: productEditorId,
+                    label: productName,
+                    description: "Nur ohne Tickets oder Umläufe möglich.",
+                  }
+                : null;
+  const masterEditorBusyKey =
+    masterDataCategory === "gates"
+      ? "master-gate"
+      : masterDataCategory === "resource-groups"
+        ? "master-resource-group"
+        : masterDataCategory === "aircraft"
+          ? "master-aircraft"
+          : masterDataCategory === "assignments"
+            ? "master-assignment"
+            : masterDataCategory === "pilots"
+              ? "master-pilot"
+              : "master-product";
+  const masterEditorInitialFocusSelector =
+    masterDataCategory === "gates"
+      ? "#gate-label"
+      : masterDataCategory === "resource-groups"
+        ? "#resource-name"
+        : masterDataCategory === "aircraft"
+          ? "#aircraft-registration"
+          : masterDataCategory === "assignments"
+            ? "#assignment-aircraft"
+            : masterDataCategory === "pilots"
+              ? "#pilot-operational-code"
+              : "#product-name";
+  const masterEditorFooter = (
+    <>
+      {masterEditorDeleteAction ? (
+        <Button
+          className="master-editor-delete-footer"
+          disabled={!isAdministrator}
+          onClick={() =>
+            requestMasterDelete(
+              masterEditorDeleteAction.entityType,
+              masterEditorDeleteAction.entityId,
+              masterEditorDeleteAction.label,
+            )
+          }
+          type="button"
+          variant="danger"
+        >
+          <Trash2 aria-hidden="true" />
+          Löschen
+        </Button>
+      ) : null}
+      <div className="master-editor-standard-actions">
+        <Button onClick={requestMasterEditorClose} type="button">
+          Abbrechen
+        </Button>
+        <Button
+          busy={busyActionKey === masterEditorBusyKey}
+          disabled={!isAdministrator}
+          onClick={requestCurrentMasterSave}
+          type="button"
+          variant="primary"
+        >
+          Speichern
+        </Button>
+      </div>
+    </>
+  );
+  const masterEditorMobileFurtherActions = masterEditorDeleteAction ? (
+    <section className="master-editor-more-actions">
+      <h3>Weitere Aktionen</h3>
+      <p>{masterEditorDeleteAction.description}</p>
+      <Button
+        disabled={!isAdministrator}
+        onClick={() =>
+          requestMasterDelete(
+            masterEditorDeleteAction.entityType,
+            masterEditorDeleteAction.entityId,
+            masterEditorDeleteAction.label,
+          )
+        }
+        type="button"
+        variant="danger"
+      >
+        <Trash2 aria-hidden="true" />
+        Löschen
+      </Button>
+    </section>
+  ) : null;
   const filteredEvents = events.filter((entry) =>
     `${entry.name} ${entry.eventDate} ${entry.aerodrome}`
       .toLocaleLowerCase("de-DE")
@@ -2546,14 +2904,6 @@ export function AdminView() {
                   : "Beim Auslösen einer administrativen Änderung erscheint die PIN-Abfrage."}
             </ValidationHint>
           </section>
-          {masterDataStepActive ? (
-            <header className="master-data-heading">
-              <h1>
-                Stammdaten <span aria-hidden="true">›</span>{" "}
-                <strong>{masterDataSectionLabel[masterDataCategory]}</strong>
-              </h1>
-            </header>
-          ) : null}
           {adminArea === "users" ? <AccountManagement /> : null}
           <section className="reset-levels" hidden={adminArea !== "backup"}>
             {!isAdministrator ? (
@@ -2596,12 +2946,14 @@ export function AdminView() {
               vollständig gelöscht werden.
             </p>
             <div className="parameter-grid">
-              <label>
+              <div className="field-control">
                 <FieldLabel
+                  htmlFor="restart-mode"
                   label="Neustart-Stufe"
                   help="Bestimmt, ob Stammdaten übernommen werden oder die neue Veranstaltung vollständig leer beginnt."
                 />
                 <select
+                  id="restart-mode"
                   value={restartMode}
                   onChange={(event) =>
                     setRestartMode(event.target.value as "KEEP_MASTER_DATA" | "EMPTY")
@@ -2610,33 +2962,37 @@ export function AdminView() {
                   <option value="KEEP_MASTER_DATA">Betriebsdaten zurücksetzen</option>
                   <option value="EMPTY">Vollständig neu einrichten</option>
                 </select>
-              </label>
-              <label>
+              </div>
+              <div className="field-control">
                 <FieldLabel
+                  htmlFor="new-event-id"
                   label="Technische ID"
                   help="Eindeutige, URL-taugliche Kennung der neuen Veranstaltung; zum Beispiel rundflug-2027."
                 />
                 <input
+                  id="new-event-id"
                   value={newEventId}
                   onChange={(event) => setNewEventId(event.target.value)}
                   placeholder="rundflug-2027"
                 />
-              </label>
-              <label>
+              </div>
+              <div className="field-control">
                 <FieldLabel
+                  htmlFor="new-event-name"
                   label="Bezeichnung"
                   help="Lesbarer Veranstaltungsname für Administration, Kasse und Anzeigen."
                 />
                 <input
+                  id="new-event-name"
                   value={newEventName}
                   onChange={(event) => setNewEventName(event.target.value)}
                   placeholder="Flugtag 2027"
                 />
-              </label>
+              </div>
               <LocalizedDateInput
                 label="Datum"
                 labelContent={
-                  <FieldLabel
+                  <FieldGroupLabel
                     label="Datum"
                     help="Veranstaltungstag im deutschen Format TT.MM.JJJJ."
                   />
@@ -2644,29 +3000,33 @@ export function AdminView() {
                 value={newEventDate}
                 onChange={setNewEventDate}
               />
-              <label>
+              <div className="field-control">
                 <FieldLabel
+                  htmlFor="new-event-aerodrome"
                   label="Flugplatz"
                   help="Kurze Flugplatzkennung oder Ortsangabe für die Veranstaltung."
                 />
                 <input
+                  id="new-event-aerodrome"
                   value={newEventAerodrome}
                   onChange={(event) => setNewEventAerodrome(event.target.value)}
                   placeholder="EDXX"
                 />
-              </label>
-              <label>
+              </div>
+              <div className="field-control">
                 <FieldLabel
+                  htmlFor="restart-confirmation"
                   label="Bestätigung"
                   help="Schutz vor versehentlichem Neustart. Zur Ausführung muss NEUSTART eingegeben werden."
                 />
                 <input
+                  id="restart-confirmation"
                   value={restartConfirmation}
                   onChange={(event) => setRestartConfirmation(event.target.value)}
                   placeholder="NEUSTART"
                   autoComplete="off"
                 />
-              </label>
+              </div>
             </div>
             <p className="help-text">
               {restartMode === "KEEP_MASTER_DATA"
@@ -3337,18 +3697,12 @@ export function AdminView() {
                           masterEditorOpen && assignmentAircraftId === aircraft.id ? "selected" : ""
                         }
                         key={aircraft.id}
-                        onClick={() => {
-                          setAssignmentAircraftId(aircraft.id);
-                          setAssignmentResourceGroupId(aircraft.resourceGroupId);
-                          setMasterSubmitAttempted(false);
-                          setMasterEditorOpen(true);
-                        }}
+                        onClick={() =>
+                          selectAssignmentForEditing(aircraft.id, aircraft.resourceGroupId)
+                        }
                         onKeyDown={(event) => {
                           if (event.key === "Enter" || event.key === " ") {
-                            setAssignmentAircraftId(aircraft.id);
-                            setAssignmentResourceGroupId(aircraft.resourceGroupId);
-                            setMasterSubmitAttempted(false);
-                            setMasterEditorOpen(true);
+                            selectAssignmentForEditing(aircraft.id, aircraft.resourceGroupId);
                           }
                         }}
                         tabIndex={0}
@@ -3615,7 +3969,12 @@ export function AdminView() {
             ) : null}
           </section>
           <ModalDialog
-            onClose={() => setMasterEditorOpen(false)}
+            bodyClassName="master-data-editor-body"
+            className="master-data-editor-dialog"
+            footer={masterEditorFooter}
+            footerClassName="master-data-editor-footer"
+            initialFocusSelector={masterEditorInitialFocusSelector}
+            onClose={requestMasterEditorClose}
             open={
               masterDataStepActive &&
               masterEditorOpen &&
@@ -3640,15 +3999,20 @@ export function AdminView() {
                   den normalen Betrieb genügt eine Bezeichnung; technische Gate-Arten sind nicht
                   erforderlich.
                 </p>
-                <label>
+                <div className="field-control">
                   <FieldLabel
+                    htmlFor="gate-label"
                     label="Bezeichnung"
                     help="Kurzer, vor Ort eindeutig sichtbarer Name, zum Beispiel Eingang Halle oder Flight Line Nord."
                   />
-                  <input value={gateLabel} onChange={(event) => setGateLabel(event.target.value)} />
-                </label>
+                  <input
+                    id="gate-label"
+                    value={gateLabel}
+                    onChange={(event) => setGateLabel(event.target.value)}
+                  />
+                </div>
                 <div className="gate-active-field">
-                  <FieldLabel
+                  <FieldGroupLabel
                     label="Status"
                     help="Nur aktive Gates stehen für neue Zuordnungen und öffentliche Anzeigen zur Verfügung."
                   />
@@ -3674,7 +4038,7 @@ export function AdminView() {
                   </div>
                   <div className="gate-filter-group">
                     <strong>
-                      <FieldLabel
+                      <FieldGroupLabel
                         label="Produkte"
                         help="Begrenzt die öffentliche Gate-Anzeige auf die ausgewählten Produkte. Die Ressourcenzuordnung bleibt unverändert."
                       />
@@ -3703,7 +4067,7 @@ export function AdminView() {
                   </div>
                   <div className="gate-filter-group">
                     <strong>
-                      <FieldLabel
+                      <FieldGroupLabel
                         label="Umlaufstatus"
                         help="Begrenzt die Anzeige auf die gewählten Phasen. Diese Auswahl löst keine Zustandsänderung aus."
                       />
@@ -3753,38 +4117,15 @@ export function AdminView() {
                     Die Gate-Bezeichnung muss mindestens 2 Zeichen lang sein.
                   </ValidationHint>
                 ) : null}
-                <Button
-                  busy={busyActionKey === "master-gate"}
-                  className="primary-action"
-                  disabled={!isAdministrator}
-                  onClick={() => requestMasterSave("gate", gateLabel.trim().length >= 2)}
-                  type="button"
-                >
-                  Gate speichern
-                </Button>
-                {gateEditorId !== "new" ? (
-                  <div className="master-delete-zone">
-                    <div>
-                      <strong>Gate löschen</strong>
-                      <span>Nur in der Vorbereitung und ohne operative Verwendung möglich.</span>
-                    </div>
-                    <button
-                      className="danger-link-action"
-                      onClick={() => requestMasterDelete("GATE", gateEditorId, gateLabel)}
-                      type="button"
-                    >
-                      Löschen
-                    </button>
-                  </div>
-                ) : null}
               </fieldset>
               <fieldset hidden={masterDataCategory !== "products"}>
                 <legend>Produkt</legend>
                 <section className="product-editor-section">
                   <h3>Allgemein</h3>
                   <div className="parameter-grid">
-                    <label>
+                    <div className="field-control">
                       <FieldLabel
+                        htmlFor="product-name"
                         label="Bezeichnung"
                         help="Interner und öffentlicher Name des Produkts."
                       />
@@ -3796,9 +4137,10 @@ export function AdminView() {
                       {masterSubmitAttempted && productName.trim().length < 2 ? (
                         <span className="field-error">Mindestens 2 Zeichen eingeben.</span>
                       ) : null}
-                    </label>
-                    <label>
+                    </div>
+                    <div className="field-control">
                       <FieldLabel
+                        htmlFor="product-code"
                         label="Kürzel"
                         help="2–12 Großbuchstaben, Ziffern oder Bindestriche; Bestandteil der stabilen Fluggruppenkennung."
                       />
@@ -3811,9 +4153,10 @@ export function AdminView() {
                       {masterSubmitAttempted && !/^[A-Z0-9-]{2,12}$/.test(productCode) ? (
                         <span className="field-error">Zum Beispiel PAN20 oder KURZ-10.</span>
                       ) : null}
-                    </label>
-                    <label>
+                    </div>
+                    <div className="field-control">
                       <FieldLabel
+                        htmlFor="product-price"
                         label="Preis in €"
                         help="Informatorischer Einzelpreis je Ticket. Das System ist keine elektronische Kasse."
                       />
@@ -3832,25 +4175,28 @@ export function AdminView() {
                           Eurobetrag mit höchstens zwei Nachkommastellen eingeben.
                         </span>
                       ) : null}
-                    </label>
-                    <label className="product-description-field">
+                    </div>
+                    <div className="field-control product-description-field">
                       <FieldLabel
+                        htmlFor="product-description"
                         label="Öffentliche Beschreibung"
                         help="Kurzer Text für Kasse und öffentliche Anzeigen."
                       />
                       <input
+                        id="product-description"
                         value={productDescription}
                         maxLength={240}
                         onChange={(event) => setProductDescription(event.target.value)}
                       />
-                    </label>
+                    </div>
                   </div>
                 </section>
                 <section className="product-editor-section">
                   <h3>Planung</h3>
                   <div className="parameter-grid">
-                    <label>
+                    <div className="field-control">
                       <FieldLabel
+                        htmlFor="product-resource-group"
                         label="Ressourcengruppe"
                         help="Ordnet das Produkt genau einer gemeinsamen operativen Queue und Kapazität zu."
                       />
@@ -3869,9 +4215,10 @@ export function AdminView() {
                       {masterSubmitAttempted && !productResourceGroupId ? (
                         <span className="field-error">Eine Ressourcengruppe auswählen.</span>
                       ) : null}
-                    </label>
-                    <label>
+                    </div>
+                    <div className="field-control">
                       <FieldLabel
+                        htmlFor="product-gate"
                         label="Gate"
                         help="Veröffentlichter Treffpunkt beziehungsweise Abfertigungsort."
                       />
@@ -3892,13 +4239,15 @@ export function AdminView() {
                       {masterSubmitAttempted && !productGateId ? (
                         <span className="field-error">Ein aktives Gate auswählen.</span>
                       ) : null}
-                    </label>
-                    <label>
+                    </div>
+                    <div className="field-control">
                       <FieldLabel
+                        htmlFor="product-reference-duration"
                         label="Referenzdauer"
                         help="Planwert für den Kaltstart der Prognose, keine zugesagte Flugzeit."
                       />
                       <input
+                        id="product-reference-duration"
                         type="number"
                         min="1"
                         max="600"
@@ -3907,13 +4256,15 @@ export function AdminView() {
                           setProductReferenceDuration(Number(event.target.value))
                         }
                       />
-                    </label>
-                    <label>
+                    </div>
+                    <div className="field-control">
                       <FieldLabel
+                        htmlFor="product-promised-flight-minutes"
                         label="Zugesagte Flugzeit (Min.)"
                         help="Öffentlich kommunizierte reine Flugzeit des Produkts. Sie ändert die operative Prognose nicht."
                       />
                       <input
+                        id="product-promised-flight-minutes"
                         type="number"
                         min="1"
                         max="600"
@@ -3922,13 +4273,15 @@ export function AdminView() {
                           setProductPromisedFlightMinutes(Number(event.target.value))
                         }
                       />
-                    </label>
-                    <label>
+                    </div>
+                    <div className="field-control">
                       <FieldLabel
+                        htmlFor="product-sort-order"
                         label="Position in Anzeigen"
                         help="Legt nur die Reihenfolge in Kasse und Anzeigen fest. Queue und Priorität ändern sich dadurch nicht."
                       />
                       <select
+                        id="product-sort-order"
                         value={productSortOrder}
                         onChange={(event) => setProductSortOrder(Number(event.target.value))}
                       >
@@ -3938,43 +4291,20 @@ export function AdminView() {
                           </option>
                         ))}
                       </select>
-                    </label>
+                    </div>
                   </div>
                 </section>
-                <div className="editor-actions product-editor-actions">
-                  <button onClick={() => setMasterEditorOpen(false)} type="button">
-                    Abbrechen
-                  </button>
-                  <Button
-                    busy={busyActionKey === "master-product"}
-                    className="primary-action"
-                    disabled={!isAdministrator}
-                    onClick={requestProductSave}
-                    type="button"
-                  >
-                    <span>Produkt speichern</span>
-                  </Button>
-                </div>
-                {productEditorId !== "new" ? (
-                  <div className="master-delete-zone">
-                    <div>
-                      <strong>Produkt löschen</strong>
-                      <span>Nur ohne Tickets oder Umläufe möglich.</span>
-                    </div>
-                    <button
-                      className="danger-link-action"
-                      onClick={() => requestMasterDelete("PRODUCT", productEditorId, productName)}
-                      type="button"
-                    >
-                      Löschen
-                    </button>
-                  </div>
-                ) : null}
               </fieldset>
             </div>
+            {masterEditorMobileFurtherActions}
           </ModalDialog>
           <ModalDialog
-            onClose={() => setMasterEditorOpen(false)}
+            bodyClassName="master-data-editor-body"
+            className="master-data-editor-dialog"
+            footer={masterEditorFooter}
+            footerClassName="master-data-editor-footer"
+            initialFocusSelector={masterEditorInitialFocusSelector}
+            onClose={requestMasterEditorClose}
             open={
               masterDataStepActive &&
               masterEditorOpen &&
@@ -3996,23 +4326,27 @@ export function AdminView() {
             <div className="resource-master-grid">
               <fieldset hidden={masterDataCategory !== "resource-groups"}>
                 <legend>Ressourcengruppe</legend>
-                <label>
+                <div className="field-control">
                   <FieldLabel
+                    htmlFor="resource-name"
                     label="Bezeichnung"
                     help="Lesbarer Name der gemeinsamen operativen Warteschlange."
                   />
                   <input
+                    id="resource-name"
                     value={resourceName}
                     onChange={(event) => setResourceName(event.target.value)}
                   />
-                </label>
-                <label>
+                </div>
+                <div className="field-control">
                   <FieldLabel
+                    htmlFor="resource-short-code"
                     label="Kurzzeichen"
                     help="Eindeutiges Kürzel mit 2 bis 8 Großbuchstaben, Ziffern oder Bindestrichen für kompakte operative Ansichten."
                   />
                   <input
                     autoCapitalize="characters"
+                    id="resource-short-code"
                     maxLength={8}
                     placeholder="z. B. PA"
                     value={resourceShortCode}
@@ -4022,13 +4356,15 @@ export function AdminView() {
                       )
                     }
                   />
-                </label>
-                <label>
+                </div>
+                <div className="field-control">
                   <FieldLabel
+                    htmlFor="resource-gate"
                     label="Gate"
                     help="Standardmäßiger Treffpunkt für Produkte und Umläufe dieser Ressourcengruppe."
                   />
                   <select
+                    id="resource-gate"
                     value={resourceGateId}
                     onChange={(event) => setResourceGateId(event.target.value)}
                   >
@@ -4041,31 +4377,35 @@ export function AdminView() {
                         </option>
                       ))}
                   </select>
-                </label>
-                <label>
+                </div>
+                <div className="field-control">
                   <FieldLabel
+                    htmlFor="resource-planned-minutes"
                     label="Plan-Umlaufzeit (Min.)"
                     help="Initialer Zeitwert eines vollständigen Umlaufs für die Prognose."
                   />
                   <input
+                    id="resource-planned-minutes"
                     type="number"
                     min="1"
                     max="600"
                     value={resourcePlannedMinutes}
                     onChange={(event) => setResourcePlannedMinutes(Number(event.target.value))}
                   />
-                </label>
-                <label className="admin-check-row">
+                </div>
+                <div className="admin-check-row">
                   <input
                     checked={resourceAutomaticPrecall}
+                    id="resource-automatic-precall"
                     onChange={(event) => setResourceAutomaticPrecall(event.target.checked)}
                     type="checkbox"
                   />
                   <FieldLabel
+                    htmlFor="resource-automatic-precall"
                     label="Automatischer Voraufruf für diese Gruppe"
                     help="Kann für einzelne Ressourcengruppen abgeschaltet werden. Belegung, Pilot und Boarding bleiben immer manuell bestätigt."
                   />
-                </label>
+                </div>
                 <section className="resource-aircraft-selection">
                   <h3>Flugzeuge dieser Ressourcengruppe</h3>
                   <p>
@@ -4123,134 +4463,80 @@ export function AdminView() {
                     angegeben werden.
                   </ValidationHint>
                 ) : null}
-                <Button
-                  busy={busyActionKey === "master-resource-group"}
-                  className="primary-action"
-                  disabled={!isAdministrator}
-                  onClick={() =>
-                    requestMasterSave(
-                      "resource-group",
-                      resourceName.trim().length >= 2 &&
-                        /^[A-Z0-9-]{2,8}$/.test(resourceShortCode.trim().toUpperCase()) &&
-                        Boolean(resourceGateId),
-                    )
-                  }
-                  type="button"
-                >
-                  Ressourcengruppe speichern
-                </Button>
-                {resourceEditorId !== "new" ? (
-                  <div className="master-delete-zone">
-                    <div>
-                      <strong>Ressourcengruppe löschen</strong>
-                      <span>Produkte und Flugzeugzuordnungen müssen vorher entfernt sein.</span>
-                    </div>
-                    <button
-                      className="danger-link-action"
-                      onClick={() =>
-                        requestMasterDelete("RESOURCE_GROUP", resourceEditorId, resourceName)
-                      }
-                      type="button"
-                    >
-                      Löschen
-                    </button>
-                  </div>
-                ) : null}
               </fieldset>
               <fieldset hidden={masterDataCategory !== "aircraft"}>
                 <legend>Flugzeug</legend>
-                <label>
+                <div className="field-control">
                   <FieldLabel
+                    htmlFor="aircraft-registration"
                     label="Kennzeichen"
                     help="Eindeutiges operatives Luftfahrzeugkennzeichen, beispielsweise D-EXYZ."
                   />
                   <input
+                    id="aircraft-registration"
                     value={aircraftRegistration}
                     maxLength={16}
                     onChange={(event) => setAircraftRegistration(event.target.value.toUpperCase())}
                   />
-                </label>
-                <label>
+                </div>
+                <div className="field-control">
                   <FieldLabel
+                    htmlFor="aircraft-type"
                     label="Flugzeugtyp"
                     help="Typbezeichnung zur Prüfung gegen kompatible Ressourcengruppen."
                   />
                   <input
+                    id="aircraft-type"
                     value={aircraftType}
                     onChange={(event) => setAircraftType(event.target.value)}
                   />
-                </label>
-                <label>
+                </div>
+                <div className="field-control">
                   <FieldLabel
+                    htmlFor="aircraft-seats"
                     label="Passagierplätze"
                     help="Maximale Ticketanzahl je Umlauf; Besatzungsplätze werden hier nicht eingetragen."
                   />
                   <input
+                    id="aircraft-seats"
                     type="number"
                     min="1"
                     max="100"
                     value={aircraftSeats}
                     onChange={(event) => setAircraftSeats(Number(event.target.value))}
                   />
-                </label>
-                <label>
+                </div>
+                <div className="field-control">
                   <FieldLabel
+                    htmlFor="aircraft-maximum-payload"
                     label="Max. Passagierzuladung (kg)"
                     help="Optionaler organisatorischer Hinweiswert. Er besitzt keine Freigabe- oder Sicherheitssemantik."
                   />
                   <input
+                    id="aircraft-maximum-payload"
                     type="number"
                     min="1"
                     value={aircraftMaximumPayload}
                     onChange={(event) => setAircraftMaximumPayload(event.target.value)}
                   />
-                </label>
+                </div>
                 {masterSubmitAttempted &&
                 (aircraftRegistration.trim().length < 3 || aircraftType.trim().length < 2) ? (
                   <ValidationHint tone="error">
                     Kennzeichen und Flugzeugtyp müssen mindestens 2 Zeichen lang sein.
                   </ValidationHint>
                 ) : null}
-                <Button
-                  busy={busyActionKey === "master-aircraft"}
-                  className="primary-action"
-                  disabled={!isAdministrator}
-                  onClick={() =>
-                    requestMasterSave(
-                      "aircraft",
-                      aircraftRegistration.trim().length >= 3 && aircraftType.trim().length >= 2,
-                    )
-                  }
-                  type="button"
-                >
-                  Flugzeug speichern
-                </Button>
-                {aircraftEditorId !== "new" ? (
-                  <div className="master-delete-zone">
-                    <div>
-                      <strong>Flugzeug löschen</strong>
-                      <span>Eine bestehende Zuordnung muss zuerst entfernt werden.</span>
-                    </div>
-                    <button
-                      className="danger-link-action"
-                      onClick={() =>
-                        requestMasterDelete("AIRCRAFT", aircraftEditorId, aircraftRegistration)
-                      }
-                      type="button"
-                    >
-                      Löschen
-                    </button>
-                  </div>
-                ) : null}
               </fieldset>
               <fieldset hidden={masterDataCategory !== "assignments"}>
                 <legend>Historisierte Zuordnung</legend>
-                <label>
+                <div className="field-control">
                   <FieldLabel
+                    htmlFor="assignment-aircraft"
                     label="Flugzeug"
                     help="Flugzeug, dessen aktive Ressourcengruppenzuordnung geändert werden soll."
                   />
                   <select
+                    id="assignment-aircraft"
                     value={assignmentAircraftId}
                     onChange={(event) => setAssignmentAircraftId(event.target.value)}
                   >
@@ -4261,13 +4547,15 @@ export function AdminView() {
                       </option>
                     ))}
                   </select>
-                </label>
-                <label>
+                </div>
+                <div className="field-control">
                   <FieldLabel
+                    htmlFor="assignment-resource-group"
                     label="Neue Ressourcengruppe"
                     help="Zielgruppe der neuen historisierten Zuordnung. Ein Flugzeug kann gleichzeitig nur einer aktiven Gruppe angehören."
                   />
                   <select
+                    id="assignment-resource-group"
                     value={assignmentResourceGroupId}
                     onChange={(event) => setAssignmentResourceGroupId(event.target.value)}
                   >
@@ -4280,7 +4568,7 @@ export function AdminView() {
                         </option>
                       ))}
                   </select>
-                </label>
+                </div>
                 <p>
                   Wirksam ab Bestätigung. Aktive Umläufe und inkompatible Flugzeugtypen werden
                   serverseitig abgewiesen.
@@ -4290,78 +4578,50 @@ export function AdminView() {
                     Flugzeug und neue Ressourcengruppe müssen ausgewählt werden.
                   </ValidationHint>
                 ) : null}
-                <Button
-                  busy={busyActionKey === "master-assignment"}
-                  className="primary-action"
-                  disabled={!isAdministrator}
-                  onClick={() =>
-                    requestMasterSave(
-                      "assignment",
-                      Boolean(assignmentAircraftId && assignmentResourceGroupId),
-                    )
-                  }
-                  type="button"
-                >
-                  Zuordnung ändern
-                </Button>
-                {assignmentAircraftId &&
-                board?.aircraft.find((entry) => entry.id === assignmentAircraftId)
-                  ?.resourceGroupId ? (
-                  <div className="master-delete-zone">
-                    <div>
-                      <strong>Zuordnung entfernen</strong>
-                      <span>Das Flugzeug und die Ressourcengruppe bleiben erhalten.</span>
-                    </div>
-                    <button
-                      className="danger-link-action"
-                      onClick={() =>
-                        requestMasterDelete(
-                          "ASSIGNMENT",
-                          assignmentAircraftId,
-                          `Zuordnung ${board?.aircraft.find((entry) => entry.id === assignmentAircraftId)?.registration ?? ""}`,
-                        )
-                      }
-                      type="button"
-                    >
-                      Entfernen
-                    </button>
-                  </div>
-                ) : null}
               </fieldset>
             </div>
+            {masterEditorMobileFurtherActions}
           </ModalDialog>
           <ModalDialog
-            onClose={() => setMasterEditorOpen(false)}
+            bodyClassName="master-data-editor-body"
+            className="master-data-editor-dialog"
+            footer={masterEditorFooter}
+            footerClassName="master-data-editor-footer"
+            initialFocusSelector={masterEditorInitialFocusSelector}
+            onClose={requestMasterEditorClose}
             open={masterDataStepActive && masterEditorOpen && masterDataCategory === "pilots"}
             size="wide"
             title={pilotEditorId === "new" ? "Pilotencode anlegen" : "Pilotencode bearbeiten"}
           >
             <div className="parameter-grid compact-editor-grid">
-              <label>
+              <div className="field-control">
                 <FieldLabel
+                  htmlFor="pilot-operational-code"
                   label="Operativer Pilotencode"
                   help="Anonymer technischer Code für die operative Zuordnung; keine Namen oder Lizenzdaten erfassen."
                 />
                 <input
-                  aria-label="Operativer Pilotencode"
+                  id="pilot-operational-code"
                   value={pilotCode}
                   onChange={(event) => setPilotCode(event.target.value.toUpperCase())}
                 />
                 <span className="field-help">
                   Nur technische Codes, keine Namen oder Lizenzdaten.
                 </span>
-              </label>
-              <label>
+              </div>
+              <div className="field-control">
                 <FieldLabel
+                  htmlFor="pilot-operational-note"
                   label="Organisatorische Bemerkung"
                   help="Optionaler nicht personenbezogener Hinweis, zum Beispiel Einsatzbereich oder Schicht."
                 />
                 <input
+                  id="pilot-operational-note"
                   value={pilotNote}
                   onChange={(event) => setPilotNote(event.target.value)}
                   placeholder="Optional · keine personenbezogenen Daten"
                 />
-              </label>
+              </div>
             </div>
             {masterSubmitAttempted && !/^[A-Z0-9-]{2,12}$/.test(pilotCode) ? (
               <ValidationHint tone="error">
@@ -4369,47 +4629,53 @@ export function AdminView() {
                 bestehen.
               </ValidationHint>
             ) : null}
-            <div className="editor-actions">
-              <Button
-                busy={busyActionKey === "master-pilot"}
-                className="primary-action"
-                disabled={!isAdministrator}
-                onClick={() => requestMasterSave("pilot", /^[A-Z0-9-]{2,12}$/.test(pilotCode))}
-                type="button"
-              >
-                {pilotEditorId === "new" ? "Pilotencode anlegen" : "Änderungen speichern"}
-              </Button>
-              <button onClick={() => setMasterEditorOpen(false)} type="button">
-                Abbrechen
-              </button>
-              {pilotEditorId !== "new" ? (
+            {pilotEditorId !== "new" ? (
+              <section className="master-editor-status-section">
+                <div>
+                  <h3>Status</h3>
+                  <p>
+                    Der Pilotencode ist aktuell {currentPilot?.active ? "aktiv" : "inaktiv"}.
+                    Statusänderungen werden separat gespeichert und protokolliert.
+                    {masterEditorDirty
+                      ? " Speichern oder verwerfen Sie zuerst die Formularänderungen."
+                      : ""}
+                  </p>
+                </div>
                 <Button
                   busy={busyActionKey === "master-pilot-toggle"}
-                  disabled={!isAdministrator}
+                  disabled={!isAdministrator || masterEditorDirty}
                   onClick={() => requestMasterSave("pilot-toggle", true)}
                   type="button"
                 >
-                  {board?.pilots.find((pilot) => pilot.id === pilotEditorId)?.active
-                    ? "Deaktivieren"
-                    : "Aktivieren"}
+                  {currentPilot?.active ? "Deaktivieren" : "Aktivieren"}
                 </Button>
-              ) : null}
-            </div>
-            {pilotEditorId !== "new" ? (
-              <div className="master-delete-zone">
-                <div>
-                  <strong>Pilotencode löschen</strong>
-                  <span>Nur ohne Umlauf oder Flugzeugbindung möglich.</span>
-                </div>
-                <button
-                  className="danger-link-action"
-                  onClick={() => requestMasterDelete("PILOT", pilotEditorId, pilotCode)}
-                  type="button"
-                >
-                  Löschen
-                </button>
-              </div>
+              </section>
             ) : null}
+            {masterEditorMobileFurtherActions}
+          </ModalDialog>
+          <ModalDialog
+            className="master-discard-dialog"
+            footer={
+              <>
+                <Button data-master-discard-continue onClick={continueMasterEditing} type="button">
+                  Weiter bearbeiten
+                </Button>
+                <Button onClick={discardMasterChanges} type="button" variant="danger">
+                  Verwerfen
+                </Button>
+              </>
+            }
+            initialFocusSelector="[data-master-discard-continue]"
+            onClose={continueMasterEditing}
+            open={discardMasterChangesOpen}
+            role="alertdialog"
+            size="compact"
+            title="Änderungen verwerfen?"
+          >
+            <p className="master-discard-copy">
+              Die noch nicht gespeicherten Änderungen gehen verloren. Dieser Vorgang kann nicht
+              rückgängig gemacht werden.
+            </p>
           </ModalDialog>
           <section
             className="admin-section admin-simulator-launch"
@@ -4445,17 +4711,19 @@ export function AdminView() {
             hidden={adminArea !== "events" || eventStep !== "operations"}
           >
             <h2>Notfallmodus</h2>
-            <label>
+            <div className="field-control">
               <FieldLabel
+                htmlFor="emergency-reason"
                 label="Begründung für den Notfallmodus"
                 help="Nur außergewöhnliche Eingriffe benötigen einen frei eingegebenen Grund. Normale Betriebsänderungen werden automatisch protokolliert."
               />
               <input
+                id="emergency-reason"
                 onChange={(event) => setReason(event.target.value)}
                 placeholder="Mindestens 3 Zeichen"
                 value={reason}
               />
-            </label>
+            </div>
             {!board?.event.emergencyMode ? (
               <Button
                 busy={busyActionKey === "emergency-trigger"}
@@ -4524,12 +4792,14 @@ export function AdminView() {
               flugbetriebliche oder sicherheitsbezogene Freigabewirkung.
             </ValidationHint>
             <div className="manifest-correction-grid">
-              <label>
+              <div className="field-control">
                 <FieldLabel
+                  htmlFor="manifest-ticket-group"
                   label="Zu korrigierende Buchungsgruppe"
                   help="Es werden nur anonyme Gruppen angeboten, deren dokumentierter Umlauf bereits im Flug, gelandet oder abgeschlossen ist."
                 />
                 <select
+                  id="manifest-ticket-group"
                   value={manifestTicketGroupId}
                   onChange={(event) => {
                     setManifestTicketGroupId(event.target.value);
@@ -4543,14 +4813,16 @@ export function AdminView() {
                     </option>
                   ))}
                 </select>
-              </label>
-              <label>
+              </div>
+              <div className="field-control">
                 <FieldLabel
+                  htmlFor="manifest-target-rotation"
                   label="Tatsächlicher Zielumlauf"
                   help="Der Zielumlauf muss mindestens den Status Im Flug erreicht haben. Bisherige Umläufe der Gruppe sind ausgeschlossen."
                 />
                 <select
                   disabled={!selectedManifestCandidate}
+                  id="manifest-target-rotation"
                   value={manifestTargetRotationId}
                   onChange={(event) => setManifestTargetRotationId(event.target.value)}
                 >
@@ -4561,20 +4833,22 @@ export function AdminView() {
                     </option>
                   ))}
                 </select>
-              </label>
-              <label className="manifest-reason-field">
+              </div>
+              <div className="field-control manifest-reason-field">
                 <FieldLabel
+                  htmlFor="manifest-correction-reason"
                   label="Dokumentationsgrund"
                   help="Mindestens 10 Zeichen. Der Grund wird zusammen mit Quelle, Ziel, Gerät und Version dauerhaft auditiert."
                 />
                 <textarea
+                  id="manifest-correction-reason"
                   maxLength={500}
                   placeholder="Zum Beispiel: Tatsächliche Besetzung nach Rückmeldung der Flight Line berichtigen"
                   value={manifestCorrectionReason}
                   onChange={(event) => setManifestCorrectionReason(event.target.value)}
                 />
                 <small>{manifestCorrectionReason.trim().length}/10 Mindestzeichen</small>
-              </label>
+              </div>
             </div>
             {selectedManifestCandidate ? (
               <div className="manifest-correction-preview">
@@ -4618,18 +4892,20 @@ export function AdminView() {
           </section>
           <section className="admin-section" hidden>
             <h2>Betriebs- und Wetterhinweise</h2>
-            <label>
+            <div className="field-control">
               <FieldLabel
+                htmlFor="operational-notice"
                 label="Organisatorischer Hinweis"
                 help="Öffentlich sichtbare Information ohne automatische Auswirkung auf Verkauf oder Flugbetrieb."
               />
               <input
+                id="operational-notice"
                 value={operationalNotice}
                 maxLength={240}
                 onChange={(event) => setOperationalNotice(event.target.value)}
                 placeholder="Hinweis setzen oder leer speichern zum Entfernen"
               />
-            </label>
+            </div>
             <div className="secondary-actions notice-actions">
               <Button
                 busy={busyActionKey === "notice-event"}
@@ -4676,7 +4952,7 @@ export function AdminView() {
             <LocalizedDateTimeInput
               label="Neuer harter Verkaufsschluss"
               labelContent={
-                <FieldLabel
+                <FieldGroupLabel
                   label="Neuer harter Verkaufsschluss"
                   help="Nach diesem lokalen Zeitpunkt werden für das gewählte Produkt keine neuen Verkäufe akzeptiert."
                 />
@@ -4857,19 +5133,21 @@ export function AdminView() {
                 </div>
               ))}
             </div>
-            <label className="threshold-input">
+            <div className="field-control threshold-input">
               <FieldLabel
+                htmlFor="refuel-threshold"
                 label="Umläufe bis Tank-Erinnerung"
                 help="Rein organisatorischer Erinnerungswert je Flugzeug; keine Kraftstoff- oder Freigabeentscheidung."
               />
               <input
+                id="refuel-threshold"
                 type="number"
                 min={1}
                 max={100}
                 value={refuelThreshold}
                 onChange={(event) => setRefuelThreshold(Number(event.target.value))}
               />
-            </label>
+            </div>
             <h3>Pilotenpausen</h3>
             <p className="help-text">
               Pilotencodes und organisatorische Bemerkungen werden unter Stammdaten verwaltet.
@@ -5033,7 +5311,10 @@ export function AdminView() {
               <LocalizedDateTimeInput
                 label="Von"
                 labelContent={
-                  <FieldLabel label="Von" help="Optionaler Beginn des ausgewerteten Zeitraums." />
+                  <FieldGroupLabel
+                    label="Von"
+                    help="Optionaler Beginn des ausgewerteten Zeitraums."
+                  />
                 }
                 value={historySince}
                 onChange={setHistorySince}
@@ -5041,55 +5322,66 @@ export function AdminView() {
               <LocalizedDateTimeInput
                 label="Bis"
                 labelContent={
-                  <FieldLabel label="Bis" help="Optionales Ende des ausgewerteten Zeitraums." />
+                  <FieldGroupLabel
+                    label="Bis"
+                    help="Optionales Ende des ausgewerteten Zeitraums."
+                  />
                 }
                 value={historyUntil}
                 onChange={setHistoryUntil}
               />
               {historyView === "AUDIT" ? (
                 <>
-                  <label>
+                  <div className="field-control">
                     <FieldLabel
+                      htmlFor="history-event-type"
                       label="Ereignistyp"
                       help="Technischer Audit-Ereignisname, beispielsweise TICKET_NO_SHOW. Leer zeigt alle Typen."
                     />
                     <input
+                      id="history-event-type"
                       value={historyEventType}
                       onChange={(event) => setHistoryEventType(event.target.value)}
                       placeholder="z. B. TICKET_NO_SHOW"
                     />
-                  </label>
-                  <label>
+                  </div>
+                  <div className="field-control">
                     <FieldLabel
+                      htmlFor="history-aggregate-type"
                       label="Bezugsart"
                       help="Art des betroffenen Objekts, beispielsweise ROTATION, TICKET oder PRODUCT."
                     />
                     <input
+                      id="history-aggregate-type"
                       value={historyAggregateType}
                       onChange={(event) => setHistoryAggregateType(event.target.value)}
                       placeholder="z. B. ROTATION"
                     />
-                  </label>
-                  <label>
+                  </div>
+                  <div className="field-control">
                     <FieldLabel
+                      htmlFor="history-aggregate-id"
                       label="Bezugs-ID"
                       help="Interne anonyme Kennung eines bestimmten Objekts zur gezielten Nachverfolgung."
                     />
                     <input
+                      id="history-aggregate-id"
                       value={historyAggregateId}
                       onChange={(event) => setHistoryAggregateId(event.target.value)}
                       placeholder="interne ID"
                     />
-                  </label>
+                  </div>
                 </>
               ) : (
                 <>
-                  <label>
+                  <div className="field-control">
                     <FieldLabel
+                      htmlFor="history-aircraft"
                       label="Flugzeug"
                       help="Begrenzt Betriebs- oder Prognoseeinträge auf ein Flugzeug."
                     />
                     <select
+                      id="history-aircraft"
                       value={historyAircraftId}
                       onChange={(event) => setHistoryAircraftId(event.target.value)}
                     >
@@ -5100,13 +5392,15 @@ export function AdminView() {
                         </option>
                       ))}
                     </select>
-                  </label>
-                  <label>
+                  </div>
+                  <div className="field-control">
                     <FieldLabel
+                      htmlFor="history-pilot"
                       label="Pilotencode"
                       help="Begrenzt die Ansicht auf einen anonymen operativen Pilotencode."
                     />
                     <select
+                      id="history-pilot"
                       value={historyPilotId}
                       onChange={(event) => setHistoryPilotId(event.target.value)}
                     >
@@ -5117,26 +5411,30 @@ export function AdminView() {
                         </option>
                       ))}
                     </select>
-                  </label>
-                  <label>
+                  </div>
+                  <div className="field-control">
                     <FieldLabel
+                      htmlFor="history-rotation"
                       label="Umlauf-ID"
                       help="Interne Kennung eines konkreten Umlaufs; leer zeigt alle Umläufe."
                     />
                     <input
+                      id="history-rotation"
                       value={historyRotationId}
                       onChange={(event) => setHistoryRotationId(event.target.value)}
                       placeholder="interne ID"
                     />
-                  </label>
+                  </div>
                   {historyView === "OPERATIONS" ? (
                     <>
-                      <label>
+                      <div className="field-control">
                         <FieldLabel
+                          htmlFor="history-ticket-status"
                           label="Ticketstatus"
                           help="Filtert nach dem aktuellen oder protokollierten anonymen Ticketzustand."
                         />
                         <select
+                          id="history-ticket-status"
                           value={historyTicketStatus}
                           onChange={(event) => setHistoryTicketStatus(event.target.value)}
                         >
@@ -5158,13 +5456,15 @@ export function AdminView() {
                             </option>
                           ))}
                         </select>
-                      </label>
-                      <label>
+                      </div>
+                      <div className="field-control">
                         <FieldLabel
+                          htmlFor="history-product"
                           label="Produkt"
                           help="Begrenzt die Betriebshistorie auf ein Produkt."
                         />
                         <select
+                          id="history-product"
                           value={historyProductId}
                           onChange={(event) => setHistoryProductId(event.target.value)}
                         >
@@ -5175,13 +5475,15 @@ export function AdminView() {
                             </option>
                           ))}
                         </select>
-                      </label>
-                      <label>
+                      </div>
+                      <div className="field-control">
                         <FieldLabel
+                          htmlFor="history-resource-group"
                           label="Ressourcengruppe"
                           help="Begrenzt die Betriebshistorie auf die gemeinsame operative Queue."
                         />
                         <select
+                          id="history-resource-group"
                           value={historyResourceGroupId}
                           onChange={(event) => setHistoryResourceGroupId(event.target.value)}
                         >
@@ -5192,41 +5494,47 @@ export function AdminView() {
                             </option>
                           ))}
                         </select>
-                      </label>
-                      <label>
+                      </div>
+                      <div className="field-control">
                         <FieldLabel
+                          htmlFor="history-communication-number"
                           label="Fluggruppennummer"
                           help="Stabile öffentliche Kommunikationsnummer der Fluggruppe, keine garantierte Uhrzeit."
                         />
                         <input
+                          id="history-communication-number"
                           min="1"
                           type="number"
                           value={historyCommunicationNumber}
                           onChange={(event) => setHistoryCommunicationNumber(event.target.value)}
                         />
-                      </label>
-                      <label>
+                      </div>
+                      <div className="field-control">
                         <FieldLabel
+                          htmlFor="history-ticket-id"
                           label="Ticket-ID"
                           help="Interne anonyme Ticketkennung; nicht der öffentliche QR-Code."
                         />
                         <input
+                          id="history-ticket-id"
                           value={historyTicketId}
                           onChange={(event) => setHistoryTicketId(event.target.value)}
                           placeholder="interne ID"
                         />
-                      </label>
-                      <label>
+                      </div>
+                      <div className="field-control">
                         <FieldLabel
+                          htmlFor="history-ticket-group"
                           label="Ticketgruppe"
                           help="Interne anonyme Kennung einer gemeinsam gebuchten und untrennbaren Gruppe."
                         />
                         <input
+                          id="history-ticket-group"
                           value={historyTicketGroupId}
                           onChange={(event) => setHistoryTicketGroupId(event.target.value)}
                           placeholder="interne ID"
                         />
-                      </label>
+                      </div>
                     </>
                   ) : null}
                 </>
@@ -5461,34 +5769,49 @@ export function AdminView() {
             </div>
           ) : null}
           {pendingMasterDelete ? (
-            <div className="modal-backdrop">
-              <form
-                aria-labelledby="master-delete-title"
-                aria-modal="true"
-                className="confirmation-dialog master-delete-dialog"
-                onKeyDown={(event) => {
-                  if (event.key === "Escape") setPendingMasterDelete(null);
-                }}
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  void runBusyAction("master-delete", confirmMasterDelete);
-                }}
-                role="dialog"
-              >
-                <div className="drawer-heading">
-                  <div>
-                    <span className="danger-eyebrow">Endgültig löschen</span>
-                    <h2 id="master-delete-title">{pendingMasterDelete.label} löschen?</h2>
-                    <p>Die Löschung wird dem angemeldeten Konto zugeordnet und protokolliert.</p>
-                  </div>
-                  <button
-                    aria-label="Löschen abbrechen"
-                    onClick={() => setPendingMasterDelete(null)}
+            <ModalDialog
+              bodyClassName="master-delete-dialog-body"
+              className="master-delete-dialog"
+              closeLabel="Löschen abbrechen"
+              description="Diese Aktion entfernt den Datensatz dauerhaft und wird dem angemeldeten Konto zugeordnet und protokolliert."
+              footer={
+                <>
+                  <Button data-master-delete-cancel onClick={cancelMasterDelete} type="button">
+                    Abbrechen
+                  </Button>
+                  <Button
+                    busy={busyActionKey === "master-delete"}
+                    disabled={
+                      board?.event.status !== "PREPARATION" ||
+                      pendingMasterDelete.blockers.length > 0 ||
+                      adminPin.length < 4
+                    }
+                    onClick={() => void runBusyAction("master-delete", confirmMasterDelete)}
                     type="button"
+                    variant="danger"
                   >
-                    ×
-                  </button>
-                </div>
+                    Endgültig löschen
+                  </Button>
+                </>
+              }
+              initialFocusSelector="[data-master-delete-cancel]"
+              onClose={cancelMasterDelete}
+              open
+              role="alertdialog"
+              size="default"
+              title={
+                <span className="master-delete-title">
+                  <Trash2 aria-hidden="true" />
+                  {pendingMasterDelete.label} endgültig löschen?
+                </span>
+              }
+            >
+              <div className="master-delete-record">
+                <strong>{pendingMasterDelete.label}</strong>
+                <span>Administrativer Stammdatensatz</span>
+              </div>
+              <section aria-labelledby="master-delete-effects">
+                <h3 id="master-delete-effects">Auswirkungen</h3>
                 {board?.event.status !== "PREPARATION" ? (
                   <div className="delete-blockers" role="status">
                     <strong>Löschen ist nach Betriebsfreigabe gesperrt.</strong>
@@ -5505,48 +5828,36 @@ export function AdminView() {
                     </ul>
                   </div>
                 ) : (
-                  <p className="delete-ready-copy">
-                    Der Datensatz hat keine erkennbaren Abhängigkeiten und kann in der Vorbereitung
-                    entfernt werden. Der Server prüft dies vor der Löschung erneut.
-                  </p>
+                  <div className="delete-ready-copy">
+                    <CheckCircle2 aria-hidden="true" />
+                    <span>
+                      Keine erkennbaren Abhängigkeiten. Der Server prüft sie vor dem Löschen erneut.
+                    </span>
+                  </div>
                 )}
-                {!adminModeUnlocked ? (
-                  <label>
-                    Administrator-PIN
-                    <input
-                      autoComplete="current-password"
-                      onChange={(event) => setAdminPin(event.target.value)}
-                      ref={adminPinInputRef}
-                      type="password"
-                      value={adminPin}
-                    />
-                  </label>
-                ) : (
-                  <ValidationHint>
-                    Bearbeitungsmodus aktiv. Die Löschung benötigt weiterhin diese ausdrückliche
-                    Bestätigung.
-                  </ValidationHint>
-                )}
-                <div className="dialog-actions">
-                  <button onClick={() => setPendingMasterDelete(null)} type="button">
-                    Abbrechen
-                  </button>
-                  <Button
-                    busy={busyActionKey === "master-delete"}
-                    className="danger-action"
-                    disabled={
-                      board?.event.status !== "PREPARATION" ||
-                      pendingMasterDelete.blockers.length > 0 ||
-                      adminPin.length < 4
-                    }
-                    type="submit"
-                    variant="danger"
-                  >
-                    Endgültig löschen
-                  </Button>
+              </section>
+              {!adminModeUnlocked ? (
+                <div className="field-control">
+                  <label htmlFor="master-delete-pin">Administrator-PIN</label>
+                  <input
+                    autoComplete="current-password"
+                    id="master-delete-pin"
+                    onChange={(event) => setAdminPin(event.target.value)}
+                    ref={adminPinInputRef}
+                    type="password"
+                    value={adminPin}
+                  />
                 </div>
-              </form>
-            </div>
+              ) : (
+                <ValidationHint>
+                  Der Entwurf bleibt erhalten. Zum Löschen ist weiterhin diese ausdrückliche
+                  Bestätigung erforderlich.
+                </ValidationHint>
+              )}
+              <p className="master-delete-audit-note">
+                Einheitlicher Audit-Grund: Administrative Stammdatenlöschung
+              </p>
+            </ModalDialog>
           ) : null}
           <ModalDialog
             description="Versionierte Stammdaten werden geprüft und ausschließlich atomar in eine leere Veranstaltung in Vorbereitung importiert."
@@ -5680,43 +5991,49 @@ export function AdminView() {
                     <li>Die Ersteinrichtung</li>
                   </ul>
                 </div>
-                <label>
+                <div className="field-control">
                   <FieldLabel
+                    htmlFor="factory-reset-reason"
                     label="Begründung"
                     help="Dokumentiert, warum der vollständige Werksreset ausgeführt wird."
                   />
                   <textarea
+                    id="factory-reset-reason"
                     maxLength={240}
                     onChange={(event) => setFactoryResetReason(event.target.value)}
                     placeholder="Grund für den Werksreset"
                     value={factoryResetReason}
                   />
-                </label>
+                </div>
                 {session?.account.role !== "ADMIN" ? (
-                  <label>
+                  <div className="field-control">
                     <FieldLabel
+                      htmlFor="factory-reset-pin"
                       label="Administrator-PIN"
                       help="Bestätigt die Berechtigung für diesen irreversiblen Vorgang. Die PIN wird nicht protokolliert."
                     />
                     <input
                       autoComplete="current-password"
+                      id="factory-reset-pin"
                       onChange={(event) => setFactoryResetPin(event.target.value)}
                       type="password"
                       value={factoryResetPin}
                     />
-                  </label>
+                  </div>
                 ) : null}
-                <label>
+                <div className="field-control">
                   <FieldLabel
+                    htmlFor="factory-reset-confirmation"
                     label="Sicherheitsbestätigung"
                     help="Zum Schutz vor versehentlicher Ausführung muss WERKSZUSTAND vollständig eingegeben werden."
                   />
                   <input
                     autoComplete="off"
+                    id="factory-reset-confirmation"
                     onChange={(event) => setFactoryResetConfirmation(event.target.value)}
                     value={factoryResetConfirmation}
                   />
-                </label>
+                </div>
                 <label className="reset-checkbox">
                   <input
                     checked={retainRecoveryBackup}
