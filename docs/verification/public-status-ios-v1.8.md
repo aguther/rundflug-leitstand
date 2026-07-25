@@ -8,10 +8,11 @@ Status: Automatisierte Abnahme erfolgreich; Originalhardware-Abnahme in HTTPS-St
   Symbole; PREPARE wird als WARTEN und eine Unterbrechung als VERZÖGERT projiziert.
 - GO TO GATE und BOARDING besitzen getrennte Copy.
 - Jedes dynamische Manifest enthält den exakten Ticket-/Gruppenpfad als `id` und `start_url`,
-  `scope: "/"`, `display: "standalone"`, die Ticketgruppe als Namen und ein Ticket-Icon.
-- Ticket-/Gruppenroute, Manifest, Apple-Touch-Icon und Apple-App-Titel werden schon im ersten
-  HTML-Dokument verbunden. Kasse, Flight Line, Assist, FIDS und Admin besitzen entsprechend eigene
-  Manifeste, Icons und Startpfade.
+  `scope: "/"`, `display: "standalone"`, die Ticketgruppe als Namen und reguläre sowie maskierbare
+  Ticket-Icons.
+- Ticket-/Gruppenroute, Manifest, Favicon, Apple-Touch-Icon und Apple-App-Titel werden schon im
+  ersten HTML-Dokument verbunden. Kasse, Flight Director, Flight Line, FIDS und Admin besitzen
+  entsprechend eigene Manifeste, Icons und Startpfade.
 - Der Workbox-Navigationsfallback schließt alle installierbaren Ticket-, Gruppen- und
   Betriebsrouten aus. Damit kann der vorgecachete generische App-Shell weder `Leitstand` noch `/`
   als Installationsprofil unterschieben.
@@ -55,7 +56,7 @@ Verwendet werden ausschließlich synthetische Codes und die HTTPS-Abnahmeumgebun
 7. Safari prüfen; Vivaldi zusätzlich prüfen, sofern dessen Teilen-Menü auf dem Testgerät
    `Zum Home-Bildschirm` anbietet.
 8. Gerät, iOS-Version, Browser, Uhrzeit, Route und Screenshots protokollieren.
-9. Kasse, Flight Line, Assist, FIDS und Admin jeweils separat hinzufügen und prüfen, dass Name,
-   Symbol und geöffnete Startansicht dem gewählten Profil entsprechen.
+9. Kasse, Flight Director, Flight Line, FIDS und Admin jeweils separat hinzufügen und prüfen, dass
+   Name, Symbol und geöffnete Startansicht dem gewählten Profil entsprechen.
 
 Ein erfolgreicher Desktop-/Emulationstest ersetzt diese Prüfung nicht.

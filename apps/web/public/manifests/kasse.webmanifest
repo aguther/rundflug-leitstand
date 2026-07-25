@@ -11,16 +11,28 @@
   "theme_color": "#102a43",
   "icons": [
     {
-      "src": "/icons/kasse-icon-192.png",
+      "src": "/icons/pwa/kasse/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/icons/kasse-icon-512.png",
+      "src": "/icons/pwa/kasse/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/pwa/kasse/maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/pwa/kasse/maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }

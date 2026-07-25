@@ -5,7 +5,7 @@ import { VitePWA } from "vite-plugin-pwa";
 
 const operationalPwa = VitePWA({
   registerType: "autoUpdate",
-  includeAssets: ["icons/app-icon.svg", "icons/app-icon-180.png"],
+  includeAssets: ["icons/pwa/brand/favicon.svg", "icons/pwa/brand/apple-touch-icon-180.png"],
   manifest: {
     name: "Rundflug-Leitstand",
     short_name: "Leitstand",
@@ -17,19 +17,25 @@ const operationalPwa = VitePWA({
     theme_color: "#102a43",
     icons: [
       {
-        src: "/icons/app-icon-192.png",
+        src: "/icons/pwa/brand/icon-192.png",
         sizes: "192x192",
         type: "image/png",
         purpose: "any",
       },
       {
-        src: "/icons/app-icon-512.png",
+        src: "/icons/pwa/brand/icon-512.png",
         sizes: "512x512",
         type: "image/png",
         purpose: "any",
       },
       {
-        src: "/icons/app-icon-512-maskable.png",
+        src: "/icons/pwa/brand/maskable-192.png",
+        sizes: "192x192",
+        type: "image/png",
+        purpose: "maskable",
+      },
+      {
+        src: "/icons/pwa/brand/maskable-512.png",
         sizes: "512x512",
         type: "image/png",
         purpose: "maskable",

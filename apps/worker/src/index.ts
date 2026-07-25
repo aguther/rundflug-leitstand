@@ -287,6 +287,7 @@ type PublicStatusInstallTarget = "ticket" | "group";
 
 interface AppInstallProfile {
   manifestHref: string;
+  faviconHref: string;
   appleTouchIconHref: string;
   title: string;
 }
@@ -296,32 +297,38 @@ const PUBLIC_STATUS_CODE_PATTERN = /^[A-Z2-9]{12,32}$/;
 const INTERNAL_APP_INSTALL_PROFILES = {
   "/kasse": {
     manifestHref: "/manifests/kasse.webmanifest",
-    appleTouchIconHref: "/icons/kasse-icon-180.png",
+    faviconHref: "/icons/pwa/kasse/favicon.svg",
+    appleTouchIconHref: "/icons/pwa/kasse/apple-touch-icon-180.png",
     title: "Kasse · Rundflug-Leitstand",
   },
   "/flight-director": {
     manifestHref: "/manifests/flight-director.webmanifest",
-    appleTouchIconHref: "/icons/flight-line-icon-180.png",
+    faviconHref: "/icons/pwa/flight-director/favicon.svg",
+    appleTouchIconHref: "/icons/pwa/flight-director/apple-touch-icon-180.png",
     title: "Flight Director · Rundflug-Leitstand",
   },
   "/flight-line": {
     manifestHref: "/manifests/flight-line.webmanifest",
-    appleTouchIconHref: "/icons/assist-icon-180.png",
+    faviconHref: "/icons/pwa/flight-line/favicon.svg",
+    appleTouchIconHref: "/icons/pwa/flight-line/apple-touch-icon-180.png",
     title: "Flight Line · Rundflug-Leitstand",
   },
   "/fids": {
     manifestHref: "/manifests/fids.webmanifest",
-    appleTouchIconHref: "/icons/fids-icon-180.png",
+    faviconHref: "/icons/pwa/fids/favicon.svg",
+    appleTouchIconHref: "/icons/pwa/fids/apple-touch-icon-180.png",
     title: "FIDS · Rundflug-Leitstand",
   },
   "/fids/terminal": {
     manifestHref: "/manifests/fids.webmanifest",
-    appleTouchIconHref: "/icons/fids-icon-180.png",
+    faviconHref: "/icons/pwa/fids/favicon.svg",
+    appleTouchIconHref: "/icons/pwa/fids/apple-touch-icon-180.png",
     title: "FIDS · Rundflug-Leitstand",
   },
   "/admin": {
     manifestHref: "/manifests/admin.webmanifest",
-    appleTouchIconHref: "/icons/admin-icon-180.png",
+    faviconHref: "/icons/pwa/admin/favicon.svg",
+    appleTouchIconHref: "/icons/pwa/admin/apple-touch-icon-180.png",
     title: "Admin · Rundflug-Leitstand",
   },
 } satisfies Record<string, AppInstallProfile>;
@@ -388,12 +395,18 @@ async function installableAppShellResponse(
   const appleTitle = profile.title.split(" · ", 1)[0] ?? profile.title;
   const headMetadata = [
     `<link rel="manifest" href="${escapeHtmlAttribute(profile.manifestHref)}">`,
+    `<link rel="icon" href="${escapeHtmlAttribute(profile.faviconHref)}" type="image/svg+xml">`,
     `<link rel="apple-touch-icon" href="${escapeHtmlAttribute(profile.appleTouchIconHref)}">`,
     `<meta name="apple-mobile-web-app-title" content="${escapeHtmlAttribute(appleTitle)}">`,
     '<meta name="apple-mobile-web-app-capable" content="yes">',
   ].join("");
   return new HTMLRewriter()
     .on('link[rel="manifest"]', {
+      element(element) {
+        element.remove();
+      },
+    })
+    .on('link[rel="icon"]', {
       element(element) {
         element.remove();
       },
@@ -4728,19 +4741,25 @@ app.get("/api/public/pwa-manifest/:target/:code", async (context) => {
       theme_color: "#ffffff",
       icons: [
         {
-          src: "/icons/ticket-icon-192.png",
+          src: "/icons/pwa/ticket/icon-192.png",
           sizes: "192x192",
           type: "image/png",
           purpose: "any",
         },
         {
-          src: "/icons/ticket-icon-512.png",
+          src: "/icons/pwa/ticket/icon-512.png",
           sizes: "512x512",
           type: "image/png",
           purpose: "any",
         },
         {
-          src: "/icons/ticket-icon-512.png",
+          src: "/icons/pwa/ticket/maskable-192.png",
+          sizes: "192x192",
+          type: "image/png",
+          purpose: "maskable",
+        },
+        {
+          src: "/icons/pwa/ticket/maskable-512.png",
           sizes: "512x512",
           type: "image/png",
           purpose: "maskable",
@@ -4771,7 +4790,8 @@ for (const target of ["ticket", "group"] as const) {
     const installTitle = await publicStatusInstallTitle(context.env.DB, target, code);
     return installableAppShellResponse(context.env, context.req.raw, {
       manifestHref: `/api/public/pwa-manifest/${target}/${code}`,
-      appleTouchIconHref: "/icons/ticket-icon-180.png",
+      faviconHref: "/icons/pwa/ticket/favicon.svg",
+      appleTouchIconHref: "/icons/pwa/ticket/apple-touch-icon-180.png",
       title: `${installTitle} · Rundflug`,
     });
   });

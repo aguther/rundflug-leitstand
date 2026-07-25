@@ -439,6 +439,32 @@ try {
     publicManifest("ticket", privateCodes[0]),
     publicManifest("group", publicGroupCode),
   ]);
+  const expectedTicketIcons = [
+    {
+      src: "/icons/pwa/ticket/icon-192.png",
+      sizes: "192x192",
+      type: "image/png",
+      purpose: "any",
+    },
+    {
+      src: "/icons/pwa/ticket/icon-512.png",
+      sizes: "512x512",
+      type: "image/png",
+      purpose: "any",
+    },
+    {
+      src: "/icons/pwa/ticket/maskable-192.png",
+      sizes: "192x192",
+      type: "image/png",
+      purpose: "maskable",
+    },
+    {
+      src: "/icons/pwa/ticket/maskable-512.png",
+      sizes: "512x512",
+      type: "image/png",
+      purpose: "maskable",
+    },
+  ];
   if (
     ticketManifest.id !== `/ticket/${privateCodes[0]}` ||
     ticketManifest.start_url !== `/ticket/${privateCodes[0]}` ||
@@ -450,7 +476,8 @@ try {
     ticketManifest.short_name !== initialGroupStatus.bookingGroupLabel ||
     groupManifest.name !== initialGroupStatus.bookingGroupLabel ||
     groupManifest.short_name !== initialGroupStatus.bookingGroupLabel ||
-    ticketManifest.icons?.some((icon) => !icon.src.startsWith("/icons/ticket-icon-"))
+    JSON.stringify(ticketManifest.icons) !== JSON.stringify(expectedTicketIcons) ||
+    JSON.stringify(groupManifest.icons) !== JSON.stringify(expectedTicketIcons)
   ) {
     throw new Error(
       "Das dynamische PWA-Manifest öffnet nicht den exakten öffentlichen Status mit Ticketgruppenname und Ticket-Icon.",

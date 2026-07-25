@@ -1,0 +1,16 @@
+{
+  "name": "Rundflug Leitstand — Ticket",
+  "short_name": "Ticket",
+  "id": "/ticket/",
+  "start_url": "/ticket/",
+  "scope": "/ticket/",
+  "background_color": "#0D1B26",
+  "theme_color": "#0D1B26",
+  "display": "standalone",
+  "icons": [
+    { "src": "/ticket/icons/android/icon-192.png",     "sizes": "192x192", "type": "image/png" },
+    { "src": "/ticket/icons/android/icon-512.png",     "sizes": "512x512", "type": "image/png" },
+    { "src": "/ticket/icons/android/maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/ticket/icons/android/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
