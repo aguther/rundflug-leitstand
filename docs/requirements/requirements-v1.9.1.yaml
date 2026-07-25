@@ -10,7 +10,7 @@ requirements:
     requirement: Verkauf und Aufteilungsanzeige leiten die Gruppenkapazität aus aktiven Ressourcengruppenzuordnungen statt temporären Flugzeugzuständen ab.
     status: implemented
   - id: V191-PRN-010
-    requirement: POS-58 druckt ausschließlich das vergrößerte, auf der Rollenachse zentrierte Ticket ohne Vorlauf oder feste Rollenlänge; Direktdruck wird betrieblich konfiguriert.
+    requirement: POS-58 druckt ausschließlich das auf 56 mm vergrößerte, mit einem 52-mm-QR-Code versehene und auf der Rollenachse zentrierte Ticket ohne Vorlauf oder feste Rollenlänge; Direktdruck wird betrieblich konfiguriert.
     status: implemented
   - id: V191-PUB-010
     requirement: Öffentliche Status-PWAs vermeiden leeren iPhone-Überlauf und bezeichnen IN_FLIGHT als IM FLUG sowie LANDED als GELANDET.
