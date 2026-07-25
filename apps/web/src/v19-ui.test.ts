@@ -64,7 +64,12 @@ describe("V1.9 approved UI delta", () => {
     expect(cashierStyles).toMatch(
       /\.cashier-shell > \.ticket-print-document \{[\s\S]*?width: 100%;[\s\S]*?justify-content: center;/,
     );
-    expect(cashierStyles).toMatch(/\.ticket-print-document \.ticket-paper \{[\s\S]*?width: 52mm;/);
+    expect(cashierStyles).toMatch(
+      /\.ticket-print-document \.ticket-paper \{[\s\S]*?width: 56mm;[\s\S]*?padding: 1mm;/,
+    );
+    expect(cashierStyles).toMatch(
+      /\.ticket-print-document \.ticket-paper > img \{[\s\S]*?width: 52mm;[\s\S]*?height: 52mm;/,
+    );
   });
 
   it("maps only the approved Flight Director and Flight Line paths", () => {
