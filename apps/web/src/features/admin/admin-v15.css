@@ -503,12 +503,14 @@
 }
 
 .event-catalog-table-wrap {
-  overflow: auto;
-  scrollbar-gutter: stable;
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 .event-catalog-table {
-  width: 100%;
+  width: max-content;
+  min-width: 100%;
   border-collapse: collapse;
   font-size: 0.74rem;
 }

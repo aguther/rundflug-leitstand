@@ -1,5 +1,11 @@
 import { Search } from "lucide-react";
-import { type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, useId } from "react";
+import {
+  type InputHTMLAttributes,
+  type ReactNode,
+  type SelectHTMLAttributes,
+  type TextareaHTMLAttributes,
+  useId,
+} from "react";
 
 export interface FieldProps {
   label: ReactNode;
@@ -69,6 +75,27 @@ export function SelectField({
         {children}
       </select>
       {help ? <small>{help}</small> : null}
+    </label>
+  );
+}
+
+export function TextAreaField({
+  label,
+  help,
+  className = "",
+  ...textarea
+}: TextareaHTMLAttributes<HTMLTextAreaElement> & { label: ReactNode; help?: ReactNode }) {
+  const generatedId = useId();
+  const id = textarea.id ?? generatedId;
+  const helpId = `${id}-help`;
+  const describedBy = [textarea["aria-describedby"], help ? helpId : undefined]
+    .filter(Boolean)
+    .join(" ");
+  return (
+    <label className={`ds-field ${className}`.trim()} htmlFor={id}>
+      <span className="ds-field-label">{label}</span>
+      <textarea {...textarea} aria-describedby={describedBy || undefined} id={id} />
+      {help ? <small id={helpId}>{help}</small> : null}
     </label>
   );
 }

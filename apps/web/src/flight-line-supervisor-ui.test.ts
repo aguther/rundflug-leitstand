@@ -1,11 +1,12 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import operationsDialogSource from "./features/flight-line/FlightDirectorOperationsDialog.tsx?raw";
 import { expectedReviewAtFromPause } from "./flight-line-pause";
 import sharedSource from "./flight-line-shared.tsx?raw";
 import supervisorSource from "./flight-line-supervisor.tsx?raw";
 import appSource from "./flight-line-view.tsx?raw";
 
-const flightLineSource = `${supervisorSource}\n${sharedSource}`;
+const flightLineSource = `${supervisorSource}\n${sharedSource}\n${operationsDialogSource}`;
 const flightLineStyles = readFileSync(
   new URL("./features/flight-line/flight-line-v12.css", import.meta.url),
   "utf8",
@@ -37,6 +38,16 @@ describe("Flight Director", () => {
     expect(supervisorSource).not.toContain("PILOT_REASSIGN_CONFIRMATION_REQUIRED");
     expect(flightLineSource).toContain("Vor Belegung bitte über „Pilot zuweisen“");
     expect(appSource).not.toContain('className="pilot-assignment"');
+  });
+
+  it("aligns the operational status, action and resource filter on the shared control row", () => {
+    expect(supervisorSource).toContain("<StatusPill");
+    expect(flightLineStyles).toContain(
+      ".flight-director-header-actions .flight-director-resource-filter",
+    );
+    expect(flightLineStyles).toMatch(
+      /\.flight-director-header-actions > \.ds-button,[\s\S]*?min-height: var\(--control-default\);/,
+    );
   });
 
   it("V161-FL-020: keeps the pilot assignment confirmation free of the selected pilot code", () => {
@@ -153,7 +164,6 @@ describe("Flight Director", () => {
     expect(appSource).toContain("([10, 20, 30] as const)");
     expect(appSource).toContain("{minutes} Min.");
     expect(appSource).toContain("Dauer unbekannt");
-    expect(appSource).toContain("Pilotenpause gestartet.");
     expect(appSource).not.toContain("setTimeout");
     expect(appSource).toContain('type: "SET_AIRCRAFT_OPERATIONAL_STATE"');
   });
@@ -161,18 +171,38 @@ describe("Flight Director", () => {
   it("centralizes Flight Director controls in the prioritized operations dialog", () => {
     expect(supervisorSource).toContain("operationalSummary");
     expect(supervisorSource).toContain("Betrieb");
-    expect(appSource).toContain(
-      'type OperationsTab = "notices" | "resources" | "pilots" | "emergency"',
-    );
-    expect(appSource).toContain("Not-Halt aktiv");
+    expect(operationsDialogSource).toContain('type OperationsTab = "operations" | "resources"');
+    expect(operationsDialogSource).toContain('{ value: "operations", label: "Betrieb" }');
+    expect(operationsDialogSource).toContain('{ value: "resources", label: "Ressourcengruppen" }');
+    expect(operationsDialogSource).toContain("Not-Halt aktiv");
     expect(appSource).toContain("Betrieb unterbrochen");
     expect(appSource).toContain("Betrieb normal");
     expect(appSource).toContain('type: "SET_OPERATIONAL_NOTE"');
     expect(appSource).toContain('type: "SET_RESOURCE_GROUP_NOTICE"');
     expect(appSource).toContain('type: "SET_RESOURCE_GROUP_STATUS"');
-    expect(appSource).toContain('type: "SET_PILOT_PAUSE"');
-    expect(appSource).toContain("Die Aufhebung bleibt ausschließlich");
-    expect(appSource).toContain("Admin-Bereich möglich.");
+    expect(appSource).toContain(
+      'const FLIGHT_DIRECTOR_AUDIT_REASON = "Operative Entscheidung Flight Director"',
+    );
+    expect(appSource).not.toContain('type: "SET_PILOT_PAUSE"');
+    expect(operationsDialogSource).not.toContain("Pilotenpausen");
+    expect(operationsDialogSource).not.toContain("Begründung für Zustandsänderungen");
+    expect(operationsDialogSource).toContain("Die Aufhebung bleibt ausschließlich");
+    expect(operationsDialogSource).toContain("Admin-Bereich möglich.");
+    expect(operationsDialogSource.match(/<ModalDialog/g)).toHaveLength(1);
     expect(appSource).not.toContain('<details className="emergency-control">');
+  });
+
+  it("provides explicit published, editing and deletion states for operational notices", () => {
+    expect(operationsDialogSource).toContain("publishedEventNotice");
+    expect(operationsDialogSource).toContain("Hinweis veröffentlichen");
+    expect(operationsDialogSource).toContain("Hinweis bearbeiten");
+    expect(operationsDialogSource).toContain("Bearbeiten");
+    expect(operationsDialogSource).toContain("Speichern");
+    expect(operationsDialogSource).toContain("Löschen");
+    expect(operationsDialogSource).toContain('onPublishEventNotice("")');
+    expect(operationsDialogSource).toContain(
+      'onPublishResourceNotice(selectedResourceGroup.id, "")',
+    );
+    expect(operationsDialogSource).toContain("returnToResources");
   });
 });
