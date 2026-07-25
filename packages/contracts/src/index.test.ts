@@ -6,6 +6,7 @@ import {
   cloneEventRequestSchema,
   commandEnvelopeSchema,
   commandResultSchema,
+  eventLogoThemeSchema,
   factoryResetRequestSchema,
   fidsPreferencesSchema,
   forecastHistoryQuerySchema,
@@ -24,6 +25,14 @@ import {
   updateFidsPreferencesSchema,
   updateOperatorAccountSchema,
 } from "./index";
+
+describe("eventLogoThemeSchema", () => {
+  it("accepts only the two supported event-logo variants", () => {
+    expect(eventLogoThemeSchema.parse("light")).toBe("light");
+    expect(eventLogoThemeSchema.parse("dark")).toBe("dark");
+    expect(() => eventLogoThemeSchema.parse("system")).toThrow();
+  });
+});
 
 describe("commandEnvelopeSchema", () => {
   it("accepts aggregate preconditions for independent operational commands", () => {

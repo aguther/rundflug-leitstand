@@ -669,6 +669,12 @@ export const eventSnapshotSchema = z.object({
   plannedDeboardingMinutes: z.number().int().positive(),
   plannedBufferMinutes: z.number().int().nonnegative(),
   departedVisibilitySeconds: z.number().int().min(5).max(900).default(15),
+  logoVariants: z
+    .object({
+      light: z.boolean(),
+      dark: z.boolean(),
+    })
+    .optional(),
   updatedAt: z.string(),
 });
 
@@ -724,6 +730,9 @@ export type FidsLayout = z.infer<typeof fidsLayoutSchema>;
 
 export const fidsThemeSchema = z.enum(["SYSTEM", "LIGHT", "DARK"]);
 export type FidsTheme = z.infer<typeof fidsThemeSchema>;
+
+export const eventLogoThemeSchema = z.enum(["light", "dark"]);
+export type EventLogoTheme = z.infer<typeof eventLogoThemeSchema>;
 
 export const fidsPreferencesSchema = z
   .object({

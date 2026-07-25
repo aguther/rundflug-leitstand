@@ -10,7 +10,7 @@ V15-TKT-010,apps/worker/migrations/0036_v1_5_stable_operations.sql,apps/worker/s
 V15-TKT-020,apps/web/src/cashier-view.tsx,apps/worker/src/v1-5-stable-operations.test.ts,umgesetzt
 V15-FIDS-010,apps/worker/src/index.ts apps/web/src/fids-display.tsx und ADR-0022,PublicBoard- Integrations- und Browser-Kennungstest,umgesetzt
 V15-FIDS-020,apps/web/src/fids-display.tsx,apps/web/src/fids-display-ui.test.ts,umgesetzt
-V15-BRAND-010,apps/worker/src/event-logo.ts,apps/worker/src/event-logo.test.ts,umgesetzt
+V15-BRAND-010,apps/worker/src/event-logo.ts index.ts Migration 0044 und apps/web/src/design-system/BrandMark.tsx,event-logo.test.ts event-logo-theme-routes.test.ts brand-mark.test.ts und Browserabnahme,umgesetzt
 V15-EVT-010,apps/worker/src/event-deletion.ts,apps/worker/src/event-deletion.test.ts,umgesetzt
 V15-EVT-020,apps/worker/src/index.ts,apps/worker/src/event-deletion.test.ts,umgesetzt
 V15-EXP-010,apps/worker/src/index.ts,apps/worker/src/event-deletion.test.ts,umgesetzt

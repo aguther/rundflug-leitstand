@@ -6,6 +6,7 @@ import {
   bootstrapRequestSchema,
   cloneEventRequestSchema,
   createOperatorAccountSchema,
+  type EventLogoTheme,
   type FactoryResetResponse,
   type FidsPreferences,
   factoryResetRequestSchema,
@@ -55,7 +56,12 @@ import { runD1ReadsSequentially } from "./d1-read-scheduler";
 import { dailyReportCsv, dailyReportPdfLines, loadDailyReport } from "./daily-report";
 import { EventCoordinator } from "./event-coordinator";
 import { eventDeletionStatements } from "./event-deletion";
-import { eventLogoExtension, validateEventLogo } from "./event-logo";
+import {
+  eventLogoExtension,
+  parseEventLogoTheme,
+  readEventLogoBytes,
+  validateEventLogo,
+} from "./event-logo";
 import {
   clearFactoryResetCoordinators,
   factoryResetRequestHash,
@@ -476,6 +482,62 @@ async function authorizeDevice(
     .bind(new Date().toISOString(), deviceId)
     .run();
   return { id: deviceId, role: device.role, accountId: null, loginCode: null };
+}
+
+interface EventLogoRow {
+  version: number;
+  logo_object_key: string | null;
+  logo_media_type: string | null;
+  logo_dark_object_key: string | null;
+  logo_dark_media_type: string | null;
+}
+
+interface EventLogoReceipt {
+  operation_day_id: string;
+  device_id: string;
+  command_type: string;
+  response_json: string;
+}
+
+function eventLogoColumns(theme: EventLogoTheme): {
+  key: "logo_object_key" | "logo_dark_object_key";
+  mediaType: "logo_media_type" | "logo_dark_media_type";
+} {
+  return theme === "dark"
+    ? { key: "logo_dark_object_key", mediaType: "logo_dark_media_type" }
+    : { key: "logo_object_key", mediaType: "logo_media_type" };
+}
+
+function eventLogoCommandType(operation: "SET" | "REMOVE", theme: EventLogoTheme): string {
+  return `${operation}_EVENT_LOGO_${theme.toUpperCase()}`;
+}
+
+function eventLogoReceiptMatches(
+  receipt: EventLogoReceipt,
+  input: {
+    eventId: string;
+    deviceId: string;
+    commandType: string;
+    theme: EventLogoTheme;
+    operation: "SET" | "REMOVE";
+  },
+): boolean {
+  if (receipt.operation_day_id !== input.eventId || receipt.device_id !== input.deviceId) {
+    return false;
+  }
+  if (receipt.command_type === input.commandType) return true;
+  const legacyCommandType = input.operation === "SET" ? "SET_EVENT_LOGO" : "REMOVE_EVENT_LOGO";
+  return input.theme === "light" && receipt.command_type === legacyCommandType;
+}
+
+async function findEventLogoReceipt(env: Env, commandId: string): Promise<EventLogoReceipt | null> {
+  return env.DB.prepare(
+    `SELECT operation_day_id, device_id, command_type, response_json
+       FROM idempotency_receipts
+      WHERE command_id = ?1`,
+  )
+    .bind(commandId)
+    .first<EventLogoReceipt>();
 }
 
 function eventCoordinatorNamespace(env: Env): DurableObjectNamespace {
@@ -2212,10 +2274,14 @@ app.delete("/api/admin/events/:eventId", async (context) => {
     );
   }
   const event = await context.env.DB.prepare(
-    "SELECT id, logo_object_key FROM operation_days WHERE id = ?1",
+    "SELECT id, logo_object_key, logo_dark_object_key FROM operation_days WHERE id = ?1",
   )
     .bind(eventId)
-    .first<{ id: string; logo_object_key: string | null }>();
+    .first<{
+      id: string;
+      logo_object_key: string | null;
+      logo_dark_object_key: string | null;
+    }>();
   if (!event) {
     return context.json(
       { error: { code: "EVENT_NOT_FOUND", message: "Veranstaltung nicht gefunden." } },
@@ -2247,12 +2313,22 @@ app.delete("/api/admin/events/:eventId", async (context) => {
     );
   }
   await context.env.DB.batch(statements);
-  if (event.logo_object_key) await context.env.BACKUPS.delete(event.logo_object_key);
+  const logoObjectKeys = [...new Set([event.logo_object_key, event.logo_dark_object_key])].filter(
+    (key): key is string => Boolean(key),
+  );
+  if (logoObjectKeys.length > 0) await context.env.BACKUPS.delete(logoObjectKeys);
   return context.json({ deleted: true, eventId, setupRequired: lastEvent });
 });
 
 app.put("/api/admin/events/:eventId/logo", async (context) => {
   const eventId = context.req.param("eventId");
+  const theme = parseEventLogoTheme(context.req.query("theme") ?? null);
+  if (!theme) {
+    return context.json(
+      { error: { code: "EVENT_LOGO_THEME_INVALID", message: "Logo-Theme ist ungültig." } },
+      400,
+    );
+  }
   const device = await authorizeDevice(context.env, eventId, context.req.raw);
   if (device?.role !== "ADMIN") {
     return context.json(
@@ -2268,11 +2344,32 @@ app.put("/api/admin/events/:eventId/logo", async (context) => {
       400,
     );
   }
+  const commandType = eventLogoCommandType("SET", theme);
+  const receiptInput = {
+    eventId,
+    deviceId: device.id,
+    commandType,
+    theme,
+    operation: "SET" as const,
+  };
+  const existingReceipt = await findEventLogoReceipt(context.env, commandId);
+  if (existingReceipt) {
+    if (!eventLogoReceiptMatches(existingReceipt, receiptInput)) {
+      return context.json(
+        { error: { code: "IDEMPOTENCY_CONFLICT", message: "Kommando-ID ist bereits belegt." } },
+        409,
+      );
+    }
+    return context.json(JSON.parse(existingReceipt.response_json));
+  }
+  const columns = eventLogoColumns(theme);
   const event = await context.env.DB.prepare(
-    "SELECT version, logo_object_key FROM operation_days WHERE id = ?1",
+    `SELECT version, logo_object_key, logo_media_type,
+            logo_dark_object_key, logo_dark_media_type
+       FROM operation_days WHERE id = ?1`,
   )
     .bind(eventId)
-    .first<{ version: number; logo_object_key: string | null }>();
+    .first<EventLogoRow>();
   if (!event) {
     return context.json(
       { error: { code: "EVENT_NOT_FOUND", message: "Veranstaltung nicht gefunden." } },
@@ -2287,9 +2384,10 @@ app.put("/api/admin/events/:eventId/logo", async (context) => {
       409,
     );
   }
-  const bytes = new Uint8Array(await context.req.raw.arrayBuffer());
+  let bytes: Uint8Array;
   let mediaType: ReturnType<typeof validateEventLogo>;
   try {
+    bytes = await readEventLogoBytes(context.req.raw);
     mediaType = validateEventLogo(bytes, context.req.header("content-type") ?? null);
   } catch {
     return context.json(
@@ -2306,14 +2404,20 @@ app.put("/api/admin/events/:eventId/logo", async (context) => {
   const objectKey = `event-logos/${eventId}/${crypto.randomUUID()}.${eventLogoExtension(mediaType)}`;
   await context.env.BACKUPS.put(objectKey, bytes, {
     httpMetadata: { contentType: mediaType },
-    customMetadata: { eventId },
+    customMetadata: { eventId, theme },
   });
-  const response = { logoUrl: `/api/public/events/${encodeURIComponent(eventId)}/logo` };
+  const response = {
+    logoUrl: `/api/public/events/${encodeURIComponent(eventId)}/logo?theme=${theme}`,
+    theme,
+  };
+  const responseJson = JSON.stringify(response);
+  const mutationGuard = `id = ?1 AND version = ?2 AND ${columns.key} = ?3`;
+  let results: D1Result[];
   try {
-    await context.env.DB.batch([
+    results = await context.env.DB.batch([
       context.env.DB.prepare(
         `UPDATE operation_days
-            SET logo_object_key = ?1, logo_media_type = ?2, logo_updated_at = ?3,
+            SET ${columns.key} = ?1, ${columns.mediaType} = ?2, logo_updated_at = ?3,
                 version = version + 1, updated_at = ?3
           WHERE id = ?4 AND version = ?5`,
       ).bind(objectKey, mediaType, now, eventId, expectedVersion),
@@ -2321,34 +2425,80 @@ app.put("/api/admin/events/:eventId/logo", async (context) => {
         `INSERT INTO operational_events
           (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type,
            aggregate_id, aggregate_version, payload_json)
-         VALUES (?1, ?2, 'EVENT_LOGO_CHANGED', ?3, ?4, 'OPERATION_DAY', ?2, ?5, ?6)`,
+         SELECT ?4, ?1, 'EVENT_LOGO_CHANGED', ?5, ?6, 'OPERATION_DAY', ?1, ?2, ?7
+           FROM operation_days
+          WHERE ${mutationGuard}`,
       ).bind(
-        crypto.randomUUID(),
         eventId,
+        expectedVersion + 1,
+        objectKey,
+        crypto.randomUUID(),
         now,
         device.id,
-        expectedVersion + 1,
-        JSON.stringify({ mediaType }),
+        JSON.stringify({ theme, mediaType }),
       ),
       context.env.DB.prepare(
         `INSERT INTO idempotency_receipts
           (command_id, operation_day_id, device_id, command_type, received_at, response_json)
-         VALUES (?1, ?2, ?3, 'SET_EVENT_LOGO', ?4, ?5)`,
-      ).bind(commandId, eventId, device.id, now, JSON.stringify(response)),
+         SELECT ?4, ?1, ?5, ?6, ?7, ?8
+           FROM operation_days
+          WHERE ${mutationGuard}`,
+      ).bind(
+        eventId,
+        expectedVersion + 1,
+        objectKey,
+        commandId,
+        device.id,
+        commandType,
+        now,
+        responseJson,
+      ),
       context.env.DB.prepare(
-        "INSERT INTO outbox (id, operation_day_id, topic, payload_json, created_at) VALUES (?1, ?2, 'EVENT_STATE_CHANGED', ?3, ?4)",
-      ).bind(crypto.randomUUID(), eventId, JSON.stringify(response), now),
+        `INSERT INTO outbox (id, operation_day_id, topic, payload_json, created_at)
+         SELECT ?4, ?1, 'EVENT_STATE_CHANGED', ?5, ?6
+           FROM operation_days
+          WHERE ${mutationGuard}`,
+      ).bind(eventId, expectedVersion + 1, objectKey, crypto.randomUUID(), responseJson, now),
     ]);
   } catch (cause) {
     await context.env.BACKUPS.delete(objectKey);
+    const concurrentReceipt = await findEventLogoReceipt(context.env, commandId);
+    if (concurrentReceipt) {
+      if (!eventLogoReceiptMatches(concurrentReceipt, receiptInput)) {
+        return context.json(
+          { error: { code: "IDEMPOTENCY_CONFLICT", message: "Kommando-ID ist bereits belegt." } },
+          409,
+        );
+      }
+      return context.json(JSON.parse(concurrentReceipt.response_json));
+    }
     throw cause;
   }
-  if (event.logo_object_key) await context.env.BACKUPS.delete(event.logo_object_key);
+  if (results[0]?.meta.changes !== 1) {
+    await context.env.BACKUPS.delete(objectKey);
+    return context.json(
+      {
+        error: { code: "STALE_VERSION", message: "Veranstaltung wurde zwischenzeitlich geändert." },
+      },
+      409,
+    );
+  }
+  const previousObjectKey = event[columns.key];
+  if (previousObjectKey && previousObjectKey !== objectKey) {
+    await context.env.BACKUPS.delete(previousObjectKey);
+  }
   return context.json(response);
 });
 
 app.delete("/api/admin/events/:eventId/logo", async (context) => {
   const eventId = context.req.param("eventId");
+  const theme = parseEventLogoTheme(context.req.query("theme") ?? null);
+  if (!theme) {
+    return context.json(
+      { error: { code: "EVENT_LOGO_THEME_INVALID", message: "Logo-Theme ist ungültig." } },
+      400,
+    );
+  }
   const device = await authorizeDevice(context.env, eventId, context.req.raw);
   if (device?.role !== "ADMIN") {
     return context.json(
@@ -2364,12 +2514,38 @@ app.delete("/api/admin/events/:eventId/logo", async (context) => {
       400,
     );
   }
+  const commandType = eventLogoCommandType("REMOVE", theme);
+  const receiptInput = {
+    eventId,
+    deviceId: device.id,
+    commandType,
+    theme,
+    operation: "REMOVE" as const,
+  };
+  const existingReceipt = await findEventLogoReceipt(context.env, commandId);
+  if (existingReceipt) {
+    if (!eventLogoReceiptMatches(existingReceipt, receiptInput)) {
+      return context.json(
+        { error: { code: "IDEMPOTENCY_CONFLICT", message: "Kommando-ID ist bereits belegt." } },
+        409,
+      );
+    }
+    return context.json(JSON.parse(existingReceipt.response_json));
+  }
+  const columns = eventLogoColumns(theme);
   const event = await context.env.DB.prepare(
-    "SELECT version, logo_object_key FROM operation_days WHERE id = ?1",
+    `SELECT version, logo_object_key, logo_media_type,
+            logo_dark_object_key, logo_dark_media_type
+       FROM operation_days WHERE id = ?1`,
   )
     .bind(eventId)
-    .first<{ version: number; logo_object_key: string | null }>();
-  if (!event) return context.body(null, 404);
+    .first<EventLogoRow>();
+  if (!event) {
+    return context.json(
+      { error: { code: "EVENT_NOT_FOUND", message: "Veranstaltung nicht gefunden." } },
+      404,
+    );
+  }
   if (event.version !== expectedVersion) {
     return context.json(
       {
@@ -2379,50 +2555,147 @@ app.delete("/api/admin/events/:eventId/logo", async (context) => {
     );
   }
   const now = new Date().toISOString();
-  const response = { removed: true };
-  await context.env.DB.batch([
-    context.env.DB.prepare(
-      `UPDATE operation_days SET logo_object_key = NULL, logo_media_type = NULL,
-          logo_updated_at = ?1, version = version + 1, updated_at = ?1
-        WHERE id = ?2 AND version = ?3`,
-    ).bind(now, eventId, expectedVersion),
-    context.env.DB.prepare(
-      `INSERT INTO operational_events
-        (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type,
-         aggregate_id, aggregate_version, payload_json)
-       VALUES (?1, ?2, 'EVENT_LOGO_REMOVED', ?3, ?4, 'OPERATION_DAY', ?2, ?5, '{}')`,
-    ).bind(crypto.randomUUID(), eventId, now, device.id, event.version + 1),
-    context.env.DB.prepare(
-      `INSERT INTO idempotency_receipts
-        (command_id, operation_day_id, device_id, command_type, received_at, response_json)
-       VALUES (?1, ?2, ?3, 'REMOVE_EVENT_LOGO', ?4, ?5)`,
-    ).bind(commandId, eventId, device.id, now, JSON.stringify(response)),
-    context.env.DB.prepare(
-      "INSERT INTO outbox (id, operation_day_id, topic, payload_json, created_at) VALUES (?1, ?2, 'EVENT_STATE_CHANGED', ?3, ?4)",
-    ).bind(crypto.randomUUID(), eventId, JSON.stringify(response), now),
-  ]);
-  if (event.logo_object_key) await context.env.BACKUPS.delete(event.logo_object_key);
-  return context.body(null, 204);
+  const previousObjectKey = event[columns.key];
+  const response = { removed: Boolean(previousObjectKey), theme };
+  const responseJson = JSON.stringify(response);
+  if (!previousObjectKey) {
+    try {
+      const result = await context.env.DB.prepare(
+        `INSERT INTO idempotency_receipts
+          (command_id, operation_day_id, device_id, command_type, received_at, response_json)
+         SELECT ?1, ?2, ?3, ?4, ?5, ?6
+           FROM operation_days
+          WHERE id = ?2 AND version = ?7 AND ${columns.key} IS NULL`,
+      )
+        .bind(commandId, eventId, device.id, commandType, now, responseJson, expectedVersion)
+        .run();
+      if (result.meta.changes !== 1) {
+        return context.json(
+          {
+            error: {
+              code: "STALE_VERSION",
+              message: "Veranstaltung wurde zwischenzeitlich geändert.",
+            },
+          },
+          409,
+        );
+      }
+    } catch (cause) {
+      const concurrentReceipt = await findEventLogoReceipt(context.env, commandId);
+      if (concurrentReceipt) {
+        if (!eventLogoReceiptMatches(concurrentReceipt, receiptInput)) {
+          return context.json(
+            { error: { code: "IDEMPOTENCY_CONFLICT", message: "Kommando-ID ist bereits belegt." } },
+            409,
+          );
+        }
+        return context.json(JSON.parse(concurrentReceipt.response_json));
+      }
+      throw cause;
+    }
+    return context.json(response);
+  }
+
+  const mutationGuard = `id = ?1 AND version = ?2 AND ${columns.key} IS NULL AND logo_updated_at = ?3`;
+  let results: D1Result[];
+  try {
+    results = await context.env.DB.batch([
+      context.env.DB.prepare(
+        `UPDATE operation_days
+            SET ${columns.key} = NULL, ${columns.mediaType} = NULL,
+                logo_updated_at = ?1, version = version + 1, updated_at = ?1
+          WHERE id = ?2 AND version = ?3 AND ${columns.key} = ?4`,
+      ).bind(now, eventId, expectedVersion, previousObjectKey),
+      context.env.DB.prepare(
+        `INSERT INTO operational_events
+          (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type,
+           aggregate_id, aggregate_version, payload_json)
+         SELECT ?4, ?1, 'EVENT_LOGO_REMOVED', ?3, ?5, 'OPERATION_DAY', ?1, ?2, ?6
+           FROM operation_days
+          WHERE ${mutationGuard}`,
+      ).bind(
+        eventId,
+        expectedVersion + 1,
+        now,
+        crypto.randomUUID(),
+        device.id,
+        JSON.stringify({ theme }),
+      ),
+      context.env.DB.prepare(
+        `INSERT INTO idempotency_receipts
+          (command_id, operation_day_id, device_id, command_type, received_at, response_json)
+         SELECT ?4, ?1, ?5, ?6, ?3, ?7
+           FROM operation_days
+          WHERE ${mutationGuard}`,
+      ).bind(eventId, expectedVersion + 1, now, commandId, device.id, commandType, responseJson),
+      context.env.DB.prepare(
+        `INSERT INTO outbox (id, operation_day_id, topic, payload_json, created_at)
+         SELECT ?4, ?1, 'EVENT_STATE_CHANGED', ?5, ?3
+           FROM operation_days
+          WHERE ${mutationGuard}`,
+      ).bind(eventId, expectedVersion + 1, now, crypto.randomUUID(), responseJson),
+    ]);
+  } catch (cause) {
+    const concurrentReceipt = await findEventLogoReceipt(context.env, commandId);
+    if (concurrentReceipt) {
+      if (!eventLogoReceiptMatches(concurrentReceipt, receiptInput)) {
+        return context.json(
+          { error: { code: "IDEMPOTENCY_CONFLICT", message: "Kommando-ID ist bereits belegt." } },
+          409,
+        );
+      }
+      return context.json(JSON.parse(concurrentReceipt.response_json));
+    }
+    throw cause;
+  }
+  if (results[0]?.meta.changes !== 1) {
+    return context.json(
+      {
+        error: { code: "STALE_VERSION", message: "Veranstaltung wurde zwischenzeitlich geändert." },
+      },
+      409,
+    );
+  }
+  await context.env.BACKUPS.delete(previousObjectKey);
+  return context.json(response);
 });
 
 app.get("/api/public/events/:eventId/logo", async (context) => {
   const eventId = context.req.param("eventId");
+  const requestedTheme = parseEventLogoTheme(context.req.query("theme") ?? null);
+  if (!requestedTheme) {
+    return context.json(
+      { error: { code: "EVENT_LOGO_THEME_INVALID", message: "Logo-Theme ist ungültig." } },
+      400,
+    );
+  }
   const event = await context.env.DB.prepare(
-    "SELECT logo_object_key, logo_media_type FROM operation_days WHERE id = ?1",
+    `SELECT version, logo_object_key, logo_media_type,
+            logo_dark_object_key, logo_dark_media_type
+       FROM operation_days WHERE id = ?1`,
   )
     .bind(eventId)
-    .first<{ logo_object_key: string | null; logo_media_type: string | null }>();
-  if (!event?.logo_object_key || !event.logo_media_type) return context.body(null, 404);
-  const object = await context.env.BACKUPS.get(event.logo_object_key);
-  if (!object) return context.body(null, 404);
-  return new Response(object.body, {
-    headers: {
-      "content-type": event.logo_media_type,
-      "cache-control": "public, max-age=300",
-      "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'",
-      "x-content-type-options": "nosniff",
-    },
-  });
+    .first<EventLogoRow>();
+  if (!event) return context.body(null, 404);
+  const fallbackTheme: EventLogoTheme = requestedTheme === "light" ? "dark" : "light";
+  for (const resolvedTheme of [requestedTheme, fallbackTheme]) {
+    const columns = eventLogoColumns(resolvedTheme);
+    const objectKey = event[columns.key];
+    const mediaType = event[columns.mediaType];
+    if (!objectKey || !mediaType) continue;
+    const object = await context.env.BACKUPS.get(objectKey);
+    if (!object) continue;
+    return new Response(object.body, {
+      headers: {
+        "content-type": mediaType,
+        "cache-control": "public, max-age=300",
+        "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'",
+        "x-content-type-options": "nosniff",
+        "x-event-logo-theme": resolvedTheme,
+      },
+    });
+  }
+  return context.body(null, 404);
 });
 
 app.on("GET", eventRoutes("/snapshot"), async (context) => {
@@ -2435,7 +2708,7 @@ app.on("GET", eventRoutes("/snapshot"), async (context) => {
             automatic_precall_enabled, precall_lead_minutes, max_gate_wait_minutes,
             precall_min_quality, precall_gate_cooldown_minutes,
             heavy_reference_weight_kg, planned_boarding_minutes, planned_deboarding_minutes,
-            planned_buffer_minutes, updated_at
+            planned_buffer_minutes, logo_object_key, logo_dark_object_key, updated_at
        FROM operation_days
       WHERE id = ?1`,
   )
@@ -2613,7 +2886,8 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
             automatic_precall_enabled, precall_lead_minutes, max_gate_wait_minutes,
             precall_min_quality, precall_gate_cooldown_minutes,
             heavy_reference_weight_kg, planned_boarding_minutes, planned_deboarding_minutes,
-            planned_buffer_minutes, updated_at FROM operation_days WHERE id = ?1`,
+            planned_buffer_minutes, logo_object_key, logo_dark_object_key, updated_at
+       FROM operation_days WHERE id = ?1`,
   )
     .bind(eventId)
     .first<StoredEventRow>();

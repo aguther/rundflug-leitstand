@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { BrandMark } from "../../design-system/BrandMark";
+import { BrandLockup, BrandMark } from "../../design-system/BrandMark";
 import { Button } from "../../design-system/components";
 import { ThemeToggle } from "../../design-system/ThemeToggle";
 import { useAuth } from "./AuthContext";
@@ -64,9 +64,8 @@ export function LoginPage() {
   return (
     <main className="login-page">
       <header className="login-topbar">
-        <a className="app-brand" href="/" aria-label="Rundflug-Leitstand">
-          <BrandMark />
-          <strong>Rundflug-Leitstand</strong>
+        <a className="app-brand" href="/">
+          <BrandLockup />
         </a>
         <ThemeToggle />
       </header>

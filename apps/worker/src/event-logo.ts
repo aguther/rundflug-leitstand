@@ -1,6 +1,43 @@
+import type { EventLogoTheme } from "@rundflug/contracts";
+
 export const MAX_EVENT_LOGO_BYTES = 1024 * 1024;
 
 export type EventLogoMediaType = "image/png" | "image/jpeg" | "image/webp" | "image/svg+xml";
+
+export function parseEventLogoTheme(value: string | null): EventLogoTheme | null {
+  const normalized = value?.trim().toLowerCase() ?? "light";
+  return normalized === "light" || normalized === "dark" ? normalized : null;
+}
+
+export async function readEventLogoBytes(request: Request): Promise<Uint8Array> {
+  const declaredLength = Number(request.headers.get("content-length"));
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_EVENT_LOGO_BYTES) {
+    throw new Error("EVENT_LOGO_SIZE_INVALID");
+  }
+  if (!request.body) return new Uint8Array();
+
+  const chunks: Uint8Array[] = [];
+  const reader = request.body.getReader();
+  let length = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    length += value.byteLength;
+    if (length > MAX_EVENT_LOGO_BYTES) {
+      await reader.cancel("EVENT_LOGO_SIZE_INVALID");
+      throw new Error("EVENT_LOGO_SIZE_INVALID");
+    }
+    chunks.push(value);
+  }
+
+  const bytes = new Uint8Array(length);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return bytes;
+}
 
 function startsWith(bytes: Uint8Array, signature: readonly number[]): boolean {
   return signature.every((value, index) => bytes[index] === value);

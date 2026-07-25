@@ -4,6 +4,7 @@ import adminUxSource from "./admin-ux.tsx?raw";
 import adminViewSource from "./admin-view.tsx?raw";
 import apiSource from "./api.ts?raw";
 import chartSource from "./features/admin/AdminEventFlowChart.tsx?raw";
+import eventLogoEditorSource from "./features/admin/EventLogoEditor.tsx?raw";
 
 const adminStyles = readFileSync(
   new URL("./features/admin/admin-v15.css", import.meta.url),
@@ -36,8 +37,10 @@ describe("V1.5 administration UI", () => {
   });
 
   it("supports SVG branding and consistent Pilotencode terminology", () => {
-    expect(adminViewSource).toContain("image/svg+xml");
-    expect(adminViewSource).toContain("PNG, JPEG, WebP oder sicheres SVG bis 1 MiB.");
+    expect(eventLogoEditorSource).toContain("image/svg+xml");
+    expect(eventLogoEditorSource).toContain("PNG, JPEG, WebP oder sicheres SVG bis 1 MiB.");
+    expect(eventLogoEditorSource).toContain("Logo für {themeLabel}");
+    expect(apiSource).toMatch(/logo\?theme=\$\{theme\}/);
     expect(adminUxSource).toContain('{ id: "pilots", label: "Pilotencodes" }');
   });
 

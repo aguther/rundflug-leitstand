@@ -47,6 +47,8 @@
   --ui-shadow-soft: 0 5px 18px rgb(18 24 32 / 8%);
   --ui-highlight: rgb(255 255 255 / 72%);
   --ui-overlay: rgb(18 20 24 / 58%);
+  --brand-ink: #0d1b26;
+  --brand-accent: #ffb020;
 }
 
 [data-theme="dark"] {
@@ -80,4 +82,5 @@
   --ui-shadow-soft: 0 8px 28px rgb(0 0 0 / 28%);
   --ui-highlight: rgb(255 255 255 / 8%);
   --ui-overlay: rgb(0 0 0 / 72%);
+  --brand-ink: #e6edf3;
 }

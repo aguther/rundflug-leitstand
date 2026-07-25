@@ -273,23 +273,110 @@
 
 .event-logo-editor-v15 {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  gap: 6px;
-  align-items: end;
+  gap: 8px;
   margin-top: 12px;
 }
 
+.event-logo-editor-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.event-logo-editor-heading > strong {
+  font-size: 0.8rem;
+}
+
+.event-logo-editor-heading > span {
+  color: var(--ui-muted);
+  font-size: 0.72rem;
+}
+
+.event-logo-variant-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.event-logo-variant {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  padding: 8px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-sm);
+  background: var(--ui-surface-subtle);
+}
+
+.event-logo-preview {
+  width: 64px;
+  height: 54px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid rgb(13 27 38 / 16%);
+  border-radius: var(--radius-sm);
+}
+
+.event-logo-variant--light .event-logo-preview {
+  --brand-ink: #0d1b26;
+  background: #f2f5f7;
+}
+
+.event-logo-variant--dark .event-logo-preview {
+  --brand-ink: #e6edf3;
+  background: #14212c;
+  border-color: rgb(230 237 243 / 18%);
+}
+
+.event-logo-preview .brand-mark {
+  width: 46px;
+  height: 46px;
+}
+
+.event-logo-variant-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.event-logo-variant-copy > strong {
+  font-size: 0.77rem;
+}
+
+.event-logo-variant-copy > span {
+  color: var(--ui-muted);
+  font-size: 0.68rem;
+  line-height: 1.3;
+}
+
 .event-logo-editor-v15 .ds-field {
+  grid-column: 1 / -1;
   margin: 0;
 }
 
 .event-logo-editor-v15 input[type="file"] {
+  width: 100%;
   min-height: var(--control-default);
   padding: 5px 8px;
 }
 
 .event-logo-editor-v15 .ds-field small {
   display: none;
+}
+
+.event-logo-variant-actions {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.event-logo-variant-actions .ds-button {
+  width: 100%;
 }
 
 .event-advanced-settings {
@@ -553,12 +640,13 @@
     display: none;
   }
 
-  .event-logo-editor-v15 {
-    grid-template-columns: 1fr 1fr;
+  .event-logo-editor-heading {
+    display: grid;
+    gap: 2px;
   }
 
-  .event-logo-editor-v15 .ds-field {
-    grid-column: 1 / -1;
+  .event-logo-variant-grid {
+    grid-template-columns: 1fr;
   }
 
   .event-catalog-v15 > .ds-page-header,

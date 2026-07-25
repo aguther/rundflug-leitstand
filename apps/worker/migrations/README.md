@@ -233,3 +233,12 @@ tatsächlichen Typ. Der Versand leitet daraus serverseitig ausschließlich relat
 Statuspfade ab. Vor Anwendung wird eine D1-Time-Travel-Marke oder vollständige D1-Sicherung
 angelegt. Ein Rollback erfolgt per D1 Time Travel oder aus dieser Sicherung. Push-Abonnements
 bleiben aus portablen R2-Backups ausgeschlossen und werden im Wiederherstellungsfall neu erteilt.
+
+## 0044 – Themevarianten für Veranstaltungslogos
+
+Ergänzt Veranstaltungen additiv um R2-Schlüssel und Medientyp des Logos für das dunkle Theme.
+Die vorhandenen Logo-Spalten bleiben unverändert die helle Variante; Bestandslogos sind dadurch
+ohne Datenkopie weiter verfügbar. Vor Anwendung wird eine D1-Time-Travel-Marke beziehungsweise
+vollständige D1-/R2-Sicherung angelegt. Ein Rollback erfolgt per D1 Time Travel oder aus dieser
+Sicherung, weil D1 die additiven Spalten nicht ohne Tabellenneuaufbau entfernt. Ein älterer Worker
+kann die neuen nullable Spalten ignorieren, liefert dann aber ausschließlich die helle Variante.
