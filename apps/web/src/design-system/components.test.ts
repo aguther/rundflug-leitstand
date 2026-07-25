@@ -61,6 +61,10 @@ describe("shared design-system component library", () => {
     expect(fieldSource).toContain("ds-field");
     expect(fieldSource).toContain("useId");
     expect(fieldSource).toContain("SearchField");
+    expect(fieldSource).toContain("TextAreaField");
+    expect(fieldSource).toContain("TextareaHTMLAttributes");
+    expect(fieldSource).toContain("aria-describedby={describedBy || undefined}");
+    expect(fieldSource).toContain("<small id={helpId}>");
     expect(fieldSource).toContain("ds-search-control");
     expect(tabsSource).toContain('role="tablist"');
     expect(tabsSource).toContain('role="tab"');

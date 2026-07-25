@@ -197,6 +197,7 @@ export function AdminView() {
       ? (requestedSection as MasterDataCategory)
       : "resource-groups";
   });
+  const adminWorkspaceScrollRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (["gates", "resource-groups", "aircraft", "pilots", "products"].includes(eventStep)) {
       setMasterDataCategory(eventStep as MasterDataCategory);
@@ -214,6 +215,10 @@ export function AdminView() {
     else url.searchParams.delete("step");
     url.searchParams.delete("section");
     window.history.replaceState(null, "", url);
+  }, [adminArea, eventStep]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: switching area or setup step intentionally resets the independent content scroller
+  useEffect(() => {
+    adminWorkspaceScrollRef.current?.scrollTo({ top: 0 });
   }, [adminArea, eventStep]);
   const [reason, setReason] = useState("");
   const [adminPin, setAdminPinState] = useState(session?.account.role === "ADMIN" ? "000000" : "");
@@ -2755,11 +2760,13 @@ export function AdminView() {
           {adminArea === "events" ? (
             <SetupProgress currentStepId={eventStep} onSelect={openSetupStep} steps={setupSteps} />
           ) : null}
-          {board?.currentDeviceRole === "FLIGHT_DIRECTOR" ? (
-            <div className="readonly-banner">Flugleitungsansicht · primär lesend</div>
-          ) : null}
-          {board ? (
-            <>
+          {/* biome-ignore format: preserve the large existing workspace subtree while adding its scroll boundary */}
+          <div className="admin-workspace-scroll-region" ref={adminWorkspaceScrollRef}>
+            {board?.currentDeviceRole === "FLIGHT_DIRECTOR" ? (
+              <div className="readonly-banner">Flugleitungsansicht · primär lesend</div>
+            ) : null}
+            {board ? (
+              <>
               <div hidden={adminArea !== "overview"}>
                 <AdminEventFlowChart
                   error={eventFlowError}
@@ -2844,8 +2851,8 @@ export function AdminView() {
                   Besuchergerät testen.
                 </ValidationHint>
               ) : null}
-            </>
-          ) : null}
+              </>
+            ) : null}
           <section
             className={`admin-edit-context admin-mode-bar ${adminModeUnlocked ? "unlocked" : "locked"}`}
           >
@@ -4316,7 +4323,7 @@ export function AdminView() {
               masterEditorOpen &&
               ["resource-groups", "aircraft", "assignments"].includes(masterDataCategory)
             }
-            size="wide"
+            size={masterDataCategory === "resource-groups" ? "wide" : "default"}
             title={
               masterDataCategory === "resource-groups"
                 ? resourceEditorId === "new"
@@ -4596,7 +4603,7 @@ export function AdminView() {
             initialFocusSelector={masterEditorInitialFocusSelector}
             onClose={requestMasterEditorClose}
             open={masterDataStepActive && masterEditorOpen && masterDataCategory === "pilots"}
-            size="wide"
+            size="default"
             title={pilotEditorId === "new" ? "Pilotencode anlegen" : "Pilotencode bearbeiten"}
           >
             <div className="parameter-grid compact-editor-grid">
@@ -5702,77 +5709,68 @@ export function AdminView() {
             ) : null}
           </section>
           {adminPinDialog ? (
-            <div className="modal-backdrop">
-              <form
-                aria-labelledby="admin-pin-dialog-title"
-                aria-modal="true"
-                className="confirmation-dialog"
-                onKeyDown={(event) => {
-                  if (event.key === "Escape") closeAdminPinDialog();
-                }}
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  void confirmAdminPinDialog();
-                }}
-                role="dialog"
-              >
-                <div className="drawer-heading">
-                  <div>
-                    <h2 id="admin-pin-dialog-title">
-                      {adminPinDialog === "unlock"
-                        ? "Bearbeitungsmodus entsperren"
-                        : "Änderung bestätigen"}
-                    </h2>
-                    <p>
-                      {adminPinDialog === "unlock"
-                        ? "Die PIN gilt nur in diesem Browser-Tab und wird nach 15 Minuten Inaktivität verworfen."
-                        : "Diese einzelne Änderung wird nach erfolgreicher PIN-Prüfung ausgeführt und protokolliert."}
-                    </p>
-                  </div>
-                  <button
-                    aria-label="Bestätigung schließen"
+            <ModalDialog
+              description={
+                adminPinDialog === "unlock"
+                  ? "Die PIN gilt nur in diesem Browser-Tab und wird nach 15 Minuten Inaktivität verworfen."
+                  : "Diese einzelne Änderung wird nach erfolgreicher PIN-Prüfung ausgeführt und protokolliert."
+              }
+              footer={
+                <>
+                  <Button
                     disabled={adminPinBusy}
                     onClick={closeAdminPinDialog}
                     type="button"
                   >
-                    ×
-                  </button>
-                </div>
-                <label>
-                  Administrator-PIN
-                  <input
-                    autoComplete="current-password"
-                    onChange={(event) => setAdminPin(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") {
-                        event.preventDefault();
-                        void confirmAdminPinDialog();
-                      }
-                    }}
-                    ref={adminPinInputRef}
-                    type="password"
-                    value={adminPin}
-                  />
-                </label>
-                {adminPinError ? (
-                  <ValidationHint tone="error">{adminPinError}</ValidationHint>
-                ) : null}
-                <div className="dialog-actions">
-                  <button disabled={adminPinBusy} onClick={closeAdminPinDialog} type="button">
                     Abbrechen
-                  </button>
+                  </Button>
                   <Button
                     busy={adminPinBusy}
-                    className="primary-action"
                     disabled={adminPin.length < 4}
+                    form="admin-pin-form"
                     type="submit"
                     variant="primary"
                   >
                     {adminPinDialog === "unlock" ? "Entsperren" : "Bestätigen"}
                   </Button>
+                </>
+              }
+              initialFocusSelector="#admin-pin-input"
+              onClose={() => {
+                if (!adminPinBusy) closeAdminPinDialog();
+              }}
+              open
+              size="compact"
+              title={
+                adminPinDialog === "unlock"
+                  ? "Bearbeitungsmodus entsperren"
+                  : "Änderung bestätigen"
+              }
+            >
+              <form
+                className="admin-pin-form"
+                id="admin-pin-form"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void confirmAdminPinDialog();
+                }}
+              >
+                <div className="ds-field admin-pin-field">
+                  <label htmlFor="admin-pin-input">Administrator-PIN</label>
+                  <input
+                    autoComplete="current-password"
+                    id="admin-pin-input"
+                    onChange={(event) => setAdminPin(event.target.value)}
+                    ref={adminPinInputRef}
+                    type="password"
+                    value={adminPin}
+                  />
                 </div>
+                {adminPinError ? (
+                  <ValidationHint tone="error">{adminPinError}</ValidationHint>
+                ) : null}
               </form>
-            </div>
+            </ModalDialog>
           ) : null}
           {pendingMasterDelete ? (
             <ModalDialog
@@ -5843,7 +5841,7 @@ export function AdminView() {
                 )}
               </section>
               {!adminModeUnlocked ? (
-                <div className="field-control">
+                <div className="ds-field master-delete-pin-field">
                   <label htmlFor="master-delete-pin">Administrator-PIN</label>
                   <input
                     autoComplete="current-password"
@@ -5887,7 +5885,7 @@ export function AdminView() {
                   type="button"
                   variant="primary"
                 >
-                  Vorlage importieren
+                  Importieren
                 </Button>
               </>
             }
@@ -6100,6 +6098,7 @@ export function AdminView() {
               </form>
             </div>
           ) : null}
+          </div>
         </div>
       </section>
     </Shell>

@@ -495,7 +495,10 @@
   display: block;
 }
 
-.admin-shell .admin-workspace.master-data-active > .master-data-workspace {
+.admin-shell
+  .admin-workspace.master-data-active
+  > .admin-workspace-scroll-region
+  > .master-data-workspace {
   min-height: auto;
   padding: 10px 16px 12px;
 }
@@ -554,7 +557,10 @@
   font-size: 0.72rem;
 }
 
-.admin-shell .admin-workspace:not(.master-data-active) > .admin-section:not([hidden]) {
+.admin-shell
+  .admin-workspace:not(.master-data-active)
+  > .admin-workspace-scroll-region
+  > .admin-section:not([hidden]) {
   gap: 10px;
   margin: 0 16px 8px;
   padding: 14px;
@@ -564,26 +570,36 @@
   overflow-x: hidden;
 }
 
-.admin-shell .admin-workspace:not(.master-data-active) > .admin-section:not([hidden]) h2 {
+.admin-shell
+  .admin-workspace:not(.master-data-active)
+  > .admin-workspace-scroll-region
+  > .admin-section:not([hidden])
+  h2 {
   margin: 0;
   font-size: 0.96rem;
 }
 
 .admin-shell
   .admin-workspace:not(.master-data-active)
+  > .admin-workspace-scroll-region
   > .admin-section:not([hidden])
   :is(input, select) {
   min-height: 36px;
   padding: 7px 9px;
 }
 
-.admin-shell .admin-workspace:not(.master-data-active) > .admin-section:not([hidden]) textarea {
+.admin-shell
+  .admin-workspace:not(.master-data-active)
+  > .admin-workspace-scroll-region
+  > .admin-section:not([hidden])
+  textarea {
   min-height: 72px;
   padding: 8px 9px;
 }
 
 .admin-shell
   .admin-workspace:not(.master-data-active)
+  > .admin-workspace-scroll-region
   > .admin-section:not([hidden])
   :is(.danger-action, .primary-action, .ds-button) {
   min-height: 34px;
@@ -687,6 +703,7 @@
 
 .admin-shell
   .admin-workspace:not(.master-data-active)
+  > .admin-workspace-scroll-region
   > .admin-section:not([hidden])
   .manifest-reason-field
   textarea {
@@ -764,7 +781,10 @@
     padding-inline: 12px;
   }
 
-  .admin-shell .admin-workspace:not(.master-data-active) > .admin-section:not([hidden]) {
+  .admin-shell
+    .admin-workspace:not(.master-data-active)
+    > .admin-workspace-scroll-region
+    > .admin-section:not([hidden]) {
     margin-inline: 12px;
   }
 
@@ -805,10 +825,52 @@
 /* Unified master-data editors and stable event-step geometry. */
 .admin-shell .admin-workspace,
 .admin-shell .admin-workspace.master-data-active {
-  display: block;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.admin-shell .admin-workspace-scroll-region {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.admin-shell .admin-workspace > .ds-page-header,
+.admin-shell .admin-workspace > .event-catalog-primary {
+  flex: 0 0 auto;
+}
+
+.admin-shell .admin-workspace > .event-catalog-primary {
+  display: flex;
+  min-height: 0;
+  max-height: clamp(190px, 32vh, 320px);
+  flex-direction: column;
+}
+
+.admin-shell .event-catalog-primary > .ds-page-header {
+  flex: 0 0 auto;
+}
+
+.admin-shell .event-catalog-primary > .event-catalog-table-wrap {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.admin-shell .event-catalog-primary .event-catalog-table thead {
+  position: sticky;
+  z-index: 1;
+  top: 0;
 }
 
 .admin-shell .setup-progress {
+  flex: 0 0 48px;
   height: 48px;
   min-height: 48px;
   scrollbar-gutter: stable;
@@ -835,7 +897,10 @@
   scroll-margin-inline: 16px;
 }
 
-.admin-shell .admin-workspace.master-data-active > .admin-mode-bar {
+.admin-shell
+  .admin-workspace.master-data-active
+  > .admin-workspace-scroll-region
+  > .admin-mode-bar {
   position: static;
   width: auto;
   margin: 0 16px 8px;
@@ -845,33 +910,50 @@
   background: var(--ui-surface);
 }
 
-.admin-shell .admin-workspace.master-data-active > .admin-mode-bar > div:first-child,
-.admin-shell .admin-workspace.master-data-active > .admin-mode-bar > .admin-validation {
+.admin-shell
+  .admin-workspace.master-data-active
+  > .admin-workspace-scroll-region
+  > .admin-mode-bar
+  > div:first-child,
+.admin-shell
+  .admin-workspace.master-data-active
+  > .admin-workspace-scroll-region
+  > .admin-mode-bar
+  > .admin-validation {
   display: grid;
 }
 
-.admin-shell .admin-workspace.master-data-active > .master-data-workspace {
+.admin-shell
+  .admin-workspace.master-data-active
+  > .admin-workspace-scroll-region
+  > .master-data-workspace {
   margin: 0;
   padding: 0 16px 8px;
 }
 
-.admin-shell .master-data-editor-dialog {
-  width: min(1260px, calc(100vw - 32px));
+.admin-shell .master-data-editor-dialog.ds-modal-dialog--wide {
+  width: min(1040px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+}
+
+.admin-shell .master-data-editor-dialog.ds-modal-dialog--default {
+  width: min(680px, calc(100vw - 32px));
   max-height: calc(100dvh - 32px);
 }
 
 .admin-shell .master-data-editor-dialog .ds-modal-header {
-  min-height: 76px;
-  padding: 18px 20px;
+  min-height: 70px;
+  padding: var(--space-4) var(--space-5);
 }
 
 .admin-shell .master-data-editor-dialog .ds-modal-header h2 {
-  font-size: 1.15rem;
-  font-weight: 720;
+  font-size: 1.1rem;
+  font-weight: 650;
 }
 
 .admin-shell .master-data-editor-body {
-  padding: 20px;
+  overflow-x: hidden;
+  padding: var(--space-5);
 }
 
 .admin-shell .master-data-editor-body .master-data-columns,
@@ -903,9 +985,9 @@
   .master-data-editor-body
   :is(.field-control, .gate-active-field)
   :is(input:not([type="checkbox"]), select, textarea) {
-  min-height: 46px;
-  padding: 10px 12px;
-  font-size: 0.94rem;
+  min-height: var(--control-default);
+  padding: 8px 10px;
+  font-size: 0.86rem;
 }
 
 .admin-shell .master-data-editor-body .form-introduction {
@@ -978,10 +1060,9 @@
 }
 
 .admin-shell .master-data-editor-footer {
-  min-height: 82px;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 20px;
+  padding: var(--space-4) var(--space-5);
 }
 
 .admin-shell .master-editor-standard-actions {
@@ -992,7 +1073,7 @@
 
 .admin-shell .master-data-editor-footer .ds-button {
   min-width: 140px;
-  min-height: 46px;
+  min-height: var(--control-default);
 }
 
 .admin-shell .master-data-editor-footer .master-editor-standard-actions .ds-button:last-child {
@@ -1011,6 +1092,16 @@
   margin: 0;
   color: var(--ui-muted);
   line-height: 1.5;
+}
+
+.admin-shell .admin-pin-form {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.admin-shell .admin-pin-form .ds-field,
+.admin-shell .master-delete-pin-field {
+  margin: 0;
 }
 
 .admin-shell .master-delete-dialog {
@@ -1098,7 +1189,8 @@
     min-width: 150px;
   }
 
-  .admin-shell .master-data-editor-dialog {
+  .admin-shell .master-data-editor-dialog.ds-modal-dialog--wide,
+  .admin-shell .master-data-editor-dialog.ds-modal-dialog--default {
     width: min(100%, 620px);
     max-height: calc(100dvh - 16px);
   }

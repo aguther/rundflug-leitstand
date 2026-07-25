@@ -58,16 +58,20 @@
   gap: 8px;
 }
 
+.flight-director-header-actions .flight-director-resource-filter {
+  align-self: center;
+  margin: 0;
+}
+
+.flight-director-header-actions > .ds-button,
+.flight-director-header-actions .flight-director-resource-filter select,
+.flight-director-operational-summary {
+  min-height: var(--control-default);
+}
+
 .flight-director-operational-summary {
   max-width: min(34vw, 420px);
   overflow: hidden;
-  padding: 7px 10px;
-  border: 1px solid var(--ui-border);
-  border-radius: 999px;
-  background: var(--ui-surface-raised);
-  color: var(--ui-muted);
-  font-size: 0.78rem;
-  font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -99,25 +103,8 @@
   overflow-x: auto;
 }
 
-.flight-director-operation-reason {
-  display: grid;
-  gap: 6px;
-  color: var(--ui-muted);
-  font-size: 0.8rem;
-  font-weight: 700;
-}
-
-.flight-director-operation-reason input,
-.flight-director-operation-panel input,
-.flight-director-operation-panel select,
-.flight-director-operation-panel textarea,
-.flight-director-emergency-panel input {
-  width: 100%;
-}
-
 .flight-director-operation-panel {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -132,6 +119,18 @@
   background: var(--ui-surface);
 }
 
+.flight-director-operation-panel .ds-field,
+.flight-director-resource-notice-editor .ds-field {
+  margin: 0;
+}
+
+.flight-director-operation-panel textarea,
+.flight-director-resource-notice-editor textarea {
+  width: 100%;
+  min-height: 112px;
+  resize: vertical;
+}
+
 .flight-director-operation-panel h3,
 .flight-director-emergency-panel h3 {
   margin: 0;
@@ -143,32 +142,14 @@
   color: var(--ui-muted);
 }
 
-.flight-director-operation-panel label,
-.flight-director-emergency-panel label {
-  display: grid;
-  gap: 6px;
-  font-size: 0.82rem;
-  font-weight: 700;
-}
-
-.flight-director-operation-panel textarea {
-  resize: vertical;
-}
-
 .flight-director-operation-panel .flight-director-interruption {
-  grid-column: 1 / -1;
   grid-template-columns: 1fr auto;
   align-items: center;
 }
 
-.flight-director-operation-panel .flight-director-interruption h3,
-.flight-director-operation-panel .flight-director-interruption p {
-  grid-column: 1;
-}
-
 .flight-director-operation-panel .flight-director-interruption .ds-button {
   grid-column: 2;
-  grid-row: 1 / span 2;
+  grid-row: 1;
 }
 
 .flight-director-operation-list {
@@ -178,7 +159,7 @@
 
 .flight-director-operation-list > article {
   display: grid;
-  grid-template-columns: minmax(170px, 1fr) auto minmax(260px, auto);
+  grid-template-columns: minmax(170px, 1fr) auto minmax(260px, auto) minmax(150px, auto);
   align-items: center;
   gap: 12px;
   padding: 12px;
@@ -201,6 +182,10 @@
   display: flex;
   justify-content: flex-end;
   gap: 6px;
+}
+
+.flight-director-resource-notice-action {
+  white-space: nowrap;
 }
 
 .operation-status {
@@ -237,6 +222,51 @@
 .flight-director-emergency-panel > div.active {
   border: 1px solid var(--ui-danger);
   background: color-mix(in srgb, var(--ui-danger) 12%, var(--ui-surface));
+}
+
+.flight-director-event-notice {
+  gap: 14px;
+}
+
+.flight-director-published-notice {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-sm);
+  background: var(--ui-surface-subtle);
+}
+
+.flight-director-published-notice > p {
+  color: var(--ui-text);
+  white-space: pre-wrap;
+}
+
+.flight-director-published-notice > div,
+.flight-director-notice-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.flight-director-resource-notice-editor {
+  display: grid;
+  gap: 16px;
+}
+
+.flight-director-resource-notice-context {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-sm);
+  background: var(--ui-surface-subtle);
+}
+
+.flight-director-resource-notice-context span {
+  color: var(--ui-muted);
 }
 
 .flight-director-v15 > .action-message {
