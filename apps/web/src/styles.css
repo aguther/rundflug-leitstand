@@ -3076,29 +3076,6 @@ p {
 .weight-class-options input {
   min-height: auto;
 }
-.admin-check-row,
-.admin-section label.admin-check-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 42px;
-  padding: 9px 11px;
-  border: 1px solid var(--ui-border);
-  border-radius: 6px;
-  background: var(--ui-control);
-  cursor: pointer;
-}
-.admin-check-row input[type="checkbox"] {
-  flex: 0 0 auto;
-  width: 18px;
-  height: 18px;
-  min-height: 18px;
-  margin: 0;
-  accent-color: var(--ui-accent);
-}
-.admin-check-row .field-label {
-  min-width: 0;
-}
 .weight-class-options {
   display: flex;
   flex-wrap: wrap;
@@ -4084,6 +4061,7 @@ p {
 }
 .resource-aircraft-selection {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 9px;
   padding: 14px;
   border: 1px solid var(--ui-border);
@@ -4098,12 +4076,8 @@ p {
   color: var(--ui-muted);
   font-size: 0.9rem;
 }
-.resource-aircraft-selection .checkbox-label {
-  min-height: 44px;
-  padding: 9px 10px;
-  border: 1px solid var(--ui-border);
-  border-radius: 5px;
-  background: var(--ui-control);
+.resource-automatic-precall {
+  grid-column: 1 / -1;
 }
 .gate-display-filter h3,
 .gate-display-filter p {
@@ -4119,12 +4093,9 @@ p {
   gap: 8px;
 }
 .gate-filter-options {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 16px;
-}
-.gate-filter-options .checkbox-label {
-  min-height: 32px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
 }
 .gate-assignment-summary {
   padding-top: 14px;

@@ -193,16 +193,47 @@ describe("Flight Director", () => {
   });
 
   it("provides explicit published, editing and deletion states for operational notices", () => {
+    expect(operationsDialogSource).toContain("type NoticeEditorTarget =");
+    expect(operationsDialogSource).toContain('kind: "event"');
+    expect(operationsDialogSource).toContain('kind: "resource"');
+    expect(operationsDialogSource).toContain("OperationalNoticeEditor");
     expect(operationsDialogSource).toContain("publishedEventNotice");
     expect(operationsDialogSource).toContain("Hinweis veröffentlichen");
     expect(operationsDialogSource).toContain("Hinweis bearbeiten");
-    expect(operationsDialogSource).toContain("Bearbeiten");
     expect(operationsDialogSource).toContain("Speichern");
     expect(operationsDialogSource).toContain("Löschen");
     expect(operationsDialogSource).toContain('onPublishEventNotice("")');
     expect(operationsDialogSource).toContain(
-      'onPublishResourceNotice(selectedResourceGroup.id, "")',
+      'onPublishResourceNotice(noticeTarget.resourceGroupId, "")',
     );
-    expect(operationsDialogSource).toContain("returnToResources");
+    expect(operationsDialogSource).toContain("returnFromNoticeEditor");
+    expect(operationsDialogSource).toContain("flight-director-event-notice-summary");
+    expect(operationsDialogSource).not.toContain("flight-director-published-notice");
+  });
+
+  it("orders resource actions with a stable notice action before the destructive ending", () => {
+    const statusList = operationsDialogSource.slice(
+      operationsDialogSource.indexOf("const resourceStatusActions"),
+      operationsDialogSource.indexOf("const endedStatusAction"),
+    );
+    expect(statusList.indexOf('label: "Aktiv"')).toBeLessThan(statusList.indexOf('label: "Pause"'));
+    expect(statusList.indexOf('label: "Pause"')).toBeLessThan(
+      statusList.indexOf('label: "Unterbrochen"'),
+    );
+    expect(statusList).not.toContain('label: "Beendet"');
+
+    const actionMarkup = operationsDialogSource.slice(
+      operationsDialogSource.indexOf('className="flight-director-operation-actions"'),
+      operationsDialogSource.indexOf(
+        "</div>",
+        operationsDialogSource.indexOf('className="flight-director-operation-actions"'),
+      ),
+    );
+    expect(actionMarkup.indexOf("flight-director-notice-action")).toBeLessThan(
+      actionMarkup.indexOf("endedStatusAction.label"),
+    );
+    expect(flightLineStyles).toMatch(
+      /\.flight-director-notice-action \{[\s\S]*?inline-size: 11\.5rem;[\s\S]*?flex: 0 0 11\.5rem;/,
+    );
   });
 });

@@ -397,7 +397,10 @@
   font-size: 0.9rem;
 }
 
-.admin-shell .ds-modal-body :is(.master-data-columns, .resource-master-grid) label {
+.admin-shell
+  .ds-modal-body
+  :is(.master-data-columns, .resource-master-grid)
+  label:not(.ds-checkbox-field-label) {
   gap: 5px;
   font-size: 0.76rem;
 }
@@ -418,7 +421,6 @@
     .gate-display-filter,
     .resource-aircraft-selection,
     .derived-resource-summary,
-    .admin-check-row,
     .master-delete-zone,
     .admin-validation
   ) {
@@ -444,18 +446,8 @@
   line-height: 1.35;
 }
 
-.admin-shell .ds-modal-body .resource-aircraft-selection {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
 .admin-shell .ds-modal-body .resource-aircraft-selection :is(h3, p) {
   grid-column: 1 / -1;
-}
-
-.admin-shell .ds-modal-body .resource-aircraft-selection .checkbox-label {
-  min-height: 34px;
-  padding: 6px 8px;
-  font-size: 0.76rem;
 }
 
 .admin-shell .ds-modal-body .derived-resource-summary {
@@ -772,10 +764,6 @@
     grid-template-columns: 1fr;
   }
 
-  .admin-shell .ds-modal-body .resource-aircraft-selection {
-    grid-template-columns: 1fr;
-  }
-
   .admin-shell .metrics-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     padding-inline: 12px;
@@ -997,34 +985,9 @@
   line-height: 1.5;
 }
 
-.admin-shell .master-data-editor-body .admin-check-row {
-  min-height: 58px;
-  display: flex;
-  grid-column: 1 / -1;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 14px;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--radius-sm);
-  background: var(--ui-surface-subtle);
-}
-
-.admin-shell .master-data-editor-body .admin-check-row > input {
-  width: 18px;
-  height: 18px;
-  flex: 0 0 auto;
-  margin: 0;
-}
-
 .admin-shell .master-data-editor-body .resource-aircraft-selection {
   gap: 10px;
   padding: 16px;
-}
-
-.admin-shell .master-data-editor-body .resource-aircraft-selection .checkbox-label {
-  min-height: 48px;
-  padding: 10px 12px;
-  font-size: 0.82rem;
 }
 
 .admin-shell .master-data-editor-body .derived-resource-summary {
