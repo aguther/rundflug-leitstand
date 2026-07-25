@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import mainSource from "../main.tsx?raw";
 
 const stylesSource = readFileSync(new URL("./components.css", import.meta.url), "utf8");
+const tokensSource = readFileSync(new URL("./tokens.css", import.meta.url), "utf8");
 const buttonSource = readFileSync(new URL("./components/Button.tsx", import.meta.url), "utf8");
 const iconButtonSource = readFileSync(
   new URL("./components/IconButton.tsx", import.meta.url),
@@ -65,6 +66,15 @@ describe("shared design-system component library", () => {
     expect(fieldSource).toContain("TextareaHTMLAttributes");
     expect(fieldSource).toContain("aria-describedby={describedBy || undefined}");
     expect(fieldSource).toContain("<small id={helpId}>");
+    expect(fieldSource).toContain("CheckboxField");
+    expect(fieldSource).toContain('className="ds-checkbox-field-label"');
+    expect(fieldSource).toContain("htmlFor={id}");
+    expect(fieldSource).toContain('type="checkbox"');
+    expect(fieldSource).toContain("ds-checkbox-field-trailing");
+    expect(stylesSource).toContain(".ds-checkbox-field:has(input:focus-visible)");
+    expect(stylesSource).toContain("min-height: var(--control-touch)");
+    expect(stylesSource).toContain("width: var(--control-checkbox)");
+    expect(tokensSource).toContain("--control-checkbox: 20px");
     expect(fieldSource).toContain("ds-search-control");
     expect(tabsSource).toContain('role="tablist"');
     expect(tabsSource).toContain('role="tab"');

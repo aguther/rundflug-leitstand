@@ -10,6 +10,7 @@ const adminStyles = readFileSync(
   new URL("./features/admin/admin-v15.css", import.meta.url),
   "utf8",
 );
+const legacyStyles = readFileSync(new URL("./styles.css", import.meta.url), "utf8");
 
 describe("unified master-data dialogs and stable event workspace", () => {
   it("keeps the event header and setup navigation outside one internally scrolling step region", () => {
@@ -58,6 +59,23 @@ describe("unified master-data dialogs and stable event workspace", () => {
     expect(adminViewSource).toMatch(/>\s*Abbrechen\s*<\/Button>/);
     expect(adminViewSource).toMatch(/>\s*Speichern\s*<\/Button>/);
     expect(adminViewSource).toContain("<h3>Weitere Aktionen</h3>");
+  });
+
+  it("uses one shared, touch-sized checkbox row across master-data dialogs", () => {
+    expect(adminViewSource.match(/<CheckboxField/g)).toHaveLength(5);
+    expect(adminViewSource).toContain('label="Gate ist aktiv"');
+    expect(adminViewSource).toContain('className="resource-automatic-precall"');
+    expect(adminViewSource).toContain("<FieldHelp");
+    expect(legacyStyles).toMatch(
+      /\.resource-aircraft-selection \{[\s\S]*?grid-template-columns: minmax\(0, 1fr\);/,
+    );
+    expect(legacyStyles).toMatch(
+      /\.gate-filter-options \{[\s\S]*?grid-template-columns: repeat\(auto-fit, minmax\(180px, 1fr\)\);/,
+    );
+    expect(adminEventStyles).not.toMatch(
+      /\.resource-aircraft-selection \{[^}]*grid-template-columns: repeat\(2,/,
+    );
+    expect(adminEventStyles).not.toContain(".resource-aircraft-selection .checkbox-label");
   });
 
   it("keeps status, discard, delete, import and PIN flows in the shared modal language", () => {
