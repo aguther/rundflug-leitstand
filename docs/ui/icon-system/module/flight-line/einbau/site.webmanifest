@@ -1,0 +1,16 @@
+{
+  "name": "Rundflug Leitstand — Flight Line",
+  "short_name": "Flight Line",
+  "id": "/flight-line/",
+  "start_url": "/flight-line/",
+  "scope": "/flight-line/",
+  "background_color": "#0D1B26",
+  "theme_color": "#0D1B26",
+  "display": "standalone",
+  "icons": [
+    { "src": "/flight-line/icons/android/icon-192.png",     "sizes": "192x192", "type": "image/png" },
+    { "src": "/flight-line/icons/android/icon-512.png",     "sizes": "512x512", "type": "image/png" },
+    { "src": "/flight-line/icons/android/maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/flight-line/icons/android/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

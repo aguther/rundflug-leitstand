@@ -33,6 +33,15 @@ describe("V1.2 app navigation", () => {
     expect(mayOpenEventRoute("FLIGHT_LINE", "/flight-line/assist")).toBe(false);
   });
 
+  it("Q-UX-040 keeps the view switcher on the established plain Lucide glyphs", () => {
+    expect(headerSource).toContain('"/kasse": Tickets');
+    expect(headerSource).toContain('"/flight-director": Users');
+    expect(headerSource).toContain('"/flight-line": Headphones');
+    expect(headerSource).toContain('"/fids": Plane');
+    expect(headerSource).toContain('"/admin": Settings');
+    expect(headerSource).not.toContain("/icons/pwa/");
+  });
+
   it("keeps the standalone simulator route ADMIN-only and out of the global switcher", () => {
     expect(mayOpenEventRoute("ADMIN", "/simulation")).toBe(true);
     expect(mayOpenEventRoute("CASHIER", "/simulation")).toBe(false);

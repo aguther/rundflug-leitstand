@@ -50,7 +50,8 @@ describe("mobiler öffentlicher Status V1.8", () => {
 
   it("bindet das exakte dynamische Manifest und führt iPhone-Browsernutzer", () => {
     expect(installMetadata).toContain(["/api/public/pwa-manifest/", "{target}/"].join("$"));
-    expect(installMetadata).toContain("/icons/ticket-icon-180.png");
+    expect(installMetadata).toContain("/icons/pwa/ticket/favicon.svg");
+    expect(installMetadata).toContain("/icons/pwa/ticket/apple-touch-icon-180.png");
     expect(manifestHook).toContain("bookingGroupLabel");
     expect(pushHook).toContain(
       "Auf dem iPhone: Zum Home-Bildschirm hinzufügen, dann Benachrichtigungen aktivieren.",

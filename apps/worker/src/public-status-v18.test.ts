@@ -42,14 +42,16 @@ describe("öffentlicher Status V1.8", () => {
     expect(worker).toContain("publicStatusInstallTitle");
     expect(worker).toContain("name: installTitle");
     expect(worker).toContain("short_name: installTitle");
-    expect(worker).toContain("/icons/ticket-icon-512.png");
+    expect(worker).toContain("/icons/pwa/ticket/icon-512.png");
+    expect(worker).toContain("/icons/pwa/ticket/maskable-512.png");
   });
 
   it("liefert schon im ersten HTML-Dokument seitenspezifische Installationsmetadaten", () => {
     expect(worker).toContain("installableAppShellResponse");
     expect(worker).toContain("new HTMLRewriter()");
     expect(worker).toMatch(/manifestHref: `\/api\/public\/pwa-manifest\/\$\{target\}\/\$\{code\}`/);
-    expect(worker).toContain('appleTouchIconHref: "/icons/ticket-icon-180.png"');
+    expect(worker).toContain('faviconHref: "/icons/pwa/ticket/favicon.svg"');
+    expect(worker).toContain('appleTouchIconHref: "/icons/pwa/ticket/apple-touch-icon-180.png"');
     expect(worker).toMatch(/title: `\$\{installTitle\} · Rundflug`/);
   });
 
