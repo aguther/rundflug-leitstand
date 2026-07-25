@@ -70,31 +70,119 @@ export const aircraftStateLabel = {
 } as const;
 
 export function FieldHelp({ help }: { help: string }) {
-  const [open, setOpen] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const [pinned, setPinned] = useState(false);
+  const [tooltipLeft, setTooltipLeft] = useState(-7);
   const tooltipId = useId();
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const open = hovered || focused || pinned;
+
+  const close = useCallback(() => {
+    setHovered(false);
+    setFocused(false);
+    setPinned(false);
+  }, []);
+
+  const positionTooltip = useCallback(() => {
+    const button = buttonRef.current;
+    if (!button) return;
+    const buttonBounds = button.getBoundingClientRect();
+    const tooltipWidth = Math.min(230, window.innerWidth - 32);
+    const viewportLeft = Math.min(
+      Math.max(16, buttonBounds.left - 7),
+      window.innerWidth - 16 - tooltipWidth,
+    );
+    setTooltipLeft(viewportLeft - buttonBounds.left);
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!buttonRef.current?.contains(event.target as Node)) close();
+    };
+    document.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("resize", positionTooltip);
+    document.addEventListener("scroll", positionTooltip, true);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("resize", positionTooltip);
+      document.removeEventListener("scroll", positionTooltip, true);
+    };
+  }, [close, open, positionTooltip]);
+
   return (
     <button
       aria-describedby={open ? tooltipId : undefined}
       aria-expanded={open}
       aria-label={`Hilfe: ${help}`}
       className={`field-info ${open ? "is-open" : ""}`}
-      onBlur={() => setOpen(false)}
+      onBlur={close}
       onClick={(event) => {
         event.preventDefault();
         event.stopPropagation();
-        setOpen((value) => !value);
+        if (pinned) close();
+        else {
+          positionTooltip();
+          setPinned(true);
+        }
       }}
+      onFocus={(event) => {
+        if (event.currentTarget.matches(":focus-visible")) {
+          positionTooltip();
+          setFocused(true);
+        }
+      }}
+      onKeyDown={(event) => {
+        if (event.key !== "Escape") return;
+        event.preventDefault();
+        event.stopPropagation();
+        close();
+      }}
+      onPointerEnter={() => {
+        positionTooltip();
+        setHovered(true);
+      }}
+      onPointerLeave={(event) => {
+        if (event.pointerType === "mouse") close();
+        else setHovered(false);
+      }}
+      ref={buttonRef}
       type="button"
     >
       <Info aria-hidden="true" />
-      <span className="field-info-tooltip" id={tooltipId} role="tooltip">
-        {help}
-      </span>
+      {open ? (
+        <span
+          className="field-info-tooltip"
+          id={tooltipId}
+          role="tooltip"
+          style={{ left: tooltipLeft }}
+        >
+          {help}
+        </span>
+      ) : null}
     </button>
   );
 }
 
-export function FieldLabel({ label, help }: { label: string; help: string }) {
+export function FieldLabel({
+  label,
+  help,
+  htmlFor,
+}: {
+  label: string;
+  help: string;
+  htmlFor: string;
+}) {
+  return (
+    <span className="field-label-with-info">
+      <label htmlFor={htmlFor}>{label}</label>
+      <FieldHelp help={help} />
+    </span>
+  );
+}
+
+export function FieldGroupLabel({ label, help }: { label: string; help: string }) {
   return (
     <span className="field-label-with-info">
       <span>{label}</span>

@@ -334,6 +334,22 @@
   align-items: center;
   gap: 6px;
 }
+.field-label-with-info > label {
+  display: inline;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.field-control {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 6px;
+}
+.field-control > :is(input, select, textarea) {
+  width: 100%;
+  min-width: 0;
+}
 .field-info {
   position: relative;
   display: inline-grid;
@@ -387,8 +403,6 @@
     transform 120ms ease,
     visibility 0s linear 120ms;
 }
-.field-info:hover .field-info-tooltip,
-.field-info:focus-visible .field-info-tooltip,
 .field-info.is-open .field-info-tooltip {
   opacity: 1;
   transform: translateY(0);
