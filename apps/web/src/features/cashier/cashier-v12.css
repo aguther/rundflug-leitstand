@@ -786,7 +786,7 @@
     padding: 0;
   }
   .ticket-print-document .ticket-paper {
-    width: 52mm;
+    width: 56mm;
     min-height: 0;
     margin: 0 auto;
     padding: 1mm;
@@ -796,23 +796,32 @@
     break-after: auto;
   }
   .ticket-print-document .ticket-paper > img {
-    width: 48mm;
-    height: 48mm;
+    width: 52mm;
+    height: 52mm;
   }
   .ticket-print-document .ticket-paper > strong {
-    font-size: 13pt;
+    font-size: 14pt;
+    line-height: 1.2;
   }
   .ticket-print-document .ticket-paper > small {
-    font-size: 9.5pt;
+    font-size: 10pt;
+    line-height: 1.2;
   }
   .ticket-print-document .ticket-paper > b {
-    font-size: 13pt;
+    font-size: 14pt;
+    line-height: 1.2;
   }
   .ticket-print-document .ticket-paper dl {
-    font-size: 10pt;
+    font-size: 11pt;
+    line-height: 1.2;
   }
   .ticket-print-document .ticket-paper dl > div {
     grid-template-columns: 18mm minmax(0, 1fr);
     column-gap: 1mm;
+  }
+  .ticket-print-document .ticket-paper :is(strong, b, small, dt, dd) {
+    max-width: 100%;
+    min-width: 0;
+    overflow-wrap: anywhere;
   }
 }

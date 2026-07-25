@@ -76,7 +76,6 @@ describe("V1.7.0 cashier", () => {
     expect(stylesSource).not.toContain("min-height: 100mm");
     expect(stylesSource).not.toContain("size: 58mm 110mm");
     expect(stylesSource).not.toContain("break-after: page");
-    expect(stylesSource).toContain("width: 48mm");
     expect(stylesSource).toMatch(
       /html,[\s\S]*?body,[\s\S]*?#root \{[\s\S]*?width: 100% !important;/,
     );
@@ -87,9 +86,32 @@ describe("V1.7.0 cashier", () => {
     expect(stylesSource).toMatch(
       /\.cashier-shell > \.ticket-print-document \{[\s\S]*?width: 100%;[\s\S]*?justify-content: center;/,
     );
-    expect(stylesSource).toMatch(/\.ticket-print-document \.ticket-paper \{[\s\S]*?width: 52mm;/);
+    expect(stylesSource).toMatch(
+      /\.ticket-print-document \.ticket-paper \{[\s\S]*?width: 56mm;[\s\S]*?padding: 1mm;/,
+    );
+    expect(stylesSource).toMatch(
+      /\.ticket-print-document \.ticket-paper > img \{[\s\S]*?width: 52mm;[\s\S]*?height: 52mm;/,
+    );
+    expect(stylesSource).toMatch(
+      /\.ticket-print-document \.ticket-paper > strong \{[\s\S]*?font-size: 14pt;[\s\S]*?line-height: 1\.2;/,
+    );
+    expect(stylesSource).toMatch(
+      /\.ticket-print-document \.ticket-paper > small \{[\s\S]*?font-size: 10pt;[\s\S]*?line-height: 1\.2;/,
+    );
+    expect(stylesSource).toMatch(
+      /\.ticket-print-document \.ticket-paper > b \{[\s\S]*?font-size: 14pt;[\s\S]*?line-height: 1\.2;/,
+    );
+    expect(stylesSource).toMatch(
+      /\.ticket-print-document \.ticket-paper dl \{[\s\S]*?font-size: 11pt;[\s\S]*?line-height: 1\.2;/,
+    );
     expect(stylesSource).toMatch(
       /\.ticket-print-document \.ticket-paper dl > div \{[\s\S]*?grid-template-columns: 18mm minmax\(0, 1fr\);[\s\S]*?column-gap: 1mm;/,
+    );
+    expect(stylesSource).toMatch(
+      /\.ticket-print-document \.ticket-paper :is\(strong, b, small, dt, dd\) \{[\s\S]*?max-width: 100%;[\s\S]*?min-width: 0;[\s\S]*?overflow-wrap: anywhere;/,
+    );
+    expect(stylesSource).toMatch(
+      /\.ticket-paper-preview > img \{[\s\S]*?width: min\(144px, 58%\);/,
     );
   });
 
