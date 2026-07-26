@@ -7,18 +7,9 @@ import { applyInitialInstallMetadata } from "./app/install-metadata";
 import { applyInitialTheme, ThemeProvider } from "./design-system/theme";
 import "./design-system/tokens.css";
 import "./styles.css";
-import "./features/admin/admin-v12.css";
-import "./features/cashier/cashier-v12.css";
-import "./features/flight-line/flight-line-v12.css";
-import "./features/fids/fids-v12.css";
 import "./features/ui-finish-v12.css";
-import "./features/operations-finish-v12.css";
-import "./features/admin/admin-v15.css";
-import "./features/admin/admin-event-workspace.css";
-import "./features/flight-line/flight-line-assist-v15.css";
 import "./design-system/base.css";
 import "./design-system/components.css";
-import "./features/public-status/public-status-v18.css";
 
 applyInitialInstallMetadata();
 applyInitialTheme();

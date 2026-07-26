@@ -14,7 +14,7 @@ Automatisierte responsive Browserprüfungen ersetzen diese Prüfung auf echter A
 1. Anmeldung, Veranstaltungsauswahl und Wechsel zwischen allen berechtigten Ansichten durchführen.
 2. Gerät drehen, Split View auf dem iPad verwenden und prüfen, dass keine Primäraktion außerhalb des
    Viewports liegt.
-3. Flight Line Assist auf dem iPhone einspaltig und auf iPad zweispaltig bedienen: Claim,
+3. Flight Line auf dem iPhone einspaltig und auf iPad zweispaltig bedienen: Claim,
    Gruppenanwesenheit ohne Scan, Kombination, Boarding, Off-Block, On-Block, Abschluss.
 4. Kamera-Scan erlauben und verweigern; die manuelle Anwesenheit muss in beiden Fällen funktionieren.
 5. PWA in den Hintergrund schicken, wieder öffnen und Reconnect sowie aktuellen Serverstand prüfen.

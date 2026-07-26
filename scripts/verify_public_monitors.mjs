@@ -175,7 +175,7 @@ const board = async () => {
   return response.json();
 };
 const operationBoard = async (device, token) => {
-  const response = await fetch(`${base}/api/events/demo-2026/operations`, {
+  const response = await fetch(`${base}/api/control/demo-2026/operations`, {
     headers: { "x-device-id": device, "x-device-token": token },
   });
   if (!response.ok) throw new Error(`Operativer Board-Abruf fehlgeschlagen (${response.status}).`);
@@ -183,7 +183,7 @@ const operationBoard = async (device, token) => {
 };
 const searchTickets = async (query) => {
   const response = await fetch(
-    `${base}/api/events/demo-2026/tickets/search?status=ACTIVE&limit=20&q=${encodeURIComponent(query)}`,
+    `${base}/api/control/demo-2026/tickets/search?status=ACTIVE&limit=20&q=${encodeURIComponent(query)}`,
     {
       headers: {
         "x-device-id": devices.cashier,
@@ -214,7 +214,7 @@ const publicManifest = async (target, code) => {
   return response.json();
 };
 const command = async (device, token, expectedVersion, type, payload, staleRetries = 0) => {
-  const response = await fetch(`${base}/api/events/demo-2026/commands`, {
+  const response = await fetch(`${base}/api/control/demo-2026/commands`, {
     method: "POST",
     headers: { "content-type": "application/json", "x-device-token": token },
     body: JSON.stringify({
@@ -353,7 +353,7 @@ const assertPublicTimeCommunication = (payload, label) => {
 let socket;
 try {
   await waitForWorker();
-  const adminResponse = await fetch(`${base}/api/events/demo-2026/operations`, {
+  const adminResponse = await fetch(`${base}/api/control/demo-2026/operations`, {
     headers: { "x-device-id": devices.admin, "x-device-token": tokens.admin },
   });
   const current = await adminResponse.json();

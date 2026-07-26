@@ -11,12 +11,13 @@ const quietSurfaceStylesheets = [
 ];
 
 describe("quiet surfaces stay gradient-free", () => {
-  it.each(
-    quietSurfaceStylesheets,
-  )("%s has no gradients (Admin/Kasse/Supervisor/FIDS are calm, table-dense surfaces per the multi-surface concept)", (relativePath) => {
-    const source = readFileSync(new URL(relativePath, import.meta.url), "utf8");
-    expect(source).not.toMatch(gradientPattern);
-  });
+  it.each(quietSurfaceStylesheets)(
+    "%s has no gradients (Admin/Kasse/Supervisor/FIDS are calm, table-dense surfaces per the multi-surface concept)",
+    (relativePath) => {
+      const source = readFileSync(new URL(relativePath, import.meta.url), "utf8");
+      expect(source).not.toMatch(gradientPattern);
+    },
+  );
 
   it("the shared design-system component library has no gradients either", () => {
     const source = readFileSync(

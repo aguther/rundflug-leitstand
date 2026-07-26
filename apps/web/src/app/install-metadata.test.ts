@@ -39,13 +39,16 @@ describe("ansichtsspezifische Installationsmetadaten", () => {
       "/icons/pwa/admin/favicon.svg",
       "/icons/pwa/admin/apple-touch-icon-180.png",
     ],
-  ])("ordnet %s ein eigenes Manifest, Favicon und App-Symbol zu", (path, manifestHref, faviconHref, appleTouchIconHref) => {
-    expect(installMetadataForPath(path)).toMatchObject({
-      manifestHref,
-      faviconHref,
-      appleTouchIconHref,
-    });
-  });
+  ])(
+    "ordnet %s ein eigenes Manifest, Favicon und App-Symbol zu",
+    (path, manifestHref, faviconHref, appleTouchIconHref) => {
+      expect(installMetadataForPath(path)).toMatchObject({
+        manifestHref,
+        faviconHref,
+        appleTouchIconHref,
+      });
+    },
+  );
 
   it("registriert den alten Assist-Pfad nicht mehr", () => {
     expect(installMetadataForPath("/flight-line/assist")).toBeNull();

@@ -1,4 +1,4 @@
-import { REQUIREMENTS_VERSION } from "@rundflug/config";
+import { APP_VERSION, REQUIREMENTS_VERSION } from "@rundflug/config";
 import { sha256Hex } from "./crypto";
 import type { Env } from "./types";
 
@@ -32,6 +32,7 @@ export interface PortableBackup {
   format: "rundflug-leitstand-portable-backup";
   formatVersion: 1;
   createdAt: string;
+  applicationVersion: string;
   requirementsVersion: string;
   reason: BackupReason;
   tables: Record<string, unknown[]>;
@@ -73,6 +74,7 @@ export async function createPortableBackup(
     format: "rundflug-leitstand-portable-backup",
     formatVersion: 1,
     createdAt,
+    applicationVersion: APP_VERSION,
     requirementsVersion: REQUIREMENTS_VERSION,
     reason,
     tables,
@@ -83,7 +85,13 @@ export async function createPortableBackup(
   const key = `backups/${day}/${createdAt.replaceAll(":", "-")}.json`;
   await env.BACKUPS.put(key, body, {
     httpMetadata: { contentType: "application/json" },
-    customMetadata: { sha256: checksum, formatVersion: "1", reason },
+    customMetadata: {
+      sha256: checksum,
+      formatVersion: "1",
+      applicationVersion: APP_VERSION,
+      requirementsVersion: REQUIREMENTS_VERSION,
+      reason,
+    },
   });
 
   const retentionThreshold = now.getTime() - 14 * 24 * 60 * 60 * 1000;

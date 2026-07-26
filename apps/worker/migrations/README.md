@@ -4,6 +4,12 @@
 Folgemigration benötigt eine Wiederherstellungsnotiz. Produktive Migrationen werden zuerst in der
 Abnahmeumgebung und gegen eine aktuelle Sicherung geprüft.
 
+## 0001 – Initialschema
+
+Legt das initiale relationale Schema an. Es wird ausschließlich auf einer leeren Datenbank
+angewendet. Wiederherstellung: fehlgeschlagene Erstbereitstellung verwerfen und eine neue leere D1
+anlegen; niemals eine produktiv befüllte Datenbank durch erneute Anwendung reparieren.
+
 ## 0002 – Geräteidentität
 
 Führt ausschließlich die additive Tabelle `paired_devices` ein. Wiederherstellung: vor Anwendung
@@ -26,10 +32,17 @@ erfolgt aus der Sicherung vor Migration. Tokens selbst werden weder in D1 noch i
 
 ## 0005 – Notfall, Unterbrechung und Korrektur
 
-Erweitert Geräte um die Rolle Flugleitung, ergänzt den Rücknahmezeitpunkt eines Aufrufs und führt
+Erweitert Geräte um die Rolle Flight Director, ergänzt den Rücknahmezeitpunkt eines Aufrufs und führt
 historisierte betriebliche Blockierungen ein. Vor Anwendung ist eine Sicherung verpflichtend. Der
 Tabellenneuaufbau von `paired_devices` wird zuerst in Acceptance geprüft; Wiederherstellung erfolgt
 aus der Sicherung. Bestehende Credentials werden unverändert als Hash übernommen.
+
+## 0009 bis 0012 – Betriebs-, Ressourcen-, Unterbrechungs- und Pilotenergänzungen
+
+Die vier additiven Migrationen erweitern Flugzeug-, Ressourcengruppen-, Veranstaltungs- und
+Pilotenzustände. Vor Anwendung ist eine portable Sicherung erforderlich. Wiederherstellung erfolgt
+aus dieser Sicherung beziehungsweise per D1 Time Travel; ein isoliertes Entfernen der Spalten würde
+einen SQLite-Tabellenneuaufbau erfordern.
 
 ## 0013 – Optionaler Anwesenheitsabgleich
 
@@ -122,6 +135,12 @@ Ersteinrichtung. Die Tabelle enthält ausschließlich technische IDs und den Abs
 Anwendung wird portabel gesichert. Ein Rollback erfolgt aus dieser Sicherung; der Guard darf nach
 erfolgreichem Produktiv-Bootstrap nicht isoliert entfernt werden.
 
+## 0025 – Ticket-Zurückstellungen
+
+Ergänzt additive Grenzen und Zähler für bewusste Zurückstellungen. Vor Anwendung wird portabel
+gesichert. Wiederherstellung erfolgt aus dieser Sicherung beziehungsweise per D1 Time Travel, weil
+ein spaltenweiser Rückbau einen Tabellenneuaufbau erfordern würde.
+
 ## 0026 – Historisches Umlauf-Gate und organisatorische Bemerkung
 
 Ergänzt Umläufe additiv um das beim Anlegen wirksame Gate und eine optionale organisatorische
@@ -150,6 +169,13 @@ Snapshots werden ausdrücklich als `LEGACY_UNKNOWN` gekennzeichnet und bleiben u
 auswertbar. Vor Anwendung wird eine portable D1-Sicherung erzeugt. Wiederherstellung erfolgt aus
 dieser Sicherung beziehungsweise per D1 Time Travel; ältere Worker dürfen nach der Migration keine
 neuen Snapshots mehr schreiben, weil ihnen die vollständige Datengrundlage fehlt.
+
+## 0030 bis 0032 – Manifestkorrekturen, FIDS-Filter und Reset-Prognosen
+
+Die drei Migrationen ergänzen Korrekturbezüge, gespeicherte FIDS-Filter und die vollständige
+Bereinigung von Prognose-Snapshots beim Werksreset. Vor Anwendung ist eine portable Sicherung
+beziehungsweise D1-Time-Travel-Marke erforderlich. Wiederherstellung erfolgt ausschließlich daraus;
+ein partieller Rückbau darf Audit- oder Resetkonsistenz nicht schwächen.
 
 ## 0033 – Kurzlebige anonyme Flight-Line-Betreuung
 
@@ -242,3 +268,17 @@ ohne Datenkopie weiter verfügbar. Vor Anwendung wird eine D1-Time-Travel-Marke 
 vollständige D1-/R2-Sicherung angelegt. Ein Rollback erfolgt per D1 Time Travel oder aus dieser
 Sicherung, weil D1 die additiven Spalten nicht ohne Tabellenneuaufbau entfernt. Ein älterer Worker
 kann die neuen nullable Spalten ignorieren, liefert dann aber ausschließlich die helle Variante.
+
+## 0045 – Reset-Fortsetzungsfreigabe
+
+Ergänzt Reset-Belege um Hash, Ablauf und Verbrauchszeit einer kurzlebigen Setup-Freigabe. Der
+Klartextgrant wird nicht gespeichert. Vor Anwendung wird eine D1-Time-Travel-Marke beziehungsweise
+portable Sicherung angelegt. Ältere Worker ignorieren die nullable Spalten; Wiederherstellung
+erfolgt per Time Travel oder aus der Sicherung.
+
+## Historische Doppelnummer 0036
+
+`0036_product_promised_flight_time.sql` und `0036_v1_5_stable_operations.sql` wurden bereits unter
+ihren vollständigen Dateinamen angewendet. Sie werden nicht nachträglich umbenannt. Das automatisch
+geprüfte Register erlaubt ausschließlich diese bekannte Doppelnummer und weist jede weitere
+Nummerkollision ab.

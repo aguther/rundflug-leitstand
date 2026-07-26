@@ -144,7 +144,7 @@ const envelope = (deviceId, expectedVersion, type, payload) => ({
   payload,
 });
 const post = async (body) => {
-  const response = await fetch(`${base}/api/events/${eventId}/commands`, {
+  const response = await fetch(`${base}/api/control/${eventId}/commands`, {
     method: "POST",
     headers: { "content-type": "application/json", "x-device-token": token },
     body: JSON.stringify(body),
@@ -158,7 +158,7 @@ const post = async (body) => {
   return result;
 };
 const loadOperations = async () => {
-  const response = await fetch(`${base}/api/events/${eventId}/operations`, {
+  const response = await fetch(`${base}/api/control/${eventId}/operations`, {
     headers: { "x-device-id": "acceptance-admin", "x-device-token": token },
   });
   if (!response.ok)
@@ -234,7 +234,7 @@ try {
   }
 
   const operations = await loadOperations();
-  const eventHistoryResponse = await fetch(`${base}/api/events/${eventId}/history?limit=1000`, {
+  const eventHistoryResponse = await fetch(`${base}/api/control/${eventId}/history?limit=1000`, {
     headers: { "x-device-id": "acceptance-admin", "x-device-token": token },
   });
   const eventHistory = await eventHistoryResponse.json();

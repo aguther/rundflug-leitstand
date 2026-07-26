@@ -170,7 +170,7 @@ const waitForWorker = async () => {
   throw new Error("Lokaler Worker wurde nicht rechtzeitig bereit.");
 };
 const command = async (expectedVersion, note) => {
-  const response = await fetch(`${base}/api/events/${eventId}/commands`, {
+  const response = await fetch(`${base}/api/control/${eventId}/commands`, {
     method: "POST",
     headers: {
       "content-type": "application/json",
@@ -195,14 +195,14 @@ const command = async (expectedVersion, note) => {
   return result;
 };
 const loadOperations = async () => {
-  const response = await fetch(`${base}/api/events/${eventId}/operations`, {
+  const response = await fetch(`${base}/api/control/${eventId}/operations`, {
     headers: { "x-device-id": deviceId, "x-device-token": token },
   });
   if (!response.ok) throw new Error(`Operativer Stand nicht lesbar (${response.status}).`);
   return response.json();
 };
 const loadHistory = async () => {
-  const response = await fetch(`${base}/api/events/${eventId}/history?limit=100`, {
+  const response = await fetch(`${base}/api/control/${eventId}/history?limit=100`, {
     headers: { "x-device-id": deviceId, "x-device-token": token },
   });
   if (!response.ok) throw new Error(`GO-TO-GATE-Audit nicht lesbar (${response.status}).`);

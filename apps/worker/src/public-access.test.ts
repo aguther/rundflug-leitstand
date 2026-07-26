@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   allowAdminDeviceRecoveryAttempt,
   allowLoginAttempt,
+  allowSetupAttempt,
   allowUnknownTicketAttempt,
 } from "./public-access";
 
@@ -53,5 +54,19 @@ describe("administrator device recovery access", () => {
     const key = limit.mock.calls[0]?.[0].key as string;
     expect(key).toMatch(/^admin-device-recovery:[a-f0-9]{64}$/);
     expect(key).not.toContain("192.0.2.20");
+  });
+});
+
+describe("installation setup access", () => {
+  it("limits setup attempts without exposing the requesting address", async () => {
+    const limit = vi.fn().mockResolvedValue({ success: true });
+    const request = new Request("https://example.test/api/setup", {
+      headers: { "cf-connecting-ip": "192.0.2.30" },
+    });
+
+    await expect(allowSetupAttempt({ limit }, request)).resolves.toBe(true);
+    const key = limit.mock.calls[0]?.[0].key as string;
+    expect(key).toMatch(/^installation-setup:[a-f0-9]{64}$/);
+    expect(key).not.toContain("192.0.2.30");
   });
 });

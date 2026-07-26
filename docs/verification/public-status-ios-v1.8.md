@@ -30,14 +30,12 @@ Status: Automatisierte Abnahme erfolgreich; Originalhardware-Abnahme in HTTPS-St
   geprüft. Das Geräteschema steuert ohne gespeicherten Wert Hell/Dunkel; eine manuelle Auswahl
   speichert ausschließlich `light` oder `dark`.
 
-## Browser-Bildbelege
+## Browser-Nachweis
 
-- [390 × 844, hell](../ui/v1.8.0-public-status-browser-390x844-light.png)
-- [390 × 844, dunkel](../ui/v1.8.0-public-status-browser-390x844-dark.png)
-- [430 × 932, hell](../ui/v1.8.0-public-status-browser-430x932-light.png)
-- [430 × 932, dunkel](../ui/v1.8.0-public-status-browser-430x932-dark.png)
-- [Desktop, hell](../ui/v1.8.0-public-status-browser-desktop-light.png)
-- [Desktop, dunkel](../ui/v1.8.0-public-status-browser-desktop-dark.png)
+Die früheren Release-Screenshots wurden nach Übernahme der gültigen Aussagen in den kumulativen
+Releasekatalog 1.10.0 entfernt. Der reproduzierbare Nachweis erfolgt über die aktuellen
+Browser-Rollenabläufe und die responsiven Public-Status-Tests; das aktuelle Oberflächenkonzept steht
+unter [UI-Konzept 1.10.0](../ui/v1.10.0-release-concept.md).
 
 ## Verbindliche Originalhardware-Prüfung
 

@@ -1111,3 +1111,5 @@ export function CashierView() {
     </Shell>
   );
 }
+
+import "./features/cashier/cashier-v12.css";

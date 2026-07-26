@@ -197,11 +197,11 @@ const createTicketCode = () =>
     (value) => ticketCodeAlphabet[value % ticketCodeAlphabet.length],
   ).join("");
 const board = () =>
-  requestJson(`${base}/api/events/${eventId}/operations`, {
+  requestJson(`${base}/api/control/${eventId}/operations`, {
     headers: { "x-device-id": deviceId, "x-device-token": deviceToken },
   });
 const command = (version, type, payload) =>
-  requestJson(`${base}/api/events/${eventId}/commands`, {
+  requestJson(`${base}/api/control/${eventId}/commands`, {
     method: "POST",
     headers,
     body: JSON.stringify({

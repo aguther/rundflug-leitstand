@@ -27,7 +27,7 @@ describe("serverseitige Sitzungsautorisierung (ADR-0010, Q-SIC-020, T-020)", () 
 
   it("removes browser device credentials and injects the session origin into commands", () => {
     const middleware = workerSource.slice(
-      workerSource.indexOf('for (const protectedPrefix of ["/api/control/*", "/api/events/*"]'),
+      workerSource.indexOf('for (const protectedPrefix of ["/api/control/*"]'),
       workerSource.indexOf('app.get("/api/health"'),
     );
     const route = workerSource.slice(

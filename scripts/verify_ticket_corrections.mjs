@@ -49,7 +49,7 @@ const waitForWorker = async () => {
   throw new Error("Lokaler Worker wurde nicht rechtzeitig bereit.");
 };
 const board = async () => {
-  const response = await fetch(`${base}/api/events/demo-2026/operations`, {
+  const response = await fetch(`${base}/api/control/demo-2026/operations`, {
     headers: { "x-device-id": devices.admin, "x-device-token": tokens.admin },
   });
   if (!response.ok) throw new Error(`Board-Abruf fehlgeschlagen (${response.status}).`);
@@ -65,7 +65,7 @@ const envelope = (deviceId, expectedVersion, type, payload, commandId = randomUU
   payload,
 });
 const post = async (token, body, expectedStatus = 200) => {
-  const response = await fetch(`${base}/api/events/demo-2026/commands`, {
+  const response = await fetch(`${base}/api/control/demo-2026/commands`, {
     method: "POST",
     headers: { "content-type": "application/json", "x-device-token": token },
     body: JSON.stringify(body),
@@ -84,7 +84,7 @@ const history = async (ticketGroupId) => {
     aggregateId: ticketGroupId,
     limit: "100",
   });
-  const response = await fetch(`${base}/api/events/demo-2026/history?${query}`, {
+  const response = await fetch(`${base}/api/control/demo-2026/history?${query}`, {
     headers: { "x-device-id": devices.admin, "x-device-token": tokens.admin },
   });
   if (!response.ok) throw new Error(`Historien-Abruf fehlgeschlagen (${response.status}).`);
@@ -92,7 +92,7 @@ const history = async (ticketGroupId) => {
 };
 const ticketSearch = async (status, query) => {
   const params = new URLSearchParams({ status, q: query, limit: "20" });
-  const response = await fetch(`${base}/api/events/demo-2026/tickets/search?${params}`, {
+  const response = await fetch(`${base}/api/control/demo-2026/tickets/search?${params}`, {
     headers: { "x-device-id": devices.cashier, "x-device-token": tokens.cashier },
   });
   if (!response.ok) throw new Error(`Ticketsuche fehlgeschlagen (${response.status}).`);
@@ -100,7 +100,7 @@ const ticketSearch = async (status, query) => {
 };
 const operationalHistory = async (filters, device = "admin", expectedStatus = 200) => {
   const query = new URLSearchParams(filters);
-  const response = await fetch(`${base}/api/events/demo-2026/history/operations?${query}`, {
+  const response = await fetch(`${base}/api/control/demo-2026/history/operations?${query}`, {
     headers: { "x-device-id": devices[device], "x-device-token": tokens[device] },
   });
   const result = await response.json();
@@ -112,7 +112,7 @@ const operationalHistory = async (filters, device = "admin", expectedStatus = 20
   return result;
 };
 const dailyReport = async () => {
-  const response = await fetch(`${base}/api/events/demo-2026/reports/daily.csv`, {
+  const response = await fetch(`${base}/api/control/demo-2026/reports/daily.csv`, {
     headers: { "x-device-id": devices.admin, "x-device-token": tokens.admin },
   });
   if (!response.ok) throw new Error(`Tagesbericht-Abruf fehlgeschlagen (${response.status}).`);

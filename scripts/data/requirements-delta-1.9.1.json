@@ -1,0 +1,78 @@
+{
+  "version": "1.10.0",
+  "sourceRelease": "1.9.1",
+  "requirements": [
+    {
+      "source": "1.9.1",
+      "id": "V191-CAS-010",
+      "section": "Fortgeltendes Delta 1.9.1",
+      "requirement": "Temporäre Kapazitäts- und Prognosezustände bleiben Hinweise und sperren keinen ausdrücklich freigegebenen Verkauf; die Gruppengröße bleibt nach Verkauf erhalten und besitzt einen Reset auf 1.",
+      "priority": "MUSS",
+      "stage": "V1",
+      "status": "implemented",
+      "module": "apps/web/src/cashier-view.tsx apps/worker/src/event-coordinator.ts und scripts/verify_sale_guards.mjs",
+      "tests": "cashier-v12.test.ts sale-capacity-policy.test.ts und test:sale-guards",
+      "traceStatus": "umgesetzt"
+    },
+    {
+      "source": "1.9.1",
+      "id": "V191-GRP-010",
+      "section": "Fortgeltendes Delta 1.9.1",
+      "requirement": "Verkauf und Aufteilungsanzeige leiten die Gruppenkapazität aus aktiven Ressourcengruppenzuordnungen statt temporären Flugzeugzuständen ab.",
+      "priority": "MUSS",
+      "stage": "V1",
+      "status": "implemented",
+      "module": "apps/worker/src/index.ts und event-coordinator.ts",
+      "tests": "sale-capacity-policy.test.ts test:sale-guards und Browserabnahme",
+      "traceStatus": "umgesetzt"
+    },
+    {
+      "source": "1.9.1",
+      "id": "V191-PRN-010",
+      "section": "Fortgeltendes Delta 1.9.1",
+      "requirement": "POS-58 druckt ausschließlich das auf 56 mm vergrößerte, mit einem 52-mm-QR-Code versehene und auf der Rollenachse zentrierte Ticket ohne Vorlauf oder feste Rollenlänge; Direktdruck wird betrieblich konfiguriert.",
+      "priority": "MUSS",
+      "stage": "V1",
+      "status": "implemented",
+      "module": "apps/web/src/features/cashier/cashier-v12.css und docs/operations/pos-58-direct-print.md",
+      "tests": "cashier-v12.test.ts Print-to-PDF und physische POS-58-Prüfung extern",
+      "traceStatus": "umgesetzt"
+    },
+    {
+      "source": "1.9.1",
+      "id": "V191-PUB-010",
+      "section": "Fortgeltendes Delta 1.9.1",
+      "requirement": "Öffentliche Status-PWAs vermeiden leeren iPhone-Überlauf und bezeichnen IN_FLIGHT als IM FLUG sowie LANDED als GELANDET.",
+      "priority": "MUSS",
+      "stage": "V1",
+      "status": "implemented",
+      "module": "apps/web/src/features/public-status/public-status-model.ts und public-status-v18.css",
+      "tests": "public-status-model.test.ts public-status-ui.test.ts und mobile Browserabnahme",
+      "traceStatus": "umgesetzt"
+    },
+    {
+      "source": "1.9.1",
+      "id": "V191-FID-010",
+      "section": "Fortgeltendes Delta 1.9.1",
+      "requirement": "FIDS-Zeitfenster werden ohne nachgestelltes Wort Uhr dargestellt.",
+      "priority": "MUSS",
+      "stage": "V1",
+      "status": "implemented",
+      "module": "apps/web/src/time-window.ts und fids-display.tsx",
+      "tests": "time-window.test.ts fids-display-ui.test.ts und Browserabnahme",
+      "traceStatus": "umgesetzt"
+    },
+    {
+      "source": "1.9.1",
+      "id": "V191-QA-010",
+      "section": "Fortgeltendes Delta 1.9.1",
+      "requirement": "Automatisierte, visuelle und Druckabnahmen decken das vollständige freigegebene Korrekturdelta ab.",
+      "priority": "MUSS",
+      "stage": "V1",
+      "status": "implemented",
+      "module": "Workspace-Prüfskripte und docs/ui/v1.10.0-release-concept.md",
+      "tests": "Vollständiger Check responsive Browserabnahme und Diff-Review",
+      "traceStatus": "umgesetzt"
+    }
+  ]
+}

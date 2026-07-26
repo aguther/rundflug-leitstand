@@ -7,12 +7,11 @@ und des Prognoseverfahrens steht in
 ```text
 Browser / PWA
 ├── Kasse
-├── Flight Line Supervisor (Desktop)
-├── Flight Line Assist (Mobilgerät)
-├── kompakte Administration
-├── Standard-FIDS / Boardingmonitor
-├── Terminal-FIDS (vollständig Englisch)
-└── öffentliche Ticketstatusseite
+├── Flight Director (Disposition)
+├── Flight Line (Mobilgerät)
+├── Administration
+├── FIDS
+└── öffentlicher Gruppenstatus
           │ HTTPS + WebSocket
           ▼
 Cloudflare Worker

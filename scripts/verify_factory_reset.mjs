@@ -44,7 +44,7 @@ if (forecastFixture.status !== 0) {
   throw new Error("Prognosehistorie für den Werksreset-Test konnte nicht angelegt werden.");
 }
 
-const pin = String.fromCharCode(48).repeat(6);
+const pin = "123456";
 const setupCode = ["synthetic", "factory", "reset", "setup", "code"].join("-");
 const server = spawn(
   process.execPath,
@@ -60,7 +60,9 @@ const server = spawn(
     "--var",
     `ADMIN_PIN_HASH:${createHash("sha256").update(pin).digest("hex")}`,
     "--var",
-    `BOOTSTRAP_TOKEN:${setupCode}`,
+    `INSTALLATION_RECOVERY_CODE:${setupCode}`,
+    "--var",
+    `RESET_SETUP_SIGNING_KEY:${["synthetic", "reset", "grant", "signing", "key"].join("-")}`,
   ],
   { cwd: root, stdio: "ignore", windowsHide: true },
 );
@@ -77,6 +79,39 @@ const waitForWorker = async () => {
 
 try {
   await waitForWorker();
+  const loginResponse = await fetch(`${base}/api/auth/login`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      accountId: "550e8400-e29b-41d4-a716-446655440200",
+      pin,
+    }),
+  });
+  if (!loginResponse.ok)
+    throw new Error(`Admin-Anmeldung fehlgeschlagen (${loginResponse.status}).`);
+  const sessionCookie = loginResponse.headers.get("set-cookie")?.split(";")[0];
+  if (!sessionCookie) throw new Error("Admin-Anmeldung hat kein Sitzungscookie geliefert.");
+  const rejectedReset = await fetch(`${base}/api/admin/events/demo-2026/factory-reset`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      cookie: sessionCookie,
+    },
+    body: JSON.stringify({
+      commandId: randomUUID(),
+      eventId: "demo-2026",
+      reason: "Synthetischer Test einer falschen PIN",
+      adminPin: "654321",
+      confirmation: "WERKSZUSTAND",
+      retainRecoveryBackup: true,
+      deleteAllBackups: false,
+    }),
+  });
+  if (rejectedReset.status !== 403) {
+    throw new Error(
+      `Werksreset mit falscher Konto-PIN wurde nicht abgelehnt (${rejectedReset.status}).`,
+    );
+  }
   const commandId = randomUUID();
   const request = {
     commandId,
@@ -92,8 +127,7 @@ try {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        "x-device-id": "technical-scaffold",
-        "x-device-token": "demo-admin-device-token",
+        cookie: sessionCookie,
       },
       body: JSON.stringify(request),
     });
@@ -102,11 +136,44 @@ try {
   if (!first.ok || !firstBody.resetComplete || !firstBody.recoveryBackupKey) {
     throw new Error(`Werksreset fehlgeschlagen (${first.status}).`);
   }
-  const statusAfterReset = await fetch(`${base}/api/setup/status`).then((response) =>
+  const resetSetupCookie = first.headers.get("set-cookie")?.split(";")[0];
+  if (!resetSetupCookie) throw new Error("Werksreset hat keinen Setup-Grant ausgestellt.");
+  const statusAfterReset = await fetch(`${base}/api/setup/status`, {
+    headers: { cookie: resetSetupCookie },
+  }).then((response) => response.json());
+  if (!statusAfterReset.setupRequired || !statusAfterReset.resetSetupAuthorized) {
+    throw new Error("System autorisiert nach dem Werksreset keine direkte Ersteinrichtung.");
+  }
+  const foreignBrowserStatus = await fetch(`${base}/api/setup/status`).then((response) =>
     response.json(),
   );
-  if (!statusAfterReset.setupRequired) {
-    throw new Error("System verlangt nach dem Werksreset keine Ersteinrichtung.");
+  if (foreignBrowserStatus.resetSetupAuthorized) {
+    throw new Error("Ein anderer Browser hat unerwartet den Reset-Setup-Grant erhalten.");
+  }
+  const foreignDuplicate = await fetch(`${base}/api/admin/events/demo-2026/factory-reset`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(request),
+  });
+  if (foreignDuplicate.status !== 403 || foreignDuplicate.headers.get("set-cookie")) {
+    throw new Error(
+      `Fremder Browser konnte den Reset-Beleg wiederholen (${foreignDuplicate.status}).`,
+    );
+  }
+  const unauthorizedSetup = await fetch(`${base}/api/setup`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      adminPin: pin,
+      eventId: "unauthorized-after-reset",
+      name: "Nicht autorisierter Neustart",
+      eventDate: "2026-07-14",
+      aerodrome: "EDQA",
+      timeZone: "Europe/Berlin",
+    }),
+  });
+  if (unauthorizedSetup.status !== 403) {
+    throw new Error(`Fremder Setup-Browser wurde nicht abgelehnt (${unauthorizedSetup.status}).`);
   }
   const duplicate = await executeReset();
   if (!duplicate.ok || !(await duplicate.json()).resetComplete) {
@@ -117,9 +184,7 @@ try {
   const adminDeviceToken = ["synthetic", "new", "admin", "device", "token"].join("-");
   const setup = await fetch(`${base}/api/setup`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
     body: JSON.stringify({
-      setupCode,
       adminPin: pin,
       eventId: "synthetic-after-reset",
       name: "Synthetischer Neustart",
@@ -129,18 +194,44 @@ try {
       adminDeviceId,
       adminCredentialHash: createHash("sha256").update(adminDeviceToken).digest("hex"),
     }),
+    headers: {
+      "content-type": "application/json",
+      cookie: resetSetupCookie,
+    },
   });
   if (setup.status !== 201) {
     throw new Error(`Ersteinrichtung nach Werksreset fehlgeschlagen (${setup.status}).`);
   }
+  const replay = await fetch(`${base}/api/setup`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      cookie: resetSetupCookie,
+    },
+    body: JSON.stringify({
+      adminPin: pin,
+      eventId: "replayed-after-reset",
+      name: "Wiederholter Neustart",
+      eventDate: "2026-07-14",
+      aerodrome: "EDQA",
+      timeZone: "Europe/Berlin",
+    }),
+  });
+  if (replay.status !== 409) {
+    throw new Error(`Verbrauchter Setup-Grant wurde nicht abgelehnt (${replay.status}).`);
+  }
   console.log(
     JSON.stringify({
       resetComplete: true,
+      incorrectAdminPinRejected: true,
       recoveryBackupCreated: true,
       forecastHistoryDeleted: true,
       duplicateResetIdempotent: true,
       setupRequiredAfterReset: true,
+      foreignBrowserRejected: true,
+      foreignDuplicateRejected: true,
       setupCompletedAgain: true,
+      consumedGrantRejected: true,
     }),
   );
 } finally {

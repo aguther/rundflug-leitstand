@@ -16,9 +16,8 @@ fachlichen Stand, aber unterschiedliche Typografie und Sprache.
 
 ## Entscheidung
 
-- Flight Line Supervisor ist die dichte Desktop-Gesamtsicht für Flotte, Queue, Prognose und
-  Ausnahmen.
-- Flight Line Assist ist eine vereinfachte Tablet-/Telefonansicht. Anonyme, kurzlebige
+- Flight Director ist die dichte Desktop-Gesamtsicht für Flotte, Queue, Prognose und Ausnahmen.
+- Flight Line ist die vereinfachte Tablet-/Telefonansicht. Anonyme, kurzlebige
   Gerätereservierungen verhindern, dass zwei Helfer unbemerkt dasselbe Flugzeug bearbeiten.
 - Das System löst den Voraufruf `GO TO GATE` automatisch anhand von Queue, Prognosequalität,
   Vorlauf und maximal akzeptierter Gate-Wartezeit aus.
@@ -41,4 +40,4 @@ Pausen benötigen einen optionalen erwarteten Rückkehrzeitpunkt. Display-Konfig
 Profil und Nachlaufzeit. Alle neuen Schreibpfade bleiben idempotent, versionsgeprüft und auditiert.
 
 Das freigegebene Bedienkonzept steht in
-`docs/ui/operations-v2-multi-surface-concept.md`.
+`docs/ui/v1.10.0-release-concept.md`.

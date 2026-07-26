@@ -22,7 +22,7 @@ Dem neuen Betreiber werden mindestens übergeben:
   `docs/operations/third-party-licenses-v1.md`,
 - offene Abweichungen, Migrationen und Abnahmeauflagen.
 
-Nicht in Repository, Übergabeprotokoll oder Tickets kopiert werden Klartext-PIN, Bootstrap-Code,
+Nicht in Repository, Übergabeprotokoll oder Tickets kopiert werden Klartext-PIN, Installations-Notfallcode,
 VAPID-Privatschlüssel, API-Token, Gerätekopplungstoken oder öffentliche Ticketcodes.
 
 ## 2. Reproduzierbarer Neuaufbau
@@ -35,10 +35,12 @@ npm install
 npm run check
 ```
 
-Für Cloudflare werden anschließend D1 und R2 mit EU-Jurisdiktion neu angelegt, deren IDs in einer
-betreiberspezifischen Konfiguration gebunden, alle Migrationen angewendet und Secrets interaktiv neu
-erzeugt. Alte Secrets werden nicht übertragen, sondern rotiert. Die Ersteinrichtung erfolgt über
-`/setup` oder ein verifiziertes portables Backup.
+Für Cloudflare wird anschließend
+`npm run cloudflare:bootstrap -- --target <ziel> ...` gemäß
+[Cloudflare-Neuaufbau](cloudflare-neuaufbau.md) ausgeführt. D1 und R2 entstehen in EU-Jurisdiktion,
+die accountbezogene Konfiguration bleibt lokal und alle Secrets werden neu erzeugt. Alte Secrets
+werden nicht übertragen. Die Ersteinrichtung erfolgt über `/setup`; ein verifiziertes portables
+Backup ist ein davon getrennter Importweg.
 
 ## 3. Datenportabilität
 
@@ -89,7 +91,8 @@ Realtime erst nach erfolgreicher Persistenz nicht abschwächen.
 4. Repository und Dokumentation auf Secret-/Personendatenfreiheit prüfen.
 5. Neue Accounts, zwei Administratoren, 2FA, minimale CI-Rechte und Kostenwarnungen einrichten.
 6. D1/R2/DO-Jurisdiktion, Worker, Domain, TLS, Rate Limit, Cron und Observability prüfen.
-7. Neue PIN-, Bootstrap-, VAPID- und CI-Secrets interaktiv setzen.
+7. Neue Installations-, Reset-Signier-, VAPID- und CI-Secrets über den Bootstrap erzeugen; die
+   Administrator-PIN ausschließlich im Browser festlegen.
 8. Rollen-Smoke-Test für Administration, Kasse, Flight Line, FIDS und öffentlichen Ticketstatus
    durchführen.
 9. Domain umschalten, mindestens 30 Minuten beobachten und alten Stand nur lesend bereithalten.

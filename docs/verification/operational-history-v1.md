@@ -17,7 +17,7 @@ Ticket-Umlauf-Zuordnungen bleiben sichtbar, damit Storno sowie historische Umbuc
 Historie nicht überschreiben. Neue Korrekturen erfolgen durch Storno und Neuverkauf. Filterwerte
 werden ausschließlich als gebundene D1-Parameter verarbeitet.
 
-Zugriff erhalten Administration, Flight-Line-Leitung und Flugleitung. Kassen-Geräte werden mit
+Zugriff erhalten Administration, Flight Line und Flight Director. Kassen-Geräte werden mit
 `403` abgewiesen. Umgekehrte Zeiträume, unbekannte Statuswerte und andere ungültige Filter werden
 mit `400` abgewiesen.
 

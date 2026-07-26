@@ -72,4 +72,4 @@ Benutzer gepflegt wird. Die Disposition muss gemischte Kapazitäten bei Vorschla
 berücksichtigen. Migrationen müssen bestehende Daten weiterhin lesen können; veraltete manuelle
 Referenzwerte dürfen keine operative Entscheidung mehr treiben.
 
-Die UI-Freigabe ist in `docs/ui/v1-simplified-operations.md` dokumentiert.
+Die fortgeltende UI-Freigabe ist im aktuellen `docs/ui/v1.10.0-release-concept.md` konsolidiert.

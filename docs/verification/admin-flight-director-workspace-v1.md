@@ -1,6 +1,6 @@
 # Abnahmenachweis: Admin- und Flight-Director-Oberfläche
 
-- Konzept: `docs/ui/admin-flight-director-workspace-v1.md`
+- Aktuelles Konzept: `docs/ui/v1.10.0-release-concept.md`
 - Entscheidung: `docs/adr/0026-veranstaltungsbezogene-administration-und-stammdatenvorlagen.md`
 - Anforderungen: F-ADM-060, F-ADM-080, Q-UX-020 und F-SLT-040
 - Testdaten: ausschließlich synthetisch

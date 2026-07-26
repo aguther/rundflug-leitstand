@@ -39,3 +39,13 @@ export async function allowLoginAttempt(
   });
   return result.success;
 }
+
+export async function allowSetupAttempt(
+  limiter: TicketAttemptRateLimiter,
+  request: Request,
+): Promise<boolean> {
+  const result = await limiter.limit({
+    key: `installation-setup:${await actorHash(request)}`,
+  });
+  return result.success;
+}

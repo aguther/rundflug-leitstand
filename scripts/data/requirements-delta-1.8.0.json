@@ -1,0 +1,114 @@
+{
+  "version": "1.10.0",
+  "sourceRelease": "1.8.0",
+  "requirements": [
+    {
+      "source": "1.8.0",
+      "id": "V18-BSY-010",
+      "section": "Fortgeltendes Delta 1.8.0",
+      "requirement": "Der auslösende asynchrone Button zeigt den größenstabilen zugänglichen Busy Indicator; andere gesperrte Buttons behalten ihren Inhalt.",
+      "priority": "MUSS",
+      "stage": "V1",
+      "status": "implemented",
+      "module": "apps/web/src/design-system/components und asynchrone Anwendungsaktionen",
+      "tests": "components.test.ts sowie UI-Quelltests und Browserabnahme",
+      "traceStatus": "umgesetzt"
+    },
+    {
+      "source": "1.8.0",
+      "id": "V18-TIM-010",
+      "section": "Fortgeltendes Delta 1.8.0",
+      "requirement": "Kasse, Flight Line, FIDS und öffentliche Statusseiten zeigen prognostizierte Zeitfenster als absolute Veranstaltungszeiten.",
+      "priority": "MUSS",
+      "stage": "V1",
+      "status": "implemented",
+      "module": "apps/web/src/time-window.ts sowie Kasse Flight Line FIDS und öffentliche Statusseiten",
+      "tests": "time-window.test.ts Contracttests und Browserabnahme",
+      "traceStatus": "umgesetzt"
+    },
+    {
+      "source": "1.8.0",
+      "id": "V18-CAS-010",
+      "section": "Fortgeltendes Delta 1.8.0",
+      "requirement": "Kassenliste und Detail entsprechen dem freigegebenen Delta mit Fluggruppenzeilen, Phasensymbolen, GoToGate-Aktiv, absolutem Fenster und Ticket drucken.",
+      "priority": "MUSS",
+      "stage": "V1",
+      "status": "implemented",
+      "module": "apps/web/src/cashier-view.tsx und cashier-v12.css",
+      "tests": "cashier-v1-6.test.ts cashier-v12.test.ts und Browserabnahme",
+      "traceStatus": "umgesetzt"
+    },
+    {
+      "source": "1.8.0",
+      "id": "V18-FLT-010",
+      "section": "Fortgeltendes Delta 1.8.0",
+      "requirement": "Verkaufte Tickets in Flight Line verwenden die verbindliche dreizehnspaltige Reihenfolge mit getrennten G- und F-Kennungen.",
+      "priority": "MUSS",
+      "stage": "V1",
+      "status": "implemented",
+      "module": "apps/web/src/flight-line-supervisor.tsx und flight-line-v12.css",
+      "tests": "flight-line-sort.test.ts flight-line-supervisor-ui.test.ts und Browserabnahme",
+      "traceStatus": "umgesetzt"
+    },
+    {
+      "source": "1.8.0",
+      "id": "V18-GRP-010",
+      "section": "Fortgeltendes Delta 1.8.0",
+      "requirement": "Eine Buchungsgruppe besitzt genau einen öffentlichen Gruppen-QR-Code und einen aggregierten Status für alle Teilflüge.",
+      "priority": "MUSS",
+      "stage": "V1",
+      "status": "implemented",
+      "module": "apps/worker/src/index.ts apps/web/src/group-status-view.tsx und cashier-view.tsx",
+      "tests": "Contract- Worker- und UI-Tests sowie Splitgruppenabnahme",
+      "traceStatus": "umgesetzt"
+    },
+    {
+      "source": "1.8.0",
+      "id": "V18-API-010",
+      "section": "Fortgeltendes Delta 1.8.0",
+      "requirement": "Verträge liefern ISO-Zeitfenster und Zeitzone; Gruppenroute und Legacy-Ticketroute bleiben parallel verfügbar.",
+      "priority": "MUSS",
+      "stage": "V1",
+      "status": "implemented",
+      "module": "packages/contracts/src/index.ts apps/worker/src/index.ts und apps/web/src/api.ts",
+      "tests": "Contract- und API-Tests",
+      "traceStatus": "umgesetzt"
+    },
+    {
+      "source": "1.8.0",
+      "id": "V18-DAT-010",
+      "section": "Fortgeltendes Delta 1.8.0",
+      "requirement": "Migration 0042 speichert Gruppencode und Push-Zuordnung geschützt, füllt Bestände kompatibel und hält Codes aus Audit und Outbox.",
+      "priority": "MUSS",
+      "stage": "V1",
+      "status": "implemented",
+      "module": "apps/worker/migrations/0042_group_status_codes_and_push.sql event-coordinator.ts und web-push.ts",
+      "tests": "Migrations- Push- und Geheimhaltungstests",
+      "traceStatus": "umgesetzt"
+    },
+    {
+      "source": "1.8.0",
+      "id": "V18-OPS-010",
+      "section": "Fortgeltendes Delta 1.8.0",
+      "requirement": "ADR und Migrationsnotiz dokumentieren Rückwärtskompatibilität und Wiederherstellung.",
+      "priority": "MUSS",
+      "stage": "V1",
+      "status": "implemented",
+      "module": "docs/adr/0023-oeffentlicher-gruppencode.md und apps/worker/migrations/README.md",
+      "tests": "Requirements-Verifikation und Diffprüfung",
+      "traceStatus": "umgesetzt"
+    },
+    {
+      "source": "1.8.0",
+      "id": "V18-QA-010",
+      "section": "Fortgeltendes Delta 1.8.0",
+      "requirement": "Automatisierte und visuelle Abnahme deckt Busy, Zeitfenster, Tabellen, Gruppendruck, Splitstatus, Push, Legacy und Geheimhaltung ab.",
+      "priority": "MUSS",
+      "stage": "V1",
+      "status": "implemented",
+      "module": "Workspace-Prüfskripte und docs/ui/v1.10.0-release-concept.md",
+      "tests": "Vollständiger Check und Browserabnahme",
+      "traceStatus": "umgesetzt"
+    }
+  ]
+}

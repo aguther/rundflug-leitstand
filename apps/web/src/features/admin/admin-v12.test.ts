@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import appSource from "../../admin-view.tsx?raw";
-import mainSource from "../../main.tsx?raw";
+import featureRouterSource from "../../FeatureRouter.tsx?raw";
 
 const stylesSource = readFileSync(new URL("./admin-v12.css", import.meta.url), "utf8");
 const legacyStylesSource = readFileSync(new URL("../../styles.css", import.meta.url), "utf8");
@@ -12,10 +12,9 @@ describe("V1.2 compact administration", () => {
     expect(legacyStylesSource).not.toContain(".admin-shell > .app-header");
   });
 
-  it("loads the semantic administration layer after the legacy styles", () => {
-    expect(mainSource.indexOf('import "./styles.css"')).toBeLessThan(
-      mainSource.indexOf('import "./features/admin/admin-v12.css"'),
-    );
+  it("loads the semantic administration layer with the lazy administration route", () => {
+    expect(featureRouterSource).toContain('import("./admin-view")');
+    expect(appSource).toContain('import "./features/admin/admin-v12.css"');
     expect(stylesSource).toContain("var(--ui-surface)");
     expect(stylesSource).toContain("var(--ui-bg)");
   });

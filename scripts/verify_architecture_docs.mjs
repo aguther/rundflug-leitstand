@@ -1,4 +1,8 @@
-import { readFile } from "node:fs/promises";
+import { access, readdir, readFile } from "node:fs/promises";
+import { dirname, extname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 const documentPath = new URL(
   "../docs/architecture/domain-state-and-forecast-v1.md",
@@ -82,9 +86,10 @@ const licenseInventoryEvidence = [
   "T-080",
   "@block65/custom-error",
   "RFC 8291",
-  "nativen Web-Crypto-API",
-  "27 unter MIT und 6 unter ISC",
-  "Nutzungsrecht, Lizenztext und Übergabeprotokoll",
+  "native Web-Crypto-API",
+  "externe Produktionspakete",
+  "docs:licenses:check",
+  "OQ-13",
 ];
 const missingLicenseInventory = licenseInventoryEvidence.filter(
   (entry) => !licenseInventory.includes(entry),
@@ -119,6 +124,101 @@ if (missingEnvironmentDecision.length > 0) {
   );
 }
 
+async function markdownFiles(directory) {
+  const entries = await readdir(directory, { withFileTypes: true });
+  const result = [];
+  for (const entry of entries) {
+    const path = resolve(directory, entry.name);
+    if (entry.isDirectory()) result.push(...(await markdownFiles(path)));
+    else if (extname(entry.name) === ".md") result.push(path);
+  }
+  return result;
+}
+
+const currentDocuments = [
+  resolve(root, "README.md"),
+  resolve(root, "AGENTS.md"),
+  ...(await markdownFiles(resolve(root, "docs"))),
+];
+const missingLinks = [];
+for (const document of currentDocuments) {
+  const markdown = await readFile(document, "utf8");
+  for (const match of markdown.matchAll(/!?\[[^\]]*]\(([^)]+)\)/g)) {
+    const target = match[1].trim().replace(/^<|>$/g, "").split("#", 1)[0];
+    if (!target || /^(?:https?:|mailto:)/i.test(target)) continue;
+    const path = target.startsWith("/")
+      ? resolve(root, target.slice(1))
+      : resolve(dirname(document), decodeURIComponent(target));
+    try {
+      await access(path);
+    } catch {
+      missingLinks.push(`${document.slice(root.length + 1)} -> ${target}`);
+    }
+  }
+}
+if (missingLinks.length > 0) {
+  throw new Error(`Lokale Dokumentationslinks fehlen: ${missingLinks.join(", ")}`);
+}
+
+const currentRoleFiles = await markdownFiles(resolve(root, "docs/roles"));
+const roleMarkdown = (
+  await Promise.all(currentRoleFiles.map((path) => readFile(path, "utf8")))
+).join("\n");
+for (const forbidden of ["Flight Line Assist", "Flight Line Supervisor", "BOOTSTRAP_TOKEN"]) {
+  if (roleMarkdown.includes(forbidden)) {
+    throw new Error(`Rollenunterlagen enthalten veralteten oder sensitiven Begriff: ${forbidden}`);
+  }
+}
+const roleImages = (await readdir(resolve(root, "docs/roles/images"))).filter((name) =>
+  /\.(?:png|jpe?g|webp)$/i.test(name),
+);
+const orphanRoleImages = roleImages.filter((name) => !roleMarkdown.includes(`images/${name}`));
+if (orphanRoleImages.length > 0) {
+  throw new Error(`Verwaiste aktuelle Rollenbilder: ${orphanRoleImages.join(", ")}`);
+}
+
+const requirementsReadme = await readFile(resolve(root, "docs/requirements/README.md"), "utf8");
+if (!requirementsReadme.includes("einzige aktuelle Releasefassung")) {
+  throw new Error("Der aktuelle kumulative Releasekatalog ist nicht eindeutig ausgewiesen.");
+}
+
+const requirementsFiles = await readdir(resolve(root, "docs/requirements"));
+const allowedVersionedRequirements = new Set([
+  "requirements-v1.4.md",
+  "requirements-v1.4.yaml",
+  "requirements-v1.10.0.md",
+  "requirements-v1.10.0.yaml",
+  "traceability-v1.10.0.csv",
+]);
+const competingReleases = requirementsFiles.filter(
+  (name) =>
+    /^(?:requirements|traceability)-v\d/.test(name) && !allowedVersionedRequirements.has(name),
+);
+if (competingReleases.length > 0) {
+  throw new Error(`Konkurrierende Releasefassungen vorhanden: ${competingReleases.join(", ")}`);
+}
+
+const currentTerminologyFiles = [
+  resolve(root, "README.md"),
+  resolve(root, "AGENTS.md"),
+  ...(await markdownFiles(resolve(root, "docs/architecture"))),
+  ...(await markdownFiles(resolve(root, "docs/operations"))),
+  ...(await markdownFiles(resolve(root, "docs/roles"))),
+  resolve(root, "docs/ui/v1.10.0-release-concept.md"),
+  resolve(root, "docs/requirements/README.md"),
+  resolve(root, "docs/requirements/requirements-summary.md"),
+  resolve(root, "docs/requirements/requirements-v1.10.0.md"),
+  resolve(root, "docs/requirements/open-questions.md"),
+];
+const currentTerminology = (
+  await Promise.all(currentTerminologyFiles.map((path) => readFile(path, "utf8")))
+).join("\n");
+for (const forbidden of ["Flight Line Assist", "Flight Line Supervisor"]) {
+  if (currentTerminology.includes(forbidden)) {
+    throw new Error(`Aktuelle Dokumentation enthält veralteten Begriff: ${forbidden}`);
+  }
+}
+
 console.log(
-  "OK: Q-WAR-010/020/040/050, Q-DSG-040, T-070 und T-080 Betriebs-, Fachmodell-, Datenschutz-, Umgebungs- und Lizenznachweise dokumentiert",
+  "OK: Architektur-, Datenschutz-, Umgebungs-, Lizenz-, Link-, Rollenbild- und Releasekonsistenz dokumentiert",
 );

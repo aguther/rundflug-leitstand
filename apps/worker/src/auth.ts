@@ -44,6 +44,12 @@ export function clearedSessionCookie(request: Request): string {
   return sessionCookie("", request, 0);
 }
 
+export async function sessionBrowserBindingHash(request: Request): Promise<string | null> {
+  const token = cookieValue(request, SESSION_COOKIE);
+  if (!token || token.length < 32 || token.length > 256) return null;
+  return sha256Hex(`reset-browser:${token}`);
+}
+
 export async function authorizeSession(env: Env, request: Request): Promise<SessionActor | null> {
   const token = cookieValue(request, SESSION_COOKIE);
   if (!token || token.length < 32 || token.length > 256) return null;
