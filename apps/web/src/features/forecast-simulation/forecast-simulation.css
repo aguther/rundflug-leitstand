@@ -837,6 +837,10 @@
   width: min(760px, 100%);
 }
 
+.forecast-simulator .ds-sidepanel:has(.sim-demand-profile-toolbar) {
+  width: min(536px, 100%);
+}
+
 .forecast-simulator .ds-sidepanel[data-open="false"] {
   visibility: hidden;
 }
@@ -1008,6 +1012,239 @@
   align-items: center;
   padding: 12px 14px;
   border-bottom: 1px solid var(--ui-border);
+}
+
+.sim-schedule-editor {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.sim-schedule-row {
+  display: grid;
+  grid-template-columns: 120px repeat(2, minmax(0, 1fr));
+  align-items: end;
+  gap: 12px;
+}
+
+.sim-schedule-row > strong {
+  align-self: center;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.sim-time-field {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+  color: var(--ui-muted);
+  font-size: 10px;
+}
+
+.sim-time-control {
+  min-height: 36px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 34px;
+  align-items: center;
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-md);
+  background: var(--ui-control);
+}
+
+.sim-time-control input {
+  min-width: 0;
+  height: 34px;
+  padding: 0 9px;
+  border: 0;
+  outline: 0;
+  color: var(--ui-text);
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sim-time-control input::-webkit-calendar-picker-indicator {
+  display: none;
+}
+
+.sim-time-control svg {
+  width: 15px;
+  justify-self: center;
+  color: var(--ui-muted);
+  pointer-events: none;
+}
+
+.sim-schedule-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 14px;
+  border-top: 1px solid var(--ui-border);
+  color: var(--ui-muted);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sim-schedule-summary strong {
+  color: var(--ui-text);
+}
+
+.sim-demand-profile-toolbar {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.7fr) minmax(0, 1fr);
+  align-items: end;
+  gap: 18px;
+  padding: 14px 14px 8px;
+}
+
+.sim-demand-profile-toolbar label {
+  display: grid;
+  gap: 5px;
+  color: var(--ui-muted);
+  font-size: 10px;
+}
+
+.sim-demand-profile-toolbar select {
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-md);
+  color: var(--ui-text);
+  background: var(--ui-control);
+  font-size: 12px;
+}
+
+.sim-demand-profile-toolbar p {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 5px 8px;
+  margin: 0 0 9px;
+  color: var(--ui-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sim-demand-chart {
+  width: calc(100% - 28px);
+  height: auto;
+  display: block;
+  margin: 0 14px 8px;
+}
+
+.sim-demand-chart text {
+  fill: var(--ui-muted);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sim-demand-chart .sim-demand-chart-unit,
+.sim-demand-chart .sim-demand-chart-operation-label {
+  fill: var(--ui-text);
+}
+
+.sim-demand-chart-grid {
+  stroke: var(--ui-border);
+  stroke-width: 1;
+}
+
+.sim-demand-chart-area {
+  fill: color-mix(in srgb, var(--ui-accent) 17%, transparent);
+}
+
+.sim-demand-chart-line {
+  fill: none;
+  stroke: var(--ui-accent);
+  stroke-linecap: square;
+  stroke-linejoin: miter;
+  stroke-width: 2;
+}
+
+.sim-demand-chart-operation {
+  stroke: var(--ui-text);
+  stroke-dasharray: 4 4;
+  stroke-width: 1;
+}
+
+.sim-demand-window-table {
+  margin: 0 14px;
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-md);
+}
+
+.sim-demand-window-head,
+.sim-demand-window-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(130px, 1.15fr) 36px;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 9px;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.sim-demand-window-head {
+  color: var(--ui-muted);
+  background: var(--ui-surface-subtle);
+  font-size: 10px;
+}
+
+.sim-demand-window-row:last-child {
+  border-bottom: 0;
+}
+
+.sim-demand-window-row > input,
+.sim-demand-window-row .sim-number-field {
+  width: 100%;
+  min-width: 0;
+  min-height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-sm);
+  color: var(--ui-text);
+  background: var(--ui-control);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sim-demand-window-row > button {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--ui-muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.sim-demand-window-row > button:hover {
+  border-color: var(--ui-border);
+  color: var(--ui-danger);
+  background: var(--ui-danger-soft);
+}
+
+.sim-demand-window-row > button svg {
+  width: 15px;
+}
+
+.sim-demand-window-empty {
+  margin: 0;
+  padding: 14px;
+  color: var(--ui-muted);
+  font-size: 11px;
+}
+
+.sim-add-demand-window.ds-button {
+  margin: 12px 14px 14px;
+}
+
+.sim-add-demand-window svg {
+  width: 15px;
 }
 
 .sim-experiment-warning {

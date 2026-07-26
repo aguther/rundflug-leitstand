@@ -77,6 +77,10 @@ function result(input: {
 }): SimulationResult {
   return {
     config: simulationConfigForPreset("NORMAL"),
+    runWindow: {
+      startAt: at(0),
+      endAt: at(600),
+    },
     aircraft: [
       {
         id: "aircraft-1",
