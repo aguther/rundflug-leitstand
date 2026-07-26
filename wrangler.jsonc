@@ -29,6 +29,15 @@
     "DATA_JURISDICTION": "eu",
     "PUSH_RETENTION_DAYS": "7"
   },
+  "secrets": {
+    "required": [
+      "INSTALLATION_RECOVERY_CODE",
+      "RESET_SETUP_SIGNING_KEY",
+      "VAPID_PUBLIC_KEY",
+      "VAPID_PRIVATE_KEY",
+      "VAPID_SUBJECT"
+    ]
+  },
   "d1_databases": [
     {
       "binding": "DB",

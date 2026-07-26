@@ -13,7 +13,7 @@ Dem neuen Betreiber werden mindestens übergeben:
 - `package.json`, Lockfile und dokumentierte Node-/npm-Versionen,
 - sämtliche TypeScript-Quellen, Tests, SQL-Migrationen und synthetischen Seeds,
 - Anforderungen, ADRs, Traceability, Architektur-, Betriebs- und Wiederherstellungsdokumentation,
-- `wrangler.jsonc` ohne Secrets sowie die Liste aller benötigten Bindings und Secret-Namen,
+- `wrangler.jsonc` ohne Secret-Werte sowie die Liste aller benötigten Bindings und Secret-Namen,
 - letzter erfolgreicher `npm run check`-Nachweis,
 - letzter portabler D1-/R2-Backupnachweis samt SHA-256-Prüfsumme,
 - DNS-/Domainzuständigkeit, Cloudflare-Accountrollen und CI-/GitHub-Buildkonfiguration,
