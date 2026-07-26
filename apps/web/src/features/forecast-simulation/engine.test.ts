@@ -1,11 +1,18 @@
 import { describe, expect, it } from "vitest";
 
 import { runSimulation, sampleTriangular } from "./engine";
-import { simulationConfigForPreset } from "./model";
+import {
+  calculateDemandSummary,
+  demandForProfile,
+  salesDurationMinutes,
+  simulationConfigForPreset,
+} from "./model";
 
 function shortNormalConfig() {
   const config = simulationConfigForPreset("NORMAL");
-  config.endAt = "2026-07-22T11:00:00.000Z";
+  config.schedule.salesEndAt = "2026-07-22T10:00:00.000Z";
+  config.schedule.operationsEndAt = "2026-07-22T11:00:00.000Z";
+  config.realityModel.demand = demandForProfile("TWO_WAVES", 180);
   return config;
 }
 
@@ -34,78 +41,78 @@ describe("local forecast simulation", () => {
     );
     expect(baseline).toEqual({
       NORMAL: {
-        generated: 32,
-        completed: 25,
+        generated: 40,
+        completed: 28,
         windowCoverage: 0,
         boardingMedian: 0.5,
-        boardingP90: 27.3,
+        boardingP90: 23.1,
         averageWindowWidth: 0,
         maximumReactionSeconds: 29.648,
         uncertainCountdownViolations: 0,
         precall: {
           eligibleGroups: 28,
-          precalledGroups: 27,
-          coveragePercent: 96.43,
-          medianGateWaitMinutes: 16.5,
-          p90GateWaitMinutes: 28.4,
+          precalledGroups: 28,
+          coveragePercent: 100,
+          medianGateWaitMinutes: 18,
+          p90GateWaitMinutes: 34.75,
           sameTickCount: 5,
           uncertainPrecallCount: 0,
         },
       },
       PEAK_LOAD: {
-        generated: 68,
-        completed: 25,
+        generated: 78,
+        completed: 28,
         windowCoverage: 0,
         boardingMedian: 0.5,
-        boardingP90: 23.5,
+        boardingP90: 23.1,
         averageWindowWidth: 0,
         maximumReactionSeconds: 29.648,
         uncertainCountdownViolations: 0,
         precall: {
           eligibleGroups: 28,
-          precalledGroups: 26,
-          coveragePercent: 92.86,
-          medianGateWaitMinutes: 19,
-          p90GateWaitMinutes: 33.5,
-          sameTickCount: 2,
+          precalledGroups: 28,
+          coveragePercent: 100,
+          medianGateWaitMinutes: 18,
+          p90GateWaitMinutes: 34.75,
+          sameTickCount: 5,
           uncertainPrecallCount: 0,
         },
       },
       AIRCRAFT_FAILURE: {
-        generated: 32,
-        completed: 20,
+        generated: 40,
+        completed: 21,
         windowCoverage: 0,
         boardingMedian: 0.5,
-        boardingP90: 15.3,
+        boardingP90: 15.5,
         averageWindowWidth: 0,
         maximumReactionSeconds: 29.648,
         uncertainCountdownViolations: 0,
         precall: {
           eligibleGroups: 21,
-          precalledGroups: 20,
-          coveragePercent: 95.24,
-          medianGateWaitMinutes: 17.5,
-          p90GateWaitMinutes: 26.4,
-          sameTickCount: 3,
+          precalledGroups: 21,
+          coveragePercent: 100,
+          medianGateWaitMinutes: 17,
+          p90GateWaitMinutes: 29.5,
+          sameTickCount: 4,
           uncertainPrecallCount: 0,
         },
       },
       OPERATION_INTERRUPTION: {
-        generated: 32,
-        completed: 26,
+        generated: 40,
+        completed: 27,
         windowCoverage: 0,
         boardingMedian: 0.5,
-        boardingP90: 28.7,
-        averageWindowWidth: 0.4,
+        boardingP90: 27.5,
+        averageWindowWidth: 0,
         maximumReactionSeconds: 29.648,
         uncertainCountdownViolations: 0,
         precall: {
-          eligibleGroups: 28,
+          eligibleGroups: 27,
           precalledGroups: 27,
-          coveragePercent: 96.43,
-          medianGateWaitMinutes: 16.5,
-          p90GateWaitMinutes: 31.5,
-          sameTickCount: 6,
+          coveragePercent: 100,
+          medianGateWaitMinutes: 17,
+          p90GateWaitMinutes: 34.2,
+          sameTickCount: 8,
           uncertainPrecallCount: 0,
         },
       },
@@ -120,6 +127,89 @@ describe("local forecast simulation", () => {
     expect(JSON.stringify(second)).toBe(JSON.stringify(first));
     expect(first.rotations.length).toBeGreaterThan(0);
     expect(first.snapshots.length).toBeGreaterThan(0);
+  });
+
+  it("builds an opening queue without precalling or boarding before operations start", () => {
+    const config = simulationConfigForPreset("NORMAL");
+    const result = runSimulation(config);
+    const operationsStart = Date.parse(config.schedule.operationsStartAt);
+    const openingQueue = result.rotations.filter(
+      (rotation) => Date.parse(rotation.createdAt) < operationsStart,
+    );
+
+    expect(openingQueue.length).toBeGreaterThan(0);
+    expect(
+      result.events
+        .filter(
+          (event) => event.type === "FLIGHT_GROUP_PRECALLED" || event.type === "ROTATION_CALLED",
+        )
+        .every((event) => Date.parse(event.occurredAt) >= operationsStart),
+    ).toBe(true);
+    expect(
+      result.snapshots
+        .filter((snapshot) => Date.parse(snapshot.capturedAt) < operationsStart)
+        .every(
+          (snapshot) =>
+            snapshot.activeCapacity === 0 &&
+            snapshot.uncertaintyReasons.includes("RESOURCE_GROUP_INACTIVE"),
+        ),
+    ).toBe(true);
+  });
+
+  it("stops new rotations at operations end and completes already active rotations", () => {
+    const config = simulationConfigForPreset("NORMAL");
+    config.schedule.salesStartAt = "2026-07-22T07:59:00.000Z";
+    config.schedule.salesEndAt = "2026-07-22T08:00:00.000Z";
+    config.schedule.operationsStartAt = "2026-07-22T08:00:00.000Z";
+    config.schedule.operationsEndAt = "2026-07-22T08:01:00.000Z";
+    config.realityModel.demand = demandForProfile("UNIFORM", 1, 72_000);
+    config.realityModel.incidents.refueling.enabled = false;
+    config.realityModel.incidents.plannedPause.enabled = false;
+    config.realityModel.incidents.unplannedPause.enabled = false;
+    config.realityModel.incidents.technicalDefect.enabled = false;
+    const result = runSimulation(config);
+    const operationsEnd = Date.parse(config.schedule.operationsEndAt);
+    const called = result.rotations.filter((rotation) => rotation.calledAt);
+
+    expect(called).toHaveLength(3);
+    expect(called.every((rotation) => Date.parse(rotation.calledAt ?? "") < operationsEnd)).toBe(
+      true,
+    );
+    expect(called.every((rotation) => rotation.completedAt !== null)).toBe(true);
+    expect(Date.parse(result.runWindow.endAt)).toBeGreaterThan(operationsEnd);
+  });
+
+  it("creates no sales inside explicit zero-demand gaps", () => {
+    const config = shortNormalConfig();
+    config.realityModel.demand = {
+      profile: "CUSTOM",
+      windows: [
+        { startOffsetMinutes: 0, endOffsetMinutes: 30, personsPerHour: 240 },
+        { startOffsetMinutes: 90, endOffsetMinutes: 120, personsPerHour: 240 },
+      ],
+    };
+    const result = runSimulation(config);
+    const salesStart = Date.parse(config.schedule.salesStartAt);
+    const gapStart = salesStart + 30 * 60_000;
+    const gapEnd = salesStart + 90 * 60_000;
+
+    expect(result.rotations.length).toBeGreaterThan(0);
+    expect(
+      result.rotations.every((rotation) => {
+        const createdAt = Date.parse(rotation.createdAt);
+        return createdAt < gapStart || createdAt >= gapEnd;
+      }),
+    ).toBe(true);
+  });
+
+  it("keeps a fully demand-free profile empty", () => {
+    const config = shortNormalConfig();
+    config.realityModel.demand = { profile: "CUSTOM", windows: [] };
+    const result = runSimulation(config);
+
+    expect(result.rotations).toEqual([]);
+    expect(result.snapshots).toEqual([]);
+    expect(result.runWindow.endAt).toBe(config.schedule.operationsEndAt);
   });
 
   it("separates Admin plan values from the simulated real duration", () => {
@@ -220,8 +310,11 @@ describe("local forecast simulation", () => {
 
   it("records queue-sorted parallel GO TO GATE events in the same forecast tick", () => {
     const config = simulationConfigForPreset("NORMAL");
-    config.endAt = "2026-07-22T08:01:00.000Z";
-    config.realityModel.demandPersonsPerHour = 7_200;
+    config.schedule.salesStartAt = "2026-07-22T07:59:00.000Z";
+    config.schedule.salesEndAt = "2026-07-22T08:00:00.000Z";
+    config.schedule.operationsStartAt = "2026-07-22T08:00:00.000Z";
+    config.schedule.operationsEndAt = "2026-07-22T08:01:00.000Z";
+    config.realityModel.demand = demandForProfile("UNIFORM", 1, 72_000);
     config.realityModel.incidents.refueling.enabled = false;
     config.realityModel.incidents.plannedPause.enabled = false;
     config.realityModel.incidents.unplannedPause.enabled = false;
@@ -335,8 +428,18 @@ describe("local forecast simulation", () => {
     const interruption = runSimulation(simulationConfigForPreset("OPERATION_INTERRUPTION"));
 
     expect(normal.config.adminParameters.aircraftCount).toBe(3);
-    expect(normal.config.realityModel.demandPersonsPerHour).toBe(18);
-    expect(peak.config.realityModel.demandPersonsPerHour).toBe(36);
+    expect(
+      calculateDemandSummary(
+        normal.config.realityModel.demand,
+        salesDurationMinutes(normal.config.schedule),
+      ).averagePersonsPerHour,
+    ).toBe(18);
+    expect(
+      calculateDemandSummary(
+        peak.config.realityModel.demand,
+        salesDurationMinutes(peak.config.schedule),
+      ).averagePersonsPerHour,
+    ).toBe(36);
     expect(outage.events.some((event) => event.type === "AIRCRAFT_DAY_OUT")).toBe(true);
     const interruptedAt = interruption.events.find((event) => event.type === "EVENT_INTERRUPTED");
     const resumedAt = interruption.events.find((event) => event.type === "EVENT_RESUMED");

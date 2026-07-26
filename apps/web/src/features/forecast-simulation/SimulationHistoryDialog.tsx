@@ -480,7 +480,10 @@ export function SimulationHistoryDialog({
     const until = block.end ? Date.parse(block.end.occurredAt) : visibleAt;
     return total + Math.max(0, (until - Date.parse(block.start.occurredAt)) / MINUTE_MS);
   }, 0);
-  const elapsedMinutes = Math.max(1, (visibleAt - Date.parse(result.config.startAt)) / MINUTE_MS);
+  const elapsedMinutes = Math.max(
+    1,
+    (visibleAt - Date.parse(result.runWindow.startAt)) / MINUTE_MS,
+  );
   const utilization = Math.min(100, (operatingMinutes / elapsedMinutes) * 100);
 
   const openAircraft = (aircraftId: string) => {
@@ -757,7 +760,7 @@ export function SimulationHistoryDialog({
                   endMs={visibleAt}
                   onOpenGroup={openGroup}
                   rotations={aircraftRotations}
-                  startMs={Date.parse(result.config.startAt)}
+                  startMs={Date.parse(result.runWindow.startAt)}
                 />
                 <div className="sim-aircraft-history-tables">
                   <section className="sim-history-section">

@@ -67,8 +67,8 @@ export function ForecastTimeline({
   onSelectRotation: (rotationId: string) => void;
   onShowHistory: () => void;
 }) {
-  const simulationStart = Date.parse(result.config.startAt);
-  const simulationEnd = Date.parse(result.config.endAt);
+  const simulationStart = Date.parse(result.runWindow.startAt);
+  const simulationEnd = Date.parse(result.runWindow.endAt);
   const halfWindow = (WINDOW_MINUTES / 2) * MINUTE_MS;
   const windowStart = Math.max(
     simulationStart,

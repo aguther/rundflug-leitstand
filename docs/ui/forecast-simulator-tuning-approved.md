@@ -1,6 +1,6 @@
 # Prognose-Simulator – Admin-Parameter und Tuning-Labor
 
-Stand: 23. Juli 2026
+Stand: 26. Juli 2026
 Status: durch den Implementierungsauftrag des Auftraggebers freigegeben
 
 ## Ziel und Struktur
@@ -10,8 +10,9 @@ getrennte Register:
 
 1. `Betrieb` zeigt ausschließlich tatsächlich prognoserelevante Admin-Planwerte, Flottenparameter,
    Pilotenkapazität sowie die Voraufruf-Aktivierung für Veranstaltung und Ressourcengruppe.
-2. `Simulierte Realität` enthält Nachfrage, reale Dreiecksverteilungen und synthetische
-   Betriebsereignisse. Diese Werte verändern nicht verdeckt die Admin-Planwerte.
+2. `Simulierte Realität` enthält getrennte Verkaufs- und Betriebszeiten, das zeitfensterbasierte
+   Nachfrageprofil, reale Dreiecksverteilungen und synthetische Betriebsereignisse. Diese Werte
+   verändern nicht verdeckt die Admin-Planwerte.
 3. `Prognose-Labor` stellt unveränderliche Produktionswerte und lokal editierbare Kandidatenwerte
    nebeneinander. Jeder Kandidat kann einzeln oder vollständig zurückgesetzt werden.
 
@@ -44,5 +45,6 @@ D1-Werte werden aus Kompatibilitätsgründen beim Speichern unverändert weiterg
 - Light und Dark Mode verwenden ausschließlich bestehende Design-Tokens.
 - A/B-Fortschritt und Abbruch reagieren, ohne Wiedergabe oder Navigation zu blockieren.
 - CSV-Kalibrierung verändert nur `Simulierte Realität`.
-- Exportformat `rundflug-forecast-simulation/v4` enthält getrennte Admin-, Realitäts-,
-  Tuning- und Vergleichsdaten.
+- Exportformat `rundflug-forecast-simulation/v5` enthält zusätzlich Tageszeiten,
+  Nachfragefenster und das tatsächliche Laufzeitfenster sowie weiterhin getrennte Admin-,
+  Realitäts-, Tuning- und Vergleichsdaten.

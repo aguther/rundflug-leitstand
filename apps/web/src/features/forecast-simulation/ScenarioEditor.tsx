@@ -4,10 +4,22 @@ import {
   type ForecastTuningProfile,
   type PrecallTuningProfile,
 } from "@rundflug/domain";
-import { RotateCcw } from "lucide-react";
-import { useState } from "react";
+import { Clock3, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { type KeyboardEvent, useEffect, useState } from "react";
 import { Button, SidePanel } from "../../design-system/components";
-import type { SimulationConfig, TriangularDistribution } from "./model";
+import { eventLocalDateTimeToIso, formatEventLocalDateTime } from "../../event-time";
+import {
+  calculateDemandSummary,
+  demandForProfile,
+  rescaleDemandWindows,
+  SIMULATION_DEMAND_PROFILE_LABELS,
+  type SimulationConfig,
+  type SimulationDemand,
+  type SimulationDemandProfileId,
+  type SimulationDemandWindow,
+  salesDurationMinutes,
+  type TriangularDistribution,
+} from "./model";
 
 interface ScenarioEditorProps {
   open: boolean;
@@ -180,6 +192,206 @@ const PRECALL_FIELDS: readonly TuningField<keyof PrecallTuningProfile>[] = [
   },
 ];
 
+const MINUTE_MS = 60_000;
+
+function localTime(value: string, timeZone: string): string {
+  return formatEventLocalDateTime(value, timeZone).slice(11, 16);
+}
+
+function replaceTime(value: string, time: string, timeZone: string): string {
+  const localDate = formatEventLocalDateTime(value, timeZone).slice(0, 10);
+  return eventLocalDateTimeToIso(`${localDate}T${time}`, timeZone);
+}
+
+function timeAtDemandOffset(config: SimulationConfig, offsetMinutes: number): string {
+  return localTime(
+    new Date(Date.parse(config.schedule.salesStartAt) + offsetMinutes * MINUTE_MS).toISOString(),
+    config.schedule.timeZone,
+  );
+}
+
+function demandOffsetAtTime(config: SimulationConfig, time: string): number {
+  const localDate = formatEventLocalDateTime(
+    config.schedule.salesStartAt,
+    config.schedule.timeZone,
+  ).slice(0, 10);
+  return Math.round(
+    (Date.parse(eventLocalDateTimeToIso(`${localDate}T${time}`, config.schedule.timeZone)) -
+      Date.parse(config.schedule.salesStartAt)) /
+      MINUTE_MS,
+  );
+}
+
+function EditableTimeInput({
+  ariaLabel,
+  className,
+  onChange,
+  value,
+}: {
+  ariaLabel: string;
+  className?: string;
+  onChange: (value: string) => void;
+  value: string;
+}) {
+  const [draft, setDraft] = useState(value);
+  useEffect(() => setDraft(value), [value]);
+
+  const commit = () => {
+    if (/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(draft)) {
+      onChange(draft);
+    } else {
+      setDraft(value);
+    }
+  };
+  const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== "Enter") return;
+    commit();
+    event.currentTarget.blur();
+  };
+
+  return (
+    <input
+      aria-label={ariaLabel}
+      className={className}
+      inputMode="numeric"
+      maxLength={5}
+      onBlur={commit}
+      onChange={(event) => setDraft(event.currentTarget.value)}
+      onKeyDown={handleKeyDown}
+      pattern="(?:[01]\d|2[0-3]):[0-5]\d"
+      placeholder="HH:MM"
+      value={draft}
+    />
+  );
+}
+
+function TimeInput({
+  label,
+  value,
+  timeZone,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  timeZone: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="sim-time-field">
+      <span>{label}</span>
+      <span className="sim-time-control">
+        <EditableTimeInput
+          ariaLabel={`${label}, Uhrzeit`}
+          onChange={onChange}
+          value={localTime(value, timeZone)}
+        />
+        <Clock3 aria-hidden="true" />
+      </span>
+    </div>
+  );
+}
+
+function DemandProfileChart({ config }: { config: SimulationConfig }) {
+  const width = 680;
+  const height = 172;
+  const padding = { top: 25, right: 16, bottom: 29, left: 42 };
+  const salesMinutes = Math.max(1, salesDurationMinutes(config.schedule));
+  const windows = [...config.realityModel.demand.windows].sort(
+    (left, right) =>
+      left.startOffsetMinutes - right.startOffsetMinutes ||
+      left.endOffsetMinutes - right.endOffsetMinutes,
+  );
+  const maximumRate = Math.max(10, ...windows.map((window) => window.personsPerHour));
+  const chartWidth = width - padding.left - padding.right;
+  const chartHeight = height - padding.top - padding.bottom;
+  const xAt = (minutes: number) => padding.left + (minutes / salesMinutes) * chartWidth;
+  const yAt = (rate: number) => padding.top + chartHeight - (rate / maximumRate) * chartHeight;
+  const operationsOffset =
+    (Date.parse(config.schedule.operationsStartAt) - Date.parse(config.schedule.salesStartAt)) /
+    MINUTE_MS;
+  const showOperationsMarker = operationsOffset >= 0 && operationsOffset <= salesMinutes;
+  const ticks = [0, 0.25, 0.5, 0.75, 1];
+
+  return (
+    <svg
+      aria-label="Nachfrageprofil über den Verkaufstag"
+      className="sim-demand-chart"
+      role="img"
+      viewBox={`0 0 ${width} ${height}`}
+    >
+      <title>Nachfrageprofil mit markiertem Beginn des Flugbetriebs und Personen je Stunde</title>
+      <text className="sim-demand-chart-unit" x={padding.left} y={12}>
+        Pers./Std.
+      </text>
+      {[0, 0.5, 1].map((ratio) => {
+        const rate = maximumRate * ratio;
+        const y = yAt(rate);
+        return (
+          <g key={ratio}>
+            <line
+              className="sim-demand-chart-grid"
+              x1={padding.left}
+              x2={width - padding.right}
+              y1={y}
+              y2={y}
+            />
+            <text textAnchor="end" x={padding.left - 7} y={y + 4}>
+              {Math.round(rate)}
+            </text>
+          </g>
+        );
+      })}
+      {windows.map((window) => {
+        const x = xAt(window.startOffsetMinutes);
+        const endX = xAt(window.endOffsetMinutes);
+        const y = yAt(window.personsPerHour);
+        return (
+          <g key={`${window.startOffsetMinutes}-${window.endOffsetMinutes}`}>
+            <rect
+              className="sim-demand-chart-area"
+              height={padding.top + chartHeight - y}
+              width={Math.max(0, endX - x)}
+              x={x}
+              y={y}
+            />
+            <path
+              className="sim-demand-chart-line"
+              d={`M ${x} ${padding.top + chartHeight} L ${x} ${y} L ${endX} ${y} L ${endX} ${padding.top + chartHeight}`}
+            />
+          </g>
+        );
+      })}
+      {showOperationsMarker ? (
+        <g>
+          <line
+            className="sim-demand-chart-operation"
+            x1={xAt(operationsOffset)}
+            x2={xAt(operationsOffset)}
+            y1={padding.top - 4}
+            y2={padding.top + chartHeight}
+          />
+          <text className="sim-demand-chart-operation-label" x={xAt(operationsOffset) + 5} y={21}>
+            Flugbetrieb startet
+          </text>
+        </g>
+      ) : null}
+      {ticks.map((ratio) => {
+        const offset = Math.round(salesMinutes * ratio);
+        return (
+          <text
+            key={ratio}
+            textAnchor={ratio === 0 ? "start" : ratio === 1 ? "end" : "middle"}
+            x={xAt(offset)}
+            y={height - 7}
+          >
+            {timeAtDemandOffset(config, offset)}
+          </text>
+        );
+      })}
+    </svg>
+  );
+}
+
 function NumberInput({
   label,
   value,
@@ -294,6 +506,85 @@ export function ScenarioEditor({
     updateReality({
       incidents: { ...config.realityModel.incidents, [key]: value },
     });
+  const updateScheduleTime = (
+    key: keyof Omit<SimulationConfig["schedule"], "timeZone">,
+    time: string,
+  ) => {
+    const previousSalesMinutes = salesDurationMinutes(config.schedule);
+    const nextSchedule = {
+      ...config.schedule,
+      [key]: replaceTime(config.schedule[key], time, config.schedule.timeZone),
+    };
+    const nextSalesMinutes = salesDurationMinutes(nextSchedule);
+    const demand =
+      (key === "salesStartAt" || key === "salesEndAt") &&
+      previousSalesMinutes > 0 &&
+      nextSalesMinutes > 0
+        ? rescaleDemandWindows(config.realityModel.demand, previousSalesMinutes, nextSalesMinutes)
+        : config.realityModel.demand;
+    onChange({
+      ...config,
+      schedule: nextSchedule,
+      realityModel: { ...config.realityModel, demand },
+    });
+  };
+  const updateDemand = (demand: SimulationDemand) => updateReality({ demand });
+  const applyDemandProfile = (profile: SimulationDemandProfileId) => {
+    if (profile === "CUSTOM") return;
+    const salesMinutes = salesDurationMinutes(config.schedule);
+    const summary = calculateDemandSummary(config.realityModel.demand, salesMinutes);
+    updateDemand(demandForProfile(profile, salesMinutes, summary.averagePersonsPerHour));
+  };
+  const updateDemandWindow = (index: number, value: SimulationDemandWindow) => {
+    const windows = config.realityModel.demand.windows.map((window, candidateIndex) =>
+      candidateIndex === index ? value : window,
+    );
+    updateDemand({ profile: "CUSTOM", windows });
+  };
+  const removeDemandWindow = (index: number) => {
+    updateDemand({
+      profile: "CUSTOM",
+      windows: config.realityModel.demand.windows.filter(
+        (_window, candidateIndex) => candidateIndex !== index,
+      ),
+    });
+  };
+  const addDemandWindow = () => {
+    const salesMinutes = Math.max(1, Math.round(salesDurationMinutes(config.schedule)));
+    const windows = config.realityModel.demand.windows;
+    if (windows.length === 0) {
+      updateDemand({
+        profile: "CUSTOM",
+        windows: [{ startOffsetMinutes: 0, endOffsetMinutes: salesMinutes, personsPerHour: 18 }],
+      });
+      return;
+    }
+    let longestIndex = 0;
+    for (let index = 1; index < windows.length; index += 1) {
+      const current = windows[index];
+      const longest = windows[longestIndex];
+      if (
+        current &&
+        longest &&
+        current.endOffsetMinutes - current.startOffsetMinutes >
+          longest.endOffsetMinutes - longest.startOffsetMinutes
+      ) {
+        longestIndex = index;
+      }
+    }
+    const longest = windows[longestIndex];
+    if (!longest || longest.endOffsetMinutes - longest.startOffsetMinutes < 2) return;
+    const splitAt = Math.round((longest.startOffsetMinutes + longest.endOffsetMinutes) / 2);
+    const nextWindows = windows.flatMap((window, index) =>
+      index === longestIndex
+        ? [
+            { ...window, endOffsetMinutes: splitAt },
+            { ...window, startOffsetMinutes: splitAt },
+          ]
+        : [window],
+    );
+    updateDemand({ profile: "CUSTOM", windows: nextWindows });
+  };
   const updateForecast = (key: keyof ForecastTuningProfile, value: number) =>
     onChange({
       ...config,
@@ -310,6 +601,17 @@ export function ScenarioEditor({
         precall: { ...config.forecastTuning.precall, [key]: value },
       },
     });
+  const demandSummary = calculateDemandSummary(
+    config.realityModel.demand,
+    salesDurationMinutes(config.schedule),
+  );
+  const demandWindows = config.realityModel.demand.windows
+    .map((window, index) => ({ window, index }))
+    .sort(
+      (left, right) =>
+        left.window.startOffsetMinutes - right.window.startOffsetMinutes ||
+        left.window.endOffsetMinutes - right.window.endOffsetMinutes,
+    );
 
   return (
     <SidePanel
@@ -484,22 +786,170 @@ export function ScenarioEditor({
           <section className="sim-editor-card">
             <header className="sim-editor-section-heading">
               <div>
-                <h3>Nachfrage und Realzeiten</h3>
+                <h3>Tageszeiten</h3>
+                <p>Verkauf kann vor dem Flugbetrieb beginnen und eine Anfangsqueue aufbauen.</p>
+              </div>
+              <ParameterTag kind="Simulation" />
+            </header>
+            <div className="sim-schedule-editor">
+              <div className="sim-schedule-row">
+                <strong>Verkauf</strong>
+                <TimeInput
+                  label="Von"
+                  onChange={(time) => updateScheduleTime("salesStartAt", time)}
+                  timeZone={config.schedule.timeZone}
+                  value={config.schedule.salesStartAt}
+                />
+                <TimeInput
+                  label="Bis"
+                  onChange={(time) => updateScheduleTime("salesEndAt", time)}
+                  timeZone={config.schedule.timeZone}
+                  value={config.schedule.salesEndAt}
+                />
+              </div>
+              <div className="sim-schedule-row">
+                <strong>Flugbetrieb</strong>
+                <TimeInput
+                  label="Von"
+                  onChange={(time) => updateScheduleTime("operationsStartAt", time)}
+                  timeZone={config.schedule.timeZone}
+                  value={config.schedule.operationsStartAt}
+                />
+                <TimeInput
+                  label="Bis"
+                  onChange={(time) => updateScheduleTime("operationsEndAt", time)}
+                  timeZone={config.schedule.timeZone}
+                  value={config.schedule.operationsEndAt}
+                />
+              </div>
+            </div>
+            <p className="sim-schedule-summary">
+              <strong>Simulationslauf</strong>
+              {localTime(
+                new Date(
+                  Math.min(
+                    Date.parse(config.schedule.salesStartAt),
+                    Date.parse(config.schedule.operationsStartAt),
+                  ),
+                ).toISOString(),
+                config.schedule.timeZone,
+              )}
+              –{localTime(config.schedule.operationsEndAt, config.schedule.timeZone)}
+              <span aria-hidden="true">·</span>
+              {config.schedule.timeZone}
+            </p>
+          </section>
+
+          <section className="sim-editor-card">
+            <header className="sim-editor-section-heading">
+              <div>
+                <h3>Nachfrageprofil</h3>
+                <p>Verkäufe entstehen zufällig innerhalb der gewählten Zeitfenster.</p>
+              </div>
+              <ParameterTag kind="Simulation" />
+            </header>
+            <div className="sim-demand-profile-toolbar">
+              <label>
+                <span>Vorlage</span>
+                <select
+                  onChange={(event) =>
+                    applyDemandProfile(event.currentTarget.value as SimulationDemandProfileId)
+                  }
+                  value={config.realityModel.demand.profile}
+                >
+                  {(
+                    Object.keys(SIMULATION_DEMAND_PROFILE_LABELS) as SimulationDemandProfileId[]
+                  ).map((profile) => (
+                    <option disabled={profile === "CUSTOM"} key={profile} value={profile}>
+                      {SIMULATION_DEMAND_PROFILE_LABELS[profile]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <p>
+                Ø{" "}
+                {demandSummary.averagePersonsPerHour.toLocaleString("de-DE", {
+                  maximumFractionDigits: 1,
+                })}{" "}
+                Pers./Std.
+                <span aria-hidden="true">·</span>
+                Erwartungswert{" "}
+                {demandSummary.expectedPersons.toLocaleString("de-DE", {
+                  maximumFractionDigits: 1,
+                })}{" "}
+                Personen
+              </p>
+            </div>
+            <DemandProfileChart config={config} />
+            <div className="sim-demand-window-table">
+              <div className="sim-demand-window-head">
+                <span>Von</span>
+                <span>Bis</span>
+                <span>Personen / Std.</span>
+                <span />
+              </div>
+              {demandWindows.length === 0 ? (
+                <p className="sim-demand-window-empty">
+                  Keine Zeitfenster: In diesem Verkaufszeitraum entsteht keine Nachfrage.
+                </p>
+              ) : null}
+              {demandWindows.map(({ window, index }) => (
+                <div
+                  className="sim-demand-window-row"
+                  key={`${window.startOffsetMinutes}-${window.endOffsetMinutes}`}
+                >
+                  <EditableTimeInput
+                    ariaLabel={`Nachfragefenster ${index + 1}, von`}
+                    onChange={(value) =>
+                      updateDemandWindow(index, {
+                        ...window,
+                        startOffsetMinutes: demandOffsetAtTime(config, value),
+                      })
+                    }
+                    value={timeAtDemandOffset(config, window.startOffsetMinutes)}
+                  />
+                  <EditableTimeInput
+                    ariaLabel={`Nachfragefenster ${index + 1}, bis`}
+                    onChange={(value) =>
+                      updateDemandWindow(index, {
+                        ...window,
+                        endOffsetMinutes: demandOffsetAtTime(config, value),
+                      })
+                    }
+                    value={timeAtDemandOffset(config, window.endOffsetMinutes)}
+                  />
+                  <NumberInput
+                    label={`Nachfragefenster ${index + 1}, Personen je Stunde`}
+                    onChange={(personsPerHour) =>
+                      updateDemandWindow(index, { ...window, personsPerHour })
+                    }
+                    step={0.1}
+                    value={window.personsPerHour}
+                  />
+                  <button
+                    aria-label={`Nachfragefenster ${index + 1} entfernen`}
+                    onClick={() => removeDemandWindow(index)}
+                    title="Zeitfenster entfernen"
+                    type="button"
+                  >
+                    <Trash2 aria-hidden="true" />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <Button className="sim-add-demand-window" onClick={addDemandWindow}>
+              <Plus aria-hidden="true" /> Zeitfenster hinzufügen
+            </Button>
+          </section>
+
+          <section className="sim-editor-card">
+            <header className="sim-editor-section-heading">
+              <div>
+                <h3>Reale Phasendauern</h3>
                 <p>Diese Werte erzeugen die synthetische Realität, nicht die Prognosegrundlage.</p>
               </div>
               <ParameterTag kind="Simulation" />
             </header>
-            <div className="sim-demand-editor">
-              <span>Nachfrage</span>
-              <div className="sim-input-unit">
-                <NumberInput
-                  label="Nachfrage in Personen je Stunde"
-                  onChange={(demandPersonsPerHour) => updateReality({ demandPersonsPerHour })}
-                  value={config.realityModel.demandPersonsPerHour}
-                />
-                <small>Pers./Std.</small>
-              </div>
-            </div>
             <div className="sim-editor-table sim-editor-table--phases">
               <div className="sim-editor-table-head">
                 <span>Phase</span>

@@ -1,14 +1,15 @@
 # Prognose-Simulator – freigegebenes UI-Konzept
 
-Stand: 23. Juli 2026
+Stand: 26. Juli 2026
 
-Die folgenden sechs Desktop-Konzepte sind die verbindliche visuelle Spezifikation für den lokalen
+Die folgenden sieben Desktop-Konzepte sind die verbindliche visuelle Spezifikation für den lokalen
 Prognose-Simulator:
 
 - [Hauptansicht](forecast-simulator-main-approved.png)
 - [FIDS-Einstieg in der Hauptansicht](forecast-simulator-fids-entry-approved.png)
 - [Simuliertes Live-FIDS](forecast-simulator-fids-approved.png)
 - [Szenario-Konfiguration](forecast-simulator-scenario-approved.png)
+- [Tageszeiten und Nachfragewellen](forecast-simulator-demand-approved.png)
 - [Verlauf einer Fluggruppe](forecast-simulator-group-history-approved.png)
 - [Tagesverlauf eines Flugzeugs](forecast-simulator-aircraft-history-approved.png)
 
@@ -16,6 +17,8 @@ Die beiden Verlaufsbilder wurden am 23. Juli 2026 freigegeben; ihre fachlichen D
 [Verlaufsauswertung](forecast-simulator-history-approved.md) festgehalten.
 Die am 23. Juli 2026 beauftragte Erweiterung des Szenarioeditors und der A/B-Auswertung ist im
 [Tuning-Konzept](forecast-simulator-tuning-approved.md) verbindlich beschrieben.
+Die am 26. Juli 2026 freigegebene Nachfrageerweiterung ergänzt dieses Konzept um getrennte
+Verkaufs- und Betriebszeiten sowie editierbare Nachfragewellen.
 
 ## Verbindliche Struktur
 
@@ -27,8 +30,9 @@ Kopf sichtbar.
 
 Der Konfigurationsbereich öffnet als rechter Seiteneditor mit den Registern `Betrieb`,
 `Simulierte Realität` und `Prognose-Labor`. Admin-Planwerte und reale Dreiecksverteilungen bleiben
-getrennt. Das Übernehmen startet den Lauf vollständig mit demselben Seed und den neuen Parametern
-neu.
+getrennt. `Simulierte Realität` zeigt zusätzlich die getrennten Tageszeiten, eine
+Nachfragevorlage, die daraus abgeleitete Stufenkurve und die editierbaren Zeitfenster. Das
+Übernehmen startet den Lauf vollständig mit demselben Seed und den neuen Parametern neu.
 
 Die `Verlaufsauswertung` öffnet als breiter Dialog mit den Registern `Fluggruppen` und `Flugzeuge`.
 Die Gruppenansicht zeigt jeden einzelnen Prognosesnapshot samt realisierten Meilensteinen. Die
@@ -55,6 +59,15 @@ dauerhaft vom operativen FIDS ab. Ein Einstellungszugang ist in dieser Variante 
   manuell injizierbar. Flugzeugereignisse warten bei einem laufenden Umlauf bis zur nächsten
   organisatorisch zulässigen Grenze.
 - Eine temporäre Flugzeugsperre endet erst mit dem synthetischen bestätigten Rückkehrereignis.
+- Der Verkauf darf vor dem Flugbetrieb beginnen. Vor Betriebsbeginn entstehen synthetische
+  Buchungsgruppen und Prognosesnapshots mit inaktiver Kapazität, aber weder `GO TO GATE` noch
+  Boarding.
+- Nachfrage entsteht als seedbasierter Poisson-Prozess je Zeitfenster. `Normalbetrieb`,
+  `Flugzeugausfall` und `Betriebsunterbrechung` verwenden standardmäßig zwei Wellen mit
+  durchschnittlich 18 Personen pro Stunde; `Stoßlast` verwendet dieselbe Form mit 36 Personen pro
+  Stunde.
+- Ab Betriebsende beginnen keine neuen Umläufe oder Voraufrufe. Bereits gebundene Umläufe werden
+  bis `ABGESCHLOSSEN` fortgeführt; die Wiedergabe endet erst mit diesem letzten Abschluss.
 - Der automatische Voraufruf `GO TO GATE` verwendet dieselbe adaptive Domain-Logik wie der Worker.
   Er wird als eigener Zeitpunkt vor Boarding festgehalten und bindet noch kein Flugzeug. Die
   produktionsnahen Betriebsparameter enthalten nur die Aktivierung; technische Werte sind deutlich
@@ -62,8 +75,9 @@ dauerhaft vom operativen FIDS ab. Ein Einstellungszugang ist in dieser Variante 
 - Bei Prognosequalität `UNCERTAIN` zeigt die Oberfläche keinen Countdown. Auswahlzusammenfassung
   und Detaildialog kennzeichnen die numerischen Rohwerte ausdrücklich als nicht freigegebene
   Diagnose und nennen Unterdrückungsgrund, Lernwertalter, Stichprobengröße und aktive Kapazität.
-- Der lokale JSON-Export `rundflug-forecast-simulation/v4` enthält getrennte Admin-, Realitäts- und
-  Tuningparameter, einen optionalen A/B-Vergleich, Rohwerte, explizite
+- Der lokale JSON-Export `rundflug-forecast-simulation/v5` enthält getrennte Tageszeiten,
+  Nachfragefenster, tatsächliches Laufzeitfenster, Admin-, Realitäts- und Tuningparameter, einen
+  optionalen A/B-Vergleich, Rohwerte, explizite
   Unterdrückungsgründe, Voraufrufdiagnostik sowie die normalisierte Flugzeug- und Ereignishistorie;
   sie besitzen keine operative oder öffentliche Zeitsemantik.
 - CSV-Kalibrierung und JSON-Export bleiben vollständig lokal. Es gibt keinen Upload und keine
