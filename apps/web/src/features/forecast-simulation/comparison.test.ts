@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { productionBaselineConfig, runBatchComparison } from "./comparison";
 import { demandForProfile, simulationConfigForPreset } from "./model";
 
+const BATCH_BASELINE_TIMEOUT_MS = 90_000;
+
 function comparisonConfig() {
   const config = simulationConfigForPreset("NORMAL");
   config.schedule.salesEndAt = "2026-07-22T10:00:00.000Z";
@@ -66,69 +68,73 @@ describe("local forecast A/B comparison", () => {
     expect(baseline.forecastTuning.availabilityModel).toBe("SCALAR");
   });
 
-  it("captures the approved 25-seed two-wave baseline and time-dependent candidate", () => {
-    const config = simulationConfigForPreset("NORMAL");
-    const result = runBatchComparison(config);
-    const baseline = Object.fromEntries(result.rows.map((row) => [row.id, row.baseline]));
-    const candidate = Object.fromEntries(result.rows.map((row) => [row.id, row.candidate]));
+  it(
+    "captures the approved 25-seed two-wave baseline and time-dependent candidate",
+    () => {
+      const config = simulationConfigForPreset("NORMAL");
+      const result = runBatchComparison(config);
+      const baseline = Object.fromEntries(result.rows.map((row) => [row.id, row.baseline]));
+      const candidate = Object.fromEntries(result.rows.map((row) => [row.id, row.candidate]));
 
-    expect({
-      boardingMedian: baseline["boarding-median"],
-      boardingP90: baseline["boarding-p90"],
-      boardingBias: baseline["boarding-bias"],
-      boardingWidth: baseline["boarding-width"],
-      horizon60: baseline["horizon-60"],
-      horizon30: baseline["horizon-30"],
-      horizon15: baseline["horizon-15"],
-      departureP90: baseline["departure-p90"],
-      landingP90: baseline["landing-p90"],
-      completionP90: baseline["completion-p90"],
-      uncertainCountdowns: baseline["uncertain-countdowns"],
-      precallMedian: baseline["precall-median"],
-      precallP90: baseline["precall-p90"],
-    }).toEqual({
-      boardingMedian: 1.5,
-      boardingP90: 19.7,
-      boardingBias: 5.69,
-      boardingWidth: 3.87,
-      horizon60: 60,
-      horizon30: 30,
-      horizon15: 23.8,
-      departureP90: 2.3,
-      landingP90: 6.98,
-      completionP90: 0.45,
-      uncertainCountdowns: 0,
-      precallMedian: 16.5,
-      precallP90: 34.65,
-    });
-    expect({
-      baselineCoverage: baseline["boarding-coverage"],
-      candidateCoverage: candidate["boarding-coverage"],
-      candidateP90: candidate["boarding-p90"],
-      baselineAverageChange: baseline["stability-average-change"],
-      candidateAverageChange: candidate["stability-average-change"],
-      baselineJumps15: baseline["stability-jumps-15"],
-      candidateJumps15: candidate["stability-jumps-15"],
-      baselineJumps30: baseline["stability-jumps-30"],
-      candidateJumps30: candidate["stability-jumps-30"],
-      baselineMaximumJump: baseline["stability-maximum-jump"],
-      candidateMaximumJump: candidate["stability-maximum-jump"],
-      baselineThroughput: baseline["operations-throughput"],
-      candidateThroughput: candidate["operations-throughput"],
-    }).toEqual({
-      baselineCoverage: 55.17,
-      candidateCoverage: 86.67,
-      candidateP90: 7.3,
-      baselineAverageChange: 3,
-      candidateAverageChange: 0.55,
-      baselineJumps15: 221,
-      candidateJumps15: 51,
-      baselineJumps30: 205,
-      candidateJumps30: 7,
-      baselineMaximumJump: 465,
-      candidateMaximumJump: 38.5,
-      baselineThroughput: 27,
-      candidateThroughput: 27,
-    });
-  }, 30_000);
+      expect({
+        boardingMedian: baseline["boarding-median"],
+        boardingP90: baseline["boarding-p90"],
+        boardingBias: baseline["boarding-bias"],
+        boardingWidth: baseline["boarding-width"],
+        horizon60: baseline["horizon-60"],
+        horizon30: baseline["horizon-30"],
+        horizon15: baseline["horizon-15"],
+        departureP90: baseline["departure-p90"],
+        landingP90: baseline["landing-p90"],
+        completionP90: baseline["completion-p90"],
+        uncertainCountdowns: baseline["uncertain-countdowns"],
+        precallMedian: baseline["precall-median"],
+        precallP90: baseline["precall-p90"],
+      }).toEqual({
+        boardingMedian: 1.5,
+        boardingP90: 19.7,
+        boardingBias: 5.69,
+        boardingWidth: 3.87,
+        horizon60: 60,
+        horizon30: 30,
+        horizon15: 23.8,
+        departureP90: 2.3,
+        landingP90: 6.98,
+        completionP90: 0.45,
+        uncertainCountdowns: 0,
+        precallMedian: 16.5,
+        precallP90: 34.65,
+      });
+      expect({
+        baselineCoverage: baseline["boarding-coverage"],
+        candidateCoverage: candidate["boarding-coverage"],
+        candidateP90: candidate["boarding-p90"],
+        baselineAverageChange: baseline["stability-average-change"],
+        candidateAverageChange: candidate["stability-average-change"],
+        baselineJumps15: baseline["stability-jumps-15"],
+        candidateJumps15: candidate["stability-jumps-15"],
+        baselineJumps30: baseline["stability-jumps-30"],
+        candidateJumps30: candidate["stability-jumps-30"],
+        baselineMaximumJump: baseline["stability-maximum-jump"],
+        candidateMaximumJump: candidate["stability-maximum-jump"],
+        baselineThroughput: baseline["operations-throughput"],
+        candidateThroughput: candidate["operations-throughput"],
+      }).toEqual({
+        baselineCoverage: 55.17,
+        candidateCoverage: 86.67,
+        candidateP90: 7.3,
+        baselineAverageChange: 3,
+        candidateAverageChange: 0.55,
+        baselineJumps15: 221,
+        candidateJumps15: 51,
+        baselineJumps30: 205,
+        candidateJumps30: 7,
+        baselineMaximumJump: 465,
+        candidateMaximumJump: 38.5,
+        baselineThroughput: 27,
+        candidateThroughput: 27,
+      });
+    },
+    BATCH_BASELINE_TIMEOUT_MS,
+  );
 });
