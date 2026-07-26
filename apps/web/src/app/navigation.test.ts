@@ -33,11 +33,11 @@ describe("V1.2 app navigation", () => {
     expect(mayOpenEventRoute("FLIGHT_LINE", "/flight-line/assist")).toBe(false);
   });
 
-  it("Q-UX-040 keeps the view switcher on the established plain Lucide glyphs", () => {
+  it("Q-UX-040 keeps the view switcher on the approved plain Lucide glyphs", () => {
     expect(headerSource).toContain('"/kasse": Tickets');
     expect(headerSource).toContain('"/flight-director": Users');
     expect(headerSource).toContain('"/flight-line": Headphones');
-    expect(headerSource).toContain('"/fids": Plane');
+    expect(headerSource).toContain('"/fids": Monitor');
     expect(headerSource).toContain('"/admin": Settings');
     expect(headerSource).not.toContain("/icons/pwa/");
   });
