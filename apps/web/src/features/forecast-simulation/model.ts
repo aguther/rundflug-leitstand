@@ -80,6 +80,7 @@ export interface SimulationForecastTuning {
   forecast: ForecastTuningProfile;
   precall: PrecallTuningProfile;
   comparisonRuns: number;
+  availabilityModel: "SCALAR" | "TIME_DEPENDENT";
 }
 
 export interface SimulationConfig {
@@ -221,6 +222,19 @@ export interface SimulationMetrics {
     sameTickCount: number;
     uncertainPrecallCount: number;
   };
+  stability: {
+    changes: number;
+    averageAbsoluteChangeMinutes: number | null;
+    maximumJumpMinutes: number;
+    jumpsOver15Minutes: number;
+    jumpsOver30Minutes: number;
+    maximumWindowWidthMinutes: number;
+  };
+  operations: {
+    completedRotations: number;
+    overtimeMinutes: number;
+    aircraftUtilizationPercent: number | null;
+  };
   uncertainCountdownViolations: number;
   maximumEventReactionSeconds: number;
 }
@@ -243,6 +257,8 @@ export const FORECAST_UNCERTAINTY_REASON_LABELS: Record<ForecastUncertaintyReaso
   EMERGENCY_MODE: "Notfallmodus",
   RESOURCE_GROUP_INACTIVE: "Ressourcengruppe nicht aktiv",
   NO_ACTIVE_CAPACITY: "keine aktive Kapazität",
+  PLANNED_CONSTRAINT_OVERDUE: "geplante Einschränkung überfällig",
+  UNPLANNED_RESOURCE_RETURN: "Rückkehrzeit einer Ressource unklar",
   STALE_PREDICTION: "Prognose älter als fünf Minuten",
 };
 
@@ -437,6 +453,7 @@ const BASE_CONFIG: SimulationConfig = {
     forecast: { ...DEFAULT_FORECAST_TUNING_PROFILE },
     precall: { ...DEFAULT_PRECALL_TUNING_PROFILE },
     comparisonRuns: 25,
+    availabilityModel: "TIME_DEPENDENT",
   },
 };
 

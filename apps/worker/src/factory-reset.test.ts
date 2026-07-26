@@ -22,6 +22,7 @@ describe("factory reset", () => {
         "app_bootstrap",
         "operation_days",
         "rotation_manifest_corrections",
+        "planned_operational_constraints",
       ]),
     );
     expect(FACTORY_RESET_DELETE_TABLES).not.toContain("system_reset_receipts");
@@ -36,6 +37,12 @@ describe("factory reset", () => {
     );
     expect(FACTORY_RESET_DELETE_TABLES.indexOf("fids_preferences")).toBeLessThan(
       FACTORY_RESET_DELETE_TABLES.indexOf("operator_accounts"),
+    );
+    expect(FACTORY_RESET_DELETE_TABLES.indexOf("operational_blocks")).toBeLessThan(
+      FACTORY_RESET_DELETE_TABLES.indexOf("planned_operational_constraints"),
+    );
+    expect(FACTORY_RESET_DELETE_TABLES.indexOf("planned_operational_constraints")).toBeLessThan(
+      FACTORY_RESET_DELETE_TABLES.indexOf("rotations"),
     );
   });
 

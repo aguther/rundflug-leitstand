@@ -171,8 +171,11 @@ describe("Flight Director", () => {
   it("centralizes Flight Director controls in the prioritized operations dialog", () => {
     expect(supervisorSource).toContain("operationalSummary");
     expect(supervisorSource).toContain("Betrieb");
-    expect(operationsDialogSource).toContain('type OperationsTab = "operations" | "resources"');
+    expect(operationsDialogSource).toContain(
+      'type OperationsTab = "operations" | "plan" | "resources"',
+    );
     expect(operationsDialogSource).toContain('{ value: "operations", label: "Betrieb" }');
+    expect(operationsDialogSource).toContain('{ value: "plan", label: "Betriebsplan" }');
     expect(operationsDialogSource).toContain('{ value: "resources", label: "Ressourcengruppen" }');
     expect(operationsDialogSource).toContain("Not-Halt aktiv");
     expect(appSource).toContain("Betrieb unterbrochen");
@@ -183,7 +186,7 @@ describe("Flight Director", () => {
     expect(appSource).toContain(
       'const FLIGHT_DIRECTOR_AUDIT_REASON = "Operative Entscheidung Flight Director"',
     );
-    expect(appSource).not.toContain('type: "SET_PILOT_PAUSE"');
+    expect(appSource).toContain('type: "SET_PILOT_PAUSE"');
     expect(operationsDialogSource).not.toContain("Pilotenpausen");
     expect(operationsDialogSource).not.toContain("Begründung für Zustandsänderungen");
     expect(operationsDialogSource).toContain("Die Aufhebung bleibt ausschließlich");

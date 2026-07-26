@@ -276,6 +276,15 @@ Klartextgrant wird nicht gespeichert. Vor Anwendung wird eine D1-Time-Travel-Mar
 portable Sicherung angelegt. Ältere Worker ignorieren die nullable Spalten; Wiederherstellung
 erfolgt per Time Travel oder aus der Sicherung.
 
+## 0046 – Weicher Betriebsplan und Betriebsbeginn
+
+Ergänzt den optionalen geplanten Betriebsbeginn sowie weiche, versionierte Einschränkungen für
+Veranstaltung, Ressourcengruppe, Flugzeug und anonymen Pilotencode. Ein Plan startet oder beendet
+keinen operativen Zustand automatisch; erst ein menschlich bestätigtes Bestandskommando verknüpft
+ihn mit einer tatsächlichen Blockierung. Vor Anwendung wird eine D1-Time-Travel-Marke
+beziehungsweise portable Sicherung angelegt. Ein älterer Worker ignoriert die additiven Daten;
+Wiederherstellung erfolgt per Time Travel oder aus der Sicherung.
+
 ## Historische Doppelnummer 0036
 
 `0036_product_promised_flight_time.sql` und `0036_v1_5_stable_operations.sql` wurden bereits unter

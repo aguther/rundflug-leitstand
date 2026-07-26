@@ -10,6 +10,7 @@ export interface AbsoluteTimeWindowInput {
   phase?: TimeWindowPhase;
   quality?: TimeWindowQuality | null;
   includeClockSuffix?: boolean;
+  maximumWidthMinutes?: number;
 }
 
 interface LocalDateTime {
@@ -60,6 +61,12 @@ export function formatAbsoluteTimeWindow(input: AbsoluteTimeWindowInput): string
   if (input.phase === "NOW") return "Jetzt";
   if (input.phase === "FINISHED") return "–";
   if (input.quality === "UNCERTAIN" || input.lowerAt === null || input.upperAt === null) {
+    return variant === "compact" ? "–" : "Wird aktualisiert";
+  }
+  if (
+    input.maximumWidthMinutes !== undefined &&
+    Date.parse(input.upperAt) - Date.parse(input.lowerAt) > input.maximumWidthMinutes * 60_000
+  ) {
     return variant === "compact" ? "–" : "Wird aktualisiert";
   }
 

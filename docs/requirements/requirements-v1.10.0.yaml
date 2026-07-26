@@ -496,7 +496,7 @@ requirements:
     requirement: "Pausen können je Flugzeug oder anonymem Pilotencode ohne Dauer oder mit geschätzter Dauer erfasst werden. Ein bekanntes Pausenende darf als unsichere erwartete Verfügbarkeit in Prognosen einfließen; tatsächlich verfügbar wird die Ressource erst nach menschlicher Bestätigung. Eine Pause ohne Dauer nimmt die Ressource vollständig aus der prognostizierten Kapazität."
     priority: SOLL
     stage: V1
-    status: in Arbeit
+    status: umgesetzt
   - id: F-PRG-010
     source: "1.4-konsolidiert"
     section: "8.6 Prognose, Disposition und Kapazität"
@@ -1056,7 +1056,7 @@ requirements:
     requirement: "Blockierung/Unterbrechung/Pause: Geltungsbereich, Typ, Beginn, optionaler erwarteter Rückkehr- oder Prüfzeitpunkt, Status, Grund und bestätigte Aufhebung."
     priority: MUSS
     stage: V1
-    status: in Arbeit
+    status: umgesetzt
   - id: D-070
     source: "1.4-konsolidiert"
     section: "9 Datenanforderungen"

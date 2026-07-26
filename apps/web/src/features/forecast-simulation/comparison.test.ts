@@ -12,7 +12,7 @@ function comparisonConfig() {
 }
 
 describe("local forecast A/B comparison", () => {
-  it("returns zero deltas when the candidate equals the production defaults", () => {
+  it("compares the scalar baseline with the time-dependent resource model", () => {
     const result = runBatchComparison(comparisonConfig());
     expect(result.runCount).toBe(5);
     expect(result.rows.length).toBeGreaterThan(0);
@@ -25,7 +25,13 @@ describe("local forecast A/B comparison", () => {
         expect.objectContaining({ id: "suppression-stale-prediction" }),
       ]),
     );
-    expect(result.rows.every((row) => row.delta === 0 || row.delta === null)).toBe(true);
+    const boardingP90 = result.rows.find((row) => row.id === "boarding-p90");
+    expect(boardingP90?.baseline).not.toBeNull();
+    expect(boardingP90?.candidate).not.toBeNull();
+    expect(boardingP90?.candidate ?? Number.POSITIVE_INFINITY).toBeLessThan(
+      boardingP90?.baseline ?? Number.NEGATIVE_INFINITY,
+    );
+    expect(result.rows.some((row) => row.delta !== 0 && row.delta !== null)).toBe(true);
   });
 
   it("uses deterministic consecutive seeds and reports progress", () => {
@@ -57,12 +63,14 @@ describe("local forecast A/B comparison", () => {
     expect(baseline.realityModel.phases.boarding.typical).toBe(9);
     expect(baseline.forecastTuning.forecast.maximumSamples).toBe(12);
     expect(baseline.forecastTuning.precall.baselineLeadMinutes).toBe(12);
+    expect(baseline.forecastTuning.availabilityModel).toBe("SCALAR");
   });
 
-  it("captures the approved 25-seed two-wave baseline", () => {
+  it("captures the approved 25-seed two-wave baseline and time-dependent candidate", () => {
     const config = simulationConfigForPreset("NORMAL");
     const result = runBatchComparison(config);
     const baseline = Object.fromEntries(result.rows.map((row) => [row.id, row.baseline]));
+    const candidate = Object.fromEntries(result.rows.map((row) => [row.id, row.candidate]));
 
     expect({
       boardingMedian: baseline["boarding-median"],
@@ -79,19 +87,48 @@ describe("local forecast A/B comparison", () => {
       precallMedian: baseline["precall-median"],
       precallP90: baseline["precall-p90"],
     }).toEqual({
-      boardingMedian: 0.5,
+      boardingMedian: 1.5,
       boardingP90: 19.7,
-      boardingBias: 4.75,
-      boardingWidth: 0,
+      boardingBias: 5.69,
+      boardingWidth: 3.87,
       horizon60: 60,
       horizon30: 30,
-      horizon15: 20.6,
+      horizon15: 23.8,
       departureP90: 2.3,
       landingP90: 6.98,
       completionP90: 0.45,
       uncertainCountdowns: 0,
       precallMedian: 16.5,
       precallP90: 34.65,
+    });
+    expect({
+      baselineCoverage: baseline["boarding-coverage"],
+      candidateCoverage: candidate["boarding-coverage"],
+      candidateP90: candidate["boarding-p90"],
+      baselineAverageChange: baseline["stability-average-change"],
+      candidateAverageChange: candidate["stability-average-change"],
+      baselineJumps15: baseline["stability-jumps-15"],
+      candidateJumps15: candidate["stability-jumps-15"],
+      baselineJumps30: baseline["stability-jumps-30"],
+      candidateJumps30: candidate["stability-jumps-30"],
+      baselineMaximumJump: baseline["stability-maximum-jump"],
+      candidateMaximumJump: candidate["stability-maximum-jump"],
+      baselineThroughput: baseline["operations-throughput"],
+      candidateThroughput: candidate["operations-throughput"],
+    }).toEqual({
+      baselineCoverage: 55.17,
+      candidateCoverage: 86.67,
+      candidateP90: 7.3,
+      baselineAverageChange: 3,
+      candidateAverageChange: 0.55,
+      baselineJumps15: 221,
+      candidateJumps15: 51,
+      baselineJumps30: 205,
+      candidateJumps30: 7,
+      baselineMaximumJump: 465,
+      candidateMaximumJump: 38.5,
+      baselineThroughput: 27,
+      candidateThroughput: 27,
     });
   }, 30_000);
 });

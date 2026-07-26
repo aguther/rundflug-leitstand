@@ -88,6 +88,7 @@ function statusWindow(part: StatusPart, timeZone: string): string {
   return formatAbsoluteTimeWindow({
     lowerAt: part.boardingWindowLowerAt,
     upperAt: part.boardingWindowUpperAt,
+    maximumWidthMinutes: 60,
     timeZone,
     quality: part.predictionQuality,
     phase:

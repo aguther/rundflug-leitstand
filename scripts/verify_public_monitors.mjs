@@ -483,27 +483,64 @@ try {
       "Das dynamische PWA-Manifest öffnet nicht den exakten öffentlichen Status mit Ticketgruppenname und Ticket-Icon.",
     );
   }
-  const interrupted = await command(
+  const interruptionPlanId = randomUUID();
+  const interruptionPlan = await command(
     devices.admin,
     tokens.admin,
     sold.event.version,
+    "UPSERT_PLANNED_OPERATION",
+    {
+      planId: interruptionPlanId,
+      planExpectedVersion: null,
+      scopeType: "EVENT",
+      scopeId: "demo-2026",
+      kind: "FLIGHT_SHOW",
+      startMode: "TIME_WINDOW",
+      earliestStartAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+      latestStartAt: new Date(Date.now() + 45 * 60 * 1000).toISOString(),
+      afterRotationId: null,
+      minimumDurationMinutes: 10,
+      typicalDurationMinutes: 15,
+      maximumDurationMinutes: 25,
+      reason: "Synthetisch geplantes Flugshowfenster",
+      publicNote: "Flugbetrieb voraussichtlich kurz pausiert.",
+    },
+  );
+  const boardBeforePlanConfirmation = await board();
+  if (
+    boardBeforePlanConfirmation.operationalInterrupted ||
+    boardBeforePlanConfirmation.operationalNotice === "Flugbetrieb voraussichtlich kurz pausiert."
+  ) {
+    throw new Error("Ein weicher Planeintrag wurde ohne menschliche Bestätigung veröffentlicht.");
+  }
+  const interrupted = await command(
+    devices.admin,
+    tokens.admin,
+    interruptionPlan.event.version,
     "SET_EVENT_INTERRUPTION",
     {
       interrupted: true,
       reason: "Synthetischer öffentlicher Pausentest",
       expectedReviewAt: null,
+      plannedOperationId: interruptionPlanId,
     },
   );
-  const [pausedTicketStatus, pausedGroupStatus] = await Promise.all([
+  const [pausedTicketStatus, pausedGroupStatus, pausedPublicBoard] = await Promise.all([
     ticketStatus(privateCodes[0]),
     groupStatus(publicGroupCode),
+    board(),
   ]);
   if (
     pausedTicketStatus.status !== "SERVICE_PAUSED" ||
     pausedGroupStatus.parts.some((part) => part.status !== "SERVICE_PAUSED") ||
-    pausedTicketStatus.message !== "Flugbetrieb unterbrochen – bitte Status erneut prüfen."
+    pausedTicketStatus.message !== "Flugbetrieb unterbrochen – bitte Status erneut prüfen." ||
+    pausedTicketStatus.operationalNotice !== "Flugbetrieb voraussichtlich kurz pausiert." ||
+    pausedGroupStatus.operationalNotice !== "Flugbetrieb voraussichtlich kurz pausiert." ||
+    pausedPublicBoard.operationalNotice !== "Flugbetrieb voraussichtlich kurz pausiert."
   ) {
-    throw new Error("Ticket und Gruppe projizieren die Betriebsunterbrechung nicht als VERZÖGERT.");
+    throw new Error(
+      "Ticket, Gruppe und FIDS projizieren die bestätigte Betriebsunterbrechung nicht vollständig.",
+    );
   }
   const resumed = await command(
     devices.admin,
@@ -514,6 +551,7 @@ try {
       interrupted: false,
       reason: "Synthetischer öffentlicher Pausentest beendet",
       expectedReviewAt: null,
+      plannedOperationId: interruptionPlanId,
     },
   );
   assertPublicTimeCommunication(
@@ -920,6 +958,7 @@ try {
       staleDeparturesDoNotDisplaceUpcomingGroups: true,
       absolutePublicTimeWindows: true,
       compatiblePublicWaitWindowsConsistent: true,
+      plannedPublicNoticeRequiresConfirmedStart: true,
       historicalRotationGatePreserved: true,
       realtimeUnderTwoSeconds: true,
       reconnectMilliseconds,

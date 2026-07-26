@@ -35,6 +35,8 @@ export type ForecastUncertaintyReason =
   | "EMERGENCY_MODE"
   | "RESOURCE_GROUP_INACTIVE"
   | "NO_ACTIVE_CAPACITY"
+  | "PLANNED_CONSTRAINT_OVERDUE"
+  | "UNPLANNED_RESOURCE_RETURN"
   | "STALE_PREDICTION";
 
 export interface ForecastFreshnessAssessment {
@@ -56,6 +58,7 @@ export type ForecastRotationStatus = "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED"
 export interface ForecastTimelineEventInput {
   eventId: string;
   now: string;
+  plannedOperationsStartAt?: string | null;
   operationalInterrupted: boolean;
   emergencyMode: boolean;
   plannedBoardingMinutes: number;
@@ -92,6 +95,26 @@ export interface ForecastTimelineDurationSample {
 export interface ForecastTimelineCapacityInput {
   resourceGroupId: string;
   activeAircraft: number;
+  availabilityLanes?: readonly ForecastAvailabilityLaneInput[];
+  sharedConstraints?: readonly ForecastAvailabilityConstraintInput[];
+}
+
+export interface ForecastAvailabilityConstraintInput {
+  id: string;
+  earliestStartAt: string;
+  latestStartAt: string;
+  minimumDurationMinutes: number;
+  typicalDurationMinutes: number;
+  maximumDurationMinutes: number;
+  overdue?: boolean;
+}
+
+export interface ForecastAvailabilityLaneInput {
+  laneId: string;
+  availableLowerAt: string;
+  availableExpectedAt: string;
+  availableUpperAt: string;
+  constraints?: readonly ForecastAvailabilityConstraintInput[];
 }
 
 export type ForecastDataBasisScope =
@@ -163,13 +186,50 @@ function selectRobustDurationSamples(
 
 export interface QueueAvailabilityState {
   lowerMinutes: number[];
+  expectedMinutes: number[];
   upperMinutes: number[];
+  lanes: QueueAvailabilityLane[];
+}
+
+export interface QueueAvailabilityConstraint {
+  id: string;
+  earliestStartMinutes: number;
+  expectedStartMinutes: number;
+  latestStartMinutes: number;
+  minimumDurationMinutes: number;
+  typicalDurationMinutes: number;
+  maximumDurationMinutes: number;
+}
+
+export interface QueueAvailabilityLane {
+  laneId: string;
+  lowerMinutes: number;
+  expectedMinutes: number;
+  upperMinutes: number;
+  varianceMinutesSquared: number;
+  constraints: QueueAvailabilityConstraint[];
 }
 
 export function createQueueAvailability(input: {
   activeAircraft: number;
   busyAircraftMinutes: readonly number[];
+  lanes?: readonly Omit<QueueAvailabilityLane, "varianceMinutesSquared">[];
 }): QueueAvailabilityState {
+  if (input.lanes && input.lanes.length > 0) {
+    const lanes = input.lanes.map((lane) => ({
+      ...lane,
+      lowerMinutes: Math.max(0, lane.lowerMinutes),
+      expectedMinutes: Math.max(0, lane.expectedMinutes),
+      upperMinutes: Math.max(0, lane.upperMinutes),
+      varianceMinutesSquared: intervalVariance(
+        lane.lowerMinutes,
+        lane.expectedMinutes,
+        lane.upperMinutes,
+      ),
+      constraints: [...lane.constraints],
+    }));
+    return availabilityFromLanes(lanes);
+  }
   const capacity = Math.max(0, Math.floor(input.activeAircraft));
   const busy = input.busyAircraftMinutes
     .filter((value) => Number.isFinite(value) && value > 0)
@@ -177,7 +237,102 @@ export function createQueueAvailability(input: {
   const idle = Array.from({ length: Math.max(0, capacity - busy.length) }, () => 0);
   const slots = [...busy, ...idle];
   slots.sort((left, right) => left - right);
-  return { lowerMinutes: [...slots], upperMinutes: [...slots] };
+  return availabilityFromLanes(
+    slots.map((minutes, index) => ({
+      laneId: `capacity-${index + 1}`,
+      lowerMinutes: minutes,
+      expectedMinutes: minutes,
+      upperMinutes: minutes,
+      varianceMinutesSquared: 0,
+      constraints: [],
+    })),
+  );
+}
+
+const P10_P90_Z = 1.2815515655446004;
+
+function intervalVariance(lower: number, expected: number, upper: number): number {
+  const maximumDeviation = Math.max(0, expected - lower, upper - expected);
+  return (maximumDeviation / P10_P90_Z) ** 2;
+}
+
+function intervalFromVariance(
+  expected: number,
+  variance: number,
+): {
+  lower: number;
+  upper: number;
+} {
+  const margin = P10_P90_Z * Math.sqrt(Math.max(0, variance));
+  return {
+    lower: Math.max(0, expected - margin),
+    upper: Math.max(0, expected + margin),
+  };
+}
+
+function availabilityFromLanes(lanes: QueueAvailabilityLane[]): QueueAvailabilityState {
+  const sorted = [...lanes].sort(
+    (left, right) =>
+      left.expectedMinutes - right.expectedMinutes ||
+      left.lowerMinutes - right.lowerMinutes ||
+      left.laneId.localeCompare(right.laneId),
+  );
+  return {
+    lowerMinutes: sorted.map((lane) => lane.lowerMinutes),
+    expectedMinutes: sorted.map((lane) => lane.expectedMinutes),
+    upperMinutes: sorted.map((lane) => lane.upperMinutes),
+    lanes: sorted,
+  };
+}
+
+function shiftPastConstraint(
+  start: number,
+  duration: number,
+  blockStart: number,
+  blockEnd: number,
+): number {
+  return start < blockEnd && start + duration > blockStart ? blockEnd : start;
+}
+
+function applyAvailabilityConstraints(
+  lane: QueueAvailabilityLane,
+  duration: DurationEstimate,
+): QueueAvailabilityLane {
+  let lower = lane.lowerMinutes;
+  let expected = lane.expectedMinutes;
+  let upper = lane.upperMinutes;
+  for (const constraint of lane.constraints) {
+    lower = shiftPastConstraint(
+      lower,
+      duration.lowerMinutes,
+      constraint.latestStartMinutes,
+      constraint.latestStartMinutes + constraint.minimumDurationMinutes,
+    );
+    expected = shiftPastConstraint(
+      expected,
+      duration.expectedMinutes,
+      constraint.expectedStartMinutes,
+      constraint.expectedStartMinutes + constraint.typicalDurationMinutes,
+    );
+    upper = shiftPastConstraint(
+      upper,
+      duration.upperMinutes,
+      constraint.earliestStartMinutes,
+      constraint.earliestStartMinutes + constraint.maximumDurationMinutes,
+    );
+    expected = Math.max(lower, expected);
+    upper = Math.max(expected, upper);
+  }
+  return {
+    ...lane,
+    lowerMinutes: lower,
+    expectedMinutes: expected,
+    upperMinutes: upper,
+    varianceMinutesSquared: Math.max(
+      lane.varianceMinutesSquared,
+      intervalVariance(lower, expected, upper),
+    ),
+  };
 }
 
 export function reserveNextQueueWindow(
@@ -187,32 +342,63 @@ export function reserveNextQueueWindow(
   window: { lowerMinutes: number; upperMinutes: number; quality: PredictionQuality };
   availability: QueueAvailabilityState;
 } {
-  if (availability.lowerMinutes.length === 0 || availability.upperMinutes.length === 0) {
+  if (availability.lanes.length === 0) {
     return {
       window: { lowerMinutes: 0, upperMinutes: 0, quality: "UNCERTAIN" },
       availability,
     };
   }
-  const lower = Math.min(...availability.lowerMinutes);
-  const upper = Math.min(...availability.upperMinutes);
-  const lowerIndex = availability.lowerMinutes.indexOf(lower);
-  const upperIndex = availability.upperMinutes.indexOf(upper);
-  const nextLower = [...availability.lowerMinutes];
-  const nextUpper = [...availability.upperMinutes];
-  nextLower[lowerIndex] = lower + duration.lowerMinutes;
-  nextUpper[upperIndex] = upper + duration.upperMinutes;
-  nextLower.sort((left, right) => left - right);
-  nextUpper.sort((left, right) => left - right);
+  const adjustedLanes = availability.lanes.map((lane) =>
+    applyAvailabilityConstraints(lane, duration),
+  );
+  const selected = [...adjustedLanes].sort(
+    (left, right) =>
+      left.expectedMinutes - right.expectedMinutes ||
+      left.lowerMinutes - right.lowerMinutes ||
+      left.laneId.localeCompare(right.laneId),
+  )[0];
+  if (!selected) {
+    return {
+      window: { lowerMinutes: 0, upperMinutes: 0, quality: "UNCERTAIN" },
+      availability,
+    };
+  }
+  const durationVariance = intervalVariance(
+    duration.lowerMinutes,
+    duration.expectedMinutes,
+    duration.upperMinutes,
+  );
+  const nextExpected = selected.expectedMinutes + duration.expectedMinutes;
+  const nextVariance = selected.varianceMinutesSquared + durationVariance;
+  const nextInterval = intervalFromVariance(nextExpected, nextVariance);
+  const nextLanes = adjustedLanes.map((lane) =>
+    lane.laneId === selected.laneId
+      ? {
+          ...lane,
+          lowerMinutes: nextInterval.lower,
+          expectedMinutes: nextExpected,
+          upperMinutes: nextInterval.upper,
+          varianceMinutesSquared: nextVariance,
+        }
+      : lane,
+  );
+  const minimumWindowMargin =
+    duration.quality === "UNCERTAIN" ? 0 : duration.quality === "STABLE" ? 3 : 5;
+  const windowLower = Math.max(
+    0,
+    Math.min(selected.lowerMinutes, selected.expectedMinutes - minimumWindowMargin),
+  );
+  const windowUpper = Math.max(
+    selected.upperMinutes,
+    selected.expectedMinutes + minimumWindowMargin,
+  );
   return {
     window: {
-      lowerMinutes: Math.max(0, Math.round(lower)),
-      upperMinutes: Math.max(0, Math.round(upper)),
+      lowerMinutes: Math.max(0, Math.round(windowLower)),
+      upperMinutes: Math.max(0, Math.round(windowUpper)),
       quality: duration.quality,
     },
-    availability: {
-      lowerMinutes: nextLower,
-      upperMinutes: nextUpper,
-    },
+    availability: availabilityFromLanes(nextLanes),
   };
 }
 
@@ -375,7 +561,10 @@ export function calculateForecastTimelines(
   const capacities = new Map(
     input.capacities.map((entry) => [
       entry.resourceGroupId,
-      Math.max(0, Math.floor(entry.activeAircraft)),
+      {
+        ...entry,
+        activeAircraft: Math.max(0, Math.floor(entry.activeAircraft)),
+      },
     ]),
   );
   const busyAircraftMinutes = new Map<string, number[]>();
@@ -411,14 +600,90 @@ export function calculateForecastTimelines(
     values.push(remaining);
     busyAircraftMinutes.set(rotation.resourceGroupId, values);
   }
+  const offsetMinutes = (value: string): number =>
+    Math.max(0, (Date.parse(value) - now.getTime()) / 60_000);
+  const constraintToQueueConstraint = (
+    constraint: ForecastAvailabilityConstraintInput,
+  ): QueueAvailabilityConstraint => {
+    const earliest = offsetMinutes(constraint.earliestStartAt);
+    const latest = Math.max(earliest, offsetMinutes(constraint.latestStartAt));
+    return {
+      id: constraint.id,
+      earliestStartMinutes: earliest,
+      expectedStartMinutes: (earliest + latest) / 2,
+      latestStartMinutes: latest,
+      minimumDurationMinutes: constraint.minimumDurationMinutes,
+      typicalDurationMinutes: constraint.typicalDurationMinutes,
+      maximumDurationMinutes: constraint.maximumDurationMinutes,
+    };
+  };
+  const operationStartMinutes = input.event.plannedOperationsStartAt
+    ? offsetMinutes(input.event.plannedOperationsStartAt)
+    : 0;
   const queueAvailability = new Map(
-    [...capacities.entries()].map(([resourceGroupId, activeAircraft]) => [
-      resourceGroupId,
-      createQueueAvailability({
-        activeAircraft,
-        busyAircraftMinutes: busyAircraftMinutes.get(resourceGroupId) ?? [],
-      }),
-    ]),
+    [...capacities.entries()].map(([resourceGroupId, capacity]) => {
+      const sharedConstraints = (capacity.sharedConstraints ?? []).map(constraintToQueueConstraint);
+      const lanes = capacity.availabilityLanes?.map((lane) => {
+        const lower = Math.max(operationStartMinutes, offsetMinutes(lane.availableLowerAt));
+        const expected = Math.max(operationStartMinutes, offsetMinutes(lane.availableExpectedAt));
+        const upper = Math.max(
+          expected,
+          operationStartMinutes,
+          offsetMinutes(lane.availableUpperAt),
+        );
+        return {
+          laneId: lane.laneId,
+          lowerMinutes: Math.min(lower, expected),
+          expectedMinutes: expected,
+          upperMinutes: upper,
+          constraints: [
+            ...sharedConstraints,
+            ...(lane.constraints ?? []).map(constraintToQueueConstraint),
+          ].sort(
+            (left, right) =>
+              left.earliestStartMinutes - right.earliestStartMinutes ||
+              left.id.localeCompare(right.id),
+          ),
+        };
+      });
+      if (lanes && lanes.length > 0) {
+        return [
+          resourceGroupId,
+          createQueueAvailability({
+            activeAircraft: lanes.length,
+            busyAircraftMinutes: [],
+            lanes,
+          }),
+        ] as const;
+      }
+      const busy = busyAircraftMinutes.get(resourceGroupId) ?? [];
+      const idleCount = Math.max(0, capacity.activeAircraft - busy.length);
+      const fallbackBusy = busy.slice(0, capacity.activeAircraft);
+      const fallbackLanes = [
+        ...fallbackBusy.map((minutes, index) => ({
+          laneId: `busy-${index + 1}`,
+          lowerMinutes: minutes,
+          expectedMinutes: minutes,
+          upperMinutes: minutes,
+          constraints: sharedConstraints,
+        })),
+        ...Array.from({ length: idleCount }, (_, index) => ({
+          laneId: `idle-${index + 1}`,
+          lowerMinutes: operationStartMinutes,
+          expectedMinutes: operationStartMinutes,
+          upperMinutes: operationStartMinutes,
+          constraints: sharedConstraints,
+        })),
+      ];
+      return [
+        resourceGroupId,
+        createQueueAvailability({
+          activeAircraft: capacity.activeAircraft,
+          busyAircraftMinutes: fallbackBusy,
+          lanes: fallbackLanes,
+        }),
+      ] as const;
+    }),
   );
   const newestSamples = [...input.durationSamples].sort(
     (left, right) => Date.parse(right.completedAt) - Date.parse(left.completedAt),
@@ -429,7 +694,9 @@ export function calculateForecastTimelines(
     const deboarding = input.event.plannedDeboardingMinutes;
     const buffer = input.event.plannedBufferMinutes;
     const referenceTotal = boarding + rotation.referenceDurationMinutes + deboarding + buffer;
-    const activeCapacity = capacities.get(rotation.resourceGroupId) ?? 0;
+    const capacity = capacities.get(rotation.resourceGroupId);
+    const activeCapacity = capacity?.activeAircraft ?? 0;
+    const forecastCapacity = queueAvailability.get(rotation.resourceGroupId)?.lanes.length ?? 0;
     const allProductHistory = newestSamples.filter(
       (sample) => sample.productCode === rotation.productCode,
     );
@@ -462,35 +729,45 @@ export function calculateForecastTimelines(
     if (rotation.resourceGroupStatus !== "ACTIVE") {
       uncertaintyReasons.push("RESOURCE_GROUP_INACTIVE");
     }
-    if (activeCapacity === 0) uncertaintyReasons.push("NO_ACTIVE_CAPACITY");
+    if (forecastCapacity === 0) uncertaintyReasons.push("NO_ACTIVE_CAPACITY");
+    const hasOverdueConstraint = [
+      ...(capacity?.sharedConstraints ?? []),
+      ...(capacity?.availabilityLanes ?? []).flatMap((lane) => lane.constraints ?? []),
+    ].some((constraint) => constraint.overdue);
+    if (hasOverdueConstraint) {
+      uncertaintyReasons.push("PLANNED_CONSTRAINT_OVERDUE");
+    }
     const estimate = estimateDuration({
       referenceMinutes: referenceTotal,
       actualDurationsMinutes: actualDurations,
-      interrupted: uncertaintyReasons.some((reason) => reason !== "NO_ACTIVE_CAPACITY"),
-      activeCapacity,
+      interrupted: input.event.emergencyMode || input.event.operationalInterrupted,
+      activeCapacity: forecastCapacity,
       tuning,
     });
+    const predictionQuality =
+      hasOverdueConstraint && estimate.quality === "STABLE" ? "CHANGING" : estimate.quality;
+    const effectiveEstimate = { ...estimate, quality: predictionQuality };
     let window = forecastQueueWindows({
       queueSequence: rotation.queueSequence,
-      activeAircraft: activeCapacity,
-      duration: estimate,
+      activeAircraft: forecastCapacity,
+      duration: effectiveEstimate,
     });
     if (rotation.status === "DRAFT") {
       const availability =
         queueAvailability.get(rotation.resourceGroupId) ??
-        createQueueAvailability({ activeAircraft: activeCapacity, busyAircraftMinutes: [] });
-      const reservation = reserveNextQueueWindow(availability, estimate);
+        createQueueAvailability({ activeAircraft: forecastCapacity, busyAircraftMinutes: [] });
+      const reservation = reserveNextQueueWindow(availability, effectiveEstimate);
       window = reservation.window;
       queueAvailability.set(rotation.resourceGroupId, reservation.availability);
     }
     const planOffset =
-      Math.floor(Math.max(0, rotation.queueSequence - 1) / Math.max(1, activeCapacity)) *
+      Math.floor(Math.max(0, rotation.queueSequence - 1) / Math.max(1, forecastCapacity)) *
       referenceTotal;
     const plannedBoardingAt = addMinutes(rotation.createdAt, planOffset);
     const plannedDepartureAt = addMinutes(plannedBoardingAt, boarding);
     const plannedLandingAt = addMinutes(plannedDepartureAt, rotation.referenceDurationMinutes);
     const plannedCompletionAt = addMinutes(plannedLandingAt, deboarding + buffer);
-    let predictedBoardingAt = addMinutes(now, window.lowerMinutes);
+    let predictedBoardingAt = addMinutes(now, (window.lowerMinutes + window.upperMinutes) / 2);
     if (rotation.calledAt) predictedBoardingAt = rotation.calledAt;
     let predictedDepartureAt = addMinutes(predictedBoardingAt, boarding);
     if (rotation.departedAt) predictedDepartureAt = rotation.departedAt;
@@ -523,7 +800,7 @@ export function calculateForecastTimelines(
       predictedDepartureAt,
       predictedLandingAt,
       predictedCompletionAt,
-      predictionQuality: estimate.quality,
+      predictionQuality,
       predictionLowerMinutes: window.lowerMinutes,
       predictionUpperMinutes: window.upperMinutes,
       dataBasisScope,
