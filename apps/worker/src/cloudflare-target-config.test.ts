@@ -1,3 +1,5 @@
+// @ts-expect-error The configuration test runs in Node, outside the Worker runtime.
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 // @ts-expect-error The operational Node helper is executed directly as ESM and tested here.
 import * as cloudflareTarget from "../../../scripts/cloudflare-target.mjs";
@@ -11,6 +13,13 @@ const {
 } = cloudflareTarget;
 
 describe("Cloudflare target configuration", () => {
+  it("uses the same deterministic secret inventory in the checked-in configuration", () => {
+    const config = JSON.parse(
+      readFileSync(new URL("../../../wrangler.jsonc", import.meta.url), "utf8"),
+    );
+    expect(config.secrets).toEqual({ required: cloudflareTarget.requiredCloudflareSecrets });
+  });
+
   it("derives safe resource names from one target", () => {
     expect(
       parseCloudflareTargetArguments(["--target", "verein-abnahme", "--dry-run"]),
@@ -72,7 +81,7 @@ describe("Cloudflare target configuration", () => {
       bucket_name: "rundflug-leitstand-verein-abnahme-backups",
       jurisdiction: "eu",
     });
-    expect(generated).not.toHaveProperty("secrets");
+    expect(generated.secrets).toEqual({ required: cloudflareTarget.requiredCloudflareSecrets });
     expect(base.d1_databases[0]?.database_id).toBe("old");
   });
 
