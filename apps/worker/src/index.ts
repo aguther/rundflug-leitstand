@@ -284,16 +284,19 @@ function predictedBoardingWindow(input: {
     return { lowerAt: null, upperAt: null };
   }
   const referenceMs = Date.parse(input.referenceAt);
-  const storedLowerMs = input.predictedBoardingAt
+  const storedCenterMs = input.predictedBoardingAt
     ? Date.parse(input.predictedBoardingAt)
     : Number.NaN;
-  const lowerMs = Number.isFinite(storedLowerMs)
-    ? storedLowerMs
+  const midpointMinutes = (input.lowerMinutes + input.upperMinutes) / 2;
+  const lowerMs = Number.isFinite(storedCenterMs)
+    ? storedCenterMs + (input.lowerMinutes - midpointMinutes) * 60_000
     : referenceMs + input.lowerMinutes * 60_000;
-  const widthMinutes = Math.max(0, input.upperMinutes - input.lowerMinutes);
+  const upperMs = Number.isFinite(storedCenterMs)
+    ? storedCenterMs + (input.upperMinutes - midpointMinutes) * 60_000
+    : referenceMs + input.upperMinutes * 60_000;
   return {
     lowerAt: new Date(lowerMs).toISOString(),
-    upperAt: new Date(lowerMs + widthMinutes * 60_000).toISOString(),
+    upperAt: new Date(Math.max(lowerMs, upperMs)).toISOString(),
   };
 }
 
@@ -2833,7 +2836,8 @@ app.on("GET", eventRoutes("/snapshot"), async (context) => {
   const row = await context.env.DB.prepare(
     `SELECT id, name, event_date, aerodrome, time_zone, status, archived_at, template_source_id,
             emergency_mode, operational_interrupted, version,
-            operational_note, operations_end_at, sale_opens_at, no_show_after_minutes,
+            operational_note, operations_start_at, operations_end_at, sale_opens_at,
+            no_show_after_minutes,
             max_ticket_deferrals,
             notification_lead_minutes, child_reference_weight_kg, normal_reference_weight_kg,
             automatic_precall_enabled, precall_lead_minutes, max_gate_wait_minutes,
@@ -3011,7 +3015,8 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
   const eventRow = await context.env.DB.prepare(
     `SELECT id, name, event_date, aerodrome, time_zone, status, archived_at, template_source_id,
             emergency_mode, operational_interrupted, version,
-            operational_note, operations_end_at, sale_opens_at, no_show_after_minutes,
+            operational_note, operations_start_at, operations_end_at, sale_opens_at,
+            no_show_after_minutes,
             max_ticket_deferrals,
             notification_lead_minutes, child_reference_weight_kg, normal_reference_weight_kg,
             automatic_precall_enabled, precall_lead_minutes, max_gate_wait_minutes,
@@ -3039,6 +3044,7 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
     pilotRows,
     gatesRows,
     resourceGroupRows,
+    plannedOperationRows,
     metricsRow,
   ] = await runD1ReadsSequentially([
     () =>
@@ -3517,6 +3523,52 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
         }>(),
     () =>
       context.env.DB.prepare(
+        `SELECT plan.id, plan.version, plan.scope_type, plan.scope_id,
+                plan.constraint_kind, plan.start_mode, plan.earliest_start_at,
+                plan.latest_start_at, plan.after_rotation_id,
+                plan.minimum_duration_minutes, plan.typical_duration_minutes,
+                plan.maximum_duration_minutes, plan.status, plan.reason, plan.public_note,
+                plan.created_at, plan.updated_at, plan.activated_at, plan.cleared_at,
+                plan.canceled_at, after_rotation.status AS after_rotation_status
+           FROM planned_operational_constraints plan
+           LEFT JOIN rotations after_rotation ON after_rotation.id = plan.after_rotation_id
+          WHERE plan.operation_day_id = ?1
+          ORDER BY
+            CASE plan.status WHEN 'ACTIVE' THEN 0 WHEN 'PLANNED' THEN 1 ELSE 2 END,
+            COALESCE(plan.earliest_start_at, plan.created_at), plan.created_at`,
+      )
+        .bind(eventId)
+        .all<{
+          id: string;
+          version: number;
+          scope_type: "EVENT" | "RESOURCE_GROUP" | "AIRCRAFT" | "PILOT";
+          scope_id: string;
+          constraint_kind:
+            | "PAUSE"
+            | "REFUELING"
+            | "FLIGHT_SHOW"
+            | "WEATHER"
+            | "TECHNICAL"
+            | "OTHER";
+          start_mode: "TIME_WINDOW" | "AFTER_CURRENT_ROTATION";
+          earliest_start_at: string | null;
+          latest_start_at: string | null;
+          after_rotation_id: string | null;
+          minimum_duration_minutes: number;
+          typical_duration_minutes: number;
+          maximum_duration_minutes: number;
+          status: "PLANNED" | "ACTIVE" | "CLEARED" | "CANCELED";
+          reason: string;
+          public_note: string;
+          created_at: string;
+          updated_at: string;
+          activated_at: string | null;
+          cleared_at: string | null;
+          canceled_at: string | null;
+          after_rotation_status: string | null;
+        }>(),
+    () =>
+      context.env.DB.prepare(
         `SELECT
           (SELECT COUNT(*) FROM tickets t JOIN ticket_groups tg ON tg.id = t.ticket_group_id
             WHERE tg.operation_day_id = ?1
@@ -3651,16 +3703,51 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
           eventRow.operational_interrupted === 1,
         activeCapacity: activeAircraft,
       });
-      const forecast = forecastQueueWindows({ queueSequence, activeAircraft, duration });
+      const fallbackForecast = forecastQueueWindows({ queueSequence, activeAircraft, duration });
+      const firstQueuedRotation = rotations.results.find(
+        (rotation) =>
+          rotation.resource_group_id === product.resource_group_id &&
+          rotation.status === "DRAFT" &&
+          rotation.prediction_lower_minutes !== null &&
+          rotation.prediction_upper_minutes !== null,
+      );
+      const preOperationsOffset = eventRow.operations_start_at
+        ? Math.max(0, (Date.parse(eventRow.operations_start_at) - Date.now()) / 60_000)
+        : 0;
+      const forecast = firstQueuedRotation
+        ? {
+            lowerMinutes: firstQueuedRotation.prediction_lower_minutes ?? 0,
+            upperMinutes: firstQueuedRotation.prediction_upper_minutes ?? 0,
+            quality: firstQueuedRotation.prediction_quality ?? fallbackForecast.quality,
+          }
+        : preOperationsOffset > 0
+          ? {
+              lowerMinutes: Math.max(0, Math.round(preOperationsOffset - 5)),
+              upperMinutes: Math.round(preOperationsOffset + 5),
+              quality: "CHANGING" as const,
+            }
+          : fallbackForecast;
       const forecastReferenceMs = Date.now();
+      const forecastMidpointMinutes = (forecast.lowerMinutes + forecast.upperMinutes) / 2;
+      const storedForecastCenterMs = firstQueuedRotation?.predicted_boarding_at
+        ? Date.parse(firstQueuedRotation.predicted_boarding_at)
+        : Number.NaN;
       const nextBoardingWindowLowerAt =
         forecast.quality === "UNCERTAIN"
           ? null
-          : new Date(forecastReferenceMs + forecast.lowerMinutes * 60_000).toISOString();
+          : new Date(
+              Number.isFinite(storedForecastCenterMs)
+                ? storedForecastCenterMs +
+                    (forecast.lowerMinutes - forecastMidpointMinutes) * 60_000
+                : forecastReferenceMs + forecast.lowerMinutes * 60_000,
+            ).toISOString();
       const nextBoardingWindowUpperAt =
         forecast.quality === "UNCERTAIN"
           ? null
-          : new Date(forecastReferenceMs + forecast.upperMinutes * 60_000).toISOString();
+          : new Date(
+              Date.parse(nextBoardingWindowLowerAt ?? new Date(forecastReferenceMs).toISOString()) +
+                Math.max(0, forecast.upperMinutes - forecast.lowerMinutes) * 60_000,
+            ).toISOString();
       const capacity = assessRemainingCapacity({
         remainingOperatingMinutes,
         expectedRotationMinutes: duration.expectedMinutes,
@@ -3739,16 +3826,8 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
         predictionUpdatedAt: rotation.prediction_updated_at,
         now: forecastReadAt,
       });
-      const resourceGroupStatus = products.results.find(
-        (product) => product.resource_group_id === rotation.resource_group_id,
-      )?.resource_group_status;
       const effectivePredictionQuality =
-        eventRow.emergency_mode === 1 ||
-        eventRow.operational_interrupted === 1 ||
-        resourceGroupStatus !== "ACTIVE" ||
-        effectiveActiveCapacity === 0
-          ? "UNCERTAIN"
-          : forecastFreshness.quality;
+        eventRow.emergency_mode === 1 ? "UNCERTAIN" : forecastFreshness.quality;
       const fallbackWindow = forecastQueueWindows({
         queueSequence: index + 1,
         activeAircraft: effectiveActiveCapacity,
@@ -3912,6 +3991,34 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
       pauseExpectedReviewAt: pilot.pause_expected_review_at,
       currentRotationId: pilot.current_rotation_id,
       currentCommunicationNumber: pilot.current_communication_number,
+    })),
+    plannedOperations: plannedOperationRows.results.map((plan) => ({
+      id: plan.id,
+      version: plan.version,
+      scopeType: plan.scope_type,
+      scopeId: plan.scope_id,
+      kind: plan.constraint_kind,
+      startMode: plan.start_mode,
+      earliestStartAt: plan.earliest_start_at,
+      latestStartAt: plan.latest_start_at,
+      afterRotationId: plan.after_rotation_id,
+      minimumDurationMinutes: plan.minimum_duration_minutes,
+      typicalDurationMinutes: plan.typical_duration_minutes,
+      maximumDurationMinutes: plan.maximum_duration_minutes,
+      status:
+        plan.status === "PLANNED" &&
+        ((plan.latest_start_at !== null && Date.parse(plan.latest_start_at) <= Date.now()) ||
+          (plan.start_mode === "AFTER_CURRENT_ROTATION" &&
+            ["COMPLETED", "CANCELED"].includes(plan.after_rotation_status ?? "")))
+          ? "DUE"
+          : plan.status,
+      reason: plan.reason,
+      publicNote: plan.public_note,
+      createdAt: plan.created_at,
+      updatedAt: plan.updated_at,
+      activatedAt: plan.activated_at,
+      clearedAt: plan.cleared_at,
+      canceledAt: plan.canceled_at,
     })),
     gates: gatesRows.results.map((gate) => ({
       id: gate.id,
@@ -4934,7 +5041,15 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
             od.operational_note AS event_operational_note, od.operational_interrupted,
             od.emergency_mode, od.notification_lead_minutes,
             rg.status AS resource_group_status,
-            rg.operational_note AS resource_group_operational_note, od.updated_at
+            rg.operational_note AS resource_group_operational_note,
+            (SELECT plan.public_note FROM planned_operational_constraints plan
+              WHERE plan.operation_day_id = od.id AND plan.status = 'ACTIVE'
+                AND plan.public_note <> ''
+                AND ((plan.scope_type = 'RESOURCE_GROUP' AND plan.scope_id = rg.id)
+                  OR (plan.scope_type = 'EVENT' AND plan.scope_id = od.id))
+              ORDER BY CASE plan.scope_type WHEN 'RESOURCE_GROUP' THEN 0 ELSE 1 END,
+                       plan.activated_at DESC LIMIT 1) AS planned_public_note,
+            od.updated_at
        FROM tickets t
        JOIN ticket_groups tg ON tg.id = t.ticket_group_id
        JOIN products p ON p.id = tg.product_id
@@ -4967,6 +5082,7 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
       time_zone: string;
       event_operational_note: string;
       resource_group_operational_note: string;
+      planned_public_note: string | null;
       operational_interrupted: number;
       emergency_mode: number;
       notification_lead_minutes: number;
@@ -5061,7 +5177,8 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
             : forecastFreshness.reason === "STALE_PREDICTION"
               ? "Prognose wird aktualisiert – bitte Status erneut prüfen."
               : message[publicStatus],
-    operationalNotice: row.resource_group_operational_note || row.event_operational_note,
+    operationalNotice:
+      row.planned_public_note || row.resource_group_operational_note || row.event_operational_note,
     updatedAt: row.updated_at,
   });
 });
@@ -5078,6 +5195,13 @@ app.get("/api/public/groups/:groupCode", async (context) => {
             od.operational_interrupted, od.emergency_mode, od.notification_lead_minutes,
             od.updated_at, rg.status AS resource_group_status,
             rg.operational_note AS resource_group_operational_note,
+            (SELECT plan.public_note FROM planned_operational_constraints plan
+              WHERE plan.operation_day_id = od.id AND plan.status = 'ACTIVE'
+                AND plan.public_note <> ''
+                AND ((plan.scope_type = 'RESOURCE_GROUP' AND plan.scope_id = rg.id)
+                  OR (plan.scope_type = 'EVENT' AND plan.scope_id = od.id))
+              ORDER BY CASE plan.scope_type WHEN 'RESOURCE_GROUP' THEN 0 ELSE 1 END,
+                       plan.activated_at DESC LIMIT 1) AS planned_public_note,
             (SELECT COUNT(*) FROM tickets t WHERE t.ticket_group_id = tg.id) AS group_size
        FROM ticket_groups tg
        JOIN products p ON p.id = tg.product_id
@@ -5102,6 +5226,7 @@ app.get("/api/public/groups/:groupCode", async (context) => {
       updated_at: string;
       resource_group_status: "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED";
       resource_group_operational_note: string;
+      planned_public_note: string | null;
       group_size: number;
     }>();
   if (!group) {
@@ -5227,7 +5352,10 @@ app.get("/api/public/groups/:groupCode", async (context) => {
     productCode: group.product_code,
     publicDescription: group.public_description,
     timeZone: group.time_zone,
-    operationalNotice: group.resource_group_operational_note || group.event_operational_note,
+    operationalNotice:
+      group.planned_public_note ||
+      group.resource_group_operational_note ||
+      group.event_operational_note,
     updatedAt: group.updated_at,
     parts,
   });
@@ -5513,7 +5641,14 @@ app.get("/api/public/events/:eventId/board", async (context) => {
   const eventId = context.req.param("eventId");
   const requestedGateId = context.req.query("gateId")?.trim() || null;
   const event = await context.env.DB.prepare(
-    "SELECT name, time_zone, emergency_mode, operational_interrupted, operational_note, departed_visibility_seconds, updated_at FROM operation_days WHERE id = ?1",
+    `SELECT od.name, od.time_zone, od.emergency_mode, od.operational_interrupted,
+            od.operational_note, od.departed_visibility_seconds, od.updated_at,
+            (SELECT plan.public_note FROM planned_operational_constraints plan
+              WHERE plan.operation_day_id = od.id AND plan.status = 'ACTIVE'
+                AND plan.scope_type = 'EVENT' AND plan.scope_id = od.id
+                AND plan.public_note <> ''
+              ORDER BY plan.activated_at DESC LIMIT 1) AS planned_public_note
+       FROM operation_days od WHERE od.id = ?1`,
   )
     .bind(eventId)
     .first<{
@@ -5522,6 +5657,7 @@ app.get("/api/public/events/:eventId/board", async (context) => {
       emergency_mode: number;
       operational_interrupted: number;
       operational_note: string;
+      planned_public_note: string | null;
       departed_visibility_seconds: number;
       updated_at: string;
     }>();
@@ -5572,7 +5708,12 @@ app.get("/api/public/events/:eventId/board", async (context) => {
             r.departed_at,
             COUNT(rt.ticket_id) AS ticket_count,
             rg.status AS resource_group_status,
-            rg.operational_note AS resource_group_operational_note
+            rg.operational_note AS resource_group_operational_note,
+            (SELECT plan.public_note FROM planned_operational_constraints plan
+              WHERE plan.operation_day_id = r.operation_day_id AND plan.status = 'ACTIVE'
+                AND plan.scope_type = 'RESOURCE_GROUP' AND plan.scope_id = rg.id
+                AND plan.public_note <> ''
+              ORDER BY plan.activated_at DESC LIMIT 1) AS planned_public_note
        FROM rotations r
        JOIN flight_groups fg ON fg.id = r.flight_group_id
        JOIN resource_groups rg ON rg.id = fg.resource_group_id
@@ -5627,6 +5768,7 @@ app.get("/api/public/events/:eventId/board", async (context) => {
       ticket_count: number;
       resource_group_status: "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED";
       resource_group_operational_note: string;
+      planned_public_note: string | null;
     }>();
   const fleet = await context.env.DB.prepare(
     `SELECT a.registration, a.operational_state, a.refuel_planned
@@ -5647,7 +5789,7 @@ app.get("/api/public/events/:eventId/board", async (context) => {
       : null,
     emergencyMode: event.emergency_mode === 1,
     operationalInterrupted: event.operational_interrupted === 1,
-    operationalNotice: event.operational_note,
+    operationalNotice: event.planned_public_note || event.operational_note,
     departedVisibilitySeconds: event.departed_visibility_seconds,
     updatedAt: event.updated_at,
     groups: event.emergency_mode
@@ -5702,7 +5844,7 @@ app.get("/api/public/events/:eventId/board", async (context) => {
             boardingWindowLowerAt: boardingWindow.lowerAt,
             boardingWindowUpperAt: boardingWindow.upperAt,
             predictionQuality,
-            operationalNotice: row.resource_group_operational_note,
+            operationalNotice: row.planned_public_note || row.resource_group_operational_note,
           };
         }),
     fleet: event.emergency_mode

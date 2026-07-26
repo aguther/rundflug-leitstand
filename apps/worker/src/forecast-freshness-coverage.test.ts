@@ -8,7 +8,8 @@ describe("persisted forecast freshness", () => {
     expect(workerSource).toContain("assessForecastFreshness");
     expect(workerSource).toContain("predictionUpdatedAt: rotation.prediction_updated_at");
     expect(workerSource).toContain("predictionQuality: effectivePredictionQuality");
-    expect(workerSource).toContain('resourceGroupStatus !== "ACTIVE"');
+    expect(workerSource).toContain("const effectivePredictionQuality =");
+    expect(workerSource).toContain("eventRow.emergency_mode === 1");
     const publicTicketRoute = workerSource.slice(
       workerSource.indexOf('app.get("/api/public/tickets/:ticketCode"'),
       workerSource.indexOf('app.get("/api/public/push/config"'),

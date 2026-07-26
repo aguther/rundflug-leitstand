@@ -51,6 +51,7 @@ D1-Identität; angewandte Dateien werden nicht nachträglich umbenannt.
 | 44 | `0043_web_push_target_kind.sql` | eindeutig |
 | 45 | `0044_event_logo_theme_variants.sql` | eindeutig |
 | 46 | `0045_reset_setup_grants.sql` | eindeutig |
+| 47 | `0046_operational_plans.sql` | eindeutig |
 
-Gesamt: 46 Migrationen. Wiederherstellungsnotizen werden gegen SQL und
+Gesamt: 47 Migrationen. Wiederherstellungsnotizen werden gegen SQL und
 `apps/worker/migrations/README.md` geprüft.

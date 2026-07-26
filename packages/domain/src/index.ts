@@ -202,6 +202,8 @@ export type OperationalCommandType =
   | "SET_RESOURCE_GROUP_STATUS"
   | "SET_EVENT_INTERRUPTION"
   | "SET_PILOT_PAUSE"
+  | "UPSERT_PLANNED_OPERATION"
+  | "CANCEL_PLANNED_OPERATION"
   | "CONFIGURE_PRODUCT_SALES"
   | "PAIR_DEVICE"
   | "REVOKE_DEVICE"
@@ -252,6 +254,8 @@ const commandRoles: Readonly<Record<OperationalCommandType, readonly DeviceRole[
   SET_RESOURCE_GROUP_STATUS: ["FLIGHT_DIRECTOR", "ADMIN"],
   SET_EVENT_INTERRUPTION: ["FLIGHT_DIRECTOR", "ADMIN"],
   SET_PILOT_PAUSE: ["FLIGHT_DIRECTOR", "ADMIN"],
+  UPSERT_PLANNED_OPERATION: ["FLIGHT_DIRECTOR", "ADMIN"],
+  CANCEL_PLANNED_OPERATION: ["FLIGHT_DIRECTOR", "ADMIN"],
   CONFIGURE_PRODUCT_SALES: ["ADMIN"],
   PAIR_DEVICE: ["ADMIN"],
   REVOKE_DEVICE: ["ADMIN"],
@@ -346,6 +350,7 @@ export function assertPublicTicketCode(code: string): string {
 export * from "./capacity";
 export * from "./communication-labels";
 export * from "./forecast";
+export * from "./operational-plan";
 export * from "./outage-recovery";
 export * from "./precall";
 export * from "./public-status";

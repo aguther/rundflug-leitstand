@@ -29,6 +29,7 @@ export interface StoredEventRow {
   operational_interrupted?: number;
   version: number;
   operational_note: string;
+  operations_start_at?: string | null;
   operations_end_at?: string | null;
   sale_opens_at?: string | null;
   no_show_after_minutes?: number;

@@ -10,7 +10,7 @@ describe("persistierter automatischer Voraufruf (F-BEN-030)", () => {
     expect(coordinatorSource).toContain('trigger: "AUTOMATIC_PRECALL"');
     const persistence = coordinatorSource.slice(
       coordinatorSource.indexOf("private async persistAutomaticPrecalls"),
-      coordinatorSource.indexOf("private async handleFleetAdministration"),
+      coordinatorSource.indexOf("private async handlePlannedOperation"),
     );
     expect(persistence).toContain("UPDATE flight_groups");
     expect(persistence).not.toMatch(/UPDATE rotations|aircraft_id\s*=/i);

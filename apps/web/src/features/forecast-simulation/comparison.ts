@@ -4,7 +4,15 @@ import type { ManualIncident, SimulationConfig, SimulationMetrics } from "./mode
 
 export interface ComparisonMetricDefinition {
   id: string;
-  category: "Boarding" | "Meilensteine" | "Horizonte" | "Qualität" | "Unterdrückung" | "GO TO GATE";
+  category:
+    | "Boarding"
+    | "Meilensteine"
+    | "Horizonte"
+    | "Qualität"
+    | "Stabilität"
+    | "Betrieb"
+    | "Unterdrückung"
+    | "GO TO GATE";
   label: string;
   unit: string;
 }
@@ -158,6 +166,62 @@ const METRIC_DEFINITIONS: readonly (ComparisonMetricDefinition & {
     read: (metrics) => metrics.qualities.STABLE,
   },
   {
+    id: "stability-average-change",
+    category: "Stabilität",
+    label: "Ø Prognoseänderung",
+    unit: "Min.",
+    read: (metrics) => metrics.stability.averageAbsoluteChangeMinutes,
+  },
+  {
+    id: "stability-jumps-15",
+    category: "Stabilität",
+    label: "Sprünge über 15 Minuten",
+    unit: "",
+    read: (metrics) => metrics.stability.jumpsOver15Minutes,
+  },
+  {
+    id: "stability-jumps-30",
+    category: "Stabilität",
+    label: "Sprünge über 30 Minuten",
+    unit: "",
+    read: (metrics) => metrics.stability.jumpsOver30Minutes,
+  },
+  {
+    id: "stability-maximum-jump",
+    category: "Stabilität",
+    label: "Größter Prognosesprung",
+    unit: "Min.",
+    read: (metrics) => metrics.stability.maximumJumpMinutes,
+  },
+  {
+    id: "stability-maximum-window",
+    category: "Stabilität",
+    label: "Größtes Zeitfenster",
+    unit: "Min.",
+    read: (metrics) => metrics.stability.maximumWindowWidthMinutes,
+  },
+  {
+    id: "operations-throughput",
+    category: "Betrieb",
+    label: "Abgeschlossene Umläufe",
+    unit: "",
+    read: (metrics) => metrics.operations.completedRotations,
+  },
+  {
+    id: "operations-overtime",
+    category: "Betrieb",
+    label: "Überziehung Betriebsende",
+    unit: "Min.",
+    read: (metrics) => metrics.operations.overtimeMinutes,
+  },
+  {
+    id: "operations-utilization",
+    category: "Betrieb",
+    label: "Flugzeugauslastung",
+    unit: "%",
+    read: (metrics) => metrics.operations.aircraftUtilizationPercent,
+  },
+  {
     id: "quality-changing",
     category: "Qualität",
     label: "CHANGING-Snapshots",
@@ -259,6 +323,7 @@ export function productionBaselineConfig(config: SimulationConfig): SimulationCo
   const baseline = structuredClone(config);
   baseline.forecastTuning.forecast = { ...DEFAULT_FORECAST_TUNING_PROFILE };
   baseline.forecastTuning.precall = { ...DEFAULT_PRECALL_TUNING_PROFILE };
+  baseline.forecastTuning.availabilityModel = "SCALAR";
   return baseline;
 }
 
@@ -273,7 +338,8 @@ export function runBatchComparison(
   const runCount = config.forecastTuning.comparisonRuns;
   const candidateUsesProductionTuning =
     sameValues(config.forecastTuning.forecast, baselineConfig.forecastTuning.forecast) &&
-    sameValues(config.forecastTuning.precall, baselineConfig.forecastTuning.precall);
+    sameValues(config.forecastTuning.precall, baselineConfig.forecastTuning.precall) &&
+    config.forecastTuning.availabilityModel === baselineConfig.forecastTuning.availabilityModel;
 
   for (let index = 0; index < runCount; index += 1) {
     const seed = nextSeed(config.seed, index);

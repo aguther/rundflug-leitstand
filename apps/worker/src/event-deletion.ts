@@ -22,6 +22,10 @@ export function eventDeletionStatements(env: Env, eventId: string): D1PreparedSt
     env.DB.prepare(
       "DELETE FROM rotation_tickets WHERE rotation_id IN (SELECT id FROM rotations WHERE operation_day_id = ?1)",
     ).bind(eventId),
+    env.DB.prepare("DELETE FROM operational_blocks WHERE operation_day_id = ?1").bind(eventId),
+    env.DB.prepare("DELETE FROM planned_operational_constraints WHERE operation_day_id = ?1").bind(
+      eventId,
+    ),
     env.DB.prepare("DELETE FROM rotations WHERE operation_day_id = ?1").bind(eventId),
     env.DB.prepare("DELETE FROM flight_groups WHERE operation_day_id = ?1").bind(eventId),
     env.DB.prepare(
@@ -30,7 +34,6 @@ export function eventDeletionStatements(env: Env, eventId: string): D1PreparedSt
     env.DB.prepare("DELETE FROM ticket_groups WHERE operation_day_id = ?1").bind(eventId),
     env.DB.prepare("DELETE FROM outbox WHERE operation_day_id = ?1").bind(eventId),
     env.DB.prepare("DELETE FROM idempotency_receipts WHERE operation_day_id = ?1").bind(eventId),
-    env.DB.prepare("DELETE FROM operational_blocks WHERE operation_day_id = ?1").bind(eventId),
     env.DB.prepare("DELETE FROM resource_group_memberships WHERE operation_day_id = ?1").bind(
       eventId,
     ),
