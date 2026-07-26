@@ -20,7 +20,7 @@ Boarding verbunden werden können.
   horizontalen Scrollbereich. Flugzeugzeilen werden nicht aufgeklappt.
 - Buchungsgruppenbelegung und Pilotzuweisung verwenden getrennte, zentrierte Dialoge. Gruppen bleiben
   vollständig; Anwesenheit und konkrete Flugzeugkapazität werden weiterhin hart geprüft.
-- `ASSIGN_AIRCRAFT_PILOT` verwaltet eine exklusive anonyme Pilotvormerkung je Flugzeug. Flugleitung
+- `ASSIGN_AIRCRAFT_PILOT` verwaltet eine exklusive anonyme Pilotvormerkung je Flugzeug. Flight Director
   und Administration dürfen sie ohne aktiven Umlauf oder während `CALLED` ändern. Ab Offblock bis
   zum Umlaufabschluss bleibt die Zuordnung unverändert.
 - Eine Vormerkung an einem anderen konfliktfreien Flugzeug wird ausschließlich nach separater

@@ -103,45 +103,46 @@ describe("T-010 PWA installability and icon family", () => {
     });
   });
 
-  it.each(
-    staticManifests,
-  )("liefert für %s einen stabilen Startpfad und vier eindeutige Icons", (raw, path, profile) => {
-    const manifest = JSON.parse(raw) as {
-      id: string;
-      start_url: string;
-      display: string;
-      icons: Array<{ src: string; sizes: string; purpose: string }>;
-    };
-    expect(manifest.id).toBe(path);
-    expect(manifest.start_url).toBe(path);
-    expect(manifest.display).toBe("standalone");
-    expect(manifest.icons).toEqual([
-      {
-        src: `/icons/pwa/${profile}/icon-192.png`,
-        sizes: "192x192",
-        type: "image/png",
-        purpose: "any",
-      },
-      {
-        src: `/icons/pwa/${profile}/icon-512.png`,
-        sizes: "512x512",
-        type: "image/png",
-        purpose: "any",
-      },
-      {
-        src: `/icons/pwa/${profile}/maskable-192.png`,
-        sizes: "192x192",
-        type: "image/png",
-        purpose: "maskable",
-      },
-      {
-        src: `/icons/pwa/${profile}/maskable-512.png`,
-        sizes: "512x512",
-        type: "image/png",
-        purpose: "maskable",
-      },
-    ]);
-  });
+  it.each(staticManifests)(
+    "liefert für %s einen stabilen Startpfad und vier eindeutige Icons",
+    (raw, path, profile) => {
+      const manifest = JSON.parse(raw) as {
+        id: string;
+        start_url: string;
+        display: string;
+        icons: Array<{ src: string; sizes: string; purpose: string }>;
+      };
+      expect(manifest.id).toBe(path);
+      expect(manifest.start_url).toBe(path);
+      expect(manifest.display).toBe("standalone");
+      expect(manifest.icons).toEqual([
+        {
+          src: `/icons/pwa/${profile}/icon-192.png`,
+          sizes: "192x192",
+          type: "image/png",
+          purpose: "any",
+        },
+        {
+          src: `/icons/pwa/${profile}/icon-512.png`,
+          sizes: "512x512",
+          type: "image/png",
+          purpose: "any",
+        },
+        {
+          src: `/icons/pwa/${profile}/maskable-192.png`,
+          sizes: "192x192",
+          type: "image/png",
+          purpose: "maskable",
+        },
+        {
+          src: `/icons/pwa/${profile}/maskable-512.png`,
+          sizes: "512x512",
+          type: "image/png",
+          purpose: "maskable",
+        },
+      ]);
+    },
+  );
 
   it("schreibt Manifest, Favicon und iOS-Metadaten für alle Hauptansichten in den ersten HTML-Stream", () => {
     for (const path of [

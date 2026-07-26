@@ -15,7 +15,7 @@ const migrate = spawnSync(process.execPath, [npmCli, "run", "db:migrate:local"],
 if (migrate.status !== 0)
   throw new Error("Leere lokale Testdatenbank konnte nicht migriert werden.");
 const pin = String.fromCharCode(48).repeat(6);
-const setupCode = ["synthetic", "first", "run", "setup", "code"].join("-");
+const setupCode = ["synthetic", "first", "run", "recovery", "code"].join("-");
 const deviceToken = ["synthetic", "bootstrap", "admin", "device", "token", "value"].join("-");
 const server = spawn(
   process.execPath,
@@ -29,9 +29,7 @@ const server = spawn(
     "--var",
     "DATA_JURISDICTION:eu",
     "--var",
-    `ADMIN_PIN_HASH:${createHash("sha256").update(pin).digest("hex")}`,
-    "--var",
-    `BOOTSTRAP_TOKEN:${setupCode}`,
+    `INSTALLATION_RECOVERY_CODE:${setupCode}`,
   ],
   { cwd: root, stdio: "ignore", windowsHide: true },
 );
@@ -98,7 +96,7 @@ try {
   }
   const after = await setupStatus();
   if (after.setupRequired) throw new Error("Setup-Status blieb nach Erststart offen.");
-  const boardResponse = await fetch(`${base}/api/events/${request.eventId}/operations`, {
+  const boardResponse = await fetch(`${base}/api/control/${request.eventId}/operations`, {
     headers: { "x-device-id": adminDeviceId, "x-device-token": deviceToken },
   });
   const board = await boardResponse.json();
@@ -144,13 +142,13 @@ try {
   ) {
     throw new Error("Administrationsgerät konnte nicht mit der PIN erneuert werden.");
   }
-  const oldCredentialResponse = await fetch(`${base}/api/events/${request.eventId}/operations`, {
+  const oldCredentialResponse = await fetch(`${base}/api/control/${request.eventId}/operations`, {
     headers: { "x-device-id": adminDeviceId, "x-device-token": deviceToken },
   });
   if (oldCredentialResponse.status !== 403) {
     throw new Error("Der ersetzte Geräteschlüssel blieb nach der Wiederherstellung gültig.");
   }
-  const recoveredBoardResponse = await fetch(`${base}/api/events/${request.eventId}/operations`, {
+  const recoveredBoardResponse = await fetch(`${base}/api/control/${request.eventId}/operations`, {
     headers: { "x-device-id": adminDeviceId, "x-device-token": recoveredToken },
   });
   if (!recoveredBoardResponse.ok) {
@@ -172,14 +170,14 @@ try {
   if (!additionalRecovery.ok) {
     throw new Error("Ein neuer Browser konnte keinen PIN-geschützten Adminzugang erhalten.");
   }
-  const additionalBoardResponse = await fetch(`${base}/api/events/${request.eventId}/operations`, {
+  const additionalBoardResponse = await fetch(`${base}/api/control/${request.eventId}/operations`, {
     headers: { "x-device-id": additionalAdminDeviceId, "x-device-token": additionalAdminToken },
   });
   if (!additionalBoardResponse.ok) {
     throw new Error("Der neue PIN-geschützte Adminzugang lädt keinen Betriebsstand.");
   }
   const recoveryHistoryResponse = await fetch(
-    `${base}/api/events/${request.eventId}/history?eventType=ADMIN_DEVICE_CREDENTIAL_RECOVERED`,
+    `${base}/api/control/${request.eventId}/history?eventType=ADMIN_DEVICE_CREDENTIAL_RECOVERED`,
     { headers: { "x-device-id": adminDeviceId, "x-device-token": recoveredToken } },
   );
   const recoveryHistory = await recoveryHistoryResponse.json();

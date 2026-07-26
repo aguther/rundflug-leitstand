@@ -70,6 +70,9 @@ export function factoryResetStatements(
   completedAt: string,
   r2CleanupPending: boolean,
   response: FactoryResetResponse,
+  setupGrantHash: string,
+  setupGrantExpiresAt: string,
+  setupBrowserBindingHash: string,
 ): D1PreparedStatement[] {
   return [
     env.DB.prepare("UPDATE system_reset_control SET active = 1 WHERE singleton = 1"),
@@ -78,9 +81,20 @@ export function factoryResetStatements(
     env.DB.prepare("UPDATE system_reset_control SET active = 0 WHERE singleton = 1"),
     env.DB.prepare(
       `INSERT INTO system_reset_receipts
-        (command_id, request_hash, completed_at, r2_cleanup_pending, response_json)
-       VALUES (?1, ?2, ?3, ?4, ?5)`,
-    ).bind(commandId, requestHash, completedAt, r2CleanupPending ? 1 : 0, JSON.stringify(response)),
+        (command_id, request_hash, completed_at, r2_cleanup_pending, response_json,
+         setup_grant_hash, setup_grant_expires_at, setup_grant_used_at,
+         setup_browser_binding_hash)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, NULL, ?8)`,
+    ).bind(
+      commandId,
+      requestHash,
+      completedAt,
+      r2CleanupPending ? 1 : 0,
+      JSON.stringify(response),
+      setupGrantHash,
+      setupGrantExpiresAt,
+      setupBrowserBindingHash,
+    ),
   ];
 }
 

@@ -226,7 +226,7 @@ const percentile95 = (values) =>
 const sockets = [];
 try {
   await waitForWorker();
-  const initial = await timedJson(`${base}/api/events/perf-current/operations`, {
+  const initial = await timedJson(`${base}/api/control/perf-current/operations`, {
     headers: headers(1),
   });
   if (
@@ -243,7 +243,7 @@ try {
   sockets.push(...(await Promise.all(Array.from({ length: 20 }, () => connect()))));
   const parallel = await Promise.all(
     Array.from({ length: 20 }, (_, index) =>
-      timedJson(`${base}/api/events/perf-current/operations`, { headers: headers(index + 1) }),
+      timedJson(`${base}/api/control/perf-current/operations`, { headers: headers(index + 1) }),
     ),
   );
   if (parallel.some((entry) => !entry.response.ok)) {
@@ -254,7 +254,7 @@ try {
   const parallelTimes = parallel.map((entry) => entry.elapsedMs);
 
   const history = await timedJson(
-    `${base}/api/events/perf-current/history/operations?limit=200&offset=800`,
+    `${base}/api/control/perf-current/history/operations?limit=200&offset=800`,
     { headers: headers(1) },
   );
   if (!history.response.ok || history.body.total !== 1000 || history.body.entries.length !== 200) {
@@ -262,7 +262,7 @@ try {
   }
 
   const cashierPageOne = await timedJson(
-    `${base}/api/events/perf-current/tickets/search?status=ACTIVE&limit=50&q=`,
+    `${base}/api/control/perf-current/tickets/search?status=ACTIVE&limit=50&q=`,
     { headers: headers(2) },
   );
   if (
@@ -274,7 +274,7 @@ try {
     throw new Error("Erste cursorbasierte Kassenseite ist im Mengengerüst unvollständig.");
   }
   const cashierPageTwo = await timedJson(
-    `${base}/api/events/perf-current/tickets/search?status=ACTIVE&limit=50&q=&cursor=${encodeURIComponent(cashierPageOne.body.nextCursor)}`,
+    `${base}/api/control/perf-current/tickets/search?status=ACTIVE&limit=50&q=&cursor=${encodeURIComponent(cashierPageOne.body.nextCursor)}`,
     { headers: headers(2) },
   );
   const firstPageIds = new Set(cashierPageOne.body.results.map((entry) => entry.ticketGroupId));
@@ -286,7 +286,7 @@ try {
     throw new Error("Zweite cursorbasierte Kassenseite enthält Lücken oder Duplikate.");
   }
   const revalidation = await timedJson(
-    `${base}/api/events/perf-current/tickets/search?status=ACTIVE&limit=20&q=&id=perf-ticket-group-1000&id=perf-ticket-group-0951`,
+    `${base}/api/control/perf-current/tickets/search?status=ACTIVE&limit=20&q=&id=perf-ticket-group-1000&id=perf-ticket-group-0951`,
     { headers: headers(2) },
   );
   if (!revalidation.response.ok || revalidation.body.results.length !== 2) {
@@ -310,7 +310,7 @@ try {
     },
   };
   const saleStartedAt = performance.now();
-  const sale = await timedJson(`${base}/api/events/perf-current/commands`, {
+  const sale = await timedJson(`${base}/api/control/perf-current/commands`, {
     method: "POST",
     headers: { ...headers(2), "content-type": "application/json" },
     body: JSON.stringify(command),

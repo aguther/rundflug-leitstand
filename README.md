@@ -1,6 +1,6 @@
 # Rundflug-Leitstand
 
-Aktueller Applikations- und Anforderungsstand: **1.7.2**.
+Aktueller Applikations- und Anforderungsstand: **1.10.0**.
 
 In Entwicklung befindliche V1 eines webbasierten Operations-Management-Systems zur Organisation
 von Rundflügen auf Flugplatzfesten und Fly-Ins. Der aktuelle Stand läuft als nicht produktive
@@ -30,6 +30,8 @@ Die Entscheidung für diese Architektur ist in `docs/adr/` dokumentiert.
 Ein datierter Vergleich mit kostengünstigen Alternativen liegt unter `docs/operations/provider-comparison.md`.
 Fachmodell, Zustandsautomaten, Invarianten und Prognoseverfahren sind unter
 `docs/architecture/domain-state-and-forecast-v1.md` zusammenhängend beschrieben.
+Der erledigte und noch verbleibende Konsolidierungsbedarf steht in
+[docs/architecture/technical-debt-1.10.0.md](docs/architecture/technical-debt-1.10.0.md).
 
 ## Voraussetzungen
 
@@ -86,18 +88,15 @@ npm run check
 
 Der Befehl führt Format-/Lintprüfung, Typprüfung, Tests, Web-Build, Worker-Dry-Run und die
 Vollständigkeitsprüfung des Anforderungskatalogs aus.
-Die vor dem Verpacken ausgeführten Prüfungen sind in `docs/verification/initial-verification.md` festgehalten.
+Die aktuellen automatisierten Prüfungen sind in `package.json`, den Requirements und der
+vollständigen Traceability dokumentiert.
 
 ## Cloudflare-Ressourcen
 
-Die aktuell verwendete D1-Datenbank und der R2-Bucket sind in `wrangler.jsonc` gebunden. Beide
-Ressourcen müssen in EU-Jurisdiktion liegen. Die vollständige Anleitung steht in
-`docs/operations/cloudflare-setup.md`.
-
-Bis zur Produktionsfreigabe wird gemäß
-[ADR-0007](docs/adr/0007-eine-cloudflare-abnahmeumgebung.md) bewusst nur diese eine zentrale
-Abnahmeumgebung von `main` aus betrieben. Sie ist keine Produktivumgebung; die nach T-070
-erforderliche Trennung ist ein eigenes Produktions-Gate.
+Die aktuell verwendete D1-Datenbank und der R2-Bucket sind in `wrangler.jsonc` gebunden. Neue,
+getrennte Zielumgebungen werden namensgesteuert und in EU-Jurisdiktion gemäß
+[Cloudflare-Neuaufbau](docs/operations/cloudflare-neuaufbau.md) sowie
+[ADR-0027](docs/adr/0027-portable-cloudflare-ziele-und-reset-fortsetzung.md) erstellt.
 
 Die für V1 erforderliche, telefonnummernfreie Browser-Benachrichtigung wird sicher eingerichtet mit:
 
@@ -133,15 +132,15 @@ packages/config/          gemeinsame Konstanten
 packages/testkit/         synthetische Testdaten und Testuhr
 docs/requirements/        Lastenheft, strukturierte Anforderungen und Traceability
 docs/adr/                 Architekturentscheidungen
-docs/codex/prompts/       direkt nutzbare Codex-Aufträge
 docs/operations/          Konto-, Deployment-, Backup- und Notfallhinweise
+docs/roles/               aktuelle Rollenblätter und synthetische Screenshots
 scripts/                   lokale Prüf- und Hilfsskripte
 ```
 
 ## Empfohlener Codex-Ablauf
 
 1. `AGENTS.md` und die Anforderungen lesen lassen.
-2. Mit `docs/codex/prompts/01-plan-und-traceability.md` im Plan-Modus beginnen.
+2. Aktuelle Traceability und offene Fragen prüfen.
 3. Offene Fragen und ADRs fachlich freigeben.
 4. Je Pull Request genau einen vertikalen, testbaren Baustein umsetzen.
 5. Anforderungs-IDs in Issue, Commit, Test und Pull Request referenzieren.

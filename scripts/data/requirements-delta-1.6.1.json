@@ -1,0 +1,90 @@
+{
+  "version": "1.10.0",
+  "sourceRelease": "1.6.1",
+  "requirements": [
+    {
+      "source": "1.6.1",
+      "id": "V161-UI-010",
+      "section": "Fortgeltendes Delta 1.6.1",
+      "requirement": "Zweispaltige Kasse ohne horizontales Abschneiden im iPad-Landscape-Bereich.",
+      "priority": "MUSS",
+      "stage": "V1",
+      "status": "implemented",
+      "module": "apps/web/src/cashier-view.tsx und cashier-v12.css",
+      "tests": "Komponententest und Browserabnahme bei 1194×679 sowie Tablet-Portrait",
+      "traceStatus": "umgesetzt"
+    },
+    {
+      "source": "1.6.1",
+      "id": "V161-UI-020",
+      "section": "Fortgeltendes Delta 1.6.1",
+      "requirement": "Genau ein Scroll-Eigentümer für Ticketliste und cursorbasiertes Nachladen.",
+      "priority": "MUSS",
+      "stage": "V1",
+      "status": "implemented",
+      "module": "apps/web/src/features/cashier/cashier-v12.css",
+      "tests": "Komponententest und Browserabnahme mit gefüllter und leerer Ticketliste",
+      "traceStatus": "umgesetzt"
+    },
+    {
+      "source": "1.6.1",
+      "id": "V161-UI-030",
+      "section": "Fortgeltendes Delta 1.6.1",
+      "requirement": "Ein globaler Footer entfällt; die aktuelle Releaseversion steht zugänglich in der oberen Navigation.",
+      "priority": "MUSS",
+      "stage": "V1",
+      "status": "implemented",
+      "module": "apps/web/src/app/AppShell.tsx und AppHeader.tsx",
+      "tests": "apps/web/src/app/navigation.test.ts und Browserabnahme",
+      "traceStatus": "umgesetzt"
+    },
+    {
+      "source": "1.6.1",
+      "id": "V161-FL-010",
+      "section": "Fortgeltendes Delta 1.6.1",
+      "requirement": "Kompakte scrollbare Flugzeugtabelle mit deutschem Status, Zustandszeit und iPad-Darstellung.",
+      "priority": "MUSS",
+      "stage": "V1",
+      "status": "implemented",
+      "module": "apps/web/src/flight-line-supervisor.tsx und flight-line-v12.css sowie apps/worker/migrations/0038_aircraft_state_changed_at.sql",
+      "tests": "Contract-/Migration-/UI-Tests und Browserabnahme Desktop/iPad",
+      "traceStatus": "umgesetzt"
+    },
+    {
+      "source": "1.6.1",
+      "id": "V161-FL-020",
+      "section": "Fortgeltendes Delta 1.6.1",
+      "requirement": "Zeilenaktionen und Buchungsgruppenbelegung im zentrierten Dialog ohne Zeilenaufklappung.",
+      "priority": "MUSS",
+      "stage": "V1",
+      "status": "implemented",
+      "module": "apps/web/src/flight-line-supervisor.tsx und design-system/components/ModalDialog.tsx",
+      "tests": "Flight-Line- und Designsystemtests sowie Fokusabnahme",
+      "traceStatus": "umgesetzt"
+    },
+    {
+      "source": "1.6.1",
+      "id": "V161-FL-030",
+      "section": "Fortgeltendes Delta 1.6.1",
+      "requirement": "Separate konfliktgeprüfte und auditierte Pilotzuweisung bis Offblock.",
+      "priority": "MUSS",
+      "stage": "V1",
+      "status": "implemented",
+      "module": "packages/contracts und packages/domain sowie apps/worker/src/event-coordinator.ts",
+      "tests": "Contract-/Rollen-/Worker-Tests und test:pilot-conflict",
+      "traceStatus": "umgesetzt"
+    },
+    {
+      "source": "1.6.1",
+      "id": "V161-FL-040",
+      "section": "Fortgeltendes Delta 1.6.1",
+      "requirement": "Vollständige deutschsprachige Zeitlinie für aktuellen Umlauf und eine Historienzeile je Umlauf.",
+      "priority": "MUSS",
+      "stage": "V1",
+      "status": "implemented",
+      "module": "packages/domain/src/index.ts und apps/web/src/flight-line-supervisor.tsx",
+      "tests": "Domain- und Flight-Line-UI-Tests sowie Browserablauf",
+      "traceStatus": "umgesetzt"
+    }
+  ]
+}

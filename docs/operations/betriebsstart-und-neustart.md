@@ -7,16 +7,14 @@ zur Wiederherstellung erhalten.
 
 ## 1. Einmalige Cloudflare-Einrichtung
 
-1. D1-Datenbank und R2-Bucket in EU-Jurisdiktion anlegen und in `wrangler.jsonc` binden.
-2. Migrationen auf D1 anwenden und den Worker aus `main` bereitstellen.
-3. `ADMIN_PIN_HASH` und den einmaligen `BOOTSTRAP_TOKEN` als Cloudflare-Secrets einrichten. Secrets
-   niemals in Dateien oder Logs schreiben.
-4. Nach dem ersten Deployment `/setup` öffnen und dort die erste Veranstaltung sowie das anonyme
-   Administrationsgerät anlegen. Der Setup-Zugang sperrt sich danach dauerhaft.
-5. Web-Push mit `npm run cloudflare:configure-push` einrichten. Ohne diese Werte funktioniert der
-   übrige Leitstand, aber die verbindliche V1-Browserbenachrichtigung ist nicht betriebsbereit.
-6. Healthcheck, Administrationsoberfläche, D1-Sicherung nach R2 und einen Wiederherstellungstest
-   prüfen.
+1. Den automatisierten Neuaufbau aus
+   [Cloudflare-Neuaufbau](cloudflare-neuaufbau.md) zunächst mit `--dry-run`, danach ohne diesen
+   Schalter ausführen.
+2. Den einmalig angezeigten Installations-Notfallcode unmittelbar im Passwortsafe sichern.
+3. Die ausgegebene `/setup`-Adresse öffnen und dort die erste Veranstaltung sowie das
+   Administratorkonto mit einer neuen PIN anlegen.
+4. `npm run cloudflare:verify -- --target <ziel>` ausführen.
+5. Administrationsoberfläche, D1-Sicherung nach R2 und Wiederherstellungstest prüfen.
 
 Die konkreten Cloudflare-Schritte und Befehle stehen in [cloudflare-setup.md](cloudflare-setup.md),
 das Sicherungs- und Wiederherstellungsverfahren in [backup-restore.md](backup-restore.md).
@@ -114,9 +112,18 @@ Leerung ist wiederholbar; ein technischer Reset-Beleg erlaubt das Fortsetzen, we
 dieser letzte Schritt unterbrochen wurde. Dieser Beleg enthält keine PIN, keinen Gerätetoken und
 keine personenbezogenen Daten.
 
-Nach einem erfolgreichen Reset löscht der Browser Geräteschlüssel und Offline-Snapshots und wechselt
-zu `/setup`. Für die neue Ersteinrichtung werden wieder der serverseitig konfigurierte Setup-Code und
-die Administrator-PIN benötigt.
+Der Reset verlangt immer die aktuelle PIN des angemeldeten Administratorkontos. Nach einem
+erfolgreichen Reset löscht der Browser Geräteschlüssel und Offline-Snapshots und wechselt zu
+`/setup`. Im selben Browser erkennt der Worker eine einmal verwendbare, 30 Minuten gültige
+Fortsetzungsfreigabe in einem nicht per JavaScript lesbaren, hostgebundenen Cookie. Das Codefeld ist
+ausgeblendet; Veranstaltung und neue Administrator-PIN können ohne Konsole eingerichtet werden.
+
+Geht die Reset-Antwort verloren, wiederholt die Oberfläche denselben `commandId`; der Worker stellt
+dasselbe sichere Cookie erneut aus. Ein anderer Browser erhält keine Freigabe. Bei verlorenem
+Browser oder abgelaufenem Grant darf ausschließlich der beim Cloudflare-Neuaufbau im Passwortsafe
+gesicherte Installations-Notfallcode verwendet werden. Er funktioniert nur bei wirklich leerer
+Installation. Ist auch dieser Code verloren, bleibt als Break-Glass-Weg die bewusste Rotation von
+`INSTALLATION_RECOVERY_CODE` im Cloudflare-Account.
 
 ## Gestörte Administrationsgerätebindung
 

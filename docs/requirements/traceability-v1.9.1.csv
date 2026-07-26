@@ -1,8 +1,0 @@
-ID,Modul,Tests,Status
-V191-REL-010,package.json Workspace-Pakete packages/config und Releaseunterlagen,Requirements- und Versionsverifikation,umgesetzt
-V191-CAS-010,apps/web/src/cashier-view.tsx apps/worker/src/event-coordinator.ts und scripts/verify_sale_guards.mjs,cashier-v12.test.ts sale-capacity-policy.test.ts und test:sale-guards,umgesetzt
-V191-GRP-010,apps/worker/src/index.ts und event-coordinator.ts,sale-capacity-policy.test.ts test:sale-guards und Browserabnahme,umgesetzt
-V191-PRN-010,apps/web/src/features/cashier/cashier-v12.css und docs/operations/pos-58-direct-print.md,cashier-v12.test.ts Print-to-PDF und physische POS-58-Prüfung extern,umgesetzt
-V191-PUB-010,apps/web/src/features/public-status/public-status-model.ts und public-status-v18.css,public-status-model.test.ts public-status-ui.test.ts und mobile Browserabnahme,umgesetzt
-V191-FID-010,apps/web/src/time-window.ts und fids-display.tsx,time-window.test.ts fids-display-ui.test.ts und Browserabnahme,umgesetzt
-V191-QA-010,Workspace-Prüfskripte und docs/ui/v1.9.1-cashier-concept.md,Vollständiger Check responsive Browserabnahme und Diff-Review,umgesetzt

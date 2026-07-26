@@ -16,7 +16,7 @@ die auf demselben Gerätetyp verfügbar sein können.
 ## Entscheidung
 
 - Die am 17. Juli 2026 bestätigten Referenzbilder in
-  `docs/ui/operations-v2-multi-surface-concept.md` sind die ausschließliche visuelle Quelle für
+  `docs/ui/v1.10.0-release-concept.md` und die aktuellen Rollenbilder sind die visuelle Quelle für
   V1.2. Ältere Konzepte sind historisch.
 - Ein gemeinsames Designsystem definiert semantische Farb-, Typografie-, Abstands-, Radius-,
   Höhen-, Fokus- und Bewegungstokens für Light und Dark Mode.
@@ -38,4 +38,3 @@ die auf demselben Gerätetyp verfügbar sein können.
 Die Migration erfolgt vertikal: Designsystem und App-Shell zuerst, danach Authentifizierung und
 anschließend Oberfläche für Oberfläche. Fachliche Zustandsübergänge verbleiben in Domain und Worker.
 Automatisierte UI-Verträge werden durch Browser- und Screenshotabnahmen ergänzt.
-

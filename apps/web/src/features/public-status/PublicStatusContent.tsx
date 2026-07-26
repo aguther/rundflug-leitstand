@@ -287,3 +287,5 @@ export type TicketStatusPart = Pick<
 >;
 
 export type GroupStatusPart = PublicGroupStatus["parts"][number];
+
+import "./public-status-v18.css";

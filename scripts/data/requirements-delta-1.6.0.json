@@ -1,0 +1,102 @@
+{
+  "version": "1.10.0",
+  "sourceRelease": "1.6.0",
+  "requirements": [
+    {
+      "source": "1.6.0",
+      "id": "V16-KAS-010",
+      "section": "Fortgeltendes Delta 1.6.0",
+      "requirement": "Produktbezogene idempotente Verkaufsaktion an stabiler Position.",
+      "priority": "MUSS",
+      "stage": "V1",
+      "status": "implemented",
+      "module": "apps/web/src/cashier-view.tsx",
+      "tests": "apps/web/src/cashier-v1-6.test.ts",
+      "traceStatus": "umgesetzt"
+    },
+    {
+      "source": "1.6.0",
+      "id": "V16-KAS-015",
+      "section": "Fortgeltendes Delta 1.6.0",
+      "requirement": "Vollständig bedienbare kompakte Produktliste auch bei mehr als zwei Produkten.",
+      "priority": "MUSS",
+      "stage": "V1",
+      "status": "implemented",
+      "module": "apps/web/src/cashier-view.tsx und cashier-v12.css",
+      "tests": "Komponententest und Browserabnahme mit drei Produkten",
+      "traceStatus": "umgesetzt"
+    },
+    {
+      "source": "1.6.0",
+      "id": "V16-KAS-020",
+      "section": "Fortgeltendes Delta 1.6.0",
+      "requirement": "Dauerhaft reservierte Hinweisfläche ohne Layoutsprung.",
+      "priority": "MUSS",
+      "stage": "V1",
+      "status": "implemented",
+      "module": "apps/web/src/features/cashier/cashier-v12.css",
+      "tests": "apps/web/src/cashier-v1-6.test.ts und Browserabnahme",
+      "traceStatus": "umgesetzt"
+    },
+    {
+      "source": "1.6.0",
+      "id": "V16-KAS-030",
+      "section": "Fortgeltendes Delta 1.6.0",
+      "requirement": "Aktuelle cursorbasierte Kassenliste mit gezielter Revalidierung.",
+      "priority": "MUSS",
+      "stage": "V1",
+      "status": "implemented",
+      "module": "apps/web/src/cashier-view.tsx apps/worker/src/index.ts und ADR-0022",
+      "tests": "Contracts- Worker- Suchkompatibilitäts- und Browsertests",
+      "traceStatus": "umgesetzt"
+    },
+    {
+      "source": "1.6.0",
+      "id": "V16-KAS-040",
+      "section": "Fortgeltendes Delta 1.6.0",
+      "requirement": "Zuverlässiger auditierter Storno mit unmittelbarer Kapazitätsfreigabe.",
+      "priority": "MUSS",
+      "stage": "V1",
+      "status": "implemented",
+      "module": "apps/worker/src/event-coordinator.ts und apps/web/src/cashier-view.tsx",
+      "tests": "scripts/verify_ticket_corrections.mjs und Browserabnahme",
+      "traceStatus": "umgesetzt"
+    },
+    {
+      "source": "1.6.0",
+      "id": "V16-KAS-050",
+      "section": "Fortgeltendes Delta 1.6.0",
+      "requirement": "Keine neue Umbuchung; Korrektur durch Storno und Neuverkauf.",
+      "priority": "MUSS",
+      "stage": "V1",
+      "status": "implemented",
+      "module": "packages/contracts packages/domain apps/worker und apps/web",
+      "tests": "Contracts- Domain- und Integrationstests",
+      "traceStatus": "umgesetzt"
+    },
+    {
+      "source": "1.6.0",
+      "id": "V16-TKT-010",
+      "section": "Fortgeltendes Delta 1.6.0",
+      "requirement": "Gemeinsames lesbares 58-mm-Dokument für Vorschau und Druck.",
+      "priority": "MUSS",
+      "stage": "V1",
+      "status": "implemented",
+      "module": "apps/web/src/cashier-view.tsx apps/worker/src/index.ts und ADR-0022",
+      "tests": "Druckmarkup- G-Kennungs- und Browserabnahme",
+      "traceStatus": "umgesetzt"
+    },
+    {
+      "source": "1.6.0",
+      "id": "V16-TKT-020",
+      "section": "Fortgeltendes Delta 1.6.0",
+      "requirement": "Druck nur bei vollständigen Daten; Verkauf bleibt unabhängig gültig.",
+      "priority": "MUSS",
+      "stage": "V1",
+      "status": "implemented",
+      "module": "apps/web/src/cashier-view.tsx",
+      "tests": "Druckbereitschafts- und Browsertests",
+      "traceStatus": "umgesetzt"
+    }
+  ]
+}

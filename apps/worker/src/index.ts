@@ -47,6 +47,7 @@ import {
   nextLoginCode,
   type OperatorRole,
   type SessionActor,
+  sessionBrowserBindingHash,
   sessionCookie,
   sessionTimes,
 } from "./auth";
@@ -78,9 +79,23 @@ import { buildOperationalHistoryStatement } from "./operational-history";
 import {
   allowAdminDeviceRecoveryAttempt,
   allowLoginAttempt,
+  allowSetupAttempt,
   allowUnknownTicketAttempt,
 } from "./public-access";
 import { createCsv, createTextPdf } from "./report";
+import {
+  API_BODY_LIMIT_BYTES,
+  limitApiBody,
+  requireValidJsonBody,
+} from "./request-body-boundaries";
+import {
+  clearedResetSetupCookie,
+  installationRecoveryCode,
+  resetSetupCookie,
+  resetSetupGrantExpiry,
+  resetSetupToken,
+  validResetSetupGrant,
+} from "./reset-setup-grant";
 import { rowToSnapshot } from "./snapshot";
 import { ticketSearchStatusCondition } from "./ticket-search";
 import { httpsRedirectLocation } from "./transport-security";
@@ -100,10 +115,9 @@ const app = new Hono<{
 
 function eventRoutes<const Suffix extends string>(
   suffix: Suffix,
-): [`/api/control/:eventId${Suffix}`, `/api/events/:eventId${Suffix}`] {
+): [`/api/control/:eventId${Suffix}`] {
   const controlPath = `/api/control/:eventId${suffix}` as `/api/control/:eventId${Suffix}`;
-  const legacyPath = `/api/events/:eventId${suffix}` as `/api/events/:eventId${Suffix}`;
-  return [controlPath, legacyPath];
+  return [controlPath];
 }
 
 interface TicketSearchCursor {
@@ -138,7 +152,7 @@ function decodeTicketSearchCursor(value: string | undefined): TicketSearchCursor
   }
 }
 
-const MASTER_DATA_TEMPLATE_BODY_LIMIT_BYTES = 1_250_000;
+const MASTER_DATA_TEMPLATE_BODY_LIMIT_BYTES = API_BODY_LIMIT_BYTES;
 
 function masterDataTemplateCounts(template: MasterDataTemplate): MasterDataTemplateCounts {
   return {
@@ -584,7 +598,10 @@ app.use("/api/*", async (context, next) => {
   context.header("cache-control", "no-store");
 });
 
-for (const protectedPrefix of ["/api/control/*", "/api/events/*"] as const) {
+app.use("/api/*", limitApiBody);
+app.use("/api/*", requireValidJsonBody);
+
+for (const protectedPrefix of ["/api/control/*"] as const) {
   app.use(protectedPrefix, async (context, next) => {
     if (context.req.path.endsWith("/fids/preferences")) {
       await next();
@@ -620,9 +637,11 @@ app.get("/api/health", (context) =>
 
 app.get("/api/meta", (context) =>
   context.json({
+    applicationVersion: APP_VERSION,
     architecture: "Cloudflare Worker + Static Assets + D1 + Durable Object + R2",
     dataJurisdiction: context.env.DATA_JURISDICTION,
     productionReady: false,
+    requirementsVersion: REQUIREMENTS_VERSION,
   }),
 );
 
@@ -633,10 +652,13 @@ app.get("/api/setup/status", async (context) => {
       (SELECT COUNT(*) FROM operation_days) AS events,
       (SELECT COUNT(*) FROM operator_accounts WHERE role = 'ADMIN' AND active = 1) AS admins`,
   ).first<{ completed: number; events: number; admins: number }>();
+  const resetGrant = await validResetSetupGrant(context.env, context.req.raw);
   return context.json({
     setupRequired:
       (state?.completed ?? 0) === 0 && (state?.events ?? 0) === 0 && (state?.admins ?? 0) === 0,
-    setupConfigured: Boolean(context.env.BOOTSTRAP_TOKEN),
+    setupConfigured: Boolean(installationRecoveryCode(context.env) || resetGrant),
+    resetSetupAuthorized: Boolean(resetGrant),
+    resetSetupExpiresAt: resetGrant?.setup_grant_expires_at ?? null,
   });
 });
 
@@ -646,17 +668,6 @@ app.post("/api/setup", async (context) => {
     return context.json(
       { error: { code: "INVALID_SETUP", message: "Einrichtungsdaten sind unvollständig." } },
       400,
-    );
-  }
-  if (!context.env.BOOTSTRAP_TOKEN) {
-    return context.json(
-      {
-        error: {
-          code: "SETUP_NOT_CONFIGURED",
-          message: "Ersteinrichtung ist serverseitig noch nicht freigeschaltet.",
-        },
-      },
-      503,
     );
   }
   const state = await context.env.DB.prepare(
@@ -671,8 +682,31 @@ app.post("/api/setup", async (context) => {
       409,
     );
   }
-  const setupTokenHash = await sha256Hex(context.env.BOOTSTRAP_TOKEN);
-  if (!(await verifyCredential(parsed.data.setupCode, setupTokenHash))) {
+  const resetGrant = await validResetSetupGrant(context.env, context.req.raw);
+  const recoveryCode = installationRecoveryCode(context.env);
+  if (!resetGrant && !recoveryCode) {
+    return context.json(
+      {
+        error: {
+          code: "SETUP_NOT_CONFIGURED",
+          message: "Ersteinrichtung ist serverseitig noch nicht freigeschaltet.",
+        },
+      },
+      503,
+    );
+  }
+  if (
+    !resetGrant &&
+    !(await allowSetupAttempt(context.env.ADMIN_RECOVERY_RATE_LIMITER, context.req.raw))
+  ) {
+    return context.json(
+      { error: { code: "SETUP_CREDENTIALS_INVALID", message: "Einrichtung nicht autorisiert." } },
+      429,
+      { "retry-after": "60" },
+    );
+  }
+  const recoveryCodeHash = recoveryCode ? await sha256Hex(recoveryCode) : null;
+  if (!resetGrant && !(await verifyCredential(parsed.data.setupCode ?? null, recoveryCodeHash))) {
     return context.json(
       { error: { code: "SETUP_CREDENTIALS_INVALID", message: "Einrichtung nicht autorisiert." } },
       403,
@@ -689,7 +723,7 @@ app.post("/api/setup", async (context) => {
   const adminAccountId = crypto.randomUUID();
   const adminPinHash = await hashPin(input.adminPin);
   try {
-    await context.env.DB.batch([
+    const statements = [
       context.env.DB.prepare(
         `INSERT INTO operation_days
           (id, name, event_date, time_zone, status, emergency_mode, operational_note, version,
@@ -731,13 +765,27 @@ app.post("/api/setup", async (context) => {
         `INSERT INTO outbox (id, operation_day_id, topic, payload_json, created_at)
          VALUES (?1, ?2, 'SYSTEM_BOOTSTRAPPED', ?3, ?4)`,
       ).bind(crypto.randomUUID(), input.eventId, JSON.stringify({ eventId: input.eventId }), now),
-    ]);
+    ];
+    if (resetGrant) {
+      statements.push(
+        context.env.DB.prepare(
+          `UPDATE system_reset_receipts
+              SET setup_grant_used_at = ?1
+            WHERE command_id = ?2
+              AND setup_grant_used_at IS NULL
+              AND setup_grant_expires_at > ?1`,
+        ).bind(now, resetGrant.command_id),
+      );
+    }
+    await context.env.DB.batch(statements);
   } catch {
     return context.json(
       { error: { code: "SETUP_ALREADY_COMPLETED", message: "Ersteinrichtung ist abgeschlossen." } },
       409,
     );
   }
+  context.header("set-cookie", clearedResetSetupCookie(context.req.raw));
+  context.header("set-cookie", clearedSessionCookie(context.req.raw), { append: true });
   return context.json(
     {
       eventId: input.eventId,
@@ -1088,7 +1136,7 @@ app.post("/api/admin/events/:eventId/verify-pin", async (context) => {
   const actor = await authorizeSession(context.env, context.req.raw);
   if (
     authorized?.role !== "ADMIN" ||
-    (!actor && !(await verifyCredential(parsed.data.adminPin, context.env.ADMIN_PIN_HASH)))
+    (!actor && !(await verifyCredential(parsed.data.adminPin, context.env.ADMIN_PIN_HASH ?? null)))
   ) {
     return context.json(
       { error: { code: "ADMIN_REQUIRED", message: "Administrator-PIN ist nicht korrekt." } },
@@ -1135,11 +1183,15 @@ app.post("/api/admin/events/:eventId/recover-device", async (context) => {
   )
     .bind(deviceId, eventId)
     .first<{ role: string }>();
-  if (
-    !operationDay ||
-    (device && device.role !== "ADMIN") ||
-    !(await verifyCredential(parsed.data.adminPin, context.env.ADMIN_PIN_HASH))
-  ) {
+  const adminAccounts = await context.env.DB.prepare(
+    "SELECT pin_hash FROM operator_accounts WHERE role = 'ADMIN' AND active = 1",
+  ).all<{ pin_hash: string }>();
+  const currentAdminPinMatches = (
+    await Promise.all(
+      adminAccounts.results.map((account) => verifyPin(parsed.data.adminPin, account.pin_hash)),
+    )
+  ).some(Boolean);
+  if (!operationDay || (device && device.role !== "ADMIN") || !currentAdminPinMatches) {
     return context.json(
       {
         error: {
@@ -1190,16 +1242,30 @@ app.post("/api/admin/events/:eventId/factory-reset", async (context) => {
   const input = parsed.data;
   const requestHash = await factoryResetRequestHash(input);
   const prior = await context.env.DB.prepare(
-    `SELECT request_hash, r2_cleanup_pending, response_json
+    `SELECT request_hash, completed_at, r2_cleanup_pending, response_json,
+            setup_browser_binding_hash
        FROM system_reset_receipts WHERE command_id = ?1`,
   )
     .bind(input.commandId)
     .first<{
       request_hash: string;
+      completed_at: string;
       r2_cleanup_pending: number;
       response_json: string;
+      setup_browser_binding_hash: string | null;
     }>();
   if (prior) {
+    const browserBindingHash = await sessionBrowserBindingHash(context.req.raw);
+    if (
+      !browserBindingHash ||
+      !prior.setup_browser_binding_hash ||
+      browserBindingHash !== prior.setup_browser_binding_hash
+    ) {
+      return context.json(
+        { error: { code: "ADMIN_REQUIRED", message: "Administration erforderlich." } },
+        403,
+      );
+    }
     if (prior.request_hash !== requestHash) {
       return context.json(
         { error: { code: "IDEMPOTENCY_CONFLICT", message: "Reset-ID ist bereits belegt." } },
@@ -1210,20 +1276,65 @@ app.post("/api/admin/events/:eventId/factory-reset", async (context) => {
     if (prior.r2_cleanup_pending) {
       response = await finishR2Cleanup(context.env, input.commandId, response);
     }
+    const token = await resetSetupToken(context.env, input.commandId, prior.completed_at);
+    if (token) context.header("set-cookie", resetSetupCookie(token, context.req.raw));
     return context.json(response);
   }
 
-  const authorized = await authorizeDevice(context.env, input.eventId, context.req.raw);
   const actor = await authorizeSession(context.env, context.req.raw);
-  if (
-    authorized?.role !== "ADMIN" ||
-    (!actor && !(await verifyCredential(input.adminPin, context.env.ADMIN_PIN_HASH)))
-  ) {
+  const authorized = await authorizeDevice(context.env, input.eventId, context.req.raw, actor);
+  if (actor?.role !== "ADMIN" || authorized?.role !== "ADMIN") {
     return context.json(
       { error: { code: "ADMIN_REQUIRED", message: "Administration erforderlich." } },
       403,
     );
   }
+  const browserBindingHash = await sessionBrowserBindingHash(context.req.raw);
+  if (!browserBindingHash) {
+    return context.json(
+      { error: { code: "ADMIN_REQUIRED", message: "Administration erforderlich." } },
+      403,
+    );
+  }
+  if (
+    !(await allowLoginAttempt(
+      context.env.ADMIN_RECOVERY_RATE_LIMITER,
+      context.req.raw,
+      actor.accountId,
+    ))
+  ) {
+    return context.json(
+      { error: { code: "ADMIN_REQUIRED", message: "Administration erforderlich." } },
+      429,
+      { "retry-after": "60" },
+    );
+  }
+  const account = await context.env.DB.prepare(
+    "SELECT pin_hash FROM operator_accounts WHERE id = ?1 AND active = 1",
+  )
+    .bind(actor.accountId)
+    .first<{ pin_hash: string }>();
+  if (!account || !(await verifyPin(input.adminPin, account.pin_hash))) {
+    return context.json(
+      { error: { code: "ADMIN_REQUIRED", message: "Administration erforderlich." } },
+      403,
+    );
+  }
+  const completedAt = new Date();
+  const grantToken = await resetSetupToken(context.env, input.commandId, completedAt.toISOString());
+  if (!grantToken) {
+    return context.json(
+      {
+        error: {
+          code: "RESET_SETUP_NOT_CONFIGURED",
+          message: "Der sichere Einrichtungsübergang ist serverseitig nicht konfiguriert.",
+        },
+      },
+      503,
+    );
+  }
+  const grantHash = await sha256Hex(grantToken);
+  const grantExpiresAt = resetSetupGrantExpiry(completedAt);
 
   const eventRows = await context.env.DB.prepare("SELECT id FROM operation_days").all<{
     id: string;
@@ -1276,9 +1387,12 @@ app.post("/api/admin/events/:eventId/factory-reset", async (context) => {
         context.env,
         input.commandId,
         requestHash,
-        new Date().toISOString(),
+        completedAt.toISOString(),
         input.deleteAllBackups,
         response,
+        grantHash,
+        grantExpiresAt,
+        browserBindingHash,
       ),
     );
   } catch {
@@ -1294,11 +1408,15 @@ app.post("/api/admin/events/:eventId/factory-reset", async (context) => {
   }
   if (input.deleteAllBackups) {
     try {
-      return context.json(await finishR2Cleanup(context.env, input.commandId, response));
+      const completedResponse = await finishR2Cleanup(context.env, input.commandId, response);
+      context.header("set-cookie", resetSetupCookie(grantToken, context.req.raw));
+      return context.json(completedResponse);
     } catch {
+      context.header("set-cookie", resetSetupCookie(grantToken, context.req.raw));
       return context.json(response, 202);
     }
   }
+  context.header("set-cookie", resetSetupCookie(grantToken, context.req.raw));
   return context.json(response);
 });
 
@@ -5676,6 +5794,12 @@ app.notFound((context) =>
 );
 
 app.onError((error, context) => {
+  if (error instanceof SyntaxError) {
+    return context.json(
+      { error: { code: "INVALID_JSON", message: "JSON-Anfrage ist ungültig." } },
+      400,
+    );
+  }
   console.error(
     JSON.stringify({ level: "error", code: "UNHANDLED_API_ERROR", message: error.message }),
   );

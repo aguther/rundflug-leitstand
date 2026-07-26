@@ -12,6 +12,8 @@ export function SetupView() {
   const [status, setStatus] = useState<{
     setupRequired: boolean;
     setupConfigured: boolean;
+    resetSetupAuthorized: boolean;
+    resetSetupExpiresAt: string | null;
   } | null>(null);
   const [eventId, setEventId] = useState(`rundflug-${new Date().getFullYear()}`);
   const [name, setName] = useState(`Rundflug ${new Date().getFullYear()}`);
@@ -32,14 +34,17 @@ export function SetupView() {
 
   async function submitSetup() {
     if (busy) return;
-    const validationMessages = setupValidationMessages({
-      eventId,
-      name,
-      eventDate,
-      aerodrome,
-      setupCode,
-      adminPin,
-    });
+    const validationMessages = setupValidationMessages(
+      {
+        eventId,
+        name,
+        eventDate,
+        aerodrome,
+        setupCode,
+        adminPin,
+      },
+      { requireSetupCode: status?.resetSetupAuthorized !== true },
+    );
     if (validationMessages.length > 0) {
       setMessage(validationMessages.join(" "));
       return;
@@ -47,7 +52,7 @@ export function SetupView() {
     setBusy(true);
     try {
       const result = await bootstrapSystem({
-        setupCode,
+        ...(status?.resetSetupAuthorized ? {} : { setupCode }),
         adminPin,
         eventId: eventId.trim(),
         name: name.trim(),
@@ -83,8 +88,17 @@ export function SetupView() {
               keine Personen- oder Gastnamen erfasst.
             </p>
             {status && !status.setupConfigured ? (
-              <p className="connection-warning">
-                Der einmalige Cloudflare-Einrichtungscode fehlt noch.
+              <p className="connection-warning">Der Installations-Notfallcode fehlt noch.</p>
+            ) : null}
+            {status?.resetSetupAuthorized ? (
+              <p className="connection-success">
+                Dieser Browser darf die Einrichtung nach dem Werksreset direkt fortsetzen
+                {status.resetSetupExpiresAt
+                  ? ` – gültig bis ${new Date(status.resetSetupExpiresAt).toLocaleTimeString(
+                      "de-DE",
+                      { hour: "2-digit", minute: "2-digit" },
+                    )} Uhr.`
+                  : "."}
               </p>
             ) : null}
             <div className="setup-grid">
@@ -110,16 +124,18 @@ export function SetupView() {
                   placeholder="z. B. EDXX"
                 />
               </label>
-              <label>
-                Einmaliger Einrichtungscode
-                <input
-                  type="password"
-                  value={setupCode}
-                  onChange={(event) => setSetupCode(event.target.value)}
-                  autoComplete="off"
-                />
-                <small>Mindestens 8 Zeichen; exakt wie im Terminal eingegeben</small>
-              </label>
+              {!status?.resetSetupAuthorized ? (
+                <label>
+                  Installations-Notfallcode
+                  <input
+                    type="password"
+                    value={setupCode}
+                    onChange={(event) => setSetupCode(event.target.value)}
+                    autoComplete="off"
+                  />
+                  <small>Aus dem betreiberseitigen Passwortsafe</small>
+                </label>
+              ) : null}
               <label>
                 Erste Administrator-PIN
                 <input

@@ -44,13 +44,13 @@ describe("factory reset", () => {
       commandId: "550e8400-e29b-41d4-a716-446655440501",
       eventId: "synthetic-event",
       reason: "Entwicklungsstand neu aufbauen",
-      adminPin: "synthetic-pin",
+      adminPin: "123456",
       confirmation: "WERKSZUSTAND",
       retainRecoveryBackup: true,
       deleteAllBackups: false,
     });
     expect(hash).toMatch(/^[a-f0-9]{64}$/);
-    expect(hash).not.toContain("synthetic-pin");
+    expect(hash).not.toContain("123456");
   });
 
   it("empties every R2 page in bounded batches", async () => {

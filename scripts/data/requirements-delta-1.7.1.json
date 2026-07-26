@@ -1,0 +1,138 @@
+{
+  "version": "1.10.0",
+  "sourceRelease": "1.7.1",
+  "requirements": [
+    {
+      "source": "1.7.1",
+      "id": "V171-HEAD-010",
+      "section": "Fortgeltendes Delta 1.7.1",
+      "requirement": "Einzeilige Kopfzeile außer FIDS mit iconbasiertem geschlossenem Ansichtsumschalter.",
+      "priority": "MUSS",
+      "stage": "V1",
+      "status": "implemented",
+      "module": "apps/web/src/app/AppHeader.tsx design-system/base.css und Admin-CSS",
+      "tests": "Header-UI-Tests sowie ausgerichtete Admin-Browserabnahme",
+      "traceStatus": "umgesetzt"
+    },
+    {
+      "source": "1.7.1",
+      "id": "V171-TIM-010",
+      "section": "Fortgeltendes Delta 1.7.1",
+      "requirement": "Gemeinsame achsengleiche fünfstufige Zeitlinie ohne Status-Hintergrundfläche.",
+      "priority": "MUSS",
+      "stage": "V1",
+      "status": "implemented",
+      "module": "apps/web/src/flight-line-shared.tsx und Flight-Line-CSS",
+      "tests": "flight-line-shared.test.ts und Browserabnahme",
+      "traceStatus": "umgesetzt"
+    },
+    {
+      "source": "1.7.1",
+      "id": "V171-AST-010",
+      "section": "Fortgeltendes Delta 1.7.1",
+      "requirement": "Fester scrollbarerer Flight-Line-Umlaufblock und einzeilige Pilotverwaltung.",
+      "priority": "MUSS",
+      "stage": "V1",
+      "status": "implemented",
+      "module": "apps/web/src/flight-line-assist.tsx und flight-line-assist-v15.css",
+      "tests": "flight-line-assist-ui.test.ts und Browserabnahme",
+      "traceStatus": "umgesetzt"
+    },
+    {
+      "source": "1.7.1",
+      "id": "V171-ACT-010",
+      "section": "Fortgeltendes Delta 1.7.1",
+      "requirement": "Stabile zugängliche Icon-Aktionsreihen in Flight Line und Flight Director.",
+      "priority": "MUSS",
+      "stage": "V1",
+      "status": "implemented",
+      "module": "apps/web/src/flight-line-assist.tsx flight-line-supervisor.tsx und Flight-Line-CSS",
+      "tests": "Flight-Line-UI-Tests für Kurzzeichen Tank-Sperre Zurückstellen Touchzustände und responsive Browserabnahme",
+      "traceStatus": "umgesetzt"
+    },
+    {
+      "source": "1.7.1",
+      "id": "V171-CLM-010",
+      "section": "Fortgeltendes Delta 1.7.1",
+      "requirement": "Loginbasierte 30-Minuten-Claims mit Aktivitätsverlängerung und revisionierter Übernahme.",
+      "priority": "MUSS",
+      "stage": "V1",
+      "status": "implemented",
+      "module": "Contracts Migration Worker und Assist",
+      "tests": "flight-line-assist-claims.test.ts und Sitzungsautorisierungstests",
+      "traceStatus": "umgesetzt"
+    },
+    {
+      "source": "1.7.1",
+      "id": "V171-ABT-010",
+      "section": "Fortgeltendes Delta 1.7.1",
+      "requirement": "Atomarer technischer Umlaufabbruch mit Queue-Rückstellung und INACTIVE-Flugzeug.",
+      "priority": "MUSS",
+      "stage": "V1",
+      "status": "implemented",
+      "module": "packages/domain Contracts und apps/worker/src/event-coordinator.ts",
+      "tests": "Domain- Contract- Unit- und test:fleet-operations-Integration mit historischem Queue-Eintrag",
+      "traceStatus": "umgesetzt"
+    },
+    {
+      "source": "1.7.1",
+      "id": "V171-PAU-010",
+      "section": "Fortgeltendes Delta 1.7.1",
+      "requirement": "Kompakter Pausendialog mit vier unmittelbar ausführenden Daueraktionen.",
+      "priority": "MUSS",
+      "stage": "V1",
+      "status": "implemented",
+      "module": "apps/web/src/flight-line-view.tsx und flight-line-pause.ts",
+      "tests": "flight-line-supervisor-ui.test.ts und mobile Browserabnahme",
+      "traceStatus": "umgesetzt"
+    },
+    {
+      "source": "1.7.1",
+      "id": "V171-SUP-010",
+      "section": "Fortgeltendes Delta 1.7.1",
+      "requirement": "Flight-Director-Tabelle ohne Status und Nächster Schritt mit Zeilenzeitlinie und Historienmodal.",
+      "priority": "MUSS",
+      "stage": "V1",
+      "status": "implemented",
+      "module": "apps/web/src/flight-line-supervisor.tsx und Flight-Line-CSS",
+      "tests": "Supervisor-UI-Test und Desktop-Browserabnahme",
+      "traceStatus": "umgesetzt"
+    },
+    {
+      "source": "1.7.1",
+      "id": "V171-TKT-010",
+      "section": "Fortgeltendes Delta 1.7.1",
+      "requirement": "Verkaufte Ticketgruppen nach soldAt und ID absteigend bei unveränderter Suche.",
+      "priority": "MUSS",
+      "stage": "V1",
+      "status": "implemented",
+      "module": "apps/worker/src/index.ts und flight-line-supervisor.tsx",
+      "tests": "Supervisor-UI-Test und Browserabnahme",
+      "traceStatus": "umgesetzt"
+    },
+    {
+      "source": "1.7.1",
+      "id": "V171-MSG-010",
+      "section": "Fortgeltendes Delta 1.7.1",
+      "requirement": "Keine Erfolgstoasts für erwartete lokale Standardaktionen.",
+      "priority": "MUSS",
+      "stage": "V1",
+      "status": "implemented",
+      "module": "apps/web/src/flight-line-view.tsx und PageNotifications",
+      "tests": "UI-Quelltests und Browserabnahme",
+      "traceStatus": "umgesetzt"
+    },
+    {
+      "source": "1.7.1",
+      "id": "V171-QA-010",
+      "section": "Fortgeltendes Delta 1.7.1",
+      "requirement": "Automatisierte und visuelle Abnahme der mobilen und Desktop-Layouts sowie Fachkonflikte.",
+      "priority": "MUSS",
+      "stage": "V1",
+      "status": "implemented",
+      "module": "Workspace-Test- und Buildskripte sowie Kassen-V2-Entwurf und Migration 0040",
+      "tests": "Vollständiger Check Offline-Draft-Unit-Test Master-Data-Integration und Browserabnahme",
+      "traceStatus": "umgesetzt"
+    }
+  ]
+}

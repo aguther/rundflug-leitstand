@@ -74,6 +74,7 @@ import { forgetActiveEvent, rememberActiveEvent } from "./event-context";
 import { eventLocalDateTimeToIso, formatEventLocalDateTime } from "./event-time";
 import { AdminEventFlowChart } from "./features/admin/AdminEventFlowChart";
 import { EventLogoEditor } from "./features/admin/EventLogoEditor";
+import { FactoryResetDialog } from "./features/admin/FactoryResetDialog";
 import { AccountManagement } from "./features/auth/AccountManagement";
 import { useAuth } from "./features/auth/AuthContext";
 import {
@@ -486,9 +487,7 @@ export function AdminView() {
   const [factoryResetBusy, setFactoryResetBusy] = useState(false);
   const [factoryResetError, setFactoryResetError] = useState<string | null>(null);
   const [factoryResetReason, setFactoryResetReason] = useState("");
-  const [factoryResetPin, setFactoryResetPin] = useState(
-    session?.account.role === "ADMIN" ? "000000" : "",
-  );
+  const [factoryResetPin, setFactoryResetPin] = useState("");
   const [factoryResetConfirmation, setFactoryResetConfirmation] = useState("");
   const [retainRecoveryBackup, setRetainRecoveryBackup] = useState(true);
   const [deleteAllBackups, setDeleteAllBackups] = useState(false);
@@ -560,7 +559,6 @@ export function AdminView() {
     if (session?.account.role !== "ADMIN") return;
     setAdminModeUnlocked(true);
     setAdminPin("000000");
-    setFactoryResetPin("000000");
   }, [session?.account.role, setAdminPin]);
 
   useEffect(() => {
@@ -1969,7 +1967,7 @@ export function AdminView() {
     setFactoryResetError(null);
     setMessage(null);
     setFactoryResetReason("");
-    setFactoryResetPin(session?.account.role === "ADMIN" ? "000000" : "");
+    setFactoryResetPin("");
     setFactoryResetConfirmation("");
     setRetainRecoveryBackup(true);
     setDeleteAllBackups(false);
@@ -1980,7 +1978,7 @@ export function AdminView() {
     if (
       factoryResetBusy ||
       factoryResetReason.trim().length < 3 ||
-      factoryResetPin.length < 4 ||
+      !/^\d{6,12}$/.test(factoryResetPin) ||
       factoryResetConfirmation !== "WERKSZUSTAND"
     )
       return;
@@ -2765,7 +2763,7 @@ export function AdminView() {
           {/* biome-ignore format: preserve the large existing workspace subtree while adding its scroll boundary */}
           <div className="admin-workspace-scroll-region" ref={adminWorkspaceScrollRef}>
             {board?.currentDeviceRole === "FLIGHT_DIRECTOR" ? (
-              <div className="readonly-banner">Flugleitungsansicht · primär lesend</div>
+              <div className="readonly-banner">Flight-Director-Ansicht · primär lesend</div>
             ) : null}
             {board ? (
               <>
@@ -5952,147 +5950,36 @@ export function AdminView() {
               ) : null}
             </div>
           </ModalDialog>
-          {factoryResetOpen ? (
-            <div className="modal-backdrop factory-reset-backdrop">
-              <form
-                aria-labelledby="factory-reset-title"
-                aria-modal="true"
-                className="confirmation-dialog factory-reset-dialog"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  void performFactoryReset();
-                }}
-                role="dialog"
-              >
-                <div className="drawer-heading">
-                  <div>
-                    <h2 id="factory-reset-title">Werkszustand herstellen</h2>
-                    <p>Diese Aktion kann nicht rückgängig gemacht werden.</p>
-                  </div>
-                  <button
-                    aria-label="Werksreset schließen"
-                    disabled={factoryResetBusy}
-                    onClick={() => setFactoryResetOpen(false)}
-                    type="button"
-                  >
-                    ×
-                  </button>
-                </div>
-                <div className="factory-delete-summary">
-                  <strong>Wird gelöscht</strong>
-                  <ul>
-                    <li>Alle Tickets, Warteschlangen, Umläufe und Flugdaten</li>
-                    <li>Alle Stammdaten und Veranstaltungsparameter</li>
-                    <li>Alle Historien, Protokolle und Sitzungen</li>
-                    <li>Die Ersteinrichtung</li>
-                  </ul>
-                </div>
-                <div className="field-control">
-                  <FieldLabel
-                    htmlFor="factory-reset-reason"
-                    label="Begründung"
-                    help="Dokumentiert, warum der vollständige Werksreset ausgeführt wird."
-                  />
-                  <textarea
-                    id="factory-reset-reason"
-                    maxLength={240}
-                    onChange={(event) => setFactoryResetReason(event.target.value)}
-                    placeholder="Grund für den Werksreset"
-                    value={factoryResetReason}
-                  />
-                </div>
-                {session?.account.role !== "ADMIN" ? (
-                  <div className="field-control">
-                    <FieldLabel
-                      htmlFor="factory-reset-pin"
-                      label="Administrator-PIN"
-                      help="Bestätigt die Berechtigung für diesen irreversiblen Vorgang. Die PIN wird nicht protokolliert."
-                    />
-                    <input
-                      autoComplete="current-password"
-                      id="factory-reset-pin"
-                      onChange={(event) => setFactoryResetPin(event.target.value)}
-                      type="password"
-                      value={factoryResetPin}
-                    />
-                  </div>
-                ) : null}
-                <div className="field-control">
-                  <FieldLabel
-                    htmlFor="factory-reset-confirmation"
-                    label="Sicherheitsbestätigung"
-                    help="Zum Schutz vor versehentlicher Ausführung muss WERKSZUSTAND vollständig eingegeben werden."
-                  />
-                  <input
-                    autoComplete="off"
-                    id="factory-reset-confirmation"
-                    onChange={(event) => setFactoryResetConfirmation(event.target.value)}
-                    value={factoryResetConfirmation}
-                  />
-                </div>
-                <label className="reset-checkbox">
-                  <input
-                    checked={retainRecoveryBackup}
-                    onChange={(event) => {
-                      setRetainRecoveryBackup(event.target.checked);
-                      if (event.target.checked) setDeleteAllBackups(false);
-                    }}
-                    type="checkbox"
-                  />
-                  <span>
-                    <strong>Wiederherstellungssicherung in R2 behalten</strong>
-                    <small>Empfohlen – ermöglicht eine spätere Wiederherstellung.</small>
-                  </span>
-                </label>
-                <label className="reset-checkbox extra-danger">
-                  <input
-                    checked={deleteAllBackups}
-                    onChange={(event) => {
-                      setDeleteAllBackups(event.target.checked);
-                      if (event.target.checked) setRetainRecoveryBackup(false);
-                    }}
-                    type="checkbox"
-                  />
-                  <span>
-                    <strong>Auch alle R2-Sicherungen endgültig löschen</strong>
-                    <small>Diese Aktion kann nicht rückgängig gemacht werden.</small>
-                  </span>
-                </label>
-                <p className="reset-consequence">
-                  Nach erfolgreichem Reset werden lokale Zugangsdaten entfernt und /setup geöffnet.
-                </p>
-                {factoryResetError ? (
-                  <ValidationHint tone="error">{factoryResetError}</ValidationHint>
-                ) : null}
-                <div className="dialog-actions">
-                  <button
-                    disabled={factoryResetBusy}
-                    onClick={() => setFactoryResetOpen(false)}
-                    type="button"
-                  >
-                    Abbrechen
-                  </button>
-                  <Button
-                    busy={factoryResetBusy}
-                    className="danger-action"
-                    disabled={
-                      factoryResetReason.trim().length < 3 ||
-                      factoryResetPin.length < 4 ||
-                      factoryResetConfirmation !== "WERKSZUSTAND"
-                    }
-                    onClick={() => void performFactoryReset()}
-                    type="button"
-                    variant="danger"
-                  >
-                    Alles löschen und neu starten
-                  </Button>
-                </div>
-              </form>
-            </div>
-          ) : null}
+          <FactoryResetDialog
+            busy={factoryResetBusy}
+            confirmation={factoryResetConfirmation}
+            deleteAllBackups={deleteAllBackups}
+            error={factoryResetError}
+            onClose={() => setFactoryResetOpen(false)}
+            onConfirmationChange={setFactoryResetConfirmation}
+            onDeleteAllBackupsChange={(checked) => {
+              setDeleteAllBackups(checked);
+              if (checked) setRetainRecoveryBackup(false);
+            }}
+            onPinChange={setFactoryResetPin}
+            onReasonChange={setFactoryResetReason}
+            onRetainRecoveryBackupChange={(checked) => {
+              setRetainRecoveryBackup(checked);
+              if (checked) setDeleteAllBackups(false);
+            }}
+            onSubmit={() => void performFactoryReset()}
+            open={factoryResetOpen}
+            pin={factoryResetPin}
+            reason={factoryResetReason}
+            retainRecoveryBackup={retainRecoveryBackup}
+          />
           </div>
         </div>
       </section>
     </Shell>
   );
 }
+
+import "./features/admin/admin-v12.css";
+import "./features/admin/admin-v15.css";
+import "./features/admin/admin-event-workspace.css";

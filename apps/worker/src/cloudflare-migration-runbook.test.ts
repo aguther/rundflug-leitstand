@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import recovery from "../../../docs/operations/backup-restore.md?raw";
-import setup from "../../../docs/operations/cloudflare-setup.md?raw";
+import setup from "../../../docs/operations/cloudflare-neuaufbau.md?raw";
 import rootPackageSource from "../../../package.json?raw";
 
 const rootPackage = JSON.parse(rootPackageSource) as { scripts: Record<string, string> };
@@ -16,10 +16,15 @@ describe("Cloudflare migration runbook", () => {
   });
 
   it("documents backup-first deployment ordering without an implicit build migration", () => {
-    expect(setup).toContain("Workers Builds deployt jeden Push auf `main` automatisch");
-    expect(setup).toContain("Portables R2-Backup");
-    expect(setup).toContain("Migrationen werden niemals stillschweigend im normalen Build");
-    expect(setup).toContain("No migrations to apply");
+    expect(setup).toMatch(/löscht\s+oder leert niemals vorhandene Ressourcen/);
+    expect(setup).toContain("wendet alle Migrationen auf die leere D1 an");
+    expect(setup).toContain(
+      "Bei offener Migration vor jeder Änderung Backup-/D1-Time-Travel-Punkt",
+    );
+    expect(setup).toContain(
+      "bricht bei offenen Migrationen ab, solange `apply_migrations` nicht bewusst gewählt wurde",
+    );
+    expect(rootPackage.scripts.build).not.toContain("db:migrate");
   });
 
   it("records recovery notes for both pending additive migrations", () => {

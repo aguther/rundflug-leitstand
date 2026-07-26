@@ -1,103 +1,13 @@
-# Fachliche Entscheidungen V1
+# Wirklich offene Freigaben – Release 1.10.0
 
-Diese Liste entstand aus Fragen, die mindestens ein V1-Arbeitspaket blockierten. OQ-01 bis OQ-12
-wurden am 11.07.2026 im unten stehenden Freigabeprotokoll entschieden und sind keine offenen
-fachlichen Blocker mehr. Die Beschlüsse ändern die binären Referenzanforderungen nicht stillschweigend;
-Abweichungen und Konkretisierungen sind in ADRs, Traceability und Tests nachvollziehbar. Die noch
-ausstehende Datenschutz-/Produktionsabnahme zu OQ-06 ist eine Betreiber- und Rechtsfreigabe, keine
-ungeklärte fachliche Entscheidung.
+Alle fachlichen V1-Entscheidungen sind in `requirements-v1.10.0.md`, gültigen ADRs und Tests
+konsolidiert. Offen sind nur noch externe oder betreiberseitige Freigaben:
 
-`ABGESCHLOSSEN/VERFÜGBAR` ist gemäß Lastenheft bereits das Ereignis, das nach `GELANDET` den
-Turnaround beendet; dies war daher nie eine offene Frage.
+| ID | Offene Freigabe | Verantwortlich | Produktionswirkung |
+| --- | --- | --- | --- |
+| OQ-06 | Nachweis, dass Worker-/TLS-/Push-Verarbeitung und personenbeziehbare Metadaten die strenge EU-Anforderung Q-DSG-040 erfüllen; einschließlich DPA/AVV und Subprozessorprüfung. | Datenschutz und Betreiber | Produktion bleibt gesperrt. |
+| OQ-13 | Nutzungsrecht, endgültiger Projektlizenztext und unterschriebenes Übergabeprotokoll. | Berechtigte Parteien | Betreiberübergabe bleibt formal offen. |
+| OQ-14 | Konkrete Hardwareliste und unterstützte Browserstände vier Wochen vor Generalprobe einfrieren. | Auftraggeber und IT-Betrieb | Generalprobe bleibt offen. |
 
-| Nr. | Blockierende Entscheidung | Betroffene Anforderungen | Entscheidung durch | Benötigt vor | Blockiert |
-|---|---|---|---|---|---|
-| OQ-01 | Welche Kommandotypen dürfen während eines kurzen Offline-Zustands lokal angenommen werden? Welche Aktionen, insbesondere `NEXT`, `IM FLUG`, `GELANDET`, `ABGESCHLOSSEN`, Verkauf, Storno, Neuverkauf nach Korrektur, Not-Halt und Stammdatenänderungen, benötigen zwingend eine Online-Bestätigung? | T-035, Q-ZUV-020, Q-ZUV-040, F-EVT-020, F-INT-070 | Auftraggeber, Leiter Flight Line und Datenschutz/IT-Betrieb | Spezifikation von BP-09 | BP-04, BP-08, BP-09 |
-| OQ-02 | Welche der häufigen Aktionen müssen innerhalb der Zehn-Sekunden-Frist rückgängig sein, und welches fachliche Korrekturereignis gilt jeweils? Was passiert, wenn bereits ein abhängiges Folgeereignis vorliegt? | Q-UX-030, F-EVT-030, F-HIS-020 | Auftraggeber und Leiter Flight Line | Zustandsautomaten von BP-04/BP-05 | BP-04, BP-05, BP-10 |
-| OQ-03 | Unter welchen Bedingungen darf eine Buchungsgruppe auf unmittelbar aufeinanderfolgende Fluggruppen verteilt werden, wer bestätigt die Teilung und wie bleibt die Gruppenbindung sichtbar? | D-040, F-SLT-020, F-SLT-050, F-SLT-090 | Auftraggeber, Kasse und Leiter Flight Line | Queue-Regeln von BP-05 | BP-05 |
-| OQ-04 | Darf eine bereits aufgerufene Fluggruppe einem anderen kompatiblen Flugzeug zugeordnet werden? Falls ja: welche Rollen dürfen vorschlagen und bestätigen, und welche öffentlichen Informationen bleiben unverändert? | F-BRD-025, F-BRD-030, F-PRG-110, D-045, D-050 | Auftraggeber und Leiter Flight Line | Sonderfallmodell von BP-05 | BP-05, BP-06 |
-| OQ-05 | Wie werden Prognosequalität und Zeitfenster intern, an der Kasse, auf Monitoren und auf der Ticketstatusseite abgestuft und formuliert? Welche Schwellen führen statt eines Countdowns zu einem Unsicherheitshinweis? | F-PRG-070, F-PRG-080, F-PRG-090, F-KAP-060, F-BEN-100 | Auftraggeber, Kasse und Flight Line | UI-/Prognosekonzept von BP-06/BP-07 | BP-06, BP-07 |
-| OQ-06 | Muss jede Verarbeitung personenbezogener Daten einschließlich Worker-Ausführung und Push-Verarbeitung nachweislich in der EU erfolgen, oder genügt EU-Jurisdiktion der persistenten Daten? | Q-DSG-040, T-030 | Auftraggeber und Datenschutzverantwortlicher | Cloudflare-Ressourcenfreigabe/BP-11 | BP-02, BP-07, BP-11 |
-| OQ-07 | Welche Aufbewahrungsfristen gelten für nicht personenbezogene Ticket-, Flug-, Prognose- und Audit-Historie, und welche gesetzlichen oder vereinsinternen Löschsperren gelten? | F-HIS-010, F-HIS-020, F-HIS-060, Q-DSG-020 | Auftraggeber und Datenschutzverantwortlicher | Datenmodell von BP-10 | BP-10, BP-11 |
-| OQ-08 | Wie werden Papierverkäufe, Aufrufe und Umlaufereignisse nach einem Totalausfall wieder eingepflegt, in welcher Reihenfolge, durch welche Rolle und mit welcher Kennzeichnung als nacherfasst? | Q-ZUV-070, T-050, F-EVT-010, F-HIS-020 | Auftraggeber, Kasse, Leiter Flight Line und IT-Betrieb | Betriebsabnahme von BP-11 | BP-09, BP-11, BP-12 |
-| OQ-09 | Welche Gewichtsklassen und Referenzwerte sind beim ersten Produktiveinsatz je Produkt aktiv, und mit welchem konkreten Ablauf wird das 15-Sekunden-Ziel bei aktivierter Erfassung abgenommen? | F-KAS-010, F-KAS-030, F-KAS-110, F-ADM-010 | Auftraggeber und Kasse | Verkaufskonzept von BP-04 | BP-04, BP-12 |
-| OQ-10 | Welche Ticketausgabe wird beim ersten Produktiveinsatz verbindlich verwendet: vorgedruckte Codes, druckbares/digitales Ticket oder beide? Welche Ausgabe gilt als Fallback? | F-KAS-050 | Auftraggeber und Kasse | Verkaufskonzept von BP-04 | BP-04, BP-11 |
-| OQ-11 | Welche Mindesthardware und konkret unterstützten Browserstände werden für Generalprobe und Abnahme festgelegt? | T-020, T-040, Q-UX-060, Q-ZUV-050 | Auftraggeber und IT-Betrieb | Testplanung von BP-12 | BP-07, BP-12 |
-| OQ-12 | Welche fachliche Priorität und Bedienerentscheidung gilt, wenn Offline- oder parallele Kommandos aus Kasse, Flight Line und Administration miteinander in Konflikt stehen? | Q-ZUV-040, F-EVT-020, F-ADM-020, F-INT-070 | Auftraggeber, Kasse und Leiter Flight Line | Konfliktmodell von BP-09 | BP-02, BP-09 |
-
-## Entscheidungsprotokoll
-
-Alle oben aufgeführten Fragen sind im Freigabeprotokoll entschieden und in Traceability, Backlog,
-ADRs und Tests nachvollziehbar referenziert.
-
-## Freigegebene Entscheidungsgrundlage vom 11.07.2026
-
-Die folgenden Antworten bildeten den konsistenten V1-Vorschlag und wurden mit den im
-Freigabeprotokoll dokumentierten Ergänzungen verbindlich freigegeben.
-
-| Nr. | Empfohlene V1-Entscheidung |
-|---|---|
-| OQ-01 | Offline werden nur vorbereitende, lokal reversible Eingaben angenommen. Verkauf, Storno, Neuverkauf nach Korrektur, `NEXT`, `IM FLUG`, `GELANDET`, `ABGESCHLOSSEN`, Not-Halt und Stammdatenänderungen benötigen eine Serverbestätigung. Nicht bestätigte Eingaben heißen sichtbar „ausstehend“ und entfalten keine operative oder öffentliche Wirkung. |
-| OQ-02 | Zehn Sekunden rückgängig: `NEXT`, Zurückstellen/No-Show-Markierung und lokale Eingaben vor Serverbestätigung. Korrekturereignisse: `CALL_REVOKED`, `QUEUE_POSITION_RESTORED`, `NO_SHOW_REVOKED`. Verkauf wird storniert, nicht gelöscht; `IM FLUG`, `GELANDET`, `ABGESCHLOSSEN`, Not-Halt, Storno und Stammdatenänderungen sind nicht per Sofort-Undo rückgängig. Eine Verkaufskorrektur erfolgt durch Storno und bewussten Neuverkauf. Liegt ein Folgeereignis vor, wird Undo abgelehnt und ein rollenberechtigter Korrekturablauf verlangt. |
-| OQ-03 | Teilung nur, wenn die gesamte Buchungsgruppe nicht in einen einzelnen kompatiblen Umlauf passt oder die Gruppe dies ausdrücklich wünscht. Die Kasse zeigt die Auswirkungen passiv im gewählten Produkt; der bewusste Verkaufsklick übernimmt sie ohne zusätzlichen Bestätigungsschritt. Teilgruppen erhalten dieselbe Gruppen-ID, eine Teilgruppenkennung und unmittelbar aufeinanderfolgende Queue-Priorität; automatische Teilung bleibt verboten. |
-| OQ-04 | Ja, bis unmittelbar vor `IM FLUG`: Das System darf nach `NEXT` nur einen kompatiblen Umbesetzungsvorschlag erzeugen. Flight-Line-Personal darf vorschlagen, Leiter Flight Line oder Administrator bestätigt. Slotnummer, Gruppenbindung, öffentlicher Status und veröffentlichtes Zeitfenster bleiben stabil; Flugzeugkennung wird öffentlich nicht gezeigt. |
-| OQ-05 | Drei Qualitätsstufen: „stabil“ (intern ±5 min, öffentlich 10-min-Fenster), „veränderlich“ (intern ±10 min, öffentlich 20-min-Fenster) und „unsicher“ (kein Countdown; Warteposition plus „Betrieb verzögert – bitte Status erneut prüfen“). Ab Stufe „veränderlich“ keine minutengenaue Aussage; bei Pause, Unterbrechung, Notfall, fehlender aktiver Kapazität oder mehr als fünf Minuten seit der letzten erfolgreichen Prognoseneuberechnung stets „unsicher“. Das Alter des jüngsten Lernumlaufs bleibt rein diagnostisch. Kasse und Flight Line sehen Ursache/Datenalter, öffentliche Ansichten nur handlungsorientierte Formulierungen. |
-| OQ-06 | Die MUSS-Anforderung wird streng ausgelegt: auch Worker-/TLS-/Push-Verarbeitung und personenbeziehbare Metadaten innerhalb der EU. Produktionsfreigabe nur mit nachgewiesener EU-Regionalisierung aller beteiligten Dienste, AVV/DPA und dokumentierter Subprozessorprüfung. Falls das Kostenlimit dies ausschließt, ist vor Produktion eine formale Anforderungsänderung nötig; EU-Jurisdiktion nur für persistente Daten genügt nicht. |
-| OQ-07 | Personenbezogene Benachrichtigungsdaten: Standard sieben Tage nach Veranstaltungsende gemäß Q-DSG-020. Operative Ticket-/Flug-/Prognosedaten: fünf Jahre, danach Löschung oder irreversibel aggregierte Statistik. Audit- und abrechnungsrelevante Tagesberichte: acht Jahre, soweit sie Buchungsbelege sind; sonst sechs Jahre. Eine dokumentierte Löschsperre setzt Löschung nur für den betroffenen Datensatz und Zeitraum aus. Rechtliche Prüfung durch Steuerberatung/Datenschutz bleibt Freigabebedingung. |
-| OQ-08 | Nacherfassung erfolgt nach Wiederanlauf ausschließlich durch Kasse (Papierverkäufe) und Leiter Flight Line/Administrator (Aufrufe und Umlaufereignisse) über einen eigenen Importablauf. Reihenfolge ist tatsächliche Ereigniszeit, bei Gleichstand Papier-Belegfolge; jede Eingabe trägt `recordedAfterOutage=true`, ursprüngliche Zeit, Nacherfasser-Gerät und Belegreferenz ohne Gastnamen. Vor Commit zeigt eine Simulation Konflikte; stale oder logisch unmögliche Folgen werden nicht automatisch zusammengeführt. Vier-Augen-Abschluss durch Administrator. |
-| OQ-09 | Abnahmekonfiguration: Gewichtserfassung standardmäßig aus. Für den Test aktiv: Kind, Normal, Schwer, Individuell; Grenz-/Referenzwerte sind veranstaltungs- bzw. produktbezogene Konfiguration und besitzen keine Freigabewirkung. Das 15-Sekunden-Ziel wird mit 30 Standardverkäufen nach höchstens zehn Minuten Einweisung gemessen; Median unter 15 s, mindestens 27/30 unter 15 s, keine Fehlbuchung. Produktive Werte werden vom Betreiber vor Generalprobe eingetragen. |
-| OQ-10 | Beide V1-Ausgaben werden unterstützt. Primär: vorgedruckter, kryptografisch zufälliger QR-Code, den die Kasse scannt und aktiviert. Sekundär: systemerzeugtes druckbares/digitales Ticket. Papierfallback bei Totalausfall: fortlaufend kontrollierte vorgedruckte Codes mit späterer Nacherfassung. |
-| OQ-11 | Abnahmebasis: Tablets ab 10 Zoll/1920×1200 bzw. iPad ab 10,2 Zoll, Windows-PC ab 1366×768, 4 GB RAM, Kamera für Kassen-/Flight-Line-Geräte; jeweils letzte und vorletzte Hauptversion von Chrome, Edge und Safari zum Zeitpunkt der Generalprobe. Kiosk-Gerät mit automatischem Vollbildstart und WebSocket-Unterstützung. Die konkrete Hardwareliste wird vier Wochen vor Generalprobe eingefroren. |
-| OQ-12 | Es gibt keine automatische fachliche Gewinnerrolle. Der Event-Durable-Object serialisiert nach Servereingang; erwartete Version und Invarianten entscheiden. Der erste gültige Schreibbefehl gewinnt technisch, jeder stale Konflikt wird sichtbar abgelehnt. Not-Halt hat einen eigenen autorisierten Sofortpfad, überschreibt aber keine Historie. Konflikte werden durch Leiter Flight Line für operative Abläufe, Kasse für noch nicht operative Verkäufe und Administrator für Stammdaten/Korrekturen neu entschieden und als neues Kommando protokolliert. |
-
-### Begründungsnachweise für OQ-06 und OQ-07
-
-- Cloudflare Durable-Object-Jurisdiktion `eu` begrenzt nur Ausführung und Persistenz des Durable
-  Objects; Worker-Zugriffe und bestimmte Logs können außerhalb liegen:
-  <https://developers.cloudflare.com/durable-objects/reference/data-location/>
-- TLS-/Request-Verarbeitung und Metadaten benötigen Regional Services und Customer Metadata Boundary;
-  die Data Localization Suite ist ein Enterprise-Zusatz:
-  <https://developers.cloudflare.com/data-localization/>
-- Cloudflare-DPA/SCC müssen vertraglich geprüft werden:
-  <https://www.cloudflare.com/en-gb/cloudflare-customer-dpa/>
-- § 147 Abs. 3 AO nennt aktuell acht Jahre für Buchungsbelege und sechs Jahre für sonstige dort
-  aufgeführte Unterlagen: <https://www.gesetze-im-internet.de/ao_1977/__147.html>
-- Datenschutzrechtliche Speicherfristen müssen auf das erforderliche Mindestmaß begrenzt werden:
-  <https://www.bfdi.bund.de/SharedDocs/Downloads/DE/DokumenteBfDI/AccessForAll/2023/2021_Loeschkonzept-BfDI.pdf?__blob=publicationFile&v=2>
-
-## Freigabeprotokoll
-
-| Datum | Status | Verantwortliche Rolle | Umfang und Begründung |
-|---|---|---|---|
-| 11.07.2026 | freigegeben | Auftraggeber | OQ-01 bis OQ-05 und OQ-07 bis OQ-12 gemäß freigegebener Entscheidungsgrundlage vom 11.07.2026. |
-| 11.07.2026 | freigegeben | Auftraggeber und Datenschutzverantwortlicher | OQ-06 gemäß freigegebener Entscheidungsgrundlage: namens- und telefonnummernfreier, rein ID-basierter Kern; freiwilliges ticketbezogenes Web-Push bleibt erhalten. Die Verarbeitung ist damit datensparsam und pseudonym, nicht vollständig anonym. Q-DSG-040 wird streng ausgelegt; Produktionsfreigabe erfordert nachgewiesene EU-Verarbeitung einschließlich Push- und Netzwerkmetadaten. |
-| 11.07.2026 | freigegeben | Auftraggeber | V1 erfasst abweichend von F-KAS-040 und D-030 keinerlei Telefonnummern, auch nicht optional. Telefonnummern-, SMS- und Messenger-basierte Benachrichtigung ist nicht Bestandteil von V1. Der Gast ruft seinen Status ausschließlich über einen nicht erratbaren QR-/Ticketcode in Webseite oder PWA ab. Die binären Referenzanforderungen bleiben unverändert; die Änderung ist in der nächsten konsolidierten Anforderungsversion nachzuführen. |
-| 11.07.2026 | freigegeben | Auftraggeber | Freiwilliges Web-Push je Ticket in der PWA bleibt Bestandteil von V1 (F-BEN-020, F-BEN-040, D-110 und Q-DSG-020/Q-DSG-030). Push-Abonnement und Einwilligung werden strikt vom operativen Ticketkern getrennt, zweckgebunden gespeichert und fristgerecht gelöscht. |
-| 16.07.2026 | freigegeben | Auftraggeber | ADR-0008 und ADR-0009: abgeleitete Kapazitäten, keine Zahlungsdaten, anonyme Pilotencodes, kompakte Administration, Flight Line Supervisor und Assist, automatischer Voraufruf bei weiterhin menschlichem NEXT, Standard-/Terminal-FIDS, kurze DEPARTED-Nachlaufzeit sowie optionale prognosewirksame Pausendauer. Die Markdown-, YAML- und Traceability-Fassungen werden als fortgeschriebene V1-Quellen konsolidiert; binäre Referenzen bleiben unverändert. |
-| 21.07.2026 | freigegeben | Auftraggeber | ADR-0019 und die drei UI-Referenzen für getrennte Assist-Auswahl und -Arbeitsansicht, Supervisor-konsistente Status-/Verlaufslogik, rollenabhängigen Pilotwechsel sowie ein viewportfestes Ansichtsmenü; gemeinsam mit der parallelen Kassen-/Queue-Ausbaustufe in Release 1.7.0 integriert. |
-| 21.07.2026 | freigegeben | Auftraggeber | Release 1.7.1: technischer Abbruch während Boarding/Off-Block stellt alle vollständigen Gruppen als stabilen Block an den Queue-Anfang und setzt das Flugzeug nicht verfügbar; Claims gehören 30 Minuten lang dem pseudonymen Login und können revisioniert bewusst übernommen werden. In der Supervisor-Tabelle entfallen Status und Nächster Schritt. Die konsolidierte UI- und Fachspezifikation ist abschließend freigegeben; hierzu bestehen keine offenen Produktentscheidungen. |
-| 22.07.2026 | freigegeben | Auftraggeber | Release 1.7.2: die bereitgestellten UI-Screenshots und bestätigten Entscheidungen zu Fokusrahmen, responsiver Kasse, kompakten Flight-Line-Tabellen, symbolischer Zeitlinie, vier direkten Abschlusswegen sowie größenstabiler Assist-Übernahme sind das freigegebene Änderungskonzept. Fachregeln, Rollen, Contracts, Worker-Kommandos und Persistenz bleiben unverändert. |
-| 22.07.2026 | freigegeben | Auftraggeber | Release 1.7.3: FIDS verwendet ausschließlich die freigegebene Standardansicht, globale Handlungspriorität, 4 bis 20 dynamische Zeilen und optional zwei Spalten. Die neue Rolle DISPLAY besitzt eine 90-Tage-Sitzung, exklusiven FIDS-Zugriff und kontobezogene versionierte Einstellungen. Public Board und Logo bleiben anonym. |
-| 23.07.2026 | freigegeben | Auftraggeber | Ergänzung zu Release 1.7.3: ADMIN darf FIDS und die kontobezogenen FIDS-Einstellungen zusätzlich öffnen. `/admin` bleibt die Administrator-Startseite und die reguläre 16-Stunden-Sitzung unverändert; DISPLAY bleibt auf FIDS beschränkt. |
-| 23.07.2026 | freigegeben | Auftraggeber | Release 1.8.0: Der auslösende asynchrone Button zeigt allein den Busy Indicator; Zeitfenster werden absolut in der Veranstaltungszeitzone dargestellt; Kasse und Flight Line verwenden die freigegebenen Delta-Spalten; je Buchungsgruppe gibt es genau einen öffentlichen QR-Code und aggregierten Teilflugstatus. |
-| 24.07.2026 | freigegeben | Auftraggeber | Release 1.9.0: Schlichtes blaues Plane-Favicon auf dunklem Grund; Kassenbuttons im Verhältnis 1/3 zu 2/3, Symbolköpfe, Abschlussstatus, offene Tickets und POS-58 ohne Vorlauf; Supervisor wird Flight Director unter `/flight-director`, Assist wird Flight Line unter `/flight-line`, der alte Assist-Pfad entfällt ohne Weiterleitung. |
-| 24.07.2026 | freigegeben | Auftraggeber | Release 1.9.1: Temporäre Flugzeug- und Prognosezustände bleiben verkaufsseitig beratend; Gruppenkapazität folgt aktiven Zuordnungen. Personenanzahl bleibt nach Verkauf mit explizitem Reset erhalten. POS-58 druckt größer, isoliert und auf der Rollenachse zentriert; öffentliche Status-PWAs vermeiden iPhone-Leerscrollen, verwenden `IM FLUG`/`GELANDET`, FIDS-Zeitfenster entfallen ohne `Uhr`. |
-| 25.07.2026 | freigegeben | Auftraggeber | Veranstaltungslogos besitzen unabhängige Light-/Dark-Uploads für PNG, JPEG, WebP und sicheres SVG. Fehlt eine Variante, wird die Gegenvariante verwendet; Bestandslogos bleiben Light. Ohne Veranstaltungslogo ersetzt die neue Rundflug-Leitstand-Marke das Plane-Fallback. Statische Produktflächen zeigen zusätzlich die lokal gesetzte Wortmarke; Favicon und PWA-Installationsicons bleiben gemäß V19-BRN-010 unverändert. |
-| 25.07.2026 | freigegeben | Auftraggeber | Die vollständig gelieferte App-Icon-Familie ersetzt die bisherige V19-BRN-010-Laufzeitvorgabe: Hauptmarke, Kasse, Flight Director, Flight Line, FIDS, Admin und Ticket-/Gruppenstatus erhalten jeweils eigene Favicons, Apple-Touch-Icons sowie reguläre und maskierbare Android-/PWA-Icons. Die vollständige Familie bleibt als Designreferenz im Repository; das Ansichtsmenü verwendet weiterhin ausschließlich seine bestehenden puren Lucide-Symbole. |
-| 26.07.2026 | freigegeben | Auftraggeber | Im Ansichtsmenü verwendet FIDS künftig die pure Lucide-Glyphe `Monitor` statt `Plane`. Alle übrigen Navigationssymbole bleiben unverändert. |
-| 23.07.2026 | freigegeben | Auftraggeber | ADR-0022: Öffentliche Buchungsgruppen verwenden `G-<Produktkürzel>-<vierstellige Buchungsnummer>`. Operative Fluggruppen verwenden `F-<Ressourcengruppenkürzel>-<dreistellige Fluggruppennummer>`. Öffentliche Ansichten zeigen nur G; interne Verkaufs-, Flight-Line- und Historienansichten ordnen G und F eindeutig zu. Die abweichende Formulierung von F-SLT-100 wird in der nächsten konsolidierten Anforderungsversion nachgeführt. |
-| 23.07.2026 | freigegeben | Auftraggeber | ADR-0024 und die hellen/dunklen Referenzen für den mobilen Ticket-/Gruppenstatus: FIDS-nahe Statuscopy mit Symbol, kompakter unverlinkter Veranstaltungsheader, binärer Theme-Schalter, kleiner abrufbarer Datenschutzlink und iOS-Ausnahme für Web Push. Auf iPhone/iPad ab 16.4 wird Push nur in einer zum Home-Bildschirm hinzugefügten Web-App angeboten; andere unterstützte Plattformen bleiben installationsfrei. |
-
-### Abgrenzung zur gewünschten Anonymität
-
-Keine Gastnamen und persönliche Helferkonten zu speichern bleibt verbindlich. Zufällige Ticket-,
-Gruppen- und Geräte-IDs sind jedoch nur dann anonym, wenn eine Person mit keinem Mittel, das
-vernünftigerweise eingesetzt werden kann, identifizierbar ist. Solange ein Ticketcode mit seinem
-Inhaber, eine Push-Registrierung mit einem Browser oder eine Telefonnummer mit einer Person verknüpft
-werden kann, handelt es sich mindestens um pseudonymisierte und damit weiterhin personenbezogene Daten.
-
-- EDSA zur Abgrenzung: <https://www.edpb.europa.eu/sme-data-protection-guide/faq-frequently-asked-questions/answer/what-difference-between_en>
-- EDSA: pseudonymisierte Daten bleiben personenbezogene Daten:
-  <https://www.edpb.europa.eu/news/edpb-adopts-pseudonymisation-guidelines-and-paves-the-way-to-improve-cooperation-with_en>
-- EuGH zu Identifikationsnummern, Online-Kennungen und Erwägungsgrund 26:
-  <https://eur-lex.europa.eu/legal-content/en/TXT/?uri=CELEX%3A62021CJ0683>
+Datenschutz-, Hardware-, Helfer- und Produktionsabnahme bleiben manuelle Gates. Sie dürfen nicht
+durch technische Tests oder ein erfolgreiches Deployment ersetzt werden.

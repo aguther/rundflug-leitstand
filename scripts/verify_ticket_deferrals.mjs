@@ -58,7 +58,7 @@ const waitForWorker = async () => {
 };
 
 const command = async (actor, version, type, payload) => {
-  const response = await fetch(`${base}/api/events/${eventId}/commands`, {
+  const response = await fetch(`${base}/api/control/${eventId}/commands`, {
     method: "POST",
     headers: { "content-type": "application/json", "x-device-token": actors[actor].token },
     body: JSON.stringify({
@@ -77,7 +77,7 @@ const command = async (actor, version, type, payload) => {
 };
 
 const board = async () => {
-  const response = await fetch(`${base}/api/events/${eventId}/operations`, {
+  const response = await fetch(`${base}/api/control/${eventId}/operations`, {
     headers: {
       "x-device-id": actors.flightLine.id,
       "x-device-token": actors.flightLine.token,
@@ -89,7 +89,7 @@ const board = async () => {
 
 const history = async (groupId) => {
   const query = new URLSearchParams({ aggregateType: "TICKET_GROUP", aggregateId: groupId });
-  const response = await fetch(`${base}/api/events/${eventId}/history?${query}`, {
+  const response = await fetch(`${base}/api/control/${eventId}/history?${query}`, {
     headers: { "x-device-id": actors.admin.id, "x-device-token": actors.admin.token },
   });
   if (!response.ok) throw new Error(`Historie konnte nicht geladen werden (${response.status}).`);
@@ -98,7 +98,7 @@ const history = async (groupId) => {
 
 const search = async (groupId) => {
   const response = await fetch(
-    `${base}/api/events/${eventId}/tickets/search?q=${encodeURIComponent(groupId)}`,
+    `${base}/api/control/${eventId}/tickets/search?q=${encodeURIComponent(groupId)}`,
     {
       headers: { "x-device-id": actors.cashier.id, "x-device-token": actors.cashier.token },
     },

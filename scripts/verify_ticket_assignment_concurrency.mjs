@@ -58,7 +58,7 @@ const waitForWorker = async () => {
 };
 
 const postCommand = async (actor, expectedVersion, type, payload) => {
-  const response = await fetch(`${base}/api/events/${eventId}/commands`, {
+  const response = await fetch(`${base}/api/control/${eventId}/commands`, {
     method: "POST",
     headers: {
       "content-type": "application/json",
@@ -86,7 +86,7 @@ const accept = async (actor, version, type, payload) => {
 };
 
 const board = async () => {
-  const response = await fetch(`${base}/api/events/${eventId}/operations`, {
+  const response = await fetch(`${base}/api/control/${eventId}/operations`, {
     headers: {
       "x-device-id": actors.admin.deviceId,
       "x-device-token": actors.admin.token,
@@ -97,7 +97,7 @@ const board = async () => {
 };
 
 const history = async () => {
-  const response = await fetch(`${base}/api/events/${eventId}/history?limit=50`, {
+  const response = await fetch(`${base}/api/control/${eventId}/history?limit=50`, {
     headers: {
       "x-device-id": actors.admin.deviceId,
       "x-device-token": actors.admin.token,
