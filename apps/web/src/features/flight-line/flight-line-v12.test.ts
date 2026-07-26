@@ -4,6 +4,7 @@ import assistSource from "../../flight-line-assist.tsx?raw";
 import sharedSource from "../../flight-line-shared.tsx?raw";
 import supervisorSource from "../../flight-line-supervisor.tsx?raw";
 import viewSource from "../../flight-line-view.tsx?raw";
+import operationalPlanSource from "../operations/OperationalPlanPanel.tsx?raw";
 import operationsDialogSource from "./FlightDirectorOperationsDialog.tsx?raw";
 
 const stylesSource = [
@@ -106,12 +107,14 @@ describe("V1.9 Flight Director and Flight Line surfaces", () => {
 
   it("shows the approved soft operational plan with explicit start and end confirmation", () => {
     expect(operationsDialogSource).toContain('label: "Betriebsplan"');
-    expect(operationsDialogSource).toContain("Interne Planung ohne automatische Zustandsänderung.");
-    expect(operationsDialogSource).toContain("Start bestätigen");
-    expect(operationsDialogSource).toContain("Ende bestätigen");
-    expect(operationsDialogSource).toContain("Ungefähres Zeitfenster");
-    expect(operationsDialogSource).toContain("Nach einem Umlauf");
-    expect(operationsDialogSource).not.toContain("automatisch starten");
+    expect(operationsDialogSource).toContain("<OperationalPlanPanel");
+    expect(operationalPlanSource).toContain("Interne Planung ohne automatische Zustandsänderung.");
+    expect(operationalPlanSource).toContain("Start bestätigen");
+    expect(operationalPlanSource).toContain("Ende bestätigen");
+    expect(operationalPlanSource).toContain("Ungefähres Zeitfenster");
+    expect(operationalPlanSource).toContain("Nach einem Umlauf");
+    expect(operationalPlanSource).not.toContain("automatisch starten");
+    expect(operationalPlanSource).not.toContain("{plan.reason}");
     expect(viewSource).toContain('type: "UPSERT_PLANNED_OPERATION"');
     expect(viewSource).toContain('type: "CANCEL_PLANNED_OPERATION"');
   });

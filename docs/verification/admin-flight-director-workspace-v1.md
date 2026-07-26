@@ -2,7 +2,8 @@
 
 - Aktuelles Konzept: `docs/ui/v1.10.0-release-concept.md`
 - Entscheidung: `docs/adr/0026-veranstaltungsbezogene-administration-und-stammdatenvorlagen.md`
-- Anforderungen: F-ADM-060, F-ADM-080, Q-UX-020 und F-SLT-040
+- Anforderungen: F-ADM-020, F-ADM-060, F-ADM-080, F-ADM-120, F-FLT-090,
+  Q-UX-010, Q-UX-020, Q-UX-040 und F-SLT-040
 - Testdaten: ausschließlich synthetisch
 
 ## Automatisierte Nachweise
@@ -18,6 +19,10 @@
   Zeitzonen/DST und adaptive Intervalle
 - `apps/web/src/admin-v15-ui.test.ts`: Navigation, Legacy-Links, Schritte, Diagramm und
   Importvorschau
+- `apps/web/src/admin-modernization-ui.test.ts`: zugängliche segmentierte Tabs, gemeinsame
+  Betriebsplantabelle, rollenabhängige Bestätigung, Kontenmodalen und iPad-Reduktionen
+- `apps/worker/src/operator-account-management.test.ts`: Admin-Schutz, Sitzungswiderruf und
+  geschütztes Löschen von Konten; eigene und letzte aktive Administrationskonten bleiben erhalten
 - `apps/web/src/admin-v1-completion-ui.test.ts`: zentrierte Editoren, Tooltip-Auslösung,
   Rollenabgrenzung und Abschlusskorrektur
 - `apps/web/src/flight-line-supervisor-ui.test.ts`: Kopfzeilenpriorität, Betriebsdialog,
@@ -25,17 +30,24 @@
 
 ## Browserabnahme
 
-Am 24. Juli 2026 wurden nach erfolgreichem Build mit ausschließlich synthetischen Daten geprüft:
+Am 26. Juli 2026 wurden nach erfolgreichem Build mit ausschließlich synthetischen Daten geprüft:
 
 - Admin-Übersicht mit veranstaltungsbezogenem SVG-Diagramm
-- Veranstaltungstabelle, alle acht Schritte, Suche, dreistufige Sortierung und Paginierung
-- Stammdatentabellen ohne redundante Aktionsspalte; Zeilenklick öffnet den zentrierten Editor
+- Veranstaltungstabelle im Verwaltungsdialog sowie alle acht kompakten, per Tastatur bedienbaren
+  Schritte mit festem Statusplatz
+- Stammdatentabellen mit expliziten Stift-/Löschen-Aktionen, Suche, Leerzuständen und zentrierten
+  Editoren
+- Kontentabelle mit Hinzufügen-/Bearbeiten-/Löschen-Dialogen; ein synthetisch angelegtes Testkonto
+  wurde gelöscht und verschwand aus Anmeldung und Verwaltung
 - Modal-Fokusführung sowie Hilfetext nur über Hover, Fokus oder Klick des Info-Symbols
 - Legacy-Links für `setup`, `master-data` und `audit`
-- Admin/Betrieb ohne duplizierte Flotten- und Tanksteuerung
+- gemeinsamer Betriebsplan in Admin und Flight Director; nur der Flight Director erhält
+  Start-/Endbestätigung
 - Admin/Abschluss mit Bericht, Historie, Prognosegüte, Audit und Besetzungskorrektur
 - Flight-Director-Kopf, Priorität des Betriebshinweises und alle vier Dialogtabs
-- Hell/Dunkel auf Desktop, Tablet und 430 CSS-Pixel
+- Hell/Dunkel sowie Layouts bei 1440 × 1024, 1194 × 834 und 834 × 1194 CSS-Pixel
+- keine horizontale Seitenverschiebung; 44–48-px-Aktionsflächen und begrenzt hohe,
+  intern scrollende Modale
 - Browserkonsole ohne Warnungen oder Fehler
 
 Der Importablauf einschließlich ungültiger und gültiger synthetischer Vorlagen ist durch die oben

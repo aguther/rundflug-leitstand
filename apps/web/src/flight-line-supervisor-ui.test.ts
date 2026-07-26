@@ -1,12 +1,13 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import operationsDialogSource from "./features/flight-line/FlightDirectorOperationsDialog.tsx?raw";
+import operationalPlanSource from "./features/operations/OperationalPlanPanel.tsx?raw";
 import { expectedReviewAtFromPause } from "./flight-line-pause";
 import sharedSource from "./flight-line-shared.tsx?raw";
 import supervisorSource from "./flight-line-supervisor.tsx?raw";
 import appSource from "./flight-line-view.tsx?raw";
 
-const flightLineSource = `${supervisorSource}\n${sharedSource}\n${operationsDialogSource}`;
+const flightLineSource = `${supervisorSource}\n${sharedSource}\n${operationsDialogSource}\n${operationalPlanSource}`;
 const flightLineStyles = readFileSync(
   new URL("./features/flight-line/flight-line-v12.css", import.meta.url),
   "utf8",

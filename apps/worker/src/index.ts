@@ -653,7 +653,8 @@ app.get("/api/setup/status", async (context) => {
     `SELECT
       (SELECT COUNT(*) FROM app_bootstrap) AS completed,
       (SELECT COUNT(*) FROM operation_days) AS events,
-      (SELECT COUNT(*) FROM operator_accounts WHERE role = 'ADMIN' AND active = 1) AS admins`,
+      (SELECT COUNT(*) FROM operator_accounts
+        WHERE role = 'ADMIN' AND active = 1 AND deleted_at IS NULL) AS admins`,
   ).first<{ completed: number; events: number; admins: number }>();
   const resetGrant = await validResetSetupGrant(context.env, context.req.raw);
   return context.json({
@@ -677,7 +678,8 @@ app.post("/api/setup", async (context) => {
     `SELECT
       (SELECT COUNT(*) FROM app_bootstrap) AS completed,
       (SELECT COUNT(*) FROM operation_days) AS events,
-      (SELECT COUNT(*) FROM operator_accounts WHERE role = 'ADMIN' AND active = 1) AS admins`,
+      (SELECT COUNT(*) FROM operator_accounts
+        WHERE role = 'ADMIN' AND active = 1 AND deleted_at IS NULL) AS admins`,
   ).first<{ completed: number; events: number; admins: number }>();
   if ((state?.completed ?? 0) > 0 || (state?.events ?? 0) > 0 || (state?.admins ?? 0) > 0) {
     return context.json(
@@ -805,7 +807,7 @@ const LOGIN_ERROR = {
 app.get("/api/auth/accounts", async (context) => {
   const rows = await context.env.DB.prepare(
     `SELECT id, login_code, role FROM operator_accounts
-      WHERE active = 1 ORDER BY role, login_code`,
+      WHERE active = 1 AND deleted_at IS NULL ORDER BY role, login_code`,
   ).all<{ id: string; login_code: string; role: OperatorRole }>();
   return context.json({
     accounts: rows.results.map((row) => ({
@@ -833,7 +835,7 @@ app.post("/api/auth/login", async (context) => {
   const now = new Date();
   const account = await context.env.DB.prepare(
     `SELECT id, login_code, role, pin_hash, active, failed_attempts, locked_until, session_version
-       FROM operator_accounts WHERE id = ?1`,
+       FROM operator_accounts WHERE id = ?1 AND deleted_at IS NULL`,
   )
     .bind(accountId)
     .first<{
@@ -1001,7 +1003,8 @@ app.get("/api/admin/operator-accounts", async (context) => {
   if (!actor)
     return context.json({ error: { code: "FORBIDDEN", message: "Nicht autorisiert." } }, 403);
   const rows = await context.env.DB.prepare(
-    `SELECT id, login_code, role, active FROM operator_accounts ORDER BY role, login_code`,
+    `SELECT id, login_code, role, active FROM operator_accounts
+      WHERE deleted_at IS NULL ORDER BY role, login_code`,
   ).all<{ id: string; login_code: string; role: OperatorRole; active: number }>();
   return context.json({
     accounts: rows.results.map((row) => ({
@@ -1066,7 +1069,7 @@ app.patch("/api/admin/operator-accounts/:accountId", async (context) => {
               ELSE session_version
             END,
             failed_attempts = 0, locked_until = NULL, updated_at = ?3
-      WHERE id = ?4`,
+      WHERE id = ?4 AND deleted_at IS NULL`,
   )
     .bind(
       parsed.data.active === undefined ? null : parsed.data.active ? 1 : 0,
@@ -1083,6 +1086,70 @@ app.patch("/api/admin/operator-accounts/:accountId", async (context) => {
     );
   }
   return context.json({ updated: true });
+});
+
+app.delete("/api/admin/operator-accounts/:accountId", async (context) => {
+  const actor = assertRole(await authorizeSession(context.env, context.req.raw), ["ADMIN"]);
+  if (!actor)
+    return context.json({ error: { code: "FORBIDDEN", message: "Nicht autorisiert." } }, 403);
+  const accountId = context.req.param("accountId");
+  if (accountId === actor.accountId) {
+    return context.json(
+      {
+        error: {
+          code: "ACTIVE_SESSION_REQUIRED",
+          message: "Das aktuell verwendete eigene Konto kann nicht gelöscht werden.",
+        },
+      },
+      409,
+    );
+  }
+  const now = new Date().toISOString();
+  const result = await context.env.DB.prepare(
+    `UPDATE operator_accounts
+        SET active = 0, deleted_at = ?1, session_version = session_version + 1,
+            failed_attempts = 0, locked_until = NULL, updated_at = ?1
+      WHERE id = ?2
+        AND deleted_at IS NULL
+        AND (
+          role <> 'ADMIN'
+          OR active = 0
+          OR (
+            SELECT COUNT(*) FROM operator_accounts
+             WHERE role = 'ADMIN' AND active = 1 AND deleted_at IS NULL
+          ) > 1
+        )`,
+  )
+    .bind(now, accountId)
+    .run();
+  if (!result.meta.changes) {
+    const account = await context.env.DB.prepare(
+      `SELECT role, active FROM operator_accounts WHERE id = ?1 AND deleted_at IS NULL`,
+    )
+      .bind(accountId)
+      .first<{ role: OperatorRole; active: number }>();
+    if (!account) {
+      return context.json(
+        { error: { code: "ACCOUNT_NOT_FOUND", message: "Konto nicht gefunden." } },
+        404,
+      );
+    }
+    return context.json(
+      {
+        error: {
+          code: "LAST_ACTIVE_ADMIN",
+          message: "Das letzte aktive Administrationskonto kann nicht gelöscht werden.",
+        },
+      },
+      409,
+    );
+  }
+  await context.env.DB.prepare(
+    "DELETE FROM flight_line_assist_claims WHERE operator_account_id = ?1",
+  )
+    .bind(accountId)
+    .run();
+  return context.body(null, 204);
 });
 
 app.get("/api/device/context", async (context) => {
@@ -1187,7 +1254,8 @@ app.post("/api/admin/events/:eventId/recover-device", async (context) => {
     .bind(deviceId, eventId)
     .first<{ role: string }>();
   const adminAccounts = await context.env.DB.prepare(
-    "SELECT pin_hash FROM operator_accounts WHERE role = 'ADMIN' AND active = 1",
+    `SELECT pin_hash FROM operator_accounts
+      WHERE role = 'ADMIN' AND active = 1 AND deleted_at IS NULL`,
   ).all<{ pin_hash: string }>();
   const currentAdminPinMatches = (
     await Promise.all(
@@ -1313,7 +1381,8 @@ app.post("/api/admin/events/:eventId/factory-reset", async (context) => {
     );
   }
   const account = await context.env.DB.prepare(
-    "SELECT pin_hash FROM operator_accounts WHERE id = ?1 AND active = 1",
+    `SELECT pin_hash FROM operator_accounts
+      WHERE id = ?1 AND active = 1 AND deleted_at IS NULL`,
   )
     .bind(actor.accountId)
     .first<{ pin_hash: string }>();

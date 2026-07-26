@@ -11,6 +11,7 @@ const FOCUSABLE_SELECTOR = [
   "textarea:not([disabled])",
   "[tabindex]:not([tabindex='-1'])",
 ].join(",");
+const modalDialogStack: HTMLDialogElement[] = [];
 
 export interface ModalDialogProps {
   open: boolean;
@@ -59,6 +60,7 @@ export function ModalDialog({
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const dialog = dialogRef.current;
+    if (dialog) modalDialogStack.push(dialog);
     const focusable = dialog?.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR);
     const requestedInitialFocus = initialFocusSelector
       ? dialog?.querySelector<HTMLElement>(initialFocusSelector)
@@ -66,6 +68,7 @@ export function ModalDialog({
     (requestedInitialFocus ?? focusable?.[0] ?? dialog)?.focus();
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (modalDialogStack.at(-1) !== dialog) return;
       if (event.key === "Escape") {
         event.preventDefault();
         onCloseRef.current();
@@ -91,6 +94,10 @@ export function ModalDialog({
     document.addEventListener("keydown", handleKeyDown);
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
+      if (dialog) {
+        const dialogIndex = modalDialogStack.lastIndexOf(dialog);
+        if (dialogIndex >= 0) modalDialogStack.splice(dialogIndex, 1);
+      }
       document.body.style.overflow = previousOverflow;
       previousFocus?.focus();
     };
