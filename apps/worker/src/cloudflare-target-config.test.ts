@@ -1,6 +1,6 @@
 // @ts-expect-error The configuration test runs in Node, outside the Worker runtime.
 import { readFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 // @ts-expect-error The operational Node helper is executed directly as ESM and tested here.
 import * as cloudflareTarget from "../../../scripts/cloudflare-target.mjs";
 
@@ -13,6 +13,10 @@ const {
 } = cloudflareTarget;
 
 describe("Cloudflare target configuration", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it("uses the deterministic compatibility inventory in the checked-in configuration", () => {
     const config = JSON.parse(
       readFileSync(new URL("../../../wrangler.jsonc", import.meta.url), "utf8"),
@@ -86,6 +90,7 @@ describe("Cloudflare target configuration", () => {
   });
 
   it("selects one explicit account and refuses an ambiguous login", () => {
+    vi.stubEnv("CLOUDFLARE_ACCOUNT_ID", undefined);
     const payload = { accounts: [{ id: "account-a" }, { id: "account-b" }] };
     expect(cloudflareAccountId(payload, "account-b")).toBe("account-b");
     expect(() => cloudflareAccountId(payload)).toThrow(/mehreren Cloudflare-Accounts/);
