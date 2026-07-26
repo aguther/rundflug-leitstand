@@ -1,4 +1,4 @@
-import type { CommandResult, OperationBoard } from "@rundflug/contracts";
+import type { CommandEnvelope, CommandResult, OperationBoard } from "@rundflug/contracts";
 import { formatBookingGroupLabel } from "@rundflug/domain";
 import { useEffect, useRef, useState } from "react";
 import { claimFlightLineAircraft, releaseFlightLineAircraft, sendCommand } from "./api";
@@ -43,6 +43,11 @@ type Rotation = OperationBoard["rotations"][number];
 type Aircraft = OperationBoard["aircraft"][number];
 type QueueGroup = OperationBoard["queueGroups"][number];
 type TurnaroundNextState = "AVAILABLE" | "REFUELING" | "PAUSED" | "INACTIVE";
+type UpsertPlannedOperationPayload = Extract<
+  CommandEnvelope,
+  { type: "UPSERT_PLANNED_OPERATION" }
+>["payload"];
+type PlannedOperation = OperationBoard["plannedOperations"][number];
 const FLIGHT_DIRECTOR_AUDIT_REASON = "Operative Entscheidung Flight Director";
 
 function queuedSegmentTicketCount(group: QueueGroup): number {
@@ -514,7 +519,11 @@ export function FlightLineView() {
     }
   }
 
-  async function setEventInterruption(interrupted: boolean) {
+  async function setEventInterruption(
+    interrupted: boolean,
+    plannedOperationId?: string,
+    expectedReviewAt: string | null = null,
+  ) {
     if (!board) return;
     setOperationsBusy(true);
     try {
@@ -529,7 +538,8 @@ export function FlightLineView() {
           payload: {
             interrupted,
             reason: FLIGHT_DIRECTOR_AUDIT_REASON,
-            expectedReviewAt: null,
+            expectedReviewAt,
+            ...(plannedOperationId ? { plannedOperationId } : {}),
           },
         },
         deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
@@ -548,6 +558,8 @@ export function FlightLineView() {
   async function setResourceGroupStatus(
     resourceGroupId: string,
     status: "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED",
+    plannedOperationId?: string,
+    expectedReviewAt: string | null = null,
   ) {
     if (!board) return;
     setOperationsBusy(true);
@@ -564,7 +576,8 @@ export function FlightLineView() {
             resourceGroupId,
             status,
             reason: FLIGHT_DIRECTOR_AUDIT_REASON,
-            expectedReviewAt: null,
+            expectedReviewAt,
+            ...(plannedOperationId ? { plannedOperationId } : {}),
           },
         },
         deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
@@ -573,6 +586,140 @@ export function FlightLineView() {
       await refresh();
     } catch (reason) {
       setMessage(reason instanceof Error ? reason.message : "Statusänderung fehlgeschlagen.");
+    } finally {
+      setOperationsBusy(false);
+    }
+  }
+
+  async function upsertPlannedOperation(payload: UpsertPlannedOperationPayload) {
+    if (!board) return;
+    setOperationsBusy(true);
+    try {
+      await sendCommand(
+        {
+          commandId: crypto.randomUUID(),
+          eventId: EVENT_ID,
+          deviceId: FLIGHT_LINE_DEVICE_ID,
+          expectedVersion: board.event.version,
+          issuedAt: new Date().toISOString(),
+          type: "UPSERT_PLANNED_OPERATION",
+          payload,
+        },
+        deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
+      );
+      setMessage("Planeintrag gespeichert; der operative Zustand bleibt unverändert.");
+      await refresh();
+    } catch (reason) {
+      setMessage(
+        reason instanceof Error ? reason.message : "Planeintrag konnte nicht gespeichert werden.",
+      );
+      throw reason;
+    } finally {
+      setOperationsBusy(false);
+    }
+  }
+
+  async function cancelPlannedOperation(plan: PlannedOperation) {
+    if (!board) return;
+    setOperationsBusy(true);
+    try {
+      await sendCommand(
+        {
+          commandId: crypto.randomUUID(),
+          eventId: EVENT_ID,
+          deviceId: FLIGHT_LINE_DEVICE_ID,
+          expectedVersion: board.event.version,
+          issuedAt: new Date().toISOString(),
+          type: "CANCEL_PLANNED_OPERATION",
+          payload: {
+            planId: plan.id,
+            planExpectedVersion: plan.version,
+            reason: FLIGHT_DIRECTOR_AUDIT_REASON,
+          },
+        },
+        deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
+      );
+      setMessage("Planeintrag abgesagt; laufende Zustände wurden nicht verändert.");
+      await refresh();
+    } catch (reason) {
+      setMessage(
+        reason instanceof Error ? reason.message : "Planeintrag konnte nicht abgesagt werden.",
+      );
+      throw reason;
+    } finally {
+      setOperationsBusy(false);
+    }
+  }
+
+  async function confirmPlannedOperation(plan: PlannedOperation, activate: boolean) {
+    if (!board) return;
+    const expectedReviewAt = activate
+      ? new Date(Date.now() + plan.typicalDurationMinutes * 60_000).toISOString()
+      : null;
+    if (plan.scopeType === "EVENT") {
+      await setEventInterruption(activate, plan.id, expectedReviewAt);
+      return;
+    }
+    if (plan.scopeType === "RESOURCE_GROUP") {
+      await setResourceGroupStatus(
+        plan.scopeId,
+        activate ? (plan.kind === "PAUSE" ? "PAUSED" : "INTERRUPTED") : "ACTIVE",
+        plan.id,
+        expectedReviewAt,
+      );
+      return;
+    }
+    setOperationsBusy(true);
+    try {
+      await sendCommand(
+        plan.scopeType === "AIRCRAFT"
+          ? {
+              commandId: crypto.randomUUID(),
+              eventId: EVENT_ID,
+              deviceId: FLIGHT_LINE_DEVICE_ID,
+              expectedVersion: board.event.version,
+              issuedAt: new Date().toISOString(),
+              type: "SET_AIRCRAFT_OPERATIONAL_STATE",
+              payload: {
+                aircraftId: plan.scopeId,
+                state: activate
+                  ? plan.kind === "REFUELING"
+                    ? "REFUELING"
+                    : plan.kind === "PAUSE"
+                      ? "PAUSED"
+                      : "INTERRUPTED"
+                  : "AVAILABLE",
+                reason: FLIGHT_DIRECTOR_AUDIT_REASON,
+                expectedReviewAt,
+                plannedOperationId: plan.id,
+              },
+            }
+          : {
+              commandId: crypto.randomUUID(),
+              eventId: EVENT_ID,
+              deviceId: FLIGHT_LINE_DEVICE_ID,
+              expectedVersion: board.event.version,
+              issuedAt: new Date().toISOString(),
+              type: "SET_PILOT_PAUSE",
+              payload: {
+                pilotId: plan.scopeId,
+                paused: activate,
+                reason: FLIGHT_DIRECTOR_AUDIT_REASON,
+                expectedReviewAt,
+                plannedOperationId: plan.id,
+              },
+            },
+        deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
+      );
+      setMessage(
+        activate
+          ? "Geplante Einschränkung als gestartet bestätigt."
+          : "Geplante Einschränkung als beendet bestätigt.",
+      );
+      await refresh();
+    } catch (reason) {
+      setMessage(reason instanceof Error ? reason.message : "Planbestätigung fehlgeschlagen.");
+      throw reason;
     } finally {
       setOperationsBusy(false);
     }
@@ -1603,14 +1750,23 @@ export function FlightLineView() {
         <FlightDirectorOperationsDialog
           busy={operationsBusy}
           emergencyMode={board.event.emergencyMode}
+          eventId={board.event.eventId}
           eventInterrupted={board.event.operationalInterrupted}
           eventNotice={board.event.operationalNote}
+          eventTimeZone={board.event.timeZone}
+          aircraft={board.aircraft}
+          pilots={board.pilots}
+          plannedOperations={board.plannedOperations}
+          rotations={board.rotations}
+          onCancelPlannedOperation={cancelPlannedOperation}
           onClose={() => setOperationsOpen(false)}
+          onConfirmPlannedOperation={confirmPlannedOperation}
           onPublishEventNotice={setEventNotice}
           onPublishResourceNotice={setResourceNoticeCommand}
           onSetEventInterruption={setEventInterruption}
           onSetResourceGroupStatus={setResourceGroupStatus}
           onTriggerEmergency={triggerEmergency}
+          onUpsertPlannedOperation={upsertPlannedOperation}
           open={operationsOpen && canManageAircraft}
           resourceGroups={board.resourceGroups}
         />

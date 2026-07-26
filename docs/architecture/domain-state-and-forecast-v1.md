@@ -100,6 +100,16 @@ Ressourcengruppen besitzen `ACTIVE`, `PAUSED`, `INTERRUPTED` und `ENDED`. Nur `A
 Verkäufe und Aufrufe. Pausen und Unterbrechungen erzeugen einen nachvollziehbaren Betriebsblock;
 die Rückkehr auf `ACTIVE` schließt aktive Blöcke. Nicht betroffene Ressourcengruppen laufen weiter.
 
+#### 3.4.1 Weicher Betriebsplan
+
+Der Flight Director kann ungefähre Einschränkungen für Veranstaltung, Ressourcengruppe, Flugzeug
+oder anonymen Pilotencode vormerken. Ein Plan enthält Art, Startfenster oder einen Start nach einem
+bestimmten Umlauf sowie minimale, typische und maximale Dauer. Er ist ausschließlich
+Prognoseeingang: Fälligkeit startet keine Pause, Betankung oder Unterbrechung. Erst ein
+menschlich bestätigtes Zustandskommando aktiviert den Plan und verknüpft ihn mit dem tatsächlichen
+Betriebsblock beziehungsweise der Pilotencode-Pause. Dasselbe gilt für die Aufhebung. Vollständige Begründung und Folgen beschreibt
+`docs/adr/0028-zeitabhaengige-prognose-und-weicher-betriebsplan.md`.
+
 ### 3.5 Tickets und Buchungsgruppen
 
 Die ausführliche Zuordnung steht in `docs/architecture/ticket-states-v1.md`. Wesentliche Regeln:
@@ -163,15 +173,16 @@ Der Rechenlauf verwendet:
 - Queueposition der noch offenen Umläufe;
 - Produkt-Referenzflugdauer;
 - geplante Boarding-, Deboarding- und Pufferdauer der Veranstaltung;
-- aktive, nicht pausierte, nicht tankende und nicht unterbrochene Flugzeuge je Ressourcengruppe;
-- Anzahl aktiver, nicht pausierter Piloten; die nutzbare Parallelität ist das Minimum aus Flugzeugen
-  und Piloten;
+- zeitabhängige Verfügbarkeitsbahnen aus genau einem Flugzeug und einem anonymen Pilotencode;
+  die nutzbare Parallelität ist das Minimum beider Ressourcen;
 - Zustand von Veranstaltung und Ressourcengruppe;
 - gespeicherte Ist-Zeiten laufender Umläufe;
 - bis zu zwölf jüngste abgeschlossene Vergleichsumläufe, bevorzugt für Produkt und Flugzeugtyp,
   sonst für das Produkt.
 - optionale erwartete Endzeiten aktiver Flugzeug- und Pilotencode-Pausen; Pausen ohne Endzeit
   reduzieren die vorhergesagte Kapazität bis zur bestätigten Rückkehr.
+- optionaler geplanter Betriebsbeginn und weiche geplante Einschränkungen mit frühestem,
+  typischem und spätestem Verlauf.
 
 ### 5.3 Lernen aus Ist-Daten
 
@@ -183,6 +194,24 @@ Ausreißer. Das Alter des jüngsten Messwerts bleibt diagnostisch und ist kein U
 
 Details und Begründung stehen in `docs/architecture/forecast-sample-policy-v1.md`; die reine Logik
 liegt in `packages/domain/src/forecast.ts`.
+
+### 5.4 Queue, Unsicherheit und öffentliche Darstellung
+
+Offene Fluggruppen werden auf die jeweils früheste erwartete Verfügbarkeitsbahn gelegt. Eine
+vorübergehend blockierte Ressource bleibt dadurch als spätere Kapazität erhalten, statt die gesamte
+Queue bei Beginn und Ende der Blockierung zwischen unterschiedlichen Parallelitätsgraden neu zu
+verteilen. Frühester, erwarteter und spätester Verlauf einer Bahn werden gekoppelt fortgeschrieben;
+die Prognose kombiniert nicht unabhängig das globale Minimum und Maximum aller Ressourcen.
+
+Vor dem ersten Ist-Ereignis begrenzt der geplante Betriebsbeginn das scheinbar mögliche Boarding.
+Absehbare Pausen, Betankungen und Unterbrechungen sperren ausschließlich die betroffenen Bahnen in
+ihrem ungefähren Zeitraum. Ein überschrittener Plan erhöht die ausgewiesene Unsicherheit, löst aber
+keinen operativen Zustand aus.
+
+Interne Prognosezeitpunkte verwenden die Mitte des resultierenden Intervalls als Erwartungswert.
+Öffentliche Zeitfenster über 60 Minuten werden als `Wird aktualisiert` dargestellt. Aktiver
+Notfallmodus oder eine globale Betriebsunterbrechung unterdrücken weiterhin eine scheinpräzise
+Prognose.
 
 Die benannten Produktionskonstanten werden zusätzlich als optionales `ForecastTuningProfile`
 bereitgestellt. Ein fehlendes Profil ist charakterisiert und liefert bitgenau das bisherige

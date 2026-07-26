@@ -16,6 +16,7 @@ export function rowToSnapshot(row: StoredEventRow): EventSnapshot {
     version: row.version,
     operationalNote: row.operational_note,
     saleOpensAt: row.sale_opens_at ?? null,
+    operationsStartAt: row.operations_start_at ?? null,
     operationsEndAt: row.operations_end_at ?? null,
     noShowAfterMinutes: row.no_show_after_minutes ?? 10,
     maxTicketDeferrals: row.max_ticket_deferrals ?? 2,

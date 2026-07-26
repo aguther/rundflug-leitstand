@@ -64,6 +64,7 @@ function timeWindow(group: PublicGroup, timeZone: string): string {
   return formatAbsoluteTimeWindow({
     lowerAt: group.boardingWindowLowerAt,
     upperAt: group.boardingWindowUpperAt,
+    maximumWidthMinutes: 60,
     timeZone,
     includeClockSuffix: false,
     quality: group.predictionQuality,

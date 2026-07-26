@@ -5,7 +5,7 @@ import { simulationConfigForPreset } from "./model";
 import { createSimulationExport, SIMULATION_EXPORT_SCHEMA } from "./simulation-export";
 
 describe("forecast simulation export", () => {
-  it("writes the v5 schedule, demand profile, and actual run window", () => {
+  it("writes the v6 schedule, demand profile, resource model, and actual run window", () => {
     const result = runSimulation(simulationConfigForPreset("NORMAL"));
     const exported = createSimulationExport(result, [], null);
 

@@ -4,6 +4,7 @@ import assistSource from "../../flight-line-assist.tsx?raw";
 import sharedSource from "../../flight-line-shared.tsx?raw";
 import supervisorSource from "../../flight-line-supervisor.tsx?raw";
 import viewSource from "../../flight-line-view.tsx?raw";
+import operationsDialogSource from "./FlightDirectorOperationsDialog.tsx?raw";
 
 const stylesSource = [
   "./flight-line-v12.css",
@@ -101,5 +102,17 @@ describe("V1.9 Flight Director and Flight Line surfaces", () => {
     expect(stylesSource).toContain(".assist-meta-item");
     expect(stylesSource).toContain(".setup-shell .setup-page");
     expect(stylesSource).not.toContain("body > button");
+  });
+
+  it("shows the approved soft operational plan with explicit start and end confirmation", () => {
+    expect(operationsDialogSource).toContain('label: "Betriebsplan"');
+    expect(operationsDialogSource).toContain("Interne Planung ohne automatische Zustandsänderung.");
+    expect(operationsDialogSource).toContain("Start bestätigen");
+    expect(operationsDialogSource).toContain("Ende bestätigen");
+    expect(operationsDialogSource).toContain("Ungefähres Zeitfenster");
+    expect(operationsDialogSource).toContain("Nach einem Umlauf");
+    expect(operationsDialogSource).not.toContain("automatisch starten");
+    expect(viewSource).toContain('type: "UPSERT_PLANNED_OPERATION"');
+    expect(viewSource).toContain('type: "CANCEL_PLANNED_OPERATION"');
   });
 });

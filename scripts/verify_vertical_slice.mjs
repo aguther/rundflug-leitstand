@@ -510,7 +510,7 @@ try {
         entry.dataBasisScope === "LEGACY_UNKNOWN" ||
         entry.triggerEventType === "LEGACY_UNKNOWN" ||
         entry.referenceDurationMinutes <= 0 ||
-        entry.activeCapacity <= 0 ||
+        entry.activeCapacity < 0 ||
         entry.actual.completionAt === null ||
         entry.deviationMinutes.boarding === null ||
         entry.deviationMinutes.departure === null ||

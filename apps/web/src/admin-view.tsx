@@ -319,6 +319,7 @@ export function AdminView() {
   const [operationalNotice, setOperationalNotice] = useState("");
   const [eventSettingsInitialized, setEventSettingsInitialized] = useState(false);
   const [saleOpensAt, setSaleOpensAt] = useState("");
+  const [operationsStartAt, setOperationsStartAt] = useState("");
   const [operationsEndAt, setOperationsEndAt] = useState("");
   const [noShowAfterMinutes, setNoShowAfterMinutes] = useState(10);
   const [maxTicketDeferrals, setMaxTicketDeferrals] = useState(2);
@@ -668,6 +669,9 @@ export function AdminView() {
   useEffect(() => {
     if (!board || eventSettingsInitialized) return;
     setSaleOpensAt(formatEventLocalDateTime(board.event.saleOpensAt, board.event.timeZone));
+    setOperationsStartAt(
+      formatEventLocalDateTime(board.event.operationsStartAt, board.event.timeZone),
+    );
     setOperationsEndAt(formatEventLocalDateTime(board.event.operationsEndAt, board.event.timeZone));
     setNoShowAfterMinutes(board.event.noShowAfterMinutes);
     setMaxTicketDeferrals(board.event.maxTicketDeferrals);
@@ -950,6 +954,9 @@ export function AdminView() {
           payload: {
             saleOpensAt: saleOpensAt
               ? eventLocalDateTimeToIso(saleOpensAt, board.event.timeZone)
+              : null,
+            operationsStartAt: operationsStartAt
+              ? eventLocalDateTimeToIso(operationsStartAt, board.event.timeZone)
               : null,
             operationsEndAt: eventLocalDateTimeToIso(operationsEndAt, board.event.timeZone),
             noShowAfterMinutes,
@@ -3131,6 +3138,11 @@ export function AdminView() {
                   label="Verkaufsbeginn"
                   value={saleOpensAt}
                   onChange={setSaleOpensAt}
+                />
+                <LocalizedDateTimeInput
+                  label="Betriebsbeginn (Plan)"
+                  value={operationsStartAt}
+                  onChange={setOperationsStartAt}
                 />
                 <LocalizedDateTimeInput
                   label="Betriebsende"

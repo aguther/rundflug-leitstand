@@ -1,7 +1,7 @@
 import type { BatchComparisonResult } from "./comparison";
 import type { ManualIncident, SimulationResult } from "./model";
 
-export const SIMULATION_EXPORT_SCHEMA = "rundflug-forecast-simulation/v5" as const;
+export const SIMULATION_EXPORT_SCHEMA = "rundflug-forecast-simulation/v6" as const;
 
 export function createSimulationExport(
   result: SimulationResult,

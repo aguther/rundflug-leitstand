@@ -27,6 +27,92 @@ export const timeZoneSchema = z
     { message: "Ungültige IANA-Zeitzone" },
   );
 
+export const operationalPlanScopeSchema = z.enum(["EVENT", "RESOURCE_GROUP", "AIRCRAFT", "PILOT"]);
+export const operationalPlanKindSchema = z.enum([
+  "PAUSE",
+  "REFUELING",
+  "FLIGHT_SHOW",
+  "WEATHER",
+  "TECHNICAL",
+  "OTHER",
+]);
+export const operationalPlanStartModeSchema = z.enum(["TIME_WINDOW", "AFTER_CURRENT_ROTATION"]);
+export const operationalPlanStatusSchema = z.enum([
+  "PLANNED",
+  "DUE",
+  "ACTIVE",
+  "CLEARED",
+  "CANCELED",
+]);
+
+const upsertPlannedOperationPayloadSchema = z
+  .object({
+    planId: z.uuid(),
+    planExpectedVersion: z.number().int().nonnegative().nullable(),
+    scopeType: operationalPlanScopeSchema,
+    scopeId: z.string().min(1).max(100),
+    kind: operationalPlanKindSchema,
+    startMode: operationalPlanStartModeSchema,
+    earliestStartAt: z.iso.datetime().nullable(),
+    latestStartAt: z.iso.datetime().nullable(),
+    afterRotationId: z.string().min(1).max(100).nullable(),
+    minimumDurationMinutes: z.number().int().min(1).max(1440),
+    typicalDurationMinutes: z.number().int().min(1).max(1440),
+    maximumDurationMinutes: z.number().int().min(1).max(1440),
+    reason: z.string().trim().min(3).max(240),
+    publicNote: z.string().trim().max(160),
+  })
+  .strict()
+  .superRefine((payload, context) => {
+    if (
+      payload.minimumDurationMinutes > payload.typicalDurationMinutes ||
+      payload.typicalDurationMinutes > payload.maximumDurationMinutes
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Die Dauer muss als Minimum ≤ Typisch ≤ Maximum angegeben werden.",
+        path: ["typicalDurationMinutes"],
+      });
+    }
+    if (payload.publicNote.length > 0 && !["EVENT", "RESOURCE_GROUP"].includes(payload.scopeType)) {
+      context.addIssue({
+        code: "custom",
+        message: "Öffentliche Hinweise sind nur veranstaltungs- oder gruppenweit zulässig.",
+        path: ["publicNote"],
+      });
+    }
+    if (payload.startMode === "TIME_WINDOW") {
+      if (
+        !payload.earliestStartAt ||
+        !payload.latestStartAt ||
+        Date.parse(payload.earliestStartAt) > Date.parse(payload.latestStartAt)
+      ) {
+        context.addIssue({
+          code: "custom",
+          message: "Das Startzeitfenster ist unvollständig oder ungültig.",
+          path: ["earliestStartAt"],
+        });
+      }
+      if (payload.afterRotationId !== null) {
+        context.addIssue({
+          code: "custom",
+          message: "Ein Zeitfenster darf nicht zugleich an einen Umlauf gebunden sein.",
+          path: ["afterRotationId"],
+        });
+      }
+    } else if (
+      payload.afterRotationId === null ||
+      payload.earliestStartAt !== null ||
+      payload.latestStartAt !== null
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Ein umlaufgebundener Beginn benötigt genau einen Umlauf.",
+        path: ["afterRotationId"],
+      });
+    }
+  });
+
 export const gateDisplayFilterSchema = z
   .object({
     productIds: z
@@ -272,6 +358,7 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
         interrupted: z.boolean(),
         reason: z.string().trim().min(3).max(240),
         expectedReviewAt: z.iso.datetime().nullable(),
+        plannedOperationId: z.uuid().optional(),
       })
       .strict(),
   }),
@@ -283,6 +370,7 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
         status: z.enum(["ACTIVE", "PAUSED", "INTERRUPTED", "ENDED"]),
         reason: z.string().trim().min(3).max(240),
         expectedReviewAt: z.iso.datetime().nullable(),
+        plannedOperationId: z.uuid().optional(),
       })
       .strict(),
   }),
@@ -292,6 +380,20 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
       resourceGroupId: z.string().min(1).max(100),
       note: z.string().trim().max(240),
     }),
+  }),
+  commandBaseSchema.extend({
+    type: z.literal("UPSERT_PLANNED_OPERATION"),
+    payload: upsertPlannedOperationPayloadSchema,
+  }),
+  commandBaseSchema.extend({
+    type: z.literal("CANCEL_PLANNED_OPERATION"),
+    payload: z
+      .object({
+        planId: z.uuid(),
+        planExpectedVersion: z.number().int().nonnegative(),
+        reason: z.string().trim().min(3).max(240),
+      })
+      .strict(),
   }),
   commandBaseSchema.extend({
     type: z.literal("CONFIGURE_PRODUCT_SALES"),
@@ -331,6 +433,7 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
         paused: z.boolean(),
         reason: z.string().trim().min(3).max(240),
         expectedReviewAt: z.iso.datetime().nullable(),
+        plannedOperationId: z.uuid().optional(),
       })
       .strict(),
   }),
@@ -342,6 +445,7 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
         state: z.enum(["AVAILABLE", "REFUELING", "PAUSED", "INTERRUPTED", "INACTIVE"]),
         reason: z.string().trim().min(3).max(240),
         expectedReviewAt: z.iso.datetime().nullable(),
+        plannedOperationId: z.uuid().optional(),
       })
       .strict(),
   }),
@@ -441,6 +545,7 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
     type: z.literal("CONFIGURE_EVENT_PARAMETERS"),
     payload: z.object({
       saleOpensAt: z.iso.datetime().nullable(),
+      operationsStartAt: z.iso.datetime().nullable().default(null),
       operationsEndAt: z.iso.datetime(),
       noShowAfterMinutes: z.number().int().min(1).max(120),
       maxTicketDeferrals: z.number().int().min(1).max(10).default(2),
@@ -658,6 +763,7 @@ export const eventSnapshotSchema = z.object({
   version: z.number().int().nonnegative(),
   operationalNote: z.string(),
   saleOpensAt: z.string().nullable(),
+  operationsStartAt: z.string().nullable().default(null),
   operationsEndAt: z.string().nullable(),
   noShowAfterMinutes: z.number().int().positive(),
   maxTicketDeferrals: z.number().int().min(1).max(10),
@@ -1282,6 +1388,7 @@ export const commandResultSchema = z.object({
         "TICKET_GROUP",
         "ROTATION",
         "RECOVERY_BATCH",
+        "OPERATIONAL_PLAN",
       ]),
       id: z.string(),
       relatedRotationId: z.string().optional(),
@@ -1463,6 +1570,30 @@ export const pilotOperationalSummarySchema = z.object({
   currentCommunicationNumber: z.number().int().positive().nullable(),
 });
 
+export const plannedOperationalConstraintSchema = z.object({
+  id: z.string(),
+  version: z.number().int().nonnegative(),
+  scopeType: operationalPlanScopeSchema,
+  scopeId: z.string(),
+  kind: operationalPlanKindSchema,
+  startMode: operationalPlanStartModeSchema,
+  earliestStartAt: z.string().nullable(),
+  latestStartAt: z.string().nullable(),
+  afterRotationId: z.string().nullable(),
+  minimumDurationMinutes: z.number().int().positive(),
+  typicalDurationMinutes: z.number().int().positive(),
+  maximumDurationMinutes: z.number().int().positive(),
+  status: operationalPlanStatusSchema,
+  reason: z.string(),
+  publicNote: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  activatedAt: z.string().nullable(),
+  clearedAt: z.string().nullable(),
+  canceledAt: z.string().nullable(),
+});
+export type PlannedOperationalConstraint = z.infer<typeof plannedOperationalConstraintSchema>;
+
 export const operationBoardSchema = z.object({
   currentDeviceRole: z.enum(["CASHIER", "FLIGHT_LINE", "FLIGHT_DIRECTOR", "ADMIN"]),
   event: eventSnapshotSchema,
@@ -1503,6 +1634,7 @@ export const operationBoardSchema = z.object({
     }),
   ),
   pilots: z.array(pilotOperationalSummarySchema),
+  plannedOperations: z.array(plannedOperationalConstraintSchema).default([]),
   gates: z.array(
     z.object({
       id: z.string(),

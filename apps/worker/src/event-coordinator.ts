@@ -804,7 +804,8 @@ export class EventCoordinator extends DurableObject<Env> {
       const current = await this.env.DB.prepare(
         `SELECT id, name, event_date, aerodrome, time_zone, status, archived_at, template_source_id,
                 emergency_mode, operational_interrupted, version,
-                operational_note, operations_end_at, sale_opens_at, no_show_after_minutes,
+                operational_note, operations_start_at, operations_end_at, sale_opens_at,
+                no_show_after_minutes,
                 max_ticket_deferrals,
                 notification_lead_minutes, child_reference_weight_kg, normal_reference_weight_kg,
                 automatic_precall_enabled, precall_lead_minutes, max_gate_wait_minutes,
@@ -824,6 +825,8 @@ export class EventCoordinator extends DurableObject<Env> {
       }
       const versionConflict = await this.validateCommandVersion(command, current);
       if (versionConflict) return versionConflict;
+      const plannedOperationConflict = await this.validatePlannedOperationLink(command);
+      if (plannedOperationConflict) return plannedOperationConflict;
 
       const commandNow = new Date();
       const activeOperatorClaim = operatorAccountId
@@ -1276,6 +1279,12 @@ export class EventCoordinator extends DurableObject<Env> {
           return this.handleAircraftPilotAssignment(command, current);
         }
         if (
+          command.type === "UPSERT_PLANNED_OPERATION" ||
+          command.type === "CANCEL_PLANNED_OPERATION"
+        ) {
+          return this.handlePlannedOperation(command, current);
+        }
+        if (
           command.type === "SET_AIRCRAFT_OPERATIONAL_STATE" ||
           command.type === "SCHEDULE_AIRCRAFT_REFUEL" ||
           command.type === "CONFIGURE_AIRCRAFT_REFUEL_THRESHOLD" ||
@@ -1486,6 +1495,82 @@ export class EventCoordinator extends DurableObject<Env> {
     }
   }
 
+  private async validatePlannedOperationLink(command: CommandEnvelope): Promise<Response | null> {
+    const plannedOperationId = (command.payload as { plannedOperationId?: string })
+      .plannedOperationId;
+    if (!plannedOperationId) return null;
+    let expectedScope: "EVENT" | "RESOURCE_GROUP" | "AIRCRAFT" | "PILOT";
+    let expectedScopeId: string;
+    let activating: boolean;
+    if (command.type === "SET_EVENT_INTERRUPTION") {
+      expectedScope = "EVENT";
+      expectedScopeId = command.eventId;
+      activating = command.payload.interrupted;
+    } else if (command.type === "SET_RESOURCE_GROUP_STATUS") {
+      expectedScope = "RESOURCE_GROUP";
+      expectedScopeId = command.payload.resourceGroupId;
+      activating = command.payload.status !== "ACTIVE";
+    } else if (command.type === "SET_PILOT_PAUSE") {
+      expectedScope = "PILOT";
+      expectedScopeId = command.payload.pilotId;
+      activating = command.payload.paused;
+    } else if (command.type === "SET_AIRCRAFT_OPERATIONAL_STATE") {
+      expectedScope = "AIRCRAFT";
+      expectedScopeId = command.payload.aircraftId;
+      activating = command.payload.state !== "AVAILABLE";
+    } else {
+      return json(
+        {
+          error: {
+            code: "PLANNED_OPERATION_LINK_NOT_SUPPORTED",
+            message: "Dieses Kommando kann nicht mit einem Planeintrag verknüpft werden.",
+          },
+        },
+        { status: 409 },
+      );
+    }
+    const plan = await this.env.DB.prepare(
+      `SELECT scope_type, scope_id, status
+         FROM planned_operational_constraints
+        WHERE id = ?1 AND operation_day_id = ?2`,
+    )
+      .bind(plannedOperationId, command.eventId)
+      .first<{
+        scope_type: "EVENT" | "RESOURCE_GROUP" | "AIRCRAFT" | "PILOT";
+        scope_id: string;
+        status: "PLANNED" | "ACTIVE" | "CLEARED" | "CANCELED";
+      }>();
+    if (!plan) {
+      return json(
+        { error: { code: "PLANNED_OPERATION_NOT_FOUND", message: "Planeintrag nicht gefunden." } },
+        { status: 404 },
+      );
+    }
+    if (plan.scope_type !== expectedScope || plan.scope_id !== expectedScopeId) {
+      return json(
+        {
+          error: {
+            code: "PLANNED_OPERATION_SCOPE_MISMATCH",
+            message: "Planeintrag und operatives Ziel stimmen nicht überein.",
+          },
+        },
+        { status: 409 },
+      );
+    }
+    if ((activating && plan.status !== "PLANNED") || (!activating && plan.status !== "ACTIVE")) {
+      return json(
+        {
+          error: {
+            code: "PLANNED_OPERATION_STATUS_MISMATCH",
+            message: "Der Planeintrag ist für diese Bestätigung nicht im passenden Zustand.",
+          },
+        },
+        { status: 409 },
+      );
+    }
+    return null;
+  }
+
   private broadcast(result: CommandResult): void {
     this.ctx.waitUntil(this.ensureForecastAlarm(result.event.eventId));
     this.ctx.waitUntil(this.scheduleForecastRecalculation(result.event.eventId, result.eventType));
@@ -1554,33 +1639,43 @@ export class EventCoordinator extends DurableObject<Env> {
     eventId: string,
     triggerEventType: string,
   ): Promise<void> {
-    const [event, rotationRows, durationRows, capacityRows, pilotRow, gateWaitRows] =
-      await Promise.all([
-        this.env.DB.prepare(
-          `SELECT version, operational_interrupted, emergency_mode, planned_boarding_minutes,
-                planned_deboarding_minutes, planned_buffer_minutes, updated_at, status,
-                automatic_precall_enabled, precall_lead_minutes, max_gate_wait_minutes,
+    const [
+      event,
+      rotationRows,
+      durationRows,
+      capacityRows,
+      pilotRows,
+      gateWaitRows,
+      plannedOperationRows,
+      activeBlockRows,
+    ] = await Promise.all([
+      this.env.DB.prepare(
+        `SELECT version, operational_interrupted, emergency_mode, planned_boarding_minutes,
+                 planned_deboarding_minutes, planned_buffer_minutes, updated_at, status,
+                 operations_start_at,
+                 automatic_precall_enabled, precall_lead_minutes, max_gate_wait_minutes,
                 precall_min_quality, precall_gate_cooldown_minutes
            FROM operation_days WHERE id = ?1`,
-        )
-          .bind(eventId)
-          .first<{
-            version: number;
-            operational_interrupted: number;
-            emergency_mode: number;
-            planned_boarding_minutes: number;
-            planned_deboarding_minutes: number;
-            planned_buffer_minutes: number;
-            updated_at: string;
-            status: "PREPARATION" | "ACTIVE" | "CLOSED" | "ARCHIVED";
-            automatic_precall_enabled: number;
-            precall_lead_minutes: number;
-            max_gate_wait_minutes: number;
-            precall_min_quality: "STABLE" | "CHANGING";
-            precall_gate_cooldown_minutes: number;
-          }>(),
-        this.env.DB.prepare(
-          `SELECT r.id, r.status, r.created_at, r.called_at, r.departed_at, r.landed_at,
+      )
+        .bind(eventId)
+        .first<{
+          version: number;
+          operational_interrupted: number;
+          emergency_mode: number;
+          planned_boarding_minutes: number;
+          planned_deboarding_minutes: number;
+          planned_buffer_minutes: number;
+          operations_start_at: string | null;
+          updated_at: string;
+          status: "PREPARATION" | "ACTIVE" | "CLOSED" | "ARCHIVED";
+          automatic_precall_enabled: number;
+          precall_lead_minutes: number;
+          max_gate_wait_minutes: number;
+          precall_min_quality: "STABLE" | "CHANGING";
+          precall_gate_cooldown_minutes: number;
+        }>(),
+      this.env.DB.prepare(
+        `SELECT r.id, r.status, r.created_at, r.called_at, r.departed_at, r.landed_at,
                 r.completed_at, fg.id AS flight_group_id, fg.version AS flight_group_version,
                 fg.precalled_at, fg.resource_group_id, rg.status AS resource_group_status,
                 rg.automatic_precall_enabled AS resource_group_precall_enabled,
@@ -1602,34 +1697,34 @@ export class EventCoordinator extends DurableObject<Env> {
           GROUP BY r.id
           ORDER BY CASE WHEN r.status = 'DRAFT' THEN 1 ELSE 0 END,
                    COALESCE(fg.queue_position, fg.communication_number), r.created_at`,
-        )
-          .bind(eventId)
-          .all<{
-            id: string;
-            status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED";
-            created_at: string;
-            called_at: string | null;
-            departed_at: string | null;
-            landed_at: string | null;
-            completed_at: string | null;
-            flight_group_id: string;
-            flight_group_version: number;
-            precalled_at: string | null;
-            resource_group_id: string;
-            resource_group_status: "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED";
-            resource_group_precall_enabled: number;
-            queue_sequence: number;
-            ticket_count: number;
-            reference_duration_minutes: number;
-            product_code: string;
-            aircraft_type: string | null;
-            gate_id: string | null;
-            predicted_departure_at: string | null;
-            predicted_landing_at: string | null;
-            predicted_completion_at: string | null;
-          }>(),
-        this.env.DB.prepare(
-          `SELECT (julianday(r.completed_at) - julianday(r.called_at)) * 1440.0 AS minutes,
+      )
+        .bind(eventId)
+        .all<{
+          id: string;
+          status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED";
+          created_at: string;
+          called_at: string | null;
+          departed_at: string | null;
+          landed_at: string | null;
+          completed_at: string | null;
+          flight_group_id: string;
+          flight_group_version: number;
+          precalled_at: string | null;
+          resource_group_id: string;
+          resource_group_status: "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED";
+          resource_group_precall_enabled: number;
+          queue_sequence: number;
+          ticket_count: number;
+          reference_duration_minutes: number;
+          product_code: string;
+          aircraft_type: string | null;
+          gate_id: string | null;
+          predicted_departure_at: string | null;
+          predicted_landing_at: string | null;
+          predicted_completion_at: string | null;
+        }>(),
+      this.env.DB.prepare(
+        `SELECT (julianday(r.completed_at) - julianday(r.called_at)) * 1440.0 AS minutes,
                 r.completed_at, r.operation_day_id, p.code AS product_code, a.aircraft_type
            FROM rotations r
            JOIN rotation_tickets rt ON rt.rotation_id = r.id
@@ -1656,30 +1751,68 @@ export class EventCoordinator extends DurableObject<Env> {
             )
           GROUP BY r.id, p.code, a.aircraft_type
           ORDER BY r.completed_at DESC LIMIT 200`,
-        ).all<{
-          minutes: number;
-          completed_at: string;
-          operation_day_id: string;
-          product_code: string;
-          aircraft_type: string | null;
+      ).all<{
+        minutes: number;
+        completed_at: string;
+        operation_day_id: string;
+        product_code: string;
+        aircraft_type: string | null;
+      }>(),
+      this.env.DB.prepare(
+        `SELECT m.resource_group_id, a.id AS aircraft_id, a.passenger_seats,
+                  a.operational_state, a.operational_interrupted,
+                  active_rotation.predicted_completion_at,
+                  (SELECT block.expected_review_at
+                     FROM operational_blocks block
+                    WHERE block.operation_day_id = m.operation_day_id
+                      AND block.scope_type = 'AIRCRAFT' AND block.scope_id = a.id
+                      AND block.status = 'ACTIVE'
+                    ORDER BY block.started_at DESC LIMIT 1) AS expected_review_at
+             FROM resource_group_memberships m
+             JOIN aircraft a ON a.id = m.aircraft_id
+             LEFT JOIN rotations active_rotation ON active_rotation.id = (
+               SELECT candidate.id FROM rotations candidate
+                WHERE candidate.operation_day_id = m.operation_day_id
+                  AND candidate.aircraft_id = a.id
+                  AND candidate.status IN ('CALLED', 'IN_FLIGHT', 'LANDED')
+                ORDER BY candidate.updated_at DESC LIMIT 1
+             )
+            WHERE m.operation_day_id = ?1 AND m.active_until IS NULL
+            ORDER BY m.resource_group_id, a.registration`,
+      )
+        .bind(eventId)
+        .all<{
+          resource_group_id: string;
+          aircraft_id: string;
+          passenger_seats: number;
+          operational_state: AircraftOperationalState;
+          operational_interrupted: number;
+          predicted_completion_at: string | null;
+          expected_review_at: string | null;
         }>(),
-        this.env.DB.prepare(
-          `SELECT m.resource_group_id, COUNT(*) AS count, MAX(a.passenger_seats) AS max_seats
-           FROM resource_group_memberships m
-           JOIN aircraft a ON a.id = m.aircraft_id
-          WHERE m.operation_day_id = ?1 AND m.active_until IS NULL
-            AND a.operational_state NOT IN ('INACTIVE', 'PAUSED', 'REFUELING', 'INTERRUPTED')
-          GROUP BY m.resource_group_id`,
-        )
-          .bind(eventId)
-          .all<{ resource_group_id: string; count: number; max_seats: number }>(),
-        this.env.DB.prepare(
-          "SELECT COUNT(*) AS count FROM pilots WHERE operation_day_id = ?1 AND active = 1 AND paused = 0",
-        )
-          .bind(eventId)
-          .first<{ count: number }>(),
-        this.env.DB.prepare(
-          `SELECT (julianday(r.called_at) - julianday(fg.precalled_at)) * 1440.0 AS minutes
+      this.env.DB.prepare(
+        `SELECT pilot.id, pilot.paused, pilot.pause_expected_review_at,
+                  active_rotation.predicted_completion_at
+             FROM pilots pilot
+             LEFT JOIN rotations active_rotation ON active_rotation.id = (
+               SELECT candidate.id FROM rotations candidate
+                WHERE candidate.operation_day_id = pilot.operation_day_id
+                  AND candidate.pilot_id = pilot.id
+                  AND candidate.status IN ('CALLED', 'IN_FLIGHT', 'LANDED')
+                ORDER BY candidate.updated_at DESC LIMIT 1
+             )
+            WHERE pilot.operation_day_id = ?1 AND pilot.active = 1
+            ORDER BY pilot.operational_code`,
+      )
+        .bind(eventId)
+        .all<{
+          id: string;
+          paused: number;
+          pause_expected_review_at: string | null;
+          predicted_completion_at: string | null;
+        }>(),
+      this.env.DB.prepare(
+        `SELECT (julianday(r.called_at) - julianday(fg.precalled_at)) * 1440.0 AS minutes
            FROM rotations r
            JOIN flight_groups fg ON fg.id = r.flight_group_id
           WHERE r.called_at IS NOT NULL AND fg.precalled_at IS NOT NULL
@@ -1693,22 +1826,203 @@ export class EventCoordinator extends DurableObject<Env> {
                  AND interruption.occurred_at >= fg.precalled_at
             )
           ORDER BY r.called_at DESC LIMIT 20`,
-        )
-          .bind(eventId)
-          .all<{ minutes: number }>(),
-      ]);
+      )
+        .bind(eventId)
+        .all<{ minutes: number }>(),
+      this.env.DB.prepare(
+        `SELECT plan.id, plan.scope_type, plan.scope_id, plan.earliest_start_at,
+                  plan.latest_start_at, plan.minimum_duration_minutes,
+                  plan.typical_duration_minutes, plan.maximum_duration_minutes,
+                  plan.after_rotation_id, after_rotation.predicted_completion_at,
+                  after_rotation.completed_at
+             FROM planned_operational_constraints plan
+             LEFT JOIN rotations after_rotation ON after_rotation.id = plan.after_rotation_id
+            WHERE plan.operation_day_id = ?1 AND plan.status = 'PLANNED'`,
+      )
+        .bind(eventId)
+        .all<{
+          id: string;
+          scope_type: "EVENT" | "RESOURCE_GROUP" | "AIRCRAFT" | "PILOT";
+          scope_id: string;
+          earliest_start_at: string | null;
+          latest_start_at: string | null;
+          minimum_duration_minutes: number;
+          typical_duration_minutes: number;
+          maximum_duration_minutes: number;
+          after_rotation_id: string | null;
+          predicted_completion_at: string | null;
+          completed_at: string | null;
+        }>(),
+      this.env.DB.prepare(
+        `SELECT scope_type, scope_id, expected_review_at
+             FROM operational_blocks
+            WHERE operation_day_id = ?1 AND status = 'ACTIVE'
+              AND scope_type IN ('EVENT', 'RESOURCE_GROUP')`,
+      )
+        .bind(eventId)
+        .all<{
+          scope_type: "EVENT" | "RESOURCE_GROUP";
+          scope_id: string;
+          expected_review_at: string | null;
+        }>(),
+    ]);
     if (!event || rotationRows.results.length === 0) return;
 
     const now = new Date();
     const nowIso = now.toISOString();
-    const capacities = new Map(
-      capacityRows.results.map((row) => [
-        row.resource_group_id,
-        Math.min(row.count, pilotRow?.count ?? 0),
-      ]),
-    );
+    const availabilityWindow = (
+      value: string | null,
+      immediatelyAvailable: boolean,
+    ): { lowerAt: string; expectedAt: string; upperAt: string } | null => {
+      if (immediatelyAvailable) {
+        return { lowerAt: nowIso, expectedAt: nowIso, upperAt: nowIso };
+      }
+      if (!value || !Number.isFinite(Date.parse(value))) return null;
+      const expected = Math.max(now.getTime(), Date.parse(value));
+      return {
+        lowerAt: new Date(Math.max(now.getTime(), expected - 5 * 60_000)).toISOString(),
+        expectedAt: new Date(expected).toISOString(),
+        upperAt: new Date(expected + 5 * 60_000).toISOString(),
+      };
+    };
+    const resolvedPlans = plannedOperationRows.results.flatMap((plan) => {
+      const afterRotationAt = plan.completed_at ?? plan.predicted_completion_at;
+      const earliest =
+        plan.earliest_start_at ??
+        (afterRotationAt ? new Date(Date.parse(afterRotationAt)).toISOString() : null);
+      const latest =
+        plan.latest_start_at ??
+        (afterRotationAt ? new Date(Date.parse(afterRotationAt) + 5 * 60_000).toISOString() : null);
+      if (!earliest || !latest) return [];
+      return [
+        {
+          id: plan.id,
+          scopeType: plan.scope_type,
+          scopeId: plan.scope_id,
+          earliestStartAt: earliest,
+          latestStartAt: latest,
+          minimumDurationMinutes: plan.minimum_duration_minutes,
+          typicalDurationMinutes: plan.typical_duration_minutes,
+          maximumDurationMinutes: plan.maximum_duration_minutes,
+          overdue: Date.parse(latest) <= now.getTime(),
+        },
+      ];
+    });
+    const blockAvailability = (
+      resourceGroupId: string,
+    ): { lowerAt: string; expectedAt: string; upperAt: string } | null | undefined => {
+      const effective = activeBlockRows.results.filter(
+        (block) =>
+          (block.scope_type === "EVENT" && block.scope_id === eventId) ||
+          (block.scope_type === "RESOURCE_GROUP" && block.scope_id === resourceGroupId),
+      );
+      if (effective.length === 0) return undefined;
+      if (effective.some((block) => block.expected_review_at === null)) return null;
+      const latestReviewAt = effective.reduce<string | null>(
+        (latest, block) =>
+          !latest || Date.parse(block.expected_review_at ?? "") > Date.parse(latest)
+            ? block.expected_review_at
+            : latest,
+        null,
+      );
+      return availabilityWindow(latestReviewAt, false);
+    };
+    const availablePilotWindows = pilotRows.results.flatMap((pilot) => {
+      const immediatelyAvailable = pilot.paused === 0 && pilot.predicted_completion_at === null;
+      const window = availabilityWindow(
+        pilot.predicted_completion_at ?? pilot.pause_expected_review_at,
+        immediatelyAvailable,
+      );
+      return window ? [{ pilotId: pilot.id, ...window }] : [];
+    });
+    const resourceGroupIds = [...new Set(capacityRows.results.map((row) => row.resource_group_id))];
+    const forecastCapacities = resourceGroupIds.map((resourceGroupId) => {
+      const groupBlock = blockAvailability(resourceGroupId);
+      const aircraftWindows = capacityRows.results
+        .filter((row) => row.resource_group_id === resourceGroupId)
+        .flatMap((aircraft) => {
+          const immediatelyAvailable =
+            aircraft.predicted_completion_at === null &&
+            aircraft.operational_interrupted === 0 &&
+            !["INACTIVE", "PAUSED", "REFUELING"].includes(aircraft.operational_state);
+          const window = availabilityWindow(
+            aircraft.predicted_completion_at ?? aircraft.expected_review_at,
+            immediatelyAvailable,
+          );
+          return window ? [{ aircraftId: aircraft.aircraft_id, ...window }] : [];
+        })
+        .sort(
+          (left, right) =>
+            Date.parse(left.expectedAt) - Date.parse(right.expectedAt) ||
+            left.aircraftId.localeCompare(right.aircraftId),
+        );
+      const pilots = [...availablePilotWindows].sort(
+        (left, right) =>
+          Date.parse(left.expectedAt) - Date.parse(right.expectedAt) ||
+          left.pilotId.localeCompare(right.pilotId),
+      );
+      const laneCount = groupBlock === null ? 0 : Math.min(aircraftWindows.length, pilots.length);
+      const availabilityLanes = Array.from({ length: laneCount }, (_, index) => {
+        const aircraft = aircraftWindows[index];
+        const pilot = pilots[index];
+        if (!aircraft || !pilot) throw new Error("Forecast resource pairing is incomplete.");
+        const lowerAt = new Date(
+          Math.max(
+            Date.parse(aircraft.lowerAt),
+            Date.parse(pilot.lowerAt),
+            groupBlock ? Date.parse(groupBlock.lowerAt) : 0,
+          ),
+        ).toISOString();
+        const expectedAt = new Date(
+          Math.max(
+            Date.parse(aircraft.expectedAt),
+            Date.parse(pilot.expectedAt),
+            groupBlock ? Date.parse(groupBlock.expectedAt) : 0,
+          ),
+        ).toISOString();
+        const upperAt = new Date(
+          Math.max(
+            Date.parse(aircraft.upperAt),
+            Date.parse(pilot.upperAt),
+            groupBlock ? Date.parse(groupBlock.upperAt) : 0,
+          ),
+        ).toISOString();
+        const constraints = resolvedPlans.filter(
+          (plan) =>
+            (plan.scopeType === "AIRCRAFT" && plan.scopeId === aircraft.aircraftId) ||
+            (plan.scopeType === "PILOT" && plan.scopeId === pilot.pilotId),
+        );
+        return {
+          laneId: `${aircraft.aircraftId}:${pilot.pilotId}`,
+          availableLowerAt: lowerAt,
+          availableExpectedAt: expectedAt,
+          availableUpperAt: upperAt,
+          constraints,
+        };
+      });
+      return {
+        resourceGroupId,
+        activeAircraft: availabilityLanes.filter(
+          (lane) => Date.parse(lane.availableExpectedAt) <= now.getTime(),
+        ).length,
+        availabilityLanes,
+        sharedConstraints: resolvedPlans.filter(
+          (plan) =>
+            (plan.scopeType === "EVENT" && plan.scopeId === eventId) ||
+            (plan.scopeType === "RESOURCE_GROUP" && plan.scopeId === resourceGroupId),
+        ),
+      };
+    });
     const maximumSeats = new Map(
-      capacityRows.results.map((row) => [row.resource_group_id, row.max_seats ?? 0]),
+      resourceGroupIds.map((resourceGroupId) => [
+        resourceGroupId,
+        Math.max(
+          0,
+          ...capacityRows.results
+            .filter((row) => row.resource_group_id === resourceGroupId)
+            .map((row) => row.passenger_seats),
+        ),
+      ]),
     );
     const adaptiveLeadMinutes = deriveAdaptivePrecallLeadMinutes({
       observedGateWaitMinutes: [...gateWaitRows.results].reverse().map((row) => row.minutes),
@@ -1717,16 +2031,14 @@ export class EventCoordinator extends DurableObject<Env> {
       event: {
         eventId,
         now: nowIso,
+        plannedOperationsStartAt: event.operations_start_at,
         operationalInterrupted: event.operational_interrupted === 1,
         emergencyMode: event.emergency_mode === 1,
         plannedBoardingMinutes: event.planned_boarding_minutes,
         plannedDeboardingMinutes: event.planned_deboarding_minutes,
         plannedBufferMinutes: event.planned_buffer_minutes,
       },
-      capacities: [...capacities.entries()].map(([resourceGroupId, activeAircraft]) => ({
-        resourceGroupId,
-        activeAircraft,
-      })),
+      capacities: forecastCapacities,
       durationSamples: durationRows.results.map((row) => ({
         minutes: row.minutes,
         completedAt: row.completed_at,
@@ -1979,6 +2291,302 @@ export class EventCoordinator extends DurableObject<Env> {
     }
   }
 
+  private async handlePlannedOperation(
+    command: Extract<
+      CommandEnvelope,
+      { type: "UPSERT_PLANNED_OPERATION" | "CANCEL_PLANNED_OPERATION" }
+    >,
+    current: StoredEventRow,
+  ): Promise<Response> {
+    const existing = await this.env.DB.prepare(
+      `SELECT id, version, status
+         FROM planned_operational_constraints
+        WHERE id = ?1 AND operation_day_id = ?2`,
+    )
+      .bind(command.payload.planId, command.eventId)
+      .first<{
+        id: string;
+        version: number;
+        status: "PLANNED" | "ACTIVE" | "CLEARED" | "CANCELED";
+      }>();
+
+    if (command.type === "UPSERT_PLANNED_OPERATION") {
+      if (
+        (command.payload.planExpectedVersion === null && existing) ||
+        (command.payload.planExpectedVersion !== null &&
+          (!existing || existing.version !== command.payload.planExpectedVersion))
+      ) {
+        return json(
+          {
+            error: {
+              code: "PLANNED_OPERATION_VERSION_CONFLICT",
+              message: "Der Betriebsplan wurde inzwischen geändert.",
+              currentVersion: existing?.version,
+            },
+          },
+          { status: 409 },
+        );
+      }
+      if (existing && existing.status !== "PLANNED") {
+        return json(
+          {
+            error: {
+              code: "PLANNED_OPERATION_NOT_EDITABLE",
+              message: "Nur noch nicht gestartete Planeinträge können bearbeitet werden.",
+            },
+          },
+          { status: 409 },
+        );
+      }
+      const targetExists =
+        command.payload.scopeType === "EVENT"
+          ? command.payload.scopeId === command.eventId
+          : command.payload.scopeType === "RESOURCE_GROUP"
+            ? Boolean(
+                await this.env.DB.prepare(
+                  "SELECT id FROM resource_groups WHERE id = ?1 AND operation_day_id = ?2",
+                )
+                  .bind(command.payload.scopeId, command.eventId)
+                  .first(),
+              )
+            : command.payload.scopeType === "AIRCRAFT"
+              ? Boolean(
+                  await this.env.DB.prepare(
+                    `SELECT a.id FROM aircraft a
+                       JOIN resource_group_memberships m ON m.aircraft_id = a.id
+                      WHERE a.id = ?1 AND m.operation_day_id = ?2 AND m.active_until IS NULL`,
+                  )
+                    .bind(command.payload.scopeId, command.eventId)
+                    .first(),
+                )
+              : Boolean(
+                  await this.env.DB.prepare(
+                    "SELECT id FROM pilots WHERE id = ?1 AND operation_day_id = ?2",
+                  )
+                    .bind(command.payload.scopeId, command.eventId)
+                    .first(),
+                );
+      if (!targetExists) {
+        return json(
+          {
+            error: {
+              code: "PLANNED_OPERATION_SCOPE_NOT_FOUND",
+              message: "Das Ziel des Planeintrags wurde nicht gefunden.",
+            },
+          },
+          { status: 404 },
+        );
+      }
+      if (command.payload.afterRotationId) {
+        const rotation = await this.env.DB.prepare(
+          `SELECT r.id, r.status, r.aircraft_id, r.pilot_id, fg.resource_group_id
+             FROM rotations r
+             JOIN flight_groups fg ON fg.id = r.flight_group_id
+            WHERE r.id = ?1 AND r.operation_day_id = ?2`,
+        )
+          .bind(command.payload.afterRotationId, command.eventId)
+          .first<{
+            id: string;
+            status: string;
+            aircraft_id: string | null;
+            pilot_id: string | null;
+            resource_group_id: string;
+          }>();
+        if (!rotation) {
+          return json(
+            {
+              error: {
+                code: "PLANNED_OPERATION_ROTATION_NOT_FOUND",
+                message: "Der Bezugsumlauf des Planeintrags wurde nicht gefunden.",
+              },
+            },
+            { status: 404 },
+          );
+        }
+        const targetMatchesRotation =
+          command.payload.scopeType === "EVENT" ||
+          (command.payload.scopeType === "RESOURCE_GROUP" &&
+            rotation.resource_group_id === command.payload.scopeId) ||
+          (command.payload.scopeType === "AIRCRAFT" &&
+            rotation.aircraft_id === command.payload.scopeId) ||
+          (command.payload.scopeType === "PILOT" && rotation.pilot_id === command.payload.scopeId);
+        if (
+          !["CALLED", "IN_FLIGHT", "LANDED"].includes(rotation.status) ||
+          !targetMatchesRotation
+        ) {
+          return json(
+            {
+              error: {
+                code: "PLANNED_OPERATION_ROTATION_SCOPE_MISMATCH",
+                message: "Der Bezugsumlauf ist nicht der aktuelle Umlauf des gewählten Ziels.",
+              },
+            },
+            { status: 409 },
+          );
+        }
+      }
+    } else {
+      if (!existing) {
+        return json(
+          {
+            error: {
+              code: "PLANNED_OPERATION_NOT_FOUND",
+              message: "Planeintrag nicht gefunden.",
+            },
+          },
+          { status: 404 },
+        );
+      }
+      if (existing.version !== command.payload.planExpectedVersion) {
+        return json(
+          {
+            error: {
+              code: "PLANNED_OPERATION_VERSION_CONFLICT",
+              message: "Der Betriebsplan wurde inzwischen geändert.",
+              currentVersion: existing.version,
+            },
+          },
+          { status: 409 },
+        );
+      }
+      if (existing.status !== "PLANNED") {
+        return json(
+          {
+            error: {
+              code: "PLANNED_OPERATION_NOT_CANCELABLE",
+              message: "Nur noch nicht gestartete Planeinträge können abgesagt werden.",
+            },
+          },
+          { status: 409 },
+        );
+      }
+    }
+
+    const now = new Date().toISOString();
+    const nextEventVersion = current.version + 1;
+    const nextPlanVersion = existing ? existing.version + 1 : 0;
+    const eventType =
+      command.type === "UPSERT_PLANNED_OPERATION"
+        ? existing
+          ? "PLANNED_OPERATION_UPDATED"
+          : "PLANNED_OPERATION_CREATED"
+        : "PLANNED_OPERATION_CANCELED";
+    const result: CommandResult = {
+      accepted: true,
+      duplicate: false,
+      event: rowToSnapshot({
+        ...current,
+        version: nextEventVersion,
+        updated_at: now,
+      }),
+      eventType,
+      aggregate: { type: "OPERATIONAL_PLAN", id: command.payload.planId },
+    };
+    const planStatement =
+      command.type === "UPSERT_PLANNED_OPERATION"
+        ? existing
+          ? this.env.DB.prepare(
+              `UPDATE planned_operational_constraints
+                  SET scope_type = ?1, scope_id = ?2, constraint_kind = ?3, start_mode = ?4,
+                      earliest_start_at = ?5, latest_start_at = ?6, after_rotation_id = ?7,
+                      minimum_duration_minutes = ?8, typical_duration_minutes = ?9,
+                      maximum_duration_minutes = ?10, reason = ?11, public_note = ?12,
+                      version = ?13, updated_at = ?14
+                WHERE id = ?15 AND operation_day_id = ?16 AND version = ?17 AND status = 'PLANNED'`,
+            ).bind(
+              command.payload.scopeType,
+              command.payload.scopeId,
+              command.payload.kind,
+              command.payload.startMode,
+              command.payload.earliestStartAt,
+              command.payload.latestStartAt,
+              command.payload.afterRotationId,
+              command.payload.minimumDurationMinutes,
+              command.payload.typicalDurationMinutes,
+              command.payload.maximumDurationMinutes,
+              command.payload.reason,
+              command.payload.publicNote,
+              nextPlanVersion,
+              now,
+              command.payload.planId,
+              command.eventId,
+              existing.version,
+            )
+          : this.env.DB.prepare(
+              `INSERT INTO planned_operational_constraints
+                (id, operation_day_id, scope_type, scope_id, constraint_kind, start_mode,
+                 earliest_start_at, latest_start_at, after_rotation_id,
+                 minimum_duration_minutes, typical_duration_minutes, maximum_duration_minutes,
+                 status, reason, public_note, version, created_by_device_id, created_at, updated_at)
+               VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12,
+                       'PLANNED', ?13, ?14, 0, ?15, ?16, ?16)`,
+            ).bind(
+              command.payload.planId,
+              command.eventId,
+              command.payload.scopeType,
+              command.payload.scopeId,
+              command.payload.kind,
+              command.payload.startMode,
+              command.payload.earliestStartAt,
+              command.payload.latestStartAt,
+              command.payload.afterRotationId,
+              command.payload.minimumDurationMinutes,
+              command.payload.typicalDurationMinutes,
+              command.payload.maximumDurationMinutes,
+              command.payload.reason,
+              command.payload.publicNote,
+              command.deviceId,
+              now,
+            )
+        : this.env.DB.prepare(
+            `UPDATE planned_operational_constraints
+                SET status = 'CANCELED', canceled_at = ?1, updated_at = ?1, version = ?2
+              WHERE id = ?3 AND operation_day_id = ?4 AND version = ?5 AND status = 'PLANNED'`,
+          ).bind(now, nextPlanVersion, command.payload.planId, command.eventId, existing?.version);
+    const auditPayload =
+      command.type === "UPSERT_PLANNED_OPERATION"
+        ? { ...command.payload, planExpectedVersion: undefined }
+        : { planId: command.payload.planId, reason: command.payload.reason };
+    await this.env.DB.batch([
+      this.env.DB.prepare(
+        "UPDATE operation_days SET version = ?1, updated_at = ?2 WHERE id = ?3 AND version = ?4",
+      ).bind(nextEventVersion, now, command.eventId, current.version),
+      planStatement,
+      this.env.DB.prepare(
+        `INSERT INTO operational_events
+          (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type,
+           aggregate_id, aggregate_version, payload_json)
+         VALUES (?1, ?2, ?3, ?4, ?5, 'OPERATIONAL_PLAN', ?6, ?7, ?8)`,
+      ).bind(
+        crypto.randomUUID(),
+        command.eventId,
+        eventType,
+        now,
+        command.deviceId,
+        command.payload.planId,
+        nextPlanVersion,
+        JSON.stringify(auditPayload),
+      ),
+      this.env.DB.prepare(
+        `INSERT INTO idempotency_receipts
+          (command_id, operation_day_id, device_id, command_type, received_at, response_json)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)`,
+      ).bind(
+        command.commandId,
+        command.eventId,
+        command.deviceId,
+        command.type,
+        now,
+        JSON.stringify(result),
+      ),
+      this.env.DB.prepare(
+        "INSERT INTO outbox (id, operation_day_id, topic, payload_json, created_at) VALUES (?1, ?2, 'EVENT_STATE_CHANGED', ?3, ?4)",
+      ).bind(crypto.randomUUID(), command.eventId, JSON.stringify(result), now),
+    ]);
+    this.broadcast(result);
+    return json(result);
+  }
+
   private async handleFleetAdministration(
     command: Extract<
       CommandEnvelope,
@@ -2049,6 +2657,22 @@ export class EventCoordinator extends DurableObject<Env> {
             command.eventId,
           ),
         );
+        if (command.payload.plannedOperationId) {
+          statements.push(
+            this.env.DB.prepare(
+              `UPDATE planned_operational_constraints
+                  SET status = ?1, version = version + 1, updated_at = ?2,
+                      activated_at = CASE WHEN ?1 = 'ACTIVE' THEN ?2 ELSE activated_at END,
+                      cleared_at = CASE WHEN ?1 = 'CLEARED' THEN ?2 ELSE cleared_at END
+                WHERE id = ?3 AND operation_day_id = ?4`,
+            ).bind(
+              command.payload.paused ? "ACTIVE" : "CLEARED",
+              now,
+              command.payload.plannedOperationId,
+              command.eventId,
+            ),
+          );
+        }
         aggregateType = "PILOT";
         aggregateId = pilot.id;
         eventType = command.payload.paused ? "PILOT_PAUSE_STARTED" : "PILOT_PAUSE_ENDED";
@@ -2057,6 +2681,7 @@ export class EventCoordinator extends DurableObject<Env> {
           paused: command.payload.paused,
           reason: command.payload.reason,
           expectedReviewAt: command.payload.expectedReviewAt,
+          plannedOperationId: command.payload.plannedOperationId,
         };
       } else {
         const duplicateCode = await this.env.DB.prepare(
@@ -2203,6 +2828,16 @@ export class EventCoordinator extends DurableObject<Env> {
                   AND status = 'ACTIVE'`,
             ).bind(now, command.eventId, aircraft.id),
           );
+          if (command.payload.plannedOperationId) {
+            statements.push(
+              this.env.DB.prepare(
+                `UPDATE planned_operational_constraints
+                    SET status = 'CLEARED', cleared_at = ?1, updated_at = ?1,
+                        version = version + 1
+                  WHERE id = ?2 AND operation_day_id = ?3`,
+              ).bind(now, command.payload.plannedOperationId, command.eventId),
+            );
+          }
         } else {
           const blockType =
             nextState === "REFUELING"
@@ -2214,8 +2849,8 @@ export class EventCoordinator extends DurableObject<Env> {
             this.env.DB.prepare(
               `INSERT INTO operational_blocks
                 (id, operation_day_id, scope_type, scope_id, block_type, status, reason,
-                 started_at, expected_review_at, device_id)
-               VALUES (?1, ?2, 'AIRCRAFT', ?3, ?4, 'ACTIVE', ?5, ?6, ?7, ?8)`,
+                 started_at, expected_review_at, device_id, planned_operation_id)
+               VALUES (?1, ?2, 'AIRCRAFT', ?3, ?4, 'ACTIVE', ?5, ?6, ?7, ?8, ?9)`,
             ).bind(
               crypto.randomUUID(),
               command.eventId,
@@ -2225,8 +2860,19 @@ export class EventCoordinator extends DurableObject<Env> {
               now,
               command.payload.expectedReviewAt,
               command.deviceId,
+              command.payload.plannedOperationId ?? null,
             ),
           );
+          if (command.payload.plannedOperationId) {
+            statements.push(
+              this.env.DB.prepare(
+                `UPDATE planned_operational_constraints
+                    SET status = 'ACTIVE', activated_at = ?1, updated_at = ?1,
+                        version = version + 1
+                  WHERE id = ?2 AND operation_day_id = ?3`,
+              ).bind(now, command.payload.plannedOperationId, command.eventId),
+            );
+          }
         }
         eventType = "AIRCRAFT_OPERATIONAL_STATE_CHANGED";
         auditPayload = {
@@ -2234,6 +2880,7 @@ export class EventCoordinator extends DurableObject<Env> {
           to: command.payload.state,
           reason: command.payload.reason,
           expectedReviewAt: command.payload.expectedReviewAt,
+          plannedOperationId: command.payload.plannedOperationId,
           informationalOnly: true,
         };
       }
@@ -3782,6 +4429,20 @@ export class EventCoordinator extends DurableObject<Env> {
       );
     }
     if (
+      payload.operationsStartAt &&
+      Date.parse(payload.operationsStartAt) >= Date.parse(payload.operationsEndAt)
+    ) {
+      return json(
+        {
+          error: {
+            code: "EVENT_TIME_RANGE_INVALID",
+            message: "Der Betriebsbeginn muss vor dem Betriebsende liegen.",
+          },
+        },
+        { status: 409 },
+      );
+    }
+    if (
       !(
         payload.childReferenceWeightKg < payload.normalReferenceWeightKg &&
         payload.normalReferenceWeightKg < payload.heavyReferenceWeightKg
@@ -3806,6 +4467,7 @@ export class EventCoordinator extends DurableObject<Env> {
         ...current,
         version: nextVersion,
         sale_opens_at: payload.saleOpensAt,
+        operations_start_at: payload.operationsStartAt,
         operations_end_at: payload.operationsEndAt,
         no_show_after_minutes: payload.noShowAfterMinutes,
         max_ticket_deferrals: payload.maxTicketDeferrals,
@@ -3829,6 +4491,7 @@ export class EventCoordinator extends DurableObject<Env> {
     };
     const auditPayload = {
       saleOpensAt: payload.saleOpensAt,
+      operationsStartAt: payload.operationsStartAt,
       operationsEndAt: payload.operationsEndAt,
       noShowAfterMinutes: payload.noShowAfterMinutes,
       maxTicketDeferrals: payload.maxTicketDeferrals,
@@ -3851,18 +4514,19 @@ export class EventCoordinator extends DurableObject<Env> {
     };
     await this.env.DB.batch([
       this.env.DB.prepare(
-        `UPDATE operation_days SET sale_opens_at = ?1, operations_end_at = ?2,
-          no_show_after_minutes = ?3, max_ticket_deferrals = ?4, notification_lead_minutes = ?5,
-          automatic_precall_enabled = ?6, precall_lead_minutes = ?7,
-          max_gate_wait_minutes = ?8, precall_min_quality = ?9,
-          precall_gate_cooldown_minutes = ?10,
-          child_reference_weight_kg = ?11, normal_reference_weight_kg = ?12,
-          heavy_reference_weight_kg = ?13, planned_boarding_minutes = ?14,
-          planned_deboarding_minutes = ?15, planned_buffer_minutes = ?16,
-          departed_visibility_seconds = ?17,
-          version = ?18, updated_at = ?19 WHERE id = ?20 AND version = ?21`,
+        `UPDATE operation_days SET sale_opens_at = ?1, operations_start_at = ?2,
+          operations_end_at = ?3, no_show_after_minutes = ?4, max_ticket_deferrals = ?5,
+          notification_lead_minutes = ?6, automatic_precall_enabled = ?7,
+          precall_lead_minutes = ?8, max_gate_wait_minutes = ?9, precall_min_quality = ?10,
+          precall_gate_cooldown_minutes = ?11,
+          child_reference_weight_kg = ?12, normal_reference_weight_kg = ?13,
+          heavy_reference_weight_kg = ?14, planned_boarding_minutes = ?15,
+          planned_deboarding_minutes = ?16, planned_buffer_minutes = ?17,
+          departed_visibility_seconds = ?18,
+          version = ?19, updated_at = ?20 WHERE id = ?21 AND version = ?22`,
       ).bind(
         payload.saleOpensAt,
+        payload.operationsStartAt,
         payload.operationsEndAt,
         payload.noShowAfterMinutes,
         payload.maxTicketDeferrals,
@@ -7023,8 +7687,8 @@ export class EventCoordinator extends DurableObject<Env> {
           this.env.DB.prepare(
             `INSERT INTO operational_blocks
               (id, operation_day_id, scope_type, scope_id, block_type, status, reason,
-               started_at, expected_review_at, device_id)
-             VALUES (?1, ?2, 'EVENT', ?2, 'INTERRUPTION', 'ACTIVE', ?3, ?4, ?5, ?6)`,
+               started_at, expected_review_at, device_id, planned_operation_id)
+              VALUES (?1, ?2, 'EVENT', ?2, 'INTERRUPTION', 'ACTIVE', ?3, ?4, ?5, ?6, ?7)`,
           ).bind(
             crypto.randomUUID(),
             command.eventId,
@@ -7032,6 +7696,7 @@ export class EventCoordinator extends DurableObject<Env> {
             now,
             command.payload.expectedReviewAt,
             command.deviceId,
+            command.payload.plannedOperationId ?? null,
           ),
         );
       } else {
@@ -7041,6 +7706,22 @@ export class EventCoordinator extends DurableObject<Env> {
               WHERE operation_day_id = ?2 AND scope_type = 'EVENT' AND scope_id = ?2
                 AND status = 'ACTIVE'`,
           ).bind(now, command.eventId),
+        );
+      }
+      if (command.payload.plannedOperationId) {
+        statements.push(
+          this.env.DB.prepare(
+            `UPDATE planned_operational_constraints
+                SET status = ?1, version = version + 1, updated_at = ?2,
+                    activated_at = CASE WHEN ?1 = 'ACTIVE' THEN ?2 ELSE activated_at END,
+                    cleared_at = CASE WHEN ?1 = 'CLEARED' THEN ?2 ELSE cleared_at END
+              WHERE id = ?3 AND operation_day_id = ?4`,
+          ).bind(
+            command.payload.interrupted ? "ACTIVE" : "CLEARED",
+            now,
+            command.payload.plannedOperationId,
+            command.eventId,
+          ),
         );
       }
     }
@@ -7063,8 +7744,8 @@ export class EventCoordinator extends DurableObject<Env> {
           this.env.DB.prepare(
             `INSERT INTO operational_blocks
               (id, operation_day_id, scope_type, scope_id, block_type, status, reason,
-               started_at, expected_review_at, device_id)
-             VALUES (?1, ?2, 'RESOURCE_GROUP', ?3, ?4, 'ACTIVE', ?5, ?6, ?7, ?8)`,
+               started_at, expected_review_at, device_id, planned_operation_id)
+              VALUES (?1, ?2, 'RESOURCE_GROUP', ?3, ?4, 'ACTIVE', ?5, ?6, ?7, ?8, ?9)`,
           ).bind(
             crypto.randomUUID(),
             command.eventId,
@@ -7074,6 +7755,23 @@ export class EventCoordinator extends DurableObject<Env> {
             now,
             command.payload.expectedReviewAt,
             command.deviceId,
+            command.payload.plannedOperationId ?? null,
+          ),
+        );
+      }
+      if (command.payload.plannedOperationId) {
+        statements.push(
+          this.env.DB.prepare(
+            `UPDATE planned_operational_constraints
+                SET status = ?1, version = version + 1, updated_at = ?2,
+                    activated_at = CASE WHEN ?1 = 'ACTIVE' THEN ?2 ELSE activated_at END,
+                    cleared_at = CASE WHEN ?1 = 'CLEARED' THEN ?2 ELSE cleared_at END
+              WHERE id = ?3 AND operation_day_id = ?4`,
+          ).bind(
+            command.payload.status === "ACTIVE" ? "CLEARED" : "ACTIVE",
+            now,
+            command.payload.plannedOperationId,
+            command.eventId,
           ),
         );
       }
@@ -7096,6 +7794,7 @@ export class EventCoordinator extends DurableObject<Env> {
             resourceGroupId: command.payload.resourceGroupId,
             status: command.payload.status,
             expectedReviewAt: command.payload.expectedReviewAt,
+            plannedOperationId: command.payload.plannedOperationId,
           }
         : command.type === "SET_RESOURCE_GROUP_NOTICE"
           ? {
@@ -7108,6 +7807,7 @@ export class EventCoordinator extends DurableObject<Env> {
                 reason,
                 interrupted: command.payload.interrupted,
                 expectedReviewAt: command.payload.expectedReviewAt,
+                plannedOperationId: command.payload.plannedOperationId,
                 informationalOnly: true,
               }
             : { reason };

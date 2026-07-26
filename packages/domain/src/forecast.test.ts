@@ -159,9 +159,9 @@ describe("event-driven forecast", () => {
     availability = first.availability;
     const second = reserveNextQueueWindow(availability, duration);
     expect(first.window.lowerMinutes).toBe(0);
-    expect(first.window.upperMinutes).toBe(0);
-    expect(second.window.lowerMinutes).toBe(9);
-    expect(second.window.upperMinutes).toBe(9);
+    expect(first.window.upperMinutes).toBe(5);
+    expect(second.window.lowerMinutes).toBe(4);
+    expect(second.window.upperMinutes).toBe(14);
   });
 
   it("keeps old learning samples diagnostic without making a fresh estimate uncertain", () => {
@@ -374,17 +374,156 @@ describe("event-driven forecast", () => {
     ]);
     expect(projections[1]).toMatchObject({
       predictionLowerMinutes: 0,
-      predictionUpperMinutes: 0,
+      predictionUpperMinutes: 5,
       predictionQuality: "CHANGING",
-      predictedBoardingAt: "2026-07-22T10:00:00.000Z",
+      predictedBoardingAt: "2026-07-22T10:02:30.000Z",
       dataBasisScope: "REFERENCE_ONLY",
       activeCapacity: 2,
     });
     expect(projections[2]).toMatchObject({
-      predictionLowerMinutes: 19,
-      predictionUpperMinutes: 19,
+      predictionLowerMinutes: 14,
+      predictionUpperMinutes: 24,
       predictedBoardingAt: "2026-07-22T10:19:00.000Z",
     });
+  });
+
+  it("anchors sales forecasts to the planned operating start", () => {
+    const projection = calculateForecastTimelines({
+      event: {
+        eventId: "event-current",
+        now: "2026-07-22T09:00:00.000Z",
+        plannedOperationsStartAt: "2026-07-22T10:00:00.000Z",
+        operationalInterrupted: false,
+        emergencyMode: false,
+        plannedBoardingMinutes: 5,
+        plannedDeboardingMinutes: 5,
+        plannedBufferMinutes: 2,
+      },
+      capacities: [
+        {
+          resourceGroupId: "rg-1",
+          activeAircraft: 0,
+          availabilityLanes: [
+            {
+              laneId: "aircraft-1:pilot-1",
+              availableLowerAt: "2026-07-22T09:00:00.000Z",
+              availableExpectedAt: "2026-07-22T09:00:00.000Z",
+              availableUpperAt: "2026-07-22T09:00:00.000Z",
+            },
+          ],
+        },
+      ],
+      durationSamples: [],
+      rotations: [
+        {
+          id: "presale",
+          status: "DRAFT",
+          createdAt: "2026-07-22T09:00:00.000Z",
+          calledAt: null,
+          departedAt: null,
+          landedAt: null,
+          resourceGroupId: "rg-1",
+          resourceGroupStatus: "ACTIVE",
+          queueSequence: 1,
+          referenceDurationMinutes: 20,
+          productCode: "PAN",
+          aircraftType: null,
+          predictedDepartureAt: null,
+          predictedLandingAt: null,
+          predictedCompletionAt: null,
+        },
+      ],
+    })[0];
+
+    expect(projection).toMatchObject({
+      predictionLowerMinutes: 55,
+      predictionUpperMinutes: 65,
+      predictedBoardingAt: "2026-07-22T10:00:00.000Z",
+      predictionQuality: "CHANGING",
+    });
+  });
+
+  it("reserves a planned constraint without pretending that it already started", () => {
+    const projection = calculateForecastTimelines({
+      event: {
+        eventId: "event-current",
+        now: "2026-07-22T10:00:00.000Z",
+        operationalInterrupted: false,
+        emergencyMode: false,
+        plannedBoardingMinutes: 5,
+        plannedDeboardingMinutes: 5,
+        plannedBufferMinutes: 6,
+      },
+      capacities: [
+        {
+          resourceGroupId: "rg-1",
+          activeAircraft: 1,
+          availabilityLanes: [
+            {
+              laneId: "aircraft-1:pilot-1",
+              availableLowerAt: "2026-07-22T10:00:00.000Z",
+              availableExpectedAt: "2026-07-22T10:00:00.000Z",
+              availableUpperAt: "2026-07-22T10:00:00.000Z",
+              constraints: [
+                {
+                  id: "pause-1",
+                  earliestStartAt: "2026-07-22T10:00:00.000Z",
+                  latestStartAt: "2026-07-22T10:00:00.000Z",
+                  minimumDurationMinutes: 10,
+                  typicalDurationMinutes: 20,
+                  maximumDurationMinutes: 30,
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      durationSamples: [],
+      rotations: [
+        {
+          id: "draft",
+          status: "DRAFT",
+          createdAt: "2026-07-22T10:00:00.000Z",
+          calledAt: null,
+          departedAt: null,
+          landedAt: null,
+          resourceGroupId: "rg-1",
+          resourceGroupStatus: "ACTIVE",
+          queueSequence: 1,
+          referenceDurationMinutes: 20,
+          productCode: "PAN",
+          aircraftType: null,
+          predictedDepartureAt: null,
+          predictedLandingAt: null,
+          predictedCompletionAt: null,
+        },
+      ],
+    })[0];
+
+    expect(projection).toMatchObject({
+      predictionLowerMinutes: 10,
+      predictionUpperMinutes: 30,
+      predictedBoardingAt: "2026-07-22T10:20:00.000Z",
+      uncertaintyReasons: [],
+    });
+  });
+
+  it("aggregates repeated uncertainty by variance instead of linear extrema", () => {
+    let availability = createQueueAvailability({ activeAircraft: 1, busyAircraftMinutes: [] });
+    const duration = estimateDuration({
+      referenceMinutes: 36,
+      actualDurationsMinutes: [],
+      interrupted: false,
+      activeCapacity: 1,
+    });
+    const first = reserveNextQueueWindow(availability, duration);
+    availability = first.availability;
+    const second = reserveNextQueueWindow(availability, duration);
+    availability = second.availability;
+    const third = reserveNextQueueWindow(availability, duration);
+
+    expect(second.window.upperMinutes - second.window.lowerMinutes).toBe(20);
+    expect(third.window.upperMinutes - third.window.lowerMinutes).toBeLessThan(40);
   });
 
   it("keeps robust current-day samples stable even when their age exceeds five minutes", () => {

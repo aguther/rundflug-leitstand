@@ -327,6 +327,9 @@ export function calculateSimulationMetrics(input: {
   rotations: readonly SimulationRotation[];
   snapshots: readonly SimulationForecastSnapshot[];
   events: readonly SimulationEvent[];
+  operationsStartAt?: string;
+  operationsEndAt?: string;
+  aircraftCount?: number;
 }): SimulationMetrics {
   const snapshotsByRotation = new Map<string, SimulationForecastSnapshot[]>();
   for (const snapshot of input.snapshots) {
@@ -395,6 +398,8 @@ export function calculateSimulationMetrics(input: {
     EMERGENCY_MODE: 0,
     RESOURCE_GROUP_INACTIVE: 0,
     NO_ACTIVE_CAPACITY: 0,
+    PLANNED_CONSTRAINT_OVERDUE: 0,
+    UNPLANNED_RESOURCE_RETURN: 0,
     STALE_PREDICTION: 0,
   };
   let uncertainCountdownViolations = 0;
@@ -425,6 +430,44 @@ export function calculateSimulationMetrics(input: {
     )
     .filter((value) => Number.isFinite(value) && value >= 0)
     .sort((left, right) => left - right);
+  const forecastChanges: number[] = [];
+  for (const snapshots of snapshotsByRotation.values()) {
+    const draftSnapshots = snapshots.filter((snapshot) => snapshot.status === "DRAFT");
+    for (let index = 1; index < draftSnapshots.length; index += 1) {
+      const previous = draftSnapshots[index - 1];
+      const current = draftSnapshots[index];
+      if (!previous || !current) continue;
+      forecastChanges.push(
+        Math.abs(
+          (Date.parse(current.predictedBoardingAt) - Date.parse(previous.predictedBoardingAt)) /
+            MINUTE_MS,
+        ),
+      );
+    }
+  }
+  const completedRotations = input.rotations.filter((rotation) => rotation.completedAt);
+  const operationsEndMs = input.operationsEndAt ? Date.parse(input.operationsEndAt) : Number.NaN;
+  const latestCompletionMs = Math.max(
+    0,
+    ...completedRotations.map((rotation) => Date.parse(rotation.completedAt ?? "")),
+  );
+  const operationsStartMs = input.operationsStartAt
+    ? Date.parse(input.operationsStartAt)
+    : Number.NaN;
+  const totalAvailableAircraftMinutes =
+    Number.isFinite(operationsStartMs) &&
+    Number.isFinite(operationsEndMs) &&
+    (input.aircraftCount ?? 0) > 0
+      ? ((operationsEndMs - operationsStartMs) / MINUTE_MS) * (input.aircraftCount ?? 0)
+      : 0;
+  const occupiedAircraftMinutes = completedRotations.reduce(
+    (sum, rotation) =>
+      sum +
+      (rotation.calledAt && rotation.completedAt
+        ? (Date.parse(rotation.completedAt) - Date.parse(rotation.calledAt)) / MINUTE_MS
+        : 0),
+    0,
+  );
   return {
     boarding: {
       ...metricSummary(boardingErrors),
@@ -459,6 +502,33 @@ export function calculateSimulationMetrics(input: {
       uncertainPrecallCount: precalledRotations.filter(
         (rotation) => rotation.precallPredictionQuality === "UNCERTAIN",
       ).length,
+    },
+    stability: {
+      changes: forecastChanges.length,
+      averageAbsoluteChangeMinutes:
+        forecastChanges.length === 0
+          ? null
+          : rounded(
+              forecastChanges.reduce((sum, value) => sum + value, 0) / forecastChanges.length,
+            ),
+      maximumJumpMinutes: rounded(Math.max(0, ...forecastChanges)),
+      jumpsOver15Minutes: forecastChanges.filter((value) => value > 15).length,
+      jumpsOver30Minutes: forecastChanges.filter((value) => value > 30).length,
+      maximumWindowWidthMinutes: Math.max(
+        0,
+        ...input.snapshots.map((snapshot) => snapshot.upperMinutes - snapshot.lowerMinutes),
+      ),
+    },
+    operations: {
+      completedRotations: completedRotations.length,
+      overtimeMinutes:
+        Number.isFinite(operationsEndMs) && latestCompletionMs > operationsEndMs
+          ? rounded((latestCompletionMs - operationsEndMs) / MINUTE_MS)
+          : 0,
+      aircraftUtilizationPercent:
+        totalAvailableAircraftMinutes > 0
+          ? rounded((occupiedAircraftMinutes / totalAvailableAircraftMinutes) * 100)
+          : null,
     },
     uncertainCountdownViolations,
     maximumEventReactionSeconds: reactionSeconds.length === 0 ? 0 : Math.max(...reactionSeconds),
@@ -567,10 +637,91 @@ export function runSimulation(
               .length,
           )
         : 0;
+    const activeInterruptionEndMs = activeInterruptions.reduce<number | null>(
+      (latest, interruption) => {
+        const startsAt = Date.parse(interruption.at);
+        const endsAt = addMinutes(startsAt, interruption.durationMinutes);
+        if (nowMs < startsAt || nowMs >= endsAt) return latest;
+        return latest === null ? endsAt : Math.max(latest, endsAt);
+      },
+      null,
+    );
+    const referenceTotalMinutes =
+      config.adminParameters.plannedBoardingMinutes +
+      config.adminParameters.productReferenceDurationMinutes +
+      config.adminParameters.plannedDeboardingMinutes +
+      config.adminParameters.plannedBufferMinutes;
+    const availabilityLanes = aircraft
+      .flatMap((entry) => {
+        if (entry.state === "DAY_OUT") return [];
+        const activeRotation = entry.activeRotationId
+          ? rotations.find((rotation) => rotation.id === entry.activeRotationId)
+          : null;
+        const resourceExpectedAt =
+          entry.blockedUntilMs ??
+          (activeRotation?.predictedCompletionAt
+            ? Date.parse(activeRotation.predictedCompletionAt)
+            : entry.state === "ACTIVE"
+              ? addMinutes(nowMs, referenceTotalMinutes)
+              : nowMs);
+        const expectedAt = Math.max(nowMs, resourceExpectedAt, activeInterruptionEndMs ?? 0);
+        const futureUncertainty = expectedAt > nowMs ? 5 * MINUTE_MS : 0;
+        const constraints = [];
+        const remainingUntilPlannedPause = entry.nextPauseAtMinutes - entry.operatingMinutes;
+        if (
+          config.realityModel.incidents.plannedPause.enabled &&
+          entry.state !== "PLANNED_PAUSE" &&
+          remainingUntilPlannedPause <= referenceTotalMinutes
+        ) {
+          constraints.push({
+            id: `${entry.id}:next-planned-pause`,
+            earliestStartAt: iso(expectedAt),
+            latestStartAt: iso(addMinutes(expectedAt, 5)),
+            minimumDurationMinutes: config.realityModel.incidents.plannedPause.duration.minimum,
+            typicalDurationMinutes: config.realityModel.incidents.plannedPause.duration.typical,
+            maximumDurationMinutes: config.realityModel.incidents.plannedPause.duration.maximum,
+          });
+        }
+        if (
+          config.realityModel.incidents.refueling.enabled &&
+          entry.state !== "REFUELING" &&
+          (entry.completedRotations + 1) %
+            config.realityModel.incidents.refueling.everyRotations ===
+            0
+        ) {
+          constraints.push({
+            id: `${entry.id}:next-refueling`,
+            earliestStartAt: iso(expectedAt),
+            latestStartAt: iso(addMinutes(expectedAt, 5)),
+            minimumDurationMinutes: config.realityModel.incidents.refueling.duration.minimum,
+            typicalDurationMinutes: config.realityModel.incidents.refueling.duration.typical,
+            maximumDurationMinutes: config.realityModel.incidents.refueling.duration.maximum,
+          });
+        }
+        return [
+          {
+            laneId: entry.id,
+            availableLowerAt: iso(Math.max(nowMs, expectedAt - futureUncertainty)),
+            availableExpectedAt: iso(expectedAt),
+            availableUpperAt: iso(expectedAt + futureUncertainty),
+            constraints,
+          },
+        ];
+      })
+      .sort(
+        (left, right) =>
+          Date.parse(left.availableExpectedAt) - Date.parse(right.availableExpectedAt) ||
+          left.laneId.localeCompare(right.laneId),
+      )
+      .slice(0, config.adminParameters.activePilotCount);
     return calculateForecastTimelines({
       event: {
         eventId: EVENT_ID,
         now: iso(nowMs),
+        plannedOperationsStartAt:
+          config.forecastTuning.availabilityModel === "TIME_DEPENDENT"
+            ? config.schedule.operationsStartAt
+            : null,
         operationalInterrupted,
         emergencyMode: false,
         plannedBoardingMinutes: config.adminParameters.plannedBoardingMinutes,
@@ -597,7 +748,15 @@ export function runSimulation(
         predictedCompletionAt: rotation.predictedCompletionAt,
       })),
       durationSamples,
-      capacities: [{ resourceGroupId: RESOURCE_GROUP_ID, activeAircraft: activeCapacity }],
+      capacities: [
+        {
+          resourceGroupId: RESOURCE_GROUP_ID,
+          activeAircraft: activeCapacity,
+          ...(config.forecastTuning.availabilityModel === "TIME_DEPENDENT"
+            ? { availabilityLanes }
+            : {}),
+        },
+      ],
       tuning: config.forecastTuning.forecast,
     });
   };
@@ -1016,6 +1175,13 @@ export function runSimulation(
     rotations: publicRotations,
     events,
     snapshots,
-    metrics: calculateSimulationMetrics({ rotations: publicRotations, snapshots, events }),
+    metrics: calculateSimulationMetrics({
+      rotations: publicRotations,
+      snapshots,
+      events,
+      operationsStartAt: config.schedule.operationsStartAt,
+      operationsEndAt: config.schedule.operationsEndAt,
+      aircraftCount: config.adminParameters.aircraftCount,
+    }),
   };
 }

@@ -409,7 +409,7 @@ try {
     const rotation = current.rotations.find(
       (entry) => entry.id === sold.aggregate.relatedRotationId,
     );
-    if (rotation?.timeline.predictionQuality === "UNCERTAIN") break;
+    if (rotation?.timeline.predictionQuality === "CHANGING") break;
     await new Promise((resolvePromise) => setTimeout(resolvePromise, 100));
   }
   const pausedSummary = current.aircraft.find((entry) => entry.id === "aircraft-a");
@@ -419,7 +419,7 @@ try {
   if (
     pausedSummary?.resourceGroupName !== "Panorama" ||
     pausedSummary.expectedReviewAt !== reviewAt ||
-    affectedRotation?.timeline.predictionQuality !== "UNCERTAIN"
+    affectedRotation?.timeline.predictionQuality !== "CHANGING"
   ) {
     throw new Error(
       `Flugzeugqueue, Prüfzeitpunkt oder automatische Neuplanung fehlt: ${JSON.stringify({ pausedSummary, predictionQuality: affectedRotation?.timeline.predictionQuality })}`,
@@ -625,7 +625,59 @@ try {
     reason: "Synthetische Pilotenpause beendet",
     expectedReviewAt: null,
   });
-  const refuelPlanned = await admin(resumedPilot.event.version, "SCHEDULE_AIRCRAFT_REFUEL", {
+  const plannedPauseId = randomUUID();
+  const plannedPause = await admin(resumedPilot.event.version, "UPSERT_PLANNED_OPERATION", {
+    planId: plannedPauseId,
+    planExpectedVersion: null,
+    scopeType: "PILOT",
+    scopeId: assignedPilot.id,
+    kind: "PAUSE",
+    startMode: "TIME_WINDOW",
+    earliestStartAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+    latestStartAt: new Date(Date.now() + 45 * 60 * 1000).toISOString(),
+    afterRotationId: null,
+    minimumDurationMinutes: 10,
+    typicalDurationMinutes: 15,
+    maximumDurationMinutes: 25,
+    reason: "Synthetisch geplante Pilotenpause",
+    publicNote: "",
+  });
+  current = await board(devices.admin, tokens.admin);
+  if (
+    current.plannedOperations.find((entry) => entry.id === plannedPauseId)?.status !== "PLANNED" ||
+    current.pilots.find((entry) => entry.id === assignedPilot.id)?.paused
+  ) {
+    throw new Error("Weicher Planeintrag hat den Pilotenzustand vor Bestätigung verändert.");
+  }
+  const activatedPlannedPause = await admin(plannedPause.event.version, "SET_PILOT_PAUSE", {
+    pilotId: assignedPilot.id,
+    paused: true,
+    reason: "Synthetisch geplante Pilotenpause gestartet",
+    expectedReviewAt: reviewAt,
+    plannedOperationId: plannedPauseId,
+  });
+  current = await board(devices.admin, tokens.admin);
+  if (
+    current.plannedOperations.find((entry) => entry.id === plannedPauseId)?.status !== "ACTIVE" ||
+    !current.pilots.find((entry) => entry.id === assignedPilot.id)?.paused
+  ) {
+    throw new Error("Bestätigter Planstart wurde nicht atomar aktiviert.");
+  }
+  const clearedPlannedPause = await admin(activatedPlannedPause.event.version, "SET_PILOT_PAUSE", {
+    pilotId: assignedPilot.id,
+    paused: false,
+    reason: "Synthetisch geplante Pilotenpause beendet",
+    expectedReviewAt: null,
+    plannedOperationId: plannedPauseId,
+  });
+  current = await board(devices.admin, tokens.admin);
+  if (
+    current.plannedOperations.find((entry) => entry.id === plannedPauseId)?.status !== "CLEARED" ||
+    current.pilots.find((entry) => entry.id === assignedPilot.id)?.paused
+  ) {
+    throw new Error("Bestätigtes Planende wurde nicht atomar aufgehoben.");
+  }
+  const refuelPlanned = await admin(clearedPlannedPause.event.version, "SCHEDULE_AIRCRAFT_REFUEL", {
     aircraftId: "aircraft-a",
     planned: true,
     reason: "Synthetische Tankvormerkung",
@@ -650,7 +702,7 @@ try {
   const rotationHistory = await history("ROTATION", sold.aggregate.relatedRotationId);
   if (
     pilotHistory.entries.filter((entry) => entry.eventType.startsWith("PILOT_PAUSE_")).length !==
-      2 ||
+      4 ||
     !pilotHistory.entries.some(
       (entry) =>
         entry.eventType === "PILOT_CONFIGURATION_CHANGED" &&
@@ -678,11 +730,12 @@ try {
   }
   process.stdout.write(
     JSON.stringify({
-      requirements: ["F-PRG-110", "F-PRG-130", "F-SLT-090"],
+      requirements: ["F-FLT-090", "F-PRG-110", "F-PRG-130", "F-SLT-090", "D-065"],
       anonymousPilotCodeAndNoteVisible: true,
       currentPilotAssignmentVisible: true,
       activePilotPauseRejected: true,
       pilotPauseAndResumeAudited: true,
+      plannedConstraintSoftAndConfirmed: true,
       aircraftQueueVisible: true,
       aircraftPauseBlocksCall: true,
       flightLineAircraftStateAuthorized: true,
