@@ -111,6 +111,7 @@ export function targetManifestPath(profile) {
 export function createTargetWranglerConfig(baseConfig, profile, databaseId) {
   const result = structuredClone(baseConfig);
   result.name = profile.workerName;
+  result.secrets = { required: [...requiredCloudflareSecrets] };
   result.vars = {
     ...(result.vars ?? {}),
     APP_ENV: profile.appEnv,

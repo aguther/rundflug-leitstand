@@ -1,6 +1,14 @@
 export type Env = Omit<
   CloudflareBindings,
-  "APP_ENV" | "DATA_JURISDICTION" | "ADMIN_PIN_HASH" | "PUSH_RETENTION_DAYS"
+  | "APP_ENV"
+  | "DATA_JURISDICTION"
+  | "ADMIN_PIN_HASH"
+  | "INSTALLATION_RECOVERY_CODE"
+  | "RESET_SETUP_SIGNING_KEY"
+  | "VAPID_PUBLIC_KEY"
+  | "VAPID_PRIVATE_KEY"
+  | "VAPID_SUBJECT"
+  | "PUSH_RETENTION_DAYS"
 > & {
   APP_ENV: "development" | "acceptance" | "production";
   DATA_JURISDICTION: "eu";
