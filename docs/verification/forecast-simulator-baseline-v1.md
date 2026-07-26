@@ -152,7 +152,7 @@ Betriebshinweis, setzt die Prognosequalität auf `UNCERTAIN` und veröffentlicht
 Zeitfenster.
 
 Die Anzeige verwendet ausschließlich synthetische `G-SIM-####`-Kennungen, `Rundflug Simulation`
-und `Flight Line 1`. Sie besitzt acht Zeilen, einspaltiges Layout und keine Einstellungen.
+und `Flight Line 1`. Sie besitzt 20 Zeilen, einspaltiges Layout und keine Einstellungen.
 `LIVE-SIMULATION`, `Virtuelle Zeit` und der permanente Hinweis
 `Nur Simulation – keine Betriebsdaten` verhindern eine Verwechslung mit Betriebsdaten.
 Abflugtransitionen bleiben auch bei 60× oder 300× für 15 Sekunden realer Betrachtungszeit sichtbar;

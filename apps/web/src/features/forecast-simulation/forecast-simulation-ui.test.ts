@@ -79,6 +79,7 @@ describe("local and hosted forecast simulation surface", () => {
     expect(fidsPopoutSource).toContain('connectionLabel="LIVE-SIMULATION"');
     expect(fidsPopoutSource).toContain('simulationBanner="Nur Simulation – keine Betriebsdaten"');
     expect(fidsPopoutSource).toContain('footerNote="Virtuelle Zeit"');
+    expect(fidsPopoutSource).toContain("visibleRows: 20");
     expect(fidsPopoutSource).toContain("Das FIDS-Fenster wurde blockiert");
     expect(fidsPopoutSource).not.toContain("FidsSettingsDialog");
     expect(fidsPopoutSource).not.toContain("onOpenSettings");
