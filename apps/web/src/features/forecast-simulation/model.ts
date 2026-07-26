@@ -31,8 +31,34 @@ export interface SimulationAdminParameters {
   activePilotCount: number;
 }
 
+export type SimulationDemandProfileId =
+  | "UNIFORM"
+  | "OPENING_RUSH"
+  | "TWO_WAVES"
+  | "LATE_RUSH"
+  | "CUSTOM";
+
+export interface SimulationDemandWindow {
+  startOffsetMinutes: number;
+  endOffsetMinutes: number;
+  personsPerHour: number;
+}
+
+export interface SimulationDemand {
+  profile: SimulationDemandProfileId;
+  windows: SimulationDemandWindow[];
+}
+
+export interface SimulationSchedule {
+  timeZone: string;
+  salesStartAt: string;
+  salesEndAt: string;
+  operationsStartAt: string;
+  operationsEndAt: string;
+}
+
 export interface SimulationRealityModel {
-  demandPersonsPerHour: number;
+  demand: SimulationDemand;
   phases: {
     boarding: TriangularDistribution;
     flight: TriangularDistribution;
@@ -59,8 +85,7 @@ export interface SimulationForecastTuning {
 export interface SimulationConfig {
   preset: SimulationPresetId;
   seed: number;
-  startAt: string;
-  endAt: string;
+  schedule: SimulationSchedule;
   adminParameters: SimulationAdminParameters;
   realityModel: SimulationRealityModel;
   forecastTuning: SimulationForecastTuning;
@@ -202,6 +227,10 @@ export interface SimulationMetrics {
 
 export interface SimulationResult {
   config: SimulationConfig;
+  runWindow: {
+    startAt: string;
+    endAt: string;
+  };
   aircraft: SimulationAircraft[];
   rotations: SimulationRotation[];
   events: SimulationEvent[];
@@ -221,6 +250,125 @@ export function forecastUncertaintyLabel(reasons: readonly ForecastUncertaintyRe
   return reasons.length === 0
     ? "nicht näher bestimmt"
     : reasons.map((reason) => FORECAST_UNCERTAINTY_REASON_LABELS[reason]).join(", ");
+}
+
+export const SIMULATION_DEMAND_PROFILE_LABELS: Record<SimulationDemandProfileId, string> = {
+  UNIFORM: "Gleichmäßig",
+  OPENING_RUSH: "Morgenandrang",
+  TWO_WAVES: "Zwei Wellen",
+  LATE_RUSH: "Später Andrang",
+  CUSTOM: "Benutzerdefiniert",
+};
+
+const MINUTE_MS = 60_000;
+const DEFAULT_DEMAND_PERSONS_PER_HOUR = 18;
+
+type DemandTemplateWindow = {
+  endRatio: number;
+  intensityAtDefault: number;
+};
+
+const DEMAND_TEMPLATES: Record<
+  Exclude<SimulationDemandProfileId, "CUSTOM">,
+  readonly DemandTemplateWindow[]
+> = {
+  UNIFORM: [{ endRatio: 1, intensityAtDefault: 18 }],
+  OPENING_RUSH: [
+    { endRatio: 0.25, intensityAtDefault: 42 },
+    { endRatio: 1, intensityAtDefault: 10 },
+  ],
+  TWO_WAVES: [
+    { endRatio: 0.1875, intensityAtDefault: 40 },
+    { endRatio: 0.5625, intensityAtDefault: 8 },
+    { endRatio: 0.75, intensityAtDefault: 32 },
+    { endRatio: 1, intensityAtDefault: 6 },
+  ],
+  LATE_RUSH: [
+    { endRatio: 0.75, intensityAtDefault: 10 },
+    { endRatio: 1, intensityAtDefault: 42 },
+  ],
+};
+
+function roundedDemandRate(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+export function salesDurationMinutes(schedule: SimulationSchedule): number {
+  return (Date.parse(schedule.salesEndAt) - Date.parse(schedule.salesStartAt)) / MINUTE_MS;
+}
+
+export function calculateDemandSummary(
+  demand: SimulationDemand,
+  salesMinutes: number,
+): {
+  averagePersonsPerHour: number;
+  expectedPersons: number;
+} {
+  if (!Number.isFinite(salesMinutes) || salesMinutes <= 0) {
+    return { averagePersonsPerHour: 0, expectedPersons: 0 };
+  }
+  const expectedPersons = demand.windows.reduce((total, window) => {
+    const durationMinutes = Math.max(0, window.endOffsetMinutes - window.startOffsetMinutes);
+    return total + (window.personsPerHour * durationMinutes) / 60;
+  }, 0);
+  return {
+    averagePersonsPerHour: expectedPersons / (salesMinutes / 60),
+    expectedPersons,
+  };
+}
+
+export function demandForProfile(
+  profile: Exclude<SimulationDemandProfileId, "CUSTOM">,
+  salesMinutes: number,
+  averagePersonsPerHour = DEFAULT_DEMAND_PERSONS_PER_HOUR,
+): SimulationDemand {
+  const durationMinutes = Math.max(1, Math.round(salesMinutes));
+  const effectiveAverage =
+    Number.isFinite(averagePersonsPerHour) && averagePersonsPerHour > 0
+      ? averagePersonsPerHour
+      : DEFAULT_DEMAND_PERSONS_PER_HOUR;
+  const scale = effectiveAverage / DEFAULT_DEMAND_PERSONS_PER_HOUR;
+  let previousEnd = 0;
+  return {
+    profile,
+    windows: DEMAND_TEMPLATES[profile].map((window, index, entries) => {
+      const startOffsetMinutes = previousEnd;
+      const endOffsetMinutes =
+        index === entries.length - 1
+          ? durationMinutes
+          : Math.round(window.endRatio * durationMinutes);
+      previousEnd = endOffsetMinutes;
+      return {
+        startOffsetMinutes,
+        endOffsetMinutes,
+        personsPerHour: roundedDemandRate(window.intensityAtDefault * scale),
+      };
+    }),
+  };
+}
+
+export function rescaleDemandWindows(
+  demand: SimulationDemand,
+  previousSalesMinutes: number,
+  nextSalesMinutes: number,
+): SimulationDemand {
+  if (
+    !Number.isFinite(previousSalesMinutes) ||
+    previousSalesMinutes <= 0 ||
+    !Number.isFinite(nextSalesMinutes) ||
+    nextSalesMinutes <= 0
+  ) {
+    return demand;
+  }
+  const scale = nextSalesMinutes / previousSalesMinutes;
+  return {
+    ...demand,
+    windows: demand.windows.map((window) => ({
+      ...window,
+      startOffsetMinutes: Math.round(window.startOffsetMinutes * scale),
+      endOffsetMinutes: Math.round(window.endOffsetMinutes * scale),
+    })),
+  };
 }
 
 export const DEFAULT_PHASES: SimulationRealityModel["phases"] = {
@@ -261,8 +409,13 @@ function cloneConfig(config: SimulationConfig): SimulationConfig {
 const BASE_CONFIG: SimulationConfig = {
   preset: "NORMAL",
   seed: 20260722,
-  startAt: "2026-07-22T08:00:00.000Z",
-  endAt: "2026-07-22T16:00:00.000Z",
+  schedule: {
+    timeZone: "Europe/Berlin",
+    salesStartAt: "2026-07-22T07:00:00.000Z",
+    salesEndAt: "2026-07-22T15:00:00.000Z",
+    operationsStartAt: "2026-07-22T08:00:00.000Z",
+    operationsEndAt: "2026-07-22T16:00:00.000Z",
+  },
   adminParameters: {
     plannedBoardingMinutes: 8,
     productReferenceDurationMinutes: 20,
@@ -276,7 +429,7 @@ const BASE_CONFIG: SimulationConfig = {
     activePilotCount: 3,
   },
   realityModel: {
-    demandPersonsPerHour: 18,
+    demand: demandForProfile("TWO_WAVES", 8 * 60),
     phases: DEFAULT_PHASES,
     incidents: DEFAULT_INCIDENTS,
   },
@@ -292,7 +445,10 @@ export const SIMULATION_PRESETS: Readonly<Record<SimulationPresetId, SimulationC
   PEAK_LOAD: {
     ...cloneConfig(BASE_CONFIG),
     preset: "PEAK_LOAD",
-    realityModel: { ...cloneConfig(BASE_CONFIG).realityModel, demandPersonsPerHour: 36 },
+    realityModel: {
+      ...cloneConfig(BASE_CONFIG).realityModel,
+      demand: demandForProfile("TWO_WAVES", 8 * 60, 36),
+    },
   },
   AIRCRAFT_FAILURE: { ...cloneConfig(BASE_CONFIG), preset: "AIRCRAFT_FAILURE" },
   OPERATION_INTERRUPTION: { ...cloneConfig(BASE_CONFIG), preset: "OPERATION_INTERRUPTION" },
@@ -325,6 +481,15 @@ export function validateDistribution(
     return "Es gilt Minimum ≤ typisch ≤ Maximum; alle Werte müssen gültig sein.";
   }
   return null;
+}
+
+function localDate(value: string, timeZone: string): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(value));
 }
 
 export function validateSimulationConfig(config: SimulationConfig): string[] {
@@ -372,15 +537,65 @@ export function validateSimulationConfig(config: SimulationConfig): string[] {
       errors.push(`${label} muss eine ganze Minute zwischen ${minimum} und 600 sein.`);
     }
   }
-  if (
-    !Number.isFinite(config.realityModel.demandPersonsPerHour) ||
-    config.realityModel.demandPersonsPerHour < 0
-  )
-    errors.push("Die Nachfrage darf nicht negativ sein.");
   if (!Number.isInteger(config.seed) || config.seed < 1 || config.seed > 4_294_967_295)
     errors.push("Der Seed muss eine positive 32-Bit-Ganzzahl sein.");
-  if (Date.parse(config.startAt) >= Date.parse(config.endAt))
-    errors.push("Das Simulationsende muss nach dem Beginn liegen.");
+  const scheduleValues = [
+    config.schedule.salesStartAt,
+    config.schedule.salesEndAt,
+    config.schedule.operationsStartAt,
+    config.schedule.operationsEndAt,
+  ];
+  if (scheduleValues.some((value) => Number.isNaN(Date.parse(value)))) {
+    errors.push("Alle Tageszeiten müssen gültige Zeitpunkte sein.");
+  } else {
+    try {
+      const localDates = new Set(
+        scheduleValues.map((value) => localDate(value, config.schedule.timeZone)),
+      );
+      if (localDates.size !== 1) {
+        errors.push("Verkauf und Flugbetrieb müssen am selben Veranstaltungstag liegen.");
+      }
+    } catch {
+      errors.push("Die Simulationszeitzone ist ungültig.");
+    }
+    if (Date.parse(config.schedule.salesStartAt) >= Date.parse(config.schedule.salesEndAt)) {
+      errors.push("Das Verkaufsende muss nach dem Verkaufsbeginn liegen.");
+    }
+    if (
+      Date.parse(config.schedule.operationsStartAt) >= Date.parse(config.schedule.operationsEndAt)
+    ) {
+      errors.push("Das Betriebsende muss nach dem Betriebsbeginn liegen.");
+    }
+    if (Date.parse(config.schedule.salesEndAt) > Date.parse(config.schedule.operationsEndAt)) {
+      errors.push("Der Verkauf darf nicht nach dem Flugbetrieb enden.");
+    }
+  }
+  const demandWindows = [...config.realityModel.demand.windows].sort(
+    (left, right) =>
+      left.startOffsetMinutes - right.startOffsetMinutes ||
+      left.endOffsetMinutes - right.endOffsetMinutes,
+  );
+  const demandDuration = salesDurationMinutes(config.schedule);
+  for (const [index, window] of demandWindows.entries()) {
+    if (
+      !Number.isInteger(window.startOffsetMinutes) ||
+      !Number.isInteger(window.endOffsetMinutes) ||
+      window.startOffsetMinutes < 0 ||
+      window.endOffsetMinutes <= window.startOffsetMinutes ||
+      window.endOffsetMinutes > demandDuration
+    ) {
+      errors.push(`Nachfragefenster ${index + 1} liegt außerhalb des Verkaufszeitraums.`);
+    }
+    if (!Number.isFinite(window.personsPerHour) || window.personsPerHour < 0) {
+      errors.push(`Nachfragefenster ${index + 1} besitzt eine ungültige Nachfrage.`);
+    }
+    if (
+      index > 0 &&
+      (demandWindows[index - 1]?.endOffsetMinutes ?? 0) > window.startOffsetMinutes
+    ) {
+      errors.push(`Nachfragefenster ${index} und ${index + 1} überlappen sich.`);
+    }
+  }
   if (
     config.realityModel.incidents.refueling.enabled &&
     config.realityModel.incidents.refueling.everyRotations < 1

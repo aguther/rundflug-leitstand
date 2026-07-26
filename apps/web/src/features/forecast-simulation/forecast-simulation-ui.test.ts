@@ -113,7 +113,22 @@ describe("local and hosted forecast simulation surface", () => {
     ]) {
       expect(editorSource).toContain(label);
     }
-    expect(viewSource).toContain('schema: "rundflug-forecast-simulation/v4"');
+    expect(viewSource).toContain(
+      "createSimulationExport(result, manualIncidents, comparisonResult)",
+    );
+    expect(viewSource).toContain("SIMULATION_DEMAND_PROFILE_LABELS");
+    expect(viewSource).not.toContain('id="sim-demand"');
+    for (const label of [
+      "Tageszeiten",
+      "Verkauf",
+      "Flugbetrieb",
+      "Nachfrageprofil",
+      "Flugbetrieb startet",
+      "Zeitfenster hinzufügen",
+      "Erwartungswert",
+    ]) {
+      expect(editorSource).toContain(label);
+    }
     expect(editorSource).toContain("Admin-Planwert");
     expect(editorSource).toContain("Prognose-Labor");
     expect(viewSource).toContain("Baseline und Kandidat vergleichen");

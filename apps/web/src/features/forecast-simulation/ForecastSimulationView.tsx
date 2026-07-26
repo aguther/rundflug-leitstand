@@ -24,19 +24,23 @@ import { CalibrationCsvError, calibrateFromCsv } from "./csv-calibration";
 import { calculateSimulationMetrics, runSimulation } from "./engine";
 import { ForecastTimeline } from "./ForecastTimeline";
 import {
+  calculateDemandSummary,
   forecastUncertaintyLabel,
   type ManualIncident,
+  SIMULATION_DEMAND_PROFILE_LABELS,
   SIMULATION_PRESET_LABELS,
   type SimulationConfig,
   type SimulationForecastSnapshot,
   type SimulationPresetId,
   type SimulationRotation,
+  salesDurationMinutes,
   simulationConfigForPreset,
   validateSimulationConfig,
 } from "./model";
 import { ScenarioEditor } from "./ScenarioEditor";
 import { SimulationFidsPopout, type SimulationFidsPopoutHandle } from "./SimulationFidsPopout";
 import { SimulationHistoryDialog } from "./SimulationHistoryDialog";
+import { createSimulationExport } from "./simulation-export";
 import "./forecast-simulation.css";
 
 const MINUTE_MS = 60_000;
@@ -184,34 +188,17 @@ function MetricCard({ label, value, hint }: { label: string; value: string; hint
   );
 }
 
-function safeExport(
-  result: ReturnType<typeof runSimulation>,
-  manualIncidents: readonly ManualIncident[],
-  comparison: BatchComparisonResult | null,
-) {
-  return {
-    schema: "rundflug-forecast-simulation/v4",
-    scenario: result.config,
-    seed: result.config.seed,
-    adminParameters: result.config.adminParameters,
-    realityModel: result.config.realityModel,
-    forecastTuning: result.config.forecastTuning,
-    manualIncidents,
-    syntheticEventLedger: result.events,
-    forecastSnapshots: result.snapshots,
-    aircraft: result.aircraft,
-    rotations: result.rotations,
-    metrics: result.metrics,
-    batchComparison: comparison,
-  };
-}
-
 export function ForecastSimulationView() {
   const initialConfig = useMemo(() => simulationConfigForPreset("NORMAL"), []);
   const [config, setConfig] = useState<SimulationConfig>(initialConfig);
   const [manualIncidents, setManualIncidents] = useState<ManualIncident[]>([]);
   const [result, setResult] = useState(() => runSimulation(initialConfig));
-  const [currentMs, setCurrentMs] = useState(() => Date.parse(initialConfig.startAt));
+  const [currentMs, setCurrentMs] = useState(() =>
+    Math.min(
+      Date.parse(initialConfig.schedule.salesStartAt),
+      Date.parse(initialConfig.schedule.operationsStartAt),
+    ),
+  );
   const [speed, setSpeed] = useState<(typeof SPEEDS)[number]>(10);
   const [running, setRunning] = useState(false);
   const [selectedRotationId, setSelectedRotationId] = useState<string | null>(null);
@@ -234,7 +221,7 @@ export function ForecastSimulationView() {
   const comparisonWorkerRef = useRef<Worker | null>(null);
   const fidsPopoutRef = useRef<SimulationFidsPopoutHandle>(null);
   const editorErrors = validateSimulationConfig(editorConfig);
-  const simulationEnd = Date.parse(config.endAt);
+  const simulationEnd = Date.parse(result.runWindow.endAt);
 
   useEffect(() => {
     if (!running) return;
@@ -266,7 +253,7 @@ export function ForecastSimulationView() {
     setConfig(structuredClone(nextConfig));
     setManualIncidents([...incidents]);
     setResult(nextResult);
-    setCurrentMs(Date.parse(nextConfig.startAt));
+    setCurrentMs(Date.parse(nextResult.runWindow.startAt));
     setRunning(false);
     setSelectedRotationId(null);
     setSelectedAircraftId("aircraft-1");
@@ -277,6 +264,13 @@ export function ForecastSimulationView() {
     if (validateSimulationConfig(nextConfig).length === 0) restart(nextConfig);
   };
   const visibleAt = Math.floor(currentMs / TICK_MS) * TICK_MS;
+  const operationsAvailableNow =
+    visibleAt >= Date.parse(config.schedule.operationsStartAt) &&
+    visibleAt < Date.parse(config.schedule.operationsEndAt);
+  const demandSummary = calculateDemandSummary(
+    config.realityModel.demand,
+    salesDurationMinutes(config.schedule),
+  );
   const visibleSnapshots = useMemo(
     () => result.snapshots.filter((snapshot) => Date.parse(snapshot.capturedAt) <= visibleAt),
     [result.snapshots, visibleAt],
@@ -355,7 +349,7 @@ export function ForecastSimulationView() {
 
   const exportResult = () => {
     const blob = new Blob(
-      [JSON.stringify(safeExport(result, manualIncidents, comparisonResult), null, 2)],
+      [JSON.stringify(createSimulationExport(result, manualIncidents, comparisonResult), null, 2)],
       {
         type: "application/json;charset=utf-8",
       },
@@ -506,25 +500,10 @@ export function ForecastSimulationView() {
               </button>
             </div>
           </section>
-          <section>
-            <label htmlFor="sim-demand">Nachfrage</label>
-            <div className="sim-input-unit">
-              <input
-                id="sim-demand"
-                min={0}
-                onChange={(event) => {
-                  const value = event.currentTarget.valueAsNumber;
-                  if (Number.isFinite(value))
-                    applyQuickConfig({
-                      ...config,
-                      realityModel: { ...config.realityModel, demandPersonsPerHour: value },
-                    });
-                }}
-                type="number"
-                value={config.realityModel.demandPersonsPerHour}
-              />
-              <span>Pers./Std.</span>
-            </div>
+          <section className="sim-model-summary sim-demand-summary">
+            <span>Nachfrage</span>
+            <strong>Ø {metric(demandSummary.averagePersonsPerHour)} Pers./Std.</strong>
+            <small>{SIMULATION_DEMAND_PROFILE_LABELS[config.realityModel.demand.profile]}</small>
           </section>
           <section className="sim-model-summary">
             <span>Zeitmodell</span>
@@ -646,6 +625,7 @@ export function ForecastSimulationView() {
                 </select>
               </div>
               <Button
+                disabled={!operationsAvailableNow}
                 onClick={() =>
                   inject("UNPLANNED_PAUSE", {
                     durationMinutes: config.realityModel.incidents.unplannedPause.duration.typical,
@@ -655,6 +635,7 @@ export function ForecastSimulationView() {
                 <Coffee aria-hidden="true" /> Pause
               </Button>
               <Button
+                disabled={!operationsAvailableNow}
                 onClick={() =>
                   inject("REFUELING", {
                     durationMinutes: config.realityModel.incidents.refueling.duration.typical,
@@ -664,6 +645,7 @@ export function ForecastSimulationView() {
                 <Fuel aria-hidden="true" /> Tanken
               </Button>
               <Button
+                disabled={!operationsAvailableNow}
                 onClick={() =>
                   inject("TECHNICAL_DEFECT", {
                     durationMinutes: config.realityModel.incidents.technicalDefect.duration.typical,
@@ -673,11 +655,15 @@ export function ForecastSimulationView() {
                 <Wrench aria-hidden="true" /> Defekt
               </Button>
               <Button
+                disabled={!operationsAvailableNow}
                 onClick={() => inject("TECHNICAL_DEFECT", { dayOutage: true, durationMinutes: 0 })}
               >
                 <Plane aria-hidden="true" /> Flugzeugausfall
               </Button>
-              <Button onClick={() => inject("EVENT_INTERRUPTION", { durationMinutes: 30 })}>
+              <Button
+                disabled={!operationsAvailableNow}
+                onClick={() => inject("EVENT_INTERRUPTION", { durationMinutes: 30 })}
+              >
                 <Square aria-hidden="true" /> Betrieb unterbrechen
               </Button>
             </div>

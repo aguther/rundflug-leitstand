@@ -1,6 +1,6 @@
 # Verifikation Prognose-Simulator V1
 
-Stand: 24. Juli 2026
+Stand: 26. Juli 2026
 
 ## Zweck und Ausführung
 
@@ -17,18 +17,21 @@ ausschließlich synthetische Eingaben im Browser. CSV-Inhalte, Konfiguration und
 nicht an die API übertragen und nicht persistiert. Simulator-Chunks und -Styles sind vom
 PWA-Precache ausgeschlossen.
 
-Alle hier genannten Läufe verwenden die freigegebenen Standardparameter und Seed `20260722` für
-10:00–18:00 Uhr Europe/Berlin. Die Nachfrage erzeugt synthetische, ungeteilte Vierergruppen und wird
-mit der vorhandenen Queue-Planung disponiert. Die Preset-Baseline ist als exakter Testwert fixiert.
+Alle hier genannten Läufe verwenden die freigegebenen Standardparameter und Seed `20260722`.
+Der Verkauf läuft 09:00–17:00 Uhr, der Flugbetrieb 10:00–18:00 Uhr Europe/Berlin. Das
+Normalprofil verwendet zwei Wellen mit 40/8/32/6 Personen pro Stunde über
+90/180/90/120 Minuten und damit einen Erwartungswert von 144 Personen. Die Nachfrage erzeugt
+synthetische, ungeteilte Vierergruppen und wird mit der vorhandenen Queue-Planung disponiert. Die
+Preset-Baseline ist als exakter Testwert fixiert.
 
 ## Baseline-Ergebnis
 
 | Preset | erzeugte / abgeschlossene Umläufe | Boarding-Fenster getroffen | Median absolut | P90 absolut | Ø Fensterbreite | max. Reaktion |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Normalbetrieb | 32 / 25 | 0 % | 0,5 Min. | 27,3 Min. | 0 Min. | 29,648 Sek. |
-| Stoßlast | 68 / 25 | 0 % | 0,5 Min. | 23,5 Min. | 0 Min. | 29,648 Sek. |
-| Flugzeugausfall | 32 / 20 | 0 % | 0,5 Min. | 15,3 Min. | 0 Min. | 29,648 Sek. |
-| Betriebsunterbrechung | 32 / 26 | 0 % | 0,5 Min. | 28,7 Min. | 0,4 Min. | 29,648 Sek. |
+| Normalbetrieb | 40 / 28 | 0 % | 0,5 Min. | 23,1 Min. | 0 Min. | 29,648 Sek. |
+| Stoßlast | 78 / 28 | 0 % | 0,5 Min. | 23,1 Min. | 0 Min. | 29,648 Sek. |
+| Flugzeugausfall | 40 / 21 | 0 % | 0,5 Min. | 15,5 Min. | 0 Min. | 29,648 Sek. |
+| Betriebsunterbrechung | 40 / 27 | 0 % | 0,5 Min. | 27,5 Min. | 0 Min. | 29,648 Sek. |
 
 Die Baseline zeigt damit transparent, dass die aktuelle Prognoseformel für die meisten
 Boarding-Prognosen Punktfenster statt praktisch nutzbarer Zeitspannen erzeugt. Die niedrige
@@ -53,10 +56,10 @@ Sperrgründe, ein ungeeigneter vorderer Queue-Eintrag und fehlende passende Kapa
 
 | Preset | voraufgerufen / aufgerufen | Abdeckung | Median Gate → Boarding | P90 | gleicher 30-Sek.-Tick | bei `UNCERTAIN` |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Normalbetrieb | 27 / 28 | 96,43 % | 16,5 Min. | 28,4 Min. | 5 | 0 |
-| Stoßlast | 26 / 28 | 92,86 % | 19,0 Min. | 33,5 Min. | 2 | 0 |
-| Flugzeugausfall | 20 / 21 | 95,24 % | 17,5 Min. | 26,4 Min. | 3 | 0 |
-| Betriebsunterbrechung | 27 / 28 | 96,43 % | 16,5 Min. | 31,5 Min. | 6 | 0 |
+| Normalbetrieb | 28 / 28 | 100 % | 18,0 Min. | 34,75 Min. | 5 | 0 |
+| Stoßlast | 28 / 28 | 100 % | 18,0 Min. | 34,75 Min. | 5 | 0 |
+| Flugzeugausfall | 21 / 21 | 100 % | 17,0 Min. | 29,5 Min. | 4 | 0 |
+| Betriebsunterbrechung | 27 / 27 | 100 % | 17,0 Min. | 34,2 Min. | 8 | 0 |
 
 Nicht jeder bis zum Simulationsende aufgerufene Umlauf besitzt einen Voraufruf: Ein bestätigter
 Boardingbeginn bleibt fachlich auch ohne vorherigen Voraufruf möglich, beispielsweise wenn mehrere
@@ -78,49 +81,29 @@ seedübergreifenden Mediane der wichtigsten Baselinewerte lauten:
 | Kennzahl | Baseline |
 | --- | ---: |
 | Boarding Median absolut | 0,5 Min. |
-| Boarding P90 absolut | 23,0 Min. |
-| Boarding Bias | +5,96 Min. |
+| Boarding P90 absolut | 19,7 Min. |
+| Boarding Bias | +4,75 Min. |
 | Boarding Fensterbreite | 0 Min. |
-| P90 bei 60 / 30 / 15 Minuten Horizont | 50,3 / 28,2 / 23,0 Min. |
-| Off-Block / On-Block / Abschluss P90 | 2,33 / 6,94 / 0,45 Min. |
+| P90 bei 60 / 30 / 15 Minuten Horizont | 60,0 / 30,0 / 20,6 Min. |
+| Off-Block / On-Block / Abschluss P90 | 2,3 / 6,98 / 0,45 Min. |
 | Countdowns bei `UNCERTAIN` | 0 |
-| GO TO GATE → Boarding Median / P90 | 12,0 / 32,45 Min. |
+| GO TO GATE → Boarding Median / P90 | 16,5 / 34,65 Min. |
 
 Der Vergleich läuft abbrechbar in einem lokalen Browser-Worker. Er bewertet keine Variante
 automatisch als Gewinner.
 
 ## Korrektur der falschen Unterdrückung
 
-Vor der Korrektur waren im Normalbetrieb 1.108 von 1.507 für tatsächlich aufgerufene Umläufe
-auswertbaren DRAFT-Snapshots `UNCERTAIN`. 1.050 davon wurden ausschließlich unterdrückt, weil der
-letzte abgeschlossene Lernumlauf mehr als fünf Minuten zurücklag. Ihr Medianfehler betrug trotzdem
-nur acht Minuten; P90 lag bei 25,5 Minuten.
+Vor Betriebsbeginn ist die Ressourcengruppe absichtlich prognostisch inaktiv. In diesem Abschnitt
+entstehende DRAFT-Snapshots dürfen deshalb `UNCERTAIN` sein und keine numerische Voraufruf- oder
+Boardingfreigabe auslösen. Nach Betriebsbeginn erzeugt allein das Alter des letzten Lernwerts bei
+positiver aktiver Kapazität weiterhin keine Unterdrückung; `STALE_PREDICTION` tritt im vollständig
+lokal und alle 30 Sekunden neu berechneten Lauf nicht auf.
 
-Nach der Korrektur enthält der vollständige Normalbetrieb 3.106 stabile, 713 veränderliche und 58
-unsichere Snapshots. Sämtliche 58 Unsicherheiten beruhen auf tatsächlich fehlender aktiver
-Kapazität; `STALE_PREDICTION` tritt im vollständig lokal und alle 30 Sekunden neu berechneten Lauf
-nicht auf. Lernwertalter über fünf Minuten erzeugt bei positiver Kapazität keine Unterdrückung mehr.
-
-Die festen Boarding-Horizonte zeigen folgenden Vorher-/Nachher-Vergleich; angegeben sind
-Median/P90 des absoluten Fehlers in Minuten:
-
-| Preset | Horizont | vorher | nachher |
-| --- | ---: | ---: | ---: |
-| Normalbetrieb | 15 Min. | 7,0 / 36,0 | 7,0 / 40,0 |
-| Normalbetrieb | 30 Min. | 14,0 / 25,0 | 10,0 / 25,0 |
-| Normalbetrieb | 60 Min. | 29,5 / 29,9 | 22,5 / 22,9 |
-| Stoßlast | 15 Min. | 8,0 / 30,4 | 8,0 / 30,4 |
-| Stoßlast | 30 Min. | 8,5 / 27,5 | 8,0 / 27,5 |
-| Stoßlast | 60 Min. | 23,0 / 35,4 | 20,0 / 33,6 |
-| Flugzeugausfall | 15 Min. | 8,5 / 22,0 | 8,5 / 25,5 |
-| Flugzeugausfall | 30 Min. | 9,0 / 20,0 | 10,0 / 21,0 |
-| Flugzeugausfall | 60 Min. | 28,0 / 50,4 | 25,0 / 54,4 |
-| Betriebsunterbrechung | 15 Min. | 10,0 / 21,8 | 10,0 / 26,6 |
-| Betriebsunterbrechung | 30 Min. | 14,0 / 28,4 | 11,0 / 28,4 |
-| Betriebsunterbrechung | 60 Min. | 7,0 / 21,4 | 22,0 / 27,6 |
-
-Die kleinen Stichproben bei langen Horizonten, insbesondere im Unterbrechungspreset, erlauben
-keine belastbare Aussage über eine generelle Verbesserung oder Verschlechterung der Formel.
+Die früher für gleichmäßige Nachfrage dokumentierten Snapshot-Anzahlen und
+Vorher-/Nachher-Horizontwerte sind wegen der neuen Zwei-Wellen-Nachfrage und der zusätzlichen
+Vorverkaufsstunde nicht mit der aktuellen Baseline vergleichbar. Maßgeblich sind daher die oben
+festgeschriebenen Preset- und 25-Seed-Werte.
 
 ## Messmethode
 
@@ -151,7 +134,7 @@ keine belastbare Aussage über eine generelle Verbesserung oder Verschlechterung
 - Exportiert werden nur Szenario, Seed, synthetisches Ereignisledger, Flugzeuge, Umläufe,
   Prognosesnapshots und Kennzahlen. Ticketcodes, Namen, Telefonnummern, PINs und Secrets sind weder
   Teil des Modells noch des Exports. Das Format trägt die Kennung
-  `rundflug-forecast-simulation/v4`.
+  `rundflug-forecast-simulation/v5`.
 
 ## Simuliertes Live-FIDS
 
@@ -182,6 +165,26 @@ Vite-Modus mit dem In-App-Browser gegen die gerenderte Anwendung verglichen. Die
 erfolgte bei 1280×720; ergänzende Headless-Aufnahmen belegen das Layout bei 1536×1024 und 1280×800.
 Light und Dark Mode wurden jeweils im In-App-Browser geprüft:
 
+- die ergänzende Nachfrageabnahme vom 26. Juli 2026 prüft das freigegebene Konzept
+  `docs/ui/forecast-simulator-demand-approved.png` nativ bei 1536×1024 und 1280×800, jeweils in
+  Light und Dark Mode;
+- Tageszeiten und alle Nachfragefenster werden unabhängig von der Browser-Locale eindeutig im
+  24-Stunden-Format `HH:MM` dargestellt;
+- der Vorlagenwechsel auf Morgenandrang erhält Ø 18 Personen/Stunde und 144 erwartete Personen;
+  `Zeitfenster hinzufügen` teilt das längste Fenster und übernimmt dessen Rate;
+- eine manuelle Fensteränderung setzt `Benutzerdefiniert`; eine erzeugte Überlappung zeigt
+  `Nachfragefenster 1 und 2 überlappen sich.` und deaktiviert `Übernehmen & neu starten`;
+- um 09:55 enthält die sichtbare Anfangsqueue zwölf Gruppen, ohne `GO TO GATE`, Boarding oder
+  aktivierbare Störungstaste; um 10:00 beginnen genau drei Boardings und die operativen
+  Störungstasten werden aktiv;
+- um 18:00 bleiben die drei zu diesem Zeitpunkt laufenden Umläufe sichtbar, während keine neue
+  Gruppe mehr aufgerufen wird und die Störungstasten deaktiviert sind; der Lauf endet nach deren
+  Abschluss um 18:27;
+- bei 1536×1024 entsprechen Dokument- und Clientbreite jeweils 1536 Pixel; bei 1280×800 jeweils
+  1265 Pixel wegen der vertikalen Browser-Scrollbar. Der 536 Pixel breite Drawer besitzt in beiden
+  Fällen identische Client- und Scrollbreite und erzeugt keinen horizontalen Überlauf;
+- die Browserkonsole enthält nach Editor-, Validierungs-, Wiedergabe- und Theme-Prüfung keine
+  Warnung und keinen Fehler;
 - Normalbetrieb bei virtueller Zeit 11:40 mit einem mehr als fünf Minuten alten Lernwert zeigt die
   reguläre Boarding-Prognose und keine Unterdrückung;
 - eine ausgewählte Fluggruppe während der Betriebsunterbrechung zeigt keinen Countdown, aber die

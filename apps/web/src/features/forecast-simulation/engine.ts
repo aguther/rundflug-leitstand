@@ -135,21 +135,38 @@ function createAircraft(config: SimulationConfig): RuntimeAircraft[] {
 }
 
 function createDemand(config: SimulationConfig): RuntimeRotation[] {
-  if (config.realityModel.demandPersonsPerHour === 0) return [];
-  const startMs = Date.parse(config.startAt);
-  const endMs = Date.parse(config.endAt);
+  const salesStartMs = Date.parse(config.schedule.salesStartAt);
   const groupSize = config.adminParameters.passengerSeats;
-  const groupRatePerHour = config.realityModel.demandPersonsPerHour / groupSize;
-  const random = mulberry32(hashSeed(config.seed, "demand"));
-  const rotations: RuntimeRotation[] = [];
-  let arrivalMs = startMs;
-  while (arrivalMs <= endMs) {
-    const draw = Math.max(Number.EPSILON, random.next());
-    arrivalMs += (-Math.log(draw) / groupRatePerHour) * 60 * MINUTE_MS;
-    if (arrivalMs > endMs) break;
-    const sequence = rotations.length + 1;
+  const arrivalTimes: number[] = [];
+  const windows = [...config.realityModel.demand.windows].sort(
+    (left, right) =>
+      left.startOffsetMinutes - right.startOffsetMinutes ||
+      left.endOffsetMinutes - right.endOffsetMinutes,
+  );
+  for (const [index, window] of windows.entries()) {
+    if (window.personsPerHour === 0) continue;
+    const windowStartMs = addMinutes(salesStartMs, window.startOffsetMinutes);
+    const windowEndMs = addMinutes(salesStartMs, window.endOffsetMinutes);
+    const groupRatePerHour = window.personsPerHour / groupSize;
+    const random = mulberry32(
+      hashSeed(
+        config.seed,
+        `demand:${index}:${window.startOffsetMinutes}:${window.endOffsetMinutes}`,
+      ),
+    );
+    let arrivalMs = windowStartMs;
+    while (arrivalMs < windowEndMs) {
+      const draw = Math.max(Number.EPSILON, random.next());
+      arrivalMs += (-Math.log(draw) / groupRatePerHour) * 60 * MINUTE_MS;
+      if (arrivalMs >= windowEndMs) break;
+      arrivalTimes.push(roundedTick(arrivalMs));
+    }
+  }
+  arrivalTimes.sort((left, right) => left - right);
+  return arrivalTimes.map((arrivalMs, index) => {
+    const sequence = index + 1;
     const id = `rotation-${String(sequence).padStart(3, "0")}`;
-    rotations.push({
+    return {
       id,
       communicationNumber: sequence,
       passengerCount: groupSize,
@@ -172,13 +189,14 @@ function createDemand(config: SimulationConfig): RuntimeRotation[] {
       predictedDepartureAt: null,
       predictedLandingAt: null,
       predictedCompletionAt: null,
-    });
-  }
-  return rotations;
+    };
+  });
 }
 
 function presetIncidents(config: SimulationConfig): ManualIncident[] {
-  const at = iso(addMinutes(Date.parse(config.startAt), 120));
+  const atMs = addMinutes(Date.parse(config.schedule.operationsStartAt), 120);
+  if (atMs >= Date.parse(config.schedule.operationsEndAt)) return [];
+  const at = iso(atMs);
   if (config.preset === "AIRCRAFT_FAILURE") {
     return [
       {
@@ -453,8 +471,10 @@ export function runSimulation(
 ): SimulationResult {
   const validationErrors = validateSimulationConfig(config);
   if (validationErrors.length > 0) throw new Error(validationErrors.join(" "));
-  const startMs = Date.parse(config.startAt);
-  const endMs = Date.parse(config.endAt);
+  const operationsStartMs = Date.parse(config.schedule.operationsStartAt);
+  const operationsEndMs = Date.parse(config.schedule.operationsEndAt);
+  const runStartMs = Math.min(Date.parse(config.schedule.salesStartAt), operationsStartMs);
+  let runEndMs = operationsEndMs;
   const aircraft = createAircraft(config);
   for (const entry of aircraft) {
     entry.nextPauseAtMinutes = config.realityModel.incidents.plannedPause.everyOperatingMinutes;
@@ -465,9 +485,15 @@ export function runSimulation(
   const allIncidents = [
     ...presetIncidents(config),
     ...manualIncidents.map((entry) => ({ ...entry })),
-  ].sort(
-    (left, right) => Date.parse(left.at) - Date.parse(right.at) || left.id.localeCompare(right.id),
-  );
+  ]
+    .filter((entry) => {
+      const at = Date.parse(entry.at);
+      return at >= operationsStartMs && at < operationsEndMs;
+    })
+    .sort(
+      (left, right) =>
+        Date.parse(left.at) - Date.parse(right.at) || left.id.localeCompare(right.id),
+    );
   const processedIncidentIds = new Set<string>();
   const activeInterruptions = allIncidents.filter((entry) => entry.type === "EVENT_INTERRUPTION");
   const recordedGlobalBoundaries = new Set<string>();
@@ -507,7 +533,11 @@ export function runSimulation(
     );
   };
 
-  const calculateCurrentProjections = (nowMs: number, operationalInterrupted: boolean) => {
+  const calculateCurrentProjections = (
+    nowMs: number,
+    resourceGroupStatus: "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED",
+  ) => {
+    const operationalInterrupted = resourceGroupStatus === "INTERRUPTED";
     const open = rotations.filter(
       (rotation) => rotation.status !== "COMPLETED" && Date.parse(rotation.createdAt) <= nowMs,
     );
@@ -517,7 +547,7 @@ export function runSimulation(
         minutes:
           (Date.parse(rotation.completedAt ?? "") - Date.parse(rotation.calledAt ?? "")) /
           MINUTE_MS,
-        completedAt: rotation.completedAt ?? config.startAt,
+        completedAt: rotation.completedAt ?? config.schedule.operationsStartAt,
         eventId: EVENT_ID,
         productCode: PRODUCT_ID,
         aircraftType: rotation.aircraftId
@@ -529,10 +559,14 @@ export function runSimulation(
         .filter((rotation) => rotation.status === "DRAFT")
         .map((rotation, index) => [rotation.id, index + 1]),
     );
-    const activeCapacity = Math.min(
-      config.adminParameters.activePilotCount,
-      aircraft.filter((entry) => entry.state === "AVAILABLE" || entry.state === "ACTIVE").length,
-    );
+    const activeCapacity =
+      resourceGroupStatus === "ACTIVE"
+        ? Math.min(
+            config.adminParameters.activePilotCount,
+            aircraft.filter((entry) => entry.state === "AVAILABLE" || entry.state === "ACTIVE")
+              .length,
+          )
+        : 0;
     return calculateForecastTimelines({
       event: {
         eventId: EVENT_ID,
@@ -551,7 +585,7 @@ export function runSimulation(
         departedAt: rotation.departedAt,
         landedAt: rotation.landedAt,
         resourceGroupId: RESOURCE_GROUP_ID,
-        resourceGroupStatus: operationalInterrupted ? "INTERRUPTED" : "ACTIVE",
+        resourceGroupStatus,
         queueSequence: rotation.status === "DRAFT" ? (draftSequence.get(rotation.id) ?? 1) : 1,
         referenceDurationMinutes: config.adminParameters.productReferenceDurationMinutes,
         productCode: PRODUCT_ID,
@@ -568,11 +602,12 @@ export function runSimulation(
     });
   };
 
-  for (let nowMs = startMs; nowMs <= endMs; nowMs += TICK_MS) {
+  for (let nowMs = runStartMs; ; nowMs += TICK_MS) {
     for (const interruption of activeInterruptions) {
       const incidentStart = roundedTick(Date.parse(interruption.at));
-      const incidentEnd = roundedTick(
-        addMinutes(Date.parse(interruption.at), interruption.durationMinutes),
+      const incidentEnd = Math.min(
+        operationsEndMs,
+        roundedTick(addMinutes(Date.parse(interruption.at), interruption.durationMinutes)),
       );
       const startKey = `${interruption.id}:start`;
       const endKey = `${interruption.id}:end`;
@@ -598,11 +633,23 @@ export function runSimulation(
         );
       }
     }
-    const operationalInterrupted = activeInterruptions.some((entry) => {
-      const from = roundedTick(Date.parse(entry.at));
-      const until = roundedTick(addMinutes(Date.parse(entry.at), entry.durationMinutes));
-      return nowMs >= from && nowMs < until;
-    });
+    const operationsOpen = nowMs >= operationsStartMs && nowMs < operationsEndMs;
+    const operationalInterrupted =
+      operationsOpen &&
+      activeInterruptions.some((entry) => {
+        const from = roundedTick(Date.parse(entry.at));
+        const until = roundedTick(addMinutes(Date.parse(entry.at), entry.durationMinutes));
+        return nowMs >= from && nowMs < until;
+      });
+    const resourceGroupStatus =
+      nowMs < operationsStartMs
+        ? "PAUSED"
+        : nowMs >= operationsEndMs
+          ? "ENDED"
+          : operationalInterrupted
+            ? "INTERRUPTED"
+            : "ACTIVE";
+    const operationsAvailable = resourceGroupStatus === "ACTIVE";
 
     for (const entry of aircraft) {
       if (entry.blockedUntilMs !== null && nowMs >= entry.blockedUntilMs) {
@@ -771,13 +818,13 @@ export function runSimulation(
     }
 
     for (const entry of aircraft) {
-      if (entry.state === "AVAILABLE" && entry.activeRotationId === null) {
+      if (operationsAvailable && entry.state === "AVAILABLE" && entry.activeRotationId === null) {
         const block = entry.pendingBlocks.shift();
         if (block) startBlock(entry, block, nowMs);
       }
     }
 
-    const precallProjections = calculateCurrentProjections(nowMs, operationalInterrupted);
+    const precallProjections = calculateCurrentProjections(nowMs, resourceGroupStatus);
     const waitingRotations = rotations.filter(
       (rotation) => rotation.status === "DRAFT" && Date.parse(rotation.createdAt) <= nowMs,
     );
@@ -796,9 +843,11 @@ export function runSimulation(
         const value = Date.parse(rotation.precalledAt);
         return latest === null ? value : Math.max(latest, value);
       }, null);
-      const largestEligibleAircraftSeats = aircraft
-        .filter((entry) => entry.state === "AVAILABLE" || entry.state === "ACTIVE")
-        .reduce((maximum, entry) => Math.max(maximum, entry.capacity), 0);
+      const largestEligibleAircraftSeats = operationsAvailable
+        ? aircraft
+            .filter((entry) => entry.state === "AVAILABLE" || entry.state === "ACTIVE")
+            .reduce((maximum, entry) => Math.max(maximum, entry.capacity), 0)
+        : 0;
       const projectionByRotationId = new Map(
         precallProjections.map((projection) => [projection.rotationId, projection]),
       );
@@ -812,9 +861,9 @@ export function runSimulation(
               id: rotation.id,
               resourceGroupId: RESOURCE_GROUP_ID,
               enabled: config.adminParameters.eventAutomaticPrecallEnabled,
-              eventActive: true,
-              operationsAvailable: !operationalInterrupted,
-              resourceGroupActive: !operationalInterrupted,
+              eventActive: operationsOpen,
+              operationsAvailable,
+              resourceGroupActive: operationsAvailable,
               resourceGroupEnabled: config.adminParameters.resourceGroupAutomaticPrecallEnabled,
               alreadyPrecalled: rotation.precalledAt !== null,
               groupSize: rotation.passengerCount,
@@ -853,7 +902,7 @@ export function runSimulation(
       }
     }
 
-    if (!operationalInterrupted) {
+    if (operationsAvailable) {
       const waiting = rotations.filter(
         (rotation) => rotation.status === "DRAFT" && Date.parse(rotation.createdAt) <= nowMs,
       );
@@ -909,7 +958,7 @@ export function runSimulation(
       }
     }
 
-    const projections = calculateCurrentProjections(nowMs, operationalInterrupted);
+    const projections = calculateCurrentProjections(nowMs, resourceGroupStatus);
     for (const projection of projections) {
       const rotation = rotations.find((candidate) => candidate.id === projection.rotationId);
       if (!rotation || rotation.status === "COMPLETED") continue;
@@ -935,6 +984,10 @@ export function runSimulation(
         countdownDisplayed: projection.predictionQuality !== "UNCERTAIN",
       });
     }
+    if (nowMs >= operationsEndMs && !aircraft.some((entry) => entry.activeRotationId !== null)) {
+      runEndMs = nowMs;
+      break;
+    }
   }
 
   events.sort(
@@ -944,6 +997,10 @@ export function runSimulation(
   const publicRotations = rotations.map(publicRotation);
   return {
     config: structuredClone(config),
+    runWindow: {
+      startAt: iso(runStartMs),
+      endAt: iso(runEndMs),
+    },
     aircraft: aircraft.map(
       ({
         state: _state,
