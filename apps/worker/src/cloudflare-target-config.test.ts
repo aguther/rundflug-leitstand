@@ -13,11 +13,11 @@ const {
 } = cloudflareTarget;
 
 describe("Cloudflare target configuration", () => {
-  it("uses the same deterministic secret inventory in the checked-in configuration", () => {
+  it("uses the deterministic compatibility inventory in the checked-in configuration", () => {
     const config = JSON.parse(
       readFileSync(new URL("../../../wrangler.jsonc", import.meta.url), "utf8"),
     );
-    expect(config.secrets).toEqual({ required: cloudflareTarget.requiredCloudflareSecrets });
+    expect(config.secrets).toEqual({ required: cloudflareTarget.compatibilityProfileSecrets });
   });
 
   it("derives safe resource names from one target", () => {

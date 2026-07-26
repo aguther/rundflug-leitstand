@@ -31,8 +31,8 @@
   },
   "secrets": {
     "required": [
-      "INSTALLATION_RECOVERY_CODE",
-      "RESET_SETUP_SIGNING_KEY",
+      "ADMIN_PIN_HASH",
+      "BOOTSTRAP_TOKEN",
       "VAPID_PUBLIC_KEY",
       "VAPID_PRIVATE_KEY",
       "VAPID_SUBJECT"
