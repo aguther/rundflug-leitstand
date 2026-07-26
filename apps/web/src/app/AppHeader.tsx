@@ -11,7 +11,6 @@ import {
   LogOut,
   Monitor,
   Moon,
-  Plane,
   Settings,
   Sun,
   Tickets,
@@ -31,7 +30,7 @@ const destinationIcons = {
   "/kasse": Tickets,
   "/flight-director": Users,
   "/flight-line": Headphones,
-  "/fids": Plane,
+  "/fids": Monitor,
   "/admin": Settings,
 } as const;
 

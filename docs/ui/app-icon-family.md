@@ -39,7 +39,8 @@ Generator liegt unter `docs/ui/icon-system/`. Der ausgelieferte Minimalsatz lieg
 Die gerahmte Marke steht allein: als Browser-Favicon, PWA-Installationsicon, Home-Screen-Symbol,
 Kachel, Ladebildschirm oder Briefkopf. Sie ersetzt keine Bedien- oder Navigationssymbole.
 Insbesondere behält das Ansichtsmenü die vorhandenen puren Lucide-Glyphen `Tickets`, `Users`,
-`Headphones`, `Plane` und `Settings`.
+`Headphones`, `Monitor` und `Settings`. Die FIDS-Glyphe wurde am 26. Juli 2026 auf ausdrücklichen
+Auftraggeberwunsch von `Plane` auf `Monitor` umgestellt.
 
 Jedes Laufzeitprofil enthält:
 
