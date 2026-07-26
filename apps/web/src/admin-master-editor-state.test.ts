@@ -58,8 +58,12 @@ describe("setup progress", () => {
       }),
     );
 
-    expect(markup).toContain('class="complete current"');
+    expect(markup).toContain('class="setup-progress-item complete current"');
     expect(markup.match(/aria-current="step"/g)).toHaveLength(1);
-    expect(markup).toContain(">✓</span><span>Gates</span>");
+    expect(markup).toContain('class="setup-step-status"');
+    expect(markup).toContain('class="setup-step-label">Gates</span>');
+    expect(markup).toContain('aria-selected="true"');
+    expect(markup).toContain('role="tablist"');
+    expect(markup).toContain('class="setup-step-status"></span>');
   });
 });

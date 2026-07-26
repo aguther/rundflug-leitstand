@@ -16,6 +16,7 @@ import {
   ExternalLink,
   FlaskConical,
   LockKeyhole,
+  Pencil,
   Plus,
   Trash2,
 } from "lucide-react";
@@ -63,6 +64,7 @@ import {
   Button,
   CheckboxField,
   Field,
+  IconButton,
   ModalDialog,
   PageHeader,
   Panel,
@@ -77,6 +79,11 @@ import { EventLogoEditor } from "./features/admin/EventLogoEditor";
 import { FactoryResetDialog } from "./features/admin/FactoryResetDialog";
 import { AccountManagement } from "./features/auth/AccountManagement";
 import { useAuth } from "./features/auth/AuthContext";
+import {
+  OperationalPlanPanel,
+  type PlannedOperation,
+  type UpsertPlannedOperationPayload,
+} from "./features/operations/OperationalPlanPanel";
 import {
   formatGermanDate,
   LocalizedDateInput,
@@ -120,6 +127,40 @@ const NO_EVENT_LOGO_VARIANTS: Record<EventLogoTheme, boolean> = {
   light: false,
   dark: false,
 };
+const eventStepCopy: Record<AdminEventStep, { title: string; description: string }> = {
+  event: {
+    title: "Veranstaltung",
+    description: "Grunddaten, Betriebszeiten und öffentliche Darstellung verwalten.",
+  },
+  gates: {
+    title: "Gates",
+    description: "Ausgabeorte, Reihenfolge und Displayfilter verwalten.",
+  },
+  "resource-groups": {
+    title: "Ressourcengruppen",
+    description: "Operative Queues, Kapazitäten und Flugzeugzuordnungen verwalten.",
+  },
+  aircraft: {
+    title: "Flugzeuge",
+    description: "Flotte, Sitzplätze und organisatorische Zuordnungen verwalten.",
+  },
+  pilots: {
+    title: "Pilotencodes",
+    description: "Anonyme operative Codes und Verfügbarkeit verwalten.",
+  },
+  products: {
+    title: "Produkte",
+    description: "Verkaufsprodukte, Preise und Queue-Zuordnung verwalten.",
+  },
+  operations: {
+    title: "Betrieb",
+    description: "Betriebsplan, Freigabe, Kapazität und organisatorische Eingriffe verwalten.",
+  },
+  completion: {
+    title: "Abschluss",
+    description: "Betriebstag prüfen, Berichte exportieren und Verläufe auswerten.",
+  },
+};
 
 function SortableTableHeading({
   active,
@@ -143,6 +184,37 @@ function SortableTableHeading({
         </span>
       </button>
     </th>
+  );
+}
+
+function MasterTableActions({
+  deleteLabel,
+  editLabel,
+  onDelete,
+  onEdit,
+}: {
+  deleteLabel?: string;
+  editLabel: string;
+  onDelete?: () => void;
+  onEdit: () => void;
+}) {
+  return (
+    <div className="master-row-actions">
+      <IconButton label={editLabel} onClick={onEdit} size="touch" type="button">
+        <Pencil aria-hidden="true" />
+      </IconButton>
+      {onDelete && deleteLabel ? (
+        <IconButton
+          className="master-row-delete"
+          label={deleteLabel}
+          onClick={onDelete}
+          size="touch"
+          type="button"
+        >
+          <Trash2 aria-hidden="true" />
+        </IconButton>
+      ) : null}
+    </div>
   );
 }
 
@@ -464,6 +536,7 @@ export function AdminView() {
   const [eventFlow, setEventFlow] = useState<AdminEventFlow | null>(null);
   const [eventFlowError, setEventFlowError] = useState<string | null>(null);
   const [eventFlowLoading, setEventFlowLoading] = useState(true);
+  const [eventCatalogOpen, setEventCatalogOpen] = useState(false);
   const [eventSearch, setEventSearch] = useState("");
   const [eventSort, setEventSort] = useState<{
     key: "name" | "eventDate" | "status" | "aerodrome";
@@ -1578,6 +1651,62 @@ export function AdminView() {
     }
   }
 
+  async function upsertAdminPlannedOperation(payload: UpsertPlannedOperationPayload) {
+    if (!board || !isAdministrator || !adminModeUnlocked) return;
+    try {
+      await sendCommand(
+        {
+          commandId: crypto.randomUUID(),
+          eventId: EVENT_ID,
+          deviceId: ADMIN_DEVICE_ID,
+          expectedVersion: board.event.version,
+          issuedAt: new Date().toISOString(),
+          type: "UPSERT_PLANNED_OPERATION",
+          payload,
+        },
+        deviceTokenFor(ADMIN_DEVICE_ID),
+      );
+      setMessage("Planeintrag gespeichert; der operative Zustand bleibt unverändert.");
+      await refresh();
+      await refreshHistory();
+    } catch (cause) {
+      setMessage(
+        cause instanceof Error ? cause.message : "Planeintrag konnte nicht gespeichert werden.",
+      );
+      throw cause;
+    }
+  }
+
+  async function cancelAdminPlannedOperation(plan: PlannedOperation) {
+    if (!board || !isAdministrator || !adminModeUnlocked) return;
+    try {
+      await sendCommand(
+        {
+          commandId: crypto.randomUUID(),
+          eventId: EVENT_ID,
+          deviceId: ADMIN_DEVICE_ID,
+          expectedVersion: board.event.version,
+          issuedAt: new Date().toISOString(),
+          type: "CANCEL_PLANNED_OPERATION",
+          payload: {
+            planId: plan.id,
+            planExpectedVersion: plan.version,
+            reason: OPERATIONAL_AUDIT_REASON,
+          },
+        },
+        deviceTokenFor(ADMIN_DEVICE_ID),
+      );
+      setMessage("Planeintrag abgesagt; laufende Zustände wurden nicht verändert.");
+      await refresh();
+      await refreshHistory();
+    } catch (cause) {
+      setMessage(
+        cause instanceof Error ? cause.message : "Planeintrag konnte nicht abgesagt werden.",
+      );
+      throw cause;
+    }
+  }
+
   async function configureProductSales(
     product: OperationBoard["products"][number],
     saleEnabled: boolean,
@@ -2593,176 +2722,204 @@ export function AdminView() {
         <div className={`admin-workspace ${masterDataStepActive ? "master-data-active" : ""}`}>
           <PageHeader
             actions={
-              <StatusPill
-                tone={
-                  board?.event.status === "ACTIVE"
-                    ? "success"
+              <div className="admin-page-header-actions">
+                {adminArea === "events" ? (
+                  <Button onClick={() => setEventCatalogOpen(true)} size="compact">
+                    Veranstaltungen verwalten
+                  </Button>
+                ) : null}
+                <StatusPill
+                  tone={
+                    board?.event.status === "ACTIVE"
+                      ? "success"
+                      : board?.event.status === "PREPARATION"
+                        ? "warning"
+                        : error
+                          ? "danger"
+                          : "neutral"
+                  }
+                >
+                  {board?.event.status === "ACTIVE"
+                    ? "Betrieb aktiv"
                     : board?.event.status === "PREPARATION"
-                      ? "warning"
-                      : error
-                        ? "danger"
-                        : "neutral"
-                }
-              >
-                {board?.event.status === "ACTIVE"
-                  ? "Betrieb aktiv"
-                  : board?.event.status === "PREPARATION"
-                    ? "Betrieb noch nicht freigegeben"
-                    : board?.event.status === "CLOSED"
-                      ? "Betrieb geschlossen"
-                      : error
-                        ? "Stand nicht verfügbar"
-                        : "Stand wird geladen"}
-              </StatusPill>
+                      ? "Betrieb noch nicht freigegeben"
+                      : board?.event.status === "CLOSED"
+                        ? "Betrieb geschlossen"
+                        : error
+                          ? "Stand nicht verfügbar"
+                          : "Stand wird geladen"}
+                </StatusPill>
+              </div>
             }
-            description={adminAreaCopy[adminArea].description}
-            title={adminAreaCopy[adminArea].title}
+            description={
+              adminArea === "events"
+                ? eventStepCopy[eventStep].description
+                : adminAreaCopy[adminArea].description
+            }
+            title={
+              adminArea === "events"
+                ? eventStepCopy[eventStep].title
+                : adminAreaCopy[adminArea].title
+            }
           />
           {adminArea === "events" ? (
-            <Panel className="event-catalog-v15 event-catalog-primary" padding="none">
-              <PageHeader
-                actions={
-                  <div className="event-catalog-actions">
-                    <SearchField
-                      label="Veranstaltungen durchsuchen"
-                      onChange={(event) => setEventSearch(event.target.value)}
-                      placeholder="Veranstaltungen suchen …"
-                      value={eventSearch}
-                    />
-                    <Button
-                      busy={busyActionKey === "export-master-data-template"}
-                      disabled={!board || busyActionKey !== null}
-                      onClick={() =>
-                        void runBusyAction("export-master-data-template", exportMasterDataTemplate)
-                      }
-                      size="compact"
-                    >
-                      Stammdaten exportieren
-                    </Button>
-                    <Button
-                      disabled={!board || !isAdministrator}
-                      onClick={() => {
-                        setTemplateDraft(null);
-                        setTemplateValidation(null);
-                        setTemplateError(null);
-                        setTemplateFileName("");
-                        setTemplateDialogOpen(true);
-                      }}
-                      size="compact"
-                    >
-                      Stammdaten importieren
-                    </Button>
-                    <Button
-                      disabled={!isAdministrator}
-                      onClick={() => {
-                        setRestartMode("EMPTY");
-                        setRestartConfirmation("");
-                        setRestartEditorOpen(true);
-                      }}
-                      size="compact"
-                      variant="primary"
-                    >
-                      <Plus aria-hidden="true" /> Neue Veranstaltung
-                    </Button>
-                  </div>
-                }
-                level={2}
-                title="Veranstaltungen"
-              />
-              <div className="event-catalog-table-wrap">
-                <table className="event-catalog-table">
-                  <thead>
-                    <tr>
-                      {(
-                        [
-                          ["name", "Veranstaltungsname"],
-                          ["eventDate", "Datum"],
-                          ["status", "Phase"],
-                          ["aerodrome", "Flugplatz"],
-                        ] as const
-                      ).map(([key, label]) => (
-                        <th
-                          aria-sort={
-                            eventSort.key === key && eventSort.direction
-                              ? eventSort.direction === "asc"
-                                ? "ascending"
-                                : "descending"
-                              : "none"
-                          }
-                          key={key}
-                        >
-                          <button
-                            className="admin-sort-button"
-                            onClick={() => toggleEventSort(key)}
-                            type="button"
-                          >
-                            {label}
-                            <span aria-hidden="true">
-                              {eventSort.key === key && eventSort.direction
-                                ? eventSort.direction === "asc"
-                                  ? "↑"
-                                  : "↓"
-                                : "↕"}
-                            </span>
-                          </button>
-                        </th>
-                      ))}
-                      <th>Zeitzone</th>
-                      <th>
-                        <span className="visually-hidden">Aktionen</span>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {visibleEvents.map((entry) => (
-                      <tr
-                        aria-selected={entry.eventId === EVENT_ID}
-                        className={entry.eventId === EVENT_ID ? "is-current" : ""}
-                        key={entry.eventId}
+            <ModalDialog
+              bodyClassName="event-catalog-dialog-body"
+              className="event-catalog-dialog"
+              description="Veranstaltung auswählen, neu anlegen oder Stammdaten übertragen."
+              onClose={() => setEventCatalogOpen(false)}
+              open={eventCatalogOpen}
+              size="wide"
+              title="Veranstaltungen verwalten"
+            >
+              <Panel className="event-catalog-v15 event-catalog-primary" padding="none">
+                <PageHeader
+                  actions={
+                    <div className="event-catalog-actions">
+                      <SearchField
+                        label="Veranstaltungen durchsuchen"
+                        onChange={(event) => setEventSearch(event.target.value)}
+                        placeholder="Veranstaltungen suchen …"
+                        value={eventSearch}
+                      />
+                      <Button
+                        busy={busyActionKey === "export-master-data-template"}
+                        disabled={!board || busyActionKey !== null}
+                        onClick={() =>
+                          void runBusyAction(
+                            "export-master-data-template",
+                            exportMasterDataTemplate,
+                          )
+                        }
+                        size="compact"
                       >
-                        <td>
-                          <a
-                            href={`/admin?event=${encodeURIComponent(entry.eventId)}&area=events&step=${eventStep}`}
-                          >
-                            {entry.name}
-                          </a>
-                        </td>
-                        <td>{formatGermanDate(entry.eventDate)}</td>
-                        <td>
-                          {entry.status === "PREPARATION"
-                            ? "Vorbereitung"
-                            : entry.status === "ACTIVE"
-                              ? "Aktiv"
-                              : entry.status === "CLOSED"
-                                ? "Geschlossen"
-                                : "Archiviert"}
-                        </td>
-                        <td>{entry.aerodrome || "–"}</td>
-                        <td>{entry.timeZone}</td>
-                        <td>
-                          <Button
-                            aria-label={`${entry.name} löschen`}
-                            busy={busyActionKey === `delete-event-${entry.eventId}`}
-                            onClick={() =>
-                              void runBusyAction(`delete-event-${entry.eventId}`, () =>
-                                removeEvent(entry.eventId, entry.name),
-                              )
+                        Stammdaten exportieren
+                      </Button>
+                      <Button
+                        disabled={!board || !isAdministrator}
+                        onClick={() => {
+                          setTemplateDraft(null);
+                          setTemplateValidation(null);
+                          setTemplateError(null);
+                          setTemplateFileName("");
+                          setTemplateDialogOpen(true);
+                        }}
+                        size="compact"
+                      >
+                        Stammdaten importieren
+                      </Button>
+                      <Button
+                        disabled={!isAdministrator}
+                        onClick={() => {
+                          setRestartMode("EMPTY");
+                          setRestartConfirmation("");
+                          setRestartEditorOpen(true);
+                        }}
+                        size="compact"
+                        variant="primary"
+                      >
+                        <Plus aria-hidden="true" /> Neue Veranstaltung
+                      </Button>
+                    </div>
+                  }
+                  level={2}
+                  title="Veranstaltungen"
+                />
+                <div className="event-catalog-table-wrap">
+                  <table className="event-catalog-table">
+                    <thead>
+                      <tr>
+                        {(
+                          [
+                            ["name", "Veranstaltungsname"],
+                            ["eventDate", "Datum"],
+                            ["status", "Phase"],
+                            ["aerodrome", "Flugplatz"],
+                          ] as const
+                        ).map(([key, label]) => (
+                          <th
+                            aria-sort={
+                              eventSort.key === key && eventSort.direction
+                                ? eventSort.direction === "asc"
+                                  ? "ascending"
+                                  : "descending"
+                                : "none"
                             }
-                            size="compact"
-                            variant="danger"
+                            key={key}
                           >
-                            <Trash2 aria-hidden="true" /> Löschen
-                          </Button>
-                        </td>
+                            <button
+                              className="admin-sort-button"
+                              onClick={() => toggleEventSort(key)}
+                              type="button"
+                            >
+                              {label}
+                              <span aria-hidden="true">
+                                {eventSort.key === key && eventSort.direction
+                                  ? eventSort.direction === "asc"
+                                    ? "↑"
+                                    : "↓"
+                                  : "↕"}
+                              </span>
+                            </button>
+                          </th>
+                        ))}
+                        <th>Zeitzone</th>
+                        <th>
+                          <span className="visually-hidden">Aktionen</span>
+                        </th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {visibleEvents.length === 0 ? (
-                  <p className="event-catalog-empty">Keine passende Veranstaltung gefunden.</p>
-                ) : null}
-              </div>
-            </Panel>
+                    </thead>
+                    <tbody>
+                      {visibleEvents.map((entry) => (
+                        <tr
+                          aria-selected={entry.eventId === EVENT_ID}
+                          className={entry.eventId === EVENT_ID ? "is-current" : ""}
+                          key={entry.eventId}
+                        >
+                          <td>
+                            <a
+                              href={`/admin?event=${encodeURIComponent(entry.eventId)}&area=events&step=${eventStep}`}
+                            >
+                              {entry.name}
+                            </a>
+                          </td>
+                          <td>{formatGermanDate(entry.eventDate)}</td>
+                          <td>
+                            {entry.status === "PREPARATION"
+                              ? "Vorbereitung"
+                              : entry.status === "ACTIVE"
+                                ? "Aktiv"
+                                : entry.status === "CLOSED"
+                                  ? "Geschlossen"
+                                  : "Archiviert"}
+                          </td>
+                          <td>{entry.aerodrome || "–"}</td>
+                          <td>{entry.timeZone}</td>
+                          <td>
+                            <Button
+                              aria-label={`${entry.name} löschen`}
+                              busy={busyActionKey === `delete-event-${entry.eventId}`}
+                              onClick={() =>
+                                void runBusyAction(`delete-event-${entry.eventId}`, () =>
+                                  removeEvent(entry.eventId, entry.name),
+                                )
+                              }
+                              size="compact"
+                              variant="danger"
+                            >
+                              <Trash2 aria-hidden="true" /> Löschen
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {visibleEvents.length === 0 ? (
+                    <p className="event-catalog-empty">Keine passende Veranstaltung gefunden.</p>
+                  ) : null}
+                </div>
+              </Panel>
+            </ModalDialog>
           ) : null}
           {adminArea === "events" ? (
             <SetupProgress currentStepId={eventStep} onSelect={openSetupStep} steps={setupSteps} />
@@ -3462,13 +3619,13 @@ export function AdminView() {
                   value={masterSearch}
                 />
               </label>
-              <button className="primary-action" onClick={startNewMasterDataEntry} type="button">
-                <span aria-hidden="true">+</span> {masterDataSingularLabel[masterDataCategory]}
-              </button>
+              <Button onClick={startNewMasterDataEntry} type="button" variant="primary">
+                <Plus aria-hidden="true" /> {masterDataSingularLabel[masterDataCategory]}
+              </Button>
             </div>
             <div className="master-data-table-scroll">
               {masterDataCategory === "gates" ? (
-                <table className="master-data-table">
+                <table className="master-data-table" data-master-table="gates">
                   <thead>
                     <tr>
                       <SortableTableHeading
@@ -3497,6 +3654,7 @@ export function AdminView() {
                       />
                       <th>Ressourcengruppen</th>
                       <th>Displayfilter</th>
+                      <th className="master-actions-heading">Aktionen</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -3504,12 +3662,6 @@ export function AdminView() {
                       <tr
                         className={masterEditorOpen && gateEditorId === gate.id ? "selected" : ""}
                         key={gate.id}
-                        onClick={() => selectGateForEditing(gate.id)}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter" || event.key === " ")
-                            selectGateForEditing(gate.id);
-                        }}
-                        tabIndex={0}
                       >
                         <td>{gate.label}</td>
                         <td>{gate.gateType}</td>
@@ -3524,13 +3676,24 @@ export function AdminView() {
                           {gate.displayFilter.productIds.length} Produkte ·{" "}
                           {gate.displayFilter.rotationStatuses.length} Status
                         </td>
+                        <td className="master-actions-cell">
+                          <MasterTableActions
+                            deleteLabel={`${gate.label} löschen`}
+                            editLabel={`${gate.label} bearbeiten`}
+                            onDelete={() => requestMasterDelete("GATE", gate.id, gate.label)}
+                            onEdit={() => selectGateForEditing(gate.id)}
+                          />
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               ) : null}
               {masterDataCategory === "resource-groups" ? (
-                <table className="master-data-table resource-group-list-table">
+                <table
+                  className="master-data-table resource-group-list-table"
+                  data-master-table="resource-groups"
+                >
                   <thead>
                     <tr>
                       <SortableTableHeading
@@ -3575,6 +3738,7 @@ export function AdminView() {
                       />
                       <th>Plan / Voraufruf</th>
                       <th>Produkte</th>
+                      <th className="master-actions-heading">Aktionen</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -3584,12 +3748,6 @@ export function AdminView() {
                           masterEditorOpen && resourceEditorId === group.id ? "selected" : ""
                         }
                         key={group.id}
-                        onClick={() => selectResourceForEditing(group.id)}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter" || event.key === " ")
-                            selectResourceForEditing(group.id);
-                        }}
-                        tabIndex={0}
                       >
                         <td>
                           <strong>{group.name}</strong>
@@ -3618,13 +3776,23 @@ export function AdminView() {
                           {board?.products.filter((product) => product.resourceGroupId === group.id)
                             .length ?? 0}
                         </td>
+                        <td className="master-actions-cell">
+                          <MasterTableActions
+                            deleteLabel={`${group.name} löschen`}
+                            editLabel={`${group.name} bearbeiten`}
+                            onDelete={() =>
+                              requestMasterDelete("RESOURCE_GROUP", group.id, group.name)
+                            }
+                            onEdit={() => selectResourceForEditing(group.id)}
+                          />
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               ) : null}
               {masterDataCategory === "aircraft" ? (
-                <table className="master-data-table">
+                <table className="master-data-table" data-master-table="aircraft">
                   <thead>
                     <tr>
                       <SortableTableHeading
@@ -3666,6 +3834,7 @@ export function AdminView() {
                         label="Status"
                         onClick={() => toggleMasterSort("status")}
                       />
+                      <th className="master-actions-heading">Aktionen</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -3675,12 +3844,6 @@ export function AdminView() {
                           masterEditorOpen && aircraftEditorId === aircraft.id ? "selected" : ""
                         }
                         key={aircraft.id}
-                        onClick={() => selectAircraftForEditing(aircraft.id)}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter" || event.key === " ")
-                            selectAircraftForEditing(aircraft.id);
-                        }}
-                        tabIndex={0}
                       >
                         <td>
                           <strong>{aircraft.registration}</strong>
@@ -3701,18 +3864,33 @@ export function AdminView() {
                             {aircraftStateLabel[aircraft.operationalState]}
                           </span>
                         </td>
+                        <td className="master-actions-cell">
+                          <MasterTableActions
+                            deleteLabel={`${aircraft.registration} löschen`}
+                            editLabel={`${aircraft.registration} bearbeiten`}
+                            onDelete={() =>
+                              requestMasterDelete(
+                                "AIRCRAFT",
+                                aircraft.id,
+                                aircraft.registration,
+                              )
+                            }
+                            onEdit={() => selectAircraftForEditing(aircraft.id)}
+                          />
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               ) : null}
               {masterDataCategory === "assignments" ? (
-                <table className="master-data-table">
+                <table className="master-data-table" data-master-table="assignments">
                   <thead>
                     <tr>
                       <th>Flugzeug</th>
                       <th>Flugzeugtyp</th>
                       <th>Aktuelle Ressourcengruppe</th>
+                      <th className="master-actions-heading">Aktionen</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -3722,28 +3900,30 @@ export function AdminView() {
                           masterEditorOpen && assignmentAircraftId === aircraft.id ? "selected" : ""
                         }
                         key={aircraft.id}
-                        onClick={() =>
-                          selectAssignmentForEditing(aircraft.id, aircraft.resourceGroupId)
-                        }
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter" || event.key === " ") {
-                            selectAssignmentForEditing(aircraft.id, aircraft.resourceGroupId);
-                          }
-                        }}
-                        tabIndex={0}
                       >
                         <td>
                           <strong>{aircraft.registration}</strong>
                         </td>
                         <td>{aircraft.aircraftType}</td>
                         <td>{aircraft.resourceGroupName || "Nicht zugeordnet"}</td>
+                        <td className="master-actions-cell">
+                          <MasterTableActions
+                            editLabel={`Zuordnung für ${aircraft.registration} bearbeiten`}
+                            onEdit={() =>
+                              selectAssignmentForEditing(
+                                aircraft.id,
+                                aircraft.resourceGroupId,
+                              )
+                            }
+                          />
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               ) : null}
               {masterDataCategory === "pilots" ? (
-                <table className="master-data-table">
+                <table className="master-data-table" data-master-table="pilots">
                   <thead>
                     <tr>
                       <SortableTableHeading
@@ -3770,6 +3950,7 @@ export function AdminView() {
                         label="Aktueller Umlauf"
                         onClick={() => toggleMasterSort("rotation")}
                       />
+                      <th className="master-actions-heading">Aktionen</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -3777,12 +3958,6 @@ export function AdminView() {
                       <tr
                         className={masterEditorOpen && pilotEditorId === pilot.id ? "selected" : ""}
                         key={pilot.id}
-                        onClick={() => selectPilotForEditing(pilot.id)}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter" || event.key === " ")
-                            selectPilotForEditing(pilot.id);
-                        }}
-                        tabIndex={0}
                       >
                         <td>
                           <strong>{pilot.operationalCode}</strong>
@@ -3798,13 +3973,23 @@ export function AdminView() {
                             ? `Fluggruppe ${pilot.currentCommunicationNumber}`
                             : "Nicht zugeordnet"}
                         </td>
+                        <td className="master-actions-cell">
+                          <MasterTableActions
+                            deleteLabel={`${pilot.operationalCode} löschen`}
+                            editLabel={`${pilot.operationalCode} bearbeiten`}
+                            onDelete={() =>
+                              requestMasterDelete("PILOT", pilot.id, pilot.operationalCode)
+                            }
+                            onEdit={() => selectPilotForEditing(pilot.id)}
+                          />
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               ) : null}
               {masterDataCategory === "products" ? (
-                <table className="master-data-table">
+                <table className="master-data-table" data-master-table="products">
                   <thead>
                     <tr>
                       <SortableTableHeading
@@ -3849,6 +4034,7 @@ export function AdminView() {
                         label="Status"
                         onClick={() => toggleMasterSort("status")}
                       />
+                      <th className="master-actions-heading">Aktionen</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -3858,12 +4044,6 @@ export function AdminView() {
                           masterEditorOpen && productEditorId === product.id ? "selected" : ""
                         }
                         key={product.id}
-                        onClick={() => selectProductForEditing(product.id)}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter" || event.key === " ")
-                            selectProductForEditing(product.id);
-                        }}
-                        tabIndex={0}
                       >
                         <td>
                           <strong>{product.code}</strong>
@@ -3884,6 +4064,16 @@ export function AdminView() {
                           >
                             {product.saleEnabled ? "Verkauf aktiv" : "Verkauf gesperrt"}
                           </span>
+                        </td>
+                        <td className="master-actions-cell">
+                          <MasterTableActions
+                            deleteLabel={`${product.name} löschen`}
+                            editLabel={`${product.name} bearbeiten`}
+                            onDelete={() =>
+                              requestMasterDelete("PRODUCT", product.id, product.name)
+                            }
+                            onEdit={() => selectProductForEditing(product.id)}
+                          />
                         </td>
                       </tr>
                     ))}
@@ -3929,7 +4119,27 @@ export function AdminView() {
                     >
                       Gate verwalten
                     </button>
+                  ) : masterDataCategory !== "assignments" ? (
+                    <Button onClick={startNewMasterDataEntry} type="button" variant="primary">
+                      <Plus aria-hidden="true" /> Ersten Datensatz hinzufügen
+                    </Button>
                   ) : null}
+                </div>
+              ) : null}
+              {activeMasterDataRows.length === 0 &&
+              normalizedMasterSearch &&
+              ((masterDataCategory === "gates" && (board?.gates.length ?? 0) > 0) ||
+                (masterDataCategory === "resource-groups" && resourceGroups.length > 0) ||
+                (["aircraft", "assignments"].includes(masterDataCategory) &&
+                  (board?.aircraft.length ?? 0) > 0) ||
+                (masterDataCategory === "pilots" && (board?.pilots.length ?? 0) > 0) ||
+                (masterDataCategory === "products" && (board?.products.length ?? 0) > 0)) ? (
+                <div className="master-data-empty master-data-no-results">
+                  <strong>Keine passenden Einträge</strong>
+                  <p>Die Suche „{masterSearch.trim()}“ liefert in diesem Bereich keine Treffer.</p>
+                  <Button onClick={() => setMasterSearch("")} type="button" variant="secondary">
+                    Suche zurücksetzen
+                  </Button>
                 </div>
               ) : null}
             </div>
@@ -4720,6 +4930,33 @@ export function AdminView() {
               Prognose-Simulator öffnen
               <ExternalLink aria-hidden="true" />
             </a>
+          </section>
+          <section
+            className="admin-section admin-operational-plan-section"
+            hidden={adminArea !== "events" || eventStep !== "operations"}
+          >
+            {board ? (
+              <OperationalPlanPanel
+                aircraft={board.aircraft}
+                busy={busyActionKey !== null}
+                eventId={board.event.eventId}
+                eventTimeZone={board.event.timeZone}
+                mode="admin"
+                onCancel={(plan) =>
+                  runBusyAction("admin-plan-cancel", () => cancelAdminPlannedOperation(plan))
+                }
+                onUpsert={(payload) =>
+                  runBusyAction("admin-plan-upsert", () => upsertAdminPlannedOperation(payload))
+                }
+                pilots={board.pilots}
+                plannedOperations={board.plannedOperations}
+                readOnly={!isAdministrator || !adminModeUnlocked}
+                resourceGroups={board.resourceGroups}
+                rotations={board.rotations}
+              />
+            ) : (
+              <ValidationHint>Der bestätigte Betriebsplan wird geladen.</ValidationHint>
+            )}
           </section>
           <section
             className="admin-section admin-emergency-section"
@@ -5995,3 +6232,4 @@ export function AdminView() {
 import "./features/admin/admin-v12.css";
 import "./features/admin/admin-v15.css";
 import "./features/admin/admin-event-workspace.css";
+import "./features/admin/admin-modernization.css";

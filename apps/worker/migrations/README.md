@@ -285,6 +285,15 @@ ihn mit einer tatsächlichen Blockierung. Vor Anwendung wird eine D1-Time-Travel
 beziehungsweise portable Sicherung angelegt. Ein älterer Worker ignoriert die additiven Daten;
 Wiederherstellung erfolgt per Time Travel oder aus der Sicherung.
 
+## 0047 – Konten aus der aktiven Verwaltung entfernen
+
+Ergänzt eine Löschmarkierung für pseudonyme Konten. Gelöschte Konten werden deaktiviert, aus
+Anmeldung und Administration ausgeblendet und ihre Sitzungen durch eine neue Sitzungsrevision
+ungültig. ID und Kontokennung bleiben intern reserviert, damit historische Audit-Zuordnungen
+eindeutig bleiben. Vor Anwendung wird eine D1-Time-Travel-Marke beziehungsweise vollständige
+D1-Sicherung angelegt. Ein älterer Worker ignoriert die nullable Spalte; Wiederherstellung erfolgt
+per Time Travel oder aus der Sicherung.
+
 ## Historische Doppelnummer 0036
 
 `0036_product_promised_flight_time.sql` und `0036_v1_5_stable_operations.sql` wurden bereits unter

@@ -410,14 +410,15 @@
 
 .ds-table-actions {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
   gap: 6px;
   white-space: nowrap;
 }
 
 .ds-table-icon-action {
-  width: 30px;
-  height: 30px;
+  width: 44px;
+  height: 44px;
   display: inline-grid;
   place-items: center;
   padding: 0;
@@ -475,14 +476,51 @@
 }
 
 .ds-pagination-nav button {
-  min-width: 30px;
-  min-height: 30px;
+  min-width: 36px;
+  min-height: 36px;
   padding: 0 6px;
   border: 1px solid var(--ui-border-strong);
   border-radius: var(--radius-sm);
   color: var(--ui-text);
   background: var(--ui-control);
   font-weight: 600;
+}
+
+.ds-pagination-nav svg {
+  width: 16px;
+  height: 16px;
+  display: block;
+  margin: auto;
+}
+
+@media (max-width: 1199px) {
+  .ds-table-column--tertiary {
+    display: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .ds-table-scroll {
+    overflow-x: hidden;
+  }
+
+  .ds-table-column--secondary {
+    display: none;
+  }
+
+  .ds-table thead th,
+  .ds-table tbody td {
+    padding-inline: 10px;
+  }
+
+  .ds-table-actions-heading,
+  .ds-table-actions-cell {
+    width: 56px;
+  }
+
+  .ds-pagination {
+    flex-wrap: wrap;
+  }
 }
 
 .ds-pagination-nav button:hover:not(:disabled) {

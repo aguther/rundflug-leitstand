@@ -1,12 +1,13 @@
 import {
   CalendarDays,
   ChartNoAxesColumn,
+  Check,
   Grid2X2,
   type LucideIcon,
   ShieldCheck,
   UsersRound,
 } from "lucide-react";
-import { type ReactNode, useCallback } from "react";
+import { type KeyboardEvent, type ReactNode, useCallback, useRef } from "react";
 
 export type AdminArea = "overview" | "events" | "users" | "evaluation" | "backup";
 export type AdminEventStep =
@@ -56,6 +57,7 @@ export function AdminNavigation({
           className={activeArea === id ? "active" : ""}
           key={id}
           onClick={() => onChange(id)}
+          title={label}
           type="button"
         >
           <Icon aria-hidden="true" className="admin-nav-icon" />
@@ -75,6 +77,7 @@ export function SetupProgress({
   currentStepId?: AdminEventStep;
   onSelect: (step: SetupStep) => void;
 }) {
+  const buttonRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const currentButtonRef = useCallback((element: HTMLButtonElement | null) => {
     element?.scrollIntoView({
       behavior: "auto",
@@ -91,28 +94,54 @@ export function SetupProgress({
         ? steps.length - 1
         : firstIncomplete;
 
+  function selectFromKeyboard(event: KeyboardEvent<HTMLButtonElement>, index: number) {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+    event.preventDefault();
+    const nextIndex =
+      event.key === "Home"
+        ? 0
+        : event.key === "End"
+          ? steps.length - 1
+          : event.key === "ArrowRight"
+            ? (index + 1) % steps.length
+            : (index - 1 + steps.length) % steps.length;
+    const nextStep = steps[nextIndex];
+    if (!nextStep) return;
+    onSelect(nextStep);
+    buttonRefs.current[nextIndex]?.focus();
+  }
+
   return (
-    <ol aria-label="Einrichtungsfortschritt" className="setup-progress">
+    <div aria-label="Veranstaltung einrichten" className="setup-progress" role="tablist">
       {steps.map((step, index) => {
         const current = index === currentIndex;
         const state = [step.complete ? "complete" : "pending", current ? "current" : ""]
           .filter(Boolean)
           .join(" ");
         return (
-          <li className={state} key={step.id}>
+          <div className={`setup-progress-item ${state}`} key={step.id} role="presentation">
             <button
               aria-current={current ? "step" : undefined}
+              aria-selected={current}
               onClick={() => onSelect(step)}
-              ref={current ? currentButtonRef : undefined}
+              onKeyDown={(event) => selectFromKeyboard(event, index)}
+              ref={(element) => {
+                buttonRefs.current[index] = element;
+                if (current) currentButtonRef(element);
+              }}
+              role="tab"
+              tabIndex={current ? 0 : -1}
               type="button"
             >
-              <span className="setup-step-number">{step.complete ? "✓" : index + 1}</span>
-              <span>{step.label}</span>
+              <span aria-hidden="true" className="setup-step-status">
+                {step.complete ? <Check /> : null}
+              </span>
+              <span className="setup-step-label">{step.label}</span>
             </button>
-          </li>
+          </div>
         );
       })}
-    </ol>
+    </div>
   );
 }
 

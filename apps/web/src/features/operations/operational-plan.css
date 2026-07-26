@@ -1,0 +1,168 @@
+.operational-plan {
+  min-width: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.operational-plan-header {
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.operational-plan-header h3,
+.operational-plan-header p {
+  margin: 0;
+}
+
+.operational-plan-header p {
+  margin-top: 4px;
+  color: var(--ui-muted);
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.operational-plan-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.operational-plan-title h3 {
+  font-size: 1rem;
+}
+
+.operational-plan-title > span {
+  min-width: 24px;
+  height: 24px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0 7px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 999px;
+  color: var(--ui-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.operational-plan-table {
+  max-width: 100%;
+}
+
+.operational-plan-table .ds-table {
+  min-width: 760px;
+}
+
+.operational-plan-table .ds-table tbody td {
+  height: 58px;
+}
+
+.operational-plan-primary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.operational-plan-primary svg {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 auto;
+  color: var(--ui-muted);
+}
+
+.operational-plan-status {
+  display: grid;
+  justify-items: start;
+  gap: 3px;
+}
+
+.operational-plan-status small {
+  color: var(--ui-muted);
+  font-size: 0.7rem;
+  white-space: nowrap;
+}
+
+.operational-plan-empty {
+  max-width: 520px;
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  margin: auto;
+}
+
+.operational-plan-empty > svg {
+  width: 28px;
+  height: 28px;
+  color: var(--ui-muted);
+}
+
+.operational-plan-empty strong,
+.operational-plan-empty p {
+  margin: 0;
+}
+
+.operational-plan-empty p {
+  color: var(--ui-muted);
+}
+
+.operational-plan-form-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.operational-plan-dialog .ds-modal-body {
+  display: grid;
+  gap: 12px;
+}
+
+.operational-plan--flight-director .operational-plan-table .ds-table-actions {
+  min-width: 260px;
+}
+
+@media (max-width: 1199px) {
+  .operational-plan-table .ds-table {
+    min-width: 0;
+  }
+
+  .operational-plan--flight-director .operational-plan-table .ds-table {
+    min-width: 700px;
+  }
+
+  .operational-plan-form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .operational-plan-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .operational-plan-header > .ds-button {
+    width: 100%;
+  }
+
+  .operational-plan-table .ds-table,
+  .operational-plan--flight-director .operational-plan-table .ds-table {
+    min-width: 0;
+  }
+
+  .operational-plan-primary {
+    white-space: normal;
+  }
+
+  .operational-plan-status small {
+    display: none;
+  }
+}
+
+@media (max-width: 620px) {
+  .operational-plan-form-grid {
+    grid-template-columns: 1fr;
+  }
+}

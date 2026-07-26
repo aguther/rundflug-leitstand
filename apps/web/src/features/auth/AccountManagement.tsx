@@ -1,8 +1,25 @@
 import type { OperatorAccountSummary, OperatorRole } from "@rundflug/contracts";
-import { useCallback, useEffect, useState } from "react";
+import { KeyRound, Pencil, Plus, RotateCcw, Search, Trash2, UserRoundCog } from "lucide-react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useActionMessageBridge } from "../../app/PageNotifications";
-import { Button } from "../../design-system/components";
-import { createManagedAccount, loadManagedAccounts, roleLabels, updateManagedAccount } from "./api";
+import {
+  Button,
+  ConfirmationDialog,
+  DataTable,
+  IconButton,
+  ModalDialog,
+  SelectField,
+  StatusPill,
+  TextField,
+} from "../../design-system/components";
+import { useAuth } from "./AuthContext";
+import {
+  createManagedAccount,
+  deleteManagedAccount,
+  loadManagedAccounts,
+  roleLabels,
+  updateManagedAccount,
+} from "./api";
 import "./accounts.css";
 
 const assignableRoles: OperatorRole[] = [
@@ -14,11 +31,18 @@ const assignableRoles: OperatorRole[] = [
 ];
 
 export function AccountManagement() {
+  const { session } = useAuth();
   const [accounts, setAccounts] = useState<OperatorAccountSummary[]>([]);
   const [role, setRole] = useState<OperatorRole>("FLIGHT_LINE");
   const [pin, setPin] = useState("");
+  const [createOpen, setCreateOpen] = useState(false);
   const [selected, setSelected] = useState<OperatorAccountSummary | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<OperatorAccountSummary | null>(null);
+  const [selectedActive, setSelectedActive] = useState(true);
   const [resetPin, setResetPin] = useState("");
+  const [search, setSearch] = useState("");
+  const deferredSearch = useDeferredValue(search);
+  const [roleFilter, setRoleFilter] = useState<OperatorRole | "ALL">("ALL");
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   useActionMessageBridge(message, setMessage);
@@ -32,90 +56,178 @@ export function AccountManagement() {
   }, []);
   useEffect(() => void refresh(), [refresh]);
 
-  async function createAccount(event: React.FormEvent) {
-    event.preventDefault();
+  const visibleAccounts = useMemo(() => {
+    const query = deferredSearch.trim().toLocaleLowerCase("de-DE");
+    return accounts.filter(
+      (account) =>
+        (roleFilter === "ALL" || account.role === roleFilter) &&
+        (!query ||
+          `${account.loginCode} ${roleLabels[account.role]}`
+            .toLocaleLowerCase("de-DE")
+            .includes(query)),
+    );
+  }, [accounts, deferredSearch, roleFilter]);
+
+  async function createAccount() {
     if (!/^\d{6,12}$/.test(pin) || busyAction) return;
     setBusyAction("create");
     setMessage(null);
     try {
       await createManagedAccount({ role, pin });
       setPin("");
+      setCreateOpen(false);
       setMessage("Konto wurde angelegt.");
       await refresh();
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : "Konto konnte nicht angelegt werden.");
+      throw cause;
     } finally {
       setBusyAction(null);
     }
   }
 
+  function openAccount(account: OperatorAccountSummary) {
+    setSelected(account);
+    setSelectedActive(account.active);
+    setResetPin("");
+  }
+
   async function changeAccount(
     account: OperatorAccountSummary,
     input: { active?: boolean; pin?: string; revokeSessions?: true },
-    action: "revoke" | "toggle" | "pin",
+    action: "revoke" | "save",
   ) {
     if (busyAction) return;
     setBusyAction(action);
     setMessage(null);
     try {
       await updateManagedAccount(account.id, input);
-      setSelected(null);
-      setResetPin("");
-      setMessage("Konto wurde aktualisiert; bestehende Sitzungen wurden widerrufen.");
+      setMessage(
+        action === "revoke"
+          ? "Aktive Sitzungen wurden widerrufen."
+          : "Konto wurde aktualisiert; bestehende Sitzungen wurden widerrufen.",
+      );
+      if (action === "save") {
+        setSelected(null);
+        setResetPin("");
+      }
       await refresh();
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : "Konto konnte nicht geändert werden.");
+      throw cause;
     } finally {
       setBusyAction(null);
     }
   }
 
+  async function saveSelectedAccount() {
+    if (!selected) return;
+    const input: { active?: boolean; pin?: string } = {};
+    if (selected.active !== selectedActive) input.active = selectedActive;
+    if (resetPin) input.pin = resetPin;
+    if (Object.keys(input).length === 0) {
+      setSelected(null);
+      return;
+    }
+    await changeAccount(selected, input, "save");
+  }
+
+  async function deleteAccount() {
+    if (!deleteTarget || busyAction) return;
+    setBusyAction("delete");
+    setMessage(null);
+    try {
+      await deleteManagedAccount(deleteTarget.id);
+      setDeleteTarget(null);
+      setMessage(`Konto ${deleteTarget.loginCode} wurde gelöscht.`);
+      await refresh();
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : "Konto konnte nicht gelöscht werden.");
+      throw cause;
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  const activeAdminCount = accounts.filter(
+    (account) => account.role === "ADMIN" && account.active,
+  ).length;
+
+  function deletionBlock(account: OperatorAccountSummary): string | null {
+    if (account.id === session?.account.id) return "Das aktuell verwendete eigene Konto";
+    if (account.role === "ADMIN" && account.active && activeAdminCount <= 1) {
+      return "Das letzte aktive Administrationskonto";
+    }
+    return null;
+  }
+
+  const accountColumns = [
+    {
+      key: "account",
+      header: "Konto",
+      priority: "primary" as const,
+      render: (account: OperatorAccountSummary) => (
+        <div className="account-primary-cell">
+          <UserRoundCog aria-hidden="true" />
+          <div>
+            <strong>{account.loginCode}</strong>
+            <small className="account-role-inline">{roleLabels[account.role]}</small>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: "role",
+      header: "Rolle",
+      priority: "secondary" as const,
+      render: (account: OperatorAccountSummary) => roleLabels[account.role],
+    },
+    {
+      key: "status",
+      header: "Status",
+      priority: "primary" as const,
+      render: (account: OperatorAccountSummary) => (
+        <StatusPill tone={account.active ? "success" : "neutral"}>
+          {account.active ? "Aktiv" : "Deaktiviert"}
+        </StatusPill>
+      ),
+    },
+  ];
+
   return (
     <section className="account-management" aria-labelledby="account-management-title">
-      <header>
+      <header className="account-management-header">
         <div>
-          <h1 id="account-management-title">Konten</h1>
-          <p>Pseudonyme Arbeitskonten mit Rolle und sechsstelliger PIN.</p>
+          <div className="account-title-row">
+            <h2 id="account-management-title">Konten</h2>
+            <span>{accounts.length}</span>
+          </div>
+          <p>Pseudonyme Zugänge, Rollen und aktive Sitzungen verwalten.</p>
         </div>
+        <Button onClick={() => setCreateOpen(true)} type="button" variant="primary">
+          <Plus aria-hidden="true" /> Konto hinzufügen
+        </Button>
       </header>
-      <div className="account-layout">
-        <div className="account-table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Konto</th>
-                <th>Rolle</th>
-                <th>Status</th>
-                <th>Aktionen</th>
-              </tr>
-            </thead>
-            <tbody>
-              {accounts.map((account) => (
-                <tr key={account.id}>
-                  <td>
-                    <strong>{account.loginCode}</strong>
-                  </td>
-                  <td>{roleLabels[account.role]}</td>
-                  <td>
-                    <span className={`account-status ${account.active ? "active" : "inactive"}`}>
-                      {account.active ? "Aktiv" : "Inaktiv"}
-                    </span>
-                  </td>
-                  <td>
-                    <button type="button" onClick={() => setSelected(account)}>
-                      Bearbeiten
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <form className="account-editor" onSubmit={(event) => void createAccount(event)}>
-          <h2>Neues Konto</h2>
-          <label>
-            Rolle
-            <select value={role} onChange={(event) => setRole(event.target.value as OperatorRole)}>
+
+      <div className="account-table-card">
+        <div className="account-table-toolbar">
+          <label className="account-search">
+            <Search aria-hidden="true" />
+            <span className="visually-hidden">Konten durchsuchen</span>
+            <input
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Konten durchsuchen"
+              type="search"
+              value={search}
+            />
+          </label>
+          <label className="account-role-filter">
+            <span className="visually-hidden">Nach Rolle filtern</span>
+            <select
+              onChange={(event) => setRoleFilter(event.target.value as OperatorRole | "ALL")}
+              value={roleFilter}
+            >
+              <option value="ALL">Alle Rollen</option>
               {assignableRoles.map((entry) => (
                 <option key={entry} value={entry}>
                   {roleLabels[entry]}
@@ -123,92 +235,233 @@ export function AccountManagement() {
               ))}
             </select>
           </label>
-          <label>
-            Erste PIN
-            <input
-              inputMode="numeric"
-              maxLength={12}
-              minLength={6}
-              pattern="[0-9]{6,12}"
-              type="password"
-              value={pin}
-              onChange={(event) => setPin(event.target.value.replace(/\D/g, ""))}
-              placeholder="6–12 Ziffern"
-            />
-          </label>
-          <Button
-            busy={busyAction === "create"}
-            className="primary-action"
-            disabled={pin.length < 6 || busyAction !== null}
-            type="submit"
-            variant="primary"
-          >
-            Konto anlegen
-          </Button>
-        </form>
-      </div>
-      {selected ? (
-        <div className="modal-backdrop">
-          <form
-            className="confirmation-dialog account-dialog"
-            onSubmit={(event) => {
-              event.preventDefault();
-              if (resetPin.length >= 6) void changeAccount(selected, { pin: resetPin }, "pin");
-            }}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="account-dialog-title"
-          >
-            <header>
-              <div>
-                <h2 id="account-dialog-title">{selected.loginCode}</h2>
-                <p>{roleLabels[selected.role]}</p>
+        </div>
+        <DataTable
+          className="account-table"
+          columns={accountColumns}
+          emptyLabel={
+            <div className="account-empty">
+              <UserRoundCog aria-hidden="true" />
+              <strong>
+                {accounts.length === 0 ? "Noch keine Konten" : "Keine Konten gefunden"}
+              </strong>
+              <p>
+                {accounts.length === 0
+                  ? "Legen Sie den ersten pseudonymen Zugang an."
+                  : "Passen Sie Suche oder Rollenfilter an."}
+              </p>
+              {accounts.length === 0 ? (
+                <Button onClick={() => setCreateOpen(true)} type="button" variant="secondary">
+                  <Plus aria-hidden="true" /> Erstes Konto hinzufügen
+                </Button>
+              ) : (
+                <Button
+                  onClick={() => {
+                    setSearch("");
+                    setRoleFilter("ALL");
+                  }}
+                  type="button"
+                  variant="secondary"
+                >
+                  Filter zurücksetzen
+                </Button>
+              )}
+            </div>
+          }
+          pageSize={10}
+          renderRowActions={(account) => {
+            const deleteBlockedBy = deletionBlock(account);
+            return (
+              <div className="account-row-actions">
+                <IconButton
+                  label={`${account.loginCode} bearbeiten`}
+                  onClick={() => openAccount(account)}
+                  size="touch"
+                  type="button"
+                >
+                  <Pencil aria-hidden="true" />
+                </IconButton>
+                <IconButton
+                  className="account-row-delete"
+                  disabled={deleteBlockedBy !== null}
+                  label={
+                    deleteBlockedBy
+                      ? `${deleteBlockedBy} kann nicht gelöscht werden`
+                      : `${account.loginCode} löschen`
+                  }
+                  onClick={() => setDeleteTarget(account)}
+                  size="touch"
+                  type="button"
+                >
+                  <Trash2 aria-hidden="true" />
+                </IconButton>
               </div>
-              <button aria-label="Schließen" onClick={() => setSelected(null)} type="button">
-                ×
-              </button>
-            </header>
-            <label>
-              Neue PIN
-              <input
+            );
+          }}
+          rowKey={(account) => account.id}
+          rows={visibleAccounts}
+        />
+      </div>
+
+      <ModalDialog
+        className="account-dialog"
+        description="Rolle und PIN bilden den pseudonymen Zugang zum Leitstand."
+        footer={
+          <>
+            <Button
+              disabled={busyAction !== null}
+              onClick={() => setCreateOpen(false)}
+              type="button"
+              variant="secondary"
+            >
+              Abbrechen
+            </Button>
+            <Button
+              busy={busyAction === "create"}
+              disabled={pin.length < 6 || busyAction !== null}
+              onClick={createAccount}
+              type="button"
+              variant="primary"
+            >
+              Konto anlegen
+            </Button>
+          </>
+        }
+        initialFocusSelector="#new-account-role"
+        onClose={() => setCreateOpen(false)}
+        open={createOpen}
+        size="default"
+        title="Konto hinzufügen"
+      >
+        <div className="account-form-grid">
+          <SelectField
+            id="new-account-role"
+            label="Rolle"
+            onChange={(event) => setRole(event.target.value as OperatorRole)}
+            value={role}
+          >
+            {assignableRoles.map((entry) => (
+              <option key={entry} value={entry}>
+                {roleLabels[entry]}
+              </option>
+            ))}
+          </SelectField>
+          <TextField
+            help="6–12 Ziffern; wird nicht angezeigt oder protokolliert."
+            inputMode="numeric"
+            label="Erste PIN"
+            maxLength={12}
+            minLength={6}
+            onChange={(event) => setPin(event.target.value.replace(/\D/g, ""))}
+            pattern="[0-9]{6,12}"
+            placeholder="6–12 Ziffern"
+            type="password"
+            value={pin}
+          />
+        </div>
+      </ModalDialog>
+
+      <ModalDialog
+        className="account-dialog"
+        description="Änderungen widerrufen bestehende Sitzungen entsprechend der Kontenrichtlinie."
+        footer={
+          <>
+            <Button
+              disabled={busyAction !== null}
+              onClick={() => setSelected(null)}
+              type="button"
+              variant="secondary"
+            >
+              Abbrechen
+            </Button>
+            <Button
+              busy={busyAction === "save"}
+              disabled={busyAction !== null || (resetPin.length > 0 && resetPin.length < 6)}
+              onClick={saveSelectedAccount}
+              type="button"
+              variant="primary"
+            >
+              Änderungen speichern
+            </Button>
+          </>
+        }
+        onClose={() => setSelected(null)}
+        open={selected !== null}
+        size="default"
+        title="Konto bearbeiten"
+      >
+        {selected ? (
+          <div className="account-edit-content">
+            <div className="account-form-grid">
+              <TextField disabled label="Kontokennung" value={selected.loginCode} />
+              <TextField disabled label="Rolle" value={roleLabels[selected.role]} />
+              <SelectField
+                label="Status"
+                onChange={(event) => setSelectedActive(event.target.value === "ACTIVE")}
+                value={selectedActive ? "ACTIVE" : "INACTIVE"}
+              >
+                <option value="ACTIVE">Aktiv</option>
+                <option value="INACTIVE">Deaktiviert</option>
+              </SelectField>
+              <TextField
+                help="Leer lassen, um die PIN nicht zu verändern."
                 inputMode="numeric"
+                label="Neue PIN"
+                maxLength={12}
+                minLength={6}
+                onChange={(event) => setResetPin(event.target.value.replace(/\D/g, ""))}
                 pattern="[0-9]{6,12}"
+                placeholder="6–12 Ziffern"
                 type="password"
                 value={resetPin}
-                onChange={(event) => setResetPin(event.target.value.replace(/\D/g, ""))}
-                placeholder="6–12 Ziffern"
               />
-            </label>
-            <div className="dialog-actions">
+            </div>
+            <section className="account-security-actions">
+              <div>
+                <KeyRound aria-hidden="true" />
+                <div>
+                  <strong>PIN &amp; Sitzungen</strong>
+                  <p>Aktive Sitzungen können unabhängig von anderen Änderungen beendet werden.</p>
+                </div>
+              </div>
               <Button
                 busy={busyAction === "revoke"}
                 disabled={busyAction !== null}
-                type="button"
                 onClick={() => void changeAccount(selected, { revokeSessions: true }, "revoke")}
-              >
-                Sitzungen widerrufen
-              </Button>
-              <Button
-                busy={busyAction === "toggle"}
-                disabled={busyAction !== null}
                 type="button"
-                onClick={() => void changeAccount(selected, { active: !selected.active }, "toggle")}
+                variant="secondary"
               >
-                {selected.active ? "Deaktivieren" : "Aktivieren"}
+                <RotateCcw aria-hidden="true" /> Sitzungen widerrufen
               </Button>
-              <Button
-                busy={busyAction === "pin"}
-                className="primary-action"
-                disabled={resetPin.length < 6 || busyAction !== null}
-                type="submit"
-                variant="primary"
-              >
-                PIN ändern
-              </Button>
-            </div>
-          </form>
-        </div>
-      ) : null}
+            </section>
+          </div>
+        ) : null}
+      </ModalDialog>
+
+      <ConfirmationDialog
+        body={
+          <div className="account-delete-copy">
+            <p>
+              Das Konto <strong>{deleteTarget?.loginCode}</strong> wird aus Anmeldung und Verwaltung
+              entfernt.
+            </p>
+            <p>
+              Aktive Sitzungen werden beendet. Die Kontokennung bleibt intern reserviert und wird
+              nicht erneut vergeben.
+            </p>
+          </div>
+        }
+        confirmBusy={busyAction === "delete"}
+        confirmDisabled={busyAction !== null && busyAction !== "delete"}
+        confirmLabel="Konto endgültig löschen"
+        danger
+        onCancel={() => {
+          if (!busyAction) setDeleteTarget(null);
+        }}
+        onConfirm={deleteAccount}
+        open={deleteTarget !== null}
+        title="Konto löschen"
+      />
     </section>
   );
 }

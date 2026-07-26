@@ -61,7 +61,8 @@ export async function authorizeSession(env: Env, request: Request): Promise<Sess
             a.login_code, a.role, a.session_version AS account_session_version
        FROM operator_sessions s
        JOIN operator_accounts a ON a.id = s.account_id
-      WHERE s.token_hash = ?1 AND s.revoked_at IS NULL AND a.active = 1`,
+      WHERE s.token_hash = ?1 AND s.revoked_at IS NULL
+        AND a.active = 1 AND a.deleted_at IS NULL`,
   )
     .bind(tokenHash)
     .first<{

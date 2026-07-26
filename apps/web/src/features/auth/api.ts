@@ -68,6 +68,17 @@ export async function updateManagedAccount(
   if (!response.ok) throw new Error("Konto konnte nicht geändert werden.");
 }
 
+export async function deleteManagedAccount(accountId: string): Promise<void> {
+  const response = await fetch(`/api/admin/operator-accounts/${encodeURIComponent(accountId)}`, {
+    method: "DELETE",
+  });
+  if (response.ok) return;
+  const body = (await response.json().catch(() => null)) as {
+    error?: { message?: string };
+  } | null;
+  throw new Error(body?.error?.message ?? "Konto konnte nicht gelöscht werden.");
+}
+
 export type LoginAccount = Pick<OperatorAccountSummary, "id" | "loginCode" | "role">;
 
 export const roleLabels: Record<OperatorRole, string> = {
