@@ -42,7 +42,7 @@ bestätigte Rückkehrereignisse.
 Das simulierte FIDS wird über `FIDS öffnen` im Kopf der Hauptansicht als separates, skalierbares
 Browserfenster geöffnet. Es kann neben dem Simulator oder auf einem zweiten Bildschirm stehen und
 verwendet den bestehenden FIDS-Aufbau mit synthetischen `G-SIM-####`-Kennungen, dem aktuellen
-Szenarionamen, acht Zeilen und einspaltigem Layout. Der kompakte Hinweis
+Szenarionamen, 20 Zeilen und einspaltigem Layout. Der kompakte Hinweis
 `Nur Simulation – keine Betriebsdaten`, `LIVE-SIMULATION` und `Virtuelle Zeit` grenzen die Anzeige
 dauerhaft vom operativen FIDS ab. Ein Einstellungszugang ist in dieser Variante nicht vorhanden.
 

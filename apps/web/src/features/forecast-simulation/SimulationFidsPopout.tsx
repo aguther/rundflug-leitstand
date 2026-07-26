@@ -179,7 +179,7 @@ export const SimulationFidsPopout = forwardRef<
   );
   const preferences = useMemo<FidsPreferences>(
     () => ({
-      visibleRows: 8,
+      visibleRows: 20,
       layout: "SINGLE",
       theme: resolved === "dark" ? "DARK" : "LIGHT",
       version: 0,
