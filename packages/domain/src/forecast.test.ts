@@ -255,21 +255,20 @@ describe("event-driven forecast", () => {
         predictedCompletionAt: "2026-07-11T12:40:00.000Z",
       },
     },
-  ])("moves an overdue $status milestone and every following milestone", ({
-    status,
-    now,
-    expected,
-  }) => {
-    expect(
-      advanceOverduePrediction({
-        status,
-        now,
-        predictedDepartureAt: "2026-07-11T12:00:00.000Z",
-        predictedLandingAt: "2026-07-11T12:20:00.000Z",
-        predictedCompletionAt: "2026-07-11T12:30:00.000Z",
-      }),
-    ).toEqual({ ...expected, delayedByMissingEvent: true });
-  });
+  ])(
+    "moves an overdue $status milestone and every following milestone",
+    ({ status, now, expected }) => {
+      expect(
+        advanceOverduePrediction({
+          status,
+          now,
+          predictedDepartureAt: "2026-07-11T12:00:00.000Z",
+          predictedLandingAt: "2026-07-11T12:20:00.000Z",
+          predictedCompletionAt: "2026-07-11T12:30:00.000Z",
+        }),
+      ).toEqual({ ...expected, delayedByMissingEvent: true });
+    },
+  );
 
   it("does not move a future milestone without a missing event", () => {
     expect(

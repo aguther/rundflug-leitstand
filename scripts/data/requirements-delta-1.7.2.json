@@ -1,0 +1,114 @@
+{
+  "version": "1.10.0",
+  "sourceRelease": "1.7.2",
+  "requirements": [
+    {
+      "source": "1.7.2",
+      "id": "V172-FOC-010",
+      "section": "Fortgeltendes Delta 1.7.2",
+      "requirement": "Suchfelder verwenden genau einen zugänglichen Fokusrahmen am äußeren Container.",
+      "priority": "MUSS",
+      "stage": "V1",
+      "status": "implemented",
+      "module": "apps/web/src/design-system/components.css",
+      "tests": "design-system/components.test.ts und Browserabnahme mit Tastaturfokus",
+      "traceStatus": "umgesetzt"
+    },
+    {
+      "source": "1.7.2",
+      "id": "V172-CAS-010",
+      "section": "Fortgeltendes Delta 1.7.2",
+      "requirement": "Kassenprodukte ohne Flugzeugsymbol und ohne horizontalen Überlauf; das vergrößerte, optisch nach links versetzte Ticketsymbol bleibt auch auf schmalen Ansichten layoutstabil.",
+      "priority": "MUSS",
+      "stage": "V1",
+      "status": "implemented",
+      "module": "apps/web/src/cashier-view.tsx und features/cashier/cashier-v12.css",
+      "tests": "cashier-v12.test.ts und responsive Browserabnahme",
+      "traceStatus": "umgesetzt"
+    },
+    {
+      "source": "1.7.2",
+      "id": "V172-SUP-010",
+      "section": "Fortgeltendes Delta 1.7.2",
+      "requirement": "Responsive Flight-Director-Flugzeugtabelle mit kompakter Detailspalte, sechs Aktionen und größenstabil mittig ausgerichteter Zeitlinie.",
+      "priority": "MUSS",
+      "stage": "V1",
+      "status": "implemented",
+      "module": "apps/web/src/flight-line-supervisor.tsx und features/flight-line/flight-line-v12.css",
+      "tests": "flight-line-supervisor-ui.test.ts und Supervisor-Browserabnahme",
+      "traceStatus": "umgesetzt"
+    },
+    {
+      "source": "1.7.2",
+      "id": "V172-TKT-010",
+      "section": "Fortgeltendes Delta 1.7.2",
+      "requirement": "Initial offene Tickets sowie kompakte Ticketmatrix mit stabiler Scrollbar, Symbolköpfen und unveränderter vertikaler Kopfposition beim Filtern.",
+      "priority": "MUSS",
+      "stage": "V1",
+      "status": "implemented",
+      "module": "apps/web/src/flight-line-supervisor.tsx und features/flight-line/flight-line-v12.css",
+      "tests": "flight-line-supervisor-ui.test.ts und Ticketlisten-Browserabnahme",
+      "traceStatus": "umgesetzt"
+    },
+    {
+      "source": "1.7.2",
+      "id": "V172-TIM-010",
+      "section": "Fortgeltendes Delta 1.7.2",
+      "requirement": "Gemeinsame symbolische Zeitlinie mit Verbindungen nur zwischen Symbolkanten, gut lesbaren stabilen Zeitplätzen und einem nach Umlaufabschluss allein sichtbaren aktuellen Folgezustand.",
+      "priority": "MUSS",
+      "stage": "V1",
+      "status": "implemented",
+      "module": "apps/web/src/flight-line-shared.tsx und Flight-Line-CSS",
+      "tests": "flight-line-shared.test.ts und Browserabnahme aller Endzustände",
+      "traceStatus": "umgesetzt"
+    },
+    {
+      "source": "1.7.2",
+      "id": "V172-ACT-010",
+      "section": "Fortgeltendes Delta 1.7.2",
+      "requirement": "Vier direkte Abschlussaktionen mit serverseitig gesperrter Aktionsgruppe.",
+      "priority": "MUSS",
+      "stage": "V1",
+      "status": "implemented",
+      "module": "apps/web/src/flight-line-view.tsx flight-line-assist.tsx und flight-line-supervisor.tsx",
+      "tests": "Assist- und Supervisor-UI-Tests sowie Browserabnahme der vier Abschlusswege",
+      "traceStatus": "umgesetzt"
+    },
+    {
+      "source": "1.7.2",
+      "id": "V172-AST-010",
+      "section": "Fortgeltendes Delta 1.7.2",
+      "requirement": "Kompakte Flight-Line-Arbeitsansicht mit aktuellem operativem Umlauf, Symbol-Zeit-Markern in Auswahl und Historie, 56-Pixel-Aktionen, getrennter Pilotverwaltung und stabiler Buchungsgruppenübersicht; redundante Status- und Zustandszeitangaben entfallen.",
+      "priority": "MUSS",
+      "stage": "V1",
+      "status": "implemented",
+      "module": "apps/web/src/flight-line-assist.tsx und features/flight-line/flight-line-assist-v15.css",
+      "tests": "flight-line-assist-ui.test.ts und Browserabnahme ab 320×568",
+      "traceStatus": "umgesetzt"
+    },
+    {
+      "source": "1.7.2",
+      "id": "V172-CLM-010",
+      "section": "Fortgeltendes Delta 1.7.2",
+      "requirement": "Gelbe ungefüllte bewusste Übernahme, blau gefüllter größenstabiler Pendingzustand mit ausschließlich mittigem Spinner und neutraler Touch-Hover beim Aktualisieren.",
+      "priority": "MUSS",
+      "stage": "V1",
+      "status": "implemented",
+      "module": "apps/web/src/flight-line-assist.tsx und Assist-CSS",
+      "tests": "flight-line-assist-ui.test.ts und Browserabnahme für Übernahme sowie Aktualisieren",
+      "traceStatus": "umgesetzt"
+    },
+    {
+      "source": "1.7.2",
+      "id": "V172-QA-010",
+      "section": "Fortgeltendes Delta 1.7.2",
+      "requirement": "Automatisierte und visuelle Abnahme der festgelegten Light- und Dark-Viewports.",
+      "priority": "MUSS",
+      "stage": "V1",
+      "status": "implemented",
+      "module": "Workspace-Test- und Buildskripte sowie UI-Konzepte",
+      "tests": "Vollständiger Check und Light-/Dark-Browserabnahme",
+      "traceStatus": "umgesetzt"
+    }
+  ]
+}

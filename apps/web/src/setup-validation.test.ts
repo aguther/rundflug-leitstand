@@ -30,8 +30,14 @@ describe("setupValidationMessages", () => {
       "Die Bezeichnung benötigt 3–120 Zeichen.",
       "Bitte ein Veranstaltungsdatum auswählen.",
       "Der Flugplatz benötigt 2–120 Zeichen.",
-      "Der einmalige Einrichtungscode benötigt 8–256 Zeichen.",
+      "Der Installations-Notfallcode benötigt 8–256 Zeichen.",
       "Die erste Administrator-PIN benötigt 6–12 Ziffern.",
     ]);
+  });
+
+  it("benötigt nach einem autorisierten Werksreset keinen Notfallcode", () => {
+    expect(
+      setupValidationMessages({ ...validSetup, setupCode: "" }, { requireSetupCode: false }),
+    ).toEqual([]);
   });
 });

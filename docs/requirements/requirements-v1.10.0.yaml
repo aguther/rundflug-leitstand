@@ -1,0 +1,2235 @@
+version: 1.10.0
+requirements:
+  - id: F-KAS-010
+    source: "1.4-konsolidiert"
+    section: "8.1 Ticketverkauf (Kasse)"
+    requirement: "Das Kassenpersonal muss einen Standardverkauf für eine Gruppe in maximal sechs Interaktionen und in der Regel in weniger als 15 Sekunden abschließen können. Freiwillige Zusatzangaben und Sonderfälle sind von dieser Zielzeit ausgenommen."
+    priority: MUSS
+    stage: V1
+    status: in Arbeit
+  - id: F-KAS-020
+    source: "1.4-konsolidiert"
+    section: "8.1 Ticketverkauf (Kasse)"
+    requirement: "Zusammen verkaufte Tickets erhalten automatisch eine gemeinsame Gruppen-ID. Gruppenbindungen werden in allen Folgeprozessen berücksichtigt."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-KAS-030
+    source: "1.4-konsolidiert"
+    section: "8.1 Ticketverkauf (Kasse)"
+    requirement: "Gewichtsklassen (Kind, Normal, Schwer, Individuell mit kg-Angabe) müssen je Produkt oder Veranstaltung konfigurierbar aktivierbar sein. Ist die Funktion aktiv, ist je Person eine Klasse zu erfassen; ist sie deaktiviert, darf sie den Verkaufsablauf nicht verlängern."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-KAS-040
+    source: "1.4-konsolidiert"
+    section: "8.1 Ticketverkauf (Kasse)"
+    requirement: "Im Ticketkern werden weder Namen noch Telefonnummern erfasst. Optional sind ausschließlich anonyme ticketbezogene Merkmale wie Standby und erforderliche Produktoptionen; Web-Push wird getrennt und freiwillig je Ticket registriert."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-KAS-050
+    source: "1.4-konsolidiert"
+    section: "8.1 Ticketverkauf (Kasse)"
+    requirement: "Jedes Ticket erhält eine eindeutige, nicht erratbare Ticketnummer mit QR-Code. V1 unterstützt sowohl vorgedruckte Ticketcodes als auch die Ausgabe eines druckbaren oder digitalen Tickets aus dem System."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-KAS-055
+    source: "1.4-konsolidiert"
+    section: "8.1 Ticketverkauf (Kasse)"
+    requirement: "Eine gerätespezifische Bondrucker-Anbindung zur direkten Ticketausgabe ist vorzusehen."
+    priority: SOLL
+    stage: V2
+    status: geplant
+  - id: F-KAS-060
+    source: "1.4-konsolidiert"
+    section: "8.1 Ticketverkauf (Kasse)"
+    requirement: "Bezahlstatus und Zahlart werden nicht erfasst. Der Produktpreis wird ausschließlich als Produkt- und Abstimmungsinformation angezeigt; das System ist keine elektronische Registrierkasse und wickelt keine Zahlung ab."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-KAS-070
+    source: "1.4-konsolidiert"
+    section: "8.1 Ticketverkauf (Kasse)"
+    requirement: "Storno ist nur für Kasse und Administrator zulässig, erfordert einen Grund und erzeugt einen unveränderlichen Protokolleintrag."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-KAS-080
+    source: "1.4-konsolidiert"
+    section: "8.1 Ticketverkauf (Kasse)"
+    requirement: "Umbuchung eines Tickets auf ein anderes Produkt muss mit korrekter Neueinreihung in die operative Warteschlange und vollständiger Protokollierung möglich sein."
+    priority: MUSS
+    stage: V1
+    status: entfällt
+  - id: F-KAS-090
+    source: "1.4-konsolidiert"
+    section: "8.1 Ticketverkauf (Kasse)"
+    requirement: "Ticketsuche nach Ticketnummer, Gruppen-ID, Fluggruppen-/Slotnummer und QR-Code."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-KAS-100
+    source: "1.4-konsolidiert"
+    section: "8.1 Ticketverkauf (Kasse)"
+    requirement: "Die Verkaufskachel zeigt je Produkt mindestens: Betriebsstatus, realistische Wartezeitspanne, prognostiziertes Aufruf-/Boardingfenster, Kapazitätsampel und realistisch verbleibende verkaufbare Plätze."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-KAS-110
+    source: "1.4-konsolidiert"
+    section: "8.1 Ticketverkauf (Kasse)"
+    requirement: "Ist für ein Produkt eine Begleitpflicht für Kinder hinterlegt, weist das System bei einer Kinderbuchung ohne erwachsene Begleitung in derselben Gruppe deutlich darauf hin."
+    priority: SOLL
+    stage: V1
+    status: umgesetzt
+  - id: F-KAS-120
+    source: "1.4-konsolidiert"
+    section: "8.1 Ticketverkauf (Kasse)"
+    requirement: "Der Verkauf wird technisch gesperrt, wenn das Produkt oder seine Ressourcengruppe nicht verkaufbar ist, der Verkaufsschluss erreicht ist oder der Notfallmodus aktiv ist. Der Sperrgrund wird angezeigt."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-KAS-130
+    source: "1.4-konsolidiert"
+    section: "8.1 Ticketverkauf (Kasse)"
+    requirement: "Tageszählbericht als Abstimmhilfe mit verkauften Tickets und Stornos je Produkt. Zahlarten, Bezahlstatus und Zahlungsabwicklung sind ausgeschlossen."
+    priority: MUSS
+    stage: V1
+    status: in Arbeit
+  - id: F-KAS-140
+    source: "1.4-konsolidiert"
+    section: "8.1 Ticketverkauf (Kasse)"
+    requirement: "Gutschein-Tickets können ohne sofortige Einreihung ausgegeben und später an der Kasse eingelöst werden."
+    priority: KANN
+    stage: V2
+    status: geplant
+  - id: F-KAS-150
+    source: "1.4-konsolidiert"
+    section: "8.1 Ticketverkauf (Kasse)"
+    requirement: "Warteliste je Produkt für ausverkaufte oder gesperrte Angebote; Vormerkung ohne Zahlung und geregeltes Nachrücken bei frei werdender Kapazität."
+    priority: KANN
+    stage: V2
+    status: geplant
+  - id: F-KAS-160
+    source: "1.4-konsolidiert"
+    section: "8.1 Ticketverkauf (Kasse)"
+    requirement: "Die Kasse verkauft ausschließlich auf Basis der aktuellen Betriebs- und Prognoselage. Eine feste Flugzeug- oder Pilotenzuordnung durch die Kasse ist ausgeschlossen."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-RES-010
+    source: "1.4-konsolidiert"
+    section: "8.2 Produkte, Ressourcengruppen und Flugzeuge"
+    requirement: "Jedes buchbare Produkt verwendet genau eine Ressourcengruppe. Produktmerkmale wie Bezeichnung, Preis, prognostische Referenzdauer, davon getrennte zugesagte Flugzeit, öffentliche Darstellung und Verkaufsregeln sind von der Ressourcengruppe getrennt zu führen. Die zugesagte Flugzeit verändert keine operative Prognose."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-RES-020
+    source: "1.4-konsolidiert"
+    section: "8.2 Produkte, Ressourcengruppen und Flugzeuge"
+    requirement: "Mehrere Produkte dürfen dieselbe Ressourcengruppe verwenden. Deren Nachfrage wird in einer gemeinsamen operativen Kapazität disponiert."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-RES-030
+    source: "1.4-konsolidiert"
+    section: "8.2 Produkte, Ressourcengruppen und Flugzeuge"
+    requirement: "Eine Ressourcengruppe kann ein oder mehrere Flugzeuge enthalten. Standardmäßig besitzt jedes Flugzeug eine eigene Ressourcengruppe; die Zusammenfassung mehrerer Flugzeuge ist konfigurierbar."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-RES-040
+    source: "1.4-konsolidiert"
+    section: "8.2 Produkte, Ressourcengruppen und Flugzeuge"
+    requirement: "Ein Flugzeug darf zu jedem Zeitpunkt höchstens einer aktiven Ressourcengruppe zugeordnet sein. Das System muss widersprüchliche Zuordnungen technisch verhindern."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-RES-050
+    source: "1.4-konsolidiert"
+    section: "8.2 Produkte, Ressourcengruppen und Flugzeuge"
+    requirement: "Zuordnungen von Flugzeugen zu Ressourcengruppen besitzen Gültigkeitszeiträume und werden historisiert. Änderungen im laufenden Betrieb werden mit Auswirkungen auf Queue und Prognose sofort verarbeitet."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-RES-060
+    source: "1.4-konsolidiert"
+    section: "8.2 Produkte, Ressourcengruppen und Flugzeuge"
+    requirement: "Ein Produkt verwendet genau eine Ressourcengruppe. Flugzeugkompatibilität und Passagierkapazität werden aus den konkret aktiv zugeordneten Flugzeugen abgeleitet; gepflegt werden Gate und planmäßige Prozessdauern, keine Freitext-Typenlisten oder manuelle Gruppenkapazität."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-RES-070
+    source: "1.4-konsolidiert"
+    section: "8.2 Produkte, Ressourcengruppen und Flugzeuge"
+    requirement: "Ressourcengruppen besitzen einen eigenen Betriebsstatus: aktiv, pausiert, unterbrochen oder beendet. Der Status wirkt auf Verkauf, Aufruf, Prognose und Anzeigen."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-RES-080
+    source: "1.4-konsolidiert"
+    section: "8.2 Produkte, Ressourcengruppen und Flugzeuge"
+    requirement: "Die operative Queue wird je Ressourcengruppe geführt. Produktzugehörigkeit und stabile öffentliche Fluggruppen-/Slotnummern bleiben dabei erhalten."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-RES-090
+    source: "1.4-konsolidiert"
+    section: "8.2 Produkte, Ressourcengruppen und Flugzeuge"
+    requirement: "Flugzeuge mit abweichender Sitzplatzkapazität dürfen in einer Ressourcengruppe betrieben werden, sofern die konkrete Kapazität beim Umlauf berücksichtigt wird. V1 darf hierfür einen bestätigungspflichtigen Vorschlag statt vollautomatischer Optimierung verwenden."
+    priority: SOLL
+    stage: V1
+    status: umgesetzt
+  - id: F-RES-100
+    source: "1.4-konsolidiert"
+    section: "8.2 Produkte, Ressourcengruppen und Flugzeuge"
+    requirement: "Eine temporäre Umgruppierung eines Flugzeugs im laufenden Betrieb ist nur durch Leiter Flight Line oder Administrator zulässig, zeigt die prognostizierten Auswirkungen vor Bestätigung und wird protokolliert."
+    priority: SOLL
+    stage: V2
+    status: geplant
+  - id: F-SLT-010
+    source: "1.4-konsolidiert"
+    section: "8.3 Fluggruppen, Slots und Warteschlangen"
+    requirement: "Das System bildet aus verkauften Tickets stabile Fluggruppen/Slots je Produkt. Die operative Reihenfolge wird innerhalb der zugehörigen Ressourcengruppe geführt. Beim Verkauf erfolgt keine Flugzeugzuordnung."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-SLT-020
+    source: "1.4-konsolidiert"
+    section: "8.3 Fluggruppen, Slots und Warteschlangen"
+    requirement: "Zusammen gekaufte Tickets bleiben grundsätzlich zusammen. Ist eine Gruppe größer als die verfügbare Kapazität eines einzelnen Umlaufs, wird sie nur nach ausdrücklichem Hinweis auf unmittelbar aufeinanderfolgende Fluggruppen verteilt."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-SLT-030
+    source: "1.4-konsolidiert"
+    section: "8.3 Fluggruppen, Slots und Warteschlangen"
+    requirement: "Freie Plätze in noch nicht aufgerufenen Fluggruppen füllt das System automatisch mit der vordersten passenden Gruppe oder Einzelperson. Standby-Tickets dürfen bevorzugt werden. Ab dem Aufruf erfolgen Änderungen nur noch als bestätigungspflichtiger Vorschlag."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-SLT-040
+    source: "1.4-konsolidiert"
+    section: "8.3 Fluggruppen, Slots und Warteschlangen"
+    requirement: "Fluggruppen dürfen bis zum Statuswechsel IM FLUG geändert, ergänzt oder nachbesetzt werden. Nach IM FLUG ist die Besetzung unveränderlich; Korrekturen sind nur als dokumentierter Administrationsvorgang zulässig."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-SLT-050
+    source: "1.4-konsolidiert"
+    section: "8.3 Fluggruppen, Slots und Warteschlangen"
+    requirement: "Leiter Flight Line und Flight-Line-Personal können Fluggruppen manuell anpassen. Jede Abweichung vom Systemvorschlag wird protokolliert."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-SLT-060
+    source: "1.4-konsolidiert"
+    section: "8.3 Fluggruppen, Slots und Warteschlangen"
+    requirement: "Die nutzbare Platzanzahl eines konkreten Umlaufs kann vor dem Aufruf reduziert werden. Nicht mitfliegende Tickets rücken unter Erhalt der Gruppenbindung an die vorderste passende Warteschlangenposition."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-SLT-070
+    source: "1.4-konsolidiert"
+    section: "8.3 Fluggruppen, Slots und Warteschlangen"
+    requirement: "Fluggruppenbildung und Verkauf verwenden die aus den aktuell nutzbaren Flugzeugen der Ressourcengruppe abgeleitete Kapazitätsspanne. Maßgeblich für den konkreten Umlauf ist die Kapazität des bestätigten Flugzeugs; eine Gruppe wird nur geteilt, wenn kein nutzbares Flugzeug sie gemeinsam aufnehmen kann und die Teilung ausdrücklich bestätigt wird."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-SLT-080
+    source: "1.4-konsolidiert"
+    section: "8.3 Fluggruppen, Slots und Warteschlangen"
+    requirement: "Nach jedem relevanten Ereignis berechnet das System Reihenfolge, Zuordnungen, Prognosen und Wartezeitspannen neu und verteilt den neuen Stand in Echtzeit an alle Geräte."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-SLT-090
+    source: "1.4-konsolidiert"
+    section: "8.3 Fluggruppen, Slots und Warteschlangen"
+    requirement: "Fällt ein Flugzeug aus, verteilt das System noch nicht gestartete Fluggruppen auf verbleibende kompatible Flugzeuge der Ressourcengruppe neu. Bereits aufgerufene Gruppen werden nicht stillschweigend verändert."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-SLT-100
+    source: "1.4-konsolidiert"
+    section: "8.3 Fluggruppen, Slots und Warteschlangen"
+    requirement: "Jede Fluggruppe erhält eine fortlaufende, gut kommunizierbare Tagesnummer in Verbindung mit dem Produktkürzel, z. B. SR-042. Diese Kennung ist auf allen Ansichten identisch."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-SLT-110
+    source: "1.4-konsolidiert"
+    section: "8.3 Fluggruppen, Slots und Warteschlangen"
+    requirement: "Nutzen mehrere Produkte dieselbe Ressourcengruppe, gilt in V1 grundsätzlich die Verkaufsreihenfolge über Produktgrenzen hinweg. Konfigurierbare Produktprioritäten oder Quoten dürfen diese Regel in späteren Stufen ergänzen."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-SLT-120
+    source: "1.4-konsolidiert"
+    section: "8.3 Fluggruppen, Slots und Warteschlangen"
+    requirement: "Eine noch nicht fest zugeordnete Fluggruppe wird dem frühest verfügbaren kompatiblen Flugzeug vorgeschlagen. Dabei dürfen weder Flugzeug- noch Pilotenkonflikte entstehen."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-EVT-010
+    source: "1.4-konsolidiert"
+    section: "8.4 Ereignisse und Flight-Line-/Boarding-Ablauf"
+    requirement: "Alle fachlich relevanten Änderungen werden als Ereignisse mit Zeitstempel, Quelle, Gerät, Bezug und Nutzdaten erfasst. Der operative Zustand wird aus diesen Ereignissen abgeleitet."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-EVT-020
+    source: "1.4-konsolidiert"
+    section: "8.4 Ereignisse und Flight-Line-/Boarding-Ablauf"
+    requirement: "Ereignisse müssen idempotent verarbeitet werden. Doppel-Tipps, Wiederholungen nach Verbindungsstörungen oder parallele Eingaben dürfen keine doppelten Statuswechsel erzeugen."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-EVT-030
+    source: "1.4-konsolidiert"
+    section: "8.4 Ereignisse und Flight-Line-/Boarding-Ablauf"
+    requirement: "Fehleingaben werden nicht durch Überschreiben historischer Zeitstempel korrigiert, sondern durch ein nachvollziehbares Korrektur- oder Rücknahmeereignis."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-EVT-040
+    source: "1.4-konsolidiert"
+    section: "8.4 Ereignisse und Flight-Line-/Boarding-Ablauf"
+    requirement: "Das System darf aus einer Primäraktion mehrere fachliche Ereignisse ableiten, sofern diese Ableitung transparent und protokolliert ist, z. B. Belegung bestätigen und Boarding starten erzeugt Flugzeugbindung, verbindlichen Aufruf und Boardingbeginn."
+    priority: MUSS
+    stage: V1
+    status: in Arbeit
+  - id: F-EVT-050
+    source: "1.4-konsolidiert"
+    section: "8.4 Ereignisse und Flight-Line-/Boarding-Ablauf"
+    requirement: "Spätere automatische Quellen wie ADS-B dürfen Ereignisse vorschlagen oder plausibilisieren. Eine automatische Übernahme muss je Ereignistyp konfigurierbar sein."
+    priority: SOLL
+    stage: V3
+    status: geplant
+  - id: F-BRD-010
+    source: "1.4-konsolidiert"
+    section: "8.4 Ereignisse und Flight-Line-/Boarding-Ablauf"
+    requirement: "Der Standardumlauf wird flugzeugzentriert durchgeführt: verfügbares Flugzeug öffnen, passende ganze Gruppen aus der geordneten Queue übernehmen, Belegung bestätigen und Boarding starten, IM FLUG, GELANDET und ABGESCHLOSSEN/VERFÜGBAR. Pilot und Belegung werden vorgeschlagen; zusätzliche Interaktionen entstehen nur bei Abweichungen oder Sonderfällen."
+    priority: MUSS
+    stage: V1
+    status: in Arbeit
+  - id: F-BRD-020
+    source: "1.4-konsolidiert"
+    section: "8.4 Ereignisse und Flight-Line-/Boarding-Ablauf"
+    requirement: "Belegung bestätigen und Boarding starten bindet die ausgewählten ganzen Gruppen, das konkrete verfügbare Flugzeug und den anonymen Pilotencode, startet die Boardingmessung und löst Monitore sowie Benachrichtigungen aus. Die technische Kommandobezeichnung darf aus Kompatibilitätsgründen CALL_NEXT bleiben, wird aber nicht als Bedienwort angezeigt."
+    priority: MUSS
+    stage: V1
+    status: in Arbeit
+  - id: F-BRD-025
+    source: "1.4-konsolidiert"
+    section: "8.4 Ereignisse und Flight-Line-/Boarding-Ablauf"
+    requirement: "Check-in beziehungsweise Anwesenheit kann je Ticket per QR-Scan oder Antippen erfasst werden. Der Standardumlauf muss auch ohne Einzel-Scan vollständig bedienbar bleiben."
+    priority: SOLL
+    stage: V1
+    status: umgesetzt
+  - id: F-BRD-030
+    source: "1.4-konsolidiert"
+    section: "8.4 Ereignisse und Flight-Line-/Boarding-Ablauf"
+    requirement: "Je Flugzeug ist ein aktueller Pilot hinterlegt und wird vorgeschlagen. Ein Pilotwechsel ist mit einer zusätzlichen Interaktion möglich und wird protokolliert."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-BRD-040
+    source: "1.4-konsolidiert"
+    section: "8.4 Ereignisse und Flight-Line-/Boarding-Ablauf"
+    requirement: "Ein Pilot darf zu keinem Zeitpunkt mehr als einen Umlauf in Boarding, Bereit oder Im Flug besitzen. Das System verhindert Konflikte technisch."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-BRD-050
+    source: "1.4-konsolidiert"
+    section: "8.4 Ereignisse und Flight-Line-/Boarding-Ablauf"
+    requirement: "Ein Ticket darf zu keinem Zeitpunkt mehr als einem nicht abgeschlossenen Umlauf zugeordnet sein. Dies gilt auch bei paralleler Bedienung mehrerer Geräte."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-BRD-060
+    source: "1.4-konsolidiert"
+    section: "8.4 Ereignisse und Flight-Line-/Boarding-Ablauf"
+    requirement: "Das System führt mindestens die Ticketzustände Verkauft, Wartend, Voraufruf, Bitte zur Flight Line, Eingecheckt, Boarding, Im Flug, Gelandet, Abgeschlossen, Zurückgestellt, No-Show, Klärung Kasse und Storniert."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-BRD-070
+    source: "1.4-konsolidiert"
+    section: "8.4 Ereignisse und Flight-Line-/Boarding-Ablauf"
+    requirement: "Tickets können mit einer Interaktion zurückgestellt werden. Die Anzahl wird gezählt; nach einer konfigurierbaren Höchstzahl wechselt das Ticket in Klärung Kasse."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-BRD-080
+    source: "1.4-konsolidiert"
+    section: "8.4 Ereignisse und Flight-Line-/Boarding-Ablauf"
+    requirement: "Erscheint ein aufgerufener Gast nicht innerhalb der konfigurierten Frist, kann das Ticket auf No-Show gesetzt werden. Das System schlägt eine Nachbesetzung vor; das Personal entscheidet über Nachbesetzen, Leerplatz oder Zurückstellung."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-BRD-085
+    source: "1.4-konsolidiert"
+    section: "8.4 Ereignisse und Flight-Line-/Boarding-Ablauf"
+    requirement: "Gruppenschutz: Gruppen werden nach dem Aufruf niemals automatisch getrennt. Fehlen Mitglieder, entscheidet das Flight-Line-Personal zwischen unvollständig fliegen, Gruppe gemeinsam zurückstellen oder Platz leer lassen."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-BRD-090
+    source: "1.4-konsolidiert"
+    section: "8.4 Ereignisse und Flight-Line-/Boarding-Ablauf"
+    requirement: "Ein Umlauf kann vor IM FLUG abgebrochen werden; alle Tickets kehren unter Erhalt ihrer Gruppenbindung an die vorderste passende Warteschlangenposition zurück."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-BRD-100
+    source: "1.4-konsolidiert"
+    section: "8.4 Ereignisse und Flight-Line-/Boarding-Ablauf"
+    requirement: "Das System misst getrennt mindestens Boardingdauer, Flugzeit, Zeit von Landung bis Abschluss und gesamte Umlaufzeit. Die Messpunkte werden aus den Primärereignissen abgeleitet."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-BRD-110
+    source: "1.4-konsolidiert"
+    section: "8.4 Ereignisse und Flight-Line-/Boarding-Ablauf"
+    requirement: "Anwesenheitsabgleich per QR-Scan oder Antippen in der Fluggruppenkarte."
+    priority: SOLL
+    stage: V1
+    status: umgesetzt
+  - id: F-BRD-120
+    source: "1.4-konsolidiert"
+    section: "8.4 Ereignisse und Flight-Line-/Boarding-Ablauf"
+    requirement: "Die geschätzte Passagierzuladung wird auf Basis konfigurierbarer Referenzgewichte neutral angezeigt. Sie trägt dauerhaft den Hinweis, dass die Entscheidung ausschließlich beim Piloten liegt und besitzt keine Freigabesemantik."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-BRD-130
+    source: "1.4-konsolidiert"
+    section: "8.4 Ereignisse und Flight-Line-/Boarding-Ablauf"
+    requirement: "Sitzplatzzuordnung je Passagier innerhalb des Umlaufs."
+    priority: SOLL
+    stage: V2
+    status: geplant
+  - id: F-BRD-140
+    source: "1.4-konsolidiert"
+    section: "8.4 Ereignisse und Flight-Line-/Boarding-Ablauf"
+    requirement: "Vollständige Schwerpunktberechnung als getrenntes Pilotenwerkzeug mit echten Gewichten, Hebelarmen und Sitzpositionen; ohne Freigabewirkung für den organisatorischen Leitstand."
+    priority: KANN
+    stage: V3
+    status: geplant
+  - id: F-BRD-150
+    source: "1.4-konsolidiert"
+    section: "8.4 Ereignisse und Flight-Line-/Boarding-Ablauf"
+    requirement: "Mehrere Flight Lines beziehungsweise Gates werden im Datenmodell ab V1 berücksichtigt; parallele Bedienung mehrerer Gates wird in V2 bereitgestellt."
+    priority: SOLL
+    stage: V2
+    status: geplant
+  - id: F-BRD-160
+    source: "1.4-konsolidiert"
+    section: "8.4 Ereignisse und Flight-Line-/Boarding-Ablauf"
+    requirement: "GELANDET beendet nicht automatisch die Flugzeugbelegung. Erst ABGESCHLOSSEN/VERFÜGBAR kennzeichnet Ausstieg und Bodenprozess als beendet und gibt das Flugzeug für den nächsten Umlauf frei."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-FLT-010
+    source: "1.4-konsolidiert"
+    section: "8.5 Flotte, Piloten, Pausen und Tanken"
+    requirement: "Verwaltung der Flugzeugstammdaten einschließlich Ressourcengruppen-Zuordnung und Pflege im laufenden Betrieb."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-FLT-020
+    source: "1.4-konsolidiert"
+    section: "8.5 Flotte, Piloten, Pausen und Tanken"
+    requirement: "Event-Status je Flugzeug: aktiv oder inaktiv für die Veranstaltung."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-FLT-030
+    source: "1.4-konsolidiert"
+    section: "8.5 Flotte, Piloten, Pausen und Tanken"
+    requirement: "Live-Status je Flugzeug mindestens: verfügbar, Boarding, im Flug, gelandet/deboarding, Tanken vorgemerkt, Tanken aktuell, Pause, Flugbetrieb unterbrochen und kurzfristig inaktiv. Statuswechsel sind in höchstens zwei Interaktionen möglich."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-FLT-040
+    source: "1.4-konsolidiert"
+    section: "8.5 Flotte, Piloten, Pausen und Tanken"
+    requirement: "Piloten werden ausschließlich über anonyme operative Codes geführt, die bei P-01 beginnen und live angelegt oder deaktiviert werden können. Namen, Lizenz-, Dokumenten- und Flugbuchdaten sind ausgeschlossen."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-FLT-050
+    source: "1.4-konsolidiert"
+    section: "8.5 Flotte, Piloten, Pausen und Tanken"
+    requirement: "Tanken vorgemerkt reserviert eine passende operative Lücke ohne feste Zusage; Tanken aktuell nimmt das Flugzeug aus der Disposition. Beide Zustände wirken sofort auf Prognose und Kapazität."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-FLT-060
+    source: "1.4-konsolidiert"
+    section: "8.5 Flotte, Piloten, Pausen und Tanken"
+    requirement: "Je Flugzeug führt das System einen Umlaufzähler seit dem letzten Tanken mit konfigurierbarer Erinnerungsschwelle."
+    priority: SOLL
+    stage: V1
+    status: umgesetzt
+  - id: F-FLT-070
+    source: "1.4-konsolidiert"
+    section: "8.5 Flotte, Piloten, Pausen und Tanken"
+    requirement: "Geschätzte Kraftstoffbilanz je Flugzeug als organisatorische Erinnerungshilfe mit Startfüllstand, pauschalem Verbrauch, Warnschwelle und Korrektur beim Tanken; ohne Sicherheitsfunktion."
+    priority: SOLL
+    stage: V2
+    status: geplant
+  - id: F-FLT-080
+    source: "1.4-konsolidiert"
+    section: "8.5 Flotte, Piloten, Pausen und Tanken"
+    requirement: "Die aktuelle Ressourcengruppe und ihre Queue sind am Flugzeug sichtbar. Status- oder Gruppierungsänderungen lösen eine automatische Neuplanung aller abhängigen Prognosen aus."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-FLT-090
+    source: "1.4-konsolidiert"
+    section: "8.5 Flotte, Piloten, Pausen und Tanken"
+    requirement: "Pausen können je Flugzeug oder anonymem Pilotencode ohne Dauer oder mit geschätzter Dauer erfasst werden. Ein bekanntes Pausenende darf als unsichere erwartete Verfügbarkeit in Prognosen einfließen; tatsächlich verfügbar wird die Ressource erst nach menschlicher Bestätigung. Eine Pause ohne Dauer nimmt die Ressource vollständig aus der prognostizierten Kapazität."
+    priority: SOLL
+    stage: V1
+    status: in Arbeit
+  - id: F-PRG-010
+    source: "1.4-konsolidiert"
+    section: "8.6 Prognose, Disposition und Kapazität"
+    requirement: "Für alle relevanten Prozesspunkte unterscheidet das System Planzeit, Prognosezeit und Ist-Zeit. Diese Werte werden getrennt gespeichert und angezeigt."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-PRG-020
+    source: "1.4-konsolidiert"
+    section: "8.6 Prognose, Disposition und Kapazität"
+    requirement: "Nach jedem relevanten Ereignis und während des aktiven Betriebs zusätzlich mindestens alle 30 Sekunden werden erwartetes Boarding, Start, Landung, Abschluss, verbleibende Wartezeit und alle abhängigen Folgeflüge automatisch neu berechnet."
+    priority: MUSS
+    stage: V1
+    status: in Arbeit
+  - id: F-PRG-030
+    source: "1.4-konsolidiert"
+    section: "8.6 Prognose, Disposition und Kapazität"
+    requirement: "Die Prognose berücksichtigt mindestens Produktdauer, Flugzeugprofil, Boarding-, Flug-, Deboarding- und Pufferzeiten, aktuelle Flugzeugzustände, Pausen, Tanken, Unterbrechungen und Queue-Reihenfolge."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-PRG-040
+    source: "1.4-konsolidiert"
+    section: "8.6 Prognose, Disposition und Kapazität"
+    requirement: "Tatsächlich gemessene Ereignisdauern des aktuellen Veranstaltungstags müssen stärker in die Prognose eingehen als statische oder historische Planwerte. Frühere Vergleichswerte dienen nur als Kaltstart und werden durch bestätigte Tageswerte verdrängt."
+    priority: MUSS
+    stage: V1
+    status: in Arbeit
+  - id: F-PRG-050
+    source: "1.4-konsolidiert"
+    section: "8.6 Prognose, Disposition und Kapazität"
+    requirement: "Bei wenigen oder fehlenden Tagesmesswerten verwendet das System einen nachvollziehbaren Kaltstart aus Stammdaten und historischen Parametern, ohne die Prognose als hochsicher darzustellen."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-PRG-060
+    source: "1.4-konsolidiert"
+    section: "8.6 Prognose, Disposition und Kapazität"
+    requirement: "Ausreißer, abgebrochene Flüge, fehlerhaft korrigierte Ereignisse sowie durch Wetter, Flugshow, Notfall oder andere Unterbrechungen außergewöhnlich verlängerte Umläufe dürfen die Normalprognose nicht unkontrolliert verzerren. Die aktuelle Verzögerung wirkt sofort auf offene Prognosen; überlappende Umläufe werden jedoch nicht als normale Lerndauer übernommen. Die Behandlung muss nachvollziehbar dokumentiert sein."
+    priority: SOLL
+    stage: V1
+    status: in Arbeit
+  - id: F-PRG-070
+    source: "1.4-konsolidiert"
+    section: "8.6 Prognose, Disposition und Kapazität"
+    requirement: "Interne Rollen sehen konkrete Prognosezeitpunkte für Boarding, Start, Landung und Abschluss sowie die zugrunde liegende Unsicherheit."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-PRG-080
+    source: "1.4-konsolidiert"
+    section: "8.6 Prognose, Disposition und Kapazität"
+    requirement: "Gegenüber Gästen werden Countdown oder Zeitfenster kommuniziert. Eine einzelne exakte Uhrzeit darf nicht als feste Zusage erscheinen; ein ungefähres Uhrzeitfenster ist zulässig."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-PRG-090
+    source: "1.4-konsolidiert"
+    section: "8.6 Prognose, Disposition und Kapazität"
+    requirement: "Jede Prognose besitzt eine Qualitäts- oder Unsicherheitsangabe, z. B. hoch/mittel/gering oder ein Zeitintervall. Weit entfernte Fluggruppen erhalten breitere Intervalle."
+    priority: SOLL
+    stage: V1
+    status: umgesetzt
+  - id: F-PRG-100
+    source: "1.4-konsolidiert"
+    section: "8.6 Prognose, Disposition und Kapazität"
+    requirement: "Das System erkennt Verspätungen und ungeplante Verlängerungen anhand ausbleibender Ereignisse und gemessener Abweichungen und aktualisiert den Folgeplan ohne manuelle Zeitkorrektur."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-PRG-110
+    source: "1.4-konsolidiert"
+    section: "8.6 Prognose, Disposition und Kapazität"
+    requirement: "Bei mehreren Flugzeugen einer Ressourcengruppe darf das System noch nicht festgelegte Fluggruppen auf ein früher verfügbares kompatibles Flugzeug umplanen. Ab NEXT sind Änderungen bestätigungspflichtig."
+    priority: MUSS
+    stage: V1
+    status: in Arbeit
+  - id: F-PRG-120
+    source: "1.4-konsolidiert"
+    section: "8.6 Prognose, Disposition und Kapazität"
+    requirement: "Prognose-Snapshots werden zu definierten Zeitpunkten gespeichert, damit Prognosegüte und Entwicklung nach dem Event ausgewertet werden können."
+    priority: SOLL
+    stage: V1
+    status: umgesetzt
+  - id: F-PRG-130
+    source: "1.4-konsolidiert"
+    section: "8.6 Prognose, Disposition und Kapazität"
+    requirement: "Operative Eingriffe erfolgen grundsätzlich über reale Zustände und Ereignisse wie Pause, Tanken, Blockierung oder Wetterunterbrechung. Das direkte Überschreiben einzelner Folgezeiten ist im Regelbetrieb nicht vorgesehen."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-KAP-010
+    source: "1.4-konsolidiert"
+    section: "8.6 Prognose, Disposition und Kapazität"
+    requirement: "Das System berechnet laufend die realistisch verbleibende Kapazität je Produkt und Ressourcengruppe aus aktiven Flugzeugen, Prognosedauern, verbleibender Betriebszeit, offenen Tickets und Blockierungen."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-KAP-020
+    source: "1.4-konsolidiert"
+    section: "8.6 Prognose, Disposition und Kapazität"
+    requirement: "Kapazitätsampel je Produkt und Ressourcengruppe mit konfigurierbaren Schwellwerten; sichtbar an Kasse und Administration. Farben werden stets durch Text oder Symbol ergänzt."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-KAP-030
+    source: "1.4-konsolidiert"
+    section: "8.6 Prognose, Disposition und Kapazität"
+    requirement: "Harter Verkaufsschluss zu einer konfigurierbaren Uhrzeit mit rechtzeitiger Vorwarnung. Er wirkt zusätzlich zur dynamischen Kapazitätsentscheidung."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-KAP-040
+    source: "1.4-konsolidiert"
+    section: "8.6 Prognose, Disposition und Kapazität"
+    requirement: "Produkte und Ressourcengruppen können live auf verkaufbar beziehungsweise nicht verkaufbar gesetzt werden; jede Änderung wird protokolliert."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-KAP-050
+    source: "1.4-konsolidiert"
+    section: "8.6 Prognose, Disposition und Kapazität"
+    requirement: "Die Kasse erhält eine konkrete, vorsichtige Verkaufsempfehlung je Produkt, einschließlich Restplätzen und Prognosefenster."
+    priority: SOLL
+    stage: V1
+    status: umgesetzt
+  - id: F-KAP-060
+    source: "1.4-konsolidiert"
+    section: "8.6 Prognose, Disposition und Kapazität"
+    requirement: "Bei geringer Prognosequalität muss die Verkaufsempfehlung konservativer ausfallen oder eine manuelle Freigabe verlangen."
+    priority: SOLL
+    stage: V1
+    status: umgesetzt
+  - id: F-WET-010
+    source: "1.4-konsolidiert"
+    section: "8.7 Wetter, Betriebsunterbrechung und Notfallmodus"
+    requirement: "Globale oder ressourcengruppenspezifische Wetter- und Betriebshinweise können gesetzt werden und erscheinen auf Bediengeräten, Monitoren und Status-Seiten. Ein Hinweis löst nicht automatisch einen sicherheitsrelevanten Flugstopp aus."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-WET-020
+    source: "1.4-konsolidiert"
+    section: "8.7 Wetter, Betriebsunterbrechung und Notfallmodus"
+    requirement: "Flugbetrieb unterbrochen ist je Flugzeug, Ressourcengruppe oder gesamter Veranstaltung setzbar. Nicht betroffene Ressourcen laufen unverändert weiter."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-WET-030
+    source: "1.4-konsolidiert"
+    section: "8.7 Wetter, Betriebsunterbrechung und Notfallmodus"
+    requirement: "Hinweise, Unterbrechungen und deren Aufhebung werden mit Zeitstempel und auslösendem Gerät protokolliert."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-WET-040
+    source: "1.4-konsolidiert"
+    section: "8.7 Wetter, Betriebsunterbrechung und Notfallmodus"
+    requirement: "Für organisatorische Zwecke darf eine unverbindliche erwartete Mindestdauer oder ein Prüfzeitpunkt der Unterbrechung erfasst werden. Dies ist keine direkte manuelle Korrektur einzelner Flugzeiten."
+    priority: SOLL
+    stage: V1
+    status: umgesetzt
+  - id: F-NOT-010
+    source: "1.4-konsolidiert"
+    section: "8.7 Wetter, Betriebsunterbrechung und Notfallmodus"
+    requirement: "Administrator, Leiter Flight Line und Flight Director können den Notfallmodus in maximal zwei Interaktionen auslösen."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-NOT-020
+    source: "1.4-konsolidiert"
+    section: "8.7 Wetter, Betriebsunterbrechung und Notfallmodus"
+    requirement: "Der Notfallmodus sperrt sofort Verkauf und neue Aufrufe, schaltet öffentliche Anzeigen auf neutralen Inhalt und kennzeichnet alle Bediengeräte deutlich."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-NOT-030
+    source: "1.4-konsolidiert"
+    section: "8.7 Wetter, Betriebsunterbrechung und Notfallmodus"
+    requirement: "Laufende Flüge bleiben unverändert und können weiter mit GELANDET und ABGESCHLOSSEN dokumentiert werden."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-NOT-040
+    source: "1.4-konsolidiert"
+    section: "8.7 Wetter, Betriebsunterbrechung und Notfallmodus"
+    requirement: "Das Aufheben des Notfallmodus erfordert die Administrator-PIN. Auslösung und Aufhebung werden protokolliert."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-MON-010
+    source: "1.4-konsolidiert"
+    section: "8.8 Besucher-, FIDS- und Boardinganzeigen"
+    requirement: "Der Fluggastmonitor zeigt mindestens Produkt, Fluggruppen-/Slotnummer, Gate, Status, aktuelle Boardingaufrufe und die nächsten Fluggruppen mit Countdown oder Zeitfenster. Er besitzt ein modernes Standardprofil und ein klassisches Terminalprofil. Abgeflogene Zeilen zeigen kurz DEPARTED beziehungsweise Abgeflogen und verschwinden nach einer konfigurierbaren Nachlaufzeit, ohne fachliche Daten zu löschen."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-MON-020
+    source: "1.4-konsolidiert"
+    section: "8.8 Besucher-, FIDS- und Boardinganzeigen"
+    requirement: "Der Boardingmonitor zeigt mehrere kommende Fluggruppen, Ticketnummern, Gate und nach Zuordnung das Flugzeug sowie eine Flottenstatuszeile."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-MON-030
+    source: "1.4-konsolidiert"
+    section: "8.8 Besucher-, FIDS- und Boardinganzeigen"
+    requirement: "Monitore laufen im Vollbild-Kioskmodus, aktualisieren sich in Echtzeit, verbinden sich automatisch neu und benötigen während des Veranstaltungstags keinen manuellen Eingriff."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-MON-040
+    source: "1.4-konsolidiert"
+    section: "8.8 Besucher-, FIDS- und Boardinganzeigen"
+    requirement: "Personenbezogene Daten auf Monitoren sind ausgeschlossen. Angezeigt werden nur Ticket-/Fluggruppenkennungen, Produkte, Gates, Status und Betriebsinformationen."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-MON-050
+    source: "1.4-konsolidiert"
+    section: "8.8 Besucher-, FIDS- und Boardinganzeigen"
+    requirement: "Im Notfallmodus zeigen alle öffentlichen Monitore unverzüglich einen neutralen Hinweis ohne Aufrufe."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-MON-060
+    source: "1.4-konsolidiert"
+    section: "8.8 Besucher-, FIDS- und Boardinganzeigen"
+    requirement: "Das Standardprofil verwendet die deutsche öffentliche Terminologie. Das Terminalprofil verwendet ausschließlich englische beschreibende Begriffe, insbesondere DEPARTURES, WAITING, GO TO GATE, BOARDING, DELAYED und DEPARTED; der Produkt-Eigenname darf unverändert bleiben."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-MON-070
+    source: "1.4-konsolidiert"
+    section: "8.8 Besucher-, FIDS- und Boardinganzeigen"
+    requirement: "Statusfarben sind systemweit einheitlich, werden aber stets zusätzlich durch Text oder Symbol erläutert."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-MON-080
+    source: "1.4-konsolidiert"
+    section: "8.8 Besucher-, FIDS- und Boardinganzeigen"
+    requirement: "Die Anzeige kann je Gate, Flight Line oder Ressourcengruppe gefiltert werden; der parallele Mehr-Gate-Betrieb der Bedienoberfläche folgt in V2."
+    priority: SOLL
+    stage: V2
+    status: in Arbeit
+  - id: F-BEN-010
+    source: "1.4-konsolidiert"
+    section: "8.9 Gastinformation und Benachrichtigung"
+    requirement: "Jedes Ticket verlinkt per QR-Code auf eine öffentliche Status-Seite ohne Anmeldung. Sie zeigt Produkt, Fluggruppe, öffentlichen Status, verbleibende Wartezeit beziehungsweise Zeitfenster, Position, Gate, Hinweise und Zeitpunkt der letzten Aktualisierung."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-BEN-020
+    source: "1.4-konsolidiert"
+    section: "8.9 Gastinformation und Benachrichtigung"
+    requirement: "Gäste können Web-Push-Benachrichtigungen je Ticket aktivieren, ohne App-Installation und ohne Telefonnummer."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-BEN-030
+    source: "1.4-konsolidiert"
+    section: "8.9 Gastinformation und Benachrichtigung"
+    requirement: "Das System prüft während des aktiven Betriebs regelmäßig und nach relevanten Ereignissen Prognose, reale Flugzeugverfügbarkeit, Queue-Position und Anwesenheitslage und löst daraus automatisch Bitte zum Gate beziehungsweise GO TO GATE aus. Der Zielvorlauf wird aus bestätigten Tageswerten adaptiv nachgeregelt; Gate-Wartezeit und Prognosequalität sind weiche Optimierungsgrößen und keine harten Auslösesperren. Die konkrete Flugzeugbelegung und der Boardingstart bleiben davon getrennt und werden erst menschlich bestätigt."
+    priority: MUSS
+    stage: V1
+    status: in Arbeit
+  - id: F-BEN-040
+    source: "1.4-konsolidiert"
+    section: "8.9 Gastinformation und Benachrichtigung"
+    requirement: "Benachrichtigungen können alternativ an der Kasse für die Ticketnummer aktiviert werden."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-BEN-050
+    source: "1.4-konsolidiert"
+    section: "8.9 Gastinformation und Benachrichtigung"
+    requirement: "SMS als zusätzlicher Kanal über einen externen Versanddienst mit Warteschlange, Wiederholung und sichtbarem Versandstatus."
+    priority: SOLL
+    stage: V2
+    status: geplant
+  - id: F-BEN-060
+    source: "1.4-konsolidiert"
+    section: "8.9 Gastinformation und Benachrichtigung"
+    requirement: "Falls Telefon- oder Messenger-Kanäle in einer späteren Stufe ergänzt werden, erfordert jede Registrierung eine dokumentierte Einwilligung mit Zeitpunkt und Kanal. V1 erfasst keine Telefonnummern."
+    priority: MUSS
+    stage: V2
+    status: umgesetzt
+  - id: F-BEN-070
+    source: "1.4-konsolidiert"
+    section: "8.9 Gastinformation und Benachrichtigung"
+    requirement: "Bei relevanten Änderungen wie erheblicher Verschiebung, Unterbrechung, Gate-Wechsel oder Notfallmodus werden betroffene registrierte Gäste informiert."
+    priority: SOLL
+    stage: V2
+    status: geplant
+  - id: F-BEN-080
+    source: "1.4-konsolidiert"
+    section: "8.9 Gastinformation und Benachrichtigung"
+    requirement: "WhatsApp oder vergleichbarer Messenger über eine offizielle Business-Schnittstelle mit dokumentierter Einwilligung."
+    priority: KANN
+    stage: V3
+    status: geplant
+  - id: F-BEN-090
+    source: "1.4-konsolidiert"
+    section: "8.9 Gastinformation und Benachrichtigung"
+    requirement: "Öffentliche Statusbezeichnungen sind auf wenige handlungsorientierte Zustände zu reduzieren: Warten, Bitte zum Gate, Boarding, Abgeflogen beziehungsweise Flug läuft, Verzögert, Gelandet und Abgeschlossen. Das Terminalprofil bildet diese ausschließlich auf WAITING, GO TO GATE, BOARDING, DEPARTED und DELAYED ab."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-BEN-100
+    source: "1.4-konsolidiert"
+    section: "8.9 Gastinformation und Benachrichtigung"
+    requirement: "Bei unsicherer oder unterbrochener Prognose zeigt die Status-Seite einen ehrlichen Hinweis statt eines scheinbar präzisen Countdowns."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-HIS-010
+    source: "1.4-konsolidiert"
+    section: "8.10 Historie, Protokoll und Auswertung"
+    requirement: "Flüge, Fluggruppen und Tickets werden dauerhaft gespeichert und sind nach Datum, Flugzeug, Pilot, Produkt, Ressourcengruppe, Slotnummer, Ticket und Status filterbar."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-HIS-020
+    source: "1.4-konsolidiert"
+    section: "8.10 Historie, Protokoll und Auswertung"
+    requirement: "Unveränderliches, nur anfügendes Ereignisprotokoll mindestens für Verkauf, Storno, Umbuchung, Aufruf, Check-in, IM FLUG, GELANDET, ABGESCHLOSSEN, Zurückstellung, No-Show, Pilot- und Ressourcenwechsel, Tanken, Wetter, Unterbrechung, Notfallmodus und manuelle Disposition."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-HIS-030
+    source: "1.4-konsolidiert"
+    section: "8.10 Historie, Protokoll und Auswertung"
+    requirement: "Automatischer Tagesbericht als PDF und CSV mit Flügen, Passagierzahlen, Auslastung, gemessenen Prozesszeiten, Wartezeiten, Ticket-Zählbericht je Produkt, Prognoseentwicklung und besonderen Ereignissen."
+    priority: SOLL
+    stage: V1
+    status: in Arbeit
+  - id: F-HIS-040
+    source: "1.4-konsolidiert"
+    section: "8.10 Historie, Protokoll und Auswertung"
+    requirement: "CSV-Export der fachlichen Rohdaten für Vereinsabrechnung und eigene Auswertungen."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-HIS-050
+    source: "1.4-konsolidiert"
+    section: "8.10 Historie, Protokoll und Auswertung"
+    requirement: "Statistik-Dashboard über mehrere Veranstaltungen mit Durchsatz, Auslastung, Wartezeit und Prognosegüte."
+    priority: SOLL
+    stage: V2
+    status: geplant
+  - id: F-HIS-060
+    source: "1.4-konsolidiert"
+    section: "8.10 Historie, Protokoll und Auswertung"
+    requirement: "Prognose-Snapshots und zugehörige Ist-Ergebnisse sind auswertbar, insbesondere Abweichung von Boarding-, Start- und Abschlussprognose."
+    priority: SOLL
+    stage: V1
+    status: umgesetzt
+  - id: F-HIS-070
+    source: "1.4-konsolidiert"
+    section: "8.10 Historie, Protokoll und Auswertung"
+    requirement: "Kennzahlen wie Boardingdauer, Flugzeit, Bodenzeit, Umlaufzeit und Wartezeit besitzen im System eindeutige, dokumentierte Start- und Endereignisse."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-ADM-010
+    source: "1.4-konsolidiert"
+    section: "8.11 Administration und Geräteverwaltung"
+    requirement: "Pflege der erforderlichen Veranstaltungsparameter einschließlich Verkaufszeiten, Betriebsende, Fristen, Ampelschwellen, Referenzgewichte, Benachrichtigungsvorlauf und fachlicher Planwerte. Technische Einzelschwellen für den adaptiven Voraufruf werden nicht regulär administriert; sichtbar bleiben nur dessen Aktivierung und verständliche Betriebsinformationen."
+    priority: MUSS
+    stage: V1
+    status: in Arbeit
+  - id: F-ADM-020
+    source: "1.4-konsolidiert"
+    section: "8.11 Administration und Geräteverwaltung"
+    requirement: "Stammdaten für Produkte, Ressourcengruppen, Flugzeuge, anonyme Pilotencodes und Gates sind auch während des Betriebs änderbar; Zuordnungen werden direkt an der Ressourcengruppe gepflegt. Änderungen werden protokolliert und wirken kontrolliert auf den Livezustand."
+    priority: MUSS
+    stage: V1
+    status: in Arbeit
+  - id: F-ADM-030
+    source: "1.4-konsolidiert"
+    section: "8.11 Administration und Geräteverwaltung"
+    requirement: "Anonyme Helferkonten besitzen einen systematisch erzeugten, rollenkennzeichnenden Anmeldecode, eine unveränderliche technische ID und mindestens eine serverseitig gespeicherte Rolle. Konten enthalten keine Namen, E-Mail-Adressen oder sonstige Personendaten."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-ADM-040
+    source: "1.4-konsolidiert"
+    section: "8.11 Administration und Geräteverwaltung"
+    requirement: "Geräteübersicht mit Rolle, Online-Status, letztem Kontakt und, soweit verfügbar, Akkustand."
+    priority: SOLL
+    stage: V1
+    status: umgesetzt
+  - id: F-ADM-050
+    source: "1.4-konsolidiert"
+    section: "8.11 Administration und Geräteverwaltung"
+    requirement: "Kritische Aktionen wie Storno, Aufheben des Notfallmodus, Löschen von Stammdaten und wesentliche Live-Konfigurationsänderungen erfordern eine aktive Sitzung mit passender Rolle und gegebenenfalls eine erneute PIN-Bestätigung desselben Kontos. Eine gemeinsame Administrator-PIN ist unzulässig."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-ADM-060
+    source: "1.4-konsolidiert"
+    section: "8.11 Administration und Geräteverwaltung"
+    requirement: "Kompakte Administrationsübersicht mit offenen Tickets, Durchsatz, mittleren Prozesszeiten, Prognosequalität sowie Geräte- und Benachrichtigungsstatus. Operative Flottensteuerung liegt in der Flight-Director-Ansicht."
+    priority: SOLL
+    stage: V1
+    status: in Arbeit
+  - id: F-ADM-070
+    source: "1.4-konsolidiert"
+    section: "8.11 Administration und Geräteverwaltung"
+    requirement: "Trainingsmodus mit Beispieldaten und vollständiger Rücksetzung; Trainingsdaten dürfen nicht in Auswertungen einfließen."
+    priority: KANN
+    stage: V2
+    status: geplant
+  - id: F-ADM-080
+    source: "1.4-konsolidiert"
+    section: "8.11 Administration und Geräteverwaltung"
+    requirement: "Verwaltung mehrerer Veranstaltungen mit eventübergreifender Stammdatenbibliothek und Kopie einer Vorveranstaltung als Vorlage."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-ADM-090
+    source: "1.4-konsolidiert"
+    section: "8.11 Administration und Geräteverwaltung"
+    requirement: "Dashboard Flight Director als primär lesende Gesamtsicht mit offenen Tickets, Ressourcenstatus, laufenden Flügen, Kapazität, Prognosen und Not-Halt."
+    priority: SOLL
+    stage: V1
+    status: umgesetzt
+  - id: F-ADM-100
+    source: "1.4-konsolidiert"
+    section: "8.11 Administration und Geräteverwaltung"
+    requirement: "Die Administration verhindert technisch ungültige Ressourcengruppen-Zuordnungen und zeigt Konflikte vor dem Speichern verständlich an."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-INT-010
+    source: "1.4-konsolidiert"
+    section: "8.12 Schnittstellen und spätere Erweiterungen"
+    requirement: "Die Architektur stellt eine dokumentierte interne Schnittstelle für Ereignisse und Statusabfragen bereit, damit spätere Datenquellen ohne Neuentwicklung des Kerns angebunden werden können."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-INT-020
+    source: "1.4-konsolidiert"
+    section: "8.12 Schnittstellen und spätere Erweiterungen"
+    requirement: "ADS-B- oder Flugbewegungsmonitoring zur Plausibilisierung von Start, Landung und ETA."
+    priority: KANN
+    stage: V3
+    status: geplant
+  - id: F-INT-030
+    source: "1.4-konsolidiert"
+    section: "8.12 Schnittstellen und spätere Erweiterungen"
+    requirement: "Automatische Erkennung von Start und Landung als Vorschlag oder konfigurierbare automatische Ereignisquelle."
+    priority: KANN
+    stage: V3
+    status: geplant
+  - id: F-INT-040
+    source: "1.4-konsolidiert"
+    section: "8.12 Schnittstellen und spätere Erweiterungen"
+    requirement: "Digitale Passagierlisten werden, falls erforderlich, als separates Modul mit eigener Berechtigung, Rechtsgrundlage und Löschfrist umgesetzt; keine stillschweigende Erweiterung des datensparsamen Kern-Ticketings."
+    priority: KANN
+    stage: V3
+    status: geplant
+  - id: F-INT-050
+    source: "1.4-konsolidiert"
+    section: "8.12 Schnittstellen und spätere Erweiterungen"
+    requirement: "Online-Vorverkauf mit Kontingentsteuerung bleibt optional und darf den Vor-Ort-Regelbetrieb nicht voraussetzen."
+    priority: KANN
+    stage: V3
+    status: geplant
+  - id: F-INT-060
+    source: "1.4-konsolidiert"
+    section: "8.12 Schnittstellen und spätere Erweiterungen"
+    requirement: "Mehrere Flugplätze und Mandantenfähigkeit für mehrere Veranstalter."
+    priority: KANN
+    stage: V4
+    status: geplant
+  - id: F-INT-070
+    source: "1.4-konsolidiert"
+    section: "8.12 Schnittstellen und spätere Erweiterungen"
+    requirement: "Mehrere Kassen- und Flight-Line-Geräte dürfen bereits in V1 parallel auf denselben Livezustand zugreifen. Flight Line koordiniert die kurzzeitige Betreuung eines Flugzeugs über anonyme, auslaufende Gerätereservierungen; fachliche Schreibkommandos bleiben versioniert und konfliktgeprüft. Mehrere organisatorisch unabhängige Flight Lines folgen in V2."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: D-010
+    source: "1.4-konsolidiert"
+    section: "9 Datenanforderungen"
+    requirement: "Flugzeug: Kennzeichen, Typ, Passagierkapazität, maximale Passagierzuladung, Gate, Event- und Live-Status, aktueller Pilotencode, Zeitprofile, Tankhinweise, optionale geschätzte Pausendauer und aktive Ressourcengruppe."
+    priority: MUSS
+    stage: V1
+    status: in Arbeit
+  - id: D-015
+    source: "1.4-konsolidiert"
+    section: "9 Datenanforderungen"
+    requirement: "Ressourcengruppe: Bezeichnung, Status, zugehörige Produkte, Prognoseparameter, Gates, aktive Flugzeugzuordnungen und daraus abgeleitete Kapazitätsspanne."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: D-016
+    source: "1.4-konsolidiert"
+    section: "9 Datenanforderungen"
+    requirement: "Ressourcengruppen-Zuordnung: Flugzeug, Ressourcengruppe, gültig ab/bis, aktiv, Änderungsgrund und Protokollbezug."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: D-020
+    source: "1.4-konsolidiert"
+    section: "9 Datenanforderungen"
+    requirement: "Produkt: Bezeichnung, Kürzel, Preis, genau eine Ressourcengruppe, öffentliche Darstellung, prognostische Referenzdauer, zugesagte Flugzeit, Verkaufsregeln, Begleitpflicht und Sortierung; keine manuell gepflegte Referenzkapazität."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: D-030
+    source: "1.4-konsolidiert"
+    section: "9 Datenanforderungen"
+    requirement: "Ticket: nicht erratbare Ticketnummer, Produkt, Fluggruppe beziehungsweise Queue-Position, Gruppen-ID, optionale Gewichtsklasse, Standby, Status und Verkaufszeitpunkt. Namen, Telefonnummern und Zahlungsdaten werden nicht im Ticketkern gespeichert; Web-Push-Registrierungen sind getrennt."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: D-040
+    source: "1.4-konsolidiert"
+    section: "9 Datenanforderungen"
+    requirement: "Buchungsgruppe: Gruppen-ID, Größe, zugehörige Tickets, Gruppenbindung, Standby-Regel und gegebenenfalls Aufteilung auf unmittelbar aufeinanderfolgende Fluggruppen."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: D-045
+    source: "1.4-konsolidiert"
+    section: "9 Datenanforderungen"
+    requirement: "Fluggruppe/Slot: stabile Tageskennung, Produkt, Ressourcengruppe, Tickets, Queue-Position, öffentliche Statusinformation, prognostizierte Zeitfenster und gegebenenfalls zugeordneter Umlauf."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: D-050
+    source: "1.4-konsolidiert"
+    section: "9 Datenanforderungen"
+    requirement: "Flug/Umlauf: Fluggruppe, Flugzeug, anonymer Pilotencode, Gate, Tickets, Status, Plan-, Prognose- und Ist-Zeiten für Aufruf, Boarding, Start, Landung und Abschluss sowie anonyme organisatorische Bemerkungen."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: D-055
+    source: "1.4-konsolidiert"
+    section: "9 Datenanforderungen"
+    requirement: "Prognose-Snapshot: Erstellzeitpunkt, Bezug, prognostizierte Prozesszeiten, Zeitfenster, Qualitätsstufe, verwendete Datengrundlage und Auslöser der Neuberechnung."
+    priority: SOLL
+    stage: V1
+    status: umgesetzt
+  - id: D-060
+    source: "1.4-konsolidiert"
+    section: "9 Datenanforderungen"
+    requirement: "Pilot: anonymer operativer Code, aktiv, aktuelle Zuordnung und optionale nicht personenbezogene Bemerkung; keine Namen, Lizenz- oder Dokumentendaten."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: D-065
+    source: "1.4-konsolidiert"
+    section: "9 Datenanforderungen"
+    requirement: "Blockierung/Unterbrechung/Pause: Geltungsbereich, Typ, Beginn, optionaler erwarteter Rückkehr- oder Prüfzeitpunkt, Status, Grund und bestätigte Aufhebung."
+    priority: MUSS
+    stage: V1
+    status: in Arbeit
+  - id: D-070
+    source: "1.4-konsolidiert"
+    section: "9 Datenanforderungen"
+    requirement: "Gate/Flight Line: Bezeichnung, Art, zugeordnete Ressourcengruppen und Anzeigefilter."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: D-080
+    source: "1.4-konsolidiert"
+    section: "9 Datenanforderungen"
+    requirement: "Gerät: unveränderliche technische ID, optionale Bezeichnung, letzter Kontakt, aktiv und technische Statusinformationen. Ein Gerät ist nicht selbst die Benutzeridentität."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: D-090
+    source: "1.4-konsolidiert"
+    section: "9 Datenanforderungen"
+    requirement: "Ereignis: fortlaufende ID, Zeitstempel, Ereignistyp, Quelle, auslösendes Gerät, fachlicher Bezug, Nutzdaten und gegebenenfalls Korrekturbezug."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: D-100
+    source: "1.4-konsolidiert"
+    section: "9 Datenanforderungen"
+    requirement: "Veranstaltung: Name, Datum, Flugplatz, Zeitzone, Parameter, Notfallstatus, Betriebsphasen und Archivkennzeichen."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: D-110
+    source: "1.4-konsolidiert"
+    section: "9 Datenanforderungen"
+    requirement: "Benachrichtigungsregistrierung: Ticketbezug, Kanal, Zielkennung soweit erforderlich, Einwilligung, Status und Löschzeitpunkt."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: Q-UX-010
+    source: "1.4-konsolidiert"
+    section: "10.1 Bedienbarkeit und Oberfläche"
+    requirement: "Alle Bedienoberflächen sind für Fingerbedienung auf Tablets ausgelegt: große Bedienelemente, hoher Kontrast für Sonnenlicht und maximal eine hervorgehobene Primäraktion je Arbeitszustand."
+    priority: MUSS
+    stage: V1
+    status: in Arbeit
+  - id: Q-UX-020
+    source: "1.4-konsolidiert"
+    section: "10.1 Bedienbarkeit und Oberfläche"
+    requirement: "Kasse und Flight Line kommen im Standardablauf ohne Menünavigation aus. Flight Line besitzt eine Flight-Director-Ansicht und eine vereinfachte Flight-Line-Ansicht für iPad, iPad mini, iPhone und vergleichbare Geräte. Die Administration zeigt kompakte Tabellen; Formulare öffnen nur nach Neu oder Bearbeiten."
+    priority: MUSS
+    stage: V1
+    status: in Arbeit
+  - id: Q-UX-030
+    source: "1.4-konsolidiert"
+    section: "10.1 Bedienbarkeit und Oberfläche"
+    requirement: "Häufige Aktionen sind ohne Bestätigungsdialog ausführbar und mindestens zehn Sekunden rückgängig zu machen. Weitreichende destruktive Aktionen erfordern PIN oder explizite Bestätigung."
+    priority: MUSS
+    stage: V1
+    status: in Arbeit
+  - id: Q-UX-040
+    source: "1.4-konsolidiert"
+    section: "10.1 Bedienbarkeit und Oberfläche"
+    requirement: "Statusbegriffe, Farben und Symbole sind systemweit einheitlich."
+    priority: MUSS
+    stage: V1
+    status: in Arbeit
+  - id: Q-UX-050
+    source: "1.4-konsolidiert"
+    section: "10.1 Bedienbarkeit und Oberfläche"
+    requirement: "Doppelte Eingaben dürfen keine doppelten Buchungen, Ereignisse oder Statuswechsel erzeugen."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: Q-UX-060
+    source: "1.4-konsolidiert"
+    section: "10.1 Bedienbarkeit und Oberfläche"
+    requirement: "Die deutsche Bedienoberfläche muss nach höchstens zehn Minuten Einweisung je Helferrolle sicher bedienbar sein."
+    priority: MUSS
+    stage: V1
+    status: in Arbeit
+  - id: Q-UX-070
+    source: "1.4-konsolidiert"
+    section: "10.1 Bedienbarkeit und Oberfläche"
+    requirement: "Umschaltbares helles und dunkles Farbschema für Sonne, Dämmerung und Abendbetrieb auf allen Bedienoberflächen."
+    priority: MUSS
+    stage: V1
+    status: in Arbeit
+  - id: Q-UX-080
+    source: "1.4-konsolidiert"
+    section: "10.1 Bedienbarkeit und Oberfläche"
+    requirement: "Öffentliche Ansichten formulieren handlungsorientiert und vermeiden interne Fachbegriffe, wenn diese für Gäste nicht erforderlich sind."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: Q-ZUV-010
+    source: "1.4-konsolidiert"
+    section: "10.2 Zuverlässigkeit und Verbindungsverhalten"
+    requirement: "Status- und Prognoseänderungen sind im Normalbetrieb innerhalb von zwei Sekunden auf allen verbundenen Geräten sichtbar."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: Q-ZUV-020
+    source: "1.4-konsolidiert"
+    section: "10.2 Zuverlässigkeit und Verbindungsverhalten"
+    requirement: "Verbindungsaussetzer und vorübergehende Server- oder D1-Fehler werden ohne Leeren der Oberfläche überbrückt. Der letzte bestätigte Stand bleibt mit Alter und Verbindungsstatus sichtbar; unbestätigte Schreibaktionen bleiben gesperrt und werden nicht als operative Änderungen gezählt."
+    priority: MUSS
+    stage: V1
+    status: in Arbeit
+  - id: Q-ZUV-030
+    source: "1.4-konsolidiert"
+    section: "10.2 Zuverlässigkeit und Verbindungsverhalten"
+    requirement: "Nach einer Störung stellen Geräte die Verbindung automatisch wieder her und gleichen den Zustand vollständig ab; ein manueller Neustart ist nicht erforderlich."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: Q-ZUV-040
+    source: "1.4-konsolidiert"
+    section: "10.2 Zuverlässigkeit und Verbindungsverhalten"
+    requirement: "Widersprüchliche parallele Bedienung wird serverseitig konfliktgeprüft aufgelöst. Kein Gerät darf einen neueren Zustand mit einem veralteten Stand überschreiben."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: Q-ZUV-050
+    source: "1.4-konsolidiert"
+    section: "10.2 Zuverlässigkeit und Verbindungsverhalten"
+    requirement: "Das System ist für mindestens zwölf Stunden durchgehenden Veranstaltungseinsatz ohne Neustart ausgelegt."
+    priority: MUSS
+    stage: V1
+    status: in Arbeit
+  - id: Q-ZUV-060
+    source: "1.4-konsolidiert"
+    section: "10.2 Zuverlässigkeit und Verbindungsverhalten"
+    requirement: "Verfügbarkeit der zentralen Serverumgebung während des Veranstaltungszeitraums mindestens 99,5 Prozent; geplante Wartung an Veranstaltungstagen ist ausgeschlossen."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: Q-ZUV-070
+    source: "1.4-konsolidiert"
+    section: "10.2 Zuverlässigkeit und Verbindungsverhalten"
+    requirement: "Für Totalausfall der Verbindung besteht eine dokumentierte Papier-Rückfallebene einschließlich geregelter Wiedereinpflege nach Wiederanlauf."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: Q-PER-010
+    source: "1.4-konsolidiert"
+    section: "10.3 Performance und Mengengerüst"
+    requirement: "Lokale Reaktion der Bedienoberfläche auf Eingaben unter 300 ms; serverseitiger Abschluss eines Standardverkaufs im Normalbetrieb unter zwei Sekunden."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: Q-PER-020
+    source: "1.4-konsolidiert"
+    section: "10.3 Performance und Mengengerüst"
+    requirement: "Auslegung mindestens auf 20 gleichzeitig verbundene Geräte, 1.000 Tickets, 300 Flugumläufe je Veranstaltungstag und fünf Jahre Historie ohne spürbare Verschlechterung."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: Q-PER-030
+    source: "1.4-konsolidiert"
+    section: "10.3 Performance und Mengengerüst"
+    requirement: "Eine vollständige Neuberechnung der V1-Prognose für alle offenen Fluggruppen erfolgt im festgelegten Mengengerüst in höchstens zwei Sekunden."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: Q-SIC-010
+    source: "1.4-konsolidiert"
+    section: "10.4 Sicherheit, Datenschutz und Zugriffsschutz"
+    requirement: "Sämtliche Kommunikation erfolgt verschlüsselt über HTTPS/TLS."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: Q-SIC-020
+    source: "1.4-konsolidiert"
+    section: "10.4 Sicherheit, Datenschutz und Zugriffsschutz"
+    requirement: "Schreibzugriff ist nur über eine gültige, serverseitig widerrufbare Sitzung eines rollenberechtigten Kontos zulässig; jede Schreiboperation ist Konto, Sitzung und Gerät zuordenbar."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: Q-SIC-030
+    source: "1.4-konsolidiert"
+    section: "10.4 Sicherheit, Datenschutz und Zugriffsschutz"
+    requirement: "Die öffentliche Status-Seite gibt ausschließlich Informationen zum jeweiligen nicht erratbaren Ticketcode preis. Aufzählbarkeit und automatisierte Fehlversuche werden begrenzt."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: Q-SIC-040
+    source: "1.4-konsolidiert"
+    section: "10.4 Sicherheit, Datenschutz und Zugriffsschutz"
+    requirement: "Es werden keine Werbung, kein Tracking und keine externen Analysedienste eingebunden."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: Q-DSG-010
+    source: "1.4-konsolidiert"
+    section: "10.4 Sicherheit, Datenschutz und Zugriffsschutz"
+    requirement: "Im Kernsystem werden keine Gastnamen oder sonstigen nicht erforderlichen Personendaten erfasst. Der Betrieb funktioniert vollständig ohne Telefonnummer."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: Q-DSG-020
+    source: "1.4-konsolidiert"
+    section: "10.4 Sicherheit, Datenschutz und Zugriffsschutz"
+    requirement: "Push-Registrierungen werden nach einer konfigurierbaren Frist nach Veranstaltungsende, standardmäßig sieben Tage, gelöscht oder irreversibel entkoppelt. V1 speichert keine Telefonnummern."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: Q-DSG-030
+    source: "1.4-konsolidiert"
+    section: "10.4 Sicherheit, Datenschutz und Zugriffsschutz"
+    requirement: "Einwilligungen werden mit Zeitpunkt und Kanal dokumentiert; Datenschutzhinweise sind auf der Status-Seite abrufbar."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: Q-DSG-040
+    source: "1.4-konsolidiert"
+    section: "10.4 Sicherheit, Datenschutz und Zugriffsschutz"
+    requirement: "Personenbezogene Daten werden ausschließlich in Rechenzentren innerhalb der EU verarbeitet; erforderliche Auftragsverarbeitungsverträge und Angaben für das Verarbeitungsverzeichnis werden bereitgestellt."
+    priority: MUSS
+    stage: V1
+    status: in Arbeit
+  - id: Q-DSG-050
+    source: "1.4-konsolidiert"
+    section: "10.4 Sicherheit, Datenschutz und Zugriffsschutz"
+    requirement: "Ein späteres Passagierlistenmodul ist technisch und berechtigungsseitig vom datensparsamen Ticketing zu trennen."
+    priority: MUSS
+    stage: V3
+    status: geplant
+  - id: Q-WAR-010
+    source: "1.4-konsolidiert"
+    section: "10.5 Wartbarkeit, Erweiterbarkeit und Betriebskosten"
+    requirement: "Verwendung verbreiteter, quelloffener Standardtechnologien ohne exotische Abhängigkeiten; ein erfahrener Webentwickler kann sich ohne Herstellerbindung einarbeiten."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: Q-WAR-020
+    source: "1.4-konsolidiert"
+    section: "10.5 Wartbarkeit, Erweiterbarkeit und Betriebskosten"
+    requirement: "Betriebliche Parameter, Texte, Schwellenwerte, Referenzzeiten und Gewichtsklassen sind ohne Programmänderung konfigurierbar."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: Q-WAR-030
+    source: "1.4-konsolidiert"
+    section: "10.5 Wartbarkeit, Erweiterbarkeit und Betriebskosten"
+    requirement: "Laufende Grundbetriebskosten für Hosting, Domain und Zertifikate sollen ohne Mobilfunk- und volumenabhängige Versandkosten höchstens 15 Euro je Monat betragen. Abweichungen sind transparent zu begründen."
+    priority: SOLL
+    stage: V1
+    status: umgesetzt
+  - id: Q-WAR-040
+    source: "1.4-konsolidiert"
+    section: "10.5 Wartbarkeit, Erweiterbarkeit und Betriebskosten"
+    requirement: "Die Architektur ermöglicht V2 bis V4 ohne Neuentwicklung des Kerns; insbesondere sind Ressourcengruppen, mehrere Produkte je Gruppe, Gates, Mehrveranstaltungsbetrieb, Sitzplätze und externe Ereignisquellen von Beginn an modelliert."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: Q-WAR-050
+    source: "1.4-konsolidiert"
+    section: "10.5 Wartbarkeit, Erweiterbarkeit und Betriebskosten"
+    requirement: "Prognoseverfahren, Zustandsautomaten und fachliche Invarianten sind in einer für Betreiber und zukünftige Entwickler nachvollziehbaren technischen Dokumentation beschrieben."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: T-010
+    source: "1.4-konsolidiert"
+    section: "11 Technische Rahmenbedingungen"
+    requirement: "Die Lösung ist eine responsive Progressive Web App; eine Installation aus einem App-Store ist nicht erforderlich."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: T-020
+    source: "1.4-konsolidiert"
+    section: "11 Technische Rahmenbedingungen"
+    requirement: "Unterstützt werden aktuelle Versionen von Chrome, Safari und Edge auf Android-Tablets, iPads und Windows-PCs."
+    priority: MUSS
+    stage: V1
+    status: geplant
+  - id: T-030
+    source: "1.4-konsolidiert"
+    section: "11 Technische Rahmenbedingungen"
+    requirement: "Zentraler Betrieb in einem EU-Rechenzentrum. Am Veranstaltungsort erfolgt die Anbindung über LTE/5G; ein Dual-SIM-Router unterschiedlicher Netzbetreiber wird empfohlen."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: T-035
+    source: "1.4-konsolidiert"
+    section: "11 Technische Rahmenbedingungen"
+    requirement: "Bediengeräte besitzen lokale Zwischenspeicherung und Offline-Queue für kurze Ausfälle. Ein optionaler lokaler Edge-Betrieb darf später ergänzt werden, ohne das fachliche Modell zu ändern."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: T-040
+    source: "1.4-konsolidiert"
+    section: "11 Technische Rahmenbedingungen"
+    requirement: "Monitore werden über handelsübliche Kiosk-Abspielgeräte betrieben und laden ihre Ansicht nach dem Einschalten automatisch im Vollbild."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: T-050
+    source: "1.4-konsolidiert"
+    section: "11 Technische Rahmenbedingungen"
+    requirement: "Automatische tägliche Datensicherung mit mindestens 14 Tagen Aufbewahrung sowie Sicherung vor Veranstaltungstagen; dokumentierter Wiederanlauf innerhalb von 30 Minuten."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: T-060
+    source: "1.4-konsolidiert"
+    section: "11 Technische Rahmenbedingungen"
+    requirement: "Zeitzonen- und sommerzeitfeste Verarbeitung, standardmäßig Europe/Berlin."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: T-070
+    source: "1.4-konsolidiert"
+    section: "11 Technische Rahmenbedingungen"
+    requirement: "Getrennte Test-/Abnahmeumgebung und Produktivumgebung."
+    priority: MUSS
+    stage: V1
+    status: geplant
+  - id: T-080
+    source: "1.4-konsolidiert"
+    section: "11 Technische Rahmenbedingungen"
+    requirement: "Vollständiger Quellcode, Konfiguration und Deploymentbeschreibung gehen in das uneingeschränkte Nutzungsrecht des Auftraggebers über; ein Betreiberwechsel darf nicht durch proprietäre Bindungen verhindert werden."
+    priority: MUSS
+    stage: V1
+    status: in Arbeit
+  - id: T-090
+    source: "1.4-konsolidiert"
+    section: "11 Technische Rahmenbedingungen"
+    requirement: "Echtzeitaktualisierung erfolgt über eine geeignete Push-Technik mit automatischem Fallback und Wiederverbindung."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: T-100
+    source: "1.4-konsolidiert"
+    section: "11 Technische Rahmenbedingungen"
+    requirement: "Die technische Umsetzung muss die fachlichen Ereignisse, Zustandsübergänge und Invarianten transaktional konsistent verarbeiten."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-ADM-110
+    source: "1.4-konsolidiert"
+    section: "8.11 Administration und Geräteverwaltung"
+    requirement: "Die Anmeldung zeigt alle aktiven, nach Rolle gruppierten Konten zur Auswahl und verlangt anschließend eine mindestens sechsstellige numerische PIN. Das PIN-Feld erhält den Fokus; Enter bestätigt. Konto oder PIN dürfen in Fehlermeldungen nicht einzeln als falsch offengelegt werden."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-ADM-120
+    source: "1.4-konsolidiert"
+    section: "8.11 Administration und Geräteverwaltung"
+    requirement: "Administratoren können Konten durch Rollenauswahl anlegen, aktivieren, deaktivieren, eine neue PIN setzen und alle Sitzungen eines Kontos widerrufen. Der Anmeldecode wird konfliktfrei aus Rolle und laufender Nummer erzeugt."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: F-ADM-130
+    source: "1.4-konsolidiert"
+    section: "8.11 Administration und Geräteverwaltung"
+    requirement: "Interne Oberflächen sind ohne gültige Sitzung nicht zugänglich. QR-Ticketstatus und öffentliche FIDS-Inhalte bleiben anonym öffentlich; Konfiguration und Aktivierung eines Displays benötigen ein berechtigtes Konto."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: D-085
+    source: "1.4-konsolidiert"
+    section: "9 Datenanforderungen"
+    requirement: "Helferkonto und Sitzung: nicht personenbezogene Konto-ID, rollenkennzeichnender Anmeldecode, Rollen, aktiver Status, gesalzener PIN-Hash, fehlgeschlagene Anmeldeversuche sowie widerrufbare Sitzung mit Geräte-ID, Erstell-, Ablauf-, Letztaktivitäts- und Widerrufszeitpunkt. PIN und Sitzungstoken werden niemals im Klartext gespeichert oder protokolliert."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: Q-UX-090
+    source: "1.4-konsolidiert"
+    section: "10.1 Bedienbarkeit und Oberfläche"
+    requirement: "Alle internen Desktop-Oberflächen verwenden die freigegebene kompakte Dichte: zentrale Tabellen und Primärabläufe passen bei 1366 × 768 und 1920 × 1080 ohne vermeidbares Seitenscrolling; Editoren erscheinen erst nach Neu oder Bearbeiten als Drawer oder Dialog. Öffentliche Distanzanzeigen sind davon ausgenommen."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: Q-UX-100
+    source: "1.4-konsolidiert"
+    section: "10.1 Bedienbarkeit und Oberfläche"
+    requirement: "Flight Director und Flight Line sind eigenständige, rollenberechtigte Oberflächen und werden nicht allein anhand der Bildschirmbreite gewählt. Flight Director bleibt auf Desktop und iPad vollständig; Flight Line ist auf iPad, iPad mini, iPhone und vergleichbaren Geräten touchoptimiert."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: Q-SIC-050
+    source: "1.4-konsolidiert"
+    section: "10.4 Sicherheit, Datenschutz und Zugriffsschutz"
+    requirement: "PINs werden mit einem langsamen, gesalzenen Passwort-Hash gespeichert. Sitzungen verwenden nicht aus JavaScript lesbare Secure-/HttpOnly-/SameSite-Cookies, werden bei Inaktivität gesperrt und absolut befristet. Fehlversuche werden serverseitig pro Konto und Herkunft progressiv begrenzt."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: Q-WAR-060
+    source: "1.4-konsolidiert"
+    section: "10.5 Wartbarkeit, Erweiterbarkeit und Betriebskosten"
+    requirement: "Die Webanwendung ist nach App-Shell, Designsystem, Authentifizierung und fachlichen Features modularisiert. App.tsx enthält ausschließlich Komposition und Routing; fachliche Oberflächen, API-Zugriff und Zustandslogik besitzen eindeutige Modulgrenzen."
+    priority: MUSS
+    stage: V1
+    status: umgesetzt
+  - id: V15-AUTH-010
+    source: "1.5"
+    section: "Fortgeltendes Delta 1.5"
+    requirement: "Interne Sitzungen gelten 16 Stunden absolut ohne Idle-Ablauf."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V15-NAV-010
+    source: "1.5"
+    section: "Fortgeltendes Delta 1.5"
+    requirement: "Gemeinsamer Ansichtswechsler mit sichtbar gesperrten Zielen."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V15-ROLE-010
+    source: "1.5"
+    section: "Fortgeltendes Delta 1.5"
+    requirement: "Flight Director verwendet die Rolle FLIGHT_DIRECTOR."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V15-QUE-010
+    source: "1.5"
+    section: "Fortgeltendes Delta 1.5"
+    requirement: "Buchungsgruppen bleiben einzeln und besitzen stabile Kommunikationsnummern."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V15-QUE-020
+    source: "1.5"
+    section: "Fortgeltendes Delta 1.5"
+    requirement: "Mehrgruppen-Aufrufe kombinieren nur vollständige kompatible Gruppen atomar."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V15-FLT-010
+    source: "1.5"
+    section: "Fortgeltendes Delta 1.5"
+    requirement: "MARK_OFF_BLOCK, MARK_ON_BLOCK und expliziter Turnaround-Abschluss."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V15-FLT-020
+    source: "1.5"
+    section: "Fortgeltendes Delta 1.5"
+    requirement: "Manuelle Anwesenheit und getrennte Gruppenaktionen ohne Scan."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V15-TKT-010
+    source: "1.5"
+    section: "Fortgeltendes Delta 1.5"
+    requirement: "Ticketcodes bleiben bis zur Veranstaltungslöschung geschützt gespeichert."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V15-TKT-020
+    source: "1.5"
+    section: "Fortgeltendes Delta 1.5"
+    requirement: "Geschützter Nachdruck als QR-Ticketzettel ohne Kassenbon-Darstellung."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V15-FIDS-010
+    source: "1.5"
+    section: "Fortgeltendes Delta 1.5"
+    requirement: "Öffentliches FIDS benötigt keine Gerätekopplung."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V15-FIDS-020
+    source: "1.5"
+    section: "Fortgeltendes Delta 1.5"
+    requirement: "Persistierte Ausblendfrist von 5 bis 900 Sekunden, Standard 15."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V15-BRAND-010
+    source: "1.5"
+    section: "Fortgeltendes Delta 1.5"
+    requirement: "PNG, JPEG, WebP und sicheres SVG mit Plane-Fallback."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V15-EVT-010
+    source: "1.5"
+    section: "Fortgeltendes Delta 1.5"
+    requirement: "Veranstaltungen können vollständig gelöscht werden."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V15-EVT-020
+    source: "1.5"
+    section: "Fortgeltendes Delta 1.5"
+    requirement: "Nach Löschung der letzten Veranstaltung startet die Ersteinrichtung."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V15-EXP-010
+    source: "1.5"
+    section: "Fortgeltendes Delta 1.5"
+    requirement: "Kontextbezogener anonymer Leistungsprofilexport."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V15-UI-020
+    source: "1.5"
+    section: "Fortgeltendes Delta 1.5"
+    requirement: "Ein-Bildschirm-Abläufe und eigenständige iPad-/iPhone-Layouts."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V15-IOS-010
+    source: "1.5"
+    section: "Fortgeltendes Delta 1.5"
+    requirement: "Manuelle Safari- und PWA-Abnahme auf realem iPhone und iPad."
+    priority: MUSS
+    stage: V1
+    status: manual_acceptance_pending
+  - id: V15-OPS-010
+    source: "1.5"
+    section: "Fortgeltendes Delta 1.5"
+    requirement: "Rolleneinweisungen und leicht löschbare synthetische Testveranstaltung."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V16-KAS-010
+    source: "1.6.0"
+    section: "Fortgeltendes Delta 1.6.0"
+    requirement: "Produktbezogene idempotente Verkaufsaktion an stabiler Position."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V16-KAS-015
+    source: "1.6.0"
+    section: "Fortgeltendes Delta 1.6.0"
+    requirement: "Vollständig bedienbare kompakte Produktliste auch bei mehr als zwei Produkten."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V16-KAS-020
+    source: "1.6.0"
+    section: "Fortgeltendes Delta 1.6.0"
+    requirement: "Dauerhaft reservierte Hinweisfläche ohne Layoutsprung."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V16-KAS-030
+    source: "1.6.0"
+    section: "Fortgeltendes Delta 1.6.0"
+    requirement: "Aktuelle cursorbasierte Kassenliste mit gezielter Revalidierung."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V16-KAS-040
+    source: "1.6.0"
+    section: "Fortgeltendes Delta 1.6.0"
+    requirement: "Zuverlässiger auditierter Storno mit unmittelbarer Kapazitätsfreigabe."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V16-KAS-050
+    source: "1.6.0"
+    section: "Fortgeltendes Delta 1.6.0"
+    requirement: "Keine neue Umbuchung; Korrektur durch Storno und Neuverkauf."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V16-TKT-010
+    source: "1.6.0"
+    section: "Fortgeltendes Delta 1.6.0"
+    requirement: "Gemeinsames lesbares 58-mm-Dokument für Vorschau und Druck."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V16-TKT-020
+    source: "1.6.0"
+    section: "Fortgeltendes Delta 1.6.0"
+    requirement: "Druck nur bei vollständigen Daten; Verkauf bleibt unabhängig gültig."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V161-UI-010
+    source: "1.6.1"
+    section: "Fortgeltendes Delta 1.6.1"
+    requirement: "Zweispaltige Kasse ohne horizontales Abschneiden im iPad-Landscape-Bereich."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V161-UI-020
+    source: "1.6.1"
+    section: "Fortgeltendes Delta 1.6.1"
+    requirement: "Genau ein Scroll-Eigentümer für Ticketliste und cursorbasiertes Nachladen."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V161-UI-030
+    source: "1.6.1"
+    section: "Fortgeltendes Delta 1.6.1"
+    requirement: "Ein globaler Footer entfällt; die aktuelle Releaseversion steht zugänglich in der oberen Navigation."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V161-FL-010
+    source: "1.6.1"
+    section: "Fortgeltendes Delta 1.6.1"
+    requirement: "Kompakte scrollbare Flugzeugtabelle mit deutschem Status, Zustandszeit und iPad-Darstellung."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V161-FL-020
+    source: "1.6.1"
+    section: "Fortgeltendes Delta 1.6.1"
+    requirement: "Zeilenaktionen und Buchungsgruppenbelegung im zentrierten Dialog ohne Zeilenaufklappung."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V161-FL-030
+    source: "1.6.1"
+    section: "Fortgeltendes Delta 1.6.1"
+    requirement: "Separate konfliktgeprüfte und auditierte Pilotzuweisung bis Offblock."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V161-FL-040
+    source: "1.6.1"
+    section: "Fortgeltendes Delta 1.6.1"
+    requirement: "Vollständige deutschsprachige Zeitlinie für aktuellen Umlauf und eine Historienzeile je Umlauf."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V17-KAS-010
+    source: "1.7.0"
+    section: "Fortgeltendes Delta 1.7.0"
+    requirement: "Kompakte feste Produktzeilen mit gemeinsamem Gruppenzähler und eigener Verkaufsaktion."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V17-KAS-020
+    source: "1.7.0"
+    section: "Fortgeltendes Delta 1.7.0"
+    requirement: "Geometrisch reservierte Aufteilungswarnung ohne wiederholte Bestätigung."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V17-KAS-030
+    source: "1.7.0"
+    section: "Fortgeltendes Delta 1.7.0"
+    requirement: "Operativ ausgeblendete Gewichtserfassung und ausschließlich generierte QR-Tickets bei erhaltener Vertragskompatibilität."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V17-KAS-040
+    source: "1.7.0"
+    section: "Fortgeltendes Delta 1.7.0"
+    requirement: "Gruppenzähler springt ausschließlich nach bestätigtem Verkauf auf eins zurück."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V17-OPS-010
+    source: "1.7.0"
+    section: "Fortgeltendes Delta 1.7.0"
+    requirement: "Kapazitäts- und statuskonsistenter segmentweiser Aufruf bewusst aufgeteilter Buchungsgruppen."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V17-TKT-010
+    source: "1.7.0"
+    section: "Fortgeltendes Delta 1.7.0"
+    requirement: "Vollständige Ticketvorschau ohne Scrollbereich und zugänglicher QR-Scan-Dialog."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V17-UI-010
+    source: "1.7.0"
+    section: "Fortgeltendes Delta 1.7.0"
+    requirement: "Sichtbarer Abstand zwischen Ticketstatus und Summe im iPad-Landscape-Layout."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V17-UI-020
+    source: "1.7.0"
+    section: "Fortgeltendes Delta 1.7.0"
+    requirement: "Schließbare gestapelte Top-Meldungen als layoutneutrale Seitenüberlagerung."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V17-UI-030
+    source: "1.7.0"
+    section: "Fortgeltendes Delta 1.7.0"
+    requirement: "Responsives Ansichtsmenü bleibt bis 320 CSS-Pixel vollständig und zugänglich im Viewport."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V17-FL-010
+    source: "1.7.0"
+    section: "Fortgeltendes Delta 1.7.0"
+    requirement: "Flight Line trennt Claim-Auswahl und Flugzeug-Arbeitsansicht mit ausschließlich manueller regulärer Freigabe."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V17-FL-020
+    source: "1.7.0"
+    section: "Fortgeltendes Delta 1.7.0"
+    requirement: "Flight Line teilt Status Zeitlinie Historie und Zustandsaktionen mit Flight Director; FLIGHT_LINE darf Flugzeugzustände aber keine Piloten ändern."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V17-FL-030
+    source: "1.7.0"
+    section: "Fortgeltendes Delta 1.7.0"
+    requirement: "Flight Line und Flight Director teilen eine verbundene Ist-Zeitlinie kompakte Aktionen semantische Unterzustandsfarben und konsistente Pilotenicons."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V17-UI-040
+    source: "1.7.0"
+    section: "Fortgeltendes Delta 1.7.0"
+    requirement: "Transiente Aktionsmeldungen verschwinden zeitgesteuert; betriebliche Zustandsmeldungen bleiben persistent."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V17-UI-050
+    source: "1.7.0"
+    section: "Fortgeltendes Delta 1.7.0"
+    requirement: "Die scrollbare Flight-Line-Flugzeugauswahl verwendet eine schmale themefähige Desktop-Scrollbar ohne mobilen Dokumentüberlauf."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V171-HEAD-010
+    source: "1.7.1"
+    section: "Fortgeltendes Delta 1.7.1"
+    requirement: "Einzeilige Kopfzeile außer FIDS mit iconbasiertem geschlossenem Ansichtsumschalter."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V171-TIM-010
+    source: "1.7.1"
+    section: "Fortgeltendes Delta 1.7.1"
+    requirement: "Gemeinsame achsengleiche fünfstufige Zeitlinie ohne Status-Hintergrundfläche."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V171-AST-010
+    source: "1.7.1"
+    section: "Fortgeltendes Delta 1.7.1"
+    requirement: "Fester scrollbarerer Flight-Line-Umlaufblock und einzeilige Pilotverwaltung."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V171-ACT-010
+    source: "1.7.1"
+    section: "Fortgeltendes Delta 1.7.1"
+    requirement: "Stabile zugängliche Icon-Aktionsreihen in Flight Line und Flight Director."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V171-CLM-010
+    source: "1.7.1"
+    section: "Fortgeltendes Delta 1.7.1"
+    requirement: "Loginbasierte 30-Minuten-Claims mit Aktivitätsverlängerung und revisionierter Übernahme."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V171-ABT-010
+    source: "1.7.1"
+    section: "Fortgeltendes Delta 1.7.1"
+    requirement: "Atomarer technischer Umlaufabbruch mit Queue-Rückstellung und INACTIVE-Flugzeug."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V171-PAU-010
+    source: "1.7.1"
+    section: "Fortgeltendes Delta 1.7.1"
+    requirement: "Kompakter Pausendialog mit vier unmittelbar ausführenden Daueraktionen."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V171-SUP-010
+    source: "1.7.1"
+    section: "Fortgeltendes Delta 1.7.1"
+    requirement: "Flight-Director-Tabelle ohne Status und Nächster Schritt mit Zeilenzeitlinie und Historienmodal."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V171-TKT-010
+    source: "1.7.1"
+    section: "Fortgeltendes Delta 1.7.1"
+    requirement: "Verkaufte Ticketgruppen nach soldAt und ID absteigend bei unveränderter Suche."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V171-MSG-010
+    source: "1.7.1"
+    section: "Fortgeltendes Delta 1.7.1"
+    requirement: "Keine Erfolgstoasts für erwartete lokale Standardaktionen."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V171-QA-010
+    source: "1.7.1"
+    section: "Fortgeltendes Delta 1.7.1"
+    requirement: "Automatisierte und visuelle Abnahme der mobilen und Desktop-Layouts sowie Fachkonflikte."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V172-FOC-010
+    source: "1.7.2"
+    section: "Fortgeltendes Delta 1.7.2"
+    requirement: "Suchfelder verwenden genau einen zugänglichen Fokusrahmen am äußeren Container."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V172-CAS-010
+    source: "1.7.2"
+    section: "Fortgeltendes Delta 1.7.2"
+    requirement: "Kassenprodukte ohne Flugzeugsymbol und ohne horizontalen Überlauf; das vergrößerte, optisch nach links versetzte Ticketsymbol bleibt auch auf schmalen Ansichten layoutstabil."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V172-SUP-010
+    source: "1.7.2"
+    section: "Fortgeltendes Delta 1.7.2"
+    requirement: "Responsive Flight-Director-Flugzeugtabelle mit kompakter Detailspalte, sechs Aktionen und größenstabil mittig ausgerichteter Zeitlinie."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V172-TKT-010
+    source: "1.7.2"
+    section: "Fortgeltendes Delta 1.7.2"
+    requirement: "Initial offene Tickets sowie kompakte Ticketmatrix mit stabiler Scrollbar, Symbolköpfen und unveränderter vertikaler Kopfposition beim Filtern."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V172-TIM-010
+    source: "1.7.2"
+    section: "Fortgeltendes Delta 1.7.2"
+    requirement: "Gemeinsame symbolische Zeitlinie mit Verbindungen nur zwischen Symbolkanten, gut lesbaren stabilen Zeitplätzen und einem nach Umlaufabschluss allein sichtbaren aktuellen Folgezustand."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V172-ACT-010
+    source: "1.7.2"
+    section: "Fortgeltendes Delta 1.7.2"
+    requirement: "Vier direkte Abschlussaktionen mit serverseitig gesperrter Aktionsgruppe."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V172-AST-010
+    source: "1.7.2"
+    section: "Fortgeltendes Delta 1.7.2"
+    requirement: "Kompakte Flight-Line-Arbeitsansicht mit aktuellem operativem Umlauf, Symbol-Zeit-Markern in Auswahl und Historie, 56-Pixel-Aktionen, getrennter Pilotverwaltung und stabiler Buchungsgruppenübersicht; redundante Status- und Zustandszeitangaben entfallen."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V172-CLM-010
+    source: "1.7.2"
+    section: "Fortgeltendes Delta 1.7.2"
+    requirement: "Gelbe ungefüllte bewusste Übernahme, blau gefüllter größenstabiler Pendingzustand mit ausschließlich mittigem Spinner und neutraler Touch-Hover beim Aktualisieren."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V172-QA-010
+    source: "1.7.2"
+    section: "Fortgeltendes Delta 1.7.2"
+    requirement: "Automatisierte und visuelle Abnahme der festgelegten Light- und Dark-Viewports."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V173-FID-010
+    source: "1.7.3"
+    section: "Fortgeltendes Delta 1.7.3"
+    requirement: "Standard-FIDS mit Veranstaltungsname, rahmenlosem großem Logo oder freiem schlankem Plane-Fallback in blauer Markenfarbe und kompatibler Normalisierung aller Terminallinks."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V173-PRI-010
+    source: "1.7.3"
+    section: "Fortgeltendes Delta 1.7.3"
+    requirement: "Aktive GO-TO-GATE- und BOARDING-Gruppen bilden unabhängig von Ressource und Produkt einen stabil queue-sortierten obersten Block; pausierte Gruppen sind verzögert."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V173-LAY-010
+    source: "1.7.3"
+    section: "Fortgeltendes Delta 1.7.3"
+    requirement: "Überlauffreie 100dvh-Anzeige mit exakt 4 bis 20 skalierten Zeilen, höchstens texthohen und ungefassten Lucide-Symbolen (users, clock-3, circle-arrow-right, tickets-plane, plane-takeoff), neutralem WARTEN und dezentem neutralem Footer-Trenner, kompakter schmaler Ansicht und zeilenweise verteilter Zweispaltenansicht ab 1280 Pixel."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V173-SET-010
+    source: "1.7.3"
+    section: "Fortgeltendes Delta 1.7.3"
+    requirement: "Zugänglicher dezenter Einstellungsbutton und bestätigungsgebundener Dialog für Zeilen, Layout, Theme und Abmeldung in der blauen UI-Akzentfarbe der Anwendung."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V173-AUT-010
+    source: "1.7.3"
+    section: "Fortgeltendes Delta 1.7.3"
+    requirement: "DISPLAY-Konten sind administrierbar und bleiben auf FIDS beschränkt; ADMIN-Konten dürfen FIDS zusätzlich zu ihren Administrationsansichten und mit unveränderter Startseite verwenden."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V173-SES-010
+    source: "1.7.3"
+    section: "Fortgeltendes Delta 1.7.3"
+    requirement: "DISPLAY-Sitzungen laufen absolut 90 Tage ohne früheren Idle-Ablauf; andere Rollen bleiben bei 16 Stunden und alle Widerrufswege wirken sofort."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V173-API-010
+    source: "1.7.3"
+    section: "Fortgeltendes Delta 1.7.3"
+    requirement: "Versionierter FidsPreferences-Vertrag und kontobezogene GET-/PUT-Endpunkte; Public Board und Logo bleiben anonym."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V173-DAT-010
+    source: "1.7.3"
+    section: "Fortgeltendes Delta 1.7.3"
+    requirement: "Präferenzupdates sind je Konto und Veranstaltung serialisiert, versioniert, idempotent, auditiert und atomar mit nicht sensitiver Outbox gespeichert."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V173-OPS-010
+    source: "1.7.3"
+    section: "Fortgeltendes Delta 1.7.3"
+    requirement: "Migration 0041, D1-Time-Travel-Wiederherstellung, Löschreihenfolge und bewusster Ausschluss aus portablen Backups sind dokumentiert."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V173-AST-010
+    source: "1.7.3"
+    section: "Fortgeltendes Delta 1.7.3"
+    requirement: "Mobile Flight-Line-Auswahl mit Ressourcengruppe und Plätzen statt unverbindlicher Fluggruppenkennung, optionaler eigener Ressourcenzeile, als gesamte Einheit vertikal zum linken Detailblock zentriertem Zustandsblock aus Symbol und stabiler Zeit darunter, neutraler Markerfläche und allein zustandsfarbigem Symbol samt Zeit, vollbreitem größenstabilem Übernahmebutton, gleichmäßig zweispaltiger Historie mit linksbündig beginnenden Symbolen und Werten ohne horizontalen Überlauf sowie gesperrten Aktionen während der Flugzeugfreigabe."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V173-QA-010
+    source: "1.7.3"
+    section: "Fortgeltendes Delta 1.7.3"
+    requirement: "Automatisierte und visuelle Abnahme deckt Rollen, Persistenz, Priorität, Themes, Viewports, Zeilenzahlen, Überlauf, Realtime und Offline-Stand ab."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V18-BSY-010
+    source: "1.8.0"
+    section: "Fortgeltendes Delta 1.8.0"
+    requirement: "Der auslösende asynchrone Button zeigt den größenstabilen zugänglichen Busy Indicator; andere gesperrte Buttons behalten ihren Inhalt."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V18-TIM-010
+    source: "1.8.0"
+    section: "Fortgeltendes Delta 1.8.0"
+    requirement: "Kasse, Flight Line, FIDS und öffentliche Statusseiten zeigen prognostizierte Zeitfenster als absolute Veranstaltungszeiten."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V18-CAS-010
+    source: "1.8.0"
+    section: "Fortgeltendes Delta 1.8.0"
+    requirement: "Kassenliste und Detail entsprechen dem freigegebenen Delta mit Fluggruppenzeilen, Phasensymbolen, GoToGate-Aktiv, absolutem Fenster und Ticket drucken."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V18-FLT-010
+    source: "1.8.0"
+    section: "Fortgeltendes Delta 1.8.0"
+    requirement: "Verkaufte Tickets in Flight Line verwenden die verbindliche dreizehnspaltige Reihenfolge mit getrennten G- und F-Kennungen."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V18-GRP-010
+    source: "1.8.0"
+    section: "Fortgeltendes Delta 1.8.0"
+    requirement: "Eine Buchungsgruppe besitzt genau einen öffentlichen Gruppen-QR-Code und einen aggregierten Status für alle Teilflüge."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V18-API-010
+    source: "1.8.0"
+    section: "Fortgeltendes Delta 1.8.0"
+    requirement: "Verträge liefern ISO-Zeitfenster und Zeitzone; Gruppenroute und Legacy-Ticketroute bleiben parallel verfügbar."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V18-DAT-010
+    source: "1.8.0"
+    section: "Fortgeltendes Delta 1.8.0"
+    requirement: "Migration 0042 speichert Gruppencode und Push-Zuordnung geschützt, füllt Bestände kompatibel und hält Codes aus Audit und Outbox."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V18-OPS-010
+    source: "1.8.0"
+    section: "Fortgeltendes Delta 1.8.0"
+    requirement: "ADR und Migrationsnotiz dokumentieren Rückwärtskompatibilität und Wiederherstellung."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V18-QA-010
+    source: "1.8.0"
+    section: "Fortgeltendes Delta 1.8.0"
+    requirement: "Automatisierte und visuelle Abnahme deckt Busy, Zeitfenster, Tabellen, Gruppendruck, Splitstatus, Push, Legacy und Geheimhaltung ab."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V19-BRN-010
+    source: "1.9.0"
+    section: "Fortgeltendes Delta 1.9.0"
+    requirement: "Das generische App-Icon verwendet in allen synchronen Varianten ein blaues Plane-Outline auf dunklem Hintergrund."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V19-CAS-010
+    source: "1.9.0"
+    section: "Fortgeltendes Delta 1.9.0"
+    requirement: "Kassenbuttons, Symbolköpfe, Personenanzeige, Abschlussstatus und der servergestützte Tab Offene Tickets entsprechen dem freigegebenen Delta."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V19-PRN-010
+    source: "1.9.0"
+    section: "Fortgeltendes Delta 1.9.0"
+    requirement: "POS-58 druckt das Gruppenticket ohne Vorlauf oder feste Rollenlänge aus genau einer Druckregelquelle."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V19-RTE-010
+    source: "1.9.0"
+    section: "Fortgeltendes Delta 1.9.0"
+    requirement: "Flight Director liegt unter /flight-director und Flight Line unter /flight-line; der alte Flight-Line-Pfad entfällt ohne Weiterleitung."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V19-API-010
+    source: "1.9.0"
+    section: "Fortgeltendes Delta 1.9.0"
+    requirement: "Die Ticketsuche filtert OPEN serverseitig vor Cursor und Pagination ohne neue Domänen- oder Datenbankzustände."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V19-QA-010
+    source: "1.9.0"
+    section: "Fortgeltendes Delta 1.9.0"
+    requirement: "Automatisierte und visuelle Abnahme deckt Favicon, Kasse, Druck, Statuslogik, neue Routen und entfernte Legacy-Metadaten ab."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V191-CAS-010
+    source: "1.9.1"
+    section: "Fortgeltendes Delta 1.9.1"
+    requirement: "Temporäre Kapazitäts- und Prognosezustände bleiben Hinweise und sperren keinen ausdrücklich freigegebenen Verkauf; die Gruppengröße bleibt nach Verkauf erhalten und besitzt einen Reset auf 1."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V191-GRP-010
+    source: "1.9.1"
+    section: "Fortgeltendes Delta 1.9.1"
+    requirement: "Verkauf und Aufteilungsanzeige leiten die Gruppenkapazität aus aktiven Ressourcengruppenzuordnungen statt temporären Flugzeugzuständen ab."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V191-PRN-010
+    source: "1.9.1"
+    section: "Fortgeltendes Delta 1.9.1"
+    requirement: "POS-58 druckt ausschließlich das auf 56 mm vergrößerte, mit einem 52-mm-QR-Code versehene und auf der Rollenachse zentrierte Ticket ohne Vorlauf oder feste Rollenlänge; Direktdruck wird betrieblich konfiguriert."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V191-PUB-010
+    source: "1.9.1"
+    section: "Fortgeltendes Delta 1.9.1"
+    requirement: "Öffentliche Status-PWAs vermeiden leeren iPhone-Überlauf und bezeichnen IN_FLIGHT als IM FLUG sowie LANDED als GELANDET."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V191-FID-010
+    source: "1.9.1"
+    section: "Fortgeltendes Delta 1.9.1"
+    requirement: "FIDS-Zeitfenster werden ohne nachgestelltes Wort Uhr dargestellt."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V191-QA-010
+    source: "1.9.1"
+    section: "Fortgeltendes Delta 1.9.1"
+    requirement: "Automatisierte, visuelle und Druckabnahmen decken das vollständige freigegebene Korrekturdelta ab."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V1100-REL-010
+    source: "1.10.0"
+    section: "Release und Versionierung"
+    requirement: "Anwendung, Workspace-Pakete, /api/meta, Healthcheck, Backups, Requirements, Traceability, Rollenunterlagen und PDFs melden konsistent 1.10.0."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V1100-DOC-010
+    source: "1.10.0"
+    section: "Dokumentationskonsistenz"
+    requirement: "Nur der aktuelle Katalog, gültige ADRs, Betriebsanleitungen, automatisierte Tests und unveränderte binäre Quellen gelten als aktuelle Dokumentation. Links, Bilder, Versionen und Begriffe werden automatisiert geprüft."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V1100-ROL-010
+    source: "1.10.0"
+    section: "Rollenbezogene Einweisung"
+    requirement: "Für Kasse, Flight Line, Flight Director und FIDS existiert je ein einseitiges Rollenblatt, für Administration höchstens zwei Seiten. Markdown ist Quelle; PDF wird reproduzierbar erzeugt. Jedes Blatt enthält Einstieg, vier bis sechs Schritte, aktuellen Screenshot, Ablaufstreifen, Stopp/Hilfe und Rolleninvarianten."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V1100-CF-010
+    source: "1.10.0"
+    section: "Cloudflare-Neuaufbau"
+    requirement: "Eine leere Cloudflare-Umgebung ist mit einem Zielnamen weitgehend automatisch und wiederaufnehmbar aufbaubar. Worker-, D1- und R2-Namen sind ableitbar oder überschreibbar; D1 und R2 verwenden EU-Jurisdiktion. Bestehende Ressourcen werden nie gelöscht oder geleert."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V1100-CF-020
+    source: "1.10.0"
+    section: "Cloudflare-Neuaufbau"
+    requirement: "Eine lokale, nicht versionierte Zielkonfiguration umfasst Static Assets, D1, R2, Durable Object, Rate Limits, Cron und Observability. Migrationen, Secrets, Build, Deployment und Smoke-Prüfung sind dokumentiert; Demo-Seeds bleiben ausgeschlossen."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V1100-SET-010
+    source: "1.10.0"
+    section: "Werksreset und Ersteinrichtung"
+    requirement: "Ein authentifizierter Werksreset verlangt die aktuelle Konto-PIN und führt im selben Browser über eine 30 Minuten gültige, einmal verwendbare, gehashte und hostgebundene Fortsetzungsfreigabe ohne Konsolenarbeit zu /setup. Antwortverlust ist über denselben commandId idempotent wiederholbar."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V1100-SEC-010
+    source: "1.10.0"
+    section: "Installationssicherheit"
+    requirement: "Der Installations-Notfallcode besitzt mindestens 128 Bit Entropie, liegt ausschließlich als Worker-Secret und im Passwortsafe vor, funktioniert nur bei leerer Installation und wird rate-limitiert mit generischen Fehlern geprüft. PINs, Codes, Cookies und Secrets erscheinen nie in Logs, Backups, Screenshots oder Repository."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V1100-API-010
+    source: "1.10.0"
+    section: "Interne API"
+    requirement: "Interne operative Clients verwenden ausschließlich /api/control/:eventId/.... JSON-Anfragen sind größenbegrenzt; fehlerhaftes JSON liefert 400, eine Überschreitung 413. Zugesicherte öffentliche Statusrouten bleiben kompatibel."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V1100-TYP-010
+    source: "1.10.0"
+    section: "Generierte Worker-Typen"
+    requirement: "Worker-Bindings werden mit wrangler types erzeugt und bei jeder Typprüfung mit --check gegen wrangler.jsonc verifiziert."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V1100-MIG-010
+    source: "1.10.0"
+    section: "Migrationen"
+    requirement: "SQL-Migrationen besitzen einen automatisch geprüften Registereintrag und eine Wiederherstellungsnotiz. Die historische Doppelnummer 0036 bleibt aus Gründen der angewandten D1-Historie unverändert und ist ausdrücklich registriert."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V1100-DEP-010
+    source: "1.10.0"
+    section: "Abhängigkeiten"
+    requirement: "Kompatible Patchstände werden kontrolliert aktualisiert; TypeScript bleibt in diesem Release auf 6.0.3. Dependabot schlägt wöchentlich gruppierte Patchupdates vor."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V1100-QA-010
+    source: "1.10.0"
+    section: "Qualitätssicherung"
+    requirement: "Unit-, Worker-/D1-Integrations- und Browserprüfungen decken Reset/Setup, Bootstrap-Konfiguration, Rollenabläufe, responsive Darstellung, Dokumente und Backups ab. Der vollständige Abnahmelauf bleibt npm run check."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V1100-MOD-010
+    source: "1.10.0"
+    section: "Modularisierung"
+    requirement: "Neue Setup-/Reset-, Request-Grenz- und Cloudflare-Ziellogik liegt in eigenständigen Modulen. Weitere Zerlegung der großen operativen Handler darf Atomarität, erwartete Version, Idempotenz, Audit, Outbox oder Veröffentlichung nach Persistenz nicht verändern."
+    priority: MUSS
+    stage: V1
+    status: implemented

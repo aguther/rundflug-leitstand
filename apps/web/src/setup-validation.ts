@@ -7,7 +7,10 @@ export interface SetupFormValues {
   adminPin: string;
 }
 
-export function setupValidationMessages(values: SetupFormValues): string[] {
+export function setupValidationMessages(
+  values: SetupFormValues,
+  options: { requireSetupCode?: boolean } = {},
+): string[] {
   const messages: string[] = [];
   if (!/^[a-z0-9][a-z0-9-]{2,63}$/.test(values.eventId.trim())) {
     messages.push(
@@ -23,8 +26,11 @@ export function setupValidationMessages(values: SetupFormValues): string[] {
   if (values.aerodrome.trim().length < 2 || values.aerodrome.trim().length > 120) {
     messages.push("Der Flugplatz benötigt 2–120 Zeichen.");
   }
-  if (values.setupCode.length < 8 || values.setupCode.length > 256) {
-    messages.push("Der einmalige Einrichtungscode benötigt 8–256 Zeichen.");
+  if (
+    options.requireSetupCode !== false &&
+    (values.setupCode.length < 8 || values.setupCode.length > 256)
+  ) {
+    messages.push("Der Installations-Notfallcode benötigt 8–256 Zeichen.");
   }
   if (!/^\d{6,12}$/.test(values.adminPin)) {
     messages.push("Die erste Administrator-PIN benötigt 6–12 Ziffern.");

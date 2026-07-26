@@ -85,7 +85,7 @@ const waitForWorker = async () => {
   throw new Error("Lokaler Worker wurde nicht rechtzeitig bereit.");
 };
 const board = async () => {
-  const response = await fetch(`${base}/api/events/demo-2026/operations`, {
+  const response = await fetch(`${base}/api/control/demo-2026/operations`, {
     headers: { "x-device-id": "technical-scaffold", "x-device-token": tokens.admin },
   });
   if (!response.ok) throw new Error(`Board-Abruf fehlgeschlagen (${response.status}).`);
@@ -109,7 +109,7 @@ const command = async (
   expectedStatus = 200,
   commandId = randomUUID(),
 ) => {
-  const response = await fetch(`${base}/api/events/demo-2026/commands`, {
+  const response = await fetch(`${base}/api/control/demo-2026/commands`, {
     method: "POST",
     headers: { "content-type": "application/json", "x-device-token": token },
     body: JSON.stringify({
@@ -146,7 +146,7 @@ const sell = (version, size, oversizeSplitAcknowledged = false) =>
   });
 const history = async (aggregateType, aggregateId) => {
   const query = new URLSearchParams({ aggregateType, aggregateId });
-  const response = await fetch(`${base}/api/events/demo-2026/history?${query}`, {
+  const response = await fetch(`${base}/api/control/demo-2026/history?${query}`, {
     headers: { "x-device-id": "technical-scaffold", "x-device-token": tokens.admin },
   });
   if (!response.ok) throw new Error(`Historienabruf fehlgeschlagen (${response.status}).`);

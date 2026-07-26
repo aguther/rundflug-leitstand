@@ -3,9 +3,10 @@ import { describe, expect, it } from "vitest";
 import adminUxSource from "./admin-ux.tsx?raw";
 import adminViewSource from "./admin-view.tsx?raw";
 import notificationsSource from "./app/PageNotifications.tsx?raw";
+import factoryResetDialogSource from "./features/admin/FactoryResetDialog.tsx?raw";
 import sharedSource from "./operation-workspace.tsx?raw";
 
-const appSource = `${adminViewSource}\n${sharedSource}`;
+const appSource = `${adminViewSource}\n${sharedSource}\n${factoryResetDialogSource}`;
 
 const stylesSource = [
   readFileSync(new URL("./styles.css", import.meta.url), "utf8"),

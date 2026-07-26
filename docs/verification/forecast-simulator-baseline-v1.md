@@ -160,13 +160,13 @@ Neustart, Rücksprung und ein neu berechnetes Ergebnis löschen diese Anzeigehis
 
 ## Browserabnahme
 
-Die freigegebenen Konzepte unter `docs/ui/forecast-simulator-*-approved.png` wurden im lokalen
+Die in Release 1.10.0 konsolidierten Simulatorabläufe wurden im lokalen
 Vite-Modus mit dem In-App-Browser gegen die gerenderte Anwendung verglichen. Die Funktionsprüfung
 erfolgte bei 1280×720; ergänzende Headless-Aufnahmen belegen das Layout bei 1536×1024 und 1280×800.
 Light und Dark Mode wurden jeweils im In-App-Browser geprüft:
 
 - die ergänzende Nachfrageabnahme vom 26. Juli 2026 prüft das freigegebene Konzept
-  `docs/ui/forecast-simulator-demand-approved.png` nativ bei 1536×1024 und 1280×800, jeweils in
+  die Nachfrageansicht nativ bei 1536×1024 und 1280×800, jeweils in
   Light und Dark Mode;
 - Tageszeiten und alle Nachfragefenster werden unabhängig von der Browser-Locale eindeutig im
   24-Stunden-Format `HH:MM` dargestellt;

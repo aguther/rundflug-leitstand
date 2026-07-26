@@ -1,20 +1,20 @@
-export interface Env {
+export type Env = Omit<
+  CloudflareBindings,
+  "APP_ENV" | "DATA_JURISDICTION" | "ADMIN_PIN_HASH" | "PUSH_RETENTION_DAYS"
+> & {
   APP_ENV: "development" | "acceptance" | "production";
   DATA_JURISDICTION: "eu";
   /** @deprecated Only read by the V1.1 compatibility routes during the V1.2 transition. */
-  ADMIN_PIN_HASH: string;
+  ADMIN_PIN_HASH?: string;
+  INSTALLATION_RECOVERY_CODE?: string;
+  RESET_SETUP_SIGNING_KEY?: string;
+  /** @deprecated Use INSTALLATION_RECOVERY_CODE. Kept for one deployment transition. */
   BOOTSTRAP_TOKEN?: string;
   VAPID_PUBLIC_KEY?: string;
   VAPID_PRIVATE_KEY?: string;
   VAPID_SUBJECT?: string;
   PUSH_RETENTION_DAYS?: string;
-  DB: D1Database;
-  BACKUPS: R2Bucket;
-  PUBLIC_TICKET_RATE_LIMITER: RateLimit;
-  ADMIN_RECOVERY_RATE_LIMITER: RateLimit;
-  EVENT_COORDINATOR: DurableObjectNamespace;
-  ASSETS: Fetcher;
-}
+};
 
 export interface StoredEventRow {
   id: string;

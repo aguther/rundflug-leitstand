@@ -1,4 +1,4 @@
--- Synthetic browser-QA data for the V1.7.3 FIDS view. Apply only to a reset local database.
+-- Synthetic browser-QA data for the current FIDS view. Apply only to a reset local database.
 INSERT OR IGNORE INTO resource_groups
   (id, operation_day_id, name, short_code, status, gate_id, version, created_at, updated_at)
 VALUES

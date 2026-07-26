@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { clearedSessionCookie, operatorRoles, sessionCookie, sessionTimes } from "./auth";
+import {
+  clearedSessionCookie,
+  operatorRoles,
+  sessionBrowserBindingHash,
+  sessionCookie,
+  sessionTimes,
+} from "./auth";
 
 describe("operator sessions", () => {
   it("uses an HttpOnly strict secure cookie on HTTPS", () => {
@@ -12,6 +18,23 @@ describe("operator sessions", () => {
 
   it("clears the session without exposing a reusable value", () => {
     expect(clearedSessionCookie(new Request("https://example.test/logout"))).toContain("Max-Age=0");
+  });
+
+  it("binds reset retries to the original HttpOnly browser session", async () => {
+    const original = new Request("https://example.test/reset", {
+      headers: { cookie: `rls_session=${"a".repeat(48)}` },
+    });
+    const otherBrowser = new Request("https://example.test/reset", {
+      headers: { cookie: `rls_session=${"b".repeat(48)}` },
+    });
+
+    await expect(sessionBrowserBindingHash(original)).resolves.toMatch(/^[a-f0-9]{64}$/);
+    expect(await sessionBrowserBindingHash(original)).not.toBe(
+      await sessionBrowserBindingHash(otherBrowser),
+    );
+    await expect(
+      sessionBrowserBindingHash(new Request("https://example.test/reset")),
+    ).resolves.toBeNull();
   });
 
   it("expires every internal session exactly after 16 hours", () => {

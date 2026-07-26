@@ -1,6 +1,6 @@
 # FIDS-Monitore mit Display-Konto
 
-Die FIDS-Webanwendung ist ab Release 1.7.3 mit einem aktiven Konto der Rolle `DISPLAY` oder `ADMIN`
+Die FIDS-Webanwendung ist in Release 1.10.0 mit einem aktiven Konto der Rolle `DISPLAY` oder `ADMIN`
 erreichbar. Für dauerhaft betriebene Monitore ist ein eigenes Display-Konto vorgesehen. Die feste
 Anzeige-URL lautet:
 

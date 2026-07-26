@@ -10,7 +10,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 YAML_PATH = ROOT / "docs/requirements/requirements-v1.4.yaml"
 CSV_PATH = ROOT / "docs/requirements/traceability.csv"
-BACKLOG_PATH = ROOT / "docs/backlog/v1-initial.md"
 ID_PATTERN = re.compile(r"^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+$")
 ALLOWED_PRIORITIES = {"MUSS", "SOLL", "KANN"}
 ALLOWED_STAGES = {"V1", "V2", "V3", "V4"}
@@ -36,7 +35,7 @@ def verify_release_version() -> str:
         ROOT / f"docs/requirements/requirements-v{version}.md",
         ROOT / f"docs/requirements/requirements-v{version}.yaml",
         ROOT / f"docs/requirements/traceability-v{version}.csv",
-        ROOT / f"docs/ui/v{version}-cashier-concept.md",
+        ROOT / f"docs/ui/v{version}-release-concept.md",
     ]
     missing = [str(path.relative_to(ROOT)) for path in versioned_paths if not path.exists()]
     if missing:
@@ -46,6 +45,8 @@ def verify_release_version() -> str:
     if not release_yaml.startswith(f"version: {version}\n"):
         fail(f"requirements-v{version}.yaml does not declare version {version}")
     release_ids = re.findall(r"^  - id: ([A-Z0-9-]+)$", release_yaml, re.MULTILINE)
+    if len(release_ids) != 319 or len(release_ids) != len(set(release_ids)):
+        fail(f"release {version} must contain exactly 319 unique current requirements")
     with versioned_paths[2].open(newline="", encoding="utf-8-sig") as handle:
         trace_ids = [row["ID"] for row in csv.DictReader(handle)]
     if release_ids != trace_ids:
@@ -60,6 +61,8 @@ def verify_release_version() -> str:
         fail("runtime requirements version is not aligned with the application version")
     if "applicationVersion: APP_VERSION" not in worker_source:
         fail("health endpoint does not expose the application version")
+    if "applicationVersion: APP_VERSION" not in backup_source:
+        fail("portable backups do not use the aligned application version")
     if "requirementsVersion: REQUIREMENTS_VERSION" not in backup_source:
         fail("portable backups do not use the aligned requirements version")
     return version
@@ -141,19 +144,12 @@ def main() -> None:
     if invalid_modules:
         fail(f"invalid V1 backlog package references: {invalid_modules}")
 
-    backlog = BACKLOG_PATH.read_text(encoding="utf-8")
-    missing_packages = [
-        f"BP-{number:02d}" for number in range(1, 13) if f"## BP-{number:02d} " not in backlog
-    ]
-    if missing_packages:
-        fail(f"backlog packages missing from v1-initial.md: {missing_packages}")
-
     v1_must = [row for row in v1_rows if row["Priorität"] == "MUSS"]
     if len(v1_must) != 166:
         fail(f"expected 166 V1 MUSS requirements, found {len(v1_must)}")
 
     print(
-        f"OK: release {release_version}, {len(ids)} unique requirements, "
+        f"OK: release {release_version}, 319 current requirements, {len(ids)} baseline requirements, "
         f"{len(v1_rows)} assigned V1 rows and {len(v1_must)} assigned V1 MUSS rows"
     )
 

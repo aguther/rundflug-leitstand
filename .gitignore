@@ -3,6 +3,7 @@ node_modules/
 **/dist/
 **/.wrangler/
 .wrangler/
+wrangler.*.generated.jsonc
 .dev.vars
 .dev.vars.*
 .env
@@ -11,6 +12,7 @@ node_modules/
 coverage/
 playwright-report/
 test-results/
+tmp/
 rundflug-leitstand-before-*.sql
 .DS_Store
 Thumbs.db

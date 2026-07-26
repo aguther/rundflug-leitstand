@@ -11,10 +11,8 @@ V1 trennt Schreiben, bestätigte Statusabfrage und Änderungssignal:
   ausschließlich den Hinweis, dass eine bestätigte Veranstaltungsversion vorliegt. Der Client lädt
   daraufhin seinen berechtigten DTO neu; das Signal enthält weder Ticketcodes noch interne Aggregate
   oder Sitzungsdaten.
-- Die früheren geschützten Pfade unter `/api/events/:eventId/...` bleiben vorübergehend als
-  serverseitige Kompatibilitätsaliase auf denselben Handlern bestehen. Browser verwenden nur noch
-  den neutralen Präfix `/api/control`, weil verbreitete Tracking-Schutzlisten den generischen
-  Workers-Pfad `/api/event...` blockieren. Öffentliche FIDS-, Logo- und Ticketpfade unter
+- Frühere interne Pfade unter `/api/events/:eventId/...` sind entfernt. Interne Clients verwenden
+  ausschließlich `/api/control/:eventId/...`. Öffentliche FIDS-, Logo- und Ticketpfade unter
   `/api/public/...` bleiben getrennt und unverändert.
 
 Das veranstaltungsbezogene Durable Object serialisiert Schreibkommandos. Persistierter Zustand,

@@ -163,6 +163,8 @@ function deviceHeaders(
 export async function getSetupStatus(): Promise<{
   setupRequired: boolean;
   setupConfigured: boolean;
+  resetSetupAuthorized: boolean;
+  resetSetupExpiresAt: string | null;
 }> {
   const response = await apiFetch("/api/setup/status", {
     headers: { "cache-control": "no-store" },

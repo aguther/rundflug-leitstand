@@ -1,54 +1,39 @@
-# Drittanbieter-Lizenzinventar V1
+# Drittanbieter-Lizenzinventar – Release 1.10.0
 
-Stand: 14. Juli 2026  
-Betroffene Anforderung: T-080
+Stand: automatisch aus installiertem Lockfile/Produktionsgraph erzeugt
+Betroffene Anforderung: T-080 und V1100-DEP-010
 
 ## Ergebnis
 
-Der installierte Produktionsabhängigkeitsgraph wurde nach `npm install` mit
-`npm query ':not(.dev)' --json` gegen die Paketmetadaten unter `node_modules` geprüft. Er enthält 33
-externe Pakete: 27 unter MIT und 6 unter ISC. Kein Produktionspaket besitzt fehlende,
-`UNLICENSED`- oder proprietäre Lizenzmetadaten.
+`npm query ':not(.dev)' --json` meldet 32 externe Produktionspakete:
+7 ISC, 24 MIT, 1 OFL-1.1. Kein Produktionspaket besitzt fehlende, `UNLICENSED`- oder proprietäre
+Lizenzmetadaten.
 
-Die zuvor direkte Abhängigkeit `@block65/webcrypto-web-push` und deren ausdrücklich
-unlizenziertes Transitpaket `@block65/custom-error` wurden entfernt. Web-Push bleibt erhalten und
-wird in `apps/worker/src/web-push-request.ts` ausschließlich mit der nativen Web-Crypto-API nach
-RFC 8188, RFC 8291 und RFC 8292 erzeugt. Der Test
-`apps/worker/src/web-push-request.test.ts` entschlüsselt das erzeugte `aes128gcm`-Paket wieder und
-verifiziert die VAPID-Signatur kryptografisch.
+Die frühere Abhängigkeit `@block65/webcrypto-web-push` und deren unlizenziertes Transitpaket
+`@block65/custom-error` sind nicht enthalten. Web-Push verwendet die native Web-Crypto-API nach
+RFC 8188, RFC 8291 und RFC 8292.
 
 ## Direkte Laufzeitabhängigkeiten
 
-| Paket | Version | Lizenz | Einsatz |
-| --- | --- | --- | --- |
-| `hono` | 4.12.29 | MIT | Worker-HTTP-Routing |
-| `zod` | 4.4.3 | MIT | Laufzeitvalidierung und Verträge |
-| `qrcode` | 1.5.4 | MIT | anonyme Ticket- und Gerätekopplungs-QR-Codes |
-| `react` | 19.2.7 | MIT | Weboberfläche |
-| `react-dom` | 19.2.7 | MIT | Browser-Rendering |
-| `workbox-window` | 7.4.1 | MIT | PWA-/Service-Worker-Anbindung |
+| Paket | Installierte Version | Lizenz |
+| --- | --- | --- |
+| `@fontsource/barlow-condensed` | 5.3.0 | OFL-1.1 |
+| `hono` | 4.12.32 | MIT |
+| `lucide-react` | 1.27.0 | ISC |
+| `qrcode` | 1.5.4 | MIT |
+| `zod` | 4.4.3 | MIT |
 
-Die Pakete unter `@rundflug/*` sind interne, nicht veröffentlichte Workspace-Pakete desselben
-Repositories. Für Build, Test und Deployment werden zusätzlich nur Pakete mit MIT-, ISC-, Apache-,
-BSD-, MPL-, BlueOak-, CC- oder LGPL-Metadaten verwendet; sie werden nicht als eigenständige
-proprietäre Laufzeitdienste benötigt. Das Lockfile ist die versionsgenaue Quelle des Inventars.
+Interne Pakete unter `@rundflug/*` gehören zum selben privaten Repository. Das Lockfile ist die
+versionsgenaue Quelle. Das Inventar wird mit `npm run docs:licenses:check` gegen den installierten
+Produktionsgraph geprüft und mit `npm run docs:licenses:build` aktualisiert.
 
-## Reproduzierbare Prüfung
+## Sicherheits- und Rechtehinweis
 
-```bash
-npm install
-npm ls @block65/webcrypto-web-push @block65/custom-error --all
-npm query ':not(.dev)' --json
-npm run check
-```
+`npm audit --omit=dev` ist vor Freigabe auszuführen. Der am 26. Juli 2026 verbleibende npm-Befund
+betrifft ausschließlich die Buildkette von `vite-plugin-pwa`/Workbox; es gibt derzeit keine mit
+Vite 8 kompatible gefixte Upstreamversion. Dependabot überwacht die Kette wöchentlich. Sie verarbeitet
+keine Laufzeitanfragen oder fremden Projektdateien im Worker.
 
-Der erste Befehl mit `npm ls` muss `(empty)` liefern. Die Abhängigkeits-Allowlist und die Abwesenheit
-der entfernten Pakete werden zusätzlich in
-`apps/worker/src/maintainability-coverage.test.ts` geprüft.
-
-## Verbleibende Rechteentscheidung
-
-Dieses Inventar beseitigt den technischen Drittanbieter-Lizenzblocker, ersetzt aber keine
-rechtsverbindliche Rechteübertragung am projektspezifischen Quellcode. `LICENSE.md` bleibt bis zur
-ausdrücklichen Entscheidung der berechtigten Parteien auf „alle Rechte vorbehalten“. T-080 bleibt
-deshalb formal in Arbeit, bis Nutzungsrecht, Lizenztext und Übergabeprotokoll freigegeben sind.
+Dieses technische Inventar ersetzt keine rechtsverbindliche Rechteübertragung am projektspezifischen
+Quellcode. `LICENSE.md` bleibt bis zur Entscheidung der berechtigten Parteien auf „alle Rechte
+vorbehalten“. Nutzungsrecht, Lizenztext und Übergabeprotokoll bleiben als OQ-13 offen.

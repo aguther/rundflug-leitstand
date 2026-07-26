@@ -140,3 +140,5 @@ export function FidsView() {
     />
   );
 }
+
+import "./features/fids/fids-v12.css";

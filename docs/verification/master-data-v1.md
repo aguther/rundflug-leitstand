@@ -35,9 +35,9 @@ synthetischer Kasse sowie FIDS auf Desktop und 430 × 900 Pixeln nach.
 ## Administration und Ersteinrichtung
 
 Die Administrationsoberfläche wurde gegen das freigegebene Konzept
-`docs/ui/operations-v2-multi-surface-concept.md` fortgeschrieben. Sie gliedert die Aufgaben in
+`docs/ui/v1.10.0-release-concept.md` fortgeschrieben. Sie gliedert die Aufgaben in
 Übersicht, Einrichtung, Stammdaten, Auswertung sowie Sicherung und Reset. Operative Steuerung liegt
-in Flight Line Supervisor. Der Einrichtungsfortschritt weist Parameter, Gates,
+im Flight Director. Der Einrichtungsfortschritt weist Parameter, Gates,
 Ressourcengruppen, Flugzeuge, Zuordnungen, anonyme Pilotencodes, Produkte und Betriebsfreigabe als
 acht voneinander abhängige Schritte aus.
 
@@ -54,7 +54,7 @@ Die frühere Prüfung auf Desktop und bei 430 × 900 Pixeln wies für die damali
 Die erneute Browserabnahme muss zusätzlich nachweisen, dass im Ruhezustand nur kompakte Tabellen
 sichtbar sind und Editoren ausschließlich nach „Neu“ oder „Bearbeiten“ öffnen.
 
-Die Produkt- und PIN-Bedienung wurde nach Freigabe von `docs/ui/product-master-data-v1.md` am
+Die Produkt- und PIN-Bedienung wurde nach Freigabe des aktuellen Releasekonzepts am
 14.07.2026 erneut geprüft. Der Nachweis umfasst:
 
 - Light und Dark bei 430 und 1440 Pixel Breite ohne horizontalen Überlauf,

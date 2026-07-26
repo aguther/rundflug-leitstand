@@ -201,7 +201,7 @@ describe("commandEnvelopeSchema", () => {
       commandId: "550e8400-e29b-41d4-a716-446655440500",
       eventId: "synthetic-event",
       reason: "Entwicklungsstand neu aufbauen",
-      adminPin: "0000",
+      adminPin: "000000",
       confirmation: "WERKSZUSTAND",
       retainRecoveryBackup: true,
       deleteAllBackups: false,
@@ -236,6 +236,18 @@ describe("commandEnvelopeSchema", () => {
     expect(() => bootstrapRequestSchema.parse({ ...parsed, timeZone: "Mars/Olympus" })).toThrow(
       "Ungültige IANA-Zeitzone",
     );
+  });
+  it("accepts setup without a recovery code when the server authorizes a reset grant", () => {
+    expect(
+      bootstrapRequestSchema.parse({
+        adminPin: "000000",
+        eventId: "synthetic-after-reset",
+        name: "Synthetischer Neustart",
+        eventDate: "2026-07-12",
+        aerodrome: "EDQA",
+        timeZone: "Europe/Berlin",
+      }),
+    ).not.toHaveProperty("setupCode");
   });
   it("accepts anonymous, ordered paper recovery records without guest fields", () => {
     const parsed = stageOutageRecoveryRequestSchema.parse({

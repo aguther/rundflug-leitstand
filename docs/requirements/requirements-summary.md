@@ -1,13 +1,12 @@
-# Anforderungskatalog – Basis v1.4, aktueller Release 1.9.1
+# Anforderungskatalog – Basis v1.4, aktueller Release 1.10.0
 
 Automatisch extrahiert: **207 eindeutige Anforderungen**.
 
-Die Zahlen unten beschreiben den unveränderten Basiskatalog V1.4. Die verbindlichen
-Releasekonkretisierungen für Anwendungsversion 1.9.1 stehen in `requirements-v1.9.1.md` und
-`requirements-v1.9.1.yaml`; sie ergänzen Verkaufskapazität, Gruppenkapazität, Personenreset,
-POS-58-/iPhone-Korrekturen und FIDS-Zeitfenster und
-übernehmen den
-übrigen Funktionsumfang von V1.9.0 unverändert.
+Die Zahlen unten beschreiben den unveränderten Basiskatalog V1.4. Der einzige aktuelle kumulative
+Releasekatalog für Anwendungsversion 1.10.0 steht in
+`requirements-v1.10.0.md` und `requirements-v1.10.0.yaml`. Er übernimmt alle fortgeltenden
+fachlichen Anforderungen und ergänzt Dokumentationskonsistenz, Rollenblätter, Cloudflare-Neuaufbau,
+sicheren Reset-/Setup-Ablauf, API-Grenzen und generierte Worker-Typen.
 
 ## Nach Priorität
 
@@ -54,16 +53,8 @@ POS-58-/iPhone-Korrekturen und FIDS-Zeitfenster und
 
 - `requirements-v1.4.md`: durchsuchbare Lesefassung des gesamten Lastenhefts.
 - `requirements-v1.4.yaml`: maschinenlesbarer Katalog; bewusst auch valides JSON.
-- `requirements-v1.6.0.md` und `.yaml`: fortgeltender Kassen- und Druckumfang.
-- `requirements-v1.6.1.md` und `.yaml`: fortgeltende Kassen- und Flight-Line-Korrekturen zu 1.6.1.
-- `requirements-v1.7.3.md` und `.yaml`: FIDS-, Auth- und UI-Erweiterungen.
-- `requirements-v1.8.0.md` und `.yaml`: fortgeltende Busy-, Zeitfenster-, Kassen-, Flight-Line- und
-  Gruppenticket-Erweiterungen.
-- `requirements-v1.9.0.md` und `.yaml`: fortgeltende Favicon-, Kassen-, Druck- und
-  Ansichts-/Routenerweiterungen.
-- `requirements-v1.9.1.md` und `.yaml`: aktuelle Verkaufs-, Gruppenkapazitäts-, Druck-, Ticket-
-  und FIDS-Korrekturen.
-- `traceability-v1.9.1.csv`: aktuelle Release-Traceability.
-- `traceability.csv`: Zuordnung zu Issues, Modulen, Tests und Umsetzungsstatus.
+- `requirements-v1.10.0.md` und `.yaml`: aktueller kumulativer Katalog mit 319 Anforderungen.
+- `traceability-v1.10.0.csv`: vollständige aktuelle Release-Traceability.
+- `traceability.csv`: Basiszuordnung zu Issues, Modulen, Tests und Umsetzungsstatus.
 - `Lastenheft_Rundflug-Leitstand_v1.4_konsolidiert.pdf`: unveränderte Referenz.
 - `Lastenheft_Rundflug-Leitstand_v1.4_konsolidiert.docx`: unveränderte Referenz.

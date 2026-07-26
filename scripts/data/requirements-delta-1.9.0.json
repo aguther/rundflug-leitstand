@@ -1,0 +1,78 @@
+{
+  "version": "1.10.0",
+  "sourceRelease": "1.9.0",
+  "requirements": [
+    {
+      "source": "1.9.0",
+      "id": "V19-BRN-010",
+      "section": "Fortgeltendes Delta 1.9.0",
+      "requirement": "Das generische App-Icon verwendet in allen synchronen Varianten ein blaues Plane-Outline auf dunklem Hintergrund.",
+      "priority": "MUSS",
+      "stage": "V1",
+      "status": "implemented",
+      "module": "apps/web/public/icons/app-icon.svg und Rastervarianten",
+      "tests": "pwa-installability.test.ts sowie visuelle Kleinformatabnahme",
+      "traceStatus": "umgesetzt"
+    },
+    {
+      "source": "1.9.0",
+      "id": "V19-CAS-010",
+      "section": "Fortgeltendes Delta 1.9.0",
+      "requirement": "Kassenbuttons, Symbolköpfe, Personenanzeige, Abschlussstatus und der servergestützte Tab Offene Tickets entsprechen dem freigegebenen Delta.",
+      "priority": "MUSS",
+      "stage": "V1",
+      "status": "implemented",
+      "module": "apps/web/src/cashier-view.tsx cashier-guidance.ts und cashier-v12.css",
+      "tests": "cashier-guidance.test.ts v19-ui.test.ts cashier-v12.test.ts und Browserabnahme",
+      "traceStatus": "umgesetzt"
+    },
+    {
+      "source": "1.9.0",
+      "id": "V19-PRN-010",
+      "section": "Fortgeltendes Delta 1.9.0",
+      "requirement": "POS-58 druckt das Gruppenticket ohne Vorlauf oder feste Rollenlänge aus genau einer Druckregelquelle.",
+      "priority": "MUSS",
+      "stage": "V1",
+      "status": "implemented",
+      "module": "apps/web/src/features/cashier/cashier-v12.css und styles.css",
+      "tests": "v19-ui.test.ts cashier-v12.test.ts und 58x100-mm-Print-to-PDF; physische POS-58-Prüfung extern",
+      "traceStatus": "umgesetzt"
+    },
+    {
+      "source": "1.9.0",
+      "id": "V19-RTE-010",
+      "section": "Fortgeltendes Delta 1.9.0",
+      "requirement": "Flight Director liegt unter /flight-director und Flight Line unter /flight-line; der alte Flight-Line-Pfad entfällt ohne Weiterleitung.",
+      "priority": "MUSS",
+      "stage": "V1",
+      "status": "implemented",
+      "module": "apps/web Router Navigation Installationsmetadaten Workerprofile und PWA-Manifeste",
+      "tests": "navigation.test.ts install-metadata.test.ts pwa-installability.test.ts und Browserabnahme",
+      "traceStatus": "umgesetzt"
+    },
+    {
+      "source": "1.9.0",
+      "id": "V19-API-010",
+      "section": "Fortgeltendes Delta 1.9.0",
+      "requirement": "Die Ticketsuche filtert OPEN serverseitig vor Cursor und Pagination ohne neue Domänen- oder Datenbankzustände.",
+      "priority": "MUSS",
+      "stage": "V1",
+      "status": "implemented",
+      "module": "packages/contracts/src/index.ts apps/worker/src/ticket-search.ts und index.ts",
+      "tests": "index.test.ts ticket-search.test.ts und Worker-Quelltests",
+      "traceStatus": "umgesetzt"
+    },
+    {
+      "source": "1.9.0",
+      "id": "V19-QA-010",
+      "section": "Fortgeltendes Delta 1.9.0",
+      "requirement": "Automatisierte und visuelle Abnahme deckt Favicon, Kasse, Druck, Statuslogik, neue Routen und entfernte Legacy-Metadaten ab.",
+      "priority": "MUSS",
+      "stage": "V1",
+      "status": "implemented",
+      "module": "Workspace-Prüfskripte und docs/ui/v1.10.0-release-concept.md",
+      "tests": "Vollständiger Check und responsive Browserabnahme",
+      "traceStatus": "umgesetzt"
+    }
+  ]
+}
