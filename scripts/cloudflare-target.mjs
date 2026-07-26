@@ -10,6 +10,13 @@ export const requiredCloudflareSecrets = [
   "VAPID_PRIVATE_KEY",
   "VAPID_SUBJECT",
 ];
+export const compatibilityProfileSecrets = [
+  "ADMIN_PIN_HASH",
+  "BOOTSTRAP_TOKEN",
+  "VAPID_PUBLIC_KEY",
+  "VAPID_PRIVATE_KEY",
+  "VAPID_SUBJECT",
+];
 
 const NAME_PATTERN = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/;
 
