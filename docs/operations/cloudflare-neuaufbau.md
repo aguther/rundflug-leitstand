@@ -66,10 +66,11 @@ Nach Prüfung denselben Befehl ohne `--dry-run` ausführen. Das Skript:
 7. zeigt den Installations-Notfallcode genau einmal sowie Worker-, Setup- und Prüfbefehl an.
 
 Beide lokalen Dateien sind von Git ausgeschlossen. D1-IDs müssen nicht manuell eingetragen werden.
-Demo-Seeds werden nicht ausgeführt. `wrangler.jsonc` und jede erzeugte Zielkonfiguration deklarieren
-unter `secrets.required` ausschließlich die fünf erforderlichen Secret-Namen. Dadurch bleiben
-Typgenerierung und CI unabhängig von lokalen `.dev.vars`; Secret-Werte stehen weiterhin nie in der
-Konfiguration oder im Repository.
+Demo-Seeds werden nicht ausgeführt. Jede erzeugte Zielkonfiguration deklariert unter
+`secrets.required` ausschließlich die fünf aktuellen Secret-Namen. Die eingecheckte
+`wrangler.jsonc` führt die Namen des bestehenden Kompatibilitätsprofils. Dadurch bleiben
+Typgenerierung und CI unabhängig von lokalen `.dev.vars`; Secret-Werte stehen weiterhin nie in
+der Konfiguration oder im Repository.
 
 Nach einem Abbruch exakt dieselben Namen und zusätzlich `--resume` verwenden:
 
