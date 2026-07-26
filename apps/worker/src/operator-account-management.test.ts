@@ -12,4 +12,15 @@ describe("operator account management", () => {
     expect(workerSource).toContain("parsed.data.revokeSessions ? 1 : 0");
     expect(workerSource).toContain("OR ?5 = 1 THEN session_version + 1");
   });
+
+  it("soft-deletes accounts while protecting the current and last active admin", () => {
+    expect(workerSource).toContain('app.delete("/api/admin/operator-accounts/:accountId"');
+    expect(workerSource).toContain("accountId === actor.accountId");
+    expect(workerSource).toContain("LAST_ACTIVE_ADMIN");
+    expect(workerSource).toContain("SET active = 0, deleted_at = ?1");
+    expect(workerSource).toContain("session_version = session_version + 1");
+    expect(workerSource).toContain(
+      "DELETE FROM flight_line_assist_claims WHERE operator_account_id = ?1",
+    );
+  });
 });

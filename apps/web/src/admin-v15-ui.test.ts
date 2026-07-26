@@ -137,18 +137,25 @@ describe("V1.5 administration UI", () => {
     expect(adminViewSource).toContain('size="wide"');
   });
 
-  it("opens master-data editors from rows without a redundant actions column", () => {
+  it("uses explicit touch actions instead of clickable master-data rows", () => {
     const masterDataTables = adminViewSource.slice(
       adminViewSource.indexOf('<section className="master-data-workspace"'),
       adminViewSource.indexOf('hidden={eventStep !== "completion"}'),
     );
 
-    expect(masterDataTables).not.toContain("<th>Aktionen</th>");
+    expect(masterDataTables).toContain('className="master-actions-heading">Aktionen</th>');
     expect(masterDataTables).not.toContain("table-overflow-action");
-    expect(masterDataTables).toContain("onClick={() => selectGateForEditing(gate.id)}");
-    expect(masterDataTables).toContain("onClick={() => selectResourceForEditing(group.id)}");
-    expect(masterDataTables).toContain("onClick={() => selectAircraftForEditing(aircraft.id)}");
-    expect(masterDataTables).toContain("onClick={() => selectPilotForEditing(pilot.id)}");
-    expect(masterDataTables).toContain("onClick={() => selectProductForEditing(product.id)}");
+    expect(masterDataTables).toContain("onEdit={() => selectGateForEditing(gate.id)}");
+    expect(masterDataTables).toContain("onEdit={() => selectResourceForEditing(group.id)}");
+    expect(masterDataTables).toContain("onEdit={() => selectAircraftForEditing(aircraft.id)}");
+    expect(masterDataTables).toContain("onEdit={() => selectPilotForEditing(pilot.id)}");
+    expect(masterDataTables).toContain("onEdit={() => selectProductForEditing(product.id)}");
+    expect(masterDataTables).toContain('requestMasterDelete("GATE"');
+    expect(masterDataTables).toContain('requestMasterDelete("RESOURCE_GROUP"');
+    expect(masterDataTables).toMatch(/requestMasterDelete\(\s*"AIRCRAFT"/);
+    expect(masterDataTables).toContain('requestMasterDelete("PILOT"');
+    expect(masterDataTables).toContain('requestMasterDelete("PRODUCT"');
+    expect(masterDataTables).not.toContain("tabIndex={0}");
+    expect(masterDataTables).not.toContain("onClick={() => selectGateForEditing(gate.id)}");
   });
 });

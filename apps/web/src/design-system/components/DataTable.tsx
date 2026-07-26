@@ -1,4 +1,5 @@
-import { type ReactNode, useMemo, useState } from "react";
+import { ChevronFirst, ChevronLast, ChevronLeft, ChevronRight } from "lucide-react";
+import { type ReactNode, useId, useMemo, useState } from "react";
 
 export interface DataTableColumn<Row> {
   key: string;
@@ -6,6 +7,7 @@ export interface DataTableColumn<Row> {
   render: (row: Row) => ReactNode;
   align?: "left" | "right" | "center";
   width?: string;
+  priority?: "primary" | "secondary" | "tertiary";
 }
 
 export interface DataTableProps<Row> {
@@ -34,6 +36,7 @@ export function DataTable<Row>({
   className = "",
 }: DataTableProps<Row>) {
   const paginated = pageSize !== undefined;
+  const paginationId = useId();
   const [rowsPerPage, setRowsPerPage] = useState(pageSize ?? rows.length);
   const [page, setPage] = useState(0);
 
@@ -58,13 +61,18 @@ export function DataTable<Row>({
           <tr>
             {columns.map((column) => (
               <th
+                className={column.priority ? `ds-table-column--${column.priority}` : undefined}
                 key={column.key}
                 style={{ width: column.width, textAlign: column.align ?? "left" }}
               >
                 {column.header}
               </th>
             ))}
-            {renderRowActions ? <th style={{ textAlign: "right" }}>Aktionen</th> : null}
+            {renderRowActions ? (
+              <th className="ds-table-actions-heading" style={{ textAlign: "right" }}>
+                Aktionen
+              </th>
+            ) : null}
           </tr>
         </thead>
         <tbody>
@@ -84,12 +92,18 @@ export function DataTable<Row>({
                   onClick={onRowClick ? () => onRowClick(row) : undefined}
                 >
                   {columns.map((column) => (
-                    <td key={column.key} style={{ textAlign: column.align ?? "left" }}>
+                    <td
+                      className={
+                        column.priority ? `ds-table-column--${column.priority}` : undefined
+                      }
+                      key={column.key}
+                      style={{ textAlign: column.align ?? "left" }}
+                    >
                       {column.render(row)}
                     </td>
                   ))}
                   {renderRowActions ? (
-                    <td>
+                    <td className="ds-table-actions-cell">
                       <div className="ds-table-actions">{renderRowActions(row)}</div>
                     </td>
                   ) : null}
@@ -102,9 +116,9 @@ export function DataTable<Row>({
       {paginated && rows.length > 0 ? (
         <div className="ds-pagination">
           <div className="ds-pagination-size">
-            <label htmlFor="ds-pagination-size-select">Zeilen pro Seite</label>
+            <label htmlFor={paginationId}>Zeilen pro Seite</label>
             <select
-              id="ds-pagination-size-select"
+              id={paginationId}
               value={rowsPerPage}
               onChange={(event) => {
                 setRowsPerPage(Number(event.target.value));
@@ -128,7 +142,7 @@ export function DataTable<Row>({
               onClick={() => setPage(0)}
               aria-label="Erste Seite"
             >
-              «
+              <ChevronFirst aria-hidden="true" />
             </button>
             <button
               type="button"
@@ -136,7 +150,7 @@ export function DataTable<Row>({
               onClick={() => setPage((value) => Math.max(0, value - 1))}
               aria-label="Vorherige Seite"
             >
-              ‹
+              <ChevronLeft aria-hidden="true" />
             </button>
             <button type="button" className="current" disabled>
               {currentPage + 1}
@@ -147,7 +161,7 @@ export function DataTable<Row>({
               onClick={() => setPage((value) => Math.min(pageCount - 1, value + 1))}
               aria-label="Nächste Seite"
             >
-              ›
+              <ChevronRight aria-hidden="true" />
             </button>
             <button
               type="button"
@@ -155,7 +169,7 @@ export function DataTable<Row>({
               onClick={() => setPage(pageCount - 1)}
               aria-label="Letzte Seite"
             >
-              »
+              <ChevronLast aria-hidden="true" />
             </button>
           </nav>
         </div>
