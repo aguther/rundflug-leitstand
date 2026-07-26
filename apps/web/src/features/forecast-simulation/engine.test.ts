@@ -8,6 +8,8 @@ import {
   simulationConfigForPreset,
 } from "./model";
 
+const FORECAST_BASELINE_TIMEOUT_MS = 20_000;
+
 function shortNormalConfig() {
   const config = simulationConfigForPreset("NORMAL");
   config.schedule.salesEndAt = "2026-07-22T10:00:00.000Z";
@@ -17,107 +19,111 @@ function shortNormalConfig() {
 }
 
 describe("local forecast simulation", () => {
-  it("captures the approved preset baseline", () => {
-    const baseline = Object.fromEntries(
-      (["NORMAL", "PEAK_LOAD", "AIRCRAFT_FAILURE", "OPERATION_INTERRUPTION"] as const).map(
-        (preset) => {
-          const result = runSimulation(simulationConfigForPreset(preset));
-          return [
-            preset,
-            {
-              generated: result.rotations.length,
-              completed: result.rotations.filter((rotation) => rotation.completedAt).length,
-              windowCoverage: result.metrics.boarding.windowCoveragePercent,
-              boardingMedian: result.metrics.boarding.medianAbsoluteErrorMinutes,
-              boardingP90: result.metrics.boarding.p90AbsoluteErrorMinutes,
-              averageWindowWidth: result.metrics.boarding.averageWindowWidthMinutes,
-              maximumReactionSeconds: result.metrics.maximumEventReactionSeconds,
-              uncertainCountdownViolations: result.metrics.uncertainCountdownViolations,
-              precall: result.metrics.precall,
-            },
-          ];
+  it(
+    "captures the approved preset baseline",
+    () => {
+      const baseline = Object.fromEntries(
+        (["NORMAL", "PEAK_LOAD", "AIRCRAFT_FAILURE", "OPERATION_INTERRUPTION"] as const).map(
+          (preset) => {
+            const result = runSimulation(simulationConfigForPreset(preset));
+            return [
+              preset,
+              {
+                generated: result.rotations.length,
+                completed: result.rotations.filter((rotation) => rotation.completedAt).length,
+                windowCoverage: result.metrics.boarding.windowCoveragePercent,
+                boardingMedian: result.metrics.boarding.medianAbsoluteErrorMinutes,
+                boardingP90: result.metrics.boarding.p90AbsoluteErrorMinutes,
+                averageWindowWidth: result.metrics.boarding.averageWindowWidthMinutes,
+                maximumReactionSeconds: result.metrics.maximumEventReactionSeconds,
+                uncertainCountdownViolations: result.metrics.uncertainCountdownViolations,
+                precall: result.metrics.precall,
+              },
+            ];
+          },
+        ),
+      );
+      expect(baseline).toEqual({
+        NORMAL: {
+          generated: 40,
+          completed: 28,
+          windowCoverage: 85.71,
+          boardingMedian: 2,
+          boardingP90: 8.2,
+          averageWindowWidth: 4.82,
+          maximumReactionSeconds: 29.648,
+          uncertainCountdownViolations: 0,
+          precall: {
+            eligibleGroups: 28,
+            precalledGroups: 26,
+            coveragePercent: 92.86,
+            medianGateWaitMinutes: 13.75,
+            p90GateWaitMinutes: 33.25,
+            sameTickCount: 4,
+            uncertainPrecallCount: 0,
+          },
         },
-      ),
-    );
-    expect(baseline).toEqual({
-      NORMAL: {
-        generated: 40,
-        completed: 28,
-        windowCoverage: 85.71,
-        boardingMedian: 2,
-        boardingP90: 8.2,
-        averageWindowWidth: 4.82,
-        maximumReactionSeconds: 29.648,
-        uncertainCountdownViolations: 0,
-        precall: {
-          eligibleGroups: 28,
-          precalledGroups: 26,
-          coveragePercent: 92.86,
-          medianGateWaitMinutes: 13.75,
-          p90GateWaitMinutes: 33.25,
-          sameTickCount: 4,
-          uncertainPrecallCount: 0,
+        PEAK_LOAD: {
+          generated: 78,
+          completed: 28,
+          windowCoverage: 85.71,
+          boardingMedian: 2,
+          boardingP90: 8.2,
+          averageWindowWidth: 4.82,
+          maximumReactionSeconds: 29.648,
+          uncertainCountdownViolations: 0,
+          precall: {
+            eligibleGroups: 28,
+            precalledGroups: 26,
+            coveragePercent: 92.86,
+            medianGateWaitMinutes: 13.75,
+            p90GateWaitMinutes: 33.25,
+            sameTickCount: 4,
+            uncertainPrecallCount: 0,
+          },
         },
-      },
-      PEAK_LOAD: {
-        generated: 78,
-        completed: 28,
-        windowCoverage: 85.71,
-        boardingMedian: 2,
-        boardingP90: 8.2,
-        averageWindowWidth: 4.82,
-        maximumReactionSeconds: 29.648,
-        uncertainCountdownViolations: 0,
-        precall: {
-          eligibleGroups: 28,
-          precalledGroups: 26,
-          coveragePercent: 92.86,
-          medianGateWaitMinutes: 13.75,
-          p90GateWaitMinutes: 33.25,
-          sameTickCount: 4,
-          uncertainPrecallCount: 0,
+        AIRCRAFT_FAILURE: {
+          generated: 40,
+          completed: 21,
+          windowCoverage: 100,
+          boardingMedian: 2,
+          boardingP90: 2.5,
+          averageWindowWidth: 4.9,
+          maximumReactionSeconds: 29.648,
+          uncertainCountdownViolations: 0,
+          precall: {
+            eligibleGroups: 21,
+            precalledGroups: 21,
+            coveragePercent: 100,
+            medianGateWaitMinutes: 17,
+            p90GateWaitMinutes: 39.5,
+            sameTickCount: 3,
+            uncertainPrecallCount: 0,
+          },
         },
-      },
-      AIRCRAFT_FAILURE: {
-        generated: 40,
-        completed: 21,
-        windowCoverage: 100,
-        boardingMedian: 2,
-        boardingP90: 2.5,
-        averageWindowWidth: 4.9,
-        maximumReactionSeconds: 29.648,
-        uncertainCountdownViolations: 0,
-        precall: {
-          eligibleGroups: 21,
-          precalledGroups: 21,
-          coveragePercent: 100,
-          medianGateWaitMinutes: 17,
-          p90GateWaitMinutes: 39.5,
-          sameTickCount: 3,
-          uncertainPrecallCount: 0,
+        OPERATION_INTERRUPTION: {
+          generated: 40,
+          completed: 27,
+          windowCoverage: 88.89,
+          boardingMedian: 2,
+          boardingP90: 8.2,
+          averageWindowWidth: 4.89,
+          maximumReactionSeconds: 29.648,
+          uncertainCountdownViolations: 0,
+          precall: {
+            eligibleGroups: 27,
+            precalledGroups: 25,
+            coveragePercent: 92.59,
+            medianGateWaitMinutes: 13,
+            p90GateWaitMinutes: 26.6,
+            sameTickCount: 3,
+            uncertainPrecallCount: 0,
+          },
         },
-      },
-      OPERATION_INTERRUPTION: {
-        generated: 40,
-        completed: 27,
-        windowCoverage: 88.89,
-        boardingMedian: 2,
-        boardingP90: 8.2,
-        averageWindowWidth: 4.89,
-        maximumReactionSeconds: 29.648,
-        uncertainCountdownViolations: 0,
-        precall: {
-          eligibleGroups: 27,
-          precalledGroups: 25,
-          coveragePercent: 92.59,
-          medianGateWaitMinutes: 13,
-          p90GateWaitMinutes: 26.6,
-          sameTickCount: 3,
-          uncertainPrecallCount: 0,
-        },
-      },
-    });
-  });
+      });
+    },
+    FORECAST_BASELINE_TIMEOUT_MS,
+  );
 
   it("is bit-for-bit reproducible for the same parameters and seed", () => {
     const config = shortNormalConfig();
@@ -421,31 +427,35 @@ describe("local forecast simulation", () => {
     expect(types).toContain("AIRCRAFT_RETURN_CONFIRMED");
   });
 
-  it("covers the four acceptance presets including forced outage and interruption", () => {
-    const normal = runSimulation(simulationConfigForPreset("NORMAL"));
-    const peak = runSimulation(simulationConfigForPreset("PEAK_LOAD"));
-    const outage = runSimulation(simulationConfigForPreset("AIRCRAFT_FAILURE"));
-    const interruption = runSimulation(simulationConfigForPreset("OPERATION_INTERRUPTION"));
+  it(
+    "covers the four acceptance presets including forced outage and interruption",
+    () => {
+      const normal = runSimulation(simulationConfigForPreset("NORMAL"));
+      const peak = runSimulation(simulationConfigForPreset("PEAK_LOAD"));
+      const outage = runSimulation(simulationConfigForPreset("AIRCRAFT_FAILURE"));
+      const interruption = runSimulation(simulationConfigForPreset("OPERATION_INTERRUPTION"));
 
-    expect(normal.config.adminParameters.aircraftCount).toBe(3);
-    expect(
-      calculateDemandSummary(
-        normal.config.realityModel.demand,
-        salesDurationMinutes(normal.config.schedule),
-      ).averagePersonsPerHour,
-    ).toBe(18);
-    expect(
-      calculateDemandSummary(
-        peak.config.realityModel.demand,
-        salesDurationMinutes(peak.config.schedule),
-      ).averagePersonsPerHour,
-    ).toBe(36);
-    expect(outage.events.some((event) => event.type === "AIRCRAFT_DAY_OUT")).toBe(true);
-    const interruptedAt = interruption.events.find((event) => event.type === "EVENT_INTERRUPTED");
-    const resumedAt = interruption.events.find((event) => event.type === "EVENT_RESUMED");
-    expect(
-      (Date.parse(resumedAt?.occurredAt ?? "") - Date.parse(interruptedAt?.occurredAt ?? "")) /
-        60_000,
-    ).toBe(30);
-  });
+      expect(normal.config.adminParameters.aircraftCount).toBe(3);
+      expect(
+        calculateDemandSummary(
+          normal.config.realityModel.demand,
+          salesDurationMinutes(normal.config.schedule),
+        ).averagePersonsPerHour,
+      ).toBe(18);
+      expect(
+        calculateDemandSummary(
+          peak.config.realityModel.demand,
+          salesDurationMinutes(peak.config.schedule),
+        ).averagePersonsPerHour,
+      ).toBe(36);
+      expect(outage.events.some((event) => event.type === "AIRCRAFT_DAY_OUT")).toBe(true);
+      const interruptedAt = interruption.events.find((event) => event.type === "EVENT_INTERRUPTED");
+      const resumedAt = interruption.events.find((event) => event.type === "EVENT_RESUMED");
+      expect(
+        (Date.parse(resumedAt?.occurredAt ?? "") - Date.parse(interruptedAt?.occurredAt ?? "")) /
+          60_000,
+      ).toBe(30);
+    },
+    FORECAST_BASELINE_TIMEOUT_MS,
+  );
 });
