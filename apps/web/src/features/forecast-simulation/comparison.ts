@@ -250,6 +250,11 @@ function nextSeed(seedStart: number, offset: number): number {
   return ((seedStart - 1 + offset) % maximumSeed) + 1;
 }
 
+function sameValues<T extends object>(left: T, right: T): boolean {
+  const keys = Object.keys(left) as Array<keyof T>;
+  return keys.length === Object.keys(right).length && keys.every((key) => left[key] === right[key]);
+}
+
 export function productionBaselineConfig(config: SimulationConfig): SimulationConfig {
   const baseline = structuredClone(config);
   baseline.forecastTuning.forecast = { ...DEFAULT_FORECAST_TUNING_PROFILE };
@@ -266,14 +271,20 @@ export function runBatchComparison(
   const candidateValues = new Map<string, number[]>();
   const baselineConfig = productionBaselineConfig(config);
   const runCount = config.forecastTuning.comparisonRuns;
+  const candidateUsesProductionTuning =
+    sameValues(config.forecastTuning.forecast, baselineConfig.forecastTuning.forecast) &&
+    sameValues(config.forecastTuning.precall, baselineConfig.forecastTuning.precall);
 
   for (let index = 0; index < runCount; index += 1) {
     const seed = nextSeed(config.seed, index);
     baselineConfig.seed = seed;
-    const candidateConfig = structuredClone(config);
-    candidateConfig.seed = seed;
     const baselineMetrics = runSimulation(baselineConfig, manualIncidents).metrics;
-    const candidateMetrics = runSimulation(candidateConfig, manualIncidents).metrics;
+    let candidateMetrics = baselineMetrics;
+    if (!candidateUsesProductionTuning) {
+      const candidateConfig = structuredClone(config);
+      candidateConfig.seed = seed;
+      candidateMetrics = runSimulation(candidateConfig, manualIncidents).metrics;
+    }
     for (const definition of METRIC_DEFINITIONS) {
       const baselineValue = definition.read(baselineMetrics);
       const candidateValue = definition.read(candidateMetrics);
