@@ -11,6 +11,14 @@ const eventScopedSource = readFileSync(
 const adminSource = readFileSync(new URL("../../admin-view.tsx", import.meta.url), "utf8");
 const viewSource = readFileSync(new URL("./ForecastSimulationView.tsx", import.meta.url), "utf8");
 const editorSource = readFileSync(new URL("./ScenarioEditor.tsx", import.meta.url), "utf8");
+const planEditorSource = readFileSync(
+  new URL("./SimulationPlanEditor.tsx", import.meta.url),
+  "utf8",
+);
+const planImportSource = readFileSync(
+  new URL("./simulation-plan-import.ts", import.meta.url),
+  "utf8",
+);
 const historySource = readFileSync(
   new URL("./SimulationHistoryDialog.tsx", import.meta.url),
   "utf8",
@@ -55,7 +63,7 @@ describe("local and hosted forecast simulation surface", () => {
   });
 
   it("contains no browser network or persistence call in the simulator feature", () => {
-    const allSources = `${viewSource}\n${editorSource}\n${historySource}\n${fidsPopoutSource}\n${fidsProjectionSource}`;
+    const allSources = `${viewSource}\n${editorSource}\n${planEditorSource}\n${planImportSource}\n${historySource}\n${fidsPopoutSource}\n${fidsProjectionSource}`;
     expect(allSources).not.toMatch(/\bfetch\s*\(/);
     expect(allSources).not.toMatch(/\bWebSocket\b/);
     expect(allSources).not.toMatch(
@@ -104,6 +112,9 @@ describe("local and hosted forecast simulation surface", () => {
       "Landung",
       "Abschluss",
       "Lauf auswerten",
+      "Simulationsplan importieren",
+      "Duplizieren",
+      "Als neue Variante übernehmen",
     ]) {
       expect(viewSource).toContain(label);
     }
@@ -153,10 +164,20 @@ describe("local and hosted forecast simulation surface", () => {
     expect(historySource).toContain("Realisierte Umläufe");
     expect(historySource).toContain("Sperren und Rückkehrereignisse");
     expect(historySource).toContain("Gruppe öffnen");
+    expect(historySource).toContain("Werte mit Maus anzeigen");
+    expect(historySource).toContain("Snapshot {formatTime(activeSnapshot.capturedAt)}");
+    expect(viewSource).toContain("Boarding-Prognose");
+    expect(viewSource).toContain(".sort((left, right) => left.at - right.at)");
     expect(viewSource).toContain("Aktueller Prognose-Snapshot");
     expect(viewSource).toContain("Unterdrückungsgründe");
     expect(viewSource).toContain("Rohwerte nicht als operative Zeit freigegeben");
     expect(stylesSource).toContain(".sim-raw-forecast");
+    expect(stylesSource).toContain(".sim-chart-tooltip");
+    expect(stylesSource).toContain(".sim-interruption-bar");
+    expect(planEditorSource).toContain("Geplante Unterbrechungen und Flugshows");
+    expect(planEditorSource).toContain("Nach simuliertem Umlauf");
+    expect(planImportSource).toContain("rundflug-master-data-template");
+    expect(planImportSource).toContain("MAX_SIMULATION_PLAN_FILE_BYTES");
   });
 
   it("keeps narrow layouts inside an internal scroll container", () => {

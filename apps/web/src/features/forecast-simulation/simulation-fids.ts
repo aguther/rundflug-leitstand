@@ -105,6 +105,24 @@ function interruptionAt(events: readonly SimulationEvent[], visibleAt: number): 
   return interrupted;
 }
 
+function activePlannedOperationIds(
+  events: readonly SimulationEvent[],
+  visibleAt: number,
+): ReadonlySet<string> {
+  const active = new Set<string>();
+  for (const event of events) {
+    if (Date.parse(event.occurredAt) > visibleAt) break;
+    if (!event.plannedOperationId) continue;
+    if (event.type === "PLANNED_OPERATION_STARTED") {
+      active.add(event.plannedOperationId);
+    }
+    if (event.type === "PLANNED_OPERATION_ENDED") {
+      active.delete(event.plannedOperationId);
+    }
+  }
+  return active;
+}
+
 function latestSnapshotsAt(
   snapshots: readonly SimulationForecastSnapshot[],
   visibleAt: number,
@@ -183,7 +201,16 @@ export function createSimulationFidsBoard(input: {
   visibleAt: number;
   recentDepartedRotationIds: ReadonlySet<string>;
 }): PublicBoard {
-  const interrupted = interruptionAt(input.result.events, input.visibleAt);
+  const manuallyInterrupted = interruptionAt(input.result.events, input.visibleAt);
+  const activePlanIds = activePlannedOperationIds(input.result.events, input.visibleAt);
+  const activePlans = (input.result.plannedOperations ?? []).filter((entry) =>
+    activePlanIds.has(entry.key),
+  );
+  const activeEventPlan = activePlans.find((entry) => entry.scopeType === "EVENT");
+  const interrupted = manuallyInterrupted || activeEventPlan !== undefined;
+  const globalNotice =
+    activeEventPlan?.publicNote ||
+    (interrupted ? "Der Rundflugbetrieb ist vorübergehend unterbrochen." : "");
   const snapshots = latestSnapshotsAt(input.result.snapshots, input.visibleAt);
   const visible = input.result.rotations
     .filter((rotation) => Date.parse(rotation.createdAt) <= input.visibleAt)
@@ -213,27 +240,37 @@ export function createSimulationFidsBoard(input: {
     .slice(0, 20);
 
   return {
-    eventName: "Simulierter Veranstaltungstag",
-    timeZone: "Europe/Berlin",
+    eventName: input.result.config.operationalModel?.sourceName ?? "Simulierter Veranstaltungstag",
+    timeZone: input.result.config.schedule.timeZone,
     selectedGate: null,
     emergencyMode: false,
     operationalInterrupted: interrupted,
-    operationalNotice: interrupted ? "Der Rundflugbetrieb ist vorübergehend unterbrochen." : "",
+    operationalNotice: globalNotice,
     departedVisibilitySeconds: SIMULATION_DEPARTED_VISIBILITY_MS / 1_000,
     updatedAt: new Date(input.visibleAt).toISOString(),
     groups: visible.map(({ rotation, lifecycle }) => {
+      const activeGroupPlan = activePlans.find(
+        (entry) =>
+          entry.scopeType === "RESOURCE_GROUP" && entry.scopeId === rotation.resourceGroupId,
+      );
+      const rotationInterrupted = interrupted || activeGroupPlan !== undefined;
       const snapshot = snapshots.get(rotation.id);
-      const window = boardWindow({ lifecycle, snapshot, interrupted });
-      const bookingGroupLabel = formatBookingGroupLabel("SIM", rotation.communicationNumber);
+      const window = boardWindow({
+        lifecycle,
+        snapshot,
+        interrupted: rotationInterrupted,
+      });
+      const productCode = rotation.productCode ?? "SIM";
+      const bookingGroupLabel = formatBookingGroupLabel(productCode, rotation.communicationNumber);
       const boundAircraft =
         lifecycle === "DRAFT"
           ? null
           : (input.result.aircraft.find((entry) => entry.id === rotation.aircraftId)
               ?.registration ?? null);
       return {
-        productName: "Rundflug Simulation",
-        productCode: "SIM",
-        gateLabel: "Flight Line 1",
+        productName: rotation.productName ?? "Rundflug Simulation",
+        productCode,
+        gateLabel: rotation.gateLabel ?? "Flight Line 1",
         communicationNumber: rotation.communicationNumber,
         ticketLabels: Array.from(
           { length: rotation.passengerCount },
@@ -247,9 +284,9 @@ export function createSimulationFidsBoard(input: {
         boardingWindowLowerAt: window.lowerAt,
         boardingWindowUpperAt: window.upperAt,
         predictionQuality: window.quality,
-        operationalNotice: interrupted
-          ? "Flugbetrieb unterbrochen – bitte Status erneut prüfen."
-          : "",
+        operationalNotice:
+          activeGroupPlan?.publicNote ||
+          (rotationInterrupted ? "Flugbetrieb unterbrochen – bitte Status erneut prüfen." : ""),
       };
     }),
     fleet: [],

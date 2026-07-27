@@ -12,10 +12,11 @@ Cloudflare-Ressourcen sind in diesem lokalen Simulatormodus nicht beteiligt.
 Der normale Cloudflare-Build enthält denselben Simulator zusätzlich als lazy Route `/simulation`.
 Der Einstieg liegt ausschließlich unter **Administration → Auswertung**, öffnet einen neuen Tab und
 wird über die vorhandene Sitzung auf die Rolle `ADMIN` begrenzt. Die bestehende Sitzungs- und
-Veranstaltungsauswahl darf beim Einstieg D1 lesen; die Simulation selbst verwendet weiterhin
-ausschließlich synthetische Eingaben im Browser. CSV-Inhalte, Konfiguration und Ergebnisse werden
-nicht an die API übertragen und nicht persistiert. Simulator-Chunks und -Styles sind vom
-PWA-Precache ausgeschlossen.
+Veranstaltungsauswahl darf beim Einstieg D1 lesen. Zusätzlich kann ein Administrator eine
+eigens dafür begrenzte Simulationsgrundlage herunterladen und anschließend lokal über die
+Dateiauswahl importieren. Die Simulation selbst führt keine API-Abfrage aus. CSV-/JSON-Inhalte,
+Varianten, Konfiguration und Ergebnisse werden nicht an die API übertragen und weder im Browser
+noch serverseitig persistiert. Simulator-Chunks und -Styles sind vom PWA-Precache ausgeschlossen.
 
 Alle hier genannten Läufe verwenden die freigegebenen Standardparameter und Seed `20260722`.
 Der Verkauf läuft 09:00–17:00 Uhr, der Flugbetrieb 10:00–18:00 Uhr Europe/Berlin. Das
@@ -92,6 +93,62 @@ seedübergreifenden Mediane der wichtigsten Baselinewerte lauten:
 Der Vergleich läuft abbrechbar in einem lokalen Browser-Worker. Er bewertet keine Variante
 automatisch als Gewinner.
 
+## Operative Simulationsgrundlage und Varianten
+
+Unter **Administration → Auswertung** erzeugt
+`GET /api/control/:eventId/exports/simulation-plan.json` das strikt validierte Format
+`rundflug-simulation-plan` Version 1. Der lesende Export ist für `ADMIN` und
+`FLIGHT_DIRECTOR` autorisiert; die aktuelle Oberfläche bietet ihn ausschließlich in der
+Administration an. Enthalten sind:
+
+- Veranstaltungszeiten und fachliche Planparameter,
+- Gates, Ressourcengruppen, aktuell zugeordnete Flugzeuge, anonyme Pilotencodes und Produkte,
+- ausschließlich noch offene Planeinträge im Zustand `PLANNED`.
+
+Nicht enthalten sind Tickets oder Ticketcodes, Buchungs- und Fluggruppen, Queues, aktuelle
+Flugzeug-/Piloten-/Umlaufzustände, Prognosesnapshots, Ereignisledger, Auditdaten,
+Operatorenkonten oder Sitzungen. Ein operativer Bezug auf einen aktuellen Umlauf wird nicht
+exportiert. Stattdessen trägt der Eintrag nur `afterCurrentRotation: true` und bleibt nach dem
+Import ausdrücklich unaufgelöst.
+
+Der Simulator akzeptiert sowohl das neue Format als auch das bestehende
+`rundflug-master-data-template` Version 1. Dateien sind auf 1 MiB begrenzt und werden vor der
+Übernahme vollständig gegen den Vertrags-Schema geprüft. Die Vorschau nennt Quelle und Anzahl
+aller Stammdaten und Planeinträge. Umlaufgebundene Einträge blockieren den Start, bis sie im
+Tagesplan in ein Zeitfenster umgewandelt oder in der Importvorschau bewusst ausgeschlossen
+werden. Das Stammdaten-Template behält mangels Tagesplan die bisher im Simulator eingestellten
+Zeiten und enthält keine Planeinträge.
+
+Mehrere Varianten existieren ausschließlich im React-Zustand der geöffneten Simulatorseite. Sie
+können benannt, dupliziert, gewechselt und gelöscht werden. Beim Import entsteht stets eine neue
+Variante; vorhandene Varianten werden nicht überschrieben. Ein Reload verwirft sie bewusst.
+
+Für importierte Stammdaten erzeugt jede Variante weiterhin ausschließlich synthetische Nachfrage,
+Gruppen, Umläufe und Ist-Ereignisse. Die voreingestellte Gesamtnachfrage von 18 Personen pro
+Stunde wird gleichmäßig über die importierten Produkte verteilt und kann anschließend angepasst
+werden. Die Queue-Planung berücksichtigt Produkt, Ressourcengruppe, heterogene
+Flugzeugkapazitäten und gemeinsam verfügbare anonyme Pilotencodes.
+
+Der Tagesplan unterstützt dieselben Arten und Geltungsbereiche wie der operative Plan:
+Pause, Tanken, Flugshow, Wetter, Technik oder Sonstiges für Veranstaltung,
+Ressourcengruppe, Flugzeug oder Pilotencode. Ein Seed realisiert Beginn und Dauer reproduzierbar
+innerhalb des angegebenen Zeit- beziehungsweise Dauerfensters. Diese Realisierung ist eine
+synthetische Annahme und keine operative Bestätigung. Planstart und -ende erscheinen im lokalen
+Ereignisledger, als Sperre in der Disposition, als Segment auf der Zeitachse und – bei neutralem
+öffentlichem Hinweis auf Veranstaltungs- oder Gruppenebene – im simulierten FIDS.
+
+Die Zeitachse trennt den schraffierten Tagesplan von realisierten Betriebsereignissen. Geplante
+Pausen nach einem Umlauf, Tanken, ungeplante Pausen, technische Defekte und Tagesausfälle
+erscheinen auf der jeweiligen Flugzeugspur; globale Unterbrechungen erscheinen auf der
+gemeinsamen Betriebsspur. Eine noch offene Sperre endet in der Darstellung an der aktuell
+sichtbaren Simulationszeit, sodass kein zukünftiges Rückkehrereignis vorweggenommen wird.
+
+Beide Prognosediagramme sind ohne zusätzliche Diagrammbibliothek interaktiv. Beim Zeigen auf einen
+Messpunkt nennt der Tagesfehlerverlauf Snapshotzeit, damalige Boarding-Prognose, Ist-Boarding und
+Fehler. Die Gruppenauswertung zeigt für den gewählten Snapshot dessen Erfassungszeit sowie die
+damals gültigen Prognosen für Boarding, Off-Block, On-Block und Abschluss. Die Messpunkte werden
+vor dem Verbinden chronologisch sortiert.
+
 ## Korrektur der falschen Unterdrückung
 
 Vor Betriebsbeginn ist die Ressourcengruppe absichtlich prognostisch inaktiv. In diesem Abschnitt
@@ -128,13 +185,19 @@ festgeschriebenen Preset- und 25-Seed-Werte.
   flugbetriebliche, technische, sicherheitsrelevante oder luftrechtliche Entscheidung.
 - Der CSV-Import kalibriert ausschließlich die Zeitverteilungen. Ohne Queue- und Snapshot-Historie
   rekonstruiert er keinen historischen Veranstaltungstag.
-- Synthetische Gruppen füllen derzeit jeweils die konfigurierte Sitzplatzzahl eines einheitlichen
-  Flugzeugtyps. Der Gruppenschutz und die Queue-Planung werden dadurch geprüft; mehrere Produkte
-  oder Ressourcengruppen werden noch nicht modelliert.
+- Ohne importierte Simulationsgrundlage verwendet die freigegebene Baseline weiterhin genau ein
+  synthetisches Produkt, eine Ressourcengruppe und einen einheitlichen Flugzeugtyp. Importierte
+  Varianten modellieren mehrere Produkte, Ressourcengruppen, Gates, Flugzeugtypen und
+  Pilotencodes.
+- Operative Planeinträge im Zustand `ACTIVE`, `CLEARED`, `CANCELED` oder der zeitabhängig
+  abgeleiteten Fälligkeit werden nicht als Plan exportiert. Der Simulator rekonstruiert damit
+  ausdrücklich keinen bereits begonnenen Veranstaltungstag.
+- Ein importierter Tagesplan ist weder Dienstplan noch technische, flugbetriebliche,
+  sicherheitsrelevante oder luftrechtliche Freigabe.
 - Exportiert werden nur Szenario, Seed, synthetisches Ereignisledger, Flugzeuge, Umläufe,
   Prognosesnapshots und Kennzahlen. Ticketcodes, Namen, Telefonnummern, PINs und Secrets sind weder
   Teil des Modells noch des Exports. Das Format trägt die Kennung
-  `rundflug-forecast-simulation/v5`.
+  `rundflug-forecast-simulation/v6`.
 
 ## Simuliertes Live-FIDS
 
@@ -151,8 +214,10 @@ aufgerufene Gruppen als `BOARDING`; Abflug, Landung und Abschluss werden im FIDS
 Betriebshinweis, setzt die Prognosequalität auf `UNCERTAIN` und veröffentlicht kein numerisches
 Zeitfenster.
 
-Die Anzeige verwendet ausschließlich synthetische `G-SIM-####`-Kennungen, `Rundflug Simulation`
-und `Flight Line 1`. Sie zeigt 20 Einträge in zwei Spalten mit jeweils zehn Zeilen und besitzt
+Die Anzeige verwendet ausschließlich synthetische Gruppenkennungen. In der Baseline lauten
+Produkt und Gate `Rundflug Simulation` und `Flight Line 1`; importierte Varianten verwenden die
+importierten Produktcodes, Produktnamen und Gatebezeichnungen. Sie zeigt 20 Einträge in zwei
+Spalten mit jeweils zehn Zeilen und besitzt
 weder Einstellungen noch die für den öffentlichen Betrieb bestimmte Fußzeile. `LIVE-SIMULATION`,
 die virtuelle Uhrzeit und der permanente Hinweis `Nur Simulation – keine Betriebsdaten` verhindern
 eine Verwechslung mit Betriebsdaten. Abflugtransitionen bleiben bei 1× für 15 Sekunden realer

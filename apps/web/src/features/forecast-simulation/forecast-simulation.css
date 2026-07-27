@@ -196,6 +196,58 @@
   background: var(--ui-control);
 }
 
+.sim-variant-manager {
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.sim-variant-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.sim-variant-actions button {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-sm);
+  color: var(--ui-muted);
+  background: var(--ui-control);
+  cursor: pointer;
+  font-size: 10px;
+}
+
+.sim-variant-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.sim-variant-actions svg {
+  width: 13px;
+}
+
+.sim-imported-topology {
+  display: grid;
+  gap: 3px;
+  padding: 9px 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-md);
+  background: var(--ui-surface);
+}
+
+.sim-imported-topology strong {
+  font-size: 16px;
+}
+
+.sim-imported-topology small {
+  color: var(--ui-muted);
+  font-size: 10px;
+}
+
 .sim-sidebar input.visually-hidden {
   position: absolute;
   width: 1px;
@@ -435,6 +487,8 @@
 
 .sim-timeline-legend {
   min-width: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   margin: 0;
   padding: 0;
   border: 0;
@@ -473,6 +527,22 @@
   background: #596168;
 }
 
+.sim-timeline-legend .sim-legend-plan::before {
+  width: 12px;
+  border: 1px solid color-mix(in srgb, var(--ui-warning) 70%, var(--ui-border));
+  background: repeating-linear-gradient(
+    135deg,
+    var(--ui-warning-soft) 0 3px,
+    color-mix(in srgb, var(--ui-warning) 38%, transparent) 3px 6px
+  );
+}
+
+.sim-timeline-legend .sim-legend-interruption::before {
+  width: 12px;
+  border: 1px solid color-mix(in srgb, var(--ui-danger) 72%, var(--ui-border));
+  background: color-mix(in srgb, var(--ui-danger) 72%, transparent);
+}
+
 .sim-timeline-scale {
   position: relative;
   height: 32px;
@@ -483,6 +553,10 @@
 
 .sim-timeline-scale time:last-child {
   transform: translateX(-100%);
+}
+
+.sim-timeline-scale time:first-child {
+  transform: none;
 }
 
 .sim-timeline-scale time {
@@ -499,7 +573,7 @@
 }
 
 .sim-aircraft-lane {
-  min-height: 78px;
+  min-height: 86px;
   display: grid;
   grid-template-columns: 112px minmax(0, 1fr);
   border-bottom: 1px solid var(--ui-border);
@@ -529,6 +603,41 @@
   background: color-mix(in srgb, var(--ui-surface-subtle) 42%, transparent);
 }
 
+.sim-plan-lane {
+  min-height: 62px;
+  background: color-mix(in srgb, var(--ui-warning-soft) 35%, transparent);
+}
+
+.sim-planned-operation-bar {
+  position: absolute;
+  z-index: 3;
+  top: 6px;
+  height: 20px;
+  overflow: hidden;
+  padding: 2px 5px;
+  border: 1px solid color-mix(in srgb, var(--ui-warning) 65%, var(--ui-border));
+  border-radius: 3px;
+  color: var(--ui-warning-text);
+  background: repeating-linear-gradient(
+    135deg,
+    var(--ui-warning-soft) 0 4px,
+    color-mix(in srgb, var(--ui-warning) 32%, var(--ui-warning-soft)) 4px 8px
+  );
+  font-size: 9px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.sim-planned-operation-bar[data-active="true"] {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ui-warning) 28%, transparent);
+}
+
+.sim-planned-operation-bar--aircraft {
+  top: 3px;
+  height: 16px;
+  padding: 1px 5px;
+}
+
 .sim-lane-gridline {
   position: absolute;
   inset-block: 0;
@@ -547,6 +656,49 @@
   color: var(--ui-text);
   background: transparent;
   cursor: pointer;
+}
+
+.sim-interruption-bar {
+  position: absolute;
+  z-index: 4;
+  top: 62px;
+  height: 16px;
+  overflow: hidden;
+  padding: 1px 5px;
+  border: 1px solid color-mix(in srgb, var(--ui-danger) 65%, var(--ui-border));
+  border-radius: 3px;
+  color: var(--ui-text);
+  background: color-mix(in srgb, var(--ui-danger) 72%, var(--ui-surface));
+  box-shadow: 0 1px 3px rgb(0 0 0 / 25%);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sim-interruption-bar[data-tone="planned"] {
+  border-color: color-mix(in srgb, var(--ui-warning) 70%, var(--ui-border));
+  color: var(--ui-warning-text);
+  background: repeating-linear-gradient(
+    135deg,
+    var(--ui-warning-soft) 0 4px,
+    color-mix(in srgb, var(--ui-warning) 38%, var(--ui-warning-soft)) 4px 8px
+  );
+}
+
+.sim-interruption-bar[data-tone="service"] {
+  border-color: color-mix(in srgb, var(--ui-accent) 68%, var(--ui-border));
+  color: var(--ui-accent);
+  background: color-mix(in srgb, var(--ui-accent) 18%, var(--ui-surface));
+}
+
+.sim-interruption-bar[data-active="true"] {
+  box-shadow: 0 0 0 2px color-mix(in srgb, currentcolor 30%, transparent);
+}
+
+.sim-interruption-bar--shared {
+  top: 34px;
 }
 
 .sim-rotation-bar[data-selected="true"] {
@@ -640,13 +792,14 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
   padding: 10px 14px;
 }
 
 .sim-queue-list button {
-  width: 44px;
-  height: 44px;
+  width: 64px;
+  height: 54px;
   display: grid;
   flex: 0 0 auto;
   place-items: center;
@@ -672,7 +825,11 @@
 }
 
 .sim-queue-list button small {
+  max-width: 100%;
+  overflow: hidden;
   font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sim-empty-queue {
@@ -733,8 +890,15 @@
 }
 
 .sim-chart-panel header span {
+  max-width: 230px;
   color: var(--ui-muted);
   font-size: 11px;
+  line-height: 1.3;
+  text-align: right;
+}
+
+.sim-chart-interactive {
+  position: relative;
 }
 
 .sim-error-chart {
@@ -742,6 +906,13 @@
   height: 170px;
   margin-top: 8px;
   overflow: visible;
+}
+
+.sim-error-chart:focus-visible,
+.sim-history-chart:focus-visible {
+  border-radius: var(--radius-sm);
+  outline: 2px solid color-mix(in srgb, var(--ui-accent) 65%, transparent);
+  outline-offset: 2px;
 }
 
 .sim-error-chart text {
@@ -763,6 +934,68 @@
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 2.2;
+}
+
+.sim-chart-cursor {
+  stroke: color-mix(in srgb, var(--ui-text) 68%, transparent);
+  stroke-dasharray: 3 3;
+  stroke-width: 1;
+}
+
+.sim-chart-active-point {
+  fill: var(--ui-surface);
+  stroke: var(--ui-accent);
+  stroke-width: 3;
+}
+
+.sim-chart-tooltip {
+  position: absolute;
+  z-index: 10;
+  top: 8px;
+  min-width: 184px;
+  max-width: 240px;
+  padding: 9px 11px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--radius-md);
+  color: var(--ui-text);
+  background: color-mix(in srgb, var(--ui-surface) 96%, transparent);
+  box-shadow: 0 9px 28px rgb(0 0 0 / 28%);
+  font-size: 10px;
+  pointer-events: none;
+  transform: translateX(-50%);
+}
+
+.sim-chart-tooltip[data-align="right"] {
+  transform: translateX(-100%);
+}
+
+.sim-chart-tooltip > strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 11px;
+}
+
+.sim-chart-tooltip dl {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+}
+
+.sim-chart-tooltip dl div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sim-chart-tooltip dt {
+  color: var(--ui-muted);
+}
+
+.sim-chart-tooltip dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+  white-space: nowrap;
 }
 
 .sim-chart-empty {
@@ -861,7 +1094,7 @@
   z-index: 2;
   top: 0;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   margin-bottom: 14px;
   border: 1px solid var(--ui-border);
   border-radius: var(--radius-md);
@@ -897,6 +1130,169 @@
   border: 1px solid var(--ui-border);
   border-radius: var(--radius-lg);
   background: var(--ui-surface);
+}
+
+.sim-plan-list {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.sim-plan-entry {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-md);
+  background: var(--ui-surface-subtle);
+}
+
+.sim-plan-entry > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sim-plan-entry > header button {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-sm);
+  color: var(--ui-danger);
+  background: var(--ui-control);
+  cursor: pointer;
+}
+
+.sim-plan-entry > header svg {
+  width: 15px;
+}
+
+.sim-plan-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.sim-plan-grid--times {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.sim-plan-grid label,
+.sim-plan-note {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+  color: var(--ui-muted);
+  font-size: 11px;
+}
+
+.sim-plan-entry :is(input, select) {
+  min-width: 0;
+  min-height: 34px;
+  padding: 0 8px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-sm);
+  color: var(--ui-text);
+  background: var(--ui-control);
+}
+
+.sim-plan-duration {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) repeat(3, 72px) auto;
+  align-items: center;
+  gap: 7px;
+  color: var(--ui-muted);
+  font-size: 11px;
+}
+
+.sim-plan-unresolved {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px;
+  border: 1px solid var(--ui-warning);
+  border-radius: var(--radius-sm);
+  color: var(--ui-warning-text);
+  background: var(--ui-warning-soft);
+}
+
+.sim-plan-import-preview {
+  display: grid;
+  gap: 14px;
+}
+
+.sim-plan-import-preview > header,
+.sim-plan-import-preview dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.sim-plan-import-preview > header > div,
+.sim-plan-import-preview dl > div {
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-sm);
+  background: var(--ui-surface-subtle);
+}
+
+.sim-plan-import-preview > header span,
+.sim-plan-import-preview dt {
+  color: var(--ui-muted);
+  font-size: 11px;
+}
+
+.sim-plan-import-preview dd {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.sim-plan-import-preview dl {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.sim-plan-import-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 10px;
+  border: 1px solid var(--ui-warning);
+  border-radius: var(--radius-sm);
+  color: var(--ui-warning-text);
+  background: var(--ui-warning-soft);
+}
+
+.sim-plan-import-warning svg {
+  width: 17px;
+  flex: 0 0 auto;
+}
+
+.sim-plan-import-exclusion {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  font-weight: 650;
+}
+
+@media (max-width: 760px) {
+  .sim-plan-grid,
+  .sim-plan-grid--times,
+  .sim-plan-import-preview > header,
+  .sim-plan-import-preview dl {
+    grid-template-columns: 1fr;
+  }
+
+  .sim-plan-duration {
+    grid-template-columns: 1fr repeat(3, minmax(0, 1fr)) auto;
+  }
 }
 
 .sim-editor-section-heading {
@@ -2013,7 +2409,7 @@
 .sim-aircraft-history-legend {
   display: flex;
   flex-wrap: wrap;
-  justify-content: flex-end;
+  justify-content: flex-start;
   gap: 8px 16px;
   color: var(--ui-muted);
   font-size: 10px;
@@ -2054,6 +2450,16 @@
   background: #949da4;
 }
 
+.sim-history-chart-legend [data-series="cursor"] {
+  margin-left: auto;
+}
+
+.sim-history-chart-legend [data-series="cursor"]::before {
+  width: 1px;
+  height: 12px;
+  background: var(--ui-text);
+}
+
 .sim-history-chart {
   width: 100%;
   height: 245px;
@@ -2089,6 +2495,26 @@
 
 .sim-history-chart-completion {
   stroke: #949da4;
+}
+
+.sim-chart-active-point.sim-history-chart-boarding {
+  fill: #2f86ff;
+}
+
+.sim-chart-active-point.sim-history-chart-departure {
+  fill: #22bfd6;
+}
+
+.sim-chart-active-point.sim-history-chart-landing {
+  fill: #65b64c;
+}
+
+.sim-chart-active-point.sim-history-chart-completion {
+  fill: #949da4;
+}
+
+.sim-history-chart-stage .sim-chart-tooltip {
+  top: 22px;
 }
 
 .sim-history-chart-actual {
@@ -2423,15 +2849,29 @@
 
 @media (max-width: 980px) {
   .forecast-simulator {
+    width: 100vw;
+    max-width: 100vw;
     height: 100dvh;
     overflow: hidden;
   }
 
   .sim-app-header {
-    min-width: 940px;
+    width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+  }
+
+  .sim-app-header > * {
+    flex: 0 0 auto;
+  }
+
+  .sim-app-header .sim-safety-notice {
+    flex-basis: 360px;
   }
 
   .sim-layout {
+    width: 100%;
+    max-width: 100vw;
     grid-template-columns: 220px 940px;
     overflow-x: auto;
   }
@@ -2453,7 +2893,7 @@
   }
 
   .sim-aircraft-lane {
-    min-height: 66px;
+    min-height: 86px;
   }
 
   .sim-analysis {

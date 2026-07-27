@@ -41,6 +41,7 @@ import {
   publicBoardSchema,
   publicGroupStatusSchema,
   publicTicketStatusSchema,
+  simulationPlanExportSchema,
   type TicketGroupPrintData,
   type TicketSearchRequest,
   type TicketSearchResponse,
@@ -347,6 +348,28 @@ export async function downloadMasterDataTemplate(
   const link = document.createElement("a");
   link.href = url;
   link.download = `stammdaten-${eventId}.json`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+export async function downloadSimulationPlan(
+  eventId: string,
+  deviceId: string,
+  deviceToken: string,
+): Promise<void> {
+  const response = await apiFetch(controlApiPath(eventId, "/exports/simulation-plan.json"), {
+    headers: deviceHeaders(deviceId, deviceToken),
+  });
+  if (!response.ok) throw new Error("Simulationsgrundlage nicht verfügbar.");
+  const simulationPlan = simulationPlanExportSchema.parse(await response.json());
+  const url = URL.createObjectURL(
+    new Blob([`${JSON.stringify(simulationPlan, null, 2)}\n`], {
+      type: "application/json;charset=utf-8",
+    }),
+  );
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `simulationsplan-${eventId}.json`;
   link.click();
   URL.revokeObjectURL(url);
 }
