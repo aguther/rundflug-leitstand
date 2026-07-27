@@ -195,6 +195,90 @@ describe("simulation FIDS projection", () => {
       waitUpperMinutes: 0,
     });
   });
+
+  it("projects imported product, gate and active public plan notices", () => {
+    const importedRotation = rotation("imported", 7, {
+      productId: "product-1",
+      productName: "Alpenrunde",
+      productCode: "ALP",
+      resourceGroupId: "group-1",
+      gateLabel: "Gate Süd",
+    });
+    const importedResult = result({
+      rotations: [importedRotation],
+      snapshots: [snapshot(importedRotation.id)],
+      events: [
+        {
+          id: "plan-start",
+          type: "PLANNED_OPERATION_STARTED",
+          occurredAt: at(55),
+          aircraftId: null,
+          plannedOperationId: "plan-group",
+          rotationId: null,
+          details: "Flugshow",
+          forecastRecalculatedAt: at(55),
+        },
+      ],
+    });
+    importedResult.config.operationalModel = {
+      sourceName: "Flugtag Alpen",
+      gates: [{ id: "gate-1", label: "Gate Süd" }],
+      resourceGroups: [
+        {
+          id: "group-1",
+          name: "Alpen",
+          shortCode: "ALP",
+          gateId: "gate-1",
+          automaticPrecallEnabled: true,
+        },
+      ],
+      aircraft: importedResult.aircraft,
+      pilots: [],
+      products: [
+        {
+          id: "product-1",
+          name: "Alpenrunde",
+          code: "ALP",
+          resourceGroupId: "group-1",
+          gateId: "gate-1",
+          referenceCapacity: 4,
+          referenceDurationMinutes: 20,
+        },
+      ],
+    };
+    importedResult.plannedOperations = [
+      {
+        key: "plan-group",
+        scopeType: "RESOURCE_GROUP",
+        scopeId: "group-1",
+        kind: "FLIGHT_SHOW",
+        startMode: "TIME_WINDOW",
+        earliestStartAt: at(55),
+        latestStartAt: at(55),
+        afterRotationId: null,
+        unresolvedAfterCurrentRotation: false,
+        minimumDurationMinutes: 20,
+        typicalDurationMinutes: 20,
+        maximumDurationMinutes: 20,
+        publicNote: "Flugshow – bitte am Gate warten",
+      },
+    ];
+
+    const board = createSimulationFidsBoard({
+      result: importedResult,
+      visibleAt: Date.parse(at(60)),
+      recentDepartedRotationIds: new Set(),
+    });
+
+    expect(board.eventName).toBe("Flugtag Alpen");
+    expect(board.groups[0]).toMatchObject({
+      productName: "Alpenrunde",
+      productCode: "ALP",
+      gateLabel: "Gate Süd",
+      predictionQuality: "UNCERTAIN",
+      operationalNotice: "Flugshow – bitte am Gate warten",
+    });
+  });
 });
 
 describe("simulation FIDS departure observation", () => {

@@ -28,6 +28,7 @@ export const timeZoneSchema = z
   );
 
 export const operationalPlanScopeSchema = z.enum(["EVENT", "RESOURCE_GROUP", "AIRCRAFT", "PILOT"]);
+export type OperationalPlanScope = z.infer<typeof operationalPlanScopeSchema>;
 export const operationalPlanKindSchema = z.enum([
   "PAUSE",
   "REFUELING",
@@ -36,7 +37,9 @@ export const operationalPlanKindSchema = z.enum([
   "TECHNICAL",
   "OTHER",
 ]);
+export type OperationalPlanKind = z.infer<typeof operationalPlanKindSchema>;
 export const operationalPlanStartModeSchema = z.enum(["TIME_WINDOW", "AFTER_CURRENT_ROTATION"]);
+export type OperationalPlanStartMode = z.infer<typeof operationalPlanStartModeSchema>;
 export const operationalPlanStatusSchema = z.enum([
   "PLANNED",
   "DUE",
@@ -1292,6 +1295,139 @@ export const masterDataTemplateSchema = z
     });
   });
 export type MasterDataTemplate = z.infer<typeof masterDataTemplateSchema>;
+
+const simulationPlanScheduleSchema = z
+  .object({
+    timeZone: timeZoneSchema,
+    salesStartAt: z.iso.datetime(),
+    salesEndAt: z.iso.datetime(),
+    operationsStartAt: z.iso.datetime(),
+    operationsEndAt: z.iso.datetime(),
+  })
+  .strict()
+  .superRefine((schedule, context) => {
+    if (Date.parse(schedule.salesStartAt) >= Date.parse(schedule.salesEndAt)) {
+      context.addIssue({
+        code: "custom",
+        message: "Das Verkaufsende muss nach dem Verkaufsbeginn liegen.",
+        path: ["salesEndAt"],
+      });
+    }
+    if (Date.parse(schedule.operationsStartAt) >= Date.parse(schedule.operationsEndAt)) {
+      context.addIssue({
+        code: "custom",
+        message: "Das Betriebsende muss nach dem Betriebsbeginn liegen.",
+        path: ["operationsEndAt"],
+      });
+    }
+    if (Date.parse(schedule.salesEndAt) > Date.parse(schedule.operationsEndAt)) {
+      context.addIssue({
+        code: "custom",
+        message: "Der Verkauf darf nicht nach dem Flugbetrieb enden.",
+        path: ["salesEndAt"],
+      });
+    }
+  });
+export type SimulationPlanSchedule = z.infer<typeof simulationPlanScheduleSchema>;
+
+const simulationPlanOperationSchema = z
+  .object({
+    key: masterDataTemplateKeySchema,
+    scopeType: operationalPlanScopeSchema,
+    scopeKey: masterDataTemplateKeySchema,
+    kind: operationalPlanKindSchema,
+    startMode: operationalPlanStartModeSchema,
+    earliestStartAt: z.iso.datetime().nullable(),
+    latestStartAt: z.iso.datetime().nullable(),
+    afterCurrentRotation: z.boolean(),
+    minimumDurationMinutes: z.number().int().min(1).max(1440),
+    typicalDurationMinutes: z.number().int().min(1).max(1440),
+    maximumDurationMinutes: z.number().int().min(1).max(1440),
+    publicNote: z.string().trim().max(160),
+  })
+  .strict()
+  .superRefine((operation, context) => {
+    if (
+      operation.minimumDurationMinutes > operation.typicalDurationMinutes ||
+      operation.typicalDurationMinutes > operation.maximumDurationMinutes
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Die Dauer muss als Minimum ≤ Typisch ≤ Maximum angegeben werden.",
+        path: ["typicalDurationMinutes"],
+      });
+    }
+    if (operation.startMode === "TIME_WINDOW") {
+      if (
+        !operation.earliestStartAt ||
+        !operation.latestStartAt ||
+        Date.parse(operation.earliestStartAt) > Date.parse(operation.latestStartAt) ||
+        operation.afterCurrentRotation
+      ) {
+        context.addIssue({
+          code: "custom",
+          message: "Das Startzeitfenster ist unvollständig oder ungültig.",
+          path: ["earliestStartAt"],
+        });
+      }
+    } else if (
+      operation.earliestStartAt !== null ||
+      operation.latestStartAt !== null ||
+      !operation.afterCurrentRotation
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Ein umlaufgebundener Beginn darf kein Startzeitfenster enthalten.",
+        path: ["afterCurrentRotation"],
+      });
+    }
+    if (
+      operation.publicNote.length > 0 &&
+      !["EVENT", "RESOURCE_GROUP"].includes(operation.scopeType)
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Öffentliche Hinweise sind nur veranstaltungs- oder gruppenweit zulässig.",
+        path: ["publicNote"],
+      });
+    }
+  });
+export type SimulationPlanOperation = z.infer<typeof simulationPlanOperationSchema>;
+
+export const simulationPlanExportSchema = z
+  .object({
+    format: z.literal("rundflug-simulation-plan"),
+    formatVersion: z.literal(1),
+    exportedAt: z.iso.datetime(),
+    source: masterDataTemplateSourceSchema,
+    schedule: simulationPlanScheduleSchema,
+    masterData: masterDataTemplateSchema,
+    plannedOperations: z.array(simulationPlanOperationSchema).max(500),
+  })
+  .strict()
+  .superRefine((exported, context) => {
+    const resourceGroupKeys = new Set(exported.masterData.resourceGroups.map((entry) => entry.key));
+    const aircraftKeys = new Set(exported.masterData.aircraft.map((entry) => entry.key));
+    const pilotKeys = new Set(exported.masterData.pilots.map((entry) => entry.key));
+    exported.plannedOperations.forEach((operation, index) => {
+      const targetExists =
+        operation.scopeType === "EVENT"
+          ? operation.scopeKey === "event"
+          : operation.scopeType === "RESOURCE_GROUP"
+            ? resourceGroupKeys.has(operation.scopeKey)
+            : operation.scopeType === "AIRCRAFT"
+              ? aircraftKeys.has(operation.scopeKey)
+              : pilotKeys.has(operation.scopeKey);
+      if (!targetExists) {
+        context.addIssue({
+          code: "custom",
+          message: "Der Planeintrag verweist auf kein exportiertes Ziel.",
+          path: ["plannedOperations", index, "scopeKey"],
+        });
+      }
+    });
+  });
+export type SimulationPlanExport = z.infer<typeof simulationPlanExportSchema>;
 
 export const masterDataTemplateValidationRequestSchema = z
   .object({ template: masterDataTemplateSchema })

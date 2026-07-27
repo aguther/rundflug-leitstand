@@ -1,3 +1,4 @@
+import type { SimulationPlanOperation as ImportedSimulationPlanOperation } from "@rundflug/contracts";
 import type {
   ForecastRotationStatus,
   ForecastTuningProfile,
@@ -90,6 +91,54 @@ export interface SimulationConfig {
   adminParameters: SimulationAdminParameters;
   realityModel: SimulationRealityModel;
   forecastTuning: SimulationForecastTuning;
+  operationalModel?: SimulationOperationalModel;
+  demandByProduct?: Record<string, SimulationDemand>;
+  plannedOperations: SimulationPlannedOperation[];
+}
+
+export interface SimulationGate {
+  id: string;
+  label: string;
+}
+
+export interface SimulationResourceGroup {
+  id: string;
+  name: string;
+  shortCode: string;
+  gateId: string;
+  automaticPrecallEnabled: boolean;
+}
+
+export interface SimulationProduct {
+  id: string;
+  name: string;
+  code: string;
+  resourceGroupId: string;
+  gateId: string;
+  referenceCapacity: number;
+  referenceDurationMinutes: number;
+}
+
+export interface SimulationPilot {
+  id: string;
+  operationalCode: string;
+  active: boolean;
+}
+
+export interface SimulationOperationalModel {
+  sourceName: string;
+  gates: SimulationGate[];
+  resourceGroups: SimulationResourceGroup[];
+  aircraft: SimulationAircraft[];
+  pilots: SimulationPilot[];
+  products: SimulationProduct[];
+}
+
+export interface SimulationPlannedOperation
+  extends Omit<ImportedSimulationPlanOperation, "scopeKey" | "afterCurrentRotation"> {
+  scopeId: string;
+  afterRotationId: string | null;
+  unresolvedAfterCurrentRotation: boolean;
 }
 
 export type SimulationPresetId =
@@ -127,6 +176,7 @@ export interface SimulationAircraft {
   registration: string;
   aircraftType: string;
   capacity: number;
+  resourceGroupId?: string;
 }
 
 export interface SimulationRotation {
@@ -140,6 +190,12 @@ export interface SimulationRotation {
   precallPredictedBoardingAt: string | null;
   precallAdaptiveLeadMinutes: number | null;
   aircraftId: string | null;
+  pilotId?: string | null;
+  productId?: string;
+  productName?: string;
+  productCode?: string;
+  resourceGroupId?: string;
+  gateLabel?: string;
   calledAt: string | null;
   departedAt: string | null;
   landedAt: string | null;
@@ -182,13 +238,17 @@ export type SimulationEventType =
   | "AIRCRAFT_DAY_OUT"
   | "AIRCRAFT_RETURN_CONFIRMED"
   | "EVENT_INTERRUPTED"
-  | "EVENT_RESUMED";
+  | "EVENT_RESUMED"
+  | "PLANNED_OPERATION_STARTED"
+  | "PLANNED_OPERATION_ENDED";
 
 export interface SimulationEvent {
   id: string;
   type: SimulationEventType;
   occurredAt: string;
   aircraftId: string | null;
+  pilotId?: string | null;
+  plannedOperationId?: string | null;
   rotationId: string | null;
   details: string;
   forecastRecalculatedAt: string;
@@ -246,6 +306,8 @@ export interface SimulationResult {
     endAt: string;
   };
   aircraft: SimulationAircraft[];
+  pilots?: SimulationPilot[];
+  plannedOperations?: SimulationPlannedOperation[];
   rotations: SimulationRotation[];
   events: SimulationEvent[];
   snapshots: SimulationForecastSnapshot[];
@@ -455,6 +517,7 @@ const BASE_CONFIG: SimulationConfig = {
     comparisonRuns: 25,
     availabilityModel: "TIME_DEPENDENT",
   },
+  plannedOperations: [],
 };
 
 export const SIMULATION_PRESETS: Readonly<Record<SimulationPresetId, SimulationConfig>> = {
@@ -527,9 +590,11 @@ export function validateSimulationConfig(config: SimulationConfig): string[] {
   if (
     !Number.isInteger(config.adminParameters.aircraftCount) ||
     config.adminParameters.aircraftCount < 1 ||
-    config.adminParameters.aircraftCount > 12
+    config.adminParameters.aircraftCount > (config.operationalModel ? 200 : 12)
   )
-    errors.push("Die Zahl der Flugzeuge muss zwischen 1 und 12 liegen.");
+    errors.push(
+      `Die Zahl der Flugzeuge muss zwischen 1 und ${config.operationalModel ? 200 : 12} liegen.`,
+    );
   if (
     !Number.isInteger(config.adminParameters.passengerSeats) ||
     config.adminParameters.passengerSeats < 1 ||
@@ -539,9 +604,9 @@ export function validateSimulationConfig(config: SimulationConfig): string[] {
   if (
     !Number.isInteger(config.adminParameters.activePilotCount) ||
     config.adminParameters.activePilotCount < 0 ||
-    config.adminParameters.activePilotCount > 100
+    config.adminParameters.activePilotCount > 200
   )
-    errors.push("Die aktive Pilotenkapazität muss zwischen 0 und 100 liegen.");
+    errors.push("Die aktive Pilotenkapazität muss zwischen 0 und 200 liegen.");
   if (config.adminParameters.aircraftType.trim().length < 2)
     errors.push("Der Flugzeugtyp muss mindestens zwei Zeichen lang sein.");
   for (const [label, value, minimum] of [
@@ -612,6 +677,123 @@ export function validateSimulationConfig(config: SimulationConfig): string[] {
     ) {
       errors.push(`Nachfragefenster ${index} und ${index + 1} überlappen sich.`);
     }
+  }
+  if (config.operationalModel) {
+    const model = config.operationalModel;
+    const gateIds = new Set(model.gates.map((entry) => entry.id));
+    const resourceGroupIds = new Set(model.resourceGroups.map((entry) => entry.id));
+    const aircraftIds = new Set(model.aircraft.map((entry) => entry.id));
+    const pilotIds = new Set(model.pilots.map((entry) => entry.id));
+    const productIds = new Set(model.products.map((entry) => entry.id));
+    for (const [label, ids] of [
+      ["Gate", model.gates.map((entry) => entry.id)],
+      ["Ressourcengruppe", model.resourceGroups.map((entry) => entry.id)],
+      ["Flugzeug", model.aircraft.map((entry) => entry.id)],
+      ["Pilot", model.pilots.map((entry) => entry.id)],
+      ["Produkt", model.products.map((entry) => entry.id)],
+    ] as const) {
+      if (new Set(ids).size !== ids.length) {
+        errors.push(`${label}-Kennungen müssen eindeutig sein.`);
+      }
+    }
+    if (model.gates.length === 0) errors.push("Der Import enthält kein Gate.");
+    if (model.resourceGroups.length === 0)
+      errors.push("Der Import enthält keine Ressourcengruppe.");
+    if (model.aircraft.length === 0) errors.push("Der Import enthält kein Flugzeug.");
+    if (model.products.length === 0) errors.push("Der Import enthält kein Produkt.");
+    for (const group of model.resourceGroups) {
+      if (!gateIds.has(group.gateId)) {
+        errors.push(`Ressourcengruppe ${group.shortCode} verweist auf ein unbekanntes Gate.`);
+      }
+    }
+    for (const entry of model.aircraft) {
+      if (!entry.resourceGroupId || !resourceGroupIds.has(entry.resourceGroupId)) {
+        errors.push(`Flugzeug ${entry.registration} besitzt keine gültige Ressourcengruppe.`);
+      }
+    }
+    for (const product of model.products) {
+      if (!resourceGroupIds.has(product.resourceGroupId) || !gateIds.has(product.gateId)) {
+        errors.push(`Produkt ${product.code} besitzt ungültige Gruppen- oder Gate-Verweise.`);
+      }
+    }
+    for (const productId of Object.keys(config.demandByProduct ?? {})) {
+      if (!productIds.has(productId)) {
+        errors.push(`Die Nachfrage verweist auf ein unbekanntes Produkt (${productId}).`);
+      }
+    }
+    for (const product of model.products) {
+      const demand = config.demandByProduct?.[product.id];
+      if (!demand) {
+        errors.push(`Für Produkt ${product.code} fehlt ein Nachfragemodell.`);
+        continue;
+      }
+      const windows = [...demand.windows].sort(
+        (left, right) =>
+          left.startOffsetMinutes - right.startOffsetMinutes ||
+          left.endOffsetMinutes - right.endOffsetMinutes,
+      );
+      for (const [index, window] of windows.entries()) {
+        if (
+          !Number.isInteger(window.startOffsetMinutes) ||
+          !Number.isInteger(window.endOffsetMinutes) ||
+          window.startOffsetMinutes < 0 ||
+          window.endOffsetMinutes <= window.startOffsetMinutes ||
+          window.endOffsetMinutes > demandDuration ||
+          !Number.isFinite(window.personsPerHour) ||
+          window.personsPerHour < 0
+        ) {
+          errors.push(`Nachfragefenster ${index + 1} für Produkt ${product.code} ist ungültig.`);
+        }
+        if (index > 0 && (windows[index - 1]?.endOffsetMinutes ?? 0) > window.startOffsetMinutes) {
+          errors.push(`Nachfragefenster für Produkt ${product.code} überlappen sich.`);
+        }
+      }
+    }
+    const operationIds = new Set<string>();
+    for (const operation of config.plannedOperations) {
+      if (operationIds.has(operation.key)) {
+        errors.push(`Planeintrag ${operation.key} ist doppelt vorhanden.`);
+      }
+      operationIds.add(operation.key);
+      if (operation.unresolvedAfterCurrentRotation) {
+        errors.push(
+          `Planeintrag ${operation.key} beginnt „nach aktuellem Umlauf“ und muss vor dem Lauf umgewandelt oder ausgeschlossen werden.`,
+        );
+      }
+      const targetValid =
+        operation.scopeType === "EVENT"
+          ? operation.scopeId === "event"
+          : operation.scopeType === "RESOURCE_GROUP"
+            ? resourceGroupIds.has(operation.scopeId)
+            : operation.scopeType === "AIRCRAFT"
+              ? aircraftIds.has(operation.scopeId)
+              : pilotIds.has(operation.scopeId);
+      if (!targetValid) {
+        errors.push(`Planeintrag ${operation.key} verweist auf ein unbekanntes Ziel.`);
+      }
+      if (
+        operation.minimumDurationMinutes < 1 ||
+        operation.minimumDurationMinutes > operation.typicalDurationMinutes ||
+        operation.typicalDurationMinutes > operation.maximumDurationMinutes
+      ) {
+        errors.push(`Planeintrag ${operation.key} besitzt eine ungültige Dauer.`);
+      }
+      if (
+        operation.startMode === "TIME_WINDOW" &&
+        (!operation.earliestStartAt ||
+          !operation.latestStartAt ||
+          Number.isNaN(Date.parse(operation.earliestStartAt)) ||
+          Number.isNaN(Date.parse(operation.latestStartAt)) ||
+          Date.parse(operation.earliestStartAt) > Date.parse(operation.latestStartAt))
+      ) {
+        errors.push(`Planeintrag ${operation.key} besitzt ein ungültiges Startzeitfenster.`);
+      }
+      if (operation.startMode === "AFTER_CURRENT_ROTATION" && !operation.afterRotationId) {
+        errors.push(`Planeintrag ${operation.key} benötigt einen simulierten Bezugsumlauf.`);
+      }
+    }
+  } else if (config.plannedOperations.length > 0) {
+    errors.push("Geplante Unterbrechungen benötigen importierte operative Stammdaten.");
   }
   if (
     config.realityModel.incidents.refueling.enabled &&

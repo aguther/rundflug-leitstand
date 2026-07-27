@@ -3,7 +3,9 @@ import {
   ArrowLeft,
   Clock3,
   Coffee,
+  Copy,
   Download,
+  FileJson,
   Fuel,
   Monitor,
   Pause,
@@ -13,6 +15,7 @@ import {
   RotateCcw,
   Settings2,
   Square,
+  Trash2,
   Upload,
   Wrench,
 } from "lucide-react";
@@ -41,12 +44,26 @@ import { ScenarioEditor } from "./ScenarioEditor";
 import { SimulationFidsPopout, type SimulationFidsPopoutHandle } from "./SimulationFidsPopout";
 import { SimulationHistoryDialog } from "./SimulationHistoryDialog";
 import { createSimulationExport } from "./simulation-export";
+import {
+  excludeUnresolvedPlannedOperations,
+  MAX_SIMULATION_PLAN_FILE_BYTES,
+  parseSimulationPlanImport,
+  SimulationPlanImportError,
+  type SimulationPlanImportPreview,
+} from "./simulation-plan-import";
 import "./forecast-simulation.css";
 
 const MINUTE_MS = 60_000;
 const TICK_MS = 30_000;
 const SPEEDS = [1, 10, 60, 300] as const;
 const HOSTED_SIMULATOR = import.meta.env.MODE !== "simulator";
+
+interface SimulationVariant {
+  id: string;
+  name: string;
+  config: SimulationConfig;
+  manualIncidents: ManualIncident[];
+}
 
 function createComparisonWorker(): Worker {
   return new Worker(new URL("./comparison-worker.ts", import.meta.url), {
@@ -111,18 +128,24 @@ function ErrorChart({
   rotations: readonly SimulationRotation[];
   snapshots: readonly SimulationForecastSnapshot[];
 }) {
-  const points = rotations.flatMap((rotation) => {
-    if (!rotation.calledAt) return [];
-    const snapshot = latestSnapshotBefore(snapshots, rotation.id, rotation.calledAt, "DRAFT");
-    if (!snapshot) return [];
-    return [
-      {
-        at: Date.parse(rotation.calledAt),
-        error:
-          (Date.parse(snapshot.predictedBoardingAt) - Date.parse(rotation.calledAt)) / MINUTE_MS,
-      },
-    ];
-  });
+  const [activePointIndex, setActivePointIndex] = useState<number | null>(null);
+  const points = rotations
+    .flatMap((rotation) => {
+      if (!rotation.calledAt) return [];
+      const snapshot = latestSnapshotBefore(snapshots, rotation.id, rotation.calledAt, "DRAFT");
+      if (!snapshot) return [];
+      return [
+        {
+          at: Date.parse(rotation.calledAt),
+          capturedAt: Date.parse(snapshot.capturedAt),
+          predictedBoardingAt: Date.parse(snapshot.predictedBoardingAt),
+          communicationNumber: rotation.communicationNumber,
+          error:
+            (Date.parse(snapshot.predictedBoardingAt) - Date.parse(rotation.calledAt)) / MINUTE_MS,
+        },
+      ];
+    })
+    .sort((left, right) => left.at - right.at);
   if (points.length < 2) {
     return (
       <div className="sim-chart-empty">Noch nicht genügend abgeschlossene Prognosevergleiche.</div>
@@ -134,46 +157,122 @@ function ErrorChart({
   const minAt = Math.min(...points.map((point) => point.at));
   const maxAt = Math.max(...points.map((point) => point.at));
   const maxError = Math.max(10, ...points.map((point) => Math.abs(point.error)));
-  const coordinates = points.map((point) => {
+  const plottedPoints = points.map((point) => {
     const x = padding + ((point.at - minAt) / Math.max(1, maxAt - minAt)) * (width - padding * 2);
     const y = height / 2 - (point.error / maxError) * (height / 2 - padding);
-    return `${x},${y}`;
+    return { ...point, x, y };
   });
+  const activePoint = activePointIndex === null ? null : plottedPoints[activePointIndex];
+  const selectNearestPoint = (pointerX: number) => {
+    let nearestIndex = 0;
+    let nearestDistance = Number.POSITIVE_INFINITY;
+    for (const [index, point] of plottedPoints.entries()) {
+      const distance = Math.abs(point.x - pointerX);
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearestIndex = index;
+      }
+    }
+    setActivePointIndex(nearestIndex);
+  };
   return (
-    <svg
-      aria-label="Verlauf des Boarding-Prognosefehlers"
-      className="sim-error-chart"
-      role="img"
-      viewBox={`0 0 ${width} ${height}`}
-    >
-      <line
-        className="sim-chart-axis"
-        x1={padding}
-        x2={width - padding}
-        y1={height / 2}
-        y2={height / 2}
-      />
-      {[0.25, 0.75].map((position) => (
+    <div className="sim-chart-interactive sim-error-chart-stage">
+      <svg
+        aria-label="Interaktiver Verlauf des Boarding-Prognosefehlers"
+        className="sim-error-chart"
+        onPointerLeave={() => setActivePointIndex(null)}
+        onPointerMove={(event) => {
+          const matrix = event.currentTarget.getScreenCTM();
+          if (!matrix) return;
+          const pointer = event.currentTarget.createSVGPoint();
+          pointer.x = event.clientX;
+          pointer.y = event.clientY;
+          selectNearestPoint(pointer.matrixTransform(matrix.inverse()).x);
+        }}
+        role="img"
+        viewBox={`0 0 ${width} ${height}`}
+      >
         <line
-          className="sim-chart-grid"
-          key={position}
+          className="sim-chart-axis"
           x1={padding}
           x2={width - padding}
-          y1={height * position}
-          y2={height * position}
+          y1={height / 2}
+          y2={height / 2}
         />
-      ))}
-      <polyline className="sim-chart-line" fill="none" points={coordinates.join(" ")} />
-      <text x={2} y={height / 2 - 5}>
-        0
-      </text>
-      <text x={padding} y={height - 4}>
-        {formatTime(minAt)}
-      </text>
-      <text textAnchor="end" x={width - padding} y={height - 4}>
-        {formatTime(maxAt)}
-      </text>
-    </svg>
+        {[0.25, 0.75].map((position) => (
+          <line
+            className="sim-chart-grid"
+            key={position}
+            x1={padding}
+            x2={width - padding}
+            y1={height * position}
+            y2={height * position}
+          />
+        ))}
+        <polyline
+          className="sim-chart-line"
+          fill="none"
+          points={plottedPoints.map((point) => `${point.x},${point.y}`).join(" ")}
+        />
+        {activePoint ? (
+          <>
+            <line
+              className="sim-chart-cursor"
+              x1={activePoint.x}
+              x2={activePoint.x}
+              y1={padding / 2}
+              y2={height - padding}
+            />
+            <circle
+              className="sim-chart-active-point"
+              cx={activePoint.x}
+              cy={activePoint.y}
+              r={4}
+            />
+          </>
+        ) : null}
+        <text x={2} y={height / 2 - 5}>
+          0
+        </text>
+        <text x={padding} y={height - 4}>
+          {formatTime(minAt)}
+        </text>
+        <text textAnchor="end" x={width - padding} y={height - 4}>
+          {formatTime(maxAt)}
+        </text>
+      </svg>
+      {activePoint ? (
+        <div
+          className="sim-chart-tooltip"
+          data-align={activePoint.x > width * 0.68 ? "right" : "center"}
+          role="status"
+          style={{ left: `${(activePoint.x / width) * 100}%` }}
+        >
+          <strong>Fluggruppe {activePoint.communicationNumber}</strong>
+          <dl>
+            <div>
+              <dt>Snapshot</dt>
+              <dd>{formatTime(activePoint.capturedAt)}</dd>
+            </div>
+            <div>
+              <dt>Boarding-Prognose</dt>
+              <dd>{formatTime(activePoint.predictedBoardingAt)}</dd>
+            </div>
+            <div>
+              <dt>Boarding (Ist)</dt>
+              <dd>{formatTime(activePoint.at)}</dd>
+            </div>
+            <div>
+              <dt>Fehler</dt>
+              <dd>
+                {activePoint.error > 0 ? "+" : ""}
+                {metric(activePoint.error, " Min.")}
+              </dd>
+            </div>
+          </dl>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -190,6 +289,15 @@ function MetricCard({ label, value, hint }: { label: string; value: string; hint
 
 export function ForecastSimulationView() {
   const initialConfig = useMemo(() => simulationConfigForPreset("NORMAL"), []);
+  const [variants, setVariants] = useState<SimulationVariant[]>(() => [
+    {
+      id: "variant-1",
+      name: "Variante 1",
+      config: structuredClone(initialConfig),
+      manualIncidents: [],
+    },
+  ]);
+  const [selectedVariantId, setSelectedVariantId] = useState("variant-1");
   const [config, setConfig] = useState<SimulationConfig>(initialConfig);
   const [manualIncidents, setManualIncidents] = useState<ManualIncident[]>([]);
   const [result, setResult] = useState(() => runSimulation(initialConfig));
@@ -216,8 +324,14 @@ export function ForecastSimulationView() {
   const [comparisonRunning, setComparisonRunning] = useState(false);
   const [importMessage, setImportMessage] = useState<string | null>(null);
   const [importingCsv, setImportingCsv] = useState(false);
+  const [planImportPreview, setPlanImportPreview] = useState<SimulationPlanImportPreview | null>(
+    null,
+  );
+  const [planImportError, setPlanImportError] = useState<string | null>(null);
+  const [excludeUnresolvedPlans, setExcludeUnresolvedPlans] = useState(false);
   const [fidsWindowError, setFidsWindowError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const planFileInputRef = useRef<HTMLInputElement>(null);
   const comparisonWorkerRef = useRef<Worker | null>(null);
   const fidsPopoutRef = useRef<SimulationFidsPopoutHandle>(null);
   const editorErrors = validateSimulationConfig(editorConfig);
@@ -248,7 +362,10 @@ export function ForecastSimulationView() {
     };
   }, []);
 
-  const restart = (nextConfig = config, incidents: readonly ManualIncident[] = []) => {
+  const loadSimulation = (
+    nextConfig: SimulationConfig,
+    incidents: readonly ManualIncident[] = [],
+  ) => {
     const nextResult = runSimulation(nextConfig, incidents);
     setConfig(structuredClone(nextConfig));
     setManualIncidents([...incidents]);
@@ -256,7 +373,22 @@ export function ForecastSimulationView() {
     setCurrentMs(Date.parse(nextResult.runWindow.startAt));
     setRunning(false);
     setSelectedRotationId(null);
-    setSelectedAircraftId("aircraft-1");
+    setSelectedAircraftId(nextResult.aircraft[0]?.id ?? "");
+  };
+
+  const restart = (nextConfig = config, incidents: readonly ManualIncident[] = []) => {
+    loadSimulation(nextConfig, incidents);
+    setVariants((current) =>
+      current.map((variant) =>
+        variant.id === selectedVariantId
+          ? {
+              ...variant,
+              config: structuredClone(nextConfig),
+              manualIncidents: structuredClone([...incidents]),
+            }
+          : variant,
+      ),
+    );
   };
 
   const applyPreset = (preset: SimulationPresetId) => restart(simulationConfigForPreset(preset));
@@ -268,7 +400,12 @@ export function ForecastSimulationView() {
     visibleAt >= Date.parse(config.schedule.operationsStartAt) &&
     visibleAt < Date.parse(config.schedule.operationsEndAt);
   const demandSummary = calculateDemandSummary(
-    config.realityModel.demand,
+    config.operationalModel
+      ? {
+          profile: "CUSTOM",
+          windows: Object.values(config.demandByProduct ?? {}).flatMap((demand) => demand.windows),
+        }
+      : config.realityModel.demand,
     salesDurationMinutes(config.schedule),
   );
   const visibleSnapshots = useMemo(
@@ -317,6 +454,13 @@ export function ForecastSimulationView() {
     const nextIncidents = [...manualIncidents, incident];
     setManualIncidents(nextIncidents);
     setResult(runSimulation(config, nextIncidents));
+    setVariants((current) =>
+      current.map((variant) =>
+        variant.id === selectedVariantId
+          ? { ...variant, manualIncidents: structuredClone(nextIncidents) }
+          : variant,
+      ),
+    );
   };
 
   const handleCsv = async (file: File | undefined) => {
@@ -345,6 +489,84 @@ export function ForecastSimulationView() {
       setImportingCsv(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
+  };
+
+  const handleSimulationPlan = async (file: File | undefined) => {
+    if (!file) return;
+    setPlanImportError(null);
+    setExcludeUnresolvedPlans(false);
+    try {
+      if (file.size > MAX_SIMULATION_PLAN_FILE_BYTES) {
+        throw new SimulationPlanImportError(
+          "Die Datei ist größer als 1 MiB und wird nicht verarbeitet.",
+        );
+      }
+      setPlanImportPreview(parseSimulationPlanImport(await file.text(), config));
+    } catch (error) {
+      setPlanImportError(
+        error instanceof SimulationPlanImportError
+          ? error.message
+          : "Der Simulationsplan konnte nicht gelesen werden.",
+      );
+      setPlanImportPreview(null);
+    } finally {
+      if (planFileInputRef.current) planFileInputRef.current.value = "";
+    }
+  };
+
+  const preparedImportedConfig = planImportPreview
+    ? planImportPreview.counts.unresolvedAfterCurrentRotation > 0 && excludeUnresolvedPlans
+      ? excludeUnresolvedPlannedOperations(planImportPreview)
+      : planImportPreview.config
+    : null;
+  const planImportValidationErrors = preparedImportedConfig
+    ? validateSimulationConfig(preparedImportedConfig)
+    : [];
+
+  const activateVariant = (variant: SimulationVariant) => {
+    setSelectedVariantId(variant.id);
+    loadSimulation(variant.config, variant.manualIncidents);
+  };
+
+  const duplicateVariant = () => {
+    const source = variants.find((variant) => variant.id === selectedVariantId);
+    if (!source) return;
+    const id = `variant-${crypto.randomUUID()}`;
+    const duplicate: SimulationVariant = {
+      id,
+      name: `${source.name} – Kopie`,
+      config: structuredClone(config),
+      manualIncidents: structuredClone(manualIncidents),
+    };
+    setVariants((current) => [...current, duplicate]);
+    activateVariant(duplicate);
+  };
+
+  const deleteVariant = () => {
+    if (variants.length <= 1) return;
+    const remaining = variants.filter((variant) => variant.id !== selectedVariantId);
+    const replacement = remaining[0];
+    if (!replacement) return;
+    setVariants(remaining);
+    activateVariant(replacement);
+  };
+
+  const applyImportedVariant = () => {
+    if (!planImportPreview || !preparedImportedConfig) return;
+    if (planImportValidationErrors.length > 0) return;
+    const id = `variant-${crypto.randomUUID()}`;
+    const imported: SimulationVariant = {
+      id,
+      name: `${planImportPreview.sourceName} · Variante`,
+      config: structuredClone(preparedImportedConfig),
+      manualIncidents: [],
+    };
+    setVariants((current) => [...current, imported]);
+    activateVariant(imported);
+    setPlanImportPreview(null);
+    setImportMessage(
+      `${planImportPreview.sourceName} als neue Variante übernommen; keine Tickets, Queues oder Ist-Zustände importiert.`,
+    );
   };
 
   const exportResult = () => {
@@ -422,7 +644,7 @@ export function ForecastSimulationView() {
         <div className="sim-view-name">Prognose-Simulation</div>
         <div className="sim-safety-notice">
           <AlertTriangle aria-hidden="true" />
-          Nur Simulation – keine Betriebsdaten
+          Nur Simulation – keine Tickets oder Ist-Zustände
         </div>
         <Button className="sim-fids-button" onClick={() => fidsPopoutRef.current?.open()}>
           <Monitor aria-hidden="true" />
@@ -448,6 +670,45 @@ export function ForecastSimulationView() {
 
       <main className="sim-layout">
         <aside className="sim-sidebar">
+          <section className="sim-variant-manager">
+            <label htmlFor="sim-variant">Variante</label>
+            <select
+              id="sim-variant"
+              onChange={(event) => {
+                const variant = variants.find((entry) => entry.id === event.currentTarget.value);
+                if (variant) activateVariant(variant);
+              }}
+              value={selectedVariantId}
+            >
+              {variants.map((variant) => (
+                <option key={variant.id} value={variant.id}>
+                  {variant.name}
+                </option>
+              ))}
+            </select>
+            <input
+              aria-label="Variantenname"
+              maxLength={80}
+              onChange={(event) => {
+                const name = event.currentTarget.value;
+                setVariants((current) =>
+                  current.map((variant) =>
+                    variant.id === selectedVariantId ? { ...variant, name } : variant,
+                  ),
+                );
+              }}
+              type="text"
+              value={variants.find((variant) => variant.id === selectedVariantId)?.name ?? ""}
+            />
+            <div className="sim-variant-actions">
+              <button onClick={duplicateVariant} type="button">
+                <Copy aria-hidden="true" /> Duplizieren
+              </button>
+              <button disabled={variants.length <= 1} onClick={deleteVariant} type="button">
+                <Trash2 aria-hidden="true" /> Löschen
+              </button>
+            </div>
+          </section>
           <section>
             <label htmlFor="sim-preset">Szenario</label>
             <select
@@ -464,41 +725,51 @@ export function ForecastSimulationView() {
           </section>
           <section>
             <span>Flugzeuge</span>
-            <div className="sim-stepper">
-              <output>{config.adminParameters.aircraftCount}</output>
-              <button
-                aria-label="Ein Flugzeug entfernen"
-                disabled={config.adminParameters.aircraftCount <= 1}
-                onClick={() =>
-                  applyQuickConfig({
-                    ...config,
-                    adminParameters: {
-                      ...config.adminParameters,
-                      aircraftCount: config.adminParameters.aircraftCount - 1,
-                    },
-                  })
-                }
-                type="button"
-              >
-                −
-              </button>
-              <button
-                aria-label="Ein Flugzeug hinzufügen"
-                disabled={config.adminParameters.aircraftCount >= 12}
-                onClick={() =>
-                  applyQuickConfig({
-                    ...config,
-                    adminParameters: {
-                      ...config.adminParameters,
-                      aircraftCount: config.adminParameters.aircraftCount + 1,
-                    },
-                  })
-                }
-                type="button"
-              >
-                <Plus aria-hidden="true" />
-              </button>
-            </div>
+            {config.operationalModel ? (
+              <div className="sim-imported-topology">
+                <strong>{config.operationalModel.aircraft.length}</strong>
+                <small>
+                  {config.operationalModel.resourceGroups.length} Ressourcengruppen ·{" "}
+                  {config.operationalModel.products.length} Produkte
+                </small>
+              </div>
+            ) : (
+              <div className="sim-stepper">
+                <output>{config.adminParameters.aircraftCount}</output>
+                <button
+                  aria-label="Ein Flugzeug entfernen"
+                  disabled={config.adminParameters.aircraftCount <= 1}
+                  onClick={() =>
+                    applyQuickConfig({
+                      ...config,
+                      adminParameters: {
+                        ...config.adminParameters,
+                        aircraftCount: config.adminParameters.aircraftCount - 1,
+                      },
+                    })
+                  }
+                  type="button"
+                >
+                  −
+                </button>
+                <button
+                  aria-label="Ein Flugzeug hinzufügen"
+                  disabled={config.adminParameters.aircraftCount >= 12}
+                  onClick={() =>
+                    applyQuickConfig({
+                      ...config,
+                      adminParameters: {
+                        ...config.adminParameters,
+                        aircraftCount: config.adminParameters.aircraftCount + 1,
+                      },
+                    })
+                  }
+                  type="button"
+                >
+                  <Plus aria-hidden="true" />
+                </button>
+              </div>
+            )}
           </section>
           <section className="sim-model-summary sim-demand-summary">
             <span>Nachfrage</span>
@@ -544,6 +815,16 @@ export function ForecastSimulationView() {
             ref={fileInputRef}
             type="file"
           />
+          <input
+            accept=".json,application/json"
+            className="visually-hidden"
+            onChange={(event) => void handleSimulationPlan(event.currentTarget.files?.[0])}
+            ref={planFileInputRef}
+            type="file"
+          />
+          <Button className="sim-full-button" onClick={() => planFileInputRef.current?.click()}>
+            <FileJson aria-hidden="true" /> Simulationsplan importieren
+          </Button>
           <Button
             busy={importingCsv}
             className="sim-full-button"
@@ -572,7 +853,10 @@ export function ForecastSimulationView() {
               </button>
             ))}
           </section>
-          <p className="sim-sidebar-note">Alle Daten sind synthetisch und nur für lokale Tests.</p>
+          <p className="sim-sidebar-note">
+            Stammdaten dürfen aus dem Betrieb stammen. Nachfrage, Umläufe, Ereignisse und Ergebnisse
+            bleiben synthetisch und lokal.
+          </p>
         </aside>
 
         <div className="sim-workspace">
@@ -685,7 +969,7 @@ export function ForecastSimulationView() {
             <div className="sim-chart-panel">
               <header>
                 <strong>Prognosefehler über den Tagesverlauf</strong>
-                <span>Boarding · Fehler in Minuten</span>
+                <span>Boarding · Fehler in Minuten · Werte mit Maus anzeigen</span>
               </header>
               <ErrorChart rotations={visibleRotations} snapshots={visibleSnapshots} />
             </div>
@@ -723,8 +1007,8 @@ export function ForecastSimulationView() {
         </div>
       </main>
       <footer className="sim-app-footer">
-        Hinweis: Alle Zeiten sind virtuell und rein synthetisch. Ergebnisse dienen nur der Bewertung
-        der Prognosequalität im lokalen Test.
+        Hinweis: Alle Abläufe und Ist-Zeiten sind virtuell und synthetisch. Importierte Stammdaten
+        besitzen keine operative Wirkung.
       </footer>
 
       <ScenarioEditor
@@ -737,6 +1021,7 @@ export function ForecastSimulationView() {
         onChange={setEditorConfig}
         onClose={() => setEditorOpen(false)}
         open={editorOpen}
+        rotations={result.rotations}
       />
 
       <SimulationFidsPopout
@@ -757,6 +1042,117 @@ export function ForecastSimulationView() {
         result={result}
         visibleAt={visibleAt}
       />
+
+      <ModalDialog
+        description="Die Vorschau enthält ausschließlich Stammdaten, Tageszeiten und noch offene Planeinträge."
+        footer={
+          <>
+            <Button
+              onClick={() => {
+                setPlanImportPreview(null);
+                setPlanImportError(null);
+              }}
+            >
+              Abbrechen
+            </Button>
+            <Button
+              disabled={
+                !planImportPreview ||
+                (planImportPreview.counts.unresolvedAfterCurrentRotation > 0 &&
+                  !excludeUnresolvedPlans) ||
+                planImportValidationErrors.length > 0
+              }
+              onClick={applyImportedVariant}
+              variant="primary"
+            >
+              Als neue Variante übernehmen
+            </Button>
+          </>
+        }
+        onClose={() => {
+          setPlanImportPreview(null);
+          setPlanImportError(null);
+        }}
+        open={planImportPreview !== null || planImportError !== null}
+        size="wide"
+        title="Simulationsplan prüfen"
+      >
+        {planImportError ? (
+          <p className="sim-editor-errors" role="alert">
+            {planImportError}
+          </p>
+        ) : null}
+        {planImportPreview ? (
+          <div className="sim-plan-import-preview">
+            <header>
+              <div>
+                <span>Quelle</span>
+                <strong>{planImportPreview.sourceName}</strong>
+              </div>
+              <div>
+                <span>Format</span>
+                <strong>{planImportPreview.format}</strong>
+              </div>
+            </header>
+            <dl>
+              <div>
+                <dt>Gates</dt>
+                <dd>{planImportPreview.counts.gates}</dd>
+              </div>
+              <div>
+                <dt>Ressourcengruppen</dt>
+                <dd>{planImportPreview.counts.resourceGroups}</dd>
+              </div>
+              <div>
+                <dt>Flugzeuge</dt>
+                <dd>{planImportPreview.counts.aircraft}</dd>
+              </div>
+              <div>
+                <dt>aktive Piloten</dt>
+                <dd>{planImportPreview.counts.pilots}</dd>
+              </div>
+              <div>
+                <dt>Produkte</dt>
+                <dd>{planImportPreview.counts.products}</dd>
+              </div>
+              <div>
+                <dt>Planeinträge</dt>
+                <dd>{planImportPreview.counts.plannedOperations}</dd>
+              </div>
+            </dl>
+            {planImportPreview.warnings.map((warning) => (
+              <p className="sim-plan-import-warning" key={warning}>
+                <AlertTriangle aria-hidden="true" /> {warning}
+              </p>
+            ))}
+            {planImportPreview.counts.unresolvedAfterCurrentRotation > 0 ? (
+              <label className="sim-plan-import-exclusion">
+                <input
+                  checked={excludeUnresolvedPlans}
+                  onChange={(event) => setExcludeUnresolvedPlans(event.currentTarget.checked)}
+                  type="checkbox"
+                />
+                Unaufgelöste umlaufgebundene Planeinträge für diese Variante ausdrücklich
+                ausschließen
+              </label>
+            ) : null}
+            {planImportValidationErrors.length > 0 ? (
+              <div className="sim-editor-errors" role="alert">
+                <strong>Die Variante ist noch nicht lauffähig:</strong>
+                <ul>
+                  {planImportValidationErrors.map((error) => (
+                    <li key={error}>{error}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            <p className="sim-editor-hint">
+              Nicht enthalten: Tickets, Warteschlangen, Gastdaten, aktuelle Flugzeugzustände,
+              Ereignisverlauf, Audit oder Prognose-Snapshots.
+            </p>
+          </div>
+        ) : null}
+      </ModalDialog>
 
       <ModalDialog
         description={

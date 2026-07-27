@@ -140,6 +140,9 @@ describe("V1.2 app navigation", () => {
     expect(adminSource).toContain('href="/simulation"');
     expect(adminSource).toContain('target="_blank"');
     expect(adminSource).toContain('rel="noopener"');
-    expect(adminSource).toContain("keine Betriebsdaten verwendet oder gespeichert");
+    expect(adminSource).toContain("Stammdaten und offene Planeinträge");
+    expect(adminSource).toContain(
+      "Tickets, Ist-Verläufe und operative Zustände werden nicht exportiert",
+    );
   });
 });

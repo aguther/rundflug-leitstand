@@ -110,16 +110,20 @@ function GroupForecastChart({
   rotation: SimulationRotation;
   snapshots: readonly SimulationForecastSnapshot[];
 }) {
+  const [activeSnapshotIndex, setActiveSnapshotIndex] = useState<number | null>(null);
   if (snapshots.length === 0) {
     return <div className="sim-history-empty">Für diese Gruppe liegt noch kein Snapshot vor.</div>;
   }
+  const orderedSnapshots = [...snapshots].sort(
+    (left, right) => Date.parse(left.capturedAt) - Date.parse(right.capturedAt),
+  );
   const width = 1_000;
   const height = 270;
   const paddingX = 48;
   const paddingY = 28;
-  const capturedTimes = snapshots.map((snapshot) => Date.parse(snapshot.capturedAt));
+  const capturedTimes = orderedSnapshots.map((snapshot) => Date.parse(snapshot.capturedAt));
   const values = [
-    ...snapshots.flatMap((snapshot) =>
+    ...orderedSnapshots.flatMap((snapshot) =>
       FORECAST_SERIES.map(([field]) => Date.parse(snapshot[field])),
     ),
     ...[rotation.calledAt, rotation.departedAt, rotation.landedAt, rotation.completedAt]
@@ -143,6 +147,21 @@ function GroupForecastChart({
     [rotation.landedAt, "landing"],
     [rotation.completedAt, "completion"],
   ] as const;
+  const activeSnapshot =
+    activeSnapshotIndex === null ? null : orderedSnapshots[activeSnapshotIndex];
+  const activeSnapshotX = activeSnapshot ? x(Date.parse(activeSnapshot.capturedAt)) : null;
+  const selectNearestSnapshot = (pointerX: number) => {
+    let nearestIndex = 0;
+    let nearestDistance = Number.POSITIVE_INFINITY;
+    for (const [index, capturedAt] of capturedTimes.entries()) {
+      const distance = Math.abs(x(capturedAt) - pointerX);
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearestIndex = index;
+      }
+    }
+    setActiveSnapshotIndex(nearestIndex);
+  };
 
   return (
     <div className="sim-history-chart-wrap">
@@ -153,80 +172,130 @@ function GroupForecastChart({
           </span>
         ))}
         <span data-series="actual">gestrichelt = Ist</span>
+        <span data-series="cursor">Werte mit Maus anzeigen</span>
       </div>
-      <svg
-        aria-label="Verlauf sämtlicher Prognosesnapshots"
-        className="sim-history-chart"
-        role="img"
-        viewBox={`0 0 ${width} ${height}`}
-      >
-        {[0, 0.25, 0.5, 0.75, 1].map((position) => (
-          <line
-            className="sim-history-chart-grid"
-            key={position}
-            x1={paddingX}
-            x2={width - paddingX}
-            y1={paddingY + position * (height - paddingY * 2)}
-            y2={paddingY + position * (height - paddingY * 2)}
-          />
-        ))}
-        {actuals.map(([actualAt, className]) =>
-          actualAt ? (
+      <div className="sim-chart-interactive sim-history-chart-stage">
+        <svg
+          aria-label="Interaktiver Verlauf sämtlicher Prognosesnapshots"
+          className="sim-history-chart"
+          onPointerLeave={() => setActiveSnapshotIndex(null)}
+          onPointerMove={(event) => {
+            const matrix = event.currentTarget.getScreenCTM();
+            if (!matrix) return;
+            const pointer = event.currentTarget.createSVGPoint();
+            pointer.x = event.clientX;
+            pointer.y = event.clientY;
+            selectNearestSnapshot(pointer.matrixTransform(matrix.inverse()).x);
+          }}
+          role="img"
+          viewBox={`0 0 ${width} ${height}`}
+        >
+          {[0, 0.25, 0.5, 0.75, 1].map((position) => (
             <line
-              className={`sim-history-chart-actual sim-history-chart-${className}`}
-              key={className}
+              className="sim-history-chart-grid"
+              key={position}
               x1={paddingX}
               x2={width - paddingX}
-              y1={y(Date.parse(actualAt))}
-              y2={y(Date.parse(actualAt))}
+              y1={paddingY + position * (height - paddingY * 2)}
+              y2={paddingY + position * (height - paddingY * 2)}
             />
-          ) : null,
-        )}
-        {rotation.precalledAt ? (
-          <g>
-            <line
-              className="sim-history-chart-precall"
-              x1={x(Date.parse(rotation.precalledAt))}
-              x2={x(Date.parse(rotation.precalledAt))}
-              y1={paddingY}
-              y2={height - paddingY}
+          ))}
+          {actuals.map(([actualAt, className]) =>
+            actualAt ? (
+              <line
+                className={`sim-history-chart-actual sim-history-chart-${className}`}
+                key={className}
+                x1={paddingX}
+                x2={width - paddingX}
+                y1={y(Date.parse(actualAt))}
+                y2={y(Date.parse(actualAt))}
+              />
+            ) : null,
+          )}
+          {rotation.precalledAt ? (
+            <g>
+              <line
+                className="sim-history-chart-precall"
+                x1={x(Date.parse(rotation.precalledAt))}
+                x2={x(Date.parse(rotation.precalledAt))}
+                y1={paddingY}
+                y2={height - paddingY}
+              />
+              <text
+                className="sim-history-chart-precall-label"
+                textAnchor="middle"
+                x={x(Date.parse(rotation.precalledAt))}
+                y={16}
+              >
+                GO TO GATE {formatTime(rotation.precalledAt)}
+              </text>
+            </g>
+          ) : null}
+          {FORECAST_SERIES.map(([field, , className]) => (
+            <polyline
+              className={`sim-history-chart-line sim-history-chart-${className}`}
+              fill="none"
+              key={field}
+              points={orderedSnapshots
+                .map(
+                  (snapshot) =>
+                    `${x(Date.parse(snapshot.capturedAt))},${y(Date.parse(snapshot[field]))}`,
+                )
+                .join(" ")}
             />
-            <text
-              className="sim-history-chart-precall-label"
-              textAnchor="middle"
-              x={x(Date.parse(rotation.precalledAt))}
-              y={16}
-            >
-              GO TO GATE {formatTime(rotation.precalledAt)}
-            </text>
-          </g>
+          ))}
+          {activeSnapshot && activeSnapshotX !== null ? (
+            <>
+              <line
+                className="sim-chart-cursor"
+                x1={activeSnapshotX}
+                x2={activeSnapshotX}
+                y1={paddingY}
+                y2={height - paddingY}
+              />
+              {FORECAST_SERIES.map(([field, , className]) => (
+                <circle
+                  className={`sim-chart-active-point sim-history-chart-${className}`}
+                  cx={activeSnapshotX}
+                  cy={y(Date.parse(activeSnapshot[field]))}
+                  key={field}
+                  r={4}
+                />
+              ))}
+            </>
+          ) : null}
+          <text x={4} y={paddingY + 4}>
+            {formatTime(maximumY)}
+          </text>
+          <text x={4} y={height - paddingY + 4}>
+            {formatTime(minimumY)}
+          </text>
+          <text x={paddingX} y={height - 5}>
+            {formatTime(minimumX)}
+          </text>
+          <text textAnchor="end" x={width - paddingX} y={height - 5}>
+            {formatTime(maximumX)}
+          </text>
+        </svg>
+        {activeSnapshot && activeSnapshotX !== null ? (
+          <div
+            className="sim-chart-tooltip"
+            data-align={activeSnapshotX > width * 0.68 ? "right" : "center"}
+            role="status"
+            style={{ left: `${(activeSnapshotX / width) * 100}%` }}
+          >
+            <strong>Snapshot {formatTime(activeSnapshot.capturedAt)}</strong>
+            <dl>
+              {FORECAST_SERIES.map(([field, label]) => (
+                <div key={field}>
+                  <dt>{label.replace(" (Prognose)", "")}</dt>
+                  <dd>{formatTime(activeSnapshot[field])}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
         ) : null}
-        {FORECAST_SERIES.map(([field, , className]) => (
-          <polyline
-            className={`sim-history-chart-line sim-history-chart-${className}`}
-            fill="none"
-            key={field}
-            points={snapshots
-              .map(
-                (snapshot) =>
-                  `${x(Date.parse(snapshot.capturedAt))},${y(Date.parse(snapshot[field]))}`,
-              )
-              .join(" ")}
-          />
-        ))}
-        <text x={4} y={paddingY + 4}>
-          {formatTime(maximumY)}
-        </text>
-        <text x={4} y={height - paddingY + 4}>
-          {formatTime(minimumY)}
-        </text>
-        <text x={paddingX} y={height - 5}>
-          {formatTime(minimumX)}
-        </text>
-        <text textAnchor="end" x={width - paddingX} y={height - 5}>
-          {formatTime(maximumX)}
-        </text>
-      </svg>
+      </div>
     </div>
   );
 }
