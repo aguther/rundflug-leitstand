@@ -115,6 +115,8 @@ describe("V1.9 Flight Director and Flight Line surfaces", () => {
     expect(operationalPlanSource).toContain("Nach einem Umlauf");
     expect(operationalPlanSource).not.toContain("automatisch starten");
     expect(operationalPlanSource).not.toContain("{plan.reason}");
+    expect(operationalPlanSource).not.toContain("Interner Grund");
+    expect(operationalPlanSource).not.toContain("planReason");
     expect(viewSource).toContain('type: "UPSERT_PLANNED_OPERATION"');
     expect(viewSource).toContain('type: "CANCEL_PLANNED_OPERATION"');
   });

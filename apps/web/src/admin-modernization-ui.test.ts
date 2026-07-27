@@ -30,6 +30,8 @@ describe("modernized administration workspace", () => {
     expect(planSource).toContain("Bestätigung durch Flight Director");
     expect(planSource).toContain("Planeintrag wirklich absagen?");
     expect(planSource).not.toContain("{plan.reason}");
+    expect(planSource).not.toContain("Interner Grund");
+    expect(planSource).not.toContain("planReason");
   });
 
   it("uses a modal account table with explicit edit and protected delete actions", () => {

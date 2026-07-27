@@ -639,12 +639,15 @@ try {
     minimumDurationMinutes: 10,
     typicalDurationMinutes: 15,
     maximumDurationMinutes: 25,
-    reason: "Synthetisch geplante Pilotenpause",
     publicNote: "",
   });
   current = await board(devices.admin, tokens.admin);
+  const plannedPauseSummary = current.plannedOperations.find(
+    (entry) => entry.id === plannedPauseId,
+  );
   if (
-    current.plannedOperations.find((entry) => entry.id === plannedPauseId)?.status !== "PLANNED" ||
+    plannedPauseSummary?.status !== "PLANNED" ||
+    "reason" in plannedPauseSummary ||
     current.pilots.find((entry) => entry.id === assignedPilot.id)?.paused
   ) {
     throw new Error("Weicher Planeintrag hat den Pilotenzustand vor Bestätigung verändert.");
@@ -698,6 +701,7 @@ try {
     throw new Error("Tankvormerkung oder Erinnerungsschwelle fehlt.");
   }
   const pilotHistory = await history("PILOT", assignedPilot.id);
+  const plannedPauseHistory = await history("OPERATIONAL_PLAN", plannedPauseId);
   const aircraftHistory = await history("AIRCRAFT", "aircraft-a");
   const rotationHistory = await history("ROTATION", sold.aggregate.relatedRotationId);
   if (
@@ -707,6 +711,11 @@ try {
       (entry) =>
         entry.eventType === "PILOT_CONFIGURATION_CHANGED" &&
         entry.payload.operationalNote === "Nur Vormittagsschicht",
+    ) ||
+    !plannedPauseHistory.entries.some(
+      (entry) =>
+        entry.eventType === "PLANNED_OPERATION_CREATED" &&
+        entry.payload.reason === "Administration: Pause für einen Pilotencode eingeplant.",
     ) ||
     !aircraftHistory.entries.some(
       (entry) =>
