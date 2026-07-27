@@ -19,6 +19,18 @@ HTTP-Entwicklungsumgebungen – wird bewusst der klassische Payload ohne `web_pu
 gesendet. Er wird vom Service Worker angezeigt, statt von Safari verworfen zu werden. Ein solches
 Abonnement erhält seinen Ursprung bei der nächsten Einwilligung.
 
+## Erneuerte Abonnements
+
+Browser dürfen ein Push-Abonnement jederzeit austauschen. Der Service Worker beantwortet
+`pushsubscriptionchange`, erzeugt das Ziel neu und hebt die bestehende Einwilligung über
+`POST /api/public/push/subscriptions/refresh` auf den neuen Endpunkt. Ticketbindung, Ursprung und
+Löschfrist bleiben dabei unverändert, weil der Eintrag an Ort und Stelle fortgeschrieben wird.
+
+Die Anfrage weist sich allein über den bisherigen Endpunkt aus; dieser ist ein nicht erratbares
+Geheimnis des jeweiligen Browsers. Ein unbekannter oder abgelaufener Vorgänger wird mit HTTP 404
+abgewiesen. Safari unterstützt `pushsubscriptionchange` bislang nicht zuverlässig – dort bleibt der
+Widerruf beim nächsten Zustellversuch (HTTP 404/410) der maßgebliche Weg.
+
 ## Datenschutz und Aufbewahrung
 
 - Web-Push wird nur nach aktiver Zustimmung im Browser registriert.

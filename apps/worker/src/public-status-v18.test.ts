@@ -110,4 +110,65 @@ describe("öffentlicher Status V1.8", () => {
       lang: "de",
     });
   });
+
+  it("hebt eine Einwilligung ohne Zutun des Gastes auf ein erneuertes Push-Ziel", async () => {
+    const listeners = new Map<string, (event: unknown) => void>();
+    const renewed = {
+      endpoint: "https://web.push.apple.com/neu",
+      toJSON: () => ({
+        endpoint: "https://web.push.apple.com/neu",
+        keys: { p256dh: "neuer-schluessel", auth: "neuer-auth" },
+      }),
+    };
+    const fetchMock = vi.fn(async (path: string) =>
+      path === "/api/public/push/config"
+        ? { ok: true, json: async () => ({ publicKey: "vapid-public-key", retentionDays: 7 }) }
+        : { ok: true, json: async () => ({ active: true }) },
+    );
+    const serviceWorker = {
+      PUBLIC_STATUS_PATH: undefined,
+      location: { origin: "https://status.example" },
+      fetch: fetchMock,
+      addEventListener: (type: string, listener: (event: unknown) => void) => {
+        listeners.set(type, listener);
+      },
+      registration: {
+        showNotification: vi.fn(),
+        pushManager: {
+          getSubscription: vi.fn().mockResolvedValue(null),
+          subscribe: vi.fn().mockResolvedValue(renewed),
+        },
+      },
+      clients: { matchAll: vi.fn(), openWindow: vi.fn() },
+    };
+    new Function("self", pushWorker)(serviceWorker);
+    let renewal: Promise<unknown> | undefined;
+    const changeListener = listeners.get("pushsubscriptionchange") as (event: {
+      oldSubscription: { endpoint: string };
+      newSubscription: null;
+      waitUntil(work: Promise<unknown>): void;
+    }) => void;
+    changeListener({
+      oldSubscription: { endpoint: "https://web.push.apple.com/alt" },
+      newSubscription: null,
+      waitUntil: (work) => {
+        renewal = work;
+      },
+    });
+    await renewal;
+
+    expect(serviceWorker.registration.pushManager.subscribe).toHaveBeenCalledWith({
+      userVisibleOnly: true,
+      applicationServerKey: "vapid-public-key",
+    });
+    expect(fetchMock).toHaveBeenLastCalledWith("/api/public/push/subscriptions/refresh", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        previousEndpoint: "https://web.push.apple.com/alt",
+        endpoint: "https://web.push.apple.com/neu",
+        keys: { p256dh: "neuer-schluessel", auth: "neuer-auth" },
+      }),
+    });
+  });
 });

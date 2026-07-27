@@ -5900,6 +5900,53 @@ app.get("/api/public/push/config", (context) => {
   });
 });
 
+app.post("/api/public/push/subscriptions/refresh", async (context) => {
+  const body = await context.req.json<{
+    previousEndpoint?: string;
+    endpoint?: string;
+    keys?: { p256dh?: string; auth?: string };
+  }>();
+  if (
+    typeof body.previousEndpoint !== "string" ||
+    !isAllowedPushEndpoint(body.previousEndpoint) ||
+    typeof body.endpoint !== "string" ||
+    !isAllowedPushEndpoint(body.endpoint) ||
+    typeof body.keys?.p256dh !== "string" ||
+    typeof body.keys.auth !== "string"
+  ) {
+    return context.json(
+      {
+        error: { code: "INVALID_PUSH_SUBSCRIPTION", message: "Push-Erneuerung ist ungültig." },
+      },
+      400,
+    );
+  }
+  const now = new Date().toISOString();
+  const [, renewal] = await context.env.DB.batch([
+    // Ein verwaistes Ziel auf dem neuen Endpunkt würde dessen Eindeutigkeit verletzen.
+    context.env.DB.prepare(
+      "DELETE FROM web_push_subscriptions WHERE endpoint = ?1 AND endpoint <> ?2",
+    ).bind(body.endpoint, body.previousEndpoint),
+    context.env.DB.prepare(
+      `UPDATE web_push_subscriptions
+          SET endpoint = ?1, p256dh = ?2, auth = ?3, updated_at = ?4
+        WHERE endpoint = ?5 AND status = 'ACTIVE' AND delete_after > ?4`,
+    ).bind(body.endpoint, body.keys.p256dh, body.keys.auth, now, body.previousEndpoint),
+  ]);
+  if ((renewal?.meta.changes ?? 0) === 0) {
+    return context.json(
+      {
+        error: {
+          code: "PUSH_SUBSCRIPTION_NOT_FOUND",
+          message: "Für dieses Push-Ziel liegt keine gültige Einwilligung vor.",
+        },
+      },
+      404,
+    );
+  }
+  return context.json({ active: true, updatedAt: now });
+});
+
 app.post("/api/public/tickets/:ticketCode/push-subscriptions", async (context) => {
   const ticketCode = context.req.param("ticketCode").trim().toUpperCase();
   if (!/^[A-Z2-9]{12,32}$/.test(ticketCode)) {
