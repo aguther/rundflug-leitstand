@@ -48,6 +48,38 @@ self.addEventListener("push", (event) => {
   );
 });
 
+async function renewedSubscription(existing) {
+  if (existing) return existing;
+  const current = await self.registration.pushManager.getSubscription();
+  if (current) return current;
+  const response = await self.fetch("/api/public/push/config", { cache: "no-store" });
+  if (!response.ok) return null;
+  const configuration = await response.json();
+  if (typeof configuration?.publicKey !== "string") return null;
+  return await self.registration.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: configuration.publicKey,
+  });
+}
+
+// Erneuert der Browser das Abonnement, zeigt der Schalter weiter „aktiviert", während der alte
+// Endpunkt tot ist. Die Einwilligung wird deshalb ohne Zutun des Gastes auf das neue Ziel gehoben.
+async function renewPushSubscription(oldSubscription, newSubscription) {
+  const previousEndpoint = oldSubscription?.endpoint;
+  if (typeof previousEndpoint !== "string") return;
+  const subscription = await renewedSubscription(newSubscription);
+  if (!subscription) return;
+  await self.fetch("/api/public/push/subscriptions/refresh", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ previousEndpoint, ...subscription.toJSON() }),
+  });
+}
+
+self.addEventListener("pushsubscriptionchange", (event) => {
+  event.waitUntil(renewPushSubscription(event.oldSubscription, event.newSubscription));
+});
+
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const targetPath = safePublicStatusPath(event.notification.data?.url);
