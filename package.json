@@ -75,7 +75,7 @@
   "devDependencies": {
     "@biomejs/biome": "^2.5.5",
     "@cloudflare/vitest-pool-workers": "^0.18.8",
-    "@cloudflare/workers-types": "^5.20260726.1",
+    "@cloudflare/workers-types": "^5.20260727.1",
     "@playwright/test": "^1.62.0",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
