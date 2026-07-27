@@ -36,6 +36,8 @@ Der Flight Director kann weiche betriebliche Einschränkungen mit folgenden Anga
 
 - Geltungsbereich Veranstaltung, Ressourcengruppe, Flugzeug oder anonymer Pilotencode,
 - Art Pause, Tanken, Flugshow, Wetter, Technik oder Sonstiges,
+- Wirkung als vollständige Blockierung oder als Verzögerung mit einem Faktor von 110 bis
+  300 Prozent,
 - ungefähres Startfenster oder Beginn nach einem ausgewählten aktuellen Umlauf,
 - minimale, typische und maximale Dauer,
 - automatisch aus Rolle und Aktion erzeugter interner Auditgrund sowie optionaler neutraler
@@ -48,10 +50,17 @@ Auditgrund weder anzeigen noch verändern.
 
 Ein Plan ist zunächst `PLANNED` und wird nach Ablauf seines spätesten Startzeitpunkts lediglich als
 `DUE` abgeleitet. Er verändert niemals selbst einen operativen Zustand. Start und Ende werden
-durch Menschen über die vorhandenen Zustandskommandos bestätigt; erst dann wechselt der Plan zu
-`ACTIVE` beziehungsweise `CLEARED` und wird mit der tatsächlichen Blockierung beziehungsweise
-Pilotencode-Pause verknüpft.
+durch Menschen bestätigt. Blockierungen werden dabei über die vorhandenen Zustandskommandos mit
+dem Plan verknüpft; Verzögerungen erhalten ein eigenes Start-/Ende-Kommando ohne
+Ressourcenzustandswechsel. Erst dann wechselt der Plan zu `ACTIVE` beziehungsweise `CLEARED`.
 Bearbeitung, Absage, Aktivierung und Aufhebung bleiben versioniert, idempotent und auditiert.
+
+Eine bestätigte Verzögerung blockiert keine Ressource. Während ihrer aktiven Zeit verlängert die
+Prognose die noch nicht durch Ist-Ereignisse bestätigten Phasen passender Umläufe um den hinterlegten
+Faktor. Mehrere gleichzeitig passende Verzögerungen werden nicht multipliziert; es gilt der höchste
+Faktor. Ist dieselbe Zeitspanne bereits hart blockiert, hat die Blockierung Vorrang. Umläufe, die
+während einer Verzögerung abgewickelt werden, fließen nicht in die adaptive Dauerlernung ein, damit
+der temporäre Effekt nicht dauerhaft in die Normaldauer übernommen wird.
 
 Ein Startfenster ist keine zugesagte Uhrzeit. Ein Ende ist eine unsichere erwartete Verfügbarkeit;
 die Ressource wird erst nach bestätigter Rückkehr tatsächlich verfügbar. Fehlt ein erwarteter
@@ -69,6 +78,32 @@ maximale Fensterbreite, Durchsatz, Überziehung und Flugzeugauslastung. Die Opti
 Simulators ist damit kein Selbstzweck, sondern muss bessere Entscheidungen im realen Betrieb
 unterstützen.
 
+### Wiederkehrende Tagesregeln
+
+Die bestehende Tank-Erinnerungsschwelle bleibt ein Stammdatum ohne Zustands- oder
+Freigabewirkung. Für einen konkreten Flugtag können Flight Director und Administration zusätzlich
+versionierte Regeln für `REFUELING` eines Flugzeugs sowie `PAUSE` eines Flugzeugs oder anonymen
+Pilotencodes anlegen. Auslöser sind bestätigte abgeschlossene Umläufe oder bestätigte
+Betriebsminuten vom Boardingbeginn bis zum Turnaround-Abschluss. Je Ziel und Art darf höchstens
+eine Regel aktiv sein.
+
+Eine neue Regel übernimmt den seit dem letzten passenden bestätigten Abschluss beziehungsweise
+seit Betriebsbeginn erreichten Fortschritt. Erreicht der Fortschritt das Intervall, werden
+Regelfortschritt, ein eindeutiger weicher Planeintrag, Audit-Ereignis und Outbox-Nachricht in
+derselben Persistenzgrenze geschrieben. Der Planeintrag beginnt frühestens nach dem auslösenden
+Umlauf und ändert keinen operativen Zustand. Erst die vorhandenen menschlich bestätigten
+Start-/Endkommandos aktivieren und beenden Pause oder Tanken. Der bestätigte Abschluss sowie das
+auditierte Überspringen eines einzelnen Vorkommens setzen den Zähler zurück. Das Deaktivieren
+entfernt nur künftige Projektionen und lässt ein bereits offenes Vorkommen bestehen.
+
+Der reine Prognosekern führt Intervall und Restfortschritt je gekoppelter Flugzeug-/Pilotenspur
+weiter und berücksichtigt wiederholte Fälligkeiten bis zum Betriebsende. Gleichzeitig fällige
+Flugzeug- und Pilotenregeln beginnen parallel; für die weitere Verfügbarkeit gilt das späteste
+Ende statt der Summe beider Dauern. Der operative Simulationsexport V2 enthält diese Regeln.
+V1-Dateien werden weiterhin akzeptiert und erhalten eine leere Regelliste. Betrieb und Simulation
+verwenden dieselbe Domain-Projektion; eine importierte Regel unterdrückt nur die entsprechende
+generische automatische Simulationspolitik, nicht ungeplante Pausen oder Defekte.
+
 ## Folgen
 
 - Geplante Einschränkungen verbessern die Vorausschau, ohne operative Freigaben vorwegzunehmen.
@@ -80,3 +115,6 @@ unterstützen.
 - Die Entscheidung konkretisiert insbesondere `F-FLT-090`, `F-PRG-030`, `F-PRG-060`,
   `F-PRG-080`, `F-PRG-090`, `F-PRG-110`, `F-PRG-130`, `F-WET-040`, `D-065` und
   `Q-WAR-050`.
+- Die wiederkehrenden Tagesregeln konkretisieren zusätzlich `F-FLT-050`, `F-FLT-060`,
+  `F-FLT-090` und `F-PRG-030`, ohne die bestehende menschliche Bestätigung oder die Trennung von
+  Stammdatum, Plan, Prognose und Ist-Zeit aufzuweichen.

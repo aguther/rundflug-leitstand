@@ -1,4 +1,7 @@
-import type { SimulationPlanOperation as ImportedSimulationPlanOperation } from "@rundflug/contracts";
+import type {
+  SimulationPlanOperation as ImportedSimulationPlanOperation,
+  SimulationRecurringOperationalRule as ImportedSimulationRecurringOperationalRule,
+} from "@rundflug/contracts";
 import type {
   ForecastRotationStatus,
   ForecastTuningProfile,
@@ -94,6 +97,7 @@ export interface SimulationConfig {
   operationalModel?: SimulationOperationalModel;
   demandByProduct?: Record<string, SimulationDemand>;
   plannedOperations: SimulationPlannedOperation[];
+  recurringRules?: SimulationRecurringOperationalRule[];
 }
 
 export interface SimulationGate {
@@ -135,10 +139,20 @@ export interface SimulationOperationalModel {
 }
 
 export interface SimulationPlannedOperation
-  extends Omit<ImportedSimulationPlanOperation, "scopeKey" | "afterCurrentRotation"> {
+  extends Omit<
+    ImportedSimulationPlanOperation,
+    "scopeKey" | "afterCurrentRotation" | "effectMode" | "durationMultiplierPercent"
+  > {
   scopeId: string;
   afterRotationId: string | null;
   unresolvedAfterCurrentRotation: boolean;
+  effectMode?: "BLOCKING" | "SLOWDOWN";
+  durationMultiplierPercent?: number | null;
+}
+
+export interface SimulationRecurringOperationalRule
+  extends Omit<ImportedSimulationRecurringOperationalRule, "scopeKey"> {
+  scopeId: string;
 }
 
 export type SimulationPresetId =
@@ -176,6 +190,7 @@ export interface SimulationAircraft {
   registration: string;
   aircraftType: string;
   capacity: number;
+  refuelReminderThreshold?: number;
   resourceGroupId?: string;
 }
 
@@ -308,6 +323,7 @@ export interface SimulationResult {
   aircraft: SimulationAircraft[];
   pilots?: SimulationPilot[];
   plannedOperations?: SimulationPlannedOperation[];
+  recurringRules?: SimulationRecurringOperationalRule[];
   rotations: SimulationRotation[];
   events: SimulationEvent[];
   snapshots: SimulationForecastSnapshot[];
@@ -518,6 +534,7 @@ const BASE_CONFIG: SimulationConfig = {
     availabilityModel: "TIME_DEPENDENT",
   },
   plannedOperations: [],
+  recurringRules: [],
 };
 
 export const SIMULATION_PRESETS: Readonly<Record<SimulationPresetId, SimulationConfig>> = {
@@ -779,6 +796,17 @@ export function validateSimulationConfig(config: SimulationConfig): string[] {
         errors.push(`Planeintrag ${operation.key} besitzt eine ungültige Dauer.`);
       }
       if (
+        (operation.effectMode === "BLOCKING" &&
+          operation.durationMultiplierPercent !== null &&
+          operation.durationMultiplierPercent !== undefined) ||
+        (operation.effectMode === "SLOWDOWN" &&
+          (!Number.isInteger(operation.durationMultiplierPercent) ||
+            (operation.durationMultiplierPercent ?? 0) < 110 ||
+            (operation.durationMultiplierPercent ?? 0) > 300))
+      ) {
+        errors.push(`Planeintrag ${operation.key} besitzt einen ungültigen Verzögerungsfaktor.`);
+      }
+      if (
         operation.startMode === "TIME_WINDOW" &&
         (!operation.earliestStartAt ||
           !operation.latestStartAt ||
@@ -792,8 +820,36 @@ export function validateSimulationConfig(config: SimulationConfig): string[] {
         errors.push(`Planeintrag ${operation.key} benötigt einen simulierten Bezugsumlauf.`);
       }
     }
+    const activeRuleTargets = new Set<string>();
+    for (const rule of config.recurringRules ?? []) {
+      const identity = `${rule.scopeType}:${rule.scopeId}:${rule.kind}`;
+      if (activeRuleTargets.has(identity)) {
+        errors.push(`Für ${rule.scopeId} ist die Regelart ${rule.kind} doppelt vorhanden.`);
+      }
+      activeRuleTargets.add(identity);
+      const targetValid =
+        rule.scopeType === "AIRCRAFT" ? aircraftIds.has(rule.scopeId) : pilotIds.has(rule.scopeId);
+      if (!targetValid) {
+        errors.push(`Regel ${rule.key} verweist auf ein unbekanntes Ziel.`);
+      }
+      if (rule.kind === "REFUELING" && rule.scopeType !== "AIRCRAFT") {
+        errors.push(`Regel ${rule.key}: Tanken ist nur für Flugzeuge zulässig.`);
+      }
+      if (!Number.isInteger(rule.intervalValue) || rule.intervalValue < 1) {
+        errors.push(`Regel ${rule.key} besitzt ein ungültiges Intervall.`);
+      }
+      if (
+        rule.minimumDurationMinutes < 1 ||
+        rule.minimumDurationMinutes > rule.typicalDurationMinutes ||
+        rule.typicalDurationMinutes > rule.maximumDurationMinutes
+      ) {
+        errors.push(`Regel ${rule.key} besitzt eine ungültige Dauer.`);
+      }
+    }
   } else if (config.plannedOperations.length > 0) {
     errors.push("Geplante Unterbrechungen benötigen importierte operative Stammdaten.");
+  } else if ((config.recurringRules ?? []).length > 0) {
+    errors.push("Wiederkehrende Regeln benötigen importierte operative Stammdaten.");
   }
   if (
     config.realityModel.incidents.refueling.enabled &&

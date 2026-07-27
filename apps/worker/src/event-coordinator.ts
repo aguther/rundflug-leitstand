@@ -43,6 +43,7 @@ import {
   simulateOutageRecovery,
   transitionAircraft,
   transitionRotation,
+  validateRecurringOperationalRule,
 } from "@rundflug/domain";
 import { sha256Hex, verifyCredential } from "./crypto";
 import { mayAccessFids } from "./fids-authorization";
@@ -1285,9 +1286,16 @@ export class EventCoordinator extends DurableObject<Env> {
         }
         if (
           command.type === "UPSERT_PLANNED_OPERATION" ||
-          command.type === "CANCEL_PLANNED_OPERATION"
+          command.type === "CANCEL_PLANNED_OPERATION" ||
+          command.type === "SET_PLANNED_SLOWDOWN_ACTIVE"
         ) {
           return this.handlePlannedOperation(command, current, device.role);
+        }
+        if (
+          command.type === "UPSERT_RECURRING_OPERATIONAL_RULE" ||
+          command.type === "DISABLE_RECURRING_OPERATIONAL_RULE"
+        ) {
+          return this.handleRecurringOperationalRule(command, current);
         }
         if (
           command.type === "SET_AIRCRAFT_OPERATIONAL_STATE" ||
@@ -1535,7 +1543,7 @@ export class EventCoordinator extends DurableObject<Env> {
       );
     }
     const plan = await this.env.DB.prepare(
-      `SELECT scope_type, scope_id, status
+      `SELECT scope_type, scope_id, status, effect_mode
          FROM planned_operational_constraints
         WHERE id = ?1 AND operation_day_id = ?2`,
     )
@@ -1544,11 +1552,23 @@ export class EventCoordinator extends DurableObject<Env> {
         scope_type: "EVENT" | "RESOURCE_GROUP" | "AIRCRAFT" | "PILOT";
         scope_id: string;
         status: "PLANNED" | "ACTIVE" | "CLEARED" | "CANCELED";
+        effect_mode: "BLOCKING" | "SLOWDOWN";
       }>();
     if (!plan) {
       return json(
         { error: { code: "PLANNED_OPERATION_NOT_FOUND", message: "Planeintrag nicht gefunden." } },
         { status: 404 },
+      );
+    }
+    if (plan.effect_mode !== "BLOCKING") {
+      return json(
+        {
+          error: {
+            code: "PLANNED_OPERATION_EFFECT_MISMATCH",
+            message: "Ein verzögerter Betrieb darf keinen Ressourcenstopp auslösen.",
+          },
+        },
+        { status: 409 },
       );
     }
     if (plan.scope_type !== expectedScope || plan.scope_id !== expectedScopeId) {
@@ -1652,12 +1672,13 @@ export class EventCoordinator extends DurableObject<Env> {
       pilotRows,
       gateWaitRows,
       plannedOperationRows,
+      recurringRuleRows,
       activeBlockRows,
     ] = await Promise.all([
       this.env.DB.prepare(
         `SELECT version, operational_interrupted, emergency_mode, planned_boarding_minutes,
                  planned_deboarding_minutes, planned_buffer_minutes, updated_at, status,
-                 operations_start_at,
+                 operations_start_at, operations_end_at,
                  automatic_precall_enabled, precall_lead_minutes, max_gate_wait_minutes,
                 precall_min_quality, precall_gate_cooldown_minutes
            FROM operation_days WHERE id = ?1`,
@@ -1671,6 +1692,7 @@ export class EventCoordinator extends DurableObject<Env> {
           planned_deboarding_minutes: number;
           planned_buffer_minutes: number;
           operations_start_at: string | null;
+          operations_end_at: string | null;
           updated_at: string;
           status: "PREPARATION" | "ACTIVE" | "CLOSED" | "ARCHIVED";
           automatic_precall_enabled: number;
@@ -1681,6 +1703,7 @@ export class EventCoordinator extends DurableObject<Env> {
         }>(),
       this.env.DB.prepare(
         `SELECT r.id, r.status, r.created_at, r.called_at, r.departed_at, r.landed_at,
+                r.aircraft_id, r.pilot_id,
                 r.completed_at, fg.id AS flight_group_id, fg.version AS flight_group_version,
                 fg.precalled_at, fg.resource_group_id, rg.status AS resource_group_status,
                 rg.automatic_precall_enabled AS resource_group_precall_enabled,
@@ -1711,6 +1734,8 @@ export class EventCoordinator extends DurableObject<Env> {
           called_at: string | null;
           departed_at: string | null;
           landed_at: string | null;
+          aircraft_id: string | null;
+          pilot_id: string | null;
           completed_at: string | null;
           flight_group_id: string;
           flight_group_version: number;
@@ -1732,6 +1757,7 @@ export class EventCoordinator extends DurableObject<Env> {
         `SELECT (julianday(r.completed_at) - julianday(r.called_at)) * 1440.0 AS minutes,
                 r.completed_at, r.operation_day_id, p.code AS product_code, a.aircraft_type
            FROM rotations r
+           JOIN flight_groups fg ON fg.id = r.flight_group_id
            JOIN rotation_tickets rt ON rt.rotation_id = r.id
            JOIN tickets t ON t.id = rt.ticket_id
            JOIN ticket_groups tg ON tg.id = t.ticket_group_id
@@ -1752,6 +1778,22 @@ export class EventCoordinator extends DurableObject<Env> {
                             AND resumed.event_type = 'EVENT_OPERATION_RESUMED')
                         OR (interruption.event_type = 'EMERGENCY_MODE_TRIGGERED'
                             AND resumed.event_type = 'EMERGENCY_MODE_CLEARED'))
+                 )
+            )
+            AND NOT EXISTS (
+              SELECT 1
+                FROM planned_operational_constraints slowdown
+               WHERE slowdown.operation_day_id = r.operation_day_id
+                 AND slowdown.effect_mode = 'SLOWDOWN'
+                 AND slowdown.activated_at IS NOT NULL
+                 AND slowdown.activated_at < r.completed_at
+                 AND COALESCE(slowdown.cleared_at, '9999-12-31T23:59:59.999Z') > r.called_at
+                 AND (
+                   (slowdown.scope_type = 'EVENT' AND slowdown.scope_id = r.operation_day_id)
+                   OR (slowdown.scope_type = 'RESOURCE_GROUP'
+                       AND slowdown.scope_id = fg.resource_group_id)
+                   OR (slowdown.scope_type = 'AIRCRAFT' AND slowdown.scope_id = r.aircraft_id)
+                   OR (slowdown.scope_type = 'PILOT' AND slowdown.scope_id = r.pilot_id)
                  )
             )
           GROUP BY r.id, p.code, a.aircraft_type
@@ -1835,20 +1877,31 @@ export class EventCoordinator extends DurableObject<Env> {
         .bind(eventId)
         .all<{ minutes: number }>(),
       this.env.DB.prepare(
-        `SELECT plan.id, plan.scope_type, plan.scope_id, plan.earliest_start_at,
+        `SELECT plan.id, plan.scope_type, plan.scope_id, plan.effect_mode,
+                  plan.duration_multiplier_percent, plan.status, plan.activated_at,
+                  plan.earliest_start_at,
                   plan.latest_start_at, plan.minimum_duration_minutes,
                   plan.typical_duration_minutes, plan.maximum_duration_minutes,
                   plan.after_rotation_id, after_rotation.predicted_completion_at,
                   after_rotation.completed_at
              FROM planned_operational_constraints plan
              LEFT JOIN rotations after_rotation ON after_rotation.id = plan.after_rotation_id
-            WHERE plan.operation_day_id = ?1 AND plan.status = 'PLANNED'`,
+            WHERE plan.operation_day_id = ?1
+              AND plan.recurring_rule_id IS NULL
+              AND (
+                plan.status = 'PLANNED'
+                OR (plan.status = 'ACTIVE' AND plan.effect_mode = 'SLOWDOWN')
+              )`,
       )
         .bind(eventId)
         .all<{
           id: string;
           scope_type: "EVENT" | "RESOURCE_GROUP" | "AIRCRAFT" | "PILOT";
           scope_id: string;
+          effect_mode: "BLOCKING" | "SLOWDOWN";
+          duration_multiplier_percent: number | null;
+          status: "PLANNED" | "ACTIVE";
+          activated_at: string | null;
           earliest_start_at: string | null;
           latest_start_at: string | null;
           minimum_duration_minutes: number;
@@ -1857,6 +1910,25 @@ export class EventCoordinator extends DurableObject<Env> {
           after_rotation_id: string | null;
           predicted_completion_at: string | null;
           completed_at: string | null;
+        }>(),
+      this.env.DB.prepare(
+        `SELECT id, scope_type, scope_id, trigger_metric, interval_value, progress_value,
+                minimum_duration_minutes, typical_duration_minutes, maximum_duration_minutes
+           FROM recurring_operational_rules
+          WHERE operation_day_id = ?1 AND status = 'ACTIVE'
+          ORDER BY scope_type, scope_id, operation_kind, id`,
+      )
+        .bind(eventId)
+        .all<{
+          id: string;
+          scope_type: "AIRCRAFT" | "PILOT";
+          scope_id: string;
+          trigger_metric: "COMPLETED_ROTATIONS" | "OPERATING_MINUTES";
+          interval_value: number;
+          progress_value: number;
+          minimum_duration_minutes: number;
+          typical_duration_minutes: number;
+          maximum_duration_minutes: number;
         }>(),
       this.env.DB.prepare(
         `SELECT scope_type, scope_id, expected_review_at
@@ -1893,10 +1965,10 @@ export class EventCoordinator extends DurableObject<Env> {
     const resolvedPlans = plannedOperationRows.results.flatMap((plan) => {
       const afterRotationAt = plan.completed_at ?? plan.predicted_completion_at;
       const earliest =
-        plan.earliest_start_at ??
+        (plan.status === "ACTIVE" ? plan.activated_at : plan.earliest_start_at) ??
         (afterRotationAt ? new Date(Date.parse(afterRotationAt)).toISOString() : null);
       const latest =
-        plan.latest_start_at ??
+        (plan.status === "ACTIVE" ? plan.activated_at : plan.latest_start_at) ??
         (afterRotationAt ? new Date(Date.parse(afterRotationAt) + 5 * 60_000).toISOString() : null);
       if (!earliest || !latest) return [];
       return [
@@ -1904,12 +1976,18 @@ export class EventCoordinator extends DurableObject<Env> {
           id: plan.id,
           scopeType: plan.scope_type,
           scopeId: plan.scope_id,
+          effectMode: plan.effect_mode,
+          durationMultiplierPercent: plan.duration_multiplier_percent,
+          active: plan.status === "ACTIVE",
           earliestStartAt: earliest,
           latestStartAt: latest,
           minimumDurationMinutes: plan.minimum_duration_minutes,
           typicalDurationMinutes: plan.typical_duration_minutes,
           maximumDurationMinutes: plan.maximum_duration_minutes,
-          overdue: Date.parse(latest) <= now.getTime(),
+          overdue:
+            plan.status === "ACTIVE"
+              ? Date.parse(earliest) + plan.maximum_duration_minutes * 60_000 <= now.getTime()
+              : Date.parse(latest) <= now.getTime(),
         },
       ];
     });
@@ -2003,6 +2081,22 @@ export class EventCoordinator extends DurableObject<Env> {
           availableExpectedAt: expectedAt,
           availableUpperAt: upperAt,
           constraints,
+          recurringConstraints: recurringRuleRows.results
+            .filter(
+              (rule) =>
+                (rule.scope_type === "AIRCRAFT" && rule.scope_id === aircraft.aircraftId) ||
+                (rule.scope_type === "PILOT" && rule.scope_id === pilot.pilotId),
+            )
+            .map((rule) => ({
+              id: rule.id,
+              triggerMetric: rule.trigger_metric,
+              intervalValue: rule.interval_value,
+              progressValue: rule.progress_value,
+              minimumDurationMinutes: rule.minimum_duration_minutes,
+              typicalDurationMinutes: rule.typical_duration_minutes,
+              maximumDurationMinutes: rule.maximum_duration_minutes,
+              active: true,
+            })),
         };
       });
       return {
@@ -2037,6 +2131,7 @@ export class EventCoordinator extends DurableObject<Env> {
         eventId,
         now: nowIso,
         plannedOperationsStartAt: event.operations_start_at,
+        plannedOperationsEndAt: event.operations_end_at,
         operationalInterrupted: event.operational_interrupted === 1,
         emergencyMode: event.emergency_mode === 1,
         plannedBoardingMinutes: event.planned_boarding_minutes,
@@ -2059,6 +2154,8 @@ export class EventCoordinator extends DurableObject<Env> {
         departedAt: rotation.departed_at,
         landedAt: rotation.landed_at,
         resourceGroupId: rotation.resource_group_id,
+        aircraftId: rotation.aircraft_id,
+        pilotId: rotation.pilot_id,
         resourceGroupStatus: rotation.resource_group_status,
         queueSequence: rotation.queue_sequence,
         referenceDurationMinutes: rotation.reference_duration_minutes,
@@ -2067,6 +2164,13 @@ export class EventCoordinator extends DurableObject<Env> {
         predictedDepartureAt: rotation.predicted_departure_at,
         predictedLandingAt: rotation.predicted_landing_at,
         predictedCompletionAt: rotation.predicted_completion_at,
+        constraints: resolvedPlans.filter(
+          (plan) =>
+            (plan.scopeType === "EVENT" && plan.scopeId === eventId) ||
+            (plan.scopeType === "RESOURCE_GROUP" && plan.scopeId === rotation.resource_group_id) ||
+            (plan.scopeType === "AIRCRAFT" && plan.scopeId === rotation.aircraft_id) ||
+            (plan.scopeType === "PILOT" && plan.scopeId === rotation.pilot_id),
+        ),
       })),
     });
     const projectionByRotationId = new Map(
@@ -2222,6 +2326,15 @@ export class EventCoordinator extends DurableObject<Env> {
         socket.close(1011, "Prognose-Broadcast fehlgeschlagen");
       }
     }
+    if (
+      triggerEventType === "PLANNED_SLOWDOWN_STARTED" ||
+      triggerEventType === "PLANNED_SLOWDOWN_ENDED"
+    ) {
+      this.pendingForecast = {
+        eventId,
+        triggerEventType: `${triggerEventType}_FOLLOW_UP`,
+      };
+    }
   }
 
   private async persistAutomaticPrecalls(
@@ -2299,13 +2412,19 @@ export class EventCoordinator extends DurableObject<Env> {
   private async handlePlannedOperation(
     command: Extract<
       CommandEnvelope,
-      { type: "UPSERT_PLANNED_OPERATION" | "CANCEL_PLANNED_OPERATION" }
+      {
+        type:
+          | "UPSERT_PLANNED_OPERATION"
+          | "CANCEL_PLANNED_OPERATION"
+          | "SET_PLANNED_SLOWDOWN_ACTIVE";
+      }
     >,
     current: StoredEventRow,
     role: DeviceRole,
   ): Promise<Response> {
     const existing = await this.env.DB.prepare(
-      `SELECT id, version, status, constraint_kind, scope_type
+      `SELECT id, version, status, constraint_kind, scope_type, effect_mode,
+              duration_multiplier_percent, recurring_rule_id
          FROM planned_operational_constraints
         WHERE id = ?1 AND operation_day_id = ?2`,
     )
@@ -2316,6 +2435,9 @@ export class EventCoordinator extends DurableObject<Env> {
         status: "PLANNED" | "ACTIVE" | "CLEARED" | "CANCELED";
         constraint_kind: PlannedOperationKind;
         scope_type: PlannedOperationScope;
+        effect_mode: "BLOCKING" | "SLOWDOWN";
+        duration_multiplier_percent: number | null;
+        recurring_rule_id: string | null;
       }>();
 
     if (command.type === "UPSERT_PLANNED_OPERATION") {
@@ -2341,6 +2463,18 @@ export class EventCoordinator extends DurableObject<Env> {
             error: {
               code: "PLANNED_OPERATION_NOT_EDITABLE",
               message: "Nur noch nicht gestartete Planeinträge können bearbeitet werden.",
+            },
+          },
+          { status: 409 },
+        );
+      }
+      if (existing?.recurring_rule_id) {
+        return json(
+          {
+            error: {
+              code: "RECURRING_OCCURRENCE_NOT_EDITABLE",
+              message:
+                "Ein automatisch erzeugtes Vorkommen wird über seine Regel gepflegt oder einmalig übersprungen.",
             },
           },
           { status: 409 },
@@ -2433,7 +2567,7 @@ export class EventCoordinator extends DurableObject<Env> {
           );
         }
       }
-    } else {
+    } else if (command.type === "CANCEL_PLANNED_OPERATION") {
       if (!existing) {
         return json(
           {
@@ -2468,6 +2602,53 @@ export class EventCoordinator extends DurableObject<Env> {
           { status: 409 },
         );
       }
+    } else {
+      if (!existing) {
+        return json(
+          {
+            error: {
+              code: "PLANNED_OPERATION_NOT_FOUND",
+              message: "Planeintrag nicht gefunden.",
+            },
+          },
+          { status: 404 },
+        );
+      }
+      if (existing.version !== command.payload.planExpectedVersion) {
+        return json(
+          {
+            error: {
+              code: "PLANNED_OPERATION_VERSION_CONFLICT",
+              message: "Der Betriebsplan wurde inzwischen geändert.",
+              currentVersion: existing.version,
+            },
+          },
+          { status: 409 },
+        );
+      }
+      if (existing.effect_mode !== "SLOWDOWN") {
+        return json(
+          {
+            error: {
+              code: "PLANNED_OPERATION_EFFECT_MISMATCH",
+              message: "Nur ein verzögerter Betrieb wird ohne Ressourcenstopp bestätigt.",
+            },
+          },
+          { status: 409 },
+        );
+      }
+      const expectedStatus = command.payload.active ? "PLANNED" : "ACTIVE";
+      if (existing.status !== expectedStatus) {
+        return json(
+          {
+            error: {
+              code: "PLANNED_OPERATION_STATUS_MISMATCH",
+              message: "Der Planeintrag ist für diese Bestätigung nicht im passenden Zustand.",
+            },
+          },
+          { status: 409 },
+        );
+      }
     }
 
     const now = new Date().toISOString();
@@ -2478,11 +2659,25 @@ export class EventCoordinator extends DurableObject<Env> {
         ? existing
           ? "PLANNED_OPERATION_UPDATED"
           : "PLANNED_OPERATION_CREATED"
-        : "PLANNED_OPERATION_CANCELED";
+        : command.type === "CANCEL_PLANNED_OPERATION"
+          ? existing?.recurring_rule_id
+            ? "RECURRING_OPERATION_OCCURRENCE_SKIPPED"
+            : "PLANNED_OPERATION_CANCELED"
+          : command.payload.active
+            ? "PLANNED_SLOWDOWN_STARTED"
+            : "PLANNED_SLOWDOWN_ENDED";
     const auditReason = plannedOperationAuditReason({
       role,
       action:
-        command.type === "CANCEL_PLANNED_OPERATION" ? "CANCEL" : existing ? "UPDATE" : "CREATE",
+        command.type === "CANCEL_PLANNED_OPERATION"
+          ? "CANCEL"
+          : command.type === "SET_PLANNED_SLOWDOWN_ACTIVE"
+            ? command.payload.active
+              ? "START"
+              : "END"
+            : existing
+              ? "UPDATE"
+              : "CREATE",
       kind:
         command.type === "UPSERT_PLANNED_OPERATION"
           ? command.payload.kind
@@ -2510,10 +2705,11 @@ export class EventCoordinator extends DurableObject<Env> {
               `UPDATE planned_operational_constraints
                   SET scope_type = ?1, scope_id = ?2, constraint_kind = ?3, start_mode = ?4,
                       earliest_start_at = ?5, latest_start_at = ?6, after_rotation_id = ?7,
-                      minimum_duration_minutes = ?8, typical_duration_minutes = ?9,
-                      maximum_duration_minutes = ?10, reason = ?11, public_note = ?12,
-                      version = ?13, updated_at = ?14
-                WHERE id = ?15 AND operation_day_id = ?16 AND version = ?17 AND status = 'PLANNED'`,
+                      effect_mode = ?8, duration_multiplier_percent = ?9,
+                      minimum_duration_minutes = ?10, typical_duration_minutes = ?11,
+                      maximum_duration_minutes = ?12, reason = ?13, public_note = ?14,
+                      version = ?15, updated_at = ?16
+                WHERE id = ?17 AND operation_day_id = ?18 AND version = ?19 AND status = 'PLANNED'`,
             ).bind(
               command.payload.scopeType,
               command.payload.scopeId,
@@ -2522,6 +2718,8 @@ export class EventCoordinator extends DurableObject<Env> {
               command.payload.earliestStartAt,
               command.payload.latestStartAt,
               command.payload.afterRotationId,
+              command.payload.effectMode,
+              command.payload.durationMultiplierPercent,
               command.payload.minimumDurationMinutes,
               command.payload.typicalDurationMinutes,
               command.payload.maximumDurationMinutes,
@@ -2537,10 +2735,11 @@ export class EventCoordinator extends DurableObject<Env> {
               `INSERT INTO planned_operational_constraints
                 (id, operation_day_id, scope_type, scope_id, constraint_kind, start_mode,
                  earliest_start_at, latest_start_at, after_rotation_id,
+                 effect_mode, duration_multiplier_percent,
                  minimum_duration_minutes, typical_duration_minutes, maximum_duration_minutes,
                  status, reason, public_note, version, created_by_device_id, created_at, updated_at)
-               VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12,
-                       'PLANNED', ?13, ?14, 0, ?15, ?16, ?16)`,
+               VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14,
+                       'PLANNED', ?15, ?16, 0, ?17, ?18, ?18)`,
             ).bind(
               command.payload.planId,
               command.eventId,
@@ -2551,6 +2750,8 @@ export class EventCoordinator extends DurableObject<Env> {
               command.payload.earliestStartAt,
               command.payload.latestStartAt,
               command.payload.afterRotationId,
+              command.payload.effectMode,
+              command.payload.durationMultiplierPercent,
               command.payload.minimumDurationMinutes,
               command.payload.typicalDurationMinutes,
               command.payload.maximumDurationMinutes,
@@ -2559,27 +2760,65 @@ export class EventCoordinator extends DurableObject<Env> {
               command.deviceId,
               now,
             )
-        : this.env.DB.prepare(
-            `UPDATE planned_operational_constraints
-                SET status = 'CANCELED', reason = ?1, canceled_at = ?2, updated_at = ?2, version = ?3
-              WHERE id = ?4 AND operation_day_id = ?5 AND version = ?6 AND status = 'PLANNED'`,
-          ).bind(
-            auditReason,
-            now,
-            nextPlanVersion,
-            command.payload.planId,
-            command.eventId,
-            existing?.version,
-          );
+        : command.type === "CANCEL_PLANNED_OPERATION"
+          ? this.env.DB.prepare(
+              `UPDATE planned_operational_constraints
+                  SET status = 'CANCELED', reason = ?1, canceled_at = ?2, updated_at = ?2,
+                      version = ?3
+                WHERE id = ?4 AND operation_day_id = ?5 AND version = ?6
+                  AND status = 'PLANNED'`,
+            ).bind(
+              auditReason,
+              now,
+              nextPlanVersion,
+              command.payload.planId,
+              command.eventId,
+              existing?.version,
+            )
+          : this.env.DB.prepare(
+              `UPDATE planned_operational_constraints
+                  SET status = ?1, reason = ?2, updated_at = ?3, version = ?4,
+                      activated_at = CASE WHEN ?1 = 'ACTIVE' THEN ?3 ELSE activated_at END,
+                      cleared_at = CASE WHEN ?1 = 'CLEARED' THEN ?3 ELSE cleared_at END
+                WHERE id = ?5 AND operation_day_id = ?6 AND version = ?7
+                  AND effect_mode = 'SLOWDOWN' AND status = ?8`,
+            ).bind(
+              command.payload.active ? "ACTIVE" : "CLEARED",
+              auditReason,
+              now,
+              nextPlanVersion,
+              command.payload.planId,
+              command.eventId,
+              existing?.version,
+              command.payload.active ? "PLANNED" : "ACTIVE",
+            );
     const auditPayload =
       command.type === "UPSERT_PLANNED_OPERATION"
         ? { ...command.payload, planExpectedVersion: undefined, reason: auditReason }
-        : { planId: command.payload.planId, reason: auditReason };
+        : command.type === "CANCEL_PLANNED_OPERATION"
+          ? { planId: command.payload.planId, reason: auditReason }
+          : {
+              planId: command.payload.planId,
+              active: command.payload.active,
+              durationMultiplierPercent: existing?.duration_multiplier_percent,
+              reason: auditReason,
+              informationalOnly: true,
+            };
     await this.env.DB.batch([
       this.env.DB.prepare(
         "UPDATE operation_days SET version = ?1, updated_at = ?2 WHERE id = ?3 AND version = ?4",
       ).bind(nextEventVersion, now, command.eventId, current.version),
       planStatement,
+      ...(command.type === "CANCEL_PLANNED_OPERATION" && existing?.recurring_rule_id
+        ? [
+            this.env.DB.prepare(
+              `UPDATE recurring_operational_rules
+                  SET progress_value = 0, last_reset_at = ?1, updated_at = ?1,
+                      version = version + 1
+                WHERE id = ?2 AND operation_day_id = ?3 AND status = 'ACTIVE'`,
+            ).bind(now, existing.recurring_rule_id, command.eventId),
+          ]
+        : []),
       this.env.DB.prepare(
         `INSERT INTO operational_events
           (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type,
@@ -2611,6 +2850,424 @@ export class EventCoordinator extends DurableObject<Env> {
         "INSERT INTO outbox (id, operation_day_id, topic, payload_json, created_at) VALUES (?1, ?2, 'EVENT_STATE_CHANGED', ?3, ?4)",
       ).bind(crypto.randomUUID(), command.eventId, JSON.stringify(result), now),
     ]);
+    this.broadcast(result);
+    return json(result);
+  }
+
+  private async handleRecurringOperationalRule(
+    command: Extract<
+      CommandEnvelope,
+      {
+        type: "UPSERT_RECURRING_OPERATIONAL_RULE" | "DISABLE_RECURRING_OPERATIONAL_RULE";
+      }
+    >,
+    current: StoredEventRow,
+  ): Promise<Response> {
+    const existing = await this.env.DB.prepare(
+      `SELECT rule.id, rule.version, rule.status, rule.scope_type, rule.scope_id,
+              rule.operation_kind, rule.trigger_metric, rule.interval_value,
+              rule.progress_value, rule.minimum_duration_minutes,
+              rule.typical_duration_minutes, rule.maximum_duration_minutes,
+              rule.sequence_number, rule.last_reset_at,
+              (SELECT plan.id
+                 FROM planned_operational_constraints plan
+                WHERE plan.recurring_rule_id = rule.id
+                  AND plan.status IN ('PLANNED', 'DUE', 'ACTIVE')
+                ORDER BY plan.recurrence_sequence DESC LIMIT 1) AS open_plan_id
+         FROM recurring_operational_rules rule
+        WHERE rule.id = ?1 AND rule.operation_day_id = ?2`,
+    )
+      .bind(command.payload.ruleId, command.eventId)
+      .first<{
+        id: string;
+        version: number;
+        status: "ACTIVE" | "DISABLED";
+        scope_type: "AIRCRAFT" | "PILOT";
+        scope_id: string;
+        operation_kind: "PAUSE" | "REFUELING";
+        trigger_metric: "COMPLETED_ROTATIONS" | "OPERATING_MINUTES";
+        interval_value: number;
+        progress_value: number;
+        minimum_duration_minutes: number;
+        typical_duration_minutes: number;
+        maximum_duration_minutes: number;
+        sequence_number: number;
+        last_reset_at: string;
+        open_plan_id: string | null;
+      }>();
+
+    if (command.type === "DISABLE_RECURRING_OPERATIONAL_RULE") {
+      if (!existing) {
+        return json(
+          { error: { code: "RECURRING_RULE_NOT_FOUND", message: "Regel nicht gefunden." } },
+          { status: 404 },
+        );
+      }
+      if (
+        existing.version !== command.payload.ruleExpectedVersion ||
+        existing.status !== "ACTIVE"
+      ) {
+        return json(
+          {
+            error: {
+              code: "RECURRING_RULE_VERSION_CONFLICT",
+              message: "Die Regel wurde inzwischen geändert oder deaktiviert.",
+              currentVersion: existing.version,
+            },
+          },
+          { status: 409 },
+        );
+      }
+    } else {
+      if (
+        (command.payload.ruleExpectedVersion === null && existing) ||
+        (command.payload.ruleExpectedVersion !== null &&
+          (!existing || existing.version !== command.payload.ruleExpectedVersion)) ||
+        existing?.status === "DISABLED"
+      ) {
+        return json(
+          {
+            error: {
+              code: "RECURRING_RULE_VERSION_CONFLICT",
+              message: "Die Regel wurde inzwischen geändert oder deaktiviert.",
+              currentVersion: existing?.version,
+            },
+          },
+          { status: 409 },
+        );
+      }
+      const validationErrors = validateRecurringOperationalRule({
+        ...command.payload.rule,
+        progressValue: existing?.progress_value ?? 0,
+      });
+      if (validationErrors.length > 0) {
+        return json(
+          {
+            error: {
+              code: "RECURRING_RULE_INVALID",
+              message: validationErrors.join(" "),
+            },
+          },
+          { status: 400 },
+        );
+      }
+      const targetExists =
+        command.payload.rule.scopeType === "AIRCRAFT"
+          ? Boolean(
+              await this.env.DB.prepare(
+                `SELECT a.id FROM aircraft a
+                   JOIN resource_group_memberships membership
+                     ON membership.aircraft_id = a.id
+                    AND membership.operation_day_id = ?2
+                    AND membership.active_until IS NULL
+                  WHERE a.id = ?1`,
+              )
+                .bind(command.payload.rule.scopeId, command.eventId)
+                .first(),
+            )
+          : Boolean(
+              await this.env.DB.prepare(
+                "SELECT id FROM pilots WHERE id = ?1 AND operation_day_id = ?2",
+              )
+                .bind(command.payload.rule.scopeId, command.eventId)
+                .first(),
+            );
+      if (!targetExists) {
+        return json(
+          {
+            error: {
+              code: "RECURRING_RULE_SCOPE_NOT_FOUND",
+              message: "Das Ziel der Regel wurde nicht gefunden.",
+            },
+          },
+          { status: 404 },
+        );
+      }
+      const conflicting = await this.env.DB.prepare(
+        `SELECT id FROM recurring_operational_rules
+          WHERE operation_day_id = ?1 AND scope_type = ?2 AND scope_id = ?3
+            AND operation_kind = ?4 AND status = 'ACTIVE' AND id <> ?5`,
+      )
+        .bind(
+          command.eventId,
+          command.payload.rule.scopeType,
+          command.payload.rule.scopeId,
+          command.payload.rule.kind,
+          command.payload.ruleId,
+        )
+        .first<{ id: string }>();
+      if (conflicting) {
+        return json(
+          {
+            error: {
+              code: "RECURRING_RULE_ALREADY_ACTIVE",
+              message: "Für dieses Ziel und diese Art besteht bereits eine aktive Regel.",
+            },
+          },
+          { status: 409 },
+        );
+      }
+    }
+
+    const now = new Date().toISOString();
+    const nextEventVersion = current.version + 1;
+    const nextRuleVersion = existing ? existing.version + 1 : 0;
+    let initialProgress = existing?.progress_value ?? 0;
+    let lastRotationId: string | null = null;
+    let progressResetAt = existing?.last_reset_at ?? now;
+    if (command.type === "UPSERT_RECURRING_OPERATIONAL_RULE") {
+      const progressBasisChanged =
+        !existing ||
+        existing.scope_type !== command.payload.rule.scopeType ||
+        existing.scope_id !== command.payload.rule.scopeId ||
+        existing.operation_kind !== command.payload.rule.kind ||
+        existing.trigger_metric !== command.payload.rule.triggerMetric;
+      const resetBoundary = progressBasisChanged
+        ? command.payload.rule.scopeType === "AIRCRAFT"
+          ? await this.env.DB.prepare(
+              `SELECT COALESCE(
+                  (SELECT MAX(cleared_at) FROM operational_blocks
+                    WHERE operation_day_id = ?1 AND scope_type = 'AIRCRAFT' AND scope_id = ?2
+                      AND block_type = ?3 AND status = 'CLEARED'),
+                  operations_start_at, created_at
+                ) AS reset_at
+                 FROM operation_days WHERE id = ?1`,
+            )
+              .bind(command.eventId, command.payload.rule.scopeId, command.payload.rule.kind)
+              .first<{ reset_at: string }>()
+          : await this.env.DB.prepare(
+              `SELECT COALESCE(
+                  (SELECT MAX(occurred_at) FROM operational_events
+                    WHERE operation_day_id = ?1 AND aggregate_type = 'PILOT'
+                      AND aggregate_id = ?2 AND event_type = 'PILOT_PAUSE_ENDED'),
+                  operations_start_at, created_at
+                ) AS reset_at
+                 FROM operation_days WHERE id = ?1`,
+            )
+              .bind(command.eventId, command.payload.rule.scopeId)
+              .first<{ reset_at: string }>()
+        : { reset_at: existing.last_reset_at };
+      progressResetAt = resetBoundary?.reset_at ?? current.updated_at;
+      const progress = await this.env.DB.prepare(
+        `SELECT
+            COUNT(*) AS completed_rotations,
+            COALESCE(ROUND(SUM(
+              MAX(0, (julianday(r.completed_at) - julianday(r.called_at)) * 1440)
+            )), 0) AS operating_minutes,
+            (SELECT latest.id
+               FROM rotations latest
+              WHERE latest.operation_day_id = ?1
+                AND latest.status = 'COMPLETED'
+                AND latest.completed_at >= ?4
+                AND CASE WHEN ?2 = 'AIRCRAFT'
+                         THEN latest.aircraft_id = ?3 ELSE latest.pilot_id = ?3 END
+              ORDER BY latest.completed_at DESC, latest.id DESC LIMIT 1) AS last_rotation_id
+           FROM rotations r
+          WHERE r.operation_day_id = ?1 AND r.status = 'COMPLETED'
+            AND r.completed_at >= ?4
+            AND CASE WHEN ?2 = 'AIRCRAFT'
+                     THEN r.aircraft_id = ?3 ELSE r.pilot_id = ?3 END`,
+      )
+        .bind(
+          command.eventId,
+          command.payload.rule.scopeType,
+          command.payload.rule.scopeId,
+          progressResetAt,
+        )
+        .first<{
+          completed_rotations: number;
+          operating_minutes: number;
+          last_rotation_id: string | null;
+        }>();
+      if (progressBasisChanged) {
+        initialProgress =
+          command.payload.rule.triggerMetric === "COMPLETED_ROTATIONS"
+            ? Number(progress?.completed_rotations ?? 0)
+            : Number(progress?.operating_minutes ?? 0);
+      }
+      lastRotationId = progress?.last_rotation_id ?? null;
+    }
+
+    const ruleValues =
+      command.type === "UPSERT_RECURRING_OPERATIONAL_RULE"
+        ? command.payload.rule
+        : {
+            scopeType: existing?.scope_type ?? "AIRCRAFT",
+            scopeId: existing?.scope_id ?? "",
+            kind: existing?.operation_kind ?? "PAUSE",
+            triggerMetric: existing?.trigger_metric ?? "COMPLETED_ROTATIONS",
+            intervalValue: existing?.interval_value ?? 1,
+            minimumDurationMinutes: existing?.minimum_duration_minutes ?? 1,
+            typicalDurationMinutes: existing?.typical_duration_minutes ?? 1,
+            maximumDurationMinutes: existing?.maximum_duration_minutes ?? 1,
+          };
+    const dueOnUpsert =
+      command.type === "UPSERT_RECURRING_OPERATIONAL_RULE" &&
+      initialProgress >= ruleValues.intervalValue &&
+      lastRotationId !== null &&
+      !existing?.open_plan_id;
+    const occurrenceId = dueOnUpsert ? crypto.randomUUID() : null;
+    const sequenceNumber = (existing?.sequence_number ?? 0) + (dueOnUpsert ? 1 : 0);
+    const eventType =
+      command.type === "DISABLE_RECURRING_OPERATIONAL_RULE"
+        ? "RECURRING_OPERATIONAL_RULE_DISABLED"
+        : existing
+          ? "RECURRING_OPERATIONAL_RULE_UPDATED"
+          : "RECURRING_OPERATIONAL_RULE_CREATED";
+    const result: CommandResult = {
+      accepted: true,
+      duplicate: false,
+      event: rowToSnapshot({
+        ...current,
+        version: nextEventVersion,
+        updated_at: now,
+      }),
+      eventType,
+      aggregate: { type: "OPERATIONAL_RULE", id: command.payload.ruleId },
+    };
+    const ruleStatement =
+      command.type === "DISABLE_RECURRING_OPERATIONAL_RULE"
+        ? this.env.DB.prepare(
+            `UPDATE recurring_operational_rules
+                SET status = 'DISABLED', reason = ?1, disabled_at = ?2, updated_at = ?2,
+                    version = ?3
+              WHERE id = ?4 AND operation_day_id = ?5 AND version = ?6 AND status = 'ACTIVE'`,
+          ).bind(
+            command.payload.reason,
+            now,
+            nextRuleVersion,
+            command.payload.ruleId,
+            command.eventId,
+            existing?.version,
+          )
+        : existing
+          ? this.env.DB.prepare(
+              `UPDATE recurring_operational_rules
+                  SET scope_type = ?1, scope_id = ?2, operation_kind = ?3,
+                      trigger_metric = ?4, interval_value = ?5,
+                      minimum_duration_minutes = ?6, typical_duration_minutes = ?7,
+                      maximum_duration_minutes = ?8, progress_value = ?9,
+                      sequence_number = ?10, last_reset_at = ?11, reason = ?12,
+                      updated_at = ?13, version = ?14
+                WHERE id = ?15 AND operation_day_id = ?16 AND version = ?17
+                  AND status = 'ACTIVE'`,
+            ).bind(
+              ruleValues.scopeType,
+              ruleValues.scopeId,
+              ruleValues.kind,
+              ruleValues.triggerMetric,
+              ruleValues.intervalValue,
+              ruleValues.minimumDurationMinutes,
+              ruleValues.typicalDurationMinutes,
+              ruleValues.maximumDurationMinutes,
+              initialProgress,
+              sequenceNumber,
+              progressResetAt,
+              command.payload.reason,
+              now,
+              nextRuleVersion,
+              command.payload.ruleId,
+              command.eventId,
+              existing.version,
+            )
+          : this.env.DB.prepare(
+              `INSERT INTO recurring_operational_rules
+                (id, operation_day_id, scope_type, scope_id, operation_kind, trigger_metric,
+                 interval_value, progress_value, minimum_duration_minutes,
+                 typical_duration_minutes, maximum_duration_minutes, status, sequence_number,
+                 reason, version, created_by_device_id, last_reset_at, created_at, updated_at)
+               VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, 'ACTIVE', ?12,
+                       ?13, 0, ?14, ?15, ?16, ?16)`,
+            ).bind(
+              command.payload.ruleId,
+              command.eventId,
+              ruleValues.scopeType,
+              ruleValues.scopeId,
+              ruleValues.kind,
+              ruleValues.triggerMetric,
+              ruleValues.intervalValue,
+              initialProgress,
+              ruleValues.minimumDurationMinutes,
+              ruleValues.typicalDurationMinutes,
+              ruleValues.maximumDurationMinutes,
+              sequenceNumber,
+              command.payload.reason,
+              command.deviceId,
+              progressResetAt,
+              now,
+            );
+    const statements: D1PreparedStatement[] = [
+      this.env.DB.prepare(
+        "UPDATE operation_days SET version = ?1, updated_at = ?2 WHERE id = ?3 AND version = ?4",
+      ).bind(nextEventVersion, now, command.eventId, current.version),
+      ruleStatement,
+    ];
+    if (dueOnUpsert && occurrenceId && lastRotationId) {
+      statements.push(
+        this.env.DB.prepare(
+          `INSERT INTO planned_operational_constraints
+            (id, operation_day_id, scope_type, scope_id, constraint_kind, start_mode,
+             earliest_start_at, latest_start_at, after_rotation_id, effect_mode,
+             duration_multiplier_percent, minimum_duration_minutes, typical_duration_minutes,
+             maximum_duration_minutes, status, reason, public_note, version,
+             created_by_device_id, created_at, updated_at, recurring_rule_id, recurrence_sequence)
+           VALUES (?1, ?2, ?3, ?4, ?5, 'AFTER_CURRENT_ROTATION', NULL, NULL, ?6,
+                   'BLOCKING', NULL, ?7, ?8, ?9, 'PLANNED', ?10, '', 0, ?11, ?12, ?12, ?13, ?14)`,
+        ).bind(
+          occurrenceId,
+          command.eventId,
+          ruleValues.scopeType,
+          ruleValues.scopeId,
+          ruleValues.kind,
+          lastRotationId,
+          ruleValues.minimumDurationMinutes,
+          ruleValues.typicalDurationMinutes,
+          ruleValues.maximumDurationMinutes,
+          "Wiederkehrende Regel ist aufgrund des bestätigten Fortschritts fällig.",
+          command.deviceId,
+          now,
+          command.payload.ruleId,
+          sequenceNumber,
+        ),
+      );
+    }
+    statements.push(
+      this.env.DB.prepare(
+        `INSERT INTO operational_events
+          (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type,
+           aggregate_id, aggregate_version, payload_json)
+         VALUES (?1, ?2, ?3, ?4, ?5, 'OPERATIONAL_RULE', ?6, ?7, ?8)`,
+      ).bind(
+        crypto.randomUUID(),
+        command.eventId,
+        eventType,
+        now,
+        command.deviceId,
+        command.payload.ruleId,
+        nextRuleVersion,
+        JSON.stringify({
+          ...(command.type === "UPSERT_RECURRING_OPERATIONAL_RULE"
+            ? { ...ruleValues, progressValue: initialProgress, occurrenceId }
+            : { reason: command.payload.reason }),
+        }),
+      ),
+      this.env.DB.prepare(
+        `INSERT INTO idempotency_receipts
+          (command_id, operation_day_id, device_id, command_type, received_at, response_json)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)`,
+      ).bind(
+        command.commandId,
+        command.eventId,
+        command.deviceId,
+        command.type,
+        now,
+        JSON.stringify(result),
+      ),
+      this.env.DB.prepare(
+        "INSERT INTO outbox (id, operation_day_id, topic, payload_json, created_at) VALUES (?1, ?2, 'EVENT_STATE_CHANGED', ?3, ?4)",
+      ).bind(crypto.randomUUID(), command.eventId, JSON.stringify(result), now),
+    );
+    await this.env.DB.batch(statements);
     this.broadcast(result);
     return json(result);
   }
@@ -2699,6 +3356,17 @@ export class EventCoordinator extends DurableObject<Env> {
               command.payload.plannedOperationId,
               command.eventId,
             ),
+          );
+        }
+        if (!command.payload.paused) {
+          statements.push(
+            this.env.DB.prepare(
+              `UPDATE recurring_operational_rules
+                  SET progress_value = 0, last_reset_at = ?1, updated_at = ?1,
+                      version = version + 1
+                WHERE operation_day_id = ?2 AND scope_type = 'PILOT' AND scope_id = ?3
+                  AND operation_kind = 'PAUSE' AND status = 'ACTIVE'`,
+            ).bind(now, command.eventId, pilot.id),
           );
         }
         aggregateType = "PILOT";
@@ -2864,6 +3532,23 @@ export class EventCoordinator extends DurableObject<Env> {
                         version = version + 1
                   WHERE id = ?2 AND operation_day_id = ?3`,
               ).bind(now, command.payload.plannedOperationId, command.eventId),
+            );
+          }
+          const completedKind =
+            aircraft.operational_state === "REFUELING"
+              ? "REFUELING"
+              : aircraft.operational_state === "PAUSED"
+                ? "PAUSE"
+                : null;
+          if (completedKind) {
+            statements.push(
+              this.env.DB.prepare(
+                `UPDATE recurring_operational_rules
+                    SET progress_value = 0, last_reset_at = ?1, updated_at = ?1,
+                        version = version + 1
+                  WHERE operation_day_id = ?2 AND scope_type = 'AIRCRAFT' AND scope_id = ?3
+                    AND operation_kind = ?4 AND status = 'ACTIVE'`,
+              ).bind(now, command.eventId, aircraft.id, completedKind),
             );
           }
         } else {
@@ -4769,7 +5454,7 @@ export class EventCoordinator extends DurableObject<Env> {
       );
     }
     const rotation = await this.env.DB.prepare(
-      `SELECT r.id, r.status, r.version, r.aircraft_id, r.pilot_id,
+      `SELECT r.id, r.status, r.version, r.aircraft_id, r.pilot_id, r.called_at,
               rg.status AS resource_group_status
          FROM rotations r
          JOIN flight_groups fg ON fg.id = r.flight_group_id
@@ -4783,6 +5468,7 @@ export class EventCoordinator extends DurableObject<Env> {
         version: number;
         aircraft_id: string | null;
         pilot_id: string | null;
+        called_at: string | null;
         resource_group_status: "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED";
       }>();
     if (!rotation)
@@ -5059,6 +5745,113 @@ export class EventCoordinator extends DurableObject<Env> {
               ).bind(now, group.rotation_id),
             ])
         : [];
+    const recurringProgressStatements: D1PreparedStatement[] = [];
+    if (command.type === "COMPLETE_TURNAROUND") {
+      const recurringRules = await this.env.DB.prepare(
+        `SELECT rule.id, rule.version, rule.scope_type, rule.scope_id, rule.operation_kind,
+                rule.trigger_metric, rule.interval_value, rule.progress_value,
+                rule.minimum_duration_minutes, rule.typical_duration_minutes,
+                rule.maximum_duration_minutes, rule.sequence_number,
+                (SELECT plan.id FROM planned_operational_constraints plan
+                  WHERE plan.recurring_rule_id = rule.id
+                    AND plan.status IN ('PLANNED', 'ACTIVE')
+                  ORDER BY plan.recurrence_sequence DESC LIMIT 1) AS open_plan_id
+           FROM recurring_operational_rules rule
+          WHERE rule.operation_day_id = ?1 AND rule.status = 'ACTIVE'
+            AND (
+              (rule.scope_type = 'AIRCRAFT' AND rule.scope_id = ?2)
+              OR (rule.scope_type = 'PILOT' AND rule.scope_id = ?3)
+            )
+          ORDER BY rule.scope_type, rule.scope_id, rule.operation_kind, rule.id`,
+      )
+        .bind(command.eventId, selectedAircraftId, selectedPilotId)
+        .all<{
+          id: string;
+          version: number;
+          scope_type: "AIRCRAFT" | "PILOT";
+          scope_id: string;
+          operation_kind: "PAUSE" | "REFUELING";
+          trigger_metric: "COMPLETED_ROTATIONS" | "OPERATING_MINUTES";
+          interval_value: number;
+          progress_value: number;
+          minimum_duration_minutes: number;
+          typical_duration_minutes: number;
+          maximum_duration_minutes: number;
+          sequence_number: number;
+          open_plan_id: string | null;
+        }>();
+      const operatingMinutes = rotation.called_at
+        ? Math.max(0, Math.round((Date.parse(now) - Date.parse(rotation.called_at)) / 60_000))
+        : 0;
+      const withinOperations =
+        !current.operations_end_at || Date.parse(now) < Date.parse(current.operations_end_at);
+      for (const rule of recurringRules.results) {
+        const increment = rule.trigger_metric === "COMPLETED_ROTATIONS" ? 1 : operatingMinutes;
+        const progressValue = rule.progress_value + increment;
+        const becomesDue =
+          withinOperations && progressValue >= rule.interval_value && rule.open_plan_id === null;
+        const nextSequence = rule.sequence_number + (becomesDue ? 1 : 0);
+        recurringProgressStatements.push(
+          this.env.DB.prepare(
+            `UPDATE recurring_operational_rules
+                SET progress_value = ?1, sequence_number = ?2, version = version + 1,
+                    updated_at = ?3
+              WHERE id = ?4 AND operation_day_id = ?5 AND version = ?6
+                AND status = 'ACTIVE'`,
+          ).bind(progressValue, nextSequence, now, rule.id, command.eventId, rule.version),
+        );
+        if (!becomesDue) continue;
+        const occurrenceId = crypto.randomUUID();
+        recurringProgressStatements.push(
+          this.env.DB.prepare(
+            `INSERT INTO planned_operational_constraints
+              (id, operation_day_id, scope_type, scope_id, constraint_kind, start_mode,
+               earliest_start_at, latest_start_at, after_rotation_id, effect_mode,
+               duration_multiplier_percent, minimum_duration_minutes, typical_duration_minutes,
+               maximum_duration_minutes, status, reason, public_note, version,
+               created_by_device_id, created_at, updated_at, recurring_rule_id, recurrence_sequence)
+             VALUES (?1, ?2, ?3, ?4, ?5, 'AFTER_CURRENT_ROTATION', NULL, NULL, ?6,
+                     'BLOCKING', NULL, ?7, ?8, ?9, 'PLANNED', ?10, '', 0, ?11, ?12, ?12, ?13, ?14)`,
+          ).bind(
+            occurrenceId,
+            command.eventId,
+            rule.scope_type,
+            rule.scope_id,
+            rule.operation_kind,
+            rotation.id,
+            rule.minimum_duration_minutes,
+            rule.typical_duration_minutes,
+            rule.maximum_duration_minutes,
+            "Wiederkehrende Regel nach bestätigtem Umlauf fällig.",
+            command.deviceId,
+            now,
+            rule.id,
+            nextSequence,
+          ),
+          this.env.DB.prepare(
+            `INSERT INTO operational_events
+              (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type,
+               aggregate_id, aggregate_version, payload_json)
+             VALUES (?1, ?2, 'RECURRING_OPERATION_DUE', ?3, ?4, 'OPERATIONAL_RULE', ?5, ?6, ?7)`,
+          ).bind(
+            crypto.randomUUID(),
+            command.eventId,
+            now,
+            command.deviceId,
+            rule.id,
+            rule.version + 1,
+            JSON.stringify({
+              occurrenceId,
+              recurrenceSequence: nextSequence,
+              afterRotationId: rotation.id,
+              progressValue,
+              intervalValue: rule.interval_value,
+              triggerMetric: rule.trigger_metric,
+            }),
+          ),
+        );
+      }
+    }
     await this.env.DB.batch([
       this.env.DB.prepare(
         "UPDATE operation_days SET version = ?1, updated_at = ?2 WHERE id = ?3 AND version = ?4",
@@ -5084,6 +5877,7 @@ export class EventCoordinator extends DurableObject<Env> {
         selectedAircraftId,
         command.type === "COMPLETE_TURNAROUND" ? 1 : 0,
       ),
+      ...recurringProgressStatements,
       this.env.DB.prepare(
         `UPDATE tickets SET status = CASE
             WHEN ?1 = 'CALL_NEXT' THEN 'BOARDING'
@@ -5318,7 +6112,7 @@ export class EventCoordinator extends DurableObject<Env> {
       this.env.DB.prepare(
         `SELECT reference.paper_reference, reference.ticket_group_id, reference.rotation_id,
                   reference.current_state, r.aircraft_id, r.pilot_id, fg.resource_group_id,
-                  r.version, COUNT(rt.ticket_id) AS ticket_count
+                  r.version, r.called_at, r.completed_at, COUNT(rt.ticket_id) AS ticket_count
              FROM outage_recovery_references reference
              JOIN rotations r ON r.id = reference.rotation_id
              JOIN flight_groups fg ON fg.id = r.flight_group_id
@@ -5337,6 +6131,8 @@ export class EventCoordinator extends DurableObject<Env> {
           resource_group_id: string;
           version: number;
           ticket_count: number;
+          called_at: string | null;
+          completed_at: string | null;
         }>(),
       this.env.DB.prepare(
         `SELECT p.resource_group_id, COALESCE(MAX(tg.queue_sequence), 0) AS maximum
@@ -5376,6 +6172,8 @@ export class EventCoordinator extends DurableObject<Env> {
       rotationVersion: number;
       aircraftId: string | null;
       pilotId: string | null;
+      calledAt: string | null;
+      completedAt: string | null;
     };
     const references = new Map<string, WorkingReference>(
       existingReferences.results.map((reference) => [
@@ -5389,6 +6187,8 @@ export class EventCoordinator extends DurableObject<Env> {
           rotationVersion: reference.version,
           aircraftId: reference.aircraft_id,
           pilotId: reference.pilot_id,
+          calledAt: reference.called_at,
+          completedAt: reference.completed_at,
         },
       ]),
     );
@@ -5400,6 +6200,7 @@ export class EventCoordinator extends DurableObject<Env> {
       ).bind(nextVersion, now, command.eventId, current.version),
     ];
     const completedRotationsByAircraft = new Map<string, number>();
+    const completedReferencesInBatch: WorkingReference[] = [];
     const activeRecoveredAircraft = new Map<string, string>();
     const activeRecoveredPilots = new Map<string, string>();
     try {
@@ -5444,6 +6245,8 @@ export class EventCoordinator extends DurableObject<Env> {
             rotationVersion: 0,
             aircraftId: null,
             pilotId: null,
+            calledAt: null,
+            completedAt: null,
           };
           references.set(entry.paper_reference, reference);
           statements.push(
@@ -5583,6 +6386,12 @@ export class EventCoordinator extends DurableObject<Env> {
         }
         reference.rotationVersion += 1;
         reference.state = nextState;
+        if (entry.entry_type === "ROTATION_CALLED") {
+          reference.calledAt = entry.original_occurred_at;
+        }
+        if (entry.entry_type === "ROTATION_COMPLETED") {
+          reference.completedAt = entry.original_occurred_at;
+        }
         const timestampColumn = {
           ROTATION_CALLED: "called_at",
           ROTATION_IN_FLIGHT: "departed_at",
@@ -5636,6 +6445,7 @@ export class EventCoordinator extends DurableObject<Env> {
           }),
         );
         if (nextState === "COMPLETED") {
+          completedReferencesInBatch.push(reference);
           completedRotationsByAircraft.set(
             reference.aircraftId,
             (completedRotationsByAircraft.get(reference.aircraftId) ?? 0) + 1,
@@ -5719,6 +6529,136 @@ export class EventCoordinator extends DurableObject<Env> {
                     updated_at = ?2 WHERE id = ?3`,
           ).bind(completedCount, now, aircraftId),
         );
+      }
+      if (completedReferencesInBatch.length > 0) {
+        const recurringRules = await this.env.DB.prepare(
+          `SELECT rule.id, rule.version, rule.scope_type, rule.scope_id, rule.operation_kind,
+                  rule.trigger_metric, rule.interval_value, rule.progress_value,
+                  rule.minimum_duration_minutes, rule.typical_duration_minutes,
+                  rule.maximum_duration_minutes, rule.sequence_number,
+                  (SELECT plan.id FROM planned_operational_constraints plan
+                    WHERE plan.recurring_rule_id = rule.id
+                      AND plan.status IN ('PLANNED', 'ACTIVE')
+                    ORDER BY plan.recurrence_sequence DESC LIMIT 1) AS open_plan_id
+             FROM recurring_operational_rules rule
+            WHERE rule.operation_day_id = ?1 AND rule.status = 'ACTIVE'`,
+        )
+          .bind(command.eventId)
+          .all<{
+            id: string;
+            version: number;
+            scope_type: "AIRCRAFT" | "PILOT";
+            scope_id: string;
+            operation_kind: "PAUSE" | "REFUELING";
+            trigger_metric: "COMPLETED_ROTATIONS" | "OPERATING_MINUTES";
+            interval_value: number;
+            progress_value: number;
+            minimum_duration_minutes: number;
+            typical_duration_minutes: number;
+            maximum_duration_minutes: number;
+            sequence_number: number;
+            open_plan_id: string | null;
+          }>();
+        for (const rule of recurringRules.results) {
+          const matching = completedReferencesInBatch.filter((reference) =>
+            rule.scope_type === "AIRCRAFT"
+              ? reference.aircraftId === rule.scope_id
+              : reference.pilotId === rule.scope_id,
+          );
+          if (matching.length === 0) continue;
+          const increment =
+            rule.trigger_metric === "COMPLETED_ROTATIONS"
+              ? matching.length
+              : matching.reduce((sum, reference) => {
+                  if (!reference.calledAt || !reference.completedAt) return sum;
+                  return (
+                    sum +
+                    Math.max(
+                      0,
+                      Math.round(
+                        (Date.parse(reference.completedAt) - Date.parse(reference.calledAt)) /
+                          60_000,
+                      ),
+                    )
+                  );
+                }, 0);
+          const progressValue = rule.progress_value + increment;
+          const latestReference = matching.toSorted((left, right) =>
+            (right.completedAt ?? "").localeCompare(left.completedAt ?? ""),
+          )[0];
+          const withinOperations =
+            !current.operations_end_at ||
+            Date.parse(latestReference?.completedAt ?? now) < Date.parse(current.operations_end_at);
+          const becomesDue =
+            progressValue >= rule.interval_value &&
+            rule.open_plan_id === null &&
+            Boolean(latestReference) &&
+            withinOperations;
+          const nextSequence = rule.sequence_number + (becomesDue ? 1 : 0);
+          statements.push(
+            this.env.DB.prepare(
+              `UPDATE recurring_operational_rules
+                  SET progress_value = ?1, sequence_number = ?2, version = version + 1,
+                      updated_at = ?3
+                WHERE id = ?4 AND operation_day_id = ?5 AND version = ?6
+                  AND status = 'ACTIVE'`,
+            ).bind(progressValue, nextSequence, now, rule.id, command.eventId, rule.version),
+          );
+          if (!becomesDue || !latestReference) continue;
+          const occurrenceId = crypto.randomUUID();
+          statements.push(
+            this.env.DB.prepare(
+              `INSERT INTO planned_operational_constraints
+                (id, operation_day_id, scope_type, scope_id, constraint_kind, start_mode,
+                 earliest_start_at, latest_start_at, after_rotation_id, effect_mode,
+                 duration_multiplier_percent, minimum_duration_minutes, typical_duration_minutes,
+                 maximum_duration_minutes, status, reason, public_note, version,
+                 created_by_device_id, created_at, updated_at, recurring_rule_id,
+                 recurrence_sequence)
+               VALUES (?1, ?2, ?3, ?4, ?5, 'AFTER_CURRENT_ROTATION', NULL, NULL, ?6,
+                       'BLOCKING', NULL, ?7, ?8, ?9, 'PLANNED', ?10, '', 0, ?11, ?12, ?12,
+                       ?13, ?14)`,
+            ).bind(
+              occurrenceId,
+              command.eventId,
+              rule.scope_type,
+              rule.scope_id,
+              rule.operation_kind,
+              latestReference.rotationId,
+              rule.minimum_duration_minutes,
+              rule.typical_duration_minutes,
+              rule.maximum_duration_minutes,
+              "Wiederkehrende Regel nach bestätigter Nacherfassung fällig.",
+              command.deviceId,
+              now,
+              rule.id,
+              nextSequence,
+            ),
+            this.env.DB.prepare(
+              `INSERT INTO operational_events
+                (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type,
+                 aggregate_id, aggregate_version, payload_json)
+               VALUES (?1, ?2, 'RECURRING_OPERATION_DUE', ?3, ?4, 'OPERATIONAL_RULE',
+                       ?5, ?6, ?7)`,
+            ).bind(
+              crypto.randomUUID(),
+              command.eventId,
+              latestReference.completedAt ?? now,
+              command.deviceId,
+              rule.id,
+              rule.version + 1,
+              JSON.stringify({
+                occurrenceId,
+                recurrenceSequence: nextSequence,
+                afterRotationId: latestReference.rotationId,
+                progressValue,
+                intervalValue: rule.interval_value,
+                triggerMetric: rule.trigger_metric,
+                recordedAfterOutage: true,
+              }),
+            ),
+          );
+        }
       }
     } catch (reason) {
       if (reason instanceof DomainRuleError) {

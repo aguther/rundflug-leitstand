@@ -294,6 +294,34 @@ eindeutig bleiben. Vor Anwendung wird eine D1-Time-Travel-Marke beziehungsweise 
 D1-Sicherung angelegt. Ein älterer Worker ignoriert die nullable Spalte; Wiederherstellung erfolgt
 per Time Travel oder aus der Sicherung.
 
+## 0048 – Idempotente Veranstaltungslöschung
+
+Ergänzt globale, technische Löschbelege, damit ein bestätigter Löschbefehl nach einer unterbrochenen
+Antwort sicher wiederholt und eine noch offene R2-Logo-Bereinigung fortgesetzt werden kann. Die
+Belege enthalten keine Klartext-Anmeldedaten und gehören bewusst nicht zum veranstaltungsbezogenen
+portablen Backup. Vor Anwendung wird eine D1-Time-Travel-Marke beziehungsweise vollständige
+D1-/R2-Sicherung angelegt. Ein älterer Worker ignoriert die zusätzliche Tabelle; eine vollständige
+Wiederherstellung erfolgt per Time Travel oder aus der Sicherung.
+
+## 0049 – Verzögerungswirkung im Betriebsplan
+
+Ergänzt Betriebsplaneinträge additiv um die Wirkung `BLOCKING` oder `SLOWDOWN` und bei Verzögerungen
+um einen Faktor von 110 bis 300 Prozent. Bestände bleiben durch den Standard `BLOCKING` unverändert.
+Trigger verhindern unvollständige oder widersprüchliche Kombinationen. Vor Anwendung wird eine
+D1-Time-Travel-Marke beziehungsweise portable Sicherung angelegt. Ein älterer Worker liest die
+additiven Spalten nicht; für eine vollständige Schema-Rückkehr wird D1 per Time Travel oder aus der
+Sicherung wiederhergestellt.
+
+## 0050 – Wiederkehrende Betriebsregeln
+
+Ergänzt veranstaltungsbezogene, versionierte Regeln für Pausen und Tanken nach bestätigten Umläufen
+oder bestätigten Betriebsminuten. Automatisch erzeugte Vorkommen bleiben weiche Planeinträge und
+sind über Regel und Sequenz eindeutig nachvollziehbar; sie ändern keinen operativen Zustand ohne
+menschliches Bestätigungskommando. Ein partieller Index erlaubt je Ziel und Art höchstens eine
+aktive Regel. Vor Anwendung wird eine D1-Time-Travel-Marke beziehungsweise portable Sicherung
+angelegt. Für eine vollständige Schema-Rückkehr wird D1 per Time Travel oder aus dieser Sicherung
+wiederhergestellt.
+
 ## Historische Doppelnummer 0036
 
 `0036_product_promised_flight_time.sql` und `0036_v1_5_stable_operations.sql` wurden bereits unter

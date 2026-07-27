@@ -12,6 +12,7 @@ export const OPERATIONAL_PLAN_KINDS = [
 export type OperationalPlanKind = (typeof OPERATIONAL_PLAN_KINDS)[number];
 
 export type OperationalPlanStartMode = "TIME_WINDOW" | "AFTER_CURRENT_ROTATION";
+export type OperationalPlanEffectMode = "BLOCKING" | "SLOWDOWN";
 export type StoredOperationalPlanStatus = "PLANNED" | "ACTIVE" | "CLEARED" | "CANCELED";
 export type OperationalPlanStatus = StoredOperationalPlanStatus | "DUE";
 
@@ -20,6 +21,8 @@ export interface PlannedOperationalConstraint {
   scopeType: OperationalPlanScope;
   scopeId: string;
   kind: OperationalPlanKind;
+  effectMode: OperationalPlanEffectMode;
+  durationMultiplierPercent: number | null;
   startMode: OperationalPlanStartMode;
   earliestStartAt: string | null;
   latestStartAt: string | null;
@@ -51,6 +54,15 @@ export function validateOperationalPlan(
   const minimum = plan.minimumDurationMinutes;
   const typical = plan.typicalDurationMinutes;
   const maximum = plan.maximumDurationMinutes;
+  if (
+    (plan.effectMode === "BLOCKING" && plan.durationMultiplierPercent !== null) ||
+    (plan.effectMode === "SLOWDOWN" &&
+      (!Number.isInteger(plan.durationMultiplierPercent) ||
+        (plan.durationMultiplierPercent ?? 0) < 110 ||
+        (plan.durationMultiplierPercent ?? 0) > 300))
+  ) {
+    errors.push("Ein verzögerter Betrieb benötigt einen Faktor zwischen 110 und 300 Prozent.");
+  }
   if (
     !Number.isInteger(minimum) ||
     !Number.isInteger(typical) ||

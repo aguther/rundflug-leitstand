@@ -46,7 +46,9 @@ describe("V1 administration completion UI", () => {
     expect(appSource).toContain("const { session, logout } = useAuth()");
     expect(appSource).toContain('useState(session?.account.role === "ADMIN" ? "000000" : "")');
     expect(appSource).toContain('useState(session?.account.role === "ADMIN")');
-    expect(appSource).toContain("<AccountManagement />");
+    expect(appSource).toContain("<AccountManagement");
+    expect(appSource).toContain("createOpen={accountCreateOpen}");
+    expect(appSource).toContain("onCreateOpenChange={setAccountCreateOpen}");
   });
 
   it("suspends product weight controls while retaining compatible product payloads", () => {

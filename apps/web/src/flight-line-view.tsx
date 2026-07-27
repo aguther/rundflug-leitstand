@@ -48,6 +48,11 @@ type UpsertPlannedOperationPayload = Extract<
   { type: "UPSERT_PLANNED_OPERATION" }
 >["payload"];
 type PlannedOperation = OperationBoard["plannedOperations"][number];
+type RecurringOperationalRule = OperationBoard["recurringOperationalRules"][number];
+type UpsertRecurringOperationalRulePayload = Extract<
+  CommandEnvelope,
+  { type: "UPSERT_RECURRING_OPERATIONAL_RULE" }
+>["payload"];
 const FLIGHT_DIRECTOR_AUDIT_REASON = "Operative Entscheidung Flight Director";
 
 function queuedSegmentTicketCount(group: QueueGroup): number {
@@ -650,8 +655,101 @@ export function FlightLineView() {
     }
   }
 
+  async function upsertRecurringRule(payload: UpsertRecurringOperationalRulePayload) {
+    if (!board) return;
+    setOperationsBusy(true);
+    try {
+      await sendCommand(
+        {
+          commandId: crypto.randomUUID(),
+          eventId: EVENT_ID,
+          deviceId: FLIGHT_LINE_DEVICE_ID,
+          expectedVersion: board.event.version,
+          issuedAt: new Date().toISOString(),
+          type: "UPSERT_RECURRING_OPERATIONAL_RULE",
+          payload,
+        },
+        deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
+      );
+      setMessage("Wiederkehrende Regel gespeichert.");
+      await refresh();
+    } catch (reason) {
+      setMessage(
+        reason instanceof Error ? reason.message : "Regel konnte nicht gespeichert werden.",
+      );
+      throw reason;
+    } finally {
+      setOperationsBusy(false);
+    }
+  }
+
+  async function disableRecurringRule(rule: RecurringOperationalRule) {
+    if (!board) return;
+    setOperationsBusy(true);
+    try {
+      await sendCommand(
+        {
+          commandId: crypto.randomUUID(),
+          eventId: EVENT_ID,
+          deviceId: FLIGHT_LINE_DEVICE_ID,
+          expectedVersion: board.event.version,
+          issuedAt: new Date().toISOString(),
+          type: "DISABLE_RECURRING_OPERATIONAL_RULE",
+          payload: {
+            ruleId: rule.id,
+            ruleExpectedVersion: rule.version,
+            reason: "Wiederkehrende Tagesregel deaktiviert.",
+          },
+        },
+        deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
+      );
+      setMessage("Wiederkehrende Regel deaktiviert; offene Planeinträge bleiben bestehen.");
+      await refresh();
+    } catch (reason) {
+      setMessage(
+        reason instanceof Error ? reason.message : "Regel konnte nicht deaktiviert werden.",
+      );
+      throw reason;
+    } finally {
+      setOperationsBusy(false);
+    }
+  }
+
   async function confirmPlannedOperation(plan: PlannedOperation, activate: boolean) {
     if (!board) return;
+    if (plan.effectMode === "SLOWDOWN") {
+      setOperationsBusy(true);
+      try {
+        await sendCommand(
+          {
+            commandId: crypto.randomUUID(),
+            eventId: EVENT_ID,
+            deviceId: FLIGHT_LINE_DEVICE_ID,
+            expectedVersion: board.event.version,
+            issuedAt: new Date().toISOString(),
+            type: "SET_PLANNED_SLOWDOWN_ACTIVE",
+            payload: {
+              planId: plan.id,
+              planExpectedVersion: plan.version,
+              active: activate,
+            },
+          },
+          deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
+        );
+        setMessage(
+          activate
+            ? `Verzögerter Betrieb mit ${plan.durationMultiplierPercent ?? 150} % gestartet.`
+            : "Verzögerter Betrieb beendet.",
+        );
+        await refresh();
+      } catch (reason) {
+        setMessage(reason instanceof Error ? reason.message : "Planbestätigung fehlgeschlagen.");
+        throw reason;
+      } finally {
+        setOperationsBusy(false);
+      }
+      return;
+    }
     const expectedReviewAt = activate
       ? new Date(Date.now() + plan.typicalDurationMinutes * 60_000).toISOString()
       : null;
@@ -1756,16 +1854,19 @@ export function FlightLineView() {
           aircraft={board.aircraft}
           pilots={board.pilots}
           plannedOperations={board.plannedOperations}
+          recurringOperationalRules={board.recurringOperationalRules}
           rotations={board.rotations}
           onCancelPlannedOperation={cancelPlannedOperation}
           onClose={() => setOperationsOpen(false)}
           onConfirmPlannedOperation={confirmPlannedOperation}
+          onDisableRecurringRule={disableRecurringRule}
           onPublishEventNotice={setEventNotice}
           onPublishResourceNotice={setResourceNoticeCommand}
           onSetEventInterruption={setEventInterruption}
           onSetResourceGroupStatus={setResourceGroupStatus}
           onTriggerEmergency={triggerEmergency}
           onUpsertPlannedOperation={upsertPlannedOperation}
+          onUpsertRecurringRule={upsertRecurringRule}
           open={operationsOpen && canManageAircraft}
           resourceGroups={board.resourceGroups}
         />

@@ -16,6 +16,7 @@ const suites = [
   "test:automatic-precall",
   "test:sale-guards",
   "test:fleet-operations",
+  "test:recurring-operational-rules",
   "test:pilot-conflict",
   "test:emergency-mode",
   "test:outage-recovery",

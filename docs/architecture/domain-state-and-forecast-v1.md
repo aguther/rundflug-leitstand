@@ -110,6 +110,13 @@ menschlich bestätigtes Zustandskommando aktiviert den Plan und verknüpft ihn m
 Betriebsblock beziehungsweise der Pilotencode-Pause. Dasselbe gilt für die Aufhebung. Vollständige Begründung und Folgen beschreibt
 `docs/adr/0028-zeitabhaengige-prognose-und-weicher-betriebsplan.md`.
 
+Veranstaltungsbezogene wiederkehrende Regeln ergänzen diesen Plan um Pausen für Flugzeuge oder
+Pilotencodes sowie Betankungen für Flugzeuge. Der Auslöser ist eine Anzahl bestätigter, vollständig
+abgeschlossener Umläufe oder deren bestätigte Betriebsminuten vom Boardingbeginn bis zum
+Turnaround-Abschluss. Eine Fälligkeit erzeugt atomar einen auditierten weichen Planeintrag nach dem
+auslösenden Umlauf, aber keine Zustandsänderung. Abschluss oder ausdrücklich bestätigtes
+Überspringen setzt den Fortschritt zurück. Pro Ziel und Art darf nur eine aktive Regel bestehen.
+
 ### 3.5 Tickets und Buchungsgruppen
 
 Die ausführliche Zuordnung steht in `docs/architecture/ticket-states-v1.md`. Wesentliche Regeln:
@@ -183,6 +190,9 @@ Der Rechenlauf verwendet:
   reduzieren die vorhergesagte Kapazität bis zur bestätigten Rückkehr.
 - optionaler geplanter Betriebsbeginn und weiche geplante Einschränkungen mit frühestem,
   typischem und spätestem Verlauf.
+- aktive wiederkehrende Regeln mit Intervall, bestätigtem Restfortschritt und
+  Minimum-/Typisch-/Maximum-Dauer bis zum Betriebsende; gleichzeitig fällige Flugzeug- und
+  Pilotencode-Pausen überlagern sich und verwenden das spätere Ende.
 
 ### 5.3 Lernen aus Ist-Daten
 

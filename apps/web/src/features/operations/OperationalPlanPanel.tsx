@@ -12,12 +12,18 @@ import {
   TextField,
 } from "../../design-system/components";
 import { eventLocalDateTimeToIso, formatEventLocalDateTime } from "../../event-time";
+import { LocalizedDateTimeInput } from "../../localized-date-input";
 import "./operational-plan.css";
 
 export type PlannedOperation = OperationBoard["plannedOperations"][number];
+export type RecurringOperationalRule = OperationBoard["recurringOperationalRules"][number];
 export type UpsertPlannedOperationPayload = Extract<
   CommandEnvelope,
   { type: "UPSERT_PLANNED_OPERATION" }
+>["payload"];
+export type UpsertRecurringOperationalRulePayload = Extract<
+  CommandEnvelope,
+  { type: "UPSERT_RECURRING_OPERATIONAL_RULE" }
 >["payload"];
 
 type OperationalPlanMode = "admin" | "flight-director";
@@ -30,12 +36,15 @@ export interface OperationalPlanPanelProps {
   mode: OperationalPlanMode;
   pilots: OperationBoard["pilots"];
   plannedOperations: OperationBoard["plannedOperations"];
+  recurringOperationalRules: OperationBoard["recurringOperationalRules"];
   readOnly?: boolean;
   resourceGroups: OperationBoard["resourceGroups"];
   rotations: OperationBoard["rotations"];
   onCancel: (plan: PlannedOperation) => Promise<void>;
   onConfirm?: (plan: PlannedOperation, activate: boolean) => Promise<void>;
+  onDisableRecurringRule: (rule: RecurringOperationalRule) => Promise<void>;
   onUpsert: (payload: UpsertPlannedOperationPayload) => Promise<void>;
+  onUpsertRecurringRule: (payload: UpsertRecurringOperationalRulePayload) => Promise<void>;
 }
 
 const planKindLabels: Record<PlannedOperation["kind"], string> = {
@@ -83,12 +92,15 @@ export function OperationalPlanPanel({
   mode,
   pilots,
   plannedOperations,
+  recurringOperationalRules,
   readOnly = false,
   resourceGroups,
   rotations,
   onCancel,
   onConfirm,
+  onDisableRecurringRule,
   onUpsert,
+  onUpsertRecurringRule,
 }: OperationalPlanPanelProps) {
   const [editorOpen, setEditorOpen] = useState(false);
   const [planEditorId, setPlanEditorId] = useState<string | null>(null);
@@ -96,6 +108,8 @@ export function OperationalPlanPanel({
   const [planScopeType, setPlanScopeType] = useState<PlannedOperation["scopeType"]>("EVENT");
   const [planScopeId, setPlanScopeId] = useState(eventId);
   const [planKind, setPlanKind] = useState<PlannedOperation["kind"]>("PAUSE");
+  const [planEffectMode, setPlanEffectMode] = useState<PlannedOperation["effectMode"]>("BLOCKING");
+  const [planDurationMultiplierPercent, setPlanDurationMultiplierPercent] = useState(150);
   const [planStartMode, setPlanStartMode] = useState<PlannedOperation["startMode"]>("TIME_WINDOW");
   const [planEarliestStart, setPlanEarliestStart] = useState("");
   const [planLatestStart, setPlanLatestStart] = useState("");
@@ -105,6 +119,22 @@ export function OperationalPlanPanel({
   const [planMaximumDuration, setPlanMaximumDuration] = useState(30);
   const [planPublicNote, setPlanPublicNote] = useState("");
   const [pendingCancel, setPendingCancel] = useState<PlannedOperation | null>(null);
+  const [ruleEditorOpen, setRuleEditorOpen] = useState(false);
+  const [ruleEditorId, setRuleEditorId] = useState<string | null>(null);
+  const [ruleExpectedVersion, setRuleExpectedVersion] = useState<number | null>(null);
+  const [ruleScopeType, setRuleScopeType] =
+    useState<RecurringOperationalRule["scopeType"]>("AIRCRAFT");
+  const [ruleScopeId, setRuleScopeId] = useState(aircraft[0]?.id ?? "");
+  const [ruleKind, setRuleKind] = useState<RecurringOperationalRule["kind"]>("REFUELING");
+  const [ruleTrigger, setRuleTrigger] =
+    useState<RecurringOperationalRule["triggerMetric"]>("COMPLETED_ROTATIONS");
+  const [ruleInterval, setRuleInterval] = useState(aircraft[0]?.refuelReminderThreshold ?? 5);
+  const [ruleMinimumDuration, setRuleMinimumDuration] = useState(8);
+  const [ruleTypicalDuration, setRuleTypicalDuration] = useState(12);
+  const [ruleMaximumDuration, setRuleMaximumDuration] = useState(18);
+  const [pendingRuleDisable, setPendingRuleDisable] = useState<RecurringOperationalRule | null>(
+    null,
+  );
 
   const currentPlans = useMemo(
     () =>
@@ -130,6 +160,8 @@ export function OperationalPlanPanel({
     setPlanScopeType("EVENT");
     setPlanScopeId(eventId);
     setPlanKind("PAUSE");
+    setPlanEffectMode("BLOCKING");
+    setPlanDurationMultiplierPercent(150);
     setPlanStartMode("TIME_WINDOW");
     setPlanEarliestStart(formatEventLocalDateTime(earliest, eventTimeZone));
     setPlanLatestStart(formatEventLocalDateTime(latest, eventTimeZone));
@@ -139,6 +171,20 @@ export function OperationalPlanPanel({
     setPlanMaximumDuration(30);
     setPlanPublicNote("");
   }, [eventId, eventTimeZone]);
+
+  const resetRuleEditor = useCallback(() => {
+    const target = aircraft[0];
+    setRuleEditorId(null);
+    setRuleExpectedVersion(null);
+    setRuleScopeType(target ? "AIRCRAFT" : "PILOT");
+    setRuleScopeId(target?.id ?? pilots[0]?.id ?? "");
+    setRuleKind(target ? "REFUELING" : "PAUSE");
+    setRuleTrigger(target ? "COMPLETED_ROTATIONS" : "OPERATING_MINUTES");
+    setRuleInterval(target?.refuelReminderThreshold ?? 5);
+    setRuleMinimumDuration(target ? 8 : 15);
+    setRuleTypicalDuration(target ? 12 : 20);
+    setRuleMaximumDuration(target ? 18 : 30);
+  }, [aircraft, pilots]);
 
   function openNewPlan() {
     resetPlanEditor();
@@ -151,6 +197,8 @@ export function OperationalPlanPanel({
     setPlanScopeType(plan.scopeType);
     setPlanScopeId(plan.scopeId);
     setPlanKind(plan.kind);
+    setPlanEffectMode(plan.effectMode);
+    setPlanDurationMultiplierPercent(plan.durationMultiplierPercent ?? 150);
     setPlanStartMode(plan.startMode);
     setPlanEarliestStart(formatEventLocalDateTime(plan.earliestStartAt, eventTimeZone));
     setPlanLatestStart(formatEventLocalDateTime(plan.latestStartAt, eventTimeZone));
@@ -162,6 +210,25 @@ export function OperationalPlanPanel({
     setEditorOpen(true);
   }
 
+  function openNewRule() {
+    resetRuleEditor();
+    setRuleEditorOpen(true);
+  }
+
+  function editRecurringRule(rule: RecurringOperationalRule) {
+    setRuleEditorId(rule.id);
+    setRuleExpectedVersion(rule.version);
+    setRuleScopeType(rule.scopeType);
+    setRuleScopeId(rule.scopeId);
+    setRuleKind(rule.kind);
+    setRuleTrigger(rule.triggerMetric);
+    setRuleInterval(rule.intervalValue);
+    setRuleMinimumDuration(rule.minimumDurationMinutes);
+    setRuleTypicalDuration(rule.typicalDurationMinutes);
+    setRuleMaximumDuration(rule.maximumDurationMinutes);
+    setRuleEditorOpen(true);
+  }
+
   const planTargets =
     planScopeType === "RESOURCE_GROUP"
       ? resourceGroups.map((group) => ({ value: group.id, label: group.name }))
@@ -170,6 +237,10 @@ export function OperationalPlanPanel({
         : planScopeType === "PILOT"
           ? pilots.map((pilot) => ({ value: pilot.id, label: pilot.operationalCode }))
           : [{ value: eventId, label: "Gesamte Veranstaltung" }];
+  const ruleTargets =
+    ruleScopeType === "AIRCRAFT"
+      ? aircraft.map((entry) => ({ value: entry.id, label: entry.registration }))
+      : pilots.map((entry) => ({ value: entry.id, label: entry.operationalCode }));
 
   function planScopeLabel(plan: PlannedOperation) {
     if (plan.scopeType === "EVENT") return "Gesamte Veranstaltung";
@@ -204,6 +275,8 @@ export function OperationalPlanPanel({
     planMinimumDuration >= 1 &&
     planMinimumDuration <= planTypicalDuration &&
     planTypicalDuration <= planMaximumDuration &&
+    (planEffectMode === "BLOCKING" ||
+      (planDurationMultiplierPercent >= 110 && planDurationMultiplierPercent <= 300)) &&
     (planScopeType === "EVENT" || planScopeId.length > 0) &&
     (planStartMode === "TIME_WINDOW"
       ? Boolean(earliestIso && latestIso && Date.parse(earliestIso) <= Date.parse(latestIso))
@@ -216,6 +289,9 @@ export function OperationalPlanPanel({
       scopeType: planScopeType,
       scopeId: planScopeType === "EVENT" ? eventId : planScopeId,
       kind: planKind,
+      effectMode: planEffectMode,
+      durationMultiplierPercent:
+        planEffectMode === "SLOWDOWN" ? planDurationMultiplierPercent : null,
       startMode: planStartMode,
       earliestStartAt: earliestIso,
       latestStartAt: latestIso,
@@ -227,6 +303,33 @@ export function OperationalPlanPanel({
     });
     setEditorOpen(false);
     resetPlanEditor();
+  }
+
+  const canSaveRule =
+    ruleScopeId.length > 0 &&
+    ruleInterval >= 1 &&
+    ruleMinimumDuration >= 1 &&
+    ruleMinimumDuration <= ruleTypicalDuration &&
+    ruleTypicalDuration <= ruleMaximumDuration;
+
+  async function saveRecurringRule() {
+    await onUpsertRecurringRule({
+      ruleId: ruleEditorId ?? crypto.randomUUID(),
+      ruleExpectedVersion,
+      rule: {
+        scopeType: ruleScopeType,
+        scopeId: ruleScopeId,
+        kind: ruleKind,
+        triggerMetric: ruleTrigger,
+        intervalValue: ruleInterval,
+        minimumDurationMinutes: ruleMinimumDuration,
+        typicalDurationMinutes: ruleTypicalDuration,
+        maximumDurationMinutes: ruleMaximumDuration,
+      },
+      reason: "Wiederkehrende Tagesregel im Betriebsplan gepflegt.",
+    });
+    setRuleEditorOpen(false);
+    resetRuleEditor();
   }
 
   const columns = [
@@ -256,9 +359,14 @@ export function OperationalPlanPanel({
     },
     {
       key: "kind",
-      header: "Art",
+      header: "Wirkung",
       priority: "primary" as const,
-      render: (plan: PlannedOperation) => planKindLabels[plan.kind],
+      render: (plan: PlannedOperation) => (
+        <span>
+          {planKindLabels[plan.kind]} ·{" "}
+          {plan.effectMode === "SLOWDOWN" ? `${plan.durationMultiplierPercent ?? 150} %` : "Stopp"}
+        </span>
+      ),
     },
     {
       key: "duration",
@@ -323,18 +431,24 @@ export function OperationalPlanPanel({
           <>
             {plan.status === "PLANNED" || plan.status === "DUE" ? (
               <>
+                {!plan.recurringRuleId ? (
+                  <IconButton
+                    disabled={busy || readOnly}
+                    label={`${planKindLabels[plan.kind]} bearbeiten`}
+                    onClick={() => editPlannedOperation(plan)}
+                    size="touch"
+                    type="button"
+                  >
+                    <Pencil aria-hidden="true" />
+                  </IconButton>
+                ) : null}
                 <IconButton
                   disabled={busy || readOnly}
-                  label={`${planKindLabels[plan.kind]} bearbeiten`}
-                  onClick={() => editPlannedOperation(plan)}
-                  size="touch"
-                  type="button"
-                >
-                  <Pencil aria-hidden="true" />
-                </IconButton>
-                <IconButton
-                  disabled={busy || readOnly}
-                  label={`${planKindLabels[plan.kind]} absagen`}
+                  label={
+                    plan.recurringRuleId
+                      ? `${planKindLabels[plan.kind]} dieses Mal überspringen`
+                      : `${planKindLabels[plan.kind]} absagen`
+                  }
                   onClick={() => setPendingCancel(plan)}
                   size="touch"
                   type="button"
@@ -369,6 +483,94 @@ export function OperationalPlanPanel({
         rowKey={(plan) => plan.id}
         rows={currentPlans}
       />
+
+      <section className="operational-rule-section">
+        <header>
+          <div>
+            <h4>Wiederkehrende Regeln</h4>
+            <p>Nur die Planung ist automatisch. Start und Ende bleiben menschlich bestätigt.</p>
+          </div>
+          {!readOnly ? (
+            <Button disabled={busy} onClick={openNewRule} size="compact" type="button">
+              <Plus aria-hidden="true" /> Regel hinzufügen
+            </Button>
+          ) : null}
+        </header>
+        <div className="operational-rule-list">
+          {recurringOperationalRules.filter((rule) => rule.status === "ACTIVE").length === 0 ? (
+            <p className="operational-rule-empty">Keine aktive Regel für diesen Flugtag.</p>
+          ) : null}
+          {recurringOperationalRules
+            .filter((rule) => rule.status === "ACTIVE")
+            .map((rule) => {
+              const target =
+                rule.scopeType === "AIRCRAFT"
+                  ? aircraft.find((entry) => entry.id === rule.scopeId)?.registration
+                  : pilots.find((entry) => entry.id === rule.scopeId)?.operationalCode;
+              const remaining = Math.max(0, rule.intervalValue - rule.progressValue);
+              return (
+                <article key={rule.id}>
+                  <div className="operational-rule-main">
+                    <strong>
+                      {planKindLabels[rule.kind]} · {target ?? rule.scopeId}
+                    </strong>
+                    <span>
+                      nach {rule.intervalValue}{" "}
+                      {rule.triggerMetric === "COMPLETED_ROTATIONS"
+                        ? "Umläufen"
+                        : "Betriebsminuten"}
+                    </span>
+                  </div>
+                  <div>
+                    <span>Fortschritt</span>
+                    <strong>
+                      {rule.progressValue} / {rule.intervalValue}
+                    </strong>
+                  </div>
+                  <div>
+                    <span>Dauerband</span>
+                    <strong>
+                      {rule.minimumDurationMinutes}/{rule.typicalDurationMinutes}/
+                      {rule.maximumDurationMinutes} Min.
+                    </strong>
+                  </div>
+                  <div>
+                    <span>Nächste Fälligkeit</span>
+                    <strong>
+                      {rule.openPlannedOperationId
+                        ? "Planeintrag offen"
+                        : remaining === 0
+                          ? "jetzt"
+                          : `in ${remaining} ${
+                              rule.triggerMetric === "COMPLETED_ROTATIONS" ? "Umläufen" : "Min."
+                            }`}
+                    </strong>
+                  </div>
+                  <div className="operational-rule-actions">
+                    <IconButton
+                      disabled={busy || readOnly}
+                      label="Regel bearbeiten"
+                      onClick={() => editRecurringRule(rule)}
+                      size="touch"
+                      type="button"
+                    >
+                      <Pencil aria-hidden="true" />
+                    </IconButton>
+                    <IconButton
+                      disabled={busy || readOnly}
+                      label="Regel deaktivieren"
+                      onClick={() => setPendingRuleDisable(rule)}
+                      size="touch"
+                      type="button"
+                    >
+                      <Ban aria-hidden="true" />
+                    </IconButton>
+                  </div>
+                </article>
+              );
+            })}
+        </div>
+      </section>
 
       <ModalDialog
         className="operational-plan-dialog"
@@ -451,6 +653,28 @@ export function OperationalPlanPanel({
             ))}
           </SelectField>
           <SelectField
+            label="Auswirkung"
+            onChange={(event) =>
+              setPlanEffectMode(event.target.value as PlannedOperation["effectMode"])
+            }
+            value={planEffectMode}
+          >
+            <option value="BLOCKING">Vollständige Einschränkung</option>
+            <option value="SLOWDOWN">Verzögerter Betrieb</option>
+          </SelectField>
+          {planEffectMode === "SLOWDOWN" ? (
+            <TextField
+              help="150 % verlängert den noch offenen Umlauf auf das 1,5-Fache."
+              label="Verzögerungsfaktor (%)"
+              max="300"
+              min="110"
+              onChange={(event) => setPlanDurationMultiplierPercent(Number(event.target.value))}
+              step="10"
+              type="number"
+              value={planDurationMultiplierPercent}
+            />
+          ) : null}
+          <SelectField
             label="Beginn"
             onChange={(event) =>
               setPlanStartMode(event.target.value as PlannedOperation["startMode"])
@@ -462,16 +686,14 @@ export function OperationalPlanPanel({
           </SelectField>
           {planStartMode === "TIME_WINDOW" ? (
             <>
-              <TextField
+              <LocalizedDateTimeInput
                 label="Frühester Beginn"
-                onChange={(event) => setPlanEarliestStart(event.target.value)}
-                type="datetime-local"
+                onChange={setPlanEarliestStart}
                 value={planEarliestStart}
               />
-              <TextField
+              <LocalizedDateTimeInput
                 label="Spätester Beginn"
-                onChange={(event) => setPlanLatestStart(event.target.value)}
-                type="datetime-local"
+                onChange={setPlanLatestStart}
                 value={planLatestStart}
               />
             </>
@@ -521,16 +743,126 @@ export function OperationalPlanPanel({
         />
       </ModalDialog>
 
+      <ModalDialog
+        className="operational-plan-dialog"
+        description="Regeln gelten nur für diesen Flugtag und erzeugen weiche Planeinträge."
+        footer={
+          <>
+            <Button onClick={() => setRuleEditorOpen(false)} type="button" variant="secondary">
+              Abbrechen
+            </Button>
+            <Button
+              busy={busy}
+              disabled={busy || !canSaveRule}
+              onClick={saveRecurringRule}
+              type="button"
+              variant="primary"
+            >
+              {ruleEditorId ? "Änderungen speichern" : "Regel anlegen"}
+            </Button>
+          </>
+        }
+        onClose={() => setRuleEditorOpen(false)}
+        open={ruleEditorOpen}
+        size="wide"
+        title={ruleEditorId ? "Wiederkehrende Regel bearbeiten" : "Wiederkehrende Regel anlegen"}
+      >
+        <div className="operational-plan-form-grid">
+          <SelectField
+            label="Zielart"
+            onChange={(event) => {
+              const scopeType = event.target.value as RecurringOperationalRule["scopeType"];
+              setRuleScopeType(scopeType);
+              setRuleScopeId(
+                scopeType === "AIRCRAFT" ? (aircraft[0]?.id ?? "") : (pilots[0]?.id ?? ""),
+              );
+              if (scopeType === "PILOT") setRuleKind("PAUSE");
+            }}
+            value={ruleScopeType}
+          >
+            <option value="AIRCRAFT">Flugzeug</option>
+            <option value="PILOT">Pilotencode</option>
+          </SelectField>
+          <SelectField
+            label="Ziel"
+            onChange={(event) => setRuleScopeId(event.target.value)}
+            value={ruleScopeId}
+          >
+            {ruleTargets.map((target) => (
+              <option key={target.value} value={target.value}>
+                {target.label}
+              </option>
+            ))}
+          </SelectField>
+          <SelectField
+            label="Art"
+            onChange={(event) =>
+              setRuleKind(event.target.value as RecurringOperationalRule["kind"])
+            }
+            value={ruleKind}
+          >
+            <option value="PAUSE">Pause</option>
+            {ruleScopeType === "AIRCRAFT" ? <option value="REFUELING">Tanken</option> : null}
+          </SelectField>
+          <SelectField
+            label="Auslöser"
+            onChange={(event) =>
+              setRuleTrigger(event.target.value as RecurringOperationalRule["triggerMetric"])
+            }
+            value={ruleTrigger}
+          >
+            <option value="COMPLETED_ROTATIONS">Bestätigte Umläufe</option>
+            <option value="OPERATING_MINUTES">Bestätigte Betriebsminuten</option>
+          </SelectField>
+          <TextField
+            help={
+              ruleKind === "REFUELING" && ruleTrigger === "COMPLETED_ROTATIONS"
+                ? "Vorgeschlagen aus der Tank-Erinnerung; das Stammdatum bleibt unverändert."
+                : undefined
+            }
+            label="Intervall"
+            min="1"
+            onChange={(event) => setRuleInterval(Number(event.target.value))}
+            type="number"
+            value={ruleInterval}
+          />
+          <TextField
+            label="Dauer Minimum (Min.)"
+            min="1"
+            onChange={(event) => setRuleMinimumDuration(Number(event.target.value))}
+            type="number"
+            value={ruleMinimumDuration}
+          />
+          <TextField
+            label="Dauer typisch (Min.)"
+            min="1"
+            onChange={(event) => setRuleTypicalDuration(Number(event.target.value))}
+            type="number"
+            value={ruleTypicalDuration}
+          />
+          <TextField
+            label="Dauer Maximum (Min.)"
+            min="1"
+            onChange={(event) => setRuleMaximumDuration(Number(event.target.value))}
+            type="number"
+            value={ruleMaximumDuration}
+          />
+        </div>
+      </ModalDialog>
+
       <ConfirmationDialog
         body={
           <>
             <strong>{pendingCancel ? planKindLabels[pendingCancel.kind] : "Planeintrag"}</strong>{" "}
-            wird aus dem aktuellen Betriebsplan entfernt. Ein bereits aktiver Zustand bleibt
-            unverändert.
+            {pendingCancel?.recurringRuleId
+              ? "wird für dieses Vorkommen übersprungen; die Regel beginnt danach neu zu zählen."
+              : "wird aus dem aktuellen Betriebsplan entfernt. Ein bereits aktiver Zustand bleibt unverändert."}
           </>
         }
         confirmBusy={busy}
-        confirmLabel="Planeintrag absagen"
+        confirmLabel={
+          pendingCancel?.recurringRuleId ? "Dieses Vorkommen überspringen" : "Planeintrag absagen"
+        }
         danger
         onCancel={() => setPendingCancel(null)}
         onConfirm={async () => {
@@ -540,6 +872,20 @@ export function OperationalPlanPanel({
         }}
         open={pendingCancel !== null}
         title="Planeintrag wirklich absagen?"
+      />
+      <ConfirmationDialog
+        body="Zukünftige Projektionen entfallen. Ein bereits fälliger Planeintrag bleibt separat bestehen."
+        confirmBusy={busy}
+        confirmLabel="Regel deaktivieren"
+        danger
+        onCancel={() => setPendingRuleDisable(null)}
+        onConfirm={async () => {
+          if (!pendingRuleDisable) return;
+          await onDisableRecurringRule(pendingRuleDisable);
+          setPendingRuleDisable(null);
+        }}
+        open={pendingRuleDisable !== null}
+        title="Wiederkehrende Regel deaktivieren?"
       />
     </section>
   );

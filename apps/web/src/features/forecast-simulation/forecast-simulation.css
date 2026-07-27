@@ -1070,10 +1070,6 @@
   width: min(760px, 100%);
 }
 
-.forecast-simulator .ds-sidepanel:has(.sim-demand-profile-toolbar) {
-  width: min(536px, 100%);
-}
-
 .forecast-simulator .ds-sidepanel[data-open="false"] {
   visibility: hidden;
 }
@@ -1151,6 +1147,17 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+.sim-plan-entry > header > div {
+  display: grid;
+  gap: 3px;
+}
+
+.sim-rule-due {
+  color: var(--ui-muted);
+  font-size: 10px;
+  font-weight: 500;
 }
 
 .sim-plan-entry > header button {
@@ -1255,7 +1262,7 @@
 }
 
 .sim-plan-import-preview dl {
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(0, 1fr));
 }
 
 .sim-plan-import-warning {

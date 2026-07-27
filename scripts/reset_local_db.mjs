@@ -1,7 +1,22 @@
 import { spawnSync } from "node:child_process";
 import { rm } from "node:fs/promises";
 
-await rm(".wrangler/state", { recursive: true, force: true });
+const removeLocalState = async () => {
+  const retryableWindowsErrors = new Set(["EBUSY", "ENOTEMPTY", "EPERM"]);
+  for (let attempt = 0; attempt < 25; attempt += 1) {
+    try {
+      await rm(".wrangler/state", { recursive: true, force: true });
+      return;
+    } catch (error) {
+      const code =
+        error && typeof error === "object" && "code" in error ? String(error.code) : null;
+      if (!code || !retryableWindowsErrors.has(code) || attempt === 24) throw error;
+      await new Promise((resolvePromise) => setTimeout(resolvePromise, 100));
+    }
+  }
+};
+
+await removeLocalState();
 const scripts = process.argv.includes("--empty")
   ? ["db:migrate:local"]
   : ["db:migrate:local", "db:seed:local"];

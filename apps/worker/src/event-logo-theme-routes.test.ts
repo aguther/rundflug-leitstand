@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import migration from "../migrations/0044_event_logo_theme_variants.sql?raw";
 import migrationNotes from "../migrations/README.md?raw";
+import eventDeletion from "./event-deletion.ts?raw";
 import worker from "./index.ts?raw";
 
 describe("theme-specific event logo persistence and delivery", () => {
@@ -35,6 +36,7 @@ describe("theme-specific event logo persistence and delivery", () => {
     expect(worker).toContain("for (const resolvedTheme of [requestedTheme, fallbackTheme])");
     expect(worker).toContain('"x-event-logo-theme": resolvedTheme');
     expect(worker).toContain("[event.logo_object_key, event.logo_dark_object_key]");
-    expect(worker).toContain("context.env.BACKUPS.delete(logoObjectKeys)");
+    expect(worker).toContain("finishEventDeletionAssetCleanup(");
+    expect(eventDeletion).toContain("env.BACKUPS.delete([...logoObjectKeys])");
   });
 });

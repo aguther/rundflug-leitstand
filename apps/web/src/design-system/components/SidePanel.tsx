@@ -1,4 +1,6 @@
+import { X } from "lucide-react";
 import type { ReactNode } from "react";
+import { IconButton } from "./IconButton";
 
 export interface SidePanelProps {
   open: boolean;
@@ -6,9 +8,17 @@ export interface SidePanelProps {
   onClose: () => void;
   children: ReactNode;
   footer?: ReactNode;
+  closeLabel?: string;
 }
 
-export function SidePanel({ open, title, onClose, children, footer }: SidePanelProps) {
+export function SidePanel({
+  open,
+  title,
+  onClose,
+  children,
+  footer,
+  closeLabel = "Dialog schließen",
+}: SidePanelProps) {
   return (
     <>
       <div
@@ -26,14 +36,9 @@ export function SidePanel({ open, title, onClose, children, footer }: SidePanelP
       >
         <div className="ds-sidepanel-header">
           <h2>{title}</h2>
-          <button
-            type="button"
-            className="ds-sidepanel-close"
-            onClick={onClose}
-            aria-label="Schließen"
-          >
-            ×
-          </button>
+          <IconButton label={closeLabel} onClick={onClose} size="compact" type="button">
+            <X aria-hidden="true" />
+          </IconButton>
         </div>
         <div className="ds-sidepanel-body">{children}</div>
         {footer ? <div className="ds-sidepanel-footer">{footer}</div> : null}

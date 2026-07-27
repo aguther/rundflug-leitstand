@@ -223,6 +223,7 @@
   background: transparent;
 }
 .ds-search-field input:focus-visible {
+  outline: 0;
   box-shadow: none;
 }
 .ds-search-control {
@@ -588,19 +589,6 @@
   margin: 0;
   font-size: 1.1rem;
   font-weight: 650;
-}
-
-.ds-sidepanel-close {
-  width: 34px;
-  height: 34px;
-  display: inline-grid;
-  place-items: center;
-  padding: 0;
-  border: 1px solid var(--ui-border-strong);
-  border-radius: 50%;
-  color: var(--ui-text);
-  background: var(--ui-control);
-  font-size: 1.1rem;
 }
 
 .ds-sidepanel-body {
