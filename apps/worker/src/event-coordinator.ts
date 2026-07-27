@@ -46,6 +46,11 @@ import {
 } from "@rundflug/domain";
 import { sha256Hex, verifyCredential } from "./crypto";
 import { mayAccessFids } from "./fids-authorization";
+import {
+  type PlannedOperationKind,
+  type PlannedOperationScope,
+  plannedOperationAuditReason,
+} from "./planned-operation-audit-reason";
 import { rowToSnapshot, safeErrorMessage } from "./snapshot";
 import type { Env, StoredEventRow } from "./types";
 import { queueEligiblePreparationNotifications, sendRotationPushNotifications } from "./web-push";
@@ -1282,7 +1287,7 @@ export class EventCoordinator extends DurableObject<Env> {
           command.type === "UPSERT_PLANNED_OPERATION" ||
           command.type === "CANCEL_PLANNED_OPERATION"
         ) {
-          return this.handlePlannedOperation(command, current);
+          return this.handlePlannedOperation(command, current, device.role);
         }
         if (
           command.type === "SET_AIRCRAFT_OPERATIONAL_STATE" ||
@@ -2297,9 +2302,10 @@ export class EventCoordinator extends DurableObject<Env> {
       { type: "UPSERT_PLANNED_OPERATION" | "CANCEL_PLANNED_OPERATION" }
     >,
     current: StoredEventRow,
+    role: DeviceRole,
   ): Promise<Response> {
     const existing = await this.env.DB.prepare(
-      `SELECT id, version, status
+      `SELECT id, version, status, constraint_kind, scope_type
          FROM planned_operational_constraints
         WHERE id = ?1 AND operation_day_id = ?2`,
     )
@@ -2308,6 +2314,8 @@ export class EventCoordinator extends DurableObject<Env> {
         id: string;
         version: number;
         status: "PLANNED" | "ACTIVE" | "CLEARED" | "CANCELED";
+        constraint_kind: PlannedOperationKind;
+        scope_type: PlannedOperationScope;
       }>();
 
     if (command.type === "UPSERT_PLANNED_OPERATION") {
@@ -2471,6 +2479,19 @@ export class EventCoordinator extends DurableObject<Env> {
           ? "PLANNED_OPERATION_UPDATED"
           : "PLANNED_OPERATION_CREATED"
         : "PLANNED_OPERATION_CANCELED";
+    const auditReason = plannedOperationAuditReason({
+      role,
+      action:
+        command.type === "CANCEL_PLANNED_OPERATION" ? "CANCEL" : existing ? "UPDATE" : "CREATE",
+      kind:
+        command.type === "UPSERT_PLANNED_OPERATION"
+          ? command.payload.kind
+          : (existing?.constraint_kind ?? "OTHER"),
+      scopeType:
+        command.type === "UPSERT_PLANNED_OPERATION"
+          ? command.payload.scopeType
+          : (existing?.scope_type ?? "EVENT"),
+    });
     const result: CommandResult = {
       accepted: true,
       duplicate: false,
@@ -2504,7 +2525,7 @@ export class EventCoordinator extends DurableObject<Env> {
               command.payload.minimumDurationMinutes,
               command.payload.typicalDurationMinutes,
               command.payload.maximumDurationMinutes,
-              command.payload.reason,
+              auditReason,
               command.payload.publicNote,
               nextPlanVersion,
               now,
@@ -2533,20 +2554,27 @@ export class EventCoordinator extends DurableObject<Env> {
               command.payload.minimumDurationMinutes,
               command.payload.typicalDurationMinutes,
               command.payload.maximumDurationMinutes,
-              command.payload.reason,
+              auditReason,
               command.payload.publicNote,
               command.deviceId,
               now,
             )
         : this.env.DB.prepare(
             `UPDATE planned_operational_constraints
-                SET status = 'CANCELED', canceled_at = ?1, updated_at = ?1, version = ?2
-              WHERE id = ?3 AND operation_day_id = ?4 AND version = ?5 AND status = 'PLANNED'`,
-          ).bind(now, nextPlanVersion, command.payload.planId, command.eventId, existing?.version);
+                SET status = 'CANCELED', reason = ?1, canceled_at = ?2, updated_at = ?2, version = ?3
+              WHERE id = ?4 AND operation_day_id = ?5 AND version = ?6 AND status = 'PLANNED'`,
+          ).bind(
+            auditReason,
+            now,
+            nextPlanVersion,
+            command.payload.planId,
+            command.eventId,
+            existing?.version,
+          );
     const auditPayload =
       command.type === "UPSERT_PLANNED_OPERATION"
-        ? { ...command.payload, planExpectedVersion: undefined }
-        : { planId: command.payload.planId, reason: command.payload.reason };
+        ? { ...command.payload, planExpectedVersion: undefined, reason: auditReason }
+        : { planId: command.payload.planId, reason: auditReason };
     await this.env.DB.batch([
       this.env.DB.prepare(
         "UPDATE operation_days SET version = ?1, updated_at = ?2 WHERE id = ?3 AND version = ?4",

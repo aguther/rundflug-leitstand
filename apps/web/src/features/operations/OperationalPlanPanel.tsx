@@ -9,7 +9,6 @@ import {
   ModalDialog,
   SelectField,
   StatusPill,
-  TextAreaField,
   TextField,
 } from "../../design-system/components";
 import { eventLocalDateTimeToIso, formatEventLocalDateTime } from "../../event-time";
@@ -104,7 +103,6 @@ export function OperationalPlanPanel({
   const [planMinimumDuration, setPlanMinimumDuration] = useState(10);
   const [planTypicalDuration, setPlanTypicalDuration] = useState(20);
   const [planMaximumDuration, setPlanMaximumDuration] = useState(30);
-  const [planReason, setPlanReason] = useState("Organisatorisch eingeplante Einschränkung");
   const [planPublicNote, setPlanPublicNote] = useState("");
   const [pendingCancel, setPendingCancel] = useState<PlannedOperation | null>(null);
 
@@ -139,7 +137,6 @@ export function OperationalPlanPanel({
     setPlanMinimumDuration(10);
     setPlanTypicalDuration(20);
     setPlanMaximumDuration(30);
-    setPlanReason("Organisatorisch eingeplante Einschränkung");
     setPlanPublicNote("");
   }, [eventId, eventTimeZone]);
 
@@ -161,7 +158,6 @@ export function OperationalPlanPanel({
     setPlanMinimumDuration(plan.minimumDurationMinutes);
     setPlanTypicalDuration(plan.typicalDurationMinutes);
     setPlanMaximumDuration(plan.maximumDurationMinutes);
-    setPlanReason(plan.reason);
     setPlanPublicNote(plan.publicNote);
     setEditorOpen(true);
   }
@@ -205,7 +201,6 @@ export function OperationalPlanPanel({
       ? eventLocalDateTimeToIso(planLatestStart, eventTimeZone)
       : null;
   const canSavePlan =
-    planReason.trim().length >= 3 &&
     planMinimumDuration >= 1 &&
     planMinimumDuration <= planTypicalDuration &&
     planTypicalDuration <= planMaximumDuration &&
@@ -228,7 +223,6 @@ export function OperationalPlanPanel({
       minimumDurationMinutes: planMinimumDuration,
       typicalDurationMinutes: planTypicalDuration,
       maximumDurationMinutes: planMaximumDuration,
-      reason: planReason.trim(),
       publicNote: planPublicNote.trim(),
     });
     setEditorOpen(false);
@@ -517,14 +511,6 @@ export function OperationalPlanPanel({
             value={planMaximumDuration}
           />
         </div>
-        <TextAreaField
-          help="Nur intern sichtbar; wird mit dem Planeintrag auditiert."
-          label="Interner Grund"
-          maxLength={240}
-          onChange={(event) => setPlanReason(event.target.value)}
-          rows={2}
-          value={planReason}
-        />
         <TextField
           disabled={!["EVENT", "RESOURCE_GROUP"].includes(planScopeType)}
           help="Optional und neutral formuliert; keine interne Ursache veröffentlichen."
