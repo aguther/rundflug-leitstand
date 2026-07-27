@@ -7,10 +7,12 @@ import {
   publicPushTargetPath,
   purgeExpiredPushSubscriptions,
   pushDeleteAfter,
+  pushErrorMessage,
   pushMessageFor,
   pushRetentionDays,
   pushUrgencyFor,
   shouldQueuePreparationNotification,
+  vapidConfiguration,
 } from "./web-push";
 
 describe("Web-Push-Endpunkte", () => {
@@ -99,6 +101,41 @@ describe("Web-Push-Endpunkte", () => {
     });
     expect(payload.web_push).toBeUndefined();
     expect(payload.navigate).toBeUndefined();
+  });
+});
+
+describe("Web-Push-Konfiguration", () => {
+  const configuredEnv = (
+    overrides: Partial<
+      Record<"VAPID_PUBLIC_KEY" | "VAPID_PRIVATE_KEY" | "VAPID_SUBJECT", string | undefined>
+    > = {},
+  ) =>
+    ({
+      VAPID_PUBLIC_KEY: "public",
+      VAPID_PRIVATE_KEY: "private",
+      VAPID_SUBJECT: "mailto:betrieb@example.invalid",
+      ...overrides,
+    }) as unknown as Env;
+
+  it("gilt erst mit Schlüsselpaar und Betreiberkontakt als betriebsbereit", () => {
+    expect(vapidConfiguration(configuredEnv())).toEqual({
+      publicKey: "public",
+      privateKey: "private",
+      subject: "mailto:betrieb@example.invalid",
+    });
+    expect(vapidConfiguration(configuredEnv({ VAPID_PRIVATE_KEY: undefined }))).toBeNull();
+    expect(vapidConfiguration(configuredEnv({ VAPID_SUBJECT: undefined }))).toBeNull();
+    expect(vapidConfiguration(configuredEnv({ VAPID_PUBLIC_KEY: undefined }))).toBeNull();
+  });
+
+  it("hält Push-Endpunkte aus Fehlerprotokollen heraus", () => {
+    expect(pushErrorMessage(new Error("Invalid URL: https://web.push.apple.com/QIs0Rgeheim"))).toBe(
+      "Invalid URL: [endpunkt]",
+    );
+    expect(pushErrorMessage(new Error("Web-Push-TTL ist ungültig."))).toBe(
+      "Web-Push-TTL ist ungültig.",
+    );
+    expect(pushErrorMessage("kein Fehlerobjekt")).toBe("Unbekannter Fehler");
   });
 });
 
