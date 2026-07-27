@@ -4,8 +4,10 @@ import { runSimulation, sampleTriangular } from "./engine";
 import {
   calculateDemandSummary,
   demandForProfile,
+  type SimulationConfig,
   salesDurationMinutes,
   simulationConfigForPreset,
+  validateSimulationConfig,
 } from "./model";
 
 const FORECAST_BASELINE_TIMEOUT_MS = 20_000;
@@ -18,7 +20,236 @@ function shortNormalConfig() {
   return config;
 }
 
+function operationalConfig(): SimulationConfig {
+  const config = simulationConfigForPreset("NORMAL");
+  config.schedule = {
+    timeZone: "Europe/Berlin",
+    salesStartAt: "2026-07-22T07:00:00.000Z",
+    salesEndAt: "2026-07-22T10:30:00.000Z",
+    operationsStartAt: "2026-07-22T08:00:00.000Z",
+    operationsEndAt: "2026-07-22T11:00:00.000Z",
+  };
+  config.adminParameters.aircraftCount = 2;
+  config.adminParameters.activePilotCount = 2;
+  config.realityModel.demand = demandForProfile("UNIFORM", 210, 12);
+  config.realityModel.incidents.refueling.enabled = false;
+  config.realityModel.incidents.plannedPause.enabled = false;
+  config.realityModel.incidents.unplannedPause.enabled = false;
+  config.realityModel.incidents.technicalDefect.enabled = false;
+  config.operationalModel = {
+    sourceName: "Importierter Flugtag",
+    gates: [
+      { id: "gate-a", label: "Flight Line A" },
+      { id: "gate-b", label: "Flight Line B" },
+    ],
+    resourceGroups: [
+      {
+        id: "group-a",
+        name: "Gruppe A",
+        shortCode: "GA",
+        gateId: "gate-a",
+        automaticPrecallEnabled: true,
+      },
+      {
+        id: "group-b",
+        name: "Gruppe B",
+        shortCode: "GB",
+        gateId: "gate-b",
+        automaticPrecallEnabled: true,
+      },
+    ],
+    aircraft: [
+      {
+        id: "aircraft-a",
+        registration: "D-EAAA",
+        aircraftType: "C172",
+        capacity: 3,
+        resourceGroupId: "group-a",
+      },
+      {
+        id: "aircraft-b",
+        registration: "D-EBBB",
+        aircraftType: "PA28",
+        capacity: 3,
+        resourceGroupId: "group-b",
+      },
+    ],
+    pilots: [
+      { id: "pilot-a", operationalCode: "PA", active: true },
+      { id: "pilot-b", operationalCode: "PB", active: true },
+    ],
+    products: [
+      {
+        id: "product-a",
+        name: "Rundflug A",
+        code: "RFA",
+        resourceGroupId: "group-a",
+        gateId: "gate-a",
+        referenceCapacity: 3,
+        referenceDurationMinutes: 20,
+      },
+      {
+        id: "product-b",
+        name: "Rundflug B",
+        code: "RFB",
+        resourceGroupId: "group-b",
+        gateId: "gate-b",
+        referenceCapacity: 3,
+        referenceDurationMinutes: 25,
+      },
+    ],
+  };
+  config.demandByProduct = {
+    "product-a": demandForProfile("UNIFORM", 210, 12),
+    "product-b": demandForProfile("UNIFORM", 210, 12),
+  };
+  config.plannedOperations = [
+    {
+      key: "plan-event",
+      scopeType: "EVENT",
+      scopeId: "event",
+      kind: "FLIGHT_SHOW",
+      startMode: "TIME_WINDOW",
+      earliestStartAt: "2026-07-22T09:00:00.000Z",
+      latestStartAt: "2026-07-22T09:05:00.000Z",
+      afterRotationId: null,
+      unresolvedAfterCurrentRotation: false,
+      minimumDurationMinutes: 15,
+      typicalDurationMinutes: 15,
+      maximumDurationMinutes: 15,
+      publicNote: "Flugshow läuft",
+    },
+    {
+      key: "plan-group",
+      scopeType: "RESOURCE_GROUP",
+      scopeId: "group-a",
+      kind: "PAUSE",
+      startMode: "TIME_WINDOW",
+      earliestStartAt: "2026-07-22T09:30:00.000Z",
+      latestStartAt: "2026-07-22T09:35:00.000Z",
+      afterRotationId: null,
+      unresolvedAfterCurrentRotation: false,
+      minimumDurationMinutes: 10,
+      typicalDurationMinutes: 10,
+      maximumDurationMinutes: 10,
+      publicNote: "Gruppe A pausiert",
+    },
+    {
+      key: "plan-aircraft",
+      scopeType: "AIRCRAFT",
+      scopeId: "aircraft-b",
+      kind: "REFUELING",
+      startMode: "TIME_WINDOW",
+      earliestStartAt: "2026-07-22T08:30:00.000Z",
+      latestStartAt: "2026-07-22T08:35:00.000Z",
+      afterRotationId: null,
+      unresolvedAfterCurrentRotation: false,
+      minimumDurationMinutes: 8,
+      typicalDurationMinutes: 8,
+      maximumDurationMinutes: 8,
+      publicNote: "",
+    },
+    {
+      key: "plan-pilot",
+      scopeType: "PILOT",
+      scopeId: "pilot-a",
+      kind: "PAUSE",
+      startMode: "TIME_WINDOW",
+      earliestStartAt: "2026-07-22T10:00:00.000Z",
+      latestStartAt: "2026-07-22T10:05:00.000Z",
+      afterRotationId: null,
+      unresolvedAfterCurrentRotation: false,
+      minimumDurationMinutes: 8,
+      typicalDurationMinutes: 8,
+      maximumDurationMinutes: 8,
+      publicNote: "",
+    },
+  ];
+  return config;
+}
+
 describe("local forecast simulation", () => {
+  it("plays imported topology and all planned-operation scopes deterministically", () => {
+    const config = operationalConfig();
+    expect(validateSimulationConfig(config)).toEqual([]);
+
+    const first = runSimulation(config);
+    const second = runSimulation(structuredClone(config));
+    expect(JSON.stringify(second)).toBe(JSON.stringify(first));
+    expect(new Set(first.rotations.map((entry) => entry.productCode))).toEqual(
+      new Set(["RFA", "RFB"]),
+    );
+    expect(
+      first.rotations
+        .filter((entry) => entry.aircraftId)
+        .every((entry) => {
+          const aircraft = first.aircraft.find((candidate) => candidate.id === entry.aircraftId);
+          return aircraft?.resourceGroupId === entry.resourceGroupId;
+        }),
+    ).toBe(true);
+    expect(
+      new Set(
+        first.events
+          .filter((entry) => entry.type === "PLANNED_OPERATION_STARTED")
+          .map((entry) => entry.plannedOperationId),
+      ),
+    ).toEqual(new Set(["plan-event", "plan-group", "plan-aircraft", "plan-pilot"]));
+    const eventStart = first.events.find(
+      (entry) =>
+        entry.type === "PLANNED_OPERATION_STARTED" && entry.plannedOperationId === "plan-event",
+    );
+    const eventEnd = first.events.find(
+      (entry) =>
+        entry.type === "PLANNED_OPERATION_ENDED" && entry.plannedOperationId === "plan-event",
+    );
+    expect(eventStart).toBeDefined();
+    expect(eventEnd).toBeDefined();
+    expect(
+      first.events
+        .filter((entry) => entry.type === "ROTATION_CALLED")
+        .some(
+          (entry) =>
+            Date.parse(entry.occurredAt) >= Date.parse(eventStart?.occurredAt ?? "") &&
+            Date.parse(entry.occurredAt) < Date.parse(eventEnd?.occurredAt ?? ""),
+        ),
+    ).toBe(false);
+  });
+
+  it("starts a resolved plan only after its selected synthetic rotation completes", () => {
+    const config = operationalConfig();
+    config.plannedOperations = [
+      {
+        key: "plan-after-rotation",
+        scopeType: "EVENT",
+        scopeId: "event",
+        kind: "PAUSE",
+        startMode: "AFTER_CURRENT_ROTATION",
+        earliestStartAt: null,
+        latestStartAt: null,
+        afterRotationId: "rotation-001",
+        unresolvedAfterCurrentRotation: false,
+        minimumDurationMinutes: 5,
+        typicalDurationMinutes: 5,
+        maximumDurationMinutes: 5,
+        publicNote: "",
+      },
+    ];
+
+    const result = runSimulation(config);
+    const reference = result.rotations.find((entry) => entry.id === "rotation-001");
+    const start = result.events.find(
+      (entry) =>
+        entry.type === "PLANNED_OPERATION_STARTED" &&
+        entry.plannedOperationId === "plan-after-rotation",
+    );
+
+    expect(reference?.completedAt).not.toBeNull();
+    expect(start).toBeDefined();
+    expect(Date.parse(start?.occurredAt ?? "")).toBeGreaterThanOrEqual(
+      Date.parse(reference?.completedAt ?? ""),
+    );
+  });
+
   it(
     "captures the approved preset baseline",
     () => {

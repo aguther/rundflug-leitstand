@@ -42,6 +42,7 @@ import {
   downloadDailyReport,
   downloadMasterDataTemplate,
   downloadPerformanceProfile,
+  downloadSimulationPlan,
   downloadTicketRawData,
   factoryReset,
   getAdminEventFlow,
@@ -781,6 +782,11 @@ export function AdminView() {
   async function exportMasterDataTemplate() {
     await downloadMasterDataTemplate(EVENT_ID, ADMIN_DEVICE_ID, deviceTokenFor(ADMIN_DEVICE_ID));
     setMessage("Stammdatenvorlage wurde als versionierte JSON-Datei exportiert.");
+  }
+
+  async function exportSimulationPlan() {
+    await downloadSimulationPlan(EVENT_ID, ADMIN_DEVICE_ID, deviceTokenFor(ADMIN_DEVICE_ID));
+    setMessage("Stammdaten und offener Betriebsplan wurden für die Simulation exportiert.");
   }
 
   async function readMasterDataTemplate(file: File | null) {
@@ -4915,20 +4921,32 @@ export function AdminView() {
                   <span>Nur Simulation</span>
                 </div>
                 <p>
-                  Synthetische Szenarien, Prognoseparameter und A/B-Vergleiche vollständig im
-                  Browser untersuchen. Es werden keine Betriebsdaten verwendet oder gespeichert.
+                  Stammdaten und offene Planeinträge als lokale Simulationsgrundlage verwenden.
+                  Tickets, Ist-Verläufe und operative Zustände werden nicht exportiert.
                 </p>
               </div>
             </div>
-            <a
-              className="admin-simulator-launch-action"
-              href="/simulation"
-              rel="noopener"
-              target="_blank"
-            >
-              Prognose-Simulator öffnen
-              <ExternalLink aria-hidden="true" />
-            </a>
+            <div className="admin-simulator-launch-actions">
+              <Button
+                busy={busyActionKey === "export-simulation-plan"}
+                disabled={!board || busyActionKey !== null}
+                onClick={() =>
+                  void runBusyAction("export-simulation-plan", exportSimulationPlan)
+                }
+                type="button"
+              >
+                Simulationsgrundlage exportieren
+              </Button>
+              <a
+                className="admin-simulator-launch-action"
+                href="/simulation"
+                rel="noopener"
+                target="_blank"
+              >
+                Prognose-Simulator öffnen
+                <ExternalLink aria-hidden="true" />
+              </a>
+            </div>
           </section>
           <section
             className="admin-section admin-operational-plan-section"

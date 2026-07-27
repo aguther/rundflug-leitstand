@@ -1,5 +1,7 @@
 import {
   forecastUncertaintyLabel,
+  type SimulationEvent,
+  type SimulationEventType,
   type SimulationForecastSnapshot,
   type SimulationResult,
   type SimulationRotation,
@@ -54,6 +56,110 @@ function phaseStyle(from: number, until: number, start: number, end: number) {
   };
 }
 
+const AIRCRAFT_INTERRUPTION_LABELS: Partial<Record<SimulationEventType, string>> = {
+  REFUELING_STARTED: "Tanken",
+  PLANNED_PAUSE_STARTED: "Geplante Pause",
+  UNPLANNED_PAUSE_STARTED: "Ungeplante Pause",
+  TECHNICAL_DEFECT_REPORTED: "Defekt",
+  AIRCRAFT_DAY_OUT: "Tagesausfall",
+  EVENT_INTERRUPTED: "Betrieb unterbrochen",
+};
+
+const AIRCRAFT_INTERRUPTION_START_TYPES = new Set<SimulationEventType>([
+  "REFUELING_STARTED",
+  "PLANNED_PAUSE_STARTED",
+  "UNPLANNED_PAUSE_STARTED",
+  "TECHNICAL_DEFECT_REPORTED",
+  "AIRCRAFT_DAY_OUT",
+]);
+
+export interface TimelineInterruption {
+  id: string;
+  label: string;
+  start: number;
+  end: number;
+  active: boolean;
+  tone: "planned" | "service" | "unplanned";
+  details: string;
+}
+
+function interruptionTone(type: SimulationEventType): TimelineInterruption["tone"] {
+  if (type === "PLANNED_PAUSE_STARTED") return "planned";
+  if (type === "REFUELING_STARTED") return "service";
+  return "unplanned";
+}
+
+export function buildTimelineInterruptions(
+  events: readonly SimulationEvent[],
+  aircraftId: string | null,
+  visibleAt: number,
+  simulationEnd: number,
+): TimelineInterruption[] {
+  const startTypes =
+    aircraftId === null
+      ? new Set<SimulationEventType>(["EVENT_INTERRUPTED"])
+      : AIRCRAFT_INTERRUPTION_START_TYPES;
+  const endType = aircraftId === null ? "EVENT_RESUMED" : "AIRCRAFT_RETURN_CONFIRMED";
+  const visibleEvents = events
+    .filter(
+      (event) =>
+        Date.parse(event.occurredAt) <= visibleAt &&
+        event.aircraftId === aircraftId &&
+        (startTypes.has(event.type) || event.type === endType),
+    )
+    .sort((left, right) => Date.parse(left.occurredAt) - Date.parse(right.occurredAt));
+  const interruptions: TimelineInterruption[] = [];
+  let pending: SimulationEvent | null = null;
+
+  for (const event of visibleEvents) {
+    if (startTypes.has(event.type)) {
+      if (pending) {
+        interruptions.push({
+          id: pending.id,
+          label: AIRCRAFT_INTERRUPTION_LABELS[pending.type] ?? pending.type,
+          start: Date.parse(pending.occurredAt),
+          end: Date.parse(event.occurredAt),
+          active: false,
+          tone: interruptionTone(pending.type),
+          details: pending.details,
+        });
+      }
+      pending = event;
+      continue;
+    }
+    if (!pending) continue;
+    interruptions.push({
+      id: pending.id,
+      label: AIRCRAFT_INTERRUPTION_LABELS[pending.type] ?? pending.type,
+      start: Date.parse(pending.occurredAt),
+      end: Date.parse(event.occurredAt),
+      active: false,
+      tone: interruptionTone(pending.type),
+      details: pending.details,
+    });
+    pending = null;
+  }
+
+  if (pending) {
+    interruptions.push({
+      id: pending.id,
+      label: AIRCRAFT_INTERRUPTION_LABELS[pending.type] ?? pending.type,
+      start: Date.parse(pending.occurredAt),
+      end: Math.min(visibleAt, simulationEnd),
+      active: true,
+      tone: interruptionTone(pending.type),
+      details: pending.details,
+    });
+  }
+
+  return interruptions;
+}
+
+function interruptionTitle(interruption: TimelineInterruption): string {
+  const until = interruption.active ? "offen" : formatTime(interruption.end);
+  return `${interruption.label} · ${formatTime(interruption.start)}–${until} · ${interruption.details}`;
+}
+
 export function ForecastTimeline({
   currentMs,
   result,
@@ -96,6 +202,30 @@ export function ForecastTimeline({
     ? latestSnapshot(result.snapshots, selected.id, currentMs)
     : undefined;
   const nowPosition = clampPercent(percent(currentMs, windowStart, windowEnd));
+  const plannedSegments = (result.plannedOperations ?? []).flatMap((plan) => {
+    const startEvent = result.events.find(
+      (event) =>
+        event.type === "PLANNED_OPERATION_STARTED" && event.plannedOperationId === plan.key,
+    );
+    if (!startEvent) return [];
+    const endEvent = result.events.find(
+      (event) =>
+        event.type === "PLANNED_OPERATION_ENDED" &&
+        event.plannedOperationId === plan.key &&
+        Date.parse(event.occurredAt) >= Date.parse(startEvent.occurredAt),
+    );
+    const start = Date.parse(startEvent.occurredAt);
+    const end = endEvent ? Date.parse(endEvent.occurredAt) : simulationEnd;
+    if (start >= windowEnd || end <= windowStart) return [];
+    return [{ plan, start, end }];
+  });
+  const sharedPlannedSegments = plannedSegments.filter(({ plan }) => plan.scopeType !== "AIRCRAFT");
+  const sharedInterruptions = buildTimelineInterruptions(
+    result.events,
+    null,
+    currentMs,
+    simulationEnd,
+  ).filter(({ start, end }) => start < windowEnd && end >= windowStart);
 
   return (
     <section className="sim-timeline-panel" aria-label="Simulationszeitachse">
@@ -113,6 +243,8 @@ export function ForecastTimeline({
           <span className="sim-legend-boarding">Boarding</span>
           <span className="sim-legend-flight">Flug</span>
           <span className="sim-legend-ground">Boden</span>
+          <span className="sim-legend-plan">Tagesplan</span>
+          <span className="sim-legend-interruption">Unterbrechung / Ausfall</span>
         </fieldset>
       </header>
       <div className="sim-timeline-scale">
@@ -128,10 +260,63 @@ export function ForecastTimeline({
             <time>{formatTime(currentMs)}</time>
           </div>
         </div>
+        {sharedPlannedSegments.length > 0 || sharedInterruptions.length > 0 ? (
+          <div className="sim-aircraft-lane sim-plan-lane">
+            <div className="sim-aircraft-label">
+              <strong>Tagesplan / Betrieb</strong>
+              <small>Plan und globale Unterbrechung</small>
+            </div>
+            <div className="sim-lane-track">
+              {sharedPlannedSegments.map(({ plan, start, end }) => (
+                <span
+                  className="sim-planned-operation-bar"
+                  data-active={start <= currentMs && currentMs < end}
+                  key={plan.key}
+                  style={{
+                    left: `${clampPercent(percent(start, windowStart, windowEnd))}%`,
+                    width: `${Math.max(
+                      1.2,
+                      clampPercent(percent(end, windowStart, windowEnd)) -
+                        clampPercent(percent(start, windowStart, windowEnd)),
+                    )}%`,
+                  }}
+                  title={`${plan.kind}${plan.publicNote ? ` · ${plan.publicNote}` : ""}`}
+                >
+                  {plan.kind}
+                </span>
+              ))}
+              {sharedInterruptions.map((interruption) => (
+                <span
+                  className="sim-interruption-bar sim-interruption-bar--shared"
+                  data-active={interruption.active}
+                  data-tone={interruption.tone}
+                  key={interruption.id}
+                  style={{
+                    left: `${clampPercent(percent(interruption.start, windowStart, windowEnd))}%`,
+                    width: `${Math.max(
+                      1.2,
+                      clampPercent(percent(interruption.end, windowStart, windowEnd)) -
+                        clampPercent(percent(interruption.start, windowStart, windowEnd)),
+                    )}%`,
+                  }}
+                  title={interruptionTitle(interruption)}
+                >
+                  {interruption.label}
+                </span>
+              ))}
+            </div>
+          </div>
+        ) : null}
         {result.aircraft.map((aircraft) => {
           const rotations = visibleRotations.filter(
             (rotation) => rotation.aircraftId === aircraft.id,
           );
+          const interruptions = buildTimelineInterruptions(
+            result.events,
+            aircraft.id,
+            currentMs,
+            simulationEnd,
+          ).filter(({ start, end }) => start < windowEnd && end >= windowStart);
           return (
             <div className="sim-aircraft-lane" key={aircraft.id}>
               <div className="sim-aircraft-label">
@@ -148,6 +333,28 @@ export function ForecastTimeline({
                     style={{ left: `${percent(tick, windowStart, windowEnd)}%` }}
                   />
                 ))}
+                {plannedSegments
+                  .filter(
+                    ({ plan }) => plan.scopeType === "AIRCRAFT" && plan.scopeId === aircraft.id,
+                  )
+                  .map(({ plan, start, end }) => (
+                    <span
+                      className="sim-planned-operation-bar sim-planned-operation-bar--aircraft"
+                      data-active={start <= currentMs && currentMs < end}
+                      key={plan.key}
+                      style={{
+                        left: `${clampPercent(percent(start, windowStart, windowEnd))}%`,
+                        width: `${Math.max(
+                          1.2,
+                          clampPercent(percent(end, windowStart, windowEnd)) -
+                            clampPercent(percent(start, windowStart, windowEnd)),
+                        )}%`,
+                      }}
+                      title={`${plan.kind}${plan.publicNote ? ` · ${plan.publicNote}` : ""}`}
+                    >
+                      {plan.kind}
+                    </span>
+                  ))}
                 {rotations.map((rotation) => {
                   const called = Date.parse(rotation.calledAt ?? "");
                   const departed = Date.parse(rotation.departedAt ?? "");
@@ -183,6 +390,25 @@ export function ForecastTimeline({
                     </button>
                   );
                 })}
+                {interruptions.map((interruption) => (
+                  <span
+                    className="sim-interruption-bar"
+                    data-active={interruption.active}
+                    data-tone={interruption.tone}
+                    key={interruption.id}
+                    style={{
+                      left: `${clampPercent(percent(interruption.start, windowStart, windowEnd))}%`,
+                      width: `${Math.max(
+                        1.2,
+                        clampPercent(percent(interruption.end, windowStart, windowEnd)) -
+                          clampPercent(percent(interruption.start, windowStart, windowEnd)),
+                      )}%`,
+                    }}
+                    title={interruptionTitle(interruption)}
+                  >
+                    {interruption.label}
+                  </span>
+                ))}
               </div>
             </div>
           );
@@ -212,8 +438,8 @@ export function ForecastTimeline({
               <strong>{rotation.communicationNumber}</strong>
               <small>
                 {rotation.precalledAt && Date.parse(rotation.precalledAt) <= currentMs
-                  ? "Gate"
-                  : index + 1}
+                  ? (rotation.gateLabel ?? "Gate")
+                  : `${rotation.productCode ?? ""}${rotation.productCode ? " · " : ""}${index + 1}`}
               </small>
             </button>
           ))}

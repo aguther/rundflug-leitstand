@@ -66,8 +66,8 @@ npm run simulator
 ```
 
 Vite öffnet `http://127.0.0.1:5173/simulation`. Die Route ist ausschließlich im Vite-Modus
-`simulator` aktiv, verarbeitet CSV-Dateien nur im Browser und führt selbst keine Netzwerkzugriffe
-aus.
+`simulator` aktiv, verarbeitet CSV- und JSON-Dateien nur im Browser und führt selbst keine
+Netzwerkzugriffe aus.
 
 Der normale Cloudflare-Build stellt dieselbe Oberfläche zusätzlich lazy unter `/simulation` bereit.
 Sie wird aus **Administration → Auswertung** in einem neuen Tab geöffnet und durch die vorhandene
@@ -76,6 +76,12 @@ verwendet die bestehende API; Simulationskonfiguration, CSV-Inhalte, A/B-Verglei
 bleiben danach vollständig im Browser und werden weder in D1 noch in Durable Objects, KV oder R2
 gespeichert. Der Simulator erscheint bewusst nicht im allgemeinen Ansichtswechsler und wird nicht
 für alle PWA-Installationen vorab gecacht.
+
+Über **Administration → Auswertung → Simulationsgrundlage exportieren** kann eine sichere
+JSON-Datei mit Tageszeiten, Stammdaten und noch offenen geplanten Unterbrechungen erstellt werden.
+Der anschließende Import im Simulator legt eine lokale Variante an. Tickets, Queues, Ist-Zustände,
+Ereignisverlauf, Audit und Prognosesnapshots sind nicht Teil der Datei. Varianten und synthetische
+Läufe bleiben flüchtig im geöffneten Browser-Tab.
 
 Die vollständige Checkliste für Einrichtung, Betriebsbeginn und einen gestuften sicheren Neustart
 steht in [docs/operations/betriebsstart-und-neustart.md](docs/operations/betriebsstart-und-neustart.md).

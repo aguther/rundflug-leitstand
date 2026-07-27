@@ -186,6 +186,18 @@
   height: 17px;
 }
 
+.admin-shell .admin-simulator-launch-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.admin-shell .admin-simulator-launch-actions .ds-button {
+  min-height: 44px;
+  white-space: nowrap;
+}
+
 .event-setup-v15 {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(330px, 0.82fr);
@@ -609,6 +621,12 @@
 
   .admin-shell .admin-simulator-launch-action {
     width: 100%;
+  }
+
+  .admin-shell .admin-simulator-launch-actions {
+    width: 100%;
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .event-setup-v15 .ds-page-header {

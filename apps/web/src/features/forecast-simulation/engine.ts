@@ -23,6 +23,7 @@ import type {
   TriangularDistribution,
 } from "./model";
 import { validateSimulationConfig } from "./model";
+import { runOperationalSimulation } from "./operational-engine";
 
 const TICK_MS = 30_000;
 const MINUTE_MS = 60_000;
@@ -541,6 +542,9 @@ export function runSimulation(
 ): SimulationResult {
   const validationErrors = validateSimulationConfig(config);
   if (validationErrors.length > 0) throw new Error(validationErrors.join(" "));
+  if (config.operationalModel) {
+    return runOperationalSimulation(config, manualIncidents, calculateSimulationMetrics);
+  }
   const operationsStartMs = Date.parse(config.schedule.operationsStartAt);
   const operationsEndMs = Date.parse(config.schedule.operationsEndAt);
   const runStartMs = Math.min(Date.parse(config.schedule.salesStartAt), operationsStartMs);

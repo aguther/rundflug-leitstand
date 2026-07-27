@@ -132,6 +132,11 @@ describe("V1.5 administration UI", () => {
     expect(apiSource).toContain("/flow");
     expect(apiSource).toContain("/master-data-template/validate");
     expect(apiSource).toContain("/master-data-template/import");
+    expect(apiSource).toContain("/exports/simulation-plan.json");
+    expect(adminViewSource).toContain("Simulationsgrundlage exportieren");
+    expect(adminViewSource).toContain(
+      "Tickets, Ist-Verläufe und operative Zustände werden nicht exportiert.",
+    );
     expect(adminViewSource).toMatch(/>\s*Importieren\s*<\/Button>/);
     expect(adminViewSource).toContain("templateValidation.counts");
     expect(adminViewSource).toContain('size="wide"');

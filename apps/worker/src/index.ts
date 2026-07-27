@@ -24,6 +24,7 @@ import {
   operationalHistoryQuerySchema,
   operationalHistorySchema,
   operatorLoginRequestSchema,
+  simulationPlanExportSchema,
   ticketSearchRequestSchema,
   updateOperatorAccountSchema,
 } from "@rundflug/contracts";
@@ -75,6 +76,7 @@ import {
   EMPTY_GATE_DISPLAY_FILTER_JSON,
   withGateDisplayFilterFallback,
 } from "./gate-display-filter-storage";
+import { loadMasterDataExportProjection } from "./master-data-export";
 import { buildOperationalHistoryStatement } from "./operational-history";
 import {
   allowAdminDeviceRecoveryAttempt,
@@ -1765,6 +1767,107 @@ app.get("/api/admin/events/:eventId/master-data-template", async (context) => {
   });
   return context.json(template, 200, {
     "content-disposition": `attachment; filename="stammdaten-${eventId}.json"`,
+  });
+});
+
+app.on("GET", eventRoutes("/exports/simulation-plan.json"), async (context) => {
+  const eventId = context.req.param("eventId");
+  const device = await authorizeDevice(context.env, eventId, context.req.raw);
+  if (!device || !["ADMIN", "FLIGHT_DIRECTOR"].includes(device.role)) {
+    return context.json(
+      {
+        error: {
+          code: "SESSION_NOT_AUTHORIZED",
+          message: "Sitzung für diesen Simulationsexport nicht berechtigt.",
+        },
+      },
+      403,
+    );
+  }
+  const exportedAt = new Date().toISOString();
+  const [projection, plans] = await Promise.all([
+    loadMasterDataExportProjection(context.env.DB, eventId, exportedAt),
+    context.env.DB.prepare(
+      `SELECT id, scope_type, scope_id, constraint_kind, start_mode,
+                earliest_start_at, latest_start_at, after_rotation_id,
+                minimum_duration_minutes, typical_duration_minutes, maximum_duration_minutes,
+                public_note
+           FROM planned_operational_constraints
+          WHERE operation_day_id = ?1 AND status = 'PLANNED'
+          ORDER BY COALESCE(earliest_start_at, created_at), created_at, id`,
+    )
+      .bind(eventId)
+      .all<{
+        id: string;
+        scope_type: "EVENT" | "RESOURCE_GROUP" | "AIRCRAFT" | "PILOT";
+        scope_id: string;
+        constraint_kind: "PAUSE" | "REFUELING" | "FLIGHT_SHOW" | "WEATHER" | "TECHNICAL" | "OTHER";
+        start_mode: "TIME_WINDOW" | "AFTER_CURRENT_ROTATION";
+        earliest_start_at: string | null;
+        latest_start_at: string | null;
+        after_rotation_id: string | null;
+        minimum_duration_minutes: number;
+        typical_duration_minutes: number;
+        maximum_duration_minutes: number;
+        public_note: string;
+      }>(),
+  ]);
+  if (!projection) {
+    return context.json(
+      { error: { code: "EVENT_NOT_FOUND", message: "Veranstaltung nicht gefunden." } },
+      404,
+    );
+  }
+  if (!projection.schedule) {
+    return context.json(
+      {
+        error: {
+          code: "SIMULATION_SCHEDULE_INCOMPLETE",
+          message: "Verkaufs- und Betriebszeiten müssen vor dem Export vollständig sein.",
+        },
+      },
+      409,
+    );
+  }
+  const plannedOperations = plans.results.map((plan, index) => {
+    const scopeKey =
+      plan.scope_type === "EVENT"
+        ? "event"
+        : plan.scope_type === "RESOURCE_GROUP"
+          ? projection.keys.resourceGroups.get(plan.scope_id)
+          : plan.scope_type === "AIRCRAFT"
+            ? projection.keys.aircraft.get(plan.scope_id)
+            : projection.keys.pilots.get(plan.scope_id);
+    if (!scopeKey) {
+      throw new Error(`Simulationsexport: Ziel für Planeintrag ${plan.id} fehlt.`);
+    }
+    return {
+      key: `plan-${index + 1}`,
+      scopeType: plan.scope_type,
+      scopeKey,
+      kind: plan.constraint_kind,
+      startMode: plan.start_mode,
+      earliestStartAt: plan.earliest_start_at,
+      latestStartAt: plan.latest_start_at,
+      afterCurrentRotation: plan.after_rotation_id !== null,
+      minimumDurationMinutes: plan.minimum_duration_minutes,
+      typicalDurationMinutes: plan.typical_duration_minutes,
+      maximumDurationMinutes: plan.maximum_duration_minutes,
+      publicNote: plan.public_note,
+    };
+  });
+  const simulationPlan = simulationPlanExportSchema.parse({
+    format: "rundflug-simulation-plan",
+    formatVersion: 1,
+    exportedAt,
+    source: projection.template.source,
+    schedule: projection.schedule,
+    masterData: projection.template,
+    plannedOperations,
+  });
+  return context.json(simulationPlan, 200, {
+    "cache-control": "no-store",
+    "content-disposition": `attachment; filename="simulationsplan-${eventId}.json"`,
   });
 });
 

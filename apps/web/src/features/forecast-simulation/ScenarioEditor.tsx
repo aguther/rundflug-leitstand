@@ -17,20 +17,23 @@ import {
   type SimulationDemand,
   type SimulationDemandProfileId,
   type SimulationDemandWindow,
+  type SimulationRotation,
   salesDurationMinutes,
   type TriangularDistribution,
 } from "./model";
+import { SimulationPlanEditor } from "./SimulationPlanEditor";
 
 interface ScenarioEditorProps {
   open: boolean;
   config: SimulationConfig;
   errors: readonly string[];
+  rotations: readonly SimulationRotation[];
   onChange: (config: SimulationConfig) => void;
   onApply: () => void;
   onClose: () => void;
 }
 
-type EditorTab = "ADMIN" | "REALITY" | "TUNING";
+type EditorTab = "ADMIN" | "PLAN" | "REALITY" | "TUNING";
 type DistributionKey = keyof SimulationConfig["realityModel"]["phases"];
 type DistributionValue = keyof TriangularDistribution;
 
@@ -487,6 +490,7 @@ export function ScenarioEditor({
   open,
   config,
   errors,
+  rotations,
   onChange,
   onApply,
   onClose,
@@ -628,13 +632,14 @@ export function ScenarioEditor({
       title={
         <span className="sim-editor-title">
           Szenario konfigurieren
-          <small>Planwerte, simulierte Realität und lokales Prognose-Labor</small>
+          <small>Stammdaten, Tagesplan, simulierte Realität und Prognose-Labor</small>
         </span>
       }
     >
       <nav aria-label="Konfigurationsbereiche" className="sim-editor-tabs">
         {[
           ["ADMIN", "Betrieb"],
+          ["PLAN", "Tagesplan"],
           ["REALITY", "Simulierte Realität"],
           ["TUNING", "Prognose-Labor"],
         ].map(([id, label]) => (
@@ -779,6 +784,10 @@ export function ScenarioEditor({
             </div>
           </section>
         </div>
+      ) : null}
+
+      {activeTab === "PLAN" ? (
+        <SimulationPlanEditor config={config} onChange={onChange} rotations={rotations} />
       ) : null}
 
       {activeTab === "REALITY" ? (
