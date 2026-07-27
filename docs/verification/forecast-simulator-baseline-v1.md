@@ -1,6 +1,6 @@
 # Verifikation Prognose-Simulator V1
 
-Stand: 26. Juli 2026
+Stand: 27. Juli 2026
 
 ## Zweck und Ausführung
 
@@ -152,11 +152,13 @@ Betriebshinweis, setzt die Prognosequalität auf `UNCERTAIN` und veröffentlicht
 Zeitfenster.
 
 Die Anzeige verwendet ausschließlich synthetische `G-SIM-####`-Kennungen, `Rundflug Simulation`
-und `Flight Line 1`. Sie besitzt 20 Zeilen, einspaltiges Layout und keine Einstellungen.
-`LIVE-SIMULATION`, `Virtuelle Zeit` und der permanente Hinweis
-`Nur Simulation – keine Betriebsdaten` verhindern eine Verwechslung mit Betriebsdaten.
-Abflugtransitionen bleiben auch bei 60× oder 300× für 15 Sekunden realer Betrachtungszeit sichtbar;
-Neustart, Rücksprung und ein neu berechnetes Ergebnis löschen diese Anzeigehistorie.
+und `Flight Line 1`. Sie zeigt 20 Einträge in zwei Spalten mit jeweils zehn Zeilen und besitzt
+weder Einstellungen noch die für den öffentlichen Betrieb bestimmte Fußzeile. `LIVE-SIMULATION`,
+die virtuelle Uhrzeit und der permanente Hinweis `Nur Simulation – keine Betriebsdaten` verhindern
+eine Verwechslung mit Betriebsdaten. Abflugtransitionen bleiben bei 1× für 15 Sekunden realer
+Betrachtungszeit sichtbar. Die Dauer wird bei beschleunigter Wiedergabe durch die
+Simulationsgeschwindigkeit geteilt und beträgt mindestens eine Sekunde; Neustart, Rücksprung und ein
+neu berechnetes Ergebnis löschen diese Anzeigehistorie.
 
 ## Browserabnahme
 
@@ -202,8 +204,9 @@ Light und Dark Mode wurden jeweils im In-App-Browser geprüft:
 - das FIDS-Pop-out folgt Start, Pause, `+5 Min.`, Szenariowechsel und Betriebsunterbrechung, ohne die
   Bedienung des Simulatorfensters zu blockieren;
 - ein zweiter Klick auf `FIDS öffnen` fokussiert das vorhandene Fenster und erzeugt kein Duplikat;
-- das simulierte FIDS zeigt bei 1920 × 1080 und 1280 × 720 weder Dokument- noch Tabellen-Scrollbars
-  und bleibt in heller wie dunkler Darstellung lesbar;
+- das simulierte FIDS zeigt bei 1920 × 1080 und 1280 × 720 seine bis zu 20 Einträge in zwei
+  Zehn-Zeilen-Spalten, hält Gruppe, Gate, Status und Zeitfenster jeweils einzeilig, erzeugt weder
+  Dokument- noch Tabellen-Scrollbars und bleibt in heller wie dunkler Darstellung lesbar;
 - eine vollständig neu geladene Browserseite enthält sinnvollen Anwendungsinhalt, kein
   Framework-Fehleroverlay und keine Konsolenfehler oder -warnungen;
 - Netzwerkaufzeichnung nach Reload: ausschließlich lokale Vite-Modul- und HMR-Verbindungen,

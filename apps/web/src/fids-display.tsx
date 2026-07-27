@@ -32,6 +32,7 @@ export interface FidsBoardPresentationProps {
   subtitle?: string;
   simulationBanner?: string;
   footerNote?: string;
+  showFooter?: boolean;
   filterDeparted?: boolean;
   onOpenSettings?: () => void;
   children?: ReactNode;
@@ -193,6 +194,7 @@ export function FidsBoardPresentation({
   subtitle,
   simulationBanner,
   footerNote,
+  showFooter = true,
   filterDeparted = true,
   onOpenSettings,
   children,
@@ -237,6 +239,7 @@ export function FidsBoardPresentation({
     <main
       className="standard-fids"
       data-fids-layout={preferences.layout.toLowerCase()}
+      data-fids-footer={showFooter ? "visible" : "hidden"}
       data-fids-mode={simulationBanner ? "simulation" : "standard"}
       data-fids-theme={preferences.theme.toLowerCase()}
       data-testid="fids-display"
@@ -288,31 +291,33 @@ export function FidsBoardPresentation({
         ) : null}
       </section>
 
-      <footer className="fids-footer">
-        <div className="fids-footer-copy">
-          <span>
-            <QrCode aria-hidden="true" /> Bitte QR-Ticket bereithalten
-          </span>
-          <i aria-hidden="true" />
-          <span>Zeitfenster sind Prognosen</span>
-          {footerNote ? (
-            <>
-              <i aria-hidden="true" />
-              <span>{footerNote}</span>
-            </>
+      {showFooter ? (
+        <footer className="fids-footer">
+          <div className="fids-footer-copy">
+            <span>
+              <QrCode aria-hidden="true" /> Bitte QR-Ticket bereithalten
+            </span>
+            <i aria-hidden="true" />
+            <span>Zeitfenster sind Prognosen</span>
+            {footerNote ? (
+              <>
+                <i aria-hidden="true" />
+                <span>{footerNote}</span>
+              </>
+            ) : null}
+          </div>
+          {onOpenSettings ? (
+            <button
+              aria-label="FIDS-Einstellungen öffnen"
+              className="fids-settings-button"
+              onClick={onOpenSettings}
+              type="button"
+            >
+              <Settings aria-hidden="true" />
+            </button>
           ) : null}
-        </div>
-        {onOpenSettings ? (
-          <button
-            aria-label="FIDS-Einstellungen öffnen"
-            className="fids-settings-button"
-            onClick={onOpenSettings}
-            type="button"
-          >
-            <Settings aria-hidden="true" />
-          </button>
-        ) : null}
-      </footer>
+        </footer>
+      ) : null}
 
       {children}
     </main>

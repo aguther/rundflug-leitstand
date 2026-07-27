@@ -744,6 +744,7 @@ export function ForecastSimulationView() {
         onWindowError={setFidsWindowError}
         ref={fidsPopoutRef}
         result={result}
+        speed={speed}
         visibleAt={visibleAt}
       />
 
