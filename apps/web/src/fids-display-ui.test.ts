@@ -53,6 +53,11 @@ describe("FIDS V1.7.3 UI", () => {
     expect(displaySource).toContain("connectionTone");
     expect(displaySource).toContain("simulationBanner");
     expect(displaySource).toContain("footerNote");
+    expect(displaySource).toContain("showFooter = true");
+    expect(displaySource).toContain('data-fids-footer={showFooter ? "visible" : "hidden"}');
+    expect(stylesSource).toContain(
+      '.standard-fids[data-fids-mode="simulation"][data-fids-footer="hidden"]',
+    );
     expect(displaySource).toContain("filterDeparted = true");
     expect(displaySource).toContain("<FidsSettingsDialog");
     expect(displaySource).toContain("onOpenSettings={() => setSettingsOpen(true)}");
@@ -66,6 +71,11 @@ describe("FIDS V1.7.3 UI", () => {
     expect(stylesSource).toContain('data-fids-layout="double"');
     expect(stylesSource).toContain("repeat(var(--fids-single-rows)");
     expect(stylesSource).toContain("repeat(var(--fids-double-rows)");
+    expect(stylesSource).toContain(
+      '.standard-fids[data-fids-mode="simulation"][data-fids-layout="double"]',
+    );
+    expect(stylesSource).toContain("minmax(0, 1.25fr)");
+    expect(stylesSource).toContain("white-space: nowrap");
   });
 
   it("omits the redundant clock suffix from FIDS time windows", () => {

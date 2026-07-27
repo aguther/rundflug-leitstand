@@ -11,7 +11,9 @@ import {
   createRecentDepartureState,
   createSimulationFidsBoard,
   recentDepartureIds,
+  SIMULATION_DEPARTED_MINIMUM_VISIBILITY_MS,
   SIMULATION_DEPARTED_VISIBILITY_MS,
+  simulationDepartedVisibilityMs,
 } from "./simulation-fids";
 
 const START_MS = Date.parse("2026-07-22T08:00:00.000Z");
@@ -196,26 +198,60 @@ describe("simulation FIDS projection", () => {
 });
 
 describe("simulation FIDS departure observation", () => {
-  it("retains every departure crossed by an accelerated jump for 15 wall-clock seconds", () => {
+  it.each([
+    [1, 15_000],
+    [10, 1_500],
+    [60, 1_000],
+    [300, 1_000],
+  ])("scales departure visibility for %sx playback to %sms", (speed, expected) => {
+    expect(simulationDepartedVisibilityMs(speed)).toBe(expected);
+  });
+
+  it("retains every departure crossed by a jump for the playback-adjusted wall time", () => {
     vi.useFakeTimers();
     vi.setSystemTime("2026-07-24T10:00:00.000Z");
+    const visibilityMs = simulationDepartedVisibilityMs(10);
     const rotations = [
       rotation("one", 1, { departedAt: at(5) }),
       rotation("two", 2, { departedAt: at(8) }),
     ];
-    let state = createRecentDepartureState(Date.parse(at(0)));
+    let state = createRecentDepartureState(Date.parse(at(0)), visibilityMs);
     state = advanceRecentDepartures({
       state,
       rotations,
       visibleAt: Date.parse(at(10)),
       wallNow: Date.now(),
+      visibilityMs,
     });
 
-    expect(recentDepartureIds(state, Date.now())).toEqual(new Set(["one", "two"]));
-    vi.advanceTimersByTime(SIMULATION_DEPARTED_VISIBILITY_MS - 1);
-    expect(recentDepartureIds(state, Date.now())).toEqual(new Set(["one", "two"]));
+    expect(recentDepartureIds(state, Date.now(), visibilityMs)).toEqual(new Set(["one", "two"]));
+    vi.advanceTimersByTime(visibilityMs - 1);
+    expect(recentDepartureIds(state, Date.now(), visibilityMs)).toEqual(new Set(["one", "two"]));
     vi.advanceTimersByTime(1);
-    expect(recentDepartureIds(state, Date.now())).toEqual(new Set());
+    expect(recentDepartureIds(state, Date.now(), visibilityMs)).toEqual(new Set());
+  });
+
+  it("applies speed changes to visible departures without reviving expired entries", () => {
+    const departed = rotation("one", 1, { departedAt: at(5) });
+    const normalVisibilityMs = simulationDepartedVisibilityMs(1);
+    const acceleratedVisibilityMs = simulationDepartedVisibilityMs(300);
+    let state = advanceRecentDepartures({
+      state: createRecentDepartureState(Date.parse(at(0)), normalVisibilityMs),
+      rotations: [departed],
+      visibleAt: Date.parse(at(10)),
+      wallNow: 1_000,
+      visibilityMs: normalVisibilityMs,
+    });
+
+    state = advanceRecentDepartures({
+      state,
+      rotations: [departed],
+      visibleAt: Date.parse(at(10)),
+      wallNow: 2_001,
+      visibilityMs: acceleratedVisibilityMs,
+    });
+    expect(state.observedAtByRotationId).toEqual({});
+    expect(recentDepartureIds(state, 2_001, normalVisibilityMs)).toEqual(new Set());
   });
 
   it("clears observed departures on restart or backward time movement", () => {
@@ -225,6 +261,7 @@ describe("simulation FIDS departure observation", () => {
       rotations: [departed],
       visibleAt: Date.parse(at(10)),
       wallNow: 1_000,
+      visibilityMs: SIMULATION_DEPARTED_VISIBILITY_MS,
     });
 
     expect(
@@ -233,7 +270,8 @@ describe("simulation FIDS departure observation", () => {
         rotations: [departed],
         visibleAt: Date.parse(at(0)),
         wallNow: 2_000,
-      }).expiresAtByRotationId,
+        visibilityMs: SIMULATION_DEPARTED_VISIBILITY_MS,
+      }).observedAtByRotationId,
     ).toEqual({});
     expect(
       advanceRecentDepartures({
@@ -241,8 +279,9 @@ describe("simulation FIDS departure observation", () => {
         rotations: [departed],
         visibleAt: Date.parse(at(10)),
         wallNow: 2_000,
+        visibilityMs: SIMULATION_DEPARTED_MINIMUM_VISIBILITY_MS,
         reset: true,
-      }).expiresAtByRotationId,
+      }).observedAtByRotationId,
     ).toEqual({});
   });
 });
