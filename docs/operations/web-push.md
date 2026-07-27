@@ -6,11 +6,24 @@ keine zusätzliche Web-Push-Kryptobibliothek eingesetzt. Der kryptografische Reg
 `apps/worker/src/web-push-request.test.ts` entschlüsselt ein erzeugtes Paket wieder und verifiziert
 die VAPID-Signatur.
 
+## Deklarative iOS-Nachrichten
+
+Der Payload folgt dem deklarativen Format (`web_push: 8030`), damit Safari ab iOS 18.4 die
+Mitteilung ohne laufenden Service Worker anzeigt. Safari parst das Feld `navigate` ohne Basis-URL
+und verwirft die gesamte Nachricht, sobald daraus keine gültige URL entsteht; ein relativer Pfad
+ist damit unzustellbar. Der Ursprung der Statusseite wird deshalb bei der Einwilligung aus der
+Registrierungsanfrage übernommen und je Abonnement gespeichert (Migration `0051_web_push_origin.sql`).
+
+Ohne gespeicherten HTTPS-Ursprung – Bestandsabonnements vor dieser Migration sowie lokale
+HTTP-Entwicklungsumgebungen – wird bewusst der klassische Payload ohne `web_push`-Schlüssel
+gesendet. Er wird vom Service Worker angezeigt, statt von Safari verworfen zu werden. Ein solches
+Abonnement erhält seinen Ursprung bei der nächsten Einwilligung.
+
 ## Datenschutz und Aufbewahrung
 
 - Web-Push wird nur nach aktiver Zustimmung im Browser registriert.
-- Gespeichert werden Ticket-ID, Push-Endpunkt, Browser-Schlüssel, Einwilligungszeitpunkt und
-  Löschzeitpunkt – keine Namen und keine Telefonnummern.
+- Gespeichert werden Ticket-ID, Push-Endpunkt, Browser-Schlüssel, Einwilligungszeitpunkt,
+  Löschzeitpunkt und der Ursprung der Statusseite – keine Namen und keine Telefonnummern.
 - Push-Ziele liegen in einer getrennten Tabelle und werden nicht in portable R2-Sicherungen aufgenommen.
 - Vorbereitung, Aufruf und Umlaufstatus werden zunächst als deduplizierter Zustellauftrag erfasst.
   Pro Abonnement, Umlauf und Hinweistyp existiert höchstens ein Auftrag. Ohne vollständige

@@ -30,7 +30,7 @@ ermöglichen.
 | Piloten | veranstaltungsbezogene technische ID, operatives Kürzel, optionale operative Notiz, Pause/Zuordnung | keine Namen; lokale Zuordnung außerhalb des Systems kann das Kürzel pseudonym machen |
 | Geräte | technische Geräte-ID, frei wählbare technische Bezeichnung, Rolle, Aktivität, letzter Kontakt, Hash des Kopplungstokens | keine persönlichen Gerätenamen verwenden; Klartexttoken bleibt nur lokal im gekoppelten Browser |
 | Audit/Idempotenz | Zeitpunkt, technische Geräte-ID, Kommando-/Ereignistyp, Aggregat-ID, fachlicher Payload, Begründung soweit erforderlich | append-only; niemals Namen, Telefonnummern, PINs, Ticketcodes oder freie personenbezogene Angaben eintragen |
-| Web-Push | Ticket-ID, Push-Endpunkt, Browser-Schlüssel, Einwilligungs-, Lösch- und Zustellzeitpunkt | pseudonyme Online-Kontaktdaten; getrennte Tabellen, nicht Bestandteil portabler R2-Sicherungen |
+| Web-Push | Ticket-ID, Push-Endpunkt, Browser-Schlüssel, Ursprung der Statusseite, Einwilligungs-, Lösch- und Zustellzeitpunkt | pseudonyme Online-Kontaktdaten; getrennte Tabellen, nicht Bestandteil portabler R2-Sicherungen |
 | Prognose/Berichte | Zeitfenster, Prozessdauern, Auslastung, Zählwerte, besondere betriebliche Ereignisse | aggregierte bzw. pseudonyme Betriebsdaten; Rohdatenexport enthält keine Klartext-Ticketcodes |
 
 ## 3. Daten außerhalb des fachlichen D1-Schemas
