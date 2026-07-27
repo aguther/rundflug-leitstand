@@ -112,6 +112,7 @@ import {
   pushDeleteAfter,
   pushRetentionDays,
   queueEligiblePreparationNotifications,
+  vapidConfiguration,
 } from "./web-push";
 
 const app = new Hono<{
@@ -5888,14 +5889,17 @@ app.get("/api/public/groups/:groupCode", async (context) => {
 });
 
 app.get("/api/public/push/config", (context) => {
-  if (!context.env.VAPID_PUBLIC_KEY) {
+  // Ein öffentlicher Schlüssel allein macht noch keinen Versand möglich: Ohne privaten Schlüssel
+  // und Betreiberkontakt bliebe jede Einwilligung folgenlos.
+  const vapid = vapidConfiguration(context.env);
+  if (!vapid) {
     return context.json(
       { error: { code: "PUSH_NOT_CONFIGURED", message: "Web-Push ist noch nicht eingerichtet." } },
       503,
     );
   }
   return context.json({
-    publicKey: context.env.VAPID_PUBLIC_KEY,
+    publicKey: vapid.publicKey,
     retentionDays: pushRetentionDays(context.env.PUSH_RETENTION_DAYS),
   });
 });
