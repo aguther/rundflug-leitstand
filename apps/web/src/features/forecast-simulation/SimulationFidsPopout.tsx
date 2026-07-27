@@ -11,12 +11,14 @@ import {
 import { createPortal } from "react-dom";
 import { useTheme } from "../../design-system/theme";
 import { FidsBoardPresentation } from "../../fids-display";
+import fidsStylesheetUrl from "../fids/fids-v12.css?url";
 import { SIMULATION_PRESET_LABELS, type SimulationResult } from "./model";
 import {
   advanceRecentDepartures,
   createRecentDepartureState,
   createSimulationFidsBoard,
   recentDepartureIds,
+  simulationDepartedVisibilityMs,
 } from "./simulation-fids";
 
 const POPUP_NAME = "rundflug-simulation-fids";
@@ -24,7 +26,6 @@ const POPUP_FEATURES = "popup=yes,width=1600,height=900,resizable=yes,scrollbars
 const POPUP_STYLE_PATHS = [
   "/design-system/tokens.css",
   "/styles.css",
-  "/features/fids/fids-v12.css",
   "/design-system/base.css",
 ] as const;
 
@@ -40,6 +41,7 @@ export interface SimulationFidsPopoutHandle {
 export interface SimulationFidsPopoutProps {
   result: SimulationResult;
   clockMs: number;
+  speed: number;
   visibleAt: number;
   onWindowError: (message: string | null) => void;
 }
@@ -72,12 +74,20 @@ function copyPresentationHead(target: Document): void {
   }
 }
 
+function appendPresentationStylesheet(target: Document, stylesheetUrl: string): void {
+  const stylesheet = target.createElement("link");
+  stylesheet.rel = "stylesheet";
+  stylesheet.href = new URL(stylesheetUrl, window.location.href).href;
+  target.head.append(stylesheet);
+}
+
 function preparePopup(popup: Window): PopupTarget {
   const target = popup.document;
   target.documentElement.lang = "de";
   target.head.replaceChildren();
   target.body.replaceChildren();
   copyPresentationHead(target);
+  appendPresentationStylesheet(target, fidsStylesheetUrl);
   target.title = "Simuliertes FIDS · Rundflug-Leitstand";
   const root = target.createElement("div");
   root.id = "simulation-fids-root";
@@ -88,13 +98,16 @@ function preparePopup(popup: Window): PopupTarget {
 export const SimulationFidsPopout = forwardRef<
   SimulationFidsPopoutHandle,
   SimulationFidsPopoutProps
->(function SimulationFidsPopout({ result, clockMs, visibleAt, onWindowError }, ref) {
+>(function SimulationFidsPopout({ result, clockMs, speed, visibleAt, onWindowError }, ref) {
   const { resolved } = useTheme();
   const popupRef = useRef<Window | null>(null);
   const resultRef = useRef(result);
   const [target, setTarget] = useState<PopupTarget | null>(null);
   const [wallNow, setWallNow] = useState(Date.now());
-  const [departures, setDepartures] = useState(() => createRecentDepartureState(visibleAt));
+  const departedVisibilityMs = simulationDepartedVisibilityMs(speed);
+  const [departures, setDepartures] = useState(() =>
+    createRecentDepartureState(visibleAt, departedVisibilityMs),
+  );
 
   const open = useCallback(() => {
     const current = popupRef.current;
@@ -135,10 +148,11 @@ export const SimulationFidsPopout = forwardRef<
         rotations: result.rotations,
         visibleAt,
         wallNow: Date.now(),
+        visibilityMs: departedVisibilityMs,
         reset,
       }),
     );
-  }, [result, target, visibleAt]);
+  }, [departedVisibilityMs, result, target, visibleAt]);
 
   useEffect(() => {
     if (!target) return;
@@ -167,7 +181,10 @@ export const SimulationFidsPopout = forwardRef<
     };
   }, []);
 
-  const recentIds = useMemo(() => recentDepartureIds(departures, wallNow), [departures, wallNow]);
+  const recentIds = useMemo(
+    () => recentDepartureIds(departures, wallNow, departedVisibilityMs),
+    [departedVisibilityMs, departures, wallNow],
+  );
   const board = useMemo(
     () =>
       createSimulationFidsBoard({
@@ -180,7 +197,7 @@ export const SimulationFidsPopout = forwardRef<
   const preferences = useMemo<FidsPreferences>(
     () => ({
       visibleRows: 20,
-      layout: "SINGLE",
+      layout: "DOUBLE",
       theme: resolved === "dark" ? "DARK" : "LIGHT",
       version: 0,
     }),
@@ -196,8 +213,8 @@ export const SimulationFidsPopout = forwardRef<
       connectionTone="simulation"
       error={null}
       filterDeparted={false}
-      footerNote="Virtuelle Zeit"
       preferences={preferences}
+      showFooter={false}
       simulationBanner="Nur Simulation – keine Betriebsdaten"
       subtitle={`Abflugtafel · ${SIMULATION_PRESET_LABELS[result.config.preset]}`}
     />,

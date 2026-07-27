@@ -9,19 +9,33 @@ import type {
 
 const MINUTE_MS = 60_000;
 export const SIMULATION_DEPARTED_VISIBILITY_MS = 15_000;
+export const SIMULATION_DEPARTED_MINIMUM_VISIBILITY_MS = 1_000;
 
 type RotationLifecycle = "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
 type PublicGroup = PublicBoard["groups"][number];
 
 export interface RecentDepartureState {
   previousVisibleAt: number;
-  expiresAtByRotationId: Readonly<Record<string, number>>;
+  observedAtByRotationId: Readonly<Record<string, number>>;
+  visibilityMs: number;
 }
 
-export function createRecentDepartureState(visibleAt: number): RecentDepartureState {
+export function simulationDepartedVisibilityMs(speed: number): number {
+  const normalizedSpeed = Number.isFinite(speed) && speed > 0 ? speed : 1;
+  return Math.max(
+    SIMULATION_DEPARTED_MINIMUM_VISIBILITY_MS,
+    SIMULATION_DEPARTED_VISIBILITY_MS / normalizedSpeed,
+  );
+}
+
+export function createRecentDepartureState(
+  visibleAt: number,
+  visibilityMs = SIMULATION_DEPARTED_VISIBILITY_MS,
+): RecentDepartureState {
   return {
     previousVisibleAt: visibleAt,
-    expiresAtByRotationId: {},
+    observedAtByRotationId: {},
+    visibilityMs,
   };
 }
 
@@ -30,36 +44,41 @@ export function advanceRecentDepartures(input: {
   rotations: readonly SimulationRotation[];
   visibleAt: number;
   wallNow: number;
+  visibilityMs: number;
   reset?: boolean;
 }): RecentDepartureState {
   if (input.reset || input.visibleAt < input.state.previousVisibleAt) {
-    return createRecentDepartureState(input.visibleAt);
+    return createRecentDepartureState(input.visibleAt, input.visibilityMs);
   }
-  const expiresAtByRotationId = Object.fromEntries(
-    Object.entries(input.state.expiresAtByRotationId).filter(([, expiresAt]) => {
-      return expiresAt > input.wallNow;
+  const effectiveVisibilityMs = Math.min(input.state.visibilityMs, input.visibilityMs);
+  const observedAtByRotationId = Object.fromEntries(
+    Object.entries(input.state.observedAtByRotationId).filter(([, observedAt]) => {
+      return input.wallNow - observedAt < effectiveVisibilityMs;
     }),
   );
   for (const rotation of input.rotations) {
     if (!rotation.departedAt) continue;
     const departedAt = Date.parse(rotation.departedAt);
     if (departedAt > input.state.previousVisibleAt && departedAt <= input.visibleAt) {
-      expiresAtByRotationId[rotation.id] = input.wallNow + SIMULATION_DEPARTED_VISIBILITY_MS;
+      observedAtByRotationId[rotation.id] = input.wallNow;
     }
   }
   return {
     previousVisibleAt: input.visibleAt,
-    expiresAtByRotationId,
+    observedAtByRotationId,
+    visibilityMs: input.visibilityMs,
   };
 }
 
 export function recentDepartureIds(
   state: RecentDepartureState,
   wallNow: number,
+  visibilityMs = state.visibilityMs,
 ): ReadonlySet<string> {
+  const effectiveVisibilityMs = Math.min(state.visibilityMs, visibilityMs);
   return new Set(
-    Object.entries(state.expiresAtByRotationId)
-      .filter(([, expiresAt]) => expiresAt > wallNow)
+    Object.entries(state.observedAtByRotationId)
+      .filter(([, observedAt]) => wallNow - observedAt < effectiveVisibilityMs)
       .map(([rotationId]) => rotationId),
   );
 }
