@@ -1,7 +1,15 @@
 self.PUBLIC_STATUS_PATH = /^\/(?:ticket|gruppe)\/[A-Z2-9]{12,32}$/;
 
 function safePublicStatusPath(value) {
-  return typeof value === "string" && self.PUBLIC_STATUS_PATH.test(value) ? value : null;
+  if (typeof value !== "string") return null;
+  let target;
+  try {
+    target = new URL(value, self.location.origin);
+  } catch {
+    return null;
+  }
+  if (target.origin !== self.location.origin) return null;
+  return self.PUBLIC_STATUS_PATH.test(target.pathname) ? target.pathname : null;
 }
 
 function pushMessage(data) {

@@ -11,6 +11,7 @@ interface StoredPushSubscription {
   target_kind: "TICKET" | "GROUP";
   ticket_public_code: string;
   group_public_code: string | null;
+  origin: string | null;
 }
 
 const DEFAULT_PUSH_RETENTION_DAYS = 7;
@@ -43,17 +44,36 @@ export function publicPushTargetPath(input: {
   return input.targetKind === "GROUP" ? `/gruppe/${code}` : `/ticket/${code}`;
 }
 
-export function publicPushPayload(eventType: PushNotificationType, targetPath: string): string {
+export function publicPushNavigateOrigin(value: string | null): string | null {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && url.origin === value ? url.origin : null;
+  } catch {
+    return null;
+  }
+}
+
+export function publicPushPayload(
+  eventType: PushNotificationType,
+  targetPath: string,
+  origin: string | null,
+): string {
+  const notification = {
+    title: "Rundflug-Leitstand",
+    lang: "de",
+    dir: "ltr",
+    body: pushMessageFor(eventType),
+    data: { url: targetPath },
+  };
+  const navigateOrigin = publicPushNavigateOrigin(origin);
+  // Safari parst `navigate` ohne Basis-URL und verwirft eine deklarative Nachricht vollständig,
+  // sobald daraus keine gültige URL entsteht. Ohne bekannten Ursprung bleibt deshalb nur der
+  // klassische Payload, den der Service Worker anzeigt.
+  if (!navigateOrigin) return JSON.stringify(notification);
   return JSON.stringify({
     web_push: 8030,
-    notification: {
-      title: "Rundflug-Leitstand",
-      lang: "de",
-      dir: "ltr",
-      body: pushMessageFor(eventType),
-      navigate: targetPath,
-      data: { url: targetPath },
-    },
+    notification: { ...notification, navigate: `${navigateOrigin}${targetPath}` },
   });
 }
 
@@ -170,7 +190,7 @@ export async function sendRotationPushNotifications(
     privateKey: env.VAPID_PRIVATE_KEY,
   };
   const subscriptions = await env.DB.prepare(
-    `SELECT d.id AS delivery_id, w.id, w.endpoint, w.p256dh, w.auth, w.target_kind,
+    `SELECT d.id AS delivery_id, w.id, w.endpoint, w.p256dh, w.auth, w.target_kind, w.origin,
             t.public_code AS ticket_public_code,
             tg.public_status_code AS group_public_code
        FROM web_push_deliveries d
@@ -195,7 +215,7 @@ export async function sendRotationPushNotifications(
       });
       if (!targetPath) return;
       const payload = await buildWebPushRequest({
-        data: publicPushPayload(eventType, targetPath),
+        data: publicPushPayload(eventType, targetPath, subscription.origin),
         endpoint: subscription.endpoint,
         p256dh: subscription.p256dh,
         auth: subscription.auth,
