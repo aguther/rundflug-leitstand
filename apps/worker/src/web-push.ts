@@ -1,4 +1,5 @@
 import { assessForecastFreshness } from "@rundflug/domain";
+import { safeErrorMessage } from "./snapshot";
 import type { Env } from "./types";
 import { buildWebPushRequest } from "./web-push-request";
 
@@ -12,6 +13,27 @@ interface StoredPushSubscription {
   ticket_public_code: string;
   group_public_code: string | null;
   origin: string | null;
+}
+
+export interface VapidConfiguration {
+  subject: string;
+  publicKey: string;
+  privateKey: string;
+}
+
+/** Ein Versand ist erst mit allen drei Werten möglich; die Statusseite darf nichts anderes melden. */
+export function vapidConfiguration(env: Env): VapidConfiguration | null {
+  if (!env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_KEY || !env.VAPID_SUBJECT) return null;
+  return {
+    subject: env.VAPID_SUBJECT,
+    publicKey: env.VAPID_PUBLIC_KEY,
+    privateKey: env.VAPID_PRIVATE_KEY,
+  };
+}
+
+/** Laufzeitfehler können die aufgerufene URL führen; Push-Endpunkte gehören nie in Protokolle. */
+export function pushErrorMessage(reason: unknown): string {
+  return safeErrorMessage(reason).replaceAll(/https?:\/\/\S+/g, "[endpunkt]");
 }
 
 const DEFAULT_PUSH_RETENTION_DAYS = 7;
@@ -182,13 +204,18 @@ export async function sendRotationPushNotifications(
   )
     .bind(rotationId, eventType, now)
     .run();
-  if (!env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_KEY || !env.VAPID_SUBJECT)
+  const vapid = vapidConfiguration(env);
+  if (!vapid) {
+    console.warn(
+      JSON.stringify({
+        level: "warn",
+        code: "WEB_PUSH_NOT_CONFIGURED",
+        notificationType: eventType,
+        queued: queued.meta.changes,
+      }),
+    );
     return queued.meta.changes;
-  const vapid = {
-    subject: env.VAPID_SUBJECT,
-    publicKey: env.VAPID_PUBLIC_KEY,
-    privateKey: env.VAPID_PRIVATE_KEY,
-  };
+  }
   const subscriptions = await env.DB.prepare(
     `SELECT d.id AS delivery_id, w.id, w.endpoint, w.p256dh, w.auth, w.target_kind, w.origin,
             t.public_code AS ticket_public_code,
@@ -208,52 +235,88 @@ export async function sendRotationPushNotifications(
     .all<StoredPushSubscription>();
   await Promise.allSettled(
     subscriptions.results.map(async (subscription) => {
-      const targetPath = publicPushTargetPath({
-        targetKind: subscription.target_kind,
-        ticketCode: subscription.ticket_public_code,
-        groupCode: subscription.group_public_code,
-      });
-      if (!targetPath) return;
-      const payload = await buildWebPushRequest({
-        data: publicPushPayload(eventType, targetPath, subscription.origin),
-        endpoint: subscription.endpoint,
-        p256dh: subscription.p256dh,
-        auth: subscription.auth,
-        ttl: 300,
-        urgency: pushUrgencyFor(eventType),
-        vapid,
-      });
-      const requestBody = new ArrayBuffer(payload.body.byteLength);
-      new Uint8Array(requestBody).set(payload.body);
-      const headers = new Headers();
-      for (const [name, value] of Object.entries(payload.headers)) {
-        if (value !== undefined) headers.set(name, value);
-      }
-      const response = await fetch(subscription.endpoint, {
-        method: payload.method,
-        headers,
-        body: requestBody,
-      });
-      if (response.status === 404 || response.status === 410) {
-        await env.DB.batch([
-          env.DB.prepare(
-            "UPDATE web_push_subscriptions SET status = 'EXPIRED', updated_at = ?1 WHERE id = ?2",
-          ).bind(new Date().toISOString(), subscription.id),
-          env.DB.prepare(
-            "UPDATE web_push_deliveries SET status = 'EXPIRED', last_attempt_at = ?1 WHERE id = ?2",
-          ).bind(new Date().toISOString(), subscription.delivery_id),
-        ]);
-      } else if (response.ok) {
-        await env.DB.prepare(
-          `UPDATE web_push_deliveries SET status = 'DELIVERED', last_attempt_at = ?1,
+      try {
+        const targetPath = publicPushTargetPath({
+          targetKind: subscription.target_kind,
+          ticketCode: subscription.ticket_public_code,
+          groupCode: subscription.group_public_code,
+        });
+        if (!targetPath) return;
+        const payload = await buildWebPushRequest({
+          data: publicPushPayload(eventType, targetPath, subscription.origin),
+          endpoint: subscription.endpoint,
+          p256dh: subscription.p256dh,
+          auth: subscription.auth,
+          ttl: 300,
+          urgency: pushUrgencyFor(eventType),
+          vapid,
+        });
+        const requestBody = new ArrayBuffer(payload.body.byteLength);
+        new Uint8Array(requestBody).set(payload.body);
+        const headers = new Headers();
+        for (const [name, value] of Object.entries(payload.headers)) {
+          if (value !== undefined) headers.set(name, value);
+        }
+        const response = await fetch(subscription.endpoint, {
+          method: payload.method,
+          headers,
+          body: requestBody,
+        });
+        // Der Push-Dienst ist der einzige Zeuge einer abgelehnten Zustellung; ohne dieses
+        // Protokoll bleibt die Ablehnung in der Zustellzeile nicht von einem Netzfehler
+        // unterscheidbar. Der Endpunkt selbst bleibt außen vor, nur sein Dienst wird benannt.
+        const pushService = new URL(subscription.endpoint).host;
+        if (response.status === 404 || response.status === 410) {
+          console.info(
+            JSON.stringify({
+              level: "info",
+              code: "WEB_PUSH_SUBSCRIPTION_EXPIRED",
+              deliveryId: subscription.delivery_id,
+              notificationType: eventType,
+              status: response.status,
+              pushService,
+            }),
+          );
+          await env.DB.batch([
+            env.DB.prepare(
+              "UPDATE web_push_subscriptions SET status = 'EXPIRED', updated_at = ?1 WHERE id = ?2",
+            ).bind(new Date().toISOString(), subscription.id),
+            env.DB.prepare(
+              "UPDATE web_push_deliveries SET status = 'EXPIRED', last_attempt_at = ?1 WHERE id = ?2",
+            ).bind(new Date().toISOString(), subscription.delivery_id),
+          ]);
+        } else if (response.ok) {
+          await env.DB.prepare(
+            `UPDATE web_push_deliveries SET status = 'DELIVERED', last_attempt_at = ?1,
              delivered_at = ?1 WHERE id = ?2`,
-        )
-          .bind(new Date().toISOString(), subscription.delivery_id)
-          .run();
-      } else {
-        await env.DB.prepare("UPDATE web_push_deliveries SET last_attempt_at = ?1 WHERE id = ?2")
-          .bind(new Date().toISOString(), subscription.delivery_id)
-          .run();
+          )
+            .bind(new Date().toISOString(), subscription.delivery_id)
+            .run();
+        } else {
+          console.warn(
+            JSON.stringify({
+              level: "warn",
+              code: "WEB_PUSH_DELIVERY_REJECTED",
+              deliveryId: subscription.delivery_id,
+              notificationType: eventType,
+              status: response.status,
+              pushService,
+            }),
+          );
+          await env.DB.prepare("UPDATE web_push_deliveries SET last_attempt_at = ?1 WHERE id = ?2")
+            .bind(new Date().toISOString(), subscription.delivery_id)
+            .run();
+        }
+      } catch (reason: unknown) {
+        console.error(
+          JSON.stringify({
+            level: "error",
+            code: "WEB_PUSH_DELIVERY_FAILED",
+            deliveryId: subscription.delivery_id,
+            notificationType: eventType,
+            message: pushErrorMessage(reason),
+          }),
+        );
       }
     }),
   );

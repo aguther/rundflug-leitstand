@@ -31,6 +31,19 @@ Geheimnis des jeweiligen Browsers. Ein unbekannter oder abgelaufener Vorgänger 
 abgewiesen. Safari unterstützt `pushsubscriptionchange` bislang nicht zuverlässig – dort bleibt der
 Widerruf beim nächsten Zustellversuch (HTTP 404/410) der maßgebliche Weg.
 
+## Betriebsprotokolle
+
+Der Versand protokolliert ausschließlich pseudonyme Felder – Zustellauftrag, Hinweistyp,
+HTTP-Status und den Namen des Push-Dienstes. Endpunkte und Schlüssel bleiben ausgeschlossen; auch
+Fehlermeldungen werden vor der Ausgabe um URLs bereinigt.
+
+| Code | Bedeutung |
+| --- | --- |
+| `WEB_PUSH_NOT_CONFIGURED` | VAPID unvollständig; Aufträge bleiben vorgemerkt, es geht nichts raus |
+| `WEB_PUSH_DELIVERY_REJECTED` | Push-Dienst hat abgelehnt, etwa HTTP 403 bei unpassendem Schlüsselpaar |
+| `WEB_PUSH_SUBSCRIPTION_EXPIRED` | Ziel ist beim Dienst erloschen und wurde stillgelegt |
+| `WEB_PUSH_DELIVERY_FAILED` | Versand ist vor der Antwort gescheitert, etwa durch einen Netzfehler |
+
 ## Datenschutz und Aufbewahrung
 
 - Web-Push wird nur nach aktiver Zustimmung im Browser registriert.
@@ -69,8 +82,10 @@ Argument übergeben werden; private Schlüssel oder andere Secrets dürfen nie a
 npm run cloudflare:configure-push -- --subject https://<worker-domain>/
 ```
 
-Anschließend muss `/api/public/push/config` mit HTTP 200 antworten. HTTP 503 mit
-`PUSH_NOT_CONFIGURED` bedeutet, dass die V1-Browserbenachrichtigung noch nicht betriebsbereit ist.
+Anschließend muss `/api/public/push/config` mit HTTP 200 antworten. Die Auskunft prüft alle drei
+Werte, nicht nur den öffentlichen Schlüssel: Eine unvollständige Einrichtung meldet HTTP 503 mit
+`PUSH_NOT_CONFIGURED` und die Statusseite bietet die Einwilligung gar nicht erst an, statt sie
+folgenlos entgegenzunehmen.
 
 Die D1-Migrationen `0006_web_push.sql` und `0021_web_push_delivery_queue.sql` müssen vor dem ersten
 Registrierungs- und Zustellungstest in der Zielumgebung angewendet sein.
