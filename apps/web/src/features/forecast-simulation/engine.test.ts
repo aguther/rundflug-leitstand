@@ -250,6 +250,77 @@ describe("local forecast simulation", () => {
     );
   });
 
+  it("applies imported recurring aircraft and pilot rules deterministically without generic duplicates", () => {
+    const config = operationalConfig();
+    config.plannedOperations = [];
+    config.realityModel.incidents.refueling.enabled = true;
+    config.realityModel.incidents.refueling.everyRotations = 1;
+    config.realityModel.incidents.plannedPause.enabled = true;
+    config.realityModel.incidents.plannedPause.everyOperatingMinutes = 1;
+    config.recurringRules = [
+      {
+        key: "rule-aircraft-refuel",
+        scopeType: "AIRCRAFT",
+        scopeId: "aircraft-a",
+        kind: "REFUELING",
+        triggerMetric: "COMPLETED_ROTATIONS",
+        intervalValue: 1,
+        progressValue: 0,
+        minimumDurationMinutes: 5,
+        typicalDurationMinutes: 5,
+        maximumDurationMinutes: 5,
+      },
+      {
+        key: "rule-pilot-pause",
+        scopeType: "PILOT",
+        scopeId: "pilot-a",
+        kind: "PAUSE",
+        triggerMetric: "COMPLETED_ROTATIONS",
+        intervalValue: 1,
+        progressValue: 0,
+        minimumDurationMinutes: 10,
+        typicalDurationMinutes: 10,
+        maximumDurationMinutes: 10,
+      },
+      {
+        key: "rule-aircraft-pause",
+        scopeType: "AIRCRAFT",
+        scopeId: "aircraft-a",
+        kind: "PAUSE",
+        triggerMetric: "OPERATING_MINUTES",
+        intervalValue: 30,
+        progressValue: 0,
+        minimumDurationMinutes: 6,
+        typicalDurationMinutes: 8,
+        maximumDurationMinutes: 10,
+      },
+    ];
+
+    const first = runSimulation(config);
+    const second = runSimulation(structuredClone(config));
+    expect(JSON.stringify(second)).toBe(JSON.stringify(first));
+    const recurringStarts = first.events.filter(
+      (event) =>
+        event.type === "PLANNED_OPERATION_STARTED" &&
+        (event.plannedOperationId?.startsWith("rule-aircraft-refuel:") ||
+          event.plannedOperationId?.startsWith("rule-pilot-pause:")),
+    );
+    expect(recurringStarts.length).toBeGreaterThanOrEqual(2);
+    expect(
+      first.plannedOperations?.some((plan) => plan.key.startsWith("rule-aircraft-refuel:")),
+    ).toBe(true);
+    expect(
+      first.events.some(
+        (event) => event.type === "REFUELING_STARTED" && event.aircraftId === "aircraft-a",
+      ),
+    ).toBe(false);
+    expect(
+      first.events.some(
+        (event) => event.type === "PLANNED_PAUSE_STARTED" && event.aircraftId === "aircraft-a",
+      ),
+    ).toBe(false);
+  });
+
   it(
     "captures the approved preset baseline",
     () => {

@@ -233,28 +233,35 @@
 .event-basics-grid {
   display: grid;
   gap: 7px;
+  margin: 0;
 }
 
-.event-basics-grid .ds-field {
+.event-basics-grid > div {
+  min-width: 0;
+  display: grid;
   grid-template-columns: 138px minmax(0, 1fr);
   align-items: center;
   gap: 8px;
   margin: 0;
 }
 
-.event-basics-grid .ds-field-label {
+.event-basics-grid dt {
+  margin: 0;
+  color: var(--ui-text);
   font-size: 0.75rem;
+  font-weight: 650;
 }
 
-.event-basics-grid input[readonly] {
-  min-height: var(--control-default);
+.event-basics-grid dd {
+  min-width: 0;
+  margin: 0;
   color: var(--ui-text);
-  background: var(--ui-surface-subtle);
+  overflow-wrap: anywhere;
 }
 
 .event-timing-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: 10px;
   margin-top: 12px;
   padding-top: 12px;
@@ -642,7 +649,7 @@
     width: 100%;
   }
 
-  .event-basics-grid .ds-field {
+  .event-basics-grid > div {
     grid-template-columns: 1fr;
     gap: 4px;
   }

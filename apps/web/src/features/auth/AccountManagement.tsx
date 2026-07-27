@@ -1,5 +1,5 @@
 import type { OperatorAccountSummary, OperatorRole } from "@rundflug/contracts";
-import { KeyRound, Pencil, Plus, RotateCcw, Search, Trash2, UserRoundCog } from "lucide-react";
+import { KeyRound, Pencil, Plus, RotateCcw, Trash2, UserRoundCog } from "lucide-react";
 import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useActionMessageBridge } from "../../app/PageNotifications";
 import {
@@ -8,6 +8,7 @@ import {
   DataTable,
   IconButton,
   ModalDialog,
+  SearchField,
   SelectField,
   StatusPill,
   TextField,
@@ -30,12 +31,17 @@ const assignableRoles: OperatorRole[] = [
   "DISPLAY",
 ];
 
-export function AccountManagement() {
+export function AccountManagement({
+  createOpen,
+  onCreateOpenChange,
+}: {
+  createOpen: boolean;
+  onCreateOpenChange: (open: boolean) => void;
+}) {
   const { session } = useAuth();
   const [accounts, setAccounts] = useState<OperatorAccountSummary[]>([]);
   const [role, setRole] = useState<OperatorRole>("FLIGHT_LINE");
   const [pin, setPin] = useState("");
-  const [createOpen, setCreateOpen] = useState(false);
   const [selected, setSelected] = useState<OperatorAccountSummary | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<OperatorAccountSummary | null>(null);
   const [selectedActive, setSelectedActive] = useState(true);
@@ -75,7 +81,7 @@ export function AccountManagement() {
     try {
       await createManagedAccount({ role, pin });
       setPin("");
-      setCreateOpen(false);
+      onCreateOpenChange(false);
       setMessage("Konto wurde angelegt.");
       await refresh();
     } catch (cause) {
@@ -195,32 +201,16 @@ export function AccountManagement() {
   ];
 
   return (
-    <section className="account-management" aria-labelledby="account-management-title">
-      <header className="account-management-header">
-        <div>
-          <div className="account-title-row">
-            <h2 id="account-management-title">Konten</h2>
-            <span>{accounts.length}</span>
-          </div>
-          <p>Pseudonyme Zugänge, Rollen und aktive Sitzungen verwalten.</p>
-        </div>
-        <Button onClick={() => setCreateOpen(true)} type="button" variant="primary">
-          <Plus aria-hidden="true" /> Konto hinzufügen
-        </Button>
-      </header>
-
+    <section className="account-management" aria-label="Konten">
       <div className="account-table-card">
         <div className="account-table-toolbar">
-          <label className="account-search">
-            <Search aria-hidden="true" />
-            <span className="visually-hidden">Konten durchsuchen</span>
-            <input
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Konten durchsuchen"
-              type="search"
-              value={search}
-            />
-          </label>
+          <SearchField
+            className="account-search"
+            label="Konten durchsuchen"
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Konten durchsuchen"
+            value={search}
+          />
           <label className="account-role-filter">
             <span className="visually-hidden">Nach Rolle filtern</span>
             <select
@@ -235,6 +225,15 @@ export function AccountManagement() {
               ))}
             </select>
           </label>
+          <Button
+            className="account-create-button"
+            onClick={() => onCreateOpenChange(true)}
+            size="compact"
+            type="button"
+            variant="primary"
+          >
+            <Plus aria-hidden="true" /> Konto hinzufügen
+          </Button>
         </div>
         <DataTable
           className="account-table"
@@ -251,7 +250,7 @@ export function AccountManagement() {
                   : "Passen Sie Suche oder Rollenfilter an."}
               </p>
               {accounts.length === 0 ? (
-                <Button onClick={() => setCreateOpen(true)} type="button" variant="secondary">
+                <Button onClick={() => onCreateOpenChange(true)} type="button" variant="secondary">
                   <Plus aria-hidden="true" /> Erstes Konto hinzufügen
                 </Button>
               ) : (
@@ -310,7 +309,7 @@ export function AccountManagement() {
           <>
             <Button
               disabled={busyAction !== null}
-              onClick={() => setCreateOpen(false)}
+              onClick={() => onCreateOpenChange(false)}
               type="button"
               variant="secondary"
             >
@@ -328,7 +327,7 @@ export function AccountManagement() {
           </>
         }
         initialFocusSelector="#new-account-role"
-        onClose={() => setCreateOpen(false)}
+        onClose={() => onCreateOpenChange(false)}
         open={createOpen}
         size="default"
         title="Konto hinzufügen"

@@ -59,6 +59,7 @@ export interface ForecastTimelineEventInput {
   eventId: string;
   now: string;
   plannedOperationsStartAt?: string | null;
+  plannedOperationsEndAt?: string | null;
   operationalInterrupted: boolean;
   emergencyMode: boolean;
   plannedBoardingMinutes: number;
@@ -74,6 +75,8 @@ export interface ForecastTimelineRotationInput {
   departedAt: string | null;
   landedAt: string | null;
   resourceGroupId: string;
+  aircraftId?: string | null;
+  pilotId?: string | null;
   resourceGroupStatus: "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED";
   queueSequence: number;
   referenceDurationMinutes: number;
@@ -82,6 +85,7 @@ export interface ForecastTimelineRotationInput {
   predictedDepartureAt: string | null;
   predictedLandingAt: string | null;
   predictedCompletionAt: string | null;
+  constraints?: readonly ForecastAvailabilityConstraintInput[];
 }
 
 export interface ForecastTimelineDurationSample {
@@ -106,6 +110,9 @@ export interface ForecastAvailabilityConstraintInput {
   minimumDurationMinutes: number;
   typicalDurationMinutes: number;
   maximumDurationMinutes: number;
+  effectMode?: "BLOCKING" | "SLOWDOWN";
+  durationMultiplierPercent?: number | null;
+  active?: boolean;
   overdue?: boolean;
 }
 
@@ -115,6 +122,18 @@ export interface ForecastAvailabilityLaneInput {
   availableExpectedAt: string;
   availableUpperAt: string;
   constraints?: readonly ForecastAvailabilityConstraintInput[];
+  recurringConstraints?: readonly ForecastRecurringConstraintInput[];
+}
+
+export interface ForecastRecurringConstraintInput {
+  id: string;
+  triggerMetric: "COMPLETED_ROTATIONS" | "OPERATING_MINUTES";
+  intervalValue: number;
+  progressValue: number;
+  minimumDurationMinutes: number;
+  typicalDurationMinutes: number;
+  maximumDurationMinutes: number;
+  active?: boolean;
 }
 
 export type ForecastDataBasisScope =
@@ -199,6 +218,9 @@ export interface QueueAvailabilityConstraint {
   minimumDurationMinutes: number;
   typicalDurationMinutes: number;
   maximumDurationMinutes: number;
+  effectMode: "BLOCKING" | "SLOWDOWN";
+  durationMultiplierPercent: number | null;
+  active: boolean;
 }
 
 export interface QueueAvailabilityLane {
@@ -208,12 +230,31 @@ export interface QueueAvailabilityLane {
   upperMinutes: number;
   varianceMinutesSquared: number;
   constraints: QueueAvailabilityConstraint[];
+  recurringConstraints: QueueRecurringConstraint[];
+}
+
+export interface QueueRecurringConstraint {
+  id: string;
+  triggerMetric: "COMPLETED_ROTATIONS" | "OPERATING_MINUTES";
+  intervalValue: number;
+  lowerProgress: number;
+  expectedProgress: number;
+  upperProgress: number;
+  minimumDurationMinutes: number;
+  typicalDurationMinutes: number;
+  maximumDurationMinutes: number;
+  active: boolean;
 }
 
 export function createQueueAvailability(input: {
   activeAircraft: number;
   busyAircraftMinutes: readonly number[];
-  lanes?: readonly Omit<QueueAvailabilityLane, "varianceMinutesSquared">[];
+  lanes?: readonly (Omit<
+    QueueAvailabilityLane,
+    "varianceMinutesSquared" | "recurringConstraints"
+  > & {
+    recurringConstraints?: readonly QueueRecurringConstraint[];
+  })[];
 }): QueueAvailabilityState {
   if (input.lanes && input.lanes.length > 0) {
     const lanes = input.lanes.map((lane) => ({
@@ -227,6 +268,7 @@ export function createQueueAvailability(input: {
         lane.upperMinutes,
       ),
       constraints: [...lane.constraints],
+      recurringConstraints: [...(lane.recurringConstraints ?? [])],
     }));
     return availabilityFromLanes(lanes);
   }
@@ -245,8 +287,93 @@ export function createQueueAvailability(input: {
       upperMinutes: minutes,
       varianceMinutesSquared: 0,
       constraints: [],
+      recurringConstraints: [],
     })),
   );
+}
+
+function applyDueRecurringConstraints(
+  lane: QueueAvailabilityLane,
+  operationsEndMinutes: number | null,
+): QueueAvailabilityLane {
+  if (operationsEndMinutes !== null && lane.expectedMinutes >= operationsEndMinutes) {
+    return lane;
+  }
+  const due = lane.recurringConstraints.filter(
+    (constraint) =>
+      constraint.active &&
+      (constraint.lowerProgress >= constraint.intervalValue ||
+        constraint.expectedProgress >= constraint.intervalValue ||
+        constraint.upperProgress >= constraint.intervalValue),
+  );
+  if (due.length === 0) return lane;
+
+  const lowerDuration = Math.max(
+    0,
+    ...due
+      .filter((constraint) => constraint.lowerProgress >= constraint.intervalValue)
+      .map((constraint) => constraint.minimumDurationMinutes),
+  );
+  const expectedDuration = Math.max(
+    0,
+    ...due
+      .filter((constraint) => constraint.expectedProgress >= constraint.intervalValue)
+      .map((constraint) => constraint.typicalDurationMinutes),
+  );
+  const upperDuration = Math.max(
+    0,
+    ...due
+      .filter((constraint) => constraint.upperProgress >= constraint.intervalValue)
+      .map((constraint) => constraint.maximumDurationMinutes),
+  );
+  const lowerMinutes = lane.lowerMinutes + lowerDuration;
+  const expectedMinutes = Math.max(lowerMinutes, lane.expectedMinutes + expectedDuration);
+  const upperMinutes = Math.max(expectedMinutes, lane.upperMinutes + upperDuration);
+  return {
+    ...lane,
+    lowerMinutes,
+    expectedMinutes,
+    upperMinutes,
+    varianceMinutesSquared: Math.max(
+      lane.varianceMinutesSquared,
+      intervalVariance(lowerMinutes, expectedMinutes, upperMinutes),
+    ),
+    recurringConstraints: lane.recurringConstraints.map((constraint) => ({
+      ...constraint,
+      lowerProgress:
+        constraint.lowerProgress >= constraint.intervalValue ? 0 : constraint.lowerProgress,
+      expectedProgress:
+        constraint.expectedProgress >= constraint.intervalValue ? 0 : constraint.expectedProgress,
+      upperProgress:
+        constraint.upperProgress >= constraint.intervalValue ? 0 : constraint.upperProgress,
+    })),
+  };
+}
+
+function advanceRecurringProgress(
+  lane: QueueAvailabilityLane,
+  duration: DurationEstimate,
+): QueueAvailabilityLane {
+  return {
+    ...lane,
+    recurringConstraints: lane.recurringConstraints.map((constraint) => {
+      if (!constraint.active) return constraint;
+      if (constraint.triggerMetric === "COMPLETED_ROTATIONS") {
+        return {
+          ...constraint,
+          lowerProgress: constraint.lowerProgress + 1,
+          expectedProgress: constraint.expectedProgress + 1,
+          upperProgress: constraint.upperProgress + 1,
+        };
+      }
+      return {
+        ...constraint,
+        lowerProgress: constraint.lowerProgress + duration.lowerMinutes,
+        expectedProgress: constraint.expectedProgress + duration.expectedMinutes,
+        upperProgress: constraint.upperProgress + duration.upperMinutes,
+      };
+    }),
+  };
 }
 
 const P10_P90_Z = 1.2815515655446004;
@@ -294,14 +421,55 @@ function shiftPastConstraint(
   return start < blockEnd && start + duration > blockStart ? blockEnd : start;
 }
 
+function constraintWindow(
+  constraint: QueueAvailabilityConstraint,
+  scenario: "lower" | "expected" | "upper",
+): { start: number; end: number } {
+  const start =
+    scenario === "lower"
+      ? constraint.latestStartMinutes
+      : scenario === "expected"
+        ? constraint.expectedStartMinutes
+        : constraint.earliestStartMinutes;
+  if (constraint.active) return { start, end: Number.POSITIVE_INFINITY };
+  const duration =
+    scenario === "lower"
+      ? constraint.minimumDurationMinutes
+      : scenario === "expected"
+        ? constraint.typicalDurationMinutes
+        : constraint.maximumDurationMinutes;
+  return { start, end: start + duration };
+}
+
+function overlaps(start: number, duration: number, blockStart: number, blockEnd: number): boolean {
+  return start < blockEnd && start + duration > blockStart;
+}
+
+function slowdownMultiplier(
+  start: number,
+  duration: number,
+  constraints: readonly QueueAvailabilityConstraint[],
+  scenario: "lower" | "expected" | "upper",
+): number {
+  let multiplierPercent = 100;
+  for (const constraint of constraints) {
+    if (constraint.effectMode !== "SLOWDOWN") continue;
+    const window = constraintWindow(constraint, scenario);
+    if (overlaps(start, duration, window.start, window.end)) {
+      multiplierPercent = Math.max(multiplierPercent, constraint.durationMultiplierPercent ?? 100);
+    }
+  }
+  return multiplierPercent;
+}
+
 function applyAvailabilityConstraints(
   lane: QueueAvailabilityLane,
   duration: DurationEstimate,
-): QueueAvailabilityLane {
+): { lane: QueueAvailabilityLane; duration: DurationEstimate; multiplierPercent: number } {
   let lower = lane.lowerMinutes;
   let expected = lane.expectedMinutes;
   let upper = lane.upperMinutes;
-  for (const constraint of lane.constraints) {
+  for (const constraint of lane.constraints.filter((entry) => entry.effectMode === "BLOCKING")) {
     lower = shiftPastConstraint(
       lower,
       duration.lowerMinutes,
@@ -323,55 +491,96 @@ function applyAvailabilityConstraints(
     expected = Math.max(lower, expected);
     upper = Math.max(expected, upper);
   }
+  const lowerMultiplier = slowdownMultiplier(
+    lower,
+    duration.lowerMinutes,
+    lane.constraints,
+    "lower",
+  );
+  const expectedMultiplier = slowdownMultiplier(
+    expected,
+    duration.expectedMinutes,
+    lane.constraints,
+    "expected",
+  );
+  const upperMultiplier = slowdownMultiplier(
+    upper,
+    duration.upperMinutes,
+    lane.constraints,
+    "upper",
+  );
   return {
-    ...lane,
-    lowerMinutes: lower,
-    expectedMinutes: expected,
-    upperMinutes: upper,
-    varianceMinutesSquared: Math.max(
-      lane.varianceMinutesSquared,
-      intervalVariance(lower, expected, upper),
-    ),
+    lane: {
+      ...lane,
+      lowerMinutes: lower,
+      expectedMinutes: expected,
+      upperMinutes: upper,
+      varianceMinutesSquared: Math.max(
+        lane.varianceMinutesSquared,
+        intervalVariance(lower, expected, upper),
+      ),
+    },
+    duration: {
+      ...duration,
+      lowerMinutes: (duration.lowerMinutes * lowerMultiplier) / 100,
+      expectedMinutes: (duration.expectedMinutes * expectedMultiplier) / 100,
+      upperMinutes: (duration.upperMinutes * upperMultiplier) / 100,
+      quality:
+        expectedMultiplier > 100 && duration.quality === "STABLE" ? "CHANGING" : duration.quality,
+    },
+    multiplierPercent: expectedMultiplier,
   };
 }
 
 export function reserveNextQueueWindow(
   availability: QueueAvailabilityState,
   duration: DurationEstimate,
+  operationsEndMinutes: number | null = null,
 ): {
   window: { lowerMinutes: number; upperMinutes: number; quality: PredictionQuality };
   availability: QueueAvailabilityState;
+  duration: DurationEstimate;
+  durationMultiplierPercent: number;
 } {
   if (availability.lanes.length === 0) {
     return {
       window: { lowerMinutes: 0, upperMinutes: 0, quality: "UNCERTAIN" },
       availability,
+      duration,
+      durationMultiplierPercent: 100,
     };
   }
-  const adjustedLanes = availability.lanes.map((lane) =>
-    applyAvailabilityConstraints(lane, duration),
+  const adjustedCandidates = availability.lanes.map((lane) =>
+    applyAvailabilityConstraints(
+      applyDueRecurringConstraints(lane, operationsEndMinutes),
+      duration,
+    ),
   );
-  const selected = [...adjustedLanes].sort(
+  const selectedCandidate = [...adjustedCandidates].sort(
     (left, right) =>
-      left.expectedMinutes - right.expectedMinutes ||
-      left.lowerMinutes - right.lowerMinutes ||
-      left.laneId.localeCompare(right.laneId),
+      left.lane.expectedMinutes - right.lane.expectedMinutes ||
+      left.lane.lowerMinutes - right.lane.lowerMinutes ||
+      left.lane.laneId.localeCompare(right.lane.laneId),
   )[0];
-  if (!selected) {
+  if (!selectedCandidate) {
     return {
       window: { lowerMinutes: 0, upperMinutes: 0, quality: "UNCERTAIN" },
       availability,
+      duration,
+      durationMultiplierPercent: 100,
     };
   }
+  const selected = selectedCandidate.lane;
+  const effectiveDuration = selectedCandidate.duration;
   const durationVariance = intervalVariance(
-    duration.lowerMinutes,
-    duration.expectedMinutes,
-    duration.upperMinutes,
+    effectiveDuration.lowerMinutes,
+    effectiveDuration.expectedMinutes,
+    effectiveDuration.upperMinutes,
   );
-  const nextExpected = selected.expectedMinutes + duration.expectedMinutes;
+  const nextExpected = selected.expectedMinutes + effectiveDuration.expectedMinutes;
   const nextVariance = selected.varianceMinutesSquared + durationVariance;
   const nextInterval = intervalFromVariance(nextExpected, nextVariance);
-  const nextLanes = adjustedLanes.map((lane) =>
+  const nextLanes = adjustedCandidates.map(({ lane }) =>
     lane.laneId === selected.laneId
       ? {
           ...lane,
@@ -379,11 +588,13 @@ export function reserveNextQueueWindow(
           expectedMinutes: nextExpected,
           upperMinutes: nextInterval.upper,
           varianceMinutesSquared: nextVariance,
+          recurringConstraints: advanceRecurringProgress(lane, effectiveDuration)
+            .recurringConstraints,
         }
       : lane,
   );
   const minimumWindowMargin =
-    duration.quality === "UNCERTAIN" ? 0 : duration.quality === "STABLE" ? 3 : 5;
+    effectiveDuration.quality === "UNCERTAIN" ? 0 : effectiveDuration.quality === "STABLE" ? 3 : 5;
   const windowLower = Math.max(
     0,
     Math.min(selected.lowerMinutes, selected.expectedMinutes - minimumWindowMargin),
@@ -396,9 +607,11 @@ export function reserveNextQueueWindow(
     window: {
       lowerMinutes: Math.max(0, Math.round(windowLower)),
       upperMinutes: Math.max(0, Math.round(windowUpper)),
-      quality: duration.quality,
+      quality: effectiveDuration.quality,
     },
     availability: availabilityFromLanes(nextLanes),
+    duration: effectiveDuration,
+    durationMultiplierPercent: selectedCandidate.multiplierPercent,
   };
 }
 
@@ -615,11 +828,17 @@ export function calculateForecastTimelines(
       minimumDurationMinutes: constraint.minimumDurationMinutes,
       typicalDurationMinutes: constraint.typicalDurationMinutes,
       maximumDurationMinutes: constraint.maximumDurationMinutes,
+      effectMode: constraint.effectMode ?? "BLOCKING",
+      durationMultiplierPercent: constraint.durationMultiplierPercent ?? null,
+      active: constraint.active ?? false,
     };
   };
   const operationStartMinutes = input.event.plannedOperationsStartAt
     ? offsetMinutes(input.event.plannedOperationsStartAt)
     : 0;
+  const operationEndMinutes = input.event.plannedOperationsEndAt
+    ? offsetMinutes(input.event.plannedOperationsEndAt)
+    : null;
   const queueAvailability = new Map(
     [...capacities.entries()].map(([resourceGroupId, capacity]) => {
       const sharedConstraints = (capacity.sharedConstraints ?? []).map(constraintToQueueConstraint);
@@ -644,6 +863,18 @@ export function calculateForecastTimelines(
               left.earliestStartMinutes - right.earliestStartMinutes ||
               left.id.localeCompare(right.id),
           ),
+          recurringConstraints: (lane.recurringConstraints ?? []).map((constraint) => ({
+            id: constraint.id,
+            triggerMetric: constraint.triggerMetric,
+            intervalValue: constraint.intervalValue,
+            lowerProgress: constraint.progressValue,
+            expectedProgress: constraint.progressValue,
+            upperProgress: constraint.progressValue,
+            minimumDurationMinutes: constraint.minimumDurationMinutes,
+            typicalDurationMinutes: constraint.typicalDurationMinutes,
+            maximumDurationMinutes: constraint.maximumDurationMinutes,
+            active: constraint.active ?? true,
+          })),
         };
       });
       if (lanes && lanes.length > 0) {
@@ -666,6 +897,7 @@ export function calculateForecastTimelines(
           expectedMinutes: minutes,
           upperMinutes: minutes,
           constraints: sharedConstraints,
+          recurringConstraints: [],
         })),
         ...Array.from({ length: idleCount }, (_, index) => ({
           laneId: `idle-${index + 1}`,
@@ -673,6 +905,7 @@ export function calculateForecastTimelines(
           expectedMinutes: operationStartMinutes,
           upperMinutes: operationStartMinutes,
           constraints: sharedConstraints,
+          recurringConstraints: [],
         })),
       ];
       return [
@@ -746,7 +979,7 @@ export function calculateForecastTimelines(
     });
     const predictionQuality =
       hasOverdueConstraint && estimate.quality === "STABLE" ? "CHANGING" : estimate.quality;
-    const effectiveEstimate = { ...estimate, quality: predictionQuality };
+    let effectiveEstimate = { ...estimate, quality: predictionQuality };
     let window = forecastQueueWindows({
       queueSequence: rotation.queueSequence,
       activeAircraft: forecastCapacity,
@@ -756,9 +989,44 @@ export function calculateForecastTimelines(
       const availability =
         queueAvailability.get(rotation.resourceGroupId) ??
         createQueueAvailability({ activeAircraft: forecastCapacity, busyAircraftMinutes: [] });
-      const reservation = reserveNextQueueWindow(availability, effectiveEstimate);
+      const reservation = reserveNextQueueWindow(
+        availability,
+        effectiveEstimate,
+        operationEndMinutes,
+      );
       window = reservation.window;
+      effectiveEstimate = reservation.duration;
       queueAvailability.set(rotation.resourceGroupId, reservation.availability);
+    } else if (rotation.constraints && rotation.constraints.length > 0) {
+      const converted = rotation.constraints.map(constraintToQueueConstraint);
+      const lowerMultiplier = slowdownMultiplier(
+        0,
+        effectiveEstimate.lowerMinutes,
+        converted,
+        "lower",
+      );
+      const expectedMultiplier = slowdownMultiplier(
+        0,
+        effectiveEstimate.expectedMinutes,
+        converted,
+        "expected",
+      );
+      const upperMultiplier = slowdownMultiplier(
+        0,
+        effectiveEstimate.upperMinutes,
+        converted,
+        "upper",
+      );
+      effectiveEstimate = {
+        ...effectiveEstimate,
+        lowerMinutes: (effectiveEstimate.lowerMinutes * lowerMultiplier) / 100,
+        expectedMinutes: (effectiveEstimate.expectedMinutes * expectedMultiplier) / 100,
+        upperMinutes: (effectiveEstimate.upperMinutes * upperMultiplier) / 100,
+        quality:
+          expectedMultiplier > 100 && effectiveEstimate.quality === "STABLE"
+            ? "CHANGING"
+            : effectiveEstimate.quality,
+      };
     }
     const planOffset =
       Math.floor(Math.max(0, rotation.queueSequence - 1) / Math.max(1, forecastCapacity)) *
@@ -767,17 +1035,25 @@ export function calculateForecastTimelines(
     const plannedDepartureAt = addMinutes(plannedBoardingAt, boarding);
     const plannedLandingAt = addMinutes(plannedDepartureAt, rotation.referenceDurationMinutes);
     const plannedCompletionAt = addMinutes(plannedLandingAt, deboarding + buffer);
+    const phaseMultiplier =
+      estimate.expectedMinutes > 0
+        ? Math.max(1, effectiveEstimate.expectedMinutes / estimate.expectedMinutes)
+        : 1;
     let predictedBoardingAt = addMinutes(now, (window.lowerMinutes + window.upperMinutes) / 2);
     if (rotation.calledAt) predictedBoardingAt = rotation.calledAt;
-    let predictedDepartureAt = addMinutes(predictedBoardingAt, boarding);
+    let predictedDepartureAt = addMinutes(predictedBoardingAt, boarding * phaseMultiplier);
     if (rotation.departedAt) predictedDepartureAt = rotation.departedAt;
-    const expectedFlightMinutes = Math.max(
-      rotation.referenceDurationMinutes,
-      estimate.expectedMinutes - boarding - deboarding - buffer,
-    );
+    const expectedFlightMinutes =
+      Math.max(
+        rotation.referenceDurationMinutes,
+        estimate.expectedMinutes - boarding - deboarding - buffer,
+      ) * phaseMultiplier;
     let predictedLandingAt = addMinutes(predictedDepartureAt, expectedFlightMinutes);
     if (rotation.landedAt) predictedLandingAt = rotation.landedAt;
-    let predictedCompletionAt = addMinutes(predictedLandingAt, deboarding + buffer);
+    let predictedCompletionAt = addMinutes(
+      predictedLandingAt,
+      (deboarding + buffer) * phaseMultiplier,
+    );
     if (rotation.status !== "DRAFT") {
       const advanced = advanceOverduePrediction({
         status: rotation.status,
@@ -800,7 +1076,7 @@ export function calculateForecastTimelines(
       predictedDepartureAt,
       predictedLandingAt,
       predictedCompletionAt,
-      predictionQuality,
+      predictionQuality: effectiveEstimate.quality,
       predictionLowerMinutes: window.lowerMinutes,
       predictionUpperMinutes: window.upperMinutes,
       dataBasisScope,

@@ -31,7 +31,73 @@ def apply_schema(connection: sqlite3.Connection, through: str | None = None) -> 
         connection.executescript(migration.read_text(encoding="utf-8"))
 
 
-def seed_source(connection: sqlite3.Connection) -> None:
+def seed_recurring_rules(connection: sqlite3.Connection, now: str) -> None:
+    connection.execute(
+        "INSERT INTO recurring_operational_rules "
+        "(id,operation_day_id,scope_type,scope_id,operation_kind,trigger_metric,"
+        "interval_value,progress_value,minimum_duration_minutes,typical_duration_minutes,"
+        "maximum_duration_minutes,status,sequence_number,reason,version,created_by_device_id,"
+        "last_reset_at,created_at,updated_at) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        (
+            "synthetic-rule",
+            "synthetic-event",
+            "AIRCRAFT",
+            "synthetic-aircraft",
+            "REFUELING",
+            "COMPLETED_ROTATIONS",
+            5,
+            4,
+            8,
+            12,
+            18,
+            "ACTIVE",
+            1,
+            "Synthetische Wiederherstellungsregel",
+            0,
+            "synthetic-admin",
+            now,
+            now,
+            now,
+        ),
+    )
+    connection.execute(
+        "INSERT INTO planned_operational_constraints "
+        "(id,operation_day_id,scope_type,scope_id,constraint_kind,start_mode,"
+        "earliest_start_at,latest_start_at,after_rotation_id,minimum_duration_minutes,"
+        "typical_duration_minutes,maximum_duration_minutes,status,reason,public_note,version,"
+        "created_by_device_id,created_at,updated_at,effect_mode,duration_multiplier_percent,"
+        "recurring_rule_id,recurrence_sequence) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        (
+            "synthetic-rule-occurrence",
+            "synthetic-event",
+            "AIRCRAFT",
+            "synthetic-aircraft",
+            "REFUELING",
+            "AFTER_CURRENT_ROTATION",
+            None,
+            None,
+            "synthetic-rotation",
+            8,
+            12,
+            18,
+            "PLANNED",
+            "Synthetisches Regelvorkommen",
+            "",
+            0,
+            "synthetic-admin",
+            now,
+            now,
+            "BLOCKING",
+            None,
+            "synthetic-rule",
+            1,
+        ),
+    )
+
+
+def seed_source(connection: sqlite3.Connection, include_recurring: bool = True) -> None:
     now = "2026-07-11T08:00:00.000Z"
     connection.execute(
         "INSERT INTO operation_days "
@@ -106,6 +172,8 @@ def seed_source(connection: sqlite3.Connection) -> None:
         "INSERT INTO app_bootstrap (singleton,operation_day_id,admin_device_id,completed_at) VALUES (1,?,?,?)",
         ("synthetic-event", "synthetic-admin", now),
     )
+    if include_recurring:
+        seed_recurring_rules(connection, now)
     connection.execute(
         "INSERT INTO operational_events "
         "(id,operation_day_id,event_type,occurred_at,device_id,aggregate_type,aggregate_id,aggregate_version,payload_json) "
@@ -156,7 +224,7 @@ def restore_backup(connection: sqlite3.Connection, serialized: str, checksum: st
 def verify_aircraft_state_backfill() -> None:
     connection = sqlite3.connect(":memory:")
     apply_schema(connection, "0037_cashier_ticket_search.sql")
-    seed_source(connection)
+    seed_source(connection, include_recurring=False)
     connection.execute(
         "INSERT INTO aircraft (id,registration,aircraft_type,passenger_seats,created_at,updated_at) "
         "VALUES (?,?,?,?,?,?)",
@@ -228,6 +296,15 @@ def main() -> None:
     ).fetchone()
     if restored_rotation != ("synthetic-gate", "Organisatorischer Testhinweis"):
         raise AssertionError("Historisches Umlauf-Gate oder Bemerkung wurde nicht wiederhergestellt")
+    restored_rule = target.execute(
+        "SELECT rule.progress_value, plan.recurrence_sequence "
+        "FROM recurring_operational_rules rule "
+        "JOIN planned_operational_constraints plan ON plan.recurring_rule_id = rule.id "
+        "WHERE rule.id = ?",
+        ("synthetic-rule",),
+    ).fetchone()
+    if restored_rule != (4, 1):
+        raise AssertionError("Wiederkehrende Regel oder ihr Planeintrag wurde nicht wiederhergestellt")
     source.close()
     target.close()
     elapsed = time.monotonic() - started

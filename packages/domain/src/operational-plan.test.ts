@@ -10,6 +10,8 @@ const basePlan: PlannedOperationalConstraint = {
   scopeType: "AIRCRAFT",
   scopeId: "aircraft-1",
   kind: "PAUSE",
+  effectMode: "BLOCKING",
+  durationMultiplierPercent: null,
   startMode: "TIME_WINDOW",
   earliestStartAt: "2026-07-22T10:00:00.000Z",
   latestStartAt: "2026-07-22T10:15:00.000Z",
@@ -42,5 +44,23 @@ describe("operational planning", () => {
         typicalDurationMinutes: 20,
       }),
     ).toContain("Die Dauer muss als aufsteigendes Minimum, Typisch und Maximum angegeben werden.");
+  });
+
+  it("accepts only a bounded factor for delayed operation", () => {
+    const { status: _status, ...validPlan } = basePlan;
+    expect(
+      validateOperationalPlan({
+        ...validPlan,
+        effectMode: "SLOWDOWN",
+        durationMultiplierPercent: 150,
+      }),
+    ).toEqual([]);
+    expect(
+      validateOperationalPlan({
+        ...validPlan,
+        effectMode: "SLOWDOWN",
+        durationMultiplierPercent: 301,
+      }),
+    ).toContain("Ein verzögerter Betrieb benötigt einen Faktor zwischen 110 und 300 Prozent.");
   });
 });

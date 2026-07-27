@@ -27,6 +27,13 @@ describe("unified master-data dialogs and stable event workspace", () => {
     expect(adminEventStyles).toMatch(
       /\.admin-shell \.admin-workspace,[\s\S]*?flex-direction: column;[\s\S]*?overflow: hidden;/,
     );
+    expect(adminEventStyles).toMatch(
+      /\.admin-workspace:not\(\.master-data-active\)[\s\S]*?> \.admin-workspace-scroll-region \{[\s\S]*?padding-top: 16px;/,
+    );
+    expect(adminEventStyles).toMatch(
+      /\.admin-workspace:not\(\.master-data-active\) > \.setup-progress \{[\s\S]*?margin-bottom: 0;/,
+    );
+    expect(adminEventStyles).toMatch(/\.admin-shell \.reset-levels \{[\s\S]*?padding: 0 16px 8px;/);
   });
 
   it("lets the event table and selected row fill the panel without an unused vertical gutter", () => {

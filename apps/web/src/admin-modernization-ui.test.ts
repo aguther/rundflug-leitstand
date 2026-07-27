@@ -36,6 +36,9 @@ describe("modernized administration workspace", () => {
 
   it("uses a modal account table with explicit edit and protected delete actions", () => {
     expect(accountSource).toContain("<DataTable");
+    expect(accountSource).toMatch(
+      /className="account-table-toolbar"[\s\S]*?className="account-create-button"[\s\S]*?Konto hinzufügen/,
+    );
     expect(accountSource).toContain('title="Konto hinzufügen"');
     expect(accountSource).toContain('title="Konto bearbeiten"');
     expect(accountSource).toContain("Sitzungen widerrufen");

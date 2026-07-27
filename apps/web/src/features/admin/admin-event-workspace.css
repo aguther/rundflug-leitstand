@@ -247,11 +247,10 @@
   gap: 5px;
 }
 
-.admin-shell .event-basics-grid .ds-field {
+.admin-shell .event-basics-grid > div {
   grid-template-columns: 124px minmax(0, 1fr);
 }
 
-.admin-shell .event-basics-grid :is(.ds-input, input[readonly]),
 .admin-shell .event-timing-grid input,
 .admin-shell .event-logo-editor-v15 :is(input, .ds-button) {
   min-height: 34px;
@@ -502,7 +501,7 @@
 
 .admin-shell .admin-workspace.master-data-active .master-data-table-scroll {
   height: auto;
-  max-height: min(360px, calc(100dvh - 300px));
+  max-height: calc(100dvh - 300px);
   align-self: start;
 }
 
@@ -828,6 +827,10 @@
   scrollbar-gutter: stable;
 }
 
+.admin-shell .admin-workspace:not(.master-data-active) > .admin-workspace-scroll-region {
+  padding-top: 16px;
+}
+
 .admin-shell .admin-workspace > .ds-page-header,
 .admin-shell .admin-workspace > .event-catalog-primary {
   flex: 0 0 auto;
@@ -864,13 +867,17 @@
   display: flex;
   align-items: stretch;
   gap: 0;
-  margin: 0 16px;
+  margin: 8px 16px 12px;
   overflow-x: auto;
   border: 1px solid var(--ui-border);
   border-radius: var(--radius-md);
   background: var(--ui-surface);
   scrollbar-width: none;
   scrollbar-gutter: stable;
+}
+
+.admin-shell .admin-workspace:not(.master-data-active) > .setup-progress {
+  margin-bottom: 0;
 }
 
 .admin-shell .setup-progress .setup-progress-item,
@@ -940,6 +947,10 @@
 
 .admin-shell .setup-progress .setup-progress-item.current button {
   scroll-margin-inline: 16px;
+}
+
+.admin-shell .reset-levels {
+  padding: 0 16px 8px;
 }
 
 .admin-shell

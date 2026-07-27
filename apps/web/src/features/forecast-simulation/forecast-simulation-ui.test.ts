@@ -175,6 +175,8 @@ describe("local and hosted forecast simulation surface", () => {
     expect(stylesSource).toContain(".sim-chart-tooltip");
     expect(stylesSource).toContain(".sim-interruption-bar");
     expect(planEditorSource).toContain("Geplante Unterbrechungen und Flugshows");
+    expect(planEditorSource).toContain("Wiederkehrende Regeln");
+    expect(planEditorSource).toContain("Bestätigter Fortschritt");
     expect(planEditorSource).toContain("Nach simuliertem Umlauf");
     expect(planImportSource).toContain("rundflug-master-data-template");
     expect(planImportSource).toContain("MAX_SIMULATION_PLAN_FILE_BYTES");
@@ -185,6 +187,9 @@ describe("local and hosted forecast simulation surface", () => {
     expect(stylesSource).toContain("overflow-x: auto");
     expect(stylesSource).toContain(".sim-workspace");
     expect(stylesSource).toContain("overflow: auto");
+    expect(stylesSource).toContain(".forecast-simulator .ds-sidepanel");
+    expect(stylesSource).toContain("width: min(760px, 100%)");
+    expect(stylesSource).not.toContain(".ds-sidepanel:has(");
   });
 
   it("removes deprecated precall controls while preserving their legacy payload values", () => {
