@@ -59,7 +59,6 @@ const upsertPlannedOperationPayloadSchema = z
     minimumDurationMinutes: z.number().int().min(1).max(1440),
     typicalDurationMinutes: z.number().int().min(1).max(1440),
     maximumDurationMinutes: z.number().int().min(1).max(1440),
-    reason: z.string().trim().min(3).max(240),
     publicNote: z.string().trim().max(160),
   })
   .strict()
@@ -391,7 +390,6 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
       .object({
         planId: z.uuid(),
         planExpectedVersion: z.number().int().nonnegative(),
-        reason: z.string().trim().min(3).max(240),
       })
       .strict(),
   }),
@@ -1584,7 +1582,6 @@ export const plannedOperationalConstraintSchema = z.object({
   typicalDurationMinutes: z.number().int().positive(),
   maximumDurationMinutes: z.number().int().positive(),
   status: operationalPlanStatusSchema,
-  reason: z.string(),
   publicNote: z.string(),
   createdAt: z.string(),
   updatedAt: z.string(),

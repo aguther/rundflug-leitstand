@@ -17,6 +17,9 @@
   transaktionaler Idempotenz-Guard, Audit und Outbox
 - `apps/worker/src/admin-event-flow.test.ts`: kumulative Verkäufe und Abschlüsse, leere Zeiträume,
   Zeitzonen/DST und adaptive Intervalle
+- `apps/worker/src/planned-operation-audit-reason.test.ts` und
+  `apps/worker/src/operational-planning.test.ts`: rollen- und aktionsbezogene Auditgründe,
+  abgelehnte Browser-Gründe und privater Betriebsplan ohne internes Grundfeld
 - `apps/web/src/admin-v15-ui.test.ts`: Navigation, Legacy-Links, Schritte, Diagramm und
   Importvorschau
 - `apps/web/src/admin-modernization-ui.test.ts`: zugängliche segmentierte Tabs, gemeinsame
@@ -30,7 +33,9 @@
 
 ## Browserabnahme
 
-Am 26. Juli 2026 wurden nach erfolgreichem Build mit ausschließlich synthetischen Daten geprüft:
+Am 26. Juli 2026 wurden nach erfolgreichem Build mit ausschließlich synthetischen Daten geprüft;
+die ergänzende Prüfung der automatisch erzeugten Betriebsplan-Auditgründe erfolgte am 27. Juli
+2026:
 
 - Admin-Übersicht mit veranstaltungsbezogenem SVG-Diagramm
 - Veranstaltungstabelle im Verwaltungsdialog sowie alle acht kompakten, per Tastatur bedienbaren
@@ -43,6 +48,8 @@ Am 26. Juli 2026 wurden nach erfolgreichem Build mit ausschließlich synthetisch
 - Legacy-Links für `setup`, `master-data` und `audit`
 - gemeinsamer Betriebsplan in Admin und Flight Director; nur der Flight Director erhält
   Start-/Endbestätigung
+- Erstellen-/Bearbeiten-Dialog des Betriebsplans ohne sichtbaren oder bearbeitbaren internen Grund;
+  der Worker ergänzt den Auditgrund aus authentifizierter Rolle und Aktion
 - Admin/Abschluss mit Bericht, Historie, Prognosegüte, Audit und Besetzungskorrektur
 - Flight-Director-Kopf, Priorität des Betriebshinweises und alle vier Dialogtabs
 - Hell/Dunkel sowie Layouts bei 1440 × 1024, 1194 × 834 und 834 × 1194 CSS-Pixel

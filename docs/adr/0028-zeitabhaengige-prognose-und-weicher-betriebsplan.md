@@ -38,7 +38,13 @@ Der Flight Director kann weiche betriebliche Einschränkungen mit folgenden Anga
 - Art Pause, Tanken, Flugshow, Wetter, Technik oder Sonstiges,
 - ungefähres Startfenster oder Beginn nach einem ausgewählten aktuellen Umlauf,
 - minimale, typische und maximale Dauer,
-- interner Grund und optionaler neutraler öffentlicher Hinweis.
+- automatisch aus Rolle und Aktion erzeugter interner Auditgrund sowie optionaler neutraler
+  öffentlicher Hinweis.
+
+Der interne Auditgrund ist kein Eingabefeld und wird nicht im privaten Betriebsplan-Snapshot
+veröffentlicht. Beim Erstellen, Bearbeiten und Absagen erzeugt der Worker ihn aus der
+authentifizierten Rolle, der Aktion, der Art und dem Geltungsbereich. Damit kann der Browser den
+Auditgrund weder anzeigen noch verändern.
 
 Ein Plan ist zunächst `PLANNED` und wird nach Ablauf seines spätesten Startzeitpunkts lediglich als
 `DUE` abgeleitet. Er verändert niemals selbst einen operativen Zustand. Start und Ende werden

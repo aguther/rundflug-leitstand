@@ -33,7 +33,6 @@ describe("general operational planning", () => {
         minimumDurationMinutes: 10,
         typicalDurationMinutes: 20,
         maximumDurationMinutes: 30,
-        reason: "Geplante Pause",
         publicNote: "",
       },
     } as const;
@@ -54,6 +53,28 @@ describe("general operational planning", () => {
         payload: { ...command.payload, publicNote: "Pause bis etwa 11 Uhr" },
       }).success,
     ).toBe(false);
+    expect(
+      commandEnvelopeSchema.safeParse({
+        ...command,
+        payload: { ...command.payload, reason: "Vom Browser vorgegebener Grund" },
+      }).success,
+    ).toBe(false);
+    const cancellation = {
+      ...command,
+      commandId: "810712d2-692d-47f3-9081-77211cfcfbc9",
+      type: "CANCEL_PLANNED_OPERATION",
+      payload: {
+        planId: command.payload.planId,
+        planExpectedVersion: 0,
+      },
+    } as const;
+    expect(commandEnvelopeSchema.safeParse(cancellation).success).toBe(true);
+    expect(
+      commandEnvelopeSchema.safeParse({
+        ...cancellation,
+        payload: { ...cancellation.payload, reason: "Vom Browser vorgegebener Absagegrund" },
+      }).success,
+    ).toBe(false);
   });
 
   it("keeps planning idempotent, versioned, audited and non-automatic", () => {
@@ -67,6 +88,8 @@ describe("general operational planning", () => {
     expect(handler).toContain("INSERT INTO operational_events");
     expect(handler).toContain("INSERT INTO idempotency_receipts");
     expect(handler).toContain("INSERT INTO outbox");
+    expect(handler).toContain("plannedOperationAuditReason");
+    expect(handler).toContain("reason: auditReason");
     expect(handler).not.toContain("UPDATE aircraft SET operational_state");
     expect(handler).not.toContain("UPDATE resource_groups SET status");
   });
@@ -76,6 +99,7 @@ describe("general operational planning", () => {
     expect(worker).toContain("plan.status = 'ACTIVE'");
     expect(worker).toContain("AS planned_public_note");
     expect(operationBoardSchema.shape.plannedOperations).toBeTruthy();
+    expect(worker).not.toContain("reason: plan.reason");
     expect(worker).not.toContain("publicOperationalPlanReason");
   });
 });

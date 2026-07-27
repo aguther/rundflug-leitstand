@@ -502,7 +502,6 @@ try {
       minimumDurationMinutes: 10,
       typicalDurationMinutes: 15,
       maximumDurationMinutes: 25,
-      reason: "Synthetisch geplantes Flugshowfenster",
       publicNote: "Flugbetrieb voraussichtlich kurz pausiert.",
     },
   );

@@ -634,7 +634,6 @@ export function FlightLineView() {
           payload: {
             planId: plan.id,
             planExpectedVersion: plan.version,
-            reason: FLIGHT_DIRECTOR_AUDIT_REASON,
           },
         },
         deviceTokenFor(FLIGHT_LINE_DEVICE_ID),

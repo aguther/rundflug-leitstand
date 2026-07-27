@@ -3596,7 +3596,7 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
                 plan.constraint_kind, plan.start_mode, plan.earliest_start_at,
                 plan.latest_start_at, plan.after_rotation_id,
                 plan.minimum_duration_minutes, plan.typical_duration_minutes,
-                plan.maximum_duration_minutes, plan.status, plan.reason, plan.public_note,
+                plan.maximum_duration_minutes, plan.status, plan.public_note,
                 plan.created_at, plan.updated_at, plan.activated_at, plan.cleared_at,
                 plan.canceled_at, after_rotation.status AS after_rotation_status
            FROM planned_operational_constraints plan
@@ -3627,7 +3627,6 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
           typical_duration_minutes: number;
           maximum_duration_minutes: number;
           status: "PLANNED" | "ACTIVE" | "CLEARED" | "CANCELED";
-          reason: string;
           public_note: string;
           created_at: string;
           updated_at: string;
@@ -4081,7 +4080,6 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
             ["COMPLETED", "CANCELED"].includes(plan.after_rotation_status ?? "")))
           ? "DUE"
           : plan.status,
-      reason: plan.reason,
       publicNote: plan.public_note,
       createdAt: plan.created_at,
       updatedAt: plan.updated_at,

@@ -1691,7 +1691,6 @@ export function AdminView() {
           payload: {
             planId: plan.id,
             planExpectedVersion: plan.version,
-            reason: OPERATIONAL_AUDIT_REASON,
           },
         },
         deviceTokenFor(ADMIN_DEVICE_ID),
