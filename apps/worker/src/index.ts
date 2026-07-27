@@ -5971,13 +5971,13 @@ app.post("/api/public/tickets/:ticketCode/push-subscriptions", async (context) =
   await context.env.DB.prepare(
     `INSERT INTO web_push_subscriptions
        (id, operation_day_id, ticket_id, ticket_group_id, target_kind, endpoint, p256dh, auth,
-        consented_at, delete_after, status, updated_at)
-     VALUES (?1, ?2, ?3, ?4, 'TICKET', ?5, ?6, ?7, ?8, ?9, 'ACTIVE', ?8)
+        consented_at, delete_after, status, updated_at, origin)
+     VALUES (?1, ?2, ?3, ?4, 'TICKET', ?5, ?6, ?7, ?8, ?9, 'ACTIVE', ?8, ?10)
      ON CONFLICT(endpoint) DO UPDATE SET ticket_id = excluded.ticket_id,
        ticket_group_id = excluded.ticket_group_id, operation_day_id = excluded.operation_day_id,
        target_kind = excluded.target_kind, p256dh = excluded.p256dh, auth = excluded.auth,
        consented_at = excluded.consented_at, delete_after = excluded.delete_after,
-       status = 'ACTIVE', updated_at = excluded.updated_at`,
+       origin = excluded.origin, status = 'ACTIVE', updated_at = excluded.updated_at`,
   )
     .bind(
       crypto.randomUUID(),
@@ -5989,6 +5989,7 @@ app.post("/api/public/tickets/:ticketCode/push-subscriptions", async (context) =
       body.keys.auth,
       now.toISOString(),
       deleteAfter,
+      new URL(context.req.url).origin,
     )
     .run();
   const preparationQueued = await queueEligiblePreparationNotifications(
@@ -6077,13 +6078,13 @@ app.post("/api/public/groups/:groupCode/push-subscriptions", async (context) => 
   await context.env.DB.prepare(
     `INSERT INTO web_push_subscriptions
        (id, operation_day_id, ticket_id, ticket_group_id, target_kind, endpoint, p256dh, auth,
-        consented_at, delete_after, status, updated_at)
-     VALUES (?1, ?2, ?3, ?4, 'GROUP', ?5, ?6, ?7, ?8, ?9, 'ACTIVE', ?8)
+        consented_at, delete_after, status, updated_at, origin)
+     VALUES (?1, ?2, ?3, ?4, 'GROUP', ?5, ?6, ?7, ?8, ?9, 'ACTIVE', ?8, ?10)
      ON CONFLICT(endpoint) DO UPDATE SET ticket_id = excluded.ticket_id,
        ticket_group_id = excluded.ticket_group_id, operation_day_id = excluded.operation_day_id,
        target_kind = excluded.target_kind, p256dh = excluded.p256dh, auth = excluded.auth,
        consented_at = excluded.consented_at, delete_after = excluded.delete_after,
-       status = 'ACTIVE', updated_at = excluded.updated_at`,
+       origin = excluded.origin, status = 'ACTIVE', updated_at = excluded.updated_at`,
   )
     .bind(
       crypto.randomUUID(),
@@ -6095,6 +6096,7 @@ app.post("/api/public/groups/:groupCode/push-subscriptions", async (context) => 
       body.keys.auth,
       now.toISOString(),
       deleteAfter,
+      new URL(context.req.url).origin,
     )
     .run();
   const rotationRows = await context.env.DB.prepare(

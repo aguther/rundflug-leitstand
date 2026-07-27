@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { Env } from "./types";
 import {
   isAllowedPushEndpoint,
+  publicPushNavigateOrigin,
   publicPushPayload,
   publicPushTargetPath,
   purgeExpiredPushSubscriptions,
@@ -58,7 +59,9 @@ describe("Web-Push-Endpunkte", () => {
   });
 
   it("liefert einen deklarativen, service-worker-unabhängigen iOS-Payload", () => {
-    const payload = JSON.parse(publicPushPayload("FLIGHT_GROUP_CALLED", "/gruppe/NPQRSTUVWXYZ2"));
+    const payload = JSON.parse(
+      publicPushPayload("FLIGHT_GROUP_CALLED", "/gruppe/NPQRSTUVWXYZ2", "https://status.example"),
+    );
     expect(payload).toEqual({
       web_push: 8030,
       notification: {
@@ -66,10 +69,36 @@ describe("Web-Push-Endpunkte", () => {
         lang: "de",
         dir: "ltr",
         body: "Bitte jetzt zum Gate kommen.",
-        navigate: "/gruppe/NPQRSTUVWXYZ2",
+        navigate: "https://status.example/gruppe/NPQRSTUVWXYZ2",
         data: { url: "/gruppe/NPQRSTUVWXYZ2" },
       },
     });
+  });
+
+  it("akzeptiert als Navigationsziel nur einen absoluten HTTPS-Ursprung", () => {
+    expect(publicPushNavigateOrigin("https://status.example")).toBe("https://status.example");
+    expect(publicPushNavigateOrigin("https://status.example:8443")).toBe(
+      "https://status.example:8443",
+    );
+    expect(publicPushNavigateOrigin("http://localhost:8787")).toBeNull();
+    expect(publicPushNavigateOrigin("https://status.example/gruppe")).toBeNull();
+    expect(publicPushNavigateOrigin("/gruppe/NPQRSTUVWXYZ2")).toBeNull();
+    expect(publicPushNavigateOrigin(null)).toBeNull();
+  });
+
+  it("fällt ohne bekannten Ursprung auf den Service-Worker-Payload zurück", () => {
+    const payload = JSON.parse(
+      publicPushPayload("FLIGHT_GROUP_CALLED", "/gruppe/NPQRSTUVWXYZ2", null),
+    );
+    expect(payload).toEqual({
+      title: "Rundflug-Leitstand",
+      lang: "de",
+      dir: "ltr",
+      body: "Bitte jetzt zum Gate kommen.",
+      data: { url: "/gruppe/NPQRSTUVWXYZ2" },
+    });
+    expect(payload.web_push).toBeUndefined();
+    expect(payload.navigate).toBeUndefined();
   });
 });
 

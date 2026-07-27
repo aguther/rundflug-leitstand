@@ -55,9 +55,10 @@ describe("öffentlicher Status V1.8", () => {
     expect(worker).toMatch(/title: `\$\{installTitle\} · Rundflug`/);
   });
 
-  it("öffnet aus Push ausschließlich validierte relative Statuspfade", () => {
+  it("öffnet aus Push ausschließlich validierte Statuspfade des eigenen Ursprungs", () => {
     expect(pushWorker).toContain("^\\/(?:ticket|gruppe)\\/");
     expect(pushWorker).toContain("safePublicStatusPath");
+    expect(pushWorker).toContain("target.origin !== self.location.origin");
     expect(pushWorker).toContain("data?.web_push === 8030");
     expect(pushWorker).toContain("notification?.navigate");
     expect(pushWorker).toContain("self.clients.openWindow(targetPath)");
@@ -70,6 +71,7 @@ describe("öffentlicher Status V1.8", () => {
     const showNotification = vi.fn().mockResolvedValue(undefined);
     const serviceWorker = {
       PUBLIC_STATUS_PATH: undefined,
+      location: { origin: "https://status.example" },
       addEventListener: (type: string, listener: (event: unknown) => void) => {
         listeners.set(type, listener);
       },
@@ -92,7 +94,7 @@ describe("öffentlicher Status V1.8", () => {
           notification: {
             title: "Rundflug-Leitstand",
             body: "Bitte jetzt zum Gate kommen.",
-            navigate: "/gruppe/NPQRSTUVWXYZ2",
+            navigate: "https://status.example/gruppe/NPQRSTUVWXYZ2",
           },
         }),
       },
