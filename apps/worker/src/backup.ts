@@ -18,6 +18,7 @@ export const BACKUP_TABLES = [
   "rotation_tickets",
   "rotation_manifest_corrections",
   "app_bootstrap",
+  "recurring_operational_rules",
   "planned_operational_constraints",
   "operational_blocks",
   "forecast_snapshots",

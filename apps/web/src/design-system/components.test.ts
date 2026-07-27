@@ -80,7 +80,9 @@ describe("shared design-system component library", () => {
     expect(tabsSource).toContain('role="tab"');
     expect(stylesSource).toContain("scrollbar-width: none");
     expect(stylesSource).toContain(".ds-tabs::-webkit-scrollbar");
-    expect(stylesSource).toMatch(/\.ds-search-field input:focus-visible\s*\{\s*box-shadow: none;/);
+    expect(stylesSource).toMatch(
+      /\.ds-search-field input:focus-visible\s*\{\s*outline: 0;\s*box-shadow: none;/,
+    );
   });
 
   it("StatusPill exposes a tone-based API backed by semantic tokens", () => {
@@ -102,6 +104,10 @@ describe("shared design-system component library", () => {
 
   it("SidePanel adapts to a bottom sheet on narrow viewports and exposes dialog semantics", () => {
     expect(sidePanelSource).toContain('role="dialog"');
+    expect(sidePanelSource).toContain("<IconButton");
+    expect(sidePanelSource).toContain('closeLabel = "Dialog schließen"');
+    expect(sidePanelSource).toContain("<X");
+    expect(sidePanelSource).not.toContain(">×<");
     expect(stylesSource).toMatch(/@media \(max-width: 760px\) \{\s*\.ds-sidepanel \{/);
   });
 

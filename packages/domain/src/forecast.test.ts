@@ -164,6 +164,155 @@ describe("event-driven forecast", () => {
     expect(second.window.upperMinutes).toBe(14);
   });
 
+  it("projects a recurring rotation rule repeatedly on the same availability lane", () => {
+    let availability = createQueueAvailability({
+      activeAircraft: 1,
+      busyAircraftMinutes: [],
+      lanes: [
+        {
+          laneId: "aircraft-1:pilot-1",
+          lowerMinutes: 0,
+          expectedMinutes: 0,
+          upperMinutes: 0,
+          constraints: [],
+          recurringConstraints: [
+            {
+              id: "refuel-rule",
+              triggerMetric: "COMPLETED_ROTATIONS",
+              intervalValue: 1,
+              lowerProgress: 0,
+              expectedProgress: 0,
+              upperProgress: 0,
+              minimumDurationMinutes: 5,
+              typicalDurationMinutes: 5,
+              maximumDurationMinutes: 5,
+              active: true,
+            },
+          ],
+        },
+      ],
+    });
+    const duration = {
+      expectedMinutes: 10,
+      lowerMinutes: 10,
+      upperMinutes: 10,
+      quality: "STABLE" as const,
+      sampleCount: 5,
+    };
+    availability = reserveNextQueueWindow(availability, duration).availability;
+    expect(availability.lanes[0]?.expectedMinutes).toBe(10);
+    availability = reserveNextQueueWindow(availability, duration).availability;
+    expect(availability.lanes[0]?.expectedMinutes).toBe(25);
+    availability = reserveNextQueueWindow(availability, duration).availability;
+    expect(availability.lanes[0]?.expectedMinutes).toBe(40);
+  });
+
+  it("runs simultaneously due aircraft and pilot rules in parallel", () => {
+    const availability = createQueueAvailability({
+      activeAircraft: 1,
+      busyAircraftMinutes: [],
+      lanes: [
+        {
+          laneId: "combined-lane",
+          lowerMinutes: 0,
+          expectedMinutes: 0,
+          upperMinutes: 0,
+          constraints: [],
+          recurringConstraints: [
+            {
+              id: "aircraft-pause",
+              triggerMetric: "COMPLETED_ROTATIONS",
+              intervalValue: 1,
+              lowerProgress: 1,
+              expectedProgress: 1,
+              upperProgress: 1,
+              minimumDurationMinutes: 5,
+              typicalDurationMinutes: 5,
+              maximumDurationMinutes: 5,
+              active: true,
+            },
+            {
+              id: "pilot-pause",
+              triggerMetric: "OPERATING_MINUTES",
+              intervalValue: 30,
+              lowerProgress: 30,
+              expectedProgress: 30,
+              upperProgress: 30,
+              minimumDurationMinutes: 7,
+              typicalDurationMinutes: 9,
+              maximumDurationMinutes: 12,
+              active: true,
+            },
+          ],
+        },
+      ],
+    });
+    const reserved = reserveNextQueueWindow(availability, {
+      expectedMinutes: 10,
+      lowerMinutes: 10,
+      upperMinutes: 10,
+      quality: "STABLE",
+      sampleCount: 5,
+    });
+    expect(reserved.availability.lanes[0]).toMatchObject({
+      lowerMinutes: 16,
+      expectedMinutes: 19,
+      upperMinutes: 22,
+    });
+  });
+
+  it("does not project disabled or post-horizon recurring rules", () => {
+    const lane = {
+      laneId: "lane",
+      lowerMinutes: 20,
+      expectedMinutes: 20,
+      upperMinutes: 20,
+      constraints: [],
+      recurringConstraints: [
+        {
+          id: "disabled",
+          triggerMetric: "COMPLETED_ROTATIONS" as const,
+          intervalValue: 1,
+          lowerProgress: 1,
+          expectedProgress: 1,
+          upperProgress: 1,
+          minimumDurationMinutes: 5,
+          typicalDurationMinutes: 5,
+          maximumDurationMinutes: 5,
+          active: false,
+        },
+        {
+          id: "after-end",
+          triggerMetric: "COMPLETED_ROTATIONS" as const,
+          intervalValue: 1,
+          lowerProgress: 1,
+          expectedProgress: 1,
+          upperProgress: 1,
+          minimumDurationMinutes: 7,
+          typicalDurationMinutes: 7,
+          maximumDurationMinutes: 7,
+          active: true,
+        },
+      ],
+    };
+    const result = reserveNextQueueWindow(
+      createQueueAvailability({
+        activeAircraft: 1,
+        busyAircraftMinutes: [],
+        lanes: [lane],
+      }),
+      {
+        expectedMinutes: 10,
+        lowerMinutes: 10,
+        upperMinutes: 10,
+        quality: "STABLE",
+        sampleCount: 5,
+      },
+      20,
+    );
+    expect(result.availability.lanes[0]?.expectedMinutes).toBe(30);
+  });
+
   it("keeps old learning samples diagnostic without making a fresh estimate uncertain", () => {
     const estimate = estimateDuration({
       referenceMinutes: 20,
@@ -506,6 +655,109 @@ describe("event-driven forecast", () => {
       predictedBoardingAt: "2026-07-22T10:20:00.000Z",
       uncertaintyReasons: [],
     });
+  });
+
+  it("stretches an overlapping rotation without removing capacity", () => {
+    const projection = calculateForecastTimelines({
+      event: {
+        eventId: "event-current",
+        now: "2026-07-22T10:00:00.000Z",
+        operationalInterrupted: false,
+        emergencyMode: false,
+        plannedBoardingMinutes: 5,
+        plannedDeboardingMinutes: 5,
+        plannedBufferMinutes: 6,
+      },
+      capacities: [
+        {
+          resourceGroupId: "rg-1",
+          activeAircraft: 1,
+          availabilityLanes: [
+            {
+              laneId: "aircraft-1:pilot-1",
+              availableLowerAt: "2026-07-22T10:00:00.000Z",
+              availableExpectedAt: "2026-07-22T10:00:00.000Z",
+              availableUpperAt: "2026-07-22T10:00:00.000Z",
+              constraints: [
+                {
+                  id: "slowdown-1",
+                  earliestStartAt: "2026-07-22T10:00:00.000Z",
+                  latestStartAt: "2026-07-22T10:00:00.000Z",
+                  minimumDurationMinutes: 60,
+                  typicalDurationMinutes: 60,
+                  maximumDurationMinutes: 60,
+                  effectMode: "SLOWDOWN",
+                  durationMultiplierPercent: 150,
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      durationSamples: [],
+      rotations: [
+        {
+          id: "draft",
+          status: "DRAFT",
+          createdAt: "2026-07-22T10:00:00.000Z",
+          calledAt: null,
+          departedAt: null,
+          landedAt: null,
+          resourceGroupId: "rg-1",
+          resourceGroupStatus: "ACTIVE",
+          queueSequence: 1,
+          referenceDurationMinutes: 20,
+          productCode: "PAN",
+          aircraftType: null,
+          predictedDepartureAt: null,
+          predictedLandingAt: null,
+          predictedCompletionAt: null,
+        },
+      ],
+    })[0];
+
+    expect(projection).toMatchObject({
+      predictedBoardingAt: "2026-07-22T10:02:30.000Z",
+      predictedCompletionAt: "2026-07-22T10:56:30.000Z",
+      activeCapacity: 1,
+    });
+  });
+
+  it("uses the highest overlapping slowdown factor instead of multiplying factors", () => {
+    const availability = createQueueAvailability({
+      activeAircraft: 1,
+      busyAircraftMinutes: [],
+      lanes: [
+        {
+          laneId: "lane-1",
+          lowerMinutes: 0,
+          expectedMinutes: 0,
+          upperMinutes: 0,
+          constraints: [125, 175].map((durationMultiplierPercent) => ({
+            id: `slowdown-${durationMultiplierPercent}`,
+            earliestStartMinutes: 0,
+            expectedStartMinutes: 0,
+            latestStartMinutes: 0,
+            minimumDurationMinutes: 60,
+            typicalDurationMinutes: 60,
+            maximumDurationMinutes: 60,
+            effectMode: "SLOWDOWN" as const,
+            durationMultiplierPercent,
+            active: false,
+          })),
+        },
+      ],
+    });
+    const reservation = reserveNextQueueWindow(availability, {
+      lowerMinutes: 30,
+      expectedMinutes: 36,
+      upperMinutes: 42,
+      quality: "CHANGING",
+      sampleCount: 0,
+    });
+
+    expect(reservation.durationMultiplierPercent).toBe(175);
+    expect(reservation.duration.expectedMinutes).toBe(63);
   });
 
   it("aggregates repeated uncertainty by variance instead of linear extrema", () => {

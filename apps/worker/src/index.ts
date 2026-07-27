@@ -57,7 +57,11 @@ import { hashPin, randomToken, sha256Hex, verifyCredential, verifyPin } from "./
 import { runD1ReadsSequentially } from "./d1-read-scheduler";
 import { dailyReportCsv, dailyReportPdfLines, loadDailyReport } from "./daily-report";
 import { EventCoordinator } from "./event-coordinator";
-import { eventDeletionStatements } from "./event-deletion";
+import {
+  type EventDeletionResponse,
+  eventDeletionStatements,
+  finishEventDeletionAssetCleanup,
+} from "./event-deletion";
 import {
   eventLogoExtension,
   parseEventLogoTheme,
@@ -1785,15 +1789,16 @@ app.on("GET", eventRoutes("/exports/simulation-plan.json"), async (context) => {
     );
   }
   const exportedAt = new Date().toISOString();
-  const [projection, plans] = await Promise.all([
+  const [projection, plans, recurringRules] = await Promise.all([
     loadMasterDataExportProjection(context.env.DB, eventId, exportedAt),
     context.env.DB.prepare(
-      `SELECT id, scope_type, scope_id, constraint_kind, start_mode,
+      `SELECT id, scope_type, scope_id, constraint_kind, effect_mode,
+                duration_multiplier_percent, start_mode,
                 earliest_start_at, latest_start_at, after_rotation_id,
                 minimum_duration_minutes, typical_duration_minutes, maximum_duration_minutes,
                 public_note
            FROM planned_operational_constraints
-          WHERE operation_day_id = ?1 AND status = 'PLANNED'
+          WHERE operation_day_id = ?1 AND status = 'PLANNED' AND recurring_rule_id IS NULL
           ORDER BY COALESCE(earliest_start_at, created_at), created_at, id`,
     )
       .bind(eventId)
@@ -1802,6 +1807,8 @@ app.on("GET", eventRoutes("/exports/simulation-plan.json"), async (context) => {
         scope_type: "EVENT" | "RESOURCE_GROUP" | "AIRCRAFT" | "PILOT";
         scope_id: string;
         constraint_kind: "PAUSE" | "REFUELING" | "FLIGHT_SHOW" | "WEATHER" | "TECHNICAL" | "OTHER";
+        effect_mode: "BLOCKING" | "SLOWDOWN";
+        duration_multiplier_percent: number | null;
         start_mode: "TIME_WINDOW" | "AFTER_CURRENT_ROTATION";
         earliest_start_at: string | null;
         latest_start_at: string | null;
@@ -1810,6 +1817,27 @@ app.on("GET", eventRoutes("/exports/simulation-plan.json"), async (context) => {
         typical_duration_minutes: number;
         maximum_duration_minutes: number;
         public_note: string;
+      }>(),
+    context.env.DB.prepare(
+      `SELECT id, scope_type, scope_id, operation_kind, trigger_metric, interval_value,
+              progress_value, minimum_duration_minutes, typical_duration_minutes,
+              maximum_duration_minutes
+         FROM recurring_operational_rules
+        WHERE operation_day_id = ?1 AND status = 'ACTIVE'
+        ORDER BY scope_type, scope_id, operation_kind, id`,
+    )
+      .bind(eventId)
+      .all<{
+        id: string;
+        scope_type: "AIRCRAFT" | "PILOT";
+        scope_id: string;
+        operation_kind: "PAUSE" | "REFUELING";
+        trigger_metric: "COMPLETED_ROTATIONS" | "OPERATING_MINUTES";
+        interval_value: number;
+        progress_value: number;
+        minimum_duration_minutes: number;
+        typical_duration_minutes: number;
+        maximum_duration_minutes: number;
       }>(),
   ]);
   if (!projection) {
@@ -1846,6 +1874,8 @@ app.on("GET", eventRoutes("/exports/simulation-plan.json"), async (context) => {
       scopeType: plan.scope_type,
       scopeKey,
       kind: plan.constraint_kind,
+      effectMode: plan.effect_mode,
+      durationMultiplierPercent: plan.duration_multiplier_percent,
       startMode: plan.start_mode,
       earliestStartAt: plan.earliest_start_at,
       latestStartAt: plan.latest_start_at,
@@ -1858,12 +1888,33 @@ app.on("GET", eventRoutes("/exports/simulation-plan.json"), async (context) => {
   });
   const simulationPlan = simulationPlanExportSchema.parse({
     format: "rundflug-simulation-plan",
-    formatVersion: 1,
+    formatVersion: 2,
     exportedAt,
     source: projection.template.source,
     schedule: projection.schedule,
     masterData: projection.template,
     plannedOperations,
+    recurringRules: recurringRules.results.map((rule, index) => {
+      const scopeKey =
+        rule.scope_type === "AIRCRAFT"
+          ? projection.keys.aircraft.get(rule.scope_id)
+          : projection.keys.pilots.get(rule.scope_id);
+      if (!scopeKey) {
+        throw new Error(`Simulationsexport: Ziel für Regel ${rule.id} fehlt.`);
+      }
+      return {
+        key: `rule-${index + 1}`,
+        scopeType: rule.scope_type,
+        scopeKey,
+        kind: rule.operation_kind,
+        triggerMetric: rule.trigger_metric,
+        intervalValue: rule.interval_value,
+        progressValue: rule.progress_value,
+        minimumDurationMinutes: rule.minimum_duration_minutes,
+        typicalDurationMinutes: rule.typical_duration_minutes,
+        maximumDurationMinutes: rule.maximum_duration_minutes,
+      };
+    }),
   });
   return context.json(simulationPlan, 200, {
     "cache-control": "no-store",
@@ -2557,6 +2608,95 @@ app.post("/api/admin/events/:sourceEventId/clone", async (context) => {
 app.delete("/api/admin/events/:eventId", async (context) => {
   const eventId = context.req.param("eventId");
   const sourceEventId = context.req.header("x-event-id")?.trim() || eventId;
+  const input = (await context.req.json().catch(() => null)) as {
+    commandId?: string;
+    expectedVersion?: number;
+    confirmation?: string;
+    reason?: string;
+  } | null;
+  const reason = input?.reason?.trim() ?? "";
+  if (
+    !input?.commandId ||
+    !Number.isInteger(input.expectedVersion) ||
+    (input.expectedVersion ?? -1) < 0 ||
+    input.confirmation !== eventId ||
+    reason.length < 3
+  ) {
+    return context.json(
+      {
+        error: {
+          code: "EVENT_DELETE_CONFIRMATION_INVALID",
+          message:
+            "Kommando-ID, Version, Veranstaltungs-ID und Begründung müssen bestätigt werden.",
+        },
+      },
+      400,
+    );
+  }
+  const requestHash = await sha256Hex(
+    JSON.stringify({
+      sourceEventId,
+      eventId,
+      expectedVersion: input.expectedVersion,
+      confirmation: input.confirmation,
+      reason,
+    }),
+  );
+  const prior = await context.env.DB.prepare(
+    `SELECT request_hash, actor_device_id, browser_binding_hash, legacy_credential_hash,
+            r2_cleanup_pending, logo_object_keys_json, response_json
+       FROM event_deletion_receipts WHERE command_id = ?1`,
+  )
+    .bind(input.commandId)
+    .first<{
+      request_hash: string;
+      actor_device_id: string;
+      browser_binding_hash: string | null;
+      legacy_credential_hash: string | null;
+      r2_cleanup_pending: number;
+      logo_object_keys_json: string;
+      response_json: string;
+    }>();
+  if (prior) {
+    const browserBindingHash = await sessionBrowserBindingHash(context.req.raw);
+    const browserMatches =
+      Boolean(browserBindingHash) && browserBindingHash === prior.browser_binding_hash;
+    const legacyMatches =
+      context.env.APP_ENV === "development" &&
+      context.req.header("x-device-id") === prior.actor_device_id &&
+      (await verifyCredential(
+        context.req.header("x-device-token") ?? null,
+        prior.legacy_credential_hash,
+      ));
+    if (!browserMatches && !legacyMatches) {
+      return context.json(
+        { error: { code: "ADMIN_REQUIRED", message: "Administration erforderlich." } },
+        403,
+      );
+    }
+    if (prior.request_hash !== requestHash) {
+      return context.json(
+        { error: { code: "IDEMPOTENCY_CONFLICT", message: "Kommando-ID ist bereits belegt." } },
+        409,
+      );
+    }
+    let response = JSON.parse(prior.response_json) as EventDeletionResponse;
+    if (prior.r2_cleanup_pending) {
+      const logoObjectKeys = JSON.parse(prior.logo_object_keys_json) as string[];
+      try {
+        response = await finishEventDeletionAssetCleanup(
+          context.env,
+          input.commandId,
+          logoObjectKeys,
+          response,
+        );
+      } catch {
+        return context.json(response, 202);
+      }
+    }
+    return context.json(response);
+  }
+
   const device = await authorizeDevice(context.env, sourceEventId, context.req.raw);
   if (device?.role !== "ADMIN") {
     return context.json(
@@ -2564,27 +2704,14 @@ app.delete("/api/admin/events/:eventId", async (context) => {
       403,
     );
   }
-  const input = (await context.req.json().catch(() => null)) as {
-    confirmation?: string;
-    reason?: string;
-  } | null;
-  if (input?.confirmation !== eventId || (input.reason?.trim().length ?? 0) < 3) {
-    return context.json(
-      {
-        error: {
-          code: "EVENT_DELETE_CONFIRMATION_INVALID",
-          message: "Veranstaltungs-ID und Begründung müssen bestätigt werden.",
-        },
-      },
-      400,
-    );
-  }
   const event = await context.env.DB.prepare(
-    "SELECT id, logo_object_key, logo_dark_object_key FROM operation_days WHERE id = ?1",
+    `SELECT id, version, logo_object_key, logo_dark_object_key
+       FROM operation_days WHERE id = ?1`,
   )
     .bind(eventId)
     .first<{
       id: string;
+      version: number;
       logo_object_key: string | null;
       logo_dark_object_key: string | null;
     }>();
@@ -2594,10 +2721,97 @@ app.delete("/api/admin/events/:eventId", async (context) => {
       404,
     );
   }
+  if (event.version !== input.expectedVersion) {
+    return context.json(
+      {
+        error: {
+          code: "EVENT_VERSION_CONFLICT",
+          message: "Die Veranstaltung wurde inzwischen geändert.",
+          currentVersion: event.version,
+        },
+      },
+      409,
+    );
+  }
   const count = await context.env.DB.prepare("SELECT COUNT(*) AS count FROM operation_days").first<{
     count: number;
   }>();
   const lastEvent = (count?.count ?? 0) <= 1;
+  const bootstrap = await context.env.DB.prepare(
+    "SELECT operation_day_id FROM app_bootstrap WHERE singleton = 1",
+  ).first<{ operation_day_id: string }>();
+  const sessionRebindEvent = !lastEvent
+    ? await context.env.DB.prepare(
+        `SELECT id
+             FROM operation_days
+            WHERE id <> ?1
+            ORDER BY CASE WHEN id = ?2 THEN 0 ELSE 1 END,
+                     event_date DESC, created_at DESC, id
+            LIMIT 1`,
+      )
+        .bind(eventId, sourceEventId)
+        .first<{ id: string }>()
+    : null;
+  if (!lastEvent && !sessionRebindEvent) {
+    return context.json(
+      {
+        error: {
+          code: "EVENT_DELETE_REPLACEMENT_MISSING",
+          message: "Für aktive Sitzungen wurde keine verbleibende Veranstaltung gefunden.",
+        },
+      },
+      409,
+    );
+  }
+  const replacement =
+    !lastEvent && bootstrap?.operation_day_id === eventId
+      ? await context.env.DB.prepare(
+          `SELECT operation_day.id, device.id AS admin_device_id
+             FROM operation_days operation_day
+             JOIN paired_devices device
+               ON device.operation_day_id = operation_day.id
+              AND device.role = 'ADMIN'
+              AND device.active = 1
+            WHERE operation_day.id <> ?1
+            ORDER BY CASE WHEN operation_day.id = ?2 THEN 0 ELSE 1 END,
+                     operation_day.event_date DESC,
+                     operation_day.created_at DESC,
+                     operation_day.id,
+                     device.paired_at
+            LIMIT 1`,
+        )
+          .bind(eventId, sourceEventId)
+          .first<{ id: string; admin_device_id: string }>()
+      : null;
+  if (!lastEvent && bootstrap?.operation_day_id === eventId && !replacement) {
+    return context.json(
+      {
+        error: {
+          code: "EVENT_DELETE_BOOTSTRAP_REPLACEMENT_MISSING",
+          message: "Für die verbleibende Veranstaltung fehlt eine aktive Administrationssitzung.",
+        },
+      },
+      409,
+    );
+  }
+  const browserBindingHash = await sessionBrowserBindingHash(context.req.raw);
+  const legacyCredentialHash =
+    browserBindingHash === null && context.env.APP_ENV === "development"
+      ? ((
+          await context.env.DB.prepare(
+            `SELECT credential_hash FROM paired_devices
+              WHERE id = ?1 AND operation_day_id = ?2 AND active = 1`,
+          )
+            .bind(device.id, sourceEventId)
+            .first<{ credential_hash: string | null }>()
+        )?.credential_hash ?? null)
+      : null;
+  if (!browserBindingHash && !legacyCredentialHash) {
+    return context.json(
+      { error: { code: "ADMIN_REQUIRED", message: "Administration erforderlich." } },
+      403,
+    );
+  }
   const coordinator = context.env.EVENT_COORDINATOR.get(
     context.env.EVENT_COORDINATOR.idFromName(eventId),
   );
@@ -2610,20 +2824,91 @@ app.delete("/api/admin/events/:eventId", async (context) => {
       409,
     );
   }
-  const statements = eventDeletionStatements(context.env, eventId);
+  const logoObjectKeys = [...new Set([event.logo_object_key, event.logo_dark_object_key])].filter(
+    (key): key is string => Boolean(key),
+  );
+  const completedAt = new Date().toISOString();
+  const response: EventDeletionResponse = {
+    deleted: true,
+    eventId,
+    setupRequired: lastEvent,
+    assetCleanupPending: logoObjectKeys.length > 0,
+  };
+  const statements: D1PreparedStatement[] = [
+    context.env.DB.prepare("UPDATE system_reset_control SET active = 1 WHERE singleton = 1"),
+  ];
+  if (lastEvent) {
+    statements.push(context.env.DB.prepare("DELETE FROM app_bootstrap"));
+  } else if (replacement) {
+    statements.push(
+      context.env.DB.prepare(
+        `UPDATE app_bootstrap
+            SET operation_day_id = ?1, admin_device_id = ?2
+          WHERE singleton = 1 AND operation_day_id = ?3`,
+      ).bind(replacement.id, replacement.admin_device_id, eventId),
+    );
+  }
+  if (sessionRebindEvent) {
+    statements.push(
+      context.env.DB.prepare(
+        `UPDATE paired_devices
+            SET operation_day_id = ?1, last_seen_at = ?2
+          WHERE operation_day_id = ?3
+            AND id IN (
+              SELECT device_id
+                FROM operator_sessions
+               WHERE revoked_at IS NULL
+                 AND absolute_expires_at > ?2
+            )`,
+      ).bind(sessionRebindEvent.id, completedAt, eventId),
+    );
+  }
+  statements.push(...eventDeletionStatements(context.env, eventId));
   if (lastEvent) {
     statements.push(
       context.env.DB.prepare("DELETE FROM operator_sessions"),
       context.env.DB.prepare("DELETE FROM operator_accounts"),
-      context.env.DB.prepare("DELETE FROM app_bootstrap"),
     );
   }
-  await context.env.DB.batch(statements);
-  const logoObjectKeys = [...new Set([event.logo_object_key, event.logo_dark_object_key])].filter(
-    (key): key is string => Boolean(key),
+  statements.push(
+    context.env.DB.prepare("UPDATE system_reset_control SET active = 0 WHERE singleton = 1"),
+    context.env.DB.prepare(
+      `INSERT INTO event_deletion_receipts
+          (command_id, request_hash, source_operation_day_id, target_operation_day_id,
+           target_version, actor_device_id, browser_binding_hash, legacy_credential_hash,
+           completed_at, r2_cleanup_pending, logo_object_keys_json, response_json)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)`,
+    ).bind(
+      input.commandId,
+      requestHash,
+      sourceEventId,
+      eventId,
+      event.version,
+      device.id,
+      browserBindingHash,
+      legacyCredentialHash,
+      completedAt,
+      logoObjectKeys.length > 0 ? 1 : 0,
+      JSON.stringify(logoObjectKeys),
+      JSON.stringify(response),
+    ),
   );
-  if (logoObjectKeys.length > 0) await context.env.BACKUPS.delete(logoObjectKeys);
-  return context.json({ deleted: true, eventId, setupRequired: lastEvent });
+  await context.env.DB.batch(statements);
+  if (logoObjectKeys.length > 0) {
+    try {
+      return context.json(
+        await finishEventDeletionAssetCleanup(
+          context.env,
+          input.commandId,
+          logoObjectKeys,
+          response,
+        ),
+      );
+    } catch {
+      return context.json(response, 202);
+    }
+  }
+  return context.json(response);
 });
 
 app.put("/api/admin/events/:eventId/logo", async (context) => {
@@ -3217,6 +3502,7 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
     gatesRows,
     resourceGroupRows,
     plannedOperationRows,
+    recurringRuleRows,
     metricsRow,
   ] = await runD1ReadsSequentially([
     () =>
@@ -3696,12 +3982,14 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
     () =>
       context.env.DB.prepare(
         `SELECT plan.id, plan.version, plan.scope_type, plan.scope_id,
-                plan.constraint_kind, plan.start_mode, plan.earliest_start_at,
+                plan.constraint_kind, plan.effect_mode, plan.duration_multiplier_percent,
+                plan.start_mode, plan.earliest_start_at,
                 plan.latest_start_at, plan.after_rotation_id,
                 plan.minimum_duration_minutes, plan.typical_duration_minutes,
                 plan.maximum_duration_minutes, plan.status, plan.public_note,
                 plan.created_at, plan.updated_at, plan.activated_at, plan.cleared_at,
-                plan.canceled_at, after_rotation.status AS after_rotation_status
+                plan.canceled_at, plan.recurring_rule_id, plan.recurrence_sequence,
+                after_rotation.status AS after_rotation_status
            FROM planned_operational_constraints plan
            LEFT JOIN rotations after_rotation ON after_rotation.id = plan.after_rotation_id
           WHERE plan.operation_day_id = ?1
@@ -3722,6 +4010,8 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
             | "WEATHER"
             | "TECHNICAL"
             | "OTHER";
+          effect_mode: "BLOCKING" | "SLOWDOWN";
+          duration_multiplier_percent: number | null;
           start_mode: "TIME_WINDOW" | "AFTER_CURRENT_ROTATION";
           earliest_start_at: string | null;
           latest_start_at: string | null;
@@ -3736,7 +4026,48 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
           activated_at: string | null;
           cleared_at: string | null;
           canceled_at: string | null;
+          recurring_rule_id: string | null;
+          recurrence_sequence: number | null;
           after_rotation_status: string | null;
+        }>(),
+    () =>
+      context.env.DB.prepare(
+        `SELECT rule.id, rule.operation_day_id, rule.version, rule.scope_type, rule.scope_id,
+                rule.operation_kind, rule.trigger_metric, rule.interval_value,
+                rule.progress_value, rule.minimum_duration_minutes,
+                rule.typical_duration_minutes, rule.maximum_duration_minutes,
+                rule.status, rule.sequence_number, rule.reason, rule.last_reset_at,
+                rule.created_at, rule.updated_at,
+                (SELECT plan.id FROM planned_operational_constraints plan
+                  WHERE plan.recurring_rule_id = rule.id
+                    AND plan.status IN ('PLANNED', 'ACTIVE')
+                  ORDER BY plan.recurrence_sequence DESC LIMIT 1) AS open_plan_id
+           FROM recurring_operational_rules rule
+          WHERE rule.operation_day_id = ?1
+          ORDER BY CASE rule.status WHEN 'ACTIVE' THEN 0 ELSE 1 END,
+                   rule.scope_type, rule.scope_id, rule.operation_kind`,
+      )
+        .bind(eventId)
+        .all<{
+          id: string;
+          operation_day_id: string;
+          version: number;
+          scope_type: "AIRCRAFT" | "PILOT";
+          scope_id: string;
+          operation_kind: "PAUSE" | "REFUELING";
+          trigger_metric: "COMPLETED_ROTATIONS" | "OPERATING_MINUTES";
+          interval_value: number;
+          progress_value: number;
+          minimum_duration_minutes: number;
+          typical_duration_minutes: number;
+          maximum_duration_minutes: number;
+          status: "ACTIVE" | "DISABLED";
+          sequence_number: number;
+          reason: string;
+          last_reset_at: string;
+          created_at: string;
+          updated_at: string;
+          open_plan_id: string | null;
         }>(),
     () =>
       context.env.DB.prepare(
@@ -4169,6 +4500,8 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
       scopeType: plan.scope_type,
       scopeId: plan.scope_id,
       kind: plan.constraint_kind,
+      effectMode: plan.effect_mode,
+      durationMultiplierPercent: plan.duration_multiplier_percent,
       startMode: plan.start_mode,
       earliestStartAt: plan.earliest_start_at,
       latestStartAt: plan.latest_start_at,
@@ -4189,6 +4522,29 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
       activatedAt: plan.activated_at,
       clearedAt: plan.cleared_at,
       canceledAt: plan.canceled_at,
+      recurringRuleId: plan.recurring_rule_id,
+      recurrenceSequence: plan.recurrence_sequence,
+    })),
+    recurringOperationalRules: recurringRuleRows.results.map((rule) => ({
+      id: rule.id,
+      operationDayId: rule.operation_day_id,
+      version: rule.version,
+      scopeType: rule.scope_type,
+      scopeId: rule.scope_id,
+      kind: rule.operation_kind,
+      triggerMetric: rule.trigger_metric,
+      intervalValue: rule.interval_value,
+      progressValue: rule.progress_value,
+      minimumDurationMinutes: rule.minimum_duration_minutes,
+      typicalDurationMinutes: rule.typical_duration_minutes,
+      maximumDurationMinutes: rule.maximum_duration_minutes,
+      status: rule.status,
+      sequenceNumber: rule.sequence_number,
+      openPlannedOperationId: rule.open_plan_id,
+      reason: rule.reason,
+      lastResetAt: rule.last_reset_at,
+      createdAt: rule.created_at,
+      updatedAt: rule.updated_at,
     })),
     gates: gatesRows.results.map((gate) => ({
       id: gate.id,

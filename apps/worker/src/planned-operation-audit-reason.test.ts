@@ -31,4 +31,23 @@ describe("plannedOperationAuditReason", () => {
       }),
     ).toBe("Flight Director: technische Unterbrechung für ein Flugzeug abgesagt.");
   });
+
+  it("describes manually confirmed slowdown boundaries", () => {
+    expect(
+      plannedOperationAuditReason({
+        role: "FLIGHT_DIRECTOR",
+        action: "START",
+        kind: "WEATHER",
+        scopeType: "EVENT",
+      }),
+    ).toBe("Flight Director: Wetterunterbrechung für die gesamte Veranstaltung gestartet.");
+    expect(
+      plannedOperationAuditReason({
+        role: "FLIGHT_DIRECTOR",
+        action: "END",
+        kind: "WEATHER",
+        scopeType: "EVENT",
+      }),
+    ).toBe("Flight Director: Wetterunterbrechung für die gesamte Veranstaltung beendet.");
+  });
 });

@@ -10,6 +10,7 @@ import {
   type SimulationConfig,
   type SimulationOperationalModel,
   type SimulationPlannedOperation,
+  type SimulationRecurringOperationalRule,
   salesDurationMinutes,
 } from "./model";
 
@@ -26,6 +27,7 @@ export interface SimulationPlanImportPreview {
     pilots: number;
     products: number;
     plannedOperations: number;
+    recurringRules: number;
     unresolvedAfterCurrentRotation: number;
   };
   warnings: string[];
@@ -52,6 +54,7 @@ function createOperationalModel(template: MasterDataTemplate): SimulationOperati
       registration: entry.registration,
       aircraftType: entry.aircraftType,
       capacity: entry.passengerSeats,
+      refuelReminderThreshold: entry.refuelReminderThreshold,
       ...(assignmentByAircraftKey.has(entry.key)
         ? { resourceGroupId: assignmentByAircraftKey.get(entry.key) as string }
         : {}),
@@ -81,6 +84,8 @@ function createPlannedOperations(
     scopeType: entry.scopeType,
     scopeId: entry.scopeKey,
     kind: entry.kind,
+    effectMode: entry.effectMode,
+    durationMultiplierPercent: entry.durationMultiplierPercent,
     startMode: entry.startMode,
     earliestStartAt: entry.earliestStartAt,
     latestStartAt: entry.latestStartAt,
@@ -90,6 +95,15 @@ function createPlannedOperations(
     typicalDurationMinutes: entry.typicalDurationMinutes,
     maximumDurationMinutes: entry.maximumDurationMinutes,
     publicNote: entry.publicNote,
+  }));
+}
+
+function createRecurringRules(
+  exported: SimulationPlanExport | null,
+): SimulationRecurringOperationalRule[] {
+  return (exported?.recurringRules ?? []).map((entry) => ({
+    ...entry,
+    scopeId: entry.scopeKey,
   }));
 }
 
@@ -110,6 +124,7 @@ function buildPreview(
     ]),
   );
   const plannedOperations = createPlannedOperations(exported);
+  const recurringRules = createRecurringRules(exported);
   const aircraftTypes = new Set(operationalModel.aircraft.map((entry) => entry.aircraftType));
   const representativeProduct = operationalModel.products[0];
   const firstDemand = representativeProduct ? demandByProduct[representativeProduct.id] : undefined;
@@ -146,6 +161,7 @@ function buildPreview(
     operationalModel,
     demandByProduct,
     plannedOperations,
+    recurringRules,
   };
   const unresolvedAfterCurrentRotation = plannedOperations.filter(
     (entry) => entry.unresolvedAfterCurrentRotation,
@@ -183,6 +199,7 @@ function buildPreview(
       pilots: activePilots,
       products: operationalModel.products.length,
       plannedOperations: plannedOperations.length,
+      recurringRules: recurringRules.length,
       unresolvedAfterCurrentRotation,
     },
     warnings,

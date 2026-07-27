@@ -4,7 +4,9 @@ import { Button, ModalDialog, Tabs, TextAreaField } from "../../design-system/co
 import {
   OperationalPlanPanel,
   type PlannedOperation,
+  type RecurringOperationalRule,
   type UpsertPlannedOperationPayload,
+  type UpsertRecurringOperationalRulePayload,
 } from "../operations/OperationalPlanPanel";
 
 type OperationsTab = "operations" | "plan" | "resources";
@@ -36,17 +38,20 @@ export interface FlightDirectorOperationsDialogProps {
   aircraft: OperationBoard["aircraft"];
   pilots: OperationBoard["pilots"];
   plannedOperations: OperationBoard["plannedOperations"];
+  recurringOperationalRules: OperationBoard["recurringOperationalRules"];
   rotations: OperationBoard["rotations"];
   resourceGroups: ResourceGroup[];
   onCancelPlannedOperation: (plan: PlannedOperation) => Promise<void>;
   onClose: () => void;
   onConfirmPlannedOperation: (plan: PlannedOperation, activate: boolean) => Promise<void>;
+  onDisableRecurringRule: (rule: RecurringOperationalRule) => Promise<void>;
   onPublishEventNotice: (notice: string) => Promise<boolean>;
   onPublishResourceNotice: (resourceGroupId: string, notice: string) => Promise<boolean>;
   onSetEventInterruption: (interrupted: boolean) => Promise<void>;
   onSetResourceGroupStatus: (resourceGroupId: string, status: ResourceGroupStatus) => Promise<void>;
   onTriggerEmergency: () => Promise<void>;
   onUpsertPlannedOperation: (payload: UpsertPlannedOperationPayload) => Promise<void>;
+  onUpsertRecurringRule: (payload: UpsertRecurringOperationalRulePayload) => Promise<void>;
 }
 
 interface OperationalNoticeEditorProps {
@@ -117,17 +122,20 @@ export function FlightDirectorOperationsDialog({
   open,
   pilots,
   plannedOperations,
+  recurringOperationalRules,
   resourceGroups,
   rotations,
   onCancelPlannedOperation,
   onClose,
   onConfirmPlannedOperation,
+  onDisableRecurringRule,
   onPublishEventNotice,
   onPublishResourceNotice,
   onSetEventInterruption,
   onSetResourceGroupStatus,
   onTriggerEmergency,
   onUpsertPlannedOperation,
+  onUpsertRecurringRule,
 }: FlightDirectorOperationsDialogProps) {
   const [tab, setTab] = useState<OperationsTab>("operations");
   const [noticeTarget, setNoticeTarget] = useState<NoticeEditorTarget | null>(null);
@@ -309,9 +317,12 @@ export function FlightDirectorOperationsDialog({
                 mode="flight-director"
                 onCancel={onCancelPlannedOperation}
                 onConfirm={onConfirmPlannedOperation}
+                onDisableRecurringRule={onDisableRecurringRule}
                 onUpsert={onUpsertPlannedOperation}
+                onUpsertRecurringRule={onUpsertRecurringRule}
                 pilots={pilots}
                 plannedOperations={plannedOperations}
+                recurringOperationalRules={recurringOperationalRules}
                 resourceGroups={resourceGroups}
                 rotations={rotations}
               />

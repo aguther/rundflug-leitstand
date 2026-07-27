@@ -443,28 +443,46 @@ export async function cloneEvent(
 export async function deleteEvent(
   sourceEventId: string,
   eventId: string,
+  expectedVersion: number,
   deviceId: string,
   deviceToken: string,
   reason: string,
-): Promise<{ deleted: true; eventId: string; setupRequired: boolean }> {
+): Promise<{
+  deleted: true;
+  eventId: string;
+  setupRequired: boolean;
+  assetCleanupPending: boolean;
+}> {
+  const commandId = crypto.randomUUID();
   const response = await apiFetch(`/api/admin/events/${encodeURIComponent(eventId)}`, {
     method: "DELETE",
     headers: deviceHeaders(deviceId, deviceToken, {
       "content-type": "application/json",
       "x-event-id": sourceEventId,
     }),
-    body: JSON.stringify({ confirmation: eventId, reason }),
+    body: JSON.stringify({
+      commandId,
+      expectedVersion,
+      confirmation: eventId,
+      reason,
+    }),
   });
   const body = (await response.json()) as {
     deleted?: boolean;
     eventId?: string;
     setupRequired?: boolean;
+    assetCleanupPending?: boolean;
     error?: { message?: string };
   };
   if (!response.ok || body.deleted !== true || body.eventId !== eventId) {
     throw new Error(body.error?.message ?? "Veranstaltung konnte nicht gelöscht werden.");
   }
-  return body as { deleted: true; eventId: string; setupRequired: boolean };
+  return body as {
+    deleted: true;
+    eventId: string;
+    setupRequired: boolean;
+    assetCleanupPending: boolean;
+  };
 }
 
 export async function uploadEventLogo(

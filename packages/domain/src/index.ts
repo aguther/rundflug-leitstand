@@ -204,6 +204,9 @@ export type OperationalCommandType =
   | "SET_PILOT_PAUSE"
   | "UPSERT_PLANNED_OPERATION"
   | "CANCEL_PLANNED_OPERATION"
+  | "SET_PLANNED_SLOWDOWN_ACTIVE"
+  | "UPSERT_RECURRING_OPERATIONAL_RULE"
+  | "DISABLE_RECURRING_OPERATIONAL_RULE"
   | "CONFIGURE_PRODUCT_SALES"
   | "PAIR_DEVICE"
   | "REVOKE_DEVICE"
@@ -256,6 +259,9 @@ const commandRoles: Readonly<Record<OperationalCommandType, readonly DeviceRole[
   SET_PILOT_PAUSE: ["FLIGHT_DIRECTOR", "ADMIN"],
   UPSERT_PLANNED_OPERATION: ["FLIGHT_DIRECTOR", "ADMIN"],
   CANCEL_PLANNED_OPERATION: ["FLIGHT_DIRECTOR", "ADMIN"],
+  SET_PLANNED_SLOWDOWN_ACTIVE: ["FLIGHT_DIRECTOR"],
+  UPSERT_RECURRING_OPERATIONAL_RULE: ["FLIGHT_DIRECTOR", "ADMIN"],
+  DISABLE_RECURRING_OPERATIONAL_RULE: ["FLIGHT_DIRECTOR", "ADMIN"],
   CONFIGURE_PRODUCT_SALES: ["ADMIN"],
   PAIR_DEVICE: ["ADMIN"],
   REVOKE_DEVICE: ["ADMIN"],
@@ -355,3 +361,4 @@ export * from "./outage-recovery";
 export * from "./precall";
 export * from "./public-status";
 export * from "./queue";
+export * from "./recurring-operational-rule";

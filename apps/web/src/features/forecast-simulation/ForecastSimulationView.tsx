@@ -1119,6 +1119,10 @@ export function ForecastSimulationView() {
                 <dt>Planeinträge</dt>
                 <dd>{planImportPreview.counts.plannedOperations}</dd>
               </div>
+              <div>
+                <dt>Regeln</dt>
+                <dd>{planImportPreview.counts.recurringRules}</dd>
+              </div>
             </dl>
             {planImportPreview.warnings.map((warning) => (
               <p className="sim-plan-import-warning" key={warning}>

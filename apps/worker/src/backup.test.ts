@@ -38,6 +38,7 @@ describe("portable backup format", () => {
         "app_bootstrap",
         "rotation_manifest_corrections",
         "planned_operational_constraints",
+        "recurring_operational_rules",
       ]),
     );
     expect(BACKUP_TABLES).not.toContain("web_push_subscriptions");

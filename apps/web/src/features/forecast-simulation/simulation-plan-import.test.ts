@@ -157,6 +157,36 @@ describe("simulation plan import", () => {
     expect(preview.warnings.join(" ")).toContain("keinen Tageszeitplan");
   });
 
+  it("imports V2 recurring rules and keeps the confirmed progress", () => {
+    const value = {
+      ...simulationPlan(),
+      formatVersion: 2,
+      recurringRules: [
+        {
+          key: "rule-1",
+          scopeType: "AIRCRAFT",
+          scopeKey: "aircraft-1",
+          kind: "REFUELING",
+          triggerMetric: "COMPLETED_ROTATIONS",
+          intervalValue: 5,
+          progressValue: 3,
+          minimumDurationMinutes: 8,
+          typicalDurationMinutes: 12,
+          maximumDurationMinutes: 18,
+        },
+      ],
+    };
+    const preview = parseSimulationPlanImport(
+      JSON.stringify(value),
+      simulationConfigForPreset("NORMAL"),
+    );
+    expect(preview.counts.recurringRules).toBe(1);
+    expect(preview.config.recurringRules?.[0]).toMatchObject({
+      scopeId: "aircraft-1",
+      progressValue: 3,
+    });
+  });
+
   it("rejects malformed or expanded payloads", () => {
     expect(() => parseSimulationPlanImport("{", simulationConfigForPreset("NORMAL"))).toThrow(
       SimulationPlanImportError,

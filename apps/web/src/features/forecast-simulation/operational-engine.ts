@@ -17,6 +17,7 @@ import type {
   SimulationMetrics,
   SimulationPilot,
   SimulationPlannedOperation,
+  SimulationRecurringOperationalRule,
   SimulationResult,
   SimulationRotation,
   TriangularDistribution,
@@ -35,6 +36,7 @@ interface OperationalRotation extends SimulationRotation {
   predictedDepartureAt: string | null;
   predictedLandingAt: string | null;
   predictedCompletionAt: string | null;
+  slowdownMultiplierPercent: number;
 }
 
 interface OperationalAircraft extends SimulationAircraft {
@@ -63,6 +65,12 @@ interface OperationalPlan extends SimulationPlannedOperation {
   actualStartMs: number | null;
   actualEndMs: number | null;
   completed: boolean;
+  recurringRuleKey: string | null;
+}
+
+interface OperationalRecurringRule extends SimulationRecurringOperationalRule {
+  currentProgress: number;
+  sequenceNumber: number;
 }
 
 type MetricsCalculator = (input: {
@@ -202,6 +210,7 @@ function createOperationalDemand(config: SimulationConfig): OperationalRotation[
       predictedDepartureAt: null,
       predictedLandingAt: null,
       predictedCompletionAt: null,
+      slowdownMultiplierPercent: 100,
     };
   });
 }
@@ -223,6 +232,7 @@ function createOperationalPlans(config: SimulationConfig): OperationalPlan[] {
       actualStartMs: null,
       actualEndMs: null,
       completed: false,
+      recurringRuleKey: null,
     };
   });
 }
@@ -241,6 +251,7 @@ function publicRotation(rotation: OperationalRotation): SimulationRotation {
     predictedDepartureAt: _predictedDepartureAt,
     predictedLandingAt: _predictedLandingAt,
     predictedCompletionAt: _predictedCompletionAt,
+    slowdownMultiplierPercent: _slowdownMultiplierPercent,
     ...result
   } = rotation;
   return result;
@@ -296,6 +307,11 @@ export function runOperationalSimulation(
     activeRotationId: null,
   }));
   const plans = createOperationalPlans(config);
+  const recurringRules: OperationalRecurringRule[] = (config.recurringRules ?? []).map((rule) => ({
+    ...structuredClone(rule),
+    currentProgress: rule.progressValue,
+    sequenceNumber: 0,
+  }));
   const events: SimulationEvent[] = [];
   const snapshots: SimulationForecastSnapshot[] = [];
   const processedIncidentIds = new Set<string>();
@@ -340,8 +356,54 @@ export function runOperationalSimulation(
   ) =>
     plans.some(
       (plan) =>
-        plan.scopeType === scopeType && plan.scopeId === scopeId && planIsActive(plan, nowMs),
+        (plan.effectMode ?? "BLOCKING") === "BLOCKING" &&
+        plan.scopeType === scopeType &&
+        plan.scopeId === scopeId &&
+        planIsActive(plan, nowMs),
     );
+
+  const planAppliesToRotation = (plan: OperationalPlan, rotation: OperationalRotation) =>
+    plan.scopeType === "EVENT" ||
+    (plan.scopeType === "RESOURCE_GROUP" && plan.scopeId === rotation.resourceGroupId) ||
+    (plan.scopeType === "AIRCRAFT" && plan.scopeId === rotation.aircraftId) ||
+    (plan.scopeType === "PILOT" && plan.scopeId === rotation.pilotId);
+
+  const activeSlowdownPercent = (rotation: OperationalRotation, nowMs: number) =>
+    plans.reduce(
+      (maximum, plan) =>
+        (plan.effectMode ?? "BLOCKING") === "SLOWDOWN" &&
+        planIsActive(plan, nowMs) &&
+        planAppliesToRotation(plan, rotation)
+          ? Math.max(maximum, plan.durationMultiplierPercent ?? 150)
+          : maximum,
+      100,
+    );
+
+  const applySlowdownToRemainingPhases = (
+    rotation: OperationalRotation,
+    targetMultiplierPercent: number,
+  ) => {
+    if (targetMultiplierPercent <= rotation.slowdownMultiplierPercent) return;
+    const ratio = targetMultiplierPercent / rotation.slowdownMultiplierPercent;
+    if (rotation.status === "CALLED" && rotation.boardingMinutes !== null) {
+      rotation.boardingMinutes *= ratio;
+    }
+    if (
+      (rotation.status === "CALLED" || rotation.status === "IN_FLIGHT") &&
+      rotation.flightMinutes !== null
+    ) {
+      rotation.flightMinutes *= ratio;
+    }
+    if (
+      ["CALLED", "IN_FLIGHT", "LANDED"].includes(rotation.status) &&
+      rotation.deboardingMinutes !== null &&
+      rotation.bufferMinutes !== null
+    ) {
+      rotation.deboardingMinutes *= ratio;
+      rotation.bufferMinutes *= ratio;
+    }
+    rotation.slowdownMultiplierPercent = targetMultiplierPercent;
+  };
 
   const globalIncidentActive = (nowMs: number) =>
     manualIncidents.some(
@@ -397,7 +459,7 @@ export function runOperationalSimulation(
         });
     }
     const durationSamples = rotations.flatMap((rotation) =>
-      rotation.completedAt && rotation.calledAt
+      rotation.completedAt && rotation.calledAt && rotation.slowdownMultiplierPercent === 100
         ? [
             {
               minutes:
@@ -420,6 +482,7 @@ export function runOperationalSimulation(
         .filter(
           (plan) =>
             !plan.completed &&
+            ((plan.effectMode ?? "BLOCKING") === "SLOWDOWN" || plan.actualStartMs === null) &&
             plan.startMode === "TIME_WINDOW" &&
             plan.earliestStartAt &&
             plan.latestStartAt &&
@@ -428,25 +491,51 @@ export function runOperationalSimulation(
         )
         .map((plan) => ({
           id: plan.key,
-          earliestStartAt: plan.earliestStartAt ?? iso(nowMs),
-          latestStartAt: plan.latestStartAt ?? iso(nowMs),
+          earliestStartAt:
+            plan.actualStartMs !== null
+              ? iso(plan.actualStartMs)
+              : (plan.earliestStartAt ?? iso(nowMs)),
+          latestStartAt:
+            plan.actualStartMs !== null
+              ? iso(plan.actualStartMs)
+              : (plan.latestStartAt ?? iso(nowMs)),
           minimumDurationMinutes: plan.minimumDurationMinutes,
           typicalDurationMinutes: plan.typicalDurationMinutes,
           maximumDurationMinutes: plan.maximumDurationMinutes,
+          effectMode: plan.effectMode ?? "BLOCKING",
+          durationMultiplierPercent: plan.durationMultiplierPercent ?? null,
+          active: planIsActive(plan, nowMs),
           overdue: Date.parse(plan.latestStartAt ?? iso(nowMs)) < nowMs,
         }));
-      const availabilityLanes = groupAircraft.map((entry) => {
+      const orderedPilots = [...pilots]
+        .filter((pilot) => pilot.active)
+        .sort((left, right) => left.id.localeCompare(right.id));
+      const availabilityLanes = groupAircraft.map((entry, laneIndex) => {
         const activeRotation = entry.activeRotationId
           ? rotations.find((rotation) => rotation.id === entry.activeRotationId)
           : null;
+        const lanePilot =
+          (activeRotation?.pilotId
+            ? pilots.find((pilot) => pilot.id === activeRotation.pilotId)
+            : null) ?? orderedPilots[laneIndex % Math.max(1, orderedPilots.length)];
         const activeAircraftPlan = plans.find(
           (plan) =>
-            plan.scopeType === "AIRCRAFT" && plan.scopeId === entry.id && planIsActive(plan, nowMs),
+            (plan.effectMode ?? "BLOCKING") === "BLOCKING" &&
+            plan.scopeType === "AIRCRAFT" &&
+            plan.scopeId === entry.id &&
+            planIsActive(plan, nowMs),
         );
         const expectedAt = Math.max(
           nowMs,
           entry.blockedUntilMs ?? 0,
           activeAircraftPlan?.actualEndMs ?? 0,
+          plans.find(
+            (plan) =>
+              (plan.effectMode ?? "BLOCKING") === "BLOCKING" &&
+              plan.scopeType === "PILOT" &&
+              plan.scopeId === lanePilot?.id &&
+              planIsActive(plan, nowMs),
+          )?.actualEndMs ?? 0,
           activeRotation?.predictedCompletionAt
             ? Date.parse(activeRotation.predictedCompletionAt)
             : 0,
@@ -455,6 +544,7 @@ export function runOperationalSimulation(
           .filter(
             (plan) =>
               !plan.completed &&
+              ((plan.effectMode ?? "BLOCKING") === "SLOWDOWN" || plan.actualStartMs === null) &&
               plan.scopeType === "AIRCRAFT" &&
               plan.scopeId === entry.id &&
               plan.startMode === "TIME_WINDOW" &&
@@ -463,11 +553,20 @@ export function runOperationalSimulation(
           )
           .map((plan) => ({
             id: plan.key,
-            earliestStartAt: plan.earliestStartAt ?? iso(nowMs),
-            latestStartAt: plan.latestStartAt ?? iso(nowMs),
+            earliestStartAt:
+              plan.actualStartMs !== null
+                ? iso(plan.actualStartMs)
+                : (plan.earliestStartAt ?? iso(nowMs)),
+            latestStartAt:
+              plan.actualStartMs !== null
+                ? iso(plan.actualStartMs)
+                : (plan.latestStartAt ?? iso(nowMs)),
             minimumDurationMinutes: plan.minimumDurationMinutes,
             typicalDurationMinutes: plan.typicalDurationMinutes,
             maximumDurationMinutes: plan.maximumDurationMinutes,
+            effectMode: plan.effectMode ?? "BLOCKING",
+            durationMultiplierPercent: plan.durationMultiplierPercent ?? null,
+            active: planIsActive(plan, nowMs),
             overdue: Date.parse(plan.latestStartAt ?? iso(nowMs)) < nowMs,
           }));
         return {
@@ -476,6 +575,26 @@ export function runOperationalSimulation(
           availableExpectedAt: iso(expectedAt),
           availableUpperAt: iso(expectedAt + (expectedAt > nowMs ? 5 * MINUTE_MS : 0)),
           constraints,
+          recurringConstraints: recurringRules
+            .filter(
+              (rule) =>
+                (rule.scopeType === "AIRCRAFT" && rule.scopeId === entry.id) ||
+                (rule.scopeType === "PILOT" && rule.scopeId === lanePilot?.id),
+            )
+            .map((rule) => ({
+              id: rule.key,
+              triggerMetric: rule.triggerMetric,
+              intervalValue: rule.intervalValue,
+              progressValue: plans.some(
+                (plan) => plan.recurringRuleKey === rule.key && !plan.completed,
+              )
+                ? 0
+                : rule.currentProgress,
+              minimumDurationMinutes: rule.minimumDurationMinutes,
+              typicalDurationMinutes: rule.typicalDurationMinutes,
+              maximumDurationMinutes: rule.maximumDurationMinutes,
+              active: true,
+            })),
         };
       });
       const activePilotCapacity = pilots.filter(
@@ -499,6 +618,7 @@ export function runOperationalSimulation(
           config.forecastTuning.availabilityModel === "TIME_DEPENDENT"
             ? config.schedule.operationsStartAt
             : null,
+        plannedOperationsEndAt: config.schedule.operationsEndAt,
         operationalInterrupted: !operationsGloballyAvailable(nowMs),
         emergencyMode: false,
         plannedBoardingMinutes: config.adminParameters.plannedBoardingMinutes,
@@ -516,6 +636,8 @@ export function runOperationalSimulation(
           departedAt: rotation.departedAt,
           landedAt: rotation.landedAt,
           resourceGroupId: groupId,
+          aircraftId: rotation.aircraftId,
+          pilotId: rotation.pilotId ?? null,
           resourceGroupStatus: groupAvailable(groupId, nowMs)
             ? ("ACTIVE" as const)
             : ("PAUSED" as const),
@@ -530,6 +652,33 @@ export function runOperationalSimulation(
           predictedDepartureAt: rotation.predictedDepartureAt,
           predictedLandingAt: rotation.predictedLandingAt,
           predictedCompletionAt: rotation.predictedCompletionAt,
+          constraints: plans
+            .filter(
+              (plan) =>
+                !plan.completed &&
+                plan.startMode === "TIME_WINDOW" &&
+                plan.earliestStartAt &&
+                plan.latestStartAt &&
+                planAppliesToRotation(plan, rotation),
+            )
+            .map((plan) => ({
+              id: plan.key,
+              earliestStartAt:
+                plan.actualStartMs !== null
+                  ? iso(plan.actualStartMs)
+                  : (plan.earliestStartAt ?? iso(nowMs)),
+              latestStartAt:
+                plan.actualStartMs !== null
+                  ? iso(plan.actualStartMs)
+                  : (plan.latestStartAt ?? iso(nowMs)),
+              minimumDurationMinutes: plan.minimumDurationMinutes,
+              typicalDurationMinutes: plan.typicalDurationMinutes,
+              maximumDurationMinutes: plan.maximumDurationMinutes,
+              effectMode: plan.effectMode ?? "BLOCKING",
+              durationMultiplierPercent: plan.durationMultiplierPercent ?? null,
+              active: planIsActive(plan, nowMs),
+              overdue: Date.parse(plan.latestStartAt ?? iso(nowMs)) < nowMs,
+            })),
         };
       }),
       durationSamples,
@@ -601,6 +750,10 @@ export function runOperationalSimulation(
         !plan.completed
       ) {
         plan.completed = true;
+        if (plan.recurringRuleKey) {
+          const rule = recurringRules.find((entry) => entry.key === plan.recurringRuleKey);
+          if (rule) rule.currentProgress = 0;
+        }
         recordEvent("PLANNED_OPERATION_ENDED", nowMs, {
           aircraftId: plan.scopeType === "AIRCRAFT" ? plan.scopeId : null,
           pilotId: plan.scopeType === "PILOT" ? plan.scopeId : null,
@@ -667,8 +820,56 @@ export function runOperationalSimulation(
             (rotation.flightMinutes ?? 0) +
             (rotation.deboardingMinutes ?? 0) +
             (rotation.bufferMinutes ?? 0);
+          const rotationOperatingMinutes =
+            (rotation.boardingMinutes ?? 0) +
+            (rotation.flightMinutes ?? 0) +
+            (rotation.deboardingMinutes ?? 0) +
+            (rotation.bufferMinutes ?? 0);
+          const dueRules = recurringRules.filter(
+            (rule) =>
+              (rule.scopeType === "AIRCRAFT" && rule.scopeId === entry.id) ||
+              (rule.scopeType === "PILOT" && rule.scopeId === pilot?.id),
+          );
+          for (const rule of dueRules) {
+            rule.currentProgress +=
+              rule.triggerMetric === "COMPLETED_ROTATIONS" ? 1 : rotationOperatingMinutes;
+            const hasOpenOccurrence = plans.some(
+              (plan) => plan.recurringRuleKey === rule.key && !plan.completed,
+            );
+            if (rule.currentProgress < rule.intervalValue || hasOpenOccurrence) continue;
+            rule.sequenceNumber += 1;
+            plans.push({
+              key: `${rule.key}:occurrence-${rule.sequenceNumber}`,
+              scopeType: rule.scopeType,
+              scopeId: rule.scopeId,
+              kind: rule.kind,
+              effectMode: "BLOCKING",
+              durationMultiplierPercent: null,
+              startMode: "AFTER_CURRENT_ROTATION",
+              earliestStartAt: null,
+              latestStartAt: null,
+              afterRotationId: rotation.id,
+              unresolvedAfterCurrentRotation: false,
+              minimumDurationMinutes: rule.minimumDurationMinutes,
+              typicalDurationMinutes: rule.typicalDurationMinutes,
+              maximumDurationMinutes: rule.maximumDurationMinutes,
+              publicNote: "",
+              candidateStartMs: null,
+              actualStartMs: null,
+              actualEndMs: null,
+              completed: false,
+              recurringRuleKey: rule.key,
+            });
+          }
+          const importedRefuelingRule = recurringRules.some(
+            (rule) =>
+              rule.kind === "REFUELING" &&
+              rule.scopeType === "AIRCRAFT" &&
+              rule.scopeId === entry.id,
+          );
           if (
             config.realityModel.incidents.refueling.enabled &&
+            !importedRefuelingRule &&
             entry.completedRotations % config.realityModel.incidents.refueling.everyRotations === 0
           ) {
             entry.pendingBlocks.push({
@@ -683,8 +884,15 @@ export function runOperationalSimulation(
               source: "AUTOMATIC",
             });
           }
+          const importedPauseRule = recurringRules.some(
+            (rule) =>
+              rule.kind === "PAUSE" &&
+              ((rule.scopeType === "AIRCRAFT" && rule.scopeId === entry.id) ||
+                (rule.scopeType === "PILOT" && rule.scopeId === pilot?.id)),
+          );
           if (
             config.realityModel.incidents.plannedPause.enabled &&
+            !importedPauseRule &&
             Math.floor(
               entry.operatingMinutes /
                 config.realityModel.incidents.plannedPause.everyOperatingMinutes,
@@ -777,16 +985,18 @@ export function runOperationalSimulation(
         nowMs >= plan.candidateStartMs;
       if (!afterRotationReady && !timeReady) continue;
       const targetIdle =
-        plan.scopeType === "AIRCRAFT"
-          ? aircraft.some(
-              (entry) =>
-                entry.id === plan.scopeId &&
-                entry.activeRotationId === null &&
-                entry.state === "AVAILABLE",
-            )
-          : plan.scopeType === "PILOT"
-            ? pilots.some((pilot) => pilot.id === plan.scopeId && pilot.activeRotationId === null)
-            : true;
+        (plan.effectMode ?? "BLOCKING") === "SLOWDOWN"
+          ? true
+          : plan.scopeType === "AIRCRAFT"
+            ? aircraft.some(
+                (entry) =>
+                  entry.id === plan.scopeId &&
+                  entry.activeRotationId === null &&
+                  entry.state === "AVAILABLE",
+              )
+            : plan.scopeType === "PILOT"
+              ? pilots.some((pilot) => pilot.id === plan.scopeId && pilot.activeRotationId === null)
+              : true;
       if (!targetIdle) continue;
       plan.actualStartMs = nowMs;
       plan.actualEndMs = roundedTick(
@@ -799,6 +1009,16 @@ export function runOperationalSimulation(
           }),
         ),
       );
+      if ((plan.effectMode ?? "BLOCKING") === "SLOWDOWN") {
+        for (const rotation of rotations) {
+          if (
+            ["CALLED", "IN_FLIGHT", "LANDED"].includes(rotation.status) &&
+            planAppliesToRotation(plan, rotation)
+          ) {
+            applySlowdownToRemainingPhases(rotation, activeSlowdownPercent(rotation, nowMs));
+          }
+        }
+      }
       recordEvent("PLANNED_OPERATION_STARTED", nowMs, {
         aircraftId: plan.scopeType === "AIRCRAFT" ? plan.scopeId : null,
         pilotId: plan.scopeType === "PILOT" ? plan.scopeId : null,
@@ -955,6 +1175,7 @@ export function runOperationalSimulation(
           `${rotation.id}:buffer`,
           config.realityModel.phases.buffer,
         );
+        applySlowdownToRemainingPhases(rotation, activeSlowdownPercent(rotation, nowMs));
         entry.state = "ACTIVE";
         entry.activeRotationId = rotation.id;
         pilot.activeRotationId = rotation.id;
@@ -1019,7 +1240,17 @@ export function runOperationalSimulation(
       }) => entry,
     ),
     pilots: pilots.map(({ activeRotationId: _active, ...entry }) => entry),
-    plannedOperations: structuredClone(config.plannedOperations),
+    plannedOperations: plans.map(
+      ({
+        candidateStartMs: _candidate,
+        actualStartMs: _actualStart,
+        actualEndMs: _actualEnd,
+        completed: _completed,
+        recurringRuleKey: _recurringRule,
+        ...plan
+      }) => structuredClone(plan),
+    ),
+    recurringRules: structuredClone(config.recurringRules ?? []),
     rotations: publicRotations,
     events,
     snapshots,

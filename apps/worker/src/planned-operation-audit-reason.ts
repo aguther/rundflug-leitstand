@@ -1,6 +1,6 @@
 import type { DeviceRole } from "@rundflug/domain";
 
-export type PlannedOperationAuditAction = "CREATE" | "UPDATE" | "CANCEL";
+export type PlannedOperationAuditAction = "CREATE" | "UPDATE" | "CANCEL" | "START" | "END";
 export type PlannedOperationKind =
   | "PAUSE"
   | "REFUELING"
@@ -22,6 +22,8 @@ const ACTION_LABELS: Record<PlannedOperationAuditAction, string> = {
   CREATE: "eingeplant",
   UPDATE: "bearbeitet",
   CANCEL: "abgesagt",
+  START: "gestartet",
+  END: "beendet",
 };
 
 const KIND_LABELS: Record<PlannedOperationKind, string> = {

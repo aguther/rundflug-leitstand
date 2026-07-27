@@ -40,6 +40,8 @@ export const operationalPlanKindSchema = z.enum([
 export type OperationalPlanKind = z.infer<typeof operationalPlanKindSchema>;
 export const operationalPlanStartModeSchema = z.enum(["TIME_WINDOW", "AFTER_CURRENT_ROTATION"]);
 export type OperationalPlanStartMode = z.infer<typeof operationalPlanStartModeSchema>;
+export const operationalPlanEffectModeSchema = z.enum(["BLOCKING", "SLOWDOWN"]);
+export type OperationalPlanEffectMode = z.infer<typeof operationalPlanEffectModeSchema>;
 export const operationalPlanStatusSchema = z.enum([
   "PLANNED",
   "DUE",
@@ -48,6 +50,49 @@ export const operationalPlanStatusSchema = z.enum([
   "CANCELED",
 ]);
 
+export const recurringOperationalRuleScopeSchema = z.enum(["AIRCRAFT", "PILOT"]);
+export type RecurringOperationalRuleScope = z.infer<typeof recurringOperationalRuleScopeSchema>;
+export const recurringOperationalRuleKindSchema = z.enum(["PAUSE", "REFUELING"]);
+export type RecurringOperationalRuleKind = z.infer<typeof recurringOperationalRuleKindSchema>;
+export const recurringOperationalRuleTriggerSchema = z.enum([
+  "COMPLETED_ROTATIONS",
+  "OPERATING_MINUTES",
+]);
+export type RecurringOperationalRuleTrigger = z.infer<typeof recurringOperationalRuleTriggerSchema>;
+export const recurringOperationalRuleStatusSchema = z.enum(["ACTIVE", "DISABLED"]);
+
+const recurringOperationalRuleValuesSchema = z
+  .object({
+    scopeType: recurringOperationalRuleScopeSchema,
+    scopeId: z.string().min(1).max(100),
+    kind: recurringOperationalRuleKindSchema,
+    triggerMetric: recurringOperationalRuleTriggerSchema,
+    intervalValue: z.number().int().min(1).max(100_000),
+    minimumDurationMinutes: z.number().int().min(1).max(1440),
+    typicalDurationMinutes: z.number().int().min(1).max(1440),
+    maximumDurationMinutes: z.number().int().min(1).max(1440),
+  })
+  .strict()
+  .superRefine((rule, context) => {
+    if (rule.kind === "REFUELING" && rule.scopeType !== "AIRCRAFT") {
+      context.addIssue({
+        code: "custom",
+        message: "Tanken kann nur für ein Flugzeug geplant werden.",
+        path: ["scopeType"],
+      });
+    }
+    if (
+      rule.minimumDurationMinutes > rule.typicalDurationMinutes ||
+      rule.typicalDurationMinutes > rule.maximumDurationMinutes
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Die Dauer muss als Minimum ≤ Typisch ≤ Maximum angegeben werden.",
+        path: ["typicalDurationMinutes"],
+      });
+    }
+  });
+
 const upsertPlannedOperationPayloadSchema = z
   .object({
     planId: z.uuid(),
@@ -55,6 +100,8 @@ const upsertPlannedOperationPayloadSchema = z
     scopeType: operationalPlanScopeSchema,
     scopeId: z.string().min(1).max(100),
     kind: operationalPlanKindSchema,
+    effectMode: operationalPlanEffectModeSchema.default("BLOCKING"),
+    durationMultiplierPercent: z.number().int().min(110).max(300).nullable().default(null),
     startMode: operationalPlanStartModeSchema,
     earliestStartAt: z.iso.datetime().nullable(),
     latestStartAt: z.iso.datetime().nullable(),
@@ -66,6 +113,16 @@ const upsertPlannedOperationPayloadSchema = z
   })
   .strict()
   .superRefine((payload, context) => {
+    if (
+      (payload.effectMode === "BLOCKING" && payload.durationMultiplierPercent !== null) ||
+      (payload.effectMode === "SLOWDOWN" && payload.durationMultiplierPercent === null)
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Verzögerungsart und Faktor passen nicht zusammen.",
+        path: ["durationMultiplierPercent"],
+      });
+    }
     if (
       payload.minimumDurationMinutes > payload.typicalDurationMinutes ||
       payload.typicalDurationMinutes > payload.maximumDurationMinutes
@@ -393,6 +450,37 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
       .object({
         planId: z.uuid(),
         planExpectedVersion: z.number().int().nonnegative(),
+      })
+      .strict(),
+  }),
+  commandBaseSchema.extend({
+    type: z.literal("SET_PLANNED_SLOWDOWN_ACTIVE"),
+    payload: z
+      .object({
+        planId: z.uuid(),
+        planExpectedVersion: z.number().int().nonnegative(),
+        active: z.boolean(),
+      })
+      .strict(),
+  }),
+  commandBaseSchema.extend({
+    type: z.literal("UPSERT_RECURRING_OPERATIONAL_RULE"),
+    payload: z
+      .object({
+        ruleId: z.uuid(),
+        ruleExpectedVersion: z.number().int().nonnegative().nullable(),
+        rule: recurringOperationalRuleValuesSchema,
+        reason: z.string().trim().min(3).max(240),
+      })
+      .strict(),
+  }),
+  commandBaseSchema.extend({
+    type: z.literal("DISABLE_RECURRING_OPERATIONAL_RULE"),
+    payload: z
+      .object({
+        ruleId: z.uuid(),
+        ruleExpectedVersion: z.number().int().nonnegative(),
+        reason: z.string().trim().min(3).max(240),
       })
       .strict(),
   }),
@@ -1336,6 +1424,8 @@ const simulationPlanOperationSchema = z
     scopeType: operationalPlanScopeSchema,
     scopeKey: masterDataTemplateKeySchema,
     kind: operationalPlanKindSchema,
+    effectMode: operationalPlanEffectModeSchema.default("BLOCKING"),
+    durationMultiplierPercent: z.number().int().min(110).max(300).nullable().default(null),
     startMode: operationalPlanStartModeSchema,
     earliestStartAt: z.iso.datetime().nullable(),
     latestStartAt: z.iso.datetime().nullable(),
@@ -1347,6 +1437,16 @@ const simulationPlanOperationSchema = z
   })
   .strict()
   .superRefine((operation, context) => {
+    if (
+      (operation.effectMode === "BLOCKING" && operation.durationMultiplierPercent !== null) ||
+      (operation.effectMode === "SLOWDOWN" && operation.durationMultiplierPercent === null)
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Verzögerungsart und Faktor passen nicht zusammen.",
+        path: ["durationMultiplierPercent"],
+      });
+    }
     if (
       operation.minimumDurationMinutes > operation.typicalDurationMinutes ||
       operation.typicalDurationMinutes > operation.maximumDurationMinutes
@@ -1394,15 +1494,53 @@ const simulationPlanOperationSchema = z
   });
 export type SimulationPlanOperation = z.infer<typeof simulationPlanOperationSchema>;
 
+const simulationRecurringOperationalRuleSchema = z
+  .object({
+    key: masterDataTemplateKeySchema,
+    scopeType: recurringOperationalRuleScopeSchema,
+    scopeKey: masterDataTemplateKeySchema,
+    kind: recurringOperationalRuleKindSchema,
+    triggerMetric: recurringOperationalRuleTriggerSchema,
+    intervalValue: z.number().int().min(1).max(100_000),
+    progressValue: z.number().int().nonnegative().max(100_000),
+    minimumDurationMinutes: z.number().int().min(1).max(1440),
+    typicalDurationMinutes: z.number().int().min(1).max(1440),
+    maximumDurationMinutes: z.number().int().min(1).max(1440),
+  })
+  .strict()
+  .superRefine((rule, context) => {
+    if (rule.kind === "REFUELING" && rule.scopeType !== "AIRCRAFT") {
+      context.addIssue({
+        code: "custom",
+        message: "Tanken kann nur für ein Flugzeug geplant werden.",
+        path: ["scopeType"],
+      });
+    }
+    if (
+      rule.minimumDurationMinutes > rule.typicalDurationMinutes ||
+      rule.typicalDurationMinutes > rule.maximumDurationMinutes
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Die Dauer muss als Minimum ≤ Typisch ≤ Maximum angegeben werden.",
+        path: ["typicalDurationMinutes"],
+      });
+    }
+  });
+export type SimulationRecurringOperationalRule = z.infer<
+  typeof simulationRecurringOperationalRuleSchema
+>;
+
 export const simulationPlanExportSchema = z
   .object({
     format: z.literal("rundflug-simulation-plan"),
-    formatVersion: z.literal(1),
+    formatVersion: z.union([z.literal(1), z.literal(2)]),
     exportedAt: z.iso.datetime(),
     source: masterDataTemplateSourceSchema,
     schedule: simulationPlanScheduleSchema,
     masterData: masterDataTemplateSchema,
     plannedOperations: z.array(simulationPlanOperationSchema).max(500),
+    recurringRules: z.array(simulationRecurringOperationalRuleSchema).max(500).default([]),
   })
   .strict()
   .superRefine((exported, context) => {
@@ -1426,6 +1564,26 @@ export const simulationPlanExportSchema = z
         });
       }
     });
+    exported.recurringRules.forEach((rule, index) => {
+      const targetExists =
+        rule.scopeType === "AIRCRAFT"
+          ? aircraftKeys.has(rule.scopeKey)
+          : pilotKeys.has(rule.scopeKey);
+      if (!targetExists) {
+        context.addIssue({
+          code: "custom",
+          message: "Die wiederkehrende Regel verweist auf kein exportiertes Ziel.",
+          path: ["recurringRules", index, "scopeKey"],
+        });
+      }
+    });
+    if (exported.formatVersion === 1 && exported.recurringRules.length > 0) {
+      context.addIssue({
+        code: "custom",
+        message: "Wiederkehrende Regeln benötigen Exportformat V2.",
+        path: ["formatVersion"],
+      });
+    }
   });
 export type SimulationPlanExport = z.infer<typeof simulationPlanExportSchema>;
 
@@ -1523,6 +1681,7 @@ export const commandResultSchema = z.object({
         "ROTATION",
         "RECOVERY_BATCH",
         "OPERATIONAL_PLAN",
+        "OPERATIONAL_RULE",
       ]),
       id: z.string(),
       relatedRotationId: z.string().optional(),
@@ -1710,6 +1869,8 @@ export const plannedOperationalConstraintSchema = z.object({
   scopeType: operationalPlanScopeSchema,
   scopeId: z.string(),
   kind: operationalPlanKindSchema,
+  effectMode: operationalPlanEffectModeSchema,
+  durationMultiplierPercent: z.number().int().min(110).max(300).nullable(),
   startMode: operationalPlanStartModeSchema,
   earliestStartAt: z.string().nullable(),
   latestStartAt: z.string().nullable(),
@@ -1724,8 +1885,33 @@ export const plannedOperationalConstraintSchema = z.object({
   activatedAt: z.string().nullable(),
   clearedAt: z.string().nullable(),
   canceledAt: z.string().nullable(),
+  recurringRuleId: z.string().nullable().default(null),
+  recurrenceSequence: z.number().int().positive().nullable().default(null),
 });
 export type PlannedOperationalConstraint = z.infer<typeof plannedOperationalConstraintSchema>;
+
+export const recurringOperationalRuleSchema = z.object({
+  id: z.string(),
+  operationDayId: z.string(),
+  version: z.number().int().nonnegative(),
+  scopeType: recurringOperationalRuleScopeSchema,
+  scopeId: z.string(),
+  kind: recurringOperationalRuleKindSchema,
+  triggerMetric: recurringOperationalRuleTriggerSchema,
+  intervalValue: z.number().int().positive(),
+  progressValue: z.number().int().nonnegative(),
+  minimumDurationMinutes: z.number().int().positive(),
+  typicalDurationMinutes: z.number().int().positive(),
+  maximumDurationMinutes: z.number().int().positive(),
+  status: recurringOperationalRuleStatusSchema,
+  sequenceNumber: z.number().int().nonnegative(),
+  openPlannedOperationId: z.string().nullable(),
+  reason: z.string().nullable(),
+  lastResetAt: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+export type RecurringOperationalRule = z.infer<typeof recurringOperationalRuleSchema>;
 
 export const operationBoardSchema = z.object({
   currentDeviceRole: z.enum(["CASHIER", "FLIGHT_LINE", "FLIGHT_DIRECTOR", "ADMIN"]),
@@ -1768,6 +1954,7 @@ export const operationBoardSchema = z.object({
   ),
   pilots: z.array(pilotOperationalSummarySchema),
   plannedOperations: z.array(plannedOperationalConstraintSchema).default([]),
+  recurringOperationalRules: z.array(recurringOperationalRuleSchema).default([]),
   gates: z.array(
     z.object({
       id: z.string(),

@@ -199,5 +199,9 @@ try {
     }),
   );
 } finally {
-  server.kill();
+  if (process.platform === "win32") {
+    spawnSync("taskkill", ["/PID", String(server.pid), "/T", "/F"], { stdio: "ignore" });
+  } else {
+    server.kill();
+  }
 }

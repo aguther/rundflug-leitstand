@@ -83,7 +83,9 @@ import { useAuth } from "./features/auth/AuthContext";
 import {
   OperationalPlanPanel,
   type PlannedOperation,
+  type RecurringOperationalRule,
   type UpsertPlannedOperationPayload,
+  type UpsertRecurringOperationalRulePayload,
 } from "./features/operations/OperationalPlanPanel";
 import {
   formatGermanDate,
@@ -232,6 +234,7 @@ export function AdminView() {
       ? (requestedArea as AdminArea)
       : "overview";
   });
+  const [accountCreateOpen, setAccountCreateOpen] = useState(false);
   const [eventStep, setEventStep] = useState<AdminEventStep>(() => {
     const requestedArea = initialAdminParams.get("area");
     const requestedStep = initialAdminParams.get("step");
@@ -883,7 +886,7 @@ export function AdminView() {
     }
   }
 
-  async function removeEvent(eventId: string, eventName: string) {
+  async function removeEvent(eventId: string, eventName: string, expectedVersion: number) {
     const confirmation = window.prompt(
       `„${eventName}“ wird vollständig gelöscht. Zum Bestätigen die technische ID eingeben:`,
     );
@@ -897,6 +900,7 @@ export function AdminView() {
       const result = await deleteEvent(
         EVENT_ID,
         eventId,
+        expectedVersion,
         ADMIN_DEVICE_ID,
         deviceTokenFor(ADMIN_DEVICE_ID),
         reason,
@@ -906,7 +910,11 @@ export function AdminView() {
         window.location.assign(result.setupRequired ? "/setup" : "/");
         return;
       }
-      setMessage("Veranstaltung vollständig gelöscht.");
+      setMessage(
+        result.assetCleanupPending
+          ? "Veranstaltung gelöscht; die Logo-Bereinigung wird erneut versucht."
+          : "Veranstaltung vollständig gelöscht.",
+      );
       await refreshEvents();
     } catch (cause) {
       setMessage(
@@ -1708,6 +1716,58 @@ export function AdminView() {
       setMessage(
         cause instanceof Error ? cause.message : "Planeintrag konnte nicht abgesagt werden.",
       );
+      throw cause;
+    }
+  }
+
+  async function upsertAdminRecurringRule(payload: UpsertRecurringOperationalRulePayload) {
+    if (!board || !isAdministrator || !adminModeUnlocked) return;
+    try {
+      await sendCommand(
+        {
+          commandId: crypto.randomUUID(),
+          eventId: EVENT_ID,
+          deviceId: ADMIN_DEVICE_ID,
+          expectedVersion: board.event.version,
+          issuedAt: new Date().toISOString(),
+          type: "UPSERT_RECURRING_OPERATIONAL_RULE",
+          payload,
+        },
+        deviceTokenFor(ADMIN_DEVICE_ID),
+      );
+      setMessage("Wiederkehrende Regel gespeichert.");
+      await refresh();
+      await refreshHistory();
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : "Regel konnte nicht gespeichert werden.");
+      throw cause;
+    }
+  }
+
+  async function disableAdminRecurringRule(rule: RecurringOperationalRule) {
+    if (!board || !isAdministrator || !adminModeUnlocked) return;
+    try {
+      await sendCommand(
+        {
+          commandId: crypto.randomUUID(),
+          eventId: EVENT_ID,
+          deviceId: ADMIN_DEVICE_ID,
+          expectedVersion: board.event.version,
+          issuedAt: new Date().toISOString(),
+          type: "DISABLE_RECURRING_OPERATIONAL_RULE",
+          payload: {
+            ruleId: rule.id,
+            ruleExpectedVersion: rule.version,
+            reason: "Wiederkehrende Tagesregel deaktiviert.",
+          },
+        },
+        deviceTokenFor(ADMIN_DEVICE_ID),
+      );
+      setMessage("Wiederkehrende Regel deaktiviert; offene Planeinträge bleiben bestehen.");
+      await refresh();
+      await refreshHistory();
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : "Regel konnte nicht deaktiviert werden.");
       throw cause;
     }
   }
@@ -2906,7 +2966,7 @@ export function AdminView() {
                               busy={busyActionKey === `delete-event-${entry.eventId}`}
                               onClick={() =>
                                 void runBusyAction(`delete-event-${entry.eventId}`, () =>
-                                  removeEvent(entry.eventId, entry.name),
+                                  removeEvent(entry.eventId, entry.name, entry.version),
                                 )
                               }
                               size="compact"
@@ -3098,7 +3158,12 @@ export function AdminView() {
                   : "Beim Auslösen einer administrativen Änderung erscheint die PIN-Abfrage."}
             </ValidationHint>
           </section>
-          {adminArea === "users" ? <AccountManagement /> : null}
+          {adminArea === "users" ? (
+            <AccountManagement
+              createOpen={accountCreateOpen}
+              onCreateOpenChange={setAccountCreateOpen}
+            />
+          ) : null}
           <section className="reset-levels" hidden={adminArea !== "backup"}>
             {!isAdministrator ? (
               <ValidationHint tone="error">
@@ -3267,34 +3332,39 @@ export function AdminView() {
                 level={2}
                 title="Veranstaltung"
               />
-              <div className="event-basics-grid">
-                <TextField label="Veranstaltungsname" readOnly value={board?.event.name ?? "–"} />
-                <TextField
-                  label="Datum"
-                  readOnly
-                  value={board?.event.eventDate ? formatGermanDate(board.event.eventDate) : "–"}
-                />
-                <TextField
-                  label="Phase"
-                  readOnly
-                  value={
-                    board?.event.status === "PREPARATION"
+              <dl className="event-basics-grid">
+                <div>
+                  <dt>Veranstaltungsname</dt>
+                  <dd>{board?.event.name ?? "–"}</dd>
+                </div>
+                <div>
+                  <dt>Datum</dt>
+                  <dd>
+                    {board?.event.eventDate ? formatGermanDate(board.event.eventDate) : "–"}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Phase</dt>
+                  <dd>
+                    {board?.event.status === "PREPARATION"
                       ? "Vorbereitung"
                       : board?.event.status === "ACTIVE"
                         ? "Aktiv"
                         : board?.event.status === "CLOSED"
                           ? "Geschlossen"
                           : "–"
-                  }
-                />
-                <TextField label="Zeitzone" readOnly value={board?.event.timeZone ?? "–"} />
-                <TextField
-                  className="event-aerodrome-field"
-                  label="Flugplatz"
-                  readOnly
-                  value={board?.event.aerodrome ?? "–"}
-                />
-              </div>
+                    }
+                  </dd>
+                </div>
+                <div>
+                  <dt>Zeitzone</dt>
+                  <dd>{board?.event.timeZone ?? "–"}</dd>
+                </div>
+                <div>
+                  <dt>Flugplatz</dt>
+                  <dd>{board?.event.aerodrome ?? "–"}</dd>
+                </div>
+              </dl>
               <div className="event-timing-grid">
                 <LocalizedDateTimeInput
                   label="Verkaufsbeginn"
@@ -3588,7 +3658,7 @@ export function AdminView() {
                             busy={busyActionKey === `delete-event-${entry.eventId}`}
                             onClick={() =>
                               void runBusyAction(`delete-event-${entry.eventId}`, () =>
-                                removeEvent(entry.eventId, entry.name),
+                                removeEvent(entry.eventId, entry.name, entry.version),
                               )
                             }
                             size="compact"
@@ -4962,11 +5032,18 @@ export function AdminView() {
                 onCancel={(plan) =>
                   runBusyAction("admin-plan-cancel", () => cancelAdminPlannedOperation(plan))
                 }
+                onDisableRecurringRule={(rule) =>
+                  runBusyAction("admin-rule-disable", () => disableAdminRecurringRule(rule))
+                }
                 onUpsert={(payload) =>
                   runBusyAction("admin-plan-upsert", () => upsertAdminPlannedOperation(payload))
                 }
+                onUpsertRecurringRule={(payload) =>
+                  runBusyAction("admin-rule-upsert", () => upsertAdminRecurringRule(payload))
+                }
                 pilots={board.pilots}
                 plannedOperations={board.plannedOperations}
+                recurringOperationalRules={board.recurringOperationalRules}
                 readOnly={!isAdministrator || !adminModeUnlocked}
                 resourceGroups={board.resourceGroups}
                 rotations={board.rotations}

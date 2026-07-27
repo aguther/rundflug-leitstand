@@ -157,4 +157,48 @@ describe("simulation plan export contract", () => {
     expect(simulationPlanExportSchema.safeParse(exported).success).toBe(true);
     expect(exported.plannedOperations[0]).not.toHaveProperty("afterRotationId");
   });
+
+  it("keeps V1 backward compatible and validates recurring rules in V2", () => {
+    const legacy = validExport();
+    expect(legacy.formatVersion).toBe(1);
+    expect(legacy.recurringRules).toEqual([]);
+
+    const versionTwo = {
+      ...legacy,
+      formatVersion: 2,
+      recurringRules: [
+        {
+          key: "rule-1",
+          scopeType: "AIRCRAFT",
+          scopeKey: "aircraft-1",
+          kind: "REFUELING",
+          triggerMetric: "COMPLETED_ROTATIONS",
+          intervalValue: 5,
+          progressValue: 2,
+          minimumDurationMinutes: 8,
+          typicalDurationMinutes: 12,
+          maximumDurationMinutes: 18,
+        },
+      ],
+    };
+    expect(simulationPlanExportSchema.safeParse(versionTwo).success).toBe(true);
+    expect(
+      simulationPlanExportSchema.safeParse({
+        ...versionTwo,
+        recurringRules: [{ ...versionTwo.recurringRules[0], scopeKey: "missing-aircraft" }],
+      }).success,
+    ).toBe(false);
+    expect(
+      simulationPlanExportSchema.safeParse({
+        ...versionTwo,
+        recurringRules: [
+          {
+            ...versionTwo.recurringRules[0],
+            scopeType: "PILOT",
+            scopeKey: "pilot-1",
+          },
+        ],
+      }).success,
+    ).toBe(false);
+  });
 });

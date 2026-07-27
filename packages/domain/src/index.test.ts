@@ -235,6 +235,15 @@ describe("sale guard", () => {
       /darf SET_PILOT_PAUSE nicht/,
     );
   });
+
+  it("reserves slowdown confirmation for the flight director", () => {
+    expect(() =>
+      assertRoleMayExecute("FLIGHT_DIRECTOR", "SET_PLANNED_SLOWDOWN_ACTIVE"),
+    ).not.toThrow();
+    expect(() => assertRoleMayExecute("ADMIN", "SET_PLANNED_SLOWDOWN_ACTIVE")).toThrowError(
+      /darf SET_PLANNED_SLOWDOWN_ACTIVE nicht/,
+    );
+  });
 });
 
 describe("public ticket codes", () => {

@@ -148,6 +148,7 @@ export function FieldHelp({ help }: { help: string }) {
         else setHovered(false);
       }}
       ref={buttonRef}
+      tabIndex={-1}
       type="button"
     >
       <Info aria-hidden="true" />
