@@ -4,6 +4,10 @@ import appSource from "../../admin-view.tsx?raw";
 import featureRouterSource from "../../FeatureRouter.tsx?raw";
 
 const stylesSource = readFileSync(new URL("./admin-v12.css", import.meta.url), "utf8");
+const modernizationStylesSource = readFileSync(
+  new URL("./admin-modernization.css", import.meta.url),
+  "utf8",
+);
 const legacyStylesSource = readFileSync(new URL("../../styles.css", import.meta.url), "utf8");
 
 describe("V1.2 compact administration", () => {
@@ -25,14 +29,23 @@ describe("V1.2 compact administration", () => {
     expect(stylesSource).toContain(".master-data-drawer");
   });
 
-  it("opens restart details only after choosing a reset level", () => {
-    expect(appSource).toContain(
-      "const [restartEditorOpen, setRestartEditorOpen] = useState(false)",
-    );
-    expect(appSource).toContain('hidden={adminArea !== "events" || !restartEditorOpen}');
-    expect(appSource).toContain("setRestartEditorOpen(true)");
-    expect(appSource).toContain("setRestartEditorOpen(false)");
+  it("keeps event management and event creation in one modal flow", () => {
+    expect(appSource).toContain('useState<"closed" | "catalog" | "create">(');
+    expect(appSource).toContain('open={eventDialogView !== "closed"}');
+    expect(appSource).toContain('eventDialogView === "create"');
+    expect(appSource).toContain("Zurück zu Veranstaltungen");
+    expect(appSource).not.toContain('className="admin-section restart-editor"');
+    expect(modernizationStylesSource).toContain(".event-create-dialog-form");
+    expect(modernizationStylesSource).toContain(".event-create-dialog-footer");
     expect(stylesSource).toMatch(/\.admin-shell \.reset-levels\[hidden\]\s*\{\s*display: none;/);
+  });
+
+  it("makes technical event IDs visible, searchable and explicit during deletion", () => {
+    expect(appSource).toContain("Technische ID:");
+    expect(appSource).toContain("entry.name} $" + "{entry.eventId} $" + "{entry.eventDate");
+    expect(appSource).toContain("Zum Bestätigen exakt");
+    expect(appSource).toContain("eventId}“ eingeben");
+    expect(modernizationStylesSource).toContain(".event-catalog-entry-id");
   });
 
   it("uses the desktop viewport without an avoidable page-level scrollbar", () => {
