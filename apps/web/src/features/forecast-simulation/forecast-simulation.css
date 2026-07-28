@@ -1,8 +1,10 @@
 /* biome-ignore-all lint/style/noDescendingSpecificity: feature-scoped component variants intentionally share compact element selectors. */
 .forecast-simulator {
+  height: 100dvh;
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   color: var(--ui-text);
   background:
     radial-gradient(
@@ -356,7 +358,10 @@
 .sim-workspace {
   min-width: 0;
   min-height: 0;
-  overflow: auto;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  overflow-x: auto;
+  overflow-y: hidden;
   background: color-mix(in srgb, var(--ui-bg) 82%, var(--ui-surface));
 }
 
@@ -408,6 +413,7 @@
 
 .sim-injector {
   min-width: 0;
+  align-items: flex-end;
   justify-content: flex-end;
 }
 
@@ -429,6 +435,10 @@
 
 .sim-timeline-panel {
   min-width: 940px;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+  overflow: hidden;
   border-bottom: 1px solid var(--ui-border);
   background: var(--ui-surface);
 }
@@ -547,6 +557,15 @@
 
 .sim-timeline-lanes {
   position: relative;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.sim-timeline-lanes:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--ui-accent) 70%, transparent);
+  outline-offset: -2px;
 }
 
 .sim-aircraft-lane {
@@ -1028,7 +1047,9 @@
 .sim-export-row {
   min-width: 940px;
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
+  gap: 8px;
   padding: 6px 16px 14px;
 }
 
@@ -3049,7 +3070,7 @@
   }
 
   .sim-workspace {
-    overflow-y: auto;
+    overflow-y: hidden;
   }
 }
 
@@ -3107,8 +3128,51 @@
   }
 
   .sim-controls {
-    min-height: 78px;
-    padding-block: 9px;
+    min-height: 72px;
+    padding-block: 6px;
+  }
+
+  .sim-playback .ds-button,
+  .sim-injector .ds-button {
+    min-height: 34px;
+    padding-block: 5px;
+  }
+
+  .sim-controls select,
+  .sim-injector select {
+    min-height: 32px;
+  }
+
+  .sim-timeline-heading {
+    min-height: 42px;
+    padding-inline: 12px;
+  }
+
+  .sim-timeline-scale {
+    height: 28px;
+  }
+
+  .sim-queue-row {
+    min-height: 50px;
+  }
+
+  .sim-queue-list {
+    padding: 6px 10px;
+  }
+
+  .sim-queue-list button {
+    height: 38px;
+  }
+
+  .sim-selection-summary {
+    min-height: 42px;
+    gap: 8px;
+    margin: 6px 12px;
+    padding: 6px 10px;
+  }
+
+  .sim-selection-summary > button {
+    min-height: 30px;
   }
 
   .sim-aircraft-lane {
@@ -3116,11 +3180,41 @@
   }
 
   .sim-analysis {
-    padding-top: 9px;
+    gap: 10px;
+    padding: 6px 12px 4px;
   }
 
-  .sim-chart-panel,
+  .sim-chart-panel {
+    min-height: 128px;
+    padding: 8px 10px;
+  }
+
+  .sim-error-chart,
+  .sim-chart-empty {
+    height: 100px;
+    margin-top: 4px;
+  }
+
   .sim-metric-card {
-    min-height: 180px;
+    min-height: 0;
+    gap: 3px;
+    padding: 8px;
+  }
+
+  .sim-metric-card > span {
+    min-height: 26px;
+  }
+
+  .sim-metric-card strong {
+    margin-top: 0;
+    font-size: 22px;
+  }
+
+  .sim-metric-card footer {
+    padding-top: 4px;
+  }
+
+  .sim-export-row {
+    padding: 4px 12px 8px;
   }
 }
