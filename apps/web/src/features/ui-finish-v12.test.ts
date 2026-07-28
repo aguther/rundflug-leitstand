@@ -24,4 +24,8 @@ describe("V1.2 visual finish", () => {
     expect(stylesSource).toContain(".admin-revoke-action");
     expect(stylesSource).toContain(".admin-section");
   });
+
+  it("keeps the shared modal backdrop transparent inside administration sections", () => {
+    expect(stylesSource).toMatch(/button:not\([\s\S]*?\.ds-modal-backdrop-dismiss[\s\S]*?\)\s*\{/);
+  });
 });

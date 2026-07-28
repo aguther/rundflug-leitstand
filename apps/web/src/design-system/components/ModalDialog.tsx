@@ -1,6 +1,7 @@
 import { X } from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect, useId, useRef } from "react";
+import { createPortal } from "react-dom";
 import { IconButton } from "./IconButton";
 
 const FOCUSABLE_SELECTOR = [
@@ -23,6 +24,7 @@ export interface ModalDialogProps {
   bodyClassName?: string;
   footerClassName?: string;
   initialFocusSelector?: string;
+  portal?: boolean;
   size?: "compact" | "default" | "wide";
   role?: "dialog" | "alertdialog";
   closeLabel?: string;
@@ -39,6 +41,7 @@ export function ModalDialog({
   bodyClassName = "",
   footerClassName = "",
   initialFocusSelector,
+  portal = false,
   size = "default",
   role = "dialog",
   closeLabel = "Dialog schließen",
@@ -105,7 +108,7 @@ export function ModalDialog({
 
   if (!open) return null;
 
-  return (
+  const content = (
     <div className="ds-modal-backdrop">
       <button
         aria-label={closeLabel}
@@ -139,4 +142,6 @@ export function ModalDialog({
       </dialog>
     </div>
   );
+
+  return portal ? createPortal(content, document.body) : content;
 }

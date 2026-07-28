@@ -488,17 +488,20 @@ export function OperationalPlanPanel({
         <header>
           <div>
             <h4>Wiederkehrende Regeln</h4>
-            <p>Nur die Planung ist automatisch. Start und Ende bleiben menschlich bestätigt.</p>
+            <p>
+              Zum Beispiel: Tanken nach jeweils 5 bestätigten Umläufen. Bei Fälligkeit entsteht
+              automatisch ein weicher Planeintrag; Start und Ende bleiben menschlich bestätigt.
+            </p>
           </div>
           {!readOnly ? (
             <Button disabled={busy} onClick={openNewRule} size="compact" type="button">
-              <Plus aria-hidden="true" /> Regel hinzufügen
+              <Plus aria-hidden="true" /> Wiederkehrende Regel hinzufügen
             </Button>
           ) : null}
         </header>
         <div className="operational-rule-list">
           {recurringOperationalRules.filter((rule) => rule.status === "ACTIVE").length === 0 ? (
-            <p className="operational-rule-empty">Keine aktive Regel für diesen Flugtag.</p>
+            <p className="operational-rule-empty">Keine aktive Wiederholung für diesen Flugtag.</p>
           ) : null}
           {recurringOperationalRules
             .filter((rule) => rule.status === "ACTIVE")
@@ -598,6 +601,7 @@ export function OperationalPlanPanel({
         }
         onClose={() => setEditorOpen(false)}
         open={editorOpen}
+        portal
         size="wide"
         title={planEditorId ? "Planeintrag bearbeiten" : "Einschränkung einplanen"}
       >
@@ -675,6 +679,7 @@ export function OperationalPlanPanel({
             />
           ) : null}
           <SelectField
+            help="Intervalle wie „alle 5 Umläufe tanken“ werden als wiederkehrende Regel geplant."
             label="Beginn"
             onChange={(event) =>
               setPlanStartMode(event.target.value as PlannedOperation["startMode"])
@@ -682,7 +687,7 @@ export function OperationalPlanPanel({
             value={planStartMode}
           >
             <option value="TIME_WINDOW">Ungefähres Zeitfenster</option>
-            <option value="AFTER_CURRENT_ROTATION">Nach einem Umlauf</option>
+            <option value="AFTER_CURRENT_ROTATION">Nach aktuellem Umlauf</option>
           </SelectField>
           {planStartMode === "TIME_WINDOW" ? (
             <>
@@ -699,11 +704,21 @@ export function OperationalPlanPanel({
             </>
           ) : (
             <SelectField
-              label="Bezugsumlauf"
+              disabled={eligiblePlanRotations.length === 0}
+              help={
+                eligiblePlanRotations.length === 0
+                  ? "Kein aktueller Umlauf verfügbar. Für einen späteren Zeitpunkt bitte ein ungefähres Zeitfenster verwenden."
+                  : "Die Einschränkung wird fällig, sobald der ausgewählte aktuelle Umlauf abgeschlossen oder abgebrochen ist."
+              }
+              label="Aktueller Bezugsumlauf"
               onChange={(event) => setPlanAfterRotationId(event.target.value)}
               value={planAfterRotationId}
             >
-              <option value="">Umlauf wählen</option>
+              <option value="">
+                {eligiblePlanRotations.length === 0
+                  ? "Kein aktueller Umlauf verfügbar"
+                  : "Aktuellen Umlauf wählen"}
+              </option>
               {eligiblePlanRotations.map((rotation) => (
                 <option key={rotation.id} value={rotation.id}>
                   {rotation.communicationLabel} · {rotation.status}
@@ -764,6 +779,7 @@ export function OperationalPlanPanel({
         }
         onClose={() => setRuleEditorOpen(false)}
         open={ruleEditorOpen}
+        portal
         size="wide"
         title={ruleEditorId ? "Wiederkehrende Regel bearbeiten" : "Wiederkehrende Regel anlegen"}
       >

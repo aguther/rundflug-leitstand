@@ -112,7 +112,7 @@ describe("V1.9 Flight Director and Flight Line surfaces", () => {
     expect(operationalPlanSource).toContain("Start bestätigen");
     expect(operationalPlanSource).toContain("Ende bestätigen");
     expect(operationalPlanSource).toContain("Ungefähres Zeitfenster");
-    expect(operationalPlanSource).toContain("Nach einem Umlauf");
+    expect(operationalPlanSource).toContain("Nach aktuellem Umlauf");
     expect(operationalPlanSource).not.toContain("automatisch starten");
     expect(operationalPlanSource).not.toContain("{plan.reason}");
     expect(operationalPlanSource).not.toContain("Interner Grund");

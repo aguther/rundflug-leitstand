@@ -151,6 +151,7 @@
     .admin-revoke-action,
     .table-overflow-action,
     .field-info,
+    .ds-modal-backdrop-dismiss,
     .setup-checklist button
   ) {
   min-height: var(--control-compact);
