@@ -15,7 +15,16 @@ describe("persistierter automatischer Voraufruf (F-BEN-030)", () => {
     );
     expect(persistence).toContain("UPDATE flight_groups");
     expect(persistence).not.toMatch(/UPDATE rotations|aircraft_id\s*=/i);
+    expect(persistence).toContain(
+      'sendRotationPushNotifications(this.env, candidate.rotationId, "GO_TO_GATE")',
+    );
+    expect(persistence).not.toContain('"BOARDING_STARTED"');
     expect(decisionMigration).toContain("precall_decision_reason");
+  });
+
+  it("keeps the human boarding confirmation on a distinct push receipt", () => {
+    expect(coordinatorSource).toContain('CALL_NEXT: "BOARDING_STARTED"');
+    expect(coordinatorSource).not.toContain('CALL_NEXT: "GO_TO_GATE"');
   });
 
   it("keeps the system command optimistic, idempotent and auditable", () => {

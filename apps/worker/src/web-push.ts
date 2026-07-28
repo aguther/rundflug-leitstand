@@ -1,4 +1,5 @@
 import { assessForecastFreshness } from "@rundflug/domain";
+import { PUBLIC_STATUS_MESSAGES } from "./public-status-copy";
 import { safeErrorMessage } from "./snapshot";
 import type { Env } from "./types";
 import { buildWebPushRequest } from "./web-push-request";
@@ -12,6 +13,7 @@ interface StoredPushSubscription {
   target_kind: "TICKET" | "GROUP";
   ticket_public_code: string;
   group_public_code: string | null;
+  gate_label: string;
   origin: string | null;
 }
 
@@ -37,21 +39,33 @@ export function pushErrorMessage(reason: unknown): string {
 }
 
 const DEFAULT_PUSH_RETENTION_DAYS = 7;
-const PUSH_MESSAGES = {
-  PREPARE_FOR_FLIGHT: "Ihr Aufruf steht bevor. Bitte bereithalten und noch nicht zum Gate kommen.",
-  FLIGHT_GROUP_CALLED: "Bitte jetzt zum Gate kommen.",
-  ROTATION_STARTED: "Ihr Rundflug ist gestartet.",
-  ROTATION_LANDED: "Ihr Rundflug ist gelandet.",
-  ROTATION_COMPLETED: "Ihr Rundflug ist abgeschlossen.",
+const PUSH_TITLES = {
+  PREPARE_FOR_FLIGHT: "Bitte bereithalten",
+  GO_TO_GATE: "Bitte zum Gate",
+  BOARDING_STARTED: "Boarding hat begonnen",
+  ROTATION_STARTED: "Rundflug gestartet",
+  ROTATION_LANDED: "Rundflug gelandet",
+  ROTATION_COMPLETED: "Rundflug abgeschlossen",
 } as const;
-export type PushNotificationType = keyof typeof PUSH_MESSAGES;
+export type PushNotificationType = keyof typeof PUSH_TITLES;
 
-export function pushMessageFor(eventType: PushNotificationType): string {
-  return PUSH_MESSAGES[eventType];
+export function pushNotificationFor(
+  eventType: PushNotificationType,
+  gateLabel: string,
+): { title: string; body: string } {
+  const body = {
+    PREPARE_FOR_FLIGHT: `Ihr Aufruf steht bevor. Bitte halten Sie sich in der Nähe von „${gateLabel}“ bereit.`,
+    GO_TO_GATE: `Bitte kommen Sie jetzt zu „${gateLabel}“ und warten Sie dort auf den Boardingaufruf.`,
+    BOARDING_STARTED: `Das Boarding an „${gateLabel}“ hat begonnen. Bitte halten Sie Ihr Ticket für den Einstieg bereit.`,
+    ROTATION_STARTED: PUBLIC_STATUS_MESSAGES.IN_FLIGHT,
+    ROTATION_LANDED: PUBLIC_STATUS_MESSAGES.LANDED,
+    ROTATION_COMPLETED: PUBLIC_STATUS_MESSAGES.COMPLETED,
+  } satisfies Record<PushNotificationType, string>;
+  return { title: PUSH_TITLES[eventType], body: body[eventType] };
 }
 
 export function pushUrgencyFor(eventType: PushNotificationType): "normal" | "high" {
-  return eventType === "FLIGHT_GROUP_CALLED" ? "high" : "normal";
+  return eventType === "GO_TO_GATE" || eventType === "BOARDING_STARTED" ? "high" : "normal";
 }
 
 const PUBLIC_CODE_PATTERN = /^[A-Z2-9]{12,32}$/;
@@ -80,12 +94,14 @@ export function publicPushPayload(
   eventType: PushNotificationType,
   targetPath: string,
   origin: string | null,
+  gateLabel: string,
 ): string {
+  const copy = pushNotificationFor(eventType, gateLabel);
   const notification = {
-    title: "Rundflug-Leitstand",
+    title: copy.title,
     lang: "de",
     dir: "ltr",
-    body: pushMessageFor(eventType),
+    body: copy.body,
     data: { url: targetPath },
   };
   const navigateOrigin = publicPushNavigateOrigin(origin);
@@ -219,11 +235,15 @@ export async function sendRotationPushNotifications(
   const subscriptions = await env.DB.prepare(
     `SELECT d.id AS delivery_id, w.id, w.endpoint, w.p256dh, w.auth, w.target_kind, w.origin,
             t.public_code AS ticket_public_code,
-            tg.public_status_code AS group_public_code
+            tg.public_status_code AS group_public_code,
+            g.label AS gate_label
        FROM web_push_deliveries d
        JOIN web_push_subscriptions w ON w.id = d.subscription_id
        JOIN tickets t ON t.id = w.ticket_id
-       LEFT JOIN ticket_groups tg ON tg.id = w.ticket_group_id
+       JOIN ticket_groups tg ON tg.id = t.ticket_group_id
+       JOIN products p ON p.id = tg.product_id
+       JOIN rotations r ON r.id = d.rotation_id
+       JOIN gates g ON g.id = COALESCE(r.gate_id, p.gate_id)
       WHERE d.rotation_id = ?1 AND d.notification_type = ?2 AND d.status = 'PENDING'
         AND w.status = 'ACTIVE' AND w.delete_after > ?3
         AND (
@@ -243,7 +263,12 @@ export async function sendRotationPushNotifications(
         });
         if (!targetPath) return;
         const payload = await buildWebPushRequest({
-          data: publicPushPayload(eventType, targetPath, subscription.origin),
+          data: publicPushPayload(
+            eventType,
+            targetPath,
+            subscription.origin,
+            subscription.gate_label,
+          ),
           endpoint: subscription.endpoint,
           p256dh: subscription.p256dh,
           auth: subscription.auth,

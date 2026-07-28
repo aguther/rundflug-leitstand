@@ -58,6 +58,7 @@ D1-Identität; angewandte Dateien werden nicht nachträglich umbenannt.
 | 51 | `0050_recurring_operational_rules.sql` | eindeutig |
 | 52 | `0051_web_push_origin.sql` | eindeutig |
 | 53 | `0052_precall_decisions.sql` | eindeutig |
+| 54 | `0053_distinct_public_push_transitions.sql` | eindeutig |
 
-Gesamt: 53 Migrationen. Wiederherstellungsnotizen werden gegen SQL und
+Gesamt: 54 Migrationen. Wiederherstellungsnotizen werden gegen SQL und
 `apps/worker/migrations/README.md` geprüft.

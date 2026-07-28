@@ -876,7 +876,8 @@ try {
   assertPublicTimeCommunication(calledTicketStatus, "aufgerufener Ticketstatus");
   if (
     calledTicketStatus.status !== "BOARDING" ||
-    calledTicketStatus.message !== "Bitte am Gate zum Einstieg bereithalten." ||
+    calledTicketStatus.message !==
+      "Das Boarding hat begonnen. Bitte halten Sie Ihr Ticket für den Einstieg bereit." ||
     calledGroupStatus.parts.some((part) => part.status !== "BOARDING")
   ) {
     throw new Error(
@@ -904,7 +905,8 @@ try {
     boardingTicketStatuses.some(
       (status) =>
         status.status !== "BOARDING" ||
-        status.message !== "Bitte am Gate zum Einstieg bereithalten.",
+        status.message !==
+          "Das Boarding hat begonnen. Bitte halten Sie Ihr Ticket für den Einstieg bereit.",
     )
   ) {
     throw new Error(
