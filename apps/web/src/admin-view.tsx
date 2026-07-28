@@ -540,7 +540,7 @@ export function AdminView() {
   const [eventFlow, setEventFlow] = useState<AdminEventFlow | null>(null);
   const [eventFlowError, setEventFlowError] = useState<string | null>(null);
   const [eventFlowLoading, setEventFlowLoading] = useState(true);
-  const [eventCatalogOpen, setEventCatalogOpen] = useState(false);
+  const [eventDialogView, setEventDialogView] = useState<"closed" | "catalog" | "create">("closed");
   const [eventSearch, setEventSearch] = useState("");
   const [eventSort, setEventSort] = useState<{
     key: "name" | "eventDate" | "status" | "aerodrome";
@@ -559,8 +559,8 @@ export function AdminView() {
   const [newEventDate, setNewEventDate] = useState("");
   const [newEventAerodrome, setNewEventAerodrome] = useState("");
   const [restartMode, setRestartMode] = useState<"KEEP_MASTER_DATA" | "EMPTY">("KEEP_MASTER_DATA");
-  const [restartEditorOpen, setRestartEditorOpen] = useState(false);
   const [restartConfirmation, setRestartConfirmation] = useState("");
+  const [eventCreationError, setEventCreationError] = useState<string | null>(null);
   const [factoryResetOpen, setFactoryResetOpen] = useState(false);
   const [factoryResetBusy, setFactoryResetBusy] = useState(false);
   const [factoryResetError, setFactoryResetError] = useState<string | null>(null);
@@ -582,6 +582,13 @@ export function AdminView() {
     selectedManifestCandidate,
   );
   const eventVersion = board?.event.version;
+  const eventCreationDisabled =
+    !isAdministrator ||
+    restartConfirmation !== "NEUSTART" ||
+    !/^[a-z0-9-]{3,64}$/.test(newEventId.trim()) ||
+    newEventName.trim().length < 3 ||
+    !newEventDate ||
+    newEventAerodrome.trim().length < 2;
 
   useEffect(() => {
     if (eventVersion === undefined || adminArea !== "overview" || !isAdministrator) return;
@@ -865,6 +872,7 @@ export function AdminView() {
   }
 
   async function createEventFromTemplate() {
+    setEventCreationError(null);
     try {
       const adminToken = deviceTokenFor(ADMIN_DEVICE_ID);
       const result = await cloneEvent(EVENT_ID, ADMIN_DEVICE_ID, adminToken, {
@@ -880,7 +888,7 @@ export function AdminView() {
       rememberActiveEvent(window.localStorage, result.eventId);
       window.location.assign(`/admin?event=${encodeURIComponent(result.eventId)}`);
     } catch (cause) {
-      setMessage(
+      setEventCreationError(
         cause instanceof Error ? cause.message : "Veranstaltung konnte nicht angelegt werden.",
       );
     }
@@ -888,7 +896,7 @@ export function AdminView() {
 
   async function removeEvent(eventId: string, eventName: string, expectedVersion: number) {
     const confirmation = window.prompt(
-      `„${eventName}“ wird vollständig gelöscht. Zum Bestätigen die technische ID eingeben:`,
+      `„${eventName}“ wird vollständig gelöscht. Zum Bestätigen exakt „${eventId}“ eingeben:`,
     );
     if (confirmation !== eventId) return;
     const reason = window.prompt("Kurze Begründung für die Löschung:")?.trim() ?? "";
@@ -2736,7 +2744,7 @@ export function AdminView() {
     </section>
   ) : null;
   const filteredEvents = events.filter((entry) =>
-    `${entry.name} ${entry.eventDate} ${entry.aerodrome}`
+    `${entry.name} ${entry.eventId} ${entry.eventDate} ${entry.aerodrome}`
       .toLocaleLowerCase("de-DE")
       .includes(eventSearch.trim().toLocaleLowerCase("de-DE")),
   );
@@ -2761,6 +2769,18 @@ export function AdminView() {
           }
         : { key, direction: "asc" },
     );
+  }
+
+  function openEventCreation() {
+    setRestartMode("EMPTY");
+    setRestartConfirmation("");
+    setEventCreationError(null);
+    setEventDialogView("create");
+  }
+
+  function closeEventDialog() {
+    setEventDialogView("closed");
+    setEventCreationError(null);
   }
 
   return (
@@ -2789,7 +2809,7 @@ export function AdminView() {
             actions={
               <div className="admin-page-header-actions">
                 {adminArea === "events" ? (
-                  <Button onClick={() => setEventCatalogOpen(true)} size="compact">
+                  <Button onClick={() => setEventDialogView("catalog")} size="compact">
                     Veranstaltungen verwalten
                   </Button>
                 ) : null}
@@ -2829,161 +2849,344 @@ export function AdminView() {
           />
           {adminArea === "events" ? (
             <ModalDialog
-              bodyClassName="event-catalog-dialog-body"
+              bodyClassName={
+                eventDialogView === "create"
+                  ? "event-create-dialog-body"
+                  : "event-catalog-dialog-body"
+              }
+              closeLabel={
+                eventDialogView === "create"
+                  ? "Veranstaltungsanlage schließen"
+                  : "Veranstaltungsverwaltung schließen"
+              }
               className="event-catalog-dialog"
-              description="Veranstaltung auswählen, neu anlegen oder Stammdaten übertragen."
-              onClose={() => setEventCatalogOpen(false)}
-              open={eventCatalogOpen}
+              description={
+                eventDialogView === "create"
+                  ? "Veranstaltungsdaten, Datenbasis und Bestätigung in einem Schritt erfassen."
+                  : "Veranstaltung auswählen, neu anlegen oder Stammdaten übertragen."
+              }
+              footer={
+                eventDialogView === "create" ? (
+                  <>
+                    <Button onClick={() => setEventDialogView("catalog")} type="button">
+                      Zurück zu Veranstaltungen
+                    </Button>
+                    <Button
+                      busy={busyActionKey === "create-event"}
+                      disabled={eventCreationDisabled}
+                      form="event-create-form"
+                      type="submit"
+                      variant="primary"
+                    >
+                      Veranstaltung anlegen
+                    </Button>
+                  </>
+                ) : undefined
+              }
+              footerClassName="event-create-dialog-footer"
+              {...(eventDialogView === "create" ? { initialFocusSelector: "#new-event-id" } : {})}
+              onClose={closeEventDialog}
+              open={eventDialogView !== "closed"}
               size="wide"
-              title="Veranstaltungen verwalten"
+              title={
+                eventDialogView === "create"
+                  ? "Neue Veranstaltung anlegen"
+                  : "Veranstaltungen verwalten"
+              }
             >
-              <Panel className="event-catalog-v15 event-catalog-primary" padding="none">
-                <PageHeader
-                  actions={
-                    <div className="event-catalog-actions">
-                      <SearchField
-                        label="Veranstaltungen durchsuchen"
-                        onChange={(event) => setEventSearch(event.target.value)}
-                        placeholder="Veranstaltungen suchen …"
-                        value={eventSearch}
-                      />
-                      <Button
-                        busy={busyActionKey === "export-master-data-template"}
-                        disabled={!board || busyActionKey !== null}
-                        onClick={() =>
-                          void runBusyAction(
-                            "export-master-data-template",
-                            exportMasterDataTemplate,
-                          )
-                        }
-                        size="compact"
-                      >
-                        Stammdaten exportieren
-                      </Button>
-                      <Button
-                        disabled={!board || !isAdministrator}
-                        onClick={() => {
-                          setTemplateDraft(null);
-                          setTemplateValidation(null);
-                          setTemplateError(null);
-                          setTemplateFileName("");
-                          setTemplateDialogOpen(true);
-                        }}
-                        size="compact"
-                      >
-                        Stammdaten importieren
-                      </Button>
-                      <Button
-                        disabled={!isAdministrator}
-                        onClick={() => {
-                          setRestartMode("EMPTY");
-                          setRestartConfirmation("");
-                          setRestartEditorOpen(true);
-                        }}
-                        size="compact"
-                        variant="primary"
-                      >
-                        <Plus aria-hidden="true" /> Neue Veranstaltung
-                      </Button>
-                    </div>
-                  }
-                  level={2}
-                  title="Veranstaltungen"
-                />
-                <div className="event-catalog-table-wrap">
-                  <table className="event-catalog-table">
-                    <thead>
-                      <tr>
-                        {(
-                          [
-                            ["name", "Veranstaltungsname"],
-                            ["eventDate", "Datum"],
-                            ["status", "Phase"],
-                            ["aerodrome", "Flugplatz"],
-                          ] as const
-                        ).map(([key, label]) => (
-                          <th
-                            aria-sort={
-                              eventSort.key === key && eventSort.direction
-                                ? eventSort.direction === "asc"
-                                  ? "ascending"
-                                  : "descending"
-                                : "none"
-                            }
-                            key={key}
-                          >
-                            <button
-                              className="admin-sort-button"
-                              onClick={() => toggleEventSort(key)}
-                              type="button"
-                            >
-                              {label}
-                              <span aria-hidden="true">
-                                {eventSort.key === key && eventSort.direction
-                                  ? eventSort.direction === "asc"
-                                    ? "↑"
-                                    : "↓"
-                                  : "↕"}
-                              </span>
-                            </button>
-                          </th>
-                        ))}
-                        <th>Zeitzone</th>
-                        <th>
-                          <span className="visually-hidden">Aktionen</span>
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {visibleEvents.map((entry) => (
-                        <tr
-                          aria-selected={entry.eventId === EVENT_ID}
-                          className={entry.eventId === EVENT_ID ? "is-current" : ""}
-                          key={entry.eventId}
+              {eventDialogView === "catalog" ? (
+                <Panel className="event-catalog-v15 event-catalog-primary" padding="none">
+                  <PageHeader
+                    actions={
+                      <div className="event-catalog-actions">
+                        <SearchField
+                          label="Veranstaltungen durchsuchen"
+                          onChange={(event) => setEventSearch(event.target.value)}
+                          placeholder="Veranstaltungen suchen …"
+                          value={eventSearch}
+                        />
+                        <Button
+                          busy={busyActionKey === "export-master-data-template"}
+                          disabled={!board || busyActionKey !== null}
+                          onClick={() =>
+                            void runBusyAction(
+                              "export-master-data-template",
+                              exportMasterDataTemplate,
+                            )
+                          }
+                          size="compact"
                         >
-                          <td>
-                            <a
-                              href={`/admin?event=${encodeURIComponent(entry.eventId)}&area=events&step=${eventStep}`}
-                            >
-                              {entry.name}
-                            </a>
-                          </td>
-                          <td>{formatGermanDate(entry.eventDate)}</td>
-                          <td>
-                            {entry.status === "PREPARATION"
-                              ? "Vorbereitung"
-                              : entry.status === "ACTIVE"
-                                ? "Aktiv"
-                                : entry.status === "CLOSED"
-                                  ? "Geschlossen"
-                                  : "Archiviert"}
-                          </td>
-                          <td>{entry.aerodrome || "–"}</td>
-                          <td>{entry.timeZone}</td>
-                          <td>
-                            <Button
-                              aria-label={`${entry.name} löschen`}
-                              busy={busyActionKey === `delete-event-${entry.eventId}`}
-                              onClick={() =>
-                                void runBusyAction(`delete-event-${entry.eventId}`, () =>
-                                  removeEvent(entry.eventId, entry.name, entry.version),
-                                )
+                          Stammdaten exportieren
+                        </Button>
+                        <Button
+                          disabled={!board || !isAdministrator}
+                          onClick={() => {
+                            setTemplateDraft(null);
+                            setTemplateValidation(null);
+                            setTemplateError(null);
+                            setTemplateFileName("");
+                            setTemplateDialogOpen(true);
+                          }}
+                          size="compact"
+                        >
+                          Stammdaten importieren
+                        </Button>
+                        <Button
+                          disabled={!isAdministrator}
+                          onClick={openEventCreation}
+                          size="compact"
+                          variant="primary"
+                        >
+                          <Plus aria-hidden="true" /> Neue Veranstaltung
+                        </Button>
+                      </div>
+                    }
+                    level={2}
+                    title="Veranstaltungen"
+                  />
+                  <div className="event-catalog-table-wrap">
+                    <table className="event-catalog-table">
+                      <thead>
+                        <tr>
+                          {(
+                            [
+                              ["name", "Veranstaltungsname"],
+                              ["eventDate", "Datum"],
+                              ["status", "Phase"],
+                              ["aerodrome", "Flugplatz"],
+                            ] as const
+                          ).map(([key, label]) => (
+                            <th
+                              aria-sort={
+                                eventSort.key === key && eventSort.direction
+                                  ? eventSort.direction === "asc"
+                                    ? "ascending"
+                                    : "descending"
+                                  : "none"
                               }
-                              size="compact"
-                              variant="danger"
+                              key={key}
                             >
-                              <Trash2 aria-hidden="true" /> Löschen
-                            </Button>
-                          </td>
+                              <button
+                                className="admin-sort-button"
+                                onClick={() => toggleEventSort(key)}
+                                type="button"
+                              >
+                                {label}
+                                <span aria-hidden="true">
+                                  {eventSort.key === key && eventSort.direction
+                                    ? eventSort.direction === "asc"
+                                      ? "↑"
+                                      : "↓"
+                                    : "↕"}
+                                </span>
+                              </button>
+                            </th>
+                          ))}
+                          <th>Zeitzone</th>
+                          <th>
+                            <span className="visually-hidden">Aktionen</span>
+                          </th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  {visibleEvents.length === 0 ? (
-                    <p className="event-catalog-empty">Keine passende Veranstaltung gefunden.</p>
+                      </thead>
+                      <tbody>
+                        {visibleEvents.map((entry) => (
+                          <tr
+                            aria-selected={entry.eventId === EVENT_ID}
+                            className={entry.eventId === EVENT_ID ? "is-current" : ""}
+                            key={entry.eventId}
+                          >
+                            <td>
+                              <div className="event-catalog-name">
+                                <a
+                                  href={`/admin?event=${encodeURIComponent(entry.eventId)}&area=events&step=${eventStep}`}
+                                >
+                                  {entry.name}
+                                </a>
+                                <span className="event-catalog-entry-id">
+                                  Technische ID: <code>{entry.eventId}</code>
+                                </span>
+                              </div>
+                            </td>
+                            <td>{formatGermanDate(entry.eventDate)}</td>
+                            <td>
+                              {entry.status === "PREPARATION"
+                                ? "Vorbereitung"
+                                : entry.status === "ACTIVE"
+                                  ? "Aktiv"
+                                  : entry.status === "CLOSED"
+                                    ? "Geschlossen"
+                                    : "Archiviert"}
+                            </td>
+                            <td>{entry.aerodrome || "–"}</td>
+                            <td>{entry.timeZone}</td>
+                            <td>
+                              <Button
+                                aria-label={`${entry.name} löschen`}
+                                busy={busyActionKey === `delete-event-${entry.eventId}`}
+                                onClick={() =>
+                                  void runBusyAction(`delete-event-${entry.eventId}`, () =>
+                                    removeEvent(entry.eventId, entry.name, entry.version),
+                                  )
+                                }
+                                size="compact"
+                                variant="danger"
+                              >
+                                <Trash2 aria-hidden="true" /> Löschen
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {visibleEvents.length === 0 ? (
+                      <p className="event-catalog-empty">Keine passende Veranstaltung gefunden.</p>
+                    ) : null}
+                  </div>
+                </Panel>
+              ) : eventDialogView === "create" ? (
+                <form
+                  className="event-create-dialog-form"
+                  id="event-create-form"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    if (eventCreationDisabled) return;
+                    void runBusyAction("create-event", createEventFromTemplate);
+                  }}
+                >
+                  <div className="event-create-source">
+                    <div>
+                      <span>Ausgangsveranstaltung</span>
+                      <strong>{board?.event.name ?? EVENT_ID}</strong>
+                    </div>
+                    <code>{EVENT_ID}</code>
+                  </div>
+
+                  <section className="event-create-section">
+                    <div className="event-create-section-heading">
+                      <h3>Veranstaltungsdaten</h3>
+                      <p>Die technische ID ist die eindeutige, URL-taugliche Kennung.</p>
+                    </div>
+                    <div className="event-create-form-grid">
+                      <div className="field-control">
+                        <FieldLabel
+                          htmlFor="new-event-id"
+                          label="Technische ID"
+                          help="3–64 Kleinbuchstaben, Ziffern oder Bindestriche; zum Beispiel rundflug-2027."
+                        />
+                        <input
+                          autoCapitalize="none"
+                          id="new-event-id"
+                          maxLength={64}
+                          onChange={(event) => setNewEventId(event.target.value.toLowerCase())}
+                          pattern="[a-z0-9-]{3,64}"
+                          placeholder="rundflug-2027"
+                          required
+                          spellCheck={false}
+                          value={newEventId}
+                        />
+                      </div>
+                      <div className="field-control">
+                        <FieldLabel
+                          htmlFor="new-event-name"
+                          label="Bezeichnung"
+                          help="Lesbarer Veranstaltungsname für Administration, Kasse und Anzeigen."
+                        />
+                        <input
+                          id="new-event-name"
+                          minLength={3}
+                          onChange={(event) => setNewEventName(event.target.value)}
+                          placeholder="Flugtag 2027"
+                          required
+                          value={newEventName}
+                        />
+                      </div>
+                      <LocalizedDateInput
+                        label="Datum"
+                        labelContent={
+                          <FieldGroupLabel
+                            label="Datum"
+                            help="Veranstaltungstag im deutschen Format TT.MM.JJJJ."
+                          />
+                        }
+                        value={newEventDate}
+                        onChange={setNewEventDate}
+                      />
+                      <div className="field-control">
+                        <FieldLabel
+                          htmlFor="new-event-aerodrome"
+                          label="Flugplatz"
+                          help="Kurze Flugplatzkennung oder Ortsangabe für die Veranstaltung."
+                        />
+                        <input
+                          id="new-event-aerodrome"
+                          minLength={2}
+                          onChange={(event) => setNewEventAerodrome(event.target.value)}
+                          placeholder="EDXX"
+                          required
+                          value={newEventAerodrome}
+                        />
+                      </div>
+                    </div>
+                  </section>
+
+                  <section className="event-create-section">
+                    <div className="event-create-section-heading">
+                      <h3>Datenbasis</h3>
+                      <p>Bestimmt, ob die neue Veranstaltung vorhandene Stammdaten übernimmt.</p>
+                    </div>
+                    <div className="field-control">
+                      <FieldLabel
+                        htmlFor="restart-mode"
+                        label="Datenbasis"
+                        help="Betriebsdaten wie Tickets, Gruppen, Umläufe und Flugdaten beginnen immer leer."
+                      />
+                      <select
+                        id="restart-mode"
+                        onChange={(event) =>
+                          setRestartMode(event.target.value as "KEEP_MASTER_DATA" | "EMPTY")
+                        }
+                        value={restartMode}
+                      >
+                        <option value="KEEP_MASTER_DATA">Stammdaten übernehmen</option>
+                        <option value="EMPTY">Leer anlegen</option>
+                      </select>
+                    </div>
+                    <p className="help-text event-create-mode-help">
+                      {restartMode === "KEEP_MASTER_DATA"
+                        ? "Übernommen werden Parameter, Gates, Ressourcengruppen, Produkte, Flugzeugzuordnungen und Piloten-IDs. Verkäufe bleiben zunächst gesperrt."
+                        : "Nur Veranstaltungsdaten, Grundeinstellungen und das erste Administrationskonto werden angelegt. Alle Stammdaten beginnen leer."}
+                    </p>
+                  </section>
+
+                  <section className="event-create-section event-create-confirmation">
+                    <div className="event-create-section-heading">
+                      <h3>Bestätigung</h3>
+                      <p>
+                        Zum Schutz vor einem versehentlichen Neustart muss NEUSTART eingegeben
+                        werden.
+                      </p>
+                    </div>
+                    <div className="field-control">
+                      <FieldLabel
+                        htmlFor="restart-confirmation"
+                        label="Bestätigungstext"
+                        help="Exakt NEUSTART in Großbuchstaben eingeben."
+                      />
+                      <input
+                        autoComplete="off"
+                        id="restart-confirmation"
+                        onChange={(event) => setRestartConfirmation(event.target.value)}
+                        placeholder="NEUSTART"
+                        value={restartConfirmation}
+                      />
+                    </div>
+                  </section>
+
+                  {eventCreationError ? (
+                    <ValidationHint tone="error">{eventCreationError}</ValidationHint>
                   ) : null}
-                </div>
-              </Panel>
+                </form>
+              ) : null}
             </ModalDialog>
           ) : null}
           {adminArea === "events" ? (
@@ -3188,125 +3391,6 @@ export function AdminView() {
                 <span>Werkszustand vorbereiten</span>
               </button>
             </div>
-          </section>
-          <section
-            className="admin-section restart-editor"
-            hidden={adminArea !== "events" || !restartEditorOpen}
-          >
-            <header className="section-heading-row">
-              <h2>Neuen Betriebsstand anlegen</h2>
-              <button onClick={() => setRestartEditorOpen(false)} type="button">
-                Schließen
-              </button>
-            </header>
-            <p>
-              Aktive Veranstaltung: <strong>{board?.event.name ?? EVENT_ID}</strong>. Ein Neustart
-              legt eine neue Veranstaltung an. Bestehende Veranstaltungen können nach dem Export
-              vollständig gelöscht werden.
-            </p>
-            <div className="parameter-grid">
-              <div className="field-control">
-                <FieldLabel
-                  htmlFor="restart-mode"
-                  label="Neustart-Stufe"
-                  help="Bestimmt, ob Stammdaten übernommen werden oder die neue Veranstaltung vollständig leer beginnt."
-                />
-                <select
-                  id="restart-mode"
-                  value={restartMode}
-                  onChange={(event) =>
-                    setRestartMode(event.target.value as "KEEP_MASTER_DATA" | "EMPTY")
-                  }
-                >
-                  <option value="KEEP_MASTER_DATA">Betriebsdaten zurücksetzen</option>
-                  <option value="EMPTY">Vollständig neu einrichten</option>
-                </select>
-              </div>
-              <div className="field-control">
-                <FieldLabel
-                  htmlFor="new-event-id"
-                  label="Technische ID"
-                  help="Eindeutige, URL-taugliche Kennung der neuen Veranstaltung; zum Beispiel rundflug-2027."
-                />
-                <input
-                  id="new-event-id"
-                  value={newEventId}
-                  onChange={(event) => setNewEventId(event.target.value)}
-                  placeholder="rundflug-2027"
-                />
-              </div>
-              <div className="field-control">
-                <FieldLabel
-                  htmlFor="new-event-name"
-                  label="Bezeichnung"
-                  help="Lesbarer Veranstaltungsname für Administration, Kasse und Anzeigen."
-                />
-                <input
-                  id="new-event-name"
-                  value={newEventName}
-                  onChange={(event) => setNewEventName(event.target.value)}
-                  placeholder="Flugtag 2027"
-                />
-              </div>
-              <LocalizedDateInput
-                label="Datum"
-                labelContent={
-                  <FieldGroupLabel
-                    label="Datum"
-                    help="Veranstaltungstag im deutschen Format TT.MM.JJJJ."
-                  />
-                }
-                value={newEventDate}
-                onChange={setNewEventDate}
-              />
-              <div className="field-control">
-                <FieldLabel
-                  htmlFor="new-event-aerodrome"
-                  label="Flugplatz"
-                  help="Kurze Flugplatzkennung oder Ortsangabe für die Veranstaltung."
-                />
-                <input
-                  id="new-event-aerodrome"
-                  value={newEventAerodrome}
-                  onChange={(event) => setNewEventAerodrome(event.target.value)}
-                  placeholder="EDXX"
-                />
-              </div>
-              <div className="field-control">
-                <FieldLabel
-                  htmlFor="restart-confirmation"
-                  label="Bestätigung"
-                  help="Schutz vor versehentlichem Neustart. Zur Ausführung muss NEUSTART eingegeben werden."
-                />
-                <input
-                  id="restart-confirmation"
-                  value={restartConfirmation}
-                  onChange={(event) => setRestartConfirmation(event.target.value)}
-                  placeholder="NEUSTART"
-                  autoComplete="off"
-                />
-              </div>
-            </div>
-            <p className="help-text">
-              {restartMode === "KEEP_MASTER_DATA"
-                ? "Übernommen werden Parameter, Gates, Ressourcengruppen, Produkte, Flugzeugzuordnungen und Piloten-IDs. Tickets, Gruppen, Umläufe und Flugdaten beginnen leer; Verkäufe bleiben zunächst gesperrt."
-                : "Nur Veranstaltungsdaten, Grundeinstellungen und das erste Administrationskonto werden angelegt. Gates, Ressourcengruppen, Produkte, Flugzeugzuordnungen, Piloten-IDs und alle Betriebsdaten beginnen leer."}
-            </p>
-            <Button
-              busy={busyActionKey === "create-event"}
-              type="button"
-              disabled={
-                !isAdministrator ||
-                restartConfirmation !== "NEUSTART" ||
-                newEventId.trim().length < 3 ||
-                newEventName.trim().length < 3 ||
-                !newEventDate ||
-                newEventAerodrome.trim().length < 2
-              }
-              onClick={() => void runBusyAction("create-event", createEventFromTemplate)}
-            >
-              Sicheren Neustart anlegen
-            </Button>
           </section>
           <div
             className="event-setup-v15 single-panel"
@@ -3595,11 +3679,7 @@ export function AdminView() {
                   />
                   <Button
                     disabled={!isAdministrator}
-                    onClick={() => {
-                      setRestartMode("EMPTY");
-                      setRestartConfirmation("");
-                      setRestartEditorOpen(true);
-                    }}
+                    onClick={openEventCreation}
                     variant="primary"
                   >
                     <Plus aria-hidden="true" /> Neue Veranstaltung
@@ -3626,7 +3706,7 @@ export function AdminView() {
                 <tbody>
                   {events
                     .filter((entry) =>
-                      `${entry.name} ${entry.eventDate} ${entry.aerodrome}`
+                      `${entry.name} ${entry.eventId} ${entry.eventDate} ${entry.aerodrome}`
                         .toLocaleLowerCase("de-DE")
                         .includes(eventSearch.trim().toLocaleLowerCase("de-DE")),
                     )
@@ -3636,11 +3716,16 @@ export function AdminView() {
                         key={entry.eventId}
                       >
                         <td>
-                          <a
-                            href={`/admin?event=${encodeURIComponent(entry.eventId)}&area=events&step=event`}
-                          >
-                            {entry.name}
-                          </a>
+                          <div className="event-catalog-name">
+                            <a
+                              href={`/admin?event=${encodeURIComponent(entry.eventId)}&area=events&step=event`}
+                            >
+                              {entry.name}
+                            </a>
+                            <span className="event-catalog-entry-id">
+                              Technische ID: <code>{entry.eventId}</code>
+                            </span>
+                          </div>
                         </td>
                         <td>{formatGermanDate(entry.eventDate)}</td>
                         <td>
