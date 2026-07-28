@@ -831,12 +831,17 @@ export function OperationalPlanPanel({
             <option value="OPERATING_MINUTES">Bestätigte Betriebsminuten</option>
           </SelectField>
           <TextField
+            className="operational-rule-trigger-value"
             help={
               ruleKind === "REFUELING" && ruleTrigger === "COMPLETED_ROTATIONS"
                 ? "Vorgeschlagen aus der Tank-Erinnerung; das Stammdatum bleibt unverändert."
                 : undefined
             }
-            label="Intervall"
+            label={
+              ruleTrigger === "COMPLETED_ROTATIONS"
+                ? "Umläufe bis zur Auslösung"
+                : "Betriebsminuten bis zur Auslösung"
+            }
             min="1"
             onChange={(event) => setRuleInterval(Number(event.target.value))}
             type="number"
