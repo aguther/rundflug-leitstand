@@ -322,6 +322,15 @@ aktive Regel. Vor Anwendung wird eine D1-Time-Travel-Marke beziehungsweise porta
 angelegt. Für eine vollständige Schema-Rückkehr wird D1 per Time Travel oder aus dieser Sicherung
 wiederhergestellt.
 
+## 0052 – Erklärbare kapazitätsgetriebene Voraufrufe
+
+Ergänzt Fluggruppen additiv um den letzten automatisch berechneten Voraufrufstatus, den fachlichen
+Entscheidungsgrund, den Entscheidungszeitpunkt sowie den verwendeten Prognose- und Vorlaufwert.
+Die Felder enthalten keine Gastdaten und ändern die stabile Kommunikationskennung nicht. Vor
+Anwendung wird eine D1-Time-Travel-Marke beziehungsweise portable Sicherung angelegt. Ein älterer
+Worker ignoriert die nullable Spalten; für eine vollständige Schema-Rückkehr wird D1 per Time
+Travel oder aus dieser Sicherung wiederhergestellt.
+
 ## Historische Doppelnummer 0036
 
 `0036_product_promised_flight_time.sql` und `0036_v1_5_stable_operations.sql` wurden bereits unter

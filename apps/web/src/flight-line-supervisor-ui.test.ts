@@ -95,6 +95,9 @@ describe("Flight Director", () => {
     expect(supervisorSource).toContain("queueGroup.queueSequence");
     expect(supervisorSource).toContain("return group.communicationNumber;");
     expect(supervisorSource).not.toContain('<PilotIcon aria-hidden="true" />');
+    expect(supervisorSource).toContain("Voraufruf fällig");
+    expect(supervisorSource).toContain("Keine Prognosekapazität");
+    expect(supervisorSource).toContain("Kein passendes Flugzeug");
   });
 
   it("shares assignment UI without repeating the assigned pilot", () => {
@@ -130,10 +133,10 @@ describe("Flight Director", () => {
   it("uses accessible icon headers and a scrollbar-stable compact ticket table", () => {
     expect(supervisorSource).toContain('label: "Ticketgruppe"');
     expect(supervisorSource).toContain('label: "Fluggruppe"');
-    expect(supervisorSource).toContain('label: "GoToGate-Aktiv"');
+    expect(supervisorSource).toContain('label: "Voraufruf"');
     expect(supervisorSource).toContain("HeaderIcon");
     expect(supervisorSource).toContain("title={column.label}");
-    expect(flightLineStyles).toContain("min-width: 940px");
+    expect(flightLineStyles).toContain("min-width: 1040px");
     expect(flightLineStyles).toContain("scrollbar-gutter: stable");
     expect(flightLineStyles).toMatch(
       /\.flight-director-ticket-overview > header \{[\s\S]*?flex: 0 0 auto;/,

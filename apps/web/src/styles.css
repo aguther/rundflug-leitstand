@@ -3414,6 +3414,7 @@ p {
 .standard-row b,
 .terminal-row b { font-size: 1.04em; letter-spacing: 0.035em; }
 .tone-gate { color: #fbbf24; }
+.tone-prepare { color: #60a5fa; }
 .tone-boarding { color: #22d3ee; }
 .tone-standby { color: #60a5fa; }
 .tone-delayed { color: #fb5c2b; }

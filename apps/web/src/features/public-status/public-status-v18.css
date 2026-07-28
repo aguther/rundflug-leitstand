@@ -262,6 +262,14 @@ body:has(> #root > .public-status-shell) {
   white-space: nowrap;
 }
 
+.public-status-part[data-status="WAITING"] .public-status-action {
+  color: var(--public-muted);
+}
+
+.public-status-part[data-status="PREPARE"] .public-status-action {
+  color: var(--public-live);
+}
+
 .public-fit-text {
   width: 100%;
   min-width: 0;

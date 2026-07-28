@@ -27,13 +27,10 @@ export interface AutomaticPrecallInput {
   resourceGroupActive: boolean;
   resourceGroupEnabled: boolean;
   alreadyPrecalled: boolean;
-  groupSize: number;
-  largestEligibleAircraftSeats: number;
+  forecastCapacityStatus: "AVAILABLE" | "NO_FORECAST_CAPACITY" | "NO_FITTING_AIRCRAFT";
   predictionQuality: PrecallQuality;
   predictedBoardingMinutes: number;
   adaptiveLeadMinutes: number;
-  minutesSinceLastGatePrecall: number | null;
-  gateCooldownMinutes: number;
 }
 
 export interface AutomaticPrecallDecision {
@@ -44,9 +41,9 @@ export interface AutomaticPrecallDecision {
     | "OPERATIONS_BLOCKED"
     | "NOT_QUEUE_FRONT"
     | "ALREADY_PRECALLED"
+    | "NO_FORECAST_CAPACITY"
     | "NO_FITTING_AIRCRAFT"
-    | "TOO_EARLY"
-    | "GATE_COOLDOWN";
+    | "TOO_EARLY";
 }
 
 export interface AutomaticPrecallQueueEntry extends AutomaticPrecallInput {
@@ -90,17 +87,14 @@ export function decideAutomaticPrecall(input: AutomaticPrecallInput): AutomaticP
     return { eligible: false, reason: "OPERATIONS_BLOCKED" };
   }
   if (input.alreadyPrecalled) return { eligible: false, reason: "ALREADY_PRECALLED" };
-  if (input.groupSize < 1 || input.groupSize > input.largestEligibleAircraftSeats) {
+  if (input.forecastCapacityStatus === "NO_FORECAST_CAPACITY") {
+    return { eligible: false, reason: "NO_FORECAST_CAPACITY" };
+  }
+  if (input.forecastCapacityStatus === "NO_FITTING_AIRCRAFT") {
     return { eligible: false, reason: "NO_FITTING_AIRCRAFT" };
   }
   if (input.predictedBoardingMinutes > input.adaptiveLeadMinutes) {
     return { eligible: false, reason: "TOO_EARLY" };
-  }
-  if (
-    input.minutesSinceLastGatePrecall !== null &&
-    input.minutesSinceLastGatePrecall < input.gateCooldownMinutes
-  ) {
-    return { eligible: false, reason: "GATE_COOLDOWN" };
   }
   return { eligible: true, reason: "ELIGIBLE" };
 }

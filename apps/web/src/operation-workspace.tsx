@@ -31,7 +31,7 @@ export const LOCAL_DEVELOPMENT =
 export const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 export const publicStatusLabel = {
   WAITING: "Warten",
-  PREPARE: "Bitte vorbereiten",
+  PREPARE: "Bereithalten",
   COME_TO_FLIGHT_LINE: "Bitte zur Flight Line",
   BOARDING: "Boarding",
   IN_FLIGHT: "Flug läuft",

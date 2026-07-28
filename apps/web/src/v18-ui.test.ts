@@ -70,7 +70,7 @@ describe("V1.8 approved UI deltas", () => {
       'label: "Umlaufstatus", Icon: Activity',
       'label: "Flugzeug", Icon: Plane',
       'label: "Produkt", Icon: Package',
-      'label: "GoToGate-Aktiv", Icon: CircleArrowRight',
+      'label: "Voraufruf", Icon: CircleArrowRight',
       'label: "Zeitfenster", Icon: Clock3',
       'label: "Boarding", Icon: TicketsPlane',
       'label: "Off-Block", Icon: PlaneTakeoff',

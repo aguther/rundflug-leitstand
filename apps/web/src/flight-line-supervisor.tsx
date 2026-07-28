@@ -93,7 +93,7 @@ const ticketColumns: Array<{ key: TicketSortKey; label: string; Icon: LucideIcon
   { key: "status", label: "Umlaufstatus", Icon: Activity },
   { key: "aircraft", label: "Flugzeug", Icon: Plane },
   { key: "product", label: "Produkt", Icon: Package },
-  { key: "goToGate", label: "GoToGate-Aktiv", Icon: CircleArrowRight },
+  { key: "goToGate", label: "Voraufruf", Icon: CircleArrowRight },
   { key: "window", label: "Zeitfenster", Icon: Clock3 },
   { key: "boarding", label: "Boarding", Icon: TicketsPlane },
   { key: "offblock", label: "Off-Block", Icon: PlaneTakeoff },
@@ -115,6 +115,30 @@ function optionalTimestamp(value: string | null | undefined): number | null {
   return Number.isNaN(timestamp) ? null : timestamp;
 }
 
+function precallDecisionLabel(rotation: Rotation): string {
+  if (rotation.status !== "DRAFT") return "–";
+  if (rotation.precalledAt || rotation.precallDecision?.status === "GO_TO_GATE") {
+    return "GO TO GATE";
+  }
+  if (rotation.precallDecision?.status === "PREPARE") return "Voraufruf fällig";
+  switch (rotation.precallDecision?.reason) {
+    case "DISABLED":
+      return "Automatik aus";
+    case "OPERATIONS_BLOCKED":
+      return "Betrieb blockiert";
+    case "NOT_QUEUE_FRONT":
+      return "Nicht Queue-Front";
+    case "NO_FORECAST_CAPACITY":
+      return "Keine Prognosekapazität";
+    case "NO_FITTING_AIRCRAFT":
+      return "Kein passendes Flugzeug";
+    case "TOO_EARLY":
+      return "Noch zu früh";
+    default:
+      return "Entscheidung ausstehend";
+  }
+}
+
 function ticketSortValue(row: TicketRow, key: TicketSortKey): string | number | null {
   const { group, rotation } = row;
   switch (key) {
@@ -133,7 +157,7 @@ function ticketSortValue(row: TicketRow, key: TicketSortKey): string | number | 
     case "product":
       return rotation.productName;
     case "goToGate":
-      return rotation.status === "DRAFT" && rotation.precalledAt ? 1 : 0;
+      return precallDecisionLabel(rotation);
     case "window":
       return optionalTimestamp(rotation.boardingWindowLowerAt);
     case "boarding":
@@ -765,10 +789,16 @@ function CompactTickets({
             <span>{phaseIcon(rotation)}</span>
             <span>{rotation.aircraftRegistration ?? "Noch offen"}</span>
             <span>{rotation.productName}</span>
-            <span>
+            <span
+              className={`precall-decision precall-decision--${rotation.precallDecision?.status.toLowerCase() ?? "unknown"}`}
+              title={precallDecisionLabel(rotation)}
+            >
               {rotation.status === "DRAFT" && rotation.precalledAt ? (
-                <Check aria-label="GoToGate-Aktiv" size={16} />
+                <Check aria-hidden="true" size={14} />
+              ) : rotation.precallDecision?.status === "PREPARE" ? (
+                <Clock3 aria-hidden="true" size={14} />
               ) : null}
+              {precallDecisionLabel(rotation)}
             </span>
             <span>{timeWindow(rotation)}</span>
             <span>{formatFlightLineTime(rotation.timeline.actual.boardingAt, timeZone)}</span>
