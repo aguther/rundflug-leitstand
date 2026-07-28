@@ -1,3 +1,5 @@
+import type { KeyboardEvent } from "react";
+
 import {
   forecastUncertaintyLabel,
   type SimulationEvent,
@@ -47,6 +49,28 @@ function percent(value: number, start: number, end: number): number {
 
 function clampPercent(value: number): number {
   return Math.min(100, Math.max(0, value));
+}
+
+function scrollTimelineWithKeyboard(event: KeyboardEvent<HTMLElement>) {
+  const container = event.currentTarget;
+  const page = Math.max(48, container.clientHeight * 0.8);
+  switch (event.key) {
+    case "PageDown":
+      container.scrollBy({ top: page });
+      break;
+    case "PageUp":
+      container.scrollBy({ top: -page });
+      break;
+    case "Home":
+      container.scrollTo({ top: 0 });
+      break;
+    case "End":
+      container.scrollTo({ top: container.scrollHeight });
+      break;
+    default:
+      return;
+  }
+  event.preventDefault();
 }
 
 function phaseStyle(from: number, until: number, start: number, end: number) {
@@ -254,7 +278,13 @@ export function ForecastTimeline({
           </time>
         ))}
       </div>
-      <div className="sim-timeline-lanes">
+      <section
+        aria-label="Tagesplan und Flugzeuge"
+        className="sim-timeline-lanes"
+        onKeyDown={scrollTimelineWithKeyboard}
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: the overflow region must accept focus for keyboard scrolling.
+        tabIndex={0}
+      >
         <div className="sim-now-track">
           <div className="sim-now-line" style={{ left: `${nowPosition}%` }}>
             <time>{formatTime(currentMs)}</time>
@@ -413,7 +443,7 @@ export function ForecastTimeline({
             </div>
           );
         })}
-      </div>
+      </section>
       <div className="sim-queue-row">
         <div>
           <strong>Warteschlange</strong>

@@ -23,6 +23,7 @@ const foundationDialogSource = readFileSync(
   new URL("./SimulationFoundationDialog.tsx", import.meta.url),
   "utf8",
 );
+const timelineSource = readFileSync(new URL("./ForecastTimeline.tsx", import.meta.url), "utf8");
 const recurringRulesSource = readFileSync(
   new URL("./SimulationRecurringRulesEditor.tsx", import.meta.url),
   "utf8",
@@ -201,11 +202,26 @@ describe("local and hosted forecast simulation surface", () => {
     expect(foundationDialogSource).toContain("Vorlage als JSON herunterladen");
   });
 
-  it("keeps narrow layouts inside an internal scroll container", () => {
+  it("keeps the viewport fixed and only the aircraft lanes vertically scrollable", () => {
     expect(stylesSource).toContain(".sim-layout");
     expect(stylesSource).toContain("overflow-x: auto");
-    expect(stylesSource).toContain(".sim-workspace");
-    expect(stylesSource).toContain("overflow: auto");
+    expect(stylesSource).toMatch(
+      /\.sim-workspace\s*\{[^}]*grid-template-rows:\s*auto minmax\(0, 1fr\) auto auto;[^}]*overflow-y:\s*hidden;/s,
+    );
+    expect(stylesSource).toMatch(
+      /\.sim-timeline-panel\s*\{[^}]*grid-template-rows:\s*auto auto minmax\(0, 1fr\) auto auto;[^}]*overflow:\s*hidden;/s,
+    );
+    expect(stylesSource).toMatch(
+      /\.sim-timeline-lanes\s*\{[^}]*overflow-y:\s*auto;[^}]*scrollbar-gutter:\s*stable;/s,
+    );
+    expect(stylesSource).toMatch(
+      /\.sim-injector\s*\{[^}]*align-items:\s*flex-end;[^}]*justify-content:\s*flex-end;/s,
+    );
+    expect(stylesSource).toMatch(/\.sim-export-row\s*\{[^}]*flex-wrap:\s*wrap;[^}]*gap:\s*8px;/s);
+    expect(timelineSource).toContain('aria-label="Tagesplan und Flugzeuge"');
+    expect(timelineSource).toContain('<section\n        aria-label="Tagesplan und Flugzeuge"');
+    expect(timelineSource).toContain("onKeyDown={scrollTimelineWithKeyboard}");
+    expect(timelineSource).toContain("tabIndex={0}");
     expect(stylesSource).toContain(".forecast-simulator .ds-sidepanel");
     expect(stylesSource).toContain("width: min(760px, 100%)");
     expect(stylesSource).not.toContain(".ds-sidepanel:has(");
