@@ -88,6 +88,16 @@ npm run check
 - Schwäche keine Invariante ab, nur damit ein Test besteht.
 - Für UI-Arbeit zunächst vollständige Konzepte für die betroffene Oberfläche erzeugen und freigeben,
   danach implementieren und im Browser gegen das Konzept prüfen.
+- Beim UI-Finish besitzen pixelgenaue Ordnung und Layoutkonstanz hohe Priorität: zusammengehörige
+  Buttons, Felder, Beschriftungen, Icons und Statusanzeigen folgen gemeinsamen Fluchten, einheitlichen
+  Controlhöhen und konsistenten Abständen.
+- Lade-, Pending-, Filter-, Status- und Inhaltsänderungen dürfen keine vermeidbaren Layoutsprünge
+  verursachen. Aktionsgruppen, Spalten, Kopfpositionen und Primäraktionen bleiben größen- und
+  positionsstabil; der Gesamtscreen scrollt möglichst nicht und umfangreiche Listen erhalten genau
+  einen klar begrenzten Scrollbereich.
+- Diese UI-Finish-Kriterien werden in den relevanten Light-/Dark-Viewports visuell gegen das
+  freigegebene Konzept geprüft; reine Layoutkorrekturen benötigen nur ein dem Risiko angemessenes
+  Mindestmaß gezielter Regressionstests.
 - Kein generisches Karten-Dashboard anstelle der vorgeschriebenen Ein-Bildschirm-Abläufe für Kasse und
   Flight Line.
 
