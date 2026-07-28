@@ -2,7 +2,9 @@ import {
   type MasterDataTemplate,
   masterDataTemplateSchema,
   type SimulationPlanExport,
+  type SimulationScenarioTemplate,
   simulationPlanExportSchema,
+  simulationScenarioTemplateSchema,
 } from "@rundflug/contracts";
 
 import {
@@ -18,7 +20,11 @@ export const MAX_SIMULATION_PLAN_FILE_BYTES = 1_048_576;
 
 export interface SimulationPlanImportPreview {
   sourceName: string;
-  format: "rundflug-simulation-plan" | "rundflug-master-data-template";
+  format:
+    | "rundflug-simulation-scenario"
+    | "rundflug-simulation-plan"
+    | "rundflug-master-data-template";
+  category: "SCENARIO" | "OPERATIONAL";
   config: SimulationConfig;
   counts: {
     gates: number;
@@ -191,6 +197,7 @@ function buildPreview(
   return {
     sourceName: template.source.name,
     format: exported ? "rundflug-simulation-plan" : "rundflug-master-data-template",
+    category: "OPERATIONAL",
     config,
     counts: {
       gates: operationalModel.gates.length,
@@ -206,6 +213,30 @@ function buildPreview(
   };
 }
 
+function buildScenarioPreview(template: SimulationScenarioTemplate): SimulationPlanImportPreview {
+  return {
+    sourceName: template.name,
+    format: template.format,
+    category: "SCENARIO",
+    config: {
+      ...structuredClone(template.config),
+      plannedOperations: [],
+      recurringRules: [],
+    },
+    counts: {
+      gates: 0,
+      resourceGroups: 0,
+      aircraft: template.config.adminParameters.aircraftCount,
+      pilots: template.config.adminParameters.activePilotCount,
+      products: 0,
+      plannedOperations: 0,
+      recurringRules: 0,
+      unresolvedAfterCurrentRotation: 0,
+    },
+    warnings: [],
+  };
+}
+
 export function parseSimulationPlanImport(
   text: string,
   baseConfig: SimulationConfig,
@@ -216,6 +247,10 @@ export function parseSimulationPlanImport(
   } catch {
     throw new SimulationPlanImportError("Die Datei enthält kein gültiges JSON.");
   }
+  const scenario = simulationScenarioTemplateSchema.safeParse(raw);
+  if (scenario.success) {
+    return buildScenarioPreview(scenario.data);
+  }
   const simulationPlan = simulationPlanExportSchema.safeParse(raw);
   if (simulationPlan.success) {
     return buildPreview(simulationPlan.data.masterData, baseConfig, simulationPlan.data);
@@ -224,13 +259,31 @@ export function parseSimulationPlanImport(
   if (masterData.success) {
     return buildPreview(masterData.data, baseConfig, null);
   }
+  const rawFormat =
+    typeof raw === "object" && raw !== null && "format" in raw ? raw.format : undefined;
   const firstIssue =
-    simulationPlan.error.issues[0]?.message ??
-    masterData.error.issues[0]?.message ??
-    "Unbekanntes Dateiformat.";
+    rawFormat === "rundflug-simulation-scenario"
+      ? scenario.error.issues[0]?.message
+      : rawFormat === "rundflug-simulation-plan"
+        ? simulationPlan.error.issues[0]?.message
+        : rawFormat === "rundflug-master-data-template"
+          ? masterData.error.issues[0]?.message
+          : "Unbekanntes Dateiformat.";
   throw new SimulationPlanImportError(
-    `Die Datei ist weder ein Simulationsplan noch ein gültiges Stammdaten-Template: ${firstIssue}`,
+    `Die Datei ist weder eine Szenario-Vorlage noch ein Simulationsplan oder gültiges Stammdaten-Template: ${firstIssue ?? "Ungültiger Dateiinhalt."}`,
   );
+}
+
+export async function parseSimulationPlanFile(
+  file: Pick<File, "size" | "text">,
+  baseConfig: SimulationConfig,
+): Promise<SimulationPlanImportPreview> {
+  if (file.size > MAX_SIMULATION_PLAN_FILE_BYTES) {
+    throw new SimulationPlanImportError(
+      "Die Datei ist größer als 1 MiB und wird nicht verarbeitet.",
+    );
+  }
+  return parseSimulationPlanImport(await file.text(), baseConfig);
 }
 
 export function excludeUnresolvedPlannedOperations(

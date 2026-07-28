@@ -83,6 +83,11 @@ Der anschließende Import im Simulator legt eine lokale Variante an. Tickets, Qu
 Ereignisverlauf, Audit und Prognosesnapshots sind nicht Teil der Datei. Varianten und synthetische
 Läufe bleiben flüchtig im geöffneten Browser-Tab.
 
+Im Simulator bündelt **Simulationsgrundlage laden** die vier eingebauten Szenarien und den
+JSON-Import. Das gewählte Szenario kann im strikt validierten Format
+`rundflug-simulation-scenario` Version 1 heruntergeladen, manuell bearbeitet und wieder als neue
+Variante geladen werden. Die CSV-Kalibrierung bleibt davon getrennt.
+
 Die vollständige Checkliste für Einrichtung, Betriebsbeginn und einen gestuften sicheren Neustart
 steht in [docs/operations/betriebsstart-und-neustart.md](docs/operations/betriebsstart-und-neustart.md).
 

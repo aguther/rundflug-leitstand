@@ -316,9 +316,19 @@ describe("local forecast simulation", () => {
     ).toBe(false);
     expect(
       first.events.some(
+        (event) => event.type === "REFUELING_STARTED" && event.aircraftId === "aircraft-b",
+      ),
+    ).toBe(true);
+    expect(
+      first.events.some(
         (event) => event.type === "PLANNED_PAUSE_STARTED" && event.aircraftId === "aircraft-a",
       ),
     ).toBe(false);
+    expect(
+      first.events.some(
+        (event) => event.type === "PLANNED_PAUSE_STARTED" && event.aircraftId === "aircraft-b",
+      ),
+    ).toBe(true);
   });
 
   it(
