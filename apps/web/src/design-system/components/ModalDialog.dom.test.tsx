@@ -67,4 +67,19 @@ describe("ModalDialog DOM behavior", () => {
       screen.getAllByRole("button", { name: "Dialog schließen" })[1],
     );
   });
+
+  it("can isolate a dialog from view-specific ancestor styles", () => {
+    const adminSection = document.createElement("section");
+    adminSection.className = "admin-shell admin-section";
+    document.body.append(adminSection);
+
+    render(
+      <ModalDialog onClose={() => undefined} open portal title="Isolierter Dialog">
+        <p>Gemeinsamer Dialogstil</p>
+      </ModalDialog>,
+      { container: adminSection },
+    );
+
+    expect(document.querySelector(".ds-modal-backdrop")?.parentElement).toBe(document.body);
+  });
 });
