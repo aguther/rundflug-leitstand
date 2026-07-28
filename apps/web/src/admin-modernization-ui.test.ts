@@ -51,6 +51,12 @@ describe("modernized administration workspace", () => {
     expect(planSource).toContain("Für einen späteren Zeitpunkt");
     expect(planSource).toContain("alle 5 Umläufe tanken");
     expect(planSource).toContain("Wiederkehrende Regel hinzufügen");
+    expect(planSource).toContain("Umläufe bis zur Auslösung");
+    expect(planSource).toContain("Betriebsminuten bis zur Auslösung");
+    expect(planSource).toContain('className="operational-rule-trigger-value"');
+    expect(planStyles).toMatch(
+      /\.operational-plan-form-grid > \.operational-rule-trigger-value \{[\s\S]*?grid-template-rows: auto var\(--control-default\) minmax\(2\.05rem, auto\);/,
+    );
   });
 
   it("uses a modal account table with explicit edit and protected delete actions", () => {

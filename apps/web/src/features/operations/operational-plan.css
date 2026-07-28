@@ -125,6 +125,10 @@
   margin-bottom: 0;
 }
 
+.operational-plan-form-grid > .operational-rule-trigger-value {
+  grid-template-rows: auto var(--control-default) minmax(2.05rem, auto);
+}
+
 .operational-plan-form-grid .localized-input-field {
   min-width: 0;
   display: grid;
