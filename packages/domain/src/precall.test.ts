@@ -14,21 +14,18 @@ const eligible: AutomaticPrecallInput = {
   resourceGroupActive: true,
   resourceGroupEnabled: true,
   alreadyPrecalled: false,
-  groupSize: 3,
-  largestEligibleAircraftSeats: 3,
+  forecastCapacityStatus: "AVAILABLE",
   predictionQuality: "CHANGING",
   predictedBoardingMinutes: 12,
   adaptiveLeadMinutes: 15,
-  minutesSinceLastGatePrecall: 5,
-  gateCooldownMinutes: 2,
 };
 
 describe("automatischer Voraufruf (F-BEN-030)", () => {
   it("allows a fitting group inside the adaptive lead", () => {
     expect(decideAutomaticPrecall(eligible)).toEqual({ eligible: true, reason: "ELIGIBLE" });
-    expect(decideAutomaticPrecall({ ...eligible, groupSize: 4 }).reason).toBe(
-      "NO_FITTING_AIRCRAFT",
-    );
+    expect(
+      decideAutomaticPrecall({ ...eligible, forecastCapacityStatus: "NO_FITTING_AIRCRAFT" }).reason,
+    ).toBe("NO_FITTING_AIRCRAFT");
   });
 
   it("selects every queue-stable group inside the shared forecast window", () => {
@@ -62,7 +59,11 @@ describe("automatischer Voraufruf (F-BEN-030)", () => {
   });
 
   it.each([
-    { groupSize: 4, predictedBoardingMinutes: 0, reason: "NO_FITTING_AIRCRAFT" },
+    {
+      forecastCapacityStatus: "NO_FITTING_AIRCRAFT",
+      predictedBoardingMinutes: 0,
+      reason: "NO_FITTING_AIRCRAFT",
+    },
     { groupSize: 3, predictedBoardingMinutes: 16, reason: "TOO_EARLY" },
   ] as const)("never skips an ineligible queue front ($reason)", (front) => {
     const decisions = selectAutomaticPrecalls([
@@ -76,22 +77,12 @@ describe("automatischer Voraufruf (F-BEN-030)", () => {
     expect(decisions[2]).toMatchObject({ eligible: true, reason: "ELIGIBLE" });
   });
 
-  it("allows a same-gate batch but applies the cooldown snapshot to the next batch", () => {
-    const openBatch = selectAutomaticPrecalls([
-      { ...eligible, id: "one", resourceGroupId: "rg-1", minutesSinceLastGatePrecall: 5 },
-      { ...eligible, id: "two", resourceGroupId: "rg-1", minutesSinceLastGatePrecall: 5 },
-      { ...eligible, id: "three", resourceGroupId: "rg-1", minutesSinceLastGatePrecall: 5 },
+  it("does not let another resource group's same-gate call block capacity", () => {
+    const decisions = selectAutomaticPrecalls([
+      { ...eligible, id: "oldtimer", resourceGroupId: "rg-oldtimer" },
+      { ...eligible, id: "rundflug", resourceGroupId: "rg-rundflug" },
     ]);
-    expect(openBatch.every((decision) => decision.eligible)).toBe(true);
-
-    const cooldownBatch = selectAutomaticPrecalls([
-      { ...eligible, id: "four", resourceGroupId: "rg-1", minutesSinceLastGatePrecall: 1 },
-      { ...eligible, id: "five", resourceGroupId: "rg-1", minutesSinceLastGatePrecall: 1 },
-    ]);
-    expect(cooldownBatch.map((decision) => decision.reason)).toEqual([
-      "GATE_COOLDOWN",
-      "NOT_QUEUE_FRONT",
-    ]);
+    expect(decisions.every((decision) => decision.eligible)).toBe(true);
   });
 
   it("does not turn uncertainty or a soft gate-wait target into a hard block", () => {
@@ -101,9 +92,17 @@ describe("automatischer Voraufruf (F-BEN-030)", () => {
     expect(decideAutomaticPrecall({ ...eligible, predictedBoardingMinutes: 16 }).reason).toBe(
       "TOO_EARLY",
     );
-    expect(decideAutomaticPrecall({ ...eligible, minutesSinceLastGatePrecall: 1 }).reason).toBe(
-      "GATE_COOLDOWN",
+    expect(
+      decideAutomaticPrecall({ ...eligible, forecastCapacityStatus: "NO_FORECAST_CAPACITY" })
+        .reason,
+    ).toBe("NO_FORECAST_CAPACITY");
+  });
+
+  it("becomes eligible from elapsed time alone on the next periodic evaluation", () => {
+    expect(decideAutomaticPrecall({ ...eligible, predictedBoardingMinutes: 15.5 }).reason).toBe(
+      "TOO_EARLY",
     );
+    expect(decideAutomaticPrecall(eligible)).toEqual({ eligible: true, reason: "ELIGIBLE" });
   });
 
   it("learns a bounded lead from observed precall-to-boarding waits", () => {

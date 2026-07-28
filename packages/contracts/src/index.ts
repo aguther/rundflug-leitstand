@@ -1772,11 +1772,30 @@ export const rotationOperationalSummarySchema = z.object({
   usableCapacity: z.number().int().positive(),
   capacityReduced: z.boolean(),
   estimatedPassengerPayloadKg: z.number().positive().nullable(),
-  predictedLowerMinutes: z.number().int().nonnegative(),
-  predictedUpperMinutes: z.number().int().nonnegative(),
+  predictedLowerMinutes: z.number().int().nonnegative().nullable(),
+  predictedUpperMinutes: z.number().int().nonnegative().nullable(),
   boardingWindowLowerAt: z.iso.datetime().nullable(),
   boardingWindowUpperAt: z.iso.datetime().nullable(),
   precalledAt: z.string().nullable().optional(),
+  precallDecision: z
+    .object({
+      status: z.enum(["WAITING", "PREPARE", "GO_TO_GATE"]),
+      reason: z.enum([
+        "ELIGIBLE",
+        "DISABLED",
+        "OPERATIONS_BLOCKED",
+        "NOT_QUEUE_FRONT",
+        "ALREADY_PRECALLED",
+        "NO_FORECAST_CAPACITY",
+        "NO_FITTING_AIRCRAFT",
+        "TOO_EARLY",
+      ]),
+      decidedAt: z.string(),
+      predictedBoardingAt: z.string().nullable(),
+      adaptiveLeadMinutes: z.number().int().nonnegative().nullable(),
+    })
+    .nullable()
+    .optional(),
   calledAt: z.string().nullable(),
   deferralCount: z.number().int().nonnegative(),
   operationalNote: z.string(),
@@ -2077,6 +2096,7 @@ export const publicBoardSchema = z.object({
         departedAt: z.string().nullable().optional().default(null),
         status: z.enum([
           "WAITING",
+          "PREPARE",
           "COME_TO_FLIGHT_LINE",
           "BOARDING",
           "IN_FLIGHT",

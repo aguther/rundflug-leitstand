@@ -53,6 +53,7 @@ function statusPresentation(status: PublicGroup["status"]): {
 } {
   if (status === "COME_TO_FLIGHT_LINE")
     return { label: "GO TO GATE", tone: "gate", icon: CircleArrowRight };
+  if (status === "PREPARE") return { label: "BEREITHALTEN", tone: "prepare", icon: Clock3 };
   if (status === "BOARDING") return { label: "BOARDING", tone: "boarding", icon: TicketsPlane };
   if (status === "IN_FLIGHT" || status === "LANDED" || status === "COMPLETED") {
     return { label: "ABGEFLOGEN", tone: "departed", icon: PlaneTakeoff };

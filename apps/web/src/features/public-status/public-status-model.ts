@@ -22,9 +22,9 @@ export const PUBLIC_STATUS_PRESENTATIONS: Record<PublicStatus, PublicStatusPrese
     defaultMessage: "Bitte Status regelmäßig prüfen.",
   },
   PREPARE: {
-    label: "WARTEN",
+    label: "BEREITHALTEN",
     iconName: "Clock3",
-    defaultMessage: "Ihr Aufruf steht bevor. Bitte bereithalten.",
+    defaultMessage: "Ihr Aufruf steht bevor. Bitte bereithalten und noch nicht zum Gate kommen.",
   },
   COME_TO_FLIGHT_LINE: {
     label: "GO TO GATE",

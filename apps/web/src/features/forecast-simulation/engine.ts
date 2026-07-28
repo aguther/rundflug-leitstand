@@ -399,6 +399,8 @@ export function calculateSimulationMetrics(input: {
     EMERGENCY_MODE: 0,
     RESOURCE_GROUP_INACTIVE: 0,
     NO_ACTIVE_CAPACITY: 0,
+    NO_FORECAST_CAPACITY: 0,
+    NO_FITTING_AIRCRAFT: 0,
     PLANNED_CONSTRAINT_OVERDUE: 0,
     UNPLANNED_RESOURCE_RETURN: 0,
     STALE_PREDICTION: 0,
@@ -705,6 +707,7 @@ export function runSimulation(
         return [
           {
             laneId: entry.id,
+            passengerSeats: entry.capacity,
             availableLowerAt: iso(Math.max(nowMs, expectedAt - futureUncertainty)),
             availableExpectedAt: iso(expectedAt),
             availableUpperAt: iso(expectedAt + futureUncertainty),
@@ -742,6 +745,7 @@ export function runSimulation(
         resourceGroupId: RESOURCE_GROUP_ID,
         resourceGroupStatus,
         queueSequence: rotation.status === "DRAFT" ? (draftSequence.get(rotation.id) ?? 1) : 1,
+        passengerCount: rotation.passengerCount,
         referenceDurationMinutes: config.adminParameters.productReferenceDurationMinutes,
         productCode: PRODUCT_ID,
         aircraftType: rotation.aircraftId
@@ -1001,16 +1005,6 @@ export function runSimulation(
         observedGateWaitMinutes,
         tuning: config.forecastTuning.precall,
       });
-      const latestPrecallAt = rotations.reduce<number | null>((latest, rotation) => {
-        if (!rotation.precalledAt) return latest;
-        const value = Date.parse(rotation.precalledAt);
-        return latest === null ? value : Math.max(latest, value);
-      }, null);
-      const largestEligibleAircraftSeats = operationsAvailable
-        ? aircraft
-            .filter((entry) => entry.state === "AVAILABLE" || entry.state === "ACTIVE")
-            .reduce((maximum, entry) => Math.max(maximum, entry.capacity), 0)
-        : 0;
       const projectionByRotationId = new Map(
         precallProjections.map((projection) => [projection.rotationId, projection]),
       );
@@ -1029,18 +1023,16 @@ export function runSimulation(
               resourceGroupActive: operationsAvailable,
               resourceGroupEnabled: config.adminParameters.resourceGroupAutomaticPrecallEnabled,
               alreadyPrecalled: rotation.precalledAt !== null,
-              groupSize: rotation.passengerCount,
-              largestEligibleAircraftSeats,
+              forecastCapacityStatus: projection.capacityStatus,
               predictionQuality: projection.predictionQuality,
-              predictedBoardingMinutes: Math.round(
-                (projection.predictionLowerMinutes + projection.predictionUpperMinutes) / 2,
-              ),
+              predictedBoardingMinutes:
+                projection.predictionLowerMinutes === null ||
+                projection.predictionUpperMinutes === null
+                  ? Number.POSITIVE_INFINITY
+                  : Math.round(
+                      (projection.predictionLowerMinutes + projection.predictionUpperMinutes) / 2,
+                    ),
               adaptiveLeadMinutes,
-              minutesSinceLastGatePrecall:
-                latestPrecallAt === null
-                  ? null
-                  : Math.max(0, (nowMs - latestPrecallAt) / MINUTE_MS),
-              gateCooldownMinutes: config.forecastTuning.precall.gateCooldownMinutes,
             },
           ];
         }),
@@ -1049,7 +1041,7 @@ export function runSimulation(
         if (!decision.eligible) continue;
         const rotation = rotationById.get(decision.id);
         const projection = projectionByRotationId.get(decision.id);
-        if (!rotation || !projection) continue;
+        if (!rotation || !projection?.predictedBoardingAt) continue;
         rotation.precalledAt = iso(nowMs);
         rotation.precallTrigger = "AUTOMATIC_PRECALL";
         rotation.precallPredictionQuality = projection.predictionQuality;
@@ -1125,6 +1117,19 @@ export function runSimulation(
     for (const projection of projections) {
       const rotation = rotations.find((candidate) => candidate.id === projection.rotationId);
       if (!rotation || rotation.status === "COMPLETED") continue;
+      if (
+        !projection.predictedBoardingAt ||
+        !projection.predictedDepartureAt ||
+        !projection.predictedLandingAt ||
+        !projection.predictedCompletionAt ||
+        projection.predictionLowerMinutes === null ||
+        projection.predictionUpperMinutes === null
+      ) {
+        rotation.predictedDepartureAt = null;
+        rotation.predictedLandingAt = null;
+        rotation.predictedCompletionAt = null;
+        continue;
+      }
       rotation.predictedDepartureAt = projection.predictedDepartureAt;
       rotation.predictedLandingAt = projection.predictedLandingAt;
       rotation.predictedCompletionAt = projection.predictedCompletionAt;

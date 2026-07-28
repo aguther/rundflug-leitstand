@@ -385,6 +385,9 @@
 .tone-gate {
   color: var(--fids-accent);
 }
+.tone-prepare {
+  color: var(--fids-blue);
+}
 .tone-boarding {
   color: var(--fids-cyan);
 }

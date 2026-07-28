@@ -158,10 +158,12 @@ describe("event-driven forecast", () => {
     const first = reserveNextQueueWindow(availability, duration);
     availability = first.availability;
     const second = reserveNextQueueWindow(availability, duration);
-    expect(first.window.lowerMinutes).toBe(0);
-    expect(first.window.upperMinutes).toBe(5);
-    expect(second.window.lowerMinutes).toBe(4);
-    expect(second.window.upperMinutes).toBe(14);
+    expect(first.window).not.toBeNull();
+    expect(second.window).not.toBeNull();
+    expect(first.window?.lowerMinutes).toBe(0);
+    expect(first.window?.upperMinutes).toBe(5);
+    expect(second.window?.lowerMinutes).toBe(4);
+    expect(second.window?.upperMinutes).toBe(14);
   });
 
   it("projects a recurring rotation rule repeatedly on the same availability lane", () => {
@@ -592,6 +594,142 @@ describe("event-driven forecast", () => {
     });
   });
 
+  it("projects a group only onto a forecast lane with enough passenger seats", () => {
+    const projection = calculateForecastTimelines({
+      event: {
+        eventId: "event-current",
+        now: "2026-07-22T10:00:00.000Z",
+        operationalInterrupted: false,
+        emergencyMode: false,
+        plannedBoardingMinutes: 5,
+        plannedDeboardingMinutes: 5,
+        plannedBufferMinutes: 2,
+      },
+      capacities: [
+        {
+          resourceGroupId: "rg-1",
+          activeAircraft: 1,
+          availabilityLanes: [
+            {
+              laneId: "two-seater:pilot-1",
+              passengerSeats: 2,
+              availableLowerAt: "2026-07-22T10:00:00.000Z",
+              availableExpectedAt: "2026-07-22T10:00:00.000Z",
+              availableUpperAt: "2026-07-22T10:00:00.000Z",
+            },
+            {
+              laneId: "four-seater:pilot-2",
+              passengerSeats: 4,
+              availableLowerAt: "2026-07-22T10:10:00.000Z",
+              availableExpectedAt: "2026-07-22T10:15:00.000Z",
+              availableUpperAt: "2026-07-22T10:20:00.000Z",
+            },
+          ],
+        },
+      ],
+      durationSamples: [],
+      rotations: [
+        {
+          id: "four-person-group",
+          status: "DRAFT",
+          createdAt: "2026-07-22T10:00:00.000Z",
+          calledAt: null,
+          departedAt: null,
+          landedAt: null,
+          resourceGroupId: "rg-1",
+          resourceGroupStatus: "ACTIVE",
+          queueSequence: 1,
+          passengerCount: 4,
+          referenceDurationMinutes: 20,
+          productCode: "PAN",
+          aircraftType: null,
+          predictedDepartureAt: null,
+          predictedLandingAt: null,
+          predictedCompletionAt: null,
+        },
+      ],
+    })[0];
+
+    expect(projection).toMatchObject({
+      capacityStatus: "AVAILABLE",
+      predictionLowerMinutes: 10,
+      predictionUpperMinutes: 20,
+      predictedBoardingAt: "2026-07-22T10:15:00.000Z",
+    });
+  });
+
+  it.each([
+    {
+      title: "no lane at all",
+      availabilityLanes: [],
+      expectedStatus: "NO_FORECAST_CAPACITY",
+    },
+    {
+      title: "only an undersized aircraft",
+      availabilityLanes: [
+        {
+          laneId: "two-seater:pilot-1",
+          passengerSeats: 2,
+          availableLowerAt: "2026-07-22T10:00:00.000Z",
+          availableExpectedAt: "2026-07-22T10:00:00.000Z",
+          availableUpperAt: "2026-07-22T10:00:00.000Z",
+        },
+      ],
+      expectedStatus: "NO_FITTING_AIRCRAFT",
+    },
+  ] as const)("publishes no artificial zero-minute forecast with $title", (scenario) => {
+    const projection = calculateForecastTimelines({
+      event: {
+        eventId: "event-current",
+        now: "2026-07-22T10:00:00.000Z",
+        operationalInterrupted: false,
+        emergencyMode: false,
+        plannedBoardingMinutes: 5,
+        plannedDeboardingMinutes: 5,
+        plannedBufferMinutes: 2,
+      },
+      capacities: [
+        {
+          resourceGroupId: "rg-1",
+          activeAircraft: 0,
+          availabilityLanes: scenario.availabilityLanes,
+        },
+      ],
+      durationSamples: [],
+      rotations: [
+        {
+          id: "four-person-group",
+          status: "DRAFT",
+          createdAt: "2026-07-22T10:00:00.000Z",
+          calledAt: null,
+          departedAt: null,
+          landedAt: null,
+          resourceGroupId: "rg-1",
+          resourceGroupStatus: "ACTIVE",
+          queueSequence: 1,
+          passengerCount: 4,
+          referenceDurationMinutes: 20,
+          productCode: "PAN",
+          aircraftType: null,
+          predictedDepartureAt: null,
+          predictedLandingAt: null,
+          predictedCompletionAt: null,
+        },
+      ],
+    })[0];
+
+    expect(projection).toMatchObject({
+      capacityStatus: scenario.expectedStatus,
+      predictionQuality: "UNCERTAIN",
+      predictionLowerMinutes: null,
+      predictionUpperMinutes: null,
+      predictedBoardingAt: null,
+      predictedDepartureAt: null,
+      predictedLandingAt: null,
+      predictedCompletionAt: null,
+    });
+  });
+
   it("reserves a planned constraint without pretending that it already started", () => {
     const projection = calculateForecastTimelines({
       event: {
@@ -774,8 +912,10 @@ describe("event-driven forecast", () => {
     availability = second.availability;
     const third = reserveNextQueueWindow(availability, duration);
 
-    expect(second.window.upperMinutes - second.window.lowerMinutes).toBe(20);
-    expect(third.window.upperMinutes - third.window.lowerMinutes).toBeLessThan(40);
+    expect(second.window).not.toBeNull();
+    expect(third.window).not.toBeNull();
+    expect((second.window?.upperMinutes ?? 0) - (second.window?.lowerMinutes ?? 0)).toBe(20);
+    expect((third.window?.upperMinutes ?? 0) - (third.window?.lowerMinutes ?? 0)).toBeLessThan(40);
   });
 
   it("keeps robust current-day samples stable even when their age exceeds five minutes", () => {
@@ -914,7 +1054,12 @@ describe("event-driven forecast", () => {
 
     expect(projection).toMatchObject({
       predictionQuality: "UNCERTAIN",
-      uncertaintyReasons: ["EMERGENCY_MODE", "RESOURCE_GROUP_INACTIVE", "NO_ACTIVE_CAPACITY"],
+      uncertaintyReasons: [
+        "EMERGENCY_MODE",
+        "RESOURCE_GROUP_INACTIVE",
+        "NO_ACTIVE_CAPACITY",
+        "NO_FORECAST_CAPACITY",
+      ],
     });
   });
 });

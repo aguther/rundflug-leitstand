@@ -3562,6 +3562,9 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
               rotation_rg.short_code AS resource_group_short_code, fg.communication_number,
               COALESCE(fg.queue_position, fg.communication_number) AS queue_position,
               r.status, r.aircraft_id, r.usable_capacity, fg.precalled_at,
+              fg.precall_decision_status, fg.precall_decision_reason,
+              fg.precall_decision_at, fg.precall_predicted_boarding_at,
+              fg.precall_adaptive_lead_minutes,
               COALESCE(r.gate_id, MIN(p.gate_id), '') AS gate_id,
               COALESCE(MAX(rotation_gate.label), MIN(product_gate.label), '') AS gate_label,
               r.operational_note,
@@ -3718,6 +3721,20 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
           queue_position: number;
           status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
           precalled_at: string | null;
+          precall_decision_status: "WAITING" | "PREPARE" | "GO_TO_GATE" | null;
+          precall_decision_reason:
+            | "ELIGIBLE"
+            | "DISABLED"
+            | "OPERATIONS_BLOCKED"
+            | "NOT_QUEUE_FRONT"
+            | "ALREADY_PRECALLED"
+            | "NO_FORECAST_CAPACITY"
+            | "NO_FITTING_AIRCRAFT"
+            | "TOO_EARLY"
+            | null;
+          precall_decision_at: string | null;
+          precall_predicted_boarding_at: string | null;
+          precall_adaptive_lead_minutes: number | null;
           gate_id: string;
           gate_label: string;
           operational_note: string;
@@ -4329,8 +4346,13 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
         predictionUpdatedAt: rotation.prediction_updated_at,
         now: forecastReadAt,
       });
+      const forecastUnavailable =
+        rotation.precall_decision_reason === "NO_FORECAST_CAPACITY" ||
+        rotation.precall_decision_reason === "NO_FITTING_AIRCRAFT";
       const effectivePredictionQuality =
-        eventRow.emergency_mode === 1 ? "UNCERTAIN" : forecastFreshness.quality;
+        eventRow.emergency_mode === 1 || forecastUnavailable
+          ? "UNCERTAIN"
+          : forecastFreshness.quality;
       const fallbackWindow = forecastQueueWindows({
         queueSequence: index + 1,
         activeAircraft: effectiveActiveCapacity,
@@ -4345,16 +4367,18 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
           activeCapacity: effectiveActiveCapacity,
         }),
       });
-      const predictedLowerMinutes =
-        rotation.prediction_lower_minutes ?? fallbackWindow.lowerMinutes;
-      const predictedUpperMinutes =
-        rotation.prediction_upper_minutes ?? fallbackWindow.upperMinutes;
+      const predictedLowerMinutes = forecastUnavailable
+        ? null
+        : (rotation.prediction_lower_minutes ?? fallbackWindow.lowerMinutes);
+      const predictedUpperMinutes = forecastUnavailable
+        ? null
+        : (rotation.prediction_upper_minutes ?? fallbackWindow.upperMinutes);
       const boardingWindow = predictedBoardingWindow({
         status: rotation.status,
         quality: effectivePredictionQuality,
         predictedBoardingAt: rotation.predicted_boarding_at,
-        lowerMinutes: predictedLowerMinutes,
-        upperMinutes: predictedUpperMinutes,
+        lowerMinutes: predictedLowerMinutes ?? 0,
+        upperMinutes: predictedUpperMinutes ?? 0,
         referenceAt: forecastReadAt,
       });
       return {
@@ -4395,6 +4419,18 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
         boardingWindowLowerAt: boardingWindow.lowerAt,
         boardingWindowUpperAt: boardingWindow.upperAt,
         precalledAt: rotation.precalled_at,
+        precallDecision:
+          rotation.precall_decision_status &&
+          rotation.precall_decision_reason &&
+          rotation.precall_decision_at
+            ? {
+                status: rotation.precall_decision_status,
+                reason: rotation.precall_decision_reason,
+                decidedAt: rotation.precall_decision_at,
+                predictedBoardingAt: rotation.precall_predicted_boarding_at,
+                adaptiveLeadMinutes: rotation.precall_adaptive_lead_minutes,
+              }
+            : null,
         calledAt: rotation.called_at,
         deferralCount: rotation.deferral_count,
         operationalNote: rotation.operational_note,
@@ -5559,7 +5595,7 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
     `SELECT p.name AS product_name, p.code AS product_code, p.public_description,
             g.label AS gate_label,
             COALESCE(tg.communication_number, fg.communication_number) AS communication_number,
-            fg.precalled_at, r.status, tg.operation_day_id,
+            fg.precalled_at, fg.precall_decision_status, r.status, tg.operation_day_id,
             COALESCE(fg.queue_position, tg.queue_sequence) AS queue_sequence,
             r.predicted_boarding_at, r.prediction_quality,
             r.prediction_lower_minutes, r.prediction_upper_minutes,
@@ -5596,6 +5632,7 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
       gate_label: string;
       communication_number: number;
       precalled_at: string | null;
+      precall_decision_status: "WAITING" | "PREPARE" | "GO_TO_GATE" | null;
       status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
       operation_day_id: string;
       queue_sequence: number;
@@ -5634,15 +5671,14 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
     row.resource_group_status === "ACTIVE" &&
     row.operational_interrupted === 0 &&
     effectivePredictionQuality !== "UNCERTAIN" &&
-    row.prediction_upper_minutes !== null &&
-    row.prediction_upper_minutes <= row.notification_lead_minutes;
+    row.precall_decision_status === "PREPARE";
   const publicStatus = derivePublicRotationStatus({
     rotationState: row.status,
     draftStatus: row.precalled_at ? "COME_TO_FLIGHT_LINE" : prepare ? "PREPARE" : "WAITING",
   });
   const message = {
     WAITING: "Bitte Status regelmäßig prüfen.",
-    PREPARE: "Ihr Aufruf steht bevor. Bitte bereithalten.",
+    PREPARE: "Ihr Aufruf steht bevor. Bitte bereithalten und noch nicht zum Gate kommen.",
     COME_TO_FLIGHT_LINE: "Bitte jetzt zum Gate kommen.",
     BOARDING: "Bitte am Gate zum Einstieg bereithalten.",
     IN_FLIGHT: "Ihr Rundflug ist gestartet.",
@@ -5763,7 +5799,8 @@ app.get("/api/public/groups/:groupCode", async (context) => {
   const rotations = await context.env.DB.prepare(
     `SELECT r.id, r.status, r.predicted_boarding_at, r.prediction_quality,
             r.prediction_lower_minutes, r.prediction_upper_minutes, r.prediction_updated_at,
-            fg.precalled_at, COALESCE(fg.queue_position, fg.communication_number) AS queue_position,
+            fg.precalled_at, fg.precall_decision_status,
+            COALESCE(fg.queue_position, fg.communication_number) AS queue_position,
             g.label AS gate_label, COUNT(t.id) AS passenger_count
        FROM rotation_tickets rt
        JOIN tickets t ON t.id = rt.ticket_id
@@ -5786,6 +5823,7 @@ app.get("/api/public/groups/:groupCode", async (context) => {
       prediction_upper_minutes: number | null;
       prediction_updated_at: string | null;
       precalled_at: string | null;
+      precall_decision_status: "WAITING" | "PREPARE" | "GO_TO_GATE" | null;
       queue_position: number;
       gate_label: string;
       passenger_count: number;
@@ -5815,7 +5853,7 @@ app.get("/api/public/groups/:groupCode", async (context) => {
     const prepare =
       rotation.status === "DRAFT" &&
       predictionQuality !== "UNCERTAIN" &&
-      upperMinutes <= group.notification_lead_minutes;
+      rotation.precall_decision_status === "PREPARE";
     const lifecycleStatus = derivePublicRotationStatus({
       rotationState: rotation.status,
       draftStatus: rotation.precalled_at ? "COME_TO_FLIGHT_LINE" : prepare ? "PREPARE" : "WAITING",
@@ -5848,7 +5886,7 @@ app.get("/api/public/groups/:groupCode", async (context) => {
                 : publicStatus === "BOARDING"
                   ? "Bitte am Gate zum Einstieg bereithalten."
                   : publicStatus === "PREPARE"
-                    ? "Ihr Aufruf steht bevor. Bitte bereithalten."
+                    ? "Ihr Aufruf steht bevor. Bitte bereithalten und noch nicht zum Gate kommen."
                     : publicStatus === "IN_FLIGHT"
                       ? "Ihr Rundflug ist gestartet."
                       : publicStatus === "LANDED"
@@ -6279,7 +6317,7 @@ app.get("/api/public/events/:eventId/board", async (context) => {
             COALESCE(MIN(p.code), 'RF') AS product_code,
             COALESCE(MIN(g.label), 'Flight Line') AS gate_label,
             COALESCE(tg.communication_number, fg.communication_number) AS communication_number,
-            fg.precalled_at,
+            fg.precalled_at, fg.precall_decision_status,
             COALESCE(fg.queue_position, fg.communication_number) AS queue_position, r.status,
             r.predicted_boarding_at, r.prediction_quality, r.prediction_lower_minutes,
             r.prediction_upper_minutes, r.prediction_updated_at,
@@ -6335,6 +6373,7 @@ app.get("/api/public/events/:eventId/board", async (context) => {
       gate_label: string;
       communication_number: number;
       precalled_at: string | null;
+      precall_decision_status: "WAITING" | "PREPARE" | "GO_TO_GATE" | null;
       queue_position: number;
       status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
       predicted_boarding_at: string | null;
@@ -6410,7 +6449,13 @@ app.get("/api/public/events/:eventId/board", async (context) => {
                 ? "SERVICE_PAUSED"
                 : derivePublicRotationStatus({
                     rotationState: row.status,
-                    draftStatus: row.precalled_at !== null ? "COME_TO_FLIGHT_LINE" : "WAITING",
+                    draftStatus:
+                      row.precalled_at !== null
+                        ? "COME_TO_FLIGHT_LINE"
+                        : row.precall_decision_status === "PREPARE" &&
+                            predictionQuality !== "UNCERTAIN"
+                          ? "PREPARE"
+                          : "WAITING",
                   }),
             waitLowerMinutes:
               event.operational_interrupted === 1 || row.resource_group_status !== "ACTIVE"
