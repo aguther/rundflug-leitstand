@@ -186,13 +186,6 @@ const PRECALL_FIELDS: readonly TuningField<keyof PrecallTuningProfile>[] = [
     min: 1,
     max: 100,
   },
-  {
-    key: "gateCooldownMinutes",
-    label: "Gate-Sperrzeit",
-    help: "Mindestabstand zwischen zwei automatischen Voraufrufen.",
-    min: 0,
-    max: 60,
-  },
 ];
 
 const MINUTE_MS = 60_000;

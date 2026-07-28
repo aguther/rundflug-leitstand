@@ -36,6 +36,9 @@ describe("V1.7.3 FIDS concept fidelity", () => {
     expect(displaySource).toContain("icon: CircleArrowRight");
     expect(displaySource).toContain("icon: TicketsPlane");
     expect(displaySource).toContain("icon: PlaneTakeoff");
+    expect(displaySource).toContain(
+      'return { label: "BEREITHALTEN", tone: "prepare", icon: Clock3 }',
+    );
     expect(displaySource).toContain('return { label: "WARTEN", tone: "standby", icon: Clock3 }');
     expect(displaySource).toContain('<Users aria-hidden="true" />');
     expect(displaySource).toContain('<Icon aria-hidden="true" className="fids-status-icon" />');
@@ -45,6 +48,7 @@ describe("V1.7.3 FIDS concept fidelity", () => {
     );
     expect(stylesSource).not.toMatch(/\.fids-status-icon \{[^}]*border:/);
     expect(stylesSource).toMatch(/\.tone-standby \{\s*color: var\(--fids-text\);/);
+    expect(stylesSource).toMatch(/\.tone-prepare \{\s*color: var\(--fids-blue\);/);
     expect(stylesSource).toMatch(
       /\.standard-fids \.fids-footer-copy > i \{[\s\S]*?background: var\(--fids-muted\);[\s\S]*?opacity: 0\.55;/,
     );

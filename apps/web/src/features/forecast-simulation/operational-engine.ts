@@ -474,6 +474,14 @@ export function runOperationalSimulation(
           ]
         : [],
     );
+    const forecastPilotIds = new Set<string>();
+    const confirmedForecastPilotIds = new Set(
+      rotations.flatMap((rotation) =>
+        ["CALLED", "IN_FLIGHT", "LANDED"].includes(rotation.status) && rotation.pilotId
+          ? [rotation.pilotId]
+          : [],
+      ),
+    );
     const capacities = model.resourceGroups.map((group) => {
       const groupAircraft = aircraft.filter(
         (entry) => entry.resourceGroupId === group.id && entry.state !== "DAY_OUT",
@@ -510,14 +518,21 @@ export function runOperationalSimulation(
       const orderedPilots = [...pilots]
         .filter((pilot) => pilot.active)
         .sort((left, right) => left.id.localeCompare(right.id));
-      const availabilityLanes = groupAircraft.map((entry, laneIndex) => {
+      const availabilityLanes = groupAircraft.flatMap((entry) => {
         const activeRotation = entry.activeRotationId
           ? rotations.find((rotation) => rotation.id === entry.activeRotationId)
           : null;
         const lanePilot =
           (activeRotation?.pilotId
-            ? pilots.find((pilot) => pilot.id === activeRotation.pilotId)
-            : null) ?? orderedPilots[laneIndex % Math.max(1, orderedPilots.length)];
+            ? pilots.find(
+                (pilot) => pilot.id === activeRotation.pilotId && !forecastPilotIds.has(pilot.id),
+              )
+            : null) ??
+          orderedPilots.find(
+            (pilot) => !forecastPilotIds.has(pilot.id) && !confirmedForecastPilotIds.has(pilot.id),
+          );
+        if (!lanePilot) return [];
+        forecastPilotIds.add(lanePilot.id);
         const activeAircraftPlan = plans.find(
           (plan) =>
             (plan.effectMode ?? "BLOCKING") === "BLOCKING" &&
@@ -569,33 +584,36 @@ export function runOperationalSimulation(
             active: planIsActive(plan, nowMs),
             overdue: Date.parse(plan.latestStartAt ?? iso(nowMs)) < nowMs,
           }));
-        return {
-          laneId: entry.id,
-          availableLowerAt: iso(expectedAt),
-          availableExpectedAt: iso(expectedAt),
-          availableUpperAt: iso(expectedAt + (expectedAt > nowMs ? 5 * MINUTE_MS : 0)),
-          constraints,
-          recurringConstraints: recurringRules
-            .filter(
-              (rule) =>
-                (rule.scopeType === "AIRCRAFT" && rule.scopeId === entry.id) ||
-                (rule.scopeType === "PILOT" && rule.scopeId === lanePilot?.id),
-            )
-            .map((rule) => ({
-              id: rule.key,
-              triggerMetric: rule.triggerMetric,
-              intervalValue: rule.intervalValue,
-              progressValue: plans.some(
-                (plan) => plan.recurringRuleKey === rule.key && !plan.completed,
+        return [
+          {
+            laneId: entry.id,
+            passengerSeats: entry.capacity,
+            availableLowerAt: iso(expectedAt),
+            availableExpectedAt: iso(expectedAt),
+            availableUpperAt: iso(expectedAt + (expectedAt > nowMs ? 5 * MINUTE_MS : 0)),
+            constraints,
+            recurringConstraints: recurringRules
+              .filter(
+                (rule) =>
+                  (rule.scopeType === "AIRCRAFT" && rule.scopeId === entry.id) ||
+                  (rule.scopeType === "PILOT" && rule.scopeId === lanePilot.id),
               )
-                ? 0
-                : rule.currentProgress,
-              minimumDurationMinutes: rule.minimumDurationMinutes,
-              typicalDurationMinutes: rule.typicalDurationMinutes,
-              maximumDurationMinutes: rule.maximumDurationMinutes,
-              active: true,
-            })),
-        };
+              .map((rule) => ({
+                id: rule.key,
+                triggerMetric: rule.triggerMetric,
+                intervalValue: rule.intervalValue,
+                progressValue: plans.some(
+                  (plan) => plan.recurringRuleKey === rule.key && !plan.completed,
+                )
+                  ? 0
+                  : rule.currentProgress,
+                minimumDurationMinutes: rule.minimumDurationMinutes,
+                typicalDurationMinutes: rule.typicalDurationMinutes,
+                maximumDurationMinutes: rule.maximumDurationMinutes,
+                active: true,
+              })),
+          },
+        ];
       });
       const activePilotCapacity = pilots.filter(
         (pilot) => pilot.active && !activePlanFor("PILOT", pilot.id, nowMs),
@@ -642,6 +660,7 @@ export function runOperationalSimulation(
             ? ("ACTIVE" as const)
             : ("PAUSED" as const),
           queueSequence: queueSequences.get(rotation.id) ?? 1,
+          passengerCount: rotation.passengerCount,
           referenceDurationMinutes:
             product?.referenceDurationMinutes ??
             config.adminParameters.productReferenceDurationMinutes,
@@ -1051,19 +1070,11 @@ export function runOperationalSimulation(
         observedGateWaitMinutes,
         tuning: config.forecastTuning.precall,
       });
-      const latestPrecallAt = rotations.reduce<number | null>((latest, rotation) => {
-        if (!rotation.precalledAt) return latest;
-        const value = Date.parse(rotation.precalledAt);
-        return latest === null ? value : Math.max(latest, value);
-      }, null);
       const decisions = selectAutomaticPrecalls(
         waiting.flatMap((rotation) => {
           const projection = projectionByRotation.get(rotation.id);
           const group = model.resourceGroups.find((entry) => entry.id === rotation.resourceGroupId);
           if (!projection || !group) return [];
-          const largestEligibleAircraftSeats = aircraft
-            .filter((entry) => entry.resourceGroupId === group.id)
-            .reduce((maximum, entry) => Math.max(maximum, entry.capacity), 0);
           return [
             {
               id: rotation.id,
@@ -1074,18 +1085,16 @@ export function runOperationalSimulation(
               resourceGroupActive: groupAvailable(group.id, nowMs),
               resourceGroupEnabled: group.automaticPrecallEnabled,
               alreadyPrecalled: rotation.precalledAt !== null,
-              groupSize: rotation.passengerCount,
-              largestEligibleAircraftSeats,
+              forecastCapacityStatus: projection.capacityStatus,
               predictionQuality: projection.predictionQuality,
-              predictedBoardingMinutes: Math.round(
-                (projection.predictionLowerMinutes + projection.predictionUpperMinutes) / 2,
-              ),
+              predictedBoardingMinutes:
+                projection.predictionLowerMinutes === null ||
+                projection.predictionUpperMinutes === null
+                  ? Number.POSITIVE_INFINITY
+                  : Math.round(
+                      (projection.predictionLowerMinutes + projection.predictionUpperMinutes) / 2,
+                    ),
               adaptiveLeadMinutes,
-              minutesSinceLastGatePrecall:
-                latestPrecallAt === null
-                  ? null
-                  : Math.max(0, (nowMs - latestPrecallAt) / MINUTE_MS),
-              gateCooldownMinutes: config.forecastTuning.precall.gateCooldownMinutes,
             },
           ];
         }),
@@ -1094,7 +1103,7 @@ export function runOperationalSimulation(
         if (!decision.eligible) continue;
         const rotation = rotations.find((entry) => entry.id === decision.id);
         const projection = projectionByRotation.get(decision.id);
-        if (!rotation || !projection) continue;
+        if (!rotation || !projection?.predictedBoardingAt) continue;
         rotation.precalledAt = iso(nowMs);
         rotation.precallTrigger = "AUTOMATIC_PRECALL";
         rotation.precallPredictionQuality = projection.predictionQuality;
@@ -1192,6 +1201,19 @@ export function runOperationalSimulation(
     for (const projection of projections) {
       const rotation = rotations.find((entry) => entry.id === projection.rotationId);
       if (!rotation || rotation.status === "COMPLETED") continue;
+      if (
+        !projection.predictedBoardingAt ||
+        !projection.predictedDepartureAt ||
+        !projection.predictedLandingAt ||
+        !projection.predictedCompletionAt ||
+        projection.predictionLowerMinutes === null ||
+        projection.predictionUpperMinutes === null
+      ) {
+        rotation.predictedDepartureAt = null;
+        rotation.predictedLandingAt = null;
+        rotation.predictedCompletionAt = null;
+        continue;
+      }
       rotation.predictedDepartureAt = projection.predictedDepartureAt;
       rotation.predictedLandingAt = projection.predictedLandingAt;
       rotation.predictedCompletionAt = projection.predictedCompletionAt;

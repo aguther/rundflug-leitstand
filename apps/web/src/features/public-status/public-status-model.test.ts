@@ -4,7 +4,12 @@ import { PUBLIC_STATUS_PRESENTATIONS, publicStatusMessage } from "./public-statu
 describe("öffentliche FIDS-Statusabbildung", () => {
   it.each([
     ["WAITING", "WARTEN", "Clock3", "Bitte Status regelmäßig prüfen."],
-    ["PREPARE", "WARTEN", "Clock3", "Ihr Aufruf steht bevor. Bitte bereithalten."],
+    [
+      "PREPARE",
+      "BEREITHALTEN",
+      "Clock3",
+      "Ihr Aufruf steht bevor. Bitte bereithalten und noch nicht zum Gate kommen.",
+    ],
     ["COME_TO_FLIGHT_LINE", "GO TO GATE", "CircleArrowRight", "Bitte jetzt zum Gate kommen."],
     ["BOARDING", "BOARDING", "TicketsPlane", "Bitte am Gate zum Einstieg bereithalten."],
     ["IN_FLIGHT", "IM FLUG", "PlaneTakeoff", "Ihr Rundflug ist gestartet."],

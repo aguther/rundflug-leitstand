@@ -11,3 +11,9 @@ konsolidiert. Offen sind nur noch externe oder betreiberseitige Freigaben:
 
 Datenschutz-, Hardware-, Helfer- und Produktionsabnahme bleiben manuelle Gates. Sie dürfen nicht
 durch technische Tests oder ein erfolgreiches Deployment ersetzt werden.
+
+## Geklärte Anforderungskonkretisierung
+
+| ID | Entscheidung | Geklärt durch | Ergebnis |
+| --- | --- | --- | --- |
+| OQ-15 | Darf der öffentliche Statuskatalog aus F-BEN-090 um einen ortsneutralen Vorstatus zwischen WARTEN und GO TO GATE ergänzt werden? | Auftraggeber, 2026-07-28; ADR-0029 | Ja. `PREPARE` wird als `BEREITHALTEN` mit ausdrücklichem Hinweis „noch nicht zum Gate kommen“ geführt. Die übrigen Zustände und ihre Handlungswirkung bleiben unverändert. |

@@ -59,7 +59,6 @@ import { queueEligiblePreparationNotifications, sendRotationPushNotifications } 
 const JSON_HEADERS = { "content-type": "application/json; charset=utf-8" } as const;
 const FORECAST_TICK_INTERVAL_MS = 30_000;
 const FORECAST_COMMAND_DEBOUNCE_MS = 150;
-const SYSTEM_GATE_COOLDOWN_MINUTES = 2;
 const ASSIST_CLAIM_TTL_MS = 30 * 60_000;
 
 function json(data: unknown, init: ResponseInit = {}): Response {
@@ -1680,7 +1679,7 @@ export class EventCoordinator extends DurableObject<Env> {
                  planned_deboarding_minutes, planned_buffer_minutes, updated_at, status,
                  operations_start_at, operations_end_at,
                  automatic_precall_enabled, precall_lead_minutes, max_gate_wait_minutes,
-                precall_min_quality, precall_gate_cooldown_minutes
+                precall_min_quality, notification_lead_minutes
            FROM operation_days WHERE id = ?1`,
       )
         .bind(eventId)
@@ -1699,7 +1698,7 @@ export class EventCoordinator extends DurableObject<Env> {
           precall_lead_minutes: number;
           max_gate_wait_minutes: number;
           precall_min_quality: "STABLE" | "CHANGING";
-          precall_gate_cooldown_minutes: number;
+          notification_lead_minutes: number;
         }>(),
       this.env.DB.prepare(
         `SELECT r.id, r.status, r.created_at, r.called_at, r.departed_at, r.landed_at,
@@ -1806,7 +1805,8 @@ export class EventCoordinator extends DurableObject<Env> {
         aircraft_type: string | null;
       }>(),
       this.env.DB.prepare(
-        `SELECT m.resource_group_id, a.id AS aircraft_id, a.passenger_seats,
+        `SELECT m.resource_group_id, m.current_pilot_id,
+                  a.id AS aircraft_id, a.passenger_seats,
                   a.operational_state, a.operational_interrupted,
                   active_rotation.predicted_completion_at,
                   (SELECT block.expected_review_at
@@ -1830,6 +1830,7 @@ export class EventCoordinator extends DurableObject<Env> {
         .bind(eventId)
         .all<{
           resource_group_id: string;
+          current_pilot_id: string | null;
           aircraft_id: string;
           passenger_seats: number;
           operational_state: AircraftOperationalState;
@@ -2012,93 +2013,180 @@ export class EventCoordinator extends DurableObject<Env> {
     };
     const availablePilotWindows = pilotRows.results.flatMap((pilot) => {
       const immediatelyAvailable = pilot.paused === 0 && pilot.predicted_completion_at === null;
+      const expectedReturnAt =
+        pilot.paused === 1
+          ? pilot.pause_expected_review_at &&
+            Math.max(
+              Date.parse(pilot.pause_expected_review_at),
+              Date.parse(pilot.predicted_completion_at ?? pilot.pause_expected_review_at),
+            )
+          : pilot.predicted_completion_at;
       const window = availabilityWindow(
-        pilot.predicted_completion_at ?? pilot.pause_expected_review_at,
+        typeof expectedReturnAt === "number"
+          ? new Date(expectedReturnAt).toISOString()
+          : expectedReturnAt,
         immediatelyAvailable,
       );
       return window ? [{ pilotId: pilot.id, ...window }] : [];
     });
-    const resourceGroupIds = [...new Set(capacityRows.results.map((row) => row.resource_group_id))];
-    const forecastCapacities = resourceGroupIds.map((resourceGroupId) => {
+    const resourceGroupIds = [
+      ...new Set([
+        ...capacityRows.results.map((row) => row.resource_group_id),
+        ...rotationRows.results.map((row) => row.resource_group_id),
+      ]),
+    ].sort();
+    type ForecastAircraftWindow = {
+      resourceGroupId: string;
+      aircraftId: string;
+      currentPilotId: string | null;
+      passengerSeats: number;
+      lowerAt: string;
+      expectedAt: string;
+      upperAt: string;
+      groupBlock: { lowerAt: string; expectedAt: string; upperAt: string } | null | undefined;
+    };
+    const aircraftWindows = resourceGroupIds.flatMap((resourceGroupId) => {
       const groupBlock = blockAvailability(resourceGroupId);
-      const aircraftWindows = capacityRows.results
+      if (groupBlock === null) return [];
+      return capacityRows.results
         .filter((row) => row.resource_group_id === resourceGroupId)
         .flatMap((aircraft) => {
-          const immediatelyAvailable =
-            aircraft.predicted_completion_at === null &&
-            aircraft.operational_interrupted === 0 &&
-            !["INACTIVE", "PAUSED", "REFUELING"].includes(aircraft.operational_state);
-          const window = availabilityWindow(
-            aircraft.predicted_completion_at ?? aircraft.expected_review_at,
-            immediatelyAvailable,
-          );
-          return window ? [{ aircraftId: aircraft.aircraft_id, ...window }] : [];
+          const blocked =
+            aircraft.operational_interrupted === 1 ||
+            ["INACTIVE", "PAUSED", "REFUELING"].includes(aircraft.operational_state);
+          const immediatelyAvailable = aircraft.predicted_completion_at === null && !blocked;
+          const expectedReturnAt =
+            blocked && aircraft.expected_review_at
+              ? new Date(
+                  Math.max(
+                    Date.parse(aircraft.expected_review_at),
+                    Date.parse(aircraft.predicted_completion_at ?? aircraft.expected_review_at),
+                  ),
+                ).toISOString()
+              : blocked
+                ? null
+                : aircraft.predicted_completion_at;
+          const window = availabilityWindow(expectedReturnAt, immediatelyAvailable);
+          return window
+            ? [
+                {
+                  resourceGroupId,
+                  aircraftId: aircraft.aircraft_id,
+                  currentPilotId: aircraft.current_pilot_id,
+                  passengerSeats: aircraft.passenger_seats,
+                  groupBlock,
+                  ...window,
+                } satisfies ForecastAircraftWindow,
+              ]
+            : [];
         })
         .sort(
           (left, right) =>
             Date.parse(left.expectedAt) - Date.parse(right.expectedAt) ||
             left.aircraftId.localeCompare(right.aircraftId),
         );
-      const pilots = [...availablePilotWindows].sort(
+    });
+    const orderedPilots = [...availablePilotWindows].sort(
+      (left, right) =>
+        Date.parse(left.expectedAt) - Date.parse(right.expectedAt) ||
+        left.pilotId.localeCompare(right.pilotId),
+    );
+    const pilotById = new Map(orderedPilots.map((pilot) => [pilot.pilotId, pilot]));
+    const usedPilotIds = new Set<string>();
+    const pairedAircraftIds = new Set<string>();
+    const resourcePairs: Array<{
+      aircraft: ForecastAircraftWindow;
+      pilot: (typeof orderedPilots)[number];
+    }> = [];
+    const pair = (
+      aircraft: ForecastAircraftWindow,
+      pilot: (typeof orderedPilots)[number] | undefined,
+    ) => {
+      if (!pilot || usedPilotIds.has(pilot.pilotId) || pairedAircraftIds.has(aircraft.aircraftId)) {
+        return;
+      }
+      usedPilotIds.add(pilot.pilotId);
+      pairedAircraftIds.add(aircraft.aircraftId);
+      resourcePairs.push({ aircraft, pilot });
+    };
+    for (const aircraft of aircraftWindows
+      .filter((entry) => entry.currentPilotId !== null)
+      .sort(
+        (left, right) =>
+          left.resourceGroupId.localeCompare(right.resourceGroupId) ||
+          left.aircraftId.localeCompare(right.aircraftId),
+      )) {
+      pair(aircraft, pilotById.get(aircraft.currentPilotId ?? ""));
+    }
+    const unpairedPilots = orderedPilots.filter((pilot) => !usedPilotIds.has(pilot.pilotId));
+    let nextPilotIndex = 0;
+    for (const aircraft of aircraftWindows
+      .filter((entry) => !pairedAircraftIds.has(entry.aircraftId))
+      .sort(
         (left, right) =>
           Date.parse(left.expectedAt) - Date.parse(right.expectedAt) ||
-          left.pilotId.localeCompare(right.pilotId),
-      );
-      const laneCount = groupBlock === null ? 0 : Math.min(aircraftWindows.length, pilots.length);
-      const availabilityLanes = Array.from({ length: laneCount }, (_, index) => {
-        const aircraft = aircraftWindows[index];
-        const pilot = pilots[index];
-        if (!aircraft || !pilot) throw new Error("Forecast resource pairing is incomplete.");
-        const lowerAt = new Date(
-          Math.max(
-            Date.parse(aircraft.lowerAt),
-            Date.parse(pilot.lowerAt),
-            groupBlock ? Date.parse(groupBlock.lowerAt) : 0,
-          ),
-        ).toISOString();
-        const expectedAt = new Date(
-          Math.max(
-            Date.parse(aircraft.expectedAt),
-            Date.parse(pilot.expectedAt),
-            groupBlock ? Date.parse(groupBlock.expectedAt) : 0,
-          ),
-        ).toISOString();
-        const upperAt = new Date(
-          Math.max(
-            Date.parse(aircraft.upperAt),
-            Date.parse(pilot.upperAt),
-            groupBlock ? Date.parse(groupBlock.upperAt) : 0,
-          ),
-        ).toISOString();
-        const constraints = resolvedPlans.filter(
-          (plan) =>
-            (plan.scopeType === "AIRCRAFT" && plan.scopeId === aircraft.aircraftId) ||
-            (plan.scopeType === "PILOT" && plan.scopeId === pilot.pilotId),
-        );
-        return {
-          laneId: `${aircraft.aircraftId}:${pilot.pilotId}`,
-          availableLowerAt: lowerAt,
-          availableExpectedAt: expectedAt,
-          availableUpperAt: upperAt,
-          constraints,
-          recurringConstraints: recurringRuleRows.results
-            .filter(
-              (rule) =>
-                (rule.scope_type === "AIRCRAFT" && rule.scope_id === aircraft.aircraftId) ||
-                (rule.scope_type === "PILOT" && rule.scope_id === pilot.pilotId),
-            )
-            .map((rule) => ({
-              id: rule.id,
-              triggerMetric: rule.trigger_metric,
-              intervalValue: rule.interval_value,
-              progressValue: rule.progress_value,
-              minimumDurationMinutes: rule.minimum_duration_minutes,
-              typicalDurationMinutes: rule.typical_duration_minutes,
-              maximumDurationMinutes: rule.maximum_duration_minutes,
-              active: true,
-            })),
-        };
-      });
+          left.resourceGroupId.localeCompare(right.resourceGroupId) ||
+          left.aircraftId.localeCompare(right.aircraftId),
+      )) {
+      pair(aircraft, unpairedPilots[nextPilotIndex]);
+      nextPilotIndex += 1;
+    }
+    const forecastCapacities = resourceGroupIds.map((resourceGroupId) => {
+      const availabilityLanes = resourcePairs
+        .filter(({ aircraft }) => aircraft.resourceGroupId === resourceGroupId)
+        .map(({ aircraft, pilot }) => {
+          const groupBlock = aircraft.groupBlock;
+          const lowerAt = new Date(
+            Math.max(
+              Date.parse(aircraft.lowerAt),
+              Date.parse(pilot.lowerAt),
+              groupBlock ? Date.parse(groupBlock.lowerAt) : 0,
+            ),
+          ).toISOString();
+          const expectedAt = new Date(
+            Math.max(
+              Date.parse(aircraft.expectedAt),
+              Date.parse(pilot.expectedAt),
+              groupBlock ? Date.parse(groupBlock.expectedAt) : 0,
+            ),
+          ).toISOString();
+          const upperAt = new Date(
+            Math.max(
+              Date.parse(aircraft.upperAt),
+              Date.parse(pilot.upperAt),
+              groupBlock ? Date.parse(groupBlock.upperAt) : 0,
+            ),
+          ).toISOString();
+          const constraints = resolvedPlans.filter(
+            (plan) =>
+              (plan.scopeType === "AIRCRAFT" && plan.scopeId === aircraft.aircraftId) ||
+              (plan.scopeType === "PILOT" && plan.scopeId === pilot.pilotId),
+          );
+          return {
+            laneId: `${aircraft.aircraftId}:${pilot.pilotId}`,
+            passengerSeats: aircraft.passengerSeats,
+            availableLowerAt: lowerAt,
+            availableExpectedAt: expectedAt,
+            availableUpperAt: upperAt,
+            constraints,
+            recurringConstraints: recurringRuleRows.results
+              .filter(
+                (rule) =>
+                  (rule.scope_type === "AIRCRAFT" && rule.scope_id === aircraft.aircraftId) ||
+                  (rule.scope_type === "PILOT" && rule.scope_id === pilot.pilotId),
+              )
+              .map((rule) => ({
+                id: rule.id,
+                triggerMetric: rule.trigger_metric,
+                intervalValue: rule.interval_value,
+                progressValue: rule.progress_value,
+                minimumDurationMinutes: rule.minimum_duration_minutes,
+                typicalDurationMinutes: rule.typical_duration_minutes,
+                maximumDurationMinutes: rule.maximum_duration_minutes,
+                active: true,
+              })),
+          };
+        });
       return {
         resourceGroupId,
         activeAircraft: availabilityLanes.filter(
@@ -2112,17 +2200,6 @@ export class EventCoordinator extends DurableObject<Env> {
         ),
       };
     });
-    const maximumSeats = new Map(
-      resourceGroupIds.map((resourceGroupId) => [
-        resourceGroupId,
-        Math.max(
-          0,
-          ...capacityRows.results
-            .filter((row) => row.resource_group_id === resourceGroupId)
-            .map((row) => row.passenger_seats),
-        ),
-      ]),
-    );
     const adaptiveLeadMinutes = deriveAdaptivePrecallLeadMinutes({
       observedGateWaitMinutes: [...gateWaitRows.results].reverse().map((row) => row.minutes),
     });
@@ -2158,6 +2235,7 @@ export class EventCoordinator extends DurableObject<Env> {
         pilotId: rotation.pilot_id,
         resourceGroupStatus: rotation.resource_group_status,
         queueSequence: rotation.queue_sequence,
+        passengerCount: rotation.ticket_count,
         referenceDurationMinutes: rotation.reference_duration_minutes,
         productCode: rotation.product_code,
         aircraftType: rotation.aircraft_type,
@@ -2176,14 +2254,6 @@ export class EventCoordinator extends DurableObject<Env> {
     const projectionByRotationId = new Map(
       projections.map((projection) => [projection.rotationId, projection]),
     );
-    const lastGatePrecall = new Map<string, number>();
-    for (const rotation of rotationRows.results) {
-      if (!rotation.gate_id || !rotation.precalled_at) continue;
-      lastGatePrecall.set(
-        rotation.gate_id,
-        Math.max(lastGatePrecall.get(rotation.gate_id) ?? 0, Date.parse(rotation.precalled_at)),
-      );
-    }
     const precallQueueEntries: AutomaticPrecallQueueEntry[] = [];
     const precallCandidateByRotationId = new Map<
       string,
@@ -2203,7 +2273,6 @@ export class EventCoordinator extends DurableObject<Env> {
       const projection = projectionByRotationId.get(rotation.id);
       if (!projection) throw new Error(`Forecast projection missing for rotation ${rotation.id}.`);
       if (rotation.status === "DRAFT") {
-        const lastGateCallAt = rotation.gate_id ? lastGatePrecall.get(rotation.gate_id) : undefined;
         precallQueueEntries.push({
           id: rotation.id,
           resourceGroupId: rotation.resource_group_id,
@@ -2213,18 +2282,15 @@ export class EventCoordinator extends DurableObject<Env> {
           resourceGroupActive: rotation.resource_group_status === "ACTIVE",
           resourceGroupEnabled: rotation.resource_group_precall_enabled === 1,
           alreadyPrecalled: rotation.precalled_at !== null,
-          groupSize: rotation.ticket_count,
-          largestEligibleAircraftSeats: maximumSeats.get(rotation.resource_group_id) ?? 0,
+          forecastCapacityStatus: projection.capacityStatus,
           predictionQuality: projection.predictionQuality,
-          predictedBoardingMinutes: Math.round(
-            (projection.predictionLowerMinutes + projection.predictionUpperMinutes) / 2,
-          ),
+          predictedBoardingMinutes:
+            projection.predictionLowerMinutes === null || projection.predictionUpperMinutes === null
+              ? Number.POSITIVE_INFINITY
+              : Math.round(
+                  (projection.predictionLowerMinutes + projection.predictionUpperMinutes) / 2,
+                ),
           adaptiveLeadMinutes,
-          minutesSinceLastGatePrecall:
-            lastGateCallAt === undefined
-              ? null
-              : Math.max(0, (now.getTime() - lastGateCallAt) / 60_000),
-          gateCooldownMinutes: SYSTEM_GATE_COOLDOWN_MINUTES,
         });
         precallCandidateByRotationId.set(rotation.id, {
           flightGroupId: rotation.flight_group_id,
@@ -2232,7 +2298,7 @@ export class EventCoordinator extends DurableObject<Env> {
           resourceGroupId: rotation.resource_group_id,
           expectedVersion: rotation.flight_group_version,
           gateId: rotation.gate_id,
-          predictionUpperMinutes: projection.predictionUpperMinutes,
+          predictionUpperMinutes: projection.predictionUpperMinutes ?? 0,
           predictionQuality: projection.predictionQuality,
           adaptiveLeadMinutes,
         });
@@ -2264,32 +2330,75 @@ export class EventCoordinator extends DurableObject<Env> {
           nowIso,
           rotation.id,
         ),
-        this.env.DB.prepare(
-          `INSERT INTO forecast_snapshots
+      );
+      if (
+        projection.capacityStatus === "AVAILABLE" &&
+        projection.predictionLowerMinutes !== null &&
+        projection.predictionUpperMinutes !== null
+      ) {
+        statements.push(
+          this.env.DB.prepare(
+            `INSERT INTO forecast_snapshots
             (id, operation_day_id, rotation_id, operation_day_version, captured_at, quality,
              lower_minutes, upper_minutes, predicted_boarding_at, predicted_departure_at,
              predicted_landing_at, predicted_completion_at, trigger_event_type, data_basis_scope,
              sample_size, data_age_minutes, active_capacity, reference_duration_minutes)
            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)`,
+          ).bind(
+            crypto.randomUUID(),
+            eventId,
+            rotation.id,
+            event.version,
+            nowIso,
+            projection.predictionQuality,
+            projection.predictionLowerMinutes,
+            projection.predictionUpperMinutes,
+            projection.predictedBoardingAt,
+            projection.predictedDepartureAt,
+            projection.predictedLandingAt,
+            projection.predictedCompletionAt,
+            triggerEventType,
+            projection.dataBasisScope,
+            projection.sampleSize,
+            projection.dataAgeMinutes,
+            projection.activeCapacity,
+            projection.referenceDurationMinutes,
+          ),
+        );
+      }
+    }
+    const precallDecisions = selectAutomaticPrecalls(precallQueueEntries);
+    for (const decision of precallDecisions) {
+      const candidate = precallCandidateByRotationId.get(decision.id);
+      const projection = projectionByRotationId.get(decision.id);
+      if (!candidate || !projection) continue;
+      const status =
+        decision.reason === "ALREADY_PRECALLED"
+          ? "GO_TO_GATE"
+          : decision.eligible
+            ? "PREPARE"
+            : decision.reason === "TOO_EARLY" &&
+                projection.predictionUpperMinutes !== null &&
+                projection.predictionUpperMinutes <= event.notification_lead_minutes
+              ? "PREPARE"
+              : "WAITING";
+      statements.push(
+        this.env.DB.prepare(
+          `UPDATE flight_groups
+              SET precall_decision_status = ?1,
+                  precall_decision_reason = ?2,
+                  precall_decision_at = ?3,
+                  precall_predicted_boarding_at = ?4,
+                  precall_adaptive_lead_minutes = ?5
+            WHERE id = ?6 AND operation_day_id = ?7`,
         ).bind(
-          crypto.randomUUID(),
-          eventId,
-          rotation.id,
-          event.version,
+          status,
+          decision.reason,
           nowIso,
-          projection.predictionQuality,
-          projection.predictionLowerMinutes,
-          projection.predictionUpperMinutes,
           projection.predictedBoardingAt,
-          projection.predictedDepartureAt,
-          projection.predictedLandingAt,
-          projection.predictedCompletionAt,
-          triggerEventType,
-          projection.dataBasisScope,
-          projection.sampleSize,
-          projection.dataAgeMinutes,
-          projection.activeCapacity,
-          projection.referenceDurationMinutes,
+          adaptiveLeadMinutes,
+          candidate.flightGroupId,
+          eventId,
         ),
       );
     }
@@ -2302,7 +2411,7 @@ export class EventCoordinator extends DurableObject<Env> {
       predictionUpperMinutes: number;
       predictionQuality: "STABLE" | "CHANGING" | "UNCERTAIN";
       adaptiveLeadMinutes: number;
-    }> = selectAutomaticPrecalls(precallQueueEntries).flatMap((decision) => {
+    }> = precallDecisions.flatMap((decision) => {
       if (!decision.eligible) return [];
       const candidate = precallCandidateByRotationId.get(decision.id);
       if (!candidate) throw new Error(`Precall candidate missing for rotation ${decision.id}.`);
@@ -2366,7 +2475,10 @@ export class EventCoordinator extends DurableObject<Env> {
       await this.env.DB.batch([
         this.env.DB.prepare(
           `UPDATE flight_groups
-              SET precalled_at = ?1, precall_trigger = ?2, version = ?3, updated_at = ?1
+              SET precalled_at = ?1, precall_trigger = ?2, version = ?3, updated_at = ?1,
+                  precall_decision_status = 'GO_TO_GATE',
+                  precall_decision_reason = 'ELIGIBLE',
+                  precall_decision_at = ?1
             WHERE id = ?4 AND operation_day_id = ?5 AND version = ?6 AND precalled_at IS NULL`,
         ).bind(
           now,

@@ -54,6 +54,9 @@ describe("Web-Push-Endpunkte", () => {
   });
 
   it("verwendet die freigegebene GO-TO-GATE-Copy", () => {
+    expect(pushMessageFor("PREPARE_FOR_FLIGHT")).toBe(
+      "Ihr Aufruf steht bevor. Bitte bereithalten und noch nicht zum Gate kommen.",
+    );
     expect(pushMessageFor("FLIGHT_GROUP_CALLED")).toBe("Bitte jetzt zum Gate kommen.");
     expect(pushMessageFor("ROTATION_STARTED")).toBe("Ihr Rundflug ist gestartet.");
     expect(pushUrgencyFor("FLIGHT_GROUP_CALLED")).toBe("high");

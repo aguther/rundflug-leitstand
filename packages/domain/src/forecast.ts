@@ -35,9 +35,13 @@ export type ForecastUncertaintyReason =
   | "EMERGENCY_MODE"
   | "RESOURCE_GROUP_INACTIVE"
   | "NO_ACTIVE_CAPACITY"
+  | "NO_FORECAST_CAPACITY"
+  | "NO_FITTING_AIRCRAFT"
   | "PLANNED_CONSTRAINT_OVERDUE"
   | "UNPLANNED_RESOURCE_RETURN"
   | "STALE_PREDICTION";
+
+export type ForecastCapacityStatus = "AVAILABLE" | "NO_FORECAST_CAPACITY" | "NO_FITTING_AIRCRAFT";
 
 export interface ForecastFreshnessAssessment {
   quality: PredictionQuality;
@@ -79,6 +83,7 @@ export interface ForecastTimelineRotationInput {
   pilotId?: string | null;
   resourceGroupStatus: "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED";
   queueSequence: number;
+  passengerCount?: number;
   referenceDurationMinutes: number;
   productCode: string;
   aircraftType: string | null;
@@ -118,6 +123,7 @@ export interface ForecastAvailabilityConstraintInput {
 
 export interface ForecastAvailabilityLaneInput {
   laneId: string;
+  passengerSeats?: number;
   availableLowerAt: string;
   availableExpectedAt: string;
   availableUpperAt: string;
@@ -147,13 +153,14 @@ export interface ForecastTimelineProjection {
   plannedDepartureAt: string;
   plannedLandingAt: string;
   plannedCompletionAt: string;
-  predictedBoardingAt: string;
-  predictedDepartureAt: string;
-  predictedLandingAt: string;
-  predictedCompletionAt: string;
+  predictedBoardingAt: string | null;
+  predictedDepartureAt: string | null;
+  predictedLandingAt: string | null;
+  predictedCompletionAt: string | null;
   predictionQuality: PredictionQuality;
-  predictionLowerMinutes: number;
-  predictionUpperMinutes: number;
+  predictionLowerMinutes: number | null;
+  predictionUpperMinutes: number | null;
+  capacityStatus: ForecastCapacityStatus;
   dataBasisScope: ForecastDataBasisScope;
   sampleSize: number;
   dataAgeMinutes: number;
@@ -225,6 +232,7 @@ export interface QueueAvailabilityConstraint {
 
 export interface QueueAvailabilityLane {
   laneId: string;
+  passengerSeats: number;
   lowerMinutes: number;
   expectedMinutes: number;
   upperMinutes: number;
@@ -251,14 +259,16 @@ export function createQueueAvailability(input: {
   busyAircraftMinutes: readonly number[];
   lanes?: readonly (Omit<
     QueueAvailabilityLane,
-    "varianceMinutesSquared" | "recurringConstraints"
+    "varianceMinutesSquared" | "recurringConstraints" | "passengerSeats"
   > & {
+    passengerSeats?: number;
     recurringConstraints?: readonly QueueRecurringConstraint[];
   })[];
 }): QueueAvailabilityState {
   if (input.lanes && input.lanes.length > 0) {
     const lanes = input.lanes.map((lane) => ({
       ...lane,
+      passengerSeats: Math.max(1, Math.floor(lane.passengerSeats ?? Number.MAX_SAFE_INTEGER)),
       lowerMinutes: Math.max(0, lane.lowerMinutes),
       expectedMinutes: Math.max(0, lane.expectedMinutes),
       upperMinutes: Math.max(0, lane.upperMinutes),
@@ -282,6 +292,7 @@ export function createQueueAvailability(input: {
   return availabilityFromLanes(
     slots.map((minutes, index) => ({
       laneId: `capacity-${index + 1}`,
+      passengerSeats: Number.MAX_SAFE_INTEGER,
       lowerMinutes: minutes,
       expectedMinutes: minutes,
       upperMinutes: minutes,
@@ -536,21 +547,36 @@ export function reserveNextQueueWindow(
   availability: QueueAvailabilityState,
   duration: DurationEstimate,
   operationsEndMinutes: number | null = null,
+  minimumPassengerSeats = 1,
 ): {
-  window: { lowerMinutes: number; upperMinutes: number; quality: PredictionQuality };
+  window: { lowerMinutes: number; upperMinutes: number; quality: PredictionQuality } | null;
   availability: QueueAvailabilityState;
   duration: DurationEstimate;
   durationMultiplierPercent: number;
+  capacityStatus: ForecastCapacityStatus;
 } {
   if (availability.lanes.length === 0) {
     return {
-      window: { lowerMinutes: 0, upperMinutes: 0, quality: "UNCERTAIN" },
+      window: null,
       availability,
       duration,
       durationMultiplierPercent: 100,
+      capacityStatus: "NO_FORECAST_CAPACITY",
     };
   }
-  const adjustedCandidates = availability.lanes.map((lane) =>
+  const fittingLanes = availability.lanes.filter(
+    (lane) => lane.passengerSeats >= minimumPassengerSeats,
+  );
+  if (fittingLanes.length === 0) {
+    return {
+      window: null,
+      availability,
+      duration,
+      durationMultiplierPercent: 100,
+      capacityStatus: "NO_FITTING_AIRCRAFT",
+    };
+  }
+  const adjustedCandidates = fittingLanes.map((lane) =>
     applyAvailabilityConstraints(
       applyDueRecurringConstraints(lane, operationsEndMinutes),
       duration,
@@ -564,10 +590,11 @@ export function reserveNextQueueWindow(
   )[0];
   if (!selectedCandidate) {
     return {
-      window: { lowerMinutes: 0, upperMinutes: 0, quality: "UNCERTAIN" },
+      window: null,
       availability,
       duration,
       durationMultiplierPercent: 100,
+      capacityStatus: "NO_FORECAST_CAPACITY",
     };
   }
   const selected = selectedCandidate.lane;
@@ -580,8 +607,10 @@ export function reserveNextQueueWindow(
   const nextExpected = selected.expectedMinutes + effectiveDuration.expectedMinutes;
   const nextVariance = selected.varianceMinutesSquared + durationVariance;
   const nextInterval = intervalFromVariance(nextExpected, nextVariance);
-  const nextLanes = adjustedCandidates.map(({ lane }) =>
-    lane.laneId === selected.laneId
+  const adjustedByLaneId = new Map(adjustedCandidates.map(({ lane }) => [lane.laneId, lane]));
+  const nextLanes = availability.lanes.map((originalLane) => {
+    const lane = adjustedByLaneId.get(originalLane.laneId) ?? originalLane;
+    return lane.laneId === selected.laneId
       ? {
           ...lane,
           lowerMinutes: nextInterval.lower,
@@ -591,8 +620,8 @@ export function reserveNextQueueWindow(
           recurringConstraints: advanceRecurringProgress(lane, effectiveDuration)
             .recurringConstraints,
         }
-      : lane,
-  );
+      : lane;
+  });
   const minimumWindowMargin =
     effectiveDuration.quality === "UNCERTAIN" ? 0 : effectiveDuration.quality === "STABLE" ? 3 : 5;
   const windowLower = Math.max(
@@ -612,6 +641,7 @@ export function reserveNextQueueWindow(
     availability: availabilityFromLanes(nextLanes),
     duration: effectiveDuration,
     durationMultiplierPercent: selectedCandidate.multiplierPercent,
+    capacityStatus: "AVAILABLE",
   };
 }
 
@@ -852,6 +882,7 @@ export function calculateForecastTimelines(
         );
         return {
           laneId: lane.laneId,
+          ...(lane.passengerSeats === undefined ? {} : { passengerSeats: lane.passengerSeats }),
           lowerMinutes: Math.min(lower, expected),
           expectedMinutes: expected,
           upperMinutes: upper,
@@ -980,7 +1011,12 @@ export function calculateForecastTimelines(
     const predictionQuality =
       hasOverdueConstraint && estimate.quality === "STABLE" ? "CHANGING" : estimate.quality;
     let effectiveEstimate = { ...estimate, quality: predictionQuality };
-    let window = forecastQueueWindows({
+    let capacityStatus: ForecastCapacityStatus = "AVAILABLE";
+    let window: {
+      lowerMinutes: number;
+      upperMinutes: number;
+      quality: PredictionQuality;
+    } | null = forecastQueueWindows({
       queueSequence: rotation.queueSequence,
       activeAircraft: forecastCapacity,
       duration: effectiveEstimate,
@@ -993,10 +1029,16 @@ export function calculateForecastTimelines(
         availability,
         effectiveEstimate,
         operationEndMinutes,
+        rotation.passengerCount ?? 1,
       );
       window = reservation.window;
+      capacityStatus = reservation.capacityStatus;
       effectiveEstimate = reservation.duration;
       queueAvailability.set(rotation.resourceGroupId, reservation.availability);
+      if (capacityStatus !== "AVAILABLE") {
+        uncertaintyReasons.push(capacityStatus);
+        effectiveEstimate = { ...effectiveEstimate, quality: "UNCERTAIN" };
+      }
     } else if (rotation.constraints && rotation.constraints.length > 0) {
       const converted = rotation.constraints.map(constraintToQueueConstraint);
       const lowerMultiplier = slowdownMultiplier(
@@ -1039,22 +1081,32 @@ export function calculateForecastTimelines(
       estimate.expectedMinutes > 0
         ? Math.max(1, effectiveEstimate.expectedMinutes / estimate.expectedMinutes)
         : 1;
-    let predictedBoardingAt = addMinutes(now, (window.lowerMinutes + window.upperMinutes) / 2);
+    let predictedBoardingAt = window
+      ? addMinutes(now, (window.lowerMinutes + window.upperMinutes) / 2)
+      : null;
     if (rotation.calledAt) predictedBoardingAt = rotation.calledAt;
-    let predictedDepartureAt = addMinutes(predictedBoardingAt, boarding * phaseMultiplier);
+    let predictedDepartureAt = predictedBoardingAt
+      ? addMinutes(predictedBoardingAt, boarding * phaseMultiplier)
+      : null;
     if (rotation.departedAt) predictedDepartureAt = rotation.departedAt;
     const expectedFlightMinutes =
       Math.max(
         rotation.referenceDurationMinutes,
         estimate.expectedMinutes - boarding - deboarding - buffer,
       ) * phaseMultiplier;
-    let predictedLandingAt = addMinutes(predictedDepartureAt, expectedFlightMinutes);
+    let predictedLandingAt = predictedDepartureAt
+      ? addMinutes(predictedDepartureAt, expectedFlightMinutes)
+      : null;
     if (rotation.landedAt) predictedLandingAt = rotation.landedAt;
-    let predictedCompletionAt = addMinutes(
-      predictedLandingAt,
-      (deboarding + buffer) * phaseMultiplier,
-    );
-    if (rotation.status !== "DRAFT") {
+    let predictedCompletionAt = predictedLandingAt
+      ? addMinutes(predictedLandingAt, (deboarding + buffer) * phaseMultiplier)
+      : null;
+    if (
+      rotation.status !== "DRAFT" &&
+      predictedDepartureAt &&
+      predictedLandingAt &&
+      predictedCompletionAt
+    ) {
       const advanced = advanceOverduePrediction({
         status: rotation.status,
         now: input.event.now,
@@ -1077,8 +1129,9 @@ export function calculateForecastTimelines(
       predictedLandingAt,
       predictedCompletionAt,
       predictionQuality: effectiveEstimate.quality,
-      predictionLowerMinutes: window.lowerMinutes,
-      predictionUpperMinutes: window.upperMinutes,
+      predictionLowerMinutes: window?.lowerMinutes ?? null,
+      predictionUpperMinutes: window?.upperMinutes ?? null,
+      capacityStatus,
       dataBasisScope,
       sampleSize: selectedHistory.length,
       dataAgeMinutes,

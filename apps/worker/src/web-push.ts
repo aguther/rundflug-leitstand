@@ -38,7 +38,7 @@ export function pushErrorMessage(reason: unknown): string {
 
 const DEFAULT_PUSH_RETENTION_DAYS = 7;
 const PUSH_MESSAGES = {
-  PREPARE_FOR_FLIGHT: "Bitte auf den bevorstehenden Aufruf vorbereiten.",
+  PREPARE_FOR_FLIGHT: "Ihr Aufruf steht bevor. Bitte bereithalten und noch nicht zum Gate kommen.",
   FLIGHT_GROUP_CALLED: "Bitte jetzt zum Gate kommen.",
   ROTATION_STARTED: "Ihr Rundflug ist gestartet.",
   ROTATION_LANDED: "Ihr Rundflug ist gelandet.",
@@ -331,8 +331,10 @@ export async function queueEligiblePreparationNotifications(
   const rows = await env.DB.prepare(
     `SELECT r.id, r.status, r.prediction_quality, r.prediction_upper_minutes,
             r.prediction_updated_at,
+            fg.precall_decision_status,
             od.notification_lead_minutes, od.operational_interrupted, od.emergency_mode
        FROM rotations r
+       JOIN flight_groups fg ON fg.id = r.flight_group_id
        JOIN operation_days od ON od.id = r.operation_day_id
       WHERE r.operation_day_id = ?1 AND (?2 IS NULL OR r.id = ?2)`,
   )
@@ -343,22 +345,25 @@ export async function queueEligiblePreparationNotifications(
       prediction_quality: string | null;
       prediction_upper_minutes: number | null;
       prediction_updated_at: string | null;
+      precall_decision_status: "WAITING" | "PREPARE" | "GO_TO_GATE" | null;
       notification_lead_minutes: number;
       operational_interrupted: number;
       emergency_mode: number;
     }>();
   const now = new Date().toISOString();
-  const eligible = rows.results.filter((row) =>
-    shouldQueuePreparationNotification({
-      emergencyMode: row.emergency_mode === 1,
-      interrupted: row.operational_interrupted === 1,
-      status: row.status,
-      predictionQuality: row.prediction_quality,
-      predictionUpdatedAt: row.prediction_updated_at,
-      predictionUpperMinutes: row.prediction_upper_minutes,
-      notificationLeadMinutes: row.notification_lead_minutes,
-      now,
-    }),
+  const eligible = rows.results.filter(
+    (row) =>
+      row.precall_decision_status === "PREPARE" &&
+      shouldQueuePreparationNotification({
+        emergencyMode: row.emergency_mode === 1,
+        interrupted: row.operational_interrupted === 1,
+        status: row.status,
+        predictionQuality: row.prediction_quality,
+        predictionUpdatedAt: row.prediction_updated_at,
+        predictionUpperMinutes: row.prediction_upper_minutes,
+        notificationLeadMinutes: row.notification_lead_minutes,
+        now,
+      }),
   );
   const queued = await Promise.all(
     eligible.map((row) => sendRotationPushNotifications(env, row.id, "PREPARE_FOR_FLIGHT")),

@@ -1662,12 +1662,30 @@
 
 .flight-director-compact-table.tickets .flight-director-compact-head,
 .flight-director-compact-table.tickets > div:not(.flight-director-compact-head) {
-  min-width: 940px;
+  min-width: 1040px;
   grid-template-columns:
     minmax(76px, 0.8fr) minmax(76px, 0.8fr) minmax(72px, 0.8fr) 44px 44px
-    minmax(72px, 0.7fr) minmax(90px, 1fr) 46px minmax(104px, 1fr) repeat(4, 50px);
+    minmax(72px, 0.7fr) minmax(90px, 1fr) minmax(126px, 1.05fr) minmax(104px, 1fr)
+    repeat(4, 50px);
   gap: 4px;
   padding-inline: 6px;
+}
+
+.flight-director-compact-table.tickets .precall-decision {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--ui-muted);
+  font-size: 0.68rem;
+  font-weight: 650;
+}
+
+.flight-director-compact-table.tickets .precall-decision--prepare {
+  color: var(--ui-accent);
+}
+
+.flight-director-compact-table.tickets .precall-decision--go_to_gate {
+  color: var(--ui-success);
 }
 
 .flight-director-phase-icon {

@@ -335,6 +335,8 @@ export const FORECAST_UNCERTAINTY_REASON_LABELS: Record<ForecastUncertaintyReaso
   EMERGENCY_MODE: "Notfallmodus",
   RESOURCE_GROUP_INACTIVE: "Ressourcengruppe nicht aktiv",
   NO_ACTIVE_CAPACITY: "keine aktive Kapazität",
+  NO_FORECAST_CAPACITY: "keine Prognosebahn verfügbar",
+  NO_FITTING_AIRCRAFT: "kein ausreichend großes Flugzeug verfügbar",
   PLANNED_CONSTRAINT_OVERDUE: "geplante Einschränkung überfällig",
   UNPLANNED_RESOURCE_RETURN: "Rückkehrzeit einer Ressource unklar",
   STALE_PREDICTION: "Prognose älter als fünf Minuten",

@@ -367,9 +367,9 @@ try {
       operationsEndAt: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString(),
       noShowAfterMinutes: 10,
       notificationLeadMinutes: 60,
-      // This scenario verifies the separate PREPARE/Web-Push threshold. Automatic GO TO GATE is
-      // covered independently and would intentionally supersede PREPARE for the first queue entry.
-      automaticPrecallEnabled: false,
+      // A known aircraft return places the first group inside the PREPARE notification window but
+      // outside the adaptive GO-TO-GATE lead. The stored domain decision is the public source.
+      automaticPrecallEnabled: true,
       childReferenceWeightKg: 35,
       normalReferenceWeightKg: 80,
       heavyReferenceWeightKg: 110,
@@ -387,6 +387,18 @@ try {
     "SET_EVENT_LIFECYCLE",
     { status: "ACTIVE", reason: "Synthetischer Monitortest", adminPin: pin },
   );
+  const pausedAircraft = await command(
+    devices.flightLine,
+    tokens.flightLine,
+    activated.event.version,
+    "SET_AIRCRAFT_OPERATIONAL_STATE",
+    {
+      aircraftId: "aircraft-a",
+      state: "PAUSED",
+      reason: "Synthetische bekannte Pause für den PREPARE-Test",
+      expectedReviewAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+    },
+  );
   socket = await connectRealtime();
   const privateCodes = [ticketCode(), ticketCode()];
   const publicGroupCode = ticketCode();
@@ -394,7 +406,7 @@ try {
   const sold = await command(
     devices.cashier,
     tokens.cashier,
-    activated.event.version,
+    pausedAircraft.event.version,
     "SELL_TICKET_GROUP",
     {
       productId: "panorama-20",
@@ -420,7 +432,7 @@ try {
     initialTicketStatus.waitUpperMinutes > 60
   ) {
     throw new Error(
-      `Ticketstatus leitet die Vorbereitung nicht aus Prognose und Vorlaufgrenze ab: ${JSON.stringify(initialTicketStatus)}`,
+      `Ticketstatus veröffentlicht den gespeicherten PREPARE-Entscheidungsstand nicht: ${JSON.stringify(initialTicketStatus)}`,
     );
   }
   assertPublicTimeCommunication(initialTicketStatus, "Ticketstatus");
@@ -819,11 +831,23 @@ try {
     throw new Error("Mehrere kommende Fluggruppen werden im FIDS nicht gemeinsam angezeigt.");
   }
 
+  const restoredAircraft = await command(
+    devices.flightLine,
+    tokens.flightLine,
+    secondSale.event.version,
+    "SET_AIRCRAFT_OPERATIONAL_STATE",
+    {
+      aircraftId: "aircraft-a",
+      state: "AVAILABLE",
+      reason: "Synthetische PREPARE-Pause beendet",
+      expectedReviewAt: null,
+    },
+  );
   const callRefresh = nextRefresh(socket);
   const called = await command(
     devices.flightLine,
     tokens.flightLine,
-    secondSale.event.version,
+    restoredAircraft.event.version,
     "CALL_NEXT",
     {
       ticketGroupIds: [sold.aggregate.id],
@@ -941,7 +965,7 @@ try {
       publicGroupStatusWithoutLogin: true,
       exactPublicManifestStartPaths: true,
       splitGroupStatusAggregated: true,
-      preparationFromForecast: true,
+      preparationFromStoredDecision: true,
       explicitPushConsentRequired: true,
       preparationPushDeduplicated: true,
       groupPushCoversBookingGroup: true,
