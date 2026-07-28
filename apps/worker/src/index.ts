@@ -88,6 +88,7 @@ import {
   allowSetupAttempt,
   allowUnknownTicketAttempt,
 } from "./public-access";
+import { PUBLIC_STATUS_MESSAGES, publicServicePausedMessage } from "./public-status-copy";
 import { createCsv, createTextPdf } from "./report";
 import {
   API_BODY_LIMIT_BYTES,
@@ -5676,15 +5677,10 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
     rotationState: row.status,
     draftStatus: row.precalled_at ? "COME_TO_FLIGHT_LINE" : prepare ? "PREPARE" : "WAITING",
   });
-  const message = {
-    WAITING: "Bitte Status regelmäßig prüfen.",
-    PREPARE: "Ihr Aufruf steht bevor. Bitte bereithalten und noch nicht zum Gate kommen.",
-    COME_TO_FLIGHT_LINE: "Bitte jetzt zum Gate kommen.",
-    BOARDING: "Bitte am Gate zum Einstieg bereithalten.",
-    IN_FLIGHT: "Ihr Rundflug ist gestartet.",
-    LANDED: "Ihr Rundflug ist gelandet.",
-    COMPLETED: "Ihr Rundflug ist abgeschlossen.",
-  } as const;
+  const servicePaused =
+    row.emergency_mode === 1 ||
+    row.operational_interrupted === 1 ||
+    row.resource_group_status !== "ACTIVE";
   const lowerMinutes = row.prediction_lower_minutes ?? Math.max(0, (row.queue_sequence - 1) * 20);
   const upperMinutes = row.prediction_upper_minutes ?? row.queue_sequence * 30;
   const boardingWindow = predictedBoardingWindow({
@@ -5703,12 +5699,7 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
     publicDescription: row.public_description,
     gateLabel: row.gate_label,
     communicationNumber: row.communication_number,
-    status:
-      row.emergency_mode === 1 ||
-      row.operational_interrupted === 1 ||
-      row.resource_group_status !== "ACTIVE"
-        ? "SERVICE_PAUSED"
-        : publicStatus,
+    status: servicePaused ? "SERVICE_PAUSED" : publicStatus,
     queuePosition: row.emergency_mode === 0 && row.status === "DRAFT" ? row.queue_sequence : null,
     waitLowerMinutes:
       row.emergency_mode === 0 &&
@@ -5730,16 +5721,15 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
     boardingWindowUpperAt: boardingWindow.upperAt,
     timeZone: row.time_zone,
     predictionQuality: effectivePredictionQuality,
-    message:
-      row.emergency_mode === 1
-        ? "Organisatorischer Betrieb pausiert – bitte später erneut prüfen."
-        : row.resource_group_status !== "ACTIVE"
-          ? "Flugbetrieb für dieses Produkt pausiert – bitte Status erneut prüfen."
-          : row.operational_interrupted === 1
-            ? "Flugbetrieb unterbrochen – bitte Status erneut prüfen."
-            : forecastFreshness.reason === "STALE_PREDICTION"
-              ? "Prognose wird aktualisiert – bitte Status erneut prüfen."
-              : message[publicStatus],
+    message: servicePaused
+      ? publicServicePausedMessage({
+          emergencyMode: row.emergency_mode === 1,
+          resourceGroupActive: row.resource_group_status === "ACTIVE",
+          operationalInterrupted: row.operational_interrupted === 1,
+        })
+      : forecastFreshness.reason === "STALE_PREDICTION"
+        ? "Prognose wird aktualisiert – bitte Status erneut prüfen."
+        : PUBLIC_STATUS_MESSAGES[publicStatus],
     operationalNotice:
       row.planned_public_note || row.resource_group_operational_note || row.event_operational_note,
     updatedAt: row.updated_at,
@@ -5834,6 +5824,10 @@ app.get("/api/public/groups/:groupCode", async (context) => {
 
   const readAt = new Date().toISOString();
   const partCount = rotations.results.length;
+  const servicePaused =
+    group.emergency_mode === 1 ||
+    group.operational_interrupted === 1 ||
+    group.resource_group_status !== "ACTIVE";
   const parts = rotations.results.map((rotation, index) => {
     const freshness = assessForecastFreshness({
       predictionQuality: rotation.prediction_quality,
@@ -5858,12 +5852,8 @@ app.get("/api/public/groups/:groupCode", async (context) => {
       rotationState: rotation.status,
       draftStatus: rotation.precalled_at ? "COME_TO_FLIGHT_LINE" : prepare ? "PREPARE" : "WAITING",
     });
-    const publicStatus =
-      group.emergency_mode === 1 ||
-      group.operational_interrupted === 1 ||
-      group.resource_group_status !== "ACTIVE"
-        ? ("SERVICE_PAUSED" as const)
-        : lifecycleStatus;
+    const publicStatus = servicePaused ? ("SERVICE_PAUSED" as const) : lifecycleStatus;
+    const lifecycleMessage = PUBLIC_STATUS_MESSAGES[lifecycleStatus];
     const boardingWindow = predictedBoardingWindow({
       status: rotation.status,
       quality: predictionQuality,
@@ -5872,28 +5862,15 @@ app.get("/api/public/groups/:groupCode", async (context) => {
       upperMinutes,
       referenceAt: readAt,
     });
-    const message =
-      group.emergency_mode === 1
-        ? "Organisatorischer Betrieb pausiert – bitte später erneut prüfen."
-        : group.resource_group_status !== "ACTIVE"
-          ? "Flugbetrieb für dieses Produkt pausiert – bitte Status erneut prüfen."
-          : group.operational_interrupted === 1
-            ? "Flugbetrieb unterbrochen – bitte Status erneut prüfen."
-            : freshness.reason === "STALE_PREDICTION"
-              ? "Prognose wird aktualisiert – bitte Status erneut prüfen."
-              : publicStatus === "COME_TO_FLIGHT_LINE"
-                ? "Bitte jetzt zum Gate kommen."
-                : publicStatus === "BOARDING"
-                  ? "Bitte am Gate zum Einstieg bereithalten."
-                  : publicStatus === "PREPARE"
-                    ? "Ihr Aufruf steht bevor. Bitte bereithalten und noch nicht zum Gate kommen."
-                    : publicStatus === "IN_FLIGHT"
-                      ? "Ihr Rundflug ist gestartet."
-                      : publicStatus === "LANDED"
-                        ? "Ihr Rundflug ist gelandet."
-                        : publicStatus === "COMPLETED"
-                          ? "Ihr Rundflug ist abgeschlossen."
-                          : "Bitte Status regelmäßig prüfen.";
+    const message = servicePaused
+      ? publicServicePausedMessage({
+          emergencyMode: group.emergency_mode === 1,
+          resourceGroupActive: group.resource_group_status === "ACTIVE",
+          operationalInterrupted: group.operational_interrupted === 1,
+        })
+      : freshness.reason === "STALE_PREDICTION"
+        ? "Prognose wird aktualisiert – bitte Status erneut prüfen."
+        : lifecycleMessage;
     return {
       partNumber: index + 1,
       partCount,

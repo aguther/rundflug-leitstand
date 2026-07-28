@@ -331,6 +331,16 @@ Anwendung wird eine D1-Time-Travel-Marke beziehungsweise portable Sicherung ange
 Worker ignoriert die nullable Spalten; für eine vollständige Schema-Rückkehr wird D1 per Time
 Travel oder aus dieser Sicherung wiederhergestellt.
 
+## 0053 – Getrennte öffentliche Push-Übergänge
+
+Erweitert den zulässigen Zustelltypkatalog um `GO_TO_GATE` und `BOARDING_STARTED`, damit
+automatischer Voraufruf und menschlich bestätigter Boardingbeginn getrennte, idempotente
+Mitteilungen erzeugen. Die Zustelltabelle wird unter Erhalt aller Belege neu aufgebaut; historische
+`FLIGHT_GROUP_CALLED`-Zeilen bleiben unverändert gültig. Vor Anwendung wird eine
+D1-Time-Travel-Marke beziehungsweise vollständige D1-Sicherung angelegt. Für eine vollständige
+Schema-Rückkehr wird D1 per Time Travel oder aus dieser Sicherung wiederhergestellt; Push-Ziele
+bleiben weiterhin aus portablen R2-Sicherungen ausgeschlossen.
+
 ## Historische Doppelnummer 0036
 
 `0036_product_promised_flight_time.sql` und `0036_v1_5_stable_operations.sql` wurden bereits unter

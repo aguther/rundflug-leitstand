@@ -8,12 +8,13 @@ import {
   purgeExpiredPushSubscriptions,
   pushDeleteAfter,
   pushErrorMessage,
-  pushMessageFor,
+  pushNotificationFor,
   pushRetentionDays,
   pushUrgencyFor,
   shouldQueuePreparationNotification,
   vapidConfiguration,
 } from "./web-push";
+import pushSource from "./web-push.ts?raw";
 
 describe("Web-Push-Endpunkte", () => {
   it("erlaubt Browser-Push-Dienste und blockiert beliebige Ziele", () => {
@@ -53,27 +54,61 @@ describe("Web-Push-Endpunkte", () => {
     ).toBeNull();
   });
 
-  it("verwendet die freigegebene GO-TO-GATE-Copy", () => {
-    expect(pushMessageFor("PREPARE_FOR_FLIGHT")).toBe(
-      "Ihr Aufruf steht bevor. Bitte bereithalten und noch nicht zum Gate kommen.",
-    );
-    expect(pushMessageFor("FLIGHT_GROUP_CALLED")).toBe("Bitte jetzt zum Gate kommen.");
-    expect(pushMessageFor("ROTATION_STARTED")).toBe("Ihr Rundflug ist gestartet.");
-    expect(pushUrgencyFor("FLIGHT_GROUP_CALLED")).toBe("high");
+  it("trennt ortsbezogene Push-Titel und -Texte mit dem konkreten Gate", () => {
+    expect(pushNotificationFor("PREPARE_FOR_FLIGHT", "Flight Line 1")).toEqual({
+      title: "Bitte bereithalten",
+      body: "Ihr Aufruf steht bevor. Bitte halten Sie sich in der Nähe von „Flight Line 1“ bereit.",
+    });
+    expect(pushNotificationFor("GO_TO_GATE", "Flight Line 1")).toEqual({
+      title: "Bitte zum Gate",
+      body: "Bitte kommen Sie jetzt zu „Flight Line 1“ und warten Sie dort auf den Boardingaufruf.",
+    });
+    expect(pushNotificationFor("BOARDING_STARTED", "Flight Line 1")).toEqual({
+      title: "Boarding hat begonnen",
+      body: "Das Boarding an „Flight Line 1“ hat begonnen. Bitte halten Sie Ihr Ticket für den Einstieg bereit.",
+    });
+    expect(pushUrgencyFor("GO_TO_GATE")).toBe("high");
+    expect(pushUrgencyFor("BOARDING_STARTED")).toBe("high");
     expect(pushUrgencyFor("ROTATION_STARTED")).toBe("normal");
+  });
+
+  it("verwendet für spätere Umlaufphasen die freigegebenen Titel und Beschreibungen", () => {
+    expect(pushNotificationFor("ROTATION_STARTED", "Flight Line 1")).toEqual({
+      title: "Rundflug gestartet",
+      body: "Ihr Rundflug ist gestartet.",
+    });
+    expect(pushNotificationFor("ROTATION_LANDED", "Flight Line 1")).toEqual({
+      title: "Rundflug gelandet",
+      body: "Ihr Rundflug ist gelandet.",
+    });
+    expect(pushNotificationFor("ROTATION_COMPLETED", "Flight Line 1")).toEqual({
+      title: "Rundflug abgeschlossen",
+      body: "Ihr Rundflug ist abgeschlossen. Vielen Dank fürs Mitfliegen!",
+    });
+  });
+
+  it("ermittelt das öffentliche Gate aus Umlauf oder Produkt ohne Gastdaten im Payload", () => {
+    expect(pushSource).toContain("g.label AS gate_label");
+    expect(pushSource).toContain("JOIN gates g ON g.id = COALESCE(r.gate_id, p.gate_id)");
+    expect(pushSource).not.toMatch(/guest_name|passenger_name|phone_number/i);
   });
 
   it("liefert einen deklarativen, service-worker-unabhängigen iOS-Payload", () => {
     const payload = JSON.parse(
-      publicPushPayload("FLIGHT_GROUP_CALLED", "/gruppe/NPQRSTUVWXYZ2", "https://status.example"),
+      publicPushPayload(
+        "GO_TO_GATE",
+        "/gruppe/NPQRSTUVWXYZ2",
+        "https://status.example",
+        "Flight Line 1",
+      ),
     );
     expect(payload).toEqual({
       web_push: 8030,
       notification: {
-        title: "Rundflug-Leitstand",
+        title: "Bitte zum Gate",
         lang: "de",
         dir: "ltr",
-        body: "Bitte jetzt zum Gate kommen.",
+        body: "Bitte kommen Sie jetzt zu „Flight Line 1“ und warten Sie dort auf den Boardingaufruf.",
         navigate: "https://status.example/gruppe/NPQRSTUVWXYZ2",
         data: { url: "/gruppe/NPQRSTUVWXYZ2" },
       },
@@ -93,13 +128,13 @@ describe("Web-Push-Endpunkte", () => {
 
   it("fällt ohne bekannten Ursprung auf den Service-Worker-Payload zurück", () => {
     const payload = JSON.parse(
-      publicPushPayload("FLIGHT_GROUP_CALLED", "/gruppe/NPQRSTUVWXYZ2", null),
+      publicPushPayload("BOARDING_STARTED", "/gruppe/NPQRSTUVWXYZ2", null, "Flight Line 1"),
     );
     expect(payload).toEqual({
-      title: "Rundflug-Leitstand",
+      title: "Boarding hat begonnen",
       lang: "de",
       dir: "ltr",
-      body: "Bitte jetzt zum Gate kommen.",
+      body: "Das Boarding an „Flight Line 1“ hat begonnen. Bitte halten Sie Ihr Ticket für den Einstieg bereit.",
       data: { url: "/gruppe/NPQRSTUVWXYZ2" },
     });
     expect(payload.web_push).toBeUndefined();

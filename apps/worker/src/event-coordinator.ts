@@ -2517,7 +2517,7 @@ export class EventCoordinator extends DurableObject<Env> {
         blockedResourceGroups.add(candidate.resourceGroupId);
         continue;
       }
-      await sendRotationPushNotifications(this.env, candidate.rotationId, "FLIGHT_GROUP_CALLED");
+      await sendRotationPushNotifications(this.env, candidate.rotationId, "GO_TO_GATE");
     }
   }
 
@@ -6097,7 +6097,7 @@ export class EventCoordinator extends DurableObject<Env> {
       ).bind(crypto.randomUUID(), command.eventId, JSON.stringify(result), now),
     ]);
     const pushEvent = {
-      CALL_NEXT: "FLIGHT_GROUP_CALLED",
+      CALL_NEXT: "BOARDING_STARTED",
       MARK_OFF_BLOCK: "ROTATION_STARTED",
       MARK_ON_BLOCK: "ROTATION_LANDED",
       COMPLETE_TURNAROUND: "ROTATION_COMPLETED",

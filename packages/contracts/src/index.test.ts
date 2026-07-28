@@ -742,7 +742,8 @@ describe("commandEnvelopeSchema", () => {
           boardingWindowLowerAt: "2026-07-23T12:20:00.000Z",
           boardingWindowUpperAt: "2026-07-23T12:40:00.000Z",
           predictionQuality: "STABLE",
-          message: "Bitte Status regelmäßig prüfen.",
+          message:
+            "Sie befinden sich in der Warteschlange. Bitte prüfen Sie den Status regelmäßig.",
         },
         {
           partNumber: 2,
