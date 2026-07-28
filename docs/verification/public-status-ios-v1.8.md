@@ -4,8 +4,9 @@ Status: Automatisierte Abnahme erfolgreich; Originalhardware-Abnahme in HTTPS-St
 
 ## Automatisiert nachgewiesen
 
-- Ticket- und Gruppenstatus verwenden für alle acht API-Zustände dieselben freigegebenen Texte und
-  Symbole; PREPARE wird als WARTEN und eine Unterbrechung als VERZÖGERT projiziert.
+- Ticket- und Gruppenstatus verwenden für alle acht API-Zustände dieselben freigegebenen
+  API-Beschreibungen und Symbole; PREPARE erscheint als BEREITHALTEN, `COME_TO_FLIGHT_LINE` als
+  BITTE ZUM GATE und eine Unterbrechung als VERZÖGERT.
 - GO TO GATE und BOARDING besitzen getrennte Copy.
 - Jedes dynamische Manifest enthält den exakten Ticket-/Gruppenpfad als `id` und `start_url`,
   `scope: "/"`, `display: "standalone"`, die Ticketgruppe als Namen und reguläre sowie maskierbare
@@ -47,14 +48,20 @@ Verwendet werden ausschließlich synthetische Codes und die HTTPS-Abnahmeumgebun
    eindeutig erkennen lassen. Das neue Symbol muss ohne Umweg über `/` oder Login exakt dieselbe
    Statusroute im Standalone-Modus öffnen.
 3. Benachrichtigungen durch direkte Betätigung des Schalters erlauben.
-4. Einen synthetischen Statuswechsel bis GO TO GATE auslösen und den exakten Text
-   `Bitte jetzt zum Gate kommen.` in der Benachrichtigung prüfen.
-5. Benachrichtigung antippen. Sie muss dieselbe installierte Gruppe öffnen.
-6. Einwilligung widerrufen und prüfen, dass keine weitere Zustellung erfolgt.
-7. Safari prüfen; Vivaldi zusätzlich prüfen, sofern dessen Teilen-Menü auf dem Testgerät
+4. Einen synthetischen Statuswechsel bis BEREITHALTEN auslösen. Der Push muss den Titel
+   `Bitte bereithalten`, das konkrete Gate und den Text
+   `Ihr Aufruf steht bevor. Bitte halten Sie sich in der Nähe von „<Gate>“ bereit.` zeigen.
+5. GO TO GATE auslösen. Der Push muss den Titel `Bitte zum Gate`, das konkrete Gate und den Text
+   `Bitte kommen Sie jetzt zu „<Gate>“ und warten Sie dort auf den Boardingaufruf.` zeigen.
+6. `CALL_NEXT` bestätigen. Der getrennte Push muss den Titel `Boarding hat begonnen` und den Text
+   `Das Boarding an „<Gate>“ hat begonnen. Bitte halten Sie Ihr Ticket für den Einstieg bereit.`
+   zeigen.
+7. Jede Benachrichtigung antippen. Sie muss dieselbe installierte Ticket- oder Gruppenroute öffnen.
+8. Einwilligung widerrufen und prüfen, dass keine weitere Zustellung erfolgt.
+9. Safari prüfen; Vivaldi zusätzlich prüfen, sofern dessen Teilen-Menü auf dem Testgerät
    `Zum Home-Bildschirm` anbietet.
-8. Gerät, iOS-Version, Browser, Uhrzeit, Route und Screenshots protokollieren.
-9. Kasse, Flight Director, Flight Line, FIDS und Admin jeweils separat hinzufügen und prüfen, dass
+10. Gerät, iOS-Version, Browser, Uhrzeit, Route und Screenshots protokollieren.
+11. Kasse, Flight Director, Flight Line, FIDS und Admin jeweils separat hinzufügen und prüfen, dass
    Name, Symbol und geöffnete Startansicht dem gewählten Profil entsprechen.
 
 Ein erfolgreicher Desktop-/Emulationstest ersetzt diese Prüfung nicht.

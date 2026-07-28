@@ -1,20 +1,26 @@
 import { describe, expect, it, vi } from "vitest";
 import pushWorker from "../../web/public/push-sw.js?raw";
 import worker from "./index.ts?raw";
+import publicStatusCopy from "./public-status-copy.ts?raw";
 
 describe("öffentlicher Status V1.8", () => {
   it("liefert Eventname und dieselbe Pausenlogik für Ticket und Gruppe", () => {
     expect(worker).toContain("eventName: row.event_name");
-    expect(worker).toMatch(
-      /row\.emergency_mode === 1 \|\|\s*row\.operational_interrupted === 1 \|\|\s*row\.resource_group_status !== "ACTIVE"\s*\? "SERVICE_PAUSED"/,
-    );
+    expect(worker.match(/const servicePaused =/g)).toHaveLength(2);
+    expect(worker).toContain('servicePaused ? "SERVICE_PAUSED" : publicStatus');
+    expect(worker).toContain('servicePaused ? ("SERVICE_PAUSED" as const) : lifecycleStatus');
+    expect(worker.match(/publicServicePausedMessage\(\{/g)).toHaveLength(2);
   });
 
   it("trennt GO-TO-GATE- und BOARDING-Copy exakt", () => {
-    expect(worker).toContain('"Bitte jetzt zum Gate kommen."');
-    expect(worker).toContain('"Bitte am Gate zum Einstieg bereithalten."');
-    expect(worker).not.toContain('"Bitte jetzt zur Flight Line kommen."');
-    expect(worker).not.toContain('"Bitte jetzt zum angegebenen Gate kommen."');
+    expect(publicStatusCopy).toContain(
+      '"Bitte kommen Sie jetzt zum Gate und warten Sie dort auf den Boardingaufruf."',
+    );
+    expect(publicStatusCopy).toContain(
+      '"Das Boarding hat begonnen. Bitte halten Sie Ihr Ticket für den Einstieg bereit."',
+    );
+    expect(publicStatusCopy).not.toContain('"Bitte jetzt zur Flight Line kommen."');
+    expect(publicStatusCopy).not.toContain('"Bitte jetzt zum angegebenen Gate kommen."');
   });
 
   it("leitet BOARDING für Ticket und Buchungsgruppe aus CALLED statt Anwesenheit ab", () => {
@@ -92,8 +98,8 @@ describe("öffentlicher Status V1.8", () => {
         json: () => ({
           web_push: 8030,
           notification: {
-            title: "Rundflug-Leitstand",
-            body: "Bitte jetzt zum Gate kommen.",
+            title: "Bitte zum Gate",
+            body: "Bitte kommen Sie jetzt zu „Flight Line 1“ und warten Sie dort auf den Boardingaufruf.",
             navigate: "https://status.example/gruppe/NPQRSTUVWXYZ2",
           },
         }),
@@ -104,8 +110,8 @@ describe("öffentlicher Status V1.8", () => {
     });
     await notificationWork;
 
-    expect(showNotification).toHaveBeenCalledWith("Rundflug-Leitstand", {
-      body: "Bitte jetzt zum Gate kommen.",
+    expect(showNotification).toHaveBeenCalledWith("Bitte zum Gate", {
+      body: "Bitte kommen Sie jetzt zu „Flight Line 1“ und warten Sie dort auf den Boardingaufruf.",
       data: { url: "/gruppe/NPQRSTUVWXYZ2" },
       lang: "de",
     });
