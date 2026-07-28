@@ -9,6 +9,10 @@ const styles = readFileSync(
   new URL("./features/admin/admin-modernization.css", import.meta.url),
   "utf8",
 );
+const planStyles = readFileSync(
+  new URL("./features/operations/operational-plan.css", import.meta.url),
+  "utf8",
+);
 
 describe("modernized administration workspace", () => {
   it("keeps event tabs keyboard accessible with a fixed status slot", () => {
@@ -32,6 +36,21 @@ describe("modernized administration workspace", () => {
     expect(planSource).not.toContain("{plan.reason}");
     expect(planSource).not.toContain("Interner Grund");
     expect(planSource).not.toContain("planReason");
+  });
+
+  it("uses one isolated operational dialog with aligned localized time controls", () => {
+    expect(planSource.match(/\sportal/g)).toHaveLength(2);
+    expect(planStyles).toContain("grid-template-columns: minmax(0, 1fr) auto minmax(96px, 112px)");
+    expect(planStyles).toContain(".operational-plan-dialog .localized-picker-control > input");
+    expect(planStyles).toContain("background: var(--ui-control)");
+    expect(planStyles).toMatch(
+      /\.operational-plan-form-grid > \.ds-field \{[\s\S]*?align-content: start;[\s\S]*?margin-bottom: 0;/,
+    );
+    expect(planSource).toContain("Nach aktuellem Umlauf");
+    expect(planSource).toContain("Kein aktueller Umlauf verfügbar");
+    expect(planSource).toContain("Für einen späteren Zeitpunkt");
+    expect(planSource).toContain("alle 5 Umläufe tanken");
+    expect(planSource).toContain("Wiederkehrende Regel hinzufügen");
   });
 
   it("uses a modal account table with explicit edit and protected delete actions", () => {

@@ -33,6 +33,9 @@ describe("unified master-data dialogs and stable event workspace", () => {
     expect(adminEventStyles).toMatch(
       /\.admin-workspace:not\(\.master-data-active\) > \.setup-progress \{[\s\S]*?margin-bottom: 0;/,
     );
+    expect(adminEventStyles).toMatch(
+      /\.admin-shell \.setup-progress \{[\s\S]*?margin: 16px 16px 12px;/,
+    );
     expect(adminEventStyles).toMatch(/\.admin-shell \.reset-levels \{[\s\S]*?padding: 0 16px 8px;/);
   });
 

@@ -111,7 +111,18 @@
 .operational-plan-form-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: start;
   gap: 12px;
+}
+
+.operational-plan-form-grid > * {
+  min-width: 0;
+}
+
+.operational-plan-form-grid > .ds-field {
+  align-self: start;
+  align-content: start;
+  margin-bottom: 0;
 }
 
 .operational-plan-form-grid .localized-input-field {
@@ -127,14 +138,39 @@
 }
 
 .operational-plan-form-grid .localized-date-time {
+  width: 100%;
+  min-width: 0;
   display: grid;
-  grid-template-columns: minmax(150px, 1fr) auto 112px;
+  grid-template-columns: minmax(0, 1fr) auto minmax(96px, 112px);
   align-items: center;
   gap: 6px;
 }
 
-.operational-plan-form-grid .localized-picker-control input {
+.operational-plan-dialog .localized-picker-control > input {
+  box-sizing: border-box;
+  width: 100%;
   min-height: var(--control-default);
+  padding: 8px 48px 8px 10px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--ui-text);
+  background: var(--ui-control);
+  font: inherit;
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.operational-plan-dialog .localized-picker-control > input:focus {
+  border-color: color-mix(in srgb, var(--ui-accent) 72%, var(--ui-border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-accent) 17%, transparent);
+  outline: 0;
+}
+
+.operational-plan-dialog .localized-picker-trigger {
+  color: var(--ui-muted);
+  background: transparent;
 }
 
 .operational-plan-dialog .ds-modal-body {
