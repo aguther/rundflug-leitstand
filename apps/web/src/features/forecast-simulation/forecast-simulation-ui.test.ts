@@ -19,6 +19,14 @@ const planImportSource = readFileSync(
   new URL("./simulation-plan-import.ts", import.meta.url),
   "utf8",
 );
+const foundationDialogSource = readFileSync(
+  new URL("./SimulationFoundationDialog.tsx", import.meta.url),
+  "utf8",
+);
+const recurringRulesSource = readFileSync(
+  new URL("./SimulationRecurringRulesEditor.tsx", import.meta.url),
+  "utf8",
+);
 const historySource = readFileSync(
   new URL("./SimulationHistoryDialog.tsx", import.meta.url),
   "utf8",
@@ -63,7 +71,7 @@ describe("local and hosted forecast simulation surface", () => {
   });
 
   it("contains no browser network or persistence call in the simulator feature", () => {
-    const allSources = `${viewSource}\n${editorSource}\n${planEditorSource}\n${planImportSource}\n${historySource}\n${fidsPopoutSource}\n${fidsProjectionSource}`;
+    const allSources = `${viewSource}\n${editorSource}\n${planEditorSource}\n${planImportSource}\n${foundationDialogSource}\n${recurringRulesSource}\n${historySource}\n${fidsPopoutSource}\n${fidsProjectionSource}`;
     expect(allSources).not.toMatch(/\bfetch\s*\(/);
     expect(allSources).not.toMatch(/\bWebSocket\b/);
     expect(allSources).not.toMatch(
@@ -112,12 +120,12 @@ describe("local and hosted forecast simulation surface", () => {
       "Landung",
       "Abschluss",
       "Lauf auswerten",
-      "Simulationsplan importieren",
+      "Simulationsgrundlage laden",
       "Duplizieren",
-      "Als neue Variante übernehmen",
     ]) {
       expect(viewSource).toContain(label);
     }
+    expect(foundationDialogSource).toContain("Als neue Variante laden");
     for (const label of [
       "Boarding",
       "Flug",
@@ -175,11 +183,22 @@ describe("local and hosted forecast simulation surface", () => {
     expect(stylesSource).toContain(".sim-chart-tooltip");
     expect(stylesSource).toContain(".sim-interruption-bar");
     expect(planEditorSource).toContain("Geplante Unterbrechungen und Flugshows");
-    expect(planEditorSource).toContain("Wiederkehrende Regeln");
-    expect(planEditorSource).toContain("Bestätigter Fortschritt");
+    expect(planEditorSource).not.toContain("Wiederkehrende Regeln");
+    expect(recurringRulesSource).toContain("Zielbezogene Regeln");
+    expect(recurringRulesSource).toContain("Bestätigter Fortschritt");
+    expect(recurringRulesSource).toContain(
+      "Eine zielbezogene Regel ersetzt für dieses Ziel den entsprechenden Standard.",
+    );
+    expect(editorSource).toContain("<h4>Wiederkehrend</h4>");
+    expect(editorSource).toContain("<h4>Zufällig</h4>");
     expect(planEditorSource).toContain("Nach simuliertem Umlauf");
     expect(planImportSource).toContain("rundflug-master-data-template");
+    expect(planImportSource).toContain("rundflug-simulation-scenario");
     expect(planImportSource).toContain("MAX_SIMULATION_PLAN_FILE_BYTES");
+    expect(viewSource).not.toContain('id="sim-preset"');
+    expect(viewSource).not.toContain("Szenario-Vorlagen");
+    expect(foundationDialogSource).toContain('role="tablist"');
+    expect(foundationDialogSource).toContain("Vorlage als JSON herunterladen");
   });
 
   it("keeps narrow layouts inside an internal scroll container", () => {

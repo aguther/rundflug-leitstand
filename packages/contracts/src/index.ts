@@ -1418,6 +1418,168 @@ const simulationPlanScheduleSchema = z
   });
 export type SimulationPlanSchedule = z.infer<typeof simulationPlanScheduleSchema>;
 
+const simulationScenarioDistributionSchema = z
+  .object({
+    minimum: z.number().nonnegative(),
+    typical: z.number().nonnegative(),
+    maximum: z.number().nonnegative(),
+  })
+  .strict()
+  .superRefine((distribution, context) => {
+    if (
+      distribution.minimum > distribution.typical ||
+      distribution.typical > distribution.maximum
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Die Verteilung muss Minimum ≤ typisch ≤ Maximum erfüllen.",
+        path: ["typical"],
+      });
+    }
+  });
+
+const simulationScenarioIncidentSchema = z
+  .object({
+    enabled: z.boolean(),
+    duration: simulationScenarioDistributionSchema,
+  })
+  .strict();
+
+const simulationScenarioDemandSchema = z
+  .object({
+    profile: z.enum(["UNIFORM", "OPENING_RUSH", "TWO_WAVES", "LATE_RUSH", "CUSTOM"]),
+    windows: z
+      .array(
+        z
+          .object({
+            startOffsetMinutes: z.number().int().nonnegative(),
+            endOffsetMinutes: z.number().int().positive(),
+            personsPerHour: z.number().nonnegative(),
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(100),
+  })
+  .strict();
+
+const simulationScenarioForecastTuningSchema = z
+  .object({
+    maximumSamples: z.number().int().min(1).max(100),
+    referenceWeight: z.number().positive(),
+    firstSampleWeight: z.number().positive(),
+    recencyWeightIncrement: z.number().nonnegative(),
+    referenceOutlierMultiplier: z.number().min(1),
+    madMultiplier: z.number().nonnegative(),
+    minimumMadToleranceRatio: z.number().nonnegative(),
+    stableMinimumSamples: z.number().int().min(1).max(100),
+    stableMaximumMeanDeviationMinutes: z.number().nonnegative(),
+    stableMarginMinutes: z.number().nonnegative(),
+    changingMarginMinutes: z.number().nonnegative(),
+  })
+  .strict()
+  .superRefine((tuning, context) => {
+    if (tuning.stableMinimumSamples > tuning.maximumSamples) {
+      context.addIssue({
+        code: "custom",
+        message: "Die stabile Mindeststichprobe darf die maximale Stichprobe nicht überschreiten.",
+        path: ["stableMinimumSamples"],
+      });
+    }
+  });
+
+const simulationScenarioPrecallTuningSchema = z
+  .object({
+    desiredGateWaitMinutes: z.number().nonnegative(),
+    baselineLeadMinutes: z.number().nonnegative(),
+    minimumLeadMinutes: z.number().nonnegative(),
+    maximumLeadMinutes: z.number().nonnegative(),
+    correctionFactor: z.number().nonnegative(),
+    observationSampleLimit: z.number().int().min(1).max(100),
+    gateCooldownMinutes: z.number().min(0).max(60),
+  })
+  .strict()
+  .superRefine((tuning, context) => {
+    if (tuning.maximumLeadMinutes < tuning.minimumLeadMinutes) {
+      context.addIssue({
+        code: "custom",
+        message: "Der maximale Vorlauf darf den minimalen Vorlauf nicht unterschreiten.",
+        path: ["maximumLeadMinutes"],
+      });
+    }
+  });
+
+export const simulationScenarioTemplateSchema = z
+  .object({
+    format: z.literal("rundflug-simulation-scenario"),
+    formatVersion: z.literal(1),
+    exportedAt: z.iso.datetime(),
+    name: z.string().trim().min(1).max(80),
+    config: z
+      .object({
+        preset: z.enum(["NORMAL", "PEAK_LOAD", "AIRCRAFT_FAILURE", "OPERATION_INTERRUPTION"]),
+        seed: z.number().int().min(1).max(4_294_967_295),
+        schedule: simulationPlanScheduleSchema,
+        adminParameters: z
+          .object({
+            plannedBoardingMinutes: z.number().int().min(1).max(600),
+            productReferenceDurationMinutes: z.number().int().min(1).max(600),
+            plannedDeboardingMinutes: z.number().int().min(1).max(600),
+            plannedBufferMinutes: z.number().int().min(0).max(600),
+            eventAutomaticPrecallEnabled: z.boolean(),
+            resourceGroupAutomaticPrecallEnabled: z.boolean(),
+            aircraftCount: z.number().int().min(1).max(12),
+            aircraftType: z.string().trim().min(2).max(100),
+            passengerSeats: z.number().int().min(1).max(100),
+            activePilotCount: z.number().int().min(0).max(200),
+          })
+          .strict(),
+        realityModel: z
+          .object({
+            demand: simulationScenarioDemandSchema,
+            phases: z
+              .object({
+                boarding: simulationScenarioDistributionSchema,
+                flight: simulationScenarioDistributionSchema,
+                deboarding: simulationScenarioDistributionSchema,
+                buffer: simulationScenarioDistributionSchema,
+              })
+              .strict(),
+            incidents: z
+              .object({
+                refueling: simulationScenarioIncidentSchema
+                  .extend({ everyRotations: z.number().int().min(1).max(100_000) })
+                  .strict(),
+                plannedPause: simulationScenarioIncidentSchema
+                  .extend({ everyOperatingMinutes: z.number().int().min(1).max(100_000) })
+                  .strict(),
+                unplannedPause: simulationScenarioIncidentSchema
+                  .extend({ ratePerOperatingHour: z.number().nonnegative() })
+                  .strict(),
+                technicalDefect: simulationScenarioIncidentSchema
+                  .extend({
+                    ratePerOperatingHour: z.number().nonnegative(),
+                    dayOutageProbability: z.number().min(0).max(1),
+                  })
+                  .strict(),
+              })
+              .strict(),
+          })
+          .strict(),
+        forecastTuning: z
+          .object({
+            forecast: simulationScenarioForecastTuningSchema,
+            precall: simulationScenarioPrecallTuningSchema,
+            comparisonRuns: z.number().int().min(5).max(100),
+            availabilityModel: z.enum(["SCALAR", "TIME_DEPENDENT"]),
+          })
+          .strict(),
+      })
+      .strict(),
+  })
+  .strict();
+export type SimulationScenarioTemplate = z.infer<typeof simulationScenarioTemplateSchema>;
+
 const simulationPlanOperationSchema = z
   .object({
     key: masterDataTemplateKeySchema,

@@ -97,7 +97,7 @@ automatisch als Gewinner.
 
 Unter **Administration → Auswertung** erzeugt
 `GET /api/control/:eventId/exports/simulation-plan.json` das strikt validierte Format
-`rundflug-simulation-plan` Version 1. Der lesende Export ist für `ADMIN` und
+`rundflug-simulation-plan` Version 2. Version 1 bleibt importkompatibel. Der lesende Export ist für `ADMIN` und
 `FLIGHT_DIRECTOR` autorisiert; die aktuelle Oberfläche bietet ihn ausschließlich in der
 Administration an. Enthalten sind:
 
@@ -111,17 +111,25 @@ Operatorenkonten oder Sitzungen. Ein operativer Bezug auf einen aktuellen Umlauf
 exportiert. Stattdessen trägt der Eintrag nur `afterCurrentRotation: true` und bleibt nach dem
 Import ausdrücklich unaufgelöst.
 
-Der Simulator akzeptiert sowohl das neue Format als auch das bestehende
-`rundflug-master-data-template` Version 1. Dateien sind auf 1 MiB begrenzt und werden vor der
-Übernahme vollständig gegen den Vertrags-Schema geprüft. Die Vorschau nennt Quelle und Anzahl
-aller Stammdaten und Planeinträge. Umlaufgebundene Einträge blockieren den Start, bis sie im
-Tagesplan in ein Zeitfenster umgewandelt oder in der Importvorschau bewusst ausgeschlossen
-werden. Das Stammdaten-Template behält mangels Tagesplan die bisher im Simulator eingestellten
-Zeiten und enthält keine Planeinträge.
+Der gemeinsame Dialog **Simulationsgrundlage laden** akzeptiert das operative Format V1/V2, das
+bestehende `rundflug-master-data-template` Version 1 und das browserlokale
+`rundflug-simulation-scenario` Version 1. Das neue Szenarioformat enthält ausschließlich die
+editierbaren Preset-, Zeit-, Nachfrage-, Phasen-, Ereignis- und Prognoseparameter. Es enthält keine
+operative Topologie, Tickets, Queues, Ist-Zustände, Ergebnisse oder manuellen Ereignisse. Das im
+Dialog gewählte eingebaute Szenario kann als JSON heruntergeladen, manuell bearbeitet und wieder
+importiert werden.
+
+Alle Dateien sind auf 1 MiB begrenzt und werden vor der Übernahme vollständig gegen ihr striktes
+Vertragsschema geprüft. Die Vorschau nennt Quelle und die jeweils relevanten Parameter oder Anzahlen.
+Umlaufgebundene Einträge blockieren den Start, bis sie im Tagesplan in ein Zeitfenster umgewandelt
+oder in der Importvorschau bewusst ausgeschlossen werden. Das Stammdaten-Template behält mangels
+Tagesplan die bisher im Simulator eingestellten Zeiten und enthält keine Planeinträge.
 
 Mehrere Varianten existieren ausschließlich im React-Zustand der geöffneten Simulatorseite. Sie
-können benannt, dupliziert, gewechselt und gelöscht werden. Beim Import entsteht stets eine neue
-Variante; vorhandene Varianten werden nicht überschrieben. Ein Reload verwirft sie bewusst.
+können benannt, dupliziert, gewechselt und gelöscht werden. Sowohl Szenarioauswahl als auch
+Dateiimport erzeugen stets eine neue, automatisch ausgewählte Variante; Namenskollisionen erhalten
+einen nummerierten Zusatz. Vorhandene Varianten werden nicht überschrieben. Ein Reload verwirft sie
+bewusst.
 
 Für importierte Stammdaten erzeugt jede Variante weiterhin ausschließlich synthetische Nachfrage,
 Gruppen, Umläufe und Ist-Ereignisse. Die voreingestellte Gesamtnachfrage von 18 Personen pro
@@ -142,6 +150,13 @@ Pausen nach einem Umlauf, Tanken, ungeplante Pausen, technische Defekte und Tage
 erscheinen auf der jeweiligen Flugzeugspur; globale Unterbrechungen erscheinen auf der
 gemeinsamen Betriebsspur. Eine noch offene Sperre endet in der Darstellung an der aktuell
 sichtbaren Simulationszeit, sodass kein zukünftiges Rückkehrereignis vorweggenommen wird.
+
+Der Editor **Simulierte Realität → Betriebsereignisse** trennt wiederkehrende Standards von
+zufälligen Pausen und Defekten. Bei importierten Stammdaten erscheinen zielbezogene Tank- und
+Pausenregeln im selben Abschnitt. Gemäß ADR-0028 ersetzt eine solche Regel nur für das gewählte
+Flugzeug beziehungsweise den Pilotencode den entsprechenden Standard; bestätigter Fortschritt und
+alle Prognosewirkungen bleiben erhalten. Der Tagesplan enthält dadurch keinen redundanten zweiten
+Regeleditor mehr.
 
 Beide Prognosediagramme sind ohne zusätzliche Diagrammbibliothek interaktiv. Beim Zeigen auf einen
 Messpunkt nennt der Tagesfehlerverlauf Snapshotzeit, damalige Boarding-Prognose, Ist-Boarding und

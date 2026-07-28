@@ -346,29 +346,6 @@
   line-height: 1.4;
 }
 
-.sim-presets {
-  margin: 2px -16px 0;
-  padding: 14px 16px 0;
-  border-top: 1px solid var(--ui-border);
-}
-
-.sim-presets button {
-  min-height: 34px;
-  padding: 0 12px;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--radius-sm);
-  color: var(--ui-muted);
-  background: var(--ui-control);
-  text-align: left;
-  cursor: pointer;
-}
-
-.sim-presets button[aria-current="true"] {
-  border-left: 3px solid var(--ui-accent);
-  color: var(--ui-text);
-  background: var(--ui-accent-soft);
-}
-
 .sim-sidebar-note {
   margin: auto 0 0;
   color: var(--ui-muted);
@@ -1231,6 +1208,139 @@
   gap: 14px;
 }
 
+.sim-foundation-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sim-foundation-title svg {
+  width: 20px;
+  color: var(--ui-accent);
+}
+
+.sim-foundation-dialog {
+  padding-top: 16px;
+}
+
+.sim-foundation-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.sim-foundation-tabs button {
+  min-height: 48px;
+  border: 0;
+  border-right: 1px solid var(--ui-border);
+  border-bottom: 2px solid transparent;
+  color: var(--ui-muted);
+  background: var(--ui-surface);
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.sim-foundation-tabs button:last-child {
+  border-right: 0;
+}
+
+.sim-foundation-tabs button[aria-selected="true"] {
+  border-bottom-color: var(--ui-accent);
+  color: var(--ui-text);
+  background: var(--ui-surface-subtle);
+}
+
+.sim-foundation-panel {
+  display: grid;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.sim-scenario-options {
+  display: grid;
+  gap: 9px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.sim-scenario-options label {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-md);
+  background: var(--ui-surface-subtle);
+  cursor: pointer;
+}
+
+.sim-scenario-options label:has(input:checked) {
+  border-color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+}
+
+.sim-scenario-options input {
+  width: 19px;
+  height: 19px;
+  accent-color: var(--ui-accent);
+}
+
+.sim-scenario-download {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 4px 0;
+  border: 0;
+  border-top: 1px solid var(--ui-border);
+  color: var(--ui-accent);
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+.sim-scenario-download svg {
+  width: 18px;
+}
+
+.sim-foundation-file {
+  min-height: 280px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 10px;
+  padding: 30px;
+  border: 1px dashed var(--ui-border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--ui-surface-subtle);
+  text-align: center;
+}
+
+.sim-foundation-file > svg {
+  width: 40px;
+  height: 40px;
+  color: var(--ui-muted);
+}
+
+.sim-foundation-file p,
+.sim-foundation-file small {
+  margin: 0;
+  color: var(--ui-muted);
+  font-size: 12px;
+}
+
+.sim-foundation-file small {
+  overflow-wrap: anywhere;
+}
+
+.sim-foundation-change-file {
+  justify-self: start;
+}
+
 .sim-plan-import-preview > header,
 .sim-plan-import-preview dl {
   display: grid;
@@ -1263,6 +1373,10 @@
 
 .sim-plan-import-preview dl {
   grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.sim-plan-import-preview .sim-scenario-import-summary {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .sim-plan-import-warning {
@@ -1830,6 +1944,35 @@
   grid-template-columns: 96px 42px minmax(0, 1fr);
 }
 
+.sim-incident-group + .sim-incident-group {
+  border-top: 1px solid var(--ui-border);
+}
+
+.sim-incident-group-heading {
+  display: grid;
+  gap: 4px;
+  padding: 14px;
+}
+
+.sim-incident-group-heading h4,
+.sim-incident-group-heading p,
+.sim-targeted-rules h4,
+.sim-targeted-rules p {
+  margin: 0;
+}
+
+.sim-incident-group-heading h4,
+.sim-targeted-rules h4 {
+  font-size: 13px;
+}
+
+.sim-incident-group-heading p,
+.sim-targeted-rules p {
+  color: var(--ui-muted);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
 .sim-incident-row:last-child {
   border-bottom: 0;
 }
@@ -1863,6 +2006,28 @@
 
 .sim-day-out-field .sim-number-field {
   width: 62px;
+}
+
+.sim-targeted-rules {
+  border-top: 1px solid var(--ui-border);
+}
+
+.sim-targeted-rules > header {
+  display: grid;
+  gap: 4px;
+  padding: 14px 14px 0;
+}
+
+.sim-targeted-rules > .sim-plan-list {
+  padding-bottom: 10px;
+}
+
+.sim-targeted-rules > .ds-button {
+  margin: 0 14px 14px;
+}
+
+.sim-targeted-rules .sim-editor-hint {
+  padding: 4px 0;
 }
 
 .sim-toggle {
@@ -2890,8 +3055,55 @@
 
 @media (max-height: 820px) {
   .sim-sidebar {
-    gap: 8px;
-    padding-block: 11px;
+    gap: 6px;
+    padding-block: 8px;
+  }
+
+  .sim-sidebar section,
+  .sim-sidebar label,
+  .sim-model-summary {
+    gap: 4px;
+  }
+
+  .sim-sidebar :is(input, select),
+  .sim-stepper :is(output, button) {
+    min-height: 32px;
+  }
+
+  .sim-variant-manager {
+    padding-bottom: 7px;
+  }
+
+  .sim-variant-actions button {
+    min-height: 28px;
+  }
+
+  .sim-model-summary {
+    gap: 2px;
+    padding: 6px 9px;
+  }
+
+  .sim-model-summary strong {
+    font-size: 13px;
+  }
+
+  .sim-model-summary small {
+    font-size: 10px;
+  }
+
+  .sim-full-button.ds-button {
+    min-height: 34px;
+    padding: 5px 8px;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+
+  .sim-full-button .ds-button-content {
+    gap: 6px;
+  }
+
+  .sim-sidebar-note {
+    display: none;
   }
 
   .sim-controls {

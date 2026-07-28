@@ -31,10 +31,8 @@ import {
   forecastUncertaintyLabel,
   type ManualIncident,
   SIMULATION_DEMAND_PROFILE_LABELS,
-  SIMULATION_PRESET_LABELS,
   type SimulationConfig,
   type SimulationForecastSnapshot,
-  type SimulationPresetId,
   type SimulationRotation,
   salesDurationMinutes,
   simulationConfigForPreset,
@@ -42,15 +40,12 @@ import {
 } from "./model";
 import { ScenarioEditor } from "./ScenarioEditor";
 import { SimulationFidsPopout, type SimulationFidsPopoutHandle } from "./SimulationFidsPopout";
+import {
+  nextSimulationVariantName,
+  SimulationFoundationDialog,
+} from "./SimulationFoundationDialog";
 import { SimulationHistoryDialog } from "./SimulationHistoryDialog";
 import { createSimulationExport } from "./simulation-export";
-import {
-  excludeUnresolvedPlannedOperations,
-  MAX_SIMULATION_PLAN_FILE_BYTES,
-  parseSimulationPlanImport,
-  SimulationPlanImportError,
-  type SimulationPlanImportPreview,
-} from "./simulation-plan-import";
 import "./forecast-simulation.css";
 
 const MINUTE_MS = 60_000;
@@ -318,20 +313,15 @@ export function ForecastSimulationView() {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [comparisonOpen, setComparisonOpen] = useState(false);
+  const [foundationOpen, setFoundationOpen] = useState(false);
   const [comparisonResult, setComparisonResult] = useState<BatchComparisonResult | null>(null);
   const [comparisonProgress, setComparisonProgress] = useState({ completed: 0, total: 0 });
   const [comparisonError, setComparisonError] = useState<string | null>(null);
   const [comparisonRunning, setComparisonRunning] = useState(false);
   const [importMessage, setImportMessage] = useState<string | null>(null);
   const [importingCsv, setImportingCsv] = useState(false);
-  const [planImportPreview, setPlanImportPreview] = useState<SimulationPlanImportPreview | null>(
-    null,
-  );
-  const [planImportError, setPlanImportError] = useState<string | null>(null);
-  const [excludeUnresolvedPlans, setExcludeUnresolvedPlans] = useState(false);
   const [fidsWindowError, setFidsWindowError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const planFileInputRef = useRef<HTMLInputElement>(null);
   const comparisonWorkerRef = useRef<Worker | null>(null);
   const fidsPopoutRef = useRef<SimulationFidsPopoutHandle>(null);
   const editorErrors = validateSimulationConfig(editorConfig);
@@ -391,7 +381,6 @@ export function ForecastSimulationView() {
     );
   };
 
-  const applyPreset = (preset: SimulationPresetId) => restart(simulationConfigForPreset(preset));
   const applyQuickConfig = (nextConfig: SimulationConfig) => {
     if (validateSimulationConfig(nextConfig).length === 0) restart(nextConfig);
   };
@@ -491,38 +480,6 @@ export function ForecastSimulationView() {
     }
   };
 
-  const handleSimulationPlan = async (file: File | undefined) => {
-    if (!file) return;
-    setPlanImportError(null);
-    setExcludeUnresolvedPlans(false);
-    try {
-      if (file.size > MAX_SIMULATION_PLAN_FILE_BYTES) {
-        throw new SimulationPlanImportError(
-          "Die Datei ist größer als 1 MiB und wird nicht verarbeitet.",
-        );
-      }
-      setPlanImportPreview(parseSimulationPlanImport(await file.text(), config));
-    } catch (error) {
-      setPlanImportError(
-        error instanceof SimulationPlanImportError
-          ? error.message
-          : "Der Simulationsplan konnte nicht gelesen werden.",
-      );
-      setPlanImportPreview(null);
-    } finally {
-      if (planFileInputRef.current) planFileInputRef.current.value = "";
-    }
-  };
-
-  const preparedImportedConfig = planImportPreview
-    ? planImportPreview.counts.unresolvedAfterCurrentRotation > 0 && excludeUnresolvedPlans
-      ? excludeUnresolvedPlannedOperations(planImportPreview)
-      : planImportPreview.config
-    : null;
-  const planImportValidationErrors = preparedImportedConfig
-    ? validateSimulationConfig(preparedImportedConfig)
-    : [];
-
   const activateVariant = (variant: SimulationVariant) => {
     setSelectedVariantId(variant.id);
     loadSimulation(variant.config, variant.manualIncidents);
@@ -551,21 +508,31 @@ export function ForecastSimulationView() {
     activateVariant(replacement);
   };
 
-  const applyImportedVariant = () => {
-    if (!planImportPreview || !preparedImportedConfig) return;
-    if (planImportValidationErrors.length > 0) return;
+  const addFoundationVariant = (foundation: {
+    config: SimulationConfig;
+    format:
+      | "rundflug-simulation-scenario"
+      | "rundflug-simulation-plan"
+      | "rundflug-master-data-template";
+    sourceName: string;
+  }) => {
     const id = `variant-${crypto.randomUUID()}`;
     const imported: SimulationVariant = {
       id,
-      name: `${planImportPreview.sourceName} · Variante`,
-      config: structuredClone(preparedImportedConfig),
+      name: nextSimulationVariantName(
+        foundation.sourceName,
+        variants.map((variant) => variant.name),
+      ),
+      config: structuredClone(foundation.config),
       manualIncidents: [],
     };
     setVariants((current) => [...current, imported]);
     activateVariant(imported);
-    setPlanImportPreview(null);
+    setFoundationOpen(false);
     setImportMessage(
-      `${planImportPreview.sourceName} als neue Variante übernommen; keine Tickets, Queues oder Ist-Zustände importiert.`,
+      foundation.format === "rundflug-simulation-scenario"
+        ? `${foundation.sourceName} als neue Variante geladen.`
+        : `${foundation.sourceName} als neue Variante übernommen; keine Tickets, Queues oder Ist-Zustände importiert.`,
     );
   };
 
@@ -710,20 +677,6 @@ export function ForecastSimulationView() {
             </div>
           </section>
           <section>
-            <label htmlFor="sim-preset">Szenario</label>
-            <select
-              id="sim-preset"
-              onChange={(event) => applyPreset(event.currentTarget.value as SimulationPresetId)}
-              value={config.preset}
-            >
-              {(Object.keys(SIMULATION_PRESET_LABELS) as SimulationPresetId[]).map((preset) => (
-                <option key={preset} value={preset}>
-                  {SIMULATION_PRESET_LABELS[preset]}
-                </option>
-              ))}
-            </select>
-          </section>
-          <section>
             <span>Flugzeuge</span>
             {config.operationalModel ? (
               <div className="sim-imported-topology">
@@ -815,15 +768,8 @@ export function ForecastSimulationView() {
             ref={fileInputRef}
             type="file"
           />
-          <input
-            accept=".json,application/json"
-            className="visually-hidden"
-            onChange={(event) => void handleSimulationPlan(event.currentTarget.files?.[0])}
-            ref={planFileInputRef}
-            type="file"
-          />
-          <Button className="sim-full-button" onClick={() => planFileInputRef.current?.click()}>
-            <FileJson aria-hidden="true" /> Simulationsplan importieren
+          <Button className="sim-full-button" onClick={() => setFoundationOpen(true)}>
+            <FileJson aria-hidden="true" /> Simulationsgrundlage laden
           </Button>
           <Button
             busy={importingCsv}
@@ -840,19 +786,6 @@ export function ForecastSimulationView() {
               {importMessage}
             </p>
           ) : null}
-          <section className="sim-presets">
-            <span>Szenario-Vorlagen</span>
-            {(Object.keys(SIMULATION_PRESET_LABELS) as SimulationPresetId[]).map((preset) => (
-              <button
-                aria-current={config.preset === preset ? "true" : undefined}
-                key={preset}
-                onClick={() => applyPreset(preset)}
-                type="button"
-              >
-                {SIMULATION_PRESET_LABELS[preset]}
-              </button>
-            ))}
-          </section>
           <p className="sim-sidebar-note">
             Stammdaten dürfen aus dem Betrieb stammen. Nachfrage, Umläufe, Ereignisse und Ergebnisse
             bleiben synthetisch und lokal.
@@ -1043,120 +976,13 @@ export function ForecastSimulationView() {
         visibleAt={visibleAt}
       />
 
-      <ModalDialog
-        description="Die Vorschau enthält ausschließlich Stammdaten, Tageszeiten und noch offene Planeinträge."
-        footer={
-          <>
-            <Button
-              onClick={() => {
-                setPlanImportPreview(null);
-                setPlanImportError(null);
-              }}
-            >
-              Abbrechen
-            </Button>
-            <Button
-              disabled={
-                !planImportPreview ||
-                (planImportPreview.counts.unresolvedAfterCurrentRotation > 0 &&
-                  !excludeUnresolvedPlans) ||
-                planImportValidationErrors.length > 0
-              }
-              onClick={applyImportedVariant}
-              variant="primary"
-            >
-              Als neue Variante übernehmen
-            </Button>
-          </>
-        }
-        onClose={() => {
-          setPlanImportPreview(null);
-          setPlanImportError(null);
-        }}
-        open={planImportPreview !== null || planImportError !== null}
-        size="wide"
-        title="Simulationsplan prüfen"
-      >
-        {planImportError ? (
-          <p className="sim-editor-errors" role="alert">
-            {planImportError}
-          </p>
-        ) : null}
-        {planImportPreview ? (
-          <div className="sim-plan-import-preview">
-            <header>
-              <div>
-                <span>Quelle</span>
-                <strong>{planImportPreview.sourceName}</strong>
-              </div>
-              <div>
-                <span>Format</span>
-                <strong>{planImportPreview.format}</strong>
-              </div>
-            </header>
-            <dl>
-              <div>
-                <dt>Gates</dt>
-                <dd>{planImportPreview.counts.gates}</dd>
-              </div>
-              <div>
-                <dt>Ressourcengruppen</dt>
-                <dd>{planImportPreview.counts.resourceGroups}</dd>
-              </div>
-              <div>
-                <dt>Flugzeuge</dt>
-                <dd>{planImportPreview.counts.aircraft}</dd>
-              </div>
-              <div>
-                <dt>aktive Piloten</dt>
-                <dd>{planImportPreview.counts.pilots}</dd>
-              </div>
-              <div>
-                <dt>Produkte</dt>
-                <dd>{planImportPreview.counts.products}</dd>
-              </div>
-              <div>
-                <dt>Planeinträge</dt>
-                <dd>{planImportPreview.counts.plannedOperations}</dd>
-              </div>
-              <div>
-                <dt>Regeln</dt>
-                <dd>{planImportPreview.counts.recurringRules}</dd>
-              </div>
-            </dl>
-            {planImportPreview.warnings.map((warning) => (
-              <p className="sim-plan-import-warning" key={warning}>
-                <AlertTriangle aria-hidden="true" /> {warning}
-              </p>
-            ))}
-            {planImportPreview.counts.unresolvedAfterCurrentRotation > 0 ? (
-              <label className="sim-plan-import-exclusion">
-                <input
-                  checked={excludeUnresolvedPlans}
-                  onChange={(event) => setExcludeUnresolvedPlans(event.currentTarget.checked)}
-                  type="checkbox"
-                />
-                Unaufgelöste umlaufgebundene Planeinträge für diese Variante ausdrücklich
-                ausschließen
-              </label>
-            ) : null}
-            {planImportValidationErrors.length > 0 ? (
-              <div className="sim-editor-errors" role="alert">
-                <strong>Die Variante ist noch nicht lauffähig:</strong>
-                <ul>
-                  {planImportValidationErrors.map((error) => (
-                    <li key={error}>{error}</li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-            <p className="sim-editor-hint">
-              Nicht enthalten: Tickets, Warteschlangen, Gastdaten, aktuelle Flugzeugzustände,
-              Ereignisverlauf, Audit oder Prognose-Snapshots.
-            </p>
-          </div>
-        ) : null}
-      </ModalDialog>
+      {foundationOpen ? (
+        <SimulationFoundationDialog
+          activeConfig={config}
+          onClose={() => setFoundationOpen(false)}
+          onLoad={addFoundationVariant}
+        />
+      ) : null}
 
       <ModalDialog
         description={

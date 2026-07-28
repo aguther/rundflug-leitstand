@@ -1,11 +1,22 @@
 import { describe, expect, it } from "vitest";
 
-import { simulationConfigForPreset, validateSimulationConfig } from "./model";
+import {
+  SIMULATION_PRESET_LABELS,
+  type SimulationPresetId,
+  simulationConfigForPreset,
+  validateSimulationConfig,
+} from "./model";
 import {
   excludeUnresolvedPlannedOperations,
+  MAX_SIMULATION_PLAN_FILE_BYTES,
+  parseSimulationPlanFile,
   parseSimulationPlanImport,
   SimulationPlanImportError,
 } from "./simulation-plan-import";
+import {
+  createSimulationScenarioTemplate,
+  simulationScenarioTemplateFileName,
+} from "./simulation-scenario-template";
 
 function simulationPlan() {
   return {
@@ -121,6 +132,50 @@ function simulationPlan() {
 }
 
 describe("simulation plan import", () => {
+  it.each(Object.keys(SIMULATION_PRESET_LABELS) as SimulationPresetId[])(
+    "round-trips the built-in %s scenario as a strict editable template",
+    (preset) => {
+      const config = simulationConfigForPreset(preset);
+      const name = SIMULATION_PRESET_LABELS[preset];
+      const exported = createSimulationScenarioTemplate(name, config, "2026-07-28T12:00:00.000Z");
+      const preview = parseSimulationPlanImport(JSON.stringify(exported), config);
+
+      expect(preview).toMatchObject({
+        sourceName: name,
+        format: "rundflug-simulation-scenario",
+        category: "SCENARIO",
+      });
+      expect(preview.config).toEqual(config);
+      expect(validateSimulationConfig(preview.config)).toEqual([]);
+    },
+  );
+
+  it("uses a stable, editable scenario filename", () => {
+    expect(simulationScenarioTemplateFileName("Normalbetrieb")).toBe(
+      "rundflug-szenario-normalbetrieb.json",
+    );
+    expect(simulationScenarioTemplateFileName("Betriebsunterbrechung")).toBe(
+      "rundflug-szenario-betriebsunterbrechung.json",
+    );
+  });
+
+  it("rejects files above the shared one MiB boundary before reading them", async () => {
+    let read = false;
+    await expect(
+      parseSimulationPlanFile(
+        {
+          size: MAX_SIMULATION_PLAN_FILE_BYTES + 1,
+          text: () => {
+            read = true;
+            return Promise.resolve("{}");
+          },
+        },
+        simulationConfigForPreset("NORMAL"),
+      ),
+    ).rejects.toThrow("größer als 1 MiB");
+    expect(read).toBe(false);
+  });
+
   it("maps only the safe topology and preserves unresolved after-rotation semantics", () => {
     const preview = parseSimulationPlanImport(
       JSON.stringify(simulationPlan()),
@@ -194,6 +249,20 @@ describe("simulation plan import", () => {
     expect(() =>
       parseSimulationPlanImport(
         JSON.stringify({ ...simulationPlan(), tickets: [] }),
+        simulationConfigForPreset("NORMAL"),
+      ),
+    ).toThrow(SimulationPlanImportError);
+    const expandedScenario = {
+      ...createSimulationScenarioTemplate(
+        "Normalbetrieb",
+        simulationConfigForPreset("NORMAL"),
+        "2026-07-28T12:00:00.000Z",
+      ),
+      queues: [],
+    };
+    expect(() =>
+      parseSimulationPlanImport(
+        JSON.stringify(expandedScenario),
         simulationConfigForPreset("NORMAL"),
       ),
     ).toThrow(SimulationPlanImportError);
