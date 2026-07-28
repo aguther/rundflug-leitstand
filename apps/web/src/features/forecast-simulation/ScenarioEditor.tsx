@@ -22,6 +22,7 @@ import {
   type TriangularDistribution,
 } from "./model";
 import { SimulationPlanEditor } from "./SimulationPlanEditor";
+import { SimulationRecurringRulesEditor } from "./SimulationRecurringRulesEditor";
 
 interface ScenarioEditorProps {
   open: boolean;
@@ -979,181 +980,201 @@ export function ScenarioEditor({
               </div>
               <ParameterTag kind="Simulation" />
             </header>
-            <div className="sim-incident-head">
-              <span>Ereignis</span>
-              <span>Aktiv</span>
-              <span>Auslöser und Dauer (Minimum / typisch / Maximum)</span>
-            </div>
-            <div className="sim-incident-row">
-              <span className="sim-incident-row-label">Tanken</span>
-              <Toggle
-                checked={config.realityModel.incidents.refueling.enabled}
-                label="Tanken aktiv"
-                onChange={(enabled) =>
-                  updateIncident("refueling", {
-                    ...config.realityModel.incidents.refueling,
-                    enabled,
-                  })
-                }
-              />
-              <div className="sim-incident-values">
-                <div className="sim-trigger-field">
-                  alle
-                  <NumberInput
-                    label="Tankintervall in Umläufen"
-                    min={1}
-                    onChange={(everyRotations) =>
-                      updateIncident("refueling", {
-                        ...config.realityModel.incidents.refueling,
-                        everyRotations,
-                      })
-                    }
-                    value={config.realityModel.incidents.refueling.everyRotations}
-                  />
-                  Umläufe
-                </div>
-                <DistributionInputs
-                  id="Tankdauer"
-                  onChange={(duration) =>
+            <div className="sim-incident-group">
+              <header className="sim-incident-group-heading">
+                <h4>Wiederkehrend</h4>
+                <p>Standards gelten für alle Flugzeuge ohne entsprechende zielbezogene Regel.</p>
+              </header>
+              <div className="sim-incident-head">
+                <span>Ereignis</span>
+                <span>Aktiv</span>
+                <span>Auslöser und Dauer (Minimum / typisch / Maximum)</span>
+              </div>
+              <div className="sim-incident-row">
+                <span className="sim-incident-row-label">Tanken</span>
+                <Toggle
+                  checked={config.realityModel.incidents.refueling.enabled}
+                  label="Tanken aktiv"
+                  onChange={(enabled) =>
                     updateIncident("refueling", {
                       ...config.realityModel.incidents.refueling,
-                      duration,
+                      enabled,
                     })
                   }
-                  value={config.realityModel.incidents.refueling.duration}
                 />
-              </div>
-            </div>
-            <div className="sim-incident-row">
-              <span className="sim-incident-row-label">Geplante Pause</span>
-              <Toggle
-                checked={config.realityModel.incidents.plannedPause.enabled}
-                label="Geplante Pause aktiv"
-                onChange={(enabled) =>
-                  updateIncident("plannedPause", {
-                    ...config.realityModel.incidents.plannedPause,
-                    enabled,
-                  })
-                }
-              />
-              <div className="sim-incident-values">
-                <div className="sim-trigger-field">
-                  alle
-                  <NumberInput
-                    label="Pausenintervall in Betriebsminuten"
-                    min={1}
-                    onChange={(everyOperatingMinutes) =>
-                      updateIncident("plannedPause", {
-                        ...config.realityModel.incidents.plannedPause,
-                        everyOperatingMinutes,
+                <div className="sim-incident-values">
+                  <div className="sim-trigger-field">
+                    alle
+                    <NumberInput
+                      label="Tankintervall in Umläufen"
+                      min={1}
+                      onChange={(everyRotations) =>
+                        updateIncident("refueling", {
+                          ...config.realityModel.incidents.refueling,
+                          everyRotations,
+                        })
+                      }
+                      value={config.realityModel.incidents.refueling.everyRotations}
+                    />
+                    Umläufe
+                  </div>
+                  <DistributionInputs
+                    id="Tankdauer"
+                    onChange={(duration) =>
+                      updateIncident("refueling", {
+                        ...config.realityModel.incidents.refueling,
+                        duration,
                       })
                     }
-                    value={config.realityModel.incidents.plannedPause.everyOperatingMinutes}
+                    value={config.realityModel.incidents.refueling.duration}
                   />
-                  Betriebsmin.
                 </div>
-                <DistributionInputs
-                  id="Geplante Pausendauer"
-                  onChange={(duration) =>
+              </div>
+              <div className="sim-incident-row">
+                <span className="sim-incident-row-label">Geplante Pause</span>
+                <Toggle
+                  checked={config.realityModel.incidents.plannedPause.enabled}
+                  label="Geplante Pause aktiv"
+                  onChange={(enabled) =>
                     updateIncident("plannedPause", {
                       ...config.realityModel.incidents.plannedPause,
-                      duration,
+                      enabled,
                     })
                   }
-                  value={config.realityModel.incidents.plannedPause.duration}
                 />
-              </div>
-            </div>
-            <div className="sim-incident-row">
-              <span className="sim-incident-row-label">Ungeplante Pause</span>
-              <Toggle
-                checked={config.realityModel.incidents.unplannedPause.enabled}
-                label="Ungeplante Pause aktiv"
-                onChange={(enabled) =>
-                  updateIncident("unplannedPause", {
-                    ...config.realityModel.incidents.unplannedPause,
-                    enabled,
-                  })
-                }
-              />
-              <div className="sim-incident-values">
-                <div className="sim-trigger-field">
-                  <NumberInput
-                    label="Rate ungeplanter Pausen je Betriebsstunde"
-                    onChange={(ratePerOperatingHour) =>
-                      updateIncident("unplannedPause", {
-                        ...config.realityModel.incidents.unplannedPause,
-                        ratePerOperatingHour,
+                <div className="sim-incident-values">
+                  <div className="sim-trigger-field">
+                    alle
+                    <NumberInput
+                      label="Pausenintervall in Betriebsminuten"
+                      min={1}
+                      onChange={(everyOperatingMinutes) =>
+                        updateIncident("plannedPause", {
+                          ...config.realityModel.incidents.plannedPause,
+                          everyOperatingMinutes,
+                        })
+                      }
+                      value={config.realityModel.incidents.plannedPause.everyOperatingMinutes}
+                    />
+                    Betriebsmin.
+                  </div>
+                  <DistributionInputs
+                    id="Geplante Pausendauer"
+                    onChange={(duration) =>
+                      updateIncident("plannedPause", {
+                        ...config.realityModel.incidents.plannedPause,
+                        duration,
                       })
                     }
-                    step={0.01}
-                    value={config.realityModel.incidents.unplannedPause.ratePerOperatingHour}
+                    value={config.realityModel.incidents.plannedPause.duration}
                   />
-                  je Betriebsstd.
                 </div>
-                <DistributionInputs
-                  id="Ungeplante Pausendauer"
-                  onChange={(duration) =>
+              </div>
+              <SimulationRecurringRulesEditor config={config} onChange={onChange} />
+            </div>
+            <div className="sim-incident-group">
+              <header className="sim-incident-group-heading">
+                <h4>Zufällig</h4>
+                <p>Diese Ereignisse werden seed-basiert aus ihren Raten erzeugt.</p>
+              </header>
+              <div className="sim-incident-head">
+                <span>Ereignis</span>
+                <span>Aktiv</span>
+                <span>Rate und Dauer (Minimum / typisch / Maximum)</span>
+              </div>
+              <div className="sim-incident-row">
+                <span className="sim-incident-row-label">Ungeplante Pause</span>
+                <Toggle
+                  checked={config.realityModel.incidents.unplannedPause.enabled}
+                  label="Ungeplante Pause aktiv"
+                  onChange={(enabled) =>
                     updateIncident("unplannedPause", {
                       ...config.realityModel.incidents.unplannedPause,
-                      duration,
+                      enabled,
                     })
                   }
-                  value={config.realityModel.incidents.unplannedPause.duration}
                 />
-              </div>
-            </div>
-            <div className="sim-incident-row sim-incident-row--defect">
-              <span className="sim-incident-row-label">Technischer Defekt</span>
-              <Toggle
-                checked={config.realityModel.incidents.technicalDefect.enabled}
-                label="Technischer Defekt aktiv"
-                onChange={(enabled) =>
-                  updateIncident("technicalDefect", {
-                    ...config.realityModel.incidents.technicalDefect,
-                    enabled,
-                  })
-                }
-              />
-              <div className="sim-incident-values">
-                <div className="sim-trigger-field">
-                  <NumberInput
-                    label="Defektrate je Betriebsstunde"
-                    onChange={(ratePerOperatingHour) =>
-                      updateIncident("technicalDefect", {
-                        ...config.realityModel.incidents.technicalDefect,
-                        ratePerOperatingHour,
+                <div className="sim-incident-values">
+                  <div className="sim-trigger-field">
+                    <NumberInput
+                      label="Rate ungeplanter Pausen je Betriebsstunde"
+                      onChange={(ratePerOperatingHour) =>
+                        updateIncident("unplannedPause", {
+                          ...config.realityModel.incidents.unplannedPause,
+                          ratePerOperatingHour,
+                        })
+                      }
+                      step={0.01}
+                      value={config.realityModel.incidents.unplannedPause.ratePerOperatingHour}
+                    />
+                    je Betriebsstd.
+                  </div>
+                  <DistributionInputs
+                    id="Ungeplante Pausendauer"
+                    onChange={(duration) =>
+                      updateIncident("unplannedPause", {
+                        ...config.realityModel.incidents.unplannedPause,
+                        duration,
                       })
                     }
-                    step={0.01}
-                    value={config.realityModel.incidents.technicalDefect.ratePerOperatingHour}
+                    value={config.realityModel.incidents.unplannedPause.duration}
                   />
-                  je Betriebsstd.
                 </div>
-                <DistributionInputs
-                  id="Defektdauer"
-                  onChange={(duration) =>
+              </div>
+              <div className="sim-incident-row sim-incident-row--defect">
+                <span className="sim-incident-row-label">Technischer Defekt</span>
+                <Toggle
+                  checked={config.realityModel.incidents.technicalDefect.enabled}
+                  label="Technischer Defekt aktiv"
+                  onChange={(enabled) =>
                     updateIncident("technicalDefect", {
                       ...config.realityModel.incidents.technicalDefect,
-                      duration,
+                      enabled,
                     })
                   }
-                  value={config.realityModel.incidents.technicalDefect.duration}
                 />
-                <div className="sim-day-out-field">
-                  Tagesausfall
-                  <NumberInput
-                    label="Wahrscheinlichkeit Tagesausfall in Prozent"
-                    max={100}
-                    onChange={(percent) =>
+                <div className="sim-incident-values">
+                  <div className="sim-trigger-field">
+                    <NumberInput
+                      label="Defektrate je Betriebsstunde"
+                      onChange={(ratePerOperatingHour) =>
+                        updateIncident("technicalDefect", {
+                          ...config.realityModel.incidents.technicalDefect,
+                          ratePerOperatingHour,
+                        })
+                      }
+                      step={0.01}
+                      value={config.realityModel.incidents.technicalDefect.ratePerOperatingHour}
+                    />
+                    je Betriebsstd.
+                  </div>
+                  <DistributionInputs
+                    id="Defektdauer"
+                    onChange={(duration) =>
                       updateIncident("technicalDefect", {
                         ...config.realityModel.incidents.technicalDefect,
-                        dayOutageProbability: percent / 100,
+                        duration,
                       })
                     }
-                    value={config.realityModel.incidents.technicalDefect.dayOutageProbability * 100}
+                    value={config.realityModel.incidents.technicalDefect.duration}
                   />
-                  %
+                  <div className="sim-day-out-field">
+                    Tagesausfall
+                    <NumberInput
+                      label="Wahrscheinlichkeit Tagesausfall in Prozent"
+                      max={100}
+                      onChange={(percent) =>
+                        updateIncident("technicalDefect", {
+                          ...config.realityModel.incidents.technicalDefect,
+                          dayOutageProbability: percent / 100,
+                        })
+                      }
+                      value={
+                        config.realityModel.incidents.technicalDefect.dayOutageProbability * 100
+                      }
+                    />
+                    %
+                  </div>
                 </div>
               </div>
             </div>
