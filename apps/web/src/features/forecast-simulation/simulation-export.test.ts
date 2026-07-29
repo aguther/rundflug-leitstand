@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { runSimulation } from "./engine";
-import { simulationConfigForPreset } from "./model";
+import { demandForProfile, simulationConfigForPreset } from "./model";
 import { createSimulationExport, SIMULATION_EXPORT_SCHEMA } from "./simulation-export";
 
 describe("forecast simulation export", () => {
@@ -16,5 +16,16 @@ describe("forecast simulation export", () => {
     expect(Date.parse(exported.runWindow.endAt)).toBeGreaterThanOrEqual(
       Date.parse(exported.schedule.operationsEndAt),
     );
+  });
+
+  it("preserves product demand profiles in the exported scenario", () => {
+    const config = simulationConfigForPreset("NORMAL");
+    config.demandByProduct = {
+      "product-a": demandForProfile("UNIFORM", 480, 6),
+      "product-b": demandForProfile("LATE_RUSH", 480, 30),
+    };
+    const exported = createSimulationExport(runSimulation(config), [], null);
+
+    expect(exported.scenario.demandByProduct).toEqual(config.demandByProduct);
   });
 });

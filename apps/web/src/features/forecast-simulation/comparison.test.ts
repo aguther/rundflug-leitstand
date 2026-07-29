@@ -57,12 +57,18 @@ describe("local forecast A/B comparison", () => {
     const config = comparisonConfig();
     config.adminParameters.plannedBoardingMinutes = 13;
     config.realityModel.phases.boarding.typical = 9;
+    config.demandByProduct = {
+      "product-a": demandForProfile("UNIFORM", 180, 6),
+      "product-b": demandForProfile("LATE_RUSH", 180, 30),
+    };
     config.forecastTuning.forecast.maximumSamples = 4;
     config.forecastTuning.precall.baselineLeadMinutes = 18;
 
     const baseline = productionBaselineConfig(config);
     expect(baseline.adminParameters.plannedBoardingMinutes).toBe(13);
     expect(baseline.realityModel.phases.boarding.typical).toBe(9);
+    expect(baseline.demandByProduct).toEqual(config.demandByProduct);
+    expect(baseline.demandByProduct).not.toBe(config.demandByProduct);
     expect(baseline.forecastTuning.forecast.maximumSamples).toBe(12);
     expect(baseline.forecastTuning.precall.baselineLeadMinutes).toBe(12);
     expect(baseline.forecastTuning.availabilityModel).toBe("SCALAR");

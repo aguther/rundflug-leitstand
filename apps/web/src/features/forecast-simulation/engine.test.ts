@@ -215,6 +215,61 @@ describe("local forecast simulation", () => {
     ).toBe(false);
   });
 
+  it("creates arrivals exclusively from each product demand profile", () => {
+    const config = operationalConfig();
+    config.plannedOperations = [];
+    config.demandByProduct = {
+      "product-a": {
+        profile: "CUSTOM",
+        windows: [{ startOffsetMinutes: 0, endOffsetMinutes: 210, personsPerHour: 0 }],
+      },
+      "product-b": demandForProfile("UNIFORM", 210, 30),
+    };
+
+    const result = runSimulation(config);
+    expect(result.rotations.length).toBeGreaterThan(0);
+    expect(new Set(result.rotations.map((rotation) => rotation.productId))).toEqual(
+      new Set(["product-b"]),
+    );
+    expect(result.rotations.every((rotation) => rotation.resourceGroupId === "group-b")).toBe(true);
+  });
+
+  it("keeps products of the same resource group in one arrival-ordered queue", () => {
+    const config = operationalConfig();
+    config.plannedOperations = [];
+    const secondProduct = config.operationalModel?.products.find(
+      (product) => product.id === "product-b",
+    );
+    const secondAircraft = config.operationalModel?.aircraft.find(
+      (aircraft) => aircraft.id === "aircraft-b",
+    );
+    if (!secondProduct || !secondAircraft)
+      throw new Error("Operative Testdaten sind unvollständig.");
+    secondProduct.resourceGroupId = "group-a";
+    secondProduct.gateId = "gate-a";
+    secondAircraft.resourceGroupId = "group-a";
+
+    const result = runSimulation(config);
+    const arrived = [...result.rotations]
+      .filter((rotation) => rotation.calledAt)
+      .sort(
+        (left, right) =>
+          Date.parse(left.createdAt) - Date.parse(right.createdAt) ||
+          left.communicationNumber - right.communicationNumber,
+      );
+    const called = [...arrived].sort(
+      (left, right) =>
+        Date.parse(left.calledAt ?? "") - Date.parse(right.calledAt ?? "") ||
+        left.communicationNumber - right.communicationNumber,
+    );
+
+    expect(new Set(arrived.map((rotation) => rotation.productId))).toEqual(
+      new Set(["product-a", "product-b"]),
+    );
+    expect(arrived.every((rotation) => rotation.resourceGroupId === "group-a")).toBe(true);
+    expect(called.map((rotation) => rotation.id)).toEqual(arrived.map((rotation) => rotation.id));
+  });
+
   it("starts a resolved plan only after its selected synthetic rotation completes", () => {
     const config = operationalConfig();
     config.plannedOperations = [
