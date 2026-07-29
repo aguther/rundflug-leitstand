@@ -3,11 +3,10 @@ import { useRef, useState } from "react";
 
 import { Button, ModalDialog } from "../../design-system/components";
 import {
-  calculateDemandSummary,
+  calculateSimulationDemandSummary,
   SIMULATION_PRESET_LABELS,
   type SimulationConfig,
   type SimulationPresetId,
-  salesDurationMinutes,
   simulationConfigForPreset,
   validateSimulationConfig,
 } from "./model";
@@ -86,12 +85,7 @@ export function SimulationFoundationDialog({
   const validationErrors = preparedImportedConfig
     ? validateSimulationConfig(preparedImportedConfig)
     : [];
-  const demandSummary = preview
-    ? calculateDemandSummary(
-        preview.config.realityModel.demand,
-        salesDurationMinutes(preview.config.schedule),
-      )
-    : null;
+  const demandSummary = preview ? calculateSimulationDemandSummary(preview.config) : null;
 
   const selectTab = (nextTab: FoundationTab) => {
     setTab(nextTab);

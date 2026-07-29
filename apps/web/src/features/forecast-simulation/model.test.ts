@@ -2,12 +2,66 @@ import { describe, expect, it } from "vitest";
 
 import {
   calculateDemandSummary,
+  calculateSimulationDemandSummary,
   demandForProfile,
+  rescaleDemandByProduct,
   rescaleDemandWindows,
   salesDurationMinutes,
   simulationConfigForPreset,
   validateSimulationConfig,
 } from "./model";
+
+function productDemandConfig() {
+  const config = simulationConfigForPreset("NORMAL");
+  config.operationalModel = {
+    sourceName: "Produktnachfrage",
+    gates: [{ id: "gate-1", label: "Flight Line" }],
+    resourceGroups: [
+      {
+        id: "group-1",
+        name: "Rundflüge",
+        shortCode: "RF",
+        gateId: "gate-1",
+        automaticPrecallEnabled: true,
+      },
+    ],
+    aircraft: [
+      {
+        id: "aircraft-1",
+        registration: "D-ESYN",
+        aircraftType: "Simulation",
+        capacity: 4,
+        resourceGroupId: "group-1",
+      },
+    ],
+    pilots: [{ id: "pilot-1", operationalCode: "P-01", active: true }],
+    products: [
+      {
+        id: "product-a",
+        name: "Kurzflug",
+        code: "K",
+        resourceGroupId: "group-1",
+        gateId: "gate-1",
+        referenceCapacity: 4,
+        referenceDurationMinutes: 15,
+      },
+      {
+        id: "product-b",
+        name: "Langflug",
+        code: "L",
+        resourceGroupId: "group-1",
+        gateId: "gate-1",
+        referenceCapacity: 4,
+        referenceDurationMinutes: 30,
+      },
+    ],
+  };
+  config.demandByProduct = {
+    "product-a": demandForProfile("UNIFORM", 480, 6),
+    "product-b": demandForProfile("LATE_RUSH", 480, 30),
+  };
+  return config;
+}
 
 describe("forecast simulation configuration", () => {
   it("defines the approved two-wave day in Europe/Berlin", () => {
@@ -59,6 +113,44 @@ describe("forecast simulation configuration", () => {
       { startOffsetMinutes: 338, endOffsetMinutes: 450, personsPerHour: 32 },
       { startOffsetMinutes: 450, endOffsetMinutes: 600, personsPerHour: 6 },
     ]);
+  });
+
+  it("keeps independent product profiles authoritative and aggregates them", () => {
+    const config = productDemandConfig();
+    config.realityModel.demand = {
+      profile: "CUSTOM",
+      windows: [{ startOffsetMinutes: 0, endOffsetMinutes: 900, personsPerHour: -1 }],
+    };
+
+    expect(calculateSimulationDemandSummary(config).averagePersonsPerHour).toBeCloseTo(36, 2);
+    expect(calculateSimulationDemandSummary(config).expectedPersons).toBeCloseTo(288, 1);
+    expect(validateSimulationConfig(config)).toEqual([]);
+
+    const missing = structuredClone(config);
+    delete missing.demandByProduct?.["product-b"];
+    missing.demandByProduct = {
+      ...missing.demandByProduct,
+      unknown: demandForProfile("UNIFORM", 480, 1),
+    };
+    expect(validateSimulationConfig(missing)).toEqual(
+      expect.arrayContaining([
+        "Die Nachfrage verweist auf ein unbekanntes Produkt (unknown).",
+        "Für Produkt L fehlt ein Nachfragemodell.",
+      ]),
+    );
+  });
+
+  it("rescales every product profile without coupling their rates", () => {
+    const config = productDemandConfig();
+    const resized = rescaleDemandByProduct(config.demandByProduct ?? {}, 480, 600);
+
+    expect(resized["product-a"]?.windows).toEqual([
+      { startOffsetMinutes: 0, endOffsetMinutes: 600, personsPerHour: 6 },
+    ]);
+    expect(resized["product-b"]?.windows.map((window) => window.personsPerHour)).toEqual([
+      16.67, 70,
+    ]);
+    expect(resized["product-b"]?.windows.at(-1)?.endOffsetMinutes).toBe(600);
   });
 
   it("allows zero-demand gaps but rejects overlaps and out-of-range windows", () => {

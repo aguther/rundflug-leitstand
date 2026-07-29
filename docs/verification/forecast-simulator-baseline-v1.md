@@ -133,9 +133,13 @@ bewusst.
 
 Für importierte Stammdaten erzeugt jede Variante weiterhin ausschließlich synthetische Nachfrage,
 Gruppen, Umläufe und Ist-Ereignisse. Die voreingestellte Gesamtnachfrage von 18 Personen pro
-Stunde wird gleichmäßig über die importierten Produkte verteilt und kann anschließend angepasst
-werden. Die Queue-Planung berücksichtigt Produkt, Ressourcengruppe, heterogene
-Flugzeugkapazitäten und gemeinsam verfügbare anonyme Pilotencodes.
+Stunde wird gleichmäßig über die importierten Produkte verteilt. Anschließend besitzt jedes Produkt
+ein unabhängig konfigurierbares Tagesprofil mit eigener Vorlage, eigenen Zeitfenstern und
+Personenraten. Die Werte einer Ressourcengruppe und des Gesamttags sind ausschließlich
+schreibgeschützte Summen dieser Produktprofile. Eine Änderung des Verkaufszeitraums skaliert alle
+Produktfenster, ohne deren Personenraten oder die Profile anderer Produkte zu koppeln. Die
+Queue-Planung berücksichtigt Produkt, Ressourcengruppe, heterogene Flugzeugkapazitäten und
+gemeinsam verfügbare anonyme Pilotencodes.
 
 Der Tagesplan unterstützt dieselben Arten und Geltungsbereiche wie der operative Plan:
 Pause, Tanken, Flugshow, Wetter, Technik oder Sonstiges für Veranstaltung,
@@ -250,6 +254,16 @@ Light und Dark Mode wurden jeweils im In-App-Browser geprüft:
 - die ergänzende Nachfrageabnahme vom 26. Juli 2026 prüft das freigegebene Konzept
   die Nachfrageansicht nativ bei 1536×1024 und 1280×800, jeweils in
   Light und Dark Mode;
+- die ergänzende Produktnachfrageabnahme vom 29. Juli 2026 importiert drei synthetische Produkte in
+  zwei Ressourcengruppen: Aus 18 Personen/Stunde entstehen zunächst die abgeleiteten
+  Gruppenaggregate 12 und 6; die Änderung ausschließlich von `LB30` erhöht deren Werte auf 11 und
+  den Gesamtwert auf 23 Personen/Stunde, während beide `KA`-Produkte unverändert bei jeweils 6
+  bleiben;
+- die Verlängerung des Verkaufsendes von 17:00 auf 18:00 skaliert die Endfenster aller drei
+  Produktprofile auf 18:00 und erhält deren individuelle Personenraten;
+- bei 1536×1024 und 1280×800 entsprechen Dokumentbreite und Viewport in Light und Dark exakt
+  einander; das 759 Pixel breite Panel und der 711 Pixel breite Produktnachfragebereich besitzen
+  jeweils identische Client- und Scrollbreiten und erzeugen keinen horizontalen Überlauf;
 - Tageszeiten und alle Nachfragefenster werden unabhängig von der Browser-Locale eindeutig im
   24-Stunden-Format `HH:MM` dargestellt;
 - der Vorlagenwechsel auf Morgenandrang erhält Ø 18 Personen/Stunde und 144 erwartete Personen;
