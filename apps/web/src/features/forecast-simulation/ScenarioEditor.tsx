@@ -9,8 +9,11 @@ import { type KeyboardEvent, useEffect, useState } from "react";
 import { Button, SidePanel } from "../../design-system/components";
 import { eventLocalDateTimeToIso, formatEventLocalDateTime } from "../../event-time";
 import {
+  calculateCombinedDemandSummary,
   calculateDemandSummary,
+  calculateSimulationDemandSummary,
   demandForProfile,
+  rescaleDemandByProduct,
   rescaleDemandWindows,
   SIMULATION_DEMAND_PROFILE_LABELS,
   type SimulationConfig,
@@ -190,6 +193,7 @@ const PRECALL_FIELDS: readonly TuningField<keyof PrecallTuningProfile>[] = [
 ];
 
 const MINUTE_MS = 60_000;
+const EMPTY_DEMAND: SimulationDemand = { profile: "CUSTOM", windows: [] };
 
 function localTime(value: string, timeZone: string): string {
   return formatEventLocalDateTime(value, timeZone).slice(11, 16);
@@ -288,12 +292,18 @@ function TimeInput({
   );
 }
 
-function DemandProfileChart({ config }: { config: SimulationConfig }) {
+function DemandProfileChart({
+  config,
+  demand,
+}: {
+  config: SimulationConfig;
+  demand: SimulationDemand;
+}) {
   const width = 680;
   const height = 172;
   const padding = { top: 25, right: 16, bottom: 29, left: 42 };
   const salesMinutes = Math.max(1, salesDurationMinutes(config.schedule));
-  const windows = [...config.realityModel.demand.windows].sort(
+  const windows = [...demand.windows].sort(
     (left, right) =>
       left.startOffsetMinutes - right.startOffsetMinutes ||
       left.endOffsetMinutes - right.endOffsetMinutes,
@@ -490,6 +500,15 @@ export function ScenarioEditor({
   onClose,
 }: ScenarioEditorProps) {
   const [activeTab, setActiveTab] = useState<EditorTab>("ADMIN");
+  const [requestedDemandProductId, setRequestedDemandProductId] = useState<string | null>(null);
+  const demandProducts = config.operationalModel?.products ?? [];
+  const selectedDemandProduct =
+    demandProducts.find((product) => product.id === requestedDemandProductId) ??
+    demandProducts[0] ??
+    null;
+  const activeDemand = selectedDemandProduct
+    ? (config.demandByProduct?.[selectedDemandProduct.id] ?? EMPTY_DEMAND)
+    : config.realityModel.demand;
   const updateAdmin = (next: Partial<SimulationConfig["adminParameters"]>) =>
     onChange({ ...config, adminParameters: { ...config.adminParameters, ...next } });
   const updateReality = (next: Partial<SimulationConfig["realityModel"]>) =>
@@ -514,27 +533,45 @@ export function ScenarioEditor({
       [key]: replaceTime(config.schedule[key], time, config.schedule.timeZone),
     };
     const nextSalesMinutes = salesDurationMinutes(nextSchedule);
-    const demand =
+    const rescaleDemand =
       (key === "salesStartAt" || key === "salesEndAt") &&
       previousSalesMinutes > 0 &&
-      nextSalesMinutes > 0
-        ? rescaleDemandWindows(config.realityModel.demand, previousSalesMinutes, nextSalesMinutes)
-        : config.realityModel.demand;
+      nextSalesMinutes > 0;
+    const demand = rescaleDemand
+      ? rescaleDemandWindows(config.realityModel.demand, previousSalesMinutes, nextSalesMinutes)
+      : config.realityModel.demand;
+    const demandByProduct =
+      rescaleDemand && config.demandByProduct
+        ? rescaleDemandByProduct(config.demandByProduct, previousSalesMinutes, nextSalesMinutes)
+        : config.demandByProduct;
     onChange({
       ...config,
       schedule: nextSchedule,
       realityModel: { ...config.realityModel, demand },
+      ...(demandByProduct ? { demandByProduct } : {}),
     });
   };
-  const updateDemand = (demand: SimulationDemand) => updateReality({ demand });
+  const updateDemand = (demand: SimulationDemand) => {
+    if (selectedDemandProduct) {
+      onChange({
+        ...config,
+        demandByProduct: {
+          ...config.demandByProduct,
+          [selectedDemandProduct.id]: demand,
+        },
+      });
+      return;
+    }
+    updateReality({ demand });
+  };
   const applyDemandProfile = (profile: SimulationDemandProfileId) => {
     if (profile === "CUSTOM") return;
     const salesMinutes = salesDurationMinutes(config.schedule);
-    const summary = calculateDemandSummary(config.realityModel.demand, salesMinutes);
+    const summary = calculateDemandSummary(activeDemand, salesMinutes);
     updateDemand(demandForProfile(profile, salesMinutes, summary.averagePersonsPerHour));
   };
   const updateDemandWindow = (index: number, value: SimulationDemandWindow) => {
-    const windows = config.realityModel.demand.windows.map((window, candidateIndex) =>
+    const windows = activeDemand.windows.map((window, candidateIndex) =>
       candidateIndex === index ? value : window,
     );
     updateDemand({ profile: "CUSTOM", windows });
@@ -542,14 +579,12 @@ export function ScenarioEditor({
   const removeDemandWindow = (index: number) => {
     updateDemand({
       profile: "CUSTOM",
-      windows: config.realityModel.demand.windows.filter(
-        (_window, candidateIndex) => candidateIndex !== index,
-      ),
+      windows: activeDemand.windows.filter((_window, candidateIndex) => candidateIndex !== index),
     });
   };
   const addDemandWindow = () => {
     const salesMinutes = Math.max(1, Math.round(salesDurationMinutes(config.schedule)));
-    const windows = config.realityModel.demand.windows;
+    const windows = activeDemand.windows;
     if (windows.length === 0) {
       updateDemand({
         profile: "CUSTOM",
@@ -599,17 +634,28 @@ export function ScenarioEditor({
         precall: { ...config.forecastTuning.precall, [key]: value },
       },
     });
-  const demandSummary = calculateDemandSummary(
-    config.realityModel.demand,
-    salesDurationMinutes(config.schedule),
-  );
-  const demandWindows = config.realityModel.demand.windows
+  const salesMinutes = salesDurationMinutes(config.schedule);
+  const demandSummary = calculateDemandSummary(activeDemand, salesMinutes);
+  const totalDemandSummary = calculateSimulationDemandSummary(config);
+  const demandWindows = activeDemand.windows
     .map((window, index) => ({ window, index }))
     .sort(
       (left, right) =>
         left.window.startOffsetMinutes - right.window.startOffsetMinutes ||
         left.window.endOffsetMinutes - right.window.endOffsetMinutes,
     );
+  const demandProductGroups = (config.operationalModel?.resourceGroups ?? []).map((group) => {
+    const products = demandProducts.filter((product) => product.resourceGroupId === group.id);
+    const demands = products.flatMap((product) => {
+      const demand = config.demandByProduct?.[product.id];
+      return demand ? [demand] : [];
+    });
+    return {
+      group,
+      products,
+      summary: calculateCombinedDemandSummary(demands, salesMinutes),
+    };
+  });
 
   return (
     <SidePanel
@@ -847,10 +893,107 @@ export function ScenarioEditor({
             <header className="sim-editor-section-heading">
               <div>
                 <h3>Nachfrageprofil</h3>
-                <p>Verkäufe entstehen zufällig innerhalb der gewählten Zeitfenster.</p>
+                <p>
+                  Verkäufe entstehen {config.operationalModel ? "je Produkt " : ""}zufällig
+                  innerhalb der gewählten Zeitfenster.
+                </p>
               </div>
               <ParameterTag kind="Simulation" />
             </header>
+            <section aria-label="Gesamtnachfrage" className="sim-demand-total-summary">
+              <span>Gesamtandrang</span>
+              <strong>
+                Ø{" "}
+                {totalDemandSummary.averagePersonsPerHour.toLocaleString("de-DE", {
+                  maximumFractionDigits: 1,
+                })}{" "}
+                Pers./Std.
+              </strong>
+              <small>
+                Erwartungswert{" "}
+                {totalDemandSummary.expectedPersons.toLocaleString("de-DE", {
+                  maximumFractionDigits: 1,
+                })}{" "}
+                Personen
+              </small>
+            </section>
+            {config.operationalModel ? (
+              <section aria-label="Nachfrage nach Produkt" className="sim-demand-product-groups">
+                {demandProductGroups.map(({ group, products, summary }) => (
+                  <section className="sim-demand-product-group" key={group.id}>
+                    <header>
+                      <div>
+                        <strong>
+                          {group.shortCode} · {group.name}
+                        </strong>
+                        <small>
+                          {products.length} {products.length === 1 ? "Produkt" : "Produkte"}
+                        </small>
+                      </div>
+                      <p>
+                        <strong>
+                          Ø{" "}
+                          {summary.averagePersonsPerHour.toLocaleString("de-DE", {
+                            maximumFractionDigits: 1,
+                          })}{" "}
+                          Pers./Std.
+                        </strong>
+                        <small>
+                          {summary.expectedPersons.toLocaleString("de-DE", {
+                            maximumFractionDigits: 1,
+                          })}{" "}
+                          Personen
+                        </small>
+                      </p>
+                    </header>
+                    <div>
+                      {products.map((product) => {
+                        const productDemand = config.demandByProduct?.[product.id] ?? EMPTY_DEMAND;
+                        const productSummary = calculateDemandSummary(productDemand, salesMinutes);
+                        const selected = selectedDemandProduct?.id === product.id;
+                        return (
+                          <button
+                            aria-label={`Produkt ${product.code} ${product.name} auswählen`}
+                            aria-pressed={selected}
+                            className={selected ? "is-active" : undefined}
+                            key={product.id}
+                            onClick={() => setRequestedDemandProductId(product.id)}
+                            type="button"
+                          >
+                            <span>
+                              <strong>{product.code}</strong>
+                              <small>{product.name}</small>
+                            </span>
+                            <span>
+                              <strong>
+                                Ø{" "}
+                                {productSummary.averagePersonsPerHour.toLocaleString("de-DE", {
+                                  maximumFractionDigits: 1,
+                                })}
+                              </strong>
+                              <small>
+                                {productSummary.expectedPersons.toLocaleString("de-DE", {
+                                  maximumFractionDigits: 1,
+                                })}{" "}
+                                Personen
+                              </small>
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </section>
+                ))}
+              </section>
+            ) : null}
+            {selectedDemandProduct ? (
+              <div className="sim-demand-product-editor-heading">
+                <span>Individuelles Produktprofil</span>
+                <strong>
+                  {selectedDemandProduct.code} · {selectedDemandProduct.name}
+                </strong>
+              </div>
+            ) : null}
             <div className="sim-demand-profile-toolbar">
               <label>
                 <span>Vorlage</span>
@@ -858,7 +1001,7 @@ export function ScenarioEditor({
                   onChange={(event) =>
                     applyDemandProfile(event.currentTarget.value as SimulationDemandProfileId)
                   }
-                  value={config.realityModel.demand.profile}
+                  value={activeDemand.profile}
                 >
                   {(
                     Object.keys(SIMULATION_DEMAND_PROFILE_LABELS) as SimulationDemandProfileId[]
@@ -883,7 +1026,7 @@ export function ScenarioEditor({
                 Personen
               </p>
             </div>
-            <DemandProfileChart config={config} />
+            <DemandProfileChart config={config} demand={activeDemand} />
             <div className="sim-demand-window-table">
               <div className="sim-demand-window-head">
                 <span>Von</span>

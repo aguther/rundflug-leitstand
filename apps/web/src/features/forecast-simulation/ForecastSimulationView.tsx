@@ -27,14 +27,13 @@ import { CalibrationCsvError, calibrateFromCsv } from "./csv-calibration";
 import { calculateSimulationMetrics, runSimulation } from "./engine";
 import { ForecastTimeline } from "./ForecastTimeline";
 import {
-  calculateDemandSummary,
+  calculateSimulationDemandSummary,
   forecastUncertaintyLabel,
   type ManualIncident,
   SIMULATION_DEMAND_PROFILE_LABELS,
   type SimulationConfig,
   type SimulationForecastSnapshot,
   type SimulationRotation,
-  salesDurationMinutes,
   simulationConfigForPreset,
   validateSimulationConfig,
 } from "./model";
@@ -388,15 +387,7 @@ export function ForecastSimulationView() {
   const operationsAvailableNow =
     visibleAt >= Date.parse(config.schedule.operationsStartAt) &&
     visibleAt < Date.parse(config.schedule.operationsEndAt);
-  const demandSummary = calculateDemandSummary(
-    config.operationalModel
-      ? {
-          profile: "CUSTOM",
-          windows: Object.values(config.demandByProduct ?? {}).flatMap((demand) => demand.windows),
-        }
-      : config.realityModel.demand,
-    salesDurationMinutes(config.schedule),
-  );
+  const demandSummary = calculateSimulationDemandSummary(config);
   const visibleSnapshots = useMemo(
     () => result.snapshots.filter((snapshot) => Date.parse(snapshot.capturedAt) <= visibleAt),
     [result.snapshots, visibleAt],
@@ -727,7 +718,11 @@ export function ForecastSimulationView() {
           <section className="sim-model-summary sim-demand-summary">
             <span>Nachfrage</span>
             <strong>Ø {metric(demandSummary.averagePersonsPerHour)} Pers./Std.</strong>
-            <small>{SIMULATION_DEMAND_PROFILE_LABELS[config.realityModel.demand.profile]}</small>
+            <small>
+              {config.operationalModel
+                ? `${config.operationalModel.products.length} individuelle Produktprofile`
+                : SIMULATION_DEMAND_PROFILE_LABELS[config.realityModel.demand.profile]}
+            </small>
           </section>
           <section className="sim-model-summary">
             <span>Zeitmodell</span>

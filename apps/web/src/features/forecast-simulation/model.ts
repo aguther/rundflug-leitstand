@@ -413,6 +413,38 @@ export function calculateDemandSummary(
   };
 }
 
+export function calculateCombinedDemandSummary(
+  demands: readonly SimulationDemand[],
+  salesMinutes: number,
+): {
+  averagePersonsPerHour: number;
+  expectedPersons: number;
+} {
+  return demands.reduce(
+    (total, demand) => {
+      const summary = calculateDemandSummary(demand, salesMinutes);
+      return {
+        averagePersonsPerHour: total.averagePersonsPerHour + summary.averagePersonsPerHour,
+        expectedPersons: total.expectedPersons + summary.expectedPersons,
+      };
+    },
+    { averagePersonsPerHour: 0, expectedPersons: 0 },
+  );
+}
+
+export function calculateSimulationDemandSummary(config: SimulationConfig): {
+  averagePersonsPerHour: number;
+  expectedPersons: number;
+} {
+  const demands = config.operationalModel
+    ? config.operationalModel.products.flatMap((product) => {
+        const demand = config.demandByProduct?.[product.id];
+        return demand ? [demand] : [];
+      })
+    : [config.realityModel.demand];
+  return calculateCombinedDemandSummary(demands, salesDurationMinutes(config.schedule));
+}
+
 export function demandForProfile(
   profile: Exclude<SimulationDemandProfileId, "CUSTOM">,
   salesMinutes: number,
@@ -465,6 +497,19 @@ export function rescaleDemandWindows(
       endOffsetMinutes: Math.round(window.endOffsetMinutes * scale),
     })),
   };
+}
+
+export function rescaleDemandByProduct(
+  demandByProduct: Readonly<Record<string, SimulationDemand>>,
+  previousSalesMinutes: number,
+  nextSalesMinutes: number,
+): Record<string, SimulationDemand> {
+  return Object.fromEntries(
+    Object.entries(demandByProduct).map(([productId, demand]) => [
+      productId,
+      rescaleDemandWindows(demand, previousSalesMinutes, nextSalesMinutes),
+    ]),
+  );
 }
 
 export const DEFAULT_PHASES: SimulationRealityModel["phases"] = {
@@ -671,30 +716,32 @@ export function validateSimulationConfig(config: SimulationConfig): string[] {
       errors.push("Der Verkauf darf nicht nach dem Flugbetrieb enden.");
     }
   }
-  const demandWindows = [...config.realityModel.demand.windows].sort(
-    (left, right) =>
-      left.startOffsetMinutes - right.startOffsetMinutes ||
-      left.endOffsetMinutes - right.endOffsetMinutes,
-  );
   const demandDuration = salesDurationMinutes(config.schedule);
-  for (const [index, window] of demandWindows.entries()) {
-    if (
-      !Number.isInteger(window.startOffsetMinutes) ||
-      !Number.isInteger(window.endOffsetMinutes) ||
-      window.startOffsetMinutes < 0 ||
-      window.endOffsetMinutes <= window.startOffsetMinutes ||
-      window.endOffsetMinutes > demandDuration
-    ) {
-      errors.push(`Nachfragefenster ${index + 1} liegt außerhalb des Verkaufszeitraums.`);
-    }
-    if (!Number.isFinite(window.personsPerHour) || window.personsPerHour < 0) {
-      errors.push(`Nachfragefenster ${index + 1} besitzt eine ungültige Nachfrage.`);
-    }
-    if (
-      index > 0 &&
-      (demandWindows[index - 1]?.endOffsetMinutes ?? 0) > window.startOffsetMinutes
-    ) {
-      errors.push(`Nachfragefenster ${index} und ${index + 1} überlappen sich.`);
+  if (!config.operationalModel) {
+    const demandWindows = [...config.realityModel.demand.windows].sort(
+      (left, right) =>
+        left.startOffsetMinutes - right.startOffsetMinutes ||
+        left.endOffsetMinutes - right.endOffsetMinutes,
+    );
+    for (const [index, window] of demandWindows.entries()) {
+      if (
+        !Number.isInteger(window.startOffsetMinutes) ||
+        !Number.isInteger(window.endOffsetMinutes) ||
+        window.startOffsetMinutes < 0 ||
+        window.endOffsetMinutes <= window.startOffsetMinutes ||
+        window.endOffsetMinutes > demandDuration
+      ) {
+        errors.push(`Nachfragefenster ${index + 1} liegt außerhalb des Verkaufszeitraums.`);
+      }
+      if (!Number.isFinite(window.personsPerHour) || window.personsPerHour < 0) {
+        errors.push(`Nachfragefenster ${index + 1} besitzt eine ungültige Nachfrage.`);
+      }
+      if (
+        index > 0 &&
+        (demandWindows[index - 1]?.endOffsetMinutes ?? 0) > window.startOffsetMinutes
+      ) {
+        errors.push(`Nachfragefenster ${index} und ${index + 1} überlappen sich.`);
+      }
     }
   }
   if (config.operationalModel) {

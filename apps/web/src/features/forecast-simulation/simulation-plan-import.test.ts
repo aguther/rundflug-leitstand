@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  calculateDemandSummary,
+  calculateSimulationDemandSummary,
   SIMULATION_PRESET_LABELS,
   type SimulationPresetId,
   simulationConfigForPreset,
@@ -210,6 +212,36 @@ describe("simulation plan import", () => {
     expect(preview.format).toBe("rundflug-master-data-template");
     expect(preview.config.plannedOperations).toEqual([]);
     expect(preview.warnings.join(" ")).toContain("keinen Tageszeitplan");
+  });
+
+  it("keeps 18 persons per hour as the total default across imported products", () => {
+    const value = simulationPlan();
+    const sourceProduct = value.masterData.products[0];
+    if (!sourceProduct) throw new Error("Das Testprodukt fehlt.");
+    value.masterData.products.push({
+      ...sourceProduct,
+      key: "product-2",
+      name: "Langflug",
+      code: "LNG-30",
+      referenceDurationMinutes: 30,
+      promisedFlightMinutes: 25,
+      sortOrder: 20,
+    });
+    const preview = parseSimulationPlanImport(
+      JSON.stringify(value),
+      simulationConfigForPreset("NORMAL"),
+    );
+
+    expect(preview.counts.products).toBe(2);
+    expect(calculateSimulationDemandSummary(preview.config)).toEqual({
+      averagePersonsPerHour: 18,
+      expectedPersons: 144,
+    });
+    expect(
+      Object.values(preview.config.demandByProduct ?? {}).map(
+        (demand) => calculateDemandSummary(demand, 480).averagePersonsPerHour,
+      ),
+    ).toEqual([9, 9]);
   });
 
   it("imports V2 recurring rules and keeps the confirmed progress", () => {
