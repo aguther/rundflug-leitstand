@@ -45,14 +45,6 @@
   font-size: 14px;
 }
 
-.event-selection-page .login-panel {
-  max-width: 42rem;
-}
-
-.event-selection-page select {
-  min-height: 3rem;
-}
-
 .event-selection-logout {
   width: 100%;
   margin-top: var(--space-3);
@@ -97,6 +89,34 @@
   background: var(--ui-disabled);
   border-color: var(--ui-border);
 }
+
+.event-selection-page .login-panel {
+  width: min(42rem, calc(100% - 32px));
+}
+
+.event-selection-page .login-heading > div,
+.event-selection-page .login-panel form,
+.event-selection-page select,
+.event-selection-page .login-submit {
+  min-width: 0;
+}
+
+.event-selection-page .login-panel form {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.event-selection-page select,
+.event-selection-page .login-submit {
+  width: 100%;
+}
+
+.event-selection-page select {
+  min-height: 3rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .login-error {
   margin: 4px 0 0;
   color: var(--ui-danger);
