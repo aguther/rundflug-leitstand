@@ -1,8 +1,11 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import headerSource from "../../app/AppHeader.tsx?raw";
 import navigationSource from "../../app/navigation.ts?raw";
 import appSource from "./EventScopedApplication.tsx?raw";
 import selectionSource from "./EventSelectionPage.tsx?raw";
+
+const loginStyles = readFileSync(new URL("./login.css", import.meta.url), "utf8");
 
 describe("explicit event selection and display binding", () => {
   it("validates persisted context against the authenticated event catalog", () => {
@@ -26,5 +29,14 @@ describe("explicit event selection and display binding", () => {
   it("redirects the standard address to the explicit home for the signed-in role", () => {
     expect(appSource).toContain('window.location.pathname === "/"');
     expect(appSource).toContain("window.location.replace(homeForRole(session.account.role))");
+  });
+
+  it("keeps long event labels inside the responsive selection panel", () => {
+    expect(loginStyles).toContain("width: min(420px, calc(100% - 32px));");
+    expect(loginStyles).toContain("width: min(42rem, calc(100% - 32px));");
+    expect(loginStyles).toContain("grid-template-columns: minmax(0, 1fr);");
+    expect(loginStyles).toContain(".event-selection-page .login-submit {\n  min-width: 0;");
+    expect(loginStyles).toContain(".event-selection-page .login-submit {\n  width: 100%;");
+    expect(loginStyles).toContain("text-overflow: ellipsis;");
   });
 });
