@@ -17,7 +17,7 @@ from reportlab.platypus import KeepInFrame, Paragraph, Spacer
 ROOT = Path(__file__).resolve().parents[1]
 ROLE_DIRECTORY = ROOT / "docs" / "roles"
 OUTPUT_DIRECTORY = ROOT / "output" / "pdf" / "roles"
-VERSION = "1.10.0"
+VERSION = "1.11.0"
 GUIDES = {
     "kasse": [(0.13, 0.18), (0.30, 0.13), (0.40, 0.18), (0.36, 0.31), (0.77, 0.34)],
     "flight-line": [(0.08, 0.12), (0.10, 0.31), (0.18, 0.31), (0.26, 0.31), (0.14, 0.57)],

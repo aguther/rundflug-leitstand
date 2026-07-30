@@ -1,6 +1,6 @@
 # Einweisung Kasse
 
-Version 1.10.0 · Ziel: sicher und zügig Tickets für eine verbundene Buchungsgruppe verkaufen.
+Version 1.11.0 · Ziel: sicher und zügig Tickets für eine verbundene Buchungsgruppe verkaufen.
 
 ## Einstieg
 
@@ -15,7 +15,7 @@ Mit dem Kassenkonto anmelden, Veranstaltung wählen und die Ansicht **Kasse** ö
 4. Preis und Gruppe nochmals lesen, dann den blauen Ticketbutton genau einmal wählen.
 5. Serverbestätigung abwarten, Ticketgruppe auswählen und Ticket drucken oder QR-Code übergeben.
 
-![Aktuelle Kassenansicht mit synthetischen Daten](images/kasse-1.10.0.png)
+![Aktuelle Kassenansicht mit synthetischen Daten](images/kasse-1.11.0.png)
 
 ## Normalfall
 

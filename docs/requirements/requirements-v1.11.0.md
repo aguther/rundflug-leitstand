@@ -1,35 +1,34 @@
-# Kumulativer Anforderungskatalog – Release 1.10.0
+# Kumulativer Anforderungskatalog – Release 1.11.0
 
-Release `1.10.0` ist die einzige aktuelle Releasefassung. Dieser Katalog enthält den
+Release `1.11.0` ist die einzige aktuelle Releasefassung. Dieser Katalog enthält den
 vollständigen 207er Basiskatalog, 99 fortgeltende und begrifflich aktualisierte Deltas
-aus 1.5 bis 1.9.1 sowie die 13 Anforderungen dieses Releases (insgesamt 319).
+aus 1.5 bis 1.9.1, 13 fortgeltende Anforderungen aus 1.10.0 sowie die 11 Anforderungen
+dieses Releases (insgesamt 330).
 Die binären V1.4-Quellen bleiben unveränderte Referenz; gültige ADRs konkretisieren den
 Katalog. Historische Releasekopien und Freigabeprotokolle sind keine Spezifikation.
 
 Die kanonischen Rollen- und Ansichtsbegriffe sind **Kasse**, **Flight Line**,
 **Flight Director**, **FIDS**, **Administration** und **öffentlicher Gruppenstatus**.
 
-## Anforderungen Release 1.10.0
+## Anforderungen Release 1.11.0
 
 | ID | Abschnitt | Aktuelle Anforderung | Priorität | Status |
 | --- | --- | --- | --- | --- |
-| V1100-REL-010 | Release und Versionierung | Anwendung, Workspace-Pakete, /api/meta, Healthcheck, Backups, Requirements, Traceability, Rollenunterlagen und PDFs melden konsistent 1.10.0. | MUSS | implemented |
-| V1100-DOC-010 | Dokumentationskonsistenz | Nur der aktuelle Katalog, gültige ADRs, Betriebsanleitungen, automatisierte Tests und unveränderte binäre Quellen gelten als aktuelle Dokumentation. Links, Bilder, Versionen und Begriffe werden automatisiert geprüft. | MUSS | implemented |
-| V1100-ROL-010 | Rollenbezogene Einweisung | Für Kasse, Flight Line, Flight Director und FIDS existiert je ein einseitiges Rollenblatt, für Administration höchstens zwei Seiten. Markdown ist Quelle; PDF wird reproduzierbar erzeugt. Jedes Blatt enthält Einstieg, vier bis sechs Schritte, aktuellen Screenshot, Ablaufstreifen, Stopp/Hilfe und Rolleninvarianten. | MUSS | implemented |
-| V1100-CF-010 | Cloudflare-Neuaufbau | Eine leere Cloudflare-Umgebung ist mit einem Zielnamen weitgehend automatisch und wiederaufnehmbar aufbaubar. Worker-, D1- und R2-Namen sind ableitbar oder überschreibbar; D1 und R2 verwenden EU-Jurisdiktion. Bestehende Ressourcen werden nie gelöscht oder geleert. | MUSS | implemented |
-| V1100-CF-020 | Cloudflare-Neuaufbau | Eine lokale, nicht versionierte Zielkonfiguration umfasst Static Assets, D1, R2, Durable Object, Rate Limits, Cron und Observability. Migrationen, Secrets, Build, Deployment und Smoke-Prüfung sind dokumentiert; Demo-Seeds bleiben ausgeschlossen. | MUSS | implemented |
-| V1100-SET-010 | Werksreset und Ersteinrichtung | Ein authentifizierter Werksreset verlangt die aktuelle Konto-PIN und führt im selben Browser über eine 30 Minuten gültige, einmal verwendbare, gehashte und hostgebundene Fortsetzungsfreigabe ohne Konsolenarbeit zu /setup. Antwortverlust ist über denselben commandId idempotent wiederholbar. | MUSS | implemented |
-| V1100-SEC-010 | Installationssicherheit | Der Installations-Notfallcode besitzt mindestens 128 Bit Entropie, liegt ausschließlich als Worker-Secret und im Passwortsafe vor, funktioniert nur bei leerer Installation und wird rate-limitiert mit generischen Fehlern geprüft. PINs, Codes, Cookies und Secrets erscheinen nie in Logs, Backups, Screenshots oder Repository. | MUSS | implemented |
-| V1100-API-010 | Interne API | Interne operative Clients verwenden ausschließlich /api/control/:eventId/.... JSON-Anfragen sind größenbegrenzt; fehlerhaftes JSON liefert 400, eine Überschreitung 413. Zugesicherte öffentliche Statusrouten bleiben kompatibel. | MUSS | implemented |
-| V1100-TYP-010 | Generierte Worker-Typen | Worker-Bindings werden mit wrangler types erzeugt und bei jeder Typprüfung mit --check gegen wrangler.jsonc verifiziert. | MUSS | implemented |
-| V1100-MIG-010 | Migrationen | SQL-Migrationen besitzen einen automatisch geprüften Registereintrag und eine Wiederherstellungsnotiz. Die historische Doppelnummer 0036 bleibt aus Gründen der angewandten D1-Historie unverändert und ist ausdrücklich registriert. | MUSS | implemented |
-| V1100-DEP-010 | Abhängigkeiten | Kompatible Patchstände werden kontrolliert aktualisiert; TypeScript bleibt in diesem Release auf 6.0.3. Dependabot schlägt wöchentlich gruppierte Patchupdates vor. | MUSS | implemented |
-| V1100-QA-010 | Qualitätssicherung | Unit-, Worker-/D1-Integrations- und Browserprüfungen decken Reset/Setup, Bootstrap-Konfiguration, Rollenabläufe, responsive Darstellung, Dokumente und Backups ab. Der vollständige Abnahmelauf bleibt npm run check. | MUSS | implemented |
-| V1100-MOD-010 | Modularisierung | Neue Setup-/Reset-, Request-Grenz- und Cloudflare-Ziellogik liegt in eigenständigen Modulen. Weitere Zerlegung der großen operativen Handler darf Atomarität, erwartete Version, Idempotenz, Audit, Outbox oder Veröffentlichung nach Persistenz nicht verändern. | MUSS | implemented |
+| V1110-REL-010 | Release und Versionierung | Anwendung, Workspace-Pakete, /api/meta, Healthcheck, Backups, Requirements und Traceability melden konsistent 1.11.0. | MUSS | implemented |
+| V1110-REC-010 | Aktiver Gruppennachruf | Ein Nachruf ist ein eigenständig persistierter temporärer Vorgang mit eindeutiger ID, gruppenbezogener Sequenz, Start- und Ablaufzeit sowie optionalem Ende. Pro Buchungsgruppe ist höchstens ein Nachruf aktiv. | MUSS | implemented |
+| V1110-REC-020 | Aktiver Gruppennachruf | Der Nachruf verändert weder Queueposition noch Belegung oder Anwesenheit. Er endet manuell, nach bestätigter Anwesenheit, Boardingbeginn, Zurückstellung, No-Show, Storno oder spätestens nach fünf Minuten automatisch. | MUSS | implemented |
+| V1110-CMD-010 | Kommandos und Konsistenz | START_TICKET_GROUP_RECALL und CLEAR_TICKET_GROUP_RECALL verwenden Event-Coordinator, erwartete Version und Idempotenz. Parallele stale writes werden abgewiesen; RESTORE_TICKET_GROUP_TO_QUEUE benennt die bisherige Queueaktion fachlich eindeutig und RECALL_TICKET_GROUP bleibt kontrollierter Kompatibilitätsalias. | MUSS | implemented |
+| V1110-AUD-010 | Audit und Outbox | Start und jedes manuelle oder automatische Ende erzeugen append-only Audit-Ereignisse mit Nachruf-ID, Gruppenzuordnung, Sequenz und Endgrund sowie einen konsistenten Outbox-Eintrag. | MUSS | implemented |
+| V1110-PSH-010 | Gruppenspezifischer Web-Push | Jeder neu gestartete Nachruf erzeugt Web-Push ausschließlich für aktive Ticket- und Gruppenstatus-Abonnements derselben Buchungsgruppe. Die Deduplizierung berücksichtigt die Nachruf-ID, sodass ein späterer Nachruf erneut zugestellt wird. | MUSS | implemented |
+| V1110-PUB-010 | Öffentliche Projektionen | Ticketstatus, Gruppenstatus und FIDS projizieren denselben aktiven Nachruf mit festen, gruppen- und gatebezogenen Textvorlagen. Der Vorgang enthält keine Namen, Telefonnummern oder frei formulierten öffentlichen Texte. | MUSS | implemented |
+| V1110-FID-010 | FIDS | Das FIDS zeigt den Nachruf direkt in der betroffenen Gruppenzeile als priorisierten Status Nachruf aktiv mit Glocke und bewegungsreduzierbarer Pulsanimation. Der normale Umlaufstatus bleibt zusätzlich sichtbar und unverändert. | MUSS | implemented |
+| V1110-UI-010 | Flight Line und Flight Director | Geeignete offene Gruppen können nach einem kompakten Bestätigungsdialog nachgerufen werden. Bei aktivem Nachruf sind Status, Startzeit, bisherige Anzahl und die Aktion Nachruf beenden sichtbar. | MUSS | implemented |
+| V1110-MIG-010 | Migration und Wiederherstellung | Die D1-Migration für Nachrufe und Push-Deduplizierung besitzt eine Wiederherstellungsnotiz; Nachrufdaten sind in Backup, Ereignislöschung und Werksreset vollständig berücksichtigt. | MUSS | implemented |
+| V1110-QA-010 | Qualitätssicherung | Automatisierte Tests prüfen Start, manuelles und automatisches Ende, Idempotenz, Parallelkonflikt, Ablaufzeit, erneuten Push, gruppenspezifische Zustellung, Projektionen, Rollen, Audit und Outbox. Flight Line, Flight Director, FIDS und mobile öffentliche Ansicht werden visuell abgenommen. | MUSS | implemented |
 
-## Fortgeltende, in 1.10.0 konsolidierte Deltas
+## Fortgeltende, in 1.11.0 konsolidierte Deltas
 
-Frühere reine Versionsanforderungen und durch 1.10.0 ersetzte UI-Konzeptbindungen sind
+Frühere reine Versionsanforderungen und durch 1.11.0 ersetzte UI-Konzeptbindungen sind
 nicht fortgeltend. Die folgenden fachlichen Aussagen bleiben verbindlich; alte Rollenbegriffe
 wurden auf Flight Line und Flight Director aktualisiert.
 
@@ -134,6 +133,19 @@ wurden auf Flight Line und Flight Director aktualisiert.
 | V191-PUB-010 | 1.9.1 | Öffentliche Status-PWAs vermeiden leeren iPhone-Überlauf und bezeichnen IN_FLIGHT als IM FLUG sowie LANDED als GELANDET. | MUSS | implemented |
 | V191-FID-010 | 1.9.1 | FIDS-Zeitfenster werden ohne nachgestelltes Wort Uhr dargestellt. | MUSS | implemented |
 | V191-QA-010 | 1.9.1 | Automatisierte, visuelle und Druckabnahmen decken das vollständige freigegebene Korrekturdelta ab. | MUSS | implemented |
+| V1100-REL-010 | 1.10.0 | Anwendung, Workspace-Pakete, /api/meta, Healthcheck, Backups, Requirements, Traceability, Rollenunterlagen und PDFs melden konsistent 1.10.0. | MUSS | implemented |
+| V1100-DOC-010 | 1.10.0 | Nur der aktuelle Katalog, gültige ADRs, Betriebsanleitungen, automatisierte Tests und unveränderte binäre Quellen gelten als aktuelle Dokumentation. Links, Bilder, Versionen und Begriffe werden automatisiert geprüft. | MUSS | implemented |
+| V1100-ROL-010 | 1.10.0 | Für Kasse, Flight Line, Flight Director und FIDS existiert je ein einseitiges Rollenblatt, für Administration höchstens zwei Seiten. Markdown ist Quelle; PDF wird reproduzierbar erzeugt. Jedes Blatt enthält Einstieg, vier bis sechs Schritte, aktuellen Screenshot, Ablaufstreifen, Stopp/Hilfe und Rolleninvarianten. | MUSS | implemented |
+| V1100-CF-010 | 1.10.0 | Eine leere Cloudflare-Umgebung ist mit einem Zielnamen weitgehend automatisch und wiederaufnehmbar aufbaubar. Worker-, D1- und R2-Namen sind ableitbar oder überschreibbar; D1 und R2 verwenden EU-Jurisdiktion. Bestehende Ressourcen werden nie gelöscht oder geleert. | MUSS | implemented |
+| V1100-CF-020 | 1.10.0 | Eine lokale, nicht versionierte Zielkonfiguration umfasst Static Assets, D1, R2, Durable Object, Rate Limits, Cron und Observability. Migrationen, Secrets, Build, Deployment und Smoke-Prüfung sind dokumentiert; Demo-Seeds bleiben ausgeschlossen. | MUSS | implemented |
+| V1100-SET-010 | 1.10.0 | Ein authentifizierter Werksreset verlangt die aktuelle Konto-PIN und führt im selben Browser über eine 30 Minuten gültige, einmal verwendbare, gehashte und hostgebundene Fortsetzungsfreigabe ohne Konsolenarbeit zu /setup. Antwortverlust ist über denselben commandId idempotent wiederholbar. | MUSS | implemented |
+| V1100-SEC-010 | 1.10.0 | Der Installations-Notfallcode besitzt mindestens 128 Bit Entropie, liegt ausschließlich als Worker-Secret und im Passwortsafe vor, funktioniert nur bei leerer Installation und wird rate-limitiert mit generischen Fehlern geprüft. PINs, Codes, Cookies und Secrets erscheinen nie in Logs, Backups, Screenshots oder Repository. | MUSS | implemented |
+| V1100-API-010 | 1.10.0 | Interne operative Clients verwenden ausschließlich /api/control/:eventId/.... JSON-Anfragen sind größenbegrenzt; fehlerhaftes JSON liefert 400, eine Überschreitung 413. Zugesicherte öffentliche Statusrouten bleiben kompatibel. | MUSS | implemented |
+| V1100-TYP-010 | 1.10.0 | Worker-Bindings werden mit wrangler types erzeugt und bei jeder Typprüfung mit --check gegen wrangler.jsonc verifiziert. | MUSS | implemented |
+| V1100-MIG-010 | 1.10.0 | SQL-Migrationen besitzen einen automatisch geprüften Registereintrag und eine Wiederherstellungsnotiz. Die historische Doppelnummer 0036 bleibt aus Gründen der angewandten D1-Historie unverändert und ist ausdrücklich registriert. | MUSS | implemented |
+| V1100-DEP-010 | 1.10.0 | Kompatible Patchstände werden kontrolliert aktualisiert; TypeScript bleibt in diesem Release auf 6.0.3. Dependabot schlägt wöchentlich gruppierte Patchupdates vor. | MUSS | implemented |
+| V1100-QA-010 | 1.10.0 | Unit-, Worker-/D1-Integrations- und Browserprüfungen decken Reset/Setup, Bootstrap-Konfiguration, Rollenabläufe, responsive Darstellung, Dokumente und Backups ab. Der vollständige Abnahmelauf bleibt npm run check. | MUSS | implemented |
+| V1100-MOD-010 | 1.10.0 | Neue Setup-/Reset-, Request-Grenz- und Cloudflare-Ziellogik liegt in eigenständigen Modulen. Weitere Zerlegung der großen operativen Handler darf Atomarität, erwartete Version, Idempotenz, Audit, Outbox oder Veröffentlichung nach Persistenz nicht verändern. | MUSS | implemented |
 
 ## Fortgeltender konsolidierter Basiskatalog
 
@@ -349,7 +361,5 @@ wurden auf Flight Line und Flight Director aktualisiert.
 
 ## Abgrenzung
 
-Backup-Import und Domain-Cutover sind getrennte Verfahren. Datenschutz-, Hardware-,
-Helfer- und Produktionsfreigaben bleiben manuelle Gates in `open-questions.md`.
-Passkeys, Cloudflare Access und Turnstile als zusätzliche Schicht sind nicht Bestandteil
-dieses Releases.
+Nicht Bestandteil sind Kamera- oder QR-Scan, eine eigenständige Ansicht Gruppen am Gate,
+eine harte Boarding-Sperre, SMS, Messenger und frei formulierte Nachruftexte.

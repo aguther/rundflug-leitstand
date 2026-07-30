@@ -31,6 +31,7 @@ import {
 import {
   assessForecastFreshness,
   assessRemainingCapacity,
+  buildTicketGroupRecallCopy,
   derivePublicRotationStatus,
   deriveResourceGroupCapacity,
   estimateDuration,
@@ -131,6 +132,39 @@ function eventRoutes<const Suffix extends string>(
 interface TicketSearchCursor {
   soldAt: string;
   id: string;
+}
+
+interface ActiveTicketGroupRecallColumns {
+  recall_id: string | null;
+  recall_sequence: number | null;
+  recall_started_at: string | null;
+  recall_expires_at: string | null;
+  product_code: string;
+  communication_number: number;
+  gate_label: string;
+}
+
+function activeTicketGroupRecallProjection(row: ActiveTicketGroupRecallColumns) {
+  if (
+    !row.recall_id ||
+    row.recall_sequence === null ||
+    !row.recall_started_at ||
+    !row.recall_expires_at
+  ) {
+    return null;
+  }
+  const copy = buildTicketGroupRecallCopy({
+    communicationLabel: formatBookingGroupLabel(row.product_code, row.communication_number),
+    gateLabel: row.gate_label,
+  });
+  return {
+    id: row.recall_id,
+    sequence: row.recall_sequence,
+    startedAt: row.recall_started_at,
+    expiresAt: row.recall_expires_at,
+    fidsMessage: copy.fids,
+    publicMessage: copy.publicStatus,
+  };
 }
 
 function encodeTicketSearchCursor(cursor: TicketSearchCursor): string {
@@ -3489,6 +3523,7 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
       404,
     );
   }
+  const projectionReadAt = new Date().toISOString();
 
   const [
     products,
@@ -3813,8 +3848,18 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
             WHERE ranked_drafts.draft_rank = 1
          )
          SELECT tg.id, tg.communication_number, tg.queue_sequence, tg.status,
-                tg.recalled_at, tg.recall_count, p.id AS product_id, p.code AS product_code,
+                active_recall.id AS recall_id,
+                active_recall.sequence AS recall_sequence,
+                active_recall.started_at AS recall_started_at,
+                active_recall.expires_at AS recall_expires_at,
+                COALESCE((
+                  SELECT MAX(recall_count.sequence)
+                    FROM ticket_group_recalls recall_count
+                   WHERE recall_count.ticket_group_id = tg.id
+                ), 0) AS recall_count,
+                p.id AS product_id, p.code AS product_code,
                 p.name AS product_name, p.resource_group_id, p.gate_id,
+                g.label AS gate_label,
                 COUNT(t.id) AS ticket_count,
                 SUM(CASE WHEN t.attendance_status = 'CHECKED_IN' THEN 1 ELSE 0 END) AS present_count,
                 next_segment.ticket_count AS next_segment_ticket_count,
@@ -3823,26 +3868,37 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
                 next_segment.segment_count
            FROM ticket_groups tg
            JOIN products p ON p.id = tg.product_id
+           JOIN gates g ON g.id = p.gate_id
            JOIN tickets t ON t.ticket_group_id = tg.id
            JOIN next_draft_segments next_segment ON next_segment.ticket_group_id = tg.id
+           LEFT JOIN ticket_group_recalls active_recall
+             ON active_recall.ticket_group_id = tg.id
+            AND active_recall.ended_at IS NULL
+            AND active_recall.expires_at > ?2
           WHERE tg.operation_day_id = ?1 AND tg.status IN ('QUEUED', 'PRESENT', 'MISSING')
           GROUP BY tg.id, p.id, next_segment.ticket_count, next_segment.present_count,
-                   next_segment.segment_index, next_segment.segment_count
+                   next_segment.segment_index, next_segment.segment_count,
+                   active_recall.id, active_recall.sequence, active_recall.started_at,
+                   active_recall.expires_at
           ORDER BY tg.queue_sequence`,
       )
-        .bind(eventId)
+        .bind(eventId, projectionReadAt)
         .all<{
           id: string;
           communication_number: number;
           queue_sequence: number;
           status: string;
-          recalled_at: string | null;
           recall_count: number;
+          recall_id: string | null;
+          recall_sequence: number | null;
+          recall_started_at: string | null;
+          recall_expires_at: string | null;
           product_id: string;
           product_code: string;
           product_name: string;
           resource_group_id: string;
           gate_id: string;
+          gate_label: string;
           ticket_count: number;
           present_count: number;
           next_segment_ticket_count: number;
@@ -4486,8 +4542,9 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
       nextSegmentPresentCount: group.next_segment_present_count,
       segmentIndex: group.segment_index,
       segmentCount: group.segment_count,
-      recalledAt: group.recalled_at,
+      recalledAt: group.recall_started_at,
       recallCount: group.recall_count,
+      activeRecall: activeTicketGroupRecallProjection(group),
     })),
     aircraft: fleetRows.results.map((aircraft) => ({
       id: aircraft.id,
@@ -5601,6 +5658,8 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
             od.emergency_mode, od.notification_lead_minutes,
             rg.status AS resource_group_status,
             rg.operational_note AS resource_group_operational_note,
+            recall.id AS recall_id, recall.sequence AS recall_sequence,
+            recall.started_at AS recall_started_at, recall.expires_at AS recall_expires_at,
             (SELECT plan.public_note FROM planned_operational_constraints plan
               WHERE plan.operation_day_id = od.id AND plan.status = 'ACTIVE'
                 AND plan.public_note <> ''
@@ -5618,9 +5677,13 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
        JOIN flight_groups fg ON fg.id = r.flight_group_id
        JOIN resource_groups rg ON rg.id = fg.resource_group_id
        JOIN operation_days od ON od.id = tg.operation_day_id
+       LEFT JOIN ticket_group_recalls recall
+         ON recall.ticket_group_id = tg.id
+        AND recall.ended_at IS NULL
+        AND recall.expires_at > ?2
       WHERE t.public_code_hash = ?1`,
   )
-    .bind(ticketHash)
+    .bind(ticketHash, new Date().toISOString())
     .first<{
       product_name: string;
       product_code: string;
@@ -5647,6 +5710,10 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
       emergency_mode: number;
       notification_lead_minutes: number;
       resource_group_status: "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED";
+      recall_id: string | null;
+      recall_sequence: number | null;
+      recall_started_at: string | null;
+      recall_expires_at: string | null;
     }>();
   if (!row) {
     return unknownTicketResponse(context.env, context.req.raw);
@@ -5727,6 +5794,7 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
         : PUBLIC_STATUS_MESSAGES[publicStatus],
     operationalNotice:
       row.planned_public_note || row.resource_group_operational_note || row.event_operational_note,
+    activeRecall: activeTicketGroupRecallProjection(row),
     updatedAt: row.updated_at,
   });
 });
@@ -5739,10 +5807,13 @@ app.get("/api/public/groups/:groupCode", async (context) => {
   const group = await context.env.DB.prepare(
     `SELECT tg.id, tg.communication_number, tg.operation_day_id,
             p.name AS product_name, p.code AS product_code, p.public_description,
+            g.label AS gate_label,
             od.name AS event_name, od.time_zone, od.operational_note AS event_operational_note,
             od.operational_interrupted, od.emergency_mode, od.notification_lead_minutes,
             od.updated_at, rg.status AS resource_group_status,
             rg.operational_note AS resource_group_operational_note,
+            recall.id AS recall_id, recall.sequence AS recall_sequence,
+            recall.started_at AS recall_started_at, recall.expires_at AS recall_expires_at,
             (SELECT plan.public_note FROM planned_operational_constraints plan
               WHERE plan.operation_day_id = od.id AND plan.status = 'ACTIVE'
                 AND plan.public_note <> ''
@@ -5753,11 +5824,16 @@ app.get("/api/public/groups/:groupCode", async (context) => {
             (SELECT COUNT(*) FROM tickets t WHERE t.ticket_group_id = tg.id) AS group_size
        FROM ticket_groups tg
        JOIN products p ON p.id = tg.product_id
+       JOIN gates g ON g.id = p.gate_id
        JOIN resource_groups rg ON rg.id = p.resource_group_id
        JOIN operation_days od ON od.id = tg.operation_day_id
+       LEFT JOIN ticket_group_recalls recall
+         ON recall.ticket_group_id = tg.id
+        AND recall.ended_at IS NULL
+        AND recall.expires_at > ?2
       WHERE tg.public_status_code_hash = ?1 AND tg.status <> 'CANCELED'`,
   )
-    .bind(await sha256Hex(groupCode))
+    .bind(await sha256Hex(groupCode), new Date().toISOString())
     .first<{
       id: string;
       communication_number: number;
@@ -5765,6 +5841,7 @@ app.get("/api/public/groups/:groupCode", async (context) => {
       product_name: string;
       product_code: string;
       public_description: string;
+      gate_label: string;
       event_name: string;
       time_zone: string;
       event_operational_note: string;
@@ -5776,6 +5853,10 @@ app.get("/api/public/groups/:groupCode", async (context) => {
       resource_group_operational_note: string;
       planned_public_note: string | null;
       group_size: number;
+      recall_id: string | null;
+      recall_sequence: number | null;
+      recall_started_at: string | null;
+      recall_expires_at: string | null;
     }>();
   if (!group) {
     return unknownTicketResponse(context.env, context.req.raw);
@@ -5893,6 +5974,7 @@ app.get("/api/public/groups/:groupCode", async (context) => {
       group.planned_public_note ||
       group.resource_group_operational_note ||
       group.event_operational_note,
+    activeRecall: activeTicketGroupRecallProjection(group),
     updatedAt: group.updated_at,
     parts,
   });
@@ -6293,6 +6375,8 @@ app.get("/api/public/events/:eventId/board", async (context) => {
             COALESCE(fg.queue_position, fg.communication_number) AS queue_position, r.status,
             r.predicted_boarding_at, r.prediction_quality, r.prediction_lower_minutes,
             r.prediction_upper_minutes, r.prediction_updated_at,
+            recall.id AS recall_id, recall.sequence AS recall_sequence,
+            recall.started_at AS recall_started_at, recall.expires_at AS recall_expires_at,
             MIN(a.registration) AS aircraft_registration,
             r.departed_at,
             COUNT(rt.ticket_id) AS ticket_count,
@@ -6312,6 +6396,10 @@ app.get("/api/public/events/:eventId/board", async (context) => {
        LEFT JOIN products p ON p.id = tg.product_id
        LEFT JOIN gates g ON g.id = COALESCE(r.gate_id, p.gate_id)
        LEFT JOIN aircraft a ON a.id = r.aircraft_id
+       LEFT JOIN ticket_group_recalls recall
+         ON recall.ticket_group_id = tg.id
+        AND recall.ended_at IS NULL
+        AND recall.expires_at > ?6
       WHERE r.operation_day_id = ?1 AND r.status <> 'CANCELED'
         AND (?2 IS NULL OR g.id = ?2)
         AND (?3 = '[]' OR p.id IN (SELECT value FROM json_each(?3)))
@@ -6338,7 +6426,14 @@ app.get("/api/public/events/:eventId/board", async (context) => {
                COALESCE(tg.communication_number, fg.communication_number)
       LIMIT 20`,
   )
-    .bind(eventId, requestedGateId, productFilterJson, statusFilterJson, departedVisibilityCutoff)
+    .bind(
+      eventId,
+      requestedGateId,
+      productFilterJson,
+      statusFilterJson,
+      departedVisibilityCutoff,
+      new Date().toISOString(),
+    )
     .all<{
       product_name: string;
       product_code: string;
@@ -6353,6 +6448,10 @@ app.get("/api/public/events/:eventId/board", async (context) => {
       prediction_lower_minutes: number | null;
       prediction_upper_minutes: number | null;
       prediction_updated_at: string | null;
+      recall_id: string | null;
+      recall_sequence: number | null;
+      recall_started_at: string | null;
+      recall_expires_at: string | null;
       aircraft_registration: string | null;
       departed_at: string | null;
       ticket_count: number;
@@ -6441,6 +6540,7 @@ app.get("/api/public/events/:eventId/board", async (context) => {
             boardingWindowUpperAt: boardingWindow.upperAt,
             predictionQuality,
             operationalNotice: row.planned_public_note || row.resource_group_operational_note,
+            activeRecall: activeTicketGroupRecallProjection(row),
           };
         }),
     fleet: event.emergency_mode

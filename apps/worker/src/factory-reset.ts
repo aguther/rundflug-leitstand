@@ -12,6 +12,7 @@ export const FACTORY_RESET_DELETE_TABLES = [
   "forecast_snapshots",
   "rotation_manifest_corrections",
   "rotation_tickets",
+  "ticket_group_recalls",
   "operational_blocks",
   "planned_operational_constraints",
   "recurring_operational_rules",

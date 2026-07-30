@@ -13,6 +13,7 @@ const suites = [
   "test:ticket-assignment-concurrency",
   "test:ticket-corrections",
   "test:ticket-deferrals",
+  "test:ticket-group-recall",
   "test:automatic-precall",
   "test:sale-guards",
   "test:fleet-operations",

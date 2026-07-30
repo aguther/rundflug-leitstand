@@ -8,6 +8,7 @@ import { Button, ModalDialog } from "./design-system/components";
 import { FlightDirectorOperationsDialog } from "./features/flight-line/FlightDirectorOperationsDialog";
 import { FlightLineAssist } from "./flight-line-assist";
 import { expectedReviewAtFromPause } from "./flight-line-pause";
+import { TicketGroupRecallDialog, TicketGroupRecallStatus } from "./flight-line-shared";
 import { FlightLineSupervisorConsole } from "./flight-line-supervisor";
 import {
   aircraftStateLabel,
@@ -92,6 +93,8 @@ export function FlightLineView() {
     aircraftVersion: number;
   } | null>(null);
   const [technicalAbortReason, setTechnicalAbortReason] = useState("");
+  const [recallDialogGroupId, setRecallDialogGroupId] = useState<string | null>(null);
+  const [recallBusy, setRecallBusy] = useState(false);
   const operationalRotations = board?.rotations.filter(
     (rotation) => rotation.status !== "COMPLETED",
   );
@@ -150,6 +153,10 @@ export function FlightLineView() {
         group.resourceGroupId === selectedAircraft?.resourceGroupId &&
         ["QUEUED", "PRESENT", "MISSING"].includes(group.status),
     ) ?? [];
+  const recallDialogGroup =
+    board?.queueGroups.find((group) => group.id === recallDialogGroupId) ?? null;
+  const recallDialogGateLabel =
+    board?.gates.find((gate) => gate.id === recallDialogGroup?.gateId)?.label ?? "";
   const selectedQueueSeatCount = compatibleQueueGroups
     .filter((group) => selectedQueueGroupIds.includes(group.id))
     .reduce((sum, group) => sum + queuedSegmentTicketCount(group), 0);
@@ -291,7 +298,7 @@ export function FlightLineView() {
     }
   }
 
-  async function updateGroupPresence(ticketGroupId: string, action: "MISSING" | "RECALL") {
+  async function updateGroupPresence(ticketGroupId: string, action: "MISSING" | "RESTORE") {
     if (!board) return;
     const reason =
       action === "MISSING" ? (window.prompt("Kurzer Grund für „Nicht da“:")?.trim() ?? "") : "";
@@ -314,7 +321,7 @@ export function FlightLineView() {
               deviceId: FLIGHT_LINE_DEVICE_ID,
               expectedVersion: board.event.version,
               issuedAt: new Date().toISOString(),
-              type: "RECALL_TICKET_GROUP",
+              type: "RESTORE_TICKET_GROUP_TO_QUEUE",
               payload: { ticketGroupId },
             },
         deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
@@ -324,6 +331,56 @@ export function FlightLineView() {
       setMessage(
         reason instanceof Error ? reason.message : "Gruppenstatus konnte nicht geändert werden.",
       );
+    }
+  }
+
+  async function startTicketGroupRecall() {
+    if (!board || !recallDialogGroup) return;
+    setRecallBusy(true);
+    try {
+      const result = await sendCommand(
+        {
+          commandId: crypto.randomUUID(),
+          eventId: EVENT_ID,
+          deviceId: FLIGHT_LINE_DEVICE_ID,
+          expectedVersion: board.event.version,
+          issuedAt: new Date().toISOString(),
+          type: "START_TICKET_GROUP_RECALL",
+          payload: { ticketGroupId: recallDialogGroup.id },
+        },
+        deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
+      );
+      confirmEvent(result.event);
+      setRecallDialogGroupId(null);
+      await refresh(result.event.version);
+    } catch (reason) {
+      setMessage(
+        reason instanceof Error ? reason.message : "Nachruf konnte nicht gestartet werden.",
+      );
+    } finally {
+      setRecallBusy(false);
+    }
+  }
+
+  async function clearTicketGroupRecall(ticketGroupId: string, recallId: string) {
+    if (!board || !recallId) return;
+    try {
+      const result = await sendCommand(
+        {
+          commandId: crypto.randomUUID(),
+          eventId: EVENT_ID,
+          deviceId: FLIGHT_LINE_DEVICE_ID,
+          expectedVersion: board.event.version,
+          issuedAt: new Date().toISOString(),
+          type: "CLEAR_TICKET_GROUP_RECALL",
+          payload: { ticketGroupId, recallId },
+        },
+        deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
+      );
+      confirmEvent(result.event);
+      await refresh(result.event.version);
+    } catch (reason) {
+      setMessage(reason instanceof Error ? reason.message : "Nachruf konnte nicht beendet werden.");
     }
   }
 
@@ -1093,7 +1150,9 @@ export function FlightLineView() {
           }}
           onGroupAttendance={setGroupAttendance}
           onGroupMissing={(ticketGroupId) => updateGroupPresence(ticketGroupId, "MISSING")}
-          onGroupRecall={(ticketGroupId) => updateGroupPresence(ticketGroupId, "RECALL")}
+          onGroupRecall={setRecallDialogGroupId}
+          onGroupRecallClear={clearTicketGroupRecall}
+          onGroupRestore={(ticketGroupId) => updateGroupPresence(ticketGroupId, "RESTORE")}
           onGroupDefer={(ticketGroupId) =>
             deferTicketGroup(ticketGroupId, "Gruppe durch Flight Line zurückgestellt")
           }
@@ -1162,7 +1221,9 @@ export function FlightLineView() {
           onPauseAircraft={openAircraftPauseDialog}
           onGroupAttendance={setGroupAttendance}
           onGroupMissing={(ticketGroupId) => updateGroupPresence(ticketGroupId, "MISSING")}
-          onGroupRecall={(ticketGroupId) => updateGroupPresence(ticketGroupId, "RECALL")}
+          onGroupRecall={setRecallDialogGroupId}
+          onGroupRecallClear={clearTicketGroupRecall}
+          onGroupRestore={(ticketGroupId) => updateGroupPresence(ticketGroupId, "RESTORE")}
           onGroupDefer={(ticketGroupId) =>
             deferTicketGroup(ticketGroupId, "Gruppe durch Flight Director zurückgestellt")
           }
@@ -1321,20 +1382,33 @@ export function FlightLineView() {
                           >
                             {group.status === "PRESENT" ? "Anwesenheit aufheben" : "Anwesend"}
                           </button>
-                          <button
-                            className="danger-link-action"
-                            onClick={() => void updateGroupPresence(group.id, "MISSING")}
-                            type="button"
-                          >
-                            Nicht da
-                          </button>
-                          <button
-                            onClick={() => void updateGroupPresence(group.id, "RECALL")}
-                            type="button"
-                          >
-                            Nachrufen{group.recallCount > 0 ? ` (${group.recallCount})` : ""}
-                          </button>
+                          {group.status === "MISSING" ? (
+                            <button
+                              onClick={() => void updateGroupPresence(group.id, "RESTORE")}
+                              type="button"
+                            >
+                              Zurück in Queue
+                            </button>
+                          ) : (
+                            <button
+                              className="danger-link-action"
+                              onClick={() => void updateGroupPresence(group.id, "MISSING")}
+                              type="button"
+                            >
+                              Nicht da
+                            </button>
+                          )}
+                          {!group.activeRecall ? (
+                            <button onClick={() => setRecallDialogGroupId(group.id)} type="button">
+                              Nachrufen{group.recallCount > 0 ? ` (${group.recallCount})` : ""}
+                            </button>
+                          ) : null}
                         </div>
+                        <TicketGroupRecallStatus
+                          group={group}
+                          onClear={clearTicketGroupRecall}
+                          timeZone={board?.event.timeZone ?? "Europe/Berlin"}
+                        />
                       </article>
                     );
                   })}
@@ -1936,6 +2010,16 @@ export function FlightLineView() {
           />
         </label>
       </ModalDialog>
+      <TicketGroupRecallDialog
+        busy={recallBusy}
+        gateLabel={recallDialogGateLabel}
+        group={recallDialogGroup}
+        onCancel={() => {
+          if (!recallBusy) setRecallDialogGroupId(null);
+        }}
+        onConfirm={startTicketGroupRecall}
+        open={recallDialogGroup !== null}
+      />
     </Shell>
   );
 }

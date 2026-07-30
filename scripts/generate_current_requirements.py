@@ -9,7 +9,7 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "1.10.0"
+VERSION = "1.11.0"
 BASE_YAML = ROOT / "docs/requirements/requirements-v1.4.yaml"
 BASE_TRACE = ROOT / "docs/requirements/traceability.csv"
 DELTA_SOURCES = sorted((ROOT / "scripts/data").glob("requirements-delta-*.json"))
@@ -152,6 +152,87 @@ CURRENT_BASE_REQUIREMENT_OVERRIDES = {
     ),
 }
 
+PRIOR_RELEASE_REQUIREMENTS = RELEASE_REQUIREMENTS
+RELEASE_REQUIREMENTS = [
+    {
+        "id": "V1110-REL-010",
+        "section": "Release und Versionierung",
+        "requirement": "Anwendung, Workspace-Pakete, /api/meta, Healthcheck, Backups, Requirements und Traceability melden konsistent 1.11.0.",
+        "module": "package.json packages/config apps/worker/src/index.ts apps/worker/src/backup.ts",
+        "tests": "scripts/verify_requirements.py und npm run check",
+    },
+    {
+        "id": "V1110-REC-010",
+        "section": "Aktiver Gruppennachruf",
+        "requirement": "Ein Nachruf ist ein eigenständig persistierter temporärer Vorgang mit eindeutiger ID, gruppenbezogener Sequenz, Start- und Ablaufzeit sowie optionalem Ende. Pro Buchungsgruppe ist höchstens ein Nachruf aktiv.",
+        "module": "packages/domain/src/ticket-group-recall.ts apps/worker/migrations/0055_ticket_group_recalls.sql",
+        "tests": "packages/domain/src/ticket-group-recall.test.ts und apps/worker/src/ticket-group-recall.test.ts",
+    },
+    {
+        "id": "V1110-REC-020",
+        "section": "Aktiver Gruppennachruf",
+        "requirement": "Der Nachruf verändert weder Queueposition noch Belegung oder Anwesenheit. Er endet manuell, nach bestätigter Anwesenheit, Boardingbeginn, Zurückstellung, No-Show, Storno oder spätestens nach fünf Minuten automatisch.",
+        "module": "apps/worker/src/event-coordinator.ts",
+        "tests": "npm run test:ticket-group-recall",
+    },
+    {
+        "id": "V1110-CMD-010",
+        "section": "Kommandos und Konsistenz",
+        "requirement": "START_TICKET_GROUP_RECALL und CLEAR_TICKET_GROUP_RECALL verwenden Event-Coordinator, erwartete Version und Idempotenz. Parallele stale writes werden abgewiesen; RESTORE_TICKET_GROUP_TO_QUEUE benennt die bisherige Queueaktion fachlich eindeutig und RECALL_TICKET_GROUP bleibt kontrollierter Kompatibilitätsalias.",
+        "module": "packages/contracts/src/index.ts packages/domain/src/index.ts apps/worker/src/event-coordinator.ts",
+        "tests": "packages/contracts/src/index.test.ts und npm run test:ticket-group-recall",
+    },
+    {
+        "id": "V1110-AUD-010",
+        "section": "Audit und Outbox",
+        "requirement": "Start und jedes manuelle oder automatische Ende erzeugen append-only Audit-Ereignisse mit Nachruf-ID, Gruppenzuordnung, Sequenz und Endgrund sowie einen konsistenten Outbox-Eintrag.",
+        "module": "apps/worker/src/event-coordinator.ts",
+        "tests": "apps/worker/src/ticket-group-recall.test.ts und npm run test:ticket-group-recall",
+    },
+    {
+        "id": "V1110-PSH-010",
+        "section": "Gruppenspezifischer Web-Push",
+        "requirement": "Jeder neu gestartete Nachruf erzeugt Web-Push ausschließlich für aktive Ticket- und Gruppenstatus-Abonnements derselben Buchungsgruppe. Die Deduplizierung berücksichtigt die Nachruf-ID, sodass ein späterer Nachruf erneut zugestellt wird.",
+        "module": "apps/worker/src/web-push.ts apps/worker/migrations/0055_ticket_group_recalls.sql",
+        "tests": "apps/worker/src/web-push.test.ts und npm run test:ticket-group-recall",
+    },
+    {
+        "id": "V1110-PUB-010",
+        "section": "Öffentliche Projektionen",
+        "requirement": "Ticketstatus, Gruppenstatus und FIDS projizieren denselben aktiven Nachruf mit festen, gruppen- und gatebezogenen Textvorlagen. Der Vorgang enthält keine Namen, Telefonnummern oder frei formulierten öffentlichen Texte.",
+        "module": "apps/worker/src/index.ts apps/web/src/features/public-status/PublicStatusContent.tsx",
+        "tests": "apps/worker/src/ticket-group-recall.test.ts und npm run test:ticket-group-recall",
+    },
+    {
+        "id": "V1110-FID-010",
+        "section": "FIDS",
+        "requirement": "Das FIDS zeigt den Nachruf direkt in der betroffenen Gruppenzeile als priorisierten Status Nachruf aktiv mit Glocke und bewegungsreduzierbarer Pulsanimation. Der normale Umlaufstatus bleibt zusätzlich sichtbar und unverändert.",
+        "module": "apps/web/src/fids-display.tsx apps/web/src/features/fids/fids-v12.css",
+        "tests": "Browser-Abnahme FIDS Light und Dark",
+    },
+    {
+        "id": "V1110-UI-010",
+        "section": "Flight Line und Flight Director",
+        "requirement": "Geeignete offene Gruppen können nach einem kompakten Bestätigungsdialog nachgerufen werden. Bei aktivem Nachruf sind Status, Startzeit, bisherige Anzahl und die Aktion Nachruf beenden sichtbar.",
+        "module": "apps/web/src/flight-line-view.tsx apps/web/src/flight-line-shared.tsx",
+        "tests": "Browser-Abnahme Flight Line und Flight Director",
+    },
+    {
+        "id": "V1110-MIG-010",
+        "section": "Migration und Wiederherstellung",
+        "requirement": "Die D1-Migration für Nachrufe und Push-Deduplizierung besitzt eine Wiederherstellungsnotiz; Nachrufdaten sind in Backup, Ereignislöschung und Werksreset vollständig berücksichtigt.",
+        "module": "apps/worker/migrations/0055_ticket_group_recalls.sql apps/worker/src/backup.ts",
+        "tests": "npm run docs:migrations:check und npm run backup:restore:test",
+    },
+    {
+        "id": "V1110-QA-010",
+        "section": "Qualitätssicherung",
+        "requirement": "Automatisierte Tests prüfen Start, manuelles und automatisches Ende, Idempotenz, Parallelkonflikt, Ablaufzeit, erneuten Push, gruppenspezifische Zustellung, Projektionen, Rollen, Audit und Outbox. Flight Line, Flight Director, FIDS und mobile öffentliche Ansicht werden visuell abgenommen.",
+        "module": "scripts/verify_ticket_group_recall.mjs apps/worker/src/ticket-group-recall.test.ts",
+        "tests": "npm run test:ticket-group-recall npm run test und npm run check",
+    },
+]
+
 
 def yaml_scalar(value: object) -> str:
     return json.dumps(str(value), ensure_ascii=False)
@@ -160,6 +241,7 @@ def yaml_scalar(value: object) -> str:
 def current_terms(value: object) -> str:
     text = str(value)
     replacements = [
+        ("docs/ui/v1.10.0-release-concept.md", "docs/ui/v1.11.0-release-concept.md"),
         ("Flight Line Assist", "Flight Line"),
         ("Flight-Line-Supervisor-Ansicht", "Flight-Director-Ansicht"),
         ("Desktop-Supervisor-Ansicht", "Flight-Director-Ansicht"),
@@ -194,12 +276,24 @@ def current_requirements() -> list[dict[str, object]]:
     ]
     for path in DELTA_SOURCES:
         payload = json.loads(path.read_text(encoding="utf-8"))
-        if payload.get("version") != VERSION:
-            raise ValueError(f"{path}: Zielversion muss {VERSION} sein")
+        if payload.get("version") not in {"1.10.0", VERSION}:
+            raise ValueError(f"{path}: Zielversion muss 1.10.0 oder {VERSION} sein")
         normalized.extend(
             {**item, "requirement": current_terms(item["requirement"])}
             for item in payload["requirements"]
         )
+    normalized.extend(
+        {
+            "id": item["id"],
+            "source": "1.10.0",
+            "section": item["section"],
+            "requirement": item["requirement"],
+            "priority": "MUSS",
+            "stage": "V1",
+            "status": "implemented",
+        }
+        for item in PRIOR_RELEASE_REQUIREMENTS
+    )
     normalized.extend(
         {
             "id": item["id"],
@@ -246,18 +340,19 @@ def render_markdown(requirements: list[dict[str, object]]) -> str:
     ]
     base = [item for item in requirements if item["source"] == "1.4-konsolidiert"]
     lines = [
-        "# Kumulativer Anforderungskatalog – Release 1.10.0",
+        "# Kumulativer Anforderungskatalog – Release 1.11.0",
         "",
-        "Release `1.10.0` ist die einzige aktuelle Releasefassung. Dieser Katalog enthält den",
+        "Release `1.11.0` ist die einzige aktuelle Releasefassung. Dieser Katalog enthält den",
         "vollständigen 207er Basiskatalog, 99 fortgeltende und begrifflich aktualisierte Deltas",
-        "aus 1.5 bis 1.9.1 sowie die 13 Anforderungen dieses Releases (insgesamt 319).",
+        "aus 1.5 bis 1.9.1, 13 fortgeltende Anforderungen aus 1.10.0 sowie die 11 Anforderungen",
+        "dieses Releases (insgesamt 330).",
         "Die binären V1.4-Quellen bleiben unveränderte Referenz; gültige ADRs konkretisieren den",
         "Katalog. Historische Releasekopien und Freigabeprotokolle sind keine Spezifikation.",
         "",
         "Die kanonischen Rollen- und Ansichtsbegriffe sind **Kasse**, **Flight Line**,",
         "**Flight Director**, **FIDS**, **Administration** und **öffentlicher Gruppenstatus**.",
         "",
-        "## Anforderungen Release 1.10.0",
+        "## Anforderungen Release 1.11.0",
         "",
         "| ID | Abschnitt | Aktuelle Anforderung | Priorität | Status |",
         "| --- | --- | --- | --- | --- |",
@@ -270,9 +365,9 @@ def render_markdown(requirements: list[dict[str, object]]) -> str:
     lines.extend(
         [
             "",
-            "## Fortgeltende, in 1.10.0 konsolidierte Deltas",
+            "## Fortgeltende, in 1.11.0 konsolidierte Deltas",
             "",
-            "Frühere reine Versionsanforderungen und durch 1.10.0 ersetzte UI-Konzeptbindungen sind",
+            "Frühere reine Versionsanforderungen und durch 1.11.0 ersetzte UI-Konzeptbindungen sind",
             "nicht fortgeltend. Die folgenden fachlichen Aussagen bleiben verbindlich; alte Rollenbegriffe",
             "wurden auf Flight Line und Flight Director aktualisiert.",
             "",
@@ -304,10 +399,8 @@ def render_markdown(requirements: list[dict[str, object]]) -> str:
             "",
             "## Abgrenzung",
             "",
-            "Backup-Import und Domain-Cutover sind getrennte Verfahren. Datenschutz-, Hardware-,",
-            "Helfer- und Produktionsfreigaben bleiben manuelle Gates in `open-questions.md`.",
-            "Passkeys, Cloudflare Access und Turnstile als zusätzliche Schicht sind nicht Bestandteil",
-            "dieses Releases.",
+            "Nicht Bestandteil sind Kamera- oder QR-Scan, eine eigenständige Ansicht Gruppen am Gate,",
+            "eine harte Boarding-Sperre, SMS, Messenger und frei formulierte Nachruftexte.",
             "",
         ]
     )
@@ -336,7 +429,7 @@ def render_traceability() -> str:
                     "Status": item["traceStatus"],
                 }
             )
-    for item in RELEASE_REQUIREMENTS:
+    for item in [*PRIOR_RELEASE_REQUIREMENTS, *RELEASE_REQUIREMENTS]:
         rows.append(
             {
                 "ID": item["id"],
@@ -393,7 +486,7 @@ def main() -> None:
     if mismatches:
         names = ", ".join(str(path.relative_to(ROOT)) for path in mismatches)
         raise SystemExit(f"Aktuelle Requirements sind nicht generiert: {names}")
-    print("OK: 319 aktuelle Anforderungen und Traceability-Einträge für Release 1.10.0")
+    print("OK: 330 aktuelle Anforderungen und Traceability-Einträge für Release 1.11.0")
 
 
 if __name__ == "__main__":

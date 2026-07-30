@@ -656,6 +656,7 @@ describe("commandEnvelopeSchema", () => {
       predictionQuality: "CHANGING",
       message: "Bitte Status prüfen.",
       operationalNotice: "",
+      activeRecall: null,
       updatedAt: "2026-07-11T12:00:00.000Z",
     });
     expect(status.eventName).toBe("Synthetischer Flugtag");
@@ -683,6 +684,7 @@ describe("commandEnvelopeSchema", () => {
           boardingWindowUpperAt: "2026-07-11T12:30:00.000Z",
           predictionQuality: "CHANGING",
           operationalNotice: "",
+          activeRecall: null,
         },
       ],
       fleet: [{ registration: "D-EAAA", status: "AVAILABLE", refuelPlanned: false }],
@@ -730,6 +732,7 @@ describe("commandEnvelopeSchema", () => {
       publicDescription: "Panoramaflug",
       timeZone: "Europe/Berlin",
       operationalNotice: "",
+      activeRecall: null,
       updatedAt: "2026-07-23T12:00:00.000Z",
       parts: [
         {

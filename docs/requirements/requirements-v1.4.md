@@ -185,7 +185,7 @@ Jede Anforderung besitzt eine eindeutige ID, Priorität und Ausbaustufe. Für di
 Das Produktrelease V1.2 ersetzt die gerätezentrierte Bedienfreigabe durch anonyme, rollenbasierte
 Helferkonten und führt ein verbindliches, durchgängiges Bedien- und Designsystem ein. Die
 fachlichen V1-Invarianten bleiben unverändert. Als visuelle Referenzen gelten ausschließlich die
-freigegebenen Konzepte im aktuellen `docs/ui/v1.10.0-release-concept.md`; ältere Entwürfe sind
+freigegebenen Konzepte im aktuellen `docs/ui/v1.11.0-release-concept.md`; ältere Entwürfe sind
 historische Nachweise und keine Implementierungsvorgabe für V1.2.
 
 V1.2 umfasst insbesondere eine kompakte Cloudflare-inspirierte Administration, vollständige

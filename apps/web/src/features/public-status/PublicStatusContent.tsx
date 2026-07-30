@@ -1,4 +1,8 @@
-import type { PublicGroupStatus, PublicTicketStatus } from "@rundflug/contracts";
+import type {
+  PublicGroupStatus,
+  PublicTicketStatus,
+  TicketGroupRecallProjection,
+} from "@rundflug/contracts";
 import type { LucideIcon } from "lucide-react";
 import {
   Bell,
@@ -13,7 +17,7 @@ import {
   TicketsPlane,
   Users,
 } from "lucide-react";
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ModalDialog } from "../../design-system/components";
 import { formatAbsoluteTimeWindow } from "../../time-window";
 import {
@@ -131,6 +135,33 @@ export function PublicStatusIdentity({
         <small>Verbindung stabil</small>
       </div>
     </div>
+  );
+}
+
+export function PublicRecallNotice({ recall }: { recall: TicketGroupRecallProjection | null }) {
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    if (!recall) return;
+    const remaining = Date.parse(recall.expiresAt) - Date.now();
+    const timer = window.setTimeout(
+      () => setNow(Date.now()),
+      Math.max(0, Math.min(remaining + 25, 300_025)),
+    );
+    return () => window.clearTimeout(timer);
+  }, [recall]);
+
+  if (!recall || Date.parse(recall.expiresAt) <= now) return null;
+  return (
+    <aside aria-live="assertive" className="public-recall-notice" role="status">
+      <span aria-hidden="true" className="public-recall-bell">
+        <Bell />
+      </span>
+      <div>
+        <strong>Nachruf aktiv</strong>
+        <p>{recall.publicMessage}</p>
+      </div>
+    </aside>
   );
 }
 

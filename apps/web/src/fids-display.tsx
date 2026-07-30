@@ -2,6 +2,7 @@ import type { FidsPreferences, PublicBoard } from "@rundflug/contracts";
 import { formatBookingGroupLabel } from "@rundflug/domain";
 import {
   AlertTriangle,
+  Bell,
   CircleArrowRight,
   Clock3,
   PlaneTakeoff,
@@ -122,10 +123,25 @@ function Status({ group }: { group: PublicGroup }) {
   const presentation = statusPresentation(group.status);
   const Icon = presentation.icon;
   return (
-    <strong className={`fids-status tone-${presentation.tone}`}>
-      <Icon aria-hidden="true" className="fids-status-icon" />
-      <span>{presentation.label}</span>
-    </strong>
+    <div className="fids-status-cell">
+      <strong className={`fids-status tone-${presentation.tone}`}>
+        <Icon aria-hidden="true" className="fids-status-icon" />
+        <span>{presentation.label}</span>
+      </strong>
+      {group.activeRecall ? (
+        <strong
+          aria-label={group.activeRecall.fidsMessage}
+          className="fids-recall-status"
+          role="status"
+          title={group.activeRecall.fidsMessage}
+        >
+          <span aria-hidden="true" className="fids-recall-bell">
+            <Bell />
+          </span>
+          <span>NACHRUF AKTIV</span>
+        </strong>
+      ) : null}
+    </div>
   );
 }
 
@@ -170,7 +186,11 @@ function FidsTable({
       </div>
       <div className="fids-table-body">
         {groups.map((group) => (
-          <div className="fids-row" key={groupRowKey(group)}>
+          <div
+            className="fids-row"
+            data-recall-active={group.activeRecall ? "true" : "false"}
+            key={groupRowKey(group)}
+          >
             <GroupCell group={group} />
             {!compact ? <span className="fids-product-cell">{group.productName}</span> : null}
             <span className="fids-gate-cell">{group.gateLabel || "–"}</span>
@@ -210,8 +230,13 @@ export function FidsBoardPresentation({
   const departedVisibilitySeconds = Number.isFinite(requestedVisibilitySeconds)
     ? Math.min(900, Math.max(5, requestedVisibilitySeconds))
     : (board?.departedVisibilitySeconds ?? DEFAULT_DEPARTED_VISIBILITY_SECONDS);
+  const currentGroups = (board?.groups ?? []).map((group) =>
+    group.activeRecall && Date.parse(group.activeRecall.expiresAt) <= clock.getTime()
+      ? { ...group, activeRecall: null }
+      : group,
+  );
   const groups = useVisibleGroups(
-    board?.groups ?? [],
+    currentGroups,
     departedVisibilitySeconds,
     preferences.visibleRows,
     filterDeparted,

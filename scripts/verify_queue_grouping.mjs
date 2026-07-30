@@ -420,32 +420,34 @@ try {
     "SET_TICKET_GROUP_ATTENDANCE",
     { ticketGroupId: pair.aggregate.id, checkedIn: true },
   );
-  const recalled = await command(
-    "flight-line-tablet-1",
-    tokens.flightLine,
-    attendance.event.version,
-    "RECALL_TICKET_GROUP",
-    { ticketGroupId: single.aggregate.id },
-  );
   const missing = await command(
     "flight-line-tablet-1",
     tokens.flightLine,
-    recalled.event.version,
+    attendance.event.version,
     "MARK_TICKET_GROUP_MISSING",
     { ticketGroupId: single.aggregate.id, reason: "Synthetisch nicht am Gate" },
   );
+  const restored = await command(
+    "flight-line-tablet-1",
+    tokens.flightLine,
+    missing.event.version,
+    "RESTORE_TICKET_GROUP_TO_QUEUE",
+    { ticketGroupId: single.aggregate.id },
+  );
   const attendanceHistory = await history("TICKET_GROUP", single.aggregate.id);
   if (
-    !attendanceHistory.entries.some((entry) => entry.eventType === "TICKET_GROUP_RECALLED") ||
+    !attendanceHistory.entries.some(
+      (entry) => entry.eventType === "TICKET_GROUP_RESTORED_TO_QUEUE",
+    ) ||
     !attendanceHistory.entries.some((entry) => entry.eventType === "TICKET_GROUP_MARKED_MISSING")
   ) {
-    throw new Error("Manuelle Anwesenheit, Nachruf oder Nicht-da-Audit fehlt.");
+    throw new Error("Manuelle Anwesenheit, Queue-Wiederherstellung oder Nicht-da-Audit fehlt.");
   }
 
   const started = await command(
     "flight-line-tablet-1",
     tokens.flightLine,
-    missing.event.version,
+    restored.event.version,
     "MARK_OFF_BLOCK",
     { rotationId: combined.id },
   );

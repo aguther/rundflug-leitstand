@@ -353,6 +353,17 @@ portable Sicherung angelegt. Ein Schema-Rollback erfolgt per Time Travel oder Wi
 dieser Sicherung; für einen älteren Worker müsste die entfernte Spalte andernfalls mit einem
 neutralen Standardwert neu angelegt werden.
 
+## 0055 – Aktive Buchungsgruppen-Nachrufe
+
+Ergänzt einen eigenständigen, sequenzierten und zeitlich begrenzten Nachrufvorgang je
+Buchungsgruppe. Ein partieller Index erlaubt höchstens einen nicht beendeten Nachruf je Gruppe.
+Die Push-Zustelltabelle wird unter Erhalt aller vorhandenen Belege neu aufgebaut und kann
+Nachrufzustellungen anhand der konkreten Nachruf-ID deduplizieren; andere Gruppen desselben
+Umlaufs werden dadurch nicht adressiert. Vor Anwendung wird eine D1-Time-Travel-Marke
+beziehungsweise vollständige D1-Sicherung angelegt. Für eine vollständige Schema-Rückkehr wird D1
+per Time Travel oder aus dieser Sicherung wiederhergestellt; Push-Ziele bleiben weiterhin aus
+portablen R2-Sicherungen ausgeschlossen.
+
 ## Historische Doppelnummer 0036
 
 `0036_product_promised_flight_time.sql` und `0036_v1_5_stable_operations.sql` wurden bereits unter

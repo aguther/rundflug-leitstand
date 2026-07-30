@@ -1,16 +1,16 @@
-# Technische Schulden – Stand 1.10.0
+# Technische Schulden – Stand 1.11.0
 
-Stand: 26. Juli 2026
+Stand: 30. Juli 2026
 
 Dieses Dokument ist die aktuelle, priorisierte Restschuldenliste. Erledigte Punkte aus früheren
 Backlogs werden nicht weitergeführt; ihre fachlichen Ergebnisse stehen im kumulativen
-Anforderungskatalog 1.10.0, in ADRs und in automatisierten Prüfungen.
+Anforderungskatalog 1.11.0, in ADRs und in automatisierten Prüfungen.
 
-## In 1.10.0 behoben
+## Bis 1.11.0 behoben
 
 - Anwendung, Pakete, API-Metadaten, Backups, Anforderungen und Rollenblätter melden einheitlich
-  Version 1.10.0.
-- Der aktuelle Anforderungskatalog enthält alle 319 fortgeltenden Anforderungen mit vollständiger
+  Version 1.11.0.
+- Der aktuelle Anforderungskatalog enthält alle 330 fortgeltenden Anforderungen mit vollständiger
   Traceability; konkurrierende textuelle Releasekopien wurden entfernt.
 - Fünf illustrierte, reproduzierbare Rollenblätter decken Kasse, Flight Line, Flight Director, FIDS
   und Administration ab.
@@ -25,13 +25,17 @@ Anforderungskatalog 1.10.0, in ADRs und in automatisierten Prüfungen.
 - Routenspezifische CSS- und Feature-Bundles reduzieren die globale Startlast.
 - Reale Workers-Runtime-, DOM- und Browserprüfungen ergänzen die bestehenden Fach- und
   Integrationsprüfungen.
+- Ein aktiver Gruppennachruf ist als eigenständiger, zeitlich begrenzter Vorgang umgesetzt. Er
+  verändert weder Queue noch Anwesenheit, wird in FIDS und öffentlichen Statusprojektionen
+  zusätzlich zum regulären Status angezeigt und benachrichtigt ausschließlich die betroffene
+  Buchungsgruppe.
 
 ## Verbleibende Schulden
 
 | Priorität | Befund | Nächster sicherer Schnitt |
 |---|---|---|
-| Hoch | `apps/worker/src/event-coordinator.ts` umfasst rund 7.700 Zeilen. | Kommandofamilien nacheinander in fachliche Handler extrahieren. Für jeden Schnitt zuerst Golden-Master-Tests für Idempotenz, erwartete Version, Audit, Outbox und Veröffentlichung nach Persistenz ergänzen. |
-| Hoch | `apps/worker/src/index.ts` und `apps/web/src/admin-view.tsx` umfassen jeweils rund 5.800 bis 6.000 Zeilen. | Worker-Routen in Setup/Auth, Administration, operative Steuerung und Public/Push trennen; Admin-Teilflächen einzeln als Container, Hooks und Präsentationskomponenten herauslösen. |
+| Hoch | `apps/worker/src/event-coordinator.ts` umfasst rund 9.900 Zeilen. | Kommandofamilien nacheinander in fachliche Handler extrahieren. Für jeden Schnitt zuerst Golden-Master-Tests für Idempotenz, erwartete Version, Audit, Outbox und Veröffentlichung nach Persistenz ergänzen. |
+| Hoch | `apps/worker/src/index.ts` und `apps/web/src/admin-view.tsx` umfassen rund 6.400 bis 6.900 Zeilen. | Worker-Routen in Setup/Auth, Administration, operative Steuerung und Public/Push trennen; Admin-Teilflächen einzeln als Container, Hooks und Präsentationskomponenten herauslösen. |
 | Mittel | Ein Teil älterer Tests prüft weiterhin Quelltextmerkmale statt beobachtbares Verhalten. | Bei jeder Änderung im betroffenen Bereich mindestens einen Quelltexttest durch einen Workers-Runtime-, DOM- oder Playwright-Test ersetzen; die Gesamtzahl in CI sichtbar machen. |
 | Mittel | Der Produktionsabhängigkeitsbaum ist ohne bekannte hohe Schwachstelle, im Entwicklungsbaum verbleiben jedoch acht hohe Meldungen in der Workbox-Buildkette von `vite-plugin-pwa`. | Upstream-Releases beobachten und nur auf eine kompatible Version mit unverändertem Offline-/Installationsverhalten aktualisieren. Keine erzwungene, inkompatible Audit-Korrektur. |
 | Mittel | Das globale CSS liegt trotz routenspezifischer Auslagerung noch bei rund 156 KiB; einzelne JavaScript-Chunks bleiben groß. | Pro Rollenroute weitere Stil- und Featuregrenzen ziehen und Größenbudgets in den Build aufnehmen. |

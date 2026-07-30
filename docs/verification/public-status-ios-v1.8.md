@@ -36,7 +36,7 @@ Status: Automatisierte Abnahme erfolgreich; Originalhardware-Abnahme in HTTPS-St
 Die früheren Release-Screenshots wurden nach Übernahme der gültigen Aussagen in den kumulativen
 Releasekatalog 1.10.0 entfernt. Der reproduzierbare Nachweis erfolgt über die aktuellen
 Browser-Rollenabläufe und die responsiven Public-Status-Tests; das aktuelle Oberflächenkonzept steht
-unter [UI-Konzept 1.10.0](../ui/v1.10.0-release-concept.md).
+unter [UI-Konzept 1.11.0](../ui/v1.11.0-release-concept.md).
 
 ## Verbindliche Originalhardware-Prüfung
 

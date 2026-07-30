@@ -70,6 +70,11 @@ describe("Web-Push-Endpunkte", () => {
     expect(pushUrgencyFor("GO_TO_GATE")).toBe("high");
     expect(pushUrgencyFor("BOARDING_STARTED")).toBe("high");
     expect(pushUrgencyFor("ROTATION_STARTED")).toBe("normal");
+    expect(pushNotificationFor("TICKET_GROUP_RECALL", "Gate 2", "PAN20-042")).toEqual({
+      title: "Erneuter Aufruf",
+      body: "Ihre Gruppe PAN20-042 wird erneut aufgerufen. Bitte kommen Sie jetzt zu Gate 2.",
+    });
+    expect(pushUrgencyFor("TICKET_GROUP_RECALL")).toBe("high");
   });
 
   it("verwendet für spätere Umlaufphasen die freigegebenen Titel und Beschreibungen", () => {

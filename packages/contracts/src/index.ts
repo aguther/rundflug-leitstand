@@ -615,6 +615,21 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
     }),
   }),
   commandBaseSchema.extend({
+    type: z.literal("START_TICKET_GROUP_RECALL"),
+    payload: z.object({ ticketGroupId: z.string().min(1).max(100) }),
+  }),
+  commandBaseSchema.extend({
+    type: z.literal("CLEAR_TICKET_GROUP_RECALL"),
+    payload: z.object({
+      ticketGroupId: z.string().min(1).max(100),
+      recallId: z.uuid(),
+    }),
+  }),
+  commandBaseSchema.extend({
+    type: z.literal("RESTORE_TICKET_GROUP_TO_QUEUE"),
+    payload: z.object({ ticketGroupId: z.string().min(1).max(100) }),
+  }),
+  commandBaseSchema.extend({
     type: z.literal("RECALL_TICKET_GROUP"),
     payload: z.object({ ticketGroupId: z.string().min(1).max(100) }),
   }),
@@ -1028,6 +1043,29 @@ export const ticketGroupOperationalStatusSchema = z.enum([
   "MISSING",
 ]);
 export type TicketGroupOperationalStatus = z.infer<typeof ticketGroupOperationalStatusSchema>;
+
+export const ticketGroupRecallEndReasonSchema = z.enum([
+  "MANUAL",
+  "PRESENT",
+  "BOARDING",
+  "DEFERRED",
+  "NO_SHOW",
+  "CANCELED",
+  "EXPIRED",
+]);
+export type TicketGroupRecallEndReason = z.infer<typeof ticketGroupRecallEndReasonSchema>;
+
+export const ticketGroupRecallProjectionSchema = z
+  .object({
+    id: z.uuid(),
+    sequence: z.number().int().positive(),
+    startedAt: z.iso.datetime(),
+    expiresAt: z.iso.datetime(),
+    fidsMessage: z.string().min(1),
+    publicMessage: z.string().min(1),
+  })
+  .strict();
+export type TicketGroupRecallProjection = z.infer<typeof ticketGroupRecallProjectionSchema>;
 
 export const ticketSearchRequestSchema = z
   .object({
@@ -2254,6 +2292,7 @@ export const commandResultSchema = z.object({
         "TICKET",
         "GATE",
         "TICKET_GROUP",
+        "TICKET_GROUP_RECALL",
         "ROTATION",
         "RECOVERY_BATCH",
         "OPERATIONAL_PLAN",
@@ -2535,6 +2574,7 @@ export const operationBoardSchema = z.object({
         segmentCount: z.number().int().positive().optional(),
         recalledAt: z.string().nullable(),
         recallCount: z.number().int().nonnegative(),
+        activeRecall: ticketGroupRecallProjectionSchema.nullable(),
       }),
     )
     .default([]),
@@ -2645,6 +2685,7 @@ export const publicTicketStatusSchema = z
     predictionQuality: z.enum(["STABLE", "CHANGING", "UNCERTAIN"]),
     message: z.string(),
     operationalNotice: z.string(),
+    activeRecall: ticketGroupRecallProjectionSchema.nullable(),
     updatedAt: z.string(),
   })
   .strict();
@@ -2687,6 +2728,7 @@ export const publicBoardSchema = z.object({
         boardingWindowUpperAt: z.iso.datetime().nullable(),
         predictionQuality: z.enum(["STABLE", "CHANGING", "UNCERTAIN"]),
         operationalNotice: z.string(),
+        activeRecall: ticketGroupRecallProjectionSchema.nullable(),
       })
       .strict(),
   ),
@@ -2745,6 +2787,7 @@ export const publicGroupStatusSchema = z
     publicDescription: z.string(),
     timeZone: timeZoneSchema,
     operationalNotice: z.string(),
+    activeRecall: ticketGroupRecallProjectionSchema.nullable(),
     updatedAt: z.string(),
     parts: z.array(publicGroupPartSchema).min(1),
   })

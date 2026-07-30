@@ -8,6 +8,7 @@ import {
   OPERATION_BOARD_RECONNECT_INITIAL_MS,
 } from "./board-sync";
 import {
+  PublicRecallNotice,
   PublicStatusFooter,
   PublicStatusIdentity,
   PublicStatusPart,
@@ -105,6 +106,7 @@ export function GroupStatusView({ code }: { code: string }) {
               passengerCount={status.groupSize}
               productName={status.productName}
             />
+            <PublicRecallNotice recall={status.activeRecall} />
             <div className="public-status-parts">
               {status.parts.map((part) => (
                 <PublicStatusPart

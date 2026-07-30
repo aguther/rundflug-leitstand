@@ -17,7 +17,7 @@ Standalone-Darstellung und eine Berechtigungsanfrage nach direkter Nutzerinterak
 ## Entscheidung
 
 - Ticket und Buchungsgruppe verwenden dieselbe FIDS-nahe, symbolgestützte Statusabbildung gemäß
-  `docs/ui/v1.10.0-release-concept.md`.
+  `docs/ui/v1.11.0-release-concept.md`.
 - Ein dynamisches Manifest verwendet den exakten relativen Statuspfad als `id` und `start_url`.
   Dadurch öffnet jede installierte Web-App wieder genau das installierte Ticket beziehungsweise die
   Gruppe und nicht die Loginroute.

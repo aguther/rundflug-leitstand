@@ -18,6 +18,7 @@ export const EVENT_DELETION_SQL = [
   "DELETE FROM forecast_snapshots WHERE operation_day_id = ?1",
   "DELETE FROM rotation_manifest_corrections WHERE operation_day_id = ?1",
   "DELETE FROM rotation_tickets WHERE rotation_id IN (SELECT id FROM rotations WHERE operation_day_id = ?1)",
+  "DELETE FROM ticket_group_recalls WHERE operation_day_id = ?1",
   "DELETE FROM operational_blocks WHERE operation_day_id = ?1",
   "DELETE FROM planned_operational_constraints WHERE operation_day_id = ?1",
   "DELETE FROM recurring_operational_rules WHERE operation_day_id = ?1",

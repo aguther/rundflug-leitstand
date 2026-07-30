@@ -1,4 +1,8 @@
-import { assessForecastFreshness } from "@rundflug/domain";
+import {
+  assessForecastFreshness,
+  buildTicketGroupRecallCopy,
+  formatBookingGroupLabel,
+} from "@rundflug/domain";
 import { PUBLIC_STATUS_MESSAGES } from "./public-status-copy";
 import { safeErrorMessage } from "./snapshot";
 import type { Env } from "./types";
@@ -14,6 +18,8 @@ interface StoredPushSubscription {
   ticket_public_code: string;
   group_public_code: string | null;
   gate_label: string;
+  product_code: string;
+  communication_number: number;
   origin: string | null;
 }
 
@@ -46,13 +52,22 @@ const PUSH_TITLES = {
   ROTATION_STARTED: "Rundflug gestartet",
   ROTATION_LANDED: "Rundflug gelandet",
   ROTATION_COMPLETED: "Rundflug abgeschlossen",
+  TICKET_GROUP_RECALL: "Erneuter Aufruf",
 } as const;
 export type PushNotificationType = keyof typeof PUSH_TITLES;
 
 export function pushNotificationFor(
   eventType: PushNotificationType,
   gateLabel: string,
+  communicationLabel?: string,
 ): { title: string; body: string } {
+  if (eventType === "TICKET_GROUP_RECALL") {
+    const copy = buildTicketGroupRecallCopy({
+      communicationLabel: communicationLabel ?? "Ihre Gruppe",
+      gateLabel,
+    });
+    return { title: copy.pushTitle, body: copy.pushBody };
+  }
   const body = {
     PREPARE_FOR_FLIGHT: `Ihr Aufruf steht bevor. Bitte halten Sie sich in der Nähe von „${gateLabel}“ bereit.`,
     GO_TO_GATE: `Bitte kommen Sie jetzt zu „${gateLabel}“ und warten Sie dort auf den Boardingaufruf.`,
@@ -60,12 +75,16 @@ export function pushNotificationFor(
     ROTATION_STARTED: PUBLIC_STATUS_MESSAGES.IN_FLIGHT,
     ROTATION_LANDED: PUBLIC_STATUS_MESSAGES.LANDED,
     ROTATION_COMPLETED: PUBLIC_STATUS_MESSAGES.COMPLETED,
-  } satisfies Record<PushNotificationType, string>;
+  } satisfies Record<Exclude<PushNotificationType, "TICKET_GROUP_RECALL">, string>;
   return { title: PUSH_TITLES[eventType], body: body[eventType] };
 }
 
 export function pushUrgencyFor(eventType: PushNotificationType): "normal" | "high" {
-  return eventType === "GO_TO_GATE" || eventType === "BOARDING_STARTED" ? "high" : "normal";
+  return eventType === "GO_TO_GATE" ||
+    eventType === "BOARDING_STARTED" ||
+    eventType === "TICKET_GROUP_RECALL"
+    ? "high"
+    : "normal";
 }
 
 const PUBLIC_CODE_PATTERN = /^[A-Z2-9]{12,32}$/;
@@ -95,8 +114,9 @@ export function publicPushPayload(
   targetPath: string,
   origin: string | null,
   gateLabel: string,
+  communicationLabel?: string,
 ): string {
-  const copy = pushNotificationFor(eventType, gateLabel);
+  const copy = pushNotificationFor(eventType, gateLabel, communicationLabel);
   const notification = {
     title: copy.title,
     lang: "de",
@@ -184,77 +204,15 @@ export function isAllowedPushEndpoint(value: string): boolean {
   }
 }
 
-export async function sendRotationPushNotifications(
+async function deliverStoredPushSubscriptions(
   env: Env,
-  rotationId: string,
   eventType: PushNotificationType,
-): Promise<number> {
-  const now = new Date().toISOString();
-  const queued = await env.DB.prepare(
-    `INSERT INTO web_push_deliveries
-       (id, operation_day_id, subscription_id, rotation_id, notification_type, status, queued_at)
-     SELECT lower(hex(randomblob(16))), w.operation_day_id, w.id, ?1, ?2, 'PENDING', ?3
-       FROM web_push_subscriptions w
-      WHERE w.status = 'ACTIVE' AND w.delete_after > ?3
-        AND (
-          EXISTS (
-            SELECT 1 FROM rotation_tickets direct_rt
-             WHERE direct_rt.ticket_id = w.ticket_id
-               AND direct_rt.released_at IS NULL
-               AND direct_rt.rotation_id = ?1
-          )
-          OR (
-            w.ticket_group_id IS NOT NULL
-            AND EXISTS (
-              SELECT 1
-                FROM tickets group_ticket
-                JOIN rotation_tickets group_rt
-                  ON group_rt.ticket_id = group_ticket.id
-                 AND group_rt.released_at IS NULL
-               WHERE group_ticket.ticket_group_id = w.ticket_group_id
-                 AND group_rt.rotation_id = ?1
-            )
-          )
-        )
-     ON CONFLICT(subscription_id, rotation_id, notification_type) DO NOTHING`,
-  )
-    .bind(rotationId, eventType, now)
-    .run();
+  subscriptions: readonly StoredPushSubscription[],
+): Promise<void> {
   const vapid = vapidConfiguration(env);
-  if (!vapid) {
-    console.warn(
-      JSON.stringify({
-        level: "warn",
-        code: "WEB_PUSH_NOT_CONFIGURED",
-        notificationType: eventType,
-        queued: queued.meta.changes,
-      }),
-    );
-    return queued.meta.changes;
-  }
-  const subscriptions = await env.DB.prepare(
-    `SELECT d.id AS delivery_id, w.id, w.endpoint, w.p256dh, w.auth, w.target_kind, w.origin,
-            t.public_code AS ticket_public_code,
-            tg.public_status_code AS group_public_code,
-            g.label AS gate_label
-       FROM web_push_deliveries d
-       JOIN web_push_subscriptions w ON w.id = d.subscription_id
-       JOIN tickets t ON t.id = w.ticket_id
-       JOIN ticket_groups tg ON tg.id = t.ticket_group_id
-       JOIN products p ON p.id = tg.product_id
-       JOIN rotations r ON r.id = d.rotation_id
-       JOIN gates g ON g.id = COALESCE(r.gate_id, p.gate_id)
-      WHERE d.rotation_id = ?1 AND d.notification_type = ?2 AND d.status = 'PENDING'
-        AND w.status = 'ACTIVE' AND w.delete_after > ?3
-        AND (
-          (w.target_kind = 'TICKET' AND t.public_code IS NOT NULL)
-          OR (w.target_kind = 'GROUP' AND tg.public_status_code IS NOT NULL)
-        )`,
-  )
-    .bind(rotationId, eventType, now)
-    .all<StoredPushSubscription>();
+  if (!vapid) return;
   await Promise.allSettled(
-    subscriptions.results.map(async (subscription) => {
+    subscriptions.map(async (subscription) => {
       try {
         const targetPath = publicPushTargetPath({
           targetKind: subscription.target_kind,
@@ -262,12 +220,17 @@ export async function sendRotationPushNotifications(
           groupCode: subscription.group_public_code,
         });
         if (!targetPath) return;
+        const communicationLabel = formatBookingGroupLabel(
+          subscription.product_code,
+          subscription.communication_number,
+        );
         const payload = await buildWebPushRequest({
           data: publicPushPayload(
             eventType,
             targetPath,
             subscription.origin,
             subscription.gate_label,
+            communicationLabel,
           ),
           endpoint: subscription.endpoint,
           p256dh: subscription.p256dh,
@@ -287,9 +250,8 @@ export async function sendRotationPushNotifications(
           headers,
           body: requestBody,
         });
-        // Der Push-Dienst ist der einzige Zeuge einer abgelehnten Zustellung; ohne dieses
-        // Protokoll bleibt die Ablehnung in der Zustellzeile nicht von einem Netzfehler
-        // unterscheidbar. Der Endpunkt selbst bleibt außen vor, nur sein Dienst wird benannt.
+        // Der Push-Dienst ist der einzige Zeuge einer abgelehnten Zustellung; der Endpunkt selbst
+        // bleibt aus Protokollen ausgeschlossen.
         const pushService = new URL(subscription.endpoint).host;
         if (response.status === 404 || response.status === 410) {
           console.info(
@@ -345,6 +307,146 @@ export async function sendRotationPushNotifications(
       }
     }),
   );
+}
+
+export async function sendRotationPushNotifications(
+  env: Env,
+  rotationId: string,
+  eventType: PushNotificationType,
+): Promise<number> {
+  const now = new Date().toISOString();
+  const queued = await env.DB.prepare(
+    `INSERT OR IGNORE INTO web_push_deliveries
+       (id, operation_day_id, subscription_id, rotation_id, notification_type, status, queued_at)
+     SELECT lower(hex(randomblob(16))), w.operation_day_id, w.id, ?1, ?2, 'PENDING', ?3
+       FROM web_push_subscriptions w
+      WHERE w.status = 'ACTIVE' AND w.delete_after > ?3
+        AND (
+          EXISTS (
+            SELECT 1 FROM rotation_tickets direct_rt
+             WHERE direct_rt.ticket_id = w.ticket_id
+               AND direct_rt.released_at IS NULL
+               AND direct_rt.rotation_id = ?1
+          )
+          OR (
+            w.ticket_group_id IS NOT NULL
+            AND EXISTS (
+              SELECT 1
+                FROM tickets group_ticket
+                JOIN rotation_tickets group_rt
+                  ON group_rt.ticket_id = group_ticket.id
+                 AND group_rt.released_at IS NULL
+               WHERE group_ticket.ticket_group_id = w.ticket_group_id
+                 AND group_rt.rotation_id = ?1
+            )
+          )
+        )
+    `,
+  )
+    .bind(rotationId, eventType, now)
+    .run();
+  const vapid = vapidConfiguration(env);
+  if (!vapid) {
+    console.warn(
+      JSON.stringify({
+        level: "warn",
+        code: "WEB_PUSH_NOT_CONFIGURED",
+        notificationType: eventType,
+        queued: queued.meta.changes,
+      }),
+    );
+    return queued.meta.changes;
+  }
+  const subscriptions = await env.DB.prepare(
+    `SELECT d.id AS delivery_id, w.id, w.endpoint, w.p256dh, w.auth, w.target_kind, w.origin,
+            t.public_code AS ticket_public_code,
+            tg.public_status_code AS group_public_code,
+            g.label AS gate_label, p.code AS product_code,
+            tg.communication_number
+       FROM web_push_deliveries d
+       JOIN web_push_subscriptions w ON w.id = d.subscription_id
+       JOIN tickets t ON t.id = w.ticket_id
+       JOIN ticket_groups tg ON tg.id = t.ticket_group_id
+       JOIN products p ON p.id = tg.product_id
+       JOIN rotations r ON r.id = d.rotation_id
+       JOIN gates g ON g.id = COALESCE(r.gate_id, p.gate_id)
+      WHERE d.rotation_id = ?1 AND d.notification_type = ?2 AND d.status = 'PENDING'
+        AND w.status = 'ACTIVE' AND w.delete_after > ?3
+        AND (
+          (w.target_kind = 'TICKET' AND t.public_code IS NOT NULL)
+          OR (w.target_kind = 'GROUP' AND tg.public_status_code IS NOT NULL)
+        )`,
+  )
+    .bind(rotationId, eventType, now)
+    .all<StoredPushSubscription>();
+  await deliverStoredPushSubscriptions(env, eventType, subscriptions.results);
+  return queued.meta.changes;
+}
+
+export async function sendTicketGroupRecallPushNotifications(
+  env: Env,
+  recallId: string,
+): Promise<number> {
+  const now = new Date().toISOString();
+  const queued = await env.DB.prepare(
+    `INSERT OR IGNORE INTO web_push_deliveries
+       (id, operation_day_id, subscription_id, ticket_group_recall_id,
+        notification_type, status, queued_at)
+     SELECT lower(hex(randomblob(16))), recall.operation_day_id, subscription.id, recall.id,
+            'TICKET_GROUP_RECALL', 'PENDING', ?2
+       FROM ticket_group_recalls recall
+       JOIN web_push_subscriptions subscription
+         ON subscription.operation_day_id = recall.operation_day_id
+        AND subscription.ticket_group_id = recall.ticket_group_id
+      WHERE recall.id = ?1
+        AND subscription.status = 'ACTIVE'
+        AND subscription.delete_after > ?2`,
+  )
+    .bind(recallId, now)
+    .run();
+  const vapid = vapidConfiguration(env);
+  if (!vapid) {
+    console.warn(
+      JSON.stringify({
+        level: "warn",
+        code: "WEB_PUSH_NOT_CONFIGURED",
+        notificationType: "TICKET_GROUP_RECALL",
+        queued: queued.meta.changes,
+      }),
+    );
+    return queued.meta.changes;
+  }
+  const subscriptions = await env.DB.prepare(
+    `SELECT delivery.id AS delivery_id, subscription.id, subscription.endpoint,
+            subscription.p256dh, subscription.auth, subscription.target_kind,
+            subscription.origin, ticket.public_code AS ticket_public_code,
+            ticket_group.public_status_code AS group_public_code,
+            gate.label AS gate_label, product.code AS product_code,
+            ticket_group.communication_number
+       FROM web_push_deliveries delivery
+       JOIN ticket_group_recalls recall ON recall.id = delivery.ticket_group_recall_id
+       JOIN web_push_subscriptions subscription ON subscription.id = delivery.subscription_id
+       JOIN ticket_groups ticket_group ON ticket_group.id = recall.ticket_group_id
+       JOIN products product ON product.id = ticket_group.product_id
+       JOIN gates gate ON gate.id = product.gate_id
+       JOIN tickets ticket ON ticket.id = subscription.ticket_id
+      WHERE delivery.ticket_group_recall_id = ?1
+        AND delivery.notification_type = 'TICKET_GROUP_RECALL'
+        AND delivery.status = 'PENDING'
+        AND subscription.status = 'ACTIVE'
+        AND subscription.delete_after > ?2
+        AND subscription.ticket_group_id = recall.ticket_group_id
+        AND (
+          (subscription.target_kind = 'TICKET' AND ticket.public_code IS NOT NULL)
+          OR (
+            subscription.target_kind = 'GROUP'
+            AND ticket_group.public_status_code IS NOT NULL
+          )
+        )`,
+  )
+    .bind(recallId, now)
+    .all<StoredPushSubscription>();
+  await deliverStoredPushSubscriptions(env, "TICKET_GROUP_RECALL", subscriptions.results);
   return queued.meta.changes;
 }
 

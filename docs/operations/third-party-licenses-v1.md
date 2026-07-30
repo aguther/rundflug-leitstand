@@ -1,4 +1,4 @@
-# Drittanbieter-Lizenzinventar – Release 1.10.0
+# Drittanbieter-Lizenzinventar – Release 1.11.0
 
 Stand: automatisch aus installiertem Lockfile/Produktionsgraph erzeugt
 Betroffene Anforderung: T-080 und V1100-DEP-010

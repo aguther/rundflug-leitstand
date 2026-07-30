@@ -9,7 +9,7 @@ from pypdf import PdfReader
 ROOT = Path(__file__).resolve().parents[1]
 ROLE_DIRECTORY = ROOT / "docs" / "roles"
 PDF_DIRECTORY = ROOT / "output" / "pdf" / "roles"
-VERSION = "1.10.0"
+VERSION = "1.11.0"
 ROLES = ["kasse", "flight-line", "flight-director", "fids", "administration"]
 FORBIDDEN = ["Flight Line Assist", "Flight Line Supervisor", "BOOTSTRAP_TOKEN", "000000"]
 

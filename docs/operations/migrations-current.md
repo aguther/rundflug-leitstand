@@ -1,4 +1,4 @@
-# Aktuelles Migrationsregister – Release 1.10.0
+# Aktuelles Migrationsregister – Release 1.11.0
 
 Diese Datei wird aus `apps/worker/migrations/*.sql` erzeugt. Vollständige Dateinamen sind die
 D1-Identität; angewandte Dateien werden nicht nachträglich umbenannt.
@@ -60,6 +60,7 @@ D1-Identität; angewandte Dateien werden nicht nachträglich umbenannt.
 | 53 | `0052_precall_decisions.sql` | eindeutig |
 | 54 | `0053_distinct_public_push_transitions.sql` | eindeutig |
 | 55 | `0054_remove_resource_group_planned_rotation.sql` | eindeutig |
+| 56 | `0055_ticket_group_recalls.sql` | eindeutig |
 
-Gesamt: 55 Migrationen. Wiederherstellungsnotizen werden gegen SQL und
+Gesamt: 56 Migrationen. Wiederherstellungsnotizen werden gegen SQL und
 `apps/worker/migrations/README.md` geprüft.

@@ -1,6 +1,6 @@
 {
   "name": "rundflug-leitstand",
-  "version": "1.10.0",
+  "version": "1.11.0",
   "private": true,
   "description": "Cloudflare-native start repository for the Rundflug-Leitstand.",
   "type": "module",
@@ -32,6 +32,7 @@
     "test:pilot-conflict": "node scripts/verify_pilot_conflict.mjs",
     "test:ticket-assignment-concurrency": "node scripts/verify_ticket_assignment_concurrency.mjs",
     "test:ticket-deferrals": "node scripts/verify_ticket_deferrals.mjs",
+    "test:ticket-group-recall": "node scripts/verify_ticket_group_recall.mjs",
     "test:automatic-precall": "node scripts/verify_automatic_precall.mjs",
     "test:first-run-setup": "node scripts/verify_first_run_setup.mjs",
     "test:factory-reset": "node scripts/verify_factory_reset.mjs",

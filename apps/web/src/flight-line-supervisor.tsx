@@ -220,6 +220,8 @@ export function FlightLineSupervisorConsole({
   onGroupAttendance,
   onGroupMissing,
   onGroupRecall,
+  onGroupRecallClear,
+  onGroupRestore,
   onGroupDefer,
 }: {
   board: OperationBoard;
@@ -242,6 +244,8 @@ export function FlightLineSupervisorConsole({
   onGroupAttendance: (ticketGroupId: string, checkedIn: boolean) => void | Promise<void>;
   onGroupMissing: (ticketGroupId: string) => void | Promise<void>;
   onGroupRecall: (ticketGroupId: string) => void | Promise<void>;
+  onGroupRecallClear: (ticketGroupId: string, recallId: string) => void | Promise<void>;
+  onGroupRestore: (ticketGroupId: string) => void | Promise<void>;
   onGroupDefer: (ticketGroupId: string) => void | Promise<void>;
 }) {
   const [resourceGroupId, setResourceGroupId] = useState("");
@@ -684,9 +688,12 @@ export function FlightLineSupervisorConsole({
         }}
         onMissing={onGroupMissing}
         onRecall={onGroupRecall}
+        onRecallClear={onGroupRecallClear}
+        onRestore={onGroupRestore}
         onToggle={onToggleGroup}
         open={assignmentOpen}
         selectedQueueGroupIds={selectedQueueGroupIds}
+        timeZone={board.event.timeZone}
       />
 
       <PilotAssignmentDialogs

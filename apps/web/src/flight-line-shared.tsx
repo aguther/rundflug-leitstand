@@ -1,5 +1,9 @@
 import type { OperationBoard } from "@rundflug/contracts";
-import { aircraftOperationalStateLabels, formatBookingGroupLabel } from "@rundflug/domain";
+import {
+  aircraftOperationalStateLabels,
+  buildTicketGroupRecallCopy,
+  formatBookingGroupLabel,
+} from "@rundflug/domain";
 import {
   Bell,
   CheckCircle2,
@@ -350,6 +354,102 @@ function queuedSegmentPresentCount(group: FlightLineQueueGroup): number {
   return group.nextSegmentPresentCount ?? group.presentCount;
 }
 
+export function TicketGroupRecallDialog({
+  group,
+  gateLabel,
+  open,
+  busy,
+  onCancel,
+  onConfirm,
+}: {
+  group: FlightLineQueueGroup | null;
+  gateLabel: string;
+  open: boolean;
+  busy: boolean;
+  onCancel: () => void;
+  onConfirm: () => void | Promise<void>;
+}) {
+  const communicationLabel = group
+    ? formatBookingGroupLabel(group.productCode, group.communicationNumber)
+    : "";
+  const copy = buildTicketGroupRecallCopy({ communicationLabel, gateLabel });
+  return (
+    <ConfirmationDialog
+      body={
+        group ? (
+          <div className="ticket-group-recall-dialog">
+            <dl>
+              <div>
+                <dt>Gruppe</dt>
+                <dd>{communicationLabel}</dd>
+              </div>
+              <div>
+                <dt>Gruppengröße</dt>
+                <dd>
+                  {group.ticketCount} Person{group.ticketCount === 1 ? "" : "en"}
+                </dd>
+              </div>
+              <div>
+                <dt>Gate</dt>
+                <dd>{gateLabel}</dd>
+              </div>
+            </dl>
+            <section>
+              <span>FIDS</span>
+              <p>{copy.fids}</p>
+            </section>
+            <section>
+              <span>Statusseite</span>
+              <p>{copy.publicStatus}</p>
+            </section>
+            <section>
+              <span>Push</span>
+              <strong>{copy.pushTitle}</strong>
+              <p>{copy.pushBody}</p>
+            </section>
+          </div>
+        ) : null
+      }
+      confirmBusy={busy}
+      confirmDisabled={!group || !gateLabel}
+      confirmLabel="Nachrufen"
+      onCancel={onCancel}
+      onConfirm={onConfirm}
+      open={open}
+      title="Buchungsgruppe nachrufen"
+    />
+  );
+}
+
+export function TicketGroupRecallStatus({
+  group,
+  timeZone,
+  onClear,
+}: {
+  group: FlightLineQueueGroup;
+  timeZone: string;
+  onClear: (ticketGroupId: string, recallId: string) => void | Promise<void>;
+}) {
+  if (!group.activeRecall) return null;
+  return (
+    <div className="ticket-group-recall-status" role="status">
+      <span aria-hidden="true" className="ticket-group-recall-status__bell">
+        <Bell />
+      </span>
+      <span>
+        <strong>Nachruf aktiv</strong>
+        <small>
+          Seit {formatFlightLineTime(group.activeRecall.startedAt, timeZone)} · Nachruf{" "}
+          {group.recallCount}
+        </small>
+      </span>
+      <button onClick={() => onClear(group.id, group.activeRecall?.id ?? "")} type="button">
+        Nachruf beenden
+      </button>
+    </div>
+  );
+}
+
 function AssignmentQueueRow({
   group,
   selected,
@@ -359,7 +459,10 @@ function AssignmentQueueRow({
   onAttendance,
   onMissing,
   onRecall,
+  onRecallClear,
+  onRestore,
   onDefer,
+  timeZone,
 }: {
   group: FlightLineQueueGroup;
   selected: boolean;
@@ -369,7 +472,10 @@ function AssignmentQueueRow({
   onAttendance: (ticketGroupId: string, checkedIn: boolean) => void | Promise<void>;
   onMissing: (ticketGroupId: string) => void | Promise<void>;
   onRecall: (ticketGroupId: string) => void | Promise<void>;
+  onRecallClear: (ticketGroupId: string, recallId: string) => void | Promise<void>;
+  onRestore: (ticketGroupId: string) => void | Promise<void>;
   onDefer?: ((ticketGroupId: string) => void | Promise<void>) | undefined;
+  timeZone: string;
 }) {
   const segmentTicketCount = queuedSegmentTicketCount(group);
   const segmentPresentCount = queuedSegmentPresentCount(group);
@@ -403,23 +509,36 @@ function AssignmentQueueRow({
         >
           <CheckCircle2 aria-hidden="true" />
         </IconButton>
-        <IconButton
-          className="flight-director-missing-action"
-          label={`${communicationLabel} nicht da`}
-          onClick={() => onMissing(group.id)}
-          size="touch"
-          type="button"
-        >
-          <UserRoundX aria-hidden="true" />
-        </IconButton>
-        <IconButton
-          label={`${communicationLabel} nachrufen`}
-          onClick={() => onRecall(group.id)}
-          size="touch"
-          type="button"
-        >
-          <Bell aria-hidden="true" />
-        </IconButton>
+        {group.status === "MISSING" ? (
+          <IconButton
+            label={`${communicationLabel} zurück in die Queue`}
+            onClick={() => onRestore(group.id)}
+            size="touch"
+            type="button"
+          >
+            <RotateCcw aria-hidden="true" />
+          </IconButton>
+        ) : (
+          <IconButton
+            className="flight-director-missing-action"
+            label={`${communicationLabel} nicht da`}
+            onClick={() => onMissing(group.id)}
+            size="touch"
+            type="button"
+          >
+            <UserRoundX aria-hidden="true" />
+          </IconButton>
+        )}
+        {!group.activeRecall && ["QUEUED", "MISSING"].includes(group.status) ? (
+          <IconButton
+            label={`${communicationLabel} nachrufen`}
+            onClick={() => onRecall(group.id)}
+            size="touch"
+            type="button"
+          >
+            <Bell aria-hidden="true" />
+          </IconButton>
+        ) : null}
         {onDefer ? (
           <IconButton
             label={`${communicationLabel} zurückstellen`}
@@ -446,6 +565,7 @@ function AssignmentQueueRow({
       <span>
         {segmentPresentCount}/{segmentTicketCount} anwesend
       </span>
+      <TicketGroupRecallStatus group={group} onClear={onRecallClear} timeZone={timeZone} />
     </div>
   );
 }
@@ -462,7 +582,10 @@ export function BookingGroupAssignmentDialog({
   onAttendance,
   onMissing,
   onRecall,
+  onRecallClear,
+  onRestore,
   onDefer,
+  timeZone,
 }: {
   aircraft: FlightLineAircraft | undefined;
   groups: FlightLineQueueGroup[];
@@ -475,7 +598,10 @@ export function BookingGroupAssignmentDialog({
   onAttendance: (ticketGroupId: string, checkedIn: boolean) => void | Promise<void>;
   onMissing: (ticketGroupId: string) => void | Promise<void>;
   onRecall: (ticketGroupId: string) => void | Promise<void>;
+  onRecallClear: (ticketGroupId: string, recallId: string) => void | Promise<void>;
+  onRestore: (ticketGroupId: string) => void | Promise<void>;
   onDefer?: (ticketGroupId: string) => void | Promise<void>;
+  timeZone: string;
 }) {
   const selectedGroups = groups.filter((group) => selectedQueueGroupIds.includes(group.id));
   const selectedSeats = selectedGroups.reduce(
@@ -523,9 +649,12 @@ export function BookingGroupAssignmentDialog({
                 onDefer={onDefer}
                 onMissing={onMissing}
                 onRecall={onRecall}
+                onRecallClear={onRecallClear}
+                onRestore={onRestore}
                 onToggle={onToggle}
                 selected={selectedQueueGroupIds.includes(group.id)}
                 selectedSeats={selectedSeats}
+                timeZone={timeZone}
               />
             ))
           ) : (
