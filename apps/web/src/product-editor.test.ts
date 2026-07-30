@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   formatEuroInput,
   parseEuroToCents,
-  productPositionOptions,
   setWeightCaptureMode,
   toggleWeightClass,
   weightCaptureEnabled,
@@ -30,17 +29,5 @@ describe("product editor values", () => {
     expect(weightClassesForChildCompanion(["NOT_CAPTURED"], true)).toEqual(["CHILD"]);
     expect(weightClassesForChildCompanion(["NORMAL"], true)).toEqual(["NORMAL", "CHILD"]);
     expect(weightClassesForChildCompanion(["CHILD", "NORMAL"], false)).toEqual(["CHILD", "NORMAL"]);
-  });
-
-  it("describes a product position without exposing sort-order internals", () => {
-    expect(
-      productPositionOptions(
-        [
-          { id: "short", name: "Kurzflug", sortOrder: 10 },
-          { id: "panorama", name: "Panorama", sortOrder: 20 },
-        ],
-        "new",
-      ).map((option) => option.label),
-    ).toEqual(["Ganz vorne", "Nach „Kurzflug“", "Nach „Panorama“"]);
   });
 });

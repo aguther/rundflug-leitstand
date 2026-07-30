@@ -872,13 +872,46 @@ describe("commandEnvelopeSchema", () => {
         promisedFlightMinutes: 20,
         childCompanionRequired: true,
         weightClasses: ["CHILD", "NORMAL", "HEAVY"],
-        sortOrder: 10,
         reason: "Stammdatenpflege",
         adminPin: "0000",
       },
     });
     expect(parsed.type).toBe("UPSERT_PRODUCT");
     expect("guestName" in parsed.payload).toBe(false);
+  });
+
+  it("validates a complete, duplicate-free cashier product order", () => {
+    const parsed = commandEnvelopeSchema.parse({
+      commandId: "ae9539ac-f320-43f9-a0b7-f973c5252c54",
+      eventId: "demo-2026",
+      deviceId: "cashier-1",
+      expectedVersion: 14,
+      issuedAt: "2026-07-30T12:00:00.000Z",
+      type: "REORDER_CASHIER_PRODUCTS",
+      payload: {
+        expectedProductIds: ["short", "panorama"],
+        orderedProductIds: ["panorama", "short"],
+      },
+    });
+
+    expect(parsed.type).toBe("REORDER_CASHIER_PRODUCTS");
+  });
+
+  it("rejects duplicate products in a cashier order", () => {
+    const parsed = commandEnvelopeSchema.safeParse({
+      commandId: "e019f015-f21f-4916-ad27-b3538879dce9",
+      eventId: "demo-2026",
+      deviceId: "cashier-1",
+      expectedVersion: 14,
+      issuedAt: "2026-07-30T12:00:00.000Z",
+      type: "REORDER_CASHIER_PRODUCTS",
+      payload: {
+        expectedProductIds: ["short", "panorama"],
+        orderedProductIds: ["short", "short"],
+      },
+    });
+
+    expect(parsed.success).toBe(false);
   });
 
   it("keeps disabled weight capture exclusive", () => {

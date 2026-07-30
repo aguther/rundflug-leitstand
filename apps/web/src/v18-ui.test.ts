@@ -39,7 +39,7 @@ describe("V1.8 approved UI deltas", () => {
     expect(cashier).toContain("publicGroupCode: groupCode");
   });
 
-  it("keeps each busy indicator until its visible follow-up state is projected", () => {
+  it("keeps operational busy states through projection and releases sales after persistence", () => {
     const rotationAction = flightLineView.slice(
       flightLineView.indexOf("async function advance("),
       flightLineView.indexOf("async function setGroupAttendance("),
@@ -55,9 +55,15 @@ describe("V1.8 approved UI deltas", () => {
 
     expect(rotationAction).toContain("await refresh(result.event.version)");
     expect(aircraftAction).toContain("await refresh(result.event.version)");
-    expect(ticketSale).toContain("const [printPrepared] = await Promise.all([");
+    expect(ticketSale).toContain("setBusyProductId(null)");
+    expect(ticketSale).toContain("await Promise.allSettled([");
     expect(ticketSale).toContain("refresh(saleResult.event.version)");
-    expect(ticketSale).toContain("loadTicketList({ preserveLoaded: true })");
+    expect(ticketSale).toContain("mergeTicketGroupsById([soldTicketGroupId])");
+    expect(ticketSale).toContain("loadTicketList({ preserveLoaded: true, reportError: false })");
+    expect(ticketSale.indexOf("setBusyProductId(null)")).toBeLessThan(
+      ticketSale.indexOf("await Promise.allSettled(["),
+    );
+    expect(ticketSale).toContain("receiptRequestToken === receiptRequestRef.current");
     expect(`${rotationAction}\n${aircraftAction}\n${ticketSale}`).not.toContain("void refresh(");
   });
 

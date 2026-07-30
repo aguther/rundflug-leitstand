@@ -38,7 +38,11 @@ Originalhardware-Abnahme.
 
 Nach höchstens zehn Minuten Einweisung führt jede Testperson 30 Standardverkäufe aus. Ein
 Standardverkauf beginnt mit der Auswahl des Produkts und endet mit der sichtbaren QR-Ticketgruppe.
-Freiwillige Zusatzinformationen und die Zeit zum physischen Kassieren werden nicht gemessen.
+Zusätzlich werden die atomare Serverbestätigung, die erneute Verkaufsbereitschaft und die
+vollständige Synchronisation getrennt erfasst. Die erneute Verkaufsbereitschaft muss unmittelbar
+nach der Bestätigung bestehen; QR-, Listen- und Projektionsabgleich dürfen den nächsten Verkauf
+nicht sperren. Freiwillige Zusatzinformationen und die Zeit zum physischen Kassieren werden nicht
+gemessen.
 
 Zu protokollieren sind je Verkauf:
 

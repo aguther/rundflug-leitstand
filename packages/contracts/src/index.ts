@@ -191,6 +191,14 @@ export type GateDisplayFilter = z.infer<typeof gateDisplayFilterSchema>;
 
 const productWeightClassSchema = z.enum(["NOT_CAPTURED", "CHILD", "NORMAL", "HEAVY", "INDIVIDUAL"]);
 
+const cashierProductOrderSchema = z
+  .array(z.string().min(1).max(100))
+  .min(1)
+  .max(1000)
+  .refine((values) => new Set(values).size === values.length, {
+    message: "Die Kassenreihenfolge darf keine Produkte doppelt enthalten.",
+  });
+
 const upsertProductPayloadSchema = z
   .object({
     productId: z.string().min(1).max(100),
@@ -215,7 +223,8 @@ const upsertProductPayloadSchema = z
       .refine((values) => new Set(values).size === values.length, {
         message: "Gewichtsklassen dürfen nicht doppelt vorkommen.",
       }),
-    sortOrder: z.number().int().min(0).max(1000),
+    // Rückwärtskompatibel für ältere Clients; die Kassenreihenfolge wird separat gepflegt.
+    sortOrder: z.number().int().min(0).max(1000).optional(),
     reason: z.string().trim().min(3).max(240),
     adminPin: z.string().min(4).max(32),
   })
@@ -684,6 +693,15 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
       reason: z.string().trim().min(3).max(240),
       adminPin: z.string().min(4).max(32),
     }),
+  }),
+  commandBaseSchema.extend({
+    type: z.literal("REORDER_CASHIER_PRODUCTS"),
+    payload: z
+      .object({
+        expectedProductIds: cashierProductOrderSchema,
+        orderedProductIds: cashierProductOrderSchema,
+      })
+      .strict(),
   }),
   commandBaseSchema.extend({
     type: z.literal("UPSERT_PRODUCT"),

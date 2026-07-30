@@ -326,9 +326,11 @@ try {
   const commandServerTiming = sale.response.headers.get("server-timing") ?? "";
   if (
     !commandServerTiming.includes("command-queue;dur=") ||
-    !commandServerTiming.includes("command;dur=")
+    !commandServerTiming.includes("command;dur=") ||
+    !commandServerTiming.includes("sale-preflight;dur=") ||
+    !commandServerTiming.includes("sale-persist;dur=")
   ) {
-    throw new Error("Server-Timing für das operative Kommando fehlt.");
+    throw new Error("Server-Timing für Verkaufsprüfung oder Persistenz fehlt.");
   }
   await forecastSignal;
   const forecastElapsedMs = performance.now() - saleStartedAt;

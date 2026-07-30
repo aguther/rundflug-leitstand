@@ -29,6 +29,14 @@ describe("V1.2 compact administration", () => {
     expect(stylesSource).toContain(".master-data-drawer");
   });
 
+  it("keeps cashier order out of product administration and sorts product choices alphabetically", () => {
+    expect(appSource).not.toContain("Position in Anzeigen");
+    expect(appSource).not.toContain("productSortOrder");
+    expect(appSource).toContain("const alphabeticalProducts =");
+    expect(appSource).toContain("adminTableCollator.compare(left.name, right.name)");
+    expect(appSource).toContain("alphabeticalProducts.map((product)");
+  });
+
   it("keeps event management and event creation in one modal flow", () => {
     expect(appSource).toContain('useState<"closed" | "catalog" | "create">(');
     expect(appSource).toContain('open={eventDialogView !== "closed"}');

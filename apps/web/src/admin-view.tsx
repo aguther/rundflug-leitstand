@@ -116,7 +116,7 @@ import {
   rotationStatusLabel,
   useOperationBoard,
 } from "./operation-workspace";
-import { formatEuroInput, parseEuroToCents, productPositionOptions } from "./product-editor";
+import { formatEuroInput, parseEuroToCents } from "./product-editor";
 import { ProductReferenceRotation } from "./product-reference-rotation";
 
 const adminTableCollator = new Intl.Collator("de-DE", {
@@ -454,7 +454,6 @@ export function AdminView() {
   const [productPromisedFlightMinutes, setProductPromisedFlightMinutes] = useState(20);
   const [productChildCompanion, setProductChildCompanion] = useState(false);
   const [productWeightClasses, setProductWeightClasses] = useState<string[]>(["NOT_CAPTURED"]);
-  const [productSortOrder, setProductSortOrder] = useState(10);
   const [gateEditorId, setGateEditorId] = useState("new");
   const [gateLabel, setGateLabel] = useState("");
   const [gateType, setGateType] = useState<"FLIGHT_LINE" | "BOARDING" | "DISPLAY_ONLY">(
@@ -506,7 +505,6 @@ export function AdminView() {
             productPromisedFlightMinutes,
             productChildCompanion,
             productWeightClasses,
-            productSortOrder,
           ])
         : masterDataCategory === "resource-groups"
           ? createMasterEditorSnapshot([
@@ -1137,7 +1135,6 @@ export function AdminView() {
     const nextPromisedFlightMinutes = entry?.promisedFlightMinutes ?? 20;
     const nextChildCompanion = entry?.childCompanionRequired ?? false;
     const nextWeightClasses = entry?.weightClasses ?? ["NOT_CAPTURED"];
-    const nextSortOrder = entry?.sortOrder ?? 10;
     initialMasterEditorSnapshotRef.current = createMasterEditorSnapshot([
       "products",
       nextName,
@@ -1150,7 +1147,6 @@ export function AdminView() {
       nextPromisedFlightMinutes,
       nextChildCompanion,
       nextWeightClasses,
-      nextSortOrder,
     ]);
     setProductEditorId(id);
     setProductName(nextName);
@@ -1163,7 +1159,6 @@ export function AdminView() {
     setProductPromisedFlightMinutes(nextPromisedFlightMinutes);
     setProductChildCompanion(nextChildCompanion);
     setProductWeightClasses(nextWeightClasses);
-    setProductSortOrder(nextSortOrder);
     setMasterSubmitAttempted(false);
     setMasterEditorOpen(true);
   }
@@ -1313,7 +1308,6 @@ export function AdminView() {
             weightClasses: productWeightClasses as Array<
               "NOT_CAPTURED" | "CHILD" | "NORMAL" | "HEAVY" | "INDIVIDUAL"
             >,
-            sortOrder: productSortOrder,
             reason: MASTER_DATA_AUDIT_REASON,
             adminPin: adminPinRef.current,
           },
@@ -2476,6 +2470,11 @@ export function AdminView() {
   }
 
   const normalizedMasterSearch = masterSearch.trim().toLocaleLowerCase("de-DE");
+  const alphabeticalProducts = (board?.products ?? []).toSorted(
+    (left, right) =>
+      adminTableCollator.compare(left.name, right.name) ||
+      adminTableCollator.compare(left.code, right.code),
+  );
   const visibleGates = sortMasterRows(
     "gates",
     (board?.gates ?? []).filter((gate) =>
@@ -2546,7 +2545,7 @@ export function AdminView() {
   );
   const visibleProducts = sortMasterRows(
     "products",
-    (board?.products ?? []).filter((product) =>
+    alphabeticalProducts.filter((product) =>
       `${product.code} ${product.name} ${product.resourceGroupName} ${product.gateLabel}`
         .toLocaleLowerCase("de-DE")
         .includes(normalizedMasterSearch),
@@ -2592,7 +2591,6 @@ export function AdminView() {
     (maximum, aircraft) => Math.max(maximum, aircraft.passengerSeats),
     0,
   );
-  const productPositionChoices = productPositionOptions(board?.products ?? [], productEditorId);
   const masterDataSingularLabel: Record<MasterDataCategory, string> = {
     gates: "Gate",
     "resource-groups": "Ressourcengruppe",
@@ -4428,7 +4426,7 @@ export function AdminView() {
                       />
                     </strong>
                     <div className="gate-filter-options">
-                      {board?.products.map((product) => (
+                      {alphabeticalProducts.map((product) => (
                         <CheckboxField
                           checked={gateDisplayProductIds.includes(product.id)}
                           key={product.id}
@@ -4660,24 +4658,6 @@ export function AdminView() {
                       deboardingMinutes={plannedDeboardingMinutes}
                       offBlockToOnBlockMinutes={productReferenceDuration}
                     />
-                    <div className="field-control">
-                      <FieldLabel
-                        htmlFor="product-sort-order"
-                        label="Position in Anzeigen"
-                        help="Legt nur die Reihenfolge in Kasse und Anzeigen fest. Queue und Priorität ändern sich dadurch nicht."
-                      />
-                      <select
-                        id="product-sort-order"
-                        value={productSortOrder}
-                        onChange={(event) => setProductSortOrder(Number(event.target.value))}
-                      >
-                        {productPositionChoices.map((option) => (
-                          <option key={`${option.value}-${option.label}`} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
                   </div>
                 </section>
               </fieldset>
@@ -5375,7 +5355,7 @@ export function AdminView() {
               onChange={setSaleClosesAt}
             />
             <div className="capacity-overview">
-              {board?.products.map((product) => (
+              {alphabeticalProducts.map((product) => (
                 <div className="capacity-row" key={product.id}>
                   <div>
                     <strong>{product.name}</strong>
@@ -5883,7 +5863,7 @@ export function AdminView() {
                           onChange={(event) => setHistoryProductId(event.target.value)}
                         >
                           <option value="">Alle</option>
-                          {board?.products.map((product) => (
+                          {alphabeticalProducts.map((product) => (
                             <option value={product.id} key={product.id}>
                               {product.name}
                             </option>

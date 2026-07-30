@@ -3571,7 +3571,7 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
          LEFT JOIN tickets t ON t.ticket_group_id = tg.id
         WHERE p.operation_day_id = ?1
         GROUP BY p.id
-        ORDER BY p.sort_order, p.name`,
+        ORDER BY p.sort_order, p.name, p.id`,
       )
         .bind(eventId)
         .all<{

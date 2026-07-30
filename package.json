@@ -44,6 +44,7 @@
     "test:cloudflare-availability": "node scripts/verify_cloudflare_availability.mjs",
     "test:worker-runtime": "vitest run --config vitest.worker.config.ts",
     "test:browser:roles": "node scripts/capture_role_guides.mjs",
+    "test:browser:cashier": "node scripts/verify_cashier_browser.mjs",
     "test:v1-integrations": "node scripts/verify_v1_integrations.mjs",
     "test:watch": "vitest",
     "lint": "biome check .",

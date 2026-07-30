@@ -73,6 +73,42 @@ Endzustände: Verkauf einschließlich aktualisierter Liste und vorbereitetem Gru
 Browser-Automation und sind daher nicht mit der oben separat gemessenen lokalen
 Eingabereaktionsgrenze gleichzusetzen. In Kasse und Flight Line traten keine Browserfehler auf.
 
+## Nachmessung des verkürzten Kassenpfads
+
+Am 30. Juli 2026 wurde der Skalierungslauf nach der Trennung von persistiertem Verkauf und
+nachlaufendem Ansichtsabgleich erneut ausgeführt:
+
+| Messpunkt | Ergebnis | Grenze |
+| --- | ---: | ---: |
+| Operationssicht | 90 ms | < 2.000 ms |
+| 20 parallele Geräte, p95 | 1.212 ms | < 2.000 ms |
+| Historie | 52 ms | < 2.000 ms |
+| Kassenliste Seite 1 / Seite 2 | 18 ms / 14 ms | jeweils < 2.000 ms |
+| gezielte Kassen-Revalidierung | 15 ms | < 2.000 ms |
+| serverseitige Verkaufsbestätigung | 29 ms | < 2.000 ms |
+| Forecast für 300 Umläufe | 285 ms | < 2.000 ms |
+
+Der Test verlangt nun zusätzlich zu Warteschlangen- und Gesamtkommandozeit die
+datenschutzneutralen Phasen `sale-preflight` und `sale-persist` im `Server-Timing`-Header.
+Auditierung, Idempotenzbeleg, Outbox und fachliche Mutation bleiben vollständig im vor der
+Bestätigung abgewarteten D1-Batch.
+
+`npm run test:browser:cashier` führte anschließend 30 Verkäufe gegen einen isolierten lokalen
+Worker und eine synthetische D1-Datenbank in Microsoft Edge aus:
+
+| Browser-Messpunkt | Median | Maximum | Grenze |
+| --- | ---: | ---: | ---: |
+| Bereitschaft für den nächsten Verkauf | 23,5 ms | 96,2 ms | < 1.000 ms |
+| QR-Erzeugung | 8,5 ms | 29,0 ms | < 2.000 ms |
+| vollständige Ansichts- und Belegsynchronisation | 101,2 ms | 240,8 ms | < 2.000 ms |
+
+Der Lauf prüft zusätzlich 44-px-Symbolcontrols, Tastatur- und Pfeilbedienung der
+Kassenreihenfolge, Abbrechen/Speichern, Schutz des neuesten Belegs durch das Sequenz-Token sowie
+eine fehlgeschlagene Nachsynchronisation, die den bestätigten Verkauf nicht als Fehlschlag
+darstellen darf. Stepper und Reset wurden als kompakte Einheit sowie die Reihenfolge-Aktion
+geometrisch rechtsbündig nachgewiesen. Light und Dark wurden bei 1440 × 1000, 1024 × 768 und
+430 × 900 ohne horizontales Überlaufen abgenommen.
+
 Nicht durch diese lokalen Läufe ersetzt werden der zwölfstündige Langlauf, die
 Cloudflare-Verfügbarkeitsmessung oder die Generalprobe auf Originalhardware. Diese Nachweise bleiben
 eigene Abnahmepunkte.
