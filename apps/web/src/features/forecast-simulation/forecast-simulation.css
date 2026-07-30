@@ -228,6 +228,12 @@
   opacity: 0.5;
 }
 
+.sim-variant-actions .sim-variant-export {
+  grid-column: 1 / -1;
+  min-height: 36px;
+  color: var(--ui-text);
+}
+
 .sim-variant-actions svg {
   width: 13px;
 }
@@ -1429,6 +1435,10 @@
   .sim-plan-grid--times,
   .sim-plan-import-preview > header,
   .sim-plan-import-preview dl {
+    grid-template-columns: 1fr;
+  }
+
+  .sim-plan-import-preview .sim-scenario-import-summary {
     grid-template-columns: 1fr;
   }
 

@@ -3,6 +3,7 @@ import {
   masterDataTemplateSchema,
   type SimulationPlanExport,
   type SimulationScenarioTemplate,
+  type SimulationScenarioTemplateV2,
   simulationPlanExportSchema,
   simulationScenarioTemplateSchema,
 } from "@rundflug/contracts";
@@ -108,8 +109,16 @@ function createRecurringRules(
   exported: SimulationPlanExport | null,
 ): SimulationRecurringOperationalRule[] {
   return (exported?.recurringRules ?? []).map((entry) => ({
-    ...entry,
+    key: entry.key,
+    scopeType: entry.scopeType,
     scopeId: entry.scopeKey,
+    kind: entry.kind,
+    triggerMetric: entry.triggerMetric,
+    intervalValue: entry.intervalValue,
+    progressValue: entry.progressValue,
+    minimumDurationMinutes: entry.minimumDurationMinutes,
+    typicalDurationMinutes: entry.typicalDurationMinutes,
+    maximumDurationMinutes: entry.maximumDurationMinutes,
   }));
 }
 
@@ -213,27 +222,96 @@ function buildPreview(
   };
 }
 
+function restoreVersionTwoScenarioConfig(
+  exported: SimulationScenarioTemplateV2["config"],
+): SimulationConfig {
+  const config = structuredClone(exported);
+  const operationalModel = config.operationalModel
+    ? {
+        ...config.operationalModel,
+        aircraft: config.operationalModel.aircraft.map((entry) => ({
+          id: entry.id,
+          registration: entry.registration,
+          aircraftType: entry.aircraftType,
+          capacity: entry.capacity,
+          ...(entry.refuelReminderThreshold !== undefined
+            ? { refuelReminderThreshold: entry.refuelReminderThreshold }
+            : {}),
+          ...(entry.resourceGroupId !== undefined
+            ? { resourceGroupId: entry.resourceGroupId }
+            : {}),
+        })),
+      }
+    : null;
+  return {
+    preset: config.preset,
+    seed: config.seed,
+    schedule: config.schedule,
+    adminParameters: config.adminParameters,
+    realityModel: config.realityModel,
+    forecastTuning: config.forecastTuning,
+    ...(operationalModel ? { operationalModel } : {}),
+    ...(config.demandByProduct ? { demandByProduct: config.demandByProduct } : {}),
+    plannedOperations: config.plannedOperations.map((entry) => ({
+      key: entry.key,
+      scopeType: entry.scopeType,
+      scopeId: entry.scopeId,
+      kind: entry.kind,
+      ...(entry.effectMode !== undefined ? { effectMode: entry.effectMode } : {}),
+      ...(entry.durationMultiplierPercent !== undefined
+        ? { durationMultiplierPercent: entry.durationMultiplierPercent }
+        : {}),
+      startMode: entry.startMode,
+      earliestStartAt: entry.earliestStartAt,
+      latestStartAt: entry.latestStartAt,
+      afterRotationId: entry.afterRotationId,
+      unresolvedAfterCurrentRotation: entry.unresolvedAfterCurrentRotation,
+      minimumDurationMinutes: entry.minimumDurationMinutes,
+      typicalDurationMinutes: entry.typicalDurationMinutes,
+      maximumDurationMinutes: entry.maximumDurationMinutes,
+      publicNote: entry.publicNote,
+    })),
+    recurringRules: config.recurringRules,
+  };
+}
+
 function buildScenarioPreview(template: SimulationScenarioTemplate): SimulationPlanImportPreview {
+  const config: SimulationConfig =
+    template.formatVersion === 1
+      ? {
+          ...structuredClone(template.config),
+          plannedOperations: [],
+          recurringRules: [],
+        }
+      : restoreVersionTwoScenarioConfig(template.config);
+  const model = config.operationalModel;
+  const unresolvedAfterCurrentRotation = config.plannedOperations.filter(
+    (entry) => entry.unresolvedAfterCurrentRotation,
+  ).length;
+  const warnings =
+    unresolvedAfterCurrentRotation > 0
+      ? [
+          `${unresolvedAfterCurrentRotation} Planeintrag/Planeinträge beginnen „nach aktuellem Umlauf“. Sie müssen vor dem Lauf ausgeschlossen oder einem simulierten Umlauf zugeordnet werden.`,
+        ]
+      : [];
   return {
     sourceName: template.name,
     format: template.format,
     category: "SCENARIO",
-    config: {
-      ...structuredClone(template.config),
-      plannedOperations: [],
-      recurringRules: [],
-    },
+    config,
     counts: {
-      gates: 0,
-      resourceGroups: 0,
-      aircraft: template.config.adminParameters.aircraftCount,
-      pilots: template.config.adminParameters.activePilotCount,
-      products: 0,
-      plannedOperations: 0,
-      recurringRules: 0,
-      unresolvedAfterCurrentRotation: 0,
+      gates: model?.gates.length ?? 0,
+      resourceGroups: model?.resourceGroups.length ?? 0,
+      aircraft: model?.aircraft.length ?? config.adminParameters.aircraftCount,
+      pilots:
+        model?.pilots.filter((entry) => entry.active).length ??
+        config.adminParameters.activePilotCount,
+      products: model?.products.length ?? 0,
+      plannedOperations: config.plannedOperations.length,
+      recurringRules: config.recurringRules?.length ?? 0,
+      unresolvedAfterCurrentRotation,
     },
-    warnings: [],
+    warnings,
   };
 }
 

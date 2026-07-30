@@ -113,11 +113,17 @@ Import ausdrücklich unaufgelöst.
 
 Der gemeinsame Dialog **Simulationsgrundlage laden** akzeptiert das operative Format V1/V2, das
 bestehende `rundflug-master-data-template` Version 1 und das browserlokale
-`rundflug-simulation-scenario` Version 1. Das neue Szenarioformat enthält ausschließlich die
-editierbaren Preset-, Zeit-, Nachfrage-, Phasen-, Ereignis- und Prognoseparameter. Es enthält keine
-operative Topologie, Tickets, Queues, Ist-Zustände, Ergebnisse oder manuellen Ereignisse. Das im
-Dialog gewählte eingebaute Szenario kann als JSON heruntergeladen, manuell bearbeitet und wieder
-importiert werden.
+`rundflug-simulation-scenario` Version 1 und 2. Version 1 bleibt als begrenzte Vorlage mit Preset-,
+Zeit-, Nachfrage-, Phasen-, Ereignis- und Prognoseparametern importkompatibel. Version 2 sichert
+zusätzlich die vollständige konfigurierbare Variante: operative Topologie, produktbezogene
+Nachfrage, Planeinträge und wiederkehrende Regeln. Tickets, Queues, Ist-Zustände, Ergebnisse,
+manuelle Laufereignisse und die Abspielposition sind weiterhin nicht enthalten.
+
+Das im Dialog gewählte eingebaute Szenario kann als JSON-Vorlage heruntergeladen werden. Zusätzlich
+exportiert **Variante exportieren** die aktuell ausgewählte Variante als strikt validierte
+V2-Szenariodatei. Der erneute Import erzeugt stets eine neue Variante und überschreibt keine bereits
+geöffnete Konfiguration; Namenskollisionen erhalten einen nummerierten Zusatz. Export, Vorschau und
+Import bleiben vollständig browserlokal und führen keine API-Abfrage aus.
 
 Alle Dateien sind auf 1 MiB begrenzt und werden vor der Übernahme vollständig gegen ihr striktes
 Vertragsschema geprüft. Die Vorschau nennt Quelle und die jeweils relevanten Parameter oder Anzahlen.
@@ -129,7 +135,7 @@ Mehrere Varianten existieren ausschließlich im React-Zustand der geöffneten Si
 können benannt, dupliziert, gewechselt und gelöscht werden. Sowohl Szenarioauswahl als auch
 Dateiimport erzeugen stets eine neue, automatisch ausgewählte Variante; Namenskollisionen erhalten
 einen nummerierten Zusatz. Vorhandene Varianten werden nicht überschrieben. Ein Reload verwirft sie
-bewusst.
+weiterhin bewusst; eine benötigte Konfiguration wird vorher über den V2-Export gesichert.
 
 Für importierte Stammdaten erzeugt jede Variante weiterhin ausschließlich synthetische Nachfrage,
 Gruppen, Umläufe und Ist-Ereignisse. Die voreingestellte Gesamtnachfrage von 18 Personen pro
