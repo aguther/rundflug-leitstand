@@ -45,6 +45,10 @@ import {
 } from "./SimulationFoundationDialog";
 import { SimulationHistoryDialog } from "./SimulationHistoryDialog";
 import { createSimulationExport } from "./simulation-export";
+import {
+  createSimulationScenarioTemplate,
+  simulationScenarioTemplateFileName,
+} from "./simulation-scenario-template";
 import "./forecast-simulation.css";
 
 const MINUTE_MS = 60_000;
@@ -499,6 +503,26 @@ export function ForecastSimulationView() {
     activateVariant(replacement);
   };
 
+  const exportVariant = () => {
+    const selectedVariant = variants.find((variant) => variant.id === selectedVariantId);
+    if (!selectedVariant) return;
+    try {
+      const template = createSimulationScenarioTemplate(selectedVariant.name, config);
+      const blob = new Blob([JSON.stringify(template, null, 2)], {
+        type: "application/json;charset=utf-8",
+      });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = simulationScenarioTemplateFileName(template.name);
+      anchor.click();
+      URL.revokeObjectURL(url);
+      setImportMessage(`${template.name} als Szenario-Konfiguration exportiert.`);
+    } catch {
+      setImportMessage("Die aktuelle Variante konnte nicht als Szenario exportiert werden.");
+    }
+  };
+
   const addFoundationVariant = (foundation: {
     config: SimulationConfig;
     format:
@@ -659,6 +683,9 @@ export function ForecastSimulationView() {
               value={variants.find((variant) => variant.id === selectedVariantId)?.name ?? ""}
             />
             <div className="sim-variant-actions">
+              <button className="sim-variant-export" onClick={exportVariant} type="button">
+                <Download aria-hidden="true" /> Variante exportieren
+              </button>
               <button onClick={duplicateVariant} type="button">
                 <Copy aria-hidden="true" /> Duplizieren
               </button>

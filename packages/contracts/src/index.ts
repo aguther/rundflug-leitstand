@@ -1509,76 +1509,77 @@ const simulationScenarioPrecallTuningSchema = z
     }
   });
 
-export const simulationScenarioTemplateSchema = z
+const simulationScenarioVersionOneConfigSchema = z
+  .object({
+    preset: z.enum(["NORMAL", "PEAK_LOAD", "AIRCRAFT_FAILURE", "OPERATION_INTERRUPTION"]),
+    seed: z.number().int().min(1).max(4_294_967_295),
+    schedule: simulationPlanScheduleSchema,
+    adminParameters: z
+      .object({
+        plannedBoardingMinutes: z.number().int().min(1).max(600),
+        productReferenceDurationMinutes: z.number().int().min(1).max(600),
+        plannedDeboardingMinutes: z.number().int().min(1).max(600),
+        plannedBufferMinutes: z.number().int().min(0).max(600),
+        eventAutomaticPrecallEnabled: z.boolean(),
+        resourceGroupAutomaticPrecallEnabled: z.boolean(),
+        aircraftCount: z.number().int().min(1).max(12),
+        aircraftType: z.string().trim().min(2).max(100),
+        passengerSeats: z.number().int().min(1).max(100),
+        activePilotCount: z.number().int().min(0).max(200),
+      })
+      .strict(),
+    realityModel: z
+      .object({
+        demand: simulationScenarioDemandSchema,
+        phases: z
+          .object({
+            boarding: simulationScenarioDistributionSchema,
+            flight: simulationScenarioDistributionSchema,
+            deboarding: simulationScenarioDistributionSchema,
+            buffer: simulationScenarioDistributionSchema,
+          })
+          .strict(),
+        incidents: z
+          .object({
+            refueling: simulationScenarioIncidentSchema
+              .extend({ everyRotations: z.number().int().min(1).max(100_000) })
+              .strict(),
+            plannedPause: simulationScenarioIncidentSchema
+              .extend({ everyOperatingMinutes: z.number().int().min(1).max(100_000) })
+              .strict(),
+            unplannedPause: simulationScenarioIncidentSchema
+              .extend({ ratePerOperatingHour: z.number().nonnegative() })
+              .strict(),
+            technicalDefect: simulationScenarioIncidentSchema
+              .extend({
+                ratePerOperatingHour: z.number().nonnegative(),
+                dayOutageProbability: z.number().min(0).max(1),
+              })
+              .strict(),
+          })
+          .strict(),
+      })
+      .strict(),
+    forecastTuning: z
+      .object({
+        forecast: simulationScenarioForecastTuningSchema,
+        precall: simulationScenarioPrecallTuningSchema,
+        comparisonRuns: z.number().int().min(5).max(100),
+        availabilityModel: z.enum(["SCALAR", "TIME_DEPENDENT"]),
+      })
+      .strict(),
+  })
+  .strict();
+
+const simulationScenarioVersionOneTemplateSchema = z
   .object({
     format: z.literal("rundflug-simulation-scenario"),
     formatVersion: z.literal(1),
     exportedAt: z.iso.datetime(),
     name: z.string().trim().min(1).max(80),
-    config: z
-      .object({
-        preset: z.enum(["NORMAL", "PEAK_LOAD", "AIRCRAFT_FAILURE", "OPERATION_INTERRUPTION"]),
-        seed: z.number().int().min(1).max(4_294_967_295),
-        schedule: simulationPlanScheduleSchema,
-        adminParameters: z
-          .object({
-            plannedBoardingMinutes: z.number().int().min(1).max(600),
-            productReferenceDurationMinutes: z.number().int().min(1).max(600),
-            plannedDeboardingMinutes: z.number().int().min(1).max(600),
-            plannedBufferMinutes: z.number().int().min(0).max(600),
-            eventAutomaticPrecallEnabled: z.boolean(),
-            resourceGroupAutomaticPrecallEnabled: z.boolean(),
-            aircraftCount: z.number().int().min(1).max(12),
-            aircraftType: z.string().trim().min(2).max(100),
-            passengerSeats: z.number().int().min(1).max(100),
-            activePilotCount: z.number().int().min(0).max(200),
-          })
-          .strict(),
-        realityModel: z
-          .object({
-            demand: simulationScenarioDemandSchema,
-            phases: z
-              .object({
-                boarding: simulationScenarioDistributionSchema,
-                flight: simulationScenarioDistributionSchema,
-                deboarding: simulationScenarioDistributionSchema,
-                buffer: simulationScenarioDistributionSchema,
-              })
-              .strict(),
-            incidents: z
-              .object({
-                refueling: simulationScenarioIncidentSchema
-                  .extend({ everyRotations: z.number().int().min(1).max(100_000) })
-                  .strict(),
-                plannedPause: simulationScenarioIncidentSchema
-                  .extend({ everyOperatingMinutes: z.number().int().min(1).max(100_000) })
-                  .strict(),
-                unplannedPause: simulationScenarioIncidentSchema
-                  .extend({ ratePerOperatingHour: z.number().nonnegative() })
-                  .strict(),
-                technicalDefect: simulationScenarioIncidentSchema
-                  .extend({
-                    ratePerOperatingHour: z.number().nonnegative(),
-                    dayOutageProbability: z.number().min(0).max(1),
-                  })
-                  .strict(),
-              })
-              .strict(),
-          })
-          .strict(),
-        forecastTuning: z
-          .object({
-            forecast: simulationScenarioForecastTuningSchema,
-            precall: simulationScenarioPrecallTuningSchema,
-            comparisonRuns: z.number().int().min(5).max(100),
-            availabilityModel: z.enum(["SCALAR", "TIME_DEPENDENT"]),
-          })
-          .strict(),
-      })
-      .strict(),
+    config: simulationScenarioVersionOneConfigSchema,
   })
   .strict();
-export type SimulationScenarioTemplate = z.infer<typeof simulationScenarioTemplateSchema>;
 
 const simulationPlanOperationSchema = z
   .object({
@@ -1691,6 +1692,394 @@ const simulationRecurringOperationalRuleSchema = z
   });
 export type SimulationRecurringOperationalRule = z.infer<
   typeof simulationRecurringOperationalRuleSchema
+>;
+
+const simulationScenarioOperationalModelSchema = z
+  .object({
+    sourceName: z.string().trim().min(1).max(120),
+    gates: z
+      .array(
+        z
+          .object({
+            id: masterDataTemplateKeySchema,
+            label: z.string().trim().min(2).max(80),
+          })
+          .strict(),
+      )
+      .max(100),
+    resourceGroups: z
+      .array(
+        z
+          .object({
+            id: masterDataTemplateKeySchema,
+            name: z.string().trim().min(2).max(100),
+            shortCode: z
+              .string()
+              .trim()
+              .regex(/^[A-Z0-9-]{2,8}$/),
+            gateId: masterDataTemplateKeySchema,
+            automaticPrecallEnabled: z.boolean(),
+          })
+          .strict(),
+      )
+      .max(100),
+    aircraft: z
+      .array(
+        z
+          .object({
+            id: masterDataTemplateKeySchema,
+            registration: z
+              .string()
+              .trim()
+              .regex(/^[A-Z0-9-]{3,16}$/),
+            aircraftType: z.string().trim().min(2).max(80),
+            capacity: z.number().int().min(1).max(100),
+            refuelReminderThreshold: z.number().int().min(1).max(100).optional(),
+            resourceGroupId: masterDataTemplateKeySchema.optional(),
+          })
+          .strict(),
+      )
+      .max(200),
+    pilots: z
+      .array(
+        z
+          .object({
+            id: masterDataTemplateKeySchema,
+            operationalCode: z
+              .string()
+              .trim()
+              .regex(/^[A-Z0-9-]{2,12}$/),
+            active: z.boolean(),
+          })
+          .strict(),
+      )
+      .max(200),
+    products: z
+      .array(
+        z
+          .object({
+            id: masterDataTemplateKeySchema,
+            name: z.string().trim().min(2).max(100),
+            code: z
+              .string()
+              .trim()
+              .regex(/^[A-Z0-9-]{2,12}$/),
+            resourceGroupId: masterDataTemplateKeySchema,
+            gateId: masterDataTemplateKeySchema,
+            referenceCapacity: z.number().int().min(1).max(100),
+            referenceDurationMinutes: z.number().int().min(1).max(600),
+          })
+          .strict(),
+      )
+      .max(200),
+  })
+  .strict();
+
+const simulationScenarioPlannedOperationSchema = z
+  .object({
+    key: masterDataTemplateKeySchema,
+    scopeType: operationalPlanScopeSchema,
+    scopeId: masterDataTemplateKeySchema,
+    kind: operationalPlanKindSchema,
+    effectMode: operationalPlanEffectModeSchema.optional(),
+    durationMultiplierPercent: z.number().int().min(110).max(300).nullable().optional(),
+    startMode: operationalPlanStartModeSchema,
+    earliestStartAt: z.iso.datetime().nullable(),
+    latestStartAt: z.iso.datetime().nullable(),
+    afterRotationId: masterDataTemplateKeySchema.nullable(),
+    unresolvedAfterCurrentRotation: z.boolean(),
+    minimumDurationMinutes: z.number().int().min(1).max(1440),
+    typicalDurationMinutes: z.number().int().min(1).max(1440),
+    maximumDurationMinutes: z.number().int().min(1).max(1440),
+    publicNote: z.string().trim().max(160),
+  })
+  .strict()
+  .superRefine((operation, context) => {
+    const effectMode = operation.effectMode ?? "BLOCKING";
+    if (
+      (effectMode === "BLOCKING" && operation.durationMultiplierPercent != null) ||
+      (effectMode === "SLOWDOWN" && operation.durationMultiplierPercent == null)
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Verzögerungsart und Faktor passen nicht zusammen.",
+        path: ["durationMultiplierPercent"],
+      });
+    }
+    if (
+      operation.minimumDurationMinutes > operation.typicalDurationMinutes ||
+      operation.typicalDurationMinutes > operation.maximumDurationMinutes
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Die Dauer muss als Minimum ≤ Typisch ≤ Maximum angegeben werden.",
+        path: ["typicalDurationMinutes"],
+      });
+    }
+    if (operation.startMode === "TIME_WINDOW") {
+      if (
+        !operation.earliestStartAt ||
+        !operation.latestStartAt ||
+        Date.parse(operation.earliestStartAt) > Date.parse(operation.latestStartAt) ||
+        operation.afterRotationId !== null ||
+        operation.unresolvedAfterCurrentRotation
+      ) {
+        context.addIssue({
+          code: "custom",
+          message: "Das Startzeitfenster ist unvollständig oder ungültig.",
+          path: ["earliestStartAt"],
+        });
+      }
+    } else if (
+      operation.earliestStartAt !== null ||
+      operation.latestStartAt !== null ||
+      (operation.afterRotationId !== null) === operation.unresolvedAfterCurrentRotation
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Ein umlaufgebundener Beginn benötigt genau einen Bezug.",
+        path: ["afterRotationId"],
+      });
+    }
+    if (
+      operation.publicNote.length > 0 &&
+      !["EVENT", "RESOURCE_GROUP"].includes(operation.scopeType)
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Öffentliche Hinweise sind nur veranstaltungs- oder gruppenweit zulässig.",
+        path: ["publicNote"],
+      });
+    }
+  });
+
+const simulationScenarioRecurringRuleSchema = z
+  .object({
+    key: masterDataTemplateKeySchema,
+    scopeType: recurringOperationalRuleScopeSchema,
+    scopeId: masterDataTemplateKeySchema,
+    kind: recurringOperationalRuleKindSchema,
+    triggerMetric: recurringOperationalRuleTriggerSchema,
+    intervalValue: z.number().int().min(1).max(100_000),
+    progressValue: z.number().int().nonnegative().max(100_000),
+    minimumDurationMinutes: z.number().int().min(1).max(1440),
+    typicalDurationMinutes: z.number().int().min(1).max(1440),
+    maximumDurationMinutes: z.number().int().min(1).max(1440),
+  })
+  .strict()
+  .superRefine((rule, context) => {
+    if (rule.kind === "REFUELING" && rule.scopeType !== "AIRCRAFT") {
+      context.addIssue({
+        code: "custom",
+        message: "Tanken kann nur für ein Flugzeug geplant werden.",
+        path: ["scopeType"],
+      });
+    }
+    if (
+      rule.minimumDurationMinutes > rule.typicalDurationMinutes ||
+      rule.typicalDurationMinutes > rule.maximumDurationMinutes
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Die Dauer muss als Minimum ≤ Typisch ≤ Maximum angegeben werden.",
+        path: ["typicalDurationMinutes"],
+      });
+    }
+  });
+
+const simulationScenarioVersionTwoConfigSchema = simulationScenarioVersionOneConfigSchema
+  .extend({
+    adminParameters: simulationScenarioVersionOneConfigSchema.shape.adminParameters
+      .extend({
+        aircraftCount: z.number().int().min(1).max(200),
+      })
+      .strict(),
+    operationalModel: simulationScenarioOperationalModelSchema.optional(),
+    demandByProduct: z
+      .record(masterDataTemplateKeySchema, simulationScenarioDemandSchema)
+      .optional(),
+    plannedOperations: z.array(simulationScenarioPlannedOperationSchema).max(500),
+    recurringRules: z.array(simulationScenarioRecurringRuleSchema).max(500),
+  })
+  .strict()
+  .superRefine((config, context) => {
+    const model = config.operationalModel;
+    if (!model) {
+      if (config.adminParameters.aircraftCount > 12) {
+        context.addIssue({
+          code: "custom",
+          message: "Szenarien ohne operative Topologie unterstützen höchstens zwölf Flugzeuge.",
+          path: ["adminParameters", "aircraftCount"],
+        });
+      }
+      if (config.demandByProduct !== undefined) {
+        context.addIssue({
+          code: "custom",
+          message: "Produktnachfrage benötigt eine operative Topologie.",
+          path: ["demandByProduct"],
+        });
+      }
+      if (config.plannedOperations.length > 0 || config.recurringRules.length > 0) {
+        context.addIssue({
+          code: "custom",
+          message: "Planeinträge und Regeln benötigen eine operative Topologie.",
+          path: ["plannedOperations"],
+        });
+      }
+      return;
+    }
+
+    addDuplicateIssues(
+      context,
+      model.gates.map((entry) => entry.id),
+      "gates",
+      "Gate-Kennung",
+    );
+    addDuplicateIssues(
+      context,
+      model.resourceGroups.map((entry) => entry.id),
+      "resourceGroups",
+      "Ressourcengruppen-Kennung",
+    );
+    addDuplicateIssues(
+      context,
+      model.aircraft.map((entry) => entry.id),
+      "aircraft",
+      "Flugzeug-Kennung",
+    );
+    addDuplicateIssues(
+      context,
+      model.pilots.map((entry) => entry.id),
+      "pilots",
+      "Piloten-Kennung",
+    );
+    addDuplicateIssues(
+      context,
+      model.products.map((entry) => entry.id),
+      "products",
+      "Produkt-Kennung",
+    );
+    addDuplicateIssues(
+      context,
+      config.plannedOperations.map((entry) => entry.key),
+      "plannedOperations",
+      "Planeintrags-Kennung",
+    );
+    addDuplicateIssues(
+      context,
+      config.recurringRules.map((entry) => entry.key),
+      "recurringRules",
+      "Regel-Kennung",
+    );
+
+    const gateIds = new Set(model.gates.map((entry) => entry.id));
+    const resourceGroupIds = new Set(model.resourceGroups.map((entry) => entry.id));
+    const aircraftIds = new Set(model.aircraft.map((entry) => entry.id));
+    const pilotIds = new Set(model.pilots.map((entry) => entry.id));
+    const productIds = new Set(model.products.map((entry) => entry.id));
+
+    model.resourceGroups.forEach((entry, index) => {
+      if (!gateIds.has(entry.gateId)) {
+        context.addIssue({
+          code: "custom",
+          message: "Ressourcengruppe verweist auf kein exportiertes Gate.",
+          path: ["operationalModel", "resourceGroups", index, "gateId"],
+        });
+      }
+    });
+    model.aircraft.forEach((entry, index) => {
+      if (!entry.resourceGroupId || !resourceGroupIds.has(entry.resourceGroupId)) {
+        context.addIssue({
+          code: "custom",
+          message: "Flugzeug verweist auf keine exportierte Ressourcengruppe.",
+          path: ["operationalModel", "aircraft", index, "resourceGroupId"],
+        });
+      }
+    });
+    model.products.forEach((entry, index) => {
+      if (!resourceGroupIds.has(entry.resourceGroupId)) {
+        context.addIssue({
+          code: "custom",
+          message: "Produkt verweist auf keine exportierte Ressourcengruppe.",
+          path: ["operationalModel", "products", index, "resourceGroupId"],
+        });
+      }
+      if (!gateIds.has(entry.gateId)) {
+        context.addIssue({
+          code: "custom",
+          message: "Produkt verweist auf kein exportiertes Gate.",
+          path: ["operationalModel", "products", index, "gateId"],
+        });
+      }
+    });
+
+    const demandIds = Object.keys(config.demandByProduct ?? {});
+    demandIds.forEach((productId) => {
+      if (!productIds.has(productId)) {
+        context.addIssue({
+          code: "custom",
+          message: "Nachfrage verweist auf kein exportiertes Produkt.",
+          path: ["demandByProduct", productId],
+        });
+      }
+    });
+    model.products.forEach((product) => {
+      if (!config.demandByProduct?.[product.id]) {
+        context.addIssue({
+          code: "custom",
+          message: "Für ein exportiertes Produkt fehlt die Nachfrage.",
+          path: ["demandByProduct", product.id],
+        });
+      }
+    });
+
+    config.plannedOperations.forEach((operation, index) => {
+      const targetExists =
+        operation.scopeType === "EVENT"
+          ? operation.scopeId === "event"
+          : operation.scopeType === "RESOURCE_GROUP"
+            ? resourceGroupIds.has(operation.scopeId)
+            : operation.scopeType === "AIRCRAFT"
+              ? aircraftIds.has(operation.scopeId)
+              : pilotIds.has(operation.scopeId);
+      if (!targetExists) {
+        context.addIssue({
+          code: "custom",
+          message: "Planeintrag verweist auf kein exportiertes Ziel.",
+          path: ["plannedOperations", index, "scopeId"],
+        });
+      }
+    });
+    config.recurringRules.forEach((rule, index) => {
+      const targetExists =
+        rule.scopeType === "AIRCRAFT" ? aircraftIds.has(rule.scopeId) : pilotIds.has(rule.scopeId);
+      if (!targetExists) {
+        context.addIssue({
+          code: "custom",
+          message: "Wiederkehrende Regel verweist auf kein exportiertes Ziel.",
+          path: ["recurringRules", index, "scopeId"],
+        });
+      }
+    });
+  });
+
+export const simulationScenarioVersionTwoTemplateSchema = z
+  .object({
+    format: z.literal("rundflug-simulation-scenario"),
+    formatVersion: z.literal(2),
+    exportedAt: z.iso.datetime(),
+    name: z.string().trim().min(1).max(80),
+    config: simulationScenarioVersionTwoConfigSchema,
+  })
+  .strict();
+
+export const simulationScenarioTemplateSchema = z.discriminatedUnion("formatVersion", [
+  simulationScenarioVersionOneTemplateSchema,
+  simulationScenarioVersionTwoTemplateSchema,
+]);
+export type SimulationScenarioTemplate = z.infer<typeof simulationScenarioTemplateSchema>;
+export type SimulationScenarioTemplateV2 = z.infer<
+  typeof simulationScenarioVersionTwoTemplateSchema
 >;
 
 export const simulationPlanExportSchema = z

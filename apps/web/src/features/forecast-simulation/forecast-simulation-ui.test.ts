@@ -122,6 +122,7 @@ describe("local and hosted forecast simulation surface", () => {
       "Abschluss",
       "Lauf auswerten",
       "Simulationsgrundlage laden",
+      "Variante exportieren",
       "Duplizieren",
     ]) {
       expect(viewSource).toContain(label);
@@ -200,6 +201,15 @@ describe("local and hosted forecast simulation surface", () => {
     expect(viewSource).not.toContain("Szenario-Vorlagen");
     expect(foundationDialogSource).toContain('role="tablist"');
     expect(foundationDialogSource).toContain("Vorlage als JSON herunterladen");
+    expect(foundationDialogSource).toContain("preview.config.operationalModel");
+    expect(viewSource).toContain("createSimulationScenarioTemplate(selectedVariant.name, config)");
+    expect(viewSource).toContain("simulationScenarioTemplateFileName(template.name)");
+    expect(stylesSource).toMatch(
+      /\.sim-variant-actions \.sim-variant-export\s*\{[^}]*grid-column:\s*1 \/ -1;/s,
+    );
+    expect(stylesSource).toMatch(
+      /@media \(max-width: 760px\)[\s\S]*\.sim-plan-import-preview \.sim-scenario-import-summary\s*\{[^}]*grid-template-columns:\s*1fr;/s,
+    );
   });
 
   it("keeps the viewport fixed and only the aircraft lanes vertically scrollable", () => {

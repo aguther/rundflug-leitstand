@@ -135,13 +135,14 @@ function simulationPlan() {
 
 describe("simulation plan import", () => {
   it.each(Object.keys(SIMULATION_PRESET_LABELS) as SimulationPresetId[])(
-    "round-trips the built-in %s scenario as a strict editable template",
+    "round-trips the built-in %s scenario as a complete V2 template",
     (preset) => {
       const config = simulationConfigForPreset(preset);
       const name = SIMULATION_PRESET_LABELS[preset];
       const exported = createSimulationScenarioTemplate(name, config, "2026-07-28T12:00:00.000Z");
       const preview = parseSimulationPlanImport(JSON.stringify(exported), config);
 
+      expect(exported.formatVersion).toBe(2);
       expect(preview).toMatchObject({
         sourceName: name,
         format: "rundflug-simulation-scenario",
@@ -152,12 +153,80 @@ describe("simulation plan import", () => {
     },
   );
 
+  it("keeps version 1 scenario templates import-compatible", () => {
+    const config = simulationConfigForPreset("NORMAL");
+    const legacyTemplate = {
+      format: "rundflug-simulation-scenario",
+      formatVersion: 1,
+      exportedAt: "2026-07-28T12:00:00.000Z",
+      name: "Legacy-Normalbetrieb",
+      config: {
+        preset: config.preset,
+        seed: config.seed,
+        schedule: config.schedule,
+        adminParameters: config.adminParameters,
+        realityModel: config.realityModel,
+        forecastTuning: config.forecastTuning,
+      },
+    };
+
+    const preview = parseSimulationPlanImport(JSON.stringify(legacyTemplate), config);
+
+    expect(preview.sourceName).toBe("Legacy-Normalbetrieb");
+    expect(preview.config).toEqual(config);
+  });
+
+  it("round-trips every configurable value of an operational variant", () => {
+    const baseConfig = simulationConfigForPreset("NORMAL");
+    const plan = {
+      ...simulationPlan(),
+      formatVersion: 2,
+      recurringRules: [
+        {
+          key: "rule-1",
+          scopeType: "AIRCRAFT",
+          scopeKey: "aircraft-1",
+          kind: "REFUELING",
+          triggerMetric: "COMPLETED_ROTATIONS",
+          intervalValue: 5,
+          progressValue: 3,
+          minimumDurationMinutes: 8,
+          typicalDurationMinutes: 12,
+          maximumDurationMinutes: 18,
+        },
+      ],
+    };
+    const configured = parseSimulationPlanImport(JSON.stringify(plan), baseConfig).config;
+    const exported = createSimulationScenarioTemplate(
+      "Operative Variante",
+      configured,
+      "2026-07-28T12:00:00.000Z",
+    );
+    const restored = parseSimulationPlanImport(JSON.stringify(exported), baseConfig);
+
+    expect(restored.sourceName).toBe("Operative Variante");
+    expect(restored.counts).toMatchObject({
+      gates: 1,
+      resourceGroups: 1,
+      aircraft: 1,
+      pilots: 1,
+      products: 1,
+      plannedOperations: 1,
+      recurringRules: 1,
+      unresolvedAfterCurrentRotation: 1,
+    });
+    expect(restored.config).toEqual(configured);
+  });
+
   it("uses a stable, editable scenario filename", () => {
     expect(simulationScenarioTemplateFileName("Normalbetrieb")).toBe(
       "rundflug-szenario-normalbetrieb.json",
     );
     expect(simulationScenarioTemplateFileName("Betriebsunterbrechung")).toBe(
       "rundflug-szenario-betriebsunterbrechung.json",
+    );
+    expect(simulationScenarioTemplateFileName("")).toBe(
+      "rundflug-szenario-unbenannte-variante.json",
     );
   });
 
