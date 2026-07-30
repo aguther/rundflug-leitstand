@@ -193,7 +193,9 @@ export function SimulationFoundationDialog({
       initialFocusSelector='[role="tab"][aria-selected="true"]'
       onClose={onClose}
       open
-      size={preview?.category === "OPERATIONAL" ? "wide" : "default"}
+      size={
+        preview?.category === "OPERATIONAL" || preview?.config.operationalModel ? "wide" : "default"
+      }
       title={
         <span className="sim-foundation-title">
           <FileJson aria-hidden="true" />
@@ -325,12 +327,40 @@ export function SimulationFoundationDialog({
                   </div>
                   <div>
                     <dt>Flugzeuge</dt>
-                    <dd>{preview.config.adminParameters.aircraftCount}</dd>
+                    <dd>{preview.counts.aircraft}</dd>
                   </div>
                   <div>
                     <dt>Nachfrage</dt>
                     <dd>Ø {demandSummary?.averagePersonsPerHour ?? 0} Pers./Std.</dd>
                   </div>
+                  {preview.config.operationalModel ? (
+                    <>
+                      <div>
+                        <dt>Gates</dt>
+                        <dd>{preview.counts.gates}</dd>
+                      </div>
+                      <div>
+                        <dt>Ressourcengruppen</dt>
+                        <dd>{preview.counts.resourceGroups}</dd>
+                      </div>
+                      <div>
+                        <dt>aktive Piloten</dt>
+                        <dd>{preview.counts.pilots}</dd>
+                      </div>
+                      <div>
+                        <dt>Produkte</dt>
+                        <dd>{preview.counts.products}</dd>
+                      </div>
+                      <div>
+                        <dt>Planeinträge</dt>
+                        <dd>{preview.counts.plannedOperations}</dd>
+                      </div>
+                      <div>
+                        <dt>Regeln</dt>
+                        <dd>{preview.counts.recurringRules}</dd>
+                      </div>
+                    </>
+                  ) : null}
                 </dl>
               ) : (
                 <dl>
