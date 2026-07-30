@@ -675,7 +675,11 @@ export function validateSimulationConfig(config: SimulationConfig): string[] {
     errors.push("Der Flugzeugtyp muss mindestens zwei Zeichen lang sein.");
   for (const [label, value, minimum] of [
     ["Plan Boarding", config.adminParameters.plannedBoardingMinutes, 1],
-    ["Produkt-Referenzdauer", config.adminParameters.productReferenceDurationMinutes, 1],
+    [
+      "Produkt-Referenzzeit Offblock–Onblock",
+      config.adminParameters.productReferenceDurationMinutes,
+      1,
+    ],
     ["Plan Ausstieg", config.adminParameters.plannedDeboardingMinutes, 1],
     ["Plan Puffer", config.adminParameters.plannedBufferMinutes, 0],
   ] as const) {

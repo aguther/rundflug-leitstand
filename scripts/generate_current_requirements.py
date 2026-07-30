@@ -111,6 +111,47 @@ RELEASE_REQUIREMENTS = [
     },
 ]
 
+# Release-scoped clarifications leave the immutable V1.4 source files unchanged.
+CURRENT_BASE_REQUIREMENT_OVERRIDES = {
+    "F-RES-010": (
+        "Jedes buchbare Produkt verwendet genau eine Ressourcengruppe. Die operative "
+        "Produkt-Planzeit wird ausschließlich als Referenzzeit Offblock–Onblock am Produkt "
+        "geführt; die davon getrennte kommunizierte Flugzeit ist reine Produktinformation und "
+        "verändert keine operative Prognose. Die Ressourcengruppe besitzt keine eigene "
+        "Plan-Umlaufzeit."
+    ),
+    "F-RES-060": (
+        "Ein Produkt verwendet genau eine Ressourcengruppe. Flugzeugkompatibilität und "
+        "Passagierkapazität werden aus den konkret aktiv zugeordneten Flugzeugen abgeleitet; "
+        "Produktzeit und veranstaltungsweite Bodenzeiten bleiben getrennt. Es werden keine "
+        "Freitext-Typenlisten, manuelle Gruppenkapazität oder eigene "
+        "Ressourcengruppen-Umlaufzeit gepflegt."
+    ),
+    "F-BRD-100": (
+        "Das System misst getrennt mindestens Boardingdauer, Offblock–Onblock-Zeit, Zeit von "
+        "Onblock bis Abschluss und gesamte Umlaufzeit. Die Messpunkte werden aus den "
+        "Primärereignissen abgeleitet."
+    ),
+    "F-PRG-030": (
+        "Die Prognose berücksichtigt mindestens Referenzzeit Offblock–Onblock des Produkts, "
+        "Flugzeugprofil, veranstaltungsweite Boarding-, Ausstiegs- und Pufferzeiten, aktuelle "
+        "Flugzeugzustände, Pausen, Tanken, Unterbrechungen und Queue-Reihenfolge. Die "
+        "Referenz-Umlaufzeit wird als Summe dieser vier Zeitanteile abgeleitet und nicht separat "
+        "gespeichert."
+    ),
+    "D-015": (
+        "Ressourcengruppe: Bezeichnung, Status, zugehörige Produkte, Gates, aktive "
+        "Flugzeugzuordnungen und daraus abgeleitete Kapazitätsspanne; keine eigene "
+        "Plan-Umlaufzeit."
+    ),
+    "D-020": (
+        "Produkt: Bezeichnung, Kürzel, Preis, genau eine Ressourcengruppe, öffentliche "
+        "Darstellung, Referenzzeit Offblock–Onblock, davon getrennte kommunizierte Flugzeit, "
+        "Verkaufsregeln, Begleitpflicht und Sortierung; keine manuell gepflegte "
+        "Referenzkapazität."
+    ),
+}
+
 
 def yaml_scalar(value: object) -> str:
     return json.dumps(str(value), ensure_ascii=False)
@@ -142,7 +183,9 @@ def current_requirements() -> list[dict[str, object]]:
             "id": item["id"],
             "source": "1.4-konsolidiert",
             "section": item["section"],
-            "requirement": current_terms(item["requirement"]),
+            "requirement": CURRENT_BASE_REQUIREMENT_OVERRIDES.get(
+                item["id"], current_terms(item["requirement"])
+            ),
             "priority": item["priority"],
             "stage": item["stage"],
             "status": base_trace_status[item["id"]],

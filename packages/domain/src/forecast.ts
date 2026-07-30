@@ -1,3 +1,5 @@
+import { deriveReferenceRotationBreakdown } from "./reference-rotation";
+
 export type PredictionQuality = "STABLE" | "CHANGING" | "UNCERTAIN";
 
 export const FORECAST_FRESHNESS_MAX_AGE_MINUTES = 5;
@@ -831,11 +833,12 @@ export function calculateForecastTimelines(
         }).predictedCompletionAt,
       );
     }
-    const fallback =
-      input.event.plannedBoardingMinutes +
-      rotation.referenceDurationMinutes +
-      input.event.plannedDeboardingMinutes +
-      input.event.plannedBufferMinutes;
+    const fallback = deriveReferenceRotationBreakdown({
+      boardingMinutes: input.event.plannedBoardingMinutes,
+      offBlockToOnBlockMinutes: rotation.referenceDurationMinutes,
+      deboardingMinutes: input.event.plannedDeboardingMinutes,
+      bufferMinutes: input.event.plannedBufferMinutes,
+    }).totalMinutes;
     const remaining = Number.isFinite(predictedCompletion)
       ? Math.max(0, (predictedCompletion - now.getTime()) / 60_000)
       : fallback;
@@ -957,7 +960,12 @@ export function calculateForecastTimelines(
     const boarding = input.event.plannedBoardingMinutes;
     const deboarding = input.event.plannedDeboardingMinutes;
     const buffer = input.event.plannedBufferMinutes;
-    const referenceTotal = boarding + rotation.referenceDurationMinutes + deboarding + buffer;
+    const referenceTotal = deriveReferenceRotationBreakdown({
+      boardingMinutes: boarding,
+      offBlockToOnBlockMinutes: rotation.referenceDurationMinutes,
+      deboardingMinutes: deboarding,
+      bufferMinutes: buffer,
+    }).totalMinutes;
     const capacity = capacities.get(rotation.resourceGroupId);
     const activeCapacity = capacity?.activeAircraft ?? 0;
     const forecastCapacity = queueAvailability.get(rotation.resourceGroupId)?.lanes.length ?? 0;

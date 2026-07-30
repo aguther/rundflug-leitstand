@@ -100,15 +100,15 @@ UPDATE operation_days
  WHERE id = '${eventId}';
 UPDATE resource_groups
    SET status = 'PAUSED', automatic_precall_enabled = 1, reference_capacity = 4,
-       planned_rotation_minutes = 36, compatible_aircraft_types_json = '["SYN-4"]'
+       compatible_aircraft_types_json = '["SYN-4"]'
  WHERE id = '${resourceGroupId}';
 INSERT INTO resource_groups
   (id, operation_day_id, name, short_code, status, gate_id, reference_capacity,
-   planned_rotation_minutes, compatible_aircraft_types_json, automatic_precall_enabled,
+   compatible_aircraft_types_json, automatic_precall_enabled,
    version, created_at, updated_at)
 VALUES
   ('${oldtimerResourceGroupId}', '${eventId}', 'Oldtimer', 'OLD', 'ACTIVE', '${gateId}', 4,
-   36, '["SYN-OLD"]', 1, 0, '${createdAt}', '${createdAt}');
+   '["SYN-OLD"]', 1, 0, '${createdAt}', '${createdAt}');
 INSERT INTO products
   (id, operation_day_id, resource_group_id, gate_id, name, code, price_cents, sale_enabled,
    reference_capacity, reference_duration_minutes, created_at, updated_at)

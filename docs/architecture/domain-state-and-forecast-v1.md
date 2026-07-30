@@ -142,6 +142,7 @@ und ungültige Umlaufübergänge blockieren den gesamten Batch.
 | Invariante | Primäre Sicherung |
 | --- | --- |
 | Produkt verwendet genau eine Ressourcengruppe | nicht nullable Fremdschlüssel `products.resource_group_id` plus Vertragsprüfung |
+| operative Planzeit liegt ausschließlich am Produkt | `products.reference_duration_minutes`; Ressourcengruppen besitzen keine eigene Umlaufzeit |
 | Flugzeug höchstens in einer aktiven Ressourcengruppe | partieller Unique-Index `uq_aircraft_one_active_resource_group` plus `assertSingleActiveResourceGroup` |
 | eine operative Queue je Ressourcengruppe | Queue-Sequenz der Buchungsgruppen innerhalb der Ressourcengruppe; Planung über ganze Gruppen |
 | stabile Kommunikationsnummer | Unique-Constraint aus Veranstaltung, Ressourcengruppe und `communication_number` |
@@ -165,7 +166,7 @@ Die Datenbanksicherungen stehen in `apps/worker/migrations/`; fachliche Prüfung
 ### 5.1 Zeitarten
 
 - **Planzeit:** beim ersten Rechenlauf aus Erstellzeit, Queueposition und konfigurierten
-  Referenzdauern abgeleitet; wird anschließend nicht überschrieben.
+  Referenz-Umlaufzeiten abgeleitet; wird anschließend nicht überschrieben.
 - **Prognosezeit:** bei relevanten bestätigten Ereignissen neu berechnete Erwartung.
 - **Ist-Zeit:** ausschließlich durch bestätigte operative Kommandos erfasst.
 
@@ -175,10 +176,28 @@ Sommerzeitpunkte werden vor dem Kommando abgewiesen.
 
 ### 5.2 Eingangsgrößen
 
+Die vier Referenzanteile besitzen feste Ereignisgrenzen:
+
+- **Boardingzeit:** bestätigter Boarding-Aufruf bis bestätigter Offblock;
+- **Referenzzeit Offblock–Onblock:** operative Produkt-Planzeit vom bestätigten Offblock bis zum
+  bestätigten Onblock; keine reine Luftzeit und keine vollständige Umlaufzeit;
+- **Ausstiegszeit:** bestätigter Onblock bis zum bestätigten Abschluss des Ausstiegs und der
+  unmittelbar notwendigen Bodenabfertigung;
+- **betrieblicher Puffer:** zusätzliche Reserve nach dem Ausstieg vor der geplanten erneuten
+  Verfügbarkeit.
+
+Boarding, Ausstieg und Puffer gelten veranstaltungsweit. Die Offblock–Onblock-Zeit liegt
+ausschließlich am Produkt. Die Ressourcengruppe und das Flugzeug besitzen keine eigene Planzeit.
+Die kommunizierte Flugzeit ist reine Produktinformation und fließt nicht in die Prognose ein.
+
+Die nicht gespeicherte Referenz-Umlaufzeit wird immer abgeleitet:
+
+`Boardingzeit + Referenzzeit Offblock–Onblock + Ausstiegszeit + betrieblicher Puffer`
+
 Der Rechenlauf verwendet:
 
 - Queueposition der noch offenen Umläufe;
-- Produkt-Referenzflugdauer;
+- Referenzzeit Offblock–Onblock des Produkts;
 - geplante Boarding-, Deboarding- und Pufferdauer der Veranstaltung;
 - zeitabhängige Verfügbarkeitsbahnen aus genau einem Flugzeug und einem anonymen Pilotencode;
   die nutzbare Parallelität ist das Minimum beider Ressourcen;
@@ -196,8 +215,8 @@ Der Rechenlauf verwendet:
 
 ### 5.3 Lernen aus Ist-Daten
 
-Nur `COMPLETED`-Umläufe mit `called_at` und `completed_at` liefern Messwerte. Der Referenzwert erhält
-Gewicht 1; reale Werte erhalten in zeitlicher Folge Gewichte ab 2, sodass jüngere Messungen stärker
+Nur `COMPLETED`-Umläufe mit `called_at` und `completed_at` liefern Messwerte. Die abgeleitete
+Referenz-Umlaufzeit erhält Gewicht 1; reale Werte erhalten in zeitlicher Folge Gewichte ab 2, sodass jüngere Messungen stärker
 wirken. Nicht endliche, nicht positive oder mehr als das 1,75-Fache des Referenzwerts betragende
 Werte werden entfernt. Ab fünf plausiblen Werten begrenzt Median Absolute Deviation weitere
 Ausreißer. Das Alter des jüngsten Messwerts bleibt diagnostisch und ist kein Unsicherheitsauslöser.

@@ -164,7 +164,7 @@ Wiedereinreihung aber nicht dauerhaft weiterbetrieben werden.
 ## 0029 – Nachvollziehbare Prognosedatengrundlage
 
 Ergänzt Prognose-Snapshots additiv um den auslösenden fachlichen Ereignistyp, den verwendeten
-Historienbezug, Stichprobengröße und Datenalter sowie aktive Kapazität und Referenzdauer. Bestehende
+Historienbezug, Stichprobengröße und Datenalter sowie aktive Kapazität und Referenz-Umlaufzeit. Bestehende
 Snapshots werden ausdrücklich als `LEGACY_UNKNOWN` gekennzeichnet und bleiben unverändert
 auswertbar. Vor Anwendung wird eine portable D1-Sicherung erzeugt. Wiederherstellung erfolgt aus
 dieser Sicherung beziehungsweise per D1 Time Travel; ältere Worker dürfen nach der Migration keine
@@ -202,11 +202,12 @@ gesalzene beziehungsweise kryptografische Hashes gespeichert. Bestehende Geräte
 für die kontrollierte Migration erhalten. Vor Anwendung ist eine portable D1-Sicherung erforderlich;
 ein Rollback erfolgt per D1 Time Travel oder Wiederherstellung dieser Sicherung.
 
-## 0036 – Zugesagte Produkt-Flugzeit
+## 0036 – Kommunizierte Produkt-Flugzeit
 
 Ergänzt Produkte additiv um die öffentlich kommunizierte Flugzeit in Minuten. Sie bleibt bewusst von
-der prognostischen Referenzdauer getrennt und besitzt keine flugbetriebliche Freigabewirkung.
-Bestehende Produkte übernehmen als sicheren Migrationsstart ihre bisherige Referenzdauer; neue
+der operativen Referenzzeit Offblock–Onblock getrennt und besitzt keine flugbetriebliche
+Freigabewirkung. Bestehende Produkte übernehmen als sicheren Migrationsstart ihre bisherige
+Referenzzeit Offblock–Onblock; neue
 Produkte erhalten ohne abweichende Eingabe 20 Minuten. Vor Anwendung ist eine portable D1-Sicherung
 erforderlich; ein Rollback erfolgt per D1 Time Travel oder Wiederherstellung dieser Sicherung, da D1
 die additive Spalte nicht einzeln zurückbauen kann.
@@ -340,6 +341,17 @@ Mitteilungen erzeugen. Die Zustelltabelle wird unter Erhalt aller Belege neu auf
 D1-Time-Travel-Marke beziehungsweise vollständige D1-Sicherung angelegt. Für eine vollständige
 Schema-Rückkehr wird D1 per Time Travel oder aus dieser Sicherung wiederhergestellt; Push-Ziele
 bleiben weiterhin aus portablen R2-Sicherungen ausgeschlossen.
+
+## 0054 – Produktbezogenes Zeitmodell
+
+Entfernt die frühere Plan-Umlaufzeit aus Ressourcengruppen. Die operative Referenzzeit
+Offblock–Onblock wird ausschließlich am Produkt gepflegt; die vollständige Referenz-Umlaufzeit wird
+aus dieser Produktzeit und den veranstaltungsweiten Zeiten für Boarding, Ausstieg und Puffer
+abgeleitet. Die Spalte wird direkt entfernt, während Daten, Constraints, Indizes und Fremdschlüssel
+der Ressourcengruppen erhalten bleiben. Vor Anwendung wird eine D1-Time-Travel-Marke beziehungsweise
+portable Sicherung angelegt. Ein Schema-Rollback erfolgt per Time Travel oder Wiederherstellung
+dieser Sicherung; für einen älteren Worker müsste die entfernte Spalte andernfalls mit einem
+neutralen Standardwert neu angelegt werden.
 
 ## Historische Doppelnummer 0036
 

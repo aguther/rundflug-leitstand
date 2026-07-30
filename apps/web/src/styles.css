@@ -329,6 +329,44 @@
 .product-description-field {
   grid-column: 1 / -1;
 }
+.reference-rotation-summary {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--ui-border);
+  border-radius: 7px;
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text);
+  font-variant-numeric: tabular-nums;
+}
+.reference-rotation-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+.reference-rotation-heading output {
+  color: var(--ui-accent);
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+.reference-rotation-breakdown {
+  display: grid;
+  grid-template-columns: 1.25rem minmax(0, 1fr);
+  gap: 4px 8px;
+  color: var(--ui-muted);
+  line-height: 1.4;
+}
+.reference-rotation-breakdown > :nth-last-child(-n + 2) {
+  color: var(--ui-text);
+}
+.reference-rotation-summary p {
+  margin: 0;
+  color: var(--ui-muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
 .field-label-with-info {
   display: inline-flex;
   align-items: center;

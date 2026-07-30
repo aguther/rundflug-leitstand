@@ -20,6 +20,7 @@ dem append-only Ereignisledger erzeugt, nicht zwischengespeichert und erfordern 
 gekoppeltes Gerät.
 
 Die geschützte Prognosehistorie verknüpft jeden Snapshot mit seinen später bestätigten Ist-Zeiten.
-Sie zeigt Datengrundlage, Stichprobengröße, Datenalter, aktive Kapazität, Referenzdauer und den
+Sie zeigt Datengrundlage, Stichprobengröße, Datenalter, aktive Kapazität, die vollständig
+abgeleitete Referenz-Umlaufzeit und den
 auslösenden fachlichen Ereignistyp. Die Abweichung wird in Minuten für Boarding, Start, Landung und
 Abschluss ausgewiesen. Kassenrollen erhalten keinen Zugriff.

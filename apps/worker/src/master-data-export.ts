@@ -56,7 +56,7 @@ export async function loadMasterDataExportProjection(
       .all<Record<string, string | number>>(),
     db
       .prepare(
-        `SELECT id, name, short_code, gate_id, reference_capacity, planned_rotation_minutes,
+        `SELECT id, name, short_code, gate_id, reference_capacity,
                 compatible_aircraft_types_json, automatic_precall_enabled
            FROM resource_groups WHERE operation_day_id = ?1 ORDER BY name, id`,
       )
@@ -160,7 +160,6 @@ export async function loadMasterDataExportProjection(
       shortCode: String(group.short_code),
       gateKey: gateKeys.get(String(group.gate_id)),
       referenceCapacity: Number(group.reference_capacity),
-      plannedRotationMinutes: Number(group.planned_rotation_minutes),
       compatibleAircraftTypes: JSON.parse(String(group.compatible_aircraft_types_json)),
       automaticPrecallEnabled: Boolean(group.automatic_precall_enabled),
     })),

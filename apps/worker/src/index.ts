@@ -1632,7 +1632,7 @@ app.get("/api/admin/events/:eventId/master-data-template", async (context) => {
       .bind(eventId)
       .all<Record<string, string | number>>(),
     context.env.DB.prepare(
-      `SELECT id, name, short_code, gate_id, reference_capacity, planned_rotation_minutes,
+      `SELECT id, name, short_code, gate_id, reference_capacity,
               compatible_aircraft_types_json, automatic_precall_enabled
          FROM resource_groups WHERE operation_day_id = ?1 ORDER BY name, id`,
     )
@@ -1728,7 +1728,6 @@ app.get("/api/admin/events/:eventId/master-data-template", async (context) => {
       shortCode: String(group.short_code),
       gateKey: gateKeys.get(String(group.gate_id)),
       referenceCapacity: Number(group.reference_capacity),
-      plannedRotationMinutes: Number(group.planned_rotation_minutes),
       compatibleAircraftTypes: JSON.parse(String(group.compatible_aircraft_types_json)),
       automaticPrecallEnabled: Boolean(group.automatic_precall_enabled),
     })),
@@ -2174,9 +2173,9 @@ app.post("/api/admin/events/:eventId/master-data-template/import", async (contex
       context.env.DB.prepare(
         `INSERT INTO resource_groups
           (id, operation_day_id, name, short_code, status, version, created_at, updated_at,
-           gate_id, reference_capacity, planned_rotation_minutes,
+           gate_id, reference_capacity,
            compatible_aircraft_types_json, automatic_precall_enabled)
-         SELECT ?3, ?1, ?4, ?5, 'ACTIVE', 0, ?6, ?6, ?7, ?8, ?9, ?10, ?11
+         SELECT ?3, ?1, ?4, ?5, 'ACTIVE', 0, ?6, ?6, ?7, ?8, ?9, ?10
           WHERE ${receiptGuard}`,
       ).bind(
         eventId,
@@ -2187,7 +2186,6 @@ app.post("/api/admin/events/:eventId/master-data-template/import", async (contex
         now,
         gateIds.get(group.gateKey),
         group.referenceCapacity,
-        group.plannedRotationMinutes,
         JSON.stringify(group.compatibleAircraftTypes),
         group.automaticPrecallEnabled ? 1 : 0,
       ),
@@ -2512,8 +2510,8 @@ app.post("/api/admin/events/:sourceEventId/clone", async (context) => {
       context.env.DB.prepare(
         `INSERT INTO resource_groups
         (id, operation_day_id, name, short_code, status, version, created_at, updated_at, gate_id,
-         reference_capacity, planned_rotation_minutes, compatible_aircraft_types_json)
-       VALUES (?1, ?2, ?3, ?4, 'ACTIVE', 0, ?5, ?5, ?6, ?7, ?8, ?9)`,
+         reference_capacity, compatible_aircraft_types_json)
+       VALUES (?1, ?2, ?3, ?4, 'ACTIVE', 0, ?5, ?5, ?6, ?7, ?8)`,
       ).bind(
         groupIds.get(String(row.id)),
         input.eventId,
@@ -2522,7 +2520,6 @@ app.post("/api/admin/events/:sourceEventId/clone", async (context) => {
         now,
         row.gate_id ? gateIds.get(String(row.gate_id)) : null,
         row.reference_capacity,
-        row.planned_rotation_minutes,
         row.compatible_aircraft_types_json,
       ),
     ),
@@ -3973,7 +3970,7 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
       context.env.DB.prepare(
         `SELECT rg.id, rg.version, rg.name, rg.short_code, rg.status, rg.operational_note,
               rg.gate_id, g.label AS gate_label,
-              rg.reference_capacity, rg.planned_rotation_minutes,
+              rg.reference_capacity,
               rg.compatible_aircraft_types_json, rg.automatic_precall_enabled,
               COALESCE((SELECT json_group_array(m.aircraft_id)
                 FROM resource_group_memberships m
@@ -3993,7 +3990,6 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
           gate_id: string;
           gate_label: string;
           reference_capacity: number;
-          planned_rotation_minutes: number;
           compatible_aircraft_types_json: string;
           automatic_precall_enabled: number;
           aircraft_ids_json: string;
@@ -4613,7 +4609,6 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
         gateId: group.gate_id,
         gateLabel: group.gate_label,
         referenceCapacity: effectiveReferenceCapacity,
-        plannedRotationMinutes: group.planned_rotation_minutes,
         compatibleAircraftTypes: [],
         automaticPrecallEnabled: group.automatic_precall_enabled === 1,
         activeAircraftIds,

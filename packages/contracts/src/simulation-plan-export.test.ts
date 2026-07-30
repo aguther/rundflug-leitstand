@@ -39,7 +39,6 @@ const masterData = {
       shortCode: "STD",
       gateKey: "gate-1",
       referenceCapacity: 3,
-      plannedRotationMinutes: 20,
       compatibleAircraftTypes: ["C172"],
       automaticPrecallEnabled: true,
     },
@@ -119,7 +118,9 @@ function validExport(): SimulationPlanExport {
 
 describe("simulation plan export contract", () => {
   it("accepts the safe, versioned simulation basis", () => {
-    expect(simulationPlanExportSchema.safeParse(validExport()).success).toBe(true);
+    const exported = validExport();
+    expect(simulationPlanExportSchema.safeParse(exported).success).toBe(true);
+    expect(exported.masterData.resourceGroups[0]).not.toHaveProperty("plannedRotationMinutes");
   });
 
   it("rejects dangling plan targets and operational state payloads", () => {

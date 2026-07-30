@@ -28,4 +28,9 @@ describe("simulation plan export route", () => {
     expect(exportRouteSource).not.toContain("afterRotationId: plan.after_rotation_id");
     expect(exportRouteSource).toContain('"cache-control": "no-store"');
   });
+
+  it("exports no obsolete resource-group duration", () => {
+    expect(projectionSource).not.toContain("plannedRotationMinutes");
+    expect(projectionSource).not.toContain("planned_rotation_minutes");
+  });
 });

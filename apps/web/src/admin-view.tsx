@@ -117,6 +117,7 @@ import {
   useOperationBoard,
 } from "./operation-workspace";
 import { formatEuroInput, parseEuroToCents, productPositionOptions } from "./product-editor";
+import { ProductReferenceRotation } from "./product-reference-rotation";
 
 const adminTableCollator = new Intl.Collator("de-DE", {
   numeric: true,
@@ -472,7 +473,6 @@ export function AdminView() {
   const [resourceName, setResourceName] = useState("");
   const [resourceShortCode, setResourceShortCode] = useState("");
   const [resourceGateId, setResourceGateId] = useState("");
-  const [resourcePlannedMinutes, setResourcePlannedMinutes] = useState(30);
   const [resourceAutomaticPrecall, setResourceAutomaticPrecall] = useState(true);
   const [resourceAircraftIds, setResourceAircraftIds] = useState<string[]>([]);
   const [aircraftEditorId, setAircraftEditorId] = useState("new");
@@ -514,7 +514,6 @@ export function AdminView() {
               resourceName,
               resourceShortCode,
               resourceGateId,
-              resourcePlannedMinutes,
               resourceAutomaticPrecall,
               resourceAircraftIds,
             ])
@@ -629,7 +628,6 @@ export function AdminView() {
     setResourceName(entry?.name ?? "");
     setResourceShortCode(entry?.shortCode ?? "");
     setResourceGateId(entry?.gateId ?? board.gates.find((gate) => gate.active)?.id ?? "");
-    setResourcePlannedMinutes(entry?.plannedRotationMinutes ?? 30);
     setResourceAutomaticPrecall(entry?.automaticPrecallEnabled ?? true);
     setResourceAircraftIds(entry?.activeAircraftIds ?? []);
   }, [adminArea, board, eventStep]);
@@ -1340,7 +1338,6 @@ export function AdminView() {
     const nextName = entry?.name ?? "";
     const nextShortCode = entry?.shortCode ?? "";
     const nextGateId = entry?.gateId ?? board?.gates.find((gate) => gate.active)?.id ?? "";
-    const nextPlannedMinutes = entry?.plannedRotationMinutes ?? 30;
     const nextAutomaticPrecall = entry?.automaticPrecallEnabled ?? true;
     const nextAircraftIds = entry?.activeAircraftIds ?? [];
     initialMasterEditorSnapshotRef.current = createMasterEditorSnapshot([
@@ -1348,7 +1345,6 @@ export function AdminView() {
       nextName,
       nextShortCode,
       nextGateId,
-      nextPlannedMinutes,
       nextAutomaticPrecall,
       nextAircraftIds,
     ]);
@@ -1356,7 +1352,6 @@ export function AdminView() {
     setResourceName(nextName);
     setResourceShortCode(nextShortCode);
     setResourceGateId(nextGateId);
-    setResourcePlannedMinutes(nextPlannedMinutes);
     setResourceAutomaticPrecall(nextAutomaticPrecall);
     setResourceAircraftIds(nextAircraftIds);
     setMasterSubmitAttempted(false);
@@ -1426,7 +1421,6 @@ export function AdminView() {
             shortCode: resourceShortCode.trim().toUpperCase(),
             gateId: resourceGateId,
             referenceCapacity: Math.max(1, ...selectedSeats),
-            plannedRotationMinutes: resourcePlannedMinutes,
             compatibleAircraftTypes: [],
             automaticPrecallEnabled: resourceAutomaticPrecall,
             aircraftIds: resourceAircraftIds,
@@ -3896,7 +3890,7 @@ export function AdminView() {
                         label="Kapazität"
                         onClick={() => toggleMasterSort("capacity")}
                       />
-                      <th>Plan / Voraufruf</th>
+                      <th>Voraufruf</th>
                       <th>Produkte</th>
                       <th className="master-actions-heading">Aktionen</th>
                     </tr>
@@ -3928,10 +3922,7 @@ export function AdminView() {
                             .join(", ") || "Keine"}
                         </td>
                         <td>{group.referenceCapacity}</td>
-                        <td>
-                          {group.plannedRotationMinutes} Min. ·{" "}
-                          {group.automaticPrecallEnabled ? "automatisch" : "manuell"}
-                        </td>
+                        <td>{group.automaticPrecallEnabled ? "Automatisch" : "Manuell"}</td>
                         <td>
                           {board?.products.filter((product) => product.resourceGroupId === group.id)
                             .length ?? 0}
@@ -4185,7 +4176,7 @@ export function AdminView() {
                       <SortableTableHeading
                         active={masterSort.category === "products" && masterSort.key === "duration"}
                         direction={masterSort.direction}
-                        label="Referenzdauer"
+                        label="Referenzzeit Offblock–Onblock"
                         onClick={() => toggleMasterSort("duration")}
                       />
                       <SortableTableHeading
@@ -4631,8 +4622,8 @@ export function AdminView() {
                     <div className="field-control">
                       <FieldLabel
                         htmlFor="product-reference-duration"
-                        label="Referenzdauer"
-                        help="Planwert für den Kaltstart der Prognose, keine zugesagte Flugzeit."
+                        label="Referenzzeit Offblock–Onblock (Min.)"
+                        help="Operative Planzeit vom bestätigten Offblock bis zum bestätigten Onblock. Boarding, Ausstieg und Puffer werden separat berücksichtigt. Trage hier weder die vollständige Umlaufzeit noch ausschließlich die beworbene Flugzeit ein."
                       />
                       <input
                         id="product-reference-duration"
@@ -4648,8 +4639,8 @@ export function AdminView() {
                     <div className="field-control">
                       <FieldLabel
                         htmlFor="product-promised-flight-minutes"
-                        label="Zugesagte Flugzeit (Min.)"
-                        help="Öffentlich kommunizierte reine Flugzeit des Produkts. Sie ändert die operative Prognose nicht."
+                        label="Kommunizierte Flugzeit (Min.)"
+                        help="Gegenüber Gästen angegebene beziehungsweise verkaufte Flugzeit. Dieser Wert wird in Produktinformationen verwendet und beeinflusst die operative Prognose nicht."
                       />
                       <input
                         id="product-promised-flight-minutes"
@@ -4662,6 +4653,12 @@ export function AdminView() {
                         }
                       />
                     </div>
+                    <ProductReferenceRotation
+                      boardingMinutes={plannedBoardingMinutes}
+                      bufferMinutes={plannedBufferMinutes}
+                      deboardingMinutes={plannedDeboardingMinutes}
+                      offBlockToOnBlockMinutes={productReferenceDuration}
+                    />
                     <div className="field-control">
                       <FieldLabel
                         htmlFor="product-sort-order"
@@ -4765,21 +4762,6 @@ export function AdminView() {
                         </option>
                       ))}
                   </select>
-                </div>
-                <div className="field-control">
-                  <FieldLabel
-                    htmlFor="resource-planned-minutes"
-                    label="Plan-Umlaufzeit (Min.)"
-                    help="Initialer Zeitwert eines vollständigen Umlaufs für die Prognose."
-                  />
-                  <input
-                    id="resource-planned-minutes"
-                    type="number"
-                    min="1"
-                    max="600"
-                    value={resourcePlannedMinutes}
-                    onChange={(event) => setResourcePlannedMinutes(Number(event.target.value))}
-                  />
                 </div>
                 <CheckboxField
                   checked={resourceAutomaticPrecall}

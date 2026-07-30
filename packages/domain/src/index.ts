@@ -362,3 +362,4 @@ export * from "./precall";
 export * from "./public-status";
 export * from "./queue";
 export * from "./recurring-operational-rule";
+export * from "./reference-rotation";
