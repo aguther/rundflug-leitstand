@@ -4,6 +4,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const port = Number(process.env.SCALE_PERFORMANCE_TEST_PORT ?? "18795");
 const npmCli = process.env.npm_execpath;
 if (!npmCli) throw new Error("npm-Ausführungspfad fehlt.");
 const wranglerCli = resolve(root, "node_modules", "wrangler", "bin", "wrangler.js");
@@ -29,10 +30,10 @@ VALUES
    '2026-07-14T06:00:00.000Z', '2026-07-14T06:00:00.000Z');
 
 INSERT INTO resource_groups
-  (id, operation_day_id, name, short_code, status, gate_id, reference_capacity, planned_rotation_minutes,
+  (id, operation_day_id, name, short_code, status, gate_id, reference_capacity,
    compatible_aircraft_types_json, version, created_at, updated_at)
 VALUES
-  ('perf-rg', 'perf-current', 'Synthetische Ressource', 'SR', 'ACTIVE', 'perf-gate', 4, 35,
+  ('perf-rg', 'perf-current', 'Synthetische Ressource', 'SR', 'ACTIVE', 'perf-gate', 4,
    '["SYNTHETIC-PERF"]', 0, '2026-07-14T06:00:00.000Z', '2026-07-14T06:00:00.000Z');
 
 INSERT INTO products
@@ -153,6 +154,8 @@ const server = spawn(
     "dev",
     "--config",
     "wrangler.jsonc",
+    "--port",
+    String(port),
     "--var",
     "APP_ENV:development",
     "--var",
@@ -162,8 +165,8 @@ const server = spawn(
   ],
   { cwd: root, stdio: "ignore", windowsHide: true },
 );
-const base = "http://127.0.0.1:8787";
-const wsBase = "ws://127.0.0.1:8787";
+const base = `http://127.0.0.1:${port}`;
+const wsBase = `ws://127.0.0.1:${port}`;
 const waitForWorker = async () => {
   for (let attempt = 0; attempt < 40; attempt += 1) {
     try {
@@ -234,7 +237,9 @@ try {
     initial.body.metrics.soldTickets !== 1000 ||
     initial.body.rotations.length !== 300
   ) {
-    throw new Error("Skalierungsdatensatz ist in der Operationssicht unvollständig.");
+    throw new Error(
+      `Skalierungsdatensatz ist in der Operationssicht unvollständig: HTTP ${initial.response.status}, ${initial.body.metrics?.soldTickets ?? "?"} Tickets, ${initial.body.rotations?.length ?? "?"} Umläufe.`,
+    );
   }
   if (!initial.response.headers.get("server-timing")?.includes("operations;dur=")) {
     throw new Error("Server-Timing für den Betriebsstand fehlt.");

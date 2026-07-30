@@ -38,7 +38,6 @@ const validTemplate = {
       shortCode: "STD",
       gateKey: "gate-1",
       referenceCapacity: 3,
-      plannedRotationMinutes: 20,
       compatibleAircraftTypes: ["C172"],
       automaticPrecallEnabled: true,
     },
@@ -79,6 +78,18 @@ const validTemplate = {
 describe("master data template contract", () => {
   it("accepts the versioned, reference-safe format", () => {
     expect(masterDataTemplateSchema.safeParse(validTemplate).success).toBe(true);
+  });
+
+  it("accepts and removes the obsolete resource-group duration from legacy templates", () => {
+    const parsed = masterDataTemplateSchema.parse({
+      ...validTemplate,
+      resourceGroups: validTemplate.resourceGroups.map((resourceGroup) => ({
+        ...resourceGroup,
+        plannedRotationMinutes: 35,
+      })),
+    });
+
+    expect(parsed.resourceGroups[0]).not.toHaveProperty("plannedRotationMinutes");
   });
 
   it("rejects unknown operational or account data", () => {

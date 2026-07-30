@@ -4724,7 +4724,6 @@ export class EventCoordinator extends DurableObject<Env> {
         shortCode: command.payload.shortCode,
         gateId: command.payload.gateId,
         referenceCapacity: command.payload.referenceCapacity,
-        plannedRotationMinutes: command.payload.plannedRotationMinutes,
         compatibleAircraftTypes: command.payload.compatibleAircraftTypes,
         automaticPrecallEnabled: command.payload.automaticPrecallEnabled,
         aircraftIds: desiredAircraftIds,
@@ -4734,13 +4733,12 @@ export class EventCoordinator extends DurableObject<Env> {
         this.env.DB.prepare(
           `INSERT INTO resource_groups
             (id, operation_day_id, name, short_code, status, gate_id, reference_capacity,
-             planned_rotation_minutes, compatible_aircraft_types_json, automatic_precall_enabled,
+             compatible_aircraft_types_json, automatic_precall_enabled,
              version, created_at, updated_at)
-           VALUES (?1, ?2, ?3, ?4, 'ACTIVE', ?5, ?6, ?7, ?8, ?9, 0, ?10, ?10)
+           VALUES (?1, ?2, ?3, ?4, 'ACTIVE', ?5, ?6, ?7, ?8, 0, ?9, ?9)
            ON CONFLICT(id) DO UPDATE SET name = excluded.name, short_code = excluded.short_code,
             gate_id = excluded.gate_id,
             reference_capacity = excluded.reference_capacity,
-            planned_rotation_minutes = excluded.planned_rotation_minutes,
             compatible_aircraft_types_json = excluded.compatible_aircraft_types_json,
             automatic_precall_enabled = excluded.automatic_precall_enabled,
             version = resource_groups.version + 1, updated_at = excluded.updated_at
@@ -4752,7 +4750,6 @@ export class EventCoordinator extends DurableObject<Env> {
           command.payload.shortCode,
           command.payload.gateId,
           command.payload.referenceCapacity,
-          command.payload.plannedRotationMinutes,
           JSON.stringify([...new Set(command.payload.compatibleAircraftTypes)]),
           command.payload.automaticPrecallEnabled ? 1 : 0,
           now,

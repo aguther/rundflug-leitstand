@@ -5,7 +5,7 @@ von Verkauf über Aufruf, Start und Landung bis zum Abschluss aus. Der Lauf veri
 
 - append-only Prognose-Snapshots nach bestätigten Kommandos,
 - auslösenden Ereignistyp sowie Historienbezug, Stichprobengröße, Datenalter, aktive Kapazität und
-  Referenzdauer,
+  Referenz-Umlaufzeit,
 - paginierte und rollenbeschränkte Prognosehistorie,
 - spätere Verknüpfung der Snapshots mit bestätigten Boarding-, Start-, Lande- und Abschlusszeiten,
 - berechnete Prognoseabweichungen für alle vier Phasen,

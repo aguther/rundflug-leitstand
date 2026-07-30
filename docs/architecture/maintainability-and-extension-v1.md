@@ -31,12 +31,12 @@ und Abnahmekriterien ist in `docs/operations/operator-handover-v1.md` dokumentie
 | No-Show-Frist und maximale Zurückstellungen | Veranstaltungsparameter |
 | Vorbereitungs-/Benachrichtigungsvorlauf | Veranstaltungsparameter |
 | Referenzgewichte | Veranstaltungsparameter |
-| Boarding-, Deboarding- und Pufferzeit | Veranstaltungsparameter |
+| Boarding-, Ausstiegs- und Pufferzeit | Veranstaltungsparameter |
 | öffentliche Texte und organisatorische Hinweise | Produkt-, Veranstaltungs-, Ressourcen- und Umlaufpflege |
 | Kapazitätswarnung und kritischer Schwellenwert | Verkaufssteuerung je Produkt |
-| Produktkapazität und Referenzflugzeit | Produktpflege |
+| Produktkapazität, Referenzzeit Offblock–Onblock und kommunizierte Flugzeit | Produktpflege |
 | aktivierte Gewichtsklassen und Begleitpflicht | Produktpflege |
-| Ressourcenkapazität und Planumlaufzeit | Ressourcengruppenpflege |
+| Ressourcenkapazität und automatischer Voraufruf | Ressourcengruppenpflege |
 | Gates, Sortierung und Status | Gatepflege |
 
 Jede Änderung läuft über einen typisierten Befehl mit Geräteberechtigung, erwarteter Version,

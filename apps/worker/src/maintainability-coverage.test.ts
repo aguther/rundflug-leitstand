@@ -126,7 +126,6 @@ describe("runtime configuration coverage", () => {
       "promisedFlightMinutes",
       "weightClasses",
       "childCompanionRequired",
-      "plannedRotationMinutes",
       "compatibleAircraftTypes",
     ]) {
       expect(contractSource).toContain(token);

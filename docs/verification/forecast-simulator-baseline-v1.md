@@ -70,7 +70,7 @@ daher diagnostisch und kein Freigabekriterium.
 ## Admin-Planwerte und A/B-Labor
 
 Die aktuelle Baseline trennt erstmals die tatsächlich verwendeten Admin-Planwerte
-`8/20/5/3` Minuten für Boarding, Produkt-Referenzdauer, Ausstieg und Puffer von den realen
+`8/20/5/3` Minuten für Boarding, Produkt-Referenzzeit Offblock–Onblock, Ausstieg und Puffer von den realen
 Dreiecksverteilungen. Änderungen der Realität verändern nicht mehr gleichzeitig die
 Prognosegrundlage. Aktive Prognosekapazität ist das Minimum aus verfügbaren Flugzeugen und aktiven
 Piloten.
@@ -204,7 +204,7 @@ festgeschriebenen Preset- und 25-Seed-Werte.
 
 ## Bekannte Grenzen
 
-- Ausreißer oberhalb `1,75×` Referenzdauer werden weiterhin unverändert verworfen. Die
+- Ausreißer oberhalb `1,75×` Referenz-Umlaufzeit werden weiterhin unverändert verworfen. Die
   Freshness-Korrektur ändert weder diese Grenze noch Median-/MAD-Filter oder Gewichtung.
 - Der Simulator bildet einen unmittelbar reagierenden idealisierten Bedienablauf ab. Er trifft keine
   flugbetriebliche, technische, sicherheitsrelevante oder luftrechtliche Entscheidung.

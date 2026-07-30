@@ -7,7 +7,9 @@ Prognoseberechnung an. Für jeden noch offenen Umlauf wird dabei ein Snapshot mi
 Veranstaltungsversion, Erfassungszeitpunkt, Qualitätsstufe, Minutenintervall und den prognostizierten
 Zeitpunkten für Boarding, Start, Landung und Abschluss geschrieben. Zusätzlich hält der Snapshot den
 auslösenden fachlichen Ereignistyp, Historienbezug, Stichprobengröße und Datenalter sowie aktive
-Kapazität und verwendete Referenzdauer fest. Damit ist nicht nur das Ergebnis, sondern auch seine
+Kapazität und verwendete, vollständig abgeleitete Referenz-Umlaufzeit fest. Das technische
+Snapshot-Feld `reference_duration_minutes` umfasst Boarding, produktbezogene Offblock–Onblock-Zeit,
+Ausstieg und Puffer. Damit ist nicht nur das Ergebnis, sondern auch seine
 Datengrundlage nachvollziehbar. Fehlgeschlagene oder abgelehnte Kommandos erzeugen keinen Snapshot.
 
 ## Unveränderlichkeit und Auswertung

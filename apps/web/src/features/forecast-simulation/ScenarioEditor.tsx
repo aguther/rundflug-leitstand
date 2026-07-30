@@ -67,7 +67,7 @@ const FORECAST_FIELDS: readonly TuningField<keyof ForecastTuningProfile>[] = [
   },
   {
     key: "referenceWeight",
-    label: "Gewicht Referenzdauer",
+    label: "Gewicht Referenz-Umlaufzeit",
     help: "Einfluss des Admin-Planwerts gegenüber bestätigten Tageswerten.",
     min: 0.1,
     max: 20,
@@ -108,7 +108,7 @@ const FORECAST_FIELDS: readonly TuningField<keyof ForecastTuningProfile>[] = [
   {
     key: "minimumMadToleranceRatio",
     label: "Mindesttoleranz zur Referenz",
-    help: "Untergrenze der MAD-Toleranz als Anteil der Referenzdauer.",
+    help: "Untergrenze der MAD-Toleranz als Anteil der Referenz-Umlaufzeit.",
     min: 0,
     max: 5,
     step: 0.05,
@@ -709,7 +709,7 @@ export function ScenarioEditor({
                 [
                   { label: "Plan Boarding", key: "plannedBoardingMinutes", minimum: 1 },
                   {
-                    label: "Produkt-Referenzdauer",
+                    label: "Referenzzeit Offblock–Onblock des Produkts",
                     key: "productReferenceDurationMinutes",
                     minimum: 1,
                   },
@@ -733,8 +733,10 @@ export function ScenarioEditor({
               ))}
             </div>
             <p className="sim-editor-hint">
-              Die Referenzdauer startet die Prognose kalt. Die tatsächlichen Zeiten werden getrennt
-              im Register „Simulierte Realität“ erzeugt.
+              Die Referenzzeit Offblock–Onblock startet zusammen mit Boarding, Ausstieg und Puffer
+              die Prognose kalt. Die tatsächlichen Zeiten werden getrennt im Register „Simulierte
+              Realität“ erzeugt. Die Bodenzeiten gelten veranstaltungsweit für alle Produkte und
+              Flugzeuge.
             </p>
           </section>
 
