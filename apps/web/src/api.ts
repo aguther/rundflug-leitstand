@@ -41,6 +41,9 @@ import {
   publicBoardSchema,
   publicGroupStatusSchema,
   publicTicketStatusSchema,
+  type ResourceDayHistory,
+  type ResourceDayHistoryQuery,
+  resourceDayHistorySchema,
   simulationPlanExportSchema,
   type TicketGroupPrintData,
   type TicketSearchRequest,
@@ -617,6 +620,20 @@ export async function getForecastHistory(
   );
   if (!response.ok) throw new Error("Prognosehistorie nicht verfügbar.");
   return forecastHistorySchema.parse(await response.json());
+}
+
+export async function getResourceDayHistory(
+  eventId: string,
+  deviceId: string,
+  deviceToken: string,
+  filters: ResourceDayHistoryQuery,
+): Promise<ResourceDayHistory> {
+  const response = await apiFetch(
+    controlApiPath(eventId, `/history/resources?${historyQuery(filters)}`),
+    { headers: deviceHeaders(deviceId, deviceToken) },
+  );
+  if (!response.ok) throw new Error("Tagesverlauf nicht verfügbar.");
+  return resourceDayHistorySchema.parse(await response.json());
 }
 
 export async function downloadDailyReport(

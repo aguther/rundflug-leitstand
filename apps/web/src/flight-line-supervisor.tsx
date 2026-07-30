@@ -1,10 +1,11 @@
-import type { OperationBoard } from "@rundflug/contracts";
+import type { ForecastHistory, OperationBoard, ResourceDayHistory } from "@rundflug/contracts";
 import { formatBookingGroupLabel, rotationStateLabels } from "@rundflug/domain";
 import type { LucideIcon } from "lucide-react";
 import {
   Activity,
   ArrowDown,
   ArrowUp,
+  ChartNoAxesCombined,
   Check,
   CircleArrowRight,
   CircleCheck,
@@ -12,7 +13,6 @@ import {
   Clock3,
   Coffee,
   Fuel,
-  History,
   Info,
   ListOrdered,
   Package,
@@ -29,7 +29,6 @@ import { useMemo, useState } from "react";
 import {
   Button,
   IconButton,
-  ModalDialog,
   PageHeader,
   Panel,
   SearchField,
@@ -37,9 +36,12 @@ import {
   StatusPill,
 } from "./design-system/components";
 import {
+  FlightDirectorAnalyticsDialog,
+  type FlightDirectorAnalyticsSelection,
+} from "./features/flight-line/FlightDirectorAnalyticsDialog";
+import {
   activeRotationForAircraft,
   BookingGroupAssignmentDialog,
-  CompactHistory,
   type FlightLineFleetState,
   FlightProgress,
   formatFlightLineTime,
@@ -48,7 +50,6 @@ import {
   PilotChangeIcon,
   primaryAircraftActionLabel,
   primaryAircraftActionPresentation,
-  rotationHistoryForAircraft,
 } from "./flight-line-shared";
 import { formatAbsoluteTimeWindow } from "./time-window";
 
@@ -223,6 +224,8 @@ export function FlightLineSupervisorConsole({
   onGroupRecallClear,
   onGroupRestore,
   onGroupDefer,
+  loadForecastHistory,
+  loadResourceHistory,
 }: {
   board: OperationBoard;
   aircraft: Aircraft[];
@@ -247,6 +250,11 @@ export function FlightLineSupervisorConsole({
   onGroupRecallClear: (ticketGroupId: string, recallId: string) => void | Promise<void>;
   onGroupRestore: (ticketGroupId: string) => void | Promise<void>;
   onGroupDefer: (ticketGroupId: string) => void | Promise<void>;
+  loadForecastHistory: (rotationId: string) => Promise<ForecastHistory["entries"]>;
+  loadResourceHistory: (
+    scopeType: "AIRCRAFT" | "PILOT",
+    scopeId: string,
+  ) => Promise<ResourceDayHistory>;
 }) {
   const [resourceGroupId, setResourceGroupId] = useState("");
   const [ticketSearch, setTicketSearch] = useState("");
@@ -254,7 +262,8 @@ export function FlightLineSupervisorConsole({
   const [ticketSort, setTicketSort] = useState<TicketSort>(null);
   const [assignmentOpen, setAssignmentOpen] = useState(false);
   const [pilotOpen, setPilotOpen] = useState(false);
-  const [historyAircraftId, setHistoryAircraftId] = useState<string | null>(null);
+  const [analyticsSelection, setAnalyticsSelection] =
+    useState<FlightDirectorAnalyticsSelection | null>(null);
   const [pendingRotationActions, setPendingRotationActions] = useState<
     Record<string, "primary" | "refueling" | "paused" | "inactive">
   >({});
@@ -289,10 +298,6 @@ export function FlightLineSupervisorConsole({
     board.event.emergencyMode ||
     board.event.status !== "ACTIVE" ||
     board.event.operationalInterrupted;
-  const historyAircraft = aircraft.find((entry) => entry.id === historyAircraftId);
-  const history = historyAircraftId
-    ? rotationHistoryForAircraft(historyAircraftId, board.rotations)
-    : [];
   const ticketRows = useMemo(() => {
     const query = ticketSearch.trim().toLocaleLowerCase("de-DE");
     const queueByGroupId = new Map(board.queueGroups.map((group) => [group.id, group]));
@@ -424,6 +429,24 @@ export function FlightLineSupervisorConsole({
               variant="secondary"
             >
               Betrieb
+            </Button>
+            <Button
+              onClick={() =>
+                setAnalyticsSelection({
+                  tab:
+                    aircraft.length > 0
+                      ? "aircraft"
+                      : board.pilots.length > 0
+                        ? "pilots"
+                        : "groups",
+                  id: aircraft[0]?.id ?? board.pilots[0]?.id ?? board.rotations[0]?.id ?? "",
+                })
+              }
+              type="button"
+              variant="secondary"
+            >
+              <ChartNoAxesCombined aria-hidden="true" />
+              Auswertungen
             </Button>
             <SelectField
               aria-label="Ressourcengruppe filtern"
@@ -608,15 +631,15 @@ export function FlightLineSupervisorConsole({
                     <PilotChangeIcon aria-hidden="true" />
                   </IconButton>
                   <IconButton
-                    label={`Historie für ${entry.registration} anzeigen`}
+                    label={`Tagesauswertung für ${entry.registration} anzeigen`}
                     onClick={(event) => {
                       event.stopPropagation();
-                      setHistoryAircraftId(entry.id);
+                      setAnalyticsSelection({ tab: "aircraft", id: entry.id });
                     }}
                     size="touch"
                     type="button"
                   >
-                    <History aria-hidden="true" />
+                    <ChartNoAxesCombined aria-hidden="true" />
                   </IconButton>
                 </span>
               </div>
@@ -648,6 +671,9 @@ export function FlightLineSupervisorConsole({
             </label>
           </header>
           <CompactTickets
+            onOpenAnalytics={(rotationId) =>
+              setAnalyticsSelection({ tab: "groups", id: rotationId })
+            }
             onSort={(key) => setTicketSort((current) => nextTicketSort(current, key))}
             rows={ticketRows}
             sort={ticketSort}
@@ -656,24 +682,14 @@ export function FlightLineSupervisorConsole({
         </Panel>
       </div>
 
-      <ModalDialog
-        description={
-          historyAircraft ? `Abgeschlossene Umläufe von ${historyAircraft.registration}` : undefined
-        }
-        footer={
-          <Button onClick={() => setHistoryAircraftId(null)} type="button" variant="secondary">
-            Schließen
-          </Button>
-        }
-        onClose={() => setHistoryAircraftId(null)}
-        open={historyAircraftId !== null}
-        size="wide"
-        title="Historie anzeigen"
-      >
-        <div className="flight-director-history-dialog">
-          <CompactHistory history={history} timeZone={board.event.timeZone} />
-        </div>
-      </ModalDialog>
+      <FlightDirectorAnalyticsDialog
+        board={board}
+        initialSelection={analyticsSelection}
+        loadForecastHistory={loadForecastHistory}
+        loadResourceHistory={loadResourceHistory}
+        onClose={() => setAnalyticsSelection(null)}
+        open={analyticsSelection !== null}
+      />
 
       <BookingGroupAssignmentDialog
         aircraft={selectedAircraft}
@@ -713,11 +729,13 @@ function CompactTickets({
   timeZone,
   sort,
   onSort,
+  onOpenAnalytics,
 }: {
   rows: TicketRow[];
   timeZone: string;
   sort: TicketSort;
   onSort: (key: TicketSortKey) => void;
+  onOpenAnalytics: (rotationId: string) => void;
 }) {
   const phaseIcon = (rotation: Rotation) => {
     const label = rotationStateLabels[rotation.status];
@@ -783,6 +801,10 @@ function CompactTickets({
             </span>
           );
         })}
+        <span className="ticket-analytics-action" title="Prognoseverlauf">
+          <ChartNoAxesCombined aria-hidden="true" />
+          <span className="visually-hidden">Prognoseverlauf</span>
+        </span>
       </div>
       {rows.length > 0 ? (
         rows.map(({ group, queue, rotation }) => (
@@ -812,6 +834,16 @@ function CompactTickets({
             <span>{formatFlightLineTime(rotation.timeline.actual.departureAt, timeZone)}</span>
             <span>{formatFlightLineTime(rotation.timeline.actual.landingAt, timeZone)}</span>
             <span>{formatFlightLineTime(rotation.timeline.actual.completionAt, timeZone)}</span>
+            <span className="ticket-analytics-action">
+              <IconButton
+                label={`Prognoseverlauf für ${rotation.communicationLabel} anzeigen`}
+                onClick={() => onOpenAnalytics(rotation.id)}
+                size="compact"
+                type="button"
+              >
+                <ChartNoAxesCombined aria-hidden="true" />
+              </IconButton>
+            </span>
           </div>
         ))
       ) : (

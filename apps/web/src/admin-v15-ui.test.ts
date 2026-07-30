@@ -67,7 +67,7 @@ describe("V1.5 administration UI", () => {
     expect(adminEventStyles).toContain(
       ".admin-shell .manifest-correction-grid > .manifest-reason-field",
     );
-    expect(chartSource).toContain("const HEIGHT = 210");
+    expect(chartSource).toContain('<ResponsiveContainer height="100%" width="100%">');
   });
 
   it("keeps the area header mounted with the same geometry on master-data steps", () => {
@@ -125,7 +125,11 @@ describe("V1.5 administration UI", () => {
 
   it("uses event-only flow data and a strict preview-before-import workflow", () => {
     expect(adminViewSource).toContain("<AdminEventFlowChart");
-    expect(chartSource).toContain("<svg");
+    expect(chartSource).toContain("<ComposedChart");
+    expect(chartSource).toContain("strokeWidth={1.75}");
+    expect(chartSource).toContain('type="stepAfter"');
+    expect(chartSource).toContain("<Tooltip");
+    expect(chartSource).toContain("<ReferenceLine");
     expect(chartSource).toContain("soldTickets");
     expect(chartSource).toContain("completedTickets");
     expect(chartSource).toContain("openTickets");

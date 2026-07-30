@@ -11,6 +11,7 @@ const privateEventRoutes = [
   ["GET", "/history"],
   ["GET", "/history/operations"],
   ["GET", "/history/forecasts"],
+  ["GET", "/history/resources"],
   ["GET", "/devices"],
   ["GET", "/reports/daily.csv"],
   ["GET", "/exports/performance-profile.json"],

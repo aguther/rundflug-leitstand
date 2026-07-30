@@ -1,0 +1,102 @@
+import { describe, expect, it } from "vitest";
+import {
+  buildAircraftBlockStatement,
+  buildPilotPauseEventStatement,
+  buildResourceDayRotationStatement,
+  pairPilotPauseEvents,
+} from "./resource-day-history";
+
+describe("resource day history queries", () => {
+  it("selects the allowed resource identifier without interpolating its value", () => {
+    const hostileId = "pilot' OR 1=1 --";
+    const statement = buildResourceDayRotationStatement(
+      "event-1",
+      { scopeType: "PILOT", scopeId: hostileId },
+      "2026-07-11T07:00:00.000Z",
+      "2026-07-11T18:00:00.000Z",
+    );
+
+    expect(statement.sql).toContain("r.pilot_id = ?2");
+    expect(statement.sql).not.toContain(hostileId);
+    expect(statement.sql).not.toMatch(/reason|payload_json|public_code/i);
+    expect(statement.bindings).toEqual([
+      "event-1",
+      hostileId,
+      "2026-07-11T07:00:00.000Z",
+      "2026-07-11T18:00:00.000Z",
+    ]);
+  });
+
+  it("keeps aircraft blocks and pilot pause events bounded and anonymous", () => {
+    const aircraft = buildAircraftBlockStatement(
+      "event-1",
+      "aircraft-1",
+      "2026-07-11T07:00:00.000Z",
+      "2026-07-11T18:00:00.000Z",
+    );
+    const pilot = buildPilotPauseEventStatement("event-1", "pilot-1", "2026-07-11T18:00:00.000Z");
+
+    expect(aircraft.sql).toContain("block_type IN ('REFUELING', 'PAUSE', 'INTERRUPTION')");
+    expect(aircraft.sql).not.toContain("reason");
+    expect(pilot.sql).toContain("aggregate_type = 'PILOT'");
+    expect(pilot.sql).not.toContain("payload_json");
+  });
+});
+
+describe("pilot pause pairing", () => {
+  it("pairs repeated and unmatched append-only events deterministically", () => {
+    const result = pairPilotPauseEvents(
+      [
+        {
+          id: "unmatched-end",
+          sequence: 1,
+          eventType: "PILOT_PAUSE_ENDED",
+          occurredAt: "2026-07-11T06:55:00.000Z",
+        },
+        {
+          id: "start-before-window",
+          sequence: 2,
+          eventType: "PILOT_PAUSE_STARTED",
+          occurredAt: "2026-07-11T06:58:00.000Z",
+        },
+        {
+          id: "repeated-start",
+          sequence: 3,
+          eventType: "PILOT_PAUSE_STARTED",
+          occurredAt: "2026-07-11T07:02:00.000Z",
+        },
+        {
+          id: "end",
+          sequence: 4,
+          eventType: "PILOT_PAUSE_ENDED",
+          occurredAt: "2026-07-11T07:12:00.000Z",
+        },
+        {
+          id: "open-start",
+          sequence: 5,
+          eventType: "PILOT_PAUSE_STARTED",
+          occurredAt: "2026-07-11T08:00:00.000Z",
+        },
+      ],
+      "2026-07-11T07:00:00.000Z",
+      "2026-07-11T09:00:00.000Z",
+    );
+
+    expect(result).toEqual([
+      {
+        id: "pilot-pause-start-before-window",
+        type: "PAUSE",
+        startedAt: "2026-07-11T07:00:00.000Z",
+        endedAt: "2026-07-11T07:12:00.000Z",
+        active: false,
+      },
+      {
+        id: "pilot-pause-open-start",
+        type: "PAUSE",
+        startedAt: "2026-07-11T08:00:00.000Z",
+        endedAt: null,
+        active: true,
+      },
+    ]);
+  });
+});

@@ -17,6 +17,8 @@ import {
   publicBoardSchema,
   publicGroupStatusSchema,
   publicTicketStatusSchema,
+  resourceDayHistoryQuerySchema,
+  resourceDayHistorySchema,
   rotationOperationalSummarySchema,
   stageOutageRecoveryRequestSchema,
   ticketGroupPrintDataSchema,
@@ -1403,5 +1405,67 @@ describe("forecast history contracts", () => {
     expect(parsed.entries[0]?.triggerEventType).toBe("ROTATION_IN_FLIGHT");
     expect(parsed.entries[0]?.deviationMinutes.completion).toBe(4);
     expect(JSON.stringify(parsed)).not.toMatch(/guest|phone|telefon/i);
+  });
+});
+
+describe("resource day history contracts", () => {
+  it("accepts only an aircraft or anonymous pilot scope", () => {
+    expect(
+      resourceDayHistoryQuerySchema.parse({
+        scopeType: "AIRCRAFT",
+        scopeId: "aircraft-synthetic",
+      }),
+    ).toEqual({ scopeType: "AIRCRAFT", scopeId: "aircraft-synthetic" });
+    expect(() =>
+      resourceDayHistoryQuerySchema.parse({
+        scopeType: "RESOURCE_GROUP",
+        scopeId: "resource-group-synthetic",
+      }),
+    ).toThrow();
+  });
+
+  it("keeps the normalized daily timeline free of personal and operational-note data", () => {
+    const parsed = resourceDayHistorySchema.parse({
+      scopeType: "PILOT",
+      scopeId: "pilot-synthetic",
+      from: "2026-07-11T07:00:00.000Z",
+      until: "2026-07-11T18:00:00.000Z",
+      observedUntil: "2026-07-11T12:00:00.000Z",
+      rotations: [
+        {
+          rotationId: "rotation-synthetic",
+          flightGroupId: "flight-group-synthetic",
+          communicationNumber: 42,
+          communicationLabel: "F-RG001-042",
+          resourceGroupId: "resource-group-synthetic",
+          resourceGroupName: "Rundflug",
+          productName: "Rundflug",
+          passengerCount: 3,
+          usableCapacity: 4,
+          aircraftId: "aircraft-synthetic",
+          aircraftRegistration: "D-TEST",
+          pilotId: "pilot-synthetic",
+          pilotOperationalCode: "P-01",
+          actual: {
+            boardingAt: "2026-07-11T08:00:00.000Z",
+            departureAt: "2026-07-11T08:08:00.000Z",
+            landingAt: "2026-07-11T08:30:00.000Z",
+            completionAt: "2026-07-11T08:36:00.000Z",
+          },
+        },
+      ],
+      blocks: [
+        {
+          id: "pause-synthetic",
+          type: "PAUSE",
+          startedAt: "2026-07-11T09:00:00.000Z",
+          endedAt: null,
+          active: true,
+        },
+      ],
+    });
+
+    expect(parsed.rotations[0]?.pilotOperationalCode).toBe("P-01");
+    expect(JSON.stringify(parsed)).not.toMatch(/guest|phone|telefon|reason|note/i);
   });
 });

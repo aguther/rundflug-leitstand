@@ -1,7 +1,18 @@
-import type { CommandEnvelope, CommandResult, OperationBoard } from "@rundflug/contracts";
+import type {
+  CommandEnvelope,
+  CommandResult,
+  ForecastHistory,
+  OperationBoard,
+} from "@rundflug/contracts";
 import { formatBookingGroupLabel } from "@rundflug/domain";
-import { useEffect, useRef, useState } from "react";
-import { claimFlightLineAircraft, releaseFlightLineAircraft, sendCommand } from "./api";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  claimFlightLineAircraft,
+  getForecastHistory,
+  getResourceDayHistory,
+  releaseFlightLineAircraft,
+  sendCommand,
+} from "./api";
 import { AppShell as Shell } from "./app/AppShell";
 import { useActionMessageBridge } from "./app/PageNotifications";
 import { Button, ModalDialog } from "./design-system/components";
@@ -1112,6 +1123,43 @@ export function FlightLineView() {
     }
   }
 
+  const loadAllForecastHistory = useCallback(async (rotationId: string) => {
+    const entries: ForecastHistory["entries"] = [];
+    let offset = 0;
+    let total = Number.POSITIVE_INFINITY;
+    while (offset < total) {
+      const page = await getForecastHistory(
+        EVENT_ID,
+        FLIGHT_LINE_DEVICE_ID,
+        deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
+        { rotationId, limit: 200, offset },
+      );
+      entries.push(...page.entries);
+      total = page.total;
+      offset += page.entries.length;
+      if (page.entries.length === 0) break;
+      if (offset > 100_000 && offset < total) {
+        throw new Error("Der Prognoseverlauf überschreitet die abrufbare Tagesmenge.");
+      }
+    }
+    return entries.sort(
+      (left, right) =>
+        Date.parse(left.capturedAt) - Date.parse(right.capturedAt) ||
+        left.snapshotId.localeCompare(right.snapshotId),
+    );
+  }, []);
+
+  const loadResourceHistory = useCallback(
+    (scopeType: "AIRCRAFT" | "PILOT", scopeId: string) =>
+      getResourceDayHistory(
+        EVENT_ID,
+        FLIGHT_LINE_DEVICE_ID,
+        deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
+        { scopeType, scopeId },
+      ),
+    [],
+  );
+
   return (
     <Shell
       className={FLIGHT_LINE_ASSIST_MODE ? "flight-line-shell assist-shell" : "flight-line-shell"}
@@ -1207,6 +1255,8 @@ export function FlightLineView() {
           canManageOperations={canManageAircraft}
           operationalSummary={operationalSummary}
           operationalSummaryTone={operationalSummaryTone}
+          loadForecastHistory={loadAllForecastHistory}
+          loadResourceHistory={loadResourceHistory}
           onOpenOperations={openOperationsDialog}
           onResourceGroupChange={setFilteredResourceGroupId}
           selectedQueueGroupIds={selectedQueueGroupIds}

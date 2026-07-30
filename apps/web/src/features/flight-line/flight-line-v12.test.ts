@@ -5,6 +5,7 @@ import sharedSource from "../../flight-line-shared.tsx?raw";
 import supervisorSource from "../../flight-line-supervisor.tsx?raw";
 import viewSource from "../../flight-line-view.tsx?raw";
 import operationalPlanSource from "../operations/OperationalPlanPanel.tsx?raw";
+import analyticsDialogSource from "./FlightDirectorAnalyticsDialog.tsx?raw";
 import operationsDialogSource from "./FlightDirectorOperationsDialog.tsx?raw";
 
 const stylesSource = [
@@ -37,7 +38,7 @@ describe("V1.9 Flight Director and Flight Line surfaces", () => {
 
   it("implements the V1.7.0 compact aircraft table with centered dialogs", () => {
     expect(supervisorSource).toContain("flight-director-aircraft-row");
-    expect(supervisorSource).toContain("ModalDialog");
+    expect(analyticsDialogSource).toContain("ModalDialog");
     expect(sharedSource).toContain("Buchungsgruppen zuweisen");
     expect(sharedSource).toContain("Gruppen bleiben vollständig zusammen");
     expect(supervisorSource).not.toContain("expanded");
@@ -51,8 +52,8 @@ describe("V1.9 Flight Director and Flight Line surfaces", () => {
     expect(supervisorSource).toContain("Button,");
     expect(supervisorSource).toContain("IconButton,");
     expect(supervisorSource).toContain("SelectField,");
-    expect(supervisorSource).toContain("ModalDialog,");
-    expect(supervisorSource).toContain("StatusPill,");
+    expect(analyticsDialogSource).toContain("ModalDialog,");
+    expect(supervisorSource).toContain("StatusPill");
     expect(supervisorSource).not.toContain("Tabs,");
     expect(supervisorSource).toContain("PilotAssignmentDialogs");
     expect(assistSource).toContain("PilotAssignmentDialogs");
