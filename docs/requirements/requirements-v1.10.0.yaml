@@ -122,7 +122,7 @@ requirements:
   - id: F-RES-010
     source: "1.4-konsolidiert"
     section: "8.2 Produkte, Ressourcengruppen und Flugzeuge"
-    requirement: "Jedes buchbare Produkt verwendet genau eine Ressourcengruppe. Produktmerkmale wie Bezeichnung, Preis, prognostische Referenzdauer, davon getrennte zugesagte Flugzeit, öffentliche Darstellung und Verkaufsregeln sind von der Ressourcengruppe getrennt zu führen. Die zugesagte Flugzeit verändert keine operative Prognose."
+    requirement: "Jedes buchbare Produkt verwendet genau eine Ressourcengruppe. Die operative Produkt-Planzeit wird ausschließlich als Referenzzeit Offblock–Onblock am Produkt geführt; die davon getrennte kommunizierte Flugzeit ist reine Produktinformation und verändert keine operative Prognose. Die Ressourcengruppe besitzt keine eigene Plan-Umlaufzeit."
     priority: MUSS
     stage: V1
     status: umgesetzt
@@ -157,7 +157,7 @@ requirements:
   - id: F-RES-060
     source: "1.4-konsolidiert"
     section: "8.2 Produkte, Ressourcengruppen und Flugzeuge"
-    requirement: "Ein Produkt verwendet genau eine Ressourcengruppe. Flugzeugkompatibilität und Passagierkapazität werden aus den konkret aktiv zugeordneten Flugzeugen abgeleitet; gepflegt werden Gate und planmäßige Prozessdauern, keine Freitext-Typenlisten oder manuelle Gruppenkapazität."
+    requirement: "Ein Produkt verwendet genau eine Ressourcengruppe. Flugzeugkompatibilität und Passagierkapazität werden aus den konkret aktiv zugeordneten Flugzeugen abgeleitet; Produktzeit und veranstaltungsweite Bodenzeiten bleiben getrennt. Es werden keine Freitext-Typenlisten, manuelle Gruppenkapazität oder eigene Ressourcengruppen-Umlaufzeit gepflegt."
     priority: MUSS
     stage: V1
     status: umgesetzt
@@ -388,7 +388,7 @@ requirements:
   - id: F-BRD-100
     source: "1.4-konsolidiert"
     section: "8.4 Ereignisse und Flight-Line-/Boarding-Ablauf"
-    requirement: "Das System misst getrennt mindestens Boardingdauer, Flugzeit, Zeit von Landung bis Abschluss und gesamte Umlaufzeit. Die Messpunkte werden aus den Primärereignissen abgeleitet."
+    requirement: "Das System misst getrennt mindestens Boardingdauer, Offblock–Onblock-Zeit, Zeit von Onblock bis Abschluss und gesamte Umlaufzeit. Die Messpunkte werden aus den Primärereignissen abgeleitet."
     priority: MUSS
     stage: V1
     status: umgesetzt
@@ -514,7 +514,7 @@ requirements:
   - id: F-PRG-030
     source: "1.4-konsolidiert"
     section: "8.6 Prognose, Disposition und Kapazität"
-    requirement: "Die Prognose berücksichtigt mindestens Produktdauer, Flugzeugprofil, Boarding-, Flug-, Deboarding- und Pufferzeiten, aktuelle Flugzeugzustände, Pausen, Tanken, Unterbrechungen und Queue-Reihenfolge."
+    requirement: "Die Prognose berücksichtigt mindestens Referenzzeit Offblock–Onblock des Produkts, Flugzeugprofil, veranstaltungsweite Boarding-, Ausstiegs- und Pufferzeiten, aktuelle Flugzeugzustände, Pausen, Tanken, Unterbrechungen und Queue-Reihenfolge. Die Referenz-Umlaufzeit wird als Summe dieser vier Zeitanteile abgeleitet und nicht separat gespeichert."
     priority: MUSS
     stage: V1
     status: umgesetzt
@@ -990,7 +990,7 @@ requirements:
   - id: D-015
     source: "1.4-konsolidiert"
     section: "9 Datenanforderungen"
-    requirement: "Ressourcengruppe: Bezeichnung, Status, zugehörige Produkte, Prognoseparameter, Gates, aktive Flugzeugzuordnungen und daraus abgeleitete Kapazitätsspanne."
+    requirement: "Ressourcengruppe: Bezeichnung, Status, zugehörige Produkte, Gates, aktive Flugzeugzuordnungen und daraus abgeleitete Kapazitätsspanne; keine eigene Plan-Umlaufzeit."
     priority: MUSS
     stage: V1
     status: umgesetzt
@@ -1004,7 +1004,7 @@ requirements:
   - id: D-020
     source: "1.4-konsolidiert"
     section: "9 Datenanforderungen"
-    requirement: "Produkt: Bezeichnung, Kürzel, Preis, genau eine Ressourcengruppe, öffentliche Darstellung, prognostische Referenzdauer, zugesagte Flugzeit, Verkaufsregeln, Begleitpflicht und Sortierung; keine manuell gepflegte Referenzkapazität."
+    requirement: "Produkt: Bezeichnung, Kürzel, Preis, genau eine Ressourcengruppe, öffentliche Darstellung, Referenzzeit Offblock–Onblock, davon getrennte kommunizierte Flugzeit, Verkaufsregeln, Begleitpflicht und Sortierung; keine manuell gepflegte Referenzkapazität."
     priority: MUSS
     stage: V1
     status: umgesetzt

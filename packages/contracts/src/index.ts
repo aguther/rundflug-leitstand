@@ -204,7 +204,9 @@ const upsertProductPayloadSchema = z
     publicDescription: z.string().trim().max(240),
     priceCents: z.number().int().min(0).max(1_000_000),
     referenceCapacity: z.number().int().min(1).max(100),
+    // Operative Produkt-Planzeit vom bestätigten Offblock bis zum bestätigten Onblock.
     referenceDurationMinutes: z.number().int().min(1).max(600),
+    // Gegenüber Gästen kommunizierte Produktzeit ohne Wirkung auf die operative Prognose.
     promisedFlightMinutes: z.number().int().min(1).max(600),
     childCompanionRequired: z.boolean(),
     weightClasses: z
@@ -683,7 +685,6 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
         .regex(/^[A-Z0-9-]{2,8}$/),
       gateId: z.string().min(1).max(100),
       referenceCapacity: z.number().int().min(1).max(100),
-      plannedRotationMinutes: z.number().int().min(1).max(600),
       compatibleAircraftTypes: z.array(z.string().trim().min(1).max(80)).max(50),
       automaticPrecallEnabled: z.boolean().default(true),
       aircraftIds: z.array(z.string().min(1).max(100)).max(100).optional(),
@@ -1155,7 +1156,6 @@ const masterDataTemplateResourceGroupSchema = z
       .regex(/^[A-Z0-9-]{2,8}$/),
     gateKey: masterDataTemplateKeySchema,
     referenceCapacity: z.number().int().min(1).max(100),
-    plannedRotationMinutes: z.number().int().min(1).max(600),
     compatibleAircraftTypes: z.array(z.string().trim().min(1).max(80)).max(50),
     automaticPrecallEnabled: z.boolean(),
   })
@@ -1207,7 +1207,9 @@ const masterDataTemplateProductSchema = z
     publicDescription: z.string().trim().max(240),
     priceCents: z.number().int().min(0).max(1_000_000),
     referenceCapacity: z.number().int().min(1).max(100),
+    // Operative Produkt-Planzeit vom bestätigten Offblock bis zum bestätigten Onblock.
     referenceDurationMinutes: z.number().int().min(1).max(600),
+    // Gegenüber Gästen kommunizierte Produktzeit ohne Wirkung auf die operative Prognose.
     promisedFlightMinutes: z.number().int().min(1).max(600),
     childCompanionRequired: z.boolean(),
     weightClasses: z.array(productWeightClassSchema).min(1).max(5),
@@ -1236,7 +1238,7 @@ function addDuplicateIssues(
   });
 }
 
-export const masterDataTemplateSchema = z
+const canonicalMasterDataTemplateSchema = z
   .object({
     format: z.literal("rundflug-master-data-template"),
     formatVersion: z.literal(1),
@@ -1382,6 +1384,28 @@ export const masterDataTemplateSchema = z
       }
     });
   });
+
+function removeLegacyResourceGroupRotationMinutes(value: unknown): unknown {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+  const template = value as Record<string, unknown>;
+  if (!Array.isArray(template.resourceGroups)) return value;
+  return {
+    ...template,
+    resourceGroups: template.resourceGroups.map((resourceGroup) => {
+      if (!resourceGroup || typeof resourceGroup !== "object" || Array.isArray(resourceGroup)) {
+        return resourceGroup;
+      }
+      const normalized = { ...(resourceGroup as Record<string, unknown>) };
+      delete normalized.plannedRotationMinutes;
+      return normalized;
+    }),
+  };
+}
+
+export const masterDataTemplateSchema = z.preprocess(
+  removeLegacyResourceGroupRotationMinutes,
+  canonicalMasterDataTemplateSchema,
+);
 export type MasterDataTemplate = z.infer<typeof masterDataTemplateSchema>;
 
 const simulationPlanScheduleSchema = z
@@ -1767,6 +1791,7 @@ const simulationScenarioOperationalModelSchema = z
             resourceGroupId: masterDataTemplateKeySchema,
             gateId: masterDataTemplateKeySchema,
             referenceCapacity: z.number().int().min(1).max(100),
+            // Operative Produkt-Planzeit vom bestätigten Offblock bis zum bestätigten Onblock.
             referenceDurationMinutes: z.number().int().min(1).max(600),
           })
           .strict(),
@@ -2268,7 +2293,9 @@ export const productOperationalSummarySchema = z.object({
   sortOrder: z.number().int().nonnegative(),
   saleEnabled: z.boolean(),
   referenceCapacity: z.number().int().positive(),
+  // Operative Produkt-Planzeit vom bestätigten Offblock bis zum bestätigten Onblock.
   referenceDurationMinutes: z.number().int().positive(),
+  // Gegenüber Gästen kommunizierte Produktzeit ohne Wirkung auf die operative Prognose.
   promisedFlightMinutes: z.number().int().positive(),
   queuedTickets: z.number().int().nonnegative(),
   resourceGroupOpenTickets: z.number().int().nonnegative(),
@@ -2547,7 +2574,6 @@ export const operationBoardSchema = z.object({
       gateId: z.string(),
       gateLabel: z.string(),
       referenceCapacity: z.number().int().positive(),
-      plannedRotationMinutes: z.number().int().positive(),
       compatibleAircraftTypes: z.array(z.string()),
       automaticPrecallEnabled: z.boolean(),
       activeAircraftIds: z.array(z.string()),
@@ -2867,6 +2893,7 @@ export const forecastHistoryEntrySchema = z.object({
   sampleSize: z.number().int().nonnegative(),
   dataAgeMinutes: z.number().nonnegative(),
   activeCapacity: z.number().int().nonnegative(),
+  // Vollständige Referenz-Umlaufzeit einschließlich veranstaltungsweiter Bodenzeiten.
   referenceDurationMinutes: z.number().int().nonnegative(),
   predicted: z.object({
     boardingAt: nullableTimestampSchema,

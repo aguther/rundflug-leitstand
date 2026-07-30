@@ -7,8 +7,8 @@ gehen nicht als Nullwert in einen Durchschnitt ein.
 | --- | --- | --- |
 | Wartezeit | Verkauf der Ticketgruppe | bestätigter Boarding-Aufruf (`CALL_NEXT`) |
 | Boardingdauer | bestätigter Boarding-Aufruf (`CALL_NEXT`) | `IM FLUG` |
-| Flugzeit | `IM FLUG` | `GELANDET` |
-| Bodenzeit | `GELANDET` | `ABGESCHLOSSEN/VERFÜGBAR` |
+| Offblock–Onblock-Zeit | bestätigter Offblock (`IM FLUG`) | bestätigter Onblock (`GELANDET`) |
+| Ausstiegs-/Bodenzeit | bestätigter Onblock (`GELANDET`) | `ABGESCHLOSSEN/VERFÜGBAR` |
 | Umlaufzeit | bestätigter Boarding-Aufruf (`CALL_NEXT`) | `ABGESCHLOSSEN/VERFÜGBAR` |
 
 Der Produktpreis ist reine Produktinformation. Umsatz, Zahlart und Bezahlstatus sind keine
