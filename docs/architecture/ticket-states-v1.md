@@ -20,6 +20,11 @@ handlungsorientierten Gastzustände ab.
 | Klärung Kasse | `CLARIFICATION` nach Erreichen von `maxTicketDeferrals`; keine operative Rotation |
 | Storniert | `CANCELED` und Audit-Ereignis |
 
+Der aktive Gruppennachruf ist ausdrücklich kein Eintrag dieser Zustandsmaschine. Er wird separat
+persistiert und projiziert. Start oder Ende ändern weder Ticketstatus noch Anwesenheit,
+Queueposition, Belegung oder normalen Umlaufstatus. Anwesenheitsbestätigung, Boardingbeginn,
+Zurückstellung, No-Show und Storno beenden lediglich einen noch aktiven Nachruf.
+
 Check-in, Aufruf und Rücknahme halten Anwesenheits- und Ticketstatus zusammen. `REVOKE_CALL` und
 `ABORT_ROTATION` setzen Tickets abhängig von bestätigter Anwesenheit auf `CHECKED_IN` oder `QUEUED`
 zurück. Ab `IN_FLIGHT` sind Anwesenheit und Besetzung gesperrt.
@@ -32,3 +37,5 @@ bestätigt Flugzeug und Boarding operativ. Nach
 Der Integrationslauf `npm run test:vertical-slice` prüft die normale Folge einschließlich Aufruf-
 Rücknahme. `npm run test:ticket-deferrals` prüft Zähler, Wiedereinreihung, Klärung Kasse,
 Kassensuche und Auditierung.
+`npm run test:ticket-group-recall` prüft den unabhängigen Vorgang einschließlich Idempotenz,
+Parallelkonflikt, Projektionen, Push-Deduplizierung, Audit und Outbox.

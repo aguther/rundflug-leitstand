@@ -1,12 +1,12 @@
-# Anforderungskatalog – Basis v1.4, aktueller Release 1.10.0
+# Anforderungskatalog – Basis v1.4, aktueller Release 1.11.0
 
 Automatisch extrahiert: **207 eindeutige Anforderungen**.
 
 Die Zahlen unten beschreiben den unveränderten Basiskatalog V1.4. Der einzige aktuelle kumulative
-Releasekatalog für Anwendungsversion 1.10.0 steht in
-`requirements-v1.10.0.md` und `requirements-v1.10.0.yaml`. Er übernimmt alle fortgeltenden
-fachlichen Anforderungen und ergänzt Dokumentationskonsistenz, Rollenblätter, Cloudflare-Neuaufbau,
-sicheren Reset-/Setup-Ablauf, API-Grenzen und generierte Worker-Typen.
+Releasekatalog für Anwendungsversion 1.11.0 steht in
+`requirements-v1.11.0.md` und `requirements-v1.11.0.yaml`. Er übernimmt alle fortgeltenden
+fachlichen Anforderungen und ergänzt den aktiven Gruppennachruf einschließlich Bedienung,
+Projektionen, Push, Auditierung und Ablauf.
 
 ## Nach Priorität
 
@@ -53,8 +53,8 @@ sicheren Reset-/Setup-Ablauf, API-Grenzen und generierte Worker-Typen.
 
 - `requirements-v1.4.md`: durchsuchbare Lesefassung des gesamten Lastenhefts.
 - `requirements-v1.4.yaml`: maschinenlesbarer Katalog; bewusst auch valides JSON.
-- `requirements-v1.10.0.md` und `.yaml`: aktueller kumulativer Katalog mit 319 Anforderungen.
-- `traceability-v1.10.0.csv`: vollständige aktuelle Release-Traceability.
+- `requirements-v1.11.0.md` und `.yaml`: aktueller kumulativer Katalog mit 330 Anforderungen.
+- `traceability-v1.11.0.csv`: vollständige aktuelle Release-Traceability.
 - `traceability.csv`: Basiszuordnung zu Issues, Modulen, Tests und Umsetzungsstatus.
 - `Lastenheft_Rundflug-Leitstand_v1.4_konsolidiert.pdf`: unveränderte Referenz.
 - `Lastenheft_Rundflug-Leitstand_v1.4_konsolidiert.docx`: unveränderte Referenz.

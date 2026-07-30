@@ -41,6 +41,9 @@ import {
   planTechnicalRotationAbortQueueBlock,
   selectAutomaticPrecalls,
   simulateOutageRecovery,
+  TICKET_GROUP_RECALL_DURATION_MS,
+  type TicketGroupRecallEndReason,
+  ticketGroupRecallEligibility,
   transitionAircraft,
   transitionRotation,
   validateRecurringOperationalRule,
@@ -54,12 +57,24 @@ import {
 } from "./planned-operation-audit-reason";
 import { rowToSnapshot, safeErrorMessage } from "./snapshot";
 import type { Env, StoredEventRow } from "./types";
-import { queueEligiblePreparationNotifications, sendRotationPushNotifications } from "./web-push";
+import {
+  queueEligiblePreparationNotifications,
+  sendRotationPushNotifications,
+  sendTicketGroupRecallPushNotifications,
+} from "./web-push";
 
 const JSON_HEADERS = { "content-type": "application/json; charset=utf-8" } as const;
 const FORECAST_TICK_INTERVAL_MS = 30_000;
 const FORECAST_COMMAND_DEBOUNCE_MS = 150;
 const ASSIST_CLAIM_TTL_MS = 30 * 60_000;
+
+interface StoredTicketGroupRecall {
+  id: string;
+  ticket_group_id: string;
+  sequence: number;
+  started_at: string;
+  expires_at: string;
+}
 
 function json(data: unknown, init: ResponseInit = {}): Response {
   const headers = new Headers(init.headers);
@@ -142,25 +157,63 @@ export class EventCoordinator extends DurableObject<Env> {
   }
 
   async alarm(): Promise<void> {
+    const task = this.commandTail.then(() => this.handleAlarm());
+    this.commandTail = task.then(
+      () => undefined,
+      () => undefined,
+    );
+    await task;
+  }
+
+  private async handleAlarm(): Promise<void> {
     const eventId = await this.ctx.storage.get<string>("eventId");
     if (!eventId) return;
     try {
-      const event = await this.env.DB.prepare("SELECT status FROM operation_days WHERE id = ?1")
+      const event = await this.env.DB.prepare(
+        `SELECT id, name, event_date, aerodrome, time_zone, status, archived_at, template_source_id,
+                emergency_mode, operational_interrupted, version,
+                operational_note, operations_start_at, operations_end_at, sale_opens_at,
+                no_show_after_minutes, max_ticket_deferrals, notification_lead_minutes,
+                child_reference_weight_kg, normal_reference_weight_kg,
+                automatic_precall_enabled, precall_lead_minutes, max_gate_wait_minutes,
+                precall_min_quality, precall_gate_cooldown_minutes,
+                heavy_reference_weight_kg, planned_boarding_minutes, planned_deboarding_minutes,
+                planned_buffer_minutes, logo_object_key, logo_dark_object_key, updated_at
+           FROM operation_days WHERE id = ?1`,
+      )
         .bind(eventId)
-        .first<{ status: "PREPARATION" | "ACTIVE" | "CLOSED" | "ARCHIVED" }>();
-      if (event?.status !== "ACTIVE") return;
-      await this.scheduleForecastRecalculation(eventId, "AUTOMATIC_FORECAST_TICK");
+        .first<StoredEventRow>();
+      if (!event) return;
+      await this.expireTicketGroupRecalls(event);
+      if (event.status === "ACTIVE") {
+        await this.scheduleForecastRecalculation(eventId, "AUTOMATIC_FORECAST_TICK");
+      }
     } catch (reason: unknown) {
       console.error(
         JSON.stringify({
           level: "error",
-          code: "AUTOMATIC_FORECAST_TICK_FAILED",
+          code: "AUTOMATIC_COORDINATOR_TICK_FAILED",
           eventId,
           message: safeErrorMessage(reason),
         }),
       );
     }
-    await this.ctx.storage.setAlarm(Date.now() + FORECAST_TICK_INTERVAL_MS);
+    const shouldContinue = await this.env.DB.prepare(
+      `SELECT 1 AS pending
+         FROM operation_days od
+        WHERE od.id = ?1 AND (
+          od.status = 'ACTIVE'
+          OR EXISTS (
+            SELECT 1 FROM ticket_group_recalls recall
+             WHERE recall.operation_day_id = od.id AND recall.ended_at IS NULL
+          )
+        )`,
+    )
+      .bind(eventId)
+      .first<{ pending: number }>();
+    if (shouldContinue) {
+      await this.ctx.storage.setAlarm(Date.now() + FORECAST_TICK_INTERVAL_MS);
+    }
   }
 
   private eventIdFromPath(pathname: string): string | null {
@@ -333,6 +386,121 @@ export class EventCoordinator extends DurableObject<Env> {
     if ((await this.ctx.storage.getAlarm()) === null) {
       await this.ctx.storage.setAlarm(Date.now() + FORECAST_TICK_INTERVAL_MS);
     }
+  }
+
+  private async loadOpenTicketGroupRecalls(
+    eventId: string,
+    ticketGroupIds: readonly string[],
+    onlyUnexpiredAt?: string,
+  ): Promise<StoredTicketGroupRecall[]> {
+    const distinctGroupIds = [...new Set(ticketGroupIds)];
+    if (distinctGroupIds.length === 0) return [];
+    const groupPlaceholders = distinctGroupIds.map((_, index) => `?${index + 2}`).join(", ");
+    const expiryFilter = onlyUnexpiredAt
+      ? `AND recall.expires_at > ?${distinctGroupIds.length + 2}`
+      : "";
+    const rows = await this.env.DB.prepare(
+      `SELECT recall.id, recall.ticket_group_id, recall.sequence,
+              recall.started_at, recall.expires_at
+         FROM ticket_group_recalls recall
+        WHERE recall.operation_day_id = ?1
+          AND recall.ticket_group_id IN (${groupPlaceholders})
+          AND recall.ended_at IS NULL
+          ${expiryFilter}
+        ORDER BY recall.ticket_group_id`,
+    )
+      .bind(eventId, ...distinctGroupIds, ...(onlyUnexpiredAt ? [onlyUnexpiredAt] : []))
+      .all<StoredTicketGroupRecall>();
+    return rows.results;
+  }
+
+  private ticketGroupRecallClosureStatements(input: {
+    recalls: readonly StoredTicketGroupRecall[];
+    eventId: string;
+    reason: TicketGroupRecallEndReason;
+    deviceId: string;
+    now: string;
+    event: CommandResult["event"];
+  }): D1PreparedStatement[] {
+    return input.recalls.flatMap((recall) => {
+      const result: CommandResult = {
+        accepted: true,
+        duplicate: false,
+        event: input.event,
+        eventType: "TICKET_GROUP_RECALL_CLEARED",
+        aggregate: { type: "TICKET_GROUP_RECALL", id: recall.id },
+      };
+      return [
+        this.env.DB.prepare(
+          `UPDATE ticket_group_recalls
+              SET ended_at = ?1, end_reason = ?2
+            WHERE id = ?3 AND operation_day_id = ?4 AND ended_at IS NULL`,
+        ).bind(input.now, input.reason, recall.id, input.eventId),
+        this.env.DB.prepare(
+          `INSERT INTO operational_events
+            (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type,
+             aggregate_id, aggregate_version, payload_json)
+           VALUES (?1, ?2, 'TICKET_GROUP_RECALL_CLEARED', ?3, ?4,
+                   'TICKET_GROUP_RECALL', ?5, ?6, ?7)`,
+        ).bind(
+          crypto.randomUUID(),
+          input.eventId,
+          input.now,
+          input.deviceId,
+          recall.id,
+          recall.sequence,
+          JSON.stringify({
+            recallId: recall.id,
+            ticketGroupId: recall.ticket_group_id,
+            sequence: recall.sequence,
+            reason: input.reason,
+          }),
+        ),
+        this.env.DB.prepare(
+          `INSERT INTO outbox (id, operation_day_id, topic, payload_json, created_at)
+           VALUES (?1, ?2, 'EVENT_STATE_CHANGED', ?3, ?4)`,
+        ).bind(crypto.randomUUID(), input.eventId, JSON.stringify(result), input.now),
+      ];
+    });
+  }
+
+  private async expireTicketGroupRecalls(event: StoredEventRow): Promise<void> {
+    const now = new Date().toISOString();
+    const due = await this.env.DB.prepare(
+      `SELECT id, ticket_group_id, sequence, started_at, expires_at
+         FROM ticket_group_recalls
+        WHERE operation_day_id = ?1 AND ended_at IS NULL AND expires_at <= ?2
+        ORDER BY expires_at, id
+        LIMIT 20`,
+    )
+      .bind(event.id, now)
+      .all<StoredTicketGroupRecall>();
+    if (due.results.length === 0) return;
+
+    const nextVersion = event.version + 1;
+    const nextEvent = rowToSnapshot({ ...event, version: nextVersion, updated_at: now });
+    const result: CommandResult = {
+      accepted: true,
+      duplicate: false,
+      event: nextEvent,
+      eventType: "TICKET_GROUP_RECALL_EXPIRED",
+      aggregate: { type: "OPERATION_DAY", id: event.id },
+    };
+    await this.env.DB.batch([
+      this.env.DB.prepare(
+        `UPDATE operation_days SET version = ?1, updated_at = ?2
+          WHERE id = ?3 AND version = ?4`,
+      ).bind(nextVersion, now, event.id, event.version),
+      ...this.ticketGroupRecallClosureStatements({
+        recalls: due.results,
+        eventId: event.id,
+        reason: "EXPIRED",
+        deviceId: "SYSTEM",
+        now,
+        event: nextEvent,
+      }),
+    ]);
+    this.broadcast(result);
   }
 
   async webSocketMessage(socket: WebSocket, message: string | ArrayBuffer): Promise<void> {
@@ -1422,7 +1590,14 @@ export class EventCoordinator extends DurableObject<Env> {
           return this.handleTicketGroupAttendance(command, current);
         }
         if (
+          command.type === "START_TICKET_GROUP_RECALL" ||
+          command.type === "CLEAR_TICKET_GROUP_RECALL"
+        ) {
+          return this.handleTicketGroupRecall(command, current);
+        }
+        if (
           command.type === "MARK_TICKET_GROUP_MISSING" ||
+          command.type === "RESTORE_TICKET_GROUP_TO_QUEUE" ||
           command.type === "RECALL_TICKET_GROUP"
         ) {
           return this.handleTicketGroupPresence(command, current);
@@ -5791,6 +5966,14 @@ export class EventCoordinator extends DurableObject<Env> {
       eventType: eventType[command.type],
       aggregate: { type: "ROTATION", id: rotation.id },
     };
+    const recallClosures =
+      command.type === "CALL_NEXT"
+        ? await this.loadOpenTicketGroupRecalls(
+            command.eventId,
+            selectedGroups.map((group) => group.ticket_group_id),
+            now,
+          )
+        : [];
     const selectedAircraftId =
       command.type === "CALL_NEXT" ? command.payload.aircraftId : rotation.aircraft_id;
     if (!selectedAircraftId) {
@@ -6064,6 +6247,14 @@ export class EventCoordinator extends DurableObject<Env> {
              WHERE rt.rotation_id = ?1
            )`,
       ).bind(rotation.id),
+      ...this.ticketGroupRecallClosureStatements({
+        recalls: recallClosures,
+        eventId: command.eventId,
+        reason: "BOARDING",
+        deviceId: command.deviceId,
+        now,
+        event: result.event,
+      }),
       this.env.DB.prepare(`INSERT INTO operational_events (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type, aggregate_id, aggregate_version, payload_json)
         VALUES (?1, ?2, ?3, ?4, ?5, 'ROTATION', ?6, ?7, ?8)`).bind(
         crypto.randomUUID(),
@@ -7959,6 +8150,12 @@ export class EventCoordinator extends DurableObject<Env> {
       eventType: eventType[command.type],
       aggregate: { type: "TICKET_GROUP", id: group.id },
     };
+    const recallClosures = await this.loadOpenTicketGroupRecalls(command.eventId, [group.id], now);
+    const recallClosureReason = {
+      CANCEL_TICKET_GROUP: "CANCELED",
+      DEFER_TICKET_GROUP: "DEFERRED",
+      MARK_NO_SHOW: "NO_SHOW",
+    } as const;
     const statements: D1PreparedStatement[] = [
       this.env.DB.prepare(
         "UPDATE operation_days SET version = ?1, updated_at = ?2 WHERE id = ?3 AND version = ?4",
@@ -7968,6 +8165,14 @@ export class EventCoordinator extends DurableObject<Env> {
           WHERE released_at IS NULL
             AND ticket_id IN (SELECT id FROM tickets WHERE ticket_group_id = ?2)`,
       ).bind(now, group.id),
+      ...this.ticketGroupRecallClosureStatements({
+        recalls: recallClosures,
+        eventId: command.eventId,
+        reason: recallClosureReason[command.type],
+        deviceId: command.deviceId,
+        now,
+        event: result.event,
+      }),
     ];
     for (const rotation of rotationRows.results) {
       if (rotation.rotation_group_count === 1) {
@@ -8270,6 +8475,9 @@ export class EventCoordinator extends DurableObject<Env> {
       eventType,
       aggregate: { type: "TICKET_GROUP", id: group.id },
     };
+    const recallClosures = checkedIn
+      ? await this.loadOpenTicketGroupRecalls(command.eventId, [group.id], now)
+      : [];
     await this.env.DB.batch([
       this.env.DB.prepare(
         "UPDATE operation_days SET version = ?1, updated_at = ?2 WHERE id = ?3 AND version = ?4",
@@ -8280,6 +8488,14 @@ export class EventCoordinator extends DurableObject<Env> {
       this.env.DB.prepare(
         "UPDATE tickets SET attendance_status = ?1, status = ?2 WHERE ticket_group_id = ?3",
       ).bind(checkedIn ? "CHECKED_IN" : "NOT_CHECKED_IN", ticketStatus, group.id),
+      ...this.ticketGroupRecallClosureStatements({
+        recalls: recallClosures,
+        eventId: command.eventId,
+        reason: "PRESENT",
+        deviceId: command.deviceId,
+        now,
+        event: result.event,
+      }),
       this.env.DB.prepare(
         `INSERT INTO operational_events
           (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type,
@@ -8315,28 +8531,256 @@ export class EventCoordinator extends DurableObject<Env> {
     return json(result);
   }
 
-  private async handleTicketGroupPresence(
+  private async handleTicketGroupRecall(
     command: Extract<
       CommandEnvelope,
-      { type: "MARK_TICKET_GROUP_MISSING" | "RECALL_TICKET_GROUP" }
+      { type: "START_TICKET_GROUP_RECALL" | "CLEAR_TICKET_GROUP_RECALL" }
     >,
     current: StoredEventRow,
   ): Promise<Response> {
     const group = await this.env.DB.prepare(
-      "SELECT id, status, version, recall_count FROM ticket_groups WHERE id = ?1 AND operation_day_id = ?2",
+      `SELECT tg.id, tg.status, g.label AS gate_label,
+              COALESCE((
+                SELECT MAX(recall.sequence)
+                  FROM ticket_group_recalls recall
+                 WHERE recall.ticket_group_id = tg.id
+              ), 0) AS recall_count
+         FROM ticket_groups tg
+         JOIN products p ON p.id = tg.product_id
+         JOIN gates g ON g.id = p.gate_id
+        WHERE tg.id = ?1 AND tg.operation_day_id = ?2`,
     )
       .bind(command.payload.ticketGroupId, command.eventId)
-      .first<{ id: string; status: string; version: number; recall_count: number }>();
+      .first<{
+        id: string;
+        status: string;
+        gate_label: string;
+        recall_count: number;
+      }>();
     if (!group) {
       return json(
         { error: { code: "TICKET_GROUP_NOT_FOUND", message: "Buchungsgruppe nicht gefunden." } },
         { status: 404 },
       );
     }
+
+    const nowDate = new Date();
+    const now = nowDate.toISOString();
+    const openRecalls = await this.loadOpenTicketGroupRecalls(command.eventId, [group.id]);
+    const openRecall = openRecalls[0] ?? null;
+    const activeRecall =
+      openRecall && Date.parse(openRecall.expires_at) > nowDate.getTime() ? openRecall : null;
+    const nextVersion = current.version + 1;
+    const nextEvent = rowToSnapshot({ ...current, version: nextVersion, updated_at: now });
+
+    if (command.type === "CLEAR_TICKET_GROUP_RECALL") {
+      if (!activeRecall) {
+        return json(
+          {
+            error: {
+              code: "TICKET_GROUP_RECALL_NOT_ACTIVE",
+              message: "Für diese Buchungsgruppe ist kein Nachruf mehr aktiv.",
+            },
+          },
+          { status: 409 },
+        );
+      }
+      if (activeRecall.id !== command.payload.recallId) {
+        return json(
+          {
+            error: {
+              code: "TICKET_GROUP_RECALL_STALE",
+              message: "Der Nachruf wurde inzwischen ersetzt oder beendet.",
+            },
+          },
+          { status: 409 },
+        );
+      }
+      const result: CommandResult = {
+        accepted: true,
+        duplicate: false,
+        event: nextEvent,
+        eventType: "TICKET_GROUP_RECALL_CLEARED",
+        aggregate: { type: "TICKET_GROUP_RECALL", id: activeRecall.id },
+      };
+      await this.env.DB.batch([
+        this.env.DB.prepare(
+          `UPDATE operation_days SET version = ?1, updated_at = ?2
+            WHERE id = ?3 AND version = ?4`,
+        ).bind(nextVersion, now, command.eventId, current.version),
+        ...this.ticketGroupRecallClosureStatements({
+          recalls: [activeRecall],
+          eventId: command.eventId,
+          reason: "MANUAL",
+          deviceId: command.deviceId,
+          now,
+          event: nextEvent,
+        }),
+        this.env.DB.prepare(
+          `INSERT INTO idempotency_receipts
+            (command_id, operation_day_id, device_id, command_type, received_at, response_json)
+           VALUES (?1, ?2, ?3, ?4, ?5, ?6)`,
+        ).bind(
+          command.commandId,
+          command.eventId,
+          command.deviceId,
+          command.type,
+          now,
+          JSON.stringify(result),
+        ),
+      ]);
+      this.broadcast(result);
+      return json(result);
+    }
+
+    if (current.status !== "ACTIVE") {
+      return json(
+        {
+          error: {
+            code: "TICKET_GROUP_RECALL_EVENT_NOT_ACTIVE",
+            message: "Nachrufe sind nur während der aktiven Veranstaltung möglich.",
+          },
+        },
+        { status: 409 },
+      );
+    }
+    const eligibility = ticketGroupRecallEligibility({
+      status: group.status,
+      gateLabel: group.gate_label,
+      activeRecall: activeRecall !== null,
+    });
+    if (!eligibility.eligible) {
+      const error = {
+        ALREADY_ACTIVE: {
+          code: "TICKET_GROUP_RECALL_ALREADY_ACTIVE",
+          message: "Für diese Buchungsgruppe ist bereits ein Nachruf aktiv.",
+        },
+        STATUS_NOT_ELIGIBLE: {
+          code: "TICKET_GROUP_RECALL_STATUS_NOT_ELIGIBLE",
+          message: "Die Buchungsgruppe ist in diesem Zustand nicht für einen Nachruf geeignet.",
+        },
+        GATE_REQUIRED: {
+          code: "TICKET_GROUP_RECALL_GATE_REQUIRED",
+          message: "Für einen Nachruf muss ein Gate festgelegt sein.",
+        },
+        ELIGIBLE: {
+          code: "TICKET_GROUP_RECALL_NOT_ELIGIBLE",
+          message: "Der Nachruf kann nicht gestartet werden.",
+        },
+      }[eligibility.reason];
+      return json({ error }, { status: 409 });
+    }
+
+    const expiredRecall = openRecall && !activeRecall ? openRecall : null;
+    const recallId = crypto.randomUUID();
+    const recallSequence = group.recall_count + 1;
+    const expiresAt = new Date(nowDate.getTime() + TICKET_GROUP_RECALL_DURATION_MS).toISOString();
+    const result: CommandResult = {
+      accepted: true,
+      duplicate: false,
+      event: nextEvent,
+      eventType: "TICKET_GROUP_RECALL_STARTED",
+      aggregate: { type: "TICKET_GROUP_RECALL", id: recallId },
+    };
+    await this.env.DB.batch([
+      this.env.DB.prepare(
+        `UPDATE operation_days SET version = ?1, updated_at = ?2
+          WHERE id = ?3 AND version = ?4`,
+      ).bind(nextVersion, now, command.eventId, current.version),
+      ...(expiredRecall
+        ? this.ticketGroupRecallClosureStatements({
+            recalls: [expiredRecall],
+            eventId: command.eventId,
+            reason: "EXPIRED",
+            deviceId: "SYSTEM",
+            now,
+            event: nextEvent,
+          })
+        : []),
+      this.env.DB.prepare(
+        `INSERT INTO ticket_group_recalls
+          (id, operation_day_id, ticket_group_id, sequence, started_at, expires_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)`,
+      ).bind(recallId, command.eventId, group.id, recallSequence, now, expiresAt),
+      this.env.DB.prepare(
+        `INSERT INTO operational_events
+          (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type,
+           aggregate_id, aggregate_version, payload_json)
+         VALUES (?1, ?2, 'TICKET_GROUP_RECALL_STARTED', ?3, ?4,
+                 'TICKET_GROUP_RECALL', ?5, ?6, ?7)`,
+      ).bind(
+        crypto.randomUUID(),
+        command.eventId,
+        now,
+        command.deviceId,
+        recallId,
+        recallSequence,
+        JSON.stringify({
+          recallId,
+          ticketGroupId: group.id,
+          sequence: recallSequence,
+          startedAt: now,
+          expiresAt,
+          template: "FIXED_V1",
+        }),
+      ),
+      this.env.DB.prepare(
+        `INSERT INTO idempotency_receipts
+          (command_id, operation_day_id, device_id, command_type, received_at, response_json)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)`,
+      ).bind(
+        command.commandId,
+        command.eventId,
+        command.deviceId,
+        command.type,
+        now,
+        JSON.stringify(result),
+      ),
+      this.env.DB.prepare(
+        `INSERT INTO outbox (id, operation_day_id, topic, payload_json, created_at)
+         VALUES (?1, ?2, 'EVENT_STATE_CHANGED', ?3, ?4)`,
+      ).bind(crypto.randomUUID(), command.eventId, JSON.stringify(result), now),
+    ]);
+    this.ctx.waitUntil(sendTicketGroupRecallPushNotifications(this.env, recallId));
+    this.broadcast(result);
+    return json(result);
+  }
+
+  private async handleTicketGroupPresence(
+    command: Extract<
+      CommandEnvelope,
+      {
+        type: "MARK_TICKET_GROUP_MISSING" | "RESTORE_TICKET_GROUP_TO_QUEUE" | "RECALL_TICKET_GROUP";
+      }
+    >,
+    current: StoredEventRow,
+  ): Promise<Response> {
+    const group = await this.env.DB.prepare(
+      "SELECT id, status, version FROM ticket_groups WHERE id = ?1 AND operation_day_id = ?2",
+    )
+      .bind(command.payload.ticketGroupId, command.eventId)
+      .first<{ id: string; status: string; version: number }>();
+    if (!group) {
+      return json(
+        { error: { code: "TICKET_GROUP_NOT_FOUND", message: "Buchungsgruppe nicht gefunden." } },
+        { status: 404 },
+      );
+    }
+    const restored = command.type !== "MARK_TICKET_GROUP_MISSING";
+    if (restored && group.status !== "MISSING") {
+      return json(
+        {
+          error: {
+            code: "TICKET_GROUP_NOT_MISSING",
+            message: "Nur eine als nicht anwesend markierte Gruppe kann zurück in die Queue.",
+          },
+        },
+        { status: 409 },
+      );
+    }
     const now = new Date().toISOString();
     const nextVersion = current.version + 1;
-    const recalled = command.type === "RECALL_TICKET_GROUP";
-    const eventType = recalled ? "TICKET_GROUP_RECALLED" : "TICKET_GROUP_MARKED_MISSING";
+    const eventType = restored ? "TICKET_GROUP_RESTORED_TO_QUEUE" : "TICKET_GROUP_MARKED_MISSING";
     const result: CommandResult = {
       accepted: true,
       duplicate: false,
@@ -8348,10 +8792,10 @@ export class EventCoordinator extends DurableObject<Env> {
       this.env.DB.prepare(
         "UPDATE operation_days SET version = ?1, updated_at = ?2 WHERE id = ?3 AND version = ?4",
       ).bind(nextVersion, now, command.eventId, current.version),
-      recalled
+      restored
         ? this.env.DB.prepare(
-            "UPDATE ticket_groups SET status = 'QUEUED', recalled_at = ?1, recall_count = recall_count + 1, version = version + 1 WHERE id = ?2 AND version = ?3",
-          ).bind(now, group.id, group.version)
+            "UPDATE ticket_groups SET status = 'QUEUED', version = version + 1 WHERE id = ?1 AND version = ?2",
+          ).bind(group.id, group.version)
         : this.env.DB.prepare(
             "UPDATE ticket_groups SET status = 'MISSING', version = version + 1 WHERE id = ?1 AND version = ?2",
           ).bind(group.id, group.version),
@@ -8369,7 +8813,9 @@ export class EventCoordinator extends DurableObject<Env> {
         group.id,
         group.version + 1,
         JSON.stringify(
-          recalled ? { recallCount: group.recall_count + 1 } : { reason: command.payload.reason },
+          restored
+            ? { legacyCommand: command.type === "RECALL_TICKET_GROUP" }
+            : { reason: command.payload.reason },
         ),
       ),
       this.env.DB.prepare(
@@ -8461,6 +8907,9 @@ export class EventCoordinator extends DurableObject<Env> {
         eventType: "TICKET_NO_SHOW",
         aggregate: { type: "TICKET", id: ticket.id, relatedRotationId: ticket.rotation_id },
       };
+      const recallClosures = groupEmptied
+        ? await this.loadOpenTicketGroupRecalls(command.eventId, [ticket.ticket_group_id], now)
+        : [];
       const statements: D1PreparedStatement[] = [
         this.env.DB.prepare(
           "UPDATE operation_days SET version = ?1, updated_at = ?2 WHERE id = ?3 AND version = ?4",
@@ -8475,6 +8924,14 @@ export class EventCoordinator extends DurableObject<Env> {
           this.env.DB.prepare(
             "UPDATE ticket_groups SET status = 'NO_SHOW', version = version + 1 WHERE id = ?1 AND version = ?2",
           ).bind(ticket.ticket_group_id, ticket.group_version),
+          ...this.ticketGroupRecallClosureStatements({
+            recalls: recallClosures,
+            eventId: command.eventId,
+            reason: "NO_SHOW",
+            deviceId: command.deviceId,
+            now,
+            event: result.event,
+          }),
         );
       }
       if (rotationEmptied) {

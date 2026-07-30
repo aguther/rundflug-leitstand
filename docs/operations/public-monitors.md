@@ -1,6 +1,6 @@
 # FIDS-Monitore mit Display-Konto
 
-Die FIDS-Webanwendung ist in Release 1.10.0 mit einem aktiven Konto der Rolle `DISPLAY` oder `ADMIN`
+Die FIDS-Webanwendung ist in Release 1.11.0 mit einem aktiven Konto der Rolle `DISPLAY` oder `ADMIN`
 erreichbar. Für dauerhaft betriebene Monitore ist ein eigenes Display-Konto vorgesehen. Die feste
 Anzeige-URL lautet:
 
@@ -54,6 +54,9 @@ aber vorübergehend in einer Spalte angezeigt.
   Größe.
 - `GO TO GATE` und `BOARDING` stehen unabhängig von Produkt und Ressourcengruppe vor allen anderen
   Zeilen; pausierte Gruppen erscheinen als `VERZÖGERT`.
+- Ein aktiver Nachruf erscheint direkt in der betroffenen Gruppenzeile als zusätzlicher
+  amberfarbener Status mit Glocke; der normale Umlaufstatus bleibt daneben sichtbar. Die Glocke
+  pulsiert nur, wenn das Betriebssystem Bewegung nicht reduziert.
 - Gewählte 4, 8 beziehungsweise 20 Zeilen sind bei genügend Daten vollständig sichtbar.
 - Bei 1920×1080, 1366×768, 1280×720, 1024×768, 800×600 und 430×900 entstehen weder horizontale
   noch vertikale Dokument- oder Tabellenscrollbars.

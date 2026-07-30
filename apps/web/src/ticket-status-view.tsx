@@ -9,6 +9,7 @@ import {
   OPERATION_BOARD_RECONNECT_INITIAL_MS,
 } from "./board-sync";
 import {
+  PublicRecallNotice,
   PublicStatusFooter,
   PublicStatusIdentity,
   PublicStatusPart,
@@ -108,6 +109,7 @@ export function TicketStatusView({ code }: { code: string }) {
               bookingGroupLabel={bookingGroupLabel ?? ""}
               productName={status.productName}
             />
+            <PublicRecallNotice recall={status.activeRecall} />
             <div className="public-status-parts">
               <PublicStatusPart
                 part={status}

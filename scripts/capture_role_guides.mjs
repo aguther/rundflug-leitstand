@@ -1,14 +1,16 @@
 import { spawn, spawnSync } from "node:child_process";
-import { mkdir } from "node:fs/promises";
+import { mkdir, rm } from "node:fs/promises";
 import { resolve } from "node:path";
 import { chromium } from "@playwright/test";
 
 const root = resolve(import.meta.dirname, "..");
 const outputDirectory = resolve(root, "docs", "roles", "images");
-const baseUrl = process.env.ROLE_GUIDE_BASE_URL ?? "http://127.0.0.1:8787";
+const baseUrl = process.env.ROLE_GUIDE_BASE_URL ?? "http://127.0.0.1:8799";
 const managesLocalWorker = !process.env.ROLE_GUIDE_BASE_URL;
 const pin = "123456";
 const wrangler = resolve(root, "node_modules", "wrangler", "bin", "wrangler.js");
+const roleGuidePersistPath = resolve(root, ".wrangler", "role-guide-state");
+const roleGuidePersistArgument = ".wrangler/role-guide-state";
 let localWorker = null;
 let localWorkerOutput = "";
 const roles = [
@@ -78,7 +80,44 @@ async function waitForWorker() {
 }
 
 async function startLocalWorker() {
-  runNpm("db:reset:local");
+  await rm(roleGuidePersistPath, { recursive: true, force: true });
+  const migration = spawnSync(
+    process.execPath,
+    [
+      wrangler,
+      "d1",
+      "migrations",
+      "apply",
+      "DB",
+      "--local",
+      "--persist-to",
+      roleGuidePersistArgument,
+      "--config",
+      "wrangler.jsonc",
+    ],
+    { cwd: root, stdio: "inherit", windowsHide: true },
+  );
+  if (migration.status !== 0)
+    throw new Error("Isolierte Rollenhandbuch-Datenbank konnte nicht migriert werden.");
+  const seed = spawnSync(
+    process.execPath,
+    [
+      wrangler,
+      "d1",
+      "execute",
+      "DB",
+      "--local",
+      "--persist-to",
+      roleGuidePersistArgument,
+      "--config",
+      "wrangler.jsonc",
+      "--file",
+      "apps/worker/seed/demo.sql",
+    ],
+    { cwd: root, stdio: "inherit", windowsHide: true },
+  );
+  if (seed.status !== 0)
+    throw new Error("Isolierte Rollenhandbuch-Datenbank konnte nicht befüllt werden.");
   const fixture = spawnSync(
     process.execPath,
     [
@@ -87,6 +126,8 @@ async function startLocalWorker() {
       "execute",
       "DB",
       "--local",
+      "--persist-to",
+      roleGuidePersistArgument,
       "--config",
       "wrangler.jsonc",
       "--file",
@@ -108,6 +149,12 @@ async function startLocalWorker() {
       "APP_ENV:development",
       "--var",
       "DATA_JURISDICTION:eu",
+      "--persist-to",
+      roleGuidePersistArgument,
+      "--port",
+      "8799",
+      "--inspector-port",
+      "9799",
     ],
     {
       cwd: root,
@@ -204,7 +251,7 @@ try {
       );
     }
     await page.screenshot({
-      path: resolve(outputDirectory, `${role.slug}-1.10.0.png`),
+      path: resolve(outputDirectory, `${role.slug}-1.11.0.png`),
       fullPage: false,
     });
     process.stdout.write(

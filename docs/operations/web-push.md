@@ -53,6 +53,10 @@ Fehlermeldungen werden vor der Ausgabe um URLs bereinigt.
 - Vorbereitung, Aufruf und Umlaufstatus werden zunächst als deduplizierter Zustellauftrag erfasst.
   Pro Abonnement, Umlauf und Hinweistyp existiert höchstens ein Auftrag. Ohne vollständige
   VAPID-Konfiguration bleibt er auslieferbar vorgemerkt, statt still verloren zu gehen.
+- Ein aktiver Gruppennachruf wird ausschließlich an Ticket- und Gruppenstatus-Abonnements mit
+  derselben `ticket_group_id` vorgemerkt. Seine Deduplizierung verwendet die konkrete Nachruf-ID;
+  ein späterer Nachruf mit neuer ID erzeugt deshalb erneut Zustellungen. Andere Buchungsgruppen
+  derselben Rotation erhalten nichts.
 - Die Aufbewahrungsfrist wird mit `PUSH_RETENTION_DAYS` konfiguriert (zulässig: 1 bis 30 Tage,
   Standard: 7) und beginnt am festgelegten Veranstaltungsende. Ohne Veranstaltungsende ist keine
   Registrierung möglich.
@@ -87,8 +91,9 @@ Werte, nicht nur den öffentlichen Schlüssel: Eine unvollständige Einrichtung 
 `PUSH_NOT_CONFIGURED` und die Statusseite bietet die Einwilligung gar nicht erst an, statt sie
 folgenlos entgegenzunehmen.
 
-Die D1-Migrationen `0006_web_push.sql` und `0021_web_push_delivery_queue.sql` müssen vor dem ersten
-Registrierungs- und Zustellungstest in der Zielumgebung angewendet sein.
+Die D1-Migrationen `0006_web_push.sql`, `0021_web_push_delivery_queue.sql` und
+`0055_ticket_group_recalls.sql` müssen vor dem ersten Registrierungs- und Zustellungstest in der
+Zielumgebung angewendet sein.
 
 ## Fachliche Auslösung
 
@@ -104,3 +109,7 @@ Zustellbelege.
 Die Kasse gibt zu jedem Ticket den nicht erratbaren Status-QR-Code aus. Der Gast kann ihn direkt an
 der Kasse mit dem eigenen Browser öffnen und dort Web-Push aktivieren; das Kassen- oder Helfergerät
 übernimmt niemals das persönliche Browser-Abonnement.
+
+Ein manueller Nachruf ist von Voraufruf und Boarding getrennt. Er verwendet den Titel
+`Erneuter Aufruf` und die feste gruppen- und gatebezogene Copy. Jeder Start erhält eine neue
+Nachruf-ID; eine wiederholte Übermittlung desselben Kommando-Umschlags bleibt dagegen idempotent.

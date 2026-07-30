@@ -45,8 +45,8 @@ def verify_release_version() -> str:
     if not release_yaml.startswith(f"version: {version}\n"):
         fail(f"requirements-v{version}.yaml does not declare version {version}")
     release_ids = re.findall(r"^  - id: ([A-Z0-9-]+)$", release_yaml, re.MULTILINE)
-    if len(release_ids) != 319 or len(release_ids) != len(set(release_ids)):
-        fail(f"release {version} must contain exactly 319 unique current requirements")
+    if len(release_ids) != 330 or len(release_ids) != len(set(release_ids)):
+        fail(f"release {version} must contain exactly 330 unique current requirements")
     with versioned_paths[2].open(newline="", encoding="utf-8-sig") as handle:
         trace_ids = [row["ID"] for row in csv.DictReader(handle)]
     if release_ids != trace_ids:
@@ -149,7 +149,7 @@ def main() -> None:
         fail(f"expected 166 V1 MUSS requirements, found {len(v1_must)}")
 
     print(
-        f"OK: release {release_version}, 319 current requirements, {len(ids)} baseline requirements, "
+        f"OK: release {release_version}, 330 current requirements, {len(ids)} baseline requirements, "
         f"{len(v1_rows)} assigned V1 rows and {len(v1_must)} assigned V1 MUSS rows"
     )
 

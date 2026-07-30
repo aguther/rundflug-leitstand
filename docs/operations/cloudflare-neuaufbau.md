@@ -1,4 +1,4 @@
-# Cloudflare-Neuaufbau – Release 1.10.0
+# Cloudflare-Neuaufbau – Release 1.11.0
 
 Diese Anleitung baut eine **leere, eigenständig deploybare Umgebung** aus einem frischen Checkout
 auf. Sie importiert keine Sicherung und schaltet keine bestehende Domain um. Das Bootstrap löscht
@@ -122,7 +122,7 @@ npm run cloudflare:verify -- \
 ```
 
 Die Prüfung verlangt: keine offene Migration, alle fünf Secret-Namen, Health- und Metadaten in
-Version 1.10.0, EU-Datenjurisdiktion, Setup-Status und einen öffentlichen VAPID-Schlüssel. Danach
+Version 1.11.0, EU-Datenjurisdiktion, Setup-Status und einen öffentlichen VAPID-Schlüssel. Danach
 werden in einem privaten Browserfenster je ein Rollen-Smoke-Test für Kasse, Flight Line, Flight
 Director, FIDS und Administration sowie ein öffentlicher Gruppenstatus geprüft.
 

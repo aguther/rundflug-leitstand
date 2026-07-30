@@ -1,5 +1,15 @@
 # Backup und Wiederherstellung
 
+## Migrationsnotiz 0054 – aktive Gruppennachrufe
+
+Migration `0055_ticket_group_recalls.sql` legt die Nachrufhistorie an und baut
+`web_push_deliveries` mit getrennten Referenzen und Deduplizierungen für Rotation und Nachruf neu
+auf. Vor dem Remote-Lauf werden D1-Time-Travel-Zeitpunkt und portables Backup dokumentiert. Bei
+Fehlschlag wird nicht manuell zurückgebaut, sondern D1 auf den Zeitpunkt vor 0054 zurückgesetzt
+oder das Backup in eine neue isolierte Instanz eingespielt. `ticket_group_recalls` ist Bestandteil
+portabler Backups; Push-Ziele und -Zustellungen bleiben ausgeschlossen. Der ausführliche Ablauf
+steht in [`migration-0055-ticket-group-recalls.md`](migration-0055-ticket-group-recalls.md).
+
 ## Migrationsnotiz 0041 – Display-Konten und FIDS-Einstellungen
 
 Migration `0041_fids_display_accounts_and_preferences.sql` baut `operator_accounts` bei

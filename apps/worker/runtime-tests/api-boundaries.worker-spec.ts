@@ -15,8 +15,8 @@ describe("Worker runtime API boundaries", () => {
     expect(response.headers.get("cache-control")).toBe("no-store");
     await expect(response.json()).resolves.toMatchObject({
       ok: true,
-      applicationVersion: "1.10.0",
-      requirementsVersion: "1.10.0",
+      applicationVersion: "1.11.0",
+      requirementsVersion: "1.11.0",
     });
   });
 
@@ -25,8 +25,8 @@ describe("Worker runtime API boundaries", () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
-      applicationVersion: "1.10.0",
-      requirementsVersion: "1.10.0",
+      applicationVersion: "1.11.0",
+      requirementsVersion: "1.11.0",
       dataJurisdiction: "eu",
     });
   });

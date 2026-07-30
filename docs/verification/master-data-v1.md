@@ -35,7 +35,7 @@ synthetischer Kasse sowie FIDS auf Desktop und 430 × 900 Pixeln nach.
 ## Administration und Ersteinrichtung
 
 Die Administrationsoberfläche wurde gegen das freigegebene Konzept
-`docs/ui/v1.10.0-release-concept.md` fortgeschrieben. Sie gliedert die Aufgaben in
+`docs/ui/v1.11.0-release-concept.md` fortgeschrieben. Sie gliedert die Aufgaben in
 Übersicht, Einrichtung, Stammdaten, Auswertung sowie Sicherung und Reset. Operative Steuerung liegt
 im Flight Director. Der Einrichtungsfortschritt weist Parameter, Gates,
 Ressourcengruppen, Flugzeuge, Zuordnungen, anonyme Pilotencodes, Produkte und Betriebsfreigabe als

@@ -317,6 +317,11 @@
   border-bottom: 1px solid var(--fids-border);
 }
 
+.fids-row[data-recall-active="true"] {
+  border-color: color-mix(in srgb, var(--fids-orange) 78%, var(--fids-border));
+  box-shadow: inset clamp(3px, 0.35vw, 7px) 0 0 var(--fids-orange);
+}
+
 .fids-row > * + * {
   border-left: 1px solid var(--fids-border);
 }
@@ -371,11 +376,67 @@
   white-space: nowrap;
 }
 
+.fids-row > .fids-status-cell {
+  display: grid;
+  align-content: center;
+  align-items: center;
+  gap: 0.2em;
+}
+
 .fids-status-icon {
   width: 1em;
   height: 1em;
   flex: 0 0 auto;
   stroke-width: 2;
+}
+
+.fids-recall-status {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.34em;
+  color: var(--fids-orange);
+  font-size: 0.72em;
+  font-weight: 900;
+  letter-spacing: 0.065em;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.fids-recall-bell {
+  display: grid;
+  width: 1.35em;
+  height: 1.35em;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--fids-surface);
+  background: var(--fids-orange);
+  animation: fids-recall-pulse 1.35s ease-in-out infinite;
+}
+
+.fids-recall-bell svg {
+  width: 0.82em;
+  height: 0.82em;
+  stroke-width: 2.5;
+}
+
+@keyframes fids-recall-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.72;
+    transform: scale(1.12);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fids-recall-bell {
+    animation: none;
+  }
 }
 
 .fids-window {

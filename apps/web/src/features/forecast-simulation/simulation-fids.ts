@@ -287,6 +287,7 @@ export function createSimulationFidsBoard(input: {
         operationalNotice:
           activeGroupPlan?.publicNote ||
           (rotationInterrupted ? "Flugbetrieb unterbrochen – bitte Status erneut prüfen." : ""),
+        activeRecall: null,
       };
     }),
     fleet: [],

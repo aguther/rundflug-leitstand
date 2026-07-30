@@ -1,4 +1,4 @@
-version: 1.10.0
+version: 1.11.0
 requirements:
   - id: F-KAS-010
     source: "1.4-konsolidiert"
@@ -2230,6 +2230,83 @@ requirements:
     source: "1.10.0"
     section: "Modularisierung"
     requirement: "Neue Setup-/Reset-, Request-Grenz- und Cloudflare-Ziellogik liegt in eigenständigen Modulen. Weitere Zerlegung der großen operativen Handler darf Atomarität, erwartete Version, Idempotenz, Audit, Outbox oder Veröffentlichung nach Persistenz nicht verändern."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V1110-REL-010
+    source: "1.11.0"
+    section: "Release und Versionierung"
+    requirement: "Anwendung, Workspace-Pakete, /api/meta, Healthcheck, Backups, Requirements und Traceability melden konsistent 1.11.0."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V1110-REC-010
+    source: "1.11.0"
+    section: "Aktiver Gruppennachruf"
+    requirement: "Ein Nachruf ist ein eigenständig persistierter temporärer Vorgang mit eindeutiger ID, gruppenbezogener Sequenz, Start- und Ablaufzeit sowie optionalem Ende. Pro Buchungsgruppe ist höchstens ein Nachruf aktiv."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V1110-REC-020
+    source: "1.11.0"
+    section: "Aktiver Gruppennachruf"
+    requirement: "Der Nachruf verändert weder Queueposition noch Belegung oder Anwesenheit. Er endet manuell, nach bestätigter Anwesenheit, Boardingbeginn, Zurückstellung, No-Show, Storno oder spätestens nach fünf Minuten automatisch."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V1110-CMD-010
+    source: "1.11.0"
+    section: "Kommandos und Konsistenz"
+    requirement: "START_TICKET_GROUP_RECALL und CLEAR_TICKET_GROUP_RECALL verwenden Event-Coordinator, erwartete Version und Idempotenz. Parallele stale writes werden abgewiesen; RESTORE_TICKET_GROUP_TO_QUEUE benennt die bisherige Queueaktion fachlich eindeutig und RECALL_TICKET_GROUP bleibt kontrollierter Kompatibilitätsalias."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V1110-AUD-010
+    source: "1.11.0"
+    section: "Audit und Outbox"
+    requirement: "Start und jedes manuelle oder automatische Ende erzeugen append-only Audit-Ereignisse mit Nachruf-ID, Gruppenzuordnung, Sequenz und Endgrund sowie einen konsistenten Outbox-Eintrag."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V1110-PSH-010
+    source: "1.11.0"
+    section: "Gruppenspezifischer Web-Push"
+    requirement: "Jeder neu gestartete Nachruf erzeugt Web-Push ausschließlich für aktive Ticket- und Gruppenstatus-Abonnements derselben Buchungsgruppe. Die Deduplizierung berücksichtigt die Nachruf-ID, sodass ein späterer Nachruf erneut zugestellt wird."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V1110-PUB-010
+    source: "1.11.0"
+    section: "Öffentliche Projektionen"
+    requirement: "Ticketstatus, Gruppenstatus und FIDS projizieren denselben aktiven Nachruf mit festen, gruppen- und gatebezogenen Textvorlagen. Der Vorgang enthält keine Namen, Telefonnummern oder frei formulierten öffentlichen Texte."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V1110-FID-010
+    source: "1.11.0"
+    section: "FIDS"
+    requirement: "Das FIDS zeigt den Nachruf direkt in der betroffenen Gruppenzeile als priorisierten Status Nachruf aktiv mit Glocke und bewegungsreduzierbarer Pulsanimation. Der normale Umlaufstatus bleibt zusätzlich sichtbar und unverändert."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V1110-UI-010
+    source: "1.11.0"
+    section: "Flight Line und Flight Director"
+    requirement: "Geeignete offene Gruppen können nach einem kompakten Bestätigungsdialog nachgerufen werden. Bei aktivem Nachruf sind Status, Startzeit, bisherige Anzahl und die Aktion Nachruf beenden sichtbar."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V1110-MIG-010
+    source: "1.11.0"
+    section: "Migration und Wiederherstellung"
+    requirement: "Die D1-Migration für Nachrufe und Push-Deduplizierung besitzt eine Wiederherstellungsnotiz; Nachrufdaten sind in Backup, Ereignislöschung und Werksreset vollständig berücksichtigt."
+    priority: MUSS
+    stage: V1
+    status: implemented
+  - id: V1110-QA-010
+    source: "1.11.0"
+    section: "Qualitätssicherung"
+    requirement: "Automatisierte Tests prüfen Start, manuelles und automatisches Ende, Idempotenz, Parallelkonflikt, Ablaufzeit, erneuten Push, gruppenspezifische Zustellung, Projektionen, Rollen, Audit und Outbox. Flight Line, Flight Director, FIDS und mobile öffentliche Ansicht werden visuell abgenommen."
     priority: MUSS
     stage: V1
     status: implemented

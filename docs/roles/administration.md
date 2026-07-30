@@ -1,6 +1,6 @@
 # Einweisung Administration
 
-Version 1.10.0 · Ziel: Veranstaltung, Konten, Stammdaten, Sicherung und Reset kontrolliert verwalten.
+Version 1.11.0 · Ziel: Veranstaltung, Konten, Stammdaten, Sicherung und Reset kontrolliert verwalten.
 
 ## Einstieg
 
@@ -16,7 +16,7 @@ Mit dem Administratorkonto anmelden, Veranstaltung wählen und **Administration*
 5. Storno, Löschung, Neustart und Werksreset nur mit Begründung, Bestätigung und aktueller Konto-PIN.
 6. Nach Werksreset im selben Browser `/setup` fortsetzen; Notfallcode nur bei verlorenem Grant.
 
-![Aktuelle Administrationsansicht mit synthetischen Daten](images/administration-1.10.0.png)
+![Aktuelle Administrationsansicht mit synthetischen Daten](images/administration-1.11.0.png)
 
 ## Normalfall
 

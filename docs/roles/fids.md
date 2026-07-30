@@ -1,6 +1,6 @@
 # Einweisung FIDS
 
-Version 1.10.0 · Ziel: den öffentlichen Gruppenstatus ruhig, lesbar und aktuell anzeigen.
+Version 1.11.0 · Ziel: den öffentlichen Gruppenstatus ruhig, lesbar und aktuell anzeigen.
 
 ## Einstieg
 
@@ -12,10 +12,11 @@ setzen; Veranstaltung, Verbindung und sichtbare Zeilen prüfen.
 1. Richtige Veranstaltung und „Verbunden“ kontrollieren.
 2. Lesbarkeit aus typischer Zuschauerentfernung prüfen.
 3. In den Einstellungen Zeilenzahl und Ein-/Zweispaltenansicht passend zum Bildschirm wählen.
-4. Hinweise wie „zur Flight Line“, Boarding, „im Flug“ und „gelandet“ stichprobenartig abgleichen.
+4. Hinweise wie „zur Flight Line“, Boarding und `Nachruf aktiv` stichprobenartig abgleichen; beim
+   Nachruf müssen Glocke und normaler Gruppenstatus gleichzeitig sichtbar bleiben.
 5. Nach Neustart Vollbild, automatische Aktualisierung und Bildschirmsperre erneut prüfen.
 
-![Aktuelle FIDS-Ansicht mit synthetischen Daten](images/fids-1.10.0.png)
+![Aktuelle FIDS-Ansicht mit synthetischen Daten](images/fids-1.11.0.png)
 
 ## Normalfall
 
@@ -32,3 +33,4 @@ Anmelden → Veranstaltung → Vollbild → Lesbarkeit prüfen → Anzeige beoba
 - FIDS zeigt Gruppenstatus und prognostische Fenster, keine garantierten Uhrzeiten.
 - Es zeigt keine Gastnamen, Telefonnummern oder flugbetrieblichen Freigaben.
 - Ein FIDS-Konto öffnet ausschließlich die Anzeige; Einstellungen sind kontogebunden.
+- Die Nachrufglocke pulsiert nur als Zusatzhinweis und ersetzt keinen normalen Status.

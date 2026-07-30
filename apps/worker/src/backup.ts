@@ -12,6 +12,7 @@ export const BACKUP_TABLES = [
   "resource_group_memberships",
   "products",
   "ticket_groups",
+  "ticket_group_recalls",
   "tickets",
   "flight_groups",
   "rotations",

@@ -53,7 +53,7 @@ for (const file of files) {
 }
 
 const lines = [
-  "# Aktuelles Migrationsregister – Release 1.10.0",
+  "# Aktuelles Migrationsregister – Release 1.11.0",
   "",
   "Diese Datei wird aus `apps/worker/migrations/*.sql` erzeugt. Vollständige Dateinamen sind die",
   "D1-Identität; angewandte Dateien werden nicht nachträglich umbenannt.",

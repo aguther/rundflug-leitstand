@@ -73,6 +73,8 @@ export function FlightLineAssist({
   onGroupAttendance,
   onGroupMissing,
   onGroupRecall,
+  onGroupRecallClear,
+  onGroupRestore,
   onGroupDefer,
   onPause,
   onRefresh,
@@ -93,6 +95,8 @@ export function FlightLineAssist({
   onGroupAttendance: (ticketGroupId: string, checkedIn: boolean) => void | Promise<void>;
   onGroupMissing: (ticketGroupId: string) => void | Promise<void>;
   onGroupRecall: (ticketGroupId: string) => void | Promise<void>;
+  onGroupRecallClear: (ticketGroupId: string, recallId: string) => void | Promise<void>;
+  onGroupRestore: (ticketGroupId: string) => void | Promise<void>;
   onGroupDefer: (ticketGroupId: string) => void | Promise<void>;
   onPause: (aircraftId: string) => void;
   onRefresh: () => Promise<void>;
@@ -612,9 +616,12 @@ export function FlightLineAssist({
         onDefer={onGroupDefer}
         onMissing={onGroupMissing}
         onRecall={onGroupRecall}
+        onRecallClear={onGroupRecallClear}
+        onRestore={onGroupRestore}
         onToggle={onToggleGroup}
         open={assignmentOpen}
         selectedQueueGroupIds={selectedQueueGroupIds}
+        timeZone={board.event.timeZone}
       />
 
       {canAssignPilot ? (

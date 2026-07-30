@@ -57,7 +57,7 @@ const licenseSummary = [...licenseCounts]
 const directRows = directPackages.map(
   (entry) => `| \`${entry.name}\` | ${entry.version} | ${entry.license} |`,
 );
-const expected = `# Drittanbieter-Lizenzinventar – Release 1.10.0
+const expected = `# Drittanbieter-Lizenzinventar – Release 1.11.0
 
 Stand: automatisch aus installiertem Lockfile/Produktionsgraph erzeugt
 Betroffene Anforderung: T-080 und V1100-DEP-010

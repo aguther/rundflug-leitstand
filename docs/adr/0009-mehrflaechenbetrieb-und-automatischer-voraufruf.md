@@ -40,4 +40,4 @@ Pausen benötigen einen optionalen erwarteten Rückkehrzeitpunkt. Display-Konfig
 Profil und Nachlaufzeit. Alle neuen Schreibpfade bleiben idempotent, versionsgeprüft und auditiert.
 
 Das freigegebene Bedienkonzept steht in
-`docs/ui/v1.10.0-release-concept.md`.
+`docs/ui/v1.11.0-release-concept.md`.

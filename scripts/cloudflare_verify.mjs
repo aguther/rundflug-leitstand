@@ -88,12 +88,12 @@ const meta = await getJson("/api/meta");
 const setup = await getJson("/api/setup/status");
 const push = await getJson("/api/public/push/config");
 if (
-  health.applicationVersion !== "1.10.0" ||
-  health.requirementsVersion !== "1.10.0" ||
-  meta.applicationVersion !== "1.10.0" ||
-  meta.requirementsVersion !== "1.10.0"
+  health.applicationVersion !== "1.11.0" ||
+  health.requirementsVersion !== "1.11.0" ||
+  meta.applicationVersion !== "1.11.0" ||
+  meta.requirementsVersion !== "1.11.0"
 ) {
-  throw new Error("Healthcheck meldet nicht den konsistenten Release 1.10.0.");
+  throw new Error("Healthcheck meldet nicht den konsistenten Release 1.11.0.");
 }
 if (meta.dataJurisdiction !== "eu") throw new Error("/api/meta meldet keine EU-Jurisdiktion.");
 if (!push.publicKey)

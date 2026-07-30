@@ -28,6 +28,7 @@ Cloudflare Worker
           │
           ├── D1
           │   ├── aktueller relationaler Zustand
+          │   ├── temporäre aktive Gruppennachrufe
           │   ├── append-only Event Ledger
           │   ├── Idempotenzbelege
           │   └── Outbox
@@ -52,6 +53,10 @@ zuerst einen vollständigen Snapshot und danach Ereignisse ab der bekannten Vers
 Fallback. Bei einem Server- oder D1-Fehler bleibt der letzte bestätigte Snapshot sichtbar und wird mit
 Alter und Störungsstatus gekennzeichnet. Schreibaktionen bleiben bis zu einer neuen
 Serverbestätigung gesperrt; ein Fehler leert den sichtbaren Stand nicht.
+
+Der vorhandene Durable-Object-Alarm bedient sowohl den 30-Sekunden-Prognosetakt als auch fällige
+Gruppennachrufe. Nachrufablauf und Schreibkommandos verwenden dieselbe serielle `commandTail`-
+Grenze. D1 bleibt auch für Start, Ende und Ablauf die einzige Source of Truth.
 
 ## Öffentlicher Ticketzugriff
 

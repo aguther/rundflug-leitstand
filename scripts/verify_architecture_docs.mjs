@@ -186,9 +186,9 @@ const requirementsFiles = await readdir(resolve(root, "docs/requirements"));
 const allowedVersionedRequirements = new Set([
   "requirements-v1.4.md",
   "requirements-v1.4.yaml",
-  "requirements-v1.10.0.md",
-  "requirements-v1.10.0.yaml",
-  "traceability-v1.10.0.csv",
+  "requirements-v1.11.0.md",
+  "requirements-v1.11.0.yaml",
+  "traceability-v1.11.0.csv",
 ]);
 const competingReleases = requirementsFiles.filter(
   (name) =>
@@ -204,10 +204,10 @@ const currentTerminologyFiles = [
   ...(await markdownFiles(resolve(root, "docs/architecture"))),
   ...(await markdownFiles(resolve(root, "docs/operations"))),
   ...(await markdownFiles(resolve(root, "docs/roles"))),
-  resolve(root, "docs/ui/v1.10.0-release-concept.md"),
+  resolve(root, "docs/ui/v1.11.0-release-concept.md"),
   resolve(root, "docs/requirements/README.md"),
   resolve(root, "docs/requirements/requirements-summary.md"),
-  resolve(root, "docs/requirements/requirements-v1.10.0.md"),
+  resolve(root, "docs/requirements/requirements-v1.11.0.md"),
   resolve(root, "docs/requirements/open-questions.md"),
 ];
 const currentTerminology = (

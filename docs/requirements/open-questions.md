@@ -1,6 +1,6 @@
-# Wirklich offene Freigaben – Release 1.10.0
+# Wirklich offene Freigaben – Release 1.11.0
 
-Alle fachlichen V1-Entscheidungen sind in `requirements-v1.10.0.md`, gültigen ADRs und Tests
+Alle fachlichen V1-Entscheidungen sind in `requirements-v1.11.0.md`, gültigen ADRs und Tests
 konsolidiert. Offen sind nur noch externe oder betreiberseitige Freigaben:
 
 | ID | Offene Freigabe | Verantwortlich | Produktionswirkung |
