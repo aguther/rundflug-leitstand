@@ -1,5 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import analyticsContentSource from "./features/flight-line/FlightDirectorAnalyticsContent.tsx?raw";
+import analyticsDialogSource from "./features/flight-line/FlightDirectorAnalyticsDialog.tsx?raw";
 import operationsDialogSource from "./features/flight-line/FlightDirectorOperationsDialog.tsx?raw";
 import operationalPlanSource from "./features/operations/OperationalPlanPanel.tsx?raw";
 import { expectedReviewAtFromPause } from "./flight-line-pause";
@@ -7,7 +9,7 @@ import sharedSource from "./flight-line-shared.tsx?raw";
 import supervisorSource from "./flight-line-supervisor.tsx?raw";
 import appSource from "./flight-line-view.tsx?raw";
 
-const flightLineSource = `${supervisorSource}\n${sharedSource}\n${operationsDialogSource}\n${operationalPlanSource}`;
+const flightLineSource = `${supervisorSource}\n${sharedSource}\n${operationsDialogSource}\n${operationalPlanSource}\n${analyticsDialogSource}\n${analyticsContentSource}`;
 const flightLineStyles = readFileSync(
   new URL("./features/flight-line/flight-line-v12.css", import.meta.url),
   "utf8",
@@ -20,7 +22,7 @@ describe("Flight Director", () => {
     expect(supervisorSource).toContain('className="flight-director-v15"');
     expect(supervisorSource).toContain('className="flight-director-aircraft-row"');
     expect(supervisorSource).not.toContain("flight-director-aircraft-row selected");
-    expect(supervisorSource).toContain("<ModalDialog");
+    expect(analyticsDialogSource).toContain("<ModalDialog");
     expect(flightLineSource).toContain("Buchungsgruppen zuweisen");
     expect(flightLineSource).toContain("Gruppen bleiben vollständig zusammen");
     expect(flightLineSource).toContain("Pilot zuweisen");
@@ -111,7 +113,7 @@ describe("Flight Director", () => {
     expect(supervisorSource).toMatch(/flight-director-aircraft-name">\s*<span>/);
     expect(supervisorSource).toContain("entry.resourceGroupShortCode");
     expect(supervisorSource).not.toContain("Pilot wechseln");
-    expect(flightLineStyles).toContain("min-width: 1040px");
+    expect(flightLineStyles).toContain("min-width: 1088px");
     expect(flightLineStyles).toContain("@media (min-width: 768px) and (max-width: 1180px)");
     expect(flightLineStyles).toContain("grid-template-columns: repeat(6, var(--control-touch))");
   });
@@ -136,10 +138,27 @@ describe("Flight Director", () => {
     expect(supervisorSource).toContain('label: "Voraufruf"');
     expect(supervisorSource).toContain("HeaderIcon");
     expect(supervisorSource).toContain("title={column.label}");
-    expect(flightLineStyles).toContain("min-width: 1040px");
+    expect(flightLineStyles).toContain("min-width: 1088px");
     expect(flightLineStyles).toContain("scrollbar-gutter: stable");
     expect(flightLineStyles).toMatch(
       /\.flight-director-ticket-overview > header \{[\s\S]*?flex: 0 0 auto;/,
+    );
+  });
+
+  it("opens one lazy daily analytics dialog from the header, aircraft and group rows", () => {
+    expect(supervisorSource).toContain("Auswertungen");
+    expect(supervisorSource).toContain("FlightDirectorAnalyticsDialog");
+    expect(supervisorSource).toContain('setAnalyticsSelection({ tab: "aircraft", id: entry.id })');
+    expect(supervisorSource).toContain('setAnalyticsSelection({ tab: "groups", id: rotationId })');
+    expect(analyticsDialogSource).toContain("lazy(() =>");
+    expect(analyticsDialogSource).toContain('{ value: "groups", label: "Fluggruppen" }');
+    expect(analyticsDialogSource).toContain('{ value: "aircraft", label: "Flugzeuge" }');
+    expect(analyticsDialogSource).toContain('{ value: "pilots", label: "Piloten" }');
+    expect(analyticsContentSource).toContain("<LineChart");
+    expect(analyticsContentSource).toContain("<BarChart");
+    expect(analyticsContentSource).toContain("Prognose öffnen");
+    expect(analyticsDialogSource).toContain(
+      "Organisatorische Übersicht · keine Dienst-, Flugzeit- oder Einsatzfreigabe.",
     );
   });
 

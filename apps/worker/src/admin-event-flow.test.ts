@@ -50,6 +50,21 @@ describe("admin event flow", () => {
     expect(winter.from).toBe("2026-12-23T23:00:00.000Z");
   });
 
+  it("uses the configured operations start when sales have no separate opening time", () => {
+    const flow = buildAdminEventFlow({
+      eventId: "operations-start",
+      eventDate: "2026-07-24",
+      timeZone: "Europe/Berlin",
+      saleOpensAt: null,
+      operationsStartAt: "2026-07-24T07:00:00.000Z",
+      operationsEndAt: "2026-07-24T17:00:00.000Z",
+      observedAt: "2026-07-24T08:00:00.000Z",
+      tickets: [],
+    });
+
+    expect(flow.from).toBe("2026-07-24T07:00:00.000Z");
+  });
+
   it("anchors local midnight correctly on both DST transition days", () => {
     const spring = buildAdminEventFlow({
       eventId: "spring-dst",

@@ -2964,3 +2964,60 @@ export const forecastHistorySchema = z.object({
   offset: z.number().int().nonnegative(),
 });
 export type ForecastHistory = z.infer<typeof forecastHistorySchema>;
+
+export const resourceDayHistoryQuerySchema = z
+  .object({
+    scopeType: z.enum(["AIRCRAFT", "PILOT"]),
+    scopeId: z.string().trim().min(1).max(100),
+  })
+  .strict();
+export type ResourceDayHistoryQuery = z.infer<typeof resourceDayHistoryQuerySchema>;
+
+const resourceDayActualTimelineSchema = z.object({
+  boardingAt: nullableTimestampSchema,
+  departureAt: nullableTimestampSchema,
+  landingAt: nullableTimestampSchema,
+  completionAt: nullableTimestampSchema,
+});
+
+export const resourceDayRotationSchema = z
+  .object({
+    rotationId: z.string(),
+    flightGroupId: z.string(),
+    communicationNumber: z.number().int().positive(),
+    communicationLabel: z.string(),
+    resourceGroupId: z.string(),
+    resourceGroupName: z.string(),
+    productName: z.string(),
+    passengerCount: z.number().int().nonnegative(),
+    usableCapacity: z.number().int().positive(),
+    aircraftId: z.string().nullable(),
+    aircraftRegistration: z.string().nullable(),
+    pilotId: z.string().nullable(),
+    pilotOperationalCode: z.string().nullable(),
+    actual: resourceDayActualTimelineSchema,
+  })
+  .strict();
+
+export const resourceDayBlockSchema = z
+  .object({
+    id: z.string(),
+    type: z.enum(["REFUELING", "PAUSE", "INTERRUPTION"]),
+    startedAt: z.string(),
+    endedAt: z.string().nullable(),
+    active: z.boolean(),
+  })
+  .strict();
+
+export const resourceDayHistorySchema = z
+  .object({
+    scopeType: z.enum(["AIRCRAFT", "PILOT"]),
+    scopeId: z.string(),
+    from: z.string(),
+    until: z.string(),
+    observedUntil: z.string(),
+    rotations: z.array(resourceDayRotationSchema),
+    blocks: z.array(resourceDayBlockSchema),
+  })
+  .strict();
+export type ResourceDayHistory = z.infer<typeof resourceDayHistorySchema>;

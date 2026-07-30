@@ -1,4 +1,5 @@
 .admin-flow-panel {
+  --admin-flow-open-fill: color-mix(in srgb, var(--ui-accent) 14%, transparent);
   margin: 0 16px 8px;
   padding: 12px 14px;
   border: 1px solid var(--ui-border);
@@ -49,7 +50,7 @@
 
 .admin-flow-legend span::before {
   width: 18px;
-  height: 3px;
+  height: 2px;
   border-radius: 2px;
   background: currentColor;
   content: "";
@@ -69,49 +70,88 @@
 }
 
 .admin-flow-chart {
+  height: 210px;
   width: 100%;
   min-height: 0;
-  margin-top: 4px;
+  margin-top: 2px;
   overflow: visible;
 }
 
-.admin-flow-grid-line {
-  stroke: var(--ui-border);
-  stroke-width: 1;
-}
-
-.admin-flow-axis-label {
+.admin-flow-chart .recharts-cartesian-axis-tick-value {
   fill: var(--ui-muted);
-  font-size: 12px;
+  font-size: 0.72rem;
 }
 
-.admin-flow-open-area {
-  fill: color-mix(in srgb, var(--ui-accent) 15%, transparent);
+.admin-flow-chart .recharts-cartesian-grid line {
+  stroke: var(--ui-border);
 }
 
-.admin-flow-line {
-  fill: none;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 3;
+.admin-flow-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  margin: 10px 0 0;
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-sm);
+  background: var(--ui-border);
 }
 
-.admin-flow-line.sold {
-  stroke: var(--ui-accent);
+.admin-flow-summary > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  padding: 7px 10px;
+  background: var(--ui-surface-subtle);
 }
 
-.admin-flow-line.completed {
-  stroke: var(--ui-success);
+.admin-flow-summary dt,
+.admin-flow-summary dd {
+  margin: 0;
 }
 
-.admin-flow-now-line {
-  stroke: var(--ui-border-strong);
-  stroke-dasharray: 4 5;
-  stroke-width: 1;
+.admin-flow-summary dt {
+  overflow: hidden;
+  color: var(--ui-muted);
+  font-size: 0.7rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-flow-summary dd {
+  font-size: 0.82rem;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.admin-flow-tooltip {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--ui-surface-raised);
+  box-shadow: var(--shadow-md);
+  color: var(--ui-text);
+  font-size: 0.72rem;
+}
+
+.admin-flow-tooltip strong {
+  margin-bottom: 2px;
+}
+
+.admin-flow-empty {
+  display: grid;
+  height: 210px;
+  place-items: center;
+  color: var(--ui-muted);
+  font-size: 0.78rem;
 }
 
 .admin-flow-placeholder {
-  height: 190px;
+  height: 254px;
   margin-top: 8px;
   border-radius: var(--radius-sm);
   background: var(--ui-surface-subtle);
@@ -748,6 +788,10 @@
 
   .admin-flow-chart {
     min-height: 0;
+  }
+
+  .admin-flow-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .admin-shell .event-catalog-primary {

@@ -10,10 +10,26 @@ interface BuildAdminEventFlowInput {
   eventDate: string;
   timeZone: string;
   saleOpensAt: string | null;
+  operationsStartAt?: string | null;
   operationsEndAt: string | null;
   observedAt: string;
   requestedBucketMinutes?: number;
   tickets: readonly EventFlowTicketRow[];
+}
+
+export interface EventDayWindow {
+  from: string;
+  until: string;
+  observedUntil: string;
+}
+
+interface BuildEventDayWindowInput {
+  eventDate: string;
+  timeZone: string;
+  saleOpensAt: string | null;
+  operationsStartAt?: string | null;
+  operationsEndAt: string | null;
+  observedAt: string;
 }
 
 const formatterCache = new Map<string, Intl.DateTimeFormat>();
@@ -80,8 +96,11 @@ function adaptiveBucketMinutes(spanMs: number, requested = 15): number {
   return bucketMinutes;
 }
 
-export function buildAdminEventFlow(input: BuildAdminEventFlowInput): AdminEventFlow {
-  const from = input.saleOpensAt ?? localMidnightIso(input.eventDate, input.timeZone);
+export function buildEventDayWindow(input: BuildEventDayWindowInput): EventDayWindow {
+  const from =
+    input.saleOpensAt ??
+    input.operationsStartAt ??
+    localMidnightIso(input.eventDate, input.timeZone);
   const fromMs = Date.parse(from);
   const fallbackUntilMs = fromMs + 12 * 60 * 60 * 1000;
   const configuredUntilMs = input.operationsEndAt
@@ -96,6 +115,17 @@ export function buildAdminEventFlow(input: BuildAdminEventFlowInput): AdminEvent
     fromMs,
     Math.min(Number.isFinite(observedAtMs) ? observedAtMs : fromMs, plannedUntilMs),
   );
+  return {
+    from: new Date(fromMs).toISOString(),
+    until: new Date(plannedUntilMs).toISOString(),
+    observedUntil: new Date(observedUntilMs).toISOString(),
+  };
+}
+
+export function buildAdminEventFlow(input: BuildAdminEventFlowInput): AdminEventFlow {
+  const window = buildEventDayWindow(input);
+  const fromMs = Date.parse(window.from);
+  const observedUntilMs = Date.parse(window.observedUntil);
   const bucketMinutes = adaptiveBucketMinutes(
     Math.max(0, observedUntilMs - fromMs),
     input.requestedBucketMinutes,
@@ -114,9 +144,9 @@ export function buildAdminEventFlow(input: BuildAdminEventFlowInput): AdminEvent
 
   return {
     eventId: input.eventId,
-    from: new Date(fromMs).toISOString(),
-    plannedUntil: new Date(plannedUntilMs).toISOString(),
-    observedUntil: new Date(observedUntilMs).toISOString(),
+    from: window.from,
+    plannedUntil: window.until,
+    observedUntil: window.observedUntil,
     bucketMinutes,
     points: boundaries.map((boundary) => {
       let soldTickets = 0;

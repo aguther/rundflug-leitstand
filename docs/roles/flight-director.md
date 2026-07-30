@@ -15,6 +15,8 @@ Mit dem Flight-Director-Konto anmelden, Veranstaltung wählen und **Flight Direc
 3. Vorschlag, Pilotencode und kompatibles Flugzeug prüfen, danach genau einmal bestätigen.
 4. Konflikte oder stale writes neu laden und fachlich neu entscheiden; niemals still überschreiben.
 5. Abbruch, Pause, Tanken und Freigabe mit Grund dokumentieren; Historie anschließend kontrollieren.
+6. **Auswertungen** öffnet die Tagesverläufe für Fluggruppen, Flugzeuge und anonyme Pilotencodes.
+   Das Diagrammsymbol einer Fluggruppe springt direkt in ihren Prognoseverlauf.
 
 ![Aktuelle Flight-Director-Ansicht mit synthetischen Daten](images/flight-director-1.11.0.png)
 
@@ -33,4 +35,5 @@ Lage prüfen → Gruppe wählen → Vorschlag prüfen → NEXT bestätigen → E
 - Ein Flugzeug gehört gleichzeitig höchstens einer aktiven Ressourcengruppe an.
 - Kommunikationsnummern sind stabil, aber weder Uhrzeit noch dauerhafte Flugzeugbindung.
 - Der Leitstand schlägt vor; er trifft keine flugbetriebliche oder sicherheitsrelevante Entscheidung.
+- Pilotenauswertungen sind organisatorisch und keine Dienst-, Flugzeit- oder Einsatzfreigabe.
 - Ein Nachruf verändert weder Queue, Anwesenheit noch Belegung und enthält keine Namen.

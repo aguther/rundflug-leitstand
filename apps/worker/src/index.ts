@@ -24,6 +24,8 @@ import {
   operationalHistoryQuerySchema,
   operationalHistorySchema,
   operatorLoginRequestSchema,
+  resourceDayHistoryQuerySchema,
+  resourceDayHistorySchema,
   simulationPlanExportSchema,
   ticketSearchRequestSchema,
   updateOperatorAccountSchema,
@@ -41,7 +43,7 @@ import {
 } from "@rundflug/domain";
 import { Hono } from "hono";
 import { secureHeaders } from "hono/secure-headers";
-import { buildAdminEventFlow } from "./admin-event-flow";
+import { buildAdminEventFlow, buildEventDayWindow } from "./admin-event-flow";
 import {
   assertRole,
   authorizeSession,
@@ -104,6 +106,12 @@ import {
   resetSetupToken,
   validResetSetupGrant,
 } from "./reset-setup-grant";
+import {
+  buildAircraftBlockStatement,
+  buildPilotPauseEventStatement,
+  buildResourceDayRotationStatement,
+  pairPilotPauseEvents,
+} from "./resource-day-history";
 import { rowToSnapshot } from "./snapshot";
 import { ticketSearchStatusCondition } from "./ticket-search";
 import { httpsRedirectLocation } from "./transport-security";
@@ -1586,7 +1594,7 @@ app.get("/api/admin/events/:eventId/flow", async (context) => {
     );
   }
   const event = await context.env.DB.prepare(
-    `SELECT id, event_date, time_zone, sale_opens_at, operations_end_at
+    `SELECT id, event_date, time_zone, sale_opens_at, operations_start_at, operations_end_at
        FROM operation_days WHERE id = ?1`,
   )
     .bind(eventId)
@@ -1595,6 +1603,7 @@ app.get("/api/admin/events/:eventId/flow", async (context) => {
       event_date: string;
       time_zone: string;
       sale_opens_at: string | null;
+      operations_start_at: string | null;
       operations_end_at: string | null;
     }>();
   if (!event) {
@@ -1621,6 +1630,7 @@ app.get("/api/admin/events/:eventId/flow", async (context) => {
     eventDate: event.event_date,
     timeZone: event.time_zone,
     saleOpensAt: event.sale_opens_at,
+    operationsStartAt: event.operations_start_at,
     operationsEndAt: event.operations_end_at,
     observedAt: new Date().toISOString(),
     requestedBucketMinutes: Number.isFinite(requestedBucketMinutes) ? requestedBucketMinutes : 15,
@@ -5258,6 +5268,211 @@ app.on("GET", eventRoutes("/history/forecasts"), async (context) => {
       total: rows.results[0]?.total_count ?? 0,
       limit: query.limit,
       offset: query.offset,
+    }),
+  );
+});
+
+app.on("GET", eventRoutes("/history/resources"), async (context) => {
+  const eventId = context.req.param("eventId");
+  const device = await authorizeDevice(context.env, eventId, context.req.raw);
+  if (!device || !["ADMIN", "FLIGHT_DIRECTOR"].includes(device.role)) {
+    return context.json(
+      {
+        error: {
+          code: "SESSION_NOT_AUTHORIZED",
+          message: "Sitzung für diese Ansicht nicht berechtigt.",
+        },
+      },
+      403,
+    );
+  }
+  const parsedQuery = resourceDayHistoryQuerySchema.safeParse({
+    scopeType: context.req.query("scopeType"),
+    scopeId: context.req.query("scopeId"),
+  });
+  if (!parsedQuery.success) {
+    return context.json(
+      {
+        error: {
+          code: "RESOURCE_HISTORY_FILTERS_INVALID",
+          message: "Die Ressourcenfilter sind ungültig.",
+        },
+      },
+      400,
+    );
+  }
+
+  const event = await context.env.DB.prepare(
+    `SELECT event_date, time_zone, sale_opens_at, operations_start_at, operations_end_at
+       FROM operation_days
+      WHERE id = ?1`,
+  )
+    .bind(eventId)
+    .first<{
+      event_date: string;
+      time_zone: string;
+      sale_opens_at: string | null;
+      operations_start_at: string | null;
+      operations_end_at: string | null;
+    }>();
+  if (!event) {
+    return context.json(
+      { error: { code: "EVENT_NOT_FOUND", message: "Veranstaltung nicht gefunden." } },
+      404,
+    );
+  }
+
+  const query = parsedQuery.data;
+  const resource =
+    query.scopeType === "AIRCRAFT"
+      ? await context.env.DB.prepare(
+          `SELECT a.id
+             FROM aircraft a
+            WHERE a.id = ?1
+              AND EXISTS (
+                SELECT 1
+                  FROM resource_group_memberships rgm
+                 WHERE rgm.operation_day_id = ?2 AND rgm.aircraft_id = a.id
+              )`,
+        )
+          .bind(query.scopeId, eventId)
+          .first<{ id: string }>()
+      : await context.env.DB.prepare(
+          `SELECT id FROM pilots WHERE id = ?1 AND operation_day_id = ?2`,
+        )
+          .bind(query.scopeId, eventId)
+          .first<{ id: string }>();
+  if (!resource) {
+    return context.json(
+      { error: { code: "RESOURCE_NOT_FOUND", message: "Ressource nicht gefunden." } },
+      404,
+    );
+  }
+
+  const window = buildEventDayWindow({
+    eventDate: event.event_date,
+    timeZone: event.time_zone,
+    saleOpensAt: event.sale_opens_at,
+    operationsStartAt: event.operations_start_at,
+    operationsEndAt: event.operations_end_at,
+    observedAt: new Date().toISOString(),
+  });
+  const rotationStatement = buildResourceDayRotationStatement(
+    eventId,
+    query,
+    window.from,
+    window.observedUntil,
+  );
+  const rotations = await context.env.DB.prepare(rotationStatement.sql)
+    .bind(...rotationStatement.bindings)
+    .all<{
+      rotation_id: string;
+      flight_group_id: string;
+      communication_number: number;
+      resource_group_id: string;
+      resource_group_name: string;
+      resource_group_short_code: string;
+      product_name: string;
+      passenger_count: number;
+      usable_capacity: number;
+      aircraft_id: string | null;
+      aircraft_registration: string | null;
+      pilot_id: string | null;
+      pilot_operational_code: string | null;
+      called_at: string | null;
+      departed_at: string | null;
+      landed_at: string | null;
+      completed_at: string | null;
+    }>();
+
+  let blocks: Array<{
+    id: string;
+    type: "REFUELING" | "PAUSE" | "INTERRUPTION";
+    startedAt: string;
+    endedAt: string | null;
+    active: boolean;
+  }>;
+  if (query.scopeType === "AIRCRAFT") {
+    const statement = buildAircraftBlockStatement(
+      eventId,
+      query.scopeId,
+      window.from,
+      window.observedUntil,
+    );
+    const rows = await context.env.DB.prepare(statement.sql)
+      .bind(...statement.bindings)
+      .all<{
+        id: string;
+        block_type: "REFUELING" | "PAUSE" | "INTERRUPTION";
+        status: "ACTIVE" | "CLEARED";
+        started_at: string;
+        cleared_at: string | null;
+      }>();
+    const fromMs = Date.parse(window.from);
+    const observedUntilMs = Date.parse(window.observedUntil);
+    blocks = rows.results.map((row) => ({
+      id: row.id,
+      type: row.block_type,
+      startedAt: new Date(Math.max(Date.parse(row.started_at), fromMs)).toISOString(),
+      endedAt: row.cleared_at
+        ? new Date(Math.min(Date.parse(row.cleared_at), observedUntilMs)).toISOString()
+        : null,
+      active: row.status === "ACTIVE" && row.cleared_at === null,
+    }));
+  } else {
+    const statement = buildPilotPauseEventStatement(eventId, query.scopeId, window.observedUntil);
+    const rows = await context.env.DB.prepare(statement.sql)
+      .bind(...statement.bindings)
+      .all<{
+        id: string;
+        sequence: number;
+        event_type: "PILOT_PAUSE_STARTED" | "PILOT_PAUSE_ENDED";
+        occurred_at: string;
+      }>();
+    blocks = pairPilotPauseEvents(
+      rows.results.map((row) => ({
+        id: row.id,
+        sequence: row.sequence,
+        eventType: row.event_type,
+        occurredAt: row.occurred_at,
+      })),
+      window.from,
+      window.observedUntil,
+    );
+  }
+
+  return context.json(
+    resourceDayHistorySchema.parse({
+      scopeType: query.scopeType,
+      scopeId: query.scopeId,
+      from: window.from,
+      until: window.until,
+      observedUntil: window.observedUntil,
+      rotations: rotations.results.map((row) => ({
+        rotationId: row.rotation_id,
+        flightGroupId: row.flight_group_id,
+        communicationNumber: row.communication_number,
+        communicationLabel: formatFlightGroupLabel(
+          row.resource_group_short_code,
+          row.communication_number,
+        ),
+        resourceGroupId: row.resource_group_id,
+        resourceGroupName: row.resource_group_name,
+        productName: row.product_name,
+        passengerCount: row.passenger_count,
+        usableCapacity: row.usable_capacity,
+        aircraftId: row.aircraft_id,
+        aircraftRegistration: row.aircraft_registration,
+        pilotId: row.pilot_id,
+        pilotOperationalCode: row.pilot_operational_code,
+        actual: {
+          boardingAt: row.called_at,
+          departureAt: row.departed_at,
+          landingAt: row.landed_at,
+          completionAt: row.completed_at,
+        },
+      })),
+      blocks,
     }),
   );
 });

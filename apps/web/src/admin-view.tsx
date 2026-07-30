@@ -3195,6 +3195,7 @@ export function AdminView() {
               <>
               <div hidden={adminArea !== "overview"}>
                 <AdminEventFlowChart
+                  averageWaitMinutes={board.metrics.averageWaitMinutes}
                   error={eventFlowError}
                   flow={eventFlow}
                   loading={eventFlowLoading}
