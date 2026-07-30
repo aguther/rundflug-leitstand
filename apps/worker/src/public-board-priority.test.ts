@@ -15,5 +15,6 @@ describe("FIDS action priority", () => {
     expect(order.indexOf("rg.status = 'ACTIVE'")).toBeLessThan(
       order.indexOf("WHEN r.status = 'DRAFT' THEN 1"),
     );
+    expect(order).not.toContain("sort_order");
   });
 });

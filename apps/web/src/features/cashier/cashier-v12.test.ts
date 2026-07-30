@@ -50,10 +50,61 @@ describe("V1.7.0 cashier", () => {
 
   it("keeps the selected group size after a sale and exposes an explicit reset", () => {
     expect(appSource).not.toContain("setSize(1);");
-    expect(appSource).toContain('aria-label="Gruppengröße auf 1 zurücksetzen"');
+    expect(appSource).toContain('label="Gruppengröße auf 1 zurücksetzen"');
     expect(appSource).toContain("onClick={() => changeGroupSize(1)}");
     expect(appSource).toContain("disabled={size === 1 || busyProductId !== null}");
-    expect(appSource).toContain("Zurücksetzen");
+    expect(appSource).toContain('<RotateCcw aria-hidden="true" size={18} />');
+    expect(stylesSource).toMatch(
+      /\.cashier-size-reset\.ds-icon-button,[\s\S]*?min-width:\s*44px;[\s\S]*?min-height:\s*44px;/,
+    );
+  });
+
+  it("keeps stepper and reset together while aligning the cashier-order action right", () => {
+    expect(appSource).toContain('className="cashier-group-size-main"');
+    expect(appSource).toContain('className="cashier-group-actions"');
+    expect(appSource).toMatch(
+      /className="cashier-group-size-main"[\s\S]*?className="cashier-stepper"[\s\S]*?className="cashier-size-reset"[\s\S]*?className="cashier-group-actions"/,
+    );
+    expect(appSource).toMatch(
+      /className="cashier-group-actions"[\s\S]*?className="cashier-order-open"/,
+    );
+    expect(stylesSource).toMatch(
+      /\.cashier-group-actions\s*\{[^}]*display:\s*flex;[^}]*margin-inline-start:\s*auto;/s,
+    );
+    expect(stylesSource).toMatch(
+      /@media \(max-width:\s*700px\)\s*\{[\s\S]*?\.cashier-group-size\s*\{[^}]*width:\s*100%;/,
+    );
+  });
+
+  it("edits only the cashier order with accessible icon controls", () => {
+    expect(appSource).toContain('label="Kassenreihenfolge bearbeiten"');
+    expect(appSource).toContain('<ListOrdered aria-hidden="true" size={19} />');
+    expect(appSource).toContain('type: "REORDER_CASHIER_PRODUCTS"');
+    expect(appSource).toContain("expectedProductIds: expectedCashierProductIds");
+    expect(appSource).toContain("orderedProductIds: orderedCashierProductIds");
+    expect(appSource).toContain(
+      "Nur Kassenreihenfolge · FIDS, Queue und operative Priorität bleiben dynamisch",
+    );
+    expect(appSource).toContain("draggable");
+    expect(appSource).toContain("nach oben verschieben");
+    expect(appSource).toContain("nach unten verschieben");
+    expect(appSource).toContain("disabled={!cashierOrderHasChanged}");
+  });
+
+  it("releases the next sale after persistence while view and receipt sync in background", () => {
+    const sellSource = appSource.slice(
+      appSource.indexOf("async function sell("),
+      appSource.indexOf("async function cancelLastSale"),
+    );
+    expect(sellSource).toContain("setBusyProductId(null)");
+    expect(sellSource).toContain("setSaleSyncCount");
+    expect(sellSource).toContain("Promise.allSettled");
+    expect(sellSource).toContain("mergeTicketGroupsById");
+    expect(sellSource.indexOf("setBusyProductId(null)")).toBeLessThan(
+      sellSource.indexOf("Promise.allSettled"),
+    );
+    expect(appSource).toContain("receiptRequestRef");
+    expect(appSource).toContain("rundflug:cashier-sale-ready");
   });
 
   it("keeps forecast capacity advisory instead of disabling an explicitly enabled sale", () => {

@@ -28,6 +28,7 @@ const requiredAuditEvents = [
   "RESOURCE_GROUP_STATUS_CHANGED",
   "EMERGENCY_MODE_TRIGGERED",
   "ROTATION_ABORTED_TO_QUEUE",
+  "CASHIER_PRODUCT_ORDER_CHANGED",
 ] as const;
 
 describe("append-only operational audit coverage", () => {

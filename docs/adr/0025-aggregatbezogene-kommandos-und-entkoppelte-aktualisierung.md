@@ -3,8 +3,8 @@
 - Status: Akzeptiert
 - Datum: 2026-07-24
 - Entscheidung: Auftraggeber
-- Betroffene Anforderungen: F-INT-070, Q-ZUV-010, Q-ZUV-040, Q-PER-010, Q-PER-020 und
-  Q-PER-030
+- Betroffene Anforderungen: F-KAS-010, F-INT-070, Q-ZUV-010, Q-ZUV-040, Q-PER-010,
+  Q-PER-020 und Q-PER-030
 
 ## Kontext
 
@@ -43,12 +43,20 @@ werden nicht unkontrolliert parallel ausgeführt.
   bedienbar.
 - Ein Verkauf liefert die geschützten Druckdaten bereits in seiner idempotenten
   Kommandobestätigung. Operationsabruf, QR-Erzeugung, Druckdialog und Listenaktualisierung laufen
-  danach parallel. Die Verkaufs-Busy-Anzeige endet erst mit deren sichtbarem Erfolg oder einer
-  erklärenden Fehlermeldung. Der öffentliche Gruppencode wird weder in Outbox noch Audit oder
-  Anwendungslog aufgenommen.
-- `Server-Timing` trennt Warteschlangen- und Kommandozeit; Browser-Performance-Einträge messen
-  Operationsabrufe und operative Kommandos. Langsame Kommandos werden nur mit Dauer und stabilem
-  Diagnosecode, ohne IDs, Codes oder personenbezogene Daten protokolliert.
+  danach parallel. Die blockierende Verkaufs-Busy-Anzeige endet unmittelbar nach dieser atomaren
+  Serverbestätigung; ein sichtbarer Synchronisationsstatus begleitet die nachlaufende Arbeit, ohne
+  den nächsten Verkauf zu sperren. Ein Sequenz-Token verhindert, dass ein verspäteter älterer
+  Abruf den Beleg eines neueren Verkaufs überschreibt. Fehler beim Nachladen ändern den bestätigten
+  Verkauf nicht nachträglich in einen Fehlschlag; die Oberfläche weist stattdessen auf den
+  nachlaufenden Ansichts- oder Belegabgleich hin und lässt den späteren Nachdruck zu.
+- Die bestätigte Buchungsgruppe wird zunächst über eine gezielte ID-Abfrage in die Kassenliste
+  gemischt. Die vollständige Listenvalidierung und Operationsprojektion bleiben nachlaufende
+  Single-Flight-Arbeit.
+- Der öffentliche Gruppencode wird weder in Outbox noch Audit oder Anwendungslog aufgenommen.
+- `Server-Timing` trennt Warteschlangen-, Kommando-, Verkaufsprüfungs- und Persistenzzeit;
+  Browser-Performance-Einträge messen Bereitschaft für den nächsten Verkauf, QR-Erzeugung und
+  vollständige Synchronisation. Langsame Kommandos werden nur mit Dauer und stabilem Diagnosecode,
+  ohne IDs, Codes oder personenbezogene Daten protokolliert.
 
 Damit bedeutet Parallelisierung bewusst nicht, dass mehrere D1-Schreibvorgänge denselben
 Veranstaltungsstand gleichzeitig verändern. Parallel werden Bedienung und unabhängige

@@ -7,6 +7,8 @@ import type {
 import {
   Activity,
   AlertTriangle,
+  ArrowDown,
+  ArrowUp,
   Check,
   CircleArrowRight,
   CircleCheck,
@@ -14,6 +16,8 @@ import {
   Clock3,
   Coins,
   Flag,
+  GripVertical,
+  ListOrdered,
   Maximize2,
   Minus,
   Package,
@@ -34,7 +38,15 @@ import {
   X,
 } from "lucide-react";
 import QRCode from "qrcode";
-import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import {
+  type DragEvent,
+  type ReactNode,
+  type PointerEvent as ReactPointerEvent,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { getTicketGroupPrintData, searchTickets, sendCommand } from "./api";
 import { AppShell as Shell } from "./app/AppShell";
 import { PageNotice, useActionMessageBridge } from "./app/PageNotifications";
@@ -49,6 +61,10 @@ import {
   Tabs,
   TextField,
 } from "./design-system/components";
+import {
+  cashierProductOrderChanged,
+  moveCashierProduct,
+} from "./features/cashier/cashier-product-order";
 import {
   appendCashierDraftRevision,
   cashierDraftQueueKey,
@@ -223,6 +239,12 @@ export function CashierView() {
   });
   const [pendingDraftCount, setPendingDraftCount] = useState(initialDraftQueue.length);
   const [busyProductId, setBusyProductId] = useState<string | null>(null);
+  const [saleSyncCount, setSaleSyncCount] = useState(0);
+  const [cashierOrderEditing, setCashierOrderEditing] = useState(false);
+  const [cashierOrderSaving, setCashierOrderSaving] = useState(false);
+  const [expectedCashierProductIds, setExpectedCashierProductIds] = useState<string[]>([]);
+  const [orderedCashierProductIds, setOrderedCashierProductIds] = useState<string[]>([]);
+  const [draggedCashierProductId, setDraggedCashierProductId] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<TicketReceipt | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   useActionMessageBridge(message, setMessage);
@@ -245,6 +267,7 @@ export function CashierView() {
   const ticketListResultCountRef = useRef(0);
   const ticketListNextCursorRef = useRef<string | null>(null);
   const lastTicketListBoardVersionRef = useRef<number | null>(null);
+  const receiptRequestRef = useRef(0);
   const selectedTicketGroup = ticketSearchResults.find(
     (entry) => entry.ticketGroupId === lastTicketGroupId,
   );
@@ -259,11 +282,19 @@ export function CashierView() {
         ? entry.groupStatus !== "CANCELED" && entry.groupStatus !== "COMPLETED"
         : entry.groupStatus !== "CANCELED",
   );
+  const cashierProductsById = new Map(
+    (board?.products ?? []).map((product) => [product.id, product]),
+  );
+  const cashierOrderHasChanged = cashierProductOrderChanged(
+    expectedCashierProductIds,
+    orderedCashierProductIds,
+  );
   const currency = (cents: number) =>
     (cents / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
   async function printableTicket(data: TicketGroupPrintData): Promise<TicketReceipt> {
+    const startedAt = performance.now();
     const statusUrl = `${window.location.origin}/gruppe/${encodeURIComponent(data.code)}`;
-    return {
+    const ticket = {
       code: data.code,
       statusUrl,
       qrDataUrl: await QRCode.toDataURL(statusUrl, {
@@ -277,6 +308,15 @@ export function CashierView() {
       communicationLabel: data.communicationLabel,
       groupSize: data.groupSize,
     };
+    try {
+      performance.measure("rundflug:cashier-sale-qr", {
+        start: startedAt,
+        end: performance.now(),
+      });
+    } catch {
+      // Performance-Messung darf den bestätigten Verkauf nie beeinflussen.
+    }
+    return ticket;
   }
 
   const loadTicketList = useCallback(
@@ -285,11 +325,13 @@ export function CashierView() {
       preserveLoaded = false,
       status = ticketListTab,
       query = ticketSearchQuery,
+      reportError = true,
     }: {
       append?: boolean;
       preserveLoaded?: boolean;
       status?: TicketListTab;
       query?: string;
+      reportError?: boolean;
     } = {}) => {
       if (!serverConfirmed) return;
       const requestId = ++ticketListRequestRef.current;
@@ -346,7 +388,7 @@ export function CashierView() {
           setLastTicketGroupId((current) => current ?? firstResult.ticketGroupId);
         }
       } catch (reason) {
-        if (requestId === ticketListRequestRef.current) {
+        if (reportError && requestId === ticketListRequestRef.current) {
           setMessage(reason instanceof Error ? reason.message : "Ticketliste nicht verfügbar.");
         }
       } finally {
@@ -356,9 +398,42 @@ export function CashierView() {
     [serverConfirmed, ticketListTab, ticketSearchQuery],
   );
 
+  const mergeTicketGroupsById = useCallback(
+    async (ticketGroupIds: string[]) => {
+      if (!serverConfirmed || ticketGroupIds.length === 0) return;
+      const response = await searchTickets(
+        EVENT_ID,
+        CASHIER_DEVICE_ID,
+        deviceTokenFor(CASHIER_DEVICE_ID),
+        {
+          q: "",
+          status: "ACTIVE",
+          limit: Math.min(ticketGroupIds.length, 50),
+          ticketGroupIds,
+        },
+      );
+      if (response.results.length !== ticketGroupIds.length) {
+        throw new Error(
+          "Der bestätigte Verkauf ist noch nicht vollständig in der Kassenliste sichtbar.",
+        );
+      }
+      setTicketSearchResults((current) => {
+        const updatedIds = new Set(response.results.map((entry) => entry.ticketGroupId));
+        const nextResults = [
+          ...response.results,
+          ...current.filter((entry) => !updatedIds.has(entry.ticketGroupId)),
+        ];
+        ticketListResultCountRef.current = nextResults.length;
+        return nextResults;
+      });
+    },
+    [serverConfirmed],
+  );
+
   async function reopenTicketGroup(
     ticketGroupId: string,
     confirmedPrintData?: TicketGroupPrintData,
+    requestToken = ++receiptRequestRef.current,
   ): Promise<boolean> {
     try {
       const data =
@@ -370,13 +445,15 @@ export function CashierView() {
           deviceTokenFor(CASHIER_DEVICE_ID),
         ));
       const prepared = await printableTicket(data);
-      setReceipt(prepared);
+      if (requestToken === receiptRequestRef.current) setReceipt(prepared);
       return true;
     } catch (reason) {
-      setReceipt(null);
-      setMessage(
-        reason instanceof Error ? reason.message : "Ticketzettel konnten nicht geladen werden.",
-      );
+      if (requestToken === receiptRequestRef.current) {
+        setReceipt(null);
+        setMessage(
+          reason instanceof Error ? reason.message : "Ticketzettel konnten nicht geladen werden.",
+        );
+      }
       return false;
     }
   }
@@ -441,15 +518,95 @@ export function CashierView() {
     return () => observer.disconnect();
   }, [loadTicketList, ticketListLoading, ticketListNextCursor]);
 
+  function openCashierOrderEditor() {
+    if (!board || busyProductId !== null) return;
+    const productIds = board.products.map((product) => product.id);
+    setExpectedCashierProductIds(productIds);
+    setOrderedCashierProductIds(productIds);
+    setDraggedCashierProductId(null);
+    setCashierOrderEditing(true);
+  }
+
+  function closeCashierOrderEditor() {
+    if (cashierOrderSaving) return;
+    setCashierOrderEditing(false);
+    setExpectedCashierProductIds([]);
+    setOrderedCashierProductIds([]);
+    setDraggedCashierProductId(null);
+  }
+
+  function moveCashierProductTo(productId: string, targetIndex: number) {
+    setOrderedCashierProductIds((current) => moveCashierProduct(current, productId, targetIndex));
+  }
+
+  function handleCashierOrderDragOver(event: DragEvent<HTMLElement>, targetProductId: string) {
+    event.preventDefault();
+    if (!draggedCashierProductId || draggedCashierProductId === targetProductId) return;
+    const targetIndex = orderedCashierProductIds.indexOf(targetProductId);
+    if (targetIndex >= 0) moveCashierProductTo(draggedCashierProductId, targetIndex);
+  }
+
+  function handleCashierOrderPointerMove(event: ReactPointerEvent<HTMLButtonElement>) {
+    if (!draggedCashierProductId || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
+    const target = document
+      .elementFromPoint(event.clientX, event.clientY)
+      ?.closest<HTMLElement>("[data-cashier-product-order-id]");
+    const targetProductId = target?.dataset.cashierProductOrderId;
+    if (!targetProductId || targetProductId === draggedCashierProductId) return;
+    const targetIndex = orderedCashierProductIds.indexOf(targetProductId);
+    if (targetIndex >= 0) moveCashierProductTo(draggedCashierProductId, targetIndex);
+  }
+
+  async function saveCashierProductOrder() {
+    if (!board || !cashierOrderHasChanged || cashierOrderSaving) return;
+    setCashierOrderSaving(true);
+    try {
+      const result = await sendCommand(
+        {
+          commandId: crypto.randomUUID(),
+          eventId: EVENT_ID,
+          deviceId: CASHIER_DEVICE_ID,
+          expectedVersion: board.event.version,
+          issuedAt: new Date().toISOString(),
+          type: "REORDER_CASHIER_PRODUCTS",
+          payload: {
+            expectedProductIds: expectedCashierProductIds,
+            orderedProductIds: orderedCashierProductIds,
+          },
+        },
+        deviceTokenFor(CASHIER_DEVICE_ID),
+      );
+      confirmEvent(result.event);
+      await refresh(result.event.version).catch(() => undefined);
+      setCashierOrderEditing(false);
+      setExpectedCashierProductIds([]);
+      setOrderedCashierProductIds([]);
+      setDraggedCashierProductId(null);
+      setMessage(
+        "Kassenreihenfolge gespeichert. FIDS, Queue und operative Priorität bleiben unverändert.",
+      );
+    } catch (reason) {
+      setMessage(
+        reason instanceof Error
+          ? reason.message
+          : "Kassenreihenfolge konnte nicht gespeichert werden.",
+      );
+    } finally {
+      setCashierOrderSaving(false);
+    }
+  }
+
   async function sell(saleProduct: OperationBoard["products"][number]) {
     if (!board || busyProductId) return;
+    const saleStartedAt = performance.now();
     const saleSplitPreview = oversizeSplitPreview(size, saleProduct.referenceCapacity);
     const codes = Array.from({ length: size }, createTicketCode);
     const groupCode = createTicketCode();
     setProductId(saleProduct.id);
     setBusyProductId(saleProduct.id);
+    let saleResult: Awaited<ReturnType<typeof sendCommand>>;
     try {
-      const saleResult = await sendCommand(
+      saleResult = await sendCommand(
         {
           commandId: crypto.randomUUID(),
           eventId: EVENT_ID,
@@ -469,31 +626,78 @@ export function CashierView() {
         },
         deviceTokenFor(CASHIER_DEVICE_ID),
       );
-      const soldTicketGroupId = saleResult.aggregate?.id ?? null;
-      lastTicketListBoardVersionRef.current = saleResult.event.version;
-      confirmEvent(saleResult.event);
-      setLastTicketGroupId(soldTicketGroupId);
-      setMessage(`${codes.length} Ticket${codes.length === 1 ? "" : "s"} verkauft.`);
-      writeCashierDraftQueue(localStorage, draftQueueKey, []);
-      setPendingDraftCount(0);
-      const printPreparation = soldTicketGroupId
-        ? reopenTicketGroup(soldTicketGroupId, saleResult.saleReceipt)
-        : Promise.resolve(true);
-      const [printPrepared] = await Promise.all([
-        printPreparation,
-        refresh(saleResult.event.version),
-        loadTicketList({ preserveLoaded: true }),
-      ]);
-      if (!printPrepared) {
-        setMessage(
-          `${codes.length} Ticket${codes.length === 1 ? "" : "s"} verkauft. Druckvorbereitung fehlgeschlagen; Nachdruck bleibt möglich.`,
-        );
-      }
     } catch (reason) {
       setMessage(reason instanceof Error ? reason.message : "Verkauf fehlgeschlagen.");
-    } finally {
       setBusyProductId(null);
+      return;
     }
+
+    const soldTicketGroupId = saleResult.aggregate?.id ?? null;
+    lastTicketListBoardVersionRef.current = saleResult.event.version;
+    confirmEvent(saleResult.event);
+    setLastTicketGroupId(soldTicketGroupId);
+    setBusyProductId(null);
+    setMessage(
+      `${codes.length} Ticket${codes.length === 1 ? "" : "s"} verkauft. Ansicht und Beleg werden aktualisiert.`,
+    );
+    try {
+      performance.measure("rundflug:cashier-sale-ready", {
+        start: saleStartedAt,
+        end: performance.now(),
+      });
+    } catch {
+      // Performance-Messung darf den bestätigten Verkauf nie beeinflussen.
+    }
+    try {
+      writeCashierDraftQueue(localStorage, draftQueueKey, []);
+      setPendingDraftCount(0);
+    } catch {
+      setMessage(
+        `${codes.length} Ticket${codes.length === 1 ? "" : "s"} verkauft. Der lokale Entwurf konnte noch nicht bereinigt werden; Ansicht und Beleg werden aktualisiert.`,
+      );
+    }
+    const receiptRequestToken = ++receiptRequestRef.current;
+    setSaleSyncCount((current) => current + 1);
+    void (async () => {
+      try {
+        const [printResult, boardResult, targetedListResult] = await Promise.allSettled([
+          soldTicketGroupId
+            ? reopenTicketGroup(soldTicketGroupId, saleResult.saleReceipt, receiptRequestToken)
+            : Promise.resolve(true),
+          refresh(saleResult.event.version),
+          soldTicketGroupId
+            ? mergeTicketGroupsById([soldTicketGroupId])
+            : Promise.reject(new Error("Die bestätigte Buchungsgruppe fehlt.")),
+        ]);
+        await loadTicketList({ preserveLoaded: true, reportError: false });
+        const printPrepared = printResult.status === "fulfilled" && printResult.value;
+        const synchronized =
+          boardResult.status === "fulfilled" && targetedListResult.status === "fulfilled";
+        if (receiptRequestToken === receiptRequestRef.current) {
+          setMessage(
+            printPrepared && synchronized
+              ? `${codes.length} Ticket${codes.length === 1 ? "" : "s"} verkauft.`
+              : `${codes.length} Ticket${codes.length === 1 ? "" : "s"} verkauft. Ansicht oder Druckvorbereitung wird weiter nachgeladen; Nachdruck bleibt möglich.`,
+          );
+        }
+      } catch {
+        if (receiptRequestToken === receiptRequestRef.current) {
+          setMessage(
+            `${codes.length} Ticket${codes.length === 1 ? "" : "s"} verkauft. Ansicht und Beleg werden weiter nachgeladen; Nachdruck bleibt möglich.`,
+          );
+        }
+      } finally {
+        try {
+          performance.measure("rundflug:cashier-sale-synchronized", {
+            start: saleStartedAt,
+            end: performance.now(),
+          });
+        } catch {
+          // Performance-Messung darf den bestätigten Verkauf nie beeinflussen.
+        }
+        setSaleSyncCount((current) => Math.max(0, current - 1));
+      }
+    })();
   }
 
   async function cancelLastSale() {
@@ -665,130 +869,265 @@ export function CashierView() {
       <section className="cashier-v15-workspace">
         <Panel className="cashier-sale-panel" aria-labelledby="cashier-sale-title">
           <div className="cashier-sale-heading">
-            <PageHeader level={1} title="Tickets verkaufen" />
-            <div className="cashier-group-size">
-              <span className="cashier-field-label">Gruppengröße</span>
-              <div className="cashier-stepper">
-                <IconButton
-                  aria-label="Gruppengröße verringern"
-                  label="Gruppengröße verringern"
-                  onClick={() => changeGroupSize(Math.max(1, size - 1))}
-                  type="button"
-                >
-                  <Minus aria-hidden="true" size={18} />
-                </IconButton>
-                <output aria-live="polite">{size}</output>
-                <IconButton
-                  aria-label="Gruppengröße erhöhen"
-                  label="Gruppengröße erhöhen"
-                  onClick={() => changeGroupSize(Math.min(12, size + 1))}
-                  type="button"
-                >
-                  <Plus aria-hidden="true" size={18} />
-                </IconButton>
-              </div>
-              <Button
-                aria-label="Gruppengröße auf 1 zurücksetzen"
-                className="cashier-size-reset"
-                disabled={size === 1 || busyProductId !== null}
-                onClick={() => changeGroupSize(1)}
-                size="compact"
-                type="button"
-                variant="secondary"
-              >
-                <RotateCcw aria-hidden="true" size={16} />
-                <span className="cashier-size-reset-label">Zurücksetzen</span>
-              </Button>
+            <div className="cashier-sale-title">
+              <PageHeader
+                level={1}
+                title={cashierOrderEditing ? "Kassen-Reihenfolge" : "Tickets verkaufen"}
+              />
+              {cashierOrderEditing ? (
+                <p>Nur Kassenreihenfolge · FIDS, Queue und operative Priorität bleiben dynamisch</p>
+              ) : null}
             </div>
-          </div>
-          <div className="cashier-products">
-            {board?.products.map((entry) => {
-              const entrySplitPreview = oversizeSplitPreview(size, entry.referenceCapacity);
-              const splitDescriptionId = `cashier-split-${entry.id}`;
-              const saleDisabled =
-                !serverConfirmed ||
-                !board ||
-                !entry.saleEnabled ||
-                entry.resourceGroupStatus !== "ACTIVE" ||
-                board.event.emergencyMode ||
-                board.event.operationalInterrupted ||
-                busyProductId !== null;
-              return (
-                <article className="cashier-product" key={entry.id}>
-                  <div className="cashier-product-row">
-                    <span className="cashier-product-name">
-                      <strong>{entry.name}</strong>
-                      <small>
-                        {entry.publicDescription ||
-                          `Flugzeit ca. ${entry.promisedFlightMinutes} Min.`}
-                      </small>
-                    </span>
-                    <span className="cashier-product-metric">
-                      <small>Zeitfenster</small>
-                      <strong>
-                        {formatAbsoluteTimeWindow({
-                          lowerAt: entry.nextBoardingWindowLowerAt,
-                          upperAt: entry.nextBoardingWindowUpperAt,
-                          timeZone: board.event.timeZone,
-                          quality: entry.predictionQuality,
-                        })}
-                      </strong>
-                    </span>
-                    <span className="cashier-product-metric">
-                      <small>Kapazität</small>
-                      <strong>
-                        {entry.remainingSellableSeats}/{entry.projectedSeats}
-                      </strong>
-                    </span>
-                    <span className="cashier-product-price">
-                      <small>Preis / Person</small>
-                      <strong>{currency(entry.priceCents)}</strong>
-                    </span>
-                    <Button
-                      aria-describedby={splitDescriptionId}
-                      aria-label={`${size} Ticket${size === 1 ? "" : "s"} für ${entry.name} verkaufen, ${currency(entry.priceCents * size)}`}
-                      className="cashier-sell-action"
-                      disabled={saleDisabled}
-                      busy={busyProductId === entry.id}
-                      busyLabel={`${size} Ticket${size === 1 ? "" : "s"} für ${entry.name} werden verkauft`}
-                      onClick={() => void sell(entry)}
+            {!cashierOrderEditing ? (
+              <div className="cashier-group-size">
+                <div className="cashier-group-size-main">
+                  <span className="cashier-field-label">Gruppengröße</span>
+                  <div className="cashier-stepper">
+                    <IconButton
+                      aria-label="Gruppengröße verringern"
+                      label="Gruppengröße verringern"
+                      onClick={() => changeGroupSize(Math.max(1, size - 1))}
                       type="button"
-                      variant="primary"
                     >
-                      <Ticket aria-hidden="true" size={20} />
-                      <span className="cashier-sell-copy">
-                        <span>
-                          {size} Ticket{size === 1 ? "" : "s"}
-                        </span>
-                        <span>{currency(entry.priceCents * size)}</span>
-                      </span>
-                    </Button>
+                      <Minus aria-hidden="true" size={18} />
+                    </IconButton>
+                    <output aria-live="polite">{size}</output>
+                    <IconButton
+                      aria-label="Gruppengröße erhöhen"
+                      label="Gruppengröße erhöhen"
+                      onClick={() => changeGroupSize(Math.min(12, size + 1))}
+                      type="button"
+                    >
+                      <Plus aria-hidden="true" size={18} />
+                    </IconButton>
                   </div>
-                  <div
-                    className={
-                      entrySplitPreview.required
-                        ? "cashier-split-line warning"
-                        : "cashier-split-line"
-                    }
-                    id={splitDescriptionId}
+                  <IconButton
+                    className="cashier-size-reset"
+                    disabled={size === 1 || busyProductId !== null}
+                    label="Gruppengröße auf 1 zurücksetzen"
+                    onClick={() => changeGroupSize(1)}
+                    size="touch"
+                    type="button"
                   >
-                    {entrySplitPreview.required ? (
-                      <>
-                        <AlertTriangle aria-hidden="true" size={16} />
-                        <span>
-                          Aufteilung: {entrySplitPreview.slotSizes.join(" + ")} Personen in{" "}
-                          {entrySplitPreview.slotSizes.length} aufeinanderfolgenden Fluggruppen; die
-                          Buchungsgruppe bleibt verbunden.
-                        </span>
-                      </>
-                    ) : (
-                      <span aria-hidden="true">&nbsp;</span>
-                    )}
-                  </div>
-                </article>
-              );
-            })}
+                    <RotateCcw aria-hidden="true" size={18} />
+                  </IconButton>
+                </div>
+                <div className="cashier-group-actions">
+                  <span
+                    aria-live="polite"
+                    className={`cashier-sale-sync${saleSyncCount > 0 ? " is-active" : ""}`}
+                    role="status"
+                    title={saleSyncCount > 0 ? "Verkaufsansicht wird aktualisiert" : undefined}
+                  >
+                    <RefreshCw aria-hidden="true" className="cashier-sale-sync-icon" size={17} />
+                    <span className="visually-hidden">
+                      {saleSyncCount > 0 ? "Verkaufsansicht wird aktualisiert" : ""}
+                    </span>
+                  </span>
+                  <IconButton
+                    className="cashier-order-open"
+                    disabled={
+                      !serverConfirmed ||
+                      busyProductId !== null ||
+                      (board?.products.length ?? 0) < 2
+                    }
+                    label="Kassenreihenfolge bearbeiten"
+                    onClick={openCashierOrderEditor}
+                    size="touch"
+                    type="button"
+                  >
+                    <ListOrdered aria-hidden="true" size={19} />
+                  </IconButton>
+                </div>
+              </div>
+            ) : null}
           </div>
+          {cashierOrderEditing ? (
+            <>
+              <ol aria-label="Kassenreihenfolge der Produkte" className="cashier-order-editor">
+                {orderedCashierProductIds.map((productId, index) => {
+                  const product = cashierProductsById.get(productId);
+                  if (!product) return null;
+                  return (
+                    <li
+                      className="cashier-order-row"
+                      data-cashier-product-order-id={productId}
+                      key={productId}
+                      onDragOver={(event) => handleCashierOrderDragOver(event, productId)}
+                    >
+                      <button
+                        aria-label={`${product.name} ziehen`}
+                        className="cashier-order-drag"
+                        disabled={cashierOrderSaving}
+                        draggable={!cashierOrderSaving}
+                        onDragEnd={() => setDraggedCashierProductId(null)}
+                        onDragStart={(event) => {
+                          event.dataTransfer.effectAllowed = "move";
+                          event.dataTransfer.setData("text/plain", productId);
+                          setDraggedCashierProductId(productId);
+                        }}
+                        onPointerCancel={() => setDraggedCashierProductId(null)}
+                        onPointerDown={(event) => {
+                          event.currentTarget.setPointerCapture(event.pointerId);
+                          setDraggedCashierProductId(productId);
+                        }}
+                        onPointerMove={handleCashierOrderPointerMove}
+                        onPointerUp={(event) => {
+                          if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+                            event.currentTarget.releasePointerCapture(event.pointerId);
+                          }
+                          setDraggedCashierProductId(null);
+                        }}
+                        title={`${product.name} ziehen`}
+                        type="button"
+                      >
+                        <GripVertical aria-hidden="true" size={20} />
+                      </button>
+                      <span className="cashier-order-position">
+                        <span className="visually-hidden">Position </span>
+                        {index + 1}
+                      </span>
+                      <span className="cashier-order-product">
+                        <strong>{product.name}</strong>
+                        <small>{product.code}</small>
+                      </span>
+                      <div className="cashier-order-actions">
+                        <IconButton
+                          disabled={index === 0 || cashierOrderSaving}
+                          label={`${product.name} nach oben verschieben`}
+                          onClick={() => moveCashierProductTo(productId, index - 1)}
+                          size="touch"
+                          type="button"
+                        >
+                          <ArrowUp aria-hidden="true" size={19} />
+                        </IconButton>
+                        <IconButton
+                          disabled={
+                            index === orderedCashierProductIds.length - 1 || cashierOrderSaving
+                          }
+                          label={`${product.name} nach unten verschieben`}
+                          onClick={() => moveCashierProductTo(productId, index + 1)}
+                          size="touch"
+                          type="button"
+                        >
+                          <ArrowDown aria-hidden="true" size={19} />
+                        </IconButton>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ol>
+              <div className="cashier-order-footer">
+                <Button
+                  disabled={cashierOrderSaving}
+                  onClick={closeCashierOrderEditor}
+                  type="button"
+                  variant="secondary"
+                >
+                  Abbrechen
+                </Button>
+                <Button
+                  busy={cashierOrderSaving}
+                  busyLabel="Kassenreihenfolge wird gespeichert"
+                  disabled={!cashierOrderHasChanged}
+                  onClick={() => void saveCashierProductOrder()}
+                  type="button"
+                  variant="primary"
+                >
+                  Speichern
+                </Button>
+              </div>
+            </>
+          ) : (
+            <div className="cashier-products">
+              {board?.products.map((entry) => {
+                const entrySplitPreview = oversizeSplitPreview(size, entry.referenceCapacity);
+                const splitDescriptionId = `cashier-split-${entry.id}`;
+                const saleDisabled =
+                  !serverConfirmed ||
+                  !board ||
+                  !entry.saleEnabled ||
+                  entry.resourceGroupStatus !== "ACTIVE" ||
+                  board.event.emergencyMode ||
+                  board.event.operationalInterrupted ||
+                  busyProductId !== null;
+                return (
+                  <article className="cashier-product" key={entry.id}>
+                    <div className="cashier-product-row">
+                      <span className="cashier-product-name">
+                        <strong>{entry.name}</strong>
+                        <small>
+                          {entry.publicDescription ||
+                            `Flugzeit ca. ${entry.promisedFlightMinutes} Min.`}
+                        </small>
+                      </span>
+                      <span className="cashier-product-metric">
+                        <small>Zeitfenster</small>
+                        <strong>
+                          {formatAbsoluteTimeWindow({
+                            lowerAt: entry.nextBoardingWindowLowerAt,
+                            upperAt: entry.nextBoardingWindowUpperAt,
+                            timeZone: board.event.timeZone,
+                            quality: entry.predictionQuality,
+                          })}
+                        </strong>
+                      </span>
+                      <span className="cashier-product-metric">
+                        <small>Kapazität</small>
+                        <strong>
+                          {entry.remainingSellableSeats}/{entry.projectedSeats}
+                        </strong>
+                      </span>
+                      <span className="cashier-product-price">
+                        <small>Preis / Person</small>
+                        <strong>{currency(entry.priceCents)}</strong>
+                      </span>
+                      <Button
+                        aria-describedby={splitDescriptionId}
+                        aria-label={`${size} Ticket${size === 1 ? "" : "s"} für ${entry.name} verkaufen, ${currency(entry.priceCents * size)}`}
+                        className="cashier-sell-action"
+                        disabled={saleDisabled}
+                        busy={busyProductId === entry.id}
+                        busyLabel={`${size} Ticket${size === 1 ? "" : "s"} für ${entry.name} werden verkauft`}
+                        onClick={() => void sell(entry)}
+                        type="button"
+                        variant="primary"
+                      >
+                        <Ticket aria-hidden="true" size={20} />
+                        <span className="cashier-sell-copy">
+                          <span>
+                            {size} Ticket{size === 1 ? "" : "s"}
+                          </span>
+                          <span>{currency(entry.priceCents * size)}</span>
+                        </span>
+                      </Button>
+                    </div>
+                    <div
+                      className={
+                        entrySplitPreview.required
+                          ? "cashier-split-line warning"
+                          : "cashier-split-line"
+                      }
+                      id={splitDescriptionId}
+                    >
+                      {entrySplitPreview.required ? (
+                        <>
+                          <AlertTriangle aria-hidden="true" size={16} />
+                          <span>
+                            Aufteilung: {entrySplitPreview.slotSizes.join(" + ")} Personen in{" "}
+                            {entrySplitPreview.slotSizes.length} aufeinanderfolgenden Fluggruppen;
+                            die Buchungsgruppe bleibt verbunden.
+                          </span>
+                        </>
+                      ) : (
+                        <span aria-hidden="true">&nbsp;</span>
+                      )}
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
         </Panel>
 
         <Panel className="cashier-ticket-panel" padding="none" aria-label="Verkaufte Tickets">

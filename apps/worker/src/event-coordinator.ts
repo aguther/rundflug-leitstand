@@ -33,7 +33,6 @@ import {
   type DeviceRole,
   DomainRuleError,
   deriveAdaptivePrecallLeadMinutes,
-  deriveResourceGroupCapacity,
   formatBookingGroupLabel,
   type OperationalCommandType,
   planBookingGroupSplit,
@@ -129,9 +128,11 @@ export class EventCoordinator extends DurableObject<Env> {
       const queueDuration = startedAt - enqueuedAt;
       const commandDuration = completedAt - startedAt;
       const headers = new Headers(response.headers);
+      const commandTiming = `command-queue;dur=${queueDuration.toFixed(1)}, command;dur=${commandDuration.toFixed(1)}`;
+      const phaseTiming = headers.get("server-timing");
       headers.set(
         "server-timing",
-        `command-queue;dur=${queueDuration.toFixed(1)}, command;dur=${commandDuration.toFixed(1)}`,
+        phaseTiming ? `${commandTiming}, ${phaseTiming}` : commandTiming,
       );
       if (queueDuration + commandDuration >= 500) {
         console.log(
@@ -804,6 +805,20 @@ export class EventCoordinator extends DurableObject<Env> {
     command: CommandEnvelope,
     current: StoredEventRow,
   ): Promise<Response | null> {
+    if (command.type === "REORDER_CASHIER_PRODUCTS") {
+      const observedEventVersion = command.observedEventVersion ?? command.expectedVersion;
+      if (observedEventVersion <= current.version) return null;
+      return json(
+        {
+          error: {
+            code: "FUTURE_VERSION",
+            message: "Der beobachtete Veranstaltungsstand liegt vor dem Serverstand.",
+            currentVersion: current.version,
+          },
+        },
+        { status: 409 },
+      );
+    }
     const target = this.scopedCommandTarget(command);
     const preconditions = command.preconditions;
     if (!preconditions) {
@@ -1066,10 +1081,17 @@ export class EventCoordinator extends DurableObject<Env> {
       }
 
       if (command.type === "SELL_TICKET_GROUP") {
+        const salePreflightStartedAt = performance.now();
         const product = await this.env.DB.prepare(
           `SELECT p.id, p.code, p.name, p.resource_group_id, p.gate_id, g.label AS gate_label,
                   p.price_cents, p.sale_enabled, p.sale_closes_at, p.weight_classes_json,
-                  rg.status AS resource_group_status
+                  rg.status AS resource_group_status,
+                  (SELECT COALESCE(MAX(a.passenger_seats), 0)
+                     FROM resource_group_memberships m
+                     JOIN aircraft a ON a.id = m.aircraft_id
+                    WHERE m.operation_day_id = p.operation_day_id
+                      AND m.resource_group_id = p.resource_group_id
+                      AND m.active_until IS NULL) AS effective_group_capacity
              FROM products p
              JOIN resource_groups rg ON rg.id = p.resource_group_id
              JOIN gates g ON g.id = p.gate_id
@@ -1088,6 +1110,7 @@ export class EventCoordinator extends DurableObject<Env> {
             sale_closes_at: string | null;
             weight_classes_json: string;
             resource_group_status: "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED";
+            effective_group_capacity: number;
           }>();
         if (!product) {
           return json(
@@ -1144,17 +1167,7 @@ export class EventCoordinator extends DurableObject<Env> {
             { status: 409 },
           );
         }
-        const aircraftRows = await this.env.DB.prepare(
-          `SELECT a.passenger_seats FROM aircraft a
-             JOIN resource_group_memberships m ON m.aircraft_id = a.id
-            WHERE m.operation_day_id = ?1 AND m.resource_group_id = ?2
-              AND m.active_until IS NULL`,
-        )
-          .bind(command.eventId, product.resource_group_id)
-          .all<{ passenger_seats: number }>();
-        const effectiveGroupCapacity = deriveResourceGroupCapacity(
-          aircraftRows.results.map((row) => row.passenger_seats),
-        );
+        const effectiveGroupCapacity = product.effective_group_capacity;
         if (effectiveGroupCapacity === 0) {
           return json(
             {
@@ -1250,54 +1263,66 @@ export class EventCoordinator extends DurableObject<Env> {
             { status: 409 },
           );
         }
-        const hashes = await Promise.all(normalizedCodes.map(sha256Hex));
-        const groupCodeHash = await sha256Hex(normalizedGroupCode);
-        const existingPublicCode = await this.env.DB.prepare(
-          `SELECT 1 AS found FROM ticket_groups WHERE public_status_code_hash = ?1
-           UNION ALL
-           SELECT 1 AS found FROM tickets WHERE public_code_hash = ?1
-           LIMIT 1`,
+        const [groupCodeHash, ...hashes] = await Promise.all(
+          [normalizedGroupCode, ...normalizedCodes].map(sha256Hex),
+        );
+        const publicCodeHashes = [groupCodeHash, ...hashes];
+        const hashPlaceholders = publicCodeHashes.map(() => "?").join(", ");
+        const saleState = await this.env.DB.prepare(
+          `SELECT
+             EXISTS(
+               SELECT 1 FROM ticket_groups
+                WHERE public_status_code_hash IN (${hashPlaceholders})
+               UNION ALL
+               SELECT 1 FROM tickets
+                WHERE public_code_hash IN (${hashPlaceholders})
+             ) AS public_code_exists,
+             (SELECT COALESCE(MAX(tg.queue_sequence), 0) + 1
+                FROM ticket_groups tg
+                JOIN products p ON p.id = tg.product_id
+               WHERE tg.operation_day_id = ? AND p.resource_group_id = ?) AS next_queue_sequence,
+             (SELECT COALESCE(MAX(communication_number), 100) + 1
+                FROM flight_groups
+               WHERE operation_day_id = ? AND resource_group_id = ?) AS next_flight_number,
+             (SELECT COALESCE(MAX(communication_number), 100) + 1
+                FROM ticket_groups
+               WHERE operation_day_id = ?) AS next_ticket_number`,
         )
-          .bind(groupCodeHash)
-          .first<{ found: number }>();
-        if (existingPublicCode) {
+          .bind(
+            ...publicCodeHashes,
+            ...publicCodeHashes,
+            command.eventId,
+            product.resource_group_id,
+            command.eventId,
+            product.resource_group_id,
+            command.eventId,
+          )
+          .first<{
+            public_code_exists: number;
+            next_queue_sequence: number;
+            next_flight_number: number;
+            next_ticket_number: number;
+          }>();
+        if (saleState?.public_code_exists) {
           return json(
             {
               error: {
                 code: "DUPLICATE_GROUP_CODE",
-                message: "Der öffentliche Gruppencode wurde bereits verwendet.",
+                message: "Einer der öffentlichen Codes wurde bereits verwendet.",
               },
             },
             { status: 409 },
           );
         }
-        const queueRow = await this.env.DB.prepare(
-          `SELECT COALESCE(MAX(tg.queue_sequence), 0) + 1 AS next_sequence
-             FROM ticket_groups tg
-             JOIN products p ON p.id = tg.product_id
-            WHERE tg.operation_day_id = ?1 AND p.resource_group_id = ?2`,
-        )
-          .bind(command.eventId, product.resource_group_id)
-          .first<{ next_sequence: number }>();
         const splitAcrossFlightGroups = splitPlan.splitAcknowledged;
-        const communicationRow = await this.env.DB.prepare(
-          "SELECT COALESCE(MAX(communication_number), 100) + 1 AS next_number FROM flight_groups WHERE operation_day_id = ?1 AND resource_group_id = ?2",
-        )
-          .bind(command.eventId, product.resource_group_id)
-          .first<{ next_number: number }>();
-        const ticketCommunicationRow = await this.env.DB.prepare(
-          "SELECT COALESCE(MAX(communication_number), 100) + 1 AS next_number FROM ticket_groups WHERE operation_day_id = ?1",
-        )
-          .bind(command.eventId)
-          .first<{ next_number: number }>();
         const now = new Date().toISOString();
         const nextVersion = current.version + 1;
         const ticketGroupId = crypto.randomUUID();
-        const ticketCommunicationNumber = ticketCommunicationRow?.next_number ?? 101;
+        const ticketCommunicationNumber = saleState?.next_ticket_number ?? 101;
         const slots = Array.from({ length: requiredFlightGroupCount }, (_, index) => ({
           flightGroupId: crypto.randomUUID(),
           rotationId: crypto.randomUUID(),
-          communicationNumber: (communicationRow?.next_number ?? 101) + index,
+          communicationNumber: (saleState?.next_flight_number ?? 101) + index,
         }));
         const primarySlot = slots[0];
         if (!primarySlot) throw new Error("Mindestens ein Fluggruppen-Slot wurde erwartet.");
@@ -1341,7 +1366,7 @@ export class EventCoordinator extends DurableObject<Env> {
             ticketGroupId,
             command.eventId,
             product.id,
-            queueRow?.next_sequence ?? 1,
+            saleState?.next_queue_sequence ?? 1,
             ticketCommunicationNumber,
             command.payload.standby ? 1 : 0,
             now,
@@ -1433,9 +1458,16 @@ export class EventCoordinator extends DurableObject<Env> {
             "INSERT INTO outbox (id, operation_day_id, topic, payload_json, created_at) VALUES (?1, ?2, 'EVENT_STATE_CHANGED', ?3, ?4)",
           ).bind(crypto.randomUUID(), command.eventId, JSON.stringify(stateChangeResult), now),
         ];
+        const salePersistStartedAt = performance.now();
         await this.env.DB.batch(statements);
+        const salePersistCompletedAt = performance.now();
         this.broadcast(result);
-        return json(result);
+        const response = json(result);
+        response.headers.set(
+          "server-timing",
+          `sale-preflight;dur=${(salePersistStartedAt - salePreflightStartedAt).toFixed(1)}, sale-persist;dur=${(salePersistCompletedAt - salePersistStartedAt).toFixed(1)}`,
+        );
+        return response;
       }
 
       if (command.type !== "SET_OPERATIONAL_NOTE") {
@@ -1481,6 +1513,9 @@ export class EventCoordinator extends DurableObject<Env> {
         }
         if (command.type === "CONFIGURE_EVENT_PARAMETERS") {
           return this.handleEventParameters(command, current);
+        }
+        if (command.type === "REORDER_CASHIER_PRODUCTS") {
+          return this.handleCashierProductReorder(command, current);
         }
         if (command.type === "SET_EVENT_LIFECYCLE") {
           return this.handleEventLifecycle(command, current);
@@ -4341,7 +4376,7 @@ export class EventCoordinator extends DurableObject<Env> {
         now,
       );
     } else {
-      const [resourceGroup, gate, duplicateCode, existing] = await Promise.all([
+      const [resourceGroup, gate, duplicateCode, existing, nextOrder] = await Promise.all([
         this.env.DB.prepare(
           "SELECT id FROM resource_groups WHERE id = ?1 AND operation_day_id = ?2",
         )
@@ -4358,13 +4393,18 @@ export class EventCoordinator extends DurableObject<Env> {
           .bind(command.eventId, command.payload.code, command.payload.productId)
           .first<{ id: string }>(),
         this.env.DB.prepare(
-          `SELECT p.resource_group_id,
+          `SELECT p.resource_group_id, p.sort_order,
             (SELECT COUNT(*) FROM tickets t JOIN ticket_groups tg ON tg.id = t.ticket_group_id
               WHERE tg.product_id = p.id AND t.status NOT IN ('CANCELED', 'COMPLETED')) AS open_tickets
            FROM products p WHERE p.id = ?1 AND p.operation_day_id = ?2`,
         )
           .bind(command.payload.productId, command.eventId)
-          .first<{ resource_group_id: string; open_tickets: number }>(),
+          .first<{ resource_group_id: string; sort_order: number; open_tickets: number }>(),
+        this.env.DB.prepare(
+          "SELECT COALESCE(MAX(sort_order), 0) + 10 AS next_sort_order FROM products WHERE operation_day_id = ?1",
+        )
+          .bind(command.eventId)
+          .first<{ next_sort_order: number }>(),
       ]);
       if (!resourceGroup || !gate) {
         return json(
@@ -4402,6 +4442,7 @@ export class EventCoordinator extends DurableObject<Env> {
       }
       eventType = "PRODUCT_UPSERTED";
       aggregate = { type: "PRODUCT", id: command.payload.productId };
+      const cashierSortOrder = existing?.sort_order ?? nextOrder?.next_sort_order ?? 10;
       auditPayload = {
         resourceGroupId: command.payload.resourceGroupId,
         gateId: command.payload.gateId,
@@ -4414,7 +4455,7 @@ export class EventCoordinator extends DurableObject<Env> {
         promisedFlightMinutes: command.payload.promisedFlightMinutes,
         childCompanionRequired: command.payload.childCompanionRequired,
         weightClasses: command.payload.weightClasses,
-        sortOrder: command.payload.sortOrder,
+        cashierSortOrder,
         reason: command.payload.reason,
       };
       mutation = this.env.DB.prepare(
@@ -4430,9 +4471,9 @@ export class EventCoordinator extends DurableObject<Env> {
            reference_capacity = excluded.reference_capacity,
            reference_duration_minutes = excluded.reference_duration_minutes,
            promised_flight_minutes = excluded.promised_flight_minutes,
-          child_companion_required = excluded.child_companion_required,
-          weight_classes_json = excluded.weight_classes_json, sort_order = excluded.sort_order,
-          updated_at = excluded.updated_at
+           child_companion_required = excluded.child_companion_required,
+           weight_classes_json = excluded.weight_classes_json,
+           updated_at = excluded.updated_at
          WHERE products.operation_day_id = excluded.operation_day_id`,
       ).bind(
         command.payload.productId,
@@ -4448,7 +4489,7 @@ export class EventCoordinator extends DurableObject<Env> {
         command.payload.promisedFlightMinutes,
         command.payload.childCompanionRequired ? 1 : 0,
         JSON.stringify(command.payload.weightClasses),
-        command.payload.sortOrder,
+        cashierSortOrder,
         now,
       );
     }
@@ -4497,6 +4538,126 @@ export class EventCoordinator extends DurableObject<Env> {
         "INSERT INTO outbox (id, operation_day_id, topic, payload_json, created_at) VALUES (?1, ?2, 'EVENT_STATE_CHANGED', ?3, ?4)",
       ).bind(crypto.randomUUID(), command.eventId, JSON.stringify(result), now),
     ]);
+    this.broadcast(result);
+    return json(result);
+  }
+
+  private async handleCashierProductReorder(
+    command: Extract<CommandEnvelope, { type: "REORDER_CASHIER_PRODUCTS" }>,
+    current: StoredEventRow,
+  ): Promise<Response> {
+    const products = await this.env.DB.prepare(
+      `SELECT id
+         FROM products
+        WHERE operation_day_id = ?1
+        ORDER BY sort_order, name, id`,
+    )
+      .bind(command.eventId)
+      .all<{ id: string }>();
+    const currentProductIds = products.results.map((product) => product.id);
+    const expectedProductIds = command.payload.expectedProductIds;
+    const orderedProductIds = command.payload.orderedProductIds;
+    const sameOrder = (left: readonly string[], right: readonly string[]) =>
+      left.length === right.length && left.every((value, index) => value === right[index]);
+
+    if (!sameOrder(currentProductIds, expectedProductIds)) {
+      return json(
+        {
+          error: {
+            code: "CASHIER_PRODUCT_ORDER_CONFLICT",
+            message:
+              "Die Kassenreihenfolge oder die Produktliste wurde zwischenzeitlich geändert. Bitte neu laden.",
+            currentVersion: current.version,
+          },
+        },
+        { status: 409 },
+      );
+    }
+
+    const currentIds = new Set(currentProductIds);
+    if (
+      orderedProductIds.length !== currentProductIds.length ||
+      orderedProductIds.some((productId) => !currentIds.has(productId))
+    ) {
+      return json(
+        {
+          error: {
+            code: "CASHIER_PRODUCT_ORDER_INVALID",
+            message:
+              "Die Kassenreihenfolge muss jedes Produkt der Veranstaltung genau einmal enthalten.",
+          },
+        },
+        { status: 409 },
+      );
+    }
+
+    if (sameOrder(currentProductIds, orderedProductIds)) {
+      return json(
+        {
+          error: {
+            code: "CASHIER_PRODUCT_ORDER_UNCHANGED",
+            message: "Die Kassenreihenfolge wurde nicht verändert.",
+          },
+        },
+        { status: 400 },
+      );
+    }
+
+    const now = new Date().toISOString();
+    const nextVersion = current.version + 1;
+    const result: CommandResult = {
+      accepted: true,
+      duplicate: false,
+      event: rowToSnapshot({ ...current, version: nextVersion, updated_at: now }),
+      eventType: "CASHIER_PRODUCT_ORDER_CHANGED",
+      aggregate: { type: "OPERATION_DAY", id: command.eventId },
+    };
+    const statements: D1PreparedStatement[] = [
+      this.env.DB.prepare(
+        "UPDATE operation_days SET version = ?1, updated_at = ?2 WHERE id = ?3 AND version = ?4",
+      ).bind(nextVersion, now, command.eventId, current.version),
+      ...orderedProductIds.map((productId, index) =>
+        this.env.DB.prepare(
+          `UPDATE products
+              SET sort_order = ?1, updated_at = ?2
+            WHERE id = ?3 AND operation_day_id = ?4`,
+        ).bind((index + 1) * 10, now, productId, command.eventId),
+      ),
+      this.env.DB.prepare(
+        `INSERT INTO operational_events
+          (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type,
+           aggregate_id, aggregate_version, payload_json)
+         VALUES (?1, ?2, 'CASHIER_PRODUCT_ORDER_CHANGED', ?3, ?4, 'OPERATION_DAY', ?2, ?5, ?6)`,
+      ).bind(
+        crypto.randomUUID(),
+        command.eventId,
+        now,
+        command.deviceId,
+        nextVersion,
+        JSON.stringify({
+          previousProductIds: currentProductIds,
+          orderedProductIds,
+          affectsOperationalPriority: false,
+        }),
+      ),
+      this.env.DB.prepare(
+        `INSERT INTO idempotency_receipts
+          (command_id, operation_day_id, device_id, command_type, received_at, response_json)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)`,
+      ).bind(
+        command.commandId,
+        command.eventId,
+        command.deviceId,
+        command.type,
+        now,
+        JSON.stringify(result),
+      ),
+      this.env.DB.prepare(
+        "INSERT INTO outbox (id, operation_day_id, topic, payload_json, created_at) VALUES (?1, ?2, 'EVENT_STATE_CHANGED', ?3, ?4)",
+      ).bind(crypto.randomUUID(), command.eventId, JSON.stringify(result), now),
+    ];
+
+    await this.env.DB.batch(statements);
     this.broadcast(result);
     return json(result);
   }

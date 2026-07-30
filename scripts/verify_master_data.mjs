@@ -61,12 +61,20 @@ const operationBoard = async (deviceId, token) => {
   if (!response.ok) throw new Error(`Board-Abruf fehlgeschlagen (${response.status}).`);
   return response.json();
 };
-const command = async (deviceId, token, expectedVersion, type, payload, expectedStatus = 200) => {
+const command = async (
+  deviceId,
+  token,
+  expectedVersion,
+  type,
+  payload,
+  expectedStatus = 200,
+  commandId = randomUUID(),
+) => {
   const response = await fetch(`${base}/api/control/demo-2026/commands`, {
     method: "POST",
     headers: { "content-type": "application/json", "x-device-token": token },
     body: JSON.stringify({
-      commandId: randomUUID(),
+      commandId,
       eventId: "demo-2026",
       deviceId,
       expectedVersion,
@@ -297,6 +305,97 @@ try {
     reason: "Synthetischen Gate-Anzeigefilter konfigurieren",
     adminPin: pin,
   });
+  const orderBeforeUnrelatedChange = await operationBoard(devices.cashier, tokens.cashier);
+  const expectedCashierProductIds = orderBeforeUnrelatedChange.products.map(
+    (product) => product.id,
+  );
+  const orderedCashierProductIds = [
+    "product-shared-30",
+    ...expectedCashierProductIds.filter((productId) => productId !== "product-shared-30"),
+  ];
+  const reorderObservedVersion = result.event.version;
+  result = await admin(result.event.version, "UPSERT_GATE", {
+    gateId: "gate-resource-test",
+    label: "Flight Line Ressourcen",
+    gateType: "FLIGHT_LINE",
+    active: true,
+    sortOrder: 20,
+    displayFilter: {
+      productIds: ["product-shared-20"],
+      rotationStatuses: ["DRAFT"],
+    },
+    reason: "Unabhängige Änderung vor Kassenreihenfolge",
+    adminPin: pin,
+  });
+  await command(
+    devices.flightLine,
+    tokens.flightLine,
+    result.event.version,
+    "REORDER_CASHIER_PRODUCTS",
+    {
+      expectedProductIds: expectedCashierProductIds,
+      orderedProductIds: orderedCashierProductIds,
+    },
+    403,
+  );
+  const reorderCommandId = randomUUID();
+  const reorderResult = await command(
+    devices.cashier,
+    tokens.cashier,
+    reorderObservedVersion,
+    "REORDER_CASHIER_PRODUCTS",
+    {
+      expectedProductIds: expectedCashierProductIds,
+      orderedProductIds: orderedCashierProductIds,
+    },
+    200,
+    reorderCommandId,
+  );
+  const duplicateReorderResult = await command(
+    devices.cashier,
+    tokens.cashier,
+    reorderObservedVersion,
+    "REORDER_CASHIER_PRODUCTS",
+    {
+      expectedProductIds: expectedCashierProductIds,
+      orderedProductIds: orderedCashierProductIds,
+    },
+    200,
+    reorderCommandId,
+  );
+  if (!duplicateReorderResult.duplicate) {
+    throw new Error("Idempotente Wiederholung der Kassenreihenfolge wurde nicht erkannt.");
+  }
+  await command(
+    devices.cashier,
+    tokens.cashier,
+    reorderResult.event.version,
+    "REORDER_CASHIER_PRODUCTS",
+    {
+      expectedProductIds: expectedCashierProductIds,
+      orderedProductIds: orderedCashierProductIds,
+    },
+    409,
+  );
+  await command(
+    devices.cashier,
+    tokens.cashier,
+    reorderResult.event.version,
+    "REORDER_CASHIER_PRODUCTS",
+    {
+      expectedProductIds: orderedCashierProductIds,
+      orderedProductIds: ["foreign-product", ...orderedCashierProductIds.slice(1)],
+    },
+    409,
+  );
+  const reorderedBoard = await operationBoard(devices.cashier, tokens.cashier);
+  if (
+    reorderedBoard.products.map((product) => product.id).join("|") !==
+    orderedCashierProductIds.join("|")
+  ) {
+    throw new Error("Die Kassenreihenfolge wurde nicht vollständig gespeichert.");
+  }
+  result = reorderResult;
   await admin(
     staleVersion,
     "UPSERT_PRODUCT",
@@ -447,6 +546,7 @@ try {
   });
   const resourceHistory = await history("RESOURCE_GROUP", "resource-shared-test");
   const productHistory = await history("PRODUCT", "product-shared-20");
+  const eventHistory = await history("OPERATION_DAY", "demo-2026");
   if (
     !resourceHistory.entries.some((entry) => entry.eventType === "RESOURCE_GROUP_UPSERTED") ||
     resourceHistory.entries.filter((entry) => entry.eventType === "RESOURCE_GROUP_STATUS_CHANGED")
@@ -461,7 +561,9 @@ try {
     productHistory.entries.filter((entry) => entry.eventType === "PRODUCT_UPSERTED").length !== 2 ||
     !productHistory.entries.some(
       (entry) => entry.eventType === "PRODUCT_UPSERTED" && entry.payload.priceCents === 4550,
-    )
+    ) ||
+    eventHistory.entries.filter((entry) => entry.eventType === "CASHIER_PRODUCT_ORDER_CHANGED")
+      .length !== 1
   ) {
     throw new Error("Stammdaten- oder Zuordnungshistorie ist unvollständig.");
   }
@@ -480,6 +582,12 @@ try {
       duplicateProductCodesRejected: true,
       invalidWeightConfigurationRejected: true,
       staleMasterDataRejected: true,
+      cashierProductOrderPersisted: true,
+      cashierProductOrderUnrelatedVersionAccepted: true,
+      cashierProductOrderConflictRejected: true,
+      cashierProductOrderForeignIdRejected: true,
+      cashierProductOrderUnauthorizedRoleRejected: true,
+      cashierProductOrderIdempotentAndAuditedOnce: true,
       pauseBlocksSales: true,
       pauseBlocksCalls: true,
       pauseVisiblePubliclyWithoutCountdown: true,

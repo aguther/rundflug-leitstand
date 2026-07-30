@@ -36,7 +36,7 @@ describe("cashier release 1.7.0 acceptance coverage", () => {
 
   it("preserves the ticket count after a sale and resets only on explicit request", () => {
     expect(cashierSource).not.toContain("setSize(1)");
-    expect(cashierSource).toContain('aria-label="Gruppengröße auf 1 zurücksetzen"');
+    expect(cashierSource).toContain('label="Gruppengröße auf 1 zurücksetzen"');
     expect(cashierSource).toContain("onClick={() => changeGroupSize(1)}");
   });
 

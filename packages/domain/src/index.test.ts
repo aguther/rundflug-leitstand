@@ -38,6 +38,17 @@ describe("command authorization", () => {
     expect(() => assertRoleMayExecute("CASHIER", "SELL_TICKET_GROUP")).not.toThrow();
   });
 
+  it("allows only cashier and administration roles to reorder cashier products", () => {
+    expect(() => assertRoleMayExecute("CASHIER", "REORDER_CASHIER_PRODUCTS")).not.toThrow();
+    expect(() => assertRoleMayExecute("ADMIN", "REORDER_CASHIER_PRODUCTS")).not.toThrow();
+    expect(() => assertRoleMayExecute("FLIGHT_LINE", "REORDER_CASHIER_PRODUCTS")).toThrowError(
+      /darf REORDER_CASHIER_PRODUCTS nicht/,
+    );
+    expect(() => assertRoleMayExecute("DISPLAY", "REORDER_CASHIER_PRODUCTS")).toThrowError(
+      /darf REORDER_CASHIER_PRODUCTS nicht/,
+    );
+  });
+
   it("allows only flight-line roles and administrators to move whole ticket groups", () => {
     expect(() => assertRoleMayExecute("FLIGHT_LINE", "MOVE_TICKET_GROUP")).not.toThrow();
     expect(() => assertRoleMayExecute("FLIGHT_DIRECTOR", "MOVE_TICKET_GROUP")).not.toThrow();
