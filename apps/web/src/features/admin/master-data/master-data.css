@@ -1,0 +1,421 @@
+.admin-shell .master-data-unified-toolbar {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--ui-border);
+  background: var(--ui-surface-subtle);
+}
+
+.admin-shell .master-data-unified-toolbar .ds-search-field {
+  width: min(420px, 100%);
+  flex: 0 1 420px;
+}
+
+.admin-shell .master-data-unified-filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-shell .master-data-result-count {
+  margin-left: auto;
+  color: var(--ui-muted);
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.admin-shell .master-data-unified-content {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  padding: 16px;
+}
+
+.admin-shell .master-data-unified-content > .ds-table-scroll {
+  max-height: min(58vh, 720px);
+  overflow: auto;
+}
+
+.admin-shell .admin-entity-table .ds-table-actions {
+  flex-wrap: nowrap;
+}
+
+.admin-shell .admin-entity-primary,
+.admin-shell .admin-entity-stacked {
+  min-width: 0;
+  display: grid;
+  align-items: center;
+  gap: 3px;
+}
+
+.admin-shell .admin-entity-primary {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.admin-shell .admin-entity-stacked > span {
+  overflow: hidden;
+  color: var(--ui-muted);
+  font-size: 0.74rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-shell .resource-group-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  max-height: min(62vh, 760px);
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+.admin-shell .resource-group-card {
+  min-width: 0;
+  display: grid;
+  grid-template-rows: auto auto minmax(88px, 1fr) auto;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-md);
+  background: var(--ui-surface);
+}
+
+.admin-shell .resource-group-card > header,
+.admin-shell .resource-group-card > footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-shell .resource-group-card > header {
+  justify-content: space-between;
+}
+
+.admin-shell .resource-group-card > header > div {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.admin-shell .resource-group-card > header span:not(.ds-status-pill) {
+  color: var(--ui-muted);
+  font-size: 0.74rem;
+  font-weight: 650;
+}
+
+.admin-shell .resource-group-card > dl {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-sm);
+  background: var(--ui-border);
+}
+
+.admin-shell .resource-group-card > dl > div {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  background: var(--ui-surface-subtle);
+}
+
+.admin-shell .resource-group-card :is(dt, dd) {
+  margin: 0;
+}
+
+.admin-shell .resource-group-card dt,
+.admin-shell .resource-card-relationships > div > span {
+  color: var(--ui-muted);
+  font-size: 0.68rem;
+}
+
+.admin-shell .resource-group-card dd {
+  font-size: 0.8rem;
+  font-weight: 650;
+}
+
+.admin-shell .resource-card-relationships {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.admin-shell .resource-card-relationships > div {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 6px;
+}
+
+.admin-shell .resource-card-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  max-height: 52px;
+  overflow: hidden;
+}
+
+.admin-shell .resource-card-chip-list span {
+  padding: 4px 7px;
+  border-radius: var(--radius-sm);
+  color: var(--ui-text);
+  background: var(--ui-surface-subtle);
+  font-size: 0.72rem;
+}
+
+.admin-shell .resource-card-empty-value {
+  color: var(--ui-muted);
+  font-size: 0.76rem;
+}
+
+.admin-shell .resource-group-card > footer {
+  justify-content: flex-end;
+  border-top: 1px solid var(--ui-border);
+  padding-top: 10px;
+}
+
+.admin-shell .aircraft-workspace-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1px;
+  margin-bottom: 12px;
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-sm);
+  background: var(--ui-border);
+}
+
+.admin-shell .aircraft-workspace-summary span {
+  flex: 1 1 180px;
+  padding: 9px 12px;
+  background: var(--ui-surface-subtle);
+  color: var(--ui-muted);
+  font-size: 0.76rem;
+}
+
+.admin-shell .aircraft-workspace-summary strong {
+  color: var(--ui-text);
+  font-size: 0.9rem;
+}
+
+@media (max-width: 1100px) {
+  .admin-shell .resource-group-card-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.admin-shell .master-data-unified-empty {
+  min-height: 180px;
+}
+
+.admin-shell .master-data-unified-pagination {
+  margin: 0 16px 16px;
+}
+
+@media (max-width: 760px) {
+  .admin-shell .master-data-unified-toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .admin-shell .master-data-unified-toolbar .ds-search-field {
+    width: 100%;
+    grid-column: 1 / -1;
+  }
+
+  .admin-shell .master-data-unified-filters {
+    min-width: 0;
+  }
+
+  .admin-shell .master-data-result-count {
+    margin-left: 0;
+  }
+
+  .admin-shell .master-data-unified-content {
+    padding: 12px;
+  }
+}
+
+.aircraft-assignment-dialog .assignment-dialog-fields {
+  display: grid;
+  gap: 16px;
+}
+
+.aircraft-assignment-dialog .assignment-fixed-value,
+.aircraft-assignment-dialog .assignment-preview > div {
+  display: grid;
+  gap: 3px;
+  padding: 10px 12px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-sm);
+  background: var(--ui-surface-subtle);
+}
+
+.aircraft-assignment-dialog .assignment-fixed-value > span,
+.aircraft-assignment-dialog .assignment-preview span {
+  color: var(--ui-muted);
+  font-size: 0.72rem;
+}
+
+.aircraft-assignment-dialog .assignment-preview {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+
+.aircraft-assignment-dialog .assignment-preview > svg {
+  color: var(--ui-accent);
+}
+
+.aircraft-assignment-dialog .assignment-effective-note {
+  margin: 0;
+  color: var(--ui-muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.turnaround-override-dialog.ds-modal-dialog--wide {
+  width: min(1320px, calc(100vw - 32px));
+}
+
+.turnaround-override-list {
+  display: grid;
+  gap: 10px;
+}
+
+.turnaround-override-row {
+  min-width: 0;
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-md);
+  background: var(--ui-surface);
+}
+
+.turnaround-override-row > header,
+.turnaround-override-row > footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.turnaround-override-row > header > div {
+  display: grid;
+  gap: 2px;
+}
+
+.turnaround-override-row > header span:not(.ds-status-pill) {
+  color: var(--ui-muted);
+  font-size: 0.72rem;
+}
+
+.turnaround-override-phases {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.turnaround-phase-control {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 5px 8px;
+  padding: 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-sm);
+  background: var(--ui-surface-subtle);
+}
+
+.turnaround-phase-control > span,
+.turnaround-phase-control small {
+  color: var(--ui-muted);
+  font-size: 0.7rem;
+}
+
+.turnaround-phase-control small,
+.turnaround-phase-control .table-action {
+  grid-column: 1 / -1;
+}
+
+.master-data-editor-dialog.ds-modal-dialog--wide {
+  width: min(1024px, calc(100vw - 32px));
+}
+
+.master-data-editor-dialog .master-editor-further-settings {
+  margin-top: 14px;
+  border-top: 1px solid var(--ui-border);
+}
+
+.master-data-editor-dialog .master-editor-further-settings summary {
+  min-height: 44px;
+  padding-block: 12px;
+  cursor: pointer;
+  font-weight: 650;
+}
+
+.master-data-editor-dialog .master-editor-readonly-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 1px;
+  margin: 12px 0 0;
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-sm);
+  background: var(--ui-border);
+}
+
+.master-data-editor-dialog .master-editor-readonly-summary > div {
+  display: grid;
+  gap: 3px;
+  padding: 10px;
+  background: var(--ui-surface-subtle);
+}
+
+.master-data-editor-dialog .master-editor-readonly-summary :is(dt, dd) {
+  margin: 0;
+}
+
+.master-data-editor-dialog .master-editor-readonly-summary dt {
+  color: var(--ui-muted);
+  font-size: 0.7rem;
+}
+
+.master-data-editor-dialog .master-editor-readonly-summary dd {
+  font-size: 0.82rem;
+  font-weight: 650;
+}
+
+.turnaround-phase-control label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.turnaround-phase-control input {
+  width: 76px;
+  min-height: 40px;
+}
+
+.turnaround-phase-control .table-action {
+  width: fit-content;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+@media (max-width: 900px) {
+  .turnaround-override-phases {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
