@@ -139,6 +139,8 @@ describe("FIDS V1.7.3 UI", () => {
     expect(displaySource).toContain("<span>NACHRUF</span>");
     expect(stylesSource).toContain("@keyframes fids-primary-status-swap");
     expect(stylesSource).toContain("@keyframes fids-recall-status-swap");
+    expect(stylesSource).not.toContain("step-end");
+    expect(stylesSource).toContain("--fids-status-font-size: 1.04em");
     expect(stylesSource).not.toMatch(/\.fids-status-icon \{[^}]*border:/);
     expect(stylesSource).toMatch(/\.tone-standby \{\s*color: var\(--fids-text\);/);
     expect(stylesSource).toMatch(

@@ -57,6 +57,38 @@ describe("V1.7.3 FIDS concept fidelity", () => {
     );
   });
 
+  it("crossfades recall copy and icons at the regular status size", () => {
+    expect(stylesSource).toContain("--fids-status-font-size: 1.04em");
+    expect(stylesSource).toMatch(
+      /\.fids-status \{[\s\S]*?font-size: var\(--fids-status-font-size\);/,
+    );
+    expect(stylesSource).toMatch(
+      /\.fids-recall-status \{[\s\S]*?font-size: var\(--fids-status-font-size\);/,
+    );
+    expect(stylesSource).toContain("animation: fids-primary-status-swap 8s ease-in-out infinite");
+    expect(stylesSource).toContain("animation: fids-recall-status-swap 8s ease-in-out infinite");
+    expect(stylesSource).not.toContain("step-end");
+
+    const primaryFrames = stylesSource.slice(
+      stylesSource.indexOf("@keyframes fids-primary-status-swap"),
+      stylesSource.indexOf("@keyframes fids-recall-status-swap"),
+    );
+    const recallFrames = stylesSource.slice(
+      stylesSource.indexOf("@keyframes fids-recall-status-swap"),
+      stylesSource.indexOf("@media (prefers-reduced-motion: reduce)"),
+    );
+    expect(primaryFrames).toContain("45%");
+    expect(primaryFrames).toContain("95%");
+    expect(primaryFrames).toMatch(/45%,[\s\S]*?opacity: 1;[\s\S]*?50%,[\s\S]*?opacity: 0;/);
+    expect(recallFrames).toMatch(/45%,[\s\S]*?opacity: 0;[\s\S]*?50%,[\s\S]*?opacity: 1;/);
+    expect(stylesSource).toMatch(
+      /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.fids-status-cell\[data-recall-active="true"\] > \.fids-status \{[\s\S]*?opacity: 0;[\s\S]*?animation: none;/,
+    );
+    expect(stylesSource).toMatch(
+      /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.fids-status-cell\[data-recall-active="true"\] > \.fids-recall-status \{[\s\S]*?opacity: 1;[\s\S]*?animation: none;/,
+    );
+  });
+
   it("draws a complete layout-neutral recall outline for every row position", () => {
     const activeRule = stylesSource.match(
       /\.fids-row\[data-recall-active="true"\] \{(?<body>[^}]*)\}/,
