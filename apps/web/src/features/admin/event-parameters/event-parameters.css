@@ -1,0 +1,489 @@
+.admin-shell .event-parameters-workspace {
+  width: min(100%, 1280px);
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  margin: 12px auto 24px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-md);
+  background: var(--ui-surface);
+  overflow: hidden;
+}
+
+.admin-shell .event-parameters-header {
+  min-height: 108px;
+  display: grid;
+  grid-template-columns: minmax(250px, 1fr) minmax(360px, 1.1fr) auto;
+  align-items: center;
+  gap: 20px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.admin-shell .event-parameters-title {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.admin-shell .event-parameters-title > div {
+  min-width: 0;
+}
+
+.admin-shell .event-parameters-title span:first-child {
+  color: var(--ui-muted);
+  font-size: 0.72rem;
+  font-weight: 650;
+}
+
+.admin-shell .event-parameters-title h2 {
+  margin: 2px 0 0;
+  overflow: hidden;
+  font-size: 1.2rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-shell .event-parameters-meta {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-sm);
+  background: var(--ui-border);
+}
+
+.admin-shell .event-parameters-meta > div {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  padding: 9px 11px;
+  background: var(--ui-surface-subtle);
+}
+
+.admin-shell .event-parameters-meta :is(dt, dd) {
+  margin: 0;
+}
+
+.admin-shell .event-parameters-meta dt {
+  color: var(--ui-muted);
+  font-size: 0.68rem;
+}
+
+.admin-shell .event-parameters-meta dd {
+  overflow: hidden;
+  font-size: 0.82rem;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-shell .event-parameters-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-shell .event-parameters-workspace > .ds-tabs {
+  width: 100%;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--ui-border);
+  background: var(--ui-surface-subtle);
+}
+
+.admin-shell .event-parameters-workspace > .ds-tabs button {
+  min-width: 150px;
+}
+
+.admin-shell .event-parameter-conflict {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  margin: 14px 20px 0;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--ui-warning) 52%, var(--ui-border));
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--ui-warning) 9%, var(--ui-surface));
+}
+
+.admin-shell .event-parameter-conflict > svg {
+  color: var(--ui-warning);
+}
+
+.admin-shell .event-parameter-conflict :is(strong, p) {
+  margin: 0;
+}
+
+.admin-shell .event-parameter-conflict p {
+  margin-top: 2px;
+  color: var(--ui-muted);
+  font-size: 0.78rem;
+}
+
+.admin-shell .event-parameters-content {
+  min-width: 0;
+  padding: 16px 20px 20px;
+}
+
+.admin-shell .event-parameter-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.admin-shell .event-parameter-card,
+.admin-shell .event-appearance-panel {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-md);
+  background: var(--ui-surface);
+}
+
+.admin-shell .event-period-card,
+.admin-shell .turnaround-card {
+  grid-column: 1 / -1;
+}
+
+.admin-shell .event-parameter-section-heading {
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.admin-shell .event-parameter-section-heading :is(h3, p) {
+  margin: 0;
+}
+
+.admin-shell .event-parameter-section-heading h3 {
+  font-size: 0.96rem;
+}
+
+.admin-shell .event-parameter-section-heading p {
+  margin-top: 3px;
+  color: var(--ui-muted);
+  font-size: 0.76rem;
+  line-height: 1.4;
+}
+
+.admin-shell .event-ground-total {
+  flex: 0 0 auto;
+  padding: 6px 9px;
+  border-radius: var(--radius-sm);
+  color: var(--ui-accent-text);
+  background: var(--ui-accent-soft);
+  font-size: 0.76rem;
+}
+
+.admin-shell .event-period-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.admin-shell .event-parameter-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(120px, 1fr));
+  gap: 12px;
+}
+
+.admin-shell .event-turnaround-fields {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) auto minmax(150px, 1fr) auto minmax(150px, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+
+.admin-shell .event-turnaround-fields > span {
+  align-self: end;
+  padding-bottom: 13px;
+  color: var(--ui-muted);
+  font-size: 1.15rem;
+}
+
+.admin-shell .event-parameter-number-field {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+  color: var(--ui-muted);
+  font-size: 0.74rem;
+  font-weight: 650;
+}
+
+.admin-shell .event-parameter-number-control {
+  min-width: 0;
+  height: var(--control-default);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  overflow: hidden;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--ui-control-bg);
+}
+
+.admin-shell .event-parameter-number-control:focus-within {
+  border-color: var(--ui-accent);
+  box-shadow: 0 0 0 2px var(--ui-focus);
+}
+
+.admin-shell .event-parameter-number-control input {
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  padding: 0 10px;
+  border: 0;
+  outline: 0;
+  color: var(--ui-text);
+  background: transparent;
+}
+
+.admin-shell .event-parameter-number-control > span {
+  height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 0 10px;
+  border-left: 1px solid var(--ui-border);
+  color: var(--ui-muted);
+  background: var(--ui-surface-subtle);
+  font-size: 0.72rem;
+}
+
+.admin-shell :is(.event-parameter-number-field, .localized-input-field).has-error small,
+.admin-shell .event-appearance-error {
+  margin: 0;
+  color: var(--ui-danger);
+  font-size: 0.72rem;
+  font-weight: 550;
+}
+
+.admin-shell
+  :is(.event-parameter-number-field, .localized-input-field).has-error
+  :is(.event-parameter-number-control, input) {
+  border-color: var(--ui-danger);
+}
+
+.admin-shell .event-parameter-card .ds-checkbox-field {
+  margin-top: auto;
+}
+
+.admin-shell .event-appearance-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.admin-shell .event-appearance-card {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 148px minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-md);
+  background: var(--ui-surface-subtle);
+}
+
+.admin-shell .event-appearance-card.is-dark {
+  color: #f2f6fa;
+  background: #172331;
+}
+
+.admin-shell .event-appearance-preview {
+  height: 84px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, currentColor 16%, transparent);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, currentColor 5%, transparent);
+}
+
+.admin-shell .event-appearance-preview img {
+  width: min(116px, 85%);
+  max-height: 64px;
+  object-fit: contain;
+}
+
+.admin-shell .event-appearance-copy {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.admin-shell .event-appearance-copy span {
+  color: var(--ui-muted);
+  font-size: 0.75rem;
+}
+
+.admin-shell .event-appearance-card.is-dark .event-appearance-copy span {
+  color: #b9c4ce;
+}
+
+.admin-shell .event-appearance-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.admin-shell .event-appearance-actions label.ds-button {
+  position: relative;
+  cursor: pointer;
+}
+
+.admin-shell .event-appearance-actions label.ds-button.is-disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.admin-shell .event-appearance-actions input[type="file"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.admin-shell .event-appearance-error {
+  grid-column: 1 / -1;
+}
+
+.admin-shell .event-parameters-mobile-actions {
+  display: none;
+}
+
+@media (max-width: 1050px) {
+  .admin-shell .event-parameters-header {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .admin-shell .event-parameters-meta {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .admin-shell .event-parameter-card-grid,
+  .admin-shell .event-appearance-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-shell .event-period-card,
+  .admin-shell .turnaround-card {
+    grid-column: auto;
+  }
+
+  .admin-shell .event-period-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 700px) {
+  .admin-shell .event-parameters-workspace {
+    width: auto;
+    margin: 10px 12px 92px;
+  }
+
+  .admin-shell .event-parameters-header {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+    padding: 14px;
+  }
+
+  .admin-shell .event-parameters-title {
+    justify-content: space-between;
+  }
+
+  .admin-shell .event-parameters-meta {
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  .admin-shell .event-parameters-actions {
+    display: none;
+  }
+
+  .admin-shell .event-parameters-workspace > .ds-tabs {
+    padding: 0 10px;
+  }
+
+  .admin-shell .event-parameters-workspace > .ds-tabs button {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .admin-shell .event-parameters-content {
+    padding: 12px;
+  }
+
+  .admin-shell .event-parameter-fields,
+  .admin-shell .event-turnaround-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-shell .event-turnaround-fields > span {
+    display: none;
+  }
+
+  .admin-shell .event-appearance-card {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-shell .event-appearance-actions,
+  .admin-shell .event-appearance-error {
+    grid-column: auto;
+  }
+
+  .admin-shell .event-appearance-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-shell .event-appearance-actions > * {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .admin-shell .event-parameter-conflict {
+    grid-template-columns: auto minmax(0, 1fr);
+    margin: 12px 12px 0;
+  }
+
+  .admin-shell .event-parameter-conflict .ds-button {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  .admin-shell .event-parameters-mobile-actions {
+    position: fixed;
+    z-index: 20;
+    right: 12px;
+    bottom: 12px;
+    left: 12px;
+    min-height: 66px;
+    display: grid;
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+    gap: 8px;
+    padding: 10px;
+    border: 1px solid var(--ui-border-strong);
+    border-radius: var(--radius-md);
+    background: color-mix(in srgb, var(--ui-surface) 94%, transparent);
+    box-shadow: var(--shadow-lg);
+    backdrop-filter: blur(12px);
+  }
+
+  .admin-shell .event-parameters-mobile-actions .ds-button {
+    width: 100%;
+  }
+}

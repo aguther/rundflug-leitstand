@@ -1,9 +1,9 @@
 import {
   type AdminEventFlow,
-  apiErrorSchema,
   type AssistClaim,
   type AuditHistory,
   adminEventFlowSchema,
+  apiErrorSchema,
   assistClaimSchema,
   auditHistorySchema,
   type BootstrapRequest,
@@ -825,11 +825,7 @@ export async function sendCommand(
       typeof body.error.message === "string"
         ? body.error.message
         : `Kommando abgelehnt (${response.status})`;
-    throw new ApiCommandError(
-      fallbackMessage,
-      "COMMAND_REJECTED",
-      response.status,
-    );
+    throw new ApiCommandError(fallbackMessage, "COMMAND_REJECTED", response.status);
   }
   return commandResultSchema.parse(await response.json());
 }
