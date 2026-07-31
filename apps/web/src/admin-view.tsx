@@ -438,6 +438,13 @@ export function AdminView() {
   const [productPriceInput, setProductPriceInput] = useState("0,00 €");
   const [productReferenceDuration, setProductReferenceDuration] = useState(20);
   const [productPromisedFlightMinutes, setProductPromisedFlightMinutes] = useState(20);
+  const [productBoardingOverride, setProductBoardingOverride] = useState("");
+  const [productDeboardingOverride, setProductDeboardingOverride] = useState("");
+  const [productBufferOverride, setProductBufferOverride] = useState("");
+  const [turnaroundOverrideAircraftId, setTurnaroundOverrideAircraftId] = useState("");
+  const [aircraftBoardingOverride, setAircraftBoardingOverride] = useState("");
+  const [aircraftDeboardingOverride, setAircraftDeboardingOverride] = useState("");
+  const [aircraftBufferOverride, setAircraftBufferOverride] = useState("");
   const [productChildCompanion, setProductChildCompanion] = useState(false);
   const [productWeightClasses, setProductWeightClasses] = useState<string[]>(["NOT_CAPTURED"]);
   const [gateEditorId, setGateEditorId] = useState("new");
@@ -489,6 +496,9 @@ export function AdminView() {
             productPriceInput,
             productReferenceDuration,
             productPromisedFlightMinutes,
+            productBoardingOverride,
+            productDeboardingOverride,
+            productBufferOverride,
             productChildCompanion,
             productWeightClasses,
           ])
@@ -1097,6 +1107,9 @@ export function AdminView() {
     const nextPriceInput = formatEuroInput(entry?.priceCents ?? 0);
     const nextReferenceDuration = entry?.referenceDurationMinutes ?? 20;
     const nextPromisedFlightMinutes = entry?.promisedFlightMinutes ?? 20;
+    const nextBoardingOverride = entry?.plannedBoardingMinutesOverride?.toString() ?? "";
+    const nextDeboardingOverride = entry?.plannedDeboardingMinutesOverride?.toString() ?? "";
+    const nextBufferOverride = entry?.plannedBufferMinutesOverride?.toString() ?? "";
     const nextChildCompanion = entry?.childCompanionRequired ?? false;
     const nextWeightClasses = entry?.weightClasses ?? ["NOT_CAPTURED"];
     initialMasterEditorSnapshotRef.current = createMasterEditorSnapshot([
@@ -1109,6 +1122,9 @@ export function AdminView() {
       nextPriceInput,
       nextReferenceDuration,
       nextPromisedFlightMinutes,
+      nextBoardingOverride,
+      nextDeboardingOverride,
+      nextBufferOverride,
       nextChildCompanion,
       nextWeightClasses,
     ]);
@@ -1121,6 +1137,13 @@ export function AdminView() {
     setProductPriceInput(nextPriceInput);
     setProductReferenceDuration(nextReferenceDuration);
     setProductPromisedFlightMinutes(nextPromisedFlightMinutes);
+    setProductBoardingOverride(nextBoardingOverride);
+    setProductDeboardingOverride(nextDeboardingOverride);
+    setProductBufferOverride(nextBufferOverride);
+    setTurnaroundOverrideAircraftId("");
+    setAircraftBoardingOverride("");
+    setAircraftDeboardingOverride("");
+    setAircraftBufferOverride("");
     setProductChildCompanion(nextChildCompanion);
     setProductWeightClasses(nextWeightClasses);
     setMasterSubmitAttempted(false);
@@ -1268,6 +1291,12 @@ export function AdminView() {
                 ?.referenceCapacity ?? 1,
             referenceDurationMinutes: productReferenceDuration,
             promisedFlightMinutes: productPromisedFlightMinutes,
+            plannedBoardingMinutesOverride:
+              productBoardingOverride === "" ? null : Number(productBoardingOverride),
+            plannedDeboardingMinutesOverride:
+              productDeboardingOverride === "" ? null : Number(productDeboardingOverride),
+            plannedBufferMinutesOverride:
+              productBufferOverride === "" ? null : Number(productBufferOverride),
             childCompanionRequired: productChildCompanion,
             weightClasses: productWeightClasses as Array<
               "NOT_CAPTURED" | "CHILD" | "NORMAL" | "HEAVY" | "INDIVIDUAL"
@@ -1287,6 +1316,102 @@ export function AdminView() {
     } catch (cause) {
       setMessage(
         cause instanceof Error ? cause.message : "Produkt konnte nicht gespeichert werden.",
+      );
+    }
+  }
+
+  function selectAircraftTurnaroundOverride(aircraftId: string) {
+    const existing = board?.aircraftProductTurnaroundOverrides.find(
+      (override) => override.productId === productEditorId && override.aircraftId === aircraftId,
+    );
+    setTurnaroundOverrideAircraftId(aircraftId);
+    setAircraftBoardingOverride(existing?.plannedBoardingMinutesOverride?.toString() ?? "");
+    setAircraftDeboardingOverride(existing?.plannedDeboardingMinutesOverride?.toString() ?? "");
+    setAircraftBufferOverride(existing?.plannedBufferMinutesOverride?.toString() ?? "");
+  }
+
+  async function saveAircraftTurnaroundOverride() {
+    if (!board || productEditorId === "new" || !turnaroundOverrideAircraftId) return;
+    const existing = board.aircraftProductTurnaroundOverrides.find(
+      (override) =>
+        override.productId === productEditorId &&
+        override.aircraftId === turnaroundOverrideAircraftId,
+    );
+    try {
+      await sendCommand(
+        {
+          commandId: crypto.randomUUID(),
+          eventId: EVENT_ID,
+          deviceId: ADMIN_DEVICE_ID,
+          expectedVersion: board.event.version,
+          issuedAt: new Date().toISOString(),
+          type: "UPSERT_AIRCRAFT_PRODUCT_TURNAROUND_OVERRIDE",
+          payload: {
+            aircraftId: turnaroundOverrideAircraftId,
+            productId: productEditorId,
+            plannedBoardingMinutesOverride:
+              aircraftBoardingOverride === "" ? null : Number(aircraftBoardingOverride),
+            plannedDeboardingMinutesOverride:
+              aircraftDeboardingOverride === "" ? null : Number(aircraftDeboardingOverride),
+            plannedBufferMinutesOverride:
+              aircraftBufferOverride === "" ? null : Number(aircraftBufferOverride),
+            expectedOverrideVersion: existing?.version ?? 0,
+            reason: MASTER_DATA_AUDIT_REASON,
+            adminPin: adminPinRef.current,
+          },
+        },
+        deviceTokenFor(ADMIN_DEVICE_ID),
+      );
+      setMessage("Flugzeugspezifische Umlaufzeiten wurden protokolliert gespeichert.");
+      await refresh();
+      await refreshHistory();
+    } catch (cause) {
+      setMessage(
+        cause instanceof Error
+          ? cause.message
+          : "Flugzeugspezifische Umlaufzeiten konnten nicht gespeichert werden.",
+      );
+    }
+  }
+
+  async function deleteAircraftTurnaroundOverride() {
+    if (!board || productEditorId === "new" || !turnaroundOverrideAircraftId) return;
+    const existing = board.aircraftProductTurnaroundOverrides.find(
+      (override) =>
+        override.productId === productEditorId &&
+        override.aircraftId === turnaroundOverrideAircraftId,
+    );
+    if (!existing) return;
+    try {
+      await sendCommand(
+        {
+          commandId: crypto.randomUUID(),
+          eventId: EVENT_ID,
+          deviceId: ADMIN_DEVICE_ID,
+          expectedVersion: board.event.version,
+          issuedAt: new Date().toISOString(),
+          type: "DELETE_AIRCRAFT_PRODUCT_TURNAROUND_OVERRIDE",
+          payload: {
+            aircraftId: turnaroundOverrideAircraftId,
+            productId: productEditorId,
+            expectedOverrideVersion: existing.version,
+            reason: MASTER_DATA_AUDIT_REASON,
+            adminPin: adminPinRef.current,
+          },
+        },
+        deviceTokenFor(ADMIN_DEVICE_ID),
+      );
+      setAircraftBoardingOverride("");
+      setAircraftDeboardingOverride("");
+      setAircraftBufferOverride("");
+      setMessage("Flugzeugspezifische Umlaufzeiten wurden entfernt.");
+      await refresh();
+      await refreshHistory();
+    } catch (cause) {
+      setMessage(
+        cause instanceof Error
+          ? cause.message
+          : "Flugzeugspezifische Umlaufzeiten konnten nicht entfernt werden.",
       );
     }
   }
@@ -4455,14 +4580,176 @@ export function AdminView() {
                         }
                       />
                     </div>
+                    <div className="field-control">
+                      <FieldLabel
+                        htmlFor="product-boarding-override"
+                        label="Boarding-Override (Min.)"
+                        help="Leer übernimmt den Veranstaltungswert."
+                      />
+                      <input
+                        id="product-boarding-override"
+                        max="120"
+                        min="0"
+                        onChange={(event) => setProductBoardingOverride(event.target.value)}
+                        placeholder={`Veranstaltung: ${board?.event.plannedBoardingMinutes ?? 8}`}
+                        type="number"
+                        value={productBoardingOverride}
+                      />
+                      <small>
+                        Quelle: {productBoardingOverride === "" ? "Veranstaltung" : "Produkt"}
+                      </small>
+                    </div>
+                    <div className="field-control">
+                      <FieldLabel
+                        htmlFor="product-deboarding-override"
+                        label="Ausstiegs-Override (Min.)"
+                        help="Leer übernimmt den Veranstaltungswert."
+                      />
+                      <input
+                        id="product-deboarding-override"
+                        max="120"
+                        min="0"
+                        onChange={(event) => setProductDeboardingOverride(event.target.value)}
+                        placeholder={`Veranstaltung: ${board?.event.plannedDeboardingMinutes ?? 5}`}
+                        type="number"
+                        value={productDeboardingOverride}
+                      />
+                      <small>
+                        Quelle: {productDeboardingOverride === "" ? "Veranstaltung" : "Produkt"}
+                      </small>
+                    </div>
+                    <div className="field-control">
+                      <FieldLabel
+                        htmlFor="product-buffer-override"
+                        label="Puffer-Override (Min.)"
+                        help="Leer übernimmt den Veranstaltungswert."
+                      />
+                      <input
+                        id="product-buffer-override"
+                        max="120"
+                        min="0"
+                        onChange={(event) => setProductBufferOverride(event.target.value)}
+                        placeholder={`Veranstaltung: ${board?.event.plannedBufferMinutes ?? 3}`}
+                        type="number"
+                        value={productBufferOverride}
+                      />
+                      <small>
+                        Quelle: {productBufferOverride === "" ? "Veranstaltung" : "Produkt"}
+                      </small>
+                    </div>
                     <ProductReferenceRotation
-                      boardingMinutes={board?.event.plannedBoardingMinutes ?? 8}
-                      bufferMinutes={board?.event.plannedBufferMinutes ?? 3}
-                      deboardingMinutes={board?.event.plannedDeboardingMinutes ?? 5}
+                      boardingMinutes={
+                        productBoardingOverride === ""
+                          ? (board?.event.plannedBoardingMinutes ?? 8)
+                          : Number(productBoardingOverride)
+                      }
+                      bufferMinutes={
+                        productBufferOverride === ""
+                          ? (board?.event.plannedBufferMinutes ?? 3)
+                          : Number(productBufferOverride)
+                      }
+                      deboardingMinutes={
+                        productDeboardingOverride === ""
+                          ? (board?.event.plannedDeboardingMinutes ?? 5)
+                          : Number(productDeboardingOverride)
+                      }
                       offBlockToOnBlockMinutes={productReferenceDuration}
                     />
                   </div>
                 </section>
+                {productEditorId !== "new" ? (
+                  <section className="product-editor-section">
+                    <h3>Flugzeugspezifische Ausnahmen</h3>
+                    <p>
+                      Leere Phasen erben komponentenweise vom Produkt und danach von der
+                      Veranstaltung.
+                    </p>
+                    <div className="parameter-grid">
+                      <div className="field-control">
+                        <FieldLabel
+                          htmlFor="turnaround-override-aircraft"
+                          label="Flugzeug"
+                          help="Ausnahme gilt ausschließlich für dieses Produkt und Flugzeug."
+                        />
+                        <select
+                          id="turnaround-override-aircraft"
+                          onChange={(event) =>
+                            selectAircraftTurnaroundOverride(event.target.value)
+                          }
+                          value={turnaroundOverrideAircraftId}
+                        >
+                          <option value="">Bitte wählen</option>
+                          {board?.aircraft.map((aircraft) => (
+                            <option key={aircraft.id} value={aircraft.id}>
+                              {aircraft.registration}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      {[
+                        {
+                          id: "aircraft-boarding-override",
+                          label: "Boarding (Min.)",
+                          value: aircraftBoardingOverride,
+                          setValue: setAircraftBoardingOverride,
+                        },
+                        {
+                          id: "aircraft-deboarding-override",
+                          label: "Ausstieg (Min.)",
+                          value: aircraftDeboardingOverride,
+                          setValue: setAircraftDeboardingOverride,
+                        },
+                        {
+                          id: "aircraft-buffer-override",
+                          label: "Puffer (Min.)",
+                          value: aircraftBufferOverride,
+                          setValue: setAircraftBufferOverride,
+                        },
+                      ].map((field) => (
+                        <label className="field-control" key={field.id}>
+                          <span>{field.label}</span>
+                          <input
+                            disabled={!turnaroundOverrideAircraftId}
+                            id={field.id}
+                            max="120"
+                            min="0"
+                            onChange={(event) => field.setValue(event.target.value)}
+                            placeholder="geerbt"
+                            type="number"
+                            value={field.value}
+                          />
+                        </label>
+                      ))}
+                    </div>
+                    {turnaroundOverrideAircraftId ? (
+                      <div className="master-data-inline-actions">
+                        <button
+                          disabled={
+                            aircraftBoardingOverride === "" &&
+                            aircraftDeboardingOverride === "" &&
+                            aircraftBufferOverride === ""
+                          }
+                          onClick={() => void saveAircraftTurnaroundOverride()}
+                          type="button"
+                        >
+                          Ausnahme speichern
+                        </button>
+                        {board?.aircraftProductTurnaroundOverrides.some(
+                          (override) =>
+                            override.productId === productEditorId &&
+                            override.aircraftId === turnaroundOverrideAircraftId,
+                        ) ? (
+                          <button
+                            onClick={() => void deleteAircraftTurnaroundOverride()}
+                            type="button"
+                          >
+                            Ausnahme entfernen
+                          </button>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </section>
+                ) : null}
               </fieldset>
             </div>
             {masterEditorMobileFurtherActions}

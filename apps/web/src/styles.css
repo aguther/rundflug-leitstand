@@ -323,6 +323,24 @@
   color: var(--ui-text);
   font-size: 0.92rem;
 }
+
+.master-data-inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.master-data-inline-actions button {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  background: var(--ui-surface-raised);
+  color: var(--ui-text);
+  font: inherit;
+  font-weight: 700;
+}
 .product-editor-section .parameter-grid {
   grid-template-columns: 1fr 1fr;
 }

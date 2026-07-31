@@ -691,6 +691,27 @@
   border-radius: var(--radius-md);
   background: var(--ui-surface);
 }
+
+.flight-director-deviation-reason,
+.queue-deviation-reason {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+  color: var(--console-muted);
+  font-weight: 700;
+}
+
+.flight-director-deviation-reason input,
+.queue-deviation-reason input {
+  width: 100%;
+  min-height: 42px;
+}
+
+.flight-director-deviation-reason small,
+.queue-deviation-reason small {
+  color: var(--ui-warning);
+  font-weight: 600;
+}
 .flight-director-selection > div:first-child {
   min-height: 44px;
   display: grid;

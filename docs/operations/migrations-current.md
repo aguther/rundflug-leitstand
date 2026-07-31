@@ -62,6 +62,7 @@ D1-Identität; angewandte Dateien werden nicht nachträglich umbenannt.
 | 55 | `0054_remove_resource_group_planned_rotation.sql` | eindeutig |
 | 56 | `0055_ticket_group_recalls.sql` | eindeutig |
 | 57 | `0056_product_pure_flight_groups.sql` | eindeutig |
+| 58 | `0057_turnaround_phase_overrides.sql` | eindeutig |
 
-Gesamt: 57 Migrationen. Wiederherstellungsnotizen werden gegen SQL und
+Gesamt: 58 Migrationen. Wiederherstellungsnotizen werden gegen SQL und
 `apps/worker/migrations/README.md` geprüft.
