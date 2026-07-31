@@ -5,10 +5,23 @@ import adminSource from "../../../admin-view.tsx?raw";
 const styles = readFileSync(new URL("./event-parameters.css", import.meta.url), "utf8");
 
 describe("event parameter surface", () => {
-  it("centers values and units vertically inside the shared number control", () => {
-    expect(styles).toMatch(/\.event-parameter-number-control input \{[\s\S]*?line-height: 1;/);
+  it("uses one scoped control height and centers values and units", () => {
+    expect(styles).toContain("--event-parameter-control-height: var(--control-touch)");
     expect(styles).toMatch(
-      /\.event-parameter-number-control > span \{[\s\S]*?place-items: center;[\s\S]*?line-height: 1;/,
+      /\.admin-shell \.event-parameters-workspace \.localized-picker-control > input,[\s\S]*?\.event-parameter-number-control \{[\s\S]*?height: var\(--event-parameter-control-height\);/,
+    );
+    expect(styles).toMatch(
+      /\.event-parameter-number-control input \{[\s\S]*?box-sizing: border-box;[\s\S]*?line-height: 1\.35;/,
+    );
+    expect(styles).toMatch(
+      /\.event-parameter-number-control\s+> \.event-parameter-number-unit \{[\s\S]*?align-items: center;[\s\S]*?justify-content: center;[\s\S]*?line-height: 1\.35;/,
+    );
+    expect(styles).not.toMatch(/Boarding|Ausstieg|Puffer|No-Show|Zurückstellungen/);
+  });
+
+  it("aligns decorative turnaround separators to the shared control height", () => {
+    expect(styles).toMatch(
+      /\.event-turnaround-fields > span \{[\s\S]*?height: var\(--event-parameter-control-height\);[\s\S]*?place-items: center;/,
     );
   });
 

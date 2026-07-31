@@ -1,4 +1,6 @@
 .admin-shell .event-parameters-workspace {
+  --event-parameter-control-height: var(--control-touch);
+  --event-parameter-field-gap: 6px;
   width: min(100%, 1280px);
   min-width: 0;
   display: grid;
@@ -205,60 +207,105 @@
 }
 
 .admin-shell .event-turnaround-fields > span {
-  align-self: end;
-  padding-bottom: 13px;
+  height: var(--event-parameter-control-height);
+  align-self: start;
+  display: grid;
+  place-items: center;
+  margin-top: calc(0.925rem + var(--event-parameter-field-gap));
   color: var(--ui-muted);
   font-size: 1.15rem;
+  line-height: 1;
 }
 
+.admin-shell .event-parameters-workspace .localized-input-field,
 .admin-shell .event-parameter-number-field {
   min-width: 0;
   display: grid;
-  gap: 6px;
+  align-content: start;
+  gap: var(--event-parameter-field-gap);
   color: var(--ui-muted);
   font-size: 0.74rem;
   font-weight: 650;
 }
 
-.admin-shell .event-parameter-number-control {
+.admin-shell
+  .event-parameters-workspace
+  :is(.localized-input-field, .event-parameter-number-field)
+  > span:first-child {
+  line-height: 0.925rem;
+}
+
+.admin-shell
+  .event-parameters-workspace
+  .event-parameter-fields
+  .event-parameter-number-field
+  > span:first-child {
+  min-height: 1.85rem;
+}
+
+.admin-shell .event-parameters-workspace .localized-picker-control > input,
+.admin-shell .event-parameters-workspace .event-parameter-number-control {
   min-width: 0;
-  height: var(--control-default);
+  height: var(--event-parameter-control-height);
+  min-height: var(--event-parameter-control-height);
+  box-sizing: border-box;
+}
+
+.admin-shell .event-parameters-workspace .localized-picker-control > input {
+  padding-block: 0;
+  font-size: 0.82rem;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.admin-shell .event-parameters-workspace .event-parameter-number-control {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
+  align-items: stretch;
   overflow: hidden;
   border: 1px solid var(--ui-border-strong);
   border-radius: var(--radius-sm);
   background: var(--ui-control-bg);
 }
 
-.admin-shell .event-parameter-number-control:focus-within {
+.admin-shell .event-parameters-workspace .event-parameter-number-control:focus-within {
   border-color: var(--ui-accent);
   box-shadow: 0 0 0 2px var(--ui-focus);
 }
 
-.admin-shell .event-parameter-number-control input {
+.admin-shell .event-parameters-workspace .event-parameter-number-control input {
   width: 100%;
   min-width: 0;
   height: 100%;
-  padding: 0 10px;
+  min-height: 0;
+  box-sizing: border-box;
+  padding: 0 12px;
   border: 0;
   outline: 0;
   color: var(--ui-text);
   background: transparent;
-  line-height: 1;
+  font-size: 0.82rem;
+  font-weight: 650;
+  line-height: 1.35;
 }
 
-.admin-shell .event-parameter-number-control > span {
+.admin-shell
+  .event-parameters-workspace
+  .event-parameter-number-control
+  > .event-parameter-number-unit {
   height: 100%;
-  display: grid;
-  place-items: center;
-  padding: 0 10px;
+  min-height: 0;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
   border-left: 1px solid var(--ui-border);
   color: var(--ui-muted);
   background: var(--ui-surface-subtle);
-  font-size: 0.72rem;
-  line-height: 1;
+  font-size: 0.74rem;
+  font-weight: 650;
+  line-height: 1.35;
 }
 
 .admin-shell :is(.event-parameter-number-field, .localized-input-field).has-error small,

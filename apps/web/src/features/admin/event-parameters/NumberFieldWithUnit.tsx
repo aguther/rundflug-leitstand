@@ -42,7 +42,9 @@ export function NumberFieldWithUnit({
           type="number"
           value={value}
         />
-        <span aria-hidden="true">{unit}</span>
+        <span aria-hidden="true" className="event-parameter-number-unit">
+          {unit}
+        </span>
       </span>
       {error ? <small id={errorId}>{error}</small> : null}
     </label>
