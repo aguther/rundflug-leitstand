@@ -61,6 +61,19 @@ describe("V1.9 Flight Director and Flight Line surfaces", () => {
     expect(sharedSource).toContain("CompactHistory");
   });
 
+  it("uses one direct recall toggle without a confirmation dialog or status card", () => {
+    expect(sharedSource).toContain("export function TicketGroupRecallButton");
+    expect(sharedSource).toContain("aria-pressed={Boolean(activeRecall)}");
+    expect(sharedSource).toContain("<BellOff");
+    expect(sharedSource).not.toContain("TicketGroupRecallDialog");
+    expect(sharedSource).not.toContain("TicketGroupRecallStatus");
+    expect(sharedSource).not.toContain("buildTicketGroupRecallCopy");
+    expect(viewSource).not.toContain("recallDialogGroupId");
+    expect(viewSource).not.toContain("setRecallDialogGroupId");
+    expect(stylesSource).not.toContain(".ticket-group-recall-dialog");
+    expect(stylesSource).not.toContain(".ticket-group-recall-status");
+  });
+
   it("uses semantic light and dark surfaces and central Assist actions", () => {
     expect(stylesSource).toContain("--assist-panel: var(--ui-surface)");
     expect(stylesSource).toContain("--console-bg: var(--ui-bg)");

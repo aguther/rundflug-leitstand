@@ -2,6 +2,7 @@ import type { ForecastHistory, OperationBoard, ResourceDayHistory } from "@rundf
 import { formatBookingGroupLabel } from "@rundflug/domain";
 
 const MINUTE_MS = 60_000;
+export const TIME_AXIS_STEPS_MINUTES = [5, 10, 15, 30, 60, 120, 180, 360, 720] as const;
 
 export type ForecastEntry = ForecastHistory["entries"][number];
 type Rotation = OperationBoard["rotations"][number];
@@ -27,6 +28,101 @@ export interface ResourceTimelineRotation {
   endPercent: number;
   phases: ResourceTimelinePhase[];
   rotation: ResourceDayHistory["rotations"][number];
+}
+
+export interface TimeAxisTick {
+  label: string;
+  value: number;
+}
+
+interface TimeAxisTickOptions {
+  from: number;
+  minimumLabelSpacing: number;
+  pixelWidth: number;
+  timeZone: string;
+  until: number;
+}
+
+const timeAxisPartsFormatterCache = new Map<string, Intl.DateTimeFormat>();
+const timeAxisLabelFormatterCache = new Map<string, Intl.DateTimeFormat>();
+
+function timeAxisPartsFormatter(timeZone: string): Intl.DateTimeFormat {
+  const cached = timeAxisPartsFormatterCache.get(timeZone);
+  if (cached) return cached;
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    hour12: false,
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+  timeAxisPartsFormatterCache.set(timeZone, formatter);
+  return formatter;
+}
+
+function timeAxisLabelFormatter(timeZone: string): Intl.DateTimeFormat {
+  const cached = timeAxisLabelFormatterCache.get(timeZone);
+  if (cached) return cached;
+  const formatter = new Intl.DateTimeFormat("de-DE", {
+    timeZone,
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  timeAxisLabelFormatterCache.set(timeZone, formatter);
+  return formatter;
+}
+
+function localMinutesAndSeconds(value: number, timeZone: string) {
+  const parts = Object.fromEntries(
+    timeAxisPartsFormatter(timeZone)
+      .formatToParts(new Date(value))
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, Number(part.value)]),
+  );
+  const hour = parts.hour === 24 ? 0 : (parts.hour ?? 0);
+  return {
+    minutes: hour * 60 + (parts.minute ?? 0),
+    seconds: parts.second ?? 0,
+  };
+}
+
+export function calculateTimeAxisTicks({
+  from,
+  minimumLabelSpacing,
+  pixelWidth,
+  timeZone,
+  until,
+}: TimeAxisTickOptions): TimeAxisTick[] {
+  if (
+    !Number.isFinite(from) ||
+    !Number.isFinite(until) ||
+    !Number.isFinite(pixelWidth) ||
+    until <= from ||
+    pixelWidth <= 0
+  ) {
+    return [];
+  }
+
+  const spanMinutes = (until - from) / MINUTE_MS;
+  const requiredStepMinutes = (spanMinutes * Math.max(1, minimumLabelSpacing)) / pixelWidth;
+  const stepMinutes =
+    TIME_AXIS_STEPS_MINUTES.find((candidate) => candidate >= requiredStepMinutes) ??
+    TIME_AXIS_STEPS_MINUTES.at(-1) ??
+    720;
+  const scanFrom = Math.ceil(from / (5 * MINUTE_MS)) * 5 * MINUTE_MS;
+  const ticks: TimeAxisTick[] = [];
+
+  for (let value = scanFrom; value <= until; value += 5 * MINUTE_MS) {
+    const local = localMinutesAndSeconds(value, timeZone);
+    if (local.seconds !== 0 || local.minutes % stepMinutes !== 0) continue;
+    if (ticks.at(-1)?.value === value) continue;
+    ticks.push({
+      label: timeAxisLabelFormatter(timeZone).format(new Date(value)),
+      value,
+    });
+  }
+
+  return ticks;
 }
 
 export function analyticsTicketGroups(rotations: readonly Rotation[]): AnalyticsTicketGroup[] {
