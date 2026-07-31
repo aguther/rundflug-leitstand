@@ -176,9 +176,10 @@ dokumentierte Breaking Change.
 `main` ist der stabile Integrationsbranch. Parallele Agenten arbeiten nicht gleichzeitig direkt auf
 `main`.
 
-Jeder unabhängige Auftrag wird auf einem eigenen kurzlebigen Branch bearbeitet. Der für einen Auftrag
-verantwortliche Agent ist nach erfolgreicher Validierung grundsätzlich auch für die Integration seines
-Branches nach `main` verantwortlich.
+Jeder unabhängige Auftrag wird auf einem eigenen kurzlebigen Branch und in einem ausschließlich diesem
+Auftrag zugewiesenen Git-Worktree bearbeitet. Der für einen Auftrag verantwortliche Agent ist nach
+erfolgreicher Validierung grundsätzlich auch für die Integration seines Branches nach `main`
+verantwortlich.
 
 Direkte Implementierungscommits auf `main` sind nicht zulässig. Ausnahmen müssen vom Auftraggeber
 ausdrücklich benannt sein, beispielsweise eine abgesicherte Historienbereinigung oder eine rein
@@ -186,13 +187,27 @@ administrative Repository-Operation.
 
 ### Beginn eines Auftrags
 
-Vor Beginn der Implementierung:
+Vor Beginn der Implementierung muss der Auftrag einen eigenen Worktree mit einem eigenen Branch auf
+Basis des aktuellen `origin/main` besitzen. Stellt die Ausführungsumgebung bereits einen eindeutig
+zugewiesenen Worktree bereit, wird dieser verwendet und kein weiterer Worktree darin angelegt.
+
+Andernfalls legt der koordinierende Agent den Worktree aus einem bestehenden Repository-Checkout an:
 
 ```bash
 git fetch origin
-git switch main
-git pull --ff-only origin main
-git switch -c <type>/<short-task-name>
+git worktree add -b <type>/<short-task-name> <absolute-worktree-path> origin/main
+```
+
+Der Worktree-Pfad muss eindeutig sein und soll außerhalb des primären Repository-Verzeichnisses liegen.
+Dadurch werden fremde Worktrees nicht versehentlich durch rekursive Dateiscans, Test-Watcher,
+Build-Werkzeuge oder Aufräumskripte erfasst.
+
+Der Agent prüft im neu angelegten Worktree vor der ersten Änderung:
+
+```bash
+git rev-parse --show-toplevel
+git branch --show-current
+git status --short --branch
 ```
 
 Branch-Namen müssen Englisch, kleingeschrieben und in Kebab-Case formuliert sein.
@@ -211,7 +226,13 @@ Ein Branch enthält genau ein fachlich zusammenhängendes Ergebnis.
 
 ### Parallele Agenten
 
-Jeder Agent arbeitet während der Implementierung ausschließlich auf seinem zugewiesenen Branch.
+Jeder Agent arbeitet während der Implementierung ausschließlich auf seinem zugewiesenen Branch und in
+seinem zugewiesenen Worktree. Ein eigener Branch ohne eigenen Worktree ist für parallele schreibende
+Arbeit nicht ausreichend.
+
+Zwei schreibende Agenten dürfen niemals dasselbe Working Directory verwenden. Ein Branch darf nicht
+gleichzeitig in mehreren Worktrees ausgecheckt werden. Der Agent führt in seinem Arbeits-Worktree kein
+`git switch main` aus.
 
 Agenten dürfen Änderungen anderer Agenten oder des Auftraggebers nicht:
 
@@ -220,6 +241,10 @@ Agenten dürfen Änderungen anderer Agenten oder des Auftraggebers nicht:
 - überschreiben,
 - stillschweigend in den eigenen Commit aufnehmen,
 - durch pauschale Konfliktauflösung ersetzen.
+
+Dev-Server-Ports, lokale D1-/Wrangler-Zustände, temporäre Verzeichnisse, Build-Ausgaben und externe
+Testressourcen müssen pro Auftrag getrennt sein. Repository-weite Git-Wartungsoperationen wie `git gc`,
+`git prune` oder das Löschen fremder Branches und Worktrees sind während paralleler Arbeit unzulässig.
 
 Vor Änderungen an gemeinsam genutzten Integrationspunkten ist der aktuelle Stand von `origin/main`
 erneut abzurufen. Dies gilt insbesondere für:
@@ -394,35 +419,41 @@ bereits veröffentlicht, wird der aktualisierte Stand anschließend mit `--force
 ### Integration nach `main`
 
 Nach erfolgreicher Validierung integriert der verantwortliche Agent seinen eigenen Branch nach `main`.
-Die Integration muss eine lineare Historie erhalten und darf nur als Fast-forward erfolgen:
+Die Integration muss eine lineare Historie erhalten und darf nur als Fast-forward erfolgen.
+
+Da jeder Agent in einem eigenen Worktree arbeitet, wechselt er zur Integration nicht auf einen lokalen
+`main`-Branch. Stattdessen pusht er den validierten Stand seines Arbeitsbranches mit einem normalen,
+nicht erzwungenen Fast-forward-Push direkt auf `origin/main`:
 
 ```bash
 git fetch origin
-git switch main
-git pull --ff-only origin main
-git switch <work-branch>
-git rebase main
+git rebase origin/main
 # relevante Prüfungen erneut ausführen
-git switch main
-git merge --ff-only <work-branch>
-git push origin main
+git push origin HEAD:main
 ```
 
 Die Prüfungen nach dem letzten Rebase müssen den tatsächlich zu pushenden Commit-Stand abdecken. Liegt
 der letzte vollständige Prüflauf bereits exakt auf diesem Stand, muss er nicht allein wegen des
-Branchwechsels wiederholt werden. Prüfungen, die den integrierten Workspace oder mehrere Pakete betreffen,
-sind auf `main` erneut auszuführen.
+Integrationsversuchs wiederholt werden. Der Push nach `main` darf niemals mit `--force` oder
+`--force-with-lease` erfolgen.
 
-Schlägt `git push origin main` fehl, weil ein anderer Agent zwischenzeitlich integriert hat, darf nicht
-force-gepusht und kein nicht-linearer Merge erzeugt werden. Der Agent muss stattdessen:
+Schlägt `git push origin HEAD:main` fehl, weil ein anderer Agent zwischenzeitlich integriert hat, darf
+nicht force-gepusht und kein nicht-linearer Merge erzeugt werden. Der Agent muss stattdessen:
 
-1. den eigenen Arbeitsbranch wieder auschecken,
-2. den neuen Stand von `origin/main` abrufen,
-3. den Arbeitsbranch auf `origin/main` rebasen,
-4. Konflikte semantisch lösen,
-5. die relevanten Prüfungen erneut ausführen,
-6. `main` erneut per Fast-forward aktualisieren,
-7. den Push erneut versuchen.
+1. den neuen Stand von `origin/main` abrufen,
+2. den Arbeitsbranch auf `origin/main` rebasen,
+3. Konflikte semantisch lösen,
+4. die relevanten Prüfungen erneut ausführen,
+5. einen bereits veröffentlichten Arbeitsbranch bei Bedarf mit `--force-with-lease` aktualisieren,
+6. den normalen Fast-forward-Push nach `main` erneut versuchen.
+
+Nach erfolgreichem Push ruft der Agent den Remote-Stand erneut ab und weist nach, dass sein Commit in
+`origin/main` enthalten ist:
+
+```bash
+git fetch origin
+git merge-base --is-ancestor HEAD origin/main
+```
 
 Damit werden parallele Integrationen optimistisch serialisiert. Ein Agent meldet seinen Auftrag erst als
 abgeschlossen, wenn der eigene Commit-Stand nachweislich auf `origin/main` enthalten ist.
@@ -432,15 +463,25 @@ der Arbeitsbranch aus unsauberen Zwischen-, Korrektur- oder Experimentiercommits
 notwendiges Umschreiben eines veröffentlichten Arbeitsbranches darf nur mit `--force-with-lease`
 gepusht werden.
 
-### Aufräumen des Arbeitsbranches
+### Aufräumen des Arbeitsbranches und Worktrees
 
 Erst nachdem der Push nach `main` erfolgreich war und bestätigt wurde, dass der integrierte Commit auf
-`origin/main` enthalten ist, wird der kurzlebige Arbeitsbranch aufgelöst:
+`origin/main` enthalten ist, werden der kurzlebige Arbeitsbranch und sein Worktree aufgelöst.
+
+Vor dem Entfernen muss bestätigt werden, dass der Worktree keine uncommittierten Änderungen enthält:
 
 ```bash
-git branch -d <work-branch>
-git push origin --delete <work-branch>
-git fetch --prune origin
+git -C <absolute-worktree-path> status --short
+```
+
+Anschließend werden aus einem anderen Checkout des Repositorys zuerst der Worktree und danach der Branch
+entfernt:
+
+```bash
+git -C <repository-path> worktree remove <absolute-worktree-path>
+git -C <repository-path> branch -d <work-branch>
+git -C <repository-path> push origin --delete <work-branch>
+git -C <repository-path> fetch --prune origin
 ```
 
 Existiert kein veröffentlichter Remote-Branch, entfällt dessen Löschung. Die Löschung darf nicht vor der
@@ -459,6 +500,8 @@ Der Agent nennt am Ende:
 - ob auf den neuesten Stand von `origin/main` rebased wurde,
 - den integrierten Commit auf `main`,
 - ob `main` erfolgreich nach `origin` gepusht wurde,
+- den verwendeten Worktree,
+- ob der Worktree entfernt wurde,
 - ob der lokale und der Remote-Arbeitsbranch gelöscht wurden,
 - offene Risiken oder nicht ausgeführte Prüfungen.
 
@@ -480,6 +523,7 @@ Eine Änderung ist nur fertig, wenn:
 - der finale Diff auf Regressionen und Datenexposition geprüft wurde,
 - der Arbeitsbranch auf dem neuesten Stand von `origin/main` validiert wurde,
 - die Änderung per Fast-forward nach `main` integriert und zu `origin/main` gepusht wurde,
+- der auftragsbezogene Worktree nach bestätigter Integration entfernt wurde,
 - der kurzlebige Arbeitsbranch nach bestätigter Integration lokal und remote aufgeräumt wurde.
 
 ## Hochkritische Review-Funde
