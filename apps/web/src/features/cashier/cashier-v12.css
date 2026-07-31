@@ -591,6 +591,55 @@
   font-size: 0.72rem;
   text-align: center;
 }
+
+.cashier-ticket-table .ds-table tbody tr.cashier-ticket-row--new {
+  animation: cashier-new-ticket-row 10s ease-out both;
+}
+
+.cashier-ticket-table .ds-table tbody tr.selected.cashier-ticket-row--new {
+  animation-name: cashier-new-selected-ticket-row;
+}
+
+@keyframes cashier-new-ticket-row {
+  0%,
+  72% {
+    background: color-mix(in srgb, var(--ui-success-soft) 86%, var(--ui-surface));
+    box-shadow: inset 0 0 0 2px var(--ui-success);
+  }
+  100% {
+    background: transparent;
+    box-shadow: inset 0 0 0 0 transparent;
+  }
+}
+
+@keyframes cashier-new-selected-ticket-row {
+  0%,
+  72% {
+    background: color-mix(in srgb, var(--ui-success-soft) 78%, var(--ui-accent-soft));
+    box-shadow:
+      inset 3px 0 0 var(--ui-accent),
+      inset 0 0 0 2px var(--ui-success);
+  }
+  100% {
+    background: color-mix(in srgb, var(--ui-accent-soft) 68%, var(--ui-surface));
+    box-shadow: inset 3px 0 0 var(--ui-accent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cashier-ticket-table .ds-table tbody tr.cashier-ticket-row--new {
+    animation: none;
+    background: color-mix(in srgb, var(--ui-success-soft) 86%, var(--ui-surface));
+    box-shadow: inset 0 0 0 2px var(--ui-success);
+  }
+
+  .cashier-ticket-table .ds-table tbody tr.selected.cashier-ticket-row--new {
+    background: color-mix(in srgb, var(--ui-success-soft) 78%, var(--ui-accent-soft));
+    box-shadow:
+      inset 3px 0 0 var(--ui-accent),
+      inset 0 0 0 2px var(--ui-success);
+  }
+}
 .cashier-cancel-dialog-body {
   display: grid;
   gap: 12px;

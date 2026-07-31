@@ -65,6 +65,7 @@ import {
   cashierProductOrderChanged,
   moveCashierProduct,
 } from "./features/cashier/cashier-product-order";
+import { useTemporaryRowHighlights } from "./features/cashier/use-temporary-row-highlights";
 import {
   appendCashierDraftRevision,
   cashierDraftQueueKey,
@@ -248,6 +249,7 @@ export function CashierView() {
   const [receipt, setReceipt] = useState<TicketReceipt | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   useActionMessageBridge(message, setMessage);
+  const [saleAnnouncement, setSaleAnnouncement] = useState("");
   const [lastTicketGroupId, setLastTicketGroupId] = useState<string | null>(null);
   const [cancelReason, setCancelReason] = useState("");
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
@@ -282,6 +284,8 @@ export function CashierView() {
         ? entry.groupStatus !== "CANCELED" && entry.groupStatus !== "COMPLETED"
         : entry.groupStatus !== "CANCELED",
   );
+  const { highlightedIds: newlySoldTicketGroupIds, queueHighlight: queueSaleHighlight } =
+    useTemporaryRowHighlights(visibleTicketGroups.map((entry) => entry.ticketGroupId));
   const cashierProductsById = new Map(
     (board?.products ?? []).map((product) => [product.id, product]),
   );
@@ -637,9 +641,9 @@ export function CashierView() {
     confirmEvent(saleResult.event);
     setLastTicketGroupId(soldTicketGroupId);
     setBusyProductId(null);
-    setMessage(
-      `${codes.length} Ticket${codes.length === 1 ? "" : "s"} verkauft. Ansicht und Beleg werden aktualisiert.`,
-    );
+    setMessage(null);
+    setSaleAnnouncement(`${codes.length} Ticket${codes.length === 1 ? "" : "s"} verkauft.`);
+    if (soldTicketGroupId) queueSaleHighlight(soldTicketGroupId);
     try {
       performance.measure("rundflug:cashier-sale-ready", {
         start: saleStartedAt,
@@ -673,11 +677,9 @@ export function CashierView() {
         const printPrepared = printResult.status === "fulfilled" && printResult.value;
         const synchronized =
           boardResult.status === "fulfilled" && targetedListResult.status === "fulfilled";
-        if (receiptRequestToken === receiptRequestRef.current) {
+        if (receiptRequestToken === receiptRequestRef.current && !(printPrepared && synchronized)) {
           setMessage(
-            printPrepared && synchronized
-              ? `${codes.length} Ticket${codes.length === 1 ? "" : "s"} verkauft.`
-              : `${codes.length} Ticket${codes.length === 1 ? "" : "s"} verkauft. Ansicht oder Druckvorbereitung wird weiter nachgeladen; Nachdruck bleibt möglich.`,
+            `${codes.length} Ticket${codes.length === 1 ? "" : "s"} verkauft. Ansicht oder Druckvorbereitung wird weiter nachgeladen; Nachdruck bleibt möglich.`,
           );
         }
       } catch {
@@ -866,6 +868,9 @@ export function CashierView() {
         </>
       }
     >
+      <p aria-live="polite" className="visually-hidden">
+        {saleAnnouncement}
+      </p>
       <section className="cashier-v15-workspace">
         <Panel className="cashier-sale-panel" aria-labelledby="cashier-sale-title">
           <div className="cashier-sale-heading">
@@ -1250,6 +1255,11 @@ export function CashierView() {
                 }
               }}
               rowKey={(result) => result.ticketGroupId}
+              rowClassName={(result) =>
+                newlySoldTicketGroupIds.has(result.ticketGroupId)
+                  ? "cashier-ticket-row--new"
+                  : undefined
+              }
               rows={visibleTicketGroups}
               {...(lastTicketGroupId ? { selectedRowKey: lastTicketGroupId } : {})}
             />
