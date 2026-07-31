@@ -109,6 +109,14 @@ describe("FlightDirectorAnalyticsContent resource timeline", () => {
     expect(rotationButton.getAttribute("title")).toContain(
       "22:25–22:35 Uhr · 1/3 Personen · D-EDNE · P-PATRICK",
     );
+    expect(
+      Array.from(container.querySelectorAll(".flight-director-analytics-table th"))
+        .slice(0, 4)
+        .map((cell) => cell.textContent),
+    ).toEqual(["Ticketgruppe", "Fluggruppe", "Flugzeug", "Pilot"]);
+    expect(container.querySelector(".flight-director-analytics-table tbody td")?.textContent).toBe(
+      "G-RN-0106, G-RN-0107",
+    );
 
     const viewport = container.querySelector(".flight-director-chart-viewport");
     expect(viewport).not.toBeNull();
@@ -140,5 +148,40 @@ describe("FlightDirectorAnalyticsContent resource timeline", () => {
 
     fireEvent.click(rotationButton);
     expect(onOpenRotation).toHaveBeenCalledWith("rotation-1");
+  });
+
+  it("shows the same ticket group projection in the pilot history table", async () => {
+    const pilotHistory = {
+      ...history,
+      scopeId: "pilot-1",
+      scopeType: "PILOT",
+    } as ResourceDayHistory;
+    const { container } = render(
+      <FlightDirectorAnalyticsContent
+        aircraftId="aircraft-1"
+        board={board}
+        loadForecastHistory={vi.fn(async () => [])}
+        loadResourceHistory={vi.fn(async () => pilotHistory)}
+        onAircraftIdChange={vi.fn()}
+        onOpenRotation={vi.fn()}
+        onPilotIdChange={vi.fn()}
+        onRotationIdChange={vi.fn()}
+        onTicketGroupIdChange={vi.fn()}
+        pilotId="pilot-1"
+        rotationId="rotation-1"
+        tab="pilots"
+        ticketGroupId="ticket-group-1"
+      />,
+    );
+
+    await screen.findByRole("heading", { name: "Piloteneinsatz P-PATRICK" });
+    expect(
+      Array.from(container.querySelectorAll(".flight-director-analytics-table th"))
+        .slice(0, 4)
+        .map((cell) => cell.textContent),
+    ).toEqual(["Ticketgruppe", "Fluggruppe", "Flugzeug", "Pilot"]);
+    expect(container.querySelector(".flight-director-analytics-table tbody td")?.textContent).toBe(
+      "G-RN-0106, G-RN-0107",
+    );
   });
 });
