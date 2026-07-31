@@ -1,8 +1,121 @@
-import type { ForecastHistory, ResourceDayHistory } from "@rundflug/contracts";
+import type { ForecastHistory, OperationBoard, ResourceDayHistory } from "@rundflug/contracts";
+import { formatBookingGroupLabel } from "@rundflug/domain";
 
 const MINUTE_MS = 60_000;
 
 export type ForecastEntry = ForecastHistory["entries"][number];
+type Rotation = OperationBoard["rotations"][number];
+
+export interface AnalyticsTicketGroup {
+  id: string;
+  label: string;
+  productName: string;
+  soldAt: string;
+  rotationIds: string[];
+}
+
+export interface ResourceTimelinePhase {
+  type: "BOARDING" | "FLIGHT" | "TURNAROUND";
+  startPercent: number;
+  endPercent: number;
+}
+
+export interface ResourceTimelineRotation {
+  id: string;
+  label: string;
+  startPercent: number;
+  endPercent: number;
+  phases: ResourceTimelinePhase[];
+  rotation: ResourceDayHistory["rotations"][number];
+}
+
+export function analyticsTicketGroups(rotations: readonly Rotation[]): AnalyticsTicketGroup[] {
+  const groups = new Map<string, AnalyticsTicketGroup>();
+  for (const rotation of rotations) {
+    const bookingGroups =
+      rotation.bookingGroups.length > 0
+        ? rotation.bookingGroups
+        : [
+            {
+              id: rotation.ticketGroupId,
+              communicationNumber: rotation.communicationNumber,
+              soldAt: "",
+            },
+          ];
+    for (const group of bookingGroups) {
+      const existing = groups.get(group.id);
+      if (existing) {
+        if (!existing.rotationIds.includes(rotation.id)) existing.rotationIds.push(rotation.id);
+        continue;
+      }
+      groups.set(group.id, {
+        id: group.id,
+        label: formatBookingGroupLabel(rotation.productCode, group.communicationNumber),
+        productName: rotation.productName,
+        soldAt: group.soldAt,
+        rotationIds: [rotation.id],
+      });
+    }
+  }
+  return [...groups.values()].sort(
+    (left, right) =>
+      left.soldAt.localeCompare(right.soldAt) ||
+      left.label.localeCompare(right.label, "de-DE", { numeric: true }),
+  );
+}
+
+function percentAt(value: number, from: number, until: number): number {
+  const span = Math.max(1, until - from);
+  return Math.min(100, Math.max(0, ((value - from) / span) * 100));
+}
+
+export function resourceTimelineRotations(history: ResourceDayHistory): ResourceTimelineRotation[] {
+  const from = Date.parse(history.from);
+  const until = Date.parse(history.until);
+  return history.rotations.flatMap((rotation) => {
+    if (!rotation.actual.boardingAt) return [];
+    const start = Math.max(from, Date.parse(rotation.actual.boardingAt));
+    const end = Math.min(until, Date.parse(rotation.actual.completionAt ?? history.observedUntil));
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end < from || start > until) return [];
+    const boundedEnd = Math.max(start + 1, end);
+    const departure = rotation.actual.departureAt
+      ? Math.min(boundedEnd, Math.max(start, Date.parse(rotation.actual.departureAt)))
+      : null;
+    const landing = rotation.actual.landingAt
+      ? Math.min(boundedEnd, Math.max(departure ?? start, Date.parse(rotation.actual.landingAt)))
+      : null;
+    const phases: ResourceTimelinePhase[] = [];
+    phases.push({
+      type: "BOARDING",
+      startPercent: percentAt(start, from, until),
+      endPercent: percentAt(departure ?? boundedEnd, from, until),
+    });
+    if (departure !== null) {
+      phases.push({
+        type: "FLIGHT",
+        startPercent: percentAt(departure, from, until),
+        endPercent: percentAt(landing ?? boundedEnd, from, until),
+      });
+    }
+    if (landing !== null) {
+      phases.push({
+        type: "TURNAROUND",
+        startPercent: percentAt(landing, from, until),
+        endPercent: percentAt(boundedEnd, from, until),
+      });
+    }
+    return [
+      {
+        id: rotation.rotationId,
+        label: rotation.communicationLabel,
+        startPercent: percentAt(start, from, until),
+        endPercent: percentAt(boundedEnd, from, until),
+        phases,
+        rotation,
+      },
+    ];
+  });
+}
 
 export function sortedForecastEntries(entries: readonly ForecastEntry[]): ForecastEntry[] {
   return [...entries].sort(

@@ -1,13 +1,19 @@
 import type { ForecastHistory, OperationBoard, ResourceDayHistory } from "@rundflug/contracts";
-import { ArrowLeft, ArrowRight, ChartNoAxesCombined, Plane, UserRound } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Bar,
-  BarChart,
+  ArrowLeft,
+  ArrowRight,
+  ChartNoAxesCombined,
+  Maximize2,
+  Plane,
+  UserRound,
+  ZoomIn,
+  ZoomOut,
+} from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
   CartesianGrid,
   Line,
   LineChart,
-  ReferenceArea,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
@@ -17,10 +23,13 @@ import {
 import { Button } from "../../design-system/components";
 import type { AnalyticsTab } from "./FlightDirectorAnalyticsDialog";
 import {
+  type AnalyticsTicketGroup,
+  analyticsTicketGroups,
   boardingForecastChangeMinutes,
   forecastChartData,
   formatDuration,
   resourceDayMetrics,
+  resourceTimelineRotations,
   sortedForecastEntries,
 } from "./flight-director-analytics-model";
 
@@ -39,13 +48,88 @@ interface FlightDirectorAnalyticsContentProps {
   onOpenRotation: (rotationId: string) => void;
   onPilotIdChange: (pilotId: string) => void;
   onRotationIdChange: (rotationId: string) => void;
+  onTicketGroupIdChange: (ticketGroupId: string) => void;
   pilotId: string;
   rotationId: string;
   tab: AnalyticsTab;
+  ticketGroupId: string;
 }
 
 const MINUTE_MS = 60_000;
 const PAGE_SIZE = 8;
+const ZOOM_LEVELS: readonly number[] = [1, 1.5, 2, 3, 4.5, 6, 8];
+
+function useDiagramZoom() {
+  const [zoom, setZoom] = useState(1);
+  const zoomRef = useRef(1);
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const wheelHandlerRef = useRef<(event: WheelEvent) => void>(() => undefined);
+  const nativeWheelListenerRef = useRef<((event: WheelEvent) => void) | null>(null);
+
+  const changeZoom = (nextZoom: number, anchorClientX?: number) => {
+    const viewport = viewportRef.current;
+    const nextIndex = ZOOM_LEVELS.reduce(
+      (nearest, level, index) =>
+        Math.abs(level - nextZoom) < Math.abs((ZOOM_LEVELS[nearest] ?? 1) - nextZoom)
+          ? index
+          : nearest,
+      0,
+    );
+    const normalizedZoom = ZOOM_LEVELS[nextIndex] ?? 1;
+    if (normalizedZoom === zoomRef.current) return;
+
+    let anchorOffset = 0;
+    let anchorRatio = 0.5;
+    if (viewport) {
+      const bounds = viewport.getBoundingClientRect();
+      anchorOffset =
+        anchorClientX === undefined
+          ? viewport.clientWidth / 2
+          : Math.min(viewport.clientWidth, Math.max(0, anchorClientX - bounds.left));
+      anchorRatio =
+        viewport.scrollWidth > 0
+          ? (viewport.scrollLeft + anchorOffset) / viewport.scrollWidth
+          : 0.5;
+    }
+
+    zoomRef.current = normalizedZoom;
+    setZoom(normalizedZoom);
+    if (!viewport) return;
+    window.requestAnimationFrame(() => {
+      viewport.scrollLeft = Math.max(0, anchorRatio * viewport.scrollWidth - anchorOffset);
+    });
+  };
+
+  wheelHandlerRef.current = (event: WheelEvent) => {
+    if (event.deltaY === 0) return;
+    event.preventDefault();
+    const currentIndex = ZOOM_LEVELS.indexOf(zoomRef.current);
+    const direction = event.deltaY < 0 ? 1 : -1;
+    const nextIndex = Math.min(ZOOM_LEVELS.length - 1, Math.max(0, currentIndex + direction));
+    changeZoom(ZOOM_LEVELS[nextIndex] ?? 1, event.clientX);
+  };
+
+  if (!nativeWheelListenerRef.current) {
+    nativeWheelListenerRef.current = (event) => wheelHandlerRef.current(event);
+  }
+  const setViewportRef = useCallback((viewport: HTMLDivElement | null) => {
+    const listener = nativeWheelListenerRef.current;
+    if (!listener) return;
+    viewportRef.current?.removeEventListener("wheel", listener);
+    viewportRef.current = viewport;
+    viewport?.addEventListener("wheel", listener, { passive: false });
+  }, []);
+
+  useEffect(
+    () => () => {
+      const listener = nativeWheelListenerRef.current;
+      if (listener) viewportRef.current?.removeEventListener("wheel", listener);
+    },
+    [],
+  );
+
+  return { changeZoom, setViewportRef, zoom };
+}
 
 function formatTime(value: string | number | null, timeZone: string): string {
   if (value === null) return "–";
@@ -99,6 +183,51 @@ function AnalyticsLoading() {
   );
 }
 
+function DiagramZoomControls({
+  onChange,
+  value,
+}: {
+  onChange: (zoom: number) => void;
+  value: number;
+}) {
+  const index = ZOOM_LEVELS.indexOf(value);
+  return (
+    <fieldset className="flight-director-diagram-zoom">
+      <legend className="visually-hidden">Diagramm-Zoom</legend>
+      <small>Mausrad: Zoom an Zeigerposition</small>
+      <Button
+        aria-label="Diagramm verkleinern"
+        disabled={index <= 0}
+        onClick={() => onChange(ZOOM_LEVELS[Math.max(0, index - 1)] ?? 1)}
+        type="button"
+        variant="secondary"
+      >
+        <ZoomOut aria-hidden="true" />
+      </Button>
+      <span aria-live="polite">{Math.round(value * 100)} %</span>
+      <Button
+        aria-label="Diagramm vergrößern"
+        disabled={index < 0 || index >= ZOOM_LEVELS.length - 1}
+        onClick={() => onChange(ZOOM_LEVELS[Math.min(ZOOM_LEVELS.length - 1, index + 1)] ?? value)}
+        type="button"
+        variant="secondary"
+      >
+        <ZoomIn aria-hidden="true" />
+      </Button>
+      <Button
+        aria-label="Gesamten Veranstaltungsverlauf anzeigen"
+        disabled={value === 1}
+        onClick={() => onChange(1)}
+        type="button"
+        variant="secondary"
+      >
+        <Maximize2 aria-hidden="true" />
+        Gesamt
+      </Button>
+    </fieldset>
+  );
+}
+
 function ForecastTooltip({
   active,
   label,
@@ -125,24 +254,21 @@ function ForecastTooltip({
   );
 }
 
-function ForecastPanel({
+function ForecastRotationPanel({
   board,
   entries,
   error,
   loading,
-  onRotationIdChange,
   rotation,
-  rotationId,
 }: {
   board: OperationBoard;
   entries: ForecastEntry[];
   error: string | null;
   loading: boolean;
-  onRotationIdChange: (rotationId: string) => void;
   rotation: Rotation | undefined;
-  rotationId: string;
 }) {
   const [page, setPage] = useState(0);
+  const { changeZoom, setViewportRef, zoom } = useDiagramZoom();
   const sorted = useMemo(() => sortedForecastEntries(entries), [entries]);
   const chartData = useMemo(() => forecastChartData(entries), [entries]);
   const latest = sorted.at(-1);
@@ -215,22 +341,17 @@ function ForecastPanel({
   ];
 
   return (
-    <section aria-labelledby="analytics-group-title" className="flight-director-analytics-panel">
+    <article
+      aria-labelledby={`analytics-rotation-${rotation?.id ?? "unknown"}`}
+      className="flight-director-forecast-detail"
+    >
       <header className="flight-director-analytics-panel-heading">
         <div>
-          <h3 id="analytics-group-title">Prognoseverlauf {rotation?.communicationLabel ?? ""}</h3>
-          <p>Wie sich die vier prognostizierten Meilensteine im Tagesverlauf verändert haben.</p>
+          <h4 id={`analytics-rotation-${rotation?.id ?? "unknown"}`}>
+            Fluggruppe {rotation?.communicationLabel ?? "–"}
+          </h4>
+          <p>{rotation?.productName ?? "Zugehöriger Umlauf"}</p>
         </div>
-        <label>
-          <span>Fluggruppe</span>
-          <select onChange={(event) => onRotationIdChange(event.target.value)} value={rotationId}>
-            {board.rotations.map((entry) => (
-              <option key={entry.id} value={entry.id}>
-                {entry.communicationLabel} · {entry.productName}
-              </option>
-            ))}
-          </select>
-        </label>
       </header>
       <dl className="flight-director-analytics-milestones">
         {milestones.map(([label, value]) => (
@@ -256,113 +377,122 @@ function ForecastPanel({
         <AnalyticsEmpty message="Für diese Fluggruppe wurden noch keine Prognose-Snapshots erfasst." />
       ) : (
         <>
-          <div className="flight-director-forecast-chart" role="img">
-            <ResponsiveContainer height="100%" width="100%">
-              <LineChart
-                accessibilityLayer
-                data={chartData}
-                margin={{ top: 18, right: 28, bottom: 2, left: 12 }}
-              >
-                <CartesianGrid stroke="var(--ui-border)" strokeDasharray="2 4" />
-                <XAxis
-                  dataKey="capturedAt"
-                  domain={["dataMin", "dataMax"]}
-                  minTickGap={44}
-                  scale="time"
-                  tickFormatter={(value: number) => formatTime(value, timeZone)}
-                  type="number"
-                />
-                <YAxis
-                  domain={[minimum, maximum]}
-                  scale="time"
-                  tickFormatter={(value: number) => formatTime(value, timeZone)}
-                  type="number"
-                  width={52}
-                />
-                <Tooltip
-                  content={(props) => (
-                    <ForecastTooltip
-                      active={props.active}
-                      label={typeof props.label === "number" ? props.label : undefined}
-                      payload={props.payload}
-                      timeZone={timeZone}
-                    />
-                  )}
-                />
-                <Line
-                  dataKey="boardingAt"
-                  dot={{ r: 2 }}
-                  isAnimationActive={false}
-                  name="Boarding"
-                  stroke="var(--analytics-boarding)"
-                  strokeWidth={1.75}
-                  type="monotone"
-                />
-                <Line
-                  dataKey="departureAt"
-                  dot={{ r: 2 }}
-                  isAnimationActive={false}
-                  name="Off-Block"
-                  stroke="var(--analytics-departure)"
-                  strokeWidth={1.75}
-                  type="monotone"
-                />
-                <Line
-                  dataKey="landingAt"
-                  dot={{ r: 2 }}
-                  isAnimationActive={false}
-                  name="On-Block"
-                  stroke="var(--analytics-landing)"
-                  strokeWidth={1.75}
-                  type="monotone"
-                />
-                <Line
-                  dataKey="completionAt"
-                  dot={{ r: 2 }}
-                  isAnimationActive={false}
-                  name="Abschluss"
-                  stroke="var(--analytics-completion)"
-                  strokeWidth={1.75}
-                  type="monotone"
-                />
-                {actual?.boardingAt ? (
-                  <ReferenceLine
+          <DiagramZoomControls onChange={changeZoom} value={zoom} />
+          <div className="flight-director-chart-viewport" ref={setViewportRef}>
+            <div
+              aria-label="Prognosediagramm; mit dem Mausrad zoomen"
+              className="flight-director-forecast-chart"
+              role="img"
+              style={{ width: `${zoom * 100}%` }}
+            >
+              <ResponsiveContainer height="100%" width="100%">
+                <LineChart
+                  accessibilityLayer
+                  data={chartData}
+                  margin={{ top: 18, right: 28, bottom: 2, left: 12 }}
+                >
+                  <CartesianGrid stroke="var(--ui-border)" strokeDasharray="2 4" />
+                  <XAxis
+                    dataKey="capturedAt"
+                    domain={["dataMin", "dataMax"]}
+                    minTickGap={44}
+                    scale="time"
+                    tickFormatter={(value: number) => formatTime(value, timeZone)}
+                    type="number"
+                  />
+                  <YAxis
+                    domain={[minimum, maximum]}
+                    scale="time"
+                    tickFormatter={(value: number) => formatTime(value, timeZone)}
+                    type="number"
+                    width={52}
+                  />
+                  <Tooltip
+                    content={(props) => (
+                      <ForecastTooltip
+                        active={props.active}
+                        label={typeof props.label === "number" ? props.label : undefined}
+                        payload={props.payload}
+                        timeZone={timeZone}
+                      />
+                    )}
+                    isAnimationActive={false}
+                  />
+                  <Line
+                    dataKey="boardingAt"
+                    dot={{ r: 2 }}
+                    isAnimationActive={false}
+                    name="Boarding"
                     stroke="var(--analytics-boarding)"
-                    strokeDasharray="3 5"
-                    y={Date.parse(actual.boardingAt)}
+                    strokeWidth={1.75}
+                    type="monotone"
                   />
-                ) : null}
-                {actual?.departureAt ? (
-                  <ReferenceLine
+                  <Line
+                    dataKey="departureAt"
+                    dot={{ r: 2 }}
+                    isAnimationActive={false}
+                    name="Off-Block"
                     stroke="var(--analytics-departure)"
-                    strokeDasharray="3 5"
-                    y={Date.parse(actual.departureAt)}
+                    strokeWidth={1.75}
+                    type="monotone"
                   />
-                ) : null}
-                {actual?.landingAt ? (
-                  <ReferenceLine
+                  <Line
+                    dataKey="landingAt"
+                    dot={{ r: 2 }}
+                    isAnimationActive={false}
+                    name="On-Block"
                     stroke="var(--analytics-landing)"
-                    strokeDasharray="3 5"
-                    y={Date.parse(actual.landingAt)}
+                    strokeWidth={1.75}
+                    type="monotone"
                   />
-                ) : null}
-                {actual?.completionAt ? (
-                  <ReferenceLine
+                  <Line
+                    dataKey="completionAt"
+                    dot={{ r: 2 }}
+                    isAnimationActive={false}
+                    name="Abschluss"
                     stroke="var(--analytics-completion)"
-                    strokeDasharray="3 5"
-                    y={Date.parse(actual.completionAt)}
+                    strokeWidth={1.75}
+                    type="monotone"
                   />
-                ) : null}
-                {rotation?.precalledAt ? (
-                  <ReferenceLine
-                    label={{ value: "GO TO GATE", fill: "var(--ui-muted)", fontSize: 10 }}
-                    stroke="var(--ui-warning)"
-                    strokeDasharray="4 4"
-                    x={Date.parse(rotation.precalledAt)}
-                  />
-                ) : null}
-              </LineChart>
-            </ResponsiveContainer>
+                  {actual?.boardingAt ? (
+                    <ReferenceLine
+                      stroke="var(--analytics-boarding)"
+                      strokeDasharray="3 5"
+                      y={Date.parse(actual.boardingAt)}
+                    />
+                  ) : null}
+                  {actual?.departureAt ? (
+                    <ReferenceLine
+                      stroke="var(--analytics-departure)"
+                      strokeDasharray="3 5"
+                      y={Date.parse(actual.departureAt)}
+                    />
+                  ) : null}
+                  {actual?.landingAt ? (
+                    <ReferenceLine
+                      stroke="var(--analytics-landing)"
+                      strokeDasharray="3 5"
+                      y={Date.parse(actual.landingAt)}
+                    />
+                  ) : null}
+                  {actual?.completionAt ? (
+                    <ReferenceLine
+                      stroke="var(--analytics-completion)"
+                      strokeDasharray="3 5"
+                      y={Date.parse(actual.completionAt)}
+                    />
+                  ) : null}
+                  {rotation?.precalledAt ? (
+                    <ReferenceLine
+                      label={{ value: "GO TO GATE", fill: "var(--ui-muted)", fontSize: 10 }}
+                      stroke="var(--ui-warning)"
+                      strokeDasharray="4 4"
+                      x={Date.parse(rotation.precalledAt)}
+                    />
+                  ) : null}
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
           </div>
           <fieldset className="flight-director-forecast-legend">
             <legend className="visually-hidden">Diagrammlegende</legend>
@@ -425,99 +555,108 @@ function ForecastPanel({
           </Button>
         </nav>
       ) : null}
+    </article>
+  );
+}
+
+interface ForecastLoadResult {
+  entries: ForecastEntry[];
+  error: string | null;
+}
+
+function ForecastPanel({
+  board,
+  forecastResults,
+  onRotationIdChange,
+  onTicketGroupIdChange,
+  rotationId,
+  ticketGroupId,
+  ticketGroups,
+}: {
+  board: OperationBoard;
+  forecastResults: Record<string, ForecastLoadResult>;
+  onRotationIdChange: (rotationId: string) => void;
+  onTicketGroupIdChange: (ticketGroupId: string) => void;
+  rotationId: string;
+  ticketGroupId: string;
+  ticketGroups: AnalyticsTicketGroup[];
+}) {
+  const ticketGroup = ticketGroups.find((group) => group.id === ticketGroupId);
+  const relatedRotations =
+    ticketGroup?.rotationIds.flatMap((id) => {
+      const rotation = board.rotations.find((entry) => entry.id === id);
+      return rotation ? [rotation] : [];
+    }) ?? [];
+  const visibleRotations =
+    rotationId === "all"
+      ? relatedRotations
+      : relatedRotations.filter((rotation) => rotation.id === rotationId);
+
+  return (
+    <section
+      aria-labelledby="analytics-ticket-group-title"
+      className="flight-director-analytics-panel"
+    >
+      <header className="flight-director-analytics-panel-heading">
+        <div>
+          <h3 id="analytics-ticket-group-title">Prognoseverlauf {ticketGroup?.label ?? ""}</h3>
+          <p>
+            Die Ticketgruppe ist führend; darunter werden alle zugehörigen Fluggruppen ausgewertet.
+          </p>
+        </div>
+        <div className="flight-director-analytics-selectors">
+          <label>
+            <span>Ticketgruppe</span>
+            <select
+              onChange={(event) => onTicketGroupIdChange(event.target.value)}
+              value={ticketGroupId}
+            >
+              {ticketGroups.map((group) => (
+                <option key={group.id} value={group.id}>
+                  {group.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>Fluggruppe</span>
+            <select
+              disabled={relatedRotations.length === 0}
+              onChange={(event) => onRotationIdChange(event.target.value)}
+              value={rotationId}
+            >
+              {relatedRotations.length > 1 ? (
+                <option value="all">Alle zugehörigen ({relatedRotations.length})</option>
+              ) : null}
+              {relatedRotations.map((rotation) => (
+                <option key={rotation.id} value={rotation.id}>
+                  {rotation.communicationLabel}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      </header>
+      {!ticketGroup || visibleRotations.length === 0 ? (
+        <AnalyticsEmpty message="Für diese Ticketgruppe liegt noch keine zugehörige Fluggruppe vor." />
+      ) : (
+        <div className="flight-director-forecast-list">
+          {visibleRotations.map((rotation) => {
+            const result = forecastResults[rotation.id];
+            return (
+              <ForecastRotationPanel
+                board={board}
+                entries={result?.entries ?? []}
+                error={result?.error ?? null}
+                key={rotation.id}
+                loading={!result}
+                rotation={rotation}
+              />
+            );
+          })}
+        </div>
+      )}
     </section>
-  );
-}
-
-interface TimelineRow {
-  bindingRange: [number, number];
-  boardingAt: number;
-  departureAt: number | null;
-  landingAt: number | null;
-  completionAt: number | null;
-  communicationLabel: string;
-  rotation: ResourceDayHistory["rotations"][number];
-}
-
-function TimelineShape({
-  height = 12,
-  payload,
-  width = 0,
-  x = 0,
-  y = 0,
-}: {
-  height?: number;
-  payload?: TimelineRow;
-  width?: number;
-  x?: number;
-  y?: number;
-}) {
-  if (!payload) return null;
-  const [start, end] = payload.bindingRange;
-  const span = Math.max(1, end - start);
-  const position = (value: number | null) =>
-    value === null ? null : x + ((Math.min(end, Math.max(start, value)) - start) / span) * width;
-  const departureX = position(payload.departureAt) ?? x;
-  const landingX = position(payload.landingAt) ?? departureX;
-  const completionX = position(payload.completionAt) ?? x + width;
-  const top = y + Math.max(0, (height - 14) / 2);
-  return (
-    <g>
-      <rect
-        className="timeline-boarding"
-        height={14}
-        rx={3}
-        width={Math.max(2, departureX - x)}
-        x={x}
-        y={top}
-      />
-      {payload.departureAt !== null ? (
-        <rect
-          className="timeline-flight"
-          height={14}
-          width={Math.max(2, landingX - departureX)}
-          x={departureX}
-          y={top}
-        />
-      ) : null}
-      {payload.landingAt !== null ? (
-        <rect
-          className="timeline-turnaround"
-          height={14}
-          rx={3}
-          width={Math.max(2, completionX - landingX)}
-          x={landingX}
-          y={top}
-        />
-      ) : null}
-    </g>
-  );
-}
-
-function ResourceTooltip({
-  active,
-  payload,
-  timeZone,
-}: {
-  active?: boolean;
-  payload?: ReadonlyArray<{ payload?: TimelineRow }>;
-  timeZone: string;
-}) {
-  const row = payload?.[0]?.payload;
-  if (!active || !row) return null;
-  return (
-    <div className="flight-director-analytics-tooltip">
-      <strong>{row.communicationLabel}</strong>
-      <span>
-        {formatTime(row.rotation.actual.boardingAt, timeZone)}–{" "}
-        {formatTime(row.rotation.actual.completionAt, timeZone)} Uhr
-      </span>
-      <span>
-        {row.rotation.passengerCount}/{row.rotation.usableCapacity} Plätze ·{" "}
-        {row.rotation.aircraftRegistration ?? "kein Flugzeug"} ·{" "}
-        {row.rotation.pilotOperationalCode ?? "kein Pilot"}
-      </span>
-    </div>
   );
 }
 
@@ -540,6 +679,7 @@ function ResourcePanel({
   scopeId: string;
   scopeType: "AIRCRAFT" | "PILOT";
 }) {
+  const { changeZoom, setViewportRef, zoom } = useDiagramZoom();
   const timeZone = board.event.timeZone;
   const resources =
     scopeType === "AIRCRAFT"
@@ -555,29 +695,22 @@ function ResourcePanel({
         }));
   const selected = resources.find((resource) => resource.id === scopeId);
   const metrics = history ? resourceDayMetrics(history) : null;
-  const timelineRows = useMemo<TimelineRow[]>(
-    () =>
-      history?.rotations
-        .filter((rotation) => rotation.actual.boardingAt)
-        .map((rotation) => {
-          const boardingAt = Date.parse(rotation.actual.boardingAt ?? history.from);
-          const completionAt = Date.parse(rotation.actual.completionAt ?? history.observedUntil);
-          return {
-            bindingRange: [boardingAt, Math.max(boardingAt + 1, completionAt)],
-            boardingAt,
-            departureAt: rotation.actual.departureAt
-              ? Date.parse(rotation.actual.departureAt)
-              : null,
-            landingAt: rotation.actual.landingAt ? Date.parse(rotation.actual.landingAt) : null,
-            completionAt: rotation.actual.completionAt
-              ? Date.parse(rotation.actual.completionAt)
-              : null,
-            communicationLabel: rotation.communicationLabel,
-            rotation,
-          };
-        }) ?? [],
+  const timelineRotations = useMemo(
+    () => (history ? resourceTimelineRotations(history) : []),
     [history],
   );
+  const timelineFrom = history ? Date.parse(history.from) : 0;
+  const timelineUntil = history ? Date.parse(history.until) : 1;
+  const timelineSpan = Math.max(1, timelineUntil - timelineFrom);
+  const timelinePercent = (value: string) =>
+    Math.min(100, Math.max(0, ((Date.parse(value) - timelineFrom) / timelineSpan) * 100));
+  const timelineTicks = Array.from({ length: 5 }, (_, index) => {
+    const percent = index * 25;
+    return {
+      percent,
+      value: timelineFrom + timelineSpan * (percent / 100),
+    };
+  });
   const summary =
     scopeType === "AIRCRAFT"
       ? [
@@ -648,74 +781,84 @@ function ResourcePanel({
           <AnalyticsLoading />
         ) : error ? (
           <AnalyticsError message={error} />
-        ) : !history || timelineRows.length === 0 ? (
-          <AnalyticsEmpty message="Für diese Ressource liegen heute noch keine bestätigten Umläufe vor." />
+        ) : !history || timelineRotations.length === 0 ? (
+          <AnalyticsEmpty message="Für diese Ressource liegen in der Veranstaltung noch keine bestätigten Umläufe vor." />
         ) : (
           <>
-            <div className="flight-director-resource-chart" role="img">
-              <ResponsiveContainer height="100%" width="100%">
-                <BarChart
-                  accessibilityLayer
-                  barCategoryGap={12}
-                  data={timelineRows}
-                  layout="vertical"
-                  margin={{ top: 14, right: 24, bottom: 2, left: 8 }}
-                >
-                  <CartesianGrid
-                    horizontal={false}
-                    stroke="var(--ui-border)"
-                    strokeDasharray="2 4"
-                  />
-                  <XAxis
-                    domain={[Date.parse(history.from), Date.parse(history.until)]}
-                    scale="time"
-                    tickFormatter={(value: number) => formatTime(value, timeZone)}
-                    type="number"
-                  />
-                  <YAxis
-                    dataKey="communicationLabel"
-                    tick={{ fontSize: 11 }}
-                    type="category"
-                    width={86}
-                  />
-                  <Tooltip
-                    content={(props) => (
-                      <ResourceTooltip
-                        active={props.active}
-                        payload={props.payload}
-                        timeZone={timeZone}
-                      />
-                    )}
-                    cursor={{ fill: "color-mix(in srgb, var(--ui-accent) 7%, transparent)" }}
-                  />
-                  {history.blocks.map((block) => (
-                    <ReferenceArea
-                      className={`resource-block resource-block--${block.type.toLowerCase()}`}
-                      fill={
-                        block.type === "REFUELING"
-                          ? "var(--analytics-refueling)"
-                          : block.type === "INTERRUPTION"
-                            ? "var(--analytics-interruption)"
-                            : "var(--analytics-pause)"
-                      }
-                      fillOpacity={0.14}
-                      key={block.id}
-                      x1={Date.parse(block.startedAt)}
-                      x2={Date.parse(block.endedAt ?? history.observedUntil)}
-                    />
+            <DiagramZoomControls onChange={changeZoom} value={zoom} />
+            <div className="flight-director-chart-viewport" ref={setViewportRef}>
+              <section
+                aria-label={`Tagesverlauf ${selected?.primary ?? ""}: ${timelineRotations.length} Umläufe hintereinander`}
+                className="flight-director-resource-chart"
+                style={{ width: `${zoom * 100}%` }}
+              >
+                <div aria-hidden="true" className="resource-timeline-grid">
+                  {timelineTicks.map((tick) => (
+                    <i key={tick.percent} style={{ left: `${tick.percent}%` }} />
                   ))}
-                  <ReferenceLine
-                    stroke="var(--ui-border-strong)"
-                    strokeDasharray="4 4"
-                    x={Date.parse(history.observedUntil)}
+                </div>
+                <div aria-hidden="true" className="resource-timeline-axis">
+                  {timelineTicks.map((tick) => (
+                    <span key={tick.percent} style={{ left: `${tick.percent}%` }}>
+                      {formatTime(tick.value, timeZone)}
+                    </span>
+                  ))}
+                </div>
+                <div className="resource-timeline-lane">
+                  {history.blocks.map((block) => {
+                    const start = timelinePercent(block.startedAt);
+                    const end = timelinePercent(block.endedAt ?? history.observedUntil);
+                    return (
+                      <span
+                        aria-hidden="true"
+                        className={`resource-timeline-block resource-timeline-block--${block.type.toLowerCase()}`}
+                        key={block.id}
+                        style={{
+                          left: `${start}%`,
+                          width: `${Math.max(0.15, end - start)}%`,
+                        }}
+                      />
+                    );
+                  })}
+                  <span
+                    aria-hidden="true"
+                    className="resource-timeline-observed"
+                    style={{ left: `${timelinePercent(history.observedUntil)}%` }}
                   />
-                  <Bar
-                    dataKey="bindingRange"
-                    isAnimationActive={false}
-                    shape={(props) => <TimelineShape {...props} />}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
+                  {timelineRotations.map((item) => {
+                    const width = Math.max(0.15, item.endPercent - item.startPercent);
+                    const title = `${item.label} · ${formatTime(item.rotation.actual.boardingAt, timeZone)}–${formatTime(item.rotation.actual.completionAt, timeZone)} Uhr · ${item.rotation.passengerCount}/${item.rotation.usableCapacity} Plätze · ${item.rotation.aircraftRegistration ?? "kein Flugzeug"} · ${item.rotation.pilotOperationalCode ?? "kein Pilot"}`;
+                    return (
+                      <div
+                        className="resource-timeline-rotation"
+                        data-label-align={item.startPercent > 85 ? "end" : "start"}
+                        key={item.id}
+                        style={{ left: `${item.startPercent}%`, width: `${width}%` }}
+                      >
+                        {item.phases.map((phase) => (
+                          <span
+                            aria-hidden="true"
+                            className={`resource-timeline-phase resource-timeline-phase--${phase.type.toLowerCase()}`}
+                            key={phase.type}
+                            style={{
+                              left: `${((phase.startPercent - item.startPercent) / width) * 100}%`,
+                              width: `${Math.max(1, ((phase.endPercent - phase.startPercent) / width) * 100)}%`,
+                            }}
+                          />
+                        ))}
+                        <button
+                          aria-label={`${item.label}: Prognose öffnen`}
+                          onClick={() => onOpenRotation(item.id)}
+                          title={title}
+                          type="button"
+                        >
+                          <span>{item.label}</span>
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
             </div>
             <div className="flight-director-resource-legend">
               <span className="boarding">Boarding</span>
@@ -783,98 +926,117 @@ export function FlightDirectorAnalyticsContent({
   onOpenRotation,
   onPilotIdChange,
   onRotationIdChange,
+  onTicketGroupIdChange,
   pilotId,
   rotationId,
   tab,
+  ticketGroupId,
 }: FlightDirectorAnalyticsContentProps) {
-  const [forecastEntries, setForecastEntries] = useState<ForecastEntry[]>([]);
+  const [forecastResults, setForecastResults] = useState<Record<string, ForecastLoadResult>>({});
   const [resourceHistory, setResourceHistory] = useState<ResourceDayHistory | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const requestSequence = useRef(0);
+  const [resourceLoading, setResourceLoading] = useState(false);
+  const [resourceError, setResourceError] = useState<string | null>(null);
+  const forecastRequestSequence = useRef(0);
+  const resourceRequestSequence = useRef(0);
   const forecastCache = useRef(new Map<string, ForecastEntry[]>());
   const resourceCache = useRef(new Map<string, ResourceDayHistory>());
+  const ticketGroups = useMemo(() => analyticsTicketGroups(board.rotations), [board.rotations]);
+  const selectedForecastRotationIds = useMemo(() => {
+    const related = ticketGroups.find((group) => group.id === ticketGroupId)?.rotationIds ?? [];
+    return rotationId === "all" ? related : related.filter((id) => id === rotationId);
+  }, [rotationId, ticketGroupId, ticketGroups]);
 
   useEffect(() => {
-    const requestId = ++requestSequence.current;
-    setError(null);
-    if (tab === "groups") {
-      if (!rotationId) {
-        setForecastEntries([]);
-        return;
-      }
-      const cached = forecastCache.current.get(rotationId);
-      if (cached) {
-        setForecastEntries(cached);
-        setLoading(false);
-        return;
-      }
-      setLoading(true);
-      void loadForecastHistory(rotationId)
-        .then((entries) => {
-          if (requestSequence.current !== requestId) return;
-          forecastCache.current.set(rotationId, entries);
-          setForecastEntries(entries);
-        })
-        .catch((caught: unknown) => {
-          if (requestSequence.current !== requestId) return;
-          setError(caught instanceof Error ? caught.message : "Prognoseverlauf nicht verfügbar.");
-        })
-        .finally(() => {
-          if (requestSequence.current === requestId) setLoading(false);
-        });
-      return;
-    }
+    if (tab !== "groups") return;
+    const requestId = ++forecastRequestSequence.current;
+    const cachedResults = Object.fromEntries(
+      selectedForecastRotationIds.flatMap((id) => {
+        const entries = forecastCache.current.get(id);
+        return entries ? [[id, { entries, error: null } satisfies ForecastLoadResult]] : [];
+      }),
+    );
+    setForecastResults(cachedResults);
+    if (selectedForecastRotationIds.length === 0) return;
 
+    void Promise.all(
+      selectedForecastRotationIds.map(async (id): Promise<[string, ForecastLoadResult]> => {
+        const cached = forecastCache.current.get(id);
+        if (cached) return [id, { entries: cached, error: null }];
+        try {
+          const entries = await loadForecastHistory(id);
+          forecastCache.current.set(id, entries);
+          return [id, { entries, error: null }];
+        } catch (caught: unknown) {
+          return [
+            id,
+            {
+              entries: [],
+              error: caught instanceof Error ? caught.message : "Prognoseverlauf nicht verfügbar.",
+            },
+          ];
+        }
+      }),
+    ).then((results) => {
+      if (forecastRequestSequence.current !== requestId) return;
+      setForecastResults(Object.fromEntries(results));
+    });
+  }, [loadForecastHistory, selectedForecastRotationIds, tab]);
+
+  useEffect(() => {
+    if (tab === "groups") return;
+    const requestId = ++resourceRequestSequence.current;
+    setResourceError(null);
     const scopeType = tab === "aircraft" ? "AIRCRAFT" : "PILOT";
     const scopeId = tab === "aircraft" ? aircraftId : pilotId;
     if (!scopeId) {
       setResourceHistory(null);
+      setResourceLoading(false);
       return;
     }
     const cacheKey = `${scopeType}:${scopeId}`;
     const cached = resourceCache.current.get(cacheKey);
     if (cached) {
       setResourceHistory(cached);
-      setLoading(false);
+      setResourceLoading(false);
       return;
     }
-    setLoading(true);
+    setResourceLoading(true);
     void loadResourceHistory(scopeType, scopeId)
       .then((history) => {
-        if (requestSequence.current !== requestId) return;
+        if (resourceRequestSequence.current !== requestId) return;
         resourceCache.current.set(cacheKey, history);
         setResourceHistory(history);
       })
       .catch((caught: unknown) => {
-        if (requestSequence.current !== requestId) return;
-        setError(caught instanceof Error ? caught.message : "Tagesverlauf nicht verfügbar.");
+        if (resourceRequestSequence.current !== requestId) return;
+        setResourceError(
+          caught instanceof Error ? caught.message : "Tagesverlauf nicht verfügbar.",
+        );
       })
       .finally(() => {
-        if (requestSequence.current === requestId) setLoading(false);
+        if (resourceRequestSequence.current === requestId) setResourceLoading(false);
       });
-  }, [aircraftId, loadForecastHistory, loadResourceHistory, pilotId, rotationId, tab]);
+  }, [aircraftId, loadResourceHistory, pilotId, tab]);
 
   if (tab === "groups") {
     return (
       <ForecastPanel
         board={board}
-        entries={forecastEntries}
-        error={error}
-        key={rotationId}
-        loading={loading}
+        forecastResults={forecastResults}
         onRotationIdChange={onRotationIdChange}
-        rotation={board.rotations.find((entry) => entry.id === rotationId)}
+        onTicketGroupIdChange={onTicketGroupIdChange}
         rotationId={rotationId}
+        ticketGroupId={ticketGroupId}
+        ticketGroups={ticketGroups}
       />
     );
   }
   return (
     <ResourcePanel
       board={board}
-      error={error}
+      error={resourceError}
       history={resourceHistory}
-      loading={loading}
+      loading={resourceLoading}
       onOpenRotation={onOpenRotation}
       onScopeIdChange={tab === "aircraft" ? onAircraftIdChange : onPilotIdChange}
       scopeId={tab === "aircraft" ? aircraftId : pilotId}
