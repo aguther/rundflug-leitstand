@@ -91,10 +91,10 @@ describe("Flight Line", () => {
       /\.flight-director-current-state-marker \{[\s\S]*?grid-template-rows: var\(--progress-node-size\) 18px;[\s\S]*?gap: 4px;[\s\S]*?background: transparent;/,
     );
     expect(sharedFlightLineStyles).toMatch(
-      /\.flight-director-current-state-marker small \{[\s\S]*?min-height: 18px;[\s\S]*?line-height: 18px;/,
+      /\.flight-director-current-state-marker small \{[^}]*min-height: 18px;[^}]*line-height: 18px;/,
     );
     expect(sharedFlightLineStyles).not.toMatch(
-      /\.flight-director-current-state-marker small \{[\s\S]*?position: absolute;/,
+      /\.flight-director-current-state-marker small \{[^}]*position: absolute;/,
     );
     expect(assistStyles).toMatch(
       /@media \(min-width: 561px\) \{[\s\S]*?article > \.flight-director-current-state-marker \{[\s\S]*?align-self: center;/,

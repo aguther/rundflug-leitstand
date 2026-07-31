@@ -23,7 +23,7 @@ describe("V1.5 administration UI", () => {
     expect(adminViewSource).toContain('className="event-catalog-v15"');
     expect(adminViewSource).toContain("<PageHeader");
     expect(adminViewSource).toContain("<Panel");
-    expect(adminViewSource).toContain("<TextField");
+    expect(adminViewSource).toContain("<EventParametersWorkspace");
     expect(adminViewSource).toContain("<Button");
   });
 

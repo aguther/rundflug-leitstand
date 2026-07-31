@@ -95,7 +95,7 @@ describe("V1.11 aktiver Gruppennachruf", () => {
     expect(worker).toContain("recall.ended_at IS NULL");
     expect(worker).toContain("recall.expires_at > ?2");
     expect(fids).toContain("group.activeRecall");
-    expect(fids).toContain("NACHRUF AKTIV");
+    expect(fids).toContain("<span>NACHRUF</span>");
     expect(fids).toContain("fids-status-cell");
     expect(publicStatus).toContain("PublicRecallNotice");
     expect(publicStatus).toContain("recall.publicMessage");

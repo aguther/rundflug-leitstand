@@ -9,6 +9,15 @@ const eventScopedSource = readFileSync(
   "utf8",
 );
 const adminSource = readFileSync(new URL("../../admin-view.tsx", import.meta.url), "utf8");
+const eventParametersSource = readFileSync(
+  new URL("../admin/event-parameters/EventParametersWorkspace.tsx", import.meta.url),
+  "utf8",
+);
+const eventParametersFormSource = readFileSync(
+  new URL("../admin/event-parameters/useEventParametersForm.ts", import.meta.url),
+  "utf8",
+);
+const adminParameterSource = `${adminSource}\n${eventParametersSource}\n${eventParametersFormSource}`;
 const viewSource = readFileSync(new URL("./ForecastSimulationView.tsx", import.meta.url), "utf8");
 const editorSource = readFileSync(new URL("./ScenarioEditor.tsx", import.meta.url), "utf8");
 const planEditorSource = readFileSync(
@@ -244,7 +253,7 @@ describe("local and hosted forecast simulation surface", () => {
       'label="Minimale Prognosequalität"',
       'label="Gate-Sperrzeit (Min.)"',
     ]) {
-      expect(adminSource).not.toContain(label);
+      expect(adminParameterSource).not.toContain(label);
     }
     for (const legacyValue of [
       "precallLeadMinutes,",
@@ -252,8 +261,8 @@ describe("local and hosted forecast simulation surface", () => {
       "precallMinimumQuality,",
       "precallGateCooldownMinutes,",
     ]) {
-      expect(adminSource).toContain(legacyValue);
+      expect(adminParameterSource).toContain(legacyValue);
     }
-    expect(adminSource).toContain("Gruppen automatisch zum Gate voraufrufen");
+    expect(adminParameterSource).toContain("Gruppen automatisch zum Gate voraufrufen");
   });
 });
