@@ -146,6 +146,17 @@ describe("FIDS V1.7.3 UI", () => {
     );
   });
 
+  it("keeps recall outlines complete in single and double column positions", () => {
+    expect(stylesSource).toMatch(
+      /\.fids-row\[data-recall-active="true"\] \{\s*box-shadow: inset 0 0 0 /,
+    );
+    expect(stylesSource).not.toMatch(/\.fids-row\[data-recall-active="true"\][^{]*:last-child/);
+    expect(stylesSource).toContain("border-bottom: 0");
+    expect(stylesSource).toContain(".fids-row:last-child");
+    expect(stylesSource).toContain("@media (min-width: 1280px)");
+    expect(stylesSource).toContain('data-fids-layout="double"');
+  });
+
   it("renders no personal, private-ticket or session data", () => {
     expect(displaySource).not.toMatch(
       /guestName|phoneNumber|publicCode|ticketLabels|sessionId|operatorAccountId/i,

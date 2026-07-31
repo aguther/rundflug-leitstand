@@ -56,4 +56,22 @@ describe("V1.7.3 FIDS concept fidelity", () => {
       /\.standard-fids \.fids-footer-copy > i \{[\s\S]*?background: var\(--fids-muted\);[\s\S]*?opacity: 0\.55;/,
     );
   });
+
+  it("draws a complete layout-neutral recall outline for every row position", () => {
+    const activeRule = stylesSource.match(
+      /\.fids-row\[data-recall-active="true"\] \{(?<body>[^}]*)\}/,
+    )?.groups?.body;
+    expect(activeRule).toContain(
+      "box-shadow: inset 0 0 0 clamp(2px, 0.24vw, 5px) var(--fids-orange)",
+    );
+    expect(activeRule).not.toContain("border");
+    expect(activeRule).not.toContain(":last-child");
+    expect(stylesSource).toMatch(
+      /\.fids-row \{[\s\S]*?border: 1px solid var\(--fids-border\);[\s\S]*?border-bottom: 0;/,
+    );
+    expect(stylesSource).toMatch(
+      /\.fids-row:last-child \{\s*border-bottom: 1px solid var\(--fids-border\);/,
+    );
+    expect(stylesSource).toContain('.standard-fids[data-fids-layout="double"] .fids-table-body');
+  });
 });
