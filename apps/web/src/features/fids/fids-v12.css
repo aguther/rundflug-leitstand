@@ -373,12 +373,14 @@
   min-width: 0;
   align-items: center;
   gap: clamp(3px, 0.55vw, 10px);
-  font-size: 1.04em;
+  font-size: var(--fids-status-font-size);
   letter-spacing: 0.035em;
   white-space: nowrap;
 }
 
 .fids-row > .fids-status-cell {
+  --fids-status-font-size: 1.04em;
+
   display: grid;
   min-height: 1.5em;
   grid-template-areas: "status";
@@ -400,7 +402,7 @@
   align-items: center;
   gap: 0.34em;
   color: var(--fids-orange);
-  font-size: 0.72em;
+  font-size: var(--fids-status-font-size);
   font-weight: 900;
   letter-spacing: 0.065em;
   line-height: 1;
@@ -413,13 +415,12 @@
 }
 
 .fids-status-cell[data-recall-active="true"] > .fids-status {
-  animation: fids-primary-status-swap 8s step-end infinite;
+  animation: fids-primary-status-swap 8s ease-in-out infinite;
 }
 
 .fids-status-cell[data-recall-active="true"] > .fids-recall-status {
   opacity: 0;
-  visibility: hidden;
-  animation: fids-recall-status-swap 8s step-end infinite;
+  animation: fids-recall-status-swap 8s ease-in-out infinite;
 }
 
 .fids-recall-bell {
@@ -454,29 +455,25 @@
 
 @keyframes fids-primary-status-swap {
   0%,
-  49%,
+  45%,
   100% {
     opacity: 1;
-    visibility: visible;
   }
   50%,
-  99% {
+  95% {
     opacity: 0;
-    visibility: hidden;
   }
 }
 
 @keyframes fids-recall-status-swap {
   0%,
-  49%,
+  45%,
   100% {
     opacity: 0;
-    visibility: hidden;
   }
   50%,
-  99% {
+  95% {
     opacity: 1;
-    visibility: visible;
   }
 }
 
