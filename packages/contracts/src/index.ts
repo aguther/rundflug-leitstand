@@ -358,6 +358,7 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
       ticketGroupIds: z.array(z.string().min(1).max(100)).min(1).max(12),
       aircraftId: z.string().min(1).max(100),
       pilotId: z.string().min(1).max(100),
+      queueDeviationReason: z.string().trim().min(3).max(240).optional(),
     }),
   }),
   commandBaseSchema.extend({

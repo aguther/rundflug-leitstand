@@ -32,6 +32,17 @@ export class DomainRuleError extends Error {
   }
 }
 
+export function assertProductPureSelection(productIds: readonly string[]): string {
+  const productId = productIds[0];
+  if (!productId || productIds.some((candidate) => candidate !== productId)) {
+    throw new DomainRuleError(
+      "PRODUCT_MISMATCH",
+      "Ausgewählte Gruppen müssen zum selben Produkt gehören.",
+    );
+  }
+  return productId;
+}
+
 const allowedAircraftTransitions: Readonly<
   Record<AircraftOperationalState, readonly AircraftOperationalState[]>
 > = {
