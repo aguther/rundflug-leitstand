@@ -65,6 +65,32 @@ describe("admin event flow", () => {
     expect(flow.from).toBe("2026-07-24T07:00:00.000Z");
   });
 
+  it("keeps late rotations inside an unconfigured event day", () => {
+    const flow = buildAdminEventFlow({
+      eventId: "late-event",
+      eventDate: "2026-07-24",
+      timeZone: "Europe/Berlin",
+      saleOpensAt: null,
+      operationsEndAt: null,
+      observedAt: "2026-07-25T08:00:00.000Z",
+      tickets: [
+        {
+          soldAt: "2026-07-24T20:18:00.000Z",
+          completedAt: "2026-07-24T20:42:00.000Z",
+        },
+      ],
+    });
+
+    expect(flow.from).toBe("2026-07-23T22:00:00.000Z");
+    expect(flow.plannedUntil).toBe("2026-07-24T22:00:00.000Z");
+    expect(flow.observedUntil).toBe("2026-07-24T22:00:00.000Z");
+    expect(flow.points.at(-1)).toMatchObject({
+      soldTickets: 1,
+      completedTickets: 1,
+      openTickets: 0,
+    });
+  });
+
   it("anchors local midnight correctly on both DST transition days", () => {
     const spring = buildAdminEventFlow({
       eventId: "spring-dst",
@@ -87,6 +113,8 @@ describe("admin event flow", () => {
 
     expect(spring.from).toBe("2026-03-28T23:00:00.000Z");
     expect(autumn.from).toBe("2026-10-24T22:00:00.000Z");
+    expect(spring.plannedUntil).toBe("2026-03-29T22:00:00.000Z");
+    expect(autumn.plannedUntil).toBe("2026-10-25T23:00:00.000Z");
     expect(spring.points.at(-1)).toMatchObject({
       soldTickets: 0,
       completedTickets: 0,
