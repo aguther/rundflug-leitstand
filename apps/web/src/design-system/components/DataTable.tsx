@@ -15,6 +15,7 @@ export interface DataTableProps<Row> {
   rows: Row[];
   rowKey: (row: Row) => string;
   selectedRowKey?: string;
+  rowClassName?: (row: Row) => string | undefined;
   onRowClick?: (row: Row) => void;
   renderRowActions?: (row: Row) => ReactNode;
   emptyLabel?: ReactNode;
@@ -28,6 +29,7 @@ export function DataTable<Row>({
   rows,
   rowKey,
   selectedRowKey,
+  rowClassName,
   onRowClick,
   renderRowActions,
   emptyLabel = "Keine Einträge vorhanden.",
@@ -85,10 +87,14 @@ export function DataTable<Row>({
           ) : (
             visibleRows.map((row) => {
               const key = rowKey(row);
+              const classes = [
+                key === selectedRowKey ? "selected" : "",
+                rowClassName?.(row) ?? "",
+              ].filter(Boolean);
               return (
                 <tr
                   key={key}
-                  className={key === selectedRowKey ? "selected" : undefined}
+                  className={classes.length > 0 ? classes.join(" ") : undefined}
                   onClick={onRowClick ? () => onRowClick(row) : undefined}
                 >
                   {columns.map((column) => (

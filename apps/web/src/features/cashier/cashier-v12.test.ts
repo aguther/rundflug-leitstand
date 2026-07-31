@@ -107,6 +107,32 @@ describe("V1.7.0 cashier", () => {
     expect(appSource).toContain("rundflug:cashier-sale-ready");
   });
 
+  it("keeps routine sale success out of visible messages while retaining partial failures", () => {
+    expect(appSource).not.toContain("verkauft. Ansicht und Beleg werden aktualisiert.`");
+    expect(appSource).not.toMatch(
+      /setMessage\(\s*`\$\{codes\.length\} Ticket\$\{codes\.length === 1 \? "" : "s"\} verkauft\.`/,
+    );
+    expect(appSource).toContain(
+      "Ansicht oder Druckvorbereitung wird weiter nachgeladen; Nachdruck bleibt möglich.",
+    );
+    expect(appSource).toContain(
+      "Der lokale Entwurf konnte noch nicht bereinigt werden; Ansicht und Beleg werden aktualisiert.",
+    );
+    expect(appSource).toContain("mergeTicketGroupsById([soldTicketGroupId])");
+    expect(appSource).toContain('className="visually-hidden"');
+    expect(appSource).toContain('aria-live="polite"');
+  });
+
+  it("marks newly confirmed ticket groups independently from selection", () => {
+    expect(appSource).toContain("useTemporaryRowHighlights");
+    expect(appSource).toContain("queueSaleHighlight(soldTicketGroupId)");
+    expect(appSource).toContain("rowClassName={(result) =>");
+    expect(appSource).toContain("cashier-ticket-row--new");
+    expect(stylesSource).toContain("@keyframes cashier-new-ticket-row");
+    expect(stylesSource).toContain("@keyframes cashier-new-selected-ticket-row");
+    expect(stylesSource).toContain("@media (prefers-reduced-motion: reduce)");
+  });
+
   it("keeps forecast capacity advisory instead of disabling an explicitly enabled sale", () => {
     const disabledRule = appSource.slice(
       appSource.indexOf("const saleDisabled ="),
