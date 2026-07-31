@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  ApiCommandError,
   assertOperationalConnection,
   controlApiPath,
   factoryReset,
@@ -119,6 +120,45 @@ describe("session-only browser transport", () => {
     const init = fetchMock.mock.calls[0]?.[1] as RequestInit;
     expect(init.headers).toEqual({ "content-type": "application/json" });
     expect(JSON.parse(String(init.body))).not.toHaveProperty("deviceId");
+  });
+
+  it("preserves structured command conflicts for stale-write handling", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            error: {
+              code: "STALE_VERSION",
+              message: "Die Veranstaltung wurde inzwischen geändert.",
+              currentVersion: 7,
+            },
+          }),
+          { status: 409, headers: { "content-type": "application/json" } },
+        ),
+      ),
+    );
+    vi.stubGlobal("navigator", { onLine: true });
+
+    const rejected = sendCommand(
+      {
+        commandId: "550e8400-e29b-41d4-a716-446655440009",
+        eventId: "synthetic-event",
+        deviceId: "browser-controlled-device",
+        expectedVersion: 6,
+        issuedAt: "2026-07-18T12:00:00.000Z",
+        type: "SET_OPERATIONAL_NOTE",
+        payload: { note: "Synthetischer Hinweis" },
+      },
+      "browser-controlled-token",
+    );
+
+    await expect(rejected).rejects.toMatchObject({
+      name: "ApiCommandError",
+      code: "STALE_VERSION",
+      status: 409,
+      currentVersion: 7,
+    } satisfies Partial<ApiCommandError>);
   });
 
   it("[T-020] sends an operation-board request without device headers", async () => {
