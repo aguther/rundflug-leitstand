@@ -36,6 +36,7 @@ import {
   ValidationHint,
 } from "./admin-ux";
 import {
+  ApiCommandError,
   cloneEvent,
   deleteEvent,
   downloadDailyPdf,
@@ -64,6 +65,7 @@ import { PageNotice, useActionMessageBridge } from "./app/PageNotifications";
 import {
   Button,
   CheckboxField,
+  ConfirmationDialog,
   Field,
   IconButton,
   ModalDialog,
@@ -71,12 +73,15 @@ import {
   Panel,
   SearchField,
   StatusPill,
-  TextField,
 } from "./design-system/components";
 import { forgetActiveEvent, rememberActiveEvent } from "./event-context";
-import { eventLocalDateTimeToIso, formatEventLocalDateTime } from "./event-time";
+import { eventLocalDateTimeToIso } from "./event-time";
 import { AdminEventFlowChart } from "./features/admin/AdminEventFlowChart";
-import { EventLogoEditor } from "./features/admin/EventLogoEditor";
+import {
+  type EventParameterSaveLifecycle,
+  EventParametersWorkspace,
+} from "./features/admin/event-parameters/EventParametersWorkspace";
+import type { ValidEventParameterPayload } from "./features/admin/event-parameters/useEventParametersForm";
 import { FactoryResetDialog } from "./features/admin/FactoryResetDialog";
 import { AccountManagement } from "./features/auth/AccountManagement";
 import { useAuth } from "./features/auth/AuthContext";
@@ -123,14 +128,6 @@ const adminTableCollator = new Intl.Collator("de-DE", {
   numeric: true,
   sensitivity: "base",
 });
-const EMPTY_EVENT_LOGO_FILES: Record<EventLogoTheme, File | null> = {
-  light: null,
-  dark: null,
-};
-const NO_EVENT_LOGO_VARIANTS: Record<EventLogoTheme, boolean> = {
-  light: false,
-  dark: false,
-};
 const eventStepCopy: Record<AdminEventStep, { title: string; description: string }> = {
   event: {
     title: "Veranstaltung",
@@ -394,30 +391,10 @@ export function AdminView() {
   const [pilotEditorId, setPilotEditorId] = useState("new");
   const [refuelThreshold, setRefuelThreshold] = useState(5);
   const [operationalNotice, setOperationalNotice] = useState("");
-  const [eventSettingsInitialized, setEventSettingsInitialized] = useState(false);
-  const [saleOpensAt, setSaleOpensAt] = useState("");
-  const [operationsStartAt, setOperationsStartAt] = useState("");
-  const [operationsEndAt, setOperationsEndAt] = useState("");
-  const [noShowAfterMinutes, setNoShowAfterMinutes] = useState(10);
-  const [maxTicketDeferrals, setMaxTicketDeferrals] = useState(2);
-  const [notificationLeadMinutes, setNotificationLeadMinutes] = useState(15);
-  const [automaticPrecallEnabled, setAutomaticPrecallEnabled] = useState(true);
-  const [precallLeadMinutes, setPrecallLeadMinutes] = useState(15);
-  const [maximumGateWaitMinutes, setMaximumGateWaitMinutes] = useState(20);
-  const [precallMinimumQuality, setPrecallMinimumQuality] = useState<"STABLE" | "CHANGING">(
-    "CHANGING",
-  );
-  const [precallGateCooldownMinutes, setPrecallGateCooldownMinutes] = useState(2);
-  const [childReferenceWeightKg, setChildReferenceWeightKg] = useState(35);
-  const [normalReferenceWeightKg, setNormalReferenceWeightKg] = useState(80);
-  const [heavyReferenceWeightKg, setHeavyReferenceWeightKg] = useState(110);
-  const [plannedBoardingMinutes, setPlannedBoardingMinutes] = useState(8);
-  const [plannedDeboardingMinutes, setPlannedDeboardingMinutes] = useState(5);
-  const [plannedBufferMinutes, setPlannedBufferMinutes] = useState(3);
-  const [departedVisibilitySeconds, setDepartedVisibilitySeconds] = useState(15);
-  const [eventLogoFiles, setEventLogoFiles] = useState<Record<EventLogoTheme, File | null>>(() => ({
-    ...EMPTY_EVENT_LOGO_FILES,
-  }));
+  const [eventParametersDirty, setEventParametersDirty] = useState(false);
+  const [eventParametersResetKey, setEventParametersResetKey] = useState(0);
+  const [discardEventNavigationOpen, setDiscardEventNavigationOpen] = useState(false);
+  const pendingEventNavigationRef = useRef<(() => void) | null>(null);
   const [pushConfigurationStatus, setPushConfigurationStatus] = useState<
     "loading" | "configured" | "missing" | "unavailable"
   >("loading");
@@ -443,6 +420,15 @@ export function AdminView() {
       .then((result) => setSetupRequired(result.setupRequired))
       .catch(() => setSetupRequired(false));
   }, [board]);
+  useEffect(() => {
+    if (!eventParametersDirty) return;
+    const warnBeforeUnload = (unloadEvent: BeforeUnloadEvent) => {
+      unloadEvent.preventDefault();
+      unloadEvent.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warnBeforeUnload);
+    return () => window.removeEventListener("beforeunload", warnBeforeUnload);
+  }, [eventParametersDirty]);
   const [productEditorId, setProductEditorId] = useState("new");
   const [productName, setProductName] = useState("");
   const [productCode, setProductCode] = useState("");
@@ -746,31 +732,6 @@ export function AdminView() {
     if (adminArea === "events" && eventStep === "completion" && historyView === "AUDIT") return;
     if (adminArea !== "events" && historyView === "AUDIT") setHistoryView("OPERATIONS");
   }, [adminArea, eventStep, historyView]);
-  useEffect(() => {
-    if (!board || eventSettingsInitialized) return;
-    setSaleOpensAt(formatEventLocalDateTime(board.event.saleOpensAt, board.event.timeZone));
-    setOperationsStartAt(
-      formatEventLocalDateTime(board.event.operationsStartAt, board.event.timeZone),
-    );
-    setOperationsEndAt(formatEventLocalDateTime(board.event.operationsEndAt, board.event.timeZone));
-    setNoShowAfterMinutes(board.event.noShowAfterMinutes);
-    setMaxTicketDeferrals(board.event.maxTicketDeferrals);
-    setNotificationLeadMinutes(board.event.notificationLeadMinutes);
-    setAutomaticPrecallEnabled(board.event.automaticPrecallEnabled);
-    setPrecallLeadMinutes(board.event.precallLeadMinutes);
-    setMaximumGateWaitMinutes(board.event.maximumGateWaitMinutes);
-    setPrecallMinimumQuality(board.event.precallMinimumQuality);
-    setPrecallGateCooldownMinutes(board.event.precallGateCooldownMinutes);
-    setChildReferenceWeightKg(board.event.referenceWeightsKg.child);
-    setNormalReferenceWeightKg(board.event.referenceWeightsKg.normal);
-    setHeavyReferenceWeightKg(board.event.referenceWeightsKg.heavy);
-    setPlannedBoardingMinutes(board.event.plannedBoardingMinutes);
-    setPlannedDeboardingMinutes(board.event.plannedDeboardingMinutes);
-    setPlannedBufferMinutes(board.event.plannedBufferMinutes);
-    setDepartedVisibilitySeconds(board.event.departedVisibilitySeconds);
-    setEventSettingsInitialized(true);
-  }, [board, eventSettingsInitialized]);
-
   const refreshEvents = useCallback(async () => {
     if (!isAdministrator) return;
     try {
@@ -1031,60 +992,58 @@ export function AdminView() {
     }
   }
 
-  async function saveEventParameters() {
-    if (!board || !operationsEndAt || adminPinRef.current.length < 4) return;
-    try {
-      await sendCommand(
-        {
-          commandId: crypto.randomUUID(),
-          eventId: EVENT_ID,
-          deviceId: ADMIN_DEVICE_ID,
-          expectedVersion: board.event.version,
-          issuedAt: new Date().toISOString(),
-          type: "CONFIGURE_EVENT_PARAMETERS",
-          payload: {
-            saleOpensAt: saleOpensAt
-              ? eventLocalDateTimeToIso(saleOpensAt, board.event.timeZone)
-              : null,
-            operationsStartAt: operationsStartAt
-              ? eventLocalDateTimeToIso(operationsStartAt, board.event.timeZone)
-              : null,
-            operationsEndAt: eventLocalDateTimeToIso(operationsEndAt, board.event.timeZone),
-            noShowAfterMinutes,
-            maxTicketDeferrals,
-            notificationLeadMinutes,
-            automaticPrecallEnabled,
-            precallLeadMinutes,
-            maximumGateWaitMinutes,
-            precallMinimumQuality,
-            precallGateCooldownMinutes,
-            childReferenceWeightKg,
-            normalReferenceWeightKg,
-            heavyReferenceWeightKg,
-            plannedBoardingMinutes,
-            plannedDeboardingMinutes,
-            plannedBufferMinutes,
-            departedVisibilitySeconds,
-            reason: ADMIN_CONFIGURATION_AUDIT_REASON,
-            adminPin: adminPinRef.current,
-          },
-        },
-        deviceTokenFor(ADMIN_DEVICE_ID),
-      );
-      setMessage("Veranstaltungsparameter wurden protokolliert aktualisiert.");
-      if (!adminModeUnlocked) setAdminPin("");
-      await refresh();
-      await refreshHistory();
-    } catch (cause) {
-      setMessage(
-        cause instanceof Error ? cause.message : "Parameter konnten nicht gespeichert werden.",
-      );
-    }
+  function requestSaveEventParameters(
+    payload: ValidEventParameterPayload,
+    lifecycle: EventParameterSaveLifecycle,
+  ) {
+    void requestAdminAction(() =>
+      runBusyAction("event-parameters", async () => {
+        if (!board || adminPinRef.current.length < 4) return;
+        try {
+          await sendCommand(
+            {
+              commandId: crypto.randomUUID(),
+              eventId: EVENT_ID,
+              deviceId: ADMIN_DEVICE_ID,
+              expectedVersion: board.event.version,
+              issuedAt: new Date().toISOString(),
+              type: "CONFIGURE_EVENT_PARAMETERS",
+              payload: {
+                ...payload,
+                reason: ADMIN_CONFIGURATION_AUDIT_REASON,
+                adminPin: adminPinRef.current,
+              },
+            },
+            deviceTokenFor(ADMIN_DEVICE_ID),
+          );
+          lifecycle.onSaved();
+          setMessage("Veranstaltungsparameter wurden protokolliert aktualisiert.");
+          if (!adminModeUnlocked) setAdminPin("");
+          await Promise.all([refresh(), refreshHistory()]);
+        } catch (cause) {
+          if (
+            cause instanceof ApiCommandError &&
+            ["STALE_VERSION", "EVENT_VERSION_CONFLICT"].includes(cause.code)
+          ) {
+            lifecycle.onConflict(cause.currentVersion);
+            await refresh();
+          }
+          setMessage(
+            cause instanceof Error ? cause.message : "Parameter konnten nicht gespeichert werden.",
+          );
+        }
+      }),
+    );
   }
 
-  async function saveEventLogo(theme: EventLogoTheme) {
-    const file = eventLogoFiles[theme];
-    if (!board || !file) return;
+  function requestSaveEventLogo(theme: EventLogoTheme, file: File) {
+    void requestAdminAction(() =>
+      runBusyAction(`event-logo-${theme}`, () => saveEventLogo(theme, file)),
+    );
+  }
+
+  async function saveEventLogo(theme: EventLogoTheme, file: File) {
+    if (!board) return;
     try {
       await uploadEventLogo(
         EVENT_ID,
@@ -1094,7 +1053,6 @@ export function AdminView() {
         theme,
         file,
       );
-      setEventLogoFiles((current) => ({ ...current, [theme]: null }));
       setMessage(
         `Logo für das ${theme === "light" ? "helle" : "dunkle"} Theme gespeichert. Die Ansichten verwenden es nach dem Neuladen.`,
       );
@@ -1102,6 +1060,12 @@ export function AdminView() {
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : "Logo konnte nicht gespeichert werden.");
     }
+  }
+
+  function requestClearEventLogo(theme: EventLogoTheme) {
+    void requestAdminAction(() =>
+      runBusyAction(`clear-event-logo-${theme}`, () => clearEventLogo(theme)),
+    );
   }
 
   async function clearEventLogo(theme: EventLogoTheme) {
@@ -2299,10 +2263,27 @@ export function AdminView() {
     },
   };
 
+  function requestEventParameterNavigation(action: () => void) {
+    if (!eventParametersDirty) {
+      action();
+      return;
+    }
+    pendingEventNavigationRef.current = action;
+    setDiscardEventNavigationOpen(true);
+  }
+
+  function changeAdminArea(nextArea: AdminArea) {
+    if (nextArea === adminArea) return;
+    requestEventParameterNavigation(() => setAdminArea(nextArea));
+  }
+
   function openSetupStep(step: SetupStep) {
-    setAdminArea("events");
-    setEventStep(step.id);
-    if (step.category) setMasterDataCategory(step.category);
+    if (adminArea === "events" && eventStep === step.id) return;
+    requestEventParameterNavigation(() => {
+      setAdminArea("events");
+      setEventStep(step.id);
+      if (step.category) setMasterDataCategory(step.category);
+    });
   }
 
   function startNewMasterDataEntry() {
@@ -2795,7 +2776,7 @@ export function AdminView() {
       }
     >
       <section className="admin-layout">
-        <AdminNavigation activeArea={adminArea} onChange={setAdminArea} />
+        <AdminNavigation activeArea={adminArea} onChange={changeAdminArea} />
         <div className={`admin-workspace ${masterDataStepActive ? "master-data-active" : ""}`}>
           <PageHeader
             actions={
@@ -3389,196 +3370,18 @@ export function AdminView() {
             className="event-setup-v15 single-panel"
             hidden={adminArea !== "events" || !["event", "operations"].includes(eventStep)}
           >
-            <Panel className="event-setup-details" hidden={eventStep !== "event"} padding="compact">
-              <PageHeader
-                actions={
-                  <Button
-                    disabled={!isAdministrator || !operationsEndAt}
-                    busy={busyActionKey === "event-parameters"}
-                    onClick={() =>
-                      requestAdminAction(() =>
-                        runBusyAction("event-parameters", saveEventParameters),
-                      )
-                    }
-                    size="compact"
-                    variant="primary"
-                  >
-                    Veranstaltungsparameter speichern
-                  </Button>
-                }
-                level={2}
-                title="Veranstaltung"
-              />
-              <dl className="event-basics-grid">
-                <div>
-                  <dt>Veranstaltungsname</dt>
-                  <dd>{board?.event.name ?? "–"}</dd>
-                </div>
-                <div>
-                  <dt>Datum</dt>
-                  <dd>
-                    {board?.event.eventDate ? formatGermanDate(board.event.eventDate) : "–"}
-                  </dd>
-                </div>
-                <div>
-                  <dt>Phase</dt>
-                  <dd>
-                    {board?.event.status === "PREPARATION"
-                      ? "Vorbereitung"
-                      : board?.event.status === "ACTIVE"
-                        ? "Aktiv"
-                        : board?.event.status === "CLOSED"
-                          ? "Geschlossen"
-                          : "–"
-                    }
-                  </dd>
-                </div>
-                <div>
-                  <dt>Zeitzone</dt>
-                  <dd>{board?.event.timeZone ?? "–"}</dd>
-                </div>
-                <div>
-                  <dt>Flugplatz</dt>
-                  <dd>{board?.event.aerodrome ?? "–"}</dd>
-                </div>
-              </dl>
-              <div className="event-timing-grid">
-                <LocalizedDateTimeInput
-                  label="Verkaufsbeginn"
-                  value={saleOpensAt}
-                  onChange={setSaleOpensAt}
-                />
-                <LocalizedDateTimeInput
-                  label="Betriebsbeginn (Plan)"
-                  value={operationsStartAt}
-                  onChange={setOperationsStartAt}
-                />
-                <LocalizedDateTimeInput
-                  label="Betriebsende"
-                  value={operationsEndAt}
-                  onChange={setOperationsEndAt}
-                />
-              </div>
-              <EventLogoEditor
+            {eventStep === "event" && board ? (
+              <EventParametersWorkspace
                 administrator={isAdministrator}
                 busyActionKey={busyActionKey}
-                eventId={EVENT_ID}
-                eventVersion={board?.event.version ?? 0}
-                files={eventLogoFiles}
-                logoVariants={board?.event.logoVariants ?? NO_EVENT_LOGO_VARIANTS}
-                onFileChange={(theme, file) =>
-                  setEventLogoFiles((current) => ({ ...current, [theme]: file }))
-                }
-                onRemove={(theme) =>
-                  requestAdminAction(() =>
-                    runBusyAction(`clear-event-logo-${theme}`, () => clearEventLogo(theme)),
-                  )
-                }
-                onUpload={(theme) =>
-                  requestAdminAction(() =>
-                    runBusyAction(`event-logo-${theme}`, () => saveEventLogo(theme)),
-                  )
-                }
+                event={board.event}
+                key={`${board.event.eventId}-${eventParametersResetKey}`}
+                onDirtyChange={setEventParametersDirty}
+                onRemoveLogo={requestClearEventLogo}
+                onSave={requestSaveEventParameters}
+                onUploadLogo={requestSaveEventLogo}
               />
-              {!operationsEndAt ? (
-                <ValidationHint tone="error">
-                  Ein Betriebsende muss festgelegt werden.
-                </ValidationHint>
-              ) : null}
-              <details className="event-advanced-settings">
-                <summary>Erweiterte Betriebsparameter</summary>
-                <div className="event-advanced-grid">
-                  <TextField
-                    label="No-Show nach Minuten"
-                    max="120"
-                    min="1"
-                    onChange={(event) => setNoShowAfterMinutes(Number(event.target.value))}
-                    type="number"
-                    value={noShowAfterMinutes}
-                  />
-                  <TextField
-                    label="Klärung nach Zurückstellungen"
-                    max="10"
-                    min="1"
-                    onChange={(event) => setMaxTicketDeferrals(Number(event.target.value))}
-                    type="number"
-                    value={maxTicketDeferrals}
-                  />
-                  <TextField
-                    label="Benachrichtigungsvorlauf (Min.)"
-                    max="240"
-                    min="1"
-                    onChange={(event) => setNotificationLeadMinutes(Number(event.target.value))}
-                    type="number"
-                    value={notificationLeadMinutes}
-                  />
-                  <TextField
-                    label="Referenzgewicht Kind (kg)"
-                    max="300"
-                    min="1"
-                    onChange={(event) => setChildReferenceWeightKg(Number(event.target.value))}
-                    type="number"
-                    value={childReferenceWeightKg}
-                  />
-                  <TextField
-                    label="Referenzgewicht Normal (kg)"
-                    max="300"
-                    min="1"
-                    onChange={(event) => setNormalReferenceWeightKg(Number(event.target.value))}
-                    type="number"
-                    value={normalReferenceWeightKg}
-                  />
-                  <TextField
-                    label="Referenzgewicht Schwer (kg)"
-                    max="300"
-                    min="1"
-                    onChange={(event) => setHeavyReferenceWeightKg(Number(event.target.value))}
-                    type="number"
-                    value={heavyReferenceWeightKg}
-                  />
-                  <TextField
-                    label="Plan Boarding (Min.)"
-                    max="120"
-                    min="1"
-                    onChange={(event) => setPlannedBoardingMinutes(Number(event.target.value))}
-                    type="number"
-                    value={plannedBoardingMinutes}
-                  />
-                  <TextField
-                    label="Plan Ausstieg (Min.)"
-                    max="120"
-                    min="1"
-                    onChange={(event) => setPlannedDeboardingMinutes(Number(event.target.value))}
-                    type="number"
-                    value={plannedDeboardingMinutes}
-                  />
-                  <TextField
-                    label="Plan Puffer (Min.)"
-                    max="120"
-                    min="0"
-                    onChange={(event) => setPlannedBufferMinutes(Number(event.target.value))}
-                    type="number"
-                    value={plannedBufferMinutes}
-                  />
-                  <TextField
-                    label="Abgeflogene Zeilen sichtbar (Sek.)"
-                    max="900"
-                    min="5"
-                    onChange={(event) => setDepartedVisibilitySeconds(Number(event.target.value))}
-                    type="number"
-                    value={departedVisibilitySeconds}
-                  />
-                  <label className="event-precall-toggle">
-                    <input
-                      checked={automaticPrecallEnabled}
-                      onChange={(event) => setAutomaticPrecallEnabled(event.target.checked)}
-                      type="checkbox"
-                    />
-                    <span>Gruppen automatisch zum Gate voraufrufen</span>
-                  </label>
-                </div>
-              </details>
-            </Panel>
+            ) : null}
 
             <Panel
               className="event-release-v15"
@@ -4653,9 +4456,9 @@ export function AdminView() {
                       />
                     </div>
                     <ProductReferenceRotation
-                      boardingMinutes={plannedBoardingMinutes}
-                      bufferMinutes={plannedBufferMinutes}
-                      deboardingMinutes={plannedDeboardingMinutes}
+                      boardingMinutes={board?.event.plannedBoardingMinutes ?? 8}
+                      bufferMinutes={board?.event.plannedBufferMinutes ?? 3}
+                      deboardingMinutes={board?.event.plannedDeboardingMinutes ?? 5}
                       offBlockToOnBlockMinutes={productReferenceDuration}
                     />
                   </div>
@@ -6341,6 +6144,30 @@ export function AdminView() {
               ) : null}
             </div>
           </ModalDialog>
+          <ConfirmationDialog
+            body={
+              <p>
+                Die ungespeicherten Veranstaltungsparameter gehen beim Verlassen dieser Ansicht
+                verloren.
+              </p>
+            }
+            confirmLabel="Verwerfen und wechseln"
+            danger
+            onCancel={() => {
+              pendingEventNavigationRef.current = null;
+              setDiscardEventNavigationOpen(false);
+            }}
+            onConfirm={() => {
+              const action = pendingEventNavigationRef.current;
+              pendingEventNavigationRef.current = null;
+              setDiscardEventNavigationOpen(false);
+              setEventParametersDirty(false);
+              setEventParametersResetKey((current) => current + 1);
+              action?.();
+            }}
+            open={discardEventNavigationOpen}
+            title="Ungespeicherte Änderungen verwerfen?"
+          />
           <FactoryResetDialog
             busy={factoryResetBusy}
             confirmation={factoryResetConfirmation}
@@ -6375,3 +6202,4 @@ import "./features/admin/admin-v12.css";
 import "./features/admin/admin-v15.css";
 import "./features/admin/admin-event-workspace.css";
 import "./features/admin/admin-modernization.css";
+import "./features/admin/event-parameters/event-parameters.css";

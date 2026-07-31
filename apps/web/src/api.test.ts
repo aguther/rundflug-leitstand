@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  ApiCommandError,
+  type ApiCommandError,
   assertOperationalConnection,
   controlApiPath,
   factoryReset,

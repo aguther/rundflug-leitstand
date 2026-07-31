@@ -8,6 +8,10 @@ type LocalizedInputProps = {
   onChange: (value: string) => void;
   dateLabel?: string;
   timeLabel?: string;
+  id?: string | undefined;
+  error?: string | undefined;
+  required?: boolean | undefined;
+  disabled?: boolean | undefined;
 };
 
 export function formatGermanDate(value: string): string {
@@ -66,18 +70,32 @@ function GermanDateControl({
   value,
   onChange,
   ariaLabel,
+  id,
+  describedBy,
+  disabled,
+  invalid,
+  required,
 }: {
   value: string;
   onChange: (value: string) => void;
   ariaLabel: string;
+  id?: string | undefined;
+  describedBy?: string | undefined;
+  disabled?: boolean | undefined;
+  invalid?: boolean | undefined;
+  required?: boolean | undefined;
 }) {
   const [displayValue, setDisplayValue] = useState(() => formatGermanDate(value));
   useEffect(() => setDisplayValue(formatGermanDate(value)), [value]);
   return (
     <div className="localized-picker-control">
       <input
+        aria-describedby={describedBy}
+        aria-invalid={invalid || undefined}
         aria-label={ariaLabel}
         autoComplete="off"
+        disabled={disabled}
+        id={id}
         inputMode="numeric"
         maxLength={10}
         onBlur={() => setDisplayValue(formatGermanDate(value))}
@@ -89,12 +107,14 @@ function GermanDateControl({
           else if (!formatted) onChange("");
         }}
         placeholder="TT.MM.JJJJ"
+        required={required}
         value={displayValue}
       />
       <span className="localized-picker-trigger">
         <PickerIcon type="date" />
         <input
           aria-label={`${ariaLabel}: Kalender öffnen`}
+          disabled={disabled}
           lang="de-DE"
           onChange={(event) => onChange(event.target.value)}
           tabIndex={-1}
@@ -111,17 +131,25 @@ function GermanTimeControl({
   onChange,
   ariaLabel,
   disabled,
+  describedBy,
+  invalid,
+  required,
 }: {
   value: string;
   onChange: (value: string) => void;
   ariaLabel: string;
   disabled: boolean;
+  describedBy?: string | undefined;
+  invalid?: boolean | undefined;
+  required?: boolean | undefined;
 }) {
   const [displayValue, setDisplayValue] = useState(value);
   useEffect(() => setDisplayValue(value), [value]);
   return (
     <div className="localized-picker-control time">
       <input
+        aria-describedby={describedBy}
+        aria-invalid={invalid || undefined}
         aria-label={ariaLabel}
         autoComplete="off"
         disabled={disabled}
@@ -134,6 +162,7 @@ function GermanTimeControl({
           if (valid24HourTime(formatted)) onChange(formatted);
         }}
         placeholder="HH:mm"
+        required={required}
         value={displayValue}
       />
       <span className="localized-picker-trigger">
@@ -159,11 +188,26 @@ export function LocalizedDateInput({
   value,
   onChange,
   dateLabel = "Datum im Format TT.MM.JJJJ",
+  id,
+  error,
+  required,
+  disabled,
 }: Omit<LocalizedInputProps, "timeLabel">) {
+  const errorId = error && id ? `${id}-error` : undefined;
   return (
-    <div className="localized-input-field">
+    <div className={`localized-input-field${error ? " has-error" : ""}`}>
       <span>{labelContent ?? label}</span>
-      <GermanDateControl ariaLabel={`${label}: ${dateLabel}`} onChange={onChange} value={value} />
+      <GermanDateControl
+        ariaLabel={`${label}: ${dateLabel}`}
+        describedBy={errorId}
+        disabled={disabled}
+        id={id}
+        invalid={Boolean(error)}
+        onChange={onChange}
+        required={required}
+        value={value}
+      />
+      {error ? <small id={errorId}>{error}</small> : null}
     </div>
   );
 }
@@ -175,26 +219,40 @@ export function LocalizedDateTimeInput({
   onChange,
   dateLabel = "Datum im Format TT.MM.JJJJ",
   timeLabel = "Uhrzeit im 24-Stunden-Format HH:mm",
+  id,
+  error,
+  required,
+  disabled,
 }: LocalizedInputProps) {
   const date = value.slice(0, 10);
   const time = value.length >= 16 ? value.slice(11, 16) : "";
+  const errorId = error && id ? `${id}-error` : undefined;
   return (
-    <div className="localized-input-field">
+    <div className={`localized-input-field${error ? " has-error" : ""}`}>
       <span>{labelContent ?? label}</span>
       <div className="localized-date-time">
         <GermanDateControl
           ariaLabel={`${label}: ${dateLabel}`}
+          describedBy={errorId}
+          disabled={disabled}
+          id={id}
+          invalid={Boolean(error)}
           onChange={(nextDate) => onChange(replaceLocalDate(value, nextDate))}
+          required={required}
           value={date}
         />
         <span aria-hidden="true">um</span>
         <GermanTimeControl
           ariaLabel={`${label}: ${timeLabel}`}
-          disabled={!date}
+          describedBy={errorId}
+          disabled={Boolean(disabled) || !date}
+          invalid={Boolean(error)}
           onChange={(nextTime) => onChange(replaceLocalTime(value, nextTime))}
+          required={required}
           value={time}
         />
       </div>
+      {error ? <small id={errorId}>{error}</small> : null}
     </div>
   );
 }

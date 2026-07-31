@@ -247,16 +247,14 @@ export function validateEventParameters(
     normalReferenceWeightKg !== null &&
     childReferenceWeightKg >= normalReferenceWeightKg
   ) {
-    errors.childReferenceWeightKg =
-      "Das Kindergewicht muss unter dem Standardgewicht liegen.";
+    errors.childReferenceWeightKg = "Das Kindergewicht muss unter dem Standardgewicht liegen.";
   }
   if (
     normalReferenceWeightKg !== null &&
     heavyReferenceWeightKg !== null &&
     normalReferenceWeightKg >= heavyReferenceWeightKg
   ) {
-    errors.normalReferenceWeightKg =
-      "Das Standardgewicht muss unter dem erhöhten Gewicht liegen.";
+    errors.normalReferenceWeightKg = "Das Standardgewicht muss unter dem erhöhten Gewicht liegen.";
   }
   const plannedBoardingMinutes = parseNumberField(
     values,
@@ -354,10 +352,7 @@ type FormAction =
   | { type: "MARK_SAVED" }
   | { type: "CONFLICT"; currentVersion?: number };
 
-function valuesEqual(
-  left: EventParameterFormValues,
-  right: EventParameterFormValues,
-): boolean {
+function valuesEqual(left: EventParameterFormValues, right: EventParameterFormValues): boolean {
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
@@ -437,9 +432,7 @@ export function useEventParametersForm(event: EventSnapshot) {
     },
     markConflict(currentVersion?: number) {
       dispatch(
-        currentVersion === undefined
-          ? { type: "CONFLICT" }
-          : { type: "CONFLICT", currentVersion },
+        currentVersion === undefined ? { type: "CONFLICT" } : { type: "CONFLICT", currentVersion },
       );
     },
   };

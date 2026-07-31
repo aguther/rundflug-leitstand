@@ -88,8 +88,7 @@ describe("event parameter form", () => {
 
   it("keeps dirty values during refresh and exposes newer server versions as conflicts", () => {
     const { result, rerender } = renderHook(
-      ({ currentEvent }: { currentEvent: EventSnapshot }) =>
-        useEventParametersForm(currentEvent),
+      ({ currentEvent }: { currentEvent: EventSnapshot }) => useEventParametersForm(currentEvent),
       { initialProps: { currentEvent: event } },
     );
 
