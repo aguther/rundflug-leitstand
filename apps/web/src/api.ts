@@ -1,5 +1,6 @@
 import {
   type AdminEventFlow,
+  apiErrorSchema,
   type AssistClaim,
   type AuditHistory,
   adminEventFlowSchema,
@@ -64,6 +65,18 @@ export class FlightLineAssistClaimConflictError extends Error {
   ) {
     super(message);
     this.name = "FlightLineAssistClaimConflictError";
+  }
+}
+
+export class ApiCommandError extends Error {
+  constructor(
+    message: string,
+    readonly code: string,
+    readonly status: number,
+    readonly currentVersion?: number,
+  ) {
+    super(message);
+    this.name = "ApiCommandError";
   }
 }
 
@@ -792,8 +805,31 @@ export async function sendCommand(
   });
   recordApiTiming("rundflug:operational-command", startedAt, { commandType: command.type });
   if (!response.ok) {
-    const body = (await response.json()) as { error?: { message?: string } };
-    throw new Error(body.error?.message ?? `Kommando abgelehnt (${response.status})`);
+    const body = await response.json();
+    const parsed = apiErrorSchema.safeParse(body);
+    if (parsed.success) {
+      throw new ApiCommandError(
+        parsed.data.error.message,
+        parsed.data.error.code,
+        response.status,
+        parsed.data.error.currentVersion,
+      );
+    }
+    const fallbackMessage =
+      typeof body === "object" &&
+      body !== null &&
+      "error" in body &&
+      typeof body.error === "object" &&
+      body.error !== null &&
+      "message" in body.error &&
+      typeof body.error.message === "string"
+        ? body.error.message
+        : `Kommando abgelehnt (${response.status})`;
+    throw new ApiCommandError(
+      fallbackMessage,
+      "COMMAND_REJECTED",
+      response.status,
+    );
   }
   return commandResultSchema.parse(await response.json());
 }
