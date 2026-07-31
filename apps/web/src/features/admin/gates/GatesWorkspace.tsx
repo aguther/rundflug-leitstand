@@ -86,7 +86,10 @@ export function GatesWorkspace({
             const statuses = gate.displayFilter.rotationStatuses;
             return statuses.length === 0
               ? "Alle Phasen"
-              : compactList(statuses.map((status) => gatePhaseLabels[status] ?? status), 3);
+              : compactList(
+                  statuses.map((status) => gatePhaseLabels[status] ?? status),
+                  3,
+                );
           },
         },
         {

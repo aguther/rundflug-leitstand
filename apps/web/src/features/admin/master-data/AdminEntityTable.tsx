@@ -22,38 +22,36 @@ export function AdminEntityTable<Row>({
   sortDirection?: "asc" | "desc" | null | undefined;
   onSort?: ((key: string) => void) | undefined;
 }) {
-  const tableColumns: DataTableColumn<Row>[] = columns.map(({ label, sortKey: columnSort, ...column }) => ({
-    ...column,
-    ...(columnSort
-      ? {
-          ariaSort:
-            sortKey === columnSort && sortDirection
-              ? sortDirection === "asc"
-                ? ("ascending" as const)
-                : ("descending" as const)
-              : ("none" as const),
-        }
-      : {}),
-    header:
-      columnSort && onSort ? (
-        <button
-          className="admin-sort-button"
-          onClick={() => onSort(columnSort)}
-          type="button"
-        >
-          {label}
-          <span aria-hidden="true">
-            {sortKey === columnSort && sortDirection
-              ? sortDirection === "asc"
-                ? "↑"
-                : "↓"
-              : "↕"}
-          </span>
-        </button>
-      ) : (
-        (label as ReactNode)
-      ),
-  }));
+  const tableColumns: DataTableColumn<Row>[] = columns.map(
+    ({ label, sortKey: columnSort, ...column }) => ({
+      ...column,
+      ...(columnSort
+        ? {
+            ariaSort:
+              sortKey === columnSort && sortDirection
+                ? sortDirection === "asc"
+                  ? ("ascending" as const)
+                  : ("descending" as const)
+                : ("none" as const),
+          }
+        : {}),
+      header:
+        columnSort && onSort ? (
+          <button className="admin-sort-button" onClick={() => onSort(columnSort)} type="button">
+            {label}
+            <span aria-hidden="true">
+              {sortKey === columnSort && sortDirection
+                ? sortDirection === "asc"
+                  ? "↑"
+                  : "↓"
+                : "↕"}
+            </span>
+          </button>
+        ) : (
+          (label as ReactNode)
+        ),
+    }),
+  );
 
   return <DataTable {...tableProps} columns={tableColumns} />;
 }

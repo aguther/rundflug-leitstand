@@ -11,6 +11,7 @@ export interface ConfirmationDialogProps {
   danger?: boolean;
   confirmDisabled?: boolean;
   confirmBusy?: boolean;
+  portal?: boolean;
   onConfirm: () => void | Promise<void>;
   onCancel: () => void;
 }
@@ -24,6 +25,7 @@ export function ConfirmationDialog({
   danger = false,
   confirmDisabled = false,
   confirmBusy = false,
+  portal = false,
   onConfirm,
   onCancel,
 }: ConfirmationDialogProps) {
@@ -62,6 +64,7 @@ export function ConfirmationDialog({
       }
       onClose={onCancel}
       open={open}
+      portal={portal}
       role="alertdialog"
       size="compact"
       title={title}

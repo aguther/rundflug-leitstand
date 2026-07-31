@@ -32,6 +32,10 @@
   margin: 0;
 }
 
+.admin-shell .event-workspace-frame--wide .operations-workspace-panel .ds-button {
+  min-height: 44px;
+}
+
 @media (max-width: 760px) {
   .operations-workspace-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));

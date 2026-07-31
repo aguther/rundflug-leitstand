@@ -121,8 +121,10 @@ export function SetupProgress({
         return (
           <div className={`setup-progress-item ${state}`} key={step.id} role="presentation">
             <button
+              aria-controls={`admin-event-step-${step.id}-panel`}
               aria-current={current ? "step" : undefined}
               aria-selected={current}
+              id={`admin-event-step-${step.id}-tab`}
               onClick={() => onSelect(step)}
               onKeyDown={(event) => selectFromKeyboard(event, index)}
               ref={(element) => {

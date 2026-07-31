@@ -1,0 +1,60 @@
+import { describe, expect, it } from "vitest";
+import adminUxSource from "./admin-ux.tsx?raw";
+import adminViewSource from "./admin-view.tsx?raw";
+import turnaroundDialogSource from "./features/admin/aircraft/AircraftProductTurnaroundOverrideDialog.tsx?raw";
+import assignmentDialogSource from "./features/admin/aircraft/AircraftResourceGroupAssignmentDialog.tsx?raw";
+import completionSource from "./features/admin/completion/CompletionWorkspace.tsx?raw";
+import frameSource from "./features/admin/event-workspace/EventWorkspaceFrame.tsx?raw";
+import masterDataSource from "./features/admin/master-data/MasterDataWorkspace.tsx?raw";
+import operationsSource from "./features/admin/operations/OperationsWorkspace.tsx?raw";
+
+describe("event-scoped administration redesign", () => {
+  it("uses one event frame with stable content width variants", () => {
+    expect(frameSource).toContain('EventWorkspaceVariant = "form" | "master-data" | "wide"');
+    expect(masterDataSource).toContain('<EventWorkspaceFrame event={event} variant="master-data">');
+    expect(operationsSource).toContain('<EventWorkspaceFrame event={board.event} variant="wide">');
+    expect(completionSource).toContain('<EventWorkspaceFrame event={board.event} variant="wide">');
+    expect(adminUxSource).toContain("id={`admin-event-step-");
+    expect(adminUxSource).toContain("-tab`}");
+    expect(adminUxSource).toContain("aria-controls={`admin-event-step-");
+    expect(adminUxSource).toContain("-panel`}");
+  });
+
+  it("preserves resource-group memberships and uses one assignment command path", () => {
+    const saveResourceGroupSource = adminViewSource.slice(
+      adminViewSource.indexOf("async function saveResourceGroup"),
+      adminViewSource.indexOf("async function saveAircraft"),
+    );
+    expect(saveResourceGroupSource).not.toContain("aircraftIds");
+    expect(adminViewSource.match(/type: "ASSIGN_AIRCRAFT_RESOURCE_GROUP"/g)).toHaveLength(1);
+    expect(assignmentDialogSource).toContain("Wirksam ab Bestätigung");
+    expect(assignmentDialogSource).not.toContain("Batch");
+    expect(assignmentDialogSource).not.toContain("Aufheben");
+  });
+
+  it("keeps product inheritance component-specific and deletes the final empty override", () => {
+    expect(turnaroundDialogSource).toContain('value !== ""');
+    expect(turnaroundDialogSource).toContain('boarding === "" ? null : Number(boarding)');
+    expect(adminViewSource).toContain('type: "UPSERT_AIRCRAFT_PRODUCT_TURNAROUND_OVERRIDE"');
+    expect(adminViewSource).toContain('type: "DELETE_AIRCRAFT_PRODUCT_TURNAROUND_OVERRIDE"');
+    expect(adminViewSource).toContain("expectedOverrideVersion: existing.version");
+  });
+
+  it("provides three operation tabs and five completion tabs with gated corrections", () => {
+    for (const label of ["Plan und Freigabe", "Verkauf und Kapazität", "Sonderlagen"]) {
+      expect(operationsSource).toContain(label);
+    }
+    for (const label of [
+      "Tagesübersicht",
+      "Betriebshistorie",
+      "Prognosegüte",
+      "Auditprotokoll",
+      "Administrative Korrekturen",
+    ]) {
+      expect(completionSource).toContain(label);
+    }
+    expect(completionSource).toContain("Korrektur beginnen");
+    expect(adminViewSource).toContain("historyFiltersByViewRef");
+    expect(adminViewSource).not.toContain("Flotte, Tanken und Pausen");
+  });
+});

@@ -905,6 +905,7 @@
 }
 
 .admin-shell .setup-progress {
+  width: calc(100% - 32px);
   flex: 0 0 56px;
   height: 56px;
   min-height: 56px;
@@ -1032,7 +1033,7 @@
 }
 
 .admin-shell .master-data-editor-dialog.ds-modal-dialog--wide {
-  width: min(1040px, calc(100vw - 32px));
+  width: min(1024px, calc(100vw - 32px));
   max-height: calc(100dvh - 32px);
 }
 
@@ -1256,6 +1257,7 @@
 
 @media (max-width: 700px) {
   .admin-shell .setup-progress {
+    width: calc(100% - 24px);
     height: 48px;
     min-height: 48px;
   }

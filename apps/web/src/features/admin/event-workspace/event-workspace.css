@@ -22,6 +22,10 @@
   --event-workspace-max-width: 1640px;
 }
 
+.admin-shell .event-workspace-frame button {
+  min-height: 44px;
+}
+
 .admin-shell .event-workspace-context {
   min-height: 108px;
   display: grid;

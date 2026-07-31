@@ -4,7 +4,12 @@ import adminUxSource from "./admin-ux.tsx?raw";
 import adminViewSource from "./admin-view.tsx?raw";
 import apiSource from "./api.ts?raw";
 import chartSource from "./features/admin/AdminEventFlowChart.tsx?raw";
+import aircraftWorkspaceSource from "./features/admin/aircraft/AircraftWorkspace.tsx?raw";
 import eventLogoEditorSource from "./features/admin/EventLogoEditor.tsx?raw";
+import gatesWorkspaceSource from "./features/admin/gates/GatesWorkspace.tsx?raw";
+import pilotWorkspaceSource from "./features/admin/pilots/PilotCodesWorkspace.tsx?raw";
+import productsWorkspaceSource from "./features/admin/products/ProductsWorkspace.tsx?raw";
+import resourceWorkspaceSource from "./features/admin/resource-groups/ResourceGroupsWorkspace.tsx?raw";
 
 const adminStyles = readFileSync(
   new URL("./features/admin/admin-v15.css", import.meta.url),
@@ -59,7 +64,7 @@ describe("V1.5 administration UI", () => {
     expect(adminEventStyles).toContain("min-height: 46px");
     expect(adminEventStyles).toContain("height: auto");
     expect(adminEventStyles).toContain("width: min(880px, 100%)");
-    expect(adminEventStyles).toContain("width: min(1040px, calc(100vw - 32px))");
+    expect(adminEventStyles).toContain("width: min(1024px, calc(100vw - 32px))");
     expect(adminEventStyles).toContain("width: min(680px, calc(100vw - 32px))");
     expect(adminEventStyles).toContain("grid-template-columns: repeat(6, minmax(0, 1fr))");
     expect(adminEventStyles).toContain(".admin-shell .history-table-wrap");
@@ -147,24 +152,24 @@ describe("V1.5 administration UI", () => {
   });
 
   it("uses explicit touch actions instead of clickable master-data rows", () => {
-    const masterDataTables = adminViewSource.slice(
-      adminViewSource.indexOf('<section className="master-data-workspace"'),
-      adminViewSource.indexOf('hidden={eventStep !== "completion"}'),
-    );
+    const featureSources = [
+      gatesWorkspaceSource,
+      resourceWorkspaceSource,
+      aircraftWorkspaceSource,
+      pilotWorkspaceSource,
+      productsWorkspaceSource,
+    ].join("\n");
 
-    expect(masterDataTables).toContain('className="master-actions-heading">Aktionen</th>');
-    expect(masterDataTables).not.toContain("table-overflow-action");
-    expect(masterDataTables).toContain("onEdit={() => selectGateForEditing(gate.id)}");
-    expect(masterDataTables).toContain("onEdit={() => selectResourceForEditing(group.id)}");
-    expect(masterDataTables).toContain("onEdit={() => selectAircraftForEditing(aircraft.id)}");
-    expect(masterDataTables).toContain("onEdit={() => selectPilotForEditing(pilot.id)}");
-    expect(masterDataTables).toContain("onEdit={() => selectProductForEditing(product.id)}");
-    expect(masterDataTables).toContain('requestMasterDelete("GATE"');
-    expect(masterDataTables).toContain('requestMasterDelete("RESOURCE_GROUP"');
-    expect(masterDataTables).toMatch(/requestMasterDelete\(\s*"AIRCRAFT"/);
-    expect(masterDataTables).toContain('requestMasterDelete("PILOT"');
-    expect(masterDataTables).toContain('requestMasterDelete("PRODUCT"');
-    expect(masterDataTables).not.toContain("tabIndex={0}");
-    expect(masterDataTables).not.toContain("onClick={() => selectGateForEditing(gate.id)}");
+    expect(adminViewSource).toContain("<GatesWorkspace");
+    expect(adminViewSource).toContain("<ResourceGroupsWorkspace");
+    expect(adminViewSource).toContain("<AircraftWorkspace");
+    expect(adminViewSource).toContain("<PilotCodesWorkspace");
+    expect(adminViewSource).toContain("<ProductsWorkspace");
+    expect(featureSources).toContain("<IconButton");
+    expect(featureSources).not.toContain("table-overflow-action");
+    expect(featureSources).not.toContain("tabIndex={0}");
+    for (const entityType of ["GATE", "RESOURCE_GROUP", "AIRCRAFT", "PILOT", "PRODUCT"]) {
+      expect(adminViewSource).toContain(`requestMasterDelete("${entityType}"`);
+    }
   });
 });

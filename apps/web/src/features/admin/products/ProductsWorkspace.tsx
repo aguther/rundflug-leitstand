@@ -33,7 +33,9 @@ export function ProductsWorkspace({
           priority: "primary",
           render: (product) => (
             <div className="admin-entity-stacked">
-              <strong>{product.code} · {product.name}</strong>
+              <strong>
+                {product.code} · {product.name}
+              </strong>
               <span>{product.publicDescription || "Keine öffentliche Beschreibung"}</span>
             </div>
           ),
@@ -43,10 +45,23 @@ export function ProductsWorkspace({
           label: "Zuordnung",
           sortKey: "group",
           render: (product) => (
-            <div className="admin-entity-stacked"><strong>{product.resourceGroupName}</strong><span>{product.gateLabel}</span></div>
+            <div className="admin-entity-stacked">
+              <strong>{product.resourceGroupName}</strong>
+              <span>{product.gateLabel}</span>
+            </div>
           ),
         },
-        { key: "price", label: "Preis", sortKey: "price", align: "right", render: (product) => (product.priceCents / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" }) },
+        {
+          key: "price",
+          label: "Preis",
+          sortKey: "price",
+          align: "right",
+          render: (product) =>
+            (product.priceCents / 100).toLocaleString("de-DE", {
+              style: "currency",
+              currency: "EUR",
+            }),
+        },
         {
           key: "time",
           label: "Zeitmodell",
@@ -54,18 +69,53 @@ export function ProductsWorkspace({
           render: (product) => (
             <div className="admin-entity-stacked">
               <strong>{product.promisedFlightMinutes} Min. Flug</strong>
-              <span>{product.referenceDurationMinutes + product.effectiveTurnaroundProfile.totalGroundMinutes} Min. Gesamtumlauf</span>
+              <span>
+                {product.referenceDurationMinutes +
+                  product.effectiveTurnaroundProfile.totalGroundMinutes}{" "}
+                Min. Gesamtumlauf
+              </span>
             </div>
           ),
         },
-        { key: "sale", label: "Verkauf", sortKey: "status", render: (product) => <StatusPill tone={product.saleEnabled ? "success" : "neutral"}>{product.saleEnabled ? "Aktiv" : "Gesperrt"}</StatusPill> },
+        {
+          key: "sale",
+          label: "Verkauf",
+          sortKey: "status",
+          render: (product) => (
+            <StatusPill tone={product.saleEnabled ? "success" : "neutral"}>
+              {product.saleEnabled ? "Aktiv" : "Gesperrt"}
+            </StatusPill>
+          ),
+        },
       ]}
       onSort={onSort}
       renderRowActions={(product) => (
         <>
-          <IconButton label={`${product.name} bearbeiten`} onClick={() => onEdit(product.id)} size="touch" type="button"><Pencil aria-hidden="true" /></IconButton>
-          <IconButton label={`Bodenzeiten für ${product.name} verwalten`} onClick={() => onTurnaround(product.id)} size="touch" type="button"><TimerReset aria-hidden="true" /></IconButton>
-          <IconButton className="master-row-delete" label={`${product.name} löschen`} onClick={() => onDelete(product.id, product.name)} size="touch" type="button"><Trash2 aria-hidden="true" /></IconButton>
+          <IconButton
+            label={`${product.name} bearbeiten`}
+            onClick={() => onEdit(product.id)}
+            size="touch"
+            type="button"
+          >
+            <Pencil aria-hidden="true" />
+          </IconButton>
+          <IconButton
+            label={`Bodenzeiten für ${product.name} verwalten`}
+            onClick={() => onTurnaround(product.id)}
+            size="touch"
+            type="button"
+          >
+            <TimerReset aria-hidden="true" />
+          </IconButton>
+          <IconButton
+            className="master-row-delete"
+            label={`${product.name} löschen`}
+            onClick={() => onDelete(product.id, product.name)}
+            size="touch"
+            type="button"
+          >
+            <Trash2 aria-hidden="true" />
+          </IconButton>
         </>
       )}
       rowKey={(product) => product.id}

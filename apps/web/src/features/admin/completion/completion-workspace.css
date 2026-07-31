@@ -116,12 +116,16 @@
 }
 
 .history-filter-chips button {
-  min-height: 36px;
+  min-height: 44px;
   padding: 6px 10px;
   border: 1px solid var(--ui-border);
   border-radius: 999px;
   color: var(--ui-text);
   background: var(--ui-surface);
+}
+
+.admin-shell .event-workspace-frame--wide .completion-workspace-panel .ds-button {
+  min-height: 44px;
 }
 
 .history-row-details summary {

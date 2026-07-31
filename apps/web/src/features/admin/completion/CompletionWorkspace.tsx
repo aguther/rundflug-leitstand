@@ -1,5 +1,5 @@
 import type { OperationBoard } from "@rundflug/contracts";
-import { useState, type ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import { Button, Tabs } from "../../../design-system/components";
 import { EventWorkspaceFrame } from "../event-workspace/EventWorkspaceFrame";
 import "./completion-workspace.css";
@@ -62,7 +62,9 @@ export function CompletionWorkspace({
           role="tabpanel"
         >
           {activeTab !== tab.value ? null : tab.value === "corrections" ? (
-            correctionStarted ? corrections : (
+            correctionStarted ? (
+              corrections
+            ) : (
               <div className="completion-correction-gate">
                 <span className="admin-only-badge">Nur Administration</span>
                 <h2>Dokumentierte Besetzung korrigieren</h2>
@@ -75,7 +77,9 @@ export function CompletionWorkspace({
                 </Button>
               </div>
             )
-          ) : panels[tab.value]}
+          ) : (
+            panels[tab.value]
+          )}
         </section>
       ))}
     </EventWorkspaceFrame>
