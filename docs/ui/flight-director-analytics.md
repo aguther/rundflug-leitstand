@@ -52,6 +52,27 @@ ausschließlich mit ihrem anonymen operativen Code dargestellt.
 - Zeitachse mit zugeordnetem Flugzeug
 - fester Hinweis: „Organisatorische Übersicht · keine Dienst-, Flugzeit- oder Einsatzfreigabe.“
 
+## Gemeinsamer Diagramm-Viewport
+
+Prognose-, Flugzeug- und Pilotendiagramme verwenden denselben festen äußeren Viewport. Nur die
+innere Zeichenfläche wird vergrößert und horizontal bewegt; Rahmen, rechte Außenkante,
+Zoomsteuerung und Scrollbereich bleiben dadurch stabil. Das Mausrad zoomt an der Zeigerposition,
+Ziehen mit der primären Maustaste verschiebt die Zeitachse, und **Gesamt** setzt Zoom,
+Scrollposition und Ziehzustand gemeinsam zurück. Auswahl- und Reiterwechsel beginnen ebenfalls
+immer in der Gesamtansicht.
+
+Die X-Achsen verwenden explizit berechnete, an lokalen Zeitgrenzen der Veranstaltungszeitzone
+ausgerichtete Ticks. Abhängig von Zeitspanne, Viewportbreite und Zoom werden ausschließlich die
+Stufen 5, 10, 15, 30, 60, 120, 180, 360 oder 720 Minuten verwendet; feinere Ticks als fünf Minuten
+werden nicht erzeugt. Höhere Zoomstufen zeigen schrittweise mehr Zeitdetails, ohne
+Beschriftungsüberlagerungen.
+
+Flugzeug- und Pilotendiagramme zeigen auf kurzen aufeinanderfolgenden Umläufen keine permanenten
+Gruppenlabels. Jeder farbige Ressourcenbalken bleibt fokussierbar und öffnet per Klick oder
+Tastatur den Prognoseverlauf. Sein zugänglicher Name und Tooltip enthalten alle zugehörigen
+Ticketgruppen, die Fluggruppe, Boarding und Abschluss, Personen/Kapazität, Flugzeugkennung und
+Pilotencode.
+
 ## Daten- und Sicherheitskonzept
 
 `GET /api/control/:eventId/history/resources` ist eine interne, read-only Route für `ADMIN` und

@@ -2292,7 +2292,7 @@ requirements:
   - id: V1110-UI-010
     source: "1.11.0"
     section: "Flight Line und Flight Director"
-    requirement: "Geeignete offene Gruppen können nach einem kompakten Bestätigungsdialog nachgerufen werden. Bei aktivem Nachruf sind Status, Startzeit, bisherige Anzahl und die Aktion Nachruf beenden sichtbar."
+    requirement: "Geeignete offene Gruppen werden ohne Bestätigungsdialog direkt über einen Glocken-Button nachgerufen. Derselbe Button bleibt an fester Position als klar erkennbarer aktiver Umschalter sichtbar; Startzeit und bisherige Anzahl sind im zugänglichen Tooltip enthalten, und erneutes Betätigen beendet den Nachruf."
     priority: MUSS
     stage: V1
     status: implemented
