@@ -32,7 +32,9 @@ describe("CompletionWorkspace", () => {
     expect(screen.getByText("Tagesinhalt").closest("section")?.hasAttribute("hidden")).toBe(false);
     fireEvent.click(screen.getByRole("tab", { name: "Prognosegüte" }));
     expect(onHistoryTabChange).toHaveBeenCalledWith("FORECASTS");
-    expect(screen.getByText("Historieninhalt").closest("section")?.hasAttribute("hidden")).toBe(false);
+    expect(screen.getByText("Historieninhalt").closest("section")?.hasAttribute("hidden")).toBe(
+      false,
+    );
 
     fireEvent.click(screen.getByRole("tab", { name: "Administrative Korrekturen" }));
     expect(screen.queryByText("Korrekturformular")).toBeNull();

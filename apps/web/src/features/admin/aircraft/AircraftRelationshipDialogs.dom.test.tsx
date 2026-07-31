@@ -55,6 +55,46 @@ describe("shared aircraft relationship dialogs", () => {
     expect(onConfirm).toHaveBeenCalledWith("aircraft-a", "group-b");
   });
 
+  it("only guards closing after the assignment selection changed", () => {
+    const onClose = vi.fn();
+    render(
+      <AircraftResourceGroupAssignmentDialog
+        board={board}
+        busy={false}
+        context={{ mode: "aircraft", aircraftId: "aircraft-a" }}
+        onClose={onClose}
+        onConfirm={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Abbrechen" }));
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+  });
+
+  it("renders a usable discard confirmation for a changed assignment", () => {
+    const onClose = vi.fn();
+    render(
+      <AircraftResourceGroupAssignmentDialog
+        board={board}
+        busy={false}
+        context={{ mode: "aircraft", aircraftId: "aircraft-a" }}
+        onClose={onClose}
+        onConfirm={vi.fn()}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("Neue Ressourcengruppe"), {
+      target: { value: "group-b" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Abbrechen" }));
+    expect(
+      screen.getByRole("alertdialog", { name: "Zuordnungsänderung verwerfen?" }),
+    ).not.toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Auswahl verwerfen" }));
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
   it("keeps an explicit zero distinct from inherited turnaround values", () => {
     const onSave = vi.fn();
     render(
@@ -67,7 +107,11 @@ describe("shared aircraft relationship dialogs", () => {
       />,
     );
 
-    fireEvent.click(screen.getAllByRole("button", { name: "Abweichung festlegen" })[0]!);
+    const firstOverrideAction = screen.getAllByRole("button", {
+      name: "Abweichung festlegen",
+    })[0];
+    expect(firstOverrideAction).toBeDefined();
+    fireEvent.click(firstOverrideAction as HTMLButtonElement);
     fireEvent.change(screen.getByRole("spinbutton", { name: /Boarding in Minuten/ }), {
       target: { value: "0" },
     });

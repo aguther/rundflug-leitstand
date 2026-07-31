@@ -1,3 +1,4 @@
+/* biome-ignore-all lint/style/noDescendingSpecificity: Feature-local card, dialog, and row patterns intentionally use independent selector groups. */
 .admin-shell .master-data-unified-toolbar {
   min-width: 0;
   display: flex;

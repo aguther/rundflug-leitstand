@@ -24,13 +24,21 @@ export function ProductSalesClosingDialog({
       description="Nur der produktspezifische Verkaufsschluss wird geändert. Freigabe, Warn- und Kritischschwelle bleiben unverändert."
       footer={
         <>
-          <Button disabled={busy} onClick={onClose} type="button">Abbrechen</Button>
+          <Button disabled={busy} onClick={onClose} type="button">
+            Abbrechen
+          </Button>
           {product?.saleClosesAt ? (
             <Button disabled={busy} onClick={() => onSave(true)} type="button" variant="danger">
               Verkaufsschluss entfernen
             </Button>
           ) : null}
-          <Button busy={busy} disabled={!value || busy} onClick={() => onSave(false)} type="button" variant="primary">
+          <Button
+            busy={busy}
+            disabled={!value || busy}
+            onClick={() => onSave(false)}
+            type="button"
+            variant="primary"
+          >
             Verkaufsschluss speichern
           </Button>
         </>

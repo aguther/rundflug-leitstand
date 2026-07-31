@@ -71,11 +71,12 @@ describe("unified master-data dialogs and stable event workspace", () => {
     expect(adminViewSource).toContain("<h3>Weitere Aktionen</h3>");
   });
 
-  it("uses one shared, touch-sized checkbox row across master-data dialogs", () => {
-    expect(adminViewSource.match(/<CheckboxField/g)).toHaveLength(5);
+  it("uses shared touch-sized checkbox rows without direct aircraft membership editing", () => {
+    expect(adminViewSource.match(/<CheckboxField/g)).toHaveLength(4);
     expect(adminViewSource).toContain('label="Gate ist aktiv"');
     expect(adminViewSource).toContain('className="resource-automatic-precall"');
     expect(adminViewSource).toContain("<FieldHelp");
+    expect(adminViewSource).not.toContain("setResourceAircraftIds");
     expect(legacyStyles).toMatch(
       /\.resource-aircraft-selection \{[\s\S]*?grid-template-columns: minmax\(0, 1fr\);/,
     );

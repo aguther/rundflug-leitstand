@@ -32,7 +32,11 @@ describe("OperationsWorkspace", () => {
     const salesTab = screen.getByRole("tab", { name: "Verkauf und Kapazität" });
     expect(salesTab.getAttribute("aria-controls")).toBe("admin-operations-sales-panel");
     fireEvent.click(salesTab);
-    expect(document.getElementById("admin-operations-sales-panel")?.hasAttribute("hidden")).toBe(false);
-    expect(screen.getByText("Verkaufsinhalt").closest("section")?.hasAttribute("hidden")).toBe(false);
+    expect(document.getElementById("admin-operations-sales-panel")?.hasAttribute("hidden")).toBe(
+      false,
+    );
+    expect(screen.getByText("Verkaufsinhalt").closest("section")?.hasAttribute("hidden")).toBe(
+      false,
+    );
   });
 });

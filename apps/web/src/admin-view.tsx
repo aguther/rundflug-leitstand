@@ -16,7 +16,6 @@ import {
   ExternalLink,
   FlaskConical,
   LockKeyhole,
-  Pencil,
   Plus,
   Trash2,
 } from "lucide-react";
@@ -67,22 +66,43 @@ import {
   CheckboxField,
   ConfirmationDialog,
   Field,
-  IconButton,
   ModalDialog,
   PageHeader,
   Panel,
   SearchField,
   StatusPill,
+  Tabs,
 } from "./design-system/components";
 import { forgetActiveEvent, rememberActiveEvent } from "./event-context";
-import { eventLocalDateTimeToIso } from "./event-time";
+import { eventLocalDateTimeToIso, formatEventLocalDateTime } from "./event-time";
 import { AdminEventFlowChart } from "./features/admin/AdminEventFlowChart";
+import {
+  AircraftProductTurnaroundOverrideDialog,
+  type TurnaroundOverrideContext,
+} from "./features/admin/aircraft/AircraftProductTurnaroundOverrideDialog";
+import {
+  type AircraftResourceGroupAssignmentContext,
+  AircraftResourceGroupAssignmentDialog,
+} from "./features/admin/aircraft/AircraftResourceGroupAssignmentDialog";
+import { AircraftWorkspace } from "./features/admin/aircraft/AircraftWorkspace";
+import { CompletionWorkspace } from "./features/admin/completion/CompletionWorkspace";
 import {
   type EventParameterSaveLifecycle,
   EventParametersWorkspace,
 } from "./features/admin/event-parameters/EventParametersWorkspace";
 import type { ValidEventParameterPayload } from "./features/admin/event-parameters/useEventParametersForm";
 import { FactoryResetDialog } from "./features/admin/FactoryResetDialog";
+import { GatesWorkspace } from "./features/admin/gates/GatesWorkspace";
+import { MasterDataPagination } from "./features/admin/master-data/MasterDataPagination";
+import {
+  MasterDataEmptyState,
+  MasterDataWorkspace,
+} from "./features/admin/master-data/MasterDataWorkspace";
+import { OperationsWorkspace } from "./features/admin/operations/OperationsWorkspace";
+import { ProductSalesClosingDialog } from "./features/admin/operations/ProductSalesClosingDialog";
+import { PilotCodesWorkspace } from "./features/admin/pilots/PilotCodesWorkspace";
+import { ProductsWorkspace } from "./features/admin/products/ProductsWorkspace";
+import { ResourceGroupsWorkspace } from "./features/admin/resource-groups/ResourceGroupsWorkspace";
 import { AccountManagement } from "./features/auth/AccountManagement";
 import { useAuth } from "./features/auth/AuthContext";
 import {
@@ -163,61 +183,30 @@ const eventStepCopy: Record<AdminEventStep, { title: string; description: string
   },
 };
 
-function SortableTableHeading({
-  active,
-  direction,
-  label,
-  onClick,
-}: {
-  active: boolean;
-  direction: "asc" | "desc" | null;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <th
-      aria-sort={active && direction ? (direction === "asc" ? "ascending" : "descending") : "none"}
-    >
-      <button className="admin-sort-button" onClick={onClick} type="button">
-        {label}
-        <span aria-hidden="true">
-          {active && direction ? (direction === "asc" ? "↑" : "↓") : "↕"}
-        </span>
-      </button>
-    </th>
-  );
-}
+const historyTicketStatusLabels: Record<string, string> = {
+  QUEUED: "In Warteschlange",
+  CHECKED_IN: "Eingecheckt",
+  CALLED: "Aufgerufen",
+  BOARDING: "Boarding",
+  IN_FLIGHT: "Im Flug",
+  LANDED: "Gelandet",
+  COMPLETED: "Abgeschlossen",
+  NO_SHOW: "Nicht erschienen",
+  CANCELED: "Storniert",
+  CLARIFICATION: "Klärung erforderlich",
+};
 
-function MasterTableActions({
-  deleteLabel,
-  editLabel,
-  onDelete,
-  onEdit,
-}: {
-  deleteLabel?: string;
-  editLabel: string;
-  onDelete?: () => void;
-  onEdit: () => void;
-}) {
-  return (
-    <div className="master-row-actions">
-      <IconButton label={editLabel} onClick={onEdit} size="touch" type="button">
-        <Pencil aria-hidden="true" />
-      </IconButton>
-      {onDelete && deleteLabel ? (
-        <IconButton
-          className="master-row-delete"
-          label={deleteLabel}
-          onClick={onDelete}
-          size="touch"
-          type="button"
-        >
-          <Trash2 aria-hidden="true" />
-        </IconButton>
-      ) : null}
-    </div>
-  );
-}
+const historyEventLabels: Record<string, string> = {
+  TICKET_NO_SHOW: "Ticket als nicht erschienen markiert",
+  ROTATION_CALLED: "Fluggruppe aufgerufen",
+  ROTATION_DEPARTED: "Umlauf gestartet",
+  ROTATION_LANDED: "Umlauf gelandet",
+  ROTATION_COMPLETED: "Umlauf abgeschlossen",
+  AIRCRAFT_RESOURCE_GROUP_ASSIGNED: "Flugzeug einer Ressourcengruppe zugeordnet",
+  PRODUCT_SALES_CONFIGURED: "Verkaufssteuerung geändert",
+  EMERGENCY_TRIGGERED: "Notfallmodus aktiviert",
+  EMERGENCY_CLEARED: "Notfallmodus aufgehoben",
+};
 
 export function AdminView() {
   const { session, logout } = useAuth();
@@ -270,9 +259,17 @@ export function AdminView() {
       "pilots",
       "products",
     ];
+    if (requestedSection === "assignments") return "aircraft";
     return (validSections as string[]).includes(requestedSection ?? "")
       ? (requestedSection as MasterDataCategory)
       : "resource-groups";
+  });
+  const legacyAssignmentRequestRef = useRef({
+    requested:
+      initialAdminParams.get("area") === "master-data" &&
+      initialAdminParams.get("section") === "assignments",
+    aircraftId: initialAdminParams.get("aircraftId") ?? "",
+    handled: false,
   });
   const adminWorkspaceScrollRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -313,6 +310,7 @@ export function AdminView() {
   const pendingAdminActionRef = useRef<(() => Promise<void>) | null>(null);
   const adminPinInputRef = useRef<HTMLInputElement>(null);
   const [masterEditorOpen, setMasterEditorOpen] = useState(false);
+  const [masterEditorTab, setMasterEditorTab] = useState<"general" | "details">("general");
   const [discardMasterChangesOpen, setDiscardMasterChangesOpen] = useState(false);
   const initialMasterEditorSnapshotRef = useRef<string | null>(null);
   const initialMasterSelectionRef = useRef(false);
@@ -325,10 +323,15 @@ export function AdminView() {
   }>({ category: "resource-groups", key: "name", direction: null });
   const [masterPage, setMasterPage] = useState(0);
   const [masterPageSize, setMasterPageSize] = useState(10);
+  const [resourceStatusFilter, setResourceStatusFilter] = useState("ALL");
+  const [assignmentDialogContext, setAssignmentDialogContext] =
+    useState<AircraftResourceGroupAssignmentContext | null>(null);
+  const [turnaroundDialogContext, setTurnaroundDialogContext] =
+    useState<TurnaroundOverrideContext | null>(null);
   // biome-ignore lint/correctness/useExhaustiveDependencies: changing a filter or page size intentionally resets pagination
   useEffect(() => {
     setMasterPage(0);
-  }, [masterDataCategory, masterSearch, masterPageSize]);
+  }, [masterDataCategory, masterSearch, masterPageSize, resourceStatusFilter]);
   const [pendingMasterDelete, setPendingMasterDelete] = useState<MasterDataDeleteTarget | null>(
     null,
   );
@@ -352,6 +355,11 @@ export function AdminView() {
     }
   }
   const [saleClosesAt, setSaleClosesAt] = useState("");
+  const [salesClosingProductId, setSalesClosingProductId] = useState<string | null>(null);
+  const [endOperationsConfirmOpen, setEndOperationsConfirmOpen] = useState(false);
+  const [pendingEmergencyAction, setPendingEmergencyAction] = useState<
+    "TRIGGER_EMERGENCY" | "CLEAR_EMERGENCY" | null
+  >(null);
   const [message, setMessage] = useState<string | null>(null);
   useActionMessageBridge(message, setMessage);
   const [setupRequired, setSetupRequired] = useState(false);
@@ -386,11 +394,15 @@ export function AdminView() {
   const [historyTicketId, setHistoryTicketId] = useState("");
   const [historyTicketGroupId, setHistoryTicketGroupId] = useState("");
   const [historyRotationId, setHistoryRotationId] = useState("");
+  const [historyTextSearch, setHistoryTextSearch] = useState("");
+  const historyFiltersByViewRef = useRef({
+    OPERATIONS: null as Record<string, string> | null,
+    FORECASTS: null as Record<string, string> | null,
+    AUDIT: null as Record<string, string> | null,
+  });
   const [pilotCode, setPilotCode] = useState("P-01");
   const [pilotNote, setPilotNote] = useState("");
   const [pilotEditorId, setPilotEditorId] = useState("new");
-  const [refuelThreshold, setRefuelThreshold] = useState(5);
-  const [operationalNotice, setOperationalNotice] = useState("");
   const [eventParametersDirty, setEventParametersDirty] = useState(false);
   const [eventParametersResetKey, setEventParametersResetKey] = useState(0);
   const [discardEventNavigationOpen, setDiscardEventNavigationOpen] = useState(false);
@@ -441,10 +453,6 @@ export function AdminView() {
   const [productBoardingOverride, setProductBoardingOverride] = useState("");
   const [productDeboardingOverride, setProductDeboardingOverride] = useState("");
   const [productBufferOverride, setProductBufferOverride] = useState("");
-  const [turnaroundOverrideAircraftId, setTurnaroundOverrideAircraftId] = useState("");
-  const [aircraftBoardingOverride, setAircraftBoardingOverride] = useState("");
-  const [aircraftDeboardingOverride, setAircraftDeboardingOverride] = useState("");
-  const [aircraftBufferOverride, setAircraftBufferOverride] = useState("");
   const [productChildCompanion, setProductChildCompanion] = useState(false);
   const [productWeightClasses, setProductWeightClasses] = useState<string[]>(["NOT_CAPTURED"]);
   const [gateEditorId, setGateEditorId] = useState("new");
@@ -466,14 +474,11 @@ export function AdminView() {
   const [resourceShortCode, setResourceShortCode] = useState("");
   const [resourceGateId, setResourceGateId] = useState("");
   const [resourceAutomaticPrecall, setResourceAutomaticPrecall] = useState(true);
-  const [resourceAircraftIds, setResourceAircraftIds] = useState<string[]>([]);
   const [aircraftEditorId, setAircraftEditorId] = useState("new");
   const [aircraftRegistration, setAircraftRegistration] = useState("");
   const [aircraftType, setAircraftType] = useState("");
   const [aircraftSeats, setAircraftSeats] = useState(3);
   const [aircraftMaximumPayload, setAircraftMaximumPayload] = useState("");
-  const [assignmentAircraftId, setAssignmentAircraftId] = useState("");
-  const [assignmentResourceGroupId, setAssignmentResourceGroupId] = useState("");
   const currentMasterEditorSnapshot =
     masterDataCategory === "gates"
       ? createMasterEditorSnapshot([
@@ -509,7 +514,6 @@ export function AdminView() {
               resourceShortCode,
               resourceGateId,
               resourceAutomaticPrecall,
-              resourceAircraftIds,
             ])
           : masterDataCategory === "aircraft"
             ? createMasterEditorSnapshot([
@@ -519,13 +523,7 @@ export function AdminView() {
                 aircraftSeats,
                 aircraftMaximumPayload,
               ])
-            : masterDataCategory === "assignments"
-              ? createMasterEditorSnapshot([
-                  "assignments",
-                  assignmentAircraftId,
-                  assignmentResourceGroupId,
-                ])
-              : createMasterEditorSnapshot(["pilots", pilotCode, pilotNote]);
+            : createMasterEditorSnapshot(["pilots", pilotCode, pilotNote]);
   const masterEditorDirty =
     masterEditorOpen &&
     hasMasterEditorChanges(initialMasterEditorSnapshotRef.current, currentMasterEditorSnapshot);
@@ -623,8 +621,23 @@ export function AdminView() {
     setResourceShortCode(entry?.shortCode ?? "");
     setResourceGateId(entry?.gateId ?? board.gates.find((gate) => gate.active)?.id ?? "");
     setResourceAutomaticPrecall(entry?.automaticPrecallEnabled ?? true);
-    setResourceAircraftIds(entry?.activeAircraftIds ?? []);
   }, [adminArea, board, eventStep]);
+
+  useEffect(() => {
+    const legacyRequest = legacyAssignmentRequestRef.current;
+    if (!legacyRequest.requested || legacyRequest.handled || !board || eventStep !== "aircraft") {
+      return;
+    }
+    legacyRequest.handled = true;
+    if (board.aircraft.some((aircraft) => aircraft.id === legacyRequest.aircraftId)) {
+      setAssignmentDialogContext({ mode: "aircraft", aircraftId: legacyRequest.aircraftId });
+      return;
+    }
+    const frame = window.requestAnimationFrame(() => {
+      document.querySelector<HTMLButtonElement>("[data-primary-assignment-action]")?.focus();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [board, eventStep]);
 
   useEffect(() => {
     if (!adminPinDialog) return;
@@ -742,6 +755,63 @@ export function AdminView() {
     if (adminArea === "events" && eventStep === "completion" && historyView === "AUDIT") return;
     if (adminArea !== "events" && historyView === "AUDIT") setHistoryView("OPERATIONS");
   }, [adminArea, eventStep, historyView]);
+
+  function changeHistoryView(nextView: "OPERATIONS" | "FORECASTS" | "AUDIT") {
+    historyFiltersByViewRef.current[historyView] = {
+      since: historySince,
+      until: historyUntil,
+      eventType: historyEventType,
+      aggregateType: historyAggregateType,
+      aggregateId: historyAggregateId,
+      ticketStatus: historyTicketStatus,
+      aircraftId: historyAircraftId,
+      pilotId: historyPilotId,
+      productId: historyProductId,
+      resourceGroupId: historyResourceGroupId,
+      communicationNumber: historyCommunicationNumber,
+      ticketId: historyTicketId,
+      ticketGroupId: historyTicketGroupId,
+      rotationId: historyRotationId,
+      textSearch: historyTextSearch,
+    };
+    const next = historyFiltersByViewRef.current[nextView] ?? {};
+    setHistorySince(next.since ?? "");
+    setHistoryUntil(next.until ?? "");
+    setHistoryEventType(next.eventType ?? "");
+    setHistoryAggregateType(next.aggregateType ?? "");
+    setHistoryAggregateId(next.aggregateId ?? "");
+    setHistoryTicketStatus(next.ticketStatus ?? "");
+    setHistoryAircraftId(next.aircraftId ?? "");
+    setHistoryPilotId(next.pilotId ?? "");
+    setHistoryProductId(next.productId ?? "");
+    setHistoryResourceGroupId(next.resourceGroupId ?? "");
+    setHistoryCommunicationNumber(next.communicationNumber ?? "");
+    setHistoryTicketId(next.ticketId ?? "");
+    setHistoryTicketGroupId(next.ticketGroupId ?? "");
+    setHistoryRotationId(next.rotationId ?? "");
+    setHistoryTextSearch(next.textSearch ?? "");
+    setHistoryOffset(0);
+    setHistoryView(nextView);
+  }
+
+  function resetHistoryFilters() {
+    setHistorySince("");
+    setHistoryUntil("");
+    setHistoryEventType("");
+    setHistoryAggregateType("");
+    setHistoryAggregateId("");
+    setHistoryTicketStatus("");
+    setHistoryAircraftId("");
+    setHistoryPilotId("");
+    setHistoryProductId("");
+    setHistoryResourceGroupId("");
+    setHistoryCommunicationNumber("");
+    setHistoryTicketId("");
+    setHistoryTicketGroupId("");
+    setHistoryRotationId("");
+    setHistoryTextSearch("");
+    setHistoryOffset(0);
+  }
   const refreshEvents = useCallback(async () => {
     if (!isAdministrator) return;
     try {
@@ -1140,13 +1210,10 @@ export function AdminView() {
     setProductBoardingOverride(nextBoardingOverride);
     setProductDeboardingOverride(nextDeboardingOverride);
     setProductBufferOverride(nextBufferOverride);
-    setTurnaroundOverrideAircraftId("");
-    setAircraftBoardingOverride("");
-    setAircraftDeboardingOverride("");
-    setAircraftBufferOverride("");
     setProductChildCompanion(nextChildCompanion);
     setProductWeightClasses(nextWeightClasses);
     setMasterSubmitAttempted(false);
+    setMasterEditorTab("general");
     setMasterEditorOpen(true);
   }
 
@@ -1175,6 +1242,7 @@ export function AdminView() {
     setGateDisplayProductIds(nextProductIds);
     setGateDisplayRotationStatuses(nextRotationStatuses);
     setMasterSubmitAttempted(false);
+    setMasterEditorTab("general");
     setMasterEditorOpen(true);
   }
 
@@ -1320,100 +1388,96 @@ export function AdminView() {
     }
   }
 
-  function selectAircraftTurnaroundOverride(aircraftId: string) {
-    const existing = board?.aircraftProductTurnaroundOverrides.find(
-      (override) => override.productId === productEditorId && override.aircraftId === aircraftId,
-    );
-    setTurnaroundOverrideAircraftId(aircraftId);
-    setAircraftBoardingOverride(existing?.plannedBoardingMinutesOverride?.toString() ?? "");
-    setAircraftDeboardingOverride(existing?.plannedDeboardingMinutesOverride?.toString() ?? "");
-    setAircraftBufferOverride(existing?.plannedBufferMinutesOverride?.toString() ?? "");
-  }
-
-  async function saveAircraftTurnaroundOverride() {
-    if (!board || productEditorId === "new" || !turnaroundOverrideAircraftId) return;
+  async function persistAircraftProductTurnaroundOverride(
+    aircraftId: string,
+    productId: string,
+    values: { boarding: number | null; deboarding: number | null; buffer: number | null },
+  ) {
+    if (!board) return;
     const existing = board.aircraftProductTurnaroundOverrides.find(
-      (override) =>
-        override.productId === productEditorId &&
-        override.aircraftId === turnaroundOverrideAircraftId,
+      (override) => override.productId === productId && override.aircraftId === aircraftId,
     );
+    const inheritAll =
+      values.boarding === null && values.deboarding === null && values.buffer === null;
+    if (inheritAll && !existing) return;
     try {
       await sendCommand(
-        {
-          commandId: crypto.randomUUID(),
-          eventId: EVENT_ID,
-          deviceId: ADMIN_DEVICE_ID,
-          expectedVersion: board.event.version,
-          issuedAt: new Date().toISOString(),
-          type: "UPSERT_AIRCRAFT_PRODUCT_TURNAROUND_OVERRIDE",
-          payload: {
-            aircraftId: turnaroundOverrideAircraftId,
-            productId: productEditorId,
-            plannedBoardingMinutesOverride:
-              aircraftBoardingOverride === "" ? null : Number(aircraftBoardingOverride),
-            plannedDeboardingMinutesOverride:
-              aircraftDeboardingOverride === "" ? null : Number(aircraftDeboardingOverride),
-            plannedBufferMinutesOverride:
-              aircraftBufferOverride === "" ? null : Number(aircraftBufferOverride),
-            expectedOverrideVersion: existing?.version ?? 0,
-            reason: MASTER_DATA_AUDIT_REASON,
-            adminPin: adminPinRef.current,
-          },
-        },
+        inheritAll && existing
+          ? {
+              commandId: crypto.randomUUID(),
+              eventId: EVENT_ID,
+              deviceId: ADMIN_DEVICE_ID,
+              expectedVersion: board.event.version,
+              issuedAt: new Date().toISOString(),
+              type: "DELETE_AIRCRAFT_PRODUCT_TURNAROUND_OVERRIDE",
+              payload: {
+                aircraftId,
+                productId,
+                expectedOverrideVersion: existing.version,
+                reason: MASTER_DATA_AUDIT_REASON,
+                adminPin: adminPinRef.current,
+              },
+            }
+          : {
+              commandId: crypto.randomUUID(),
+              eventId: EVENT_ID,
+              deviceId: ADMIN_DEVICE_ID,
+              expectedVersion: board.event.version,
+              issuedAt: new Date().toISOString(),
+              type: "UPSERT_AIRCRAFT_PRODUCT_TURNAROUND_OVERRIDE",
+              payload: {
+                aircraftId,
+                productId,
+                plannedBoardingMinutesOverride: values.boarding,
+                plannedDeboardingMinutesOverride: values.deboarding,
+                plannedBufferMinutesOverride: values.buffer,
+                expectedOverrideVersion: existing?.version ?? 0,
+                reason: MASTER_DATA_AUDIT_REASON,
+                adminPin: adminPinRef.current,
+              },
+            },
         deviceTokenFor(ADMIN_DEVICE_ID),
       );
-      setMessage("Flugzeugspezifische Umlaufzeiten wurden protokolliert gespeichert.");
+      setMessage(
+        inheritAll
+          ? "Die Bodenzeiten erben wieder unmittelbar von Produkt oder Veranstaltung."
+          : "Flugzeugspezifische Bodenzeiten wurden protokolliert gespeichert.",
+      );
       await refresh();
       await refreshHistory();
     } catch (cause) {
       setMessage(
         cause instanceof Error
           ? cause.message
-          : "Flugzeugspezifische Umlaufzeiten konnten nicht gespeichert werden.",
+          : "Flugzeugspezifische Bodenzeiten konnten nicht gespeichert werden.",
       );
     }
   }
 
-  async function deleteAircraftTurnaroundOverride() {
-    if (!board || productEditorId === "new" || !turnaroundOverrideAircraftId) return;
-    const existing = board.aircraftProductTurnaroundOverrides.find(
-      (override) =>
-        override.productId === productEditorId &&
-        override.aircraftId === turnaroundOverrideAircraftId,
-    );
-    if (!existing) return;
-    try {
-      await sendCommand(
-        {
-          commandId: crypto.randomUUID(),
-          eventId: EVENT_ID,
-          deviceId: ADMIN_DEVICE_ID,
-          expectedVersion: board.event.version,
-          issuedAt: new Date().toISOString(),
-          type: "DELETE_AIRCRAFT_PRODUCT_TURNAROUND_OVERRIDE",
-          payload: {
-            aircraftId: turnaroundOverrideAircraftId,
-            productId: productEditorId,
-            expectedOverrideVersion: existing.version,
-            reason: MASTER_DATA_AUDIT_REASON,
-            adminPin: adminPinRef.current,
-          },
-        },
-        deviceTokenFor(ADMIN_DEVICE_ID),
-      );
-      setAircraftBoardingOverride("");
-      setAircraftDeboardingOverride("");
-      setAircraftBufferOverride("");
-      setMessage("Flugzeugspezifische Umlaufzeiten wurden entfernt.");
-      await refresh();
-      await refreshHistory();
-    } catch (cause) {
-      setMessage(
-        cause instanceof Error
-          ? cause.message
-          : "Flugzeugspezifische Umlaufzeiten konnten nicht entfernt werden.",
-      );
+  function requestTurnaroundOverrideSave(
+    aircraftId: string,
+    productId: string,
+    values: { boarding: number | null; deboarding: number | null; buffer: number | null },
+  ) {
+    if (!isAdministrator) {
+      setMessage("Für Änderungen am Zeitmodell wird ein Administrationskonto benötigt.");
+      return;
     }
+    requestAdminAction(() =>
+      runBusyAction(`turnaround-${aircraftId}-${productId}`, () =>
+        persistAircraftProductTurnaroundOverride(aircraftId, productId, values),
+      ),
+    );
+  }
+
+  function requestAircraftAssignment(aircraftId: string, resourceGroupId: string) {
+    if (!isAdministrator) {
+      setMessage("Für Flugzeugzuordnungen wird ein Administrationskonto benötigt.");
+      return;
+    }
+    requestAdminAction(() =>
+      runBusyAction("master-assignment", () => assignAircraft(aircraftId, resourceGroupId)),
+    );
   }
 
   function selectResourceForEditing(id: string) {
@@ -1422,21 +1486,18 @@ export function AdminView() {
     const nextShortCode = entry?.shortCode ?? "";
     const nextGateId = entry?.gateId ?? board?.gates.find((gate) => gate.active)?.id ?? "";
     const nextAutomaticPrecall = entry?.automaticPrecallEnabled ?? true;
-    const nextAircraftIds = entry?.activeAircraftIds ?? [];
     initialMasterEditorSnapshotRef.current = createMasterEditorSnapshot([
       "resource-groups",
       nextName,
       nextShortCode,
       nextGateId,
       nextAutomaticPrecall,
-      nextAircraftIds,
     ]);
     setResourceEditorId(id);
     setResourceName(nextName);
     setResourceShortCode(nextShortCode);
     setResourceGateId(nextGateId);
     setResourceAutomaticPrecall(nextAutomaticPrecall);
-    setResourceAircraftIds(nextAircraftIds);
     setMasterSubmitAttempted(false);
     setMasterEditorOpen(true);
   }
@@ -1463,18 +1524,6 @@ export function AdminView() {
     setMasterEditorOpen(true);
   }
 
-  function selectAssignmentForEditing(aircraftId: string, resourceGroupId: string) {
-    initialMasterEditorSnapshotRef.current = createMasterEditorSnapshot([
-      "assignments",
-      aircraftId,
-      resourceGroupId,
-    ]);
-    setAssignmentAircraftId(aircraftId);
-    setAssignmentResourceGroupId(resourceGroupId);
-    setMasterSubmitAttempted(false);
-    setMasterEditorOpen(true);
-  }
-
   async function saveResourceGroup() {
     if (
       !board ||
@@ -1486,10 +1535,7 @@ export function AdminView() {
       return;
     try {
       const resourceGroupId = resourceEditorId === "new" ? crypto.randomUUID() : resourceEditorId;
-      const selectedSeats =
-        board.aircraft
-          .filter((aircraft) => resourceAircraftIds.includes(aircraft.id))
-          .map((aircraft) => aircraft.passengerSeats) ?? [];
+      const currentGroup = board.resourceGroups.find((group) => group.id === resourceGroupId);
       await sendCommand(
         {
           commandId: crypto.randomUUID(),
@@ -1503,17 +1549,18 @@ export function AdminView() {
             name: resourceName.trim(),
             shortCode: resourceShortCode.trim().toUpperCase(),
             gateId: resourceGateId,
-            referenceCapacity: Math.max(1, ...selectedSeats),
+            referenceCapacity: currentGroup?.referenceCapacity ?? 1,
             compatibleAircraftTypes: [],
             automaticPrecallEnabled: resourceAutomaticPrecall,
-            aircraftIds: resourceAircraftIds,
             reason: MASTER_DATA_AUDIT_REASON,
             adminPin: adminPinRef.current,
           },
         },
         deviceTokenFor(ADMIN_DEVICE_ID),
       );
-      setMessage("Ressourcengruppe und zugeordnete Flugzeuge wurden protokolliert gespeichert.");
+      setMessage(
+        "Ressourcengruppe wurde protokolliert gespeichert; Zuordnungen bleiben unverändert.",
+      );
       if (!adminModeUnlocked) setAdminPin("");
       selectResourceForEditing("new");
       finishMasterEditor();
@@ -1572,14 +1619,8 @@ export function AdminView() {
     }
   }
 
-  async function assignAircraft() {
-    if (
-      !board ||
-      !assignmentAircraftId ||
-      !assignmentResourceGroupId ||
-      adminPinRef.current.length < 4
-    )
-      return;
+  async function assignAircraft(aircraftId: string, resourceGroupId: string) {
+    if (!board || !aircraftId || !resourceGroupId || adminPinRef.current.length < 4) return;
     try {
       await sendCommand(
         {
@@ -1590,8 +1631,8 @@ export function AdminView() {
           issuedAt: new Date().toISOString(),
           type: "ASSIGN_AIRCRAFT_RESOURCE_GROUP",
           payload: {
-            aircraftId: assignmentAircraftId,
-            resourceGroupId: assignmentResourceGroupId,
+            aircraftId,
+            resourceGroupId,
             effectiveAt: new Date().toISOString(),
             reason: MASTER_DATA_AUDIT_REASON,
             adminPin: adminPinRef.current,
@@ -1603,6 +1644,7 @@ export function AdminView() {
         "Flugzeugzuordnung wurde historisiert geändert; Queue und Prognose werden neu berechnet.",
       );
       if (!adminModeUnlocked) setAdminPin("");
+      setAssignmentDialogContext(null);
       finishMasterEditor();
       await refresh();
       await refreshHistory();
@@ -1652,101 +1694,6 @@ export function AdminView() {
       await refreshHistory();
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : "Notfallkommando fehlgeschlagen.");
-    }
-  }
-
-  async function setResourceStatus(
-    resourceGroupId: string,
-    status: "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED",
-  ) {
-    if (!board) return;
-    try {
-      await sendCommand(
-        {
-          commandId: crypto.randomUUID(),
-          eventId: EVENT_ID,
-          deviceId: ADMIN_DEVICE_ID,
-          expectedVersion: board.event.version,
-          issuedAt: new Date().toISOString(),
-          type: "SET_RESOURCE_GROUP_STATUS",
-          payload: {
-            resourceGroupId,
-            status,
-            reason: OPERATIONAL_AUDIT_REASON,
-            expectedReviewAt: null,
-          },
-        },
-        deviceTokenFor(ADMIN_DEVICE_ID),
-      );
-      setMessage(`Ressourcengruppe auf ${status} gesetzt.`);
-      await refresh();
-      await refreshHistory();
-    } catch (cause) {
-      setMessage(cause instanceof Error ? cause.message : "Statusänderung fehlgeschlagen.");
-    }
-  }
-
-  async function setNotice(resourceGroupId?: string) {
-    if (!board) return;
-    try {
-      await sendCommand(
-        resourceGroupId
-          ? {
-              commandId: crypto.randomUUID(),
-              eventId: EVENT_ID,
-              deviceId: ADMIN_DEVICE_ID,
-              expectedVersion: board.event.version,
-              issuedAt: new Date().toISOString(),
-              type: "SET_RESOURCE_GROUP_NOTICE",
-              payload: { resourceGroupId, note: operationalNotice.trim() },
-            }
-          : {
-              commandId: crypto.randomUUID(),
-              eventId: EVENT_ID,
-              deviceId: ADMIN_DEVICE_ID,
-              expectedVersion: board.event.version,
-              issuedAt: new Date().toISOString(),
-              type: "SET_OPERATIONAL_NOTE",
-              payload: { note: operationalNotice.trim() },
-            },
-        deviceTokenFor(ADMIN_DEVICE_ID),
-      );
-      setMessage("Betriebshinweis wurde veröffentlicht und auditiert.");
-      await refresh();
-      await refreshHistory();
-    } catch (cause) {
-      setMessage(cause instanceof Error ? cause.message : "Betriebshinweis fehlgeschlagen.");
-    }
-  }
-
-  async function setEventInterruption(interrupted: boolean) {
-    if (!board) return;
-    try {
-      await sendCommand(
-        {
-          commandId: crypto.randomUUID(),
-          eventId: EVENT_ID,
-          deviceId: ADMIN_DEVICE_ID,
-          expectedVersion: board.event.version,
-          issuedAt: new Date().toISOString(),
-          type: "SET_EVENT_INTERRUPTION",
-          payload: {
-            interrupted,
-            reason: OPERATIONAL_AUDIT_REASON,
-            expectedReviewAt: null,
-          },
-        },
-        deviceTokenFor(ADMIN_DEVICE_ID),
-      );
-      setMessage(
-        interrupted ? "Flugbetrieb organisatorisch unterbrochen." : "Flugbetrieb fortgesetzt.",
-      );
-      await refresh();
-      await refreshHistory();
-    } catch (cause) {
-      setMessage(
-        cause instanceof Error ? cause.message : "Betriebsstatus konnte nicht geändert werden.",
-      );
     }
   }
 
@@ -1860,14 +1807,12 @@ export function AdminView() {
   async function configureProductSales(
     product: OperationBoard["products"][number],
     saleEnabled: boolean,
-    useEnteredClosingTime = false,
+    closingTimeOverride?: string | null,
   ) {
     if (!board || adminPinRef.current.length < 4) return;
     try {
       const configuredClosing =
-        useEnteredClosingTime && saleClosesAt
-          ? eventLocalDateTimeToIso(saleClosesAt, board.event.timeZone)
-          : product.saleClosesAt;
+        closingTimeOverride === undefined ? product.saleClosesAt : closingTimeOverride;
       await sendCommand(
         {
           commandId: crypto.randomUUID(),
@@ -1889,95 +1834,11 @@ export function AdminView() {
         deviceTokenFor(ADMIN_DEVICE_ID),
       );
       setMessage("Verkaufssteuerung wurde protokolliert aktualisiert.");
+      setSalesClosingProductId(null);
       await refresh();
       await refreshHistory();
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : "Verkaufssteuerung fehlgeschlagen.");
-    }
-  }
-
-  async function setAircraftState(
-    aircraftId: string,
-    state: "AVAILABLE" | "REFUELING" | "PAUSED" | "INTERRUPTED" | "INACTIVE",
-  ) {
-    if (!board) return;
-    try {
-      await sendCommand(
-        {
-          commandId: crypto.randomUUID(),
-          eventId: EVENT_ID,
-          deviceId: ADMIN_DEVICE_ID,
-          expectedVersion: board.event.version,
-          issuedAt: new Date().toISOString(),
-          type: "SET_AIRCRAFT_OPERATIONAL_STATE",
-          payload: {
-            aircraftId,
-            state,
-            reason: OPERATIONAL_AUDIT_REASON,
-            expectedReviewAt: null,
-          },
-        },
-        deviceTokenFor(ADMIN_DEVICE_ID),
-      );
-      setMessage("Flugzeugstatus wurde organisatorisch aktualisiert und protokolliert.");
-      await refresh();
-      await refreshHistory();
-    } catch (cause) {
-      setMessage(
-        cause instanceof Error ? cause.message : "Flugzeugstatus konnte nicht geändert werden.",
-      );
-    }
-  }
-
-  async function scheduleRefuel(aircraftId: string, planned: boolean) {
-    if (!board) return;
-    try {
-      await sendCommand(
-        {
-          commandId: crypto.randomUUID(),
-          eventId: EVENT_ID,
-          deviceId: ADMIN_DEVICE_ID,
-          expectedVersion: board.event.version,
-          issuedAt: new Date().toISOString(),
-          type: "SCHEDULE_AIRCRAFT_REFUEL",
-          payload: { aircraftId, planned, reason: OPERATIONAL_AUDIT_REASON },
-        },
-        deviceTokenFor(ADMIN_DEVICE_ID),
-      );
-      setMessage(planned ? "Tanken wurde unverbindlich vorgemerkt." : "Tankvormerkung aufgehoben.");
-      await refresh();
-      await refreshHistory();
-    } catch (cause) {
-      setMessage(cause instanceof Error ? cause.message : "Tankvormerkung fehlgeschlagen.");
-    }
-  }
-
-  async function configureRefuelThreshold(aircraftId: string) {
-    if (!board || adminPinRef.current.length < 4) return;
-    try {
-      await sendCommand(
-        {
-          commandId: crypto.randomUUID(),
-          eventId: EVENT_ID,
-          deviceId: ADMIN_DEVICE_ID,
-          expectedVersion: board.event.version,
-          issuedAt: new Date().toISOString(),
-          type: "CONFIGURE_AIRCRAFT_REFUEL_THRESHOLD",
-          payload: {
-            aircraftId,
-            reminderThreshold: refuelThreshold,
-            reason: OPERATIONAL_AUDIT_REASON,
-            adminPin: adminPinRef.current,
-          },
-        },
-        deviceTokenFor(ADMIN_DEVICE_ID),
-      );
-      setMessage("Organisatorische Tank-Erinnerungsschwelle wurde aktualisiert.");
-      if (!adminModeUnlocked) setAdminPin("");
-      await refresh();
-      await refreshHistory();
-    } catch (cause) {
-      setMessage(cause instanceof Error ? cause.message : "Erinnerungsschwelle fehlgeschlagen.");
     }
   }
 
@@ -2039,34 +1900,6 @@ export function AdminView() {
     setMasterEditorOpen(true);
   }
 
-  async function setPilotPause(pilotId: string, paused: boolean) {
-    if (!board) return;
-    try {
-      await sendCommand(
-        {
-          commandId: crypto.randomUUID(),
-          eventId: EVENT_ID,
-          deviceId: ADMIN_DEVICE_ID,
-          expectedVersion: board.event.version,
-          issuedAt: new Date().toISOString(),
-          type: "SET_PILOT_PAUSE",
-          payload: {
-            pilotId,
-            paused,
-            reason: OPERATIONAL_AUDIT_REASON,
-            expectedReviewAt: null,
-          },
-        },
-        deviceTokenFor(ADMIN_DEVICE_ID),
-      );
-      setMessage(paused ? "Anonyme Pilotenpause gestartet." : "Anonyme Pilotenpause beendet.");
-      await refresh();
-      await refreshHistory();
-    } catch (cause) {
-      setMessage(cause instanceof Error ? cause.message : "Pilotenpause fehlgeschlagen.");
-    }
-  }
-
   async function exportDailyReport() {
     try {
       await downloadDailyReport(EVENT_ID, ADMIN_DEVICE_ID, deviceTokenFor(ADMIN_DEVICE_ID));
@@ -2106,14 +1939,7 @@ export function AdminView() {
   }
 
   function requestMasterSave(
-    action:
-      | "gate"
-      | "resource-group"
-      | "aircraft"
-      | "assignment"
-      | "pilot"
-      | "pilot-toggle"
-      | "product",
+    action: "gate" | "resource-group" | "aircraft" | "pilot" | "pilot-toggle" | "product",
     valid: boolean,
     invalidFieldId?: string,
   ) {
@@ -2133,7 +1959,6 @@ export function AdminView() {
         if (action === "gate") await saveGate();
         if (action === "resource-group") await saveResourceGroup();
         if (action === "aircraft") await saveAircraft();
-        if (action === "assignment") await assignAircraft();
         if (action === "product") await saveProduct();
         if (action === "pilot") {
           const existing = board?.pilots.find((pilot) => pilot.id === pilotEditorId);
@@ -2234,15 +2059,6 @@ export function AdminView() {
             ? "aircraft-type"
             : undefined;
       requestMasterSave("aircraft", !invalidFieldId, invalidFieldId);
-      return;
-    }
-    if (masterDataCategory === "assignments") {
-      const invalidFieldId = !assignmentAircraftId
-        ? "assignment-aircraft"
-        : !assignmentResourceGroupId
-          ? "assignment-resource-group"
-          : undefined;
-      requestMasterSave("assignment", !invalidFieldId, invalidFieldId);
       return;
     }
     requestMasterSave("pilot", /^[A-Z0-9-]{2,12}$/.test(pilotCode), "pilot-operational-code");
@@ -2415,19 +2231,6 @@ export function AdminView() {
     if (masterDataCategory === "gates") selectGateForEditing("new");
     if (masterDataCategory === "resource-groups") selectResourceForEditing("new");
     if (masterDataCategory === "aircraft") selectAircraftForEditing("new");
-    if (masterDataCategory === "assignments") {
-      const nextAircraftId = board?.aircraft[0]?.id ?? "";
-      const nextResourceGroupId = board?.aircraft[0]?.resourceGroupId ?? "";
-      initialMasterEditorSnapshotRef.current = createMasterEditorSnapshot([
-        "assignments",
-        nextAircraftId,
-        nextResourceGroupId,
-      ]);
-      setAssignmentAircraftId(nextAircraftId);
-      setAssignmentResourceGroupId(nextResourceGroupId);
-      setMasterSubmitAttempted(false);
-      setMasterEditorOpen(true);
-    }
     if (masterDataCategory === "pilots") selectPilotForEditing("new");
     if (masterDataCategory === "products") selectProductForEditing("new");
   }
@@ -2597,10 +2400,12 @@ export function AdminView() {
   );
   const visibleResourceGroups = sortMasterRows(
     "resource-groups",
-    resourceGroups.filter((group) =>
-      `${group.name} ${group.gateLabel}`
-        .toLocaleLowerCase("de-DE")
-        .includes(normalizedMasterSearch),
+    resourceGroups.filter(
+      (group) =>
+        (resourceStatusFilter === "ALL" || group.status === resourceStatusFilter) &&
+        `${group.name} ${group.shortCode} ${group.gateLabel}`
+          .toLocaleLowerCase("de-DE")
+          .includes(normalizedMasterSearch),
     ),
     (group, key) =>
       key === "status"
@@ -2676,11 +2481,21 @@ export function AdminView() {
       ? visibleGates
       : masterDataCategory === "resource-groups"
         ? visibleResourceGroups
-        : masterDataCategory === "aircraft" || masterDataCategory === "assignments"
+        : masterDataCategory === "aircraft"
           ? visibleAircraft
           : masterDataCategory === "pilots"
             ? visiblePilots
             : visibleProducts;
+  const totalMasterDataCount =
+    masterDataCategory === "gates"
+      ? (board?.gates.length ?? 0)
+      : masterDataCategory === "resource-groups"
+        ? resourceGroups.length
+        : masterDataCategory === "aircraft"
+          ? (board?.aircraft.length ?? 0)
+          : masterDataCategory === "pilots"
+            ? (board?.pilots.length ?? 0)
+            : (board?.products.length ?? 0);
   const masterPageCount = Math.max(1, Math.ceil(activeMasterDataRows.length / masterPageSize));
   const masterPageClamped = Math.min(masterPage, masterPageCount - 1);
   const masterPageStart = masterPageClamped * masterPageSize;
@@ -2690,18 +2505,11 @@ export function AdminView() {
   const pagedAircraft = visibleAircraft.slice(masterPageStart, masterPageEnd);
   const pagedPilots = visiblePilots.slice(masterPageStart, masterPageEnd);
   const pagedProducts = visibleProducts.slice(masterPageStart, masterPageEnd);
-  const selectedResourceAircraft = (board?.aircraft ?? []).filter((aircraft) =>
-    resourceAircraftIds.includes(aircraft.id),
-  );
-  const selectedResourceCapacity = selectedResourceAircraft.reduce(
-    (maximum, aircraft) => Math.max(maximum, aircraft.passengerSeats),
-    0,
-  );
   const masterDataSingularLabel: Record<MasterDataCategory, string> = {
     gates: "Gate",
     "resource-groups": "Ressourcengruppe",
     aircraft: "Flugzeug",
-    assignments: "Zuordnung",
+    assignments: "Flugzeug",
     pilots: "Pilotencode",
     products: "Produkt",
   };
@@ -2736,30 +2544,21 @@ export function AdminView() {
               label: aircraftRegistration,
               description: "Eine bestehende Zuordnung muss zuerst entfernt werden.",
             }
-          : masterDataCategory === "assignments" &&
-              assignmentAircraftId &&
-              board?.aircraft.find((entry) => entry.id === assignmentAircraftId)?.resourceGroupId
+          : masterDataCategory === "pilots" && pilotEditorId !== "new"
             ? {
-                entityType: "ASSIGNMENT",
-                entityId: assignmentAircraftId,
-                label: `Zuordnung ${board?.aircraft.find((entry) => entry.id === assignmentAircraftId)?.registration ?? ""}`,
-                description: "Das Flugzeug und die Ressourcengruppe bleiben erhalten.",
+                entityType: "PILOT",
+                entityId: pilotEditorId,
+                label: pilotCode,
+                description: "Nur ohne Umlauf oder Flugzeugbindung möglich.",
               }
-            : masterDataCategory === "pilots" && pilotEditorId !== "new"
+            : masterDataCategory === "products" && productEditorId !== "new"
               ? {
-                  entityType: "PILOT",
-                  entityId: pilotEditorId,
-                  label: pilotCode,
-                  description: "Nur ohne Umlauf oder Flugzeugbindung möglich.",
+                  entityType: "PRODUCT",
+                  entityId: productEditorId,
+                  label: productName,
+                  description: "Nur ohne Tickets oder Umläufe möglich.",
                 }
-              : masterDataCategory === "products" && productEditorId !== "new"
-                ? {
-                    entityType: "PRODUCT",
-                    entityId: productEditorId,
-                    label: productName,
-                    description: "Nur ohne Tickets oder Umläufe möglich.",
-                  }
-                : null;
+              : null;
   const masterEditorBusyKey =
     masterDataCategory === "gates"
       ? "master-gate"
@@ -2767,11 +2566,9 @@ export function AdminView() {
         ? "master-resource-group"
         : masterDataCategory === "aircraft"
           ? "master-aircraft"
-          : masterDataCategory === "assignments"
-            ? "master-assignment"
-            : masterDataCategory === "pilots"
-              ? "master-pilot"
-              : "master-product";
+          : masterDataCategory === "pilots"
+            ? "master-pilot"
+            : "master-product";
   const masterEditorInitialFocusSelector =
     masterDataCategory === "gates"
       ? "#gate-label"
@@ -2779,11 +2576,9 @@ export function AdminView() {
         ? "#resource-name"
         : masterDataCategory === "aircraft"
           ? "#aircraft-registration"
-          : masterDataCategory === "assignments"
-            ? "#assignment-aircraft"
-            : masterDataCategory === "pilots"
-              ? "#pilot-operational-code"
-              : "#product-name";
+          : masterDataCategory === "pilots"
+            ? "#pilot-operational-code"
+            : "#product-name";
   const masterEditorFooter = (
     <>
       {masterEditorDeleteAction ? (
@@ -3297,7 +3092,8 @@ export function AdminView() {
             ) : null}
             {board ? (
               <>
-              <div hidden={adminArea !== "overview"}>
+              {adminArea === "overview" ? (
+              <div>
                 <AdminEventFlowChart
                   averageWaitMinutes={board.metrics.averageWaitMinutes}
                   error={eventFlowError}
@@ -3306,6 +3102,7 @@ export function AdminView() {
                   timeZone={board.event.timeZone}
                 />
               </div>
+              ) : null}
               <section
                 aria-label="Betriebskennzahlen"
                 className="metrics-grid"
@@ -3492,8 +3289,11 @@ export function AdminView() {
             </div>
           </section>
           <div
+            aria-labelledby="admin-event-step-event-tab"
             className="event-setup-v15 single-panel"
-            hidden={adminArea !== "events" || !["event", "operations"].includes(eventStep)}
+            hidden={adminArea !== "events" || eventStep !== "event"}
+            id="admin-event-step-event-panel"
+            role="tabpanel"
           >
             {eventStep === "event" && board ? (
               <EventParametersWorkspace
@@ -3508,84 +3308,6 @@ export function AdminView() {
               />
             ) : null}
 
-            <Panel
-              className="event-release-v15"
-              hidden={eventStep !== "operations"}
-              padding="compact"
-            >
-              <PageHeader
-                actions={
-                  <StatusPill tone={eventIsReleased || setupComplete ? "success" : "warning"}>
-                    {eventIsReleased ? "Freigegeben" : `${completedSetupSteps}/6 erledigt`}
-                  </StatusPill>
-                }
-                level={2}
-                title="Betriebsfreigabe"
-              />
-              {eventIsReleased ? (
-                <>
-                  <p className="event-release-ready">
-                    <CheckCircle2 aria-hidden="true" />{" "}
-                    {board?.event.status === "ACTIVE"
-                      ? "Der Veranstaltungsbetrieb ist freigegeben."
-                      : "Der Veranstaltungsbetrieb ist geschlossen."}
-                  </p>
-                  {board?.event.status === "ACTIVE" ? (
-                    <div className="event-release-action">
-                      <Button
-                        disabled={!isAdministrator}
-                        onClick={() => requestAdminAction(() => setEventLifecycle("CLOSED"))}
-                        variant="danger"
-                      >
-                        Betrieb beenden
-                      </Button>
-                    </div>
-                  ) : null}
-                </>
-              ) : !setupComplete ? (
-                <>
-                  <p>
-                    Die Veranstaltung ist noch nicht betriebsbereit. Bitte erledige die offenen
-                    Punkte, um den Betrieb freizugeben.
-                  </p>
-                  <ul className="event-release-missing">
-                    {setupSteps
-                      .filter((step) => !step.complete)
-                      .map((step) => (
-                        <li key={step.id}>
-                          <Clock3 aria-hidden="true" />
-                          <Button
-                            onClick={() => openSetupStep(step)}
-                            size="compact"
-                            variant="ghost"
-                          >
-                            {step.label} fehlt
-                          </Button>
-                        </li>
-                      ))}
-                  </ul>
-                </>
-              ) : (
-                <p className="event-release-ready">
-                  <CheckCircle2 aria-hidden="true" /> Alle Einrichtungsschritte sind abgeschlossen.
-                </p>
-              )}
-              {!eventIsReleased ? (
-                <div className="event-release-action">
-                  {!board ? (
-                    <p className="help-text">Der bestätigte Betriebsstand wird geladen.</p>
-                  ) : (
-                    <Button
-                      disabled={!isAdministrator || !setupComplete}
-                      onClick={() => requestAdminAction(() => setEventLifecycle("ACTIVE"))}
-                      variant="primary"
-                    >
-                      <LockKeyhole aria-hidden="true" /> Betrieb freigeben
-                    </Button>
-                  )}
-                </div>
-              ) : null}
-            </Panel>
           </div>
 
           <Panel className="event-catalog-v15" hidden padding="none">
@@ -3679,608 +3401,155 @@ export function AdminView() {
               </table>
             </div>
           </Panel>
-          <section className="master-data-workspace" hidden={!masterDataStepActive}>
-            {["aircraft", "assignments"].includes(masterDataCategory) &&
-            resourceGroups.length === 0 ? (
-              <ValidationHint>
-                Für eine Zuordnung muss zuerst eine Ressourcengruppe angelegt sein.
-              </ValidationHint>
-            ) : null}
-            <div className="master-data-toolbar">
-              <label className="master-data-search">
-                <span className="visually-hidden">Stammdaten durchsuchen</span>
-                <svg aria-hidden="true" viewBox="0 0 24 24">
-                  <circle cx="11" cy="11" r="6.5" />
-                  <path d="m16 16 4.5 4.5" />
-                </svg>
-                <input
-                  onChange={(event) => setMasterSearch(event.target.value)}
-                  placeholder={`${masterDataSingularLabel[masterDataCategory]} suchen`}
-                  type="search"
-                  value={masterSearch}
-                />
-              </label>
-              <Button onClick={startNewMasterDataEntry} type="button" variant="primary">
-                <Plus aria-hidden="true" /> {masterDataSingularLabel[masterDataCategory]}
-              </Button>
-            </div>
-            <div className="master-data-table-scroll">
+          {masterDataStepActive && board ? (
+            <section
+              aria-labelledby={`admin-event-step-${eventStep}-tab`}
+              id={`admin-event-step-${eventStep}-panel`}
+              role="tabpanel"
+            >
+            <MasterDataWorkspace
+              event={board.event}
+              filters={
+                masterDataCategory === "resource-groups" ? (
+                  <label className="master-data-status-filter">
+                    <span>Status</span>
+                    <select
+                      onChange={(event) => setResourceStatusFilter(event.target.value)}
+                      value={resourceStatusFilter}
+                    >
+                      <option value="ALL">Alle Status</option>
+                      <option value="ACTIVE">Aktiv</option>
+                      <option value="PAUSED">Pausiert</option>
+                      <option value="INTERRUPTED">Unterbrochen</option>
+                      <option value="ENDED">Beendet</option>
+                    </select>
+                  </label>
+                ) : undefined
+              }
+              newLabel={`${masterDataSingularLabel[masterDataCategory]} anlegen`}
+              onNew={startNewMasterDataEntry}
+              onSearchChange={setMasterSearch}
+              resultCount={activeMasterDataRows.length}
+              search={masterSearch}
+            >
               {masterDataCategory === "gates" ? (
-                <table className="master-data-table" data-master-table="gates">
-                  <thead>
-                    <tr>
-                      <SortableTableHeading
-                        active={masterSort.category === "gates" && masterSort.key === "label"}
-                        direction={masterSort.direction}
-                        label="Bezeichnung"
-                        onClick={() => toggleMasterSort("label")}
-                      />
-                      <SortableTableHeading
-                        active={masterSort.category === "gates" && masterSort.key === "type"}
-                        direction={masterSort.direction}
-                        label="Typ"
-                        onClick={() => toggleMasterSort("type")}
-                      />
-                      <SortableTableHeading
-                        active={masterSort.category === "gates" && masterSort.key === "status"}
-                        direction={masterSort.direction}
-                        label="Status"
-                        onClick={() => toggleMasterSort("status")}
-                      />
-                      <SortableTableHeading
-                        active={masterSort.category === "gates" && masterSort.key === "sortOrder"}
-                        direction={masterSort.direction}
-                        label="Sortierung"
-                        onClick={() => toggleMasterSort("sortOrder")}
-                      />
-                      <th>Ressourcengruppen</th>
-                      <th>Displayfilter</th>
-                      <th className="master-actions-heading">Aktionen</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pagedGates.map((gate) => (
-                      <tr
-                        className={masterEditorOpen && gateEditorId === gate.id ? "selected" : ""}
-                        key={gate.id}
-                      >
-                        <td>{gate.label}</td>
-                        <td>{gate.gateType}</td>
-                        <td>
-                          <span className={`status-text ${gate.active ? "active" : "inactive"}`}>
-                            {gate.active ? "Aktiv" : "Inaktiv"}
-                          </span>
-                        </td>
-                        <td>{gate.sortOrder}</td>
-                        <td>{gate.assignedResourceGroupIds.length}</td>
-                        <td>
-                          {gate.displayFilter.productIds.length} Produkte ·{" "}
-                          {gate.displayFilter.rotationStatuses.length} Status
-                        </td>
-                        <td className="master-actions-cell">
-                          <MasterTableActions
-                            deleteLabel={`${gate.label} löschen`}
-                            editLabel={`${gate.label} bearbeiten`}
-                            onDelete={() => requestMasterDelete("GATE", gate.id, gate.label)}
-                            onEdit={() => selectGateForEditing(gate.id)}
-                          />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <GatesWorkspace
+                  board={board}
+                  onDelete={(id, label) => requestMasterDelete("GATE", id, label)}
+                  onEdit={selectGateForEditing}
+                  onSort={toggleMasterSort}
+                  rows={pagedGates}
+                  sortDirection={masterSort.category === "gates" ? masterSort.direction : null}
+                  sortKey={masterSort.category === "gates" ? masterSort.key : undefined}
+                />
               ) : null}
               {masterDataCategory === "resource-groups" ? (
-                <table
-                  className="master-data-table resource-group-list-table"
-                  data-master-table="resource-groups"
-                >
-                  <thead>
-                    <tr>
-                      <SortableTableHeading
-                        active={
-                          masterSort.category === "resource-groups" && masterSort.key === "name"
-                        }
-                        direction={masterSort.direction}
-                        label="Ressourcengruppe"
-                        onClick={() => toggleMasterSort("name")}
-                      />
-                      <SortableTableHeading
-                        active={
-                          masterSort.category === "resource-groups" && masterSort.key === "status"
-                        }
-                        direction={masterSort.direction}
-                        label="Status"
-                        onClick={() => toggleMasterSort("status")}
-                      />
-                      <SortableTableHeading
-                        active={
-                          masterSort.category === "resource-groups" && masterSort.key === "gate"
-                        }
-                        direction={masterSort.direction}
-                        label="Gate"
-                        onClick={() => toggleMasterSort("gate")}
-                      />
-                      <SortableTableHeading
-                        active={
-                          masterSort.category === "resource-groups" && masterSort.key === "aircraft"
-                        }
-                        direction={masterSort.direction}
-                        label="Flugzeuge"
-                        onClick={() => toggleMasterSort("aircraft")}
-                      />
-                      <SortableTableHeading
-                        active={
-                          masterSort.category === "resource-groups" && masterSort.key === "capacity"
-                        }
-                        direction={masterSort.direction}
-                        label="Kapazität"
-                        onClick={() => toggleMasterSort("capacity")}
-                      />
-                      <th>Voraufruf</th>
-                      <th>Produkte</th>
-                      <th className="master-actions-heading">Aktionen</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pagedResourceGroups.map((group) => (
-                      <tr
-                        className={
-                          masterEditorOpen && resourceEditorId === group.id ? "selected" : ""
-                        }
-                        key={group.id}
-                      >
-                        <td>
-                          <strong>{group.name}</strong>
-                          <small>{group.shortCode}</small>
-                        </td>
-                        <td>
-                          <span
-                            className={`status-text ${group.status === "ACTIVE" ? "active" : "inactive"}`}
-                          >
-                            {group.status === "ACTIVE" ? "Aktiv" : group.status}
-                          </span>
-                        </td>
-                        <td>{group.gateLabel}</td>
-                        <td>
-                          {(board?.aircraft ?? [])
-                            .filter((aircraft) => group.activeAircraftIds.includes(aircraft.id))
-                            .map((aircraft) => aircraft.registration)
-                            .join(", ") || "Keine"}
-                        </td>
-                        <td>{group.referenceCapacity}</td>
-                        <td>{group.automaticPrecallEnabled ? "Automatisch" : "Manuell"}</td>
-                        <td>
-                          {board?.products.filter((product) => product.resourceGroupId === group.id)
-                            .length ?? 0}
-                        </td>
-                        <td className="master-actions-cell">
-                          <MasterTableActions
-                            deleteLabel={`${group.name} löschen`}
-                            editLabel={`${group.name} bearbeiten`}
-                            onDelete={() =>
-                              requestMasterDelete("RESOURCE_GROUP", group.id, group.name)
-                            }
-                            onEdit={() => selectResourceForEditing(group.id)}
-                          />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <ResourceGroupsWorkspace
+                  board={board}
+                  onAssign={(resourceGroupId) =>
+                    setAssignmentDialogContext({ mode: "resource-group", resourceGroupId })
+                  }
+                  onDelete={(id, label) => requestMasterDelete("RESOURCE_GROUP", id, label)}
+                  onEdit={selectResourceForEditing}
+                  rows={pagedResourceGroups}
+                />
               ) : null}
               {masterDataCategory === "aircraft" ? (
-                <table className="master-data-table" data-master-table="aircraft">
-                  <thead>
-                    <tr>
-                      <SortableTableHeading
-                        active={
-                          masterSort.category === "aircraft" && masterSort.key === "registration"
-                        }
-                        direction={masterSort.direction}
-                        label="Kennung"
-                        onClick={() => toggleMasterSort("registration")}
-                      />
-                      <SortableTableHeading
-                        active={masterSort.category === "aircraft" && masterSort.key === "type"}
-                        direction={masterSort.direction}
-                        label="Flugzeugtyp"
-                        onClick={() => toggleMasterSort("type")}
-                      />
-                      <SortableTableHeading
-                        active={masterSort.category === "aircraft" && masterSort.key === "seats"}
-                        direction={masterSort.direction}
-                        label="Sitzplätze"
-                        onClick={() => toggleMasterSort("seats")}
-                      />
-                      <th>Max. Zuladung</th>
-                      <SortableTableHeading
-                        active={masterSort.category === "aircraft" && masterSort.key === "group"}
-                        direction={masterSort.direction}
-                        label="Ressourcengruppe"
-                        onClick={() => toggleMasterSort("group")}
-                      />
-                      <SortableTableHeading
-                        active={masterSort.category === "aircraft" && masterSort.key === "pilot"}
-                        direction={masterSort.direction}
-                        label="Pilotencode"
-                        onClick={() => toggleMasterSort("pilot")}
-                      />
-                      <SortableTableHeading
-                        active={masterSort.category === "aircraft" && masterSort.key === "status"}
-                        direction={masterSort.direction}
-                        label="Status"
-                        onClick={() => toggleMasterSort("status")}
-                      />
-                      <th className="master-actions-heading">Aktionen</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pagedAircraft.map((aircraft) => (
-                      <tr
-                        className={
-                          masterEditorOpen && aircraftEditorId === aircraft.id ? "selected" : ""
-                        }
-                        key={aircraft.id}
-                      >
-                        <td>
-                          <strong>{aircraft.registration}</strong>
-                        </td>
-                        <td>{aircraft.aircraftType}</td>
-                        <td>{aircraft.passengerSeats}</td>
-                        <td>
-                          {aircraft.maximumPassengerPayloadKg
-                            ? `${aircraft.maximumPassengerPayloadKg} kg`
-                            : "Nicht erfasst"}
-                        </td>
-                        <td>{aircraft.resourceGroupName || "Nicht zugeordnet"}</td>
-                        <td>{aircraft.currentPilotOperationalCode || "Nicht zugeordnet"}</td>
-                        <td>
-                          <span
-                            className={`status-text ${aircraft.operationalState === "INACTIVE" ? "inactive" : "active"}`}
-                          >
-                            {aircraftStateLabel[aircraft.operationalState]}
-                          </span>
-                        </td>
-                        <td className="master-actions-cell">
-                          <MasterTableActions
-                            deleteLabel={`${aircraft.registration} löschen`}
-                            editLabel={`${aircraft.registration} bearbeiten`}
-                            onDelete={() =>
-                              requestMasterDelete(
-                                "AIRCRAFT",
-                                aircraft.id,
-                                aircraft.registration,
-                              )
-                            }
-                            onEdit={() => selectAircraftForEditing(aircraft.id)}
-                          />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              ) : null}
-              {masterDataCategory === "assignments" ? (
-                <table className="master-data-table" data-master-table="assignments">
-                  <thead>
-                    <tr>
-                      <th>Flugzeug</th>
-                      <th>Flugzeugtyp</th>
-                      <th>Aktuelle Ressourcengruppe</th>
-                      <th className="master-actions-heading">Aktionen</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pagedAircraft.map((aircraft) => (
-                      <tr
-                        className={
-                          masterEditorOpen && assignmentAircraftId === aircraft.id ? "selected" : ""
-                        }
-                        key={aircraft.id}
-                      >
-                        <td>
-                          <strong>{aircraft.registration}</strong>
-                        </td>
-                        <td>{aircraft.aircraftType}</td>
-                        <td>{aircraft.resourceGroupName || "Nicht zugeordnet"}</td>
-                        <td className="master-actions-cell">
-                          <MasterTableActions
-                            editLabel={`Zuordnung für ${aircraft.registration} bearbeiten`}
-                            onEdit={() =>
-                              selectAssignmentForEditing(
-                                aircraft.id,
-                                aircraft.resourceGroupId,
-                              )
-                            }
-                          />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <AircraftWorkspace
+                  board={board}
+                  onAssign={(aircraftId) =>
+                    setAssignmentDialogContext({ mode: "aircraft", aircraftId })
+                  }
+                  onDelete={(id, label) => requestMasterDelete("AIRCRAFT", id, label)}
+                  onEdit={selectAircraftForEditing}
+                  onSort={toggleMasterSort}
+                  onTurnaround={(aircraftId) =>
+                    setTurnaroundDialogContext({ mode: "aircraft", aircraftId })
+                  }
+                  rows={pagedAircraft}
+                  sortDirection={masterSort.category === "aircraft" ? masterSort.direction : null}
+                  sortKey={masterSort.category === "aircraft" ? masterSort.key : undefined}
+                />
               ) : null}
               {masterDataCategory === "pilots" ? (
-                <table className="master-data-table" data-master-table="pilots">
-                  <thead>
-                    <tr>
-                      <SortableTableHeading
-                        active={masterSort.category === "pilots" && masterSort.key === "code"}
-                        direction={masterSort.direction}
-                        label="Operativer Code"
-                        onClick={() => toggleMasterSort("code")}
-                      />
-                      <SortableTableHeading
-                        active={masterSort.category === "pilots" && masterSort.key === "note"}
-                        direction={masterSort.direction}
-                        label="Organisatorische Bemerkung"
-                        onClick={() => toggleMasterSort("note")}
-                      />
-                      <SortableTableHeading
-                        active={masterSort.category === "pilots" && masterSort.key === "status"}
-                        direction={masterSort.direction}
-                        label="Status"
-                        onClick={() => toggleMasterSort("status")}
-                      />
-                      <SortableTableHeading
-                        active={masterSort.category === "pilots" && masterSort.key === "rotation"}
-                        direction={masterSort.direction}
-                        label="Aktueller Umlauf"
-                        onClick={() => toggleMasterSort("rotation")}
-                      />
-                      <th className="master-actions-heading">Aktionen</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pagedPilots.map((pilot) => (
-                      <tr
-                        className={masterEditorOpen && pilotEditorId === pilot.id ? "selected" : ""}
-                        key={pilot.id}
-                      >
-                        <td>
-                          <strong>{pilot.operationalCode}</strong>
-                        </td>
-                        <td>{pilot.operationalNote || "Keine Bemerkung"}</td>
-                        <td>
-                          <span className={`status-text ${pilot.active ? "active" : "inactive"}`}>
-                            {pilot.active ? (pilot.paused ? "Pause" : "Aktiv") : "Inaktiv"}
-                          </span>
-                        </td>
-                        <td>
-                          {pilot.currentCommunicationNumber
-                            ? `Fluggruppe ${pilot.currentCommunicationNumber}`
-                            : "Nicht zugeordnet"}
-                        </td>
-                        <td className="master-actions-cell">
-                          <MasterTableActions
-                            deleteLabel={`${pilot.operationalCode} löschen`}
-                            editLabel={`${pilot.operationalCode} bearbeiten`}
-                            onDelete={() =>
-                              requestMasterDelete("PILOT", pilot.id, pilot.operationalCode)
-                            }
-                            onEdit={() => selectPilotForEditing(pilot.id)}
-                          />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <PilotCodesWorkspace
+                  onDelete={(id, label) => requestMasterDelete("PILOT", id, label)}
+                  onEdit={selectPilotForEditing}
+                  onSort={toggleMasterSort}
+                  rows={pagedPilots}
+                  sortDirection={masterSort.category === "pilots" ? masterSort.direction : null}
+                  sortKey={masterSort.category === "pilots" ? masterSort.key : undefined}
+                />
               ) : null}
               {masterDataCategory === "products" ? (
-                <table className="master-data-table" data-master-table="products">
-                  <thead>
-                    <tr>
-                      <SortableTableHeading
-                        active={masterSort.category === "products" && masterSort.key === "code"}
-                        direction={masterSort.direction}
-                        label="Kürzel"
-                        onClick={() => toggleMasterSort("code")}
-                      />
-                      <SortableTableHeading
-                        active={masterSort.category === "products" && masterSort.key === "name"}
-                        direction={masterSort.direction}
-                        label="Bezeichnung"
-                        onClick={() => toggleMasterSort("name")}
-                      />
-                      <SortableTableHeading
-                        active={masterSort.category === "products" && masterSort.key === "group"}
-                        direction={masterSort.direction}
-                        label="Ressourcengruppe"
-                        onClick={() => toggleMasterSort("group")}
-                      />
-                      <SortableTableHeading
-                        active={masterSort.category === "products" && masterSort.key === "gate"}
-                        direction={masterSort.direction}
-                        label="Gate"
-                        onClick={() => toggleMasterSort("gate")}
-                      />
-                      <SortableTableHeading
-                        active={masterSort.category === "products" && masterSort.key === "price"}
-                        direction={masterSort.direction}
-                        label="Preis"
-                        onClick={() => toggleMasterSort("price")}
-                      />
-                      <SortableTableHeading
-                        active={masterSort.category === "products" && masterSort.key === "duration"}
-                        direction={masterSort.direction}
-                        label="Referenzzeit Offblock–Onblock"
-                        onClick={() => toggleMasterSort("duration")}
-                      />
-                      <SortableTableHeading
-                        active={masterSort.category === "products" && masterSort.key === "status"}
-                        direction={masterSort.direction}
-                        label="Status"
-                        onClick={() => toggleMasterSort("status")}
-                      />
-                      <th className="master-actions-heading">Aktionen</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pagedProducts.map((product) => (
-                      <tr
-                        className={
-                          masterEditorOpen && productEditorId === product.id ? "selected" : ""
-                        }
-                        key={product.id}
+                <ProductsWorkspace
+                  onDelete={(id, label) => requestMasterDelete("PRODUCT", id, label)}
+                  onEdit={selectProductForEditing}
+                  onSort={toggleMasterSort}
+                  onTurnaround={(productId) =>
+                    setTurnaroundDialogContext({ mode: "product", productId })
+                  }
+                  rows={pagedProducts}
+                  sortDirection={masterSort.category === "products" ? masterSort.direction : null}
+                  sortKey={masterSort.category === "products" ? masterSort.key : undefined}
+                />
+              ) : null}
+              {activeMasterDataRows.length === 0 ? (
+                <MasterDataEmptyState
+                  action={
+                    totalMasterDataCount === 0 ? (
+                      <Button onClick={startNewMasterDataEntry} type="button" variant="primary">
+                        <Plus aria-hidden="true" />
+                        {masterDataSingularLabel[masterDataCategory]} anlegen
+                      </Button>
+                    ) : (
+                      <Button
+                        onClick={() => {
+                          setMasterSearch("");
+                          setResourceStatusFilter("ALL");
+                        }}
+                        type="button"
                       >
-                        <td>
-                          <strong>{product.code}</strong>
-                        </td>
-                        <td>{product.name}</td>
-                        <td>{product.resourceGroupName}</td>
-                        <td>{product.gateLabel}</td>
-                        <td>
-                          {(product.priceCents / 100).toLocaleString("de-DE", {
-                            style: "currency",
-                            currency: "EUR",
-                          })}
-                        </td>
-                        <td>{product.referenceDurationMinutes} Min.</td>
-                        <td>
-                          <span
-                            className={`status-text ${product.saleEnabled ? "active" : "inactive"}`}
-                          >
-                            {product.saleEnabled ? "Verkauf aktiv" : "Verkauf gesperrt"}
-                          </span>
-                        </td>
-                        <td className="master-actions-cell">
-                          <MasterTableActions
-                            deleteLabel={`${product.name} löschen`}
-                            editLabel={`${product.name} bearbeiten`}
-                            onDelete={() =>
-                              requestMasterDelete("PRODUCT", product.id, product.name)
-                            }
-                            onEdit={() => selectProductForEditing(product.id)}
-                          />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                        Filter zurücksetzen
+                      </Button>
+                    )
+                  }
+                  description={
+                    totalMasterDataCount === 0
+                      ? "Für diese Veranstaltung sind noch keine Einträge vorhanden."
+                      : "Die aktuelle Suche oder Filterauswahl liefert keine Einträge."
+                  }
+                  title={totalMasterDataCount === 0 ? "Noch keine Stammdaten" : "Keine Treffer"}
+                />
               ) : null}
-              {(masterDataCategory === "gates" && (board?.gates.length ?? 0) === 0) ||
-              (masterDataCategory === "resource-groups" && resourceGroups.length === 0) ||
-              (masterDataCategory === "aircraft" && (board?.aircraft.length ?? 0) === 0) ||
-              (masterDataCategory === "assignments" && (board?.aircraft.length ?? 0) === 0) ||
-              (masterDataCategory === "pilots" && (board?.pilots.length ?? 0) === 0) ||
-              (masterDataCategory === "products" && (board?.products.length ?? 0) === 0) ? (
-                <div className="master-data-empty">
-                  <strong>
-                    Noch keine{" "}
-                    {masterDataCategory === "gates"
-                      ? "Gates"
-                      : masterDataCategory === "resource-groups"
-                        ? "Ressourcengruppe"
-                        : masterDataCategory === "aircraft"
-                          ? "Flugzeuge"
-                          : masterDataCategory === "assignments"
-                            ? "Flugzeuge für eine Zuordnung"
-                            : masterDataCategory === "pilots"
-                              ? "Pilotencodes"
-                              : "Produkte"}{" "}
-                    angelegt
-                  </strong>
-                  <p>
-                    {masterDataCategory === "resource-groups"
-                      ? "Eine Ressourcengruppe benötigt ein aktives Gate."
-                      : masterDataCategory === "products"
-                        ? "Ein Produkt benötigt eine Ressourcengruppe und ein aktives Gate."
-                        : masterDataCategory === "assignments"
-                          ? "Legen Sie zuerst ein Flugzeug und eine Ressourcengruppe an."
-                          : "Mit der Schaltfläche oben kann der erste Datensatz angelegt werden."}
-                  </p>
-                  {masterDataCategory === "resource-groups" ? (
-                    <button
-                      className="table-action"
-                      onClick={() => setMasterDataCategory("gates")}
-                      type="button"
-                    >
-                      Gate verwalten
-                    </button>
-                  ) : masterDataCategory !== "assignments" ? (
-                    <Button onClick={startNewMasterDataEntry} type="button" variant="primary">
-                      <Plus aria-hidden="true" /> Ersten Datensatz hinzufügen
-                    </Button>
-                  ) : null}
-                </div>
-              ) : null}
-              {activeMasterDataRows.length === 0 &&
-              normalizedMasterSearch &&
-              ((masterDataCategory === "gates" && (board?.gates.length ?? 0) > 0) ||
-                (masterDataCategory === "resource-groups" && resourceGroups.length > 0) ||
-                (["aircraft", "assignments"].includes(masterDataCategory) &&
-                  (board?.aircraft.length ?? 0) > 0) ||
-                (masterDataCategory === "pilots" && (board?.pilots.length ?? 0) > 0) ||
-                (masterDataCategory === "products" && (board?.products.length ?? 0) > 0)) ? (
-                <div className="master-data-empty master-data-no-results">
-                  <strong>Keine passenden Einträge</strong>
-                  <p>Die Suche „{masterSearch.trim()}“ liefert in diesem Bereich keine Treffer.</p>
-                  <Button onClick={() => setMasterSearch("")} type="button" variant="secondary">
-                    Suche zurücksetzen
-                  </Button>
-                </div>
-              ) : null}
-            </div>
-            {activeMasterDataRows.length > 0 ? (
-              <div className="ds-pagination">
-                <div className="ds-pagination-size">
-                  <label htmlFor="master-data-page-size">Zeilen pro Seite</label>
-                  <select
-                    id="master-data-page-size"
-                    onChange={(event) => setMasterPageSize(Number(event.target.value))}
-                    value={masterPageSize}
-                  >
-                    <option value={10}>10</option>
-                    <option value={25}>25</option>
-                    <option value={50}>50</option>
-                  </select>
-                </div>
-                <span>
-                  {masterPageStart + 1}–{Math.min(activeMasterDataRows.length, masterPageEnd)} von{" "}
-                  {activeMasterDataRows.length}
-                </span>
-                <nav aria-label="Seitennavigation" className="ds-pagination-nav">
-                  <button
-                    aria-label="Erste Seite"
-                    disabled={masterPageClamped === 0}
-                    onClick={() => setMasterPage(0)}
-                    type="button"
-                  >
-                    «
-                  </button>
-                  <button
-                    aria-label="Vorherige Seite"
-                    disabled={masterPageClamped === 0}
-                    onClick={() => setMasterPage((value) => Math.max(0, value - 1))}
-                    type="button"
-                  >
-                    ‹
-                  </button>
-                  <button className="current" disabled type="button">
-                    {masterPageClamped + 1}
-                  </button>
-                  <button
-                    aria-label="Nächste Seite"
-                    disabled={masterPageClamped >= masterPageCount - 1}
-                    onClick={() =>
-                      setMasterPage((value) => Math.min(masterPageCount - 1, value + 1))
-                    }
-                    type="button"
-                  >
-                    ›
-                  </button>
-                  <button
-                    aria-label="Letzte Seite"
-                    disabled={masterPageClamped >= masterPageCount - 1}
-                    onClick={() => setMasterPage(masterPageCount - 1)}
-                    type="button"
-                  >
-                    »
-                  </button>
-                </nav>
-              </div>
-            ) : null}
-          </section>
+              <MasterDataPagination
+                count={activeMasterDataRows.length}
+                onPageChange={setMasterPage}
+                onPageSizeChange={setMasterPageSize}
+                page={masterPageClamped}
+                pageSize={masterPageSize}
+              />
+            </MasterDataWorkspace>
+            </section>
+          ) : null}
+          {board ? (
+            <AircraftResourceGroupAssignmentDialog
+              board={board}
+              busy={busyActionKey === "master-assignment"}
+              context={assignmentDialogContext}
+              onClose={() => setAssignmentDialogContext(null)}
+              onConfirm={requestAircraftAssignment}
+            />
+          ) : null}
+          {board ? (
+            <AircraftProductTurnaroundOverrideDialog
+              board={board}
+              busyKey={busyActionKey}
+              context={turnaroundDialogContext}
+              onClose={() => setTurnaroundDialogContext(null)}
+              onSave={requestTurnaroundOverrideSave}
+            />
+          ) : null}
           <ModalDialog
             bodyClassName="master-data-editor-body"
             className="master-data-editor-dialog"
@@ -4305,8 +3574,25 @@ export function AdminView() {
             }
           >
             <div className="master-data-columns">
-              <fieldset hidden={masterDataCategory !== "gates"}>
+              {masterDataCategory === "gates" ? (
+              <fieldset>
                 <legend>Gate</legend>
+                <Tabs
+                  idPrefix="master-gate-editor"
+                  items={[
+                    { value: "general", label: "Grunddaten" },
+                    { value: "details", label: "Öffentliche Anzeige" },
+                  ]}
+                  label="Gate-Bereiche"
+                  onChange={setMasterEditorTab}
+                  value={masterEditorTab}
+                />
+                <div
+                  aria-labelledby="master-gate-editor-general-tab"
+                  hidden={masterEditorTab !== "general"}
+                  id="master-gate-editor-general-panel"
+                  role="tabpanel"
+                >
                 <p className="form-introduction">
                   Ein Gate ist der sichtbare Treff- oder Ausgabepunkt einer Ressourcengruppe. Für
                   den normalen Betrieb genügt eine Bezeichnung; technische Gate-Arten sind nicht
@@ -4335,9 +3621,52 @@ export function AdminView() {
                     onChange={(event) => setGateActive(event.target.checked)}
                   />
                 </div>
+                <details className="master-editor-further-settings">
+                  <summary>Weitere Einstellungen</summary>
+                  <div className="parameter-grid">
+                    <div className="field-control">
+                      <FieldLabel
+                        htmlFor="gate-type"
+                        label="Technische Gate-Art"
+                        help="Kompatibler technischer Schlüssel; für den normalen Ablauf ist Flight Line passend."
+                      />
+                      <select
+                        id="gate-type"
+                        onChange={(event) =>
+                          setGateType(
+                            event.target.value as "FLIGHT_LINE" | "BOARDING" | "DISPLAY_ONLY",
+                          )
+                        }
+                        value={gateType}
+                      >
+                        <option value="FLIGHT_LINE">Flight Line</option>
+                        <option value="BOARDING">Boarding</option>
+                        <option value="DISPLAY_ONLY">Nur Anzeige</option>
+                      </select>
+                    </div>
+                    <div className="field-control">
+                      <FieldLabel
+                        htmlFor="gate-sort-order"
+                        label="Reihenfolge"
+                        help="Kleinere Werte erscheinen zuerst."
+                      />
+                      <input
+                        id="gate-sort-order"
+                        min="0"
+                        onChange={(event) => setGateSortOrder(Number(event.target.value))}
+                        type="number"
+                        value={gateSortOrder}
+                      />
+                    </div>
+                  </div>
+                </details>
+                </div>
                 <section
+                  aria-labelledby="master-gate-editor-details-tab"
                   className="gate-display-filter"
-                  aria-labelledby="gate-display-filter-title"
+                  hidden={masterEditorTab !== "details"}
+                  id="master-gate-editor-details-panel"
+                  role="tabpanel"
                 >
                   <div>
                     <h3 id="gate-display-filter-title">Anzeigefilter</h3>
@@ -4424,9 +3753,27 @@ export function AdminView() {
                   </ValidationHint>
                 ) : null}
               </fieldset>
-              <fieldset hidden={masterDataCategory !== "products"}>
+              ) : null}
+              {masterDataCategory === "products" ? (
+              <fieldset>
                 <legend>Produkt</legend>
-                <section className="product-editor-section">
+                <Tabs
+                  idPrefix="master-product-editor"
+                  items={[
+                    { value: "general", label: "Allgemein" },
+                    { value: "details", label: "Planung und Zeitmodell" },
+                  ]}
+                  label="Produktbereiche"
+                  onChange={setMasterEditorTab}
+                  value={masterEditorTab}
+                />
+                <section
+                  aria-labelledby="master-product-editor-general-tab"
+                  className="product-editor-section"
+                  hidden={masterEditorTab !== "general"}
+                  id="master-product-editor-general-panel"
+                  role="tabpanel"
+                >
                   <h3>Allgemein</h3>
                   <div className="parameter-grid">
                     <div className="field-control">
@@ -4497,8 +3844,14 @@ export function AdminView() {
                     </div>
                   </div>
                 </section>
-                <section className="product-editor-section">
-                  <h3>Planung</h3>
+                <section
+                  aria-labelledby="master-product-editor-details-tab"
+                  className="product-editor-section"
+                  hidden={masterEditorTab !== "details"}
+                  id="master-product-editor-details-panel"
+                  role="tabpanel"
+                >
+                  <h3>Planung und Zeitmodell</h3>
                   <div className="parameter-grid">
                     <div className="field-control">
                       <FieldLabel
@@ -4583,7 +3936,7 @@ export function AdminView() {
                     <div className="field-control">
                       <FieldLabel
                         htmlFor="product-boarding-override"
-                        label="Boarding-Override (Min.)"
+                        label="Boarding (Min.)"
                         help="Leer übernimmt den Veranstaltungswert."
                       />
                       <input
@@ -4598,11 +3951,24 @@ export function AdminView() {
                       <small>
                         Quelle: {productBoardingOverride === "" ? "Veranstaltung" : "Produkt"}
                       </small>
+                      <button
+                        className="table-action"
+                        onClick={() =>
+                          setProductBoardingOverride((current) =>
+                            current === "" ? String(board?.event.plannedBoardingMinutes ?? 8) : "",
+                          )
+                        }
+                        type="button"
+                      >
+                        {productBoardingOverride === ""
+                          ? "Produktabweichung festlegen"
+                          : "Produktabweichung entfernen"}
+                      </button>
                     </div>
                     <div className="field-control">
                       <FieldLabel
                         htmlFor="product-deboarding-override"
-                        label="Ausstiegs-Override (Min.)"
+                        label="Ausstieg (Min.)"
                         help="Leer übernimmt den Veranstaltungswert."
                       />
                       <input
@@ -4617,11 +3983,24 @@ export function AdminView() {
                       <small>
                         Quelle: {productDeboardingOverride === "" ? "Veranstaltung" : "Produkt"}
                       </small>
+                      <button
+                        className="table-action"
+                        onClick={() =>
+                          setProductDeboardingOverride((current) =>
+                            current === "" ? String(board?.event.plannedDeboardingMinutes ?? 5) : "",
+                          )
+                        }
+                        type="button"
+                      >
+                        {productDeboardingOverride === ""
+                          ? "Produktabweichung festlegen"
+                          : "Produktabweichung entfernen"}
+                      </button>
                     </div>
                     <div className="field-control">
                       <FieldLabel
                         htmlFor="product-buffer-override"
-                        label="Puffer-Override (Min.)"
+                        label="Puffer (Min.)"
                         help="Leer übernimmt den Veranstaltungswert."
                       />
                       <input
@@ -4636,6 +4015,19 @@ export function AdminView() {
                       <small>
                         Quelle: {productBufferOverride === "" ? "Veranstaltung" : "Produkt"}
                       </small>
+                      <button
+                        className="table-action"
+                        onClick={() =>
+                          setProductBufferOverride((current) =>
+                            current === "" ? String(board?.event.plannedBufferMinutes ?? 3) : "",
+                          )
+                        }
+                        type="button"
+                      >
+                        {productBufferOverride === ""
+                          ? "Produktabweichung festlegen"
+                          : "Produktabweichung entfernen"}
+                      </button>
                     </div>
                     <ProductReferenceRotation
                       boardingMinutes={
@@ -4657,100 +4049,8 @@ export function AdminView() {
                     />
                   </div>
                 </section>
-                {productEditorId !== "new" ? (
-                  <section className="product-editor-section">
-                    <h3>Flugzeugspezifische Ausnahmen</h3>
-                    <p>
-                      Leere Phasen erben komponentenweise vom Produkt und danach von der
-                      Veranstaltung.
-                    </p>
-                    <div className="parameter-grid">
-                      <div className="field-control">
-                        <FieldLabel
-                          htmlFor="turnaround-override-aircraft"
-                          label="Flugzeug"
-                          help="Ausnahme gilt ausschließlich für dieses Produkt und Flugzeug."
-                        />
-                        <select
-                          id="turnaround-override-aircraft"
-                          onChange={(event) =>
-                            selectAircraftTurnaroundOverride(event.target.value)
-                          }
-                          value={turnaroundOverrideAircraftId}
-                        >
-                          <option value="">Bitte wählen</option>
-                          {board?.aircraft.map((aircraft) => (
-                            <option key={aircraft.id} value={aircraft.id}>
-                              {aircraft.registration}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      {[
-                        {
-                          id: "aircraft-boarding-override",
-                          label: "Boarding (Min.)",
-                          value: aircraftBoardingOverride,
-                          setValue: setAircraftBoardingOverride,
-                        },
-                        {
-                          id: "aircraft-deboarding-override",
-                          label: "Ausstieg (Min.)",
-                          value: aircraftDeboardingOverride,
-                          setValue: setAircraftDeboardingOverride,
-                        },
-                        {
-                          id: "aircraft-buffer-override",
-                          label: "Puffer (Min.)",
-                          value: aircraftBufferOverride,
-                          setValue: setAircraftBufferOverride,
-                        },
-                      ].map((field) => (
-                        <label className="field-control" key={field.id}>
-                          <span>{field.label}</span>
-                          <input
-                            disabled={!turnaroundOverrideAircraftId}
-                            id={field.id}
-                            max="120"
-                            min="0"
-                            onChange={(event) => field.setValue(event.target.value)}
-                            placeholder="geerbt"
-                            type="number"
-                            value={field.value}
-                          />
-                        </label>
-                      ))}
-                    </div>
-                    {turnaroundOverrideAircraftId ? (
-                      <div className="master-data-inline-actions">
-                        <button
-                          disabled={
-                            aircraftBoardingOverride === "" &&
-                            aircraftDeboardingOverride === "" &&
-                            aircraftBufferOverride === ""
-                          }
-                          onClick={() => void saveAircraftTurnaroundOverride()}
-                          type="button"
-                        >
-                          Ausnahme speichern
-                        </button>
-                        {board?.aircraftProductTurnaroundOverrides.some(
-                          (override) =>
-                            override.productId === productEditorId &&
-                            override.aircraftId === turnaroundOverrideAircraftId,
-                        ) ? (
-                          <button
-                            onClick={() => void deleteAircraftTurnaroundOverride()}
-                            type="button"
-                          >
-                            Ausnahme entfernen
-                          </button>
-                        ) : null}
-                      </div>
-                    ) : null}
-                  </section>
-                ) : null}
               </fieldset>
+              ) : null}
             </div>
             {masterEditorMobileFurtherActions}
           </ModalDialog>
@@ -4764,7 +4064,7 @@ export function AdminView() {
             open={
               masterDataStepActive &&
               masterEditorOpen &&
-              ["resource-groups", "aircraft", "assignments"].includes(masterDataCategory)
+              ["resource-groups", "aircraft"].includes(masterDataCategory)
             }
             size={masterDataCategory === "resource-groups" ? "wide" : "default"}
             title={
@@ -4772,9 +4072,7 @@ export function AdminView() {
                 ? resourceEditorId === "new"
                   ? "Ressourcengruppe anlegen"
                   : "Ressourcengruppe bearbeiten"
-                : masterDataCategory === "assignments"
-                  ? "Zuordnung ändern"
-                  : aircraftEditorId === "new"
+                : aircraftEditorId === "new"
                     ? "Flugzeug anlegen"
                     : "Flugzeug bearbeiten"
             }
@@ -4844,53 +4142,30 @@ export function AdminView() {
                     <FieldHelp help="Kann für einzelne Ressourcengruppen abgeschaltet werden. Belegung, Pilot und Boarding bleiben immer manuell bestätigt." />
                   }
                 />
-                <section className="resource-aircraft-selection">
-                  <h3>Flugzeuge dieser Ressourcengruppe</h3>
+                <section className="resource-aircraft-selection resource-assignment-summary">
+                  <h3>Flugzeugzuordnungen</h3>
                   <p>
-                    Kapazität und passende Gruppengröße werden automatisch aus diesen Flugzeugen
-                    ermittelt.
+                    Zuordnungen werden getrennt historisiert und beim Speichern der
+                    Ressourcengruppe nicht verändert.
                   </p>
-                  {board?.aircraft.map((aircraft) => (
-                    <CheckboxField
-                      checked={resourceAircraftIds.includes(aircraft.id)}
-                      key={aircraft.id}
-                      label={
-                        <span>
-                        <strong>{aircraft.registration}</strong> · {aircraft.aircraftType} ·{" "}
-                        {aircraft.passengerSeats} Plätze
-                        {aircraft.resourceGroupId && aircraft.resourceGroupId !== resourceEditorId
-                          ? ` · aktuell ${aircraft.resourceGroupName}`
-                          : ""}
-                        </span>
+                  {resourceEditorId !== "new" ? (
+                    <Button
+                      onClick={() =>
+                        setAssignmentDialogContext({
+                          mode: "resource-group",
+                          resourceGroupId: resourceEditorId,
+                        })
                       }
-                      onChange={(event) =>
-                        setResourceAircraftIds((current) =>
-                          event.target.checked
-                            ? [...current, aircraft.id]
-                            : current.filter((id) => id !== aircraft.id),
-                        )
-                      }
-                    />
-                  ))}
-                  {board?.aircraft.length === 0 ? (
+                      type="button"
+                      variant="secondary"
+                    >
+                      Flugzeug zuordnen
+                    </Button>
+                  ) : (
                     <ValidationHint>
-                      Zuerst mindestens ein Flugzeug anlegen; die Zuordnung kann anschließend hier
-                      erfolgen.
+                      Die Ressourcengruppe zuerst speichern und anschließend Flugzeuge zuordnen.
                     </ValidationHint>
-                  ) : null}
-                </section>
-                <section
-                  className="derived-resource-summary"
-                  aria-label="Abgeleitete Zusammenfassung"
-                >
-                  <strong>Zusammenfassung (abgeleitet)</strong>
-                  <span>
-                    {selectedResourceAircraft.length} Flugzeug
-                    {selectedResourceAircraft.length === 1 ? "" : "e"} · Kapazität{" "}
-                    {selectedResourceCapacity || "–"}{" "}
-                    {selectedResourceCapacity === 1 ? "Platz" : "Plätze"} · Gruppen bis{" "}
-                    {selectedResourceCapacity || "–"} Personen ohne Teilung
-                  </span>
+                  )}
                 </section>
                 {masterSubmitAttempted &&
                 (resourceName.trim().length < 2 ||
@@ -4958,62 +4233,38 @@ export function AdminView() {
                     onChange={(event) => setAircraftMaximumPayload(event.target.value)}
                   />
                 </div>
+                {aircraftEditorId !== "new" ? (
+                  <dl className="master-editor-readonly-summary">
+                    <div>
+                      <dt>Betriebsstatus</dt>
+                      <dd>
+                        {aircraftStateLabel[
+                          board?.aircraft.find((entry) => entry.id === aircraftEditorId)
+                            ?.operationalState ?? "INACTIVE"
+                        ]}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Aktuelle Ressourcengruppe</dt>
+                      <dd>
+                        {board?.aircraft.find((entry) => entry.id === aircraftEditorId)
+                          ?.resourceGroupName || "Nicht zugeordnet"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Produktspezifische Zeitabweichungen</dt>
+                      <dd>
+                        {board?.aircraftProductTurnaroundOverrides.filter(
+                          (entry) => entry.aircraftId === aircraftEditorId,
+                        ).length ?? 0}
+                      </dd>
+                    </div>
+                  </dl>
+                ) : null}
                 {masterSubmitAttempted &&
                 (aircraftRegistration.trim().length < 3 || aircraftType.trim().length < 2) ? (
                   <ValidationHint tone="error">
                     Kennzeichen und Flugzeugtyp müssen mindestens 2 Zeichen lang sein.
-                  </ValidationHint>
-                ) : null}
-              </fieldset>
-              <fieldset hidden={masterDataCategory !== "assignments"}>
-                <legend>Historisierte Zuordnung</legend>
-                <div className="field-control">
-                  <FieldLabel
-                    htmlFor="assignment-aircraft"
-                    label="Flugzeug"
-                    help="Flugzeug, dessen aktive Ressourcengruppenzuordnung geändert werden soll."
-                  />
-                  <select
-                    id="assignment-aircraft"
-                    value={assignmentAircraftId}
-                    onChange={(event) => setAssignmentAircraftId(event.target.value)}
-                  >
-                    <option value="">Bitte wählen</option>
-                    {board?.aircraft.map((aircraft) => (
-                      <option key={aircraft.id} value={aircraft.id}>
-                        {aircraft.registration} · {aircraft.resourceGroupName}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="field-control">
-                  <FieldLabel
-                    htmlFor="assignment-resource-group"
-                    label="Neue Ressourcengruppe"
-                    help="Zielgruppe der neuen historisierten Zuordnung. Ein Flugzeug kann gleichzeitig nur einer aktiven Gruppe angehören."
-                  />
-                  <select
-                    id="assignment-resource-group"
-                    value={assignmentResourceGroupId}
-                    onChange={(event) => setAssignmentResourceGroupId(event.target.value)}
-                  >
-                    <option value="">Bitte wählen</option>
-                    {resourceGroups
-                      .filter((group) => group.status !== "ENDED")
-                      .map((group) => (
-                        <option key={group.id} value={group.id}>
-                          {group.name}
-                        </option>
-                      ))}
-                  </select>
-                </div>
-                <p>
-                  Wirksam ab Bestätigung. Aktive Umläufe und inkompatible Flugzeugtypen werden
-                  serverseitig abgewiesen.
-                </p>
-                {masterSubmitAttempted && (!assignmentAircraftId || !assignmentResourceGroupId) ? (
-                  <ValidationHint tone="error">
-                    Flugzeug und neue Ressourcengruppe müssen ausgewählt werden.
                   </ValidationHint>
                 ) : null}
               </fieldset>
@@ -5061,6 +4312,23 @@ export function AdminView() {
                 />
               </div>
             </div>
+            <ValidationHint>
+              Ausschließlich anonyme operative Codes erfassen – keine Namen, Lizenz- oder
+              Kontaktdaten.
+            </ValidationHint>
+            {pilotEditorId !== "new" ? (
+              <dl className="master-editor-readonly-summary">
+                <div><dt>Pausenstatus</dt><dd>{currentPilot?.paused ? "Pause" : "Einsatzbereit"}</dd></div>
+                <div>
+                  <dt>Aktuelle Fluggruppe</dt>
+                  <dd>
+                    {currentPilot?.currentCommunicationNumber
+                      ? `Fluggruppe ${currentPilot.currentCommunicationNumber}`
+                      : "Nicht zugeordnet"}
+                  </dd>
+                </div>
+              </dl>
+            ) : null}
             {masterSubmitAttempted && !/^[A-Z0-9-]{2,12}$/.test(pilotCode) ? (
               <ValidationHint tone="error">
                 Der Pilotencode muss aus 2 bis 12 Großbuchstaben, Ziffern oder Bindestrichen
@@ -5156,634 +4424,366 @@ export function AdminView() {
               </a>
             </div>
           </section>
-          <section
-            className="admin-section admin-operational-plan-section"
-            hidden={adminArea !== "events" || eventStep !== "operations"}
-          >
-            {board ? (
-              <OperationalPlanPanel
-                aircraft={board.aircraft}
-                busy={busyActionKey !== null}
-                eventId={board.event.eventId}
-                eventTimeZone={board.event.timeZone}
-                mode="admin"
-                onCancel={(plan) =>
-                  runBusyAction("admin-plan-cancel", () => cancelAdminPlannedOperation(plan))
-                }
-                onDisableRecurringRule={(rule) =>
-                  runBusyAction("admin-rule-disable", () => disableAdminRecurringRule(rule))
-                }
-                onUpsert={(payload) =>
-                  runBusyAction("admin-plan-upsert", () => upsertAdminPlannedOperation(payload))
-                }
-                onUpsertRecurringRule={(payload) =>
-                  runBusyAction("admin-rule-upsert", () => upsertAdminRecurringRule(payload))
-                }
-                pilots={board.pilots}
-                plannedOperations={board.plannedOperations}
-                recurringOperationalRules={board.recurringOperationalRules}
-                readOnly={!isAdministrator || !adminModeUnlocked}
-                resourceGroups={board.resourceGroups}
-                rotations={board.rotations}
-              />
-            ) : (
-              <ValidationHint>Der bestätigte Betriebsplan wird geladen.</ValidationHint>
-            )}
-          </section>
-          <section
-            className="admin-section admin-emergency-section"
-            hidden={adminArea !== "events" || eventStep !== "operations"}
-          >
-            <h2>Notfallmodus</h2>
-            <div className="field-control">
-              <FieldLabel
-                htmlFor="emergency-reason"
-                label="Begründung für den Notfallmodus"
-                help="Nur außergewöhnliche Eingriffe benötigen einen frei eingegebenen Grund. Normale Betriebsänderungen werden automatisch protokolliert."
-              />
-              <input
-                id="emergency-reason"
-                onChange={(event) => setReason(event.target.value)}
-                placeholder="Mindestens 3 Zeichen"
-                value={reason}
-              />
-            </div>
-            {!board?.event.emergencyMode ? (
-              <Button
-                busy={busyActionKey === "emergency-trigger"}
-                className="danger-action"
-                disabled={reason.trim().length < 3 || busyActionKey !== null}
-                onClick={() =>
-                  runBusyAction("emergency-trigger", () => emergency("TRIGGER_EMERGENCY"))
-                }
-                type="button"
-                variant="danger"
-              >
-                Not-Halt auslösen
-              </Button>
-            ) : (
-              <Button
-                busy={busyActionKey === "emergency-clear"}
-                className="danger-action"
-                disabled={!isAdministrator || reason.trim().length < 3 || busyActionKey !== null}
-                onClick={() =>
-                  requestAdminAction(() =>
-                    runBusyAction("emergency-clear", () => emergency("CLEAR_EMERGENCY")),
-                  )
-                }
-                type="button"
-                variant="danger"
-              >
-                Notfallmodus aufheben
-              </Button>
-            )}
-          </section>
-          <section className="admin-section" hidden>
-            <h2>Laufende Umläufe</h2>
-            <div className="active-rotation-list">
-              {board?.rotations
-                .filter((rotation) => ["CALLED", "IN_FLIGHT", "LANDED"].includes(rotation.status))
-                .map((rotation) => (
-                  <div key={rotation.id}>
-                    <strong>{rotation.communicationLabel}</strong>
-                    <span>{rotation.status}</span>
-                    <span>{rotation.aircraftRegistration ?? "Flugzeug offen"}</span>
-                    <span>Pilotencode {rotation.pilotOperationalCode ?? "offen"}</span>
-                  </div>
-                ))}
-              {board && board.metrics.activeRotations === 0 ? (
-                <p>Keine laufenden Umläufe.</p>
-              ) : null}
-            </div>
-          </section>
-          <section
-            className="admin-section manifest-correction"
-            hidden={adminArea !== "events" || eventStep !== "completion"}
-          >
-            <div className="section-heading">
-              <div>
-                <h2>Dokumentierte Besetzung korrigieren</h2>
-                <p>
-                  Seltener Admin-Sonderweg nach dem Flugstart. Eine anonyme Buchungsgruppe wird
-                  immer vollständig einem bereits gestarteten oder abgeschlossenen Umlauf
-                  zugeordnet.
-                </p>
-              </div>
-              <span className="admin-only-badge">Nur Administration</span>
-            </div>
-            <ValidationHint>
-              Diese Korrektur berichtigt ausschließlich die Dokumentation und besitzt keine
-              flugbetriebliche oder sicherheitsbezogene Freigabewirkung.
-            </ValidationHint>
-            <div className="manifest-correction-grid">
-              <div className="field-control">
-                <FieldLabel
-                  htmlFor="manifest-ticket-group"
-                  label="Zu korrigierende Buchungsgruppe"
-                  help="Es werden nur anonyme Gruppen angeboten, deren dokumentierter Umlauf bereits im Flug, gelandet oder abgeschlossen ist."
-                />
-                <select
-                  id="manifest-ticket-group"
-                  value={manifestTicketGroupId}
-                  onChange={(event) => {
-                    setManifestTicketGroupId(event.target.value);
-                    setManifestTargetRotationId("");
-                  }}
-                >
-                  <option value="">Bitte wählen</option>
-                  {manifestCandidates.map((candidate) => (
-                    <option key={candidate.ticketGroupId} value={candidate.ticketGroupId}>
-                      {candidate.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="field-control">
-                <FieldLabel
-                  htmlFor="manifest-target-rotation"
-                  label="Tatsächlicher Zielumlauf"
-                  help="Der Zielumlauf muss mindestens den Status Im Flug erreicht haben. Bisherige Umläufe der Gruppe sind ausgeschlossen."
-                />
-                <select
-                  disabled={!selectedManifestCandidate}
-                  id="manifest-target-rotation"
-                  value={manifestTargetRotationId}
-                  onChange={(event) => setManifestTargetRotationId(event.target.value)}
-                >
-                  <option value="">Bitte wählen</option>
-                  {manifestTargets.map((rotation) => (
-                    <option key={rotation.id} value={rotation.id}>
-                      {rotation.communicationLabel} · {rotationStatusLabel[rotation.status]}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="field-control manifest-reason-field">
-                <FieldLabel
-                  htmlFor="manifest-correction-reason"
-                  label="Dokumentationsgrund"
-                  help="Mindestens 10 Zeichen. Der Grund wird zusammen mit Quelle, Ziel, Gerät und Version dauerhaft auditiert."
-                />
-                <textarea
-                  id="manifest-correction-reason"
-                  maxLength={500}
-                  placeholder="Zum Beispiel: Tatsächliche Besetzung nach Rückmeldung der Flight Line berichtigen"
-                  value={manifestCorrectionReason}
-                  onChange={(event) => setManifestCorrectionReason(event.target.value)}
-                />
-                <small>{manifestCorrectionReason.trim().length}/10 Mindestzeichen</small>
-              </div>
-            </div>
-            {selectedManifestCandidate ? (
-              <div className="manifest-correction-preview">
-                <div>
-                  <span>Bisher dokumentiert</span>
-                  <strong>{selectedManifestCandidate.label}</strong>
-                </div>
-                <span aria-hidden="true">→</span>
-                <div>
-                  <span>Wird vollständig zugeordnet zu</span>
-                  <strong>
-                    {manifestTargets.find((rotation) => rotation.id === manifestTargetRotationId)
-                      ?.communicationLabel ?? "Zielumlauf wählen"}
-                  </strong>
-                </div>
-              </div>
-            ) : null}
-            <Button
-              busy={busyActionKey === "manifest-correction"}
-              className="primary-action manifest-correction-action"
-              disabled={
-                busyActionKey !== null ||
-                !isAdministrator ||
-                !manifestTicketGroupId ||
-                !manifestTargetRotationId ||
-                manifestCorrectionReason.trim().length < 10
-              }
-              onClick={() =>
-                requestAdminAction(() =>
-                  runBusyAction("manifest-correction", correctRotationManifest),
-                )
-              }
-              type="button"
-              variant="primary"
+          {adminArea === "events" && eventStep === "operations" && board ? (
+            <section
+              aria-labelledby="admin-event-step-operations-tab"
+              id="admin-event-step-operations-panel"
+              role="tabpanel"
             >
-              Besetzung protokolliert korrigieren
-            </Button>
-            {manifestCandidates.length === 0 ? (
-              <p className="help-text">Aktuell ist keine Korrektur nach Flugstart erforderlich.</p>
-            ) : null}
-          </section>
-          <section className="admin-section" hidden>
-            <h2>Betriebs- und Wetterhinweise</h2>
-            <div className="field-control">
-              <FieldLabel
-                htmlFor="operational-notice"
-                label="Organisatorischer Hinweis"
-                help="Öffentlich sichtbare Information ohne automatische Auswirkung auf Verkauf oder Flugbetrieb."
-              />
-              <input
-                id="operational-notice"
-                value={operationalNotice}
-                maxLength={240}
-                onChange={(event) => setOperationalNotice(event.target.value)}
-                placeholder="Hinweis setzen oder leer speichern zum Entfernen"
-              />
-            </div>
-            <div className="secondary-actions notice-actions">
-              <Button
-                busy={busyActionKey === "notice-event"}
-                disabled={busyActionKey !== null && busyActionKey !== "notice-event"}
-                onClick={() => runBusyAction("notice-event", () => setNotice())}
-                type="button"
-              >
-                Für gesamte Veranstaltung veröffentlichen
-              </Button>
-              {resourceGroups.map((group) => (
-                <Button
-                  busy={busyActionKey === `notice-${group.id}`}
-                  disabled={busyActionKey !== null && busyActionKey !== `notice-${group.id}`}
-                  key={group.id}
-                  onClick={() => runBusyAction(`notice-${group.id}`, () => setNotice(group.id))}
-                  type="button"
-                >
-                  Für {group.name} veröffentlichen
-                </Button>
-              ))}
-            </div>
-            <Button
-              busy={busyActionKey === "event-interruption"}
-              className="interrupt-action"
-              disabled={busyActionKey !== null && busyActionKey !== "event-interruption"}
-              onClick={() =>
-                runBusyAction("event-interruption", () =>
-                  setEventInterruption(!(board?.event.operationalInterrupted ?? false)),
-                )
-              }
-              type="button"
-            >
-              {board?.event.operationalInterrupted
-                ? "Veranstaltungsbetrieb fortsetzen"
-                : "Veranstaltungsbetrieb unterbrechen"}
-            </Button>
-            <p>Hinweise stoppen keinen Flugbetrieb. Unterbrechungen werden separat gesetzt.</p>
-          </section>
-          <section
-            className="admin-section admin-capacity-section"
-            hidden={adminArea !== "events" || eventStep !== "operations"}
-          >
-            <h2>Kapazität und Verkaufsempfehlung</h2>
-            <LocalizedDateTimeInput
-              label="Neuer harter Verkaufsschluss"
-              labelContent={
-                <FieldGroupLabel
-                  label="Neuer harter Verkaufsschluss"
-                  help="Nach diesem lokalen Zeitpunkt werden für das gewählte Produkt keine neuen Verkäufe akzeptiert."
-                />
-              }
-              value={saleClosesAt}
-              onChange={setSaleClosesAt}
-            />
-            <div className="capacity-overview">
-              {alphabeticalProducts.map((product) => (
-                <div className="capacity-row" key={product.id}>
-                  <div>
-                    <strong>{product.name}</strong>
-                    <span>{capacityLabel[product.capacityStatus]}</span>
-                  </div>
-                  <div>
-                    <strong>{product.remainingSellableSeats}</strong>
-                    <span>vorsichtig kalkulierte Restplätze</span>
-                  </div>
-                  <div>
-                    <strong>
-                      {product.saleRecommended ? "Verkauf empfohlen" : "Nicht verkaufen"}
-                    </strong>
-                    <span>Prognose {predictionQualityLabel[product.predictionQuality]}</span>
-                  </div>
-                  <div className="secondary-actions">
+              <OperationsWorkspace
+                board={board}
+                plan={
+                  <>
+                    <Panel className="event-release-v15" padding="compact">
+                      <PageHeader
+                        actions={
+                          <StatusPill tone={eventIsReleased || setupComplete ? "success" : "warning"}>
+                            {eventIsReleased ? "Freigegeben" : `${completedSetupSteps}/6 erledigt`}
+                          </StatusPill>
+                        }
+                        level={2}
+                        title="Betriebsfreigabe"
+                      />
+                      {eventIsReleased ? (
+                        <>
+                          <p className="event-release-ready">
+                            <CheckCircle2 aria-hidden="true" />{" "}
+                            {board.event.status === "ACTIVE"
+                              ? "Der Veranstaltungsbetrieb ist freigegeben."
+                              : "Der Veranstaltungsbetrieb ist geschlossen."}
+                          </p>
+                          {board.event.status === "ACTIVE" ? (
+                            <div className="event-release-action">
+                              <Button
+                                disabled={!isAdministrator}
+                                onClick={() => setEndOperationsConfirmOpen(true)}
+                                variant="danger"
+                              >
+                                Betrieb beenden
+                              </Button>
+                            </div>
+                          ) : null}
+                        </>
+                      ) : !setupComplete ? (
+                        <>
+                          <p>
+                            Die Veranstaltung ist noch nicht betriebsbereit. Bitte erledige die
+                            offenen Punkte, um den Betrieb freizugeben.
+                          </p>
+                          <ul className="event-release-missing">
+                            {setupSteps
+                              .filter((step) => !step.complete)
+                              .map((step) => (
+                                <li key={step.id}>
+                                  <Clock3 aria-hidden="true" />
+                                  <Button onClick={() => openSetupStep(step)} size="compact" variant="ghost">
+                                    {step.label} fehlt
+                                  </Button>
+                                </li>
+                              ))}
+                          </ul>
+                        </>
+                      ) : (
+                        <p className="event-release-ready">
+                          <CheckCircle2 aria-hidden="true" /> Alle Einrichtungsschritte sind abgeschlossen.
+                        </p>
+                      )}
+                      {!eventIsReleased ? (
+                        <div className="event-release-action">
+                          <Button
+                            disabled={!isAdministrator || !setupComplete}
+                            onClick={() => requestAdminAction(() => setEventLifecycle("ACTIVE"))}
+                            variant="primary"
+                          >
+                            <LockKeyhole aria-hidden="true" /> Betrieb freigeben
+                          </Button>
+                        </div>
+                      ) : null}
+                    </Panel>
+                    <section className="admin-section admin-operational-plan-section">
+                      <OperationalPlanPanel
+                        aircraft={board.aircraft}
+                        busy={busyActionKey !== null}
+                        eventId={board.event.eventId}
+                        eventTimeZone={board.event.timeZone}
+                        mode="admin"
+                        onCancel={(plan) =>
+                          runBusyAction("admin-plan-cancel", () => cancelAdminPlannedOperation(plan))
+                        }
+                        onDisableRecurringRule={(rule) =>
+                          runBusyAction("admin-rule-disable", () => disableAdminRecurringRule(rule))
+                        }
+                        onUpsert={(payload) =>
+                          runBusyAction("admin-plan-upsert", () => upsertAdminPlannedOperation(payload))
+                        }
+                        onUpsertRecurringRule={(payload) =>
+                          runBusyAction("admin-rule-upsert", () => upsertAdminRecurringRule(payload))
+                        }
+                        pilots={board.pilots}
+                        plannedOperations={board.plannedOperations}
+                        recurringOperationalRules={board.recurringOperationalRules}
+                        readOnly={!isAdministrator || !adminModeUnlocked}
+                        resourceGroups={board.resourceGroups}
+                        rotations={board.rotations}
+                      />
+                    </section>
+                  </>
+                }
+                sales={
+                  <section className="admin-section admin-capacity-section">
+                    <div className="section-heading">
+                      <div>
+                        <h2>Verkauf und Kapazität</h2>
+                        <p>Produktbezogene Freigabe, Restplätze, Empfehlung und Verkaufsschluss.</p>
+                      </div>
+                    </div>
+                    <div className="capacity-overview">
+                      {alphabeticalProducts.map((product) => (
+                        <div className="capacity-row" key={product.id}>
+                          <div>
+                            <strong>{product.name}</strong>
+                            <span>{product.saleEnabled ? "Verkauf aktiv" : "Verkauf gesperrt"}</span>
+                          </div>
+                          <div>
+                            <strong>{product.remainingSellableSeats}</strong>
+                            <span>{capacityLabel[product.capacityStatus]}</span>
+                          </div>
+                          <div>
+                            <strong>
+                              {product.saleRecommended ? "Verkauf empfohlen" : "Nicht verkaufen"}
+                            </strong>
+                            <span>Prognose {predictionQualityLabel[product.predictionQuality]}</span>
+                          </div>
+                          <div>
+                            <strong>
+                              {product.saleClosesAt
+                                ? formatEventLocalDateTime(product.saleClosesAt, board.event.timeZone)
+                                : "Nicht gesetzt"}
+                            </strong>
+                            <span>Verkaufsschluss</span>
+                          </div>
+                          <div className="secondary-actions">
+                            <Button
+                              busy={busyActionKey === `product-${product.id}-sales`}
+                              disabled={!isAdministrator || busyActionKey !== null}
+                              onClick={() =>
+                                requestAdminAction(() =>
+                                  runBusyAction(`product-${product.id}-sales`, () =>
+                                    configureProductSales(product, !product.saleEnabled),
+                                  ),
+                                )
+                              }
+                              type="button"
+                            >
+                              {product.saleEnabled ? "Verkauf sperren" : "Verkauf freigeben"}
+                            </Button>
+                            <Button
+                              disabled={!isAdministrator || busyActionKey !== null}
+                              onClick={() => {
+                                setSalesClosingProductId(product.id);
+                                setSaleClosesAt(
+                                  product.saleClosesAt
+                                    ? formatEventLocalDateTime(
+                                        product.saleClosesAt,
+                                        board.event.timeZone,
+                                      )
+                                    : "",
+                                );
+                              }}
+                              type="button"
+                            >
+                              Verkaufsschluss bearbeiten
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                }
+                exceptions={
+                  <section className="admin-section admin-emergency-section">
+                    <h2>Notfallmodus</h2>
+                    <p>
+                      Aktivierung und Aufhebung werden getrennt bestätigt. Versteckte Flotten-,
+                      Piloten-, Queue- und Hinweissteuerungen gehören nicht zu diesem Admin-Ablauf.
+                    </p>
+                    <div className="field-control">
+                      <FieldLabel
+                        htmlFor="emergency-reason"
+                        label="Begründung für den Notfallmodus"
+                        help="Mindestens drei Zeichen; der Grund wird mit der Zustandsänderung protokolliert."
+                      />
+                      <input
+                        id="emergency-reason"
+                        onChange={(event) => setReason(event.target.value)}
+                        placeholder="Mindestens 3 Zeichen"
+                        value={reason}
+                      />
+                    </div>
                     <Button
-                      busy={busyActionKey === `product-${product.id}-sales`}
-                      disabled={!isAdministrator || busyActionKey !== null}
-                      onClick={() =>
-                        requestAdminAction(() =>
-                          runBusyAction(`product-${product.id}-sales`, () =>
-                            configureProductSales(product, !product.saleEnabled),
-                          ),
-                        )
-                      }
-                      type="button"
-                    >
-                      {product.saleEnabled ? "Verkauf sperren" : "Verkauf freigeben"}
-                    </Button>
-                    <Button
-                      busy={busyActionKey === `product-${product.id}-closing`}
-                      disabled={!isAdministrator || !saleClosesAt || busyActionKey !== null}
-                      onClick={() =>
-                        requestAdminAction(() =>
-                          runBusyAction(`product-${product.id}-closing`, () =>
-                            configureProductSales(product, product.saleEnabled, true),
-                          ),
-                        )
-                      }
-                      type="button"
-                    >
-                      Verkaufsschluss setzen
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-          <section className="admin-section" hidden>
-            <h2>Flotte, Tanken und Pausen</h2>
-            <p className="safety-disclaimer">
-              Ausschließlich organisatorische Hinweise – keine flugbetriebliche oder
-              sicherheitsbezogene Freigabewirkung.
-            </p>
-            <div className="fleet-list">
-              {board?.aircraft.map((aircraft) => (
-                <div className="fleet-row" key={aircraft.id}>
-                  <div>
-                    <strong>{aircraft.registration}</strong>
-                    <span>
-                      {aircraft.aircraftType} · {aircraft.passengerSeats} Sitze
-                    </span>
-                    <span>Queue {aircraft.resourceGroupName}</span>
-                  </div>
-                  <div>
-                    <strong>{aircraftStateLabel[aircraft.operationalState]}</strong>
-                    <span>
-                      {aircraft.rotationsSinceRefuel}/{aircraft.refuelReminderThreshold} Umläufe
-                      seit Tanken
-                    </span>
-                    {aircraft.refuelPlanned ? (
-                      <span className="warning-text">Tanken vorgemerkt</span>
-                    ) : null}
-                  </div>
-                  <div className="secondary-actions fleet-actions">
-                    <Button
-                      busy={busyActionKey === `aircraft-${aircraft.id}-available`}
+                      busy={busyActionKey === (board.event.emergencyMode ? "emergency-clear" : "emergency-trigger")}
+                      className="danger-action"
                       disabled={
+                        reason.trim().length < 3 ||
                         busyActionKey !== null ||
-                        !["REFUELING", "PAUSED", "INACTIVE", "INTERRUPTED"].includes(
-                          aircraft.operationalState,
-                        )
+                        (board.event.emergencyMode && !isAdministrator)
                       }
                       onClick={() =>
-                        runBusyAction(`aircraft-${aircraft.id}-available`, () =>
-                          setAircraftState(aircraft.id, "AVAILABLE"),
+                        setPendingEmergencyAction(
+                          board.event.emergencyMode ? "CLEAR_EMERGENCY" : "TRIGGER_EMERGENCY",
                         )
                       }
                       type="button"
+                      variant="danger"
                     >
-                      Verfügbar
+                      {board.event.emergencyMode ? "Notfallmodus aufheben" : "Not-Halt auslösen"}
+                    </Button>
+                  </section>
+                }
+              />
+              <ProductSalesClosingDialog
+                busy={
+                  salesClosingProductId !== null &&
+                  busyActionKey === `product-${salesClosingProductId}-closing`
+                }
+                onChange={setSaleClosesAt}
+                onClose={() => setSalesClosingProductId(null)}
+                onSave={(remove) => {
+                  const product = board.products.find(
+                    (entry) => entry.id === salesClosingProductId,
+                  );
+                  if (!product) return;
+                  const closingTime = remove
+                    ? null
+                    : eventLocalDateTimeToIso(saleClosesAt, board.event.timeZone);
+                  requestAdminAction(() =>
+                    runBusyAction(`product-${product.id}-closing`, () =>
+                      configureProductSales(product, product.saleEnabled, closingTime),
+                    ),
+                  );
+                }}
+                product={
+                  board.products.find((product) => product.id === salesClosingProductId) ?? null
+                }
+                value={saleClosesAt}
+              />
+              <ConfirmationDialog
+                body={
+                  <p>
+                    Nach dem Betriebsende sind keine regulären operativen Änderungen mehr möglich.
+                    Der Vorgang wird protokolliert.
+                  </p>
+                }
+                confirmLabel="Betrieb jetzt beenden"
+                danger
+                onCancel={() => setEndOperationsConfirmOpen(false)}
+                onConfirm={() => {
+                  setEndOperationsConfirmOpen(false);
+                  return requestAdminAction(() => setEventLifecycle("CLOSED"));
+                }}
+                open={endOperationsConfirmOpen}
+                title="Betrieb wirklich beenden?"
+              />
+              <ConfirmationDialog
+                body={
+                  <p>
+                    {pendingEmergencyAction === "CLEAR_EMERGENCY"
+                      ? "Der Notfallmodus wird aufgehoben und die Aufhebung protokolliert."
+                      : "Der Notfallmodus wird veranstaltungsweit aktiviert und protokolliert."}
+                  </p>
+                }
+                confirmLabel={
+                  pendingEmergencyAction === "CLEAR_EMERGENCY"
+                    ? "Notfallmodus aufheben"
+                    : "Not-Halt auslösen"
+                }
+                danger
+                onCancel={() => setPendingEmergencyAction(null)}
+                onConfirm={() => {
+                  const action = pendingEmergencyAction;
+                  setPendingEmergencyAction(null);
+                  if (!action) return;
+                  if (action === "CLEAR_EMERGENCY") {
+                    return requestAdminAction(() =>
+                      runBusyAction("emergency-clear", () => emergency(action)),
+                    );
+                  }
+                  return runBusyAction("emergency-trigger", () => emergency(action));
+                }}
+                open={pendingEmergencyAction !== null}
+                title={
+                  pendingEmergencyAction === "CLEAR_EMERGENCY"
+                    ? "Notfallmodus wirklich aufheben?"
+                    : "Not-Halt wirklich auslösen?"
+                }
+              />
+            </section>
+          ) : null}
+          {adminArea === "events" && eventStep === "completion" && board ? (
+            <section
+              aria-labelledby="admin-event-step-completion-tab"
+              id="admin-event-step-completion-panel"
+              role="tabpanel"
+            >
+            <CompletionWorkspace
+              board={board}
+              onHistoryTabChange={changeHistoryView}
+              summary={
+                <section className="admin-section completion-day-summary">
+                  <div className="section-heading">
+                    <div>
+                      <h2>Tagesübersicht</h2>
+                      <p>Veranstaltungs-, Zeitraum- und Board-Kennzahlen des bestätigten Stands.</p>
+                    </div>
+                  </div>
+                  <dl className="completion-summary-grid">
+                    <div><dt>Betriebsbeginn</dt><dd>{formatEventLocalDateTime(board.event.operationsStartAt, board.event.timeZone) || "Nicht gestartet"}</dd></div>
+                    <div><dt>Betriebsende</dt><dd>{formatEventLocalDateTime(board.event.operationsEndAt, board.event.timeZone) || "Nicht gesetzt"}</dd></div>
+                    <div><dt>Abgeschlossene Umläufe</dt><dd>{board.metrics.completedRotations}</dd></div>
+                    <div><dt>Offene Tickets</dt><dd>{board.metrics.openTickets}</dd></div>
+                    <div><dt>Ø Umlaufzeit</dt><dd>{board.metrics.averageRotationMinutes ?? "–"} Min.</dd></div>
+                    <div><dt>Informatorischer Umsatz</dt><dd>{(board.metrics.informationalRevenueCents / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}</dd></div>
+                  </dl>
+                  <div className="completion-primary-exports">
+                    <Button
+                      busy={busyActionKey === "export-daily-pdf"}
+                      onClick={() => void runBusyAction("export-daily-pdf", exportDailyPdf)}
+                      type="button"
+                      variant="primary"
+                    >
+                      PDF-Tagesbericht
                     </Button>
                     <Button
-                      busy={busyActionKey === `aircraft-${aircraft.id}-paused`}
-                      disabled={busyActionKey !== null || aircraft.operationalState !== "AVAILABLE"}
-                      onClick={() =>
-                        runBusyAction(`aircraft-${aircraft.id}-paused`, () =>
-                          setAircraftState(aircraft.id, "PAUSED"),
-                        )
-                      }
+                      busy={busyActionKey === "export-daily-csv"}
+                      onClick={() => void runBusyAction("export-daily-csv", exportDailyReport)}
                       type="button"
                     >
-                      Pause
-                    </Button>
-                    <Button
-                      busy={busyActionKey === `aircraft-${aircraft.id}-refueling`}
-                      disabled={busyActionKey !== null || aircraft.operationalState !== "AVAILABLE"}
-                      onClick={() =>
-                        runBusyAction(`aircraft-${aircraft.id}-refueling`, () =>
-                          setAircraftState(aircraft.id, "REFUELING"),
-                        )
-                      }
-                      type="button"
-                    >
-                      Tanken aktuell
-                    </Button>
-                    <Button
-                      busy={busyActionKey === `aircraft-${aircraft.id}-inactive`}
-                      disabled={busyActionKey !== null || aircraft.operationalState !== "AVAILABLE"}
-                      onClick={() =>
-                        runBusyAction(`aircraft-${aircraft.id}-inactive`, () =>
-                          setAircraftState(aircraft.id, "INACTIVE"),
-                        )
-                      }
-                      type="button"
-                    >
-                      Inaktiv
-                    </Button>
-                    <Button
-                      busy={busyActionKey === `aircraft-${aircraft.id}-interrupted`}
-                      disabled={busyActionKey !== null || aircraft.operationalState !== "AVAILABLE"}
-                      onClick={() =>
-                        runBusyAction(`aircraft-${aircraft.id}-interrupted`, () =>
-                          setAircraftState(aircraft.id, "INTERRUPTED"),
-                        )
-                      }
-                      type="button"
-                    >
-                      Unterbrechen
-                    </Button>
-                    <Button
-                      busy={busyActionKey === `aircraft-${aircraft.id}-schedule-refuel`}
-                      disabled={busyActionKey !== null}
-                      onClick={() =>
-                        runBusyAction(`aircraft-${aircraft.id}-schedule-refuel`, () =>
-                          scheduleRefuel(aircraft.id, !aircraft.refuelPlanned),
-                        )
-                      }
-                      type="button"
-                    >
-                      {aircraft.refuelPlanned ? "Vormerkung aufheben" : "Tanken vormerken"}
-                    </Button>
-                    <Button
-                      busy={busyActionKey === `aircraft-${aircraft.id}-threshold`}
-                      disabled={!isAdministrator || busyActionKey !== null}
-                      onClick={() =>
-                        requestAdminAction(() =>
-                          runBusyAction(`aircraft-${aircraft.id}-threshold`, () =>
-                            configureRefuelThreshold(aircraft.id),
-                          ),
-                        )
-                      }
-                      type="button"
-                    >
-                      Schwelle {refuelThreshold} setzen
+                      CSV-Tagesbericht
                     </Button>
                   </div>
-                </div>
-              ))}
-            </div>
-            <div className="field-control threshold-input">
-              <FieldLabel
-                htmlFor="refuel-threshold"
-                label="Umläufe bis Tank-Erinnerung"
-                help="Rein organisatorischer Erinnerungswert je Flugzeug; keine Kraftstoff- oder Freigabeentscheidung."
-              />
-              <input
-                id="refuel-threshold"
-                type="number"
-                min={1}
-                max={100}
-                value={refuelThreshold}
-                onChange={(event) => setRefuelThreshold(Number(event.target.value))}
-              />
-            </div>
-            <h3>Pilotenpausen</h3>
-            <p className="help-text">
-              Pilotencodes und organisatorische Bemerkungen werden unter Stammdaten verwaltet.
-            </p>
-            <div className="pilot-list">
-              {board?.pilots.map((pilot) => (
-                <div key={pilot.id}>
-                  <strong>{pilot.operationalCode}</strong>
-                  <span>{pilot.active ? (pilot.paused ? "Pause" : "aktiv") : "inaktiv"}</span>
-                  <span>{pilot.operationalNote || "Keine organisatorische Bemerkung"}</span>
-                  <span>
-                    {pilot.currentCommunicationNumber
-                      ? `Aktuell Fluggruppe ${pilot.currentCommunicationNumber}`
-                      : "Aktuell keinem Umlauf zugeordnet"}
-                  </span>
-                  <Button
-                    busy={busyActionKey === `pilot-${pilot.id}-pause`}
-                    disabled={!pilot.active || busyActionKey !== null}
-                    onClick={() =>
-                      runBusyAction(`pilot-${pilot.id}-pause`, () =>
-                        setPilotPause(pilot.id, !pilot.paused),
-                      )
-                    }
-                    type="button"
-                  >
-                    {pilot.paused ? "Pause beenden" : "Pause starten"}
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </section>
-          <section className="admin-section" hidden>
-            <h2>Ressourcengruppen</h2>
-            {resourceGroups.map((group) => (
-              <div className="resource-control" key={group.id}>
-                <div>
-                  <strong>{group.name}</strong>
-                  <span>{group.status}</span>
-                </div>
-                <div className="secondary-actions">
-                  <Button
-                    busy={busyActionKey === `resource-${group.id}-paused`}
-                    disabled={busyActionKey !== null}
-                    onClick={() =>
-                      runBusyAction(`resource-${group.id}-paused`, () =>
-                        setResourceStatus(group.id, "PAUSED"),
-                      )
-                    }
-                    type="button"
-                  >
-                    Pausieren
-                  </Button>
-                  <Button
-                    busy={busyActionKey === `resource-${group.id}-interrupted`}
-                    disabled={busyActionKey !== null}
-                    onClick={() =>
-                      runBusyAction(`resource-${group.id}-interrupted`, () =>
-                        setResourceStatus(group.id, "INTERRUPTED"),
-                      )
-                    }
-                    type="button"
-                  >
-                    Unterbrechen
-                  </Button>
-                  <Button
-                    busy={busyActionKey === `resource-${group.id}-active`}
-                    disabled={busyActionKey !== null}
-                    onClick={() =>
-                      runBusyAction(`resource-${group.id}-active`, () =>
-                        setResourceStatus(group.id, "ACTIVE"),
-                      )
-                    }
-                    type="button"
-                  >
-                    Aktivieren
-                  </Button>
-                  <Button
-                    busy={busyActionKey === `resource-${group.id}-ended`}
-                    disabled={group.status === "ENDED" || busyActionKey !== null}
-                    onClick={() =>
-                      runBusyAction(`resource-${group.id}-ended`, () =>
-                        setResourceStatus(group.id, "ENDED"),
-                      )
-                    }
-                    type="button"
-                  >
-                    Beenden
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </section>
-          <section
-            className="admin-section"
-            hidden={adminArea !== "events" || eventStep !== "completion"}
-          >
-            <div className="section-heading">
-              <h2>Audit und Tagesabschluss</h2>
-              <div className="report-actions">
-                <Button
-                  busy={busyActionKey === "export-daily-csv"}
-                  onClick={() => void runBusyAction("export-daily-csv", exportDailyReport)}
-                  type="button"
-                >
-                  CSV-Tagesbericht
-                </Button>
-                <Button
-                  busy={busyActionKey === "export-daily-pdf"}
-                  onClick={() => void runBusyAction("export-daily-pdf", exportDailyPdf)}
-                  type="button"
-                >
-                  PDF-Tagesbericht
-                </Button>
-                <Button
-                  busy={busyActionKey === "export-raw-data"}
-                  onClick={() => void runBusyAction("export-raw-data", exportRawData)}
-                  type="button"
-                >
-                  Ticket-Rohdaten CSV
-                </Button>
-                <Button
-                  busy={busyActionKey === "export-performance"}
-                  onClick={() => void runBusyAction("export-performance", exportPerformanceProfile)}
-                  type="button"
-                >
-                  Leistungsprofil JSON
-                </Button>
-              </div>
-            </div>
-            <div className="history-tabs" role="tablist" aria-label="Verlaufsansicht">
-              {(
-                [
-                  ["OPERATIONS", "Betriebshistorie"],
-                  ["FORECASTS", "Prognosegüte"],
-                  ["AUDIT", "Auditprotokoll"],
-                ] as const
-              ).map(([value, label]) => (
-                <button
-                  aria-selected={historyView === value}
-                  className={historyView === value ? "active" : ""}
-                  key={value}
-                  onClick={() => {
-                    setHistoryView(value);
-                    setHistoryOffset(0);
-                  }}
-                  role="tab"
-                  type="button"
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
+                  <details className="completion-secondary-exports">
+                    <summary>Weitere Datenexporte</summary>
+                    <div>
+                      <Button
+                        busy={busyActionKey === "export-raw-data"}
+                        onClick={() => void runBusyAction("export-raw-data", exportRawData)}
+                        type="button"
+                      >
+                        Ticket-Rohdaten CSV
+                      </Button>
+                      <Button
+                        busy={busyActionKey === "export-performance"}
+                        onClick={() => void runBusyAction("export-performance", exportPerformanceProfile)}
+                        type="button"
+                      >
+                        Leistungsprofil JSON
+                      </Button>
+                    </div>
+                  </details>
+                </section>
+              }
+              history={
+                <section className="admin-section completion-history-panel">
             <fieldset className="history-filters">
               <legend>
                 {historyView === "OPERATIONS"
@@ -5792,245 +4792,165 @@ export function AdminView() {
                     ? "Prognosen filtern"
                     : "Audit-Ereignisse filtern"}
               </legend>
-              <LocalizedDateTimeInput
-                label="Von"
-                labelContent={
-                  <FieldGroupLabel
-                    label="Von"
-                    help="Optionaler Beginn des ausgewerteten Zeitraums."
-                  />
-                }
-                value={historySince}
-                onChange={setHistorySince}
-              />
-              <LocalizedDateTimeInput
-                label="Bis"
-                labelContent={
-                  <FieldGroupLabel
-                    label="Bis"
-                    help="Optionales Ende des ausgewerteten Zeitraums."
-                  />
-                }
-                value={historyUntil}
-                onChange={setHistoryUntil}
-              />
+              <div className="history-visible-filters">
+                <LocalizedDateTimeInput
+                  label="Von"
+                  labelContent={<FieldGroupLabel label="Von" help="Optionaler Beginn des ausgewerteten Zeitraums." />}
+                  onChange={setHistorySince}
+                  value={historySince}
+                />
+                <LocalizedDateTimeInput
+                  label="Bis"
+                  labelContent={<FieldGroupLabel label="Bis" help="Optionales Ende des ausgewerteten Zeitraums." />}
+                  onChange={setHistoryUntil}
+                  value={historyUntil}
+                />
+                {historyView === "OPERATIONS" ? (
+                  <div className="field-control">
+                    <FieldLabel
+                      htmlFor="history-communication-number"
+                      label="Fluggruppennummer"
+                      help="Stabile Kommunikationsnummer, keine garantierte Uhrzeit."
+                    />
+                    <input
+                      id="history-communication-number"
+                      min="1"
+                      onChange={(event) => setHistoryCommunicationNumber(event.target.value)}
+                      type="number"
+                      value={historyCommunicationNumber}
+                    />
+                  </div>
+                ) : null}
+                {historyView === "FORECASTS" ? (
+                  <div className="field-control">
+                    <FieldLabel htmlFor="history-aircraft" label="Flugzeug" help="Begrenzt Prognosen auf ein Flugzeug." />
+                    <select id="history-aircraft" onChange={(event) => setHistoryAircraftId(event.target.value)} value={historyAircraftId}>
+                      <option value="">Alle</option>
+                      {board.aircraft.map((aircraft) => <option key={aircraft.id} value={aircraft.id}>{aircraft.registration}</option>)}
+                    </select>
+                  </div>
+                ) : null}
+                {historyView === "AUDIT" ? (
+                  <div className="field-control history-readable-search">
+                    <FieldLabel
+                      htmlFor="history-readable-search"
+                      label="Ereignis oder Objekt suchen"
+                      help="Durchsucht lesbare Ereignis- und Objekttexte; unbekannte technische Typen bleiben auffindbar."
+                    />
+                    <input
+                      id="history-readable-search"
+                      onChange={(event) => setHistoryTextSearch(event.target.value)}
+                      placeholder="z. B. Fluggruppe aufgerufen"
+                      type="search"
+                      value={historyTextSearch}
+                    />
+                  </div>
+                ) : null}
+              </div>
+              {historyView === "OPERATIONS" ? (
+                <>
+                  <details className="history-advanced-filters">
+                    <summary>Fachliche Filter</summary>
+                    <div>
+                      <div className="field-control">
+                        <FieldLabel htmlFor="history-aircraft" label="Flugzeug" help="Begrenzt die Betriebshistorie auf ein Flugzeug." />
+                        <select id="history-aircraft" onChange={(event) => setHistoryAircraftId(event.target.value)} value={historyAircraftId}>
+                          <option value="">Alle</option>
+                          {board.aircraft.map((aircraft) => <option key={aircraft.id} value={aircraft.id}>{aircraft.registration}</option>)}
+                        </select>
+                      </div>
+                      <div className="field-control">
+                        <FieldLabel htmlFor="history-pilot" label="Pilotencode" help="Anonymer operativer Pilotencode." />
+                        <select id="history-pilot" onChange={(event) => setHistoryPilotId(event.target.value)} value={historyPilotId}>
+                          <option value="">Alle</option>
+                          {board.pilots.map((pilot) => <option key={pilot.id} value={pilot.id}>{pilot.operationalCode}</option>)}
+                        </select>
+                      </div>
+                      <div className="field-control">
+                        <FieldLabel htmlFor="history-product" label="Produkt" help="Begrenzt die Betriebshistorie auf ein Produkt." />
+                        <select id="history-product" onChange={(event) => setHistoryProductId(event.target.value)} value={historyProductId}>
+                          <option value="">Alle</option>
+                          {alphabeticalProducts.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}
+                        </select>
+                      </div>
+                      <div className="field-control">
+                        <FieldLabel htmlFor="history-resource-group" label="Ressourcengruppe" help="Begrenzt die Historie auf eine operative Queue." />
+                        <select id="history-resource-group" onChange={(event) => setHistoryResourceGroupId(event.target.value)} value={historyResourceGroupId}>
+                          <option value="">Alle</option>
+                          {board.resourceGroups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
+                        </select>
+                      </div>
+                      <div className="field-control">
+                        <FieldLabel htmlFor="history-ticket-status" label="Ticketstatus" help="Lesbarer Status des anonymen Tickets." />
+                        <select id="history-ticket-status" onChange={(event) => setHistoryTicketStatus(event.target.value)} value={historyTicketStatus}>
+                          <option value="">Alle</option>
+                          {Object.entries(historyTicketStatusLabels).map(([status, label]) => <option key={status} value={status}>{label}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                  </details>
+                  <details className="history-technical-filters">
+                    <summary>Technische Filter</summary>
+                    <div>
+                      <Field label="Umlauf-ID"><input onChange={(event) => setHistoryRotationId(event.target.value)} value={historyRotationId} /></Field>
+                      <Field label="Ticket-ID"><input onChange={(event) => setHistoryTicketId(event.target.value)} value={historyTicketId} /></Field>
+                      <Field label="Ticketgruppen-ID"><input onChange={(event) => setHistoryTicketGroupId(event.target.value)} value={historyTicketGroupId} /></Field>
+                    </div>
+                  </details>
+                </>
+              ) : null}
+              {historyView === "FORECASTS" ? (
+                <>
+                  <details className="history-advanced-filters">
+                    <summary>Weitere fachliche Filter</summary>
+                    <div>
+                      <div className="field-control">
+                        <FieldLabel htmlFor="history-pilot" label="Pilotencode" help="Anonymer operativer Pilotencode." />
+                        <select id="history-pilot" onChange={(event) => setHistoryPilotId(event.target.value)} value={historyPilotId}>
+                          <option value="">Alle</option>
+                          {board.pilots.map((pilot) => <option key={pilot.id} value={pilot.id}>{pilot.operationalCode}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                  </details>
+                  <details className="history-technical-filters">
+                    <summary>Technische Filter</summary>
+                    <div><Field label="Umlauf-ID"><input onChange={(event) => setHistoryRotationId(event.target.value)} value={historyRotationId} /></Field></div>
+                  </details>
+                </>
+              ) : null}
               {historyView === "AUDIT" ? (
-                <>
-                  <div className="field-control">
-                    <FieldLabel
-                      htmlFor="history-event-type"
-                      label="Ereignistyp"
-                      help="Technischer Audit-Ereignisname, beispielsweise TICKET_NO_SHOW. Leer zeigt alle Typen."
-                    />
-                    <input
-                      id="history-event-type"
-                      value={historyEventType}
-                      onChange={(event) => setHistoryEventType(event.target.value)}
-                      placeholder="z. B. TICKET_NO_SHOW"
-                    />
+                <details className="history-technical-filters">
+                  <summary>Technische Serverfilter</summary>
+                  <div>
+                    <Field label="Ereignistyp"><input onChange={(event) => setHistoryEventType(event.target.value)} value={historyEventType} /></Field>
+                    <Field label="Aggregate-Typ"><input onChange={(event) => setHistoryAggregateType(event.target.value)} value={historyAggregateType} /></Field>
+                    <Field label="Aggregate-ID"><input onChange={(event) => setHistoryAggregateId(event.target.value)} value={historyAggregateId} /></Field>
                   </div>
-                  <div className="field-control">
-                    <FieldLabel
-                      htmlFor="history-aggregate-type"
-                      label="Bezugsart"
-                      help="Art des betroffenen Objekts, beispielsweise ROTATION, TICKET oder PRODUCT."
-                    />
-                    <input
-                      id="history-aggregate-type"
-                      value={historyAggregateType}
-                      onChange={(event) => setHistoryAggregateType(event.target.value)}
-                      placeholder="z. B. ROTATION"
-                    />
-                  </div>
-                  <div className="field-control">
-                    <FieldLabel
-                      htmlFor="history-aggregate-id"
-                      label="Bezugs-ID"
-                      help="Interne anonyme Kennung eines bestimmten Objekts zur gezielten Nachverfolgung."
-                    />
-                    <input
-                      id="history-aggregate-id"
-                      value={historyAggregateId}
-                      onChange={(event) => setHistoryAggregateId(event.target.value)}
-                      placeholder="interne ID"
-                    />
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="field-control">
-                    <FieldLabel
-                      htmlFor="history-aircraft"
-                      label="Flugzeug"
-                      help="Begrenzt Betriebs- oder Prognoseeinträge auf ein Flugzeug."
-                    />
-                    <select
-                      id="history-aircraft"
-                      value={historyAircraftId}
-                      onChange={(event) => setHistoryAircraftId(event.target.value)}
-                    >
-                      <option value="">Alle</option>
-                      {board?.aircraft.map((aircraft) => (
-                        <option value={aircraft.id} key={aircraft.id}>
-                          {aircraft.registration}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="field-control">
-                    <FieldLabel
-                      htmlFor="history-pilot"
-                      label="Pilotencode"
-                      help="Begrenzt die Ansicht auf einen anonymen operativen Pilotencode."
-                    />
-                    <select
-                      id="history-pilot"
-                      value={historyPilotId}
-                      onChange={(event) => setHistoryPilotId(event.target.value)}
-                    >
-                      <option value="">Alle</option>
-                      {board?.pilots.map((pilot) => (
-                        <option value={pilot.id} key={pilot.id}>
-                          {pilot.operationalCode}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="field-control">
-                    <FieldLabel
-                      htmlFor="history-rotation"
-                      label="Umlauf-ID"
-                      help="Interne Kennung eines konkreten Umlaufs; leer zeigt alle Umläufe."
-                    />
-                    <input
-                      id="history-rotation"
-                      value={historyRotationId}
-                      onChange={(event) => setHistoryRotationId(event.target.value)}
-                      placeholder="interne ID"
-                    />
-                  </div>
-                  {historyView === "OPERATIONS" ? (
-                    <>
-                      <div className="field-control">
-                        <FieldLabel
-                          htmlFor="history-ticket-status"
-                          label="Ticketstatus"
-                          help="Filtert nach dem aktuellen oder protokollierten anonymen Ticketzustand."
-                        />
-                        <select
-                          id="history-ticket-status"
-                          value={historyTicketStatus}
-                          onChange={(event) => setHistoryTicketStatus(event.target.value)}
-                        >
-                          <option value="">Alle</option>
-                          {[
-                            "QUEUED",
-                            "CHECKED_IN",
-                            "CALLED",
-                            "BOARDING",
-                            "IN_FLIGHT",
-                            "LANDED",
-                            "COMPLETED",
-                            "NO_SHOW",
-                            "CANCELED",
-                            "CLARIFICATION",
-                          ].map((status) => (
-                            <option value={status} key={status}>
-                              {status}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="field-control">
-                        <FieldLabel
-                          htmlFor="history-product"
-                          label="Produkt"
-                          help="Begrenzt die Betriebshistorie auf ein Produkt."
-                        />
-                        <select
-                          id="history-product"
-                          value={historyProductId}
-                          onChange={(event) => setHistoryProductId(event.target.value)}
-                        >
-                          <option value="">Alle</option>
-                          {alphabeticalProducts.map((product) => (
-                            <option value={product.id} key={product.id}>
-                              {product.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="field-control">
-                        <FieldLabel
-                          htmlFor="history-resource-group"
-                          label="Ressourcengruppe"
-                          help="Begrenzt die Betriebshistorie auf die gemeinsame operative Queue."
-                        />
-                        <select
-                          id="history-resource-group"
-                          value={historyResourceGroupId}
-                          onChange={(event) => setHistoryResourceGroupId(event.target.value)}
-                        >
-                          <option value="">Alle</option>
-                          {board?.resourceGroups.map((group) => (
-                            <option value={group.id} key={group.id}>
-                              {group.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="field-control">
-                        <FieldLabel
-                          htmlFor="history-communication-number"
-                          label="Fluggruppennummer"
-                          help="Stabile öffentliche Kommunikationsnummer der Fluggruppe, keine garantierte Uhrzeit."
-                        />
-                        <input
-                          id="history-communication-number"
-                          min="1"
-                          type="number"
-                          value={historyCommunicationNumber}
-                          onChange={(event) => setHistoryCommunicationNumber(event.target.value)}
-                        />
-                      </div>
-                      <div className="field-control">
-                        <FieldLabel
-                          htmlFor="history-ticket-id"
-                          label="Ticket-ID"
-                          help="Interne anonyme Ticketkennung; nicht der öffentliche QR-Code."
-                        />
-                        <input
-                          id="history-ticket-id"
-                          value={historyTicketId}
-                          onChange={(event) => setHistoryTicketId(event.target.value)}
-                          placeholder="interne ID"
-                        />
-                      </div>
-                      <div className="field-control">
-                        <FieldLabel
-                          htmlFor="history-ticket-group"
-                          label="Ticketgruppe"
-                          help="Interne anonyme Kennung einer gemeinsam gebuchten und untrennbaren Gruppe."
-                        />
-                        <input
-                          id="history-ticket-group"
-                          value={historyTicketGroupId}
-                          onChange={(event) => setHistoryTicketGroupId(event.target.value)}
-                          placeholder="interne ID"
-                        />
-                      </div>
-                    </>
-                  ) : null}
-                </>
-              )}
-              <button
-                onClick={() =>
-                  historyView === "AUDIT" ? void refreshHistory() : void refreshDetailedHistory(0)
-                }
-                type="button"
-              >
-                Filter anwenden
-              </button>
+                </details>
+              ) : null}
+              <nav className="history-filter-chips" aria-label="Aktive Filter">
+                {historySince ? <button onClick={() => { setHistorySince(""); setHistoryOffset(0); }} type="button">Von entfernen</button> : null}
+                {historyUntil ? <button onClick={() => { setHistoryUntil(""); setHistoryOffset(0); }} type="button">Bis entfernen</button> : null}
+                {historyCommunicationNumber ? <button onClick={() => { setHistoryCommunicationNumber(""); setHistoryOffset(0); }} type="button">Fluggruppe entfernen</button> : null}
+                {historyAircraftId ? <button onClick={() => { setHistoryAircraftId(""); setHistoryOffset(0); }} type="button">Flugzeug entfernen</button> : null}
+                {historyPilotId ? <button onClick={() => { setHistoryPilotId(""); setHistoryOffset(0); }} type="button">Pilotencode entfernen</button> : null}
+                {historyTextSearch ? <button onClick={() => { setHistoryTextSearch(""); setHistoryOffset(0); }} type="button">Suche entfernen</button> : null}
+              </nav>
+              <div className="history-filter-actions">
+                <Button
+                  onClick={() => {
+                    setHistoryOffset(0);
+                    if (historyView === "AUDIT") void refreshHistory();
+                    else void refreshDetailedHistory(0);
+                  }}
+                  type="button"
+                  variant="primary"
+                >
+                  Anwenden
+                </Button>
+                <Button onClick={resetHistoryFilters} type="button">Zurücksetzen</Button>
+              </div>
             </fieldset>
             {historyView === "OPERATIONS" ? (
               <div className="history-table-wrap">
@@ -6055,12 +4975,15 @@ export function AdminView() {
                         </td>
                         <td>{entry.communicationLabel ?? "Noch offen"}</td>
                         <td>
-                          <code>{entry.ticketId}</code>
-                          <small>
+                          Anonymes Ticket
+                          <details className="history-row-details">
+                            <summary>Technische Details</summary>
+                            <code>{entry.ticketId}</code>
                             <code>{entry.ticketGroupId}</code>
-                          </small>
+                            {entry.rotationId ? <code>{entry.rotationId}</code> : null}
+                          </details>
                         </td>
-                        <td>{entry.ticketStatus}</td>
+                        <td>{historyTicketStatusLabels[entry.ticketStatus] ?? entry.ticketStatus}</td>
                         <td>{entry.aircraftRegistration ?? "–"}</td>
                         <td>{entry.pilotOperationalCode ?? "–"}</td>
                       </tr>
@@ -6093,11 +5016,13 @@ export function AdminView() {
                         </td>
                         <td>
                           {entry.communicationLabel}
-                          <small>
+                          <details className="history-row-details">
+                            <summary>Technische Details</summary>
                             <code>{entry.rotationId}</code>
-                          </small>
+                            <code>{entry.snapshotId}</code>
+                          </details>
                         </td>
-                        <td>{entry.triggerEventType}</td>
+                        <td>{historyEventLabels[entry.triggerEventType] ?? entry.triggerEventType}</td>
                         <td>
                           {entry.quality}
                           <small>
@@ -6121,17 +5046,27 @@ export function AdminView() {
               </div>
             ) : (
               <div className="audit-list">
-                {history.entries.slice(0, 50).map((entry) => (
+                {history.entries
+                  .filter((entry) =>
+                    `${historyEventLabels[entry.eventType] ?? entry.eventType} ${entry.eventType} ${entry.aggregateType}`
+                      .toLocaleLowerCase("de-DE")
+                      .includes(historyTextSearch.trim().toLocaleLowerCase("de-DE")),
+                  )
+                  .slice(0, 50)
+                  .map((entry) => (
                   <div key={entry.sequence}>
                     <time dateTime={entry.occurredAt}>
                       {new Date(entry.occurredAt).toLocaleString("de-DE", {
                         timeZone: board?.event.timeZone ?? "Europe/Berlin",
                       })}
                     </time>
-                    <strong>{entry.eventType}</strong>
-                    <span>
-                      {entry.aggregateType} · Version {entry.aggregateVersion}
-                    </span>
+                    <strong>{historyEventLabels[entry.eventType] ?? entry.eventType}</strong>
+                    {historyEventLabels[entry.eventType] ? <small>{entry.eventType}</small> : null}
+                    <details className="history-row-details">
+                      <summary>Technische Details</summary>
+                      <span>{entry.aggregateType} · Version {entry.aggregateVersion}</span>
+                      <code>{entry.aggregateId}</code>
+                    </details>
                   </div>
                 ))}
                 {history.entries.length === 0 ? <p>Keine passenden Ereignisse.</p> : null}
@@ -6178,7 +5113,124 @@ export function AdminView() {
                 </Button>
               </div>
             ) : null}
-          </section>
+                </section>
+              }
+              corrections={
+                <section className="admin-section manifest-correction">
+                  <div className="section-heading">
+                    <div>
+                      <h2>Dokumentierte Besetzung korrigieren</h2>
+                      <p>
+                        Eine anonyme Buchungsgruppe wird immer vollständig einem bereits gestarteten
+                        oder abgeschlossenen Umlauf zugeordnet.
+                      </p>
+                    </div>
+                    <span className="admin-only-badge">Nur Administration</span>
+                  </div>
+                  <ValidationHint>
+                    Diese Korrektur berichtigt ausschließlich die Dokumentation und besitzt keine
+                    flugbetriebliche oder sicherheitsbezogene Freigabewirkung.
+                  </ValidationHint>
+                  <div className="manifest-correction-grid">
+                    <div className="field-control">
+                      <FieldLabel
+                        htmlFor="manifest-ticket-group"
+                        label="Zu korrigierende Buchungsgruppe"
+                        help="Nur anonyme Gruppen mit bereits gestartetem oder abgeschlossenem dokumentiertem Umlauf."
+                      />
+                      <select
+                        id="manifest-ticket-group"
+                        onChange={(event) => {
+                          setManifestTicketGroupId(event.target.value);
+                          setManifestTargetRotationId("");
+                        }}
+                        value={manifestTicketGroupId}
+                      >
+                        <option value="">Bitte wählen</option>
+                        {manifestCandidates.map((candidate) => (
+                          <option key={candidate.ticketGroupId} value={candidate.ticketGroupId}>
+                            {candidate.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="field-control">
+                      <FieldLabel
+                        htmlFor="manifest-target-rotation"
+                        label="Tatsächlicher Zielumlauf"
+                        help="Der Zielumlauf muss mindestens den Status Im Flug erreicht haben."
+                      />
+                      <select
+                        disabled={!selectedManifestCandidate}
+                        id="manifest-target-rotation"
+                        onChange={(event) => setManifestTargetRotationId(event.target.value)}
+                        value={manifestTargetRotationId}
+                      >
+                        <option value="">Bitte wählen</option>
+                        {manifestTargets.map((rotation) => (
+                          <option key={rotation.id} value={rotation.id}>
+                            {rotation.communicationLabel} · {rotationStatusLabel[rotation.status]}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="field-control manifest-reason-field">
+                      <FieldLabel
+                        htmlFor="manifest-correction-reason"
+                        label="Dokumentationsgrund"
+                        help="Mindestens 10 Zeichen; Grund, Quelle, Ziel, Gerät und Version werden auditiert."
+                      />
+                      <textarea
+                        id="manifest-correction-reason"
+                        maxLength={500}
+                        onChange={(event) => setManifestCorrectionReason(event.target.value)}
+                        placeholder="Tatsächliche Besetzung nach Rückmeldung berichtigen"
+                        value={manifestCorrectionReason}
+                      />
+                      <small>{manifestCorrectionReason.trim().length}/10 Mindestzeichen</small>
+                    </div>
+                  </div>
+                  {selectedManifestCandidate ? (
+                    <div className="manifest-correction-preview">
+                      <div><span>Bisher dokumentiert</span><strong>{selectedManifestCandidate.label}</strong></div>
+                      <span aria-hidden="true">→</span>
+                      <div>
+                        <span>Wird vollständig zugeordnet zu</span>
+                        <strong>
+                          {manifestTargets.find((rotation) => rotation.id === manifestTargetRotationId)
+                            ?.communicationLabel ?? "Zielumlauf wählen"}
+                        </strong>
+                      </div>
+                    </div>
+                  ) : null}
+                  <Button
+                    busy={busyActionKey === "manifest-correction"}
+                    className="primary-action manifest-correction-action"
+                    disabled={
+                      busyActionKey !== null ||
+                      !isAdministrator ||
+                      !manifestTicketGroupId ||
+                      !manifestTargetRotationId ||
+                      manifestCorrectionReason.trim().length < 10
+                    }
+                    onClick={() =>
+                      requestAdminAction(() =>
+                        runBusyAction("manifest-correction", correctRotationManifest),
+                      )
+                    }
+                    type="button"
+                    variant="primary"
+                  >
+                    Besetzung protokolliert korrigieren
+                  </Button>
+                  {manifestCandidates.length === 0 ? (
+                    <p className="help-text">Aktuell ist keine Korrektur nach Flugstart erforderlich.</p>
+                  ) : null}
+                </section>
+              }
+            />
+            </section>
+          ) : null}
           {adminPinDialog ? (
             <ModalDialog
               description={

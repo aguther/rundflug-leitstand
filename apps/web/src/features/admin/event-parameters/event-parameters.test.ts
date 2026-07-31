@@ -3,6 +3,10 @@ import { describe, expect, it } from "vitest";
 import adminSource from "../../../admin-view.tsx?raw";
 
 const styles = readFileSync(new URL("./event-parameters.css", import.meta.url), "utf8");
+const workspaceStyles = readFileSync(
+  new URL("../event-workspace/event-workspace.css", import.meta.url),
+  "utf8",
+);
 
 describe("event parameter surface", () => {
   it("uses one scoped control height and centers values and units", () => {
@@ -28,7 +32,7 @@ describe("event parameter surface", () => {
   it("keeps operation planning outside the parameter workspace", () => {
     expect(adminSource).toContain("<EventParametersWorkspace");
     expect(adminSource).toContain("<OperationalPlanPanel");
-    expect(adminSource).toContain('hidden={eventStep !== "operations"}');
+    expect(adminSource).toContain("<OperationsWorkspace");
   });
 
   it("guards internal navigation and browser unload while values are dirty", () => {
@@ -38,7 +42,7 @@ describe("event parameter surface", () => {
   });
 
   it("uses a bounded responsive workspace and exactly one mobile action bar", () => {
-    expect(styles).toContain("width: min(100%, 1280px)");
+    expect(workspaceStyles).toContain("--event-workspace-max-width: 1180px");
     expect(styles).toContain(".event-parameters-mobile-actions");
     expect(styles).toContain("position: fixed");
     expect(styles).toContain("grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr)");

@@ -25,7 +25,9 @@ function CompactRelationshipList({ values }: { values: string[] }) {
       {visible.map((value) => (
         <span key={value}>{value}</span>
       ))}
-      {values.length > visible.length ? <span>+ {values.length - visible.length} weitere</span> : null}
+      {values.length > visible.length ? (
+        <span>+ {values.length - visible.length} weitere</span>
+      ) : null}
     </div>
   );
 }

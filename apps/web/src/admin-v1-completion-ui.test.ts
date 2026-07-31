@@ -3,11 +3,15 @@ import { describe, expect, it } from "vitest";
 import adminUxSource from "./admin-ux.tsx?raw";
 import adminViewSource from "./admin-view.tsx?raw";
 import notificationsSource from "./app/PageNotifications.tsx?raw";
+import assignmentDialogSource from "./features/admin/aircraft/AircraftResourceGroupAssignmentDialog.tsx?raw";
+import completionWorkspaceSource from "./features/admin/completion/CompletionWorkspace.tsx?raw";
 import eventParametersSource from "./features/admin/event-parameters/EventParametersWorkspace.tsx?raw";
 import factoryResetDialogSource from "./features/admin/FactoryResetDialog.tsx?raw";
+import masterDataWorkspaceSource from "./features/admin/master-data/MasterDataWorkspace.tsx?raw";
+import operationsWorkspaceSource from "./features/admin/operations/OperationsWorkspace.tsx?raw";
 import sharedSource from "./operation-workspace.tsx?raw";
 
-const appSource = `${adminViewSource}\n${sharedSource}\n${factoryResetDialogSource}\n${eventParametersSource}`;
+const appSource = `${adminViewSource}\n${sharedSource}\n${factoryResetDialogSource}\n${eventParametersSource}\n${assignmentDialogSource}\n${completionWorkspaceSource}\n${masterDataWorkspaceSource}\n${operationsWorkspaceSource}`;
 
 const stylesSource = [
   readFileSync(new URL("./styles.css", import.meta.url), "utf8"),
@@ -119,7 +123,7 @@ describe("V1 administration completion UI", () => {
       "Gate anlegen",
       "Ressourcengruppe anlegen",
       "Flugzeug anlegen",
-      "Zuordnung ändern",
+      "Flugzeug einer Ressourcengruppe zuordnen",
       "Pilotencode anlegen",
       "Produkt anlegen",
     ]) {
@@ -145,7 +149,7 @@ describe("V1 administration completion UI", () => {
     expect(appSource).toContain(': "resource-groups";');
     expect(appSource).toContain("const [masterEditorOpen, setMasterEditorOpen] = useState(false);");
     expect(appSource).toContain("setMasterEditorOpen(false)");
-    expect(appSource).toContain("Zusammenfassung (abgeleitet)");
+    expect(appSource).toContain("<MasterDataWorkspace");
     expect(appSource.match(/<ModalDialog/g)?.length).toBeGreaterThanOrEqual(4);
     expect(appSource.match(/size="wide"/g)?.length).toBeGreaterThanOrEqual(2);
     expect(appSource.match(/size="default"/g)?.length).toBeGreaterThanOrEqual(2);
@@ -177,7 +181,8 @@ describe("V1 administration completion UI", () => {
     expect(appSource).toContain("Prognose-Simulator");
     expect(appSource).toContain("Nur Simulation");
     expect(appSource).toContain('className="admin-section admin-simulator-launch"');
-    expect(appSource).toContain('hidden={adminArea !== "events" || eventStep !== "completion"}');
+    expect(appSource).toContain('eventStep === "completion"');
+    expect(appSource).toContain("<CompletionWorkspace");
   });
 
   it("keeps the manual board refresh touchable and exposes its loading state", () => {

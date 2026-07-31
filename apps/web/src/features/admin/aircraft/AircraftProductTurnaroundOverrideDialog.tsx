@@ -41,14 +41,24 @@ function TurnaroundPhaseControl({
       {explicit ? (
         <label>
           <span className="sr-only">{label} in Minuten</span>
-          <input min={0} onChange={(event) => onChange(event.target.value)} step={1} type="number" value={value} />
+          <input
+            min={0}
+            onChange={(event) => onChange(event.target.value)}
+            step={1}
+            type="number"
+            value={value}
+          />
           <span>Min.</span>
         </label>
       ) : (
         <strong>{inheritedValue} Min.</strong>
       )}
       <small>Quelle: {explicit ? "Flugzeug und Produkt" : sourceLabel(inheritedSource)}</small>
-      <button className="table-action" onClick={() => onChange(explicit ? "" : String(inheritedValue))} type="button">
+      <button
+        className="table-action"
+        onClick={() => onChange(explicit ? "" : String(inheritedValue))}
+        type="button"
+      >
         {explicit ? <RotateCcw aria-hidden="true" /> : null}
         {explicit ? "Vererbung verwenden" : "Abweichung festlegen"}
       </button>
@@ -69,8 +79,12 @@ function TurnaroundOverrideRow({
   busy: boolean;
   onSave: (aircraftId: string, productId: string, values: OverrideValues) => void;
 }) {
-  const [boarding, setBoarding] = useState(override?.plannedBoardingMinutesOverride?.toString() ?? "");
-  const [deboarding, setDeboarding] = useState(override?.plannedDeboardingMinutesOverride?.toString() ?? "");
+  const [boarding, setBoarding] = useState(
+    override?.plannedBoardingMinutesOverride?.toString() ?? "",
+  );
+  const [deboarding, setDeboarding] = useState(
+    override?.plannedDeboardingMinutesOverride?.toString() ?? "",
+  );
   const [buffer, setBuffer] = useState(override?.plannedBufferMinutesOverride?.toString() ?? "");
   const initial = [
     override?.plannedBoardingMinutesOverride?.toString() ?? "",
@@ -85,16 +99,54 @@ function TurnaroundOverrideRow({
   return (
     <article className="turnaround-override-row">
       <header>
-        <div><strong>{product.code} · {product.name}</strong><span>{aircraft.registration}</span></div>
-        <StatusPill tone={override ? "info" : "neutral"}>{override ? "Abweichung" : "Vererbt"}</StatusPill>
+        <div>
+          <strong>
+            {product.code} · {product.name}
+          </strong>
+          <span>{aircraft.registration}</span>
+        </div>
+        <StatusPill tone={override ? "info" : "neutral"}>
+          {override ? "Abweichung" : "Vererbt"}
+        </StatusPill>
       </header>
       <div className="turnaround-override-phases">
-        <TurnaroundPhaseControl inheritedSource={baseline.boarding.sourceLevel === "EVENT" ? "EVENT" : "PRODUCT"} inheritedValue={baseline.boarding.valueMinutes} label="Boarding" onChange={setBoarding} value={boarding} />
-        <TurnaroundPhaseControl inheritedSource={baseline.deboarding.sourceLevel === "EVENT" ? "EVENT" : "PRODUCT"} inheritedValue={baseline.deboarding.valueMinutes} label="Ausstieg" onChange={setDeboarding} value={deboarding} />
-        <TurnaroundPhaseControl inheritedSource={baseline.buffer.sourceLevel === "EVENT" ? "EVENT" : "PRODUCT"} inheritedValue={baseline.buffer.valueMinutes} label="Puffer" onChange={setBuffer} value={buffer} />
+        <TurnaroundPhaseControl
+          inheritedSource={baseline.boarding.sourceLevel === "EVENT" ? "EVENT" : "PRODUCT"}
+          inheritedValue={baseline.boarding.valueMinutes}
+          label="Boarding"
+          onChange={setBoarding}
+          value={boarding}
+        />
+        <TurnaroundPhaseControl
+          inheritedSource={baseline.deboarding.sourceLevel === "EVENT" ? "EVENT" : "PRODUCT"}
+          inheritedValue={baseline.deboarding.valueMinutes}
+          label="Ausstieg"
+          onChange={setDeboarding}
+          value={deboarding}
+        />
+        <TurnaroundPhaseControl
+          inheritedSource={baseline.buffer.sourceLevel === "EVENT" ? "EVENT" : "PRODUCT"}
+          inheritedValue={baseline.buffer.valueMinutes}
+          label="Puffer"
+          onChange={setBuffer}
+          value={buffer}
+        />
       </div>
       <footer>
-        <Button busy={busy} disabled={!dirty || invalid || busy} onClick={() => onSave(aircraft.id, product.id, { boarding: boarding === "" ? null : Number(boarding), deboarding: deboarding === "" ? null : Number(deboarding), buffer: buffer === "" ? null : Number(buffer) })} size="compact" type="button" variant="secondary">
+        <Button
+          busy={busy}
+          disabled={!dirty || invalid || busy}
+          onClick={() =>
+            onSave(aircraft.id, product.id, {
+              boarding: boarding === "" ? null : Number(boarding),
+              deboarding: deboarding === "" ? null : Number(deboarding),
+              buffer: buffer === "" ? null : Number(buffer),
+            })
+          }
+          size="compact"
+          type="button"
+          variant="secondary"
+        >
           <Save aria-hidden="true" /> Änderung speichern
         </Button>
       </footer>
@@ -116,17 +168,29 @@ export function AircraftProductTurnaroundOverrideDialog({
   onSave: (aircraftId: string, productId: string, values: OverrideValues) => void;
 }) {
   if (!context) return null;
-  const rows = context.mode === "aircraft"
-    ? board.products.map((product) => ({ aircraft: board.aircraft.find((entry) => entry.id === context.aircraftId), product }))
-    : board.aircraft.map((aircraft) => ({ aircraft, product: board.products.find((entry) => entry.id === context.productId) }));
-  const fixedLabel = context.mode === "aircraft"
-    ? board.aircraft.find((entry) => entry.id === context.aircraftId)?.registration
-    : board.products.find((entry) => entry.id === context.productId)?.name;
+  const rows =
+    context.mode === "aircraft"
+      ? board.products.map((product) => ({
+          aircraft: board.aircraft.find((entry) => entry.id === context.aircraftId),
+          product,
+        }))
+      : board.aircraft.map((aircraft) => ({
+          aircraft,
+          product: board.products.find((entry) => entry.id === context.productId),
+        }));
+  const fixedLabel =
+    context.mode === "aircraft"
+      ? board.aircraft.find((entry) => entry.id === context.aircraftId)?.registration
+      : board.products.find((entry) => entry.id === context.productId)?.name;
   return (
     <ModalDialog
       className="turnaround-override-dialog"
       description={`${fixedLabel ?? "Auswahl"}: Boarding, Ausstieg und Puffer werden für jede konkrete Kombination unabhängig aufgelöst.`}
-      footer={<Button disabled={busyKey !== null} onClick={onClose} type="button" variant="secondary">Schließen</Button>}
+      footer={
+        <Button disabled={busyKey !== null} onClick={onClose} type="button" variant="secondary">
+          Schließen
+        </Button>
+      }
       onClose={onClose}
       open
       portal
@@ -136,7 +200,9 @@ export function AircraftProductTurnaroundOverrideDialog({
       <div className="turnaround-override-list">
         {rows.flatMap(({ aircraft, product }) => {
           if (!aircraft || !product) return [];
-          const override = board.aircraftProductTurnaroundOverrides.find((entry) => entry.aircraftId === aircraft.id && entry.productId === product.id);
+          const override = board.aircraftProductTurnaroundOverrides.find(
+            (entry) => entry.aircraftId === aircraft.id && entry.productId === product.id,
+          );
           const rowKey = `${aircraft.id}:${product.id}:${override?.version ?? "inherited"}`;
           return [
             <TurnaroundOverrideRow

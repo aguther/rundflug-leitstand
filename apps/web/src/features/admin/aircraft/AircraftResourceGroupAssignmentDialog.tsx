@@ -41,7 +41,7 @@ export function AircraftResourceGroupAssignmentDialog({
   const aircraft = board.aircraft.find((entry) => entry.id === aircraftId);
   const targetGroup = board.resourceGroups.find((entry) => entry.id === resourceGroupId);
   const initialAircraftId = fixedAircraftId;
-  const initialResourceGroupId = fixedResourceGroupId || aircraft?.resourceGroupId || "";
+  const initialResourceGroupId = fixedResourceGroupId;
   const dirty = aircraftId !== initialAircraftId || resourceGroupId !== initialResourceGroupId;
   const canSubmit = Boolean(
     aircraft && targetGroup && aircraft.resourceGroupId !== targetGroup.id && !busy,
@@ -73,7 +73,9 @@ export function AircraftResourceGroupAssignmentDialog({
             </Button>
           </>
         }
-        initialFocusSelector={context.mode === "aircraft" ? "#assignment-target-group" : "#assignment-target-aircraft"}
+        initialFocusSelector={
+          context.mode === "aircraft" ? "#assignment-target-group" : "#assignment-target-aircraft"
+        }
         onClose={requestClose}
         open
         portal
@@ -95,17 +97,28 @@ export function AircraftResourceGroupAssignmentDialog({
             >
               <option value="">Bitte wählen</option>
               {board.aircraft.map((entry) => (
-                <option key={entry.id} value={entry.id}>{entry.registration}</option>
+                <option key={entry.id} value={entry.id}>
+                  {entry.registration}
+                </option>
               ))}
             </SelectField>
           ) : (
-            <div className="assignment-fixed-value"><span>Flugzeug</span><strong>{aircraft?.registration ?? "–"}</strong></div>
+            <div className="assignment-fixed-value">
+              <span>Flugzeug</span>
+              <strong>{aircraft?.registration ?? "–"}</strong>
+            </div>
           )}
-          <div className="assignment-preview" aria-label="Zuordnungsvorschau">
-            <div><span>Bisher</span><strong>{aircraft?.resourceGroupName || "Nicht zugeordnet"}</strong></div>
+          <section className="assignment-preview" aria-label="Zuordnungsvorschau">
+            <div>
+              <span>Bisher</span>
+              <strong>{aircraft?.resourceGroupName || "Nicht zugeordnet"}</strong>
+            </div>
             <ArrowRight aria-hidden="true" />
-            <div><span>Neu</span><strong>{targetGroup?.name ?? "Bitte wählen"}</strong></div>
-          </div>
+            <div>
+              <span>Neu</span>
+              <strong>{targetGroup?.name ?? "Bitte wählen"}</strong>
+            </div>
+          </section>
           {context.mode === "aircraft" ? (
             <SelectField
               id="assignment-target-group"
@@ -116,13 +129,21 @@ export function AircraftResourceGroupAssignmentDialog({
               <option value="">Bitte wählen</option>
               {board.resourceGroups
                 .filter((group) => group.status !== "ENDED")
-                .map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
+                .map((group) => (
+                  <option key={group.id} value={group.id}>
+                    {group.name}
+                  </option>
+                ))}
             </SelectField>
           ) : (
-            <div className="assignment-fixed-value"><span>Zielgruppe</span><strong>{targetGroup?.name ?? "–"}</strong></div>
+            <div className="assignment-fixed-value">
+              <span>Zielgruppe</span>
+              <strong>{targetGroup?.name ?? "–"}</strong>
+            </div>
           )}
           <p className="assignment-effective-note">
-            Wirksam ab Bestätigung. Die Anwendung trifft keine flugbetriebliche oder sicherheitsbezogene Entscheidung.
+            Wirksam ab Bestätigung. Die Anwendung trifft keine flugbetriebliche oder
+            sicherheitsbezogene Entscheidung.
           </p>
         </div>
       </ModalDialog>
@@ -133,6 +154,7 @@ export function AircraftResourceGroupAssignmentDialog({
         onCancel={() => setDiscardOpen(false)}
         onConfirm={onClose}
         open={discardOpen}
+        portal
         title="Zuordnungsänderung verwerfen?"
       />
     </>

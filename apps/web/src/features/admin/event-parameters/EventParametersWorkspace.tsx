@@ -1,12 +1,7 @@
 import type { EventLogoTheme, EventSnapshot } from "@rundflug/contracts";
 import { AlertTriangle, RotateCcw, Save } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  Button,
-  CheckboxField,
-  ConfirmationDialog,
-  Tabs,
-} from "../../../design-system/components";
+import { Button, CheckboxField, ConfirmationDialog, Tabs } from "../../../design-system/components";
 import { LocalizedDateTimeInput } from "../../../localized-date-input";
 import { EventWorkspaceFrame } from "../event-workspace/EventWorkspaceFrame";
 import { EventAppearancePanel } from "./EventAppearancePanel";
@@ -116,7 +111,6 @@ export function EventParametersWorkspace({
       containerRef={workspaceRef}
       event={event}
     >
-
       <Tabs
         idPrefix="event-parameters"
         items={[...WORKSPACE_TABS]}
