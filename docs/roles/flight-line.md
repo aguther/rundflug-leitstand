@@ -10,8 +10,9 @@ betreute Flugzeug übernehmen.
 ## Kernschritte
 
 1. Kennzeichen und Ressourcengruppe prüfen; fremde Übernahme nicht ohne Rücksprache erzwingen.
-2. Aktuelle Buchungsgruppen lesen; einen Nachruf nur nach Prüfung von Gruppe, Größe, Gate und Text
-   starten und den sichtbaren Status `Nachruf aktiv` beachten.
+2. Aktuelle Buchungsgruppen lesen; einen Nachruf nur nach Prüfung von Gruppe, Größe und Gate über
+   die Glocke direkt starten. Die hervorgehobene durchgestrichene Glocke zeigt den aktiven Nachruf;
+   ihr Tooltip nennt Startzeit und Nachrufnummer, erneutes Betätigen beendet ihn.
 3. Boarding, Off-Block, On-Block/Landung und Verfügbarkeit nur beim tatsächlichen Ereignis melden;
    ein Nachruf verändert diese Zustände nicht.
 4. Nach jedem Klick sichtbare Serverbestätigung und aktualisierte Zeitleiste abwarten.

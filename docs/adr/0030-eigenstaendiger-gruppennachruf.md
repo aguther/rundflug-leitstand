@@ -27,10 +27,15 @@ verändern.
   `RECALL_TICKET_GROUP` bleibt in 1.11.0 nur als kontrollierter Vertragsalias erhalten.
 - Öffentliche Texte sind feste, aus Gruppenkennung und Gate abgeleitete Vorlagen. Es werden keine
   personenbezogenen Daten gespeichert.
+- Flight Line und Flight Director starten einen zulässigen Nachruf ohne Bestätigungsdialog direkt
+  über einen festen Glocken-Button. Im aktiven Zustand bleibt derselbe Aktionsslot als
+  hervorgehobener Umschalter erhalten; sein zugänglicher Tooltip nennt Startzeit und Sequenz, und
+  erneutes Betätigen beendet exakt die aktuell projizierte Nachruf-ID.
 
 ## Folgen
 
 Ein späterer Nachruf besitzt eine neue ID und Sequenz und erzeugt deshalb erneut Push. FIDS,
 Ticketstatus und Gruppenstatus können denselben Vorgang projizieren, ohne den normalen
-Umlaufzustand zu überschreiben. Migration 0055 benötigt für eine Rückkehr den D1-Time-Travel-
-Zeitpunkt vor der Migration oder ein geprüftes vollständiges Backup.
+Umlaufzustand zu überschreiben. Die Direktbedienung benötigt weder frei editierbare Texte noch
+optimistischen lokalen Nachrufstatus. Migration 0055 benötigt für eine Rückkehr den
+D1-Time-Travel-Zeitpunkt vor der Migration oder ein geprüftes vollständiges Backup.

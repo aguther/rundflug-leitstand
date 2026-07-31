@@ -213,9 +213,9 @@ RELEASE_REQUIREMENTS = [
     {
         "id": "V1110-UI-010",
         "section": "Flight Line und Flight Director",
-        "requirement": "Geeignete offene Gruppen können nach einem kompakten Bestätigungsdialog nachgerufen werden. Bei aktivem Nachruf sind Status, Startzeit, bisherige Anzahl und die Aktion Nachruf beenden sichtbar.",
+        "requirement": "Geeignete offene Gruppen werden ohne Bestätigungsdialog direkt über einen Glocken-Button nachgerufen. Derselbe Button bleibt an fester Position als klar erkennbarer aktiver Umschalter sichtbar; Startzeit und bisherige Anzahl sind im zugänglichen Tooltip enthalten, und erneutes Betätigen beendet den Nachruf.",
         "module": "apps/web/src/flight-line-view.tsx apps/web/src/flight-line-shared.tsx",
-        "tests": "Browser-Abnahme Flight Line und Flight Director",
+        "tests": "apps/web/src/flight-line-recall.dom.test.tsx und Browser-Abnahme Flight Line und Flight Director",
     },
     {
         "id": "V1110-MIG-010",

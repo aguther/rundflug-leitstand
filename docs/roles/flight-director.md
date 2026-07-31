@@ -10,8 +10,9 @@ Mit dem Flight-Director-Konto anmelden, Veranstaltung wählen und **Flight Direc
 ## Kernschritte
 
 1. Flugzeugübersicht, Betriebszustände und aktive Ressourcenzuordnungen prüfen.
-2. Queue und offene Buchungsgruppen beobachten; Nachrufe als eigene Alarmvorgänge starten oder
-   beenden, `NEXT` bleibt eine getrennte bewusste menschliche Entscheidung.
+2. Queue und offene Buchungsgruppen beobachten; Nachrufe über die feste Glockenaktion direkt starten
+   und über denselben hervorgehobenen Umschalter beenden. Startzeit und Nachrufnummer stehen im
+   Tooltip; `NEXT` bleibt eine getrennte bewusste menschliche Entscheidung.
 3. Vorschlag, Pilotencode und kompatibles Flugzeug prüfen, danach genau einmal bestätigen.
 4. Konflikte oder stale writes neu laden und fachlich neu entscheiden; niemals still überschreiben.
 5. Abbruch, Pause, Tanken und Freigabe mit Grund dokumentieren; Historie anschließend kontrollieren.
