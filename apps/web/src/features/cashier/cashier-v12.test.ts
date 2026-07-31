@@ -128,8 +128,12 @@ describe("V1.7.0 cashier", () => {
     expect(appSource).toContain("queueSaleHighlight(soldTicketGroupId)");
     expect(appSource).toContain("rowClassName={(result) =>");
     expect(appSource).toContain("cashier-ticket-row--new");
+    expect(stylesSource).toContain("animation: cashier-new-ticket-row 3s ease-out both");
     expect(stylesSource).toContain("@keyframes cashier-new-ticket-row");
     expect(stylesSource).toContain("@keyframes cashier-new-selected-ticket-row");
+    expect(stylesSource).toContain("inset 3px 0 0 var(--ui-success)");
+    expect(stylesSource).toContain("inset 6px 0 0 var(--ui-accent)");
+    expect(stylesSource).not.toContain("var(--ui-success-soft)");
     expect(stylesSource).toContain("@media (prefers-reduced-motion: reduce)");
   });
 
