@@ -47,18 +47,18 @@ describe("temporary cashier row highlights", () => {
     expect(screen.getByText("Gruppe one").closest("tr")?.className).toContain("recent");
   });
 
-  it("expires multiple rows on independent ten-second timers without extension", () => {
+  it("expires multiple rows on independent three-second timers without extension", () => {
     render(<HighlightHarness visibleIds={["one", "two"]} />);
     fireEvent.click(screen.getByRole("button", { name: "Eins vormerken" }));
-    act(() => vi.advanceTimersByTime(5_000));
+    act(() => vi.advanceTimersByTime(1_500));
     fireEvent.click(screen.getByRole("button", { name: "Eins vormerken" }));
     fireEvent.click(screen.getByRole("button", { name: "Zwei vormerken" }));
 
-    act(() => vi.advanceTimersByTime(5_000));
+    act(() => vi.advanceTimersByTime(1_500));
     expect(screen.getByText("Gruppe one").closest("tr")?.className).not.toContain("recent");
     expect(screen.getByText("Gruppe two").closest("tr")?.className).toContain("recent");
 
-    act(() => vi.advanceTimersByTime(5_000));
+    act(() => vi.advanceTimersByTime(1_500));
     expect(screen.getByText("Gruppe two").closest("tr")?.className).not.toContain("recent");
   });
 

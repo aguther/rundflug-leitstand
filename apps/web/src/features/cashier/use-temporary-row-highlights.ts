@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-export function useTemporaryRowHighlights(visibleRowIds: readonly string[], durationMs = 10_000) {
+export function useTemporaryRowHighlights(visibleRowIds: readonly string[], durationMs = 3_000) {
   const [highlightedIds, setHighlightedIds] = useState<ReadonlySet<string>>(
     () => new Set<string>(),
   );
