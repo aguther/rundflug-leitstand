@@ -1,93 +1,7 @@
 .admin-shell .event-parameters-workspace {
   --event-parameter-control-height: var(--control-touch);
   --event-parameter-field-gap: 6px;
-  width: min(100%, 1280px);
   min-width: 0;
-  display: grid;
-  align-content: start;
-  margin: 12px auto 24px;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--radius-md);
-  background: var(--ui-surface);
-  overflow: hidden;
-}
-
-.admin-shell .event-parameters-header {
-  min-height: 108px;
-  display: grid;
-  grid-template-columns: minmax(250px, 1fr) minmax(360px, 1.1fr) auto;
-  align-items: center;
-  gap: 20px;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--ui-border);
-}
-
-.admin-shell .event-parameters-title {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.admin-shell .event-parameters-title > div {
-  min-width: 0;
-}
-
-.admin-shell .event-parameters-title span:first-child {
-  color: var(--ui-muted);
-  font-size: 0.72rem;
-  font-weight: 650;
-}
-
-.admin-shell .event-parameters-title h2 {
-  margin: 2px 0 0;
-  overflow: hidden;
-  font-size: 1.2rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.admin-shell .event-parameters-meta {
-  min-width: 0;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 1px;
-  margin: 0;
-  overflow: hidden;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--radius-sm);
-  background: var(--ui-border);
-}
-
-.admin-shell .event-parameters-meta > div {
-  min-width: 0;
-  display: grid;
-  gap: 2px;
-  padding: 9px 11px;
-  background: var(--ui-surface-subtle);
-}
-
-.admin-shell .event-parameters-meta :is(dt, dd) {
-  margin: 0;
-}
-
-.admin-shell .event-parameters-meta dt {
-  color: var(--ui-muted);
-  font-size: 0.68rem;
-}
-
-.admin-shell .event-parameters-meta dd {
-  overflow: hidden;
-  font-size: 0.82rem;
-  font-weight: 650;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.admin-shell .event-parameters-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
 }
 
 .admin-shell .event-parameters-workspace > .ds-tabs {
@@ -414,15 +328,6 @@
 }
 
 @media (max-width: 1050px) {
-  .admin-shell .event-parameters-header {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
-
-  .admin-shell .event-parameters-meta {
-    grid-column: 1 / -1;
-    grid-row: 2;
-  }
-
   .admin-shell .event-parameter-card-grid,
   .admin-shell .event-appearance-grid {
     grid-template-columns: minmax(0, 1fr);
@@ -444,22 +349,7 @@
     margin: 10px 12px 92px;
   }
 
-  .admin-shell .event-parameters-header {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 12px;
-    padding: 14px;
-  }
-
-  .admin-shell .event-parameters-title {
-    justify-content: space-between;
-  }
-
-  .admin-shell .event-parameters-meta {
-    grid-column: auto;
-    grid-row: auto;
-  }
-
-  .admin-shell .event-parameters-actions {
+  .admin-shell .event-parameters-workspace .event-workspace-context-actions {
     display: none;
   }
 

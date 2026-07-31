@@ -1,18 +1,29 @@
-import { useRef } from "react";
+import { useId, useRef } from "react";
 
 export interface TabItem<T extends string> {
   value: T;
   label: string;
+  id?: string;
+  panelId?: string;
 }
 export interface TabsProps<T extends string> {
   items: TabItem<T>[];
   value: T;
   onChange: (value: T) => void;
   label: string;
+  idPrefix?: string;
 }
 
-export function Tabs<T extends string>({ items, value, onChange, label }: TabsProps<T>) {
+export function Tabs<T extends string>({
+  items,
+  value,
+  onChange,
+  label,
+  idPrefix,
+}: TabsProps<T>) {
   const buttonRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const generatedId = useId().replace(/[^a-zA-Z0-9_-]/g, "");
+  const resolvedPrefix = idPrefix ?? `tabs-${generatedId}`;
 
   function moveFocus(index: number) {
     const target = items[index];
@@ -25,8 +36,10 @@ export function Tabs<T extends string>({ items, value, onChange, label }: TabsPr
     <div aria-label={label} className="ds-tabs" role="tablist">
       {items.map((item, index) => (
         <button
+          aria-controls={item.panelId ?? `${resolvedPrefix}-${item.value}-panel`}
           aria-selected={item.value === value}
           className={item.value === value ? "active" : ""}
+          id={item.id ?? `${resolvedPrefix}-${item.value}-tab`}
           key={item.value}
           onClick={() => onChange(item.value)}
           onKeyDown={(event) => {
