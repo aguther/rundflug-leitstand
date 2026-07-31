@@ -8,6 +8,7 @@ export interface DataTableColumn<Row> {
   align?: "left" | "right" | "center";
   width?: string;
   priority?: "primary" | "secondary" | "tertiary";
+  ariaSort?: "ascending" | "descending" | "none" | "other";
 }
 
 export interface DataTableProps<Row> {
@@ -63,6 +64,7 @@ export function DataTable<Row>({
           <tr>
             {columns.map((column) => (
               <th
+                aria-sort={column.ariaSort}
                 className={column.priority ? `ds-table-column--${column.priority}` : undefined}
                 key={column.key}
                 style={{ width: column.width, textAlign: column.align ?? "left" }}
