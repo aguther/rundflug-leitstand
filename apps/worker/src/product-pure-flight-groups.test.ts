@@ -15,6 +15,9 @@ describe("product-pure flight groups", () => {
     );
     expect(migration).toContain("rotation_tickets_product_pure_insert");
     expect(migration).toContain("rotation_tickets_product_pure_reactivate");
+    expect(migration).toContain("AND EXISTS (");
+    expect(migration).toContain("SELECT RAISE(ABORT, 'active rotation ticket product mismatch')");
+    expect(migration).not.toContain("SELECT CASE WHEN EXISTS");
     expect(migration).toContain("fg.product_id <> tg.product_id");
   });
 

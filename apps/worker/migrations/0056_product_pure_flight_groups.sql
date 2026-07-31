@@ -23,8 +23,7 @@ CREATE INDEX idx_flight_groups_event_product
 CREATE TRIGGER rotation_tickets_product_pure_insert
 BEFORE INSERT ON rotation_tickets
 WHEN NEW.released_at IS NULL
-BEGIN
-  SELECT CASE WHEN EXISTS (
+  AND EXISTS (
     SELECT 1
       FROM rotations r
       JOIN flight_groups fg ON fg.id = r.flight_group_id
@@ -33,14 +32,16 @@ BEGIN
      WHERE r.id = NEW.rotation_id
        AND r.status NOT IN ('COMPLETED', 'CANCELED')
        AND (fg.product_id IS NULL OR fg.product_id <> tg.product_id)
-  ) THEN RAISE(ABORT, 'active rotation ticket product mismatch') END;
+  )
+BEGIN
+  SELECT RAISE(ABORT, 'active rotation ticket product mismatch');
 END;
 
 CREATE TRIGGER rotation_tickets_product_pure_reactivate
 BEFORE UPDATE OF released_at ON rotation_tickets
-WHEN NEW.released_at IS NULL AND OLD.released_at IS NOT NULL
-BEGIN
-  SELECT CASE WHEN EXISTS (
+WHEN NEW.released_at IS NULL
+  AND OLD.released_at IS NOT NULL
+  AND EXISTS (
     SELECT 1
       FROM rotations r
       JOIN flight_groups fg ON fg.id = r.flight_group_id
@@ -49,5 +50,7 @@ BEGIN
      WHERE r.id = NEW.rotation_id
        AND r.status NOT IN ('COMPLETED', 'CANCELED')
        AND (fg.product_id IS NULL OR fg.product_id <> tg.product_id)
-  ) THEN RAISE(ABORT, 'active rotation ticket product mismatch') END;
+  )
+BEGIN
+  SELECT RAISE(ABORT, 'active rotation ticket product mismatch');
 END;
