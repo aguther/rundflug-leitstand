@@ -73,9 +73,10 @@ SELECT printf('perf-pilot-%02d', value), 'perf-current', printf('P-%02d', value)
 
 WITH RECURSIVE n(value) AS (SELECT 1 UNION ALL SELECT value + 1 FROM n WHERE value < 300)
 INSERT INTO flight_groups
-  (id, operation_day_id, resource_group_id, communication_number, queue_position, status,
+  (id, operation_day_id, resource_group_id, product_id, communication_number, queue_position, status,
    version, created_at, updated_at)
-SELECT printf('perf-flight-group-%03d', value), 'perf-current', 'perf-rg', value, value, 'QUEUED',
+SELECT printf('perf-flight-group-%03d', value), 'perf-current', 'perf-rg', 'perf-product',
+       value, value, 'QUEUED',
        0, '2026-07-14T06:00:00.000Z', '2026-07-14T06:00:00.000Z' FROM n;
 
 WITH RECURSIVE n(value) AS (SELECT 1 UNION ALL SELECT value + 1 FROM n WHERE value < 300)

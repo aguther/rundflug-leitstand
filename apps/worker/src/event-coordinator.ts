@@ -39,6 +39,7 @@ import {
   planBookingGroupSplit,
   planRotationCapacityReduction,
   planTechnicalRotationAbortQueueBlock,
+  resolveTurnaroundProfile,
   selectAutomaticPrecalls,
   simulateOutageRecovery,
   TICKET_GROUP_RECALL_DURATION_MS,
@@ -1887,6 +1888,7 @@ export class EventCoordinator extends DurableObject<Env> {
       rotationRows,
       durationRows,
       capacityRows,
+      turnaroundOverrideRows,
       pilotRows,
       gateWaitRows,
       plannedOperationRows,
@@ -1925,19 +1927,23 @@ export class EventCoordinator extends DurableObject<Env> {
                 r.completed_at, fg.id AS flight_group_id, fg.version AS flight_group_version,
                 fg.precalled_at, fg.resource_group_id, rg.status AS resource_group_status,
                 rg.automatic_precall_enabled AS resource_group_precall_enabled,
+                p.id AS product_id,
                 COALESCE(MIN(tg.queue_sequence), 1) AS queue_sequence,
                 COUNT(DISTINCT rt.ticket_id) AS ticket_count,
-                COALESCE(MIN(p.reference_duration_minutes), 20) AS reference_duration_minutes,
-                COALESCE(MIN(p.code), '') AS product_code, a.aircraft_type,
-                COALESCE(r.gate_id, MIN(p.gate_id)) AS gate_id,
-                r.predicted_departure_at, r.predicted_landing_at, r.predicted_completion_at
+                COALESCE(p.reference_duration_minutes, 20) AS reference_duration_minutes,
+                COALESCE(p.code, '') AS product_code, a.aircraft_type,
+                COALESCE(r.gate_id, p.gate_id) AS gate_id,
+                r.predicted_departure_at, r.predicted_landing_at, r.predicted_completion_at,
+                r.turnaround_boarding_minutes, r.turnaround_deboarding_minutes,
+                r.turnaround_buffer_minutes, r.turnaround_boarding_source,
+                r.turnaround_deboarding_source, r.turnaround_buffer_source
            FROM rotations r
            JOIN flight_groups fg ON fg.id = r.flight_group_id
            JOIN resource_groups rg ON rg.id = fg.resource_group_id
            LEFT JOIN rotation_tickets rt ON rt.rotation_id = r.id AND rt.released_at IS NULL
            LEFT JOIN tickets t ON t.id = rt.ticket_id
            LEFT JOIN ticket_groups tg ON tg.id = t.ticket_group_id
-           LEFT JOIN products p ON p.id = tg.product_id
+           LEFT JOIN products p ON p.id = fg.product_id
            LEFT JOIN aircraft a ON a.id = r.aircraft_id
           WHERE r.operation_day_id = ?1 AND r.status NOT IN ('COMPLETED', 'CANCELED')
           GROUP BY r.id
@@ -1961,6 +1967,7 @@ export class EventCoordinator extends DurableObject<Env> {
           resource_group_id: string;
           resource_group_status: "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED";
           resource_group_precall_enabled: number;
+          product_id: string | null;
           queue_sequence: number;
           ticket_count: number;
           reference_duration_minutes: number;
@@ -1970,6 +1977,12 @@ export class EventCoordinator extends DurableObject<Env> {
           predicted_departure_at: string | null;
           predicted_landing_at: string | null;
           predicted_completion_at: string | null;
+          turnaround_boarding_minutes: number | null;
+          turnaround_deboarding_minutes: number | null;
+          turnaround_buffer_minutes: number | null;
+          turnaround_boarding_source: string | null;
+          turnaround_deboarding_source: string | null;
+          turnaround_buffer_source: string | null;
         }>(),
       this.env.DB.prepare(
         `SELECT (julianday(r.completed_at) - julianday(r.called_at)) * 1440.0 AS minutes,
@@ -2056,6 +2069,37 @@ export class EventCoordinator extends DurableObject<Env> {
           operational_interrupted: number;
           predicted_completion_at: string | null;
           expected_review_at: string | null;
+        }>(),
+      this.env.DB.prepare(
+        `SELECT p.id AS product_id, membership.aircraft_id,
+                p.planned_boarding_minutes_override AS product_boarding,
+                p.planned_deboarding_minutes_override AS product_deboarding,
+                p.planned_buffer_minutes_override AS product_buffer,
+                override.planned_boarding_minutes_override AS aircraft_boarding,
+                override.planned_deboarding_minutes_override AS aircraft_deboarding,
+                override.planned_buffer_minutes_override AS aircraft_buffer
+           FROM products p
+           JOIN resource_group_memberships membership
+             ON membership.operation_day_id = p.operation_day_id
+            AND membership.resource_group_id = p.resource_group_id
+            AND membership.active_until IS NULL
+           LEFT JOIN aircraft_product_turnaround_overrides override
+             ON override.operation_day_id = p.operation_day_id
+            AND override.product_id = p.id
+            AND override.aircraft_id = membership.aircraft_id
+          WHERE p.operation_day_id = ?1
+          ORDER BY p.id, membership.aircraft_id`,
+      )
+        .bind(eventId)
+        .all<{
+          product_id: string;
+          aircraft_id: string;
+          product_boarding: number | null;
+          product_deboarding: number | null;
+          product_buffer: number | null;
+          aircraft_boarding: number | null;
+          aircraft_deboarding: number | null;
+          aircraft_buffer: number | null;
         }>(),
       this.env.DB.prepare(
         `SELECT pilot.id, pilot.paused, pilot.pause_expected_review_at,
@@ -2383,6 +2427,7 @@ export class EventCoordinator extends DurableObject<Env> {
           );
           return {
             laneId: `${aircraft.aircraftId}:${pilot.pilotId}`,
+            aircraftId: aircraft.aircraftId,
             passengerSeats: aircraft.passengerSeats,
             availableLowerAt: lowerAt,
             availableExpectedAt: expectedAt,
@@ -2442,33 +2487,84 @@ export class EventCoordinator extends DurableObject<Env> {
         productCode: row.product_code,
         aircraftType: row.aircraft_type,
       })),
-      rotations: rotationRows.results.map((rotation) => ({
-        id: rotation.id,
-        status: rotation.status,
-        createdAt: rotation.created_at,
-        calledAt: rotation.called_at,
-        departedAt: rotation.departed_at,
-        landedAt: rotation.landed_at,
-        resourceGroupId: rotation.resource_group_id,
-        aircraftId: rotation.aircraft_id,
-        pilotId: rotation.pilot_id,
-        resourceGroupStatus: rotation.resource_group_status,
-        queueSequence: rotation.queue_sequence,
-        passengerCount: rotation.ticket_count,
-        referenceDurationMinutes: rotation.reference_duration_minutes,
-        productCode: rotation.product_code,
-        aircraftType: rotation.aircraft_type,
-        predictedDepartureAt: rotation.predicted_departure_at,
-        predictedLandingAt: rotation.predicted_landing_at,
-        predictedCompletionAt: rotation.predicted_completion_at,
-        constraints: resolvedPlans.filter(
-          (plan) =>
-            (plan.scopeType === "EVENT" && plan.scopeId === eventId) ||
-            (plan.scopeType === "RESOURCE_GROUP" && plan.scopeId === rotation.resource_group_id) ||
-            (plan.scopeType === "AIRCRAFT" && plan.scopeId === rotation.aircraft_id) ||
-            (plan.scopeType === "PILOT" && plan.scopeId === rotation.pilot_id),
-        ),
-      })),
+      rotations: rotationRows.results.map((rotation) => {
+        const turnaroundProfiles = turnaroundOverrideRows.results
+          .filter((row) => row.product_id === rotation.product_id)
+          .map((row) => {
+            const resolved = resolveTurnaroundProfile({
+              event: {
+                sourceId: eventId,
+                boardingMinutes: event.planned_boarding_minutes,
+                deboardingMinutes: event.planned_deboarding_minutes,
+                bufferMinutes: event.planned_buffer_minutes,
+              },
+              product: {
+                sourceId: row.product_id,
+                boardingMinutes: row.product_boarding,
+                deboardingMinutes: row.product_deboarding,
+                bufferMinutes: row.product_buffer,
+              },
+              aircraftProduct: {
+                sourceId: `${row.aircraft_id}:${row.product_id}`,
+                boardingMinutes: row.aircraft_boarding,
+                deboardingMinutes: row.aircraft_deboarding,
+                bufferMinutes: row.aircraft_buffer,
+              },
+            });
+            return {
+              aircraftId: row.aircraft_id,
+              boardingMinutes: resolved.boarding.valueMinutes,
+              deboardingMinutes: resolved.deboarding.valueMinutes,
+              bufferMinutes: resolved.buffer.valueMinutes,
+              boardingSource: `${resolved.boarding.sourceLevel}:${resolved.boarding.sourceId}`,
+              deboardingSource: `${resolved.deboarding.sourceLevel}:${resolved.deboarding.sourceId}`,
+              bufferSource: `${resolved.buffer.sourceLevel}:${resolved.buffer.sourceId}`,
+            };
+          });
+        const confirmedTurnaroundProfile =
+          rotation.turnaround_boarding_minutes !== null &&
+          rotation.turnaround_deboarding_minutes !== null &&
+          rotation.turnaround_buffer_minutes !== null
+            ? {
+                boardingMinutes: rotation.turnaround_boarding_minutes,
+                deboardingMinutes: rotation.turnaround_deboarding_minutes,
+                bufferMinutes: rotation.turnaround_buffer_minutes,
+                boardingSource: rotation.turnaround_boarding_source ?? "LEGACY_UNKNOWN",
+                deboardingSource: rotation.turnaround_deboarding_source ?? "LEGACY_UNKNOWN",
+                bufferSource: rotation.turnaround_buffer_source ?? "LEGACY_UNKNOWN",
+              }
+            : null;
+        return {
+          id: rotation.id,
+          status: rotation.status,
+          createdAt: rotation.created_at,
+          calledAt: rotation.called_at,
+          departedAt: rotation.departed_at,
+          landedAt: rotation.landed_at,
+          resourceGroupId: rotation.resource_group_id,
+          aircraftId: rotation.aircraft_id,
+          pilotId: rotation.pilot_id,
+          resourceGroupStatus: rotation.resource_group_status,
+          queueSequence: rotation.queue_sequence,
+          passengerCount: rotation.ticket_count,
+          referenceDurationMinutes: rotation.reference_duration_minutes,
+          productCode: rotation.product_code,
+          aircraftType: rotation.aircraft_type,
+          predictedDepartureAt: rotation.predicted_departure_at,
+          predictedLandingAt: rotation.predicted_landing_at,
+          predictedCompletionAt: rotation.predicted_completion_at,
+          turnaroundProfiles,
+          confirmedTurnaroundProfile,
+          constraints: resolvedPlans.filter(
+            (plan) =>
+              (plan.scopeType === "EVENT" && plan.scopeId === eventId) ||
+              (plan.scopeType === "RESOURCE_GROUP" &&
+                plan.scopeId === rotation.resource_group_id) ||
+              (plan.scopeType === "AIRCRAFT" && plan.scopeId === rotation.aircraft_id) ||
+              (plan.scopeType === "PILOT" && plan.scopeId === rotation.pilot_id),
+          ),
+        };
+      }),
     });
     const projectionByRotationId = new Map(
       projections.map((projection) => [projection.rotationId, projection]),
@@ -2532,8 +2628,10 @@ export class EventCoordinator extends DurableObject<Env> {
             predicted_boarding_at = ?5, predicted_departure_at = ?6,
             predicted_landing_at = ?7, predicted_completion_at = ?8,
             prediction_quality = ?9, prediction_lower_minutes = ?10,
-            prediction_upper_minutes = ?11, prediction_updated_at = ?12
-           WHERE id = ?13`,
+            prediction_upper_minutes = ?11, prediction_updated_at = ?12,
+            forecast_assumed_aircraft_id =
+              CASE WHEN status = 'DRAFT' THEN ?13 ELSE forecast_assumed_aircraft_id END
+           WHERE id = ?14`,
         ).bind(
           projection.plannedBoardingAt,
           projection.plannedDepartureAt,
@@ -2547,6 +2645,7 @@ export class EventCoordinator extends DurableObject<Env> {
           projection.predictionLowerMinutes,
           projection.predictionUpperMinutes,
           nowIso,
+          projection.assumedAircraftId,
           rotation.id,
         ),
       );
@@ -2561,8 +2660,11 @@ export class EventCoordinator extends DurableObject<Env> {
             (id, operation_day_id, rotation_id, operation_day_version, captured_at, quality,
              lower_minutes, upper_minutes, predicted_boarding_at, predicted_departure_at,
              predicted_landing_at, predicted_completion_at, trigger_event_type, data_basis_scope,
-             sample_size, data_age_minutes, active_capacity, reference_duration_minutes)
-           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)`,
+             sample_size, data_age_minutes, active_capacity, reference_duration_minutes,
+             product_id, assumed_aircraft_id, boarding_minutes, deboarding_minutes, buffer_minutes,
+             boarding_source, deboarding_source, buffer_source)
+           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15,
+                   ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26)`,
           ).bind(
             crypto.randomUUID(),
             eventId,
@@ -2582,6 +2684,14 @@ export class EventCoordinator extends DurableObject<Env> {
             projection.dataAgeMinutes,
             projection.activeCapacity,
             projection.referenceDurationMinutes,
+            rotation.product_id,
+            projection.assumedAircraftId,
+            projection.boardingMinutes,
+            projection.deboardingMinutes,
+            projection.bufferMinutes,
+            projection.boardingSource,
+            projection.deboardingSource,
+            projection.bufferSource,
           ),
         );
       }
@@ -6131,6 +6241,8 @@ export class EventCoordinator extends DurableObject<Env> {
       ticket_count: number;
     }> = [];
     let skippedEarlierTicketGroupIds: string[] = [];
+    let confirmedTurnaroundProductId: string | null = null;
+    let confirmedTurnaroundProfile: ReturnType<typeof resolveTurnaroundProfile> | null = null;
     if (command.type === "CALL_NEXT") {
       if (rotation.resource_group_status !== "ACTIVE") {
         return json(
@@ -6241,6 +6353,56 @@ export class EventCoordinator extends DurableObject<Env> {
           { status: 409 },
         );
       }
+      const turnaroundConfiguration = await this.env.DB.prepare(
+        `SELECT p.planned_boarding_minutes_override AS product_boarding,
+                p.planned_deboarding_minutes_override AS product_deboarding,
+                p.planned_buffer_minutes_override AS product_buffer,
+                override.planned_boarding_minutes_override AS aircraft_boarding,
+                override.planned_deboarding_minutes_override AS aircraft_deboarding,
+                override.planned_buffer_minutes_override AS aircraft_buffer
+           FROM products p
+           LEFT JOIN aircraft_product_turnaround_overrides override
+             ON override.operation_day_id = p.operation_day_id
+            AND override.product_id = p.id
+            AND override.aircraft_id = ?3
+          WHERE p.id = ?1 AND p.operation_day_id = ?2`,
+      )
+        .bind(selectedProductId, command.eventId, command.payload.aircraftId)
+        .first<{
+          product_boarding: number | null;
+          product_deboarding: number | null;
+          product_buffer: number | null;
+          aircraft_boarding: number | null;
+          aircraft_deboarding: number | null;
+          aircraft_buffer: number | null;
+        }>();
+      if (!turnaroundConfiguration) {
+        return json(
+          { error: { code: "PRODUCT_NOT_FOUND", message: "Produkt nicht gefunden." } },
+          { status: 404 },
+        );
+      }
+      confirmedTurnaroundProductId = selectedProductId;
+      confirmedTurnaroundProfile = resolveTurnaroundProfile({
+        event: {
+          sourceId: command.eventId,
+          boardingMinutes: current.planned_boarding_minutes ?? 8,
+          deboardingMinutes: current.planned_deboarding_minutes ?? 5,
+          bufferMinutes: current.planned_buffer_minutes ?? 3,
+        },
+        product: {
+          sourceId: selectedProductId,
+          boardingMinutes: turnaroundConfiguration.product_boarding,
+          deboardingMinutes: turnaroundConfiguration.product_deboarding,
+          bufferMinutes: turnaroundConfiguration.product_buffer,
+        },
+        aircraftProduct: {
+          sourceId: `${command.payload.aircraftId}:${selectedProductId}`,
+          boardingMinutes: turnaroundConfiguration.aircraft_boarding,
+          deboardingMinutes: turnaroundConfiguration.aircraft_deboarding,
+          bufferMinutes: turnaroundConfiguration.aircraft_buffer,
+        },
+      });
       const earliestSelectedQueueSequence = Math.min(
         ...selectedGroups.map((group) => Number(group.queue_sequence)),
       );
@@ -6589,9 +6751,50 @@ export class EventCoordinator extends DurableObject<Env> {
       ...groupMoveStatements,
       this.env.DB.prepare(
         `UPDATE rotations SET status = ?1, ${timestampColumn[command.type]} = ?2, aircraft_id = ?3,
-                pilot_id = ?4, version = version + 1, updated_at = ?2
-          WHERE id = ?5 AND version = ?6`,
-      ).bind(nextState, now, selectedAircraftId, selectedPilotId, rotation.id, rotation.version),
+                pilot_id = ?4,
+                forecast_assumed_aircraft_id =
+                  CASE WHEN ?5 = 'CALL_NEXT' THEN NULL ELSE forecast_assumed_aircraft_id END,
+                turnaround_product_id =
+                  CASE WHEN ?5 = 'CALL_NEXT' THEN ?6 ELSE turnaround_product_id END,
+                turnaround_aircraft_id =
+                  CASE WHEN ?5 = 'CALL_NEXT' THEN ?7 ELSE turnaround_aircraft_id END,
+                turnaround_boarding_minutes =
+                  CASE WHEN ?5 = 'CALL_NEXT' THEN ?8 ELSE turnaround_boarding_minutes END,
+                turnaround_deboarding_minutes =
+                  CASE WHEN ?5 = 'CALL_NEXT' THEN ?9 ELSE turnaround_deboarding_minutes END,
+                turnaround_buffer_minutes =
+                  CASE WHEN ?5 = 'CALL_NEXT' THEN ?10 ELSE turnaround_buffer_minutes END,
+                turnaround_boarding_source =
+                  CASE WHEN ?5 = 'CALL_NEXT' THEN ?11 ELSE turnaround_boarding_source END,
+                turnaround_deboarding_source =
+                  CASE WHEN ?5 = 'CALL_NEXT' THEN ?12 ELSE turnaround_deboarding_source END,
+                turnaround_buffer_source =
+                  CASE WHEN ?5 = 'CALL_NEXT' THEN ?13 ELSE turnaround_buffer_source END,
+                version = version + 1, updated_at = ?2
+          WHERE id = ?14 AND version = ?15`,
+      ).bind(
+        nextState,
+        now,
+        selectedAircraftId,
+        selectedPilotId,
+        command.type,
+        confirmedTurnaroundProductId,
+        selectedAircraftId,
+        confirmedTurnaroundProfile?.boarding.valueMinutes ?? null,
+        confirmedTurnaroundProfile?.deboarding.valueMinutes ?? null,
+        confirmedTurnaroundProfile?.buffer.valueMinutes ?? null,
+        confirmedTurnaroundProfile
+          ? `${confirmedTurnaroundProfile.boarding.sourceLevel}:${confirmedTurnaroundProfile.boarding.sourceId}`
+          : null,
+        confirmedTurnaroundProfile
+          ? `${confirmedTurnaroundProfile.deboarding.sourceLevel}:${confirmedTurnaroundProfile.deboarding.sourceId}`
+          : null,
+        confirmedTurnaroundProfile
+          ? `${confirmedTurnaroundProfile.buffer.sourceLevel}:${confirmedTurnaroundProfile.buffer.sourceId}`
+          : null,
+        rotation.id,
+        rotation.version,
+      ),
       this.env.DB.prepare(
         "UPDATE flight_groups SET status = ?1, version = version + 1, updated_at = ?2 WHERE id = (SELECT flight_group_id FROM rotations WHERE id = ?3)",
       ).bind(nextState, now, rotation.id),

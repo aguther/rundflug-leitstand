@@ -3640,6 +3640,10 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
               r.planned_completion_at, r.predicted_boarding_at, r.predicted_departure_at,
               r.predicted_landing_at, r.predicted_completion_at, r.prediction_quality,
               r.prediction_lower_minutes, r.prediction_upper_minutes, r.prediction_updated_at,
+              r.forecast_assumed_aircraft_id, r.turnaround_boarding_minutes,
+              r.turnaround_deboarding_minutes, r.turnaround_buffer_minutes,
+              r.turnaround_boarding_source, r.turnaround_deboarding_source,
+              r.turnaround_buffer_source,
               a.registration AS aircraft_registration,
               r.pilot_id, assigned_pilot.operational_code AS pilot_operational_code,
               (SELECT available_pilot.id FROM pilots available_pilot
@@ -3838,6 +3842,13 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
           prediction_lower_minutes: number | null;
           prediction_upper_minutes: number | null;
           prediction_updated_at: string | null;
+          forecast_assumed_aircraft_id: string | null;
+          turnaround_boarding_minutes: number | null;
+          turnaround_deboarding_minutes: number | null;
+          turnaround_buffer_minutes: number | null;
+          turnaround_boarding_source: string | null;
+          turnaround_deboarding_source: string | null;
+          turnaround_buffer_source: string | null;
           tickets_json: string;
           booking_groups_json: string;
         }>(),
@@ -4479,6 +4490,91 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
           pilot.paused === 0 &&
           pilot.current_rotation_id === null,
       );
+      const rotationProduct = products.results.find(
+        (product) => product.code === rotation.product_code,
+      );
+      const profileAircraftId =
+        rotation.aircraft_id ?? rotation.forecast_assumed_aircraft_id ?? null;
+      const aircraftProductOverride = profileAircraftId
+        ? aircraftProductTurnaroundOverrideRows.results.find(
+            (override) =>
+              override.product_id === rotationProduct?.id &&
+              override.aircraft_id === profileAircraftId,
+          )
+        : undefined;
+      const resolvedTurnaroundProfile = resolveTurnaroundProfile({
+        event: {
+          sourceId: eventId,
+          boardingMinutes: eventRow.planned_boarding_minutes ?? 8,
+          deboardingMinutes: eventRow.planned_deboarding_minutes ?? 5,
+          bufferMinutes: eventRow.planned_buffer_minutes ?? 3,
+        },
+        ...(rotationProduct
+          ? {
+              product: {
+                sourceId: rotationProduct.id,
+                boardingMinutes: rotationProduct.planned_boarding_minutes_override,
+                deboardingMinutes: rotationProduct.planned_deboarding_minutes_override,
+                bufferMinutes: rotationProduct.planned_buffer_minutes_override,
+              },
+            }
+          : {}),
+        ...(aircraftProductOverride && rotationProduct
+          ? {
+              aircraftProduct: {
+                sourceId: `${aircraftProductOverride.aircraft_id}:${rotationProduct.id}`,
+                boardingMinutes: aircraftProductOverride.planned_boarding_minutes_override,
+                deboardingMinutes: aircraftProductOverride.planned_deboarding_minutes_override,
+                bufferMinutes: aircraftProductOverride.planned_buffer_minutes_override,
+              },
+            }
+          : {}),
+      });
+      const frozenSource = (
+        source: string | null,
+        fallback: (typeof resolvedTurnaroundProfile)["boarding"],
+      ) => {
+        const separator = source?.indexOf(":") ?? -1;
+        const sourceLevel = source?.slice(0, separator);
+        return separator > 0 && ["AIRCRAFT_PRODUCT", "PRODUCT", "EVENT"].includes(sourceLevel ?? "")
+          ? {
+              sourceLevel: sourceLevel as "AIRCRAFT_PRODUCT" | "PRODUCT" | "EVENT",
+              sourceId: source?.slice(separator + 1) ?? fallback.sourceId,
+            }
+          : { sourceLevel: fallback.sourceLevel, sourceId: fallback.sourceId };
+      };
+      const effectiveTurnaroundProfile =
+        rotation.turnaround_boarding_minutes !== null &&
+        rotation.turnaround_deboarding_minutes !== null &&
+        rotation.turnaround_buffer_minutes !== null
+          ? {
+              boarding: {
+                valueMinutes: rotation.turnaround_boarding_minutes,
+                ...frozenSource(
+                  rotation.turnaround_boarding_source,
+                  resolvedTurnaroundProfile.boarding,
+                ),
+              },
+              deboarding: {
+                valueMinutes: rotation.turnaround_deboarding_minutes,
+                ...frozenSource(
+                  rotation.turnaround_deboarding_source,
+                  resolvedTurnaroundProfile.deboarding,
+                ),
+              },
+              buffer: {
+                valueMinutes: rotation.turnaround_buffer_minutes,
+                ...frozenSource(
+                  rotation.turnaround_buffer_source,
+                  resolvedTurnaroundProfile.buffer,
+                ),
+              },
+              totalGroundMinutes:
+                rotation.turnaround_boarding_minutes +
+                rotation.turnaround_deboarding_minutes +
+                rotation.turnaround_buffer_minutes,
+            }
+          : resolvedTurnaroundProfile;
       const forecastFreshness = assessForecastFreshness({
         predictionQuality: rotation.prediction_quality,
         predictionUpdatedAt: rotation.prediction_updated_at,
@@ -4496,10 +4592,7 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
         activeAircraft: effectiveActiveCapacity,
         duration: estimateDuration({
           referenceMinutes:
-            rotation.reference_duration_minutes +
-            (eventRow.planned_boarding_minutes ?? 8) +
-            (eventRow.planned_deboarding_minutes ?? 5) +
-            (eventRow.planned_buffer_minutes ?? 3),
+            rotation.reference_duration_minutes + effectiveTurnaroundProfile.totalGroundMinutes,
           actualDurationsMinutes: actualDurations,
           interrupted: eventRow.emergency_mode === 1 || eventRow.operational_interrupted === 1,
           activeCapacity: effectiveActiveCapacity,
@@ -4593,6 +4686,8 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
           },
           predictionQuality: effectivePredictionQuality,
           predictionUpdatedAt: rotation.prediction_updated_at,
+          forecastAssumedAircraftId: rotation.forecast_assumed_aircraft_id,
+          effectiveTurnaroundProfile,
         },
         tickets: JSON.parse(rotation.tickets_json) as Array<{
           id: string;
@@ -5280,6 +5375,14 @@ app.on("GET", eventRoutes("/history/forecasts"), async (context) => {
       data_age_minutes: number;
       active_capacity: number;
       reference_duration_minutes: number;
+      product_id: string | null;
+      assumed_aircraft_id: string | null;
+      boarding_minutes: number | null;
+      deboarding_minutes: number | null;
+      buffer_minutes: number | null;
+      boarding_source: string;
+      deboarding_source: string;
+      buffer_source: string;
       predicted_boarding_at: string | null;
       predicted_departure_at: string | null;
       predicted_landing_at: string | null;
@@ -5321,6 +5424,16 @@ app.on("GET", eventRoutes("/history/forecasts"), async (context) => {
         dataAgeMinutes: row.data_age_minutes,
         activeCapacity: row.active_capacity,
         referenceDurationMinutes: row.reference_duration_minutes,
+        productId: row.product_id,
+        assumedAircraftId: row.assumed_aircraft_id,
+        turnaroundProfile: {
+          boardingMinutes: row.boarding_minutes,
+          deboardingMinutes: row.deboarding_minutes,
+          bufferMinutes: row.buffer_minutes,
+          boardingSource: row.boarding_source,
+          deboardingSource: row.deboarding_source,
+          bufferSource: row.buffer_source,
+        },
         predicted: {
           boardingAt: row.predicted_boarding_at,
           departureAt: row.predicted_departure_at,

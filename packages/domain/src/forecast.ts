@@ -92,7 +92,19 @@ export interface ForecastTimelineRotationInput {
   predictedDepartureAt: string | null;
   predictedLandingAt: string | null;
   predictedCompletionAt: string | null;
+  turnaroundProfiles?: readonly ForecastTurnaroundProfileInput[];
+  confirmedTurnaroundProfile?: Omit<ForecastTurnaroundProfileInput, "aircraftId"> | null;
   constraints?: readonly ForecastAvailabilityConstraintInput[];
+}
+
+export interface ForecastTurnaroundProfileInput {
+  aircraftId: string;
+  boardingMinutes: number;
+  deboardingMinutes: number;
+  bufferMinutes: number;
+  boardingSource: string;
+  deboardingSource: string;
+  bufferSource: string;
 }
 
 export interface ForecastTimelineDurationSample {
@@ -125,6 +137,7 @@ export interface ForecastAvailabilityConstraintInput {
 
 export interface ForecastAvailabilityLaneInput {
   laneId: string;
+  aircraftId: string;
   passengerSeats?: number;
   availableLowerAt: string;
   availableExpectedAt: string;
@@ -168,6 +181,13 @@ export interface ForecastTimelineProjection {
   dataAgeMinutes: number;
   activeCapacity: number;
   referenceDurationMinutes: number;
+  assumedAircraftId: string | null;
+  boardingMinutes: number;
+  deboardingMinutes: number;
+  bufferMinutes: number;
+  boardingSource: string;
+  deboardingSource: string;
+  bufferSource: string;
   uncertaintyReasons: ForecastUncertaintyReason[];
 }
 
@@ -234,6 +254,7 @@ export interface QueueAvailabilityConstraint {
 
 export interface QueueAvailabilityLane {
   laneId: string;
+  aircraftId?: string;
   passengerSeats: number;
   lowerMinutes: number;
   expectedMinutes: number;
@@ -550,12 +571,15 @@ export function reserveNextQueueWindow(
   duration: DurationEstimate,
   operationsEndMinutes: number | null = null,
   minimumPassengerSeats = 1,
+  durationByAircraftId?: ReadonlyMap<string, DurationEstimate>,
 ): {
   window: { lowerMinutes: number; upperMinutes: number; quality: PredictionQuality } | null;
   availability: QueueAvailabilityState;
   duration: DurationEstimate;
   durationMultiplierPercent: number;
   capacityStatus: ForecastCapacityStatus;
+  selectedLaneId: string | null;
+  selectedAircraftId: string | null;
 } {
   if (availability.lanes.length === 0) {
     return {
@@ -564,6 +588,8 @@ export function reserveNextQueueWindow(
       duration,
       durationMultiplierPercent: 100,
       capacityStatus: "NO_FORECAST_CAPACITY",
+      selectedLaneId: null,
+      selectedAircraftId: null,
     };
   }
   const fittingLanes = availability.lanes.filter(
@@ -576,12 +602,14 @@ export function reserveNextQueueWindow(
       duration,
       durationMultiplierPercent: 100,
       capacityStatus: "NO_FITTING_AIRCRAFT",
+      selectedLaneId: null,
+      selectedAircraftId: null,
     };
   }
   const adjustedCandidates = fittingLanes.map((lane) =>
     applyAvailabilityConstraints(
       applyDueRecurringConstraints(lane, operationsEndMinutes),
-      duration,
+      (lane.aircraftId ? durationByAircraftId?.get(lane.aircraftId) : undefined) ?? duration,
     ),
   );
   const selectedCandidate = [...adjustedCandidates].sort(
@@ -597,6 +625,8 @@ export function reserveNextQueueWindow(
       duration,
       durationMultiplierPercent: 100,
       capacityStatus: "NO_FORECAST_CAPACITY",
+      selectedLaneId: null,
+      selectedAircraftId: null,
     };
   }
   const selected = selectedCandidate.lane;
@@ -644,6 +674,8 @@ export function reserveNextQueueWindow(
     duration: effectiveDuration,
     durationMultiplierPercent: selectedCandidate.multiplierPercent,
     capacityStatus: "AVAILABLE",
+    selectedLaneId: selected.laneId,
+    selectedAircraftId: selected.aircraftId ?? null,
   };
 }
 
@@ -885,6 +917,7 @@ export function calculateForecastTimelines(
         );
         return {
           laneId: lane.laneId,
+          aircraftId: lane.aircraftId,
           ...(lane.passengerSeats === undefined ? {} : { passengerSeats: lane.passengerSeats }),
           lowerMinutes: Math.min(lower, expected),
           expectedMinutes: expected,
@@ -957,10 +990,15 @@ export function calculateForecastTimelines(
   );
 
   return input.rotations.map((rotation) => {
-    const boarding = input.event.plannedBoardingMinutes;
-    const deboarding = input.event.plannedDeboardingMinutes;
-    const buffer = input.event.plannedBufferMinutes;
-    const referenceTotal = deriveReferenceRotationBreakdown({
+    const confirmedProfile = rotation.confirmedTurnaroundProfile;
+    let boarding = confirmedProfile?.boardingMinutes ?? input.event.plannedBoardingMinutes;
+    let deboarding = confirmedProfile?.deboardingMinutes ?? input.event.plannedDeboardingMinutes;
+    let buffer = confirmedProfile?.bufferMinutes ?? input.event.plannedBufferMinutes;
+    let boardingSource = confirmedProfile?.boardingSource ?? `EVENT:${input.event.eventId}`;
+    let deboardingSource = confirmedProfile?.deboardingSource ?? `EVENT:${input.event.eventId}`;
+    let bufferSource = confirmedProfile?.bufferSource ?? `EVENT:${input.event.eventId}`;
+    let assumedAircraftId = rotation.status === "DRAFT" ? null : (rotation.aircraftId ?? null);
+    let referenceTotal = deriveReferenceRotationBreakdown({
       boardingMinutes: boarding,
       offBlockToOnBlockMinutes: rotation.referenceDurationMinutes,
       deboardingMinutes: deboarding,
@@ -1038,10 +1076,45 @@ export function calculateForecastTimelines(
         effectiveEstimate,
         operationEndMinutes,
         rotation.passengerCount ?? 1,
+        new Map(
+          (rotation.turnaroundProfiles ?? []).map((profile) => [
+            profile.aircraftId,
+            estimateDuration({
+              referenceMinutes: deriveReferenceRotationBreakdown({
+                boardingMinutes: profile.boardingMinutes,
+                offBlockToOnBlockMinutes: rotation.referenceDurationMinutes,
+                deboardingMinutes: profile.deboardingMinutes,
+                bufferMinutes: profile.bufferMinutes,
+              }).totalMinutes,
+              actualDurationsMinutes: actualDurations,
+              interrupted: input.event.emergencyMode || input.event.operationalInterrupted,
+              activeCapacity: forecastCapacity,
+              tuning,
+            }),
+          ]),
+        ),
       );
       window = reservation.window;
       capacityStatus = reservation.capacityStatus;
       effectiveEstimate = reservation.duration;
+      assumedAircraftId = reservation.selectedAircraftId;
+      const selectedProfile = rotation.turnaroundProfiles?.find(
+        (profile) => profile.aircraftId === reservation.selectedAircraftId,
+      );
+      if (selectedProfile) {
+        boarding = selectedProfile.boardingMinutes;
+        deboarding = selectedProfile.deboardingMinutes;
+        buffer = selectedProfile.bufferMinutes;
+        boardingSource = selectedProfile.boardingSource;
+        deboardingSource = selectedProfile.deboardingSource;
+        bufferSource = selectedProfile.bufferSource;
+        referenceTotal = deriveReferenceRotationBreakdown({
+          boardingMinutes: boarding,
+          offBlockToOnBlockMinutes: rotation.referenceDurationMinutes,
+          deboardingMinutes: deboarding,
+          bufferMinutes: buffer,
+        }).totalMinutes;
+      }
       queueAvailability.set(rotation.resourceGroupId, reservation.availability);
       if (capacityStatus !== "AVAILABLE") {
         uncertaintyReasons.push(capacityStatus);
@@ -1145,6 +1218,13 @@ export function calculateForecastTimelines(
       dataAgeMinutes,
       activeCapacity,
       referenceDurationMinutes: referenceTotal,
+      assumedAircraftId,
+      boardingMinutes: boarding,
+      deboardingMinutes: deboarding,
+      bufferMinutes: buffer,
+      boardingSource,
+      deboardingSource,
+      bufferSource,
       uncertaintyReasons,
     };
   });

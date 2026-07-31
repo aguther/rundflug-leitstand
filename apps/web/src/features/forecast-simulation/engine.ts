@@ -707,6 +707,7 @@ export function runSimulation(
         return [
           {
             laneId: entry.id,
+            aircraftId: entry.id,
             passengerSeats: entry.capacity,
             availableLowerAt: iso(Math.max(nowMs, expectedAt - futureUncertainty)),
             availableExpectedAt: iso(expectedAt),

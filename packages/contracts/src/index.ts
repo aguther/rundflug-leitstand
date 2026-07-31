@@ -2512,6 +2512,10 @@ export const rotationOperationalSummarySchema = z.object({
     }),
     predictionQuality: z.enum(["STABLE", "CHANGING", "UNCERTAIN"]).nullable(),
     predictionUpdatedAt: z.string().nullable(),
+    forecastAssumedAircraftId: z.string().nullable().optional(),
+    effectiveTurnaroundProfile: productOperationalSummarySchema.shape.effectiveTurnaroundProfile
+      .nullable()
+      .optional(),
   }),
   tickets: z.array(
     z.object({
@@ -3027,6 +3031,16 @@ export const forecastHistoryEntrySchema = z.object({
   activeCapacity: z.number().int().nonnegative(),
   // Vollständige Referenz-Umlaufzeit einschließlich veranstaltungsweiter Bodenzeiten.
   referenceDurationMinutes: z.number().int().nonnegative(),
+  productId: z.string().nullable(),
+  assumedAircraftId: z.string().nullable(),
+  turnaroundProfile: z.object({
+    boardingMinutes: z.number().int().nonnegative().nullable(),
+    deboardingMinutes: z.number().int().nonnegative().nullable(),
+    bufferMinutes: z.number().int().nonnegative().nullable(),
+    boardingSource: z.string(),
+    deboardingSource: z.string(),
+    bufferSource: z.string(),
+  }),
   predicted: z.object({
     boardingAt: nullableTimestampSchema,
     departureAt: nullableTimestampSchema,
