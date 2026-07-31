@@ -1669,46 +1669,57 @@ app.get("/api/admin/events/:eventId/master-data-template", async (context) => {
       404,
     );
   }
-  const [gates, resourceGroups, products, pilots, assignments] = await Promise.all([
-    context.env.DB.prepare(
-      `SELECT id, label, gate_type, active, sort_order, display_filter_json
+  const [gates, resourceGroups, products, pilots, assignments, turnaroundOverrides] =
+    await Promise.all([
+      context.env.DB.prepare(
+        `SELECT id, label, gate_type, active, sort_order, display_filter_json
          FROM gates WHERE operation_day_id = ?1 ORDER BY sort_order, label, id`,
-    )
-      .bind(eventId)
-      .all<Record<string, string | number>>(),
-    context.env.DB.prepare(
-      `SELECT id, name, short_code, gate_id, reference_capacity,
+      )
+        .bind(eventId)
+        .all<Record<string, string | number>>(),
+      context.env.DB.prepare(
+        `SELECT id, name, short_code, gate_id, reference_capacity,
               compatible_aircraft_types_json, automatic_precall_enabled
          FROM resource_groups WHERE operation_day_id = ?1 ORDER BY name, id`,
-    )
-      .bind(eventId)
-      .all<Record<string, string | number>>(),
-    context.env.DB.prepare(
-      `SELECT id, resource_group_id, gate_id, name, code, public_description, price_cents,
+      )
+        .bind(eventId)
+        .all<Record<string, string | number>>(),
+      context.env.DB.prepare(
+        `SELECT id, resource_group_id, gate_id, name, code, public_description, price_cents,
               reference_capacity, reference_duration_minutes, promised_flight_minutes,
+              planned_boarding_minutes_override, planned_deboarding_minutes_override,
+              planned_buffer_minutes_override,
               child_companion_required, weight_classes_json, sort_order,
               capacity_warning_threshold, capacity_critical_threshold
          FROM products WHERE operation_day_id = ?1 ORDER BY sort_order, name, id`,
-    )
-      .bind(eventId)
-      .all<Record<string, string | number>>(),
-    context.env.DB.prepare(
-      `SELECT id, operational_code, operational_note, active
+      )
+        .bind(eventId)
+        .all<Record<string, string | number | null>>(),
+      context.env.DB.prepare(
+        `SELECT id, operational_code, operational_note, active
          FROM pilots WHERE operation_day_id = ?1 ORDER BY operational_code, id`,
-    )
-      .bind(eventId)
-      .all<Record<string, string | number>>(),
-    context.env.DB.prepare(
-      `SELECT m.aircraft_id, m.resource_group_id, a.registration, a.aircraft_type,
+      )
+        .bind(eventId)
+        .all<Record<string, string | number>>(),
+      context.env.DB.prepare(
+        `SELECT m.aircraft_id, m.resource_group_id, a.registration, a.aircraft_type,
               a.passenger_seats, a.maximum_passenger_payload_kg, a.refuel_reminder_threshold
          FROM resource_group_memberships m
          JOIN aircraft a ON a.id = m.aircraft_id
         WHERE m.operation_day_id = ?1 AND m.active_until IS NULL
         ORDER BY a.registration, a.id`,
-    )
-      .bind(eventId)
-      .all<Record<string, string | number | null>>(),
-  ]);
+      )
+        .bind(eventId)
+        .all<Record<string, string | number | null>>(),
+      context.env.DB.prepare(
+        `SELECT aircraft_id, product_id, planned_boarding_minutes_override,
+              planned_deboarding_minutes_override, planned_buffer_minutes_override
+         FROM aircraft_product_turnaround_overrides
+        WHERE operation_day_id = ?1 ORDER BY product_id, aircraft_id`,
+      )
+        .bind(eventId)
+        .all<Record<string, string | number | null>>(),
+    ]);
   const gateKeys = new Map(
     gates.results.map((gate, index) => [String(gate.id), `gate-${index + 1}`]),
   );
@@ -1728,7 +1739,7 @@ app.get("/api/admin/events/:eventId/master-data-template", async (context) => {
   );
   const template = masterDataTemplateSchema.parse({
     format: "rundflug-master-data-template",
-    formatVersion: 1,
+    formatVersion: 2,
     exportedAt: new Date().toISOString(),
     source: { name: event.name, version: Number(event.version) },
     eventParameters: {
@@ -1808,11 +1819,39 @@ app.get("/api/admin/events/:eventId/master-data-template", async (context) => {
       referenceCapacity: Number(product.reference_capacity),
       referenceDurationMinutes: Number(product.reference_duration_minutes),
       promisedFlightMinutes: Number(product.promised_flight_minutes),
+      plannedBoardingMinutesOverride:
+        product.planned_boarding_minutes_override === null
+          ? null
+          : Number(product.planned_boarding_minutes_override),
+      plannedDeboardingMinutesOverride:
+        product.planned_deboarding_minutes_override === null
+          ? null
+          : Number(product.planned_deboarding_minutes_override),
+      plannedBufferMinutesOverride:
+        product.planned_buffer_minutes_override === null
+          ? null
+          : Number(product.planned_buffer_minutes_override),
       childCompanionRequired: Boolean(product.child_companion_required),
       weightClasses: JSON.parse(String(product.weight_classes_json)),
       sortOrder: Number(product.sort_order),
       capacityWarningThreshold: Number(product.capacity_warning_threshold),
       capacityCriticalThreshold: Number(product.capacity_critical_threshold),
+    })),
+    aircraftProductTurnaroundOverrides: turnaroundOverrides.results.map((override) => ({
+      aircraftKey: aircraftKeys.get(String(override.aircraft_id)),
+      productKey: productKeys.get(String(override.product_id)),
+      plannedBoardingMinutesOverride:
+        override.planned_boarding_minutes_override === null
+          ? null
+          : Number(override.planned_boarding_minutes_override),
+      plannedDeboardingMinutesOverride:
+        override.planned_deboarding_minutes_override === null
+          ? null
+          : Number(override.planned_deboarding_minutes_override),
+      plannedBufferMinutesOverride:
+        override.planned_buffer_minutes_override === null
+          ? null
+          : Number(override.planned_buffer_minutes_override),
     })),
   });
   return context.json(template, 200, {
@@ -1934,7 +1973,7 @@ app.on("GET", eventRoutes("/exports/simulation-plan.json"), async (context) => {
   });
   const simulationPlan = simulationPlanExportSchema.parse({
     format: "rundflug-simulation-plan",
-    formatVersion: 2,
+    formatVersion: 3,
     exportedAt,
     source: projection.template.source,
     schedule: projection.schedule,
@@ -2243,9 +2282,11 @@ app.post("/api/admin/events/:eventId/master-data-template/import", async (contex
           (id, operation_day_id, resource_group_id, name, price_cents, sale_enabled,
            created_at, updated_at, capacity_warning_threshold, capacity_critical_threshold,
            code, public_description, child_companion_required, sort_order, weight_classes_json,
-           gate_id, reference_capacity, reference_duration_minutes, promised_flight_minutes)
+           gate_id, reference_capacity, reference_duration_minutes, promised_flight_minutes,
+           planned_boarding_minutes_override, planned_deboarding_minutes_override,
+           planned_buffer_minutes_override)
          SELECT ?3, ?1, ?4, ?5, ?6, 0, ?7, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14,
-                ?15, ?16, ?17, ?18 WHERE ${receiptGuard}`,
+                ?15, ?16, ?17, ?18, ?19, ?20, ?21 WHERE ${receiptGuard}`,
       ).bind(
         eventId,
         input.commandId,
@@ -2265,6 +2306,9 @@ app.post("/api/admin/events/:eventId/master-data-template/import", async (contex
         product.referenceCapacity,
         product.referenceDurationMinutes,
         product.promisedFlightMinutes,
+        product.plannedBoardingMinutesOverride,
+        product.plannedDeboardingMinutesOverride,
+        product.plannedBufferMinutesOverride,
       ),
     );
   }
@@ -2301,6 +2345,26 @@ app.post("/api/admin/events/:eventId/master-data-template/import", async (contex
         aircraftIds.get(assignment.aircraftKey),
         now,
         device.id,
+      ),
+    );
+  }
+  for (const override of input.template.aircraftProductTurnaroundOverrides) {
+    statements.push(
+      context.env.DB.prepare(
+        `INSERT INTO aircraft_product_turnaround_overrides
+          (operation_day_id, aircraft_id, product_id, planned_boarding_minutes_override,
+           planned_deboarding_minutes_override, planned_buffer_minutes_override, version,
+           created_at, updated_at)
+         SELECT ?1, ?3, ?4, ?5, ?6, ?7, 0, ?8, ?8 WHERE ${receiptGuard}`,
+      ).bind(
+        eventId,
+        input.commandId,
+        aircraftIds.get(override.aircraftKey),
+        productIds.get(override.productKey),
+        override.plannedBoardingMinutesOverride,
+        override.plannedDeboardingMinutesOverride,
+        override.plannedBufferMinutesOverride,
+        now,
       ),
     );
   }
@@ -2467,7 +2531,7 @@ app.post("/api/admin/events/:sourceEventId/clone", async (context) => {
       409,
     );
   }
-  const [gates, groups, products, pilots, memberships] = await Promise.all([
+  const [gates, groups, products, pilots, memberships, turnaroundOverrides] = await Promise.all([
     context.env.DB.prepare("SELECT * FROM gates WHERE operation_day_id = ?1")
       .bind(sourceEventId)
       .all<Record<string, unknown>>(),
@@ -2482,6 +2546,11 @@ app.post("/api/admin/events/:sourceEventId/clone", async (context) => {
       .all<Record<string, unknown>>(),
     context.env.DB.prepare(
       "SELECT * FROM resource_group_memberships WHERE operation_day_id = ?1 AND active_until IS NULL",
+    )
+      .bind(sourceEventId)
+      .all<Record<string, unknown>>(),
+    context.env.DB.prepare(
+      "SELECT * FROM aircraft_product_turnaround_overrides WHERE operation_day_id = ?1",
     )
       .bind(sourceEventId)
       .all<Record<string, unknown>>(),
@@ -2574,9 +2643,11 @@ app.post("/api/admin/events/:sourceEventId/clone", async (context) => {
         (id, operation_day_id, resource_group_id, name, price_cents, sale_enabled, created_at,
           updated_at, sale_closes_at, capacity_warning_threshold, capacity_critical_threshold,
           code, public_description, child_companion_required, sort_order, weight_classes_json, gate_id,
-          reference_capacity, reference_duration_minutes, promised_flight_minutes)
+          reference_capacity, reference_duration_minutes, promised_flight_minutes,
+          planned_boarding_minutes_override, planned_deboarding_minutes_override,
+          planned_buffer_minutes_override)
         VALUES (?1, ?2, ?3, ?4, ?5, 0, ?6, ?6, NULL, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14,
-          ?15, ?16, ?17)`,
+          ?15, ?16, ?17, ?18, ?19, ?20)`,
       ).bind(
         productIds.get(String(row.id)),
         input.eventId,
@@ -2595,6 +2666,9 @@ app.post("/api/admin/events/:sourceEventId/clone", async (context) => {
         row.reference_capacity,
         row.reference_duration_minutes,
         row.promised_flight_minutes,
+        row.planned_boarding_minutes_override,
+        row.planned_deboarding_minutes_override,
+        row.planned_buffer_minutes_override,
       ),
     ),
     ...(keepMasterData ? pilots.results : []).map((row) =>
@@ -2616,6 +2690,23 @@ app.post("/api/admin/events/:sourceEventId/clone", async (context) => {
         row.aircraft_id,
         now,
         adminDeviceId,
+      ),
+    ),
+    ...(keepMasterData ? turnaroundOverrides.results : []).map((row) =>
+      context.env.DB.prepare(
+        `INSERT INTO aircraft_product_turnaround_overrides
+          (operation_day_id, aircraft_id, product_id, planned_boarding_minutes_override,
+           planned_deboarding_minutes_override, planned_buffer_minutes_override, version,
+           created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, 0, ?7, ?7)`,
+      ).bind(
+        input.eventId,
+        row.aircraft_id,
+        productIds.get(String(row.product_id)),
+        row.planned_boarding_minutes_override,
+        row.planned_deboarding_minutes_override,
+        row.planned_buffer_minutes_override,
+        now,
       ),
     ),
     context.env.DB.prepare(

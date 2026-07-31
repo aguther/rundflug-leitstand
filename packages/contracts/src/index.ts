@@ -256,6 +256,7 @@ export const commandPreconditionSchema = z
     expectedVersion: z.number().int().nonnegative(),
   })
   .strict();
+
 export type CommandPrecondition = z.infer<typeof commandPreconditionSchema>;
 
 const commandBaseSchema = z.object({
@@ -1286,6 +1287,16 @@ const masterDataTemplatePilotSchema = z
   })
   .strict();
 
+const masterDataTemplateTurnaroundOverrideSchema = z
+  .object({
+    aircraftKey: masterDataTemplateKeySchema,
+    productKey: masterDataTemplateKeySchema,
+    plannedBoardingMinutesOverride: turnaroundPhaseOverrideValueSchema,
+    plannedDeboardingMinutesOverride: turnaroundPhaseOverrideValueSchema,
+    plannedBufferMinutesOverride: turnaroundPhaseOverrideValueSchema,
+  })
+  .strict();
+
 const masterDataTemplateProductSchema = z
   .object({
     key: masterDataTemplateKeySchema,
@@ -1303,6 +1314,9 @@ const masterDataTemplateProductSchema = z
     referenceDurationMinutes: z.number().int().min(1).max(600),
     // Gegenüber Gästen kommunizierte Produktzeit ohne Wirkung auf die operative Prognose.
     promisedFlightMinutes: z.number().int().min(1).max(600),
+    plannedBoardingMinutesOverride: turnaroundPhaseOverrideValueSchema.default(null),
+    plannedDeboardingMinutesOverride: turnaroundPhaseOverrideValueSchema.default(null),
+    plannedBufferMinutesOverride: turnaroundPhaseOverrideValueSchema.default(null),
     childCompanionRequired: z.boolean(),
     weightClasses: z.array(productWeightClassSchema).min(1).max(5),
     sortOrder: z.number().int().min(0).max(1000),
@@ -1333,7 +1347,7 @@ function addDuplicateIssues(
 const canonicalMasterDataTemplateSchema = z
   .object({
     format: z.literal("rundflug-master-data-template"),
-    formatVersion: z.literal(1),
+    formatVersion: z.union([z.literal(1), z.literal(2)]),
     exportedAt: z.iso.datetime(),
     source: masterDataTemplateSourceSchema,
     eventParameters: masterDataTemplateEventParametersSchema,
@@ -1343,6 +1357,10 @@ const canonicalMasterDataTemplateSchema = z
     assignments: z.array(masterDataTemplateAssignmentSchema).max(200),
     pilots: z.array(masterDataTemplatePilotSchema).max(200),
     products: z.array(masterDataTemplateProductSchema).max(200),
+    aircraftProductTurnaroundOverrides: z
+      .array(masterDataTemplateTurnaroundOverrideSchema)
+      .max(20_000)
+      .default([]),
   })
   .strict()
   .superRefine((template, context) => {
@@ -1418,6 +1436,14 @@ const canonicalMasterDataTemplateSchema = z
       "products",
       "Produktcode",
     );
+    addDuplicateIssues(
+      context,
+      template.aircraftProductTurnaroundOverrides.map(
+        (entry) => `${entry.aircraftKey}:${entry.productKey}`,
+      ),
+      "aircraftProductTurnaroundOverrides",
+      "Flugzeug-/Produkt-Ausnahme",
+    );
 
     const gateKeys = new Set(template.gates.map((entry) => entry.key));
     const resourceGroupKeys = new Set(template.resourceGroups.map((entry) => entry.key));
@@ -1472,6 +1498,22 @@ const canonicalMasterDataTemplateSchema = z
           code: "custom",
           message: "Ressourcengruppen-Verweis ist nicht im Template enthalten.",
           path: ["assignments", index, "resourceGroupKey"],
+        });
+      }
+    });
+    template.aircraftProductTurnaroundOverrides.forEach((entry, index) => {
+      if (!aircraftKeys.has(entry.aircraftKey)) {
+        context.addIssue({
+          code: "custom",
+          message: "Umlaufzeit-Ausnahme verweist auf kein Template-Flugzeug.",
+          path: ["aircraftProductTurnaroundOverrides", index, "aircraftKey"],
+        });
+      }
+      if (!productKeys.has(entry.productKey)) {
+        context.addIssue({
+          code: "custom",
+          message: "Umlaufzeit-Ausnahme verweist auf kein Template-Produkt.",
+          path: ["aircraftProductTurnaroundOverrides", index, "productKey"],
         });
       }
     });
@@ -2202,7 +2244,7 @@ export type SimulationScenarioTemplateV2 = z.infer<
 export const simulationPlanExportSchema = z
   .object({
     format: z.literal("rundflug-simulation-plan"),
-    formatVersion: z.union([z.literal(1), z.literal(2)]),
+    formatVersion: z.union([z.literal(1), z.literal(2), z.literal(3)]),
     exportedAt: z.iso.datetime(),
     source: masterDataTemplateSourceSchema,
     schedule: simulationPlanScheduleSchema,

@@ -25,3 +25,9 @@ Bei einer Wiederherstellung wird die Tabelle zusammen mit den operativen Daten a
 Sicherung importiert. Fehlen historische Snapshots, bleibt der aktuelle operative Zustand nutzbar;
 lediglich die nachträgliche Prognosegüte für den fehlenden Zeitraum kann nicht ausgewertet werden.
 Neue Snapshots werden nach dem nächsten bestätigten Kommando wieder regulär angefügt.
+## Ergänzung V1.11: Kandidaten- und Quellenbezug
+
+Snapshots ab Migration 0058 enthalten Produkt, angenommenes Flugzeug, die drei effektiven
+Bodenphasen und deren Quellen. Historische Zeilen bleiben append-only lesbar und verwenden für
+nicht rekonstruierbare Quellen `LEGACY_UNKNOWN`. Eine angenommene Flugzeug-ID ist ausschließlich
+eine Prognoseannahme und keine operative Zuweisung.

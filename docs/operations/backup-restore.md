@@ -83,12 +83,21 @@ Datenbestand verifiziert.
 1. D1 Time Travel als schnelle erste Wiederherstellungsebene.
 2. Täglicher portabler JSON-Export aller V1-Kerntabellen nach EU-R2 unter `backups/YYYY-MM-DD/`.
 3. SHA-256-Prüfsumme als R2-Custom-Metadata und strukturiertes Format `formatVersion: 1`.
+
 4. automatisierter Restore-Test in zwei isolierten SQLite-Datenbanken mit Prüfsummen-, Mengen-,
    Fremdschlüssel- und Auditkontrolle über `npm run backup:restore:test`; Bestandteil von
    `npm run check` und zusätzlich monatlich im Betriebscheck auszuführen.
 5. Der tägliche Cron prüft das nächste Datum in `Europe/Berlin`. Liegt dort eine vorbereitete oder
    aktive Veranstaltung, wird der Export als `PRE_EVENT` in den R2-Metadaten gekennzeichnet.
 6. Der Cron löscht Objekte erst nach Ablauf von 14 vollständigen Tagen.
+
+Die portable Tabellensicherung umfasst seit Migration 0057 auch
+`aircraft_product_turnaround_overrides`; die ergänzten Produkt-, Rotations- und Snapshotspalten
+werden durch den vollständigen Tabellenexport automatisch erhalten. Beim Restore müssen Produkte
+und aktive Ressourcengruppen-Zuordnungen vor den Flugzeug-Produkt-Ausnahmen eingespielt werden.
+
+Stammdatenvorlagen werden als Version 2 exportiert und akzeptieren weiterhin Version 1.
+Simulationspläne werden als Version 3 exportiert; Version 1 und 2 bleiben importierbar.
 
 ## Wiederanlauf
 

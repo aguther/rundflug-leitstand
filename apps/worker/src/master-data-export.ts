@@ -46,51 +46,63 @@ export async function loadMasterDataExportProjection(
     .first<Record<string, string | number | null>>();
   if (!event) return null;
 
-  const [gates, resourceGroups, products, pilots, assignments] = await Promise.all([
-    db
-      .prepare(
-        `SELECT id, label, gate_type, active, sort_order, display_filter_json
+  const [gates, resourceGroups, products, pilots, assignments, turnaroundOverrides] =
+    await Promise.all([
+      db
+        .prepare(
+          `SELECT id, label, gate_type, active, sort_order, display_filter_json
            FROM gates WHERE operation_day_id = ?1 ORDER BY sort_order, label, id`,
-      )
-      .bind(eventId)
-      .all<Record<string, string | number>>(),
-    db
-      .prepare(
-        `SELECT id, name, short_code, gate_id, reference_capacity,
+        )
+        .bind(eventId)
+        .all<Record<string, string | number>>(),
+      db
+        .prepare(
+          `SELECT id, name, short_code, gate_id, reference_capacity,
                 compatible_aircraft_types_json, automatic_precall_enabled
            FROM resource_groups WHERE operation_day_id = ?1 ORDER BY name, id`,
-      )
-      .bind(eventId)
-      .all<Record<string, string | number>>(),
-    db
-      .prepare(
-        `SELECT id, resource_group_id, gate_id, name, code, public_description, price_cents,
+        )
+        .bind(eventId)
+        .all<Record<string, string | number>>(),
+      db
+        .prepare(
+          `SELECT id, resource_group_id, gate_id, name, code, public_description, price_cents,
                 reference_capacity, reference_duration_minutes, promised_flight_minutes,
+                planned_boarding_minutes_override, planned_deboarding_minutes_override,
+                planned_buffer_minutes_override,
                 child_companion_required, weight_classes_json, sort_order,
                 capacity_warning_threshold, capacity_critical_threshold
            FROM products WHERE operation_day_id = ?1 ORDER BY sort_order, name, id`,
-      )
-      .bind(eventId)
-      .all<Record<string, string | number>>(),
-    db
-      .prepare(
-        `SELECT id, operational_code, active
+        )
+        .bind(eventId)
+        .all<Record<string, string | number | null>>(),
+      db
+        .prepare(
+          `SELECT id, operational_code, active
            FROM pilots WHERE operation_day_id = ?1 ORDER BY operational_code, id`,
-      )
-      .bind(eventId)
-      .all<Record<string, string | number>>(),
-    db
-      .prepare(
-        `SELECT m.aircraft_id, m.resource_group_id, a.registration, a.aircraft_type,
+        )
+        .bind(eventId)
+        .all<Record<string, string | number>>(),
+      db
+        .prepare(
+          `SELECT m.aircraft_id, m.resource_group_id, a.registration, a.aircraft_type,
                 a.passenger_seats, a.maximum_passenger_payload_kg, a.refuel_reminder_threshold
            FROM resource_group_memberships m
            JOIN aircraft a ON a.id = m.aircraft_id
           WHERE m.operation_day_id = ?1 AND m.active_until IS NULL
           ORDER BY a.registration, a.id`,
-      )
-      .bind(eventId)
-      .all<Record<string, string | number | null>>(),
-  ]);
+        )
+        .bind(eventId)
+        .all<Record<string, string | number | null>>(),
+      db
+        .prepare(
+          `SELECT aircraft_id, product_id, planned_boarding_minutes_override,
+                planned_deboarding_minutes_override, planned_buffer_minutes_override
+           FROM aircraft_product_turnaround_overrides
+          WHERE operation_day_id = ?1 ORDER BY product_id, aircraft_id`,
+        )
+        .bind(eventId)
+        .all<Record<string, string | number | null>>(),
+    ]);
 
   const gateKeys = new Map(
     gates.results.map((gate, index) => [String(gate.id), `gate-${index + 1}`]),
@@ -115,7 +127,7 @@ export async function loadMasterDataExportProjection(
 
   const template = masterDataTemplateSchema.parse({
     format: "rundflug-master-data-template",
-    formatVersion: 1,
+    formatVersion: 2,
     exportedAt,
     source: { name: event.name, version: Number(event.version) },
     eventParameters: {
@@ -195,11 +207,39 @@ export async function loadMasterDataExportProjection(
       referenceCapacity: Number(product.reference_capacity),
       referenceDurationMinutes: Number(product.reference_duration_minutes),
       promisedFlightMinutes: Number(product.promised_flight_minutes),
+      plannedBoardingMinutesOverride:
+        product.planned_boarding_minutes_override === null
+          ? null
+          : Number(product.planned_boarding_minutes_override),
+      plannedDeboardingMinutesOverride:
+        product.planned_deboarding_minutes_override === null
+          ? null
+          : Number(product.planned_deboarding_minutes_override),
+      plannedBufferMinutesOverride:
+        product.planned_buffer_minutes_override === null
+          ? null
+          : Number(product.planned_buffer_minutes_override),
       childCompanionRequired: Boolean(product.child_companion_required),
       weightClasses: JSON.parse(String(product.weight_classes_json)),
       sortOrder: Number(product.sort_order),
       capacityWarningThreshold: Number(product.capacity_warning_threshold),
       capacityCriticalThreshold: Number(product.capacity_critical_threshold),
+    })),
+    aircraftProductTurnaroundOverrides: turnaroundOverrides.results.map((override) => ({
+      aircraftKey: aircraftKeys.get(String(override.aircraft_id)),
+      productKey: productKeys.get(String(override.product_id)),
+      plannedBoardingMinutesOverride:
+        override.planned_boarding_minutes_override === null
+          ? null
+          : Number(override.planned_boarding_minutes_override),
+      plannedDeboardingMinutesOverride:
+        override.planned_deboarding_minutes_override === null
+          ? null
+          : Number(override.planned_deboarding_minutes_override),
+      plannedBufferMinutesOverride:
+        override.planned_buffer_minutes_override === null
+          ? null
+          : Number(override.planned_buffer_minutes_override),
     })),
   });
 
