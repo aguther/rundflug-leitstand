@@ -1,0 +1,190 @@
+.admin-shell .event-workspace-frame {
+  width: min(100%, var(--event-workspace-max-width));
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  margin: 12px auto 24px;
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-md);
+  background: var(--ui-surface);
+}
+
+.admin-shell .event-workspace-frame--form {
+  --event-workspace-max-width: 1180px;
+}
+
+.admin-shell .event-workspace-frame--master-data {
+  --event-workspace-max-width: 1520px;
+}
+
+.admin-shell .event-workspace-frame--wide {
+  --event-workspace-max-width: 1640px;
+}
+
+.admin-shell .event-workspace-context {
+  min-height: 108px;
+  display: grid;
+  grid-template-columns: minmax(250px, 1fr) minmax(360px, 1.1fr) auto;
+  align-items: center;
+  gap: 20px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.admin-shell .event-workspace-identity {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.admin-shell .event-workspace-identity > div {
+  min-width: 0;
+}
+
+.admin-shell .event-workspace-identity span:first-child {
+  color: var(--ui-muted);
+  font-size: 0.72rem;
+  font-weight: 650;
+}
+
+.admin-shell .event-workspace-identity h2 {
+  margin: 2px 0 0;
+  overflow: hidden;
+  font-size: 1.2rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-shell .event-workspace-meta {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-sm);
+  background: var(--ui-border);
+}
+
+.admin-shell .event-workspace-meta > div {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  padding: 9px 11px;
+  background: var(--ui-surface-subtle);
+}
+
+.admin-shell .event-workspace-meta :is(dt, dd) {
+  margin: 0;
+}
+
+.admin-shell .event-workspace-meta dt {
+  color: var(--ui-muted);
+  font-size: 0.68rem;
+}
+
+.admin-shell .event-workspace-meta dd {
+  overflow: hidden;
+  font-size: 0.82rem;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-shell .event-workspace-context-actions,
+.admin-shell .event-workspace-section-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-shell .event-workspace-section {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-md);
+  background: var(--ui-surface);
+}
+
+.admin-shell .event-workspace-section-header {
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.admin-shell .event-workspace-section-header :is(h3, p) {
+  margin: 0;
+}
+
+.admin-shell .event-workspace-section-header h3 {
+  font-size: 0.96rem;
+}
+
+.admin-shell .event-workspace-section-header p {
+  margin-top: 3px;
+  color: var(--ui-muted);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+@media (max-width: 1100px) {
+  .admin-shell .event-workspace-context {
+    grid-template-columns: minmax(220px, 0.9fr) minmax(340px, 1.1fr);
+  }
+
+  .admin-shell .event-workspace-context-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-end;
+  }
+}
+
+@media (max-width: 760px) {
+  .admin-shell .event-workspace-frame {
+    margin-block: 8px 16px;
+    border-inline: 0;
+    border-radius: 0;
+  }
+
+  .admin-shell .event-workspace-context {
+    min-height: 0;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+    padding: 14px 16px;
+  }
+
+  .admin-shell .event-workspace-meta {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-shell .event-workspace-meta > div:last-child {
+    grid-column: 1 / -1;
+  }
+
+  .admin-shell .event-workspace-context-actions {
+    grid-column: auto;
+    justify-content: stretch;
+  }
+
+  .admin-shell .event-workspace-context-actions > * {
+    flex: 1 1 auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-shell .event-workspace-frame *,
+  .admin-shell .event-workspace-frame *::before,
+  .admin-shell .event-workspace-frame *::after {
+    scroll-behavior: auto;
+    transition-duration: 0.01ms;
+    animation-duration: 0.01ms;
+    animation-iteration-count: 1;
+  }
+}

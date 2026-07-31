@@ -5,10 +5,10 @@ import {
   Button,
   CheckboxField,
   ConfirmationDialog,
-  StatusPill,
   Tabs,
 } from "../../../design-system/components";
-import { formatGermanDate, LocalizedDateTimeInput } from "../../../localized-date-input";
+import { LocalizedDateTimeInput } from "../../../localized-date-input";
+import { EventWorkspaceFrame } from "../event-workspace/EventWorkspaceFrame";
 import { EventAppearancePanel } from "./EventAppearancePanel";
 import { NumberFieldWithUnit } from "./NumberFieldWithUnit";
 import { useEventParametersForm, type ValidEventParameterPayload } from "./useEventParametersForm";
@@ -22,13 +22,6 @@ export type EventParameterSaveLifecycle = {
   onSaved: () => void;
   onConflict: (currentVersion?: number) => void;
 };
-
-function eventStatusLabel(status: EventSnapshot["status"]): string {
-  if (status === "PREPARATION") return "Vorbereitung";
-  if (status === "ACTIVE") return "Aktiv";
-  if (status === "CLOSED") return "Geschlossen";
-  return "Archiviert";
-}
 
 export function EventParametersWorkspace({
   event,
@@ -50,7 +43,7 @@ export function EventParametersWorkspace({
   const [activeTab, setActiveTab] = useState<"parameters" | "appearance">("parameters");
   const [discardOpen, setDiscardOpen] = useState(false);
   const [submitAttempted, setSubmitAttempted] = useState(false);
-  const workspaceRef = useRef<HTMLDivElement>(null);
+  const workspaceRef = useRef<HTMLElement>(null);
   const form = useEventParametersForm(event);
   const errors = submitAttempted ? form.validation.errors : {};
   const groundMinutes = useMemo(() => {
@@ -90,32 +83,9 @@ export function EventParametersWorkspace({
   }
 
   return (
-    <div className="event-parameters-workspace" ref={workspaceRef}>
-      <header className="event-parameters-header">
-        <div className="event-parameters-title">
-          <div>
-            <span>Veranstaltung</span>
-            <h2>{event.name}</h2>
-          </div>
-          <StatusPill tone={event.status === "ACTIVE" ? "success" : "neutral"}>
-            {eventStatusLabel(event.status)}
-          </StatusPill>
-        </div>
-        <dl className="event-parameters-meta">
-          <div>
-            <dt>Datum</dt>
-            <dd>{formatGermanDate(event.eventDate)}</dd>
-          </div>
-          <div>
-            <dt>Flugplatz</dt>
-            <dd>{event.aerodrome}</dd>
-          </div>
-          <div>
-            <dt>Zeitzone</dt>
-            <dd>{event.timeZone}</dd>
-          </div>
-        </dl>
-        <div className="event-parameters-actions">
+    <EventWorkspaceFrame
+      actions={
+        <>
           <Button
             disabled={!form.dirty || busyActionKey !== null}
             onClick={() => setDiscardOpen(true)}
@@ -140,10 +110,15 @@ export function EventParametersWorkspace({
             <Save aria-hidden="true" />
             Speichern
           </Button>
-        </div>
-      </header>
+        </>
+      }
+      className="event-parameters-workspace"
+      containerRef={workspaceRef}
+      event={event}
+    >
 
       <Tabs
+        idPrefix="event-parameters"
         items={[...WORKSPACE_TABS]}
         label="Veranstaltungsparameter"
         onChange={setActiveTab}
@@ -166,7 +141,12 @@ export function EventParametersWorkspace({
         </div>
       ) : null}
 
-      <div className="event-parameters-content">
+      <div
+        aria-labelledby={`event-parameters-${activeTab}-tab`}
+        className="event-parameters-content"
+        id={`event-parameters-${activeTab}-panel`}
+        role="tabpanel"
+      >
         {activeTab === "parameters" ? (
           <div className="event-parameter-card-grid">
             <section className="event-parameter-card event-period-card">
@@ -407,6 +387,6 @@ export function EventParametersWorkspace({
         open={discardOpen}
         title="Ungespeicherte Änderungen verwerfen?"
       />
-    </div>
+    </EventWorkspaceFrame>
   );
 }
