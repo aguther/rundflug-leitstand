@@ -168,6 +168,16 @@ function ForecastPanel({
   }
   const minimum = values.length > 0 ? Math.min(...values) - 5 * MINUTE_MS : 0;
   const maximum = values.length > 0 ? Math.max(...values) + 5 * MINUTE_MS : 1;
+  const turnaroundProfile = rotation?.timeline.effectiveTurnaroundProfile;
+  const assumedAircraft = board.aircraft.find(
+    (aircraft) => aircraft.id === rotation?.timeline.forecastAssumedAircraftId,
+  );
+  const sourceLabel = (level: "AIRCRAFT_PRODUCT" | "PRODUCT" | "EVENT") =>
+    level === "AIRCRAFT_PRODUCT"
+      ? "Flugzeug + Produkt"
+      : level === "PRODUCT"
+        ? "Produkt"
+        : "Veranstaltung";
   const metrics = [
     { label: "Snapshots", value: sorted.length },
     { label: "Aktuelle Qualität", value: qualityLabel(latest?.quality) },
@@ -176,6 +186,26 @@ function ForecastPanel({
       value: signedMinutes(boardingForecastChangeMinutes(entries)),
     },
     { label: "Datenbasis", value: latest ? `${latest.sampleSize} Umläufe` : "–" },
+    {
+      label: "Prognoseannahme",
+      value: assumedAircraft?.registration ?? "bestätigte Ressource",
+    },
+    {
+      label: "Bodenprofil",
+      value: turnaroundProfile
+        ? `${turnaroundProfile.boarding.valueMinutes} + ${turnaroundProfile.deboarding.valueMinutes} + ${turnaroundProfile.buffer.valueMinutes} Min.`
+        : "–",
+    },
+    {
+      label: "Quellen",
+      value: turnaroundProfile
+        ? [
+            sourceLabel(turnaroundProfile.boarding.sourceLevel),
+            sourceLabel(turnaroundProfile.deboarding.sourceLevel),
+            sourceLabel(turnaroundProfile.buffer.sourceLevel),
+          ].join(" / ")
+        : "–",
+    },
   ];
   const milestones: Array<[string, string | null]> = [
     ["Boarding", actual?.boardingAt ?? null],

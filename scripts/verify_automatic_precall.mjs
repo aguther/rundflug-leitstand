@@ -64,10 +64,10 @@ VALUES
   ('${ticketGroupId}', '${eventId}', '${productId}', ${groupNumber}, ${100 + groupNumber}, 0,
    'QUEUED', '${createdAt}', 0);
 INSERT INTO flight_groups
-  (id, operation_day_id, resource_group_id, communication_number, queue_position, status,
+  (id, operation_day_id, resource_group_id, product_id, communication_number, queue_position, status,
    version, created_at, updated_at)
 VALUES
-  ('${flightGroupId}', '${eventId}', '${resourceGroupId}', ${groupNumber}, ${groupNumber},
+  ('${flightGroupId}', '${eventId}', '${resourceGroupId}', '${productId}', ${groupNumber}, ${groupNumber},
    'DRAFT', 0, '${createdAt}', '${createdAt}');
 INSERT INTO rotations
   (id, operation_day_id, flight_group_id, gate_id, status, version, created_at, updated_at)
@@ -155,10 +155,11 @@ VALUES
   ('automatic-precall-oldtimer-ticket-group', '${eventId}', '${oldtimerProductId}', 1, 201, 0,
    'QUEUED', '${createdAt}', 0);
 INSERT INTO flight_groups
-  (id, operation_day_id, resource_group_id, communication_number, queue_position, status,
+  (id, operation_day_id, resource_group_id, product_id, communication_number, queue_position, status,
    version, created_at, updated_at)
 VALUES
-  ('automatic-precall-oldtimer-flight-group', '${eventId}', '${oldtimerResourceGroupId}', 1, 1,
+  ('automatic-precall-oldtimer-flight-group', '${eventId}', '${oldtimerResourceGroupId}',
+   '${oldtimerProductId}', 1, 1,
    'DRAFT', 0, '${createdAt}', '${createdAt}');
 INSERT INTO rotations
   (id, operation_day_id, flight_group_id, gate_id, status, version, created_at, updated_at)

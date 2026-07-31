@@ -587,6 +587,7 @@ export function runOperationalSimulation(
         return [
           {
             laneId: entry.id,
+            aircraftId: entry.id,
             passengerSeats: entry.capacity,
             availableLowerAt: iso(expectedAt),
             availableExpectedAt: iso(expectedAt),

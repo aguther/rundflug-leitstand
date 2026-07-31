@@ -25,8 +25,8 @@ const forecastFixture = spawnSync(
     "wrangler.jsonc",
     "--command",
     `INSERT INTO flight_groups
-      (id, operation_day_id, resource_group_id, communication_number, status, version, created_at, updated_at)
-     VALUES ('factory-reset-flight-group', 'demo-2026', 'rg-panorama', 999, 'PLANNED', 0,
+      (id, operation_day_id, resource_group_id, product_id, communication_number, status, version, created_at, updated_at)
+     VALUES ('factory-reset-flight-group', 'demo-2026', 'rg-panorama', 'panorama-20', 999, 'PLANNED', 0,
              '2026-07-11T09:00:00.000Z', '2026-07-11T09:00:00.000Z');
      INSERT INTO rotations
       (id, operation_day_id, flight_group_id, aircraft_id, status, version, created_at, updated_at)

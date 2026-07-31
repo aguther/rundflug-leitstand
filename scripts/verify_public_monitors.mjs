@@ -70,10 +70,10 @@ const staleDepartureSql = staleDepartureCommunicationNumbers
          'fids-history-hash-${suffix}', 'COMPLETED', 'NOT_CAPTURED', NULL, 'PAID', 0,
          '${staleDepartureTimestamp}');
       INSERT INTO flight_groups
-        (id, operation_day_id, resource_group_id, communication_number, status, version,
+        (id, operation_day_id, resource_group_id, product_id, communication_number, status, version,
          created_at, updated_at, queue_position)
       VALUES
-        ('fids-history-flight-group-${suffix}', 'demo-2026', 'rg-panorama',
+        ('fids-history-flight-group-${suffix}', 'demo-2026', 'rg-panorama', 'panorama-20',
          ${flightGroupCommunicationNumber}, 'COMPLETED', 0, '${staleDepartureTimestamp}',
          '${staleDepartureTimestamp}', ${flightGroupCommunicationNumber});
       INSERT INTO rotations

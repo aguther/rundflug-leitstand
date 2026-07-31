@@ -557,6 +557,7 @@ describe("event-driven forecast", () => {
           availabilityLanes: [
             {
               laneId: "aircraft-1:pilot-1",
+              aircraftId: "aircraft-1",
               availableLowerAt: "2026-07-22T09:00:00.000Z",
               availableExpectedAt: "2026-07-22T09:00:00.000Z",
               availableUpperAt: "2026-07-22T09:00:00.000Z",
@@ -612,6 +613,7 @@ describe("event-driven forecast", () => {
           availabilityLanes: [
             {
               laneId: "two-seater:pilot-1",
+              aircraftId: "two-seater",
               passengerSeats: 2,
               availableLowerAt: "2026-07-22T10:00:00.000Z",
               availableExpectedAt: "2026-07-22T10:00:00.000Z",
@@ -619,6 +621,7 @@ describe("event-driven forecast", () => {
             },
             {
               laneId: "four-seater:pilot-2",
+              aircraftId: "four-seater",
               passengerSeats: 4,
               availableLowerAt: "2026-07-22T10:10:00.000Z",
               availableExpectedAt: "2026-07-22T10:15:00.000Z",
@@ -669,6 +672,7 @@ describe("event-driven forecast", () => {
       availabilityLanes: [
         {
           laneId: "two-seater:pilot-1",
+          aircraftId: "two-seater",
           passengerSeats: 2,
           availableLowerAt: "2026-07-22T10:00:00.000Z",
           availableExpectedAt: "2026-07-22T10:00:00.000Z",
@@ -748,6 +752,7 @@ describe("event-driven forecast", () => {
           availabilityLanes: [
             {
               laneId: "aircraft-1:pilot-1",
+              aircraftId: "aircraft-1",
               availableLowerAt: "2026-07-22T10:00:00.000Z",
               availableExpectedAt: "2026-07-22T10:00:00.000Z",
               availableUpperAt: "2026-07-22T10:00:00.000Z",
@@ -813,6 +818,7 @@ describe("event-driven forecast", () => {
           availabilityLanes: [
             {
               laneId: "aircraft-1:pilot-1",
+              aircraftId: "aircraft-1",
               availableLowerAt: "2026-07-22T10:00:00.000Z",
               availableExpectedAt: "2026-07-22T10:00:00.000Z",
               availableUpperAt: "2026-07-22T10:00:00.000Z",
@@ -1061,5 +1067,63 @@ describe("event-driven forecast", () => {
         "NO_FORECAST_CAPACITY",
       ],
     });
+  });
+
+  it("returns the assumed aircraft and applies its candidate-specific duration", () => {
+    const availability = createQueueAvailability({
+      activeAircraft: 2,
+      busyAircraftMinutes: [],
+      lanes: [
+        {
+          laneId: "aircraft-a:pilot-a",
+          aircraftId: "aircraft-a",
+          passengerSeats: 4,
+          lowerMinutes: 5,
+          expectedMinutes: 5,
+          upperMinutes: 5,
+          constraints: [],
+        },
+        {
+          laneId: "aircraft-b:pilot-b",
+          aircraftId: "aircraft-b",
+          passengerSeats: 4,
+          lowerMinutes: 0,
+          expectedMinutes: 0,
+          upperMinutes: 0,
+          constraints: [],
+        },
+      ],
+    });
+    const result = reserveNextQueueWindow(
+      availability,
+      {
+        expectedMinutes: 20,
+        lowerMinutes: 18,
+        upperMinutes: 22,
+        quality: "STABLE",
+        sampleCount: 0,
+      },
+      null,
+      1,
+      new Map([
+        [
+          "aircraft-b",
+          {
+            expectedMinutes: 35,
+            lowerMinutes: 32,
+            upperMinutes: 38,
+            quality: "CHANGING" as const,
+            sampleCount: 0,
+          },
+        ],
+      ]),
+    );
+
+    expect(result.selectedAircraftId).toBe("aircraft-b");
+    expect(result.selectedLaneId).toBe("aircraft-b:pilot-b");
+    expect(result.duration.expectedMinutes).toBe(35);
+    expect(
+      result.availability.lanes.find((lane) => lane.aircraftId === "aircraft-b")?.expectedMinutes,
+    ).toBe(35);
   });
 });
