@@ -76,9 +76,7 @@ npm run check
 ## Arbeitsmethode
 
 - Beginne mehrstufige Aufgaben mit einem aktualisierten Ausführungsplan.
-- Vom Auftraggeber beauftragte und vollständig geprüfte Korrekturen werden standardmäßig direkt auf
-  `main` committed und gepusht, sofern der Auftraggeber nicht ausdrücklich etwas anderes vorgibt.
-- Bearbeite pro Branch und Pull Request genau ein zusammenhängendes Ergebnis.
+- Bearbeite pro Branch genau ein fachlich zusammenhängendes Ergebnis.
 - Referenziere Anforderungs-IDs in Issues, Tests und Pull Requests.
 - Ändere die binären Anforderungsquellen nicht im Rahmen von Feature-Arbeit.
 - Führe keine neue Abhängigkeit ohne dokumentierten Zweck ein.
@@ -101,6 +99,373 @@ npm run check
 - Kein generisches Karten-Dashboard anstelle der vorgeschriebenen Ein-Bildschirm-Abläufe für Kasse und
   Flight Line.
 
+## Sprache und Benennung
+
+Die Sprache fachlicher und technischer Artefakte wird bewusst getrennt.
+
+### Fachliche Artefakte
+
+Die folgenden Inhalte dürfen auf Deutsch oder in einer für den jeweiligen Auftrag geeigneten anderen
+Sprache verfasst sein:
+
+- Requirements und Anforderungskataloge,
+- fachliche Beschreibungen,
+- User Stories und Akzeptanzkriterien,
+- ADRs und Architekturbegründungen,
+- Betriebs- und Benutzerdokumentation,
+- Issues und Planungsdokumente,
+- sichtbare Texte der Anwendung,
+- FIDS-, Ticket-, Push- und Hinweistexte.
+
+Bestehende deutsche Fachbegriffe müssen nicht künstlich übersetzt werden. Fachliche Dokumentation soll
+in der Sprache konsistent bleiben, in der das jeweilige Dokument geführt wird.
+
+### Technische Implementierung
+
+Alle neu erstellten oder geänderten technischen Bezeichner müssen Englisch verwenden. Dies gilt
+insbesondere für:
+
+- Variablen,
+- Konstanten,
+- Funktionen und Methoden,
+- Klassen, Interfaces, Types und Enums,
+- Properties und Felder,
+- Dateinamen und Verzeichnisnamen,
+- API-Routen und API-Properties,
+- Events, Commands und Queries,
+- Datenbanktabellen, Spalten, Indizes, Constraints und Views,
+- Migrationen und technische Seed-Daten,
+- Konfigurationsschlüssel und Umgebungsvariablen,
+- technische Status- und Fehlercodes,
+- Testnamen, Fixture-Bezeichner und Mock-Bezeichner.
+
+Technische Kommentare, JSDoc/TSDoc, entwicklerorientierte Fehlermeldungen, interne Logmeldungen und
+Diagnoseausgaben müssen Englisch verwenden.
+
+Nutzerseitige Texte dürfen weiterhin Deutsch sein. Die Trennung zwischen internem technischem Schlüssel
+und angezeigtem Text ist beizubehalten, beispielsweise:
+
+```ts
+const messageKey = "groupRecall.active";
+const displayText = "Bitte begeben Sie sich zur Flight Line.";
+```
+
+Keine neuen deutschen oder gemischtsprachigen technischen Bezeichner einführen.
+
+Wird bestehender Code mit deutschen technischen Bezeichnern wesentlich geändert, soll geprüft werden,
+ob die betroffenen Bezeichner innerhalb des Auftrags sicher auf Englisch migriert werden können. Eine
+großflächige Umbenennung außerhalb des Auftragsumfangs ist zu vermeiden.
+
+Persistierte oder öffentlich verwendete Bezeichner dürfen nicht allein aus stilistischen Gründen
+inkompatibel umbenannt werden. Dazu gehören insbesondere:
+
+- bereits ausgerollte Datenbankspalten,
+- bestehende API-Verträge,
+- Event-Typen,
+- externe Konfigurationsschlüssel,
+- gespeicherte JSON-Strukturen,
+- öffentliche URLs.
+
+Notwendige Umbenennungen benötigen eine kompatible Migration beziehungsweise eine ausdrücklich
+dokumentierte Breaking Change.
+
+## Git- und Commit-Workflow
+
+### Grundsatz
+
+`main` ist der stabile Integrationsbranch. Parallele Agenten arbeiten nicht gleichzeitig direkt auf
+`main`.
+
+Jeder unabhängige Auftrag wird auf einem eigenen kurzlebigen Branch bearbeitet. Der für einen Auftrag
+verantwortliche Agent ist nach erfolgreicher Validierung grundsätzlich auch für die Integration seines
+Branches nach `main` verantwortlich.
+
+Direkte Implementierungscommits auf `main` sind nicht zulässig. Ausnahmen müssen vom Auftraggeber
+ausdrücklich benannt sein, beispielsweise eine abgesicherte Historienbereinigung oder eine rein
+administrative Repository-Operation.
+
+### Beginn eines Auftrags
+
+Vor Beginn der Implementierung:
+
+```bash
+git fetch origin
+git switch main
+git pull --ff-only origin main
+git switch -c <type>/<short-task-name>
+```
+
+Branch-Namen müssen Englisch, kleingeschrieben und in Kebab-Case formuliert sein.
+
+Beispiele:
+
+```text
+feat/active-group-recall
+feat/flight-line-layout
+feat/ticket-search-filter
+feat/push-delivery-diagnostics
+fix/flight-line-behavior
+```
+
+Ein Branch enthält genau ein fachlich zusammenhängendes Ergebnis.
+
+### Parallele Agenten
+
+Jeder Agent arbeitet während der Implementierung ausschließlich auf seinem zugewiesenen Branch.
+
+Agenten dürfen Änderungen anderer Agenten oder des Auftraggebers nicht:
+
+- verwerfen,
+- zurücksetzen,
+- überschreiben,
+- stillschweigend in den eigenen Commit aufnehmen,
+- durch pauschale Konfliktauflösung ersetzen.
+
+Vor Änderungen an gemeinsam genutzten Integrationspunkten ist der aktuelle Stand von `origin/main`
+erneut abzurufen. Dies gilt insbesondere für:
+
+- Datenbankmigrationen,
+- Schemas und Verträge,
+- Lockfiles,
+- zentrale Exporte,
+- gemeinsam genutzte Domain Types,
+- Routing-Konfiguration,
+- generierte Artefakte.
+
+Neue Commits auf `origin/main` werden nicht ungeprüft während einer unvollständigen Änderung in den
+Arbeitsbranch übernommen. Die verpflichtende vollständige Synchronisierung erfolgt spätestens vor der
+abschließenden Validierung und erneut, falls eine konkurrierende Integration den Push nach `main`
+verhindert.
+
+### Sicherung des Arbeitsbranches
+
+Der Arbeitsbranch darf und soll bei längeren Aufgaben während der Bearbeitung regelmäßig auf `origin`
+gesichert werden:
+
+```bash
+git push -u origin HEAD
+```
+
+Wurde ein bereits veröffentlichter Arbeitsbranch nach einem Rebase neu geschrieben, ist ausschließlich
+folgender Push zulässig:
+
+```bash
+git push --force-with-lease origin HEAD
+```
+
+Ein unbedingter Force-Push ist verboten. `main` darf niemals force-gepusht werden, außer im Rahmen einer
+ausdrücklich beauftragten und abgesicherten einmaligen Historienbereinigung.
+
+Zwischenstände auf dem Arbeitsbranch müssen als solche erkennbar bleiben und dürfen nicht als fertig
+oder integriert gemeldet werden.
+
+### Commits
+
+Änderungen sind in kleinen, logisch abgeschlossenen Einheiten zu committen.
+
+Ein Commit soll:
+
+- genau einen nachvollziehbaren Zweck besitzen,
+- keine unabhängigen Änderungen vermischen,
+- nach Möglichkeit buildbar und testbar sein,
+- die zugehörigen Tests und erforderlichen Migrationen enthalten,
+- keine zufälligen Formatierungsänderungen in unbeteiligten Dateien enthalten.
+
+Commits werden nicht künstlich nach Dateityp getrennt. Implementierung, zugehörige Tests und zwingend
+erforderliche Dokumentationsänderungen dürfen gemeinsam committed werden, wenn sie eine atomare Einheit
+bilden.
+
+Vor jedem Commit sind mindestens auszuführen:
+
+```bash
+git status --short
+git diff
+git diff --staged
+```
+
+Nur zum Commit gehörende Dateien oder Hunks dürfen gestaged werden.
+
+### Commit-Format
+
+Alle Commit-Nachrichten müssen Englisch verwenden und dem Conventional-Commits-Format entsprechen:
+
+```text
+<type>(<optional-scope>): <imperative summary>
+```
+
+Zulässige Standardtypen:
+
+```text
+feat
+fix
+refactor
+test
+docs
+perf
+build
+ci
+chore
+style
+revert
+```
+
+Der Scope ist optional und beschreibt einen stabilen technischen oder fachlichen Bereich.
+
+Bevorzugte Scopes sind beispielsweise:
+
+```text
+admin
+boarding
+cashier
+contracts
+database
+domain
+fids
+flight-line
+forecast
+notifications
+push
+simulator
+ticket
+web
+worker
+```
+
+Beispiele:
+
+```text
+feat(flight-line): add active group recall
+fix(push): handle expired subscriptions
+refactor(domain): extract turnaround calculation
+test(boarding): cover recalled group transitions
+docs(requirements): clarify recall cancellation
+chore(database): normalize migration naming
+```
+
+Regeln für die Betreffzeile:
+
+- Englisch verwenden.
+- Imperativ beziehungsweise handlungsorientierte Grundform verwenden.
+- Mit einem Kleinbuchstaben beginnen.
+- Kein Punkt am Ende.
+- Möglichst höchstens 72 Zeichen.
+- Beschreiben, was der Commit bewirkt, nicht welche Dateien geändert wurden.
+- Keine Versionsnummer in den Betreff aufnehmen, sofern die Änderung nicht ausschließlich die
+  Versionierung betrifft.
+- Keine Anforderungs-IDs in den Betreff aufnehmen.
+
+Ein Commit-Body ist zu ergänzen, wenn Motivation, Randbedingungen oder nicht offensichtliche
+Auswirkungen erklärt werden müssen.
+
+Format:
+
+```text
+feat(flight-line): add active group recall
+
+Persist the recall state separately from the regular queue status so that
+FIDS, ticket status, and push notifications can present a consistent
+operational message.
+
+Refs: F-FLN-120, F-PUB-080
+```
+
+Anforderungs-IDs stehen im Commit-Body in einer separaten `Refs:`-Zeile. Sie dürfen alternativ oder
+zusätzlich in Tests, Issues und Pull Requests referenziert werden.
+
+Automatisch erzeugte Co-Author-Trailer sind zulässig. Alle selbst formulierten Commit-Inhalte bleiben
+Englisch.
+
+### Synchronisierung vor Abschluss
+
+Unmittelbar vor der abschließenden Validierung muss der Agent seinen Arbeitsbranch auf den neuesten Stand
+von `origin/main` bringen:
+
+```bash
+git fetch origin
+git rebase origin/main
+```
+
+Konflikte müssen semantisch gelöst werden. Es ist nicht zulässig, Konflikte pauschal mit `ours` oder
+`theirs` aufzulösen, ohne beide Änderungen zu prüfen.
+
+Nach dem Rebase sind alle für die Änderung relevanten Prüfungen erneut auszuführen. Wurde der Branch
+bereits veröffentlicht, wird der aktualisierte Stand anschließend mit `--force-with-lease` gesichert.
+
+### Integration nach `main`
+
+Nach erfolgreicher Validierung integriert der verantwortliche Agent seinen eigenen Branch nach `main`.
+Die Integration muss eine lineare Historie erhalten und darf nur als Fast-forward erfolgen:
+
+```bash
+git fetch origin
+git switch main
+git pull --ff-only origin main
+git switch <work-branch>
+git rebase main
+# relevante Prüfungen erneut ausführen
+git switch main
+git merge --ff-only <work-branch>
+git push origin main
+```
+
+Die Prüfungen nach dem letzten Rebase müssen den tatsächlich zu pushenden Commit-Stand abdecken. Liegt
+der letzte vollständige Prüflauf bereits exakt auf diesem Stand, muss er nicht allein wegen des
+Branchwechsels wiederholt werden. Prüfungen, die den integrierten Workspace oder mehrere Pakete betreffen,
+sind auf `main` erneut auszuführen.
+
+Schlägt `git push origin main` fehl, weil ein anderer Agent zwischenzeitlich integriert hat, darf nicht
+force-gepusht und kein nicht-linearer Merge erzeugt werden. Der Agent muss stattdessen:
+
+1. den eigenen Arbeitsbranch wieder auschecken,
+2. den neuen Stand von `origin/main` abrufen,
+3. den Arbeitsbranch auf `origin/main` rebasen,
+4. Konflikte semantisch lösen,
+5. die relevanten Prüfungen erneut ausführen,
+6. `main` erneut per Fast-forward aktualisieren,
+7. den Push erneut versuchen.
+
+Damit werden parallele Integrationen optimistisch serialisiert. Ein Agent meldet seinen Auftrag erst als
+abgeschlossen, wenn der eigene Commit-Stand nachweislich auf `origin/main` enthalten ist.
+
+Bestehende sinnvolle Commits des Arbeitsbranches bleiben erhalten. Ein Squash ist nur anzuwenden, wenn
+der Arbeitsbranch aus unsauberen Zwischen-, Korrektur- oder Experimentiercommits besteht. Ein dafür
+notwendiges Umschreiben eines veröffentlichten Arbeitsbranches darf nur mit `--force-with-lease`
+gepusht werden.
+
+### Aufräumen des Arbeitsbranches
+
+Erst nachdem der Push nach `main` erfolgreich war und bestätigt wurde, dass der integrierte Commit auf
+`origin/main` enthalten ist, wird der kurzlebige Arbeitsbranch aufgelöst:
+
+```bash
+git branch -d <work-branch>
+git push origin --delete <work-branch>
+git fetch --prune origin
+```
+
+Existiert kein veröffentlichter Remote-Branch, entfällt dessen Löschung. Die Löschung darf nicht vor der
+erfolgreichen Integration erfolgen. `git branch -D` ist nur zulässig, wenn zweifelsfrei bestätigt wurde,
+dass die enthaltenen Commits bereits auf `origin/main` vorhanden sind oder ausdrücklich verworfen
+werden sollen.
+
+### Abschlussbericht
+
+Der Agent nennt am Ende:
+
+- den verwendeten Arbeitsbranch,
+- die erstellten Commits,
+- die ausgeführten Prüfungen,
+- das Ergebnis der Prüfungen,
+- ob auf den neuesten Stand von `origin/main` rebased wurde,
+- den integrierten Commit auf `main`,
+- ob `main` erfolgreich nach `origin` gepusht wurde,
+- ob der lokale und der Remote-Arbeitsbranch gelöscht wurden,
+- offene Risiken oder nicht ausgeführte Prüfungen.
+
+Der Agent darf nicht behaupten, dass Prüfungen erfolgreich waren, wenn sie nicht tatsächlich ausgeführt
+wurden. Ebenso darf er keine erfolgreiche Integration behaupten, solange der Commit nicht auf
+`origin/main` nachgewiesen wurde.
+
 ## Definition of Done
 
 Eine Änderung ist nur fertig, wenn:
@@ -112,7 +477,10 @@ Eine Änderung ist nur fertig, wenn:
 - öffentliche und operative Zustände im Browser geprüft wurden,
 - Traceability und Dokumentation aktualisiert wurden,
 - keine personenbezogenen Daten oder Secrets in Diff, Logs oder Testfixtures auftauchen,
-- der finale Diff auf Regressionen und Datenexposition geprüft wurde.
+- der finale Diff auf Regressionen und Datenexposition geprüft wurde,
+- der Arbeitsbranch auf dem neuesten Stand von `origin/main` validiert wurde,
+- die Änderung per Fast-forward nach `main` integriert und zu `origin/main` gepusht wurde,
+- der kurzlebige Arbeitsbranch nach bestätigter Integration lokal und remote aufgeräumt wurde.
 
 ## Hochkritische Review-Funde
 
