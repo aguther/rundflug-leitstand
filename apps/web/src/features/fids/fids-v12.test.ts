@@ -42,6 +42,9 @@ describe("V1.7.3 FIDS concept fidelity", () => {
     expect(displaySource).toContain('return { label: "WARTEN", tone: "standby", icon: Clock3 }');
     expect(displaySource).toContain('<Users aria-hidden="true" />');
     expect(displaySource).toContain('<Icon aria-hidden="true" className="fids-status-icon" />');
+    expect(displaySource).toContain('data-recall-active={group.activeRecall ? "true" : "false"}');
+    expect(displaySource).toContain("<span>NACHRUF</span>");
+    expect(stylesSource).toContain("@keyframes fids-primary-status-swap");
     expect(displaySource).not.toContain('<span className="fids-status-icon">');
     expect(stylesSource).toMatch(
       /\.fids-status-icon \{[\s\S]*?width: 1em;[\s\S]*?height: 1em;[\s\S]*?stroke-width: 2;/,
