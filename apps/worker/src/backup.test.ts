@@ -31,6 +31,7 @@ describe("portable backup format", () => {
     expect(BACKUP_TABLES).toEqual(
       expect.arrayContaining([
         "gates",
+        "aircraft_product_turnaround_overrides",
         "forecast_snapshots",
         "outage_recovery_batches",
         "outage_recovery_entries",

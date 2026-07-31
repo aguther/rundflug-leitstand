@@ -77,7 +77,46 @@ const validTemplate = {
 
 describe("master data template contract", () => {
   it("accepts the versioned, reference-safe format", () => {
-    expect(masterDataTemplateSchema.safeParse(validTemplate).success).toBe(true);
+    const parsed = masterDataTemplateSchema.parse(validTemplate);
+
+    expect(parsed.products[0]).toMatchObject({
+      plannedBoardingMinutesOverride: null,
+      plannedDeboardingMinutesOverride: null,
+      plannedBufferMinutesOverride: null,
+    });
+    expect(parsed.aircraftProductTurnaroundOverrides).toEqual([]);
+  });
+
+  it("round-trips version 2 product and aircraft exceptions", () => {
+    const parsed = masterDataTemplateSchema.parse({
+      ...validTemplate,
+      formatVersion: 2,
+      products: validTemplate.products.map((product) => ({
+        ...product,
+        plannedBoardingMinutesOverride: 7,
+        plannedDeboardingMinutesOverride: null,
+        plannedBufferMinutesOverride: 4,
+      })),
+      aircraftProductTurnaroundOverrides: [
+        {
+          aircraftKey: "aircraft-1",
+          productKey: "product-1",
+          plannedBoardingMinutesOverride: null,
+          plannedDeboardingMinutesOverride: 6,
+          plannedBufferMinutesOverride: 5,
+        },
+      ],
+    });
+
+    expect(parsed.formatVersion).toBe(2);
+    expect(parsed.products[0]?.plannedBoardingMinutesOverride).toBe(7);
+    expect(parsed.aircraftProductTurnaroundOverrides).toEqual([
+      expect.objectContaining({
+        aircraftKey: "aircraft-1",
+        productKey: "product-1",
+        plannedDeboardingMinutesOverride: 6,
+      }),
+    ]);
   });
 
   it("accepts and removes the obsolete resource-group duration from legacy templates", () => {
@@ -110,6 +149,28 @@ describe("master data template contract", () => {
     if (!result.success) {
       expect(result.error.issues.map((issue) => issue.message).join(" ")).toMatch(
         /Gate-Verweis|Flugzeugzuordnung/,
+      );
+    }
+  });
+
+  it("rejects duplicate aircraft/product exceptions", () => {
+    const override = {
+      aircraftKey: "aircraft-1",
+      productKey: "product-1",
+      plannedBoardingMinutesOverride: null,
+      plannedDeboardingMinutesOverride: 6,
+      plannedBufferMinutesOverride: null,
+    };
+    const result = masterDataTemplateSchema.safeParse({
+      ...validTemplate,
+      formatVersion: 2,
+      aircraftProductTurnaroundOverrides: [override, override],
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.map((issue) => issue.message).join(" ")).toContain(
+        "Flugzeug-/Produkt-Ausnahme",
       );
     }
   });

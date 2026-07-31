@@ -33,4 +33,11 @@ describe("simulation plan export route", () => {
     expect(projectionSource).not.toContain("plannedRotationMinutes");
     expect(projectionSource).not.toContain("planned_rotation_minutes");
   });
+
+  it("exports portable turnaround overrides as simulation plan V3", () => {
+    expect(exportRouteSource).toContain("formatVersion: 3");
+    expect(projectionSource).toContain("formatVersion: 2");
+    expect(projectionSource).toContain("aircraftProductTurnaroundOverrides");
+    expect(projectionSource).toContain("planned_boarding_minutes_override");
+  });
 });

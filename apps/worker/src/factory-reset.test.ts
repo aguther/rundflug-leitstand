@@ -13,6 +13,7 @@ describe("factory reset", () => {
         "tickets",
         "rotations",
         "products",
+        "aircraft_product_turnaround_overrides",
         "aircraft",
         "paired_devices",
         "operator_sessions",
@@ -48,6 +49,9 @@ describe("factory reset", () => {
     expect(FACTORY_RESET_DELETE_TABLES.indexOf("planned_operational_constraints")).toBeLessThan(
       FACTORY_RESET_DELETE_TABLES.indexOf("recurring_operational_rules"),
     );
+    expect(
+      FACTORY_RESET_DELETE_TABLES.indexOf("aircraft_product_turnaround_overrides"),
+    ).toBeLessThan(FACTORY_RESET_DELETE_TABLES.indexOf("products"));
   });
 
   it("hashes the anonymous reset intent without persisting the administrator PIN", async () => {

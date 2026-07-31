@@ -147,12 +147,61 @@ def seed_source(connection: sqlite3.Connection, include_recurring: bool = True) 
         "VALUES (?,?,?,?,?,?,?,?)",
         ("synthetic-ticket", "synthetic-ticket-group", "0" * 64, "QUEUED", "NOT_CAPTURED", "PAID", 5000, now),
     )
-    connection.execute(
-        "INSERT INTO flight_groups "
-        "(id,operation_day_id,resource_group_id,communication_number,status,created_at,updated_at) "
-        "VALUES (?,?,?,?,?,?,?)",
-        ("synthetic-flight-group", "synthetic-event", "synthetic-group", 101, "DRAFT", now, now),
-    )
+    flight_group_columns = {
+        row[1] for row in connection.execute("PRAGMA table_info(flight_groups)").fetchall()
+    }
+    if "product_id" in flight_group_columns:
+        connection.execute(
+            "INSERT INTO flight_groups "
+            "(id,operation_day_id,resource_group_id,product_id,communication_number,status,created_at,updated_at) "
+            "VALUES (?,?,?,?,?,?,?,?)",
+            (
+                "synthetic-flight-group",
+                "synthetic-event",
+                "synthetic-group",
+                "synthetic-product",
+                101,
+                "DRAFT",
+                now,
+                now,
+            ),
+        )
+    else:
+        connection.execute(
+            "INSERT INTO flight_groups "
+            "(id,operation_day_id,resource_group_id,communication_number,status,created_at,updated_at) "
+            "VALUES (?,?,?,?,?,?,?)",
+            (
+                "synthetic-flight-group",
+                "synthetic-event",
+                "synthetic-group",
+                101,
+                "DRAFT",
+                now,
+                now,
+            ),
+        )
+    override_table_exists = connection.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' "
+        "AND name = 'aircraft_product_turnaround_overrides'",
+    ).fetchone()
+    if override_table_exists:
+        connection.execute(
+            "INSERT INTO aircraft_product_turnaround_overrides "
+            "(operation_day_id,aircraft_id,product_id,planned_boarding_minutes_override,"
+            "planned_deboarding_minutes_override,planned_buffer_minutes_override,created_at,updated_at) "
+            "VALUES (?,?,?,?,?,?,?,?)",
+            (
+                "synthetic-event",
+                "synthetic-aircraft",
+                "synthetic-product",
+                9,
+                None,
+                4,
+                now,
+                now,
+            ),
+        )
     connection.execute(
         "INSERT INTO rotations "
         "(id,operation_day_id,flight_group_id,aircraft_id,status,version,created_at,updated_at,pilot_id,gate_id,operational_note) "
@@ -305,6 +354,15 @@ def main() -> None:
     ).fetchone()
     if restored_rule != (4, 1):
         raise AssertionError("Wiederkehrende Regel oder ihr Planeintrag wurde nicht wiederhergestellt")
+    restored_override = target.execute(
+        "SELECT planned_boarding_minutes_override, planned_deboarding_minutes_override, "
+        "planned_buffer_minutes_override "
+        "FROM aircraft_product_turnaround_overrides "
+        "WHERE operation_day_id = ? AND aircraft_id = ? AND product_id = ?",
+        ("synthetic-event", "synthetic-aircraft", "synthetic-product"),
+    ).fetchone()
+    if restored_override != (9, None, 4):
+        raise AssertionError("Flugzeug-/Produkt-Umlaufzeit-Ausnahme wurde nicht wiederhergestellt")
     source.close()
     target.close()
     elapsed = time.monotonic() - started

@@ -68,6 +68,9 @@ describe("disposable event lifecycle", () => {
       EVENT_DELETION_SQL.findIndex((sql) => sql.includes("DELETE FROM operation_days WHERE")),
     );
     expect(EVENT_DELETION_SQL).toContain("DELETE FROM operation_days WHERE id = ?1");
+    expect(EVENT_DELETION_SQL).toContain(
+      "DELETE FROM aircraft_product_turnaround_overrides WHERE operation_day_id = ?1",
+    );
     expect(
       EVENT_DELETION_SQL.findIndex((sql) =>
         sql.includes("DELETE FROM planned_operational_constraints"),

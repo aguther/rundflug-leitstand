@@ -23,6 +23,7 @@ export const FACTORY_RESET_DELETE_TABLES = [
   "outbox",
   "idempotency_receipts",
   "resource_group_memberships",
+  "aircraft_product_turnaround_overrides",
   "products",
   "pilots",
   "operational_events",

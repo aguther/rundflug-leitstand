@@ -11,6 +11,7 @@ export const BACKUP_TABLES = [
   "paired_devices",
   "resource_group_memberships",
   "products",
+  "aircraft_product_turnaround_overrides",
   "ticket_groups",
   "ticket_group_recalls",
   "tickets",

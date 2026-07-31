@@ -346,3 +346,10 @@ implementieren.
 Vor einer Änderung an einem Automaten oder einer Invariante sind mindestens Vertrag, Domänentest,
 Integrationspfad, Audit-Ereignis, Idempotenz, stale-write-Verhalten, Realtime-Auswirkung und
 Wiederherstellbarkeit zu prüfen. Der vollständige Nachweis läuft mit `npm run check`.
+## Ergänzung V1.11: Umlaufzeit-Hierarchie
+
+Boarding, Ausstieg und Puffer werden komponentenweise aus Flugzeug+Produkt, Produkt und
+Veranstaltung aufgelöst. Die Offblock–Onblock-Referenzzeit verbleibt am Produkt. DRAFT-Prognosen
+halten die angenommene Flugzeug-Lane fest, ohne `rotations.aircraft_id` zu setzen. `CALL_NEXT` friert
+das bestätigte Profil für den laufenden Umlauf ein. Details und die Ablösung einzelner Aussagen aus
+ADR-0030 dokumentiert ADR-0031.

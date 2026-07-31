@@ -28,6 +28,7 @@ export const EVENT_DELETION_SQL = [
   "DELETE FROM ticket_groups WHERE operation_day_id = ?1",
   "DELETE FROM outbox WHERE operation_day_id = ?1",
   "DELETE FROM idempotency_receipts WHERE operation_day_id = ?1",
+  "DELETE FROM aircraft_product_turnaround_overrides WHERE operation_day_id = ?1",
   "DELETE FROM resource_group_memberships WHERE operation_day_id = ?1",
   "DELETE FROM products WHERE operation_day_id = ?1",
   "DELETE FROM pilots WHERE operation_day_id = ?1",
