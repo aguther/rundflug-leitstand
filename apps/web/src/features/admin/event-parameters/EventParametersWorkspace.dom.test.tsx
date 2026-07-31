@@ -66,6 +66,41 @@ function renderWorkspace(overrides: Partial<Parameters<typeof EventParametersWor
 }
 
 describe("event parameters workspace", () => {
+  it("renders every numeric parameter through the same accessible control structure", () => {
+    renderWorkspace();
+    const expectedValues = new Map([
+      ["Boarding", { value: "8", unit: "Min." }],
+      ["Ausstieg", { value: "5", unit: "Min." }],
+      ["Puffer", { value: "3", unit: "Min." }],
+      ["No-Show nach", { value: "10", unit: "Min." }],
+      ["Klärung nach Zurückstellungen", { value: "2", unit: "Mal" }],
+      ["Benachrichtigungsvorlauf", { value: "15", unit: "Min." }],
+      ["Kind", { value: "35", unit: "kg" }],
+      ["Standard", { value: "80", unit: "kg" }],
+      ["Erhöht", { value: "110", unit: "kg" }],
+      ["Abgeflogene Zeilen sichtbar", { value: "15", unit: "Sek." }],
+    ]);
+
+    const spinbuttons = screen.getAllByRole<HTMLInputElement>("spinbutton");
+    expect(spinbuttons).toHaveLength(expectedValues.size);
+    for (const [label, expected] of expectedValues) {
+      const input = screen.getByRole<HTMLInputElement>("spinbutton", { name: label });
+      const control = input.closest(".event-parameter-number-control");
+      expect(input.value).toBe(expected.value);
+      expect(control).not.toBeNull();
+      expect(control?.querySelector(".event-parameter-number-unit")?.textContent).toBe(
+        expected.unit,
+      );
+      expect(
+        control?.querySelector(".event-parameter-number-unit")?.getAttribute("aria-hidden"),
+      ).toBe("true");
+    }
+
+    const plusSigns = screen.getAllByText("+");
+    expect(plusSigns).toHaveLength(2);
+    expect(plusSigns.every((element) => element.getAttribute("aria-hidden") === "true")).toBe(true);
+  });
+
   it("keeps save disabled until a valid value changes and submits typed values", async () => {
     const user = userEvent.setup();
     const { onSave } = renderWorkspace();
@@ -115,5 +150,19 @@ describe("event parameters workspace", () => {
     expect((screen.getByRole("spinbutton", { name: "Puffer" }) as HTMLInputElement).value).toBe(
       "3",
     );
+  });
+
+  it("keeps validation and dirty state unchanged for an invalid numeric value", async () => {
+    const user = userEvent.setup();
+    const { onDirtyChange, onSave } = renderWorkspace();
+    const boarding = screen.getByRole<HTMLInputElement>("spinbutton", { name: "Boarding" });
+    await user.clear(boarding);
+    await user.type(boarding, "0");
+
+    expect(onDirtyChange).toHaveBeenLastCalledWith(true);
+    expect(screen.getByRole<HTMLButtonElement>("button", { name: "Speichern" }).disabled).toBe(
+      true,
+    );
+    expect(onSave).not.toHaveBeenCalled();
   });
 });
