@@ -1,11 +1,8 @@
 import type { OperationBoard } from "@rundflug/contracts";
-import {
-  aircraftOperationalStateLabels,
-  buildTicketGroupRecallCopy,
-  formatBookingGroupLabel,
-} from "@rundflug/domain";
+import { aircraftOperationalStateLabels, formatBookingGroupLabel } from "@rundflug/domain";
 import {
   Bell,
+  BellOff,
   CheckCircle2,
   CircleCheck,
   CircleX,
@@ -354,99 +351,40 @@ function queuedSegmentPresentCount(group: FlightLineQueueGroup): number {
   return group.nextSegmentPresentCount ?? group.presentCount;
 }
 
-export function TicketGroupRecallDialog({
-  group,
-  gateLabel,
-  open,
-  busy,
-  onCancel,
-  onConfirm,
-}: {
-  group: FlightLineQueueGroup | null;
-  gateLabel: string;
-  open: boolean;
-  busy: boolean;
-  onCancel: () => void;
-  onConfirm: () => void | Promise<void>;
-}) {
-  const communicationLabel = group
-    ? formatBookingGroupLabel(group.productCode, group.communicationNumber)
-    : "";
-  const copy = buildTicketGroupRecallCopy({ communicationLabel, gateLabel });
-  return (
-    <ConfirmationDialog
-      body={
-        group ? (
-          <div className="ticket-group-recall-dialog">
-            <dl>
-              <div>
-                <dt>Gruppe</dt>
-                <dd>{communicationLabel}</dd>
-              </div>
-              <div>
-                <dt>Gruppengröße</dt>
-                <dd>
-                  {group.ticketCount} Person{group.ticketCount === 1 ? "" : "en"}
-                </dd>
-              </div>
-              <div>
-                <dt>Gate</dt>
-                <dd>{gateLabel}</dd>
-              </div>
-            </dl>
-            <section>
-              <span>FIDS</span>
-              <p>{copy.fids}</p>
-            </section>
-            <section>
-              <span>Statusseite</span>
-              <p>{copy.publicStatus}</p>
-            </section>
-            <section>
-              <span>Push</span>
-              <strong>{copy.pushTitle}</strong>
-              <p>{copy.pushBody}</p>
-            </section>
-          </div>
-        ) : null
-      }
-      confirmBusy={busy}
-      confirmDisabled={!group || !gateLabel}
-      confirmLabel="Nachrufen"
-      onCancel={onCancel}
-      onConfirm={onConfirm}
-      open={open}
-      title="Buchungsgruppe nachrufen"
-    />
-  );
-}
-
-export function TicketGroupRecallStatus({
+export function TicketGroupRecallButton({
   group,
   timeZone,
+  onStart,
   onClear,
 }: {
   group: FlightLineQueueGroup;
   timeZone: string;
+  onStart: (ticketGroupId: string) => void | Promise<void>;
   onClear: (ticketGroupId: string, recallId: string) => void | Promise<void>;
 }) {
-  if (!group.activeRecall) return null;
+  const activeRecall = group.activeRecall;
+  const eligibleToStart = ["QUEUED", "MISSING"].includes(group.status);
+  if (!activeRecall && !eligibleToStart) return null;
+  const communicationLabel = formatBookingGroupLabel(group.productCode, group.communicationNumber);
+  const label = activeRecall
+    ? `${communicationLabel} · Nachruf aktiv seit ${formatFlightLineTime(activeRecall.startedAt, timeZone)} · Nachruf ${activeRecall.sequence} · erneut klicken zum Beenden`
+    : `${communicationLabel} nachrufen`;
   return (
-    <div className="ticket-group-recall-status" role="status">
-      <span aria-hidden="true" className="ticket-group-recall-status__bell">
-        <Bell />
-      </span>
-      <span>
-        <strong>Nachruf aktiv</strong>
-        <small>
-          Seit {formatFlightLineTime(group.activeRecall.startedAt, timeZone)} · Nachruf{" "}
-          {group.recallCount}
-        </small>
-      </span>
-      <button onClick={() => onClear(group.id, group.activeRecall?.id ?? "")} type="button">
-        Nachruf beenden
-      </button>
-    </div>
+    <IconButton
+      aria-pressed={Boolean(activeRecall)}
+      busyLabel={
+        activeRecall
+          ? `${communicationLabel} Nachruf wird beendet`
+          : `${communicationLabel} Nachruf wird gestartet`
+      }
+      className={`ticket-group-recall-action${activeRecall ? " is-active" : ""}`}
+      label={label}
+      onClick={() => (activeRecall ? onClear(group.id, activeRecall.id) : onStart(group.id))}
+      size="touch"
+      type="button"
+    >
+      {activeRecall ? <BellOff aria-hidden="true" /> : <Bell aria-hidden="true" />}
+    </IconButton>
   );
 }
 
@@ -531,16 +469,12 @@ function AssignmentQueueRow({
             <UserRoundX aria-hidden="true" />
           </IconButton>
         )}
-        {!group.activeRecall && ["QUEUED", "MISSING"].includes(group.status) ? (
-          <IconButton
-            label={`${communicationLabel} nachrufen`}
-            onClick={() => onRecall(group.id)}
-            size="touch"
-            type="button"
-          >
-            <Bell aria-hidden="true" />
-          </IconButton>
-        ) : null}
+        <TicketGroupRecallButton
+          group={group}
+          onClear={onRecallClear}
+          onStart={onRecall}
+          timeZone={timeZone}
+        />
         {onDefer ? (
           <IconButton
             label={`${communicationLabel} zurückstellen`}
@@ -567,7 +501,6 @@ function AssignmentQueueRow({
       <span>
         {segmentPresentCount}/{segmentTicketCount} anwesend
       </span>
-      <TicketGroupRecallStatus group={group} onClear={onRecallClear} timeZone={timeZone} />
     </div>
   );
 }

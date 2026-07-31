@@ -9,7 +9,7 @@ import {
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   CartesianGrid,
   Line,
@@ -21,11 +21,13 @@ import {
   YAxis,
 } from "recharts";
 import { Button } from "../../design-system/components";
+import { ANALYTICS_ZOOM_LEVELS, useAnalyticsDiagramViewport } from "./analytics-diagram-viewport";
 import type { AnalyticsTab } from "./FlightDirectorAnalyticsDialog";
 import {
   type AnalyticsTicketGroup,
   analyticsTicketGroups,
   boardingForecastChangeMinutes,
+  calculateTimeAxisTicks,
   forecastChartData,
   formatDuration,
   resourceDayMetrics,
@@ -57,79 +59,9 @@ interface FlightDirectorAnalyticsContentProps {
 
 const MINUTE_MS = 60_000;
 const PAGE_SIZE = 8;
-const ZOOM_LEVELS: readonly number[] = [1, 1.5, 2, 3, 4.5, 6, 8];
-
-function useDiagramZoom() {
-  const [zoom, setZoom] = useState(1);
-  const zoomRef = useRef(1);
-  const viewportRef = useRef<HTMLDivElement>(null);
-  const wheelHandlerRef = useRef<(event: WheelEvent) => void>(() => undefined);
-  const nativeWheelListenerRef = useRef<((event: WheelEvent) => void) | null>(null);
-
-  const changeZoom = (nextZoom: number, anchorClientX?: number) => {
-    const viewport = viewportRef.current;
-    const nextIndex = ZOOM_LEVELS.reduce(
-      (nearest, level, index) =>
-        Math.abs(level - nextZoom) < Math.abs((ZOOM_LEVELS[nearest] ?? 1) - nextZoom)
-          ? index
-          : nearest,
-      0,
-    );
-    const normalizedZoom = ZOOM_LEVELS[nextIndex] ?? 1;
-    if (normalizedZoom === zoomRef.current) return;
-
-    let anchorOffset = 0;
-    let anchorRatio = 0.5;
-    if (viewport) {
-      const bounds = viewport.getBoundingClientRect();
-      anchorOffset =
-        anchorClientX === undefined
-          ? viewport.clientWidth / 2
-          : Math.min(viewport.clientWidth, Math.max(0, anchorClientX - bounds.left));
-      anchorRatio =
-        viewport.scrollWidth > 0
-          ? (viewport.scrollLeft + anchorOffset) / viewport.scrollWidth
-          : 0.5;
-    }
-
-    zoomRef.current = normalizedZoom;
-    setZoom(normalizedZoom);
-    if (!viewport) return;
-    window.requestAnimationFrame(() => {
-      viewport.scrollLeft = Math.max(0, anchorRatio * viewport.scrollWidth - anchorOffset);
-    });
-  };
-
-  wheelHandlerRef.current = (event: WheelEvent) => {
-    if (event.deltaY === 0) return;
-    event.preventDefault();
-    const currentIndex = ZOOM_LEVELS.indexOf(zoomRef.current);
-    const direction = event.deltaY < 0 ? 1 : -1;
-    const nextIndex = Math.min(ZOOM_LEVELS.length - 1, Math.max(0, currentIndex + direction));
-    changeZoom(ZOOM_LEVELS[nextIndex] ?? 1, event.clientX);
-  };
-
-  if (!nativeWheelListenerRef.current) {
-    nativeWheelListenerRef.current = (event) => wheelHandlerRef.current(event);
-  }
-  const setViewportRef = useCallback((viewport: HTMLDivElement | null) => {
-    const listener = nativeWheelListenerRef.current;
-    if (!listener) return;
-    viewportRef.current?.removeEventListener("wheel", listener);
-    viewportRef.current = viewport;
-    viewport?.addEventListener("wheel", listener, { passive: false });
-  }, []);
-
-  useEffect(
-    () => () => {
-      const listener = nativeWheelListenerRef.current;
-      if (listener) viewportRef.current?.removeEventListener("wheel", listener);
-    },
-    [],
-  );
-
-  return { changeZoom, setViewportRef, zoom };
-}
+const MINIMUM_TIME_LABEL_SPACING_PX = 64;
+const FORECAST_CHART_HORIZONTAL_INSET_PX = 116;
+const RESOURCE_CHART_HORIZONTAL_INSET_PX = 28;
 
 function formatTime(value: string | number | null, timeZone: string): string {
   if (value === null) return "–";
@@ -185,20 +117,22 @@ function AnalyticsLoading() {
 
 function DiagramZoomControls({
   onChange,
+  onReset,
   value,
 }: {
   onChange: (zoom: number) => void;
+  onReset: () => void;
   value: number;
 }) {
-  const index = ZOOM_LEVELS.indexOf(value);
+  const index = ANALYTICS_ZOOM_LEVELS.indexOf(value as (typeof ANALYTICS_ZOOM_LEVELS)[number]);
   return (
     <fieldset className="flight-director-diagram-zoom">
       <legend className="visually-hidden">Diagramm-Zoom</legend>
-      <small>Mausrad: Zoom an Zeigerposition</small>
+      <small>Mausrad: Zoom · Ziehen: Verschieben</small>
       <Button
         aria-label="Diagramm verkleinern"
         disabled={index <= 0}
-        onClick={() => onChange(ZOOM_LEVELS[Math.max(0, index - 1)] ?? 1)}
+        onClick={() => onChange(ANALYTICS_ZOOM_LEVELS[Math.max(0, index - 1)] ?? 1)}
         type="button"
         variant="secondary"
       >
@@ -207,8 +141,12 @@ function DiagramZoomControls({
       <span aria-live="polite">{Math.round(value * 100)} %</span>
       <Button
         aria-label="Diagramm vergrößern"
-        disabled={index < 0 || index >= ZOOM_LEVELS.length - 1}
-        onClick={() => onChange(ZOOM_LEVELS[Math.min(ZOOM_LEVELS.length - 1, index + 1)] ?? value)}
+        disabled={index < 0 || index >= ANALYTICS_ZOOM_LEVELS.length - 1}
+        onClick={() =>
+          onChange(
+            ANALYTICS_ZOOM_LEVELS[Math.min(ANALYTICS_ZOOM_LEVELS.length - 1, index + 1)] ?? value,
+          )
+        }
         type="button"
         variant="secondary"
       >
@@ -217,7 +155,7 @@ function DiagramZoomControls({
       <Button
         aria-label="Gesamten Veranstaltungsverlauf anzeigen"
         disabled={value === 1}
-        onClick={() => onChange(1)}
+        onClick={onReset}
         type="button"
         variant="secondary"
       >
@@ -259,16 +197,30 @@ function ForecastRotationPanel({
   entries,
   error,
   loading,
+  resetKey,
   rotation,
 }: {
   board: OperationBoard;
   entries: ForecastEntry[];
   error: string | null;
   loading: boolean;
+  resetKey: string;
   rotation: Rotation | undefined;
 }) {
   const [page, setPage] = useState(0);
-  const { changeZoom, setViewportRef, zoom } = useDiagramZoom();
+  const {
+    changeZoom,
+    dragging,
+    onClickCapture,
+    onPointerCancel,
+    onPointerDown,
+    onPointerMove,
+    onPointerUp,
+    reset,
+    setViewportRef,
+    viewportWidth,
+    zoom,
+  } = useAnalyticsDiagramViewport(resetKey);
   const sorted = useMemo(() => sortedForecastEntries(entries), [entries]);
   const chartData = useMemo(() => forecastChartData(entries), [entries]);
   const latest = sorted.at(-1);
@@ -294,6 +246,22 @@ function ForecastRotationPanel({
   }
   const minimum = values.length > 0 ? Math.min(...values) - 5 * MINUTE_MS : 0;
   const maximum = values.length > 0 ? Math.max(...values) + 5 * MINUTE_MS : 1;
+  const capturedValues = chartData.map((point) => point.capturedAt);
+  const capturedMinimum = capturedValues.length > 0 ? Math.min(...capturedValues) : 0;
+  const capturedMaximum = capturedValues.length > 0 ? Math.max(...capturedValues) : 1;
+  const capturedDomain =
+    capturedMinimum === capturedMaximum
+      ? [capturedMinimum - 5 * MINUTE_MS, capturedMaximum + 5 * MINUTE_MS]
+      : [capturedMinimum, capturedMaximum];
+  const chartPixelWidth =
+    Math.max(320, viewportWidth || 720) * zoom - FORECAST_CHART_HORIZONTAL_INSET_PX;
+  const timeAxisTicks = calculateTimeAxisTicks({
+    from: capturedDomain[0] ?? 0,
+    minimumLabelSpacing: MINIMUM_TIME_LABEL_SPACING_PX,
+    pixelWidth: chartPixelWidth,
+    timeZone,
+    until: capturedDomain[1] ?? 1,
+  });
   const turnaroundProfile = rotation?.timeline.effectiveTurnaroundProfile;
   const assumedAircraft = board.aircraft.find(
     (aircraft) => aircraft.id === rotation?.timeline.forecastAssumedAircraftId,
@@ -377,10 +345,18 @@ function ForecastRotationPanel({
         <AnalyticsEmpty message="Für diese Fluggruppe wurden noch keine Prognose-Snapshots erfasst." />
       ) : (
         <>
-          <DiagramZoomControls onChange={changeZoom} value={zoom} />
-          <div className="flight-director-chart-viewport" ref={setViewportRef}>
+          <DiagramZoomControls onChange={changeZoom} onReset={reset} value={zoom} />
+          <div
+            className={`flight-director-chart-viewport${zoom > 1 ? " is-pannable" : ""}${dragging ? " is-dragging" : ""}`}
+            onClickCapture={onClickCapture}
+            onPointerCancel={onPointerCancel}
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            ref={setViewportRef}
+          >
             <div
-              aria-label="Prognosediagramm; mit dem Mausrad zoomen"
+              aria-label="Prognosediagramm; mit dem Mausrad zoomen und durch Ziehen verschieben"
               className="flight-director-forecast-chart"
               role="img"
               style={{ width: `${zoom * 100}%` }}
@@ -394,10 +370,11 @@ function ForecastRotationPanel({
                   <CartesianGrid stroke="var(--ui-border)" strokeDasharray="2 4" />
                   <XAxis
                     dataKey="capturedAt"
-                    domain={["dataMin", "dataMax"]}
-                    minTickGap={44}
+                    domain={capturedDomain}
+                    interval={0}
                     scale="time"
                     tickFormatter={(value: number) => formatTime(value, timeZone)}
+                    ticks={timeAxisTicks.map((tick) => tick.value)}
                     type="number"
                   />
                   <YAxis
@@ -650,6 +627,7 @@ function ForecastPanel({
                 error={result?.error ?? null}
                 key={rotation.id}
                 loading={!result}
+                resetKey={`${ticketGroupId}:${rotationId}:${rotation.id}`}
                 rotation={rotation}
               />
             );
@@ -679,7 +657,19 @@ function ResourcePanel({
   scopeId: string;
   scopeType: "AIRCRAFT" | "PILOT";
 }) {
-  const { changeZoom, setViewportRef, zoom } = useDiagramZoom();
+  const {
+    changeZoom,
+    dragging,
+    onClickCapture,
+    onPointerCancel,
+    onPointerDown,
+    onPointerMove,
+    onPointerUp,
+    reset,
+    setViewportRef,
+    viewportWidth,
+    zoom,
+  } = useAnalyticsDiagramViewport(`${scopeType}:${scopeId}`);
   const timeZone = board.event.timeZone;
   const resources =
     scopeType === "AIRCRAFT"
@@ -704,13 +694,27 @@ function ResourcePanel({
   const timelineSpan = Math.max(1, timelineUntil - timelineFrom);
   const timelinePercent = (value: string) =>
     Math.min(100, Math.max(0, ((Date.parse(value) - timelineFrom) / timelineSpan) * 100));
-  const timelineTicks = Array.from({ length: 5 }, (_, index) => {
-    const percent = index * 25;
-    return {
-      percent,
-      value: timelineFrom + timelineSpan * (percent / 100),
-    };
-  });
+  const timelineTicks = calculateTimeAxisTicks({
+    from: timelineFrom,
+    minimumLabelSpacing: MINIMUM_TIME_LABEL_SPACING_PX,
+    pixelWidth: Math.max(320, viewportWidth || 720) * zoom - RESOURCE_CHART_HORIZONTAL_INSET_PX,
+    timeZone,
+    until: timelineUntil,
+  }).map((tick) => ({
+    ...tick,
+    percent: ((tick.value - timelineFrom) / timelineSpan) * 100,
+  }));
+  const ticketGroupsByRotationId = useMemo(() => {
+    const result = new Map<string, string[]>();
+    for (const ticketGroup of analyticsTicketGroups(board.rotations)) {
+      for (const relatedRotationId of ticketGroup.rotationIds) {
+        const labels = result.get(relatedRotationId) ?? [];
+        labels.push(ticketGroup.label);
+        result.set(relatedRotationId, labels);
+      }
+    }
+    return result;
+  }, [board.rotations]);
   const summary =
     scopeType === "AIRCRAFT"
       ? [
@@ -785,8 +789,16 @@ function ResourcePanel({
           <AnalyticsEmpty message="Für diese Ressource liegen in der Veranstaltung noch keine bestätigten Umläufe vor." />
         ) : (
           <>
-            <DiagramZoomControls onChange={changeZoom} value={zoom} />
-            <div className="flight-director-chart-viewport" ref={setViewportRef}>
+            <DiagramZoomControls onChange={changeZoom} onReset={reset} value={zoom} />
+            <div
+              className={`flight-director-chart-viewport${zoom > 1 ? " is-pannable" : ""}${dragging ? " is-dragging" : ""}`}
+              onClickCapture={onClickCapture}
+              onPointerCancel={onPointerCancel}
+              onPointerDown={onPointerDown}
+              onPointerMove={onPointerMove}
+              onPointerUp={onPointerUp}
+              ref={setViewportRef}
+            >
               <section
                 aria-label={`Tagesverlauf ${selected?.primary ?? ""}: ${timelineRotations.length} Umläufe hintereinander`}
                 className="flight-director-resource-chart"
@@ -794,13 +806,24 @@ function ResourcePanel({
               >
                 <div aria-hidden="true" className="resource-timeline-grid">
                   {timelineTicks.map((tick) => (
-                    <i key={tick.percent} style={{ left: `${tick.percent}%` }} />
+                    <i key={tick.value} style={{ left: `${tick.percent}%` }} />
                   ))}
                 </div>
                 <div aria-hidden="true" className="resource-timeline-axis">
                   {timelineTicks.map((tick) => (
-                    <span key={tick.percent} style={{ left: `${tick.percent}%` }}>
-                      {formatTime(tick.value, timeZone)}
+                    <span
+                      key={tick.value}
+                      style={{
+                        left: `${tick.percent}%`,
+                        transform:
+                          tick.percent < 2
+                            ? "none"
+                            : tick.percent > 98
+                              ? "translateX(-100%)"
+                              : "translateX(-50%)",
+                      }}
+                    >
+                      {tick.label}
                     </span>
                   ))}
                 </div>
@@ -827,11 +850,15 @@ function ResourcePanel({
                   />
                   {timelineRotations.map((item) => {
                     const width = Math.max(0.15, item.endPercent - item.startPercent);
-                    const title = `${item.label} · ${formatTime(item.rotation.actual.boardingAt, timeZone)}–${formatTime(item.rotation.actual.completionAt, timeZone)} Uhr · ${item.rotation.passengerCount}/${item.rotation.usableCapacity} Plätze · ${item.rotation.aircraftRegistration ?? "kein Flugzeug"} · ${item.rotation.pilotOperationalCode ?? "kein Pilot"}`;
+                    const ticketGroupLabels = ticketGroupsByRotationId.get(item.id) ?? [];
+                    const ticketGroupText =
+                      ticketGroupLabels.length === 1
+                        ? `Ticketgruppe ${ticketGroupLabels[0]}`
+                        : `Ticketgruppen ${ticketGroupLabels.join(", ")}`;
+                    const title = `${ticketGroupText} · Fluggruppe ${item.label} · ${formatTime(item.rotation.actual.boardingAt, timeZone)}–${formatTime(item.rotation.actual.completionAt, timeZone)} Uhr · ${item.rotation.passengerCount}/${item.rotation.usableCapacity} Personen · ${item.rotation.aircraftRegistration ?? "kein Flugzeug"} · ${item.rotation.pilotOperationalCode ?? "kein Pilot"}`;
                     return (
                       <div
                         className="resource-timeline-rotation"
-                        data-label-align={item.startPercent > 85 ? "end" : "start"}
                         key={item.id}
                         style={{ left: `${item.startPercent}%`, width: `${width}%` }}
                       >
@@ -847,13 +874,11 @@ function ResourcePanel({
                           />
                         ))}
                         <button
-                          aria-label={`${item.label}: Prognose öffnen`}
+                          aria-label={`${title} · Prognose öffnen`}
                           onClick={() => onOpenRotation(item.id)}
                           title={title}
                           type="button"
-                        >
-                          <span>{item.label}</span>
-                        </button>
+                        />
                       </div>
                     );
                   })}
