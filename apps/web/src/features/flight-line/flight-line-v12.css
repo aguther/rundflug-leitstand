@@ -830,9 +830,12 @@
 }
 .flight-director-compact-head {
   position: sticky;
+  z-index: 5;
   top: 0;
+  isolation: isolate;
   color: var(--ui-muted);
   background: var(--ui-surface-subtle);
+  box-shadow: 0 1px 0 var(--ui-border);
   font-weight: 650;
 }
 .flight-director-compact-table > p {
@@ -1870,11 +1873,13 @@
 }
 
 .flight-director-analytics-panel-heading h3,
+.flight-director-analytics-panel-heading h4,
 .flight-director-analytics-panel-heading p {
   margin: 0;
 }
 
-.flight-director-analytics-panel-heading h3 {
+.flight-director-analytics-panel-heading h3,
+.flight-director-analytics-panel-heading h4 {
   font-size: 1rem;
 }
 
@@ -1893,7 +1898,8 @@
 }
 
 .flight-director-analytics-panel-heading select {
-  min-width: 250px;
+  width: 100%;
+  min-width: 0;
   height: var(--control-default);
   padding: 0 30px 0 10px;
   border: 1px solid var(--ui-border-strong);
@@ -1902,6 +1908,35 @@
   background: var(--ui-control);
   font: inherit;
   font-size: 0.76rem;
+}
+
+.flight-director-analytics-selectors {
+  display: grid;
+  width: clamp(460px, 46vw, 620px);
+  min-width: 460px;
+  flex: 0 1 620px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.flight-director-forecast-list {
+  display: grid;
+  gap: 16px;
+}
+
+.flight-director-forecast-detail {
+  display: grid;
+  min-width: 0;
+  align-content: start;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-md);
+  background: var(--ui-surface-subtle);
+}
+
+.flight-director-forecast-detail .flight-director-analytics-panel-loading {
+  min-height: 260px;
 }
 
 .flight-director-analytics-milestones,
@@ -1951,17 +1986,70 @@
 }
 
 .flight-director-forecast-chart {
+  min-width: 100%;
   height: 260px;
+  flex: 0 0 auto;
   border: 1px solid var(--ui-border);
   border-radius: var(--radius-md);
   background: var(--ui-surface);
 }
 
 .flight-director-resource-chart {
-  height: clamp(210px, 32vh, 340px);
+  position: relative;
+  min-width: 100%;
+  height: 170px;
+  flex: 0 0 auto;
+  overflow: hidden;
   border: 1px solid var(--ui-border);
   border-radius: var(--radius-md);
   background: var(--ui-surface);
+}
+
+.flight-director-chart-viewport {
+  display: flex;
+  max-width: 100%;
+  overflow-x: scroll;
+  overflow-y: hidden;
+  overscroll-behavior-inline: contain;
+  scrollbar-gutter: stable;
+}
+
+.flight-director-diagram-zoom {
+  display: flex;
+  width: 100%;
+  min-height: 32px;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.flight-director-diagram-zoom > small {
+  margin-right: auto;
+  color: var(--ui-muted);
+  font-size: 0.64rem;
+}
+
+.flight-director-diagram-zoom .ds-button {
+  min-height: 30px;
+  gap: 4px;
+  padding: 3px 8px;
+  font-size: 0.66rem;
+}
+
+.flight-director-diagram-zoom .ds-button svg {
+  width: 14px;
+  height: 14px;
+}
+
+.flight-director-diagram-zoom > span {
+  min-width: 48px;
+  color: var(--ui-muted);
+  font-size: 0.68rem;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
 }
 
 .flight-director-forecast-chart .recharts-cartesian-axis-tick-value,
@@ -2047,16 +2135,156 @@
   color: var(--analytics-pause);
 }
 
-.timeline-boarding {
-  fill: var(--analytics-boarding);
+.resource-timeline-grid {
+  position: absolute;
+  inset: 34px 14px 24px;
 }
 
-.timeline-flight {
-  fill: var(--analytics-departure);
+.resource-timeline-grid > i {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 1px dashed var(--ui-border);
 }
 
-.timeline-turnaround {
-  fill: var(--analytics-completion);
+.resource-timeline-axis {
+  position: absolute;
+  right: 14px;
+  bottom: 6px;
+  left: 14px;
+  height: 16px;
+}
+
+.resource-timeline-axis > span {
+  position: absolute;
+  color: var(--ui-muted);
+  font-size: 0.66rem;
+  font-variant-numeric: tabular-nums;
+  transform: translateX(-50%);
+}
+
+.resource-timeline-axis > span:first-child {
+  transform: none;
+}
+
+.resource-timeline-axis > span:last-child {
+  transform: translateX(-100%);
+}
+
+.resource-timeline-lane {
+  position: absolute;
+  top: 78px;
+  right: 14px;
+  left: 14px;
+  height: 28px;
+  border-block: 1px solid var(--ui-border);
+  background: color-mix(in srgb, var(--ui-surface-subtle) 78%, transparent);
+}
+
+.resource-timeline-block {
+  position: absolute;
+  z-index: 1;
+  top: -14px;
+  bottom: -14px;
+  min-width: 2px;
+  border-inline: 1px solid currentColor;
+  opacity: 0.22;
+}
+
+.resource-timeline-block--refueling {
+  color: var(--analytics-refueling);
+  background: var(--analytics-refueling);
+}
+
+.resource-timeline-block--interruption {
+  color: var(--analytics-interruption);
+  background: var(--analytics-interruption);
+}
+
+.resource-timeline-block--pause {
+  color: var(--analytics-pause);
+  background: var(--analytics-pause);
+}
+
+.resource-timeline-observed {
+  position: absolute;
+  z-index: 4;
+  top: -22px;
+  bottom: -22px;
+  border-left: 1px dashed var(--ui-border-strong);
+}
+
+.resource-timeline-rotation {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  min-width: 3px;
+  height: 28px;
+}
+
+.resource-timeline-phase {
+  position: absolute;
+  top: 4px;
+  height: 20px;
+  min-width: 2px;
+  pointer-events: none;
+}
+
+.resource-timeline-phase--boarding {
+  border-radius: 3px 0 0 3px;
+  background: var(--analytics-boarding);
+}
+
+.resource-timeline-phase--flight {
+  background: var(--analytics-departure);
+}
+
+.resource-timeline-phase--turnaround {
+  border-radius: 0 3px 3px 0;
+  background: var(--analytics-completion);
+}
+
+.resource-timeline-rotation > button {
+  position: absolute;
+  z-index: 3;
+  inset: -25px 0 -5px;
+  min-width: 3px;
+  padding: 0;
+  overflow: visible;
+  border: 0;
+  color: var(--ui-muted);
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+.resource-timeline-rotation > button > span {
+  position: absolute;
+  top: 0;
+  left: 0;
+  max-width: max(100%, 72px);
+  overflow: hidden;
+  font-size: 0.66rem;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.resource-timeline-rotation[data-label-align="end"] > button > span {
+  right: 0;
+  left: auto;
+  text-align: right;
+}
+
+.resource-timeline-rotation:has(button:hover) .resource-timeline-phase,
+.resource-timeline-rotation:has(button:focus-visible) .resource-timeline-phase {
+  filter: brightness(1.22);
+}
+
+.resource-timeline-rotation > button:focus-visible {
+  border-radius: 3px;
+  outline: 2px solid var(--ui-accent);
+  outline-offset: 2px;
 }
 
 .flight-director-analytics-state {
@@ -2252,9 +2480,20 @@
     width: 100%;
     min-width: 0;
   }
+
+  .flight-director-analytics-selectors {
+    width: 100%;
+    min-width: 0;
+    flex: 0 0 auto;
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 560px) {
+  .flight-director-diagram-zoom > small {
+    display: none;
+  }
+
   .flight-director-analytics-milestones,
   .flight-director-analytics-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));

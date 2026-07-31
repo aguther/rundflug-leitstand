@@ -141,6 +141,9 @@ describe("Flight Director", () => {
     expect(flightLineStyles).toContain("min-width: 1088px");
     expect(flightLineStyles).toContain("scrollbar-gutter: stable");
     expect(flightLineStyles).toMatch(
+      /\.flight-director-compact-head \{[\s\S]*?position: sticky;[\s\S]*?z-index: 5;[\s\S]*?isolation: isolate;/,
+    );
+    expect(flightLineStyles).toMatch(
       /\.flight-director-ticket-overview > header \{[\s\S]*?flex: 0 0 auto;/,
     );
   });
@@ -149,13 +152,25 @@ describe("Flight Director", () => {
     expect(supervisorSource).toContain("Auswertungen");
     expect(supervisorSource).toContain("FlightDirectorAnalyticsDialog");
     expect(supervisorSource).toContain('setAnalyticsSelection({ tab: "aircraft", id: entry.id })');
-    expect(supervisorSource).toContain('setAnalyticsSelection({ tab: "groups", id: rotationId })');
+    expect(supervisorSource).toContain(
+      'setAnalyticsSelection({ tab: "groups", id: ticketGroupId, rotationId })',
+    );
     expect(analyticsDialogSource).toContain("lazy(() =>");
-    expect(analyticsDialogSource).toContain('{ value: "groups", label: "Fluggruppen" }');
+    expect(analyticsDialogSource).toContain('{ value: "groups", label: "Ticketgruppen" }');
     expect(analyticsDialogSource).toContain('{ value: "aircraft", label: "Flugzeuge" }');
     expect(analyticsDialogSource).toContain('{ value: "pilots", label: "Piloten" }');
     expect(analyticsContentSource).toContain("<LineChart");
-    expect(analyticsContentSource).toContain("<BarChart");
+    expect(analyticsContentSource).toContain("resourceTimelineRotations");
+    expect(analyticsContentSource).toContain("Alle zugehörigen");
+    expect(analyticsContentSource).toContain("DiagramZoomControls");
+    expect(analyticsContentSource).toMatch(/ZOOM_LEVELS[^=]*= \[1, 1\.5, 2, 3, 4\.5, 6, 8\]/);
+    expect(analyticsContentSource).toContain(
+      'addEventListener("wheel", listener, { passive: false })',
+    );
+    expect(analyticsContentSource).toContain("isAnimationActive={false}");
+    expect(analyticsContentSource).toContain("{group.label}");
+    expect(flightLineStyles).toContain("overflow-x: scroll");
+    expect(flightLineStyles).toContain("grid-template-columns: repeat(2, minmax(0, 1fr))");
     expect(analyticsContentSource).toContain("Prognose öffnen");
     expect(analyticsDialogSource).toContain(
       "Organisatorische Übersicht · keine Dienst-, Flugzeit- oder Einsatzfreigabe.",

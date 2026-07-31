@@ -439,7 +439,12 @@ export function FlightLineSupervisorConsole({
                       : board.pilots.length > 0
                         ? "pilots"
                         : "groups",
-                  id: aircraft[0]?.id ?? board.pilots[0]?.id ?? board.rotations[0]?.id ?? "",
+                  id:
+                    aircraft[0]?.id ??
+                    board.pilots[0]?.id ??
+                    board.rotations[0]?.bookingGroups[0]?.id ??
+                    board.rotations[0]?.ticketGroupId ??
+                    "",
                 })
               }
               type="button"
@@ -671,8 +676,8 @@ export function FlightLineSupervisorConsole({
             </label>
           </header>
           <CompactTickets
-            onOpenAnalytics={(rotationId) =>
-              setAnalyticsSelection({ tab: "groups", id: rotationId })
+            onOpenAnalytics={(ticketGroupId, rotationId) =>
+              setAnalyticsSelection({ tab: "groups", id: ticketGroupId, rotationId })
             }
             onSort={(key) => setTicketSort((current) => nextTicketSort(current, key))}
             rows={ticketRows}
@@ -735,7 +740,7 @@ function CompactTickets({
   timeZone: string;
   sort: TicketSort;
   onSort: (key: TicketSortKey) => void;
-  onOpenAnalytics: (rotationId: string) => void;
+  onOpenAnalytics: (ticketGroupId: string, rotationId: string) => void;
 }) {
   const phaseIcon = (rotation: Rotation) => {
     const label = rotationStateLabels[rotation.status];
@@ -836,8 +841,8 @@ function CompactTickets({
             <span>{formatFlightLineTime(rotation.timeline.actual.completionAt, timeZone)}</span>
             <span className="ticket-analytics-action">
               <IconButton
-                label={`Prognoseverlauf für ${rotation.communicationLabel} anzeigen`}
-                onClick={() => onOpenAnalytics(rotation.id)}
+                label={`Tagesauswertung für ${formatBookingGroupLabel(rotation.productCode, group.communicationNumber)} anzeigen`}
+                onClick={() => onOpenAnalytics(group.id, rotation.id)}
                 size="compact"
                 type="button"
               >

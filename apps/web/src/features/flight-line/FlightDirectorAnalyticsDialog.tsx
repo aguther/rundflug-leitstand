@@ -1,6 +1,7 @@
 import type { ForecastHistory, OperationBoard, ResourceDayHistory } from "@rundflug/contracts";
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button, ModalDialog, Tabs } from "../../design-system/components";
+import { analyticsTicketGroups } from "./flight-director-analytics-model";
 
 const FlightDirectorAnalyticsContent = lazy(() =>
   import("./FlightDirectorAnalyticsContent").then((module) => ({
@@ -12,6 +13,7 @@ export type AnalyticsTab = "groups" | "aircraft" | "pilots";
 export type FlightDirectorAnalyticsSelection = {
   tab: AnalyticsTab;
   id: string;
+  rotationId?: string;
 };
 
 export interface FlightDirectorAnalyticsDialogProps {
@@ -27,7 +29,7 @@ export interface FlightDirectorAnalyticsDialogProps {
 }
 
 const tabs = [
-  { value: "groups", label: "Fluggruppen" },
+  { value: "groups", label: "Ticketgruppen" },
   { value: "aircraft", label: "Flugzeuge" },
   { value: "pilots", label: "Piloten" },
 ] satisfies Array<{ value: AnalyticsTab; label: string }>;
@@ -41,10 +43,28 @@ export function FlightDirectorAnalyticsDialog({
   open,
 }: FlightDirectorAnalyticsDialogProps) {
   const [tab, setTab] = useState<AnalyticsTab>("aircraft");
+  const [ticketGroupId, setTicketGroupId] = useState("");
   const [rotationId, setRotationId] = useState("");
   const [aircraftId, setAircraftId] = useState("");
   const [pilotId, setPilotId] = useState("");
   const wasOpen = useRef(false);
+  const ticketGroups = useMemo(() => analyticsTicketGroups(board.rotations), [board.rotations]);
+
+  const selectTicketGroup = useCallback(
+    (nextTicketGroupId: string, preferredRotationId?: string) => {
+      const rotationIds =
+        ticketGroups.find((group) => group.id === nextTicketGroupId)?.rotationIds ?? [];
+      setTicketGroupId(nextTicketGroupId);
+      setRotationId(
+        preferredRotationId && rotationIds.includes(preferredRotationId)
+          ? preferredRotationId
+          : rotationIds.length > 1
+            ? "all"
+            : (rotationIds[0] ?? ""),
+      );
+    },
+    [ticketGroups],
+  );
 
   useEffect(() => {
     if (!open) {
@@ -55,16 +75,38 @@ export function FlightDirectorAnalyticsDialog({
     wasOpen.current = true;
     const fallbackAircraftId = board.aircraft[0]?.id ?? "";
     const fallbackPilotId = board.pilots[0]?.id ?? "";
-    const fallbackRotationId = board.rotations[0]?.id ?? "";
+    const fallbackTicketGroupId = ticketGroups[0]?.id ?? "";
     const next = initialSelection ?? {
       tab: "aircraft" as const,
       id: fallbackAircraftId,
     };
+    const selectedRotation =
+      next.tab === "groups"
+        ? board.rotations.find((rotation) => rotation.id === (next.rotationId ?? next.id))
+        : undefined;
+    const selectedTicketGroupId =
+      next.tab === "groups"
+        ? (ticketGroups.find((group) => group.id === next.id)?.id ??
+          selectedRotation?.bookingGroups[0]?.id ??
+          selectedRotation?.ticketGroupId ??
+          fallbackTicketGroupId)
+        : fallbackTicketGroupId;
     setTab(next.tab);
-    setRotationId(next.tab === "groups" ? next.id : fallbackRotationId);
+    selectTicketGroup(
+      selectedTicketGroupId,
+      next.tab === "groups" ? (next.rotationId ?? selectedRotation?.id) : undefined,
+    );
     setAircraftId(next.tab === "aircraft" ? next.id : fallbackAircraftId);
     setPilotId(next.tab === "pilots" ? next.id : fallbackPilotId);
-  }, [board.aircraft, board.pilots, board.rotations, initialSelection, open]);
+  }, [
+    board.aircraft,
+    board.pilots,
+    board.rotations,
+    initialSelection,
+    open,
+    selectTicketGroup,
+    ticketGroups,
+  ]);
 
   const footerNote =
     tab === "groups"
@@ -115,14 +157,22 @@ export function FlightDirectorAnalyticsDialog({
             loadResourceHistory={loadResourceHistory}
             onAircraftIdChange={setAircraftId}
             onOpenRotation={(nextRotationId) => {
-              setRotationId(nextRotationId);
+              const nextRotation = board.rotations.find(
+                (rotation) => rotation.id === nextRotationId,
+              );
+              selectTicketGroup(
+                nextRotation?.bookingGroups[0]?.id ?? nextRotation?.ticketGroupId ?? "",
+                nextRotationId,
+              );
               setTab("groups");
             }}
             onPilotIdChange={setPilotId}
             onRotationIdChange={setRotationId}
+            onTicketGroupIdChange={selectTicketGroup}
             pilotId={pilotId}
             rotationId={rotationId}
             tab={tab}
+            ticketGroupId={ticketGroupId}
           />
         </Suspense>
       </div>
