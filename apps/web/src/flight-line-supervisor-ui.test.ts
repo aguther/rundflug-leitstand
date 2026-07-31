@@ -165,8 +165,10 @@ describe("Flight Director", () => {
     expect(analyticsContentSource).toContain("Alle zugehörigen");
     expect(analyticsContentSource).toContain("DiagramZoomControls");
     expect(analyticsViewportSource).toMatch(
-      /ANALYTICS_ZOOM_LEVELS[^=]*= \[1, 1\.5, 2, 3, 4\.5, 6, 8\]/,
+      /ANALYTICS_ZOOM_LEVELS[^=]*= \[1, 1\.5, 2, 3, 4\.5, 6, 8, 12, 16, 24, 32\]/,
     );
+    expect(analyticsViewportSource).toContain("analyticsZoomLevelsForSpan");
+    expect(analyticsContentSource).toContain("<th>Ticketgruppe</th>");
     expect(analyticsViewportSource).toContain(
       'addEventListener("wheel", listener, { passive: false })',
     );

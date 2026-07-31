@@ -1,6 +1,6 @@
 # Flight-Director-Tagesauswertung
 
-Stand: 30. Juli 2026 · Freigegebene Ergänzung zum Releasekonzept 1.11.0
+Stand: 31. Juli 2026 · Freigegebene Ergänzung zum Releasekonzept 1.11.0
 
 ## Ziel und Abgrenzung
 
@@ -59,19 +59,24 @@ innere Zeichenfläche wird vergrößert und horizontal bewegt; Rahmen, rechte Au
 Zoomsteuerung und Scrollbereich bleiben dadurch stabil. Das Mausrad zoomt an der Zeigerposition,
 Ziehen mit der primären Maustaste verschiebt die Zeitachse, und **Gesamt** setzt Zoom,
 Scrollposition und Ziehzustand gemeinsam zurück. Auswahl- und Reiterwechsel beginnen ebenfalls
-immer in der Gesamtansicht.
+immer in der Gesamtansicht. Auch ein Ziehbeginn auf Pausen, Sperren oder Achsenbeschriftungen
+markiert keinen Text.
 
 Die X-Achsen verwenden explizit berechnete, an lokalen Zeitgrenzen der Veranstaltungszeitzone
 ausgerichtete Ticks. Abhängig von Zeitspanne, Viewportbreite und Zoom werden ausschließlich die
 Stufen 5, 10, 15, 30, 60, 120, 180, 360 oder 720 Minuten verwendet; feinere Ticks als fünf Minuten
 werden nicht erzeugt. Höhere Zoomstufen zeigen schrittweise mehr Zeitdetails, ohne
-Beschriftungsüberlagerungen.
+Beschriftungsüberlagerungen. Aus der dargestellten Zeitspanne werden die Zoomstufen bis zu dem
+ersten Detailgrad angeboten, bei dem höchstens etwa 90 Minuten sichtbar bleiben. Für lange
+Tagesdomains stehen dafür bei Bedarf Stufen bis 32-fach zur Verfügung.
 
 Flugzeug- und Pilotendiagramme zeigen auf kurzen aufeinanderfolgenden Umläufen keine permanenten
 Gruppenlabels. Jeder farbige Ressourcenbalken bleibt fokussierbar und öffnet per Klick oder
 Tastatur den Prognoseverlauf. Sein zugänglicher Name und Tooltip enthalten alle zugehörigen
 Ticketgruppen, die Fluggruppe, Boarding und Abschluss, Personen/Kapazität, Flugzeugkennung und
-Pilotencode.
+Pilotencode. Die darunterliegende Umlauftabelle beginnt in Flugzeug- und Pilotenansicht mit den
+kommaseparierten Ticketgruppen vor Fluggruppe, Flugzeug und Pilot; die Zuordnung stammt aus dem
+bereits geladenen Board.
 
 ## Daten- und Sicherheitskonzept
 

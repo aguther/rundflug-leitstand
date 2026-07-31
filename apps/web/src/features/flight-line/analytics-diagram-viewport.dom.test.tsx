@@ -3,7 +3,13 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { useAnalyticsDiagramViewport } from "./analytics-diagram-viewport";
+import {
+  ANALYTICS_TARGET_VISIBLE_MINUTES,
+  analyticsZoomLevelsForSpan,
+  useAnalyticsDiagramViewport,
+} from "./analytics-diagram-viewport";
+
+const HOUR_MS = 60 * 60_000;
 
 function DiagramViewportHarness({ resetKey }: { resetKey: string }) {
   const [opened, setOpened] = useState(0);
@@ -28,6 +34,8 @@ function DiagramViewportHarness({ resetKey }: { resetKey: string }) {
         onPointerUp={viewport.onPointerUp}
         ref={viewport.setViewportRef}
       >
+        <span data-testid="pause">Pause/Sperre</span>
+        <span data-testid="axis-label">22:30</span>
         <button onClick={() => setOpened((value) => value + 1)} type="button">
           Prognose öffnen
         </button>
@@ -52,6 +60,23 @@ function prepareViewport() {
 
 describe("analytics diagram viewport", () => {
   afterEach(() => cleanup());
+
+  it.each([
+    { hours: 12, maximumZoom: 8 },
+    { hours: 24, maximumZoom: 16 },
+    { hours: 48, maximumZoom: 32 },
+  ])(
+    "limits a $hours-hour domain at $maximumZoom× once at most 90 minutes remain visible",
+    ({ hours, maximumZoom }) => {
+      const levels = analyticsZoomLevelsForSpan(hours * HOUR_MS);
+      expect(levels.at(-1)).toBe(maximumZoom);
+      expect(new Set(levels).size).toBe(levels.length);
+      expect(levels.every((level, index) => index === 0 || level > (levels[index - 1] ?? 0))).toBe(
+        true,
+      );
+      expect((hours * 60) / maximumZoom).toBeLessThanOrEqual(ANALYTICS_TARGET_VISIBLE_MINUTES);
+    },
+  );
 
   it("resets state, ref, horizontal scroll and dragging when resetKey changes", () => {
     const { rerender } = render(<DiagramViewportHarness resetKey="aircraft:one" />);
@@ -133,5 +158,41 @@ describe("analytics diagram viewport", () => {
     fireEvent.click(openButton);
 
     expect(screen.getByLabelText("Opened").textContent).toBe("1");
+  });
+
+  it.each([
+    ["pause", "a pause block"],
+    ["axis-label", "an axis label"],
+  ])("prevents text selection when dragging from %s", (testId) => {
+    render(<DiagramViewportHarness resetKey={`selection:${testId}`} />);
+    const viewport = prepareViewport();
+    viewport.scrollLeft = 240;
+    const target = screen.getByTestId(testId);
+
+    fireEvent.pointerDown(target, {
+      button: 0,
+      clientX: 200,
+      pointerId: 12,
+      pointerType: "mouse",
+    });
+    const activeSelection = new Event("selectstart", { bubbles: true, cancelable: true });
+    target.dispatchEvent(activeSelection);
+    expect(activeSelection.defaultPrevented).toBe(true);
+
+    fireEvent.pointerMove(viewport, {
+      clientX: 180,
+      pointerId: 12,
+      pointerType: "mouse",
+    });
+    expect(viewport.scrollLeft).toBe(260);
+    fireEvent.pointerUp(viewport, {
+      clientX: 180,
+      pointerId: 12,
+      pointerType: "mouse",
+    });
+
+    const idleSelection = new Event("selectstart", { bubbles: true, cancelable: true });
+    target.dispatchEvent(idleSelection);
+    expect(idleSelection.defaultPrevented).toBe(false);
   });
 });
