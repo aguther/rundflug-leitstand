@@ -31,7 +31,10 @@ describe("FIDS V1.7.3 UI", () => {
     expect(displaySource).toContain(
       "formatBookingGroupLabel(group.productCode, group.communicationNumber)",
     );
-    expect(displaySource).toContain("GO TO GATE");
+    expect(displaySource).toContain("BITTE ZUM GATE");
+    expect(displaySource).toContain("ABGEFLOGEN");
+    expect(displaySource).toContain("GELANDET");
+    expect(displaySource).toContain("ABGESCHLOSSEN");
     expect(displaySource).toContain("Bitte QR-Ticket bereithalten");
     expect(displaySource).not.toMatch(/terminalStatus|DEPARTURES|ThemeToggle/);
     expect(displaySource).not.toContain("formatFlightGroupLabel");

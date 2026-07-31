@@ -69,9 +69,9 @@ export function pushNotificationFor(
     return { title: copy.pushTitle, body: copy.pushBody };
   }
   const body = {
-    PREPARE_FOR_FLIGHT: `Ihr Aufruf steht bevor. Bitte halten Sie sich in der Nähe von „${gateLabel}“ bereit.`,
-    GO_TO_GATE: `Bitte kommen Sie jetzt zu „${gateLabel}“ und warten Sie dort auf den Boardingaufruf.`,
-    BOARDING_STARTED: `Das Boarding an „${gateLabel}“ hat begonnen. Bitte halten Sie Ihr Ticket für den Einstieg bereit.`,
+    PREPARE_FOR_FLIGHT: `Ihr Aufruf steht bevor. Bitte halten Sie sich in der Nähe von Gate „${gateLabel}“ bereit.`,
+    GO_TO_GATE: `Bitte kommen Sie jetzt zum Gate „${gateLabel}“ und warten Sie dort auf den Boardingaufruf.`,
+    BOARDING_STARTED: `Das Boarding am Gate „${gateLabel}“ hat begonnen. Bitte halten Sie Ihr Ticket für den Einstieg bereit.`,
     ROTATION_STARTED: PUBLIC_STATUS_MESSAGES.IN_FLIGHT,
     ROTATION_LANDED: PUBLIC_STATUS_MESSAGES.LANDED,
     ROTATION_COMPLETED: PUBLIC_STATUS_MESSAGES.COMPLETED,
