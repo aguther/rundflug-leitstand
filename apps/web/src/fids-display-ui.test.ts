@@ -135,6 +135,10 @@ describe("FIDS V1.7.3 UI", () => {
     expect(displaySource).toContain('return { label: "WARTEN", tone: "standby", icon: Clock3 }');
     expect(displaySource).toContain('<Users aria-hidden="true" />');
     expect(displaySource).toContain('<Icon aria-hidden="true" className="fids-status-icon" />');
+    expect(displaySource).toContain('data-recall-active={group.activeRecall ? "true" : "false"}');
+    expect(displaySource).toContain("<span>NACHRUF</span>");
+    expect(stylesSource).toContain("@keyframes fids-primary-status-swap");
+    expect(stylesSource).toContain("@keyframes fids-recall-status-swap");
     expect(stylesSource).not.toMatch(/\.fids-status-icon \{[^}]*border:/);
     expect(stylesSource).toMatch(/\.tone-standby \{\s*color: var\(--fids-text\);/);
     expect(stylesSource).toMatch(

@@ -123,7 +123,7 @@ function Status({ group }: { group: PublicGroup }) {
   const presentation = statusPresentation(group.status);
   const Icon = presentation.icon;
   return (
-    <div className="fids-status-cell">
+    <div className="fids-status-cell" data-recall-active={group.activeRecall ? "true" : "false"}>
       <strong className={`fids-status tone-${presentation.tone}`}>
         <Icon aria-hidden="true" className="fids-status-icon" />
         <span>{presentation.label}</span>
@@ -138,7 +138,7 @@ function Status({ group }: { group: PublicGroup }) {
           <span aria-hidden="true" className="fids-recall-bell">
             <Bell />
           </span>
-          <span>NACHRUF AKTIV</span>
+          <span>NACHRUF</span>
         </strong>
       ) : null}
     </div>

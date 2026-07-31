@@ -370,6 +370,9 @@
 }
 
 .fids-status {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
   gap: clamp(3px, 0.55vw, 10px);
   font-size: 1.04em;
   letter-spacing: 0.035em;
@@ -378,9 +381,11 @@
 
 .fids-row > .fids-status-cell {
   display: grid;
+  min-height: 1.5em;
+  grid-template-areas: "status";
   align-content: center;
   align-items: center;
-  gap: 0.2em;
+  justify-items: start;
 }
 
 .fids-status-icon {
@@ -401,6 +406,21 @@
   letter-spacing: 0.065em;
   line-height: 1;
   white-space: nowrap;
+}
+
+.fids-status-cell > .fids-status,
+.fids-status-cell > .fids-recall-status {
+  grid-area: status;
+}
+
+.fids-status-cell[data-recall-active="true"] > .fids-status {
+  animation: fids-primary-status-swap 8s step-end infinite;
+}
+
+.fids-status-cell[data-recall-active="true"] > .fids-recall-status {
+  opacity: 0;
+  visibility: hidden;
+  animation: fids-recall-status-swap 8s step-end infinite;
 }
 
 .fids-recall-bell {
@@ -433,8 +453,48 @@
   }
 }
 
+@keyframes fids-primary-status-swap {
+  0%,
+  49%,
+  100% {
+    opacity: 1;
+    visibility: visible;
+  }
+  50%,
+  99% {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+
+@keyframes fids-recall-status-swap {
+  0%,
+  49%,
+  100% {
+    opacity: 0;
+    visibility: hidden;
+  }
+  50%,
+  99% {
+    opacity: 1;
+    visibility: visible;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .fids-recall-bell {
+    animation: none;
+  }
+
+  .fids-status-cell[data-recall-active="true"] > .fids-status {
+    opacity: 0;
+    visibility: hidden;
+    animation: none;
+  }
+
+  .fids-status-cell[data-recall-active="true"] > .fids-recall-status {
+    opacity: 1;
+    visibility: visible;
     animation: none;
   }
 }
