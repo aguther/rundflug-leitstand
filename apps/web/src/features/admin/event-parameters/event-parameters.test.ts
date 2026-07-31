@@ -5,6 +5,13 @@ import adminSource from "../../../admin-view.tsx?raw";
 const styles = readFileSync(new URL("./event-parameters.css", import.meta.url), "utf8");
 
 describe("event parameter surface", () => {
+  it("centers values and units vertically inside the shared number control", () => {
+    expect(styles).toMatch(/\.event-parameter-number-control input \{[\s\S]*?line-height: 1;/);
+    expect(styles).toMatch(
+      /\.event-parameter-number-control > span \{[\s\S]*?place-items: center;[\s\S]*?line-height: 1;/,
+    );
+  });
+
   it("keeps operation planning outside the parameter workspace", () => {
     expect(adminSource).toContain("<EventParametersWorkspace");
     expect(adminSource).toContain("<OperationalPlanPanel");
