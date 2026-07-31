@@ -3,14 +3,19 @@ import { describe, expect, it } from "vitest";
 import adminUxSource from "./admin-ux.tsx?raw";
 import adminViewSource from "./admin-view.tsx?raw";
 import notificationsSource from "./app/PageNotifications.tsx?raw";
+import eventParametersSource from "./features/admin/event-parameters/EventParametersWorkspace.tsx?raw";
 import factoryResetDialogSource from "./features/admin/FactoryResetDialog.tsx?raw";
 import sharedSource from "./operation-workspace.tsx?raw";
 
-const appSource = `${adminViewSource}\n${sharedSource}\n${factoryResetDialogSource}`;
+const appSource = `${adminViewSource}\n${sharedSource}\n${factoryResetDialogSource}\n${eventParametersSource}`;
 
 const stylesSource = [
   readFileSync(new URL("./styles.css", import.meta.url), "utf8"),
   readFileSync(new URL("./features/admin/admin-v15.css", import.meta.url), "utf8"),
+  readFileSync(
+    new URL("./features/admin/event-parameters/event-parameters.css", import.meta.url),
+    "utf8",
+  ),
 ].join("\n");
 
 describe("V1 administration completion UI", () => {
@@ -60,10 +65,10 @@ describe("V1 administration completion UI", () => {
   });
 
   it("keeps setup saving visible and every information hint bound to its field label", () => {
-    expect(appSource).toContain('className="event-setup-details"');
+    expect(appSource).toContain('className="event-parameters-workspace"');
     expect(appSource).toContain("<PageHeader");
     expect(appSource).toContain("<Button");
-    expect(appSource).toContain("Veranstaltungsparameter speichern");
+    expect(appSource).toContain("Änderungen speichern");
     expect(appSource).toContain("className={`field-info");
     expect(appSource).toContain("aria-label={`Hilfe:");
     expect(appSource).toContain('role="tooltip"');

@@ -11,7 +11,9 @@ import domainIndexSource from "../../../packages/domain/src/index.ts?raw";
 import outageRecoverySource from "../../../packages/domain/src/outage-recovery.ts?raw";
 import queueSource from "../../../packages/domain/src/queue.ts?raw";
 import webManifestRaw from "../../web/package.json?raw";
-import webSource from "../../web/src/admin-view.tsx?raw";
+import webAdminSource from "../../web/src/admin-view.tsx?raw";
+import eventParametersSource from "../../web/src/features/admin/event-parameters/EventParametersWorkspace.tsx?raw";
+import eventParametersFormSource from "../../web/src/features/admin/event-parameters/useEventParametersForm.ts?raw";
 import initialMigration from "../migrations/0001_initial.sql?raw";
 import masterDataMigration from "../migrations/0015_product_and_gate_master_data.sql?raw";
 import multiEventMigration from "../migrations/0017_multi_event_templates.sql?raw";
@@ -23,6 +25,7 @@ type Manifest = {
   dependencies?: Record<string, string>;
   devDependencies?: Record<string, string>;
 };
+const webSource = `${webAdminSource}\n${eventParametersSource}\n${eventParametersFormSource}`;
 const dependencyNames = (raw: string) => {
   const manifest = JSON.parse(raw) as Manifest;
   return [

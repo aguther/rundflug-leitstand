@@ -1415,6 +1415,16 @@ describe("forecast history contracts", () => {
           dataAgeMinutes: 15,
           activeCapacity: 2,
           referenceDurationMinutes: 35,
+          productId: "product-synthetic",
+          assumedAircraftId: "aircraft-synthetic",
+          turnaroundProfile: {
+            boardingMinutes: 8,
+            deboardingMinutes: 5,
+            bufferMinutes: 2,
+            boardingSource: "EVENT",
+            deboardingSource: "EVENT",
+            bufferSource: "EVENT",
+          },
           predicted: {
             boardingAt: "2026-07-11T08:04:00.000Z",
             departureAt: "2026-07-11T08:10:00.000Z",
