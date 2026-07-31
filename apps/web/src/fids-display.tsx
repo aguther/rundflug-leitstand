@@ -53,11 +53,17 @@ function statusPresentation(status: PublicGroup["status"]): {
   icon: typeof Clock3;
 } {
   if (status === "COME_TO_FLIGHT_LINE")
-    return { label: "GO TO GATE", tone: "gate", icon: CircleArrowRight };
+    return { label: "BITTE ZUM GATE", tone: "gate", icon: CircleArrowRight };
   if (status === "PREPARE") return { label: "BEREITHALTEN", tone: "prepare", icon: Clock3 };
   if (status === "BOARDING") return { label: "BOARDING", tone: "boarding", icon: TicketsPlane };
-  if (status === "IN_FLIGHT" || status === "LANDED" || status === "COMPLETED") {
+  if (status === "IN_FLIGHT") {
     return { label: "ABGEFLOGEN", tone: "departed", icon: PlaneTakeoff };
+  }
+  if (status === "LANDED") {
+    return { label: "GELANDET", tone: "departed", icon: PlaneTakeoff };
+  }
+  if (status === "COMPLETED") {
+    return { label: "ABGESCHLOSSEN", tone: "departed", icon: PlaneTakeoff };
   }
   if (status === "SERVICE_PAUSED") return { label: "VERZÖGERT", tone: "delayed", icon: Clock3 };
   return { label: "WARTEN", tone: "standby", icon: Clock3 };

@@ -57,15 +57,15 @@ describe("Web-Push-Endpunkte", () => {
   it("trennt ortsbezogene Push-Titel und -Texte mit dem konkreten Gate", () => {
     expect(pushNotificationFor("PREPARE_FOR_FLIGHT", "Flight Line 1")).toEqual({
       title: "Bitte bereithalten",
-      body: "Ihr Aufruf steht bevor. Bitte halten Sie sich in der Nähe von „Flight Line 1“ bereit.",
+      body: "Ihr Aufruf steht bevor. Bitte halten Sie sich in der Nähe von Gate „Flight Line 1“ bereit.",
     });
     expect(pushNotificationFor("GO_TO_GATE", "Flight Line 1")).toEqual({
       title: "Bitte zum Gate",
-      body: "Bitte kommen Sie jetzt zu „Flight Line 1“ und warten Sie dort auf den Boardingaufruf.",
+      body: "Bitte kommen Sie jetzt zum Gate „Flight Line 1“ und warten Sie dort auf den Boardingaufruf.",
     });
     expect(pushNotificationFor("BOARDING_STARTED", "Flight Line 1")).toEqual({
       title: "Boarding hat begonnen",
-      body: "Das Boarding an „Flight Line 1“ hat begonnen. Bitte halten Sie Ihr Ticket für den Einstieg bereit.",
+      body: "Das Boarding am Gate „Flight Line 1“ hat begonnen. Bitte halten Sie Ihr Ticket für den Einstieg bereit.",
     });
     expect(pushUrgencyFor("GO_TO_GATE")).toBe("high");
     expect(pushUrgencyFor("BOARDING_STARTED")).toBe("high");
@@ -113,7 +113,7 @@ describe("Web-Push-Endpunkte", () => {
         title: "Bitte zum Gate",
         lang: "de",
         dir: "ltr",
-        body: "Bitte kommen Sie jetzt zu „Flight Line 1“ und warten Sie dort auf den Boardingaufruf.",
+        body: "Bitte kommen Sie jetzt zum Gate „Flight Line 1“ und warten Sie dort auf den Boardingaufruf.",
         navigate: "https://status.example/gruppe/NPQRSTUVWXYZ2",
         data: { url: "/gruppe/NPQRSTUVWXYZ2" },
       },
@@ -139,7 +139,7 @@ describe("Web-Push-Endpunkte", () => {
       title: "Boarding hat begonnen",
       lang: "de",
       dir: "ltr",
-      body: "Das Boarding an „Flight Line 1“ hat begonnen. Bitte halten Sie Ihr Ticket für den Einstieg bereit.",
+      body: "Das Boarding am Gate „Flight Line 1“ hat begonnen. Bitte halten Sie Ihr Ticket für den Einstieg bereit.",
       data: { url: "/gruppe/NPQRSTUVWXYZ2" },
     });
     expect(payload.web_push).toBeUndefined();
