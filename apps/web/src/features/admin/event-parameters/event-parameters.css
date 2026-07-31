@@ -246,6 +246,7 @@
   outline: 0;
   color: var(--ui-text);
   background: transparent;
+  line-height: 1;
 }
 
 .admin-shell .event-parameter-number-control > span {
@@ -257,6 +258,7 @@
   color: var(--ui-muted);
   background: var(--ui-surface-subtle);
   font-size: 0.72rem;
+  line-height: 1;
 }
 
 .admin-shell :is(.event-parameter-number-field, .localized-input-field).has-error small,
