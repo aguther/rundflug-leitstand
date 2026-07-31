@@ -88,6 +88,14 @@ function localMidnightIso(eventDate: string, timeZone: string): string {
   throw new Error("Veranstaltungsbeginn konnte für die Zeitzone nicht bestimmt werden.");
 }
 
+function nextCalendarDate(eventDate: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(eventDate);
+  if (!match) throw new Error("Veranstaltungsdatum ist ungültig.");
+  return new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]) + 1))
+    .toISOString()
+    .slice(0, 10);
+}
+
 function adaptiveBucketMinutes(spanMs: number, requested = 15): number {
   let bucketMinutes = Math.max(5, Math.min(240, Math.round(requested / 5) * 5));
   while (Math.ceil(spanMs / (bucketMinutes * 60_000)) > 95 && bucketMinutes < 24 * 60) {
@@ -102,7 +110,13 @@ export function buildEventDayWindow(input: BuildEventDayWindowInput): EventDayWi
     input.operationsStartAt ??
     localMidnightIso(input.eventDate, input.timeZone);
   const fromMs = Date.parse(from);
-  const fallbackUntilMs = fromMs + 12 * 60 * 60 * 1000;
+  const eventDayUntilMs = Date.parse(
+    localMidnightIso(nextCalendarDate(input.eventDate), input.timeZone),
+  );
+  const fallbackUntilMs =
+    Number.isFinite(eventDayUntilMs) && eventDayUntilMs > fromMs
+      ? eventDayUntilMs
+      : fromMs + 24 * 60 * 60 * 1000;
   const configuredUntilMs = input.operationsEndAt
     ? Date.parse(input.operationsEndAt)
     : fallbackUntilMs;
