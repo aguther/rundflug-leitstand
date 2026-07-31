@@ -23,6 +23,7 @@ import {
   assertMayStageOutageRecoveryEntry,
   assertOutageRecoveryApplication,
   assertOutageRecoveryApproval,
+  assertProductPureSelection,
   assertPublicTicketCode,
   assertQueueMutationAllowed,
   assertRoleMayExecute,
@@ -1375,11 +1376,13 @@ export class EventCoordinator extends DurableObject<Env> {
           ),
           ...slots.flatMap((slot) => [
             this.env.DB.prepare(`INSERT INTO flight_groups
-                  (id, operation_day_id, resource_group_id, communication_number, status, version, created_at, updated_at)
-                  VALUES (?1, ?2, ?3, ?4, 'DRAFT', 0, ?5, ?5)`).bind(
+                  (id, operation_day_id, resource_group_id, product_id, communication_number,
+                   status, version, created_at, updated_at)
+                  VALUES (?1, ?2, ?3, ?4, ?5, 'DRAFT', 0, ?6, ?6)`).bind(
               slot.flightGroupId,
               command.eventId,
               product.resource_group_id,
+              product.id,
               slot.communicationNumber,
               now,
             ),
@@ -5900,7 +5903,7 @@ export class EventCoordinator extends DurableObject<Env> {
     }
     const rotation = await this.env.DB.prepare(
       `SELECT r.id, r.status, r.version, r.aircraft_id, r.pilot_id, r.called_at,
-              rg.status AS resource_group_status
+              fg.product_id AS flight_group_product_id, rg.status AS resource_group_status
          FROM rotations r
          JOIN flight_groups fg ON fg.id = r.flight_group_id
          JOIN resource_groups rg ON rg.id = fg.resource_group_id
@@ -5914,6 +5917,7 @@ export class EventCoordinator extends DurableObject<Env> {
         aircraft_id: string | null;
         pilot_id: string | null;
         called_at: string | null;
+        flight_group_product_id: string | null;
         resource_group_status: "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED";
       }>();
     if (!rotation)
@@ -5925,8 +5929,11 @@ export class EventCoordinator extends DurableObject<Env> {
       ticket_group_id: string;
       rotation_id: string;
       resource_group_id: string;
+      product_id: string;
+      queue_sequence: number;
       ticket_count: number;
     }> = [];
+    let skippedEarlierTicketGroupIds: string[] = [];
     if (command.type === "CALL_NEXT") {
       if (rotation.resource_group_status !== "ACTIVE") {
         return json(
@@ -5954,7 +5961,7 @@ export class EventCoordinator extends DurableObject<Env> {
       const placeholders = distinctGroupIds.map((_, index) => `?${index + 2}`).join(", ");
       const groupResult = await this.env.DB.prepare(
         `SELECT tg.id AS ticket_group_id, r.id AS rotation_id,
-                p.resource_group_id, COUNT(t.id) AS ticket_count
+                tg.product_id, tg.queue_sequence, p.resource_group_id, COUNT(t.id) AS ticket_count
            FROM ticket_groups tg
            JOIN products p ON p.id = tg.product_id
            JOIN tickets t ON t.ticket_group_id = tg.id
@@ -5980,13 +5987,15 @@ export class EventCoordinator extends DurableObject<Env> {
                         candidate_group.communication_number, candidate_rotation.id
                LIMIT 1
             )
-          GROUP BY tg.id, r.id, p.resource_group_id`,
+          GROUP BY tg.id, r.id, tg.product_id, tg.queue_sequence, p.resource_group_id`,
       )
         .bind(command.eventId, ...distinctGroupIds)
         .all<{
           ticket_group_id: string;
           rotation_id: string;
           resource_group_id: string;
+          product_id: string;
+          queue_sequence: number;
           ticket_count: number;
         }>();
       selectedGroups = groupResult.results;
@@ -6007,6 +6016,77 @@ export class EventCoordinator extends DurableObject<Env> {
             error: {
               code: "RESOURCE_GROUP_MISMATCH",
               message: "Ausgewählte Gruppen gehören nicht zur gleichen Ressourcengruppe.",
+            },
+          },
+          { status: 409 },
+        );
+      }
+      let selectedProductId: string;
+      try {
+        selectedProductId = assertProductPureSelection(
+          selectedGroups.map((group) => group.product_id),
+        );
+      } catch (reason: unknown) {
+        if (!(reason instanceof DomainRuleError)) throw reason;
+        return json({ error: { code: reason.code, message: reason.message } }, { status: 409 });
+      }
+      if (
+        rotation.flight_group_product_id !== null &&
+        rotation.flight_group_product_id !== selectedProductId
+      ) {
+        return json(
+          {
+            error: {
+              code: "PRODUCT_MISMATCH",
+              message: "Die Fluggruppe gehört nicht zum Produkt der ausgewählten Ticketgruppen.",
+            },
+          },
+          { status: 409 },
+        );
+      }
+      const earliestSelectedQueueSequence = Math.min(
+        ...selectedGroups.map((group) => Number(group.queue_sequence)),
+      );
+      const skippedEarlierResult = await this.env.DB.prepare(
+        `SELECT tg.id
+           FROM ticket_groups tg
+           JOIN products p ON p.id = tg.product_id
+          WHERE tg.operation_day_id = ?1
+            AND p.resource_group_id = ?2
+            AND tg.product_id <> ?3
+            AND tg.queue_sequence < ?4
+            AND tg.status IN ('QUEUED', 'PRESENT')
+            AND EXISTS (
+              SELECT 1
+                FROM tickets earlier_ticket
+                JOIN rotation_tickets earlier_assignment
+                  ON earlier_assignment.ticket_id = earlier_ticket.id
+                 AND earlier_assignment.released_at IS NULL
+                JOIN rotations earlier_rotation
+                  ON earlier_rotation.id = earlier_assignment.rotation_id
+               WHERE earlier_ticket.ticket_group_id = tg.id
+                 AND earlier_rotation.status = 'DRAFT'
+            )
+          ORDER BY tg.queue_sequence, tg.id`,
+      )
+        .bind(
+          command.eventId,
+          selectedGroups[0]?.resource_group_id,
+          selectedProductId,
+          earliestSelectedQueueSequence,
+        )
+        .all<{ id: string }>();
+      skippedEarlierTicketGroupIds = skippedEarlierResult.results.map((group) => group.id);
+      if (
+        skippedEarlierTicketGroupIds.length > 0 &&
+        !command.payload.queueDeviationReason?.trim()
+      ) {
+        return json(
+          {
+            error: {
+              code: "QUEUE_DEVIATION_REASON_REQUIRED",
+              message:
+                "Für das Überspringen früherer Ticketgruppen eines anderen Produkts ist ein Grund erforderlich.",
             },
           },
           { status: 409 },
@@ -6430,6 +6510,9 @@ export class EventCoordinator extends DurableObject<Env> {
           to: nextState,
           aircraftId: selectedAircraftId,
           pilotId: selectedPilotId,
+          queueDeviationReason:
+            command.type === "CALL_NEXT" ? (command.payload.queueDeviationReason ?? null) : null,
+          skippedTicketGroupIds: command.type === "CALL_NEXT" ? skippedEarlierTicketGroupIds : [],
         }),
       ),
       this.env.DB.prepare(`INSERT INTO idempotency_receipts (command_id, operation_day_id, device_id, command_type, received_at, response_json)
@@ -6727,13 +6810,14 @@ export class EventCoordinator extends DurableObject<Env> {
             ),
             this.env.DB.prepare(
               `INSERT INTO flight_groups
-                (id, operation_day_id, resource_group_id, communication_number, status,
+                (id, operation_day_id, resource_group_id, product_id, communication_number, status,
                  version, created_at, updated_at)
-               VALUES (?1, ?2, ?3, ?4, 'DRAFT', 0, ?5, ?5)`,
+               VALUES (?1, ?2, ?3, ?4, ?5, 'DRAFT', 0, ?6, ?6)`,
             ).bind(
               flightGroupId,
               command.eventId,
               product.resource_group_id,
+              product.id,
               communicationNumber,
               entry.original_occurred_at,
             ),
@@ -7674,13 +7758,14 @@ export class EventCoordinator extends DurableObject<Env> {
         ).bind(rotation.id, now),
         this.env.DB.prepare(
           `INSERT INTO flight_groups
-            (id, operation_day_id, resource_group_id, communication_number, queue_position,
+            (id, operation_day_id, resource_group_id, product_id, communication_number, queue_position,
              status, version, created_at, updated_at)
-           VALUES (?1, ?2, ?3, ?4, ?5, 'DRAFT', 0, ?6, ?6)`,
+           VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'DRAFT', 0, ?7, ?7)`,
         ).bind(
           slot.flightGroupId,
           command.eventId,
           rotation.resource_group_id,
+          slot.product_id,
           slot.communicationNumber,
           slot.queuePosition,
           now,
@@ -8422,12 +8507,14 @@ export class EventCoordinator extends DurableObject<Env> {
         statements.push(
           this.env.DB.prepare(
             `INSERT INTO flight_groups
-            (id, operation_day_id, resource_group_id, communication_number, status, version, created_at, updated_at)
-           VALUES (?1, ?2, ?3, ?4, 'DRAFT', 0, ?5, ?5)`,
+            (id, operation_day_id, resource_group_id, product_id, communication_number,
+             status, version, created_at, updated_at)
+           VALUES (?1, ?2, ?3, ?4, ?5, 'DRAFT', 0, ?6, ?6)`,
           ).bind(
             slot.flightGroupId,
             command.eventId,
             targetResourceGroupId,
+            targetProductId,
             slot.communicationNumber,
             now,
           ),

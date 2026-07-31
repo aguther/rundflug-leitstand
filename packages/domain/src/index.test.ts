@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   aircraftOperationalStateLabels,
   assertGroupIsNotAutomaticallySplit,
+  assertProductPureSelection,
   assertPublicTicketCode,
   assertRoleMayExecute,
   assertSaleAllowed,
@@ -14,6 +15,16 @@ import {
   transitionAircraft,
   transitionRotation,
 } from "./index";
+
+describe("product-pure flight groups", () => {
+  it("accepts one product and rejects mixed selections", () => {
+    expect(assertProductPureSelection(["product-a", "product-a"])).toBe("product-a");
+    expect(() => assertProductPureSelection([])).toThrowError(/selben Produkt/);
+    expect(() => assertProductPureSelection(["product-a", "product-b"])).toThrowError(
+      /selben Produkt/,
+    );
+  });
+});
 
 describe("aircraft lifecycle", () => {
   it("requires a separate post-landing completion path", () => {

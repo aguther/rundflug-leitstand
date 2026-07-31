@@ -83,6 +83,7 @@ export function FlightLineView() {
   const [message, setMessage] = useState<string | null>(null);
   useActionMessageBridge(message, setMessage);
   const [queueReason, setQueueReason] = useState("");
+  const [callDeviationReason, setCallDeviationReason] = useState("");
   const [operationsOpen, setOperationsOpen] = useState(false);
   const [operationsBusy, setOperationsBusy] = useState(false);
   const [filteredResourceGroupId, setFilteredResourceGroupId] = useState("");
@@ -164,6 +165,24 @@ export function FlightLineView() {
         group.resourceGroupId === selectedAircraft?.resourceGroupId &&
         ["QUEUED", "PRESENT", "MISSING"].includes(group.status),
     ) ?? [];
+  const selectedQueueGroups = compatibleQueueGroups.filter((group) =>
+    selectedQueueGroupIds.includes(group.id),
+  );
+  const selectedQueueProductId = selectedQueueGroups[0]?.productId ?? null;
+  const earliestSelectedQueueSequence =
+    selectedQueueGroups.length > 0
+      ? Math.min(...selectedQueueGroups.map((group) => group.queueSequence))
+      : null;
+  const skippedEarlierProductGroups =
+    earliestSelectedQueueSequence === null
+      ? []
+      : compatibleQueueGroups.filter(
+          (group) =>
+            group.queueSequence < earliestSelectedQueueSequence &&
+            group.productId !== selectedQueueProductId &&
+            group.status !== "MISSING",
+        );
+  const queueDeviationReasonRequired = skippedEarlierProductGroups.length > 0;
   const recallDialogGroup =
     board?.queueGroups.find((group) => group.id === recallDialogGroupId) ?? null;
   const recallDialogGateLabel =
@@ -202,6 +221,7 @@ export function FlightLineView() {
     rotationOverride: Rotation | undefined = selected,
     aircraftOverride: Aircraft | undefined = selectedAircraft,
     nextAircraftState: TurnaroundNextState = turnaroundNextState,
+    queueDeviationReasonOverride?: string,
   ) {
     const selectedRotation = rotationOverride;
     const selectedAction = selectedRotation ? actionForState[selectedRotation.status] : null;
@@ -239,6 +259,8 @@ export function FlightLineView() {
                     : [selectedRotation.ticketGroupId],
               aircraftId: aircraftOverride.id,
               pilotId: assignedPilotId,
+              queueDeviationReason:
+                (queueDeviationReasonOverride ?? callDeviationReason.trim()) || undefined,
             },
           },
           deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
@@ -1238,11 +1260,11 @@ export function FlightLineView() {
             setSelectedId(null);
             setSelectedQueueGroupIds([]);
           }}
-          onRunRotation={(rotation, nextAircraftState) => {
+          onRunRotation={(rotation, nextAircraftState, queueDeviationReason) => {
             const rotationAircraft = operationalAircraft.find(
               (entry) => entry.id === rotation.aircraftId,
             );
-            return advance(rotation, rotationAircraft, nextAircraftState);
+            return advance(rotation, rotationAircraft, nextAircraftState, queueDeviationReason);
           }}
           onSetAircraftState={requestAircraftState}
           selectedQueueGroupIds={selectedQueueGroupIds}
@@ -1261,7 +1283,9 @@ export function FlightLineView() {
           onResourceGroupChange={setFilteredResourceGroupId}
           selectedQueueGroupIds={selectedQueueGroupIds}
           onAssignPilot={assignAircraftPilot}
-          onConfirmAssignment={() => advance()}
+          onConfirmAssignment={(queueDeviationReason) =>
+            advance(undefined, undefined, turnaroundNextState, queueDeviationReason)
+          }
           onRunRotation={(rotation, nextAircraftState) => {
             const rotationAircraft = operationalAircraft.find(
               (entry) => entry.id === rotation.aircraftId,
@@ -1365,6 +1389,10 @@ export function FlightLineView() {
                 <div className="queue-group-options">
                   {compatibleQueueGroups.map((group) => {
                     const selectedGroup = selectedQueueGroupIds.includes(group.id);
+                    const productMismatch =
+                      !selectedGroup &&
+                      selectedQueueProductId !== null &&
+                      group.productId !== selectedQueueProductId;
                     const exceedsCapacity =
                       !selectedGroup &&
                       selectedQueueSeatCount + queuedSegmentTicketCount(group) >
@@ -1379,7 +1407,9 @@ export function FlightLineView() {
                         <label>
                           <input
                             checked={selectedGroup}
-                            disabled={group.status === "MISSING" || exceedsCapacity}
+                            disabled={
+                              group.status === "MISSING" || exceedsCapacity || productMismatch
+                            }
                             onChange={(event) => {
                               setSelectedQueueGroupIds((current) =>
                                 event.target.checked
@@ -1395,6 +1425,8 @@ export function FlightLineView() {
                                     ),
                                 );
                                 if (rotation) setSelectedId(rotation.id);
+                              } else if (selectedQueueGroupIds.length === 1) {
+                                setCallDeviationReason("");
                               }
                             }}
                             type="checkbox"
@@ -1463,6 +1495,22 @@ export function FlightLineView() {
                     );
                   })}
                 </div>
+                {queueDeviationReasonRequired ? (
+                  <label className="queue-deviation-reason">
+                    Grund für das Überspringen früherer Gruppen
+                    <input
+                      maxLength={240}
+                      onChange={(event) => setCallDeviationReason(event.target.value)}
+                      placeholder="Mindestens 3 Zeichen"
+                      value={callDeviationReason}
+                    />
+                    <small>
+                      {skippedEarlierProductGroups.length} frühere Ticketgruppe
+                      {skippedEarlierProductGroups.length === 1 ? "" : "n"} eines anderen Produkts
+                      werden übersprungen.
+                    </small>
+                  </label>
+                ) : null}
               </section>
             ) : null}
             {aircraftRotations?.map((rotation) => {
@@ -1775,7 +1823,8 @@ export function FlightLineView() {
                         !selectedAircraft?.currentPilotId ||
                         board?.event.emergencyMode ||
                         board?.event.status !== "ACTIVE" ||
-                        board?.event.operationalInterrupted)
+                        board?.event.operationalInterrupted ||
+                        (queueDeviationReasonRequired && callDeviationReason.trim().length < 3))
                     }
                     onClick={() => void advance()}
                     type="button"

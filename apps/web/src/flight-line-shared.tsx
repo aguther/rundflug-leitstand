@@ -462,6 +462,7 @@ function AssignmentQueueRow({
   onRecallClear,
   onRestore,
   onDefer,
+  productMismatch,
   timeZone,
 }: {
   group: FlightLineQueueGroup;
@@ -475,6 +476,7 @@ function AssignmentQueueRow({
   onRecallClear: (ticketGroupId: string, recallId: string) => void | Promise<void>;
   onRestore: (ticketGroupId: string) => void | Promise<void>;
   onDefer?: ((ticketGroupId: string) => void | Promise<void>) | undefined;
+  productMismatch: boolean;
   timeZone: string;
 }) {
   const segmentTicketCount = queuedSegmentTicketCount(group);
@@ -488,7 +490,7 @@ function AssignmentQueueRow({
       <label>
         <input
           checked={selected}
-          disabled={group.status === "MISSING" || exceedsCapacity}
+          disabled={group.status === "MISSING" || exceedsCapacity || productMismatch}
           onChange={(event) => onToggle(group.id, event.target.checked)}
           type="checkbox"
         />
@@ -593,7 +595,7 @@ export function BookingGroupAssignmentDialog({
   confirmDisabled: boolean;
   open: boolean;
   onClose: () => void;
-  onConfirm: () => void | Promise<void>;
+  onConfirm: (queueDeviationReason?: string) => void | Promise<void>;
   onToggle: (ticketGroupId: string, selected: boolean) => void;
   onAttendance: (ticketGroupId: string, checkedIn: boolean) => void | Promise<void>;
   onMissing: (ticketGroupId: string) => void | Promise<void>;
@@ -603,6 +605,7 @@ export function BookingGroupAssignmentDialog({
   onDefer?: (ticketGroupId: string) => void | Promise<void>;
   timeZone: string;
 }) {
+  const [queueDeviationReason, setQueueDeviationReason] = useState("");
   const selectedGroups = groups.filter((group) => selectedQueueGroupIds.includes(group.id));
   const selectedSeats = selectedGroups.reduce(
     (total, group) => total + queuedSegmentTicketCount(group),
@@ -610,6 +613,27 @@ export function BookingGroupAssignmentDialog({
   );
   const capacity = aircraft?.passengerSeats ?? 0;
   const capacityExceeded = selectedSeats > capacity;
+  const selectedProductId = selectedGroups[0]?.productId ?? null;
+  const mixedProductSelection = selectedGroups.some(
+    (group) => group.productId !== selectedProductId,
+  );
+  const earliestSelectedQueueSequence =
+    selectedGroups.length > 0
+      ? Math.min(...selectedGroups.map((group) => group.queueSequence))
+      : null;
+  const skippedEarlierProductGroups =
+    earliestSelectedQueueSequence === null
+      ? []
+      : groups.filter(
+          (group) =>
+            group.status !== "MISSING" &&
+            group.queueSequence < earliestSelectedQueueSequence &&
+            group.productId !== selectedProductId,
+        );
+  const queueDeviationReasonRequired = skippedEarlierProductGroups.length > 0;
+  useEffect(() => {
+    if (!open || !queueDeviationReasonRequired) setQueueDeviationReason("");
+  }, [open, queueDeviationReasonRequired]);
   return (
     <ModalDialog
       description={
@@ -623,8 +647,14 @@ export function BookingGroupAssignmentDialog({
             Abbrechen
           </Button>
           <Button
-            disabled={confirmDisabled || selectedSeats === 0 || capacityExceeded}
-            onClick={onConfirm}
+            disabled={
+              confirmDisabled ||
+              selectedSeats === 0 ||
+              capacityExceeded ||
+              mixedProductSelection ||
+              (queueDeviationReasonRequired && queueDeviationReason.trim().length < 3)
+            }
+            onClick={() => onConfirm(queueDeviationReason.trim() || undefined)}
             type="button"
             variant="primary"
           >
@@ -652,6 +682,11 @@ export function BookingGroupAssignmentDialog({
                 onRecallClear={onRecallClear}
                 onRestore={onRestore}
                 onToggle={onToggle}
+                productMismatch={
+                  !selectedQueueGroupIds.includes(group.id) &&
+                  selectedProductId !== null &&
+                  group.productId !== selectedProductId
+                }
                 selected={selectedQueueGroupIds.includes(group.id)}
                 selectedSeats={selectedSeats}
                 timeZone={timeZone}
@@ -691,6 +726,22 @@ export function BookingGroupAssignmentDialog({
             <p className="flight-director-dialog-warning">
               Die Auswahl überschreitet die Kapazität.
             </p>
+          ) : null}
+          {queueDeviationReasonRequired ? (
+            <label className="flight-director-deviation-reason">
+              Grund für Queue-Abweichung
+              <input
+                maxLength={240}
+                onChange={(event) => setQueueDeviationReason(event.target.value)}
+                placeholder="Mindestens 3 Zeichen"
+                value={queueDeviationReason}
+              />
+              <small>
+                {skippedEarlierProductGroups.length} frühere Ticketgruppe
+                {skippedEarlierProductGroups.length === 1 ? "" : "n"} eines anderen Produkts werden
+                übersprungen.
+              </small>
+            </label>
           ) : null}
           {!aircraft?.currentPilotId ? (
             <p className="flight-director-dialog-warning">

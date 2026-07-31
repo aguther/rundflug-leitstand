@@ -101,7 +101,11 @@ export function FlightLineAssist({
   onPause: (aircraftId: string) => void;
   onRefresh: () => Promise<void>;
   onRelease: (aircraftId: string) => Promise<void>;
-  onRunRotation: (rotation: Rotation, nextAircraftState?: TurnaroundNextState) => Promise<void>;
+  onRunRotation: (
+    rotation: Rotation,
+    nextAircraftState?: TurnaroundNextState,
+    queueDeviationReason?: string,
+  ) => Promise<void>;
   onSelectAircraft: (aircraftId: string) => void;
   onSetAircraftState: (aircraftId: string, state: FlightLineFleetState) => Promise<void>;
   onToggleGroup: (ticketGroupId: string, selected: boolean) => void;
@@ -609,8 +613,8 @@ export function FlightLineAssist({
         groups={waitingGroups}
         onAttendance={onGroupAttendance}
         onClose={() => setAssignmentOpen(false)}
-        onConfirm={async () => {
-          if (activeRotation) await onRunRotation(activeRotation);
+        onConfirm={async (queueDeviationReason) => {
+          if (activeRotation) await onRunRotation(activeRotation, undefined, queueDeviationReason);
           setAssignmentOpen(false);
         }}
         onDefer={onGroupDefer}

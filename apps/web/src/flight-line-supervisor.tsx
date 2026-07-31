@@ -238,7 +238,7 @@ export function FlightLineSupervisorConsole({
   onResourceGroupChange: (resourceGroupId: string) => void;
   onAssignPilot: (aircraftId: string, pilotId: string, reassign: boolean) => Promise<void>;
   busyRotationIds?: ReadonlySet<string>;
-  onConfirmAssignment: () => Promise<void>;
+  onConfirmAssignment: (queueDeviationReason?: string) => Promise<void>;
   onRunRotation: (rotation: Rotation, nextAircraftState?: TurnaroundNextState) => Promise<void>;
   onSetAircraftState: (aircraftId: string, state: FlightLineFleetState) => Promise<void>;
   onPauseAircraft: (aircraftId: string) => void;
@@ -698,8 +698,8 @@ export function FlightLineSupervisorConsole({
         onClose={() => setAssignmentOpen(false)}
         onAttendance={onGroupAttendance}
         onDefer={onGroupDefer}
-        onConfirm={async () => {
-          await onConfirmAssignment();
+        onConfirm={async (queueDeviationReason) => {
+          await onConfirmAssignment(queueDeviationReason);
           setAssignmentOpen(false);
         }}
         onMissing={onGroupMissing}
