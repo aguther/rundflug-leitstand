@@ -190,6 +190,7 @@ export const gateDisplayFilterSchema = z
 export type GateDisplayFilter = z.infer<typeof gateDisplayFilterSchema>;
 
 const productWeightClassSchema = z.enum(["NOT_CAPTURED", "CHILD", "NORMAL", "HEAVY", "INDIVIDUAL"]);
+const turnaroundPhaseOverrideValueSchema = z.number().int().min(0).max(120).nullable();
 
 const cashierProductOrderSchema = z
   .array(z.string().min(1).max(100))
@@ -216,6 +217,9 @@ const upsertProductPayloadSchema = z
     referenceDurationMinutes: z.number().int().min(1).max(600),
     // Gegenüber Gästen kommunizierte Produktzeit ohne Wirkung auf die operative Prognose.
     promisedFlightMinutes: z.number().int().min(1).max(600),
+    plannedBoardingMinutesOverride: turnaroundPhaseOverrideValueSchema.default(null),
+    plannedDeboardingMinutesOverride: turnaroundPhaseOverrideValueSchema.default(null),
+    plannedBufferMinutesOverride: turnaroundPhaseOverrideValueSchema.default(null),
     childCompanionRequired: z.boolean(),
     weightClasses: z
       .array(productWeightClassSchema)
@@ -707,6 +711,37 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
   commandBaseSchema.extend({
     type: z.literal("UPSERT_PRODUCT"),
     payload: upsertProductPayloadSchema,
+  }),
+  commandBaseSchema.extend({
+    type: z.literal("UPSERT_AIRCRAFT_PRODUCT_TURNAROUND_OVERRIDE"),
+    payload: z
+      .object({
+        aircraftId: z.string().min(1).max(100),
+        productId: z.string().min(1).max(100),
+        plannedBoardingMinutesOverride: turnaroundPhaseOverrideValueSchema,
+        plannedDeboardingMinutesOverride: turnaroundPhaseOverrideValueSchema,
+        plannedBufferMinutesOverride: turnaroundPhaseOverrideValueSchema,
+        expectedOverrideVersion: z.number().int().nonnegative().optional(),
+        reason: z.string().trim().min(3).max(240),
+        adminPin: z.string().min(4).max(32),
+      })
+      .refine(
+        (payload) =>
+          payload.plannedBoardingMinutesOverride !== null ||
+          payload.plannedDeboardingMinutesOverride !== null ||
+          payload.plannedBufferMinutesOverride !== null,
+        { message: "Mindestens eine Phase muss überschrieben werden." },
+      ),
+  }),
+  commandBaseSchema.extend({
+    type: z.literal("DELETE_AIRCRAFT_PRODUCT_TURNAROUND_OVERRIDE"),
+    payload: z.object({
+      aircraftId: z.string().min(1).max(100),
+      productId: z.string().min(1).max(100),
+      expectedOverrideVersion: z.number().int().nonnegative(),
+      reason: z.string().trim().min(3).max(240),
+      adminPin: z.string().min(4).max(32),
+    }),
   }),
   commandBaseSchema.extend({
     type: z.literal("UPSERT_RESOURCE_GROUP"),
@@ -2355,6 +2390,27 @@ export const productOperationalSummarySchema = z.object({
   referenceDurationMinutes: z.number().int().positive(),
   // Gegenüber Gästen kommunizierte Produktzeit ohne Wirkung auf die operative Prognose.
   promisedFlightMinutes: z.number().int().positive(),
+  plannedBoardingMinutesOverride: turnaroundPhaseOverrideValueSchema,
+  plannedDeboardingMinutesOverride: turnaroundPhaseOverrideValueSchema,
+  plannedBufferMinutesOverride: turnaroundPhaseOverrideValueSchema,
+  effectiveTurnaroundProfile: z.object({
+    boarding: z.object({
+      valueMinutes: z.number().int().nonnegative(),
+      sourceLevel: z.enum(["AIRCRAFT_PRODUCT", "PRODUCT", "EVENT"]),
+      sourceId: z.string(),
+    }),
+    deboarding: z.object({
+      valueMinutes: z.number().int().nonnegative(),
+      sourceLevel: z.enum(["AIRCRAFT_PRODUCT", "PRODUCT", "EVENT"]),
+      sourceId: z.string(),
+    }),
+    buffer: z.object({
+      valueMinutes: z.number().int().nonnegative(),
+      sourceLevel: z.enum(["AIRCRAFT_PRODUCT", "PRODUCT", "EVENT"]),
+      sourceId: z.string(),
+    }),
+    totalGroundMinutes: z.number().int().nonnegative(),
+  }),
   queuedTickets: z.number().int().nonnegative(),
   resourceGroupOpenTickets: z.number().int().nonnegative(),
   estimatedWaitLowerMinutes: z.number().int().nonnegative(),
@@ -2572,6 +2628,20 @@ export const operationBoardSchema = z.object({
   currentDeviceRole: z.enum(["CASHIER", "FLIGHT_LINE", "FLIGHT_DIRECTOR", "ADMIN"]),
   event: eventSnapshotSchema,
   products: z.array(productOperationalSummarySchema),
+  aircraftProductTurnaroundOverrides: z
+    .array(
+      z.object({
+        aircraftId: z.string(),
+        productId: z.string(),
+        version: z.number().int().nonnegative(),
+        plannedBoardingMinutesOverride: turnaroundPhaseOverrideValueSchema,
+        plannedDeboardingMinutesOverride: turnaroundPhaseOverrideValueSchema,
+        plannedBufferMinutesOverride: turnaroundPhaseOverrideValueSchema,
+        effectiveTurnaroundProfile:
+          productOperationalSummarySchema.shape.effectiveTurnaroundProfile,
+      }),
+    )
+    .default([]),
   rotations: z.array(rotationOperationalSummarySchema),
   queueGroups: z
     .array(

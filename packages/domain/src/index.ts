@@ -242,6 +242,8 @@ export type OperationalCommandType =
   | "UPSERT_GATE"
   | "REORDER_CASHIER_PRODUCTS"
   | "UPSERT_PRODUCT"
+  | "UPSERT_AIRCRAFT_PRODUCT_TURNAROUND_OVERRIDE"
+  | "DELETE_AIRCRAFT_PRODUCT_TURNAROUND_OVERRIDE"
   | "UPSERT_RESOURCE_GROUP"
   | "UPSERT_AIRCRAFT"
   | "ASSIGN_AIRCRAFT_RESOURCE_GROUP"
@@ -305,6 +307,8 @@ const commandRoles: Readonly<Record<OperationalCommandType, readonly DeviceRole[
   UPSERT_GATE: ["ADMIN"],
   REORDER_CASHIER_PRODUCTS: ["CASHIER", "ADMIN"],
   UPSERT_PRODUCT: ["ADMIN"],
+  UPSERT_AIRCRAFT_PRODUCT_TURNAROUND_OVERRIDE: ["ADMIN"],
+  DELETE_AIRCRAFT_PRODUCT_TURNAROUND_OVERRIDE: ["ADMIN"],
   UPSERT_RESOURCE_GROUP: ["ADMIN"],
   UPSERT_AIRCRAFT: ["ADMIN"],
   ASSIGN_AIRCRAFT_RESOURCE_GROUP: ["ADMIN"],
@@ -383,3 +387,4 @@ export * from "./queue";
 export * from "./recurring-operational-rule";
 export * from "./reference-rotation";
 export * from "./ticket-group-recall";
+export * from "./turnaround";

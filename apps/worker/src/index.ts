@@ -40,6 +40,7 @@ import {
   forecastQueueWindows,
   formatBookingGroupLabel,
   formatFlightGroupLabel,
+  resolveTurnaroundProfile,
 } from "@rundflug/domain";
 import { Hono } from "hono";
 import { secureHeaders } from "hono/secure-headers";
@@ -3537,6 +3538,7 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
 
   const [
     products,
+    aircraftProductTurnaroundOverrideRows,
     rotations,
     queueGroupRows,
     durationRows,
@@ -3555,6 +3557,8 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
               rg.status AS resource_group_status, rg.operational_note AS resource_group_operational_note,
               p.price_cents, p.sale_enabled, p.reference_capacity, p.reference_duration_minutes,
               p.promised_flight_minutes,
+              p.planned_boarding_minutes_override, p.planned_deboarding_minutes_override,
+              p.planned_buffer_minutes_override,
               p.sale_closes_at, p.capacity_warning_threshold, p.capacity_critical_threshold,
               p.child_companion_required, p.weight_classes_json, p.sort_order, p.gate_id,
               g.label AS gate_label,
@@ -3593,11 +3597,31 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
           reference_capacity: number;
           reference_duration_minutes: number;
           promised_flight_minutes: number;
+          planned_boarding_minutes_override: number | null;
+          planned_deboarding_minutes_override: number | null;
+          planned_buffer_minutes_override: number | null;
           queued_tickets: number;
           resource_group_open_tickets: number;
           sale_closes_at: string | null;
           capacity_warning_threshold: number;
           capacity_critical_threshold: number;
+        }>(),
+    () =>
+      context.env.DB.prepare(
+        `SELECT aircraft_id, product_id, planned_boarding_minutes_override,
+                planned_deboarding_minutes_override, planned_buffer_minutes_override, version
+           FROM aircraft_product_turnaround_overrides
+          WHERE operation_day_id = ?1
+          ORDER BY product_id, aircraft_id`,
+      )
+        .bind(eventId)
+        .all<{
+          aircraft_id: string;
+          product_id: string;
+          planned_boarding_minutes_override: number | null;
+          planned_deboarding_minutes_override: number | null;
+          planned_buffer_minutes_override: number | null;
+          version: number;
         }>(),
     () =>
       context.env.DB.prepare(
@@ -4247,6 +4271,20 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
     currentDeviceRole: device.role,
     event: rowToSnapshot(eventRow),
     products: products.results.map((product) => {
+      const effectiveTurnaroundProfile = resolveTurnaroundProfile({
+        event: {
+          sourceId: eventId,
+          boardingMinutes: eventRow.planned_boarding_minutes ?? 8,
+          deboardingMinutes: eventRow.planned_deboarding_minutes ?? 5,
+          bufferMinutes: eventRow.planned_buffer_minutes ?? 3,
+        },
+        product: {
+          sourceId: product.id,
+          boardingMinutes: product.planned_boarding_minutes_override,
+          deboardingMinutes: product.planned_deboarding_minutes_override,
+          bufferMinutes: product.planned_buffer_minutes_override,
+        },
+      });
       const assignedGroupAircraft = aircraftRows.results.filter(
         (aircraft) => aircraft.resource_group_id === product.resource_group_id,
       );
@@ -4275,10 +4313,7 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
       );
       const duration = estimateDuration({
         referenceMinutes:
-          product.reference_duration_minutes +
-          (eventRow.planned_boarding_minutes ?? 8) +
-          (eventRow.planned_deboarding_minutes ?? 5) +
-          (eventRow.planned_buffer_minutes ?? 3),
+          product.reference_duration_minutes + effectiveTurnaroundProfile.totalGroundMinutes,
         actualDurationsMinutes: actualDurations,
         interrupted:
           product.resource_group_status !== "ACTIVE" ||
@@ -4362,6 +4397,10 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
         referenceCapacity: effectiveReferenceCapacity,
         referenceDurationMinutes: product.reference_duration_minutes,
         promisedFlightMinutes: product.promised_flight_minutes,
+        plannedBoardingMinutesOverride: product.planned_boarding_minutes_override,
+        plannedDeboardingMinutesOverride: product.planned_deboarding_minutes_override,
+        plannedBufferMinutesOverride: product.planned_buffer_minutes_override,
+        effectiveTurnaroundProfile,
         queuedTickets: product.queued_tickets,
         resourceGroupOpenTickets: product.resource_group_open_tickets,
         estimatedWaitLowerMinutes: forecast.lowerMinutes,
@@ -4386,6 +4425,42 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
         predictionQuality: forecast.quality,
       };
     }),
+    aircraftProductTurnaroundOverrides: aircraftProductTurnaroundOverrideRows.results.flatMap(
+      (override) => {
+        const product = products.results.find((candidate) => candidate.id === override.product_id);
+        if (!product) return [];
+        return [
+          {
+            aircraftId: override.aircraft_id,
+            productId: override.product_id,
+            version: override.version,
+            plannedBoardingMinutesOverride: override.planned_boarding_minutes_override,
+            plannedDeboardingMinutesOverride: override.planned_deboarding_minutes_override,
+            plannedBufferMinutesOverride: override.planned_buffer_minutes_override,
+            effectiveTurnaroundProfile: resolveTurnaroundProfile({
+              event: {
+                sourceId: eventId,
+                boardingMinutes: eventRow.planned_boarding_minutes ?? 8,
+                deboardingMinutes: eventRow.planned_deboarding_minutes ?? 5,
+                bufferMinutes: eventRow.planned_buffer_minutes ?? 3,
+              },
+              product: {
+                sourceId: product.id,
+                boardingMinutes: product.planned_boarding_minutes_override,
+                deboardingMinutes: product.planned_deboarding_minutes_override,
+                bufferMinutes: product.planned_buffer_minutes_override,
+              },
+              aircraftProduct: {
+                sourceId: `${override.aircraft_id}:${override.product_id}`,
+                boardingMinutes: override.planned_boarding_minutes_override,
+                deboardingMinutes: override.planned_deboarding_minutes_override,
+                bufferMinutes: override.planned_buffer_minutes_override,
+              },
+            }),
+          },
+        ];
+      },
+    ),
     rotations: rotations.results.map((rotation, index) => {
       const activeAircraft = aircraftRows.results.filter(
         (aircraft) =>

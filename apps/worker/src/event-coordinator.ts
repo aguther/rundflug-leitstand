@@ -1530,6 +1530,12 @@ export class EventCoordinator extends DurableObject<Env> {
           return this.handleMasterData(command, current);
         }
         if (
+          command.type === "UPSERT_AIRCRAFT_PRODUCT_TURNAROUND_OVERRIDE" ||
+          command.type === "DELETE_AIRCRAFT_PRODUCT_TURNAROUND_OVERRIDE"
+        ) {
+          return this.handleAircraftProductTurnaroundOverride(command, current);
+        }
+        if (
           command.type === "UPSERT_RESOURCE_GROUP" ||
           command.type === "UPSERT_AIRCRAFT" ||
           command.type === "ASSIGN_AIRCRAFT_RESOURCE_GROUP"
@@ -4456,6 +4462,9 @@ export class EventCoordinator extends DurableObject<Env> {
         referenceCapacity: command.payload.referenceCapacity,
         referenceDurationMinutes: command.payload.referenceDurationMinutes,
         promisedFlightMinutes: command.payload.promisedFlightMinutes,
+        plannedBoardingMinutesOverride: command.payload.plannedBoardingMinutesOverride,
+        plannedDeboardingMinutesOverride: command.payload.plannedDeboardingMinutesOverride,
+        plannedBufferMinutesOverride: command.payload.plannedBufferMinutesOverride,
         childCompanionRequired: command.payload.childCompanionRequired,
         weightClasses: command.payload.weightClasses,
         cashierSortOrder,
@@ -4465,15 +4474,20 @@ export class EventCoordinator extends DurableObject<Env> {
         `INSERT INTO products
           (id, operation_day_id, resource_group_id, gate_id, name, code, public_description,
            price_cents, sale_enabled, reference_capacity, reference_duration_minutes,
-           promised_flight_minutes, child_companion_required, weight_classes_json, sort_order,
-           created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 1, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?15)
+           promised_flight_minutes, planned_boarding_minutes_override,
+           planned_deboarding_minutes_override, planned_buffer_minutes_override,
+           child_companion_required, weight_classes_json, sort_order, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 1, ?9, ?10, ?11, ?12, ?13, ?14,
+                 ?15, ?16, ?17, ?18, ?18)
          ON CONFLICT(id) DO UPDATE SET resource_group_id = excluded.resource_group_id,
           gate_id = excluded.gate_id, name = excluded.name, code = excluded.code,
           public_description = excluded.public_description, price_cents = excluded.price_cents,
            reference_capacity = excluded.reference_capacity,
            reference_duration_minutes = excluded.reference_duration_minutes,
            promised_flight_minutes = excluded.promised_flight_minutes,
+           planned_boarding_minutes_override = excluded.planned_boarding_minutes_override,
+           planned_deboarding_minutes_override = excluded.planned_deboarding_minutes_override,
+           planned_buffer_minutes_override = excluded.planned_buffer_minutes_override,
            child_companion_required = excluded.child_companion_required,
            weight_classes_json = excluded.weight_classes_json,
            updated_at = excluded.updated_at
@@ -4490,6 +4504,9 @@ export class EventCoordinator extends DurableObject<Env> {
         command.payload.referenceCapacity,
         command.payload.referenceDurationMinutes,
         command.payload.promisedFlightMinutes,
+        command.payload.plannedBoardingMinutesOverride,
+        command.payload.plannedDeboardingMinutesOverride,
+        command.payload.plannedBufferMinutesOverride,
         command.payload.childCompanionRequired ? 1 : 0,
         JSON.stringify(command.payload.weightClasses),
         cashierSortOrder,
@@ -4522,6 +4539,186 @@ export class EventCoordinator extends DurableObject<Env> {
         command.deviceId,
         aggregate.type,
         aggregate.id,
+        nextVersion,
+        JSON.stringify(auditPayload),
+      ),
+      this.env.DB.prepare(
+        `INSERT INTO idempotency_receipts
+          (command_id, operation_day_id, device_id, command_type, received_at, response_json)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)`,
+      ).bind(
+        command.commandId,
+        command.eventId,
+        command.deviceId,
+        command.type,
+        now,
+        JSON.stringify(result),
+      ),
+      this.env.DB.prepare(
+        "INSERT INTO outbox (id, operation_day_id, topic, payload_json, created_at) VALUES (?1, ?2, 'EVENT_STATE_CHANGED', ?3, ?4)",
+      ).bind(crypto.randomUUID(), command.eventId, JSON.stringify(result), now),
+    ]);
+    this.broadcast(result);
+    return json(result);
+  }
+
+  private async handleAircraftProductTurnaroundOverride(
+    command: Extract<
+      CommandEnvelope,
+      {
+        type:
+          | "UPSERT_AIRCRAFT_PRODUCT_TURNAROUND_OVERRIDE"
+          | "DELETE_AIRCRAFT_PRODUCT_TURNAROUND_OVERRIDE";
+      }
+    >,
+    current: StoredEventRow,
+  ): Promise<Response> {
+    const [product, aircraft, existing] = await Promise.all([
+      this.env.DB.prepare("SELECT id FROM products WHERE id = ?1 AND operation_day_id = ?2")
+        .bind(command.payload.productId, command.eventId)
+        .first<{ id: string }>(),
+      this.env.DB.prepare(
+        `SELECT a.id
+           FROM aircraft a
+          WHERE a.id = ?1
+            AND EXISTS (
+              SELECT 1 FROM resource_group_memberships membership
+               WHERE membership.aircraft_id = a.id
+                 AND membership.operation_day_id = ?2
+            )`,
+      )
+        .bind(command.payload.aircraftId, command.eventId)
+        .first<{ id: string }>(),
+      this.env.DB.prepare(
+        `SELECT version
+           FROM aircraft_product_turnaround_overrides
+          WHERE operation_day_id = ?1 AND aircraft_id = ?2 AND product_id = ?3`,
+      )
+        .bind(command.eventId, command.payload.aircraftId, command.payload.productId)
+        .first<{ version: number }>(),
+    ]);
+    if (!product || !aircraft) {
+      return json(
+        {
+          error: {
+            code: "TURNAROUND_OVERRIDE_REFERENCE_INVALID",
+            message: "Produkt oder Flugzeug gehört nicht zu dieser Veranstaltung.",
+          },
+        },
+        { status: 409 },
+      );
+    }
+    if (command.type === "DELETE_AIRCRAFT_PRODUCT_TURNAROUND_OVERRIDE" && !existing) {
+      return json(
+        {
+          error: {
+            code: "TURNAROUND_OVERRIDE_NOT_FOUND",
+            message: "Die Flugzeugausnahme ist nicht mehr vorhanden.",
+          },
+        },
+        { status: 404 },
+      );
+    }
+    const expectedOverrideVersion = command.payload.expectedOverrideVersion;
+    if (
+      (existing && expectedOverrideVersion !== existing.version) ||
+      (!existing && expectedOverrideVersion !== undefined && expectedOverrideVersion !== 0)
+    ) {
+      return json(
+        {
+          error: {
+            code: "TURNAROUND_OVERRIDE_STALE_VERSION",
+            message: "Die Flugzeugausnahme wurde zwischenzeitlich geändert.",
+            currentVersion: existing?.version ?? 0,
+          },
+        },
+        { status: 409 },
+      );
+    }
+
+    const now = new Date().toISOString();
+    const nextVersion = current.version + 1;
+    const eventType =
+      command.type === "UPSERT_AIRCRAFT_PRODUCT_TURNAROUND_OVERRIDE"
+        ? "AIRCRAFT_PRODUCT_TURNAROUND_OVERRIDE_UPSERTED"
+        : "AIRCRAFT_PRODUCT_TURNAROUND_OVERRIDE_DELETED";
+    const aggregateId = `${command.payload.aircraftId}:${command.payload.productId}`;
+    const result: CommandResult = {
+      accepted: true,
+      duplicate: false,
+      event: rowToSnapshot({ ...current, version: nextVersion, updated_at: now }),
+      eventType,
+      aggregate: { type: "AIRCRAFT", id: command.payload.aircraftId },
+    };
+    const mutation =
+      command.type === "UPSERT_AIRCRAFT_PRODUCT_TURNAROUND_OVERRIDE"
+        ? this.env.DB.prepare(
+            `INSERT INTO aircraft_product_turnaround_overrides
+              (operation_day_id, aircraft_id, product_id, planned_boarding_minutes_override,
+               planned_deboarding_minutes_override, planned_buffer_minutes_override, version,
+               created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, 0, ?7, ?7)
+             ON CONFLICT(operation_day_id, aircraft_id, product_id) DO UPDATE SET
+               planned_boarding_minutes_override =
+                 excluded.planned_boarding_minutes_override,
+               planned_deboarding_minutes_override =
+                 excluded.planned_deboarding_minutes_override,
+               planned_buffer_minutes_override = excluded.planned_buffer_minutes_override,
+               version = aircraft_product_turnaround_overrides.version + 1,
+               updated_at = excluded.updated_at`,
+          ).bind(
+            command.eventId,
+            command.payload.aircraftId,
+            command.payload.productId,
+            command.payload.plannedBoardingMinutesOverride,
+            command.payload.plannedDeboardingMinutesOverride,
+            command.payload.plannedBufferMinutesOverride,
+            now,
+          )
+        : this.env.DB.prepare(
+            `DELETE FROM aircraft_product_turnaround_overrides
+              WHERE operation_day_id = ?1 AND aircraft_id = ?2 AND product_id = ?3
+                AND version = ?4`,
+          ).bind(
+            command.eventId,
+            command.payload.aircraftId,
+            command.payload.productId,
+            command.payload.expectedOverrideVersion,
+          );
+    const auditPayload =
+      command.type === "UPSERT_AIRCRAFT_PRODUCT_TURNAROUND_OVERRIDE"
+        ? {
+            aircraftId: command.payload.aircraftId,
+            productId: command.payload.productId,
+            plannedBoardingMinutesOverride: command.payload.plannedBoardingMinutesOverride,
+            plannedDeboardingMinutesOverride: command.payload.plannedDeboardingMinutesOverride,
+            plannedBufferMinutesOverride: command.payload.plannedBufferMinutesOverride,
+            priorVersion: existing?.version ?? null,
+            reason: command.payload.reason,
+          }
+        : {
+            aircraftId: command.payload.aircraftId,
+            productId: command.payload.productId,
+            deletedVersion: existing?.version ?? null,
+            reason: command.payload.reason,
+          };
+    await this.env.DB.batch([
+      this.env.DB.prepare(
+        "UPDATE operation_days SET version = ?1, updated_at = ?2 WHERE id = ?3 AND version = ?4",
+      ).bind(nextVersion, now, command.eventId, current.version),
+      mutation,
+      this.env.DB.prepare(
+        `INSERT INTO operational_events
+          (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type,
+           aggregate_id, aggregate_version, payload_json)
+         VALUES (?1, ?2, ?3, ?4, ?5, 'AIRCRAFT', ?6, ?7, ?8)`,
+      ).bind(
+        crypto.randomUUID(),
+        command.eventId,
+        eventType,
+        now,
+        command.deviceId,
+        aggregateId,
         nextVersion,
         JSON.stringify(auditPayload),
       ),
