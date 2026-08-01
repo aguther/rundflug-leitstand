@@ -65,6 +65,24 @@ describe("V1.7.3 FIDS concept fidelity", () => {
     expect(stylesSource).toMatch(
       /\.fids-recall-status \{[\s\S]*?font-size: var\(--fids-status-font-size\);/,
     );
+
+    const regularStatusRule = stylesSource.match(/\.fids-status \{(?<body>[^}]*)\}/)?.groups?.body;
+    const recallStatusRule = stylesSource.match(/\.fids-recall-status \{(?<body>[^}]*)\}/)?.groups
+      ?.body;
+    const sharedIconGap = "gap: clamp(3px, 0.55vw, 10px)";
+    expect(regularStatusRule).toContain(sharedIconGap);
+    expect(recallStatusRule).toContain(sharedIconGap);
+    expect(stylesSource).toMatch(/\.fids-recall-bell \{[\s\S]*?width: 1em;[\s\S]*?height: 1em;/);
+
+    const pulseFrames = stylesSource.slice(
+      stylesSource.indexOf("@keyframes fids-recall-pulse"),
+      stylesSource.indexOf("@keyframes fids-primary-status-swap"),
+    );
+    const pulseScales = [...pulseFrames.matchAll(/scale\(([\d.]+)\)/g)].map((match) =>
+      Number(match[1]),
+    );
+    expect(Math.min(...pulseScales)).toBeCloseTo(0.89);
+    expect(Math.max(...pulseScales)).toBe(1);
     expect(stylesSource).toContain("animation: fids-primary-status-swap 8s ease-in-out infinite");
     expect(stylesSource).toContain("animation: fids-recall-status-swap 8s ease-in-out infinite");
     expect(stylesSource).not.toContain("step-end");
