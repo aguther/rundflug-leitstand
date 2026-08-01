@@ -1,27 +1,17 @@
 import type { OperationBoard } from "@rundflug/contracts";
-import { type ReactNode, useState } from "react";
-import { Tabs } from "../../../design-system/components";
+import type { ReactNode } from "react";
 import { EventWorkspaceFrame } from "../event-workspace/EventWorkspaceFrame";
 import "./operations-workspace.css";
 
-type OperationsTab = "plan" | "exceptions";
-
-const operationTabs = [
-  { value: "plan", label: "Plan und Freigabe" },
-  { value: "exceptions", label: "Sonderlagen" },
-] satisfies Array<{ value: OperationsTab; label: string }>;
-
 export function OperationsWorkspace({
   board,
-  plan,
-  exceptions,
+  release,
+  emergency,
 }: {
   board: OperationBoard;
-  plan: ReactNode;
-  exceptions: ReactNode;
+  release: ReactNode;
+  emergency: ReactNode;
 }) {
-  const [activeTab, setActiveTab] = useState<OperationsTab>("plan");
-  const panels: Record<OperationsTab, ReactNode> = { plan, exceptions };
   return (
     <EventWorkspaceFrame event={board.event} variant="wide">
       <section className="operations-workspace-summary" aria-label="Betriebszusammenfassung">
@@ -39,25 +29,10 @@ export function OperationsWorkspace({
           im Verkauf
         </span>
       </section>
-      <Tabs
-        idPrefix="admin-operations"
-        items={operationTabs}
-        label="Betriebsbereiche"
-        onChange={setActiveTab}
-        value={activeTab}
-      />
-      {operationTabs.map((tab) => (
-        <section
-          aria-labelledby={`admin-operations-${tab.value}-tab`}
-          className="operations-workspace-panel"
-          hidden={activeTab !== tab.value}
-          id={`admin-operations-${tab.value}-panel`}
-          key={tab.value}
-          role="tabpanel"
-        >
-          {panels[tab.value]}
-        </section>
-      ))}
+      <div className="operations-workspace-controls">
+        <div>{release}</div>
+        <div>{emergency}</div>
+      </div>
     </EventWorkspaceFrame>
   );
 }

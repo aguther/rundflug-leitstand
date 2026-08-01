@@ -117,6 +117,7 @@ describe("V1.5 administration UI", () => {
       'id: "aircraft"',
       'id: "pilots"',
       'id: "products"',
+      'id: "operational-plan"',
       'id: "operations"',
       'id: "completion"',
     ]) {

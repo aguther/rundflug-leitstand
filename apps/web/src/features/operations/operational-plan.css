@@ -4,6 +4,12 @@
   gap: 12px;
 }
 
+.operational-plan-section {
+  min-width: 0;
+  display: grid;
+  gap: 12px;
+}
+
 .operational-plan-header {
   min-width: 0;
   display: flex;

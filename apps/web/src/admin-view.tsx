@@ -98,6 +98,7 @@ import {
   MasterDataEmptyState,
   MasterDataWorkspace,
 } from "./features/admin/master-data/MasterDataWorkspace";
+import { OperationalPlanWorkspace } from "./features/admin/operational-plan/OperationalPlanWorkspace";
 import { OperationsWorkspace } from "./features/admin/operations/OperationsWorkspace";
 import { PilotCodesWorkspace } from "./features/admin/pilots/PilotCodesWorkspace";
 import { ProductSalesDialog } from "./features/admin/products/ProductSalesDialog";
@@ -105,12 +106,11 @@ import { ProductsWorkspace } from "./features/admin/products/ProductsWorkspace";
 import { ResourceGroupsWorkspace } from "./features/admin/resource-groups/ResourceGroupsWorkspace";
 import { AccountManagement } from "./features/auth/AccountManagement";
 import { useAuth } from "./features/auth/AuthContext";
-import {
-  OperationalPlanPanel,
-  type PlannedOperation,
-  type RecurringOperationalRule,
-  type UpsertPlannedOperationPayload,
-  type UpsertRecurringOperationalRulePayload,
+import type {
+  PlannedOperation,
+  RecurringOperationalRule,
+  UpsertPlannedOperationPayload,
+  UpsertRecurringOperationalRulePayload,
 } from "./features/operations/OperationalPlanPanel";
 import {
   formatGermanDate,
@@ -171,9 +171,13 @@ const eventStepCopy: Record<AdminEventStep, { title: string; description: string
     title: "Produkte",
     description: "Verkaufsprodukte, Preise und Queue-Zuordnung verwalten.",
   },
+  "operational-plan": {
+    title: "Betriebsplan",
+    description: "Einschränkungen und wiederkehrende Regeln für den Flugtag planen.",
+  },
   operations: {
     title: "Betrieb",
-    description: "Betriebsplan, Freigabe, Kapazität und organisatorische Eingriffe verwalten.",
+    description: "Betriebsfreigabe, Betriebsende und Notfallmodus verwalten.",
   },
   completion: {
     title: "Abschluss",
@@ -231,6 +235,7 @@ export function AdminView() {
       "aircraft",
       "pilots",
       "products",
+      "operational-plan",
       "operations",
       "completion",
     ];
@@ -2164,6 +2169,14 @@ export function AdminView() {
       label: "Produkte",
       complete: Boolean(board?.products.length),
       category: "products",
+    },
+    {
+      id: "operational-plan",
+      label: "Betriebsplan",
+      complete: Boolean(
+        board?.plannedOperations.length ||
+          board?.recurringOperationalRules.some((rule) => rule.status === "ACTIVE"),
+      ),
     },
     {
       id: "operations",
@@ -4471,6 +4484,38 @@ export function AdminView() {
               </a>
             </div>
           </section>
+          {adminArea === "events" && eventStep === "operational-plan" && board ? (
+            <section
+              aria-labelledby="admin-event-step-operational-plan-tab"
+              id="admin-event-step-operational-plan-panel"
+              role="tabpanel"
+            >
+              <OperationalPlanWorkspace
+                board={board}
+                panelProps={{
+                  aircraft: board.aircraft,
+                  busy: busyActionKey !== null,
+                  eventId: board.event.eventId,
+                  eventTimeZone: board.event.timeZone,
+                  mode: "admin",
+                  onCancel: (plan) =>
+                    runBusyAction("admin-plan-cancel", () => cancelAdminPlannedOperation(plan)),
+                  onDisableRecurringRule: (rule) =>
+                    runBusyAction("admin-rule-disable", () => disableAdminRecurringRule(rule)),
+                  onUpsert: (payload) =>
+                    runBusyAction("admin-plan-upsert", () => upsertAdminPlannedOperation(payload)),
+                  onUpsertRecurringRule: (payload) =>
+                    runBusyAction("admin-rule-upsert", () => upsertAdminRecurringRule(payload)),
+                  pilots: board.pilots,
+                  plannedOperations: board.plannedOperations,
+                  recurringOperationalRules: board.recurringOperationalRules,
+                  readOnly: !isAdministrator || !adminModeUnlocked,
+                  resourceGroups: board.resourceGroups,
+                  rotations: board.rotations,
+                }}
+              />
+            </section>
+          ) : null}
           {adminArea === "events" && eventStep === "operations" && board ? (
             <section
               aria-labelledby="admin-event-step-operations-tab"
@@ -4479,9 +4524,8 @@ export function AdminView() {
             >
               <OperationsWorkspace
                 board={board}
-                plan={
-                  <>
-                    <Panel className="event-release-v15" padding="compact">
+                release={
+                  <Panel className="event-release-v15" padding="compact">
                       <PageHeader
                         actions={
                           <StatusPill tone={eventIsReleased || setupComplete ? "success" : "warning"}>
@@ -4519,6 +4563,7 @@ export function AdminView() {
                           </p>
                           <ul className="event-release-missing">
                             {setupSteps
+                              .slice(0, 6)
                               .filter((step) => !step.complete)
                               .map((step) => (
                                 <li key={step.id}>
@@ -4546,37 +4591,9 @@ export function AdminView() {
                           </Button>
                         </div>
                       ) : null}
-                    </Panel>
-                    <section className="admin-section admin-operational-plan-section">
-                      <OperationalPlanPanel
-                        aircraft={board.aircraft}
-                        busy={busyActionKey !== null}
-                        eventId={board.event.eventId}
-                        eventTimeZone={board.event.timeZone}
-                        mode="admin"
-                        onCancel={(plan) =>
-                          runBusyAction("admin-plan-cancel", () => cancelAdminPlannedOperation(plan))
-                        }
-                        onDisableRecurringRule={(rule) =>
-                          runBusyAction("admin-rule-disable", () => disableAdminRecurringRule(rule))
-                        }
-                        onUpsert={(payload) =>
-                          runBusyAction("admin-plan-upsert", () => upsertAdminPlannedOperation(payload))
-                        }
-                        onUpsertRecurringRule={(payload) =>
-                          runBusyAction("admin-rule-upsert", () => upsertAdminRecurringRule(payload))
-                        }
-                        pilots={board.pilots}
-                        plannedOperations={board.plannedOperations}
-                        recurringOperationalRules={board.recurringOperationalRules}
-                        readOnly={!isAdministrator || !adminModeUnlocked}
-                        resourceGroups={board.resourceGroups}
-                        rotations={board.rotations}
-                      />
-                    </section>
-                  </>
+                  </Panel>
                 }
-                exceptions={
+                emergency={
                   <section className="admin-section admin-emergency-section">
                     <h2>Notfallmodus</h2>
                     <p>
