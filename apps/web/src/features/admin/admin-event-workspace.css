@@ -904,25 +904,88 @@
   top: 0;
 }
 
-.admin-shell .setup-progress {
+.admin-shell .setup-progress-navigation {
   width: calc(100% - 32px);
   flex: 0 0 56px;
   height: 56px;
   min-height: 56px;
-  display: flex;
-  align-items: stretch;
-  gap: 0;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
   margin: 16px 16px 12px;
-  overflow-x: auto;
+  overflow: hidden;
   border: 1px solid var(--ui-border);
   border-radius: var(--radius-md);
   background: var(--ui-surface);
-  scrollbar-width: none;
-  scrollbar-gutter: stable;
 }
 
-.admin-shell .admin-workspace:not(.master-data-active) > .setup-progress {
+.admin-shell .setup-progress-navigation.is-overflowing {
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+}
+
+.admin-shell .setup-progress {
+  width: 100%;
+  min-width: 0;
+  height: 54px;
+  min-height: 54px;
+  display: flex;
+  flex: none;
+  align-items: stretch;
+  gap: 0;
+  margin: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+}
+
+.admin-shell .admin-workspace:not(.master-data-active) > .setup-progress-navigation {
   margin-bottom: 0;
+}
+
+.admin-shell .setup-progress-scroll {
+  width: 44px;
+  min-width: 44px;
+  min-height: 54px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  color: var(--ui-text);
+  background: var(--ui-surface-raised);
+  box-shadow: none;
+}
+
+.admin-shell .setup-progress-scroll[hidden] {
+  display: none;
+}
+
+.admin-shell .setup-progress-scroll--back {
+  border-right: 1px solid var(--ui-border);
+}
+
+.admin-shell .setup-progress-scroll--forward {
+  border-left: 1px solid var(--ui-border);
+}
+
+.admin-shell .setup-progress-scroll:is(:hover, :focus-visible):not(:disabled) {
+  color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+}
+
+.admin-shell .setup-progress-scroll:disabled {
+  color: var(--ui-muted);
+  background: var(--ui-surface-subtle);
+  opacity: 0.55;
+}
+
+.admin-shell .setup-progress-scroll svg {
+  width: 20px;
+  height: 20px;
 }
 
 .admin-shell .setup-progress .setup-progress-item,
@@ -1082,6 +1145,15 @@
 
 .admin-shell .master-data-editor-panel > :is(h3, .form-introduction, .parameter-grid) {
   grid-column: 1 / -1;
+}
+
+.admin-shell .master-data-editor-panel > .master-editor-further-settings {
+  grid-column: 1 / -1;
+}
+
+.admin-shell .master-editor-further-settings .parameter-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: end;
 }
 
 .admin-shell
@@ -1288,10 +1360,23 @@
 }
 
 @media (max-width: 700px) {
-  .admin-shell .setup-progress {
+  .admin-shell .setup-progress-navigation {
     width: calc(100% - 24px);
     height: 48px;
     min-height: 48px;
+    margin-inline: 12px;
+  }
+
+  .admin-shell .setup-progress-navigation.is-overflowing {
+    grid-template-columns: 44px minmax(0, 1fr) 44px;
+  }
+
+  .admin-shell .setup-progress,
+  .admin-shell .setup-progress .setup-progress-item,
+  .admin-shell .setup-progress button,
+  .admin-shell .setup-progress-scroll {
+    height: 46px;
+    min-height: 46px;
   }
 
   .admin-shell .setup-progress .setup-progress-item {
@@ -1325,6 +1410,11 @@
   .admin-shell .master-data-editor-panel:not([hidden]) {
     grid-template-columns: 1fr;
     gap: 20px;
+  }
+
+  .admin-shell .master-editor-further-settings .parameter-grid {
+    grid-template-columns: 1fr;
+    align-items: stretch;
   }
 
   .admin-shell .master-editor-status-section {

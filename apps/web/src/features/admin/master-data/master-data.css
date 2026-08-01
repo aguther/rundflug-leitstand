@@ -55,6 +55,22 @@
   grid-template-columns: minmax(0, 1fr) auto;
 }
 
+.admin-shell .gate-primary-cell {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+}
+
+.admin-shell .gate-primary-cell > strong {
+  min-width: 0;
+  flex: 1 1 90px;
+  overflow-wrap: anywhere;
+}
+
+.admin-shell .gate-primary-cell > .ds-status-pill {
+  flex: 0 0 auto;
+}
+
 .admin-shell .admin-entity-stacked > span {
   overflow: hidden;
   color: var(--ui-muted);

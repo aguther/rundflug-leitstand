@@ -19,6 +19,18 @@ const adminEventStyles = readFileSync(
   new URL("./features/admin/admin-event-workspace.css", import.meta.url),
   "utf8",
 );
+const masterDataStyles = readFileSync(
+  new URL("./features/admin/master-data/master-data.css", import.meta.url),
+  "utf8",
+);
+const operationsStyles = readFileSync(
+  new URL("./features/admin/operations/operations-workspace.css", import.meta.url),
+  "utf8",
+);
+const productSalesStyles = readFileSync(
+  new URL("./features/admin/products/product-sales-dialog.css", import.meta.url),
+  "utf8",
+);
 
 describe("V1.5 administration UI", () => {
   it("uses one compact setup flow and the shared design-system primitives", () => {
@@ -73,6 +85,38 @@ describe("V1.5 administration UI", () => {
       ".admin-shell .manifest-correction-grid > .manifest-reason-field",
     );
     expect(chartSource).toContain('<ResponsiveContainer height="100%" width="100%">');
+    expect(adminUxSource).toContain("Vorherige Einrichtungsschritte anzeigen");
+    expect(adminUxSource).toContain("Weitere Einrichtungsschritte anzeigen");
+    expect(operationsStyles).toMatch(
+      /\.operations-workspace-controls \.event-release-v15 \{[\s\S]*?grid-template-columns: minmax\(0, 1fr\);[\s\S]*?gap: 14px;/,
+    );
+    expect(operationsStyles).toMatch(
+      /\.event-release-v15 > \.event-release-ready \{[\s\S]*?grid-template-columns: 20px minmax\(0, 1fr\);/,
+    );
+    expect(productSalesStyles).toMatch(
+      /\.product-sales-dialog \.localized-input-field \{[\s\S]*?color: var\(--ui-muted\);[\s\S]*?font-size: 0\.74rem;/,
+    );
+    expect(productSalesStyles).toMatch(
+      /\.product-sales-dialog \.localized-picker-control > input \{[\s\S]*?height: var\(--product-sales-control-height\);[\s\S]*?border: 1px solid var\(--ui-border-strong\);[\s\S]*?border-radius: var\(--radius-sm\);[\s\S]*?background: var\(--ui-control\);/,
+    );
+    expect(productSalesStyles).toMatch(
+      /\.product-sales-dialog \.localized-picker-control > input:focus \{[\s\S]*?border-color: color-mix\(in srgb, var\(--ui-accent\) 72%, var\(--ui-border\)\);[\s\S]*?outline: 0;/,
+    );
+    expect(productSalesStyles).toMatch(
+      /\.product-sales-dialog \.localized-date-time \{[\s\S]*?grid-template-columns: minmax\(0, 1fr\) auto minmax\(112px, 0\.6fr\);/,
+    );
+    expect(productSalesStyles).toMatch(
+      /@media \(max-width: 520px\) \{[\s\S]*?\.product-sales-dialog \.localized-date-time > span \{[\s\S]*?display: inline-flex;/,
+    );
+    expect(productSalesStyles).toMatch(
+      /\.product-sales-dialog \.ds-modal-body \{[\s\S]*?grid-auto-rows: max-content;[\s\S]*?align-content: start;/,
+    );
+    expect(productSalesStyles).toMatch(
+      /\.product-sales-status \{[\s\S]*?grid-auto-rows: minmax\(76px, max-content\);/,
+    );
+    expect(productSalesStyles).toMatch(
+      /@media \(max-width: 520px\) \{[\s\S]*?\.product-sales-status \{[\s\S]*?min-height: 386px;/,
+    );
   });
 
   it("keeps the area header mounted with the same geometry on master-data steps", () => {
@@ -169,6 +213,13 @@ describe("V1.5 administration UI", () => {
     expect(productsWorkspaceSource).toContain("Handbag");
     expect(productsWorkspaceSource).toContain("Verkauf für ");
     expect(productsWorkspaceSource).toContain("product.name");
+    expect(gatesWorkspaceSource).toContain('className="admin-entity-primary gate-primary-cell"');
+    expect(masterDataStyles).toMatch(
+      /\.admin-shell \.gate-primary-cell \{[\s\S]*?display: flex;[\s\S]*?flex-wrap: wrap;/,
+    );
+    expect(masterDataStyles).toMatch(
+      /\.admin-shell \.gate-primary-cell > strong \{[\s\S]*?min-width: 0;[\s\S]*?overflow-wrap: anywhere;/,
+    );
     expect(featureSources).toContain("<IconButton");
     expect(featureSources).not.toContain("table-overflow-action");
     expect(featureSources).not.toContain("tabIndex={0}");
