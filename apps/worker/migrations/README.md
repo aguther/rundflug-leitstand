@@ -374,6 +374,17 @@ wird eine D1-Time-Travel-Marke beziehungsweise portable Sicherung angelegt. Ein 
 ignoriert die nullable Spalte. Für eine vollständige Schema-Rückkehr wird D1 per Time Travel auf den
 Stand vor 0059 zurückgesetzt oder aus der Sicherung wiederhergestellt.
 
+## 0060 – Dispatch-Planung und Gate-Wegvorlauf
+
+Ergänzt Gates additiv um einen Wegvorlauf von 0 bis 30 Minuten. Aktuelle Umläufe und append-only
+Prognose-Snapshots erhalten die deterministische Plan- und Batchrevision, Lane, Reihenfolge,
+Belegung, Commitment-Stufe, Entscheidungsgründe und prognostische Überholungszahl. Automatische
+Gate-Aufrufe speichern außerdem Gate, adaptiven Basisvorlauf, historischen Gate-Wegvorlauf,
+effektiven Gesamtvorlauf und das verwendete Boardingfenster. Bestehende Datensätze verwenden
+neutrale Null- beziehungsweise Leerwerte. Vor Anwendung wird eine D1-Time-Travel-Marke oder
+portable Sicherung angelegt; die vollständige Schema-Rückkehr erfolgt per Time Travel oder aus
+dieser Sicherung.
+
 ## Historische Doppelnummer 0036
 
 `0036_product_promised_flight_time.sql` und `0036_v1_5_stable_operations.sql` wurden bereits unter

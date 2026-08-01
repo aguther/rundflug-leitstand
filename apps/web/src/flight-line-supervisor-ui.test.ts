@@ -108,6 +108,9 @@ describe("Flight Director", () => {
     expect(sharedSource).toContain("BookingGroupAssignmentDialog");
     expect(sharedSource).not.toContain("flight-director-dialog-pilot");
     expect(supervisorSource).toContain("onDefer={onGroupDefer}");
+    expect(supervisorSource).toContain("dispatchRecommendationForAircraft");
+    expect(sharedSource).toContain("Empfohlene Belegung");
+    expect(sharedSource).toContain("recommendationMatchesSelection");
   });
 
   it("keeps the compact tablet row free of decorative and repeated content", () => {

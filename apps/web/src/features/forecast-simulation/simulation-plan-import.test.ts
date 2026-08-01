@@ -60,6 +60,7 @@ function simulationPlan() {
           gateType: "FLIGHT_LINE",
           active: true,
           sortOrder: 10,
+          travelLeadMinutes: 6,
           displayFilter: { productKeys: ["product-1"], rotationStatuses: [] },
         },
       ],
@@ -264,6 +265,10 @@ describe("simulation plan import", () => {
     expect(preview.config.operationalModel?.aircraft[0]).toMatchObject({
       id: "aircraft-1",
       resourceGroupId: "group-1",
+    });
+    expect(preview.config.operationalModel?.gates[0]).toMatchObject({
+      id: "gate-1",
+      travelLeadMinutes: 6,
     });
     expect(validateSimulationConfig(preview.config).join(" ")).toContain(
       "muss vor dem Lauf umgewandelt oder ausgeschlossen werden",

@@ -62,13 +62,16 @@ WITH RECURSIVE sequence(number) AS (
   SELECT 1 UNION ALL SELECT number + 1 FROM sequence WHERE number < 20
 )
 INSERT OR IGNORE INTO flight_groups
-  (id, operation_day_id, resource_group_id, communication_number, status,
+  (id, operation_day_id, resource_group_id, product_id, communication_number, status,
    prediction_lower_minutes, prediction_upper_minutes, version, created_at, updated_at,
    queue_position, precalled_at)
 SELECT printf('fids-qa-flight-group-%02d', number), 'demo-2026',
        CASE WHEN number % 7 = 0 THEN 'rg-paused'
             WHEN number % 5 = 0 OR number = 2 THEN 'rg-oldtimer'
             ELSE 'rg-panorama' END,
+       CASE WHEN number % 7 = 0 THEN 'paused-qa'
+            WHEN number % 5 = 0 OR number = 2 THEN 'oldtimer-qa'
+            ELSE 'normal-qa' END,
        200 + number, CASE WHEN number = 2 THEN 'CALLED' ELSE 'DRAFT' END,
        number * 5, number * 5 + 15, 0,
        '2026-07-22T08:00:00.000Z', '2026-07-22T08:00:00.000Z', number,

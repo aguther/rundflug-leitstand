@@ -93,6 +93,12 @@ export function GatesWorkspace({
           },
         },
         {
+          key: "travel",
+          label: "Wegzeit",
+          align: "right",
+          render: (gate) => `${gate.travelLeadMinutes} Min.`,
+        },
+        {
           key: "order",
           label: "Reihenfolge",
           sortKey: "sortOrder",

@@ -107,7 +107,7 @@ function validVersionTwoTemplate() {
       },
       operationalModel: {
         sourceName: "Rundflugtag",
-        gates: [{ id: "gate-1", label: "Flight Line" }],
+        gates: [{ id: "gate-1", label: "Flight Line", travelLeadMinutes: 0 }],
         resourceGroups: [
           {
             id: "group-1",

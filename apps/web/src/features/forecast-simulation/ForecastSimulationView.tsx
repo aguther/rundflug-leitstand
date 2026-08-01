@@ -1152,6 +1152,47 @@ export function ForecastSimulationView() {
               {" · "}veraltet {visibleMetrics.uncertaintyReasons.STALE_PREDICTION}
             </p>
           </article>
+          <article>
+            <h3>Dispatch</h3>
+            <p>
+              Durchsatz: {metric(visibleMetrics.dispatch.passengersPerHour, " Pers./h")} ·{" "}
+              {metric(visibleMetrics.dispatch.passengersPerAircraftHour, " Pers./Flzg.-h")}
+            </p>
+            <p>
+              Sitze: {visibleMetrics.dispatch.occupiedSeats} von{" "}
+              {visibleMetrics.dispatch.offeredSeats} belegt ·{" "}
+              {metric(visibleMetrics.dispatch.averageSeatUtilizationPercent, " %")}
+            </p>
+            <p>
+              Passagierwartezeit: P50{" "}
+              {metric(visibleMetrics.dispatch.p50PassengerWaitMinutes, " Min.")} · P90{" "}
+              {metric(visibleMetrics.dispatch.p90PassengerWaitMinutes, " Min.")} · Max.{" "}
+              {metric(visibleMetrics.dispatch.maximumPassengerWaitMinutes, " Min.")}
+            </p>
+            <p>
+              Überholungen: {visibleMetrics.dispatch.projectedOvertakes} · max.{" "}
+              {visibleMetrics.dispatch.maximumOvertakesPerGroup} je Gruppe
+            </p>
+            <p>
+              Max. Produkt-Service-Defizit:{" "}
+              {metric(visibleMetrics.dispatch.maximumProductServiceDeficitMinutes, " Min.")}
+            </p>
+            <p>
+              Planänderungen: {visibleMetrics.dispatch.unnecessaryPlanChanges} · Rücknahmen von{" "}
+              Bereithalten: {visibleMetrics.dispatch.prepareDemotions} · Neuplanung nach Bitte zum{" "}
+              Gate: {visibleMetrics.dispatch.goToGateReplans}
+            </p>
+            <p className="sim-diagnostic-reasons">
+              Wartezeit je Produkt:{" "}
+              {Object.entries(visibleMetrics.dispatch.waitMinutesByProduct)
+                .map(([productId, value]) => `${productId} ${value} Min.`)
+                .join(" · ") || "–"}
+              {" · "}Serviceanteil:{" "}
+              {Object.entries(visibleMetrics.dispatch.serviceSharePercentByProduct)
+                .map(([productId, value]) => `${productId} ${value} %`)
+                .join(" · ") || "–"}
+            </p>
+          </article>
         </div>
       </ModalDialog>
 

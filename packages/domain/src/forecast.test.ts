@@ -532,10 +532,12 @@ describe("event-driven forecast", () => {
       activeCapacity: 2,
     });
     expect(projections[2]).toMatchObject({
-      predictionLowerMinutes: 14,
-      predictionUpperMinutes: 24,
-      predictedBoardingAt: "2026-07-22T10:19:00.000Z",
+      predictionLowerMinutes: 0,
+      predictionUpperMinutes: 5,
+      predictedBoardingAt: "2026-07-22T10:02:30.000Z",
+      dispatchBatchId: projections[1]?.dispatchBatchId,
     });
+    expect(projections[1]?.dispatchOccupiedSeats).toBe(2);
   });
 
   it("anchors sales forecasts to the planned operating start", () => {

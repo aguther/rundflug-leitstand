@@ -378,6 +378,7 @@ export function assertPublicTicketCode(code: string): string {
 
 export * from "./capacity";
 export * from "./communication-labels";
+export * from "./dispatch-plan";
 export * from "./forecast";
 export * from "./operational-plan";
 export * from "./outage-recovery";

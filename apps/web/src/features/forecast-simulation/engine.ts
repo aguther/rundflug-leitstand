@@ -1,10 +1,12 @@
 import {
   calculateForecastTimelines,
+  createDispatchPlan,
+  type DispatchPlan,
   deriveAdaptivePrecallLeadMinutes,
   type ForecastRotationStatus,
   type ForecastUncertaintyReason,
+  normalizePrecallObservation,
   type PredictionQuality,
-  planNextRotations,
   selectAutomaticPrecalls,
 } from "@rundflug/domain";
 
@@ -14,6 +16,7 @@ import type {
   SimulationAircraft,
   SimulationAircraftState,
   SimulationConfig,
+  SimulationDispatchDiagnostics,
   SimulationEvent,
   SimulationEventType,
   SimulationForecastSnapshot,
@@ -22,7 +25,7 @@ import type {
   SimulationRotation,
   TriangularDistribution,
 } from "./model";
-import { validateSimulationConfig } from "./model";
+import { SIMULATION_DISPATCH_PLANNING_LIMITS, validateSimulationConfig } from "./model";
 import { runOperationalSimulation } from "./operational-engine";
 
 const TICK_MS = 30_000;
@@ -36,6 +39,13 @@ interface RuntimeRotation extends SimulationRotation {
   predictedDepartureAt: string | null;
   predictedLandingAt: string | null;
   predictedCompletionAt: string | null;
+}
+
+function dispatchPublicStatus(rotation: SimulationRotation) {
+  if (rotation.precallStatus === "GO_TO_GATE" || rotation.precalledAt) {
+    return "COME_TO_FLIGHT_LINE" as const;
+  }
+  return rotation.precallStatus === "PREPARE" ? ("PREPARE" as const) : ("WAITING" as const);
 }
 
 interface PendingBlock {
@@ -177,6 +187,12 @@ function createDemand(config: SimulationConfig): RuntimeRotation[] {
       precallPredictionQuality: null,
       precallPredictedBoardingAt: null,
       precallAdaptiveLeadMinutes: null,
+      precallStatus: "WAITING" as const,
+      productId: PRODUCT_ID,
+      productName: "Rundflug Simulation",
+      productCode: PRODUCT_ID,
+      resourceGroupId: RESOURCE_GROUP_ID,
+      gateLabel: "Simulation Gate",
       aircraftId: null,
       calledAt: null,
       departedAt: null,
@@ -331,6 +347,7 @@ export function calculateSimulationMetrics(input: {
   operationsStartAt?: string;
   operationsEndAt?: string;
   aircraftCount?: number;
+  dispatchDiagnostics?: SimulationDispatchDiagnostics;
 }): SimulationMetrics {
   const snapshotsByRotation = new Map<string, SimulationForecastSnapshot[]>();
   for (const snapshot of input.snapshots) {
@@ -471,6 +488,92 @@ export function calculateSimulationMetrics(input: {
         : 0),
     0,
   );
+  const passengerWaitSamples = completedRotations
+    .flatMap((rotation) => {
+      if (!rotation.calledAt) return [];
+      const waitMinutes = Math.max(
+        0,
+        (Date.parse(rotation.calledAt) - Date.parse(rotation.createdAt)) / MINUTE_MS,
+      );
+      return Array.from({ length: Math.max(1, rotation.passengerCount) }, () => waitMinutes);
+    })
+    .sort((left, right) => left - right);
+  const averagePassengerWaitMinutes =
+    passengerWaitSamples.length === 0
+      ? null
+      : rounded(
+          passengerWaitSamples.reduce((sum, value) => sum + value, 0) / passengerWaitSamples.length,
+        );
+  const seatUtilizationSamples = completedRotations.flatMap((rotation) =>
+    rotation.dispatchCapacity && rotation.dispatchCapacity > 0
+      ? [(rotation.passengerCount / rotation.dispatchCapacity) * 100]
+      : [],
+  );
+  const productWaits = new Map<string, number[]>();
+  const servedPassengersByProduct = new Map<string, number>();
+  for (const rotation of completedRotations) {
+    if (!rotation.calledAt) continue;
+    const waits = productWaits.get(rotation.productId ?? "DEFAULT") ?? [];
+    const waitMinutes =
+      (Date.parse(rotation.calledAt) - Date.parse(rotation.createdAt)) / MINUTE_MS;
+    waits.push(...Array.from({ length: Math.max(1, rotation.passengerCount) }, () => waitMinutes));
+    productWaits.set(rotation.productId ?? "DEFAULT", waits);
+    servedPassengersByProduct.set(
+      rotation.productId ?? "DEFAULT",
+      (servedPassengersByProduct.get(rotation.productId ?? "DEFAULT") ?? 0) +
+        rotation.passengerCount,
+    );
+  }
+  const productServiceDeficits = [...productWaits.values()].flatMap((waits) =>
+    averagePassengerWaitMinutes === null
+      ? []
+      : [
+          Math.max(
+            0,
+            waits.reduce((sum, value) => sum + value, 0) / waits.length -
+              averagePassengerWaitMinutes,
+          ),
+        ],
+  );
+  const overtakes = completedRotations.reduce(
+    (sum, rotation) => sum + (rotation.dispatchOvertakeCount ?? 0),
+    0,
+  );
+  const dispatchedGroups = completedRotations.reduce(
+    (sum, rotation) => sum + (rotation.dispatchGroupCount ?? 1),
+    0,
+  );
+  const offeredSeats = completedRotations.reduce(
+    (sum, rotation) => sum + (rotation.dispatchCapacity ?? rotation.passengerCount),
+    0,
+  );
+  const occupiedSeats = completedRotations.reduce(
+    (sum, rotation) => sum + rotation.passengerCount,
+    0,
+  );
+  const operatingWindowHours =
+    Number.isFinite(operationsStartMs) && Number.isFinite(operationsEndMs)
+      ? Math.max(0, operationsEndMs - operationsStartMs) / (60 * MINUTE_MS)
+      : 0;
+  const aircraftOperatingHours = occupiedAircraftMinutes / 60;
+  const waitMinutesByProduct = Object.fromEntries(
+    [...productWaits.entries()]
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([productId, waits]) => [
+        productId,
+        rounded(waits.reduce((sum, value) => sum + value, 0) / waits.length),
+      ]),
+  );
+  const serviceSharePercentByProduct = Object.fromEntries(
+    [...servedPassengersByProduct.entries()]
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([productId, passengers]) => [
+        productId,
+        occupiedSeats === 0 ? 0 : rounded((passengers / occupiedSeats) * 100),
+      ]),
+  );
+  const maximumProductServiceDeficitMinutes =
+    productServiceDeficits.length === 0 ? null : rounded(Math.max(...productServiceDeficits));
   return {
     boarding: {
       ...metricSummary(boardingErrors),
@@ -532,6 +635,49 @@ export function calculateSimulationMetrics(input: {
         totalAvailableAircraftMinutes > 0
           ? rounded((occupiedAircraftMinutes / totalAvailableAircraftMinutes) * 100)
           : null,
+      averageSeatUtilizationPercent:
+        seatUtilizationSamples.length === 0
+          ? null
+          : rounded(
+              seatUtilizationSamples.reduce((sum, value) => sum + value, 0) /
+                seatUtilizationSamples.length,
+            ),
+      averagePassengerWaitMinutes,
+      p90PassengerWaitMinutes:
+        passengerWaitSamples.length === 0 ? null : rounded(quantile(passengerWaitSamples, 0.9)),
+      maximumPassengerWaitMinutes:
+        passengerWaitSamples.length === 0 ? null : rounded(passengerWaitSamples.at(-1) ?? 0),
+      overtakes,
+      overtakeRatePercent:
+        dispatchedGroups === 0 ? null : rounded((overtakes / dispatchedGroups) * 100),
+      maximumProductServiceDeficitMinutes: maximumProductServiceDeficitMinutes,
+    },
+    dispatch: {
+      passengersPerHour:
+        operatingWindowHours > 0 ? rounded(occupiedSeats / operatingWindowHours) : null,
+      passengersPerAircraftHour:
+        aircraftOperatingHours > 0 ? rounded(occupiedSeats / aircraftOperatingHours) : null,
+      offeredSeats,
+      occupiedSeats,
+      averageSeatUtilizationPercent:
+        offeredSeats > 0 ? rounded((occupiedSeats / offeredSeats) * 100) : null,
+      p50PassengerWaitMinutes:
+        passengerWaitSamples.length === 0 ? null : rounded(quantile(passengerWaitSamples, 0.5)),
+      p90PassengerWaitMinutes:
+        passengerWaitSamples.length === 0 ? null : rounded(quantile(passengerWaitSamples, 0.9)),
+      maximumPassengerWaitMinutes:
+        passengerWaitSamples.length === 0 ? null : rounded(passengerWaitSamples.at(-1) ?? 0),
+      waitMinutesByProduct,
+      projectedOvertakes: overtakes,
+      maximumOvertakesPerGroup: completedRotations.reduce(
+        (maximum, rotation) => Math.max(maximum, rotation.dispatchMaximumOvertakeCount ?? 0),
+        0,
+      ),
+      serviceSharePercentByProduct,
+      maximumProductServiceDeficitMinutes,
+      unnecessaryPlanChanges: input.dispatchDiagnostics?.unnecessaryPlanChanges ?? 0,
+      prepareDemotions: input.dispatchDiagnostics?.prepareDemotions ?? 0,
+      goToGateReplans: input.dispatchDiagnostics?.goToGateReplans ?? 0,
     },
     uncertainCountdownViolations,
     maximumEventReactionSeconds: reactionSeconds.length === 0 ? 0 : Math.max(...reactionSeconds),
@@ -574,6 +720,16 @@ export function runSimulation(
   const activeInterruptions = allIncidents.filter((entry) => entry.type === "EVENT_INTERRUPTION");
   const recordedGlobalBoundaries = new Set<string>();
   let eventSequence = 0;
+  let previousDispatchPlan: DispatchPlan | null = null;
+  const dispatchDiagnostics: SimulationDispatchDiagnostics = {
+    unnecessaryPlanChanges: 0,
+    prepareDemotions: 0,
+    goToGateReplans: 0,
+  };
+  const previousDispatchAssignments = new Map<
+    string,
+    { signature: string; commitment: "WAITING" | "PREPARE" | "COME_TO_FLIGHT_LINE" }
+  >();
 
   const recordEvent = (
     type: SimulationEventType,
@@ -746,6 +902,13 @@ export function runSimulation(
         resourceGroupId: RESOURCE_GROUP_ID,
         resourceGroupStatus,
         queueSequence: rotation.status === "DRAFT" ? (draftSequence.get(rotation.id) ?? 1) : 1,
+        dispatchGroupIds: [rotation.id],
+        productId: PRODUCT_ID,
+        gateId: "SIMULATION_GATE",
+        soldAt: rotation.createdAt,
+        attendanceStatus: "WAITING" as const,
+        standby: false,
+        publicStatus: dispatchPublicStatus(rotation),
         passengerCount: rotation.passengerCount,
         referenceDurationMinutes: config.adminParameters.productReferenceDurationMinutes,
         productCode: PRODUCT_ID,
@@ -767,6 +930,8 @@ export function runSimulation(
         },
       ],
       tuning: config.forecastTuning.forecast,
+      previousDispatchPlan,
+      dispatchPlanningLimits: SIMULATION_DISPATCH_PLANNING_LIMITS,
     });
   };
 
@@ -999,7 +1164,13 @@ export function runSimulation(
     if (waitingRotations.length > 0) {
       const observedGateWaitMinutes = rotations.flatMap((rotation) =>
         rotation.precalledAt && rotation.calledAt
-          ? [(Date.parse(rotation.calledAt) - Date.parse(rotation.precalledAt)) / MINUTE_MS]
+          ? [
+              normalizePrecallObservation({
+                observedGoToGateToBoardingMinutes:
+                  (Date.parse(rotation.calledAt) - Date.parse(rotation.precalledAt)) / MINUTE_MS,
+                gateTravelLeadMinutesUsed: rotation.precallGateTravelLeadMinutes ?? 0,
+              }),
+            ]
           : [],
       );
       const adaptiveLeadMinutes = deriveAdaptivePrecallLeadMinutes({
@@ -1027,27 +1198,38 @@ export function runSimulation(
               forecastCapacityStatus: projection.capacityStatus,
               predictionQuality: projection.predictionQuality,
               predictedBoardingMinutes:
-                projection.predictionLowerMinutes === null ||
-                projection.predictionUpperMinutes === null
+                projection.predictionLowerMinutes === null
                   ? Number.POSITIVE_INFINITY
-                  : Math.round(
-                      (projection.predictionLowerMinutes + projection.predictionUpperMinutes) / 2,
-                    ),
+                  : Math.ceil(projection.predictionLowerMinutes),
               adaptiveLeadMinutes,
+              prepareLeadMinutes: config.adminParameters.plannedBoardingMinutes,
+              gateTravelLeadMinutes: 0,
+              dispatchPlanFresh: projection.dispatchPlanRevision !== null,
+              inNearDispatchBatch: projection.dispatchWave !== null && projection.dispatchWave <= 2,
+              waitingForProductFairness:
+                projection.dispatchUnplannedReason === "WAITING_FOR_PRODUCT_FAIRNESS",
+              waitingForFittingLane:
+                projection.dispatchUnplannedReason === "WAITING_FOR_FITTING_LANE",
+              commitmentLocked: projection.dispatchUnplannedReason === "COMMITMENT_LOCKED",
+              dispatchOrder: projection.dispatchOrder,
+              queueSequence: rotation.communicationNumber,
             },
           ];
         }),
       );
       for (const decision of decisions) {
-        if (!decision.eligible) continue;
         const rotation = rotationById.get(decision.id);
         const projection = projectionByRotationId.get(decision.id);
-        if (!rotation || !projection?.predictedBoardingAt) continue;
+        if (!rotation) continue;
+        rotation.precallStatus = decision.status;
+        if (!decision.eligible || !projection?.predictedBoardingAt) continue;
         rotation.precalledAt = iso(nowMs);
         rotation.precallTrigger = "AUTOMATIC_PRECALL";
         rotation.precallPredictionQuality = projection.predictionQuality;
         rotation.precallPredictedBoardingAt = projection.predictedBoardingAt;
         rotation.precallAdaptiveLeadMinutes = adaptiveLeadMinutes;
+        rotation.precallGateTravelLeadMinutes = 0;
+        rotation.precallEffectiveLeadMinutes = adaptiveLeadMinutes;
         recordEvent(
           "FLIGHT_GROUP_PRECALLED",
           nowMs,
@@ -1062,29 +1244,119 @@ export function runSimulation(
       const waiting = rotations.filter(
         (rotation) => rotation.status === "DRAFT" && Date.parse(rotation.createdAt) <= nowMs,
       );
-      const plan = planNextRotations({
+      const plan = createDispatchPlan({
+        now: iso(nowMs),
         groups: waiting.map((rotation, index) => ({
           id: rotation.id,
+          groupIds: [rotation.id],
           size: rotation.passengerCount,
           queueSequence: index + 1,
           productId: PRODUCT_ID,
+          resourceGroupId: RESOURCE_GROUP_ID,
+          gateId: "SIMULATION_GATE",
+          soldAt: rotation.createdAt,
+          attendanceStatus: "WAITING" as const,
           standby: false,
+          publicStatus: dispatchPublicStatus(rotation),
         })),
-        aircraft: aircraft.map((entry) => ({
-          id: entry.id,
-          capacity: entry.capacity,
-          compatibleProductIds: [PRODUCT_ID],
-          available: entry.state === "AVAILABLE" && entry.activeRotationId === null,
-        })),
-        standbyPriority: false,
+        lanes: aircraft.flatMap((entry) =>
+          entry.state === "AVAILABLE" && entry.activeRotationId === null
+            ? [
+                {
+                  id: entry.id,
+                  aircraftId: entry.id,
+                  pilotId: null,
+                  resourceGroupId: RESOURCE_GROUP_ID,
+                  passengerSeats: entry.capacity,
+                  availableLowerAt: iso(nowMs),
+                  availableExpectedAt: iso(nowMs),
+                  availableUpperAt: iso(nowMs),
+                  productDurations: [
+                    {
+                      productId: PRODUCT_ID,
+                      lowerMinutes:
+                        config.realityModel.phases.boarding.minimum +
+                        config.realityModel.phases.flight.minimum +
+                        config.realityModel.phases.deboarding.minimum +
+                        config.realityModel.phases.buffer.minimum,
+                      expectedMinutes:
+                        config.realityModel.phases.boarding.typical +
+                        config.realityModel.phases.flight.typical +
+                        config.realityModel.phases.deboarding.typical +
+                        config.realityModel.phases.buffer.typical,
+                      upperMinutes:
+                        config.realityModel.phases.boarding.maximum +
+                        config.realityModel.phases.flight.maximum +
+                        config.realityModel.phases.deboarding.maximum +
+                        config.realityModel.phases.buffer.maximum,
+                    },
+                  ],
+                },
+              ]
+            : [],
+        ),
+        previousPlan: previousDispatchPlan,
+        limits: SIMULATION_DISPATCH_PLANNING_LIMITS,
       });
-      for (const assignment of plan.assignments) {
-        const rotationId = assignment.groupIds[0];
-        if (!rotationId) continue;
-        const rotation = rotations.find((candidate) => candidate.id === rotationId);
-        const entry = aircraft.find((candidate) => candidate.id === assignment.aircraftId);
+      for (const decision of plan.groupDecisions) {
+        const batch = plan.batches.find((entry) => entry.id === decision.batchId);
+        const rotation = rotations.find((entry) => entry.id === decision.memberId);
+        if (!batch || !rotation) continue;
+        const signature = batch.laneId;
+        const previous = previousDispatchAssignments.get(decision.memberId);
+        const previousLaneStillPlanned =
+          previous !== undefined &&
+          plan.batches.some((entry) => entry.laneId === previous.signature);
+        if (previous && previous.signature !== signature && previousLaneStillPlanned) {
+          dispatchDiagnostics.unnecessaryPlanChanges += 1;
+          if (rotation.precallStatus === "GO_TO_GATE") {
+            dispatchDiagnostics.goToGateReplans += 1;
+          }
+        }
+        if (previous?.commitment === "PREPARE" && batch.commitmentLevel === "WAITING") {
+          dispatchDiagnostics.prepareDemotions += 1;
+        }
+        previousDispatchAssignments.set(decision.memberId, {
+          signature,
+          commitment: batch.commitmentLevel,
+        });
+      }
+      previousDispatchPlan = plan;
+      for (const assignment of plan.batches.filter((batch) => batch.wave === 1)) {
+        const assignedRotations = assignment.memberIds.flatMap((rotationId) => {
+          const rotation = rotations.find((candidate) => candidate.id === rotationId);
+          return rotation ? [rotation] : [];
+        });
+        const rotation = assignedRotations[0];
+        const entry = aircraft.find((candidate) => candidate.id === assignment.assumedAircraftId);
         if (!rotation || !entry || rotation.status !== "DRAFT" || entry.state !== "AVAILABLE")
           continue;
+        rotation.passengerCount = assignedRotations.reduce(
+          (sum, member) => sum + member.passengerCount,
+          0,
+        );
+        rotation.createdAt = assignedRotations.reduce(
+          (earliest, member) =>
+            Date.parse(member.createdAt) < Date.parse(earliest) ? member.createdAt : earliest,
+          rotation.createdAt,
+        );
+        rotation.dispatchBatchId = assignment.id;
+        rotation.dispatchOrder = assignment.dispatchOrder;
+        rotation.dispatchGroupCount = assignedRotations.length;
+        rotation.dispatchCapacity = entry.capacity;
+        rotation.dispatchOvertakeCount = plan.groupDecisions
+          .filter((decision) => assignment.memberIds.includes(decision.memberId))
+          .reduce((sum, decision) => sum + decision.projectedOvertakeCount, 0);
+        rotation.dispatchMaximumOvertakeCount = Math.max(
+          0,
+          ...plan.groupDecisions
+            .filter((decision) => assignment.memberIds.includes(decision.memberId))
+            .map((decision) => decision.projectedOvertakeCount),
+        );
+        for (const merged of assignedRotations.slice(1)) {
+          const index = rotations.findIndex((candidate) => candidate.id === merged.id);
+          if (index >= 0) rotations.splice(index, 1);
+        }
         rotation.status = "CALLED";
         rotation.aircraftId = entry.id;
         rotation.calledAt = iso(nowMs);
@@ -1110,7 +1382,13 @@ export function runSimulation(
         );
         entry.state = "ACTIVE";
         entry.activeRotationId = rotation.id;
-        recordEvent("ROTATION_CALLED", nowMs, entry.id, rotation.id, "Aufruf bestätigt.");
+        recordEvent(
+          "ROTATION_CALLED",
+          nowMs,
+          entry.id,
+          rotation.id,
+          `Dispatch-Batch mit ${assignedRotations.length} vollständigen Gruppen und ${assignment.occupiedSeats}/${entry.capacity} Plätzen bestätigt.`,
+        );
       }
     }
 
@@ -1192,6 +1470,7 @@ export function runSimulation(
       operationsStartAt: config.schedule.operationsStartAt,
       operationsEndAt: config.schedule.operationsEndAt,
       aircraftCount: config.adminParameters.aircraftCount,
+      dispatchDiagnostics,
     }),
   };
 }

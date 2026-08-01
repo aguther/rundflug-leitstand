@@ -48,7 +48,11 @@ function createOperationalModel(template: MasterDataTemplate): SimulationOperati
   );
   return {
     sourceName: template.source.name,
-    gates: template.gates.map((entry) => ({ id: entry.key, label: entry.label })),
+    gates: template.gates.map((entry) => ({
+      id: entry.key,
+      label: entry.label,
+      travelLeadMinutes: entry.travelLeadMinutes,
+    })),
     resourceGroups: template.resourceGroups.map((entry) => ({
       id: entry.key,
       name: entry.name,

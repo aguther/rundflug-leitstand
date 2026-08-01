@@ -1128,6 +1128,43 @@
   border-radius: var(--radius-md);
 }
 
+.flight-director-dispatch-recommendation {
+  display: grid;
+  gap: 5px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--ui-border);
+  background: var(--ui-accent-soft);
+}
+
+.flight-director-dispatch-recommendation > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.flight-director-dispatch-recommendation span,
+.flight-director-dispatch-recommendation small {
+  color: var(--ui-muted);
+  font-size: 0.75rem;
+}
+
+.flight-director-dispatch-recommendation p,
+.flight-director-dispatch-recommendation small {
+  margin: 0;
+}
+
+.flight-director-dialog-recommendation-ok {
+  margin: 0;
+  padding: 9px 10px;
+  border: 1px solid color-mix(in srgb, var(--ui-success) 35%, var(--ui-border));
+  border-radius: var(--radius-sm);
+  color: var(--ui-success-text, var(--ui-success));
+  background: var(--ui-success-soft);
+  font-size: 0.76rem;
+  line-height: 1.4;
+}
+
 .flight-director-assignment-dialog .flight-director-queue-row {
   grid-template-columns: minmax(120px, 1fr) auto 72px 94px;
 }

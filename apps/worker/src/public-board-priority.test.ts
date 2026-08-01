@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import workerSource from "./index.ts?raw";
 
 describe("FIDS action priority", () => {
-  it("places active GO TO GATE and BOARDING rows in one stable queue-ordered block", () => {
+  it("orders BOARDING, GO TO GATE, PREPARE and WAITING before departed rows", () => {
     const route = workerSource.slice(
       workerSource.indexOf('app.get("/api/public/events/:eventId/board"'),
       workerSource.indexOf('app.all("/api/public/events/:eventId/live"'),
@@ -11,9 +11,13 @@ describe("FIDS action priority", () => {
     expect(order).toContain("rg.status = 'ACTIVE'");
     expect(order).toContain("r.status = 'CALLED'");
     expect(order).toContain("fg.precalled_at IS NOT NULL");
-    expect(order).toContain("THEN COALESCE(fg.queue_position, fg.communication_number)");
-    expect(order.indexOf("rg.status = 'ACTIVE'")).toBeLessThan(
-      order.indexOf("WHEN r.status = 'DRAFT' THEN 1"),
+    expect(order).toContain("fg.precall_decision_status = 'PREPARE'");
+    expect(order).toContain("CASE WHEN r.status = 'DRAFT' THEN r.dispatch_order END");
+    expect(order.indexOf("r.status = 'CALLED' THEN 0")).toBeLessThan(
+      order.indexOf("fg.precalled_at IS NOT NULL THEN 1"),
+    );
+    expect(order.indexOf("fg.precalled_at IS NOT NULL THEN 1")).toBeLessThan(
+      order.indexOf("fg.precall_decision_status = 'PREPARE' THEN 2"),
     );
     expect(order).not.toContain("sort_order");
   });

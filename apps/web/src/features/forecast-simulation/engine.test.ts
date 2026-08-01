@@ -234,7 +234,7 @@ describe("local forecast simulation", () => {
     expect(result.rotations.every((rotation) => rotation.resourceGroupId === "group-b")).toBe(true);
   });
 
-  it("keeps products of the same resource group in one arrival-ordered queue", () => {
+  it("serves mixed products in one queue with bounded, visible overtakes", () => {
     const config = operationalConfig();
     config.plannedOperations = [];
     const secondProduct = config.operationalModel?.products.find(
@@ -267,7 +267,16 @@ describe("local forecast simulation", () => {
       new Set(["product-a", "product-b"]),
     );
     expect(arrived.every((rotation) => rotation.resourceGroupId === "group-a")).toBe(true);
-    expect(called.map((rotation) => rotation.id)).toEqual(arrived.map((rotation) => rotation.id));
+    expect(called.map((rotation) => rotation.id)).not.toEqual(
+      arrived.map((rotation) => rotation.id),
+    );
+    expect(called.every((rotation) => (rotation.dispatchMaximumOvertakeCount ?? 0) <= 3)).toBe(
+      true,
+    );
+    expect(Object.keys(result.metrics.dispatch.serviceSharePercentByProduct).sort()).toEqual([
+      "product-a",
+      "product-b",
+    ]);
   });
 
   it("starts a resolved plan only after its selected synthetic rotation completes", () => {
@@ -414,18 +423,18 @@ describe("local forecast simulation", () => {
         NORMAL: {
           generated: 40,
           completed: 28,
-          windowCoverage: 85.71,
+          windowCoverage: 82.14,
           boardingMedian: 2,
-          boardingP90: 8.2,
-          averageWindowWidth: 4.82,
+          boardingP90: 14.5,
+          averageWindowWidth: 4.79,
           maximumReactionSeconds: 29.648,
           uncertainCountdownViolations: 0,
           precall: {
             eligibleGroups: 28,
-            precalledGroups: 26,
-            coveragePercent: 92.86,
-            medianGateWaitMinutes: 15.75,
-            p90GateWaitMinutes: 32.25,
+            precalledGroups: 27,
+            coveragePercent: 96.43,
+            medianGateWaitMinutes: 23.5,
+            p90GateWaitMinutes: 45.9,
             sameTickCount: 3,
             uncertainPrecallCount: 0,
           },
@@ -433,18 +442,18 @@ describe("local forecast simulation", () => {
         PEAK_LOAD: {
           generated: 78,
           completed: 28,
-          windowCoverage: 85.71,
+          windowCoverage: 82.14,
           boardingMedian: 2,
-          boardingP90: 8.2,
-          averageWindowWidth: 4.82,
+          boardingP90: 14.5,
+          averageWindowWidth: 4.79,
           maximumReactionSeconds: 29.648,
           uncertainCountdownViolations: 0,
           precall: {
             eligibleGroups: 28,
-            precalledGroups: 26,
-            coveragePercent: 92.86,
-            medianGateWaitMinutes: 15.75,
-            p90GateWaitMinutes: 32.25,
+            precalledGroups: 27,
+            coveragePercent: 96.43,
+            medianGateWaitMinutes: 23.5,
+            p90GateWaitMinutes: 45.9,
             sameTickCount: 3,
             uncertainPrecallCount: 0,
           },
@@ -452,18 +461,18 @@ describe("local forecast simulation", () => {
         AIRCRAFT_FAILURE: {
           generated: 40,
           completed: 21,
-          windowCoverage: 100,
+          windowCoverage: 90.48,
           boardingMedian: 2,
           boardingP90: 2.5,
-          averageWindowWidth: 4.9,
+          averageWindowWidth: 4.67,
           maximumReactionSeconds: 29.648,
           uncertainCountdownViolations: 0,
           precall: {
             eligibleGroups: 21,
             precalledGroups: 21,
             coveragePercent: 100,
-            medianGateWaitMinutes: 17,
-            p90GateWaitMinutes: 39.5,
+            medianGateWaitMinutes: 25.5,
+            p90GateWaitMinutes: 51,
             sameTickCount: 3,
             uncertainPrecallCount: 0,
           },
@@ -471,18 +480,18 @@ describe("local forecast simulation", () => {
         OPERATION_INTERRUPTION: {
           generated: 40,
           completed: 27,
-          windowCoverage: 88.89,
+          windowCoverage: 74.07,
           boardingMedian: 2,
-          boardingP90: 8.2,
-          averageWindowWidth: 4.89,
+          boardingP90: 14.5,
+          averageWindowWidth: 5.07,
           maximumReactionSeconds: 29.648,
           uncertainCountdownViolations: 0,
           precall: {
             eligibleGroups: 27,
-            precalledGroups: 25,
-            coveragePercent: 92.59,
-            medianGateWaitMinutes: 13,
-            p90GateWaitMinutes: 26.6,
+            precalledGroups: 27,
+            coveragePercent: 100,
+            medianGateWaitMinutes: 24,
+            p90GateWaitMinutes: 43.3,
             sameTickCount: 3,
             uncertainPrecallCount: 0,
           },
@@ -500,6 +509,12 @@ describe("local forecast simulation", () => {
     expect(JSON.stringify(second)).toBe(JSON.stringify(first));
     expect(first.rotations.length).toBeGreaterThan(0);
     expect(first.snapshots.length).toBeGreaterThan(0);
+    expect(first.metrics.dispatch.goToGateReplans).toBe(0);
+    expect(first.metrics.dispatch.prepareDemotions).toBe(0);
+    expect(first.metrics.dispatch.occupiedSeats).toBeGreaterThan(0);
+    expect(first.metrics.dispatch.offeredSeats).toBeGreaterThanOrEqual(
+      first.metrics.dispatch.occupiedSeats,
+    );
   });
 
   it("builds an opening queue without precalling or boarding before operations start", () => {

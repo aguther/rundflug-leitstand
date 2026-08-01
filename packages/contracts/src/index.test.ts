@@ -140,12 +140,20 @@ describe("commandEnvelopeSchema", () => {
         ticketGroupIds: ["group-2", "group-1"],
         aircraftId: "aircraft-1",
         pilotId: "pilot-1",
+        dispatchRecommendation: {
+          planRevision: "dispatch-v1",
+          batchId: "batch-1",
+        },
       },
     });
     expect(command.type === "CALL_NEXT" && command.payload.ticketGroupIds).toEqual([
       "group-2",
       "group-1",
     ]);
+    expect(command.type === "CALL_NEXT" && command.payload.dispatchRecommendation).toEqual({
+      planRevision: "dispatch-v1",
+      batchId: "batch-1",
+    });
   });
 
   it("validates stored ticket codes only in the protected print DTO", () => {

@@ -3,6 +3,7 @@ import type {
   SimulationRecurringOperationalRule as ImportedSimulationRecurringOperationalRule,
 } from "@rundflug/contracts";
 import type {
+  DispatchPlanningLimits,
   ForecastRotationStatus,
   ForecastTuningProfile,
   ForecastUncertaintyReason,
@@ -10,6 +11,14 @@ import type {
   PredictionQuality,
 } from "@rundflug/domain";
 import { DEFAULT_FORECAST_TUNING_PROFILE, DEFAULT_PRECALL_TUNING_PROFILE } from "@rundflug/domain";
+
+export const SIMULATION_DISPATCH_PLANNING_LIMITS: Partial<DispatchPlanningLimits> = {
+  maximumGroupsPerResourceGroup: 12,
+  maximumGroupsPerProduct: 10,
+  maximumWaves: 2,
+  maximumCandidatesPerStep: 6,
+  beamWidth: 2,
+};
 
 export interface TriangularDistribution {
   minimum: number;
@@ -103,6 +112,7 @@ export interface SimulationConfig {
 export interface SimulationGate {
   id: string;
   label: string;
+  travelLeadMinutes?: number;
 }
 
 export interface SimulationResourceGroup {
@@ -204,6 +214,9 @@ export interface SimulationRotation {
   precallPredictionQuality: PredictionQuality | null;
   precallPredictedBoardingAt: string | null;
   precallAdaptiveLeadMinutes: number | null;
+  precallGateTravelLeadMinutes?: number | null;
+  precallEffectiveLeadMinutes?: number | null;
+  precallStatus?: "WAITING" | "PREPARE" | "GO_TO_GATE";
   aircraftId: string | null;
   pilotId?: string | null;
   productId?: string;
@@ -219,6 +232,12 @@ export interface SimulationRotation {
   flightMinutes: number | null;
   deboardingMinutes: number | null;
   bufferMinutes: number | null;
+  dispatchBatchId?: string | null;
+  dispatchOrder?: number | null;
+  dispatchGroupCount?: number;
+  dispatchCapacity?: number | null;
+  dispatchOvertakeCount?: number;
+  dispatchMaximumOvertakeCount?: number;
 }
 
 export interface SimulationForecastSnapshot {
@@ -309,9 +328,40 @@ export interface SimulationMetrics {
     completedRotations: number;
     overtimeMinutes: number;
     aircraftUtilizationPercent: number | null;
+    averageSeatUtilizationPercent: number | null;
+    averagePassengerWaitMinutes: number | null;
+    p90PassengerWaitMinutes: number | null;
+    maximumPassengerWaitMinutes: number | null;
+    overtakes: number;
+    overtakeRatePercent: number | null;
+    maximumProductServiceDeficitMinutes: number | null;
+  };
+  dispatch: {
+    passengersPerHour: number | null;
+    passengersPerAircraftHour: number | null;
+    offeredSeats: number;
+    occupiedSeats: number;
+    averageSeatUtilizationPercent: number | null;
+    p50PassengerWaitMinutes: number | null;
+    p90PassengerWaitMinutes: number | null;
+    maximumPassengerWaitMinutes: number | null;
+    waitMinutesByProduct: Record<string, number>;
+    projectedOvertakes: number;
+    maximumOvertakesPerGroup: number;
+    serviceSharePercentByProduct: Record<string, number>;
+    maximumProductServiceDeficitMinutes: number | null;
+    unnecessaryPlanChanges: number;
+    prepareDemotions: number;
+    goToGateReplans: number;
   };
   uncertainCountdownViolations: number;
   maximumEventReactionSeconds: number;
+}
+
+export interface SimulationDispatchDiagnostics {
+  unnecessaryPlanChanges: number;
+  prepareDemotions: number;
+  goToGateReplans: number;
 }
 
 export interface SimulationResult {

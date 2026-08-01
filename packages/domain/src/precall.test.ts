@@ -4,6 +4,7 @@ import {
   DEFAULT_PRECALL_TUNING_PROFILE,
   decideAutomaticPrecall,
   deriveAdaptivePrecallLeadMinutes,
+  normalizePrecallObservation,
   selectAutomaticPrecalls,
 } from "./precall";
 
@@ -22,7 +23,11 @@ const eligible: AutomaticPrecallInput = {
 
 describe("automatischer Voraufruf (F-BEN-030)", () => {
   it("allows a fitting group inside the adaptive lead", () => {
-    expect(decideAutomaticPrecall(eligible)).toEqual({ eligible: true, reason: "ELIGIBLE" });
+    expect(decideAutomaticPrecall(eligible)).toEqual({
+      eligible: true,
+      status: "GO_TO_GATE",
+      reason: "ELIGIBLE",
+    });
     expect(
       decideAutomaticPrecall({ ...eligible, forecastCapacityStatus: "NO_FITTING_AIRCRAFT" }).reason,
     ).toBe("NO_FITTING_AIRCRAFT");
@@ -65,17 +70,20 @@ describe("automatischer Voraufruf (F-BEN-030)", () => {
       reason: "NO_FITTING_AIRCRAFT",
     },
     { groupSize: 3, predictedBoardingMinutes: 16, reason: "TOO_EARLY" },
-  ] as const)("never skips an ineligible queue front ($reason)", (front) => {
-    const decisions = selectAutomaticPrecalls([
-      { ...eligible, ...front, id: "front", resourceGroupId: "rg-1" },
-      { ...eligible, id: "follower", resourceGroupId: "rg-1", predictedBoardingMinutes: 0 },
-      { ...eligible, id: "other-resource", resourceGroupId: "rg-2", predictedBoardingMinutes: 0 },
-    ]);
+  ] as const)(
+    "does not let an ineligible queue entry block planned followers ($reason)",
+    (front) => {
+      const decisions = selectAutomaticPrecalls([
+        { ...eligible, ...front, id: "front", resourceGroupId: "rg-1" },
+        { ...eligible, id: "follower", resourceGroupId: "rg-1", predictedBoardingMinutes: 0 },
+        { ...eligible, id: "other-resource", resourceGroupId: "rg-2", predictedBoardingMinutes: 0 },
+      ]);
 
-    expect(decisions[0]?.reason).toBe(front.reason);
-    expect(decisions[1]?.reason).toBe("NOT_QUEUE_FRONT");
-    expect(decisions[2]).toMatchObject({ eligible: true, reason: "ELIGIBLE" });
-  });
+      expect(decisions[0]?.reason).toBe(front.reason);
+      expect(decisions[1]?.reason).toBe("ELIGIBLE");
+      expect(decisions[2]).toMatchObject({ eligible: true, reason: "ELIGIBLE" });
+    },
+  );
 
   it("does not let another resource group's same-gate call block capacity", () => {
     const decisions = selectAutomaticPrecalls([
@@ -102,7 +110,11 @@ describe("automatischer Voraufruf (F-BEN-030)", () => {
     expect(decideAutomaticPrecall({ ...eligible, predictedBoardingMinutes: 15.5 }).reason).toBe(
       "TOO_EARLY",
     );
-    expect(decideAutomaticPrecall(eligible)).toEqual({ eligible: true, reason: "ELIGIBLE" });
+    expect(decideAutomaticPrecall(eligible)).toEqual({
+      eligible: true,
+      status: "GO_TO_GATE",
+      reason: "ELIGIBLE",
+    });
   });
 
   it("learns a bounded lead from observed precall-to-boarding waits", () => {
@@ -111,6 +123,33 @@ describe("automatischer Voraufruf (F-BEN-030)", () => {
       6,
     );
     expect(deriveAdaptivePrecallLeadMinutes({ observedGateWaitMinutes: [2, 3, 4] })).toBe(15);
+  });
+
+  it("adds gate travel time after bounding the adaptive base lead", () => {
+    expect(
+      decideAutomaticPrecall({
+        ...eligible,
+        predictedBoardingMinutes: 20,
+        adaptiveLeadMinutes: 15,
+        prepareLeadMinutes: 18,
+        gateTravelLeadMinutes: 6,
+      }),
+    ).toEqual({ eligible: true, status: "GO_TO_GATE", reason: "ELIGIBLE" });
+    expect(
+      decideAutomaticPrecall({
+        ...eligible,
+        predictedBoardingMinutes: 22,
+        adaptiveLeadMinutes: 15,
+        prepareLeadMinutes: 18,
+        gateTravelLeadMinutes: 6,
+      }).status,
+    ).toBe("PREPARE");
+    expect(
+      normalizePrecallObservation({
+        observedGoToGateToBoardingMinutes: 14,
+        gateTravelLeadMinutesUsed: 6,
+      }),
+    ).toBe(8);
   });
 
   it("keeps production defaults identical and applies a local experimental profile", () => {

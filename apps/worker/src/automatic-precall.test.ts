@@ -29,10 +29,11 @@ describe("persistierter automatischer Voraufruf (F-BEN-030)", () => {
 
   it("keeps the system command optimistic, idempotent and auditable", () => {
     expect(coordinatorSource).toContain("version = ?3");
-    expect(coordinatorSource).toContain("version = ?6 AND precalled_at IS NULL");
+    expect(coordinatorSource).toMatch(/version = \?12\s+AND precalled_at IS NULL/);
     expect(coordinatorSource).toContain("precall_trigger = ?1");
     expect(coordinatorSource).toContain("'SYSTEM', 'FLIGHT_GROUP'");
-    expect(coordinatorSource).toContain("blockedResourceGroups.add(candidate.resourceGroupId)");
+    expect(coordinatorSource).toContain("dispatchPlanRevision: candidate.dispatchPlanRevision");
+    expect(coordinatorSource).toContain("dispatchBatchId: candidate.dispatchBatchId");
   });
 
   it("re-evaluates active events independently of operator commands", () => {

@@ -11,6 +11,7 @@ export interface ComparisonMetricDefinition {
     | "Qualität"
     | "Stabilität"
     | "Betrieb"
+    | "Dispatch"
     | "Unterdrückung"
     | "GO TO GATE";
   label: string;
@@ -220,6 +221,111 @@ const METRIC_DEFINITIONS: readonly (ComparisonMetricDefinition & {
     label: "Flugzeugauslastung",
     unit: "%",
     read: (metrics) => metrics.operations.aircraftUtilizationPercent,
+  },
+  {
+    id: "operations-seat-utilization",
+    category: "Dispatch",
+    label: "Sitzplatzauslastung",
+    unit: "%",
+    read: (metrics) => metrics.dispatch.averageSeatUtilizationPercent,
+  },
+  {
+    id: "dispatch-passengers-per-hour",
+    category: "Dispatch",
+    label: "Personen pro Stunde",
+    unit: "Pers./h",
+    read: (metrics) => metrics.dispatch.passengersPerHour,
+  },
+  {
+    id: "dispatch-passengers-per-aircraft-hour",
+    category: "Dispatch",
+    label: "Personen pro Flugzeugstunde",
+    unit: "Pers./Flzg.-h",
+    read: (metrics) => metrics.dispatch.passengersPerAircraftHour,
+  },
+  {
+    id: "dispatch-offered-seats",
+    category: "Dispatch",
+    label: "Angebotene Sitze",
+    unit: "",
+    read: (metrics) => metrics.dispatch.offeredSeats,
+  },
+  {
+    id: "dispatch-occupied-seats",
+    category: "Dispatch",
+    label: "Belegte Sitze",
+    unit: "",
+    read: (metrics) => metrics.dispatch.occupiedSeats,
+  },
+  {
+    id: "operations-passenger-wait",
+    category: "Dispatch",
+    label: "Ø Passagierwartezeit",
+    unit: "Min.",
+    read: (metrics) => metrics.dispatch.p50PassengerWaitMinutes,
+  },
+  {
+    id: "operations-passenger-wait-p90",
+    category: "Dispatch",
+    label: "P90 Passagierwartezeit",
+    unit: "Min.",
+    read: (metrics) => metrics.dispatch.p90PassengerWaitMinutes,
+  },
+  {
+    id: "operations-passenger-wait-maximum",
+    category: "Dispatch",
+    label: "Maximale Passagierwartezeit",
+    unit: "Min.",
+    read: (metrics) => metrics.dispatch.maximumPassengerWaitMinutes,
+  },
+  {
+    id: "operations-overtakes",
+    category: "Dispatch",
+    label: "Überholungen",
+    unit: "",
+    read: (metrics) => metrics.dispatch.projectedOvertakes,
+  },
+  {
+    id: "operations-overtake-rate",
+    category: "Dispatch",
+    label: "Überholrate",
+    unit: "%",
+    read: (metrics) => metrics.operations.overtakeRatePercent,
+  },
+  {
+    id: "operations-product-deficit",
+    category: "Dispatch",
+    label: "Max. Produkt-Service-Defizit",
+    unit: "Min.",
+    read: (metrics) => metrics.dispatch.maximumProductServiceDeficitMinutes,
+  },
+  {
+    id: "dispatch-maximum-overtakes",
+    category: "Dispatch",
+    label: "Max. Überholungen je Gruppe",
+    unit: "",
+    read: (metrics) => metrics.dispatch.maximumOvertakesPerGroup,
+  },
+  {
+    id: "dispatch-plan-changes",
+    category: "Dispatch",
+    label: "Unnötige Planänderungen",
+    unit: "",
+    read: (metrics) => metrics.dispatch.unnecessaryPlanChanges,
+  },
+  {
+    id: "dispatch-prepare-demotions",
+    category: "Dispatch",
+    label: "Rücknahmen von Bereithalten",
+    unit: "",
+    read: (metrics) => metrics.dispatch.prepareDemotions,
+  },
+  {
+    id: "dispatch-go-to-gate-replans",
+    category: "Dispatch",
+    label: "Neuplanungen nach Bitte zum Gate",
+    unit: "",
+    read: (metrics) => metrics.dispatch.goToGateReplans,
   },
   {
     id: "quality-changing",
