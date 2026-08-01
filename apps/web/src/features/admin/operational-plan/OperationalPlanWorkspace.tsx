@@ -35,6 +35,7 @@ export function OperationalPlanWorkspace({
       {operationalPlanTabs.map((tab) => (
         <section
           aria-labelledby={`admin-operational-plan-${tab.value}-tab`}
+          className="operational-plan-workspace-panel"
           hidden={activeTab !== tab.value}
           id={`admin-operational-plan-${tab.value}-panel`}
           key={tab.value}

@@ -4594,44 +4594,49 @@ export function AdminView() {
                   </Panel>
                 }
                 emergency={
-                  <section className="admin-section admin-emergency-section">
+                  <Panel className="admin-emergency-section" padding="compact">
                     <h2>Notfallmodus</h2>
                     <p>
                       Aktivierung und Aufhebung werden getrennt bestätigt. Versteckte Flotten-,
                       Piloten-, Queue- und Hinweissteuerungen gehören nicht zu diesem Admin-Ablauf.
                     </p>
-                    <div className="field-control">
-                      <FieldLabel
-                        htmlFor="emergency-reason"
-                        label="Begründung für den Notfallmodus"
-                        help="Mindestens drei Zeichen; der Grund wird mit der Zustandsänderung protokolliert."
-                      />
-                      <input
-                        id="emergency-reason"
-                        onChange={(event) => setReason(event.target.value)}
-                        placeholder="Mindestens 3 Zeichen"
-                        value={reason}
-                      />
+                    <div className="operations-emergency-action">
+                      <div className="field-control">
+                        <FieldLabel
+                          htmlFor="emergency-reason"
+                          label="Begründung für den Notfallmodus"
+                          help="Mindestens drei Zeichen; der Grund wird mit der Zustandsänderung protokolliert."
+                        />
+                        <input
+                          id="emergency-reason"
+                          onChange={(event) => setReason(event.target.value)}
+                          placeholder="Mindestens 3 Zeichen"
+                          value={reason}
+                        />
+                      </div>
+                      <Button
+                        busy={
+                          busyActionKey ===
+                          (board.event.emergencyMode ? "emergency-clear" : "emergency-trigger")
+                        }
+                        className="danger-action"
+                        disabled={
+                          reason.trim().length < 3 ||
+                          busyActionKey !== null ||
+                          (board.event.emergencyMode && !isAdministrator)
+                        }
+                        onClick={() =>
+                          setPendingEmergencyAction(
+                            board.event.emergencyMode ? "CLEAR_EMERGENCY" : "TRIGGER_EMERGENCY",
+                          )
+                        }
+                        type="button"
+                        variant="danger"
+                      >
+                        {board.event.emergencyMode ? "Notfallmodus aufheben" : "Not-Halt auslösen"}
+                      </Button>
                     </div>
-                    <Button
-                      busy={busyActionKey === (board.event.emergencyMode ? "emergency-clear" : "emergency-trigger")}
-                      className="danger-action"
-                      disabled={
-                        reason.trim().length < 3 ||
-                        busyActionKey !== null ||
-                        (board.event.emergencyMode && !isAdministrator)
-                      }
-                      onClick={() =>
-                        setPendingEmergencyAction(
-                          board.event.emergencyMode ? "CLEAR_EMERGENCY" : "TRIGGER_EMERGENCY",
-                        )
-                      }
-                      type="button"
-                      variant="danger"
-                    >
-                      {board.event.emergencyMode ? "Notfallmodus aufheben" : "Not-Halt auslösen"}
-                    </Button>
-                  </section>
+                  </Panel>
                 }
               />
               <ConfirmationDialog

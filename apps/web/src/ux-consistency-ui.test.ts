@@ -9,6 +9,10 @@ import sharedSource from "./operation-workspace.tsx?raw";
 const appSource = `${sharedSource}\n${adminSource}\n${productSalesDialogSource}\n${flightLineSource}\n${cashierSource}`;
 
 const stylesSource = readFileSync(new URL("./styles.css", import.meta.url), "utf8");
+const productSalesStyles = readFileSync(
+  new URL("./features/admin/products/product-sales-dialog.css", import.meta.url),
+  "utf8",
+);
 
 describe("V1 UX consistency", () => {
   it("renders operational states and prediction quality with German labels", () => {
@@ -34,5 +38,11 @@ describe("V1 UX consistency", () => {
     expect(stylesSource).toMatch(/\.localized-picker-trigger\s*\{[^}]*width:\s*46px;/s);
     expect(stylesSource).toMatch(/\.rotation-detail\s+select\s*\{[^}]*min-height:\s*44px;/s);
     expect(stylesSource).toMatch(/\.setup-checklist\s+button\s*\{[^}]*min-height:\s*44px;/s);
+  });
+
+  it("keeps localized product closing controls touch-sized with matching inline padding", () => {
+    expect(productSalesStyles).toMatch(
+      /\.product-sales-dialog \.localized-picker-control > input \{[\s\S]*?height: var\(--product-sales-control-height\);[\s\S]*?padding-inline: 12px 48px;/,
+    );
   });
 });

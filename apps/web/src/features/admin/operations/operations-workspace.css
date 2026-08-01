@@ -1,3 +1,10 @@
+.operations-workspace-content {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-4);
+}
+
 .operations-workspace-summary {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -27,15 +34,24 @@
   min-height: 0;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  align-items: start;
+  align-items: stretch;
   gap: 16px;
 }
 
-.operations-workspace-controls > div,
+.operations-workspace-controls > div {
+  min-width: 0;
+  display: flex;
+}
+
 .operations-workspace-controls .admin-section,
 .operations-workspace-controls .ds-panel {
   min-width: 0;
   margin: 0;
+}
+
+.operations-workspace-controls > div > .ds-panel {
+  width: 100%;
+  min-height: 220px;
 }
 
 .admin-shell .event-workspace-frame--wide .operations-workspace-controls .ds-button {
@@ -94,6 +110,41 @@
 }
 
 .admin-shell .operations-workspace-controls .event-release-v15 .event-release-action .ds-button {
+  width: 100%;
+}
+
+.admin-shell .operations-workspace-controls .admin-emergency-section {
+  min-height: 220px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  align-items: stretch;
+  gap: 14px;
+  color: var(--ui-text);
+  background: var(--ui-surface);
+}
+
+.admin-shell .operations-workspace-controls .admin-emergency-section > h2,
+.admin-shell .operations-workspace-controls .admin-emergency-section > p {
+  grid-column: 1;
+  margin: 0;
+}
+
+.admin-shell .operations-workspace-controls .admin-emergency-section > p {
+  color: var(--ui-text-muted);
+  line-height: 1.4;
+}
+
+.operations-emergency-action {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--ui-danger) 58%, var(--ui-border));
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--ui-danger-soft) 72%, var(--ui-surface));
+}
+
+.operations-emergency-action > .danger-action {
   width: 100%;
 }
 

@@ -68,6 +68,11 @@ describe("event-scoped administration redesign", () => {
     expect(operationalPlanSource).toContain('label: "Wiederkehrende Regeln"');
     expect(operationsSource).toContain("release");
     expect(operationsSource).toContain("emergency");
+    expect(operationsSource).toContain('className="operations-workspace-content"');
+    expect(adminViewSource).toContain('className="operations-emergency-action"');
+    expect(adminViewSource).toContain(
+      '<Panel className="admin-emergency-section" padding="compact">',
+    );
     expect(operationsSource).not.toContain("OperationalPlanPanel");
     expect(operationsSource).not.toContain("Tabs");
   });

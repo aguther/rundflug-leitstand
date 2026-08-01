@@ -4,6 +4,11 @@
   gap: 12px;
 }
 
+.operational-plan-workspace-panel {
+  min-width: 0;
+  padding: var(--space-4);
+}
+
 .operational-plan-section {
   min-width: 0;
   display: grid;
@@ -93,10 +98,13 @@
 
 .operational-plan-empty {
   max-width: 520px;
+  min-height: 168px;
   display: grid;
+  align-content: center;
   justify-items: center;
   gap: 8px;
   margin: auto;
+  padding: 24px 16px;
 }
 
 .operational-plan-empty > svg {
@@ -188,78 +196,20 @@
   gap: 12px;
 }
 
-.operational-rule-section {
-  display: grid;
-  gap: 10px;
-  padding-top: 4px;
-  border-top: 1px solid var(--ui-border);
-}
-
-.operational-rule-section > header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.operational-rule-section :is(h4, p) {
-  margin: 0;
-}
-
-.operational-rule-section h4 {
-  font-size: 0.92rem;
-}
-
-.operational-rule-section p {
-  margin-top: 3px;
-  color: var(--ui-muted);
-  font-size: 0.76rem;
-}
-
-.operational-rule-list {
-  display: grid;
-  gap: 8px;
-}
-
-.operational-rule-list > article {
-  display: grid;
-  grid-template-columns: minmax(170px, 1.4fr) repeat(3, minmax(120px, 1fr)) auto;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--radius-md);
-  background: var(--ui-surface-subtle);
-}
-
-.operational-rule-list > article > div {
+.operational-rule-primary {
   min-width: 0;
   display: grid;
-  gap: 2px;
+  gap: 3px;
 }
 
-.operational-rule-list > article span {
+.operational-rule-primary span {
   color: var(--ui-muted);
-  font-size: 0.7rem;
+  font-size: 0.72rem;
 }
 
-.operational-rule-list > article strong {
+.operational-rule-primary strong {
   overflow: hidden;
-  font-size: 0.78rem;
   text-overflow: ellipsis;
-}
-
-.operational-rule-list > article > .operational-rule-actions {
-  display: flex;
-  flex-direction: row;
-  gap: 5px;
-}
-
-.operational-rule-empty {
-  padding: 12px;
-  border: 1px dashed var(--ui-border);
-  border-radius: var(--radius-md);
-  text-align: center;
 }
 
 .operational-plan--flight-director .operational-plan-table .ds-table-actions {
@@ -302,14 +252,6 @@
   .operational-plan-status small {
     display: none;
   }
-
-  .operational-rule-list > article {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .operational-rule-list > article > .operational-rule-actions {
-    justify-content: flex-end;
-  }
 }
 
 @media (max-width: 620px) {
@@ -323,14 +265,5 @@
 
   .operational-plan-form-grid .localized-date-time > span {
     display: none;
-  }
-
-  .operational-rule-section > header {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .operational-rule-list > article {
-    grid-template-columns: 1fr;
   }
 }

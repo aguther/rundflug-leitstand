@@ -353,13 +353,22 @@
   grid-template-rows: auto auto minmax(190px, 0.7fr) minmax(300px, 1.3fr);
 }
 .cashier-ticket-toolbar {
+  --cashier-ticket-control-height: var(--control-touch);
+
   flex-wrap: wrap;
   align-items: flex-end;
   gap: 8px;
 }
 .cashier-ticket-toolbar > .ds-search-field {
   min-width: 220px;
+  height: var(--cashier-ticket-control-height);
+  min-height: var(--cashier-ticket-control-height);
   flex: 1 1 260px;
+}
+.cashier-ticket-toolbar > .ds-icon-button {
+  width: var(--cashier-ticket-control-height);
+  height: var(--cashier-ticket-control-height);
+  min-height: var(--cashier-ticket-control-height);
 }
 .cashier-account-filter {
   min-width: 156px;
@@ -370,7 +379,8 @@
   font-weight: 700;
 }
 .cashier-account-filter select {
-  min-height: 44px;
+  height: var(--cashier-ticket-control-height);
+  min-height: var(--cashier-ticket-control-height);
   border: 1px solid var(--ui-border-strong);
   border-radius: 6px;
   padding-inline: 10px 32px;
@@ -378,10 +388,16 @@
   background: var(--ui-surface);
 }
 .cashier-own-ticket-filter.ds-checkbox-field {
-  min-height: 44px;
-  padding: 0 10px;
+  height: var(--cashier-ticket-control-height);
+  min-height: var(--cashier-ticket-control-height);
+  padding: 0;
   align-items: center;
   white-space: nowrap;
+}
+.cashier-own-ticket-filter .ds-checkbox-field-label {
+  height: 100%;
+  min-height: 0;
+  padding-block: 0;
 }
 .cashier-ticket-table-wrap {
   min-height: 0;

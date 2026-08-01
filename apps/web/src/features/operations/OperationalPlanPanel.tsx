@@ -1,5 +1,5 @@
 import type { CommandEnvelope, OperationBoard } from "@rundflug/contracts";
-import { Ban, CalendarClock, Pencil, Plus } from "lucide-react";
+import { Ban, CalendarClock, Pencil, Plus, Repeat2 } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import {
   Button,
@@ -156,6 +156,7 @@ export function OperationalPlanPanel({
         }),
     [plannedOperations],
   );
+  const activeRecurringRules = recurringOperationalRules.filter((rule) => rule.status === "ACTIVE");
 
   const resetPlanEditor = useCallback(() => {
     const earliest = new Date(Date.now() + 60 * 60_000).toISOString();
@@ -395,6 +396,71 @@ export function OperationalPlanPanel({
     },
   ];
 
+  const recurringRuleColumns = [
+    {
+      key: "rule",
+      header: "Regel",
+      priority: "primary" as const,
+      render: (rule: RecurringOperationalRule) => {
+        const target =
+          rule.scopeType === "AIRCRAFT"
+            ? aircraft.find((entry) => entry.id === rule.scopeId)?.registration
+            : pilots.find((entry) => entry.id === rule.scopeId)?.operationalCode;
+        return (
+          <div className="operational-rule-primary">
+            <strong>
+              {planKindLabels[rule.kind]} · {target ?? rule.scopeId}
+            </strong>
+            <span>
+              nach {rule.intervalValue}{" "}
+              {rule.triggerMetric === "COMPLETED_ROTATIONS" ? "Umläufen" : "Betriebsminuten"}
+            </span>
+          </div>
+        );
+      },
+    },
+    {
+      key: "progress",
+      header: "Fortschritt",
+      priority: "primary" as const,
+      render: (rule: RecurringOperationalRule) => (
+        <strong>
+          {rule.progressValue} / {rule.intervalValue}
+        </strong>
+      ),
+    },
+    {
+      key: "duration",
+      header: "Dauerband",
+      priority: "tertiary" as const,
+      render: (rule: RecurringOperationalRule) => (
+        <strong>
+          {rule.minimumDurationMinutes}/{rule.typicalDurationMinutes}/{rule.maximumDurationMinutes}{" "}
+          Min.
+        </strong>
+      ),
+    },
+    {
+      key: "nextDue",
+      header: "Nächste Fälligkeit",
+      priority: "secondary" as const,
+      render: (rule: RecurringOperationalRule) => {
+        const remaining = Math.max(0, rule.intervalValue - rule.progressValue);
+        return (
+          <strong>
+            {rule.openPlannedOperationId
+              ? "Planeintrag offen"
+              : remaining === 0
+                ? "jetzt"
+                : `in ${remaining} ${
+                    rule.triggerMetric === "COMPLETED_ROTATIONS" ? "Umläufen" : "Min."
+                  }`}
+          </strong>
+        );
+      },
+    },
+  ];
+
   return (
     <section className={`operational-plan operational-plan--${mode}`}>
       {showPlans ? (
@@ -428,11 +494,6 @@ export function OperationalPlanPanel({
                   Pausen, Flugshows oder andere Verzögerungen können als weicher Plan erfasst
                   werden.
                 </p>
-                {!readOnly ? (
-                  <Button onClick={openNewPlan} type="button" variant="secondary">
-                    <Plus aria-hidden="true" /> Erste Einschränkung hinzufügen
-                  </Button>
-                ) : null}
               </div>
             }
             renderRowActions={(plan) => (
@@ -495,97 +556,62 @@ export function OperationalPlanPanel({
       ) : null}
 
       {showRules ? (
-        <section className="operational-rule-section">
-          <header>
+        <section className="operational-plan-section">
+          <header className="operational-plan-header">
             <div>
-              <h4>Wiederkehrende Regeln</h4>
+              <div className="operational-plan-title">
+                <h3>Wiederkehrende Regeln</h3>
+                <span>{activeRecurringRules.length}</span>
+              </div>
               <p>
                 Zum Beispiel: Tanken nach jeweils 5 bestätigten Umläufen. Bei Fälligkeit entsteht
                 automatisch ein weicher Planeintrag; Start und Ende bleiben menschlich bestätigt.
               </p>
             </div>
             {!readOnly ? (
-              <Button disabled={busy} onClick={openNewRule} size="compact" type="button">
-                <Plus aria-hidden="true" /> Wiederkehrende Regel hinzufügen
+              <Button disabled={busy} onClick={openNewRule} type="button" variant="primary">
+                <Plus aria-hidden="true" /> Regel hinzufügen
               </Button>
             ) : null}
           </header>
-          <div className="operational-rule-list">
-            {recurringOperationalRules.filter((rule) => rule.status === "ACTIVE").length === 0 ? (
-              <p className="operational-rule-empty">
-                Keine aktive Wiederholung für diesen Flugtag.
-              </p>
-            ) : null}
-            {recurringOperationalRules
-              .filter((rule) => rule.status === "ACTIVE")
-              .map((rule) => {
-                const target =
-                  rule.scopeType === "AIRCRAFT"
-                    ? aircraft.find((entry) => entry.id === rule.scopeId)?.registration
-                    : pilots.find((entry) => entry.id === rule.scopeId)?.operationalCode;
-                const remaining = Math.max(0, rule.intervalValue - rule.progressValue);
-                return (
-                  <article key={rule.id}>
-                    <div className="operational-rule-main">
-                      <strong>
-                        {planKindLabels[rule.kind]} · {target ?? rule.scopeId}
-                      </strong>
-                      <span>
-                        nach {rule.intervalValue}{" "}
-                        {rule.triggerMetric === "COMPLETED_ROTATIONS"
-                          ? "Umläufen"
-                          : "Betriebsminuten"}
-                      </span>
-                    </div>
-                    <div>
-                      <span>Fortschritt</span>
-                      <strong>
-                        {rule.progressValue} / {rule.intervalValue}
-                      </strong>
-                    </div>
-                    <div>
-                      <span>Dauerband</span>
-                      <strong>
-                        {rule.minimumDurationMinutes}/{rule.typicalDurationMinutes}/
-                        {rule.maximumDurationMinutes} Min.
-                      </strong>
-                    </div>
-                    <div>
-                      <span>Nächste Fälligkeit</span>
-                      <strong>
-                        {rule.openPlannedOperationId
-                          ? "Planeintrag offen"
-                          : remaining === 0
-                            ? "jetzt"
-                            : `in ${remaining} ${
-                                rule.triggerMetric === "COMPLETED_ROTATIONS" ? "Umläufen" : "Min."
-                              }`}
-                      </strong>
-                    </div>
-                    <div className="operational-rule-actions">
-                      <IconButton
-                        disabled={busy || readOnly}
-                        label="Regel bearbeiten"
-                        onClick={() => editRecurringRule(rule)}
-                        size="touch"
-                        type="button"
-                      >
-                        <Pencil aria-hidden="true" />
-                      </IconButton>
-                      <IconButton
-                        disabled={busy || readOnly}
-                        label="Regel deaktivieren"
-                        onClick={() => setPendingRuleDisable(rule)}
-                        size="touch"
-                        type="button"
-                      >
-                        <Ban aria-hidden="true" />
-                      </IconButton>
-                    </div>
-                  </article>
-                );
-              })}
-          </div>
+          <DataTable
+            className="operational-plan-table operational-rule-table"
+            columns={recurringRuleColumns}
+            emptyLabel={
+              <div className="operational-plan-empty">
+                <Repeat2 aria-hidden="true" />
+                <strong>Noch keine wiederkehrende Regel angelegt</strong>
+                <p>
+                  Bei Fälligkeit entsteht ein weicher Planeintrag; Start und Ende bleiben menschlich
+                  bestätigt.
+                </p>
+              </div>
+            }
+            renderRowActions={(rule) => (
+              <>
+                <IconButton
+                  disabled={busy || readOnly}
+                  label="Regel bearbeiten"
+                  onClick={() => editRecurringRule(rule)}
+                  size="touch"
+                  type="button"
+                >
+                  <Pencil aria-hidden="true" />
+                </IconButton>
+                <IconButton
+                  disabled={busy || readOnly}
+                  label="Regel deaktivieren"
+                  onClick={() => setPendingRuleDisable(rule)}
+                  size="touch"
+                  type="button"
+                >
+                  <Ban aria-hidden="true" />
+                </IconButton>
+              </>
+            )}
+            rowKey={(rule) => rule.id}
+            rows={activeRecurringRules}
+          />
         </section>
       ) : null}
 
