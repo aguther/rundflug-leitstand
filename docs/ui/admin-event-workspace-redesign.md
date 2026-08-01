@@ -75,6 +75,21 @@ Konzeptfreigabe ist nicht erforderlich.
   Operator-Kontext des Workers. Öffentliche Ticket-, QR-, Druck- und Statusverträge erhalten keine
   Kontokennung.
 
+## Freigegebenes UI-Finish
+
+- In der Kassen-Ticketwerkzeugleiste verwenden Suche, Kassenkonto, „Nur meine Tickets“ und manuelles
+  Aktualisieren dieselbe Touch-Control-Höhe und eine gemeinsame Control-Achse.
+- Der lokale Verkaufsschluss übernimmt den horizontalen Textabstand der Zeitfelder aus dem
+  Veranstaltungsschritt; der reservierte Bereich für Kalender- und Uhrsymbol bleibt stabil.
+- Beide Betriebsplan-Tabs besitzen denselben umlaufenden Inhaltsabstand. Pro Tab gibt es genau eine
+  blaue Primäraktion im Kopf. Einschränkungen und wiederkehrende Regeln verwenden gleichwertige,
+  aktionsfreie Leerzustände. Beide Köpfe zeigen die Zahl der aktiven Einträge; wiederkehrende Regeln
+  verwenden wie Einschränkungen eine Tabelle mit dauerhaft sichtbarem Spaltenkopf. Die Primäraktion
+  des Regel-Tabs heißt kurz „Regel hinzufügen“.
+- Betriebsfreigabe und Notfallmodus stehen in gleich breiten und gleich hohen neutralen Außenkarten.
+  Nur Grundfeld und Not-Halt-Aktion liegen in einer rot gekennzeichneten Innenfläche; die rote
+  Semantik wird nicht auf die gesamte Kartenhälfte ausgedehnt.
+
 ## Verbindliche Fachgrenzen
 
 - Ressourcengruppenzuordnungen verwenden ausschließlich `ASSIGN_AIRCRAFT_RESOURCE_GROUP`; eine

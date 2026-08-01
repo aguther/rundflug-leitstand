@@ -31,6 +31,7 @@ describe("OperationsWorkspace", () => {
     expect(screen.getByText("Freigabeinhalt")).not.toBeNull();
     expect(screen.getByText("Notfallinhalt")).not.toBeNull();
     expect(screen.queryByRole("tab")).toBeNull();
+    expect(document.querySelector(".operations-workspace-content")).not.toBeNull();
     expect(document.querySelector(".operations-workspace-controls")).not.toBeNull();
   });
 });

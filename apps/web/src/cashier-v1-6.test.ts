@@ -62,6 +62,21 @@ describe("cashier release 1.7.0 acceptance coverage", () => {
     expect(cashierSource).toContain('soldByOperatorLoginCode ?? "Nicht zugeordnet"');
     expect(cashierSource).toContain("previousCashierAccountFilterRef.current");
     expect(styles).toMatch(/\.cashier-ticket-toolbar \{[\s\S]*?flex-wrap: wrap;/);
+    expect(styles).toMatch(
+      /\.cashier-ticket-toolbar \{[\s\S]*?--cashier-ticket-control-height: var\(--control-touch\);[\s\S]*?align-items: flex-end;/,
+    );
+    for (const selector of [
+      ".cashier-ticket-toolbar > .ds-search-field",
+      ".cashier-ticket-toolbar > .ds-icon-button",
+      ".cashier-account-filter select",
+      ".cashier-own-ticket-filter.ds-checkbox-field",
+    ]) {
+      expect(styles).toMatch(
+        new RegExp(
+          `${selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} \\{[\\s\\S]*?height: var\\(--cashier-ticket-control-height\\);`,
+        ),
+      );
+    }
   });
 
   it("uses the outer ticket list as the single scroll owner", () => {

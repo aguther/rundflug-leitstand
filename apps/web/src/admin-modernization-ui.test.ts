@@ -51,7 +51,7 @@ describe("modernized administration workspace", () => {
     expect(planSource).toContain("Kein aktueller Umlauf verfügbar");
     expect(planSource).toContain("Für einen späteren Zeitpunkt");
     expect(planSource).toContain("alle 5 Umläufe tanken");
-    expect(planSource).toContain("Wiederkehrende Regel hinzufügen");
+    expect(planSource).toContain("Regel hinzufügen");
     expect(planSource).toContain("Umläufe bis zur Auslösung");
     expect(planSource).toContain("Betriebsminuten bis zur Auslösung");
     expect(planSource).toContain('className="operational-rule-trigger-value"');

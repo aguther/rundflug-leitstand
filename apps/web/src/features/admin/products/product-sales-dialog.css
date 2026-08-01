@@ -45,6 +45,7 @@
   min-height: var(--product-sales-control-height);
   box-sizing: border-box;
   padding-block: 0;
+  padding-inline: 12px 48px;
   border: 1px solid var(--ui-border-strong);
   border-radius: var(--radius-sm);
   color: var(--ui-text);
