@@ -125,7 +125,7 @@ describe("V1 administration completion UI", () => {
       "Gate anlegen",
       "Ressourcengruppe anlegen",
       "Flugzeug anlegen",
-      "Flugzeug einer Ressourcengruppe zuordnen",
+      "Einzelzuordnung Flugzeug–Ressourcengruppe",
       "Pilotencode anlegen",
       "Produkt anlegen",
     ]) {
