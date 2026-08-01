@@ -38,23 +38,26 @@
 
 .admin-shell .event-workspace-identity {
   min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.admin-shell .event-workspace-title-row {
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 12px;
 }
 
-.admin-shell .event-workspace-identity > div {
-  min-width: 0;
-}
-
-.admin-shell .event-workspace-identity span:first-child {
+.admin-shell .event-workspace-identity > span:first-child {
   color: var(--ui-muted);
   font-size: 0.72rem;
   font-weight: 650;
 }
 
 .admin-shell .event-workspace-identity h2 {
-  margin: 2px 0 0;
+  min-width: 0;
+  margin: 0;
   overflow: hidden;
   font-size: 1.2rem;
   text-overflow: ellipsis;

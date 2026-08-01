@@ -436,10 +436,8 @@
   background: var(--ui-accent-soft);
 }
 .field-info-tooltip {
-  position: absolute;
-  z-index: 5;
-  top: calc(100% + 7px);
-  left: -7px;
+  position: fixed;
+  z-index: 110;
   width: min(230px, calc(100vw - 32px));
   padding: 8px 10px;
   border: 1px solid var(--ui-border);
@@ -459,7 +457,7 @@
     transform 120ms ease,
     visibility 0s linear 120ms;
 }
-.field-info.is-open .field-info-tooltip {
+.field-info-tooltip.is-open {
   opacity: 1;
   transform: translateY(0);
   visibility: visible;

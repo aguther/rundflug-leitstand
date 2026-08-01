@@ -20,13 +20,13 @@ export function EventContextSummary({
   return (
     <header className="event-workspace-context">
       <div className="event-workspace-identity">
-        <div>
-          <span>Veranstaltung</span>
+        <span>Veranstaltung</span>
+        <div className="event-workspace-title-row">
           <h2 title={event.name}>{event.name}</h2>
+          <StatusPill tone={event.status === "ACTIVE" ? "success" : "neutral"}>
+            {eventStatusLabel(event.status)}
+          </StatusPill>
         </div>
-        <StatusPill tone={event.status === "ACTIVE" ? "success" : "neutral"}>
-          {eventStatusLabel(event.status)}
-        </StatusPill>
       </div>
       <dl className="event-workspace-meta">
         <div>
