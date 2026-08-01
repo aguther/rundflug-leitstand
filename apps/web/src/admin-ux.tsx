@@ -2,12 +2,21 @@ import {
   CalendarDays,
   ChartNoAxesColumn,
   Check,
+  ChevronLeft,
+  ChevronRight,
   Grid2X2,
   type LucideIcon,
   ShieldCheck,
   UsersRound,
 } from "lucide-react";
-import { type KeyboardEvent, type ReactNode, useCallback, useRef } from "react";
+import {
+  type KeyboardEvent,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
 export type AdminArea = "overview" | "events" | "users" | "evaluation" | "backup";
 export type AdminEventStep =
@@ -79,13 +88,12 @@ export function SetupProgress({
   onSelect: (step: SetupStep) => void;
 }) {
   const buttonRefs = useRef<Array<HTMLButtonElement | null>>([]);
-  const currentButtonRef = useCallback((element: HTMLButtonElement | null) => {
-    element?.scrollIntoView({
-      behavior: "auto",
-      block: "nearest",
-      inline: "nearest",
-    });
-  }, []);
+  const progressRef = useRef<HTMLDivElement | null>(null);
+  const [scrollState, setScrollState] = useState({
+    canScrollBack: false,
+    canScrollForward: false,
+    overflowing: false,
+  });
   const firstIncomplete = steps.findIndex((step) => !step.complete);
   const requestedIndex = currentStepId ? steps.findIndex((step) => step.id === currentStepId) : -1;
   const currentIndex =
@@ -94,6 +102,78 @@ export function SetupProgress({
       : firstIncomplete === -1
         ? steps.length - 1
         : firstIncomplete;
+
+  const scrollCurrentIntoView = useCallback(() => {
+    const progress = progressRef.current;
+    const currentButton = buttonRefs.current[currentIndex];
+    if (!progress || !currentButton) return;
+    const progressBounds = progress.getBoundingClientRect();
+    const buttonBounds = currentButton.getBoundingClientRect();
+    const targetLeft = Math.max(
+      0,
+      progress.scrollLeft +
+        buttonBounds.left -
+        progressBounds.left -
+        (progress.clientWidth - buttonBounds.width) / 2,
+    );
+    if (typeof progress.scrollTo === "function") {
+      progress.scrollTo({ behavior: "auto", left: targetLeft });
+    } else {
+      progress.scrollLeft = targetLeft;
+    }
+  }, [currentIndex]);
+
+  const updateScrollState = useCallback(() => {
+    const progress = progressRef.current;
+    if (!progress) return;
+    const maximumScrollLeft = Math.max(0, progress.scrollWidth - progress.clientWidth);
+    setScrollState({
+      canScrollBack: progress.scrollLeft > 1,
+      canScrollForward: progress.scrollLeft < maximumScrollLeft - 1,
+      overflowing: maximumScrollLeft > 1,
+    });
+  }, []);
+
+  useEffect(() => {
+    const progress = progressRef.current;
+    if (!progress) return;
+    const handleResize = () => {
+      updateScrollState();
+      scrollCurrentIntoView();
+    };
+    handleResize();
+    progress.addEventListener("scroll", updateScrollState, { passive: true });
+    const resizeObserver =
+      typeof ResizeObserver === "undefined" ? null : new ResizeObserver(handleResize);
+    resizeObserver?.observe(progress);
+    window.addEventListener("resize", handleResize);
+    return () => {
+      progress.removeEventListener("scroll", updateScrollState);
+      resizeObserver?.disconnect();
+      window.removeEventListener("resize", handleResize);
+    };
+  }, [scrollCurrentIntoView, updateScrollState]);
+
+  useEffect(() => {
+    scrollCurrentIntoView();
+    if (typeof window.requestAnimationFrame === "function") {
+      window.requestAnimationFrame(updateScrollState);
+    } else {
+      updateScrollState();
+    }
+  }, [scrollCurrentIntoView, updateScrollState]);
+
+  function scrollSteps(direction: -1 | 1) {
+    const progress = progressRef.current;
+    if (!progress) return;
+    const distance = direction * Math.max(220, progress.clientWidth * 0.72);
+    if (typeof progress.scrollBy === "function") {
+      progress.scrollBy({ behavior: "smooth", left: distance });
+    } else {
+      progress.scrollLeft += distance;
+      updateScrollState();
+    }
+  }
 
   function selectFromKeyboard(event: KeyboardEvent<HTMLButtonElement>, index: number) {
     if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
@@ -113,37 +193,63 @@ export function SetupProgress({
   }
 
   return (
-    <div aria-label="Veranstaltung einrichten" className="setup-progress" role="tablist">
-      {steps.map((step, index) => {
-        const current = index === currentIndex;
-        const state = [step.complete ? "complete" : "pending", current ? "current" : ""]
-          .filter(Boolean)
-          .join(" ");
-        return (
-          <div className={`setup-progress-item ${state}`} key={step.id} role="presentation">
-            <button
-              aria-controls={`admin-event-step-${step.id}-panel`}
-              aria-current={current ? "step" : undefined}
-              aria-selected={current}
-              id={`admin-event-step-${step.id}-tab`}
-              onClick={() => onSelect(step)}
-              onKeyDown={(event) => selectFromKeyboard(event, index)}
-              ref={(element) => {
-                buttonRefs.current[index] = element;
-                if (current) currentButtonRef(element);
-              }}
-              role="tab"
-              tabIndex={current ? 0 : -1}
-              type="button"
-            >
-              <span aria-hidden="true" className="setup-step-status">
-                {step.complete ? <Check /> : null}
-              </span>
-              <span className="setup-step-label">{step.label}</span>
-            </button>
-          </div>
-        );
-      })}
+    <div className={`setup-progress-navigation${scrollState.overflowing ? " is-overflowing" : ""}`}>
+      <button
+        aria-label="Vorherige Einrichtungsschritte anzeigen"
+        className="setup-progress-scroll setup-progress-scroll--back"
+        disabled={!scrollState.canScrollBack}
+        hidden={!scrollState.overflowing}
+        onClick={() => scrollSteps(-1)}
+        type="button"
+      >
+        <ChevronLeft aria-hidden="true" />
+      </button>
+      <div
+        aria-label="Veranstaltung einrichten"
+        className="setup-progress"
+        ref={progressRef}
+        role="tablist"
+      >
+        {steps.map((step, index) => {
+          const current = index === currentIndex;
+          const state = [step.complete ? "complete" : "pending", current ? "current" : ""]
+            .filter(Boolean)
+            .join(" ");
+          return (
+            <div className={`setup-progress-item ${state}`} key={step.id} role="presentation">
+              <button
+                aria-controls={`admin-event-step-${step.id}-panel`}
+                aria-current={current ? "step" : undefined}
+                aria-selected={current}
+                id={`admin-event-step-${step.id}-tab`}
+                onClick={() => onSelect(step)}
+                onKeyDown={(event) => selectFromKeyboard(event, index)}
+                ref={(element) => {
+                  buttonRefs.current[index] = element;
+                }}
+                role="tab"
+                tabIndex={current ? 0 : -1}
+                type="button"
+              >
+                <span aria-hidden="true" className="setup-step-status">
+                  {step.complete ? <Check /> : null}
+                </span>
+                <span className="setup-step-label">{step.label}</span>
+              </button>
+            </div>
+          );
+        })}
+      </div>
+      <button
+        aria-label="Weitere Einrichtungsschritte anzeigen"
+        className="setup-progress-scroll setup-progress-scroll--forward"
+        disabled={!scrollState.canScrollForward}
+        hidden={!scrollState.overflowing}
+        onClick={() => scrollSteps(1)}
+        type="button"
+      >
+        <ChevronRight aria-hidden="true" />
+      </button>
     </div>
   );
 }

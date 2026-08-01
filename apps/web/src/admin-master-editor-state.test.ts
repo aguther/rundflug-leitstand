@@ -65,5 +65,8 @@ describe("setup progress", () => {
     expect(markup).toContain('aria-selected="true"');
     expect(markup).toContain('role="tablist"');
     expect(markup).toContain('class="setup-step-status"></span>');
+    expect(markup).toContain('class="setup-progress-navigation"');
+    expect(markup).toContain('aria-label="Vorherige Einrichtungsschritte anzeigen"');
+    expect(markup).toContain('aria-label="Weitere Einrichtungsschritte anzeigen"');
   });
 });

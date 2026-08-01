@@ -435,7 +435,7 @@
     height: 20px;
   }
 
-  .admin-shell .setup-progress {
+  .admin-shell .setup-progress-navigation {
     flex: 0 0 56px;
   }
 
@@ -543,7 +543,7 @@
     justify-content: center;
   }
 
-  .admin-shell .setup-progress {
+  .admin-shell .setup-progress-navigation {
     margin-inline: 12px;
   }
 

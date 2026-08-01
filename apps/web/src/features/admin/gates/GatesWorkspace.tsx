@@ -48,7 +48,7 @@ export function GatesWorkspace({
           sortKey: "label",
           priority: "primary",
           render: (gate) => (
-            <div className="admin-entity-primary">
+            <div className="admin-entity-primary gate-primary-cell">
               <strong>{gate.label}</strong>
               <StatusPill tone={gate.active ? "success" : "neutral"}>
                 {gate.active ? "Aktiv" : "Inaktiv"}

@@ -31,11 +31,13 @@ describe("unified master-data dialogs and stable event workspace", () => {
       /\.admin-workspace:not\(\.master-data-active\)[\s\S]*?> \.admin-workspace-scroll-region \{[\s\S]*?padding-top: 16px;/,
     );
     expect(adminEventStyles).toMatch(
-      /\.admin-workspace:not\(\.master-data-active\) > \.setup-progress \{[\s\S]*?margin-bottom: 0;/,
+      /\.admin-workspace:not\(\.master-data-active\) > \.setup-progress-navigation \{[\s\S]*?margin-bottom: 0;/,
     );
     expect(adminEventStyles).toMatch(
-      /\.admin-shell \.setup-progress \{[\s\S]*?margin: 16px 16px 12px;/,
+      /\.admin-shell \.setup-progress-navigation \{[\s\S]*?margin: 16px 16px 12px;/,
     );
+    expect(adminEventStyles).toContain(".setup-progress-navigation.is-overflowing");
+    expect(adminEventStyles).toContain(".setup-progress-scroll--forward");
     expect(adminEventStyles).toMatch(/\.admin-shell \.reset-levels \{[\s\S]*?padding: 0 16px 8px;/);
   });
 
@@ -87,6 +89,18 @@ describe("unified master-data dialogs and stable event workspace", () => {
       /\.resource-aircraft-selection \{[^}]*grid-template-columns: repeat\(2,/,
     );
     expect(adminEventStyles).not.toContain(".resource-aircraft-selection .checkbox-label");
+  });
+
+  it("keeps the gate advanced controls on one shared input baseline", () => {
+    expect(adminEventStyles).toMatch(
+      /\.admin-shell \.master-data-editor-panel > \.master-editor-further-settings \{[\s\S]*?grid-column: 1 \/ -1;/,
+    );
+    expect(adminEventStyles).toMatch(
+      /\.admin-shell \.master-editor-further-settings \.parameter-grid \{[\s\S]*?grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);[\s\S]*?align-items: end;/,
+    );
+    expect(adminEventStyles).toMatch(
+      /@media \(max-width: 700px\) \{[\s\S]*?\.admin-shell \.master-editor-further-settings \.parameter-grid \{[\s\S]*?grid-template-columns: 1fr;[\s\S]*?align-items: stretch;/,
+    );
   });
 
   it("keeps status, discard, delete, import and PIN flows in the shared modal language", () => {

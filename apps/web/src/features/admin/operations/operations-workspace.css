@@ -42,6 +42,61 @@
   min-height: 44px;
 }
 
+.admin-shell .operations-workspace-controls .event-release-v15 {
+  min-height: 220px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  align-items: stretch;
+  gap: 14px;
+}
+
+.admin-shell .operations-workspace-controls .event-release-v15 > .ds-page-header {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.admin-shell .operations-workspace-controls .event-release-v15 > .ds-page-header > div:first-child {
+  min-width: 0;
+}
+
+.admin-shell .operations-workspace-controls .event-release-v15 .ds-page-header-actions {
+  margin-left: auto;
+}
+
+.admin-shell .operations-workspace-controls .event-release-v15 > .event-release-ready {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  align-content: start;
+  align-items: start;
+  gap: 8px;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.admin-shell .operations-workspace-controls .event-release-v15 > .event-release-ready svg {
+  flex: none;
+  margin-top: 1px;
+}
+
+.admin-shell .operations-workspace-controls .event-release-v15 .event-release-action {
+  margin: 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--ui-border);
+  justify-self: stretch;
+}
+
+.admin-shell .operations-workspace-controls .event-release-v15 .event-release-action .ds-button {
+  width: 100%;
+}
+
 @media (max-width: 1099px) {
   .operations-workspace-controls {
     grid-template-columns: 1fr;
@@ -51,5 +106,10 @@
 @media (max-width: 760px) {
   .operations-workspace-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-shell .operations-workspace-controls .event-release-v15 .ds-page-header-actions {
+    width: 100%;
+    margin-left: 0;
   }
 }
