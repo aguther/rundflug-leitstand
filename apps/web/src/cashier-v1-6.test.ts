@@ -10,6 +10,7 @@ describe("cashier release 1.7.0 acceptance coverage", () => {
     expect(apiSource).toContain('params.set("status"');
     expect(apiSource).toContain('params.set("cursor"');
     expect(apiSource).toContain('params.append("id"');
+    expect(apiSource).toContain('params.set("soldByAccountId"');
     expect(cashierSource).toContain("IntersectionObserver");
     expect(cashierSource).toContain('window.addEventListener("focus"');
     expect(cashierSource).toContain("board?.event.version");
@@ -47,8 +48,20 @@ describe("cashier release 1.7.0 acceptance coverage", () => {
     );
     expect(cashierSource).not.toContain('<Plane aria-hidden="true" />');
     expect(styles).toMatch(
-      /@media \(min-width: 1101px\)[\s\S]*?\.cashier-ticket-table \.ds-table \{[\s\S]*?min-width: 600px;/,
+      /@media \(min-width: 1101px\)[\s\S]*?\.cashier-ticket-table \.ds-table \{[\s\S]*?min-width: 740px;/,
     );
+  });
+
+  it("keeps seller filtering inside the existing right-hand ticket workspace", () => {
+    expect(cashierSource).toContain('className="cashier-v15-workspace"');
+    expect(cashierSource).toContain('className="cashier-sale-panel"');
+    expect(cashierSource).toContain('className="ds-toolbar cashier-ticket-toolbar"');
+    expect(cashierSource).toContain('aria-label="Nach Kassenkonto filtern"');
+    expect(cashierSource).toContain('label="Nur meine Tickets"');
+    expect(cashierSource).toContain('key: "cashier"');
+    expect(cashierSource).toContain('soldByOperatorLoginCode ?? "Nicht zugeordnet"');
+    expect(cashierSource).toContain("previousCashierAccountFilterRef.current");
+    expect(styles).toMatch(/\.cashier-ticket-toolbar \{[\s\S]*?flex-wrap: wrap;/);
   });
 
   it("uses the outer ticket list as the single scroll owner", () => {

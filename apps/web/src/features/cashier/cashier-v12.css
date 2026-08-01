@@ -352,6 +352,37 @@
   display: grid;
   grid-template-rows: auto auto minmax(190px, 0.7fr) minmax(300px, 1.3fr);
 }
+.cashier-ticket-toolbar {
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+}
+.cashier-ticket-toolbar > .ds-search-field {
+  min-width: 220px;
+  flex: 1 1 260px;
+}
+.cashier-account-filter {
+  min-width: 156px;
+  display: grid;
+  gap: 4px;
+  color: var(--ui-muted);
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+.cashier-account-filter select {
+  min-height: 44px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 6px;
+  padding-inline: 10px 32px;
+  color: var(--ui-text);
+  background: var(--ui-surface);
+}
+.cashier-own-ticket-filter.ds-checkbox-field {
+  min-height: 44px;
+  padding: 0 10px;
+  align-items: center;
+  white-space: nowrap;
+}
 .cashier-ticket-table-wrap {
   min-height: 0;
   overflow: auto;
@@ -365,7 +396,7 @@
   border-radius: 0;
 }
 .cashier-ticket-table .ds-table {
-  min-width: 600px;
+  min-width: 740px;
   font-size: 0.76rem;
 }
 .cashier-ticket-table .ds-table :is(th, td) {
@@ -409,6 +440,16 @@
 }
 .cashier-ticket-detail time {
   flex: 0 0 auto;
+  color: var(--ui-muted);
+  font-size: 0.72rem;
+}
+.cashier-ticket-sale-meta {
+  min-width: max-content;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.cashier-ticket-sale-meta small {
   color: var(--ui-muted);
   font-size: 0.72rem;
 }
@@ -802,7 +843,7 @@
     font-size: 0.61rem;
   }
   .cashier-ticket-table .ds-table {
-    min-width: 600px;
+    min-width: 740px;
     table-layout: fixed;
     font-size: 0.7rem;
   }
@@ -817,17 +858,20 @@
     width: 16%;
   }
   .cashier-ticket-table .ds-table :is(th, td):nth-child(3) {
-    width: 24%;
+    width: 20%;
     white-space: normal;
   }
   .cashier-ticket-table .ds-table :is(th, td):nth-child(4) {
-    width: 12%;
+    width: 17%;
   }
   .cashier-ticket-table .ds-table :is(th, td):nth-child(5) {
-    width: 15%;
+    width: 10%;
   }
   .cashier-ticket-table .ds-table :is(th, td):nth-child(6) {
-    width: 22%;
+    width: 12%;
+  }
+  .cashier-ticket-table .ds-table :is(th, td):nth-child(7) {
+    width: 14%;
   }
   .cashier-ticket-detail {
     padding: 10px 12px;
@@ -899,7 +943,16 @@
     grid-template-rows: auto auto 240px minmax(430px, 1fr);
   }
   .cashier-ticket-table .ds-table {
-    min-width: 700px;
+    min-width: 740px;
+  }
+  .cashier-ticket-toolbar > .ds-search-field {
+    flex-basis: 100%;
+  }
+  .cashier-ticket-sale-meta {
+    min-width: 0;
+    align-items: flex-end;
+    flex-direction: column;
+    gap: 2px;
   }
   .cashier-ticket-detail {
     overflow: visible;
