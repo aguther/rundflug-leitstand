@@ -3,6 +3,14 @@ import { describe, expect, it } from "vitest";
 import appSource from "../../cashier-view.tsx?raw";
 
 const stylesSource = readFileSync(new URL("./cashier-v12.css", import.meta.url), "utf8");
+const tabletLandscapeStart = stylesSource.search(
+  /@media\s*\(min-width:\s*1101px\)[^{}]*\(max-height:\s*900px\)/,
+);
+const stackedLayoutStart = stylesSource.indexOf("@media (max-width: 1100px)");
+const tabletLandscapeStyles =
+  tabletLandscapeStart >= 0 && stackedLayoutStart > tabletLandscapeStart
+    ? stylesSource.slice(tabletLandscapeStart, stackedLayoutStart)
+    : "";
 
 describe("V1.7.0 cashier", () => {
   it("uses the authenticated cashier session without another PIN prompt", () => {
@@ -73,6 +81,46 @@ describe("V1.7.0 cashier", () => {
     );
     expect(stylesSource).toMatch(
       /@media \(max-width:\s*700px\)\s*\{[\s\S]*?\.cashier-group-size\s*\{[^}]*width:\s*100%;/,
+    );
+  });
+
+  it("defines a touch-only landscape tablet stage without changing stacked breakpoints [V15-UI-020, V161-UI-010]", () => {
+    expect(tabletLandscapeStyles).toMatch(/\(min-width:\s*1101px\)/);
+    expect(tabletLandscapeStyles).toMatch(/and\s*\(max-width:\s*1250px\)/);
+    expect(tabletLandscapeStyles).toMatch(/and\s*\(max-height:\s*900px\)/);
+    expect(tabletLandscapeStyles).toMatch(/and\s*\(\s*orientation:\s*landscape\s*\)/);
+    expect(tabletLandscapeStyles).toMatch(/and\s*\(any-pointer:\s*coarse\)/);
+    expect(tabletLandscapeStyles).toMatch(
+      /\.cashier-sale-heading\s*\{[^}]*align-items:\s*stretch;[^}]*flex-direction:\s*column;/s,
+    );
+    expect(tabletLandscapeStyles).toMatch(
+      /\.cashier-stepper \.ds-icon-button\s*\{[^}]*width:\s*44px;[^}]*height:\s*44px;[^}]*min-width:\s*44px;[^}]*min-height:\s*44px;/s,
+    );
+    expect(stylesSource).toContain("@media (max-width: 1100px)");
+    expect(stylesSource).toContain("@media (max-width: 700px)");
+  });
+
+  it("protects cashier tabs and uses a deterministic tablet filter grid [V161-UI-010]", () => {
+    expect(tabletLandscapeStyles).toMatch(
+      /\.cashier-ticket-panel > \.ds-tabs\s*\{[^}]*height:\s*48px;[^}]*min-height:\s*48px;[^}]*overflow-y:\s*hidden;/s,
+    );
+    expect(tabletLandscapeStyles).toMatch(
+      /\.cashier-ticket-panel > \.ds-tabs > button\s*\{[^}]*height:\s*48px;[^}]*min-height:\s*48px;/s,
+    );
+    expect(tabletLandscapeStyles).toMatch(
+      /\.cashier-ticket-toolbar\s*\{[^}]*display:\s*grid;[^}]*grid-template-columns:[^}]*minmax\(180px, 1fr\)[^}]*minmax\(140px, 0\.65fr\)[^}]*max-content[^}]*var\(--control-touch\);[^}]*flex-wrap:\s*nowrap;/s,
+    );
+    expect(tabletLandscapeStyles).toMatch(
+      /\.cashier-ticket-toolbar > \.ds-search-field\s*\{[^}]*min-width:\s*0;[^}]*flex:\s*initial;/s,
+    );
+  });
+
+  it("reserves tablet rows and clears nested automatic minimum sizes [Q-UX-010, V1100-QA-010]", () => {
+    expect(tabletLandscapeStyles).toMatch(
+      /\.cashier-ticket-panel\s*\{[^}]*min-height:\s*0;[^}]*grid-template-rows:\s*48px max-content minmax\(120px, 0\.65fr\) minmax\(280px, 1\.35fr\);/s,
+    );
+    expect(tabletLandscapeStyles).toMatch(
+      /\.cashier-ticket-table-wrap,[\s\S]*?\.cashier-ticket-detail,[\s\S]*?\.cashier-ticket-detail-grid,[\s\S]*?\.cashier-ticket-detail-grid > \*\s*\{[^}]*min-width:\s*0;[^}]*min-height:\s*0;/,
     );
   });
 
