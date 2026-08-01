@@ -89,12 +89,14 @@ describe("V1 administration completion UI", () => {
     expect(adminViewSource.match(/htmlFor="/g)?.length).toBeGreaterThan(30);
     expect(appSource).not.toContain("onMouseDown={(event) => event.preventDefault()}");
     expect(appSource).not.toContain('<details className="field-info">');
-    expect(stylesSource).toContain(".field-info.is-open .field-info-tooltip");
+    expect(appSource).toContain("createPortal(");
+    expect(appSource).toContain("document.body");
+    expect(stylesSource).toContain(".field-info-tooltip.is-open");
     expect(stylesSource).not.toContain(".field-info:focus-visible .field-info-tooltip");
     expect(stylesSource).not.toContain(".field-info:hover .field-info-tooltip");
     expect(stylesSource).toContain(".field-info > svg");
     expect(stylesSource).not.toContain("label:focus-within .field-info");
-    expect(stylesSource).toContain("visibility: hidden");
+    expect(stylesSource).toContain("position: fixed");
     expect(stylesSource).toContain(".event-setup-v15 .ds-page-header");
     expect(stylesSource).toContain(".event-setup-v15 .ds-page-header-actions .ds-button");
     expect(stylesSource).toContain(".admin-workspace:not(.master-data-active)");

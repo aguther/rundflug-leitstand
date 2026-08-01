@@ -2,6 +2,7 @@
 import type { CommandResult } from "@rundflug/contracts";
 import { Info } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { getOperationBoard } from "./api";
 import { PageNotice } from "./app/PageNotifications";
 import {
@@ -73,9 +74,10 @@ export function FieldHelp({ help }: { help: string }) {
   const [hovered, setHovered] = useState(false);
   const [focused, setFocused] = useState(false);
   const [pinned, setPinned] = useState(false);
-  const [tooltipLeft, setTooltipLeft] = useState(-7);
+  const [tooltipPosition, setTooltipPosition] = useState({ left: 16, top: 16 });
   const tooltipId = useId();
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const tooltipRef = useRef<HTMLSpanElement>(null);
   const open = hovered || focused || pinned;
 
   const close = useCallback(() => {
@@ -89,11 +91,17 @@ export function FieldHelp({ help }: { help: string }) {
     if (!button) return;
     const buttonBounds = button.getBoundingClientRect();
     const tooltipWidth = Math.min(230, window.innerWidth - 32);
+    const tooltipHeight = tooltipRef.current?.offsetHeight ?? 96;
     const viewportLeft = Math.min(
       Math.max(16, buttonBounds.left - 7),
       window.innerWidth - 16 - tooltipWidth,
     );
-    setTooltipLeft(viewportLeft - buttonBounds.left);
+    const belowTop = buttonBounds.bottom + 7;
+    const viewportTop =
+      belowTop + tooltipHeight <= window.innerHeight - 16
+        ? belowTop
+        : Math.max(16, buttonBounds.top - tooltipHeight - 7);
+    setTooltipPosition({ left: viewportLeft, top: viewportTop });
   }, []);
 
   useEffect(() => {
@@ -104,7 +112,9 @@ export function FieldHelp({ help }: { help: string }) {
     document.addEventListener("pointerdown", handlePointerDown);
     window.addEventListener("resize", positionTooltip);
     document.addEventListener("scroll", positionTooltip, true);
+    const positionFrame = window.requestAnimationFrame(positionTooltip);
     return () => {
+      window.cancelAnimationFrame(positionFrame);
       document.removeEventListener("pointerdown", handlePointerDown);
       window.removeEventListener("resize", positionTooltip);
       document.removeEventListener("scroll", positionTooltip, true);
@@ -148,20 +158,23 @@ export function FieldHelp({ help }: { help: string }) {
         else setHovered(false);
       }}
       ref={buttonRef}
-      tabIndex={-1}
       type="button"
     >
       <Info aria-hidden="true" />
-      {open ? (
-        <span
-          className="field-info-tooltip"
-          id={tooltipId}
-          role="tooltip"
-          style={{ left: tooltipLeft }}
-        >
-          {help}
-        </span>
-      ) : null}
+      {open
+        ? createPortal(
+            <span
+              className="field-info-tooltip is-open"
+              id={tooltipId}
+              ref={tooltipRef}
+              role="tooltip"
+              style={tooltipPosition}
+            >
+              {help}
+            </span>,
+            document.body,
+          )
+        : null}
     </button>
   );
 }

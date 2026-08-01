@@ -1054,7 +1054,39 @@
 
 .admin-shell .master-data-editor-body {
   overflow-x: hidden;
+  scrollbar-gutter: stable;
   padding: var(--space-5);
+}
+
+.admin-shell .master-data-editor-tabs,
+.admin-shell .master-data-editor-panel {
+  min-width: 0;
+  grid-column: 1 / -1;
+}
+
+.admin-shell .master-data-editor-tabs .ds-tabs {
+  width: 100%;
+  justify-content: flex-start;
+}
+
+.admin-shell .master-data-editor-panel:not([hidden]) {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px 28px;
+}
+
+.admin-shell .master-data-editor-panel[hidden] {
+  display: none;
+}
+
+.admin-shell .master-data-editor-panel > :is(h3, .form-introduction, .parameter-grid) {
+  grid-column: 1 / -1;
+}
+
+.admin-shell
+  :is(.gate-display-filter, .product-editor-section).master-data-editor-panel:not([hidden]) {
+  grid-template-columns: 1fr;
 }
 
 .admin-shell .master-data-editor-body .master-data-columns,
@@ -1286,6 +1318,11 @@
   .admin-shell .master-data-editor-body .compact-editor-grid,
   .admin-shell .master-data-editor-body .master-data-columns > fieldset,
   .admin-shell .master-data-editor-body .resource-master-grid > fieldset {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  .admin-shell .master-data-editor-panel:not([hidden]) {
     grid-template-columns: 1fr;
     gap: 20px;
   }

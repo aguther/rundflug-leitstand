@@ -3577,18 +3577,21 @@ export function AdminView() {
               {masterDataCategory === "gates" ? (
               <fieldset>
                 <legend>Gate</legend>
-                <Tabs
-                  idPrefix="master-gate-editor"
-                  items={[
-                    { value: "general", label: "Grunddaten" },
-                    { value: "details", label: "Öffentliche Anzeige" },
-                  ]}
-                  label="Gate-Bereiche"
-                  onChange={setMasterEditorTab}
-                  value={masterEditorTab}
-                />
+                <div className="master-data-editor-tabs">
+                  <Tabs
+                    idPrefix="master-gate-editor"
+                    items={[
+                      { value: "general", label: "Grunddaten" },
+                      { value: "details", label: "Öffentliche Anzeige" },
+                    ]}
+                    label="Gate-Bereiche"
+                    onChange={setMasterEditorTab}
+                    value={masterEditorTab}
+                  />
+                </div>
                 <div
                   aria-labelledby="master-gate-editor-general-tab"
+                  className="master-data-editor-panel"
                   hidden={masterEditorTab !== "general"}
                   id="master-gate-editor-general-panel"
                   role="tabpanel"
@@ -3663,7 +3666,7 @@ export function AdminView() {
                 </div>
                 <section
                   aria-labelledby="master-gate-editor-details-tab"
-                  className="gate-display-filter"
+                  className="gate-display-filter master-data-editor-panel"
                   hidden={masterEditorTab !== "details"}
                   id="master-gate-editor-details-panel"
                   role="tabpanel"
@@ -3757,19 +3760,21 @@ export function AdminView() {
               {masterDataCategory === "products" ? (
               <fieldset>
                 <legend>Produkt</legend>
-                <Tabs
-                  idPrefix="master-product-editor"
-                  items={[
-                    { value: "general", label: "Allgemein" },
-                    { value: "details", label: "Planung und Zeitmodell" },
-                  ]}
-                  label="Produktbereiche"
-                  onChange={setMasterEditorTab}
-                  value={masterEditorTab}
-                />
+                <div className="master-data-editor-tabs">
+                  <Tabs
+                    idPrefix="master-product-editor"
+                    items={[
+                      { value: "general", label: "Allgemein" },
+                      { value: "details", label: "Planung und Zeitmodell" },
+                    ]}
+                    label="Produktbereiche"
+                    onChange={setMasterEditorTab}
+                    value={masterEditorTab}
+                  />
+                </div>
                 <section
                   aria-labelledby="master-product-editor-general-tab"
-                  className="product-editor-section"
+                  className="product-editor-section master-data-editor-panel"
                   hidden={masterEditorTab !== "general"}
                   id="master-product-editor-general-panel"
                   role="tabpanel"
@@ -3846,7 +3851,7 @@ export function AdminView() {
                 </section>
                 <section
                   aria-labelledby="master-product-editor-details-tab"
-                  className="product-editor-section"
+                  className="product-editor-section master-data-editor-panel"
                   hidden={masterEditorTab !== "details"}
                   id="master-product-editor-details-panel"
                   role="tabpanel"
@@ -4312,10 +4317,6 @@ export function AdminView() {
                 />
               </div>
             </div>
-            <ValidationHint>
-              Ausschließlich anonyme operative Codes erfassen – keine Namen, Lizenz- oder
-              Kontaktdaten.
-            </ValidationHint>
             {pilotEditorId !== "new" ? (
               <dl className="master-editor-readonly-summary">
                 <div><dt>Pausenstatus</dt><dd>{currentPilot?.paused ? "Pause" : "Einsatzbereit"}</dd></div>
