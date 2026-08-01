@@ -1,5 +1,17 @@
 # Backup und Wiederherstellung
 
+## Migrationsnotiz 0059 – anonyme Kassenattribution
+
+Migration `0059_ticket_group_cashier_attribution.sql` ergänzt ausschließlich die nullable Referenz
+`ticket_groups.sold_by_operator_account_id` und einen dazu passenden Suchindex. Bestehende
+Ticketgruppen und Papierimporte bleiben unverändert ohne Zuordnung; es findet kein Backfill statt.
+Soft-gelöschte Operator-Konten bleiben mit ihrer historischen anonymen Kennung erhalten.
+
+Unmittelbar vor dem Remote-Lauf werden D1-Time-Travel-Zeitpunkt und portable Sicherung dokumentiert.
+Ein älterer Worker kann die additive Spalte ignorieren. Falls eine vollständige Schema-Rückkehr nötig
+ist, wird D1 auf den Zeitpunkt vor 0059 zurückgesetzt oder die Sicherung in eine isolierte Datenbank
+eingespielt; ein manueller Tabellenneuaufbau in der laufenden Datenbank ist nicht vorgesehen.
+
 ## Migrationsnotiz 0054 – aktive Gruppennachrufe
 
 Migration `0055_ticket_group_recalls.sql` legt die Nachrufhistorie an und baut

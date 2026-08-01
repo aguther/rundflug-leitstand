@@ -4985,6 +4985,9 @@ app.on("GET", eventRoutes("/tickets/search"), async (context) => {
     limit: searchParams.has("limit") ? Number(searchParams.get("limit")) : 20,
     ...(searchParams.has("cursor") ? { cursor: searchParams.get("cursor") ?? "" } : {}),
     ticketGroupIds: searchParams.getAll("id"),
+    ...(searchParams.has("soldByAccountId")
+      ? { soldByOperatorAccountId: searchParams.get("soldByAccountId") ?? "" }
+      : {}),
   });
   if (!parsedRequest.success) {
     return context.json(
@@ -5027,6 +5030,9 @@ app.on("GET", eventRoutes("/tickets/search"), async (context) => {
     conditions.push(`tg.id IN (${placeholders.join(", ")})`);
   } else {
     conditions.push(ticketSearchStatusCondition(request.status));
+  }
+  if (request.soldByOperatorAccountId) {
+    conditions.push(`tg.sold_by_operator_account_id = ${bind(request.soldByOperatorAccountId)}`);
   }
   if (normalized) {
     const ticketHashPlaceholder = bind(ticketHash);
@@ -5072,6 +5078,7 @@ app.on("GET", eventRoutes("/tickets/search"), async (context) => {
     `SELECT tg.id AS ticket_group_id, tg.status AS group_status,
             tg.queue_sequence, tg.communication_number AS booking_group_number, tg.standby,
             tg.sold_at, p.id AS product_id, p.code AS product_code, p.name AS product_name,
+            tg.sold_by_operator_account_id, seller.login_code AS sold_by_operator_login_code,
             rg.short_code AS resource_group_short_code,
             (SELECT COUNT(*) FROM tickets group_ticket WHERE group_ticket.ticket_group_id = tg.id)
               AS group_size,
@@ -5091,6 +5098,7 @@ app.on("GET", eventRoutes("/tickets/search"), async (context) => {
        FROM ticket_groups tg
        JOIN products p ON p.id = tg.product_id
        JOIN resource_groups rg ON rg.id = p.resource_group_id
+       LEFT JOIN operator_accounts seller ON seller.id = tg.sold_by_operator_account_id
       WHERE ${conditions.join(" AND ")}
       ORDER BY tg.sold_at DESC, tg.id DESC LIMIT ${limitPlaceholder}`,
   )
@@ -5102,6 +5110,8 @@ app.on("GET", eventRoutes("/tickets/search"), async (context) => {
       booking_group_number: number;
       standby: number;
       sold_at: string;
+      sold_by_operator_account_id: string | null;
+      sold_by_operator_login_code: string | null;
       product_id: string;
       product_code: string;
       product_name: string;
@@ -5134,6 +5144,8 @@ app.on("GET", eventRoutes("/tickets/search"), async (context) => {
         bookingGroupLabel: formatBookingGroupLabel(row.product_code, row.booking_group_number),
         standby: row.standby === 1,
         soldAt: row.sold_at,
+        soldByOperatorAccountId: row.sold_by_operator_account_id,
+        soldByOperatorLoginCode: row.sold_by_operator_login_code,
         communicationNumber: communicationNumbers[0] ?? null,
         communicationLabel: communicationLabels[0] ?? null,
         communicationNumbers,

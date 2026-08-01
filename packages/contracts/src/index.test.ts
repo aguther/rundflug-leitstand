@@ -1054,6 +1054,8 @@ describe("commandEnvelopeSchema", () => {
           bookingGroupLabel: "G-PAN20-0104",
           standby: false,
           soldAt: "2026-07-11T12:00:00.000Z",
+          soldByOperatorAccountId: "550e8400-e29b-41d4-a716-446655440000",
+          soldByOperatorLoginCode: "CASH-01",
           communicationNumber: 42,
           communicationLabel: "F-RG020-042",
           communicationNumbers: [42, 43],
@@ -1070,6 +1072,13 @@ describe("commandEnvelopeSchema", () => {
     if (!result) throw new Error("Synthetischer Suchtreffer fehlt.");
     expect("publicCode" in result).toBe(false);
     expect("guestName" in result).toBe(false);
+    expect(result.soldByOperatorLoginCode).toBe("CASH-01");
+    expect(
+      ticketSearchResponseSchema.parse({
+        results: [{ ...result, soldByOperatorAccountId: null, soldByOperatorLoginCode: null }],
+        nextCursor: null,
+      }).results[0]?.soldByOperatorLoginCode,
+    ).toBeNull();
   });
 
   it("validates cursor pagination and rejects the removed rebooking command", () => {
@@ -1079,6 +1088,11 @@ describe("commandEnvelopeSchema", () => {
     expect(ticketSearchRequestSchema.parse({ status: "OPEN" })).toMatchObject({
       status: "OPEN",
     });
+    expect(
+      ticketSearchRequestSchema.parse({
+        soldByOperatorAccountId: "550e8400-e29b-41d4-a716-446655440000",
+      }),
+    ).toMatchObject({ soldByOperatorAccountId: "550e8400-e29b-41d4-a716-446655440000" });
     expect(() =>
       ticketSearchRequestSchema.parse({ cursor: "cursor", ticketGroupIds: ["group-1"] }),
     ).toThrow();

@@ -1129,6 +1129,7 @@ export const ticketSearchRequestSchema = z
     limit: z.number().int().min(1).max(50).default(20),
     cursor: z.string().min(1).max(500).optional(),
     ticketGroupIds: z.array(z.string().min(1).max(100)).max(50).default([]),
+    soldByOperatorAccountId: z.uuid().optional(),
   })
   .refine((value) => value.ticketGroupIds.length === 0 || !value.cursor, {
     message: "ID-Revalidierung und Cursor können nicht kombiniert werden.",
@@ -1147,6 +1148,8 @@ export const ticketSearchResultSchema = z.object({
   bookingGroupLabel: z.string(),
   standby: z.boolean(),
   soldAt: z.string(),
+  soldByOperatorAccountId: z.string().nullable(),
+  soldByOperatorLoginCode: z.string().nullable(),
   communicationNumber: z.number().int().positive().nullable(),
   communicationLabel: z.string().nullable(),
   communicationNumbers: z.array(z.number().int().positive()),

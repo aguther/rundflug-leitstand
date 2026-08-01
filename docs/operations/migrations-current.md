@@ -64,6 +64,7 @@ D1-Identität; angewandte Dateien werden nicht nachträglich umbenannt.
 | 57 | `0056_product_pure_flight_groups.sql` | eindeutig |
 | 58 | `0057_turnaround_phase_overrides.sql` | eindeutig |
 | 59 | `0058_forecast_turnaround_sources.sql` | eindeutig |
+| 60 | `0059_ticket_group_cashier_attribution.sql` | eindeutig |
 
-Gesamt: 59 Migrationen. Wiederherstellungsnotizen werden gegen SQL und
+Gesamt: 60 Migrationen. Wiederherstellungsnotizen werden gegen SQL und
 `apps/worker/migrations/README.md` geprüft.
