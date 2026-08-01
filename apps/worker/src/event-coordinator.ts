@@ -1363,8 +1363,9 @@ export class EventCoordinator extends DurableObject<Env> {
           ).bind(nextVersion, now, command.eventId, current.version),
           this.env.DB.prepare(`INSERT INTO ticket_groups
             (id, operation_day_id, product_id, queue_sequence, communication_number, standby,
-             status, sold_at, version, public_status_code_hash, public_status_code)
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'QUEUED', ?7, 0, ?8, ?9)`).bind(
+             status, sold_at, version, public_status_code_hash, public_status_code,
+             sold_by_operator_account_id)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'QUEUED', ?7, 0, ?8, ?9, ?10)`).bind(
             ticketGroupId,
             command.eventId,
             product.id,
@@ -1374,6 +1375,7 @@ export class EventCoordinator extends DurableObject<Env> {
             now,
             groupCodeHash,
             normalizedGroupCode,
+            operatorAccountId,
           ),
           ...slots.flatMap((slot) => [
             this.env.DB.prepare(`INSERT INTO flight_groups

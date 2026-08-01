@@ -364,6 +364,16 @@ beziehungsweise vollständige D1-Sicherung angelegt. Für eine vollständige Sch
 per Time Travel oder aus dieser Sicherung wiederhergestellt; Push-Ziele bleiben weiterhin aus
 portablen R2-Sicherungen ausgeschlossen.
 
+## 0059 – Anonyme Kassenattribution
+
+Ergänzt Ticketgruppen additiv um eine nullable Referenz auf das ausstellende Operator-Konto und
+einen Suchindex für die gefilterte Kassenliste. Reguläre Verkäufe übernehmen die Referenz nur aus
+dem authentifizierten Worker-Kontext. Bestehende Ticketgruppen und Papierimporte bleiben bewusst
+ohne Zuordnung; soft-gelöschte Konten bleiben als historische Kennung referenzierbar. Vor Anwendung
+wird eine D1-Time-Travel-Marke beziehungsweise portable Sicherung angelegt. Ein älterer Worker
+ignoriert die nullable Spalte. Für eine vollständige Schema-Rückkehr wird D1 per Time Travel auf den
+Stand vor 0059 zurückgesetzt oder aus der Sicherung wiederhergestellt.
+
 ## Historische Doppelnummer 0036
 
 `0036_product_promised_flight_time.sql` und `0036_v1_5_stable_operations.sql` wurden bereits unter

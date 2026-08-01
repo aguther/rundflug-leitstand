@@ -296,6 +296,9 @@ export async function searchTickets(
   params.set("status", options.status ?? "ACTIVE");
   params.set("limit", String(options.limit ?? 20));
   if (options.cursor) params.set("cursor", options.cursor);
+  if (options.soldByOperatorAccountId) {
+    params.set("soldByAccountId", options.soldByOperatorAccountId);
+  }
   for (const ticketGroupId of options.ticketGroupIds ?? []) params.append("id", ticketGroupId);
   const response = await apiFetch(controlApiPath(eventId, `/tickets/search?${params.toString()}`), {
     headers: deviceHeaders(deviceId, deviceToken),
