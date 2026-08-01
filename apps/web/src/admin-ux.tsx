@@ -17,6 +17,7 @@ export type AdminEventStep =
   | "aircraft"
   | "pilots"
   | "products"
+  | "operational-plan"
   | "operations"
   | "completion";
 export type MasterDataCategory =

@@ -23,17 +23,29 @@
   font-size: 1.05rem;
 }
 
-.operations-workspace-panel {
+.operations-workspace-controls {
   min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 16px;
 }
 
-.operations-workspace-panel > .admin-section,
-.operations-workspace-panel > .admin-operational-plan-section {
+.operations-workspace-controls > div,
+.operations-workspace-controls .admin-section,
+.operations-workspace-controls .ds-panel {
+  min-width: 0;
   margin: 0;
 }
 
-.admin-shell .event-workspace-frame--wide .operations-workspace-panel .ds-button {
+.admin-shell .event-workspace-frame--wide .operations-workspace-controls .ds-button {
   min-height: 44px;
+}
+
+@media (max-width: 1099px) {
+  .operations-workspace-controls {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 760px) {

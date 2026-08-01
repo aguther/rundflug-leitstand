@@ -26,11 +26,12 @@ describe("modernized administration workspace", () => {
   });
 
   it("exposes the shared plan in admin without operational confirmation controls", () => {
-    expect(adminViewSource).toContain("<OperationalPlanPanel");
-    expect(adminViewSource).toContain('mode="admin"');
+    expect(adminViewSource).toContain("<OperationalPlanWorkspace");
+    expect(adminViewSource).toContain('mode: "admin"');
     expect(adminViewSource).toContain('type: "UPSERT_PLANNED_OPERATION"');
     expect(adminViewSource).toContain('type: "CANCEL_PLANNED_OPERATION"');
     expect(planSource).toContain('mode === "flight-director" && onConfirm');
+    expect(planSource).toContain('content = "combined"');
     expect(planSource).toContain("Bestätigung durch Flight Director");
     expect(planSource).toContain("Planeintrag wirklich absagen?");
     expect(planSource).not.toContain("{plan.reason}");

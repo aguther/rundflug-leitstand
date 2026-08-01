@@ -31,7 +31,7 @@ describe("event parameter surface", () => {
 
   it("keeps operation planning outside the parameter workspace", () => {
     expect(adminSource).toContain("<EventParametersWorkspace");
-    expect(adminSource).toContain("<OperationalPlanPanel");
+    expect(adminSource).toContain("<OperationalPlanWorkspace");
     expect(adminSource).toContain("<OperationsWorkspace");
   });
 
