@@ -39,6 +39,7 @@ describe("product-pure flight groups", () => {
     expect(coordinator).toContain("DISPATCH_PLAN_STALE");
     expect(coordinator).toContain("dispatch_plan_revision");
     expect(coordinator).toContain("dispatch_group_ids_json");
+    expect(coordinator).toContain("rotation.dispatch_operation_day_version === current.version");
     expect(coordinator).toContain("acceptedDispatchRecommendation");
   });
 });

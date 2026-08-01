@@ -35,4 +35,10 @@ describe("forecast snapshot retention", () => {
     expect(coordinatorSource).not.toMatch(/DELETE\s+FROM\s+forecast_snapshots/i);
     expect(backupSource).toContain('"forecast_snapshots"');
   });
+
+  it("does not plan inactive or interrupted aircraft before human confirmation", () => {
+    expect(coordinatorSource).toContain('aircraft.operational_state === "INACTIVE"');
+    expect(coordinatorSource).toContain("aircraft.operational_interrupted === 1");
+    expect(coordinatorSource).toContain('const blocked = ["PAUSED", "REFUELING"]');
+  });
 });

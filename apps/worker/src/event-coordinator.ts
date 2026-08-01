@@ -2381,9 +2381,10 @@ export class EventCoordinator extends DurableObject<Env> {
       return capacityRows.results
         .filter((row) => row.resource_group_id === resourceGroupId)
         .flatMap((aircraft) => {
-          const blocked =
-            aircraft.operational_interrupted === 1 ||
-            ["INACTIVE", "PAUSED", "REFUELING"].includes(aircraft.operational_state);
+          if (aircraft.operational_interrupted === 1 || aircraft.operational_state === "INACTIVE") {
+            return [];
+          }
+          const blocked = ["PAUSED", "REFUELING"].includes(aircraft.operational_state);
           const immediatelyAvailable = aircraft.predicted_completion_at === null && !blocked;
           const expectedReturnAt =
             blocked && aircraft.expected_review_at
@@ -6547,6 +6548,12 @@ export class EventCoordinator extends DurableObject<Env> {
       `SELECT r.id, r.status, r.version, r.aircraft_id, r.pilot_id, r.called_at,
               r.forecast_assumed_aircraft_id, r.dispatch_plan_revision,
               r.dispatch_batch_id, r.dispatch_group_ids_json,
+              (SELECT snapshot.operation_day_version
+                 FROM forecast_snapshots snapshot
+                WHERE snapshot.rotation_id = r.id
+                  AND snapshot.dispatch_plan_revision = r.dispatch_plan_revision
+                ORDER BY snapshot.captured_at DESC, snapshot.id DESC
+                LIMIT 1) AS dispatch_operation_day_version,
               fg.product_id AS flight_group_product_id, rg.status AS resource_group_status
          FROM rotations r
          JOIN flight_groups fg ON fg.id = r.flight_group_id
@@ -6565,6 +6572,7 @@ export class EventCoordinator extends DurableObject<Env> {
         dispatch_plan_revision: string | null;
         dispatch_batch_id: string | null;
         dispatch_group_ids_json: string;
+        dispatch_operation_day_version: number | null;
         flight_group_product_id: string | null;
         resource_group_status: "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED";
       }>();
@@ -6677,6 +6685,7 @@ export class EventCoordinator extends DurableObject<Env> {
         const selectedGroupIds = [...distinctGroupIds].sort();
         const currentRecommendedGroupIds = [...recommendedGroupIds].sort();
         acceptedDispatchRecommendation =
+          rotation.dispatch_operation_day_version === current.version &&
           rotation.dispatch_plan_revision === command.payload.dispatchRecommendation.planRevision &&
           rotation.dispatch_batch_id === command.payload.dispatchRecommendation.batchId &&
           rotation.forecast_assumed_aircraft_id === command.payload.aircraftId &&
