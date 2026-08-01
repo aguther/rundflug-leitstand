@@ -3745,6 +3745,12 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
               r.prediction_lower_minutes, r.prediction_upper_minutes, r.prediction_updated_at,
               r.forecast_assumed_aircraft_id, r.turnaround_boarding_minutes,
               r.dispatch_plan_id, r.dispatch_plan_revision, r.dispatch_batch_id,
+              (SELECT snapshot.operation_day_version
+                 FROM forecast_snapshots snapshot
+                WHERE snapshot.rotation_id = r.id
+                  AND snapshot.dispatch_plan_revision = r.dispatch_plan_revision
+                ORDER BY snapshot.captured_at DESC, snapshot.id DESC
+                LIMIT 1) AS dispatch_operation_day_version,
               r.dispatch_order, r.dispatch_wave, r.dispatch_lane_id,
               r.dispatch_group_ids_json, r.dispatch_occupied_seats,
               r.dispatch_available_seats, r.dispatch_commitment_level,
@@ -3969,6 +3975,7 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
           dispatch_plan_id: string | null;
           dispatch_plan_revision: string | null;
           dispatch_batch_id: string | null;
+          dispatch_operation_day_version: number | null;
           dispatch_order: number | null;
           dispatch_wave: number | null;
           dispatch_lane_id: string | null;
@@ -4627,13 +4634,18 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
       const suggestedAircraft = fleetRows.results.find(
         (aircraft) => aircraft.id === rotation.suggested_aircraft_id,
       );
-      const dispatchAircraft = fleetRows.results.find(
-        (aircraft) => aircraft.id === rotation.forecast_assumed_aircraft_id,
-      );
+      const dispatchPlanFresh = rotation.dispatch_operation_day_version === eventRow.version;
+      const dispatchAircraft = dispatchPlanFresh
+        ? fleetRows.results.find(
+            (aircraft) => aircraft.id === rotation.forecast_assumed_aircraft_id,
+          )
+        : undefined;
       const dispatchPilotId = rotation.dispatch_lane_id?.split(":")[1] ?? null;
-      const dispatchPilot = pilotRows.results.find(
-        (pilot) => pilot.id === dispatchPilotId && pilot.active === 1 && pilot.paused === 0,
-      );
+      const dispatchPilot = dispatchPlanFresh
+        ? pilotRows.results.find(
+            (pilot) => pilot.id === dispatchPilotId && pilot.active === 1 && pilot.paused === 0,
+          )
+        : undefined;
       const rememberedPilot = pilotRows.results.find(
         (pilot) =>
           pilot.id === suggestedAircraft?.current_pilot_id &&
@@ -4645,7 +4657,9 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
         (product) => product.code === rotation.product_code,
       );
       const profileAircraftId =
-        rotation.aircraft_id ?? rotation.forecast_assumed_aircraft_id ?? null;
+        rotation.aircraft_id ??
+        (dispatchPlanFresh ? rotation.forecast_assumed_aircraft_id : null) ??
+        null;
       const aircraftProductOverride = profileAircraftId
         ? aircraftProductTurnaroundOverrideRows.results.find(
             (override) =>
@@ -4790,7 +4804,8 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
           rememberedPilot?.operational_code ??
           rotation.suggested_pilot_operational_code,
         suggestedAircraftId:
-          rotation.forecast_assumed_aircraft_id ?? rotation.suggested_aircraft_id,
+          (dispatchPlanFresh ? rotation.forecast_assumed_aircraft_id : null) ??
+          rotation.suggested_aircraft_id,
         suggestedAircraftRegistration:
           dispatchAircraft?.registration ?? rotation.suggested_aircraft_registration,
         ticketCount: rotation.ticket_count,
@@ -4825,7 +4840,7 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
             : null,
         calledAt: rotation.called_at,
         dispatchPlan:
-          rotation.dispatch_plan_id && rotation.dispatch_plan_revision
+          dispatchPlanFresh && rotation.dispatch_plan_id && rotation.dispatch_plan_revision
             ? {
                 planId: rotation.dispatch_plan_id,
                 revision: rotation.dispatch_plan_revision,
