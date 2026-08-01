@@ -400,7 +400,7 @@
   display: flex;
   min-width: 0;
   align-items: center;
-  gap: 0.34em;
+  gap: clamp(3px, 0.55vw, 10px);
   color: var(--fids-orange);
   font-size: var(--fids-status-font-size);
   font-weight: 900;
@@ -425,8 +425,8 @@
 
 .fids-recall-bell {
   display: grid;
-  width: 1.35em;
-  height: 1.35em;
+  width: 1em;
+  height: 1em;
   flex: 0 0 auto;
   place-items: center;
   border-radius: 50%;
@@ -445,11 +445,11 @@
   0%,
   100% {
     opacity: 1;
-    transform: scale(1);
+    transform: scale(0.89);
   }
   50% {
     opacity: 0.72;
-    transform: scale(1.12);
+    transform: scale(1);
   }
 }
 
