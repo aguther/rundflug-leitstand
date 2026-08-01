@@ -283,6 +283,30 @@
   line-height: 1.45;
 }
 
+.aircraft-assignment-dialog .assignment-server-checks {
+  display: grid;
+  gap: 5px;
+  padding: 12px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-sm);
+  background: var(--ui-surface-subtle);
+}
+
+.aircraft-assignment-dialog .assignment-server-checks :is(p, small) {
+  margin: 0;
+  line-height: 1.45;
+}
+
+.aircraft-assignment-dialog .assignment-server-checks p {
+  font-size: 0.82rem;
+  font-weight: 650;
+}
+
+.aircraft-assignment-dialog .assignment-server-checks small {
+  color: var(--ui-muted);
+  font-size: 0.74rem;
+}
+
 .turnaround-override-dialog.ds-modal-dialog--wide {
   width: min(1320px, calc(100vw - 32px));
 }
