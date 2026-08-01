@@ -142,7 +142,8 @@ function publicStatus(
   visibleAt: number,
 ): PublicGroup["status"] {
   if (lifecycle === "DRAFT") {
-    return visibleMilestone(rotation.precalledAt, visibleAt) ? "COME_TO_FLIGHT_LINE" : "WAITING";
+    if (visibleMilestone(rotation.precalledAt, visibleAt)) return "COME_TO_FLIGHT_LINE";
+    return rotation.precallStatus === "PREPARE" ? "PREPARE" : "WAITING";
   }
   if (lifecycle === "CALLED") return "BOARDING";
   return lifecycle;
@@ -153,14 +154,11 @@ function statusPriority(
   lifecycle: RotationLifecycle,
   visibleAt: number,
 ): number {
-  if (
-    lifecycle === "CALLED" ||
-    (lifecycle === "DRAFT" && visibleMilestone(rotation.precalledAt, visibleAt))
-  ) {
-    return 0;
-  }
-  if (lifecycle === "DRAFT") return 1;
-  return 2;
+  if (lifecycle === "CALLED") return 0;
+  if (lifecycle === "DRAFT" && visibleMilestone(rotation.precalledAt, visibleAt)) return 1;
+  if (lifecycle === "DRAFT" && rotation.precallStatus === "PREPARE") return 2;
+  if (lifecycle === "DRAFT") return 3;
+  return 4;
 }
 
 function boardWindow(input: {
@@ -235,7 +233,22 @@ export function createSimulationFidsBoard(input: {
           Date.parse(right.rotation.departedAt ?? "") - Date.parse(left.rotation.departedAt ?? "")
         );
       }
-      return left.rotation.communicationNumber - right.rotation.communicationNumber;
+      if (left.lifecycle === "DRAFT" && right.lifecycle === "DRAFT") {
+        const dispatchDifference =
+          (left.rotation.dispatchOrder ?? Number.MAX_SAFE_INTEGER) -
+          (right.rotation.dispatchOrder ?? Number.MAX_SAFE_INTEGER);
+        if (dispatchDifference !== 0) return dispatchDifference;
+        const predictionDifference =
+          Date.parse(snapshots.get(left.rotation.id)?.predictedBoardingAt ?? "") -
+          Date.parse(snapshots.get(right.rotation.id)?.predictedBoardingAt ?? "");
+        if (Number.isFinite(predictionDifference) && predictionDifference !== 0) {
+          return predictionDifference;
+        }
+      }
+      return (
+        left.rotation.communicationNumber - right.rotation.communicationNumber ||
+        left.rotation.id.localeCompare(right.rotation.id)
+      );
     })
     .slice(0, 20);
 
@@ -284,6 +297,7 @@ export function createSimulationFidsBoard(input: {
         boardingWindowLowerAt: window.lowerAt,
         boardingWindowUpperAt: window.upperAt,
         predictionQuality: window.quality,
+        dispatchOrder: rotation.dispatchOrder ?? null,
         operationalNotice:
           activeGroupPlan?.publicNote ||
           (rotationInterrupted ? "Flugbetrieb unterbrochen – bitte Status erneut prüfen." : ""),

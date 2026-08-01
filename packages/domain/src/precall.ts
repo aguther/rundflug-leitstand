@@ -31,10 +31,19 @@ export interface AutomaticPrecallInput {
   predictionQuality: PrecallQuality;
   predictedBoardingMinutes: number;
   adaptiveLeadMinutes: number;
+  prepareLeadMinutes?: number;
+  gateTravelLeadMinutes?: number;
+  dispatchPlanFresh?: boolean;
+  inNearDispatchBatch?: boolean;
+  gateCapacityCovered?: boolean;
+  waitingForProductFairness?: boolean;
+  waitingForFittingLane?: boolean;
+  commitmentLocked?: boolean;
 }
 
 export interface AutomaticPrecallDecision {
   eligible: boolean;
+  status: "WAITING" | "PREPARE" | "GO_TO_GATE";
   reason:
     | "ELIGIBLE"
     | "DISABLED"
@@ -43,12 +52,20 @@ export interface AutomaticPrecallDecision {
     | "ALREADY_PRECALLED"
     | "NO_FORECAST_CAPACITY"
     | "NO_FITTING_AIRCRAFT"
+    | "NOT_IN_NEAR_DISPATCH_BATCH"
+    | "GATE_CAPACITY_COVERED"
+    | "WAITING_FOR_PRODUCT_FAIRNESS"
+    | "WAITING_FOR_FITTING_LANE"
+    | "COMMITMENT_LOCKED"
+    | "DISPATCH_PLAN_STALE"
     | "TOO_EARLY";
 }
 
 export interface AutomaticPrecallQueueEntry extends AutomaticPrecallInput {
   id: string;
   resourceGroupId: string;
+  dispatchOrder?: number | null;
+  queueSequence?: number;
 }
 
 export interface AutomaticPrecallQueueDecision extends AutomaticPrecallDecision {
@@ -81,50 +98,90 @@ export function deriveAdaptivePrecallLeadMinutes(input: {
   );
 }
 
-export function decideAutomaticPrecall(input: AutomaticPrecallInput): AutomaticPrecallDecision {
-  if (!input.enabled || !input.resourceGroupEnabled) return { eligible: false, reason: "DISABLED" };
-  if (!input.eventActive || !input.operationsAvailable || !input.resourceGroupActive) {
-    return { eligible: false, reason: "OPERATIONS_BLOCKED" };
+export function normalizePrecallObservation(input: {
+  observedGoToGateToBoardingMinutes: number;
+  gateTravelLeadMinutesUsed: number;
+}): number {
+  if (
+    !Number.isFinite(input.observedGoToGateToBoardingMinutes) ||
+    !Number.isFinite(input.gateTravelLeadMinutesUsed)
+  ) {
+    throw new Error("Precall observation is invalid.");
   }
-  if (input.alreadyPrecalled) return { eligible: false, reason: "ALREADY_PRECALLED" };
+  return Math.max(
+    0,
+    input.observedGoToGateToBoardingMinutes - Math.max(0, input.gateTravelLeadMinutesUsed),
+  );
+}
+
+export function decideAutomaticPrecall(input: AutomaticPrecallInput): AutomaticPrecallDecision {
+  if (!input.enabled || !input.resourceGroupEnabled) {
+    return { eligible: false, status: "WAITING", reason: "DISABLED" };
+  }
+  if (!input.eventActive || !input.operationsAvailable || !input.resourceGroupActive) {
+    return { eligible: false, status: "WAITING", reason: "OPERATIONS_BLOCKED" };
+  }
+  if (input.dispatchPlanFresh === false) {
+    return { eligible: false, status: "WAITING", reason: "DISPATCH_PLAN_STALE" };
+  }
+  if (input.alreadyPrecalled) {
+    return { eligible: false, status: "GO_TO_GATE", reason: "ALREADY_PRECALLED" };
+  }
   if (input.forecastCapacityStatus === "NO_FORECAST_CAPACITY") {
-    return { eligible: false, reason: "NO_FORECAST_CAPACITY" };
+    return { eligible: false, status: "WAITING", reason: "NO_FORECAST_CAPACITY" };
   }
   if (input.forecastCapacityStatus === "NO_FITTING_AIRCRAFT") {
-    return { eligible: false, reason: "NO_FITTING_AIRCRAFT" };
+    return { eligible: false, status: "WAITING", reason: "NO_FITTING_AIRCRAFT" };
   }
-  if (input.predictedBoardingMinutes > input.adaptiveLeadMinutes) {
-    return { eligible: false, reason: "TOO_EARLY" };
+  if (input.waitingForFittingLane) {
+    return { eligible: false, status: "WAITING", reason: "WAITING_FOR_FITTING_LANE" };
   }
-  return { eligible: true, reason: "ELIGIBLE" };
+  if (input.waitingForProductFairness) {
+    return { eligible: false, status: "WAITING", reason: "WAITING_FOR_PRODUCT_FAIRNESS" };
+  }
+  if (input.commitmentLocked) {
+    return { eligible: false, status: "PREPARE", reason: "COMMITMENT_LOCKED" };
+  }
+  if (input.inNearDispatchBatch === false) {
+    return { eligible: false, status: "WAITING", reason: "NOT_IN_NEAR_DISPATCH_BATCH" };
+  }
+  if (input.gateCapacityCovered) {
+    return { eligible: false, status: "WAITING", reason: "GATE_CAPACITY_COVERED" };
+  }
+  const gateTravelLeadMinutes = Math.max(0, input.gateTravelLeadMinutes ?? 0);
+  const effectiveGoToGateLead = input.adaptiveLeadMinutes + gateTravelLeadMinutes;
+  if (input.predictedBoardingMinutes <= effectiveGoToGateLead) {
+    return { eligible: true, status: "GO_TO_GATE", reason: "ELIGIBLE" };
+  }
+  const effectivePrepareLead =
+    (input.prepareLeadMinutes ?? input.adaptiveLeadMinutes) + gateTravelLeadMinutes;
+  if (input.predictedBoardingMinutes <= effectivePrepareLead) {
+    return { eligible: false, status: "PREPARE", reason: "TOO_EARLY" };
+  }
+  return { eligible: false, status: "WAITING", reason: "TOO_EARLY" };
 }
 
 /**
- * Evaluates queue entries in their caller-provided stable order. A resource group's first
- * ineligible, not-yet-precalled entry closes that queue prefix for the current forecast run.
- * Already-precalled entries keep their place without blocking eligible followers.
+ * Evaluates entries in deterministic dispatch order. An entry that is not selected for an early
+ * batch does not block later queue entries which the dispatch plan needs for a complete batch.
  */
 export function selectAutomaticPrecalls(
   entries: readonly AutomaticPrecallQueueEntry[],
 ): AutomaticPrecallQueueDecision[] {
-  const blockedResourceGroups = new Set<string>();
-  return entries.map((entry) => {
-    if (blockedResourceGroups.has(entry.resourceGroupId)) {
-      return {
-        id: entry.id,
-        resourceGroupId: entry.resourceGroupId,
-        eligible: false,
-        reason: "NOT_QUEUE_FRONT",
-      };
-    }
-    const decision = decideAutomaticPrecall(entry);
-    if (!decision.eligible && decision.reason !== "ALREADY_PRECALLED") {
-      blockedResourceGroups.add(entry.resourceGroupId);
-    }
-    return {
+  return entries
+    .map((entry, inputOrder) => ({ entry, inputOrder }))
+    .sort(
+      (left, right) =>
+        (left.entry.dispatchOrder ?? Number.MAX_SAFE_INTEGER) -
+          (right.entry.dispatchOrder ?? Number.MAX_SAFE_INTEGER) ||
+        (left.entry.queueSequence ?? Number.MAX_SAFE_INTEGER) -
+          (right.entry.queueSequence ?? Number.MAX_SAFE_INTEGER) ||
+        left.inputOrder - right.inputOrder ||
+        left.entry.id.localeCompare(right.entry.id),
+    )
+    .map(({ entry }) => ({
       id: entry.id,
       resourceGroupId: entry.resourceGroupId,
-      ...decision,
-    };
-  });
+      ...decideAutomaticPrecall(entry),
+    }));
 }

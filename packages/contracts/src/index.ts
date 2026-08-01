@@ -363,6 +363,13 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
       ticketGroupIds: z.array(z.string().min(1).max(100)).min(1).max(12),
       aircraftId: z.string().min(1).max(100),
       pilotId: z.string().min(1).max(100),
+      dispatchRecommendation: z
+        .object({
+          planRevision: z.string().min(1).max(100),
+          batchId: z.string().min(1).max(100),
+        })
+        .strict()
+        .optional(),
       queueDeviationReason: z.string().trim().min(3).max(240).optional(),
     }),
   }),
@@ -695,6 +702,7 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
       gateType: z.enum(["FLIGHT_LINE", "BOARDING", "DISPLAY_ONLY"]),
       active: z.boolean(),
       sortOrder: z.number().int().min(0).max(1000),
+      travelLeadMinutes: z.number().int().min(0).max(30).default(0),
       displayFilter: gateDisplayFilterSchema.optional(),
       reason: z.string().trim().min(3).max(240),
       adminPin: z.string().min(4).max(32),
@@ -1233,6 +1241,7 @@ const masterDataTemplateGateSchema = z
     gateType: z.enum(["FLIGHT_LINE", "BOARDING", "DISPLAY_ONLY"]),
     active: z.boolean(),
     sortOrder: z.number().int().min(0).max(1000),
+    travelLeadMinutes: z.number().int().min(0).max(30).default(0),
     displayFilter: z
       .object({
         productKeys: z.array(masterDataTemplateKeySchema).max(100),
@@ -1864,6 +1873,7 @@ const simulationScenarioOperationalModelSchema = z
           .object({
             id: masterDataTemplateKeySchema,
             label: z.string().trim().min(2).max(80),
+            travelLeadMinutes: z.number().int().min(0).max(30).default(0),
           })
           .strict(),
       )
@@ -2525,15 +2535,64 @@ export const rotationOperationalSummarySchema = z.object({
         "ALREADY_PRECALLED",
         "NO_FORECAST_CAPACITY",
         "NO_FITTING_AIRCRAFT",
+        "NOT_IN_NEAR_DISPATCH_BATCH",
+        "GATE_CAPACITY_COVERED",
+        "WAITING_FOR_PRODUCT_FAIRNESS",
+        "WAITING_FOR_FITTING_LANE",
+        "COMMITMENT_LOCKED",
+        "DISPATCH_PLAN_STALE",
         "TOO_EARLY",
       ]),
       decidedAt: z.string(),
       predictedBoardingAt: z.string().nullable(),
       adaptiveLeadMinutes: z.number().int().nonnegative().nullable(),
+      gateId: z.string().nullable().default(null),
+      adaptiveBaseLeadMinutes: z.number().int().nonnegative().nullable().default(null),
+      gateTravelLeadMinutes: z.number().int().min(0).max(30).nullable().default(null),
+      effectiveLeadMinutes: z.number().int().nonnegative().nullable().default(null),
+      boardingWindowLowerAt: z.string().nullable().default(null),
+      boardingWindowUpperAt: z.string().nullable().default(null),
     })
     .nullable()
     .optional(),
   calledAt: z.string().nullable(),
+  dispatchPlan: z
+    .object({
+      planId: z.string(),
+      revision: z.string(),
+      batchId: z.string().nullable(),
+      dispatchOrder: z.number().int().positive().nullable(),
+      wave: z.number().int().positive().nullable(),
+      laneId: z.string().nullable(),
+      groupIds: z.array(z.string()),
+      occupiedSeats: z.number().int().positive().nullable(),
+      availableSeats: z.number().int().nonnegative().nullable(),
+      commitmentLevel: z.enum(["WAITING", "PREPARE", "COME_TO_FLIGHT_LINE"]).nullable(),
+      decisionReasons: z.array(
+        z.enum([
+          "HARD_COMMITMENT",
+          "MUST_SERVE_MAX_WAIT",
+          "MUST_SERVE_MAX_OVERTAKES",
+          "PRODUCT_FAIRNESS",
+          "CAPACITY_OPTIMIZED",
+          "QUEUE_ORDER",
+          "PLAN_STABILITY",
+          "STANDBY_PRIORITY",
+        ]),
+      ),
+      projectedOvertakeCount: z.number().int().nonnegative(),
+      unplannedReason: z
+        .enum([
+          "NO_FORECAST_CAPACITY",
+          "WAITING_FOR_FITTING_LANE",
+          "WAITING_FOR_PRODUCT_FAIRNESS",
+          "NOT_IN_NEAR_DISPATCH_BATCH",
+          "COMMITMENT_LOCKED",
+        ])
+        .nullable(),
+    })
+    .nullable()
+    .optional(),
   deferralCount: z.number().int().nonnegative(),
   operationalNote: z.string(),
   timeline: z.object({
@@ -2737,6 +2796,7 @@ export const operationBoardSchema = z.object({
       gateType: z.enum(["FLIGHT_LINE", "BOARDING", "DISPLAY_ONLY"]),
       active: z.boolean(),
       sortOrder: z.number().int().nonnegative(),
+      travelLeadMinutes: z.number().int().min(0).max(30),
       displayFilter: gateDisplayFilterSchema,
       assignedResourceGroupIds: z.array(z.string()),
     }),
@@ -2874,6 +2934,7 @@ export const publicBoardSchema = z.object({
         waitUpperMinutes: z.number().int().nonnegative(),
         boardingWindowLowerAt: z.iso.datetime().nullable(),
         boardingWindowUpperAt: z.iso.datetime().nullable(),
+        dispatchOrder: z.number().int().positive().nullable().default(null),
         predictionQuality: z.enum(["STABLE", "CHANGING", "UNCERTAIN"]),
         operationalNotice: z.string(),
         activeRecall: ticketGroupRecallProjectionSchema.nullable(),
@@ -3093,6 +3154,45 @@ export const forecastHistoryEntrySchema = z.object({
     deboardingSource: z.string(),
     bufferSource: z.string(),
   }),
+  dispatchPlan: z
+    .object({
+      planId: z.string().nullable(),
+      revision: z.string().nullable(),
+      batchId: z.string().nullable(),
+      dispatchOrder: z.number().int().positive().nullable(),
+      wave: z.number().int().positive().nullable(),
+      laneId: z.string().nullable(),
+      groupIds: z.array(z.string()),
+      occupiedSeats: z.number().int().positive().nullable(),
+      availableSeats: z.number().int().nonnegative().nullable(),
+      commitmentLevel: z.enum(["WAITING", "PREPARE", "COME_TO_FLIGHT_LINE"]).nullable(),
+      decisionReasons: z.array(z.string()),
+      projectedOvertakeCount: z.number().int().nonnegative(),
+      unplannedReason: z
+        .enum([
+          "NO_FORECAST_CAPACITY",
+          "WAITING_FOR_FITTING_LANE",
+          "WAITING_FOR_PRODUCT_FAIRNESS",
+          "NOT_IN_NEAR_DISPATCH_BATCH",
+          "COMMITMENT_LOCKED",
+        ])
+        .nullable(),
+    })
+    .default({
+      planId: null,
+      revision: null,
+      batchId: null,
+      dispatchOrder: null,
+      wave: null,
+      laneId: null,
+      groupIds: [],
+      occupiedSeats: null,
+      availableSeats: null,
+      commitmentLevel: null,
+      decisionReasons: [],
+      projectedOvertakeCount: 0,
+      unplannedReason: null,
+    }),
   predicted: z.object({
     boardingAt: nullableTimestampSchema,
     departureAt: nullableTimestampSchema,

@@ -17,8 +17,8 @@ UPDATE operation_days SET operations_end_at = '2026-07-11T19:00:00.000Z'
  WHERE id = 'demo-2026' AND operations_end_at IS NULL;
 
 INSERT OR IGNORE INTO gates
-  (id, operation_day_id, label, gate_type, active, sort_order, created_at, updated_at)
-VALUES ('demo-2026-gate-main', 'demo-2026', 'Flight Line 1', 'FLIGHT_LINE', 1, 10,
+  (id, operation_day_id, label, gate_type, active, sort_order, travel_lead_minutes, created_at, updated_at)
+VALUES ('demo-2026-gate-main', 'demo-2026', 'Flight Line 1', 'FLIGHT_LINE', 1, 10, 0,
         '2026-07-11T08:00:00.000Z', '2026-07-11T08:00:00.000Z');
 
 INSERT OR IGNORE INTO paired_devices (

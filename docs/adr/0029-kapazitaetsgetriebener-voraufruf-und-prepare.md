@@ -6,6 +6,8 @@
 - Entscheidung: Auftraggeber
 - Betroffene Anforderungen: F-FLT-090, F-PRG-020, F-PRG-030, F-BEN-030, F-BEN-090,
   F-BEN-100, Q-UX-020 und Q-ZUV-020
+- Teilweise ersetzt: Die Queue-Präfix- und Nicht-Überholen-Entscheidung wird durch
+  [ADR-0032](0032-durchsatz-und-fairnessorientierte-dispatch-planung.md) ersetzt.
 
 ## Kontext
 

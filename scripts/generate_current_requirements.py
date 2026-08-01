@@ -113,6 +113,13 @@ RELEASE_REQUIREMENTS = [
 
 # Release-scoped clarifications leave the immutable V1.4 source files unchanged.
 CURRENT_BASE_REQUIREMENT_OVERRIDES = {
+    "F-PRG-020": (
+        "Nach jedem relevanten Ereignis und während des aktiven Betriebs zusätzlich mindestens "
+        "alle 30 Sekunden werden erwartetes Boarding, Start, Landung, Abschluss, verbleibende "
+        "Wartezeit und alle abhängigen Folgeflüge automatisch neu berechnet. Ein reiner "
+        "deterministischer und begrenzter Dispatch-Plan plant dabei mehrere Bahnen und nahe "
+        "Batches gemeinsam; Produktion und Simulator verwenden dieselbe Domainlogik."
+    ),
     "F-RES-010": (
         "Jedes buchbare Produkt verwendet genau eine Ressourcengruppe. Die operative "
         "Produkt-Planzeit wird ausschließlich als Referenzzeit Offblock–Onblock am Produkt "
@@ -135,9 +142,37 @@ CURRENT_BASE_REQUIREMENT_OVERRIDES = {
     "F-PRG-030": (
         "Die Prognose berücksichtigt mindestens Referenzzeit Offblock–Onblock des Produkts, "
         "Flugzeugprofil, veranstaltungsweite Boarding-, Ausstiegs- und Pufferzeiten, aktuelle "
-        "Flugzeugzustände, Pausen, Tanken, Unterbrechungen und Queue-Reihenfolge. Die "
-        "Referenz-Umlaufzeit wird als Summe dieser vier Zeitanteile abgeleitet und nicht separat "
-        "gespeichert."
+        "Flugzeugzustände, Pausen, Tanken, Unterbrechungen, vollständige Gruppen, Sitzkapazität, "
+        "Produktfairness, Wartealter, begrenzte Überholungen und Planstabilität. Pro "
+        "produktreinem Batch wird genau eine Bahn reserviert; alle Mitglieder erhalten dasselbe "
+        "Boardingfenster. Die Referenz-Umlaufzeit wird als Summe der vier Zeitanteile abgeleitet "
+        "und nicht separat gespeichert."
+    ),
+    "F-BEN-030": (
+        "Das System prüft während des aktiven Betriebs regelmäßig und nach relevanten Ereignissen "
+        "den frischen Dispatch-Plan, reale Flugzeugverfügbarkeit und Anwesenheitslage und löst für "
+        "nahe Batches automatisch Bereithalten oder Bitte zum Gate aus. Ein Gate-Wegvorlauf von "
+        "0 bis 30 Minuten wird zum adaptiven Basisvorlauf addiert, verändert aber nicht das "
+        "Boardingfenster und wird für das Lernen aus der Beobachtung herausgerechnet. Nicht "
+        "passende Vordergruppen oder unabhängige Ressourcengruppen am selben Gate blockieren den "
+        "Aufruf nicht. Die konkrete Flugzeugbelegung und der Boardingstart bleiben getrennt und "
+        "werden erst menschlich bestätigt."
+    ),
+    "F-BEN-090": (
+        "Öffentliche Statusbezeichnungen sind auf wenige handlungsorientierte Zustände zu "
+        "reduzieren: Warten, Bereithalten, Bitte zum Gate, Boarding, Abgeflogen beziehungsweise "
+        "Flug läuft, Verzögert, Gelandet und Abgeschlossen. Das Terminalprofil bildet diese auf "
+        "WAITING, PREPARE, GO TO GATE, BOARDING, DEPARTED und DELAYED ab. FIDS priorisiert "
+        "Boarding, Bitte zum Gate, Bereithalten und Warten; innerhalb eines Zustands gelten "
+        "Dispatch-Plan, Prognose, Queue und stabile ID."
+    ),
+    "Q-ZUV-020": (
+        "Verbindungsaussetzer und vorübergehende Server- oder D1-Fehler werden ohne Leeren der "
+        "Oberfläche überbrückt. Der letzte bestätigte Stand bleibt mit Alter und "
+        "Verbindungsstatus sichtbar; unbestätigte Schreibaktionen bleiben gesperrt und werden "
+        "nicht als operative Änderungen gezählt. Dispatch-Bestätigungen übermitteln "
+        "Planrevision und Batch-ID; veraltete Empfehlungen und stale writes werden abgewiesen "
+        "und niemals still überschrieben."
     ),
     "D-015": (
         "Ressourcengruppe: Bezeichnung, Status, zugehörige Produkte, Gates, aktive "
@@ -198,6 +233,41 @@ CURRENT_DELTA_REQUIREMENT_OVERRIDES = {
         "tests": (
             "Vollständiger Check, Worker-Runtime-, Public-Monitors- und Browserabnahme"
         ),
+    },
+}
+
+CURRENT_BASE_STATUS_OVERRIDES = {
+    "F-PRG-020": "umgesetzt",
+    "F-BEN-030": "umgesetzt",
+}
+
+CURRENT_BASE_TRACE_OVERRIDES = {
+    "F-PRG-020": {
+        "Kurzbeschreibung": "Ereignisbasierte Neuberechnung mit gemeinsamem deterministischem Dispatch-Plan für Produktion und Simulator.",
+        "Modul": "BP-06",
+        "Tests": "ADR-0032 + packages/domain/src/dispatch-plan.ts + packages/domain/src/forecast.ts + apps/worker/src/event-coordinator.ts + Simulator",
+        "Status": "umgesetzt",
+    },
+    "F-PRG-030": {
+        "Kurzbeschreibung": "Produktreine kapazitätskonforme Batches reservieren je eine Bahn und projizieren für alle Mitglieder dasselbe Boardingfenster.",
+        "Modul": "BP-06",
+        "Tests": "ADR-0032 + Dispatch-/Forecast-Domaintests A bis K + Worker- und Simulatorregression",
+    },
+    "F-BEN-030": {
+        "Kurzbeschreibung": "Dispatch-basierter Vorabruf mit sitzbezogenen nahen Batches und zusätzlichem Gate-Wegvorlauf ohne Verschiebung des Boardingfensters.",
+        "Modul": "BP-07",
+        "Tests": "ADR-0032 + packages/domain/src/precall.ts + Migration 0060 + Gate-Import/Export/Backup + Simulator- und Browsertests",
+        "Status": "umgesetzt",
+    },
+    "F-BEN-090": {
+        "Kurzbeschreibung": "Handlungsorientierte öffentliche Zustände mit stabiler FIDS-Priorität nach Dispatch-Plan und Prognose.",
+        "Modul": "BP-07",
+        "Tests": "ADR-0029/0032 + PREPARE/BEREITHALTEN + Worker-FIDS-Prioritätstest + Simulation-FIDS + Browser Hell/Dunkel",
+    },
+    "Q-ZUV-020": {
+        "Kurzbeschreibung": "Verbindungs-, Server- und D1-Fehler leeren die Oberfläche nicht; Dispatch-Bestätigungen mit veralteter Revision oder Batch-ID werden abgewiesen.",
+        "Modul": "BP-09",
+        "Tests": "Integration D1-Fehler/Offline-Replay/Konflikte + DISPATCH_PLAN_STALE + E2E Ausfall/Wiederverbindung",
     },
 }
 
@@ -319,7 +389,7 @@ def current_requirements() -> list[dict[str, object]]:
             ),
             "priority": item["priority"],
             "stage": item["stage"],
-            "status": base_trace_status[item["id"]],
+            "status": CURRENT_BASE_STATUS_OVERRIDES.get(item["id"], base_trace_status[item["id"]]),
         }
         for item in base
     ]
@@ -470,6 +540,7 @@ def render_traceability() -> str:
     for row in rows:
         for field in ("Kurzbeschreibung", "Modul", "Tests"):
             row[field] = current_terms(row[field])
+        row.update(CURRENT_BASE_TRACE_OVERRIDES.get(row["ID"], {}))
     for path in DELTA_SOURCES:
         payload = json.loads(path.read_text(encoding="utf-8"))
         for item in payload["requirements"]:

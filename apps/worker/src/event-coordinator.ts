@@ -31,10 +31,13 @@ import {
   assertTechnicalRotationAbortAllowed,
   assertTicketNoShowAllowed,
   calculateForecastTimelines,
+  DEFAULT_DISPATCH_PLANNING_LIMITS,
   type DeviceRole,
+  type DispatchPlan,
   DomainRuleError,
   deriveAdaptivePrecallLeadMinutes,
   formatBookingGroupLabel,
+  normalizePrecallObservation,
   type OperationalCommandType,
   planBookingGroupSplit,
   planRotationCapacityReduction,
@@ -1928,15 +1931,45 @@ export class EventCoordinator extends DurableObject<Env> {
         `SELECT r.id, r.status, r.created_at, r.called_at, r.departed_at, r.landed_at,
                 r.aircraft_id, r.pilot_id,
                 r.completed_at, fg.id AS flight_group_id, fg.version AS flight_group_version,
-                fg.precalled_at, fg.resource_group_id, rg.status AS resource_group_status,
+                fg.precalled_at, fg.precall_decision_status, fg.resource_group_id,
+                rg.status AS resource_group_status,
                 rg.automatic_precall_enabled AS resource_group_precall_enabled,
                 p.id AS product_id,
                 COALESCE(MIN(tg.queue_sequence), 1) AS queue_sequence,
+                COALESCE((SELECT json_group_array(group_ids.id) FROM (
+                  SELECT DISTINCT member_group.id
+                    FROM rotation_tickets member_assignment
+                    JOIN tickets member_ticket ON member_ticket.id = member_assignment.ticket_id
+                    JOIN ticket_groups member_group ON member_group.id = member_ticket.ticket_group_id
+                   WHERE member_assignment.rotation_id = r.id
+                     AND member_assignment.released_at IS NULL
+                   ORDER BY member_group.queue_sequence, member_group.id
+                ) group_ids), '[]') AS current_group_ids_json,
+                MIN(tg.sold_at) AS sold_at,
+                MAX(COALESCE(tg.standby, 0)) AS standby,
+                CASE
+                  WHEN MAX(CASE WHEN tg.status = 'MISSING' THEN 1 ELSE 0 END) = 1 THEN 'MISSING'
+                  WHEN MAX(CASE WHEN tg.status = 'CLARIFICATION' THEN 1 ELSE 0 END) = 1
+                    THEN 'CLARIFICATION'
+                  WHEN COUNT(DISTINCT rt.ticket_id) > 0
+                    AND SUM(CASE WHEN t.attendance_status = 'CHECKED_IN' THEN 1 ELSE 0 END)
+                      = COUNT(DISTINCT rt.ticket_id) THEN 'PRESENT'
+                  ELSE 'WAITING'
+                END AS attendance_status,
                 COUNT(DISTINCT rt.ticket_id) AS ticket_count,
                 COALESCE(p.reference_duration_minutes, 20) AS reference_duration_minutes,
                 COALESCE(p.code, '') AS product_code, a.aircraft_type,
                 COALESCE(r.gate_id, p.gate_id) AS gate_id,
+                COALESCE(g.travel_lead_minutes, 0) AS gate_travel_lead_minutes,
                 r.predicted_departure_at, r.predicted_landing_at, r.predicted_completion_at,
+                r.predicted_boarding_at, r.prediction_lower_minutes, r.prediction_upper_minutes,
+                r.forecast_assumed_aircraft_id,
+                r.dispatch_plan_id, r.dispatch_plan_revision, r.dispatch_batch_id,
+                r.dispatch_order, r.dispatch_wave, r.dispatch_lane_id,
+                r.dispatch_group_ids_json, r.dispatch_occupied_seats,
+                r.dispatch_available_seats, r.dispatch_commitment_level,
+                r.dispatch_decision_reasons_json, r.dispatch_projected_overtake_count,
+                r.dispatch_unplanned_reason,
                 r.turnaround_boarding_minutes, r.turnaround_deboarding_minutes,
                 r.turnaround_buffer_minutes, r.turnaround_boarding_source,
                 r.turnaround_deboarding_source, r.turnaround_buffer_source
@@ -1948,6 +1981,7 @@ export class EventCoordinator extends DurableObject<Env> {
            LEFT JOIN ticket_groups tg ON tg.id = t.ticket_group_id
            LEFT JOIN products p ON p.id = fg.product_id
            LEFT JOIN aircraft a ON a.id = r.aircraft_id
+           LEFT JOIN gates g ON g.id = COALESCE(r.gate_id, p.gate_id)
           WHERE r.operation_day_id = ?1 AND r.status NOT IN ('COMPLETED', 'CANCELED')
           GROUP BY r.id
           ORDER BY CASE WHEN r.status = 'DRAFT' THEN 1 ELSE 0 END,
@@ -1967,25 +2001,54 @@ export class EventCoordinator extends DurableObject<Env> {
           flight_group_id: string;
           flight_group_version: number;
           precalled_at: string | null;
+          precall_decision_status: "WAITING" | "PREPARE" | "GO_TO_GATE" | null;
           resource_group_id: string;
           resource_group_status: "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED";
           resource_group_precall_enabled: number;
           product_id: string | null;
           queue_sequence: number;
+          current_group_ids_json: string;
+          sold_at: string | null;
+          standby: number;
+          attendance_status: "WAITING" | "PRESENT" | "MISSING" | "CLARIFICATION";
           ticket_count: number;
           reference_duration_minutes: number;
           product_code: string;
           aircraft_type: string | null;
           gate_id: string | null;
+          gate_travel_lead_minutes: number;
+          predicted_boarding_at: string | null;
+          prediction_lower_minutes: number | null;
+          prediction_upper_minutes: number | null;
           predicted_departure_at: string | null;
           predicted_landing_at: string | null;
           predicted_completion_at: string | null;
+          forecast_assumed_aircraft_id: string | null;
           turnaround_boarding_minutes: number | null;
           turnaround_deboarding_minutes: number | null;
           turnaround_buffer_minutes: number | null;
           turnaround_boarding_source: string | null;
           turnaround_deboarding_source: string | null;
           turnaround_buffer_source: string | null;
+          dispatch_plan_id: string | null;
+          dispatch_plan_revision: string | null;
+          dispatch_batch_id: string | null;
+          dispatch_order: number | null;
+          dispatch_wave: number | null;
+          dispatch_lane_id: string | null;
+          dispatch_group_ids_json: string;
+          dispatch_occupied_seats: number | null;
+          dispatch_available_seats: number | null;
+          dispatch_commitment_level: "WAITING" | "PREPARE" | "COME_TO_FLIGHT_LINE" | null;
+          dispatch_decision_reasons_json: string;
+          dispatch_projected_overtake_count: number;
+          dispatch_unplanned_reason:
+            | "NO_FORECAST_CAPACITY"
+            | "WAITING_FOR_FITTING_LANE"
+            | "WAITING_FOR_PRODUCT_FAIRNESS"
+            | "NOT_IN_NEAR_DISPATCH_BATCH"
+            | "COMMITMENT_LOCKED"
+            | null;
         }>(),
       this.env.DB.prepare(
         `SELECT (julianday(r.completed_at) - julianday(r.called_at)) * 1440.0 AS minutes,
@@ -2126,7 +2189,8 @@ export class EventCoordinator extends DurableObject<Env> {
           predicted_completion_at: string | null;
         }>(),
       this.env.DB.prepare(
-        `SELECT (julianday(r.called_at) - julianday(fg.precalled_at)) * 1440.0 AS minutes
+        `SELECT (julianday(r.called_at) - julianday(fg.precalled_at)) * 1440.0 AS minutes,
+                COALESCE(fg.precall_gate_travel_lead_minutes, 0) AS gate_travel_lead_minutes
            FROM rotations r
            JOIN flight_groups fg ON fg.id = r.flight_group_id
           WHERE r.called_at IS NOT NULL AND fg.precalled_at IS NOT NULL
@@ -2142,7 +2206,7 @@ export class EventCoordinator extends DurableObject<Env> {
           ORDER BY r.called_at DESC LIMIT 20`,
       )
         .bind(eventId)
-        .all<{ minutes: number }>(),
+        .all<{ minutes: number; gate_travel_lead_minutes: number }>(),
       this.env.DB.prepare(
         `SELECT plan.id, plan.scope_type, plan.scope_id, plan.effect_mode,
                   plan.duration_multiplier_percent, plan.status, plan.activated_at,
@@ -2431,6 +2495,7 @@ export class EventCoordinator extends DurableObject<Env> {
           return {
             laneId: `${aircraft.aircraftId}:${pilot.pilotId}`,
             aircraftId: aircraft.aircraftId,
+            pilotId: pilot.pilotId,
             passengerSeats: aircraft.passengerSeats,
             availableLowerAt: lowerAt,
             availableExpectedAt: expectedAt,
@@ -2468,8 +2533,113 @@ export class EventCoordinator extends DurableObject<Env> {
       };
     });
     const adaptiveLeadMinutes = deriveAdaptivePrecallLeadMinutes({
-      observedGateWaitMinutes: [...gateWaitRows.results].reverse().map((row) => row.minutes),
+      observedGateWaitMinutes: [...gateWaitRows.results].reverse().map((row) =>
+        normalizePrecallObservation({
+          observedGoToGateToBoardingMinutes: row.minutes,
+          gateTravelLeadMinutesUsed: row.gate_travel_lead_minutes,
+        }),
+      ),
     });
+    const productServiceDeficits = new Map<string, number>();
+    for (const rotation of rotationRows.results.filter((entry) => entry.status === "DRAFT")) {
+      if (!rotation.product_id) continue;
+      const waitingMinutes = Math.max(
+        0,
+        (now.getTime() - Date.parse(rotation.sold_at ?? rotation.created_at)) / 60_000,
+      );
+      const deficit =
+        (waitingMinutes * Math.max(1, rotation.ticket_count)) /
+        Math.max(1, rotation.reference_duration_minutes);
+      productServiceDeficits.set(
+        rotation.product_id,
+        (productServiceDeficits.get(rotation.product_id) ?? 0) + deficit,
+      );
+    }
+    const previousRevision = rotationRows.results.find(
+      (rotation) => rotation.status === "DRAFT" && rotation.dispatch_plan_revision !== null,
+    )?.dispatch_plan_revision;
+    const previousRows = previousRevision
+      ? rotationRows.results.filter(
+          (rotation) =>
+            rotation.status === "DRAFT" && rotation.dispatch_plan_revision === previousRevision,
+        )
+      : [];
+    const previousBatchIds = [
+      ...new Set(
+        previousRows.flatMap((rotation) =>
+          rotation.dispatch_batch_id ? [rotation.dispatch_batch_id] : [],
+        ),
+      ),
+    ];
+    const previousDispatchPlan: DispatchPlan | null =
+      previousRows.length > 0 && previousBatchIds.length > 0
+        ? {
+            planId: previousRows[0]?.dispatch_plan_id ?? `legacy-${previousRevision}`,
+            revision: previousRevision ?? "",
+            batches: previousBatchIds.map((batchId) => {
+              const members = previousRows.filter(
+                (rotation) => rotation.dispatch_batch_id === batchId,
+              );
+              const first = members[0];
+              if (!first) throw new Error(`Stored dispatch batch ${batchId} has no members.`);
+              const expectedBoardingAt = first.predicted_boarding_at ?? nowIso;
+              const lowerAt =
+                first.prediction_lower_minutes === null
+                  ? expectedBoardingAt
+                  : new Date(now.getTime() + first.prediction_lower_minutes * 60_000).toISOString();
+              const upperAt =
+                first.prediction_upper_minutes === null
+                  ? expectedBoardingAt
+                  : new Date(now.getTime() + first.prediction_upper_minutes * 60_000).toISOString();
+              return {
+                id: batchId,
+                resourceGroupId: first.resource_group_id,
+                productId: first.product_id ?? `legacy-product:${first.id}`,
+                gateId: first.gate_id ?? `legacy-gate:${first.resource_group_id}`,
+                laneId: first.dispatch_lane_id ?? "legacy-lane",
+                assumedAircraftId:
+                  first.forecast_assumed_aircraft_id ?? first.aircraft_id ?? "legacy-aircraft",
+                assumedPilotId: first.dispatch_lane_id?.split(":")[1] ?? null,
+                memberIds: members.map((member) => member.id),
+                groupIds: JSON.parse(first.dispatch_group_ids_json) as string[],
+                occupiedSeats: first.dispatch_occupied_seats ?? first.ticket_count,
+                availableSeats: first.dispatch_available_seats ?? 0,
+                dispatchOrder: first.dispatch_order ?? 1,
+                wave: first.dispatch_wave ?? 1,
+                boardingWindowLowerAt: lowerAt,
+                boardingWindowExpectedAt: expectedBoardingAt,
+                boardingWindowUpperAt: upperAt,
+                predictedCompletionAt: first.predicted_completion_at ?? expectedBoardingAt,
+                commitmentLevel: first.dispatch_commitment_level ?? "WAITING",
+                decisionReasons: JSON.parse(
+                  first.dispatch_decision_reasons_json,
+                ) as DispatchPlan["batches"][number]["decisionReasons"],
+              };
+            }),
+            groupDecisions: previousRows.flatMap((rotation) =>
+              rotation.dispatch_batch_id && rotation.dispatch_lane_id && rotation.dispatch_order
+                ? [
+                    {
+                      memberId: rotation.id,
+                      batchId: rotation.dispatch_batch_id,
+                      laneId: rotation.dispatch_lane_id,
+                      dispatchOrder: rotation.dispatch_order,
+                      projectedOvertakeCount: rotation.dispatch_projected_overtake_count,
+                      decisionReasons: JSON.parse(
+                        rotation.dispatch_decision_reasons_json,
+                      ) as DispatchPlan["groupDecisions"][number]["decisionReasons"],
+                    },
+                  ]
+                : [],
+            ),
+            unplannedGroups: previousRows.flatMap((rotation) =>
+              rotation.dispatch_unplanned_reason
+                ? [{ memberId: rotation.id, reason: rotation.dispatch_unplanned_reason }]
+                : [],
+            ),
+            limits: { ...DEFAULT_DISPATCH_PLANNING_LIMITS },
+          }
+        : null;
     const projections = calculateForecastTimelines({
       event: {
         eventId,
@@ -2483,6 +2653,7 @@ export class EventCoordinator extends DurableObject<Env> {
         plannedBufferMinutes: event.planned_buffer_minutes,
       },
       capacities: forecastCapacities,
+      previousDispatchPlan,
       durationSamples: durationRows.results.map((row) => ({
         minutes: row.minutes,
         completedAt: row.completed_at,
@@ -2549,6 +2720,22 @@ export class EventCoordinator extends DurableObject<Env> {
           pilotId: rotation.pilot_id,
           resourceGroupStatus: rotation.resource_group_status,
           queueSequence: rotation.queue_sequence,
+          dispatchGroupIds: JSON.parse(rotation.current_group_ids_json) as string[],
+          productId: rotation.product_id ?? `legacy-product:${rotation.id}`,
+          gateId: rotation.gate_id ?? `legacy-gate:${rotation.resource_group_id}`,
+          soldAt: rotation.sold_at ?? rotation.created_at,
+          attendanceStatus: rotation.attendance_status,
+          standby: rotation.standby === 1,
+          publicStatus:
+            rotation.precall_decision_status === "GO_TO_GATE"
+              ? "COME_TO_FLIGHT_LINE"
+              : rotation.precall_decision_status === "PREPARE"
+                ? "PREPARE"
+                : "WAITING",
+          priorOvertakeCount: rotation.dispatch_projected_overtake_count,
+          productServiceDeficit: rotation.product_id
+            ? (productServiceDeficits.get(rotation.product_id) ?? 0)
+            : 0,
           passengerCount: rotation.ticket_count,
           referenceDurationMinutes: rotation.reference_duration_minutes,
           productCode: rotation.product_code,
@@ -2584,6 +2771,12 @@ export class EventCoordinator extends DurableObject<Env> {
         predictionUpperMinutes: number;
         predictionQuality: "STABLE" | "CHANGING" | "UNCERTAIN";
         adaptiveLeadMinutes: number;
+        gateTravelLeadMinutes: number;
+        effectiveLeadMinutes: number;
+        boardingWindowLowerAt: string | null;
+        boardingWindowUpperAt: string | null;
+        dispatchPlanRevision: string | null;
+        dispatchBatchId: string | null;
       }
     >();
     const statements: D1PreparedStatement[] = [];
@@ -2603,12 +2796,21 @@ export class EventCoordinator extends DurableObject<Env> {
           forecastCapacityStatus: projection.capacityStatus,
           predictionQuality: projection.predictionQuality,
           predictedBoardingMinutes:
-            projection.predictionLowerMinutes === null || projection.predictionUpperMinutes === null
+            projection.predictionLowerMinutes === null
               ? Number.POSITIVE_INFINITY
-              : Math.round(
-                  (projection.predictionLowerMinutes + projection.predictionUpperMinutes) / 2,
-                ),
+              : Math.ceil(projection.predictionLowerMinutes),
           adaptiveLeadMinutes,
+          prepareLeadMinutes: event.notification_lead_minutes,
+          gateTravelLeadMinutes: rotation.gate_travel_lead_minutes,
+          dispatchPlanFresh: projection.dispatchPlanRevision !== null,
+          inNearDispatchBatch: projection.dispatchWave !== null && projection.dispatchWave <= 2,
+          gateCapacityCovered: false,
+          waitingForProductFairness:
+            projection.dispatchUnplannedReason === "WAITING_FOR_PRODUCT_FAIRNESS",
+          waitingForFittingLane: projection.dispatchUnplannedReason === "WAITING_FOR_FITTING_LANE",
+          commitmentLocked: projection.dispatchUnplannedReason === "COMMITMENT_LOCKED",
+          dispatchOrder: projection.dispatchOrder,
+          queueSequence: rotation.queue_sequence,
         });
         precallCandidateByRotationId.set(rotation.id, {
           flightGroupId: rotation.flight_group_id,
@@ -2619,6 +2821,18 @@ export class EventCoordinator extends DurableObject<Env> {
           predictionUpperMinutes: projection.predictionUpperMinutes ?? 0,
           predictionQuality: projection.predictionQuality,
           adaptiveLeadMinutes,
+          gateTravelLeadMinutes: rotation.gate_travel_lead_minutes,
+          effectiveLeadMinutes: adaptiveLeadMinutes + rotation.gate_travel_lead_minutes,
+          boardingWindowLowerAt:
+            projection.predictionLowerMinutes === null
+              ? null
+              : new Date(now.getTime() + projection.predictionLowerMinutes * 60_000).toISOString(),
+          boardingWindowUpperAt:
+            projection.predictionUpperMinutes === null
+              ? null
+              : new Date(now.getTime() + projection.predictionUpperMinutes * 60_000).toISOString(),
+          dispatchPlanRevision: projection.dispatchPlanRevision,
+          dispatchBatchId: projection.dispatchBatchId,
         });
       }
       statements.push(
@@ -2651,6 +2865,31 @@ export class EventCoordinator extends DurableObject<Env> {
           projection.assumedAircraftId,
           rotation.id,
         ),
+        this.env.DB.prepare(
+          `UPDATE rotations SET
+              dispatch_plan_id = ?1, dispatch_plan_revision = ?2,
+              dispatch_batch_id = ?3, dispatch_order = ?4, dispatch_wave = ?5,
+              dispatch_lane_id = ?6, dispatch_group_ids_json = ?7,
+              dispatch_occupied_seats = ?8, dispatch_available_seats = ?9,
+              dispatch_commitment_level = ?10, dispatch_decision_reasons_json = ?11,
+              dispatch_projected_overtake_count = ?12, dispatch_unplanned_reason = ?13
+            WHERE id = ?14 AND status = 'DRAFT'`,
+        ).bind(
+          projection.dispatchPlanId,
+          projection.dispatchPlanRevision,
+          projection.dispatchBatchId,
+          projection.dispatchOrder,
+          projection.dispatchWave,
+          projection.dispatchLaneId,
+          JSON.stringify(projection.dispatchGroupIds),
+          projection.dispatchOccupiedSeats,
+          projection.dispatchAvailableSeats,
+          projection.dispatchCommitmentLevel,
+          JSON.stringify(projection.dispatchDecisionReasons),
+          projection.dispatchProjectedOvertakeCount,
+          projection.dispatchUnplannedReason,
+          rotation.id,
+        ),
       );
       if (
         projection.capacityStatus === "AVAILABLE" &&
@@ -2665,9 +2904,15 @@ export class EventCoordinator extends DurableObject<Env> {
              predicted_landing_at, predicted_completion_at, trigger_event_type, data_basis_scope,
              sample_size, data_age_minutes, active_capacity, reference_duration_minutes,
              product_id, assumed_aircraft_id, boarding_minutes, deboarding_minutes, buffer_minutes,
-             boarding_source, deboarding_source, buffer_source)
+             boarding_source, deboarding_source, buffer_source,
+             dispatch_plan_id, dispatch_plan_revision, dispatch_batch_id, dispatch_order,
+             dispatch_wave, dispatch_lane_id, dispatch_group_ids_json,
+             dispatch_occupied_seats, dispatch_available_seats, dispatch_commitment_level,
+             dispatch_decision_reasons_json, dispatch_projected_overtake_count,
+             dispatch_unplanned_reason)
            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15,
-                   ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26)`,
+                   ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27, ?28,
+                   ?29, ?30, ?31, ?32, ?33, ?34, ?35, ?36, ?37, ?38, ?39)`,
           ).bind(
             crypto.randomUUID(),
             eventId,
@@ -2695,6 +2940,19 @@ export class EventCoordinator extends DurableObject<Env> {
             projection.boardingSource,
             projection.deboardingSource,
             projection.bufferSource,
+            projection.dispatchPlanId,
+            projection.dispatchPlanRevision,
+            projection.dispatchBatchId,
+            projection.dispatchOrder,
+            projection.dispatchWave,
+            projection.dispatchLaneId,
+            JSON.stringify(projection.dispatchGroupIds),
+            projection.dispatchOccupiedSeats,
+            projection.dispatchAvailableSeats,
+            projection.dispatchCommitmentLevel,
+            JSON.stringify(projection.dispatchDecisionReasons),
+            projection.dispatchProjectedOvertakeCount,
+            projection.dispatchUnplannedReason,
           ),
         );
       }
@@ -2704,31 +2962,47 @@ export class EventCoordinator extends DurableObject<Env> {
       const candidate = precallCandidateByRotationId.get(decision.id);
       const projection = projectionByRotationId.get(decision.id);
       if (!candidate || !projection) continue;
-      const status =
-        decision.reason === "ALREADY_PRECALLED"
-          ? "GO_TO_GATE"
-          : decision.eligible
-            ? "PREPARE"
-            : decision.reason === "TOO_EARLY" &&
-                projection.predictionUpperMinutes !== null &&
-                projection.predictionUpperMinutes <= event.notification_lead_minutes
-              ? "PREPARE"
-              : "WAITING";
+      const legacyReasons = new Set([
+        "ELIGIBLE",
+        "DISABLED",
+        "OPERATIONS_BLOCKED",
+        "NOT_QUEUE_FRONT",
+        "ALREADY_PRECALLED",
+        "NO_FORECAST_CAPACITY",
+        "NO_FITTING_AIRCRAFT",
+        "TOO_EARLY",
+      ]);
+      const legacyReason = legacyReasons.has(decision.reason) ? decision.reason : "TOO_EARLY";
+      const dispatchReason = legacyReasons.has(decision.reason) ? null : decision.reason;
       statements.push(
         this.env.DB.prepare(
           `UPDATE flight_groups
               SET precall_decision_status = ?1,
                   precall_decision_reason = ?2,
-                  precall_decision_at = ?3,
-                  precall_predicted_boarding_at = ?4,
-                  precall_adaptive_lead_minutes = ?5
-            WHERE id = ?6 AND operation_day_id = ?7`,
+                  precall_dispatch_reason = ?3,
+                  precall_decision_at = ?4,
+                  precall_predicted_boarding_at = ?5,
+                  precall_adaptive_lead_minutes = ?6,
+                  precall_gate_id = ?7,
+                  precall_adaptive_base_lead_minutes = ?8,
+                  precall_gate_travel_lead_minutes = ?9,
+                  precall_effective_lead_minutes = ?10,
+                  precall_boarding_window_lower_at = ?11,
+                  precall_boarding_window_upper_at = ?12
+            WHERE id = ?13 AND operation_day_id = ?14`,
         ).bind(
-          status,
-          decision.reason,
+          decision.status,
+          legacyReason,
+          dispatchReason,
           nowIso,
           projection.predictedBoardingAt,
           adaptiveLeadMinutes,
+          candidate.gateId,
+          adaptiveLeadMinutes,
+          candidate.gateTravelLeadMinutes,
+          candidate.effectiveLeadMinutes,
+          candidate.boardingWindowLowerAt,
+          candidate.boardingWindowUpperAt,
           candidate.flightGroupId,
           eventId,
         ),
@@ -2743,11 +3017,24 @@ export class EventCoordinator extends DurableObject<Env> {
       predictionUpperMinutes: number;
       predictionQuality: "STABLE" | "CHANGING" | "UNCERTAIN";
       adaptiveLeadMinutes: number;
+      gateTravelLeadMinutes: number;
+      effectiveLeadMinutes: number;
+      boardingWindowLowerAt: string | null;
+      boardingWindowUpperAt: string | null;
+      dispatchPlanRevision: string;
+      dispatchBatchId: string;
     }> = precallDecisions.flatMap((decision) => {
       if (!decision.eligible) return [];
       const candidate = precallCandidateByRotationId.get(decision.id);
       if (!candidate) throw new Error(`Precall candidate missing for rotation ${decision.id}.`);
-      return [candidate];
+      if (!candidate.dispatchPlanRevision || !candidate.dispatchBatchId) return [];
+      return [
+        {
+          ...candidate,
+          dispatchPlanRevision: candidate.dispatchPlanRevision,
+          dispatchBatchId: candidate.dispatchBatchId,
+        },
+      ];
     });
     for (let index = 0; index < statements.length; index += 80) {
       await this.env.DB.batch(statements.slice(index, index + 80));
@@ -2789,12 +3076,16 @@ export class EventCoordinator extends DurableObject<Env> {
       predictionUpperMinutes: number;
       predictionQuality: "STABLE" | "CHANGING" | "UNCERTAIN";
       adaptiveLeadMinutes: number;
+      gateTravelLeadMinutes: number;
+      effectiveLeadMinutes: number;
+      boardingWindowLowerAt: string | null;
+      boardingWindowUpperAt: string | null;
+      dispatchPlanRevision: string;
+      dispatchBatchId: string;
     }>,
     now: string,
   ): Promise<void> {
-    const blockedResourceGroups = new Set<string>();
     for (const candidate of candidates) {
-      if (blockedResourceGroups.has(candidate.resourceGroupId)) continue;
       const systemCommandId = crypto.randomUUID();
       const nextVersion = candidate.expectedVersion + 1;
       const payload = JSON.stringify({
@@ -2803,6 +3094,12 @@ export class EventCoordinator extends DurableObject<Env> {
         predictionUpperMinutes: candidate.predictionUpperMinutes,
         predictionQuality: candidate.predictionQuality,
         adaptiveLeadMinutes: candidate.adaptiveLeadMinutes,
+        gateTravelLeadMinutes: candidate.gateTravelLeadMinutes,
+        effectiveLeadMinutes: candidate.effectiveLeadMinutes,
+        boardingWindowLowerAt: candidate.boardingWindowLowerAt,
+        boardingWindowUpperAt: candidate.boardingWindowUpperAt,
+        dispatchPlanRevision: candidate.dispatchPlanRevision,
+        dispatchBatchId: candidate.dispatchBatchId,
       });
       await this.env.DB.batch([
         this.env.DB.prepare(
@@ -2810,12 +3107,26 @@ export class EventCoordinator extends DurableObject<Env> {
               SET precalled_at = ?1, precall_trigger = ?2, version = ?3, updated_at = ?1,
                   precall_decision_status = 'GO_TO_GATE',
                   precall_decision_reason = 'ELIGIBLE',
-                  precall_decision_at = ?1
-            WHERE id = ?4 AND operation_day_id = ?5 AND version = ?6 AND precalled_at IS NULL`,
+                  precall_dispatch_reason = NULL,
+                  precall_decision_at = ?1,
+                  precall_gate_id = ?4,
+                  precall_adaptive_base_lead_minutes = ?5,
+                  precall_gate_travel_lead_minutes = ?6,
+                  precall_effective_lead_minutes = ?7,
+                  precall_boarding_window_lower_at = ?8,
+                  precall_boarding_window_upper_at = ?9
+            WHERE id = ?10 AND operation_day_id = ?11 AND version = ?12
+              AND precalled_at IS NULL`,
         ).bind(
           now,
           systemCommandId,
           nextVersion,
+          candidate.gateId,
+          candidate.adaptiveLeadMinutes,
+          candidate.gateTravelLeadMinutes,
+          candidate.effectiveLeadMinutes,
+          candidate.boardingWindowLowerAt,
+          candidate.boardingWindowUpperAt,
           candidate.flightGroupId,
           eventId,
           candidate.expectedVersion,
@@ -2846,7 +3157,6 @@ export class EventCoordinator extends DurableObject<Env> {
         .bind(candidate.flightGroupId, systemCommandId)
         .first<{ persisted: number }>();
       if (!persisted) {
-        blockedResourceGroups.add(candidate.resourceGroupId);
         continue;
       }
       await sendRotationPushNotifications(this.env, candidate.rotationId, "GO_TO_GATE");
@@ -4494,16 +4804,18 @@ export class EventCoordinator extends DurableObject<Env> {
         gateType: command.payload.gateType,
         active: command.payload.active,
         sortOrder: command.payload.sortOrder,
+        travelLeadMinutes: command.payload.travelLeadMinutes,
         displayFilter,
         reason: command.payload.reason,
       };
       mutation = this.env.DB.prepare(
         `INSERT INTO gates
-          (id, operation_day_id, label, gate_type, active, sort_order, display_filter_json,
-           created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?8)
+          (id, operation_day_id, label, gate_type, active, sort_order, travel_lead_minutes,
+           display_filter_json, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?9)
          ON CONFLICT(id) DO UPDATE SET label = excluded.label, gate_type = excluded.gate_type,
           active = excluded.active, sort_order = excluded.sort_order,
+          travel_lead_minutes = excluded.travel_lead_minutes,
           display_filter_json = excluded.display_filter_json, updated_at = excluded.updated_at
          WHERE gates.operation_day_id = excluded.operation_day_id`,
       ).bind(
@@ -4513,6 +4825,7 @@ export class EventCoordinator extends DurableObject<Env> {
         command.payload.gateType,
         command.payload.active ? 1 : 0,
         command.payload.sortOrder,
+        command.payload.travelLeadMinutes,
         JSON.stringify(displayFilter),
         now,
       );
@@ -6232,6 +6545,8 @@ export class EventCoordinator extends DurableObject<Env> {
     }
     const rotation = await this.env.DB.prepare(
       `SELECT r.id, r.status, r.version, r.aircraft_id, r.pilot_id, r.called_at,
+              r.forecast_assumed_aircraft_id, r.dispatch_plan_revision,
+              r.dispatch_batch_id, r.dispatch_group_ids_json,
               fg.product_id AS flight_group_product_id, rg.status AS resource_group_status
          FROM rotations r
          JOIN flight_groups fg ON fg.id = r.flight_group_id
@@ -6246,6 +6561,10 @@ export class EventCoordinator extends DurableObject<Env> {
         aircraft_id: string | null;
         pilot_id: string | null;
         called_at: string | null;
+        forecast_assumed_aircraft_id: string | null;
+        dispatch_plan_revision: string | null;
+        dispatch_batch_id: string | null;
+        dispatch_group_ids_json: string;
         flight_group_product_id: string | null;
         resource_group_status: "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED";
       }>();
@@ -6263,6 +6582,7 @@ export class EventCoordinator extends DurableObject<Env> {
       ticket_count: number;
     }> = [];
     let skippedEarlierTicketGroupIds: string[] = [];
+    let acceptedDispatchRecommendation = false;
     let confirmedTurnaroundProductId: string | null = null;
     let confirmedTurnaroundProfile: ReturnType<typeof resolveTurnaroundProfile> | null = null;
     if (command.type === "CALL_NEXT") {
@@ -6351,6 +6671,33 @@ export class EventCoordinator extends DurableObject<Env> {
           },
           { status: 409 },
         );
+      }
+      if (command.payload.dispatchRecommendation) {
+        const recommendedGroupIds = JSON.parse(rotation.dispatch_group_ids_json) as string[];
+        const selectedGroupIds = [...distinctGroupIds].sort();
+        const currentRecommendedGroupIds = [...recommendedGroupIds].sort();
+        acceptedDispatchRecommendation =
+          rotation.dispatch_plan_revision === command.payload.dispatchRecommendation.planRevision &&
+          rotation.dispatch_batch_id === command.payload.dispatchRecommendation.batchId &&
+          rotation.forecast_assumed_aircraft_id === command.payload.aircraftId &&
+          selectedGroupIds.length === currentRecommendedGroupIds.length &&
+          selectedGroupIds.every(
+            (ticketGroupId, index) => ticketGroupId === currentRecommendedGroupIds[index],
+          );
+        if (!acceptedDispatchRecommendation) {
+          return json(
+            {
+              error: {
+                code: "DISPATCH_PLAN_STALE",
+                message:
+                  "Die Belegungsempfehlung wurde inzwischen neu berechnet. Bitte aktuellen Plan prüfen.",
+                currentPlanRevision: rotation.dispatch_plan_revision,
+                currentBatchId: rotation.dispatch_batch_id,
+              },
+            },
+            { status: 409 },
+          );
+        }
       }
       let selectedProductId: string;
       try {
@@ -6460,6 +6807,7 @@ export class EventCoordinator extends DurableObject<Env> {
       skippedEarlierTicketGroupIds = skippedEarlierResult.results.map((group) => group.id);
       if (
         skippedEarlierTicketGroupIds.length > 0 &&
+        !acceptedDispatchRecommendation &&
         !command.payload.queueDeviationReason?.trim()
       ) {
         return json(
@@ -6933,7 +7281,14 @@ export class EventCoordinator extends DurableObject<Env> {
           aircraftId: selectedAircraftId,
           pilotId: selectedPilotId,
           queueDeviationReason:
-            command.type === "CALL_NEXT" ? (command.payload.queueDeviationReason ?? null) : null,
+            command.type === "CALL_NEXT"
+              ? (command.payload.queueDeviationReason ??
+                (acceptedDispatchRecommendation ? "CAPACITY_OPTIMIZED_DISPATCH" : null))
+              : null,
+          dispatchRecommendation:
+            command.type === "CALL_NEXT" && acceptedDispatchRecommendation
+              ? command.payload.dispatchRecommendation
+              : null,
           skippedTicketGroupIds: command.type === "CALL_NEXT" ? skippedEarlierTicketGroupIds : [],
         }),
       ),

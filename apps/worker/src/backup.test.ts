@@ -44,4 +44,23 @@ describe("portable backup format", () => {
     );
     expect(BACKUP_TABLES).not.toContain("web_push_subscriptions");
   });
+
+  it("preserves gate travel lead and dispatch planning columns without reinterpretation", () => {
+    const serialized = serializePortableBackup({
+      format: "rundflug-leitstand-portable-backup",
+      formatVersion: 1,
+      createdAt: "2026-08-01T08:00:00.000Z",
+      applicationVersion: "1.11.0",
+      requirementsVersion: "1.11.0",
+      reason: "PRE_EVENT",
+      tables: {
+        gates: [{ id: "gate-1", travel_lead_minutes: 7 }],
+        rotations: [{ id: "rotation-1", dispatch_plan_revision: "dispatch-v1" }],
+      },
+    });
+    expect(JSON.parse(serialized).tables).toMatchObject({
+      gates: [{ travel_lead_minutes: 7 }],
+      rotations: [{ dispatch_plan_revision: "dispatch-v1" }],
+    });
+  });
 });

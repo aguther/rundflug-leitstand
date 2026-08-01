@@ -136,6 +136,19 @@ export function FlightLineView() {
     operationalAircraft.find(
       (aircraft) => aircraft.id === (selectedAircraftId ?? claimedAssistAircraftId),
     ) ?? (FLIGHT_LINE_ASSIST_MODE ? undefined : operationalAircraft[0]);
+  const selectedDispatchPlan = board?.rotations
+    .filter(
+      (rotation) =>
+        rotation.status === "DRAFT" &&
+        rotation.timeline.forecastAssumedAircraftId === selectedAircraft?.id &&
+        rotation.dispatchPlan?.batchId,
+    )
+    .sort(
+      (left, right) =>
+        (left.dispatchPlan?.dispatchOrder ?? Number.MAX_SAFE_INTEGER) -
+          (right.dispatchPlan?.dispatchOrder ?? Number.MAX_SAFE_INTEGER) ||
+        left.id.localeCompare(right.id),
+    )[0]?.dispatchPlan;
   const aircraftRotations = operationalRotations?.filter((rotation) => {
     if (!selectedAircraft) return false;
     if (rotation.aircraftId) return rotation.aircraftId === selectedAircraft.id;
@@ -240,19 +253,34 @@ export function FlightLineView() {
             "Vor Belegung bitte über „Pilot zuweisen“ einen Pilotencode am Flugzeug hinterlegen.",
           );
         }
+        const ticketGroupIds =
+          selectedQueueGroupIds.length > 0
+            ? selectedQueueGroupIds
+            : selectedRotation.bookingGroups.length > 0
+              ? selectedRotation.bookingGroups.map((group) => group.id)
+              : [selectedRotation.ticketGroupId];
+        const currentRecommendationSelected = Boolean(
+          selectedDispatchPlan?.batchId &&
+            selectedDispatchPlan.groupIds.length === ticketGroupIds.length &&
+            [...selectedDispatchPlan.groupIds]
+              .sort()
+              .every((groupId, index) => groupId === [...ticketGroupIds].sort()[index]),
+        );
         result = await sendCommand(
           {
             ...commandBase,
             type: "CALL_NEXT",
             payload: {
-              ticketGroupIds:
-                selectedQueueGroupIds.length > 0
-                  ? selectedQueueGroupIds
-                  : selectedRotation.bookingGroups.length > 0
-                    ? selectedRotation.bookingGroups.map((group) => group.id)
-                    : [selectedRotation.ticketGroupId],
+              ticketGroupIds,
               aircraftId: aircraftOverride.id,
               pilotId: assignedPilotId,
+              dispatchRecommendation:
+                currentRecommendationSelected && selectedDispatchPlan?.batchId
+                  ? {
+                      planRevision: selectedDispatchPlan.revision,
+                      batchId: selectedDispatchPlan.batchId,
+                    }
+                  : undefined,
               queueDeviationReason:
                 (queueDeviationReasonOverride ?? callDeviationReason.trim()) || undefined,
             },

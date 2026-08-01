@@ -54,12 +54,12 @@
       "source": "1.5",
       "id": "V15-QUE-020",
       "section": "Fortgeltendes Delta 1.5",
-      "requirement": "Mehrgruppen-Aufrufe kombinieren nur vollständige kompatible Gruppen atomar.",
+      "requirement": "Mehrgruppen-Aufrufe kombinieren nur vollständige produktkompatible Gruppen atomar; der begrenzte Dispatch-Plan darf Gruppen zugunsten von Durchsatz und Fairness sichtbar überholen, aber niemals automatisch teilen.",
       "priority": "MUSS",
       "stage": "V1",
       "status": "implemented",
-      "module": "apps/worker/src/event-coordinator.ts",
-      "tests": "apps/worker/src/v1-5-stable-operations.test.ts",
+      "module": "packages/domain/src/dispatch-plan.ts apps/worker/src/event-coordinator.ts",
+      "tests": "packages/domain/src/dispatch-plan.test.ts apps/worker/src/v1-5-stable-operations.test.ts",
       "traceStatus": "umgesetzt"
     },
     {

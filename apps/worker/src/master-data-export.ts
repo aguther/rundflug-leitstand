@@ -50,7 +50,8 @@ export async function loadMasterDataExportProjection(
     await Promise.all([
       db
         .prepare(
-          `SELECT id, label, gate_type, active, sort_order, display_filter_json
+          `SELECT id, label, gate_type, active, sort_order, travel_lead_minutes,
+                  display_filter_json
            FROM gates WHERE operation_day_id = ?1 ORDER BY sort_order, label, id`,
         )
         .bind(eventId)
@@ -157,6 +158,7 @@ export async function loadMasterDataExportProjection(
         gateType: String(gate.gate_type),
         active: Boolean(gate.active),
         sortOrder: Number(gate.sort_order),
+        travelLeadMinutes: Number(gate.travel_lead_minutes),
         displayFilter: {
           productKeys: displayFilter.productIds.flatMap((productId) => {
             const productKey = productKeys.get(productId);

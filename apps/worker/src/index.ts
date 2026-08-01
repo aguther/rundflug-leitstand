@@ -1676,7 +1676,8 @@ app.get("/api/admin/events/:eventId/master-data-template", async (context) => {
   const [gates, resourceGroups, products, pilots, assignments, turnaroundOverrides] =
     await Promise.all([
       context.env.DB.prepare(
-        `SELECT id, label, gate_type, active, sort_order, display_filter_json
+        `SELECT id, label, gate_type, active, sort_order, travel_lead_minutes,
+                display_filter_json
          FROM gates WHERE operation_day_id = ?1 ORDER BY sort_order, label, id`,
       )
         .bind(eventId)
@@ -1773,6 +1774,7 @@ app.get("/api/admin/events/:eventId/master-data-template", async (context) => {
         gateType: String(gate.gate_type),
         active: Boolean(gate.active),
         sortOrder: Number(gate.sort_order),
+        travelLeadMinutes: Number(gate.travel_lead_minutes),
         displayFilter: {
           productKeys: displayFilter.productIds.flatMap((productId) => {
             const productKey = productKeys.get(productId);
@@ -2237,9 +2239,9 @@ app.post("/api/admin/events/:eventId/master-data-template/import", async (contex
     statements.push(
       context.env.DB.prepare(
         `INSERT INTO gates
-          (id, operation_day_id, label, gate_type, active, sort_order, display_filter_json,
-           created_at, updated_at)
-         SELECT ?3, ?1, ?4, ?5, ?6, ?7, ?8, ?9, ?9 WHERE ${receiptGuard}`,
+          (id, operation_day_id, label, gate_type, active, sort_order, travel_lead_minutes,
+           display_filter_json, created_at, updated_at)
+         SELECT ?3, ?1, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?10 WHERE ${receiptGuard}`,
       ).bind(
         eventId,
         input.commandId,
@@ -2248,6 +2250,7 @@ app.post("/api/admin/events/:eventId/master-data-template/import", async (contex
         gate.gateType,
         gate.active ? 1 : 0,
         gate.sortOrder,
+        gate.travelLeadMinutes,
         JSON.stringify({
           productIds: gate.displayFilter.productKeys.map((key) => productIds.get(key)),
           rotationStatuses: gate.displayFilter.rotationStatuses,
@@ -2602,9 +2605,9 @@ app.post("/api/admin/events/:sourceEventId/clone", async (context) => {
     ...(keepMasterData ? gates.results : []).map((row) =>
       context.env.DB.prepare(
         `INSERT INTO gates
-          (id, operation_day_id, label, gate_type, active, sort_order, display_filter_json,
-           created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?8)`,
+          (id, operation_day_id, label, gate_type, active, sort_order, travel_lead_minutes,
+           display_filter_json, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?9)`,
       ).bind(
         gateIds.get(String(row.id)),
         input.eventId,
@@ -2612,6 +2615,7 @@ app.post("/api/admin/events/:sourceEventId/clone", async (context) => {
         row.gate_type,
         row.active,
         row.sort_order,
+        row.travel_lead_minutes,
         JSON.stringify({
           ...gateDisplayFilterSchema.parse(JSON.parse(String(row.display_filter_json))),
           productIds: gateDisplayFilterSchema
@@ -3725,8 +3729,12 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
               COALESCE(fg.queue_position, fg.communication_number) AS queue_position,
               r.status, r.aircraft_id, r.usable_capacity, fg.precalled_at,
               fg.precall_decision_status, fg.precall_decision_reason,
+              fg.precall_dispatch_reason,
               fg.precall_decision_at, fg.precall_predicted_boarding_at,
-              fg.precall_adaptive_lead_minutes,
+              fg.precall_adaptive_lead_minutes, fg.precall_gate_id,
+              fg.precall_adaptive_base_lead_minutes,
+              fg.precall_gate_travel_lead_minutes, fg.precall_effective_lead_minutes,
+              fg.precall_boarding_window_lower_at, fg.precall_boarding_window_upper_at,
               COALESCE(r.gate_id, MIN(p.gate_id), '') AS gate_id,
               COALESCE(MAX(rotation_gate.label), MIN(product_gate.label), '') AS gate_label,
               r.operational_note,
@@ -3736,6 +3744,12 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
               r.predicted_landing_at, r.predicted_completion_at, r.prediction_quality,
               r.prediction_lower_minutes, r.prediction_upper_minutes, r.prediction_updated_at,
               r.forecast_assumed_aircraft_id, r.turnaround_boarding_minutes,
+              r.dispatch_plan_id, r.dispatch_plan_revision, r.dispatch_batch_id,
+              r.dispatch_order, r.dispatch_wave, r.dispatch_lane_id,
+              r.dispatch_group_ids_json, r.dispatch_occupied_seats,
+              r.dispatch_available_seats, r.dispatch_commitment_level,
+              r.dispatch_decision_reasons_json, r.dispatch_projected_overtake_count,
+              r.dispatch_unplanned_reason,
               r.turnaround_deboarding_minutes, r.turnaround_buffer_minutes,
               r.turnaround_boarding_source, r.turnaround_deboarding_source,
               r.turnaround_buffer_source,
@@ -3898,9 +3912,23 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
             | "NO_FITTING_AIRCRAFT"
             | "TOO_EARLY"
             | null;
+          precall_dispatch_reason:
+            | "NOT_IN_NEAR_DISPATCH_BATCH"
+            | "GATE_CAPACITY_COVERED"
+            | "WAITING_FOR_PRODUCT_FAIRNESS"
+            | "WAITING_FOR_FITTING_LANE"
+            | "COMMITMENT_LOCKED"
+            | "DISPATCH_PLAN_STALE"
+            | null;
           precall_decision_at: string | null;
           precall_predicted_boarding_at: string | null;
           precall_adaptive_lead_minutes: number | null;
+          precall_gate_id: string | null;
+          precall_adaptive_base_lead_minutes: number | null;
+          precall_gate_travel_lead_minutes: number | null;
+          precall_effective_lead_minutes: number | null;
+          precall_boarding_window_lower_at: string | null;
+          precall_boarding_window_upper_at: string | null;
           gate_id: string;
           gate_label: string;
           operational_note: string;
@@ -3938,6 +3966,25 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
           prediction_upper_minutes: number | null;
           prediction_updated_at: string | null;
           forecast_assumed_aircraft_id: string | null;
+          dispatch_plan_id: string | null;
+          dispatch_plan_revision: string | null;
+          dispatch_batch_id: string | null;
+          dispatch_order: number | null;
+          dispatch_wave: number | null;
+          dispatch_lane_id: string | null;
+          dispatch_group_ids_json: string;
+          dispatch_occupied_seats: number | null;
+          dispatch_available_seats: number | null;
+          dispatch_commitment_level: "WAITING" | "PREPARE" | "COME_TO_FLIGHT_LINE" | null;
+          dispatch_decision_reasons_json: string;
+          dispatch_projected_overtake_count: number;
+          dispatch_unplanned_reason:
+            | "NO_FORECAST_CAPACITY"
+            | "WAITING_FOR_FITTING_LANE"
+            | "WAITING_FOR_PRODUCT_FAIRNESS"
+            | "NOT_IN_NEAR_DISPATCH_BATCH"
+            | "COMMITMENT_LOCKED"
+            | null;
           turnaround_boarding_minutes: number | null;
           turnaround_deboarding_minutes: number | null;
           turnaround_buffer_minutes: number | null;
@@ -4145,7 +4192,8 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
             ? "g.display_filter_json"
             : `'${EMPTY_GATE_DISPLAY_FILTER_JSON}' AS display_filter_json`;
         return context.env.DB.prepare(
-          `SELECT g.id, g.label, g.gate_type, g.active, g.sort_order, ${displayFilterProjection},
+          `SELECT g.id, g.label, g.gate_type, g.active, g.sort_order,
+                g.travel_lead_minutes, ${displayFilterProjection},
                 COALESCE((SELECT json_group_array(rg.id) FROM resource_groups rg
                   WHERE rg.operation_day_id = g.operation_day_id AND rg.gate_id = g.id), '[]')
                   AS assigned_resource_group_ids_json
@@ -4158,6 +4206,7 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
             gate_type: "FLIGHT_LINE" | "BOARDING" | "DISPLAY_ONLY";
             active: number;
             sort_order: number;
+            travel_lead_minutes: number;
             display_filter_json: string;
             assigned_resource_group_ids_json: string;
           }>();
@@ -4578,6 +4627,13 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
       const suggestedAircraft = fleetRows.results.find(
         (aircraft) => aircraft.id === rotation.suggested_aircraft_id,
       );
+      const dispatchAircraft = fleetRows.results.find(
+        (aircraft) => aircraft.id === rotation.forecast_assumed_aircraft_id,
+      );
+      const dispatchPilotId = rotation.dispatch_lane_id?.split(":")[1] ?? null;
+      const dispatchPilot = pilotRows.results.find(
+        (pilot) => pilot.id === dispatchPilotId && pilot.active === 1 && pilot.paused === 0,
+      );
       const rememberedPilot = pilotRows.results.find(
         (pilot) =>
           pilot.id === suggestedAircraft?.current_pilot_id &&
@@ -4728,11 +4784,15 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
         aircraftRegistration: rotation.aircraft_registration,
         pilotId: rotation.pilot_id,
         pilotOperationalCode: rotation.pilot_operational_code,
-        suggestedPilotId: rememberedPilot?.id ?? rotation.suggested_pilot_id,
+        suggestedPilotId: dispatchPilot?.id ?? rememberedPilot?.id ?? rotation.suggested_pilot_id,
         suggestedPilotOperationalCode:
-          rememberedPilot?.operational_code ?? rotation.suggested_pilot_operational_code,
-        suggestedAircraftId: rotation.suggested_aircraft_id,
-        suggestedAircraftRegistration: rotation.suggested_aircraft_registration,
+          dispatchPilot?.operational_code ??
+          rememberedPilot?.operational_code ??
+          rotation.suggested_pilot_operational_code,
+        suggestedAircraftId:
+          rotation.forecast_assumed_aircraft_id ?? rotation.suggested_aircraft_id,
+        suggestedAircraftRegistration:
+          dispatchAircraft?.registration ?? rotation.suggested_aircraft_registration,
         ticketCount: rotation.ticket_count,
         baselineCapacity: rotation.baseline_capacity,
         usableCapacity: rotation.usable_capacity ?? rotation.baseline_capacity,
@@ -4751,13 +4811,37 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
           rotation.precall_decision_at
             ? {
                 status: rotation.precall_decision_status,
-                reason: rotation.precall_decision_reason,
+                reason: rotation.precall_dispatch_reason ?? rotation.precall_decision_reason,
                 decidedAt: rotation.precall_decision_at,
                 predictedBoardingAt: rotation.precall_predicted_boarding_at,
                 adaptiveLeadMinutes: rotation.precall_adaptive_lead_minutes,
+                gateId: rotation.precall_gate_id,
+                adaptiveBaseLeadMinutes: rotation.precall_adaptive_base_lead_minutes,
+                gateTravelLeadMinutes: rotation.precall_gate_travel_lead_minutes,
+                effectiveLeadMinutes: rotation.precall_effective_lead_minutes,
+                boardingWindowLowerAt: rotation.precall_boarding_window_lower_at,
+                boardingWindowUpperAt: rotation.precall_boarding_window_upper_at,
               }
             : null,
         calledAt: rotation.called_at,
+        dispatchPlan:
+          rotation.dispatch_plan_id && rotation.dispatch_plan_revision
+            ? {
+                planId: rotation.dispatch_plan_id,
+                revision: rotation.dispatch_plan_revision,
+                batchId: rotation.dispatch_batch_id,
+                dispatchOrder: rotation.dispatch_order,
+                wave: rotation.dispatch_wave,
+                laneId: rotation.dispatch_lane_id,
+                groupIds: JSON.parse(rotation.dispatch_group_ids_json) as string[],
+                occupiedSeats: rotation.dispatch_occupied_seats,
+                availableSeats: rotation.dispatch_available_seats,
+                commitmentLevel: rotation.dispatch_commitment_level,
+                decisionReasons: JSON.parse(rotation.dispatch_decision_reasons_json) as string[],
+                projectedOvertakeCount: rotation.dispatch_projected_overtake_count,
+                unplannedReason: rotation.dispatch_unplanned_reason,
+              }
+            : null,
         deferralCount: rotation.deferral_count,
         operationalNote: rotation.operational_note,
         timeline: {
@@ -4918,6 +5002,7 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
       gateType: gate.gate_type,
       active: gate.active === 1,
       sortOrder: gate.sort_order,
+      travelLeadMinutes: gate.travel_lead_minutes,
       displayFilter: gateDisplayFilterSchema.parse(JSON.parse(gate.display_filter_json)),
       assignedResourceGroupIds: JSON.parse(gate.assigned_resource_group_ids_json) as string[],
     })),
@@ -5490,6 +5575,25 @@ app.on("GET", eventRoutes("/history/forecasts"), async (context) => {
       boarding_source: string;
       deboarding_source: string;
       buffer_source: string;
+      dispatch_plan_id: string | null;
+      dispatch_plan_revision: string | null;
+      dispatch_batch_id: string | null;
+      dispatch_order: number | null;
+      dispatch_wave: number | null;
+      dispatch_lane_id: string | null;
+      dispatch_group_ids_json: string;
+      dispatch_occupied_seats: number | null;
+      dispatch_available_seats: number | null;
+      dispatch_commitment_level: "WAITING" | "PREPARE" | "COME_TO_FLIGHT_LINE" | null;
+      dispatch_decision_reasons_json: string;
+      dispatch_projected_overtake_count: number;
+      dispatch_unplanned_reason:
+        | "NO_FORECAST_CAPACITY"
+        | "WAITING_FOR_FITTING_LANE"
+        | "WAITING_FOR_PRODUCT_FAIRNESS"
+        | "NOT_IN_NEAR_DISPATCH_BATCH"
+        | "COMMITMENT_LOCKED"
+        | null;
       predicted_boarding_at: string | null;
       predicted_departure_at: string | null;
       predicted_landing_at: string | null;
@@ -5540,6 +5644,21 @@ app.on("GET", eventRoutes("/history/forecasts"), async (context) => {
           boardingSource: row.boarding_source,
           deboardingSource: row.deboarding_source,
           bufferSource: row.buffer_source,
+        },
+        dispatchPlan: {
+          planId: row.dispatch_plan_id,
+          revision: row.dispatch_plan_revision,
+          batchId: row.dispatch_batch_id,
+          dispatchOrder: row.dispatch_order,
+          wave: row.dispatch_wave,
+          laneId: row.dispatch_lane_id,
+          groupIds: JSON.parse(row.dispatch_group_ids_json) as string[],
+          occupiedSeats: row.dispatch_occupied_seats,
+          availableSeats: row.dispatch_available_seats,
+          commitmentLevel: row.dispatch_commitment_level,
+          decisionReasons: JSON.parse(row.dispatch_decision_reasons_json) as string[],
+          projectedOvertakeCount: row.dispatch_projected_overtake_count,
+          unplannedReason: row.dispatch_unplanned_reason,
         },
         predicted: {
           boardingAt: row.predicted_boarding_at,
@@ -6895,7 +7014,8 @@ app.get("/api/public/events/:eventId/board", async (context) => {
             COALESCE(MIN(g.label), 'Flight Line') AS gate_label,
             COALESCE(tg.communication_number, fg.communication_number) AS communication_number,
             fg.precalled_at, fg.precall_decision_status,
-            COALESCE(fg.queue_position, fg.communication_number) AS queue_position, r.status,
+            COALESCE(fg.queue_position, fg.communication_number) AS queue_position,
+            r.dispatch_order, r.status,
             r.predicted_boarding_at, r.prediction_quality, r.prediction_lower_minutes,
             r.prediction_upper_minutes, r.prediction_updated_at,
             recall.id AS recall_id, recall.sequence AS recall_sequence,
@@ -6930,23 +7050,22 @@ app.get("/api/public/events/:eventId/board", async (context) => {
         AND (r.status NOT IN ('IN_FLIGHT', 'LANDED', 'COMPLETED') OR r.departed_at > ?5)
       GROUP BY r.id, tg.id
       ORDER BY CASE
-                 WHEN rg.status = 'ACTIVE'
-                   AND (r.status = 'CALLED'
-                     OR (r.status = 'DRAFT' AND fg.precalled_at IS NOT NULL)) THEN 0
-                 WHEN r.status = 'DRAFT' THEN 1
-                 ELSE 2
+                 WHEN rg.status = 'ACTIVE' AND r.status = 'CALLED' THEN 0
+                 WHEN rg.status = 'ACTIVE' AND r.status = 'DRAFT'
+                   AND fg.precalled_at IS NOT NULL THEN 1
+                 WHEN rg.status = 'ACTIVE' AND r.status = 'DRAFT'
+                   AND fg.precall_decision_status = 'PREPARE' THEN 2
+                 WHEN r.status = 'DRAFT' THEN 3
+                 ELSE 4
                END,
-               CASE
-                 WHEN rg.status = 'ACTIVE'
-                   AND (r.status = 'CALLED'
-                     OR (r.status = 'DRAFT' AND fg.precalled_at IS NOT NULL))
-                   THEN COALESCE(fg.queue_position, fg.communication_number)
-               END,
+               CASE WHEN r.status = 'DRAFT' THEN r.dispatch_order END,
+               CASE WHEN r.status = 'DRAFT' THEN r.predicted_boarding_at END,
                CASE WHEN r.status = 'DRAFT'
                  THEN COALESCE(fg.queue_position, fg.communication_number) END,
                CASE WHEN r.status IN ('IN_FLIGHT', 'LANDED', 'COMPLETED')
                  THEN r.departed_at END DESC,
-               COALESCE(tg.communication_number, fg.communication_number)
+               COALESCE(tg.communication_number, fg.communication_number),
+               r.id
       LIMIT 20`,
   )
     .bind(
@@ -6965,6 +7084,7 @@ app.get("/api/public/events/:eventId/board", async (context) => {
       precalled_at: string | null;
       precall_decision_status: "WAITING" | "PREPARE" | "GO_TO_GATE" | null;
       queue_position: number;
+      dispatch_order: number | null;
       status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
       predicted_boarding_at: string | null;
       prediction_quality: "STABLE" | "CHANGING" | "UNCERTAIN" | null;
@@ -7062,6 +7182,7 @@ app.get("/api/public/events/:eventId/board", async (context) => {
             boardingWindowLowerAt: boardingWindow.lowerAt,
             boardingWindowUpperAt: boardingWindow.upperAt,
             predictionQuality,
+            dispatchOrder: row.dispatch_order,
             operationalNotice: row.planned_public_note || row.resource_group_operational_note,
             activeRecall: activeTicketGroupRecallProjection(row),
           };

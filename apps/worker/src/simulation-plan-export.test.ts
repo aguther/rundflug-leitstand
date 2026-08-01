@@ -39,5 +39,7 @@ describe("simulation plan export route", () => {
     expect(projectionSource).toContain("formatVersion: 2");
     expect(projectionSource).toContain("aircraftProductTurnaroundOverrides");
     expect(projectionSource).toContain("planned_boarding_minutes_override");
+    expect(projectionSource).toContain("travel_lead_minutes");
+    expect(projectionSource).toContain("travelLeadMinutes");
   });
 });

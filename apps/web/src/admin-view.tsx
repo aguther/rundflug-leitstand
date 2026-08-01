@@ -465,6 +465,7 @@ export function AdminView() {
   );
   const [gateActive, setGateActive] = useState(true);
   const [gateSortOrder, setGateSortOrder] = useState(10);
+  const [gateTravelLeadMinutes, setGateTravelLeadMinutes] = useState(0);
   const [gateDisplayProductIds, setGateDisplayProductIds] = useState<string[]>([]);
   const [gateDisplayRotationStatuses, setGateDisplayRotationStatuses] = useState<
     GateDisplayStatus[]
@@ -490,6 +491,7 @@ export function AdminView() {
           gateType,
           gateActive,
           gateSortOrder,
+          gateTravelLeadMinutes,
           gateDisplayProductIds,
           gateDisplayRotationStatuses,
         ])
@@ -1226,6 +1228,7 @@ export function AdminView() {
     const nextType = entry?.gateType ?? "FLIGHT_LINE";
     const nextActive = entry?.active ?? true;
     const nextSortOrder = entry?.sortOrder ?? 10;
+    const nextTravelLeadMinutes = entry?.travelLeadMinutes ?? 0;
     const nextProductIds = entry?.displayFilter.productIds ?? [];
     const nextRotationStatuses = entry?.displayFilter.rotationStatuses ?? [];
     initialMasterEditorSnapshotRef.current = createMasterEditorSnapshot([
@@ -1234,6 +1237,7 @@ export function AdminView() {
       nextType,
       nextActive,
       nextSortOrder,
+      nextTravelLeadMinutes,
       nextProductIds,
       nextRotationStatuses,
     ]);
@@ -1242,6 +1246,7 @@ export function AdminView() {
     setGateType(nextType);
     setGateActive(nextActive);
     setGateSortOrder(nextSortOrder);
+    setGateTravelLeadMinutes(nextTravelLeadMinutes);
     setGateDisplayProductIds(nextProductIds);
     setGateDisplayRotationStatuses(nextRotationStatuses);
     setMasterSubmitAttempted(false);
@@ -1266,6 +1271,7 @@ export function AdminView() {
             gateType,
             active: gateActive,
             sortOrder: gateSortOrder,
+            travelLeadMinutes: gateTravelLeadMinutes,
             displayFilter: {
               productIds: gateDisplayProductIds,
               rotationStatuses: gateDisplayRotationStatuses,
@@ -1281,6 +1287,7 @@ export function AdminView() {
       finishMasterEditor();
       setGateEditorId("new");
       setGateLabel("");
+      setGateTravelLeadMinutes(0);
       await refresh();
       await refreshHistory();
     } catch (cause) {
@@ -3681,6 +3688,21 @@ export function AdminView() {
                     checked={gateActive}
                     label="Gate ist aktiv"
                     onChange={(event) => setGateActive(event.target.checked)}
+                  />
+                </div>
+                <div className="field-control">
+                  <FieldLabel
+                    htmlFor="gate-travel-lead-minutes"
+                    label="Zusätzlicher Wegvorlauf"
+                    help="Zusätzliche Zeit für den Weg vom Wartebereich zu diesem Gate. Der Wert verschiebt „Bereithalten“ und „Bitte zum Gate“ nach vorne, verändert aber nicht das prognostizierte Boardingzeitfenster."
+                  />
+                  <input
+                    id="gate-travel-lead-minutes"
+                    max="30"
+                    min="0"
+                    onChange={(event) => setGateTravelLeadMinutes(Number(event.target.value))}
+                    type="number"
+                    value={gateTravelLeadMinutes}
                   />
                 </div>
                 <details className="master-editor-further-settings">

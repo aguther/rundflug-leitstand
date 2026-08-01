@@ -317,3 +317,32 @@ Teil des allgemeinen Ansichtswechslers und wird erst nach erfolgreicher Anmeldun
 Veranstaltungsauswahl und Rollenprüfung gerendert. Nicht angemeldete Aufrufe zeigen die Anmeldung;
 andere Rollen werden auf ihren jeweiligen Arbeitsbereich zurückgeführt. Die Simulator-Artefakte
 werden nicht in den PWA-Precache aufgenommen und daher erst beim bewussten Admin-Aufruf geladen.
+
+## Dispatch-Verifikation nach ADR-0032
+
+Produktion und Simulator verwenden `createDispatchPlan` aus `packages/domain`. Der Simulator
+erzeugt bei importierten Produkten deterministisch Gruppen unterschiedlicher Größe, hält jede
+Buchungsgruppe atomar und führt nur produktreine Batches aus. Forecast und tatsächliche
+Simulationsausführung verwenden dieselbe begrenzte Zielordnung.
+
+Die Detail- und A/B-Auswertung weist zusätzlich folgende Dispatch-Kennzahlen aus:
+
+- Personen pro Stunde und Personen pro Flugzeugstunde;
+- angebotene und belegte Sitze sowie Sitzplatzauslastung;
+- P50, P90 und Maximum der personenbezogenen Wartezeit sowie Mittelwert je Produkt;
+- projizierte Überholungen und maximale Überholzahl je Gruppe;
+- Serviceanteil und maximales Service-Defizit je Produkt;
+- unnötige Planänderungen, Rücknahmen von `PREPARE` und Neuplanungen nach `GO TO GATE`;
+- weiterhin Prognosefehler, Fensterabdeckung und Gate-Wartezeit.
+
+Ein kleines, deterministisches Referenzbeispiel dokumentiert den Unterschied zum früheren
+Ein-Gruppen-je-Umlauf-Verhalten: Queuegrößen `1, 1, 3, 1`, ein Dreisitzer, ein Produkt, alle Gruppen
+gleichzeitig anwesend. Das alte Modell bot in vier Umläufen 12 Sitze an und belegte 6 (50 %). Der
+Dispatch-Plan bildet die Batches `1+1+1` und `3`, bietet 6 Sitze an, belegt 6 (100 %) und halbiert
+die nötigen Umläufe bei unveränderter Gruppenatomarität. Die allgemeine Freigabe stützt sich nicht
+allein auf dieses Beispiel, sondern auf die Szenarien A–K und den Mehrseed-A/B-Lauf.
+
+Die Stabilitätsdiagnostik zählt einen Bahnwechsel nur, wenn die bisherige Bahn weiterhin im Plan
+vorhanden ist. Das normale Fortschreiten einer Welle sowie Ressourcenverlust sind keine unnötige
+Planänderung. Für `GO TO GATE` bleibt eine weiterhin passende Bahn hart geschützt; ein
+Ressourcenverlust darf neu planen, aber keine Gruppe duplizieren oder teilen.

@@ -32,5 +32,13 @@ describe("product-pure flight groups", () => {
     expect(coordinator).toContain("QUEUE_DEVIATION_REASON_REQUIRED");
     expect(coordinator).toContain("queueDeviationReason");
     expect(coordinator).toContain("skippedTicketGroupIds");
+    expect(coordinator).toContain("CAPACITY_OPTIMIZED_DISPATCH");
+  });
+
+  it("rejects stale dispatch recommendations before the atomic assignment", () => {
+    expect(coordinator).toContain("DISPATCH_PLAN_STALE");
+    expect(coordinator).toContain("dispatch_plan_revision");
+    expect(coordinator).toContain("dispatch_group_ids_json");
+    expect(coordinator).toContain("acceptedDispatchRecommendation");
   });
 });

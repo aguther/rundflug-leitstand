@@ -507,6 +507,7 @@ function AssignmentQueueRow({
 
 export function BookingGroupAssignmentDialog({
   aircraft,
+  dispatchRecommendation,
   groups,
   selectedQueueGroupIds,
   confirmDisabled,
@@ -523,6 +524,15 @@ export function BookingGroupAssignmentDialog({
   timeZone,
 }: {
   aircraft: FlightLineAircraft | undefined;
+  dispatchRecommendation?: {
+    planRevision: string;
+    batchId: string;
+    dispatchOrder: number;
+    groupIds: string[];
+    occupiedSeats: number;
+    availableSeats: number;
+    decisionReasons: string[];
+  } | null;
   groups: FlightLineQueueGroup[];
   selectedQueueGroupIds: string[];
   confirmDisabled: boolean;
@@ -563,7 +573,25 @@ export function BookingGroupAssignmentDialog({
             group.queueSequence < earliestSelectedQueueSequence &&
             group.productId !== selectedProductId,
         );
-  const queueDeviationReasonRequired = skippedEarlierProductGroups.length > 0;
+  const sortedSelectedQueueGroupIds = [...selectedQueueGroupIds].sort();
+  const recommendationMatchesSelection = Boolean(
+    dispatchRecommendation &&
+      dispatchRecommendation.groupIds.length === selectedQueueGroupIds.length &&
+      [...dispatchRecommendation.groupIds]
+        .sort()
+        .every((groupId, index) => groupId === sortedSelectedQueueGroupIds[index]),
+  );
+  const queueDeviationReasonRequired =
+    skippedEarlierProductGroups.length > 0 && !recommendationMatchesSelection;
+  const recommendationReason = dispatchRecommendation?.decisionReasons.includes(
+    "MUST_SERVE_MAX_WAIT",
+  )
+    ? "Lange Wartezeit hat Vorrang."
+    : dispatchRecommendation?.decisionReasons.includes("PRODUCT_FAIRNESS")
+      ? "Produktfairness und verfügbare Kapazität bestimmen diese Belegung."
+      : dispatchRecommendation?.decisionReasons.includes("CAPACITY_OPTIMIZED")
+        ? "Diese Kombination nutzt die nächste passende Flugzeugkapazität am besten."
+        : "Queue-Reihenfolge und verfügbare Kapazität bestimmen diese Belegung.";
   useEffect(() => {
     if (!open || !queueDeviationReasonRequired) setQueueDeviationReason("");
   }, [open, queueDeviationReasonRequired]);
@@ -602,6 +630,25 @@ export function BookingGroupAssignmentDialog({
     >
       <div className="flight-director-assignment-dialog">
         <section className="flight-director-queue">
+          {dispatchRecommendation ? (
+            <div className="flight-director-dispatch-recommendation">
+              <div>
+                <span>Empfohlene Belegung · Umlauf {dispatchRecommendation.dispatchOrder}</span>
+                <strong>
+                  {dispatchRecommendation.occupiedSeats} belegt ·{" "}
+                  {dispatchRecommendation.availableSeats} frei
+                </strong>
+              </div>
+              <p>{recommendationReason}</p>
+              {skippedEarlierProductGroups.length > 0 ? (
+                <small>
+                  {skippedEarlierProductGroups.length} frühere Gruppe
+                  {skippedEarlierProductGroups.length === 1 ? " wird" : "n werden"} nur für die
+                  produktreine, kapazitätsoptimierte Belegung überholt.
+                </small>
+              ) : null}
+            </div>
+          ) : null}
           {groups.length > 0 ? (
             groups.map((group) => (
               <AssignmentQueueRow
@@ -675,6 +722,11 @@ export function BookingGroupAssignmentDialog({
                 übersprungen.
               </small>
             </label>
+          ) : null}
+          {recommendationMatchesSelection ? (
+            <p className="flight-director-dialog-recommendation-ok">
+              Aktuelle Dispatch-Empfehlung ausgewählt. Kein freier Abweichungsgrund erforderlich.
+            </p>
           ) : null}
           {!aircraft?.currentPilotId ? (
             <p className="flight-director-dialog-warning">

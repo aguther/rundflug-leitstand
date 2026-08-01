@@ -507,14 +507,14 @@ requirements:
   - id: F-PRG-020
     source: "1.4-konsolidiert"
     section: "8.6 Prognose, Disposition und Kapazität"
-    requirement: "Nach jedem relevanten Ereignis und während des aktiven Betriebs zusätzlich mindestens alle 30 Sekunden werden erwartetes Boarding, Start, Landung, Abschluss, verbleibende Wartezeit und alle abhängigen Folgeflüge automatisch neu berechnet."
+    requirement: "Nach jedem relevanten Ereignis und während des aktiven Betriebs zusätzlich mindestens alle 30 Sekunden werden erwartetes Boarding, Start, Landung, Abschluss, verbleibende Wartezeit und alle abhängigen Folgeflüge automatisch neu berechnet. Ein reiner deterministischer und begrenzter Dispatch-Plan plant dabei mehrere Bahnen und nahe Batches gemeinsam; Produktion und Simulator verwenden dieselbe Domainlogik."
     priority: MUSS
     stage: V1
-    status: in Arbeit
+    status: umgesetzt
   - id: F-PRG-030
     source: "1.4-konsolidiert"
     section: "8.6 Prognose, Disposition und Kapazität"
-    requirement: "Die Prognose berücksichtigt mindestens Referenzzeit Offblock–Onblock des Produkts, Flugzeugprofil, veranstaltungsweite Boarding-, Ausstiegs- und Pufferzeiten, aktuelle Flugzeugzustände, Pausen, Tanken, Unterbrechungen und Queue-Reihenfolge. Die Referenz-Umlaufzeit wird als Summe dieser vier Zeitanteile abgeleitet und nicht separat gespeichert."
+    requirement: "Die Prognose berücksichtigt mindestens Referenzzeit Offblock–Onblock des Produkts, Flugzeugprofil, veranstaltungsweite Boarding-, Ausstiegs- und Pufferzeiten, aktuelle Flugzeugzustände, Pausen, Tanken, Unterbrechungen, vollständige Gruppen, Sitzkapazität, Produktfairness, Wartealter, begrenzte Überholungen und Planstabilität. Pro produktreinem Batch wird genau eine Bahn reserviert; alle Mitglieder erhalten dasselbe Boardingfenster. Die Referenz-Umlaufzeit wird als Summe der vier Zeitanteile abgeleitet und nicht separat gespeichert."
     priority: MUSS
     stage: V1
     status: umgesetzt
@@ -759,10 +759,10 @@ requirements:
   - id: F-BEN-030
     source: "1.4-konsolidiert"
     section: "8.9 Gastinformation und Benachrichtigung"
-    requirement: "Das System prüft während des aktiven Betriebs regelmäßig und nach relevanten Ereignissen Prognose, reale Flugzeugverfügbarkeit, Queue-Position und Anwesenheitslage und löst daraus automatisch Bitte zum Gate beziehungsweise GO TO GATE aus. Der Zielvorlauf wird aus bestätigten Tageswerten adaptiv nachgeregelt; Gate-Wartezeit und Prognosequalität sind weiche Optimierungsgrößen und keine harten Auslösesperren. Die konkrete Flugzeugbelegung und der Boardingstart bleiben davon getrennt und werden erst menschlich bestätigt."
+    requirement: "Das System prüft während des aktiven Betriebs regelmäßig und nach relevanten Ereignissen den frischen Dispatch-Plan, reale Flugzeugverfügbarkeit und Anwesenheitslage und löst für nahe Batches automatisch Bereithalten oder Bitte zum Gate aus. Ein Gate-Wegvorlauf von 0 bis 30 Minuten wird zum adaptiven Basisvorlauf addiert, verändert aber nicht das Boardingfenster und wird für das Lernen aus der Beobachtung herausgerechnet. Nicht passende Vordergruppen oder unabhängige Ressourcengruppen am selben Gate blockieren den Aufruf nicht. Die konkrete Flugzeugbelegung und der Boardingstart bleiben getrennt und werden erst menschlich bestätigt."
     priority: MUSS
     stage: V1
-    status: in Arbeit
+    status: umgesetzt
   - id: F-BEN-040
     source: "1.4-konsolidiert"
     section: "8.9 Gastinformation und Benachrichtigung"
@@ -801,7 +801,7 @@ requirements:
   - id: F-BEN-090
     source: "1.4-konsolidiert"
     section: "8.9 Gastinformation und Benachrichtigung"
-    requirement: "Öffentliche Statusbezeichnungen sind auf wenige handlungsorientierte Zustände zu reduzieren: Warten, Bitte zum Gate, Boarding, Abgeflogen beziehungsweise Flug läuft, Verzögert, Gelandet und Abgeschlossen. Das Terminalprofil bildet diese ausschließlich auf WAITING, GO TO GATE, BOARDING, DEPARTED und DELAYED ab."
+    requirement: "Öffentliche Statusbezeichnungen sind auf wenige handlungsorientierte Zustände zu reduzieren: Warten, Bereithalten, Bitte zum Gate, Boarding, Abgeflogen beziehungsweise Flug läuft, Verzögert, Gelandet und Abgeschlossen. Das Terminalprofil bildet diese auf WAITING, PREPARE, GO TO GATE, BOARDING, DEPARTED und DELAYED ab. FIDS priorisiert Boarding, Bitte zum Gate, Bereithalten und Warten; innerhalb eines Zustands gelten Dispatch-Plan, Prognose, Queue und stabile ID."
     priority: MUSS
     stage: V1
     status: umgesetzt
@@ -1158,7 +1158,7 @@ requirements:
   - id: Q-ZUV-020
     source: "1.4-konsolidiert"
     section: "10.2 Zuverlässigkeit und Verbindungsverhalten"
-    requirement: "Verbindungsaussetzer und vorübergehende Server- oder D1-Fehler werden ohne Leeren der Oberfläche überbrückt. Der letzte bestätigte Stand bleibt mit Alter und Verbindungsstatus sichtbar; unbestätigte Schreibaktionen bleiben gesperrt und werden nicht als operative Änderungen gezählt."
+    requirement: "Verbindungsaussetzer und vorübergehende Server- oder D1-Fehler werden ohne Leeren der Oberfläche überbrückt. Der letzte bestätigte Stand bleibt mit Alter und Verbindungsstatus sichtbar; unbestätigte Schreibaktionen bleiben gesperrt und werden nicht als operative Änderungen gezählt. Dispatch-Bestätigungen übermitteln Planrevision und Batch-ID; veraltete Empfehlungen und stale writes werden abgewiesen und niemals still überschrieben."
     priority: MUSS
     stage: V1
     status: in Arbeit
@@ -1480,7 +1480,7 @@ requirements:
   - id: V15-QUE-020
     source: "1.5"
     section: "Fortgeltendes Delta 1.5"
-    requirement: "Mehrgruppen-Aufrufe kombinieren nur vollständige kompatible Gruppen atomar."
+    requirement: "Mehrgruppen-Aufrufe kombinieren nur vollständige produktkompatible Gruppen atomar; der begrenzte Dispatch-Plan darf Gruppen zugunsten von Durchsatz und Fairness sichtbar überholen, aber niemals automatisch teilen."
     priority: MUSS
     stage: V1
     status: implemented

@@ -58,6 +58,34 @@ type Rotation = OperationBoard["rotations"][number];
 type QueueGroup = OperationBoard["queueGroups"][number];
 type TurnaroundNextState = "AVAILABLE" | "REFUELING" | "PAUSED" | "INACTIVE";
 
+function dispatchRecommendationForAircraft(board: OperationBoard, aircraftId: string | undefined) {
+  if (!aircraftId) return null;
+  const rotation = board.rotations
+    .filter(
+      (entry) =>
+        entry.status === "DRAFT" &&
+        entry.timeline.forecastAssumedAircraftId === aircraftId &&
+        entry.dispatchPlan?.batchId,
+    )
+    .sort(
+      (left, right) =>
+        (left.dispatchPlan?.dispatchOrder ?? Number.MAX_SAFE_INTEGER) -
+          (right.dispatchPlan?.dispatchOrder ?? Number.MAX_SAFE_INTEGER) ||
+        left.id.localeCompare(right.id),
+    )[0];
+  const plan = rotation?.dispatchPlan;
+  if (!plan?.batchId || !plan.dispatchOrder || plan.occupiedSeats === null) return null;
+  return {
+    planRevision: plan.revision,
+    batchId: plan.batchId,
+    dispatchOrder: plan.dispatchOrder,
+    groupIds: plan.groupIds,
+    occupiedSeats: plan.occupiedSeats,
+    availableSeats: plan.availableSeats ?? 0,
+    decisionReasons: plan.decisionReasons,
+  };
+}
+
 function queuedSegmentTicketCount(group: QueueGroup): number {
   return group.nextSegmentTicketCount ?? group.ticketCount;
 }
@@ -270,6 +298,10 @@ export function FlightLineSupervisorConsole({
   const [pendingAircraftActions, setPendingAircraftActions] = useState<
     Record<string, "primary" | "refueling" | "inactive">
   >({});
+  const dispatchRecommendation = useMemo(
+    () => dispatchRecommendationForAircraft(board, selectedAircraft?.id),
+    [board, selectedAircraft?.id],
+  );
 
   const filteredAircraft = useMemo(
     () => aircraft.filter((entry) => !resourceGroupId || entry.resourceGroupId === resourceGroupId),
@@ -392,6 +424,17 @@ export function FlightLineSupervisorConsole({
       return runAircraftStateAction(entry, "primary", "AVAILABLE");
     }
     if (!rotation || rotation.status === "DRAFT") {
+      const recommendation = dispatchRecommendationForAircraft(board, entry.id);
+      if (recommendation) {
+        for (const selectedGroupId of selectedQueueGroupIds) {
+          if (!recommendation.groupIds.includes(selectedGroupId)) {
+            onToggleGroup(selectedGroupId, false);
+          }
+        }
+        for (const groupId of recommendation.groupIds) {
+          if (!selectedQueueGroupIds.includes(groupId)) onToggleGroup(groupId, true);
+        }
+      }
       setAssignmentOpen(true);
       return;
     }
@@ -699,6 +742,7 @@ export function FlightLineSupervisorConsole({
       <BookingGroupAssignmentDialog
         aircraft={selectedAircraft}
         confirmDisabled={assignmentBlocked}
+        dispatchRecommendation={dispatchRecommendation}
         groups={compatibleGroups}
         onClose={() => setAssignmentOpen(false)}
         onAttendance={onGroupAttendance}
