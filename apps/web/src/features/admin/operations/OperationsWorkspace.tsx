@@ -4,27 +4,24 @@ import { Tabs } from "../../../design-system/components";
 import { EventWorkspaceFrame } from "../event-workspace/EventWorkspaceFrame";
 import "./operations-workspace.css";
 
-type OperationsTab = "plan" | "sales" | "exceptions";
+type OperationsTab = "plan" | "exceptions";
 
 const operationTabs = [
   { value: "plan", label: "Plan und Freigabe" },
-  { value: "sales", label: "Verkauf und Kapazität" },
   { value: "exceptions", label: "Sonderlagen" },
 ] satisfies Array<{ value: OperationsTab; label: string }>;
 
 export function OperationsWorkspace({
   board,
   plan,
-  sales,
   exceptions,
 }: {
   board: OperationBoard;
   plan: ReactNode;
-  sales: ReactNode;
   exceptions: ReactNode;
 }) {
   const [activeTab, setActiveTab] = useState<OperationsTab>("plan");
-  const panels: Record<OperationsTab, ReactNode> = { plan, sales, exceptions };
+  const panels: Record<OperationsTab, ReactNode> = { plan, exceptions };
   return (
     <EventWorkspaceFrame event={board.event} variant="wide">
       <section className="operations-workspace-summary" aria-label="Betriebszusammenfassung">

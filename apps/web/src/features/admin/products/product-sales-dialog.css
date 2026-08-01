@@ -1,0 +1,89 @@
+.product-sales-dialog .ds-modal-body {
+  display: grid;
+  gap: 16px;
+}
+
+.product-sales-status {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-md);
+  background: var(--ui-border);
+}
+
+.product-sales-status > div {
+  display: grid;
+  min-height: 76px;
+  align-content: center;
+  gap: 5px;
+  padding: 12px;
+  background: var(--ui-surface-subtle);
+}
+
+.product-sales-status span:not(.ds-status-pill) {
+  color: var(--ui-text-muted);
+  font-size: 0.75rem;
+}
+
+.product-sales-status strong {
+  line-height: 1.25;
+}
+
+.product-sales-control {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-md);
+  background: var(--ui-surface);
+}
+
+.product-sales-control h3,
+.product-sales-control p {
+  margin: 0;
+}
+
+.product-sales-control p {
+  margin-top: 4px;
+  color: var(--ui-text-muted);
+  font-size: 0.82rem;
+}
+
+.product-sales-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.product-sales-control > .ds-button {
+  justify-self: end;
+}
+
+@media (max-width: 800px) {
+  .product-sales-status {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .product-sales-status > div:first-child {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 520px) {
+  .product-sales-status {
+    grid-template-columns: 1fr;
+  }
+
+  .product-sales-status > div:first-child {
+    grid-column: auto;
+  }
+
+  .product-sales-actions,
+  .product-sales-actions .ds-button,
+  .product-sales-control > .ds-button {
+    width: 100%;
+  }
+}

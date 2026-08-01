@@ -40,10 +40,9 @@ describe("event-scoped administration redesign", () => {
     expect(adminViewSource).toContain("expectedOverrideVersion: existing.version");
   });
 
-  it("provides three operation tabs and five completion tabs with gated corrections", () => {
-    for (const label of ["Plan und Freigabe", "Verkauf und Kapazität", "Sonderlagen"]) {
-      expect(operationsSource).toContain(label);
-    }
+  it("keeps product sales outside operations and provides five gated completion tabs", () => {
+    expect(adminViewSource).toContain("<ProductSalesDialog");
+    expect(operationsSource).not.toContain("Verkauf und Kapazität");
     for (const label of [
       "Tagesübersicht",
       "Betriebshistorie",

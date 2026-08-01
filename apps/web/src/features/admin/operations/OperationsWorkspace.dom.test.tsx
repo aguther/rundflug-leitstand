@@ -19,24 +19,24 @@ const board = {
 } as OperationBoard;
 
 describe("OperationsWorkspace", () => {
-  it("keeps three stable tab and panel relationships", () => {
+  it("keeps the remaining operation tab and panel relationships", () => {
     render(
       <OperationsWorkspace
         board={board}
         exceptions={<p>Sonderlageninhalt</p>}
         plan={<p>Planinhalt</p>}
-        sales={<p>Verkaufsinhalt</p>}
       />,
     );
 
-    const salesTab = screen.getByRole("tab", { name: "Verkauf und Kapazität" });
-    expect(salesTab.getAttribute("aria-controls")).toBe("admin-operations-sales-panel");
-    fireEvent.click(salesTab);
-    expect(document.getElementById("admin-operations-sales-panel")?.hasAttribute("hidden")).toBe(
+    const exceptionsTab = screen.getByRole("tab", { name: "Sonderlagen" });
+    expect(exceptionsTab.getAttribute("aria-controls")).toBe("admin-operations-exceptions-panel");
+    fireEvent.click(exceptionsTab);
+    expect(
+      document.getElementById("admin-operations-exceptions-panel")?.hasAttribute("hidden"),
+    ).toBe(false);
+    expect(screen.getByText("Sonderlageninhalt").closest("section")?.hasAttribute("hidden")).toBe(
       false,
     );
-    expect(screen.getByText("Verkaufsinhalt").closest("section")?.hasAttribute("hidden")).toBe(
-      false,
-    );
+    expect(screen.queryByRole("tab", { name: "Verkauf und Kapazität" })).toBeNull();
   });
 });
