@@ -1,5 +1,5 @@
 import type { OperationBoard } from "@rundflug/contracts";
-import { Pencil, TimerReset, Trash2 } from "lucide-react";
+import { Handbag, Pencil, TimerReset, Trash2 } from "lucide-react";
 import { IconButton, StatusPill } from "../../../design-system/components";
 import { AdminEntityTable } from "../master-data/AdminEntityTable";
 
@@ -11,6 +11,7 @@ export function ProductsWorkspace({
   sortDirection,
   onSort,
   onEdit,
+  onSales,
   onTurnaround,
   onDelete,
 }: {
@@ -19,6 +20,7 @@ export function ProductsWorkspace({
   sortDirection?: "asc" | "desc" | null | undefined;
   onSort: (key: string) => void;
   onEdit: (id: string) => void;
+  onSales: (id: string) => void;
   onTurnaround: (id: string) => void;
   onDelete: (id: string, label: string) => void;
 }) {
@@ -98,6 +100,14 @@ export function ProductsWorkspace({
             type="button"
           >
             <Pencil aria-hidden="true" />
+          </IconButton>
+          <IconButton
+            label={`Verkauf für ${product.name} steuern`}
+            onClick={() => onSales(product.id)}
+            size="touch"
+            type="button"
+          >
+            <Handbag aria-hidden="true" />
           </IconButton>
           <IconButton
             label={`Bodenzeiten für ${product.name} verwalten`}

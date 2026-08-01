@@ -56,6 +56,7 @@ import {
   type PlannedOperationScope,
   plannedOperationAuditReason,
 } from "./planned-operation-audit-reason";
+import { validateProductSalesUpdate } from "./product-sales-policy";
 import { rowToSnapshot, safeErrorMessage } from "./snapshot";
 import type { Env, StoredEventRow } from "./types";
 import {
@@ -4315,14 +4316,33 @@ export class EventCoordinator extends DurableObject<Env> {
       );
     }
     const product = await this.env.DB.prepare(
-      "SELECT id FROM products WHERE id = ?1 AND operation_day_id = ?2",
+      "SELECT id, sale_enabled FROM products WHERE id = ?1 AND operation_day_id = ?2",
     )
       .bind(command.payload.productId, command.eventId)
-      .first<{ id: string }>();
+      .first<{ id: string; sale_enabled: number }>();
     if (!product) {
       return json(
         { error: { code: "PRODUCT_NOT_FOUND", message: "Produkt nicht gefunden." } },
         { status: 404 },
+      );
+    }
+    const policyError = validateProductSalesUpdate(
+      current.status,
+      Boolean(product.sale_enabled),
+      command.payload.saleEnabled,
+    );
+    if (policyError) {
+      return json(
+        {
+          error: {
+            code: policyError,
+            message:
+              policyError === "PRODUCT_SALES_EVENT_READ_ONLY"
+                ? "Die Verkaufssteuerung ist nach Betriebsende nur lesbar."
+                : "Die Live-Verkaufssteuerung ist erst nach Betriebsfreigabe verfügbar.",
+          },
+        },
+        { status: 409 },
       );
     }
     const now = new Date().toISOString();

@@ -165,6 +165,9 @@ describe("V1.5 administration UI", () => {
     expect(adminViewSource).toContain("<AircraftWorkspace");
     expect(adminViewSource).toContain("<PilotCodesWorkspace");
     expect(adminViewSource).toContain("<ProductsWorkspace");
+    expect(productsWorkspaceSource).toContain("Handbag");
+    expect(productsWorkspaceSource).toContain("Verkauf für ");
+    expect(productsWorkspaceSource).toContain("product.name");
     expect(featureSources).toContain("<IconButton");
     expect(featureSources).not.toContain("table-overflow-action");
     expect(featureSources).not.toContain("tabIndex={0}");

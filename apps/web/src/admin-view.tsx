@@ -99,8 +99,8 @@ import {
   MasterDataWorkspace,
 } from "./features/admin/master-data/MasterDataWorkspace";
 import { OperationsWorkspace } from "./features/admin/operations/OperationsWorkspace";
-import { ProductSalesClosingDialog } from "./features/admin/operations/ProductSalesClosingDialog";
 import { PilotCodesWorkspace } from "./features/admin/pilots/PilotCodesWorkspace";
+import { ProductSalesDialog } from "./features/admin/products/ProductSalesDialog";
 import { ProductsWorkspace } from "./features/admin/products/ProductsWorkspace";
 import { ResourceGroupsWorkspace } from "./features/admin/resource-groups/ResourceGroupsWorkspace";
 import { AccountManagement } from "./features/auth/AccountManagement";
@@ -123,7 +123,6 @@ import {
   ADMIN_DEVICE_ID,
   aircraftStateLabel,
   ConnectionNotice,
-  capacityLabel,
   deviceTokenFor,
   EmergencyNotice,
   EVENT_ID,
@@ -137,7 +136,6 @@ import {
   type MasterDataDeleteTarget,
   OPERATIONAL_AUDIT_REASON,
   OperationalNotice,
-  predictionQualityLabel,
   rotationStatusLabel,
   useOperationBoard,
 } from "./operation-workspace";
@@ -355,7 +353,7 @@ export function AdminView() {
     }
   }
   const [saleClosesAt, setSaleClosesAt] = useState("");
-  const [salesClosingProductId, setSalesClosingProductId] = useState<string | null>(null);
+  const [salesProductId, setSalesProductId] = useState<string | null>(null);
   const [endOperationsConfirmOpen, setEndOperationsConfirmOpen] = useState(false);
   const [pendingEmergencyAction, setPendingEmergencyAction] = useState<
     "TRIGGER_EMERGENCY" | "CLEAR_EMERGENCY" | null
@@ -1834,7 +1832,7 @@ export function AdminView() {
         deviceTokenFor(ADMIN_DEVICE_ID),
       );
       setMessage("Verkaufssteuerung wurde protokolliert aktualisiert.");
-      setSalesClosingProductId(null);
+      setSalesProductId(null);
       await refresh();
       await refreshHistory();
     } catch (cause) {
@@ -3485,6 +3483,16 @@ export function AdminView() {
                 <ProductsWorkspace
                   onDelete={(id, label) => requestMasterDelete("PRODUCT", id, label)}
                   onEdit={selectProductForEditing}
+                  onSales={(productId) => {
+                    const product = board.products.find((entry) => entry.id === productId);
+                    if (!product) return;
+                    setSalesProductId(product.id);
+                    setSaleClosesAt(
+                      product.saleClosesAt
+                        ? formatEventLocalDateTime(product.saleClosesAt, board.event.timeZone)
+                        : "",
+                    );
+                  }}
                   onSort={toggleMasterSort}
                   onTurnaround={(productId) =>
                     setTurnaroundDialogContext({ mode: "product", productId })
@@ -3548,6 +3556,44 @@ export function AdminView() {
               context={turnaroundDialogContext}
               onClose={() => setTurnaroundDialogContext(null)}
               onSave={requestTurnaroundOverrideSave}
+            />
+          ) : null}
+          {board ? (
+            <ProductSalesDialog
+              busyAction={
+                salesProductId && busyActionKey === `product-${salesProductId}-closing`
+                  ? "closing"
+                  : salesProductId && busyActionKey === `product-${salesProductId}-sales`
+                    ? "toggle"
+                    : null
+              }
+              closingValue={saleClosesAt}
+              eventStatus={board.event.status}
+              key={salesProductId ?? "closed"}
+              onClose={() => setSalesProductId(null)}
+              onClosingChange={setSaleClosesAt}
+              onSaveClosing={(remove) => {
+                const product = board.products.find((entry) => entry.id === salesProductId);
+                if (!product) return;
+                const closingTime = remove
+                  ? null
+                  : eventLocalDateTimeToIso(saleClosesAt, board.event.timeZone);
+                requestAdminAction(() =>
+                  runBusyAction(`product-${product.id}-closing`, () =>
+                    configureProductSales(product, product.saleEnabled, closingTime),
+                  ),
+                );
+              }}
+              onToggleSales={() => {
+                const product = board.products.find((entry) => entry.id === salesProductId);
+                if (!product) return;
+                requestAdminAction(() =>
+                  runBusyAction(`product-${product.id}-sales`, () =>
+                    configureProductSales(product, !product.saleEnabled),
+                  ),
+                );
+              }}
+              product={board.products.find((product) => product.id === salesProductId) ?? null}
             />
           ) : null}
           <ModalDialog
@@ -4530,77 +4576,6 @@ export function AdminView() {
                     </section>
                   </>
                 }
-                sales={
-                  <section className="admin-section admin-capacity-section">
-                    <div className="section-heading">
-                      <div>
-                        <h2>Verkauf und Kapazität</h2>
-                        <p>Produktbezogene Freigabe, Restplätze, Empfehlung und Verkaufsschluss.</p>
-                      </div>
-                    </div>
-                    <div className="capacity-overview">
-                      {alphabeticalProducts.map((product) => (
-                        <div className="capacity-row" key={product.id}>
-                          <div>
-                            <strong>{product.name}</strong>
-                            <span>{product.saleEnabled ? "Verkauf aktiv" : "Verkauf gesperrt"}</span>
-                          </div>
-                          <div>
-                            <strong>{product.remainingSellableSeats}</strong>
-                            <span>{capacityLabel[product.capacityStatus]}</span>
-                          </div>
-                          <div>
-                            <strong>
-                              {product.saleRecommended ? "Verkauf empfohlen" : "Nicht verkaufen"}
-                            </strong>
-                            <span>Prognose {predictionQualityLabel[product.predictionQuality]}</span>
-                          </div>
-                          <div>
-                            <strong>
-                              {product.saleClosesAt
-                                ? formatEventLocalDateTime(product.saleClosesAt, board.event.timeZone)
-                                : "Nicht gesetzt"}
-                            </strong>
-                            <span>Verkaufsschluss</span>
-                          </div>
-                          <div className="secondary-actions">
-                            <Button
-                              busy={busyActionKey === `product-${product.id}-sales`}
-                              disabled={!isAdministrator || busyActionKey !== null}
-                              onClick={() =>
-                                requestAdminAction(() =>
-                                  runBusyAction(`product-${product.id}-sales`, () =>
-                                    configureProductSales(product, !product.saleEnabled),
-                                  ),
-                                )
-                              }
-                              type="button"
-                            >
-                              {product.saleEnabled ? "Verkauf sperren" : "Verkauf freigeben"}
-                            </Button>
-                            <Button
-                              disabled={!isAdministrator || busyActionKey !== null}
-                              onClick={() => {
-                                setSalesClosingProductId(product.id);
-                                setSaleClosesAt(
-                                  product.saleClosesAt
-                                    ? formatEventLocalDateTime(
-                                        product.saleClosesAt,
-                                        board.event.timeZone,
-                                      )
-                                    : "",
-                                );
-                              }}
-                              type="button"
-                            >
-                              Verkaufsschluss bearbeiten
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </section>
-                }
                 exceptions={
                   <section className="admin-section admin-emergency-section">
                     <h2>Notfallmodus</h2>
@@ -4641,32 +4616,6 @@ export function AdminView() {
                     </Button>
                   </section>
                 }
-              />
-              <ProductSalesClosingDialog
-                busy={
-                  salesClosingProductId !== null &&
-                  busyActionKey === `product-${salesClosingProductId}-closing`
-                }
-                onChange={setSaleClosesAt}
-                onClose={() => setSalesClosingProductId(null)}
-                onSave={(remove) => {
-                  const product = board.products.find(
-                    (entry) => entry.id === salesClosingProductId,
-                  );
-                  if (!product) return;
-                  const closingTime = remove
-                    ? null
-                    : eventLocalDateTimeToIso(saleClosesAt, board.event.timeZone);
-                  requestAdminAction(() =>
-                    runBusyAction(`product-${product.id}-closing`, () =>
-                      configureProductSales(product, product.saleEnabled, closingTime),
-                    ),
-                  );
-                }}
-                product={
-                  board.products.find((product) => product.id === salesClosingProductId) ?? null
-                }
-                value={saleClosesAt}
               />
               <ConfirmationDialog
                 body={

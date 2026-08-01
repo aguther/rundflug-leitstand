@@ -148,6 +148,7 @@ describe("runtime configuration coverage", () => {
     expect(coordinatorSource).toMatch(
       /PRODUCT_SALES_CONFIGURED[\s\S]*capacity_warning_threshold[\s\S]*capacity_critical_threshold/,
     );
+    expect(coordinatorSource).toContain("validateProductSalesUpdate(");
     expect(coordinatorSource).toMatch(
       /PRODUCT_UPSERTED[\s\S]*promised_flight_minutes[\s\S]*weight_classes_json/,
     );
