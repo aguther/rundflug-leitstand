@@ -33,9 +33,9 @@ describe("V1.8 public group ticket", () => {
 
   it("aggregates split parts without publishing an internal F identifier", () => {
     expect(worker).toContain('app.get("/api/public/groups/:groupCode"');
-    expect(worker).toContain("partNumber: index + 1");
-    expect(worker).toContain("passengerCount: rotation.passenger_count");
-    expect(publicStatusContent).toContain("Teilflug {partNumber} von {partCount}");
+    expect(worker).toContain("withBookingGroupPartProjection(");
+    expect(worker).toContain("...partContext");
+    expect(publicStatusContent).toContain("formatBookingGroupPart(bookingGroupPart)");
     expect(groupStatus).not.toContain("communicationLabel");
     expect(groupStatus).not.toContain("flightGroup");
   });

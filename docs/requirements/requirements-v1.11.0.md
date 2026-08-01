@@ -116,11 +116,11 @@ wurden auf Flight Line und Flight Director aktualisiert.
 | V18-TIM-010 | 1.8.0 | Kasse, Flight Line, FIDS und öffentliche Statusseiten zeigen prognostizierte Zeitfenster als absolute Veranstaltungszeiten. | MUSS | implemented |
 | V18-CAS-010 | 1.8.0 | Kassenliste und Detail entsprechen dem freigegebenen Delta mit Fluggruppenzeilen, Phasensymbolen, GoToGate-Aktiv, absolutem Fenster und Ticket drucken. | MUSS | implemented |
 | V18-FLT-010 | 1.8.0 | Verkaufte Tickets in Flight Line verwenden die verbindliche dreizehnspaltige Reihenfolge mit getrennten G- und F-Kennungen. | MUSS | implemented |
-| V18-GRP-010 | 1.8.0 | Eine Buchungsgruppe besitzt genau einen öffentlichen Gruppen-QR-Code und einen aggregierten Status für alle Teilflüge. | MUSS | implemented |
-| V18-API-010 | 1.8.0 | Verträge liefern ISO-Zeitfenster und Zeitzone; Gruppenroute und Legacy-Ticketroute bleiben parallel verfügbar. | MUSS | implemented |
+| V18-GRP-010 | 1.8.0 | Eine Buchungsgruppe besitzt genau einen öffentlichen Gruppen-QR-Code und einen aggregierten Status für alle Teilflüge. Öffentlicher Gruppenstatus, Legacy-Ticketstatus und konkrete umlaufbezogene Push-Nachrichten verwenden dieselbe aktuelle Teilflugprojektion; Teilflugnummer und -anzahl werden gruppenweise deterministisch aus nicht freigegebenen Ticketzuordnungen zu nicht stornierten Umläufen abgeleitet. | MUSS | implemented |
+| V18-API-010 | 1.8.0 | Verträge liefern ISO-Zeitfenster und Zeitzone; PublicTicketStatus enthält additiv den fachlich vorhandenen Teilflugkontext, und Gruppenroute sowie Legacy-Ticketroute bleiben ohne interne Umlauf- oder Fluggruppenkennungen parallel verfügbar. | MUSS | implemented |
 | V18-DAT-010 | 1.8.0 | Migration 0042 speichert Gruppencode und Push-Zuordnung geschützt, füllt Bestände kompatibel und hält Codes aus Audit und Outbox. | MUSS | implemented |
 | V18-OPS-010 | 1.8.0 | ADR und Migrationsnotiz dokumentieren Rückwärtskompatibilität und Wiederherstellung. | MUSS | implemented |
-| V18-QA-010 | 1.8.0 | Automatisierte und visuelle Abnahme deckt Busy, Zeitfenster, Tabellen, Gruppendruck, Splitstatus, Push, Legacy und Geheimhaltung ab. | MUSS | implemented |
+| V18-QA-010 | 1.8.0 | Automatisierte und visuelle Abnahme deckt Busy, Zeitfenster, Tabellen, Gruppendruck, kanonischen Splitstatus, teilflugbezogenen Umlauf-Push, Legacy, Hell-/Dunkelmodus, mobile Viewports und Geheimhaltung ab. | MUSS | implemented |
 | V19-BRN-010 | 1.9.0 | Das generische App-Icon verwendet in allen synchronen Varianten ein blaues Plane-Outline auf dunklem Hintergrund. | MUSS | implemented |
 | V19-CAS-010 | 1.9.0 | Kassenbuttons, Symbolköpfe, Personenanzeige, Abschlussstatus und der servergestützte Tab Offene Tickets entsprechen dem freigegebenen Delta. | MUSS | implemented |
 | V19-PRN-010 | 1.9.0 | POS-58 druckt das Gruppenticket ohne Vorlauf oder feste Rollenlänge aus genau einer Druckregelquelle. | MUSS | implemented |

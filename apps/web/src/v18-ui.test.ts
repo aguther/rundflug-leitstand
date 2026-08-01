@@ -94,8 +94,8 @@ describe("V1.8 approved UI deltas", () => {
   });
 
   it("shows split parts without an internal F identifier", () => {
-    expect(publicStatusContent).toContain("Teilflug {partNumber} von {partCount}");
-    expect(groupStatus).toContain("part.passengerCount");
+    expect(publicStatusContent).toContain("formatBookingGroupPart(bookingGroupPart)");
+    expect(groupStatus).toContain("bookingGroupPart={part}");
     expect(publicStatusContent).toContain("part.gateLabel");
     expect(groupStatus).not.toContain("communicationLabel");
   });

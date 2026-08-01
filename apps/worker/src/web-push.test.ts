@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { Env } from "./types";
 import {
   isAllowedPushEndpoint,
+  type PushNotificationContext,
   publicPushNavigateOrigin,
   publicPushPayload,
   publicPushTargetPath,
@@ -17,6 +18,20 @@ import {
 import pushSource from "./web-push.ts?raw";
 
 describe("Web-Push-Endpunkte", () => {
+  const pushContext = (
+    notificationType: PushNotificationContext["notificationType"],
+    bookingGroupPart: PushNotificationContext["bookingGroupPart"] = {
+      partNumber: 1,
+      partCount: 1,
+      passengerCount: 5,
+    },
+  ): PushNotificationContext => ({
+    notificationType,
+    gateLabel: "Flight Line 1",
+    bookingGroupLabel: "G-PAN-0101",
+    bookingGroupPart,
+  });
+
   it("erlaubt Browser-Push-Dienste und blockiert beliebige Ziele", () => {
     expect(isAllowedPushEndpoint("https://fcm.googleapis.com/fcm/send/synthetic")).toBe(true);
     expect(
@@ -55,22 +70,32 @@ describe("Web-Push-Endpunkte", () => {
   });
 
   it("trennt ortsbezogene Push-Titel und -Texte mit dem konkreten Gate", () => {
-    expect(pushNotificationFor("PREPARE_FOR_FLIGHT", "Flight Line 1")).toEqual({
+    expect(pushNotificationFor(pushContext("PREPARE_FOR_FLIGHT"))).toEqual({
       title: "Bitte bereithalten",
       body: "Ihr Aufruf steht bevor. Bitte halten Sie sich in der Nähe von Gate „Flight Line 1“ bereit.",
     });
-    expect(pushNotificationFor("GO_TO_GATE", "Flight Line 1")).toEqual({
+    expect(pushNotificationFor(pushContext("GO_TO_GATE"))).toEqual({
       title: "Bitte zum Gate",
       body: "Bitte kommen Sie jetzt zum Gate „Flight Line 1“ und warten Sie dort auf den Boardingaufruf.",
     });
-    expect(pushNotificationFor("BOARDING_STARTED", "Flight Line 1")).toEqual({
+    expect(pushNotificationFor(pushContext("BOARDING_STARTED"))).toEqual({
       title: "Boarding hat begonnen",
       body: "Das Boarding am Gate „Flight Line 1“ hat begonnen. Bitte halten Sie Ihr Ticket für den Einstieg bereit.",
     });
     expect(pushUrgencyFor("GO_TO_GATE")).toBe("high");
     expect(pushUrgencyFor("BOARDING_STARTED")).toBe("high");
     expect(pushUrgencyFor("ROTATION_STARTED")).toBe("normal");
-    expect(pushNotificationFor("TICKET_GROUP_RECALL", "Gate 2", "PAN20-042")).toEqual({
+    expect(
+      pushNotificationFor({
+        ...pushContext("TICKET_GROUP_RECALL", {
+          partNumber: 2,
+          partCount: 2,
+          passengerCount: 2,
+        }),
+        gateLabel: "Gate 2",
+        bookingGroupLabel: "PAN20-042",
+      }),
+    ).toEqual({
       title: "Erneuter Aufruf",
       body: "Ihre Gruppe PAN20-042 wird erneut aufgerufen. Bitte kommen Sie jetzt zu Gate 2.",
     });
@@ -78,19 +103,43 @@ describe("Web-Push-Endpunkte", () => {
   });
 
   it("verwendet für spätere Umlaufphasen die freigegebenen Titel und Beschreibungen", () => {
-    expect(pushNotificationFor("ROTATION_STARTED", "Flight Line 1")).toEqual({
+    expect(pushNotificationFor(pushContext("ROTATION_STARTED"))).toEqual({
       title: "Rundflug gestartet",
       body: "Ihr Rundflug ist gestartet.",
     });
-    expect(pushNotificationFor("ROTATION_LANDED", "Flight Line 1")).toEqual({
+    expect(pushNotificationFor(pushContext("ROTATION_LANDED"))).toEqual({
       title: "Rundflug gelandet",
       body: "Ihr Rundflug ist gelandet.",
     });
-    expect(pushNotificationFor("ROTATION_COMPLETED", "Flight Line 1")).toEqual({
+    expect(pushNotificationFor(pushContext("ROTATION_COMPLETED"))).toEqual({
       title: "Rundflug abgeschlossen",
       body: "Ihr Rundflug ist abgeschlossen. Vielen Dank fürs Mitfliegen!",
     });
   });
+
+  it.each([
+    ["PREPARE_FOR_FLIGHT", "Bitte bereithalten"],
+    ["GO_TO_GATE", "Bitte zum Gate"],
+    ["BOARDING_STARTED", "Boarding hat begonnen"],
+    ["ROTATION_STARTED", "Rundflug gestartet"],
+    ["ROTATION_LANDED", "Rundflug gelandet"],
+    ["ROTATION_COMPLETED", "Rundflug abgeschlossen"],
+  ] as const)(
+    "prefixes %s with the canonical booking group part label",
+    (notificationType, title) => {
+      const firstPart = pushNotificationFor(
+        pushContext(notificationType, { partNumber: 1, partCount: 2, passengerCount: 3 }),
+      );
+      const secondPart = pushNotificationFor(
+        pushContext(notificationType, { partNumber: 2, partCount: 2, passengerCount: 2 }),
+      );
+
+      expect(firstPart.title).toBe(`Teilflug 1/2 · ${title}`);
+      expect(firstPart.body).toMatch(/^Teilflug 1 von 2 der Gruppe G-PAN-0101: /);
+      expect(secondPart.title).toBe(`Teilflug 2/2 · ${title}`);
+      expect(secondPart.body).toMatch(/^Teilflug 2 von 2 der Gruppe G-PAN-0101: /);
+    },
+  );
 
   it("ermittelt das öffentliche Gate aus Umlauf oder Produkt ohne Gastdaten im Payload", () => {
     expect(pushSource).toContain("g.label AS gate_label");
@@ -100,20 +149,19 @@ describe("Web-Push-Endpunkte", () => {
 
   it("liefert einen deklarativen, service-worker-unabhängigen iOS-Payload", () => {
     const payload = JSON.parse(
-      publicPushPayload(
-        "GO_TO_GATE",
-        "/gruppe/NPQRSTUVWXYZ2",
-        "https://status.example",
-        "Flight Line 1",
-      ),
+      publicPushPayload({
+        ...pushContext("GO_TO_GATE", { partNumber: 1, partCount: 2, passengerCount: 3 }),
+        targetPath: "/gruppe/NPQRSTUVWXYZ2",
+        origin: "https://status.example",
+      }),
     );
     expect(payload).toEqual({
       web_push: 8030,
       notification: {
-        title: "Bitte zum Gate",
+        title: "Teilflug 1/2 · Bitte zum Gate",
         lang: "de",
         dir: "ltr",
-        body: "Bitte kommen Sie jetzt zum Gate „Flight Line 1“ und warten Sie dort auf den Boardingaufruf.",
+        body: "Teilflug 1 von 2 der Gruppe G-PAN-0101: Bitte kommen Sie jetzt zum Gate „Flight Line 1“ und warten Sie dort auf den Boardingaufruf.",
         navigate: "https://status.example/gruppe/NPQRSTUVWXYZ2",
         data: { url: "/gruppe/NPQRSTUVWXYZ2" },
       },
@@ -133,17 +181,41 @@ describe("Web-Push-Endpunkte", () => {
 
   it("fällt ohne bekannten Ursprung auf den Service-Worker-Payload zurück", () => {
     const payload = JSON.parse(
-      publicPushPayload("BOARDING_STARTED", "/gruppe/NPQRSTUVWXYZ2", null, "Flight Line 1"),
+      publicPushPayload({
+        ...pushContext("BOARDING_STARTED", {
+          partNumber: 2,
+          partCount: 2,
+          passengerCount: 2,
+        }),
+        targetPath: "/gruppe/NPQRSTUVWXYZ2",
+        origin: null,
+      }),
     );
     expect(payload).toEqual({
-      title: "Boarding hat begonnen",
+      title: "Teilflug 2/2 · Boarding hat begonnen",
       lang: "de",
       dir: "ltr",
-      body: "Das Boarding am Gate „Flight Line 1“ hat begonnen. Bitte halten Sie Ihr Ticket für den Einstieg bereit.",
+      body: "Teilflug 2 von 2 der Gruppe G-PAN-0101: Das Boarding am Gate „Flight Line 1“ hat begonnen. Bitte halten Sie Ihr Ticket für den Einstieg bereit.",
       data: { url: "/gruppe/NPQRSTUVWXYZ2" },
     });
     expect(payload.web_push).toBeUndefined();
     expect(payload.navigate).toBeUndefined();
+  });
+
+  it("keeps declarative iOS and service-worker payload copy identical", () => {
+    const context = {
+      ...pushContext("GO_TO_GATE", { partNumber: 2, partCount: 2, passengerCount: 2 }),
+      targetPath: "/gruppe/NPQRSTUVWXYZ2",
+    };
+    const declarative = JSON.parse(
+      publicPushPayload({ ...context, origin: "https://status.example" }),
+    );
+    const fallback = JSON.parse(publicPushPayload({ ...context, origin: null }));
+
+    expect({ title: declarative.notification.title, body: declarative.notification.body }).toEqual({
+      title: fallback.title,
+      body: fallback.body,
+    });
   });
 });
 

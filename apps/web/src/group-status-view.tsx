@@ -111,10 +111,8 @@ export function GroupStatusView({ code }: { code: string }) {
               {status.parts.map((part) => (
                 <PublicStatusPart
                   key={part.partNumber}
+                  bookingGroupPart={part}
                   part={part}
-                  partCount={part.partCount}
-                  partNumber={part.partNumber}
-                  passengerCount={part.passengerCount}
                   pauseReason={status.operationalNotice}
                   timeZone={status.timeZone}
                 />

@@ -24,12 +24,14 @@ describe("mobiler öffentlicher Status V1.8", () => {
 
   it("verwendet denselben kompakten Statusblock für Ticket und Gruppe", () => {
     expect(ticketStatus).toContain("<PublicStatusPart");
+    expect(ticketStatus).toContain("bookingGroupPart={status.bookingGroupPart}");
     expect(ticketStatus).toContain("part={status}");
     expect(ticketStatus).toContain("pauseReason={status.operationalNotice}");
     expect(groupStatus).toContain("<PublicStatusPart");
     expect(content).toContain("PUBLIC_STATUS_PRESENTATIONS[part.status]");
-    expect(content).toContain("Teilflug {partNumber} von {partCount}");
-    expect(content).toContain("{passengerCount} Person");
+    expect(content).toContain("formatBookingGroupPart(bookingGroupPart)");
+    expect(content).toContain("{partLabels.long}");
+    expect(content).toContain("{bookingGroupPart.passengerCount} Person");
     expect(ticketStatus).not.toContain("<code>");
     expect(content).not.toContain("Position in der Warteschlange");
   });

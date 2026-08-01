@@ -2795,6 +2795,15 @@ export const assistClaimSchema = z.object({
 });
 export type AssistClaim = z.infer<typeof assistClaimSchema>;
 
+export const bookingGroupPartContextSchema = z
+  .object({
+    partNumber: z.number().int().positive(),
+    partCount: z.number().int().positive(),
+    passengerCount: z.number().int().positive(),
+  })
+  .strict();
+export type BookingGroupPartContext = z.infer<typeof bookingGroupPartContextSchema>;
+
 export const publicTicketStatusSchema = z
   .object({
     eventId: z.string(),
@@ -2804,6 +2813,7 @@ export const publicTicketStatusSchema = z
     publicDescription: z.string(),
     gateLabel: z.string(),
     communicationNumber: z.number().int().positive(),
+    bookingGroupPart: bookingGroupPartContextSchema.nullable(),
     status: z.enum([
       "WAITING",
       "PREPARE",
@@ -2890,11 +2900,8 @@ export const publicBoardSchema = z.object({
 });
 export type PublicBoard = z.infer<typeof publicBoardSchema>;
 
-const publicGroupPartSchema = z
-  .object({
-    partNumber: z.number().int().positive(),
-    partCount: z.number().int().positive(),
-    passengerCount: z.number().int().positive(),
+const publicGroupPartSchema = bookingGroupPartContextSchema
+  .extend({
     gateLabel: z.string(),
     status: z.enum([
       "WAITING",

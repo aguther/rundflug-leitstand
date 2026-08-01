@@ -2026,14 +2026,14 @@ requirements:
   - id: V18-GRP-010
     source: "1.8.0"
     section: "Fortgeltendes Delta 1.8.0"
-    requirement: "Eine Buchungsgruppe besitzt genau einen öffentlichen Gruppen-QR-Code und einen aggregierten Status für alle Teilflüge."
+    requirement: "Eine Buchungsgruppe besitzt genau einen öffentlichen Gruppen-QR-Code und einen aggregierten Status für alle Teilflüge. Öffentlicher Gruppenstatus, Legacy-Ticketstatus und konkrete umlaufbezogene Push-Nachrichten verwenden dieselbe aktuelle Teilflugprojektion; Teilflugnummer und -anzahl werden gruppenweise deterministisch aus nicht freigegebenen Ticketzuordnungen zu nicht stornierten Umläufen abgeleitet."
     priority: MUSS
     stage: V1
     status: implemented
   - id: V18-API-010
     source: "1.8.0"
     section: "Fortgeltendes Delta 1.8.0"
-    requirement: "Verträge liefern ISO-Zeitfenster und Zeitzone; Gruppenroute und Legacy-Ticketroute bleiben parallel verfügbar."
+    requirement: "Verträge liefern ISO-Zeitfenster und Zeitzone; PublicTicketStatus enthält additiv den fachlich vorhandenen Teilflugkontext, und Gruppenroute sowie Legacy-Ticketroute bleiben ohne interne Umlauf- oder Fluggruppenkennungen parallel verfügbar."
     priority: MUSS
     stage: V1
     status: implemented
@@ -2054,7 +2054,7 @@ requirements:
   - id: V18-QA-010
     source: "1.8.0"
     section: "Fortgeltendes Delta 1.8.0"
-    requirement: "Automatisierte und visuelle Abnahme deckt Busy, Zeitfenster, Tabellen, Gruppendruck, Splitstatus, Push, Legacy und Geheimhaltung ab."
+    requirement: "Automatisierte und visuelle Abnahme deckt Busy, Zeitfenster, Tabellen, Gruppendruck, kanonischen Splitstatus, teilflugbezogenen Umlauf-Push, Legacy, Hell-/Dunkelmodus, mobile Viewports und Geheimhaltung ab."
     priority: MUSS
     stage: V1
     status: implemented

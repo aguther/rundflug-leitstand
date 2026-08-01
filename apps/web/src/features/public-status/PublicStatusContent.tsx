@@ -1,8 +1,10 @@
 import type {
+  BookingGroupPartContext,
   PublicGroupStatus,
   PublicTicketStatus,
   TicketGroupRecallProjection,
 } from "@rundflug/contracts";
+import { formatBookingGroupPart, isSplitBookingGroupPart } from "@rundflug/domain";
 import type { LucideIcon } from "lucide-react";
 import {
   Bell,
@@ -168,33 +170,31 @@ export function PublicRecallNotice({ recall }: { recall: TicketGroupRecallProjec
 export function PublicStatusPart({
   part,
   timeZone,
-  partNumber,
-  partCount,
-  passengerCount,
+  bookingGroupPart,
   pauseReason,
 }: {
   part: StatusPart;
   timeZone: string;
-  partNumber?: number;
-  partCount?: number;
-  passengerCount?: number;
+  bookingGroupPart?: BookingGroupPartContext | null;
   pauseReason?: string;
 }) {
   const presentation = PUBLIC_STATUS_PRESENTATIONS[part.status];
   const StatusIcon = STATUS_ICONS[presentation.iconName];
-  const multipleParts = Boolean(partCount && partCount > 1 && partNumber && passengerCount);
+  const partLabels =
+    bookingGroupPart && isSplitBookingGroupPart(bookingGroupPart)
+      ? formatBookingGroupPart(bookingGroupPart)
+      : null;
   const gateLabel = part.gateLabel || "–";
   const windowLabel = statusWindow(part, timeZone);
   return (
     <article className="public-status-part" data-status={part.status}>
-      {multipleParts ? (
+      {partLabels && bookingGroupPart ? (
         <header className="public-status-part-header">
-          <strong>
-            Teilflug {partNumber} von {partCount}
-          </strong>
+          <strong>{partLabels.long}</strong>
           <span>
             <Users aria-hidden="true" />
-            {passengerCount} Person{passengerCount === 1 ? "" : "en"}
+            {bookingGroupPart.passengerCount} Person
+            {bookingGroupPart.passengerCount === 1 ? "" : "en"}
           </span>
         </header>
       ) : null}
