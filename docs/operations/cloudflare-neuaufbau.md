@@ -146,6 +146,14 @@ Bestätigung `DEPLOY`, führt `npm run check` aus, rekonstruiert die ignorierte 
 bricht bei offenen Migrationen ab, solange `apply_migrations` nicht bewusst gewählt wurde.
 Anwendungssecrets bleiben direkt am Worker und werden nicht nach GitHub kopiert.
 
+Die harte Performance-SLO ist bewusst kein Bestandteil dieses allgemeinen GitHub-Checks. Für eine
+isolierte Abnahmeumgebung steht der manuelle Workflow `Cloudflare-Performance-SLO` bereit. Er erhält
+Environment, HTTPS-Origin und die ID einer vorbereiteten synthetischen `perf-*`-Veranstaltung als
+Eingaben und startet erst nach der Bestätigung `PERFORMANCE`. Der Lauf führt ausschließlich lesende
+öffentliche Board-Abfragen und WebSocket-Verbindungen aus; Produktionsumgebungen, andere
+Veranstaltungs-IDs sowie HTTP-Ziele werden vom Skript abgelehnt. Details und Datensatzanforderungen
+sind in `docs/verification/scale-performance-v1.md` dokumentiert.
+
 ## 8. Fehlerbehebung ohne Datenverlust
 
 - Niemals D1/R2 löschen, leeren oder unter demselben Namen neu erstellen.

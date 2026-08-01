@@ -17,4 +17,14 @@ describe("FIDS action priority", () => {
     );
     expect(order).not.toContain("sort_order");
   });
+
+  it("exposes server-side projection timing for remote read-only SLO checks", () => {
+    const route = workerSource.slice(
+      workerSource.indexOf('app.get("/api/public/events/:eventId/board"'),
+      workerSource.indexOf('app.all("/api/public/events/:eventId/live"'),
+    );
+    expect(route).toContain("const requestStartedAt = performance.now()");
+    expect(route).toContain("public-board;dur=");
+    expect(route).toContain("performance.now() - requestStartedAt");
+  });
 });
