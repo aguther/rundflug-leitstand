@@ -16,6 +16,8 @@ const wrangler = resolve(root, "node_modules", "wrangler", "bin", "wrangler.js")
 const npmCli = process.env.npm_execpath;
 const cashierAccountId = "550e8400-e29b-41d4-a716-446655440201";
 const pin = "123456";
+const tabletLandscapeMediaQuery =
+  "(min-width: 1101px) and (max-width: 1250px) and (max-height: 900px) and (orientation: landscape) and (any-pointer: coarse)";
 let worker = null;
 let workerOutput = "";
 
@@ -322,9 +324,272 @@ async function assertFailedBackgroundSyncStaysSold(page) {
   await page.unroute("**/api/control/demo-2026/tickets/search**");
 }
 
-async function captureViewport(browser, viewport, colorScheme, storageState) {
+function assertContained(inner, outer, label, tolerance = 1) {
+  if (
+    inner.left < outer.left - tolerance ||
+    inner.top < outer.top - tolerance ||
+    inner.right > outer.right + tolerance ||
+    inner.bottom > outer.bottom + tolerance
+  ) {
+    throw new Error(`${label} is not fully contained: ${JSON.stringify({ inner, outer })}`);
+  }
+}
+
+async function assertViewportGeometry(page, scenario) {
+  const geometry = await page.evaluate((query) => {
+    const element = (selector) => {
+      const match = document.querySelector(selector);
+      if (!(match instanceof HTMLElement)) throw new Error(`Missing element: ${selector}`);
+      return match;
+    };
+    const rectangle = (target) => {
+      const box = target.getBoundingClientRect();
+      return {
+        left: box.left,
+        top: box.top,
+        right: box.right,
+        bottom: box.bottom,
+        width: box.width,
+        height: box.height,
+      };
+    };
+    const tabs = element(".cashier-ticket-panel > .ds-tabs");
+    const toolbar = element(".cashier-ticket-toolbar");
+    const heading = element(".cashier-sale-title h1");
+    const ticketTable = element(".cashier-ticket-table-wrap");
+    const ticketDetail = element(".cashier-ticket-detail");
+    const ticketDetailGrid = element(".cashier-ticket-detail-grid");
+    const flightGroups = element(".cashier-flight-groups");
+    const refreshButton = element(".cashier-ticket-toolbar > .ds-icon-button");
+    const activeTab = tabs.querySelector('[aria-selected="true"]');
+    if (!(activeTab instanceof HTMLButtonElement)) throw new Error("Missing active cashier tab");
+
+    return {
+      viewport: {
+        left: 0,
+        top: 0,
+        right: window.innerWidth,
+        bottom: window.innerHeight,
+        width: window.innerWidth,
+        height: window.innerHeight,
+      },
+      document: {
+        clientWidth: document.documentElement.clientWidth,
+        clientHeight: document.documentElement.clientHeight,
+        scrollWidth: document.documentElement.scrollWidth,
+        scrollHeight: document.documentElement.scrollHeight,
+        bodyScrollWidth: document.body.scrollWidth,
+        bodyScrollHeight: document.body.scrollHeight,
+      },
+      media: {
+        tabletLandscape: window.matchMedia(query).matches,
+        pointerCoarse: window.matchMedia("(pointer: coarse)").matches,
+        anyPointerCoarse: window.matchMedia("(any-pointer: coarse)").matches,
+        hoverNone: window.matchMedia("(hover: none)").matches,
+        anyHoverNone: window.matchMedia("(any-hover: none)").matches,
+      },
+      shell: rectangle(element(".cashier-shell")),
+      workspace: rectangle(element(".cashier-v15-workspace")),
+      salePanel: rectangle(element(".cashier-sale-panel")),
+      ticketPanel: rectangle(element(".cashier-ticket-panel")),
+      heading: {
+        box: rectangle(heading),
+        clientWidth: heading.clientWidth,
+        clientHeight: heading.clientHeight,
+        scrollWidth: heading.scrollWidth,
+        scrollHeight: heading.scrollHeight,
+        lineHeight: Number.parseFloat(getComputedStyle(heading).lineHeight),
+      },
+      tabs: {
+        box: rectangle(tabs),
+        clientHeight: tabs.clientHeight,
+        scrollHeight: tabs.scrollHeight,
+        scrollTop: tabs.scrollTop,
+        buttons: Array.from(tabs.querySelectorAll("button"), rectangle),
+        activeBorderWidth: Number.parseFloat(getComputedStyle(activeTab).borderBottomWidth),
+        activeBorderColor: getComputedStyle(activeTab).borderBottomColor,
+      },
+      toolbar: {
+        box: rectangle(toolbar),
+        controls: [
+          ".ds-search-field",
+          ".cashier-account-filter",
+          ".cashier-own-ticket-filter",
+          ".ds-icon-button",
+        ].map((selector) => ({
+          selector,
+          box: rectangle(element(`.cashier-ticket-toolbar > ${selector}`)),
+        })),
+      },
+      refreshButton: {
+        box: rectangle(refreshButton),
+        visibility: getComputedStyle(refreshButton).visibility,
+        display: getComputedStyle(refreshButton).display,
+        opacity: Number.parseFloat(getComputedStyle(refreshButton).opacity),
+      },
+      stepperButtons: Array.from(document.querySelectorAll(".cashier-stepper > button"), rectangle),
+      ticketTable: {
+        box: rectangle(ticketTable),
+        clientHeight: ticketTable.clientHeight,
+        scrollHeight: ticketTable.scrollHeight,
+        overflowY: getComputedStyle(ticketTable).overflowY,
+      },
+      ticketDetail: rectangle(ticketDetail),
+      ticketDetailGrid: {
+        box: rectangle(ticketDetailGrid),
+        children: Array.from(ticketDetailGrid.children, rectangle),
+      },
+      flightGroups: {
+        box: rectangle(flightGroups),
+        overflowY: getComputedStyle(flightGroups).overflowY,
+      },
+      ticketActions: rectangle(element(".cashier-ticket-actions")),
+      actionButtons: Array.from(
+        document.querySelectorAll(".cashier-ticket-actions > button"),
+        (button) => ({
+          box: rectangle(button),
+          label: button.textContent?.replace(/\s+/g, " ").trim() ?? "",
+        }),
+      ),
+    };
+  }, tabletLandscapeMediaQuery);
+
+  if (
+    geometry.document.scrollWidth > geometry.document.clientWidth + 1 ||
+    geometry.document.bodyScrollWidth > geometry.viewport.width + 1
+  ) {
+    throw new Error(`Horizontal document overflow: ${JSON.stringify(geometry.document)}`);
+  }
+  if (geometry.toolbar.box.bottom > geometry.ticketTable.box.top + 1) {
+    throw new Error(
+      `Cashier toolbar overlaps the ticket list: ${JSON.stringify({ toolbar: geometry.toolbar.box, ticketTable: geometry.ticketTable.box })}`,
+    );
+  }
+  if (
+    scenario.expectSingleScreen &&
+    (geometry.document.scrollHeight > geometry.document.clientHeight + 1 ||
+      geometry.document.bodyScrollHeight > geometry.viewport.height + 1)
+  ) {
+    throw new Error(
+      `Vertical document scroll in single-screen mode: ${JSON.stringify(geometry.document)}`,
+    );
+  }
+  if (geometry.media.tabletLandscape !== scenario.expectTabletLayout) {
+    throw new Error(
+      `Unexpected tablet media-query state: ${JSON.stringify({ scenario, media: geometry.media })}`,
+    );
+  }
+
+  if (!scenario.expectTabletLayout) return geometry;
+
+  if (!geometry.media.pointerCoarse || !geometry.media.anyPointerCoarse) {
+    throw new Error(
+      `Tablet context does not expose a coarse pointer: ${JSON.stringify(geometry.media)}`,
+    );
+  }
+  assertContained(geometry.salePanel, geometry.viewport, "Cashier sale panel");
+  assertContained(geometry.ticketPanel, geometry.viewport, "Cashier ticket panel");
+  if (
+    geometry.heading.scrollWidth > geometry.heading.clientWidth + 1 ||
+    geometry.heading.scrollHeight > geometry.heading.clientHeight + 1 ||
+    geometry.heading.box.height > geometry.heading.lineHeight * 1.5
+  ) {
+    throw new Error(`Cashier heading wraps or clips: ${JSON.stringify(geometry.heading)}`);
+  }
+  for (const [index, button] of geometry.tabs.buttons.entries()) {
+    assertContained(button, geometry.tabs.box, `Cashier tab ${index + 1}`);
+  }
+  if (
+    geometry.tabs.scrollTop !== 0 ||
+    geometry.tabs.scrollHeight > geometry.tabs.clientHeight + 1
+  ) {
+    throw new Error(`Cashier tabs scroll vertically: ${JSON.stringify(geometry.tabs)}`);
+  }
+  if (
+    geometry.tabs.box.bottom > geometry.toolbar.box.top + 1 ||
+    geometry.tabs.activeBorderWidth < 2 ||
+    geometry.tabs.activeBorderColor === "rgba(0, 0, 0, 0)"
+  ) {
+    throw new Error(
+      `Cashier tabs overlap the toolbar or hide the active underline: ${JSON.stringify({ tabs: geometry.tabs, toolbar: geometry.toolbar })}`,
+    );
+  }
+  for (const control of geometry.toolbar.controls) {
+    assertContained(
+      control.box,
+      geometry.toolbar.box,
+      `Cashier toolbar control ${control.selector}`,
+    );
+  }
+  if (
+    geometry.refreshButton.box.width < 44 ||
+    geometry.refreshButton.box.height < 44 ||
+    geometry.refreshButton.display === "none" ||
+    geometry.refreshButton.visibility !== "visible" ||
+    geometry.refreshButton.opacity === 0
+  ) {
+    throw new Error(
+      `Cashier refresh control is not a visible 44px target: ${JSON.stringify(geometry.refreshButton)}`,
+    );
+  }
+  for (const [index, button] of geometry.stepperButtons.entries()) {
+    if (button.width < 44 || button.height < 44) {
+      throw new Error(
+        `Cashier stepper target ${index + 1} is below 44px: ${JSON.stringify(button)}`,
+      );
+    }
+  }
+  if (
+    geometry.ticketTable.clientHeight < 120 ||
+    !["auto", "scroll"].includes(geometry.ticketTable.overflowY) ||
+    geometry.ticketTable.scrollHeight <= geometry.ticketTable.clientHeight
+  ) {
+    throw new Error(
+      `Cashier ticket list is not a usable scroll region: ${JSON.stringify(geometry.ticketTable)}`,
+    );
+  }
+  assertContained(geometry.ticketTable.box, geometry.ticketPanel, "Cashier ticket list");
+  assertContained(geometry.ticketDetail, geometry.ticketPanel, "Cashier ticket detail");
+  if (geometry.ticketTable.box.bottom > geometry.ticketDetail.top + 1) {
+    throw new Error(
+      `Cashier ticket list overlaps the detail: ${JSON.stringify({ ticketTable: geometry.ticketTable.box, ticketDetail: geometry.ticketDetail })}`,
+    );
+  }
+  assertContained(
+    geometry.ticketDetailGrid.box,
+    geometry.ticketDetail,
+    "Cashier ticket detail grid",
+  );
+  for (const [index, child] of geometry.ticketDetailGrid.children.entries()) {
+    assertContained(
+      child,
+      geometry.ticketDetailGrid.box,
+      `Cashier ticket detail area ${index + 1}`,
+    );
+  }
+  if (!["auto", "scroll"].includes(geometry.flightGroups.overflowY)) {
+    throw new Error(
+      `Cashier flight groups are not a bounded scroll region: ${JSON.stringify(geometry.flightGroups)}`,
+    );
+  }
+  assertContained(geometry.ticketActions, geometry.ticketDetail, "Cashier ticket actions");
+  const actionLabels = geometry.actionButtons.map((button) => button.label);
+  for (const requiredLabel of ["Stornieren", "Ticket drucken"]) {
+    if (!actionLabels.includes(requiredLabel)) {
+      throw new Error(`Missing visible cashier ticket action: ${requiredLabel}`);
+    }
+  }
+  for (const [index, button] of geometry.actionButtons.entries()) {
+    assertContained(button.box, geometry.viewport, `Cashier ticket action ${index + 1}`);
+  }
+  return geometry;
+}
+
+async function captureViewport(browser, scenario, colorScheme, storageState) {
+  const { viewport, hasTouch = false } = scenario;
   const context = await browser.newContext({
     viewport,
+    hasTouch,
     colorScheme,
     locale: "de-DE",
     timezoneId: "Europe/Berlin",
@@ -337,14 +602,12 @@ async function captureViewport(browser, viewport, colorScheme, storageState) {
     while ((await noticeCloseButtons.count()) > 0) {
       await noticeCloseButtons.first().click();
     }
-    const geometry = await page.evaluate(() => ({
-      innerWidth: window.innerWidth,
-      documentWidth: document.documentElement.scrollWidth,
-      bodyWidth: document.body.scrollWidth,
-    }));
-    if (geometry.documentWidth > geometry.innerWidth || geometry.bodyWidth > geometry.innerWidth) {
-      throw new Error(`Horizontales Überlaufen: ${JSON.stringify(geometry)}`);
-    }
+    const screenshotVariant = `${viewport.width}x${viewport.height}${hasTouch ? "-touch" : "-mouse"}-${colorScheme}`;
+    await page.screenshot({
+      path: resolve(outputDirectory, `cashier-${screenshotVariant}.png`),
+      fullPage: false,
+    });
+    await assertViewportGeometry(page, scenario);
     const actionAlignment = await page.locator(".cashier-group-size").evaluate((groupSize) => {
       const actions = groupSize.querySelector(".cashier-group-actions");
       const stepper = groupSize.querySelector(".cashier-stepper");
@@ -374,20 +637,10 @@ async function captureViewport(browser, viewport, colorScheme, storageState) {
         `Stepper und Reset sind nicht kompakt gruppiert: ${JSON.stringify(actionAlignment)}`,
       );
     }
-    await page.screenshot({
-      path: resolve(
-        outputDirectory,
-        `cashier-${viewport.width}x${viewport.height}-${colorScheme}.png`,
-      ),
-      fullPage: false,
-    });
     await page.getByRole("button", { name: "Kassenreihenfolge bearbeiten" }).click();
     await page.getByRole("heading", { name: "Kassen-Reihenfolge" }).waitFor();
     await page.screenshot({
-      path: resolve(
-        outputDirectory,
-        `cashier-order-${viewport.width}x${viewport.height}-${colorScheme}.png`,
-      ),
+      path: resolve(outputDirectory, `cashier-order-${screenshotVariant}.png`),
       fullPage: false,
     });
   } finally {
@@ -438,10 +691,70 @@ try {
   const storageState = await context.storageState();
   await context.close();
 
+  const viewportScenarios = [
+    {
+      viewport: { width: 1440, height: 1000 },
+      expectSingleScreen: true,
+      expectTabletLayout: false,
+    },
+    {
+      viewport: { width: 1920, height: 1080 },
+      expectSingleScreen: true,
+      expectTabletLayout: false,
+    },
+    { viewport: { width: 1194, height: 834 }, expectSingleScreen: true, expectTabletLayout: false },
+    {
+      viewport: { width: 1024, height: 768 },
+      expectSingleScreen: false,
+      expectTabletLayout: false,
+    },
+    {
+      viewport: { width: 430, height: 900 },
+      hasTouch: true,
+      expectSingleScreen: false,
+      expectTabletLayout: false,
+    },
+    {
+      viewport: { width: 834, height: 1194 },
+      hasTouch: true,
+      expectSingleScreen: false,
+      expectTabletLayout: false,
+    },
+    {
+      viewport: { width: 1194, height: 700 },
+      hasTouch: true,
+      expectSingleScreen: true,
+      expectTabletLayout: true,
+    },
+    {
+      viewport: { width: 1194, height: 834 },
+      hasTouch: true,
+      expectSingleScreen: true,
+      expectTabletLayout: true,
+    },
+    {
+      viewport: { width: 1133, height: 744 },
+      hasTouch: true,
+      expectSingleScreen: true,
+      expectTabletLayout: true,
+    },
+    {
+      viewport: { width: 1180, height: 820 },
+      hasTouch: true,
+      expectSingleScreen: true,
+      expectTabletLayout: true,
+    },
+  ];
+  const verifiedViewports = [];
   for (const colorScheme of ["light", "dark"]) {
-    await captureViewport(browser, { width: 1440, height: 1000 }, colorScheme, storageState);
-    await captureViewport(browser, { width: 1024, height: 768 }, colorScheme, storageState);
-    await captureViewport(browser, { width: 430, height: 900 }, colorScheme, storageState);
+    for (const scenario of viewportScenarios) {
+      const scenarioKey = `${scenario.viewport.width}x${scenario.viewport.height}${scenario.hasTouch ? "-touch" : ""}`;
+      const verifyDark =
+        scenario.expectTabletLayout || ["1440x1000", "430x900-touch"].includes(scenarioKey);
+      if (colorScheme === "dark" && !verifyDark) continue;
+      await captureViewport(browser, scenario, colorScheme, storageState);
+      verifiedViewports.push(`${scenarioKey}-${colorScheme}`);
+    }
   }
 
   const summarize = (values) => ({
@@ -462,14 +775,10 @@ try {
       cancelAndSaveVerified: true,
       latestReceiptSequenceVerified: true,
       failedBackgroundSyncRemainsSold: true,
-      viewports: [
-        "1440x1000-light",
-        "1440x1000-dark",
-        "1024x768-light",
-        "1024x768-dark",
-        "430x900-light",
-        "430x900-dark",
-      ],
+      tabletLandscapeMediaQuery,
+      tabletGeometryVerified: true,
+      mouseViewportExcludesTabletLayout: true,
+      viewports: verifiedViewports,
       outputDirectory,
     })}\n`,
   );
