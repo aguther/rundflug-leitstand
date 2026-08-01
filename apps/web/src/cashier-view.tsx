@@ -34,6 +34,7 @@ import {
   Tickets,
   TicketsPlane,
   Trash2,
+  UserRound,
   Users,
   X,
 } from "lucide-react";
@@ -53,6 +54,7 @@ import { PageNotice, useActionMessageBridge } from "./app/PageNotifications";
 import { cashierTicketCompletionIndicator } from "./cashier-guidance";
 import {
   Button,
+  CheckboxField,
   ConfirmationDialog,
   DataTable,
   IconButton,
@@ -61,6 +63,8 @@ import {
   Tabs,
   TextField,
 } from "./design-system/components";
+import { useAuth } from "./features/auth/AuthContext";
+import { type LoginAccount, loadLoginAccounts } from "./features/auth/api";
 import {
   cashierProductOrderChanged,
   moveCashierProduct,
@@ -225,6 +229,7 @@ function QrScanDialog({
 }
 
 export function CashierView() {
+  const { session } = useAuth();
   const { board, error, lastConfirmedAt, backendConfirmed, confirmEvent, refresh } =
     useOperationBoard(CASHIER_DEVICE_ID);
   const online = useConnectivity();
@@ -260,6 +265,9 @@ export function CashierView() {
   const [ticketListTab, setTicketListTab] = useState<TicketListTab>("ACTIVE");
   const [ticketListNextCursor, setTicketListNextCursor] = useState<string | null>(null);
   const [ticketListLoading, setTicketListLoading] = useState(false);
+  const [cashierAccounts, setCashierAccounts] = useState<LoginAccount[]>([]);
+  const [cashierAccountFilter, setCashierAccountFilter] = useState("");
+  const [onlyOwnTickets, setOnlyOwnTickets] = useState(false);
   const [qrScanOpen, setQrScanOpen] = useState(false);
   const [printBusy, setPrintBusy] = useState(false);
   const [manualRefreshBusy, setManualRefreshBusy] = useState(false);
@@ -268,11 +276,15 @@ export function CashierView() {
   const printDocumentRef = useRef<HTMLDivElement | null>(null);
   const ticketListResultCountRef = useRef(0);
   const ticketListNextCursorRef = useRef<string | null>(null);
+  const previousCashierAccountFilterRef = useRef("");
   const lastTicketListBoardVersionRef = useRef<number | null>(null);
   const receiptRequestRef = useRef(0);
   const selectedTicketGroup = ticketSearchResults.find(
     (entry) => entry.ticketGroupId === lastTicketGroupId,
   );
+  const effectiveCashierAccountFilter = onlyOwnTickets
+    ? (session?.account.id ?? "")
+    : cashierAccountFilter;
   const selectedRotations =
     board?.rotations.filter((rotation) =>
       rotation.bookingGroups.some((group) => group.id === lastTicketGroupId),
@@ -323,6 +335,16 @@ export function CashierView() {
     return ticket;
   }
 
+  const resetTicketListState = useCallback(() => {
+    ticketListRequestRef.current += 1;
+    ticketListResultCountRef.current = 0;
+    ticketListNextCursorRef.current = null;
+    setTicketSearchResults([]);
+    setTicketListNextCursor(null);
+    setLastTicketGroupId(null);
+    setReceipt(null);
+  }, []);
+
   const loadTicketList = useCallback(
     async ({
       append = false,
@@ -330,12 +352,14 @@ export function CashierView() {
       status = ticketListTab,
       query = ticketSearchQuery,
       reportError = true,
+      soldByOperatorAccountId = effectiveCashierAccountFilter || undefined,
     }: {
       append?: boolean;
       preserveLoaded?: boolean;
       status?: TicketListTab;
       query?: string;
       reportError?: boolean;
+      soldByOperatorAccountId?: string;
     } = {}) => {
       if (!serverConfirmed) return;
       const requestId = ++ticketListRequestRef.current;
@@ -354,6 +378,7 @@ export function CashierView() {
             ...(append && ticketListNextCursorRef.current
               ? { cursor: ticketListNextCursorRef.current }
               : {}),
+            ...(soldByOperatorAccountId ? { soldByOperatorAccountId } : {}),
           },
         );
         if (requestId !== ticketListRequestRef.current) return;
@@ -399,7 +424,7 @@ export function CashierView() {
         if (requestId === ticketListRequestRef.current) setTicketListLoading(false);
       }
     },
-    [serverConfirmed, ticketListTab, ticketSearchQuery],
+    [effectiveCashierAccountFilter, serverConfirmed, ticketListTab, ticketSearchQuery],
   );
 
   const mergeTicketGroupsById = useCallback(
@@ -414,9 +439,14 @@ export function CashierView() {
           status: "ACTIVE",
           limit: Math.min(ticketGroupIds.length, 50),
           ticketGroupIds,
+          ...(effectiveCashierAccountFilter
+            ? { soldByOperatorAccountId: effectiveCashierAccountFilter }
+            : {}),
         },
       );
-      if (response.results.length !== ticketGroupIds.length) {
+      const soldTicketMustMatchFilter =
+        !effectiveCashierAccountFilter || effectiveCashierAccountFilter === session?.account.id;
+      if (soldTicketMustMatchFilter && response.results.length !== ticketGroupIds.length) {
         throw new Error(
           "Der bestätigte Verkauf ist noch nicht vollständig in der Kassenliste sichtbar.",
         );
@@ -431,7 +461,7 @@ export function CashierView() {
         return nextResults;
       });
     },
-    [serverConfirmed],
+    [effectiveCashierAccountFilter, serverConfirmed, session?.account.id],
   );
 
   async function reopenTicketGroup(
@@ -480,6 +510,13 @@ export function CashierView() {
   }
   useEffect(() => {
     localStorage.removeItem(legacyCashierDraftQueueKey(EVENT_ID, CASHIER_DEVICE_ID));
+  }, []);
+  useEffect(() => {
+    void loadLoginAccounts()
+      .then((accounts) =>
+        setCashierAccounts(accounts.filter((account) => account.role === "CASHIER")),
+      )
+      .catch(() => setCashierAccounts([]));
   }, []);
   useEffect(() => {
     if (!serverConfirmed) return;
@@ -738,14 +775,38 @@ export function CashierView() {
     }
   }
 
-  async function runTicketSearch() {
+  function runTicketSearch() {
     const query = ticketSearch.trim();
     if (query.length === 1) {
       setMessage("Für die Suche mindestens zwei Zeichen eingeben.");
       return;
     }
+    resetTicketListState();
+    if (query === ticketSearchQuery) {
+      void loadTicketList({ query });
+      return;
+    }
     setTicketSearchQuery(query);
-    await loadTicketList({ query });
+  }
+
+  function changeCashierAccountFilter(nextAccountId: string) {
+    resetTicketListState();
+    if (nextAccountId === cashierAccountFilter) {
+      void loadTicketList(nextAccountId ? { soldByOperatorAccountId: nextAccountId } : {});
+      return;
+    }
+    setCashierAccountFilter(nextAccountId);
+  }
+
+  function changeOnlyOwnTickets(checked: boolean) {
+    resetTicketListState();
+    if (checked) {
+      previousCashierAccountFilterRef.current = cashierAccountFilter;
+      setOnlyOwnTickets(true);
+      return;
+    }
+    setCashierAccountFilter(previousCashierAccountFilterRef.current);
+    setOnlyOwnTickets(false);
   }
 
   function selectSearchResult(result: TicketSearchResult) {
@@ -1140,9 +1201,8 @@ export function CashierView() {
             label="Ticketstatus"
             value={ticketListTab}
             onChange={(nextTab) => {
+              resetTicketListState();
               setTicketListTab(nextTab);
-              setLastTicketGroupId(null);
-              setReceipt(null);
             }}
             items={[
               { value: "ACTIVE", label: "Verkaufte Tickets" },
@@ -1163,6 +1223,29 @@ export function CashierView() {
                 placeholder="Suche (z. B. Gruppe, Produkt)"
               />
             </label>
+            <label className="cashier-account-filter">
+              <span>Kassenkonto</span>
+              <select
+                aria-label="Nach Kassenkonto filtern"
+                disabled={onlyOwnTickets}
+                onChange={(event) => changeCashierAccountFilter(event.target.value)}
+                value={cashierAccountFilter}
+              >
+                <option value="">Alle Kassen</option>
+                {cashierAccounts.map((account) => (
+                  <option key={account.id} value={account.id}>
+                    {account.loginCode}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <CheckboxField
+              checked={onlyOwnTickets}
+              className="cashier-own-ticket-filter"
+              disabled={!session}
+              label="Nur meine Tickets"
+              onChange={(event) => changeOnlyOwnTickets(event.target.checked)}
+            />
             <IconButton
               label="Liste aktualisieren"
               busy={manualRefreshBusy}
@@ -1206,6 +1289,15 @@ export function CashierView() {
                     </TableIconHeader>
                   ),
                   render: (result) => result.productName,
+                },
+                {
+                  key: "cashier",
+                  header: (
+                    <TableIconHeader label="Kasse">
+                      <UserRound aria-hidden="true" size={17} />
+                    </TableIconHeader>
+                  ),
+                  render: (result) => result.soldByOperatorLoginCode ?? "Nicht zugeordnet",
                 },
                 {
                   key: "people",
@@ -1287,14 +1379,19 @@ export function CashierView() {
                 ) : null}
               </div>
               {selectedTicketGroup ? (
-                <time>
-                  Verkauft:{" "}
-                  {new Date(selectedTicketGroup.soldAt).toLocaleTimeString("de-DE", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}{" "}
-                  Uhr
-                </time>
+                <div className="cashier-ticket-sale-meta">
+                  <small>
+                    Kasse: {selectedTicketGroup.soldByOperatorLoginCode ?? "Nicht zugeordnet"}
+                  </small>
+                  <time>
+                    Verkauft:{" "}
+                    {new Date(selectedTicketGroup.soldAt).toLocaleTimeString("de-DE", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}{" "}
+                    Uhr
+                  </time>
+                </div>
               ) : null}
             </header>
             <div className="cashier-ticket-detail-grid">

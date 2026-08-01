@@ -32,9 +32,7 @@ describe("cashier ticket attribution", () => {
     );
     expect(paperInsert).not.toContain("sold_by_operator_account_id");
 
-    const searchStart = workerSource.indexOf(
-      'app.on("GET", eventRoutes("/tickets/search")',
-    );
+    const searchStart = workerSource.indexOf('app.on("GET", eventRoutes("/tickets/search")');
     const searchEnd = workerSource.indexOf(
       'app.on("GET", eventRoutes("/ticket-groups/:ticketGroupId/print-data")',
     );
