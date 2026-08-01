@@ -40,6 +40,7 @@
     "test:vertical-slice": "node scripts/verify_vertical_slice.mjs",
     "test:v1-acceptance-day": "node scripts/verify_v1_acceptance_day.mjs",
     "test:scale-performance": "node scripts/verify_scale_performance.mjs",
+    "test:cloudflare-scale-performance": "node scripts/verify_cloudflare_scale_performance.mjs",
     "test:soak-reliability": "node scripts/verify_soak_reliability.mjs",
     "test:cloudflare-availability": "node scripts/verify_cloudflare_availability.mjs",
     "test:worker-runtime": "vitest run --config vitest.worker.config.ts",

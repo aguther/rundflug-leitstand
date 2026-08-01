@@ -2,11 +2,26 @@ import { spawn, spawnSync } from "node:child_process";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  LOCAL_CI_GUARDRAIL_MILLISECONDS,
+  localScaleGuardrails,
+  percentile95,
+} from "./scale-performance-policy.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const port = Number(process.env.SCALE_PERFORMANCE_TEST_PORT ?? "18795");
+const ciGuardrailMilliseconds = Number(
+  process.env.SCALE_CI_GUARDRAIL_MILLISECONDS ?? LOCAL_CI_GUARDRAIL_MILLISECONDS,
+);
+if (
+  !Number.isFinite(ciGuardrailMilliseconds) ||
+  ciGuardrailMilliseconds < 2_000 ||
+  ciGuardrailMilliseconds > 60_000
+) {
+  throw new Error("SCALE_CI_GUARDRAIL_MILLISECONDS must be between 2000 and 60000.");
+}
 const npmCli = process.env.npm_execpath;
-if (!npmCli) throw new Error("npm-Ausführungspfad fehlt.");
+if (!npmCli) throw new Error("The npm execution path is missing.");
 const wranglerCli = resolve(root, "node_modules", "wrangler", "bin", "wrangler.js");
 const reset = spawnSync(process.execPath, [npmCli, "run", "db:reset:local"], {
   cwd: root,
@@ -191,8 +206,8 @@ const connect = () =>
   new Promise((resolvePromise, reject) => {
     const socket = new WebSocket(`${wsBase}/api/public/events/perf-current/live`);
     const timeout = setTimeout(
-      () => reject(new Error("WebSocket-Verbindung dauerte zu lange.")),
-      2_000,
+      () => reject(new Error("The WebSocket connection exceeded the local CI guardrail.")),
+      ciGuardrailMilliseconds,
     );
     socket.addEventListener("message", (event) => {
       const message = JSON.parse(String(event.data));
@@ -209,8 +224,8 @@ const connect = () =>
 const waitForForecast = (socket) =>
   new Promise((resolvePromise, reject) => {
     const timeout = setTimeout(
-      () => reject(new Error("Prognoseberechnung überschritt zwei Sekunden.")),
-      2_000,
+      () => reject(new Error("The forecast update exceeded the local CI guardrail.")),
+      ciGuardrailMilliseconds,
     );
     socket.addEventListener("message", (event) => {
       const message = JSON.parse(String(event.data));
@@ -224,9 +239,6 @@ const ticketCode = () =>
     .toString("base64url")
     .toUpperCase()
     .replaceAll(/[01OI_-]/g, "A");
-const percentile95 = (values) =>
-  [...values].sort((left, right) => left - right)[Math.ceil(values.length * 0.95) - 1];
-
 const sockets = [];
 try {
   await waitForWorker();
@@ -336,25 +348,27 @@ try {
   await forecastSignal;
   const forecastElapsedMs = performance.now() - saleStartedAt;
 
-  const thresholds = {
-    initialOperationsUnderTwoSeconds: initial.elapsedMs < 2_000,
-    parallelDeviceP95UnderTwoSeconds: percentile95(parallelTimes) < 2_000,
-    historyUnderTwoSeconds: history.elapsedMs < 2_000,
-    cashierPaginationUnderTwoSeconds:
-      cashierPageOne.elapsedMs < 2_000 && cashierPageTwo.elapsedMs < 2_000,
-    cashierRevalidationUnderTwoSeconds: revalidation.elapsedMs < 2_000,
-    saleUnderTwoSeconds: sale.elapsedMs < 2_000,
-    forecastFor300RotationsUnderTwoSeconds: forecastElapsedMs < 2_000,
+  const measurements = {
+    initialOperations: initial.elapsedMs,
+    parallelDeviceP95: percentile95(parallelTimes),
+    history: history.elapsedMs,
+    cashierPageOne: cashierPageOne.elapsedMs,
+    cashierPageTwo: cashierPageTwo.elapsedMs,
+    cashierRevalidation: revalidation.elapsedMs,
+    sale: sale.elapsedMs,
+    forecast: forecastElapsedMs,
   };
-  if (Object.values(thresholds).some((passed) => !passed)) {
+  const guardrails = localScaleGuardrails(measurements, ciGuardrailMilliseconds);
+  if (Object.values(guardrails).some((passed) => !passed)) {
     throw new Error(
-      `Performancegrenze überschritten: ${JSON.stringify({ thresholds, initial: initial.elapsedMs, parallelTimes, history: history.elapsedMs, sale: sale.elapsedMs, forecastElapsedMs })}`,
+      `Local CI scale guardrail exceeded: ${JSON.stringify({ ciGuardrailMilliseconds, guardrails, measurements, parallelTimes })}`,
     );
   }
 
   console.log(
     JSON.stringify({
       ok: true,
+      executionProfile: "local-wrangler-ci",
       requirements: ["Q-PER-010-server", "Q-PER-020", "Q-PER-030", "V16-KAS-030"],
       dataset: {
         connectedDevices: 20,
@@ -364,16 +378,18 @@ try {
         historyEvents: 6000,
       },
       measurementsMs: {
-        operations: Math.round(initial.elapsedMs),
-        parallelDeviceP95: Math.round(percentile95(parallelTimes)),
-        operationalHistory: Math.round(history.elapsedMs),
-        cashierPageOne: Math.round(cashierPageOne.elapsedMs),
-        cashierPageTwo: Math.round(cashierPageTwo.elapsedMs),
-        cashierRevalidation: Math.round(revalidation.elapsedMs),
-        standardSale: Math.round(sale.elapsedMs),
-        forecastFor300Rotations: Math.round(forecastElapsedMs),
+        operations: Math.round(measurements.initialOperations),
+        parallelDeviceP95: Math.round(measurements.parallelDeviceP95),
+        operationalHistory: Math.round(measurements.history),
+        cashierPageOne: Math.round(measurements.cashierPageOne),
+        cashierPageTwo: Math.round(measurements.cashierPageTwo),
+        cashierRevalidation: Math.round(measurements.cashierRevalidation),
+        standardSale: Math.round(measurements.sale),
+        forecastFor300Rotations: Math.round(measurements.forecast),
       },
-      thresholds,
+      ciGuardrailMilliseconds,
+      guardrails,
+      productionSloEvaluated: false,
       serverTimingExposed: true,
     }),
   );

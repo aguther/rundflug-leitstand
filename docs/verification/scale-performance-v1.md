@@ -15,6 +15,13 @@ versionierten Standardverkauf sowie die dadurch ausgelöste persistierte Prognos
 offenen Umläufe. Autorisierung, Vertragsvalidierung und normale Worker-Routen werden nicht
 umgangen.
 
+Im regulären `npm run check` ist dieser Lauf ein **lokales Skalierungs- und Regressionsgate**. Die
+gemessenen Zeiten werden vollständig ausgegeben, blockieren CI aber erst bei der bewusst großzügigen
+lokalen Schutzgrenze von standardmäßig 10.000 ms. Damit erkennt CI Hänger, Serialisierungsprobleme
+und grobe Regressionen, ohne die variable Leistung eines GitHub-Runners mit der Cloudflare-Laufzeit
+gleichzusetzen. Die Schutzgrenze kann für Diagnosezwecke mit
+`SCALE_CI_GUARDRAIL_MILLISECONDS` zwischen 2.000 und 60.000 ms gesetzt werden.
+
 Referenzlauf am 14. Juli 2026:
 
 | Messpunkt | Ergebnis | Grenze |
@@ -25,8 +32,42 @@ Referenzlauf am 14. Juli 2026:
 | serverseitiger Standardverkauf | 89 ms | < 2.000 ms |
 | Prognoseaktualisierung für 300 Umläufe | 89 ms | < 2.000 ms |
 
-Die Messwerte sind harte Abbruchkriterien des Skripts; eine Überschreitung beendet den Lauf
-fehlerhaft. Q-PER-020 und die Worker-Seite von Q-PER-010 sind damit reproduzierbar nachgewiesen.
+Diese Referenzmessung dokumentiert den damaligen lokalen Nachweis. Sie wird im normalen
+GitHub-`check` nicht mehr als unveränderter Zwei-Sekunden-Produktionsgrenzwert interpretiert.
+
+## Getrennte Cloudflare-SLO-Messung
+
+Die harte Zwei-Sekunden-Grenze für das Mengengerüst wird separat gegen eine bereitgestellte
+Cloudflare-Abnahmeumgebung gemessen. Der manuelle Workflow `Cloudflare-Performance-SLO` verlangt:
+
+- eine geschützte GitHub-Environment der Abnahme,
+- die HTTPS-Origin eines Workers mit `APP_ENV=acceptance`,
+- eine ausschließlich synthetische Veranstaltung mit einer ID beginnend mit `perf-`,
+- das vollständige Q-PER-020-Mengengerüst und mindestens 20 sichtbare Board-Zeilen sowie
+- die ausdrückliche Bestätigung `PERFORMANCE`.
+
+Der Lauf ist strikt read-only: Er öffnet 20 öffentliche WebSocket-Verbindungen und führt
+standardmäßig drei Runden mit jeweils 20 parallelen Board-Projektionen aus. Der Worker liefert dafür
+`Server-Timing: public-board;dur=...`; dadurch bewertet die harte Grenze die Ausführungszeit auf
+Cloudflare und nicht die CPU-Leistung des GitHub-Runners. Sowohl die initiale Projektion als auch das
+p95 aller serverseitigen Parallelmessungen müssen unter 2.000 ms bleiben. Die zusätzliche
+Client-p95-Zeit wird nur diagnostisch ausgegeben.
+
+Der gleiche read-only Lauf kann außerhalb von GitHub gestartet werden:
+
+```bash
+CLOUDFLARE_SCALE_TARGET_ORIGIN=https://example.workers.dev \
+  CLOUDFLARE_SCALE_EVENT_ID=perf-release-1 \
+  CLOUDFLARE_SCALE_CONFIRMATION=PERFORMANCE \
+  npm run test:cloudflare-scale-performance
+```
+
+Dieser Cloudflare-Lauf belegt den lesenden Skalierungspfad aus Q-PER-020. Er verkauft bewusst kein
+Ticket und erzeugt weder Ticket-, Audit- noch Outbox-Daten. Der serverseitige Standardverkauf aus
+Q-PER-010 und die persistierte Prognoseneuberechnung aus Q-PER-030 werden im lokalen Skalierungslauf
+weiter funktional und mit Messwerten geprüft; ihre formale Zwei-Sekunden-Abnahme bleibt ein
+kontrollierter Abnahmepunkt auf der isolierten Testumgebung und wird nicht durch einen mutierenden
+GitHub-Workflow automatisiert.
 
 ## Lokale Browserreaktion
 

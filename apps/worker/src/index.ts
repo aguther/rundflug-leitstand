@@ -6803,6 +6803,7 @@ app.delete("/api/public/groups/:groupCode/push-subscriptions", async (context) =
 });
 
 app.get("/api/public/events/:eventId/board", async (context) => {
+  const requestStartedAt = performance.now();
   const eventId = context.req.param("eventId");
   const requestedGateId = context.req.query("gateId")?.trim() || null;
   const event = await context.env.DB.prepare(
@@ -6964,7 +6965,7 @@ app.get("/api/public/events/:eventId/board", async (context) => {
     .bind(eventId)
     .all<{ registration: string; operational_state: string; refuel_planned: number }>();
   const boardReadAt = new Date().toISOString();
-  return context.json({
+  const response = context.json({
     eventName: event.name,
     timeZone: event.time_zone,
     selectedGate: selectedGate
@@ -7045,6 +7046,11 @@ app.get("/api/public/events/:eventId/board", async (context) => {
           refuelPlanned: aircraft.refuel_planned === 1,
         })),
   });
+  response.headers.set(
+    "server-timing",
+    `public-board;dur=${(performance.now() - requestStartedAt).toFixed(1)}`,
+  );
+  return response;
 });
 
 app.all("/api/public/events/:eventId/live", async (context) => {
