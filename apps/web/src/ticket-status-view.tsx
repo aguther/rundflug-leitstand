@@ -112,6 +112,7 @@ export function TicketStatusView({ code }: { code: string }) {
             <PublicRecallNotice recall={status.activeRecall} />
             <div className="public-status-parts">
               <PublicStatusPart
+                bookingGroupPart={status.bookingGroupPart}
                 part={status}
                 pauseReason={status.operationalNotice}
                 timeZone={status.timeZone}

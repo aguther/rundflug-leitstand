@@ -57,6 +57,10 @@ import {
   sessionTimes,
 } from "./auth";
 import { createPortableBackup, operationDateInTimeZone } from "./backup";
+import {
+  bookingGroupPartContextFromColumns,
+  withBookingGroupPartProjection,
+} from "./booking-group-part-projection";
 import { hashPin, randomToken, sha256Hex, verifyCredential, verifyPin } from "./crypto";
 import { runD1ReadsSequentially } from "./d1-read-scheduler";
 import { dailyReportCsv, dailyReportPdfLines, loadDailyReport } from "./daily-report";
@@ -6151,9 +6155,11 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
   }
   const ticketHash = await sha256Hex(ticketCode);
   const row = await context.env.DB.prepare(
-    `SELECT p.name AS product_name, p.code AS product_code, p.public_description,
+    withBookingGroupPartProjection(
+      `SELECT p.name AS product_name, p.code AS product_code, p.public_description,
             g.label AS gate_label,
             COALESCE(tg.communication_number, fg.communication_number) AS communication_number,
+            part.part_number, part.part_count, part.passenger_count,
             fg.precalled_at, fg.precall_decision_status, r.status, tg.operation_day_id,
             COALESCE(fg.queue_position, tg.queue_sequence) AS queue_sequence,
             r.predicted_boarding_at, r.prediction_quality,
@@ -6179,6 +6185,8 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
        JOIN products p ON p.id = tg.product_id
        JOIN rotation_tickets rt ON rt.ticket_id = t.id AND rt.released_at IS NULL
        JOIN rotations r ON r.id = rt.rotation_id
+       JOIN booking_group_parts part
+         ON part.ticket_group_id = tg.id AND part.rotation_id = r.id
        JOIN gates g ON g.id = COALESCE(r.gate_id, p.gate_id)
        JOIN flight_groups fg ON fg.id = r.flight_group_id
        JOIN resource_groups rg ON rg.id = fg.resource_group_id
@@ -6188,6 +6196,7 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
         AND recall.ended_at IS NULL
         AND recall.expires_at > ?2
       WHERE t.public_code_hash = ?1`,
+    ),
   )
     .bind(ticketHash, new Date().toISOString())
     .first<{
@@ -6196,6 +6205,9 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
       public_description: string;
       gate_label: string;
       communication_number: number;
+      part_number: number;
+      part_count: number;
+      passenger_count: number;
       precalled_at: string | null;
       precall_decision_status: "WAITING" | "PREPARE" | "GO_TO_GATE" | null;
       status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
@@ -6267,6 +6279,7 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
     publicDescription: row.public_description,
     gateLabel: row.gate_label,
     communicationNumber: row.communication_number,
+    bookingGroupPart: bookingGroupPartContextFromColumns(row),
     status: servicePaused ? "SERVICE_PAUSED" : publicStatus,
     queuePosition: row.emergency_mode === 0 && row.status === "DRAFT" ? row.queue_sequence : null,
     waitLowerMinutes:
@@ -6369,21 +6382,21 @@ app.get("/api/public/groups/:groupCode", async (context) => {
   }
 
   const rotations = await context.env.DB.prepare(
-    `SELECT r.id, r.status, r.predicted_boarding_at, r.prediction_quality,
+    withBookingGroupPartProjection(
+      `SELECT r.id, r.status, r.predicted_boarding_at, r.prediction_quality,
             r.prediction_lower_minutes, r.prediction_upper_minutes, r.prediction_updated_at,
             fg.precalled_at, fg.precall_decision_status,
             COALESCE(fg.queue_position, fg.communication_number) AS queue_position,
-            g.label AS gate_label, COUNT(t.id) AS passenger_count
-       FROM rotation_tickets rt
-       JOIN tickets t ON t.id = rt.ticket_id
-       JOIN rotations r ON r.id = rt.rotation_id
+            g.label AS gate_label, part.part_number, part.part_count, part.passenger_count
+       FROM booking_group_parts part
+       JOIN rotations r ON r.id = part.rotation_id
        JOIN flight_groups fg ON fg.id = r.flight_group_id
-       JOIN ticket_groups part_tg ON part_tg.id = t.ticket_group_id
+       JOIN ticket_groups part_tg ON part_tg.id = part.ticket_group_id
        JOIN products part_product ON part_product.id = part_tg.product_id
        JOIN gates g ON g.id = COALESCE(r.gate_id, part_product.gate_id)
-      WHERE t.ticket_group_id = ?1 AND rt.released_at IS NULL AND r.status <> 'CANCELED'
-      GROUP BY r.id
-      ORDER BY COALESCE(fg.queue_position, fg.communication_number), r.created_at, r.id`,
+      WHERE part.ticket_group_id = ?1
+      ORDER BY part.part_number`,
+    ),
   )
     .bind(group.id)
     .all<{
@@ -6398,6 +6411,8 @@ app.get("/api/public/groups/:groupCode", async (context) => {
       precall_decision_status: "WAITING" | "PREPARE" | "GO_TO_GATE" | null;
       queue_position: number;
       gate_label: string;
+      part_number: number;
+      part_count: number;
       passenger_count: number;
     }>();
   if (rotations.results.length === 0) {
@@ -6405,12 +6420,11 @@ app.get("/api/public/groups/:groupCode", async (context) => {
   }
 
   const readAt = new Date().toISOString();
-  const partCount = rotations.results.length;
   const servicePaused =
     group.emergency_mode === 1 ||
     group.operational_interrupted === 1 ||
     group.resource_group_status !== "ACTIVE";
-  const parts = rotations.results.map((rotation, index) => {
+  const parts = rotations.results.map((rotation) => {
     const freshness = assessForecastFreshness({
       predictionQuality: rotation.prediction_quality,
       predictionUpdatedAt: rotation.prediction_updated_at,
@@ -6453,10 +6467,12 @@ app.get("/api/public/groups/:groupCode", async (context) => {
       : freshness.reason === "STALE_PREDICTION"
         ? "Prognose wird aktualisiert – bitte Status erneut prüfen."
         : lifecycleMessage;
+    const partContext = bookingGroupPartContextFromColumns(rotation);
+    if (!partContext) {
+      throw new Error("Canonical booking group part projection is incomplete.");
+    }
     return {
-      partNumber: index + 1,
-      partCount,
-      passengerCount: rotation.passenger_count,
+      ...partContext,
       gateLabel: rotation.gate_label,
       status: publicStatus,
       queuePosition: rotation.status === "DRAFT" ? rotation.queue_position : null,

@@ -3,7 +3,7 @@
 - Status: Akzeptiert
 - Datum: 2026-07-23
 - Entscheidung: Auftraggeber
-- Betroffene Anforderungen: V18-GRP-010, V18-API-010, V18-DAT-010 und V18-OPS-010
+- Betroffene Anforderungen: V18-GRP-010, V18-API-010, V18-DAT-010, V18-OPS-010 und V18-QA-010
 
 ## Kontext
 
@@ -26,6 +26,17 @@ pro Gruppe erhöhen Druckumfang und Verwechslungsgefahr ohne öffentlichen Mehrw
   erreichbar ist.
 - Neue Push-Abonnements referenzieren die Buchungsgruppe und werden für Statusänderungen jedes
   aktuellen Teilflugs ausgewählt.
+- Der öffentliche Begriff lautet „Teilflug“. Öffentlicher Gruppenstatus, Legacy-Ticketstatus und
+  konkrete umlaufbezogene Push-Nachrichten verwenden dieselbe aktuelle Projektion nicht
+  freigegebener Ticketzuordnungen zu nicht stornierten Umläufen. Sie sortiert deterministisch nach
+  Queueposition beziehungsweise Kommunikationsnummer der Fluggruppe, Erstellzeit und Umlauf-ID;
+  die 1-basierte Position ist die Teilflugnummer.
+- Bei mehr als einem aktuellen Teilflug beginnt der Titel eines konkreten umlaufbezogenen Pushs mit
+  `Teilflug <n>/<m> ·`; sein Text beginnt mit
+  `Teilflug <n> von <m> der Gruppe <Buchungsgruppenkennung>:`. Ein einzelner Teilflug erhält keinen
+  `Teilflug 1/1`-Zusatz. Der gruppenweite Nachruf ohne Umlaufreferenz erhält keine Teilflugnummer.
+- Die Teilflugprojektion veröffentlicht weder interne Fluggruppen- oder Umlaufkennungen noch
+  Flugzeugkennzeichen oder Gastdaten und wird nicht als dauerhafte fachliche Identität gespeichert.
 - Weder Gruppen- noch Ticketcode wird in Audit-Payload, Outbox oder Anwendungslogs aufgenommen.
 
 Diese Entscheidung konkretisiert und ersetzt ADR-0022 dort, wo ADR-0022 noch einen QR-Ticketstatus
@@ -39,3 +50,6 @@ des vorherigen Workers und Rücksetzen per D1 Time Travel beziehungsweise Wieder
 Sicherung. Das ist erforderlich, weil D1 additive Spalten nicht ohne Tabellenneuaufbau entfernt.
 Portable fachliche Backups enthalten Buchungsgruppen und damit den geschützten Code; ephemere
 Push-Abonnements bleiben wie bisher ausgeschlossen.
+
+Die ergänzte Teilflugnummerierung benötigt keine Migration. Sie wird bei jeder öffentlichen
+Projektion und Push-Zielauswahl aus den bereits vorhandenen Umlauf- und Ticketzuordnungen abgeleitet.

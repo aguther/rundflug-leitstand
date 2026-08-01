@@ -152,6 +152,55 @@ CURRENT_BASE_REQUIREMENT_OVERRIDES = {
     ),
 }
 
+CURRENT_DELTA_REQUIREMENT_OVERRIDES = {
+    "V18-GRP-010": {
+        "requirement": (
+            "Eine Buchungsgruppe besitzt genau einen öffentlichen Gruppen-QR-Code und einen "
+            "aggregierten Status für alle Teilflüge. Öffentlicher Gruppenstatus, "
+            "Legacy-Ticketstatus und konkrete umlaufbezogene Push-Nachrichten verwenden dieselbe "
+            "aktuelle Teilflugprojektion; Teilflugnummer und -anzahl werden gruppenweise "
+            "deterministisch aus nicht freigegebenen Ticketzuordnungen zu nicht stornierten "
+            "Umläufen abgeleitet."
+        ),
+        "module": (
+            "packages/domain/src/public-status.ts "
+            "apps/worker/src/booking-group-part-projection.ts "
+            "apps/worker/src/index.ts apps/worker/src/web-push.ts "
+            "apps/web/src/features/public-status/PublicStatusContent.tsx"
+        ),
+        "tests": (
+            "Domain- und Contract-Tests, Worker-D1-Projektion, Push-Tests, "
+            "Public-Monitors-Integration und Browserabnahme"
+        ),
+    },
+    "V18-API-010": {
+        "requirement": (
+            "Verträge liefern ISO-Zeitfenster und Zeitzone; PublicTicketStatus enthält additiv "
+            "den fachlich vorhandenen Teilflugkontext, und Gruppenroute sowie "
+            "Legacy-Ticketroute bleiben ohne interne Umlauf- oder Fluggruppenkennungen parallel "
+            "verfügbar."
+        ),
+        "module": (
+            "packages/contracts/src/index.ts apps/worker/src/index.ts "
+            "apps/web/src/ticket-status-view.tsx apps/web/src/group-status-view.tsx"
+        ),
+        "tests": (
+            "Contract-Tests, Worker-D1-Projektion, Public-Monitors-Integration und UI-DOM-Test"
+        ),
+    },
+    "V18-QA-010": {
+        "requirement": (
+            "Automatisierte und visuelle Abnahme deckt Busy, Zeitfenster, Tabellen, "
+            "Gruppendruck, kanonischen Splitstatus, teilflugbezogenen Umlauf-Push, Legacy, "
+            "Hell-/Dunkelmodus, mobile Viewports und Geheimhaltung ab."
+        ),
+        "module": "Workspace-Prüfskripte und docs/ui/v1.11.0-release-concept.md",
+        "tests": (
+            "Vollständiger Check, Worker-Runtime-, Public-Monitors- und Browserabnahme"
+        ),
+    },
+}
+
 PRIOR_RELEASE_REQUIREMENTS = RELEASE_REQUIREMENTS
 RELEASE_REQUIREMENTS = [
     {
@@ -279,7 +328,15 @@ def current_requirements() -> list[dict[str, object]]:
         if payload.get("version") not in {"1.10.0", VERSION}:
             raise ValueError(f"{path}: Zielversion muss 1.10.0 oder {VERSION} sein")
         normalized.extend(
-            {**item, "requirement": current_terms(item["requirement"])}
+            {
+                **item,
+                **CURRENT_DELTA_REQUIREMENT_OVERRIDES.get(item["id"], {}),
+                "requirement": current_terms(
+                    CURRENT_DELTA_REQUIREMENT_OVERRIDES.get(item["id"], {}).get(
+                        "requirement", item["requirement"]
+                    )
+                ),
+            }
             for item in payload["requirements"]
         )
     normalized.extend(
@@ -416,17 +473,21 @@ def render_traceability() -> str:
     for path in DELTA_SOURCES:
         payload = json.loads(path.read_text(encoding="utf-8"))
         for item in payload["requirements"]:
+            current_item = {
+                **item,
+                **CURRENT_DELTA_REQUIREMENT_OVERRIDES.get(item["id"], {}),
+            }
             rows.append(
                 {
-                    "ID": item["id"],
-                    "Stufe": item["stage"],
-                    "Priorität": item["priority"],
-                    "Abschnitt": item["section"],
-                    "Kurzbeschreibung": item["requirement"],
+                    "ID": current_item["id"],
+                    "Stufe": current_item["stage"],
+                    "Priorität": current_item["priority"],
+                    "Abschnitt": current_item["section"],
+                    "Kurzbeschreibung": current_item["requirement"],
                     "Issue": "",
-                    "Modul": current_terms(item["module"]),
-                    "Tests": current_terms(item["tests"]),
-                    "Status": item["traceStatus"],
+                    "Modul": current_terms(current_item["module"]),
+                    "Tests": current_terms(current_item["tests"]),
+                    "Status": current_item["traceStatus"],
                 }
             )
     for item in [*PRIOR_RELEASE_REQUIREMENTS, *RELEASE_REQUIREMENTS]:

@@ -1,14 +1,22 @@
 import {
   assessForecastFreshness,
+  type BookingGroupPartContext,
   buildTicketGroupRecallCopy,
   formatBookingGroupLabel,
+  formatBookingGroupPart,
+  isSplitBookingGroupPart,
 } from "@rundflug/domain";
+import {
+  type BookingGroupPartProjectionColumns,
+  bookingGroupPartContextFromColumns,
+  withBookingGroupPartProjection,
+} from "./booking-group-part-projection";
 import { PUBLIC_STATUS_MESSAGES } from "./public-status-copy";
 import { safeErrorMessage } from "./snapshot";
 import type { Env } from "./types";
 import { buildWebPushRequest } from "./web-push-request";
 
-interface StoredPushSubscription {
+export interface StoredPushSubscription extends BookingGroupPartProjectionColumns {
   delivery_id: string;
   id: string;
   endpoint: string;
@@ -56,27 +64,49 @@ const PUSH_TITLES = {
 } as const;
 export type PushNotificationType = keyof typeof PUSH_TITLES;
 
-export function pushNotificationFor(
-  eventType: PushNotificationType,
-  gateLabel: string,
-  communicationLabel?: string,
-): { title: string; body: string } {
-  if (eventType === "TICKET_GROUP_RECALL") {
+export interface PushNotificationContext {
+  notificationType: PushNotificationType;
+  gateLabel: string;
+  bookingGroupLabel: string;
+  bookingGroupPart: BookingGroupPartContext | null;
+}
+
+export interface PublicPushPayloadContext extends PushNotificationContext {
+  targetPath: string;
+  origin: string | null;
+}
+
+export function pushNotificationFor(context: PushNotificationContext): {
+  title: string;
+  body: string;
+} {
+  if (context.notificationType === "TICKET_GROUP_RECALL") {
     const copy = buildTicketGroupRecallCopy({
-      communicationLabel: communicationLabel ?? "Ihre Gruppe",
-      gateLabel,
+      communicationLabel: context.bookingGroupLabel,
+      gateLabel: context.gateLabel,
     });
     return { title: copy.pushTitle, body: copy.pushBody };
   }
   const body = {
-    PREPARE_FOR_FLIGHT: `Ihr Aufruf steht bevor. Bitte halten Sie sich in der Nähe von Gate „${gateLabel}“ bereit.`,
-    GO_TO_GATE: `Bitte kommen Sie jetzt zum Gate „${gateLabel}“ und warten Sie dort auf den Boardingaufruf.`,
-    BOARDING_STARTED: `Das Boarding am Gate „${gateLabel}“ hat begonnen. Bitte halten Sie Ihr Ticket für den Einstieg bereit.`,
+    PREPARE_FOR_FLIGHT: `Ihr Aufruf steht bevor. Bitte halten Sie sich in der Nähe von Gate „${context.gateLabel}“ bereit.`,
+    GO_TO_GATE: `Bitte kommen Sie jetzt zum Gate „${context.gateLabel}“ und warten Sie dort auf den Boardingaufruf.`,
+    BOARDING_STARTED: `Das Boarding am Gate „${context.gateLabel}“ hat begonnen. Bitte halten Sie Ihr Ticket für den Einstieg bereit.`,
     ROTATION_STARTED: PUBLIC_STATUS_MESSAGES.IN_FLIGHT,
     ROTATION_LANDED: PUBLIC_STATUS_MESSAGES.LANDED,
     ROTATION_COMPLETED: PUBLIC_STATUS_MESSAGES.COMPLETED,
   } satisfies Record<Exclude<PushNotificationType, "TICKET_GROUP_RECALL">, string>;
-  return { title: PUSH_TITLES[eventType], body: body[eventType] };
+  const copy = {
+    title: PUSH_TITLES[context.notificationType],
+    body: body[context.notificationType],
+  };
+  if (!context.bookingGroupPart || !isSplitBookingGroupPart(context.bookingGroupPart)) {
+    return copy;
+  }
+  const partLabels = formatBookingGroupPart(context.bookingGroupPart);
+  return {
+    title: `${partLabels.compact} · ${copy.title}`,
+    body: `${partLabels.long} der Gruppe ${context.bookingGroupLabel}: ${copy.body}`,
+  };
 }
 
 export function pushUrgencyFor(eventType: PushNotificationType): "normal" | "high" {
@@ -109,29 +139,22 @@ export function publicPushNavigateOrigin(value: string | null): string | null {
   }
 }
 
-export function publicPushPayload(
-  eventType: PushNotificationType,
-  targetPath: string,
-  origin: string | null,
-  gateLabel: string,
-  communicationLabel?: string,
-): string {
-  const copy = pushNotificationFor(eventType, gateLabel, communicationLabel);
+export function publicPushPayload(context: PublicPushPayloadContext): string {
+  const copy = pushNotificationFor(context);
   const notification = {
     title: copy.title,
     lang: "de",
     dir: "ltr",
     body: copy.body,
-    data: { url: targetPath },
+    data: { url: context.targetPath },
   };
-  const navigateOrigin = publicPushNavigateOrigin(origin);
-  // Safari parst `navigate` ohne Basis-URL und verwirft eine deklarative Nachricht vollständig,
-  // sobald daraus keine gültige URL entsteht. Ohne bekannten Ursprung bleibt deshalb nur der
-  // klassische Payload, den der Service Worker anzeigt.
+  const navigateOrigin = publicPushNavigateOrigin(context.origin);
+  // Safari discards a declarative notification when `navigate` cannot be resolved to an
+  // absolute URL. Without a known origin, keep the classic service-worker payload.
   if (!navigateOrigin) return JSON.stringify(notification);
   return JSON.stringify({
     web_push: 8030,
-    notification: { ...notification, navigate: `${navigateOrigin}${targetPath}` },
+    notification: { ...notification, navigate: `${navigateOrigin}${context.targetPath}` },
   });
 }
 
@@ -220,18 +243,19 @@ async function deliverStoredPushSubscriptions(
           groupCode: subscription.group_public_code,
         });
         if (!targetPath) return;
-        const communicationLabel = formatBookingGroupLabel(
+        const bookingGroupLabel = formatBookingGroupLabel(
           subscription.product_code,
           subscription.communication_number,
         );
         const payload = await buildWebPushRequest({
-          data: publicPushPayload(
-            eventType,
+          data: publicPushPayload({
+            notificationType: eventType,
             targetPath,
-            subscription.origin,
-            subscription.gate_label,
-            communicationLabel,
-          ),
+            origin: subscription.origin,
+            gateLabel: subscription.gate_label,
+            bookingGroupLabel,
+            bookingGroupPart: bookingGroupPartContextFromColumns(subscription),
+          }),
           endpoint: subscription.endpoint,
           p256dh: subscription.p256dh,
           auth: subscription.auth,
@@ -250,8 +274,8 @@ async function deliverStoredPushSubscriptions(
           headers,
           body: requestBody,
         });
-        // Der Push-Dienst ist der einzige Zeuge einer abgelehnten Zustellung; der Endpunkt selbst
-        // bleibt aus Protokollen ausgeschlossen.
+        // The push service is the only source for delivery rejection details. Keep the endpoint
+        // itself out of logs.
         const pushService = new URL(subscription.endpoint).host;
         if (response.status === 404 || response.status === 410) {
           console.info(
@@ -357,30 +381,53 @@ export async function sendRotationPushNotifications(
     );
     return queued.meta.changes;
   }
-  const subscriptions = await env.DB.prepare(
-    `SELECT d.id AS delivery_id, w.id, w.endpoint, w.p256dh, w.auth, w.target_kind, w.origin,
+  const subscriptions = await loadPendingRotationPushSubscriptions(
+    env.DB,
+    rotationId,
+    eventType,
+    now,
+  );
+  await deliverStoredPushSubscriptions(env, eventType, subscriptions);
+  return queued.meta.changes;
+}
+
+export async function loadPendingRotationPushSubscriptions(
+  database: D1Database,
+  rotationId: string,
+  eventType: PushNotificationType,
+  now: string,
+): Promise<StoredPushSubscription[]> {
+  const subscriptions = await database
+    .prepare(
+      withBookingGroupPartProjection(
+        `SELECT d.id AS delivery_id, w.id, w.endpoint, w.p256dh, w.auth, w.target_kind, w.origin,
             t.public_code AS ticket_public_code,
             tg.public_status_code AS group_public_code,
             g.label AS gate_label, p.code AS product_code,
-            tg.communication_number
+            tg.communication_number,
+            booking_part.part_number, booking_part.part_count, booking_part.passenger_count
        FROM web_push_deliveries d
        JOIN web_push_subscriptions w ON w.id = d.subscription_id
        JOIN tickets t ON t.id = w.ticket_id
        JOIN ticket_groups tg ON tg.id = t.ticket_group_id
        JOIN products p ON p.id = tg.product_id
        JOIN rotations r ON r.id = d.rotation_id
+       JOIN booking_group_parts booking_part
+         ON booking_part.ticket_group_id = tg.id
+        AND booking_part.rotation_id = d.rotation_id
        JOIN gates g ON g.id = COALESCE(r.gate_id, p.gate_id)
       WHERE d.rotation_id = ?1 AND d.notification_type = ?2 AND d.status = 'PENDING'
         AND w.status = 'ACTIVE' AND w.delete_after > ?3
         AND (
           (w.target_kind = 'TICKET' AND t.public_code IS NOT NULL)
           OR (w.target_kind = 'GROUP' AND tg.public_status_code IS NOT NULL)
-        )`,
-  )
+        )
+      ORDER BY d.id`,
+      ),
+    )
     .bind(rotationId, eventType, now)
     .all<StoredPushSubscription>();
-  await deliverStoredPushSubscriptions(env, eventType, subscriptions.results);
-  return queued.meta.changes;
+  return subscriptions.results;
 }
 
 export async function sendTicketGroupRecallPushNotifications(
@@ -422,7 +469,8 @@ export async function sendTicketGroupRecallPushNotifications(
             subscription.origin, ticket.public_code AS ticket_public_code,
             ticket_group.public_status_code AS group_public_code,
             gate.label AS gate_label, product.code AS product_code,
-            ticket_group.communication_number
+            ticket_group.communication_number,
+            NULL AS part_number, NULL AS part_count, NULL AS passenger_count
        FROM web_push_deliveries delivery
        JOIN ticket_group_recalls recall ON recall.id = delivery.ticket_group_recall_id
        JOIN web_push_subscriptions subscription ON subscription.id = delivery.subscription_id

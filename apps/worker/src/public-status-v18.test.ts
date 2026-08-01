@@ -98,8 +98,8 @@ describe("öffentlicher Status V1.8", () => {
         json: () => ({
           web_push: 8030,
           notification: {
-            title: "Bitte zum Gate",
-            body: "Bitte kommen Sie jetzt zu „Flight Line 1“ und warten Sie dort auf den Boardingaufruf.",
+            title: "Teilflug 1/2 · Bitte zum Gate",
+            body: "Teilflug 1 von 2 der Gruppe G-PAN-0101: Bitte kommen Sie jetzt zum Gate „Flight Line 1“ und warten Sie dort auf den Boardingaufruf.",
             navigate: "https://status.example/gruppe/NPQRSTUVWXYZ2",
           },
         }),
@@ -110,8 +110,8 @@ describe("öffentlicher Status V1.8", () => {
     });
     await notificationWork;
 
-    expect(showNotification).toHaveBeenCalledWith("Bitte zum Gate", {
-      body: "Bitte kommen Sie jetzt zu „Flight Line 1“ und warten Sie dort auf den Boardingaufruf.",
+    expect(showNotification).toHaveBeenCalledWith("Teilflug 1/2 · Bitte zum Gate", {
+      body: "Teilflug 1 von 2 der Gruppe G-PAN-0101: Bitte kommen Sie jetzt zum Gate „Flight Line 1“ und warten Sie dort auf den Boardingaufruf.",
       data: { url: "/gruppe/NPQRSTUVWXYZ2" },
       lang: "de",
     });

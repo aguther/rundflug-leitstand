@@ -1,6 +1,6 @@
 import { spawn, spawnSync } from "node:child_process";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
@@ -9,7 +9,9 @@ import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const wranglerCli = resolve(root, "node_modules", "wrangler", "bin", "wrangler.js");
-const stateDirectory = mkdtempSync(resolve(root, ".wrangler", "public-monitors-"));
+const wranglerDirectory = resolve(root, ".wrangler");
+mkdirSync(wranglerDirectory, { recursive: true });
+const stateDirectory = mkdtempSync(resolve(wranglerDirectory, "public-monitors-"));
 const localD1Arguments = ["--local", "--persist-to", stateDirectory, "--config", "wrangler.jsonc"];
 const migrate = spawnSync(
   process.execPath,
@@ -443,6 +445,9 @@ try {
     initialGroupStatus.groupSize !== 2 ||
     initialGroupStatus.parts.length !== 1 ||
     initialGroupStatus.parts[0]?.passengerCount !== 2 ||
+    initialTicketStatus.bookingGroupPart?.partNumber !== 1 ||
+    initialTicketStatus.bookingGroupPart?.partCount !== 1 ||
+    initialTicketStatus.bookingGroupPart?.passengerCount !== 2 ||
     "communicationLabel" in initialGroupStatus.parts[0]
   ) {
     throw new Error("Der öffentliche Gruppenstatus aggregiert die Buchungsgruppe nicht korrekt.");
@@ -747,12 +752,27 @@ try {
   );
   await splitSaleRefresh;
   const splitStatus = await groupStatus(splitGroupCode);
+  const splitTicketStatuses = await Promise.all(
+    splitPrivateCodes.map((code) => ticketStatus(code)),
+  );
+  const secondPartTicketStatus = splitTicketStatuses.find(
+    (status) => status.bookingGroupPart?.partNumber === 2,
+  );
+  const secondGroupPart = splitStatus.parts.find((part) => part.partNumber === 2);
   if (
     splitStatus.groupSize !== 5 ||
     splitStatus.parts.length !== 2 ||
     splitStatus.parts.some((part) => part.partCount !== 2) ||
     splitStatus.parts.reduce((sum, part) => sum + part.passengerCount, 0) !== 5 ||
-    splitStatus.parts.some((part) => "communicationLabel" in part || "flightGroup" in part)
+    splitStatus.parts.some((part) => "communicationLabel" in part || "flightGroup" in part) ||
+    !secondPartTicketStatus ||
+    !secondGroupPart ||
+    JSON.stringify(secondPartTicketStatus.bookingGroupPart) !==
+      JSON.stringify({
+        partNumber: secondGroupPart.partNumber,
+        partCount: secondGroupPart.partCount,
+        passengerCount: secondGroupPart.passengerCount,
+      })
   ) {
     throw new Error(
       "Der öffentliche Gruppenstatus bildet eine bewusste Aufteilung nicht korrekt ab.",
@@ -967,6 +987,7 @@ try {
       publicGroupStatusWithoutLogin: true,
       exactPublicManifestStartPaths: true,
       splitGroupStatusAggregated: true,
+      legacyTicketPartMatchesGroupProjection: true,
       preparationFromStoredDecision: true,
       explicitPushConsentRequired: true,
       preparationPushDeduplicated: true,

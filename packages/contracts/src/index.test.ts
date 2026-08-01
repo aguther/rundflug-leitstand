@@ -648,6 +648,7 @@ describe("commandEnvelopeSchema", () => {
       publicDescription: "Panoramaflug",
       gateLabel: "Flight Line 1",
       communicationNumber: 101,
+      bookingGroupPart: { partNumber: 2, partCount: 2, passengerCount: 2 },
       status: "WAITING",
       queuePosition: 1,
       waitLowerMinutes: 0,
@@ -662,6 +663,11 @@ describe("commandEnvelopeSchema", () => {
       updatedAt: "2026-07-11T12:00:00.000Z",
     });
     expect(status.eventName).toBe("Synthetischer Flugtag");
+    expect(status.bookingGroupPart).toEqual({
+      partNumber: 2,
+      partCount: 2,
+      passengerCount: 2,
+    });
     const board = publicBoardSchema.parse({
       eventName: "Demo",
       timeZone: "Europe/Berlin",
@@ -692,6 +698,8 @@ describe("commandEnvelopeSchema", () => {
       fleet: [{ registration: "D-EAAA", status: "AVAILABLE", refuelPlanned: false }],
     });
     expect("aircraftRegistration" in status).toBe(false);
+    expect("rotationId" in status).toBe(false);
+    expect("guestName" in status).toBe(false);
     expect("guestName" in board).toBe(false);
     expect(() =>
       publicTicketStatusSchema.parse({
