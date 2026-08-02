@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import adminUxSource from "./admin-ux.tsx?raw";
 import adminViewSource from "./admin-view.tsx?raw";
@@ -9,9 +10,24 @@ import masterDataSource from "./features/admin/master-data/MasterDataWorkspace.t
 import operationalPlanSource from "./features/admin/operational-plan/OperationalPlanWorkspace.tsx?raw";
 import operationsSource from "./features/admin/operations/OperationsWorkspace.tsx?raw";
 
+const adminWorkspaceStyles = readFileSync(
+  new URL("./features/admin/admin-event-workspace.css", import.meta.url),
+  "utf8",
+);
+const frameStyles = readFileSync(
+  new URL("./features/admin/event-workspace/event-workspace.css", import.meta.url),
+  "utf8",
+);
+
 describe("event-scoped administration redesign", () => {
-  it("uses one event frame with stable content width variants", () => {
+  it("uses one event frame with a stable outer width for every variant", () => {
     expect(frameSource).toContain('EventWorkspaceVariant = "form" | "master-data" | "wide"');
+    expect(frameStyles).toContain("--event-workspace-max-width: 1640px");
+    expect(frameStyles).not.toContain("--event-workspace-max-width: 1180px");
+    expect(frameStyles).not.toContain("--event-workspace-max-width: 1520px");
+    expect(adminWorkspaceStyles).toMatch(
+      /\.admin-shell \.event-setup-v15\.single-panel \{[\s\S]*?margin: 0;/,
+    );
     expect(masterDataSource).toContain('<EventWorkspaceFrame event={event} variant="master-data">');
     expect(operationsSource).toContain('<EventWorkspaceFrame event={board.event} variant="wide">');
     expect(completionSource).toContain('<EventWorkspaceFrame event={board.event} variant="wide">');

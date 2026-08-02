@@ -1,7 +1,8 @@
 import type { CommandEnvelope, OperationBoard } from "@rundflug/contracts";
-import { Ban, CalendarClock, Pencil, Plus, Repeat2 } from "lucide-react";
+import { Ban, CalendarClock, Pencil, Repeat2 } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import {
+  AddButton,
   Button,
   ConfirmationDialog,
   DataTable,
@@ -477,9 +478,11 @@ export function OperationalPlanPanel({
               </p>
             </div>
             {!readOnly ? (
-              <Button disabled={busy} onClick={openNewPlan} type="button" variant="primary">
-                <Plus aria-hidden="true" /> Einschränkung hinzufügen
-              </Button>
+              <AddButton
+                ariaLabel="Einschränkung hinzufügen"
+                disabled={busy}
+                onClick={openNewPlan}
+              />
             ) : null}
           </header>
 
@@ -569,9 +572,7 @@ export function OperationalPlanPanel({
               </p>
             </div>
             {!readOnly ? (
-              <Button disabled={busy} onClick={openNewRule} type="button" variant="primary">
-                <Plus aria-hidden="true" /> Regel hinzufügen
-              </Button>
+              <AddButton ariaLabel="Regel hinzufügen" disabled={busy} onClick={openNewRule} />
             ) : null}
           </header>
           <DataTable

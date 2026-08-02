@@ -1,7 +1,7 @@
 import type { EventSnapshot } from "@rundflug/contracts";
-import { Plus } from "lucide-react";
+import { Database } from "lucide-react";
 import type { ReactNode } from "react";
-import { Button, SearchField } from "../../../design-system/components";
+import { AddButton, SearchField } from "../../../design-system/components";
 import { EventWorkspaceFrame } from "../event-workspace/EventWorkspaceFrame";
 import "./master-data.css";
 
@@ -10,7 +10,7 @@ export function MasterDataWorkspace({
   search,
   onSearchChange,
   resultCount,
-  newLabel,
+  addAriaLabel,
   onNew,
   filters,
   children,
@@ -19,7 +19,7 @@ export function MasterDataWorkspace({
   search: string;
   onSearchChange: (value: string) => void;
   resultCount: number;
-  newLabel: string;
+  addAriaLabel: string;
   onNew: () => void;
   filters?: ReactNode;
   children: ReactNode;
@@ -37,10 +37,7 @@ export function MasterDataWorkspace({
         <span aria-live="polite" className="master-data-result-count">
           {resultCount} {resultCount === 1 ? "Eintrag" : "Einträge"}
         </span>
-        <Button onClick={onNew} type="button" variant="primary">
-          <Plus aria-hidden="true" />
-          {newLabel}
-        </Button>
+        <AddButton ariaLabel={addAriaLabel} onClick={onNew} />
       </div>
       <div className="master-data-unified-content">{children}</div>
     </EventWorkspaceFrame>
@@ -50,17 +47,15 @@ export function MasterDataWorkspace({
 export function MasterDataEmptyState({
   title,
   description,
-  action,
 }: {
   title: ReactNode;
   description: ReactNode;
-  action?: ReactNode;
 }) {
   return (
     <div className="master-data-empty master-data-unified-empty">
+      <Database aria-hidden="true" />
       <strong>{title}</strong>
       <p>{description}</p>
-      {action}
     </div>
   );
 }

@@ -2531,6 +2531,28 @@ export function AdminView() {
     pilots: "Pilotencode",
     products: "Produkt",
   };
+  const masterDataPluralLabel: Record<MasterDataCategory, string> = {
+    gates: "Gates",
+    "resource-groups": "Ressourcengruppen",
+    aircraft: "Flugzeuge",
+    assignments: "Flugzeuge",
+    pilots: "Pilotencodes",
+    products: "Produkte",
+  };
+  const masterDataEmptyState = (
+    <MasterDataEmptyState
+      description={
+        totalMasterDataCount === 0
+          ? "Für diese Veranstaltung sind noch keine Einträge vorhanden."
+          : "Die aktuelle Suche oder Filterauswahl liefert keine Einträge."
+      }
+      title={
+        totalMasterDataCount === 0
+          ? `Noch keine ${masterDataPluralLabel[masterDataCategory]}`
+          : "Keine Treffer"
+      }
+    />
+  );
   const masterDataStepActive =
     adminArea === "events" &&
     ["gates", "resource-groups", "aircraft", "pilots", "products"].includes(eventStep);
@@ -3444,7 +3466,7 @@ export function AdminView() {
                   </label>
                 ) : undefined
               }
-              newLabel={`${masterDataSingularLabel[masterDataCategory]} anlegen`}
+              addAriaLabel={`${masterDataSingularLabel[masterDataCategory]} hinzufügen`}
               onNew={startNewMasterDataEntry}
               onSearchChange={setMasterSearch}
               resultCount={activeMasterDataRows.length}
@@ -3453,6 +3475,7 @@ export function AdminView() {
               {masterDataCategory === "gates" ? (
                 <GatesWorkspace
                   board={board}
+                  emptyLabel={masterDataEmptyState}
                   onDelete={(id, label) => requestMasterDelete("GATE", id, label)}
                   onEdit={selectGateForEditing}
                   onSort={toggleMasterSort}
@@ -3475,6 +3498,7 @@ export function AdminView() {
               {masterDataCategory === "aircraft" ? (
                 <AircraftWorkspace
                   board={board}
+                  emptyLabel={masterDataEmptyState}
                   onAssign={(aircraftId) =>
                     setAssignmentDialogContext({ mode: "aircraft", aircraftId })
                   }
@@ -3491,6 +3515,7 @@ export function AdminView() {
               ) : null}
               {masterDataCategory === "pilots" ? (
                 <PilotCodesWorkspace
+                  emptyLabel={masterDataEmptyState}
                   onDelete={(id, label) => requestMasterDelete("PILOT", id, label)}
                   onEdit={selectPilotForEditing}
                   onSort={toggleMasterSort}
@@ -3501,6 +3526,7 @@ export function AdminView() {
               ) : null}
               {masterDataCategory === "products" ? (
                 <ProductsWorkspace
+                  emptyLabel={masterDataEmptyState}
                   onDelete={(id, label) => requestMasterDelete("PRODUCT", id, label)}
                   onEdit={selectProductForEditing}
                   onSales={(productId) => {
@@ -3522,34 +3548,9 @@ export function AdminView() {
                   sortKey={masterSort.category === "products" ? masterSort.key : undefined}
                 />
               ) : null}
-              {activeMasterDataRows.length === 0 ? (
-                <MasterDataEmptyState
-                  action={
-                    totalMasterDataCount === 0 ? (
-                      <Button onClick={startNewMasterDataEntry} type="button" variant="primary">
-                        <Plus aria-hidden="true" />
-                        {masterDataSingularLabel[masterDataCategory]} anlegen
-                      </Button>
-                    ) : (
-                      <Button
-                        onClick={() => {
-                          setMasterSearch("");
-                          setResourceStatusFilter("ALL");
-                        }}
-                        type="button"
-                      >
-                        Filter zurücksetzen
-                      </Button>
-                    )
-                  }
-                  description={
-                    totalMasterDataCount === 0
-                      ? "Für diese Veranstaltung sind noch keine Einträge vorhanden."
-                      : "Die aktuelle Suche oder Filterauswahl liefert keine Einträge."
-                  }
-                  title={totalMasterDataCount === 0 ? "Noch keine Stammdaten" : "Keine Treffer"}
-                />
-              ) : null}
+              {masterDataCategory === "resource-groups" && activeMasterDataRows.length === 0
+                ? masterDataEmptyState
+                : null}
               <MasterDataPagination
                 count={activeMasterDataRows.length}
                 onPageChange={setMasterPage}

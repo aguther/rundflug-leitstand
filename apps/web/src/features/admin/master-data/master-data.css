@@ -9,9 +9,13 @@
   background: var(--ui-surface-subtle);
 }
 
-.admin-shell .master-data-unified-toolbar .ds-search-field {
+.admin-shell .master-data-unified-toolbar > .ds-search-control {
   width: min(420px, 100%);
   flex: 0 1 420px;
+}
+
+.admin-shell .master-data-unified-toolbar > .ds-search-control .ds-search-field {
+  width: 100%;
 }
 
 .admin-shell .master-data-unified-filters {
@@ -232,6 +236,12 @@
   min-height: 180px;
 }
 
+.admin-shell .master-data-unified-empty > svg {
+  width: 28px;
+  height: 28px;
+  color: var(--ui-muted);
+}
+
 .admin-shell .master-data-unified-pagination {
   margin: 0 16px 16px;
 }
@@ -242,9 +252,10 @@
     grid-template-columns: minmax(0, 1fr) auto;
   }
 
-  .admin-shell .master-data-unified-toolbar .ds-search-field {
+  .admin-shell .master-data-unified-toolbar > .ds-search-control {
     width: 100%;
     grid-column: 1 / -1;
+    flex-basis: auto;
   }
 
   .admin-shell .master-data-unified-filters {

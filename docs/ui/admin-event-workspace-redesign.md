@@ -23,10 +23,13 @@ Konzeptfreigabe ist nicht erforderlich.
   Schrittinhalts stabil.
 - Jeder Schritt beginnt mit demselben kompakten Veranstaltungskontext: Name, Status, Datum,
   Flugplatz und Zeitzone aus dem `OperationBoard`.
-- Formularinhalte sind auf 1180 px, Stammdaten auf 1520 px sowie Betrieb und Abschluss auf 1640 px
-  begrenzt. Kleine Viewports nutzen die gesamte verfügbare Breite.
+- Alle neun Schritte verwenden eine gemeinsame äußere Maximalbreite von 1640 px, damit der Rahmen
+  beim Tabwechsel stabil bleibt. Interne Formularinhalte behalten mit höchstens 1180 px ihre sinnvolle
+  Lesebreite. Kleine Viewports nutzen die gesamte verfügbare Breite.
 - Stammdaten verwenden eine gemeinsame Werkzeugleiste, eindeutige Leerzustände, kontrollierte
-  Sortierung und Paginierung. Breite Listen besitzen genau einen internen horizontalen Scrollbereich.
+  Sortierung und Paginierung. Tabellenköpfe bleiben auch ohne Datensätze sichtbar; fachlich leere
+  Tabellen und leere Suchergebnisse zeigen jeweils genau einen aktionsfreien Leerzustand im
+  Tabellenkörper. Breite Listen besitzen genau einen internen horizontalen Scrollbereich.
 - Dialoge behalten einen festen Kopf und Fuß; nur der Body scrollt. Speichern, Abbrechen und
   irreversible Aktionen sind räumlich getrennt, Dirty-State und Fokus werden geschützt.
 - Blau kennzeichnet Auswahl und Primäraktion, Grün Erfolg beziehungsweise aktiven Zustand, Amber
@@ -34,6 +37,9 @@ Konzeptfreigabe ist nicht erforderlich.
   Design-Tokens werden verwendet.
 - Tabs besitzen vollständige `tablist`-/`tab`-/`tabpanel`-Semantik und unterstützen Pfeiltasten,
   `Home` und `End`.
+- Tab-Sequenzen in Formularen führen über veränderbare Controls und notwendige Aktionen. Rein
+  informative Hilfe- und Tooltip-Trigger bleiben per Maus und Touch bedienbar, erzeugen aber keinen
+  zusätzlichen Tabstopp.
 - Gate- und Produkteditoren verwenden direkt unter ihrer Legende eine horizontale Tabzeile über die
   volle Dialogbreite. Tooltip-Overlays verändern weder Dialogbreite noch Scrollmaße; der Dialogbody
   reserviert seine Scrollbarbreite dauerhaft.
@@ -81,11 +87,12 @@ Konzeptfreigabe ist nicht erforderlich.
   Aktualisieren dieselbe Touch-Control-Höhe und eine gemeinsame Control-Achse.
 - Der lokale Verkaufsschluss übernimmt den horizontalen Textabstand der Zeitfelder aus dem
   Veranstaltungsschritt; der reservierte Bereich für Kalender- und Uhrsymbol bleibt stabil.
+- Alle Hinzufügen-Aktionen in den Veranstaltungsschritten zeigen einheitlich „+ Hinzufügen“; ihr
+  kontextbezogener Accessible Name benennt weiterhin das anzulegende Objekt.
 - Beide Betriebsplan-Tabs besitzen denselben umlaufenden Inhaltsabstand. Pro Tab gibt es genau eine
   blaue Primäraktion im Kopf. Einschränkungen und wiederkehrende Regeln verwenden gleichwertige,
   aktionsfreie Leerzustände. Beide Köpfe zeigen die Zahl der aktiven Einträge; wiederkehrende Regeln
-  verwenden wie Einschränkungen eine Tabelle mit dauerhaft sichtbarem Spaltenkopf. Die Primäraktion
-  des Regel-Tabs heißt kurz „Regel hinzufügen“.
+  verwenden wie Einschränkungen eine Tabelle mit dauerhaft sichtbarem Spaltenkopf.
 - Betriebsfreigabe und Notfallmodus stehen in gleich breiten und gleich hohen neutralen Außenkarten.
   Nur Grundfeld und Not-Halt-Aktion liegen in einer rot gekennzeichneten Innenfläche; die rote
   Semantik wird nicht auf die gesamte Kartenhälfte ausgedehnt.

@@ -1,5 +1,6 @@
 import type { OperationBoard } from "@rundflug/contracts";
 import { Link2, Pencil, TimerReset, Trash2 } from "lucide-react";
+import type { ReactNode } from "react";
 import { IconButton, StatusPill } from "../../../design-system/components";
 import { aircraftStateLabel } from "../../../operation-workspace";
 import { AdminEntityTable } from "../master-data/AdminEntityTable";
@@ -16,6 +17,7 @@ export function AircraftWorkspace({
   onAssign,
   onTurnaround,
   onDelete,
+  emptyLabel = "Keine Einträge vorhanden.",
 }: {
   board: OperationBoard;
   rows: Aircraft[];
@@ -26,6 +28,7 @@ export function AircraftWorkspace({
   onAssign: (id: string, resourceGroupId: string) => void;
   onTurnaround: (id: string) => void;
   onDelete: (id: string, label: string) => void;
+  emptyLabel?: ReactNode;
 }) {
   const available = board.aircraft.filter(
     (aircraft) => aircraft.operationalState === "AVAILABLE",
@@ -102,6 +105,7 @@ export function AircraftWorkspace({
             render: (aircraft) => aircraft.currentPilotOperationalCode || "Nicht zugeordnet",
           },
         ]}
+        emptyLabel={emptyLabel}
         onSort={onSort}
         renderRowActions={(aircraft) => (
           <>
