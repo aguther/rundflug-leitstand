@@ -1,6 +1,6 @@
 # Betriebskonzept für Diagnose- und Tagesanalysepakete
 
-Status: Architektur und UI freigegeben; produktive Umsetzung und Betriebsfreigabe ausstehend
+Status: WP1 bis WP4 umgesetzt; Produktionsaktivierung bleibt vom vollständigen Abnahmelauf abhängig
 
 Architektur: ADR-0034
 
@@ -100,13 +100,16 @@ Konflikt abgewiesen.
 
 ```text
 PENDING -> BUILDING -> READY
-                   -> FAILED -> BUILDING
+                   -> FAILED -> PENDING -> BUILDING
 READY -> EXPIRED
 READY -> DELETED
 ```
 
 `READY` wird erst nach vollständigem R2-Multipart-Abschluss und gespeicherter Objektmetadatenreferenz
-gesetzt. Ein fehlgeschlagener oder abgebrochener Upload wird niemals als downloadbar gemeldet.
+gesetzt. Ein fehlgeschlagener oder abgebrochener Upload wird niemals als downloadbar gemeldet. Ein
+`BUILDING`-Claim ohne Fortschritt wird nach 15 Minuten automatisch mit dem festen Fehlercode
+`ARCHIVE_BUILD_TIMEOUT` nach `FAILED` überführt und kann anschließend kontrolliert erneut gestartet
+werden.
 
 ### R2-Ablage
 
@@ -126,21 +129,15 @@ Konto-, Geräte-, Token-, Push-, Freitext- oder Netzwerkdaten werden als R2-Meta
 ```text
 manifest.json
 README.md
-snapshot/final-operation-board.json
 snapshot/event.json
 planning/runs.ndjson
 planning/contexts.ndjson
 planning/chunks.ndjson
-planning/dispatch-results.ndjson
-planning/precall-results.ndjson
 history/forecast-snapshots.ndjson
 history/operational-events.ndjson
 history/analysis-archive-events.ndjson
 state/*.ndjson
-reports/daily.csv
 reports/queue.csv
-reports/dispatch-batches.csv
-reports/group-decisions.csv
 reports/forecast-windows.csv
 reports/resource-timeline.csv
 ```
@@ -216,10 +213,11 @@ Manuelle Löschung ist idempotent. R2 wird gelöscht, D1 wechselt auf `DELETED` 
 `ARCHIVE_DELETED` wird ergänzt. Archivmetadaten und Zugriffsprotokoll bleiben zur
 Nachvollziehbarkeit erhalten.
 
-Bei Veranstaltungslöschung werden alle Objekte unter `analysis/<event-id>/` paginiert entfernt,
-bevor die eventbezogenen D1-Zeilen in korrekter Fremdschlüsselreihenfolge gelöscht werden. Der
-Werksreset umfasst Analyseobjekte und neue Tabellen. Diese Vorgänge bleiben destruktiv und folgen
-den bereits dokumentierten Bestätigungs- und Wiederherstellungsregeln.
+Bei Veranstaltungslöschung werden die eventbezogenen D1-Zeilen in der geschützten Reset-Grenze
+gelöscht und alle Objekte unter `analysis/<event-id>/` anschließend paginiert entfernt. Bis zum
+erfolgreichen R2-Abschluss bleibt ein wiederholbarer Cleanup-Beleg bestehen. Der Werksreset umfasst
+Analyseobjekte und neue Tabellen. Diese Vorgänge bleiben destruktiv und folgen den bereits
+dokumentierten Bestätigungs- und Wiederherstellungsregeln.
 
 ## Portable Backups
 
@@ -245,7 +243,7 @@ Tagesmanifest geben ihn aus. Er enthält weder Build-Secret noch CI-Token.
 
 ## Offline-Replay
 
-Geplanter Aufruf:
+Aufruf:
 
 ```bash
 npm run analysis:replay -- ./rundflug-analyse-....json
@@ -268,6 +266,15 @@ Istwert ausgegeben.
 `--allow-version-mismatch` erlaubt eine diagnostische Berechnung auf anderem Quellstand, markiert
 das Ergebnis aber ausdrücklich als versionsabweichend. Das Werkzeug schreibt niemals in D1, R2
 oder eine Produktionsumgebung.
+
+## Nachgewiesenes Maximalszenario
+
+`npm run test:analysis-scale` bildet 1.440 Läufe mit 300 Umläufen, Ankern im
+Fünf-Minuten-Abstand, die vollständige Snapshot-Laufreferenz und alle relevanten SQLite-Indizes ab.
+Der lokale Abnahmelauf vom 2. August 2026 ergab 45,21 MB zusätzlichen D1-Platz, 1,561 ms
+Capture-p95 und 7,92 Prozent zusätzliche CPU im Vergleich zum projizierten Forecastpfad. Die
+Messwerte sind ein reproduzierbarer lokaler Guardrail; die Produktionsaktivierung verlangt
+zusätzlich den Cloudflare-Messlauf im Zielkonto.
 
 ## Supportübergabe
 

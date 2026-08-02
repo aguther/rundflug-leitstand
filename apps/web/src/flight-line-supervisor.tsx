@@ -12,6 +12,7 @@ import {
   CircleX,
   Clock3,
   Coffee,
+  Download,
   Fuel,
   Info,
   ListOrdered,
@@ -26,6 +27,7 @@ import {
   Users,
 } from "lucide-react";
 import { useMemo, useState } from "react";
+import { downloadAnalysisSnapshot } from "./api";
 import {
   Button,
   IconButton,
@@ -35,6 +37,10 @@ import {
   SelectField,
   StatusPill,
 } from "./design-system/components";
+import {
+  buildAnalysisClientContext,
+  recordAnalysisUiEvent,
+} from "./features/analysis/analysis-client-diagnostics";
 import {
   FlightDirectorAnalyticsDialog,
   type FlightDirectorAnalyticsSelection,
@@ -290,6 +296,8 @@ export function FlightLineSupervisorConsole({
   const [ticketSort, setTicketSort] = useState<TicketSort>(null);
   const [assignmentOpen, setAssignmentOpen] = useState(false);
   const [pilotOpen, setPilotOpen] = useState(false);
+  const [analysisBusy, setAnalysisBusy] = useState(false);
+  const [analysisStatus, setAnalysisStatus] = useState("");
   const [analyticsSelection, setAnalyticsSelection] =
     useState<FlightDirectorAnalyticsSelection | null>(null);
   const [pendingRotationActions, setPendingRotationActions] = useState<
@@ -374,6 +382,78 @@ export function FlightLineSupervisorConsole({
 
   function selectAircraft(aircraftId: string) {
     onSelectAircraft(aircraftId);
+    recordAnalysisUiEvent({
+      type: "AIRCRAFT_SELECTED",
+      occurredAt: new Date().toISOString(),
+      aircraftId,
+    });
+  }
+
+  function toggleAssignmentGroup(ticketGroupId: string, selected: boolean) {
+    const nextIds = selected
+      ? [...new Set([...selectedQueueGroupIds, ticketGroupId])]
+      : selectedQueueGroupIds.filter((id) => id !== ticketGroupId);
+    recordAnalysisUiEvent({
+      type: "QUEUE_GROUP_SELECTION_CHANGED",
+      occurredAt: new Date().toISOString(),
+      groupIds: nextIds,
+    });
+    onToggleGroup(ticketGroupId, selected);
+  }
+
+  function closeAssignmentDialog() {
+    recordAnalysisUiEvent({
+      type: "ASSIGNMENT_DIALOG_CLOSED",
+      occurredAt: new Date().toISOString(),
+    });
+    setAssignmentOpen(false);
+  }
+
+  async function exportAnalysisSnapshot(dialogOpen: boolean) {
+    if (analysisBusy) return;
+    setAnalysisBusy(true);
+    setAnalysisStatus("Diagnose-Momentaufnahme wird vorbereitet.");
+    recordAnalysisUiEvent({
+      type: "ANALYSIS_EXPORT_STARTED",
+      occurredAt: new Date().toISOString(),
+    });
+    try {
+      const { deviceTokenFor, FLIGHT_LINE_DEVICE_ID } = await import("./operation-workspace");
+      await downloadAnalysisSnapshot(
+        board.event.eventId,
+        FLIGHT_LINE_DEVICE_ID,
+        deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
+        board.event.version,
+        buildAnalysisClientContext({
+          route: window.location.pathname,
+          selectedAircraftId: selectedAircraft?.id ?? null,
+          selectedRotationId: activeRotation?.id ?? null,
+          selectedQueueGroupIds,
+          assignmentDialogOpen: dialogOpen,
+          visibleRecommendation: dispatchRecommendation
+            ? {
+                planRevision: dispatchRecommendation.planRevision,
+                batchId: dispatchRecommendation.batchId,
+                groupIds: dispatchRecommendation.groupIds,
+              }
+            : null,
+          connectionState: navigator.onLine ? "CONNECTED" : "OFFLINE",
+        }),
+      );
+      recordAnalysisUiEvent({
+        type: "ANALYSIS_EXPORT_COMPLETED",
+        occurredAt: new Date().toISOString(),
+      });
+      setAnalysisStatus("Diagnose-Momentaufnahme wurde heruntergeladen.");
+    } catch {
+      recordAnalysisUiEvent({
+        type: "ANALYSIS_EXPORT_FAILED",
+        occurredAt: new Date().toISOString(),
+      });
+      setAnalysisStatus("Diagnose-Momentaufnahme konnte nicht erstellt werden.");
+    } finally {
+      setAnalysisBusy(false);
+    }
   }
 
   function openPilot(entry: Aircraft) {
@@ -428,14 +508,26 @@ export function FlightLineSupervisorConsole({
       if (recommendation) {
         for (const selectedGroupId of selectedQueueGroupIds) {
           if (!recommendation.groupIds.includes(selectedGroupId)) {
-            onToggleGroup(selectedGroupId, false);
+            toggleAssignmentGroup(selectedGroupId, false);
           }
         }
         for (const groupId of recommendation.groupIds) {
-          if (!selectedQueueGroupIds.includes(groupId)) onToggleGroup(groupId, true);
+          if (!selectedQueueGroupIds.includes(groupId)) toggleAssignmentGroup(groupId, true);
         }
+        recordAnalysisUiEvent({
+          type: "DISPATCH_RECOMMENDATION_APPLIED",
+          occurredAt: new Date().toISOString(),
+          planRevision: recommendation.planRevision,
+          batchId: recommendation.batchId,
+          groupIds: recommendation.groupIds,
+        });
       }
       setAssignmentOpen(true);
+      recordAnalysisUiEvent({
+        type: "ASSIGNMENT_DIALOG_OPENED",
+        occurredAt: new Date().toISOString(),
+        rotationId: rotation?.id ?? null,
+      });
       return;
     }
     return runRotationAction(
@@ -496,6 +588,19 @@ export function FlightLineSupervisorConsole({
               <ChartNoAxesCombined aria-hidden="true" />
               Auswertungen
             </Button>
+            <IconButton
+              busy={analysisBusy}
+              className="flight-director-analysis-action"
+              label="Support-sichere Diagnose-Momentaufnahme herunterladen"
+              onClick={() => exportAnalysisSnapshot(false)}
+              size="compact"
+              type="button"
+            >
+              <Download aria-hidden="true" />
+            </IconButton>
+            <span aria-live="polite" className="visually-hidden">
+              {analysisStatus}
+            </span>
             <SelectField
               aria-label="Ressourcengruppe filtern"
               className="flight-director-resource-filter"
@@ -744,18 +849,29 @@ export function FlightLineSupervisorConsole({
         confirmDisabled={assignmentBlocked}
         dispatchRecommendation={dispatchRecommendation}
         groups={compatibleGroups}
-        onClose={() => setAssignmentOpen(false)}
+        headerActions={
+          <IconButton
+            busy={analysisBusy}
+            label="Support-sichere Diagnose-Momentaufnahme herunterladen"
+            onClick={() => exportAnalysisSnapshot(true)}
+            size="compact"
+            type="button"
+          >
+            <Download aria-hidden="true" />
+          </IconButton>
+        }
+        onClose={closeAssignmentDialog}
         onAttendance={onGroupAttendance}
         onDefer={onGroupDefer}
         onConfirm={async (queueDeviationReason) => {
           await onConfirmAssignment(queueDeviationReason);
-          setAssignmentOpen(false);
+          closeAssignmentDialog();
         }}
         onMissing={onGroupMissing}
         onRecall={onGroupRecall}
         onRecallClear={onGroupRecallClear}
         onRestore={onGroupRestore}
-        onToggle={onToggleGroup}
+        onToggle={toggleAssignmentGroup}
         open={assignmentOpen}
         selectedQueueGroupIds={selectedQueueGroupIds}
         timeZone={board.event.timeZone}

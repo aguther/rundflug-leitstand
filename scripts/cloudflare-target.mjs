@@ -123,6 +123,8 @@ export function createTargetWranglerConfig(baseConfig, profile, databaseId) {
     ...(result.vars ?? {}),
     APP_ENV: profile.appEnv,
     DATA_JURISDICTION: "eu",
+    SOURCE_REVISION: process.env.GITHUB_SHA ?? result.vars?.SOURCE_REVISION ?? "unknown",
+    ANALYSIS_RETENTION_DAYS: result.vars?.ANALYSIS_RETENTION_DAYS ?? "30",
   };
   result.d1_databases = [
     {

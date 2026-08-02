@@ -2871,6 +2871,304 @@ export const operationBoardSchema = z.object({
 });
 export type OperationBoard = z.infer<typeof operationBoardSchema>;
 
+export const analysisPrivacyProfileSchema = z.literal("SUPPORT_SAFE");
+export type AnalysisPrivacyProfile = z.infer<typeof analysisPrivacyProfileSchema>;
+
+export const planningCaptureMetadataSchema = z
+  .object({
+    mode: z.enum(["REFERENCE", "CHANGE", "ANCHOR"]),
+    contextId: z.string().min(1),
+    anchorRunId: z.string().min(1),
+    replayDistance: z.number().int().min(0).max(10),
+  })
+  .strict();
+export type PlanningCaptureMetadata = z.infer<typeof planningCaptureMetadataSchema>;
+
+const analysisUiEventSchema = z.discriminatedUnion("type", [
+  z
+    .object({
+      type: z.literal("AIRCRAFT_SELECTED"),
+      occurredAt: z.string().datetime(),
+      aircraftId: z.string().nullable(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("ASSIGNMENT_DIALOG_OPENED"),
+      occurredAt: z.string().datetime(),
+      rotationId: z.string().nullable(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("DISPATCH_RECOMMENDATION_APPLIED"),
+      occurredAt: z.string().datetime(),
+      planRevision: z.string(),
+      batchId: z.string(),
+      groupIds: z.array(z.string()).max(50),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("QUEUE_GROUP_SELECTION_CHANGED"),
+      occurredAt: z.string().datetime(),
+      groupIds: z.array(z.string()).max(50),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("ASSIGNMENT_DIALOG_CLOSED"),
+      occurredAt: z.string().datetime(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("ANALYSIS_EXPORT_STARTED"),
+      occurredAt: z.string().datetime(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("ANALYSIS_EXPORT_COMPLETED"),
+      occurredAt: z.string().datetime(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("ANALYSIS_EXPORT_FAILED"),
+      occurredAt: z.string().datetime(),
+    })
+    .strict(),
+]);
+export type AnalysisUiEvent = z.infer<typeof analysisUiEventSchema>;
+
+export const analysisClientContextSchema = z
+  .object({
+    capturedAt: z.string().datetime(),
+    route: z
+      .string()
+      .max(256)
+      .regex(/^\/[a-zA-Z0-9/_-]*$/),
+    selectedAircraftId: z.string().nullable(),
+    selectedRotationId: z.string().nullable(),
+    selectedQueueGroupIds: z.array(z.string()).max(50),
+    assignmentDialogOpen: z.boolean(),
+    visibleRecommendation: z
+      .object({
+        planRevision: z.string(),
+        batchId: z.string(),
+        groupIds: z.array(z.string()).max(50),
+      })
+      .strict()
+      .nullable(),
+    connectionState: z.enum(["CONNECTED", "STALE", "OFFLINE"]),
+    viewport: z
+      .object({
+        width: z.number().int().nonnegative(),
+        height: z.number().int().nonnegative(),
+        devicePixelRatio: z.number().positive().max(10),
+      })
+      .strict(),
+    displayMode: z.enum(["BROWSER", "PWA"]),
+    browserFamily: z.enum(["CHROME", "EDGE", "FIREFOX", "SAFARI", "OTHER"]),
+    browserMajorVersion: z.number().int().positive().nullable(),
+    recentUiEvents: z.array(analysisUiEventSchema).max(100),
+  })
+  .strict();
+export type AnalysisClientContext = z.infer<typeof analysisClientContextSchema>;
+
+const analysisPlanningManifestEntrySchema = z
+  .object({
+    kind: z.enum([
+      "EVENT_CONFIGURATION",
+      "ROTATIONS_QUEUE",
+      "CAPACITIES",
+      "DURATION_SAMPLES",
+      "OPERATIONAL_CONSTRAINTS",
+    ]),
+    partitionKey: z.string(),
+    chunkId: z.string(),
+  })
+  .strict();
+
+const analysisPlanningChunkSchema = z
+  .object({
+    id: z.string(),
+    kind: z.enum([
+      "EVENT_CONFIGURATION",
+      "ROTATIONS_QUEUE",
+      "CAPACITIES",
+      "DURATION_SAMPLES",
+      "OPERATIONAL_CONSTRAINTS",
+      "PREVIOUS_FORECAST_STATE",
+      "PREVIOUS_DISPATCH_STATE",
+      "DISPATCH_RESULT",
+      "PRECALL_RESULT",
+    ]),
+    schemaVersion: z.number().int().positive(),
+    hash: z.string().regex(/^[a-f0-9]{64}$/),
+    byteSize: z.number().int().nonnegative(),
+    payload: z.json(),
+  })
+  .strict();
+
+const analysisForecastSnapshotSchema = z
+  .object({
+    id: z.string(),
+    planningRunId: z.string(),
+    rotationId: z.string(),
+    capturedAt: z.string().datetime(),
+    quality: z.enum(["STABLE", "CHANGING", "UNCERTAIN"]),
+    lowerMinutes: z.number().nonnegative(),
+    upperMinutes: z.number().nonnegative(),
+    predictedBoardingAt: z.string().nullable(),
+    predictedDepartureAt: z.string().nullable(),
+    predictedLandingAt: z.string().nullable(),
+    predictedCompletionAt: z.string().nullable(),
+    dispatchPlanRevision: z.string().nullable(),
+  })
+  .strict();
+
+export const analysisSnapshotManifestSchema = z
+  .object({
+    exportId: z.string(),
+    capturedAt: z.string().datetime(),
+    applicationVersion: z.string(),
+    requirementsVersion: z.string(),
+    sourceRevision: z.string(),
+    environment: appEnvironmentSchema,
+    privacyProfile: analysisPrivacyProfileSchema,
+    eventId: z.string(),
+    eventVersion: z.number().int().nonnegative(),
+    eventDate: z.string(),
+    timeZone: z.string(),
+    planningRunId: z.string(),
+    planningRunEventVersion: z.number().int().nonnegative(),
+    dispatchPlanRevision: z.string(),
+    schemaVersions: z
+      .object({
+        snapshot: z.literal(1),
+        planningContext: z.number().int().positive(),
+        planningRun: z.literal(1),
+      })
+      .strict(),
+  })
+  .strict();
+
+export const analysisSnapshotSchema = z
+  .object({
+    format: z.literal("rundflug-analysis-snapshot"),
+    formatVersion: z.literal(1),
+    manifest: analysisSnapshotManifestSchema,
+    currentState: z
+      .object({
+        operationBoard: z.json(),
+      })
+      .strict(),
+    planning: z
+      .object({
+        metadata: planningCaptureMetadataSchema,
+        run: z
+          .object({
+            id: z.string(),
+            eventVersion: z.number().int().nonnegative(),
+            calculationNow: z.string().datetime(),
+            capturedAt: z.string().datetime(),
+            trigger: z.string(),
+            sourceRevision: z.string(),
+            dispatchPlanRevision: z.string(),
+            forecastDigest: z.string().regex(/^[a-f0-9]{64}$/),
+            precallDigest: z.string().regex(/^[a-f0-9]{64}$/),
+            durationMs: z.number().nonnegative(),
+            captureDurationMs: z.number().nonnegative(),
+          })
+          .strict(),
+        replayChain: z
+          .array(
+            z
+              .object({
+                id: z.string(),
+                previousRunId: z.string().nullable(),
+                anchorRunId: z.string(),
+                contextId: z.string(),
+                eventVersion: z.number().int().nonnegative(),
+                replayDistance: z.number().int().min(0).max(10),
+                calculationNow: z.string().datetime(),
+                capturedAt: z.string().datetime(),
+                trigger: z.string(),
+                mode: z.enum(["REFERENCE", "CHANGE", "ANCHOR"]),
+                sourceRevision: z.string(),
+                dispatchPlanRevision: z.string(),
+                forecastDigest: z.string().regex(/^[a-f0-9]{64}$/),
+                precallDigest: z.string().regex(/^[a-f0-9]{64}$/),
+                previousForecastStateChunkId: z.string().nullable(),
+                previousDispatchStateChunkId: z.string().nullable(),
+                dispatchResultChunkId: z.string().nullable(),
+                precallResultChunkId: z.string().nullable(),
+              })
+              .strict(),
+          )
+          .min(1)
+          .max(11),
+        context: z
+          .object({
+            id: z.string(),
+            eventVersion: z.number().int().nonnegative(),
+            schemaVersion: z.number().int().positive(),
+            manifestHash: z.string().regex(/^[a-f0-9]{64}$/),
+            manifest: z.array(analysisPlanningManifestEntrySchema),
+          })
+          .strict(),
+        chunks: z.array(analysisPlanningChunkSchema),
+        forecastSnapshots: z.array(analysisForecastSnapshotSchema),
+      })
+      .strict(),
+    client: analysisClientContextSchema.nullable(),
+  })
+  .strict();
+export type AnalysisSnapshot = z.infer<typeof analysisSnapshotSchema>;
+
+export const analysisArchiveStatusSchema = z.enum([
+  "PENDING",
+  "BUILDING",
+  "READY",
+  "FAILED",
+  "EXPIRED",
+  "DELETED",
+]);
+export type AnalysisArchiveStatus = z.infer<typeof analysisArchiveStatusSchema>;
+
+export const analysisArchiveRequestSchema = z
+  .object({
+    requestId: z.uuid(),
+    expectedEventVersion: z.number().int().nonnegative(),
+  })
+  .strict();
+export type AnalysisArchiveRequest = z.infer<typeof analysisArchiveRequestSchema>;
+
+export const analysisArchiveSchema = z
+  .object({
+    id: z.string().min(1),
+    eventId: z.string().min(1),
+    eventVersion: z.number().int().nonnegative(),
+    privacyProfile: analysisPrivacyProfileSchema,
+    formatVersion: z.literal(1),
+    status: analysisArchiveStatusSchema,
+    requestedAt: z.string().datetime(),
+    startedAt: z.string().datetime().nullable(),
+    completedAt: z.string().datetime().nullable(),
+    expiresAt: z.string().datetime(),
+    sizeBytes: z.number().int().nonnegative().nullable(),
+    failureCode: z.string().nullable(),
+  })
+  .strict();
+export type AnalysisArchive = z.infer<typeof analysisArchiveSchema>;
+
+export const analysisArchiveListSchema = z
+  .object({ archives: z.array(analysisArchiveSchema) })
+  .strict();
+export type AnalysisArchiveList = z.infer<typeof analysisArchiveListSchema>;
+
 export const assistClaimMutationSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("ACQUIRE_OR_RENEW") }).strict(),
   z

@@ -3,6 +3,7 @@ import {
   type DispatchCommitmentLevel,
   type DispatchDecisionReason,
   type DispatchPlan,
+  type DispatchPlanInput,
   type DispatchPlanningLimits,
   type DispatchUnplannedReason,
   orderDispatchGroupsForProjection,
@@ -240,6 +241,16 @@ export interface ForecastTimelinesInput {
   tuning?: ForecastTuningProfile;
   previousDispatchPlan?: DispatchPlan | null;
   dispatchPlanningLimits?: Partial<DispatchPlanningLimits>;
+}
+
+export interface ForecastCalculationDiagnostics {
+  dispatchInput: DispatchPlanInput;
+  dispatchPlan: DispatchPlan;
+}
+
+export interface ForecastCalculationResult {
+  projections: ForecastTimelineProjection[];
+  diagnostics: ForecastCalculationDiagnostics;
 }
 
 function median(values: readonly number[]): number {
@@ -1339,9 +1350,9 @@ interface LongRangeReplayReservation extends DispatchReplayReservation {
  * milestone forecast. A batch advances its forecast lane exactly once, regardless of how many
  * complete booking groups it contains.
  */
-export function calculateForecastTimelines(
+export function calculateForecastTimelineResult(
   input: ForecastTimelinesInput,
-): ForecastTimelineProjection[] {
+): ForecastCalculationResult {
   const legacy = calculateLegacyForecastTimelines(input);
   const now = new Date(input.event.now);
   if (!Number.isFinite(now.getTime())) throw new Error("Forecast time is invalid.");
@@ -1593,7 +1604,7 @@ export function calculateForecastTimelines(
       }));
     },
   );
-  const dispatchPlan = createDispatchPlan({
+  const dispatchInput: DispatchPlanInput = {
     now: input.event.now,
     groups: dispatchGroups,
     lanes: dispatchLanes,
@@ -1601,7 +1612,8 @@ export function calculateForecastTimelines(
       ? {}
       : { previousPlan: input.previousDispatchPlan }),
     ...(input.dispatchPlanningLimits === undefined ? {} : { limits: input.dispatchPlanningLimits }),
-  });
+  };
+  const dispatchPlan = createDispatchPlan(dispatchInput);
   const reservationByBatchId = new Map<string, DispatchReplayReservation>();
   for (const batch of dispatchPlan.batches) {
     const member = rotationsById.get(batch.memberIds[0] ?? "");
@@ -1795,7 +1807,7 @@ export function calculateForecastTimelines(
   const unplannedByMemberId = new Map(
     dispatchPlan.unplannedGroups.map((entry) => [entry.memberId, entry.reason]),
   );
-  return legacy.map((projection) => {
+  const projections = legacy.map((projection) => {
     const rotation = rotationsById.get(projection.rotationId);
     if (rotation?.status !== "DRAFT") {
       const operationsEnd = operationsEndAssessment(
@@ -1955,4 +1967,17 @@ export function calculateForecastTimelines(
       dispatchUnplannedReason: batch ? null : unplannedReason,
     };
   });
+  return {
+    projections,
+    diagnostics: {
+      dispatchInput,
+      dispatchPlan,
+    },
+  };
+}
+
+export function calculateForecastTimelines(
+  input: ForecastTimelinesInput,
+): ForecastTimelineProjection[] {
+  return calculateForecastTimelineResult(input).projections;
 }

@@ -30,12 +30,13 @@ import {
   assertSaleAllowed,
   assertTechnicalRotationAbortAllowed,
   assertTicketNoShowAllowed,
-  calculateForecastTimelines,
+  calculateForecastTimelineResult,
   DEFAULT_DISPATCH_PLANNING_LIMITS,
   type DeviceRole,
   type DispatchPlan,
   DomainRuleError,
   deriveAdaptivePrecallLeadMinutes,
+  type ForecastTimelinesInput,
   formatBookingGroupLabel,
   normalizePrecallObservation,
   type OperationalCommandType,
@@ -52,6 +53,10 @@ import {
   transitionRotation,
   validateRecurringOperationalRule,
 } from "@rundflug/domain";
+import {
+  automaticArchiveRequestStatements,
+  processPendingAnalysisArchives,
+} from "./analysis-archive";
 import { sha256Hex, verifyCredential } from "./crypto";
 import { mayAccessFids } from "./fids-authorization";
 import { loadFidsPreferences, normalizeFidsContentFilter } from "./fids-preferences-storage";
@@ -60,6 +65,12 @@ import {
   type PlannedOperationScope,
   plannedOperationAuditReason,
 } from "./planned-operation-audit-reason";
+import {
+  completePlanningCapture,
+  failPlanningCapture,
+  type PreparedPlanningCapture,
+  preparePlanningCapture,
+} from "./planning-capture";
 import { validateProductSalesUpdate } from "./product-sales-policy";
 import { rowToSnapshot, safeErrorMessage } from "./snapshot";
 import type { Env, StoredEventRow } from "./types";
@@ -110,6 +121,17 @@ export class EventCoordinator extends DurableObject<Env> {
     }
     if (request.method === "POST" && url.pathname.endsWith("/command")) {
       return this.enqueueCommand(request);
+    }
+    if (request.method === "POST" && url.pathname.endsWith("/analysis-capture")) {
+      const eventId = this.eventIdFromPath(url.pathname);
+      if (!eventId) {
+        return json(
+          { error: { code: "EVENT_NOT_FOUND", message: "Event identifier is missing." } },
+          { status: 404 },
+        );
+      }
+      await this.scheduleForecastRecalculation(eventId, "MANUAL_DIAGNOSIS");
+      return json({ captured: true });
     }
     if (request.method === "PUT" && url.pathname.endsWith("/fids/preferences")) {
       return this.enqueueFidsPreferences(request, url);
@@ -2330,7 +2352,7 @@ export class EventCoordinator extends DurableObject<Env> {
           expected_review_at: string | null;
         }>(),
     ]);
-    if (!event || rotationRows.results.length === 0) return;
+    if (!event) return;
 
     const now = new Date();
     const nowIso = now.toISOString();
@@ -2721,7 +2743,7 @@ export class EventCoordinator extends DurableObject<Env> {
             limits: { ...DEFAULT_DISPATCH_PLANNING_LIMITS },
           }
         : null;
-    const projections = calculateForecastTimelines({
+    const forecastInput = {
       event: {
         eventId,
         now: nowIso,
@@ -2836,7 +2858,12 @@ export class EventCoordinator extends DurableObject<Env> {
           ),
         };
       }),
-    });
+    } satisfies ForecastTimelinesInput;
+    const calculationStartedAtMs = performance.now();
+    const calculationResult = calculateForecastTimelineResult(forecastInput);
+    const calculationDurationMs = Math.max(0, performance.now() - calculationStartedAtMs);
+    const projections = calculationResult.projections;
+    const planningRunId = crypto.randomUUID();
     const projectionByRotationId = new Map(
       projections.map((projection) => [projection.rotationId, projection]),
     );
@@ -2990,10 +3017,10 @@ export class EventCoordinator extends DurableObject<Env> {
              dispatch_wave, dispatch_lane_id, dispatch_group_ids_json,
              dispatch_occupied_seats, dispatch_available_seats, dispatch_commitment_level,
              dispatch_decision_reasons_json, dispatch_projected_overtake_count,
-             dispatch_unplanned_reason)
+             dispatch_unplanned_reason, planning_run_id)
            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15,
                    ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27, ?28,
-                   ?29, ?30, ?31, ?32, ?33, ?34, ?35, ?36, ?37, ?38, ?39)`,
+                   ?29, ?30, ?31, ?32, ?33, ?34, ?35, ?36, ?37, ?38, ?39, ?40)`,
           ).bind(
             crypto.randomUUID(),
             eventId,
@@ -3034,6 +3061,7 @@ export class EventCoordinator extends DurableObject<Env> {
             JSON.stringify(projection.dispatchDecisionReasons),
             projection.dispatchProjectedOvertakeCount,
             projection.dispatchUnplannedReason,
+            planningRunId,
           ),
         );
       }
@@ -3117,11 +3145,34 @@ export class EventCoordinator extends DurableObject<Env> {
         },
       ];
     });
-    for (let index = 0; index < statements.length; index += 80) {
-      await this.env.DB.batch(statements.slice(index, index + 80));
+    let planningCapture: PreparedPlanningCapture | null = null;
+    try {
+      planningCapture = await preparePlanningCapture({
+        env: this.env,
+        eventId,
+        eventVersion: event.version,
+        calculationNow: nowIso,
+        capturedAt: new Date().toISOString(),
+        triggerEventType,
+        forecastInput,
+        calculationResult,
+        precallInput: precallQueueEntries,
+        precallOutput: precallDecisions,
+        durationMs: calculationDurationMs,
+        runId: planningRunId,
+      });
+      for (let index = 0; index < statements.length; index += 80) {
+        await this.env.DB.batch(statements.slice(index, index + 80));
+      }
+      await this.persistAutomaticPrecalls(eventId, precallCandidates, nowIso);
+      await queueEligiblePreparationNotifications(this.env, eventId);
+      await completePlanningCapture(this.env, planningCapture);
+    } catch (error) {
+      if (planningCapture) {
+        await failPlanningCapture(this.env, planningCapture).catch(() => undefined);
+      }
+      throw error;
     }
-    await this.persistAutomaticPrecalls(eventId, precallCandidates, nowIso);
-    await queueEligiblePreparationNotifications(this.env, eventId);
     const forecastMessage = JSON.stringify({
       type: "forecast-updated",
       eventId,
@@ -6250,6 +6301,15 @@ export class EventCoordinator extends DurableObject<Env> {
       eventType,
       aggregate: { type: "OPERATION_DAY", id: command.eventId },
     };
+    const archiveStatements =
+      target === "CLOSED"
+        ? await automaticArchiveRequestStatements({
+            env: this.env,
+            eventId: command.eventId,
+            eventVersion: nextVersion,
+            requestedAt: now,
+          })
+        : [];
     await this.env.DB.batch([
       this.env.DB.prepare(
         `UPDATE operation_days SET status = ?1, archived_at = ?2, version = ?3, updated_at = ?4
@@ -6288,8 +6348,13 @@ export class EventCoordinator extends DurableObject<Env> {
       this.env.DB.prepare(
         "INSERT INTO outbox (id, operation_day_id, topic, payload_json, created_at) VALUES (?1, ?2, 'EVENT_STATE_CHANGED', ?3, ?4)",
       ).bind(crypto.randomUUID(), command.eventId, JSON.stringify(result), now),
+      ...archiveStatements,
     ]);
     this.broadcast(result);
+    if (target === "CLOSED") {
+      const forecastWork = this.forecastWork ?? Promise.resolve();
+      this.ctx.waitUntil(forecastWork.then(() => processPendingAnalysisArchives(this.env, 1)));
+    }
     return json(result);
   }
 

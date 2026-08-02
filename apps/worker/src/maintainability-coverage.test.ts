@@ -52,6 +52,7 @@ describe("V1 maintainability and portability boundaries", () => {
       "@testing-library/react",
       "@testing-library/user-event",
       "concurrently",
+      "fflate",
       "hono",
       "jsdom",
       "lucide-react",

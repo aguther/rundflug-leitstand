@@ -15,7 +15,12 @@ export const EVENT_DELETION_SQL = [
   "DELETE FROM outage_recovery_references WHERE operation_day_id = ?1",
   "DELETE FROM outage_recovery_entries WHERE batch_id IN (SELECT id FROM outage_recovery_batches WHERE operation_day_id = ?1)",
   "DELETE FROM outage_recovery_batches WHERE operation_day_id = ?1",
+  "DELETE FROM analysis_archive_events WHERE operation_day_id = ?1",
+  "DELETE FROM analysis_archives WHERE operation_day_id = ?1",
   "DELETE FROM forecast_snapshots WHERE operation_day_id = ?1",
+  "DELETE FROM planning_runs WHERE operation_day_id = ?1",
+  "DELETE FROM planning_contexts WHERE operation_day_id = ?1",
+  "DELETE FROM planning_chunks WHERE operation_day_id = ?1",
   "DELETE FROM rotation_manifest_corrections WHERE operation_day_id = ?1",
   "DELETE FROM rotation_tickets WHERE rotation_id IN (SELECT id FROM rotations WHERE operation_day_id = ?1)",
   "DELETE FROM ticket_group_recalls WHERE operation_day_id = ?1",
@@ -54,6 +59,17 @@ export async function finishEventDeletionAssetCleanup(
   response: EventDeletionResponse,
 ): Promise<EventDeletionResponse> {
   if (logoObjectKeys.length > 0) await env.BACKUPS.delete([...logoObjectKeys]);
+  let cursor: string | undefined;
+  do {
+    const listed = await env.BACKUPS.list({
+      prefix: `analysis/${response.eventId}/`,
+      ...(cursor ? { cursor } : {}),
+    });
+    if (listed.objects.length > 0) {
+      await env.BACKUPS.delete(listed.objects.map((object) => object.key));
+    }
+    cursor = listed.truncated ? listed.cursor : undefined;
+  } while (cursor);
   const completedResponse = { ...response, assetCleanupPending: false };
   await env.DB.prepare(
     `UPDATE event_deletion_receipts
