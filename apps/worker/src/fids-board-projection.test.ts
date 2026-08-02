@@ -84,6 +84,67 @@ describe("protected FIDS board projection", () => {
     expect(recording.bindings[0]?.slice(-2)).toEqual([8, 16]);
   });
 
+  it("selects recent departures only inside the configured cutoff", async () => {
+    const recording = recordingDatabase({ rows: [] });
+    await loadFidsProjectionRows(recording.db, {
+      ...projectionInput,
+      band: "RECENT_DEPARTURE",
+      limit: 8,
+      offset: 0,
+    });
+    expect(recording.statements[0]).toContain("status IN ('IN_FLIGHT', 'LANDED', 'COMPLETED')");
+    expect(recording.statements[0]).toContain(
+      "r.status NOT IN ('IN_FLIGHT', 'LANDED', 'COMPLETED') OR r.departed_at > ?5",
+    );
+    expect(recording.statements[0]).toContain(
+      "?7 = 'RECENT_DEPARTURE' AND recent_departure_band = 1",
+    );
+    expect(recording.bindings[0]?.[6]).toBe("RECENT_DEPARTURE");
+  });
+
+  it("categorically excludes actionable and recent-departure rows from lower paging", async () => {
+    const recording = recordingDatabase({ count: 4 });
+    await countFidsProjectionRows(recording.db, {
+      ...projectionInput,
+      band: "LOWER",
+      excludedRowIds: ["selected-prepare"],
+    });
+    expect(recording.statements[0]).toContain(
+      "?7 = 'LOWER' AND actionable_band = 0 AND recent_departure_band = 0",
+    );
+    expect(recording.bindings[0]?.[6]).toBe("LOWER");
+    expect(recording.bindings[0]?.[7]).toBe('["selected-prepare"]');
+  });
+
+  it("keeps the ALL band ordering unchanged for the anonymous projection", async () => {
+    const recording = recordingDatabase({ rows: [] });
+    await loadFidsProjectionRows(recording.db, {
+      ...projectionInput,
+      band: "ALL",
+      limit: 8,
+      offset: 0,
+    });
+    expect(recording.statements[0]).toContain("?7 = 'ALL'");
+    expect(recording.statements[0]).toMatch(
+      /CASE WHEN status IN \('IN_FLIGHT', 'LANDED', 'COMPLETED'\)\s+THEN departed_at END DESC/,
+    );
+    expect(recording.bindings[0]?.[6]).toBe("ALL");
+  });
+
+  it("assembles actionable, recent departure and lower bands in the protected endpoint", () => {
+    const protectedRoute = workerSource.slice(
+      workerSource.indexOf('app.on("GET", eventRoutes("/fids/board")'),
+      workerSource.indexOf('app.on("GET", eventRoutes("/forecast/history")'),
+    );
+    expect(protectedRoute).toContain('band: "ACTIONABLE"');
+    expect(protectedRoute).toContain('band: "RECENT_DEPARTURE"');
+    expect(protectedRoute).toContain('band: "LOWER"');
+    expect(protectedRoute).toContain(
+      "const priorityRows = [...actionableRows, ...recentDepartureRows, ...prepareRows]",
+    );
+    expect(protectedRoute).toContain("const excludedRowIds = prepareRows.map((row) => row.row_id)");
+  });
+
   it("keeps protected identifiers out of the anonymous response", () => {
     const publicRoute = workerSource.slice(
       workerSource.indexOf('app.get("/api/public/events/:eventId/board"'),

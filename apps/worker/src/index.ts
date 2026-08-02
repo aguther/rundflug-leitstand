@@ -45,6 +45,7 @@ import {
   formatBookingGroupLabel,
   formatFlightGroupLabel,
   parseFidsPage,
+  planFidsSplitCapacity,
   resolveTurnaroundProfile,
 } from "@rundflug/domain";
 import { Hono } from "hono";
@@ -3812,60 +3813,77 @@ app.on("GET", eventRoutes("/fids/board"), async (context) => {
       groups: rows.map((row) => mapFidsProjectionRow(row, event, boardReadAt)),
     };
   } else {
-    const urgentTotal = await countFidsProjectionRows(context.env.DB, {
+    const actionableTotal = await countFidsProjectionRows(context.env.DB, {
       ...baseProjection,
-      band: "URGENT",
+      band: "ACTIONABLE",
     });
-    const urgentRows = await loadFidsProjectionRows(context.env.DB, {
+    const recentDepartureTotal = await countFidsProjectionRows(context.env.DB, {
       ...baseProjection,
-      band: "URGENT",
-      limit: preferences.visibleRows,
-      offset: 0,
+      band: "RECENT_DEPARTURE",
     });
-    const prepareCapacity = Math.max(0, preferences.priorityGroupCount - urgentRows.length);
+    const splitCapacity = planFidsSplitCapacity({
+      visibleRows: preferences.visibleRows,
+      priorityGroupCount: preferences.priorityGroupCount,
+      actionableCount: actionableTotal,
+      recentDepartureCount: recentDepartureTotal,
+    });
+    const actionableRows =
+      splitCapacity.actionableLimit === 0
+        ? []
+        : await loadFidsProjectionRows(context.env.DB, {
+            ...baseProjection,
+            band: "ACTIONABLE",
+            limit: splitCapacity.actionableLimit,
+            offset: 0,
+          });
+    const recentDepartureRows =
+      splitCapacity.recentDepartureLimit === 0
+        ? []
+        : await loadFidsProjectionRows(context.env.DB, {
+            ...baseProjection,
+            band: "RECENT_DEPARTURE",
+            limit: splitCapacity.recentDepartureLimit,
+            offset: 0,
+          });
     const prepareRows =
-      prepareCapacity === 0
+      splitCapacity.prepareLimit === 0
         ? []
         : await loadFidsProjectionRows(context.env.DB, {
             ...baseProjection,
             band: "PREPARE",
-            limit: prepareCapacity,
+            limit: splitCapacity.prepareLimit,
             offset: 0,
           });
-    const priorityRows = [...urgentRows, ...prepareRows];
-    const effectiveCapacity = Math.min(
-      preferences.visibleRows,
-      Math.max(preferences.priorityGroupCount, urgentRows.length),
-    );
-    const lowerPageSize = Math.max(0, preferences.visibleRows - effectiveCapacity);
-    const excludedRowIds = priorityRows.map((row) => row.row_id);
+    const priorityRows = [...actionableRows, ...recentDepartureRows, ...prepareRows];
+    const excludedRowIds = prepareRows.map((row) => row.row_id);
     const lowerTotal = await countFidsProjectionRows(context.env.DB, {
       ...baseProjection,
-      band: "ALL",
+      band: "LOWER",
       excludedRowIds,
     });
     const lowerRows =
-      lowerPageSize === 0
+      splitCapacity.lowerPageSize === 0
         ? []
         : await loadFidsProjectionRows(context.env.DB, {
             ...baseProjection,
-            band: "ALL",
+            band: "LOWER",
             excludedRowIds,
-            limit: lowerPageSize,
-            offset: (lowerPage - 1) * lowerPageSize,
+            limit: splitCapacity.lowerPageSize,
+            offset: (lowerPage - 1) * splitCapacity.lowerPageSize,
           });
     priority = {
       configuredCapacity: preferences.priorityGroupCount,
-      effectiveCapacity,
-      totalItems: urgentTotal + prepareRows.length,
-      overflowCount: Math.max(0, urgentTotal - preferences.visibleRows),
+      effectiveCapacity: splitCapacity.effectivePriorityCapacity,
+      totalItems: actionableTotal + recentDepartureTotal + prepareRows.length,
+      overflowCount: splitCapacity.overflowCount,
       groups: priorityRows.map((row) => mapFidsProjectionRow(row, event, boardReadAt)),
     };
     boardPage = {
       requestedPage: lowerPage,
-      pageSize: lowerPageSize,
+      pageSize: splitCapacity.lowerPageSize,
       totalItems: lowerTotal,
-      totalPages: lowerPageSize === 0 ? 0 : Math.ceil(lowerTotal / lowerPageSize),
+      totalPages:
+        splitCapacity.lowerPageSize === 0 ? 0 : Math.ceil(lowerTotal / splitCapacity.lowerPageSize),
       groups: lowerRows.map((row) => mapFidsProjectionRow(row, event, boardReadAt)),
     };
   }
