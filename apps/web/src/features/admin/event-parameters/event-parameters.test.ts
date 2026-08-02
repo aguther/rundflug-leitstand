@@ -42,7 +42,8 @@ describe("event parameter surface", () => {
   });
 
   it("uses a bounded responsive workspace and exactly one mobile action bar", () => {
-    expect(workspaceStyles).toContain("--event-workspace-max-width: 1180px");
+    expect(workspaceStyles).toContain("--event-workspace-max-width: 1640px");
+    expect(styles).toContain("width: min(100%, 1180px)");
     expect(styles).toContain(".event-parameters-mobile-actions");
     expect(styles).toContain("position: fixed");
     expect(styles).toContain("grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr)");

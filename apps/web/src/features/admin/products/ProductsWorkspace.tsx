@@ -1,5 +1,6 @@
 import type { OperationBoard } from "@rundflug/contracts";
 import { Handbag, Pencil, TimerReset, Trash2 } from "lucide-react";
+import type { ReactNode } from "react";
 import { IconButton, StatusPill } from "../../../design-system/components";
 import { AdminEntityTable } from "../master-data/AdminEntityTable";
 
@@ -14,6 +15,7 @@ export function ProductsWorkspace({
   onSales,
   onTurnaround,
   onDelete,
+  emptyLabel = "Keine Einträge vorhanden.",
 }: {
   rows: Product[];
   sortKey?: string | undefined;
@@ -23,6 +25,7 @@ export function ProductsWorkspace({
   onSales: (id: string) => void;
   onTurnaround: (id: string) => void;
   onDelete: (id: string, label: string) => void;
+  emptyLabel?: ReactNode;
 }) {
   return (
     <AdminEntityTable
@@ -90,6 +93,7 @@ export function ProductsWorkspace({
           ),
         },
       ]}
+      emptyLabel={emptyLabel}
       onSort={onSort}
       renderRowActions={(product) => (
         <>

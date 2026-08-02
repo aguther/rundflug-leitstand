@@ -93,6 +93,9 @@ npm run check
   verursachen. Aktionsgruppen, Spalten, Kopfpositionen und Primäraktionen bleiben größen- und
   positionsstabil; der Gesamtscreen scrollt möglichst nicht und umfangreiche Listen erhalten genau
   einen klar begrenzten Scrollbereich.
+- In Dateneingabeformularen folgen Tab-Sequenzen den veränderbaren Form-Controls und notwendigen
+  Aktionen. Rein informative Hilfe-, Tooltip- und Dekorationselemente dürfen keine zusätzlichen
+  Tabstopps erzeugen.
 - Diese UI-Finish-Kriterien werden in den relevanten Light-/Dark-Viewports visuell gegen das
   freigegebene Konzept geprüft; reine Layoutkorrekturen benötigen nur ein dem Risiko angemessenes
   Mindestmaß gezielter Regressionstests.

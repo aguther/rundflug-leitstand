@@ -265,7 +265,7 @@
 
 .admin-shell .event-setup-v15.single-panel {
   grid-template-columns: minmax(0, 1fr);
-  margin: 0 16px 8px;
+  margin: 0;
 }
 
 .admin-shell .event-setup-v15 .ds-panel {
@@ -349,13 +349,19 @@
   color: inherit;
   background: transparent;
   font: inherit;
-  font-weight: 700;
+  font-weight: inherit;
+  letter-spacing: inherit;
   text-align: left;
+  text-transform: inherit;
 }
 
 .admin-sort-button span {
   color: var(--ui-muted);
   font-size: 0.7rem;
+}
+
+.admin-shell .event-workspace-frame .admin-sort-button {
+  min-height: 1.25rem;
 }
 
 .event-catalog-empty {

@@ -58,6 +58,7 @@ describe("OperationalPlanWorkspace", () => {
     expect(plansTab.getAttribute("aria-controls")).toBe("admin-operational-plan-plans-panel");
     expect(rulesTab.getAttribute("aria-controls")).toBe("admin-operational-plan-rules-panel");
     expect(addPlanButton.classList.contains("ds-button--primary")).toBe(true);
+    expect(addPlanButton.textContent?.trim()).toBe("+ Hinzufügen");
     expect(screen.queryByRole("button", { name: "Erste Einschränkung hinzufügen" })).toBeNull();
     expect(document.getElementById("admin-operational-plan-plans-panel")?.hidden).toBe(false);
     expect(document.getElementById("admin-operational-plan-rules-panel")?.hidden).toBe(true);
@@ -95,6 +96,7 @@ describe("OperationalPlanWorkspace", () => {
     ).not.toBeNull();
     const addRuleButton = screen.getByRole("button", { name: "Regel hinzufügen" });
     expect(addRuleButton.classList.contains("ds-button--primary")).toBe(true);
+    expect(addRuleButton.textContent?.trim()).toBe("+ Hinzufügen");
     expect(screen.getAllByRole("button", { name: "Regel hinzufügen" })).toHaveLength(1);
   });
 

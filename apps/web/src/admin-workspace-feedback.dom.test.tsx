@@ -31,19 +31,25 @@ describe("admin workspace feedback interactions", () => {
     expect(title.parentElement?.contains(screen.getByText("Aktiv"))).toBe(true);
   });
 
-  it("renders keyboard and click help outside dialog scroll measurements", async () => {
+  it("skips informative help while keeping form controls and actions keyboard reachable", async () => {
     const user = userEvent.setup();
-    render(<FieldHelp help="Synthetische Hilfe" />);
+    render(
+      <>
+        <input aria-label="Bezeichnung" />
+        <FieldHelp help="Synthetische Hilfe" />
+        <button type="button">Speichern</button>
+      </>,
+    );
     const button = screen.getByRole("button", { name: "Hilfe: Synthetische Hilfe" });
 
     await user.tab();
-    expect(document.activeElement).toBe(button);
-    expect(screen.getByRole("tooltip").parentElement).toBe(document.body);
-    expect(button.getAttribute("aria-describedby")).toBe(screen.getByRole("tooltip").id);
+    expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "Bezeichnung" }));
+    await user.tab();
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Speichern" }));
+    expect(button.tabIndex).toBe(-1);
 
-    await user.keyboard("{Escape}");
-    expect(screen.queryByRole("tooltip")).toBeNull();
     await user.click(button);
     expect(screen.getByRole("tooltip").parentElement).toBe(document.body);
+    expect(button.getAttribute("aria-describedby")).toBe(screen.getByRole("tooltip").id);
   });
 });

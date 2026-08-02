@@ -42,7 +42,10 @@
 }
 
 .admin-shell .event-parameters-content {
+  width: min(100%, 1180px);
   min-width: 0;
+  box-sizing: border-box;
+  margin-inline: auto;
   padding: 16px 20px 20px;
 }
 

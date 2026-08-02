@@ -1,5 +1,6 @@
 import type { OperationBoard } from "@rundflug/contracts";
 import { Pencil, Trash2 } from "lucide-react";
+import type { ReactNode } from "react";
 import { IconButton, StatusPill } from "../../../design-system/components";
 import { AdminEntityTable } from "../master-data/AdminEntityTable";
 
@@ -12,6 +13,7 @@ export function PilotCodesWorkspace({
   onSort,
   onEdit,
   onDelete,
+  emptyLabel = "Keine Einträge vorhanden.",
 }: {
   rows: Pilot[];
   sortKey?: string | undefined;
@@ -19,6 +21,7 @@ export function PilotCodesWorkspace({
   onSort: (key: string) => void;
   onEdit: (id: string) => void;
   onDelete: (id: string, label: string) => void;
+  emptyLabel?: ReactNode;
 }) {
   return (
     <AdminEntityTable
@@ -66,6 +69,7 @@ export function PilotCodesWorkspace({
               : "Nicht zugeordnet",
         },
       ]}
+      emptyLabel={emptyLabel}
       onSort={onSort}
       renderRowActions={(pilot) => (
         <>

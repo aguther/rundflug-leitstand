@@ -1,3 +1,5 @@
+export type { AddButtonProps } from "./AddButton";
+export { AddButton } from "./AddButton";
 export type { BusyIndicatorProps } from "./BusyIndicator";
 export { BusyIndicator } from "./BusyIndicator";
 export type { ButtonProps } from "./Button";
