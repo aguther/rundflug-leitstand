@@ -38,6 +38,7 @@ jobs:
       CLOUDFLARE_D1_NAME: ${{ vars.CLOUDFLARE_D1_NAME }}
       CLOUDFLARE_R2_NAME: ${{ vars.CLOUDFLARE_R2_NAME }}
       CLOUDFLARE_APP_ENV: ${{ vars.CLOUDFLARE_APP_ENV }}
+      SOURCE_REVISION: ${{ github.sha }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

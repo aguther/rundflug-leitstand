@@ -104,6 +104,7 @@ import { PilotCodesWorkspace } from "./features/admin/pilots/PilotCodesWorkspace
 import { ProductSalesDialog } from "./features/admin/products/ProductSalesDialog";
 import { ProductsWorkspace } from "./features/admin/products/ProductsWorkspace";
 import { ResourceGroupsWorkspace } from "./features/admin/resource-groups/ResourceGroupsWorkspace";
+import { AnalysisWorkspace } from "./features/analysis/AnalysisWorkspace";
 import { AccountManagement } from "./features/auth/AccountManagement";
 import { useAuth } from "./features/auth/AuthContext";
 import type {
@@ -4466,47 +4467,53 @@ export function AdminView() {
               rückgängig gemacht werden.
             </p>
           </ModalDialog>
-          <section
-            className="admin-section admin-simulator-launch"
-            hidden={adminArea !== "evaluation"}
-          >
-            <div className="admin-simulator-launch-copy">
-              <span aria-hidden="true" className="admin-simulator-launch-icon">
-                <FlaskConical />
-              </span>
-              <div>
-                <div className="admin-simulator-launch-title">
-                  <h2>Prognose-Simulator</h2>
-                  <span>Nur Simulation</span>
-                </div>
-                <p>
-                  Stammdaten und offene Planeinträge als lokale Simulationsgrundlage verwenden.
-                  Tickets, Ist-Verläufe und operative Zustände werden nicht exportiert.
-                </p>
-              </div>
-            </div>
-            <div className="admin-simulator-launch-actions">
-              <Button
-                busy={busyActionKey === "export-simulation-plan"}
-                disabled={!board || busyActionKey !== null}
-                onClick={() =>
-                  void runBusyAction("export-simulation-plan", exportSimulationPlan)
-                }
-                type="button"
-              >
-                Simulationsgrundlage exportieren
-              </Button>
-              <a
-                className="admin-simulator-launch-action"
-                href="/simulation"
-                rel="noopener"
-                target="_blank"
-              >
-                Prognose-Simulator öffnen
-                <ExternalLink aria-hidden="true" />
-              </a>
-            </div>
-          </section>
+          {adminArea === "evaluation" ? (
+            <AnalysisWorkspace
+              backendConfirmed={backendConfirmed}
+              board={board}
+              onRefresh={refresh}
+              simulator={
+                <section className="admin-section admin-simulator-launch">
+                  <div className="admin-simulator-launch-copy">
+                    <span aria-hidden="true" className="admin-simulator-launch-icon">
+                      <FlaskConical />
+                    </span>
+                    <div>
+                      <div className="admin-simulator-launch-title">
+                        <h2>Prognose-Simulator</h2>
+                        <span>Nur Simulation</span>
+                      </div>
+                      <p>
+                        Stammdaten und offene Planeinträge als lokale Simulationsgrundlage
+                        verwenden. {"Tickets, Ist-Verläufe und operative Zustände werden nicht exportiert."}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="admin-simulator-launch-actions">
+                    <Button
+                      busy={busyActionKey === "export-simulation-plan"}
+                      disabled={!board || busyActionKey !== null}
+                      onClick={() =>
+                        void runBusyAction("export-simulation-plan", exportSimulationPlan)
+                      }
+                      type="button"
+                    >
+                      Simulationsgrundlage exportieren
+                    </Button>
+                    <a
+                      className="admin-simulator-launch-action"
+                      href="/simulation"
+                      rel="noopener"
+                      target="_blank"
+                    >
+                      Prognose-Simulator öffnen
+                      <ExternalLink aria-hidden="true" />
+                    </a>
+                  </div>
+                </section>
+              }
+            />
+          ) : null}
           {adminArea === "events" && eventStep === "operational-plan" && board ? (
             <section
               aria-labelledby="admin-event-step-operational-plan-tab"

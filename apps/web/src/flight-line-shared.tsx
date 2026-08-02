@@ -21,7 +21,7 @@ import {
   UserPen,
   UserRoundX,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { Button, ConfirmationDialog, IconButton, ModalDialog } from "./design-system/components";
 
 export type FlightLineAircraft = OperationBoard["aircraft"][number];
@@ -522,6 +522,7 @@ export function BookingGroupAssignmentDialog({
   onRestore,
   onDefer,
   timeZone,
+  headerActions,
 }: {
   aircraft: FlightLineAircraft | undefined;
   dispatchRecommendation?: {
@@ -547,6 +548,7 @@ export function BookingGroupAssignmentDialog({
   onRestore: (ticketGroupId: string) => void | Promise<void>;
   onDefer?: (ticketGroupId: string) => void | Promise<void>;
   timeZone: string;
+  headerActions?: ReactNode;
 }) {
   const [queueDeviationReason, setQueueDeviationReason] = useState("");
   const selectedGroups = groups.filter((group) => selectedQueueGroupIds.includes(group.id));
@@ -623,6 +625,7 @@ export function BookingGroupAssignmentDialog({
           </Button>
         </>
       }
+      headerActions={headerActions}
       onClose={onClose}
       open={open}
       size="wide"

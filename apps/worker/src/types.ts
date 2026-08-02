@@ -10,6 +10,8 @@ export type Env = Omit<
   | "VAPID_PRIVATE_KEY"
   | "VAPID_SUBJECT"
   | "PUSH_RETENTION_DAYS"
+  | "SOURCE_REVISION"
+  | "ANALYSIS_RETENTION_DAYS"
 > & {
   APP_ENV: "development" | "acceptance" | "production";
   DATA_JURISDICTION: "eu";
@@ -23,6 +25,8 @@ export type Env = Omit<
   VAPID_PRIVATE_KEY?: string;
   VAPID_SUBJECT?: string;
   PUSH_RETENTION_DAYS?: string;
+  SOURCE_REVISION?: string;
+  ANALYSIS_RETENTION_DAYS?: string;
 };
 
 export interface StoredEventRow {

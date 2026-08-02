@@ -397,6 +397,26 @@ additiven Spalten; die vollständige Schema-Rückkehr erfolgt per Time Travel od
 Die in ADR-0021 dokumentierte Ausnahme von Konten, Sitzungen und Präferenzen aus portablen
 R2-Sicherungen bleibt bestehen.
 
+## 0062 – Hybride Planungserfassung
+
+Ergänzt inhaltsadressierte, typisierte Planungschunks, wiederverwendbare Kontexte und eine kompakte
+Lauf-Lineage mit den Modi `REFERENCE`, `CHANGE` und `ANCHOR`. Prognose-Snapshots erhalten eine
+nullable Laufreferenz; die bestehenden numerischen Snapshot-Felder bleiben unverändert und werden
+nicht durch zusätzliche Ergebnisfelder dupliziert. Historische Snapshots bleiben ohne künstliche
+Laufmigration lesbar. Planungstabellen sind im Regelbetrieb append-only; Veranstaltungslöschung und
+Werksreset verwenden weiterhin die geschützte Reset-Grenze. Vor Anwendung wird eine
+D1-Time-Travel-Marke oder portable Sicherung angelegt. Ein älterer Worker ignoriert die additiven
+Tabellen und die nullable Spalte; die vollständige Schema-Rückkehr erfolgt per Time Travel oder aus
+dieser Sicherung.
+
+## 0063 – Tagesanalysearchive
+
+Ergänzt die idempotente Zustandsmaschine für serverseitig erstellte Analysearchive und ein davon
+getrenntes append-only Zugriffsprotokoll. Die ZIP-Dateien selbst liegen ausschließlich unter dem
+R2-Präfix `analysis/`; portable Sicherungen enthalten nur ihre Metadaten. Vor Anwendung wird eine
+D1-Time-Travel-Marke oder portable Sicherung angelegt. Eine vollständige Rückkehr erfolgt per Time
+Travel beziehungsweise Restore und durch Löschen der zugehörigen R2-Objekte.
+
 ## Historische Doppelnummer 0036
 
 `0036_product_promised_flight_time.sql` und `0036_v1_5_stable_operations.sql` wurden bereits unter

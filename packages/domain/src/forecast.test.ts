@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   advanceOverduePrediction,
   assessForecastFreshness,
+  calculateForecastTimelineResult,
   calculateForecastTimelines,
   createQueueAvailability,
   DEFAULT_FORECAST_TUNING_PROFILE,
@@ -11,6 +12,52 @@ import {
 } from "./forecast";
 
 describe("event-driven forecast", () => {
+  it("returns deterministic diagnostics without changing the projection wrapper or input", () => {
+    const input = {
+      event: {
+        eventId: "event-diagnostics",
+        now: "2026-08-02T10:00:00.000Z",
+        plannedOperationsStartAt: "2026-08-02T08:00:00.000Z",
+        plannedOperationsEndAt: "2026-08-02T20:00:00.000Z",
+        operationalInterrupted: false,
+        emergencyMode: false,
+        plannedBoardingMinutes: 5,
+        plannedDeboardingMinutes: 4,
+        plannedBufferMinutes: 2,
+      },
+      capacities: [],
+      durationSamples: [],
+      rotations: [
+        {
+          id: "rotation-diagnostics",
+          status: "DRAFT" as const,
+          createdAt: "2026-08-02T09:00:00.000Z",
+          calledAt: null,
+          departedAt: null,
+          landedAt: null,
+          resourceGroupId: "resource-diagnostics",
+          resourceGroupStatus: "ACTIVE" as const,
+          queueSequence: 1,
+          referenceDurationMinutes: 20,
+          productCode: "R",
+          aircraftType: null,
+          predictedDepartureAt: null,
+          predictedLandingAt: null,
+          predictedCompletionAt: null,
+        },
+      ],
+    };
+    const snapshot = structuredClone(input);
+    const first = calculateForecastTimelineResult(input);
+    const second = calculateForecastTimelineResult(input);
+
+    expect(first.projections).toEqual(calculateForecastTimelines(input));
+    expect(first.diagnostics).toEqual(second.diagnostics);
+    expect(first.diagnostics.dispatchInput.now).toBe(input.event.now);
+    expect(first.diagnostics.dispatchPlan.revision).toBeTruthy();
+    expect(input).toEqual(snapshot);
+  });
+
   it("uses the reference model on cold start without requiring a recent actual event", () => {
     const estimate = estimateDuration({
       referenceMinutes: 20,

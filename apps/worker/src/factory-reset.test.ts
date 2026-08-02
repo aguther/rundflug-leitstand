@@ -20,6 +20,8 @@ describe("factory reset", () => {
         "fids_preferences",
         "operator_accounts",
         "operational_events",
+        "analysis_archive_events",
+        "analysis_archives",
         "app_bootstrap",
         "operation_days",
         "rotation_manifest_corrections",
@@ -28,6 +30,9 @@ describe("factory reset", () => {
       ]),
     );
     expect(FACTORY_RESET_DELETE_TABLES).not.toContain("system_reset_receipts");
+    expect(FACTORY_RESET_DELETE_TABLES.indexOf("analysis_archive_events")).toBeLessThan(
+      FACTORY_RESET_DELETE_TABLES.indexOf("analysis_archives"),
+    );
     expect(FACTORY_RESET_DELETE_TABLES.indexOf("rotation_tickets")).toBeLessThan(
       FACTORY_RESET_DELETE_TABLES.indexOf("rotations"),
     );

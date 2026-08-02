@@ -18,6 +18,7 @@ export interface ModalDialogProps {
   open: boolean;
   title: ReactNode;
   description?: ReactNode;
+  headerActions?: ReactNode;
   children: ReactNode;
   footer?: ReactNode;
   className?: string;
@@ -35,6 +36,7 @@ export function ModalDialog({
   open,
   title,
   description,
+  headerActions,
   children,
   footer,
   className = "",
@@ -131,9 +133,12 @@ export function ModalDialog({
             <h2 id={titleId}>{title}</h2>
             {description ? <p id={descriptionId}>{description}</p> : null}
           </div>
-          <IconButton label={closeLabel} onClick={onClose} size="compact" type="button">
-            <X aria-hidden="true" />
-          </IconButton>
+          <div className="ds-modal-header-actions">
+            {headerActions}
+            <IconButton label={closeLabel} onClick={onClose} size="compact" type="button">
+              <X aria-hidden="true" />
+            </IconButton>
+          </div>
         </header>
         <div className={`ds-modal-body ${bodyClassName}`.trim()}>{children}</div>
         {footer ? (

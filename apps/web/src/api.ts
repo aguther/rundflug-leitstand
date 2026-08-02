@@ -1,8 +1,13 @@
 import {
   type AdminEventFlow,
+  type AnalysisArchive,
+  type AnalysisClientContext,
   type AssistClaim,
   type AuditHistory,
   adminEventFlowSchema,
+  analysisArchiveListSchema,
+  analysisArchiveSchema,
+  analysisSnapshotSchema,
   apiErrorSchema,
   assistClaimSchema,
   auditHistorySchema,
@@ -826,6 +831,129 @@ export async function getOperationBoard(
   recordApiTiming("rundflug:operations-snapshot", startedAt);
   if (!response.ok) throw new Error(`Betriebsdaten nicht verfügbar (${response.status})`);
   return operationBoardSchema.parse(await response.json());
+}
+
+export function analysisSnapshotFilename(eventDate: string, capturedAt: string): string {
+  const captured = new Date(capturedAt);
+  const time = [captured.getHours(), captured.getMinutes(), captured.getSeconds()]
+    .map((value) => String(value).padStart(2, "0"))
+    .join("-");
+  return `rundflug-analyse-momentaufnahme-${eventDate}-${time}.json`;
+}
+
+export async function downloadAnalysisSnapshot(
+  eventId: string,
+  deviceId: string,
+  deviceToken: string,
+  expectedEventVersion: number,
+  clientContext: AnalysisClientContext,
+): Promise<string> {
+  const query = new URLSearchParams({ expectedEventVersion: String(expectedEventVersion) });
+  const response = await apiFetch(
+    `${controlApiPath(eventId, "/analysis/snapshot.json")}?${query.toString()}`,
+    {
+      cache: "no-store",
+      ...(LEGACY_DEVELOPMENT_DEVICE_AUTH && deviceToken
+        ? { headers: deviceHeaders(deviceId, deviceToken) }
+        : {}),
+    },
+  );
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as {
+      error?: { message?: string };
+    } | null;
+    throw new Error(body?.error?.message ?? `Diagnoseexport nicht verfügbar (${response.status})`);
+  }
+  const serverSnapshot = analysisSnapshotSchema.parse(await response.json());
+  const snapshot = analysisSnapshotSchema.parse({ ...serverSnapshot, client: clientContext });
+  const filename = analysisSnapshotFilename(snapshot.manifest.eventDate, clientContext.capturedAt);
+  const url = URL.createObjectURL(
+    new Blob([JSON.stringify(snapshot, null, 2)], { type: "application/json" }),
+  );
+  const anchor = document.createElement("a");
+  try {
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.rel = "noopener";
+    anchor.click();
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+  return filename;
+}
+
+async function analysisArchiveError(response: Response, fallback: string): Promise<Error> {
+  const body = (await response.json().catch(() => null)) as {
+    error?: { message?: string };
+  } | null;
+  return new Error(body?.error?.message ?? fallback);
+}
+
+export async function listAnalysisArchives(
+  eventId: string,
+  deviceId: string,
+  deviceToken: string,
+): Promise<AnalysisArchive[]> {
+  const response = await apiFetch(controlApiPath(eventId, "/analysis/day-archives"), {
+    headers: deviceHeaders(deviceId, deviceToken),
+  });
+  if (!response.ok) throw await analysisArchiveError(response, "Tagesarchive nicht verfügbar.");
+  return analysisArchiveListSchema.parse(await response.json()).archives;
+}
+
+export async function createAnalysisArchive(
+  eventId: string,
+  deviceId: string,
+  deviceToken: string,
+  expectedEventVersion: number,
+): Promise<AnalysisArchive> {
+  const response = await apiFetch(controlApiPath(eventId, "/analysis/day-archives"), {
+    method: "POST",
+    headers: deviceHeaders(deviceId, deviceToken, { "content-type": "application/json" }),
+    body: JSON.stringify({ requestId: crypto.randomUUID(), expectedEventVersion }),
+  });
+  if (!response.ok) {
+    throw await analysisArchiveError(response, "Tagesarchiv konnte nicht angefordert werden.");
+  }
+  return analysisArchiveSchema.parse(await response.json());
+}
+
+export async function downloadAnalysisArchive(
+  eventId: string,
+  deviceId: string,
+  deviceToken: string,
+  archive: AnalysisArchive,
+): Promise<void> {
+  const response = await apiFetch(
+    controlApiPath(eventId, `/analysis/day-archives/${encodeURIComponent(archive.id)}/download`),
+    { method: "POST", headers: deviceHeaders(deviceId, deviceToken) },
+  );
+  if (!response.ok) throw await analysisArchiveError(response, "Tagesarchiv nicht verfügbar.");
+  const url = URL.createObjectURL(await response.blob());
+  const anchor = document.createElement("a");
+  try {
+    anchor.href = url;
+    anchor.download = `rundflug-tagesanalyse-${eventId}-v${archive.eventVersion}.zip`;
+    anchor.rel = "noopener";
+    anchor.click();
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+export async function deleteAnalysisArchive(
+  eventId: string,
+  deviceId: string,
+  deviceToken: string,
+  archiveId: string,
+): Promise<AnalysisArchive> {
+  const response = await apiFetch(
+    controlApiPath(eventId, `/analysis/day-archives/${encodeURIComponent(archiveId)}`),
+    { method: "DELETE", headers: deviceHeaders(deviceId, deviceToken) },
+  );
+  if (!response.ok)
+    throw await analysisArchiveError(response, "Tagesarchiv konnte nicht gelöscht werden.");
+  return analysisArchiveSchema.parse(await response.json());
 }
 
 export async function sendCommand(
