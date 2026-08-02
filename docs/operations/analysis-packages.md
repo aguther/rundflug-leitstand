@@ -1,6 +1,6 @@
 # Betriebskonzept für Diagnose- und Tagesanalysepakete
 
-Status: WP0-Entwurf; produktive Umsetzung und Betriebsfreigabe ausstehend
+Status: Architektur und UI freigegeben; produktive Umsetzung und Betriebsfreigabe ausstehend
 
 Architektur: ADR-0034
 
@@ -65,16 +65,22 @@ Flugzeugkennzeichen und pseudonyme operative Pilotencodes.
 
 Es gibt keinen Fallback auf einen älteren Planungslauf und keinen Export eines gemischten Stands.
 
-## Exakte Planungsläufe
+## Hybride Planungsläufe
 
-Ein erfolgreicher Forecast-Lauf speichert deduplizierte kanonische Payloads für Forecast-Eingang,
-Dispatch-Eingang/-Ausgang und Voraufruf-Eingang/-Ausgang. `calculation_now`, Quellversionen,
-Auslöser, Laufzeit und Dispatch-Revision stehen am Lauf. Die Forecast-Snapshot-Zeilen referenzieren
-denselben Lauf und bilden dessen vollständige persistierte Forecast-Projektion.
+Jeder Forecast-Lauf speichert eine kompakte Lineage. Unveränderte Timer-Ticks verwenden denselben
+Kontext; fachliche Ereignisse, diagnostisch relevante Ergebniswechsel, manuelle Diagnose und der
+spätestens nach fünf Minuten fällige Vollanker erzeugen einen neuen Anker. Zwischen zwei Ankern
+liegen höchstens zehn Referenzläufe.
 
-Payloads und erfolgreiche Laufzeilen sind append-only. Sie werden nicht als operative Ereignisse
-gezählt und lösen selbst keine Realtime-Nachricht aus. Ein `SUCCEEDED`-Lauf existiert nur zusammen
-mit vollständig persistierten Rotation-Projektionen und Snapshots.
+Kanonische Eingangsdaten werden in wiederverwendbare Chunks mit höchstens 50 Einträgen zerlegt. Ein
+Kontextmanifest referenziert die Chunks, statt den vollständigen 300-Umlauf-Zustand zu duplizieren.
+`calculation_now` steht ausschließlich am Lauf. Dispatch- und Voraufrufergebnisse werden nur bei
+Änderung oder Anker vollständig gespeichert; Forecast-Snapshot-Zeilen bleiben im bestehenden
+30-Sekunden-Takt erhalten und referenzieren denselben Lauf.
+
+Chunks, Kontexte und erfolgreiche Laufzeilen sind append-only. Sie werden nicht als operative
+Ereignisse gezählt und lösen selbst keine Realtime-Nachricht aus. Ein erfolgreicher Lauf existiert
+nur zusammen mit vollständig persistierten Rotation-Projektionen und Snapshots.
 
 ## Tagesanalysepaket
 
@@ -123,11 +129,10 @@ README.md
 snapshot/final-operation-board.json
 snapshot/event.json
 planning/runs.ndjson
-planning/forecast-inputs.ndjson
-planning/dispatch-inputs.ndjson
-planning/dispatch-outputs.ndjson
-planning/precall-inputs.ndjson
-planning/precall-outputs.ndjson
+planning/contexts.ndjson
+planning/chunks.ndjson
+planning/dispatch-results.ndjson
+planning/precall-results.ndjson
 history/forecast-snapshots.ndjson
 history/operational-events.ndjson
 history/analysis-archive-events.ndjson
@@ -221,7 +226,8 @@ den bereits dokumentierten Bestätigungs- und Wiederherstellungsregeln.
 Folgende D1-Tabellen werden nach ihrer Einführung in das portable Backupregister aufgenommen:
 
 ```text
-planning_payloads
+planning_chunks
+planning_contexts
 planning_runs
 analysis_archives
 analysis_archive_events
@@ -281,8 +287,9 @@ Browserprofil bitten. Zusätzliche Daten benötigen eine neue dokumentierte Frei
 
 Zu messen und ohne interne IDs oder Secrets strukturiert zu protokollieren:
 
-- Zahl und Dauer erfolgreicher/fehlgeschlagener Planungscaptures,
-- Payload-Deduplizierungsquote und D1-Volumen,
+- Zahl und Dauer erfolgreicher/fehlgeschlagener Planungscaptures nach Capture-Modus,
+- Kontext- und Chunk-Wiederverwendung sowie tatsächlicher D1-Zuwachs einschließlich Indizes,
+- zusätzliche CPU im p95 und relativ zum Forecast-Lauf,
 - Snapshot-Größe und Erzeugungszeit,
 - Archivlaufzeit, R2-Größe und Anzahl Einträge,
 - D1-Seitenzahl, maximale Puffergröße und Multipart-Teile,
@@ -304,7 +311,7 @@ Archiv-ID, Konto, Ticket- oder Gruppenbezug werden nicht ungeprüft in zentrale 
 
 ## Freigabegates
 
-Vor WP1: OQ-17 und OQ-19, ADR und UI-Konzept freigeben.
+WP1 bis WP4 sind durch die Auftraggeberfreigabe vom 2026-08-02 freigegeben.
 
 Vor WP3: Worker-/ZIP-/Lizenzspike und Performancebudget freigeben.
 

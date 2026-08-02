@@ -2,9 +2,9 @@
 
 ## Geplante Erweiterung 1.12 – Analysemetadaten
 
-Nach Freigabe und Einführung der zugehörigen Migrationen werden `planning_payloads`,
+Nach Einführung der zugehörigen Migrationen werden `planning_chunks`, `planning_contexts`,
 `planning_runs`, `analysis_archives` und `analysis_archive_events` in das portable D1-Backupregister
-aufgenommen. Planungspayloads und -läufe sind Replaygrundlage; Archivmetadaten und das getrennte
+aufgenommen. Planungschunks, -kontexte und -läufe sind Replaygrundlage; Archivmetadaten und das getrennte
 Zugriffsprotokoll sichern Lebenszyklus und Nachvollziehbarkeit. Die großen R2-Tagesarchive selbst
 werden nicht in das portable JSON eingebettet.
 

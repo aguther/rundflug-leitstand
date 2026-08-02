@@ -28,5 +28,5 @@ Requirements-/Traceability-Dokumente davon abweichen.
 deterministisch aus dem Basiskatalog, den konsolidierten Delta-Quellen unter `scripts/data/`, den
 Releaseanforderungen 1.10.0 und 1.11.0 sowie
 `scripts/data/requirements-delta-1.12.0.json`; `npm run docs:requirements:check` lehnt manuelle
-Abweichungen ab. Die fachliche Freigabe der geplanten Anforderungen 1.12.0 bleibt als OQ-17 offen;
-bis zu dieser Freigabe beginnt kein produktiver Umsetzungsschritt aus WP1 bis WP4.
+Abweichungen ab. Release 1.12.0, ADR-0034 und das UI-Konzept wurden am 2026-08-02 durch den
+Auftraggeber freigegeben; die Umsetzungsschritte WP1 bis WP4 dürfen beginnen.
