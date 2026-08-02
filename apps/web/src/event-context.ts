@@ -25,9 +25,6 @@ export function forgetActiveEvent(storage: Pick<Storage, "removeItem">): void {
 
 export function resolveActiveEvent(search: string, storage: EventStorage, fallback = ""): string {
   const requested = new URLSearchParams(search).get("event")?.trim();
-  if (requested) {
-    rememberActiveEvent(storage, requested);
-    return requested;
-  }
+  if (requested) return requested;
   return storage.getItem(ACTIVE_EVENT_STORAGE_KEY)?.trim() || fallback;
 }

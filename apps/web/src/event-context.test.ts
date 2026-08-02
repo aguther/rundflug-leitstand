@@ -10,9 +10,12 @@ function memoryStorage(initial: Record<string, string> = {}) {
 }
 
 describe("active event context", () => {
-  it("persists an event selected through the URL for later reloads", () => {
+  it("prefers an event selected through the URL without persisting it before validation", () => {
     const storage = memoryStorage();
     expect(resolveActiveEvent("?event=rundflug-2026", storage)).toBe("rundflug-2026");
+    expect(resolveActiveEvent("", storage)).toBe("");
+
+    rememberActiveEvent(storage, "rundflug-2026");
     expect(resolveActiveEvent("", storage)).toBe("rundflug-2026");
   });
 

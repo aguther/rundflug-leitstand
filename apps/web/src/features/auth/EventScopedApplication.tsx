@@ -2,6 +2,7 @@ import type { EventCatalogEntry, OperatorSession } from "@rundflug/contracts";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { homeForRole, mayOpenEventRoute } from "../../app/navigation";
 import { rememberActiveEvent, resolveActiveEvent } from "../../event-context";
+import { eventSelectionLocation } from "../../event-navigation";
 import { loadSelectableEvents } from "./api";
 import { EventSelectionPage } from "./EventSelectionPage";
 
@@ -21,6 +22,7 @@ function Loading({ children = "Arbeitsbereich wird geladen …" }: { children?: 
 export function EventScopedApplication({ session }: { session: OperatorSession }) {
   const [events, setEvents] = useState<EventCatalogEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [activatedEventId, setActivatedEventId] = useState<string | null>(null);
   useEffect(() => {
     let active = true;
     void loadSelectableEvents()
@@ -35,6 +37,21 @@ export function EventScopedApplication({ session }: { session: OperatorSession }
       active = false;
     };
   }, []);
+  const requestedEventId = events
+    ? resolveActiveEvent(window.location.search, window.localStorage)
+    : "";
+  const selectedEvent = events?.find((entry) => entry.eventId === requestedEventId);
+  const selectedEventId = selectedEvent?.eventId;
+  const selectedEventName = selectedEvent?.name;
+  useEffect(() => {
+    if (!selectedEventId) return;
+
+    rememberActiveEvent(window.localStorage, selectedEventId, selectedEventName);
+    if (new URLSearchParams(window.location.search).has("event")) {
+      window.history.replaceState(null, "", eventSelectionLocation(window.location.href));
+    }
+    setActivatedEventId(selectedEventId);
+  }, [selectedEventId, selectedEventName]);
   if (error)
     return (
       <div className="app-loading" role="alert">
@@ -42,10 +59,8 @@ export function EventScopedApplication({ session }: { session: OperatorSession }
       </div>
     );
   if (!events) return <Loading />;
-  const requestedEventId = resolveActiveEvent(window.location.search, window.localStorage);
-  const selectedEvent = events.find((entry) => entry.eventId === requestedEventId);
   if (!selectedEvent) return <EventSelectionPage events={events} session={session} />;
-  rememberActiveEvent(window.localStorage, selectedEvent.eventId, selectedEvent.name);
+  if (activatedEventId !== selectedEvent.eventId) return <Loading />;
   if (
     window.location.pathname === "/fids/terminal" ||
     new URLSearchParams(window.location.search).get("style") === "terminal"
