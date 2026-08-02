@@ -1,5 +1,12 @@
 # Historie und Exporte
 
+Diagnose-Momentaufnahmen und vollständige Tagesanalysepakete sind von den nachfolgenden
+Fachberichten getrennt. Sie verwenden das strikt typisierte Datenschutzprofil `SUPPORT_SAFE`,
+enthalten exakte Planungsläufe und dienen ausschließlich technischer Analyse beziehungsweise
+Offline-Replay. Sie ersetzen weder Tagesbericht noch fachlichen Rohdatenexport und sind keine
+Restorequelle. Das geplante Verfahren steht in
+[`analysis-packages.md`](analysis-packages.md) und ADR-0034.
+
 Die administrative Historie liest ausschließlich das unveränderliche `operational_events`-Ledger.
 Sie kann nach Zeitraum, Ereignistyp, Bezugsart und Bezugs-ID gefiltert werden. Es werden höchstens
 1.000 Einträge je Anfrage ausgeliefert.

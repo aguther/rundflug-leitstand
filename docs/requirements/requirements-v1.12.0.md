@@ -1,34 +1,32 @@
-# Kumulativer Anforderungskatalog – Release 1.11.0
+# Kumulativer Anforderungskatalog – Release 1.12.0
 
-Release `1.11.0` ist die einzige aktuelle Releasefassung. Dieser Katalog enthält den
-vollständigen 207er Basiskatalog, 99 fortgeltende und begrifflich aktualisierte Deltas
-aus 1.5 bis 1.9.1, 13 fortgeltende Anforderungen aus 1.10.0 sowie die 11 Anforderungen
-dieses Releases (insgesamt 330).
+Release `1.12.0` ist die einzige aktuelle Releasefassung. Dieser Katalog enthält den
+vollständigen 207er Basiskatalog, 123 fortgeltende und begrifflich aktualisierte Deltas
+aus 1.5 bis 1.11.0 sowie die 10 Anforderungen dieses Releases (insgesamt 340).
 Die binären V1.4-Quellen bleiben unveränderte Referenz; gültige ADRs konkretisieren den
 Katalog. Historische Releasekopien und Freigabeprotokolle sind keine Spezifikation.
 
 Die kanonischen Rollen- und Ansichtsbegriffe sind **Kasse**, **Flight Line**,
 **Flight Director**, **FIDS**, **Administration** und **öffentlicher Gruppenstatus**.
 
-## Anforderungen Release 1.11.0
+## Anforderungen Release 1.12.0
 
 | ID | Abschnitt | Aktuelle Anforderung | Priorität | Status |
 | --- | --- | --- | --- | --- |
-| V1110-REL-010 | Release und Versionierung | Anwendung, Workspace-Pakete, /api/meta, Healthcheck, Backups, Requirements und Traceability melden konsistent 1.11.0. | MUSS | implemented |
-| V1110-REC-010 | Aktiver Gruppennachruf | Ein Nachruf ist ein eigenständig persistierter temporärer Vorgang mit eindeutiger ID, gruppenbezogener Sequenz, Start- und Ablaufzeit sowie optionalem Ende. Pro Buchungsgruppe ist höchstens ein Nachruf aktiv. | MUSS | implemented |
-| V1110-REC-020 | Aktiver Gruppennachruf | Der Nachruf verändert weder Queueposition noch Belegung oder Anwesenheit. Er endet manuell, nach bestätigter Anwesenheit, Boardingbeginn, Zurückstellung, No-Show, Storno oder spätestens nach fünf Minuten automatisch. | MUSS | implemented |
-| V1110-CMD-010 | Kommandos und Konsistenz | START_TICKET_GROUP_RECALL und CLEAR_TICKET_GROUP_RECALL verwenden Event-Coordinator, erwartete Version und Idempotenz. Parallele stale writes werden abgewiesen; RESTORE_TICKET_GROUP_TO_QUEUE benennt die bisherige Queueaktion fachlich eindeutig und RECALL_TICKET_GROUP bleibt kontrollierter Kompatibilitätsalias. | MUSS | implemented |
-| V1110-AUD-010 | Audit und Outbox | Start und jedes manuelle oder automatische Ende erzeugen append-only Audit-Ereignisse mit Nachruf-ID, Gruppenzuordnung, Sequenz und Endgrund sowie einen konsistenten Outbox-Eintrag. | MUSS | implemented |
-| V1110-PSH-010 | Gruppenspezifischer Web-Push | Jeder neu gestartete Nachruf erzeugt Web-Push ausschließlich für aktive Ticket- und Gruppenstatus-Abonnements derselben Buchungsgruppe. Die Deduplizierung berücksichtigt die Nachruf-ID, sodass ein späterer Nachruf erneut zugestellt wird. | MUSS | implemented |
-| V1110-PUB-010 | Öffentliche Projektionen | Ticketstatus, Gruppenstatus und FIDS projizieren denselben aktiven Nachruf mit festen, gruppen- und gatebezogenen Textvorlagen. Der Vorgang enthält keine Namen, Telefonnummern oder frei formulierten öffentlichen Texte. | MUSS | implemented |
-| V1110-FID-010 | FIDS | Das FIDS zeigt den Nachruf direkt in der betroffenen Gruppenzeile als priorisierten Status Nachruf aktiv mit Glocke und bewegungsreduzierbarer Pulsanimation. Der normale Umlaufstatus bleibt zusätzlich sichtbar und unverändert. | MUSS | implemented |
-| V1110-UI-010 | Flight Line und Flight Director | Geeignete offene Gruppen werden ohne Bestätigungsdialog direkt über einen Glocken-Button nachgerufen. Derselbe Button bleibt an fester Position als klar erkennbarer aktiver Umschalter sichtbar; Startzeit und bisherige Anzahl sind im zugänglichen Tooltip enthalten, und erneutes Betätigen beendet den Nachruf. | MUSS | implemented |
-| V1110-MIG-010 | Migration und Wiederherstellung | Die D1-Migration für Nachrufe und Push-Deduplizierung besitzt eine Wiederherstellungsnotiz; Nachrufdaten sind in Backup, Ereignislöschung und Werksreset vollständig berücksichtigt. | MUSS | implemented |
-| V1110-QA-010 | Qualitätssicherung | Automatisierte Tests prüfen Start, manuelles und automatisches Ende, Idempotenz, Parallelkonflikt, Ablaufzeit, erneuten Push, gruppenspezifische Zustellung, Projektionen, Rollen, Audit und Outbox. Flight Line, Flight Director, FIDS und mobile öffentliche Ansicht werden visuell abgenommen. | MUSS | implemented |
+| V1120-DIA-010 | Analyse und Diagnose | Administratoren und Flight Directors können während des Betriebs eine konsistente, strikt versionierte JSON-Momentaufnahme des support-sicheren Betriebs- und Planungsstands für eine ausdrücklich erwartete Veranstaltungsversion erzeugen; ein gemischter oder veralteter Stand wird mit einem Konflikt abgewiesen. | MUSS | planned |
+| V1120-DIA-020 | Planungsläufe | Jede erfolgreiche relevante Forecast-Neuberechnung erfasst den exakt verwendeten normalisierten Forecast-, Dispatch- und Voraufrufkontext sowie die zugehörigen Ergebnisse unveränderlich, inhaltsadressiert und dedupliziert; Planungslauf, persistierte Projektionen und Forecast-Snapshots bilden eine fachlich konsistente Einheit. | MUSS | planned |
+| V1120-DIA-030 | Clientdiagnose | Eine manuelle Momentaufnahme kann einen strikt allowlist-basierten, ausschließlich flüchtigen Client-Diagnosekontext mit Auswahl-, Dialog-, Verbindungs- und Viewportzustand enthalten; Sitzungen, Tokens, Konto- oder Gerätekennungen, freie Eingaben, vollständige Browserkennungen und Fehlerstacks sind ausgeschlossen. | MUSS | planned |
+| V1120-EXP-010 | Tagesanalysepakete | Für geschlossene oder archivierte Veranstaltungstage kann genau ein unveränderliches, serverseitig erzeugtes Tagesanalysepaket je Veranstaltungsversion, Formatversion und Datenschutzprofil erstellt werden; es enthält Manifest, sichere Zustandsprojektionen, Planungsläufe, Forecast-Snapshots, sichere Ereignishistorie sowie lesbare Auswertungen und wird nicht als Produktionsimport verwendet. | MUSS | planned |
+| V1120-RPL-010 | Offline-Replay | Exportierte Planungsläufe können mit derselben Quellcodeversion ohne Schreibzugriff auf Produktionsdaten deterministisch offline validiert und für Dispatch, Forecast und Voraufruf wiederholt werden; Format-, Referenz- und Hashfehler sowie die erste Ergebnisabweichung werden eindeutig ausgewiesen, Versionsabweichungen werden im strikten Modus abgelehnt. | MUSS | planned |
+| V1120-AUD-010 | Analysezugriffsprotokoll | Anforderung, Buildbeginn, Fertigstellung, Fehlschlag, Download, Ablauf und Löschung eines Tagesanalysepakets werden in einem getrennten append-only Analysezugriffsprotokoll ohne Klartext-Konto-ID dokumentiert; dieses Protokoll verändert weder die operative Veranstaltungsversion noch Forecast, Outbox oder öffentliche Realtime-Projektionen. | MUSS | planned |
+| V1120-SEC-010 | Exportsicherheit | Analyseexporte verwenden ausschließlich das Datenschutzprofil SUPPORT_SAFE und explizite typisierte Allowlist-Projektionen; insbesondere öffentliche Ticket- oder Gruppencodes und deren Hashes, Sitzungs- und Gerätecredentials, Administrator-PINs, Push-Ziele und Browser-Schlüssel, Konto-IDs, Einzelgewichte, freie Texte sowie rohe Ereignis-Payloads sind ausgeschlossen oder werden ausschließlich als sichere Vorhandenseinsmetadaten dargestellt. | MUSS | planned |
+| V1120-OPS-010 | Archivbetrieb und Aufbewahrung | Tagesanalysepakete werden ohne öffentliche URL in der vorhandenen EU-R2-Bindung unter einem getrennten Präfix gespeichert, besitzen eine von Backups unabhängige konfigurierte Aufbewahrung von 14 bis 365 Tagen und werden bei Ablauf, manueller Löschung, Veranstaltungslöschung und Werksreset konsistent behandelt; Produktion erfordert einen ausdrücklich freigegebenen Aufbewahrungswert. | MUSS | planned |
+| V1120-PER-010 | Analyseperformance | Planungserfassung und Archivierung bleiben im V1-Mengengerüst begrenzt: Tagesarchive werden nach erfolgreichem Worker- und Abhängigkeitsspike seitenweise und streamingfähig ohne Ganzarchivpufferung erzeugt, die operative Schließung wartet nicht auf R2 und zusätzliche CPU-, D1-, Speicher-, Laufzeit- und Größenbudgets werden gemessen und dokumentiert. | MUSS | planned |
+| V1120-QA-010 | Qualitätssicherung Analyse | Strict-Contract-, Domain-, Worker-/D1-, R2-, Replay-, Sicherheits-, Performance- und Browsertests decken Diagnose-Momentaufnahme und Tagesanalysepaket einschließlich Rollen, Event-Version, Idempotenz, Concurrency, Audittrennung, Datenschutz, Integrität, Light/Dark, Desktop/Tablet und stabile Layoutzustände ab; der vollständige Nachweis bleibt Bestandteil von npm run check. | MUSS | planned |
 
-## Fortgeltende, in 1.11.0 konsolidierte Deltas
+## Fortgeltende, in 1.12.0 konsolidierte Deltas
 
-Frühere reine Versionsanforderungen und durch 1.11.0 ersetzte UI-Konzeptbindungen sind
+Frühere reine Versionsanforderungen und durch 1.12.0 ersetzte UI-Konzeptbindungen sind
 nicht fortgeltend. Die folgenden fachlichen Aussagen bleiben verbindlich; alte Rollenbegriffe
 wurden auf Flight Line und Flight Director aktualisiert.
 
@@ -146,6 +144,17 @@ wurden auf Flight Line und Flight Director aktualisiert.
 | V1100-DEP-010 | 1.10.0 | Kompatible Patchstände werden kontrolliert aktualisiert; TypeScript bleibt in diesem Release auf 6.0.3. Dependabot schlägt wöchentlich gruppierte Patchupdates vor. | MUSS | implemented |
 | V1100-QA-010 | 1.10.0 | Unit-, Worker-/D1-Integrations- und Browserprüfungen decken Reset/Setup, Bootstrap-Konfiguration, Rollenabläufe, responsive Darstellung, Dokumente und Backups ab. Der vollständige Abnahmelauf bleibt npm run check. | MUSS | implemented |
 | V1100-MOD-010 | 1.10.0 | Neue Setup-/Reset-, Request-Grenz- und Cloudflare-Ziellogik liegt in eigenständigen Modulen. Weitere Zerlegung der großen operativen Handler darf Atomarität, erwartete Version, Idempotenz, Audit, Outbox oder Veröffentlichung nach Persistenz nicht verändern. | MUSS | implemented |
+| V1110-REL-010 | 1.11.0 | Anwendung, Workspace-Pakete, /api/meta, Healthcheck, Backups, Requirements und Traceability melden konsistent 1.11.0. | MUSS | implemented |
+| V1110-REC-010 | 1.11.0 | Ein Nachruf ist ein eigenständig persistierter temporärer Vorgang mit eindeutiger ID, gruppenbezogener Sequenz, Start- und Ablaufzeit sowie optionalem Ende. Pro Buchungsgruppe ist höchstens ein Nachruf aktiv. | MUSS | implemented |
+| V1110-REC-020 | 1.11.0 | Der Nachruf verändert weder Queueposition noch Belegung oder Anwesenheit. Er endet manuell, nach bestätigter Anwesenheit, Boardingbeginn, Zurückstellung, No-Show, Storno oder spätestens nach fünf Minuten automatisch. | MUSS | implemented |
+| V1110-CMD-010 | 1.11.0 | START_TICKET_GROUP_RECALL und CLEAR_TICKET_GROUP_RECALL verwenden Event-Coordinator, erwartete Version und Idempotenz. Parallele stale writes werden abgewiesen; RESTORE_TICKET_GROUP_TO_QUEUE benennt die bisherige Queueaktion fachlich eindeutig und RECALL_TICKET_GROUP bleibt kontrollierter Kompatibilitätsalias. | MUSS | implemented |
+| V1110-AUD-010 | 1.11.0 | Start und jedes manuelle oder automatische Ende erzeugen append-only Audit-Ereignisse mit Nachruf-ID, Gruppenzuordnung, Sequenz und Endgrund sowie einen konsistenten Outbox-Eintrag. | MUSS | implemented |
+| V1110-PSH-010 | 1.11.0 | Jeder neu gestartete Nachruf erzeugt Web-Push ausschließlich für aktive Ticket- und Gruppenstatus-Abonnements derselben Buchungsgruppe. Die Deduplizierung berücksichtigt die Nachruf-ID, sodass ein späterer Nachruf erneut zugestellt wird. | MUSS | implemented |
+| V1110-PUB-010 | 1.11.0 | Ticketstatus, Gruppenstatus und FIDS projizieren denselben aktiven Nachruf mit festen, gruppen- und gatebezogenen Textvorlagen. Der Vorgang enthält keine Namen, Telefonnummern oder frei formulierten öffentlichen Texte. | MUSS | implemented |
+| V1110-FID-010 | 1.11.0 | Das FIDS zeigt den Nachruf direkt in der betroffenen Gruppenzeile als priorisierten Status Nachruf aktiv mit Glocke und bewegungsreduzierbarer Pulsanimation. Der normale Umlaufstatus bleibt zusätzlich sichtbar und unverändert. | MUSS | implemented |
+| V1110-UI-010 | 1.11.0 | Geeignete offene Gruppen werden ohne Bestätigungsdialog direkt über einen Glocken-Button nachgerufen. Derselbe Button bleibt an fester Position als klar erkennbarer aktiver Umschalter sichtbar; Startzeit und bisherige Anzahl sind im zugänglichen Tooltip enthalten, und erneutes Betätigen beendet den Nachruf. | MUSS | implemented |
+| V1110-MIG-010 | 1.11.0 | Die D1-Migration für Nachrufe und Push-Deduplizierung besitzt eine Wiederherstellungsnotiz; Nachrufdaten sind in Backup, Ereignislöschung und Werksreset vollständig berücksichtigt. | MUSS | implemented |
+| V1110-QA-010 | 1.11.0 | Automatisierte Tests prüfen Start, manuelles und automatisches Ende, Idempotenz, Parallelkonflikt, Ablaufzeit, erneuten Push, gruppenspezifische Zustellung, Projektionen, Rollen, Audit und Outbox. Flight Line, Flight Director, FIDS und mobile öffentliche Ansicht werden visuell abgenommen. | MUSS | implemented |
 
 ## Fortgeltender konsolidierter Basiskatalog
 
@@ -363,3 +372,5 @@ wurden auf Flight Line und Flight Director aktualisiert.
 
 Nicht Bestandteil sind Kamera- oder QR-Scan, eine eigenständige Ansicht Gruppen am Gate,
 eine harte Boarding-Sperre, SMS, Messenger und frei formulierte Nachruftexte.
+Für Analyseexporte sind ein unbereinigtes Vollprofil, eine Restore-/Produktionsimportfunktion
+und Änderungen am Dispatch-, Forecast- oder Voraufrufalgorithmus ausdrücklich ausgeschlossen.

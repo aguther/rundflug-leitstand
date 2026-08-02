@@ -1,5 +1,19 @@
 # Backup und Wiederherstellung
 
+## Geplante Erweiterung 1.12 – Analysemetadaten
+
+Nach Freigabe und Einführung der zugehörigen Migrationen werden `planning_payloads`,
+`planning_runs`, `analysis_archives` und `analysis_archive_events` in das portable D1-Backupregister
+aufgenommen. Planungspayloads und -läufe sind Replaygrundlage; Archivmetadaten und das getrennte
+Zugriffsprotokoll sichern Lebenszyklus und Nachvollziehbarkeit. Die großen R2-Tagesarchive selbst
+werden nicht in das portable JSON eingebettet.
+
+Ein Restore erfolgt weiterhin ausschließlich in eine isolierte D1-Instanz. Danach werden alle als
+`READY` markierten Archivmetadaten gegen das private R2-Objekt geprüft; ein fehlendes oder
+abweichendes Objekt bleibt ein Integritätsfehler und wird nicht als leerer Download behandelt.
+Tagesanalysepakete sind niemals Restore- oder Produktionsimportquellen. Details und offene
+Freigaben stehen in [`analysis-packages.md`](analysis-packages.md) und ADR-0034.
+
 ## Migrationsnotiz 0059 – anonyme Kassenattribution
 
 Migration `0059_ticket_group_cashier_attribution.sql` ergänzt ausschließlich die nullable Referenz

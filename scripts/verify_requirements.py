@@ -15,6 +15,7 @@ ALLOWED_PRIORITIES = {"MUSS", "SOLL", "KANN"}
 ALLOWED_STAGES = {"V1", "V2", "V3", "V4"}
 ALLOWED_STATUSES = {"geplant", "in Arbeit", "umgesetzt", "abgenommen", "entfällt"}
 BACKLOG_PATTERN = re.compile(r"^BP-(?:0[1-9]|1[0-2])$")
+EXPECTED_CURRENT_REQUIREMENTS = 340
 
 
 def verify_release_version() -> str:
@@ -45,8 +46,11 @@ def verify_release_version() -> str:
     if not release_yaml.startswith(f"version: {version}\n"):
         fail(f"requirements-v{version}.yaml does not declare version {version}")
     release_ids = re.findall(r"^  - id: ([A-Z0-9-]+)$", release_yaml, re.MULTILINE)
-    if len(release_ids) != 330 or len(release_ids) != len(set(release_ids)):
-        fail(f"release {version} must contain exactly 330 unique current requirements")
+    if len(release_ids) != EXPECTED_CURRENT_REQUIREMENTS or len(release_ids) != len(set(release_ids)):
+        fail(
+            f"release {version} must contain exactly "
+            f"{EXPECTED_CURRENT_REQUIREMENTS} unique current requirements"
+        )
     with versioned_paths[2].open(newline="", encoding="utf-8-sig") as handle:
         trace_ids = [row["ID"] for row in csv.DictReader(handle)]
     if release_ids != trace_ids:
@@ -149,7 +153,8 @@ def main() -> None:
         fail(f"expected 166 V1 MUSS requirements, found {len(v1_must)}")
 
     print(
-        f"OK: release {release_version}, 330 current requirements, {len(ids)} baseline requirements, "
+        f"OK: release {release_version}, {EXPECTED_CURRENT_REQUIREMENTS} current requirements, "
+        f"{len(ids)} baseline requirements, "
         f"{len(v1_rows)} assigned V1 rows and {len(v1_must)} assigned V1 MUSS rows"
     )
 
