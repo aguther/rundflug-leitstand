@@ -21,7 +21,8 @@ import { BrandMark } from "../design-system/BrandMark";
 import { BusyIndicator, ModalDialog } from "../design-system/components";
 import { ThemeToggle } from "../design-system/ThemeToggle";
 import { useTheme } from "../design-system/theme";
-import { activeEventLabel, forgetActiveEvent } from "../event-context";
+import { activeEventLabel } from "../event-context";
+import { switchActiveEvent } from "../event-navigation";
 import { useAuth } from "../features/auth/AuthContext";
 import type { ConnectionStatus } from "../shared/hooks/use-connectivity";
 import { appDestinations, isDestinationActive } from "./navigation";
@@ -216,10 +217,7 @@ export function AppHeader({
         {fidsView && session && !kiosk && !publicView && eventLabel ? (
           <button
             className="app-event"
-            onClick={() => {
-              forgetActiveEvent(window.localStorage);
-              window.location.reload();
-            }}
+            onClick={switchActiveEvent}
             title="Veranstaltung wechseln"
             type="button"
           >
@@ -280,14 +278,7 @@ export function AppHeader({
                   <small>{session.account.role}</small>
                 </header>
                 {eventLabel ? (
-                  <button
-                    className="account-menu-action"
-                    onClick={() => {
-                      forgetActiveEvent(window.localStorage);
-                      window.location.reload();
-                    }}
-                    type="button"
-                  >
+                  <button className="account-menu-action" onClick={switchActiveEvent} type="button">
                     <CalendarDays aria-hidden="true" size={19} />
                     <span>
                       <strong>Veranstaltung wechseln</strong>

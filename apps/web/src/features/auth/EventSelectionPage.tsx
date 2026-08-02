@@ -4,6 +4,7 @@ import { BrandLockup, BrandMark } from "../../design-system/BrandMark";
 import { Button } from "../../design-system/components";
 import { ThemeToggle } from "../../design-system/ThemeToggle";
 import { rememberActiveEvent } from "../../event-context";
+import { eventSelectionLocation } from "../../event-navigation";
 import { useAuth } from "./AuthContext";
 import "./login.css";
 
@@ -39,9 +40,7 @@ export function EventSelectionPage({
     const selected = events.find((entry) => entry.eventId === eventId);
     if (!selected) return;
     rememberActiveEvent(window.localStorage, selected.eventId, selected.name);
-    const url = new URL(window.location.href);
-    url.searchParams.delete("event");
-    window.location.assign(`${url.pathname}${url.search}${url.hash}`);
+    window.location.assign(eventSelectionLocation(window.location.href));
   }
 
   return (
