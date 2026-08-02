@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const wranglerBin = resolve(root, "node_modules", "wrangler", "bin", "wrangler.js");
 const stateDirectory = mkdtempSync(join(tmpdir(), "rundflug-queue-grouping-"));
+const port = 10_000 + (process.pid % 50_000);
 const initializeD1 = (args) =>
   spawnSync(
     process.execPath,
@@ -66,11 +67,11 @@ const server = spawn(
     "--persist-to",
     stateDirectory,
     "--port",
-    "8794",
+    String(port),
   ],
   { cwd: root, stdio: "ignore", windowsHide: true },
 );
-const base = "http://127.0.0.1:8794";
+const base = `http://127.0.0.1:${port}`;
 const tokens = {
   admin: "demo-admin-device-token",
   cashier: "demo-cashier-device-token",
@@ -489,5 +490,10 @@ try {
   } else {
     server.kill();
   }
-  await rm(stateDirectory, { force: true, recursive: true });
+  await rm(stateDirectory, {
+    force: true,
+    maxRetries: 5,
+    recursive: true,
+    retryDelay: 100,
+  });
 }

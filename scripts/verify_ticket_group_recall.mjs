@@ -9,7 +9,15 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const wranglerCli = resolve(root, "node_modules", "wrangler", "bin", "wrangler.js");
 const persistPath = mkdtempSync(join(tmpdir(), "rundflug-ticket-group-recall-"));
 const persistArgument = persistPath;
-const port = 8_798;
+const port = 10_000 + (process.pid % 50_000);
+process.on("exit", () =>
+  rmSync(persistPath, {
+    recursive: true,
+    force: true,
+    maxRetries: 5,
+    retryDelay: 100,
+  }),
+);
 const eventId = "demo-2026";
 const gateId = "demo-2026-gate-main";
 const adminPin = "0000";
@@ -20,7 +28,6 @@ const actors = {
 };
 const localD1Arguments = ["--local", "--persist-to", persistArgument, "--config", "wrangler.jsonc"];
 
-process.on("exit", () => rmSync(persistPath, { recursive: true, force: true }));
 const migrate = spawnSync(
   process.execPath,
   [wranglerCli, "d1", "migrations", "apply", "DB", ...localD1Arguments],

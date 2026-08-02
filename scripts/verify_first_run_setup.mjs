@@ -1,17 +1,30 @@
 import { spawn, spawnSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
-import { rm } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const npmCli = process.env.npm_execpath;
-if (!npmCli) throw new Error("npm-Ausführungspfad fehlt.");
-await rm(resolve(root, ".wrangler", "state"), { recursive: true, force: true });
-const migrate = spawnSync(process.execPath, [npmCli, "run", "db:migrate:local"], {
-  cwd: root,
-  stdio: "ignore",
-});
+const wranglerCli = resolve(root, "node_modules", "wrangler", "bin", "wrangler.js");
+const persistPath = await mkdtemp(resolve(tmpdir(), "rundflug-first-run-"));
+const port = 10_000 + (process.pid % 50_000);
+const migrate = spawnSync(
+  process.execPath,
+  [
+    wranglerCli,
+    "d1",
+    "migrations",
+    "apply",
+    "DB",
+    "--local",
+    "--persist-to",
+    persistPath,
+    "--config",
+    "wrangler.jsonc",
+  ],
+  { cwd: root, stdio: "ignore" },
+);
 if (migrate.status !== 0)
   throw new Error("Leere lokale Testdatenbank konnte nicht migriert werden.");
 const pin = String.fromCharCode(48).repeat(6);
@@ -20,7 +33,7 @@ const deviceToken = ["synthetic", "bootstrap", "admin", "device", "token", "valu
 const server = spawn(
   process.execPath,
   [
-    resolve(root, "node_modules", "wrangler", "bin", "wrangler.js"),
+    wranglerCli,
     "dev",
     "--config",
     "wrangler.jsonc",
@@ -30,10 +43,14 @@ const server = spawn(
     "DATA_JURISDICTION:eu",
     "--var",
     `INSTALLATION_RECOVERY_CODE:${setupCode}`,
+    "--persist-to",
+    persistPath,
+    "--port",
+    String(port),
   ],
   { cwd: root, stdio: "ignore", windowsHide: true },
 );
-const base = "http://127.0.0.1:8787";
+const base = `http://127.0.0.1:${port}`;
 const waitForWorker = async () => {
   for (let attempt = 0; attempt < 40; attempt += 1) {
     try {
@@ -205,4 +222,10 @@ try {
   } else {
     server.kill();
   }
+  await rm(persistPath, {
+    recursive: true,
+    force: true,
+    maxRetries: 5,
+    retryDelay: 100,
+  });
 }
