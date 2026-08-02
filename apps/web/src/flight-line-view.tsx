@@ -1701,6 +1701,16 @@ export function FlightLineView() {
                         : "noch nicht berechnet"}
                     </span>
                   </div>
+                  {selected.timeline.extendsBeyondOperationsEnd ? (
+                    <p className="rotation-timeline-overtime" role="status">
+                      Voraussichtlicher Abschluss nach Betriebsende:{" "}
+                      {operationalTimeLabel(
+                        selected.timeline.predicted.completionAt,
+                        board?.event.timeZone ?? "Europe/Berlin",
+                      )}{" "}
+                      · +{selected.timeline.overtimeMinutes} Min.
+                    </p>
+                  ) : null}
                   <table>
                     <thead>
                       <tr>

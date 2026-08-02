@@ -2101,6 +2101,9 @@ export class EventCoordinator extends DurableObject<Env> {
             | "WAITING_FOR_PRODUCT_FAIRNESS"
             | "NOT_IN_NEAR_DISPATCH_BATCH"
             | "COMMITMENT_LOCKED"
+            | "ATTENDANCE_MISSING"
+            | "ATTENDANCE_CLARIFICATION"
+            | "UNKNOWN_RESOURCE_RETURN"
             | null;
         }>(),
       this.env.DB.prepare(
@@ -2573,6 +2576,25 @@ export class EventCoordinator extends DurableObject<Env> {
               })),
           };
         });
+      const groupReturnUnknown = activeBlockRows.results.some(
+        (block) =>
+          block.expected_review_at === null &&
+          ((block.scope_type === "EVENT" && block.scope_id === eventId) ||
+            (block.scope_type === "RESOURCE_GROUP" && block.scope_id === resourceGroupId)),
+      );
+      const aircraftReturnUnknown = capacityRows.results.some(
+        (aircraft) =>
+          aircraft.resource_group_id === resourceGroupId &&
+          (["PAUSED", "REFUELING"].includes(aircraft.operational_state) ||
+            aircraft.operational_interrupted === 1) &&
+          aircraft.expected_review_at === null,
+      );
+      const pilotReturnUnknown =
+        aircraftWindows.some((aircraft) => aircraft.resourceGroupId === resourceGroupId) &&
+        availabilityLanes.length === 0 &&
+        pilotRows.results.some(
+          (pilot) => pilot.paused === 1 && pilot.pause_expected_review_at === null,
+        );
       return {
         resourceGroupId,
         activeAircraft: availabilityLanes.filter(
@@ -2584,6 +2606,11 @@ export class EventCoordinator extends DurableObject<Env> {
             (plan.scopeType === "EVENT" && plan.scopeId === eventId) ||
             (plan.scopeType === "RESOURCE_GROUP" && plan.scopeId === resourceGroupId),
         ),
+        unavailableReason:
+          availabilityLanes.length === 0 &&
+          (groupReturnUnknown || aircraftReturnUnknown || pilotReturnUnknown)
+            ? ("UNKNOWN_RESOURCE_RETURN" as const)
+            : null,
       };
     });
     const adaptiveLeadMinutes = deriveAdaptivePrecallLeadMinutes({

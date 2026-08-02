@@ -3,6 +3,7 @@ import {
   createDispatchPlan,
   type DispatchPlan,
   deriveAdaptivePrecallLeadMinutes,
+  derivePublicForecastProjection,
   type ForecastRotationStatus,
   type ForecastUncertaintyReason,
   normalizePrecallObservation,
@@ -334,6 +335,7 @@ function latestSnapshotBefore(
     .filter(
       (snapshot) =>
         snapshot.status === status &&
+        (snapshot.status !== "DRAFT" || snapshot.forecastState !== "UNAVAILABLE") &&
         Date.parse(snapshot.capturedAt) < Date.parse(actualAt) &&
         Date.parse(snapshot.capturedAt) <= notAfterMs,
     )
@@ -452,7 +454,9 @@ export function calculateSimulationMetrics(input: {
     .sort((left, right) => left - right);
   const forecastChanges: number[] = [];
   for (const snapshots of snapshotsByRotation.values()) {
-    const draftSnapshots = snapshots.filter((snapshot) => snapshot.status === "DRAFT");
+    const draftSnapshots = snapshots.filter(
+      (snapshot) => snapshot.status === "DRAFT" && snapshot.forecastState !== "UNAVAILABLE",
+    );
     for (let index = 1; index < draftSnapshots.length; index += 1) {
       const previous = draftSnapshots[index - 1];
       const current = draftSnapshots[index];
@@ -770,6 +774,10 @@ export function runSimulation(
     resourceGroupStatus: "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED",
   ) => {
     const operationalInterrupted = resourceGroupStatus === "INTERRUPTED";
+    const forecastResourceGroupStatus =
+      resourceGroupStatus === "PAUSED" && nowMs < operationsStartMs
+        ? "ACTIVE"
+        : resourceGroupStatus;
     const open = rotations.filter(
       (rotation) => rotation.status !== "COMPLETED" && Date.parse(rotation.createdAt) <= nowMs,
     );
@@ -792,7 +800,7 @@ export function runSimulation(
         .map((rotation, index) => [rotation.id, index + 1]),
     );
     const activeCapacity =
-      resourceGroupStatus === "ACTIVE"
+      forecastResourceGroupStatus === "ACTIVE"
         ? Math.min(
             config.adminParameters.activePilotCount,
             aircraft.filter((entry) => entry.state === "AVAILABLE" || entry.state === "ACTIVE")
@@ -900,7 +908,7 @@ export function runSimulation(
         departedAt: rotation.departedAt,
         landedAt: rotation.landedAt,
         resourceGroupId: RESOURCE_GROUP_ID,
-        resourceGroupStatus,
+        resourceGroupStatus: forecastResourceGroupStatus,
         queueSequence: rotation.status === "DRAFT" ? (draftSequence.get(rotation.id) ?? 1) : 1,
         dispatchGroupIds: [rotation.id],
         productId: PRODUCT_ID,
@@ -1396,39 +1404,48 @@ export function runSimulation(
     for (const projection of projections) {
       const rotation = rotations.find((candidate) => candidate.id === projection.rotationId);
       if (!rotation || rotation.status === "COMPLETED") continue;
-      if (
-        !projection.predictedBoardingAt ||
-        !projection.predictedDepartureAt ||
-        !projection.predictedLandingAt ||
-        !projection.predictedCompletionAt ||
-        projection.predictionLowerMinutes === null ||
-        projection.predictionUpperMinutes === null
-      ) {
-        rotation.predictedDepartureAt = null;
-        rotation.predictedLandingAt = null;
-        rotation.predictedCompletionAt = null;
-        continue;
-      }
       rotation.predictedDepartureAt = projection.predictedDepartureAt;
       rotation.predictedLandingAt = projection.predictedLandingAt;
       rotation.predictedCompletionAt = projection.predictedCompletionAt;
+      const forecastResourceGroupStatus =
+        resourceGroupStatus === "PAUSED" && nowMs < operationsStartMs
+          ? "ACTIVE"
+          : resourceGroupStatus;
+      const publicForecast = derivePublicForecastProjection({
+        rotationStatus: rotation.status,
+        predictionQuality: projection.predictionQuality,
+        predictedBoardingAt: projection.predictedBoardingAt,
+        predictedCompletionAt: projection.predictedCompletionAt,
+        operationsEndAt: config.schedule.operationsEndAt,
+        dispatchBatchId: projection.dispatchBatchId,
+        dispatchUnplannedReason: projection.dispatchUnplannedReason,
+        emergencyMode: false,
+        operationalInterrupted: projection.uncertaintyReasons.includes("OPERATION_INTERRUPTED"),
+        resourceGroupStatus: forecastResourceGroupStatus,
+      });
       snapshots.push({
         rotationId: rotation.id,
         capturedAt: iso(nowMs),
         status: rotation.status,
         quality: projection.predictionQuality,
-        lowerMinutes: projection.predictionLowerMinutes,
-        upperMinutes: projection.predictionUpperMinutes,
+        lowerMinutes: projection.predictionLowerMinutes ?? 0,
+        upperMinutes: projection.predictionUpperMinutes ?? 0,
         plannedBoardingAt: projection.plannedBoardingAt,
-        predictedBoardingAt: projection.predictedBoardingAt,
-        predictedDepartureAt: projection.predictedDepartureAt,
-        predictedLandingAt: projection.predictedLandingAt,
-        predictedCompletionAt: projection.predictedCompletionAt,
+        predictedBoardingAt: projection.predictedBoardingAt ?? projection.plannedBoardingAt,
+        predictedDepartureAt: projection.predictedDepartureAt ?? projection.plannedDepartureAt,
+        predictedLandingAt: projection.predictedLandingAt ?? projection.plannedLandingAt,
+        predictedCompletionAt: projection.predictedCompletionAt ?? projection.plannedCompletionAt,
         sampleSize: projection.sampleSize,
         dataAgeMinutes: projection.dataAgeMinutes,
         activeCapacity: projection.activeCapacity,
         uncertaintyReasons: projection.uncertaintyReasons,
-        countdownDisplayed: projection.predictionQuality !== "UNCERTAIN",
+        ...publicForecast,
+        dispatchBatchId: projection.dispatchBatchId,
+        dispatchUnplannedReason: projection.dispatchUnplannedReason,
+        countdownDisplayed:
+          projection.predictionQuality !== "UNCERTAIN" &&
+          (publicForecast.forecastState === "DISPATCH_WINDOW" ||
+            publicForecast.forecastState === "LONG_RANGE_WINDOW"),
       });
     }
     if (nowMs >= operationsEndMs && !aircraft.some((entry) => entry.activeRotationId !== null)) {

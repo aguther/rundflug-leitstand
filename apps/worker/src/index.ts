@@ -34,8 +34,10 @@ import {
 } from "@rundflug/contracts";
 import {
   assessForecastFreshness,
-  assessRemainingCapacity,
+  assessMarginalProductCapacity,
   buildTicketGroupRecallCopy,
+  createQueueAvailability,
+  derivePublicForecastProjection,
   derivePublicRotationStatus,
   deriveResourceGroupCapacity,
   estimateDuration,
@@ -379,7 +381,9 @@ function mapFidsProjectionRow(
     now: boardReadAt,
   });
   const predictionQuality =
-    event.operational_interrupted === 1 || row.resource_group_status !== "ACTIVE"
+    event.operational_interrupted === 1 ||
+    row.resource_group_status === "INTERRUPTED" ||
+    row.resource_group_status === "ENDED"
       ? "UNCERTAIN"
       : forecastFreshness.quality;
   const waitLowerMinutes = row.prediction_lower_minutes ?? row.projection_index * 20;
@@ -392,6 +396,21 @@ function mapFidsProjectionRow(
     upperMinutes: waitUpperMinutes,
     referenceAt: boardReadAt,
   });
+  const publicForecast = derivePublicForecastProjection({
+    rotationStatus: row.status,
+    predictionQuality,
+    predictedBoardingAt: row.predicted_boarding_at,
+    predictedCompletionAt: row.predicted_completion_at,
+    operationsEndAt: event.operations_end_at,
+    dispatchBatchId: row.dispatch_batch_id,
+    dispatchUnplannedReason: row.dispatch_unplanned_reason,
+    emergencyMode: event.emergency_mode === 1,
+    operationalInterrupted: event.operational_interrupted === 1,
+    resourceGroupStatus: row.resource_group_status,
+  });
+  const publishesWindow =
+    publicForecast.forecastState === "DISPATCH_WINDOW" ||
+    publicForecast.forecastState === "LONG_RANGE_WINDOW";
   return {
     rowId: row.row_id,
     productId: row.product_id,
@@ -419,16 +438,11 @@ function mapFidsProjectionRow(
                   ? "PREPARE"
                   : "WAITING",
           }),
-    waitLowerMinutes:
-      event.operational_interrupted === 1 || row.resource_group_status !== "ACTIVE"
-        ? 0
-        : waitLowerMinutes,
-    waitUpperMinutes:
-      event.operational_interrupted === 1 || row.resource_group_status !== "ACTIVE"
-        ? 0
-        : waitUpperMinutes,
-    boardingWindowLowerAt: boardingWindow.lowerAt,
-    boardingWindowUpperAt: boardingWindow.upperAt,
+    waitLowerMinutes: publishesWindow ? waitLowerMinutes : 0,
+    waitUpperMinutes: publishesWindow ? waitUpperMinutes : 0,
+    boardingWindowLowerAt: publishesWindow ? boardingWindow.lowerAt : null,
+    boardingWindowUpperAt: publishesWindow ? boardingWindow.upperAt : null,
+    ...publicForecast,
     predictionQuality,
     dispatchOrder: row.dispatch_order,
     operationalNotice: row.planned_public_note || row.resource_group_operational_note,
@@ -4284,6 +4298,9 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
             | "WAITING_FOR_PRODUCT_FAIRNESS"
             | "NOT_IN_NEAR_DISPATCH_BATCH"
             | "COMMITMENT_LOCKED"
+            | "ATTENDANCE_MISSING"
+            | "ATTENDANCE_CLARIFICATION"
+            | "UNKNOWN_RESOURCE_RETURN"
             | null;
           turnaround_boarding_minutes: number | null;
           turnaround_deboarding_minutes: number | null;
@@ -4719,8 +4736,9 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
     (pilot) => pilot.active === 1 && pilot.paused === 0,
   ).length;
   const forecastReadAt = new Date().toISOString();
+  const forecastReferenceMs = Date.parse(forecastReadAt);
   const operationsEnd = eventRow.operations_end_at ? Date.parse(eventRow.operations_end_at) : 0;
-  const remainingOperatingMinutes = Math.max(0, (operationsEnd - Date.now()) / 60_000);
+  const operationsEndMinutes = Math.max(0, (operationsEnd - forecastReferenceMs) / 60_000);
 
   const response = context.json({
     currentDeviceRole: device.role,
@@ -4758,9 +4776,6 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
         1,
         deriveResourceGroupCapacity(allGroupAircraftSeats),
       );
-      const reservedRefuelSeats = operationalGroupAircraft
-        .filter((aircraft) => aircraft.refuel_planned === 1)
-        .reduce((sum, aircraft) => sum + aircraft.passenger_seats, 0);
       const activeAircraft = groupAircraftSeats.length;
       const queueSequence = Math.max(
         1,
@@ -4785,7 +4800,7 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
           rotation.prediction_upper_minutes !== null,
       );
       const preOperationsOffset = eventRow.operations_start_at
-        ? Math.max(0, (Date.parse(eventRow.operations_start_at) - Date.now()) / 60_000)
+        ? Math.max(0, (Date.parse(eventRow.operations_start_at) - forecastReferenceMs) / 60_000)
         : 0;
       const forecast = firstQueuedRotation
         ? {
@@ -4800,7 +4815,6 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
               quality: "CHANGING" as const,
             }
           : fallbackForecast;
-      const forecastReferenceMs = Date.now();
       const forecastMidpointMinutes = (forecast.lowerMinutes + forecast.upperMinutes) / 2;
       const storedForecastCenterMs = firstQueuedRotation?.predicted_boarding_at
         ? Date.parse(firstQueuedRotation.predicted_boarding_at)
@@ -4821,12 +4835,272 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
               Date.parse(nextBoardingWindowLowerAt ?? new Date(forecastReferenceMs).toISOString()) +
                 Math.max(0, forecast.upperMinutes - forecast.lowerMinutes) * 60_000,
             ).toISOString();
-      const capacity = assessRemainingCapacity({
-        remainingOperatingMinutes,
-        expectedRotationMinutes: duration.expectedMinutes,
-        activeAircraftSeats: eventRow.operational_interrupted === 1 ? [] : groupAircraftSeats,
+      const resourceGroupRotations = rotations.results.filter(
+        (rotation) => rotation.resource_group_id === product.resource_group_id,
+      );
+      const blockingUnprojectedQueue = resourceGroupRotations.some(
+        (rotation) =>
+          rotation.status === "DRAFT" &&
+          rotation.ticket_count > 0 &&
+          rotation.predicted_completion_at === null &&
+          !["ATTENDANCE_MISSING", "ATTENDANCE_CLARIFICATION"].includes(
+            rotation.dispatch_unplanned_reason ?? "",
+          ),
+      );
+      const availablePilots = pilotRows.results
+        .flatMap((pilot) => {
+          if (pilot.active !== 1) return [];
+          const activeRotation = pilot.current_rotation_id
+            ? resourceGroupRotations.find((rotation) => rotation.id === pilot.current_rotation_id)
+            : undefined;
+          const availableAt = activeRotation?.predicted_completion_at
+            ? Date.parse(activeRotation.predicted_completion_at)
+            : pilot.paused === 1
+              ? pilot.pause_expected_review_at
+                ? Date.parse(pilot.pause_expected_review_at)
+                : Number.NaN
+              : forecastReferenceMs;
+          if (!Number.isFinite(availableAt)) return [];
+          return [
+            {
+              id: pilot.id,
+              availableMinutes: Math.max(0, (availableAt - forecastReferenceMs) / 60_000),
+            },
+          ];
+        })
+        .sort(
+          (left, right) =>
+            left.availableMinutes - right.availableMinutes || left.id.localeCompare(right.id),
+        );
+      const compatibleAircraftTypes = new Set(
+        JSON.parse(
+          resourceGroupRows.results.find((group) => group.id === product.resource_group_id)
+            ?.compatible_aircraft_types_json ?? "[]",
+        ) as string[],
+      );
+      const capacityLanes =
+        eventRow.operational_interrupted === 1 ||
+        product.resource_group_status !== "ACTIVE" ||
+        blockingUnprojectedQueue
+          ? []
+          : fleetRows.results
+              .filter(
+                (aircraft) =>
+                  aircraft.resource_group_id === product.resource_group_id &&
+                  aircraft.operational_state !== "INACTIVE" &&
+                  (compatibleAircraftTypes.size === 0 ||
+                    compatibleAircraftTypes.has(aircraft.aircraft_type)),
+              )
+              .flatMap((aircraft) => {
+                const assignedRotations = resourceGroupRotations.filter(
+                  (rotation) =>
+                    rotation.aircraft_id === aircraft.id ||
+                    rotation.forecast_assumed_aircraft_id === aircraft.id,
+                );
+                const unknownReturn =
+                  (aircraft.operational_interrupted === 1 ||
+                    ["PAUSED", "REFUELING"].includes(aircraft.operational_state)) &&
+                  aircraft.expected_review_at === null &&
+                  !assignedRotations.some((rotation) => rotation.predicted_completion_at !== null);
+                if (unknownReturn) return [];
+                const projectedCompletions = assignedRotations.flatMap((rotation) => {
+                  if (!rotation.predicted_completion_at) return [];
+                  const expectedMinutes = Math.max(
+                    0,
+                    (Date.parse(rotation.predicted_completion_at) - forecastReferenceMs) / 60_000,
+                  );
+                  const intervalWidth = Math.max(
+                    0,
+                    (rotation.prediction_upper_minutes ?? 0) -
+                      (rotation.prediction_lower_minutes ?? 0),
+                  );
+                  return [
+                    {
+                      lowerMinutes: Math.max(0, expectedMinutes - intervalWidth / 2),
+                      expectedMinutes,
+                      upperMinutes: expectedMinutes + intervalWidth / 2,
+                    },
+                  ];
+                });
+                const returnMinutes = aircraft.expected_review_at
+                  ? Math.max(
+                      0,
+                      (Date.parse(aircraft.expected_review_at) - forecastReferenceMs) / 60_000,
+                    )
+                  : 0;
+                return [
+                  {
+                    aircraft,
+                    lowerMinutes: Math.max(
+                      returnMinutes,
+                      ...projectedCompletions.map((entry) => entry.lowerMinutes),
+                    ),
+                    expectedMinutes: Math.max(
+                      returnMinutes,
+                      ...projectedCompletions.map((entry) => entry.expectedMinutes),
+                    ),
+                    upperMinutes: Math.max(
+                      returnMinutes,
+                      ...projectedCompletions.map((entry) => entry.upperMinutes),
+                    ),
+                  },
+                ];
+              })
+              .sort(
+                (left, right) =>
+                  left.expectedMinutes - right.expectedMinutes ||
+                  left.aircraft.id.localeCompare(right.aircraft.id),
+              )
+              .slice(0, availablePilots.length)
+              .flatMap((lane, index) => {
+                const pilot = availablePilots[index];
+                if (!pilot) return [];
+                const applicablePlans = plannedOperationRows.results.filter(
+                  (plan) =>
+                    plan.status !== "CLEARED" &&
+                    plan.status !== "CANCELED" &&
+                    (plan.scope_type === "EVENT" ||
+                      (plan.scope_type === "RESOURCE_GROUP" &&
+                        plan.scope_id === product.resource_group_id) ||
+                      (plan.scope_type === "AIRCRAFT" && plan.scope_id === lane.aircraft.id) ||
+                      (plan.scope_type === "PILOT" && plan.scope_id === pilot.id)),
+                );
+                const unknownConstraintStart = applicablePlans.some(
+                  (plan) =>
+                    plan.start_mode === "AFTER_CURRENT_ROTATION" &&
+                    !resourceGroupRotations.find(
+                      (rotation) => rotation.id === plan.after_rotation_id,
+                    )?.predicted_completion_at,
+                );
+                if (unknownConstraintStart) return [];
+                const constraints = applicablePlans.map((plan) => {
+                  const afterRotationCompletion = resourceGroupRotations.find(
+                    (rotation) => rotation.id === plan.after_rotation_id,
+                  )?.predicted_completion_at;
+                  const earliestStart =
+                    plan.start_mode === "AFTER_CURRENT_ROTATION"
+                      ? Date.parse(afterRotationCompletion ?? forecastReadAt)
+                      : Date.parse(plan.earliest_start_at ?? forecastReadAt);
+                  const latestStart =
+                    plan.start_mode === "AFTER_CURRENT_ROTATION"
+                      ? earliestStart
+                      : Date.parse(
+                          plan.latest_start_at ?? plan.earliest_start_at ?? forecastReadAt,
+                        );
+                  const earliestStartMinutes = Math.max(
+                    0,
+                    (earliestStart - forecastReferenceMs) / 60_000,
+                  );
+                  const latestStartMinutes = Math.max(
+                    earliestStartMinutes,
+                    (latestStart - forecastReferenceMs) / 60_000,
+                  );
+                  return {
+                    id: plan.id,
+                    earliestStartMinutes,
+                    expectedStartMinutes: (earliestStartMinutes + latestStartMinutes) / 2,
+                    latestStartMinutes,
+                    minimumDurationMinutes: plan.minimum_duration_minutes,
+                    typicalDurationMinutes: plan.typical_duration_minutes,
+                    maximumDurationMinutes: plan.maximum_duration_minutes,
+                    effectMode: plan.effect_mode,
+                    durationMultiplierPercent: plan.duration_multiplier_percent,
+                    active: plan.status === "ACTIVE",
+                  };
+                });
+                const recurringConstraints = recurringRuleRows.results
+                  .filter(
+                    (rule) =>
+                      rule.status === "ACTIVE" &&
+                      ((rule.scope_type === "AIRCRAFT" && rule.scope_id === lane.aircraft.id) ||
+                        (rule.scope_type === "PILOT" && rule.scope_id === pilot.id)),
+                  )
+                  .map((rule) => ({
+                    id: rule.id,
+                    triggerMetric: rule.trigger_metric,
+                    intervalValue: rule.interval_value,
+                    lowerProgress: rule.progress_value,
+                    expectedProgress: rule.progress_value,
+                    upperProgress: rule.progress_value,
+                    minimumDurationMinutes: rule.minimum_duration_minutes,
+                    typicalDurationMinutes: rule.typical_duration_minutes,
+                    maximumDurationMinutes: rule.maximum_duration_minutes,
+                    active: true,
+                  }));
+                return [
+                  {
+                    laneId: `${lane.aircraft.id}:${pilot.id}`,
+                    aircraftId: lane.aircraft.id,
+                    passengerSeats: lane.aircraft.passenger_seats,
+                    lowerMinutes: Math.max(lane.lowerMinutes, pilot.availableMinutes),
+                    expectedMinutes: Math.max(lane.expectedMinutes, pilot.availableMinutes),
+                    upperMinutes: Math.max(lane.upperMinutes, pilot.availableMinutes),
+                    constraints,
+                    recurringConstraints,
+                  },
+                ];
+              });
+      const availabilityAfterQueue = createQueueAvailability({
+        activeAircraft: 0,
+        busyAircraftMinutes: [],
+        lanes: capacityLanes,
+      });
+      const durationByAircraftId = new Map(
+        capacityLanes.map((lane) => {
+          const override = aircraftProductTurnaroundOverrideRows.results.find(
+            (entry) => entry.aircraft_id === lane.aircraftId && entry.product_id === product.id,
+          );
+          const aircraftProfile = resolveTurnaroundProfile({
+            event: {
+              sourceId: eventId,
+              boardingMinutes: eventRow.planned_boarding_minutes ?? 8,
+              deboardingMinutes: eventRow.planned_deboarding_minutes ?? 5,
+              bufferMinutes: eventRow.planned_buffer_minutes ?? 3,
+            },
+            product: {
+              sourceId: product.id,
+              boardingMinutes: product.planned_boarding_minutes_override,
+              deboardingMinutes: product.planned_deboarding_minutes_override,
+              bufferMinutes: product.planned_buffer_minutes_override,
+            },
+            ...(override
+              ? {
+                  aircraftProduct: {
+                    sourceId: `${override.aircraft_id}:${override.product_id}`,
+                    boardingMinutes: override.planned_boarding_minutes_override,
+                    deboardingMinutes: override.planned_deboarding_minutes_override,
+                    bufferMinutes: override.planned_buffer_minutes_override,
+                  },
+                }
+              : {}),
+          });
+          return [
+            lane.aircraftId,
+            estimateDuration({
+              referenceMinutes:
+                product.reference_duration_minutes + aircraftProfile.totalGroundMinutes,
+              actualDurationsMinutes: actualDurations,
+              interrupted: false,
+              activeCapacity: Math.max(1, capacityLanes.length),
+            }),
+          ] as const;
+        }),
+      );
+      const queuedSeatsCompletedByEnd = resourceGroupRotations
+        .filter(
+          (rotation) =>
+            rotation.status === "DRAFT" &&
+            rotation.predicted_completion_at !== null &&
+            Date.parse(rotation.predicted_completion_at) <= operationsEnd,
+        )
+        .reduce((sum, rotation) => sum + rotation.ticket_count, 0);
+      const capacity = assessMarginalProductCapacity({
+        operationsEndMinutes,
+        availabilityAfterQueue,
+        duration,
+        durationByAircraftId,
+        queuedSeatsCompletedByEnd,
         openTickets: product.resource_group_open_tickets,
-        reservedSeats: reservedRefuelSeats,
         predictionQuality: forecast.quality,
         warningThreshold: product.capacity_warning_threshold,
         criticalThreshold: product.capacity_critical_threshold,
@@ -5070,6 +5344,16 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
         upperMinutes: predictedUpperMinutes ?? 0,
         referenceAt: forecastReadAt,
       });
+      const predictedCompletionMs = rotation.predicted_completion_at
+        ? Date.parse(rotation.predicted_completion_at)
+        : Number.NaN;
+      const operationsEndMs = eventRow.operations_end_at
+        ? Date.parse(eventRow.operations_end_at)
+        : Number.NaN;
+      const overtimeMinutes =
+        Number.isFinite(predictedCompletionMs) && Number.isFinite(operationsEndMs)
+          ? Math.max(0, Math.ceil((predictedCompletionMs - operationsEndMs) / 60_000))
+          : 0;
       return {
         id: rotation.id,
         version: rotation.version,
@@ -5174,6 +5458,8 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
           predictionQuality: effectivePredictionQuality,
           predictionUpdatedAt: rotation.prediction_updated_at,
           forecastAssumedAircraftId: rotation.forecast_assumed_aircraft_id,
+          extendsBeyondOperationsEnd: overtimeMinutes > 0,
+          overtimeMinutes,
           effectiveTurnaroundProfile,
         },
         tickets: JSON.parse(rotation.tickets_json) as Array<{
@@ -5901,6 +6187,9 @@ app.on("GET", eventRoutes("/history/forecasts"), async (context) => {
         | "WAITING_FOR_PRODUCT_FAIRNESS"
         | "NOT_IN_NEAR_DISPATCH_BATCH"
         | "COMMITMENT_LOCKED"
+        | "ATTENDANCE_MISSING"
+        | "ATTENDANCE_CLARIFICATION"
+        | "UNKNOWN_RESOURCE_RETURN"
         | null;
       predicted_boarding_at: string | null;
       predicted_departure_at: string | null;
@@ -6589,12 +6878,12 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
             part.part_number, part.part_count, part.passenger_count,
             fg.precalled_at, fg.precall_decision_status, r.status, tg.operation_day_id,
             COALESCE(fg.queue_position, tg.queue_sequence) AS queue_sequence,
-            r.predicted_boarding_at, r.prediction_quality,
+            r.predicted_boarding_at, r.predicted_completion_at, r.prediction_quality,
             r.prediction_lower_minutes, r.prediction_upper_minutes,
-            r.prediction_updated_at,
+            r.prediction_updated_at, r.dispatch_batch_id, r.dispatch_unplanned_reason,
             od.name AS event_name, od.time_zone,
             od.operational_note AS event_operational_note, od.operational_interrupted,
-            od.emergency_mode, od.notification_lead_minutes,
+            od.emergency_mode, od.notification_lead_minutes, od.operations_end_at,
             rg.status AS resource_group_status,
             rg.operational_note AS resource_group_operational_note,
             recall.id AS recall_id, recall.sequence AS recall_sequence,
@@ -6641,10 +6930,22 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
       operation_day_id: string;
       queue_sequence: number;
       predicted_boarding_at: string | null;
+      predicted_completion_at: string | null;
       prediction_quality: "STABLE" | "CHANGING" | "UNCERTAIN" | null;
       prediction_lower_minutes: number | null;
       prediction_upper_minutes: number | null;
       prediction_updated_at: string | null;
+      dispatch_batch_id: string | null;
+      dispatch_unplanned_reason:
+        | "NO_FORECAST_CAPACITY"
+        | "WAITING_FOR_FITTING_LANE"
+        | "WAITING_FOR_PRODUCT_FAIRNESS"
+        | "NOT_IN_NEAR_DISPATCH_BATCH"
+        | "COMMITMENT_LOCKED"
+        | "ATTENDANCE_MISSING"
+        | "ATTENDANCE_CLARIFICATION"
+        | "UNKNOWN_RESOURCE_RETURN"
+        | null;
       updated_at: string;
       event_name: string;
       time_zone: string;
@@ -6654,6 +6955,7 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
       operational_interrupted: number;
       emergency_mode: number;
       notification_lead_minutes: number;
+      operations_end_at: string | null;
       resource_group_status: "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED";
       recall_id: string | null;
       recall_sequence: number | null;
@@ -6671,7 +6973,8 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
   const effectivePredictionQuality =
     row.emergency_mode === 1 ||
     row.operational_interrupted === 1 ||
-    row.resource_group_status !== "ACTIVE"
+    row.resource_group_status === "INTERRUPTED" ||
+    row.resource_group_status === "ENDED"
       ? "UNCERTAIN"
       : forecastFreshness.quality;
   const prepare =
@@ -6698,6 +7001,21 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
     upperMinutes,
     referenceAt: new Date().toISOString(),
   });
+  const publicForecast = derivePublicForecastProjection({
+    rotationStatus: row.status,
+    predictionQuality: effectivePredictionQuality,
+    predictedBoardingAt: row.predicted_boarding_at,
+    predictedCompletionAt: row.predicted_completion_at,
+    operationsEndAt: row.operations_end_at,
+    dispatchBatchId: row.dispatch_batch_id,
+    dispatchUnplannedReason: row.dispatch_unplanned_reason,
+    emergencyMode: row.emergency_mode === 1,
+    operationalInterrupted: row.operational_interrupted === 1,
+    resourceGroupStatus: row.resource_group_status,
+  });
+  const publishesWindow =
+    publicForecast.forecastState === "DISPATCH_WINDOW" ||
+    publicForecast.forecastState === "LONG_RANGE_WINDOW";
   return context.json({
     eventId: row.operation_day_id,
     eventName: row.event_name,
@@ -6714,7 +7032,7 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
       row.resource_group_status === "ACTIVE" &&
       row.status === "DRAFT" &&
       row.operational_interrupted === 0 &&
-      effectivePredictionQuality !== "UNCERTAIN"
+      publishesWindow
         ? lowerMinutes
         : 0,
     waitUpperMinutes:
@@ -6722,11 +7040,12 @@ app.get("/api/public/tickets/:ticketCode", async (context) => {
       row.resource_group_status === "ACTIVE" &&
       row.status === "DRAFT" &&
       row.operational_interrupted === 0 &&
-      effectivePredictionQuality !== "UNCERTAIN"
+      publishesWindow
         ? upperMinutes
         : 0,
-    boardingWindowLowerAt: boardingWindow.lowerAt,
-    boardingWindowUpperAt: boardingWindow.upperAt,
+    boardingWindowLowerAt: publishesWindow ? boardingWindow.lowerAt : null,
+    boardingWindowUpperAt: publishesWindow ? boardingWindow.upperAt : null,
+    ...publicForecast,
     timeZone: row.time_zone,
     predictionQuality: effectivePredictionQuality,
     message: servicePaused
@@ -6756,6 +7075,7 @@ app.get("/api/public/groups/:groupCode", async (context) => {
             g.label AS gate_label,
             od.name AS event_name, od.time_zone, od.operational_note AS event_operational_note,
             od.operational_interrupted, od.emergency_mode, od.notification_lead_minutes,
+            od.operations_end_at,
             od.updated_at, rg.status AS resource_group_status,
             rg.operational_note AS resource_group_operational_note,
             recall.id AS recall_id, recall.sequence AS recall_sequence,
@@ -6794,6 +7114,7 @@ app.get("/api/public/groups/:groupCode", async (context) => {
       operational_interrupted: number;
       emergency_mode: number;
       notification_lead_minutes: number;
+      operations_end_at: string | null;
       updated_at: string;
       resource_group_status: "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED";
       resource_group_operational_note: string;
@@ -6810,8 +7131,10 @@ app.get("/api/public/groups/:groupCode", async (context) => {
 
   const rotations = await context.env.DB.prepare(
     withBookingGroupPartProjection(
-      `SELECT r.id, r.status, r.predicted_boarding_at, r.prediction_quality,
+      `SELECT r.id, r.status, r.predicted_boarding_at, r.predicted_completion_at,
+            r.prediction_quality,
             r.prediction_lower_minutes, r.prediction_upper_minutes, r.prediction_updated_at,
+            r.dispatch_batch_id, r.dispatch_unplanned_reason,
             fg.precalled_at, fg.precall_decision_status,
             COALESCE(fg.queue_position, fg.communication_number) AS queue_position,
             g.label AS gate_label, part.part_number, part.part_count, part.passenger_count
@@ -6830,10 +7153,22 @@ app.get("/api/public/groups/:groupCode", async (context) => {
       id: string;
       status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
       predicted_boarding_at: string | null;
+      predicted_completion_at: string | null;
       prediction_quality: "STABLE" | "CHANGING" | "UNCERTAIN" | null;
       prediction_lower_minutes: number | null;
       prediction_upper_minutes: number | null;
       prediction_updated_at: string | null;
+      dispatch_batch_id: string | null;
+      dispatch_unplanned_reason:
+        | "NO_FORECAST_CAPACITY"
+        | "WAITING_FOR_FITTING_LANE"
+        | "WAITING_FOR_PRODUCT_FAIRNESS"
+        | "NOT_IN_NEAR_DISPATCH_BATCH"
+        | "COMMITMENT_LOCKED"
+        | "ATTENDANCE_MISSING"
+        | "ATTENDANCE_CLARIFICATION"
+        | "UNKNOWN_RESOURCE_RETURN"
+        | null;
       precalled_at: string | null;
       precall_decision_status: "WAITING" | "PREPARE" | "GO_TO_GATE" | null;
       queue_position: number;
@@ -6860,7 +7195,8 @@ app.get("/api/public/groups/:groupCode", async (context) => {
     const predictionQuality =
       group.emergency_mode === 1 ||
       group.operational_interrupted === 1 ||
-      group.resource_group_status !== "ACTIVE"
+      group.resource_group_status === "INTERRUPTED" ||
+      group.resource_group_status === "ENDED"
         ? "UNCERTAIN"
         : freshness.quality;
     const lowerMinutes =
@@ -6885,6 +7221,21 @@ app.get("/api/public/groups/:groupCode", async (context) => {
       upperMinutes,
       referenceAt: readAt,
     });
+    const publicForecast = derivePublicForecastProjection({
+      rotationStatus: rotation.status,
+      predictionQuality,
+      predictedBoardingAt: rotation.predicted_boarding_at,
+      predictedCompletionAt: rotation.predicted_completion_at,
+      operationsEndAt: group.operations_end_at,
+      dispatchBatchId: rotation.dispatch_batch_id,
+      dispatchUnplannedReason: rotation.dispatch_unplanned_reason,
+      emergencyMode: group.emergency_mode === 1,
+      operationalInterrupted: group.operational_interrupted === 1,
+      resourceGroupStatus: group.resource_group_status,
+    });
+    const publishesWindow =
+      publicForecast.forecastState === "DISPATCH_WINDOW" ||
+      publicForecast.forecastState === "LONG_RANGE_WINDOW";
     const message = servicePaused
       ? publicServicePausedMessage({
           emergencyMode: group.emergency_mode === 1,
@@ -6903,8 +7254,9 @@ app.get("/api/public/groups/:groupCode", async (context) => {
       gateLabel: rotation.gate_label,
       status: publicStatus,
       queuePosition: rotation.status === "DRAFT" ? rotation.queue_position : null,
-      boardingWindowLowerAt: boardingWindow.lowerAt,
-      boardingWindowUpperAt: boardingWindow.upperAt,
+      boardingWindowLowerAt: publishesWindow ? boardingWindow.lowerAt : null,
+      boardingWindowUpperAt: publishesWindow ? boardingWindow.upperAt : null,
+      ...publicForecast,
       predictionQuality,
       message,
     };

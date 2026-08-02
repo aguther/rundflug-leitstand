@@ -2456,6 +2456,14 @@ p {
   margin: 0;
   font-size: 1rem;
 }
+.rotation-timeline-overtime {
+  margin: 0;
+  padding: 10px 14px;
+  border-top: 1px solid color-mix(in srgb, var(--ui-warning) 55%, var(--ui-border));
+  color: var(--ui-warning-text);
+  background: var(--ui-warning-soft);
+  font-weight: 750;
+}
 .rotation-timeline table {
   width: 100%;
   border-collapse: collapse;

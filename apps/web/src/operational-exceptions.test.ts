@@ -50,6 +50,8 @@ function rotation(input: Partial<Rotation> & Pick<Rotation, "id" | "ticketGroupI
       actual: { boardingAt: null, departureAt: null, landingAt: null, completionAt: null },
       predictionQuality: null,
       predictionUpdatedAt: null,
+      extendsBeyondOperationsEnd: false,
+      overtimeMinutes: 0,
     },
     tickets: input.tickets ?? [
       { id: `ticket-${input.id}`, status: "QUEUED", attendanceStatus: "NOT_CHECKED_IN" },

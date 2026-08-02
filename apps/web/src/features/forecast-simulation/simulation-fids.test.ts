@@ -186,7 +186,7 @@ describe("simulation FIDS projection", () => {
     });
 
     expect(board.operationalInterrupted).toBe(true);
-    expect(board.groups[0]).toMatchObject({
+    expect(board.groups.find((group) => group.communicationNumber === 1)).toMatchObject({
       status: "WAITING",
       predictionQuality: "UNCERTAIN",
       boardingWindowLowerAt: null,
@@ -271,13 +271,72 @@ describe("simulation FIDS projection", () => {
     });
 
     expect(board.eventName).toBe("Flugtag Alpen");
-    expect(board.groups[0]).toMatchObject({
+    expect(board.groups.find((group) => group.communicationNumber === 7)).toMatchObject({
       productName: "Alpenrunde",
       productCode: "ALP",
       gateLabel: "Gate Süd",
-      predictionQuality: "UNCERTAIN",
+      predictionQuality: "STABLE",
       operationalNotice: "Flugshow – bitte am Gate warten",
     });
+  });
+
+  it("uses the same explicit after-end and unavailable states as production", () => {
+    const afterEnd = rotation("after-end", 1);
+    const unknownReturn = rotation("unknown-return", 2);
+    const projectedResult = result({
+      rotations: [afterEnd, unknownReturn],
+      snapshots: [
+        snapshot(afterEnd.id, {
+          predictedBoardingAt: at(90),
+          predictedCompletionAt: at(130),
+        }),
+        snapshot(unknownReturn.id, {
+          capturedAt: at(51),
+          forecastState: "UNAVAILABLE",
+          forecastReason: "RETURN_TIME_UNKNOWN",
+          countdownDisplayed: false,
+        }),
+      ],
+    });
+    projectedResult.config.schedule.operationsEndAt = at(120);
+
+    const board = createSimulationFidsBoard({
+      result: projectedResult,
+      visibleAt: Date.parse(at(60)),
+      recentDepartedRotationIds: new Set(),
+    });
+
+    expect(board.groups.find((group) => group.communicationNumber === 1)).toMatchObject({
+      forecastState: "AFTER_OPERATIONS_END",
+      forecastReason: null,
+      boardingWindowLowerAt: null,
+      boardingWindowUpperAt: null,
+    });
+    expect(board.groups.find((group) => group.communicationNumber === 2)).toMatchObject({
+      forecastState: "UNAVAILABLE",
+      forecastReason: "RETURN_TIME_UNKNOWN",
+      boardingWindowLowerAt: null,
+      boardingWindowUpperAt: null,
+    });
+  });
+
+  it("keeps the complete queue available for paged FIDS projection", () => {
+    const rotations = Array.from({ length: 25 }, (_, index) =>
+      rotation(`group-${index + 1}`, index + 1),
+    );
+    const board = createSimulationFidsBoard({
+      result: result({
+        rotations,
+        snapshots: rotations.map((entry) => snapshot(entry.id)),
+      }),
+      visibleAt: Date.parse(at(60)),
+      recentDepartedRotationIds: new Set(),
+    });
+
+    expect(board.groups).toHaveLength(25);
+    expect(board.groups.map((group) => group.communicationNumber)).toEqual(
+      Array.from({ length: 25 }, (_, index) => index + 1),
+    );
   });
 });
 

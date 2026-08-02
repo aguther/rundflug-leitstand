@@ -53,6 +53,8 @@ function rotation(
       actual: { boardingAt: null, departureAt: null, landingAt: null, completionAt: null },
       predictionQuality: null,
       predictionUpdatedAt: null,
+      extendsBeyondOperationsEnd: false,
+      overtimeMinutes: 0,
     },
     tickets: [],
   };

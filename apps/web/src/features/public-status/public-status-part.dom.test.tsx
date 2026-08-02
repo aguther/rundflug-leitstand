@@ -24,6 +24,8 @@ const part = {
   boardingWindowLowerAt: "2026-07-31T12:20:00.000Z",
   boardingWindowUpperAt: "2026-07-31T12:40:00.000Z",
   predictionQuality: "STABLE" as const,
+  forecastState: "LONG_RANGE_WINDOW" as const,
+  forecastReason: null,
 };
 
 describe("V18-GRP-010 public booking group part header", () => {
@@ -51,5 +53,21 @@ describe("V18-GRP-010 public booking group part header", () => {
 
     expect(screen.queryByText(/Teilflug/)).toBeNull();
     expect(screen.queryByText("5 Personen")).toBeNull();
+  });
+
+  it.each([
+    ["AFTER_OPERATIONS_END", null, "Voraussichtlich heute nicht mehr"],
+    ["UNAVAILABLE", "RETURN_TIME_UNKNOWN", "Rückkehrzeit offen"],
+    ["UNAVAILABLE", "NO_MATCHING_CAPACITY", "Keine passende Kapazität"],
+    ["UNAVAILABLE", "STATUS_CLARIFICATION", "Status wird geklärt"],
+  ] as const)("renders the %s forecast state explicitly", (forecastState, forecastReason, copy) => {
+    render(
+      <PublicStatusPart
+        part={{ ...part, forecastState, forecastReason }}
+        timeZone="Europe/Berlin"
+      />,
+    );
+
+    expect(screen.getByText(copy)).toBeTruthy();
   });
 });

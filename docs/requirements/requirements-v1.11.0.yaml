@@ -573,7 +573,7 @@ requirements:
     requirement: "Bei mehreren Flugzeugen einer Ressourcengruppe darf das System noch nicht festgelegte Fluggruppen auf ein früher verfügbares kompatibles Flugzeug umplanen. Ab NEXT sind Änderungen bestätigungspflichtig."
     priority: MUSS
     stage: V1
-    status: in Arbeit
+    status: umgesetzt
   - id: F-PRG-120
     source: "1.4-konsolidiert"
     section: "8.6 Prognose, Disposition und Kapazität"

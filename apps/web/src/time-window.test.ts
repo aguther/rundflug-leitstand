@@ -59,14 +59,13 @@ describe("formatAbsoluteTimeWindow", () => {
     ).toBe("01:50 – 03:10");
   });
 
-  it("veröffentlicht kein praktisch nutzloses Fenster über einer Stunde", () => {
+  it("formatiert auch lange Prognosefenster vollständig", () => {
     expect(
       formatAbsoluteTimeWindow({
         lowerAt: "2026-07-22T10:00:00.000Z",
         upperAt: "2026-07-22T11:01:00.000Z",
         timeZone: "Europe/Berlin",
-        maximumWidthMinutes: 60,
       }),
-    ).toBe("Wird aktualisiert");
+    ).toBe("ca. 12:00 – 13:01 Uhr");
   });
 });

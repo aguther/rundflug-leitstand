@@ -31,3 +31,12 @@ Snapshots ab Migration 0058 enthalten Produkt, angenommenes Flugzeug, die drei e
 Bodenphasen und deren Quellen. Historische Zeilen bleiben append-only lesbar und verwenden für
 nicht rekonstruierbare Quellen `LEGACY_UNKNOWN`. Eine angenommene Flugzeug-ID ist ausschließlich
 eine Prognoseannahme und keine operative Zuweisung.
+
+## Ergänzung ADR-0033: vollständiger Schwanz und öffentliche Ableitung
+
+Ein Snapshot wird auch dann angefügt, wenn für einen offenen Umlauf aktuell kein veröffentlichbares
+Zeitfenster existiert. Produktion leitet `forecastState` und `forecastReason` beim Lesen aus den
+gespeicherten Prognose-, Dispatch- und Betriebsfeldern ab; dafür ist keine Migration erforderlich.
+Der Simulator speichert dieselbe Ableitung direkt in seinem flüchtigen Snapshotmodell. So ersetzt
+eine aktuelle Unterbrechung oder unbekannte Rückkehr ein älteres Fenster, statt es versehentlich
+weiter anzuzeigen. Prognosemetriken behandeln `UNAVAILABLE` nicht als Zeitmesspunkt.

@@ -384,6 +384,7 @@ export * from "./forecast";
 export * from "./operational-plan";
 export * from "./outage-recovery";
 export * from "./precall";
+export * from "./public-forecast";
 export * from "./public-status";
 export * from "./queue";
 export * from "./recurring-operational-rule";

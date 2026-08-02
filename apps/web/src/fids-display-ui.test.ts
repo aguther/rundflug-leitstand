@@ -84,6 +84,10 @@ describe("FIDS V1.7.3 UI", () => {
 
   it("omits the redundant clock suffix from FIDS time windows", () => {
     expect(displaySource).toContain("includeClockSuffix: false");
+    expect(displaySource).not.toContain("maximumWidthMinutes");
+    expect(displaySource).toContain("Voraussichtlich heute nicht mehr");
+    expect(displaySource).toContain("Rückkehrzeit offen");
+    expect(displaySource).toContain("Keine passende Kapazität");
   });
 
   it("keeps the settings dialog open until a confirmed save and exposes only approved choices", () => {

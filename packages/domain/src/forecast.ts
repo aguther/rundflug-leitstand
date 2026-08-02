@@ -5,10 +5,16 @@ import {
   type DispatchPlan,
   type DispatchPlanningLimits,
   type DispatchUnplannedReason,
+  orderDispatchGroupsForProjection,
 } from "./dispatch-plan";
 import { deriveReferenceRotationBreakdown } from "./reference-rotation";
 
 export type PredictionQuality = "STABLE" | "CHANGING" | "UNCERTAIN";
+export type ForecastState =
+  | "DISPATCH_WINDOW"
+  | "LONG_RANGE_WINDOW"
+  | "AFTER_OPERATIONS_END"
+  | "UNAVAILABLE";
 
 export const FORECAST_FRESHNESS_MAX_AGE_MINUTES = 5;
 
@@ -137,6 +143,7 @@ export interface ForecastTimelineCapacityInput {
   activeAircraft: number;
   availabilityLanes?: readonly ForecastAvailabilityLaneInput[];
   sharedConstraints?: readonly ForecastAvailabilityConstraintInput[];
+  unavailableReason?: Extract<DispatchUnplannedReason, "UNKNOWN_RESOURCE_RETURN"> | null;
 }
 
 export interface ForecastAvailabilityConstraintInput {
@@ -190,6 +197,9 @@ export interface ForecastTimelineProjection {
   predictedDepartureAt: string | null;
   predictedLandingAt: string | null;
   predictedCompletionAt: string | null;
+  forecastState: ForecastState;
+  extendsBeyondOperationsEnd: boolean;
+  overtimeMinutes: number;
   predictionQuality: PredictionQuality;
   predictionLowerMinutes: number | null;
   predictionUpperMinutes: number | null;
@@ -606,6 +616,7 @@ export function reserveNextQueueWindow(
   minimumPassengerSeats = 1,
   durationByAircraftId?: ReadonlyMap<string, DurationEstimate>,
   preferredLaneId?: string,
+  eligibleLaneIds?: ReadonlySet<string>,
 ): {
   window: { lowerMinutes: number; upperMinutes: number; quality: PredictionQuality } | null;
   availability: QueueAvailabilityState;
@@ -629,7 +640,8 @@ export function reserveNextQueueWindow(
   const fittingLanes = availability.lanes.filter(
     (lane) =>
       lane.passengerSeats >= minimumPassengerSeats &&
-      (preferredLaneId === undefined || lane.laneId === preferredLaneId),
+      (preferredLaneId === undefined || lane.laneId === preferredLaneId) &&
+      (eligibleLaneIds === undefined || eligibleLaneIds.has(lane.laneId)),
   );
   if (fittingLanes.length === 0) {
     return {
@@ -859,6 +871,22 @@ export function forecastQueueWindows(input: {
 
 function addMinutes(value: string | Date, minutes: number): string {
   return new Date(new Date(value).getTime() + minutes * 60_000).toISOString();
+}
+
+function operationsEndAssessment(
+  predictedCompletionAt: string | null,
+  plannedOperationsEndAt: string | null | undefined,
+): { extendsBeyondOperationsEnd: boolean; overtimeMinutes: number } {
+  const completionMs = predictedCompletionAt ? Date.parse(predictedCompletionAt) : Number.NaN;
+  const operationsEndMs = plannedOperationsEndAt ? Date.parse(plannedOperationsEndAt) : Number.NaN;
+  if (!Number.isFinite(completionMs) || !Number.isFinite(operationsEndMs)) {
+    return { extendsBeyondOperationsEnd: false, overtimeMinutes: 0 };
+  }
+  const overtimeMinutes = Math.max(0, Math.ceil((completionMs - operationsEndMs) / 60_000));
+  return {
+    extendsBeyondOperationsEnd: overtimeMinutes > 0,
+    overtimeMinutes,
+  };
 }
 
 /**
@@ -1235,6 +1263,10 @@ function calculateLegacyForecastTimelines(
       predictedLandingAt = advanced.predictedLandingAt;
       predictedCompletionAt = advanced.predictedCompletionAt;
     }
+    const operationsEnd = operationsEndAssessment(
+      predictedCompletionAt,
+      input.event.plannedOperationsEndAt,
+    );
     return {
       rotationId: rotation.id,
       plannedBoardingAt,
@@ -1245,6 +1277,8 @@ function calculateLegacyForecastTimelines(
       predictedDepartureAt,
       predictedLandingAt,
       predictedCompletionAt,
+      forecastState: "UNAVAILABLE" as const,
+      ...operationsEnd,
       predictionQuality: effectiveEstimate.quality,
       predictionLowerMinutes: window?.lowerMinutes ?? null,
       predictionUpperMinutes: window?.upperMinutes ?? null,
@@ -1290,6 +1324,14 @@ interface DispatchReplayReservation {
   boardingSource: string;
   deboardingSource: string;
   bufferSource: string;
+}
+
+interface LongRangeReplayReservation extends DispatchReplayReservation {
+  selectedLaneId: string;
+  memberIds: string[];
+  groupIds: string[];
+  occupiedSeats: number;
+  availableSeats: number;
 }
 
 /**
@@ -1597,6 +1639,151 @@ export function calculateForecastTimelines(
       ...profile,
     });
   }
+  const dispatchLaneById = new Map(dispatchLanes.map((lane) => [lane.id, lane]));
+  const previousLaneByMemberId = new Map(
+    (input.previousDispatchPlan?.batches ?? []).flatMap((batch) =>
+      batch.memberIds.map((memberId) => [memberId, batch.laneId] as const),
+    ),
+  );
+  const nearMemberIds = new Set(dispatchPlan.batches.flatMap((batch) => batch.memberIds));
+  const longRangeReservationByMemberId = new Map<string, LongRangeReplayReservation>();
+  const resourceGroupIdsForTail = [
+    ...new Set(dispatchGroups.map((group) => group.resourceGroupId)),
+  ].sort();
+  for (const resourceGroupId of resourceGroupIdsForTail) {
+    let remaining = orderDispatchGroupsForProjection({
+      now: input.event.now,
+      groups: dispatchGroups.filter(
+        (group) =>
+          group.resourceGroupId === resourceGroupId &&
+          !nearMemberIds.has(group.id) &&
+          group.attendanceStatus !== "MISSING" &&
+          group.attendanceStatus !== "CLARIFICATION",
+      ),
+      ...(input.dispatchPlanningLimits === undefined
+        ? {}
+        : { limits: input.dispatchPlanningLimits }),
+    });
+    while (remaining.length > 0) {
+      const availability = availabilityByResourceGroup.get(resourceGroupId);
+      if (!availability || availability.lanes.length === 0) break;
+      const anchorGroup = remaining.find((group) =>
+        availability.lanes.some((lane) => {
+          const dispatchLane = dispatchLaneById.get(lane.laneId);
+          if (!dispatchLane) return false;
+          const lockedLane =
+            group.publicStatus === "COME_TO_FLIGHT_LINE"
+              ? previousLaneByMemberId.get(group.id)
+              : undefined;
+          return (
+            (group.publicStatus !== "COME_TO_FLIGHT_LINE" || lockedLane === lane.laneId) &&
+            group.size <= lane.passengerSeats &&
+            dispatchLane.productDurations.some((duration) => duration.productId === group.productId)
+          );
+        }),
+      );
+      if (!anchorGroup) break;
+      const member = rotationsById.get(anchorGroup.id);
+      if (!member) throw new Error(`Forecast rotation ${anchorGroup.id} disappeared.`);
+      const estimatesByAircraftId = new Map(
+        availability.lanes.flatMap((lane) =>
+          lane.aircraftId
+            ? [
+                [
+                  lane.aircraftId,
+                  durationEstimate(member, lane.aircraftId, availability.lanes.length),
+                ] as const,
+              ]
+            : [],
+        ),
+      );
+      const estimate = durationEstimate(member, null, availability.lanes.length);
+      const eligibleLaneIds = new Set(
+        availability.lanes
+          .filter((lane) => {
+            const dispatchLane = dispatchLaneById.get(lane.laneId);
+            const lockedLane =
+              anchorGroup.publicStatus === "COME_TO_FLIGHT_LINE"
+                ? previousLaneByMemberId.get(anchorGroup.id)
+                : undefined;
+            return (
+              dispatchLane !== undefined &&
+              anchorGroup.size <= lane.passengerSeats &&
+              (anchorGroup.publicStatus !== "COME_TO_FLIGHT_LINE" || lockedLane === lane.laneId) &&
+              dispatchLane.productDurations.some(
+                (duration) => duration.productId === anchorGroup.productId,
+              )
+            );
+          })
+          .map((lane) => lane.laneId),
+      );
+      const laneSelection = reserveNextQueueWindow(
+        availability,
+        estimate,
+        null,
+        anchorGroup.size,
+        estimatesByAircraftId,
+        undefined,
+        eligibleLaneIds,
+      );
+      const selectedLane = availability.lanes.find(
+        (lane) => lane.laneId === laneSelection.selectedLaneId,
+      );
+      if (!selectedLane) break;
+      const memberIds = [anchorGroup.id];
+      let occupiedSeats = anchorGroup.size;
+      for (const group of remaining) {
+        if (
+          group.id === anchorGroup.id ||
+          group.productId !== anchorGroup.productId ||
+          group.gateId !== anchorGroup.gateId ||
+          occupiedSeats + group.size > selectedLane.passengerSeats
+        ) {
+          continue;
+        }
+        const lockedLane =
+          group.publicStatus === "COME_TO_FLIGHT_LINE"
+            ? previousLaneByMemberId.get(group.id)
+            : undefined;
+        if (group.publicStatus === "COME_TO_FLIGHT_LINE" && lockedLane !== selectedLane.laneId) {
+          continue;
+        }
+        memberIds.push(group.id);
+        occupiedSeats += group.size;
+      }
+      const reservation = reserveNextQueueWindow(
+        availability,
+        estimate,
+        null,
+        occupiedSeats,
+        estimatesByAircraftId,
+        selectedLane.laneId,
+      );
+      if (!reservation.window || !reservation.selectedLaneId) break;
+      availabilityByResourceGroup.set(resourceGroupId, reservation.availability);
+      const profile = turnaroundProfile(member, reservation.selectedAircraftId);
+      const memberIdSet = new Set(memberIds);
+      const replay: LongRangeReplayReservation = {
+        window: {
+          ...reservation.window,
+          quality: reservation.window.quality === "UNCERTAIN" ? "UNCERTAIN" : "CHANGING",
+        },
+        capacityStatus: reservation.capacityStatus,
+        selectedAircraftId: reservation.selectedAircraftId,
+        selectedLaneId: reservation.selectedLaneId,
+        duration: reservation.duration,
+        ...profile,
+        memberIds,
+        groupIds: remaining
+          .filter((group) => memberIdSet.has(group.id))
+          .flatMap((group) => group.groupIds),
+        occupiedSeats,
+        availableSeats: selectedLane.passengerSeats - occupiedSeats,
+      };
+      for (const memberId of memberIds) longRangeReservationByMemberId.set(memberId, replay);
+      remaining = remaining.filter((group) => !memberIdSet.has(group.id));
+    }
+  }
   const batchByMemberId = new Map(
     dispatchPlan.batches.flatMap((batch) =>
       batch.memberIds.map((memberId) => [memberId, batch] as const),
@@ -1611,8 +1798,14 @@ export function calculateForecastTimelines(
   return legacy.map((projection) => {
     const rotation = rotationsById.get(projection.rotationId);
     if (rotation?.status !== "DRAFT") {
+      const operationsEnd = operationsEndAssessment(
+        projection.predictedCompletionAt,
+        input.event.plannedOperationsEndAt,
+      );
       return {
         ...projection,
+        forecastState: "UNAVAILABLE" as const,
+        ...operationsEnd,
         dispatchPlanId: null,
         dispatchPlanRevision: null,
         dispatchBatchId: null,
@@ -1631,12 +1824,22 @@ export function calculateForecastTimelines(
     const batch = batchByMemberId.get(rotation.id);
     const decision = decisionByMemberId.get(rotation.id);
     const unplannedReason = unplannedByMemberId.get(rotation.id) ?? null;
-    const replay = batch ? reservationByBatchId.get(batch.id) : undefined;
-    if (!batch || !replay) {
+    const dispatchReplay = batch ? reservationByBatchId.get(batch.id) : undefined;
+    const longRangeReplay = longRangeReservationByMemberId.get(rotation.id);
+    const replay = dispatchReplay ?? longRangeReplay;
+    if (!replay) {
+      const capacityUnavailableReason = input.capacities.find(
+        (capacity) => capacity.resourceGroupId === rotation.resourceGroupId,
+      )?.unavailableReason;
+      const effectiveUnplannedReason =
+        unplannedReason === "NO_FORECAST_CAPACITY" && capacityUnavailableReason
+          ? capacityUnavailableReason
+          : unplannedReason;
       const capacityStatus: ForecastCapacityStatus =
-        unplannedReason === "NO_FORECAST_CAPACITY"
+        effectiveUnplannedReason === "NO_FORECAST_CAPACITY" ||
+        effectiveUnplannedReason === "UNKNOWN_RESOURCE_RETURN"
           ? "NO_FORECAST_CAPACITY"
-          : unplannedReason === "WAITING_FOR_FITTING_LANE"
+          : effectiveUnplannedReason === "WAITING_FOR_FITTING_LANE"
             ? "NO_FITTING_AIRCRAFT"
             : "AVAILABLE";
       const uncertaintyReasons: ForecastUncertaintyReason[] = [
@@ -1649,6 +1852,9 @@ export function calculateForecastTimelines(
         predictedDepartureAt: null,
         predictedLandingAt: null,
         predictedCompletionAt: null,
+        forecastState: "UNAVAILABLE" as const,
+        extendsBeyondOperationsEnd: false,
+        overtimeMinutes: 0,
         predictionLowerMinutes: null,
         predictionUpperMinutes: null,
         predictionQuality:
@@ -1668,7 +1874,7 @@ export function calculateForecastTimelines(
         dispatchCommitmentLevel: null,
         dispatchDecisionReasons: [],
         dispatchProjectedOvertakeCount: 0,
-        dispatchUnplannedReason: unplannedReason,
+        dispatchUnplannedReason: effectiveUnplannedReason,
       };
     }
     const midpointMinutes = (replay.window.lowerMinutes + replay.window.upperMinutes) / 2;
@@ -1686,6 +1892,22 @@ export function calculateForecastTimelines(
       predictedLandingAt,
       replay.deboardingMinutes + replay.bufferMinutes,
     );
+    const operationsEnd = operationsEndAssessment(
+      predictedCompletionAt,
+      input.event.plannedOperationsEndAt,
+    );
+    const hardUnavailable =
+      input.event.emergencyMode ||
+      input.event.operationalInterrupted ||
+      rotation.resourceGroupStatus === "INTERRUPTED" ||
+      rotation.resourceGroupStatus === "ENDED";
+    const forecastState: ForecastState = hardUnavailable
+      ? "UNAVAILABLE"
+      : operationsEnd.extendsBeyondOperationsEnd
+        ? "AFTER_OPERATIONS_END"
+        : batch
+          ? "DISPATCH_WINDOW"
+          : "LONG_RANGE_WINDOW";
     const referenceDurationMinutes = deriveReferenceRotationBreakdown({
       boardingMinutes: replay.boardingMinutes,
       offBlockToOnBlockMinutes: rotation.referenceDurationMinutes,
@@ -1698,6 +1920,8 @@ export function calculateForecastTimelines(
       predictedDepartureAt,
       predictedLandingAt,
       predictedCompletionAt,
+      forecastState,
+      ...operationsEnd,
       predictionQuality: replay.window.quality,
       predictionLowerMinutes: replay.window.lowerMinutes,
       predictionUpperMinutes: replay.window.upperMinutes,
@@ -1718,17 +1942,17 @@ export function calculateForecastTimelines(
       ),
       dispatchPlanId: dispatchPlan.planId,
       dispatchPlanRevision: dispatchPlan.revision,
-      dispatchBatchId: batch.id,
-      dispatchOrder: batch.dispatchOrder,
-      dispatchWave: batch.wave,
-      dispatchLaneId: batch.laneId,
-      dispatchGroupIds: batch.groupIds,
-      dispatchOccupiedSeats: batch.occupiedSeats,
-      dispatchAvailableSeats: batch.availableSeats,
-      dispatchCommitmentLevel: batch.commitmentLevel,
-      dispatchDecisionReasons: batch.decisionReasons,
+      dispatchBatchId: batch?.id ?? null,
+      dispatchOrder: batch?.dispatchOrder ?? null,
+      dispatchWave: batch?.wave ?? null,
+      dispatchLaneId: batch?.laneId ?? null,
+      dispatchGroupIds: batch?.groupIds ?? [],
+      dispatchOccupiedSeats: batch?.occupiedSeats ?? null,
+      dispatchAvailableSeats: batch?.availableSeats ?? null,
+      dispatchCommitmentLevel: batch?.commitmentLevel ?? null,
+      dispatchDecisionReasons: batch?.decisionReasons ?? [],
       dispatchProjectedOvertakeCount: decision?.projectedOvertakeCount ?? 0,
-      dispatchUnplannedReason: null,
+      dispatchUnplannedReason: batch ? null : unplannedReason,
     };
   });
 }
