@@ -21,6 +21,7 @@ process.on("exit", () =>
 const eventId = "demo-2026";
 const gateId = "demo-2026-gate-main";
 const adminPin = "0000";
+const commandOutputBufferBytes = 16 * 1024 * 1024;
 const actors = {
   admin: { id: "technical-scaffold", token: "demo-admin-device-token" },
   cashier: { id: "cashier-tablet-1", token: "demo-cashier-device-token" },
@@ -31,18 +32,22 @@ const localD1Arguments = ["--local", "--persist-to", persistArgument, "--config"
 const migrate = spawnSync(
   process.execPath,
   [wranglerCli, "d1", "migrations", "apply", "DB", ...localD1Arguments],
-  { cwd: root, encoding: "utf8" },
+  { cwd: root, encoding: "utf8", maxBuffer: commandOutputBufferBytes },
 );
 if (migrate.status !== 0) {
-  throw new Error(`Nachruf-Testdatenbank konnte nicht migriert werden: ${migrate.stderr}`);
+  throw new Error(
+    `Recall test database migration failed: ${migrate.error?.message ?? migrate.stderr ?? migrate.stdout}`,
+  );
 }
 const seed = spawnSync(
   process.execPath,
   [wranglerCli, "d1", "execute", "DB", "--file", "apps/worker/seed/demo.sql", ...localD1Arguments],
-  { cwd: root, encoding: "utf8" },
+  { cwd: root, encoding: "utf8", maxBuffer: commandOutputBufferBytes },
 );
 if (seed.status !== 0) {
-  throw new Error(`Nachruf-Testdatenbank konnte nicht befüllt werden: ${seed.stderr}`);
+  throw new Error(
+    `Recall test database seeding failed: ${seed.error?.message ?? seed.stderr ?? seed.stdout}`,
+  );
 }
 
 const server = spawn(
