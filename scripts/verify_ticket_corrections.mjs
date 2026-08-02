@@ -1,21 +1,40 @@
 import { spawn, spawnSync } from "node:child_process";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
-import { dirname, resolve } from "node:path";
+import { mkdtempSync } from "node:fs";
+import { rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const npmCli = process.env.npm_execpath;
-if (!npmCli) throw new Error("npm-Ausführungspfad fehlt.");
-const reset = spawnSync(process.execPath, [npmCli, "run", "db:reset:local"], {
-  cwd: root,
-  stdio: "ignore",
-});
-if (reset.status !== 0) throw new Error("Lokale Testdatenbank konnte nicht initialisiert werden.");
+const wranglerCli = resolve(root, "node_modules", "wrangler", "bin", "wrangler.js");
+const stateDirectory = mkdtempSync(join(tmpdir(), "rundflug-ticket-corrections-"));
+const port = 10_000 + (process.pid % 50_000);
+const initializeD1 = (args) =>
+  spawnSync(
+    process.execPath,
+    [
+      wranglerCli,
+      "d1",
+      ...args,
+      "--local",
+      "--persist-to",
+      stateDirectory,
+      "--config",
+      "wrangler.jsonc",
+    ],
+    { cwd: root, stdio: "ignore" },
+  );
+const migrate = initializeD1(["migrations", "apply", "DB"]);
+const seed = initializeD1(["execute", "DB", "--file", "apps/worker/seed/demo.sql"]);
+if (migrate.status !== 0 || seed.status !== 0) {
+  throw new Error("Isolierte lokale Testdatenbank konnte nicht initialisiert werden.");
+}
 const pin = String.fromCharCode(48).repeat(4);
 const server = spawn(
   process.execPath,
   [
-    resolve(root, "node_modules", "wrangler", "bin", "wrangler.js"),
+    wranglerCli,
     "dev",
     "--config",
     "wrangler.jsonc",
@@ -25,10 +44,14 @@ const server = spawn(
     "DATA_JURISDICTION:eu",
     "--var",
     `ADMIN_PIN_HASH:${createHash("sha256").update(pin).digest("hex")}`,
+    "--persist-to",
+    stateDirectory,
+    "--port",
+    String(port),
   ],
   { cwd: root, stdio: "ignore", windowsHide: true },
 );
-const base = "http://127.0.0.1:8787";
+const base = `http://127.0.0.1:${port}`;
 const devices = {
   admin: "technical-scaffold",
   cashier: "cashier-tablet-1",
@@ -372,4 +395,10 @@ try {
   } else {
     server.kill();
   }
+  await rm(stateDirectory, {
+    force: true,
+    maxRetries: 5,
+    recursive: true,
+    retryDelay: 100,
+  });
 }
