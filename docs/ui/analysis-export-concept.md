@@ -1,6 +1,6 @@
 # UI-Konzept: Analyse und Diagnose
 
-Status: Entwurf zur ausdrücklichen Freigabe gemäß OQ-19
+Status: Durch Auftraggeber am 02.08.2026 freigegeben
 
 Stand: 02.08.2026
 
@@ -353,4 +353,4 @@ Vor Freigabe von WP2 beziehungsweise WP3 wird im Browser gegen dieses Konzept ge
 - [ ] Desktop-/Tablet-/Light-/Dark-Viewports freigegeben
 - [ ] Löschhinweis und Support-sicher-Copy freigegeben
 
-Die Freigabe wird durch Aktualisierung von OQ-19 und dieses Statuskopfs dokumentiert.
+Die Freigabe ist durch OQ-19 und diesen Statuskopf dokumentiert.

@@ -1,6 +1,6 @@
 # ADR-0034: Support-sichere Analyseexporte und deterministischer Replay
 
-- Status: Vorgeschlagen – Freigabe gemäß OQ-17 und OQ-19 ausstehend
+- Status: Akzeptiert – Hybridmodell durch Auftraggeber am 2026-08-02 freigegeben
 - Datum: 2026-08-02
 - Betroffene Anforderungen: V1120-DIA-010, V1120-DIA-020, V1120-DIA-030,
   V1120-EXP-010, V1120-RPL-010, V1120-AUD-010, V1120-SEC-010, V1120-OPS-010,
@@ -69,38 +69,43 @@ Ereignistyp exportiert ausschließlich sichere technische Metadaten und
 `redactedUnknownPayload: true`. Ein späteres Profil `INTERNAL_FULL` benötigt neue Requirements,
 eine neue Datenschutzfreigabe und eine eigene Architekturentscheidung.
 
-### 3. Exakte Planungsläufe in D1
+### 3. Hybride Planungsläufe in D1
 
-Jede erfolgreiche relevante Forecast-Neuberechnung erzeugt einen unveränderlichen
-`planning_run`. Der Lauf referenziert inhaltsadressierte, je Veranstaltung und Payloadart
-deduplizierte Datensätze für:
+Jede erfolgreiche relevante Forecast-Neuberechnung erzeugt einen kleinen unveränderlichen
+`planning_run`. Ein Lauf referenziert einen wiederverwendbaren `planning_context`, seinen
+Vorgängerlauf, `calculation_now`, Trigger, Capture-Modus, Source-Revision, Dispatch-Revision,
+Ergebnisdigests und Laufzeit. Die Capture-Modi sind `REFERENCE`, `CHANGE` und `ANCHOR`.
 
-- `FORECAST_INPUT_CONTEXT`,
-- `DISPATCH_INPUT_CONTEXT`,
-- `DISPATCH_OUTPUT`,
-- `PRECALL_INPUT_CONTEXT`,
-- `PRECALL_OUTPUT`.
+Ein unveränderter 30-Sekunden-Tick mit derselben Veranstaltungsversion verwendet den bestehenden
+Kontext ohne erneute Chunk-Serialisierung oder Hashbildung. Vollständige Anker entstehen bei jedem
+fachlichen Nicht-Timer-Ereignis, spätestens fünf Minuten nach dem letzten Anker, bei geänderter
+Dispatch-Revision oder Voraufrufentscheidung, bei qualitativen Forecaständerungen, bei manueller
+Diagnose, Berechnungsfehler oder geänderter Source-Revision. Unbekannte neue Trigger ankern
+vorsichtshalber. Zwischen zwei Ankern liegen höchstens zehn Referenzläufe.
 
-Objektschlüssel werden rekursiv sortiert, fachlich relevante Arrayreihenfolgen bleiben erhalten,
-nicht endliche Zahlen werden abgelehnt und die kanonische UTF-8-JSON-Darstellung wird mit SHA-256
-adressiert. `calculation_now` gehört an den Lauf und nicht in den deduplizierten Forecast-Kontext.
-Beim Replay wird dieser Wert wieder als explizites `event.now` eingesetzt.
+Planungseingaben werden nicht als monolithisches JSON gespeichert. `planning_chunks` trennt
+Eventkonfiguration, Rotationen und Queue, Kapazitäten, Dauerstichproben, operative Einschränkungen
+und vorherigen Dispatch-Zustand. Große Mengen werden deterministisch nach Art, Ressourcengruppe und
+stabilem ID-Bucket mit höchstens 50 Einträgen partitioniert. `planning_contexts` speichert nur ein
+kleines Manifest der Chunk-IDs. Gleiche Chunks werden je Veranstaltung, Art, Schemaversion und
+SHA-256-Hash wiederverwendet.
 
-`forecast_snapshots` referenziert den Lauf und enthält auch Planzeiten, Forecaststatus,
-Betriebsendeüberschreitung, Kapazitätsstatus und Unsicherheitsgründe. Ein zusätzliches vollständiges
-Forecast-Ausgabe-JSON wird wegen seines Volumens nicht gespeichert. Die Snapshot-Zeilen desselben
-Laufs bilden zusammen die persistierte Forecast-Ausgabe.
+`calculation_now` und abgeleitete Prognosewerte erscheinen in keinem Eingangschunk. Der Zeitpunkt
+steht ausschließlich am Lauf; abgeleiteter Vorzustand wird über `previous_run_id` beziehungsweise
+einen Ankerzustand aufgelöst. Dispatch- und Voraufrufergebnisse werden bei Änderung oder Anker
+vollständig gespeichert, Referenzläufe enthalten Revision beziehungsweise Digest. Die vorhandenen
+30-Sekunden-`forecast_snapshots` bleiben unverändert häufig, referenzieren den Lauf und bilden die
+vollständige numerische Forecast-Ausgabe.
 
-Inhaltsadressierte Payloads dürfen vorab idempotent mit deterministischen IDs angelegt werden. Der
-erfolgreiche `planning_run`, Rotation-Projektionen und Forecast-Snapshots werden anschließend in
-derselben fachlich konsistenten D1-Batch-/Transaktionsgrenze gespeichert. Ein Lauf darf niemals als
-`SUCCEEDED` erscheinen, wenn die Projektion nicht vollständig persistiert wurde. Verwaiste
-Payloads nach einem Fehler sind zulässig und werden mit der Veranstaltung gelöscht. Fehlerläufe
-enthalten nur einen normierten technischen Fehlercode, keine rohe Fehlermeldung.
+Neue Chunks und Kontexte dürfen vorab idempotent angelegt werden. Der erfolgreiche Lauf,
+Rotation-Projektionen und Forecast-Snapshots werden anschließend in derselben fachlich konsistenten
+D1-Batch-/Transaktionsgrenze gespeichert. Ein Lauf darf niemals als erfolgreich erscheinen, wenn
+die Projektion unvollständig ist. Fehlerdaten enthalten nur normierte technische Codes.
 
 Die bestehende Domainfunktion bleibt als kompatibler Projektionen-Wrapper erhalten. Eine neue reine
-Ergebnisfunktion liefert Projektionen sowie Dispatch- und Voraufrufdiagnostik. Produktion und
-Simulator verwenden dieselbe Ergebnisfunktion; es gibt keine zweite Diagnoseberechnung.
+Ergebnisfunktion trennt Basiszustand, vorherigen Forecastzustand und `calculationNow` und liefert
+Projektionen sowie Dispatch- und Voraufrufdiagnostik. Produktion und Simulator verwenden dieselbe
+Ergebnisfunktion; es gibt keine zweite Diagnoseberechnung.
 
 ### 4. Konsistenzmodell der Momentaufnahme
 
@@ -173,7 +178,7 @@ stellt in der R2-Workers-API `createMultipartUpload`, `uploadPart`, `complete` u
 Schlägt der Spike fehl, stoppt WP3. Es wird weder synchron gepuffert noch eigenmächtig eine zweite
 Bibliothek eingeführt; ADR und Containerentscheidung müssen dann erneut freigegeben werden.
 
-Manifest, Pflichtdateien, ZIP-CRC und die SHA-256-Hashes kanonischer Planungspayloads bilden den
+Manifest, Pflichtdateien, ZIP-CRC und die SHA-256-Hashes kanonischer Planungschunks bilden den
 verbindlichen Offline-Integritätsnachweis. Ein Hash über das gesamte ZIP wird nur ergänzt, wenn der
 Spike eine inkrementelle Berechnung ohne Ganzarchivpufferung belegt. Ein R2-ETag wird als externe
 Objektmetadateninformation behandelt und nicht als allgemeiner kryptografischer Dateihash
@@ -191,7 +196,7 @@ D1-Status auf `EXPIRED` und ergänzt das append-only Analyseereignis. Manuelle L
 Objekte unter dem eventbezogenen Analysepräfix vor den D1-Zeilen in gültiger
 Fremdschlüsselreihenfolge. Der Werksreset berücksichtigt Analyseobjekte und neue Tabellen.
 
-Planungspayloads, Planungsläufe, Archivmetadaten und Analyseereignisse werden in den portablen
+Planungschunks, Planungskontexte, Planungsläufe, Archivmetadaten und Analyseereignisse werden in den portablen
 D1-Backupregister aufgenommen. Die großen R2-Tagesdateien werden nicht in das portable D1-JSON
 eingebettet. Eine R2-Lifecycle-Regel darf höchstens als länger laufendes betriebliches Sicherheitsnetz
 dienen; die auditierte Anwendungslöschung bleibt führend, weil ein verzögerter Provider-Lifecycle
@@ -247,19 +252,25 @@ dienstzeitrechtliche oder luftrechtliche Aussage.
 
 ## Folgen und Umsetzungsreihenfolge
 
-Die zusätzliche Planungserfassung erhöht D1-Schreibvolumen und CPU-Zeit. WP1 muss deshalb
-Capture-Overhead, Deduplizierungsquote und Tagesvolumen im V1-Mengengerüst messen, bevor Stufe 1
-freigegeben wird. Stufe 2 darf die operative Schließung nicht verlängern und benötigt getrennte
-Laufzeit-, Speicher-, D1- und R2-Nachweise.
+Die hybride Planungserfassung muss im 12-Stunden-/300-Umlauf-Fall einschließlich Indizes höchstens
+50 MB zusätzliche D1-Daten erzeugen. Ihre zusätzliche CPU-Zeit darf im p95 weder 50 ms noch zehn
+Prozent des Forecast-Laufs überschreiten. Unveränderte Timer-Ticks müssen den Kontext vollständig
+wiederverwenden. Eine Budgetüberschreitung stoppt WP1 vor Merge; Grenzwerte werden nicht
+nachträglich aufgeweicht. Stufe 2 darf die operative Schließung nicht verlängern und benötigt
+getrennte Laufzeit-, Speicher-, D1- und R2-Nachweise.
 
-Die Umsetzung erfolgt sequenziell in WP1 bis WP4. Diese ADR wird erst nach der fachlichen,
-datenschutzbezogenen und visuellen Freigabe aus OQ-17 und OQ-19 auf `Akzeptiert` gesetzt. Vorher
-entsteht kein produktiver TypeScript-, SQL- oder UI-Code.
+Die Umsetzung erfolgt sequenziell in WP1 bis WP4. OQ-17 und OQ-19 wurden am 2026-08-02 durch den
+Auftraggeber freigegeben; die ADR ist damit akzeptiert. Produktionsgates einschließlich OQ-18
+bleiben bestehen.
 
 ## Verworfene Alternativen
 
 - **Nur vorhandene Rotation-/Snapshot-Felder exportieren:** trennt Worker-Aufbereitung und
   Domainberechnung nicht und ermöglicht keinen vollständigen Replay.
+- **Fünf monolithische Payloads je Forecast-Lauf:** dupliziert bei kleinen Änderungen große
+  Kontexte und verbraucht trotz Inhaltsadressierung unnötig CPU und D1-Speicher.
+- **Reduzierte Forecast-Snapshot-Frequenz:** schwächt die vorhandene zeitliche Analyse und ist für
+  die Optimierung des zusätzlichen Diagnosebedarfs nicht erforderlich.
 - **Rohe D1-Tabellen exportieren:** verletzt Datenminimierung und koppelt das Format unkontrolliert
   an interne Schemaänderungen.
 - **ZIP bereits in Stufe 1:** fügt unnötige Abhängigkeit und Speicherkomplexität hinzu.
@@ -271,11 +282,11 @@ entsteht kein produktiver TypeScript-, SQL- oder UI-Code.
 
 ## Freigabe- und Nachweisgates
 
-Vor WP1:
+Vor WP1 erfüllt:
 
-- OQ-17 und OQ-19 freigeben,
-- dieses Dokument auf `Akzeptiert` setzen,
-- das UI-Konzept ausdrücklich freigeben.
+- OQ-17 und OQ-19 am 2026-08-02 freigegeben,
+- dieses Dokument auf `Akzeptiert` gesetzt,
+- UI-Konzept ausdrücklich freigegeben.
 
 Vor WP3 zusätzlich:
 

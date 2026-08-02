@@ -88,7 +88,7 @@ HTTPS/WSS außerhalb der lokalen Entwicklung.
   Analysezugriffsprotokoll.
 - Diagnose-Momentaufnahmen: keine serverseitige Langzeitkopie. Die lokal heruntergeladene Datei
   unterliegt dem freizugebenden Support- und Löschprozess des Verantwortlichen.
-- Planungsläufe und deduplizierte Planungspayloads: Bestandteil der fachlichen Veranstaltung und
+- Planungsläufe sowie deduplizierte Planungskontexte und -chunks: Bestandteil der fachlichen Veranstaltung und
   der portablen Sicherung; Löschung zusammen mit der Veranstaltung beziehungsweise beim
   Werksreset. Eine davon abweichende fachliche Aufbewahrungsfrist bleibt Teil der allgemeinen
   Historienentscheidung.
