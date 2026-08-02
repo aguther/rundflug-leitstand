@@ -69,6 +69,7 @@ export function FidsSettingsDialog({
   preferences,
   filterOptions,
   filterOptionsLoaded,
+  departedVisibilitySeconds,
   accountCode,
   eventName,
   page,
@@ -82,6 +83,7 @@ export function FidsSettingsDialog({
   preferences: FidsPreferences;
   filterOptions: FidsFilterOptions;
   filterOptionsLoaded: boolean;
+  departedVisibilitySeconds: number;
   accountCode: string;
   eventName: string;
   page: number;
@@ -181,7 +183,7 @@ export function FidsSettingsDialog({
             </div>
             <Stepper
               disabled={saving}
-              label="Sichtbare Gruppen"
+              label="Anzeigeplätze gesamt"
               maximum={20}
               minimum={4}
               onChange={(visibleRows) =>
@@ -197,7 +199,7 @@ export function FidsSettingsDialog({
               <div className="fids-split-settings">
                 <Stepper
                   disabled={saving}
-                  label="Prioritätsplätze"
+                  label="Oben reservierte Plätze"
                   maximum={draft.visibleRows - 1}
                   minimum={1}
                   onChange={(priorityGroupCount) =>
@@ -207,7 +209,7 @@ export function FidsSettingsDialog({
                 />
                 <Stepper
                   disabled={saving}
-                  label="Wechselintervall (Sek.)"
+                  label="Seitenwechsel unten"
                   maximum={60}
                   minimum={5}
                   onChange={(rotationIntervalSeconds) =>
@@ -215,6 +217,24 @@ export function FidsSettingsDialog({
                   }
                   value={draft.rotationIntervalSeconds}
                 />
+                <div className="fids-split-guidance">
+                  <strong>
+                    Oben: {draft.priorityGroupCount} reservierte Plätze · unten:{" "}
+                    {draft.visibleRows - draft.priorityGroupCount} Plätze je Seite
+                  </strong>
+                  <p>
+                    BOARDING und BITTE ZUM GATE stehen zuerst oben. Kürzlich abgeflogene Gruppen
+                    folgen für die veranstaltungsweit konfigurierte Dauer. BEREITHALTEN füllt danach
+                    freie reservierte Plätze. Handlungsrelevante und kürzlich abgeflogene Gruppen
+                    können den oberen Bereich vorübergehend erweitern; nur die übrigen Gruppen
+                    rotieren unten.
+                  </p>
+                  <p>
+                    Abgeflogene Gruppen bleiben {departedVisibilitySeconds} Sek. oben sichtbar.
+                    <br />
+                    Änderbar unter Administration → Veranstaltungsparameter.
+                  </p>
+                </div>
               </div>
             ) : null}
           </section>

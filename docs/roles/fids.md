@@ -36,8 +36,9 @@ Anmelden → Veranstaltung → Vollbild → Lesbarkeit prüfen → Anzeige beoba
 - Ein FIDS-Konto öffnet ausschließlich die Anzeige; Einstellungen sind kontogebunden.
 - Mehrere Geräte desselben Kontos teilen Einstellungen und Filter. Unterschiedliche Seiten werden
   über `page` in der URL eingerichtet; unterschiedliche Filter benötigen getrennte FIDS-Konten.
-- `FIXED_PAGE` bleibt auf der URL-Seite. In `SPLIT` bleibt der dringende obere Bereich stehen und nur
-  der untere Bereich wechselt.
+- `FIXED_PAGE` bleibt auf der URL-Seite. In `SPLIT` enthält der obere Bereich zuerst `BOARDING` und
+  `BITTE ZUM GATE`, danach kürzlich abgeflogene Gruppen innerhalb der Nachlaufzeit und anschließend
+  `BEREITHALTEN`. Nur der disjunkte untere Bereich wechselt; dessen Überschrift zeigt die Unterseite.
 - Die Nachrufglocke pulsiert nur als Zusatzhinweis und ersetzt keinen normalen Status.
 
 ## Setup eines Monitors
@@ -50,3 +51,8 @@ Anmelden → Veranstaltung → Vollbild → Lesbarkeit prüfen → Anzeige beoba
 Der kopierte Link enthält keinen Setupzustand, keine PIN, Sitzung, Filter oder Kontokennung. Ist die
 gewählte feste Seite leer, bleibt ein Leerhinweis sichtbar; im Setup kann direkt zurückgeblättert
 werden.
+
+Im Einstellungsdialog bezeichnet „Anzeigeplätze gesamt“ die gesamte physische Zeilenkapazität und
+„Oben reservierte Plätze“ die Zielgröße des oberen Bereichs. Der Dialog fasst die daraus folgende
+Aufteilung unmittelbar zusammen. Die Nachlaufzeit kürzlich abgeflogener Gruppen ist eine
+Veranstaltungseinstellung und wird deshalb nur erläutert, nicht am Display geändert.

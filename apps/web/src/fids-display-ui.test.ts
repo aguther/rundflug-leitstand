@@ -73,8 +73,9 @@ describe("FIDS V1.7.3 UI", () => {
     expect(displaySource).toContain("index % 2 === 1");
     expect(stylesSource).toContain("@media (min-width: 1280px)");
     expect(stylesSource).toContain('data-fids-layout="double"');
-    expect(stylesSource).toContain("repeat(var(--fids-single-rows)");
-    expect(stylesSource).toContain("repeat(var(--fids-double-rows)");
+    expect(stylesSource).toContain("--fids-section-single-tracks");
+    expect(stylesSource).toContain("--fids-section-double-tracks");
+    expect(stylesSource).toContain("--fids-shared-row-height");
     expect(stylesSource).toContain(
       '.standard-fids[data-fids-mode="simulation"][data-fids-layout="double"]',
     );
@@ -82,12 +83,17 @@ describe("FIDS V1.7.3 UI", () => {
     expect(stylesSource).toContain("white-space: nowrap");
   });
 
-  it("omits the redundant clock suffix from FIDS time windows", () => {
-    expect(displaySource).toContain("includeClockSuffix: false");
+  it("uses compact non-wrapping FIDS time windows and concise fallback copy", () => {
+    expect(displaySource).toContain('variant: "compact"');
+    expect(displaySource).toContain('.replace(" – ", "–")');
     expect(displaySource).not.toContain("maximumWidthMinutes");
-    expect(displaySource).toContain("Voraussichtlich heute nicht mehr");
-    expect(displaySource).toContain("Rückkehrzeit offen");
+    expect(displaySource).toContain("Heute nicht mehr");
+    expect(displaySource).toContain("Rückkehr offen");
+    expect(displaySource).toContain("Statusklärung");
+    expect(displaySource).toContain("Aktualisierung");
     expect(displaySource).toContain("Keine passende Kapazität");
+    expect(stylesSource).toMatch(/\.fids-window \{[\s\S]*?white-space: nowrap;/);
+    expect(stylesSource).toMatch(/\.fids-window \{[\s\S]*?font-variant-numeric: tabular-nums;/);
   });
 
   it("keeps the settings dialog open until a confirmed save and exposes only approved choices", () => {
@@ -99,7 +105,9 @@ describe("FIDS V1.7.3 UI", () => {
       saveHandler.indexOf("onClose();"),
     );
     for (const copy of [
-      "Sichtbare Gruppen",
+      "Anzeigeplätze gesamt",
+      "Oben reservierte Plätze",
+      "Seitenwechsel unten",
       "Feste Seite",
       "Geteilte Ansicht",
       "Eine Spalte",
@@ -118,6 +126,8 @@ describe("FIDS V1.7.3 UI", () => {
     expect(settingsSource).not.toContain("useState<EditableFidsPreferences>(preferences)");
     expect(settingsSource).toContain("setError(null)");
     expect(settingsSource).toContain("fids-settings-scroll");
+    expect(settingsSource).toContain("Abgeflogene Gruppen bleiben");
+    expect(settingsSource).toContain("Administration → Veranstaltungsparameter");
   });
 
   it("binds the shell to 100dvh without document or table scrolling", () => {

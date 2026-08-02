@@ -9,10 +9,11 @@ V173-API-010, V173-DAT-010, V173-OPS-010, V173-QA-010
 | Ebene | Nachweis |
 | --- | --- |
 | Vertrag | Defaults, strikte Felder, Filtergrenzen und `priorityGroupCount < visibleRows` |
-| Domain | feste Seitengrenzen, disjunkte Split-Partition, dringende Erweiterung und Überlauf |
-| Worker | Rollen, Migration, erwartete Version, Idempotenz, Audit/Outbox und Public-Kompatibilität |
-| React-Controller | URL-Seite, untere Rotation, stabile Priorität, Timerabbau und letzter Offline-Stand |
-| Simulation | identische Experience und vollständige synthetische Projektion ohne Live-Schreibpfad |
+| Domain | reine Kapazitätsplanung, Actionable vor Recent departure vor PREPARE, disjunkte untere Seiten und relevanter Überlauf |
+| Worker | explizite Actionable-/Recent-/Lower-Bänder, reale D1-Runtime-Projektion, Rollen und Public-Kompatibilität |
+| React-Controller | URL-Seite, untere Rotation, Einmal-Ablauftimer, Schleifenfreiheit, ungültige Unterseite und letzter Offline-Stand |
+| Simulation | derselbe Kapazitätsplan, dieselbe Reihenfolge und identische Seitenmetadaten ohne Live-Schreibpfad |
+| Darstellung | Bereichs-Leerzustände, feste Slotanzahl, Seitentext, kompakte Zeitfenster, Langtext und zugängliche Ellipsen |
 
 ## Endpunkt- und Datenbankabnahme
 
@@ -27,7 +28,10 @@ Mit ausschließlich synthetischen Daten werden geprüft:
    Antwortzeit werden gegen den synthetischen Großbestand geprüft.
 5. Feste Seiten enthalten höchstens `visibleRows` und stabile `rowId`-Werte. Split-Ober- und
    Unterbereich besitzen keine Schnittmenge.
-6. Die anonyme Board-Antwort bleibt am bestehenden Schema parsebar und enthält weder `rowId`,
+6. Die reale Workers-Runtime-D1-Projektion ordnet `CALLED` vor zwei noch sichtbaren Abflugzeilen und
+   `PREPARE`; dieselben Abflugzeilen fehlen vollständig in `LOWER`, eine abgelaufene Abflugzeile fehlt
+   in beiden Bereichen.
+7. Die anonyme Board-Antwort bleibt am bestehenden Schema parsebar und enthält weder `rowId`,
    `productId`, `gateId` noch Konto- oder Filterdaten.
 
 Der am 2. August 2026 gegen die lokale synthetische D1-Datenbank ausgeführte
@@ -58,40 +62,67 @@ repository-weite Skalierungsbasis und ersetzt ebenfalls keine Produktionsmessung
 
 ## Visuelle Abnahme
 
-Die Browserprüfung erfolgt für Live-FIDS und Simulation. Geprüft werden:
+Die Browserprüfung wurde für Live-FIDS und Simulation durchgeführt. Geprüft wurden:
 
 - `FIXED_PAGE` und `SPLIT`, jeweils Light und Dark;
-- 1920×1080, 1440×900, 800×600 und 640×600;
-- Setup-Leiste, Einstellungsdialog, leere Seite und dringender Überlauf;
+- 1920×1080, 1440×900, 1280×720, 1024×768, 800×600, 640×600 und zusätzlich 640×900;
+- Setup-Leiste, Einstellungsdialog, leere Seite, ein Ergebnis, volle acht Plätze und relevanter
+  Überlauf;
 - ein- und zweispaltiges Layout einschließlich kontrolliertem Rückfall unter 1280 Pixel;
 - kein horizontaler Dokument-, Dialog- oder Tabellenscroll und genau ein Dialog-Scrollbereich;
-- stabile Kopf-, Tabellen- und Footerpositionen bei Realtime-, Pending-, Filter- und Offlinewechseln;
+- stabile Kopf-, Tabellen- und Footerpositionen bei Status-, Seiten-, Filter- und Offlinewechseln;
 - sichtbares Simulationsbanner bei ansonsten identischer Darstellung.
 
 Die freigegebenen Referenzen liegen als lokale Konzeptartefakte im auftragsbezogenen
 Visualisierungsverzeichnis. Browser-Screenshots werden dort getrennt als Implementierungsnachweis
 abgelegt; sie sind keine Produktivdaten und enthalten nur synthetische Testwerte.
 
-Die geometrische Live-Browserprüfung wurde in sämtlichen geforderten Viewports durchgeführt:
+Die geometrische Simulatorprüfung wurde in sämtlichen geforderten Viewports durchgeführt:
 
 | Viewport | Dokumentüberlauf | Layout bei gespeicherter Zweispaltenwahl | Footer/Settings |
 | --- | --- | --- | --- |
 | 1920×1080 | keiner | zwei Spalten | vollständig im Viewport |
-| 1600×900 | keiner | zwei Spalten | vollständig im Viewport |
-| 1366×768 | keiner | zwei Spalten | vollständig im Viewport |
+| 1440×900 | keiner | zwei Spalten | vollständig im Viewport |
 | 1280×720 | keiner | zwei Spalten | vollständig im Viewport |
 | 1024×768 | keiner | kontrollierter Rückfall auf eine Spalte | vollständig im Viewport |
-| 900×700 | keiner | kontrollierter Rückfall auf eine Spalte | vollständig im Viewport |
 | 800×600 | keiner | kontrollierter Rückfall auf eine Spalte | vollständig im Viewport |
 | 640×600 | keiner | kontrollierter Rückfall auf eine Spalte | vollständig im Viewport |
+| 640×900 | keiner | kontrollierter Rückfall auf eine Spalte | vollständig im Viewport |
 
-Bei 640×600 maß der Einstellungsdialog 478 Pixel Höhe. Kopf und 119 Pixel hohe Aktionsfläche
-blieben fest; ausschließlich der 359 Pixel hohe Inhaltsbereich scrollte. Feste Seite, unbelegte
-Seite, Setup, Split-Rotation, Light/Dark und der Zweispaltenrückfall wurden einzeln geprüft. Im
-lokalen Simulator öffnete die gleich-originige Route `/simulation/fids` ohne Vorbereitungsfehler;
-der gemeinsame React-Pfad, das Banner und die vollständige Simulationsprojektion sind zusätzlich
-durch die gezielten UI- und Datenquellentests abgedeckt. Das native Popup wurde vom In-App-
-Browser-Testtreiber nicht als separat aufnehmbarer Tab exponiert.
+Die größte gemessene Differenz regulärer oder leer reservierter Zeilen betrug in der Simulation
+0,016 CSS-Pixel bei 1920×1080 und 1440×900, ansonsten 0 Pixel. In der Live-Darstellung betrug sie bei
+1440×900 und 640×900 jeweils 0 Pixel. Alle Status- und Zeitfensterzellen blieben einzeilig; lange
+Gruppen-, Produkt- und Gatewerte wurden mit Ellipse gekürzt und behielten `title` sowie ihren
+vollständigen zugänglichen Textinhalt. Die Seitenpräfixe waren breit als „SEITE 2 / 4“ und schmal als
+„2 / 4“ sichtbar.
+
+Bei 640×600 besaß der Einstellungsdialog keinen horizontalen Überlauf und genau einen scrollbaren
+Inhaltsbereich. Kopf und Aktionen blieben im Viewport; die rein informativen Split-Hinweise erzeugten
+keinen Tabstopp. Beide Split-Leerzustände lagen vollständig in ihrem Tabellenkörper, während
+Abschnitts- und Spaltenköpfe sichtbar blieben. Die leere feste Seite belegte nach der Korrektur alle
+acht physischen Zeilenspuren.
+
+Der Simulator zeigte `BOARDING` beziehungsweise `BITTE ZUM GATE` vor drei kürzlich abgeflogenen
+Zeilen; nach der beschleunigten Nachlaufzeit verschwanden diese Zeilen. Die untere Seite wechselte
+von 1/2 auf 2/2, ohne die obere Ergebnismenge zu ändern. Live lieferte der geschützte Endpoint die
+Statusfolge `BOARDING`, `COME_TO_FLIGHT_LINE`, `IN_FLIGHT`, `LANDED`, `COMPLETED`; die untere Seite
+enthielt nur `WAITING` beziehungsweise `SERVICE_PAUSED`. Der obere Bereich erweiterte sich von drei
+reservierten auf fünf belegte Plätze. Der aktive Nachruf, exakt ein gefiltertes Ergebnis sowie die
+leere feste Seite wurden im Browser geprüft.
+
+Für den Live-Ablauf wurde der isolierte lokale Worker kontrolliert unterbrochen. Der letzte bestätigte
+Boardstand blieb sichtbar. Nach einer synthetischen Änderung und dem Neustart wurde der Wechsel einer
+Zeile zu `BOARDING` hervorgehoben; separat erschien eine zuvor als `BOARDING` sichtbare Zeile als
+`ABGEFLOGEN` und verschwand nach Ablauf der 30-sekündigen Veranstaltungseinstellung. Parallel sank
+die Unterseitenzahl von 5 auf 1, während Seite 3 aktiv war; der Controller wechselte ohne sichtbaren
+Leerzustand direkt auf 1/1. Der lokale Neustart-Harness erzeugte erwartete 403-Meldungen bei
+WebSocket-Neuanmeldungen; der vorgesehene 15-Sekunden-Polling-Fallback stellte die Aktualisierung her.
+Andere Konsolen-, Seiten- oder unerwartete Ressourcenfehler traten nicht auf.
+
+Screenshots und JSON-Messberichte liegen ausschließlich im auftragsbezogenen lokalen
+Visualisierungsverzeichnis und werden nicht committed. Das native Simulations-Popup wurde vom
+In-App-Browser-Testtreiber nicht als eigener Tab exponiert; deshalb erfolgte die vollständige
+Messung mit lokalem Playwright und installiertem Edge gegen dieselbe laufende Anwendung.
 
 ## Datenschutzkontrolle
 

@@ -65,15 +65,28 @@ seinen bestehenden Vertrag unverändert.
 `FIXED_PAGE` zeigt ausschließlich die per URL bestimmte Seite. `SPLIT` partitioniert nach der
 maßgeblichen Backend-Reihenfolge:
 
-1. `BOARDING` und `COME_TO_FLIGHT_LINE` stehen im reservierten oberen Bereich;
-2. `PREPARE` füllt freie Prioritätsplätze;
-3. dringende Gruppen dürfen den oberen Bereich bis zur gesamten Zeilenkapazität erweitern;
-4. nicht sichtbarer Dringlichkeitsüberlauf wird als Anzahl ausgewiesen;
-5. nur der disjunkte untere Bereich rotiert im gespeicherten Intervall.
+1. `BOARDING` und `COME_TO_FLIGHT_LINE` stehen in der maßgeblichen Backend-Reihenfolge zuerst;
+2. bereits ausgelieferte `IN_FLIGHT`-, `LANDED`- und `COMPLETED`-Zeilen folgen während der
+   veranstaltungsweit konfigurierten Nachlaufzeit, neueste `departedAt` zuerst;
+3. `PREPARE` füllt danach freie reservierte Prioritätsplätze;
+4. handlungsrelevante und kürzlich abgeflogene Gruppen erweitern den oberen Bereich gemeinsam bis zur
+   gesamten sichtbaren Zeilenkapazität;
+5. `overflowCount` weist ausschließlich nicht sichtbare relevante obere Einträge aus;
+6. nur der disjunkte übrige Bereich rotiert im gespeicherten Intervall.
 
-Eine Zeile kann nie zugleich oben und unten erscheinen. Status- oder Gateänderungen werden nur bei
-einem tatsächlichen Übergang dezent hervorgehoben; stabile `rowId`-Schlüssel verhindern unnötige
-Neumontage. Bei Verbindungsfehlern bleibt der letzte bestätigte Stand sichtbar.
+Der Worker schließt sämtliche handlungsrelevanten und kürzlich abgeflogenen Zeilen sowie die oben
+ausgewählten `PREPARE`-Zeilen kategorisch aus der unteren Abfrage aus. Domain und Simulation verwenden
+denselben reinen Kapazitätsplan. Eine Zeile kann daher nie zugleich oben und unten erscheinen. Der
+Controller plant genau einen Einmal-Timer für den nächsten sichtbaren Ablaufzeitpunkt. Nach Ablauf
+lädt er das Board neu, plant anhand der Serverantwort neu und versucht denselben Ablaufzeitpunkt nicht
+in einer Schleife erneut; das 15-Sekunden-Polling bleibt die Rückfallebene. Bei Verbindungsfehlern
+bleibt der letzte bestätigte Stand sichtbar.
+
+Oberer und unterer Bereich teilen dasselbe physische Zeilenraster. Beide Bereiche haben eigene
+Überschriften, der untere Bereich trägt die Seiteninformation. Reservierte, aber noch unbelegte Plätze
+bleiben als geometrische Leerzeilen erhalten. Bereichsspezifische Leerzustände überdecken weder die
+andere Tabelle noch die Überschrift. Lange Kennungen werden einzeilig gekürzt und per Tooltip
+zugänglich; Zeitfenster verwenden eine kompakte, nicht umbrechende Darstellung.
 
 ### Eine React-Experience für Livebetrieb und Simulation
 
@@ -106,10 +119,11 @@ Sitzungen und FIDS-Präferenzen aus portablen R2-Sicherungen bleibt bestehen.
   erweitern.
 - Filterwechsel gelten absichtlich für alle Geräte desselben Kontos; getrennte Filter erfordern
   getrennte DISPLAY-Konten.
-- Ein Split-Display rotiert nur bei mindestens zwei unteren Seiten. Alle Timer und laufenden Requests
-  werden beim Wechsel oder Unmount beendet.
+- Ein Split-Display rotiert nur bei mindestens zwei unteren Seiten. Ablauf- und Rotationstimer sowie
+  laufende Requests werden beim Wechsel oder Unmount beendet. Eine durch Zustandsänderung ungültige
+  Unterseite lädt zunächst Seite 1, ohne den letzten bestätigten Stand zwischenzeitlich zu leeren.
 - `DOUBLE` bleibt gespeichert, fällt unter 1280 CSS-Pixel aber kontrolliert auf eine Spalte zurück.
 - Contract-, Domain-, Worker- und DOM-Tests decken Defaults, Constraints, Partitionierung, Paging,
-  Timer, Offline-Stand, URL-Datenschutz, Idempotenz und Konflikte ab.
+  Ablauf-Timer, Schleifenfreiheit, Offline-Stand, URL-Datenschutz, Idempotenz und Konflikte ab.
 - Die visuelle Abnahme vergleicht Live- und Simulationsansicht in Light und Dark bei 1920×1080,
-  1440×900, 800×600 und 640×600 mit dem freigegebenen Konzept.
+  1440×900, 1280×720, 1024×768, 800×600 und 640×600 mit dem freigegebenen Konzept.
