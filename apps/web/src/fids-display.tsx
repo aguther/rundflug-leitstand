@@ -1,10 +1,13 @@
-import type { FidsPreferences, PublicBoard } from "@rundflug/contracts";
+import type { FidsBoardResponse, FidsBoardRow, FidsPreferences } from "@rundflug/contracts";
 import { formatBookingGroupLabel } from "@rundflug/domain";
 import {
   AlertTriangle,
   Bell,
+  ChevronLeft,
+  ChevronRight,
   CircleArrowRight,
   Clock3,
+  Copy,
   PlaneTakeoff,
   QrCode,
   Settings,
@@ -12,42 +15,19 @@ import {
   Users,
 } from "lucide-react";
 import type { CSSProperties, ReactNode } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
 import { BrandMark } from "./design-system/BrandMark";
 import { useTheme } from "./design-system/theme";
 import { FidsSettingsDialog } from "./features/fids/FidsSettingsDialog";
+import type { FidsDataSource } from "./features/fids/fids-data-source";
+import type { FidsLocationAdapter } from "./features/fids/fids-location";
+import { useFidsExperience } from "./features/fids/useFidsExperience";
 import { formatAbsoluteTimeWindow } from "./time-window";
 
-type PublicGroup = PublicBoard["groups"][number];
-type EditableFidsPreferences = Pick<FidsPreferences, "visibleRows" | "layout" | "theme">;
-
-const DEFAULT_DEPARTED_VISIBILITY_SECONDS = 15;
-
-export interface FidsBoardPresentationProps {
-  board: PublicBoard | null;
-  error: string | null;
-  preferences: FidsPreferences;
-  clock: Date;
-  connectionLabel: string;
-  connectionTone: "connected" | "offline" | "simulation";
-  subtitle?: string;
-  simulationBanner?: string;
-  footerNote?: string;
-  showFooter?: boolean;
-  filterDeparted?: boolean;
-  onOpenSettings?: () => void;
-  children?: ReactNode;
-}
-
-function groupCode(group: PublicGroup): string {
+function groupCode(group: FidsBoardRow): string {
   return formatBookingGroupLabel(group.productCode, group.communicationNumber);
 }
 
-function groupRowKey(group: PublicGroup): string {
-  return JSON.stringify(group);
-}
-
-function statusPresentation(status: PublicGroup["status"]): {
+function statusPresentation(status: FidsBoardRow["status"]): {
   label: string;
   tone: string;
   icon: typeof Clock3;
@@ -56,20 +36,15 @@ function statusPresentation(status: PublicGroup["status"]): {
     return { label: "BITTE ZUM GATE", tone: "gate", icon: CircleArrowRight };
   if (status === "PREPARE") return { label: "BEREITHALTEN", tone: "prepare", icon: Clock3 };
   if (status === "BOARDING") return { label: "BOARDING", tone: "boarding", icon: TicketsPlane };
-  if (status === "IN_FLIGHT") {
-    return { label: "ABGEFLOGEN", tone: "departed", icon: PlaneTakeoff };
-  }
-  if (status === "LANDED") {
-    return { label: "GELANDET", tone: "departed", icon: PlaneTakeoff };
-  }
-  if (status === "COMPLETED") {
+  if (status === "IN_FLIGHT") return { label: "ABGEFLOGEN", tone: "departed", icon: PlaneTakeoff };
+  if (status === "LANDED") return { label: "GELANDET", tone: "departed", icon: PlaneTakeoff };
+  if (status === "COMPLETED")
     return { label: "ABGESCHLOSSEN", tone: "departed", icon: PlaneTakeoff };
-  }
   if (status === "SERVICE_PAUSED") return { label: "VERZÖGERT", tone: "delayed", icon: Clock3 };
   return { label: "WARTEN", tone: "standby", icon: Clock3 };
 }
 
-function timeWindow(group: PublicGroup, timeZone: string): string {
+function timeWindow(group: FidsBoardRow, timeZone: string): string {
   return formatAbsoluteTimeWindow({
     lowerAt: group.boardingWindowLowerAt,
     upperAt: group.boardingWindowUpperAt,
@@ -86,46 +61,7 @@ function timeWindow(group: PublicGroup, timeZone: string): string {
   });
 }
 
-function useVisibleGroups(
-  groups: PublicBoard["groups"],
-  departedVisibilitySeconds: number,
-  visibleRows: number,
-  filterDeparted: boolean,
-): PublicBoard["groups"] {
-  const locallyObservedDeparture = useRef(new Map<string, number>());
-  const [now, setNow] = useState(Date.now());
-
-  useEffect(() => {
-    if (!filterDeparted) return;
-    const timer = window.setInterval(() => setNow(Date.now()), 1_000);
-    return () => window.clearInterval(timer);
-  }, [filterDeparted]);
-
-  return useMemo(() => {
-    if (!filterDeparted) return groups.slice(0, visibleRows);
-    const currentCodes = new Set(groups.map(groupCode));
-    for (const code of locallyObservedDeparture.current.keys()) {
-      if (!currentCodes.has(code)) locallyObservedDeparture.current.delete(code);
-    }
-    return groups
-      .filter((group) => {
-        const code = groupCode(group);
-        if (!["IN_FLIGHT", "LANDED", "COMPLETED"].includes(group.status)) {
-          locallyObservedDeparture.current.delete(code);
-          return true;
-        }
-        const persistedDeparture = group.departedAt ? Date.parse(group.departedAt) : Number.NaN;
-        const firstSeen = Number.isFinite(persistedDeparture)
-          ? persistedDeparture
-          : (locallyObservedDeparture.current.get(code) ?? now);
-        locallyObservedDeparture.current.set(code, firstSeen);
-        return now - firstSeen < departedVisibilitySeconds * 1_000;
-      })
-      .slice(0, visibleRows);
-  }, [departedVisibilitySeconds, filterDeparted, groups, now, visibleRows]);
-}
-
-function Status({ group }: { group: PublicGroup }) {
+function Status({ group }: { group: FidsBoardRow }) {
   const presentation = statusPresentation(group.status);
   const Icon = presentation.icon;
   return (
@@ -151,7 +87,7 @@ function Status({ group }: { group: PublicGroup }) {
   );
 }
 
-function GroupCell({ group }: { group: PublicGroup }) {
+function GroupCell({ group }: { group: FidsBoardRow }) {
   return (
     <div className="fids-group-cell">
       <Users aria-hidden="true" />
@@ -166,10 +102,12 @@ function GroupCell({ group }: { group: PublicGroup }) {
 function FidsTable({
   groups,
   compact,
+  highlightedRows,
   timeZone,
 }: {
-  groups: PublicBoard["groups"];
+  groups: FidsBoardRow[];
   compact: boolean;
+  highlightedRows: ReadonlySet<string>;
   timeZone: string;
 }) {
   return (
@@ -194,8 +132,9 @@ function FidsTable({
         {groups.map((group) => (
           <div
             className="fids-row"
+            data-highlighted={highlightedRows.has(group.rowId) ? "true" : "false"}
             data-recall-active={group.activeRecall ? "true" : "false"}
-            key={groupRowKey(group)}
+            key={group.rowId}
           >
             <GroupCell group={group} />
             {!compact ? <span className="fids-product-cell">{group.productName}</span> : null}
@@ -211,69 +150,130 @@ function FidsTable({
   );
 }
 
+function FidsSection({
+  groups,
+  highlightedRows,
+  label,
+  rows,
+  timeZone,
+}: {
+  groups: FidsBoardRow[];
+  highlightedRows: ReadonlySet<string>;
+  label?: string;
+  rows: number;
+  timeZone: string;
+}) {
+  const leftColumn = groups.filter((_, index) => index % 2 === 0);
+  const rightColumn = groups.filter((_, index) => index % 2 === 1);
+  return (
+    <section
+      className="fids-board-section"
+      style={
+        {
+          "--fids-section-rows": Math.max(1, rows),
+          "--fids-double-rows": Math.max(1, Math.ceil(rows / 2)),
+        } as CSSProperties
+      }
+    >
+      {label ? <h2>{label}</h2> : null}
+      <div className="fids-single-board">
+        <FidsTable
+          compact={false}
+          groups={groups}
+          highlightedRows={highlightedRows}
+          timeZone={timeZone}
+        />
+      </div>
+      <div className="fids-double-board">
+        <FidsTable
+          compact
+          groups={leftColumn}
+          highlightedRows={highlightedRows}
+          timeZone={timeZone}
+        />
+        <FidsTable
+          compact
+          groups={rightColumn}
+          highlightedRows={highlightedRows}
+          timeZone={timeZone}
+        />
+      </div>
+    </section>
+  );
+}
+
+export interface FidsBoardPresentationProps {
+  board: FidsBoardResponse | null;
+  children?: ReactNode;
+  preferences: FidsPreferences;
+  clock: Date;
+  connectionLabel: string;
+  connectionTone: "connected" | "offline" | "simulation";
+  error: string | null;
+  highlightedRows?: ReadonlySet<string>;
+  linkCopied?: boolean;
+  onCopyLink?: () => void;
+  onOpenSettings?: () => void;
+  onSetPage?: (page: number) => void;
+  onStopSetup?: () => void;
+  page?: number;
+  setupMode?: boolean;
+  simulationBanner?: string;
+  subtitle?: string;
+}
+
 export function FidsBoardPresentation({
   board,
-  error,
+  children,
   preferences,
   clock,
   connectionLabel,
   connectionTone,
-  subtitle,
-  simulationBanner,
-  footerNote,
-  showFooter = true,
-  filterDeparted = true,
+  error,
+  highlightedRows = new Set(),
+  linkCopied = false,
+  onCopyLink,
   onOpenSettings,
-  children,
+  onSetPage,
+  onStopSetup,
+  page = 1,
+  setupMode = false,
+  simulationBanner,
+  subtitle,
 }: FidsBoardPresentationProps) {
   const { system: systemTheme } = useTheme();
   const logoTheme =
     preferences.theme === "SYSTEM" ? systemTheme : preferences.theme === "DARK" ? "dark" : "light";
-  const requestedVisibilitySeconds = Number.parseInt(
-    new URLSearchParams(window.location.search).get("departedSeconds") ?? "",
-    10,
-  );
-  const departedVisibilitySeconds = Number.isFinite(requestedVisibilitySeconds)
-    ? Math.min(900, Math.max(5, requestedVisibilitySeconds))
-    : (board?.departedVisibilitySeconds ?? DEFAULT_DEPARTED_VISIBILITY_SECONDS);
-  const currentGroups = (board?.groups ?? []).map((group) =>
-    group.activeRecall && Date.parse(group.activeRecall.expiresAt) <= clock.getTime()
-      ? { ...group, activeRecall: null }
-      : group,
-  );
-  const groups = useVisibleGroups(
-    currentGroups,
-    departedVisibilitySeconds,
-    preferences.visibleRows,
-    filterDeparted,
-  );
-  const leftColumn = groups.filter((_, index) => index % 2 === 0);
-  const rightColumn = groups.filter((_, index) => index % 2 === 1);
+  const timeZone = board?.timeZone ?? "Europe/Berlin";
   const time = new Intl.DateTimeFormat("de-DE", {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
-    timeZone: board?.timeZone ?? "Europe/Berlin",
+    timeZone,
   }).format(clock);
   const date = new Intl.DateTimeFormat("de-DE", {
     day: "2-digit",
     month: "long",
     year: "numeric",
-    timeZone: board?.timeZone ?? "Europe/Berlin",
+    timeZone,
   }).format(clock);
   const style = {
     "--fids-single-rows": preferences.visibleRows,
     "--fids-double-rows": Math.ceil(preferences.visibleRows / 2),
   } as CSSProperties;
-  const eventName = board?.eventName ?? "Veranstaltung";
+  const split = board?.viewMode === "SPLIT";
+  const priorityRows = board?.priority?.effectiveCapacity ?? preferences.priorityGroupCount;
+  const totalGroups = (board?.priority?.groups.length ?? 0) + (board?.page.groups.length ?? 0);
+  const displayedPage = page;
 
   return (
     <main
       className="standard-fids"
       data-fids-layout={preferences.layout.toLowerCase()}
-      data-fids-footer={showFooter ? "visible" : "hidden"}
       data-fids-mode={simulationBanner ? "simulation" : "standard"}
       data-fids-theme={preferences.theme.toLowerCase()}
+      data-fids-view={split ? "split" : "fixed"}
+      data-setup={setupMode ? "true" : "false"}
       data-testid="fids-display"
       style={style}
     >
@@ -288,11 +288,8 @@ export function FidsBoardPresentation({
           <BrandMark theme={logoTheme} />
         </div>
         <div className="fids-title">
-          <h1>{eventName}</h1>
-          <p>
-            {subtitle ??
-              (board?.selectedGate ? `Abflugtafel · ${board.selectedGate.label}` : "Abflugtafel")}
-          </p>
+          <h1>{board?.eventName ?? "Veranstaltung"}</h1>
+          <p>{subtitle ?? "Abflugtafel"}</p>
         </div>
         <div className="standard-clock">
           <b>{time}</b>
@@ -307,97 +304,147 @@ export function FidsBoardPresentation({
         {board?.emergencyMode || board?.operationalInterrupted ? (
           <div className="standard-alert">Der Rundflugbetrieb ist vorübergehend unterbrochen.</div>
         ) : null}
-        <div className="fids-single-board">
-          <FidsTable
-            compact={false}
-            groups={groups}
-            timeZone={board?.timeZone ?? "Europe/Berlin"}
+        {split ? (
+          <div className="fids-split-board">
+            <FidsSection
+              groups={board?.priority?.groups ?? []}
+              highlightedRows={highlightedRows}
+              label="JETZT RELEVANT"
+              rows={priorityRows}
+              timeZone={timeZone}
+            />
+            <FidsSection
+              groups={board?.page.groups ?? []}
+              highlightedRows={highlightedRows}
+              label="WEITERE FLÜGE"
+              rows={board?.page.pageSize ?? Math.max(0, preferences.visibleRows - priorityRows)}
+              timeZone={timeZone}
+            />
+            {(board?.priority?.overflowCount ?? 0) > 0 ? (
+              <p className="fids-priority-overflow" role="status">
+                +{board?.priority?.overflowCount} weitere dringende Gruppen
+              </p>
+            ) : null}
+          </div>
+        ) : (
+          <FidsSection
+            groups={board?.page.groups ?? []}
+            highlightedRows={highlightedRows}
+            rows={preferences.visibleRows}
+            timeZone={timeZone}
           />
-        </div>
-        <div className="fids-double-board">
-          <FidsTable compact groups={leftColumn} timeZone={board?.timeZone ?? "Europe/Berlin"} />
-          <FidsTable compact groups={rightColumn} timeZone={board?.timeZone ?? "Europe/Berlin"} />
-        </div>
-        {groups.length === 0 ? (
-          <div className="standard-empty">{error ?? "Aktuell keine Gruppen auf der Anzeige."}</div>
+        )}
+        {totalGroups === 0 ? (
+          <div className="standard-empty">{error ?? "Aktuell keine Gruppen auf dieser Seite."}</div>
         ) : null}
       </section>
 
-      {showFooter ? (
-        <footer className="fids-footer">
+      <footer className="fids-footer">
+        {setupMode ? (
+          <fieldset className="fids-setup-tray" aria-label="FIDS-Setup">
+            <button
+              aria-label="Vorherige Seite"
+              disabled={displayedPage <= 1}
+              onClick={() => onSetPage?.(Math.max(1, displayedPage - 1))}
+              type="button"
+            >
+              <ChevronLeft aria-hidden="true" />
+            </button>
+            <strong>
+              Seite {displayedPage}
+              {board?.page.totalPages ? ` / ${board.page.totalPages}` : ""}
+            </strong>
+            <button
+              aria-label="Nächste Seite"
+              onClick={() => onSetPage?.(Math.min(999, displayedPage + 1))}
+              type="button"
+            >
+              <ChevronRight aria-hidden="true" />
+            </button>
+            <button onClick={() => void onCopyLink?.()} type="button">
+              <Copy aria-hidden="true" /> {linkCopied ? "Kopiert" : "Link kopieren"}
+            </button>
+            <button onClick={onStopSetup} type="button">
+              Setup beenden
+            </button>
+          </fieldset>
+        ) : (
           <div className="fids-footer-copy">
             <span>
               <QrCode aria-hidden="true" /> Bitte QR-Ticket bereithalten
             </span>
             <i aria-hidden="true" />
             <span>Zeitfenster sind Prognosen</span>
-            {footerNote ? (
-              <>
-                <i aria-hidden="true" />
-                <span>{footerNote}</span>
-              </>
-            ) : null}
+            <i aria-hidden="true" />
+            <span>{split ? `Unterseite ${board?.page.requestedPage ?? 1}` : `Seite ${page}`}</span>
           </div>
-          {onOpenSettings ? (
-            <button
-              aria-label="FIDS-Einstellungen öffnen"
-              className="fids-settings-button"
-              onClick={onOpenSettings}
-              type="button"
-            >
-              <Settings aria-hidden="true" />
-            </button>
-          ) : null}
-        </footer>
-      ) : null}
-
+        )}
+        {onOpenSettings ? (
+          <button
+            aria-label="FIDS-Einstellungen öffnen"
+            className="fids-settings-button"
+            onClick={onOpenSettings}
+            type="button"
+          >
+            <Settings aria-hidden="true" />
+          </button>
+        ) : null}
+      </footer>
       {children}
     </main>
   );
 }
 
 export function FidsDisplay({
-  board,
-  error,
-  preferences,
   accountCode,
-  onSavePreferences,
+  clockOverride,
+  dataSource,
+  locationAdapter,
   onLogout,
+  simulationBanner,
+  subtitle,
 }: {
-  board: PublicBoard | null;
-  error: string | null;
-  preferences: FidsPreferences;
   accountCode: string;
-  onSavePreferences: (next: EditableFidsPreferences) => Promise<void>;
-  onLogout: () => Promise<void>;
+  clockOverride?: Date;
+  dataSource: FidsDataSource;
+  locationAdapter: FidsLocationAdapter;
+  onLogout?: () => Promise<void>;
+  simulationBanner?: string;
+  subtitle?: string;
 }) {
-  const [clock, setClock] = useState(new Date());
-  const [settingsOpen, setSettingsOpen] = useState(false);
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setClock(new Date()), 1_000);
-    return () => window.clearInterval(timer);
-  }, []);
-
-  const connected = Boolean(board) && !error;
+  const fids = useFidsExperience({ dataSource, locationAdapter });
   return (
     <FidsBoardPresentation
-      board={board}
-      clock={clock}
-      connectionLabel={connected ? "VERBUNDEN" : "OFFLINE"}
-      connectionTone={connected ? "connected" : "offline"}
-      error={error}
-      onOpenSettings={() => setSettingsOpen(true)}
-      preferences={preferences}
+      board={fids.board}
+      clock={clockOverride ?? fids.clock}
+      connectionLabel={fids.connection.label}
+      connectionTone={fids.connection.tone}
+      error={fids.error}
+      highlightedRows={fids.highlightedRows}
+      linkCopied={fids.linkCopied}
+      onCopyLink={fids.copyShareableUrl}
+      onOpenSettings={() => fids.setSettingsOpen(true)}
+      onSetPage={fids.setPage}
+      onStopSetup={() => fids.setSetupMode(false)}
+      page={fids.page}
+      preferences={fids.preferences}
+      setupMode={fids.setupMode}
+      {...(simulationBanner ? { simulationBanner } : {})}
+      {...(subtitle ? { subtitle } : {})}
     >
       <FidsSettingsDialog
         accountCode={accountCode}
-        eventName={board?.eventName ?? "Veranstaltung"}
-        onClose={() => setSettingsOpen(false)}
-        onLogout={onLogout}
-        onSave={onSavePreferences}
-        open={settingsOpen}
-        preferences={preferences}
+        eventName={fids.board?.eventName ?? "Veranstaltung"}
+        filterOptions={fids.filterOptions}
+        filterOptionsLoaded={fids.filterOptionsLoaded}
+        onClose={() => fids.setSettingsOpen(false)}
+        {...(onLogout ? { onLogout } : {})}
+        onSave={fids.savePreferences}
+        onSetSetupMode={fids.setSetupMode}
+        open={fids.settingsOpen}
+        page={fids.page}
+        preferences={fids.preferences}
+        setupMode={fids.setupMode}
       />
     </FidsBoardPresentation>
   );

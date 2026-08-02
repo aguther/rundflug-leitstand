@@ -18,10 +18,14 @@ import {
   eventSnapshotSchema,
   type FactoryResetRequest,
   type FactoryResetResponse,
+  type FidsBoardResponse,
+  type FidsFilterOptions,
   type FidsPreferences,
   type ForecastHistory,
   type ForecastHistoryQuery,
   factoryResetResponseSchema,
+  fidsBoardResponseSchema,
+  fidsFilterOptionsSchema,
   fidsPreferencesSchema,
   forecastHistorySchema,
   type ImportMasterDataTemplateRequest,
@@ -774,6 +778,36 @@ export async function updateFidsPreferences(
     throw new Error(body?.error?.message ?? "FIDS-Einstellungen konnten nicht gespeichert werden.");
   }
   return fidsPreferencesSchema.parse(await response.json());
+}
+
+export async function getFidsFilterOptions(eventId: string): Promise<FidsFilterOptions> {
+  const response = await apiFetch(controlApiPath(eventId, "/fids/filter-options"), {
+    cache: "no-store",
+  });
+  if (!response.ok) throw new Error("FIDS-Filteroptionen nicht verfügbar.");
+  return fidsFilterOptionsSchema.parse(await response.json());
+}
+
+export async function getFidsBoard(
+  eventId: string,
+  input: { page: number; lowerPage: number },
+  signal?: AbortSignal,
+): Promise<FidsBoardResponse> {
+  const query = new URLSearchParams({
+    page: String(input.page),
+    lowerPage: String(input.lowerPage),
+  });
+  const response = await apiFetch(`${controlApiPath(eventId, "/fids/board")}?${query.toString()}`, {
+    cache: "no-store",
+    ...(signal ? { signal } : {}),
+  });
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as {
+      error?: { message?: string };
+    } | null;
+    throw new Error(body?.error?.message ?? "FIDS-Anzeige nicht verfügbar.");
+  }
+  return fidsBoardResponseSchema.parse(await response.json());
 }
 
 export async function getOperationBoard(

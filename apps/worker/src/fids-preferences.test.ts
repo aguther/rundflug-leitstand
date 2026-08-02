@@ -52,6 +52,7 @@ describe("FIDS V1.7.3 persistence and authorization", () => {
       VALUES ('display-1', 'event-1', 20, 'DOUBLE', 'DARK', 1,
               '2026-07-22T08:00:00Z', '2026-07-22T08:00:00Z');
     `);
+    database.exec(readFileSync(`${migrationsDirectory}/0061_fids_fixed_split_filters.sql`, "utf8"));
 
     expect(
       database.prepare("SELECT role FROM operator_accounts WHERE id = 'admin-1'").get(),
@@ -60,6 +61,24 @@ describe("FIDS V1.7.3 persistence and authorization", () => {
       database.prepare("SELECT account_id FROM operator_sessions WHERE id = 'session-1'").get(),
     ).toEqual({ account_id: "admin-1" });
     expect(database.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+    expect(
+      database
+        .prepare(
+          `SELECT visible_rows, layout, theme, version, view_mode, priority_group_count,
+                  rotation_interval_seconds, content_filter_json
+             FROM fids_preferences WHERE operator_account_id = 'display-1'`,
+        )
+        .get(),
+    ).toEqual({
+      visible_rows: 20,
+      layout: "DOUBLE",
+      theme: "DARK",
+      version: 1,
+      view_mode: "FIXED_PAGE",
+      priority_group_count: 3,
+      rotation_interval_seconds: 12,
+      content_filter_json: '{"productIds":[],"gateIds":[]}',
+    });
     expect(() =>
       database.exec(`
         INSERT INTO fids_preferences
@@ -68,6 +87,11 @@ describe("FIDS V1.7.3 persistence and authorization", () => {
         VALUES ('admin-1', 'event-1', 21, 'SINGLE', 'SYSTEM', 0,
                 '2026-07-22T08:00:00Z', '2026-07-22T08:00:00Z');
       `),
+    ).toThrow();
+    expect(() =>
+      database.exec(
+        "UPDATE fids_preferences SET rotation_interval_seconds = 4 WHERE operator_account_id = 'display-1'",
+      ),
     ).toThrow();
     database.exec("DELETE FROM operator_accounts WHERE id = 'display-1'");
     expect(database.prepare("SELECT COUNT(*) AS count FROM fids_preferences").get()).toEqual({
@@ -95,7 +119,7 @@ describe("FIDS V1.7.3 persistence and authorization", () => {
     expect(route).not.toContain('context.req.header("x-operator-account-id")');
     expect(coordinatorSource).toContain("!mayAccessFids(role)");
     expect(workerSource).toContain('actor?.role === "DISPLAY"');
-    expect(workerSource).toContain('context.req.path.endsWith("/fids/preferences")');
+    expect(workerSource).toContain('context.req.path.includes("/fids/")');
   });
 
   it("serializes version checks, audit, idempotency and a non-sensitive outbox message", () => {
@@ -109,6 +133,10 @@ describe("FIDS V1.7.3 persistence and authorization", () => {
     expect(handler).toContain("await this.env.DB.batch([");
     expect(handler).toContain("'FIDS_PREFERENCES_CHANGED'");
     expect(handler).toContain("operatorAccountId: accountId");
+    expect(handler).toContain("productIds: next.contentFilter.productIds");
+    expect(handler).toContain("gateIds: next.contentFilter.gateIds");
+    expect(handler).toContain("normalizeFidsContentFilter(input.contentFilter)");
+    expect(handler).toContain("FIDS_FILTER_OPTION_NOT_FOUND");
     expect(handler).not.toContain("operatorLoginCode: loginCode");
     expect(handler).not.toContain("operatorSessionId: sessionId");
     expect(handler).toContain("JSON.stringify({ version: next.version })");

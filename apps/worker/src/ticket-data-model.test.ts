@@ -6,6 +6,7 @@ import initialMigration from "../migrations/0001_initial.sql?raw";
 import pushMigration from "../migrations/0006_web_push.sql?raw";
 import rotationMigration from "../migrations/0026_rotation_gate_and_note.sql?raw";
 import coordinator from "./event-coordinator.ts?raw";
+import fidsProjection from "./fids-board-projection.ts?raw";
 import worker from "./index.ts?raw";
 
 const cashierSource = `${cashierViewSource}\n${operationWorkspaceSource}`;
@@ -56,7 +57,10 @@ describe("anonymous V1 ticket data model", () => {
 
   it("uses the frozen rotation gate in protected and public slot projections", () => {
     expect(worker).toContain("COALESCE(r.gate_id, MIN(p.gate_id), '') AS gate_id");
-    expect(worker.match(/g\.id = COALESCE\(r\.gate_id, p\.gate_id\)/g)).toHaveLength(2);
+    expect(
+      `${worker}\n${fidsProjection}`.match(/g\.id = COALESCE\(r\.gate_id, p\.gate_id\)/g),
+    ).toHaveLength(2);
+    expect(fidsProjection).toContain("LEFT JOIN gates g ON g.id = COALESCE(r.gate_id, p.gate_id)");
     expect(worker).toContain("communicationNumber: row.communication_number");
     expect(worker).toContain("queuePosition:");
     expect(worker).toContain("prediction_lower_minutes");

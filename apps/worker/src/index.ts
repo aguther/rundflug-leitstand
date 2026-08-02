@@ -8,7 +8,9 @@ import {
   createOperatorAccountSchema,
   type EventLogoTheme,
   type FactoryResetResponse,
-  type FidsPreferences,
+  type FidsBoardResponse,
+  type FidsBoardRow,
+  type FidsFilterOptions,
   factoryResetRequestSchema,
   forecastHistoryQuerySchema,
   forecastHistorySchema,
@@ -40,6 +42,7 @@ import {
   forecastQueueWindows,
   formatBookingGroupLabel,
   formatFlightGroupLabel,
+  parseFidsPage,
   resolveTurnaroundProfile,
 } from "@rundflug/domain";
 import { Hono } from "hono";
@@ -83,6 +86,16 @@ import {
   finishR2Cleanup,
 } from "./factory-reset";
 import { mayAccessFids } from "./fids-authorization";
+import {
+  countFidsProjectionRows,
+  type FidsProjectionEvent,
+  type FidsProjectionFilter,
+  type FidsProjectionRow,
+  loadFidsProjectionEvent,
+  loadFidsProjectionFleet,
+  loadFidsProjectionRows,
+} from "./fids-board-projection";
+import { loadFidsPreferences } from "./fids-preferences-storage";
 import { buildForecastHistoryStatement } from "./forecast-history";
 import {
   EMPTY_GATE_DISPLAY_FILTER_JSON,
@@ -352,6 +365,74 @@ function predictedBoardingWindow(input: {
   return {
     lowerAt: new Date(lowerMs).toISOString(),
     upperAt: new Date(Math.max(lowerMs, upperMs)).toISOString(),
+  };
+}
+
+function mapFidsProjectionRow(
+  row: FidsProjectionRow,
+  event: FidsProjectionEvent,
+  boardReadAt: string,
+): FidsBoardRow {
+  const forecastFreshness = assessForecastFreshness({
+    predictionQuality: row.prediction_quality,
+    predictionUpdatedAt: row.prediction_updated_at,
+    now: boardReadAt,
+  });
+  const predictionQuality =
+    event.operational_interrupted === 1 || row.resource_group_status !== "ACTIVE"
+      ? "UNCERTAIN"
+      : forecastFreshness.quality;
+  const waitLowerMinutes = row.prediction_lower_minutes ?? row.projection_index * 20;
+  const waitUpperMinutes = row.prediction_upper_minutes ?? (row.projection_index + 1) * 30;
+  const boardingWindow = predictedBoardingWindow({
+    status: row.status,
+    quality: predictionQuality,
+    predictedBoardingAt: row.predicted_boarding_at,
+    lowerMinutes: waitLowerMinutes,
+    upperMinutes: waitUpperMinutes,
+    referenceAt: boardReadAt,
+  });
+  return {
+    rowId: row.row_id,
+    productId: row.product_id,
+    gateId: row.gate_id,
+    productName: row.product_name,
+    productCode: row.product_code,
+    gateLabel: row.gate_label,
+    communicationNumber: row.communication_number,
+    ticketLabels: Array.from(
+      { length: Math.max(1, row.ticket_count) },
+      (_, ticketIndex) =>
+        `${formatBookingGroupLabel(row.product_code, row.communication_number)}/${ticketIndex + 1}`,
+    ),
+    aircraftRegistration: row.aircraft_registration,
+    departedAt: row.departed_at,
+    status:
+      row.resource_group_status !== "ACTIVE"
+        ? "SERVICE_PAUSED"
+        : derivePublicRotationStatus({
+            rotationState: row.status,
+            draftStatus:
+              row.precalled_at !== null
+                ? "COME_TO_FLIGHT_LINE"
+                : row.precall_decision_status === "PREPARE" && predictionQuality !== "UNCERTAIN"
+                  ? "PREPARE"
+                  : "WAITING",
+          }),
+    waitLowerMinutes:
+      event.operational_interrupted === 1 || row.resource_group_status !== "ACTIVE"
+        ? 0
+        : waitLowerMinutes,
+    waitUpperMinutes:
+      event.operational_interrupted === 1 || row.resource_group_status !== "ACTIVE"
+        ? 0
+        : waitUpperMinutes,
+    boardingWindowLowerAt: boardingWindow.lowerAt,
+    boardingWindowUpperAt: boardingWindow.upperAt,
+    predictionQuality,
+    dispatchOrder: row.dispatch_order,
+    operationalNotice: row.planned_public_note || row.resource_group_operational_note,
+    activeRecall: activeTicketGroupRecallProjection(row),
   };
 }
 
@@ -661,7 +742,7 @@ app.use("/api/*", requireValidJsonBody);
 
 for (const protectedPrefix of ["/api/control/*"] as const) {
   app.use(protectedPrefix, async (context, next) => {
-    if (context.req.path.endsWith("/fids/preferences")) {
+    if (context.req.path.includes("/fids/")) {
       await next();
       return;
     }
@@ -3542,24 +3623,7 @@ app.on("GET", eventRoutes("/fids/preferences"), async (context) => {
       404,
     );
   }
-  const stored = await context.env.DB.prepare(
-    `SELECT visible_rows, layout, theme, version
-       FROM fids_preferences
-      WHERE operator_account_id = ?1 AND operation_day_id = ?2`,
-  )
-    .bind(actor.accountId, eventId)
-    .first<{
-      visible_rows: number;
-      layout: FidsPreferences["layout"];
-      theme: FidsPreferences["theme"];
-      version: number;
-    }>();
-  return context.json({
-    visibleRows: stored?.visible_rows ?? 8,
-    layout: stored?.layout ?? "SINGLE",
-    theme: stored?.theme ?? "SYSTEM",
-    version: stored?.version ?? 0,
-  } satisfies FidsPreferences);
+  return context.json(await loadFidsPreferences(context.env.DB, actor.accountId, eventId));
 });
 
 app.on("PUT", eventRoutes("/fids/preferences"), async (context) => {
@@ -3589,6 +3653,235 @@ app.on("PUT", eventRoutes("/fids/preferences"), async (context) => {
   const body = await context.req.text();
   const response = await stub.fetch(new Request(target, { method: "PUT", headers, body }));
   return new Response(response.body, response);
+});
+
+app.on("GET", eventRoutes("/fids/filter-options"), async (context) => {
+  const eventId = context.req.param("eventId");
+  const actor = await authorizeSession(context.env, context.req.raw);
+  if (!actor || !mayAccessFids(actor.role)) {
+    return context.json(
+      {
+        error: {
+          code: "SESSION_NOT_AUTHORIZED",
+          message: "Sitzung für diese Ansicht nicht berechtigt.",
+        },
+      },
+      403,
+    );
+  }
+  const event = await context.env.DB.prepare("SELECT id FROM operation_days WHERE id = ?1")
+    .bind(eventId)
+    .first<{ id: string }>();
+  if (!event) {
+    return context.json(
+      { error: { code: "EVENT_NOT_FOUND", message: "Veranstaltung nicht gefunden." } },
+      404,
+    );
+  }
+  const [gates, products] = await runD1ReadsSequentially([
+    () =>
+      context.env.DB.prepare(
+        `SELECT id, label, active
+           FROM gates
+          WHERE operation_day_id = ?1
+          ORDER BY active DESC, label COLLATE NOCASE, id`,
+      )
+        .bind(eventId)
+        .all<{ id: string; label: string; active: number }>(),
+    () =>
+      context.env.DB.prepare(
+        `SELECT p.id, p.code, p.name, COALESCE(p.gate_id, rg.gate_id) AS gate_id,
+                p.sale_enabled AS active
+           FROM products p
+           JOIN resource_groups rg ON rg.id = p.resource_group_id
+          WHERE p.operation_day_id = ?1
+          ORDER BY p.sale_enabled DESC, p.sort_order, p.code COLLATE NOCASE, p.id`,
+      )
+        .bind(eventId)
+        .all<{ id: string; code: string; name: string; gate_id: string; active: number }>(),
+  ] as const);
+  return context.json({
+    gates: gates.results.map((gate) => ({
+      id: gate.id,
+      label: gate.label,
+      active: gate.active === 1,
+    })),
+    products: products.results.map((product) => ({
+      id: product.id,
+      code: product.code,
+      name: product.name,
+      gateId: product.gate_id,
+      active: product.active === 1,
+    })),
+  } satisfies FidsFilterOptions);
+});
+
+app.on("GET", eventRoutes("/fids/board"), async (context) => {
+  const requestStartedAt = performance.now();
+  const eventId = context.req.param("eventId");
+  const actor = await authorizeSession(context.env, context.req.raw);
+  if (!actor || !mayAccessFids(actor.role)) {
+    return context.json(
+      {
+        error: {
+          code: "SESSION_NOT_AUTHORIZED",
+          message: "Sitzung für diese Ansicht nicht berechtigt.",
+        },
+      },
+      403,
+    );
+  }
+  const event = await loadFidsProjectionEvent(context.env.DB, eventId);
+  if (!event) {
+    return context.json(
+      { error: { code: "EVENT_NOT_FOUND", message: "Veranstaltung nicht gefunden." } },
+      404,
+    );
+  }
+  const preferences = await loadFidsPreferences(context.env.DB, actor.accountId, eventId);
+  const page = parseFidsPage(context.req.query("page"));
+  const lowerPage = parseFidsPage(context.req.query("lowerPage"));
+  const boardReadAt = new Date().toISOString();
+  const departedVisibilityCutoff = new Date(
+    Date.now() - event.departed_visibility_seconds * 1_000,
+  ).toISOString();
+  const filter: FidsProjectionFilter = {
+    productIds: preferences.contentFilter.productIds,
+    gateIds: preferences.contentFilter.gateIds,
+    rotationStatuses: [],
+  };
+  const baseProjection = {
+    eventId,
+    filter,
+    departedVisibilityCutoff,
+    now: boardReadAt,
+  };
+  const fleet = event.emergency_mode ? [] : await loadFidsProjectionFleet(context.env.DB, eventId);
+
+  let priority: FidsBoardResponse["priority"] = null;
+  let boardPage: FidsBoardResponse["page"];
+  if (event.emergency_mode === 1) {
+    boardPage = {
+      requestedPage: preferences.viewMode === "SPLIT" ? lowerPage : page,
+      pageSize:
+        preferences.viewMode === "SPLIT"
+          ? preferences.visibleRows - preferences.priorityGroupCount
+          : preferences.visibleRows,
+      totalItems: 0,
+      totalPages: 0,
+      groups: [],
+    };
+    if (preferences.viewMode === "SPLIT") {
+      priority = {
+        configuredCapacity: preferences.priorityGroupCount,
+        effectiveCapacity: preferences.priorityGroupCount,
+        totalItems: 0,
+        overflowCount: 0,
+        groups: [],
+      };
+    }
+  } else if (preferences.viewMode === "FIXED_PAGE") {
+    const [totalItems, rows] = await Promise.all([
+      countFidsProjectionRows(context.env.DB, { ...baseProjection, band: "ALL" }),
+      loadFidsProjectionRows(context.env.DB, {
+        ...baseProjection,
+        band: "ALL",
+        limit: preferences.visibleRows,
+        offset: (page - 1) * preferences.visibleRows,
+      }),
+    ]);
+    boardPage = {
+      requestedPage: page,
+      pageSize: preferences.visibleRows,
+      totalItems,
+      totalPages: Math.ceil(totalItems / preferences.visibleRows),
+      groups: rows.map((row) => mapFidsProjectionRow(row, event, boardReadAt)),
+    };
+  } else {
+    const urgentTotal = await countFidsProjectionRows(context.env.DB, {
+      ...baseProjection,
+      band: "URGENT",
+    });
+    const urgentRows = await loadFidsProjectionRows(context.env.DB, {
+      ...baseProjection,
+      band: "URGENT",
+      limit: preferences.visibleRows,
+      offset: 0,
+    });
+    const prepareCapacity = Math.max(0, preferences.priorityGroupCount - urgentRows.length);
+    const prepareRows =
+      prepareCapacity === 0
+        ? []
+        : await loadFidsProjectionRows(context.env.DB, {
+            ...baseProjection,
+            band: "PREPARE",
+            limit: prepareCapacity,
+            offset: 0,
+          });
+    const priorityRows = [...urgentRows, ...prepareRows];
+    const effectiveCapacity = Math.min(
+      preferences.visibleRows,
+      Math.max(preferences.priorityGroupCount, urgentRows.length),
+    );
+    const lowerPageSize = Math.max(0, preferences.visibleRows - effectiveCapacity);
+    const excludedRowIds = priorityRows.map((row) => row.row_id);
+    const lowerTotal = await countFidsProjectionRows(context.env.DB, {
+      ...baseProjection,
+      band: "ALL",
+      excludedRowIds,
+    });
+    const lowerRows =
+      lowerPageSize === 0
+        ? []
+        : await loadFidsProjectionRows(context.env.DB, {
+            ...baseProjection,
+            band: "ALL",
+            excludedRowIds,
+            limit: lowerPageSize,
+            offset: (lowerPage - 1) * lowerPageSize,
+          });
+    priority = {
+      configuredCapacity: preferences.priorityGroupCount,
+      effectiveCapacity,
+      totalItems: urgentTotal + prepareRows.length,
+      overflowCount: Math.max(0, urgentTotal - preferences.visibleRows),
+      groups: priorityRows.map((row) => mapFidsProjectionRow(row, event, boardReadAt)),
+    };
+    boardPage = {
+      requestedPage: lowerPage,
+      pageSize: lowerPageSize,
+      totalItems: lowerTotal,
+      totalPages: lowerPageSize === 0 ? 0 : Math.ceil(lowerTotal / lowerPageSize),
+      groups: lowerRows.map((row) => mapFidsProjectionRow(row, event, boardReadAt)),
+    };
+  }
+
+  const response = context.json({
+    eventName: event.name,
+    timeZone: event.time_zone,
+    emergencyMode: event.emergency_mode === 1,
+    operationalInterrupted: event.operational_interrupted === 1,
+    operationalNotice: event.planned_public_note || event.operational_note,
+    departedVisibilitySeconds: event.departed_visibility_seconds,
+    updatedAt: event.updated_at,
+    preferencesVersion: preferences.version,
+    viewMode: preferences.viewMode,
+    filterSummary: preferences.contentFilter,
+    priority,
+    page: boardPage,
+    fleet: event.emergency_mode
+      ? []
+      : fleet.map((aircraft) => ({
+          registration: aircraft.registration,
+          status: aircraft.operational_state as FidsBoardResponse["fleet"][number]["status"],
+          refuelPlanned: aircraft.refuel_planned === 1,
+        })),
+  } satisfies FidsBoardResponse);
+  response.headers.set(
+    "server-timing",
+    `fids-board;dur=${(performance.now() - requestStartedAt).toFixed(1)}`,
+  );
+  return response;
 });
 
 app.on("GET", eventRoutes("/operations"), async (context) => {
@@ -6968,27 +7261,7 @@ app.get("/api/public/events/:eventId/board", async (context) => {
   const requestStartedAt = performance.now();
   const eventId = context.req.param("eventId");
   const requestedGateId = context.req.query("gateId")?.trim() || null;
-  const event = await context.env.DB.prepare(
-    `SELECT od.name, od.time_zone, od.emergency_mode, od.operational_interrupted,
-            od.operational_note, od.departed_visibility_seconds, od.updated_at,
-            (SELECT plan.public_note FROM planned_operational_constraints plan
-              WHERE plan.operation_day_id = od.id AND plan.status = 'ACTIVE'
-                AND plan.scope_type = 'EVENT' AND plan.scope_id = od.id
-                AND plan.public_note <> ''
-              ORDER BY plan.activated_at DESC LIMIT 1) AS planned_public_note
-       FROM operation_days od WHERE od.id = ?1`,
-  )
-    .bind(eventId)
-    .first<{
-      name: string;
-      time_zone: string;
-      emergency_mode: number;
-      operational_interrupted: number;
-      operational_note: string;
-      planned_public_note: string | null;
-      departed_visibility_seconds: number;
-      updated_at: string;
-    }>();
+  const event = await loadFidsProjectionEvent(context.env.DB, eventId);
   if (!event) {
     return context.json(
       { error: { code: "EVENT_NOT_FOUND", message: "Veranstaltung nicht gefunden." } },
@@ -7018,116 +7291,29 @@ app.get("/api/public/events/:eventId/board", async (context) => {
   const displayFilter: GateDisplayFilter = selectedGate
     ? gateDisplayFilterSchema.parse(JSON.parse(selectedGate.display_filter_json))
     : { productIds: [], rotationStatuses: [] };
-  const productFilterJson = JSON.stringify(displayFilter.productIds);
-  const statusFilterJson = JSON.stringify(displayFilter.rotationStatuses);
+  const boardReadAt = new Date().toISOString();
   const departedVisibilityCutoff = new Date(
     Date.now() - event.departed_visibility_seconds * 1_000,
   ).toISOString();
-  const rows = await context.env.DB.prepare(
-    `SELECT COALESCE(MIN(p.name), 'Rundflug') AS product_name,
-            COALESCE(MIN(p.code), 'RF') AS product_code,
-            COALESCE(MIN(g.label), 'Flight Line') AS gate_label,
-            COALESCE(tg.communication_number, fg.communication_number) AS communication_number,
-            fg.precalled_at, fg.precall_decision_status,
-            COALESCE(fg.queue_position, fg.communication_number) AS queue_position,
-            r.dispatch_order, r.status,
-            r.predicted_boarding_at, r.prediction_quality, r.prediction_lower_minutes,
-            r.prediction_upper_minutes, r.prediction_updated_at,
-            recall.id AS recall_id, recall.sequence AS recall_sequence,
-            recall.started_at AS recall_started_at, recall.expires_at AS recall_expires_at,
-            MIN(a.registration) AS aircraft_registration,
-            r.departed_at,
-            COUNT(rt.ticket_id) AS ticket_count,
-            rg.status AS resource_group_status,
-            rg.operational_note AS resource_group_operational_note,
-            (SELECT plan.public_note FROM planned_operational_constraints plan
-              WHERE plan.operation_day_id = r.operation_day_id AND plan.status = 'ACTIVE'
-                AND plan.scope_type = 'RESOURCE_GROUP' AND plan.scope_id = rg.id
-                AND plan.public_note <> ''
-              ORDER BY plan.activated_at DESC LIMIT 1) AS planned_public_note
-       FROM rotations r
-       JOIN flight_groups fg ON fg.id = r.flight_group_id
-       JOIN resource_groups rg ON rg.id = fg.resource_group_id
-       LEFT JOIN rotation_tickets rt ON rt.rotation_id = r.id AND rt.released_at IS NULL
-       LEFT JOIN tickets t ON t.id = rt.ticket_id
-       LEFT JOIN ticket_groups tg ON tg.id = t.ticket_group_id
-       LEFT JOIN products p ON p.id = tg.product_id
-       LEFT JOIN gates g ON g.id = COALESCE(r.gate_id, p.gate_id)
-       LEFT JOIN aircraft a ON a.id = r.aircraft_id
-       LEFT JOIN ticket_group_recalls recall
-         ON recall.ticket_group_id = tg.id
-        AND recall.ended_at IS NULL
-        AND recall.expires_at > ?6
-      WHERE r.operation_day_id = ?1 AND r.status <> 'CANCELED'
-        AND (?2 IS NULL OR g.id = ?2)
-        AND (?3 = '[]' OR p.id IN (SELECT value FROM json_each(?3)))
-        AND (?4 = '[]' OR r.status IN (SELECT value FROM json_each(?4)))
-        AND (r.status NOT IN ('IN_FLIGHT', 'LANDED', 'COMPLETED') OR r.departed_at > ?5)
-      GROUP BY r.id, tg.id
-      ORDER BY CASE
-                 WHEN rg.status = 'ACTIVE' AND r.status = 'CALLED' THEN 0
-                 WHEN rg.status = 'ACTIVE' AND r.status = 'DRAFT'
-                   AND fg.precalled_at IS NOT NULL THEN 1
-                 WHEN rg.status = 'ACTIVE' AND r.status = 'DRAFT'
-                   AND fg.precall_decision_status = 'PREPARE' THEN 2
-                 WHEN r.status = 'DRAFT' THEN 3
-                 ELSE 4
-               END,
-               CASE WHEN r.status = 'DRAFT' THEN r.dispatch_order END,
-               CASE WHEN r.status = 'DRAFT' THEN r.predicted_boarding_at END,
-               CASE WHEN r.status = 'DRAFT'
-                 THEN COALESCE(fg.queue_position, fg.communication_number) END,
-               CASE WHEN r.status IN ('IN_FLIGHT', 'LANDED', 'COMPLETED')
-                 THEN r.departed_at END DESC,
-               COALESCE(tg.communication_number, fg.communication_number),
-               r.id
-      LIMIT 20`,
-  )
-    .bind(
-      eventId,
-      requestedGateId,
-      productFilterJson,
-      statusFilterJson,
-      departedVisibilityCutoff,
-      new Date().toISOString(),
-    )
-    .all<{
-      product_name: string;
-      product_code: string;
-      gate_label: string;
-      communication_number: number;
-      precalled_at: string | null;
-      precall_decision_status: "WAITING" | "PREPARE" | "GO_TO_GATE" | null;
-      queue_position: number;
-      dispatch_order: number | null;
-      status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
-      predicted_boarding_at: string | null;
-      prediction_quality: "STABLE" | "CHANGING" | "UNCERTAIN" | null;
-      prediction_lower_minutes: number | null;
-      prediction_upper_minutes: number | null;
-      prediction_updated_at: string | null;
-      recall_id: string | null;
-      recall_sequence: number | null;
-      recall_started_at: string | null;
-      recall_expires_at: string | null;
-      aircraft_registration: string | null;
-      departed_at: string | null;
-      ticket_count: number;
-      resource_group_status: "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED";
-      resource_group_operational_note: string;
-      planned_public_note: string | null;
-    }>();
-  const fleet = await context.env.DB.prepare(
-    `SELECT a.registration, a.operational_state, a.refuel_planned
-       FROM aircraft a
-       JOIN resource_group_memberships m ON m.aircraft_id = a.id
-      WHERE m.operation_day_id = ?1 AND m.active_until IS NULL
-      GROUP BY a.id, a.registration, a.operational_state, a.refuel_planned
-      ORDER BY a.registration`,
-  )
-    .bind(eventId)
-    .all<{ registration: string; operational_state: string; refuel_planned: number }>();
-  const boardReadAt = new Date().toISOString();
+  const projectionFilter: FidsProjectionFilter = {
+    productIds: displayFilter.productIds,
+    gateIds: requestedGateId ? [requestedGateId] : [],
+    rotationStatuses: displayFilter.rotationStatuses,
+  };
+  const rows =
+    event.emergency_mode === 1
+      ? []
+      : await loadFidsProjectionRows(context.env.DB, {
+          eventId,
+          filter: projectionFilter,
+          departedVisibilityCutoff,
+          now: boardReadAt,
+          band: "ALL",
+          limit: 20,
+          offset: 0,
+        });
+  const fleet =
+    event.emergency_mode === 1 ? [] : await loadFidsProjectionFleet(context.env.DB, eventId);
   const response = context.json({
     eventName: event.name,
     timeZone: event.time_zone,
@@ -7139,72 +7325,18 @@ app.get("/api/public/events/:eventId/board", async (context) => {
     operationalNotice: event.planned_public_note || event.operational_note,
     departedVisibilitySeconds: event.departed_visibility_seconds,
     updatedAt: event.updated_at,
-    groups: event.emergency_mode
-      ? []
-      : rows.results.map((row, index) => {
-          const forecastFreshness = assessForecastFreshness({
-            predictionQuality: row.prediction_quality,
-            predictionUpdatedAt: row.prediction_updated_at,
-            now: boardReadAt,
-          });
-          const predictionQuality =
-            event.operational_interrupted === 1 || row.resource_group_status !== "ACTIVE"
-              ? "UNCERTAIN"
-              : forecastFreshness.quality;
-          const waitLowerMinutes = row.prediction_lower_minutes ?? index * 20;
-          const waitUpperMinutes = row.prediction_upper_minutes ?? (index + 1) * 30;
-          const boardingWindow = predictedBoardingWindow({
-            status: row.status,
-            quality: predictionQuality,
-            predictedBoardingAt: row.predicted_boarding_at,
-            lowerMinutes: waitLowerMinutes,
-            upperMinutes: waitUpperMinutes,
-            referenceAt: boardReadAt,
-          });
-          return {
-            productName: row.product_name,
-            productCode: row.product_code,
-            gateLabel: row.gate_label,
-            communicationNumber: row.communication_number,
-            ticketLabels: Array.from(
-              { length: row.ticket_count },
-              (_, ticketIndex) =>
-                `${formatBookingGroupLabel(row.product_code, row.communication_number)}/${ticketIndex + 1}`,
-            ),
-            aircraftRegistration: row.aircraft_registration,
-            departedAt: row.departed_at,
-            status:
-              row.resource_group_status !== "ACTIVE"
-                ? "SERVICE_PAUSED"
-                : derivePublicRotationStatus({
-                    rotationState: row.status,
-                    draftStatus:
-                      row.precalled_at !== null
-                        ? "COME_TO_FLIGHT_LINE"
-                        : row.precall_decision_status === "PREPARE" &&
-                            predictionQuality !== "UNCERTAIN"
-                          ? "PREPARE"
-                          : "WAITING",
-                  }),
-            waitLowerMinutes:
-              event.operational_interrupted === 1 || row.resource_group_status !== "ACTIVE"
-                ? 0
-                : waitLowerMinutes,
-            waitUpperMinutes:
-              event.operational_interrupted === 1 || row.resource_group_status !== "ACTIVE"
-                ? 0
-                : waitUpperMinutes,
-            boardingWindowLowerAt: boardingWindow.lowerAt,
-            boardingWindowUpperAt: boardingWindow.upperAt,
-            predictionQuality,
-            dispatchOrder: row.dispatch_order,
-            operationalNotice: row.planned_public_note || row.resource_group_operational_note,
-            activeRecall: activeTicketGroupRecallProjection(row),
-          };
-        }),
+    groups: rows.map((row) => {
+      const {
+        rowId: _rowId,
+        productId: _productId,
+        gateId: _gateId,
+        ...group
+      } = mapFidsProjectionRow(row, event, boardReadAt);
+      return group;
+    }),
     fleet: event.emergency_mode
       ? []
-      : fleet.results.map((aircraft) => ({
+      : fleet.map((aircraft) => ({
           registration: aircraft.registration,
           status: aircraft.operational_state,
           refuelPlanned: aircraft.refuel_planned === 1,

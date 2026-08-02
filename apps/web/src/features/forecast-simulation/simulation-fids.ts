@@ -1,4 +1,4 @@
-import type { PublicBoard } from "@rundflug/contracts";
+import type { FidsBoardRow, PublicBoard } from "@rundflug/contracts";
 import { formatBookingGroupLabel } from "@rundflug/domain";
 import type {
   SimulationEvent,
@@ -13,6 +13,7 @@ export const SIMULATION_DEPARTED_MINIMUM_VISIBILITY_MS = 1_000;
 
 type RotationLifecycle = "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
 type PublicGroup = PublicBoard["groups"][number];
+export type SimulationFidsBoard = Omit<PublicBoard, "groups"> & { groups: FidsBoardRow[] };
 
 export interface RecentDepartureState {
   previousVisibleAt: number;
@@ -198,7 +199,7 @@ export function createSimulationFidsBoard(input: {
   result: SimulationResult;
   visibleAt: number;
   recentDepartedRotationIds: ReadonlySet<string>;
-}): PublicBoard {
+}): SimulationFidsBoard {
   const manuallyInterrupted = interruptionAt(input.result.events, input.visibleAt);
   const activePlanIds = activePlannedOperationIds(input.result.events, input.visibleAt);
   const activePlans = (input.result.plannedOperations ?? []).filter((entry) =>
@@ -249,8 +250,7 @@ export function createSimulationFidsBoard(input: {
         left.rotation.communicationNumber - right.rotation.communicationNumber ||
         left.rotation.id.localeCompare(right.rotation.id)
       );
-    })
-    .slice(0, 20);
+    });
 
   return {
     eventName: input.result.config.operationalModel?.sourceName ?? "Simulierter Veranstaltungstag",
@@ -274,6 +274,11 @@ export function createSimulationFidsBoard(input: {
         interrupted: rotationInterrupted,
       });
       const productCode = rotation.productCode ?? "SIM";
+      const model = input.result.config.operationalModel;
+      const product = model?.products.find((entry) => entry.id === rotation.productId);
+      const resourceGroup = model?.resourceGroups.find(
+        (entry) => entry.id === rotation.resourceGroupId,
+      );
       const bookingGroupLabel = formatBookingGroupLabel(productCode, rotation.communicationNumber);
       const boundAircraft =
         lifecycle === "DRAFT"
@@ -281,6 +286,9 @@ export function createSimulationFidsBoard(input: {
           : (input.result.aircraft.find((entry) => entry.id === rotation.aircraftId)
               ?.registration ?? null);
       return {
+        rowId: rotation.id,
+        productId: rotation.productId ?? product?.id ?? `simulation-product:${productCode}`,
+        gateId: product?.gateId ?? resourceGroup?.gateId ?? null,
         productName: rotation.productName ?? "Rundflug Simulation",
         productCode,
         gateLabel: rotation.gateLabel ?? "Flight Line 1",

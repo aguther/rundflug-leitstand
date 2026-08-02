@@ -93,10 +93,13 @@ describe("local and hosted forecast simulation surface", () => {
     expect(viewSource).toContain("FIDS öffnen");
     expect(viewSource).toContain("<Monitor");
     expect(viewSource).toContain("fidsPopoutRef.current?.open()");
-    expect(fidsPopoutSource).toContain('window.open("", POPUP_NAME, POPUP_FEATURES)');
+    expect(fidsPopoutSource).toContain("window.open(POPUP_PATH, POPUP_NAME, POPUP_FEATURES)");
+    expect(fidsPopoutSource).toContain('popup.addEventListener("load", connect, { once: true })');
     expect(fidsPopoutSource).toContain("current.focus()");
     expect(fidsPopoutSource).toContain("createPortal(");
-    expect(fidsPopoutSource).toContain("<FidsBoardPresentation");
+    expect(fidsPopoutSource).toContain("<FidsDisplay");
+    expect(fidsPopoutSource).toContain("createSimulationFidsDataSource");
+    expect(fidsPopoutSource).toContain("createFidsLocationAdapter");
     expect(fidsPopoutSource).toContain("POPUP_STYLE_PATHS");
     expect(fidsPopoutSource).toContain('from "../fids/fids-v12.css?url"');
     expect(fidsPopoutSource).toContain("appendPresentationStylesheet(target, fidsStylesheetUrl)");
@@ -106,9 +109,7 @@ describe("local and hosted forecast simulation surface", () => {
     expect(fidsPopoutSource).toContain('source.getAttribute("data-vite-dev-id")');
     expect(fidsPopoutSource).toContain('source.href.includes("/assets/ForecastSimulationView-")');
     expect(fidsPopoutSource).toContain('target.title = "Simuliertes FIDS · Rundflug-Leitstand"');
-    expect(fidsPopoutSource).toContain('connectionLabel="LIVE-SIMULATION"');
     expect(fidsPopoutSource).toContain('simulationBanner="Nur Simulation – keine Betriebsdaten"');
-    expect(fidsPopoutSource).toContain("showFooter={false}");
     expect(fidsPopoutSource).toContain("visibleRows: 20");
     expect(fidsPopoutSource).toContain('layout: "DOUBLE"');
     expect(fidsPopoutSource).toContain("simulationDepartedVisibilityMs(speed)");

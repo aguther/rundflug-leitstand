@@ -385,6 +385,18 @@ neutrale Null- beziehungsweise Leerwerte. Vor Anwendung wird eine D1-Time-Travel
 portable Sicherung angelegt; die vollständige Schema-Rückkehr erfolgt per Time Travel oder aus
 dieser Sicherung.
 
+## 0061 – Feste FIDS-Seiten, Split und Inhaltsfilter
+
+Ergänzt die bestehende konten- und veranstaltungsbezogene `fids_preferences`-Tabelle additiv um
+Ansichtsmodus, reservierte Prioritätsplätze, Rotationsintervall und validiertes JSON für Produkt-
+und Gatefilter. Bestehende Datensätze behalten Version, Layout, Theme und Zeilenanzahl; neue Felder
+erhalten die kompatiblen Defaults `FIXED_PAGE`, `3`, `12` und leere Filterlisten. `page` und `setup`
+bleiben ausschließlich URL-Zustand und werden nicht persistiert. Vor Anwendung wird eine
+D1-Time-Travel-Marke oder vollständige D1-Sicherung angelegt. Ein älterer Worker ignoriert die
+additiven Spalten; die vollständige Schema-Rückkehr erfolgt per Time Travel oder aus der Sicherung.
+Die in ADR-0021 dokumentierte Ausnahme von Konten, Sitzungen und Präferenzen aus portablen
+R2-Sicherungen bleibt bestehen.
+
 ## Historische Doppelnummer 0036
 
 `0036_product_promised_flight_time.sql` und `0036_v1_5_stable_operations.sql` wurden bereits unter

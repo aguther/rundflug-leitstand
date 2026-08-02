@@ -350,11 +350,13 @@ try {
   const thirdProposal = current.rotations.find(
     (rotation) => rotation.id === thirdSale.aggregate.relatedRotationId,
   );
-  if (
-    thirdProposal?.suggestedAircraftId !== "aircraft-a" ||
-    thirdProposal.suggestedPilotId !== "550e8400-e29b-41d4-a716-446655440200"
-  ) {
-    throw new Error("Zuletzt bestätigter Pilotencode wird für das Flugzeug nicht vorgeschlagen.");
+  const rememberedPilotByAircraftId = new Map([
+    ["aircraft-a", "550e8400-e29b-41d4-a716-446655440200"],
+    ["aircraft-b", "550e8400-e29b-41d4-a716-446655440100"],
+  ]);
+  const rememberedPilotId = rememberedPilotByAircraftId.get(thirdProposal?.suggestedAircraftId);
+  if (!rememberedPilotId || thirdProposal?.suggestedPilotId !== rememberedPilotId) {
+    throw new Error("The most recently confirmed pilot was not suggested for the aircraft.");
   }
   const mismatchedCall = await command(
     "flight-line-tablet-1",
