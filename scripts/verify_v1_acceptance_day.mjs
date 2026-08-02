@@ -1,14 +1,15 @@
 import { spawn, spawnSync } from "node:child_process";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
-import { rm } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const wranglerCli = resolve(root, "node_modules", "wrangler", "bin", "wrangler.js");
-const persistPath = resolve(root, ".wrangler/acceptance-state");
+const persistPath = mkdtempSync(join(tmpdir(), "rundflug-v1-acceptance-"));
 const port = 8_796;
-await rm(persistPath, { recursive: true, force: true });
+process.on("exit", () => rmSync(persistPath, { recursive: true, force: true }));
 const wranglerBaseArguments = [
   "--local",
   "--persist-to",

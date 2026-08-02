@@ -1921,35 +1921,35 @@ requirements:
   - id: V173-FID-010
     source: "1.7.3"
     section: "Fortgeltendes Delta 1.7.3"
-    requirement: "Standard-FIDS mit Veranstaltungsname, rahmenlosem großem Logo oder freiem schlankem Plane-Fallback in blauer Markenfarbe und kompatibler Normalisierung aller Terminallinks."
+    requirement: "Das Standard-FIDS behält Look & Feel, Veranstaltungsname und Markenlogo. FIXED_PAGE zeigt eine ausschließlich per URL bestimmte, auch bei Realtime-Updates statische Seite; mehrere Displays desselben Kontos können so unterschiedliche Seiten derselben kontobezogenen Liste zeigen. page und setup werden niemals persistiert."
     priority: MUSS
     stage: V1
     status: implemented
   - id: V173-PRI-010
     source: "1.7.3"
     section: "Fortgeltendes Delta 1.7.3"
-    requirement: "Aktive GO-TO-GATE- und BOARDING-Gruppen bilden unabhängig von Ressource und Produkt einen stabil queue-sortierten obersten Block; pausierte Gruppen sind verzögert."
+    requirement: "Im Modus SPLIT bleiben BOARDING und COME_TO_FLIGHT_LINE vor PREPARE in einem reservierten oberen Bereich; dringende Gruppen dürfen ihn bis zur Gesamtkapazität erweitern und Überlauf wird angezeigt. Nur der disjunkte untere Bereich rotiert im gespeicherten Intervall nach weiterhin maßgeblicher Backend-Sortierung."
     priority: MUSS
     stage: V1
     status: implemented
   - id: V173-LAY-010
     source: "1.7.3"
     section: "Fortgeltendes Delta 1.7.3"
-    requirement: "Überlauffreie 100dvh-Anzeige mit exakt 4 bis 20 skalierten Zeilen, höchstens texthohen und ungefassten Lucide-Symbolen (users, clock-3, circle-arrow-right, tickets-plane, plane-takeoff), neutralem WARTEN und dezentem neutralem Footer-Trenner, kompakter schmaler Ansicht und zeilenweise verteilter Zweispaltenansicht ab 1280 Pixel."
+    requirement: "Die 100dvh-Anzeige bleibt von 1920×1080 bis 640×600 ohne horizontalen Dokument- oder Tabellenscroll überlauffrei; DOUBLE fällt unter 1280 Pixel kontrolliert auf eine Spalte zurück. Header, Gate, Status, Zeitfenster, Footer, Setup und Dialog bleiben ohne vermeidbare Layoutsprünge erreichbar."
     priority: MUSS
     stage: V1
     status: implemented
   - id: V173-SET-010
     source: "1.7.3"
     section: "Fortgeltendes Delta 1.7.3"
-    requirement: "Zugänglicher dezenter Einstellungsbutton und bestätigungsgebundener Dialog für Zeilen, Layout, Theme und Abmeldung in der blauen UI-Akzentfarbe der Anwendung."
+    requirement: "Der zentrale bestätigungsgebundene FIDS-Dialog bearbeitet Modus, Zeilen, Layout, Theme, Split-Parameter sowie Produkt- und Gate-Mehrfachfilter und aktiviert oder beendet Setup. Der Dialog besitzt festen Kopf und Footer sowie genau einen internen Scrollbereich; Abbrechen verwirft den Entwurf."
     priority: MUSS
     stage: V1
     status: implemented
   - id: V173-AUT-010
     source: "1.7.3"
     section: "Fortgeltendes Delta 1.7.3"
-    requirement: "DISPLAY-Konten sind administrierbar und bleiben auf FIDS beschränkt; ADMIN-Konten dürfen FIDS zusätzlich zu ihren Administrationsansichten und mit unveränderter Startseite verwenden."
+    requirement: "DISPLAY-Konten sind die einzigen Display-Profile und bleiben auf FIDS-spezifische Lese- und Schreibpfade beschränkt; ADMIN darf FIDS ebenfalls verwenden. Gleiche Konten teilen veranstaltungsbezogene Einstellungen, unterschiedliche Filter erfordern unterschiedliche DISPLAY-Konten; eine zusätzliche Profilentität existiert nicht."
     priority: MUSS
     stage: V1
     status: implemented
@@ -1963,21 +1963,21 @@ requirements:
   - id: V173-API-010
     source: "1.7.3"
     section: "Fortgeltendes Delta 1.7.3"
-    requirement: "Versionierter FidsPreferences-Vertrag und kontobezogene GET-/PUT-Endpunkte; Public Board und Logo bleiben anonym."
+    requirement: "Der versionierte FidsPreferences-Vertrag speichert viewMode, visibleRows, layout, theme, priorityGroupCount, rotationIntervalSeconds und veranstaltungsbezogene Produkt-/Gatefilter. Geschützte Filteroptions- und paginierte Board-Endpunkte verwenden Sitzungsidentität; das anonyme Public Board bleibt schema- und semantikkompatibel."
     priority: MUSS
     stage: V1
     status: implemented
   - id: V173-DAT-010
     source: "1.7.3"
     section: "Fortgeltendes Delta 1.7.3"
-    requirement: "Präferenzupdates sind je Konto und Veranstaltung serialisiert, versioniert, idempotent, auditiert und atomar mit nicht sensitiver Outbox gespeichert."
+    requirement: "Präferenzupdates sind je Konto und Veranstaltung im EventCoordinator serialisiert, erwartungsversioniert, idempotent, auditiert und atomar mit minimaler Outbox gespeichert. Filter-IDs werden gegen die Veranstaltung validiert; leere Listen bedeuten alle, innerhalb einer Dimension gilt ODER und zwischen Dimensionen AND."
     priority: MUSS
     stage: V1
     status: implemented
   - id: V173-OPS-010
     source: "1.7.3"
     section: "Fortgeltendes Delta 1.7.3"
-    requirement: "Migration 0041, D1-Time-Travel-Wiederherstellung, Löschreihenfolge und bewusster Ausschluss aus portablen Backups sind dokumentiert."
+    requirement: "Migration 0061 erweitert die mit 0041 eingeführten FIDS-Präferenzen unter Erhalt bestehender Zeilen und Versionen um kompatible Defaults, Constraints und validiertes Filter-JSON. D1-Time-Travel-Wiederherstellung und der bewusste Ausschluss aus portablen Backups bleiben dokumentiert."
     priority: MUSS
     stage: V1
     status: implemented
@@ -1991,7 +1991,7 @@ requirements:
   - id: V173-QA-010
     source: "1.7.3"
     section: "Fortgeltendes Delta 1.7.3"
-    requirement: "Automatisierte und visuelle Abnahme deckt Rollen, Persistenz, Priorität, Themes, Viewports, Zeilenzahlen, Überlauf, Realtime und Offline-Stand ab."
+    requirement: "Live und Simulation verwenden dieselbe React-FIDS-Experience, denselben Controller, URL-Adapter, Dialog sowie Fixed-/Split-/Filterlogik und unterscheiden sich nur durch Datenquelle, Persistenz, Verbindung und Simulationsbanner. Tests decken Rollen, Migration, Verträge, Paging, Timer, Realtime, letzten Offline-Stand, Datenschutz und visuelle Viewports ab."
     priority: MUSS
     stage: V1
     status: implemented

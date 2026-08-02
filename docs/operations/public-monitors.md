@@ -8,10 +8,19 @@ Anzeige-URL lautet:
 https://<Worker-Domain>/fids?event=<Veranstaltungs-ID>
 ```
 
-Optional grenzt `gateId=<Gate-ID>` die Anzeige ein. Veranstaltung und Gate sind URL- beziehungsweise
-kontextgebunden und nicht Teil des Einstellungsdialogs. Alte URLs mit `/fids/terminal` oder
-`style=terminal` werden auf die Standardansicht normalisiert. Ein Terminalprofil existiert nicht
-mehr.
+`page=<Seite>` weist dem Browserfenster eine feste, 1-basierte Seite zu. Beispiel für zwei Monitore
+mit demselben Konto:
+
+```text
+https://<Worker-Domain>/fids?event=<Veranstaltungs-ID>&page=1
+https://<Worker-Domain>/fids?event=<Veranstaltungs-ID>&page=2
+```
+
+Die Seite wird ausschließlich aus der URL gelesen und niemals im Konto gespeichert. `setup=1`
+blendet vorübergehend die Einrichtungsleiste ein. „Link kopieren“ entfernt diesen Setupzustand sowie
+alle weiteren Parameter. Das geschützte FIDS wertet die früheren URL-Parameter `gateId` und `gate`
+nicht mehr aus; Gatefilter werden ausschließlich im geschützten Einstellungsdialog gepflegt. Ein
+Terminalprofil existiert nicht.
 
 Die anonym lesbaren Endpunkte `/api/public/events/:eventId/board` und
 `/api/public/events/:eventId/logo` bleiben für bestehende Besucherintegrationen verfügbar. Die
@@ -37,19 +46,70 @@ sofort. Die PIN wird weder in der URL noch im lokalen Speicher abgelegt.
 Der dezente Zahnradbutton rechts unten öffnet die kontobezogenen Einstellungen:
 
 - 4 bis 20 sichtbare Zeilen, Standard 8;
+- feste URL-Seite oder geteilte Ansicht;
+- in der geteilten Ansicht 1 bis 19 Prioritätsplätze, stets weniger als die sichtbaren Zeilen;
+- 5 bis 60 Sekunden Wechselintervall für ausschließlich den unteren Bereich;
 - eine oder zwei Spalten; zwei Spalten werden erst ab 1280 CSS-Pixel dargestellt;
 - Darstellung nach System, Hell oder Dunkel;
+- mehrere Produkte und Gates; „Alle“ ist als leere Auswahlliste gespeichert;
+- Setup aktivieren beziehungsweise beenden;
 - Abmelden.
 
 Speichern wird erst nach Serverbestätigung wirksam. Bei einem Versionskonflikt oder Fehler bleibt
 der Dialog offen. Einstellungen gelten genau für das angemeldete Display- oder Administratorkonto
-und die aktuelle Veranstaltung. Unter 1280 Pixel bleibt eine Zweispaltenwahl gespeichert, wird
-aber vorübergehend in einer Spalte angezeigt.
+und die aktuelle Veranstaltung. Alle Geräte desselben Kontos teilen diese Werte. Unterschiedliche
+Filter benötigen daher unterschiedliche DISPLAY-Konten; unterschiedliche feste Seiten können
+dagegen über `page` mit demselben Konto betrieben werden. Unter 1280 Pixel bleibt eine
+Zweispaltenwahl gespeichert, wird aber vorübergehend in einer Spalte angezeigt.
+
+Produkt- und Gatefilter werden vor Sortierungsausschnitt und Paging im Worker angewendet. Innerhalb
+einer Filtergruppe gilt ODER, zwischen Produkt und Gate AND. Inaktive, aber noch vorhandene Produkte
+bleiben sichtbar gekennzeichnet. Ist eine gespeicherte ID nicht mehr verfügbar, weist der Dialog vor
+dem bestätigten Speichern darauf hin; ein Ladefehler setzt Filter niemals still zurück.
+
+Benötigen zwei Monitore verschiedene Inhalte, werden beispielsweise zwei Konten so eingerichtet:
+
+```text
+DISPLAY-01:
+Gate A
+alle Produkte
+
+DISPLAY-02:
+Gate B
+Produkt Rundflug XL
+```
+
+Die jeweilige Auswahl gilt anschließend für alle Geräte des betreffenden Kontos und nur für die
+aktuelle Veranstaltung.
+
+## Ansichtsmodi
+
+`FIXED_PAGE` zeigt genau die URL-Seite und wechselt sie auch bei Realtime-Updates nicht. Eine leere
+Seite bleibt als klarer Leerzustand stehen; die Setup-Leiste erlaubt die Korrektur und das Kopieren
+der kanonischen URL.
+
+`SPLIT` reserviert oben Plätze für `BOARDING` und `BITTE ZUM GATE`; `BEREITHALTEN` füllt freie
+Prioritätsplätze. Dringende Gruppen dürfen den oberen Bereich bis zur gesamten Zeilenkapazität
+erweitern. Weiterer Überlauf wird als Anzahl angezeigt. Nur der disjunkte untere Bereich rotiert,
+und nur wenn mehr als eine Unterseite existiert.
+
+Eine typische Konfiguration lautet:
+
+```text
+viewMode = SPLIT
+priorityGroupCount = 3
+rotationIntervalSeconds = 12
+```
+
+Das Simulations-FIDS verwendet dieselben Ansichtsmodi, Filter, URL-Seiten, Setup-Steuerung und
+responsiven Tabellen. Es wird über „FIDS öffnen“ aus der Prognose-Simulation gestartet und bleibt
+durch das sichtbare Simulationsbanner eindeutig von Betriebsdaten getrennt. Seine Einstellungen
+bleiben im Simulationszustand und überschreiben keine produktiven Präferenzen.
 
 ## Vor Veranstaltungsbeginn prüfen
 
-- Monitor startet ohne zusätzliche Interaktion und öffnet die richtige Veranstaltung und das
-  richtige Gate.
+- Monitor startet ohne zusätzliche Interaktion und öffnet die richtige Veranstaltung und feste
+  Seite beziehungsweise geteilte Ansicht.
 - Im Kopf stehen Veranstaltungsname sowie Veranstaltungslogo oder Plane-Fallback in ausreichender
   Größe.
 - `GO TO GATE` und `BOARDING` stehen unabhängig von Produkt und Ressourcengruppe vor allen anderen
@@ -58,8 +118,14 @@ aber vorübergehend in einer Spalte angezeigt.
   amberfarbener Status mit Glocke; der normale Umlaufstatus bleibt daneben sichtbar. Die Glocke
   pulsiert nur, wenn das Betriebssystem Bewegung nicht reduziert.
 - Gewählte 4, 8 beziehungsweise 20 Zeilen sind bei genügend Daten vollständig sichtbar.
-- Bei 1920×1080, 1366×768, 1280×720, 1024×768, 800×600 und 430×900 entstehen weder horizontale
+- Bei 1920×1080, 1440×900, 1280×720, 1024×768, 800×600 und 640×600 entstehen weder horizontale
   noch vertikale Dokument- oder Tabellenscrollbars.
+- Setup-Leiste und Einstellungsdialog sind vollständig erreichbar; der Dialog besitzt nur einen
+  inneren Scrollbereich und feste Kopf-/Aktionsflächen.
+- In `SPLIT` bleibt der obere Bereich während mindestens eines vollständigen unteren
+  Rotationsintervalls unverändert und keine Gruppe erscheint gleichzeitig in beiden Bereichen.
+- Ein Filtertest mit je zwei Produkten und Gates entspricht ODER innerhalb und AND zwischen den
+  Dimensionen; eine leere Auswahl zeigt alle.
 - Eine Teständerung erscheint ohne Neuladen; nach kurzer Netzunterbrechung verbindet sich die
   Anzeige selbständig neu und behält bis dahin den letzten bestätigten Board-Stand.
 - Notfall- beziehungsweise Unterbrechungshinweis ist sichtbar, ohne den Viewport zu überlaufen.

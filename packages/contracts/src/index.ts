@@ -1012,24 +1012,56 @@ export type FidsLayout = z.infer<typeof fidsLayoutSchema>;
 export const fidsThemeSchema = z.enum(["SYSTEM", "LIGHT", "DARK"]);
 export type FidsTheme = z.infer<typeof fidsThemeSchema>;
 
+export const fidsViewModeSchema = z.enum(["FIXED_PAGE", "SPLIT"]);
+export type FidsViewMode = z.infer<typeof fidsViewModeSchema>;
+
+const uniqueFidsIdsSchema = z
+  .array(z.string().trim().min(1).max(100))
+  .max(100)
+  .refine((ids) => new Set(ids).size === ids.length, "FIDS filter IDs must be unique");
+
+export const fidsContentFilterSchema = z
+  .object({
+    productIds: uniqueFidsIdsSchema.default([]),
+    gateIds: uniqueFidsIdsSchema.default([]),
+  })
+  .strict();
+export type FidsContentFilter = z.infer<typeof fidsContentFilterSchema>;
+
 export const eventLogoThemeSchema = z.enum(["light", "dark"]);
 export type EventLogoTheme = z.infer<typeof eventLogoThemeSchema>;
 
-export const fidsPreferencesSchema = z
+const fidsPreferencesFieldsSchema = z
   .object({
     visibleRows: z.number().int().min(4).max(20),
     layout: fidsLayoutSchema,
     theme: fidsThemeSchema,
+    viewMode: fidsViewModeSchema.default("FIXED_PAGE"),
+    priorityGroupCount: z.number().int().min(1).max(19).default(3),
+    rotationIntervalSeconds: z.number().int().min(5).max(60).default(12),
+    contentFilter: fidsContentFilterSchema.default({ productIds: [], gateIds: [] }),
     version: z.number().int().min(0),
   })
   .strict();
+
+export const fidsPreferencesSchema = fidsPreferencesFieldsSchema.refine(
+  (preferences) => preferences.priorityGroupCount < preferences.visibleRows,
+  {
+    message: "Priority group count must be lower than visible rows",
+    path: ["priorityGroupCount"],
+  },
+);
 export type FidsPreferences = z.infer<typeof fidsPreferencesSchema>;
 
-export const updateFidsPreferencesSchema = fidsPreferencesSchema
+export const updateFidsPreferencesSchema = fidsPreferencesFieldsSchema
   .omit({ version: true })
   .extend({
     commandId: z.uuid(),
     expectedVersion: z.number().int().min(0),
+  })
+  .refine((preferences) => preferences.priorityGroupCount < preferences.visibleRows, {
+    message: "Priority group count must be lower than visible rows",
+    path: ["priorityGroupCount"],
   })
   .strict();
 export type UpdateFidsPreferences = z.infer<typeof updateFidsPreferencesSchema>;
@@ -2899,6 +2931,128 @@ export const publicTicketStatusSchema = z
   .strict();
 export type PublicTicketStatus = z.infer<typeof publicTicketStatusSchema>;
 
+export const publicBoardGroupSchema = z
+  .object({
+    productName: z.string(),
+    productCode: z.string(),
+    gateLabel: z.string(),
+    communicationNumber: z.number().int().positive(),
+    ticketLabels: z.array(z.string()).min(1),
+    aircraftRegistration: z.string().nullable(),
+    departedAt: z.string().nullable().optional().default(null),
+    status: z.enum([
+      "WAITING",
+      "PREPARE",
+      "COME_TO_FLIGHT_LINE",
+      "BOARDING",
+      "IN_FLIGHT",
+      "LANDED",
+      "COMPLETED",
+      "SERVICE_PAUSED",
+    ]),
+    waitLowerMinutes: z.number().int().nonnegative(),
+    waitUpperMinutes: z.number().int().nonnegative(),
+    boardingWindowLowerAt: z.iso.datetime().nullable(),
+    boardingWindowUpperAt: z.iso.datetime().nullable(),
+    dispatchOrder: z.number().int().positive().nullable().default(null),
+    predictionQuality: z.enum(["STABLE", "CHANGING", "UNCERTAIN"]),
+    operationalNotice: z.string(),
+    activeRecall: ticketGroupRecallProjectionSchema.nullable(),
+  })
+  .strict();
+export type PublicBoardGroup = z.infer<typeof publicBoardGroupSchema>;
+
+export const fidsBoardRowSchema = publicBoardGroupSchema
+  .extend({
+    rowId: z.string().min(1).max(100),
+    productId: z.string().min(1).max(100),
+    gateId: z.string().min(1).max(100).nullable(),
+  })
+  .strict();
+export type FidsBoardRow = z.infer<typeof fidsBoardRowSchema>;
+
+export const fidsFilterOptionsSchema = z
+  .object({
+    gates: z.array(
+      z
+        .object({
+          id: z.string().min(1).max(100),
+          label: z.string().min(1).max(160),
+          active: z.boolean(),
+        })
+        .strict(),
+    ),
+    products: z.array(
+      z
+        .object({
+          id: z.string().min(1).max(100),
+          code: z.string().min(1).max(40),
+          name: z.string().min(1).max(160),
+          gateId: z.string().min(1).max(100),
+          active: z.boolean(),
+        })
+        .strict(),
+    ),
+  })
+  .strict();
+export type FidsFilterOptions = z.infer<typeof fidsFilterOptionsSchema>;
+
+const fidsPageSchema = z
+  .object({
+    requestedPage: z.number().int().min(1).max(999),
+    pageSize: z.number().int().min(0).max(20),
+    totalItems: z.number().int().nonnegative(),
+    totalPages: z.number().int().nonnegative(),
+    groups: z.array(fidsBoardRowSchema),
+  })
+  .strict();
+
+export const fidsBoardResponseSchema = z
+  .object({
+    eventName: z.string(),
+    timeZone: timeZoneSchema,
+    emergencyMode: z.boolean(),
+    operationalInterrupted: z.boolean(),
+    operationalNotice: z.string(),
+    departedVisibilitySeconds: z.number().int().min(5).max(900).default(15),
+    updatedAt: z.string(),
+    preferencesVersion: z.number().int().nonnegative(),
+    viewMode: fidsViewModeSchema,
+    filterSummary: fidsContentFilterSchema,
+    priority: z
+      .object({
+        configuredCapacity: z.number().int().min(1).max(19),
+        effectiveCapacity: z.number().int().min(0).max(20),
+        totalItems: z.number().int().nonnegative(),
+        overflowCount: z.number().int().nonnegative(),
+        groups: z.array(fidsBoardRowSchema),
+      })
+      .strict()
+      .nullable(),
+    page: fidsPageSchema,
+    fleet: z.array(
+      z
+        .object({
+          registration: z.string(),
+          status: z.enum([
+            "AVAILABLE",
+            "BOARDING",
+            "IN_FLIGHT",
+            "LANDED",
+            "TURNAROUND",
+            "REFUELING",
+            "PAUSED",
+            "INTERRUPTED",
+            "INACTIVE",
+          ]),
+          refuelPlanned: z.boolean(),
+        })
+        .strict(),
+    ),
+  })
+  .strict();
+export type FidsBoardResponse = z.infer<typeof fidsBoardResponseSchema>;
+
 export const publicBoardSchema = z.object({
   eventName: z.string(),
   timeZone: timeZoneSchema,
@@ -2910,37 +3064,7 @@ export const publicBoardSchema = z.object({
   operationalNotice: z.string(),
   departedVisibilitySeconds: z.number().int().min(5).max(900).default(15),
   updatedAt: z.string(),
-  groups: z.array(
-    z
-      .object({
-        productName: z.string(),
-        productCode: z.string(),
-        gateLabel: z.string(),
-        communicationNumber: z.number().int().positive(),
-        ticketLabels: z.array(z.string()).min(1),
-        aircraftRegistration: z.string().nullable(),
-        departedAt: z.string().nullable().optional().default(null),
-        status: z.enum([
-          "WAITING",
-          "PREPARE",
-          "COME_TO_FLIGHT_LINE",
-          "BOARDING",
-          "IN_FLIGHT",
-          "LANDED",
-          "COMPLETED",
-          "SERVICE_PAUSED",
-        ]),
-        waitLowerMinutes: z.number().int().nonnegative(),
-        waitUpperMinutes: z.number().int().nonnegative(),
-        boardingWindowLowerAt: z.iso.datetime().nullable(),
-        boardingWindowUpperAt: z.iso.datetime().nullable(),
-        dispatchOrder: z.number().int().positive().nullable().default(null),
-        predictionQuality: z.enum(["STABLE", "CHANGING", "UNCERTAIN"]),
-        operationalNotice: z.string(),
-        activeRecall: ticketGroupRecallProjectionSchema.nullable(),
-      })
-      .strict(),
-  ),
+  groups: z.array(publicBoardGroupSchema),
   fleet: z.array(
     z.object({
       registration: z.string(),

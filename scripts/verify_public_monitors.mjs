@@ -1,6 +1,6 @@
 import { spawn, spawnSync } from "node:child_process";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
@@ -9,9 +9,7 @@ import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const wranglerCli = resolve(root, "node_modules", "wrangler", "bin", "wrangler.js");
-const wranglerDirectory = resolve(root, ".wrangler");
-mkdirSync(wranglerDirectory, { recursive: true });
-const stateDirectory = mkdtempSync(resolve(wranglerDirectory, "public-monitors-"));
+const stateDirectory = mkdtempSync(join(tmpdir(), "rundflug-public-monitors-"));
 const localD1Arguments = ["--local", "--persist-to", stateDirectory, "--config", "wrangler.jsonc"];
 const migrate = spawnSync(
   process.execPath,

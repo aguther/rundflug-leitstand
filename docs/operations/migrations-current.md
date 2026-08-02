@@ -66,6 +66,7 @@ D1-Identität; angewandte Dateien werden nicht nachträglich umbenannt.
 | 59 | `0058_forecast_turnaround_sources.sql` | eindeutig |
 | 60 | `0059_ticket_group_cashier_attribution.sql` | eindeutig |
 | 61 | `0060_dispatch_planning_and_gate_travel_lead.sql` | eindeutig |
+| 62 | `0061_fids_fixed_split_filters.sql` | eindeutig |
 
-Gesamt: 61 Migrationen. Wiederherstellungsnotizen werden gegen SQL und
+Gesamt: 62 Migrationen. Wiederherstellungsnotizen werden gegen SQL und
 `apps/worker/migrations/README.md` geprüft.

@@ -10,8 +10,10 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { useTheme } from "../../design-system/theme";
-import { FidsBoardPresentation } from "../../fids-display";
+import { FidsDisplay } from "../../fids-display";
+import { createFidsLocationAdapter } from "../fids/fids-location";
 import fidsStylesheetUrl from "../fids/fids-v12.css?url";
+import { createSimulationFidsDataSource } from "../fids/simulation-fids-data-source";
 import { SIMULATION_PRESET_LABELS, type SimulationResult } from "./model";
 import {
   advanceRecentDepartures,
@@ -23,6 +25,7 @@ import {
 
 const POPUP_NAME = "rundflug-simulation-fids";
 const POPUP_FEATURES = "popup=yes,width=1600,height=900,resizable=yes,scrollbars=no";
+const POPUP_PATH = "/simulation/fids";
 const POPUP_STYLE_PATHS = [
   "/design-system/tokens.css",
   "/styles.css",
@@ -89,6 +92,17 @@ function preparePopup(popup: Window): PopupTarget {
   copyPresentationHead(target);
   appendPresentationStylesheet(target, fidsStylesheetUrl);
   target.title = "Simuliertes FIDS · Rundflug-Leitstand";
+  const sourceParams = new URLSearchParams(window.location.search);
+  const popupParams = new URLSearchParams();
+  for (const key of ["page", "setup"] as const) {
+    const value = sourceParams.get(key);
+    if (value) popupParams.set(key, value);
+  }
+  popup.history.replaceState(
+    null,
+    "",
+    `${POPUP_PATH}${popupParams.size > 0 ? `?${popupParams.toString()}` : ""}`,
+  );
   const root = target.createElement("div");
   root.id = "simulation-fids-root";
   target.body.append(root);
@@ -103,6 +117,16 @@ export const SimulationFidsPopout = forwardRef<
   const popupRef = useRef<Window | null>(null);
   const resultRef = useRef(result);
   const [target, setTarget] = useState<PopupTarget | null>(null);
+  const [preferences, setPreferences] = useState<FidsPreferences>(() => ({
+    visibleRows: 20,
+    layout: "DOUBLE",
+    theme: resolved === "dark" ? "DARK" : "LIGHT",
+    viewMode: "FIXED_PAGE",
+    priorityGroupCount: 3,
+    rotationIntervalSeconds: 12,
+    contentFilter: { productIds: [], gateIds: [] },
+    version: 0,
+  }));
   const [wallNow, setWallNow] = useState(Date.now());
   const departedVisibilityMs = simulationDepartedVisibilityMs(speed);
   const [departures, setDepartures] = useState(() =>
@@ -116,24 +140,31 @@ export const SimulationFidsPopout = forwardRef<
       onWindowError(null);
       return;
     }
-    const popup = window.open("", POPUP_NAME, POPUP_FEATURES);
+    const popup = window.open(POPUP_PATH, POPUP_NAME, POPUP_FEATURES);
     if (!popup) {
       onWindowError(
         "Das FIDS-Fenster wurde blockiert. Bitte Pop-ups für diese Seite erlauben und erneut öffnen.",
       );
       return;
     }
-    try {
-      const nextTarget = preparePopup(popup);
-      popupRef.current = popup;
-      setTarget(nextTarget);
-      popup.focus();
-      onWindowError(null);
-    } catch {
-      popup.close();
-      popupRef.current = null;
-      setTarget(null);
-      onWindowError("Das FIDS-Fenster konnte nicht vorbereitet werden.");
+    popupRef.current = popup;
+    onWindowError(null);
+    const connect = () => {
+      try {
+        const nextTarget = preparePopup(popup);
+        setTarget(nextTarget);
+        popup.focus();
+      } catch {
+        popup.close();
+        popupRef.current = null;
+        setTarget(null);
+        onWindowError("Das FIDS-Fenster konnte nicht vorbereitet werden.");
+      }
+    };
+    if (popup.document.readyState === "complete" && popup.location.pathname === POPUP_PATH) {
+      connect();
+    } else {
+      popup.addEventListener("load", connect, { once: true });
     }
   }, [onWindowError]);
 
@@ -194,27 +225,30 @@ export const SimulationFidsPopout = forwardRef<
       }),
     [recentIds, result, visibleAt],
   );
-  const preferences = useMemo<FidsPreferences>(
-    () => ({
-      visibleRows: 20,
-      layout: "DOUBLE",
-      theme: resolved === "dark" ? "DARK" : "LIGHT",
-      version: 0,
-    }),
-    [resolved],
+  const dataSource = useMemo(
+    () =>
+      createSimulationFidsDataSource({
+        board,
+        ...(result.config.operationalModel
+          ? { operationalModel: result.config.operationalModel }
+          : {}),
+        preferences,
+        onPreferencesChanged: setPreferences,
+      }),
+    [board, preferences, result.config.operationalModel],
+  );
+  const locationAdapter = useMemo(
+    () => (target ? createFidsLocationAdapter(target.popup) : null),
+    [target],
   );
 
-  if (!target) return null;
+  if (!target || !locationAdapter) return null;
   return createPortal(
-    <FidsBoardPresentation
-      board={board}
-      clock={new Date(clockMs)}
-      connectionLabel="LIVE-SIMULATION"
-      connectionTone="simulation"
-      error={null}
-      filterDeparted={false}
-      preferences={preferences}
-      showFooter={false}
+    <FidsDisplay
+      accountCode="SIMULATION"
+      clockOverride={new Date(clockMs)}
+      dataSource={dataSource}
+      locationAdapter={locationAdapter}
       simulationBanner="Nur Simulation – keine Betriebsdaten"
       subtitle={`Abflugtafel · ${SIMULATION_PRESET_LABELS[result.config.preset]}`}
     />,

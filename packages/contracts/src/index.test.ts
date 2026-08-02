@@ -8,6 +8,7 @@ import {
   commandResultSchema,
   eventLogoThemeSchema,
   factoryResetRequestSchema,
+  fidsBoardResponseSchema,
   fidsPreferencesSchema,
   forecastHistoryQuerySchema,
   forecastHistorySchema,
@@ -184,7 +185,16 @@ describe("commandEnvelopeSchema", () => {
         theme: "SYSTEM",
         version: 3,
       }),
-    ).toEqual({ visibleRows: 8, layout: "DOUBLE", theme: "SYSTEM", version: 3 });
+    ).toEqual({
+      visibleRows: 8,
+      layout: "DOUBLE",
+      theme: "SYSTEM",
+      viewMode: "FIXED_PAGE",
+      priorityGroupCount: 3,
+      rotationIntervalSeconds: 12,
+      contentFilter: { productIds: [], gateIds: [] },
+      version: 3,
+    });
     expect(() =>
       updateFidsPreferencesSchema.parse({
         commandId: "550e8400-e29b-41d4-a716-446655440500",
@@ -194,6 +204,39 @@ describe("commandEnvelopeSchema", () => {
         theme: "DARK",
       }),
     ).toThrow();
+  });
+
+  it("validates fixed and split FIDS preferences without persisting URL state", () => {
+    const fixed = fidsPreferencesSchema.parse({
+      visibleRows: 8,
+      layout: "SINGLE",
+      theme: "DARK",
+      viewMode: "FIXED_PAGE",
+      priorityGroupCount: 3,
+      rotationIntervalSeconds: 12,
+      contentFilter: { productIds: [], gateIds: [] },
+      version: 1,
+    });
+    const split = fidsPreferencesSchema.parse({
+      ...fixed,
+      viewMode: "SPLIT",
+      contentFilter: { productIds: ["product-a"], gateIds: ["gate-a"] },
+    });
+    expect(fixed.viewMode).toBe("FIXED_PAGE");
+    expect(split.viewMode).toBe("SPLIT");
+    expect("page" in fixed).toBe(false);
+    expect("setup" in fixed).toBe(false);
+    for (const invalid of [
+      { ...split, viewMode: "ROTATING" },
+      { ...split, priorityGroupCount: 8 },
+      { ...split, rotationIntervalSeconds: 4 },
+      { ...split, rotationIntervalSeconds: 61 },
+      { ...split, contentFilter: { productIds: ["product-a", "product-a"], gateIds: [] } },
+      { ...split, contentFilter: { productIds: [], gateIds: ["gate-a", "gate-a"] } },
+      { ...split, page: 2 },
+    ]) {
+      expect(() => fidsPreferencesSchema.parse(invalid)).toThrow();
+    }
   });
   it("accepts only a PIN and hashed client credential for admin recovery", () => {
     const parsed = adminDeviceRecoverySchema.parse({
@@ -709,6 +752,48 @@ describe("commandEnvelopeSchema", () => {
     expect("rotationId" in status).toBe(false);
     expect("guestName" in status).toBe(false);
     expect("guestName" in board).toBe(false);
+    const fidsRow = {
+      ...board.groups[0],
+      rowId: "rotation-1:group-1",
+      productId: "product-1",
+      gateId: "gate-1",
+    };
+    const fixedFidsBoard = fidsBoardResponseSchema.parse({
+      eventName: board.eventName,
+      timeZone: board.timeZone,
+      emergencyMode: false,
+      operationalInterrupted: false,
+      operationalNotice: "",
+      departedVisibilitySeconds: 15,
+      updatedAt: board.updatedAt,
+      preferencesVersion: 2,
+      viewMode: "FIXED_PAGE",
+      filterSummary: { productIds: [], gateIds: [] },
+      priority: null,
+      page: {
+        requestedPage: 1,
+        pageSize: 8,
+        totalItems: 1,
+        totalPages: 1,
+        groups: [fidsRow],
+      },
+      fleet: board.fleet,
+    });
+    expect(fixedFidsBoard.page.groups[0]?.rowId).toBe("rotation-1:group-1");
+    expect(
+      fidsBoardResponseSchema.parse({
+        ...fixedFidsBoard,
+        viewMode: "SPLIT",
+        priority: {
+          configuredCapacity: 3,
+          effectiveCapacity: 3,
+          totalItems: 1,
+          overflowCount: 0,
+          groups: [fidsRow],
+        },
+        page: { ...fixedFidsBoard.page, pageSize: 5, groups: [] },
+      }).viewMode,
+    ).toBe("SPLIT");
     expect(() =>
       publicTicketStatusSchema.parse({
         ...status,

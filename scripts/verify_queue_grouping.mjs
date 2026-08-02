@@ -1,13 +1,14 @@
 import { spawn, spawnSync } from "node:child_process";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const wranglerBin = resolve(root, "node_modules", "wrangler", "bin", "wrangler.js");
-const stateDirectory = resolve(root, ".wrangler", "queue-grouping-state");
-await rm(stateDirectory, { force: true, recursive: true });
+const stateDirectory = mkdtempSync(join(tmpdir(), "rundflug-queue-grouping-"));
 const initializeD1 = (args) =>
   spawnSync(
     process.execPath,
@@ -488,4 +489,5 @@ try {
   } else {
     server.kill();
   }
+  await rm(stateDirectory, { force: true, recursive: true });
 }

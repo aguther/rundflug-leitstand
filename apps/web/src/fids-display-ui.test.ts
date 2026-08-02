@@ -4,6 +4,8 @@ import appSource from "./App.tsx?raw";
 import routerSource from "./FeatureRouter.tsx?raw";
 import eventScopedSource from "./features/auth/EventScopedApplication.tsx?raw";
 import settingsSource from "./features/fids/FidsSettingsDialog.tsx?raw";
+import liveDataSource from "./features/fids/live-fids-data-source.ts?raw";
+import controllerSource from "./features/fids/useFidsExperience.ts?raw";
 import displaySource from "./fids-display.tsx?raw";
 import fidsViewSource from "./fids-view.tsx?raw";
 
@@ -50,24 +52,23 @@ describe("FIDS V1.7.3 UI", () => {
     );
   });
 
-  it("keeps the production wrapper while exposing a controlled presentation for simulation", () => {
+  it("uses one controlled presentation and experience for live and simulation", () => {
     expect(displaySource).toContain("export function FidsBoardPresentation");
     expect(displaySource).toContain("connectionLabel");
     expect(displaySource).toContain("connectionTone");
     expect(displaySource).toContain("simulationBanner");
-    expect(displaySource).toContain("footerNote");
-    expect(displaySource).toContain("showFooter = true");
-    expect(displaySource).toContain('data-fids-footer={showFooter ? "visible" : "hidden"}');
-    expect(stylesSource).toContain(
-      '.standard-fids[data-fids-mode="simulation"][data-fids-footer="hidden"]',
-    );
-    expect(displaySource).toContain("filterDeparted = true");
+    expect(displaySource).toContain("useFidsExperience({ dataSource, locationAdapter })");
+    expect(displaySource).toContain("dataSource: FidsDataSource");
+    expect(displaySource).toContain('data-fids-view={split ? "split" : "fixed"}');
+    expect(displaySource).toContain("JETZT RELEVANT");
+    expect(displaySource).toContain("WEITERE FLÜGE");
     expect(displaySource).toContain("<FidsSettingsDialog");
-    expect(displaySource).toContain("onOpenSettings={() => setSettingsOpen(true)}");
+    expect(displaySource).toContain("onOpenSettings={() => fids.setSettingsOpen(true)}");
   });
 
-  it("applies the exact row limit and row-major double-column distribution", () => {
-    expect(displaySource).toContain(".slice(0, visibleRows)");
+  it("trusts server paging and keeps row-major double-column distribution", () => {
+    expect(displaySource).not.toContain(".slice(0, visibleRows)");
+    expect(displaySource).toContain("key={group.rowId}");
     expect(displaySource).toContain("index % 2 === 0");
     expect(displaySource).toContain("index % 2 === 1");
     expect(stylesSource).toContain("@media (min-width: 1280px)");
@@ -88,13 +89,15 @@ describe("FIDS V1.7.3 UI", () => {
   it("keeps the settings dialog open until a confirmed save and exposes only approved choices", () => {
     const saveHandler = settingsSource.slice(
       settingsSource.indexOf("const save = async"),
-      settingsSource.indexOf("return ("),
+      settingsSource.indexOf("const logout = async"),
     );
     expect(saveHandler.indexOf("await onSave(draft)")).toBeLessThan(
       saveHandler.indexOf("onClose();"),
     );
     for (const copy of [
-      "Angezeigte Zeilen",
+      "Sichtbare Gruppen",
+      "Feste Seite",
+      "Geteilte Ansicht",
       "Eine Spalte",
       "Zwei Spalten",
       "System",
@@ -106,11 +109,11 @@ describe("FIDS V1.7.3 UI", () => {
     ]) {
       expect(settingsSource).toContain(copy);
     }
-    expect(fidsViewSource).toContain("expectedVersion: preferences.version");
+    expect(liveDataSource).toContain("expectedVersion");
     expect(settingsSource).toContain("editablePreferences(preferences)");
-    expect(settingsSource).toContain("visibleRows: preferences.visibleRows");
     expect(settingsSource).not.toContain("useState<EditableFidsPreferences>(preferences)");
-    expect(settingsSource).toContain("if (open) setError(null)");
+    expect(settingsSource).toContain("setError(null)");
+    expect(settingsSource).toContain("fids-settings-scroll");
   });
 
   it("binds the shell to 100dvh without document or table scrolling", () => {
@@ -169,14 +172,15 @@ describe("FIDS V1.7.3 UI", () => {
   });
 
   it("keeps the last confirmed board during reconnect and polling failures", () => {
-    const refreshFlow = fidsViewSource.slice(
-      fidsViewSource.indexOf("const refresh = () =>"),
-      fidsViewSource.indexOf("const connect = () =>"),
+    const refreshFlow = controllerSource.slice(
+      controllerSource.indexOf("const refresh = useCallback"),
+      controllerSource.indexOf("refreshRef.current = refresh"),
     );
     expect(refreshFlow).toContain("setBoard(nextBoard)");
     expect(refreshFlow).toContain("setError(");
     expect(refreshFlow).not.toContain("setBoard(null)");
-    expect(fidsViewSource).toContain("new WebSocket(");
-    expect(fidsViewSource).toContain("window.setInterval(refresh, 15_000)");
+    expect(liveDataSource).toContain("new WebSocket(");
+    expect(liveDataSource).toContain("target.setInterval(refresh, 15_000)");
+    expect(fidsViewSource).not.toMatch(/localStorage|gateId|\bgate\b/);
   });
 });

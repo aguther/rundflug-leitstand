@@ -54,6 +54,7 @@ import {
 } from "@rundflug/domain";
 import { sha256Hex, verifyCredential } from "./crypto";
 import { mayAccessFids } from "./fids-authorization";
+import { loadFidsPreferences, normalizeFidsContentFilter } from "./fids-preferences-storage";
 import {
   type PlannedOperationKind,
   type PlannedOperationScope,
@@ -111,7 +112,7 @@ export class EventCoordinator extends DurableObject<Env> {
       return this.enqueueCommand(request);
     }
     if (request.method === "PUT" && url.pathname.endsWith("/fids/preferences")) {
-      return this.handleFidsPreferences(request, url);
+      return this.enqueueFidsPreferences(request, url);
     }
     if (
       (request.method === "PUT" || request.method === "DELETE") &&
@@ -156,6 +157,15 @@ export class EventCoordinator extends DurableObject<Env> {
         headers,
       });
     });
+    this.commandTail = task.then(
+      () => undefined,
+      () => undefined,
+    );
+    return task;
+  }
+
+  private enqueueFidsPreferences(request: Request, url: URL): Promise<Response> {
+    const task = this.commandTail.then(() => this.handleFidsPreferences(request, url));
     this.commandTail = task.then(
       () => undefined,
       () => undefined,
@@ -299,19 +309,44 @@ export class EventCoordinator extends DurableObject<Env> {
       );
     }
 
-    const current = await this.env.DB.prepare(
-      `SELECT visible_rows, layout, theme, version
-         FROM fids_preferences
-        WHERE operator_account_id = ?1 AND operation_day_id = ?2`,
-    )
-      .bind(accountId, eventId)
-      .first<{
-        visible_rows: number;
-        layout: FidsPreferences["layout"];
-        theme: FidsPreferences["theme"];
-        version: number;
-      }>();
-    const currentVersion = current?.version ?? 0;
+    const normalizedFilter = normalizeFidsContentFilter(input.contentFilter);
+    const [knownProducts, knownGates] = await Promise.all([
+      normalizedFilter.productIds.length === 0
+        ? Promise.resolve({ results: [] as Array<{ id: string }> })
+        : this.env.DB.prepare(
+            `SELECT id FROM products
+              WHERE operation_day_id = ?1
+                AND id IN (SELECT value FROM json_each(?2))`,
+          )
+            .bind(eventId, JSON.stringify(normalizedFilter.productIds))
+            .all<{ id: string }>(),
+      normalizedFilter.gateIds.length === 0
+        ? Promise.resolve({ results: [] as Array<{ id: string }> })
+        : this.env.DB.prepare(
+            `SELECT id FROM gates
+              WHERE operation_day_id = ?1
+                AND id IN (SELECT value FROM json_each(?2))`,
+          )
+            .bind(eventId, JSON.stringify(normalizedFilter.gateIds))
+            .all<{ id: string }>(),
+    ]);
+    if (
+      knownProducts.results.length !== normalizedFilter.productIds.length ||
+      knownGates.results.length !== normalizedFilter.gateIds.length
+    ) {
+      return json(
+        {
+          error: {
+            code: "FIDS_FILTER_OPTION_NOT_FOUND",
+            message: "Mindestens eine Filteroption gehört nicht zu dieser Veranstaltung.",
+          },
+        },
+        { status: 400 },
+      );
+    }
+
+    const current = await loadFidsPreferences(this.env.DB, accountId, eventId);
+    const currentVersion = current.version;
     if (currentVersion !== input.expectedVersion) {
       return json(
         {
@@ -330,6 +365,10 @@ export class EventCoordinator extends DurableObject<Env> {
       visibleRows: input.visibleRows,
       layout: input.layout,
       theme: input.theme,
+      viewMode: input.viewMode,
+      priorityGroupCount: input.priorityGroupCount,
+      rotationIntervalSeconds: input.rotationIntervalSeconds,
+      contentFilter: normalizedFilter,
       version: currentVersion + 1,
     };
     const auditPayload = {
@@ -337,26 +376,40 @@ export class EventCoordinator extends DurableObject<Env> {
       visibleRows: next.visibleRows,
       layout: next.layout,
       theme: next.theme,
+      viewMode: next.viewMode,
+      priorityGroupCount: next.priorityGroupCount,
+      rotationIntervalSeconds: next.rotationIntervalSeconds,
+      productIds: next.contentFilter.productIds,
+      gateIds: next.contentFilter.gateIds,
     };
     await this.env.DB.batch([
       this.env.DB.prepare(
         `INSERT INTO fids_preferences
-          (operator_account_id, operation_day_id, visible_rows, layout, theme, version,
+          (operator_account_id, operation_day_id, visible_rows, layout, theme, view_mode,
+           priority_group_count, rotation_interval_seconds, content_filter_json, version,
            created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?11)
          ON CONFLICT(operator_account_id, operation_day_id) DO UPDATE SET
            visible_rows = excluded.visible_rows,
            layout = excluded.layout,
            theme = excluded.theme,
+           view_mode = excluded.view_mode,
+           priority_group_count = excluded.priority_group_count,
+           rotation_interval_seconds = excluded.rotation_interval_seconds,
+           content_filter_json = excluded.content_filter_json,
            version = excluded.version,
            updated_at = excluded.updated_at
-         WHERE fids_preferences.version = ?8`,
+         WHERE fids_preferences.version = ?12`,
       ).bind(
         accountId,
         eventId,
         next.visibleRows,
         next.layout,
         next.theme,
+        next.viewMode,
+        next.priorityGroupCount,
+        next.rotationIntervalSeconds,
+        JSON.stringify(next.contentFilter),
         next.version,
         now,
         currentVersion,
