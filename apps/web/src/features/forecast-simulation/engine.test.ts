@@ -517,7 +517,7 @@ describe("local forecast simulation", () => {
     );
   });
 
-  it("builds an opening queue without precalling or boarding before operations start", () => {
+  it("builds a conservatively forecast opening queue without precalling before operations start", () => {
     const config = simulationConfigForPreset("NORMAL");
     const result = runSimulation(config);
     const operationsStart = Date.parse(config.schedule.operationsStartAt);
@@ -533,14 +533,19 @@ describe("local forecast simulation", () => {
         )
         .every((event) => Date.parse(event.occurredAt) >= operationsStart),
     ).toBe(true);
+    const openingSnapshots = result.snapshots.filter(
+      (snapshot) => Date.parse(snapshot.capturedAt) < operationsStart,
+    );
+    expect(openingSnapshots.length).toBeGreaterThan(0);
     expect(
-      result.snapshots
-        .filter((snapshot) => Date.parse(snapshot.capturedAt) < operationsStart)
-        .every(
-          (snapshot) =>
-            snapshot.activeCapacity === 0 &&
-            snapshot.uncertaintyReasons.includes("RESOURCE_GROUP_INACTIVE"),
-        ),
+      openingSnapshots.every(
+        (snapshot) =>
+          snapshot.activeCapacity > 0 &&
+          ["DISPATCH_WINDOW", "LONG_RANGE_WINDOW"].includes(snapshot.forecastState ?? "") &&
+          !snapshot.uncertaintyReasons.includes("RESOURCE_GROUP_INACTIVE") &&
+          !snapshot.uncertaintyReasons.includes("OPERATION_INTERRUPTED") &&
+          Date.parse(snapshot.predictedBoardingAt) >= operationsStart,
+      ),
     ).toBe(true);
   });
 
@@ -757,11 +762,16 @@ describe("local forecast simulation", () => {
     const result = runSimulation(simulationConfigForPreset("OPERATION_INTERRUPTION"));
     const uncertain = result.snapshots.find(
       (snapshot) =>
+        snapshot.status === "DRAFT" &&
         snapshot.quality === "UNCERTAIN" &&
         snapshot.uncertaintyReasons.includes("OPERATION_INTERRUPTED"),
     );
 
-    expect(uncertain).toMatchObject({ countdownDisplayed: false });
+    expect(uncertain).toMatchObject({
+      countdownDisplayed: false,
+      forecastState: "UNAVAILABLE",
+      forecastReason: "OPERATIONS_INTERRUPTED",
+    });
     expect(Date.parse(uncertain?.predictedBoardingAt ?? "")).not.toBeNaN();
     expect(Date.parse(uncertain?.predictedCompletionAt ?? "")).not.toBeNaN();
     expect(result.metrics.uncertaintyReasons.OPERATION_INTERRUPTED).toBeGreaterThan(0);

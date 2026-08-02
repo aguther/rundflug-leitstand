@@ -1,5 +1,5 @@
 import type { FidsBoardRow, PublicBoard } from "@rundflug/contracts";
-import { formatBookingGroupLabel } from "@rundflug/domain";
+import { derivePublicForecastProjection, formatBookingGroupLabel } from "@rundflug/domain";
 import type {
   SimulationEvent,
   SimulationForecastSnapshot,
@@ -166,12 +166,15 @@ function boardWindow(input: {
   lifecycle: RotationLifecycle;
   snapshot: SimulationForecastSnapshot | undefined;
   interrupted: boolean;
+  operationsEndAt: string;
 }): {
   lowerAt: string | null;
   upperAt: string | null;
   lowerMinutes: number;
   upperMinutes: number;
   quality: PublicGroup["predictionQuality"];
+  forecastState: PublicGroup["forecastState"];
+  forecastReason: PublicGroup["forecastReason"];
 } {
   const quality = input.interrupted ? "UNCERTAIN" : (input.snapshot?.quality ?? "UNCERTAIN");
   const lowerMinutes = quality === "UNCERTAIN" ? 0 : Math.max(0, input.snapshot?.lowerMinutes ?? 0);
@@ -179,12 +182,49 @@ function boardWindow(input: {
     quality === "UNCERTAIN"
       ? 0
       : Math.max(lowerMinutes, input.snapshot?.upperMinutes ?? lowerMinutes);
-  if (input.lifecycle !== "DRAFT" || quality === "UNCERTAIN" || !input.snapshot) {
-    return { lowerAt: null, upperAt: null, lowerMinutes, upperMinutes, quality };
+  const publicForecast = derivePublicForecastProjection({
+    rotationStatus: input.lifecycle,
+    predictionQuality: quality,
+    predictedBoardingAt: input.snapshot?.predictedBoardingAt ?? null,
+    predictedCompletionAt: input.snapshot?.predictedCompletionAt ?? null,
+    operationsEndAt: input.operationsEndAt,
+    dispatchBatchId: input.snapshot?.dispatchBatchId ?? null,
+    dispatchUnplannedReason: input.snapshot?.dispatchUnplannedReason ?? null,
+    emergencyMode: false,
+    operationalInterrupted: input.interrupted,
+    resourceGroupStatus: "ACTIVE",
+  });
+  const forecastState = input.snapshot?.forecastState ?? publicForecast.forecastState;
+  const forecastReason = input.snapshot?.forecastReason ?? publicForecast.forecastReason;
+  const publishesWindow =
+    forecastState === "DISPATCH_WINDOW" || forecastState === "LONG_RANGE_WINDOW";
+  if (
+    input.lifecycle !== "DRAFT" ||
+    quality === "UNCERTAIN" ||
+    !input.snapshot ||
+    !publishesWindow
+  ) {
+    return {
+      lowerAt: null,
+      upperAt: null,
+      lowerMinutes,
+      upperMinutes,
+      quality,
+      forecastState,
+      forecastReason,
+    };
   }
   const lowerMs = Date.parse(input.snapshot.predictedBoardingAt);
   if (!Number.isFinite(lowerMs)) {
-    return { lowerAt: null, upperAt: null, lowerMinutes, upperMinutes, quality };
+    return {
+      lowerAt: null,
+      upperAt: null,
+      lowerMinutes,
+      upperMinutes,
+      quality,
+      forecastState: "UNAVAILABLE",
+      forecastReason: null,
+    };
   }
   return {
     lowerAt: new Date(lowerMs).toISOString(),
@@ -192,6 +232,8 @@ function boardWindow(input: {
     lowerMinutes,
     upperMinutes,
     quality,
+    forecastState,
+    forecastReason,
   };
 }
 
@@ -271,7 +313,8 @@ export function createSimulationFidsBoard(input: {
       const window = boardWindow({
         lifecycle,
         snapshot,
-        interrupted: rotationInterrupted,
+        interrupted,
+        operationsEndAt: input.result.config.schedule.operationsEndAt,
       });
       const productCode = rotation.productCode ?? "SIM";
       const model = input.result.config.operationalModel;
@@ -299,12 +342,16 @@ export function createSimulationFidsBoard(input: {
         ),
         aircraftRegistration: boundAircraft,
         departedAt: rotation.departedAt,
-        status: publicStatus(rotation, lifecycle, input.visibleAt),
+        status: activeGroupPlan
+          ? "SERVICE_PAUSED"
+          : publicStatus(rotation, lifecycle, input.visibleAt),
         waitLowerMinutes: window.lowerMinutes,
         waitUpperMinutes: window.upperMinutes,
         boardingWindowLowerAt: window.lowerAt,
         boardingWindowUpperAt: window.upperAt,
         predictionQuality: window.quality,
+        forecastState: window.forecastState,
+        forecastReason: window.forecastReason,
         dispatchOrder: rotation.dispatchOrder ?? null,
         operationalNotice:
           activeGroupPlan?.publicNote ||

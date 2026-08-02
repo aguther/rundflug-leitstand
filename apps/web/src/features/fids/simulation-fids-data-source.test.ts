@@ -24,6 +24,8 @@ const row = (
   waitUpperMinutes: 30,
   boardingWindowLowerAt: "2026-08-02T08:00:00.000Z",
   boardingWindowUpperAt: "2026-08-02T08:30:00.000Z",
+  forecastState: "DISPATCH_WINDOW",
+  forecastReason: null,
   dispatchOrder: index,
   predictionQuality: "STABLE",
   operationalNotice: "",

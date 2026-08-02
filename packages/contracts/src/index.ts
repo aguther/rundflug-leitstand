@@ -2620,6 +2620,9 @@ export const rotationOperationalSummarySchema = z.object({
           "WAITING_FOR_PRODUCT_FAIRNESS",
           "NOT_IN_NEAR_DISPATCH_BATCH",
           "COMMITMENT_LOCKED",
+          "ATTENDANCE_MISSING",
+          "ATTENDANCE_CLARIFICATION",
+          "UNKNOWN_RESOURCE_RETURN",
         ])
         .nullable(),
     })
@@ -2649,6 +2652,8 @@ export const rotationOperationalSummarySchema = z.object({
     predictionQuality: z.enum(["STABLE", "CHANGING", "UNCERTAIN"]).nullable(),
     predictionUpdatedAt: z.string().nullable(),
     forecastAssumedAircraftId: z.string().nullable().optional(),
+    extendsBeyondOperationsEnd: z.boolean(),
+    overtimeMinutes: z.number().int().nonnegative(),
     effectiveTurnaroundProfile: productOperationalSummarySchema.shape.effectiveTurnaroundProfile
       .nullable()
       .optional(),
@@ -2896,6 +2901,24 @@ export const bookingGroupPartContextSchema = z
   .strict();
 export type BookingGroupPartContext = z.infer<typeof bookingGroupPartContextSchema>;
 
+export const forecastStateSchema = z.enum([
+  "DISPATCH_WINDOW",
+  "LONG_RANGE_WINDOW",
+  "AFTER_OPERATIONS_END",
+  "UNAVAILABLE",
+]);
+export type ForecastState = z.infer<typeof forecastStateSchema>;
+
+export const publicForecastReasonSchema = z.enum([
+  "RETURN_TIME_UNKNOWN",
+  "NO_MATCHING_CAPACITY",
+  "STATUS_CLARIFICATION",
+  "OPERATIONS_INTERRUPTED",
+  "EMERGENCY_MODE",
+  "RESOURCE_GROUP_UNAVAILABLE",
+]);
+export type PublicForecastReason = z.infer<typeof publicForecastReasonSchema>;
+
 export const publicTicketStatusSchema = z
   .object({
     eventId: z.string(),
@@ -2921,6 +2944,8 @@ export const publicTicketStatusSchema = z
     waitUpperMinutes: z.number().int().nonnegative(),
     boardingWindowLowerAt: z.iso.datetime().nullable(),
     boardingWindowUpperAt: z.iso.datetime().nullable(),
+    forecastState: forecastStateSchema,
+    forecastReason: publicForecastReasonSchema.nullable(),
     timeZone: timeZoneSchema,
     predictionQuality: z.enum(["STABLE", "CHANGING", "UNCERTAIN"]),
     message: z.string(),
@@ -2954,6 +2979,8 @@ export const publicBoardGroupSchema = z
     waitUpperMinutes: z.number().int().nonnegative(),
     boardingWindowLowerAt: z.iso.datetime().nullable(),
     boardingWindowUpperAt: z.iso.datetime().nullable(),
+    forecastState: forecastStateSchema,
+    forecastReason: publicForecastReasonSchema.nullable(),
     dispatchOrder: z.number().int().positive().nullable().default(null),
     predictionQuality: z.enum(["STABLE", "CHANGING", "UNCERTAIN"]),
     operationalNotice: z.string(),
@@ -3101,6 +3128,8 @@ const publicGroupPartSchema = bookingGroupPartContextSchema
     queuePosition: z.number().int().positive().nullable(),
     boardingWindowLowerAt: z.iso.datetime().nullable(),
     boardingWindowUpperAt: z.iso.datetime().nullable(),
+    forecastState: forecastStateSchema,
+    forecastReason: publicForecastReasonSchema.nullable(),
     predictionQuality: z.enum(["STABLE", "CHANGING", "UNCERTAIN"]),
     message: z.string(),
   })
@@ -3299,6 +3328,9 @@ export const forecastHistoryEntrySchema = z.object({
           "WAITING_FOR_PRODUCT_FAIRNESS",
           "NOT_IN_NEAR_DISPATCH_BATCH",
           "COMMITMENT_LOCKED",
+          "ATTENDANCE_MISSING",
+          "ATTENDANCE_CLARIFICATION",
+          "UNKNOWN_RESOURCE_RETURN",
         ])
         .nullable(),
     })

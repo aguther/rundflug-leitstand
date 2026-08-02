@@ -15,7 +15,10 @@ export type DispatchUnplannedReason =
   | "WAITING_FOR_FITTING_LANE"
   | "WAITING_FOR_PRODUCT_FAIRNESS"
   | "NOT_IN_NEAR_DISPATCH_BATCH"
-  | "COMMITMENT_LOCKED";
+  | "COMMITMENT_LOCKED"
+  | "ATTENDANCE_MISSING"
+  | "ATTENDANCE_CLARIFICATION"
+  | "UNKNOWN_RESOURCE_RETURN";
 
 export interface DispatchPlanningLimits {
   maximumGroupsPerResourceGroup: number;
@@ -301,6 +304,37 @@ function groupOrder(left: NormalizedGroup, right: NormalizedGroup): number {
     left.soldAt.localeCompare(right.soldAt) ||
     left.id.localeCompare(right.id)
   );
+}
+
+/**
+ * Orders complete groups for deterministic projection beyond the bounded dispatch horizon.
+ * The ordering intentionally reuses the dispatch fairness, waiting-age and overtake rules without
+ * applying the dispatch candidate or beam-search limits.
+ */
+export function orderDispatchGroupsForProjection(input: {
+  now: string;
+  groups: readonly DispatchGroupInput[];
+  limits?: Partial<DispatchPlanningLimits>;
+}): DispatchGroupInput[] {
+  const nowMs = Date.parse(input.now);
+  if (!Number.isFinite(nowMs)) throw new Error("Dispatch projection time is invalid.");
+  const limits = normalizedLimits(input.limits);
+  const seenIds = new Set<string>();
+  return input.groups
+    .map((group) => {
+      if (seenIds.has(group.id)) throw new Error(`Dispatch group ${group.id} is duplicated.`);
+      seenIds.add(group.id);
+      return normalizeGroup(group, nowMs, limits);
+    })
+    .sort(groupOrder)
+    .map(
+      ({
+        waitMinutes: _waitMinutes,
+        mustServeForWait: _mustServeForWait,
+        mustServeForOvertakes: _mustServeForOvertakes,
+        ...group
+      }) => group,
+    );
 }
 
 function queueOrder(left: NormalizedGroup, right: NormalizedGroup): number {
@@ -871,13 +905,18 @@ export function createDispatchPlan(input: DispatchPlanInput): DispatchPlan {
     .sort(queueOrder)
     .map((group) => ({
       memberId: group.id,
-      reason: consideredIds.has(group.id)
-        ? unplannedReason(
-            group,
-            normalizedLanes.filter((lane) => lane.resourceGroupId === group.resourceGroupId),
-            plannedStates,
-          )
-        : ("NOT_IN_NEAR_DISPATCH_BATCH" as const),
+      reason:
+        group.attendanceStatus === "MISSING"
+          ? ("ATTENDANCE_MISSING" as const)
+          : group.attendanceStatus === "CLARIFICATION"
+            ? ("ATTENDANCE_CLARIFICATION" as const)
+            : consideredIds.has(group.id)
+              ? unplannedReason(
+                  group,
+                  normalizedLanes.filter((lane) => lane.resourceGroupId === group.resourceGroupId),
+                  plannedStates,
+                )
+              : ("NOT_IN_NEAR_DISPATCH_BATCH" as const),
     }));
   const revision = stableHash(
     batches

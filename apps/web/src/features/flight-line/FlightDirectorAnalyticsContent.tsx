@@ -306,6 +306,14 @@ function ForecastRotationPanel({
           ].join(" / ")
         : "–",
     },
+    ...(rotation?.timeline.extendsBeyondOperationsEnd
+      ? [
+          {
+            label: "Betriebsende",
+            value: `${formatTime(rotation.timeline.predicted.completionAt, timeZone)} · +${rotation.timeline.overtimeMinutes} Min.`,
+          },
+        ]
+      : []),
   ];
   const milestones: Array<[string, string | null]> = [
     ["Boarding", actual?.boardingAt ?? null],

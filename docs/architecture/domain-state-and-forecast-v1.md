@@ -226,8 +226,13 @@ liegt in `packages/domain/src/forecast.ts`.
 
 ### 5.4 Queue, Unsicherheit und öffentliche Darstellung
 
-Offene Fluggruppen werden auf die jeweils früheste erwartete Verfügbarkeitsbahn gelegt. Eine
-vorübergehend blockierte Ressource bleibt dadurch als spätere Kapazität erhalten, statt die gesamte
+Nahe offene Fluggruppen erhalten zunächst einen begrenzten, kombinatorisch optimierten
+Dispatch-Plan. Er bleibt eine versionierte Empfehlung. Alle übrigen prognostizierbaren Gruppen
+werden danach deterministisch und linear mit derselben Prioritätsordnung auf die jeweils früheste
+kompatible Verfügbarkeitsbahn gelegt. Ganze Gruppen bleiben erhalten; ein Batch ist produkt- und
+gatrein. `MISSING` und `CLARIFICATION` reservieren keine Kapazität.
+
+Eine vorübergehend blockierte Ressource bleibt dadurch als spätere Kapazität erhalten, statt die gesamte
 Queue bei Beginn und Ende der Blockierung zwischen unterschiedlichen Parallelitätsgraden neu zu
 verteilen. Frühester, erwarteter und spätester Verlauf einer Bahn werden gekoppelt fortgeschrieben;
 die Prognose kombiniert nicht unabhängig das globale Minimum und Maximum aller Ressourcen.
@@ -237,17 +242,21 @@ Absehbare Pausen, Betankungen und Unterbrechungen sperren ausschließlich die be
 ihrem ungefähren Zeitraum. Ein überschrittener Plan erhöht die ausgewiesene Unsicherheit, löst aber
 keinen operativen Zustand aus.
 
-Interne Prognosezeitpunkte verwenden die Mitte des resultierenden Intervalls als Erwartungswert.
-Öffentliche Zeitfenster über 60 Minuten werden als `Wird aktualisiert` dargestellt. Aktiver
-Notfallmodus oder eine globale Betriebsunterbrechung unterdrücken weiterhin eine scheinpräzise
-Prognose.
+Interne Prognosezeitpunkte verwenden die Mitte des resultierenden Intervalls als Erwartungswert und
+werden auch jenseits des Betriebsendes fortgeschrieben. `extendsBeyondOperationsEnd` und
+`overtimeMinutes` machen die Überschreitung intern sichtbar. Öffentliche Verträge unterscheiden
+`DISPATCH_WINDOW`, `LONG_RANGE_WINDOW`, `AFTER_OPERATIONS_END` und `UNAVAILABLE` sowie einen sicheren
+Grund. Lange absolute Fenster werden vollständig dargestellt; nach Betriebsende lautet die
+Gastinformation „Voraussichtlich heute nicht mehr“. Eine unbekannte Ressourcenrückkehr, fehlende
+passende Kapazität oder Statusklärung erscheinen als eigene Meldung. Aktiver Notfallmodus oder eine
+globale Betriebsunterbrechung unterdrücken weiterhin eine scheinpräzise Prognose.
 
 Die benannten Produktionskonstanten werden zusätzlich als optionales `ForecastTuningProfile`
 bereitgestellt. Ein fehlendes Profil ist charakterisiert und liefert bitgenau das bisherige
 Verhalten. Produktive Worker-Aufrufe bleiben profilfrei; lokale Kandidatenwerte werden weder
 persistiert noch über HTTP transportiert.
 
-### 5.4 Qualitätsstufen und Intervalle
+### 5.5 Qualitätsstufen und Intervalle
 
 | Qualität | Bedeutung | Öffentliche Wirkung |
 | --- | --- | --- |
@@ -262,15 +271,18 @@ Zeitpunkte nach vorn, statt einen bereits vergangenen Zeitpunkt weiter anzuzeige
 Die Freshness-Prüfung verwendet ausschließlich `prediction_updated_at`; der Zeitpunkt des letzten
 Lernumlaufs und `operation_days.updated_at` besitzen keine Freshness-Semantik.
 
-### 5.5 Kapazität
+### 5.6 Kapazität
 
-`assessRemainingCapacity` in `packages/domain/src/capacity.ts` berechnet zunächst die verbleibenden
-vollständigen Umläufe und die Summe der aktiven Sitzplätze. Unsicherheit reduziert die rechnerische
-Kapazität konservativ: Faktor 1,0 bei `STABLE`, 0,85 bei `CHANGING`, 0,6 bei `UNCERTAIN`.
-Reservierte und bereits offene Plätze werden abgezogen. Die Schwellwerte ergeben `AVAILABLE`,
-`LIMITED`, `MANUAL_REVIEW` oder `SOLD_OUT`; sie sind keine flugbetriebliche Freigabe.
+`assessMarginalProductCapacity` in `packages/domain/src/capacity.ts` beginnt mit der nach der
+vollständigen gemeinsamen Ressourcengruppen-Queue verbleibenden Spurverfügbarkeit. Für jedes Produkt
+simuliert die Funktion zusätzliche produktreine Batches mit den wirksamen Flugzeug-/Produktdauern,
+geplanten Sperren und wiederkehrenden Pausen oder Betankungen. Ein Sitz zählt nur, wenn das obere
+Abschlussende konservativ vor oder auf dem Betriebsende liegt. Bereits offene Tickets werden von
+dieser Gesamtleistung abgezogen. Die Schwellwerte ergeben `AVAILABLE`, `LIMITED`, `MANUAL_REVIEW`
+oder `SOLD_OUT`; `UNCERTAIN` erzwingt bei positiver Restkapazität die manuelle Prüfung. Das Ergebnis
+ist eine organisatorische Verkaufshilfe ohne flugbetriebliche Freigabewirkung.
 
-### 5.6 Ausführung, Snapshots und Fehlerverhalten
+### 5.7 Ausführung, Snapshots und Fehlerverhalten
 
 Nach einer erfolgreichen Fachtransaktion stößt das Durable Object die Prognose asynchron an. Der
 Rechenlauf verändert keine bestätigten Ist-Ereignisse. Er aktualisiert die Prognosefelder offener
@@ -282,7 +294,7 @@ Scheitert die Prognose, bleibt der bestätigte operative Zustand gültig; der Fe
 Zustandswechsel startet einen neuen Lauf. Snapshots und Wiederherstellung sind in
 `docs/architecture/forecast-snapshots-v1.md` beschrieben.
 
-### 5.7 Automatischer Voraufruf und menschliche Bestätigung
+### 5.8 Automatischer Voraufruf und menschliche Bestätigung
 
 Der Prognoselauf kann eine noch ungebundene Fluggruppe automatisch auf `GO_TO_GATE` setzen. Dafür
 müssen Queueposition, Prognosequalität, verfügbare Ressourcenkapazität und die konfigurierte

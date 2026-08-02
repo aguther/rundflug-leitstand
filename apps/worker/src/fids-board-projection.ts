@@ -21,10 +21,22 @@ export interface FidsProjectionRow {
   dispatch_order: number | null;
   status: "DRAFT" | "CALLED" | "IN_FLIGHT" | "LANDED" | "COMPLETED";
   predicted_boarding_at: string | null;
+  predicted_completion_at: string | null;
   prediction_quality: "STABLE" | "CHANGING" | "UNCERTAIN" | null;
   prediction_lower_minutes: number | null;
   prediction_upper_minutes: number | null;
   prediction_updated_at: string | null;
+  dispatch_batch_id: string | null;
+  dispatch_unplanned_reason:
+    | "NO_FORECAST_CAPACITY"
+    | "WAITING_FOR_FITTING_LANE"
+    | "WAITING_FOR_PRODUCT_FAIRNESS"
+    | "NOT_IN_NEAR_DISPATCH_BATCH"
+    | "COMMITMENT_LOCKED"
+    | "ATTENDANCE_MISSING"
+    | "ATTENDANCE_CLARIFICATION"
+    | "UNKNOWN_RESOURCE_RETURN"
+    | null;
   recall_id: string | null;
   recall_sequence: number | null;
   recall_started_at: string | null;
@@ -51,8 +63,9 @@ const projectionCte = `WITH projected AS (
          fg.precalled_at, fg.precall_decision_status,
          COALESCE(fg.queue_position, fg.communication_number) AS queue_position,
          r.dispatch_order, r.status,
-         r.predicted_boarding_at, r.prediction_quality, r.prediction_lower_minutes,
-         r.prediction_upper_minutes, r.prediction_updated_at,
+         r.predicted_boarding_at, r.predicted_completion_at, r.prediction_quality,
+         r.prediction_lower_minutes, r.prediction_upper_minutes, r.prediction_updated_at,
+         r.dispatch_batch_id, r.dispatch_unplanned_reason,
          recall.id AS recall_id, recall.sequence AS recall_sequence,
          recall.started_at AS recall_started_at, recall.expires_at AS recall_expires_at,
          MIN(a.registration) AS aircraft_registration,
@@ -174,6 +187,7 @@ export interface FidsProjectionEvent {
   emergency_mode: number;
   operational_interrupted: number;
   operational_note: string;
+  operations_end_at: string | null;
   planned_public_note: string | null;
   departed_visibility_seconds: number;
   updated_at: string;
@@ -186,7 +200,8 @@ export async function loadFidsProjectionEvent(
   return db
     .prepare(
       `SELECT od.name, od.time_zone, od.emergency_mode, od.operational_interrupted,
-              od.operational_note, od.departed_visibility_seconds, od.updated_at,
+              od.operational_note, od.operations_end_at, od.departed_visibility_seconds,
+              od.updated_at,
               (SELECT plan.public_note FROM planned_operational_constraints plan
                 WHERE plan.operation_day_id = od.id AND plan.status = 'ACTIVE'
                   AND plan.scope_type = 'EVENT' AND plan.scope_id = od.id

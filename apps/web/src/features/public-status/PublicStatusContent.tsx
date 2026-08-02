@@ -88,13 +88,30 @@ interface StatusPart {
   boardingWindowLowerAt: string | null;
   boardingWindowUpperAt: string | null;
   predictionQuality: "STABLE" | "CHANGING" | "UNCERTAIN";
+  forecastState: "DISPATCH_WINDOW" | "LONG_RANGE_WINDOW" | "AFTER_OPERATIONS_END" | "UNAVAILABLE";
+  forecastReason:
+    | "RETURN_TIME_UNKNOWN"
+    | "NO_MATCHING_CAPACITY"
+    | "STATUS_CLARIFICATION"
+    | "OPERATIONS_INTERRUPTED"
+    | "EMERGENCY_MODE"
+    | "RESOURCE_GROUP_UNAVAILABLE"
+    | null;
 }
 
 function statusWindow(part: StatusPart, timeZone: string): string {
+  if (part.forecastState === "AFTER_OPERATIONS_END") {
+    return "Voraussichtlich heute nicht mehr";
+  }
+  if (part.forecastState === "UNAVAILABLE") {
+    if (part.forecastReason === "RETURN_TIME_UNKNOWN") return "Rückkehrzeit offen";
+    if (part.forecastReason === "NO_MATCHING_CAPACITY") return "Keine passende Kapazität";
+    if (part.forecastReason === "STATUS_CLARIFICATION") return "Status wird geklärt";
+    return "Wird aktualisiert";
+  }
   return formatAbsoluteTimeWindow({
     lowerAt: part.boardingWindowLowerAt,
     upperAt: part.boardingWindowUpperAt,
-    maximumWidthMinutes: 60,
     timeZone,
     quality: part.predictionQuality,
     phase:
@@ -316,6 +333,8 @@ export type TicketStatusPart = Pick<
   | "boardingWindowLowerAt"
   | "boardingWindowUpperAt"
   | "predictionQuality"
+  | "forecastState"
+  | "forecastReason"
 >;
 
 export type GroupStatusPart = PublicGroupStatus["parts"][number];

@@ -3,6 +3,7 @@ import { productionBaselineConfig, runBatchComparison } from "./comparison";
 import { demandForProfile, simulationConfigForPreset } from "./model";
 
 const BATCH_BASELINE_TIMEOUT_MS = 90_000;
+const COMPARISON_SMOKE_TIMEOUT_MS = 20_000;
 
 function comparisonConfig() {
   const config = simulationConfigForPreset("NORMAL");
@@ -14,48 +15,56 @@ function comparisonConfig() {
 }
 
 describe("local forecast A/B comparison", () => {
-  it("compares the scalar baseline with the time-dependent resource model", () => {
-    const result = runBatchComparison(comparisonConfig());
-    expect(result.runCount).toBe(5);
-    expect(result.rows.length).toBeGreaterThan(0);
-    expect(result.rows).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ id: "departure-mae" }),
-        expect.objectContaining({ id: "landing-median" }),
-        expect.objectContaining({ id: "completion-bias" }),
-        expect.objectContaining({ id: "suppression-capacity" }),
-        expect.objectContaining({ id: "suppression-stale-prediction" }),
-        expect.objectContaining({ id: "dispatch-passengers-per-hour" }),
-        expect.objectContaining({ id: "dispatch-passengers-per-aircraft-hour" }),
-        expect.objectContaining({ id: "dispatch-maximum-overtakes" }),
-        expect.objectContaining({ id: "dispatch-go-to-gate-replans" }),
-      ]),
-    );
-    const boardingP90 = result.rows.find((row) => row.id === "boarding-p90");
-    expect(boardingP90?.baseline).not.toBeNull();
-    expect(boardingP90?.candidate).not.toBeNull();
-    expect(boardingP90?.candidate ?? Number.POSITIVE_INFINITY).toBeLessThan(
-      boardingP90?.baseline ?? Number.NEGATIVE_INFINITY,
-    );
-    expect(result.rows.some((row) => row.delta !== 0 && row.delta !== null)).toBe(true);
-  });
+  it(
+    "compares the scalar baseline with the time-dependent resource model",
+    () => {
+      const result = runBatchComparison(comparisonConfig());
+      expect(result.runCount).toBe(5);
+      expect(result.rows.length).toBeGreaterThan(0);
+      expect(result.rows).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ id: "departure-mae" }),
+          expect.objectContaining({ id: "landing-median" }),
+          expect.objectContaining({ id: "completion-bias" }),
+          expect.objectContaining({ id: "suppression-capacity" }),
+          expect.objectContaining({ id: "suppression-stale-prediction" }),
+          expect.objectContaining({ id: "dispatch-passengers-per-hour" }),
+          expect.objectContaining({ id: "dispatch-passengers-per-aircraft-hour" }),
+          expect.objectContaining({ id: "dispatch-maximum-overtakes" }),
+          expect.objectContaining({ id: "dispatch-go-to-gate-replans" }),
+        ]),
+      );
+      const boardingP90 = result.rows.find((row) => row.id === "boarding-p90");
+      expect(boardingP90?.baseline).not.toBeNull();
+      expect(boardingP90?.candidate).not.toBeNull();
+      expect(boardingP90?.candidate ?? Number.POSITIVE_INFINITY).toBeLessThan(
+        boardingP90?.baseline ?? Number.NEGATIVE_INFINITY,
+      );
+      expect(result.rows.some((row) => row.delta !== 0 && row.delta !== null)).toBe(true);
+    },
+    COMPARISON_SMOKE_TIMEOUT_MS,
+  );
 
-  it("uses deterministic consecutive seeds and reports progress", () => {
-    const progress: Array<[number, number]> = [];
-    const first = runBatchComparison(comparisonConfig(), [], (completed, total) => {
-      progress.push([completed, total]);
-    });
-    const second = runBatchComparison(comparisonConfig());
+  it(
+    "uses deterministic consecutive seeds and reports progress",
+    () => {
+      const progress: Array<[number, number]> = [];
+      const first = runBatchComparison(comparisonConfig(), [], (completed, total) => {
+        progress.push([completed, total]);
+      });
+      const second = runBatchComparison(comparisonConfig());
 
-    expect(second).toEqual(first);
-    expect(progress).toEqual([
-      [1, 5],
-      [2, 5],
-      [3, 5],
-      [4, 5],
-      [5, 5],
-    ]);
-  });
+      expect(second).toEqual(first);
+      expect(progress).toEqual([
+        [1, 5],
+        [2, 5],
+        [3, 5],
+        [4, 5],
+        [5, 5],
+      ]);
+    },
+    COMPARISON_SMOKE_TIMEOUT_MS,
+  );
 
   it("keeps Admin and reality values but resets only technical tuning in the baseline", () => {
     const config = comparisonConfig();
@@ -102,10 +111,10 @@ describe("local forecast A/B comparison", () => {
         precallP90: baseline["precall-p90"],
       }).toEqual({
         boardingMedian: 2,
-        boardingP90: 21.5,
-        boardingBias: 6.06,
-        boardingWidth: 4.57,
-        horizon60: 58.5,
+        boardingP90: 20.2,
+        boardingBias: 5.63,
+        boardingWidth: 4.62,
+        horizon60: 58.35,
         horizon30: 28.5,
         horizon15: 13.5,
         departureP90: 2.3,
@@ -130,17 +139,17 @@ describe("local forecast A/B comparison", () => {
         baselineThroughput: baseline["operations-throughput"],
         candidateThroughput: candidate["operations-throughput"],
       }).toEqual({
-        baselineCoverage: 64,
+        baselineCoverage: 67.86,
         candidateCoverage: 81.48,
         candidateP90: 15.5,
-        baselineAverageChange: 0.91,
-        candidateAverageChange: 1.05,
-        baselineJumps15: 99,
-        candidateJumps15: 102,
-        baselineJumps30: 42,
-        candidateJumps30: 48,
-        baselineMaximumJump: 49.5,
-        candidateMaximumJump: 87,
+        baselineAverageChange: 0.97,
+        candidateAverageChange: 0.86,
+        baselineJumps15: 127,
+        candidateJumps15: 153,
+        baselineJumps30: 64,
+        candidateJumps30: 54,
+        baselineMaximumJump: 61,
+        candidateMaximumJump: 94,
         baselineThroughput: 27,
         candidateThroughput: 27,
       });

@@ -45,10 +45,18 @@ function statusPresentation(status: FidsBoardRow["status"]): {
 }
 
 function timeWindow(group: FidsBoardRow, timeZone: string): string {
+  if (group.forecastState === "AFTER_OPERATIONS_END") {
+    return "Voraussichtlich heute nicht mehr";
+  }
+  if (group.forecastState === "UNAVAILABLE") {
+    if (group.forecastReason === "RETURN_TIME_UNKNOWN") return "Rückkehrzeit offen";
+    if (group.forecastReason === "NO_MATCHING_CAPACITY") return "Keine passende Kapazität";
+    if (group.forecastReason === "STATUS_CLARIFICATION") return "Status wird geklärt";
+    return "Wird aktualisiert";
+  }
   return formatAbsoluteTimeWindow({
     lowerAt: group.boardingWindowLowerAt,
     upperAt: group.boardingWindowUpperAt,
-    maximumWidthMinutes: 60,
     timeZone,
     includeClockSuffix: false,
     quality: group.predictionQuality,

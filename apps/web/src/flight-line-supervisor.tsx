@@ -807,8 +807,8 @@ function CompactTickets({
       </span>
     );
   };
-  const timeWindow = (rotation: Rotation) =>
-    formatAbsoluteTimeWindow({
+  const timeWindow = (rotation: Rotation) => {
+    const window = formatAbsoluteTimeWindow({
       lowerAt: rotation.boardingWindowLowerAt,
       upperAt: rotation.boardingWindowUpperAt,
       timeZone,
@@ -822,6 +822,10 @@ function CompactTickets({
             ? "FORECAST"
             : "FINISHED",
     });
+    return rotation.timeline.extendsBeyondOperationsEnd
+      ? `${window} · Ende +${rotation.timeline.overtimeMinutes} Min.`
+      : window;
+  };
   return (
     <div className="flight-director-compact-table tickets">
       <div className="flight-director-compact-head">

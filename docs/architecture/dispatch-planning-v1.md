@@ -33,13 +33,16 @@ Simulator. ADR-0029 hatte dieses Queue-Präfix ausdrücklich stabil und überhol
    Verpflichtungen, Produkt-Service-Schulden und verfügbare Flugzeug-/Piloten-Bahnen.
 2. `createDispatchPlan` liefert Plan-ID, Revision, Batches, Gruppenentscheidungen und explizite
    Nichtplanungsgründe.
-3. `calculateForecastTimelines` reserviert je Batch genau einmal eine Bahn und projiziert dasselbe
-   Boardingfenster auf alle Mitglieder.
-4. `selectAutomaticPrecalls` berücksichtigt ausschließlich frische, nahe Dispatch-Batches. Der
+3. `calculateForecastTimelines` reserviert je nahem Batch genau einmal eine Bahn und projiziert
+   dasselbe Boardingfenster auf alle Mitglieder.
+4. Die verbleibenden Gruppen werden anschließend mit derselben stabilen Prioritätsordnung linear auf
+   die fortgeschriebenen Bahnen gelegt. Dieser Langzeitschwanz füllt produkt- und gatereine Batches
+   aus ganzen Gruppen, verwendet aber keine Beam-Suche und ist keine operative Empfehlung.
+5. `selectAutomaticPrecalls` berücksichtigt ausschließlich frische, nahe Dispatch-Batches. Der
    effektive Vorlauf setzt sich aus adaptivem Basiswert und Gate-Wegvorlauf zusammen.
-5. D1 speichert Projektion und Entscheidungsdiagnostik. Erst danach werden Realtime- und
+6. D1 speichert Projektion und Entscheidungsdiagnostik. Erst danach werden Realtime- und
    Outbox-Nachrichten veröffentlicht.
-6. `CALL_NEXT` akzeptiert die Empfehlung nur bei passender Planrevision, Batch-ID, Flugzeug und
+7. `CALL_NEXT` akzeptiert die Empfehlung nur bei passender Planrevision, Batch-ID, Flugzeug und
    unveränderter Gruppenmenge. Andernfalls wird `DISPATCH_PLAN_STALE` zurückgegeben.
 
 ## Begrenzung und Laufzeit
@@ -49,6 +52,11 @@ je Schritt und Beam-Breite 24. Der Simulator verwendet für schnelle Mehrfachlä
 fachlich identische Grenzen. Die Kandidatenerzeugung kombiniert ausschließlich vollständige Gruppen
 eines Produkts bis zur Sitzkapazität. Alle Sortierungen enden mit stabilen IDs. Gleiche Eingaben
 erzeugen bitgleich denselben Plan; Eingabeobjekte werden nicht verändert.
+
+Die Grenzen gelten nur für die nahe Dispatch-Empfehlung. `NOT_IN_NEAR_DISPATCH_BATCH` entfernt keine
+Prognose. Der nachgelagerte vollständige Schwanz verarbeitet alle prognostizierbaren Gruppen linear,
+übernimmt Flugzeug-/Pilotenspuren und Einschränkungen und läuft bei Bedarf über das Betriebsende
+hinaus. Details begründet ADR-0033.
 
 ## Persistenz und Kompatibilität
 

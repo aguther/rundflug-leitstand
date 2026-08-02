@@ -450,6 +450,227 @@ describe("event-driven forecast", () => {
     expect(elapsed).toBeLessThan(2_000);
   });
 
+  it("projects all 300 eligible groups beyond the bounded dispatch horizon", () => {
+    const now = "2026-07-22T08:00:00.000Z";
+    const rotations = Array.from({ length: 300 }, (_, index) => {
+      const resourceIndex = index % 2;
+      const queueSequence = Math.floor(index / 2) + 1;
+      return {
+        id: `draft-${index + 1}`,
+        status: "DRAFT" as const,
+        createdAt: new Date(Date.parse(now) - (300 - index) * 60_000).toISOString(),
+        calledAt: null,
+        departedAt: null,
+        landedAt: null,
+        resourceGroupId: `rg-${resourceIndex + 1}`,
+        resourceGroupStatus: "ACTIVE" as const,
+        queueSequence,
+        passengerCount: (index % 3) + 1,
+        productId: `product-${(index % 4) + 1}`,
+        gateId: `gate-${resourceIndex + 1}`,
+        referenceDurationMinutes: 18 + (index % 4) * 4,
+        productCode: `P${(index % 4) + 1}`,
+        aircraftType: null,
+        predictedDepartureAt: null,
+        predictedLandingAt: null,
+        predictedCompletionAt: null,
+      };
+    });
+    const startedAt = performance.now();
+    const projections = calculateForecastTimelines({
+      event: {
+        eventId: "event-scale",
+        now,
+        plannedOperationsStartAt: now,
+        plannedOperationsEndAt: "2026-07-22T12:00:00.000Z",
+        operationalInterrupted: false,
+        emergencyMode: false,
+        plannedBoardingMinutes: 5,
+        plannedDeboardingMinutes: 5,
+        plannedBufferMinutes: 2,
+      },
+      capacities: [1, 2].map((resourceIndex) => ({
+        resourceGroupId: `rg-${resourceIndex}`,
+        activeAircraft: 2,
+        availabilityLanes: [1, 2].map((laneIndex) => ({
+          laneId: `aircraft-${resourceIndex}-${laneIndex}:pilot-${resourceIndex}-${laneIndex}`,
+          aircraftId: `aircraft-${resourceIndex}-${laneIndex}`,
+          pilotId: `pilot-${resourceIndex}-${laneIndex}`,
+          passengerSeats: laneIndex === 1 ? 4 : 3,
+          availableLowerAt: now,
+          availableExpectedAt: now,
+          availableUpperAt: now,
+        })),
+      })),
+      durationSamples: [],
+      rotations,
+    });
+    const elapsed = performance.now() - startedAt;
+
+    expect(projections).toHaveLength(300);
+    expect(new Set(projections.map((projection) => projection.rotationId))).toHaveLength(300);
+    expect(
+      projections.every(
+        (projection) =>
+          projection.predictedBoardingAt !== null && projection.forecastState !== "UNAVAILABLE",
+      ),
+    ).toBe(true);
+    expect(projections.some((projection) => projection.forecastState === "LONG_RANGE_WINDOW")).toBe(
+      true,
+    );
+    expect(
+      projections.some(
+        (projection) =>
+          projection.forecastState === "AFTER_OPERATIONS_END" && projection.overtimeMinutes > 0,
+      ),
+    ).toBe(true);
+    expect(elapsed).toBeLessThan(2_000);
+  });
+
+  it("uses the earliest compatible tail lane after a recurring constraint becomes due", () => {
+    const now = "2026-07-22T08:00:00.000Z";
+    const projections = calculateForecastTimelines({
+      event: {
+        eventId: "event-tail-lane",
+        now,
+        plannedOperationsStartAt: now,
+        plannedOperationsEndAt: "2026-07-22T12:00:00.000Z",
+        operationalInterrupted: false,
+        emergencyMode: false,
+        plannedBoardingMinutes: 5,
+        plannedDeboardingMinutes: 5,
+        plannedBufferMinutes: 2,
+      },
+      capacities: [
+        {
+          resourceGroupId: "rg-1",
+          activeAircraft: 2,
+          availabilityLanes: [
+            {
+              laneId: "aircraft-a:pilot-a",
+              aircraftId: "aircraft-a",
+              pilotId: "pilot-a",
+              passengerSeats: 1,
+              availableLowerAt: now,
+              availableExpectedAt: now,
+              availableUpperAt: now,
+              recurringConstraints: [
+                {
+                  id: "pause-after-one",
+                  triggerMetric: "COMPLETED_ROTATIONS",
+                  intervalValue: 1,
+                  progressValue: 0,
+                  minimumDurationMinutes: 60,
+                  typicalDurationMinutes: 60,
+                  maximumDurationMinutes: 60,
+                },
+              ],
+            },
+            {
+              laneId: "aircraft-b:pilot-b",
+              aircraftId: "aircraft-b",
+              pilotId: "pilot-b",
+              passengerSeats: 1,
+              availableLowerAt: "2026-07-22T08:40:00.000Z",
+              availableExpectedAt: "2026-07-22T08:40:00.000Z",
+              availableUpperAt: "2026-07-22T08:40:00.000Z",
+            },
+          ],
+        },
+      ],
+      durationSamples: [],
+      dispatchPlanningLimits: { maximumGroupsPerResourceGroup: 1 },
+      rotations: [1, 2].map((queueSequence) => ({
+        id: `draft-${queueSequence}`,
+        status: "DRAFT" as const,
+        createdAt: new Date(Date.parse(now) - (3 - queueSequence) * 60_000).toISOString(),
+        calledAt: null,
+        departedAt: null,
+        landedAt: null,
+        resourceGroupId: "rg-1",
+        resourceGroupStatus: "ACTIVE" as const,
+        queueSequence,
+        passengerCount: 1,
+        productId: "product-1",
+        gateId: "gate-1",
+        referenceDurationMinutes: 20,
+        productCode: "PAN",
+        aircraftType: null,
+        predictedDepartureAt: null,
+        predictedLandingAt: null,
+        predictedCompletionAt: null,
+      })),
+    });
+
+    expect(projections[0]).toMatchObject({
+      rotationId: "draft-1",
+      assumedAircraftId: "aircraft-a",
+      forecastState: "DISPATCH_WINDOW",
+    });
+    expect(projections[1]).toMatchObject({
+      rotationId: "draft-2",
+      assumedAircraftId: "aircraft-b",
+      forecastState: "LONG_RANGE_WINDOW",
+    });
+  });
+
+  it("keeps attendance blocks out of regular capacity and reports unknown returns", () => {
+    const baseRotation = {
+      status: "DRAFT" as const,
+      createdAt: "2026-07-22T10:00:00.000Z",
+      calledAt: null,
+      departedAt: null,
+      landedAt: null,
+      resourceGroupId: "rg-1",
+      resourceGroupStatus: "ACTIVE" as const,
+      referenceDurationMinutes: 20,
+      productCode: "PAN",
+      aircraftType: null,
+      predictedDepartureAt: null,
+      predictedLandingAt: null,
+      predictedCompletionAt: null,
+    };
+    const projections = calculateForecastTimelines({
+      event: {
+        eventId: "event-current",
+        now: "2026-07-22T10:00:00.000Z",
+        operationalInterrupted: false,
+        emergencyMode: false,
+        plannedBoardingMinutes: 5,
+        plannedDeboardingMinutes: 5,
+        plannedBufferMinutes: 2,
+      },
+      capacities: [
+        {
+          resourceGroupId: "rg-1",
+          activeAircraft: 0,
+          availabilityLanes: [],
+          unavailableReason: "UNKNOWN_RESOURCE_RETURN",
+        },
+      ],
+      durationSamples: [],
+      rotations: [
+        { ...baseRotation, id: "missing", queueSequence: 1, attendanceStatus: "MISSING" as const },
+        {
+          ...baseRotation,
+          id: "clarification",
+          queueSequence: 2,
+          attendanceStatus: "CLARIFICATION" as const,
+        },
+        { ...baseRotation, id: "waiting", queueSequence: 3, attendanceStatus: "WAITING" as const },
+      ],
+    });
+
+    expect(projections.map((projection) => projection.dispatchUnplannedReason)).toEqual([
+      "ATTENDANCE_MISSING",
+      "ATTENDANCE_CLARIFICATION",
+      "UNKNOWN_RESOURCE_RETURN",
+    ]);
+    expect(projections.every((projection) => projection.forecastState === "UNAVAILABLE")).toBe(
+      true,
+    );
+  });
+
   it("projects active availability and queued rotations with an explicit clock", () => {
     const projections = calculateForecastTimelines({
       event: {

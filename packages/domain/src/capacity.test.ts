@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { assessRemainingCapacity } from "./capacity";
+import { assessMarginalProductCapacity, assessRemainingCapacity } from "./capacity";
+import { createQueueAvailability } from "./forecast";
 
 describe("verbleibende Kapazität", () => {
   it("zieht offene Tickets von konservativ bewerteten Umläufen ab", () => {
@@ -33,8 +34,8 @@ describe("verbleibende Kapazität", () => {
     });
     expect(result.projectedSeats).toBe(7);
     expect(result.remainingSellableSeats).toBe(6);
-    expect(result.status).toBe("LIMITED");
-    expect(result.saleRecommended).toBe(true);
+    expect(result.status).toBe("MANUAL_REVIEW");
+    expect(result.saleRecommended).toBe(false);
   });
 
   it("weist ohne Restzeit oder aktive Sitzplätze ausverkauft aus", () => {
@@ -64,5 +65,102 @@ describe("verbleibende Kapazität", () => {
     });
     expect(result.projectedSeats).toBe(20);
     expect(result.remainingSellableSeats).toBe(16);
+  });
+
+  it("derives product capacity from shared post-queue resource lanes", () => {
+    const availability = createQueueAvailability({
+      activeAircraft: 2,
+      busyAircraftMinutes: [],
+      lanes: [
+        {
+          laneId: "large",
+          aircraftId: "large",
+          passengerSeats: 4,
+          lowerMinutes: 0,
+          expectedMinutes: 0,
+          upperMinutes: 0,
+          constraints: [],
+        },
+        {
+          laneId: "small",
+          aircraftId: "small",
+          passengerSeats: 2,
+          lowerMinutes: 0,
+          expectedMinutes: 0,
+          upperMinutes: 0,
+          constraints: [],
+        },
+      ],
+    });
+    const assess = (expectedMinutes: number) =>
+      assessMarginalProductCapacity({
+        operationsEndMinutes: 60,
+        availabilityAfterQueue: availability,
+        duration: {
+          lowerMinutes: expectedMinutes,
+          expectedMinutes,
+          upperMinutes: expectedMinutes,
+          quality: "STABLE",
+          sampleCount: 0,
+        },
+        queuedSeatsCompletedByEnd: 6,
+        openTickets: 6,
+        predictionQuality: "STABLE",
+        warningThreshold: 4,
+        criticalThreshold: 2,
+      });
+
+    expect(assess(30)).toMatchObject({ projectedSeats: 18, remainingSellableSeats: 12 });
+    expect(assess(45)).toMatchObject({ projectedSeats: 12, remainingSellableSeats: 6 });
+  });
+
+  it("applies recurring pauses before recommending another sale batch", () => {
+    const availability = createQueueAvailability({
+      activeAircraft: 1,
+      busyAircraftMinutes: [],
+      lanes: [
+        {
+          laneId: "lane-1",
+          aircraftId: "aircraft-1",
+          passengerSeats: 4,
+          lowerMinutes: 0,
+          expectedMinutes: 0,
+          upperMinutes: 0,
+          constraints: [],
+          recurringConstraints: [
+            {
+              id: "pause",
+              triggerMetric: "COMPLETED_ROTATIONS",
+              intervalValue: 1,
+              lowerProgress: 1,
+              expectedProgress: 1,
+              upperProgress: 1,
+              minimumDurationMinutes: 10,
+              typicalDurationMinutes: 10,
+              maximumDurationMinutes: 10,
+              active: true,
+            },
+          ],
+        },
+      ],
+    });
+    const result = assessMarginalProductCapacity({
+      operationsEndMinutes: 45,
+      availabilityAfterQueue: availability,
+      duration: {
+        lowerMinutes: 20,
+        expectedMinutes: 20,
+        upperMinutes: 20,
+        quality: "STABLE",
+        sampleCount: 0,
+      },
+      queuedSeatsCompletedByEnd: 0,
+      openTickets: 0,
+      predictionQuality: "STABLE",
+      warningThreshold: 3,
+      criticalThreshold: 1,
+    });
+
+    expect(result).toMatchObject({ projectedSeats: 4, remainingSellableSeats: 4 });
   });
 });

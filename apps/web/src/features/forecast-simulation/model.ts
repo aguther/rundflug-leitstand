@@ -256,6 +256,10 @@ export interface SimulationForecastSnapshot {
   dataAgeMinutes: number;
   activeCapacity: number;
   uncertaintyReasons: ForecastUncertaintyReason[];
+  forecastState?: import("@rundflug/domain").ForecastState;
+  forecastReason?: import("@rundflug/domain").PublicForecastReason | null;
+  dispatchBatchId?: string | null;
+  dispatchUnplannedReason?: import("@rundflug/domain").DispatchUnplannedReason | null;
   countdownDisplayed: boolean;
 }
 
