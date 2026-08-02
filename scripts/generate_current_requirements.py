@@ -9,15 +9,20 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "1.11.0"
+VERSION = "1.12.0"
 BASE_YAML = ROOT / "docs/requirements/requirements-v1.4.yaml"
 BASE_TRACE = ROOT / "docs/requirements/traceability.csv"
-DELTA_SOURCES = sorted((ROOT / "scripts/data").glob("requirements-delta-*.json"))
+CURRENT_RELEASE_SOURCE = ROOT / "scripts/data" / f"requirements-delta-{VERSION}.json"
+LEGACY_DELTA_SOURCES = sorted(
+    path
+    for path in (ROOT / "scripts/data").glob("requirements-delta-*.json")
+    if path != CURRENT_RELEASE_SOURCE
+)
 CURRENT_YAML = ROOT / f"docs/requirements/requirements-v{VERSION}.yaml"
 CURRENT_MD = ROOT / f"docs/requirements/requirements-v{VERSION}.md"
 CURRENT_TRACE = ROOT / f"docs/requirements/traceability-v{VERSION}.csv"
 
-RELEASE_REQUIREMENTS = [
+RELEASE_1_10_REQUIREMENTS = [
     {
         "id": "V1100-REL-010",
         "section": "Release und Versionierung",
@@ -271,8 +276,7 @@ CURRENT_BASE_TRACE_OVERRIDES = {
     },
 }
 
-PRIOR_RELEASE_REQUIREMENTS = RELEASE_REQUIREMENTS
-RELEASE_REQUIREMENTS = [
+RELEASE_1_11_REQUIREMENTS = [
     {
         "id": "V1110-REL-010",
         "section": "Release und Versionierung",
@@ -352,6 +356,15 @@ RELEASE_REQUIREMENTS = [
     },
 ]
 
+CURRENT_RELEASE_PAYLOAD = json.loads(CURRENT_RELEASE_SOURCE.read_text(encoding="utf-8"))
+if CURRENT_RELEASE_PAYLOAD.get("version") != VERSION:
+    raise ValueError(f"{CURRENT_RELEASE_SOURCE}: Zielversion muss {VERSION} sein")
+CURRENT_RELEASE_REQUIREMENTS = CURRENT_RELEASE_PAYLOAD["requirements"]
+PRIOR_RELEASE_REQUIREMENTS = [
+    *({**item, "source": "1.10.0"} for item in RELEASE_1_10_REQUIREMENTS),
+    *({**item, "source": "1.11.0"} for item in RELEASE_1_11_REQUIREMENTS),
+]
+
 
 def yaml_scalar(value: object) -> str:
     return json.dumps(str(value), ensure_ascii=False)
@@ -360,7 +373,8 @@ def yaml_scalar(value: object) -> str:
 def current_terms(value: object) -> str:
     text = str(value)
     replacements = [
-        ("docs/ui/v1.10.0-release-concept.md", "docs/ui/v1.11.0-release-concept.md"),
+        ("docs/ui/v1.10.0-release-concept.md", f"docs/ui/v{VERSION}-release-concept.md"),
+        ("docs/ui/v1.11.0-release-concept.md", f"docs/ui/v{VERSION}-release-concept.md"),
         ("Flight Line Assist", "Flight Line"),
         ("Flight-Line-Supervisor-Ansicht", "Flight-Director-Ansicht"),
         ("Desktop-Supervisor-Ansicht", "Flight-Director-Ansicht"),
@@ -393,10 +407,10 @@ def current_requirements() -> list[dict[str, object]]:
         }
         for item in base
     ]
-    for path in DELTA_SOURCES:
+    for path in LEGACY_DELTA_SOURCES:
         payload = json.loads(path.read_text(encoding="utf-8"))
-        if payload.get("version") not in {"1.10.0", VERSION}:
-            raise ValueError(f"{path}: Zielversion muss 1.10.0 oder {VERSION} sein")
+        if payload.get("version") != "1.10.0":
+            raise ValueError(f"{path}: historische Zielversion muss 1.10.0 sein")
         normalized.extend(
             {
                 **item,
@@ -412,7 +426,7 @@ def current_requirements() -> list[dict[str, object]]:
     normalized.extend(
         {
             "id": item["id"],
-            "source": "1.10.0",
+            "source": item["source"],
             "section": item["section"],
             "requirement": item["requirement"],
             "priority": "MUSS",
@@ -424,14 +438,14 @@ def current_requirements() -> list[dict[str, object]]:
     normalized.extend(
         {
             "id": item["id"],
-            "source": VERSION,
+            "source": item["source"],
             "section": item["section"],
-            "requirement": item["requirement"],
-            "priority": "MUSS",
-            "stage": "V1",
-            "status": "implemented",
+            "requirement": current_terms(item["requirement"]),
+            "priority": item["priority"],
+            "stage": item["stage"],
+            "status": item["status"],
         }
-        for item in RELEASE_REQUIREMENTS
+        for item in CURRENT_RELEASE_REQUIREMENTS
     )
     return normalized
 
@@ -458,7 +472,7 @@ def md_cell(value: object) -> str:
 
 
 def render_markdown(requirements: list[dict[str, object]]) -> str:
-    release_ids = {item["id"] for item in RELEASE_REQUIREMENTS}
+    release_ids = {item["id"] for item in CURRENT_RELEASE_REQUIREMENTS}
     release = [item for item in requirements if item["id"] in release_ids]
     historical_deltas = [
         item
@@ -467,19 +481,18 @@ def render_markdown(requirements: list[dict[str, object]]) -> str:
     ]
     base = [item for item in requirements if item["source"] == "1.4-konsolidiert"]
     lines = [
-        "# Kumulativer Anforderungskatalog – Release 1.11.0",
+        f"# Kumulativer Anforderungskatalog – Release {VERSION}",
         "",
-        "Release `1.11.0` ist die einzige aktuelle Releasefassung. Dieser Katalog enthält den",
-        "vollständigen 207er Basiskatalog, 99 fortgeltende und begrifflich aktualisierte Deltas",
-        "aus 1.5 bis 1.9.1, 13 fortgeltende Anforderungen aus 1.10.0 sowie die 11 Anforderungen",
-        "dieses Releases (insgesamt 330).",
+        f"Release `{VERSION}` ist die einzige aktuelle Releasefassung. Dieser Katalog enthält den",
+        "vollständigen 207er Basiskatalog, 123 fortgeltende und begrifflich aktualisierte Deltas",
+        "aus 1.5 bis 1.11.0 sowie die 10 Anforderungen dieses Releases (insgesamt 340).",
         "Die binären V1.4-Quellen bleiben unveränderte Referenz; gültige ADRs konkretisieren den",
         "Katalog. Historische Releasekopien und Freigabeprotokolle sind keine Spezifikation.",
         "",
         "Die kanonischen Rollen- und Ansichtsbegriffe sind **Kasse**, **Flight Line**,",
         "**Flight Director**, **FIDS**, **Administration** und **öffentlicher Gruppenstatus**.",
         "",
-        "## Anforderungen Release 1.11.0",
+        f"## Anforderungen Release {VERSION}",
         "",
         "| ID | Abschnitt | Aktuelle Anforderung | Priorität | Status |",
         "| --- | --- | --- | --- | --- |",
@@ -492,9 +505,9 @@ def render_markdown(requirements: list[dict[str, object]]) -> str:
     lines.extend(
         [
             "",
-            "## Fortgeltende, in 1.11.0 konsolidierte Deltas",
+            f"## Fortgeltende, in {VERSION} konsolidierte Deltas",
             "",
-            "Frühere reine Versionsanforderungen und durch 1.11.0 ersetzte UI-Konzeptbindungen sind",
+            f"Frühere reine Versionsanforderungen und durch {VERSION} ersetzte UI-Konzeptbindungen sind",
             "nicht fortgeltend. Die folgenden fachlichen Aussagen bleiben verbindlich; alte Rollenbegriffe",
             "wurden auf Flight Line und Flight Director aktualisiert.",
             "",
@@ -528,6 +541,8 @@ def render_markdown(requirements: list[dict[str, object]]) -> str:
             "",
             "Nicht Bestandteil sind Kamera- oder QR-Scan, eine eigenständige Ansicht Gruppen am Gate,",
             "eine harte Boarding-Sperre, SMS, Messenger und frei formulierte Nachruftexte.",
+            "Für Analyseexporte sind ein unbereinigtes Vollprofil, eine Restore-/Produktionsimportfunktion",
+            "und Änderungen am Dispatch-, Forecast- oder Voraufrufalgorithmus ausdrücklich ausgeschlossen.",
             "",
         ]
     )
@@ -541,7 +556,7 @@ def render_traceability() -> str:
         for field in ("Kurzbeschreibung", "Modul", "Tests"):
             row[field] = current_terms(row[field])
         row.update(CURRENT_BASE_TRACE_OVERRIDES.get(row["ID"], {}))
-    for path in DELTA_SOURCES:
+    for path in LEGACY_DELTA_SOURCES:
         payload = json.loads(path.read_text(encoding="utf-8"))
         for item in payload["requirements"]:
             current_item = {
@@ -561,7 +576,7 @@ def render_traceability() -> str:
                     "Status": current_item["traceStatus"],
                 }
             )
-    for item in [*PRIOR_RELEASE_REQUIREMENTS, *RELEASE_REQUIREMENTS]:
+    for item in PRIOR_RELEASE_REQUIREMENTS:
         rows.append(
             {
                 "ID": item["id"],
@@ -573,6 +588,20 @@ def render_traceability() -> str:
                 "Modul": item["module"],
                 "Tests": item["tests"],
                 "Status": "umgesetzt",
+            }
+        )
+    for item in CURRENT_RELEASE_REQUIREMENTS:
+        rows.append(
+            {
+                "ID": item["id"],
+                "Stufe": item["stage"],
+                "Priorität": item["priority"],
+                "Abschnitt": item["section"],
+                "Kurzbeschreibung": item["requirement"],
+                "Issue": "",
+                "Modul": item["module"],
+                "Tests": item["tests"],
+                "Status": item["traceStatus"],
             }
         )
     output = io.StringIO(newline="")
@@ -618,7 +647,7 @@ def main() -> None:
     if mismatches:
         names = ", ".join(str(path.relative_to(ROOT)) for path in mismatches)
         raise SystemExit(f"Aktuelle Requirements sind nicht generiert: {names}")
-    print("OK: 330 aktuelle Anforderungen und Traceability-Einträge für Release 1.11.0")
+    print(f"OK: 340 aktuelle Anforderungen und Traceability-Einträge für Release {VERSION}")
 
 
 if __name__ == "__main__":

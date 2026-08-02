@@ -1,4 +1,4 @@
-version: 1.11.0
+version: 1.12.0
 requirements:
   - id: F-KAS-010
     source: "1.4-konsolidiert"
@@ -2310,3 +2310,73 @@ requirements:
     priority: MUSS
     stage: V1
     status: implemented
+  - id: V1120-DIA-010
+    source: "1.12.0"
+    section: "Analyse und Diagnose"
+    requirement: "Administratoren und Flight Directors können während des Betriebs eine konsistente, strikt versionierte JSON-Momentaufnahme des support-sicheren Betriebs- und Planungsstands für eine ausdrücklich erwartete Veranstaltungsversion erzeugen; ein gemischter oder veralteter Stand wird mit einem Konflikt abgewiesen."
+    priority: MUSS
+    stage: V1
+    status: planned
+  - id: V1120-DIA-020
+    source: "1.12.0"
+    section: "Planungsläufe"
+    requirement: "Jede erfolgreiche relevante Forecast-Neuberechnung erfasst den exakt verwendeten normalisierten Forecast-, Dispatch- und Voraufrufkontext sowie die zugehörigen Ergebnisse unveränderlich, inhaltsadressiert und dedupliziert; Planungslauf, persistierte Projektionen und Forecast-Snapshots bilden eine fachlich konsistente Einheit."
+    priority: MUSS
+    stage: V1
+    status: planned
+  - id: V1120-DIA-030
+    source: "1.12.0"
+    section: "Clientdiagnose"
+    requirement: "Eine manuelle Momentaufnahme kann einen strikt allowlist-basierten, ausschließlich flüchtigen Client-Diagnosekontext mit Auswahl-, Dialog-, Verbindungs- und Viewportzustand enthalten; Sitzungen, Tokens, Konto- oder Gerätekennungen, freie Eingaben, vollständige Browserkennungen und Fehlerstacks sind ausgeschlossen."
+    priority: MUSS
+    stage: V1
+    status: planned
+  - id: V1120-EXP-010
+    source: "1.12.0"
+    section: "Tagesanalysepakete"
+    requirement: "Für geschlossene oder archivierte Veranstaltungstage kann genau ein unveränderliches, serverseitig erzeugtes Tagesanalysepaket je Veranstaltungsversion, Formatversion und Datenschutzprofil erstellt werden; es enthält Manifest, sichere Zustandsprojektionen, Planungsläufe, Forecast-Snapshots, sichere Ereignishistorie sowie lesbare Auswertungen und wird nicht als Produktionsimport verwendet."
+    priority: MUSS
+    stage: V1
+    status: planned
+  - id: V1120-RPL-010
+    source: "1.12.0"
+    section: "Offline-Replay"
+    requirement: "Exportierte Planungsläufe können mit derselben Quellcodeversion ohne Schreibzugriff auf Produktionsdaten deterministisch offline validiert und für Dispatch, Forecast und Voraufruf wiederholt werden; Format-, Referenz- und Hashfehler sowie die erste Ergebnisabweichung werden eindeutig ausgewiesen, Versionsabweichungen werden im strikten Modus abgelehnt."
+    priority: MUSS
+    stage: V1
+    status: planned
+  - id: V1120-AUD-010
+    source: "1.12.0"
+    section: "Analysezugriffsprotokoll"
+    requirement: "Anforderung, Buildbeginn, Fertigstellung, Fehlschlag, Download, Ablauf und Löschung eines Tagesanalysepakets werden in einem getrennten append-only Analysezugriffsprotokoll ohne Klartext-Konto-ID dokumentiert; dieses Protokoll verändert weder die operative Veranstaltungsversion noch Forecast, Outbox oder öffentliche Realtime-Projektionen."
+    priority: MUSS
+    stage: V1
+    status: planned
+  - id: V1120-SEC-010
+    source: "1.12.0"
+    section: "Exportsicherheit"
+    requirement: "Analyseexporte verwenden ausschließlich das Datenschutzprofil SUPPORT_SAFE und explizite typisierte Allowlist-Projektionen; insbesondere öffentliche Ticket- oder Gruppencodes und deren Hashes, Sitzungs- und Gerätecredentials, Administrator-PINs, Push-Ziele und Browser-Schlüssel, Konto-IDs, Einzelgewichte, freie Texte sowie rohe Ereignis-Payloads sind ausgeschlossen oder werden ausschließlich als sichere Vorhandenseinsmetadaten dargestellt."
+    priority: MUSS
+    stage: V1
+    status: planned
+  - id: V1120-OPS-010
+    source: "1.12.0"
+    section: "Archivbetrieb und Aufbewahrung"
+    requirement: "Tagesanalysepakete werden ohne öffentliche URL in der vorhandenen EU-R2-Bindung unter einem getrennten Präfix gespeichert, besitzen eine von Backups unabhängige konfigurierte Aufbewahrung von 14 bis 365 Tagen und werden bei Ablauf, manueller Löschung, Veranstaltungslöschung und Werksreset konsistent behandelt; Produktion erfordert einen ausdrücklich freigegebenen Aufbewahrungswert."
+    priority: MUSS
+    stage: V1
+    status: planned
+  - id: V1120-PER-010
+    source: "1.12.0"
+    section: "Analyseperformance"
+    requirement: "Planungserfassung und Archivierung bleiben im V1-Mengengerüst begrenzt: Tagesarchive werden nach erfolgreichem Worker- und Abhängigkeitsspike seitenweise und streamingfähig ohne Ganzarchivpufferung erzeugt, die operative Schließung wartet nicht auf R2 und zusätzliche CPU-, D1-, Speicher-, Laufzeit- und Größenbudgets werden gemessen und dokumentiert."
+    priority: MUSS
+    stage: V1
+    status: planned
+  - id: V1120-QA-010
+    source: "1.12.0"
+    section: "Qualitätssicherung Analyse"
+    requirement: "Strict-Contract-, Domain-, Worker-/D1-, R2-, Replay-, Sicherheits-, Performance- und Browsertests decken Diagnose-Momentaufnahme und Tagesanalysepaket einschließlich Rollen, Event-Version, Idempotenz, Concurrency, Audittrennung, Datenschutz, Integrität, Light/Dark, Desktop/Tablet und stabile Layoutzustände ab; der vollständige Nachweis bleibt Bestandteil von npm run check."
+    priority: MUSS
+    stage: V1
+    status: planned
