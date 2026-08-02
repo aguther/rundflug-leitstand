@@ -23,6 +23,11 @@ import type { FidsLocationAdapter } from "./features/fids/fids-location";
 import { useFidsExperience } from "./features/fids/useFidsExperience";
 import { formatAbsoluteTimeWindow } from "./time-window";
 
+const FIDS_EMPTY_SLOT_KEYS = Array.from(
+  { length: 20 },
+  (_, index) => `fids-empty-slot-${index + 1}`,
+);
+
 function groupCode(group: FidsBoardRow): string {
   return formatBookingGroupLabel(group.productCode, group.communicationNumber);
 }
@@ -46,19 +51,19 @@ function statusPresentation(status: FidsBoardRow["status"]): {
 
 function timeWindow(group: FidsBoardRow, timeZone: string): string {
   if (group.forecastState === "AFTER_OPERATIONS_END") {
-    return "Voraussichtlich heute nicht mehr";
+    return "Heute nicht mehr";
   }
   if (group.forecastState === "UNAVAILABLE") {
-    if (group.forecastReason === "RETURN_TIME_UNKNOWN") return "Rückkehrzeit offen";
+    if (group.forecastReason === "RETURN_TIME_UNKNOWN") return "Rückkehr offen";
     if (group.forecastReason === "NO_MATCHING_CAPACITY") return "Keine passende Kapazität";
-    if (group.forecastReason === "STATUS_CLARIFICATION") return "Status wird geklärt";
-    return "Wird aktualisiert";
+    if (group.forecastReason === "STATUS_CLARIFICATION") return "Statusklärung";
+    return "Aktualisierung";
   }
   return formatAbsoluteTimeWindow({
     lowerAt: group.boardingWindowLowerAt,
     upperAt: group.boardingWindowUpperAt,
     timeZone,
-    includeClockSuffix: false,
+    variant: "compact",
     quality: group.predictionQuality,
     phase:
       group.status === "COME_TO_FLIGHT_LINE" || group.status === "BOARDING"
@@ -66,7 +71,7 @@ function timeWindow(group: FidsBoardRow, timeZone: string): string {
         : ["IN_FLIGHT", "LANDED", "COMPLETED"].includes(group.status)
           ? "FINISHED"
           : "FORECAST",
-  });
+  }).replace(" – ", "–");
 }
 
 function Status({ group }: { group: FidsBoardRow }) {
@@ -96,12 +101,13 @@ function Status({ group }: { group: FidsBoardRow }) {
 }
 
 function GroupCell({ group }: { group: FidsBoardRow }) {
+  const code = groupCode(group);
   return (
     <div className="fids-group-cell">
       <Users aria-hidden="true" />
       <span>
-        <strong>{groupCode(group)}</strong>
-        <small>{group.productName}</small>
+        <strong title={code}>{code}</strong>
+        <small title={group.productName}>{group.productName}</small>
       </span>
     </div>
   );
@@ -111,13 +117,16 @@ function FidsTable({
   groups,
   compact,
   highlightedRows,
+  rowCapacity,
   timeZone,
 }: {
   groups: FidsBoardRow[];
   compact: boolean;
   highlightedRows: ReadonlySet<string>;
+  rowCapacity: number;
   timeZone: string;
 }) {
+  const emptySlots = Math.max(0, rowCapacity - groups.length);
   return (
     <div className={`fids-table ${compact ? "fids-table--compact" : "fids-table--wide"}`}>
       <div className="fids-grid-head" aria-hidden="true">
@@ -145,16 +154,43 @@ function FidsTable({
             key={group.rowId}
           >
             <GroupCell group={group} />
-            {!compact ? <span className="fids-product-cell">{group.productName}</span> : null}
-            <span className="fids-gate-cell">{group.gateLabel || "–"}</span>
+            {!compact ? (
+              <span className="fids-product-cell" title={group.productName}>
+                {group.productName}
+              </span>
+            ) : null}
+            <span className="fids-gate-cell" title={group.gateLabel || "Kein Gate"}>
+              {group.gateLabel || (
+                <>
+                  <span aria-hidden="true">–</span>
+                  <span className="visually-hidden">Kein Gate</span>
+                </>
+              )}
+            </span>
             <Status group={group} />
             <strong className={`fids-window tone-${statusPresentation(group.status).tone}`}>
               {timeWindow(group, timeZone)}
             </strong>
           </div>
         ))}
+        {FIDS_EMPTY_SLOT_KEYS.slice(0, emptySlots).map((slotKey) => (
+          <div
+            aria-hidden="true"
+            className="fids-row fids-row--slot"
+            data-testid="fids-empty-slot"
+            key={slotKey}
+          />
+        ))}
       </div>
     </div>
+  );
+}
+
+function FidsEmptyState({ message, tone }: { message: string; tone?: "error" }) {
+  return (
+    <p className="fids-section-empty" data-tone={tone ?? "empty"} role={tone ? "alert" : "status"}>
+      {message}
+    </p>
   );
 }
 
@@ -162,49 +198,73 @@ function FidsSection({
   groups,
   highlightedRows,
   label,
+  meta,
   rows,
   timeZone,
+  emptyMessage,
+  emptyTone,
 }: {
   groups: FidsBoardRow[];
   highlightedRows: ReadonlySet<string>;
   label?: string;
+  meta?: ReactNode;
   rows: number;
   timeZone: string;
+  emptyMessage: string;
+  emptyTone?: "error";
 }) {
   const leftColumn = groups.filter((_, index) => index % 2 === 0);
   const rightColumn = groups.filter((_, index) => index % 2 === 1);
+  const leftColumnCapacity = Math.ceil(rows / 2);
+  const rightColumnCapacity = Math.floor(rows / 2);
+  const emptyState = groups.length === 0 && rows > 0;
   return (
     <section
-      className="fids-board-section"
+      className={`fids-board-section${label ? " fids-board-section--labelled" : ""}`}
       style={
         {
-          "--fids-section-rows": Math.max(1, rows),
-          "--fids-double-rows": Math.max(1, Math.ceil(rows / 2)),
+          "--fids-section-rows": rows,
+          "--fids-section-single-tracks": rows,
+          "--fids-section-double-tracks": Math.ceil(rows / 2),
         } as CSSProperties
       }
     >
-      {label ? <h2>{label}</h2> : null}
+      {label ? (
+        <header className="fids-section-heading">
+          <h2>{label}</h2>
+          {meta}
+        </header>
+      ) : null}
       <div className="fids-single-board">
         <FidsTable
           compact={false}
           groups={groups}
           highlightedRows={highlightedRows}
+          rowCapacity={rows}
           timeZone={timeZone}
         />
+        {emptyState ? (
+          <FidsEmptyState message={emptyMessage} {...(emptyTone ? { tone: emptyTone } : {})} />
+        ) : null}
       </div>
       <div className="fids-double-board">
         <FidsTable
           compact
           groups={leftColumn}
           highlightedRows={highlightedRows}
+          rowCapacity={leftColumnCapacity}
           timeZone={timeZone}
         />
         <FidsTable
           compact
           groups={rightColumn}
           highlightedRows={highlightedRows}
+          rowCapacity={rightColumnCapacity}
           timeZone={timeZone}
         />
+        {emptyState ? (
+          <FidsEmptyState message={emptyMessage} {...(emptyTone ? { tone: emptyTone } : {})} />
+        ) : null}
       </div>
     </section>
   );
@@ -268,10 +328,15 @@ export function FidsBoardPresentation({
   const style = {
     "--fids-single-rows": preferences.visibleRows,
     "--fids-double-rows": Math.ceil(preferences.visibleRows / 2),
-  } as CSSProperties;
+  } as CSSProperties & Record<string, number>;
   const split = board?.viewMode === "SPLIT";
   const priorityRows = board?.priority?.effectiveCapacity ?? preferences.priorityGroupCount;
-  const totalGroups = (board?.priority?.groups.length ?? 0) + (board?.page.groups.length ?? 0);
+  const lowerRows = board?.page.pageSize ?? Math.max(0, preferences.visibleRows - priorityRows);
+  style["--fids-split-single-tracks"] = Math.max(1, priorityRows + lowerRows);
+  style["--fids-split-double-tracks"] = Math.max(
+    1,
+    Math.ceil(priorityRows / 2) + Math.ceil(lowerRows / 2),
+  );
   const displayedPage = page;
 
   return (
@@ -315,36 +380,55 @@ export function FidsBoardPresentation({
         {split ? (
           <div className="fids-split-board">
             <FidsSection
+              emptyMessage="Derzeit keine unmittelbar relevanten Gruppen."
               groups={board?.priority?.groups ?? []}
               highlightedRows={highlightedRows}
               label="JETZT RELEVANT"
+              meta={
+                (board?.priority?.overflowCount ?? 0) > 0 ? (
+                  <span className="fids-priority-overflow" role="status">
+                    +{board?.priority?.overflowCount} weitere relevante Gruppen
+                  </span>
+                ) : null
+              }
               rows={priorityRows}
               timeZone={timeZone}
             />
             <FidsSection
+              emptyMessage="Derzeit keine weiteren Gruppen."
               groups={board?.page.groups ?? []}
               highlightedRows={highlightedRows}
               label="WEITERE FLÜGE"
-              rows={board?.page.pageSize ?? Math.max(0, preferences.visibleRows - priorityRows)}
+              meta={
+                (board?.page.totalItems ?? 0) > 0 ? (
+                  <span
+                    className="fids-section-page"
+                    aria-label={`Seite ${board?.page.requestedPage ?? 1} von ${board?.page.totalPages ?? 1}`}
+                    role="status"
+                  >
+                    <span className="fids-section-page-prefix">SEITE </span>
+                    {board?.page.requestedPage ?? 1} / {board?.page.totalPages ?? 1}
+                  </span>
+                ) : null
+              }
+              rows={lowerRows}
               timeZone={timeZone}
             />
-            {(board?.priority?.overflowCount ?? 0) > 0 ? (
-              <p className="fids-priority-overflow" role="status">
-                +{board?.priority?.overflowCount} weitere dringende Gruppen
-              </p>
-            ) : null}
           </div>
         ) : (
           <FidsSection
+            emptyMessage={
+              board
+                ? "Aktuell keine Gruppen auf dieser Seite."
+                : (error ?? "FIDS-Anzeige wird geladen …")
+            }
+            {...(!board && error ? { emptyTone: "error" as const } : {})}
             groups={board?.page.groups ?? []}
             highlightedRows={highlightedRows}
             rows={preferences.visibleRows}
             timeZone={timeZone}
           />
         )}
-        {totalGroups === 0 ? (
-          <div className="standard-empty">{error ?? "Aktuell keine Gruppen auf dieser Seite."}</div>
-        ) : null}
       </section>
 
       <footer className="fids-footer">
@@ -383,8 +467,12 @@ export function FidsBoardPresentation({
             </span>
             <i aria-hidden="true" />
             <span>Zeitfenster sind Prognosen</span>
-            <i aria-hidden="true" />
-            <span>{split ? `Unterseite ${board?.page.requestedPage ?? 1}` : `Seite ${page}`}</span>
+            {!split ? (
+              <>
+                <i aria-hidden="true" />
+                <span>Seite {page}</span>
+              </>
+            ) : null}
           </div>
         )}
         {onOpenSettings ? (
@@ -445,6 +533,7 @@ export function FidsDisplay({
         eventName={fids.board?.eventName ?? "Veranstaltung"}
         filterOptions={fids.filterOptions}
         filterOptionsLoaded={fids.filterOptionsLoaded}
+        departedVisibilitySeconds={fids.board?.departedVisibilitySeconds ?? 15}
         onClose={() => fids.setSettingsOpen(false)}
         {...(onLogout ? { onLogout } : {})}
         onSave={fids.savePreferences}

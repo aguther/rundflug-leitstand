@@ -23,10 +23,29 @@ describe("V1.7.3 FIDS concept fidelity", () => {
   });
 
   it("combines group and flight on compact displays without horizontal overflow", () => {
-    expect(displaySource).toContain("<small>{group.productName}</small>");
+    expect(displaySource).toContain("<small title={group.productName}>");
+    expect(displaySource).toContain('className="visually-hidden">Kein Gate</span>');
     expect(stylesSource).toContain("@media (max-width: 900px)");
-    expect(stylesSource).toContain("overflow-wrap: anywhere");
+    expect(stylesSource).toMatch(
+      /\.fids-product-cell,[\s\S]*?\.fids-gate-cell \{[\s\S]*?text-overflow: ellipsis;[\s\S]*?white-space: nowrap;/,
+    );
     expect(stylesSource).not.toContain("overflow-x: auto");
+  });
+
+  it("keeps split headings inside their fixed grid track despite legacy header styles", () => {
+    expect(stylesSource).toMatch(
+      /\.standard-fids \.fids-section-heading \{[\s\S]*?min-height: 0;[\s\S]*?padding-block: 0;/,
+    );
+    expect(stylesSource).not.toMatch(/\n\.fids-section-heading \{/);
+  });
+
+  it("keeps an empty fixed page at its configured physical row capacity", () => {
+    expect(stylesSource).toMatch(
+      /\.fids-board-section \{[\s\S]*?height: 100%;[\s\S]*?min-height: 0;/,
+    );
+    expect(stylesSource).toMatch(
+      /\.fids-single-board,\s*\.fids-double-board \{[\s\S]*?min-height: 0;/,
+    );
   });
 
   it("uses the approved unframed Lucide symbols and neutral passive information", () => {

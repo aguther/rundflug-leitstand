@@ -45,10 +45,11 @@ sofort. Die PIN wird weder in der URL noch im lokalen Speicher abgelegt.
 
 Der dezente Zahnradbutton rechts unten öffnet die kontobezogenen Einstellungen:
 
-- 4 bis 20 sichtbare Zeilen, Standard 8;
+- 4 bis 20 „Anzeigeplätze gesamt“, Standard 8;
 - feste URL-Seite oder geteilte Ansicht;
-- in der geteilten Ansicht 1 bis 19 Prioritätsplätze, stets weniger als die sichtbaren Zeilen;
-- 5 bis 60 Sekunden Wechselintervall für ausschließlich den unteren Bereich;
+- in der geteilten Ansicht 1 bis 19 „Oben reservierte Plätze“, stets weniger als die sichtbaren
+  Zeilen;
+- 5 bis 60 Sekunden „Seitenwechsel unten“ für ausschließlich den unteren Bereich;
 - eine oder zwei Spalten; zwei Spalten werden erst ab 1280 CSS-Pixel dargestellt;
 - Darstellung nach System, Hell oder Dunkel;
 - mehrere Produkte und Gates; „Alle“ ist als leere Auswahlliste gespeichert;
@@ -61,6 +62,10 @@ und die aktuelle Veranstaltung. Alle Geräte desselben Kontos teilen diese Werte
 Filter benötigen daher unterschiedliche DISPLAY-Konten; unterschiedliche feste Seiten können
 dagegen über `page` mit demselben Konto betrieben werden. Unter 1280 Pixel bleibt eine
 Zweispaltenwahl gespeichert, wird aber vorübergehend in einer Spalte angezeigt.
+
+Der Dialog zeigt die resultierende Aufteilung in obere und untere Plätze unmittelbar an. Die
+Nachlaufzeit kürzlich abgeflogener Gruppen ist eine Veranstaltungseinstellung; ein Hinweis nennt den
+aktiven Wert und verweist für Änderungen auf die Administration. Der Dialog ändert diesen Wert nicht.
 
 Produkt- und Gatefilter werden vor Sortierungsausschnitt und Paging im Worker angewendet. Innerhalb
 einer Filtergruppe gilt ODER, zwischen Produkt und Gate AND. Inaktive, aber noch vorhandene Produkte
@@ -88,10 +93,13 @@ aktuelle Veranstaltung.
 Seite bleibt als klarer Leerzustand stehen; die Setup-Leiste erlaubt die Korrektur und das Kopieren
 der kanonischen URL.
 
-`SPLIT` reserviert oben Plätze für `BOARDING` und `BITTE ZUM GATE`; `BEREITHALTEN` füllt freie
-Prioritätsplätze. Dringende Gruppen dürfen den oberen Bereich bis zur gesamten Zeilenkapazität
-erweitern. Weiterer Überlauf wird als Anzahl angezeigt. Nur der disjunkte untere Bereich rotiert,
-und nur wenn mehr als eine Unterseite existiert.
+`SPLIT` zeigt oben zuerst `BOARDING` und `BITTE ZUM GATE`. Danach folgen `ABGEFLOGEN`, `GELANDET` und
+`ABGESCHLOSSEN`, solange ihre `departedAt`-Zeit innerhalb der veranstaltungsweit konfigurierten
+Nachlaufzeit liegt; die jüngste Zeit steht zuerst. `BEREITHALTEN` füllt anschließend freie reservierte
+Plätze. Handlungsrelevante und kürzlich abgeflogene Gruppen dürfen den oberen Bereich gemeinsam bis
+zur gesamten Zeilenkapazität erweitern. Weiterer relevanter Überlauf wird als Anzahl angezeigt. Diese
+Kategorien erscheinen nie unten. Nur der disjunkte übrige Bereich rotiert, und nur wenn mehr als eine
+Unterseite existiert. Die Seiteninformation steht in der Überschrift „WEITERE FLÜGE“.
 
 Eine typische Konfiguration lautet:
 
@@ -118,19 +126,23 @@ bleiben im Simulationszustand und überschreiben keine produktiven Präferenzen.
   amberfarbener Status mit Glocke; der normale Umlaufstatus bleibt daneben sichtbar. Die Glocke
   pulsiert nur, wenn das Betriebssystem Bewegung nicht reduziert.
 - Gewählte 4, 8 beziehungsweise 20 Zeilen sind bei genügend Daten vollständig sichtbar.
+- Oberer und unterer Bereich verwenden dasselbe Zeilenraster; ihre sichtbaren Zeilenhöhen unterscheiden
+  sich höchstens um 1 Pixel. Lange Gruppen-, Produkt- und Gatebezeichnungen erzeugen keinen Umbruch.
 - Bei 1920×1080, 1440×900, 1280×720, 1024×768, 800×600 und 640×600 entstehen weder horizontale
   noch vertikale Dokument- oder Tabellenscrollbars.
 - Setup-Leiste und Einstellungsdialog sind vollständig erreichbar; der Dialog besitzt nur einen
   inneren Scrollbereich und feste Kopf-/Aktionsflächen.
 - In `SPLIT` bleibt der obere Bereich während mindestens eines vollständigen unteren
   Rotationsintervalls unverändert und keine Gruppe erscheint gleichzeitig in beiden Bereichen.
+- Eine synthetisch als abgeflogen markierte Zeile erscheint während der Nachlaufzeit oben, nie auf
+  einer Unterseite und verschwindet nach Ablauf ohne eng getaktete Neuladeschleife.
 - Ein Filtertest mit je zwei Produkten und Gates entspricht ODER innerhalb und AND zwischen den
   Dimensionen; eine leere Auswahl zeigt alle.
 - Eine Teständerung erscheint ohne Neuladen; nach kurzer Netzunterbrechung verbindet sich die
   Anzeige selbständig neu und behält bis dahin den letzten bestätigten Board-Stand.
 - Notfall- beziehungsweise Unterbrechungshinweis ist sichtbar, ohne den Viewport zu überlaufen.
-- Eine synthetisch als abgeflogen markierte Zeile verschwindet nach der konfigurierten Nachlaufzeit,
-  bleibt aber in Ticketstatus und Historie erhalten.
+- Bereichsbezogene Leer- oder Fehlerzustände bleiben innerhalb ihres Bereichs und überdecken keine
+  Überschrift oder zweite Tabelle.
 
 Die Ansicht empfängt über WebSocket nur ein minimales Versionssignal. Bei Verbindungsabbruch erfolgt
 eine begrenzte exponentielle Neuverbindung; ein 15-Sekunden-Polling dient als Rückfallebene. Die
