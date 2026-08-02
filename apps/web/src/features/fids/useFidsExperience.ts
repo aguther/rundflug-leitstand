@@ -26,11 +26,27 @@ const DEFAULT_PREFERENCES: FidsPreferences = {
 const EMPTY_FILTER_OPTIONS: FidsFilterOptions = { gates: [], products: [] };
 const HIGHLIGHT_DURATION_MS = 4_000;
 const HIGHLIGHT_STATUSES = new Set(["PREPARE", "COME_TO_FLIGHT_LINE", "BOARDING"]);
+const RECENT_DEPARTURE_STATUSES = new Set(["IN_FLIGHT", "LANDED", "COMPLETED"]);
+const DEPARTURE_EXPIRY_REFRESH_DELAY_MS = 100;
 
 function rowsById(board: FidsBoardResponse): Map<string, FidsBoardRow> {
   return new Map(
     [...(board.priority?.groups ?? []), ...board.page.groups].map((row) => [row.rowId, row]),
   );
+}
+
+function visibleDepartureExpiries(board: FidsBoardResponse): Array<{
+  expiresAt: number;
+  key: string;
+}> {
+  const visibilityMs = board.departedVisibilitySeconds * 1_000;
+  return [...(board.priority?.groups ?? []), ...board.page.groups]
+    .filter((row) => RECENT_DEPARTURE_STATUSES.has(row.status) && row.departedAt !== null)
+    .flatMap((row) => {
+      const expiresAt = Date.parse(row.departedAt ?? "") + visibilityMs;
+      return Number.isFinite(expiresAt) ? [{ expiresAt, key: `${row.rowId}:${expiresAt}` }] : [];
+    })
+    .sort((left, right) => left.expiresAt - right.expiresAt);
 }
 
 export function useFidsExperience(input: {
@@ -55,6 +71,9 @@ export function useFidsExperience(input: {
   const previousRows = useRef(new Map<string, FidsBoardRow>());
   const request = useRef<AbortController | null>(null);
   const highlightTimer = useRef<number | null>(null);
+  const departureExpiryTimer = useRef<number | null>(null);
+  const departureTimerDataSource = useRef(input.dataSource);
+  const attemptedDepartureExpiries = useRef(new Set<string>());
   const refreshRef = useRef<() => void>(() => undefined);
 
   useEffect(() => {
@@ -108,6 +127,11 @@ export function useFidsExperience(input: {
       .loadBoard({ page, lowerPage, signal: controller.signal })
       .then((nextBoard) => {
         if (controller.signal.aborted) return;
+        const lastValidLowerPage = Math.max(1, nextBoard.page.totalPages);
+        if (nextBoard.viewMode === "SPLIT" && nextBoard.page.requestedPage > lastValidLowerPage) {
+          setLowerPage(1);
+          return;
+        }
         const previous = previousRows.current;
         const next = rowsById(nextBoard);
         const changed = new Set<string>();
@@ -152,6 +176,44 @@ export function useFidsExperience(input: {
     () => input.dataSource.subscribe(() => refreshRef.current(), setConnection),
     [input.dataSource],
   );
+
+  useEffect(() => {
+    departureTimerDataSource.current = input.dataSource;
+    attemptedDepartureExpiries.current.clear();
+    return () => {
+      if (departureExpiryTimer.current !== null) {
+        window.clearTimeout(departureExpiryTimer.current);
+        departureExpiryTimer.current = null;
+      }
+    };
+  }, [input.dataSource]);
+
+  useEffect(() => {
+    if (departureExpiryTimer.current !== null) {
+      window.clearTimeout(departureExpiryTimer.current);
+      departureExpiryTimer.current = null;
+    }
+    if (!board) return;
+    const nextExpiry = visibleDepartureExpiries(board).find(
+      (expiry) => !attemptedDepartureExpiries.current.has(expiry.key),
+    );
+    if (!nextExpiry) return;
+    const delay = Math.max(
+      DEPARTURE_EXPIRY_REFRESH_DELAY_MS,
+      nextExpiry.expiresAt - Date.now() + DEPARTURE_EXPIRY_REFRESH_DELAY_MS,
+    );
+    departureExpiryTimer.current = window.setTimeout(() => {
+      departureExpiryTimer.current = null;
+      attemptedDepartureExpiries.current.add(nextExpiry.key);
+      refreshRef.current();
+    }, delay);
+    return () => {
+      if (departureExpiryTimer.current !== null) {
+        window.clearTimeout(departureExpiryTimer.current);
+        departureExpiryTimer.current = null;
+      }
+    };
+  }, [board]);
 
   useEffect(() => {
     if (!board || board.preferencesVersion === preferences.version) return;

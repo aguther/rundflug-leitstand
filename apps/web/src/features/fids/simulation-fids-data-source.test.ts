@@ -8,6 +8,7 @@ const row = (
   status: FidsBoardRow["status"],
   productId = "product-a",
   gateId = "gate-a",
+  departedAt: string | null = null,
 ): FidsBoardRow => ({
   rowId: `row-${index}`,
   productId,
@@ -18,7 +19,7 @@ const row = (
   communicationNumber: index,
   ticketLabels: [`${index}/1`],
   aircraftRegistration: null,
-  departedAt: null,
+  departedAt,
   status,
   waitLowerMinutes: 0,
   waitUpperMinutes: 30,
@@ -100,6 +101,52 @@ describe("simulation FIDS data source", () => {
     expect(response.page).toMatchObject({ requestedPage: 2, pageSize: 2, totalItems: 5 });
     expect(response.page.groups.map((entry) => entry.rowId)).toEqual(["row-5", "row-6"]);
     expect(response.page.groups).not.toContainEqual(response.priority?.groups[0]);
+  });
+
+  it("keeps recent departures above PREPARE with identical live paging metadata", async () => {
+    const recentBoard: SimulationFidsBoard = {
+      ...board,
+      groups: [
+        row(1, "BOARDING"),
+        row(2, "COME_TO_FLIGHT_LINE"),
+        row(8, "COMPLETED", "product-a", "gate-a", "2026-08-02T08:01:00.000Z"),
+        row(9, "IN_FLIGHT", "product-a", "gate-a", "2026-08-02T08:03:00.000Z"),
+        row(3, "PREPARE", "product-b"),
+        row(4, "WAITING"),
+        row(5, "WAITING"),
+      ],
+    };
+    const current = preferences({ viewMode: "SPLIT", visibleRows: 6, priorityGroupCount: 3 });
+    const dataSource = createSimulationFidsDataSource({
+      board: recentBoard,
+      preferences: current,
+      onPreferencesChanged: vi.fn(),
+    });
+
+    const response = await dataSource.loadBoard({ page: 1, lowerPage: 1 });
+
+    expect(response.priority?.groups.map((entry) => entry.rowId)).toEqual([
+      "row-1",
+      "row-2",
+      "row-9",
+      "row-8",
+    ]);
+    expect(response.priority).toMatchObject({ effectiveCapacity: 4, overflowCount: 0 });
+    expect(response.page).toMatchObject({
+      requestedPage: 1,
+      pageSize: 2,
+      totalItems: 3,
+      totalPages: 2,
+    });
+    expect(response.page.groups.map((entry) => entry.rowId)).toEqual(["row-3", "row-4"]);
+    expect(response.page.groups.every((entry) => entry.status !== "IN_FLIGHT")).toBe(true);
+    expect(response.page.groups.every((entry) => entry.status !== "COMPLETED")).toBe(true);
+    expect(
+      new Set([
+        ...(response.priority?.groups.map((entry) => entry.rowId) ?? []),
+        ...response.page.groups.map((entry) => entry.rowId),
+      ]).size,
+    ).toBe((response.priority?.groups.length ?? 0) + response.page.groups.length);
   });
 
   it("applies product OR and gate AND filters before simulation paging", async () => {

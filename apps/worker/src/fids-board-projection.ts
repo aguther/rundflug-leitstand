@@ -1,4 +1,4 @@
-export type FidsProjectionBand = "ALL" | "URGENT" | "PREPARE";
+export type FidsProjectionBand = "ALL" | "ACTIONABLE" | "RECENT_DEPARTURE" | "PREPARE" | "LOWER";
 
 export interface FidsProjectionFilter {
   productIds: readonly string[];
@@ -108,6 +108,9 @@ const projectionCte = `WITH projected AS (
    GROUP BY r.id, tg.id
 ), ranked AS (
   SELECT projected.*,
+         CASE WHEN sort_rank IN (0, 1) THEN 1 ELSE 0 END AS actionable_band,
+         CASE WHEN status IN ('IN_FLIGHT', 'LANDED', 'COMPLETED') THEN 1 ELSE 0 END
+           AS recent_departure_band,
          ROW_NUMBER() OVER (
            ORDER BY sort_rank,
                     CASE WHEN status = 'DRAFT' THEN dispatch_order END,
@@ -122,8 +125,10 @@ const projectionCte = `WITH projected AS (
 ), selected AS (
   SELECT * FROM ranked
    WHERE (?7 = 'ALL'
-      OR (?7 = 'URGENT' AND sort_rank IN (0, 1))
-      OR (?7 = 'PREPARE' AND sort_rank = 2))
+      OR (?7 = 'ACTIONABLE' AND actionable_band = 1)
+      OR (?7 = 'RECENT_DEPARTURE' AND recent_departure_band = 1)
+      OR (?7 = 'PREPARE' AND sort_rank = 2)
+      OR (?7 = 'LOWER' AND actionable_band = 0 AND recent_departure_band = 0))
      AND (?8 = '[]' OR row_id NOT IN (SELECT value FROM json_each(?8)))
 )`;
 

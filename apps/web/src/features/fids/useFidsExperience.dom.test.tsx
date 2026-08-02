@@ -18,7 +18,11 @@ const preferences: FidsPreferences = {
   version: 0,
 };
 
-const row = (rowId: string, status: FidsBoardRow["status"] = "WAITING"): FidsBoardRow => ({
+const row = (
+  rowId: string,
+  status: FidsBoardRow["status"] = "WAITING",
+  departedAt: string | null = null,
+): FidsBoardRow => ({
   rowId,
   productId: "product-1",
   gateId: "gate-1",
@@ -28,7 +32,7 @@ const row = (rowId: string, status: FidsBoardRow["status"] = "WAITING"): FidsBoa
   communicationNumber: Number(rowId.replace(/\D/g, "")) + 1,
   ticketLabels: [`${rowId}/1`],
   aircraftRegistration: null,
-  departedAt: null,
+  departedAt,
   status,
   waitLowerMinutes: 0,
   waitUpperMinutes: 30,
@@ -42,7 +46,10 @@ const row = (rowId: string, status: FidsBoardRow["status"] = "WAITING"): FidsBoa
   activeRecall: null,
 });
 
-function splitBoard(lowerPage: number): FidsBoardResponse {
+function splitBoard(
+  lowerPage: number,
+  overrides: Partial<FidsBoardResponse> = {},
+): FidsBoardResponse {
   return {
     eventName: "Synthetischer Flugtag",
     timeZone: "Europe/Berlin",
@@ -69,10 +76,36 @@ function splitBoard(lowerPage: number): FidsBoardResponse {
       groups: [row(`lower-${lowerPage}`)],
     },
     fleet: [],
+    ...overrides,
   };
 }
 
-function Harness({ dataSource }: { dataSource: FidsDataSource }) {
+function boardWithDepartures(lowerPage: number, departures: FidsBoardRow[]): FidsBoardResponse {
+  return splitBoard(lowerPage, {
+    priority: {
+      configuredCapacity: 2,
+      effectiveCapacity: 2,
+      totalItems: departures.length,
+      overflowCount: 0,
+      groups: departures,
+    },
+    page: {
+      requestedPage: lowerPage,
+      pageSize: 3,
+      totalItems: 1,
+      totalPages: 1,
+      groups: [row("lower-1")],
+    },
+  });
+}
+
+function Harness({
+  dataSource,
+  onRenderedLowerRow,
+}: {
+  dataSource: FidsDataSource;
+  onRenderedLowerRow?: (rowId: string) => void;
+}) {
   const location: FidsLocationAdapter = {
     getPage: () => 1,
     setPage: () => undefined,
@@ -82,6 +115,7 @@ function Harness({ dataSource }: { dataSource: FidsDataSource }) {
     subscribe: () => () => undefined,
   };
   const state = useFidsExperience({ dataSource, locationAdapter: location });
+  onRenderedLowerRow?.(state.board?.page.groups[0]?.rowId ?? "");
   return (
     <div>
       <span data-testid="lower-page">{state.lowerPage}</span>
@@ -145,5 +179,168 @@ describe("shared FIDS experience", () => {
     act(() => triggerRefresh());
     await waitFor(() => expect(screen.getByTestId("error").textContent).toBe("Offline"));
     expect(screen.getByTestId("lower-row").textContent).toBe("lower-1");
+  });
+
+  it("refreshes once just after the next visible departure expiry", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-02T08:00:00.000Z"));
+    const departure = row("departure-1", "IN_FLIGHT", "2026-08-02T07:59:50.000Z");
+    const loadBoard = vi.fn(async ({ lowerPage }: { lowerPage: number }) =>
+      boardWithDepartures(lowerPage, [departure]),
+    );
+    render(<Harness dataSource={dataSource(loadBoard)} />);
+    await act(async () => Promise.resolve());
+    expect(loadBoard).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      vi.advanceTimersByTime(5_099);
+      await Promise.resolve();
+    });
+    expect(loadBoard).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      vi.advanceTimersByTime(1);
+      await Promise.resolve();
+    });
+    expect(loadBoard).toHaveBeenCalledTimes(2);
+  });
+
+  it("plans only the nearest departure and replans after a confirmed refresh", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-02T08:00:00.000Z"));
+    const first = row("departure-1", "IN_FLIGHT", "2026-08-02T07:59:50.000Z");
+    const second = row("departure-2", "LANDED", "2026-08-02T07:59:55.000Z");
+    let response = 0;
+    const loadBoard = vi.fn(async ({ lowerPage }: { lowerPage: number }) => {
+      response += 1;
+      return boardWithDepartures(lowerPage, response === 1 ? [first, second] : [second]);
+    });
+    render(<Harness dataSource={dataSource(loadBoard)} />);
+    await act(async () => Promise.resolve());
+
+    await act(async () => {
+      vi.advanceTimersByTime(5_100);
+      await Promise.resolve();
+    });
+    expect(loadBoard).toHaveBeenCalledTimes(2);
+    await act(async () => {
+      vi.advanceTimersByTime(4_999);
+      await Promise.resolve();
+    });
+    expect(loadBoard).toHaveBeenCalledTimes(2);
+    await act(async () => {
+      vi.advanceTimersByTime(1);
+      await Promise.resolve();
+    });
+    expect(loadBoard).toHaveBeenCalledTimes(3);
+  });
+
+  it("does not loop when the server immediately returns the same expired departure", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-02T08:00:20.000Z"));
+    const departure = row("departure-1", "COMPLETED", "2026-08-02T08:00:00.000Z");
+    const loadBoard = vi.fn(async ({ lowerPage }: { lowerPage: number }) =>
+      boardWithDepartures(lowerPage, [departure]),
+    );
+    render(<Harness dataSource={dataSource(loadBoard)} />);
+    await act(async () => Promise.resolve());
+    await act(async () => {
+      vi.advanceTimersByTime(100);
+      await Promise.resolve();
+    });
+    expect(loadBoard).toHaveBeenCalledTimes(2);
+    await act(async () => {
+      vi.advanceTimersByTime(10_000);
+      await Promise.resolve();
+    });
+    expect(loadBoard).toHaveBeenCalledTimes(2);
+  });
+
+  it("cleans the departure timer on unmount", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-02T08:00:00.000Z"));
+    const departure = row("departure-1", "IN_FLIGHT", "2026-08-02T07:59:50.000Z");
+    const view = render(
+      <Harness
+        dataSource={dataSource(async ({ lowerPage }) =>
+          boardWithDepartures(lowerPage, [departure]),
+        )}
+      />,
+    );
+    await act(async () => Promise.resolve());
+    expect(vi.getTimerCount()).toBeGreaterThan(0);
+    view.unmount();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("keeps the confirmed board when an expiry refresh fails", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-02T08:00:00.000Z"));
+    const departure = row("departure-1", "IN_FLIGHT", "2026-08-02T07:59:50.000Z");
+    let requestCount = 0;
+    const loadBoard = vi.fn(async ({ lowerPage }: { lowerPage: number }) => {
+      requestCount += 1;
+      if (requestCount > 1) throw new Error("Offline beim Ablauf");
+      return boardWithDepartures(lowerPage, [departure]);
+    });
+    render(<Harness dataSource={dataSource(loadBoard)} />);
+    await act(async () => Promise.resolve());
+    await act(async () => {
+      vi.advanceTimersByTime(5_100);
+      await Promise.resolve();
+    });
+    expect(screen.getByTestId("priority-row").textContent).toBe("departure-1");
+    expect(screen.getByTestId("error").textContent).toBe("Offline beim Ablauf");
+  });
+
+  it("keeps the last valid lower page visible while an invalid page is reset", async () => {
+    vi.useFakeTimers();
+    let shrink = false;
+    let triggerRefresh: () => void = () => undefined;
+    const renderedRows: string[] = [];
+    const source = dataSource(async ({ lowerPage }) => {
+      if (shrink && lowerPage === 2) {
+        return splitBoard(2, {
+          page: {
+            requestedPage: 2,
+            pageSize: 3,
+            totalItems: 1,
+            totalPages: 1,
+            groups: [],
+          },
+        });
+      }
+      return splitBoard(lowerPage, {
+        page: {
+          requestedPage: lowerPage,
+          pageSize: 3,
+          totalItems: shrink ? 1 : 6,
+          totalPages: shrink ? 1 : 2,
+          groups: [row(`lower-${lowerPage}`)],
+        },
+      });
+    });
+    source.subscribe = (refresh) => {
+      triggerRefresh = refresh;
+      return () => undefined;
+    };
+    render(
+      <Harness dataSource={source} onRenderedLowerRow={(rowId) => renderedRows.push(rowId)} />,
+    );
+    await act(async () => Promise.resolve());
+    await act(async () => {
+      vi.advanceTimersByTime(5_000);
+      await Promise.resolve();
+    });
+    expect(screen.getByTestId("lower-row").textContent).toBe("lower-2");
+    renderedRows.length = 0;
+    shrink = true;
+    await act(async () => {
+      triggerRefresh();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(screen.getByTestId("lower-page").textContent).toBe("1");
+    expect(screen.getByTestId("lower-row").textContent).toBe("lower-1");
+    expect(renderedRows).not.toContain("");
   });
 });

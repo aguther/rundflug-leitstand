@@ -31,6 +31,7 @@ export function filterFidsRows<Row extends FilterableFidsRow>(
 }
 
 export interface PageableFidsRow extends FilterableFidsRow {
+  departedAt?: string | null;
   status: string;
 }
 
@@ -69,8 +70,54 @@ export interface FidsSplitProjection<Row> {
   page: FidsPage<Row>;
 }
 
-const isUrgentFidsStatus = (status: string): boolean =>
+const isActionableFidsStatus = (status: string): boolean =>
   status === "BOARDING" || status === "COME_TO_FLIGHT_LINE";
+
+const isRecentDepartureFidsStatus = (status: string): boolean =>
+  status === "IN_FLIGHT" || status === "LANDED" || status === "COMPLETED";
+
+export interface FidsSplitCapacityPlan {
+  actionableLimit: number;
+  recentDepartureLimit: number;
+  prepareLimit: number;
+  effectivePriorityCapacity: number;
+  lowerPageSize: number;
+  overflowCount: number;
+}
+
+export function planFidsSplitCapacity(input: {
+  visibleRows: number;
+  priorityGroupCount: number;
+  actionableCount: number;
+  recentDepartureCount: number;
+}): FidsSplitCapacityPlan {
+  const visibleRows = Math.max(0, Math.floor(input.visibleRows));
+  const configuredPriorityCapacity = Math.min(
+    visibleRows,
+    Math.max(0, Math.floor(input.priorityGroupCount)),
+  );
+  const actionableCount = Math.max(0, Math.floor(input.actionableCount));
+  const recentDepartureCount = Math.max(0, Math.floor(input.recentDepartureCount));
+  const actionableLimit = Math.min(actionableCount, visibleRows);
+  const recentDepartureLimit = Math.min(
+    recentDepartureCount,
+    Math.max(0, visibleRows - actionableLimit),
+  );
+  const mandatoryVisibleCount = actionableLimit + recentDepartureLimit;
+  const effectivePriorityCapacity = Math.min(
+    visibleRows,
+    Math.max(configuredPriorityCapacity, mandatoryVisibleCount),
+  );
+
+  return {
+    actionableLimit,
+    recentDepartureLimit,
+    prepareLimit: Math.max(0, configuredPriorityCapacity - mandatoryVisibleCount),
+    effectivePriorityCapacity,
+    lowerPageSize: Math.max(0, visibleRows - effectivePriorityCapacity),
+    overflowCount: Math.max(0, actionableCount + recentDepartureCount - mandatoryVisibleCount),
+  };
+}
 
 export function partitionFidsRows<Row extends PageableFidsRow>(input: {
   rows: readonly Row[];
@@ -78,29 +125,44 @@ export function partitionFidsRows<Row extends PageableFidsRow>(input: {
   priorityGroupCount: number;
   lowerPage: number;
 }): FidsSplitProjection<Row> {
-  const urgent = input.rows.filter((row) => isUrgentFidsStatus(row.status));
-  const regularPrepare = input.rows.filter((row) => row.status === "PREPARE");
-  const urgentShown = urgent.slice(0, input.visibleRows);
-  const prepareCapacity = Math.max(0, input.priorityGroupCount - urgentShown.length);
-  const priorityGroups = [
-    ...urgentShown,
-    ...regularPrepare.slice(0, Math.min(prepareCapacity, input.visibleRows - urgentShown.length)),
-  ];
-  const effectiveCapacity = Math.min(
-    input.visibleRows,
-    Math.max(input.priorityGroupCount, urgentShown.length),
+  const actionable = input.rows.filter((row) => isActionableFidsStatus(row.status));
+  const recentDepartures = input.rows
+    .map((row, index) => ({ row, index }))
+    .filter(({ row }) => isRecentDepartureFidsStatus(row.status))
+    .sort((left, right) => {
+      const departedDifference =
+        Date.parse(right.row.departedAt ?? "") - Date.parse(left.row.departedAt ?? "");
+      return (
+        (Number.isFinite(departedDifference) ? departedDifference : 0) || left.index - right.index
+      );
+    })
+    .map(({ row }) => row);
+  const prepare = input.rows.filter((row) => row.status === "PREPARE");
+  const capacity = planFidsSplitCapacity({
+    visibleRows: input.visibleRows,
+    priorityGroupCount: input.priorityGroupCount,
+    actionableCount: actionable.length,
+    recentDepartureCount: recentDepartures.length,
+  });
+  const actionableShown = actionable.slice(0, capacity.actionableLimit);
+  const recentDeparturesShown = recentDepartures.slice(0, capacity.recentDepartureLimit);
+  const prepareShown = prepare.slice(0, capacity.prepareLimit);
+  const priorityGroups = [...actionableShown, ...recentDeparturesShown, ...prepareShown];
+  const mandatoryPriorityIds = new Set(
+    [...actionable, ...recentDepartures].map((row) => row.rowId),
   );
-  const priorityIds = new Set(priorityGroups.map((row) => row.rowId));
-  const remainingRows = input.rows.filter((row) => !priorityIds.has(row.rowId));
-  const lowerPageSize = Math.max(0, input.visibleRows - effectiveCapacity);
+  const selectedPrepareIds = new Set(prepareShown.map((row) => row.rowId));
+  const remainingRows = input.rows.filter(
+    (row) => !mandatoryPriorityIds.has(row.rowId) && !selectedPrepareIds.has(row.rowId),
+  );
   return {
     priority: {
       configuredCapacity: input.priorityGroupCount,
-      effectiveCapacity,
-      totalItems: urgent.length + priorityGroups.length - urgentShown.length,
-      overflowCount: Math.max(0, urgent.length - input.visibleRows),
+      effectiveCapacity: capacity.effectivePriorityCapacity,
+      totalItems: actionable.length + recentDepartures.length + prepareShown.length,
+      overflowCount: capacity.overflowCount,
       groups: priorityGroups,
     },
-    page: paginateFidsRows(remainingRows, input.lowerPage, lowerPageSize),
+    page: paginateFidsRows(remainingRows, input.lowerPage, capacity.lowerPageSize),
   };
 }

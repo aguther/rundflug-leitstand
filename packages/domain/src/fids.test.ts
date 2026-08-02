@@ -1,13 +1,26 @@
 import { describe, expect, it } from "vitest";
-import { filterFidsRows, paginateFidsRows, parseFidsPage, partitionFidsRows } from "./fids";
+import {
+  filterFidsRows,
+  paginateFidsRows,
+  parseFidsPage,
+  partitionFidsRows,
+  planFidsSplitCapacity,
+} from "./fids";
 
-type Row = { rowId: string; productId: string; gateId: string | null; status: string };
-const row = (rowId: string, status = "WAITING", productId = "p-1", gateId = "g-1"): Row => ({
-  rowId,
-  productId,
-  gateId,
-  status,
-});
+type Row = {
+  rowId: string;
+  productId: string;
+  gateId: string | null;
+  status: string;
+  departedAt: string | null;
+};
+const row = (
+  rowId: string,
+  status = "WAITING",
+  productId = "p-1",
+  gateId = "g-1",
+  departedAt: string | null = null,
+): Row => ({ rowId, productId, gateId, status, departedAt });
 
 describe("FIDS paging", () => {
   it("accepts only safe one-based URL pages", () => {
@@ -42,60 +55,162 @@ describe("FIDS filters", () => {
 });
 
 describe("FIDS split projection", () => {
-  it("keeps urgent groups above PREPARE, reserves capacity, and never duplicates rows", () => {
+  it("orders actionable rows before recent departures and PREPARE", () => {
     const rows = [
-      row("boarding", "BOARDING"),
       row("gate", "COME_TO_FLIGHT_LINE"),
+      row("departure-old", "COMPLETED", "p-1", "g-1", "2026-08-02T08:00:00.000Z"),
       row("prepare-1", "PREPARE"),
-      row("prepare-2", "PREPARE"),
-      row("waiting-1"),
-      row("waiting-2"),
+      row("boarding", "BOARDING"),
+      row("departure-new", "IN_FLIGHT", "p-1", "g-1", "2026-08-02T08:02:00.000Z"),
     ];
     const split = partitionFidsRows({
       rows,
+      visibleRows: 5,
+      priorityGroupCount: 5,
+      lowerPage: 1,
+    });
+    expect(split.priority.groups.map((entry) => entry.rowId)).toEqual([
+      "gate",
+      "boarding",
+      "departure-new",
+      "departure-old",
+      "prepare-1",
+    ]);
+  });
+
+  it("extends priority capacity for recent departures and excludes them from lower paging", () => {
+    const split = partitionFidsRows({
+      rows: [
+        row("boarding", "BOARDING"),
+        row("departure", "LANDED", "p-1", "g-1", "2026-08-02T08:02:00.000Z"),
+        row("prepare", "PREPARE"),
+        row("waiting"),
+      ],
+      visibleRows: 5,
+      priorityGroupCount: 1,
+      lowerPage: 1,
+    });
+    expect(split.priority.effectiveCapacity).toBe(2);
+    expect(split.priority.groups.map((entry) => entry.rowId)).toEqual(["boarding", "departure"]);
+    expect(split.page.pageSize).toBe(3);
+    expect(split.page.groups.map((entry) => entry.rowId)).toEqual(["prepare", "waiting"]);
+  });
+
+  it("fills only remaining reserved priority places with PREPARE", () => {
+    const split = partitionFidsRows({
+      rows: [
+        row("boarding", "BOARDING"),
+        row("departure", "IN_FLIGHT", "p-1", "g-1", "2026-08-02T08:02:00.000Z"),
+        row("prepare-1", "PREPARE"),
+        row("prepare-2", "PREPARE"),
+        row("waiting"),
+      ],
       visibleRows: 5,
       priorityGroupCount: 3,
       lowerPage: 1,
     });
     expect(split.priority.groups.map((entry) => entry.rowId)).toEqual([
       "boarding",
-      "gate",
+      "departure",
       "prepare-1",
     ]);
     expect(split.priority.effectiveCapacity).toBe(3);
     expect(split.page.pageSize).toBe(2);
-    expect(split.page.groups.map((entry) => entry.rowId)).toEqual(["prepare-2", "waiting-1"]);
-    expect(
-      new Set([...split.priority.groups, ...split.page.groups].map((entry) => entry.rowId)).size,
-    ).toBe(5);
+    expect(split.page.groups.map((entry) => entry.rowId)).toEqual(["prepare-2", "waiting"]);
   });
 
-  it("expands for urgent groups and reports urgent overflow at full capacity", () => {
-    const urgent = Array.from({ length: 6 }, (_, index) => row(`urgent-${index}`, "BOARDING"));
+  it("reports hidden actionable and recent-departure overflow without leaking it below", () => {
+    const rows = [
+      row("boarding-1", "BOARDING"),
+      row("boarding-2", "BOARDING"),
+      row("boarding-3", "BOARDING"),
+      row("departure-new", "IN_FLIGHT", "p-1", "g-1", "2026-08-02T08:03:00.000Z"),
+      row("departure-old", "COMPLETED", "p-1", "g-1", "2026-08-02T08:01:00.000Z"),
+      row("waiting"),
+    ];
     const split = partitionFidsRows({
-      rows: [...urgent, row("waiting")],
-      visibleRows: 5,
+      rows,
+      visibleRows: 4,
       priorityGroupCount: 2,
       lowerPage: 1,
     });
-    expect(split.priority.effectiveCapacity).toBe(5);
-    expect(split.priority.groups).toHaveLength(5);
-    expect(split.priority.totalItems).toBe(6);
+    expect(split.priority.groups.map((entry) => entry.rowId)).toEqual([
+      "boarding-1",
+      "boarding-2",
+      "boarding-3",
+      "departure-new",
+    ]);
     expect(split.priority.overflowCount).toBe(1);
-    expect(split.page.pageSize).toBe(0);
+    expect(split.page.totalItems).toBe(1);
     expect(split.page.groups).toEqual([]);
+    expect(
+      new Set([...split.priority.groups, ...split.page.groups].map((entry) => entry.rowId)).size,
+    ).toBe(split.priority.groups.length + split.page.groups.length);
   });
 
-  it("keeps the configured upper space reserved when fewer priority groups exist", () => {
-    const split = partitionFidsRows({
-      rows: [row("prepare", "PREPARE"), row("waiting")],
+  it("redistributes capacity deterministically after an expired departure leaves the input", () => {
+    const rows = [
+      row("boarding", "BOARDING"),
+      row("departure", "IN_FLIGHT", "p-1", "g-1", "2026-08-02T08:02:00.000Z"),
+      row("prepare-1", "PREPARE"),
+      row("prepare-2", "PREPARE"),
+      row("waiting"),
+    ];
+    const before = partitionFidsRows({
+      rows,
       visibleRows: 5,
       priorityGroupCount: 3,
       lowerPage: 1,
     });
-    expect(split.priority.effectiveCapacity).toBe(3);
-    expect(split.priority.groups).toHaveLength(1);
-    expect(split.page.pageSize).toBe(2);
-    expect(split.page.groups.map((entry) => entry.rowId)).toEqual(["waiting"]);
+    const after = partitionFidsRows({
+      rows: rows.filter((entry) => entry.rowId !== "departure"),
+      visibleRows: 5,
+      priorityGroupCount: 3,
+      lowerPage: 1,
+    });
+    expect(before.priority.groups.map((entry) => entry.rowId)).toEqual([
+      "boarding",
+      "departure",
+      "prepare-1",
+    ]);
+    expect(after.priority.groups.map((entry) => entry.rowId)).toEqual([
+      "boarding",
+      "prepare-1",
+      "prepare-2",
+    ]);
+    expect(after.page.groups.map((entry) => entry.rowId)).toEqual(["waiting"]);
+  });
+
+  it("plans mandatory upper capacity without depending on row content", () => {
+    expect(
+      planFidsSplitCapacity({
+        visibleRows: 8,
+        priorityGroupCount: 3,
+        actionableCount: 2,
+        recentDepartureCount: 3,
+      }),
+    ).toEqual({
+      actionableLimit: 2,
+      recentDepartureLimit: 3,
+      prepareLimit: 0,
+      effectivePriorityCapacity: 5,
+      lowerPageSize: 3,
+      overflowCount: 0,
+    });
+    expect(
+      planFidsSplitCapacity({
+        visibleRows: 4,
+        priorityGroupCount: 2,
+        actionableCount: 5,
+        recentDepartureCount: 2,
+      }),
+    ).toMatchObject({
+      actionableLimit: 4,
+      recentDepartureLimit: 0,
+      prepareLimit: 0,
+      effectivePriorityCapacity: 4,
+      lowerPageSize: 0,
+      overflowCount: 3,
+    });
   });
 });
