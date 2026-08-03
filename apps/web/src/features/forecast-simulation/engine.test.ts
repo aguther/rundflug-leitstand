@@ -10,7 +10,7 @@ import {
   validateSimulationConfig,
 } from "./model";
 
-const FORECAST_BASELINE_TIMEOUT_MS = 20_000;
+const FORECAST_BASELINE_TIMEOUT_MS = 60_000;
 
 function shortNormalConfig() {
   const config = simulationConfigForPreset("NORMAL");

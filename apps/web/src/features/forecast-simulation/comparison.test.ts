@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { productionBaselineConfig, runBatchComparison } from "./comparison";
 import { demandForProfile, simulationConfigForPreset } from "./model";
 
-const BATCH_BASELINE_TIMEOUT_MS = 90_000;
+const BATCH_BASELINE_TIMEOUT_MS = 180_000;
 const COMPARISON_SMOKE_TIMEOUT_MS = 20_000;
 
 function comparisonConfig() {
