@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   filterFidsRows,
+  groupSharedFidsFlights,
+  orderFidsRows,
   paginateFidsRows,
   parseFidsPage,
   partitionFidsRows,
@@ -51,6 +53,88 @@ describe("FIDS filters", () => {
       rows[1],
     ]);
     expect(filterFidsRows(rows, { productIds: ["p-1"], gateIds: ["g-2"] })).toEqual([]);
+  });
+});
+
+describe("FIDS shared flights", () => {
+  type SharedRow = Row & {
+    activeRecall: { id: string } | null;
+    bookingGroupLabels: string[];
+    communicationNumber: number;
+    productCode: string;
+    sharedFlightKey: string | null;
+    ticketLabels: string[];
+  };
+  const sharedRow = (
+    rowId: string,
+    communicationNumber: number,
+    overrides: Partial<SharedRow> = {},
+  ): SharedRow => ({
+    ...row(rowId, "BOARDING"),
+    activeRecall: null,
+    bookingGroupLabels: [`G-PAN-${String(communicationNumber).padStart(4, "0")}`],
+    communicationNumber,
+    productCode: "PAN",
+    sharedFlightKey: "rotation:one",
+    ticketLabels: [`ticket-${communicationNumber}`],
+    ...overrides,
+  });
+
+  it("groups at most three compatible booking groups before paging", () => {
+    const grouped = groupSharedFidsFlights(
+      [1, 2, 3, 4].map((number) => sharedRow(`row-${number}`, number)),
+      true,
+    );
+
+    expect(grouped).toHaveLength(2);
+    expect(grouped[0]?.bookingGroupLabels).toEqual(["G-PAN-0001", "G-PAN-0002", "G-PAN-0003"]);
+    expect(grouped[0]?.ticketLabels).toEqual(["ticket-1", "ticket-2", "ticket-3"]);
+    expect(grouped[1]?.bookingGroupLabels).toEqual(["G-PAN-0004"]);
+    expect(paginateFidsRows(grouped, 1, 1)).toMatchObject({ totalItems: 2, totalPages: 2 });
+  });
+
+  it("keeps recalled, incompatible and unbound rows separate", () => {
+    const rows = [
+      sharedRow("recalled", 1, { activeRecall: { id: "recall" } }),
+      sharedRow("other-product", 2, { productId: "p-2" }),
+      sharedRow("other-gate", 3, { gateId: "g-2" }),
+      sharedRow("other-status", 4, { status: "IN_FLIGHT" }),
+      sharedRow("unbound", 5, { sharedFlightKey: null }),
+    ];
+
+    const grouped = groupSharedFidsFlights(rows, true);
+    expect(grouped).toHaveLength(rows.length);
+    expect(grouped[0]?.rowId).toBe("recalled");
+    expect(grouped.at(-1)?.rowId).toBe("unbound");
+    expect(grouped.map((entry) => entry.bookingGroupLabels)).toEqual(
+      rows.map((entry) => entry.bookingGroupLabels),
+    );
+    expect(groupSharedFidsFlights(rows, false)).toEqual(rows);
+  });
+
+  it("keeps the shared row identity stable when another group joins its first chunk", () => {
+    const first = groupSharedFidsFlights([sharedRow("one", 1)], true)[0];
+    const expanded = groupSharedFidsFlights([sharedRow("one", 1), sharedRow("two", 2)], true)[0];
+
+    expect(first?.rowId).toBe(expanded?.rowId);
+  });
+
+  it("orders recent departures directly after actionable rows", () => {
+    const ordered = orderFidsRows([
+      row("waiting"),
+      row("departure-old", "COMPLETED", "p-1", "g-1", "2026-08-02T08:00:00.000Z"),
+      row("prepare", "PREPARE"),
+      row("boarding", "BOARDING"),
+      row("departure-new", "IN_FLIGHT", "p-1", "g-1", "2026-08-02T08:01:00.000Z"),
+    ]);
+
+    expect(ordered.map((entry) => entry.rowId)).toEqual([
+      "boarding",
+      "departure-new",
+      "departure-old",
+      "prepare",
+      "waiting",
+    ]);
   });
 });
 

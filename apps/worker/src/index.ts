@@ -51,8 +51,11 @@ import {
   forecastQueueWindows,
   formatBookingGroupLabel,
   formatFlightGroupLabel,
+  groupSharedFidsFlights,
+  orderFidsRows,
+  paginateFidsRows,
   parseFidsPage,
-  planFidsSplitCapacity,
+  partitionFidsRows,
   resolveTurnaroundProfile,
 } from "@rundflug/domain";
 import { Hono } from "hono";
@@ -108,10 +111,10 @@ import {
 } from "./factory-reset";
 import { mayAccessFids } from "./fids-authorization";
 import {
-  countFidsProjectionRows,
   type FidsProjectionEvent,
   type FidsProjectionFilter,
   type FidsProjectionRow,
+  loadAllFidsProjectionRows,
   loadFidsProjectionEvent,
   loadFidsProjectionFleet,
   loadFidsProjectionRows,
@@ -430,6 +433,19 @@ function mapFidsProjectionRow(
   const publishesWindow =
     publicForecast.forecastState === "DISPATCH_WINDOW" ||
     publicForecast.forecastState === "LONG_RANGE_WINDOW";
+  const activeRecall = activeTicketGroupRecallProjection(row);
+  const status: FidsBoardRow["status"] =
+    row.resource_group_status !== "ACTIVE"
+      ? "SERVICE_PAUSED"
+      : derivePublicRotationStatus({
+          rotationState: row.status,
+          draftStatus:
+            row.precalled_at !== null
+              ? "COME_TO_FLIGHT_LINE"
+              : row.precall_decision_status === "PREPARE" && predictionQuality !== "UNCERTAIN"
+                ? "PREPARE"
+                : "WAITING",
+        });
   return {
     rowId: row.row_id,
     productId: row.product_id,
@@ -438,6 +454,7 @@ function mapFidsProjectionRow(
     productCode: row.product_code,
     gateLabel: row.gate_label,
     communicationNumber: row.communication_number,
+    bookingGroupLabels: [formatBookingGroupLabel(row.product_code, row.communication_number)],
     ticketLabels: Array.from(
       { length: Math.max(1, row.ticket_count) },
       (_, ticketIndex) =>
@@ -445,18 +462,15 @@ function mapFidsProjectionRow(
     ),
     aircraftRegistration: row.aircraft_registration,
     departedAt: row.departed_at,
-    status:
-      row.resource_group_status !== "ACTIVE"
-        ? "SERVICE_PAUSED"
-        : derivePublicRotationStatus({
-            rotationState: row.status,
-            draftStatus:
-              row.precalled_at !== null
-                ? "COME_TO_FLIGHT_LINE"
-                : row.precall_decision_status === "PREPARE" && predictionQuality !== "UNCERTAIN"
-                  ? "PREPARE"
-                  : "WAITING",
-          }),
+    status,
+    sharedFlightKey:
+      activeRecall !== null
+        ? null
+        : status === "COME_TO_FLIGHT_LINE" && row.dispatch_batch_id
+          ? `dispatch:${row.dispatch_batch_id}`
+          : ["BOARDING", "IN_FLIGHT", "LANDED", "COMPLETED"].includes(status)
+            ? `rotation:${row.rotation_id}`
+            : null,
     waitLowerMinutes: publishesWindow ? waitLowerMinutes : 0,
     waitUpperMinutes: publishesWindow ? waitUpperMinutes : 0,
     boardingWindowLowerAt: publishesWindow ? boardingWindow.lowerAt : null,
@@ -465,7 +479,7 @@ function mapFidsProjectionRow(
     predictionQuality,
     dispatchOrder: row.dispatch_order,
     operationalNotice: row.planned_public_note || row.resource_group_operational_note,
-    activeRecall: activeTicketGroupRecallProjection(row),
+    activeRecall,
   };
 }
 
@@ -3847,7 +3861,17 @@ app.on("GET", eventRoutes("/fids/board"), async (context) => {
     departedVisibilityCutoff,
     now: boardReadAt,
   };
-  const fleet = event.emergency_mode ? [] : await loadFidsProjectionFleet(context.env.DB, eventId);
+  const [fleet, projectionRows] =
+    event.emergency_mode === 1
+      ? [[], []]
+      : await Promise.all([
+          loadFidsProjectionFleet(context.env.DB, eventId),
+          loadAllFidsProjectionRows(context.env.DB, { ...baseProjection, band: "ALL" }),
+        ]);
+  const displayedRows = groupSharedFidsFlights(
+    orderFidsRows(projectionRows.map((row) => mapFidsProjectionRow(row, event, boardReadAt))),
+    preferences.groupSharedFlights,
+  );
 
   let priority: FidsBoardResponse["priority"] = null;
   let boardPage: FidsBoardResponse["page"];
@@ -3872,96 +3896,16 @@ app.on("GET", eventRoutes("/fids/board"), async (context) => {
       };
     }
   } else if (preferences.viewMode === "FIXED_PAGE") {
-    const [totalItems, rows] = await Promise.all([
-      countFidsProjectionRows(context.env.DB, { ...baseProjection, band: "ALL" }),
-      loadFidsProjectionRows(context.env.DB, {
-        ...baseProjection,
-        band: "ALL",
-        limit: preferences.visibleRows,
-        offset: (page - 1) * preferences.visibleRows,
-      }),
-    ]);
-    boardPage = {
-      requestedPage: page,
-      pageSize: preferences.visibleRows,
-      totalItems,
-      totalPages: Math.ceil(totalItems / preferences.visibleRows),
-      groups: rows.map((row) => mapFidsProjectionRow(row, event, boardReadAt)),
-    };
+    boardPage = paginateFidsRows(displayedRows, page, preferences.visibleRows);
   } else {
-    const actionableTotal = await countFidsProjectionRows(context.env.DB, {
-      ...baseProjection,
-      band: "ACTIONABLE",
-    });
-    const recentDepartureTotal = await countFidsProjectionRows(context.env.DB, {
-      ...baseProjection,
-      band: "RECENT_DEPARTURE",
-    });
-    const splitCapacity = planFidsSplitCapacity({
+    const splitProjection = partitionFidsRows({
+      rows: displayedRows,
       visibleRows: preferences.visibleRows,
       priorityGroupCount: preferences.priorityGroupCount,
-      actionableCount: actionableTotal,
-      recentDepartureCount: recentDepartureTotal,
+      lowerPage,
     });
-    const actionableRows =
-      splitCapacity.actionableLimit === 0
-        ? []
-        : await loadFidsProjectionRows(context.env.DB, {
-            ...baseProjection,
-            band: "ACTIONABLE",
-            limit: splitCapacity.actionableLimit,
-            offset: 0,
-          });
-    const recentDepartureRows =
-      splitCapacity.recentDepartureLimit === 0
-        ? []
-        : await loadFidsProjectionRows(context.env.DB, {
-            ...baseProjection,
-            band: "RECENT_DEPARTURE",
-            limit: splitCapacity.recentDepartureLimit,
-            offset: 0,
-          });
-    const prepareRows =
-      splitCapacity.prepareLimit === 0
-        ? []
-        : await loadFidsProjectionRows(context.env.DB, {
-            ...baseProjection,
-            band: "PREPARE",
-            limit: splitCapacity.prepareLimit,
-            offset: 0,
-          });
-    const priorityRows = [...actionableRows, ...recentDepartureRows, ...prepareRows];
-    const excludedRowIds = prepareRows.map((row) => row.row_id);
-    const lowerTotal = await countFidsProjectionRows(context.env.DB, {
-      ...baseProjection,
-      band: "LOWER",
-      excludedRowIds,
-    });
-    const lowerRows =
-      splitCapacity.lowerPageSize === 0
-        ? []
-        : await loadFidsProjectionRows(context.env.DB, {
-            ...baseProjection,
-            band: "LOWER",
-            excludedRowIds,
-            limit: splitCapacity.lowerPageSize,
-            offset: (lowerPage - 1) * splitCapacity.lowerPageSize,
-          });
-    priority = {
-      configuredCapacity: preferences.priorityGroupCount,
-      effectiveCapacity: splitCapacity.effectivePriorityCapacity,
-      totalItems: actionableTotal + recentDepartureTotal + prepareRows.length,
-      overflowCount: splitCapacity.overflowCount,
-      groups: priorityRows.map((row) => mapFidsProjectionRow(row, event, boardReadAt)),
-    };
-    boardPage = {
-      requestedPage: lowerPage,
-      pageSize: splitCapacity.lowerPageSize,
-      totalItems: lowerTotal,
-      totalPages:
-        splitCapacity.lowerPageSize === 0 ? 0 : Math.ceil(lowerTotal / splitCapacity.lowerPageSize),
-      groups: lowerRows.map((row) => mapFidsProjectionRow(row, event, boardReadAt)),
-    };
+    priority = splitProjection.priority;
+    boardPage = splitProjection.page;
   }
 
   const response = context.json({
@@ -8113,6 +8057,8 @@ app.get("/api/public/events/:eventId/board", async (context) => {
         rowId: _rowId,
         productId: _productId,
         gateId: _gateId,
+        bookingGroupLabels: _bookingGroupLabels,
+        sharedFlightKey: _sharedFlightKey,
         ...group
       } = mapFidsProjectionRow(row, event, boardReadAt);
       return group;

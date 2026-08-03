@@ -368,6 +368,24 @@
   white-space: nowrap;
 }
 
+.fids-group-cell .fids-group-codes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 7.2em), 1fr));
+  gap: 0.08em 0.38em;
+  overflow: visible;
+  line-height: 1.03;
+  text-overflow: clip;
+  white-space: normal;
+}
+
+.fids-group-cell[data-group-count="2"] .fids-group-codes {
+  font-size: 0.91em;
+}
+
+.fids-group-cell[data-group-count="3"] .fids-group-codes {
+  font-size: 0.8em;
+}
+
 .fids-group-cell small {
   display: block;
   min-width: 0;
@@ -1326,6 +1344,49 @@
   align-items: center;
   gap: 16px;
   margin-top: 12px;
+}
+
+.fids-shared-flight-setting {
+  display: flex;
+  min-width: 0;
+  min-height: 58px;
+  align-items: center;
+  gap: 14px;
+  margin-top: 12px;
+  padding: 10px 16px;
+  border: 1px solid var(--fids-border);
+  border-radius: 9px;
+  color: var(--fids-text);
+  cursor: pointer;
+}
+
+.fids-shared-flight-setting:has(input:checked) {
+  border-color: var(--fids-ui-accent);
+  background: var(--fids-ui-accent-soft);
+}
+
+.fids-shared-flight-setting:has(input:focus-visible) {
+  outline: 3px solid color-mix(in srgb, var(--fids-ui-accent) 75%, transparent);
+  outline-offset: 2px;
+}
+
+.fids-shared-flight-setting input {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  margin: 0;
+  accent-color: var(--fids-ui-accent);
+}
+
+.fids-shared-flight-setting span {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.fids-shared-flight-setting small {
+  color: var(--fids-muted);
+  line-height: 1.35;
 }
 
 .fids-filter-list {

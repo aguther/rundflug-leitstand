@@ -186,6 +186,28 @@ export async function loadFidsProjectionRows(
   return result.results;
 }
 
+export async function loadAllFidsProjectionRows(
+  db: D1Database,
+  input: Parameters<typeof projectionBindings>[0],
+): Promise<FidsProjectionRow[]> {
+  const result = await db
+    .prepare(
+      `${projectionCte}
+       SELECT * FROM selected
+        ORDER BY sort_rank,
+                 CASE WHEN status = 'DRAFT' THEN dispatch_order END,
+                 CASE WHEN status = 'DRAFT' THEN predicted_boarding_at END,
+                 CASE WHEN status = 'DRAFT' THEN queue_position END,
+                 CASE WHEN status IN ('IN_FLIGHT', 'LANDED', 'COMPLETED')
+                   THEN departed_at END DESC,
+                 communication_number,
+                 rotation_id`,
+    )
+    .bind(...projectionBindings(input))
+    .all<FidsProjectionRow>();
+  return result.results;
+}
+
 export interface FidsProjectionEvent {
   name: string;
   time_zone: string;

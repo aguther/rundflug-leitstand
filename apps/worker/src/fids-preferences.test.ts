@@ -53,6 +53,9 @@ describe("FIDS V1.7.3 persistence and authorization", () => {
               '2026-07-22T08:00:00Z', '2026-07-22T08:00:00Z');
     `);
     database.exec(readFileSync(`${migrationsDirectory}/0061_fids_fixed_split_filters.sql`, "utf8"));
+    database.exec(
+      readFileSync(`${migrationsDirectory}/0065_fids_shared_flight_grouping.sql`, "utf8"),
+    );
 
     expect(
       database.prepare("SELECT role FROM operator_accounts WHERE id = 'admin-1'").get(),
@@ -65,7 +68,7 @@ describe("FIDS V1.7.3 persistence and authorization", () => {
       database
         .prepare(
           `SELECT visible_rows, layout, theme, version, view_mode, priority_group_count,
-                  rotation_interval_seconds, content_filter_json
+                  rotation_interval_seconds, group_shared_flights, content_filter_json
              FROM fids_preferences WHERE operator_account_id = 'display-1'`,
         )
         .get(),
@@ -77,6 +80,7 @@ describe("FIDS V1.7.3 persistence and authorization", () => {
       view_mode: "FIXED_PAGE",
       priority_group_count: 3,
       rotation_interval_seconds: 12,
+      group_shared_flights: 0,
       content_filter_json: '{"productIds":[],"gateIds":[]}',
     });
     expect(() =>
@@ -91,6 +95,11 @@ describe("FIDS V1.7.3 persistence and authorization", () => {
     expect(() =>
       database.exec(
         "UPDATE fids_preferences SET rotation_interval_seconds = 4 WHERE operator_account_id = 'display-1'",
+      ),
+    ).toThrow();
+    expect(() =>
+      database.exec(
+        "UPDATE fids_preferences SET group_shared_flights = 2 WHERE operator_account_id = 'display-1'",
       ),
     ).toThrow();
     database.exec("DELETE FROM operator_accounts WHERE id = 'display-1'");
@@ -135,6 +144,7 @@ describe("FIDS V1.7.3 persistence and authorization", () => {
     expect(handler).toContain("operatorAccountId: accountId");
     expect(handler).toContain("productIds: next.contentFilter.productIds");
     expect(handler).toContain("gateIds: next.contentFilter.gateIds");
+    expect(handler).toContain("groupSharedFlights: next.groupSharedFlights");
     expect(handler).toContain("normalizeFidsContentFilter(input.contentFilter)");
     expect(handler).toContain("FIDS_FILTER_OPTION_NOT_FOUND");
     expect(handler).not.toContain("operatorLoginCode: loginCode");

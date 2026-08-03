@@ -449,6 +449,7 @@ export class EventCoordinator extends DurableObject<Env> {
       viewMode: input.viewMode,
       priorityGroupCount: input.priorityGroupCount,
       rotationIntervalSeconds: input.rotationIntervalSeconds,
+      groupSharedFlights: input.groupSharedFlights,
       contentFilter: normalizedFilter,
       version: currentVersion + 1,
     };
@@ -460,6 +461,7 @@ export class EventCoordinator extends DurableObject<Env> {
       viewMode: next.viewMode,
       priorityGroupCount: next.priorityGroupCount,
       rotationIntervalSeconds: next.rotationIntervalSeconds,
+      groupSharedFlights: next.groupSharedFlights,
       productIds: next.contentFilter.productIds,
       gateIds: next.contentFilter.gateIds,
     };
@@ -467,9 +469,10 @@ export class EventCoordinator extends DurableObject<Env> {
       this.env.DB.prepare(
         `INSERT INTO fids_preferences
           (operator_account_id, operation_day_id, visible_rows, layout, theme, view_mode,
-           priority_group_count, rotation_interval_seconds, content_filter_json, version,
+           priority_group_count, rotation_interval_seconds, group_shared_flights,
+           content_filter_json, version,
            created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?11)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?12)
          ON CONFLICT(operator_account_id, operation_day_id) DO UPDATE SET
            visible_rows = excluded.visible_rows,
            layout = excluded.layout,
@@ -477,10 +480,11 @@ export class EventCoordinator extends DurableObject<Env> {
            view_mode = excluded.view_mode,
            priority_group_count = excluded.priority_group_count,
            rotation_interval_seconds = excluded.rotation_interval_seconds,
+           group_shared_flights = excluded.group_shared_flights,
            content_filter_json = excluded.content_filter_json,
            version = excluded.version,
            updated_at = excluded.updated_at
-         WHERE fids_preferences.version = ?12`,
+         WHERE fids_preferences.version = ?13`,
       ).bind(
         accountId,
         eventId,
@@ -490,6 +494,7 @@ export class EventCoordinator extends DurableObject<Env> {
         next.viewMode,
         next.priorityGroupCount,
         next.rotationIntervalSeconds,
+        next.groupSharedFlights ? 1 : 0,
         JSON.stringify(next.contentFilter),
         next.version,
         now,

@@ -195,6 +195,26 @@ export function FidsSettingsDialog({
               }
               value={draft.visibleRows}
             />
+            <label className="fids-shared-flight-setting">
+              <input
+                checked={draft.groupSharedFlights}
+                disabled={saving}
+                onChange={(event) =>
+                  setDraft((current) => ({
+                    ...current,
+                    groupSharedFlights: event.target.checked,
+                  }))
+                }
+                type="checkbox"
+              />
+              <span>
+                <strong>Gruppen desselben Flugs zusammenfassen</strong>
+                <small>
+                  Zeigt bis zu drei Buchungsgruppen gemeinsam, wenn Produkt, Gate, Status und der
+                  nächste operative Flug übereinstimmen. Aktive Nachrufe bleiben einzeln.
+                </small>
+              </span>
+            </label>
             {draft.viewMode === "SPLIT" ? (
               <div className="fids-split-settings">
                 <Stepper

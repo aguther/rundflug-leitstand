@@ -91,6 +91,7 @@ describe("FIDS V1.7.3 UI", () => {
     expect(displaySource).toContain("Rückkehr offen");
     expect(displaySource).toContain("Statusklärung");
     expect(displaySource).toContain("Aktualisierung");
+    expect(displaySource).toContain('return "Jetzt"');
     expect(displaySource).toContain("Keine passende Kapazität");
     expect(stylesSource).toMatch(/\.fids-window \{[\s\S]*?white-space: nowrap;/);
     expect(stylesSource).toMatch(/\.fids-window \{[\s\S]*?font-variant-numeric: tabular-nums;/);
@@ -110,6 +111,7 @@ describe("FIDS V1.7.3 UI", () => {
       "Seitenwechsel unten",
       "Feste Seite",
       "Geteilte Ansicht",
+      "Gruppen desselben Flugs zusammenfassen",
       "Eine Spalte",
       "Zwei Spalten",
       "System",
@@ -128,6 +130,7 @@ describe("FIDS V1.7.3 UI", () => {
     expect(settingsSource).toContain("fids-settings-scroll");
     expect(settingsSource).toContain("Abgeflogene Gruppen bleiben");
     expect(settingsSource).toContain("Administration → Veranstaltungsparameter");
+    expect(settingsSource).toContain("groupSharedFlights: event.target.checked");
   });
 
   it("binds the shell to 100dvh without document or table scrolling", () => {
@@ -141,6 +144,7 @@ describe("FIDS V1.7.3 UI", () => {
     expect(stylesSource).toMatch(
       /\.fids-group-cell > svg \{[\s\S]*?width: 1em;[\s\S]*?height: 1em;/,
     );
+    expect(stylesSource).toContain('.fids-group-cell[data-group-count="3"]');
     expect(stylesSource).toMatch(/\.fids-status-icon \{[\s\S]*?width: 1em;[\s\S]*?height: 1em;/);
     expect(stylesSource).toContain("--fids-ui-accent: #2f8af5");
     expect(stylesSource).toMatch(

@@ -427,6 +427,14 @@ Statuswechsel. Vor Anwendung wird eine D1-Time-Travel-Marke oder portable Sicher
 älterer Worker ignoriert die additive Tabelle; die vollständige Schema-Rückkehr erfolgt per Time
 Travel oder aus dieser Sicherung.
 
+## 0065 – Optionale FIDS-Zusammenfassung gemeinsamer Flüge
+
+Ergänzt die konten- und veranstaltungsbezogenen FIDS-Einstellungen additiv um die standardmäßig
+deaktivierte Option, Buchungsgruppen desselben operativen Fluges platzsparend zusammenzufassen.
+Bestehende Anzeigen behalten damit unverändert eine Buchungsgruppe je Zeile. Vor Anwendung wird
+eine D1-Time-Travel-Marke oder vollständige D1-Sicherung angelegt. Ein älterer Worker ignoriert die
+additive Spalte; die vollständige Schema-Rückkehr erfolgt per Time Travel oder aus dieser Sicherung.
+
 ## Historische Doppelnummer 0036
 
 `0036_product_promised_flight_time.sql` und `0036_v1_5_stable_operations.sql` wurden bereits unter

@@ -1040,6 +1040,7 @@ const fidsPreferencesFieldsSchema = z
     viewMode: fidsViewModeSchema.default("FIXED_PAGE"),
     priorityGroupCount: z.number().int().min(1).max(19).default(3),
     rotationIntervalSeconds: z.number().int().min(5).max(60).default(12),
+    groupSharedFlights: z.boolean().default(false),
     contentFilter: fidsContentFilterSchema.default({ productIds: [], gateIds: [] }),
     version: z.number().int().min(0),
   })
@@ -3322,6 +3323,8 @@ export const fidsBoardRowSchema = publicBoardGroupSchema
     rowId: z.string().min(1).max(100),
     productId: z.string().min(1).max(100),
     gateId: z.string().min(1).max(100).nullable(),
+    bookingGroupLabels: z.array(z.string().min(1).max(80)).min(1).max(3).optional(),
+    sharedFlightKey: z.string().min(1).max(120).nullable().optional(),
   })
   .strict();
 export type FidsBoardRow = z.infer<typeof fidsBoardRowSchema>;

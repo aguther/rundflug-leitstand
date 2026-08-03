@@ -14,6 +14,7 @@ const preferences: FidsPreferences = {
   viewMode: "SPLIT",
   priorityGroupCount: 2,
   rotationIntervalSeconds: 5,
+  groupSharedFlights: false,
   contentFilter: { productIds: [], gateIds: [] },
   version: 0,
 };

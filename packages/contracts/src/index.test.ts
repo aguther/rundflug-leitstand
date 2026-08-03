@@ -228,6 +228,7 @@ describe("commandEnvelopeSchema", () => {
       viewMode: "FIXED_PAGE",
       priorityGroupCount: 3,
       rotationIntervalSeconds: 12,
+      groupSharedFlights: false,
       contentFilter: { productIds: [], gateIds: [] },
       version: 3,
     });
@@ -250,6 +251,7 @@ describe("commandEnvelopeSchema", () => {
       viewMode: "FIXED_PAGE",
       priorityGroupCount: 3,
       rotationIntervalSeconds: 12,
+      groupSharedFlights: true,
       contentFilter: { productIds: [], gateIds: [] },
       version: 1,
     });
@@ -259,6 +261,7 @@ describe("commandEnvelopeSchema", () => {
       contentFilter: { productIds: ["product-a"], gateIds: ["gate-a"] },
     });
     expect(fixed.viewMode).toBe("FIXED_PAGE");
+    expect(fixed.groupSharedFlights).toBe(true);
     expect(split.viewMode).toBe("SPLIT");
     expect("page" in fixed).toBe(false);
     expect("setup" in fixed).toBe(false);

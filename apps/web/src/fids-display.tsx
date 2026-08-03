@@ -28,8 +28,10 @@ const FIDS_EMPTY_SLOT_KEYS = Array.from(
   (_, index) => `fids-empty-slot-${index + 1}`,
 );
 
-function groupCode(group: FidsBoardRow): string {
-  return formatBookingGroupLabel(group.productCode, group.communicationNumber);
+function groupCodes(group: FidsBoardRow): string[] {
+  return group.bookingGroupLabels?.length
+    ? group.bookingGroupLabels
+    : [formatBookingGroupLabel(group.productCode, group.communicationNumber)];
 }
 
 function statusPresentation(status: FidsBoardRow["status"]): {
@@ -50,6 +52,11 @@ function statusPresentation(status: FidsBoardRow["status"]): {
 }
 
 function timeWindow(group: FidsBoardRow, timeZone: string): string {
+  if (
+    ["COME_TO_FLIGHT_LINE", "BOARDING", "IN_FLIGHT", "LANDED", "COMPLETED"].includes(group.status)
+  ) {
+    return "Jetzt";
+  }
   if (group.forecastState === "AFTER_OPERATIONS_END") {
     return "Heute nicht mehr";
   }
@@ -101,13 +108,17 @@ function Status({ group }: { group: FidsBoardRow }) {
 }
 
 function GroupCell({ group }: { group: FidsBoardRow }) {
-  const code = groupCode(group);
+  const codes = groupCodes(group);
   return (
-    <div className="fids-group-cell">
+    <div className="fids-group-cell" data-group-count={codes.length}>
       <Users aria-hidden="true" />
       <span>
-        <strong title={code}>{code}</strong>
-        <small title={group.productName}>{group.productName}</small>
+        <strong className="fids-group-codes" title={codes.join(", ")}>
+          {codes.map((code) => (
+            <span key={code}>{code}</span>
+          ))}
+        </strong>
+        {codes.length === 1 ? <small title={group.productName}>{group.productName}</small> : null}
       </span>
     </div>
   );

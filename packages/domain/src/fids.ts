@@ -1,3 +1,5 @@
+import { formatBookingGroupLabel } from "./communication-labels";
+
 export const FIDS_PAGE_LIMIT = 999;
 
 export function parseFidsPage(value: string | null | undefined): number {
@@ -35,6 +37,102 @@ export interface PageableFidsRow extends FilterableFidsRow {
   status: string;
 }
 
+export interface SharedFlightFidsRow extends PageableFidsRow {
+  activeRecall?: unknown | null;
+  bookingGroupLabels?: readonly string[] | undefined;
+  communicationNumber: number;
+  productCode: string;
+  sharedFlightKey?: string | null | undefined;
+  ticketLabels: readonly string[];
+}
+
+const isActionableFidsStatus = (status: string): boolean =>
+  status === "BOARDING" || status === "COME_TO_FLIGHT_LINE";
+
+const isRecentDepartureFidsStatus = (status: string): boolean =>
+  status === "IN_FLIGHT" || status === "LANDED" || status === "COMPLETED";
+
+export function orderFidsRows<Row extends PageableFidsRow>(rows: readonly Row[]): Row[] {
+  const actionable = rows.filter((row) => isActionableFidsStatus(row.status));
+  const recentDepartures = rows
+    .map((row, index) => ({ row, index }))
+    .filter(({ row }) => isRecentDepartureFidsStatus(row.status))
+    .sort((left, right) => {
+      const departedDifference =
+        Date.parse(right.row.departedAt ?? "") - Date.parse(left.row.departedAt ?? "");
+      return (
+        (Number.isFinite(departedDifference) ? departedDifference : 0) || left.index - right.index
+      );
+    })
+    .map(({ row }) => row);
+  const prepare = rows.filter((row) => row.status === "PREPARE");
+  const remaining = rows.filter(
+    (row) =>
+      !isActionableFidsStatus(row.status) &&
+      !isRecentDepartureFidsStatus(row.status) &&
+      row.status !== "PREPARE",
+  );
+  return [...actionable, ...recentDepartures, ...prepare, ...remaining];
+}
+
+function stableFidsRowHash(value: string): string {
+  let forward = 0x811c9dc5;
+  let backward = 0x811c9dc5;
+  for (let index = 0; index < value.length; index += 1) {
+    forward = Math.imul(forward ^ value.charCodeAt(index), 0x01000193);
+    backward = Math.imul(backward ^ value.charCodeAt(value.length - index - 1), 0x01000193);
+  }
+  return `${(forward >>> 0).toString(36)}${(backward >>> 0).toString(36)}`;
+}
+
+function bookingGroupLabels(row: SharedFlightFidsRow): string[] {
+  return row.bookingGroupLabels && row.bookingGroupLabels.length > 0
+    ? [...row.bookingGroupLabels]
+    : [formatBookingGroupLabel(row.productCode, row.communicationNumber)];
+}
+
+export function groupSharedFidsFlights<Row extends SharedFlightFidsRow>(
+  rows: readonly Row[],
+  enabled: boolean,
+): Row[] {
+  if (!enabled) return [...rows];
+
+  const grouped = new Map<string, Row[]>();
+  const orderedKeys: string[] = [];
+  for (const row of rows) {
+    const canGroup = row.activeRecall == null && Boolean(row.sharedFlightKey);
+    const key = canGroup
+      ? [row.sharedFlightKey, row.productId, row.gateId ?? "", row.status].join("\u001f")
+      : `row:${row.rowId}`;
+    const existing = grouped.get(key);
+    if (existing) {
+      existing.push(row);
+    } else {
+      grouped.set(key, [row]);
+      orderedKeys.push(key);
+    }
+  }
+
+  return orderedKeys.flatMap((key) => {
+    const members = grouped.get(key) ?? [];
+    if (members.length === 0 || key.startsWith("row:")) return members;
+    const chunks: Row[] = [];
+    for (let offset = 0; offset < members.length; offset += 3) {
+      const chunk = members.slice(offset, offset + 3);
+      const first = chunk[0];
+      if (!first) continue;
+      const labels = Array.from(new Set(chunk.flatMap(bookingGroupLabels))).slice(0, 3);
+      chunks.push({
+        ...first,
+        rowId: `fids-shared-${stableFidsRowHash(`${key}:${Math.floor(offset / 3)}`)}`,
+        bookingGroupLabels: labels,
+        ticketLabels: chunk.flatMap((row) => [...row.ticketLabels]),
+      });
+    }
+    return chunks;
+  });
+}
+
 export interface FidsPage<Row> {
   requestedPage: number;
   pageSize: number;
@@ -69,12 +167,6 @@ export interface FidsSplitProjection<Row> {
   };
   page: FidsPage<Row>;
 }
-
-const isActionableFidsStatus = (status: string): boolean =>
-  status === "BOARDING" || status === "COME_TO_FLIGHT_LINE";
-
-const isRecentDepartureFidsStatus = (status: string): boolean =>
-  status === "IN_FLIGHT" || status === "LANDED" || status === "COMPLETED";
 
 export interface FidsSplitCapacityPlan {
   actionableLimit: number;

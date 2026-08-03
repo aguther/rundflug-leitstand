@@ -11,6 +11,7 @@ export const DEFAULT_FIDS_PREFERENCES: FidsPreferences = {
   viewMode: "FIXED_PAGE",
   priorityGroupCount: 3,
   rotationIntervalSeconds: 12,
+  groupSharedFlights: false,
   contentFilter: { productIds: [], gateIds: [] },
   version: 0,
 };
@@ -22,6 +23,7 @@ export interface StoredFidsPreferences {
   view_mode: FidsPreferences["viewMode"];
   priority_group_count: number;
   rotation_interval_seconds: number;
+  group_shared_flights: number;
   content_filter_json: string;
   version: number;
 }
@@ -42,6 +44,7 @@ export function storedFidsPreferences(row: StoredFidsPreferences | null): FidsPr
     viewMode: row.view_mode,
     priorityGroupCount: row.priority_group_count,
     rotationIntervalSeconds: row.rotation_interval_seconds,
+    groupSharedFlights: row.group_shared_flights === 1,
     contentFilter: normalizeFidsContentFilter(
       fidsContentFilterSchema.parse(JSON.parse(row.content_filter_json)),
     ),
@@ -57,7 +60,7 @@ export async function loadFidsPreferences(
   const row = await db
     .prepare(
       `SELECT visible_rows, layout, theme, view_mode, priority_group_count,
-              rotation_interval_seconds, content_filter_json, version
+              rotation_interval_seconds, group_shared_flights, content_filter_json, version
          FROM fids_preferences
         WHERE operator_account_id = ?1 AND operation_day_id = ?2`,
     )

@@ -61,6 +61,7 @@ const preferences = (overrides: Partial<FidsPreferences> = {}): FidsPreferences 
   viewMode: "FIXED_PAGE",
   priorityGroupCount: 2,
   rotationIntervalSeconds: 12,
+  groupSharedFlights: false,
   contentFilter: { productIds: [], gateIds: [] },
   version: 4,
   ...overrides,
@@ -164,6 +165,33 @@ describe("simulation FIDS data source", () => {
       "row-5",
       "row-6",
     ]);
+  });
+
+  it("groups compatible shared flights before simulation paging when enabled", async () => {
+    const sharedBoard: SimulationFidsBoard = {
+      ...board,
+      groups: [1, 2, 3, 4].map((number) => ({
+        ...row(number, "BOARDING"),
+        bookingGroupLabels: [`G-PAN-${String(number).padStart(4, "0")}`],
+        sharedFlightKey: "rotation:shared",
+      })),
+    };
+    const current = preferences({ groupSharedFlights: true });
+    const dataSource = createSimulationFidsDataSource({
+      board: sharedBoard,
+      preferences: current,
+      onPreferencesChanged: vi.fn(),
+    });
+
+    const response = await dataSource.loadBoard({ page: 1, lowerPage: 1 });
+
+    expect(response.page).toMatchObject({ totalItems: 2, totalPages: 1 });
+    expect(response.page.groups[0]?.bookingGroupLabels).toEqual([
+      "G-PAN-0001",
+      "G-PAN-0002",
+      "G-PAN-0003",
+    ]);
+    expect(response.page.groups[1]?.bookingGroupLabels).toEqual(["G-PAN-0004"]);
   });
 
   it("keeps simulation preference persistence local and version checked", async () => {

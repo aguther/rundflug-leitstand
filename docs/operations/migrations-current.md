@@ -70,6 +70,7 @@ D1-Identität; angewandte Dateien werden nicht nachträglich umbenannt.
 | 63 | `0062_hybrid_planning_capture.sql` | eindeutig |
 | 64 | `0063_analysis_day_archives.sql` | eindeutig |
 | 65 | `0064_dispatch_recommendation_leases.sql` | eindeutig |
+| 66 | `0065_fids_shared_flight_grouping.sql` | eindeutig |
 
-Gesamt: 65 Migrationen. Wiederherstellungsnotizen werden gegen SQL und
+Gesamt: 66 Migrationen. Wiederherstellungsnotizen werden gegen SQL und
 `apps/worker/migrations/README.md` geprüft.

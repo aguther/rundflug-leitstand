@@ -15,6 +15,7 @@ const preferences: FidsPreferences = {
   viewMode: "SPLIT",
   priorityGroupCount: 3,
   rotationIntervalSeconds: 12,
+  groupSharedFlights: false,
   contentFilter: { productIds: [], gateIds: [] },
   version: 4,
 };
@@ -183,11 +184,57 @@ describe("FIDS board presentation", () => {
     const view = renderBoard(board, { highlightedRows: new Set(["priority"]) });
 
     expect(screen.getAllByText("BITTE ZUM GATE").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("18:20–18:40").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Jetzt").length).toBeGreaterThan(0);
     expect(screen.getAllByTitle(priorityRow.productName).length).toBeGreaterThan(0);
     expect(screen.getAllByTitle(priorityRow.gateLabel).length).toBeGreaterThan(0);
     expect(screen.getAllByLabelText(activeRecall.fidsMessage).length).toBeGreaterThan(0);
     expect(view.container.querySelector('[data-highlighted="true"]')).not.toBeNull();
+  });
+
+  it("shows every booking group of a compacted shared flight", () => {
+    const grouped = row("shared", "BOARDING", {
+      bookingGroupLabels: ["G-PAN-0101", "G-PAN-0102", "G-PAN-0103"],
+    });
+    const board = splitBoard({
+      priority: {
+        configuredCapacity: 3,
+        effectiveCapacity: 3,
+        totalItems: 1,
+        overflowCount: 0,
+        groups: [grouped],
+      },
+    });
+
+    const view = renderBoard(board);
+
+    for (const label of grouped.bookingGroupLabels ?? []) {
+      expect(screen.getAllByText(label).length).toBeGreaterThan(0);
+    }
+    expect(view.container.querySelector('[data-group-count="3"]')).not.toBeNull();
+  });
+
+  it("uses Jetzt for every currently running public status", () => {
+    const groups = (
+      ["COME_TO_FLIGHT_LINE", "BOARDING", "IN_FLIGHT", "LANDED", "COMPLETED"] as const
+    ).map((status, index) => row(`running-${index}`, status));
+    const fixed = splitBoard({
+      viewMode: "FIXED_PAGE",
+      priority: null,
+      page: {
+        requestedPage: 1,
+        pageSize: 8,
+        totalItems: groups.length,
+        totalPages: 1,
+        groups,
+      },
+    });
+    const view = renderBoard(fixed, {
+      preferences: { ...preferences, viewMode: "FIXED_PAGE" },
+    });
+
+    const windows = Array.from(view.container.querySelectorAll(".fids-window"));
+    expect(windows).toHaveLength(groups.length * 2);
+    expect(windows.every((window) => window.textContent === "Jetzt")).toBe(true);
   });
 
   it("uses the fixed-page empty message while preserving the column headings", () => {

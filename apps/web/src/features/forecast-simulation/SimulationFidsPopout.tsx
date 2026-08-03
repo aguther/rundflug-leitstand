@@ -124,6 +124,7 @@ export const SimulationFidsPopout = forwardRef<
     viewMode: "FIXED_PAGE",
     priorityGroupCount: 3,
     rotationIntervalSeconds: 12,
+    groupSharedFlights: false,
     contentFilter: { productIds: [], gateIds: [] },
     version: 0,
   }));

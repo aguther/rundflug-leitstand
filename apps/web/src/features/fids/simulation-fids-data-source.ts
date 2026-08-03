@@ -3,7 +3,13 @@ import {
   type FidsPreferences,
   fidsPreferencesSchema,
 } from "@rundflug/contracts";
-import { filterFidsRows, paginateFidsRows, partitionFidsRows } from "@rundflug/domain";
+import {
+  filterFidsRows,
+  groupSharedFidsFlights,
+  orderFidsRows,
+  paginateFidsRows,
+  partitionFidsRows,
+} from "@rundflug/domain";
 import type { SimulationOperationalModel } from "../forecast-simulation/model";
 import type { SimulationFidsBoard } from "../forecast-simulation/simulation-fids";
 import type { FidsDataSource } from "./fids-data-source";
@@ -33,7 +39,10 @@ export function createSimulationFidsDataSource(input: {
       })),
     }),
     loadBoard: async ({ page, lowerPage }) => {
-      const filteredRows = filterFidsRows(input.board.groups, input.preferences.contentFilter);
+      const filteredRows = groupSharedFidsFlights(
+        orderFidsRows(filterFidsRows(input.board.groups, input.preferences.contentFilter)),
+        input.preferences.groupSharedFlights,
+      );
       const projection =
         input.preferences.viewMode === "SPLIT"
           ? partitionFidsRows({

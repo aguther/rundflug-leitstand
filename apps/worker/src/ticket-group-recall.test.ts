@@ -89,9 +89,11 @@ describe("V1.11 aktiver Gruppennachruf", () => {
   });
 
   it("projiziert den aktiven Vorgang in Leitstand, Ticket, Gruppe und FIDS ohne Normalstatus zu ersetzen", () => {
-    expect(
-      worker.match(/activeRecall: activeTicketGroupRecallProjection/g)?.length,
-    ).toBeGreaterThanOrEqual(4);
+    const inlineProjections =
+      worker.match(/activeRecall: activeTicketGroupRecallProjection/g)?.length ?? 0;
+    const reusedProjections =
+      worker.match(/const activeRecall = activeTicketGroupRecallProjection/g)?.length ?? 0;
+    expect(inlineProjections + reusedProjections).toBeGreaterThanOrEqual(4);
     expect(worker).toContain("recall.ended_at IS NULL");
     expect(worker).toContain("recall.expires_at > ?2");
     expect(fids).toContain("group.activeRecall");

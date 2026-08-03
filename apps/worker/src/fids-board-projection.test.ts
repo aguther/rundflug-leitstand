@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   countFidsProjectionRows,
   type FidsProjectionRow,
+  loadAllFidsProjectionRows,
   loadFidsProjectionRows,
 } from "./fids-board-projection";
 import projectionSource from "./fids-board-projection.ts?raw";
@@ -84,6 +85,13 @@ describe("protected FIDS board projection", () => {
     expect(recording.bindings[0]?.slice(-2)).toEqual([8, 16]);
   });
 
+  it("loads the complete filtered projection before optional shared-flight grouping", async () => {
+    const recording = recordingDatabase({ rows: [] });
+    await expect(loadAllFidsProjectionRows(recording.db, projectionInput)).resolves.toEqual([]);
+    expect(recording.statements[0]).not.toContain("LIMIT ?9 OFFSET ?10");
+    expect(recording.bindings[0]?.[6]).toBe("PREPARE");
+  });
+
   it("selects recent departures only inside the configured cutoff", async () => {
     const recording = recordingDatabase({ rows: [] });
     await loadFidsProjectionRows(recording.db, {
@@ -131,18 +139,17 @@ describe("protected FIDS board projection", () => {
     expect(recording.bindings[0]?.[6]).toBe("ALL");
   });
 
-  it("assembles actionable, recent departure and lower bands in the protected endpoint", () => {
+  it("groups and paginates the complete protected projection with shared domain rules", () => {
     const protectedRoute = workerSource.slice(
       workerSource.indexOf('app.on("GET", eventRoutes("/fids/board")'),
       workerSource.indexOf('app.on("GET", eventRoutes("/forecast/history")'),
     );
-    expect(protectedRoute).toContain('band: "ACTIONABLE"');
-    expect(protectedRoute).toContain('band: "RECENT_DEPARTURE"');
-    expect(protectedRoute).toContain('band: "LOWER"');
-    expect(protectedRoute).toContain(
-      "const priorityRows = [...actionableRows, ...recentDepartureRows, ...prepareRows]",
-    );
-    expect(protectedRoute).toContain("const excludedRowIds = prepareRows.map((row) => row.row_id)");
+    expect(protectedRoute).toContain("loadAllFidsProjectionRows");
+    expect(protectedRoute).toContain("orderFidsRows(");
+    expect(protectedRoute).toContain("groupSharedFidsFlights(");
+    expect(protectedRoute).toContain("preferences.groupSharedFlights");
+    expect(protectedRoute).toContain("paginateFidsRows(displayedRows");
+    expect(protectedRoute).toContain("partitionFidsRows({");
   });
 
   it("keeps protected identifiers out of the anonymous response", () => {
@@ -153,6 +160,8 @@ describe("protected FIDS board projection", () => {
     expect(publicRoute).toContain("rowId: _rowId");
     expect(publicRoute).toContain("productId: _productId");
     expect(publicRoute).toContain("gateId: _gateId");
+    expect(publicRoute).toContain("bookingGroupLabels: _bookingGroupLabels");
+    expect(publicRoute).toContain("sharedFlightKey: _sharedFlightKey");
     expect(publicRoute).toContain("groups: rows.map");
     expect(publicRoute).not.toContain("preferencesVersion");
   });

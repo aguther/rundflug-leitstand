@@ -336,6 +336,7 @@ export function createSimulationFidsBoard(input: {
         productCode,
         gateLabel: rotation.gateLabel ?? "Flight Line 1",
         communicationNumber: rotation.communicationNumber,
+        bookingGroupLabels: [bookingGroupLabel],
         ticketLabels: Array.from(
           { length: rotation.passengerCount },
           (_, index) => `${bookingGroupLabel}/${index + 1}`,
@@ -345,6 +346,16 @@ export function createSimulationFidsBoard(input: {
         status: activeGroupPlan
           ? "SERVICE_PAUSED"
           : publicStatus(rotation, lifecycle, input.visibleAt),
+        sharedFlightKey:
+          activeGroupPlan !== undefined
+            ? null
+            : lifecycle === "DRAFT" && visibleMilestone(rotation.precalledAt, input.visibleAt)
+              ? snapshot?.dispatchBatchId
+                ? `dispatch:${snapshot.dispatchBatchId}`
+                : null
+              : lifecycle !== "DRAFT"
+                ? `rotation:${rotation.id}`
+                : null,
         waitLowerMinutes: window.lowerMinutes,
         waitUpperMinutes: window.upperMinutes,
         boardingWindowLowerAt: window.lowerAt,
