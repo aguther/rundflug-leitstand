@@ -6,6 +6,8 @@ import {
   cloneEventRequestSchema,
   commandEnvelopeSchema,
   commandResultSchema,
+  dispatchRecommendationLeaseAcquireSchema,
+  dispatchRecommendationLeaseSchema,
   eventLogoThemeSchema,
   factoryResetRequestSchema,
   fidsBoardResponseSchema,
@@ -145,6 +147,7 @@ describe("commandEnvelopeSchema", () => {
           planRevision: "dispatch-v1",
           batchId: "batch-1",
         },
+        dispatchRecommendationLeaseId: "00e971df-23d5-4d28-9107-92b447416201",
       },
     });
     expect(command.type === "CALL_NEXT" && command.payload.ticketGroupIds).toEqual([
@@ -155,6 +158,39 @@ describe("commandEnvelopeSchema", () => {
       planRevision: "dispatch-v1",
       batchId: "batch-1",
     });
+    expect(command.type === "CALL_NEXT" && command.payload.dispatchRecommendationLeaseId).toBe(
+      "00e971df-23d5-4d28-9107-92b447416201",
+    );
+  });
+
+  it("validates the short-lived dispatch recommendation lease transport", () => {
+    expect(
+      dispatchRecommendationLeaseAcquireSchema.parse({
+        commandId: "00e971df-23d5-4d28-9107-92b447416202",
+        aircraftId: "aircraft-1",
+        expectedVersion: 7,
+      }),
+    ).toEqual({
+      commandId: "00e971df-23d5-4d28-9107-92b447416202",
+      aircraftId: "aircraft-1",
+      expectedVersion: 7,
+    });
+    expect(
+      dispatchRecommendationLeaseSchema.parse({
+        leaseId: "00e971df-23d5-4d28-9107-92b447416203",
+        aircraftId: "aircraft-1",
+        planRevision: "dispatch-v1",
+        batchId: "batch-1",
+        dispatchOrder: 1,
+        groupIds: ["group-1", "group-2"],
+        occupiedSeats: 3,
+        availableSeats: 1,
+        decisionReasons: ["CAPACITY_OPTIMIZED"],
+        acquiredAt: "2026-08-03T19:00:00.000Z",
+        expiresAt: "2026-08-03T19:01:30.000Z",
+        serverNow: "2026-08-03T19:00:00.000Z",
+      }).groupIds,
+    ).toEqual(["group-1", "group-2"]);
   });
 
   it("validates stored ticket codes only in the protected print DTO", () => {

@@ -1315,6 +1315,11 @@ app.delete("/api/admin/operator-accounts/:accountId", async (context) => {
     );
   }
   await context.env.DB.prepare(
+    "DELETE FROM dispatch_recommendation_leases WHERE operator_account_id = ?1",
+  )
+    .bind(accountId)
+    .run();
+  await context.env.DB.prepare(
     "DELETE FROM flight_line_assist_claims WHERE operator_account_id = ?1",
   )
     .bind(accountId)
@@ -3616,6 +3621,66 @@ app.on("DELETE", eventRoutes("/assist-claims/:aircraftId"), async (context) => {
   const stub = namespace.get(namespace.idFromName(eventId));
   const target = new URL(context.req.url);
   target.pathname = `/internal/events/${encodeURIComponent(eventId)}/assist-claims/${encodeURIComponent(aircraftId)}`;
+  const headers = new Headers();
+  headers.set("x-operator-account-id", actor.accountId);
+  headers.set("x-operator-login-code", actor.loginCode);
+  headers.set("x-operator-session-id", actor.sessionId);
+  headers.set("x-operator-role", actor.role);
+  headers.set("x-operator-device-id", actor.deviceId);
+  const response = await stub.fetch(new Request(target, { method: "DELETE", headers }));
+  return new Response(response.body, response);
+});
+
+app.on("POST", eventRoutes("/dispatch-recommendation-leases"), async (context) => {
+  const eventId = context.req.param("eventId");
+  const actor = await authorizeSession(context.env, context.req.raw);
+  if (!actor || !["FLIGHT_LINE", "FLIGHT_DIRECTOR", "ADMIN"].includes(actor.role)) {
+    return context.json(
+      {
+        error: {
+          code: "SESSION_NOT_AUTHORIZED",
+          message: "Sitzung für diese Ansicht nicht berechtigt.",
+        },
+      },
+      403,
+    );
+  }
+  const namespace = eventCoordinatorNamespace(context.env);
+  const stub = namespace.get(namespace.idFromName(eventId));
+  const target = new URL(context.req.url);
+  target.pathname = `/internal/events/${encodeURIComponent(eventId)}/dispatch-recommendation-leases`;
+  const headers = new Headers({ "content-type": "application/json" });
+  headers.set("x-operator-account-id", actor.accountId);
+  headers.set("x-operator-login-code", actor.loginCode);
+  headers.set("x-operator-session-id", actor.sessionId);
+  headers.set("x-operator-role", actor.role);
+  headers.set("x-operator-device-id", actor.deviceId);
+  const body: unknown = await context.req.json().catch(() => null);
+  const response = await stub.fetch(
+    new Request(target, { method: "POST", headers, body: JSON.stringify(body) }),
+  );
+  return new Response(response.body, response);
+});
+
+app.on("DELETE", eventRoutes("/dispatch-recommendation-leases/:leaseId"), async (context) => {
+  const eventId = context.req.param("eventId");
+  const leaseId = context.req.param("leaseId");
+  const actor = await authorizeSession(context.env, context.req.raw);
+  if (!actor || !["FLIGHT_LINE", "FLIGHT_DIRECTOR", "ADMIN"].includes(actor.role)) {
+    return context.json(
+      {
+        error: {
+          code: "SESSION_NOT_AUTHORIZED",
+          message: "Sitzung für diese Ansicht nicht berechtigt.",
+        },
+      },
+      403,
+    );
+  }
+  const namespace = eventCoordinatorNamespace(context.env);
+  const stub = namespace.get(namespace.idFromName(eventId));
+  const target = new URL(context.req.url);
+  target.pathname = `/internal/events/${encodeURIComponent(eventId)}/dispatch-recommendation-leases/${encodeURIComponent(leaseId)}`;
   const headers = new Headers();
   headers.set("x-operator-account-id", actor.accountId);
   headers.set("x-operator-login-code", actor.loginCode);

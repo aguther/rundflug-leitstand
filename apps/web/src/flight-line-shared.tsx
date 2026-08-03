@@ -23,6 +23,11 @@ import {
 } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 import { Button, ConfirmationDialog, IconButton, ModalDialog } from "./design-system/components";
+import {
+  type DispatchRecommendationLeaseController,
+  dispatchLeaseRemainingSeconds,
+  formatDispatchLeaseCountdown,
+} from "./dispatch-recommendation-lease";
 
 export type FlightLineAircraft = OperationBoard["aircraft"][number];
 export type FlightLineRotation = OperationBoard["rotations"][number];
@@ -507,7 +512,7 @@ function AssignmentQueueRow({
 
 export function BookingGroupAssignmentDialog({
   aircraft,
-  dispatchRecommendation,
+  dispatchLease,
   groups,
   selectedQueueGroupIds,
   confirmDisabled,
@@ -521,36 +526,32 @@ export function BookingGroupAssignmentDialog({
   onRecallClear,
   onRestore,
   onDefer,
+  onReserveRecommendation,
   timeZone,
   headerActions,
 }: {
   aircraft: FlightLineAircraft | undefined;
-  dispatchRecommendation?: {
-    planRevision: string;
-    batchId: string;
-    dispatchOrder: number;
-    groupIds: string[];
-    occupiedSeats: number;
-    availableSeats: number;
-    decisionReasons: string[];
-  } | null;
+  dispatchLease: DispatchRecommendationLeaseController;
   groups: FlightLineQueueGroup[];
   selectedQueueGroupIds: string[];
   confirmDisabled: boolean;
   open: boolean;
   onClose: () => void;
   onConfirm: (queueDeviationReason?: string) => void | Promise<void>;
-  onToggle: (ticketGroupId: string, selected: boolean) => void;
+  onToggle: (ticketGroupId: string, selected: boolean) => void | Promise<void>;
   onAttendance: (ticketGroupId: string, checkedIn: boolean) => void | Promise<void>;
   onMissing: (ticketGroupId: string) => void | Promise<void>;
   onRecall: (ticketGroupId: string) => void | Promise<void>;
   onRecallClear: (ticketGroupId: string, recallId: string) => void | Promise<void>;
   onRestore: (ticketGroupId: string) => void | Promise<void>;
   onDefer?: (ticketGroupId: string) => void | Promise<void>;
+  onReserveRecommendation: () => void | Promise<void>;
   timeZone: string;
   headerActions?: ReactNode;
 }) {
   const [queueDeviationReason, setQueueDeviationReason] = useState("");
+  const [leaseRemainingSeconds, setLeaseRemainingSeconds] = useState(0);
+  const dispatchRecommendation = dispatchLease.lease;
   const selectedGroups = groups.filter((group) => selectedQueueGroupIds.includes(group.id));
   const selectedSeats = selectedGroups.reduce(
     (total, group) => total + queuedSegmentTicketCount(group),
@@ -597,6 +598,25 @@ export function BookingGroupAssignmentDialog({
   useEffect(() => {
     if (!open || !queueDeviationReasonRequired) setQueueDeviationReason("");
   }, [open, queueDeviationReasonRequired]);
+  useEffect(() => {
+    if (!open || dispatchLease.mode !== "RESERVED" || !dispatchLease.lease) {
+      setLeaseRemainingSeconds(0);
+      return;
+    }
+    const updateRemainingTime = () => {
+      const remaining = dispatchLeaseRemainingSeconds(
+        dispatchLease.lease?.expiresAt ?? "",
+        dispatchLease.serverClockOffsetMs,
+        Date.now(),
+      );
+      setLeaseRemainingSeconds(remaining);
+      if (remaining === 0) dispatchLease.markExpired();
+    };
+    updateRemainingTime();
+    const interval = window.setInterval(updateRemainingTime, 250);
+    return () => window.clearInterval(interval);
+  }, [dispatchLease, open]);
+  const reservationBlocksConfirmation = !["RESERVED", "MANUAL"].includes(dispatchLease.mode);
   return (
     <ModalDialog
       description={
@@ -612,6 +632,7 @@ export function BookingGroupAssignmentDialog({
           <Button
             disabled={
               confirmDisabled ||
+              reservationBlocksConfirmation ||
               selectedSeats === 0 ||
               capacityExceeded ||
               mixedProductSelection ||
@@ -633,10 +654,26 @@ export function BookingGroupAssignmentDialog({
     >
       <div className="flight-director-assignment-dialog">
         <section className="flight-director-queue">
+          {dispatchLease.mode === "ACQUIRING" ? (
+            <div className="flight-director-dispatch-reservation is-loading" role="status">
+              <Clock3 aria-hidden="true" />
+              <span>Der nächste passende Vorschlag wird reserviert …</span>
+            </div>
+          ) : null}
           {dispatchRecommendation ? (
             <div className="flight-director-dispatch-recommendation">
               <div>
-                <span>Empfohlene Belegung · Umlauf {dispatchRecommendation.dispatchOrder}</span>
+                <span>
+                  Empfohlene Belegung · Umlauf {dispatchRecommendation.dispatchOrder}
+                  {dispatchLease.mode === "RESERVED" ? (
+                    <strong
+                      aria-live="polite"
+                      className={leaseRemainingSeconds <= 15 ? "is-expiring" : undefined}
+                    >
+                      Reserviert {formatDispatchLeaseCountdown(leaseRemainingSeconds)}
+                    </strong>
+                  ) : null}
+                </span>
                 <strong>
                   {dispatchRecommendation.occupiedSeats} belegt ·{" "}
                   {dispatchRecommendation.availableSeats} frei
@@ -652,6 +689,23 @@ export function BookingGroupAssignmentDialog({
               ) : null}
             </div>
           ) : null}
+          {dispatchLease.mode === "MANUAL" ? (
+            <div className="flight-director-dispatch-reservation is-manual" role="status">
+              Manuelle Belegung – nicht reserviert
+            </div>
+          ) : null}
+          {dispatchLease.mode === "EXPIRED" || dispatchLease.mode === "ERROR" ? (
+            <div className="flight-director-dispatch-reservation is-expired" role="alert">
+              <span>
+                {dispatchLease.mode === "EXPIRED"
+                  ? "Die Vorschlagsreservierung ist abgelaufen."
+                  : dispatchLease.error}
+              </span>
+              <Button onClick={onReserveRecommendation} size="compact" variant="secondary">
+                <RotateCcw aria-hidden="true" /> Vorschlag neu reservieren
+              </Button>
+            </div>
+          ) : null}
           {groups.length > 0 ? (
             groups.map((group) => (
               <AssignmentQueueRow
@@ -664,7 +718,16 @@ export function BookingGroupAssignmentDialog({
                 onRecall={onRecall}
                 onRecallClear={onRecallClear}
                 onRestore={onRestore}
-                onToggle={onToggle}
+                onToggle={async (ticketGroupId, selected) => {
+                  if (
+                    ["IDLE", "RESERVED", "ACQUIRING", "EXPIRED", "ERROR"].includes(
+                      dispatchLease.mode,
+                    )
+                  ) {
+                    await dispatchLease.switchToManual();
+                  }
+                  await onToggle(ticketGroupId, selected);
+                }}
                 productMismatch={
                   !selectedQueueGroupIds.includes(group.id) &&
                   selectedProductId !== null &&

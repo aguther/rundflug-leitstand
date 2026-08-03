@@ -1,4 +1,9 @@
-import type { ForecastHistory, OperationBoard, ResourceDayHistory } from "@rundflug/contracts";
+import type {
+  DispatchRecommendationLease,
+  ForecastHistory,
+  OperationBoard,
+  ResourceDayHistory,
+} from "@rundflug/contracts";
 import { formatBookingGroupLabel, rotationStateLabels } from "@rundflug/domain";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -37,6 +42,7 @@ import {
   SelectField,
   StatusPill,
 } from "./design-system/components";
+import type { DispatchRecommendationLeaseController } from "./dispatch-recommendation-lease";
 import {
   buildAnalysisClientContext,
   recordAnalysisUiEvent,
@@ -45,10 +51,6 @@ import {
   FlightDirectorAnalyticsDialog,
   type FlightDirectorAnalyticsSelection,
 } from "./features/flight-line/FlightDirectorAnalyticsDialog";
-import {
-  dispatchRecommendationForAircraft,
-  dispatchRecommendationSelectionForAircraft,
-} from "./flight-line-assignment";
 import {
   activeRotationForAircraft,
   BookingGroupAssignmentDialog,
@@ -218,6 +220,7 @@ export function FlightLineSupervisorConsole({
   operationalSummary,
   operationalSummaryTone,
   canManageOperations,
+  dispatchLease,
   onOpenOperations,
   onResourceGroupChange,
   onAssignPilot,
@@ -227,7 +230,7 @@ export function FlightLineSupervisorConsole({
   onSetAircraftState,
   onPauseAircraft,
   onSelectAircraft,
-  onReplaceGroupSelection,
+  onReserveAssignment,
   onToggleGroup,
   onGroupAttendance,
   onGroupMissing,
@@ -245,16 +248,17 @@ export function FlightLineSupervisorConsole({
   operationalSummary: string;
   operationalSummaryTone: "critical" | "warning" | "notice" | "normal";
   canManageOperations: boolean;
+  dispatchLease: DispatchRecommendationLeaseController;
   onOpenOperations: () => void;
   onResourceGroupChange: (resourceGroupId: string) => void;
   onAssignPilot: (aircraftId: string, pilotId: string, reassign: boolean) => Promise<void>;
   busyRotationIds?: ReadonlySet<string>;
-  onConfirmAssignment: (queueDeviationReason?: string) => Promise<void>;
-  onRunRotation: (rotation: Rotation, nextAircraftState?: TurnaroundNextState) => Promise<void>;
+  onConfirmAssignment: (queueDeviationReason?: string) => Promise<boolean>;
+  onRunRotation: (rotation: Rotation, nextAircraftState?: TurnaroundNextState) => Promise<boolean>;
   onSetAircraftState: (aircraftId: string, state: FlightLineFleetState) => Promise<void>;
   onPauseAircraft: (aircraftId: string) => void;
   onSelectAircraft: (aircraftId: string) => void;
-  onReplaceGroupSelection: (ticketGroupIds: string[]) => void;
+  onReserveAssignment: (aircraftId: string) => Promise<DispatchRecommendationLease | null>;
   onToggleGroup: (ticketGroupId: string, selected: boolean) => void;
   onGroupAttendance: (ticketGroupId: string, checkedIn: boolean) => void | Promise<void>;
   onGroupMissing: (ticketGroupId: string) => void | Promise<void>;
@@ -284,10 +288,7 @@ export function FlightLineSupervisorConsole({
   const [pendingAircraftActions, setPendingAircraftActions] = useState<
     Record<string, "primary" | "refueling" | "inactive">
   >({});
-  const dispatchRecommendation = useMemo(
-    () => dispatchRecommendationForAircraft(board, selectedAircraft?.id),
-    [board, selectedAircraft?.id],
-  );
+  const dispatchRecommendation = dispatchLease.lease;
 
   const filteredAircraft = useMemo(
     () => aircraft.filter((entry) => !resourceGroupId || entry.resourceGroupId === resourceGroupId),
@@ -385,6 +386,7 @@ export function FlightLineSupervisorConsole({
       occurredAt: new Date().toISOString(),
     });
     setAssignmentOpen(false);
+    void dispatchLease.release();
   }
 
   async function exportAnalysisSnapshot(dialogOpen: boolean) {
@@ -473,7 +475,7 @@ export function FlightLineSupervisorConsole({
     }
   }
 
-  function runPrimary(entry: Aircraft, rotation: Rotation | undefined) {
+  async function runPrimary(entry: Aircraft, rotation: Rotation | undefined) {
     selectAircraft(entry.id);
     if (entry.operationalState === "REFUELING" || entry.operationalState === "PAUSED") {
       return runAircraftStateAction(entry, "primary", "AVAILABLE");
@@ -482,16 +484,13 @@ export function FlightLineSupervisorConsole({
       return runAircraftStateAction(entry, "primary", "AVAILABLE");
     }
     if (!rotation || rotation.status === "DRAFT") {
-      const { recommendation, groupIds } = dispatchRecommendationSelectionForAircraft(
-        board,
-        entry.id,
-      );
-      onReplaceGroupSelection(groupIds);
+      setAssignmentOpen(true);
       recordAnalysisUiEvent({
-        type: "QUEUE_GROUP_SELECTION_CHANGED",
+        type: "ASSIGNMENT_DIALOG_OPENED",
         occurredAt: new Date().toISOString(),
-        groupIds,
+        rotationId: rotation?.id ?? null,
       });
+      const recommendation = await onReserveAssignment(entry.id);
       if (recommendation) {
         recordAnalysisUiEvent({
           type: "DISPATCH_RECOMMENDATION_APPLIED",
@@ -501,12 +500,6 @@ export function FlightLineSupervisorConsole({
           groupIds: recommendation.groupIds,
         });
       }
-      setAssignmentOpen(true);
-      recordAnalysisUiEvent({
-        type: "ASSIGNMENT_DIALOG_OPENED",
-        occurredAt: new Date().toISOString(),
-        rotationId: rotation?.id ?? null,
-      });
       return;
     }
     return runRotationAction(
@@ -826,7 +819,7 @@ export function FlightLineSupervisorConsole({
       <BookingGroupAssignmentDialog
         aircraft={selectedAircraft}
         confirmDisabled={assignmentBlocked}
-        dispatchRecommendation={dispatchRecommendation}
+        dispatchLease={dispatchLease}
         groups={compatibleGroups}
         headerActions={
           <IconButton
@@ -843,13 +836,15 @@ export function FlightLineSupervisorConsole({
         onAttendance={onGroupAttendance}
         onDefer={onGroupDefer}
         onConfirm={async (queueDeviationReason) => {
-          await onConfirmAssignment(queueDeviationReason);
-          closeAssignmentDialog();
+          if (await onConfirmAssignment(queueDeviationReason)) closeAssignmentDialog();
         }}
         onMissing={onGroupMissing}
         onRecall={onGroupRecall}
         onRecallClear={onGroupRecallClear}
         onRestore={onGroupRestore}
+        onReserveRecommendation={async () => {
+          if (selectedAircraft) await onReserveAssignment(selectedAircraft.id);
+        }}
         onToggle={toggleAssignmentGroup}
         open={assignmentOpen}
         selectedQueueGroupIds={selectedQueueGroupIds}

@@ -3,6 +3,7 @@ import { sha256Hex } from "./crypto";
 import type { Env } from "./types";
 
 export const FACTORY_RESET_DELETE_TABLES = [
+  "dispatch_recommendation_leases",
   "flight_line_assist_claims",
   "web_push_deliveries",
   "web_push_subscriptions",

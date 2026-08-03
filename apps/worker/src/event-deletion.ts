@@ -9,6 +9,7 @@ export interface EventDeletionResponse {
 
 export const EVENT_DELETION_SQL = [
   "DELETE FROM fids_preferences WHERE operation_day_id = ?1",
+  "DELETE FROM dispatch_recommendation_leases WHERE operation_day_id = ?1",
   "DELETE FROM flight_line_assist_claims WHERE operation_day_id = ?1",
   "DELETE FROM web_push_deliveries WHERE operation_day_id = ?1",
   "DELETE FROM web_push_subscriptions WHERE operation_day_id = ?1",

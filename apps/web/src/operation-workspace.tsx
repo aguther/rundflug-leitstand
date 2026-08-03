@@ -291,11 +291,11 @@ export function useOperationBoard(deviceId: string) {
     [deviceId],
   );
   const refresh = useCallback(
-    async (minimumVersion = 0) => {
+    async (minimumVersion = 0, forceFollowUp = false) => {
       activeRefreshCallersRef.current += 1;
       setRefreshing(true);
       try {
-        const outcome = await syncCoordinator.request(minimumVersion);
+        const outcome = await syncCoordinator.request(minimumVersion, forceFollowUp);
         setState((current) => reduceBoardSyncState(current, outcome));
         if (outcome.type === "CONFIRMED") {
           latestVersionRef.current = Math.max(
@@ -353,7 +353,7 @@ export function useOperationBoard(deviceId: string) {
         const changedVersion = realtimeStateChangeVersion(event.data);
         if (changedVersion === false) return;
         if (changedVersion !== null && changedVersion <= latestVersionRef.current) return;
-        void refresh(changedVersion ?? 0);
+        void refresh(changedVersion ?? 0, changedVersion === null);
       });
       socket.addEventListener("close", () => {
         stopHeartbeat();

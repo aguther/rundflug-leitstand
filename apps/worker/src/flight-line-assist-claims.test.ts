@@ -31,6 +31,9 @@ describe("loginbasierte Flight-Line-Assist-Betreuungsreservierung (F-INT-070)", 
   });
 
   it("removes ephemeral claims during a full factory reset", () => {
-    expect(FACTORY_RESET_DELETE_TABLES[0]).toBe("flight_line_assist_claims");
+    expect(FACTORY_RESET_DELETE_TABLES).toContain("flight_line_assist_claims");
+    expect(FACTORY_RESET_DELETE_TABLES.indexOf("dispatch_recommendation_leases")).toBeLessThan(
+      FACTORY_RESET_DELETE_TABLES.indexOf("flight_line_assist_claims"),
+    );
   });
 });

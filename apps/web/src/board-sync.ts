@@ -48,13 +48,14 @@ export async function requestBoardSync(
 }
 
 export interface BoardSyncCoordinator {
-  request(minimumVersion?: number): Promise<BoardSyncOutcome>;
+  request(minimumVersion?: number, forceFollowUp?: boolean): Promise<BoardSyncOutcome>;
 }
 
 /**
  * Coalesces WebSocket, command-confirmation and polling refreshes into one board request.
  * A refresh that arrives while another request is running only causes one follow-up request,
- * and only when the first response did not yet reach the requested event version.
+ * when the first response did not yet reach the requested event version or a caller explicitly
+ * requests a fresh projection even at the same event version.
  */
 export function createBoardSyncCoordinator(
   load: () => Promise<OperationBoard>,
@@ -62,6 +63,7 @@ export function createBoardSyncCoordinator(
 ): BoardSyncCoordinator {
   let inFlight: Promise<BoardSyncOutcome> | null = null;
   let requestedMinimumVersion = 0;
+  let forcedRequestPending = false;
   let lastConfirmed: Extract<BoardSyncOutcome, { type: "CONFIRMED" }> | null = null;
 
   const run = async (): Promise<BoardSyncOutcome> => {
@@ -72,13 +74,14 @@ export function createBoardSyncCoordinator(
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const targetVersion = requestedMinimumVersion;
       requestedMinimumVersion = 0;
+      forcedRequestPending = false;
       outcome = await requestBoardSync(load, now);
       if (outcome.type !== "CONFIRMED") return outcome;
       if (!lastConfirmed || outcome.board.event.version >= lastConfirmed.board.event.version) {
         lastConfirmed = outcome;
       }
       const latestTargetVersion = Math.max(targetVersion, requestedMinimumVersion);
-      if (outcome.board.event.version >= latestTargetVersion) {
+      if (outcome.board.event.version >= latestTargetVersion && !forcedRequestPending) {
         requestedMinimumVersion = 0;
         return lastConfirmed;
       }
@@ -89,8 +92,9 @@ export function createBoardSyncCoordinator(
   };
 
   return {
-    request(minimumVersion = 0) {
+    request(minimumVersion = 0, forceFollowUp = false) {
       if (
+        !forceFollowUp &&
         minimumVersion > 0 &&
         lastConfirmed &&
         lastConfirmed.board.event.version >= minimumVersion
@@ -98,6 +102,7 @@ export function createBoardSyncCoordinator(
         return Promise.resolve(lastConfirmed);
       }
       requestedMinimumVersion = Math.max(requestedMinimumVersion, minimumVersion);
+      forcedRequestPending = forcedRequestPending || forceFollowUp;
       if (!inFlight) {
         inFlight = run().finally(() => {
           inFlight = null;

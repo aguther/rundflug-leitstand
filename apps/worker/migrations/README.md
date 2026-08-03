@@ -417,6 +417,16 @@ R2-Präfix `analysis/`; portable Sicherungen enthalten nur ihre Metadaten. Vor A
 D1-Time-Travel-Marke oder portable Sicherung angelegt. Eine vollständige Rückkehr erfolgt per Time
 Travel beziehungsweise Restore und durch Löschen der zugehörigen R2-Objekte.
 
+## 0064 – Kurzlebige Dispatch-Empfehlungsreservierungen
+
+Ergänzt eine konten-, geräte- und flugzeugbezogene Reservierung für den aktuell bestätigungsnahen
+Dispatch-Batch. Aktive Reservierungen sind je Batch und je Flugzeug eindeutig, laufen nach 90
+Sekunden aus und besitzen einen idempotenten Acquire-Beleg. Sie binden weder Tickets noch Flugzeug;
+erst das weiterhin versionierte `CALL_NEXT` verbraucht die Reservierung atomar mit dem operativen
+Statuswechsel. Vor Anwendung wird eine D1-Time-Travel-Marke oder portable Sicherung angelegt. Ein
+älterer Worker ignoriert die additive Tabelle; die vollständige Schema-Rückkehr erfolgt per Time
+Travel oder aus dieser Sicherung.
+
 ## Historische Doppelnummer 0036
 
 `0036_product_promised_flight_time.sql` und `0036_v1_5_stable_operations.sql` wurden bereits unter

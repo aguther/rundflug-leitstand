@@ -108,9 +108,9 @@ describe("Flight Director", () => {
     expect(sharedSource).toContain("BookingGroupAssignmentDialog");
     expect(sharedSource).not.toContain("flight-director-dialog-pilot");
     expect(supervisorSource).toContain("onDefer={onGroupDefer}");
-    expect(supervisorSource).toContain("dispatchRecommendationForAircraft");
-    expect(supervisorSource).toContain("onReplaceGroupSelection");
-    expect(supervisorSource).toContain("dispatchRecommendationSelectionForAircraft");
+    expect(supervisorSource).toContain("dispatchLease={dispatchLease}");
+    expect(supervisorSource).toContain("await onReserveAssignment(entry.id)");
+    expect(supervisorSource).toContain("dispatchLease.release()");
     expect(supervisorSource).not.toMatch(/for \(const .*selectedQueueGroupIds/);
     expect(sharedSource).toContain("Empfohlene Belegung");
     expect(sharedSource).toContain("recommendationMatchesSelection");

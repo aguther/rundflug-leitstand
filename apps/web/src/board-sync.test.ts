@@ -134,4 +134,24 @@ describe("operation board reconnection", () => {
 
     expect(load).toHaveBeenCalledTimes(2);
   });
+
+  it("forces one follow-up for same-version projection changes during an active request", async () => {
+    let resolveFirst: ((board: OperationBoard) => void) | undefined;
+    const first = new Promise<OperationBoard>((resolve) => {
+      resolveFirst = resolve;
+    });
+    const load = vi
+      .fn<() => Promise<OperationBoard>>()
+      .mockReturnValueOnce(first)
+      .mockResolvedValueOnce({ event: { version: 7 } } as OperationBoard);
+    const coordinator = createBoardSyncCoordinator(load);
+
+    const initial = coordinator.request(7);
+    const forced = coordinator.request(0, true);
+    resolveFirst?.({ event: { version: 7 } } as OperationBoard);
+
+    await expect(initial).resolves.toMatchObject({ board: { event: { version: 7 } } });
+    await expect(forced).resolves.toMatchObject({ board: { event: { version: 7 } } });
+    expect(load).toHaveBeenCalledTimes(2);
+  });
 });

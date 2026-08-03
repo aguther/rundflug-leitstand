@@ -20,6 +20,7 @@ import {
   Panel,
   Tabs,
 } from "./design-system/components";
+import type { DispatchRecommendationLeaseController } from "./dispatch-recommendation-lease";
 import {
   activeRotationForAircraft,
   BookingGroupAssignmentDialog,
@@ -67,6 +68,7 @@ export function FlightLineAssist({
   aircraft,
   busyRotationIds,
   canAssignPilot,
+  dispatchLease,
   onAssignPilot,
   onClaim,
   onClaimUnavailable,
@@ -79,6 +81,7 @@ export function FlightLineAssist({
   onPause,
   onRefresh,
   onRelease,
+  onReserveAssignment,
   onRunRotation,
   onSelectAircraft,
   onSetAircraftState,
@@ -89,6 +92,7 @@ export function FlightLineAssist({
   aircraft: Aircraft[];
   busyRotationIds?: ReadonlySet<string>;
   canAssignPilot: boolean;
+  dispatchLease: DispatchRecommendationLeaseController;
   onAssignPilot: (aircraftId: string, pilotId: string, reassign: boolean) => Promise<void>;
   onClaim: (aircraftId: string, expectedTakeoverRevision?: number) => Promise<void>;
   onClaimUnavailable: () => void;
@@ -101,11 +105,12 @@ export function FlightLineAssist({
   onPause: (aircraftId: string) => void;
   onRefresh: () => Promise<void>;
   onRelease: (aircraftId: string) => Promise<void>;
+  onReserveAssignment: (aircraftId: string) => Promise<unknown>;
   onRunRotation: (
     rotation: Rotation,
     nextAircraftState?: TurnaroundNextState,
     queueDeviationReason?: string,
-  ) => Promise<void>;
+  ) => Promise<boolean>;
   onSelectAircraft: (aircraftId: string) => void;
   onSetAircraftState: (aircraftId: string, state: FlightLineFleetState) => Promise<void>;
   onToggleGroup: (ticketGroupId: string, selected: boolean) => void;
@@ -200,6 +205,7 @@ export function FlightLineAssist({
     setClaimedAircraftId(null);
     setServerClaimSeen(false);
     setAssignmentOpen(false);
+    void dispatchLease.release();
     setClaimError(
       externalClaim
         ? `${externalClaim.ownerLoginCode} hat die Betreuung dieses Flugzeugs übernommen.`
@@ -213,6 +219,7 @@ export function FlightLineAssist({
     ownServerClaim,
     releasing,
     serverClaimSeen,
+    dispatchLease.release,
   ]);
 
   useEffect(() => {
@@ -316,6 +323,7 @@ export function FlightLineAssist({
       setServerClaimSeen(false);
       setPilotOpen(false);
       setAssignmentOpen(false);
+      await dispatchLease.release();
       setClaimError(null);
     } catch (cause) {
       setClaimError(
@@ -352,13 +360,14 @@ export function FlightLineAssist({
     }
   }
 
-  function runPrimary() {
+  async function runPrimary() {
     if (!activeAircraft) return;
     if (requiresAvailableReset) {
       return runAircraftStateAction("primary", "AVAILABLE");
     }
     if (activeRotation?.status === "DRAFT") {
       setAssignmentOpen(true);
+      await onReserveAssignment(activeAircraft.id);
       return;
     }
     if (activeRotation) {
@@ -610,18 +619,29 @@ export function FlightLineAssist({
       <BookingGroupAssignmentDialog
         aircraft={activeAircraft}
         confirmDisabled={!assignmentReady || primaryDisabled}
+        dispatchLease={dispatchLease}
         groups={waitingGroups}
         onAttendance={onGroupAttendance}
-        onClose={() => setAssignmentOpen(false)}
-        onConfirm={async (queueDeviationReason) => {
-          if (activeRotation) await onRunRotation(activeRotation, undefined, queueDeviationReason);
+        onClose={() => {
           setAssignmentOpen(false);
+          void dispatchLease.release();
+        }}
+        onConfirm={async (queueDeviationReason) => {
+          if (
+            activeRotation &&
+            (await onRunRotation(activeRotation, undefined, queueDeviationReason))
+          ) {
+            setAssignmentOpen(false);
+          }
         }}
         onDefer={onGroupDefer}
         onMissing={onGroupMissing}
         onRecall={onGroupRecall}
         onRecallClear={onGroupRecallClear}
         onRestore={onGroupRestore}
+        onReserveRecommendation={async () => {
+          if (activeAircraft) await onReserveAssignment(activeAircraft.id);
+        }}
         onToggle={onToggleGroup}
         open={assignmentOpen}
         selectedQueueGroupIds={selectedQueueGroupIds}

@@ -7,6 +7,8 @@ import {
   type CommandResult,
   commandEnvelopeSchema,
   commandResultSchema,
+  type DispatchRecommendationLease,
+  dispatchRecommendationLeaseAcquireSchema,
   type FidsPreferences,
   type GateDisplayFilter,
   gateDisplayFilterSchema,
@@ -84,6 +86,7 @@ const JSON_HEADERS = { "content-type": "application/json; charset=utf-8" } as co
 const FORECAST_TICK_INTERVAL_MS = 30_000;
 const FORECAST_COMMAND_DEBOUNCE_MS = 150;
 const ASSIST_CLAIM_TTL_MS = 30 * 60_000;
+const DISPATCH_RECOMMENDATION_LEASE_TTL_MS = 90_000;
 
 interface StoredTicketGroupRecall {
   id: string;
@@ -91,6 +94,26 @@ interface StoredTicketGroupRecall {
   sequence: number;
   started_at: string;
   expires_at: string;
+}
+
+interface StoredDispatchRecommendationLease {
+  id: string;
+  operation_day_id: string;
+  aircraft_id: string;
+  operator_account_id: string;
+  device_id: string;
+  acquire_command_id: string;
+  dispatch_plan_revision: string;
+  dispatch_batch_id: string;
+  dispatch_order: number;
+  ticket_group_ids_json: string;
+  occupied_seats: number;
+  available_seats: number;
+  decision_reasons_json: string;
+  status: "ACTIVE" | "RELEASED" | "EXPIRED" | "CONSUMED" | "INVALIDATED";
+  acquired_at: string;
+  expires_at: string;
+  version: number;
 }
 
 function json(data: unknown, init: ResponseInit = {}): Response {
@@ -142,6 +165,12 @@ export class EventCoordinator extends DurableObject<Env> {
     ) {
       return this.handleAssistClaim(request, url);
     }
+    if (
+      (request.method === "POST" || request.method === "DELETE") &&
+      url.pathname.includes("/dispatch-recommendation-leases")
+    ) {
+      return this.enqueueDispatchRecommendationLease(request, url);
+    }
     return json(
       { error: { code: "NOT_FOUND", message: "Durable-Object-Route nicht gefunden." } },
       { status: 404 },
@@ -188,6 +217,36 @@ export class EventCoordinator extends DurableObject<Env> {
 
   private enqueueFidsPreferences(request: Request, url: URL): Promise<Response> {
     const task = this.commandTail.then(() => this.handleFidsPreferences(request, url));
+    this.commandTail = task.then(
+      () => undefined,
+      () => undefined,
+    );
+    return task;
+  }
+
+  private enqueueDispatchRecommendationLease(request: Request, url: URL): Promise<Response> {
+    const task = this.commandTail.then(async () => {
+      try {
+        return await this.handleDispatchRecommendationLease(request, url);
+      } catch (error) {
+        console.error(
+          JSON.stringify({
+            level: "error",
+            code: "DISPATCH_RECOMMENDATION_LEASE_FAILED",
+            message: error instanceof Error ? error.message : "Unknown dispatch lease failure",
+          }),
+        );
+        return json(
+          {
+            error: {
+              code: "DISPATCH_RECOMMENDATION_LEASE_FAILED",
+              message: "Belegungsvorschlag konnte nicht reserviert werden.",
+            },
+          },
+          { status: 500 },
+        );
+      }
+    });
     this.commandTail = task.then(
       () => undefined,
       () => undefined,
@@ -610,6 +669,483 @@ export class EventCoordinator extends DurableObject<Env> {
     this.ctx.acceptWebSocket(server);
     server.send(JSON.stringify({ type: "connected", timestamp: new Date().toISOString() }));
     return new Response(null, { status: 101, webSocket: client });
+  }
+
+  private dispatchRecommendationLeaseResponse(
+    lease: StoredDispatchRecommendationLease,
+    serverNow: string,
+  ): DispatchRecommendationLease {
+    return {
+      leaseId: lease.id,
+      aircraftId: lease.aircraft_id,
+      planRevision: lease.dispatch_plan_revision,
+      batchId: lease.dispatch_batch_id,
+      dispatchOrder: lease.dispatch_order,
+      groupIds: (JSON.parse(lease.ticket_group_ids_json) as unknown[]).filter(
+        (value): value is string => typeof value === "string",
+      ),
+      occupiedSeats: lease.occupied_seats,
+      availableSeats: lease.available_seats,
+      decisionReasons: (JSON.parse(lease.decision_reasons_json) as unknown[]).filter(
+        (value): value is string => typeof value === "string",
+      ),
+      acquiredAt: lease.acquired_at,
+      expiresAt: lease.expires_at,
+      serverNow,
+    };
+  }
+
+  private async handleDispatchRecommendationLease(request: Request, url: URL): Promise<Response> {
+    const eventId = this.eventIdFromPath(url.pathname);
+    const segments = url.pathname.split("/").filter(Boolean);
+    const leaseIndex = segments.indexOf("dispatch-recommendation-leases");
+    const leaseId = leaseIndex >= 0 ? segments[leaseIndex + 1] : null;
+    const accountId = request.headers.get("x-operator-account-id");
+    const deviceId = request.headers.get("x-operator-device-id");
+    const role = request.headers.get("x-operator-role") as DeviceRole | null;
+    if (!eventId || !accountId || !deviceId || !role) {
+      return json(
+        { error: { code: "SESSION_NOT_AUTHORIZED", message: "Anmeldung erforderlich." } },
+        { status: 401 },
+      );
+    }
+    if (!["FLIGHT_LINE", "FLIGHT_DIRECTOR", "ADMIN"].includes(role)) {
+      return json(
+        { error: { code: "ROLE_NOT_AUTHORIZED", message: "Sitzung ist nicht berechtigt." } },
+        { status: 403 },
+      );
+    }
+
+    const now = new Date();
+    const nowIso = now.toISOString();
+    const event = await this.env.DB.prepare("SELECT version FROM operation_days WHERE id = ?1")
+      .bind(eventId)
+      .first<{ version: number }>();
+    if (!event) {
+      return json(
+        { error: { code: "EVENT_NOT_FOUND", message: "Veranstaltung nicht gefunden." } },
+        { status: 404 },
+      );
+    }
+
+    if (request.method === "DELETE") {
+      if (!leaseId) {
+        return json(
+          { error: { code: "DISPATCH_LEASE_NOT_FOUND", message: "Reservierung fehlt." } },
+          { status: 404 },
+        );
+      }
+      const lease = await this.env.DB.prepare(
+        `SELECT id, operation_day_id, aircraft_id, operator_account_id, device_id,
+                acquire_command_id, dispatch_plan_revision, dispatch_batch_id, dispatch_order,
+                ticket_group_ids_json, occupied_seats, available_seats, decision_reasons_json,
+                status, acquired_at, expires_at, version
+           FROM dispatch_recommendation_leases
+          WHERE id = ?1 AND operation_day_id = ?2`,
+      )
+        .bind(leaseId, eventId)
+        .first<StoredDispatchRecommendationLease>();
+      if (
+        !lease ||
+        lease.operator_account_id !== accountId ||
+        lease.device_id !== deviceId ||
+        lease.status !== "ACTIVE"
+      ) {
+        return new Response(null, { status: 204 });
+      }
+      const expired = Date.parse(lease.expires_at) <= now.getTime();
+      const status = expired ? "EXPIRED" : "RELEASED";
+      const eventType = expired
+        ? "DISPATCH_RECOMMENDATION_LEASE_EXPIRED"
+        : "DISPATCH_RECOMMENDATION_LEASE_RELEASED";
+      const payload = {
+        action: status,
+        leaseId: lease.id,
+        aircraftId: lease.aircraft_id,
+        batchId: lease.dispatch_batch_id,
+      };
+      await this.env.DB.batch([
+        this.env.DB.prepare(
+          `UPDATE dispatch_recommendation_leases
+              SET status = ?1, released_at = CASE WHEN ?1 = 'RELEASED' THEN ?2 ELSE released_at END,
+                  expired_at = CASE WHEN ?1 = 'EXPIRED' THEN ?2 ELSE expired_at END,
+                  version = version + 1
+            WHERE id = ?3 AND status = 'ACTIVE' AND version = ?4`,
+        ).bind(status, nowIso, lease.id, lease.version),
+        this.env.DB.prepare(
+          `INSERT INTO operational_events
+            (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type,
+             aggregate_id, aggregate_version, payload_json)
+           VALUES (?1, ?2, ?3, ?4, ?5, 'DISPATCH_LEASE', ?6, ?7, ?8)`,
+        ).bind(
+          crypto.randomUUID(),
+          eventId,
+          eventType,
+          nowIso,
+          deviceId,
+          lease.id,
+          lease.version + 1,
+          JSON.stringify(payload),
+        ),
+        this.env.DB.prepare(
+          `INSERT INTO outbox (id, operation_day_id, topic, payload_json, created_at)
+           VALUES (?1, ?2, 'DISPATCH_LEASE_CHANGED', ?3, ?4)`,
+        ).bind(crypto.randomUUID(), eventId, JSON.stringify(payload), nowIso),
+      ]);
+      return new Response(null, { status: 204 });
+    }
+
+    const parsed = dispatchRecommendationLeaseAcquireSchema.safeParse(
+      await request.json().catch(() => null),
+    );
+    if (!parsed.success) {
+      return json(
+        {
+          error: {
+            code: "INVALID_DISPATCH_RECOMMENDATION_LEASE",
+            message: "Reservierungsdaten sind ungültig.",
+          },
+        },
+        { status: 400 },
+      );
+    }
+    if (parsed.data.expectedVersion !== event.version) {
+      return json(
+        {
+          error: {
+            code: "STALE_VERSION",
+            message: "Betriebsstand wurde zwischenzeitlich geändert.",
+            currentVersion: event.version,
+          },
+        },
+        { status: 409 },
+      );
+    }
+
+    const repeated = await this.env.DB.prepare(
+      `SELECT id, operation_day_id, aircraft_id, operator_account_id, device_id,
+              acquire_command_id, dispatch_plan_revision, dispatch_batch_id, dispatch_order,
+              ticket_group_ids_json, occupied_seats, available_seats, decision_reasons_json,
+              status, acquired_at, expires_at, version
+         FROM dispatch_recommendation_leases
+        WHERE acquire_command_id = ?1`,
+    )
+      .bind(parsed.data.commandId)
+      .first<StoredDispatchRecommendationLease>();
+    if (repeated) {
+      if (
+        repeated.operation_day_id !== eventId ||
+        repeated.operator_account_id !== accountId ||
+        repeated.device_id !== deviceId ||
+        repeated.aircraft_id !== parsed.data.aircraftId
+      ) {
+        return json(
+          {
+            error: {
+              code: "IDEMPOTENCY_CONFLICT",
+              message: "Kommando-ID ist bereits für eine andere Reservierung belegt.",
+            },
+          },
+          { status: 409 },
+        );
+      }
+      if (repeated.status === "ACTIVE" && Date.parse(repeated.expires_at) > now.getTime()) {
+        return json(this.dispatchRecommendationLeaseResponse(repeated, nowIso));
+      }
+      return json(
+        {
+          error: {
+            code: "DISPATCH_RECOMMENDATION_LEASE_FINISHED",
+            message: "Diese Reservierungsanfrage ist bereits abgelaufen oder beendet.",
+          },
+        },
+        { status: 409 },
+      );
+    }
+
+    const aircraft = await this.env.DB.prepare(
+      `SELECT a.id, a.passenger_seats, a.operational_state, membership.resource_group_id
+         FROM aircraft a
+         JOIN resource_group_memberships membership
+           ON membership.aircraft_id = a.id AND membership.active_until IS NULL
+        WHERE a.id = ?1 AND membership.operation_day_id = ?2`,
+    )
+      .bind(parsed.data.aircraftId, eventId)
+      .first<{
+        id: string;
+        passenger_seats: number;
+        operational_state: string;
+        resource_group_id: string;
+      }>();
+    if (!aircraft) {
+      return json(
+        { error: { code: "AIRCRAFT_NOT_FOUND", message: "Flugzeug nicht gefunden." } },
+        { status: 404 },
+      );
+    }
+    if (aircraft.operational_state !== "AVAILABLE") {
+      return json(
+        {
+          error: {
+            code: "AIRCRAFT_NOT_AVAILABLE",
+            message: "Das Flugzeug ist nicht mehr für eine neue Belegung verfügbar.",
+          },
+        },
+        { status: 409 },
+      );
+    }
+    if (role === "FLIGHT_LINE") {
+      const assistClaim = await this.env.DB.prepare(
+        `SELECT aircraft_id
+           FROM flight_line_assist_claims
+          WHERE operation_day_id = ?1 AND operator_account_id = ?2
+            AND aircraft_id = ?3 AND expires_at > ?4`,
+      )
+        .bind(eventId, accountId, aircraft.id, nowIso)
+        .first<{ aircraft_id: string }>();
+      if (!assistClaim) {
+        return json(
+          {
+            error: {
+              code: "AIRCRAFT_ASSIST_CLAIM_REQUIRED",
+              message: "Das Flugzeug muss vor der Belegungsreservierung übernommen werden.",
+            },
+          },
+          { status: 409 },
+        );
+      }
+    }
+
+    const ownedLease = await this.env.DB.prepare(
+      `SELECT id, operation_day_id, aircraft_id, operator_account_id, device_id,
+              acquire_command_id, dispatch_plan_revision, dispatch_batch_id, dispatch_order,
+              ticket_group_ids_json, occupied_seats, available_seats, decision_reasons_json,
+              status, acquired_at, expires_at, version
+         FROM dispatch_recommendation_leases
+        WHERE operation_day_id = ?1 AND operator_account_id = ?2 AND device_id = ?3
+          AND status = 'ACTIVE' AND expires_at > ?4
+        LIMIT 1`,
+    )
+      .bind(eventId, accountId, deviceId, nowIso)
+      .first<StoredDispatchRecommendationLease>();
+    if (ownedLease) {
+      if (ownedLease.aircraft_id === aircraft.id) {
+        return json(this.dispatchRecommendationLeaseResponse(ownedLease, nowIso));
+      }
+      return json(
+        {
+          error: {
+            code: "DISPATCH_RECOMMENDATION_LEASE_ALREADY_HELD",
+            message: "Dieses Gerät bereitet bereits eine andere Belegung vor.",
+          },
+        },
+        { status: 409 },
+      );
+    }
+
+    const aircraftLease = await this.env.DB.prepare(
+      `SELECT lease.id
+         FROM dispatch_recommendation_leases lease
+        WHERE lease.operation_day_id = ?1 AND lease.aircraft_id = ?2
+          AND lease.status = 'ACTIVE' AND lease.expires_at > ?3
+        LIMIT 1`,
+    )
+      .bind(eventId, aircraft.id, nowIso)
+      .first<{ id: string }>();
+    if (aircraftLease) {
+      return json(
+        {
+          error: {
+            code: "AIRCRAFT_DISPATCH_RECOMMENDATION_LEASED",
+            message: "Für dieses Flugzeug wird bereits eine Belegung vorbereitet.",
+          },
+        },
+        { status: 409 },
+      );
+    }
+
+    const candidate = await this.env.DB.prepare(
+      `SELECT r.dispatch_plan_revision, r.dispatch_batch_id, r.dispatch_order,
+              r.dispatch_group_ids_json, r.dispatch_occupied_seats,
+              r.dispatch_decision_reasons_json
+         FROM rotations r
+         JOIN flight_groups fg ON fg.id = r.flight_group_id
+        WHERE r.operation_day_id = ?1 AND r.status = 'DRAFT'
+          AND fg.resource_group_id = ?2
+          AND r.dispatch_plan_revision IS NOT NULL
+          AND r.dispatch_batch_id IS NOT NULL
+          AND r.dispatch_order IS NOT NULL
+          AND r.dispatch_occupied_seats IS NOT NULL
+          AND r.dispatch_occupied_seats <= ?3
+          AND EXISTS (
+            SELECT 1 FROM forecast_snapshots snapshot
+             WHERE snapshot.rotation_id = r.id
+               AND snapshot.dispatch_plan_revision = r.dispatch_plan_revision
+               AND snapshot.operation_day_version = ?4
+          )
+          AND NOT EXISTS (
+            SELECT 1 FROM dispatch_recommendation_leases lease
+             WHERE lease.operation_day_id = r.operation_day_id
+               AND lease.dispatch_batch_id = r.dispatch_batch_id
+               AND lease.status = 'ACTIVE' AND lease.expires_at > ?5
+          )
+        ORDER BY r.dispatch_order,
+                 CASE WHEN r.forecast_assumed_aircraft_id = ?6 THEN 0 ELSE 1 END,
+                 r.dispatch_batch_id, r.id
+        LIMIT 1`,
+    )
+      .bind(
+        eventId,
+        aircraft.resource_group_id,
+        aircraft.passenger_seats,
+        event.version,
+        nowIso,
+        aircraft.id,
+      )
+      .first<{
+        dispatch_plan_revision: string;
+        dispatch_batch_id: string;
+        dispatch_order: number;
+        dispatch_group_ids_json: string;
+        dispatch_occupied_seats: number;
+        dispatch_decision_reasons_json: string;
+      }>();
+    if (!candidate) {
+      return json(
+        {
+          error: {
+            code: "DISPATCH_RECOMMENDATION_NOT_AVAILABLE",
+            message: "Aktuell ist kein unreservierter, passender Belegungsvorschlag verfügbar.",
+          },
+        },
+        { status: 409 },
+      );
+    }
+
+    const expiredLeases = await this.env.DB.prepare(
+      `SELECT id, aircraft_id, dispatch_batch_id, version
+         FROM dispatch_recommendation_leases
+        WHERE operation_day_id = ?1 AND status = 'ACTIVE' AND expires_at <= ?2`,
+    )
+      .bind(eventId, nowIso)
+      .all<{ id: string; aircraft_id: string; dispatch_batch_id: string; version: number }>();
+    const leaseIdValue = crypto.randomUUID();
+    const expiresAt = new Date(now.getTime() + DISPATCH_RECOMMENDATION_LEASE_TTL_MS).toISOString();
+    const groupIds = (JSON.parse(candidate.dispatch_group_ids_json) as unknown[]).filter(
+      (value): value is string => typeof value === "string",
+    );
+    const decisionReasons = (
+      JSON.parse(candidate.dispatch_decision_reasons_json) as unknown[]
+    ).filter((value): value is string => typeof value === "string");
+    if (groupIds.length === 0) {
+      return json(
+        {
+          error: {
+            code: "DISPATCH_RECOMMENDATION_INVALID",
+            message: "Der aktuelle Belegungsvorschlag enthält keine Gruppen.",
+          },
+        },
+        { status: 409 },
+      );
+    }
+    const lease: StoredDispatchRecommendationLease = {
+      id: leaseIdValue,
+      operation_day_id: eventId,
+      aircraft_id: aircraft.id,
+      operator_account_id: accountId,
+      device_id: deviceId,
+      acquire_command_id: parsed.data.commandId,
+      dispatch_plan_revision: candidate.dispatch_plan_revision,
+      dispatch_batch_id: candidate.dispatch_batch_id,
+      dispatch_order: candidate.dispatch_order,
+      ticket_group_ids_json: JSON.stringify(groupIds),
+      occupied_seats: candidate.dispatch_occupied_seats,
+      available_seats: Math.max(0, aircraft.passenger_seats - candidate.dispatch_occupied_seats),
+      decision_reasons_json: JSON.stringify(decisionReasons),
+      status: "ACTIVE",
+      acquired_at: nowIso,
+      expires_at: expiresAt,
+      version: 1,
+    };
+    const expirationStatements = expiredLeases.results.flatMap((expiredLease) => {
+      const payload = {
+        action: "EXPIRED",
+        leaseId: expiredLease.id,
+        aircraftId: expiredLease.aircraft_id,
+        batchId: expiredLease.dispatch_batch_id,
+      };
+      return [
+        this.env.DB.prepare(
+          `UPDATE dispatch_recommendation_leases
+              SET status = 'EXPIRED', expired_at = ?1, version = version + 1
+            WHERE id = ?2 AND status = 'ACTIVE' AND version = ?3`,
+        ).bind(nowIso, expiredLease.id, expiredLease.version),
+        this.env.DB.prepare(
+          `INSERT INTO operational_events
+            (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type,
+             aggregate_id, aggregate_version, payload_json)
+           VALUES (?1, ?2, 'DISPATCH_RECOMMENDATION_LEASE_EXPIRED', ?3, ?4,
+                   'DISPATCH_LEASE', ?5, ?6, ?7)`,
+        ).bind(
+          crypto.randomUUID(),
+          eventId,
+          nowIso,
+          deviceId,
+          expiredLease.id,
+          expiredLease.version + 1,
+          JSON.stringify(payload),
+        ),
+      ];
+    });
+    const payload = {
+      action: "ACQUIRED",
+      leaseId: lease.id,
+      aircraftId: lease.aircraft_id,
+      batchId: lease.dispatch_batch_id,
+      planRevision: lease.dispatch_plan_revision,
+      groupIds,
+      expiresAt,
+    };
+    await this.env.DB.batch([
+      ...expirationStatements,
+      this.env.DB.prepare(
+        `INSERT INTO dispatch_recommendation_leases
+          (id, operation_day_id, aircraft_id, operator_account_id, device_id,
+           acquire_command_id, dispatch_plan_revision, dispatch_batch_id, dispatch_order,
+           ticket_group_ids_json, occupied_seats, available_seats, decision_reasons_json,
+           status, acquired_at, expires_at, version)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13,
+                 'ACTIVE', ?14, ?15, 1)`,
+      ).bind(
+        lease.id,
+        eventId,
+        lease.aircraft_id,
+        accountId,
+        deviceId,
+        lease.acquire_command_id,
+        lease.dispatch_plan_revision,
+        lease.dispatch_batch_id,
+        lease.dispatch_order,
+        lease.ticket_group_ids_json,
+        lease.occupied_seats,
+        lease.available_seats,
+        lease.decision_reasons_json,
+        nowIso,
+        expiresAt,
+      ),
+      this.env.DB.prepare(
+        `INSERT INTO operational_events
+          (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type,
+           aggregate_id, aggregate_version, payload_json)
+         VALUES (?1, ?2, 'DISPATCH_RECOMMENDATION_LEASE_ACQUIRED', ?3, ?4,
+                 'DISPATCH_LEASE', ?5, 1, ?6)`,
+      ).bind(crypto.randomUUID(), eventId, nowIso, deviceId, lease.id, JSON.stringify(payload)),
+      this.env.DB.prepare(
+        `INSERT INTO outbox (id, operation_day_id, topic, payload_json, created_at)
+         VALUES (?1, ?2, 'DISPATCH_LEASE_CHANGED', ?3, ?4)`,
+      ).bind(crypto.randomUUID(), eventId, JSON.stringify(payload), nowIso),
+    ]);
+    return json(this.dispatchRecommendationLeaseResponse(lease, nowIso));
   }
 
   private async handleAssistClaim(request: Request, url: URL): Promise<Response> {
@@ -1710,7 +2246,7 @@ export class EventCoordinator extends DurableObject<Env> {
               { status: 409 },
             );
           }
-          return this.handleRotationTransition(command, current);
+          return this.handleRotationTransition(command, current, operatorAccountId);
         }
         if (command.type === "SET_TICKET_GROUP_ATTENDANCE") {
           return this.handleTicketGroupAttendance(command, current);
@@ -6661,6 +7197,7 @@ export class EventCoordinator extends DurableObject<Env> {
       }
     >,
     current: StoredEventRow,
+    operatorAccountId: string | null,
   ): Promise<Response> {
     const primaryAssignment =
       command.type === "CALL_NEXT"
@@ -6736,6 +7273,7 @@ export class EventCoordinator extends DurableObject<Env> {
     }> = [];
     let skippedEarlierTicketGroupIds: string[] = [];
     let acceptedDispatchRecommendation = false;
+    let acceptedDispatchRecommendationLease: StoredDispatchRecommendationLease | null = null;
     let confirmedTurnaroundProductId: string | null = null;
     let confirmedTurnaroundProfile: ReturnType<typeof resolveTurnaroundProfile> | null = null;
     if (command.type === "CALL_NEXT") {
@@ -6825,7 +7363,79 @@ export class EventCoordinator extends DurableObject<Env> {
           { status: 409 },
         );
       }
-      if (command.payload.dispatchRecommendation) {
+      const leaseId = command.payload.dispatchRecommendationLeaseId;
+      if (leaseId) {
+        if (!operatorAccountId || !command.payload.dispatchRecommendation) {
+          return json(
+            {
+              error: {
+                code: "DISPATCH_RECOMMENDATION_LEASE_MISMATCH",
+                message: "Die Vorschlagsreservierung gehört nicht zu dieser Bestätigung.",
+              },
+            },
+            { status: 409 },
+          );
+        }
+        const lease = await this.env.DB.prepare(
+          `SELECT id, operation_day_id, aircraft_id, operator_account_id, device_id,
+                  acquire_command_id, dispatch_plan_revision, dispatch_batch_id,
+                  dispatch_order, ticket_group_ids_json, occupied_seats, available_seats,
+                  decision_reasons_json, status, acquired_at, expires_at, version
+             FROM dispatch_recommendation_leases
+            WHERE id = ?1 AND operation_day_id = ?2`,
+        )
+          .bind(leaseId, command.eventId)
+          .first<StoredDispatchRecommendationLease>();
+        if (lease?.status !== "ACTIVE") {
+          return json(
+            {
+              error: {
+                code: "DISPATCH_RECOMMENDATION_LEASE_CONFLICT",
+                message: "Die Vorschlagsreservierung ist nicht mehr aktiv.",
+              },
+            },
+            { status: 409 },
+          );
+        }
+        if (Date.parse(lease.expires_at) <= Date.now()) {
+          return json(
+            {
+              error: {
+                code: "DISPATCH_RECOMMENDATION_LEASE_EXPIRED",
+                message: "Die Vorschlagsreservierung ist abgelaufen. Bitte neu reservieren.",
+              },
+            },
+            { status: 409 },
+          );
+        }
+        const leaseGroupIds = (JSON.parse(lease.ticket_group_ids_json) as string[]).sort();
+        const selectedGroupIds = [...distinctGroupIds].sort();
+        const leaseMatches =
+          lease.operator_account_id === operatorAccountId &&
+          lease.device_id === command.deviceId &&
+          lease.aircraft_id === command.payload.aircraftId &&
+          lease.dispatch_plan_revision === command.payload.dispatchRecommendation.planRevision &&
+          lease.dispatch_batch_id === command.payload.dispatchRecommendation.batchId &&
+          rotation.dispatch_operation_day_version === current.version &&
+          rotation.dispatch_plan_revision === lease.dispatch_plan_revision &&
+          rotation.dispatch_batch_id === lease.dispatch_batch_id &&
+          leaseGroupIds.length === selectedGroupIds.length &&
+          leaseGroupIds.every((ticketGroupId, index) => ticketGroupId === selectedGroupIds[index]);
+        if (!leaseMatches) {
+          return json(
+            {
+              error: {
+                code: "DISPATCH_RECOMMENDATION_LEASE_MISMATCH",
+                message:
+                  "Die reservierte Belegung passt nicht mehr zum aktuellen Plan. Bitte neu reservieren.",
+              },
+            },
+            { status: 409 },
+          );
+        }
+        acceptedDispatchRecommendation = true;
+        acceptedDispatchRecommendationLease = lease;
+      } else if (command.payload.dispatchRecommendation) {
         const recommendedGroupIds = JSON.parse(rotation.dispatch_group_ids_json) as string[];
         const selectedGroupIds = [...distinctGroupIds].sort();
         const currentRecommendedGroupIds = [...recommendedGroupIds].sort();
@@ -6847,6 +7457,37 @@ export class EventCoordinator extends DurableObject<Env> {
                   "Die Belegungsempfehlung wurde inzwischen neu berechnet. Bitte aktuellen Plan prüfen.",
                 currentPlanRevision: rotation.dispatch_plan_revision,
                 currentBatchId: rotation.dispatch_batch_id,
+              },
+            },
+            { status: 409 },
+          );
+        }
+      }
+      if (!leaseId) {
+        const selectedGroupIdsJson = JSON.stringify(distinctGroupIds);
+        const conflictingLease = await this.env.DB.prepare(
+          `SELECT lease.id
+             FROM dispatch_recommendation_leases lease
+            WHERE lease.operation_day_id = ?1
+              AND lease.status = 'ACTIVE'
+              AND lease.expires_at > ?2
+              AND EXISTS (
+                SELECT 1
+                  FROM json_each(lease.ticket_group_ids_json) reserved_group
+                  JOIN json_each(?3) selected_group
+                    ON selected_group.value = reserved_group.value
+              )
+            LIMIT 1`,
+        )
+          .bind(command.eventId, new Date().toISOString(), selectedGroupIdsJson)
+          .first<{ id: string }>();
+        if (conflictingLease) {
+          return json(
+            {
+              error: {
+                code: "DISPATCH_RECOMMENDATION_LEASE_CONFLICT",
+                message:
+                  "Mindestens eine gewählte Gruppe ist gerade in einem anderen Boarding-Dialog reserviert.",
               },
             },
             { status: 409 },
@@ -7443,9 +8084,48 @@ export class EventCoordinator extends DurableObject<Env> {
             command.type === "CALL_NEXT" && acceptedDispatchRecommendation
               ? command.payload.dispatchRecommendation
               : null,
+          dispatchRecommendationLeaseId:
+            command.type === "CALL_NEXT" ? (acceptedDispatchRecommendationLease?.id ?? null) : null,
           skippedTicketGroupIds: command.type === "CALL_NEXT" ? skippedEarlierTicketGroupIds : [],
         }),
       ),
+      ...(acceptedDispatchRecommendationLease
+        ? [
+            this.env.DB.prepare(
+              `UPDATE dispatch_recommendation_leases
+                  SET status = 'CONSUMED', consumed_at = ?1, version = version + 1
+                WHERE id = ?2 AND operation_day_id = ?3 AND status = 'ACTIVE'
+                  AND operator_account_id = ?4 AND device_id = ?5 AND aircraft_id = ?6
+                  AND expires_at > ?1`,
+            ).bind(
+              now,
+              acceptedDispatchRecommendationLease.id,
+              command.eventId,
+              operatorAccountId,
+              command.deviceId,
+              selectedAircraftId,
+            ),
+            this.env.DB.prepare(
+              `INSERT INTO operational_events
+                (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type,
+                 aggregate_id, aggregate_version, payload_json)
+               VALUES (?1, ?2, 'DISPATCH_RECOMMENDATION_LEASE_CONSUMED', ?3, ?4,
+                       'DISPATCH_LEASE', ?5, ?6, ?7)`,
+            ).bind(
+              crypto.randomUUID(),
+              command.eventId,
+              now,
+              command.deviceId,
+              acceptedDispatchRecommendationLease.id,
+              acceptedDispatchRecommendationLease.version + 1,
+              JSON.stringify({
+                aircraftId: selectedAircraftId,
+                rotationId: rotation.id,
+                dispatchBatchId: acceptedDispatchRecommendationLease.dispatch_batch_id,
+              }),
+            ),
+          ]
+        : []),
       this.env.DB.prepare(`INSERT INTO idempotency_receipts (command_id, operation_day_id, device_id, command_type, received_at, response_json)
         VALUES (?1, ?2, ?3, ?4, ?5, ?6)`).bind(
         command.commandId,

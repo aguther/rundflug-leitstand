@@ -16,6 +16,9 @@ import {
   type CommandEnvelope,
   type CommandResult,
   commandResultSchema,
+  type DispatchRecommendationLease,
+  type DispatchRecommendationLeaseAcquire,
+  dispatchRecommendationLeaseSchema,
   type EventCatalog,
   type EventLogoTheme,
   type EventSnapshot,
@@ -290,6 +293,65 @@ export async function releaseFlightLineAircraft(
   if (!response.ok) {
     const body = (await response.json()) as { error?: { message?: string } };
     throw new Error(body.error?.message ?? "Betreuung konnte nicht beendet werden.");
+  }
+}
+
+export async function acquireDispatchRecommendationLease(
+  eventId: string,
+  deviceId: string,
+  deviceToken: string,
+  input: DispatchRecommendationLeaseAcquire,
+): Promise<DispatchRecommendationLease> {
+  assertOperationalConnection(navigator.onLine);
+  const response = await apiFetch(controlApiPath(eventId, "/dispatch-recommendation-leases"), {
+    method: "POST",
+    headers: deviceHeaders(deviceId, deviceToken, { "content-type": "application/json" }),
+    body: JSON.stringify(input),
+  });
+  const body: unknown = await response.json();
+  if (!response.ok) {
+    const parsed = apiErrorSchema.safeParse(body);
+    if (parsed.success) {
+      throw new ApiCommandError(
+        parsed.data.error.message,
+        parsed.data.error.code,
+        response.status,
+        parsed.data.error.currentVersion,
+      );
+    }
+    throw new ApiCommandError(
+      "Belegungsvorschlag konnte nicht reserviert werden.",
+      "DISPATCH_RECOMMENDATION_LEASE_REJECTED",
+      response.status,
+    );
+  }
+  return dispatchRecommendationLeaseSchema.parse(body);
+}
+
+export async function releaseDispatchRecommendationLease(
+  eventId: string,
+  leaseId: string,
+  deviceId: string,
+  deviceToken: string,
+): Promise<void> {
+  const response = await apiFetch(
+    controlApiPath(eventId, `/dispatch-recommendation-leases/${encodeURIComponent(leaseId)}`),
+    {
+      method: "DELETE",
+      headers: deviceHeaders(deviceId, deviceToken),
+    },
+  );
+  if (!response.ok) {
+    const body: unknown = await response.json().catch(() => null);
+    const parsed = apiErrorSchema.safeParse(body);
+    throw new ApiCommandError(
+      parsed.success
+        ? parsed.data.error.message
+        : "Belegungsvorschlag konnte nicht freigegeben werden.",
+      parsed.success ? parsed.data.error.code : "DISPATCH_RECOMMENDATION_LEASE_RELEASE_FAILED",
+      response.status,
+      parsed.success ? parsed.data.error.currentVersion : undefined,
+    );
   }
 }
 

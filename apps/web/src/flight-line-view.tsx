@@ -7,6 +7,7 @@ import type {
 import { formatBookingGroupLabel } from "@rundflug/domain";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  ApiCommandError,
   claimFlightLineAircraft,
   getForecastHistory,
   getResourceDayHistory,
@@ -16,6 +17,7 @@ import {
 import { AppShell as Shell } from "./app/AppShell";
 import { useActionMessageBridge } from "./app/PageNotifications";
 import { Button, ModalDialog } from "./design-system/components";
+import { useDispatchRecommendationLease } from "./dispatch-recommendation-lease";
 import { FlightDirectorOperationsDialog } from "./features/flight-line/FlightDirectorOperationsDialog";
 import { FlightLineAssist } from "./flight-line-assist";
 import { expectedReviewAtFromPause } from "./flight-line-pause";
@@ -92,6 +94,16 @@ export function FlightLineView() {
   const [busyRotationIds, setBusyRotationIds] = useState<ReadonlySet<string>>(() => new Set());
   const busyRotationIdsRef = useRef(new Set<string>());
   const [selectedQueueGroupIds, setSelectedQueueGroupIds] = useState<string[]>([]);
+  const replaceSelectedQueueGroups = useCallback((ticketGroupIds: string[]) => {
+    setSelectedQueueGroupIds([...ticketGroupIds]);
+  }, []);
+  const dispatchLease = useDispatchRecommendationLease({
+    eventId: EVENT_ID,
+    deviceId: FLIGHT_LINE_DEVICE_ID,
+    deviceToken: deviceTokenFor(FLIGHT_LINE_DEVICE_ID),
+    expectedVersion: board?.event.version ?? 0,
+    onReserved: replaceSelectedQueueGroups,
+  });
   const [dispositionOpen, setDispositionOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [dispositionCapacity, setDispositionCapacity] = useState(1);
@@ -136,19 +148,6 @@ export function FlightLineView() {
     operationalAircraft.find(
       (aircraft) => aircraft.id === (selectedAircraftId ?? claimedAssistAircraftId),
     ) ?? (FLIGHT_LINE_ASSIST_MODE ? undefined : operationalAircraft[0]);
-  const selectedDispatchPlan = board?.rotations
-    .filter(
-      (rotation) =>
-        rotation.status === "DRAFT" &&
-        rotation.timeline.forecastAssumedAircraftId === selectedAircraft?.id &&
-        rotation.dispatchPlan?.batchId,
-    )
-    .sort(
-      (left, right) =>
-        (left.dispatchPlan?.dispatchOrder ?? Number.MAX_SAFE_INTEGER) -
-          (right.dispatchPlan?.dispatchOrder ?? Number.MAX_SAFE_INTEGER) ||
-        left.id.localeCompare(right.id),
-    )[0]?.dispatchPlan;
   const aircraftRotations = operationalRotations?.filter((rotation) => {
     if (!selectedAircraft) return false;
     if (rotation.aircraftId) return rotation.aircraftId === selectedAircraft.id;
@@ -229,11 +228,11 @@ export function FlightLineView() {
     aircraftOverride: Aircraft | undefined = selectedAircraft,
     nextAircraftState: TurnaroundNextState = turnaroundNextState,
     queueDeviationReasonOverride?: string,
-  ) {
+  ): Promise<boolean> {
     const selectedRotation = rotationOverride;
     const selectedAction = selectedRotation ? actionForState[selectedRotation.status] : null;
-    if (!board || !selectedRotation || !selectedAction) return;
-    if (busyRotationIdsRef.current.has(selectedRotation.id)) return;
+    if (!board || !selectedRotation || !selectedAction) return false;
+    if (busyRotationIdsRef.current.has(selectedRotation.id)) return false;
     busyRotationIdsRef.current.add(selectedRotation.id);
     setBusyRotationIds(new Set(busyRotationIdsRef.current));
     try {
@@ -259,10 +258,10 @@ export function FlightLineView() {
             : selectedRotation.bookingGroups.length > 0
               ? selectedRotation.bookingGroups.map((group) => group.id)
               : [selectedRotation.ticketGroupId];
-        const currentRecommendationSelected = Boolean(
-          selectedDispatchPlan?.batchId &&
-            selectedDispatchPlan.groupIds.length === ticketGroupIds.length &&
-            [...selectedDispatchPlan.groupIds]
+        const reservedRecommendationSelected = Boolean(
+          dispatchLease.mode === "RESERVED" &&
+            dispatchLease.lease?.groupIds.length === ticketGroupIds.length &&
+            [...(dispatchLease.lease?.groupIds ?? [])]
               .sort()
               .every((groupId, index) => groupId === [...ticketGroupIds].sort()[index]),
         );
@@ -275,11 +274,15 @@ export function FlightLineView() {
               aircraftId: aircraftOverride.id,
               pilotId: assignedPilotId,
               dispatchRecommendation:
-                currentRecommendationSelected && selectedDispatchPlan?.batchId
+                reservedRecommendationSelected && dispatchLease.lease
                   ? {
-                      planRevision: selectedDispatchPlan.revision,
-                      batchId: selectedDispatchPlan.batchId,
+                      planRevision: dispatchLease.lease.planRevision,
+                      batchId: dispatchLease.lease.batchId,
                     }
+                  : undefined,
+              dispatchRecommendationLeaseId:
+                reservedRecommendationSelected && dispatchLease.lease
+                  ? dispatchLease.lease.leaseId
                   : undefined,
               queueDeviationReason:
                 (queueDeviationReasonOverride ?? callDeviationReason.trim()) || undefined,
@@ -321,9 +324,33 @@ export function FlightLineView() {
         );
       }
       confirmEvent(result.event);
+      if (selectedAction.command === "CALL_NEXT") dispatchLease.consume();
       await refresh(result.event.version);
+      return true;
     } catch (reason) {
       setMessage(reason instanceof Error ? reason.message : "Aktion fehlgeschlagen.");
+      if (
+        reason instanceof ApiCommandError &&
+        [
+          "STALE_VERSION",
+          "DISPATCH_PLAN_STALE",
+          "DISPATCH_RECOMMENDATION_LEASE_EXPIRED",
+          "DISPATCH_RECOMMENDATION_LEASE_CONFLICT",
+          "DISPATCH_RECOMMENDATION_LEASE_MISMATCH",
+        ].includes(reason.code) &&
+        aircraftOverride?.id
+      ) {
+        await dispatchLease.release();
+        await refresh(reason.currentVersion ?? 0, true);
+        await dispatchLease.reserve(
+          aircraftOverride.id,
+          reason.currentVersion ?? board.event.version,
+        );
+        setMessage(
+          "Der Belegungsplan wurde aktualisiert. Bitte den neuen Vorschlag erneut bestätigen.",
+        );
+      }
+      return false;
     } finally {
       busyRotationIdsRef.current.delete(selectedRotation.id);
       setBusyRotationIds(new Set(busyRotationIdsRef.current));
@@ -1224,6 +1251,7 @@ export function FlightLineView() {
           board={board}
           busyRotationIds={busyRotationIds}
           canAssignPilot={canManageAircraft}
+          dispatchLease={dispatchLease}
           onAssignPilot={assignAircraftPilot}
           onClaim={async (aircraftId, expectedTakeoverRevision) => {
             await claimFlightLineAircraft(
@@ -1283,11 +1311,12 @@ export function FlightLineView() {
             setSelectedQueueGroupIds([]);
           }}
           onRunRotation={(rotation, nextAircraftState, queueDeviationReason) => {
-            const rotationAircraft = operationalAircraft.find(
-              (entry) => entry.id === rotation.aircraftId,
-            );
+            const rotationAircraft =
+              operationalAircraft.find((entry) => entry.id === rotation.aircraftId) ??
+              selectedAircraft;
             return advance(rotation, rotationAircraft, nextAircraftState, queueDeviationReason);
           }}
+          onReserveAssignment={(aircraftId) => dispatchLease.reserve(aircraftId)}
           onSetAircraftState={requestAircraftState}
           selectedQueueGroupIds={selectedQueueGroupIds}
         />
@@ -1297,6 +1326,7 @@ export function FlightLineView() {
           board={board}
           busyRotationIds={busyRotationIds}
           canManageOperations={canManageAircraft}
+          dispatchLease={dispatchLease}
           operationalSummary={operationalSummary}
           operationalSummaryTone={operationalSummaryTone}
           loadForecastHistory={loadAllForecastHistory}
@@ -1331,9 +1361,7 @@ export function FlightLineView() {
             setDispositionOpen(false);
             setDetailsOpen(false);
           }}
-          onReplaceGroupSelection={(ticketGroupIds) => {
-            setSelectedQueueGroupIds([...ticketGroupIds]);
-          }}
+          onReserveAssignment={(aircraftId) => dispatchLease.reserve(aircraftId)}
           onToggleGroup={(ticketGroupId, isSelected) => {
             setSelectedQueueGroupIds((current) =>
               isSelected
