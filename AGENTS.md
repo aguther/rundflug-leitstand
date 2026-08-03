@@ -416,8 +416,15 @@ git rebase origin/main
 Konflikte müssen semantisch gelöst werden. Es ist nicht zulässig, Konflikte pauschal mit `ours` oder
 `theirs` aufzulösen, ohne beide Änderungen zu prüfen.
 
-Nach dem Rebase sind alle für die Änderung relevanten Prüfungen erneut auszuführen. Wurde der Branch
-bereits veröffentlicht, wird der aktualisierte Stand anschließend mit `--force-with-lease` gesichert.
+Ein bereits erfolgreicher Prüflauf darf für die abschließende Integration wiederverwendet werden, wenn
+sowohl der geprüfte Commit des Arbeitsbranches als auch der Commit von `origin/main`, auf den der Branch
+für diesen Prüflauf rebased wurde, unverändert sind. Ergibt der abschließende Abruf von `origin/main`
+keinen neuen Stand, ist deshalb kein erneuter Prüflauf erforderlich.
+
+Ist `origin/main` seit dem letzten validierten Rebase fortgeschritten oder wurde der Arbeitsbranch nach
+dem Prüflauf geändert, sind nach dem Rebase alle für die Änderung relevanten Prüfungen erneut
+auszuführen. Wurde der Branch bereits veröffentlicht, wird der aktualisierte Stand anschließend mit
+`--force-with-lease` gesichert.
 
 ### Integration nach `main`
 
@@ -430,15 +437,16 @@ nicht erzwungenen Fast-forward-Push direkt auf `origin/main`:
 
 ```bash
 git fetch origin
+# Only if origin/main advanced since the last validated rebase:
 git rebase origin/main
-# relevante Prüfungen erneut ausführen
+# Rerun relevant checks only after rebasing onto a new origin/main commit
 git push origin HEAD:main
 ```
 
-Die Prüfungen nach dem letzten Rebase müssen den tatsächlich zu pushenden Commit-Stand abdecken. Liegt
-der letzte vollständige Prüflauf bereits exakt auf diesem Stand, muss er nicht allein wegen des
-Integrationsversuchs wiederholt werden. Der Push nach `main` darf niemals mit `--force` oder
-`--force-with-lease` erfolgen.
+Die Prüfungen nach dem letzten validierten Rebase müssen den tatsächlich zu pushenden Commit-Stand und
+dessen Basis auf `origin/main` abdecken. Sind beide seit dem erfolgreichen Prüflauf unverändert, muss der
+Prüflauf nicht allein wegen des Integrationsversuchs wiederholt werden. Der Push nach `main` darf
+niemals mit `--force` oder `--force-with-lease` erfolgen.
 
 Schlägt `git push origin HEAD:main` fehl, weil ein anderer Agent zwischenzeitlich integriert hat, darf
 nicht force-gepusht und kein nicht-linearer Merge erzeugt werden. Der Agent muss stattdessen:
@@ -500,6 +508,8 @@ Der Agent nennt am Ende:
 - die erstellten Commits,
 - die ausgeführten Prüfungen,
 - das Ergebnis der Prüfungen,
+- ob vorhandene Prüfergebnisse wiederverwendet wurden und welche unveränderten Branch- und
+  `origin/main`-Stände dies erlaubt haben,
 - ob auf den neuesten Stand von `origin/main` rebased wurde,
 - den integrierten Commit auf `main`,
 - ob `main` erfolgreich nach `origin` gepusht wurde,
