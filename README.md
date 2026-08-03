@@ -35,7 +35,8 @@ Der erledigte und noch verbleibende Konsolidierungsbedarf steht in
 
 ## Voraussetzungen
 
-- Node.js 22.22.2, 24.15.0 oder neuer innerhalb einer unterstützten geraden Hauptversion
+- Node.js 24.18.0 als Standard- und Deployment-Version; Node.js 22.22.2 bleibt die in CI geprüfte
+  minimale unterstützte Version
 - npm 12.0.2 oder neuer innerhalb der Hauptversion 12
 - Python 3 für die Validierung des Anforderungskatalogs
 - für Cloudflare-Deployments ein Cloudflare-Konto und `wrangler login`

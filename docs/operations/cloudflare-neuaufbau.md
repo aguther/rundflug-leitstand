@@ -8,8 +8,9 @@ oder leert niemals vorhandene Ressourcen.
 
 - Cloudflare-Account mit zwei verantwortlichen Personen, erzwungener 2FA und Rechten für Workers,
   D1, R2, Durable Objects, Rate Limits und Secrets,
-- Node.js 22.22.2 beziehungsweise ab 24.15 innerhalb einer unterstützten geraden Hauptversion,
-  npm 12.0.2 und ein frischer Checkout des freigegebenen Commits,
+- Node.js 24.18.0 als Standard- und Deployment-Version, npm 12.0.2 und ein frischer Checkout des
+  freigegebenen Commits; Node.js 22.22.2 bleibt ausschließlich die in CI geprüfte minimale
+  unterstützte Version,
 - `npm install` und ein erfolgreicher Lauf von `npm run check`,
 - interaktive Wrangler-Anmeldung mit `npx wrangler login`,
 - Passwortsafe für den einmalig angezeigten Installations-Notfallcode,

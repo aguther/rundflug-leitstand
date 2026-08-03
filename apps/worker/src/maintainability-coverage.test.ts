@@ -73,11 +73,12 @@ describe("V1 maintainability and portability boundaries", () => {
       "esbuild@0.28.1": true,
       "workerd@1.20260730.1": true,
     });
-    expect(nodeVersion.trim()).toBe("22.22.2");
+    const defaultNodeVersion = nodeVersion.trim();
+    expect(defaultNodeVersion).toBe("24.18.0");
     expect(ciWorkflow).toContain("node-version: 22.22.2");
     expect(ciWorkflow).toContain("npm install --global npm@12.0.2");
     for (const workflow of [deployCloudflareWorkflow, cloudflarePerformanceWorkflow]) {
-      expect(workflow).toContain("node-version: 24.18.0");
+      expect(workflow).toContain(`node-version: ${defaultNodeVersion}`);
       expect(workflow).toContain("npm install --global npm@12.0.2");
     }
   });
