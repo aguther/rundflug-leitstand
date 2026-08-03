@@ -15,9 +15,11 @@ Tuningprofil. Ohne Profil gilt unverändert die Produktions-Baseline. Der Worker
 kein Profil; ausschließlich der lokale Simulator darf Kandidatenwerte zu Diagnose- und
 Vergleichszwecken einsetzen.
 
-Nicht endliche, nicht positive oder mehr als das 1,75-Fache des Referenzwerts betragende Dauern werden
-verworfen. Dadurch werden Serien außergewöhnlicher Verzögerungen durch Wetter, Flugshow oder andere
-Sperrzeiten nicht als neue Normaldauer gelernt. Ab fünf plausiblen Werten entfernt eine robuste
+Nicht endliche, kürzer als die Hälfte des Referenzwerts oder mehr als das 1,75-Fache des
+Referenzwerts betragende Dauern werden verworfen. Die relative Untergrenze ist eine fachliche
+Plausibilitätsregel und kein Tuningparameter. Dadurch werden insbesondere beschleunigte Testumläufe
+nicht als Normaldauer gelernt; Serien außergewöhnlicher Verzögerungen durch Wetter, Flugshow oder
+andere Sperrzeiten werden ebenfalls ausgeschlossen. Ab fünf plausiblen Werten entfernt eine robuste
 Median-/MAD-Regel zusätzlich einzelne
 statistische Ausreißer. Die Toleranz ist mindestens die Hälfte des Referenzwertes, damit normale
 operative Schwankungen nicht vorschnell verworfen werden.
@@ -37,6 +39,9 @@ kennzeichnet das Ergebnis als `UNCERTAIN`; öffentliche Ansichten zeigen dann ke
 
 Das Alter des jüngsten abgeschlossenen Lernumlaufs bleibt als `dataAgeMinutes` diagnostisch
 sichtbar, beeinflusst aber weder `STABLE` noch `CHANGING` und erzeugt allein niemals `UNCERTAIN`.
+`sampleSize`, `dataBasisScope` und `dataAgeMinutes` berücksichtigen nur Messwerte, die diese
+Plausibilitäts- und Ausreißerprüfung bestanden haben. Sind keine Werte lernfähig, wird
+`REFERENCE_ONLY` mit Stichprobengröße und Datenalter `0` ausgewiesen.
 Die technische Aktualität einer persistierten Prognose wird separat über `prediction_updated_at`
 bewertet. Fehlt dieser Zeitpunkt, ist er ungültig oder liegt er mehr als fünf Minuten zurück, gilt
 die gespeicherte Prognose als `UNCERTAIN`, bis eine erfolgreiche Neuberechnung vorliegt.

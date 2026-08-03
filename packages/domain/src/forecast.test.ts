@@ -7,9 +7,69 @@ import {
   createQueueAvailability,
   DEFAULT_FORECAST_TUNING_PROFILE,
   estimateDuration,
+  type ForecastTimelinesInput,
   forecastQueueWindows,
   reserveNextQueueWindow,
 } from "./forecast";
+
+function learningTimelineInput(sampleMinutes: readonly number[]): ForecastTimelinesInput {
+  const now = "2026-08-02T10:00:00.000Z";
+  return {
+    event: {
+      eventId: "event-short-learning",
+      now,
+      operationalInterrupted: false,
+      emergencyMode: false,
+      plannedBoardingMinutes: 5,
+      plannedDeboardingMinutes: 5,
+      plannedBufferMinutes: 2,
+    },
+    capacities: [
+      {
+        resourceGroupId: "rg-1",
+        activeAircraft: 1,
+        availabilityLanes: [
+          {
+            laneId: "aircraft-1:pilot-1",
+            aircraftId: "aircraft-1",
+            pilotId: "pilot-1",
+            passengerSeats: 3,
+            availableLowerAt: now,
+            availableExpectedAt: now,
+            availableUpperAt: now,
+          },
+        ],
+      },
+    ],
+    durationSamples: sampleMinutes.map((minutes, index) => ({
+      minutes,
+      completedAt: new Date(Date.parse(now) - (index + 1) * 60_000).toISOString(),
+      eventId: "event-short-learning",
+      productCode: "R",
+      aircraftType: null,
+    })),
+    rotations: [
+      {
+        id: "draft-short-learning",
+        status: "DRAFT",
+        createdAt: "2026-08-02T09:30:00.000Z",
+        calledAt: null,
+        departedAt: null,
+        landedAt: null,
+        resourceGroupId: "rg-1",
+        resourceGroupStatus: "ACTIVE",
+        queueSequence: 1,
+        passengerCount: 3,
+        referenceDurationMinutes: 20,
+        productCode: "R",
+        aircraftType: null,
+        predictedDepartureAt: null,
+        predictedLandingAt: null,
+        predictedCompletionAt: null,
+      },
+    ],
+  };
+}
 
 describe("event-driven forecast", () => {
   it("returns deterministic diagnostics without changing the projection wrapper or input", () => {
@@ -58,6 +118,75 @@ describe("event-driven forecast", () => {
     expect(input).toEqual(snapshot);
   });
 
+  it("keeps group 101 in the first equally full dispatch wave after forecast input mapping", () => {
+    const now = "2026-07-31T17:42:54.000Z";
+    const soldGroups = [
+      ["101", 1, "2026-07-31T17:37:30.268Z"],
+      ["102", 2, "2026-07-31T17:37:31.503Z"],
+      ["103", 2, "2026-07-31T17:37:33.648Z"],
+      ["104", 1, "2026-07-31T17:37:34.859Z"],
+      ["105", 3, "2026-07-31T17:37:36.154Z"],
+      ["106", 3, "2026-07-31T17:37:37.370Z"],
+      ["107", 1, "2026-07-31T17:37:39.125Z"],
+      ["108", 1, "2026-07-31T17:37:39.888Z"],
+      ["109", 2, "2026-07-31T17:37:41.427Z"],
+    ] as const;
+    const result = calculateForecastTimelineResult({
+      event: {
+        eventId: "event-101",
+        now,
+        operationalInterrupted: false,
+        emergencyMode: false,
+        plannedBoardingMinutes: 4,
+        plannedDeboardingMinutes: 4,
+        plannedBufferMinutes: 2,
+      },
+      capacities: [
+        {
+          resourceGroupId: "touring",
+          activeAircraft: 4,
+          availabilityLanes: Array.from({ length: 4 }, (_, index) => ({
+            laneId: `lane-${index + 1}`,
+            aircraftId: `aircraft-${index + 1}`,
+            pilotId: `pilot-${index + 1}`,
+            passengerSeats: 3,
+            availableLowerAt: now,
+            availableExpectedAt: now,
+            availableUpperAt: now,
+          })),
+        },
+      ],
+      durationSamples: [],
+      dispatchPlanningLimits: { maximumWaves: 2 },
+      rotations: soldGroups.map(([id, passengerCount, soldAt], index) => ({
+        id,
+        status: "DRAFT" as const,
+        createdAt: soldAt,
+        soldAt,
+        calledAt: null,
+        departedAt: null,
+        landedAt: null,
+        resourceGroupId: "touring",
+        resourceGroupStatus: "ACTIVE" as const,
+        queueSequence: index + 1,
+        passengerCount,
+        referenceDurationMinutes: 20,
+        productCode: "R",
+        productId: "round-flight",
+        aircraftType: null,
+        predictedDepartureAt: null,
+        predictedLandingAt: null,
+        predictedCompletionAt: null,
+      })),
+    });
+    const firstWave = result.diagnostics.dispatchPlan.batches
+      .filter((batch) => batch.wave === 1)
+      .map((batch) => [...batch.memberIds].sort().join("+"))
+      .sort();
+
+    expect(firstWave).toEqual(["101+102", "103+104", "105", "106"]);
+  });
+
   it("uses the reference model on cold start without requiring a recent actual event", () => {
     const estimate = estimateDuration({
       referenceMinutes: 20,
@@ -87,6 +216,60 @@ describe("event-driven forecast", () => {
       activeCapacity: 1,
     });
     expect(estimate.expectedMinutes).toBeGreaterThan(25);
+  });
+
+  it("rejects unrealistically short test rotations instead of learning them", () => {
+    const estimate = estimateDuration({
+      referenceMinutes: 30,
+      actualDurationsMinutes: [0.1468, 0.4864, 0.6859, 0.8007, 1.0586, 1.3189],
+      interrupted: false,
+      activeCapacity: 4,
+    });
+
+    expect(estimate).toMatchObject({
+      expectedMinutes: 30,
+      quality: "CHANGING",
+      sampleCount: 0,
+    });
+  });
+
+  it("keeps plausible short rotations at the documented lower reference boundary", () => {
+    const estimate = estimateDuration({
+      referenceMinutes: 30,
+      actualDurationsMinutes: [15, 16, 17],
+      interrupted: false,
+      activeCapacity: 4,
+    });
+
+    expect(estimate.sampleCount).toBe(3);
+    expect(estimate.expectedMinutes).toBeLessThan(30);
+  });
+
+  it("uses the same learned total duration for dispatch reservation and visible completion", () => {
+    const result = calculateForecastTimelineResult(learningTimelineInput([16, 16, 16, 16, 16]));
+    const projection = result.projections[0];
+    const batch = result.diagnostics.dispatchPlan.batches[0];
+
+    expect(projection?.sampleSize).toBe(5);
+    expect(
+      Date.parse(projection?.predictedCompletionAt ?? "") -
+        Date.parse(projection?.predictedBoardingAt ?? ""),
+    ).toBe(
+      Date.parse(batch?.predictedCompletionAt ?? "") -
+        Date.parse(batch?.boardingWindowExpectedAt ?? ""),
+    );
+  });
+
+  it("reports only accepted learning samples in forecast diagnostics", () => {
+    const projection = calculateForecastTimelines(
+      learningTimelineInput([0.1468, 0.4864, 0.6859, 0.8007, 1.0586, 1.3189]),
+    )[0];
+
+    expect(projection).toMatchObject({
+      sampleSize: 0,
+      dataBasisScope: "REFERENCE_ONLY",
+      dataAgeMinutes: 0,
+    });
   });
 
   it("gives the newest value the greatest weight when samples are chronological", () => {

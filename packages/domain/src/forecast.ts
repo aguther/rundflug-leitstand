@@ -260,6 +260,8 @@ function median(values: readonly number[]): number {
   return ((sorted[middle - 1] ?? 0) + (sorted[middle] ?? 0)) / 2;
 }
 
+export const MINIMUM_PLAUSIBLE_DURATION_RATIO = 0.5;
+
 function selectRobustDurationSamples(
   samples: readonly number[],
   referenceMinutes: number,
@@ -268,7 +270,7 @@ function selectRobustDurationSamples(
   const plausible = samples.filter(
     (duration) =>
       Number.isFinite(duration) &&
-      duration > 0 &&
+      duration >= referenceMinutes * MINIMUM_PLAUSIBLE_DURATION_RATIO &&
       duration <= referenceMinutes * tuning.referenceOutlierMultiplier,
   );
   if (plausible.length < tuning.stableMinimumSamples) {
@@ -1097,14 +1099,20 @@ function calculateLegacyForecastTimelines(
       0,
       tuning.maximumSamples,
     );
+    const actualDurations = [...selectedHistory].reverse().map((sample) => sample.minutes);
+    const acceptedDurationValues = new Set(
+      selectRobustDurationSamples(actualDurations, referenceTotal, tuning),
+    );
+    const acceptedHistory = selectedHistory.filter((sample) =>
+      acceptedDurationValues.has(sample.minutes),
+    );
     const dataBasisScope: ForecastDataBasisScope =
-      selectedHistory.length === 0
+      acceptedHistory.length === 0
         ? "REFERENCE_ONLY"
         : aircraftHistory.length > 0
           ? "AIRCRAFT_PRODUCT_HISTORY"
           : "PRODUCT_HISTORY";
-    const actualDurations = [...selectedHistory].reverse().map((sample) => sample.minutes);
-    const lastActualAt = selectedHistory[0]?.completedAt;
+    const lastActualAt = acceptedHistory[0]?.completedAt;
     const dataAgeMinutes = lastActualAt
       ? Math.max(0, (now.getTime() - Date.parse(lastActualAt)) / 60_000)
       : 0;
@@ -1295,7 +1303,7 @@ function calculateLegacyForecastTimelines(
       predictionUpperMinutes: window?.upperMinutes ?? null,
       capacityStatus,
       dataBasisScope,
-      sampleSize: selectedHistory.length,
+      sampleSize: estimate.sampleCount,
       dataAgeMinutes,
       activeCapacity,
       referenceDurationMinutes: referenceTotal,
@@ -1891,19 +1899,17 @@ export function calculateForecastTimelineResult(
     }
     const midpointMinutes = (replay.window.lowerMinutes + replay.window.upperMinutes) / 2;
     const predictedBoardingAt = addMinutes(now, midpointMinutes);
-    const predictedDepartureAt = addMinutes(predictedBoardingAt, replay.boardingMinutes);
-    const expectedFlightMinutes = Math.max(
-      rotation.referenceDurationMinutes,
-      replay.duration.expectedMinutes -
-        replay.boardingMinutes -
-        replay.deboardingMinutes -
-        replay.bufferMinutes,
-    );
-    const predictedLandingAt = addMinutes(predictedDepartureAt, expectedFlightMinutes);
-    const predictedCompletionAt = addMinutes(
-      predictedLandingAt,
+    const totalDurationMinutes = replay.duration.expectedMinutes;
+    const boardingMinutes = Math.min(replay.boardingMinutes, totalDurationMinutes);
+    const remainingAfterBoarding = Math.max(0, totalDurationMinutes - boardingMinutes);
+    const completionTurnaroundMinutes = Math.min(
       replay.deboardingMinutes + replay.bufferMinutes,
+      remainingAfterBoarding,
     );
+    const expectedFlightMinutes = remainingAfterBoarding - completionTurnaroundMinutes;
+    const predictedDepartureAt = addMinutes(predictedBoardingAt, boardingMinutes);
+    const predictedLandingAt = addMinutes(predictedDepartureAt, expectedFlightMinutes);
+    const predictedCompletionAt = addMinutes(predictedLandingAt, completionTurnaroundMinutes);
     const operationsEnd = operationsEndAssessment(
       predictedCompletionAt,
       input.event.plannedOperationsEndAt,
