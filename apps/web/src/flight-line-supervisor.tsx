@@ -46,6 +46,10 @@ import {
   type FlightDirectorAnalyticsSelection,
 } from "./features/flight-line/FlightDirectorAnalyticsDialog";
 import {
+  dispatchRecommendationForAircraft,
+  dispatchRecommendationSelectionForAircraft,
+} from "./flight-line-assignment";
+import {
   activeRotationForAircraft,
   BookingGroupAssignmentDialog,
   type FlightLineFleetState,
@@ -63,34 +67,6 @@ type Aircraft = OperationBoard["aircraft"][number];
 type Rotation = OperationBoard["rotations"][number];
 type QueueGroup = OperationBoard["queueGroups"][number];
 type TurnaroundNextState = "AVAILABLE" | "REFUELING" | "PAUSED" | "INACTIVE";
-
-function dispatchRecommendationForAircraft(board: OperationBoard, aircraftId: string | undefined) {
-  if (!aircraftId) return null;
-  const rotation = board.rotations
-    .filter(
-      (entry) =>
-        entry.status === "DRAFT" &&
-        entry.timeline.forecastAssumedAircraftId === aircraftId &&
-        entry.dispatchPlan?.batchId,
-    )
-    .sort(
-      (left, right) =>
-        (left.dispatchPlan?.dispatchOrder ?? Number.MAX_SAFE_INTEGER) -
-          (right.dispatchPlan?.dispatchOrder ?? Number.MAX_SAFE_INTEGER) ||
-        left.id.localeCompare(right.id),
-    )[0];
-  const plan = rotation?.dispatchPlan;
-  if (!plan?.batchId || !plan.dispatchOrder || plan.occupiedSeats === null) return null;
-  return {
-    planRevision: plan.revision,
-    batchId: plan.batchId,
-    dispatchOrder: plan.dispatchOrder,
-    groupIds: plan.groupIds,
-    occupiedSeats: plan.occupiedSeats,
-    availableSeats: plan.availableSeats ?? 0,
-    decisionReasons: plan.decisionReasons,
-  };
-}
 
 function queuedSegmentTicketCount(group: QueueGroup): number {
   return group.nextSegmentTicketCount ?? group.ticketCount;
@@ -251,6 +227,7 @@ export function FlightLineSupervisorConsole({
   onSetAircraftState,
   onPauseAircraft,
   onSelectAircraft,
+  onReplaceGroupSelection,
   onToggleGroup,
   onGroupAttendance,
   onGroupMissing,
@@ -277,6 +254,7 @@ export function FlightLineSupervisorConsole({
   onSetAircraftState: (aircraftId: string, state: FlightLineFleetState) => Promise<void>;
   onPauseAircraft: (aircraftId: string) => void;
   onSelectAircraft: (aircraftId: string) => void;
+  onReplaceGroupSelection: (ticketGroupIds: string[]) => void;
   onToggleGroup: (ticketGroupId: string, selected: boolean) => void;
   onGroupAttendance: (ticketGroupId: string, checkedIn: boolean) => void | Promise<void>;
   onGroupMissing: (ticketGroupId: string) => void | Promise<void>;
@@ -504,16 +482,17 @@ export function FlightLineSupervisorConsole({
       return runAircraftStateAction(entry, "primary", "AVAILABLE");
     }
     if (!rotation || rotation.status === "DRAFT") {
-      const recommendation = dispatchRecommendationForAircraft(board, entry.id);
+      const { recommendation, groupIds } = dispatchRecommendationSelectionForAircraft(
+        board,
+        entry.id,
+      );
+      onReplaceGroupSelection(groupIds);
+      recordAnalysisUiEvent({
+        type: "QUEUE_GROUP_SELECTION_CHANGED",
+        occurredAt: new Date().toISOString(),
+        groupIds,
+      });
       if (recommendation) {
-        for (const selectedGroupId of selectedQueueGroupIds) {
-          if (!recommendation.groupIds.includes(selectedGroupId)) {
-            toggleAssignmentGroup(selectedGroupId, false);
-          }
-        }
-        for (const groupId of recommendation.groupIds) {
-          if (!selectedQueueGroupIds.includes(groupId)) toggleAssignmentGroup(groupId, true);
-        }
         recordAnalysisUiEvent({
           type: "DISPATCH_RECOMMENDATION_APPLIED",
           occurredAt: new Date().toISOString(),

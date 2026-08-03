@@ -1331,6 +1331,9 @@ export function FlightLineView() {
             setDispositionOpen(false);
             setDetailsOpen(false);
           }}
+          onReplaceGroupSelection={(ticketGroupIds) => {
+            setSelectedQueueGroupIds([...ticketGroupIds]);
+          }}
           onToggleGroup={(ticketGroupId, isSelected) => {
             setSelectedQueueGroupIds((current) =>
               isSelected

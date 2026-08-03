@@ -109,6 +109,9 @@ describe("Flight Director", () => {
     expect(sharedSource).not.toContain("flight-director-dialog-pilot");
     expect(supervisorSource).toContain("onDefer={onGroupDefer}");
     expect(supervisorSource).toContain("dispatchRecommendationForAircraft");
+    expect(supervisorSource).toContain("onReplaceGroupSelection");
+    expect(supervisorSource).toContain("dispatchRecommendationSelectionForAircraft");
+    expect(supervisorSource).not.toMatch(/for \(const .*selectedQueueGroupIds/);
     expect(sharedSource).toContain("Empfohlene Belegung");
     expect(sharedSource).toContain("recommendationMatchesSelection");
   });
