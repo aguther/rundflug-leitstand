@@ -88,7 +88,7 @@
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
     "concurrently": "^10.0.4",
-    "jsdom": "^29.1.1",
+    "jsdom": "^30.0.1",
     "typescript": "6.0.3",
     "vitest": "4.1.10",
     "wrangler": "^4.114.0"
