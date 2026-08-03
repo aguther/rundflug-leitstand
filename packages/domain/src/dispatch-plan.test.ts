@@ -103,6 +103,91 @@ describe("createDispatchPlan", () => {
     expect(plan.batches.every((batch) => batch.wave === 1)).toBe(true);
   });
 
+  it("keeps the earliest fitting group in the first equally full four-lane wave", () => {
+    const planningTime = "2026-07-31T17:42:54.000Z";
+    const soldGroups = [
+      ["101", 1, "2026-07-31T17:37:30.268Z"],
+      ["102", 2, "2026-07-31T17:37:31.503Z"],
+      ["103", 2, "2026-07-31T17:37:33.648Z"],
+      ["104", 1, "2026-07-31T17:37:34.859Z"],
+      ["105", 3, "2026-07-31T17:37:36.154Z"],
+      ["106", 3, "2026-07-31T17:37:37.370Z"],
+      ["107", 1, "2026-07-31T17:37:39.125Z"],
+      ["108", 1, "2026-07-31T17:37:39.888Z"],
+      ["109", 2, "2026-07-31T17:37:41.427Z"],
+    ] as const;
+    const groups = soldGroups.map(([id, size, soldAt], index) =>
+      group(id, size, index + 1, { soldAt, waitingSince: soldAt }),
+    );
+    const lanes = Array.from({ length: 4 }, (_, index) =>
+      lane(`historical-${index + 1}`, 3, {
+        availableLowerAt: planningTime,
+        availableExpectedAt: planningTime,
+        availableUpperAt: planningTime,
+      }),
+    );
+
+    const plan = createDispatchPlan({
+      now: planningTime,
+      groups,
+      lanes,
+      limits: { maximumWaves: 2 },
+    });
+    const firstWave = plan.batches
+      .filter((batch) => batch.wave === 1)
+      .map((batch) => [...batch.memberIds].sort().join("+"))
+      .sort();
+
+    expect(firstWave).toEqual(["101+102", "103+104", "105", "106"]);
+    expect(plan.groupDecisions.find((decision) => decision.memberId === "101")).toMatchObject({
+      projectedOvertakeCount: 0,
+    });
+  });
+
+  it("replaces an equally full provisional waiting plan as earlier fitting groups arrive", () => {
+    const planningTime = "2026-07-31T17:42:54.000Z";
+    const soldGroups = [
+      ["101", 1, "2026-07-31T17:37:30.268Z"],
+      ["102", 2, "2026-07-31T17:37:31.503Z"],
+      ["103", 2, "2026-07-31T17:37:33.648Z"],
+      ["104", 1, "2026-07-31T17:37:34.859Z"],
+      ["105", 3, "2026-07-31T17:37:36.154Z"],
+      ["106", 3, "2026-07-31T17:37:37.370Z"],
+      ["107", 1, "2026-07-31T17:37:39.125Z"],
+      ["108", 1, "2026-07-31T17:37:39.888Z"],
+      ["109", 2, "2026-07-31T17:37:41.427Z"],
+    ] as const;
+    const lanes = Array.from({ length: 4 }, (_, index) =>
+      lane(`incremental-${index + 1}`, 3, {
+        availableLowerAt: planningTime,
+        availableExpectedAt: planningTime,
+        availableUpperAt: planningTime,
+      }),
+    );
+    let previousPlan = null;
+    for (let count = 1; count <= soldGroups.length; count += 1) {
+      previousPlan = createDispatchPlan({
+        now: planningTime,
+        groups: soldGroups
+          .slice(0, count)
+          .map(([id, size, soldAt], index) =>
+            group(id, size, index + 1, { soldAt, waitingSince: soldAt }),
+          ),
+        lanes,
+        previousPlan,
+        limits: { maximumWaves: 2 },
+      });
+    }
+    if (!previousPlan) throw new Error("Incremental dispatch plan was not created.");
+
+    expect(
+      previousPlan.batches
+        .filter((batch) => batch.wave === 1)
+        .map((batch) => [...batch.memberIds].sort().join("+"))
+        .sort(),
+    ).toEqual(["101+102", "103+104", "105", "106"]);
+  });
+
   it("uses a one-seater for a single group and preserves the larger lane", () => {
     const plan = createDispatchPlan({
       now: NOW,
