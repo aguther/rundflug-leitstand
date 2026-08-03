@@ -81,10 +81,10 @@
     "clean": "node -e \"const fs=require('node:fs'); for (const p of ['apps/web/dist','apps/worker/dist']) fs.rmSync(p,{recursive:true,force:true})\""
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.5",
+    "@biomejs/biome": "^2.5.6",
     "@cloudflare/vitest-pool-workers": "^0.18.8",
     "@cloudflare/workers-types": "^5.20260726.1",
-    "@playwright/test": "^1.62.0",
+    "@playwright/test": "^1.62.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
     "concurrently": "^10.0.4",
