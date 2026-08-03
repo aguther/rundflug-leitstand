@@ -5,8 +5,9 @@ Automatisch extrahiert: **207 eindeutige Anforderungen**.
 Die Zahlen unten beschreiben den unveränderten Basiskatalog V1.4. Der einzige aktuelle kumulative
 Releasekatalog für Anwendungsversion 1.12.0 steht in
 `requirements-v1.12.0.md` und `requirements-v1.12.0.yaml`. Er übernimmt alle fortgeltenden
-fachlichen Anforderungen und ergänzt zehn geplante Anforderungen für Diagnose-Momentaufnahmen,
-exakte Planungsläufe, Tagesanalysepakete, Offline-Replay, Datenschutz, Betrieb, Performance und QA.
+fachlichen Anforderungen und ergänzt elf Anforderungen für Diagnose-Momentaufnahmen, exakte
+Planungsläufe, Tagesanalysepakete, Offline-Replay, Datenschutz, Betrieb, Performance, QA und die
+modernisierte Entwicklungs-Toolchain.
 
 ## Nach Priorität
 
@@ -53,7 +54,7 @@ exakte Planungsläufe, Tagesanalysepakete, Offline-Replay, Datenschutz, Betrieb,
 
 - `requirements-v1.4.md`: durchsuchbare Lesefassung des gesamten Lastenhefts.
 - `requirements-v1.4.yaml`: maschinenlesbarer Katalog; bewusst auch valides JSON.
-- `requirements-v1.12.0.md` und `.yaml`: aktueller kumulativer Katalog mit 340 Anforderungen.
+- `requirements-v1.12.0.md` und `.yaml`: aktueller kumulativer Katalog mit 341 Anforderungen.
 - `traceability-v1.12.0.csv`: vollständige aktuelle Release-Traceability.
 - `traceability.csv`: Basiszuordnung zu Issues, Modulen, Tests und Umsetzungsstatus.
 - `Lastenheft_Rundflug-Leitstand_v1.4_konsolidiert.pdf`: unveränderte Referenz.

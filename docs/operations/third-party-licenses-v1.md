@@ -1,12 +1,12 @@
-# Drittanbieter-Lizenzinventar – Release 1.11.0
+# Drittanbieter-Lizenzinventar – Release 1.12.0
 
 Stand: automatisch aus installiertem Lockfile/Produktionsgraph erzeugt
-Betroffene Anforderung: T-080 und V1100-DEP-010
+Betroffene Anforderungen: T-080, V1100-DEP-010 und V1120-DEP-010
 
 ## Ergebnis
 
-`npm query ':not(.dev)' --json` meldet 71 externe Produktionspakete:
-1 BSD-3-Clause, 18 ISC, 50 MIT, 1 MIT AND ISC, 1 OFL-1.1. Kein Produktionspaket besitzt fehlende, `UNLICENSED`- oder proprietäre
+`npm ls --omit=dev --all --json --long` meldet 82 externe Produktionspakete:
+1 BSD-3-Clause, 19 ISC, 60 MIT, 1 MIT AND ISC, 1 OFL-1.1. Kein Produktionspaket besitzt fehlende, `UNLICENSED`- oder proprietäre
 Lizenzmetadaten.
 
 Die frühere Abhängigkeit `@block65/webcrypto-web-push` und deren unlizenziertes Transitpaket
@@ -19,11 +19,14 @@ RFC 8188, RFC 8291 und RFC 8292.
 | --- | --- | --- |
 | `@fontsource/barlow-condensed` | 5.3.0 | OFL-1.1 |
 | `fflate` | 0.8.3 | MIT |
-| `hono` | 4.12.32 | MIT |
-| `lucide-react` | 1.27.0 | ISC |
+| `hono` | 4.12.34 | MIT |
+| `lucide-react` | 1.28.0 | ISC |
 | `qrcode` | 1.5.4 | MIT |
+| `react` | 19.2.8 | MIT |
+| `react-dom` | 19.2.8 | MIT |
 | `react-is` | 19.2.8 | MIT |
 | `recharts` | 3.10.1 | MIT |
+| `workbox-window` | 7.4.1 | MIT |
 | `zod` | 4.4.3 | MIT |
 
 Interne Pakete unter `@rundflug/*` gehören zum selben privaten Repository. Das Lockfile ist die
@@ -32,10 +35,10 @@ Produktionsgraph geprüft und mit `npm run docs:licenses:build` aktualisiert.
 
 ## Sicherheits- und Rechtehinweis
 
-`npm audit --omit=dev` ist vor Freigabe auszuführen. Der am 26. Juli 2026 verbleibende npm-Befund
-betrifft ausschließlich die Buildkette von `vite-plugin-pwa`/Workbox; es gibt derzeit keine mit
-Vite 8 kompatible gefixte Upstreamversion. Dependabot überwacht die Kette wöchentlich. Sie verarbeitet
-keine Laufzeitanfragen oder fremden Projektdateien im Worker.
+`npm audit` und `npm audit --omit=dev` sind vor Freigabe auszuführen. Der am 3. August 2026
+geprüfte Lockfile-Stand enthält keine bekannten npm-Sicherheitsbefunde. Dependabot überwacht die
+Abhängigkeiten weiterhin wöchentlich. Die Entwicklungs- und Buildkette verarbeitet keine
+Laufzeitanfragen oder fremden Projektdateien im Worker.
 
 Dieses technische Inventar ersetzt keine rechtsverbindliche Rechteübertragung am projektspezifischen
 Quellcode. `LICENSE.md` bleibt bis zur Entscheidung der berechtigten Parteien auf „alle Rechte

@@ -1,4 +1,8 @@
 import { describe, expect, it } from "vitest";
+import ciWorkflow from "../../../.github/workflows/ci.yml?raw";
+import cloudflarePerformanceWorkflow from "../../../.github/workflows/cloudflare-performance.yml?raw";
+import deployCloudflareWorkflow from "../../../.github/workflows/deploy-cloudflare.yml?raw";
+import nodeVersion from "../../../.nvmrc?raw";
 import interfaceDocumentation from "../../../docs/architecture/command-and-realtime-interface.md?raw";
 import rootManifestRaw from "../../../package.json?raw";
 import packageLockRaw from "../../../package-lock.json?raw";
@@ -22,8 +26,11 @@ import seedSource from "../seed/demo.sql?raw";
 import coordinatorSource from "./event-coordinator.ts?raw";
 
 type Manifest = {
+  allowScripts?: Record<string, boolean>;
   dependencies?: Record<string, string>;
   devDependencies?: Record<string, string>;
+  engines?: Record<string, string>;
+  packageManager?: string;
 };
 const webSource = `${webAdminSource}\n${eventParametersSource}\n${eventParametersFormSource}`;
 const dependencyNames = (raw: string) => {
@@ -35,6 +42,46 @@ const dependencyNames = (raw: string) => {
 };
 
 describe("V1 maintainability and portability boundaries", () => {
+  it("pins the supported TypeScript 7 and npm 12 toolchain", () => {
+    const rootManifest = JSON.parse(rootManifestRaw) as Manifest;
+    const webManifest = JSON.parse(webManifestRaw) as Manifest;
+    const workerManifest = JSON.parse(workerManifestRaw) as Manifest;
+
+    expect(rootManifest.engines).toEqual({
+      node: "^22.22.2 || ^24.15.0 || >=26.0.0",
+      npm: ">=12.0.2 <13",
+    });
+    expect(rootManifest.packageManager).toBe("npm@12.0.2");
+    expect(rootManifest.devDependencies).toMatchObject({
+      "@biomejs/biome": "^2.5.6",
+      "@cloudflare/vitest-pool-workers": "^0.20.1",
+      "@cloudflare/workers-types": "^5.20260801.1",
+      "@playwright/test": "^1.62.1",
+      jsdom: "^30.0.1",
+      typescript: "7.0.2",
+      wrangler: "^4.118.0",
+    });
+    expect(webManifest.dependencies).toMatchObject({ "lucide-react": "^1.28.0" });
+    expect(webManifest.devDependencies).toMatchObject({
+      "@types/react": "19.2.18",
+      "@types/react-dom": "19.2.4",
+      "@vitejs/plugin-react": "^6.0.5",
+      vite: "^8.2.0",
+    });
+    expect(workerManifest.dependencies).toMatchObject({ hono: "^4.12.34" });
+    expect(rootManifest.allowScripts).toEqual({
+      "esbuild@0.28.1": true,
+      "workerd@1.20260730.1": true,
+    });
+    expect(nodeVersion.trim()).toBe("22.22.2");
+    expect(ciWorkflow).toContain("node-version: 22.22.2");
+    expect(ciWorkflow).toContain("npm install --global npm@12.0.2");
+    for (const workflow of [deployCloudflareWorkflow, cloudflarePerformanceWorkflow]) {
+      expect(workflow).toContain("node-version: 24.18.0");
+      expect(workflow).toContain("npm install --global npm@12.0.2");
+    }
+  });
+
   it("uses a deliberately small allowlist of common open-source runtime and build dependencies", () => {
     const allowed = new Set([
       "@cloudflare/workers-types",

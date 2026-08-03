@@ -15,7 +15,7 @@ ALLOWED_PRIORITIES = {"MUSS", "SOLL", "KANN"}
 ALLOWED_STAGES = {"V1", "V2", "V3", "V4"}
 ALLOWED_STATUSES = {"geplant", "in Arbeit", "umgesetzt", "abgenommen", "entfällt"}
 BACKLOG_PATTERN = re.compile(r"^BP-(?:0[1-9]|1[0-2])$")
-EXPECTED_CURRENT_REQUIREMENTS = 340
+EXPECTED_CURRENT_REQUIREMENTS = 341
 
 
 def verify_release_version() -> str:

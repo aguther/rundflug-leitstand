@@ -2,7 +2,7 @@
 
 Release `1.12.0` ist die einzige aktuelle Releasefassung. Dieser Katalog enthält den
 vollständigen 207er Basiskatalog, 123 fortgeltende und begrifflich aktualisierte Deltas
-aus 1.5 bis 1.11.0 sowie die 10 Anforderungen dieses Releases (insgesamt 340).
+aus 1.5 bis 1.11.0 sowie die 11 Anforderungen dieses Releases (insgesamt 341).
 Die binären V1.4-Quellen bleiben unveränderte Referenz; gültige ADRs konkretisieren den
 Katalog. Historische Releasekopien und Freigabeprotokolle sind keine Spezifikation.
 
@@ -22,6 +22,7 @@ Die kanonischen Rollen- und Ansichtsbegriffe sind **Kasse**, **Flight Line**,
 | V1120-SEC-010 | Exportsicherheit | Analyseexporte verwenden ausschließlich das Datenschutzprofil SUPPORT_SAFE und explizite typisierte Allowlist-Projektionen; insbesondere öffentliche Ticket- oder Gruppencodes und deren Hashes, Sitzungs- und Gerätecredentials, Administrator-PINs, Push-Ziele und Browser-Schlüssel, Konto-IDs, Einzelgewichte, freie Texte sowie rohe Ereignis-Payloads sind ausgeschlossen oder werden ausschließlich als sichere Vorhandenseinsmetadaten dargestellt. | MUSS | planned |
 | V1120-OPS-010 | Archivbetrieb und Aufbewahrung | Tagesanalysepakete werden ohne öffentliche URL in der vorhandenen EU-R2-Bindung unter einem getrennten Präfix gespeichert, besitzen eine von Backups unabhängige konfigurierte Aufbewahrung von 14 bis 365 Tagen und werden bei Ablauf, manueller Löschung, Veranstaltungslöschung und Werksreset konsistent behandelt; Produktion erfordert einen ausdrücklich freigegebenen Aufbewahrungswert. | MUSS | planned |
 | V1120-PER-010 | Analyseperformance | Planungserfassung und Archivierung bleiben im V1-Mengengerüst begrenzt: Die hybride Planungserfassung verursacht im 12-Stunden-/300-Umlauf-Fall höchstens 50 MB zusätzliche D1-Daten einschließlich Indizes sowie im p95 höchstens 50 ms und 10 Prozent zusätzliche CPU je Forecast-Lauf. Tagesarchive werden nach erfolgreichem Worker- und Abhängigkeitsspike seitenweise und streamingfähig ohne Ganzarchivpufferung erzeugt; die operative Schließung wartet nicht auf R2. | MUSS | planned |
+| V1120-DEP-010 | Abhängigkeiten und Toolchain | Der historische TypeScript-6.0.3-Pin aus V1100-DEP-010 wird für Release 1.12.0 ausdrücklich durch TypeScript 7.0.2 ersetzt. Direkte Abhängigkeiten werden kontrolliert auf aktuelle stabile Versionen aktualisiert; die Entwicklungsumgebung verwendet npm 12.0.2 und eine von jsdom 30 unterstützte Node.js-Version. Vollständiger und auf Produktionsabhängigkeiten begrenzter npm-Audit bleiben ohne bekannte Befunde. | MUSS | implemented |
 | V1120-QA-010 | Qualitätssicherung Analyse | Strict-Contract-, Domain-, Worker-/D1-, R2-, Replay-, Sicherheits-, Performance- und Browsertests decken Diagnose-Momentaufnahme und Tagesanalysepaket einschließlich Rollen, Event-Version, Idempotenz, Concurrency, Audittrennung, Datenschutz, Integrität, Light/Dark, Desktop/Tablet und stabile Layoutzustände ab; der vollständige Nachweis bleibt Bestandteil von npm run check. | MUSS | planned |
 
 ## Fortgeltende, in 1.12.0 konsolidierte Deltas

@@ -17,7 +17,7 @@ Laufzeitmetadaten und die aktuelle Requirements-/Traceability-Fassung.
 
 ## Zielarchitektur
 
-- React 19 + TypeScript + Vite als PWA-Frontend
+- React 19 + TypeScript 7 + Vite als PWA-Frontend
 - Cloudflare Worker als API und Auslieferung der statischen Assets
 - D1 als relationale Source of Truth
 - ein SQLite-basiertes Durable Object je Veranstaltung als serieller Kommando-Koordinator und
@@ -35,8 +35,8 @@ Der erledigte und noch verbleibende Konsolidierungsbedarf steht in
 
 ## Voraussetzungen
 
-- Node.js 22.12 oder neuer
-- npm 10 oder neuer
+- Node.js 22.22.2, 24.15.0 oder neuer innerhalb einer unterstützten geraden Hauptversion
+- npm 12.0.2 oder neuer innerhalb der Hauptversion 12
 - Python 3 für die Validierung des Anforderungskatalogs
 - für Cloudflare-Deployments ein Cloudflare-Konto und `wrangler login`
 

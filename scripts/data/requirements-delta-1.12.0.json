@@ -112,6 +112,18 @@
     },
     {
       "source": "1.12.0",
+      "id": "V1120-DEP-010",
+      "section": "Abhängigkeiten und Toolchain",
+      "requirement": "Der historische TypeScript-6.0.3-Pin aus V1100-DEP-010 wird für Release 1.12.0 ausdrücklich durch TypeScript 7.0.2 ersetzt. Direkte Abhängigkeiten werden kontrolliert auf aktuelle stabile Versionen aktualisiert; die Entwicklungsumgebung verwendet npm 12.0.2 und eine von jsdom 30 unterstützte Node.js-Version. Vollständiger und auf Produktionsabhängigkeiten begrenzter npm-Audit bleiben ohne bekannte Befunde.",
+      "priority": "MUSS",
+      "stage": "V1",
+      "status": "implemented",
+      "module": "package.json package-lock.json .github/workflows apps/worker/src/worker-configuration.d.ts",
+      "tests": "Toolchain-Regressionsprüfung, npm audit, npm audit --omit=dev, npm run typecheck, npm run test:worker-runtime und npm run check",
+      "traceStatus": "umgesetzt"
+    },
+    {
+      "source": "1.12.0",
       "id": "V1120-QA-010",
       "section": "Qualitätssicherung Analyse",
       "requirement": "Strict-Contract-, Domain-, Worker-/D1-, R2-, Replay-, Sicherheits-, Performance- und Browsertests decken Diagnose-Momentaufnahme und Tagesanalysepaket einschließlich Rollen, Event-Version, Idempotenz, Concurrency, Audittrennung, Datenschutz, Integrität, Light/Dark, Desktop/Tablet und stabile Layoutzustände ab; der vollständige Nachweis bleibt Bestandteil von npm run check.",

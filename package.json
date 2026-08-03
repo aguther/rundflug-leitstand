@@ -5,7 +5,8 @@
   "description": "Cloudflare-native start repository for the Rundflug-Leitstand.",
   "type": "module",
   "engines": {
-    "node": ">=22.12"
+    "node": "^22.22.2 || ^24.15.0 || >=26.0.0",
+    "npm": ">=12.0.2 <13"
   },
   "workspaces": [
     "apps/*",
@@ -81,20 +82,24 @@
     "clean": "node -e \"const fs=require('node:fs'); for (const p of ['apps/web/dist','apps/worker/dist']) fs.rmSync(p,{recursive:true,force:true})\""
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.5",
-    "@cloudflare/vitest-pool-workers": "^0.18.8",
-    "@cloudflare/workers-types": "^5.20260726.1",
-    "@playwright/test": "^1.62.0",
+    "@biomejs/biome": "^2.5.6",
+    "@cloudflare/vitest-pool-workers": "^0.20.1",
+    "@cloudflare/workers-types": "^5.20260801.1",
+    "@playwright/test": "^1.62.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
     "concurrently": "^10.0.4",
-    "jsdom": "^29.1.1",
-    "typescript": "6.0.3",
+    "jsdom": "^30.0.1",
+    "typescript": "7.0.2",
     "vitest": "4.1.10",
-    "wrangler": "^4.114.0"
+    "wrangler": "^4.118.0"
   },
   "overrides": {
     "shell-quote": "1.10.0"
   },
-  "packageManager": "npm@10.9.2"
+  "packageManager": "npm@12.0.2",
+  "allowScripts": {
+    "esbuild@0.28.1": true,
+    "workerd@1.20260730.1": true
+  }
 }

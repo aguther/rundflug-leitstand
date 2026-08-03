@@ -2373,6 +2373,13 @@ requirements:
     priority: MUSS
     stage: V1
     status: planned
+  - id: V1120-DEP-010
+    source: "1.12.0"
+    section: "Abhängigkeiten und Toolchain"
+    requirement: "Der historische TypeScript-6.0.3-Pin aus V1100-DEP-010 wird für Release 1.12.0 ausdrücklich durch TypeScript 7.0.2 ersetzt. Direkte Abhängigkeiten werden kontrolliert auf aktuelle stabile Versionen aktualisiert; die Entwicklungsumgebung verwendet npm 12.0.2 und eine von jsdom 30 unterstützte Node.js-Version. Vollständiger und auf Produktionsabhängigkeiten begrenzter npm-Audit bleiben ohne bekannte Befunde."
+    priority: MUSS
+    stage: V1
+    status: implemented
   - id: V1120-QA-010
     source: "1.12.0"
     section: "Qualitätssicherung Analyse"

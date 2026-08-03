@@ -485,7 +485,7 @@ def render_markdown(requirements: list[dict[str, object]]) -> str:
         "",
         f"Release `{VERSION}` ist die einzige aktuelle Releasefassung. Dieser Katalog enthält den",
         "vollständigen 207er Basiskatalog, 123 fortgeltende und begrifflich aktualisierte Deltas",
-        "aus 1.5 bis 1.11.0 sowie die 10 Anforderungen dieses Releases (insgesamt 340).",
+        "aus 1.5 bis 1.11.0 sowie die 11 Anforderungen dieses Releases (insgesamt 341).",
         "Die binären V1.4-Quellen bleiben unveränderte Referenz; gültige ADRs konkretisieren den",
         "Katalog. Historische Releasekopien und Freigabeprotokolle sind keine Spezifikation.",
         "",
@@ -647,7 +647,10 @@ def main() -> None:
     if mismatches:
         names = ", ".join(str(path.relative_to(ROOT)) for path in mismatches)
         raise SystemExit(f"Aktuelle Requirements sind nicht generiert: {names}")
-    print(f"OK: 340 aktuelle Anforderungen und Traceability-Einträge für Release {VERSION}")
+    print(
+        f"OK: {len(current_requirements())} aktuelle Anforderungen und "
+        f"Traceability-Einträge für Release {VERSION}"
+    )
 
 
 if __name__ == "__main__":
