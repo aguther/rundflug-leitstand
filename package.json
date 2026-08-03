@@ -91,7 +91,7 @@
     "jsdom": "^29.1.1",
     "typescript": "6.0.3",
     "vitest": "4.1.10",
-    "wrangler": "^4.114.0"
+    "wrangler": "^4.116.0"
   },
   "overrides": {
     "shell-quote": "1.10.0"
