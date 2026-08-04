@@ -576,13 +576,16 @@ export async function completePlanningCapture(
   capture: PreparedPlanningCapture,
 ): Promise<void> {
   const captureDurationMs = Math.max(0, performance.now() - capture.startedAtMs);
-  await env.DB.prepare(
+  const completed = await env.DB.prepare(
     `UPDATE planning_runs
         SET status = 'SUCCEEDED', capture_duration_ms = ?1
       WHERE id = ?2 AND status = 'CAPTURING'`,
   )
     .bind(captureDurationMs, capture.runId)
     .run();
+  if ((completed.meta.changes ?? 0) !== 1) {
+    throw new Error("PLANNING_CAPTURE_COMPLETION_FAILED");
+  }
 }
 
 export async function failPlanningCapture(

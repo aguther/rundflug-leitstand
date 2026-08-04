@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  type ApiCommandError,
+  ApiCommandError,
+  analysisSnapshotRequiresRefresh,
   assertOperationalConnection,
   controlApiPath,
+  downloadAnalysisSnapshot,
   factoryReset,
   getHealth,
   getOperationBoard,
@@ -92,6 +94,84 @@ describe("content-blocker-neutral operational routing", () => {
 });
 
 describe("session-only browser transport", () => {
+  it("V1120-DIA-010 posts an idempotent versioned snapshot request", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          error: {
+            code: "ANALYSIS_SNAPSHOT_STALE_VERSION",
+            message: "Die Betriebsdaten wurden inzwischen aktualisiert.",
+            currentVersion: 39,
+          },
+        }),
+        { status: 412, headers: { "content-type": "application/json" } },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const rejected = downloadAnalysisSnapshot(
+      "synthetic-event",
+      "ignored-device",
+      "ignored-token",
+      38,
+      {
+        capturedAt: "2026-08-04T08:26:24.000Z",
+        route: "/admin",
+        selectedAircraftId: null,
+        selectedRotationId: null,
+        selectedQueueGroupIds: [],
+        assignmentDialogOpen: false,
+        visibleRecommendation: null,
+        connectionState: "CONNECTED",
+        viewport: { width: 1280, height: 800, devicePixelRatio: 1 },
+        displayMode: "BROWSER",
+        browserFamily: "EDGE",
+        browserMajorVersion: 140,
+        recentUiEvents: [],
+      },
+    );
+
+    await expect(rejected).rejects.toMatchObject({
+      name: "ApiCommandError",
+      code: "ANALYSIS_SNAPSHOT_STALE_VERSION",
+      status: 412,
+      currentVersion: 39,
+    } satisfies Partial<ApiCommandError>);
+    const [path, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(path).toBe("/api/control/synthetic-event/analysis/snapshot.json");
+    expect(init).toMatchObject({
+      method: "POST",
+      cache: "no-store",
+      headers: { "content-type": "application/json" },
+    });
+    expect(JSON.parse(String(init.body))).toEqual({
+      requestId: expect.stringMatching(/^[0-9a-f-]{36}$/),
+      expectedEventVersion: 38,
+    });
+  });
+
+  it("V1120-QA-010 requires refresh only for structured snapshot version errors", () => {
+    expect(
+      analysisSnapshotRequiresRefresh(
+        new ApiCommandError("opaque", "ANALYSIS_SNAPSHOT_STALE_VERSION", 412, 39),
+      ),
+    ).toBe(true);
+    expect(
+      analysisSnapshotRequiresRefresh(
+        new ApiCommandError("opaque", "ANALYSIS_SNAPSHOT_CHANGED", 409, 39),
+      ),
+    ).toBe(true);
+    expect(
+      analysisSnapshotRequiresRefresh(
+        new ApiCommandError(
+          "Version appears only in prose",
+          "ANALYSIS_SNAPSHOT_CAPTURE_FAILED",
+          500,
+        ),
+      ),
+    ).toBe(false);
+  });
+
   it("does not send the browser's legacy device ID or token with a production command", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ error: { message: "synthetic rejection" } }), {

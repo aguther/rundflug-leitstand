@@ -32,7 +32,7 @@ import {
   Users,
 } from "lucide-react";
 import { useMemo, useState } from "react";
-import { downloadAnalysisSnapshot } from "./api";
+import { analysisSnapshotRequiresRefresh, downloadAnalysisSnapshot } from "./api";
 import {
   Button,
   IconButton,
@@ -419,12 +419,16 @@ export function FlightLineSupervisorConsole({
         occurredAt: new Date().toISOString(),
       });
       setAnalysisStatus("Diagnose-Momentaufnahme wurde heruntergeladen.");
-    } catch {
+    } catch (error) {
       recordAnalysisUiEvent({
         type: "ANALYSIS_EXPORT_FAILED",
         occurredAt: new Date().toISOString(),
       });
-      setAnalysisStatus("Diagnose-Momentaufnahme konnte nicht erstellt werden.");
+      setAnalysisStatus(
+        analysisSnapshotRequiresRefresh(error)
+          ? "Der Betriebsstand hat sich geändert. Ansicht aktualisieren und Export erneut starten."
+          : "Diagnose-Momentaufnahme konnte nicht erstellt werden. Bitte erneut versuchen.",
+      );
     } finally {
       setAnalysisBusy(false);
     }

@@ -3132,6 +3132,24 @@ export const analysisSnapshotSchema = z
   .strict();
 export type AnalysisSnapshot = z.infer<typeof analysisSnapshotSchema>;
 
+export const analysisSnapshotRequestSchema = z
+  .object({
+    requestId: z.uuid(),
+    expectedEventVersion: z.number().int().nonnegative(),
+  })
+  .strict();
+export type AnalysisSnapshotRequest = z.infer<typeof analysisSnapshotRequestSchema>;
+
+export const analysisSnapshotCaptureReceiptSchema = z
+  .object({
+    expectedEventVersion: z.number().int().nonnegative(),
+    planningRunId: z.uuid(),
+    eventVersion: z.number().int().nonnegative(),
+    dispatchPlanRevision: z.string().min(1),
+  })
+  .strict();
+export type AnalysisSnapshotCaptureReceipt = z.infer<typeof analysisSnapshotCaptureReceiptSchema>;
+
 export const analysisArchiveStatusSchema = z.enum([
   "PENDING",
   "BUILDING",

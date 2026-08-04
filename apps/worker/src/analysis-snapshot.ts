@@ -176,6 +176,7 @@ export async function buildAnalysisSnapshot(input: {
   env: Env;
   eventId: string;
   expectedEventVersion: number;
+  planningRunId: string;
   operationBoard: OperationBoard;
   capturedAt?: string;
 }): Promise<AnalysisSnapshot> {
@@ -202,14 +203,15 @@ export async function buildAnalysisSnapshot(input: {
             anchor.precall_result_chunk_id AS anchor_precall_result_chunk_id
        FROM planning_runs run
        JOIN planning_runs anchor ON anchor.id = run.anchor_run_id
-      WHERE run.operation_day_id = ?1 AND run.operation_day_version = ?2
-        AND run.status = 'SUCCEEDED'
-        AND (?3 IS NULL OR run.dispatch_plan_revision = ?3)
-      ORDER BY run.calculation_now DESC, run.captured_at DESC LIMIT 1`,
+      WHERE run.id = ?1 AND run.operation_day_id = ?2 AND run.operation_day_version = ?3
+        AND run.status = 'SUCCEEDED'`,
   )
-    .bind(input.eventId, input.expectedEventVersion, dispatchRevision)
+    .bind(input.planningRunId, input.eventId, input.expectedEventVersion)
     .first<PlanningRunExportRow>();
   if (!run) throw new Error("ANALYSIS_SNAPSHOT_NOT_READY");
+  if (dispatchRevision !== null && run.dispatch_plan_revision !== dispatchRevision) {
+    throw new Error("ANALYSIS_SNAPSHOT_CHANGED");
+  }
   const replayChain: PlanningRunLineageRow[] = [];
   let lineageRunId: string | null = run.id;
   for (let distance = 0; lineageRunId && distance <= 10; distance += 1) {
@@ -224,7 +226,13 @@ export async function buildAnalysisSnapshot(input: {
     )
       .bind(lineageRunId, input.eventId)
       .first<PlanningRunLineageRow>();
-    if (!lineageRow) throw new Error("ANALYSIS_SNAPSHOT_DATA_INCOMPLETE");
+    if (
+      !lineageRow ||
+      lineageRow.operation_day_version !== input.expectedEventVersion ||
+      lineageRow.anchor_run_id !== run.anchor_run_id
+    ) {
+      throw new Error("ANALYSIS_SNAPSHOT_DATA_INCOMPLETE");
+    }
     replayChain.unshift(lineageRow);
     if (lineageRow.id === run.anchor_run_id) break;
     lineageRunId = lineageRow.previous_run_id;
@@ -287,6 +295,17 @@ export async function buildAnalysisSnapshot(input: {
   )
     .bind(...replayRunIds)
     .all<ForecastSnapshotExportRow>();
+  const dispatchRevisionByRunId = new Map(
+    replayChain.map((lineageRun) => [lineageRun.id, lineageRun.dispatch_plan_revision]),
+  );
+  if (
+    forecastSnapshots.results.some(
+      (snapshot) =>
+        snapshot.dispatch_plan_revision !== dispatchRevisionByRunId.get(snapshot.planning_run_id),
+    )
+  ) {
+    throw new Error("ANALYSIS_SNAPSHOT_DATA_INCOMPLETE");
+  }
 
   const snapshot: AnalysisSnapshot = {
     format: "rundflug-analysis-snapshot",

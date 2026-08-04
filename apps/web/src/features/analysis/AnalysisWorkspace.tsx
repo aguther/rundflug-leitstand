@@ -2,6 +2,7 @@ import type { AnalysisArchive, OperationBoard } from "@rundflug/contracts";
 import { Archive, Download, RefreshCw, ShieldCheck, Trash2 } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 import {
+  analysisSnapshotRequiresRefresh,
   createAnalysisArchive,
   deleteAnalysisArchive,
   downloadAnalysisArchive,
@@ -208,8 +209,7 @@ export function AnalysisWorkspace({
         type: "ANALYSIS_EXPORT_FAILED",
         occurredAt: new Date().toISOString(),
       });
-      const message = error instanceof Error ? error.message : "Diagnoseexport fehlgeschlagen.";
-      const stale = /geändert|Version|aktualisiert/i.test(message);
+      const stale = analysisSnapshotRequiresRefresh(error);
       setStatus({
         tone: "error",
         text: stale

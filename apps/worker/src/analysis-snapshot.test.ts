@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { supportSafeOperationBoard } from "./analysis-snapshot";
+import snapshotSource from "./analysis-snapshot.ts?raw";
+import coordinatorSource from "./event-coordinator.ts?raw";
 import workerSource from "./index.ts?raw";
 
 describe("support-safe analysis snapshot", () => {
-  it("removes free text and credential canaries recursively", () => {
+  it("V1120-SEC-010 removes free text and credential canaries recursively", () => {
     const safe = supportSafeOperationBoard({
       event: {
         id: "event-synthetic",
@@ -29,16 +31,31 @@ describe("support-safe analysis snapshot", () => {
     expect(serialized).not.toContain("pushEndpoint");
   });
 
-  it("guards the download by role, version and no-store headers", () => {
+  it("V1120-DIA-010 guards the idempotent download by role, version and no-store headers", () => {
     const route = workerSource.slice(
       workerSource.indexOf('eventRoutes("/analysis/snapshot.json")'),
       workerSource.indexOf('eventRoutes("/tickets/search")'),
     );
+    expect(route).toContain('app.on("POST"');
     expect(route).toContain('"ADMIN", "FLIGHT_DIRECTOR"');
+    expect(route).toContain("analysisSnapshotRequestSchema.safeParse");
     expect(route).toContain("expectedEventVersion");
     expect(route).toContain("ANALYSIS_SNAPSHOT_STALE_VERSION");
-    expect(route).toContain("ANALYSIS_SNAPSHOT_NOT_READY");
+    expect(route).toContain("ANALYSIS_SNAPSHOT_IDEMPOTENCY_CONFLICT");
+    expect(route).toContain("captureAnalysisSnapshot");
+    expect(route).not.toContain("analysis-capture");
     expect(route).toContain('"cache-control": "no-store"');
     expect(route).toContain('"content-disposition"');
+  });
+
+  it("V1120-DIA-020 binds the export to the exact manual planning run", () => {
+    expect(snapshotSource).toContain("run.id = ?1");
+    expect(snapshotSource).toContain("input.planningRunId");
+    expect(snapshotSource).not.toContain("ORDER BY run.calculation_now DESC");
+    expect(coordinatorSource).toContain("planningRunId: input.requestId");
+    expect(coordinatorSource).toContain("CAPTURE_ANALYSIS_SNAPSHOT");
+    expect(coordinatorSource).toContain("idempotency_receipts");
+    expect(coordinatorSource).toContain("manualForecastQueue.shift()");
+    expect(coordinatorSource).toContain("pendingAutomaticForecast");
   });
 });

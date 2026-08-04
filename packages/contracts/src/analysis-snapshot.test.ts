@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { analysisClientContextSchema, analysisSnapshotSchema } from "./index";
+import {
+  analysisClientContextSchema,
+  analysisSnapshotCaptureReceiptSchema,
+  analysisSnapshotRequestSchema,
+  analysisSnapshotSchema,
+} from "./index";
 
 function validSnapshot(): unknown {
   return {
@@ -95,6 +100,42 @@ function validSnapshot(): unknown {
 }
 
 describe("support-safe analysis contracts", () => {
+  it("V1120-DIA-010 accepts only an idempotent versioned snapshot request", () => {
+    expect(
+      analysisSnapshotRequestSchema.parse({
+        requestId: "f8608ebe-3458-4bc4-a18c-cd9b09dc8fcf",
+        expectedEventVersion: 38,
+      }),
+    ).toEqual({
+      requestId: "f8608ebe-3458-4bc4-a18c-cd9b09dc8fcf",
+      expectedEventVersion: 38,
+    });
+    expect(
+      analysisSnapshotRequestSchema.safeParse({
+        requestId: "not-a-uuid",
+        expectedEventVersion: 38,
+        deviceId: "secret-device-canary",
+      }).success,
+    ).toBe(false);
+    expect(
+      analysisSnapshotCaptureReceiptSchema.safeParse({
+        expectedEventVersion: 38,
+        planningRunId: "f8608ebe-3458-4bc4-a18c-cd9b09dc8fcf",
+        eventVersion: 38,
+        dispatchPlanRevision: "dispatch-synthetic",
+        deviceId: "secret-device-canary",
+      }).success,
+    ).toBe(false);
+    expect(
+      analysisSnapshotCaptureReceiptSchema.parse({
+        expectedEventVersion: 38,
+        planningRunId: "f8608ebe-3458-4bc4-a18c-cd9b09dc8fcf",
+        eventVersion: 38,
+        dispatchPlanRevision: "dispatch-synthetic",
+      }),
+    ).toMatchObject({ planningRunId: "f8608ebe-3458-4bc4-a18c-cd9b09dc8fcf" });
+  });
+
   it("accepts a strict version-one snapshot", () => {
     expect(analysisSnapshotSchema.parse(validSnapshot())).toMatchObject({
       format: "rundflug-analysis-snapshot",
@@ -114,7 +155,7 @@ describe("support-safe analysis contracts", () => {
     ).toBe(false);
   });
 
-  it("does not permit credential or free-form client additions", () => {
+  it("V1120-DIA-030 does not permit credential or free-form client additions", () => {
     const context = {
       capturedAt: "2026-08-02T10:00:00.000Z",
       route: "/flight-director",

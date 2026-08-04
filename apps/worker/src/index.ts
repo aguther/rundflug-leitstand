@@ -7,6 +7,7 @@ import {
   analysisArchiveListSchema,
   analysisArchiveRequestSchema,
   analysisArchiveSchema,
+  analysisSnapshotRequestSchema,
   analysisSnapshotSchema,
   bootstrapRequestSchema,
   cloneEventRequestSchema,
@@ -665,7 +666,7 @@ async function authorizeDevice(
   preauthorizedActor?: SessionActor | null,
 ): Promise<{
   id: string;
-  role: string;
+  role: OperatorRole;
   accountId: string | null;
   loginCode: string | null;
 } | null> {
@@ -689,7 +690,7 @@ async function authorizeDevice(
     "SELECT role, credential_hash FROM paired_devices WHERE id = ?1 AND operation_day_id = ?2 AND active = 1",
   )
     .bind(deviceId, eventId)
-    .first<{ role: string; credential_hash: string | null }>();
+    .first<{ role: OperatorRole; credential_hash: string | null }>();
   if (!device || !(await verifyCredential(token ?? null, device.credential_hash))) return null;
   await env.DB.prepare("UPDATE paired_devices SET last_seen_at = ?1 WHERE id = ?2")
     .bind(new Date().toISOString(), deviceId)
@@ -753,7 +754,7 @@ async function findEventLogoReceipt(env: Env, commandId: string): Promise<EventL
     .first<EventLogoReceipt>();
 }
 
-function eventCoordinatorNamespace(env: Env): DurableObjectNamespace {
+function eventCoordinatorNamespace(env: Env): Env["EVENT_COORDINATOR"] {
   // workerd/miniflare does not implement jurisdiction restrictions locally.
   // Acceptance and production always request the EU jurisdiction explicitly.
   return env.APP_ENV === "development"
@@ -5720,7 +5721,7 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
   return response;
 });
 
-app.on("GET", eventRoutes("/analysis/snapshot.json"), async (context) => {
+app.on("POST", eventRoutes("/analysis/snapshot.json"), async (context) => {
   const eventId = context.req.param("eventId");
   const actor = context.get("sessionActor");
   const device = await authorizeDevice(context.env, eventId, context.req.raw, actor);
@@ -5740,19 +5741,21 @@ app.on("GET", eventRoutes("/analysis/snapshot.json"), async (context) => {
       403,
     );
   }
-  const rawExpectedVersion = context.req.query("expectedEventVersion") ?? "";
-  if (!/^\d+$/.test(rawExpectedVersion)) {
+  const request = analysisSnapshotRequestSchema.safeParse(
+    await context.req.json().catch(() => null),
+  );
+  if (!request.success) {
     return context.json(
       {
         error: {
-          code: "ANALYSIS_SNAPSHOT_STALE_VERSION",
-          message: "Die erwartete Veranstaltungsversion fehlt.",
+          code: "ANALYSIS_SNAPSHOT_INVALID_REQUEST",
+          message: "Die Diagnoseanforderung ist ungültig.",
         },
       },
-      412,
+      400,
     );
   }
-  const expectedEventVersion = Number.parseInt(rawExpectedVersion, 10);
+  const { requestId, expectedEventVersion } = request.data;
   const readVersion = async (): Promise<number | null> => {
     const row = await context.env.DB.prepare("SELECT version FROM operation_days WHERE id = ?1")
       .bind(eventId)
@@ -5779,25 +5782,45 @@ app.on("GET", eventRoutes("/analysis/snapshot.json"), async (context) => {
     );
   }
 
-  const coordinator = eventCoordinatorNamespace(context.env);
-  const captureResponse = await coordinator
-    .get(coordinator.idFromName(eventId))
-    .fetch(`https://internal/events/${encodeURIComponent(eventId)}/analysis-capture`, {
-      method: "POST",
+  const capture = await eventCoordinatorNamespace(context.env)
+    .getByName(eventId)
+    .captureAnalysisSnapshot({
+      eventId,
+      requestId,
+      expectedEventVersion,
+      deviceId: device.id,
+      actorRole: actor.role,
+      deviceRole: device.role,
     });
-  if (!captureResponse.ok) {
+  if (!capture.ok) {
+    const status =
+      capture.code === "SESSION_NOT_AUTHORIZED"
+        ? 403
+        : capture.code === "ANALYSIS_SNAPSHOT_STALE_VERSION"
+          ? 412
+          : capture.code === "ANALYSIS_SNAPSHOT_CAPTURE_FAILED"
+            ? 500
+            : 409;
     return context.json(
       {
         error: {
-          code: "ANALYSIS_SNAPSHOT_NOT_READY",
-          message: "Der aktuelle Planungslauf ist noch nicht verfügbar.",
+          code: capture.code,
+          message:
+            capture.code === "SESSION_NOT_AUTHORIZED"
+              ? "Für die Diagnose ist eine berechtigte Sitzung erforderlich."
+              : capture.code === "ANALYSIS_SNAPSHOT_STALE_VERSION"
+                ? "Die Betriebsdaten wurden inzwischen aktualisiert."
+                : capture.code === "ANALYSIS_SNAPSHOT_IDEMPOTENCY_CONFLICT"
+                  ? "Die Diagnoseanforderung wurde bereits mit anderen Daten verwendet."
+                  : "Der aktuelle Planungslauf konnte nicht erstellt werden.",
+          currentVersion: capture.currentVersion,
         },
       },
-      409,
+      status,
     );
   }
 
-  for (let attempt = 0; attempt < 3; attempt += 1) {
+  {
     const beforeVersion = await readVersion();
     if (beforeVersion !== expectedEventVersion) {
       return context.json(
@@ -5833,7 +5856,6 @@ app.on("GET", eventRoutes("/analysis/snapshot.json"), async (context) => {
     }
     const operationBoard = operationBoardSchema.safeParse(await operationsResponse.json());
     if (!operationBoard.success || operationBoard.data.event.version !== expectedEventVersion) {
-      if (attempt < 2) continue;
       return context.json(
         {
           error: {
@@ -5853,11 +5875,11 @@ app.on("GET", eventRoutes("/analysis/snapshot.json"), async (context) => {
         env: context.env,
         eventId,
         expectedEventVersion,
+        planningRunId: capture.planningRunId,
         operationBoard: operationBoard.data as OperationBoard,
       });
     } catch (error) {
       const code = error instanceof Error ? error.message : "ANALYSIS_SNAPSHOT_DATA_INCOMPLETE";
-      if (code === "ANALYSIS_SNAPSHOT_CHANGED" && attempt < 2) continue;
       const safeCode = [
         "ANALYSIS_SNAPSHOT_NOT_READY",
         "ANALYSIS_SNAPSHOT_CHANGED",
@@ -5881,7 +5903,6 @@ app.on("GET", eventRoutes("/analysis/snapshot.json"), async (context) => {
     }
     const afterVersion = await readVersion();
     if (afterVersion !== expectedEventVersion) {
-      if (attempt < 2) continue;
       return context.json(
         {
           error: {
@@ -5903,15 +5924,6 @@ app.on("GET", eventRoutes("/analysis/snapshot.json"), async (context) => {
       "x-content-type-options": "nosniff",
     });
   }
-  return context.json(
-    {
-      error: {
-        code: "ANALYSIS_SNAPSHOT_CHANGED",
-        message: "Die Betriebsdaten haben sich während des Exports geändert.",
-      },
-    },
-    409,
-  );
 });
 
 app.on("GET", eventRoutes("/analysis/day-archives"), async (context) => {

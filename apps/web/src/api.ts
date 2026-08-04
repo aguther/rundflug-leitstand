@@ -92,6 +92,13 @@ export class ApiCommandError extends Error {
   }
 }
 
+export function analysisSnapshotRequiresRefresh(error: unknown): boolean {
+  return (
+    error instanceof ApiCommandError &&
+    ["ANALYSIS_SNAPSHOT_STALE_VERSION", "ANALYSIS_SNAPSHOT_CHANGED"].includes(error.code)
+  );
+}
+
 export function controlApiPath(eventId: string, suffix: `/${string}`): string {
   return `/api/control/${encodeURIComponent(eventId)}${suffix}`;
 }
@@ -912,21 +919,26 @@ export async function downloadAnalysisSnapshot(
   expectedEventVersion: number,
   clientContext: AnalysisClientContext,
 ): Promise<string> {
-  const query = new URLSearchParams({ expectedEventVersion: String(expectedEventVersion) });
-  const response = await apiFetch(
-    `${controlApiPath(eventId, "/analysis/snapshot.json")}?${query.toString()}`,
-    {
-      cache: "no-store",
-      ...(LEGACY_DEVELOPMENT_DEVICE_AUTH && deviceToken
-        ? { headers: deviceHeaders(deviceId, deviceToken) }
-        : {}),
-    },
-  );
+  const response = await apiFetch(controlApiPath(eventId, "/analysis/snapshot.json"), {
+    method: "POST",
+    cache: "no-store",
+    headers:
+      LEGACY_DEVELOPMENT_DEVICE_AUTH && deviceToken
+        ? deviceHeaders(deviceId, deviceToken, { "content-type": "application/json" })
+        : { "content-type": "application/json" },
+    body: JSON.stringify({ requestId: crypto.randomUUID(), expectedEventVersion }),
+  });
   if (!response.ok) {
-    const body = (await response.json().catch(() => null)) as {
-      error?: { message?: string };
-    } | null;
-    throw new Error(body?.error?.message ?? `Diagnoseexport nicht verfügbar (${response.status})`);
+    const body: unknown = await response.json().catch(() => null);
+    const parsed = apiErrorSchema.safeParse(body);
+    throw new ApiCommandError(
+      parsed.success
+        ? parsed.data.error.message
+        : `Diagnoseexport nicht verfügbar (${response.status})`,
+      parsed.success ? parsed.data.error.code : "ANALYSIS_SNAPSHOT_REQUEST_FAILED",
+      response.status,
+      parsed.success ? parsed.data.error.currentVersion : undefined,
+    );
   }
   const serverSnapshot = analysisSnapshotSchema.parse(await response.json());
   const snapshot = analysisSnapshotSchema.parse({ ...serverSnapshot, client: clientContext });

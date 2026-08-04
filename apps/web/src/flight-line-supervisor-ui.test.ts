@@ -198,6 +198,16 @@ describe("Flight Director", () => {
     );
   });
 
+  it("V1120-QA-010 classifies diagnosis failures by the structured API error code", () => {
+    expect(supervisorSource).toContain("analysisSnapshotRequiresRefresh(error)");
+    expect(supervisorSource).toContain(
+      "Der Betriebsstand hat sich geändert. Ansicht aktualisieren und Export erneut starten.",
+    );
+    expect(supervisorSource).toContain(
+      "Diagnose-Momentaufnahme konnte nicht erstellt werden. Bitte erneut versuchen.",
+    );
+  });
+
   it("draws timeline connectors only in the gaps between the three center icons", () => {
     expect(flightLineStyles).toContain("--progress-node-size: 26px");
     expect(flightLineStyles).toContain("--progress-line-offset: 15px");

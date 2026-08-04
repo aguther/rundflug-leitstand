@@ -11,6 +11,7 @@ import {
   PLANNING_CHUNK_ENTITY_LIMIT,
   planningContextChunkValues,
 } from "./planning-capture";
+import planningCaptureSource from "./planning-capture.ts?raw";
 
 function forecastInput(rotationCount = 1): ForecastTimelinesInput {
   return {
@@ -114,6 +115,7 @@ describe("hybrid planning capture", () => {
     );
     expect(coordinatorSource).toContain("preparePlanningCapture");
     expect(coordinatorSource).toContain("planningRunId");
+    expect(planningCaptureSource).toContain("PLANNING_CAPTURE_COMPLETION_FAILED");
     expect(coordinatorSource).toContain("? Number.MAX_SAFE_INTEGER");
     expect(coordinatorSource).not.toContain("? Number.POSITIVE_INFINITY");
     expect(coordinatorSource).not.toContain(
