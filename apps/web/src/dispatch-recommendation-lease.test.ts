@@ -38,7 +38,11 @@ describe("dispatch recommendation lease UI", () => {
   it("keeps the assignment dialog geometry and scroll ownership stable", () => {
     expect(dialogSource).toContain('className="flight-director-assignment-modal"');
     expect(dialogSource).toContain('className="flight-director-dispatch-slot"');
+    expect(dialogSource).toContain('className="flight-director-queue-head"');
     expect(dialogSource).toContain('className="flight-director-queue-scroll"');
-    expect(dialogSource).toContain('className="flight-director-selection-status"');
+    expect(dialogSource).toContain('footerClassName="flight-director-assignment-modal-footer"');
+    expect(dialogSource).not.toContain('className="flight-director-selection"');
+    expect(dialogSource).not.toContain("flight-director-attendance-action");
+    expect(dialogSource).not.toContain("flight-director-missing-action");
   });
 });

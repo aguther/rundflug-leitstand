@@ -79,8 +79,14 @@ export function useDispatchRecommendationLease({
   const stateRef = useRef(state);
   const expectedVersionRef = useRef(expectedVersion);
   const onReservedRef = useRef(onReserved);
-  const requestEpochRef = useRef(0);
-  const releaseBarrierRef = useRef<Promise<void>>(Promise.resolve());
+  const transitionGenerationRef = useRef(0);
+  const transitionTailRef = useRef<Promise<void>>(Promise.resolve());
+  const serverLeaseRef = useRef<DispatchRecommendationLease | null>(null);
+  const pendingAcquireRef = useRef<{
+    aircraftId: string;
+    generation: number;
+    promise: Promise<DispatchRecommendationLease | null>;
+  } | null>(null);
 
   useEffect(() => {
     stateRef.current = state;
@@ -92,43 +98,46 @@ export function useDispatchRecommendationLease({
     onReservedRef.current = onReserved;
   }, [onReserved]);
 
-  const queueRelease = useCallback(
-    (lease: DispatchRecommendationLease): Promise<void> => {
-      const releasePromise = releaseBarrierRef.current.then(async () => {
-        try {
-          await releaseDispatchRecommendationLease(eventId, lease.leaseId, deviceId, deviceToken);
-        } catch {
-          // Expiry remains the server-side safety net if an explicit release cannot be delivered.
-        }
-      });
-      releaseBarrierRef.current = releasePromise;
-      return releasePromise;
-    },
-    [deviceId, deviceToken, eventId],
-  );
+  const enqueueTransition = useCallback(<Result>(task: () => Promise<Result>): Promise<Result> => {
+    const result = transitionTailRef.current.then(task, task);
+    transitionTailRef.current = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    return result;
+  }, []);
 
-  const release = useCallback(async () => {
-    requestEpochRef.current += 1;
-    const lease = stateRef.current.lease;
+  const releaseServerLease = useCallback(async () => {
+    const lease = serverLeaseRef.current;
+    if (!lease) return;
+    serverLeaseRef.current = null;
+    try {
+      await releaseDispatchRecommendationLease(eventId, lease.leaseId, deviceId, deviceToken);
+    } catch {
+      // Expiry remains the server-side safety net if an explicit release cannot be delivered.
+    }
+  }, [deviceId, deviceToken, eventId]);
+
+  const release = useCallback(() => {
+    transitionGenerationRef.current += 1;
+    pendingAcquireRef.current = null;
     stateRef.current = idleState;
     setState(idleState);
-    if (lease) await queueRelease(lease);
-    else await releaseBarrierRef.current;
-  }, [queueRelease]);
+    return enqueueTransition(releaseServerLease);
+  }, [enqueueTransition, releaseServerLease]);
 
   const acquire = useCallback(
-    async (
-      aircraftId: string,
-      expectedVersionOverride: number | undefined,
-      forceReload: boolean,
-    ) => {
+    (aircraftId: string, expectedVersionOverride: number | undefined, forceReload: boolean) => {
       const current = stateRef.current;
       const targetEventVersion = expectedVersionOverride ?? expectedVersionRef.current;
       if (!forceReload && current.mode === "RESERVED" && current.lease?.aircraftId === aircraftId) {
-        return current.lease;
+        return Promise.resolve(current.lease);
       }
-      const requestEpoch = requestEpochRef.current + 1;
-      requestEpochRef.current = requestEpoch;
+      if (pendingAcquireRef.current?.aircraftId === aircraftId) {
+        return pendingAcquireRef.current.promise;
+      }
+      const generation = transitionGenerationRef.current + 1;
+      transitionGenerationRef.current = generation;
       const previewLease = current.lease?.aircraftId === aircraftId ? current.lease : null;
       const acquiring: DispatchRecommendationLeaseState = {
         mode: previewLease ? "REFRESHING" : "ACQUIRING",
@@ -139,47 +148,52 @@ export function useDispatchRecommendationLease({
       };
       stateRef.current = acquiring;
       setState(acquiring);
-      try {
-        if (current.lease) await queueRelease(current.lease);
-        else await releaseBarrierRef.current;
-        const lease = await acquireDispatchRecommendationLease(eventId, deviceId, deviceToken, {
-          commandId: crypto.randomUUID(),
-          aircraftId,
-          expectedVersion: targetEventVersion,
-        });
-        if (requestEpochRef.current !== requestEpoch) {
-          void queueRelease(lease);
+      const promise = enqueueTransition(async () => {
+        try {
+          await releaseServerLease();
+          const lease = await acquireDispatchRecommendationLease(eventId, deviceId, deviceToken, {
+            commandId: crypto.randomUUID(),
+            aircraftId,
+            expectedVersion: targetEventVersion,
+          });
+          serverLeaseRef.current = lease;
+          if (transitionGenerationRef.current !== generation) return null;
+          const reserved: DispatchRecommendationLeaseState = {
+            mode: "RESERVED",
+            lease,
+            reservedEventVersion: targetEventVersion,
+            serverClockOffsetMs: Date.parse(lease.serverNow) - Date.now(),
+            error: null,
+          };
+          stateRef.current = reserved;
+          setState(reserved);
+          onReservedRef.current(lease.groupIds);
+          return lease;
+        } catch (reason) {
+          if (transitionGenerationRef.current !== generation) return null;
+          const failed: DispatchRecommendationLeaseState = {
+            mode: "ERROR",
+            lease: null,
+            reservedEventVersion: null,
+            serverClockOffsetMs: 0,
+            error:
+              reason instanceof Error
+                ? reason.message
+                : "Belegungsvorschlag konnte nicht reserviert werden.",
+          };
+          stateRef.current = failed;
+          setState(failed);
           return null;
+        } finally {
+          if (pendingAcquireRef.current?.generation === generation) {
+            pendingAcquireRef.current = null;
+          }
         }
-        const reserved: DispatchRecommendationLeaseState = {
-          mode: "RESERVED",
-          lease,
-          reservedEventVersion: targetEventVersion,
-          serverClockOffsetMs: Date.parse(lease.serverNow) - Date.now(),
-          error: null,
-        };
-        stateRef.current = reserved;
-        setState(reserved);
-        onReservedRef.current(lease.groupIds);
-        return lease;
-      } catch (reason) {
-        if (requestEpochRef.current !== requestEpoch) return null;
-        const failed: DispatchRecommendationLeaseState = {
-          mode: "ERROR",
-          lease: null,
-          reservedEventVersion: null,
-          serverClockOffsetMs: 0,
-          error:
-            reason instanceof Error
-              ? reason.message
-              : "Belegungsvorschlag konnte nicht reserviert werden.",
-        };
-        stateRef.current = failed;
-        setState(failed);
-        return null;
-      }
+      });
+      pendingAcquireRef.current = { aircraftId, generation, promise };
+      return promise;
     },
-    [deviceId, deviceToken, eventId, queueRelease],
+    [deviceId, deviceToken, enqueueTransition, eventId, releaseServerLease],
   );
 
   const reserve = useCallback(
@@ -194,8 +208,9 @@ export function useDispatchRecommendationLease({
     [acquire],
   );
 
-  const switchToManual = useCallback(async () => {
-    await release();
+  const switchToManual = useCallback(() => {
+    transitionGenerationRef.current += 1;
+    pendingAcquireRef.current = null;
     const manual: DispatchRecommendationLeaseState = {
       mode: "MANUAL",
       lease: null,
@@ -205,11 +220,14 @@ export function useDispatchRecommendationLease({
     };
     stateRef.current = manual;
     setState(manual);
-  }, [release]);
+    return enqueueTransition(releaseServerLease);
+  }, [enqueueTransition, releaseServerLease]);
 
   const markExpired = useCallback(() => {
     const lease = stateRef.current.lease;
     if (!lease || stateRef.current.mode !== "RESERVED") return;
+    transitionGenerationRef.current += 1;
+    pendingAcquireRef.current = null;
     const expired: DispatchRecommendationLeaseState = {
       ...stateRef.current,
       mode: "EXPIRED",
@@ -218,8 +236,8 @@ export function useDispatchRecommendationLease({
     };
     stateRef.current = expired;
     setState(expired);
-    void queueRelease(lease);
-  }, [queueRelease]);
+    enqueueTransition(releaseServerLease);
+  }, [enqueueTransition, releaseServerLease]);
 
   const markInvalidated = useCallback((message?: string) => {
     const current = stateRef.current;
@@ -236,9 +254,13 @@ export function useDispatchRecommendationLease({
   }, []);
 
   const consume = useCallback(() => {
+    transitionGenerationRef.current += 1;
+    pendingAcquireRef.current = null;
+    serverLeaseRef.current = null;
     stateRef.current = idleState;
     setState(idleState);
-  }, []);
+    enqueueTransition(releaseServerLease);
+  }, [enqueueTransition, releaseServerLease]);
 
   return {
     ...state,

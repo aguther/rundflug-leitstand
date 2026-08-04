@@ -1284,11 +1284,8 @@ export function FlightLineView() {
             setSelectedId(null);
             setSelectedQueueGroupIds([]);
           }}
-          onGroupAttendance={setGroupAttendance}
-          onGroupMissing={(ticketGroupId) => updateGroupPresence(ticketGroupId, "MISSING")}
           onGroupRecall={startTicketGroupRecall}
           onGroupRecallClear={clearTicketGroupRecall}
-          onGroupRestore={(ticketGroupId) => updateGroupPresence(ticketGroupId, "RESTORE")}
           onGroupDefer={(ticketGroupId) =>
             deferTicketGroup(ticketGroupId, "Gruppe durch Flight Line zurückgestellt")
           }
@@ -1361,11 +1358,8 @@ export function FlightLineView() {
             return advance(rotation, rotationAircraft, nextAircraftState);
           }}
           onPauseAircraft={openAircraftPauseDialog}
-          onGroupAttendance={setGroupAttendance}
-          onGroupMissing={(ticketGroupId) => updateGroupPresence(ticketGroupId, "MISSING")}
           onGroupRecall={startTicketGroupRecall}
           onGroupRecallClear={clearTicketGroupRecall}
-          onGroupRestore={(ticketGroupId) => updateGroupPresence(ticketGroupId, "RESTORE")}
           onGroupDefer={(ticketGroupId) =>
             deferTicketGroup(ticketGroupId, "Gruppe durch Flight Director zurückgestellt")
           }

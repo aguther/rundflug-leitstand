@@ -72,11 +72,8 @@ export function FlightLineAssist({
   onAssignPilot,
   onClaim,
   onClaimUnavailable,
-  onGroupAttendance,
-  onGroupMissing,
   onGroupRecall,
   onGroupRecallClear,
-  onGroupRestore,
   onGroupDefer,
   onPause,
   onRefresh,
@@ -96,11 +93,8 @@ export function FlightLineAssist({
   onAssignPilot: (aircraftId: string, pilotId: string, reassign: boolean) => Promise<void>;
   onClaim: (aircraftId: string, expectedTakeoverRevision?: number) => Promise<void>;
   onClaimUnavailable: () => void;
-  onGroupAttendance: (ticketGroupId: string, checkedIn: boolean) => void | Promise<void>;
-  onGroupMissing: (ticketGroupId: string) => void | Promise<void>;
   onGroupRecall: (ticketGroupId: string) => void | Promise<void>;
   onGroupRecallClear: (ticketGroupId: string, recallId: string) => void | Promise<void>;
-  onGroupRestore: (ticketGroupId: string) => void | Promise<void>;
   onGroupDefer: (ticketGroupId: string) => void | Promise<void>;
   onPause: (aircraftId: string) => void;
   onRefresh: () => Promise<void>;
@@ -621,7 +615,6 @@ export function FlightLineAssist({
         confirmDisabled={!assignmentReady || primaryDisabled}
         dispatchLease={dispatchLease}
         groups={waitingGroups}
-        onAttendance={onGroupAttendance}
         onClose={() => {
           setAssignmentOpen(false);
           void dispatchLease.release();
@@ -635,10 +628,8 @@ export function FlightLineAssist({
           }
         }}
         onDefer={onGroupDefer}
-        onMissing={onGroupMissing}
         onRecall={onGroupRecall}
         onRecallClear={onGroupRecallClear}
-        onRestore={onGroupRestore}
         onReserveRecommendation={async () => {
           if (activeAircraft) await onReserveAssignment(activeAircraft.id);
         }}

@@ -232,11 +232,8 @@ export function FlightLineSupervisorConsole({
   onSelectAircraft,
   onReserveAssignment,
   onToggleGroup,
-  onGroupAttendance,
-  onGroupMissing,
   onGroupRecall,
   onGroupRecallClear,
-  onGroupRestore,
   onGroupDefer,
   loadForecastHistory,
   loadResourceHistory,
@@ -260,11 +257,8 @@ export function FlightLineSupervisorConsole({
   onSelectAircraft: (aircraftId: string) => void;
   onReserveAssignment: (aircraftId: string) => Promise<DispatchRecommendationLease | null>;
   onToggleGroup: (ticketGroupId: string, selected: boolean) => void;
-  onGroupAttendance: (ticketGroupId: string, checkedIn: boolean) => void | Promise<void>;
-  onGroupMissing: (ticketGroupId: string) => void | Promise<void>;
   onGroupRecall: (ticketGroupId: string) => void | Promise<void>;
   onGroupRecallClear: (ticketGroupId: string, recallId: string) => void | Promise<void>;
-  onGroupRestore: (ticketGroupId: string) => void | Promise<void>;
   onGroupDefer: (ticketGroupId: string) => void | Promise<void>;
   loadForecastHistory: (rotationId: string) => Promise<ForecastHistory["entries"]>;
   loadResourceHistory: (
@@ -833,15 +827,12 @@ export function FlightLineSupervisorConsole({
           </IconButton>
         }
         onClose={closeAssignmentDialog}
-        onAttendance={onGroupAttendance}
         onDefer={onGroupDefer}
         onConfirm={async (queueDeviationReason) => {
           if (await onConfirmAssignment(queueDeviationReason)) closeAssignmentDialog();
         }}
-        onMissing={onGroupMissing}
         onRecall={onGroupRecall}
         onRecallClear={onGroupRecallClear}
-        onRestore={onGroupRestore}
         onReserveRecommendation={async () => {
           if (selectedAircraft) await onReserveAssignment(selectedAircraft.id);
         }}

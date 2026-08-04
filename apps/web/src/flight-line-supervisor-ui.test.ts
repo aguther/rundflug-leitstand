@@ -40,7 +40,7 @@ describe("Flight Director", () => {
     expect(supervisorSource).toContain("Alle Ressourcen");
     expect(supervisorSource).toContain("onAssignPilot");
     expect(supervisorSource).not.toContain("PILOT_REASSIGN_CONFIRMATION_REQUIRED");
-    expect(flightLineSource).toContain("Vor Belegung bitte über „Pilot zuweisen“");
+    expect(flightLineSource).toContain("Vor dem Boarding einen Piloten zuweisen.");
     expect(appSource).not.toContain('className="pilot-assignment"');
   });
 
@@ -112,7 +112,7 @@ describe("Flight Director", () => {
     expect(supervisorSource).toContain("await onReserveAssignment(entry.id)");
     expect(supervisorSource).toContain("dispatchLease.release()");
     expect(supervisorSource).not.toMatch(/for \(const .*selectedQueueGroupIds/);
-    expect(sharedSource).toContain("Empfohlene Belegung");
+    expect(sharedSource).toContain("Empfehlung · Umlauf");
     expect(sharedSource).toContain("recommendationMatchesSelection");
   });
 

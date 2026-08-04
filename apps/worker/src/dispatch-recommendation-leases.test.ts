@@ -135,6 +135,7 @@ describe("short-lived dispatch recommendation leases (F-BRD-010, Q-ZUV-020)", ()
     expect(coordinatorSource).toContain(
       'row.precalled_at !== null || row.precall_decision_status === "GO_TO_GATE"',
     );
+    expect(coordinatorSource).not.toContain("row.forecast_assumed_aircraft_id === aircraft.id");
     expect(coordinatorSource).toContain("lease.member_rotation_ids_json");
     expect(coordinatorSource).toContain("rotationId === selectedMemberRotationIds[index]");
     expect(coordinatorSource).toContain("lease.occupied_seats === selectedSeatCount");

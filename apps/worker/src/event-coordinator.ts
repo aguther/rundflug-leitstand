@@ -144,7 +144,6 @@ interface DispatchRecommendationPlanningRow {
   reference_duration_minutes: number;
   precalled_at: string | null;
   precall_decision_status: "WAITING" | "PREPARE" | "GO_TO_GATE" | null;
-  forecast_assumed_aircraft_id: string | null;
   dispatch_projected_overtake_count: number;
   reserved_by_active_lease: number;
 }
@@ -753,14 +752,12 @@ export class EventCoordinator extends DurableObject<Env> {
     const rows = await this.env.DB.prepare(
       `SELECT tg.id AS ticket_group_id, r.id AS rotation_id, p.id AS product_id,
               p.resource_group_id, COALESCE(r.gate_id, p.gate_id) AS gate_id,
-              COUNT(DISTINCT rt.ticket_id) AS ticket_count,
-              fg.precalled_at, fg.precall_decision_status, r.forecast_assumed_aircraft_id
+              COUNT(DISTINCT rt.ticket_id) AS ticket_count
          FROM ticket_groups tg
          JOIN products p ON p.id = tg.product_id
          JOIN tickets t ON t.ticket_group_id = tg.id
          JOIN rotation_tickets rt ON rt.ticket_id = t.id AND rt.released_at IS NULL
          JOIN rotations r ON r.id = rt.rotation_id
-         JOIN flight_groups fg ON fg.id = r.flight_group_id
         WHERE tg.operation_day_id = ?1
           AND tg.id IN (SELECT value FROM json_each(?2))
           AND tg.status IN ('QUEUED', 'PRESENT')
@@ -784,8 +781,7 @@ export class EventCoordinator extends DurableObject<Env> {
                       candidate_group.communication_number, candidate_rotation.id
              LIMIT 1
           )
-        GROUP BY tg.id, r.id, p.id, p.resource_group_id, COALESCE(r.gate_id, p.gate_id),
-                 fg.precalled_at, fg.precall_decision_status, r.forecast_assumed_aircraft_id`,
+        GROUP BY tg.id, r.id, p.id, p.resource_group_id, COALESCE(r.gate_id, p.gate_id)`,
     )
       .bind(lease.operation_day_id, JSON.stringify(leaseGroupIds))
       .all<{
@@ -795,9 +791,6 @@ export class EventCoordinator extends DurableObject<Env> {
         resource_group_id: string;
         gate_id: string;
         ticket_count: number;
-        precalled_at: string | null;
-        precall_decision_status: "WAITING" | "PREPARE" | "GO_TO_GATE" | null;
-        forecast_assumed_aircraft_id: string | null;
       }>();
     const liveGroupIds = rows.results.map((row) => row.ticket_group_id).sort();
     const liveMemberRotationIds = [...new Set(rows.results.map((row) => row.rotation_id))].sort();
@@ -813,13 +806,7 @@ export class EventCoordinator extends DurableObject<Env> {
       liveSeatCount <= aircraft.passenger_seats &&
       new Set(rows.results.map((row) => row.product_id)).size === 1 &&
       new Set(rows.results.map((row) => row.gate_id)).size === 1 &&
-      rows.results.every((row) => row.resource_group_id === aircraft.resource_group_id) &&
-      rows.results.every(
-        (row) =>
-          (row.precalled_at === null && row.precall_decision_status !== "GO_TO_GATE") ||
-          row.forecast_assumed_aircraft_id === null ||
-          row.forecast_assumed_aircraft_id === aircraft.id,
-      )
+      rows.results.every((row) => row.resource_group_id === aircraft.resource_group_id)
     );
   }
 
@@ -1155,7 +1142,7 @@ export class EventCoordinator extends DurableObject<Env> {
               END AS attendance_status,
               COUNT(DISTINCT rt.ticket_id) AS ticket_count,
               COALESCE(p.reference_duration_minutes, 20) AS reference_duration_minutes,
-              fg.precalled_at, fg.precall_decision_status, r.forecast_assumed_aircraft_id,
+              fg.precalled_at, fg.precall_decision_status,
               r.dispatch_projected_overtake_count,
               CASE WHEN EXISTS (
                 SELECT 1
@@ -1237,10 +1224,7 @@ export class EventCoordinator extends DurableObject<Env> {
       return (
         groupIds.length > 0 &&
         row.reserved_by_active_lease === 0 &&
-        groupIds.every((groupId) => firstRotationByGroupId.get(groupId) === row.rotation_id) &&
-        ((row.precalled_at === null && row.precall_decision_status !== "GO_TO_GATE") ||
-          row.forecast_assumed_aircraft_id === null ||
-          row.forecast_assumed_aircraft_id === aircraft.id)
+        groupIds.every((groupId) => firstRotationByGroupId.get(groupId) === row.rotation_id)
       );
     });
     const dispatchGroups: DispatchGroupInput[] = eligibleRows.map((row) => ({

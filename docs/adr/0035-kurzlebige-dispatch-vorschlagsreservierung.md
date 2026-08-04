@@ -29,13 +29,25 @@ Unabhängige Ereignisse ersetzen deshalb weder Lease-ID noch Gruppenmenge oder A
 wird nur ungültig, wenn Ablauf, Flugzeugverfügbarkeit, Gruppenverfügbarkeit, Segmentreihenfolge,
 Kapazität oder Eigentümer nicht mehr passen.
 
-Der Dialog zeigt die verbleibende Zeit an und gibt die Lease beim Schließen frei; eine clientseitige
-Release-Barriere serialisiert unmittelbares Wiederöffnen hinter der Freigabe. Ablauf bleibt die
-Absicherung für Verbindungs- oder Browserverlust. Eine manuelle Änderung der vorgeschlagenen Auswahl
-gibt die eigene Lease ebenfalls frei. Eine manuelle Belegung bleibt trotz fremder Leases möglich und
-unterliegt weiter Abweichungsgrund-, Kapazitäts-, Produkt- und Versionsprüfung. Überlappende fremde
-Leases werden mit Grund `MANUAL_OVERRIDE` atomar mit dem erfolgreichen `CALL_NEXT` invalidiert und
-vollständig auditiert.
+Der Dialog zeigt die verbleibende Zeit an. Erwerb, explizites Neuladen, manuelle Auswahl, Schließen und
+Freigabe laufen clientseitig über genau eine serialisierte Transition-Queue. Gleichzeitige Erwerbs-
+oder Reload-Absichten für dasselbe Flugzeug werden zusammengeführt. Das Schließen während eines
+laufenden Erwerbs gibt dessen späteres Ergebnis genau einmal frei; unmittelbares Wiederöffnen wartet
+diese Freigabe ab. Eine ältere Antwort darf dadurch niemals eine bereits von einer neueren Transition
+übernommene Lease freigeben. Ablauf bleibt die Absicherung für Verbindungs- oder Browserverlust.
+
+Eine manuelle Änderung der vorgeschlagenen Auswahl gibt die eigene Lease ebenfalls frei. Eine manuelle
+Belegung bleibt trotz fremder Leases möglich und unterliegt weiter Abweichungsgrund-, Kapazitäts-,
+Produkt- und Versionsprüfung. Überlappende fremde Leases werden mit Grund `MANUAL_OVERRIDE` atomar mit
+dem erfolgreichen `CALL_NEXT` invalidiert und vollständig auditiert.
+
+Die flugzeugbezogene Ein-Wellen-Planung verwendet unverändert den reinen Dispatch-Planer. Harte
+Kompatibilitäts- und Gruppenschutzregeln stehen zuerst, danach maximale Wartezeit, Überholschutz und
+Produktfairness. Unter danach gleichwertigen Kombinationen wird die höchste Sitzplatzauslastung
+gewählt; Queueposition, Verkaufszeit und technische ID lösen verbleibende Gleichstände deterministisch
+auf. `GO TO GATE` ist eine organisatorische Verpflichtung, aber keine Flugzeugbindung. Insbesondere ist
+`forecast_assumed_aircraft_id` nur eine Prognoseannahme und schränkt weder Lease-Erwerb noch
+Relevanzprüfung einer aufgerufenen Gruppe auf dieses angenommene Flugzeug ein.
 
 `CALL_NEXT` bestätigt eine Lease nur, wenn Eigentümer, Gerät, Flugzeug, Ablauf, Planrevision, Batch,
 vollständige Gruppenmenge, konkrete offene Segmente und Sitzanzahl noch übereinstimmen. Die Lease wird
@@ -67,6 +79,6 @@ Wiederherstellung.
 - Konkurrenztests decken ersten Erwerber, Flugzeug-, Batch- und Geräteexklusivität ab.
 - Kommandotests decken Ablauf, Eigentümer-/Geräteprüfung, relevante Planänderung, manuelle
   Übersteuerung und atomaren Verbrauch ab.
-- UI-Tests decken Countdown, stabile Lease über unabhängige Versionswechsel, Release-Barriere,
-  sichtbare Invalidierung und explizites Neuladen ab.
+- UI-Tests decken Countdown, stabile Lease über unabhängige Versionswechsel, die serialisierte
+  Transition-Queue, sichtbare Invalidierung und explizites Neuladen ab.
 - Browserabnahmen prüfen Flight Line und Flight Director in hellen und dunklen Viewports.

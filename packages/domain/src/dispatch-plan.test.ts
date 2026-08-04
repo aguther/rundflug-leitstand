@@ -56,14 +56,14 @@ describe("createDispatchPlan", () => {
   it("fills a targeted three-seat wave with the compatible one- and two-person groups", () => {
     const plan = createDispatchPlan({
       now: NOW,
-      groups: [group("G-RN-0111", 1, 111), group("G-RN-0112", 2, 112)],
+      groups: [group("first-single", 1, 1), group("second-pair", 2, 2)],
       lanes: [lane("opened-aircraft", 3)],
       limits: { maximumWaves: 1 },
     });
 
     expect(plan.batches).toHaveLength(1);
     expect(plan.batches[0]).toMatchObject({
-      memberIds: ["G-RN-0111", "G-RN-0112"],
+      memberIds: ["first-single", "second-pair"],
       occupiedSeats: 3,
       availableSeats: 0,
       wave: 1,
@@ -258,6 +258,33 @@ describe("createDispatchPlan", () => {
     });
 
     expect(plan.batches[0]?.memberIds).toEqual(["old-large"]);
+    expect(plan.batches[0]?.decisionReasons).toContain("MUST_SERVE_MAX_WAIT");
+  });
+
+  it("accepts a fair partial load when the maximum-wait group cannot mix products", () => {
+    const oldWaitingAt = new Date(
+      Date.parse(NOW) - DEFAULT_DISPATCH_PLANNING_LIMITS.maximumWaitMinutes * 60_000,
+    ).toISOString();
+    const plan = createDispatchPlan({
+      now: NOW,
+      groups: [
+        group("old-long-pair", 2, 1, {
+          productId: "long-flight",
+          waitingSince: oldWaitingAt,
+        }),
+        group("new-short-a", 1, 2, { waitingSince: NOW }),
+        group("new-short-b", 1, 3, { waitingSince: NOW }),
+        group("new-short-c", 1, 4, { waitingSince: NOW }),
+      ],
+      lanes: [lane("three-seater", 3)],
+      limits: { maximumWaves: 1 },
+    });
+
+    expect(plan.batches[0]).toMatchObject({
+      memberIds: ["old-long-pair"],
+      occupiedSeats: 2,
+      availableSeats: 1,
+    });
     expect(plan.batches[0]?.decisionReasons).toContain("MUST_SERVE_MAX_WAIT");
   });
 

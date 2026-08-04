@@ -132,16 +132,17 @@ describe("Flight Line", () => {
     expect(sharedFlightLineSource).not.toContain('?.operationalCode ?? ""} zuweisen');
   });
 
-  it("offers manual presence, missing, recall and deferral actions", () => {
-    expect(assistSource).toContain("onGroupAttendance");
-    expect(assistSource).toContain("onGroupMissing");
+  it("keeps recall and deferral while removing unused attendance actions", () => {
+    expect(assistSource).not.toContain("onGroupAttendance");
+    expect(assistSource).not.toContain("onGroupMissing");
     expect(assistSource).toContain("onGroupRecall");
     expect(assistSource).toContain("onGroupDefer");
-    expect(sharedFlightLineSource).toMatch(/\$\{communicationLabel\} anwesend/);
-    expect(sharedFlightLineSource).toMatch(/\$\{communicationLabel\} nicht da/);
+    expect(sharedFlightLineSource).not.toMatch(/\$\{communicationLabel\} anwesend/);
+    expect(sharedFlightLineSource).not.toMatch(/\$\{communicationLabel\} nicht da/);
     expect(sharedFlightLineSource).toMatch(/\$\{communicationLabel\} nachrufen/);
     expect(sharedFlightLineSource).toMatch(/\$\{communicationLabel\} zurückstellen/);
     expect(sharedFlightLineSource).toContain('className="flight-director-queue-actions"');
+    expect(sharedFlightLineSource).toContain("GO TO GATE");
     expect(sharedFlightLineSource).toContain("<IconButton");
     expect(sharedFlightLineSource).not.toContain('<CheckCircle2 aria-hidden="true" /> Anwesend');
   });
