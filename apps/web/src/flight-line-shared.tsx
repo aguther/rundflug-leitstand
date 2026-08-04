@@ -442,7 +442,17 @@ function AssignmentQueueRow({
           onChange={(event) => onToggle(group.id, event.target.checked)}
           type="checkbox"
         />
-        <strong>{communicationLabel}</strong>
+        <span className="flight-director-queue-identity">
+          <strong>{communicationLabel}</strong>
+          {group.precalledAt || group.dispatchReservation === "OTHER" ? (
+            <span className="flight-director-queue-badges">
+              {group.precalledAt ? <small className="is-gate-call">GO TO GATE</small> : null}
+              {group.dispatchReservation === "OTHER" ? (
+                <small className="is-reserved">Anderweitig reserviert</small>
+              ) : null}
+            </span>
+          ) : null}
+        </span>
       </label>
       <div className="flight-director-queue-actions">
         <IconButton
@@ -523,7 +533,6 @@ function AssignmentQueueRow({
 export function BookingGroupAssignmentDialog({
   aircraft,
   dispatchLease,
-  eventVersion,
   groups,
   selectedQueueGroupIds,
   confirmDisabled,
@@ -543,7 +552,6 @@ export function BookingGroupAssignmentDialog({
 }: {
   aircraft: FlightLineAircraft | undefined;
   dispatchLease: DispatchRecommendationLeaseController;
-  eventVersion: number;
   groups: FlightLineQueueGroup[];
   selectedQueueGroupIds: string[];
   confirmDisabled: boolean;
@@ -564,6 +572,7 @@ export function BookingGroupAssignmentDialog({
   const [queueDeviationReason, setQueueDeviationReason] = useState("");
   const [leaseRemainingSeconds, setLeaseRemainingSeconds] = useState(0);
   const [queueMutationPending, setQueueMutationPending] = useState(false);
+  const [recommendationReloadPending, setRecommendationReloadPending] = useState(false);
   const dispatchRecommendation = dispatchLease.lease;
   const selectedGroups = groups.filter((group) => selectedQueueGroupIds.includes(group.id));
   const selectedSeats = selectedGroups.reduce(
@@ -589,9 +598,11 @@ export function BookingGroupAssignmentDialog({
             group.queueSequence < earliestSelectedQueueSequence &&
             group.productId !== selectedProductId,
         );
+  const overridesOtherReservation = selectedGroups.some(
+    (group) => group.dispatchReservation === "OTHER",
+  );
   const sortedSelectedQueueGroupIds = [...selectedQueueGroupIds].sort();
-  const recommendationIsCurrent =
-    dispatchLease.mode === "RESERVED" && dispatchLease.reservedEventVersion === eventVersion;
+  const recommendationIsCurrent = dispatchLease.mode === "RESERVED";
   const recommendationMatchesSelection = Boolean(
     recommendationIsCurrent &&
       dispatchRecommendation &&
@@ -601,7 +612,8 @@ export function BookingGroupAssignmentDialog({
         .every((groupId, index) => groupId === sortedSelectedQueueGroupIds[index]),
   );
   const queueDeviationReasonRequired =
-    skippedEarlierProductGroups.length > 0 && !recommendationMatchesSelection;
+    overridesOtherReservation ||
+    (skippedEarlierProductGroups.length > 0 && !recommendationMatchesSelection);
   const recommendationReason = dispatchRecommendation?.decisionReasons.includes(
     "MUST_SERVE_MAX_WAIT",
   )
@@ -636,16 +648,36 @@ export function BookingGroupAssignmentDialog({
     updateRemainingTime();
     const interval = window.setInterval(updateRemainingTime, 250);
     return () => window.clearInterval(interval);
-  }, [dispatchLease, open, recommendationIsCurrent]);
+  }, [
+    dispatchLease.lease,
+    dispatchLease.markExpired,
+    dispatchLease.mode,
+    dispatchLease.serverClockOffsetMs,
+    open,
+    recommendationIsCurrent,
+  ]);
   const reservationBlocksConfirmation = dispatchLease.mode !== "MANUAL" && !recommendationIsCurrent;
+  const leaseBusy = dispatchLease.mode === "ACQUIRING" || dispatchLease.mode === "REFRESHING";
+  const recommendationReloadBusy = recommendationReloadPending || leaseBusy;
+  const queueInteractionPending = queueMutationPending || recommendationReloadBusy;
 
   async function runQueueMutation(action: () => void | Promise<void>) {
-    if (queueMutationPending) return;
+    if (queueInteractionPending) return;
     setQueueMutationPending(true);
     try {
       await action();
     } finally {
       setQueueMutationPending(false);
+    }
+  }
+
+  async function reloadRecommendation() {
+    if (queueInteractionPending) return;
+    setRecommendationReloadPending(true);
+    try {
+      await onReserveRecommendation();
+    } finally {
+      setRecommendationReloadPending(false);
     }
   }
   return (
@@ -663,7 +695,7 @@ export function BookingGroupAssignmentDialog({
           <Button
             disabled={
               confirmDisabled ||
-              queueMutationPending ||
+              queueInteractionPending ||
               reservationBlocksConfirmation ||
               selectedSeats === 0 ||
               capacityExceeded ||
@@ -689,66 +721,82 @@ export function BookingGroupAssignmentDialog({
       <div className="flight-director-assignment-dialog">
         <section className="flight-director-queue">
           <div className="flight-director-dispatch-slot">
-            {dispatchLease.mode === "EXPIRED" || dispatchLease.mode === "ERROR" ? (
-              <div className="flight-director-dispatch-reservation is-expired" role="alert">
-                <span>
-                  {dispatchLease.mode === "EXPIRED"
-                    ? "Die Vorschlagsreservierung ist abgelaufen."
-                    : dispatchLease.error}
-                </span>
-                <Button onClick={onReserveRecommendation} size="compact" variant="secondary">
-                  <RotateCcw aria-hidden="true" /> Vorschlag neu reservieren
-                </Button>
-              </div>
-            ) : dispatchLease.mode === "MANUAL" ? (
-              <div className="flight-director-dispatch-reservation is-manual" role="status">
-                Manuelle Belegung – nicht reserviert
-              </div>
-            ) : dispatchRecommendation ? (
-              <div
-                className={`flight-director-dispatch-recommendation${dispatchLease.mode === "REFRESHING" ? " is-refreshing" : ""}`}
-              >
-                <div>
+            <div className="flight-director-dispatch-content">
+              {["EXPIRED", "INVALIDATED", "ERROR"].includes(dispatchLease.mode) ? (
+                <div className="flight-director-dispatch-reservation is-expired" role="alert">
                   <span>
-                    Empfohlene Belegung · Umlauf {dispatchRecommendation.dispatchOrder}
-                    {recommendationIsCurrent ? (
-                      <strong
-                        aria-live="polite"
-                        className={leaseRemainingSeconds <= 30 ? "is-expiring" : undefined}
-                      >
-                        Reserviert {formatDispatchLeaseCountdown(leaseRemainingSeconds)}
-                      </strong>
-                    ) : (
-                      <strong aria-live="polite">Wird aktualisiert …</strong>
-                    )}
+                    {dispatchLease.mode === "EXPIRED"
+                      ? "Die Vorschlagsreservierung ist abgelaufen."
+                      : dispatchLease.error}
                   </span>
-                  <strong>
-                    {dispatchRecommendation.occupiedSeats} belegt ·{" "}
-                    {dispatchRecommendation.availableSeats} frei
-                  </strong>
                 </div>
-                <p>{recommendationReason}</p>
-                {skippedEarlierProductGroups.length > 0 ? (
-                  <small>
-                    {skippedEarlierProductGroups.length} frühere Gruppe
-                    {skippedEarlierProductGroups.length === 1 ? " wird" : "n werden"} nur für die
-                    produktreine, kapazitätsoptimierte Belegung überholt.
-                  </small>
-                ) : null}
-              </div>
-            ) : (
-              <div className="flight-director-dispatch-reservation is-loading" role="status">
-                <Clock3 aria-hidden="true" />
-                <span>Der nächste passende Vorschlag wird reserviert …</span>
-              </div>
-            )}
+              ) : dispatchLease.mode === "MANUAL" ? (
+                <div className="flight-director-dispatch-reservation is-manual" role="status">
+                  Manuelle Belegung – nicht reserviert
+                </div>
+              ) : dispatchRecommendation ? (
+                <div
+                  className={`flight-director-dispatch-recommendation${dispatchLease.mode === "REFRESHING" ? " is-refreshing" : ""}`}
+                >
+                  <div>
+                    <span>
+                      Empfohlene Belegung · Umlauf {dispatchRecommendation.dispatchOrder}
+                      {recommendationIsCurrent ? (
+                        <strong
+                          aria-live="polite"
+                          className={leaseRemainingSeconds <= 30 ? "is-expiring" : undefined}
+                        >
+                          Reserviert {formatDispatchLeaseCountdown(leaseRemainingSeconds)}
+                        </strong>
+                      ) : (
+                        <strong aria-live="polite">Vorschlag wird geladen …</strong>
+                      )}
+                    </span>
+                    <strong>
+                      {dispatchRecommendation.occupiedSeats} belegt ·{" "}
+                      {dispatchRecommendation.availableSeats} frei
+                    </strong>
+                  </div>
+                  <p>{recommendationReason}</p>
+                  {skippedEarlierProductGroups.length > 0 ? (
+                    <small>
+                      {skippedEarlierProductGroups.length} frühere Gruppe
+                      {skippedEarlierProductGroups.length === 1 ? " wird" : "n werden"} nur für die
+                      produktreine, kapazitätsoptimierte Belegung überholt.
+                    </small>
+                  ) : null}
+                </div>
+              ) : (
+                <div className="flight-director-dispatch-reservation is-loading" role="status">
+                  <Clock3 aria-hidden="true" />
+                  <span>Vorschlag wird geladen …</span>
+                </div>
+              )}
+            </div>
+            <div className="flight-director-dispatch-actions">
+              <Button
+                disabled={queueInteractionPending}
+                onClick={reloadRecommendation}
+                size="compact"
+                variant="secondary"
+              >
+                {recommendationReloadBusy ? (
+                  <Clock3 aria-hidden="true" />
+                ) : (
+                  <RotateCcw aria-hidden="true" />
+                )}
+                {recommendationReloadBusy
+                  ? "Vorschlag wird geladen …"
+                  : "Aktuellsten Vorschlag laden"}
+              </Button>
+            </div>
           </div>
-          <div className="flight-director-queue-scroll" aria-busy={queueMutationPending}>
+          <div className="flight-director-queue-scroll" aria-busy={queueInteractionPending}>
             {groups.length > 0 ? (
               groups.map((group) => (
                 <AssignmentQueueRow
                   capacity={capacity}
-                  disabled={queueMutationPending}
+                  disabled={queueInteractionPending}
                   group={group}
                   key={group.id}
                   onAttendance={(ticketGroupId, checkedIn) =>
@@ -831,7 +879,7 @@ export function BookingGroupAssignmentDialog({
             ) : null}
             {queueDeviationReasonRequired ? (
               <label className="flight-director-deviation-reason">
-                Grund für Queue-Abweichung
+                Grund für manuelle Abweichung
                 <input
                   maxLength={240}
                   onChange={(event) => setQueueDeviationReason(event.target.value)}
@@ -839,9 +887,9 @@ export function BookingGroupAssignmentDialog({
                   value={queueDeviationReason}
                 />
                 <small>
-                  {skippedEarlierProductGroups.length} frühere Ticketgruppe
-                  {skippedEarlierProductGroups.length === 1 ? "" : "n"} eines anderen Produkts
-                  werden übersprungen.
+                  {overridesOtherReservation
+                    ? "Die Auswahl übersteuert mindestens einen anderweitig reservierten Vorschlag."
+                    : `${skippedEarlierProductGroups.length} frühere Ticketgruppe${skippedEarlierProductGroups.length === 1 ? "" : "n"} eines anderen Produkts werden übersprungen.`}
                 </small>
               </label>
             ) : null}

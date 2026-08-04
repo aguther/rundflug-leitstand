@@ -290,7 +290,7 @@ export function useOperationBoard(deviceId: string) {
       ),
     [deviceId],
   );
-  const refresh = useCallback(
+  const refreshAndGet = useCallback(
     async (minimumVersion = 0, forceFollowUp = false) => {
       activeRefreshCallersRef.current += 1;
       setRefreshing(true);
@@ -304,13 +304,21 @@ export function useOperationBoard(deviceId: string) {
           );
           setBackendConfirmed(true);
           void saveOperationBoard(EVENT_ID, deviceId, outcome.board, outcome.confirmedAt);
+          return outcome.board;
         }
+        return null;
       } finally {
         activeRefreshCallersRef.current -= 1;
         if (activeRefreshCallersRef.current === 0) setRefreshing(false);
       }
     },
     [deviceId, syncCoordinator],
+  );
+  const refresh = useCallback(
+    async (minimumVersion = 0, forceFollowUp = false): Promise<void> => {
+      await refreshAndGet(minimumVersion, forceFollowUp);
+    },
+    [refreshAndGet],
   );
   const confirmEvent = useCallback((event: CommandResult["event"]) => {
     latestVersionRef.current = Math.max(latestVersionRef.current, event.version);
@@ -384,7 +392,7 @@ export function useOperationBoard(deviceId: string) {
       window.clearInterval(timer);
     };
   }, [refresh, deviceId]);
-  return { ...state, backendConfirmed, confirmEvent, refresh, refreshing };
+  return { ...state, backendConfirmed, confirmEvent, refresh, refreshAndGet, refreshing };
 }
 
 export function ConnectionNotice({

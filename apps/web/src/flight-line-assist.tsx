@@ -620,7 +620,6 @@ export function FlightLineAssist({
         aircraft={activeAircraft}
         confirmDisabled={!assignmentReady || primaryDisabled}
         dispatchLease={dispatchLease}
-        eventVersion={board.event.version}
         groups={waitingGroups}
         onAttendance={onGroupAttendance}
         onClose={() => {

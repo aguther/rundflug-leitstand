@@ -2808,6 +2808,8 @@ export const operationBoardSchema = z.object({
         nextSegmentPresentCount: z.number().int().nonnegative().optional(),
         segmentIndex: z.number().int().positive().optional(),
         segmentCount: z.number().int().positive().optional(),
+        precalledAt: z.string().nullable().default(null),
+        dispatchReservation: z.enum(["OWN", "OTHER"]).nullable().default(null),
         recalledAt: z.string().nullable(),
         recallCount: z.number().int().nonnegative(),
         activeRecall: ticketGroupRecallProjectionSchema.nullable(),

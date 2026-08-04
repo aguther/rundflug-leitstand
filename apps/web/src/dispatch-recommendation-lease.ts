@@ -9,6 +9,7 @@ export type DispatchRecommendationLeaseMode =
   | "RESERVED"
   | "MANUAL"
   | "EXPIRED"
+  | "INVALIDATED"
   | "ERROR";
 
 export interface DispatchRecommendationLeaseState {
@@ -24,9 +25,14 @@ export interface DispatchRecommendationLeaseController extends DispatchRecommend
     aircraftId: string,
     expectedVersionOverride?: number,
   ): Promise<DispatchRecommendationLease | null>;
+  reloadLatest(
+    aircraftId: string,
+    expectedVersionOverride?: number,
+  ): Promise<DispatchRecommendationLease | null>;
   release(): Promise<void>;
   switchToManual(): Promise<void>;
   markExpired(): void;
+  markInvalidated(message?: string): void;
   consume(): void;
 }
 
@@ -74,6 +80,7 @@ export function useDispatchRecommendationLease({
   const expectedVersionRef = useRef(expectedVersion);
   const onReservedRef = useRef(onReserved);
   const requestEpochRef = useRef(0);
+  const releaseBarrierRef = useRef<Promise<void>>(Promise.resolve());
 
   useEffect(() => {
     stateRef.current = state;
@@ -85,28 +92,39 @@ export function useDispatchRecommendationLease({
     onReservedRef.current = onReserved;
   }, [onReserved]);
 
+  const queueRelease = useCallback(
+    (lease: DispatchRecommendationLease): Promise<void> => {
+      const releasePromise = releaseBarrierRef.current.then(async () => {
+        try {
+          await releaseDispatchRecommendationLease(eventId, lease.leaseId, deviceId, deviceToken);
+        } catch {
+          // Expiry remains the server-side safety net if an explicit release cannot be delivered.
+        }
+      });
+      releaseBarrierRef.current = releasePromise;
+      return releasePromise;
+    },
+    [deviceId, deviceToken, eventId],
+  );
+
   const release = useCallback(async () => {
     requestEpochRef.current += 1;
     const lease = stateRef.current.lease;
     stateRef.current = idleState;
     setState(idleState);
-    if (!lease) return;
-    try {
-      await releaseDispatchRecommendationLease(eventId, lease.leaseId, deviceId, deviceToken);
-    } catch {
-      // Expiry remains the server-side safety net if an explicit release cannot be delivered.
-    }
-  }, [deviceId, deviceToken, eventId]);
+    if (lease) await queueRelease(lease);
+    else await releaseBarrierRef.current;
+  }, [queueRelease]);
 
-  const reserve = useCallback(
-    async (aircraftId: string, expectedVersionOverride?: number) => {
+  const acquire = useCallback(
+    async (
+      aircraftId: string,
+      expectedVersionOverride: number | undefined,
+      forceReload: boolean,
+    ) => {
       const current = stateRef.current;
       const targetEventVersion = expectedVersionOverride ?? expectedVersionRef.current;
-      if (
-        current.mode === "RESERVED" &&
-        current.lease?.aircraftId === aircraftId &&
-        current.reservedEventVersion === targetEventVersion
-      ) {
+      if (!forceReload && current.mode === "RESERVED" && current.lease?.aircraftId === aircraftId) {
         return current.lease;
       }
       const requestEpoch = requestEpochRef.current + 1;
@@ -115,33 +133,22 @@ export function useDispatchRecommendationLease({
       const acquiring: DispatchRecommendationLeaseState = {
         mode: previewLease ? "REFRESHING" : "ACQUIRING",
         lease: previewLease,
-        reservedEventVersion: null,
+        reservedEventVersion: current.reservedEventVersion,
         serverClockOffsetMs: previewLease ? current.serverClockOffsetMs : 0,
         error: null,
       };
       stateRef.current = acquiring;
       setState(acquiring);
       try {
-        if (current.lease) {
-          await releaseDispatchRecommendationLease(
-            eventId,
-            current.lease.leaseId,
-            deviceId,
-            deviceToken,
-          ).catch(() => undefined);
-        }
+        if (current.lease) await queueRelease(current.lease);
+        else await releaseBarrierRef.current;
         const lease = await acquireDispatchRecommendationLease(eventId, deviceId, deviceToken, {
           commandId: crypto.randomUUID(),
           aircraftId,
           expectedVersion: targetEventVersion,
         });
         if (requestEpochRef.current !== requestEpoch) {
-          void releaseDispatchRecommendationLease(
-            eventId,
-            lease.leaseId,
-            deviceId,
-            deviceToken,
-          ).catch(() => undefined);
+          void queueRelease(lease);
           return null;
         }
         const reserved: DispatchRecommendationLeaseState = {
@@ -159,9 +166,9 @@ export function useDispatchRecommendationLease({
         if (requestEpochRef.current !== requestEpoch) return null;
         const failed: DispatchRecommendationLeaseState = {
           mode: "ERROR",
-          lease: previewLease,
+          lease: null,
           reservedEventVersion: null,
-          serverClockOffsetMs: previewLease ? current.serverClockOffsetMs : 0,
+          serverClockOffsetMs: 0,
           error:
             reason instanceof Error
               ? reason.message
@@ -172,20 +179,20 @@ export function useDispatchRecommendationLease({
         return null;
       }
     },
-    [deviceId, deviceToken, eventId],
+    [deviceId, deviceToken, eventId, queueRelease],
   );
 
-  useEffect(() => {
-    const current = stateRef.current;
-    if (
-      current.mode !== "RESERVED" ||
-      !current.lease ||
-      current.reservedEventVersion === expectedVersion
-    ) {
-      return;
-    }
-    void reserve(current.lease.aircraftId, expectedVersion);
-  }, [expectedVersion, reserve]);
+  const reserve = useCallback(
+    (aircraftId: string, expectedVersionOverride?: number) =>
+      acquire(aircraftId, expectedVersionOverride, false),
+    [acquire],
+  );
+
+  const reloadLatest = useCallback(
+    (aircraftId: string, expectedVersionOverride?: number) =>
+      acquire(aircraftId, expectedVersionOverride, true),
+    [acquire],
+  );
 
   const switchToManual = useCallback(async () => {
     await release();
@@ -211,15 +218,36 @@ export function useDispatchRecommendationLease({
     };
     stateRef.current = expired;
     setState(expired);
-    void releaseDispatchRecommendationLease(eventId, lease.leaseId, deviceId, deviceToken).catch(
-      () => undefined,
-    );
-  }, [deviceId, deviceToken, eventId]);
+    void queueRelease(lease);
+  }, [queueRelease]);
+
+  const markInvalidated = useCallback((message?: string) => {
+    const current = stateRef.current;
+    if (!current.lease) return;
+    const invalidated: DispatchRecommendationLeaseState = {
+      ...current,
+      mode: "INVALIDATED",
+      error:
+        message ??
+        "Die reservierte Belegung ist nicht mehr verfügbar. Bitte aktuellen Vorschlag laden.",
+    };
+    stateRef.current = invalidated;
+    setState(invalidated);
+  }, []);
 
   const consume = useCallback(() => {
     stateRef.current = idleState;
     setState(idleState);
   }, []);
 
-  return { ...state, reserve, release, switchToManual, markExpired, consume };
+  return {
+    ...state,
+    reserve,
+    reloadLatest,
+    release,
+    switchToManual,
+    markExpired,
+    markInvalidated,
+    consume,
+  };
 }

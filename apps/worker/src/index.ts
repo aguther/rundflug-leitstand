@@ -3985,6 +3985,7 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
     aircraftProductTurnaroundOverrideRows,
     rotations,
     queueGroupRows,
+    dispatchLeaseRows,
     durationRows,
     aircraftRows,
     fleetRows,
@@ -4357,6 +4358,7 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
                   COALESCE(segment_group.queue_position, segment_group.communication_number)
                     AS segment_order,
                   segment_group.communication_number,
+                  segment_group.precalled_at,
                   COUNT(*) AS ticket_count,
                   SUM(CASE WHEN segment_ticket.attendance_status = 'CHECKED_IN' THEN 1 ELSE 0 END)
                     AS present_count
@@ -4368,7 +4370,8 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
               AND segment_rotation.operation_day_id = ?1
               AND segment_rotation.status <> 'CANCELED'
             GROUP BY segment_ticket.ticket_group_id, segment_rotation.id, segment_rotation.status,
-                     segment_group.queue_position, segment_group.communication_number
+                     segment_group.queue_position, segment_group.communication_number,
+                     segment_group.precalled_at
          ), ranked_segments AS (
            SELECT segment_stats.*,
                   ROW_NUMBER() OVER (
@@ -4407,7 +4410,8 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
                 next_segment.ticket_count AS next_segment_ticket_count,
                 next_segment.present_count AS next_segment_present_count,
                 next_segment.segment_index,
-                next_segment.segment_count
+                next_segment.segment_count,
+                next_segment.precalled_at
            FROM ticket_groups tg
            JOIN products p ON p.id = tg.product_id
            JOIN gates g ON g.id = p.gate_id
@@ -4420,6 +4424,7 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
           WHERE tg.operation_day_id = ?1 AND tg.status IN ('QUEUED', 'PRESENT', 'MISSING')
           GROUP BY tg.id, p.id, next_segment.ticket_count, next_segment.present_count,
                    next_segment.segment_index, next_segment.segment_count,
+                   next_segment.precalled_at,
                    active_recall.id, active_recall.sequence, active_recall.started_at,
                    active_recall.expires_at
           ORDER BY tg.queue_sequence`,
@@ -4447,6 +4452,22 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
           next_segment_present_count: number;
           segment_index: number;
           segment_count: number;
+          precalled_at: string | null;
+        }>(),
+    () =>
+      context.env.DB.prepare(
+        `SELECT reserved_group.value AS ticket_group_id, lease.operator_account_id, lease.device_id
+           FROM dispatch_recommendation_leases lease
+           JOIN json_each(lease.ticket_group_ids_json) reserved_group
+          WHERE lease.operation_day_id = ?1 AND lease.status = 'ACTIVE'
+            AND lease.expires_at > ?2
+          ORDER BY lease.acquired_at, lease.id`,
+      )
+        .bind(eventId, projectionReadAt)
+        .all<{
+          ticket_group_id: string;
+          operator_account_id: string;
+          device_id: string;
         }>(),
     () =>
       context.env.DB.prepare(
@@ -4777,6 +4798,18 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
   const forecastReferenceMs = Date.parse(forecastReadAt);
   const operationsEnd = eventRow.operations_end_at ? Date.parse(eventRow.operations_end_at) : 0;
   const operationsEndMinutes = Math.max(0, (operationsEnd - forecastReferenceMs) / 60_000);
+  const dispatchReservationByGroupId = new Map<string, "OWN" | "OTHER">();
+  for (const lease of dispatchLeaseRows.results) {
+    const reservation =
+      device.accountId !== null &&
+      lease.operator_account_id === device.accountId &&
+      lease.device_id === device.id
+        ? "OWN"
+        : "OTHER";
+    if (reservation === "OWN" || !dispatchReservationByGroupId.has(lease.ticket_group_id)) {
+      dispatchReservationByGroupId.set(lease.ticket_group_id, reservation);
+    }
+  }
 
   const response = context.json({
     currentDeviceRole: device.role,
@@ -5533,6 +5566,8 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
       nextSegmentPresentCount: group.next_segment_present_count,
       segmentIndex: group.segment_index,
       segmentCount: group.segment_count,
+      precalledAt: group.precalled_at,
+      dispatchReservation: dispatchReservationByGroupId.get(group.id) ?? null,
       recalledAt: group.recall_started_at,
       recallCount: group.recall_count,
       activeRecall: activeTicketGroupRecallProjection(group),

@@ -679,6 +679,31 @@
   align-items: center;
   gap: 8px;
 }
+.flight-director-queue-identity {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.flight-director-queue-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+.flight-director-queue-badges small {
+  width: max-content;
+  max-width: 100%;
+  padding: 2px 5px;
+  border: 1px solid var(--ui-border);
+  border-radius: 999px;
+  color: var(--ui-muted);
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+.flight-director-queue-badges small.is-gate-call {
+  border-color: var(--ui-accent);
+  color: var(--ui-accent);
+}
 .flight-director-queue-row input {
   width: 19px;
   height: 19px;
@@ -1155,10 +1180,28 @@ html:has(.flight-director-assignment-modal) {
 }
 
 .flight-director-dispatch-slot {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 220px;
   min-height: 112px;
   overflow: hidden;
   border-bottom: 1px solid var(--ui-border);
   background: var(--ui-surface-subtle);
+}
+
+.flight-director-dispatch-content {
+  min-width: 0;
+}
+
+.flight-director-dispatch-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+  border-left: 1px solid var(--ui-border);
+}
+
+.flight-director-dispatch-actions .ds-button {
+  width: 100%;
 }
 
 .flight-director-queue-scroll {
@@ -1490,6 +1533,37 @@ html:has(.flight-director-assignment-modal) {
   .flight-director-assignment-dialog {
     height: auto;
     grid-template-columns: 1fr;
+  }
+
+  .flight-director-dispatch-slot {
+    grid-template-columns: minmax(0, 1fr) 180px;
+  }
+
+  .flight-director-dispatch-recommendation {
+    gap: 2px;
+    padding: 8px 10px;
+  }
+
+  .flight-director-dispatch-recommendation > div {
+    gap: 6px;
+  }
+
+  .flight-director-dispatch-recommendation span,
+  .flight-director-dispatch-recommendation small {
+    font-size: 0.68rem;
+  }
+
+  .flight-director-dispatch-recommendation p {
+    display: -webkit-box;
+    overflow: hidden;
+    font-size: 0.82rem;
+    line-height: 1.15;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .flight-director-dispatch-actions {
+    padding: 8px;
   }
 
   .flight-director-assignment-modal-body {

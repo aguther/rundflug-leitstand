@@ -53,6 +53,23 @@ function lane(
 }
 
 describe("createDispatchPlan", () => {
+  it("fills a targeted three-seat wave with the compatible one- and two-person groups", () => {
+    const plan = createDispatchPlan({
+      now: NOW,
+      groups: [group("G-RN-0111", 1, 111), group("G-RN-0112", 2, 112)],
+      lanes: [lane("opened-aircraft", 3)],
+      limits: { maximumWaves: 1 },
+    });
+
+    expect(plan.batches).toHaveLength(1);
+    expect(plan.batches[0]).toMatchObject({
+      memberIds: ["G-RN-0111", "G-RN-0112"],
+      occupiedSeats: 3,
+      availableSeats: 0,
+      wave: 1,
+    });
+  });
+
   it("combines complete groups without allowing a large group to starve", () => {
     const first = createDispatchPlan({
       now: NOW,

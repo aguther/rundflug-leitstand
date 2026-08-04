@@ -78,7 +78,7 @@ function queuedSegmentPresentCount(group: QueueGroup): number {
 }
 
 export function FlightLineView() {
-  const { board, error, lastConfirmedAt, backendConfirmed, confirmEvent, refresh } =
+  const { board, error, lastConfirmedAt, backendConfirmed, confirmEvent, refresh, refreshAndGet } =
     useOperationBoard(FLIGHT_LINE_DEVICE_ID);
   const [selectedAircraftId, setSelectedAircraftId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -104,6 +104,26 @@ export function FlightLineView() {
     expectedVersion: board?.event.version ?? 0,
     onReserved: replaceSelectedQueueGroups,
   });
+  const reloadLatestAssignment = useCallback(
+    async (aircraftId: string) => {
+      setSelectedQueueGroupIds([]);
+      const refreshedBoard = await refreshAndGet(board?.event.version ?? 0, true);
+      return dispatchLease.reloadLatest(
+        aircraftId,
+        refreshedBoard?.event.version ?? board?.event.version ?? 0,
+      );
+    },
+    [board?.event.version, dispatchLease.reloadLatest, refreshAndGet],
+  );
+  useEffect(() => {
+    if (dispatchLease.mode !== "RESERVED" || !dispatchLease.lease || !board) return;
+    const leasedGroups = new Map(board.queueGroups.map((group) => [group.id, group]));
+    const relevantStateChanged = dispatchLease.lease.groupIds.some((groupId) => {
+      const group = leasedGroups.get(groupId);
+      return !group || group.dispatchReservation === "OTHER";
+    });
+    if (relevantStateChanged) dispatchLease.markInvalidated();
+  }, [board, dispatchLease.lease, dispatchLease.markInvalidated, dispatchLease.mode]);
   const [dispositionOpen, setDispositionOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [dispositionCapacity, setDispositionCapacity] = useState(1);
@@ -260,7 +280,6 @@ export function FlightLineView() {
               : [selectedRotation.ticketGroupId];
         const reservedRecommendationSelected = Boolean(
           dispatchLease.mode === "RESERVED" &&
-            dispatchLease.reservedEventVersion === board.event.version &&
             dispatchLease.lease?.groupIds.length === ticketGroupIds.length &&
             [...(dispatchLease.lease?.groupIds ?? [])]
               .sort()
@@ -330,26 +349,22 @@ export function FlightLineView() {
       return true;
     } catch (reason) {
       setMessage(reason instanceof Error ? reason.message : "Aktion fehlgeschlagen.");
-      if (
+      if (reason instanceof ApiCommandError && reason.code === "STALE_VERSION") {
+        await refresh(reason.currentVersion ?? 0, true);
+        setMessage(
+          "Der Betriebsstand wurde aktualisiert. Die reservierte Auswahl bleibt bestehen und kann erneut bestätigt werden.",
+        );
+      } else if (
         reason instanceof ApiCommandError &&
         [
-          "STALE_VERSION",
           "DISPATCH_PLAN_STALE",
           "DISPATCH_RECOMMENDATION_LEASE_EXPIRED",
           "DISPATCH_RECOMMENDATION_LEASE_CONFLICT",
           "DISPATCH_RECOMMENDATION_LEASE_MISMATCH",
-        ].includes(reason.code) &&
-        aircraftOverride?.id
+        ].includes(reason.code)
       ) {
-        await dispatchLease.release();
         await refresh(reason.currentVersion ?? 0, true);
-        await dispatchLease.reserve(
-          aircraftOverride.id,
-          reason.currentVersion ?? board.event.version,
-        );
-        setMessage(
-          "Der Belegungsplan wurde aktualisiert. Bitte den neuen Vorschlag erneut bestätigen.",
-        );
+        dispatchLease.markInvalidated(reason.message);
       }
       return false;
     } finally {
@@ -1317,10 +1332,7 @@ export function FlightLineView() {
               selectedAircraft;
             return advance(rotation, rotationAircraft, nextAircraftState, queueDeviationReason);
           }}
-          onReserveAssignment={(aircraftId) => {
-            setSelectedQueueGroupIds([]);
-            return dispatchLease.reserve(aircraftId);
-          }}
+          onReserveAssignment={reloadLatestAssignment}
           onSetAircraftState={requestAircraftState}
           selectedQueueGroupIds={selectedQueueGroupIds}
         />
@@ -1365,10 +1377,7 @@ export function FlightLineView() {
             setDispositionOpen(false);
             setDetailsOpen(false);
           }}
-          onReserveAssignment={(aircraftId) => {
-            setSelectedQueueGroupIds([]);
-            return dispatchLease.reserve(aircraftId);
-          }}
+          onReserveAssignment={reloadLatestAssignment}
           onToggleGroup={(ticketGroupId, isSelected) => {
             setSelectedQueueGroupIds((current) =>
               isSelected

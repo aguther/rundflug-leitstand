@@ -29,7 +29,7 @@ function lease(
     availableSeats: 3 - groupIds.length,
     decisionReasons: ["CAPACITY_OPTIMIZED"],
     acquiredAt: serverNow,
-    expiresAt: "2026-08-04T08:05:00.000Z",
+    expiresAt: "2026-08-04T08:01:30.000Z",
     serverNow,
   };
 }
@@ -39,19 +39,19 @@ afterEach(() => {
 });
 
 describe("dispatch recommendation lease lifecycle", () => {
-  it("keeps the previous preview blocked while reserving the current event version", async () => {
+  it("keeps a valid lease stable across event versions and reloads only after an explicit action", async () => {
     const firstLease = lease("00000000-0000-4000-8000-000000000001", ["group-a"]);
     const secondLease = lease("00000000-0000-4000-8000-000000000002", ["group-b"]);
-    let resolveSecondLease: ((value: DispatchRecommendationLease) => void) | undefined;
+    let resolveRelease: (() => void) | undefined;
     apiMocks.acquireDispatchRecommendationLease
       .mockResolvedValueOnce(firstLease)
-      .mockImplementationOnce(
-        () =>
-          new Promise<DispatchRecommendationLease>((resolve) => {
-            resolveSecondLease = resolve;
-          }),
-      );
-    apiMocks.releaseDispatchRecommendationLease.mockResolvedValue(undefined);
+      .mockResolvedValueOnce(secondLease);
+    apiMocks.releaseDispatchRecommendationLease.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveRelease = resolve;
+        }),
+    );
     const onReserved = vi.fn();
 
     const { result, rerender } = renderHook(
@@ -74,17 +74,22 @@ describe("dispatch recommendation lease lifecycle", () => {
     expect(onReserved).toHaveBeenLastCalledWith(["group-a"]);
 
     rerender({ expectedVersion: 5 });
-    await waitFor(() => expect(result.current.mode).toBe("REFRESHING"));
+    await waitFor(() => expect(result.current.mode).toBe("RESERVED"));
     expect(result.current.lease).toBe(firstLease);
-    expect(result.current.reservedEventVersion).toBeNull();
-    expect(apiMocks.releaseDispatchRecommendationLease).toHaveBeenCalledWith(
-      "event-a",
-      firstLease.leaseId,
-      "device-a",
-      "synthetic-token",
-    );
+    expect(result.current.reservedEventVersion).toBe(4);
+    expect(apiMocks.acquireDispatchRecommendationLease).toHaveBeenCalledTimes(1);
+    expect(apiMocks.releaseDispatchRecommendationLease).not.toHaveBeenCalled();
 
-    await act(async () => resolveSecondLease?.(secondLease));
+    let reloadPromise: Promise<DispatchRecommendationLease | null> | undefined;
+    act(() => {
+      reloadPromise = result.current.reloadLatest("aircraft-a", 5);
+    });
+    await waitFor(() => expect(result.current.mode).toBe("REFRESHING"));
+    expect(apiMocks.acquireDispatchRecommendationLease).toHaveBeenCalledTimes(1);
+    await act(async () => resolveRelease?.());
+    await act(async () => {
+      await reloadPromise;
+    });
     await waitFor(() => expect(result.current.mode).toBe("RESERVED"));
     expect(result.current.lease).toBe(secondLease);
     expect(result.current.reservedEventVersion).toBe(5);

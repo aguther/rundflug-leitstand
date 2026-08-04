@@ -117,7 +117,7 @@ describe("short-lived dispatch recommendation leases (F-BRD-010, Q-ZUV-020)", ()
   });
 
   it("serializes acquisition with CALL_NEXT and consumes a matching lease atomically", () => {
-    expect(coordinatorSource).toContain("DISPATCH_RECOMMENDATION_LEASE_TTL_MS = 5 * 60_000");
+    expect(coordinatorSource).toContain("DISPATCH_RECOMMENDATION_LEASE_TTL_MS = 90_000");
     expect(coordinatorSource).toContain("enqueueDispatchRecommendationLease");
     expect(coordinatorSource).toContain("this.commandTail.then");
     expect(coordinatorSource).toContain("DISPATCH_RECOMMENDATION_LEASE_MISMATCH");
@@ -127,7 +127,14 @@ describe("short-lived dispatch recommendation leases (F-BRD-010, Q-ZUV-020)", ()
     expect(coordinatorSource).toContain("lease.operator_account_id === operatorAccountId");
     expect(coordinatorSource).toContain("lease.device_id === command.deviceId");
     expect(coordinatorSource).toContain("lease.aircraft_id === command.payload.aircraftId");
-    expect(coordinatorSource).toContain("lease.operation_day_version === current.version");
+    expect(coordinatorSource).not.toContain("lease.operation_day_version === current.version");
+    expect(coordinatorSource).toContain("createDispatchPlan({");
+    expect(coordinatorSource).toContain("maximumWaves: 1");
+    expect(coordinatorSource).toContain('reason: "MANUAL_OVERRIDE"');
+    expect(coordinatorSource).toContain("manualOverrideLeaseStatements");
+    expect(coordinatorSource).toContain(
+      'row.precalled_at !== null || row.precall_decision_status === "GO_TO_GATE"',
+    );
     expect(coordinatorSource).toContain("lease.member_rotation_ids_json");
     expect(coordinatorSource).toContain("rotationId === selectedMemberRotationIds[index]");
     expect(coordinatorSource).toContain("lease.occupied_seats === selectedSeatCount");
@@ -170,5 +177,8 @@ describe("short-lived dispatch recommendation leases (F-BRD-010, Q-ZUV-020)", ()
     expect(workerSource).toContain(
       "DELETE FROM dispatch_recommendation_leases WHERE operator_account_id = ?1",
     );
+    expect(workerSource).toContain("segment_group.precalled_at");
+    expect(workerSource).toContain("precalledAt: group.precalled_at");
+    expect(workerSource).toContain("dispatchReservationByGroupId.get(group.id) ?? null");
   });
 });

@@ -22,15 +22,17 @@ describe("dispatch recommendation lease UI", () => {
 
   it("releases on close or manual selection and requires renewed human confirmation", () => {
     expect(dialogSource).toContain("dispatchLease.switchToManual()");
-    expect(dialogSource).toContain("Vorschlag neu reservieren");
+    expect(dialogSource).toContain("Aktuellsten Vorschlag laden");
+    expect(dialogSource).toContain("Vorschlag wird geladen …");
     expect(dialogSource).toContain("Manuelle Belegung – nicht reserviert");
     expect(dialogSource).toContain('dispatchLease.mode === "EXPIRED"');
     expect(dialogSource).toContain('dispatchLease.mode === "REFRESHING"');
-    expect(dialogSource).toContain("dispatchLease.reservedEventVersion === eventVersion");
+    expect(dialogSource).toContain('group.dispatchReservation === "OTHER"');
+    expect(dialogSource).toContain("GO TO GATE");
     expect(viewSource).toContain("dispatchRecommendationLeaseId");
-    expect(viewSource).toContain("dispatchLease.reservedEventVersion === board.event.version");
     expect(viewSource).toContain("await refresh(reason.currentVersion ?? 0, true)");
-    expect(viewSource).toContain("Bitte den neuen Vorschlag erneut bestätigen.");
+    expect(viewSource).toContain("Die reservierte Auswahl bleibt bestehen");
+    expect(viewSource).toContain("dispatchLease.markInvalidated(reason.message)");
   });
 
   it("keeps the assignment dialog geometry and scroll ownership stable", () => {
