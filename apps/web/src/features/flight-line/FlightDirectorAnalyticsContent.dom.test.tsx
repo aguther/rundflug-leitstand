@@ -117,6 +117,16 @@ describe("FlightDirectorAnalyticsContent resource timeline", () => {
     expect(container.querySelector(".flight-director-analytics-table tbody td")?.textContent).toBe(
       "G-RN-0106, G-RN-0107",
     );
+    const resourceTable = container.querySelector(
+      ".flight-director-analytics-table.is-resource-history",
+    );
+    expect(resourceTable?.querySelectorAll("col")).toHaveLength(7);
+    expect(resourceTable?.querySelector("col.resource-time")?.getAttribute("span")).toBe("4");
+    const tableForecastButton = screen.getByRole("button", {
+      name: "Prognose für F-RN-0105 öffnen",
+    });
+    expect(tableForecastButton.textContent).toBe("");
+    expect(tableForecastButton.querySelector("svg")).not.toBeNull();
 
     const viewport = container.querySelector(".flight-director-chart-viewport");
     expect(viewport).not.toBeNull();
@@ -147,6 +157,10 @@ describe("FlightDirectorAnalyticsContent resource timeline", () => {
     expect(onOpenRotation).not.toHaveBeenCalled();
 
     fireEvent.click(rotationButton);
+    expect(onOpenRotation).toHaveBeenCalledWith("rotation-1");
+
+    onOpenRotation.mockClear();
+    fireEvent.click(tableForecastButton);
     expect(onOpenRotation).toHaveBeenCalledWith("rotation-1");
   });
 

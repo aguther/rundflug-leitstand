@@ -184,6 +184,15 @@ describe("Flight Director", () => {
     expect(flightLineStyles).toMatch(/\.flight-director-forecast-chart\s*\{[^}]*overflow: hidden;/);
     expect(flightLineStyles).toContain("grid-template-columns: repeat(2, minmax(0, 1fr))");
     expect(analyticsContentSource).toContain("Prognose öffnen");
+    expect(analyticsContentSource).toContain(
+      'className="flight-director-analytics-table is-resource-history"',
+    );
+    expect(analyticsContentSource).toMatch(
+      /Prognose für \$\{rotation\.communicationLabel\} öffnen/,
+    );
+    expect(flightLineStyles).toMatch(
+      /\.flight-director-analytics-table\.is-resource-history\s*\{[^}]*min-width:\s*860px;[^}]*table-layout:\s*fixed;/s,
+    );
     expect(analyticsDialogSource).toContain(
       "Organisatorische Übersicht · keine Dienst-, Flugzeit- oder Einsatzfreigabe.",
     );

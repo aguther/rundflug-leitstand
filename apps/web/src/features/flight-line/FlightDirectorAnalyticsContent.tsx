@@ -20,7 +20,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { Button } from "../../design-system/components";
+import { Button, IconButton } from "../../design-system/components";
 import {
   analyticsZoomLevelsForSpan,
   useAnalyticsDiagramViewport,
@@ -919,7 +919,16 @@ function ResourcePanel({
           </>
         )}
         <div className="flight-director-analytics-table-wrap">
-          <table className="flight-director-analytics-table">
+          <table className="flight-director-analytics-table is-resource-history">
+            <colgroup>
+              <col className="resource-ticket-groups" />
+              <col className="resource-flight-group" />
+              <col className="resource-aircraft" />
+              <col className="resource-pilot" />
+              <col className="resource-people" />
+              <col className="resource-time" span={4} />
+              <col className="resource-action" />
+            </colgroup>
             <thead>
               <tr>
                 <th>Ticketgruppe</th>
@@ -944,9 +953,13 @@ function ResourcePanel({
                 return (
                   <tr key={rotation.rotationId}>
                     <td title={ticketGroupText}>{ticketGroupText}</td>
-                    <td>{rotation.communicationLabel}</td>
-                    <td>{rotation.aircraftRegistration ?? "–"}</td>
-                    <td>{rotation.pilotOperationalCode ?? "–"}</td>
+                    <td title={rotation.communicationLabel}>{rotation.communicationLabel}</td>
+                    <td title={rotation.aircraftRegistration ?? undefined}>
+                      {rotation.aircraftRegistration ?? "–"}
+                    </td>
+                    <td title={rotation.pilotOperationalCode ?? undefined}>
+                      {rotation.pilotOperationalCode ?? "–"}
+                    </td>
                     <td>
                       {rotation.passengerCount}/{rotation.usableCapacity}
                     </td>
@@ -954,14 +967,15 @@ function ResourcePanel({
                     <td>{formatTime(rotation.actual.departureAt, timeZone)}</td>
                     <td>{formatTime(rotation.actual.landingAt, timeZone)}</td>
                     <td>{formatTime(rotation.actual.completionAt, timeZone)}</td>
-                    <td>
-                      <Button
+                    <td className="resource-history-action">
+                      <IconButton
+                        label={`Prognose für ${rotation.communicationLabel} öffnen`}
                         onClick={() => onOpenRotation(rotation.rotationId)}
+                        size="compact"
                         type="button"
-                        variant="secondary"
                       >
-                        Prognose öffnen
-                      </Button>
+                        <ChartNoAxesCombined aria-hidden="true" />
+                      </IconButton>
                     </td>
                   </tr>
                 );

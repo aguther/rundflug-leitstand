@@ -2436,6 +2436,50 @@
   font-size: 0.66rem;
 }
 
+.flight-director-analytics-table.is-resource-history {
+  min-width: 860px;
+  table-layout: fixed;
+}
+
+.flight-director-analytics-table.is-resource-history .resource-ticket-groups {
+  width: 22%;
+}
+
+.flight-director-analytics-table.is-resource-history .resource-flight-group {
+  width: 13%;
+}
+
+.flight-director-analytics-table.is-resource-history .resource-aircraft,
+.flight-director-analytics-table.is-resource-history .resource-pilot {
+  width: 10%;
+}
+
+.flight-director-analytics-table.is-resource-history .resource-people,
+.flight-director-analytics-table.is-resource-history .resource-time {
+  width: 8%;
+}
+
+.flight-director-analytics-table.is-resource-history .resource-action {
+  width: 5%;
+}
+
+.flight-director-analytics-table.is-resource-history th,
+.flight-director-analytics-table.is-resource-history td {
+  overflow: hidden;
+  padding-inline: 6px;
+  text-overflow: ellipsis;
+}
+
+.flight-director-analytics-table.is-resource-history .resource-history-action {
+  overflow: visible;
+  padding-inline: 4px;
+  text-align: center;
+}
+
+.flight-director-analytics-table.is-resource-history .resource-history-action .ds-icon-button {
+  margin-inline: auto;
+}
+
 .analytics-pagination {
   display: flex;
   align-items: center;
