@@ -86,7 +86,7 @@ const JSON_HEADERS = { "content-type": "application/json; charset=utf-8" } as co
 const FORECAST_TICK_INTERVAL_MS = 30_000;
 const FORECAST_COMMAND_DEBOUNCE_MS = 150;
 const ASSIST_CLAIM_TTL_MS = 30 * 60_000;
-const DISPATCH_RECOMMENDATION_LEASE_TTL_MS = 90_000;
+const DISPATCH_RECOMMENDATION_LEASE_TTL_MS = 5 * 60_000;
 
 interface StoredTicketGroupRecall {
   id: string;
@@ -110,6 +110,8 @@ interface StoredDispatchRecommendationLease {
   occupied_seats: number;
   available_seats: number;
   decision_reasons_json: string;
+  operation_day_version: number;
+  member_rotation_ids_json: string;
   status: "ACTIVE" | "RELEASED" | "EXPIRED" | "CONSUMED" | "INVALIDATED";
   acquired_at: string;
   expires_at: string;
@@ -744,6 +746,7 @@ export class EventCoordinator extends DurableObject<Env> {
         `SELECT id, operation_day_id, aircraft_id, operator_account_id, device_id,
                 acquire_command_id, dispatch_plan_revision, dispatch_batch_id, dispatch_order,
                 ticket_group_ids_json, occupied_seats, available_seats, decision_reasons_json,
+                operation_day_version, member_rotation_ids_json,
                 status, acquired_at, expires_at, version
            FROM dispatch_recommendation_leases
           WHERE id = ?1 AND operation_day_id = ?2`,
@@ -831,6 +834,7 @@ export class EventCoordinator extends DurableObject<Env> {
       `SELECT id, operation_day_id, aircraft_id, operator_account_id, device_id,
               acquire_command_id, dispatch_plan_revision, dispatch_batch_id, dispatch_order,
               ticket_group_ids_json, occupied_seats, available_seats, decision_reasons_json,
+              operation_day_version, member_rotation_ids_json,
               status, acquired_at, expires_at, version
          FROM dispatch_recommendation_leases
         WHERE acquire_command_id = ?1`,
@@ -925,13 +929,14 @@ export class EventCoordinator extends DurableObject<Env> {
       `SELECT id, operation_day_id, aircraft_id, operator_account_id, device_id,
               acquire_command_id, dispatch_plan_revision, dispatch_batch_id, dispatch_order,
               ticket_group_ids_json, occupied_seats, available_seats, decision_reasons_json,
+              operation_day_version, member_rotation_ids_json,
               status, acquired_at, expires_at, version
          FROM dispatch_recommendation_leases
         WHERE operation_day_id = ?1 AND operator_account_id = ?2 AND device_id = ?3
-          AND status = 'ACTIVE' AND expires_at > ?4
+          AND status = 'ACTIVE' AND expires_at > ?4 AND operation_day_version = ?5
         LIMIT 1`,
     )
-      .bind(eventId, accountId, deviceId, nowIso)
+      .bind(eventId, accountId, deviceId, nowIso, event.version)
       .first<StoredDispatchRecommendationLease>();
     if (ownedLease) {
       if (ownedLease.aircraft_id === aircraft.id) {
@@ -953,9 +958,10 @@ export class EventCoordinator extends DurableObject<Env> {
          FROM dispatch_recommendation_leases lease
         WHERE lease.operation_day_id = ?1 AND lease.aircraft_id = ?2
           AND lease.status = 'ACTIVE' AND lease.expires_at > ?3
+          AND lease.operation_day_version = ?4
         LIMIT 1`,
     )
-      .bind(eventId, aircraft.id, nowIso)
+      .bind(eventId, aircraft.id, nowIso, event.version)
       .first<{ id: string }>();
     if (aircraftLease) {
       return json(
@@ -993,6 +999,7 @@ export class EventCoordinator extends DurableObject<Env> {
              WHERE lease.operation_day_id = r.operation_day_id
                AND lease.dispatch_batch_id = r.dispatch_batch_id
                AND lease.status = 'ACTIVE' AND lease.expires_at > ?5
+               AND lease.operation_day_version = ?4
           )
         ORDER BY r.dispatch_order,
                  CASE WHEN r.forecast_assumed_aircraft_id = ?6 THEN 0 ELSE 1 END,
@@ -1027,6 +1034,93 @@ export class EventCoordinator extends DurableObject<Env> {
       );
     }
 
+    const memberRows = await this.env.DB.prepare(
+      `SELECT r.id AS rotation_id,
+              COALESCE(json_group_array(DISTINCT tg.id), '[]') AS ticket_group_ids_json,
+              COUNT(DISTINCT rt.ticket_id) AS ticket_count
+         FROM rotations r
+         JOIN rotation_tickets rt ON rt.rotation_id = r.id AND rt.released_at IS NULL
+         JOIN tickets t ON t.id = rt.ticket_id
+         JOIN ticket_groups tg ON tg.id = t.ticket_group_id
+        WHERE r.operation_day_id = ?1 AND r.status = 'DRAFT'
+          AND r.dispatch_plan_revision = ?2 AND r.dispatch_batch_id = ?3
+        GROUP BY r.id
+        ORDER BY r.id`,
+    )
+      .bind(eventId, candidate.dispatch_plan_revision, candidate.dispatch_batch_id)
+      .all<{
+        rotation_id: string;
+        ticket_group_ids_json: string;
+        ticket_count: number;
+      }>();
+    const memberRotationIds = memberRows.results.map((member) => member.rotation_id);
+    const memberRotationByGroupId = new Map<string, string>();
+    let liveOccupiedSeats = 0;
+    let duplicatedBookingGroup = false;
+    for (const member of memberRows.results) {
+      liveOccupiedSeats += Number(member.ticket_count);
+      for (const groupId of JSON.parse(member.ticket_group_ids_json) as string[]) {
+        if (memberRotationByGroupId.has(groupId)) duplicatedBookingGroup = true;
+        memberRotationByGroupId.set(groupId, member.rotation_id);
+      }
+    }
+    const candidateGroupIds = (JSON.parse(candidate.dispatch_group_ids_json) as unknown[]).filter(
+      (value): value is string => typeof value === "string",
+    );
+    const distinctCandidateGroupIds = [...new Set(candidateGroupIds)];
+    const placeholders = distinctCandidateGroupIds.map((_, index) => `?${index + 2}`).join(", ");
+    const nextSegments =
+      distinctCandidateGroupIds.length === 0
+        ? { results: [] as Array<{ ticket_group_id: string; rotation_id: string | null }> }
+        : await this.env.DB.prepare(
+            `SELECT tg.id AS ticket_group_id,
+                    (SELECT candidate_rotation.id
+                       FROM tickets candidate_ticket
+                       JOIN rotation_tickets candidate_assignment
+                         ON candidate_assignment.ticket_id = candidate_ticket.id
+                        AND candidate_assignment.released_at IS NULL
+                       JOIN rotations candidate_rotation
+                         ON candidate_rotation.id = candidate_assignment.rotation_id
+                       JOIN flight_groups candidate_group
+                         ON candidate_group.id = candidate_rotation.flight_group_id
+                      WHERE candidate_ticket.ticket_group_id = tg.id
+                        AND candidate_rotation.status = 'DRAFT'
+                      GROUP BY candidate_rotation.id, candidate_group.queue_position,
+                               candidate_group.communication_number
+                      ORDER BY COALESCE(candidate_group.queue_position,
+                                        candidate_group.communication_number),
+                               candidate_group.communication_number, candidate_rotation.id
+                      LIMIT 1) AS rotation_id
+               FROM ticket_groups tg
+              WHERE tg.operation_day_id = ?1 AND tg.id IN (${placeholders})`,
+          )
+            .bind(eventId, ...distinctCandidateGroupIds)
+            .all<{ ticket_group_id: string; rotation_id: string | null }>();
+    const recommendationIsConsistent =
+      memberRotationIds.length > 0 &&
+      !duplicatedBookingGroup &&
+      distinctCandidateGroupIds.length === candidateGroupIds.length &&
+      distinctCandidateGroupIds.length === memberRotationByGroupId.size &&
+      distinctCandidateGroupIds.every((groupId) => memberRotationByGroupId.has(groupId)) &&
+      nextSegments.results.length === distinctCandidateGroupIds.length &&
+      nextSegments.results.every(
+        (segment) => memberRotationByGroupId.get(segment.ticket_group_id) === segment.rotation_id,
+      ) &&
+      liveOccupiedSeats === candidate.dispatch_occupied_seats &&
+      liveOccupiedSeats <= aircraft.passenger_seats;
+    if (!recommendationIsConsistent) {
+      return json(
+        {
+          error: {
+            code: "DISPATCH_RECOMMENDATION_INVALID",
+            message:
+              "Der aktuelle Belegungsvorschlag stimmt nicht mit den offenen Segmenten überein.",
+          },
+        },
+        { status: 409 },
+      );
+    }
+
     const expiredLeases = await this.env.DB.prepare(
       `SELECT id, aircraft_id, dispatch_batch_id, version
          FROM dispatch_recommendation_leases
@@ -1034,11 +1128,17 @@ export class EventCoordinator extends DurableObject<Env> {
     )
       .bind(eventId, nowIso)
       .all<{ id: string; aircraft_id: string; dispatch_batch_id: string; version: number }>();
+    const invalidatedLeases = await this.env.DB.prepare(
+      `SELECT id, aircraft_id, dispatch_batch_id, version
+         FROM dispatch_recommendation_leases
+        WHERE operation_day_id = ?1 AND status = 'ACTIVE'
+          AND expires_at > ?2 AND operation_day_version <> ?3`,
+    )
+      .bind(eventId, nowIso, event.version)
+      .all<{ id: string; aircraft_id: string; dispatch_batch_id: string; version: number }>();
     const leaseIdValue = crypto.randomUUID();
     const expiresAt = new Date(now.getTime() + DISPATCH_RECOMMENDATION_LEASE_TTL_MS).toISOString();
-    const groupIds = (JSON.parse(candidate.dispatch_group_ids_json) as unknown[]).filter(
-      (value): value is string => typeof value === "string",
-    );
+    const groupIds = distinctCandidateGroupIds;
     const decisionReasons = (
       JSON.parse(candidate.dispatch_decision_reasons_json) as unknown[]
     ).filter((value): value is string => typeof value === "string");
@@ -1064,9 +1164,11 @@ export class EventCoordinator extends DurableObject<Env> {
       dispatch_batch_id: candidate.dispatch_batch_id,
       dispatch_order: candidate.dispatch_order,
       ticket_group_ids_json: JSON.stringify(groupIds),
-      occupied_seats: candidate.dispatch_occupied_seats,
-      available_seats: Math.max(0, aircraft.passenger_seats - candidate.dispatch_occupied_seats),
+      occupied_seats: liveOccupiedSeats,
+      available_seats: Math.max(0, aircraft.passenger_seats - liveOccupiedSeats),
       decision_reasons_json: JSON.stringify(decisionReasons),
+      operation_day_version: event.version,
+      member_rotation_ids_json: JSON.stringify(memberRotationIds),
       status: "ACTIVE",
       acquired_at: nowIso,
       expires_at: expiresAt,
@@ -1102,6 +1204,37 @@ export class EventCoordinator extends DurableObject<Env> {
         ),
       ];
     });
+    const invalidationStatements = invalidatedLeases.results.flatMap((invalidatedLease) => {
+      const payload = {
+        action: "INVALIDATED",
+        leaseId: invalidatedLease.id,
+        aircraftId: invalidatedLease.aircraft_id,
+        batchId: invalidatedLease.dispatch_batch_id,
+        operationDayVersion: event.version,
+      };
+      return [
+        this.env.DB.prepare(
+          `UPDATE dispatch_recommendation_leases
+              SET status = 'INVALIDATED', invalidated_at = ?1, version = version + 1
+            WHERE id = ?2 AND status = 'ACTIVE' AND version = ?3`,
+        ).bind(nowIso, invalidatedLease.id, invalidatedLease.version),
+        this.env.DB.prepare(
+          `INSERT INTO operational_events
+            (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type,
+             aggregate_id, aggregate_version, payload_json)
+           VALUES (?1, ?2, 'DISPATCH_RECOMMENDATION_LEASE_INVALIDATED', ?3, ?4,
+                   'DISPATCH_LEASE', ?5, ?6, ?7)`,
+        ).bind(
+          crypto.randomUUID(),
+          eventId,
+          nowIso,
+          deviceId,
+          invalidatedLease.id,
+          invalidatedLease.version + 1,
+          JSON.stringify(payload),
+        ),
+      ];
+    });
     const payload = {
       action: "ACQUIRED",
       leaseId: lease.id,
@@ -1113,14 +1246,16 @@ export class EventCoordinator extends DurableObject<Env> {
     };
     await this.env.DB.batch([
       ...expirationStatements,
+      ...invalidationStatements,
       this.env.DB.prepare(
         `INSERT INTO dispatch_recommendation_leases
           (id, operation_day_id, aircraft_id, operator_account_id, device_id,
            acquire_command_id, dispatch_plan_revision, dispatch_batch_id, dispatch_order,
            ticket_group_ids_json, occupied_seats, available_seats, decision_reasons_json,
+           operation_day_version, member_rotation_ids_json,
            status, acquired_at, expires_at, version)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13,
-                 'ACTIVE', ?14, ?15, 1)`,
+                 ?14, ?15, 'ACTIVE', ?16, ?17, 1)`,
       ).bind(
         lease.id,
         eventId,
@@ -1135,6 +1270,8 @@ export class EventCoordinator extends DurableObject<Env> {
         lease.occupied_seats,
         lease.available_seats,
         lease.decision_reasons_json,
+        lease.operation_day_version,
+        lease.member_rotation_ids_json,
         nowIso,
         expiresAt,
       ),
@@ -2552,6 +2689,8 @@ export class EventCoordinator extends DurableObject<Env> {
                 rg.automatic_precall_enabled AS resource_group_precall_enabled,
                 p.id AS product_id,
                 COALESCE(MIN(tg.queue_sequence), 1) AS queue_sequence,
+                COALESCE(fg.queue_position, fg.communication_number) AS segment_order,
+                fg.communication_number,
                 COALESCE((SELECT json_group_array(group_ids.id) FROM (
                   SELECT DISTINCT member_group.id
                     FROM rotation_tickets member_assignment
@@ -2623,6 +2762,8 @@ export class EventCoordinator extends DurableObject<Env> {
           resource_group_precall_enabled: number;
           product_id: string | null;
           queue_sequence: number;
+          segment_order: number;
+          communication_number: number;
           current_group_ids_json: string;
           sold_at: string | null;
           standby: number;
@@ -3284,6 +3425,34 @@ export class EventCoordinator extends DurableObject<Env> {
             limits: { ...DEFAULT_DISPATCH_PLANNING_LIMITS },
           }
         : null;
+    const draftSegmentsByBookingGroup = new Map<string, typeof rotationRows.results>();
+    for (const rotation of rotationRows.results) {
+      if (rotation.status !== "DRAFT") continue;
+      const bookingGroupIds = JSON.parse(rotation.current_group_ids_json) as string[];
+      for (const bookingGroupId of bookingGroupIds) {
+        const segments = draftSegmentsByBookingGroup.get(bookingGroupId) ?? [];
+        segments.push(rotation);
+        draftSegmentsByBookingGroup.set(bookingGroupId, segments);
+      }
+    }
+    const dispatchPredecessorsByMember = new Map<string, Set<string>>();
+    for (const segments of draftSegmentsByBookingGroup.values()) {
+      segments.sort(
+        (left, right) =>
+          left.segment_order - right.segment_order ||
+          left.communication_number - right.communication_number ||
+          left.created_at.localeCompare(right.created_at) ||
+          left.id.localeCompare(right.id),
+      );
+      for (let index = 1; index < segments.length; index += 1) {
+        const current = segments[index];
+        const predecessor = segments[index - 1];
+        if (!current || !predecessor) continue;
+        const memberPredecessors = dispatchPredecessorsByMember.get(current.id) ?? new Set();
+        memberPredecessors.add(predecessor.id);
+        dispatchPredecessorsByMember.set(current.id, memberPredecessors);
+      }
+    }
     const forecastInput = {
       event: {
         eventId,
@@ -3365,6 +3534,9 @@ export class EventCoordinator extends DurableObject<Env> {
           resourceGroupStatus: rotation.resource_group_status,
           queueSequence: rotation.queue_sequence,
           dispatchGroupIds: JSON.parse(rotation.current_group_ids_json) as string[],
+          dispatchPredecessorMemberIds: [
+            ...(dispatchPredecessorsByMember.get(rotation.id) ?? new Set<string>()),
+          ],
           productId: rotation.product_id ?? `legacy-product:${rotation.id}`,
           gateId: rotation.gate_id ?? `legacy-gate:${rotation.resource_group_id}`,
           soldAt: rotation.sold_at ?? rotation.created_at,
@@ -3446,7 +3618,7 @@ export class EventCoordinator extends DurableObject<Env> {
           predictionQuality: projection.predictionQuality,
           predictedBoardingMinutes:
             projection.predictionLowerMinutes === null
-              ? Number.POSITIVE_INFINITY
+              ? Number.MAX_SAFE_INTEGER
               : Math.ceil(projection.predictionLowerMinutes),
           adaptiveLeadMinutes,
           prepareLeadMinutes: event.notification_lead_minutes,
@@ -7385,7 +7557,8 @@ export class EventCoordinator extends DurableObject<Env> {
           `SELECT id, operation_day_id, aircraft_id, operator_account_id, device_id,
                   acquire_command_id, dispatch_plan_revision, dispatch_batch_id,
                   dispatch_order, ticket_group_ids_json, occupied_seats, available_seats,
-                  decision_reasons_json, status, acquired_at, expires_at, version
+                  decision_reasons_json, operation_day_version, member_rotation_ids_json,
+                  status, acquired_at, expires_at, version
              FROM dispatch_recommendation_leases
             WHERE id = ?1 AND operation_day_id = ?2`,
         )
@@ -7414,18 +7587,36 @@ export class EventCoordinator extends DurableObject<Env> {
           );
         }
         const leaseGroupIds = (JSON.parse(lease.ticket_group_ids_json) as string[]).sort();
+        const leaseMemberRotationIds = (
+          JSON.parse(lease.member_rotation_ids_json) as string[]
+        ).sort();
         const selectedGroupIds = [...distinctGroupIds].sort();
+        const selectedMemberRotationIds = [
+          ...new Set(selectedGroups.map((group) => group.rotation_id)),
+        ].sort();
+        const selectedSeatCount = selectedGroups.reduce(
+          (sum, group) => sum + Number(group.ticket_count),
+          0,
+        );
         const leaseMatches =
           lease.operator_account_id === operatorAccountId &&
           lease.device_id === command.deviceId &&
           lease.aircraft_id === command.payload.aircraftId &&
+          lease.operation_day_version === current.version &&
           lease.dispatch_plan_revision === command.payload.dispatchRecommendation.planRevision &&
           lease.dispatch_batch_id === command.payload.dispatchRecommendation.batchId &&
           rotation.dispatch_operation_day_version === current.version &&
           rotation.dispatch_plan_revision === lease.dispatch_plan_revision &&
           rotation.dispatch_batch_id === lease.dispatch_batch_id &&
           leaseGroupIds.length === selectedGroupIds.length &&
-          leaseGroupIds.every((ticketGroupId, index) => ticketGroupId === selectedGroupIds[index]);
+          leaseGroupIds.every(
+            (ticketGroupId, index) => ticketGroupId === selectedGroupIds[index],
+          ) &&
+          leaseMemberRotationIds.length === selectedMemberRotationIds.length &&
+          leaseMemberRotationIds.every(
+            (rotationId, index) => rotationId === selectedMemberRotationIds[index],
+          ) &&
+          lease.occupied_seats === selectedSeatCount;
         if (!leaseMatches) {
           return json(
             {

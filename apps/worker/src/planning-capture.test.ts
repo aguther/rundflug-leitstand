@@ -114,6 +114,8 @@ describe("hybrid planning capture", () => {
     );
     expect(coordinatorSource).toContain("preparePlanningCapture");
     expect(coordinatorSource).toContain("planningRunId");
+    expect(coordinatorSource).toContain("? Number.MAX_SAFE_INTEGER");
+    expect(coordinatorSource).not.toContain("? Number.POSITIVE_INFINITY");
     expect(coordinatorSource).not.toContain(
       "if (!event || rotationRows.results.length === 0) return;",
     );

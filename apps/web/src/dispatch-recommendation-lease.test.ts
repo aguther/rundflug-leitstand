@@ -25,8 +25,18 @@ describe("dispatch recommendation lease UI", () => {
     expect(dialogSource).toContain("Vorschlag neu reservieren");
     expect(dialogSource).toContain("Manuelle Belegung – nicht reserviert");
     expect(dialogSource).toContain('dispatchLease.mode === "EXPIRED"');
+    expect(dialogSource).toContain('dispatchLease.mode === "REFRESHING"');
+    expect(dialogSource).toContain("dispatchLease.reservedEventVersion === eventVersion");
     expect(viewSource).toContain("dispatchRecommendationLeaseId");
+    expect(viewSource).toContain("dispatchLease.reservedEventVersion === board.event.version");
     expect(viewSource).toContain("await refresh(reason.currentVersion ?? 0, true)");
     expect(viewSource).toContain("Bitte den neuen Vorschlag erneut bestätigen.");
+  });
+
+  it("keeps the assignment dialog geometry and scroll ownership stable", () => {
+    expect(dialogSource).toContain('className="flight-director-assignment-modal"');
+    expect(dialogSource).toContain('className="flight-director-dispatch-slot"');
+    expect(dialogSource).toContain('className="flight-director-queue-scroll"');
+    expect(dialogSource).toContain('className="flight-director-selection-status"');
   });
 });

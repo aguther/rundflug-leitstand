@@ -5,6 +5,7 @@ import { acquireDispatchRecommendationLease, releaseDispatchRecommendationLease 
 export type DispatchRecommendationLeaseMode =
   | "IDLE"
   | "ACQUIRING"
+  | "REFRESHING"
   | "RESERVED"
   | "MANUAL"
   | "EXPIRED"
@@ -13,6 +14,7 @@ export type DispatchRecommendationLeaseMode =
 export interface DispatchRecommendationLeaseState {
   mode: DispatchRecommendationLeaseMode;
   lease: DispatchRecommendationLease | null;
+  reservedEventVersion: number | null;
   serverClockOffsetMs: number;
   error: string | null;
 }
@@ -39,6 +41,7 @@ interface LeaseHookOptions {
 const idleState: DispatchRecommendationLeaseState = {
   mode: "IDLE",
   lease: null,
+  reservedEventVersion: null,
   serverClockOffsetMs: 0,
   error: null,
 };
@@ -98,25 +101,39 @@ export function useDispatchRecommendationLease({
   const reserve = useCallback(
     async (aircraftId: string, expectedVersionOverride?: number) => {
       const current = stateRef.current;
-      if (current.mode === "RESERVED" && current.lease?.aircraftId === aircraftId) {
+      const targetEventVersion = expectedVersionOverride ?? expectedVersionRef.current;
+      if (
+        current.mode === "RESERVED" &&
+        current.lease?.aircraftId === aircraftId &&
+        current.reservedEventVersion === targetEventVersion
+      ) {
         return current.lease;
       }
-      if (current.lease) await release();
       const requestEpoch = requestEpochRef.current + 1;
       requestEpochRef.current = requestEpoch;
+      const previewLease = current.lease?.aircraftId === aircraftId ? current.lease : null;
       const acquiring: DispatchRecommendationLeaseState = {
-        mode: "ACQUIRING",
-        lease: null,
-        serverClockOffsetMs: 0,
+        mode: previewLease ? "REFRESHING" : "ACQUIRING",
+        lease: previewLease,
+        reservedEventVersion: null,
+        serverClockOffsetMs: previewLease ? current.serverClockOffsetMs : 0,
         error: null,
       };
       stateRef.current = acquiring;
       setState(acquiring);
       try {
+        if (current.lease) {
+          await releaseDispatchRecommendationLease(
+            eventId,
+            current.lease.leaseId,
+            deviceId,
+            deviceToken,
+          ).catch(() => undefined);
+        }
         const lease = await acquireDispatchRecommendationLease(eventId, deviceId, deviceToken, {
           commandId: crypto.randomUUID(),
           aircraftId,
-          expectedVersion: expectedVersionOverride ?? expectedVersionRef.current,
+          expectedVersion: targetEventVersion,
         });
         if (requestEpochRef.current !== requestEpoch) {
           void releaseDispatchRecommendationLease(
@@ -130,6 +147,7 @@ export function useDispatchRecommendationLease({
         const reserved: DispatchRecommendationLeaseState = {
           mode: "RESERVED",
           lease,
+          reservedEventVersion: targetEventVersion,
           serverClockOffsetMs: Date.parse(lease.serverNow) - Date.now(),
           error: null,
         };
@@ -138,10 +156,12 @@ export function useDispatchRecommendationLease({
         onReservedRef.current(lease.groupIds);
         return lease;
       } catch (reason) {
+        if (requestEpochRef.current !== requestEpoch) return null;
         const failed: DispatchRecommendationLeaseState = {
           mode: "ERROR",
-          lease: null,
-          serverClockOffsetMs: 0,
+          lease: previewLease,
+          reservedEventVersion: null,
+          serverClockOffsetMs: previewLease ? current.serverClockOffsetMs : 0,
           error:
             reason instanceof Error
               ? reason.message
@@ -152,14 +172,27 @@ export function useDispatchRecommendationLease({
         return null;
       }
     },
-    [deviceId, deviceToken, eventId, release],
+    [deviceId, deviceToken, eventId],
   );
+
+  useEffect(() => {
+    const current = stateRef.current;
+    if (
+      current.mode !== "RESERVED" ||
+      !current.lease ||
+      current.reservedEventVersion === expectedVersion
+    ) {
+      return;
+    }
+    void reserve(current.lease.aircraftId, expectedVersion);
+  }, [expectedVersion, reserve]);
 
   const switchToManual = useCallback(async () => {
     await release();
     const manual: DispatchRecommendationLeaseState = {
       mode: "MANUAL",
       lease: null,
+      reservedEventVersion: null,
       serverClockOffsetMs: 0,
       error: null,
     };
@@ -173,6 +206,7 @@ export function useDispatchRecommendationLease({
     const expired: DispatchRecommendationLeaseState = {
       ...stateRef.current,
       mode: "EXPIRED",
+      reservedEventVersion: null,
       error: null,
     };
     stateRef.current = expired;

@@ -101,6 +101,7 @@ export interface ForecastTimelineRotationInput {
   resourceGroupStatus: "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED";
   queueSequence: number;
   dispatchGroupIds?: readonly string[];
+  dispatchPredecessorMemberIds?: readonly string[];
   productId?: string;
   gateId?: string;
   soldAt?: string;
@@ -1556,6 +1557,7 @@ export function calculateForecastTimelineResult(
       {
         id: rotation.id,
         groupIds: [...(rotation.dispatchGroupIds ?? [rotation.id])],
+        predecessorMemberIds: [...(rotation.dispatchPredecessorMemberIds ?? [])],
         size: Math.max(1, Math.floor(rotation.passengerCount ?? 1)),
         productId: rotation.productId ?? rotation.productCode,
         resourceGroupId: rotation.resourceGroupId,

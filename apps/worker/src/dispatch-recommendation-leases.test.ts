@@ -1,7 +1,8 @@
 // @ts-expect-error Vitest runs in Node; the Worker production config intentionally excludes Node types.
 import { DatabaseSync } from "node:sqlite";
 import { describe, expect, it } from "vitest";
-import migration from "../migrations/0064_dispatch_recommendation_leases.sql?raw";
+import leaseMigration from "../migrations/0064_dispatch_recommendation_leases.sql?raw";
+import memberMigration from "../migrations/0066_dispatch_recommendation_lease_members.sql?raw";
 import coordinatorSource from "./event-coordinator.ts?raw";
 import { EVENT_DELETION_SQL } from "./event-deletion";
 import { FACTORY_RESET_DELETE_TABLES } from "./factory-reset";
@@ -15,7 +16,8 @@ function createLeaseDatabase(): DatabaseSync {
     CREATE TABLE aircraft (id TEXT PRIMARY KEY) STRICT;
     CREATE TABLE operator_accounts (id TEXT PRIMARY KEY) STRICT;
   `);
-  database.exec(migration);
+  database.exec(leaseMigration);
+  database.exec(memberMigration);
   database.exec(`
     INSERT INTO operation_days (id) VALUES ('event-a');
     INSERT INTO aircraft (id) VALUES ('aircraft-a'), ('aircraft-b');
@@ -115,7 +117,7 @@ describe("short-lived dispatch recommendation leases (F-BRD-010, Q-ZUV-020)", ()
   });
 
   it("serializes acquisition with CALL_NEXT and consumes a matching lease atomically", () => {
-    expect(coordinatorSource).toContain("DISPATCH_RECOMMENDATION_LEASE_TTL_MS = 90_000");
+    expect(coordinatorSource).toContain("DISPATCH_RECOMMENDATION_LEASE_TTL_MS = 5 * 60_000");
     expect(coordinatorSource).toContain("enqueueDispatchRecommendationLease");
     expect(coordinatorSource).toContain("this.commandTail.then");
     expect(coordinatorSource).toContain("DISPATCH_RECOMMENDATION_LEASE_MISMATCH");
@@ -125,10 +127,37 @@ describe("short-lived dispatch recommendation leases (F-BRD-010, Q-ZUV-020)", ()
     expect(coordinatorSource).toContain("lease.operator_account_id === operatorAccountId");
     expect(coordinatorSource).toContain("lease.device_id === command.deviceId");
     expect(coordinatorSource).toContain("lease.aircraft_id === command.payload.aircraftId");
+    expect(coordinatorSource).toContain("lease.operation_day_version === current.version");
+    expect(coordinatorSource).toContain("lease.member_rotation_ids_json");
+    expect(coordinatorSource).toContain("rotationId === selectedMemberRotationIds[index]");
+    expect(coordinatorSource).toContain("lease.occupied_seats === selectedSeatCount");
     expect(coordinatorSource).toContain(
       "dispatch_order, ticket_group_ids_json, occupied_seats, available_seats",
     );
     expect(coordinatorSource).toContain("'DISPATCH_LEASE', ?5, ?6, ?7)");
+  });
+
+  it("persists the event version and exact draft rotation members", () => {
+    const database = createLeaseDatabase();
+    insertLease(database, {
+      id: "lease-versioned",
+      aircraftId: "aircraft-a",
+      accountId: "account-a",
+      deviceId: "device-a",
+      commandId: "command-versioned",
+      batchId: "batch-versioned",
+    });
+
+    const lease = database
+      .prepare(
+        `SELECT operation_day_version, member_rotation_ids_json
+         FROM dispatch_recommendation_leases
+         WHERE id = 'lease-versioned'`,
+      )
+      .get() as { operation_day_version: number; member_rotation_ids_json: string };
+
+    expect(lease.operation_day_version).toBe(0);
+    expect(JSON.parse(lease.member_rotation_ids_json)).toEqual([]);
   });
 
   it("authorizes its routes and participates in every destructive lifecycle", () => {

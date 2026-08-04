@@ -260,6 +260,7 @@ export function FlightLineView() {
               : [selectedRotation.ticketGroupId];
         const reservedRecommendationSelected = Boolean(
           dispatchLease.mode === "RESERVED" &&
+            dispatchLease.reservedEventVersion === board.event.version &&
             dispatchLease.lease?.groupIds.length === ticketGroupIds.length &&
             [...(dispatchLease.lease?.groupIds ?? [])]
               .sort()
@@ -1316,7 +1317,10 @@ export function FlightLineView() {
               selectedAircraft;
             return advance(rotation, rotationAircraft, nextAircraftState, queueDeviationReason);
           }}
-          onReserveAssignment={(aircraftId) => dispatchLease.reserve(aircraftId)}
+          onReserveAssignment={(aircraftId) => {
+            setSelectedQueueGroupIds([]);
+            return dispatchLease.reserve(aircraftId);
+          }}
           onSetAircraftState={requestAircraftState}
           selectedQueueGroupIds={selectedQueueGroupIds}
         />
@@ -1361,7 +1365,10 @@ export function FlightLineView() {
             setDispositionOpen(false);
             setDetailsOpen(false);
           }}
-          onReserveAssignment={(aircraftId) => dispatchLease.reserve(aircraftId)}
+          onReserveAssignment={(aircraftId) => {
+            setSelectedQueueGroupIds([]);
+            return dispatchLease.reserve(aircraftId);
+          }}
           onToggleGroup={(ticketGroupId, isSelected) => {
             setSelectedQueueGroupIds((current) =>
               isSelected

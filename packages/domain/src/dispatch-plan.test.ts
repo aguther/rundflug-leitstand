@@ -324,6 +324,33 @@ describe("createDispatchPlan", () => {
     expect(replanned.batches.every((batch) => batch.occupiedSeats <= 3)).toBe(true);
   });
 
+  it("dispatches split booking-group segments in order and never combines them", () => {
+    const plan = createDispatchPlan({
+      now: NOW,
+      groups: [
+        group("split-part-1", 3, 1, { groupIds: ["booking-split"] }),
+        group("split-part-2", 1, 1, {
+          groupIds: ["booking-split"],
+          predecessorMemberIds: ["split-part-1"],
+        }),
+        group("single-a", 1, 2),
+        group("single-b", 1, 3),
+      ],
+      lanes: [lane("three-seat", 3)],
+      limits: { maximumWaves: 3 },
+    });
+
+    const firstPartBatch = plan.batches.find((batch) => batch.memberIds.includes("split-part-1"));
+    const secondPartBatch = plan.batches.find((batch) => batch.memberIds.includes("split-part-2"));
+
+    expect(firstPartBatch?.occupiedSeats).toBe(3);
+    expect(secondPartBatch?.dispatchOrder).toBeGreaterThan(firstPartBatch?.dispatchOrder ?? 0);
+    expect(
+      plan.batches.every((batch) => new Set(batch.groupIds).size === batch.groupIds.length),
+    ).toBe(true);
+    expect(plan.batches.every((batch) => batch.occupiedSeats <= 3)).toBe(true);
+  });
+
   it("is deterministic, product-pure and does not mutate queue input", () => {
     const groups = [
       group("a", 1, 1),

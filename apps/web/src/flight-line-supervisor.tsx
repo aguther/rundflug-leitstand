@@ -820,6 +820,7 @@ export function FlightLineSupervisorConsole({
         aircraft={selectedAircraft}
         confirmDisabled={assignmentBlocked}
         dispatchLease={dispatchLease}
+        eventVersion={board.event.version}
         groups={compatibleGroups}
         headerActions={
           <IconButton

@@ -45,6 +45,8 @@ export interface DispatchGroupInput {
   id: string;
   /** Booking groups contained in this indivisible segment. */
   groupIds: readonly string[];
+  /** Earlier draft segments that must be dispatched before this segment becomes eligible. */
+  predecessorMemberIds?: readonly string[];
   size: number;
   productId: string;
   resourceGroupId: string;
@@ -264,9 +266,11 @@ function normalizeGroup(
   if (
     !group.id ||
     group.groupIds.length === 0 ||
-    new Set(group.groupIds).size !== group.groupIds.length
+    new Set(group.groupIds).size !== group.groupIds.length ||
+    new Set(group.predecessorMemberIds ?? []).size !== (group.predecessorMemberIds ?? []).length ||
+    group.predecessorMemberIds?.includes(group.id)
   ) {
-    throw new Error("Dispatch group identifiers must be non-empty and unique.");
+    throw new Error("Dispatch group identifiers and predecessors must be non-empty and unique.");
   }
   if (!Number.isInteger(group.size) || group.size <= 0) {
     throw new Error(`Dispatch group ${group.id} has an invalid size.`);
@@ -283,6 +287,7 @@ function normalizeGroup(
   return {
     ...group,
     groupIds: [...group.groupIds],
+    predecessorMemberIds: [...(group.predecessorMemberIds ?? [])],
     waitMinutes,
     priorOvertakeCount,
     productServiceDeficit: Math.max(0, group.productServiceDeficit ?? 0),
@@ -525,13 +530,17 @@ function enumerateCandidates(
   previousMembers: ReadonlySet<string>,
   hardLaneByMember: ReadonlyMap<string, string>,
 ): CandidateBatch[] {
-  const lockedHere = remaining.filter(
+  const remainingIds = new Set(remaining.map((group) => group.id));
+  const eligible = remaining.filter((group) =>
+    (group.predecessorMemberIds ?? []).every((predecessorId) => !remainingIds.has(predecessorId)),
+  );
+  const lockedHere = eligible.filter(
     (group) =>
       group.publicStatus === "COME_TO_FLIGHT_LINE" && hardLaneByMember.get(group.id) === lane.id,
   );
   const lockedHereIds = new Set(lockedHere.map((group) => group.id));
   const byProductAndGate = new Map<string, NormalizedGroup[]>();
-  for (const group of remaining) {
+  for (const group of eligible) {
     const lockedLane =
       group.publicStatus === "COME_TO_FLIGHT_LINE" ? hardLaneByMember.get(group.id) : undefined;
     if (lockedLane !== undefined && lockedLane !== lane.id) continue;
@@ -547,7 +556,12 @@ function enumerateCandidates(
     ([left], [right]) => left.localeCompare(right),
   )) {
     const ordered = [...productGroups].sort(groupOrder).slice(0, limits.maximumGroupsPerProduct);
-    const visit = (index: number, chosen: NormalizedGroup[], occupiedSeats: number): void => {
+    const visit = (
+      index: number,
+      chosen: NormalizedGroup[],
+      occupiedSeats: number,
+      chosenGroupIds: ReadonlySet<string>,
+    ): void => {
       if (unique.size >= generationLimit) return;
       if (index >= ordered.length) {
         if (chosen.length > 0) {
@@ -557,18 +571,34 @@ function enumerateCandidates(
         return;
       }
       const group = ordered[index];
-      if (group && occupiedSeats + group.size <= lane.passengerSeats) {
-        visit(index + 1, [...chosen, group], occupiedSeats + group.size);
+      const overlapsBookingGroup = group?.groupIds.some((groupId) => chosenGroupIds.has(groupId));
+      if (group && !overlapsBookingGroup && occupiedSeats + group.size <= lane.passengerSeats) {
+        visit(
+          index + 1,
+          [...chosen, group],
+          occupiedSeats + group.size,
+          new Set([...chosenGroupIds, ...group.groupIds]),
+        );
       }
-      visit(index + 1, chosen, occupiedSeats);
+      visit(index + 1, chosen, occupiedSeats, chosenGroupIds);
     };
-    visit(0, [], 0);
+    visit(0, [], 0, new Set());
     for (const start of ordered) {
       const greedy = [start];
       let occupiedSeats = start.size;
+      const greedyGroupIds = new Set(start.groupIds);
       for (const group of ordered) {
-        if (group.id === start.id || occupiedSeats + group.size > lane.passengerSeats) continue;
+        if (
+          group.id === start.id ||
+          group.groupIds.some((groupId) => greedyGroupIds.has(groupId)) ||
+          occupiedSeats + group.size > lane.passengerSeats
+        ) {
+          continue;
+        }
         greedy.push(group);
+        group.groupIds.forEach((groupId) => {
+          greedyGroupIds.add(groupId);
+        });
         occupiedSeats += group.size;
       }
       const candidate = buildCandidate(greedy, remaining, lane, previousMembers);
@@ -776,6 +806,14 @@ export function createDispatchPlan(input: DispatchPlanInput): DispatchPlan {
     seenIds.add(group.id);
     return normalizeGroup(group, nowMs, limits);
   });
+  for (const group of normalizedGroups) {
+    for (const predecessorId of group.predecessorMemberIds ?? []) {
+      const predecessor = normalizedGroups.find((entry) => entry.id === predecessorId);
+      if (!predecessor || predecessor.resourceGroupId !== group.resourceGroupId) {
+        throw new Error(`Dispatch group ${group.id} has an invalid predecessor ${predecessorId}.`);
+      }
+    }
+  }
   const normalizedLanes = input.lanes.map(normalizeLane);
   const previousSlots = previousSlotMembers(input.previousPlan);
   const hardLaneByMember = new Map<string, string>();
