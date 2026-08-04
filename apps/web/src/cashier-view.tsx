@@ -45,6 +45,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -69,6 +70,11 @@ import {
   cashierProductOrderChanged,
   moveCashierProduct,
 } from "./features/cashier/cashier-product-order";
+import {
+  applyOperationBoardTicketStatuses,
+  mergeRevalidatedTicketGroups,
+  ticketGroupIdBatches,
+} from "./features/cashier/cashier-ticket-status-sync";
 import { useTemporaryRowHighlights } from "./features/cashier/use-temporary-row-highlights";
 import {
   appendCashierDraftRevision,
@@ -272,14 +278,23 @@ export function CashierView() {
   const [printBusy, setPrintBusy] = useState(false);
   const [manualRefreshBusy, setManualRefreshBusy] = useState(false);
   const ticketListRequestRef = useRef(0);
+  const ticketStatusRefreshRef = useRef<{ controller: AbortController | null; id: number }>({
+    controller: null,
+    id: 0,
+  });
   const ticketListSentinelRef = useRef<HTMLDivElement | null>(null);
   const printDocumentRef = useRef<HTMLDivElement | null>(null);
   const ticketListResultCountRef = useRef(0);
   const ticketListNextCursorRef = useRef<string | null>(null);
+  const ticketSearchResultsRef = useRef<TicketSearchResult[]>([]);
   const previousCashierAccountFilterRef = useRef("");
   const lastTicketListBoardVersionRef = useRef<number | null>(null);
   const receiptRequestRef = useRef(0);
-  const selectedTicketGroup = ticketSearchResults.find(
+  const operationalTicketGroups = useMemo(
+    () => applyOperationBoardTicketStatuses(ticketSearchResults, board?.rotations),
+    [board?.rotations, ticketSearchResults],
+  );
+  const selectedTicketGroup = operationalTicketGroups.find(
     (entry) => entry.ticketGroupId === lastTicketGroupId,
   );
   const effectiveCashierAccountFilter = onlyOwnTickets
@@ -289,12 +304,16 @@ export function CashierView() {
     board?.rotations.filter((rotation) =>
       rotation.bookingGroups.some((group) => group.id === lastTicketGroupId),
     ) ?? [];
-  const visibleTicketGroups = ticketSearchResults.filter((entry) =>
-    ticketListTab === "CANCELED"
-      ? entry.groupStatus === "CANCELED"
-      : ticketListTab === "OPEN"
-        ? entry.groupStatus !== "CANCELED" && entry.groupStatus !== "COMPLETED"
-        : entry.groupStatus !== "CANCELED",
+  const visibleTicketGroups = useMemo(
+    () =>
+      operationalTicketGroups.filter((entry) =>
+        ticketListTab === "CANCELED"
+          ? entry.groupStatus === "CANCELED"
+          : ticketListTab === "OPEN"
+            ? entry.groupStatus !== "CANCELED" && entry.groupStatus !== "COMPLETED"
+            : entry.groupStatus !== "CANCELED",
+      ),
+    [operationalTicketGroups, ticketListTab],
   );
   const { highlightedIds: newlySoldTicketGroupIds, queueHighlight: queueSaleHighlight } =
     useTemporaryRowHighlights(visibleTicketGroups.map((entry) => entry.ticketGroupId));
@@ -335,15 +354,25 @@ export function CashierView() {
     return ticket;
   }
 
+  const cancelTicketStatusRefresh = useCallback(() => {
+    ticketStatusRefreshRef.current.controller?.abort();
+    ticketStatusRefreshRef.current = {
+      controller: null,
+      id: ticketStatusRefreshRef.current.id + 1,
+    };
+  }, []);
+
   const resetTicketListState = useCallback(() => {
+    cancelTicketStatusRefresh();
     ticketListRequestRef.current += 1;
     ticketListResultCountRef.current = 0;
     ticketListNextCursorRef.current = null;
+    ticketSearchResultsRef.current = [];
     setTicketSearchResults([]);
     setTicketListNextCursor(null);
     setLastTicketGroupId(null);
     setReceipt(null);
-  }, []);
+  }, [cancelTicketStatusRefresh]);
 
   const loadTicketList = useCallback(
     async ({
@@ -362,6 +391,7 @@ export function CashierView() {
       soldByOperatorAccountId?: string;
     } = {}) => {
       if (!serverConfirmed) return;
+      cancelTicketStatusRefresh();
       const requestId = ++ticketListRequestRef.current;
       setTicketListLoading(true);
       try {
@@ -408,6 +438,7 @@ export function CashierView() {
             ];
           }
           ticketListResultCountRef.current = nextResults.length;
+          ticketSearchResultsRef.current = nextResults;
           return nextResults;
         });
         ticketListNextCursorRef.current = response.nextCursor;
@@ -424,7 +455,13 @@ export function CashierView() {
         if (requestId === ticketListRequestRef.current) setTicketListLoading(false);
       }
     },
-    [effectiveCashierAccountFilter, serverConfirmed, ticketListTab, ticketSearchQuery],
+    [
+      cancelTicketStatusRefresh,
+      effectiveCashierAccountFilter,
+      serverConfirmed,
+      ticketListTab,
+      ticketSearchQuery,
+    ],
   );
 
   const mergeTicketGroupsById = useCallback(
@@ -458,11 +495,68 @@ export function CashierView() {
           ...current.filter((entry) => !updatedIds.has(entry.ticketGroupId)),
         ];
         ticketListResultCountRef.current = nextResults.length;
+        ticketSearchResultsRef.current = nextResults;
         return nextResults;
       });
     },
     [effectiveCashierAccountFilter, serverConfirmed, session?.account.id],
   );
+
+  const revalidateLoadedTicketGroups = useCallback(async () => {
+    if (!serverConfirmed) return;
+    const ticketGroupIds = ticketSearchResultsRef.current.map((result) => result.ticketGroupId);
+    if (ticketGroupIds.length === 0) return;
+
+    ticketStatusRefreshRef.current.controller?.abort();
+    const controller = new AbortController();
+    const refreshId = ticketStatusRefreshRef.current.id + 1;
+    const ticketListRequestId = ticketListRequestRef.current;
+    ticketStatusRefreshRef.current = { controller, id: refreshId };
+
+    try {
+      const responses = await Promise.all(
+        ticketGroupIdBatches(ticketGroupIds).map((batch) =>
+          searchTickets(
+            EVENT_ID,
+            CASHIER_DEVICE_ID,
+            deviceTokenFor(CASHIER_DEVICE_ID),
+            {
+              q: "",
+              status: "ACTIVE",
+              limit: batch.length,
+              ticketGroupIds: batch,
+              ...(effectiveCashierAccountFilter
+                ? { soldByOperatorAccountId: effectiveCashierAccountFilter }
+                : {}),
+            },
+            { signal: controller.signal },
+          ),
+        ),
+      );
+      if (
+        controller.signal.aborted ||
+        refreshId !== ticketStatusRefreshRef.current.id ||
+        ticketListRequestId !== ticketListRequestRef.current
+      ) {
+        return;
+      }
+      const refreshed = responses.flatMap((response) => response.results);
+      setTicketSearchResults((current) => {
+        const nextResults = mergeRevalidatedTicketGroups(current, refreshed);
+        ticketListResultCountRef.current = nextResults.length;
+        ticketSearchResultsRef.current = nextResults;
+        return nextResults;
+      });
+    } catch (reason) {
+      if (reason instanceof DOMException && reason.name === "AbortError") return;
+      // The operation board already provides the live completion state. The next board event,
+      // focus refresh, or manual refresh retries the persistent ticket projection quietly.
+    } finally {
+      if (refreshId === ticketStatusRefreshRef.current.id) {
+        ticketStatusRefreshRef.current = { controller: null, id: refreshId };
+      }
+    }
+  }, [effectiveCashierAccountFilter, serverConfirmed]);
 
   async function reopenTicketGroup(
     ticketGroupId: string,
@@ -511,6 +605,7 @@ export function CashierView() {
   useEffect(() => {
     localStorage.removeItem(legacyCashierDraftQueueKey(EVENT_ID, CASHIER_DEVICE_ID));
   }, []);
+  useEffect(() => () => cancelTicketStatusRefresh(), [cancelTicketStatusRefresh]);
   useEffect(() => {
     void loadLoginAccounts()
       .then((accounts) =>
@@ -531,11 +626,13 @@ export function CashierView() {
     }
     if (lastTicketListBoardVersionRef.current === boardVersion) return;
     lastTicketListBoardVersionRef.current = boardVersion;
-    void loadTicketList({ preserveLoaded: true });
-  }, [board?.event.version, loadTicketList]);
+    void revalidateLoadedTicketGroups();
+  }, [board?.event.version, revalidateLoadedTicketGroups]);
   useEffect(() => {
     const refreshOnFocus = () => {
-      if (document.visibilityState === "visible") void loadTicketList({ preserveLoaded: true });
+      if (document.visibilityState === "visible") {
+        void loadTicketList({ preserveLoaded: true }).then(revalidateLoadedTicketGroups);
+      }
     };
     window.addEventListener("focus", refreshOnFocus);
     document.addEventListener("visibilitychange", refreshOnFocus);
@@ -543,7 +640,19 @@ export function CashierView() {
       window.removeEventListener("focus", refreshOnFocus);
       document.removeEventListener("visibilitychange", refreshOnFocus);
     };
-  }, [loadTicketList]);
+  }, [loadTicketList, revalidateLoadedTicketGroups]);
+  useEffect(() => {
+    if (
+      lastTicketGroupId &&
+      visibleTicketGroups.some((group) => group.ticketGroupId === lastTicketGroupId)
+    ) {
+      return;
+    }
+    const nextTicketGroupId = visibleTicketGroups[0]?.ticketGroupId ?? null;
+    if (nextTicketGroupId === lastTicketGroupId) return;
+    setLastTicketGroupId(nextTicketGroupId);
+    setReceipt(null);
+  }, [lastTicketGroupId, visibleTicketGroups]);
   useEffect(() => {
     const sentinel = ticketListSentinelRef.current;
     if (!sentinel || !ticketListNextCursor) return;
@@ -857,6 +966,7 @@ export function CashierView() {
     setManualRefreshBusy(true);
     try {
       await loadTicketList({ preserveLoaded: true });
+      await revalidateLoadedTicketGroups();
     } finally {
       setManualRefreshBusy(false);
     }

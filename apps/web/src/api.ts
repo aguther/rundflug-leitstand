@@ -360,6 +360,7 @@ export async function searchTickets(
   deviceId: string,
   deviceToken: string,
   input: string | Partial<TicketSearchRequest>,
+  requestOptions?: Pick<RequestInit, "signal">,
 ): Promise<TicketSearchResponse> {
   const options = typeof input === "string" ? { q: input } : input;
   const params = new URLSearchParams();
@@ -373,6 +374,7 @@ export async function searchTickets(
   for (const ticketGroupId of options.ticketGroupIds ?? []) params.append("id", ticketGroupId);
   const response = await apiFetch(controlApiPath(eventId, `/tickets/search?${params.toString()}`), {
     headers: deviceHeaders(deviceId, deviceToken),
+    ...(requestOptions?.signal ? { signal: requestOptions.signal } : {}),
   });
   if (!response.ok) throw new Error("Ticketsuche nicht verfügbar.");
   return ticketSearchResponseSchema.parse(await response.json());
