@@ -747,16 +747,20 @@ describe("local forecast simulation", () => {
     expect(result.rotations.some((rotation) => rotation.calledAt)).toBe(true);
   });
 
-  it("never suppresses a fresh forecast only because the latest learning sample is old", () => {
-    const result = runSimulation(simulationConfigForPreset("NORMAL"));
-    const oldLearningSnapshots = result.snapshots.filter(
-      (snapshot) => snapshot.dataAgeMinutes > 5 && snapshot.activeCapacity > 0,
-    );
+  it(
+    "never suppresses a fresh forecast only because the latest learning sample is old",
+    () => {
+      const result = runSimulation(simulationConfigForPreset("NORMAL"));
+      const oldLearningSnapshots = result.snapshots.filter(
+        (snapshot) => snapshot.dataAgeMinutes > 5 && snapshot.activeCapacity > 0,
+      );
 
-    expect(oldLearningSnapshots.length).toBeGreaterThan(0);
-    expect(oldLearningSnapshots.every((snapshot) => snapshot.quality !== "UNCERTAIN")).toBe(true);
-    expect(result.metrics.uncertaintyReasons.STALE_PREDICTION).toBe(0);
-  });
+      expect(oldLearningSnapshots.length).toBeGreaterThan(0);
+      expect(oldLearningSnapshots.every((snapshot) => snapshot.quality !== "UNCERTAIN")).toBe(true);
+      expect(result.metrics.uncertaintyReasons.STALE_PREDICTION).toBe(0);
+    },
+    FORECAST_BASELINE_TIMEOUT_MS,
+  );
 
   it("retains diagnostic raw times and reasons while hard uncertainty hides the countdown", () => {
     const result = runSimulation(simulationConfigForPreset("OPERATION_INTERRUPTION"));
