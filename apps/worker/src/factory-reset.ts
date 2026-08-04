@@ -86,10 +86,14 @@ export function factoryResetStatements(
   setupBrowserBindingHash: string,
 ): D1PreparedStatement[] {
   return [
+    // Planning captures contain self-referencing lineage (anchor_run_id and previous_*_id).
+    // D1 batches are transactional, so defer those checks until every application row is gone.
+    env.DB.prepare("PRAGMA defer_foreign_keys = ON"),
     env.DB.prepare("UPDATE system_reset_control SET active = 1 WHERE singleton = 1"),
     ...FACTORY_RESET_DELETE_TABLES.map((table) => env.DB.prepare(`DELETE FROM ${table}`)),
     env.DB.prepare("DELETE FROM system_reset_receipts"),
     env.DB.prepare("UPDATE system_reset_control SET active = 0 WHERE singleton = 1"),
+    env.DB.prepare("PRAGMA defer_foreign_keys = OFF"),
     env.DB.prepare(
       `INSERT INTO system_reset_receipts
         (command_id, request_hash, completed_at, r2_cleanup_pending, response_json,

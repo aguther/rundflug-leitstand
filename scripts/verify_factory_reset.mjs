@@ -32,11 +32,59 @@ const forecastFixture = spawnSync(
       (id, operation_day_id, flight_group_id, aircraft_id, status, version, created_at, updated_at)
      VALUES ('factory-reset-rotation', 'demo-2026', 'factory-reset-flight-group', 'aircraft-a',
              'PLANNED', 0, '2026-07-11T09:00:00.000Z', '2026-07-11T09:00:00.000Z');
+     INSERT INTO planning_contexts
+      (id, operation_day_id, operation_day_version, schema_version, previous_context_id,
+       manifest_json, manifest_hash, anchor_reason, created_at)
+     VALUES ('factory-reset-parent-context', 'demo-2026', 900, 1, NULL, '{}',
+             'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+             'FACTORY_RESET_TEST', '2026-07-11T09:00:00.000Z');
+     INSERT INTO planning_contexts
+      (id, operation_day_id, operation_day_version, schema_version, previous_context_id,
+       manifest_json, manifest_hash, anchor_reason, created_at)
+     VALUES ('factory-reset-child-context', 'demo-2026', 901, 1,
+             'factory-reset-parent-context', '{}',
+             'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+             NULL, '2026-07-11T09:01:00.000Z');
+     INSERT INTO planning_runs
+      (id, operation_day_id, operation_day_version, context_id, previous_run_id, anchor_run_id,
+       replay_distance, calculation_now, captured_at, trigger_event_type, capture_mode,
+       anchor_reason, application_version, requirements_version, source_revision,
+       dispatch_plan_revision, forecast_digest, forecast_semantic_digest, precall_digest,
+       previous_forecast_state_chunk_id, previous_dispatch_state_chunk_id,
+       dispatch_result_chunk_id, precall_result_chunk_id, duration_ms, capture_duration_ms,
+       status, failure_code)
+     VALUES ('factory-reset-parent-run', 'demo-2026', 900, 'factory-reset-parent-context',
+             NULL, 'factory-reset-parent-run', 0, '2026-07-11T09:00:00.000Z',
+             '2026-07-11T09:00:00.000Z', 'FACTORY_RESET_TEST', 'ANCHOR',
+             'FACTORY_RESET_TEST', '1.12.0', '1.12.0', 'synthetic-reset-test',
+             'factory-reset-parent-revision',
+             'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
+             'dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd',
+             'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
+             NULL, NULL, NULL, NULL, 1, 1, 'SUCCEEDED', NULL);
+     INSERT INTO planning_runs
+      (id, operation_day_id, operation_day_version, context_id, previous_run_id, anchor_run_id,
+       replay_distance, calculation_now, captured_at, trigger_event_type, capture_mode,
+       anchor_reason, application_version, requirements_version, source_revision,
+       dispatch_plan_revision, forecast_digest, forecast_semantic_digest, precall_digest,
+       previous_forecast_state_chunk_id, previous_dispatch_state_chunk_id,
+       dispatch_result_chunk_id, precall_result_chunk_id, duration_ms, capture_duration_ms,
+       status, failure_code)
+     VALUES ('factory-reset-child-run', 'demo-2026', 901, 'factory-reset-child-context',
+             'factory-reset-parent-run', 'factory-reset-parent-run', 1,
+             '2026-07-11T09:01:00.000Z', '2026-07-11T09:01:00.000Z',
+             'FACTORY_RESET_TEST', 'REFERENCE', NULL, '1.12.0', '1.12.0',
+             'synthetic-reset-test', 'factory-reset-child-revision',
+             'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff',
+             '1111111111111111111111111111111111111111111111111111111111111111',
+             '2222222222222222222222222222222222222222222222222222222222222222',
+             NULL, NULL, NULL, NULL, 1, 1, 'SUCCEEDED', NULL);
      INSERT INTO forecast_snapshots
       (id, operation_day_id, rotation_id, operation_day_version, captured_at, quality,
-       lower_minutes, upper_minutes)
+       lower_minutes, upper_minutes, planning_run_id)
      VALUES ('factory-reset-forecast', 'demo-2026', 'factory-reset-rotation', 0,
-             '2026-07-11T09:00:00.000Z', 'STABLE', 10, 20);`,
+             '2026-07-11T09:00:00.000Z', 'STABLE', 10, 20,
+             'factory-reset-child-run');`,
   ],
   { cwd: root, stdio: "ignore" },
 );
@@ -226,6 +274,7 @@ try {
       incorrectAdminPinRejected: true,
       recoveryBackupCreated: true,
       forecastHistoryDeleted: true,
+      planningHistoryDeleted: true,
       duplicateResetIdempotent: true,
       setupRequiredAfterReset: true,
       foreignBrowserRejected: true,

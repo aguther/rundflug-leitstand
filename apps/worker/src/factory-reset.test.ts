@@ -22,6 +22,9 @@ describe("factory reset", () => {
         "operational_events",
         "analysis_archive_events",
         "analysis_archives",
+        "planning_runs",
+        "planning_contexts",
+        "planning_chunks",
         "app_bootstrap",
         "operation_days",
         "rotation_manifest_corrections",
@@ -32,6 +35,15 @@ describe("factory reset", () => {
     expect(FACTORY_RESET_DELETE_TABLES).not.toContain("system_reset_receipts");
     expect(FACTORY_RESET_DELETE_TABLES.indexOf("analysis_archive_events")).toBeLessThan(
       FACTORY_RESET_DELETE_TABLES.indexOf("analysis_archives"),
+    );
+    expect(FACTORY_RESET_DELETE_TABLES.indexOf("forecast_snapshots")).toBeLessThan(
+      FACTORY_RESET_DELETE_TABLES.indexOf("planning_runs"),
+    );
+    expect(FACTORY_RESET_DELETE_TABLES.indexOf("planning_runs")).toBeLessThan(
+      FACTORY_RESET_DELETE_TABLES.indexOf("planning_contexts"),
+    );
+    expect(FACTORY_RESET_DELETE_TABLES.indexOf("planning_runs")).toBeLessThan(
+      FACTORY_RESET_DELETE_TABLES.indexOf("planning_chunks"),
     );
     expect(FACTORY_RESET_DELETE_TABLES.indexOf("rotation_tickets")).toBeLessThan(
       FACTORY_RESET_DELETE_TABLES.indexOf("rotations"),
