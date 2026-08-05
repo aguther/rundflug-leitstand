@@ -14,6 +14,16 @@ abweichendes Objekt bleibt ein Integritätsfehler und wird nicht als leerer Down
 Tagesanalysepakete sind niemals Restore- oder Produktionsimportquellen. Details und offene
 Freigaben stehen in [`analysis-packages.md`](analysis-packages.md) und ADR-0034.
 
+## Migrationsnotiz 0067 – bestätigte Dispatch-Überholungen
+
+Migration `0067_confirmed_dispatch_overtakes.sql` ergänzt Rotationen und Prognose-Snapshots um
+einen nicht negativen, initial auf `0` gesetzten Zähler für tatsächlich durch `CALL_NEXT`
+bestätigte Überholungen. Vor dem Remote-Lauf werden ein portables Backup und der
+D1-Time-Travel-Zeitpunkt dokumentiert. Ein älterer Worker ignoriert die additive Spalte. Für eine
+vollständige Schema-Rückkehr wird D1 per Time Travel oder aus dem unmittelbar vorherigen Backup in
+eine isolierte Datenbank wiederhergestellt; ein manueller Spaltenabbau in der laufenden Datenbank
+ist nicht vorgesehen.
+
 ## Migrationsnotiz 0059 – anonyme Kassenattribution
 
 Migration `0059_ticket_group_cashier_attribution.sql` ergänzt ausschließlich die nullable Referenz

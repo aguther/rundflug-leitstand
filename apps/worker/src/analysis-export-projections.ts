@@ -52,7 +52,8 @@ export const analysisExportProjections: readonly AnalysisExportProjection[] = [
                      dispatch_order, dispatch_wave, dispatch_lane_id, dispatch_group_ids_json,
                      dispatch_occupied_seats, dispatch_available_seats,
                      dispatch_commitment_level, dispatch_decision_reasons_json,
-                     dispatch_projected_overtake_count, dispatch_unplanned_reason
+                     dispatch_confirmed_overtake_count, dispatch_projected_overtake_count,
+                     dispatch_unplanned_reason
                 FROM forecast_snapshots WHERE operation_day_id = ?1 ORDER BY captured_at, id`,
   },
   {
@@ -165,7 +166,8 @@ export const analysisExportProjections: readonly AnalysisExportProjection[] = [
                      departed_at, landed_at, completed_at, usable_capacity,
                      dispatch_plan_id, dispatch_plan_revision, dispatch_batch_id,
                      dispatch_order, dispatch_wave, dispatch_lane_id, dispatch_commitment_level,
-                     dispatch_projected_overtake_count, dispatch_unplanned_reason,
+                     dispatch_confirmed_overtake_count, dispatch_projected_overtake_count,
+                     dispatch_unplanned_reason,
                      version, created_at, updated_at
                 FROM rotations WHERE operation_day_id = ?1 ORDER BY created_at, id`,
   },

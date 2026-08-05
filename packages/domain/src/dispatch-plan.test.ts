@@ -1,10 +1,44 @@
 import { describe, expect, it } from "vitest";
 import {
+  calculateConfirmedOvertakeIncrements,
   createDispatchPlan,
   DEFAULT_DISPATCH_PLANNING_LIMITS,
   type DispatchGroupInput,
   type DispatchLaneInput,
 } from "./dispatch-plan";
+
+describe("calculateConfirmedOvertakeIncrements", () => {
+  it("counts only later rotations that were actually selected", () => {
+    expect(
+      calculateConfirmedOvertakeIncrements({
+        selectedMembers: [
+          { rotationId: "selected-middle", queueSequence: 3 },
+          { rotationId: "selected-later", queueSequence: 5 },
+        ],
+        waitingMembers: [
+          { rotationId: "waiting-first", queueSequence: 1 },
+          { rotationId: "waiting-between", queueSequence: 4 },
+          { rotationId: "waiting-later", queueSequence: 6 },
+        ],
+      }),
+    ).toEqual([
+      { rotationId: "waiting-between", increment: 1 },
+      { rotationId: "waiting-first", increment: 2 },
+    ]);
+  });
+
+  it("never counts a selected member as overtaken", () => {
+    expect(
+      calculateConfirmedOvertakeIncrements({
+        selectedMembers: [{ rotationId: "selected", queueSequence: 2 }],
+        waitingMembers: [
+          { rotationId: "selected", queueSequence: 2 },
+          { rotationId: "later", queueSequence: 3 },
+        ],
+      }),
+    ).toEqual([]);
+  });
+});
 
 const NOW = "2026-07-31T10:00:00.000Z";
 
@@ -93,7 +127,7 @@ describe("createDispatchPlan", () => {
       now: "2026-07-31T10:30:00.000Z",
       groups: [
         group("large", 3, 1, {
-          priorOvertakeCount: DEFAULT_DISPATCH_PLANNING_LIMITS.maximumOvertakes,
+          confirmedOvertakeCount: DEFAULT_DISPATCH_PLANNING_LIMITS.maximumOvertakes,
         }),
         group("new-one-a", 1, 2),
         group("new-one-b", 1, 3),

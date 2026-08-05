@@ -44,6 +44,10 @@ Simulator. ADR-0029 hatte dieses Queue-Präfix ausdrücklich stabil und überhol
    Outbox-Nachrichten veröffentlicht.
 7. `CALL_NEXT` akzeptiert die Empfehlung nur bei passender Planrevision, Batch-ID, Flugzeug und
    unveränderter Gruppenmenge. Andernfalls wird `DISPATCH_PLAN_STALE` zurückgegeben.
+8. Der Zuweisungsdialog übernimmt den ersten weiterhin passenden Batch derselben gespeicherten
+   Revision. Nur ohne passenden Batch wird eine flugzeugbezogene Ein-Wellen-Ersatzplanung erzeugt.
+9. Projizierte Überholungen bleiben Ergebnisdiagnostik. Ausschließlich bei `CALL_NEXT` atomar
+   bestätigte Überholungen fließen als historische Fairnessschuld in spätere Planungen ein.
 
 ## Begrenzung und Laufzeit
 

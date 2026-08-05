@@ -236,6 +236,7 @@ export interface SimulationRotation {
   dispatchOrder?: number | null;
   dispatchGroupCount?: number;
   dispatchCapacity?: number | null;
+  dispatchConfirmedOvertakeCount?: number;
   dispatchOvertakeCount?: number;
   dispatchMaximumOvertakeCount?: number;
 }

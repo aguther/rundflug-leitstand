@@ -578,20 +578,25 @@ export function BookingGroupAssignmentDialog({
       (groupId) => groups.find((group) => group.id === groupId)?.precalledAt,
     ),
   );
-  const recommendationReason = dispatchRecommendation?.decisionReasons.includes(
-    "MUST_SERVE_MAX_WAIT",
-  )
-    ? "Lange Wartezeit hat Vorrang."
-    : dispatchRecommendation?.decisionReasons.includes("MUST_SERVE_MAX_OVERTAKES")
-      ? "Diese Gruppe darf nicht weiter überholt werden."
-      : dispatchRecommendation?.decisionReasons.includes("HARD_COMMITMENT") ||
-          recommendationContainsGateCall
-        ? "Bereits aufgerufene Gruppen haben Vorrang."
-        : dispatchRecommendation?.decisionReasons.includes("PRODUCT_FAIRNESS")
-          ? "Faire Verteilung zwischen den Produkten hat Vorrang."
-          : dispatchRecommendation?.decisionReasons.includes("CAPACITY_OPTIMIZED")
-            ? "Faire Queue-Reihenfolge mit bestmöglicher Sitzplatzauslastung."
-            : "Queue-Reihenfolge und verfügbare Kapazität bestimmen diese Belegung.";
+  const protectsMaximumWait =
+    dispatchRecommendation?.decisionReasons.includes("MUST_SERVE_MAX_WAIT") ?? false;
+  const protectsConfirmedOvertakes =
+    dispatchRecommendation?.decisionReasons.includes("MUST_SERVE_MAX_OVERTAKES") ?? false;
+  const recommendationReason =
+    dispatchRecommendation?.decisionReasons.includes("HARD_COMMITMENT") ||
+    recommendationContainsGateCall
+      ? "Bereits aufgerufene Gruppen haben Vorrang."
+      : protectsMaximumWait && protectsConfirmedOvertakes
+        ? "Maximale Wartezeit und Überholschutz haben Vorrang."
+        : protectsMaximumWait
+          ? "Lange Wartezeit hat Vorrang."
+          : protectsConfirmedOvertakes
+            ? "Diese Gruppe darf nicht weiter überholt werden."
+            : dispatchRecommendation?.decisionReasons.includes("PRODUCT_FAIRNESS")
+              ? "Faire Verteilung zwischen den Produkten hat Vorrang."
+              : dispatchRecommendation?.decisionReasons.includes("CAPACITY_OPTIMIZED")
+                ? "Faire Queue-Reihenfolge mit bestmöglicher Sitzplatzauslastung."
+                : "Queue-Reihenfolge und verfügbare Kapazität bestimmen diese Belegung.";
   useEffect(() => {
     if (!open || !queueDeviationReasonRequired) setQueueDeviationReason("");
   }, [open, queueDeviationReasonRequired]);

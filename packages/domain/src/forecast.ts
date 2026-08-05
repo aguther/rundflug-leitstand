@@ -108,7 +108,7 @@ export interface ForecastTimelineRotationInput {
   attendanceStatus?: "WAITING" | "PRESENT" | "MISSING" | "CLARIFICATION";
   standby?: boolean;
   publicStatus?: DispatchCommitmentLevel;
-  priorOvertakeCount?: number;
+  confirmedOvertakeCount?: number;
   productServiceDeficit?: number;
   passengerCount?: number;
   referenceDurationMinutes: number;
@@ -1567,7 +1567,7 @@ export function calculateForecastTimelineResult(
         attendanceStatus: rotation.attendanceStatus ?? "WAITING",
         standby: rotation.standby ?? false,
         publicStatus: rotation.publicStatus ?? "WAITING",
-        priorOvertakeCount: rotation.priorOvertakeCount ?? 0,
+        confirmedOvertakeCount: rotation.confirmedOvertakeCount ?? 0,
         productServiceDeficit: rotation.productServiceDeficit ?? 0,
       },
     ];

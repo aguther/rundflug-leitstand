@@ -2614,6 +2614,7 @@ export const rotationOperationalSummarySchema = z.object({
           "STANDBY_PRIORITY",
         ]),
       ),
+      confirmedOvertakeCount: z.number().int().nonnegative().default(0),
       projectedOvertakeCount: z.number().int().nonnegative(),
       unplannedReason: z
         .enum([
@@ -3671,6 +3672,7 @@ export const forecastHistoryEntrySchema = z.object({
       availableSeats: z.number().int().nonnegative().nullable(),
       commitmentLevel: z.enum(["WAITING", "PREPARE", "COME_TO_FLIGHT_LINE"]).nullable(),
       decisionReasons: z.array(z.string()),
+      confirmedOvertakeCount: z.number().int().nonnegative().default(0),
       projectedOvertakeCount: z.number().int().nonnegative(),
       unplannedReason: z
         .enum([
@@ -3697,6 +3699,7 @@ export const forecastHistoryEntrySchema = z.object({
       availableSeats: null,
       commitmentLevel: null,
       decisionReasons: [],
+      confirmedOvertakeCount: 0,
       projectedOvertakeCount: 0,
       unplannedReason: null,
     }),

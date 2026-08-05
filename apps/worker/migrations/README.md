@@ -435,6 +435,23 @@ Bestehende Anzeigen behalten damit unverändert eine Buchungsgruppe je Zeile. Vo
 eine D1-Time-Travel-Marke oder vollständige D1-Sicherung angelegt. Ein älterer Worker ignoriert die
 additive Spalte; die vollständige Schema-Rückkehr erfolgt per Time Travel oder aus dieser Sicherung.
 
+## 0066 – Exakte Mitglieder kurzlebiger Dispatch-Empfehlungen
+
+Ergänzt Dispatch-Leases additiv um die tatsächlich reservierten Rotationsmitglieder. Damit bleiben
+Split-Reihenfolge, Gruppenschutz und der atomare Abgleich mit `CALL_NEXT` auch dann eindeutig, wenn
+die globale Prognose unabhängig fortschreibt. Vor Anwendung wird eine D1-Time-Travel-Marke oder
+portable Sicherung angelegt. Ein älterer Worker ignoriert die additive Spalte; die vollständige
+Schema-Rückkehr erfolgt per Time Travel oder aus dieser Sicherung.
+
+## 0067 – Bestätigte Dispatch-Überholungen
+
+Ergänzt Rotationen und Prognose-Snapshots additiv um einen von der bloßen Prognose getrennten Zähler
+für tatsächlich durch `CALL_NEXT` bestätigte Überholungen. Bestehende Datensätze beginnen kompatibel
+bei `0`; projizierte Überholungen bleiben unverändert als reine Planungsdiagnostik erhalten. Vor
+Anwendung wird eine D1-Time-Travel-Marke oder portable Sicherung angelegt. Ein älterer Worker
+ignoriert die additiven Spalten; die vollständige Schema-Rückkehr erfolgt per Time Travel oder aus
+dieser Sicherung.
+
 ## Historische Doppelnummer 0036
 
 `0036_product_promised_flight_time.sql` und `0036_v1_5_stable_operations.sql` wurden bereits unter

@@ -31,7 +31,10 @@ function queueGroup(
   } as FlightLineQueueGroup;
 }
 
-function controller(groupIds: string[]): DispatchRecommendationLeaseController {
+function controller(
+  groupIds: string[],
+  decisionReasons: string[] = ["CAPACITY_OPTIMIZED"],
+): DispatchRecommendationLeaseController {
   const now = Date.now();
   const lease: DispatchRecommendationLease = {
     leaseId: "00000000-0000-4000-8000-000000000101",
@@ -42,7 +45,7 @@ function controller(groupIds: string[]): DispatchRecommendationLeaseController {
     groupIds,
     occupiedSeats: groupIds.length,
     availableSeats: 3 - groupIds.length,
-    decisionReasons: ["CAPACITY_OPTIMIZED"],
+    decisionReasons,
     acquiredAt: new Date(now).toISOString(),
     expiresAt: new Date(now + 90_000).toISOString(),
     serverNow: new Date(now).toISOString(),
@@ -108,5 +111,61 @@ describe("booking group assignment dialog", () => {
     expect(container.querySelector(".flight-director-selection")).toBeNull();
     expect(container.querySelector(".flight-director-queue-row.is-present")).toBeTruthy();
     expect(screen.getByText("1 von 3 Plätzen ausgewählt")).toBeTruthy();
+  });
+
+  it("shows gate commitments before lower-priority fairness reasons", () => {
+    const called = queueGroup("group-called", 1, {
+      precalledAt: "2026-08-04T12:30:00.000Z",
+    });
+    render(
+      <BookingGroupAssignmentDialog
+        aircraft={aircraft}
+        confirmDisabled={false}
+        dispatchLease={controller(
+          [called.id],
+          ["HARD_COMMITMENT", "MUST_SERVE_MAX_WAIT", "MUST_SERVE_MAX_OVERTAKES"],
+        )}
+        groups={[called]}
+        onClose={vi.fn()}
+        onConfirm={vi.fn()}
+        onDefer={vi.fn()}
+        onRecall={vi.fn()}
+        onRecallClear={vi.fn()}
+        onReserveRecommendation={vi.fn()}
+        onToggle={vi.fn()}
+        open
+        selectedQueueGroupIds={[called.id]}
+        timeZone="Europe/Berlin"
+      />,
+    );
+
+    expect(screen.getByText("Bereits aufgerufene Gruppen haben Vorrang.")).toBeTruthy();
+  });
+
+  it("combines maximum wait and confirmed overtake protection", () => {
+    const waiting = queueGroup("group-waiting", 1);
+    render(
+      <BookingGroupAssignmentDialog
+        aircraft={aircraft}
+        confirmDisabled={false}
+        dispatchLease={controller(
+          [waiting.id],
+          ["MUST_SERVE_MAX_WAIT", "MUST_SERVE_MAX_OVERTAKES"],
+        )}
+        groups={[waiting]}
+        onClose={vi.fn()}
+        onConfirm={vi.fn()}
+        onDefer={vi.fn()}
+        onRecall={vi.fn()}
+        onRecallClear={vi.fn()}
+        onReserveRecommendation={vi.fn()}
+        onToggle={vi.fn()}
+        open
+        selectedQueueGroupIds={[waiting.id]}
+        timeZone="Europe/Berlin"
+      />,
+    );
+
+    expect(screen.getByText("Maximale Wartezeit und Überholschutz haben Vorrang.")).toBeTruthy();
   });
 });

@@ -54,6 +54,14 @@ tatsächlicher Ressourcenverlust oder eine nachweislich nicht mehr passende Kapa
 Annahme lösen. `PREPARE` ist stärker bindend als `WAITING`, bleibt aber unterhalb von
 `COME_TO_FLIGHT_LINE`.
 
+Projizierte und bestätigte Überholungen bleiben getrennt. Der Plan berechnet
+`dispatch_projected_overtake_count` ausschließlich als Diagnose seiner aktuellen Reihenfolge; dieser
+Wert wird nicht als historische Fairnessschuld in den nächsten Plan zurückgeführt. Erst ein
+erfolgreiches `CALL_NEXT` erhöht den bestätigten Überholzähler früherer, zu diesem Zeitpunkt
+verfügbarer Rotationen atomar. Damit können Prognosen ihre eigene Priorisierung nicht selbst
+verstärken, während tatsächlich wiederholt überholte Gruppen weiterhin zuverlässig die
+Must-Serve-Grenze erreichen.
+
 ### Prognose, Vorabruf und Gate-Wegvorlauf
 
 Die Prognose reserviert pro Batch genau eine Bahn. Alle Batchmitglieder erhalten dasselbe
@@ -101,6 +109,8 @@ diagnostizierten Überholungen.
 - Simulator und Produktion verwenden dieselbe Domainfunktion. Der Simulator weist Durchsatz,
   Flugzeugstunden, angebotene/belegte Sitze, Wartequantile, Produktwerte, Überholungen,
   Serviceanteile, Service-Schulden und Planstabilität aus.
+- Synthetische Regressionen trennen bestätigte von projizierten Überholungen und sichern, dass
+  wiederholte Prognoseläufe keine selbstverstärkende Fairnessschuld erzeugen.
 - Migration `0060_dispatch_planning_and_gate_travel_lead.sql` ist additiv. Vor Anwendung ist eine
   portable Sicherung oder D1-Time-Travel-Marke erforderlich; die Wiederherstellungsnotiz steht in
   der Migration und im Migrationsregister.

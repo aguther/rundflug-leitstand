@@ -130,6 +130,17 @@ describe("short-lived dispatch recommendation leases (F-BRD-010, Q-ZUV-020)", ()
     expect(coordinatorSource).not.toContain("lease.operation_day_version === current.version");
     expect(coordinatorSource).toContain("createDispatchPlan({");
     expect(coordinatorSource).toContain("maximumWaves: 1");
+    expect(coordinatorSource).toContain("selectReusableDispatchBatch({");
+    expect(coordinatorSource).toContain('selectionSource = "TARGETED_REPLAN"');
+    expect(coordinatorSource).toContain(
+      "confirmedOvertakeCount: row.dispatch_confirmed_overtake_count",
+    );
+    expect(coordinatorSource).not.toContain(
+      "priorOvertakeCount: row.dispatch_projected_overtake_count",
+    );
+    expect(coordinatorSource).toContain("calculateConfirmedOvertakeIncrements({");
+    expect(coordinatorSource).toContain("dispatch_confirmed_overtake_count + ?1");
+    expect(coordinatorSource).toContain("confirmedOvertakes:");
     expect(coordinatorSource).toContain('reason: "MANUAL_OVERRIDE"');
     expect(coordinatorSource).toContain("manualOverrideLeaseStatements");
     expect(coordinatorSource).toContain(

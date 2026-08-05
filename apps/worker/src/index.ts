@@ -4101,7 +4101,8 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
               r.dispatch_order, r.dispatch_wave, r.dispatch_lane_id,
               r.dispatch_group_ids_json, r.dispatch_occupied_seats,
               r.dispatch_available_seats, r.dispatch_commitment_level,
-              r.dispatch_decision_reasons_json, r.dispatch_projected_overtake_count,
+              r.dispatch_decision_reasons_json, r.dispatch_confirmed_overtake_count,
+              r.dispatch_projected_overtake_count,
               r.dispatch_unplanned_reason,
               r.turnaround_deboarding_minutes, r.turnaround_buffer_minutes,
               r.turnaround_boarding_source, r.turnaround_deboarding_source,
@@ -4331,6 +4332,7 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
           dispatch_available_seats: number | null;
           dispatch_commitment_level: "WAITING" | "PREPARE" | "COME_TO_FLIGHT_LINE" | null;
           dispatch_decision_reasons_json: string;
+          dispatch_confirmed_overtake_count: number;
           dispatch_projected_overtake_count: number;
           dispatch_unplanned_reason:
             | "NO_FORECAST_CAPACITY"
@@ -5502,6 +5504,7 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
                 availableSeats: rotation.dispatch_available_seats,
                 commitmentLevel: rotation.dispatch_commitment_level,
                 decisionReasons: JSON.parse(rotation.dispatch_decision_reasons_json) as string[],
+                confirmedOvertakeCount: rotation.dispatch_confirmed_overtake_count,
                 projectedOvertakeCount: rotation.dispatch_projected_overtake_count,
                 unplannedReason: rotation.dispatch_unplanned_reason,
               }
@@ -6602,6 +6605,7 @@ app.on("GET", eventRoutes("/history/forecasts"), async (context) => {
       dispatch_available_seats: number | null;
       dispatch_commitment_level: "WAITING" | "PREPARE" | "COME_TO_FLIGHT_LINE" | null;
       dispatch_decision_reasons_json: string;
+      dispatch_confirmed_overtake_count: number;
       dispatch_projected_overtake_count: number;
       dispatch_unplanned_reason:
         | "NO_FORECAST_CAPACITY"
@@ -6676,6 +6680,7 @@ app.on("GET", eventRoutes("/history/forecasts"), async (context) => {
           availableSeats: row.dispatch_available_seats,
           commitmentLevel: row.dispatch_commitment_level,
           decisionReasons: JSON.parse(row.dispatch_decision_reasons_json) as string[],
+          confirmedOvertakeCount: row.dispatch_confirmed_overtake_count,
           projectedOvertakeCount: row.dispatch_projected_overtake_count,
           unplannedReason: row.dispatch_unplanned_reason,
         },

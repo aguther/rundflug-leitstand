@@ -17,11 +17,15 @@ Boarding bewirken.
 
 ## Entscheidung
 
-Beim Öffnen eines Boarding-Dialogs berechnet der Event-Coordinator mit dem reinen Dispatch-Planer für
-das konkret geöffnete Flugzeug genau eine Welle. Er reserviert den ersten aktuell passenden, noch
-nicht reservierten Vorschlag für genau ein Flugzeug, Bedienkonto und Gerät. Flight Line und Flight
-Director verwenden denselben in D1 gespeicherten Lease-Pool. Der Event-Coordinator serialisiert Erwerb,
-Freigabe und `CALL_NEXT` gemeinsam mit den übrigen Kommandos des Veranstaltungstags.
+Beim Öffnen eines Boarding-Dialogs prüft der Event-Coordinator zuerst die aktuelle gespeicherte
+Dispatch-Revision. Der erste vollständige, noch nicht reservierte Batch, der fachlich und
+kapazitätsseitig in das konkret geöffnete Flugzeug passt, wird unverändert übernommen. Die
+prognostische Flugzeugannahme bindet den Batch dabei nicht. Nur wenn kein gespeicherter Batch passt,
+berechnet der Event-Coordinator mit dem reinen Dispatch-Planer für das geöffnete Flugzeug genau eine
+Welle. Er reserviert den so bestimmten Vorschlag für genau ein Flugzeug, Bedienkonto und Gerät.
+Flight Line und Flight Director verwenden denselben in D1 gespeicherten Lease-Pool. Der
+Event-Coordinator serialisiert Erwerb, Freigabe und `CALL_NEXT` gemeinsam mit den übrigen Kommandos
+des Veranstaltungstags.
 
 Eine Lease läuft nach 90 Sekunden ohne Verlängerung ab. Die beim Erwerb aktuelle
 `operation_day_version` bleibt Herkunftsinformation und ist kein pauschaler Invalidierungsgrund.
@@ -48,6 +52,12 @@ gewählt; Queueposition, Verkaufszeit und technische ID lösen verbleibende Glei
 auf. `GO TO GATE` ist eine organisatorische Verpflichtung, aber keine Flugzeugbindung. Insbesondere ist
 `forecast_assumed_aircraft_id` nur eine Prognoseannahme und schränkt weder Lease-Erwerb noch
 Relevanzprüfung einer aufgerufenen Gruppe auf dieses angenommene Flugzeug ein.
+
+Für den Überholschutz verwendet die Lease-Planung ausschließlich durch erfolgreiche
+`CALL_NEXT`-Kommandos bestätigte Überholungen. Die prognostische Überholungszahl der aktuellen
+Dispatch-Revision bleibt Diagnose und darf eine neue Lease nicht selbstverstärkend umsortieren.
+Lease-Erwerb und `CALL_NEXT` auditieren zusätzlich, ob ein gespeicherter Batch übernommen oder eine
+flugzeugbezogene Ersatzplanung verwendet wurde und welche bestätigten Überholungen entstanden.
 
 `CALL_NEXT` bestätigt eine Lease nur, wenn Eigentümer, Gerät, Flugzeug, Ablauf, Planrevision, Batch,
 vollständige Gruppenmenge, konkrete offene Segmente und Sitzanzahl noch übereinstimmen. Die Lease wird

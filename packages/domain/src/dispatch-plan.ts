@@ -57,7 +57,7 @@ export interface DispatchGroupInput {
   attendanceStatus: "WAITING" | "PRESENT" | "MISSING" | "CLARIFICATION";
   standby: boolean;
   publicStatus: DispatchCommitmentLevel;
-  priorOvertakeCount?: number;
+  confirmedOvertakeCount?: number;
   productServiceDeficit?: number;
 }
 
@@ -111,6 +111,33 @@ export interface DispatchGroupDecision {
   decisionReasons: DispatchDecisionReason[];
 }
 
+export interface DispatchOvertakeMember {
+  rotationId: string;
+  queueSequence: number;
+}
+
+export interface ConfirmedOvertakeIncrement {
+  rotationId: string;
+  increment: number;
+}
+
+export function calculateConfirmedOvertakeIncrements(input: {
+  selectedMembers: readonly DispatchOvertakeMember[];
+  waitingMembers: readonly DispatchOvertakeMember[];
+}): ConfirmedOvertakeIncrement[] {
+  const selectedRotationIds = new Set(input.selectedMembers.map((member) => member.rotationId));
+  return input.waitingMembers
+    .filter((member) => !selectedRotationIds.has(member.rotationId))
+    .map((member) => ({
+      rotationId: member.rotationId,
+      increment: input.selectedMembers.filter(
+        (selected) => selected.queueSequence > member.queueSequence,
+      ).length,
+    }))
+    .filter((entry) => entry.increment > 0)
+    .sort((left, right) => left.rotationId.localeCompare(right.rotationId));
+}
+
 export interface DispatchUnplannedGroup {
   memberId: string;
   reason: DispatchUnplannedReason;
@@ -135,7 +162,7 @@ export interface DispatchPlanInput {
 
 interface NormalizedGroup extends DispatchGroupInput {
   waitMinutes: number;
-  priorOvertakeCount: number;
+  confirmedOvertakeCount: number;
   productServiceDeficit: number;
   mustServeForWait: boolean;
   mustServeForOvertakes: boolean;
@@ -283,16 +310,16 @@ function normalizeGroup(
     throw new Error(`Dispatch group ${group.id} has an invalid waiting timestamp.`);
   }
   const waitMinutes = Math.max(0, (nowMs - waitingSinceMs) / MINUTE_MS);
-  const priorOvertakeCount = Math.max(0, Math.floor(group.priorOvertakeCount ?? 0));
+  const confirmedOvertakeCount = Math.max(0, Math.floor(group.confirmedOvertakeCount ?? 0));
   return {
     ...group,
     groupIds: [...group.groupIds],
     predecessorMemberIds: [...(group.predecessorMemberIds ?? [])],
     waitMinutes,
-    priorOvertakeCount,
+    confirmedOvertakeCount,
     productServiceDeficit: Math.max(0, group.productServiceDeficit ?? 0),
     mustServeForWait: waitMinutes >= limits.maximumWaitMinutes,
-    mustServeForOvertakes: priorOvertakeCount >= limits.maximumOvertakes,
+    mustServeForOvertakes: confirmedOvertakeCount >= limits.maximumOvertakes,
   };
 }
 
@@ -302,7 +329,7 @@ function groupOrder(left: NormalizedGroup, right: NormalizedGroup): number {
     Number(right.mustServeForWait || right.mustServeForOvertakes) -
       Number(left.mustServeForWait || left.mustServeForOvertakes) ||
     right.productServiceDeficit - left.productServiceDeficit ||
-    right.priorOvertakeCount - left.priorOvertakeCount ||
+    right.confirmedOvertakeCount - left.confirmedOvertakeCount ||
     right.waitMinutes - left.waitMinutes ||
     Number(right.standby) - Number(left.standby) ||
     left.queueSequence - right.queueSequence ||
@@ -491,7 +518,7 @@ function buildCandidate(
       (sum, group) =>
         sum +
         group.waitMinutes * group.size +
-        group.priorOvertakeCount * 30 * group.size +
+        group.confirmedOvertakeCount * 30 * group.size +
         commitmentRank(group.publicStatus) * 120 * group.size,
       0,
     ),

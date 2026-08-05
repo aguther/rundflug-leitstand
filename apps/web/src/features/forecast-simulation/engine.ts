@@ -10,7 +10,7 @@ import {
   type PredictionQuality,
   selectAutomaticPrecalls,
 } from "@rundflug/domain";
-
+import { recordConfirmedOvertakes } from "./confirmed-overtakes";
 import type {
   ForecastMetricSummary,
   ManualIncident,
@@ -917,6 +917,7 @@ export function runSimulation(
         attendanceStatus: "WAITING" as const,
         standby: false,
         publicStatus: dispatchPublicStatus(rotation),
+        confirmedOvertakeCount: rotation.dispatchConfirmedOvertakeCount ?? 0,
         passengerCount: rotation.passengerCount,
         referenceDurationMinutes: config.adminParameters.productReferenceDurationMinutes,
         productCode: PRODUCT_ID,
@@ -1166,8 +1167,15 @@ export function runSimulation(
     }
 
     const precallProjections = calculateCurrentProjections(nowMs, resourceGroupStatus);
-    const waitingRotations = rotations.filter(
-      (rotation) => rotation.status === "DRAFT" && Date.parse(rotation.createdAt) <= nowMs,
+    const waitingRotations = rotations
+      .filter((rotation) => rotation.status === "DRAFT" && Date.parse(rotation.createdAt) <= nowMs)
+      .sort(
+        (left, right) =>
+          Date.parse(left.createdAt) - Date.parse(right.createdAt) ||
+          left.id.localeCompare(right.id),
+      );
+    const waitingQueueSequence = new Map(
+      waitingRotations.map((rotation, index) => [rotation.id, index + 1] as const),
     );
     if (waitingRotations.length > 0) {
       const observedGateWaitMinutes = rotations.flatMap((rotation) =>
@@ -1220,7 +1228,7 @@ export function runSimulation(
                 projection.dispatchUnplannedReason === "WAITING_FOR_FITTING_LANE",
               commitmentLocked: projection.dispatchUnplannedReason === "COMMITMENT_LOCKED",
               dispatchOrder: projection.dispatchOrder,
-              queueSequence: rotation.communicationNumber,
+              queueSequence: waitingQueueSequence.get(rotation.id) ?? 1,
             },
           ];
         }),
@@ -1249,9 +1257,15 @@ export function runSimulation(
     }
 
     if (operationsAvailable) {
-      const waiting = rotations.filter(
-        (rotation) => rotation.status === "DRAFT" && Date.parse(rotation.createdAt) <= nowMs,
-      );
+      const waiting = rotations
+        .filter(
+          (rotation) => rotation.status === "DRAFT" && Date.parse(rotation.createdAt) <= nowMs,
+        )
+        .sort(
+          (left, right) =>
+            Date.parse(left.createdAt) - Date.parse(right.createdAt) ||
+            left.id.localeCompare(right.id),
+        );
       const plan = createDispatchPlan({
         now: iso(nowMs),
         groups: waiting.map((rotation, index) => ({
@@ -1266,6 +1280,7 @@ export function runSimulation(
           attendanceStatus: "WAITING" as const,
           standby: false,
           publicStatus: dispatchPublicStatus(rotation),
+          confirmedOvertakeCount: rotation.dispatchConfirmedOvertakeCount ?? 0,
         })),
         lanes: aircraft.flatMap((entry) =>
           entry.state === "AVAILABLE" && entry.activeRotationId === null
@@ -1339,6 +1354,11 @@ export function runSimulation(
         const entry = aircraft.find((candidate) => candidate.id === assignment.assumedAircraftId);
         if (!rotation || !entry || rotation.status !== "DRAFT" || entry.state !== "AVAILABLE")
           continue;
+        recordConfirmedOvertakes({
+          rotations,
+          selectedRotationIds: assignment.memberIds,
+          resourceGroupId: RESOURCE_GROUP_ID,
+        });
         rotation.passengerCount = assignedRotations.reduce(
           (sum, member) => sum + member.passengerCount,
           0,
