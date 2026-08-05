@@ -452,6 +452,16 @@ Anwendung wird eine D1-Time-Travel-Marke oder portable Sicherung angelegt. Ein �
 ignoriert die additiven Spalten; die vollständige Schema-Rückkehr erfolgt per Time Travel oder aus
 dieser Sicherung.
 
+## 0068 – Technische Reihenfolge geteilter Buchungsgruppen
+
+Ergänzt Rotationen additiv um die beim Verkauf festgelegte Reihenfolge innerhalb einer bewusst
+geteilten Buchungsgruppe. Bestehende Rotationen werden einmalig aus der append-only gespeicherten
+Rotationsfolge des Verkaufsereignisses nachgezogen; ohne passenden historischen Beleg gilt kompatibel
+Segment `1`. Damit bleiben Kommunikationsnummern reine Anzeige und Dispatch-Abfragen müssen die
+Segmentreihenfolge nicht wiederholt aus Ereignis-JSON rekonstruieren. Vor Anwendung wird eine
+D1-Time-Travel-Marke oder portable Sicherung angelegt. Ein älterer Worker ignoriert die additive
+Spalte; die vollständige Schema-Rückkehr erfolgt per Time Travel oder aus dieser Sicherung.
+
 ## Historische Doppelnummer 0036
 
 `0036_product_promised_flight_time.sql` und `0036_v1_5_stable_operations.sql` wurden bereits unter

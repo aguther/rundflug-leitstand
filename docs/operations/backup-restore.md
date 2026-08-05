@@ -24,6 +24,15 @@ vollständige Schema-Rückkehr wird D1 per Time Travel oder aus dem unmittelbar 
 eine isolierte Datenbank wiederhergestellt; ein manueller Spaltenabbau in der laufenden Datenbank
 ist nicht vorgesehen.
 
+## Migrationsnotiz 0068 – technische Buchungssegment-Reihenfolge
+
+Migration `0068_booking_segment_order.sql` ergänzt Rotationen um eine positive technische
+Segmentreihenfolge. Bestehende Werte werden einmalig aus der im append-only Verkaufsereignis
+persistierten Rotationsfolge übernommen; ohne passenden Altbeleg bleibt der kompatible Wert `1`.
+Vor dem Remote-Lauf werden ein portables Backup und der D1-Time-Travel-Zeitpunkt dokumentiert. Ein
+älterer Worker ignoriert die additive Spalte. Für die vollständige Schema-Rückkehr gilt derselbe
+Restore-Weg wie für 0067; ein manueller Spaltenabbau in der laufenden Datenbank ist nicht vorgesehen.
+
 ## Migrationsnotiz 0059 – anonyme Kassenattribution
 
 Migration `0059_ticket_group_cashier_attribution.sql` ergänzt ausschließlich die nullable Referenz

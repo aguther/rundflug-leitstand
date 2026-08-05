@@ -49,9 +49,11 @@ Die flugzeugbezogene Ein-Wellen-Planung verwendet unverändert den reinen Dispat
 Kompatibilitäts- und Gruppenschutzregeln stehen zuerst, danach maximale Wartezeit, Überholschutz und
 Produktfairness. Unter danach gleichwertigen Kombinationen wird die höchste Sitzplatzauslastung
 gewählt; Queueposition, Verkaufszeit und technische ID lösen verbleibende Gleichstände deterministisch
-auf. `GO TO GATE` ist eine organisatorische Verpflichtung, aber keine Flugzeugbindung. Insbesondere ist
-`forecast_assumed_aircraft_id` nur eine Prognoseannahme und schränkt weder Lease-Erwerb noch
-Relevanzprüfung einer aufgerufenen Gruppe auf dieses angenommene Flugzeug ein.
+auf. Bei bewusst geteilten Buchungsgruppen stammt die harte Segmentreihenfolge aus der beim Verkauf
+persistierten technischen Rotationsfolge; die Kommunikationsnummer ist auch dort kein Sortier- oder
+Bewertungsschlüssel. `GO TO GATE` ist eine organisatorische Verpflichtung, aber keine Flugzeugbindung.
+Insbesondere ist `forecast_assumed_aircraft_id` nur eine Prognoseannahme und schränkt weder
+Lease-Erwerb noch Relevanzprüfung einer aufgerufenen Gruppe auf dieses angenommene Flugzeug ein.
 
 Für den Überholschutz verwendet die Lease-Planung ausschließlich durch erfolgreiche
 `CALL_NEXT`-Kommandos bestätigte Überholungen. Die prognostische Überholungszahl der aktuellen

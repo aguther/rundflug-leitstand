@@ -226,6 +226,10 @@ interface DispatchRecommendationPlanningRow {
   reserved_by_active_lease: number;
 }
 
+function dispatchSegmentOrderSql(rotationAlias: string, flightGroupAlias: string): string {
+  return `COALESCE(${flightGroupAlias}.queue_position, ${rotationAlias}.booking_segment_order, 2147483647)`;
+}
+
 function json(data: unknown, init: ResponseInit = {}): Response {
   const headers = new Headers(init.headers);
   headers.set("content-type", JSON_HEADERS["content-type"]);
@@ -823,7 +827,7 @@ export class EventCoordinator extends DurableObject<Env> {
   ): Promise<Array<{ rotationId: string; queueSequence: number }>> {
     const rows = await this.env.DB.prepare(
       `SELECT r.id AS rotation_id, r.created_at,
-              COALESCE(fg.queue_position, 2147483647) AS segment_order,
+              ${dispatchSegmentOrderSql("r", "fg")} AS segment_order,
               fg.communication_number, COALESCE(MIN(tg.queue_sequence), 1) AS queue_sequence,
               COALESCE((SELECT json_group_array(group_ids.id) FROM (
                 SELECT DISTINCT member_group.id
@@ -921,9 +925,8 @@ export class EventCoordinator extends DurableObject<Env> {
                 ON candidate_group.id = candidate_rotation.flight_group_id
              WHERE candidate_ticket.ticket_group_id = tg.id
                AND candidate_rotation.status = 'DRAFT'
-             GROUP BY candidate_rotation.id, candidate_group.queue_position,
-                      candidate_group.communication_number
-             ORDER BY COALESCE(candidate_group.queue_position, 2147483647),
+             GROUP BY candidate_rotation.id, candidate_group.queue_position
+             ORDER BY ${dispatchSegmentOrderSql("candidate_rotation", "candidate_group")},
                       candidate_rotation.created_at, candidate_rotation.id
              LIMIT 1
           )
@@ -1262,7 +1265,7 @@ export class EventCoordinator extends DurableObject<Env> {
 
     const planningRows = await this.env.DB.prepare(
       `SELECT r.id AS rotation_id, r.created_at,
-              COALESCE(fg.queue_position, 2147483647) AS segment_order,
+              ${dispatchSegmentOrderSql("r", "fg")} AS segment_order,
               fg.communication_number, COALESCE(MIN(tg.queue_sequence), 1) AS queue_sequence,
               p.id AS product_id,
               COALESCE(r.gate_id, p.gate_id) AS gate_id,
@@ -2428,6 +2431,7 @@ export class EventCoordinator extends DurableObject<Env> {
           flightGroupId: crypto.randomUUID(),
           rotationId: crypto.randomUUID(),
           communicationNumber: (saleState?.next_flight_number ?? 101) + index,
+          bookingSegmentOrder: index + 1,
         }));
         const primarySlot = slots[0];
         if (!primarySlot) throw new Error("Mindestens ein Fluggruppen-Slot wurde erwartet.");
@@ -2493,12 +2497,14 @@ export class EventCoordinator extends DurableObject<Env> {
               now,
             ),
             this.env.DB.prepare(`INSERT INTO rotations
-                  (id, operation_day_id, flight_group_id, gate_id, status, version, created_at, updated_at)
-                  VALUES (?1, ?2, ?3, ?4, 'DRAFT', 0, ?5, ?5)`).bind(
+                  (id, operation_day_id, flight_group_id, gate_id, booking_segment_order,
+                   status, version, created_at, updated_at)
+                  VALUES (?1, ?2, ?3, ?4, ?5, 'DRAFT', 0, ?6, ?6)`).bind(
               slot.rotationId,
               command.eventId,
               slot.flightGroupId,
               product.gate_id,
+              slot.bookingSegmentOrder,
               now,
             ),
           ]),
@@ -3196,7 +3202,7 @@ export class EventCoordinator extends DurableObject<Env> {
                 rg.automatic_precall_enabled AS resource_group_precall_enabled,
                 p.id AS product_id,
                 COALESCE(MIN(tg.queue_sequence), 1) AS queue_sequence,
-                COALESCE(fg.queue_position, 2147483647) AS segment_order,
+                ${dispatchSegmentOrderSql("r", "fg")} AS segment_order,
                 fg.communication_number,
                 COALESCE((SELECT json_group_array(group_ids.id) FROM (
                   SELECT DISTINCT member_group.id
@@ -7908,8 +7914,8 @@ export class EventCoordinator extends DurableObject<Env> {
                JOIN flight_groups fg ON fg.id = r.flight_group_id
               WHERE tg.operation_day_id = ?1 AND tg.id = ?2
                 AND r.status = 'DRAFT'
-              GROUP BY r.id, fg.queue_position, fg.communication_number
-              ORDER BY COALESCE(fg.queue_position, 2147483647), r.created_at, r.id
+              GROUP BY r.id, fg.queue_position
+              ORDER BY ${dispatchSegmentOrderSql("r", "fg")}, r.created_at, r.id
               LIMIT 1`,
           )
             .bind(command.eventId, command.payload.ticketGroupIds[0])
@@ -8023,9 +8029,8 @@ export class EventCoordinator extends DurableObject<Env> {
                 JOIN flight_groups candidate_group ON candidate_group.id = candidate_rotation.flight_group_id
                WHERE candidate_ticket.ticket_group_id = tg.id
                  AND candidate_rotation.status = 'DRAFT'
-               GROUP BY candidate_rotation.id, candidate_group.queue_position,
-                        candidate_group.communication_number
-               ORDER BY COALESCE(candidate_group.queue_position, 2147483647),
+               GROUP BY candidate_rotation.id, candidate_group.queue_position
+               ORDER BY ${dispatchSegmentOrderSql("candidate_rotation", "candidate_group")},
                         candidate_rotation.created_at, candidate_rotation.id
                LIMIT 1
             )

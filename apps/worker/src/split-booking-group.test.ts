@@ -5,8 +5,13 @@ import workerSource from "./index.ts?raw";
 describe("split booking-group coordination", () => {
   it("selects only the earliest remaining draft segment for CALL_NEXT", () => {
     expect(coordinatorSource).toContain("candidate_rotation.status = 'DRAFT'");
-    expect(coordinatorSource).toContain("candidate_group.communication_number");
-    expect(coordinatorSource).toContain("ORDER BY COALESCE(candidate_group.queue_position");
+    expect(coordinatorSource).toContain(
+      'dispatchSegmentOrderSql("candidate_rotation", "candidate_group")',
+    );
+    expect(coordinatorSource).toContain("rotationAlias}.booking_segment_order");
+    expect(coordinatorSource).not.toContain(
+      "ORDER BY COALESCE(candidate_group.queue_position, candidate_group.communication_number)",
+    );
     expect(coordinatorSource).toContain("LIMIT 1");
   });
 

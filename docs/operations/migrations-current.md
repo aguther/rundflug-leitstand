@@ -73,6 +73,7 @@ D1-Identität; angewandte Dateien werden nicht nachträglich umbenannt.
 | 66 | `0065_fids_shared_flight_grouping.sql` | eindeutig |
 | 67 | `0066_dispatch_recommendation_lease_members.sql` | eindeutig |
 | 68 | `0067_confirmed_dispatch_overtakes.sql` | eindeutig |
+| 69 | `0068_booking_segment_order.sql` | eindeutig |
 
-Gesamt: 68 Migrationen. Wiederherstellungsnotizen werden gegen SQL und
+Gesamt: 69 Migrationen. Wiederherstellungsnotizen werden gegen SQL und
 `apps/worker/migrations/README.md` geprüft.

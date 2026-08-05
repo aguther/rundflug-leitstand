@@ -138,6 +138,10 @@ describe("short-lived dispatch recommendation leases (F-BRD-010, Q-ZUV-020)", ()
     expect(coordinatorSource).not.toContain(
       "priorOvertakeCount: row.dispatch_projected_overtake_count",
     );
+    expect(coordinatorSource).toContain("rotationAlias}.booking_segment_order");
+    expect(coordinatorSource).not.toContain(
+      "ORDER BY COALESCE(candidate_group.queue_position, candidate_group.communication_number)",
+    );
     expect(coordinatorSource).toContain("calculateConfirmedOvertakeIncrements({");
     expect(coordinatorSource).toContain("dispatch_confirmed_overtake_count + ?1");
     expect(coordinatorSource).toContain("confirmedOvertakes:");
