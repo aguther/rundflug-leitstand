@@ -191,19 +191,66 @@ administrative Repository-Operation.
 ### Beginn eines Auftrags
 
 Vor Beginn der Implementierung muss der Auftrag einen eigenen Worktree mit einem eigenen Branch auf
-Basis des aktuellen `origin/main` besitzen. Stellt die Ausführungsumgebung bereits einen eindeutig
-zugewiesenen Worktree bereit, wird dieser verwendet und kein weiterer Worktree darin angelegt.
+Basis des aktuellen `origin/main` besitzen.
 
-Andernfalls legt der koordinierende Agent den Worktree aus einem bestehenden Repository-Checkout an:
+Stellt die Ausführungsumgebung bereits einen eindeutig diesem Auftrag zugewiesenen Worktree bereit,
+wird dieser verwendet. In einem bestehenden Worktree wird niemals ein weiterer verschachtelter
+Worktree angelegt.
+
+Andernfalls erstellt der koordinierende Agent selbst einen Worktree unter dem verbindlichen
+Codex-Worktree-Root.
+
+Der Codex-Home-Pfad wird in dieser Reihenfolge bestimmt:
+
+1. der Wert der Umgebungsvariable `CODEX_HOME`, sofern sie gesetzt ist,
+2. unter Windows `%USERPROFILE%\.codex`,
+3. unter POSIX-Systemen `$HOME/.codex`.
+
+Der verbindliche Pfad für agentenerzeugte Worktrees dieses Repositorys lautet:
+
+```text
+<codex-home>/worktrees/agent-created/rundflug-leitstand/<branch-slug>
+```
+
+Für `<branch-slug>` werden Schrägstriche im vollständigen Branch-Namen durch Bindestriche ersetzt.
+Beispiel:
+
+```text
+Branch:   feat/active-group-recall
+Worktree: C:\Users\Andreas\.codex\worktrees\agent-created\rundflug-leitstand\feat-active-group-recall
+```
+
+Andere Ablageorte sind nicht zulässig. Insbesondere werden Worktrees nicht:
+
+- im primären Repository unter `.worktrees`,
+- in einem anderen Unterverzeichnis des primären Repositorys,
+- als frei gewähltes Geschwisterverzeichnis neben dem Repository,
+- oder in einem temporären Verzeichnis
+
+angelegt.
+
+Vor der Erstellung werden Repository, aktueller Zustand, registrierte Worktrees, Basisrevision und
+der vollständig aufgelöste absolute Zielpfad geprüft:
+
+```bash
+git rev-parse --show-toplevel
+git branch --show-current
+git status --short --branch
+git fetch origin
+git worktree list --porcelain
+```
+
+Der Agent prüft, dass der aufgelöste Zielpfad innerhalb von
+`<codex-home>/worktrees/agent-created/rundflug-leitstand` liegt. Kann der Codex-Home-Pfad nicht
+eindeutig bestimmt oder der vorgesehene Zielpfad nicht sicher verwendet werden, hält der Agent vor
+der ersten Änderung an und meldet den konkreten Grund.
+
+Anschließend legt der koordinierende Agent den Worktree aus einem bestehenden Repository-Checkout an:
 
 ```bash
 git fetch origin
 git worktree add -b <type>/<short-task-name> <absolute-worktree-path> origin/main
 ```
-
-Der Worktree-Pfad muss eindeutig sein und soll außerhalb des primären Repository-Verzeichnisses liegen.
-Dadurch werden fremde Worktrees nicht versehentlich durch rekursive Dateiscans, Test-Watcher,
-Build-Werkzeuge oder Aufräumskripte erfasst.
 
 Der Agent prüft im neu angelegten Worktree vor der ersten Änderung:
 
