@@ -193,6 +193,16 @@ CURRENT_BASE_REQUIREMENT_OVERRIDES = {
 }
 
 CURRENT_DELTA_REQUIREMENT_OVERRIDES = {
+    "V18-FLT-010": {
+        "module": (
+            "ADR-0037 + apps/web/src/flight-line-supervisor.tsx und "
+            "apps/web/src/flight-line-v12.css"
+        ),
+        "tests": (
+            "flight-line-sort.test.ts flight-line-supervisor-ui.test.ts "
+            "Teilflug-DOM-Tests und Browserabnahme"
+        ),
+    },
     "V18-GRP-010": {
         "requirement": (
             "Eine Buchungsgruppe besitzt genau einen öffentlichen Gruppen-QR-Code und einen "
@@ -203,14 +213,15 @@ CURRENT_DELTA_REQUIREMENT_OVERRIDES = {
             "Umläufen abgeleitet."
         ),
         "module": (
-            "packages/domain/src/public-status.ts "
+            "ADR-0037 + packages/domain/src/public-status.ts "
+            "packages/domain/src/communication-labels.ts "
             "apps/worker/src/booking-group-part-projection.ts "
             "apps/worker/src/index.ts apps/worker/src/web-push.ts "
             "apps/web/src/features/public-status/PublicStatusContent.tsx"
         ),
         "tests": (
-            "Domain- und Contract-Tests, Worker-D1-Projektion, Push-Tests, "
-            "Public-Monitors-Integration und Browserabnahme"
+            "Domain- und Contract-Tests, Worker-D1-Projektion, FIDS-/Operation-Board- und "
+            "Push-Tests, Public-Monitors-Integration und Browserabnahme"
         ),
     },
     "V18-API-010": {
@@ -247,6 +258,25 @@ CURRENT_BASE_STATUS_OVERRIDES = {
 }
 
 CURRENT_BASE_TRACE_OVERRIDES = {
+    "F-MON-010": {
+        "Tests": (
+            "ADR-0009 ADR-0022 und ADR-0037 + gemeinsamer PublicBoard-Vertrag + "
+            "öffentliche umlaufbezogene G-/Teilflugkennung + UI-/Browser-Nachlaufprüfung + "
+            "lokale Simulator-FIDS-Projektion"
+        ),
+    },
+    "F-MON-020": {
+        "Tests": (
+            "ADR-0037 + E2E öffentliche Teilflugkennungen/Ticketlabels/Flugzeug/Flottenstatus + "
+            "Browser Kiosk"
+        ),
+    },
+    "F-MON-040": {
+        "Tests": (
+            "ADR-0037 + E2E keine privaten Ticketcodes/Pilotendaten + Public-DTO-Contract + "
+            "synthetische G-/Teilflug-Projektionsprüfung"
+        ),
+    },
     "F-PRG-020": {
         "Kurzbeschreibung": "Ereignisbasierte Neuberechnung mit gemeinsamem deterministischem Dispatch-Plan für Produktion und Simulator.",
         "Modul": "BP-06",

@@ -1398,6 +1398,24 @@ describe("commandEnvelopeSchema", () => {
     expect(parsed.operationalNote).toBe("Nur organisatorischer Testhinweis");
   });
 
+  it("defaults unsplit rotation booking groups and validates split part ranges", () => {
+    const bookingGroup = {
+      id: "synthetic-ticket-group",
+      communicationNumber: 106,
+      soldAt: "2026-07-11T12:00:00.000Z",
+      ticketCount: 2,
+      presentCount: 1,
+    };
+    const parsed = rotationOperationalSummarySchema.shape.bookingGroups.parse([bookingGroup]);
+
+    expect(parsed[0]).toMatchObject({ partNumber: 1, partCount: 1 });
+    expect(() =>
+      rotationOperationalSummarySchema.shape.bookingGroups.parse([
+        { ...bookingGroup, partNumber: 3, partCount: 2 },
+      ]),
+    ).toThrow();
+  });
+
   it("validates an anonymous, auditable rotation note", () => {
     const parsed = commandEnvelopeSchema.parse({
       commandId: "2b428d92-224f-47ea-8d68-89f5d69158ed",

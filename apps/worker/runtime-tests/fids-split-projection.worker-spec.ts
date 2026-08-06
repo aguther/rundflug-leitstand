@@ -77,7 +77,8 @@ beforeEach(async () => {
       prediction_updated_at TEXT,
       dispatch_batch_id TEXT,
       dispatch_unplanned_reason TEXT,
-      departed_at TEXT
+      departed_at TEXT,
+      created_at TEXT NOT NULL
     );
     CREATE TABLE ticket_groups (
       id TEXT PRIMARY KEY,
@@ -118,29 +119,68 @@ beforeEach(async () => {
       ('flight-recent-old', 'resource-a', 'product-a', 13, NULL, NULL, 3),
       ('flight-prepare', 'resource-a', 'product-a', 14, NULL, 'PREPARE', 4),
       ('flight-lower', 'resource-a', 'product-a', 15, NULL, 'WAITING', 5),
-      ('flight-expired', 'resource-a', 'product-a', 16, NULL, NULL, 6);
+      ('flight-expired', 'resource-a', 'product-a', 16, NULL, NULL, 6),
+      ('flight-split-a', 'resource-a', 'product-a', 17, NULL, 'WAITING', 7),
+      ('flight-split-b', 'resource-a', 'product-a', 18, NULL, 'WAITING', 8);
 
     INSERT INTO rotations VALUES
       ('rotation-actionable', 'event-fids-split', 'flight-actionable', 'gate-a', NULL,
        'CALLED', 1, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-       '2026-08-02T09:50:00.000Z'),
+       '2026-08-02T09:50:00.000Z', '2026-08-02T08:00:00.000Z'),
       ('rotation-recent-new', 'event-fids-split', 'flight-recent-new', 'gate-a', NULL,
        'LANDED', 2, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-       '2026-08-02T10:00:10.000Z'),
+       '2026-08-02T10:00:10.000Z', '2026-08-02T08:01:00.000Z'),
       ('rotation-recent-old', 'event-fids-split', 'flight-recent-old', 'gate-a', NULL,
        'IN_FLIGHT', 3, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-       '2026-08-02T10:00:05.000Z'),
+       '2026-08-02T10:00:05.000Z', '2026-08-02T08:02:00.000Z'),
       ('rotation-prepare', 'event-fids-split', 'flight-prepare', 'gate-a', NULL,
-       'DRAFT', 4, '2026-08-02T10:20:00.000Z', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+       'DRAFT', 4, '2026-08-02T10:20:00.000Z', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+       '2026-08-02T08:03:00.000Z'),
       ('rotation-lower', 'event-fids-split', 'flight-lower', 'gate-a', NULL,
-       'DRAFT', 5, '2026-08-02T10:25:00.000Z', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+       'DRAFT', 5, '2026-08-02T10:25:00.000Z', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+       '2026-08-02T08:04:00.000Z'),
       ('rotation-expired', 'event-fids-split', 'flight-expired', 'gate-a', NULL,
        'COMPLETED', 6, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-       '2026-08-02T09:59:59.000Z');
+       '2026-08-02T09:59:59.000Z', '2026-08-02T08:05:00.000Z'),
+      ('rotation-split-a', 'event-fids-split', 'flight-split-a', 'gate-a', NULL,
+       'DRAFT', 7, '2026-08-02T10:30:00.000Z', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+       '2026-08-02T08:06:00.000Z'),
+      ('rotation-split-b', 'event-fids-split', 'flight-split-b', 'gate-a', NULL,
+       'DRAFT', 8, '2026-08-02T10:35:00.000Z', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+       '2026-08-02T08:07:00.000Z');
+
+    INSERT INTO ticket_groups VALUES ('group-split', 'product-a', 201);
+    INSERT INTO tickets VALUES ('ticket-split-a', 'group-split');
+    INSERT INTO tickets VALUES ('ticket-split-b', 'group-split');
+    INSERT INTO rotation_tickets VALUES ('rotation-split-a', 'ticket-split-a', NULL);
+    INSERT INTO rotation_tickets VALUES ('rotation-split-b', 'ticket-split-b', NULL);
   `);
 });
 
 describe("protected FIDS split projection integration", () => {
+  it("projects canonical part numbers for a booking group split across two rotations", async () => {
+    const rows = await loadFidsProjectionRows(env.DB, {
+      ...projectionBase,
+      band: "ALL",
+      limit: 20,
+      offset: 0,
+    });
+
+    expect(
+      rows
+        .filter((row) => row.communication_number === 201)
+        .map((row) => ({
+          rotationId: row.rotation_id,
+          partNumber: row.part_number,
+          partCount: row.part_count,
+          passengerCount: row.passenger_count,
+        })),
+    ).toEqual([
+      { rotationId: "rotation-split-a", partNumber: 1, partCount: 2, passengerCount: 1 },
+      { rotationId: "rotation-split-b", partNumber: 2, partCount: 2, passengerCount: 1 },
+    ]);
+  });
+
   it("keeps recent departures in priority order and out of lower paging", async () => {
     const [actionableTotal, recentDepartureTotal] = await Promise.all([
       countFidsProjectionRows(env.DB, { ...projectionBase, band: "ACTIONABLE" }),
@@ -182,7 +222,11 @@ describe("protected FIDS split projection integration", () => {
       "rotation-recent-old",
       "rotation-prepare",
     ]);
-    expect(lowerRows.map((row) => row.rotation_id)).toEqual(["rotation-lower"]);
+    expect(lowerRows.map((row) => row.rotation_id)).toEqual([
+      "rotation-lower",
+      "rotation-split-a",
+      "rotation-split-b",
+    ]);
     expect(lowerRows.some((row) => row.rotation_id.startsWith("rotation-recent"))).toBe(false);
     expect(lowerRows.some((row) => row.rotation_id === "rotation-expired")).toBe(false);
   });

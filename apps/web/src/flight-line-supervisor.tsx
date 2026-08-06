@@ -4,7 +4,7 @@ import type {
   OperationBoard,
   ResourceDayHistory,
 } from "@rundflug/contracts";
-import { formatBookingGroupLabel, rotationStateLabels } from "@rundflug/domain";
+import { rotationStateLabels } from "@rundflug/domain";
 import type { LucideIcon } from "lucide-react";
 import {
   Activity,
@@ -62,6 +62,7 @@ import {
   PilotChangeIcon,
   primaryAircraftActionLabel,
   primaryAircraftActionPresentation,
+  rotationBookingGroupLabel,
 } from "./flight-line-shared";
 import { formatAbsoluteTimeWindow } from "./time-window";
 
@@ -337,7 +338,7 @@ export function FlightLineSupervisorConsole({
       .filter(({ rotation }) => !onlyOpenTickets || rotation.status !== "COMPLETED")
       .filter(({ group, queue, rotation }) => {
         if (!query) return true;
-        return `${formatBookingGroupLabel(rotation.productCode, group.communicationNumber)} ${rotation.communicationLabel} ${rotation.productName} ${rotation.aircraftRegistration ?? ""} ${queue?.resourceGroupName ?? ""} ${queue?.sequence ?? ""}`
+        return `${rotationBookingGroupLabel(rotation, group)} ${rotation.communicationLabel} ${rotation.productName} ${rotation.aircraftRegistration ?? ""} ${queue?.resourceGroupName ?? ""} ${queue?.sequence ?? ""}`
           .toLocaleLowerCase("de-DE")
           .includes(query);
       });
@@ -654,9 +655,7 @@ export function FlightLineSupervisorConsole({
                 <span className="flight-director-group-chips">
                   {rotation && rotation.status !== "DRAFT" ? (
                     rotation.bookingGroups.map((group) => (
-                      <small key={group.id}>
-                        {formatBookingGroupLabel(rotation.productCode, group.communicationNumber)}
-                      </small>
+                      <small key={group.id}>{rotationBookingGroupLabel(rotation, group)}</small>
                     ))
                   ) : (
                     <small>–</small>
@@ -947,9 +946,7 @@ function CompactTickets({
       {rows.length > 0 ? (
         rows.map(({ group, queue, rotation }) => (
           <div key={`${rotation.id}-${group.id}`}>
-            <strong>
-              {formatBookingGroupLabel(rotation.productCode, group.communicationNumber)}
-            </strong>
+            <strong>{rotationBookingGroupLabel(rotation, group)}</strong>
             <span>{rotation.communicationLabel}</span>
             <span>{queue ? `${queue.resourceGroupName} · ${queue.sequence}` : "–"}</span>
             <span>{group.ticketCount}</span>
@@ -974,7 +971,7 @@ function CompactTickets({
             <span>{formatFlightLineTime(rotation.timeline.actual.completionAt, timeZone)}</span>
             <span className="ticket-analytics-action">
               <IconButton
-                label={`Tagesauswertung für ${formatBookingGroupLabel(rotation.productCode, group.communicationNumber)} anzeigen`}
+                label={`Tagesauswertung für ${rotationBookingGroupLabel(rotation, group)} anzeigen`}
                 onClick={() => onOpenAnalytics(group.id, rotation.id)}
                 size="compact"
                 type="button"

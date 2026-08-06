@@ -1,5 +1,9 @@
 import type { OperationBoard } from "@rundflug/contracts";
-import { aircraftOperationalStateLabels, formatBookingGroupLabel } from "@rundflug/domain";
+import {
+  aircraftOperationalStateLabels,
+  formatBookingGroupLabel,
+  formatBookingGroupPartLabel,
+} from "@rundflug/domain";
 import {
   Bell,
   BellOff,
@@ -126,10 +130,19 @@ export function formatFlightLineTime(value: string | null | undefined, timeZone:
   }).format(new Date(value));
 }
 
+export function rotationBookingGroupLabel(
+  rotation: FlightLineRotation,
+  group: FlightLineRotation["bookingGroups"][number],
+): string {
+  return formatBookingGroupPartLabel(rotation.productCode, group.communicationNumber, group);
+}
+
+export function rotationGroupLabelList(rotation: FlightLineRotation): string[] {
+  return rotation.bookingGroups.map((group) => rotationBookingGroupLabel(rotation, group));
+}
+
 export function rotationGroupLabels(rotation: FlightLineRotation): string {
-  const labels = rotation.bookingGroups.map((group) =>
-    formatBookingGroupLabel(rotation.productCode, group.communicationNumber),
-  );
+  const labels = rotationGroupLabelList(rotation);
   return labels.length > 0 ? labels.join(", ") : "";
 }
 

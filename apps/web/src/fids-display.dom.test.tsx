@@ -193,7 +193,7 @@ describe("FIDS board presentation", () => {
 
   it("shows every booking group of a compacted shared flight", () => {
     const grouped = row("shared", "BOARDING", {
-      bookingGroupLabels: ["G-PAN-0101", "G-PAN-0102", "G-PAN-0103"],
+      bookingGroupLabels: ["G-PAN-0101/1", "G-PAN-0102", "G-PAN-0103/2"],
     });
     const board = splitBoard({
       priority: {

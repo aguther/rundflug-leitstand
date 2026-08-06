@@ -60,9 +60,13 @@ describe("protected FIDS board projection", () => {
     expect(projectionSource).toContain(
       "LEFT JOIN products p ON p.id = COALESCE(tg.product_id, fg.product_id)",
     );
+    expect(projectionSource).toContain("LEFT JOIN booking_group_parts booking_part");
 
     const recording = recordingDatabase({ count: 17 });
     await expect(countFidsProjectionRows(recording.db, projectionInput)).resolves.toBe(17);
+    expect(recording.statements[0]?.match(/\bWITH\b/g)).toHaveLength(1);
+    expect(recording.statements[0]).toContain("WITH relevant_booking_group_rotations AS");
+    expect(recording.statements[0]).toContain("booking_part.part_number");
     expect(recording.statements[0]).toContain("SELECT COUNT(*) AS total_items FROM selected");
     expect(recording.bindings[0]).toEqual([
       "event-synthetic",

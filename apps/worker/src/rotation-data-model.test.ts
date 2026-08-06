@@ -37,6 +37,10 @@ describe("D-050 rotation data model", () => {
     expect(worker).toContain("planned_boarding_at");
     expect(worker).toContain("predicted_boarding_at");
     expect(worker).toContain("called_at");
+    expect(worker).toContain("withBookingGroupPartProjection(");
+    expect(worker).toContain("'partNumber', grouped_tickets.part_number");
+    expect(worker).toContain("'partCount', grouped_tickets.part_count");
+    expect(worker).toContain("JOIN booking_group_parts grouped_part");
   });
 
   it("separates stable communication identifiers from mutable queue and capacity data", () => {

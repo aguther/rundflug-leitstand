@@ -51,6 +51,7 @@ import {
   estimateDuration,
   forecastQueueWindows,
   formatBookingGroupLabel,
+  formatBookingGroupPartLabel,
   formatFlightGroupLabel,
   groupSharedFidsFlights,
   orderFidsRows,
@@ -435,6 +436,10 @@ function mapFidsProjectionRow(
     publicForecast.forecastState === "DISPATCH_WINDOW" ||
     publicForecast.forecastState === "LONG_RANGE_WINDOW";
   const activeRecall = activeTicketGroupRecallProjection(row);
+  const bookingGroupPart = bookingGroupPartContextFromColumns(row);
+  const bookingGroupLabel = bookingGroupPart
+    ? formatBookingGroupPartLabel(row.product_code, row.communication_number, bookingGroupPart)
+    : formatBookingGroupLabel(row.product_code, row.communication_number);
   const status: FidsBoardRow["status"] =
     row.resource_group_status !== "ACTIVE"
       ? "SERVICE_PAUSED"
@@ -455,7 +460,7 @@ function mapFidsProjectionRow(
     productCode: row.product_code,
     gateLabel: row.gate_label,
     communicationNumber: row.communication_number,
-    bookingGroupLabels: [formatBookingGroupLabel(row.product_code, row.communication_number)],
+    bookingGroupLabels: [bookingGroupLabel],
     ticketLabels: Array.from(
       { length: Math.max(1, row.ticket_count) },
       (_, ticketIndex) =>
@@ -4071,7 +4076,8 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
         }>(),
     () =>
       context.env.DB.prepare(
-        `SELECT r.id, r.version, r.flight_group_id, fg.resource_group_id,
+        withBookingGroupPartProjection(
+          `SELECT r.id, r.version, r.flight_group_id, fg.resource_group_id,
               rotation_rg.short_code AS resource_group_short_code, fg.communication_number,
               COALESCE(fg.queue_position, fg.communication_number) AS queue_position,
               r.status, r.aircraft_id, r.usable_capacity, fg.precalled_at,
@@ -4211,21 +4217,29 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
                   'communicationNumber', grouped_tickets.communication_number,
                   'soldAt', grouped_tickets.sold_at,
                   'ticketCount', grouped_tickets.ticket_count,
-                  'presentCount', grouped_tickets.present_count
+                  'presentCount', grouped_tickets.present_count,
+                  'partNumber', grouped_tickets.part_number,
+                  'partCount', grouped_tickets.part_count
                 ))
                   FROM (
                     SELECT grouped_ticket.ticket_group_id,
                            grouped_group.communication_number,
                            grouped_group.sold_at,
+                           grouped_part.part_number,
+                           grouped_part.part_count,
                            COUNT(*) AS ticket_count,
                            SUM(CASE WHEN grouped_ticket.attendance_status = 'CHECKED_IN' THEN 1 ELSE 0 END)
                              AS present_count
                       FROM rotation_tickets grouped_rt
                       JOIN tickets grouped_ticket ON grouped_ticket.id = grouped_rt.ticket_id
                       JOIN ticket_groups grouped_group ON grouped_group.id = grouped_ticket.ticket_group_id
+                      JOIN booking_group_parts grouped_part
+                        ON grouped_part.ticket_group_id = grouped_ticket.ticket_group_id
+                       AND grouped_part.rotation_id = grouped_rt.rotation_id
                      WHERE grouped_rt.rotation_id = r.id AND grouped_rt.released_at IS NULL
                      GROUP BY grouped_ticket.ticket_group_id, grouped_group.communication_number,
-                              grouped_group.sold_at
+                              grouped_group.sold_at, grouped_part.part_number,
+                              grouped_part.part_count
                   ) grouped_tickets) AS booking_groups_json
          FROM rotations r
          JOIN operation_days od ON od.id = r.operation_day_id
@@ -4243,6 +4257,7 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
         GROUP BY r.id
         ORDER BY CASE WHEN r.status = 'DRAFT' THEN 1 ELSE 0 END,
                  COALESCE(fg.queue_position, fg.communication_number), fg.communication_number`,
+        ),
       )
         .bind(eventId)
         .all<{

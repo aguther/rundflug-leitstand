@@ -36,11 +36,15 @@ const board = {
           id: "ticket-group-1",
           communicationNumber: 106,
           soldAt: "2026-07-11T19:00:00.000Z",
+          partNumber: 1,
+          partCount: 2,
         },
         {
           id: "ticket-group-2",
           communicationNumber: 107,
           soldAt: "2026-07-11T19:01:00.000Z",
+          partNumber: 1,
+          partCount: 1,
         },
       ],
     },
@@ -103,7 +107,7 @@ describe("FlightDirectorAnalyticsContent resource timeline", () => {
     );
 
     const rotationButton = await screen.findByRole("button", {
-      name: /Ticketgruppen G-RN-0106, G-RN-0107 · Fluggruppe F-RN-0105/,
+      name: /Ticketgruppen G-RN-0106\/1, G-RN-0107 · Fluggruppe F-RN-0105/,
     });
     expect(rotationButton.textContent).toBe("");
     expect(rotationButton.getAttribute("title")).toContain(
@@ -115,7 +119,7 @@ describe("FlightDirectorAnalyticsContent resource timeline", () => {
         .map((cell) => cell.textContent),
     ).toEqual(["Ticketgruppe", "Fluggruppe", "Flugzeug", "Pilot"]);
     expect(container.querySelector(".flight-director-analytics-table tbody td")?.textContent).toBe(
-      "G-RN-0106, G-RN-0107",
+      "G-RN-0106/1, G-RN-0107",
     );
     const resourceTable = container.querySelector(
       ".flight-director-analytics-table.is-resource-history",
@@ -195,7 +199,7 @@ describe("FlightDirectorAnalyticsContent resource timeline", () => {
         .map((cell) => cell.textContent),
     ).toEqual(["Ticketgruppe", "Fluggruppe", "Flugzeug", "Pilot"]);
     expect(container.querySelector(".flight-director-analytics-table tbody td")?.textContent).toBe(
-      "G-RN-0106, G-RN-0107",
+      "G-RN-0106/1, G-RN-0107",
     );
   });
 });

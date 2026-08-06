@@ -37,6 +37,10 @@ booking_group_parts AS (
 `;
 
 export function withBookingGroupPartProjection(statement: string): string {
+  const trimmedStatement = statement.trimStart();
+  if (trimmedStatement.startsWith("WITH ")) {
+    return `${BOOKING_GROUP_PART_PROJECTION_CTE},${trimmedStatement.slice("WITH".length)}`;
+  }
   return `${BOOKING_GROUP_PART_PROJECTION_CTE}${statement}`;
 }
 

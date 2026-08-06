@@ -1,3 +1,5 @@
+import { withBookingGroupPartProjection } from "./booking-group-part-projection";
+
 export type FidsProjectionBand = "ALL" | "ACTIONABLE" | "RECENT_DEPARTURE" | "PREPARE" | "LOWER";
 
 export interface FidsProjectionFilter {
@@ -44,6 +46,9 @@ export interface FidsProjectionRow {
   aircraft_registration: string | null;
   departed_at: string | null;
   ticket_count: number;
+  part_number: number | null;
+  part_count: number | null;
+  passenger_count: number | null;
   resource_group_status: "ACTIVE" | "PAUSED" | "INTERRUPTED" | "ENDED";
   resource_group_operational_note: string;
   planned_public_note: string | null;
@@ -51,7 +56,7 @@ export interface FidsProjectionRow {
   projection_index: number;
 }
 
-const projectionCte = `WITH projected AS (
+const projectionCte = withBookingGroupPartProjection(`WITH projected AS (
   SELECT r.id || ':' || COALESCE(tg.id, fg.id) AS row_id,
          r.id AS rotation_id,
          COALESCE(MIN(p.id), fg.product_id, 'product:' || fg.resource_group_id) AS product_id,
@@ -71,6 +76,9 @@ const projectionCte = `WITH projected AS (
          MIN(a.registration) AS aircraft_registration,
          r.departed_at,
          COUNT(rt.ticket_id) AS ticket_count,
+         booking_part.part_number,
+         booking_part.part_count,
+         booking_part.passenger_count,
          rg.status AS resource_group_status,
          rg.operational_note AS resource_group_operational_note,
          (SELECT plan.public_note FROM planned_operational_constraints plan
@@ -93,6 +101,9 @@ const projectionCte = `WITH projected AS (
     LEFT JOIN rotation_tickets rt ON rt.rotation_id = r.id AND rt.released_at IS NULL
     LEFT JOIN tickets t ON t.id = rt.ticket_id
     LEFT JOIN ticket_groups tg ON tg.id = t.ticket_group_id
+    LEFT JOIN booking_group_parts booking_part
+      ON booking_part.ticket_group_id = tg.id
+     AND booking_part.rotation_id = r.id
     LEFT JOIN products p ON p.id = COALESCE(tg.product_id, fg.product_id)
     LEFT JOIN gates g ON g.id = COALESCE(r.gate_id, p.gate_id)
     LEFT JOIN aircraft a ON a.id = r.aircraft_id
@@ -105,7 +116,8 @@ const projectionCte = `WITH projected AS (
      AND (?3 = '[]' OR g.id IN (SELECT value FROM json_each(?3)))
      AND (?4 = '[]' OR r.status IN (SELECT value FROM json_each(?4)))
      AND (r.status NOT IN ('IN_FLIGHT', 'LANDED', 'COMPLETED') OR r.departed_at > ?5)
-   GROUP BY r.id, tg.id
+   GROUP BY r.id, tg.id, booking_part.part_number, booking_part.part_count,
+            booking_part.passenger_count
 ), ranked AS (
   SELECT projected.*,
          CASE WHEN sort_rank IN (0, 1) THEN 1 ELSE 0 END AS actionable_band,
@@ -130,7 +142,7 @@ const projectionCte = `WITH projected AS (
       OR (?7 = 'PREPARE' AND sort_rank = 2)
       OR (?7 = 'LOWER' AND actionable_band = 0 AND recent_departure_band = 0))
      AND (?8 = '[]' OR row_id NOT IN (SELECT value FROM json_each(?8)))
-)`;
+)`);
 
 function projectionBindings(input: {
   eventId: string;

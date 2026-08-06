@@ -2516,6 +2516,21 @@ export const productOperationalSummarySchema = z.object({
   predictionQuality: z.enum(["STABLE", "CHANGING", "UNCERTAIN"]),
 });
 
+const rotationBookingGroupSchema = z
+  .object({
+    id: z.string(),
+    communicationNumber: z.number().int().positive(),
+    soldAt: z.string(),
+    ticketCount: z.number().int().positive(),
+    presentCount: z.number().int().nonnegative(),
+    partNumber: z.number().int().positive().default(1),
+    partCount: z.number().int().positive().default(1),
+  })
+  .refine((group) => group.partNumber <= group.partCount, {
+    message: "Booking group part number must not exceed its part count",
+    path: ["partNumber"],
+  });
+
 export const rotationOperationalSummarySchema = z.object({
   id: z.string(),
   version: z.number().int().nonnegative(),
@@ -2526,17 +2541,7 @@ export const rotationOperationalSummarySchema = z.object({
   productCode: z.string(),
   productName: z.string(),
   status: z.enum(["DRAFT", "CALLED", "IN_FLIGHT", "LANDED", "COMPLETED"]),
-  bookingGroups: z
-    .array(
-      z.object({
-        id: z.string(),
-        communicationNumber: z.number().int().positive(),
-        soldAt: z.string(),
-        ticketCount: z.number().int().positive(),
-        presentCount: z.number().int().nonnegative(),
-      }),
-    )
-    .default([]),
+  bookingGroups: z.array(rotationBookingGroupSchema).default([]),
   ticketGroupId: z.string(),
   gateId: z.string().min(1),
   gateLabel: z.string().min(1),

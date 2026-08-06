@@ -15,6 +15,7 @@ import {
   latestRotationForAircraft,
   primaryAircraftActionLabel,
   primaryAircraftActionPresentation,
+  rotationGroupLabels,
   rotationHistoryForAircraft,
   visibleAircraftState,
 } from "./flight-line-shared";
@@ -29,6 +30,29 @@ function rotation(id: string, status: FlightLineRotation["status"]): FlightLineR
 }
 
 describe("gemeinsame Flight-Line-Präsentationslogik", () => {
+  it("adds part suffixes only to booking groups split across concrete rotations", () => {
+    const splitRotation = {
+      ...rotation("rotation-split", "DRAFT"),
+      productCode: "RN",
+      bookingGroups: [
+        {
+          id: "group-split",
+          communicationNumber: 106,
+          partNumber: 1,
+          partCount: 2,
+        },
+        {
+          id: "group-complete",
+          communicationNumber: 107,
+          partNumber: 1,
+          partCount: 1,
+        },
+      ],
+    } as FlightLineRotation;
+
+    expect(rotationGroupLabels(splitRotation)).toBe("G-RN-0106/1, G-RN-0107");
+  });
+
   it("derives German status and semantic tones from aircraft and active rotation", () => {
     const boarding = rotation("rotation-active", "CALLED");
     expect(visibleAircraftState(aircraft, boarding)).toBe("BOARDING");
@@ -196,7 +220,7 @@ describe("gemeinsame Flight-Line-Präsentationslogik", () => {
       productCode: "RN",
       communicationLabel: "F-RG001-007",
       pilotOperationalCode: "P-01",
-      bookingGroups: [{ id: "group-1", communicationNumber: 7 }],
+      bookingGroups: [{ id: "group-1", communicationNumber: 7, partNumber: 2, partCount: 2 }],
       timeline: {
         actual: {
           boardingAt: "2026-07-21T08:00:00.000Z",
@@ -221,7 +245,7 @@ describe("gemeinsame Flight-Line-Präsentationslogik", () => {
       expect(markup).toContain(`title="${label}"`);
       expect(markup).toContain(`>${label}</span>`);
     }
-    expect(markup).toContain("G-RN-0007");
+    expect(markup).toContain("G-RN-0007/2");
     expect(markup).toContain("P-01");
     expect(markup).toContain("10:30");
   });
@@ -257,6 +281,8 @@ describe("gemeinsame Flight-Line-Präsentationslogik", () => {
       timeline: { actual: {} },
       bookingGroups: Array.from({ length: 6 }, (_, index) => ({
         communicationNumber: index + 1,
+        partNumber: 1,
+        partCount: 1,
       })),
     } as FlightLineRotation;
     const markup = renderToStaticMarkup(

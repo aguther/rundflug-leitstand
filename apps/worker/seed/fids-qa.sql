@@ -12,12 +12,16 @@ INSERT OR IGNORE INTO aircraft
    operational_state_changed_at, created_at, updated_at)
 VALUES
   ('aircraft-fids-boarding', 'D-EQA1', 'SYNTHETIC-QA', 4, 'BOARDING',
+   '2026-07-22T08:00:00.000Z', '2026-07-22T08:00:00.000Z', '2026-07-22T08:00:00.000Z'),
+  ('aircraft-fids-split', 'D-EQA2', 'SYNTHETIC-QA', 4, 'BOARDING',
    '2026-07-22T08:00:00.000Z', '2026-07-22T08:00:00.000Z', '2026-07-22T08:00:00.000Z');
 
 INSERT OR IGNORE INTO resource_group_memberships
   (id, operation_day_id, resource_group_id, aircraft_id, active_from, active_until, created_at)
 VALUES
   ('membership-fids-boarding', 'demo-2026', 'rg-oldtimer', 'aircraft-fids-boarding',
+   '2026-07-22T08:00:00.000Z', NULL, '2026-07-22T08:00:00.000Z'),
+  ('membership-fids-split', 'demo-2026', 'rg-panorama', 'aircraft-fids-split',
    '2026-07-22T08:00:00.000Z', NULL, '2026-07-22T08:00:00.000Z');
 
 INSERT OR IGNORE INTO products
@@ -72,7 +76,7 @@ SELECT printf('fids-qa-flight-group-%02d', number), 'demo-2026',
        CASE WHEN number % 7 = 0 THEN 'paused-qa'
             WHEN number % 5 = 0 OR number = 2 THEN 'oldtimer-qa'
             ELSE 'normal-qa' END,
-       200 + number, CASE WHEN number = 2 THEN 'CALLED' ELSE 'DRAFT' END,
+       200 + number, CASE WHEN number IN (1, 2) THEN 'CALLED' ELSE 'DRAFT' END,
        number * 5, number * 5 + 15, 0,
        '2026-07-22T08:00:00.000Z', '2026-07-22T08:00:00.000Z', number,
        CASE WHEN number = 1 THEN '2026-07-22T08:05:00.000Z' ELSE NULL END
@@ -86,9 +90,11 @@ INSERT OR IGNORE INTO rotations
    created_at, updated_at, gate_id)
 SELECT printf('fids-qa-rotation-%02d', number), 'demo-2026',
        printf('fids-qa-flight-group-%02d', number),
-       CASE WHEN number = 2 THEN 'aircraft-fids-boarding' ELSE NULL END,
-       CASE WHEN number = 2 THEN 'CALLED' ELSE 'DRAFT' END,
-       CASE WHEN number = 2 THEN '2026-07-22T08:05:00.000Z' ELSE NULL END,
+       CASE WHEN number = 1 THEN 'aircraft-fids-split'
+            WHEN number = 2 THEN 'aircraft-fids-boarding'
+            ELSE NULL END,
+       CASE WHEN number IN (1, 2) THEN 'CALLED' ELSE 'DRAFT' END,
+       CASE WHEN number IN (1, 2) THEN '2026-07-22T08:05:00.000Z' ELSE NULL END,
        0, '2026-07-22T08:00:00.000Z', '2026-07-22T08:00:00.000Z',
        'demo-2026-gate-main'
   FROM sequence;
@@ -100,3 +106,31 @@ INSERT OR IGNORE INTO rotation_tickets (rotation_id, ticket_id, assigned_at)
 SELECT printf('fids-qa-rotation-%02d', number), printf('fids-qa-ticket-%02d', number),
        '2026-07-22T08:00:00.000Z'
   FROM sequence;
+
+-- Split the first booking group across two concrete rotations. The canonical projection must expose
+-- G-RN-0201/1 and G-RN-0201/2 while aggregate group surfaces keep G-RN-0201.
+INSERT OR IGNORE INTO tickets
+  (id, ticket_group_id, public_code_hash, status, weight_class, individual_weight_kg,
+   payment_status, price_cents, created_at)
+VALUES
+  ('fids-qa-ticket-01-part-2', 'fids-qa-ticket-group-01', 'fids-qa-hash-01-part-2',
+   'QUEUED', 'NOT_CAPTURED', NULL, 'PAID', 0, '2026-07-22T08:00:00.000Z');
+
+INSERT OR IGNORE INTO flight_groups
+  (id, operation_day_id, resource_group_id, product_id, communication_number, status,
+   prediction_lower_minutes, prediction_upper_minutes, version, created_at, updated_at,
+   queue_position, precalled_at)
+VALUES
+  ('fids-qa-flight-group-21', 'demo-2026', 'rg-panorama', 'normal-qa', 221, 'DRAFT',
+   105, 120, 0, '2026-07-22T08:01:00.000Z', '2026-07-22T08:01:00.000Z', 21, NULL);
+
+INSERT OR IGNORE INTO rotations
+  (id, operation_day_id, flight_group_id, aircraft_id, status, called_at, version,
+   created_at, updated_at, gate_id)
+VALUES
+  ('fids-qa-rotation-21', 'demo-2026', 'fids-qa-flight-group-21', NULL, 'DRAFT', NULL, 0,
+   '2026-07-22T08:01:00.000Z', '2026-07-22T08:01:00.000Z', 'demo-2026-gate-main');
+
+INSERT OR IGNORE INTO rotation_tickets (rotation_id, ticket_id, assigned_at)
+VALUES
+  ('fids-qa-rotation-21', 'fids-qa-ticket-01-part-2', '2026-07-22T08:01:00.000Z');

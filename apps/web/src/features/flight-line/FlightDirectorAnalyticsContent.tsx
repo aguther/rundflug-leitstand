@@ -21,6 +21,7 @@ import {
   YAxis,
 } from "recharts";
 import { Button, IconButton } from "../../design-system/components";
+import { rotationGroupLabelList } from "../../flight-line-shared";
 import {
   analyticsZoomLevelsForSpan,
   useAnalyticsDiagramViewport,
@@ -725,15 +726,9 @@ function ResourcePanel({
     percent: ((tick.value - timelineFrom) / timelineSpan) * 100,
   }));
   const ticketGroupsByRotationId = useMemo(() => {
-    const result = new Map<string, string[]>();
-    for (const ticketGroup of analyticsTicketGroups(board.rotations)) {
-      for (const relatedRotationId of ticketGroup.rotationIds) {
-        const labels = result.get(relatedRotationId) ?? [];
-        labels.push(ticketGroup.label);
-        result.set(relatedRotationId, labels);
-      }
-    }
-    return result;
+    return new Map(
+      board.rotations.map((rotation) => [rotation.id, rotationGroupLabelList(rotation)]),
+    );
   }, [board.rotations]);
   const summary =
     scopeType === "AIRCRAFT"
