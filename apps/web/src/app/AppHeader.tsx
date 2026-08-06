@@ -5,6 +5,7 @@ import {
   ChevronDown,
   Circle,
   CircleUserRound,
+  Copy,
   Headphones,
   Info,
   LockKeyhole,
@@ -18,7 +19,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { BrandMark } from "../design-system/BrandMark";
-import { BusyIndicator, ModalDialog } from "../design-system/components";
+import { BusyIndicator, IconButton, ModalDialog } from "../design-system/components";
 import { ThemeToggle } from "../design-system/ThemeToggle";
 import { useTheme } from "../design-system/theme";
 import { activeEventLabel } from "../event-context";
@@ -26,6 +27,7 @@ import { switchActiveEvent } from "../event-navigation";
 import { useAuth } from "../features/auth/AuthContext";
 import type { ConnectionStatus } from "../shared/hooks/use-connectivity";
 import { appDestinations, isDestinationActive } from "./navigation";
+import { getBuildSourceRevision } from "./source-revision";
 
 const destinationIcons = {
   "/kasse": Tickets,
@@ -59,6 +61,8 @@ const connectionLabels: Record<ConnectionStatus, string> = {
   offline: "Offline",
 };
 
+type RevisionCopyStatus = "idle" | "copied" | "error";
+
 export function AppHeader({
   title,
   kiosk = false,
@@ -70,9 +74,11 @@ export function AppHeader({
   const { preference, setPreference } = useTheme();
   const [infoOpen, setInfoOpen] = useState(false);
   const [logoutBusy, setLogoutBusy] = useState(false);
+  const [revisionCopyStatus, setRevisionCopyStatus] = useState<RevisionCopyStatus>("idle");
   const viewSwitcherRef = useRef<HTMLDetailsElement>(null);
   const accountMenuRef = useRef<HTMLDetailsElement>(null);
   const accountSummaryRef = useRef<HTMLElement>(null);
+  const revisionCopyResetRef = useRef<number | null>(null);
   const pathname = window.location.pathname;
   const fidsView = pathname === "/fids" || pathname.startsWith("/fids/");
   const eventLabel = activeEventLabel(window.localStorage);
@@ -82,6 +88,7 @@ export function AppHeader({
   const CurrentDestinationIcon = currentDestination
     ? destinationIcons[currentDestination.href as keyof typeof destinationIcons]
     : Monitor;
+  const sourceRevision = getBuildSourceRevision();
   const internalOperationalView = Boolean(session && !kiosk && !publicView && !fidsView);
   const brandContent = (
     <>
@@ -117,6 +124,45 @@ export function AppHeader({
       document.removeEventListener("keydown", closeMenusWithEscape);
     };
   }, []);
+
+  useEffect(
+    () => () => {
+      if (revisionCopyResetRef.current !== null) {
+        window.clearTimeout(revisionCopyResetRef.current);
+      }
+    },
+    [],
+  );
+
+  function resetRevisionCopyStatusLater() {
+    if (revisionCopyResetRef.current !== null) {
+      window.clearTimeout(revisionCopyResetRef.current);
+    }
+    revisionCopyResetRef.current = window.setTimeout(() => {
+      setRevisionCopyStatus("idle");
+      revisionCopyResetRef.current = null;
+    }, 2_000);
+  }
+
+  async function copyFullSourceRevision() {
+    if (!sourceRevision.known) return;
+    try {
+      await navigator.clipboard.writeText(sourceRevision.full);
+      setRevisionCopyStatus("copied");
+    } catch {
+      setRevisionCopyStatus("error");
+    }
+    resetRevisionCopyStatusLater();
+  }
+
+  function closeInfoDialog() {
+    if (revisionCopyResetRef.current !== null) {
+      window.clearTimeout(revisionCopyResetRef.current);
+      revisionCopyResetRef.current = null;
+    }
+    setRevisionCopyStatus("idle");
+    setInfoOpen(false);
+  }
 
   async function logoutAndReload() {
     if (logoutBusy) return;
@@ -339,14 +385,50 @@ export function AppHeader({
         ) : null}
       </header>
       <ModalDialog
-        onClose={() => setInfoOpen(false)}
+        onClose={closeInfoDialog}
         open={infoOpen}
         size="compact"
         title="Über Rundflug-Leitstand"
       >
         <div className="app-about-dialog">
           <strong>Rundflug-Leitstand</strong>
-          <span>Version {APP_VERSION}</span>
+          <span className="app-about-version">Version {APP_VERSION}</span>
+          <div className="app-about-revision">
+            <span>Source Revision</span>
+            <div className="app-about-revision-value">
+              <code>{sourceRevision.short}</code>
+              {sourceRevision.known ? (
+                <IconButton
+                  label={
+                    revisionCopyStatus === "copied"
+                      ? "Source Revision kopiert"
+                      : "Vollständige Source Revision kopieren"
+                  }
+                  onClick={() => void copyFullSourceRevision()}
+                  size="compact"
+                  type="button"
+                >
+                  {revisionCopyStatus === "copied" ? (
+                    <Check aria-hidden="true" />
+                  ) : (
+                    <Copy aria-hidden="true" />
+                  )}
+                </IconButton>
+              ) : null}
+            </div>
+            {sourceRevision.known ? (
+              <small
+                aria-live="polite"
+                className={revisionCopyStatus === "error" ? "is-error" : undefined}
+              >
+                {revisionCopyStatus === "copied"
+                  ? "Kopiert"
+                  : revisionCopyStatus === "error"
+                    ? "Kopieren nicht möglich."
+                    : ""}
+              </small>
+            ) : null}
+          </div>
         </div>
       </ModalDialog>
     </>

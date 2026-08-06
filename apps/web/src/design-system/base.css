@@ -298,9 +298,46 @@ body {
   padding-block: 4px;
 }
 
-.app-about-dialog span {
+.app-about-version {
   color: var(--ui-accent);
   font-weight: 650;
+}
+
+.app-about-revision {
+  display: grid;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.app-about-revision > span,
+.app-about-revision > small {
+  color: var(--ui-muted);
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+
+.app-about-revision-value {
+  min-height: var(--control-compact);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.app-about-revision-value code {
+  min-width: 0;
+  color: var(--ui-text);
+  font-size: 0.9rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.app-about-revision > small {
+  min-height: 1em;
+}
+
+.app-about-revision > small.is-error {
+  color: var(--ui-danger);
 }
 
 @media (max-width: 900px) {

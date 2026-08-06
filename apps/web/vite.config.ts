@@ -1,7 +1,11 @@
+import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
+import { resolveSourceRevision } from "./source-revision.ts";
+
+const repositoryRoot = fileURLToPath(new URL("../..", import.meta.url));
 
 const operationalPwa = VitePWA({
   registerType: "autoUpdate",
@@ -61,7 +65,16 @@ const operationalPwa = VitePWA({
 
 export default defineConfig(({ mode }) => {
   const simulator = mode === "simulator";
+  const sourceRevision = resolveSourceRevision(process.env.SOURCE_REVISION, () =>
+    execFileSync("git", ["rev-parse", "HEAD"], {
+      cwd: repositoryRoot,
+      encoding: "utf8",
+    }),
+  );
   return {
+    define: {
+      "import.meta.env.SOURCE_REVISION": JSON.stringify(sourceRevision),
+    },
     plugins: simulator ? [react()] : [react(), ...operationalPwa],
     resolve: {
       alias: simulator
