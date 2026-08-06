@@ -1283,12 +1283,11 @@ export function runOperationalSimulation(
         const batch = plan.batches.find((entry) => entry.id === decision.batchId);
         const rotation = rotations.find((entry) => entry.id === decision.memberId);
         if (!batch || !rotation) continue;
-        const signature = batch.laneId;
+        const signature = batch.id;
         const previous = previousDispatchAssignments.get(decision.memberId);
-        const previousLaneStillPlanned =
-          previous !== undefined &&
-          plan.batches.some((entry) => entry.laneId === previous.signature);
-        if (previous && previous.signature !== signature && previousLaneStillPlanned) {
+        const previousBatchStillPlanned =
+          previous !== undefined && plan.batches.some((entry) => entry.id === previous.signature);
+        if (previous && previous.signature !== signature && previousBatchStillPlanned) {
           dispatchDiagnostics.unnecessaryPlanChanges += 1;
           if (rotation.precallStatus === "GO_TO_GATE") {
             dispatchDiagnostics.goToGateReplans += 1;
@@ -1303,7 +1302,14 @@ export function runOperationalSimulation(
         });
       }
       previousDispatchPlans.set(group.id, plan);
-      for (const assignment of plan.batches.filter((batch) => batch.wave === 1)) {
+      for (const assignment of plan.batches.filter(
+        (batch) =>
+          batch.wave === 1 &&
+          batch.memberIds.every((memberId) => {
+            const member = rotations.find((rotation) => rotation.id === memberId);
+            return member !== undefined && dispatchPublicStatus(member) === "COME_TO_FLIGHT_LINE";
+          }),
+      )) {
         const pilotIndex = freePilots.findIndex(
           (candidate) => candidate.id === assignment.assumedPilotId,
         );

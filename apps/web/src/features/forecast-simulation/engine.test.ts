@@ -267,9 +267,7 @@ describe("local forecast simulation", () => {
       new Set(["product-a", "product-b"]),
     );
     expect(arrived.every((rotation) => rotation.resourceGroupId === "group-a")).toBe(true);
-    expect(called.map((rotation) => rotation.id)).not.toEqual(
-      arrived.map((rotation) => rotation.id),
-    );
+    expect(called).toHaveLength(arrived.length);
     expect(called.every((rotation) => (rotation.dispatchMaximumOvertakeCount ?? 0) <= 3)).toBe(
       true,
     );
@@ -431,10 +429,10 @@ describe("local forecast simulation", () => {
           uncertainCountdownViolations: 0,
           precall: {
             eligibleGroups: 28,
-            precalledGroups: 27,
-            coveragePercent: 96.43,
-            medianGateWaitMinutes: 23.5,
-            p90GateWaitMinutes: 45.9,
+            precalledGroups: 26,
+            coveragePercent: 92.86,
+            medianGateWaitMinutes: 19.5,
+            p90GateWaitMinutes: 37.25,
             sameTickCount: 3,
             uncertainPrecallCount: 0,
           },
@@ -450,10 +448,10 @@ describe("local forecast simulation", () => {
           uncertainCountdownViolations: 0,
           precall: {
             eligibleGroups: 28,
-            precalledGroups: 27,
-            coveragePercent: 96.43,
-            medianGateWaitMinutes: 23.5,
-            p90GateWaitMinutes: 45.9,
+            precalledGroups: 26,
+            coveragePercent: 92.86,
+            medianGateWaitMinutes: 19.5,
+            p90GateWaitMinutes: 37.25,
             sameTickCount: 3,
             uncertainPrecallCount: 0,
           },
@@ -469,10 +467,10 @@ describe("local forecast simulation", () => {
           uncertainCountdownViolations: 0,
           precall: {
             eligibleGroups: 21,
-            precalledGroups: 21,
-            coveragePercent: 100,
-            medianGateWaitMinutes: 25.5,
-            p90GateWaitMinutes: 51,
+            precalledGroups: 20,
+            coveragePercent: 95.24,
+            medianGateWaitMinutes: 21.5,
+            p90GateWaitMinutes: 44.55,
             sameTickCount: 3,
             uncertainPrecallCount: 0,
           },
@@ -488,10 +486,10 @@ describe("local forecast simulation", () => {
           uncertainCountdownViolations: 0,
           precall: {
             eligibleGroups: 27,
-            precalledGroups: 27,
-            coveragePercent: 100,
-            medianGateWaitMinutes: 24,
-            p90GateWaitMinutes: 43.3,
+            precalledGroups: 25,
+            coveragePercent: 92.59,
+            medianGateWaitMinutes: 19.5,
+            p90GateWaitMinutes: 36.1,
             sameTickCount: 3,
             uncertainPrecallCount: 0,
           },

@@ -2,6 +2,7 @@ import {
   createDispatchPlan,
   type DispatchCommitmentLevel,
   type DispatchDecisionReason,
+  type DispatchLockedBatchInput,
   type DispatchPlan,
   type DispatchPlanInput,
   type DispatchPlanningLimits,
@@ -241,6 +242,7 @@ export interface ForecastTimelinesInput {
   capacities: readonly ForecastTimelineCapacityInput[];
   tuning?: ForecastTuningProfile;
   previousDispatchPlan?: DispatchPlan | null;
+  lockedDispatchBatches?: readonly DispatchLockedBatchInput[];
   dispatchPlanningLimits?: Partial<DispatchPlanningLimits>;
 }
 
@@ -1621,6 +1623,9 @@ export function calculateForecastTimelineResult(
     ...(input.previousDispatchPlan === undefined
       ? {}
       : { previousPlan: input.previousDispatchPlan }),
+    ...(input.lockedDispatchBatches === undefined
+      ? {}
+      : { lockedBatches: input.lockedDispatchBatches }),
     ...(input.dispatchPlanningLimits === undefined ? {} : { limits: input.dispatchPlanningLimits }),
   };
   const dispatchPlan = createDispatchPlan(dispatchInput);
@@ -1662,11 +1667,6 @@ export function calculateForecastTimelineResult(
     });
   }
   const dispatchLaneById = new Map(dispatchLanes.map((lane) => [lane.id, lane]));
-  const previousLaneByMemberId = new Map(
-    (input.previousDispatchPlan?.batches ?? []).flatMap((batch) =>
-      batch.memberIds.map((memberId) => [memberId, batch.laneId] as const),
-    ),
-  );
   const nearMemberIds = new Set(dispatchPlan.batches.flatMap((batch) => batch.memberIds));
   const longRangeReservationByMemberId = new Map<string, LongRangeReplayReservation>();
   const resourceGroupIdsForTail = [
@@ -1693,12 +1693,7 @@ export function calculateForecastTimelineResult(
         availability.lanes.some((lane) => {
           const dispatchLane = dispatchLaneById.get(lane.laneId);
           if (!dispatchLane) return false;
-          const lockedLane =
-            group.publicStatus === "COME_TO_FLIGHT_LINE"
-              ? previousLaneByMemberId.get(group.id)
-              : undefined;
           return (
-            (group.publicStatus !== "COME_TO_FLIGHT_LINE" || lockedLane === lane.laneId) &&
             group.size <= lane.passengerSeats &&
             dispatchLane.productDurations.some((duration) => duration.productId === group.productId)
           );
@@ -1724,14 +1719,9 @@ export function calculateForecastTimelineResult(
         availability.lanes
           .filter((lane) => {
             const dispatchLane = dispatchLaneById.get(lane.laneId);
-            const lockedLane =
-              anchorGroup.publicStatus === "COME_TO_FLIGHT_LINE"
-                ? previousLaneByMemberId.get(anchorGroup.id)
-                : undefined;
             return (
               dispatchLane !== undefined &&
               anchorGroup.size <= lane.passengerSeats &&
-              (anchorGroup.publicStatus !== "COME_TO_FLIGHT_LINE" || lockedLane === lane.laneId) &&
               dispatchLane.productDurations.some(
                 (duration) => duration.productId === anchorGroup.productId,
               )
@@ -1761,13 +1751,6 @@ export function calculateForecastTimelineResult(
           group.gateId !== anchorGroup.gateId ||
           occupiedSeats + group.size > selectedLane.passengerSeats
         ) {
-          continue;
-        }
-        const lockedLane =
-          group.publicStatus === "COME_TO_FLIGHT_LINE"
-            ? previousLaneByMemberId.get(group.id)
-            : undefined;
-        if (group.publicStatus === "COME_TO_FLIGHT_LINE" && lockedLane !== selectedLane.laneId) {
           continue;
         }
         memberIds.push(group.id);

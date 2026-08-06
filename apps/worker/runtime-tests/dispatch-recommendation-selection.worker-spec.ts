@@ -17,6 +17,7 @@ beforeEach(async () => {
   await executeStatements(`
     DROP TABLE IF EXISTS outbox;
     DROP TABLE IF EXISTS operational_events;
+    DROP TABLE IF EXISTS planning_runs;
     DROP TABLE IF EXISTS dispatch_recommendation_leases;
     DROP TABLE IF EXISTS rotation_tickets;
     DROP TABLE IF EXISTS tickets;
@@ -30,6 +31,14 @@ beforeEach(async () => {
     DROP TABLE IF EXISTS operation_days;
 
     CREATE TABLE operation_days (id TEXT PRIMARY KEY, version INTEGER NOT NULL);
+    CREATE TABLE planning_runs (
+      id TEXT PRIMARY KEY,
+      operation_day_id TEXT NOT NULL,
+      operation_day_version INTEGER NOT NULL,
+      calculation_now TEXT NOT NULL,
+      dispatch_plan_revision TEXT NOT NULL,
+      status TEXT NOT NULL
+    );
     CREATE TABLE operator_accounts (id TEXT PRIMARY KEY);
     CREATE TABLE aircraft (
       id TEXT PRIMARY KEY,
@@ -149,6 +158,10 @@ beforeEach(async () => {
     );
 
     INSERT INTO operation_days VALUES ('event-dispatch-runtime', 7);
+    INSERT INTO planning_runs VALUES (
+      'planning-run-current', 'event-dispatch-runtime', 7,
+      '2026-08-05T09:00:00.000Z', 'plan-current', 'SUCCEEDED'
+    );
     INSERT INTO operator_accounts VALUES ('account-dispatch-runtime');
     INSERT INTO aircraft VALUES ('opened-aircraft', 3, 'AVAILABLE');
     INSERT INTO resource_group_memberships VALUES

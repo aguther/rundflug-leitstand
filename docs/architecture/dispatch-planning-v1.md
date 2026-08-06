@@ -42,11 +42,16 @@ Simulator. ADR-0029 hatte dieses Queue-Präfix ausdrücklich stabil und überhol
    effektive Vorlauf setzt sich aus adaptivem Basiswert und Gate-Wegvorlauf zusammen.
 6. D1 speichert Projektion und Entscheidungsdiagnostik. Erst danach werden Realtime- und
    Outbox-Nachrichten veröffentlicht.
-7. `CALL_NEXT` akzeptiert die Empfehlung nur bei passender Planrevision, Batch-ID, Flugzeug und
-   unveränderter Gruppenmenge. Andernfalls wird `DISPATCH_PLAN_STALE` zurückgegeben.
-8. Der Zuweisungsdialog übernimmt den ersten weiterhin passenden Batch derselben gespeicherten
-   Revision. Nur ohne passenden Batch wird eine flugzeugbezogene Ein-Wellen-Ersatzplanung erzeugt.
-9. Projizierte Überholungen bleiben Ergebnisdiagnostik. Ausschließlich bei `CALL_NEXT` atomar
+7. Aktive Boarding-Leases werden als gesperrte Batch-/Flugzeugzuordnungen in die nächste globale
+   Planung übernommen. Ihre Gruppen und ihre reservierte Flugzeugkapazität stehen dem Restplan nicht
+   erneut zur Verfügung.
+8. Der Zuweisungsdialog übernimmt den frühesten unreservierten, vollständig aufgerufenen Batch des
+   zur Veranstaltungsversion passenden globalen Plans, der in das geöffnete Flugzeug passt. Fehlt
+   ein aktueller Plan, wird vor dem Lease-Erwerb global neu geplant; eine dialoglokale
+   Ein-Wellen-Ersatzplanung existiert nicht.
+9. `CALL_NEXT` akzeptiert die Empfehlung nur bei passender Lease-ID, Batch-ID, Flugzeug und
+   unveränderter Gruppenmenge. Andernfalls wird die veraltete Empfehlung abgelehnt.
+10. Projizierte Überholungen bleiben Ergebnisdiagnostik. Ausschließlich bei `CALL_NEXT` atomar
    bestätigte Überholungen fließen als historische Fairnessschuld in spätere Planungen ein.
 
 ## Begrenzung und Laufzeit
@@ -56,6 +61,11 @@ je Schritt und Beam-Breite 24. Der Simulator verwendet für schnelle Mehrfachlä
 fachlich identische Grenzen. Die Kandidatenerzeugung kombiniert ausschließlich vollständige Gruppen
 eines Produkts bis zur Sitzkapazität. Alle Sortierungen enden mit stabilen IDs. Gleiche Eingaben
 erzeugen bitgleich denselben Plan; Eingabeobjekte werden nicht verändert.
+
+Eine Batch-ID wird aus Ressourcengruppe, Produkt, Gate und der geordneten Gruppen-/Segmentmenge
+gebildet. Lane, Welle, Pilot und angenommenes Flugzeug gehören nicht zur Identität. Ein gleich
+großes, früher verfügbares Flugzeug kann deshalb denselben Batch übernehmen, während die geänderte
+Bahnnutzung eine neue Planrevision erzeugen darf.
 
 Die Grenzen gelten nur für die nahe Dispatch-Empfehlung. `NOT_IN_NEAR_DISPATCH_BATCH` entfernt keine
 Prognose. Der nachgelagerte vollständige Schwanz verarbeitet alle prognostizierbaren Gruppen linear,
@@ -74,7 +84,11 @@ Wiederherstellung, Ereigniskopie, Stammdatenvorlage und Simulationsplan transpor
 - Ein Batch ist produktrein, gruppenatomar und kapazitätskonform.
 - Ein Ticket bleibt höchstens einem nicht abgeschlossenen Umlauf zugeordnet.
 - Eine Empfehlung ist keine dauerhafte Flugzeugbindung; erst `CALL_NEXT` bestätigt sie.
-- `COME_TO_FLIGHT_LINE` wird bei unverändert passender Bahn nicht automatisch umgeplant.
+- `COME_TO_FLIGHT_LINE` bindet vor dem Lease keine Gruppe an eine prognostizierte Flugzeugbahn.
+- Ein aktiver Lease bindet Gruppenmenge und Flugzeug bis Bestätigung, Freigabe oder Ablauf.
+- Bereits aufgerufene Gruppen dürfen ohne unvermeidbaren Ressourcenverlust nicht später eingeplant
+  werden; der bisherige prognostizierte Boardingzeitpunkt wird vor Wartezeit-, Durchsatz- und
+  Auslastungszielen geschützt.
 - Ressourcenverlust darf neu planen, aber keine Gruppe duplizieren oder teilen.
 - Fehlende Prognosekapazität erzeugt Grund und leeres Fenster, niemals einen künstlichen Nullwert.
 - Alle bestätigten operativen Zustandsänderungen bleiben versioniert, idempotent und auditiert.

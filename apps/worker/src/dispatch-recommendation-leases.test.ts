@@ -128,13 +128,11 @@ describe("short-lived dispatch recommendation leases (F-BRD-010, Q-ZUV-020)", ()
     expect(coordinatorSource).toContain("lease.device_id === command.deviceId");
     expect(coordinatorSource).toContain("lease.aircraft_id === command.payload.aircraftId");
     expect(coordinatorSource).not.toContain("lease.operation_day_version === current.version");
-    expect(coordinatorSource).toContain("createDispatchPlan({");
-    expect(coordinatorSource).toContain("maximumWaves: 1");
     expect(coordinatorSource).toContain("selectReusableDispatchBatch({");
-    expect(coordinatorSource).toContain('selectionSource = "TARGETED_REPLAN"');
-    expect(coordinatorSource).toContain(
-      "confirmedOvertakeCount: row.dispatch_confirmed_overtake_count",
-    );
+    expect(coordinatorSource).toContain('triggerEventType: "DISPATCH_RECOMMENDATION_REQUESTED"');
+    expect(coordinatorSource).toContain('"CANONICAL_REPLAN"');
+    expect(coordinatorSource).not.toContain('"TARGETED_REPLAN"');
+    expect(coordinatorSource).toContain("lockedDispatchBatches");
     expect(coordinatorSource).not.toContain(
       "priorOvertakeCount: row.dispatch_projected_overtake_count",
     );

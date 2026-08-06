@@ -354,7 +354,7 @@ describe("createDispatchPlan", () => {
     );
   });
 
-  it("keeps a COME TO group on its feasible lane while waves advance", () => {
+  it("keeps a called group early without binding it to the previous aircraft lane", () => {
     const first = createDispatchPlan({
       now: NOW,
       groups: [group("called", 1, 1), group("filler", 2, 2), group("later", 3, 3)],
@@ -371,13 +371,158 @@ describe("createDispatchPlan", () => {
     const second = createDispatchPlan({
       now: "2026-07-31T10:00:30.000Z",
       groups: committedGroups,
-      lanes: [lane("lane-a", 3), lane("lane-b", 3)],
+      lanes: [
+        lane("lane-a", 3, {
+          availableLowerAt: "2026-07-31T10:20:00.000Z",
+          availableExpectedAt: "2026-07-31T10:20:00.000Z",
+          availableUpperAt: "2026-07-31T10:20:00.000Z",
+        }),
+        lane("lane-b", 3),
+      ],
       previousPlan: first,
       limits: { maximumWaves: 2 },
     });
     const committedBatch = second.batches.find((batch) => batch.memberIds.includes("called"));
 
-    expect(committedBatch?.laneId).toBe(previousBatch?.laneId);
+    expect(previousBatch).toBeDefined();
+    expect(committedBatch?.dispatchOrder).toBe(1);
+    expect(committedBatch?.laneId).toBe("lane-b");
+  });
+
+  it("puts every guest into the first three-aircraft wave for the reported queue", () => {
+    const calledGroups = [
+      group("0106", 1, 1, { publicStatus: "COME_TO_FLIGHT_LINE" }),
+      group("0107", 2, 2, { publicStatus: "COME_TO_FLIGHT_LINE" }),
+      group("0108", 2, 3, { publicStatus: "COME_TO_FLIGHT_LINE" }),
+      group("0112", 2, 4, { publicStatus: "COME_TO_FLIGHT_LINE" }),
+      group("0113", 1, 5, { publicStatus: "COME_TO_FLIGHT_LINE" }),
+    ];
+    const laterAt = "2026-07-31T10:20:00.000Z";
+    const plan = createDispatchPlan({
+      now: NOW,
+      groups: calledGroups,
+      lanes: [
+        lane("available-a", 3),
+        lane("available-b", 3),
+        lane("available-c", 3),
+        lane("later", 3, {
+          availableLowerAt: laterAt,
+          availableExpectedAt: laterAt,
+          availableUpperAt: laterAt,
+        }),
+      ],
+      limits: { maximumWaves: 1 },
+    });
+
+    const immediateBatches = plan.batches.filter((batch) => batch.boardingWindowExpectedAt === NOW);
+    expect(immediateBatches).toHaveLength(3);
+    expect(immediateBatches.reduce((sum, batch) => sum + batch.occupiedSeats, 0)).toBe(8);
+    expect(immediateBatches[0]?.memberIds).toEqual(["0106", "0107"]);
+    expect(plan.groupDecisions.find((decision) => decision.memberId === "0112")).toBeDefined();
+  });
+
+  it("keeps the batch identity when an equally capable aircraft returns first", () => {
+    const groups = [group("first", 1, 1), group("pair", 2, 2), group("later", 3, 3)];
+    const delayedAt = "2026-07-31T10:20:00.000Z";
+    const delayedLane = (id: string) =>
+      lane(id, 3, {
+        availableLowerAt: delayedAt,
+        availableExpectedAt: delayedAt,
+        availableUpperAt: delayedAt,
+      });
+    const first = createDispatchPlan({
+      now: NOW,
+      groups,
+      lanes: [lane("aircraft-a", 3), delayedLane("aircraft-b")],
+      limits: { maximumWaves: 1 },
+    });
+    const replanned = createDispatchPlan({
+      now: NOW,
+      groups,
+      lanes: [delayedLane("aircraft-a"), lane("aircraft-b", 3)],
+      previousPlan: first,
+      limits: { maximumWaves: 1 },
+    });
+
+    expect(first.batches[0]?.memberIds).toEqual(["first", "pair"]);
+    expect(replanned.batches[0]).toMatchObject({
+      id: first.batches[0]?.id,
+      memberIds: ["first", "pair"],
+      laneId: "aircraft-b",
+      assumedAircraftId: "aircraft-aircraft-b",
+    });
+  });
+
+  it("uses added capacity globally without delaying an already called group", () => {
+    const groups = [
+      group("first-single", 1, 1, { publicStatus: "COME_TO_FLIGHT_LINE" }),
+      group("first-pair", 2, 2, { publicStatus: "COME_TO_FLIGHT_LINE" }),
+      group("second-single", 1, 3, { publicStatus: "COME_TO_FLIGHT_LINE" }),
+      group("second-pair", 2, 4, { publicStatus: "COME_TO_FLIGHT_LINE" }),
+      group("third-single", 1, 5, { publicStatus: "COME_TO_FLIGHT_LINE" }),
+    ];
+    const first = createDispatchPlan({
+      now: NOW,
+      groups,
+      lanes: [lane("three-a", 3), lane("three-b", 3)],
+      limits: { maximumWaves: 1 },
+    });
+    const replanned = createDispatchPlan({
+      now: NOW,
+      groups,
+      lanes: [lane("four", 4), lane("three-b", 3)],
+      previousPlan: first,
+      limits: { maximumWaves: 1 },
+    });
+    expect(first.batches.reduce((sum, batch) => sum + batch.occupiedSeats, 0)).toBe(6);
+    expect(replanned.batches.reduce((sum, batch) => sum + batch.occupiedSeats, 0)).toBe(7);
+    expect(replanned.groupDecisions).toHaveLength(5);
+    expect(
+      first.groupDecisions.every((oldDecision) => {
+        const decision = replanned.groupDecisions.find(
+          (candidate) => candidate.memberId === oldDecision.memberId,
+        );
+        const oldBatch = first.batches.find((batch) => batch.id === oldDecision.batchId);
+        const batch = replanned.batches.find((candidate) => candidate.id === decision?.batchId);
+        return (
+          oldBatch !== undefined &&
+          batch !== undefined &&
+          Date.parse(batch.boardingWindowExpectedAt) <=
+            Date.parse(oldBatch.boardingWindowExpectedAt)
+        );
+      }),
+    ).toBe(true);
+  });
+
+  it("freezes an active lease and plans only remaining groups and aircraft capacity", () => {
+    const groups = [group("leased-single", 1, 1), group("leased-pair", 2, 2), group("next", 3, 3)];
+    const plan = createDispatchPlan({
+      now: NOW,
+      groups,
+      lanes: [lane("reserved", 3), lane("free", 3)],
+      lockedBatches: [
+        {
+          id: "dispatch-batch-active-lease",
+          resourceGroupId: "touring",
+          productId: "short-flight",
+          gateId: "gate-a",
+          aircraftId: "aircraft-reserved",
+          memberIds: ["leased-single", "leased-pair"],
+        },
+      ],
+      limits: { maximumWaves: 1 },
+    });
+
+    expect(plan.batches.find((batch) => batch.id === "dispatch-batch-active-lease")).toMatchObject({
+      laneId: "reserved",
+      memberIds: ["leased-single", "leased-pair"],
+      occupiedSeats: 3,
+    });
+    expect(plan.batches.find((batch) => batch.memberIds.includes("next"))).toMatchObject({
+      laneId: "free",
+      occupiedSeats: 3,
+    });
+    expect(new Set(plan.batches.flatMap((batch) => batch.memberIds)).size).toBe(3);
   });
 
   it("replans after a lane loss without duplicating or splitting groups", () => {

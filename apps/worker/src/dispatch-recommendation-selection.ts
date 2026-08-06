@@ -1,4 +1,4 @@
-export type DispatchRecommendationSelectionSource = "CURRENT_PLAN_BATCH" | "TARGETED_REPLAN";
+export type DispatchRecommendationSelectionSource = "CURRENT_PLAN_BATCH" | "CANONICAL_REPLAN";
 
 export type DispatchRecommendationFallbackReason =
   | "NO_CURRENT_PLAN"
@@ -13,6 +13,7 @@ export interface StoredDispatchBatchCandidateRow {
   gateId: string;
   ticketCount: number;
   attendanceStatus: "WAITING" | "PRESENT" | "MISSING" | "CLARIFICATION";
+  calledToGate: boolean;
   firstEligibleSegment: boolean;
   reservedByActiveLease: boolean;
   planRevision: string | null;
@@ -86,6 +87,7 @@ export function selectReusableDispatchBatch(input: {
       rows.some(
         (row) =>
           !row.firstEligibleSegment ||
+          !row.calledToGate ||
           row.attendanceStatus === "MISSING" ||
           row.attendanceStatus === "CLARIFICATION",
       )

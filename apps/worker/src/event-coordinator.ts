@@ -37,10 +37,9 @@ import {
   type ConfirmedOvertakeIncrement,
   calculateConfirmedOvertakeIncrements,
   calculateForecastTimelineResult,
-  createDispatchPlan,
   DEFAULT_DISPATCH_PLANNING_LIMITS,
   type DeviceRole,
-  type DispatchGroupInput,
+  type DispatchLockedBatchInput,
   type DispatchPlan,
   DomainRuleError,
   deriveAdaptivePrecallLeadMinutes,
@@ -1057,6 +1056,9 @@ export class EventCoordinator extends DurableObject<Env> {
            VALUES (?1, ?2, 'DISPATCH_LEASE_CHANGED', ?3, ?4)`,
         ).bind(crypto.randomUUID(), eventId, JSON.stringify(payload), nowIso),
       ]);
+      this.ctx.waitUntil(
+        this.scheduleForecastRecalculation(eventId, "DISPATCH_RECOMMENDATION_LEASE_CHANGED"),
+      );
       return new Response(null, { status: 204 });
     }
 
@@ -1229,6 +1231,9 @@ export class EventCoordinator extends DurableObject<Env> {
              VALUES (?1, ?2, 'DISPATCH_LEASE_CHANGED', ?3, ?4)`,
           ).bind(crypto.randomUUID(), eventId, JSON.stringify(payload), nowIso),
         ]);
+        this.ctx.waitUntil(
+          this.scheduleForecastRecalculation(eventId, "DISPATCH_RECOMMENDATION_LEASE_CHANGED"),
+        );
       } else {
         return json(
           {
@@ -1261,6 +1266,40 @@ export class EventCoordinator extends DurableObject<Env> {
         },
         { status: 409 },
       );
+    }
+
+    if (this.forecastWork) await this.forecastWork;
+    const currentCanonicalPlan = await this.env.DB.prepare(
+      `SELECT run.dispatch_plan_revision
+         FROM planning_runs run
+        WHERE run.operation_day_id = ?1
+          AND run.operation_day_version = ?2
+          AND run.status = 'SUCCEEDED'
+          AND EXISTS (
+            SELECT 1 FROM rotations planned_rotation
+             WHERE planned_rotation.operation_day_id = run.operation_day_id
+               AND planned_rotation.status = 'DRAFT'
+               AND planned_rotation.dispatch_plan_revision = run.dispatch_plan_revision
+          )
+          AND NOT EXISTS (
+            SELECT 1 FROM dispatch_recommendation_leases active_lease
+             WHERE active_lease.operation_day_id = run.operation_day_id
+               AND active_lease.status = 'ACTIVE'
+               AND active_lease.expires_at > ?3
+               AND active_lease.acquired_at > run.calculation_now
+          )
+        ORDER BY run.calculation_now DESC, run.id DESC
+        LIMIT 1`,
+    )
+      .bind(eventId, event.version, nowIso)
+      .first<{ dispatch_plan_revision: string }>();
+    const canonicalPlanReplanned = currentCanonicalPlan === null;
+    if (canonicalPlanReplanned) {
+      await this.recalculateForecastTimelines({
+        eventId,
+        triggerEventType: "DISPATCH_RECOMMENDATION_REQUESTED",
+        expectedEventVersion: event.version,
+      });
     }
 
     const planningRows = await this.env.DB.prepare(
@@ -1359,59 +1398,6 @@ export class EventCoordinator extends DurableObject<Env> {
       const first = segments[0];
       if (first) firstRotationByGroupId.set(groupId, first.rotation_id);
     }
-    const productServiceDeficits = new Map<string, number>();
-    for (const row of planningRows.results) {
-      const waitingMinutes = Math.max(0, (now.getTime() - Date.parse(row.sold_at)) / 60_000);
-      const deficit =
-        (waitingMinutes * Math.max(1, Number(row.ticket_count))) /
-        Math.max(1, Number(row.reference_duration_minutes));
-      productServiceDeficits.set(
-        row.product_id,
-        (productServiceDeficits.get(row.product_id) ?? 0) + deficit,
-      );
-    }
-    const eligibleRows = planningRows.results.filter((row) => {
-      const groupIds = groupIdsByRotationId.get(row.rotation_id) ?? [];
-      return (
-        groupIds.length > 0 &&
-        row.reserved_by_active_lease === 0 &&
-        groupIds.every((groupId) => firstRotationByGroupId.get(groupId) === row.rotation_id)
-      );
-    });
-    const dispatchGroups: DispatchGroupInput[] = eligibleRows.map((row) => ({
-      id: row.rotation_id,
-      groupIds: groupIdsByRotationId.get(row.rotation_id) ?? [],
-      size: Number(row.ticket_count),
-      productId: row.product_id,
-      resourceGroupId: aircraft.resource_group_id,
-      gateId: row.gate_id,
-      queueSequence: Math.max(1, Number(row.queue_sequence)),
-      soldAt: row.sold_at,
-      waitingSince: row.sold_at,
-      attendanceStatus: row.attendance_status,
-      standby: row.standby === 1,
-      publicStatus:
-        row.precalled_at !== null || row.precall_decision_status === "GO_TO_GATE"
-          ? "COME_TO_FLIGHT_LINE"
-          : row.precall_decision_status === "PREPARE"
-            ? "PREPARE"
-            : "WAITING",
-      confirmedOvertakeCount: row.dispatch_confirmed_overtake_count,
-      productServiceDeficit: productServiceDeficits.get(row.product_id) ?? 0,
-    }));
-    const productDurations = [
-      ...new Map(
-        eligibleRows.map((row) => [
-          row.product_id,
-          {
-            productId: row.product_id,
-            lowerMinutes: Math.max(1, Number(row.reference_duration_minutes)),
-            expectedMinutes: Math.max(1, Number(row.reference_duration_minutes)),
-            upperMinutes: Math.max(1, Number(row.reference_duration_minutes)),
-          },
-        ]),
-      ).values(),
-    ];
     const reusableSelection = selectReusableDispatchBatch({
       aircraftPassengerSeats: aircraft.passenger_seats,
       rows: planningRows.results.map((row) => ({
@@ -1421,6 +1407,7 @@ export class EventCoordinator extends DurableObject<Env> {
         gateId: row.gate_id,
         ticketCount: Number(row.ticket_count),
         attendanceStatus: row.attendance_status,
+        calledToGate: row.precalled_at !== null || row.precall_decision_status === "GO_TO_GATE",
         firstEligibleSegment: (groupIdsByRotationId.get(row.rotation_id) ?? []).every(
           (groupId) => firstRotationByGroupId.get(groupId) === row.rotation_id,
         ),
@@ -1435,8 +1422,11 @@ export class EventCoordinator extends DurableObject<Env> {
         predictionUpdatedAt: row.prediction_updated_at,
       })),
     });
-    let selectionSource: DispatchRecommendationSelectionSource = "CURRENT_PLAN_BATCH";
-    let fallbackReason: DispatchRecommendationFallbackReason | null = null;
+    const selectionSource: DispatchRecommendationSelectionSource = canonicalPlanReplanned
+      ? "CANONICAL_REPLAN"
+      : "CURRENT_PLAN_BATCH";
+    const fallbackReason: DispatchRecommendationFallbackReason | null =
+      reusableSelection.fallbackReason;
     let selectedPlanRevision: string;
     let selectedBatchId: string;
     let selectedDispatchOrder: number;
@@ -1453,46 +1443,13 @@ export class EventCoordinator extends DurableObject<Env> {
       selectedOccupiedSeats = reusableSelection.batch.occupiedSeats;
       selectedDecisionReasons = reusableSelection.batch.decisionReasons;
     } else {
-      selectionSource = "TARGETED_REPLAN";
-      fallbackReason = reusableSelection.fallbackReason;
-      const targetedPlan = createDispatchPlan({
-        now: nowIso,
-        groups: dispatchGroups,
-        lanes: [
-          {
-            id: `dispatch-lease:${aircraft.id}`,
-            aircraftId: aircraft.id,
-            pilotId: aircraft.current_pilot_id,
-            resourceGroupId: aircraft.resource_group_id,
-            passengerSeats: aircraft.passenger_seats,
-            availableLowerAt: nowIso,
-            availableExpectedAt: nowIso,
-            availableUpperAt: nowIso,
-            productDurations,
-          },
-        ],
-        limits: { ...DEFAULT_DISPATCH_PLANNING_LIMITS, maximumWaves: 1 },
-      });
-      const candidate = targetedPlan.batches[0];
-      if (candidate) {
-        selectedPlanRevision = targetedPlan.revision;
-        selectedBatchId = candidate.id;
-        selectedDispatchOrder = candidate.dispatchOrder;
-        selectedMemberRotationIds = [...candidate.memberIds];
-        selectedGroupIds = [...new Set(candidate.groupIds)];
-        selectedOccupiedSeats = candidate.occupiedSeats;
-        selectedDecisionReasons = (candidate.decisionReasons as unknown[]).filter(
-          (value): value is string => typeof value === "string",
-        );
-      } else {
-        selectedPlanRevision = "";
-        selectedBatchId = "";
-        selectedDispatchOrder = 0;
-        selectedMemberRotationIds = [];
-        selectedGroupIds = [];
-        selectedOccupiedSeats = 0;
-        selectedDecisionReasons = [];
-      }
+      selectedPlanRevision = "";
+      selectedBatchId = "";
+      selectedDispatchOrder = 0;
+      selectedMemberRotationIds = [];
+      selectedGroupIds = [];
+      selectedOccupiedSeats = 0;
+      selectedDecisionReasons = [];
     }
     if (selectedGroupIds.length === 0) {
       return json(
@@ -1636,6 +1593,9 @@ export class EventCoordinator extends DurableObject<Env> {
          VALUES (?1, ?2, 'DISPATCH_LEASE_CHANGED', ?3, ?4)`,
       ).bind(crypto.randomUUID(), eventId, JSON.stringify(payload), nowIso),
     ]);
+    this.ctx.waitUntil(
+      this.scheduleForecastRecalculation(eventId, "DISPATCH_RECOMMENDATION_LEASE_CHANGED"),
+    );
     return json(this.dispatchRecommendationLeaseResponse(lease, nowIso));
   }
 
@@ -3155,6 +3115,7 @@ export class EventCoordinator extends DurableObject<Env> {
     request: ForecastRecalculationRequest,
   ): Promise<ForecastRecalculationResult> {
     const { eventId, triggerEventType } = request;
+    const queryNowIso = new Date().toISOString();
     const [
       event,
       rotationRows,
@@ -3166,6 +3127,7 @@ export class EventCoordinator extends DurableObject<Env> {
       plannedOperationRows,
       recurringRuleRows,
       activeBlockRows,
+      activeDispatchLeaseRows,
     ] = await Promise.all([
       this.env.DB.prepare(
         `SELECT version, operational_interrupted, emergency_mode, planned_boarding_minutes,
@@ -3548,6 +3510,19 @@ export class EventCoordinator extends DurableObject<Env> {
           scope_type: "EVENT" | "RESOURCE_GROUP";
           scope_id: string;
           expected_review_at: string | null;
+        }>(),
+      this.env.DB.prepare(
+        `SELECT id, aircraft_id, dispatch_batch_id, member_rotation_ids_json
+           FROM dispatch_recommendation_leases
+          WHERE operation_day_id = ?1 AND status = 'ACTIVE' AND expires_at > ?2
+          ORDER BY acquired_at, id`,
+      )
+        .bind(eventId, queryNowIso)
+        .all<{
+          id: string;
+          aircraft_id: string;
+          dispatch_batch_id: string;
+          member_rotation_ids_json: string;
         }>(),
     ]);
     if (!event) throw new Error("EVENT_NOT_FOUND");
@@ -3947,6 +3922,32 @@ export class EventCoordinator extends DurableObject<Env> {
             limits: { ...DEFAULT_DISPATCH_PLANNING_LIMITS },
           }
         : null;
+    const draftRotationById = new Map(
+      rotationRows.results
+        .filter((rotation) => rotation.status === "DRAFT")
+        .map((rotation) => [rotation.id, rotation] as const),
+    );
+    const lockedDispatchBatches: DispatchLockedBatchInput[] = activeDispatchLeaseRows.results.map(
+      (lease) => {
+        const memberIds = this.stringArray(lease.member_rotation_ids_json);
+        const members = memberIds.flatMap((memberId) => {
+          const member = draftRotationById.get(memberId);
+          return member ? [member] : [];
+        });
+        const first = members[0];
+        if (!first || members.length !== memberIds.length || !first.product_id || !first.gate_id) {
+          throw new Error(`Active dispatch lease ${lease.id} references unavailable members.`);
+        }
+        return {
+          id: lease.dispatch_batch_id,
+          resourceGroupId: first.resource_group_id,
+          productId: first.product_id,
+          gateId: first.gate_id,
+          aircraftId: lease.aircraft_id,
+          memberIds,
+        };
+      },
+    );
     const draftSegmentsByBookingGroup = new Map<string, typeof rotationRows.results>();
     for (const rotation of rotationRows.results) {
       if (rotation.status !== "DRAFT") continue;
@@ -3988,6 +3989,7 @@ export class EventCoordinator extends DurableObject<Env> {
       },
       capacities: forecastCapacities,
       previousDispatchPlan,
+      lockedDispatchBatches,
       durationSamples: durationRows.results.map((row) => ({
         minutes: row.minutes,
         completedAt: row.completed_at,

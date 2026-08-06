@@ -152,11 +152,23 @@ export interface DispatchPlan {
   limits: DispatchPlanningLimits;
 }
 
+export interface DispatchLockedBatchInput {
+  /** Stable batch identifier held by the active boarding lease. */
+  id: string;
+  resourceGroupId: string;
+  productId: string;
+  gateId: string;
+  aircraftId: string;
+  memberIds: readonly string[];
+}
+
 export interface DispatchPlanInput {
   now: string;
   groups: readonly DispatchGroupInput[];
   lanes: readonly DispatchLaneInput[];
   previousPlan?: DispatchPlan | null;
+  /** Active boarding leases that must remain assigned to their reserved aircraft. */
+  lockedBatches?: readonly DispatchLockedBatchInput[];
   limits?: Partial<DispatchPlanningLimits>;
 }
 
@@ -194,6 +206,7 @@ interface CandidateBatch {
 }
 
 interface PlannedBatchState {
+  fixedBatchId?: string;
   laneId: string;
   wave: number;
   candidate: CandidateBatch;
@@ -208,6 +221,7 @@ interface SearchState {
   lanes: NormalizedLane[];
   batches: PlannedBatchState[];
   commitmentServed: number;
+  calledDelayMs: number;
   mustServeCount: number;
   starvationScore: number;
   productFairnessScore: number;
@@ -458,6 +472,21 @@ function previousSlotMembers(
   );
 }
 
+function previousExpectedAtByMember(
+  previousPlan: DispatchPlan | null | undefined,
+  resourceGroupId: string,
+): ReadonlyMap<string, number> {
+  return new Map(
+    (previousPlan?.batches ?? [])
+      .filter((batch) => batch.resourceGroupId === resourceGroupId)
+      .flatMap((batch) =>
+        batch.memberIds.map(
+          (memberId) => [memberId, Date.parse(batch.boardingWindowExpectedAt)] as const,
+        ),
+      ),
+  );
+}
+
 function candidateReasons(
   groups: readonly NormalizedGroup[],
   queueOvertakes: number,
@@ -555,22 +584,13 @@ function enumerateCandidates(
   lane: NormalizedLane,
   limits: DispatchPlanningLimits,
   previousMembers: ReadonlySet<string>,
-  hardLaneByMember: ReadonlyMap<string, string>,
 ): CandidateBatch[] {
   const remainingIds = new Set(remaining.map((group) => group.id));
   const eligible = remaining.filter((group) =>
     (group.predecessorMemberIds ?? []).every((predecessorId) => !remainingIds.has(predecessorId)),
   );
-  const lockedHere = eligible.filter(
-    (group) =>
-      group.publicStatus === "COME_TO_FLIGHT_LINE" && hardLaneByMember.get(group.id) === lane.id,
-  );
-  const lockedHereIds = new Set(lockedHere.map((group) => group.id));
   const byProductAndGate = new Map<string, NormalizedGroup[]>();
   for (const group of eligible) {
-    const lockedLane =
-      group.publicStatus === "COME_TO_FLIGHT_LINE" ? hardLaneByMember.get(group.id) : undefined;
-    if (lockedLane !== undefined && lockedLane !== lane.id) continue;
     if (group.size > lane.passengerSeats || !lane.productDurations.has(group.productId)) continue;
     const productGateKey = `${group.productId}\u0000${group.gateId}`;
     const values = byProductAndGate.get(productGateKey) ?? [];
@@ -632,14 +652,7 @@ function enumerateCandidates(
       unique.set(`${productGateKey}:${candidate.stableKey}`, candidate);
     }
   }
-  return [...unique.values()]
-    .filter(
-      (candidate) =>
-        lockedHereIds.size === 0 ||
-        lockedHere.every((group) => candidate.groups.some((entry) => entry.id === group.id)),
-    )
-    .sort(compareCandidates)
-    .slice(0, limits.maximumCandidatesPerStep);
+  return [...unique.values()].sort(compareCandidates).slice(0, limits.maximumCandidatesPerStep);
 }
 
 function laneOrder(left: NormalizedLane, right: NormalizedLane): number {
@@ -664,15 +677,28 @@ function compareStates(left: SearchState, right: SearchState): number {
   const rightMustServeUnserved = right.remaining.filter(
     (group) => group.mustServeForWait || group.mustServeForOvertakes,
   ).length;
+  const leftMaximumWait = Math.max(0, ...left.remaining.map((group) => group.waitMinutes));
+  const rightMaximumWait = Math.max(0, ...right.remaining.map((group) => group.waitMinutes));
+  const leftMaximumOvertakeDebt = Math.max(
+    0,
+    ...left.remaining.map((group) => group.confirmedOvertakeCount),
+  );
+  const rightMaximumOvertakeDebt = Math.max(
+    0,
+    ...right.remaining.map((group) => group.confirmedOvertakeCount),
+  );
   return (
     leftHardUnserved - rightHardUnserved ||
+    left.calledDelayMs - right.calledDelayMs ||
     leftMustServeUnserved - rightMustServeUnserved ||
-    right.mustServeCount - left.mustServeCount ||
     right.productFairnessScore - left.productFairnessScore ||
+    leftMaximumWait - rightMaximumWait ||
+    leftMaximumOvertakeDebt - rightMaximumOvertakeDebt ||
+    right.mustServeCount - left.mustServeCount ||
     right.starvationScore - left.starvationScore ||
+    left.queueOvertakes - right.queueOvertakes ||
     right.passengers - left.passengers ||
     right.nearUtilizationScore - left.nearUtilizationScore ||
-    left.queueOvertakes - right.queueOvertakes ||
     right.ageScore - left.ageScore ||
     left.prepareBreaks - right.prepareBreaks ||
     right.commitmentServed - left.commitmentServed ||
@@ -687,6 +713,8 @@ function advanceState(
   candidate: CandidateBatch,
   duration: DispatchProductDurationInput,
   limits: DispatchPlanningLimits,
+  previousExpectedAtByMember: ReadonlyMap<string, number>,
+  fixedBatchId?: string,
 ): SearchState {
   const chosenIds = new Set(candidate.groups.map((group) => group.id));
   const nextLane: NormalizedLane = {
@@ -697,12 +725,26 @@ function advanceState(
     wave: lane.wave + 1,
   };
   const weight = limits.maximumWaves - lane.wave + 1;
+  const calledDelayMs =
+    fixedBatchId === undefined
+      ? candidate.groups.reduce((penalty, group) => {
+          if (group.publicStatus !== "COME_TO_FLIGHT_LINE") return penalty;
+          const previousExpectedAt = previousExpectedAtByMember.get(group.id);
+          return (
+            penalty +
+            (previousExpectedAt === undefined
+              ? 0
+              : Math.max(0, lane.availableExpectedMs - previousExpectedAt))
+          );
+        }, 0)
+      : 0;
   return {
     remaining: state.remaining.filter((group) => !chosenIds.has(group.id)),
     lanes: state.lanes.map((entry) => (entry.id === lane.id ? nextLane : entry)),
     batches: [
       ...state.batches,
       {
+        ...(fixedBatchId === undefined ? {} : { fixedBatchId }),
         laneId: lane.id,
         wave: lane.wave,
         candidate,
@@ -713,6 +755,7 @@ function advanceState(
       },
     ],
     commitmentServed: state.commitmentServed + candidate.commitmentServed,
+    calledDelayMs: state.calledDelayMs + calledDelayMs,
     mustServeCount: state.mustServeCount + candidate.mustServeCount,
     starvationScore: state.starvationScore + candidate.starvationScore,
     productFairnessScore: state.productFairnessScore + candidate.productFairnessScore,
@@ -733,27 +776,77 @@ function planResourceGroup(input: {
   lanes: readonly NormalizedLane[];
   limits: DispatchPlanningLimits;
   previousSlots: ReadonlyMap<string, Set<string>>;
-  hardLaneByMember: ReadonlyMap<string, string>;
+  previousExpectedAtByMember: ReadonlyMap<string, number>;
+  lockedBatches: readonly DispatchLockedBatchInput[];
 }): PlannedBatchState[] {
   if (input.groups.length === 0 || input.lanes.length === 0) return [];
-  let beam: SearchState[] = [
-    {
-      remaining: [...input.groups],
-      lanes: input.lanes.map((lane) => ({ ...lane })),
-      batches: [],
-      commitmentServed: 0,
-      mustServeCount: 0,
-      starvationScore: 0,
-      productFairnessScore: 0,
-      passengers: 0,
-      nearUtilizationScore: 0,
-      queueOvertakes: 0,
-      ageScore: 0,
-      stabilityMatches: 0,
-      prepareBreaks: 0,
-      stableKey: "",
-    },
-  ];
+  let initialState: SearchState = {
+    remaining: [...input.groups],
+    lanes: input.lanes.map((lane) => ({ ...lane })),
+    batches: [],
+    commitmentServed: 0,
+    calledDelayMs: 0,
+    mustServeCount: 0,
+    starvationScore: 0,
+    productFairnessScore: 0,
+    passengers: 0,
+    nearUtilizationScore: 0,
+    queueOvertakes: 0,
+    ageScore: 0,
+    stabilityMatches: 0,
+    prepareBreaks: 0,
+    stableKey: "",
+  };
+  const lockedAircraftIds = new Set<string>();
+  for (const lockedBatch of [...input.lockedBatches].sort((left, right) =>
+    left.id.localeCompare(right.id),
+  )) {
+    if (lockedAircraftIds.has(lockedBatch.aircraftId)) {
+      throw new Error(`Dispatch aircraft ${lockedBatch.aircraftId} has multiple active leases.`);
+    }
+    const lane = initialState.lanes.find(
+      (entry) => entry.aircraftId === lockedBatch.aircraftId && entry.wave === 1,
+    );
+    if (!lane) {
+      throw new Error(`Locked dispatch batch ${lockedBatch.id} has no available aircraft lane.`);
+    }
+    const memberIdSet = new Set(lockedBatch.memberIds);
+    if (memberIdSet.size !== lockedBatch.memberIds.length || memberIdSet.size === 0) {
+      throw new Error(`Locked dispatch batch ${lockedBatch.id} has invalid members.`);
+    }
+    const members = initialState.remaining.filter((group) => memberIdSet.has(group.id));
+    if (members.length !== memberIdSet.size) {
+      throw new Error(`Locked dispatch batch ${lockedBatch.id} references unavailable members.`);
+    }
+    if (
+      members.some(
+        (group) =>
+          group.resourceGroupId !== lockedBatch.resourceGroupId ||
+          group.productId !== lockedBatch.productId ||
+          group.gateId !== lockedBatch.gateId,
+      )
+    ) {
+      throw new Error(`Locked dispatch batch ${lockedBatch.id} is incompatible with its members.`);
+    }
+    const occupiedSeats = members.reduce((sum, group) => sum + group.size, 0);
+    const duration = lane.productDurations.get(lockedBatch.productId);
+    if (occupiedSeats > lane.passengerSeats || !duration) {
+      throw new Error(`Locked dispatch batch ${lockedBatch.id} no longer fits its aircraft.`);
+    }
+    const previousMembers = new Set(lockedBatch.memberIds);
+    const candidate = buildCandidate(members, initialState.remaining, lane, previousMembers);
+    initialState = advanceState(
+      initialState,
+      lane,
+      candidate,
+      duration,
+      input.limits,
+      input.previousExpectedAtByMember,
+      lockedBatch.id,
+    );
+    lockedAircraftIds.add(lockedBatch.aircraftId);
+  }
+  let beam: SearchState[] = [initialState];
   const maximumSteps = input.lanes.length * input.limits.maximumWaves;
   for (let step = 0; step < maximumSteps; step += 1) {
     const expanded: SearchState[] = [];
@@ -770,13 +863,7 @@ function planResourceGroup(input: {
         continue;
       }
       const previousMembers = input.previousSlots.get(`${lane.id}:${lane.wave}`) ?? new Set();
-      const candidates = enumerateCandidates(
-        state.remaining,
-        lane,
-        input.limits,
-        previousMembers,
-        input.hardLaneByMember,
-      );
+      const candidates = enumerateCandidates(state.remaining, lane, input.limits, previousMembers);
       if (candidates.length === 0) {
         expanded.push({
           ...state,
@@ -790,7 +877,16 @@ function planResourceGroup(input: {
       for (const candidate of candidates) {
         const duration = lane.productDurations.get(candidate.productId);
         if (!duration) continue;
-        expanded.push(advanceState(state, lane, candidate, duration, input.limits));
+        expanded.push(
+          advanceState(
+            state,
+            lane,
+            candidate,
+            duration,
+            input.limits,
+            input.previousExpectedAtByMember,
+          ),
+        );
       }
     }
     beam = expanded.sort(compareStates).slice(0, input.limits.beamWidth);
@@ -843,28 +939,19 @@ export function createDispatchPlan(input: DispatchPlanInput): DispatchPlan {
   }
   const normalizedLanes = input.lanes.map(normalizeLane);
   const previousSlots = previousSlotMembers(input.previousPlan);
-  const hardLaneByMember = new Map<string, string>();
-  for (const previousBatch of input.previousPlan?.batches ?? []) {
-    const lane = normalizedLanes.find(
-      (entry) => entry.id === previousBatch.laneId && previousBatch.wave <= limits.maximumWaves,
-    );
-    const members = previousBatch.memberIds.flatMap((memberId) => {
-      const group = normalizedGroups.find((entry) => entry.id === memberId);
-      return group ? [group] : [];
-    });
-    const slotStillFeasible =
-      lane !== undefined &&
-      members.length === previousBatch.memberIds.length &&
-      members.reduce((sum, group) => sum + group.size, 0) <= lane.passengerSeats &&
-      members.every(
-        (group) =>
-          group.productId === previousBatch.productId && lane.productDurations.has(group.productId),
-      );
-    if (!slotStillFeasible) continue;
-    for (const member of members) {
-      if (member.publicStatus === "COME_TO_FLIGHT_LINE") {
-        hardLaneByMember.set(member.id, previousBatch.laneId);
+  const lockedBatches = input.lockedBatches ?? [];
+  const lockedBatchIds = new Set<string>();
+  const lockedMemberIds = new Set<string>();
+  for (const lockedBatch of lockedBatches) {
+    if (lockedBatchIds.has(lockedBatch.id)) {
+      throw new Error(`Locked dispatch batch ${lockedBatch.id} is duplicated.`);
+    }
+    lockedBatchIds.add(lockedBatch.id);
+    for (const memberId of lockedBatch.memberIds) {
+      if (lockedMemberIds.has(memberId)) {
+        throw new Error(`Dispatch member ${memberId} is held by multiple active leases.`);
       }
+      lockedMemberIds.add(memberId);
     }
   }
   const plannedStates: PlannedBatchState[] = [];
@@ -873,6 +960,7 @@ export function createDispatchPlan(input: DispatchPlanInput): DispatchPlan {
     ...new Set([
       ...normalizedGroups.map((group) => group.resourceGroupId),
       ...normalizedLanes.map((lane) => lane.resourceGroupId),
+      ...lockedBatches.map((batch) => batch.resourceGroupId),
     ]),
   ].sort();
   for (const resourceGroupId of resourceGroupIds) {
@@ -894,7 +982,8 @@ export function createDispatchPlan(input: DispatchPlanInput): DispatchPlan {
         lanes: normalizedLanes.filter((lane) => lane.resourceGroupId === resourceGroupId),
         limits,
         previousSlots,
-        hardLaneByMember,
+        previousExpectedAtByMember: previousExpectedAtByMember(input.previousPlan, resourceGroupId),
+        lockedBatches: lockedBatches.filter((batch) => batch.resourceGroupId === resourceGroupId),
       }),
     );
   }
@@ -911,15 +1000,19 @@ export function createDispatchPlan(input: DispatchPlanInput): DispatchPlan {
     const lane = normalizedLanes.find((candidate) => candidate.id === entry.laneId);
     if (!lane) throw new Error(`Dispatch lane ${entry.laneId} disappeared during planning.`);
     const memberIds = entry.candidate.groups.map((group) => group.id);
-    const batchId = `dispatch-batch-${stableHash(
-      [
-        entry.candidate.groups[0]?.resourceGroupId ?? "",
-        entry.candidate.productId,
-        entry.laneId,
-        entry.wave,
-        ...memberIds,
-      ].join("|"),
-    )}`;
+    const orderedGroupIds = entry.candidate.groups.flatMap((group) => group.groupIds);
+    const batchId =
+      entry.fixedBatchId ??
+      `dispatch-batch-${stableHash(
+        [
+          entry.candidate.groups[0]?.resourceGroupId ?? "",
+          entry.candidate.productId,
+          entry.candidate.gateId,
+          ...orderedGroupIds,
+          "members",
+          ...memberIds,
+        ].join("|"),
+      )}`;
     return {
       id: batchId,
       resourceGroupId: entry.candidate.groups[0]?.resourceGroupId ?? "",
@@ -929,7 +1022,7 @@ export function createDispatchPlan(input: DispatchPlanInput): DispatchPlan {
       assumedAircraftId: lane.aircraftId,
       assumedPilotId: lane.pilotId,
       memberIds,
-      groupIds: entry.candidate.groups.flatMap((group) => group.groupIds),
+      groupIds: orderedGroupIds,
       occupiedSeats: entry.candidate.occupiedSeats,
       availableSeats: lane.passengerSeats - entry.candidate.occupiedSeats,
       dispatchOrder: index + 1,

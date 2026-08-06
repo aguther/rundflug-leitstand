@@ -17,6 +17,7 @@ function row(
     gateId: "gate-a",
     ticketCount,
     attendanceStatus: "WAITING",
+    calledToGate: true,
     firstEligibleSegment: true,
     reservedByActiveLease: false,
     planRevision: "plan-current",
@@ -129,5 +130,20 @@ describe("selectReusableDispatchBatch", () => {
         ],
       }).fallbackReason,
     ).toBe("CURRENT_PLAN_BATCH_INCOMPATIBLE");
+  });
+
+  it("does not recommend an uncalled canonical batch for immediate boarding", () => {
+    const selection = selectReusableDispatchBatch({
+      aircraftPassengerSeats: 3,
+      rows: [
+        row("rotation-early", "group-early", 1),
+        row("rotation-pair", "group-pair", 2, { calledToGate: false }),
+      ],
+    });
+
+    expect(selection).toEqual({
+      batch: null,
+      fallbackReason: "CURRENT_PLAN_BATCH_INCOMPLETE",
+    });
   });
 });
