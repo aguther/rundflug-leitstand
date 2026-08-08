@@ -116,7 +116,7 @@ const server = spawn(
 );
 const base = "http://127.0.0.1:8787";
 const waitForWorker = async () => {
-  for (let attempt = 0; attempt < 40; attempt += 1) {
+  for (let attempt = 0; attempt < 120; attempt += 1) {
     try {
       if ((await fetch(`${base}/api/health`)).ok) return;
     } catch {}
