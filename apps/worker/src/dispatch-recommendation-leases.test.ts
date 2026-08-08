@@ -3,8 +3,6 @@ import { DatabaseSync } from "node:sqlite";
 import { describe, expect, it } from "vitest";
 import leaseMigration from "../migrations/0064_dispatch_recommendation_leases.sql?raw";
 import memberMigration from "../migrations/0066_dispatch_recommendation_lease_members.sql?raw";
-import { dispatchSegmentOrderSql } from "./dispatch-ordering-sql";
-import coordinatorSource from "./event-coordinator.ts?raw";
 import { EVENT_DELETION_SQL } from "./event-deletion";
 import { FACTORY_RESET_DELETE_TABLES } from "./factory-reset";
 import workerSource from "./index.ts?raw";
@@ -115,49 +113,6 @@ describe("short-lived dispatch recommendation leases (F-BRD-010, Q-ZUV-020)", ()
         batchId: "batch-a",
       }),
     ).not.toThrow();
-  });
-
-  it("serializes acquisition with CALL_NEXT and consumes a matching lease atomically", () => {
-    expect(coordinatorSource).toContain("DISPATCH_RECOMMENDATION_LEASE_TTL_MS = 90_000");
-    expect(coordinatorSource).toContain("enqueueDispatchRecommendationLease");
-    expect(coordinatorSource).toContain("this.commandTail.then");
-    expect(coordinatorSource).toContain("DISPATCH_RECOMMENDATION_LEASE_MISMATCH");
-    expect(coordinatorSource).toContain("DISPATCH_RECOMMENDATION_LEASE_EXPIRED");
-    expect(coordinatorSource).toContain("DISPATCH_RECOMMENDATION_LEASE_CONSUMED");
-    expect(coordinatorSource).toContain("status = 'CONSUMED', consumed_at");
-    expect(coordinatorSource).toContain("lease.operator_account_id === operatorAccountId");
-    expect(coordinatorSource).toContain("lease.device_id === command.deviceId");
-    expect(coordinatorSource).toContain("lease.aircraft_id === command.payload.aircraftId");
-    expect(coordinatorSource).not.toContain("lease.operation_day_version === current.version");
-    expect(coordinatorSource).toContain("selectReusableDispatchBatch({");
-    expect(coordinatorSource).toContain('triggerEventType: "DISPATCH_RECOMMENDATION_REQUESTED"');
-    expect(coordinatorSource).toContain('"CANONICAL_REPLAN"');
-    expect(coordinatorSource).not.toContain('"TARGETED_REPLAN"');
-    expect(coordinatorSource).not.toContain(
-      "priorOvertakeCount: row.dispatch_projected_overtake_count",
-    );
-    expect(dispatchSegmentOrderSql("candidate_rotation", "candidate_group")).toContain(
-      "candidate_rotation.booking_segment_order",
-    );
-    expect(coordinatorSource).not.toContain(
-      "ORDER BY COALESCE(candidate_group.queue_position, candidate_group.communication_number)",
-    );
-    expect(coordinatorSource).toContain("calculateConfirmedOvertakeIncrements({");
-    expect(coordinatorSource).toContain("dispatch_confirmed_overtake_count + ?1");
-    expect(coordinatorSource).toContain("confirmedOvertakes:");
-    expect(coordinatorSource).toContain('reason: "MANUAL_OVERRIDE"');
-    expect(coordinatorSource).toContain("manualOverrideLeaseStatements");
-    expect(coordinatorSource).toContain(
-      'row.precalled_at !== null || row.precall_decision_status === "GO_TO_GATE"',
-    );
-    expect(coordinatorSource).not.toContain("row.forecast_assumed_aircraft_id === aircraft.id");
-    expect(coordinatorSource).toContain("lease.member_rotation_ids_json");
-    expect(coordinatorSource).toContain("rotationId === selectedMemberRotationIds[index]");
-    expect(coordinatorSource).toContain("lease.occupied_seats === selectedSeatCount");
-    expect(coordinatorSource).toContain(
-      "dispatch_order, ticket_group_ids_json, occupied_seats, available_seats",
-    );
-    expect(coordinatorSource).toContain("'DISPATCH_LEASE', ?5, ?6, ?7)");
   });
 
   it("persists the event version and exact draft rotation members", () => {

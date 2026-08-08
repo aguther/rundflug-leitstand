@@ -4,6 +4,48 @@ import { env, runInDurableObject } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { EventCoordinator } from "../src/event-coordinator";
 
+const leaseUrl =
+  "https://internal.test/internal/events/event-dispatch-runtime/dispatch-recommendation-leases";
+const leaseCommandId = "b3c6a88a-546f-4b1f-8f13-46b0263d350f";
+
+interface LeaseRequestInput {
+  method?: "POST" | "DELETE";
+  leaseId?: string;
+  commandId?: string;
+  expectedVersion?: number;
+  deviceId?: string;
+  role?: string;
+}
+
+function leaseRequest(input: LeaseRequestInput = {}): Request {
+  const method = input.method ?? "POST";
+  return new Request(input.leaseId ? `${leaseUrl}/${input.leaseId}` : leaseUrl, {
+    method,
+    headers: {
+      "content-type": "application/json",
+      "x-operator-account-id": "account-dispatch-runtime",
+      "x-operator-device-id": input.deviceId ?? "device-dispatch-runtime",
+      "x-operator-role": input.role ?? "ADMIN",
+    },
+    ...(method === "POST"
+      ? {
+          body: JSON.stringify({
+            commandId: input.commandId ?? leaseCommandId,
+            aircraftId: "opened-aircraft",
+            expectedVersion: input.expectedVersion ?? 7,
+          }),
+        }
+      : {}),
+  });
+}
+
+async function dispatchLeaseRequest(input: LeaseRequestInput = {}): Promise<Response> {
+  const stub = env.EVENT_COORDINATOR.getByName("event-dispatch-runtime");
+  return runInDurableObject(stub, async (instance: EventCoordinator) =>
+    instance.fetch(leaseRequest(input)),
+  );
+}
+
 async function executeStatements(sql: string): Promise<void> {
   for (const statement of sql
     .split(";")
@@ -203,35 +245,14 @@ beforeEach(async () => {
 
 describe("dispatch recommendation acquisition", () => {
   it("leases the same current batch as FIDS instead of feeding projected debt back", async () => {
-    const stub = env.EVENT_COORDINATOR.getByName("event-dispatch-runtime");
-    const response = await runInDurableObject(stub, async (instance: EventCoordinator) =>
-      instance.fetch(
-        new Request(
-          "https://internal.test/internal/events/event-dispatch-runtime/dispatch-recommendation-leases",
-          {
-            method: "POST",
-            headers: {
-              "content-type": "application/json",
-              "x-operator-account-id": "account-dispatch-runtime",
-              "x-operator-device-id": "device-dispatch-runtime",
-              "x-operator-role": "ADMIN",
-            },
-            body: JSON.stringify({
-              commandId: "b3c6a88a-546f-4b1f-8f13-46b0263d350f",
-              aircraftId: "opened-aircraft",
-              expectedVersion: 7,
-            }),
-          },
-        ),
-      ),
-    );
+    const response = await dispatchLeaseRequest();
     const body = (await response.json()) as {
       planRevision: string;
       batchId: string;
       groupIds: string[];
     };
 
-    expect(response.status).toBe(200);
+    expect(response.status, JSON.stringify(body)).toBe(200);
     expect(body).toMatchObject({
       planRevision: "plan-current",
       batchId: "batch-current",
@@ -245,5 +266,74 @@ describe("dispatch recommendation acquisition", () => {
       selectionSource: "CURRENT_PLAN_BATCH",
       fallbackReason: null,
     });
+  });
+
+  it("replays, rejects conflicts and stale versions, and releases the owned lease once", async () => {
+    const acquired = await dispatchLeaseRequest();
+    const lease = (await acquired.json()) as {
+      leaseId: string;
+      expiresAt: string;
+      error?: unknown;
+    };
+    expect(acquired.status, JSON.stringify(lease)).toBe(200);
+    expect(Date.parse(lease.expiresAt)).toBeGreaterThan(Date.now());
+
+    const replay = await dispatchLeaseRequest();
+    expect(replay.status).toBe(200);
+    expect(await replay.json()).toMatchObject({ leaseId: lease.leaseId });
+
+    const conflict = await dispatchLeaseRequest({ deviceId: "different-dispatch-device" });
+    expect(conflict.status).toBe(409);
+    expect(await conflict.json()).toMatchObject({ error: { code: "IDEMPOTENCY_CONFLICT" } });
+
+    const stale = await dispatchLeaseRequest({
+      commandId: "b3c6a88a-546f-4b1f-8f13-46b0263d3510",
+      expectedVersion: 6,
+    });
+    expect(stale.status).toBe(409);
+    expect(await stale.json()).toMatchObject({
+      error: { code: "STALE_VERSION", currentVersion: 7 },
+    });
+
+    const foreignRelease = await dispatchLeaseRequest({
+      method: "DELETE",
+      leaseId: lease.leaseId,
+      deviceId: "different-dispatch-device",
+    });
+    expect(foreignRelease.status).toBe(204);
+    expect(
+      await env.DB.prepare("SELECT status FROM dispatch_recommendation_leases WHERE id = ?1")
+        .bind(lease.leaseId)
+        .first<{ status: string }>(),
+    ).toEqual({ status: "ACTIVE" });
+
+    const released = await dispatchLeaseRequest({ method: "DELETE", leaseId: lease.leaseId });
+    expect(released.status).toBe(204);
+    expect(
+      await env.DB.prepare(
+        "SELECT status, version FROM dispatch_recommendation_leases WHERE id = ?1",
+      )
+        .bind(lease.leaseId)
+        .first<{ status: string; version: number }>(),
+    ).toEqual({ status: "RELEASED", version: 2 });
+
+    const finishedReplay = await dispatchLeaseRequest();
+    expect(finishedReplay.status).toBe(409);
+    expect(await finishedReplay.json()).toMatchObject({
+      error: { code: "DISPATCH_RECOMMENDATION_LEASE_FINISHED" },
+    });
+    expect(
+      await env.DB.prepare(
+        "SELECT event_type FROM operational_events ORDER BY occurred_at, event_type",
+      ).all<{ event_type: string }>(),
+    ).toMatchObject({
+      results: [
+        { event_type: "DISPATCH_RECOMMENDATION_LEASE_ACQUIRED" },
+        { event_type: "DISPATCH_RECOMMENDATION_LEASE_RELEASED" },
+      ],
+    });
+    expect(
+      await env.DB.prepare("SELECT COUNT(*) AS count FROM outbox").first<{ count: number }>(),
+    ).toEqual({ count: 2 });
   });
 });

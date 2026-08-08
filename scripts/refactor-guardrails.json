@@ -3,7 +3,7 @@
   "sizeBudgets": [
     {
       "path": "apps/worker/src/event-coordinator.ts",
-      "maxLines": 10310,
+      "maxLines": 9445,
       "targetLines": 1500
     },
     {
@@ -51,6 +51,11 @@
     {
       "path": "apps/worker/src/coordinator-realtime-service.ts",
       "maxLines": 58,
+      "targetLines": 1500
+    },
+    {
+      "path": "apps/worker/src/dispatch-recommendation-lease-service.ts",
+      "maxLines": 915,
       "targetLines": 1500
     }
   ],
@@ -183,7 +188,6 @@
     "apps/worker/src/cashier-ticket-attribution.test.ts -> apps/worker/src/event-coordinator.ts",
     "apps/worker/src/cashier-ticket-attribution.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/control-routing.test.ts -> apps/worker/src/index.ts",
-    "apps/worker/src/dispatch-recommendation-leases.test.ts -> apps/worker/src/event-coordinator.ts",
     "apps/worker/src/dispatch-recommendation-leases.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/event-deletion.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/event-logo-theme-routes.test.ts -> apps/worker/src/event-deletion.ts",
