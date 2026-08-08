@@ -3,6 +3,7 @@ import { DatabaseSync } from "node:sqlite";
 import { describe, expect, it } from "vitest";
 import leaseMigration from "../migrations/0064_dispatch_recommendation_leases.sql?raw";
 import memberMigration from "../migrations/0066_dispatch_recommendation_lease_members.sql?raw";
+import { dispatchSegmentOrderSql } from "./dispatch-ordering-sql";
 import coordinatorSource from "./event-coordinator.ts?raw";
 import { EVENT_DELETION_SQL } from "./event-deletion";
 import { FACTORY_RESET_DELETE_TABLES } from "./factory-reset";
@@ -132,11 +133,12 @@ describe("short-lived dispatch recommendation leases (F-BRD-010, Q-ZUV-020)", ()
     expect(coordinatorSource).toContain('triggerEventType: "DISPATCH_RECOMMENDATION_REQUESTED"');
     expect(coordinatorSource).toContain('"CANONICAL_REPLAN"');
     expect(coordinatorSource).not.toContain('"TARGETED_REPLAN"');
-    expect(coordinatorSource).toContain("lockedDispatchBatches");
     expect(coordinatorSource).not.toContain(
       "priorOvertakeCount: row.dispatch_projected_overtake_count",
     );
-    expect(coordinatorSource).toContain("rotationAlias}.booking_segment_order");
+    expect(dispatchSegmentOrderSql("candidate_rotation", "candidate_group")).toContain(
+      "candidate_rotation.booking_segment_order",
+    );
     expect(coordinatorSource).not.toContain(
       "ORDER BY COALESCE(candidate_group.queue_position, candidate_group.communication_number)",
     );

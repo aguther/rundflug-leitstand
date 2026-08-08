@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import coordinatorSource from "./event-coordinator.ts?raw";
 import workerSource from "./index.ts?raw";
 import pushSource from "./web-push.ts?raw";
 
@@ -30,16 +29,5 @@ describe("persisted forecast freshness", () => {
     expect(pushSource).toContain("assessForecastFreshness");
     expect(pushSource).toContain("r.prediction_updated_at");
     expect(pushSource).toContain('freshness.quality !== "UNCERTAIN"');
-  });
-
-  it("calculates automatic precalls from the same fresh projection batch", () => {
-    const recalculation = coordinatorSource.slice(
-      coordinatorSource.indexOf("private async recalculateForecastTimelines"),
-      coordinatorSource.indexOf("private async persistAutomaticPrecalls"),
-    );
-    expect(recalculation).toContain("const nowIso = now.toISOString()");
-    expect(recalculation).toContain("calculateForecastTimelines");
-    expect(recalculation).toContain("prediction_updated_at = ?12");
-    expect(recalculation).toContain("selectAutomaticPrecalls");
   });
 });

@@ -13,6 +13,21 @@ interface TestForecastRequest {
   expectedEventVersion?: number;
 }
 
+function stubForecastRecalculation(
+  instance: EventCoordinator,
+  implementation: (request: TestForecastRequest) => Promise<{
+    planningRunId: string;
+    eventVersion: number;
+    dispatchPlanRevision: string;
+  }>,
+): void {
+  const service = Reflect.get(instance, "forecastTimelineService");
+  if (!service || typeof service !== "object") {
+    throw new Error("Forecast timeline service unavailable.");
+  }
+  Reflect.set(service, "recalculateForecastTimelines", implementation);
+}
+
 const eventId = "analysis-runtime-event";
 const deviceId = "analysis-runtime-device";
 
@@ -118,18 +133,14 @@ describe("V1120-DIA-010 analysis snapshot capture coordination", () => {
     const calls: string[] = [];
 
     const outcome = await runInDurableObject(stub, async (instance: EventCoordinator) => {
-      Reflect.set(
-        instance,
-        "recalculateForecastTimelines",
-        async (request: TestForecastRequest) => {
-          calls.push(request.planningRunId ?? request.triggerEventType);
-          return {
-            planningRunId: request.planningRunId ?? "automatic-run",
-            eventVersion: request.expectedEventVersion ?? 38,
-            dispatchPlanRevision: "dispatch-revision-38",
-          };
-        },
-      );
+      stubForecastRecalculation(instance, async (request: TestForecastRequest) => {
+        calls.push(request.planningRunId ?? request.triggerEventType);
+        return {
+          planningRunId: request.planningRunId ?? "automatic-run",
+          eventVersion: request.expectedEventVersion ?? 38,
+          dispatchPlanRevision: "dispatch-revision-38",
+        };
+      });
       const input = captureInput("02f33a3b-1f58-4c63-a0d1-3ca0031d2de7");
       const results = await Promise.all([
         instance.captureAnalysisSnapshot(input),
@@ -169,18 +180,14 @@ describe("V1120-DIA-010 analysis snapshot capture coordination", () => {
     const calls: string[] = [];
 
     const results = await runInDurableObject(stub, async (instance: EventCoordinator) => {
-      Reflect.set(
-        instance,
-        "recalculateForecastTimelines",
-        async (request: TestForecastRequest) => {
-          calls.push(request.planningRunId ?? request.triggerEventType);
-          return {
-            planningRunId: request.planningRunId ?? `run-${request.triggerEventType}`,
-            eventVersion: request.expectedEventVersion ?? 38,
-            dispatchPlanRevision: "dispatch-revision-38",
-          };
-        },
-      );
+      stubForecastRecalculation(instance, async (request: TestForecastRequest) => {
+        calls.push(request.planningRunId ?? request.triggerEventType);
+        return {
+          planningRunId: request.planningRunId ?? `run-${request.triggerEventType}`,
+          eventVersion: request.expectedEventVersion ?? 38,
+          dispatchPlanRevision: "dispatch-revision-38",
+        };
+      });
       const schedule = Reflect.get(instance, "scheduleForecastRecalculation");
       if (typeof schedule !== "function") throw new Error("Forecast scheduler unavailable.");
       const firstAutomatic = Promise.resolve(
@@ -212,7 +219,7 @@ describe("V1120-DIA-010 analysis snapshot capture coordination", () => {
   it("rejects stale versions and reports persistence failures", async () => {
     const stub = env.EVENT_COORDINATOR.getByName(`${eventId}-failures`);
     const results = await runInDurableObject(stub, async (instance: EventCoordinator) => {
-      Reflect.set(instance, "recalculateForecastTimelines", async () => {
+      stubForecastRecalculation(instance, async () => {
         throw new Error("synthetic persistence failure");
       });
       const stale = await instance.captureAnalysisSnapshot(

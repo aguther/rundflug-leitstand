@@ -3,7 +3,7 @@
   "sizeBudgets": [
     {
       "path": "apps/worker/src/event-coordinator.ts",
-      "maxLines": 11998,
+      "maxLines": 10549,
       "targetLines": 1500
     },
     {
@@ -31,6 +31,16 @@
     {
       "path": "apps/worker/src/rotation-recovery-command-service.ts",
       "maxLines": 546,
+      "targetLines": 1500
+    },
+    {
+      "path": "apps/worker/src/forecast-timeline-service.ts",
+      "maxLines": 1479,
+      "targetLines": 1500
+    },
+    {
+      "path": "apps/worker/src/dispatch-ordering-sql.ts",
+      "maxLines": 3,
       "targetLines": 1500
     }
   ],
@@ -159,7 +169,6 @@
     "apps/worker/src/api-cache-policy.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/audit-coverage.test.ts -> apps/worker/src/daily-report.ts",
     "apps/worker/src/audit-coverage.test.ts -> apps/worker/src/event-coordinator.ts",
-    "apps/worker/src/automatic-precall.test.ts -> apps/worker/src/event-coordinator.ts",
     "apps/worker/src/cashier-product-order.test.ts -> apps/worker/src/event-coordinator.ts",
     "apps/worker/src/cashier-ticket-attribution.test.ts -> apps/worker/src/event-coordinator.ts",
     "apps/worker/src/cashier-ticket-attribution.test.ts -> apps/worker/src/index.ts",
@@ -180,12 +189,9 @@
     "apps/worker/src/flight-line-assist-claims.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/flight-line-pilot-assignment.test.ts -> apps/worker/src/event-coordinator.ts",
     "apps/worker/src/flight-line-pilot-assignment.test.ts -> apps/worker/src/index.ts",
-    "apps/worker/src/forecast-freshness-coverage.test.ts -> apps/worker/src/event-coordinator.ts",
     "apps/worker/src/forecast-freshness-coverage.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/forecast-freshness-coverage.test.ts -> apps/worker/src/web-push.ts",
-    "apps/worker/src/forecast-sample-coverage.test.ts -> apps/worker/src/event-coordinator.ts",
     "apps/worker/src/forecast-snapshot-coverage.test.ts -> apps/worker/src/backup.ts",
-    "apps/worker/src/forecast-snapshot-coverage.test.ts -> apps/worker/src/event-coordinator.ts",
     "apps/worker/src/forecast-turnaround-sources.test.ts -> apps/worker/src/event-coordinator.ts",
     "apps/worker/src/forecast-turnaround-sources.test.ts -> apps/worker/src/forecast-history.ts",
     "apps/worker/src/gate-display-filter-data-model.test.ts -> apps/worker/src/index.ts",
@@ -215,7 +221,6 @@
     "apps/worker/src/operational-planning.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/operator-account-management.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/planning-capture.test.ts -> apps/worker/src/backup.ts",
-    "apps/worker/src/planning-capture.test.ts -> apps/worker/src/event-coordinator.ts",
     "apps/worker/src/planning-capture.test.ts -> apps/worker/src/event-deletion.ts",
     "apps/worker/src/planning-capture.test.ts -> apps/worker/src/factory-reset.ts",
     "apps/worker/src/planning-capture.test.ts -> apps/worker/src/planning-capture.ts",

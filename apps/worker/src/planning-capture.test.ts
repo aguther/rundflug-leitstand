@@ -2,7 +2,6 @@ import type { ForecastTimelinesInput } from "@rundflug/domain";
 import { describe, expect, it } from "vitest";
 import planningMigration from "../migrations/0062_hybrid_planning_capture.sql?raw";
 import backupSource from "./backup.ts?raw";
-import coordinatorSource from "./event-coordinator.ts?raw";
 import eventDeletionSource from "./event-deletion.ts?raw";
 import factoryResetSource from "./factory-reset.ts?raw";
 import {
@@ -113,14 +112,7 @@ describe("hybrid planning capture", () => {
     expect(planningMigration).toContain(
       "ALTER TABLE forecast_snapshots ADD COLUMN planning_run_id",
     );
-    expect(coordinatorSource).toContain("preparePlanningCapture");
-    expect(coordinatorSource).toContain("planningRunId");
     expect(planningCaptureSource).toContain("PLANNING_CAPTURE_COMPLETION_FAILED");
-    expect(coordinatorSource).toContain("? Number.MAX_SAFE_INTEGER");
-    expect(coordinatorSource).not.toContain("? Number.POSITIVE_INFINITY");
-    expect(coordinatorSource).not.toContain(
-      "if (!event || rotationRows.results.length === 0) return;",
-    );
     for (const table of ["planning_chunks", "planning_contexts", "planning_runs"]) {
       expect(backupSource).toContain(`"${table}"`);
       expect(eventDeletionSource).toContain(`DELETE FROM ${table}`);

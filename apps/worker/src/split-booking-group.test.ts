@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { dispatchSegmentOrderSql } from "./dispatch-ordering-sql";
 import coordinatorSource from "./event-coordinator.ts?raw";
 import workerSource from "./index.ts?raw";
 
@@ -8,7 +9,9 @@ describe("split booking-group coordination", () => {
     expect(coordinatorSource).toContain(
       'dispatchSegmentOrderSql("candidate_rotation", "candidate_group")',
     );
-    expect(coordinatorSource).toContain("rotationAlias}.booking_segment_order");
+    expect(dispatchSegmentOrderSql("candidate_rotation", "candidate_group")).toContain(
+      "candidate_rotation.booking_segment_order",
+    );
     expect(coordinatorSource).not.toContain(
       "ORDER BY COALESCE(candidate_group.queue_position, candidate_group.communication_number)",
     );
