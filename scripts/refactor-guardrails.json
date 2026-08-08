@@ -3,7 +3,7 @@
   "sizeBudgets": [
     {
       "path": "apps/worker/src/event-coordinator.ts",
-      "maxLines": 8934,
+      "maxLines": 8485,
       "targetLines": 1500
     },
     {
@@ -66,6 +66,11 @@
     {
       "path": "apps/worker/src/operational-control-command-service.ts",
       "maxLines": 286,
+      "targetLines": 1500
+    },
+    {
+      "path": "apps/worker/src/event-administration-command-service.ts",
+      "maxLines": 477,
       "targetLines": 1500
     }
   ],

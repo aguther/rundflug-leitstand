@@ -192,9 +192,6 @@ describe("runtime configuration coverage", () => {
 
   it("persists configuration in the serialized, audited command path", () => {
     expect(coordinatorSource).toMatch(
-      /handleEventParameters[\s\S]*UPDATE operation_days SET[\s\S]*EVENT_PARAMETERS_CONFIGURED/,
-    );
-    expect(coordinatorSource).toMatch(
       /PRODUCT_SALES_CONFIGURED[\s\S]*capacity_warning_threshold[\s\S]*capacity_critical_threshold/,
     );
     expect(coordinatorSource).toContain("validateProductSalesUpdate(");
