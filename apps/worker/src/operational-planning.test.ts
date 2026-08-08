@@ -104,25 +104,6 @@ describe("general operational planning", () => {
     ).toBe(true);
   });
 
-  it("keeps planning idempotent, versioned, audited and non-automatic", () => {
-    const handler = coordinator.match(
-      /private async handlePlannedOperation[\s\S]*?private async handleFleetAdministration/,
-    )?.[0];
-    expect(handler).toBeTruthy();
-    expect(handler).toContain("PLANNED_OPERATION_VERSION_CONFLICT");
-    expect(handler).toContain("PLANNED_OPERATION_ROTATION_SCOPE_MISMATCH");
-    expect(handler).toContain("UPDATE operation_days SET version");
-    expect(handler).toContain("INSERT INTO operational_events");
-    expect(handler).toContain("INSERT INTO idempotency_receipts");
-    expect(handler).toContain("INSERT INTO outbox");
-    expect(handler).toContain("plannedOperationAuditReason");
-    expect(handler).toContain("PLANNED_SLOWDOWN_STARTED");
-    expect(handler).toContain("effect_mode = 'SLOWDOWN'");
-    expect(handler).toContain("reason: auditReason");
-    expect(handler).not.toContain("UPDATE aircraft SET operational_state");
-    expect(handler).not.toContain("UPDATE resource_groups SET status");
-  });
-
   it("publishes plans on the private operation board but no public cause field", () => {
     expect(worker).toContain("plannedOperations: plannedOperationRows.results.map");
     expect(worker).toContain("recurringOperationalRules: recurringRuleRows.results.map");

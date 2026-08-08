@@ -3,7 +3,7 @@
   "sizeBudgets": [
     {
       "path": "apps/worker/src/event-coordinator.ts",
-      "maxLines": 6726,
+      "maxLines": 6285,
       "targetLines": 1500
     },
     {
@@ -86,6 +86,11 @@
     {
       "path": "apps/worker/src/ticket-group-mutation-command-service.ts",
       "maxLines": 359,
+      "targetLines": 1500
+    },
+    {
+      "path": "apps/worker/src/planned-operation-command-service.ts",
+      "maxLines": 469,
       "targetLines": 1500
     }
   ],
