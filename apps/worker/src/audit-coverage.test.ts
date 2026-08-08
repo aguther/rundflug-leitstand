@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import initialMigration from "../migrations/0001_initial.sql?raw";
 import dailyReport from "./daily-report.ts?raw";
 import coordinator from "./event-coordinator.ts?raw";
+import { rotationRecoveryAuditEventTypes } from "./rotation-recovery-command-service";
 
 const requiredAuditEvents = [
   "TICKET_GROUP_SOLD",
@@ -27,13 +28,13 @@ const requiredAuditEvents = [
   "EVENT_OPERATION_INTERRUPTED",
   "RESOURCE_GROUP_STATUS_CHANGED",
   "EMERGENCY_MODE_TRIGGERED",
-  "ROTATION_ABORTED_TO_QUEUE",
   "CASHIER_PRODUCT_ORDER_CHANGED",
 ] as const;
 
 describe("append-only operational audit coverage", () => {
   it("keeps every F-HIS-020 minimum event in the command coordinator", () => {
     for (const eventType of requiredAuditEvents) expect(coordinator).toContain(eventType);
+    expect(Object.values(rotationRecoveryAuditEventTypes)).toContain("ROTATION_ABORTED_TO_QUEUE");
     expect(coordinator).toContain("previousRotationPilotId");
   });
 

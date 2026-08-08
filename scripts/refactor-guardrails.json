@@ -3,7 +3,7 @@
   "sizeBudgets": [
     {
       "path": "apps/worker/src/event-coordinator.ts",
-      "maxLines": 12512,
+      "maxLines": 11998,
       "targetLines": 1500
     },
     {
@@ -26,6 +26,11 @@
     {
       "path": "apps/worker/src/command-preflight.ts",
       "maxLines": 259,
+      "targetLines": 1500
+    },
+    {
+      "path": "apps/worker/src/rotation-recovery-command-service.ts",
+      "maxLines": 546,
       "targetLines": 1500
     }
   ],
@@ -232,7 +237,6 @@
     "apps/worker/src/simulation-plan-export.test.ts -> apps/worker/src/master-data-export.ts",
     "apps/worker/src/split-booking-group.test.ts -> apps/worker/src/event-coordinator.ts",
     "apps/worker/src/split-booking-group.test.ts -> apps/worker/src/index.ts",
-    "apps/worker/src/technical-rotation-abort.test.ts -> apps/worker/src/event-coordinator.ts",
     "apps/worker/src/ticket-data-model.test.ts -> apps/web/src/cashier-view.tsx",
     "apps/worker/src/ticket-data-model.test.ts -> apps/web/src/operation-workspace.tsx",
     "apps/worker/src/ticket-data-model.test.ts -> apps/worker/src/event-coordinator.ts",
