@@ -3,7 +3,7 @@
   "sizeBudgets": [
     {
       "path": "apps/worker/src/event-coordinator.ts",
-      "maxLines": 5874,
+      "maxLines": 5505,
       "targetLines": 1500
     },
     {
@@ -96,6 +96,11 @@
     {
       "path": "apps/worker/src/recurring-operational-rule-command-service.ts",
       "maxLines": 437,
+      "targetLines": 1500
+    },
+    {
+      "path": "apps/worker/src/fleet-administration-command-service.ts",
+      "maxLines": 395,
       "targetLines": 1500
     }
   ],
@@ -235,8 +240,6 @@
     "apps/worker/src/fids-board-projection.test.ts -> apps/worker/src/fids-board-projection.ts",
     "apps/worker/src/fids-board-projection.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/fids-preferences.test.ts -> apps/worker/src/index.ts",
-    "apps/worker/src/flight-line-aircraft-state.test.ts -> apps/worker/src/event-coordinator.ts",
-    "apps/worker/src/flight-line-aircraft-state.test.ts -> packages/domain/src/index.ts",
     "apps/worker/src/flight-line-assist-claims.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/flight-line-pilot-assignment.test.ts -> apps/worker/src/event-coordinator.ts",
     "apps/worker/src/flight-line-pilot-assignment.test.ts -> apps/worker/src/index.ts",
