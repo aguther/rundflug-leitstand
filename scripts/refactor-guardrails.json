@@ -3,7 +3,7 @@
   "sizeBudgets": [
     {
       "path": "apps/worker/src/event-coordinator.ts",
-      "maxLines": 7036,
+      "maxLines": 6726,
       "targetLines": 1500
     },
     {
@@ -81,6 +81,11 @@
     {
       "path": "apps/worker/src/rotation-correction-command-service.ts",
       "maxLines": 677,
+      "targetLines": 1500
+    },
+    {
+      "path": "apps/worker/src/ticket-group-mutation-command-service.ts",
+      "maxLines": 359,
       "targetLines": 1500
     }
   ],
