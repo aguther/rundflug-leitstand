@@ -3,7 +3,7 @@
   "sizeBudgets": [
     {
       "path": "apps/worker/src/event-coordinator.ts",
-      "maxLines": 10341,
+      "maxLines": 10310,
       "targetLines": 1500
     },
     {
@@ -46,6 +46,11 @@
     {
       "path": "apps/worker/src/fids-preferences-command-service.ts",
       "maxLines": 233,
+      "targetLines": 1500
+    },
+    {
+      "path": "apps/worker/src/coordinator-realtime-service.ts",
+      "maxLines": 58,
       "targetLines": 1500
     }
   ],

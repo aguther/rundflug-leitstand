@@ -55,6 +55,7 @@ import {
   plannedOperationExpectation,
   scopedCommandTarget,
 } from "./command-preflight";
+import { CoordinatorRealtimeService } from "./coordinator-realtime-service";
 import { sha256Hex, verifyCredential } from "./crypto";
 import { dispatchSegmentOrderSql } from "./dispatch-ordering-sql";
 import {
@@ -215,9 +216,10 @@ export class EventCoordinator extends DurableObject<Env> {
     (result) => this.broadcast(result),
   );
   private readonly fidsPreferencesCommands = new FidsPreferencesCommandService(this.env);
+  private readonly realtime = new CoordinatorRealtimeService(this.ctx);
   private readonly forecastTimelineService = new ForecastTimelineService(
     this.env,
-    () => this.ctx.getWebSockets(),
+    () => this.realtime.getWebSockets(),
     (request) => {
       this.pendingAutomaticForecast = request;
     },
@@ -228,12 +230,10 @@ export class EventCoordinator extends DurableObject<Env> {
     if (request.headers.get("Upgrade")?.toLowerCase() === "websocket") {
       const eventId = this.eventIdFromPath(url.pathname);
       if (eventId) await this.ensureForecastAlarm(eventId);
-      return this.openWebSocket();
+      return this.realtime.openWebSocket();
     }
     if (request.method === "POST" && url.pathname.endsWith("/factory-reset")) {
-      for (const socket of this.ctx.getWebSockets()) {
-        socket.close(1012, "System wird neu eingerichtet");
-      }
+      this.realtime.closeAllForReset();
       await this.ctx.storage.deleteAlarm();
       await this.ctx.storage.deleteAll();
       return json({ reset: true });
@@ -541,9 +541,7 @@ export class EventCoordinator extends DurableObject<Env> {
   }
 
   async webSocketMessage(socket: WebSocket, message: string | ArrayBuffer): Promise<void> {
-    if (typeof message === "string" && message === "ping") {
-      socket.send(JSON.stringify({ type: "pong", timestamp: new Date().toISOString() }));
-    }
+    this.realtime.handleMessage(socket, message);
   }
 
   async webSocketClose(
@@ -552,19 +550,11 @@ export class EventCoordinator extends DurableObject<Env> {
     _reason: string,
     _wasClean: boolean,
   ): Promise<void> {
-    // The runtime acknowledges close frames for the configured compatibility date.
+    this.realtime.handleClose();
   }
 
   async webSocketError(socket: WebSocket): Promise<void> {
-    socket.close(1011, "Verbindung beendet");
-  }
-
-  private openWebSocket(): Response {
-    const pair = new WebSocketPair();
-    const [client, server] = Object.values(pair) as [WebSocket, WebSocket];
-    this.ctx.acceptWebSocket(server);
-    server.send(JSON.stringify({ type: "connected", timestamp: new Date().toISOString() }));
-    return new Response(null, { status: 101, webSocket: client });
+    this.realtime.handleError(socket);
   }
 
   private dispatchRecommendationLeaseResponse(
@@ -2602,17 +2592,7 @@ export class EventCoordinator extends DurableObject<Env> {
   private broadcast(result: CommandResult): void {
     this.ctx.waitUntil(this.ensureForecastAlarm(result.event.eventId));
     this.ctx.waitUntil(this.scheduleForecastRecalculation(result.event.eventId, result.eventType));
-    const broadcast = JSON.stringify({
-      type: "event-state-changed",
-      eventVersion: result.event.version,
-    });
-    for (const socket of this.ctx.getWebSockets()) {
-      try {
-        socket.send(broadcast);
-      } catch {
-        socket.close(1011, "Broadcast fehlgeschlagen");
-      }
-    }
+    this.realtime.broadcastStateChanged(result.event.version);
   }
 
   private scheduleForecastRecalculation(eventId: string, triggerEventType: string): Promise<void> {
@@ -2810,18 +2790,7 @@ export class EventCoordinator extends DurableObject<Env> {
   }
 
   private broadcastBoardRefresh(eventVersion: number, eventType: string): void {
-    const broadcast = JSON.stringify({
-      type: "event-state-changed",
-      eventType,
-      eventVersion,
-    });
-    for (const socket of this.ctx.getWebSockets()) {
-      try {
-        socket.send(broadcast);
-      } catch {
-        socket.close(1011, "Broadcast fehlgeschlagen");
-      }
-    }
+    this.realtime.broadcastStateChanged(eventVersion, eventType);
   }
 
   private async handlePlannedOperation(
