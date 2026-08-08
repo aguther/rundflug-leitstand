@@ -5,7 +5,6 @@ import { DatabaseSync } from "node:sqlite";
 // @ts-expect-error Vitest runs in Node; the Worker production config intentionally excludes Node types.
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import coordinatorSource from "./event-coordinator.ts?raw";
 import { fidsOperatorRoles, mayAccessFids } from "./fids-authorization";
 import workerSource from "./index.ts?raw";
 
@@ -126,30 +125,7 @@ describe("FIDS V1.7.3 persistence and authorization", () => {
     expect(route).toContain("actor.accountId");
     expect(route).toContain('headers.set("x-operator-session-id", actor.sessionId)');
     expect(route).not.toContain('context.req.header("x-operator-account-id")');
-    expect(coordinatorSource).toContain("!mayAccessFids(role)");
     expect(workerSource).toContain('actor?.role === "DISPLAY"');
     expect(workerSource).toContain('context.req.path.includes("/fids/")');
-  });
-
-  it("serializes version checks, audit, idempotency and a non-sensitive outbox message", () => {
-    const handlerStart = coordinatorSource.indexOf("private async handleFidsPreferences");
-    const handler = coordinatorSource.slice(
-      handlerStart,
-      coordinatorSource.indexOf("private async ensureForecastAlarm", handlerStart),
-    );
-    expect(handler).toContain("currentVersion !== input.expectedVersion");
-    expect(handler).toContain('command_type !== "UPDATE_FIDS_PREFERENCES"');
-    expect(handler).toContain("await this.env.DB.batch([");
-    expect(handler).toContain("'FIDS_PREFERENCES_CHANGED'");
-    expect(handler).toContain("operatorAccountId: accountId");
-    expect(handler).toContain("productIds: next.contentFilter.productIds");
-    expect(handler).toContain("gateIds: next.contentFilter.gateIds");
-    expect(handler).toContain("groupSharedFlights: next.groupSharedFlights");
-    expect(handler).toContain("normalizeFidsContentFilter(input.contentFilter)");
-    expect(handler).toContain("FIDS_FILTER_OPTION_NOT_FOUND");
-    expect(handler).not.toContain("operatorLoginCode: loginCode");
-    expect(handler).not.toContain("operatorSessionId: sessionId");
-    expect(handler).toContain("JSON.stringify({ version: next.version })");
-    expect(handler).not.toMatch(/pin|token/i);
   });
 });

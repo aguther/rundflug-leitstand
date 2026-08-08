@@ -3,7 +3,7 @@
   "sizeBudgets": [
     {
       "path": "apps/worker/src/event-coordinator.ts",
-      "maxLines": 10549,
+      "maxLines": 10341,
       "targetLines": 1500
     },
     {
@@ -41,6 +41,11 @@
     {
       "path": "apps/worker/src/dispatch-ordering-sql.ts",
       "maxLines": 3,
+      "targetLines": 1500
+    },
+    {
+      "path": "apps/worker/src/fids-preferences-command-service.ts",
+      "maxLines": 233,
       "targetLines": 1500
     }
   ],
@@ -181,7 +186,6 @@
     "apps/worker/src/event-selection-api.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/fids-board-projection.test.ts -> apps/worker/src/fids-board-projection.ts",
     "apps/worker/src/fids-board-projection.test.ts -> apps/worker/src/index.ts",
-    "apps/worker/src/fids-preferences.test.ts -> apps/worker/src/event-coordinator.ts",
     "apps/worker/src/fids-preferences.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/flight-line-aircraft-state.test.ts -> apps/worker/src/event-coordinator.ts",
     "apps/worker/src/flight-line-aircraft-state.test.ts -> packages/domain/src/index.ts",
