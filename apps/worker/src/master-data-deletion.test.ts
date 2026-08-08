@@ -19,7 +19,7 @@ describe("F-ADM-050 master-data deletion safeguards", () => {
     expect(coordinator).toContain("MASTER_DATA_DELETE_BLOCKED");
     expect(coordinator).toContain('request.headers.get("x-operator-role")');
     expect(coordinator).toContain("operatorDeviceId === command.deviceId");
-    expect(coordinator).toContain("this.validateCommandVersion(command, current)");
+    expect(coordinator).toContain("this.validateCommandVersion(");
     expect(coordinator).toContain("current.version === command.expectedVersion");
   });
 

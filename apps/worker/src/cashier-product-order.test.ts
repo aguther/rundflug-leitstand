@@ -9,8 +9,8 @@ const reorderHandler = coordinatorSource.slice(
 describe("cashier product order persistence", () => {
   it("compares the complete expected order independently of the global event version", () => {
     const versionValidation = coordinatorSource.slice(
-      coordinatorSource.indexOf("private async validateCommandVersion"),
-      coordinatorSource.indexOf("private async validatePlannedOperationLink"),
+      coordinatorSource.indexOf("private validateCommandVersion"),
+      coordinatorSource.indexOf("private validatePlannedOperationLink"),
     );
     expect(versionValidation).toContain('command.type === "REORDER_CASHIER_PRODUCTS"');
     expect(versionValidation).toContain("observedEventVersion <= current.version");

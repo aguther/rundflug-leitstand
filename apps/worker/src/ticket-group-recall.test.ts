@@ -57,7 +57,7 @@ describe("V1.11 aktiver Gruppennachruf", () => {
       "SELECT response_json FROM idempotency_receipts WHERE command_id = ?1",
     );
     const versionCheck = coordinator.indexOf(
-      "const versionConflict = await this.validateCommandVersion(command, current)",
+      "const versionConflict = this.validateCommandVersion(",
     );
     expect(coordinator).toContain("private commandTail: Promise<void>");
     expect(duplicateCheck).toBeGreaterThan(0);

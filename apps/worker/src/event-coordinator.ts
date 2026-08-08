@@ -4,7 +4,6 @@ import {
   analysisSnapshotCaptureReceiptSchema,
   assistClaimMutationSchema,
   type CommandEnvelope,
-  type CommandPrecondition,
   type CommandResult,
   commandEnvelopeSchema,
   commandResultSchema,
@@ -64,6 +63,12 @@ import {
   automaticArchiveRequestStatements,
   processPendingAnalysisArchives,
 } from "./analysis-archive";
+import {
+  loadCommandPreflightReads,
+  type PlannedOperationRow,
+  plannedOperationExpectation,
+  scopedCommandTarget,
+} from "./command-preflight";
 import { sha256Hex, verifyCredential } from "./crypto";
 import {
   type DispatchRecommendationFallbackReason,
@@ -1851,28 +1856,11 @@ export class EventCoordinator extends DurableObject<Env> {
     } satisfies AssistClaim);
   }
 
-  private scopedCommandTarget(
-    command: CommandEnvelope,
-  ): Pick<CommandPrecondition, "aggregateType" | "aggregateId"> | null {
-    switch (command.type) {
-      case "MARK_OFF_BLOCK":
-      case "MARK_ON_BLOCK":
-      case "COMPLETE_TURNAROUND":
-      case "CANCEL_ROTATION":
-        return { aggregateType: "ROTATION", aggregateId: command.payload.rotationId };
-      case "SET_AIRCRAFT_OPERATIONAL_STATE":
-      case "SCHEDULE_AIRCRAFT_REFUEL":
-      case "CONFIGURE_AIRCRAFT_REFUEL_THRESHOLD":
-        return { aggregateType: "AIRCRAFT", aggregateId: command.payload.aircraftId };
-      default:
-        return null;
-    }
-  }
-
-  private async validateCommandVersion(
+  private validateCommandVersion(
     command: CommandEnvelope,
     current: StoredEventRow,
-  ): Promise<Response | null> {
+    aggregateVersion: number | null,
+  ): Response | null {
     if (command.type === "REORDER_CASHIER_PRODUCTS") {
       const observedEventVersion = command.observedEventVersion ?? command.expectedVersion;
       if (observedEventVersion <= current.version) return null;
@@ -1887,7 +1875,7 @@ export class EventCoordinator extends DurableObject<Env> {
         { status: 409 },
       );
     }
-    const target = this.scopedCommandTarget(command);
+    const target = scopedCommandTarget(command);
     const preconditions = command.preconditions;
     if (!preconditions) {
       if (current.version === command.expectedVersion) return null;
@@ -1932,26 +1920,7 @@ export class EventCoordinator extends DurableObject<Env> {
       );
     }
     const precondition = preconditions[0];
-    const aggregate =
-      precondition.aggregateType === "ROTATION"
-        ? await this.env.DB.prepare(
-            "SELECT version FROM rotations WHERE id = ?1 AND operation_day_id = ?2",
-          )
-            .bind(precondition.aggregateId, command.eventId)
-            .first<{ version: number }>()
-        : await this.env.DB.prepare(
-            `SELECT a.version
-               FROM aircraft a
-              WHERE a.id = ?1
-                AND EXISTS (
-                  SELECT 1 FROM resource_group_memberships membership
-                   WHERE membership.aircraft_id = a.id
-                     AND membership.operation_day_id = ?2
-                )`,
-          )
-            .bind(precondition.aggregateId, command.eventId)
-            .first<{ version: number }>();
-    if (!aggregate) {
+    if (aggregateVersion === null) {
       return json(
         {
           error: {
@@ -1962,7 +1931,7 @@ export class EventCoordinator extends DurableObject<Env> {
         { status: 404 },
       );
     }
-    if (aggregate.version === precondition.expectedVersion) return null;
+    if (aggregateVersion === precondition.expectedVersion) return null;
     return json(
       {
         error: {
@@ -1972,7 +1941,7 @@ export class EventCoordinator extends DurableObject<Env> {
           conflict: {
             aggregateType: precondition.aggregateType,
             aggregateId: precondition.aggregateId,
-            currentAggregateVersion: aggregate.version,
+            currentAggregateVersion: aggregateVersion,
           },
         },
       },
@@ -2057,43 +2026,46 @@ export class EventCoordinator extends DurableObject<Env> {
       }
 
       const operatorAccountId = request.headers.get("x-operator-account-id");
-      const current = await this.env.DB.prepare(
-        `SELECT id, name, event_date, aerodrome, time_zone, status, archived_at, template_source_id,
-                emergency_mode, operational_interrupted, version,
-                operational_note, operations_start_at, operations_end_at, sale_opens_at,
-                no_show_after_minutes,
-                max_ticket_deferrals,
-                notification_lead_minutes, child_reference_weight_kg, normal_reference_weight_kg,
-                automatic_precall_enabled, precall_lead_minutes, max_gate_wait_minutes,
-                precall_min_quality, precall_gate_cooldown_minutes,
-                heavy_reference_weight_kg, planned_boarding_minutes, planned_deboarding_minutes,
-                planned_buffer_minutes, logo_object_key, logo_dark_object_key, updated_at
-           FROM operation_days
-          WHERE id = ?1`,
-      )
-        .bind(command.eventId)
-        .first<StoredEventRow>();
+      const commandNow = new Date();
+      const preflight = await loadCommandPreflightReads({
+        db: this.env.DB,
+        command,
+        deviceRole: device.role,
+        operatorAccountId,
+        nowIso: commandNow.toISOString(),
+      });
+      if (preflight.durationMs >= 50) {
+        console.log(
+          JSON.stringify({
+            level: "info",
+            code: "SLOW_COMMAND_PREFLIGHT",
+            commandType: command.type,
+            durationMs: Math.round(preflight.durationMs),
+            batchCount: preflight.batchCount,
+            statementCount: preflight.statementCount,
+          }),
+        );
+      }
+      const current = preflight.current;
       if (!current) {
         return json(
           { error: { code: "EVENT_NOT_FOUND", message: "Veranstaltung nicht gefunden." } },
           { status: 404 },
         );
       }
-      const versionConflict = await this.validateCommandVersion(command, current);
+      const versionConflict = this.validateCommandVersion(
+        command,
+        current,
+        preflight.aggregateVersion,
+      );
       if (versionConflict) return versionConflict;
-      const plannedOperationConflict = await this.validatePlannedOperationLink(command);
+      const plannedOperationConflict = this.validatePlannedOperationLink(
+        command,
+        preflight.plannedOperation,
+      );
       if (plannedOperationConflict) return plannedOperationConflict;
 
-      const commandNow = new Date();
-      const activeOperatorClaim = operatorAccountId
-        ? await this.env.DB.prepare(
-            `SELECT aircraft_id, revision
-               FROM flight_line_assist_claims
-              WHERE operation_day_id = ?1 AND operator_account_id = ?2 AND expires_at > ?3`,
-          )
-            .bind(command.eventId, operatorAccountId, commandNow.toISOString())
-            .first<{ aircraft_id: string; revision: number }>()
-        : null;
+      const activeOperatorClaim = preflight.activeOperatorClaim;
       // Production commands always carry a session actor. The actor-less branch is retained only
       // for the development integration scaffold, which is already blocked by the public route in
       // every non-development environment.
@@ -2110,15 +2082,10 @@ export class EventCoordinator extends DurableObject<Env> {
           );
         }
         const payload = command.payload as Record<string, unknown>;
-        let targetAircraftId = typeof payload.aircraftId === "string" ? payload.aircraftId : null;
-        if (!targetAircraftId && typeof payload.rotationId === "string") {
-          const targetRotation = await this.env.DB.prepare(
-            "SELECT aircraft_id FROM rotations WHERE id = ?1 AND operation_day_id = ?2",
-          )
-            .bind(payload.rotationId, command.eventId)
-            .first<{ aircraft_id: string | null }>();
-          targetAircraftId = targetRotation?.aircraft_id ?? null;
-        }
+        const targetAircraftId =
+          typeof payload.aircraftId === "string"
+            ? payload.aircraftId
+            : preflight.targetRotationAircraftId;
         if (targetAircraftId && targetAircraftId !== activeOperatorClaim.aircraft_id) {
           return json(
             {
@@ -2798,30 +2765,13 @@ export class EventCoordinator extends DurableObject<Env> {
     }
   }
 
-  private async validatePlannedOperationLink(command: CommandEnvelope): Promise<Response | null> {
-    const plannedOperationId = (command.payload as { plannedOperationId?: string })
-      .plannedOperationId;
-    if (!plannedOperationId) return null;
-    let expectedScope: "EVENT" | "RESOURCE_GROUP" | "AIRCRAFT" | "PILOT";
-    let expectedScopeId: string;
-    let activating: boolean;
-    if (command.type === "SET_EVENT_INTERRUPTION") {
-      expectedScope = "EVENT";
-      expectedScopeId = command.eventId;
-      activating = command.payload.interrupted;
-    } else if (command.type === "SET_RESOURCE_GROUP_STATUS") {
-      expectedScope = "RESOURCE_GROUP";
-      expectedScopeId = command.payload.resourceGroupId;
-      activating = command.payload.status !== "ACTIVE";
-    } else if (command.type === "SET_PILOT_PAUSE") {
-      expectedScope = "PILOT";
-      expectedScopeId = command.payload.pilotId;
-      activating = command.payload.paused;
-    } else if (command.type === "SET_AIRCRAFT_OPERATIONAL_STATE") {
-      expectedScope = "AIRCRAFT";
-      expectedScopeId = command.payload.aircraftId;
-      activating = command.payload.state !== "AVAILABLE";
-    } else {
+  private validatePlannedOperationLink(
+    command: CommandEnvelope,
+    plan: PlannedOperationRow | null,
+  ): Response | null {
+    const expectation = plannedOperationExpectation(command);
+    if (expectation.kind === "none") return null;
+    if (expectation.kind === "unsupported") {
       return json(
         {
           error: {
@@ -2832,18 +2782,6 @@ export class EventCoordinator extends DurableObject<Env> {
         { status: 409 },
       );
     }
-    const plan = await this.env.DB.prepare(
-      `SELECT scope_type, scope_id, status, effect_mode
-         FROM planned_operational_constraints
-        WHERE id = ?1 AND operation_day_id = ?2`,
-    )
-      .bind(plannedOperationId, command.eventId)
-      .first<{
-        scope_type: "EVENT" | "RESOURCE_GROUP" | "AIRCRAFT" | "PILOT";
-        scope_id: string;
-        status: "PLANNED" | "ACTIVE" | "CLEARED" | "CANCELED";
-        effect_mode: "BLOCKING" | "SLOWDOWN";
-      }>();
     if (!plan) {
       return json(
         { error: { code: "PLANNED_OPERATION_NOT_FOUND", message: "Planeintrag nicht gefunden." } },
@@ -2861,7 +2799,7 @@ export class EventCoordinator extends DurableObject<Env> {
         { status: 409 },
       );
     }
-    if (plan.scope_type !== expectedScope || plan.scope_id !== expectedScopeId) {
+    if (plan.scope_type !== expectation.scopeType || plan.scope_id !== expectation.scopeId) {
       return json(
         {
           error: {
@@ -2872,7 +2810,10 @@ export class EventCoordinator extends DurableObject<Env> {
         { status: 409 },
       );
     }
-    if ((activating && plan.status !== "PLANNED") || (!activating && plan.status !== "ACTIVE")) {
+    if (
+      (expectation.activating && plan.status !== "PLANNED") ||
+      (!expectation.activating && plan.status !== "ACTIVE")
+    ) {
       return json(
         {
           error: {

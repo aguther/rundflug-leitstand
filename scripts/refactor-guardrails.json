@@ -3,7 +3,7 @@
   "sizeBudgets": [
     {
       "path": "apps/worker/src/event-coordinator.ts",
-      "maxLines": 12571,
+      "maxLines": 12512,
       "targetLines": 1500
     },
     {
@@ -22,7 +22,13 @@
       "targetLines": 300
     }
   ],
-  "extractedModuleBudgets": [],
+  "extractedModuleBudgets": [
+    {
+      "path": "apps/worker/src/command-preflight.ts",
+      "maxLines": 259,
+      "targetLines": 1500
+    }
+  ],
   "allowedProductionRawImports": [
     "apps/web/src/admin-dialog-workspace-ui.test.ts -> apps/web/src/admin-view.tsx",
     "apps/web/src/admin-event-workspace-redesign.test.ts -> apps/web/src/admin-ux.tsx",

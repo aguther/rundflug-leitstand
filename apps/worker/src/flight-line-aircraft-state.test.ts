@@ -14,9 +14,7 @@ describe("V1.7.0 Flight-Line-Flugzeugzustände", () => {
     const duplicateCheck = coordinator.indexOf(
       "SELECT response_json FROM idempotency_receipts WHERE command_id = ?1",
     );
-    const staleCheck = coordinator.indexOf(
-      "const versionConflict = await this.validateCommandVersion(command, current)",
-    );
+    const staleCheck = coordinator.indexOf("const versionConflict = this.validateCommandVersion(");
     const handler = coordinator.indexOf("private async handleFleetAdministration");
     expect(duplicateCheck).toBeGreaterThan(0);
     expect(staleCheck).toBeGreaterThan(duplicateCheck);
