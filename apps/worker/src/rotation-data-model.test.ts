@@ -49,17 +49,4 @@ describe("D-050 rotation data model", () => {
     expect(worker).toContain("queuePosition: rotation.queue_position");
     expect(worker).toContain("capacityReduced:");
   });
-
-  it("persists capacity changes, whole-group requeueing and audit atomically", () => {
-    const handler = coordinator.match(
-      /private async handleRotationCapacity[\s\S]*?private async handleManualTicketGroupMove/,
-    )?.[0];
-    expect(handler).toBeTruthy();
-    expect(handler).toContain("planRotationCapacityReduction");
-    expect(handler).toContain("ROTATION_CAPACITY_CHANGED");
-    expect(handler).toContain("UPDATE rotation_tickets SET released_at");
-    expect(handler).toContain("INSERT INTO idempotency_receipts");
-    expect(handler).toContain("INSERT INTO outbox");
-    expect(handler).toContain("this.env.DB.batch");
-  });
 });

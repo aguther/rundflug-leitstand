@@ -3,7 +3,7 @@
   "sizeBudgets": [
     {
       "path": "apps/worker/src/event-coordinator.ts",
-      "maxLines": 7687,
+      "maxLines": 7036,
       "targetLines": 1500
     },
     {
@@ -76,6 +76,11 @@
     {
       "path": "apps/worker/src/attendance-command-service.ts",
       "maxLines": 851,
+      "targetLines": 1500
+    },
+    {
+      "path": "apps/worker/src/rotation-correction-command-service.ts",
+      "maxLines": 677,
       "targetLines": 1500
     }
   ],
@@ -242,7 +247,6 @@
     "apps/worker/src/maintainability-coverage.test.ts -> packages/domain/src/index.ts",
     "apps/worker/src/maintainability-coverage.test.ts -> packages/domain/src/outage-recovery.ts",
     "apps/worker/src/maintainability-coverage.test.ts -> packages/domain/src/queue.ts",
-    "apps/worker/src/manifest-correction-data-model.test.ts -> apps/worker/src/event-coordinator.ts",
     "apps/worker/src/master-data-deletion.test.ts -> apps/worker/src/event-coordinator.ts",
     "apps/worker/src/master-data-deletion.test.ts -> packages/contracts/src/index.ts",
     "apps/worker/src/master-data-deletion.test.ts -> packages/domain/src/index.ts",
