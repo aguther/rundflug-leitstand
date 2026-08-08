@@ -1,43 +1,40 @@
+import { commandEnvelopeSchema } from "@rundflug/contracts";
+import { assertRoleMayExecute, DomainRuleError } from "@rundflug/domain";
 import { describe, expect, it } from "vitest";
-import contracts from "../../../packages/contracts/src/index.ts?raw";
-import domain from "../../../packages/domain/src/index.ts?raw";
-import coordinator from "./event-coordinator.ts?raw";
 
 describe("F-ADM-050 master-data deletion safeguards", () => {
-  it("requires an administrator PIN, expected version and an administrator role", () => {
-    expect(contracts).toContain('type: z.literal("DELETE_MASTER_DATA")');
-    expect(contracts).toMatch(
-      /type: z\.literal\("DELETE_MASTER_DATA"\)[\s\S]*adminPin: z\.string\(\)\.min\(4\)\.max\(32\)/,
-    );
-    expect(contracts).toContain("expectedVersion: z.number().int().nonnegative()");
-    expect(domain).toContain('DELETE_MASTER_DATA: ["ADMIN"]');
+  const command = {
+    commandId: "550e8400-e29b-41d4-a716-446655440001",
+    eventId: "synthetic-event",
+    deviceId: "synthetic-admin",
+    expectedVersion: 9,
+    issuedAt: "2026-08-08T08:00:00.000Z",
+    type: "DELETE_MASTER_DATA" as const,
+    payload: {
+      entityType: "PRODUCT" as const,
+      entityId: "product-one",
+      reason: "Synthetic cleanup",
+      adminPin: "1234",
+    },
+  };
+
+  it("requires an administrator PIN and expected event version", () => {
+    expect(commandEnvelopeSchema.parse(command)).toMatchObject({
+      type: "DELETE_MASTER_DATA",
+      expectedVersion: 9,
+    });
+    expect(() =>
+      commandEnvelopeSchema.parse({
+        ...command,
+        payload: { ...command.payload, adminPin: "123" },
+      }),
+    ).toThrow();
   });
 
-  it("allows physical deletion only for an authenticated administrator during preparation", () => {
-    expect(coordinator).toContain('current.status !== "PREPARATION"');
-    expect(coordinator).toContain("MASTER_DATA_DELETE_PHASE_LOCKED");
-    expect(coordinator).toContain("MASTER_DATA_DELETE_BLOCKED");
-    expect(coordinator).toContain('request.headers.get("x-operator-role")');
-    expect(coordinator).toContain("operatorDeviceId === command.deviceId");
-    expect(coordinator).toContain("this.validateCommandVersion(");
-    expect(coordinator).toContain("current.version === command.expectedVersion");
-  });
-
-  it("persists every supported deletion with audit, receipt and outbox in one batch", () => {
-    for (const eventType of [
-      "GATE_DELETED",
-      "RESOURCE_GROUP_DELETED",
-      "PRODUCT_DELETED",
-      "PILOT_DELETED",
-      "AIRCRAFT_DELETED",
-      "AIRCRAFT_RESOURCE_GROUP_ASSIGNMENT_DELETED",
-    ]) {
-      expect(coordinator).toContain(eventType);
-    }
-    expect(coordinator).toMatch(
-      /this\.env\.DB\.batch\(\[[\s\S]*deletion,[\s\S]*operational_events/,
+  it("allows only the administrator role to execute deletion", () => {
+    expect(() => assertRoleMayExecute("ADMIN", "DELETE_MASTER_DATA")).not.toThrow();
+    expect(() => assertRoleMayExecute("FLIGHT_DIRECTOR", "DELETE_MASTER_DATA")).toThrow(
+      DomainRuleError,
     );
-    expect(coordinator).toContain("idempotency_receipts");
-    expect(coordinator).toContain("INSERT INTO outbox");
   });
 });

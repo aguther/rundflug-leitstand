@@ -3,7 +3,7 @@
   "sizeBudgets": [
     {
       "path": "apps/worker/src/event-coordinator.ts",
-      "maxLines": 5189,
+      "maxLines": 3914,
       "targetLines": 1500
     },
     {
@@ -111,6 +111,11 @@
     {
       "path": "apps/worker/src/product-sales-command-service.ts",
       "maxLines": 130,
+      "targetLines": 1500
+    },
+    {
+      "path": "apps/worker/src/master-data-command-service.ts",
+      "maxLines": 1300,
       "targetLines": 1500
     }
   ],
@@ -238,7 +243,6 @@
     "apps/worker/src/analysis-snapshot.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/api-cache-policy.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/audit-coverage.test.ts -> apps/worker/src/daily-report.ts",
-    "apps/worker/src/cashier-product-order.test.ts -> apps/worker/src/event-coordinator.ts",
     "apps/worker/src/cashier-ticket-attribution.test.ts -> apps/worker/src/event-coordinator.ts",
     "apps/worker/src/cashier-ticket-attribution.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/control-routing.test.ts -> apps/worker/src/index.ts",
@@ -267,16 +271,12 @@
     "apps/worker/src/maintainability-coverage.test.ts -> apps/web/src/admin-view.tsx",
     "apps/worker/src/maintainability-coverage.test.ts -> apps/web/src/features/admin/event-parameters/EventParametersWorkspace.tsx",
     "apps/worker/src/maintainability-coverage.test.ts -> apps/web/src/features/admin/event-parameters/useEventParametersForm.ts",
-    "apps/worker/src/maintainability-coverage.test.ts -> apps/worker/src/event-coordinator.ts",
     "apps/worker/src/maintainability-coverage.test.ts -> packages/contracts/src/index.ts",
     "apps/worker/src/maintainability-coverage.test.ts -> packages/domain/src/capacity.ts",
     "apps/worker/src/maintainability-coverage.test.ts -> packages/domain/src/forecast.ts",
     "apps/worker/src/maintainability-coverage.test.ts -> packages/domain/src/index.ts",
     "apps/worker/src/maintainability-coverage.test.ts -> packages/domain/src/outage-recovery.ts",
     "apps/worker/src/maintainability-coverage.test.ts -> packages/domain/src/queue.ts",
-    "apps/worker/src/master-data-deletion.test.ts -> apps/worker/src/event-coordinator.ts",
-    "apps/worker/src/master-data-deletion.test.ts -> packages/contracts/src/index.ts",
-    "apps/worker/src/master-data-deletion.test.ts -> packages/domain/src/index.ts",
     "apps/worker/src/operational-note-permission.test.ts -> apps/worker/src/event-coordinator.ts",
     "apps/worker/src/operational-note-permission.test.ts -> packages/domain/src/index.ts",
     "apps/worker/src/operational-planning.test.ts -> apps/worker/src/index.ts",
@@ -314,7 +314,6 @@
     "apps/worker/src/ticket-group-recall.test.ts -> apps/worker/src/web-push.ts",
     "apps/worker/src/ticket-group-recall.test.ts -> packages/contracts/src/index.ts",
     "apps/worker/src/ticket-group-recall.test.ts -> packages/domain/src/index.ts",
-    "apps/worker/src/turnaround-overrides.test.ts -> apps/worker/src/event-coordinator.ts",
     "apps/worker/src/turnaround-overrides.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/v1-5-stable-operations.test.ts -> apps/worker/src/event-coordinator.ts",
     "apps/worker/src/v1-5-stable-operations.test.ts -> apps/worker/src/index.ts",

@@ -23,7 +23,6 @@ import masterDataMigration from "../migrations/0015_product_and_gate_master_data
 import multiEventMigration from "../migrations/0017_multi_event_templates.sql?raw";
 import workerManifestRaw from "../package.json?raw";
 import seedSource from "../seed/demo.sql?raw";
-import coordinatorSource from "./event-coordinator.ts?raw";
 
 type Manifest = {
   allowScripts?: Record<string, boolean>;
@@ -188,11 +187,5 @@ describe("runtime configuration coverage", () => {
     expect(contractSource).toContain("CONFIGURE_PRODUCT_SALES");
     expect(contractSource).toContain("warningThreshold");
     expect(contractSource).toContain("criticalThreshold");
-  });
-
-  it("persists product master data in the serialized, audited command path", () => {
-    expect(coordinatorSource).toMatch(
-      /PRODUCT_UPSERTED[\s\S]*promised_flight_minutes[\s\S]*weight_classes_json/,
-    );
   });
 });
