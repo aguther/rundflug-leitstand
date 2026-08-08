@@ -3,7 +3,7 @@
   "sizeBudgets": [
     {
       "path": "apps/worker/src/event-coordinator.ts",
-      "maxLines": 9445,
+      "maxLines": 8934,
       "targetLines": 1500
     },
     {
@@ -56,6 +56,16 @@
     {
       "path": "apps/worker/src/dispatch-recommendation-lease-service.ts",
       "maxLines": 915,
+      "targetLines": 1500
+    },
+    {
+      "path": "apps/worker/src/assist-claim-service.ts",
+      "maxLines": 272,
+      "targetLines": 1500
+    },
+    {
+      "path": "apps/worker/src/operational-control-command-service.ts",
+      "maxLines": 286,
       "targetLines": 1500
     }
   ],
@@ -183,7 +193,6 @@
     "apps/worker/src/analysis-snapshot.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/api-cache-policy.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/audit-coverage.test.ts -> apps/worker/src/daily-report.ts",
-    "apps/worker/src/audit-coverage.test.ts -> apps/worker/src/event-coordinator.ts",
     "apps/worker/src/cashier-product-order.test.ts -> apps/worker/src/event-coordinator.ts",
     "apps/worker/src/cashier-ticket-attribution.test.ts -> apps/worker/src/event-coordinator.ts",
     "apps/worker/src/cashier-ticket-attribution.test.ts -> apps/worker/src/index.ts",
@@ -198,7 +207,6 @@
     "apps/worker/src/fids-preferences.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/flight-line-aircraft-state.test.ts -> apps/worker/src/event-coordinator.ts",
     "apps/worker/src/flight-line-aircraft-state.test.ts -> packages/domain/src/index.ts",
-    "apps/worker/src/flight-line-assist-claims.test.ts -> apps/worker/src/event-coordinator.ts",
     "apps/worker/src/flight-line-assist-claims.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/flight-line-pilot-assignment.test.ts -> apps/worker/src/event-coordinator.ts",
     "apps/worker/src/flight-line-pilot-assignment.test.ts -> apps/worker/src/index.ts",

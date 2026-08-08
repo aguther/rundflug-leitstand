@@ -120,28 +120,28 @@ const connectRealtime = () =>
       },
     );
   });
-const nextRealtimeVersion = (socket) =>
+const nextRealtimeVersion = (socket, expectedVersion) =>
   new Promise((resolvePromise, reject) => {
     const startedAt = Date.now();
-    const timeout = setTimeout(
-      () =>
-        reject(
-          new Error("Paralleles Gerät erhielt die Änderung nicht innerhalb von zwei Sekunden."),
-        ),
-      2_000,
-    );
-    socket.addEventListener(
-      "message",
-      (event) => {
-        const message = JSON.parse(String(event.data));
-        if (message.type !== "event-state-changed") return;
-        clearTimeout(timeout);
-        resolvePromise({ version: message.eventVersion, elapsedMs: Date.now() - startedAt });
-      },
-      { once: true },
-    );
+    const timeout = setTimeout(() => {
+      socket.removeEventListener("message", onMessage);
+      reject(new Error("Paralleles Gerät erhielt die Änderung nicht innerhalb von zwei Sekunden."));
+    }, 2_000);
+    const onMessage = (event) => {
+      const message = JSON.parse(String(event.data));
+      if (
+        message.type !== "event-state-changed" ||
+        Number(message.eventVersion) < expectedVersion
+      ) {
+        return;
+      }
+      clearTimeout(timeout);
+      socket.removeEventListener("message", onMessage);
+      resolvePromise({ version: message.eventVersion, elapsedMs: Date.now() - startedAt });
+    };
+    socket.addEventListener("message", onMessage);
   });
-const nextForecastVersion = (socket) =>
+const nextForecastVersion = (socket, expectedVersion) =>
   new Promise((resolvePromise, reject) => {
     const startedAt = Date.now();
     const timeout = setTimeout(() => {
@@ -150,7 +150,9 @@ const nextForecastVersion = (socket) =>
     }, 2_000);
     const onMessage = (event) => {
       const message = JSON.parse(String(event.data));
-      if (message.type !== "forecast-updated") return;
+      if (message.type !== "forecast-updated" || Number(message.eventVersion) < expectedVersion) {
+        return;
+      }
       clearTimeout(timeout);
       socket.removeEventListener("message", onMessage);
       resolvePromise({
@@ -230,10 +232,11 @@ try {
   }
   cashierSocket = await connectRealtime();
   flightLineSocket = await connectRealtime();
-  const cashierSaleSignal = nextRealtimeVersion(cashierSocket);
-  const flightLineSaleSignal = nextRealtimeVersion(flightLineSocket);
-  const cashierSaleForecast = nextForecastVersion(cashierSocket);
-  const flightLineSaleForecast = nextForecastVersion(flightLineSocket);
+  const expectedSaleVersion = activated.event.version + 1;
+  const cashierSaleSignal = nextRealtimeVersion(cashierSocket, expectedSaleVersion);
+  const flightLineSaleSignal = nextRealtimeVersion(flightLineSocket, expectedSaleVersion);
+  const cashierSaleForecast = nextForecastVersion(cashierSocket, expectedSaleVersion);
+  const flightLineSaleForecast = nextForecastVersion(flightLineSocket, expectedSaleVersion);
   const saleEnvelope = envelope("cashier-tablet-1", activated.event.version, "SELL_TICKET_GROUP", {
     productId: "panorama-20",
     publicTicketCodes: [ticketCode(), ticketCode()],

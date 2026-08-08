@@ -77,7 +77,7 @@ const wait = (milliseconds) =>
   new Promise((resolvePromise) => setTimeout(resolvePromise, milliseconds));
 
 async function waitForWorker() {
-  for (let attempt = 0; attempt < 60; attempt += 1) {
+  for (let attempt = 0; attempt < 120; attempt += 1) {
     try {
       if ((await fetch(`${base}/api/health`)).ok) return;
     } catch {}
