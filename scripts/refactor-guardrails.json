@@ -3,7 +3,7 @@
   "sizeBudgets": [
     {
       "path": "apps/worker/src/event-coordinator.ts",
-      "maxLines": 6285,
+      "maxLines": 5874,
       "targetLines": 1500
     },
     {
@@ -91,6 +91,11 @@
     {
       "path": "apps/worker/src/planned-operation-command-service.ts",
       "maxLines": 469,
+      "targetLines": 1500
+    },
+    {
+      "path": "apps/worker/src/recurring-operational-rule-command-service.ts",
+      "maxLines": 437,
       "targetLines": 1500
     }
   ],
@@ -262,7 +267,6 @@
     "apps/worker/src/master-data-deletion.test.ts -> packages/domain/src/index.ts",
     "apps/worker/src/operational-note-permission.test.ts -> apps/worker/src/event-coordinator.ts",
     "apps/worker/src/operational-note-permission.test.ts -> packages/domain/src/index.ts",
-    "apps/worker/src/operational-planning.test.ts -> apps/worker/src/event-coordinator.ts",
     "apps/worker/src/operational-planning.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/operator-account-management.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/planning-capture.test.ts -> apps/worker/src/backup.ts",

@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import migration from "../migrations/0046_operational_plans.sql?raw";
 import slowdownMigration from "../migrations/0049_operational_plan_slowdown.sql?raw";
 import recurringMigration from "../migrations/0050_recurring_operational_rules.sql?raw";
-import coordinator from "./event-coordinator.ts?raw";
 import worker from "./index.ts?raw";
 
 describe("general operational planning", () => {
@@ -153,17 +152,6 @@ describe("general operational planning", () => {
         },
       }).success,
     ).toBe(false);
-
-    const handler = coordinator.match(
-      /private async handleRecurringOperationalRule[\s\S]*?private async handleFleetAdministration/,
-    )?.[0];
-    expect(handler).toBeTruthy();
-    expect(handler).toContain("RECURRING_RULE_VERSION_CONFLICT");
-    expect(handler).toContain("RECURRING_RULE_ALREADY_ACTIVE");
-    expect(handler).toContain("INSERT INTO operational_events");
-    expect(handler).toContain("INSERT INTO idempotency_receipts");
-    expect(handler).toContain("INSERT INTO outbox");
-    expect(handler).not.toContain("UPDATE aircraft SET operational_state");
     expect(operationBoardSchema.shape.recurringOperationalRules).toBeTruthy();
   });
 });
