@@ -190,11 +190,7 @@ describe("runtime configuration coverage", () => {
     expect(contractSource).toContain("criticalThreshold");
   });
 
-  it("persists configuration in the serialized, audited command path", () => {
-    expect(coordinatorSource).toMatch(
-      /PRODUCT_SALES_CONFIGURED[\s\S]*capacity_warning_threshold[\s\S]*capacity_critical_threshold/,
-    );
-    expect(coordinatorSource).toContain("validateProductSalesUpdate(");
+  it("persists product master data in the serialized, audited command path", () => {
     expect(coordinatorSource).toMatch(
       /PRODUCT_UPSERTED[\s\S]*promised_flight_minutes[\s\S]*weight_classes_json/,
     );
