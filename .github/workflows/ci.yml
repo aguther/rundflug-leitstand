@@ -31,6 +31,8 @@ jobs:
         run: npm ci
       - name: Test Coverage
         run: npm run test:coverage
+      - name: CI Check
+        run: npm run check:ci
       - name: SonarQube Scan
         if: >-
           github.event_name != 'pull_request' ||
@@ -42,5 +44,3 @@ jobs:
             -Dsonar.qualitygate.timeout=300
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-      - name: CI Check
-        run: npm run check:ci
