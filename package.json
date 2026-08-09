@@ -56,6 +56,7 @@
     "lint": "biome check .",
     "format": "biome format --write .",
     "refactor:guardrails": "node scripts/verify_refactor_guardrails.mjs",
+    "check:ci": "npm run lint && npm run refactor:guardrails && npm run build && npm run requirements:verify",
     "check": "npm run lint && npm run refactor:guardrails && npm run build && npm run test:analysis-replay && npm run test:analysis-scale && npm run test:worker-runtime && npm run test:v1-integrations && npm run test:v1-acceptance-day && npm run backup:restore:test && npm run docs:verify && npm run requirements:verify",
     "backup:restore:test": "python3 scripts/verify_backup_restore.py",
     "docs:verify": "node scripts/verify_architecture_docs.mjs && npm run docs:requirements:check && npm run docs:migrations:check && npm run docs:licenses:check && npm run docs:guides:check",

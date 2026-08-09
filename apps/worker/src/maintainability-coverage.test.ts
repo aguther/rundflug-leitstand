@@ -30,6 +30,7 @@ type Manifest = {
   devDependencies?: Record<string, string>;
   engines?: Record<string, string>;
   packageManager?: string;
+  scripts?: Record<string, string>;
 };
 const webSource = `${webAdminSource}\n${eventParametersSource}\n${eventParametersFormSource}`;
 const dependencyNames = (raw: string) => {
@@ -75,10 +76,16 @@ describe("V1 maintainability and portability boundaries", () => {
     const defaultNodeVersion = nodeVersion.trim();
     expect(defaultNodeVersion).toBe("24.18.0");
     expect(ciWorkflow).toContain("node-version: 22.22.2");
-    expect(ciWorkflow).toContain("npm install --global npm@12.0.2");
+    expect(rootManifest.scripts?.["check:ci"]).toBe(
+      "npm run lint && npm run refactor:guardrails && npm run build && npm run requirements:verify",
+    );
+    expect(ciWorkflow).toContain("npm run check:ci");
+    for (const workflow of [ciWorkflow, deployCloudflareWorkflow, cloudflarePerformanceWorkflow]) {
+      expect(workflow).toContain('npm install --global --prefix "$RUNNER_TEMP/npm" npm@12.0.2');
+      expect(workflow).toContain('echo "$RUNNER_TEMP/npm/bin" >> "$GITHUB_PATH"');
+    }
     for (const workflow of [deployCloudflareWorkflow, cloudflarePerformanceWorkflow]) {
       expect(workflow).toContain(`node-version: ${defaultNodeVersion}`);
-      expect(workflow).toContain("npm install --global npm@12.0.2");
     }
   });
 
