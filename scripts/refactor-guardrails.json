@@ -8,7 +8,7 @@
     },
     {
       "path": "apps/worker/src/index.ts",
-      "maxLines": 7237,
+      "maxLines": 7202,
       "targetLines": 800
     },
     {
@@ -161,6 +161,11 @@
     {
       "path": "apps/worker/src/public-push-routes.ts",
       "maxLines": 343,
+      "targetLines": 1500
+    },
+    {
+      "path": "apps/worker/src/public-logo-routes.ts",
+      "maxLines": 67,
       "targetLines": 1500
     }
   ],

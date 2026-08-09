@@ -13,8 +13,8 @@ describe("theme-specific event logo persistence and delivery", () => {
     expect(migrationNotes).toContain("D1-Time-Travel");
   });
 
-  it("selects a validated theme for admin mutations and public reads", () => {
-    expect(worker.match(/parseEventLogoTheme\(context\.req\.query\("theme"\)/g)).toHaveLength(3);
+  it("selects a validated theme for admin mutations", () => {
+    expect(worker.match(/parseEventLogoTheme\(context\.req\.query\("theme"\)/g)).toHaveLength(2);
     expect(worker).toContain("EVENT_LOGO_THEME_INVALID");
     expect(worker).toMatch(/return `\$\{operation\}_EVENT_LOGO_\$\{theme\.toUpperCase\(\)\}`;/);
     expect(worker).toContain('eventLogoCommandType("SET", theme)');
@@ -29,12 +29,7 @@ describe("theme-specific event logo persistence and delivery", () => {
     expect(worker).toContain("IDEMPOTENCY_CONFLICT");
   });
 
-  it("falls back to the opposite variant and cleans both objects on event deletion", () => {
-    expect(worker).toContain(
-      'const fallbackTheme: EventLogoTheme = requestedTheme === "light" ? "dark" : "light"',
-    );
-    expect(worker).toContain("for (const resolvedTheme of [requestedTheme, fallbackTheme])");
-    expect(worker).toContain('"x-event-logo-theme": resolvedTheme');
+  it("cleans both objects on event deletion", () => {
     expect(worker).toContain("[event.logo_object_key, event.logo_dark_object_key]");
     expect(worker).toContain("finishEventDeletionAssetCleanup(");
     expect(eventDeletion).toContain("env.BACKUPS.delete([...logoObjectKeys])");

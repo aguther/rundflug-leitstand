@@ -135,6 +135,7 @@ import {
   allowUnknownTicketAttempt,
 } from "./public-access";
 import { registerPublicInstallRoutes } from "./public-install-routes";
+import { registerPublicLogoRoutes } from "./public-logo-routes";
 import { registerPublicPushRoutes } from "./public-push-routes";
 import {
   activeTicketGroupRecallProjection,
@@ -3307,43 +3308,7 @@ app.delete("/api/admin/events/:eventId/logo", async (context) => {
   return context.json(response);
 });
 
-app.get("/api/public/events/:eventId/logo", async (context) => {
-  const eventId = context.req.param("eventId");
-  const requestedTheme = parseEventLogoTheme(context.req.query("theme") ?? null);
-  if (!requestedTheme) {
-    return context.json(
-      { error: { code: "EVENT_LOGO_THEME_INVALID", message: "Logo-Theme ist ungültig." } },
-      400,
-    );
-  }
-  const event = await context.env.DB.prepare(
-    `SELECT version, logo_object_key, logo_media_type,
-            logo_dark_object_key, logo_dark_media_type
-       FROM operation_days WHERE id = ?1`,
-  )
-    .bind(eventId)
-    .first<EventLogoRow>();
-  if (!event) return context.body(null, 404);
-  const fallbackTheme: EventLogoTheme = requestedTheme === "light" ? "dark" : "light";
-  for (const resolvedTheme of [requestedTheme, fallbackTheme]) {
-    const columns = eventLogoColumns(resolvedTheme);
-    const objectKey = event[columns.key];
-    const mediaType = event[columns.mediaType];
-    if (!objectKey || !mediaType) continue;
-    const object = await context.env.BACKUPS.get(objectKey);
-    if (!object) continue;
-    return new Response(object.body, {
-      headers: {
-        "content-type": mediaType,
-        "cache-control": "public, max-age=300",
-        "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'",
-        "x-content-type-options": "nosniff",
-        "x-event-logo-theme": resolvedTheme,
-      },
-    });
-  }
-  return context.body(null, 404);
-});
+registerPublicLogoRoutes(app);
 
 app.on("GET", eventRoutes("/snapshot"), async (context) => {
   const row = await context.env.DB.prepare(
