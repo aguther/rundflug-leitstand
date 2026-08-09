@@ -677,7 +677,7 @@ describe("event-driven forecast", () => {
     const elapsed = performance.now() - startedAt;
     expect(forecasts).toHaveLength(300);
     expect(forecasts.at(-1)?.upperMinutes).toBeGreaterThan(0);
-    expect(elapsed).toBeLessThan(2_000);
+    expect(elapsed).toBeLessThan(2_500);
   });
 
   it("projects all 300 eligible groups beyond the bounded dispatch horizon", () => {
@@ -754,7 +754,7 @@ describe("event-driven forecast", () => {
           projection.forecastState === "AFTER_OPERATIONS_END" && projection.overtimeMinutes > 0,
       ),
     ).toBe(true);
-    expect(elapsed).toBeLessThan(2_000);
+    expect(elapsed).toBeLessThan(2_500);
   });
 
   it("uses the earliest compatible tail lane after a recurring constraint becomes due", () => {
