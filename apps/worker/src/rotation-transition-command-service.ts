@@ -5,13 +5,15 @@ import {
   calculateConfirmedOvertakeIncrements,
   DomainRuleError,
   resolveTurnaroundProfile,
-  type TicketGroupRecallEndReason,
   transitionRotation,
 } from "@rundflug/domain";
-import type { StoredTicketGroupRecall } from "./attendance-command-service";
 import { dispatchSegmentOrderSql } from "./dispatch-ordering-sql";
 import type { StoredDispatchRecommendationLease } from "./dispatch-recommendation-lease-service";
 import { rowToSnapshot } from "./snapshot";
+import type {
+  StoredTicketGroupRecall,
+  TicketGroupRecallClosureInput,
+} from "./ticket-group-recall-persistence-service";
 import type { Env, StoredEventRow } from "./types";
 import { sendRotationPushNotifications } from "./web-push";
 
@@ -34,15 +36,6 @@ export type RotationTransitionCommand = Extract<
       | "CANCEL_ROTATION";
   }
 >;
-
-export interface TicketGroupRecallClosureInput {
-  recalls: readonly StoredTicketGroupRecall[];
-  eventId: string;
-  reason: TicketGroupRecallEndReason;
-  deviceId: string;
-  now: string;
-  event: CommandResult["event"];
-}
 
 export class RotationTransitionCommandService {
   constructor(

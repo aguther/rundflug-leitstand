@@ -3,10 +3,13 @@ import {
   assertTicketNoShowAllowed,
   DomainRuleError,
   TICKET_GROUP_RECALL_DURATION_MS,
-  type TicketGroupRecallEndReason,
   ticketGroupRecallEligibility,
 } from "@rundflug/domain";
 import { rowToSnapshot } from "./snapshot";
+import type {
+  StoredTicketGroupRecall,
+  TicketGroupRecallClosureInput,
+} from "./ticket-group-recall-persistence-service";
 import type { Env, StoredEventRow } from "./types";
 import { sendTicketGroupRecallPushNotifications } from "./web-push";
 
@@ -16,23 +19,6 @@ function json(data: unknown, init: ResponseInit = {}): Response {
   const headers = new Headers(init.headers);
   headers.set("content-type", JSON_HEADERS["content-type"]);
   return new Response(JSON.stringify(data), { ...init, headers });
-}
-
-export interface StoredTicketGroupRecall {
-  id: string;
-  ticket_group_id: string;
-  sequence: number;
-  started_at: string;
-  expires_at: string;
-}
-
-interface RecallClosureInput {
-  recalls: readonly StoredTicketGroupRecall[];
-  eventId: string;
-  reason: TicketGroupRecallEndReason;
-  deviceId: string;
-  now: string;
-  event: CommandResult["event"];
 }
 
 export class AttendanceCommandService {
@@ -46,7 +32,7 @@ export class AttendanceCommandService {
       onlyUnexpiredAt?: string,
     ) => Promise<StoredTicketGroupRecall[]>,
     private readonly ticketGroupRecallClosureStatements: (
-      input: RecallClosureInput,
+      input: TicketGroupRecallClosureInput,
     ) => D1PreparedStatement[],
   ) {}
 

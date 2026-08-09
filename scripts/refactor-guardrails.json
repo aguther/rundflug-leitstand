@@ -3,7 +3,7 @@
   "sizeBudgets": [
     {
       "path": "apps/worker/src/event-coordinator.ts",
-      "maxLines": 1561,
+      "maxLines": 1447,
       "targetLines": 1500
     },
     {
@@ -75,7 +75,7 @@
     },
     {
       "path": "apps/worker/src/attendance-command-service.ts",
-      "maxLines": 851,
+      "maxLines": 837,
       "targetLines": 1500
     },
     {
@@ -85,7 +85,7 @@
     },
     {
       "path": "apps/worker/src/ticket-group-mutation-command-service.ts",
-      "maxLines": 359,
+      "maxLines": 352,
       "targetLines": 1500
     },
     {
@@ -130,12 +130,17 @@
     },
     {
       "path": "apps/worker/src/rotation-transition-command-service.ts",
-      "maxLines": 1121,
+      "maxLines": 1114,
       "targetLines": 1500
     },
     {
       "path": "apps/worker/src/rotation-note-command-service.ts",
       "maxLines": 83,
+      "targetLines": 1500
+    },
+    {
+      "path": "apps/worker/src/ticket-group-recall-persistence-service.ts",
+      "maxLines": 136,
       "targetLines": 1500
     }
   ],

@@ -3,10 +3,12 @@ import {
   assertQueueMutationAllowed,
   DomainRuleError,
   planBookingGroupSplit,
-  type TicketGroupRecallEndReason,
 } from "@rundflug/domain";
-import type { StoredTicketGroupRecall } from "./attendance-command-service";
 import { rowToSnapshot } from "./snapshot";
+import type {
+  StoredTicketGroupRecall,
+  TicketGroupRecallClosureInput,
+} from "./ticket-group-recall-persistence-service";
 import type { Env, StoredEventRow } from "./types";
 
 const JSON_HEADERS = { "content-type": "application/json; charset=utf-8" } as const;
@@ -15,15 +17,6 @@ function json(data: unknown, init: ResponseInit = {}): Response {
   const headers = new Headers(init.headers);
   headers.set("content-type", JSON_HEADERS["content-type"]);
   return new Response(JSON.stringify(data), { ...init, headers });
-}
-
-interface RecallClosureInput {
-  recalls: readonly StoredTicketGroupRecall[];
-  eventId: string;
-  reason: TicketGroupRecallEndReason;
-  deviceId: string;
-  now: string;
-  event: CommandResult["event"];
 }
 
 export class TicketGroupMutationCommandService {
@@ -36,7 +29,7 @@ export class TicketGroupMutationCommandService {
       onlyUnexpiredAt?: string,
     ) => Promise<StoredTicketGroupRecall[]>,
     private readonly ticketGroupRecallClosureStatements: (
-      input: RecallClosureInput,
+      input: TicketGroupRecallClosureInput,
     ) => D1PreparedStatement[],
   ) {}
 

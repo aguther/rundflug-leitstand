@@ -15,7 +15,6 @@ import {
   formatBookingGroupLabel,
   type OperationalCommandType,
   planBookingGroupSplit,
-  type TicketGroupRecallEndReason,
 } from "@rundflug/domain";
 import {
   type AnalysisSnapshotCaptureInput,
@@ -23,10 +22,7 @@ import {
   AnalysisSnapshotCaptureService,
 } from "./analysis-snapshot-capture-service";
 import { AssistClaimService } from "./assist-claim-service";
-import {
-  AttendanceCommandService,
-  type StoredTicketGroupRecall,
-} from "./attendance-command-service";
+import { AttendanceCommandService } from "./attendance-command-service";
 import {
   loadCommandPreflightReads,
   type PlannedOperationRow,
@@ -56,6 +52,7 @@ import { RotationRecoveryCommandService } from "./rotation-recovery-command-serv
 import { RotationTransitionCommandService } from "./rotation-transition-command-service";
 import { rowToSnapshot, safeErrorMessage } from "./snapshot";
 import { TicketGroupMutationCommandService } from "./ticket-group-mutation-command-service";
+import { TicketGroupRecallPersistenceService } from "./ticket-group-recall-persistence-service";
 import type { Env, StoredEventRow } from "./types";
 
 const JSON_HEADERS = { "content-type": "application/json; charset=utf-8" } as const;
@@ -84,20 +81,24 @@ export class EventCoordinator extends DurableObject<Env> {
   private forecastWork: Promise<void> | null = null;
   private pendingAutomaticForecast: ForecastRecalculationRequest | null = null;
   private readonly manualForecastQueue: QueuedManualForecastRequest[] = [];
+  private readonly ticketGroupRecallPersistence = new TicketGroupRecallPersistenceService(
+    this.env,
+    (result) => this.broadcast(result),
+  );
   private readonly attendanceCommands = new AttendanceCommandService(
     this.env,
     (result) => this.broadcast(result),
     (promise) => this.ctx.waitUntil(promise),
     (eventId, ticketGroupIds, onlyUnexpiredAt) =>
-      this.loadOpenTicketGroupRecalls(eventId, ticketGroupIds, onlyUnexpiredAt),
-    (input) => this.ticketGroupRecallClosureStatements(input),
+      this.ticketGroupRecallPersistence.loadOpen(eventId, ticketGroupIds, onlyUnexpiredAt),
+    (input) => this.ticketGroupRecallPersistence.closureStatements(input),
   );
   private readonly ticketGroupMutationCommands = new TicketGroupMutationCommandService(
     this.env,
     (result) => this.broadcast(result),
     (eventId, ticketGroupIds, onlyUnexpiredAt) =>
-      this.loadOpenTicketGroupRecalls(eventId, ticketGroupIds, onlyUnexpiredAt),
-    (input) => this.ticketGroupRecallClosureStatements(input),
+      this.ticketGroupRecallPersistence.loadOpen(eventId, ticketGroupIds, onlyUnexpiredAt),
+    (input) => this.ticketGroupRecallPersistence.closureStatements(input),
   );
   private readonly eventAdministrationCommands = new EventAdministrationCommandService(
     this.env,
@@ -174,8 +175,8 @@ export class EventCoordinator extends DurableObject<Env> {
     (result) => this.broadcast(result),
     (promise) => this.ctx.waitUntil(promise),
     (eventId, ticketGroupIds, onlyUnexpiredAt) =>
-      this.loadOpenTicketGroupRecalls(eventId, ticketGroupIds, onlyUnexpiredAt),
-    (input) => this.ticketGroupRecallClosureStatements(input),
+      this.ticketGroupRecallPersistence.loadOpen(eventId, ticketGroupIds, onlyUnexpiredAt),
+    (input) => this.ticketGroupRecallPersistence.closureStatements(input),
     (eventId, resourceGroupId) =>
       this.dispatchRecommendationLeases.eligibleDraftMembers(eventId, resourceGroupId),
   );
@@ -335,7 +336,7 @@ export class EventCoordinator extends DurableObject<Env> {
         .bind(eventId)
         .first<StoredEventRow>();
       if (!event) return;
-      await this.expireTicketGroupRecalls(event);
+      await this.ticketGroupRecallPersistence.expire(event);
       if (event.status === "ACTIVE") {
         await this.scheduleForecastRecalculation(eventId, "AUTOMATIC_FORECAST_TICK");
       }
@@ -378,121 +379,6 @@ export class EventCoordinator extends DurableObject<Env> {
     if ((await this.ctx.storage.getAlarm()) === null) {
       await this.ctx.storage.setAlarm(Date.now() + FORECAST_TICK_INTERVAL_MS);
     }
-  }
-
-  private async loadOpenTicketGroupRecalls(
-    eventId: string,
-    ticketGroupIds: readonly string[],
-    onlyUnexpiredAt?: string,
-  ): Promise<StoredTicketGroupRecall[]> {
-    const distinctGroupIds = [...new Set(ticketGroupIds)];
-    if (distinctGroupIds.length === 0) return [];
-    const groupPlaceholders = distinctGroupIds.map((_, index) => `?${index + 2}`).join(", ");
-    const expiryFilter = onlyUnexpiredAt
-      ? `AND recall.expires_at > ?${distinctGroupIds.length + 2}`
-      : "";
-    const rows = await this.env.DB.prepare(
-      `SELECT recall.id, recall.ticket_group_id, recall.sequence,
-              recall.started_at, recall.expires_at
-         FROM ticket_group_recalls recall
-        WHERE recall.operation_day_id = ?1
-          AND recall.ticket_group_id IN (${groupPlaceholders})
-          AND recall.ended_at IS NULL
-          ${expiryFilter}
-        ORDER BY recall.ticket_group_id`,
-    )
-      .bind(eventId, ...distinctGroupIds, ...(onlyUnexpiredAt ? [onlyUnexpiredAt] : []))
-      .all<StoredTicketGroupRecall>();
-    return rows.results;
-  }
-
-  private ticketGroupRecallClosureStatements(input: {
-    recalls: readonly StoredTicketGroupRecall[];
-    eventId: string;
-    reason: TicketGroupRecallEndReason;
-    deviceId: string;
-    now: string;
-    event: CommandResult["event"];
-  }): D1PreparedStatement[] {
-    return input.recalls.flatMap((recall) => {
-      const result: CommandResult = {
-        accepted: true,
-        duplicate: false,
-        event: input.event,
-        eventType: "TICKET_GROUP_RECALL_CLEARED",
-        aggregate: { type: "TICKET_GROUP_RECALL", id: recall.id },
-      };
-      return [
-        this.env.DB.prepare(
-          `UPDATE ticket_group_recalls
-              SET ended_at = ?1, end_reason = ?2
-            WHERE id = ?3 AND operation_day_id = ?4 AND ended_at IS NULL`,
-        ).bind(input.now, input.reason, recall.id, input.eventId),
-        this.env.DB.prepare(
-          `INSERT INTO operational_events
-            (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type,
-             aggregate_id, aggregate_version, payload_json)
-           VALUES (?1, ?2, 'TICKET_GROUP_RECALL_CLEARED', ?3, ?4,
-                   'TICKET_GROUP_RECALL', ?5, ?6, ?7)`,
-        ).bind(
-          crypto.randomUUID(),
-          input.eventId,
-          input.now,
-          input.deviceId,
-          recall.id,
-          recall.sequence,
-          JSON.stringify({
-            recallId: recall.id,
-            ticketGroupId: recall.ticket_group_id,
-            sequence: recall.sequence,
-            reason: input.reason,
-          }),
-        ),
-        this.env.DB.prepare(
-          `INSERT INTO outbox (id, operation_day_id, topic, payload_json, created_at)
-           VALUES (?1, ?2, 'EVENT_STATE_CHANGED', ?3, ?4)`,
-        ).bind(crypto.randomUUID(), input.eventId, JSON.stringify(result), input.now),
-      ];
-    });
-  }
-
-  private async expireTicketGroupRecalls(event: StoredEventRow): Promise<void> {
-    const now = new Date().toISOString();
-    const due = await this.env.DB.prepare(
-      `SELECT id, ticket_group_id, sequence, started_at, expires_at
-         FROM ticket_group_recalls
-        WHERE operation_day_id = ?1 AND ended_at IS NULL AND expires_at <= ?2
-        ORDER BY expires_at, id
-        LIMIT 20`,
-    )
-      .bind(event.id, now)
-      .all<StoredTicketGroupRecall>();
-    if (due.results.length === 0) return;
-
-    const nextVersion = event.version + 1;
-    const nextEvent = rowToSnapshot({ ...event, version: nextVersion, updated_at: now });
-    const result: CommandResult = {
-      accepted: true,
-      duplicate: false,
-      event: nextEvent,
-      eventType: "TICKET_GROUP_RECALL_EXPIRED",
-      aggregate: { type: "OPERATION_DAY", id: event.id },
-    };
-    await this.env.DB.batch([
-      this.env.DB.prepare(
-        `UPDATE operation_days SET version = ?1, updated_at = ?2
-          WHERE id = ?3 AND version = ?4`,
-      ).bind(nextVersion, now, event.id, event.version),
-      ...this.ticketGroupRecallClosureStatements({
-        recalls: due.results,
-        eventId: event.id,
-        reason: "EXPIRED",
-        deviceId: "SYSTEM",
-        now,
-        event: nextEvent,
-      }),
-    ]);
-    this.broadcast(result);
   }
 
   async webSocketMessage(socket: WebSocket, message: string | ArrayBuffer): Promise<void> {
