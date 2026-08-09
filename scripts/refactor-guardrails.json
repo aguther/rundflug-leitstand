@@ -8,7 +8,7 @@
     },
     {
       "path": "apps/worker/src/index.ts",
-      "maxLines": 2108,
+      "maxLines": 2045,
       "targetLines": 800
     },
     {
@@ -314,6 +314,11 @@
       "targetLines": 1500
     },
     {
+      "path": "apps/worker/src/control-transport-routes.ts",
+      "maxLines": 98,
+      "targetLines": 1500
+    },
+    {
       "path": "apps/worker/src/fids-board-service.ts",
       "maxLines": 139,
       "targetLines": 1500
@@ -488,7 +493,6 @@
     "apps/worker/src/sale-capacity-policy.test.ts -> apps/worker/src/event-coordinator.ts",
     "apps/worker/src/sale-capacity-policy.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/sale-performance.test.ts -> apps/worker/src/event-coordinator.ts",
-    "apps/worker/src/session-only-authorization.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/split-booking-group.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/ticket-data-model.test.ts -> apps/web/src/cashier-view.tsx",
     "apps/worker/src/ticket-data-model.test.ts -> apps/web/src/operation-workspace.tsx",

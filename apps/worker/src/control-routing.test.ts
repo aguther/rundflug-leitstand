@@ -1,11 +1,7 @@
 import { describe, expect, it } from "vitest";
 import workerSource from "./index.ts?raw";
 
-const privateEventRoutes = [
-  ["GET", "/operations"],
-  ["GET", "/live"],
-  ["POST", "/commands"],
-] as const;
+const privateEventRoutes = [["GET", "/operations"]] as const;
 
 describe("content-blocker-neutral private event routing (T-020)", () => {
   it("maps the private API only to the canonical neutral prefix", () => {

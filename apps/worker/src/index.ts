@@ -21,12 +21,13 @@ import { registerAdminMasterDataTemplateRoutes } from "./admin-master-data-templ
 import { registerAdminSecurityRoutes } from "./admin-security-routes";
 import { expireAnalysisArchives, processPendingAnalysisArchives } from "./analysis-archive";
 import { registerAnalysisControlRoutes } from "./analysis-control-routes";
-import { authorizeSession, type SessionActor } from "./auth";
+import type { SessionActor } from "./auth";
 import { registerAuthRoutes } from "./auth-routes";
 import { createPortableBackup, operationDateInTimeZone } from "./backup";
 import { withBookingGroupPartProjection } from "./booking-group-part-projection";
 import { registerControlCoordinationRoutes } from "./control-coordination-routes";
 import { registerControlSessionMiddleware } from "./control-session-middleware";
+import { registerControlTransportRoutes } from "./control-transport-routes";
 import { runD1ReadsSequentially } from "./d1-read-scheduler";
 import { authorizeDevice } from "./device-authorization";
 import { registerDeviceRoutes } from "./device-routes";
@@ -1984,71 +1985,7 @@ registerPublicStatusRoutes(app, unknownTicketResponse);
 registerPublicPushRoutes(app, unknownTicketResponse);
 registerPublicBoardRoutes(app, eventCoordinatorNamespace);
 
-app.on("GET", eventRoutes("/live"), async (context) => {
-  const actor = await authorizeSession(context.env, context.req.raw);
-  if (!actor && context.env.APP_ENV !== "development") {
-    return context.json(
-      { error: { code: "SESSION_REQUIRED", message: "Anmeldung erforderlich." } },
-      401,
-    );
-  }
-  const eventId = context.req.param("eventId");
-  const namespace = eventCoordinatorNamespace(context.env);
-  const stub = namespace.get(namespace.idFromName(eventId));
-  const response = await stub.fetch(context.req.raw);
-  return new Response(response.body, response);
-});
-
-app.on("POST", eventRoutes("/commands"), async (context) => {
-  const eventId = context.req.param("eventId");
-  const actor = context.get("sessionActor");
-  if (!actor && context.env.APP_ENV !== "development") {
-    return context.json(
-      { error: { code: "SESSION_REQUIRED", message: "Anmeldung erforderlich." } },
-      401,
-    );
-  }
-  const namespace = eventCoordinatorNamespace(context.env);
-  const stub = namespace.get(namespace.idFromName(eventId));
-  const target = new URL(context.req.url);
-  target.pathname = `/internal/events/${encodeURIComponent(eventId)}/command`;
-  if (!actor) {
-    const response = await stub.fetch(new Request(target, context.req.raw));
-    return new Response(response.body, response);
-  }
-  const command = (await context.req.json().catch(() => null)) as Record<string, unknown> | null;
-  if (!command) {
-    return context.json(
-      { error: { code: "INVALID_COMMAND", message: "Kommando ist ungültig." } },
-      400,
-    );
-  }
-  const headers = new Headers(context.req.raw.headers);
-  for (const name of [
-    "x-device-id",
-    "x-device-token",
-    "x-operator-account-id",
-    "x-operator-login-code",
-    "x-operator-session-id",
-    "x-operator-role",
-    "x-operator-device-id",
-  ])
-    headers.delete(name);
-  headers.set("content-type", "application/json");
-  headers.set("x-operator-account-id", actor.accountId);
-  headers.set("x-operator-login-code", actor.loginCode);
-  headers.set("x-operator-session-id", actor.sessionId);
-  headers.set("x-operator-role", actor.role);
-  headers.set("x-operator-device-id", actor.deviceId);
-  const response = await stub.fetch(
-    new Request(target, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ ...command, deviceId: actor.deviceId }),
-    }),
-  );
-  return new Response(response.body, response);
-});
+registerControlTransportRoutes(app, eventCoordinatorNamespace);
 
 app.notFound((context) =>
   context.json({ error: { code: "NOT_FOUND", message: "API-Route nicht gefunden." } }, 404),
