@@ -15,7 +15,6 @@ import {
   type EventLogoTheme,
   type FactoryResetResponse,
   type FidsBoardResponse,
-  type FidsBoardRow,
   type FidsFilterOptions,
   factoryResetRequestSchema,
   forecastHistoryQuerySchema,
@@ -44,13 +43,10 @@ import {
   assessForecastFreshness,
   assessMarginalProductCapacity,
   createQueueAvailability,
-  derivePublicForecastProjection,
-  derivePublicRotationStatus,
   deriveResourceGroupCapacity,
   estimateDuration,
   forecastQueueWindows,
   formatBookingGroupLabel,
-  formatBookingGroupPartLabel,
   formatFlightGroupLabel,
   groupSharedFidsFlights,
   orderFidsRows,
@@ -85,10 +81,7 @@ import {
   sessionTimes,
 } from "./auth";
 import { createPortableBackup, operationDateInTimeZone } from "./backup";
-import {
-  bookingGroupPartContextFromColumns,
-  withBookingGroupPartProjection,
-} from "./booking-group-part-projection";
+import { withBookingGroupPartProjection } from "./booking-group-part-projection";
 import { hashPin, randomToken, sha256Hex, verifyCredential, verifyPin } from "./crypto";
 import { runD1ReadsSequentially } from "./d1-read-scheduler";
 import { dailyReportCsv, dailyReportPdfLines, loadDailyReport } from "./daily-report";
@@ -112,14 +105,12 @@ import {
 } from "./factory-reset";
 import { mayAccessFids } from "./fids-authorization";
 import {
-  type FidsProjectionEvent,
   type FidsProjectionFilter,
-  type FidsProjectionRow,
   loadAllFidsProjectionRows,
   loadFidsProjectionEvent,
   loadFidsProjectionFleet,
-  loadFidsProjectionRows,
 } from "./fids-board-projection";
+import { mapFidsProjectionRow } from "./fids-board-response";
 import { loadFidsPreferences } from "./fids-preferences-storage";
 import { buildForecastHistoryStatement } from "./forecast-history";
 import {
@@ -134,6 +125,7 @@ import {
   allowSetupAttempt,
   allowUnknownTicketAttempt,
 } from "./public-access";
+import { registerPublicBoardRoutes } from "./public-board-routes";
 import { registerPublicInstallRoutes } from "./public-install-routes";
 import { registerPublicLogoRoutes } from "./public-logo-routes";
 import { registerPublicPushRoutes } from "./public-push-routes";
@@ -330,101 +322,6 @@ async function validateTemplateAircraft(
     }
   }
   return { existingByRegistration, errors };
-}
-
-function mapFidsProjectionRow(
-  row: FidsProjectionRow,
-  event: FidsProjectionEvent,
-  boardReadAt: string,
-): FidsBoardRow {
-  const forecastFreshness = assessForecastFreshness({
-    predictionQuality: row.prediction_quality,
-    predictionUpdatedAt: row.prediction_updated_at,
-    now: boardReadAt,
-  });
-  const predictionQuality =
-    event.operational_interrupted === 1 ||
-    row.resource_group_status === "INTERRUPTED" ||
-    row.resource_group_status === "ENDED"
-      ? "UNCERTAIN"
-      : forecastFreshness.quality;
-  const waitLowerMinutes = row.prediction_lower_minutes ?? row.projection_index * 20;
-  const waitUpperMinutes = row.prediction_upper_minutes ?? (row.projection_index + 1) * 30;
-  const boardingWindow = predictedBoardingWindow({
-    status: row.status,
-    quality: predictionQuality,
-    predictedBoardingAt: row.predicted_boarding_at,
-    lowerMinutes: waitLowerMinutes,
-    upperMinutes: waitUpperMinutes,
-    referenceAt: boardReadAt,
-  });
-  const publicForecast = derivePublicForecastProjection({
-    rotationStatus: row.status,
-    predictionQuality,
-    predictedBoardingAt: row.predicted_boarding_at,
-    predictedCompletionAt: row.predicted_completion_at,
-    operationsEndAt: event.operations_end_at,
-    dispatchBatchId: row.dispatch_batch_id,
-    dispatchUnplannedReason: row.dispatch_unplanned_reason,
-    emergencyMode: event.emergency_mode === 1,
-    operationalInterrupted: event.operational_interrupted === 1,
-    resourceGroupStatus: row.resource_group_status,
-  });
-  const publishesWindow =
-    publicForecast.forecastState === "DISPATCH_WINDOW" ||
-    publicForecast.forecastState === "LONG_RANGE_WINDOW";
-  const activeRecall = activeTicketGroupRecallProjection(row);
-  const bookingGroupPart = bookingGroupPartContextFromColumns(row);
-  const bookingGroupLabel = bookingGroupPart
-    ? formatBookingGroupPartLabel(row.product_code, row.communication_number, bookingGroupPart)
-    : formatBookingGroupLabel(row.product_code, row.communication_number);
-  const status: FidsBoardRow["status"] =
-    row.resource_group_status !== "ACTIVE"
-      ? "SERVICE_PAUSED"
-      : derivePublicRotationStatus({
-          rotationState: row.status,
-          draftStatus:
-            row.precalled_at !== null
-              ? "COME_TO_FLIGHT_LINE"
-              : row.precall_decision_status === "PREPARE" && predictionQuality !== "UNCERTAIN"
-                ? "PREPARE"
-                : "WAITING",
-        });
-  return {
-    rowId: row.row_id,
-    productId: row.product_id,
-    gateId: row.gate_id,
-    productName: row.product_name,
-    productCode: row.product_code,
-    gateLabel: row.gate_label,
-    communicationNumber: row.communication_number,
-    bookingGroupLabels: [bookingGroupLabel],
-    ticketLabels: Array.from(
-      { length: Math.max(1, row.ticket_count) },
-      (_, ticketIndex) =>
-        `${formatBookingGroupLabel(row.product_code, row.communication_number)}/${ticketIndex + 1}`,
-    ),
-    aircraftRegistration: row.aircraft_registration,
-    departedAt: row.departed_at,
-    status,
-    sharedFlightKey:
-      activeRecall !== null
-        ? null
-        : status === "COME_TO_FLIGHT_LINE" && row.dispatch_batch_id
-          ? `dispatch:${row.dispatch_batch_id}`
-          : ["BOARDING", "IN_FLIGHT", "LANDED", "COMPLETED"].includes(status)
-            ? `rotation:${row.rotation_id}`
-            : null,
-    waitLowerMinutes: publishesWindow ? waitLowerMinutes : 0,
-    waitUpperMinutes: publishesWindow ? waitUpperMinutes : 0,
-    boardingWindowLowerAt: publishesWindow ? boardingWindow.lowerAt : null,
-    boardingWindowUpperAt: publishesWindow ? boardingWindow.upperAt : null,
-    ...publicForecast,
-    predictionQuality,
-    dispatchOrder: row.dispatch_order,
-    operationalNotice: row.planned_public_note || row.resource_group_operational_note,
-    activeRecall,
-  };
 }
 
 app.use("*", async (context, next) => {
@@ -6975,108 +6872,7 @@ registerPublicInstallRoutes(app);
 
 registerPublicStatusRoutes(app, unknownTicketResponse);
 registerPublicPushRoutes(app, unknownTicketResponse);
-
-app.get("/api/public/events/:eventId/board", async (context) => {
-  const requestStartedAt = performance.now();
-  const eventId = context.req.param("eventId");
-  const requestedGateId = context.req.query("gateId")?.trim() || null;
-  const event = await loadFidsProjectionEvent(context.env.DB, eventId);
-  if (!event) {
-    return context.json(
-      { error: { code: "EVENT_NOT_FOUND", message: "Veranstaltung nicht gefunden." } },
-      404,
-    );
-  }
-  const selectedGate = requestedGateId
-    ? await withGateDisplayFilterFallback((mode) => {
-        const displayFilterProjection =
-          mode === "current"
-            ? "display_filter_json"
-            : `'${EMPTY_GATE_DISPLAY_FILTER_JSON}' AS display_filter_json`;
-        return context.env.DB.prepare(
-          `SELECT id, label, ${displayFilterProjection} FROM gates
-            WHERE id = ?1 AND operation_day_id = ?2 AND active = 1`,
-        )
-          .bind(requestedGateId, eventId)
-          .first<{ id: string; label: string; display_filter_json: string }>();
-      })
-    : null;
-  if (requestedGateId && !selectedGate) {
-    return context.json(
-      { error: { code: "GATE_NOT_FOUND", message: "Anzeige-Gate nicht gefunden." } },
-      404,
-    );
-  }
-  const displayFilter: GateDisplayFilter = selectedGate
-    ? gateDisplayFilterSchema.parse(JSON.parse(selectedGate.display_filter_json))
-    : { productIds: [], rotationStatuses: [] };
-  const boardReadAt = new Date().toISOString();
-  const departedVisibilityCutoff = new Date(
-    Date.now() - event.departed_visibility_seconds * 1_000,
-  ).toISOString();
-  const projectionFilter: FidsProjectionFilter = {
-    productIds: displayFilter.productIds,
-    gateIds: requestedGateId ? [requestedGateId] : [],
-    rotationStatuses: displayFilter.rotationStatuses,
-  };
-  const rows =
-    event.emergency_mode === 1
-      ? []
-      : await loadFidsProjectionRows(context.env.DB, {
-          eventId,
-          filter: projectionFilter,
-          departedVisibilityCutoff,
-          now: boardReadAt,
-          band: "ALL",
-          limit: 20,
-          offset: 0,
-        });
-  const fleet =
-    event.emergency_mode === 1 ? [] : await loadFidsProjectionFleet(context.env.DB, eventId);
-  const response = context.json({
-    eventName: event.name,
-    timeZone: event.time_zone,
-    selectedGate: selectedGate
-      ? { id: selectedGate.id, label: selectedGate.label, displayFilter }
-      : null,
-    emergencyMode: event.emergency_mode === 1,
-    operationalInterrupted: event.operational_interrupted === 1,
-    operationalNotice: event.planned_public_note || event.operational_note,
-    departedVisibilitySeconds: event.departed_visibility_seconds,
-    updatedAt: event.updated_at,
-    groups: rows.map((row) => {
-      const {
-        rowId: _rowId,
-        productId: _productId,
-        gateId: _gateId,
-        bookingGroupLabels: _bookingGroupLabels,
-        sharedFlightKey: _sharedFlightKey,
-        ...group
-      } = mapFidsProjectionRow(row, event, boardReadAt);
-      return group;
-    }),
-    fleet: event.emergency_mode
-      ? []
-      : fleet.map((aircraft) => ({
-          registration: aircraft.registration,
-          status: aircraft.operational_state,
-          refuelPlanned: aircraft.refuel_planned === 1,
-        })),
-  });
-  response.headers.set(
-    "server-timing",
-    `public-board;dur=${(performance.now() - requestStartedAt).toFixed(1)}`,
-  );
-  return response;
-});
-
-app.all("/api/public/events/:eventId/live", async (context) => {
-  const eventId = context.req.param("eventId");
-  const namespace = eventCoordinatorNamespace(context.env);
-  const stub = namespace.get(namespace.idFromName(eventId));
-  const response = await stub.fetch(context.req.raw);
-  return new Response(response.body, response);
-});
+registerPublicBoardRoutes(app, eventCoordinatorNamespace);
 
 app.on("GET", eventRoutes("/live"), async (context) => {
   const actor = await authorizeSession(context.env, context.req.raw);

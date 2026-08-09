@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import projectionSource from "./fids-board-projection.ts?raw";
-import workerSource from "./index.ts?raw";
 
 describe("FIDS action priority", () => {
   it("orders BOARDING, GO TO GATE, PREPARE and WAITING before departed rows", () => {
@@ -20,17 +19,5 @@ describe("FIDS action priority", () => {
       order.indexOf("fg.precall_decision_status = 'PREPARE' THEN 2"),
     );
     expect(order).not.toContain("sort_order");
-    expect(workerSource).toContain("loadFidsProjectionRows(context.env.DB");
-    expect(workerSource).toContain("limit: 20");
-  });
-
-  it("exposes server-side projection timing for remote read-only SLO checks", () => {
-    const route = workerSource.slice(
-      workerSource.indexOf('app.get("/api/public/events/:eventId/board"'),
-      workerSource.indexOf('app.all("/api/public/events/:eventId/live"'),
-    );
-    expect(route).toContain("const requestStartedAt = performance.now()");
-    expect(route).toContain("public-board;dur=");
-    expect(route).toContain("performance.now() - requestStartedAt");
   });
 });

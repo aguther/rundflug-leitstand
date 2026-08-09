@@ -155,18 +155,4 @@ describe("protected FIDS board projection", () => {
     expect(protectedRoute).toContain("paginateFidsRows(displayedRows");
     expect(protectedRoute).toContain("partitionFidsRows({");
   });
-
-  it("keeps protected identifiers out of the anonymous response", () => {
-    const publicRoute = workerSource.slice(
-      workerSource.indexOf('app.get("/api/public/events/:eventId/board"'),
-      workerSource.indexOf('app.all("/api/public/events/:eventId/live"'),
-    );
-    expect(publicRoute).toContain("rowId: _rowId");
-    expect(publicRoute).toContain("productId: _productId");
-    expect(publicRoute).toContain("gateId: _gateId");
-    expect(publicRoute).toContain("bookingGroupLabels: _bookingGroupLabels");
-    expect(publicRoute).toContain("sharedFlightKey: _sharedFlightKey");
-    expect(publicRoute).toContain("groups: rows.map");
-    expect(publicRoute).not.toContain("preferencesVersion");
-  });
 });

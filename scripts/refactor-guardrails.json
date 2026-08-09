@@ -8,7 +8,7 @@
     },
     {
       "path": "apps/worker/src/index.ts",
-      "maxLines": 7202,
+      "maxLines": 6998,
       "targetLines": 800
     },
     {
@@ -166,6 +166,16 @@
     {
       "path": "apps/worker/src/public-logo-routes.ts",
       "maxLines": 67,
+      "targetLines": 1500
+    },
+    {
+      "path": "apps/worker/src/fids-board-response.ts",
+      "maxLines": 109,
+      "targetLines": 1500
+    },
+    {
+      "path": "apps/worker/src/public-board-routes.ts",
+      "maxLines": 138,
       "targetLines": 1500
     }
   ],
@@ -333,7 +343,6 @@
     "apps/worker/src/planning-capture.test.ts -> apps/worker/src/factory-reset.ts",
     "apps/worker/src/planning-capture.test.ts -> apps/worker/src/planning-capture.ts",
     "apps/worker/src/public-board-priority.test.ts -> apps/worker/src/fids-board-projection.ts",
-    "apps/worker/src/public-board-priority.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/public-status-v18.test.ts -> apps/worker/src/public-status-copy.ts",
     "apps/worker/src/pwa-installability.test.ts -> apps/web/vite.config.ts",
     "apps/worker/src/resource-day-history-route.test.ts -> apps/worker/src/index.ts",
