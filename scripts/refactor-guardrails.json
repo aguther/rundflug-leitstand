@@ -8,7 +8,7 @@
     },
     {
       "path": "apps/worker/src/index.ts",
-      "maxLines": 6184,
+      "maxLines": 5987,
       "targetLines": 800
     },
     {
@@ -206,6 +206,11 @@
     {
       "path": "apps/worker/src/setup-routes.ts",
       "maxLines": 205,
+      "targetLines": 1500
+    },
+    {
+      "path": "apps/worker/src/factory-reset-routes.ts",
+      "maxLines": 264,
       "targetLines": 1500
     }
   ],

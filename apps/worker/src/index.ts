@@ -8,10 +8,8 @@ import {
   analysisSnapshotSchema,
   cloneEventRequestSchema,
   type EventLogoTheme,
-  type FactoryResetResponse,
   type FidsBoardResponse,
   type FidsFilterOptions,
-  factoryResetRequestSchema,
   forecastHistoryQuerySchema,
   forecastHistorySchema,
   type GateDisplayFilter,
@@ -69,7 +67,7 @@ import { authorizeSession, type SessionActor, sessionBrowserBindingHash } from "
 import { registerAuthRoutes } from "./auth-routes";
 import { createPortableBackup, operationDateInTimeZone } from "./backup";
 import { withBookingGroupPartProjection } from "./booking-group-part-projection";
-import { sha256Hex, verifyCredential, verifyPin } from "./crypto";
+import { sha256Hex, verifyCredential } from "./crypto";
 import { runD1ReadsSequentially } from "./d1-read-scheduler";
 import { dailyReportCsv, dailyReportPdfLines, loadDailyReport } from "./daily-report";
 import { authorizeDevice } from "./device-authorization";
@@ -85,12 +83,7 @@ import {
   readEventLogoBytes,
   validateEventLogo,
 } from "./event-logo";
-import {
-  clearFactoryResetCoordinators,
-  factoryResetRequestHash,
-  factoryResetStatements,
-  finishR2Cleanup,
-} from "./factory-reset";
+import { registerFactoryResetRoutes } from "./factory-reset-routes";
 import { mayAccessFids } from "./fids-authorization";
 import {
   type FidsProjectionFilter,
@@ -107,7 +100,7 @@ import {
 } from "./gate-display-filter-storage";
 import { loadMasterDataExportProjection } from "./master-data-export";
 import { buildOperationalHistoryStatement } from "./operational-history";
-import { allowLoginAttempt, allowUnknownTicketAttempt } from "./public-access";
+import { allowUnknownTicketAttempt } from "./public-access";
 import { registerPublicBoardRoutes } from "./public-board-routes";
 import { registerPublicInstallRoutes } from "./public-install-routes";
 import { registerPublicLogoRoutes } from "./public-logo-routes";
@@ -123,7 +116,6 @@ import {
   limitApiBody,
   requireValidJsonBody,
 } from "./request-body-boundaries";
-import { resetSetupCookie, resetSetupGrantExpiry, resetSetupToken } from "./reset-setup-grant";
 import {
   buildAircraftBlockStatement,
   buildPilotPauseEventStatement,
@@ -461,196 +453,7 @@ registerAuthRoutes(app);
 registerAdminAccountRoutes(app);
 registerAdminSecurityRoutes(app);
 registerAdminEventRoutes(app);
-
-app.post("/api/admin/events/:eventId/factory-reset", async (context) => {
-  const parsed = factoryResetRequestSchema.safeParse(await context.req.json().catch(() => null));
-  if (!parsed.success || parsed.data.eventId !== context.req.param("eventId")) {
-    return context.json(
-      { error: { code: "INVALID_FACTORY_RESET", message: "Reset-Daten sind unvollständig." } },
-      400,
-    );
-  }
-  const input = parsed.data;
-  const requestHash = await factoryResetRequestHash(input);
-  const prior = await context.env.DB.prepare(
-    `SELECT request_hash, completed_at, r2_cleanup_pending, response_json,
-            setup_browser_binding_hash
-       FROM system_reset_receipts WHERE command_id = ?1`,
-  )
-    .bind(input.commandId)
-    .first<{
-      request_hash: string;
-      completed_at: string;
-      r2_cleanup_pending: number;
-      response_json: string;
-      setup_browser_binding_hash: string | null;
-    }>();
-  if (prior) {
-    const browserBindingHash = await sessionBrowserBindingHash(context.req.raw);
-    if (
-      !browserBindingHash ||
-      !prior.setup_browser_binding_hash ||
-      browserBindingHash !== prior.setup_browser_binding_hash
-    ) {
-      return context.json(
-        { error: { code: "ADMIN_REQUIRED", message: "Administration erforderlich." } },
-        403,
-      );
-    }
-    if (prior.request_hash !== requestHash) {
-      return context.json(
-        { error: { code: "IDEMPOTENCY_CONFLICT", message: "Reset-ID ist bereits belegt." } },
-        409,
-      );
-    }
-    let response = JSON.parse(prior.response_json) as FactoryResetResponse;
-    if (prior.r2_cleanup_pending) {
-      response = await finishR2Cleanup(context.env, input.commandId, response);
-    }
-    const token = await resetSetupToken(context.env, input.commandId, prior.completed_at);
-    if (token) context.header("set-cookie", resetSetupCookie(token, context.req.raw));
-    return context.json(response);
-  }
-
-  const actor = await authorizeSession(context.env, context.req.raw);
-  const authorized = await authorizeDevice(context.env, input.eventId, context.req.raw, actor);
-  if (actor?.role !== "ADMIN" || authorized?.role !== "ADMIN") {
-    return context.json(
-      { error: { code: "ADMIN_REQUIRED", message: "Administration erforderlich." } },
-      403,
-    );
-  }
-  const browserBindingHash = await sessionBrowserBindingHash(context.req.raw);
-  if (!browserBindingHash) {
-    return context.json(
-      { error: { code: "ADMIN_REQUIRED", message: "Administration erforderlich." } },
-      403,
-    );
-  }
-  if (
-    !(await allowLoginAttempt(
-      context.env.ADMIN_RECOVERY_RATE_LIMITER,
-      context.req.raw,
-      actor.accountId,
-    ))
-  ) {
-    return context.json(
-      { error: { code: "ADMIN_REQUIRED", message: "Administration erforderlich." } },
-      429,
-      { "retry-after": "60" },
-    );
-  }
-  const account = await context.env.DB.prepare(
-    `SELECT pin_hash FROM operator_accounts
-      WHERE id = ?1 AND active = 1 AND deleted_at IS NULL`,
-  )
-    .bind(actor.accountId)
-    .first<{ pin_hash: string }>();
-  if (!account || !(await verifyPin(input.adminPin, account.pin_hash))) {
-    return context.json(
-      { error: { code: "ADMIN_REQUIRED", message: "Administration erforderlich." } },
-      403,
-    );
-  }
-  const completedAt = new Date();
-  const grantToken = await resetSetupToken(context.env, input.commandId, completedAt.toISOString());
-  if (!grantToken) {
-    return context.json(
-      {
-        error: {
-          code: "RESET_SETUP_NOT_CONFIGURED",
-          message: "Der sichere Einrichtungsübergang ist serverseitig nicht konfiguriert.",
-        },
-      },
-      503,
-    );
-  }
-  const grantHash = await sha256Hex(grantToken);
-  const grantExpiresAt = resetSetupGrantExpiry(completedAt);
-
-  const eventRows = await context.env.DB.prepare("SELECT id FROM operation_days").all<{
-    id: string;
-  }>();
-  let recoveryBackupKey: string | null = null;
-  if (input.retainRecoveryBackup) {
-    try {
-      recoveryBackupKey = (await createPortableBackup(context.env, new Date(), "FACTORY_RESET"))
-        .key;
-    } catch {
-      return context.json(
-        {
-          error: {
-            code: "FACTORY_RESET_BACKUP_FAILED",
-            message: "Die Wiederherstellungssicherung konnte nicht erstellt werden.",
-          },
-        },
-        500,
-      );
-    }
-  }
-  const coordinator = eventCoordinatorNamespace(context.env);
-  try {
-    await clearFactoryResetCoordinators(
-      coordinator,
-      eventRows.results.map(({ id }) => id),
-    );
-  } catch {
-    return context.json(
-      {
-        error: {
-          code: "FACTORY_RESET_COORDINATOR_FAILED",
-          message:
-            "Die laufenden Veranstaltungskoordinatoren konnten nicht vollständig geleert werden.",
-        },
-      },
-      500,
-    );
-  }
-
-  const response: FactoryResetResponse = {
-    resetComplete: true,
-    setupRequired: true,
-    recoveryBackupKey,
-    r2BackupsDeleted: false,
-  };
-  try {
-    await context.env.DB.batch(
-      factoryResetStatements(
-        context.env,
-        input.commandId,
-        requestHash,
-        completedAt.toISOString(),
-        input.deleteAllBackups,
-        response,
-        grantHash,
-        grantExpiresAt,
-        browserBindingHash,
-      ),
-    );
-  } catch {
-    return context.json(
-      {
-        error: {
-          code: "FACTORY_RESET_DATABASE_FAILED",
-          message: "Die Anwendungsdaten konnten nicht vollständig zurückgesetzt werden.",
-        },
-      },
-      500,
-    );
-  }
-  if (input.deleteAllBackups) {
-    try {
-      const completedResponse = await finishR2Cleanup(context.env, input.commandId, response);
-      context.header("set-cookie", resetSetupCookie(grantToken, context.req.raw));
-      return context.json(completedResponse);
-    } catch {
-      context.header("set-cookie", resetSetupCookie(grantToken, context.req.raw));
-      return context.json(response, 202);
-    }
-  }
-  context.header("set-cookie", resetSetupCookie(grantToken, context.req.raw));
-  return context.json(response);
-});
+registerFactoryResetRoutes(app);
 
 app.get("/api/admin/events/:eventId/master-data-template", async (context) => {
   const eventId = context.req.param("eventId");
