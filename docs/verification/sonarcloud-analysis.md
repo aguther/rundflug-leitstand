@@ -16,10 +16,11 @@ startet danach den im Lockfile versionierten NPM-Scanner. Für die Übermittlung
 der Umgebung gesetzt sein. Der Wert darf weder in das Repository noch in Shell-Historien, Logs oder
 Kommandozeilenparameter geschrieben werden.
 
-Der instrumentierte Coverage-Lauf lässt ausschließlich den zeitabhängigen 300-Gruppen-Benchmark aus,
-weil die V8-Instrumentierung dessen unveränderte Zwei-Sekunden-Grenze verfälscht. Der Benchmark bleibt
-vollständig Bestandteil von `npm test`, `npm run build` und `npm run check`; alle übrigen Forecast-Tests
-tragen weiterhin zum LCOV-Bericht bei.
+Der instrumentierte Coverage-Lauf lässt die rechenintensiven Forecast-Simulationen in
+`engine.test.ts` und `comparison.test.ts` aus. Die V8-Instrumentierung verlängert diese Tests so stark,
+dass ihre für normale Testläufe bemessenen Zeitgrenzen überschritten werden. Beide Dateien bleiben
+vollständig Bestandteil von `npm test`, `npm run build` und `npm run check`. Die übrigen Unit- und
+Integrationstests erzeugen weiterhin den LCOV-Bericht für die SonarQube-Analyse.
 
 ```text
 npm run sonar
@@ -31,9 +32,8 @@ ausschließlich dem optionalen Analyselauf und verändern den normalen Build nic
 
 ## GitHub Actions
 
-Der von SonarQube Cloud vorgegebene Workflow `.github/workflows/build.yml` läuft getrennt von der
-lokalen und serverunabhängigen
-CI-Prüfung:
+Die GitHub-CI in `.github/workflows/ci.yml` führt die Repository-Prüfung und die SonarQube-Analyse in
+einem gemeinsamen Workflow aus:
 
 - bei Änderungen auf `main`,
 - bei internen Pull Requests,
@@ -45,8 +45,8 @@ Analyse berechtigten SonarQube-Cloud-Token eingerichtet sein. Fehlt das Secret b
 Lauf, kann die offizielle, versionsgenau gepinnte SonarSource-Action keine Analyse übertragen. Vor der
 Action installiert der Job die festgelegte Node-/npm-Toolchain, erzeugt den LCOV-Bericht und wartet
 anschließend höchstens fünf Minuten auf das Quality Gate. Ein nicht bestandenes Gate lässt den
-separaten Job fehlschlagen.
+gemeinsamen Job fehlschlagen.
 
-Ein Ausfall von SonarQube Cloud blockiert dadurch den Sonar-Job, aber weder `npm run build` noch
-`npm run check`. Eine lokale Freigabe stützt sich weiterhin auf die Repository-Prüfung; Historie,
-zentrale Issues und das Quality Gate stammen aus SonarQube Cloud.
+Ein Ausfall von SonarQube Cloud kann den gemeinsamen GitHub-Job blockieren, aber weder
+`npm run build` noch `npm run check`. Eine lokale Freigabe stützt sich weiterhin auf die
+Repository-Prüfung; Historie, zentrale Issues und das Quality Gate stammen aus SonarQube Cloud.

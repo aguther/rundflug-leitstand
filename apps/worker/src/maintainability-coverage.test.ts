@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import sonarWorkflow from "../../../.github/workflows/build.yml?raw";
 import ciWorkflow from "../../../.github/workflows/ci.yml?raw";
 import cloudflarePerformanceWorkflow from "../../../.github/workflows/cloudflare-performance.yml?raw";
 import deployCloudflareWorkflow from "../../../.github/workflows/deploy-cloudflare.yml?raw";
@@ -86,12 +85,7 @@ describe("V1 maintainability and portability boundaries", () => {
       "vitest run apps/worker/src/maintainability-coverage.test.ts packages/contracts/src/index.test.ts packages/domain/src/index.test.ts apps/web/src/api.test.ts",
     );
     expect(ciWorkflow).toContain("npm run check:ci");
-    for (const workflow of [
-      ciWorkflow,
-      sonarWorkflow,
-      deployCloudflareWorkflow,
-      cloudflarePerformanceWorkflow,
-    ]) {
+    for (const workflow of [ciWorkflow, deployCloudflareWorkflow, cloudflarePerformanceWorkflow]) {
       expect(workflow).toContain("actions/checkout@v7");
       expect(workflow).toContain("actions/setup-node@v7");
       expect(workflow).toContain("node-version-file: .nvmrc");
@@ -109,17 +103,21 @@ describe("V1 maintainability and portability boundaries", () => {
     expect(rootManifest.scripts).toMatchObject({
       sonar: "npm run test:coverage && sonar-scanner-npm",
       "test:coverage":
-        'vitest run --coverage --exclude=apps/web/src/features/forecast-simulation/engine.test.ts --testNamePattern="^(?!.*projects all 300 eligible groups beyond the bounded dispatch horizon).*$"',
+        'vitest run --coverage --exclude=apps/web/src/features/forecast-simulation/engine.test.ts --exclude=apps/web/src/features/forecast-simulation/comparison.test.ts --testNamePattern="^(?!.*projects all 300 eligible groups beyond the bounded dispatch horizon).*$"',
     });
     expect(rootManifest.scripts?.build).not.toContain("sonar");
     expect(rootManifest.scripts?.check).not.toContain("sonar");
     expect(sonarProperties).toContain("sonar.projectKey=aguther_rundflug-leitstand");
     expect(sonarProperties).toContain("sonar.javascript.lcov.reportPaths=coverage/lcov.info");
-    expect(sonarWorkflow).toContain(`SONAR_TOKEN: \${{ secrets.SONAR_TOKEN }}`);
-    expect(sonarWorkflow).toContain(
+    expect(ciWorkflow).toContain(`SONAR_TOKEN: \${{ secrets.SONAR_TOKEN }}`);
+    expect(ciWorkflow).toContain("fetch-depth: 0");
+    expect(ciWorkflow).toContain(
+      "github.event.pull_request.head.repo.full_name == github.repository",
+    );
+    expect(ciWorkflow).toContain(
       "SonarSource/sonarqube-scan-action@7006c4492b2e0ee0f816d36501671557c97f5995",
     );
-    expect(sonarWorkflow).toContain("-Dsonar.qualitygate.wait=true");
+    expect(ciWorkflow).toContain("-Dsonar.qualitygate.wait=true");
   });
 
   it("uses a deliberately small allowlist of common open-source runtime and build dependencies", () => {

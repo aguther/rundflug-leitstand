@@ -23,7 +23,7 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "vitest run",
     "test:ci": "vitest run apps/worker/src/maintainability-coverage.test.ts packages/contracts/src/index.test.ts packages/domain/src/index.test.ts apps/web/src/api.test.ts",
-    "test:coverage": "vitest run --coverage --exclude=apps/web/src/features/forecast-simulation/engine.test.ts --testNamePattern=\"^(?!.*projects all 300 eligible groups beyond the bounded dispatch horizon).*$\"",
+    "test:coverage": "vitest run --coverage --exclude=apps/web/src/features/forecast-simulation/engine.test.ts --exclude=apps/web/src/features/forecast-simulation/comparison.test.ts --testNamePattern=\"^(?!.*projects all 300 eligible groups beyond the bounded dispatch horizon).*$\"",
     "test:outage-recovery": "node scripts/verify_outage_recovery.mjs",
     "test:emergency-mode": "node scripts/verify_emergency_mode.mjs",
     "test:master-data": "node scripts/verify_master_data.mjs",
