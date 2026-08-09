@@ -5,7 +5,7 @@ import projectionSource from "./master-data-export.ts?raw";
 
 const routeStart = workerSource.indexOf('eventRoutes("/exports/simulation-plan.json")');
 const routeEnd = workerSource.indexOf(
-  'app.post("/api/admin/events/:eventId/master-data-template/validate"',
+  'app.post("/api/admin/events/:sourceEventId/clone"',
   routeStart,
 );
 const exportRouteSource = workerSource.slice(routeStart, routeEnd);
