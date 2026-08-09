@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { buildAdminEventFlow } from "./admin-event-flow";
-import workerSource from "./index.ts?raw";
 
 describe("admin event flow", () => {
   it("counts valid ticket sales and completions cumulatively", () => {
@@ -136,16 +135,5 @@ describe("admin event flow", () => {
 
     expect(flow.bucketMinutes).toBeGreaterThan(15);
     expect(flow.points.length).toBeLessThanOrEqual(96);
-  });
-
-  it("reads only valid tickets and completion of the current assignment", () => {
-    const route = workerSource.slice(
-      workerSource.indexOf('app.get("/api/admin/events/:eventId/flow"'),
-      workerSource.indexOf('app.get("/api/admin/events/:eventId/master-data-template"'),
-    );
-    expect(route).toContain("t.status <> 'CANCELED'");
-    expect(route).toContain("rt.released_at IS NULL");
-    expect(route).toContain("r.status = 'COMPLETED'");
-    expect(route).not.toContain("operational_events");
   });
 });

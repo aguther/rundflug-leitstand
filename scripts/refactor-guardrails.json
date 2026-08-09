@@ -8,7 +8,7 @@
     },
     {
       "path": "apps/worker/src/index.ts",
-      "maxLines": 6445,
+      "maxLines": 6346,
       "targetLines": 800
     },
     {
@@ -197,6 +197,11 @@
       "path": "apps/worker/src/admin-security-routes.ts",
       "maxLines": 186,
       "targetLines": 1500
+    },
+    {
+      "path": "apps/worker/src/admin-event-routes.ts",
+      "maxLines": 124,
+      "targetLines": 1500
     }
   ],
   "allowedProductionRawImports": [
@@ -316,7 +321,6 @@
     "apps/web/src/v19-ui.test.ts -> apps/web/src/FeatureRouter.tsx",
     "apps/web/src/v19-ui.test.ts -> apps/web/src/cashier-view.tsx",
     "apps/web/src/v19-ui.test.ts -> apps/web/src/operation-workspace.tsx",
-    "apps/worker/src/admin-event-flow.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/admin-master-data-template.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/analysis-snapshot.test.ts -> apps/worker/src/analysis-snapshot.ts",
     "apps/worker/src/analysis-snapshot.test.ts -> apps/worker/src/index.ts",
