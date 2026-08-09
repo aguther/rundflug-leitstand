@@ -761,7 +761,9 @@ describe("local forecast simulation", () => {
   );
 
   it("retains diagnostic raw times and reasons while hard uncertainty hides the countdown", () => {
-    const result = runSimulation(simulationConfigForPreset("OPERATION_INTERRUPTION"));
+    const config = shortNormalConfig();
+    config.preset = "OPERATION_INTERRUPTION";
+    const result = runSimulation(config);
     const uncertain = result.snapshots.find(
       (snapshot) =>
         snapshot.status === "DRAFT" &&
