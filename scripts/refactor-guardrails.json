@@ -8,7 +8,7 @@
     },
     {
       "path": "apps/worker/src/index.ts",
-      "maxLines": 7985,
+      "maxLines": 7569,
       "targetLines": 800
     },
     {
@@ -151,6 +151,11 @@
     {
       "path": "apps/worker/src/public-status-projection.ts",
       "maxLines": 62,
+      "targetLines": 1500
+    },
+    {
+      "path": "apps/worker/src/public-status-routes.ts",
+      "maxLines": 455,
       "targetLines": 1500
     }
   ],
@@ -319,7 +324,6 @@
     "apps/worker/src/planning-capture.test.ts -> apps/worker/src/planning-capture.ts",
     "apps/worker/src/public-board-priority.test.ts -> apps/worker/src/fids-board-projection.ts",
     "apps/worker/src/public-board-priority.test.ts -> apps/worker/src/index.ts",
-    "apps/worker/src/public-status-v18.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/public-status-v18.test.ts -> apps/worker/src/public-status-copy.ts",
     "apps/worker/src/pwa-installability.test.ts -> apps/web/vite.config.ts",
     "apps/worker/src/resource-day-history-route.test.ts -> apps/worker/src/index.ts",
@@ -338,7 +342,6 @@
     "apps/worker/src/ticket-data-model.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/ticket-group-recall.test.ts -> apps/web/src/features/public-status/PublicStatusContent.tsx",
     "apps/worker/src/ticket-group-recall.test.ts -> apps/web/src/fids-display.tsx",
-    "apps/worker/src/ticket-group-recall.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/ticket-group-recall.test.ts -> apps/worker/src/web-push.ts",
     "apps/worker/src/ticket-group-recall.test.ts -> packages/contracts/src/index.ts",
     "apps/worker/src/ticket-group-recall.test.ts -> packages/domain/src/index.ts",

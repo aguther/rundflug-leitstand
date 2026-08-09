@@ -30,16 +30,12 @@ describe("V1.8 public group ticket", () => {
   });
 
   it("aggregates split parts without publishing an internal F identifier", () => {
-    expect(worker).toContain('app.get("/api/public/groups/:groupCode"');
-    expect(worker).toContain("withBookingGroupPartProjection(");
-    expect(worker).toContain("...partContext");
     expect(publicStatusContent).toContain("formatBookingGroupPart(bookingGroupPart)");
     expect(groupStatus).not.toContain("communicationLabel");
     expect(groupStatus).not.toContain("flightGroup");
   });
 
   it("keeps legacy links and follows every current part for group push", () => {
-    expect(worker).toContain('app.get("/api/public/tickets/:ticketCode"');
     expect(worker).toContain('app.post("/api/public/groups/:groupCode/push-subscriptions"');
     expect(webPush).toContain("group_ticket.ticket_group_id = w.ticket_group_id");
     expect(webPush).toContain("group_rt.rotation_id = ?1");

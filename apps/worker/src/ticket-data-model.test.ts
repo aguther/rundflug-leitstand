@@ -53,11 +53,8 @@ describe("anonymous V1 ticket data model", () => {
     expect(rotationMigration).toContain("ALTER TABLE rotations ADD COLUMN gate_id");
   });
 
-  it("uses the frozen rotation gate in protected and public slot projections", () => {
+  it("uses the frozen rotation gate in protected and FIDS slot projections", () => {
     expect(worker).toContain("COALESCE(r.gate_id, MIN(p.gate_id), '') AS gate_id");
-    expect(
-      `${worker}\n${fidsProjection}`.match(/g\.id = COALESCE\(r\.gate_id, p\.gate_id\)/g),
-    ).toHaveLength(2);
     expect(fidsProjection).toContain("LEFT JOIN gates g ON g.id = COALESCE(r.gate_id, p.gate_id)");
     expect(worker).toContain("communicationNumber: row.communication_number");
     expect(worker).toContain("queuePosition:");

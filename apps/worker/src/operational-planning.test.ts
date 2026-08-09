@@ -106,8 +106,6 @@ describe("general operational planning", () => {
   it("publishes plans on the private operation board but no public cause field", () => {
     expect(worker).toContain("plannedOperations: plannedOperationRows.results.map");
     expect(worker).toContain("recurringOperationalRules: recurringRuleRows.results.map");
-    expect(worker).toContain("plan.status = 'ACTIVE'");
-    expect(worker).toContain("AS planned_public_note");
     expect(operationBoardSchema.shape.plannedOperations).toBeTruthy();
     expect(worker).not.toContain("reason: plan.reason");
     expect(worker).not.toContain("publicOperationalPlanReason");

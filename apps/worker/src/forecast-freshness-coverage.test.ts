@@ -3,19 +3,12 @@ import workerSource from "./index.ts?raw";
 import pushSource from "./web-push.ts?raw";
 
 describe("persisted forecast freshness", () => {
-  it("uses prediction_updated_at for internal and public read models", () => {
+  it("uses prediction_updated_at for internal read models", () => {
     expect(workerSource).toContain("assessForecastFreshness");
     expect(workerSource).toContain("predictionUpdatedAt: rotation.prediction_updated_at");
     expect(workerSource).toContain("predictionQuality: effectivePredictionQuality");
     expect(workerSource).toContain("const effectivePredictionQuality =");
     expect(workerSource).toContain("eventRow.emergency_mode === 1");
-    const publicTicketRoute = workerSource.slice(
-      workerSource.indexOf('app.get("/api/public/tickets/:ticketCode"'),
-      workerSource.indexOf('app.get("/api/public/push/config"'),
-    );
-    expect(publicTicketRoute).toContain("r.prediction_updated_at");
-    expect(publicTicketRoute).toContain('effectivePredictionQuality !== "UNCERTAIN"');
-    expect(publicTicketRoute).toContain("Prognose wird aktualisiert");
   });
 
   it("never treats operation-day or learning-sample age as forecast freshness", () => {

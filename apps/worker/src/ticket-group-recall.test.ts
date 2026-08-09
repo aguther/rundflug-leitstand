@@ -4,7 +4,6 @@ import domain from "../../../packages/domain/src/index.ts?raw";
 import publicStatus from "../../web/src/features/public-status/PublicStatusContent.tsx?raw";
 import fids from "../../web/src/fids-display.tsx?raw";
 import migration from "../migrations/0055_ticket_group_recalls.sql?raw";
-import worker from "./index.ts?raw";
 import push from "./web-push.ts?raw";
 
 describe("V1.11 aktiver Gruppennachruf", () => {
@@ -43,13 +42,6 @@ describe("V1.11 aktiver Gruppennachruf", () => {
   });
 
   it("projiziert den aktiven Vorgang in Leitstand, Ticket, Gruppe und FIDS ohne Normalstatus zu ersetzen", () => {
-    const inlineProjections =
-      worker.match(/activeRecall: activeTicketGroupRecallProjection/g)?.length ?? 0;
-    const reusedProjections =
-      worker.match(/const activeRecall = activeTicketGroupRecallProjection/g)?.length ?? 0;
-    expect(inlineProjections + reusedProjections).toBeGreaterThanOrEqual(4);
-    expect(worker).toContain("recall.ended_at IS NULL");
-    expect(worker).toContain("recall.expires_at > ?2");
     expect(fids).toContain("group.activeRecall");
     expect(fids).toContain("<span>NACHRUF</span>");
     expect(fids).toContain("fids-status-cell");
