@@ -760,26 +760,30 @@ describe("local forecast simulation", () => {
     FORECAST_BASELINE_TIMEOUT_MS,
   );
 
-  it("retains diagnostic raw times and reasons while hard uncertainty hides the countdown", () => {
-    const config = shortNormalConfig();
-    config.preset = "OPERATION_INTERRUPTION";
-    const result = runSimulation(config);
-    const uncertain = result.snapshots.find(
-      (snapshot) =>
-        snapshot.status === "DRAFT" &&
-        snapshot.quality === "UNCERTAIN" &&
-        snapshot.uncertaintyReasons.includes("OPERATION_INTERRUPTED"),
-    );
+  it(
+    "retains diagnostic raw times and reasons while hard uncertainty hides the countdown",
+    () => {
+      const config = shortNormalConfig();
+      config.preset = "OPERATION_INTERRUPTION";
+      const result = runSimulation(config);
+      const uncertain = result.snapshots.find(
+        (snapshot) =>
+          snapshot.status === "DRAFT" &&
+          snapshot.quality === "UNCERTAIN" &&
+          snapshot.uncertaintyReasons.includes("OPERATION_INTERRUPTED"),
+      );
 
-    expect(uncertain).toMatchObject({
-      countdownDisplayed: false,
-      forecastState: "UNAVAILABLE",
-      forecastReason: "OPERATIONS_INTERRUPTED",
-    });
-    expect(Date.parse(uncertain?.predictedBoardingAt ?? "")).not.toBeNaN();
-    expect(Date.parse(uncertain?.predictedCompletionAt ?? "")).not.toBeNaN();
-    expect(result.metrics.uncertaintyReasons.OPERATION_INTERRUPTED).toBeGreaterThan(0);
-  });
+      expect(uncertain).toMatchObject({
+        countdownDisplayed: false,
+        forecastState: "UNAVAILABLE",
+        forecastReason: "OPERATIONS_INTERRUPTED",
+      });
+      expect(Date.parse(uncertain?.predictedBoardingAt ?? "")).not.toBeNaN();
+      expect(Date.parse(uncertain?.predictedCompletionAt ?? "")).not.toBeNaN();
+      expect(result.metrics.uncertaintyReasons.OPERATION_INTERRUPTED).toBeGreaterThan(0);
+    },
+    FORECAST_BASELINE_TIMEOUT_MS,
+  );
 
   it("applies manual incidents only after an active rotation reaches a safe boundary", () => {
     const config = shortNormalConfig();
