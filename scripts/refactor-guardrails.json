@@ -8,7 +8,7 @@
     },
     {
       "path": "apps/worker/src/index.ts",
-      "maxLines": 8277,
+      "maxLines": 8043,
       "targetLines": 800
     },
     {
@@ -141,6 +141,11 @@
     {
       "path": "apps/worker/src/ticket-group-recall-persistence-service.ts",
       "maxLines": 136,
+      "targetLines": 1500
+    },
+    {
+      "path": "apps/worker/src/public-install-routes.ts",
+      "maxLines": 249,
       "targetLines": 1500
     }
   ],
@@ -312,7 +317,6 @@
     "apps/worker/src/public-status-v18.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/public-status-v18.test.ts -> apps/worker/src/public-status-copy.ts",
     "apps/worker/src/pwa-installability.test.ts -> apps/web/vite.config.ts",
-    "apps/worker/src/pwa-installability.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/resource-day-history-route.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/rotation-data-model.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/sale-capacity-policy.test.ts -> apps/web/src/cashier-view.tsx",

@@ -31,6 +31,22 @@ describe("Worker runtime API boundaries", () => {
     });
   });
 
+  it("injects install metadata into the cashier application shell", async () => {
+    const response = await worker.fetch("https://worker.test/kasse");
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+    const html = await response.text();
+    expect(html).toContain('<link rel="manifest" href="/manifests/kasse.webmanifest">');
+    expect(html).toContain(
+      '<link rel="icon" href="/icons/pwa/kasse/favicon.svg" type="image/svg+xml">',
+    );
+    expect(html).toContain(
+      '<link rel="apple-touch-icon" href="/icons/pwa/kasse/apple-touch-icon-180.png">',
+    );
+    expect(html).toContain("<title>Kasse · Rundflug-Leitstand</title>");
+  });
+
   it("rejects malformed JSON before route handling", async () => {
     const response = await worker.fetch("https://worker.test/api/not-a-route", {
       method: "POST",

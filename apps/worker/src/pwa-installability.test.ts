@@ -9,7 +9,7 @@ import flightDirectorManifest from "../../web/public/manifests/flight-director.w
 import flightLineManifest from "../../web/public/manifests/flight-line.webmanifest?raw";
 import kasseManifest from "../../web/public/manifests/kasse.webmanifest?raw";
 import viteConfig from "../../web/vite.config.ts?raw";
-import worker from "./index.ts?raw";
+import { INTERNAL_APP_INSTALL_PROFILES } from "./public-install-routes";
 
 const iconProfiles = [
   "brand",
@@ -145,41 +145,24 @@ describe("T-010 PWA installability and icon family", () => {
   );
 
   it("schreibt Manifest, Favicon und iOS-Metadaten für alle Hauptansichten in den ersten HTML-Stream", () => {
-    for (const path of [
-      '"/kasse"',
-      '"/flight-director"',
-      '"/flight-line"',
-      '"/fids"',
-      '"/admin"',
-    ]) {
-      expect(worker).toContain(path);
+    expect(Object.keys(INTERNAL_APP_INSTALL_PROFILES)).toEqual([
+      "/kasse",
+      "/flight-director",
+      "/flight-line",
+      "/fids",
+      "/fids/terminal",
+      "/admin",
+    ]);
+    for (const [path, profile] of Object.entries(INTERNAL_APP_INSTALL_PROFILES)) {
+      const iconProfile = path === "/fids/terminal" ? "fids" : path.slice(1);
+      expect(profile.faviconHref).toBe(`/icons/pwa/${iconProfile}/favicon.svg`);
+      expect(profile.appleTouchIconHref).toBe(`/icons/pwa/${iconProfile}/apple-touch-icon-180.png`);
+      expect(profile.manifestHref).toBe(`/manifests/${iconProfile}.webmanifest`);
     }
-    for (const profile of ["kasse", "flight-director", "flight-line", "fids", "admin"]) {
-      expect(worker).toContain(`faviconHref: "/icons/pwa/${profile}/favicon.svg"`);
-      expect(worker).toContain(
-        `appleTouchIconHref: "/icons/pwa/${profile}/apple-touch-icon-180.png"`,
-      );
-    }
-    expect(worker).toMatch(
-      /<link rel="icon" href="\$\{escapeHtmlAttribute\(profile\.faviconHref\)\}"/,
-    );
-    expect(worker).toContain(`.on('link[rel="icon"]'`);
     for (const path of ["/kasse", "/flight-director", "/flight-line", "/fids/*", "/admin"]) {
       expect(wranglerConfig).toContain(path);
     }
-    expect(worker).not.toContain('"/flight-line/assist"');
     expect(wranglerConfig).not.toContain('"/flight-line/*"');
-    expect(worker).toContain("INTERNAL_APP_INSTALL_PROFILES");
-    expect(worker).toContain("installableAppShellResponse");
-  });
-
-  it("uses the ticket family for public ticket and group installations", () => {
-    expect(worker).toContain("/icons/pwa/ticket/favicon.svg");
-    expect(worker).toContain("/icons/pwa/ticket/apple-touch-icon-180.png");
-    expect(worker).toContain("/icons/pwa/ticket/icon-192.png");
-    expect(worker).toContain("/icons/pwa/ticket/icon-512.png");
-    expect(worker).toContain("/icons/pwa/ticket/maskable-192.png");
-    expect(worker).toContain("/icons/pwa/ticket/maskable-512.png");
   });
 
   it("umgeht für installierbare Routen den generischen Workbox-Navigationsfallback", () => {

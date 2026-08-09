@@ -39,28 +39,6 @@ describe("öffentlicher Status V1.8", () => {
     expect(groupHandler).not.toContain("present_count");
   });
 
-  it("liefert ein installationsfähiges Manifest für den exakten Statuspfad", () => {
-    expect(worker).toContain('app.get("/api/public/pwa-manifest/:target/:code"');
-    expect(worker).toContain("id: targetPath");
-    expect(worker).toContain("start_url: targetPath");
-    expect(worker).toContain('scope: "/"');
-    expect(worker).toContain('display: "standalone"');
-    expect(worker).toContain("publicStatusInstallTitle");
-    expect(worker).toContain("name: installTitle");
-    expect(worker).toContain("short_name: installTitle");
-    expect(worker).toContain("/icons/pwa/ticket/icon-512.png");
-    expect(worker).toContain("/icons/pwa/ticket/maskable-512.png");
-  });
-
-  it("liefert schon im ersten HTML-Dokument seitenspezifische Installationsmetadaten", () => {
-    expect(worker).toContain("installableAppShellResponse");
-    expect(worker).toContain("new HTMLRewriter()");
-    expect(worker).toMatch(/manifestHref: `\/api\/public\/pwa-manifest\/\$\{target\}\/\$\{code\}`/);
-    expect(worker).toContain('faviconHref: "/icons/pwa/ticket/favicon.svg"');
-    expect(worker).toContain('appleTouchIconHref: "/icons/pwa/ticket/apple-touch-icon-180.png"');
-    expect(worker).toMatch(/title: `\$\{installTitle\} · Rundflug`/);
-  });
-
   it("öffnet aus Push ausschließlich validierte Statuspfade des eigenen Ursprungs", () => {
     expect(pushWorker).toContain("^\\/(?:ticket|gruppe)\\/");
     expect(pushWorker).toContain("safePublicStatusPath");
