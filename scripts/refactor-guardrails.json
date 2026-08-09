@@ -8,7 +8,7 @@
     },
     {
       "path": "apps/worker/src/index.ts",
-      "maxLines": 2988,
+      "maxLines": 2398,
       "targetLines": 800
     },
     {
@@ -284,6 +284,16 @@
       "targetLines": 1500
     },
     {
+      "path": "apps/worker/src/history-routes.ts",
+      "maxLines": 181,
+      "targetLines": 1500
+    },
+    {
+      "path": "apps/worker/src/history-service.ts",
+      "maxLines": 507,
+      "targetLines": 1500
+    },
+    {
       "path": "apps/worker/src/fids-board-service.ts",
       "maxLines": 139,
       "targetLines": 1500
@@ -453,7 +463,6 @@
     "apps/worker/src/public-board-priority.test.ts -> apps/worker/src/fids-board-projection.ts",
     "apps/worker/src/public-status-v18.test.ts -> apps/worker/src/public-status-copy.ts",
     "apps/worker/src/pwa-installability.test.ts -> apps/web/vite.config.ts",
-    "apps/worker/src/resource-day-history-route.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/rotation-data-model.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/sale-capacity-policy.test.ts -> apps/web/src/cashier-view.tsx",
     "apps/worker/src/sale-capacity-policy.test.ts -> apps/worker/src/event-coordinator.ts",

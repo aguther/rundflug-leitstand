@@ -3,10 +3,6 @@ import workerSource from "./index.ts?raw";
 
 const privateEventRoutes = [
   ["GET", "/operations"],
-  ["GET", "/history"],
-  ["GET", "/history/operations"],
-  ["GET", "/history/forecasts"],
-  ["GET", "/history/resources"],
   ["GET", "/devices"],
   ["GET", "/reports/daily.csv"],
   ["GET", "/exports/performance-profile.json"],

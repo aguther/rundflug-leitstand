@@ -56,7 +56,7 @@ describe("anonymous V1 ticket data model", () => {
   it("uses the frozen rotation gate in protected and FIDS slot projections", () => {
     expect(worker).toContain("COALESCE(r.gate_id, MIN(p.gate_id), '') AS gate_id");
     expect(fidsProjection).toContain("LEFT JOIN gates g ON g.id = COALESCE(r.gate_id, p.gate_id)");
-    expect(worker).toContain("communicationNumber: row.communication_number");
+    expect(worker).toContain("communicationNumber: rotation.communication_number");
     expect(worker).toContain("queuePosition:");
     expect(worker).toContain("prediction_lower_minutes");
     expect(worker).toContain("prediction_upper_minutes");
