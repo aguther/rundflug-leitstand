@@ -8,7 +8,7 @@
     },
     {
       "path": "apps/worker/src/index.ts",
-      "maxLines": 6346,
+      "maxLines": 6184,
       "targetLines": 800
     },
     {
@@ -201,6 +201,11 @@
     {
       "path": "apps/worker/src/admin-event-routes.ts",
       "maxLines": 124,
+      "targetLines": 1500
+    },
+    {
+      "path": "apps/worker/src/setup-routes.ts",
+      "maxLines": 205,
       "targetLines": 1500
     }
   ],

@@ -6,7 +6,6 @@ import {
   analysisArchiveSchema,
   analysisSnapshotRequestSchema,
   analysisSnapshotSchema,
-  bootstrapRequestSchema,
   cloneEventRequestSchema,
   type EventLogoTheme,
   type FactoryResetResponse,
@@ -66,16 +65,11 @@ import {
   requestAnalysisArchive,
 } from "./analysis-archive";
 import { buildAnalysisSnapshot } from "./analysis-snapshot";
-import {
-  authorizeSession,
-  clearedSessionCookie,
-  type SessionActor,
-  sessionBrowserBindingHash,
-} from "./auth";
+import { authorizeSession, type SessionActor, sessionBrowserBindingHash } from "./auth";
 import { registerAuthRoutes } from "./auth-routes";
 import { createPortableBackup, operationDateInTimeZone } from "./backup";
 import { withBookingGroupPartProjection } from "./booking-group-part-projection";
-import { hashPin, sha256Hex, verifyCredential, verifyPin } from "./crypto";
+import { sha256Hex, verifyCredential, verifyPin } from "./crypto";
 import { runD1ReadsSequentially } from "./d1-read-scheduler";
 import { dailyReportCsv, dailyReportPdfLines, loadDailyReport } from "./daily-report";
 import { authorizeDevice } from "./device-authorization";
@@ -113,7 +107,7 @@ import {
 } from "./gate-display-filter-storage";
 import { loadMasterDataExportProjection } from "./master-data-export";
 import { buildOperationalHistoryStatement } from "./operational-history";
-import { allowLoginAttempt, allowSetupAttempt, allowUnknownTicketAttempt } from "./public-access";
+import { allowLoginAttempt, allowUnknownTicketAttempt } from "./public-access";
 import { registerPublicBoardRoutes } from "./public-board-routes";
 import { registerPublicInstallRoutes } from "./public-install-routes";
 import { registerPublicLogoRoutes } from "./public-logo-routes";
@@ -129,20 +123,14 @@ import {
   limitApiBody,
   requireValidJsonBody,
 } from "./request-body-boundaries";
-import {
-  clearedResetSetupCookie,
-  installationRecoveryCode,
-  resetSetupCookie,
-  resetSetupGrantExpiry,
-  resetSetupToken,
-  validResetSetupGrant,
-} from "./reset-setup-grant";
+import { resetSetupCookie, resetSetupGrantExpiry, resetSetupToken } from "./reset-setup-grant";
 import {
   buildAircraftBlockStatement,
   buildPilotPauseEventStatement,
   buildResourceDayRotationStatement,
   pairPilotPauseEvents,
 } from "./resource-day-history";
+import { registerSetupRoutes } from "./setup-routes";
 import { rowToSnapshot } from "./snapshot";
 import { ticketSearchStatusCondition } from "./ticket-search";
 import { httpsRedirectLocation } from "./transport-security";
@@ -467,157 +455,7 @@ app.get("/api/meta", (context) =>
   }),
 );
 
-app.get("/api/setup/status", async (context) => {
-  const state = await context.env.DB.prepare(
-    `SELECT
-      (SELECT COUNT(*) FROM app_bootstrap) AS completed,
-      (SELECT COUNT(*) FROM operation_days) AS events,
-      (SELECT COUNT(*) FROM operator_accounts
-        WHERE role = 'ADMIN' AND active = 1 AND deleted_at IS NULL) AS admins`,
-  ).first<{ completed: number; events: number; admins: number }>();
-  const resetGrant = await validResetSetupGrant(context.env, context.req.raw);
-  return context.json({
-    setupRequired:
-      (state?.completed ?? 0) === 0 && (state?.events ?? 0) === 0 && (state?.admins ?? 0) === 0,
-    setupConfigured: Boolean(installationRecoveryCode(context.env) || resetGrant),
-    resetSetupAuthorized: Boolean(resetGrant),
-    resetSetupExpiresAt: resetGrant?.setup_grant_expires_at ?? null,
-  });
-});
-
-app.post("/api/setup", async (context) => {
-  const parsed = bootstrapRequestSchema.safeParse(await context.req.json().catch(() => null));
-  if (!parsed.success) {
-    return context.json(
-      { error: { code: "INVALID_SETUP", message: "Einrichtungsdaten sind unvollständig." } },
-      400,
-    );
-  }
-  const state = await context.env.DB.prepare(
-    `SELECT
-      (SELECT COUNT(*) FROM app_bootstrap) AS completed,
-      (SELECT COUNT(*) FROM operation_days) AS events,
-      (SELECT COUNT(*) FROM operator_accounts
-        WHERE role = 'ADMIN' AND active = 1 AND deleted_at IS NULL) AS admins`,
-  ).first<{ completed: number; events: number; admins: number }>();
-  if ((state?.completed ?? 0) > 0 || (state?.events ?? 0) > 0 || (state?.admins ?? 0) > 0) {
-    return context.json(
-      { error: { code: "SETUP_ALREADY_COMPLETED", message: "Ersteinrichtung ist abgeschlossen." } },
-      409,
-    );
-  }
-  const resetGrant = await validResetSetupGrant(context.env, context.req.raw);
-  const recoveryCode = installationRecoveryCode(context.env);
-  if (!resetGrant && !recoveryCode) {
-    return context.json(
-      {
-        error: {
-          code: "SETUP_NOT_CONFIGURED",
-          message: "Ersteinrichtung ist serverseitig noch nicht freigeschaltet.",
-        },
-      },
-      503,
-    );
-  }
-  if (
-    !resetGrant &&
-    !(await allowSetupAttempt(context.env.ADMIN_RECOVERY_RATE_LIMITER, context.req.raw))
-  ) {
-    return context.json(
-      { error: { code: "SETUP_CREDENTIALS_INVALID", message: "Einrichtung nicht autorisiert." } },
-      429,
-      { "retry-after": "60" },
-    );
-  }
-  const recoveryCodeHash = recoveryCode ? await sha256Hex(recoveryCode) : null;
-  if (!resetGrant && !(await verifyCredential(parsed.data.setupCode ?? null, recoveryCodeHash))) {
-    return context.json(
-      { error: { code: "SETUP_CREDENTIALS_INVALID", message: "Einrichtung nicht autorisiert." } },
-      403,
-    );
-  }
-  const input = parsed.data;
-  const now = new Date().toISOString();
-  const adminDeviceId =
-    context.env.APP_ENV === "development" && input.adminDeviceId
-      ? input.adminDeviceId
-      : crypto.randomUUID();
-  const adminCredentialHash =
-    context.env.APP_ENV === "development" ? (input.adminCredentialHash ?? null) : null;
-  const adminAccountId = crypto.randomUUID();
-  const adminPinHash = await hashPin(input.adminPin);
-  try {
-    const statements = [
-      context.env.DB.prepare(
-        `INSERT INTO operation_days
-          (id, name, event_date, time_zone, status, emergency_mode, operational_note, version,
-           created_at, updated_at, operations_end_at, operational_interrupted, sale_opens_at,
-           no_show_after_minutes, notification_lead_minutes, child_reference_weight_kg,
-           normal_reference_weight_kg, heavy_reference_weight_kg, planned_boarding_minutes,
-           planned_deboarding_minutes, planned_buffer_minutes, aerodrome)
-         VALUES (?1, ?2, ?3, ?4, 'PREPARATION', 0, '', 0, ?5, ?5, NULL, 0, NULL,
-           10, 15, 35, 80, 110, 8, 5, 3, ?6)`,
-      ).bind(input.eventId, input.name, input.eventDate, input.timeZone, now, input.aerodrome),
-      context.env.DB.prepare(
-        `INSERT INTO paired_devices
-          (id, operation_day_id, label, role, active, paired_at, last_seen_at, credential_hash)
-         VALUES (?1, ?2, 'Erste Administrationssitzung', 'ADMIN', 1, ?3, ?3, ?4)`,
-      ).bind(adminDeviceId, input.eventId, now, adminCredentialHash),
-      context.env.DB.prepare(
-        `INSERT INTO operator_accounts
-          (id, login_code, role, pin_hash, active, failed_attempts, session_version,
-           created_at, updated_at)
-         VALUES (?1, 'ADMIN-01', 'ADMIN', ?2, 1, 0, 1, ?3, ?3)`,
-      ).bind(adminAccountId, adminPinHash, now),
-      context.env.DB.prepare(
-        `INSERT INTO app_bootstrap (singleton, operation_day_id, admin_device_id, completed_at)
-         VALUES (1, ?1, ?2, ?3)`,
-      ).bind(input.eventId, adminDeviceId, now),
-      context.env.DB.prepare(
-        `INSERT INTO operational_events
-          (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type,
-           aggregate_id, aggregate_version, payload_json)
-         VALUES (?1, ?2, 'SYSTEM_BOOTSTRAPPED', ?3, ?4, 'OPERATION_DAY', ?2, 0, ?5)`,
-      ).bind(
-        crypto.randomUUID(),
-        input.eventId,
-        now,
-        adminDeviceId,
-        JSON.stringify({ anonymousAdministration: true }),
-      ),
-      context.env.DB.prepare(
-        `INSERT INTO outbox (id, operation_day_id, topic, payload_json, created_at)
-         VALUES (?1, ?2, 'SYSTEM_BOOTSTRAPPED', ?3, ?4)`,
-      ).bind(crypto.randomUUID(), input.eventId, JSON.stringify({ eventId: input.eventId }), now),
-    ];
-    if (resetGrant) {
-      statements.push(
-        context.env.DB.prepare(
-          `UPDATE system_reset_receipts
-              SET setup_grant_used_at = ?1
-            WHERE command_id = ?2
-              AND setup_grant_used_at IS NULL
-              AND setup_grant_expires_at > ?1`,
-        ).bind(now, resetGrant.command_id),
-      );
-    }
-    await context.env.DB.batch(statements);
-  } catch {
-    return context.json(
-      { error: { code: "SETUP_ALREADY_COMPLETED", message: "Ersteinrichtung ist abgeschlossen." } },
-      409,
-    );
-  }
-  context.header("set-cookie", clearedResetSetupCookie(context.req.raw));
-  context.header("set-cookie", clearedSessionCookie(context.req.raw), { append: true });
-  return context.json(
-    {
-      eventId: input.eventId,
-      ...(context.env.APP_ENV === "development" ? { adminDeviceId } : {}),
-    },
-    201,
-  );
-});
+registerSetupRoutes(app);
 
 registerAuthRoutes(app);
 registerAdminAccountRoutes(app);
