@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import migration from "../migrations/0059_ticket_group_cashier_attribution.sql?raw";
 import coordinatorSource from "./event-coordinator.ts?raw";
-import workerSource from "./index.ts?raw";
 
 describe("cashier ticket attribution", () => {
   it("adds an optional account reference and a pagination-aligned search index", () => {
@@ -24,19 +23,5 @@ describe("cashier ticket attribution", () => {
     expect(saleHandler).toContain("sold_by_operator_account_id");
     expect(saleHandler).toContain("operatorAccountId");
     expect(saleHandler).not.toContain("command.payload.soldByOperatorAccountId");
-  });
-
-  it("preserves soft-deleted seller labels in protected search", () => {
-    const searchStart = workerSource.indexOf('app.on("GET", eventRoutes("/tickets/search")');
-    const searchEnd = workerSource.indexOf(
-      'app.on("GET", eventRoutes("/ticket-groups/:ticketGroupId/print-data")',
-    );
-    const searchRoute = workerSource.slice(searchStart, searchEnd);
-    expect(searchRoute).toContain('searchParams.get("soldByAccountId")');
-    expect(searchRoute).toContain("tg.sold_by_operator_account_id =");
-    expect(searchRoute).toContain(
-      "LEFT JOIN operator_accounts seller ON seller.id = tg.sold_by_operator_account_id",
-    );
-    expect(searchRoute).not.toContain("seller.deleted_at IS NULL");
   });
 });

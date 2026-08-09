@@ -8,7 +8,7 @@
     },
     {
       "path": "apps/worker/src/index.ts",
-      "maxLines": 3289,
+      "maxLines": 2988,
       "targetLines": 800
     },
     {
@@ -274,6 +274,16 @@
       "targetLines": 1500
     },
     {
+      "path": "apps/worker/src/ticket-read-routes.ts",
+      "maxLines": 106,
+      "targetLines": 1500
+    },
+    {
+      "path": "apps/worker/src/ticket-read-service.ts",
+      "maxLines": 273,
+      "targetLines": 1500
+    },
+    {
       "path": "apps/worker/src/fids-board-service.ts",
       "maxLines": 139,
       "targetLines": 1500
@@ -410,7 +420,6 @@
     "apps/worker/src/api-cache-policy.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/audit-coverage.test.ts -> apps/worker/src/daily-report.ts",
     "apps/worker/src/cashier-ticket-attribution.test.ts -> apps/worker/src/event-coordinator.ts",
-    "apps/worker/src/cashier-ticket-attribution.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/control-routing.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/dispatch-recommendation-leases.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/fids-board-projection.test.ts -> apps/worker/src/fids-board-projection.ts",
@@ -424,7 +433,6 @@
     "apps/worker/src/group-ticket-v18.test.ts -> apps/web/src/cashier-view.tsx",
     "apps/worker/src/group-ticket-v18.test.ts -> apps/web/src/features/public-status/PublicStatusContent.tsx",
     "apps/worker/src/group-ticket-v18.test.ts -> apps/web/src/group-status-view.tsx",
-    "apps/worker/src/group-ticket-v18.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/group-ticket-v18.test.ts -> apps/worker/src/web-push.ts",
     "apps/worker/src/maintainability-coverage.test.ts -> apps/web/src/admin-view.tsx",
     "apps/worker/src/maintainability-coverage.test.ts -> apps/web/src/features/admin/event-parameters/EventParametersWorkspace.tsx",
@@ -463,7 +471,6 @@
     "apps/worker/src/ticket-group-recall.test.ts -> packages/contracts/src/index.ts",
     "apps/worker/src/ticket-group-recall.test.ts -> packages/domain/src/index.ts",
     "apps/worker/src/turnaround-overrides.test.ts -> apps/worker/src/index.ts",
-    "apps/worker/src/v1-5-stable-operations.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/web-push.test.ts -> apps/worker/src/web-push.ts"
   ]
 }

@@ -7,7 +7,6 @@ import {
   operationalHistorySchema,
   resourceDayHistoryQuerySchema,
   resourceDayHistorySchema,
-  ticketSearchRequestSchema,
 } from "@rundflug/contracts";
 import {
   assessForecastFreshness,
@@ -16,7 +15,6 @@ import {
   deriveResourceGroupCapacity,
   estimateDuration,
   forecastQueueWindows,
-  formatBookingGroupLabel,
   formatFlightGroupLabel,
   resolveTurnaroundProfile,
 } from "@rundflug/domain";
@@ -38,7 +36,6 @@ import { createPortableBackup, operationDateInTimeZone } from "./backup";
 import { withBookingGroupPartProjection } from "./booking-group-part-projection";
 import { registerControlCoordinationRoutes } from "./control-coordination-routes";
 import { registerControlSessionMiddleware } from "./control-session-middleware";
-import { sha256Hex } from "./crypto";
 import { runD1ReadsSequentially } from "./d1-read-scheduler";
 import { dailyReportCsv, dailyReportPdfLines, loadDailyReport } from "./daily-report";
 import { authorizeDevice } from "./device-authorization";
@@ -72,7 +69,7 @@ import {
 import { registerSetupRoutes } from "./setup-routes";
 import { registerSimulationPlanExportRoutes } from "./simulation-plan-export-routes";
 import { rowToSnapshot } from "./snapshot";
-import { ticketSearchStatusCondition } from "./ticket-search";
+import { registerTicketReadRoutes } from "./ticket-read-routes";
 import { httpsRedirectLocation } from "./transport-security";
 import type { Env, StoredEventRow } from "./types";
 import { purgeExpiredPushSubscriptions } from "./web-push";
@@ -87,38 +84,6 @@ function eventRoutes<const Suffix extends string>(
 ): [`/api/control/:eventId${Suffix}`] {
   const controlPath = `/api/control/:eventId${suffix}` as `/api/control/:eventId${Suffix}`;
   return [controlPath];
-}
-
-interface TicketSearchCursor {
-  soldAt: string;
-  id: string;
-}
-
-function encodeTicketSearchCursor(cursor: TicketSearchCursor): string {
-  return btoa(JSON.stringify(cursor)).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
-}
-
-function decodeTicketSearchCursor(value: string | undefined): TicketSearchCursor | null {
-  if (!value) return null;
-  try {
-    const base64 = value.replaceAll("-", "+").replaceAll("_", "/");
-    const parsed = JSON.parse(atob(base64.padEnd(Math.ceil(base64.length / 4) * 4, "="))) as {
-      soldAt?: unknown;
-      id?: unknown;
-    };
-    if (
-      typeof parsed.soldAt !== "string" ||
-      Number.isNaN(Date.parse(parsed.soldAt)) ||
-      typeof parsed.id !== "string" ||
-      parsed.id.length === 0 ||
-      parsed.id.length > 100
-    ) {
-      return null;
-    }
-    return { soldAt: parsed.soldAt, id: parsed.id };
-  } catch {
-    return null;
-  }
 }
 
 app.use("*", async (context, next) => {
@@ -2021,273 +1986,7 @@ app.on("GET", eventRoutes("/operations"), async (context) => {
 
 registerAnalysisControlRoutes(app, eventCoordinatorNamespace);
 
-app.on("GET", eventRoutes("/tickets/search"), async (context) => {
-  const eventId = context.req.param("eventId");
-  const device = await authorizeDevice(context.env, eventId, context.req.raw);
-  if (!device || !["CASHIER", "FLIGHT_LINE", "FLIGHT_DIRECTOR", "ADMIN"].includes(device.role)) {
-    return context.json(
-      {
-        error: {
-          code: "SESSION_NOT_AUTHORIZED",
-          message: "Sitzung für diese Ansicht nicht berechtigt.",
-        },
-      },
-      403,
-    );
-  }
-  const searchParams = new URL(context.req.url).searchParams;
-  const parsedRequest = ticketSearchRequestSchema.safeParse({
-    q: searchParams.get("q") ?? "",
-    status: searchParams.get("status") ?? "ACTIVE",
-    limit: searchParams.has("limit") ? Number(searchParams.get("limit")) : 20,
-    ...(searchParams.has("cursor") ? { cursor: searchParams.get("cursor") ?? "" } : {}),
-    ticketGroupIds: searchParams.getAll("id"),
-    ...(searchParams.has("soldByAccountId")
-      ? { soldByOperatorAccountId: searchParams.get("soldByAccountId") ?? "" }
-      : {}),
-  });
-  if (!parsedRequest.success) {
-    return context.json(
-      { error: { code: "INVALID_TICKET_SEARCH", message: "Ticketsuche ist ungültig." } },
-      400,
-    );
-  }
-  const request = parsedRequest.data;
-  const rawQuery = request.q;
-  if (rawQuery.length === 1 || rawQuery.length > 200) {
-    return context.json({ results: [], nextCursor: null });
-  }
-  const cursor = decodeTicketSearchCursor(request.cursor);
-  if (request.cursor && !cursor) {
-    return context.json(
-      { error: { code: "INVALID_TICKET_SEARCH_CURSOR", message: "Listencursor ist ungültig." } },
-      400,
-    );
-  }
-  let query = rawQuery;
-  try {
-    const url = new URL(rawQuery);
-    query = decodeURIComponent(url.pathname.split("/").filter(Boolean).at(-1) ?? rawQuery);
-  } catch {
-    // Plain ticket, group or communication identifier.
-  }
-  const normalized = query.trim().toUpperCase();
-  const ticketHash = await sha256Hex(normalized);
-  const likeQuery = `%${query.trim()}%`;
-  const numericText = normalized.replace(/^[GF]-?/, "");
-  const numericQuery = /^\d+$/.test(numericText) ? String(Number(numericText)) : "";
-  const conditions = ["tg.operation_day_id = ?1"];
-  const bindings: Array<string | number> = [eventId];
-  const bind = (value: string | number) => {
-    bindings.push(value);
-    return `?${bindings.length}`;
-  };
-  if (request.ticketGroupIds.length > 0) {
-    const placeholders = request.ticketGroupIds.map((id) => bind(id));
-    conditions.push(`tg.id IN (${placeholders.join(", ")})`);
-  } else {
-    conditions.push(ticketSearchStatusCondition(request.status));
-  }
-  if (request.soldByOperatorAccountId) {
-    conditions.push(`tg.sold_by_operator_account_id = ${bind(request.soldByOperatorAccountId)}`);
-  }
-  if (normalized) {
-    const ticketHashPlaceholder = bind(ticketHash);
-    const likePlaceholder = bind(likeQuery);
-    const numericPlaceholder = bind(numericQuery);
-    const normalizedPlaceholder = bind(normalized);
-    conditions.push(
-      `(EXISTS (SELECT 1 FROM tickets searched_ticket
-                  WHERE searched_ticket.ticket_group_id = tg.id
-                    AND searched_ticket.public_code_hash = ${ticketHashPlaceholder})
-        OR tg.public_status_code_hash = ${ticketHashPlaceholder}
-        OR tg.id LIKE ${likePlaceholder}
-        OR CAST(tg.communication_number AS TEXT) = ${numericPlaceholder}
-        OR UPPER('G-' || p.code || '-' || printf('%04d', tg.communication_number))
-             = ${normalizedPlaceholder}
-        OR UPPER('G-' || printf('%04d', tg.communication_number)) = ${normalizedPlaceholder}
-        OR UPPER(p.code || '-' || printf('%03d', tg.communication_number))
-             = ${normalizedPlaceholder}
-        OR EXISTS (SELECT 1 FROM tickets searched_ticket
-                    JOIN rotation_tickets searched_rt ON searched_rt.ticket_id = searched_ticket.id
-                    JOIN rotations searched_rotation ON searched_rotation.id = searched_rt.rotation_id
-                    JOIN flight_groups searched_fg ON searched_fg.id = searched_rotation.flight_group_id
-                    JOIN resource_groups searched_rg ON searched_rg.id = searched_fg.resource_group_id
-                   WHERE searched_ticket.ticket_group_id = tg.id
-                     AND (CAST(searched_fg.communication_number AS TEXT) = ${numericPlaceholder}
-                       OR UPPER('F-' || searched_rg.short_code || '-' ||
-                                printf('%03d', searched_fg.communication_number))
-                            = ${normalizedPlaceholder}
-                       OR UPPER(p.code || '-' || printf('%03d', searched_fg.communication_number)) = ${normalizedPlaceholder})))`,
-    );
-  }
-  if (cursor) {
-    const soldAtPlaceholder = bind(cursor.soldAt);
-    const idPlaceholder = bind(cursor.id);
-    conditions.push(
-      `(tg.sold_at < ${soldAtPlaceholder} OR (tg.sold_at = ${soldAtPlaceholder} AND tg.id < ${idPlaceholder}))`,
-    );
-  }
-  const effectiveLimit =
-    request.ticketGroupIds.length > 0 ? Math.min(request.ticketGroupIds.length, 50) : request.limit;
-  const limitPlaceholder = bind(effectiveLimit + 1);
-  const rows = await context.env.DB.prepare(
-    `SELECT tg.id AS ticket_group_id, tg.status AS group_status,
-            tg.queue_sequence, tg.communication_number AS booking_group_number, tg.standby,
-            tg.sold_at, p.id AS product_id, p.code AS product_code, p.name AS product_name,
-            tg.sold_by_operator_account_id, seller.login_code AS sold_by_operator_login_code,
-            rg.short_code AS resource_group_short_code,
-            (SELECT COUNT(*) FROM tickets group_ticket WHERE group_ticket.ticket_group_id = tg.id)
-              AS group_size,
-            (SELECT GROUP_CONCAT(DISTINCT group_fg.communication_number)
-               FROM tickets grouped_ticket
-               JOIN rotation_tickets group_rt
-                 ON group_rt.ticket_id = grouped_ticket.id AND group_rt.released_at IS NULL
-               JOIN rotations group_rotation ON group_rotation.id = group_rt.rotation_id
-               JOIN flight_groups group_fg ON group_fg.id = group_rotation.flight_group_id
-              WHERE grouped_ticket.ticket_group_id = tg.id) AS communication_numbers,
-            (SELECT GROUP_CONCAT(DISTINCT group_rotation.status)
-               FROM tickets grouped_ticket
-               JOIN rotation_tickets group_rt
-                 ON group_rt.ticket_id = grouped_ticket.id AND group_rt.released_at IS NULL
-               JOIN rotations group_rotation ON group_rotation.id = group_rt.rotation_id
-              WHERE grouped_ticket.ticket_group_id = tg.id) AS rotation_statuses
-       FROM ticket_groups tg
-       JOIN products p ON p.id = tg.product_id
-       JOIN resource_groups rg ON rg.id = p.resource_group_id
-       LEFT JOIN operator_accounts seller ON seller.id = tg.sold_by_operator_account_id
-      WHERE ${conditions.join(" AND ")}
-      ORDER BY tg.sold_at DESC, tg.id DESC LIMIT ${limitPlaceholder}`,
-  )
-    .bind(...bindings)
-    .all<{
-      ticket_group_id: string;
-      group_status: string;
-      queue_sequence: number;
-      booking_group_number: number;
-      standby: number;
-      sold_at: string;
-      sold_by_operator_account_id: string | null;
-      sold_by_operator_login_code: string | null;
-      product_id: string;
-      product_code: string;
-      product_name: string;
-      resource_group_short_code: string;
-      group_size: number;
-      communication_numbers: string | null;
-      rotation_statuses: string | null;
-    }>();
-  const page = rows.results.slice(0, effectiveLimit);
-  const last = page.at(-1);
-  return context.json({
-    results: page.map((row) => {
-      const communicationNumbers = (row.communication_numbers?.split(",") ?? [])
-        .map(Number)
-        .filter(Number.isInteger)
-        .sort((left, right) => left - right);
-      const communicationLabels = communicationNumbers.map((number) =>
-        formatFlightGroupLabel(row.resource_group_short_code, number),
-      );
-      const rotationStatuses = (row.rotation_statuses?.split(",") ?? []).sort();
-      return {
-        ticketGroupId: row.ticket_group_id,
-        productId: row.product_id,
-        productCode: row.product_code,
-        productName: row.product_name,
-        groupStatus: row.group_status,
-        groupSize: row.group_size,
-        queueSequence: row.queue_sequence,
-        bookingGroupNumber: row.booking_group_number,
-        bookingGroupLabel: formatBookingGroupLabel(row.product_code, row.booking_group_number),
-        standby: row.standby === 1,
-        soldAt: row.sold_at,
-        soldByOperatorAccountId: row.sold_by_operator_account_id,
-        soldByOperatorLoginCode: row.sold_by_operator_login_code,
-        communicationNumber: communicationNumbers[0] ?? null,
-        communicationLabel: communicationLabels[0] ?? null,
-        communicationNumbers,
-        communicationLabels,
-        rotationStatus: rotationStatuses[0] ?? null,
-        rotationStatuses,
-      };
-    }),
-    nextCursor:
-      request.ticketGroupIds.length === 0 && rows.results.length > effectiveLimit && last
-        ? encodeTicketSearchCursor({ soldAt: last.sold_at, id: last.ticket_group_id })
-        : null,
-  });
-});
-
-app.on("GET", eventRoutes("/ticket-groups/:ticketGroupId/print-data"), async (context) => {
-  const eventId = context.req.param("eventId");
-  const device = await authorizeDevice(context.env, eventId, context.req.raw);
-  if (!device || !["CASHIER", "ADMIN"].includes(device.role)) {
-    return context.json(
-      {
-        error: {
-          code: "SESSION_NOT_AUTHORIZED",
-          message: "Sitzung für diese Ansicht nicht berechtigt.",
-        },
-      },
-      403,
-    );
-  }
-  const ticketGroupId = context.req.param("ticketGroupId");
-  const first = await context.env.DB.prepare(
-    `SELECT COALESCE(tg.public_status_code,
-                     (SELECT legacy.public_code
-                        FROM tickets legacy
-                       WHERE legacy.ticket_group_id = tg.id AND legacy.public_code IS NOT NULL
-                       ORDER BY legacy.created_at, legacy.id LIMIT 1)) AS public_code,
-            od.name AS event_name, p.name AS product_name, g.label AS gate_label,
-            p.code AS product_code, tg.communication_number, tg.status AS group_status,
-            COUNT(t.id) AS group_size
-       FROM ticket_groups tg
-       JOIN operation_days od ON od.id = tg.operation_day_id
-       JOIN products p ON p.id = tg.product_id
-       JOIN gates g ON g.id = p.gate_id
-       JOIN tickets t ON t.ticket_group_id = tg.id
-      WHERE tg.id = ?1 AND tg.operation_day_id = ?2
-      GROUP BY tg.id`,
-  )
-    .bind(ticketGroupId, eventId)
-    .first<{
-      public_code: string | null;
-      event_name: string;
-      product_name: string;
-      gate_label: string;
-      product_code: string;
-      communication_number: number;
-      group_status: string;
-      group_size: number;
-    }>();
-  if (!first?.public_code) {
-    return context.json(
-      { error: { code: "TICKET_GROUP_NOT_FOUND", message: "Buchungsgruppe nicht gefunden." } },
-      404,
-    );
-  }
-  if (first.group_status === "CANCELED") {
-    return context.json(
-      {
-        error: {
-          code: "TICKET_GROUP_CANCELED",
-          message: "Stornierte Tickets werden nicht erneut ausgegeben.",
-        },
-      },
-      409,
-    );
-  }
-  return context.json({
-    ticketGroupId,
-    eventName: first.event_name,
-    productName: first.product_name,
-    gateLabel: first.gate_label,
-    communicationLabel: formatBookingGroupLabel(first.product_code, first.communication_number),
-    code: first.public_code,
-    groupSize: first.group_size,
-  });
-});
+registerTicketReadRoutes(app);
 
 app.on("GET", eventRoutes("/history"), async (context) => {
   const eventId = context.req.param("eventId");

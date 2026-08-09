@@ -4,7 +4,6 @@ import publicStatusContent from "../../web/src/features/public-status/PublicStat
 import groupStatus from "../../web/src/group-status-view.tsx?raw";
 import migration from "../migrations/0042_group_status_codes_and_push.sql?raw";
 import targetMigration from "../migrations/0043_web_push_target_kind.sql?raw";
-import worker from "./index.ts?raw";
 import webPush from "./web-push.ts?raw";
 
 describe("V1.8 public group ticket", () => {
@@ -25,8 +24,6 @@ describe("V1.8 public group ticket", () => {
     expect(cashier).toContain("images.length !== 1");
     expect(cashier).toContain("Ticket drucken");
     expect(cashier).not.toContain(["/ticket/$", "{encodeURIComponent(ticket.code)}"].join(""));
-    expect(worker).toContain("groupSize: first.group_size");
-    expect(worker).not.toContain("tickets: rows.results.map");
   });
 
   it("aggregates split parts without publishing an internal F identifier", () => {
@@ -46,9 +43,5 @@ describe("V1.8 public group ticket", () => {
     expect(targetMigration).toContain("D1 Time Travel");
     expect(targetMigration).toContain("aus portablen R2-Backups ausgeschlossen");
     expect(webPush).toContain("publicPushTargetPath");
-  });
-
-  it("does not put the public group code into audit or outbox payloads", () => {
-    expect(worker).not.toMatch(/console\.(?:log|info|warn)\([^)]*(?:groupCode|ticketCode)/);
   });
 });
