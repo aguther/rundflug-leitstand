@@ -8,7 +8,7 @@
     },
     {
       "path": "apps/worker/src/index.ts",
-      "maxLines": 4760,
+      "maxLines": 4460,
       "targetLines": 800
     },
     {
@@ -237,6 +237,16 @@
       "path": "apps/worker/src/admin-event-clone-service.ts",
       "maxLines": 300,
       "targetLines": 1500
+    },
+    {
+      "path": "apps/worker/src/admin-event-deletion-routes.ts",
+      "maxLines": 74,
+      "targetLines": 1500
+    },
+    {
+      "path": "apps/worker/src/admin-event-deletion-service.ts",
+      "maxLines": 320,
+      "targetLines": 1500
     }
   ],
   "allowedProductionRawImports": [
@@ -364,8 +374,6 @@
     "apps/worker/src/cashier-ticket-attribution.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/control-routing.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/dispatch-recommendation-leases.test.ts -> apps/worker/src/index.ts",
-    "apps/worker/src/event-deletion.test.ts -> apps/worker/src/index.ts",
-    "apps/worker/src/event-logo-theme-routes.test.ts -> apps/worker/src/event-deletion.ts",
     "apps/worker/src/event-logo-theme-routes.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/fids-board-projection.test.ts -> apps/worker/src/fids-board-projection.ts",
     "apps/worker/src/fids-board-projection.test.ts -> apps/worker/src/index.ts",

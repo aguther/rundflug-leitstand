@@ -34,4 +34,9 @@ describe("content-blocker-neutral private event routing (T-020)", () => {
       expect(workerSource).toContain(`app.on("${method}", eventRoutes("${suffix}")`);
     },
   );
+
+  it("keeps the performance export contextual and aggregate-only", () => {
+    expect(workerSource).toContain("average_turnaround_minutes");
+    expect(workerSource).toContain("passengerSeatCounts");
+  });
 });

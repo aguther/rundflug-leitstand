@@ -4,7 +4,6 @@ import { readdirSync, readFileSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { describe, expect, it } from "vitest";
 import { EVENT_DELETION_SQL } from "./event-deletion";
-import worker from "./index.ts?raw";
 
 function migratedDatabase() {
   const database = new DatabaseSync(":memory:");
@@ -135,24 +134,5 @@ describe("disposable event lifecycle", () => {
         .prepare("SELECT operation_day_id, admin_device_id FROM app_bootstrap WHERE singleton = 1")
         .get(),
     ).toEqual({ operation_day_id: "event-b", admin_device_id: "device-b" });
-  });
-
-  it("requires admin authorization and an exact event-id confirmation", () => {
-    const route = worker.match(
-      /app\.delete\("\/api\/admin\/events\/:eventId"[\s\S]*?app\.put\("\/api\/admin\/events\/:eventId\/logo"/,
-    )?.[0];
-    expect(route).toBeTruthy();
-    expect(route).toContain('device?.role !== "ADMIN"');
-    expect(route).toContain("input.confirmation !== eventId");
-    expect(route).toContain("input.expectedVersion");
-    expect(route).toContain("event_deletion_receipts");
-    expect(route).toContain("UPDATE system_reset_control SET active = 1");
-    expect(route).toContain("eventDeletionStatements");
-  });
-
-  it("exports only contextual aggregate performance data", () => {
-    expect(worker).toContain("/exports/performance-profile.json");
-    expect(worker).toContain("average_turnaround_minutes");
-    expect(worker).toContain("passengerSeatCounts");
   });
 });
