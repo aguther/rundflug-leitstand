@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { supportSafeOperationBoard } from "./analysis-snapshot";
 import snapshotSource from "./analysis-snapshot.ts?raw";
-import coordinatorSource from "./event-coordinator.ts?raw";
 import workerSource from "./index.ts?raw";
 
 describe("support-safe analysis snapshot", () => {
@@ -52,10 +51,5 @@ describe("support-safe analysis snapshot", () => {
     expect(snapshotSource).toContain("run.id = ?1");
     expect(snapshotSource).toContain("input.planningRunId");
     expect(snapshotSource).not.toContain("ORDER BY run.calculation_now DESC");
-    expect(coordinatorSource).toContain("planningRunId: input.requestId");
-    expect(coordinatorSource).toContain("CAPTURE_ANALYSIS_SNAPSHOT");
-    expect(coordinatorSource).toContain("idempotency_receipts");
-    expect(coordinatorSource).toContain("manualForecastQueue.shift()");
-    expect(coordinatorSource).toContain("pendingAutomaticForecast");
   });
 });

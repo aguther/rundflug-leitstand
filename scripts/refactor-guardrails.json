@@ -3,7 +3,7 @@
   "sizeBudgets": [
     {
       "path": "apps/worker/src/event-coordinator.ts",
-      "maxLines": 2854,
+      "maxLines": 2688,
       "targetLines": 1500
     },
     {
@@ -121,6 +121,11 @@
     {
       "path": "apps/worker/src/outage-recovery-command-service.ts",
       "maxLines": 1117,
+      "targetLines": 1500
+    },
+    {
+      "path": "apps/worker/src/analysis-snapshot-capture-service.ts",
+      "maxLines": 193,
       "targetLines": 1500
     }
   ],
@@ -244,7 +249,6 @@
     "apps/worker/src/admin-event-flow.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/admin-master-data-template.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/analysis-snapshot.test.ts -> apps/worker/src/analysis-snapshot.ts",
-    "apps/worker/src/analysis-snapshot.test.ts -> apps/worker/src/event-coordinator.ts",
     "apps/worker/src/analysis-snapshot.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/api-cache-policy.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/audit-coverage.test.ts -> apps/worker/src/daily-report.ts",
