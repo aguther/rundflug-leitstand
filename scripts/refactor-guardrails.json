@@ -3,7 +3,7 @@
   "sizeBudgets": [
     {
       "path": "apps/worker/src/event-coordinator.ts",
-      "maxLines": 3914,
+      "maxLines": 2854,
       "targetLines": 1500
     },
     {
@@ -116,6 +116,11 @@
     {
       "path": "apps/worker/src/master-data-command-service.ts",
       "maxLines": 1300,
+      "targetLines": 1500
+    },
+    {
+      "path": "apps/worker/src/outage-recovery-command-service.ts",
+      "maxLines": 1117,
       "targetLines": 1500
     }
   ],

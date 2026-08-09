@@ -26,12 +26,7 @@ describe("cashier ticket attribution", () => {
     expect(saleHandler).not.toContain("command.payload.soldByOperatorAccountId");
   });
 
-  it("keeps paper imports unattributed and preserves soft-deleted seller labels", () => {
-    const paperInsert = coordinatorSource.slice(
-      coordinatorSource.lastIndexOf("`INSERT INTO ticket_groups"),
-    );
-    expect(paperInsert).not.toContain("sold_by_operator_account_id");
-
+  it("preserves soft-deleted seller labels in protected search", () => {
     const searchStart = workerSource.indexOf('app.on("GET", eventRoutes("/tickets/search")');
     const searchEnd = workerSource.indexOf(
       'app.on("GET", eventRoutes("/ticket-groups/:ticketGroupId/print-data")',

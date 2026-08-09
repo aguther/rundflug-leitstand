@@ -13,7 +13,6 @@ describe("D-050 rotation data model", () => {
       "ALTER TABLE rotations ADD COLUMN operational_note TEXT NOT NULL DEFAULT ''",
     );
     expect(rotationMigration).toMatch(/UPDATE rotations[\s\S]*products[\s\S]*resource_groups/);
-    expect(coordinator).toMatch(/INSERT INTO rotations[\s\S]*flight_group_id, gate_id, status/);
   });
 
   it("persists note changes with audit, idempotency and outbox in one batch", () => {

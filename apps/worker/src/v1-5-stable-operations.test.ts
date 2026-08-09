@@ -11,9 +11,7 @@ describe("V1.5 stable operations", () => {
   });
 
   it("combines only explicitly selected whole groups in one serialized command", () => {
-    const handler = coordinator.match(
-      /private async handleRotationTransition[\s\S]*?private async handleApplyOutageRecovery/,
-    )?.[0];
+    const handler = coordinator.match(/private async handleRotationTransition[\s\S]*\n}/)?.[0];
     expect(handler).toBeTruthy();
     expect(handler).toContain("command.payload.ticketGroupIds");
     expect(handler).toContain("RESOURCE_GROUP_MISMATCH");
