@@ -79,18 +79,20 @@ describe("V1 maintainability and portability boundaries", () => {
     });
     const defaultNodeVersion = nodeVersion.trim();
     expect(defaultNodeVersion).toBe("24.18.0");
-    expect(ciWorkflow).toContain("node-version: 22.22.2");
     expect(rootManifest.scripts?.["check:ci"]).toBe(
       "npm run lint && npm run refactor:guardrails && npm run build && npm run requirements:verify",
     );
     expect(ciWorkflow).toContain("npm run check:ci");
     for (const workflow of [ciWorkflow, deployCloudflareWorkflow, cloudflarePerformanceWorkflow]) {
+      expect(workflow).toContain("actions/checkout@v7");
+      expect(workflow).toContain("actions/setup-node@v7");
+      expect(workflow).toContain("node-version-file: .nvmrc");
+      expect(workflow).not.toMatch(/\n\s+node-version: /);
       expect(workflow).toContain('npm install --global --prefix "$RUNNER_TEMP/npm" npm@12.0.2');
       expect(workflow).toContain('echo "$RUNNER_TEMP/npm/bin" >> "$GITHUB_PATH"');
     }
-    for (const workflow of [deployCloudflareWorkflow, cloudflarePerformanceWorkflow]) {
-      expect(workflow).toContain(`node-version: ${defaultNodeVersion}`);
-    }
+    expect(ciWorkflow).toContain("actions/setup-python@v7");
+    expect(ciWorkflow).not.toContain("actions/setup-python@v5");
   });
 
   it("keeps SonarQube Cloud analysis separate from the local quality gate", () => {
