@@ -8,7 +8,7 @@
     },
     {
       "path": "apps/worker/src/index.ts",
-      "maxLines": 2398,
+      "maxLines": 2147,
       "targetLines": 800
     },
     {
@@ -291,6 +291,16 @@
     {
       "path": "apps/worker/src/history-service.ts",
       "maxLines": 507,
+      "targetLines": 1500
+    },
+    {
+      "path": "apps/worker/src/report-export-routes.ts",
+      "maxLines": 119,
+      "targetLines": 1500
+    },
+    {
+      "path": "apps/worker/src/report-export-service.ts",
+      "maxLines": 209,
       "targetLines": 1500
     },
     {

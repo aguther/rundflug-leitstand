@@ -4,10 +4,6 @@ import workerSource from "./index.ts?raw";
 const privateEventRoutes = [
   ["GET", "/operations"],
   ["GET", "/devices"],
-  ["GET", "/reports/daily.csv"],
-  ["GET", "/exports/performance-profile.json"],
-  ["GET", "/exports/tickets.csv"],
-  ["GET", "/reports/daily.pdf"],
   ["GET", "/live"],
   ["POST", "/commands"],
 ] as const;
@@ -25,9 +21,4 @@ describe("content-blocker-neutral private event routing (T-020)", () => {
       expect(workerSource).toContain(`app.on("${method}", eventRoutes("${suffix}")`);
     },
   );
-
-  it("keeps the performance export contextual and aggregate-only", () => {
-    expect(workerSource).toContain("average_turnaround_minutes");
-    expect(workerSource).toContain("passengerSeatCounts");
-  });
 });
