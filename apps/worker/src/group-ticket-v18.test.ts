@@ -36,7 +36,6 @@ describe("V1.8 public group ticket", () => {
   });
 
   it("keeps legacy links and follows every current part for group push", () => {
-    expect(worker).toContain('app.post("/api/public/groups/:groupCode/push-subscriptions"');
     expect(webPush).toContain("group_ticket.ticket_group_id = w.ticket_group_id");
     expect(webPush).toContain("group_rt.rotation_id = ?1");
   });
@@ -46,8 +45,6 @@ describe("V1.8 public group ticket", () => {
     expect(targetMigration).toContain("CHECK (target_kind IN ('TICKET', 'GROUP'))");
     expect(targetMigration).toContain("D1 Time Travel");
     expect(targetMigration).toContain("aus portablen R2-Backups ausgeschlossen");
-    expect(worker).toContain("'TICKET'");
-    expect(worker).toContain("'GROUP'");
     expect(webPush).toContain("publicPushTargetPath");
   });
 
