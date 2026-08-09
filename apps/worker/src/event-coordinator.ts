@@ -51,6 +51,7 @@ import { PlannedOperationCommandService } from "./planned-operation-command-serv
 import { ProductSalesCommandService } from "./product-sales-command-service";
 import { RecurringOperationalRuleCommandService } from "./recurring-operational-rule-command-service";
 import { RotationCorrectionCommandService } from "./rotation-correction-command-service";
+import { RotationNoteCommandService } from "./rotation-note-command-service";
 import { RotationRecoveryCommandService } from "./rotation-recovery-command-service";
 import { RotationTransitionCommandService } from "./rotation-transition-command-service";
 import { rowToSnapshot, safeErrorMessage } from "./snapshot";
@@ -140,6 +141,9 @@ export class EventCoordinator extends DurableObject<Env> {
   private readonly rotationCorrectionCommands = new RotationCorrectionCommandService(
     this.env,
     (result) => this.broadcast(result),
+  );
+  private readonly rotationNoteCommands = new RotationNoteCommandService(this.env, (result) =>
+    this.broadcast(result),
   );
   private readonly rotationRecoveryCommands = new RotationRecoveryCommandService(
     this.env,
@@ -1268,7 +1272,7 @@ export class EventCoordinator extends DurableObject<Env> {
           return this.attendanceCommands.handleAttendanceException(command, current);
         }
         if (command.type === "SET_ROTATION_NOTE") {
-          return this.handleRotationNote(command, current);
+          return this.rotationNoteCommands.handle(command, current);
         }
         if (command.type === "SET_ROTATION_CAPACITY") {
           return this.rotationCorrectionCommands.handleRotationCapacity(command, current);
@@ -1553,71 +1557,5 @@ export class EventCoordinator extends DurableObject<Env> {
 
   private broadcastBoardRefresh(eventVersion: number, eventType: string): void {
     this.realtime.broadcastStateChanged(eventVersion, eventType);
-  }
-
-  private async handleRotationNote(
-    command: Extract<CommandEnvelope, { type: "SET_ROTATION_NOTE" }>,
-    current: StoredEventRow,
-  ): Promise<Response> {
-    const rotation = await this.env.DB.prepare(
-      "SELECT id, version FROM rotations WHERE id = ?1 AND operation_day_id = ?2",
-    )
-      .bind(command.payload.rotationId, command.eventId)
-      .first<{ id: string; version: number }>();
-    if (!rotation) {
-      return json(
-        { error: { code: "ROTATION_NOT_FOUND", message: "Umlauf nicht gefunden." } },
-        { status: 404 },
-      );
-    }
-
-    const now = new Date().toISOString();
-    const nextVersion = current.version + 1;
-    const result: CommandResult = {
-      accepted: true,
-      duplicate: false,
-      event: rowToSnapshot({ ...current, version: nextVersion, updated_at: now }),
-      eventType: "ROTATION_NOTE_SET",
-      aggregate: { type: "ROTATION", id: rotation.id },
-    };
-    await this.env.DB.batch([
-      this.env.DB.prepare(
-        "UPDATE operation_days SET version = ?1, updated_at = ?2 WHERE id = ?3 AND version = ?4",
-      ).bind(nextVersion, now, command.eventId, current.version),
-      this.env.DB.prepare(
-        "UPDATE rotations SET operational_note = ?1, version = version + 1, updated_at = ?2 WHERE id = ?3 AND version = ?4",
-      ).bind(command.payload.note, now, rotation.id, rotation.version),
-      this.env.DB.prepare(
-        `INSERT INTO operational_events
-          (id, operation_day_id, event_type, occurred_at, device_id, aggregate_type,
-           aggregate_id, aggregate_version, payload_json)
-         VALUES (?1, ?2, 'ROTATION_NOTE_SET', ?3, ?4, 'ROTATION', ?5, ?6, ?7)`,
-      ).bind(
-        crypto.randomUUID(),
-        command.eventId,
-        now,
-        command.deviceId,
-        rotation.id,
-        rotation.version + 1,
-        JSON.stringify({ note: command.payload.note, reason: command.payload.reason }),
-      ),
-      this.env.DB.prepare(
-        `INSERT INTO idempotency_receipts
-          (command_id, operation_day_id, device_id, command_type, received_at, response_json)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6)`,
-      ).bind(
-        command.commandId,
-        command.eventId,
-        command.deviceId,
-        command.type,
-        now,
-        JSON.stringify(result),
-      ),
-      this.env.DB.prepare(
-        "INSERT INTO outbox (id, operation_day_id, topic, payload_json, created_at) VALUES (?1, ?2, 'EVENT_STATE_CHANGED', ?3, ?4)",
-      ).bind(crypto.randomUUID(), command.eventId, JSON.stringify(result), now),
-    ]);
-    this.broadcast(result);
-    return json(result);
   }
 }

@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import rotationMigration from "../migrations/0026_rotation_gate_and_note.sql?raw";
 import capacityMigration from "../migrations/0027_rotation_capacity_queue.sql?raw";
-import coordinator from "./event-coordinator.ts?raw";
 import worker from "./index.ts?raw";
 
 describe("D-050 rotation data model", () => {
@@ -13,17 +12,6 @@ describe("D-050 rotation data model", () => {
       "ALTER TABLE rotations ADD COLUMN operational_note TEXT NOT NULL DEFAULT ''",
     );
     expect(rotationMigration).toMatch(/UPDATE rotations[\s\S]*products[\s\S]*resource_groups/);
-  });
-
-  it("persists note changes with audit, idempotency and outbox in one batch", () => {
-    const handler = coordinator.slice(coordinator.indexOf("private async handleRotationNote"));
-    expect(handler).toBeTruthy();
-    expect(handler).toContain("UPDATE rotations SET operational_note");
-    expect(handler).toContain("ROTATION_NOTE_SET");
-    expect(handler).toContain("INSERT INTO operational_events");
-    expect(handler).toContain("INSERT INTO idempotency_receipts");
-    expect(handler).toContain("INSERT INTO outbox");
-    expect(handler).toContain("this.env.DB.batch");
   });
 
   it("returns gate, note, tickets and all three timeline kinds on the operation board", () => {

@@ -3,7 +3,7 @@
   "sizeBudgets": [
     {
       "path": "apps/worker/src/event-coordinator.ts",
-      "maxLines": 1623,
+      "maxLines": 1561,
       "targetLines": 1500
     },
     {
@@ -131,6 +131,11 @@
     {
       "path": "apps/worker/src/rotation-transition-command-service.ts",
       "maxLines": 1121,
+      "targetLines": 1500
+    },
+    {
+      "path": "apps/worker/src/rotation-note-command-service.ts",
+      "maxLines": 83,
       "targetLines": 1500
     }
   ],
@@ -304,7 +309,6 @@
     "apps/worker/src/pwa-installability.test.ts -> apps/web/vite.config.ts",
     "apps/worker/src/pwa-installability.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/resource-day-history-route.test.ts -> apps/worker/src/index.ts",
-    "apps/worker/src/rotation-data-model.test.ts -> apps/worker/src/event-coordinator.ts",
     "apps/worker/src/rotation-data-model.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/sale-capacity-policy.test.ts -> apps/web/src/cashier-view.tsx",
     "apps/worker/src/sale-capacity-policy.test.ts -> apps/worker/src/event-coordinator.ts",
