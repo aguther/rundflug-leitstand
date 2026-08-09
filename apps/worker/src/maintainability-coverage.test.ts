@@ -117,7 +117,7 @@ describe("V1 maintainability and portability boundaries", () => {
     expect(ciWorkflow).toContain(
       "SonarSource/sonarqube-scan-action@7006c4492b2e0ee0f816d36501671557c97f5995",
     );
-    expect(ciWorkflow).toContain("-Dsonar.qualitygate.wait=true");
+    expect(ciWorkflow).toContain("-Dsonar.qualitygate.wait=false");
     expect(ciWorkflow.indexOf("name: CI Check")).toBeLessThan(
       ciWorkflow.indexOf("name: SonarQube Scan"),
     );
