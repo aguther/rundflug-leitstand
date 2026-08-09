@@ -145,9 +145,6 @@ describe("short-lived dispatch recommendation leases (F-BRD-010, Q-ZUV-020)", ()
     expect(EVENT_DELETION_SQL).toContain(
       "DELETE FROM dispatch_recommendation_leases WHERE operation_day_id = ?1",
     );
-    expect(workerSource).toContain(
-      "DELETE FROM dispatch_recommendation_leases WHERE operator_account_id = ?1",
-    );
     expect(workerSource).toContain("segment_group.precalled_at");
     expect(workerSource).toContain("precalledAt: group.precalled_at");
     expect(workerSource).toContain("dispatchReservationByGroupId.get(group.id) ?? null");

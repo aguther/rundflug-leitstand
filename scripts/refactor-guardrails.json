@@ -8,7 +8,7 @@
     },
     {
       "path": "apps/worker/src/index.ts",
-      "maxLines": 6800,
+      "maxLines": 6639,
       "targetLines": 800
     },
     {
@@ -182,6 +182,11 @@
       "path": "apps/worker/src/auth-routes.ts",
       "maxLines": 240,
       "targetLines": 1500
+    },
+    {
+      "path": "apps/worker/src/admin-account-routes.ts",
+      "maxLines": 200,
+      "targetLines": 1500
     }
   ],
   "allowedProductionRawImports": [
@@ -341,7 +346,6 @@
     "apps/worker/src/operational-note-permission.test.ts -> apps/worker/src/event-coordinator.ts",
     "apps/worker/src/operational-note-permission.test.ts -> packages/domain/src/index.ts",
     "apps/worker/src/operational-planning.test.ts -> apps/worker/src/index.ts",
-    "apps/worker/src/operator-account-management.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/planning-capture.test.ts -> apps/worker/src/backup.ts",
     "apps/worker/src/planning-capture.test.ts -> apps/worker/src/event-deletion.ts",
     "apps/worker/src/planning-capture.test.ts -> apps/worker/src/factory-reset.ts",
