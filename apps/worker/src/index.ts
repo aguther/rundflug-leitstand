@@ -29,6 +29,7 @@ import { registerControlCoordinationRoutes } from "./control-coordination-routes
 import { registerControlSessionMiddleware } from "./control-session-middleware";
 import { runD1ReadsSequentially } from "./d1-read-scheduler";
 import { authorizeDevice } from "./device-authorization";
+import { registerDeviceRoutes } from "./device-routes";
 import { EventCoordinator } from "./event-coordinator";
 import { registerFactoryResetRoutes } from "./factory-reset-routes";
 import { registerFidsControlRoutes } from "./fids-control-routes";
@@ -1972,48 +1973,8 @@ registerAnalysisControlRoutes(app, eventCoordinatorNamespace);
 registerTicketReadRoutes(app);
 
 registerHistoryRoutes(app);
-app.on("GET", eventRoutes("/devices"), async (context) => {
-  const eventId = context.req.param("eventId");
-  const device = await authorizeDevice(context.env, eventId, context.req.raw);
-  if (device?.role !== "ADMIN") {
-    return context.json(
-      {
-        error: {
-          code: "SESSION_NOT_AUTHORIZED",
-          message: "Sitzung für diese Ansicht nicht berechtigt.",
-        },
-      },
-      403,
-    );
-  }
-  const devices = await context.env.DB.prepare(
-    `SELECT id, label, role, active, paired_at, last_seen_at, revoked_at
-       FROM paired_devices WHERE operation_day_id = ?1 ORDER BY active DESC, paired_at DESC`,
-  )
-    .bind(eventId)
-    .all<{
-      id: string;
-      label: string;
-      role: string;
-      active: number;
-      paired_at: string;
-      last_seen_at: string;
-      revoked_at: string | null;
-    }>();
-  const now = Date.now();
-  return context.json({
-    devices: devices.results.map((entry) => ({
-      id: entry.id,
-      label: entry.label,
-      role: entry.role,
-      active: entry.active === 1,
-      online: entry.active === 1 && now - Date.parse(entry.last_seen_at) <= 120_000,
-      pairedAt: entry.paired_at,
-      lastSeenAt: entry.last_seen_at,
-      revokedAt: entry.revoked_at,
-    })),
-  });
-});
+
+registerDeviceRoutes(app);
 
 registerReportExportRoutes(app);
 
