@@ -6,8 +6,6 @@ import {
   analysisArchiveSchema,
   analysisSnapshotRequestSchema,
   analysisSnapshotSchema,
-  type FidsBoardResponse,
-  type FidsFilterOptions,
   forecastHistoryQuerySchema,
   forecastHistorySchema,
   gateDisplayFilterSchema,
@@ -28,11 +26,6 @@ import {
   forecastQueueWindows,
   formatBookingGroupLabel,
   formatFlightGroupLabel,
-  groupSharedFidsFlights,
-  orderFidsRows,
-  paginateFidsRows,
-  parseFidsPage,
-  partitionFidsRows,
   resolveTurnaroundProfile,
 } from "@rundflug/domain";
 import { Hono } from "hono";
@@ -60,21 +53,14 @@ import { authorizeSession, type SessionActor } from "./auth";
 import { registerAuthRoutes } from "./auth-routes";
 import { createPortableBackup, operationDateInTimeZone } from "./backup";
 import { withBookingGroupPartProjection } from "./booking-group-part-projection";
+import { registerControlSessionMiddleware } from "./control-session-middleware";
 import { sha256Hex } from "./crypto";
 import { runD1ReadsSequentially } from "./d1-read-scheduler";
 import { dailyReportCsv, dailyReportPdfLines, loadDailyReport } from "./daily-report";
 import { authorizeDevice } from "./device-authorization";
 import { EventCoordinator } from "./event-coordinator";
 import { registerFactoryResetRoutes } from "./factory-reset-routes";
-import { mayAccessFids } from "./fids-authorization";
-import {
-  type FidsProjectionFilter,
-  loadAllFidsProjectionRows,
-  loadFidsProjectionEvent,
-  loadFidsProjectionFleet,
-} from "./fids-board-projection";
-import { mapFidsProjectionRow } from "./fids-board-response";
-import { loadFidsPreferences } from "./fids-preferences-storage";
+import { registerFidsControlRoutes } from "./fids-control-routes";
 import { buildForecastHistoryStatement } from "./forecast-history";
 import {
   EMPTY_GATE_DISPLAY_FILTER_JSON,
@@ -204,28 +190,7 @@ app.use("/api/*", async (context, next) => {
 app.use("/api/*", limitApiBody);
 app.use("/api/*", requireValidJsonBody);
 
-for (const protectedPrefix of ["/api/control/*"] as const) {
-  app.use(protectedPrefix, async (context, next) => {
-    if (context.req.path.includes("/fids/")) {
-      await next();
-      return;
-    }
-    const actor = await authorizeSession(context.env, context.req.raw);
-    context.set("sessionActor", actor);
-    if (actor?.role === "DISPLAY") {
-      return context.json(
-        {
-          error: {
-            code: "SESSION_NOT_AUTHORIZED",
-            message: "Display-Konten dürfen ausschließlich die FIDS-Anzeige verwenden.",
-          },
-        },
-        403,
-      );
-    }
-    await next();
-  });
-}
+registerControlSessionMiddleware(app);
 
 app.get("/api/health", (context) =>
   context.json({
@@ -416,236 +381,7 @@ app.on("DELETE", eventRoutes("/dispatch-recommendation-leases/:leaseId"), async 
   return new Response(response.body, response);
 });
 
-app.on("GET", eventRoutes("/fids/preferences"), async (context) => {
-  const eventId = context.req.param("eventId");
-  const actor = await authorizeSession(context.env, context.req.raw);
-  if (!actor || !mayAccessFids(actor.role)) {
-    return context.json(
-      {
-        error: {
-          code: "SESSION_NOT_AUTHORIZED",
-          message: "Sitzung für diese Ansicht nicht berechtigt.",
-        },
-      },
-      403,
-    );
-  }
-  const event = await context.env.DB.prepare("SELECT id FROM operation_days WHERE id = ?1")
-    .bind(eventId)
-    .first<{ id: string }>();
-  if (!event) {
-    return context.json(
-      { error: { code: "EVENT_NOT_FOUND", message: "Veranstaltung nicht gefunden." } },
-      404,
-    );
-  }
-  return context.json(await loadFidsPreferences(context.env.DB, actor.accountId, eventId));
-});
-
-app.on("PUT", eventRoutes("/fids/preferences"), async (context) => {
-  const eventId = context.req.param("eventId");
-  const actor = await authorizeSession(context.env, context.req.raw);
-  if (!actor || !mayAccessFids(actor.role)) {
-    return context.json(
-      {
-        error: {
-          code: "SESSION_NOT_AUTHORIZED",
-          message: "Sitzung für diese Ansicht nicht berechtigt.",
-        },
-      },
-      403,
-    );
-  }
-  const namespace = eventCoordinatorNamespace(context.env);
-  const stub = namespace.get(namespace.idFromName(eventId));
-  const target = new URL(context.req.url);
-  target.pathname = `/internal/events/${encodeURIComponent(eventId)}/fids/preferences`;
-  const headers = new Headers({ "content-type": "application/json" });
-  headers.set("x-operator-account-id", actor.accountId);
-  headers.set("x-operator-login-code", actor.loginCode);
-  headers.set("x-operator-session-id", actor.sessionId);
-  headers.set("x-operator-role", actor.role);
-  headers.set("x-operator-device-id", actor.deviceId);
-  const body = await context.req.text();
-  const response = await stub.fetch(new Request(target, { method: "PUT", headers, body }));
-  return new Response(response.body, response);
-});
-
-app.on("GET", eventRoutes("/fids/filter-options"), async (context) => {
-  const eventId = context.req.param("eventId");
-  const actor = await authorizeSession(context.env, context.req.raw);
-  if (!actor || !mayAccessFids(actor.role)) {
-    return context.json(
-      {
-        error: {
-          code: "SESSION_NOT_AUTHORIZED",
-          message: "Sitzung für diese Ansicht nicht berechtigt.",
-        },
-      },
-      403,
-    );
-  }
-  const event = await context.env.DB.prepare("SELECT id FROM operation_days WHERE id = ?1")
-    .bind(eventId)
-    .first<{ id: string }>();
-  if (!event) {
-    return context.json(
-      { error: { code: "EVENT_NOT_FOUND", message: "Veranstaltung nicht gefunden." } },
-      404,
-    );
-  }
-  const [gates, products] = await runD1ReadsSequentially([
-    () =>
-      context.env.DB.prepare(
-        `SELECT id, label, active
-           FROM gates
-          WHERE operation_day_id = ?1
-          ORDER BY active DESC, label COLLATE NOCASE, id`,
-      )
-        .bind(eventId)
-        .all<{ id: string; label: string; active: number }>(),
-    () =>
-      context.env.DB.prepare(
-        `SELECT p.id, p.code, p.name, COALESCE(p.gate_id, rg.gate_id) AS gate_id,
-                p.sale_enabled AS active
-           FROM products p
-           JOIN resource_groups rg ON rg.id = p.resource_group_id
-          WHERE p.operation_day_id = ?1
-          ORDER BY p.sale_enabled DESC, p.sort_order, p.code COLLATE NOCASE, p.id`,
-      )
-        .bind(eventId)
-        .all<{ id: string; code: string; name: string; gate_id: string; active: number }>(),
-  ] as const);
-  return context.json({
-    gates: gates.results.map((gate) => ({
-      id: gate.id,
-      label: gate.label,
-      active: gate.active === 1,
-    })),
-    products: products.results.map((product) => ({
-      id: product.id,
-      code: product.code,
-      name: product.name,
-      gateId: product.gate_id,
-      active: product.active === 1,
-    })),
-  } satisfies FidsFilterOptions);
-});
-
-app.on("GET", eventRoutes("/fids/board"), async (context) => {
-  const requestStartedAt = performance.now();
-  const eventId = context.req.param("eventId");
-  const actor = await authorizeSession(context.env, context.req.raw);
-  if (!actor || !mayAccessFids(actor.role)) {
-    return context.json(
-      {
-        error: {
-          code: "SESSION_NOT_AUTHORIZED",
-          message: "Sitzung für diese Ansicht nicht berechtigt.",
-        },
-      },
-      403,
-    );
-  }
-  const event = await loadFidsProjectionEvent(context.env.DB, eventId);
-  if (!event) {
-    return context.json(
-      { error: { code: "EVENT_NOT_FOUND", message: "Veranstaltung nicht gefunden." } },
-      404,
-    );
-  }
-  const preferences = await loadFidsPreferences(context.env.DB, actor.accountId, eventId);
-  const page = parseFidsPage(context.req.query("page"));
-  const lowerPage = parseFidsPage(context.req.query("lowerPage"));
-  const boardReadAt = new Date().toISOString();
-  const departedVisibilityCutoff = new Date(
-    Date.now() - event.departed_visibility_seconds * 1_000,
-  ).toISOString();
-  const filter: FidsProjectionFilter = {
-    productIds: preferences.contentFilter.productIds,
-    gateIds: preferences.contentFilter.gateIds,
-    rotationStatuses: [],
-  };
-  const baseProjection = {
-    eventId,
-    filter,
-    departedVisibilityCutoff,
-    now: boardReadAt,
-  };
-  const [fleet, projectionRows] =
-    event.emergency_mode === 1
-      ? [[], []]
-      : await Promise.all([
-          loadFidsProjectionFleet(context.env.DB, eventId),
-          loadAllFidsProjectionRows(context.env.DB, { ...baseProjection, band: "ALL" }),
-        ]);
-  const displayedRows = groupSharedFidsFlights(
-    orderFidsRows(projectionRows.map((row) => mapFidsProjectionRow(row, event, boardReadAt))),
-    preferences.groupSharedFlights,
-  );
-
-  let priority: FidsBoardResponse["priority"] = null;
-  let boardPage: FidsBoardResponse["page"];
-  if (event.emergency_mode === 1) {
-    boardPage = {
-      requestedPage: preferences.viewMode === "SPLIT" ? lowerPage : page,
-      pageSize:
-        preferences.viewMode === "SPLIT"
-          ? preferences.visibleRows - preferences.priorityGroupCount
-          : preferences.visibleRows,
-      totalItems: 0,
-      totalPages: 0,
-      groups: [],
-    };
-    if (preferences.viewMode === "SPLIT") {
-      priority = {
-        configuredCapacity: preferences.priorityGroupCount,
-        effectiveCapacity: preferences.priorityGroupCount,
-        totalItems: 0,
-        overflowCount: 0,
-        groups: [],
-      };
-    }
-  } else if (preferences.viewMode === "FIXED_PAGE") {
-    boardPage = paginateFidsRows(displayedRows, page, preferences.visibleRows);
-  } else {
-    const splitProjection = partitionFidsRows({
-      rows: displayedRows,
-      visibleRows: preferences.visibleRows,
-      priorityGroupCount: preferences.priorityGroupCount,
-      lowerPage,
-    });
-    priority = splitProjection.priority;
-    boardPage = splitProjection.page;
-  }
-
-  const response = context.json({
-    eventName: event.name,
-    timeZone: event.time_zone,
-    emergencyMode: event.emergency_mode === 1,
-    operationalInterrupted: event.operational_interrupted === 1,
-    operationalNotice: event.planned_public_note || event.operational_note,
-    departedVisibilitySeconds: event.departed_visibility_seconds,
-    updatedAt: event.updated_at,
-    preferencesVersion: preferences.version,
-    viewMode: preferences.viewMode,
-    filterSummary: preferences.contentFilter,
-    priority,
-    page: boardPage,
-    fleet: event.emergency_mode
-      ? []
-      : fleet.map((aircraft) => ({
-          registration: aircraft.registration,
-          status: aircraft.operational_state as FidsBoardResponse["fleet"][number]["status"],
-          refuelPlanned: aircraft.refuel_planned === 1,
-        })),
-  } satisfies FidsBoardResponse);
-  response.headers.set(
-    "server-timing",
-    `fids-board;dur=${(performance.now() - requestStartedAt).toFixed(1)}`,
-  );
-  return response;
-});
+registerFidsControlRoutes(app, eventCoordinatorNamespace);
 
 app.on("GET", eventRoutes("/operations"), async (context) => {
   const requestStartedAt = performance.now();

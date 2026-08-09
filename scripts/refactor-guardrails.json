@@ -8,7 +8,7 @@
     },
     {
       "path": "apps/worker/src/index.ts",
-      "maxLines": 4060,
+      "maxLines": 3796,
       "targetLines": 800
     },
     {
@@ -257,6 +257,26 @@
       "path": "apps/worker/src/admin-event-logo-service.ts",
       "maxLines": 399,
       "targetLines": 1500
+    },
+    {
+      "path": "apps/worker/src/control-session-middleware.ts",
+      "maxLines": 38,
+      "targetLines": 1500
+    },
+    {
+      "path": "apps/worker/src/fids-board-service.ts",
+      "maxLines": 139,
+      "targetLines": 1500
+    },
+    {
+      "path": "apps/worker/src/fids-control-routes.ts",
+      "maxLines": 136,
+      "targetLines": 1500
+    },
+    {
+      "path": "apps/worker/src/fids-filter-options-service.ts",
+      "maxLines": 51,
+      "targetLines": 1500
     }
   ],
   "allowedProductionRawImports": [
@@ -385,8 +405,6 @@
     "apps/worker/src/control-routing.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/dispatch-recommendation-leases.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/fids-board-projection.test.ts -> apps/worker/src/fids-board-projection.ts",
-    "apps/worker/src/fids-board-projection.test.ts -> apps/worker/src/index.ts",
-    "apps/worker/src/fids-preferences.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/flight-line-assist-claims.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/flight-line-pilot-assignment.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/forecast-freshness-coverage.test.ts -> apps/worker/src/index.ts",

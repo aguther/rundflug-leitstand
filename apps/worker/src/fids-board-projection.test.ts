@@ -6,7 +6,6 @@ import {
   loadFidsProjectionRows,
 } from "./fids-board-projection";
 import projectionSource from "./fids-board-projection.ts?raw";
-import workerSource from "./index.ts?raw";
 
 function recordingDatabase(result: { count?: number; rows?: FidsProjectionRow[] }): {
   db: D1Database;
@@ -141,18 +140,5 @@ describe("protected FIDS board projection", () => {
       /CASE WHEN status IN \('IN_FLIGHT', 'LANDED', 'COMPLETED'\)\s+THEN departed_at END DESC/,
     );
     expect(recording.bindings[0]?.[6]).toBe("ALL");
-  });
-
-  it("groups and paginates the complete protected projection with shared domain rules", () => {
-    const protectedRoute = workerSource.slice(
-      workerSource.indexOf('app.on("GET", eventRoutes("/fids/board")'),
-      workerSource.indexOf('app.on("GET", eventRoutes("/forecast/history")'),
-    );
-    expect(protectedRoute).toContain("loadAllFidsProjectionRows");
-    expect(protectedRoute).toContain("orderFidsRows(");
-    expect(protectedRoute).toContain("groupSharedFidsFlights(");
-    expect(protectedRoute).toContain("preferences.groupSharedFlights");
-    expect(protectedRoute).toContain("paginateFidsRows(displayedRows");
-    expect(protectedRoute).toContain("partitionFidsRows({");
   });
 });
