@@ -8,7 +8,7 @@
     },
     {
       "path": "apps/worker/src/index.ts",
-      "maxLines": 6639,
+      "maxLines": 6445,
       "targetLines": 800
     },
     {
@@ -186,6 +186,16 @@
     {
       "path": "apps/worker/src/admin-account-routes.ts",
       "maxLines": 200,
+      "targetLines": 1500
+    },
+    {
+      "path": "apps/worker/src/device-authorization.ts",
+      "maxLines": 57,
+      "targetLines": 1500
+    },
+    {
+      "path": "apps/worker/src/admin-security-routes.ts",
+      "maxLines": 186,
       "targetLines": 1500
     }
   ],

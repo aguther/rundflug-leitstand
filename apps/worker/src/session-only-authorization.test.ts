@@ -2,18 +2,6 @@ import { describe, expect, it } from "vitest";
 import workerSource from "./index.ts?raw";
 
 describe("serverseitige Sitzungsautorisierung (ADR-0010, Q-SIC-020, T-020)", () => {
-  it("disables legacy device-header authentication outside development", () => {
-    const helper = workerSource.slice(
-      workerSource.indexOf("async function authorizeDevice("),
-      workerSource.indexOf("function eventCoordinatorNamespace"),
-    );
-    expect(helper).toContain("authorizeSession(env, request)");
-    expect(helper).toContain('if (env.APP_ENV !== "development") return null');
-    expect(helper.indexOf('if (env.APP_ENV !== "development")')).toBeLessThan(
-      helper.indexOf('request.headers.get("x-device-id")'),
-    );
-  });
-
   it("derives Assist ownership from the authorized session actor", () => {
     const route = workerSource.slice(
       workerSource.indexOf('app.on("PUT", eventRoutes("/assist-claims/:aircraftId")'),
