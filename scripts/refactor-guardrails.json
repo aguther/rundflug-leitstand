@@ -8,7 +8,7 @@
     },
     {
       "path": "apps/worker/src/index.ts",
-      "maxLines": 3796,
+      "maxLines": 3652,
       "targetLines": 800
     },
     {
@@ -261,6 +261,11 @@
     {
       "path": "apps/worker/src/control-session-middleware.ts",
       "maxLines": 38,
+      "targetLines": 1500
+    },
+    {
+      "path": "apps/worker/src/control-coordination-routes.ts",
+      "maxLines": 141,
       "targetLines": 1500
     },
     {

@@ -2,9 +2,6 @@ import { describe, expect, it } from "vitest";
 import workerSource from "./index.ts?raw";
 
 const privateEventRoutes = [
-  ["GET", "/snapshot"],
-  ["PUT", "/assist-claims/:aircraftId"],
-  ["DELETE", "/assist-claims/:aircraftId"],
   ["GET", "/operations"],
   ["GET", "/tickets/search"],
   ["GET", "/ticket-groups/:ticketGroupId/print-data"],

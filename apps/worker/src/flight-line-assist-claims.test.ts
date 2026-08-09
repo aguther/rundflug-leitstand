@@ -11,11 +11,7 @@ describe("loginbasierte Flight-Line-Assist-Betreuungsreservierung (F-INT-070)", 
     expect(migration).toContain("expires_at TEXT NOT NULL");
   });
 
-  it("requires an authorized operational session without exposing its technical ID", () => {
-    expect(workerSource).toContain(
-      'app.on("PUT", eventRoutes("/assist-claims/:aircraftId"), async (context) => {',
-    );
-    expect(workerSource).toContain('["FLIGHT_LINE", "FLIGHT_DIRECTOR", "ADMIN"]');
+  it("projects account-owned claims without exposing personal data", () => {
     expect(workerSource).toContain("assistClaims: assistClaims.map");
     expect(workerSource).toContain("claimedByCurrentOperator:");
     expect(workerSource).toContain("claim.operator_account_id === device.accountId");

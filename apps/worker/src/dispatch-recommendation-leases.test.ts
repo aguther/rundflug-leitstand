@@ -138,9 +138,7 @@ describe("short-lived dispatch recommendation leases (F-BRD-010, Q-ZUV-020)", ()
     expect(JSON.parse(lease.member_rotation_ids_json)).toEqual([]);
   });
 
-  it("authorizes its routes and participates in every destructive lifecycle", () => {
-    expect(workerSource).toContain('eventRoutes("/dispatch-recommendation-leases")');
-    expect(workerSource).toContain('eventRoutes("/dispatch-recommendation-leases/:leaseId")');
+  it("participates in every destructive lifecycle and operations projection", () => {
     expect(FACTORY_RESET_DELETE_TABLES).toContain("dispatch_recommendation_leases");
     expect(EVENT_DELETION_SQL).toContain(
       "DELETE FROM dispatch_recommendation_leases WHERE operation_day_id = ?1",

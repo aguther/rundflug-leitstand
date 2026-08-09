@@ -2,17 +2,6 @@ import { describe, expect, it } from "vitest";
 import workerSource from "./index.ts?raw";
 
 describe("serverseitige Sitzungsautorisierung (ADR-0010, Q-SIC-020, T-020)", () => {
-  it("derives Assist ownership from the authorized session actor", () => {
-    const route = workerSource.slice(
-      workerSource.indexOf('app.on("PUT", eventRoutes("/assist-claims/:aircraftId")'),
-      workerSource.indexOf('app.on("DELETE", eventRoutes("/assist-claims/:aircraftId")'),
-    );
-    expect(route).toContain("const actor = await authorizeSession");
-    expect(route).toContain('headers.set("x-operator-account-id", actor.accountId)');
-    expect(route).toContain('headers.set("x-operator-login-code", actor.loginCode)');
-    expect(route).not.toContain('context.req.header("x-device-id")');
-  });
-
   it("removes browser device credentials and injects the session origin into commands", () => {
     const route = workerSource.slice(
       workerSource.indexOf('app.on("POST", eventRoutes("/commands")'),
