@@ -8,7 +8,7 @@
     },
     {
       "path": "apps/worker/src/index.ts",
-      "maxLines": 8043,
+      "maxLines": 7985,
       "targetLines": 800
     },
     {
@@ -146,6 +146,11 @@
     {
       "path": "apps/worker/src/public-install-routes.ts",
       "maxLines": 249,
+      "targetLines": 1500
+    },
+    {
+      "path": "apps/worker/src/public-status-projection.ts",
+      "maxLines": 62,
       "targetLines": 1500
     }
   ],
