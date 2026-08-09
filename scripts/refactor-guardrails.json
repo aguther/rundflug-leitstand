@@ -8,7 +8,7 @@
     },
     {
       "path": "apps/worker/src/index.ts",
-      "maxLines": 3652,
+      "maxLines": 3289,
       "targetLines": 800
     },
     {
@@ -269,6 +269,11 @@
       "targetLines": 1500
     },
     {
+      "path": "apps/worker/src/analysis-control-routes.ts",
+      "maxLines": 420,
+      "targetLines": 1500
+    },
+    {
       "path": "apps/worker/src/fids-board-service.ts",
       "maxLines": 139,
       "targetLines": 1500
@@ -402,7 +407,6 @@
     "apps/web/src/v19-ui.test.ts -> apps/web/src/cashier-view.tsx",
     "apps/web/src/v19-ui.test.ts -> apps/web/src/operation-workspace.tsx",
     "apps/worker/src/analysis-snapshot.test.ts -> apps/worker/src/analysis-snapshot.ts",
-    "apps/worker/src/analysis-snapshot.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/api-cache-policy.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/audit-coverage.test.ts -> apps/worker/src/daily-report.ts",
     "apps/worker/src/cashier-ticket-attribution.test.ts -> apps/worker/src/event-coordinator.ts",

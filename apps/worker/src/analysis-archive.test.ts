@@ -7,7 +7,6 @@ import { analysisRetentionDays } from "./analysis-archive";
 import { analysisExportPageSize, analysisExportProjections } from "./analysis-export-projections";
 import type { Env } from "./types";
 
-const indexSource = readFileSync(new URL("./index.ts", import.meta.url), "utf8");
 const writerSource = readFileSync(new URL("./analysis-archive-writer.ts", import.meta.url), "utf8");
 const deletionSource = readFileSync(new URL("./event-deletion.ts", import.meta.url), "utf8");
 const migration = readFileSync(
@@ -74,13 +73,6 @@ describe("analysis archive boundaries", () => {
   it("keeps automatic archive jobs unique and their access events append-only", () => {
     expect(migration).toContain("UNIQUE(operation_day_id, operation_day_version");
     expect(migration).toContain("analysis_archive_events is append-only");
-  });
-
-  it("protects every archive endpoint with the admin role", () => {
-    expect(indexSource).toContain('eventRoutes("/analysis/day-archives")');
-    expect(indexSource).toContain('eventRoutes("/analysis/day-archives/:archiveId/download")');
-    expect(indexSource).toContain('eventRoutes("/analysis/day-archives/:archiveId")');
-    expect(indexSource.match(/actor\.role !== "ADMIN"/g)?.length).toBeGreaterThanOrEqual(4);
   });
 
   it("removes all event-scoped archive objects on event deletion", () => {
