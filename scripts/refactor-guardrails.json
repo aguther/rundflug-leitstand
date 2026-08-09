@@ -8,7 +8,7 @@
     },
     {
       "path": "apps/worker/src/index.ts",
-      "maxLines": 5043,
+      "maxLines": 4760,
       "targetLines": 800
     },
     {
@@ -226,6 +226,16 @@
     {
       "path": "apps/worker/src/simulation-plan-export-routes.ts",
       "maxLines": 179,
+      "targetLines": 1500
+    },
+    {
+      "path": "apps/worker/src/admin-event-clone-routes.ts",
+      "maxLines": 63,
+      "targetLines": 1500
+    },
+    {
+      "path": "apps/worker/src/admin-event-clone-service.ts",
+      "maxLines": 300,
       "targetLines": 1500
     }
   ],
