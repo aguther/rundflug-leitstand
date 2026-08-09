@@ -8,7 +8,7 @@
     },
     {
       "path": "apps/worker/src/index.ts",
-      "maxLines": 6998,
+      "maxLines": 6800,
       "targetLines": 800
     },
     {
@@ -177,6 +177,11 @@
       "path": "apps/worker/src/public-board-routes.ts",
       "maxLines": 138,
       "targetLines": 1500
+    },
+    {
+      "path": "apps/worker/src/auth-routes.ts",
+      "maxLines": 240,
+      "targetLines": 1500
     }
   ],
   "allowedProductionRawImports": [
@@ -309,7 +314,6 @@
     "apps/worker/src/event-deletion.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/event-logo-theme-routes.test.ts -> apps/worker/src/event-deletion.ts",
     "apps/worker/src/event-logo-theme-routes.test.ts -> apps/worker/src/index.ts",
-    "apps/worker/src/event-selection-api.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/fids-board-projection.test.ts -> apps/worker/src/fids-board-projection.ts",
     "apps/worker/src/fids-board-projection.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/fids-preferences.test.ts -> apps/worker/src/index.ts",
