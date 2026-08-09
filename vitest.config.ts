@@ -4,7 +4,7 @@ export default defineConfig({
   test: {
     include: ["packages/**/*.test.ts", "apps/worker/**/*.test.ts", "apps/web/**/*.test.{ts,tsx}"],
     coverage: {
-      reporter: ["text", "html"],
+      reporter: ["text", "html", "lcov"],
     },
   },
 });

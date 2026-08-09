@@ -7,6 +7,7 @@
       "!**/dist",
       "!**/.wrangler",
       "!**/.claude",
+      "!coverage",
       "!tmp",
       "!apps/worker/src/worker-configuration.d.ts",
       "!docs/ui/icon-system",

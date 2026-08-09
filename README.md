@@ -103,6 +103,17 @@ Vollständigkeitsprüfung des Anforderungskatalogs aus.
 Die aktuellen automatisierten Prüfungen sind in `package.json`, den Requirements und der
 vollständigen Traceability dokumentiert.
 
+Die davon getrennte SonarQube-Cloud-Analyse erzeugt zuerst einen lokalen LCOV-Bericht und übermittelt
+anschließend die statische Analyse. Sie ist bewusst kein Bestandteil von `npm run check` oder
+`npm run build`, damit beide Befehle ohne Netzwerk und SonarQube-Verfügbarkeit ausführbar bleiben:
+
+```bash
+npm run sonar
+```
+
+Einrichtung, CI-Secret und Fehlerverhalten beschreibt der
+[SonarQube-Cloud-Nachweis](docs/verification/sonarcloud-analysis.md).
+
 ## Cloudflare-Ressourcen
 
 Die aktuell verwendete D1-Datenbank und der R2-Bucket sind in `wrangler.jsonc` gebunden. Neue,

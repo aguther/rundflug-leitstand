@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import sonarWorkflow from "../../../.github/workflows/build.yml?raw";
 import ciWorkflow from "../../../.github/workflows/ci.yml?raw";
 import cloudflarePerformanceWorkflow from "../../../.github/workflows/cloudflare-performance.yml?raw";
 import deployCloudflareWorkflow from "../../../.github/workflows/deploy-cloudflare.yml?raw";
@@ -14,6 +15,7 @@ import forecastSource from "../../../packages/domain/src/forecast.ts?raw";
 import domainIndexSource from "../../../packages/domain/src/index.ts?raw";
 import outageRecoverySource from "../../../packages/domain/src/outage-recovery.ts?raw";
 import queueSource from "../../../packages/domain/src/queue.ts?raw";
+import sonarProperties from "../../../sonar-project.properties?raw";
 import webManifestRaw from "../../web/package.json?raw";
 import webAdminSource from "../../web/src/admin-view.tsx?raw";
 import eventParametersSource from "../../web/src/features/admin/event-parameters/EventParametersWorkspace.tsx?raw";
@@ -57,6 +59,8 @@ describe("V1 maintainability and portability boundaries", () => {
       "@cloudflare/vitest-pool-workers": "^0.20.3",
       "@cloudflare/workers-types": "^5.20260801.1",
       "@playwright/test": "^1.62.1",
+      "@sonar/scan": "^5.0.0",
+      "@vitest/coverage-v8": "^4.1.10",
       jsdom: "^30.0.1",
       typescript: "7.0.2",
       wrangler: "^4.120.0",
@@ -89,6 +93,25 @@ describe("V1 maintainability and portability boundaries", () => {
     }
   });
 
+  it("keeps SonarQube Cloud analysis separate from the local quality gate", () => {
+    const rootManifest = JSON.parse(rootManifestRaw) as Manifest;
+
+    expect(rootManifest.scripts).toMatchObject({
+      sonar: "npm run test:coverage && sonar-scanner-npm",
+      "test:coverage":
+        'vitest run --coverage --testNamePattern="^(?!.*projects all 300 eligible groups beyond the bounded dispatch horizon).*$"',
+    });
+    expect(rootManifest.scripts?.build).not.toContain("sonar");
+    expect(rootManifest.scripts?.check).not.toContain("sonar");
+    expect(sonarProperties).toContain("sonar.projectKey=aguther_rundflug-leitstand");
+    expect(sonarProperties).toContain("sonar.javascript.lcov.reportPaths=coverage/lcov.info");
+    expect(sonarWorkflow).toContain(`SONAR_TOKEN: \${{ secrets.SONAR_TOKEN }}`);
+    expect(sonarWorkflow).toContain(
+      "SonarSource/sonarqube-scan-action@7006c4492b2e0ee0f816d36501671557c97f5995",
+    );
+    expect(sonarWorkflow).toContain("-Dsonar.qualitygate.wait=true");
+  });
+
   it("uses a deliberately small allowlist of common open-source runtime and build dependencies", () => {
     const allowed = new Set([
       "@cloudflare/workers-types",
@@ -103,8 +126,10 @@ describe("V1 maintainability and portability boundaries", () => {
       "@biomejs/biome",
       "@cloudflare/vitest-pool-workers",
       "@playwright/test",
+      "@sonar/scan",
       "@testing-library/react",
       "@testing-library/user-event",
+      "@vitest/coverage-v8",
       "concurrently",
       "fflate",
       "hono",
