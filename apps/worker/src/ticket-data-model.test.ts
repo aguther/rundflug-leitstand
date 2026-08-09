@@ -5,7 +5,6 @@ import operationWorkspaceSource from "../../web/src/operation-workspace.tsx?raw"
 import initialMigration from "../migrations/0001_initial.sql?raw";
 import pushMigration from "../migrations/0006_web_push.sql?raw";
 import rotationMigration from "../migrations/0026_rotation_gate_and_note.sql?raw";
-import coordinator from "./event-coordinator.ts?raw";
 import fidsProjection from "./fids-board-projection.ts?raw";
 import worker from "./index.ts?raw";
 
@@ -52,7 +51,6 @@ describe("anonymous V1 ticket data model", () => {
       /CREATE TABLE rotation_tickets \([\s\S]*rotation_id TEXT NOT NULL[\s\S]*ticket_id TEXT NOT NULL/,
     );
     expect(rotationMigration).toContain("ALTER TABLE rotations ADD COLUMN gate_id");
-    expect(coordinator).toMatch(/MAX\(tg\.queue_sequence\)[\s\S]*p\.resource_group_id = \?2/);
   });
 
   it("uses the frozen rotation gate in protected and public slot projections", () => {

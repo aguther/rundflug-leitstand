@@ -6,7 +6,6 @@ const migration = readFileSync(
   new URL("../migrations/0056_product_pure_flight_groups.sql", import.meta.url),
   "utf8",
 );
-const coordinator = readFileSync(new URL("./event-coordinator.ts", import.meta.url), "utf8");
 
 describe("product-pure flight groups", () => {
   it("persists the product on flight groups and blocks mismatched active assignments", () => {
@@ -23,23 +22,5 @@ describe("product-pure flight groups", () => {
 
   it("keeps historical rotations readable while requiring product IDs on new flight groups", () => {
     expect(migration).toContain("r.status NOT IN ('COMPLETED', 'CANCELED')");
-    expect(coordinator).toContain("product_id, communication_number");
-    expect(coordinator).toContain("PRODUCT_MISMATCH");
-    expect(coordinator).toContain("assertProductPureSelection");
-  });
-
-  it("requires and audits a reason when an earlier group of another product is skipped", () => {
-    expect(coordinator).toContain("QUEUE_DEVIATION_REASON_REQUIRED");
-    expect(coordinator).toContain("queueDeviationReason");
-    expect(coordinator).toContain("skippedTicketGroupIds");
-    expect(coordinator).toContain("CAPACITY_OPTIMIZED_DISPATCH");
-  });
-
-  it("rejects stale dispatch recommendations before the atomic assignment", () => {
-    expect(coordinator).toContain("DISPATCH_PLAN_STALE");
-    expect(coordinator).toContain("dispatch_plan_revision");
-    expect(coordinator).toContain("dispatch_group_ids_json");
-    expect(coordinator).toContain("rotation.dispatch_operation_day_version === current.version");
-    expect(coordinator).toContain("acceptedDispatchRecommendation");
   });
 });

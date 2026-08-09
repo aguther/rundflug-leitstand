@@ -3,7 +3,7 @@
   "sizeBudgets": [
     {
       "path": "apps/worker/src/event-coordinator.ts",
-      "maxLines": 2688,
+      "maxLines": 1623,
       "targetLines": 1500
     },
     {
@@ -126,6 +126,11 @@
     {
       "path": "apps/worker/src/analysis-snapshot-capture-service.ts",
       "maxLines": 193,
+      "targetLines": 1500
+    },
+    {
+      "path": "apps/worker/src/rotation-transition-command-service.ts",
+      "maxLines": 1121,
       "targetLines": 1500
     }
   ],
@@ -268,13 +273,11 @@
     "apps/worker/src/forecast-freshness-coverage.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/forecast-freshness-coverage.test.ts -> apps/worker/src/web-push.ts",
     "apps/worker/src/forecast-snapshot-coverage.test.ts -> apps/worker/src/backup.ts",
-    "apps/worker/src/forecast-turnaround-sources.test.ts -> apps/worker/src/event-coordinator.ts",
     "apps/worker/src/forecast-turnaround-sources.test.ts -> apps/worker/src/forecast-history.ts",
     "apps/worker/src/gate-display-filter-data-model.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/group-ticket-v18.test.ts -> apps/web/src/cashier-view.tsx",
     "apps/worker/src/group-ticket-v18.test.ts -> apps/web/src/features/public-status/PublicStatusContent.tsx",
     "apps/worker/src/group-ticket-v18.test.ts -> apps/web/src/group-status-view.tsx",
-    "apps/worker/src/group-ticket-v18.test.ts -> apps/worker/src/event-coordinator.ts",
     "apps/worker/src/group-ticket-v18.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/group-ticket-v18.test.ts -> apps/worker/src/web-push.ts",
     "apps/worker/src/maintainability-coverage.test.ts -> apps/web/src/admin-view.tsx",
@@ -310,11 +313,9 @@
     "apps/worker/src/session-only-authorization.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/simulation-plan-export.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/simulation-plan-export.test.ts -> apps/worker/src/master-data-export.ts",
-    "apps/worker/src/split-booking-group.test.ts -> apps/worker/src/event-coordinator.ts",
     "apps/worker/src/split-booking-group.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/ticket-data-model.test.ts -> apps/web/src/cashier-view.tsx",
     "apps/worker/src/ticket-data-model.test.ts -> apps/web/src/operation-workspace.tsx",
-    "apps/worker/src/ticket-data-model.test.ts -> apps/worker/src/event-coordinator.ts",
     "apps/worker/src/ticket-data-model.test.ts -> apps/worker/src/fids-board-projection.ts",
     "apps/worker/src/ticket-data-model.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/ticket-group-recall.test.ts -> apps/web/src/features/public-status/PublicStatusContent.tsx",
@@ -324,7 +325,6 @@
     "apps/worker/src/ticket-group-recall.test.ts -> packages/contracts/src/index.ts",
     "apps/worker/src/ticket-group-recall.test.ts -> packages/domain/src/index.ts",
     "apps/worker/src/turnaround-overrides.test.ts -> apps/worker/src/index.ts",
-    "apps/worker/src/v1-5-stable-operations.test.ts -> apps/worker/src/event-coordinator.ts",
     "apps/worker/src/v1-5-stable-operations.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/web-push.test.ts -> apps/worker/src/web-push.ts"
   ]

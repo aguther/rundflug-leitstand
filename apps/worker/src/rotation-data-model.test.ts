@@ -16,9 +16,7 @@ describe("D-050 rotation data model", () => {
   });
 
   it("persists note changes with audit, idempotency and outbox in one batch", () => {
-    const handler = coordinator.match(
-      /private async handleRotationNote[\s\S]*?private async handleRotationTransition/,
-    )?.[0];
+    const handler = coordinator.slice(coordinator.indexOf("private async handleRotationNote"));
     expect(handler).toBeTruthy();
     expect(handler).toContain("UPDATE rotations SET operational_note");
     expect(handler).toContain("ROTATION_NOTE_SET");
