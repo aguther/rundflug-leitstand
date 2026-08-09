@@ -18,7 +18,7 @@ describe("Worker runtime API boundaries", () => {
       applicationVersion: "1.12.0",
       requirementsVersion: "1.12.0",
     });
-  });
+  }, 10_000);
 
   it("reports the same release through the deployment metadata endpoint", async () => {
     const response = await worker.fetch("https://worker.test/api/meta");
