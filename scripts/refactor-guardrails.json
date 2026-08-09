@@ -8,7 +8,7 @@
     },
     {
       "path": "apps/worker/src/index.ts",
-      "maxLines": 5190,
+      "maxLines": 5043,
       "targetLines": 800
     },
     {
@@ -222,6 +222,11 @@
       "path": "apps/worker/src/admin-master-data-template-export.ts",
       "maxLines": 231,
       "targetLines": 1500
+    },
+    {
+      "path": "apps/worker/src/simulation-plan-export-routes.ts",
+      "maxLines": 179,
+      "targetLines": 1500
     }
   ],
   "allowedProductionRawImports": [
@@ -393,8 +398,6 @@
     "apps/worker/src/sale-capacity-policy.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/sale-performance.test.ts -> apps/worker/src/event-coordinator.ts",
     "apps/worker/src/session-only-authorization.test.ts -> apps/worker/src/index.ts",
-    "apps/worker/src/simulation-plan-export.test.ts -> apps/worker/src/index.ts",
-    "apps/worker/src/simulation-plan-export.test.ts -> apps/worker/src/master-data-export.ts",
     "apps/worker/src/split-booking-group.test.ts -> apps/worker/src/index.ts",
     "apps/worker/src/ticket-data-model.test.ts -> apps/web/src/cashier-view.tsx",
     "apps/worker/src/ticket-data-model.test.ts -> apps/web/src/operation-workspace.tsx",

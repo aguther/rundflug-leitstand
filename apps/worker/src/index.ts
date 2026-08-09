@@ -19,7 +19,6 @@ import {
   operationBoardSchema,
   resourceDayHistoryQuerySchema,
   resourceDayHistorySchema,
-  simulationPlanExportSchema,
   ticketSearchRequestSchema,
 } from "@rundflug/contracts";
 import {
@@ -91,7 +90,6 @@ import {
   EMPTY_GATE_DISPLAY_FILTER_JSON,
   withGateDisplayFilterFallback,
 } from "./gate-display-filter-storage";
-import { loadMasterDataExportProjection } from "./master-data-export";
 import { buildOperationalHistoryStatement } from "./operational-history";
 import { allowUnknownTicketAttempt } from "./public-access";
 import { registerPublicBoardRoutes } from "./public-board-routes";
@@ -112,6 +110,7 @@ import {
   pairPilotPauseEvents,
 } from "./resource-day-history";
 import { registerSetupRoutes } from "./setup-routes";
+import { registerSimulationPlanExportRoutes } from "./simulation-plan-export-routes";
 import { rowToSnapshot } from "./snapshot";
 import { ticketSearchStatusCondition } from "./ticket-search";
 import { httpsRedirectLocation } from "./transport-security";
@@ -326,153 +325,7 @@ registerFactoryResetRoutes(app);
 
 registerAdminMasterDataTemplateRoutes(app);
 
-app.on("GET", eventRoutes("/exports/simulation-plan.json"), async (context) => {
-  const eventId = context.req.param("eventId");
-  const device = await authorizeDevice(context.env, eventId, context.req.raw);
-  if (!device || !["ADMIN", "FLIGHT_DIRECTOR"].includes(device.role)) {
-    return context.json(
-      {
-        error: {
-          code: "SESSION_NOT_AUTHORIZED",
-          message: "Sitzung für diesen Simulationsexport nicht berechtigt.",
-        },
-      },
-      403,
-    );
-  }
-  const exportedAt = new Date().toISOString();
-  const [projection, plans, recurringRules] = await Promise.all([
-    loadMasterDataExportProjection(context.env.DB, eventId, exportedAt),
-    context.env.DB.prepare(
-      `SELECT id, scope_type, scope_id, constraint_kind, effect_mode,
-                duration_multiplier_percent, start_mode,
-                earliest_start_at, latest_start_at, after_rotation_id,
-                minimum_duration_minutes, typical_duration_minutes, maximum_duration_minutes,
-                public_note
-           FROM planned_operational_constraints
-          WHERE operation_day_id = ?1 AND status = 'PLANNED' AND recurring_rule_id IS NULL
-          ORDER BY COALESCE(earliest_start_at, created_at), created_at, id`,
-    )
-      .bind(eventId)
-      .all<{
-        id: string;
-        scope_type: "EVENT" | "RESOURCE_GROUP" | "AIRCRAFT" | "PILOT";
-        scope_id: string;
-        constraint_kind: "PAUSE" | "REFUELING" | "FLIGHT_SHOW" | "WEATHER" | "TECHNICAL" | "OTHER";
-        effect_mode: "BLOCKING" | "SLOWDOWN";
-        duration_multiplier_percent: number | null;
-        start_mode: "TIME_WINDOW" | "AFTER_CURRENT_ROTATION";
-        earliest_start_at: string | null;
-        latest_start_at: string | null;
-        after_rotation_id: string | null;
-        minimum_duration_minutes: number;
-        typical_duration_minutes: number;
-        maximum_duration_minutes: number;
-        public_note: string;
-      }>(),
-    context.env.DB.prepare(
-      `SELECT id, scope_type, scope_id, operation_kind, trigger_metric, interval_value,
-              progress_value, minimum_duration_minutes, typical_duration_minutes,
-              maximum_duration_minutes
-         FROM recurring_operational_rules
-        WHERE operation_day_id = ?1 AND status = 'ACTIVE'
-        ORDER BY scope_type, scope_id, operation_kind, id`,
-    )
-      .bind(eventId)
-      .all<{
-        id: string;
-        scope_type: "AIRCRAFT" | "PILOT";
-        scope_id: string;
-        operation_kind: "PAUSE" | "REFUELING";
-        trigger_metric: "COMPLETED_ROTATIONS" | "OPERATING_MINUTES";
-        interval_value: number;
-        progress_value: number;
-        minimum_duration_minutes: number;
-        typical_duration_minutes: number;
-        maximum_duration_minutes: number;
-      }>(),
-  ]);
-  if (!projection) {
-    return context.json(
-      { error: { code: "EVENT_NOT_FOUND", message: "Veranstaltung nicht gefunden." } },
-      404,
-    );
-  }
-  if (!projection.schedule) {
-    return context.json(
-      {
-        error: {
-          code: "SIMULATION_SCHEDULE_INCOMPLETE",
-          message: "Verkaufs- und Betriebszeiten müssen vor dem Export vollständig sein.",
-        },
-      },
-      409,
-    );
-  }
-  const plannedOperations = plans.results.map((plan, index) => {
-    const scopeKey =
-      plan.scope_type === "EVENT"
-        ? "event"
-        : plan.scope_type === "RESOURCE_GROUP"
-          ? projection.keys.resourceGroups.get(plan.scope_id)
-          : plan.scope_type === "AIRCRAFT"
-            ? projection.keys.aircraft.get(plan.scope_id)
-            : projection.keys.pilots.get(plan.scope_id);
-    if (!scopeKey) {
-      throw new Error(`Simulationsexport: Ziel für Planeintrag ${plan.id} fehlt.`);
-    }
-    return {
-      key: `plan-${index + 1}`,
-      scopeType: plan.scope_type,
-      scopeKey,
-      kind: plan.constraint_kind,
-      effectMode: plan.effect_mode,
-      durationMultiplierPercent: plan.duration_multiplier_percent,
-      startMode: plan.start_mode,
-      earliestStartAt: plan.earliest_start_at,
-      latestStartAt: plan.latest_start_at,
-      afterCurrentRotation: plan.after_rotation_id !== null,
-      minimumDurationMinutes: plan.minimum_duration_minutes,
-      typicalDurationMinutes: plan.typical_duration_minutes,
-      maximumDurationMinutes: plan.maximum_duration_minutes,
-      publicNote: plan.public_note,
-    };
-  });
-  const simulationPlan = simulationPlanExportSchema.parse({
-    format: "rundflug-simulation-plan",
-    formatVersion: 3,
-    exportedAt,
-    source: projection.template.source,
-    schedule: projection.schedule,
-    masterData: projection.template,
-    plannedOperations,
-    recurringRules: recurringRules.results.map((rule, index) => {
-      const scopeKey =
-        rule.scope_type === "AIRCRAFT"
-          ? projection.keys.aircraft.get(rule.scope_id)
-          : projection.keys.pilots.get(rule.scope_id);
-      if (!scopeKey) {
-        throw new Error(`Simulationsexport: Ziel für Regel ${rule.id} fehlt.`);
-      }
-      return {
-        key: `rule-${index + 1}`,
-        scopeType: rule.scope_type,
-        scopeKey,
-        kind: rule.operation_kind,
-        triggerMetric: rule.trigger_metric,
-        intervalValue: rule.interval_value,
-        progressValue: rule.progress_value,
-        minimumDurationMinutes: rule.minimum_duration_minutes,
-        typicalDurationMinutes: rule.typical_duration_minutes,
-        maximumDurationMinutes: rule.maximum_duration_minutes,
-      };
-    }),
-  });
-  return context.json(simulationPlan, 200, {
-    "cache-control": "no-store",
-    "content-disposition": `attachment; filename="simulationsplan-${eventId}.json"`,
-  });
-});
+registerSimulationPlanExportRoutes(app);
 
 app.post("/api/admin/events/:sourceEventId/clone", async (context) => {
   const sourceEventId = context.req.param("sourceEventId");
