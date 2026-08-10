@@ -68,7 +68,6 @@ import {
 import { forgetActiveEvent, rememberActiveEvent } from "./event-context";
 import { eventLocalDateTimeToIso, formatEventLocalDateTime } from "./event-time";
 import { AdminAuthorizationDialog } from "./features/admin/AdminAuthorizationDialog";
-import { AdminEventFlowChart } from "./features/admin/AdminEventFlowChart";
 import {
   AircraftProductTurnaroundOverrideDialog,
   type TurnaroundOverrideContext,
@@ -105,6 +104,11 @@ import {
 import { ResourceAircraftEditorDialog } from "./features/admin/master-data/ResourceAircraftEditorDialog";
 import { OperationalPlanWorkspace } from "./features/admin/operational-plan/OperationalPlanWorkspace";
 import { OperationsWorkspace } from "./features/admin/operations/OperationsWorkspace";
+import { AdminAccessStatusBar } from "./features/admin/overview/AdminAccessStatusBar";
+import {
+  AdminOverviewPanel,
+  type PushConfigurationStatus,
+} from "./features/admin/overview/AdminOverviewPanel";
 import { PilotCodesWorkspace } from "./features/admin/pilots/PilotCodesWorkspace";
 import { PilotEditorDialog } from "./features/admin/pilots/PilotEditorDialog";
 import { usePilotEditorState } from "./features/admin/pilots/usePilotEditorState";
@@ -374,9 +378,8 @@ export function AdminView() {
     AUDIT: null as Record<string, string> | null,
   });
   const pilotEditor = usePilotEditorState(board?.pilots);
-  const [pushConfigurationStatus, setPushConfigurationStatus] = useState<
-    "loading" | "configured" | "missing" | "unavailable"
-  >("loading");
+  const [pushConfigurationStatus, setPushConfigurationStatus] =
+    useState<PushConfigurationStatus>("loading");
   useEffect(() => {
     const controller = new AbortController();
     void getPushConfiguration(controller.signal)
@@ -2577,173 +2580,29 @@ export function AdminView() {
             {board?.currentDeviceRole === "FLIGHT_DIRECTOR" ? (
               <div className="readonly-banner">Flight-Director-Ansicht · primär lesend</div>
             ) : null}
-            {board ? (
-              <>
-              {adminArea === "overview" ? (
-              <div>
-                <AdminEventFlowChart
-                  averageWaitMinutes={board.metrics.averageWaitMinutes}
-                  error={eventFlowError}
-                  flow={eventFlow}
-                  loading={eventFlowLoading}
-                  timeZone={board.event.timeZone}
-                />
-              </div>
-              ) : null}
-              <section
-                aria-label="Betriebskennzahlen"
-                className="metrics-grid"
-                hidden={adminArea !== "overview"}
-              >
-                <div>
-                  <strong>{board.metrics.openTickets}</strong>
-                  <span>offene Tickets</span>
-                </div>
-                <div>
-                  <strong>{board.metrics.activeRotations}</strong>
-                  <span>aktive Umläufe</span>
-                </div>
-                <div>
-                  <strong>{board.metrics.completedRotations}</strong>
-                  <span>abgeschlossen</span>
-                </div>
-                <div>
-                  <strong>{board.metrics.averageBoardingMinutes ?? "–"}</strong>
-                  <span>Ø Boarding Min.</span>
-                </div>
-                <div>
-                  <strong>{board.metrics.averageFlightMinutes ?? "–"}</strong>
-                  <span>Ø Flug Min.</span>
-                </div>
-                <div>
-                  <strong>{board.metrics.averageTurnaroundMinutes ?? "–"}</strong>
-                  <span>Ø Landung–frei Min.</span>
-                </div>
-                <div>
-                  <strong>{board.metrics.averageRotationMinutes ?? "–"}</strong>
-                  <span>Ø Boarding-Aufruf–frei Min.</span>
-                </div>
-                <div>
-                  <strong>{board.metrics.averageWaitMinutes ?? "–"}</strong>
-                  <span>Ø Verkauf–Boarding-Aufruf Min.</span>
-                </div>
-                <div>
-                  <strong>
-                    {(board.metrics.informationalRevenueCents / 100).toLocaleString("de-DE", {
-                      style: "currency",
-                      currency: "EUR",
-                    })}
-                  </strong>
-                  <span>informatorischer Umsatz</span>
-                </div>
-                <div>
-                  <strong>{board.metrics.activeDevices}</strong>
-                  <span>Aktive Sitzungen</span>
-                </div>
-                <div>
-                  <strong>
-                    {pushConfigurationStatus === "configured"
-                      ? board.metrics.activePushSubscriptions
-                      : pushConfigurationStatus === "loading"
-                        ? "…"
-                        : "–"}
-                  </strong>
-                  <span>
-                    {pushConfigurationStatus === "configured"
-                      ? "Web-Push aktiv"
-                      : pushConfigurationStatus === "missing"
-                        ? "Web-Push fehlt"
-                        : pushConfigurationStatus === "loading"
-                          ? "Web-Push wird geprüft"
-                          : "Web-Push nicht geprüft"}
-                  </span>
-                </div>
-              </section>
-              {adminArea === "overview" && pushConfigurationStatus === "missing" ? (
-                <ValidationHint tone="warning">
-                  <strong>Web-Push ist noch nicht eingerichtet.</strong> VAPID-Secrets mit{" "}
-                  <code>npm run cloudflare:configure-push</code> setzen und danach auf einem echten
-                  Besuchergerät testen.
-                </ValidationHint>
-              ) : null}
-              </>
+            {board && adminArea === "overview" ? (
+              <AdminOverviewPanel
+                board={board}
+                eventFlow={eventFlow}
+                eventFlowError={eventFlowError}
+                eventFlowLoading={eventFlowLoading}
+                pushConfigurationStatus={pushConfigurationStatus}
+              />
             ) : null}
-          <section
-            className={`admin-edit-context admin-mode-bar ${adminModeUnlocked ? "unlocked" : "locked"}`}
-          >
-            <div>
-              <strong>
-                {session?.account.role === "ADMIN"
-                  ? "Administration aktiv"
-                  : adminModeUnlocked
-                    ? "Bearbeitungsmodus aktiv"
-                    : "Administration gesperrt"}
-              </strong>
-              <span>
-                {session?.account.role === "ADMIN"
-                  ? `${session.account.loginCode} · Änderungen werden dem angemeldeten Konto zugeordnet.`
-                  : adminModeUnlocked
-                    ? "Mehrere Änderungen sind möglich. Jede Änderung wird weiterhin einzeln protokolliert."
-                    : "Änderungen fragen die PIN einzeln ab oder können für diese Arbeitssitzung entsperrt werden."}
-              </span>
-            </div>
-            {isAdministrator ? (
-              <Button
-                busy={session?.account.role === "ADMIN" && logoutBusy}
-                className="secondary-action"
-                onClick={() => {
-                  if (session?.account.role === "ADMIN") {
-                    void logoutAndReload();
-                  } else if (adminModeUnlocked) lockAdminMode();
-                  else requestAdminModeUnlock();
-                }}
-                type="button"
-              >
-                {session?.account.role === "ADMIN"
-                  ? "Abmelden"
-                  : adminModeUnlocked
-                    ? "Bearbeitungsmodus sperren"
-                    : "Bearbeitungsmodus entsperren"}
-              </Button>
-            ) : (
-              <div className="secondary-actions admin-recovery-actions">
-                <Button
-                  busy={refreshing}
-                  className="secondary-action"
-                  onClick={() => void refresh()}
-                  type="button"
-                >
-                  Erneut laden
-                </Button>
-                <Button
-                  busy={logoutBusy}
-                  className="secondary-action"
-                  disabled={refreshing}
-                  onClick={() => void logoutAndReload()}
-                  type="button"
-                >
-                  Mit Administrationskonto anmelden
-                </Button>
-              </div>
-            )}
-            {!isAdministrator ? (
-              error ? (
-                <ValidationHint tone="error">
-                  Der Betriebsstand konnte nicht geladen werden. Erneut laden oder mit einem
-                  Administrationskonto anmelden; vorhandene Betriebsdaten bleiben unverändert.
-                </ValidationHint>
-              ) : (
-                <ValidationHint>Sitzung und Betriebsstand werden geprüft.</ValidationHint>
-              )
-            ) : null}
-            <ValidationHint>
-              {session?.account.role === "ADMIN"
-                ? "Die Anmeldung ersetzt wiederholte PIN-Abfragen. Jede Änderung bleibt einzeln protokolliert."
-                : adminModeUnlocked
-                  ? "Änderungen sind freigeschaltet und werden automatisch protokolliert."
-                  : "Beim Auslösen einer administrativen Änderung erscheint die PIN-Abfrage."}
-            </ValidationHint>
-          </section>
+            <AdminAccessStatusBar
+              adminModeUnlocked={adminModeUnlocked}
+              administrator={isAdministrator}
+              authenticatedAdminLoginCode={
+                session?.account.role === "ADMIN" ? session.account.loginCode : null
+              }
+              boardLoadFailed={Boolean(error)}
+              logoutBusy={logoutBusy}
+              onLockAdminMode={() => lockAdminMode()}
+              onLogout={() => void logoutAndReload()}
+              onRefresh={() => void refresh()}
+              onRequestAdminModeUnlock={requestAdminModeUnlock}
+              refreshing={refreshing}
+            />
           {adminArea === "users" ? (
             <AccountManagement
               createOpen={accountCreateOpen}

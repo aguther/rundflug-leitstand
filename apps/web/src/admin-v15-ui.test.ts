@@ -169,7 +169,7 @@ describe("V1.5 administration UI", () => {
   });
 
   it("uses event-only flow data and a strict preview-before-import workflow", () => {
-    expect(adminViewSource).toContain("<AdminEventFlowChart");
+    expect(adminViewSource).toContain("<AdminOverviewPanel");
     expect(chartSource).toContain("<ComposedChart");
     expect(chartSource).toContain("strokeWidth={1.75}");
     expect(chartSource).toContain('type="stepAfter"');

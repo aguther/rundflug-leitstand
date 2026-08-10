@@ -13,7 +13,7 @@
     },
     {
       "path": "apps/web/src/admin-view.tsx",
-      "maxLines": 3774,
+      "maxLines": 3633,
       "targetLines": 700
     },
     {
@@ -426,6 +426,16 @@
     {
       "path": "apps/web/src/features/admin/completion/ManifestCorrectionPanel.tsx",
       "maxLines": 141,
+      "targetLines": 1500
+    },
+    {
+      "path": "apps/web/src/features/admin/overview/AdminOverviewPanel.tsx",
+      "maxLines": 107,
+      "targetLines": 1500
+    },
+    {
+      "path": "apps/web/src/features/admin/overview/AdminAccessStatusBar.tsx",
+      "maxLines": 105,
       "targetLines": 1500
     },
     {

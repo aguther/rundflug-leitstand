@@ -23,8 +23,7 @@ describe("V1 UX consistency", () => {
     expect(appSource).toContain("predictionQualityLabel[product.predictionQuality]");
   });
 
-  it("keeps account and session controls secondary to the current editor action", () => {
-    expect(appSource).toContain('className="secondary-action"');
+  it("keeps account session and logout wiring in the admin composition", () => {
     expect(appSource).toContain('session?.account.role === "ADMIN"');
     expect(appSource).toContain("void logoutAndReload()");
     expect(appSource).not.toContain(

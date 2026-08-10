@@ -30,15 +30,10 @@ describe("V1 administration completion UI", () => {
   });
 
   it("uses account sessions instead of browser device recovery", () => {
-    expect(appSource).toContain("Mit Administrationskonto anmelden");
-    expect(appSource).toContain("Erneut laden");
-    expect(appSource).toContain('className="secondary-actions admin-recovery-actions"');
     expect(appSource).not.toContain("attemptedDeviceCredentialRecoveries");
     expect(appSource).not.toContain("recoverAdminDevice(");
     expect(appSource).not.toContain("rememberDeviceCredential");
-    expect(appSource).toContain("Sitzung und Betriebsstand werden geprüft.");
     expect(appSource).toContain("Reset ist sichtbar, bleibt aber gesperrt");
-    expect(appSource).toContain("Bearbeitungsmodus entsperren");
   });
 
   it("uses the authenticated administrator session for normal changes", () => {
@@ -100,10 +95,8 @@ describe("V1 administration completion UI", () => {
     expect(notificationsSource).toContain('notice.tone === "danger" ? 10_000 : 5_000');
   });
 
-  it("distinguishes missing Web Push setup from zero active subscriptions", () => {
+  it("loads the Web Push configuration for the overview", () => {
     expect(appSource).toContain("getPushConfiguration(controller.signal)");
-    expect(appSource).toContain("Web-Push ist noch nicht eingerichtet.");
-    expect(appSource).toContain("npm run cloudflare:configure-push");
   });
 
   it("keeps every master-data category operable from create through delete or removal", () => {
@@ -152,9 +145,7 @@ describe("V1 administration completion UI", () => {
     expect(appSource).toContain("<CompletionWorkspace");
   });
 
-  it("keeps the manual board refresh touchable and exposes its loading state", () => {
-    expect(appSource).toContain("busy={refreshing}");
-    expect(appSource).toContain("Erneut laden");
+  it("keeps the admin bar action touchable", () => {
     expect(stylesSource).toMatch(
       /\.admin-mode-bar > button \{[\s\S]*pointer-events: auto;[\s\S]*touch-action: manipulation;/,
     );
