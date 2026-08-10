@@ -13,11 +13,7 @@ import {
 } from "./admin-ux";
 import {
   ApiCommandError,
-  downloadDailyPdf,
-  downloadDailyReport,
-  downloadPerformanceProfile,
   downloadSimulationPlan,
-  downloadTicketRawData,
   getPushConfiguration,
   getSetupStatus,
   removeEventLogo,
@@ -46,8 +42,8 @@ import {
 } from "./features/admin/aircraft/AircraftResourceGroupAssignmentDialog";
 import { AircraftWorkspace } from "./features/admin/aircraft/AircraftWorkspace";
 import { useAircraftEditorState } from "./features/admin/aircraft/useAircraftEditorState";
+import { AdminCompletionSummaryPanel } from "./features/admin/completion/AdminCompletionSummaryPanel";
 import { CompletionHistoryPanel } from "./features/admin/completion/CompletionHistoryPanel";
-import { CompletionSummaryPanel } from "./features/admin/completion/CompletionSummaryPanel";
 import { CompletionWorkspace } from "./features/admin/completion/CompletionWorkspace";
 import { ManifestCorrectionPanel } from "./features/admin/completion/ManifestCorrectionPanel";
 import { useAdminHistory } from "./features/admin/completion/useAdminHistory";
@@ -1131,44 +1127,6 @@ export function AdminView() {
     initialMasterEditorSnapshotRef.current = pilotEditor.select(id);
     setMasterSubmitAttempted(false);
     setMasterEditorOpen(true);
-  }
-
-  async function exportDailyReport() {
-    try {
-      await downloadDailyReport(EVENT_ID, ADMIN_DEVICE_ID, deviceTokenFor(ADMIN_DEVICE_ID));
-      setMessage("Tagesbericht wurde erzeugt.");
-    } catch (cause) {
-      setMessage(cause instanceof Error ? cause.message : "Tagesbericht fehlgeschlagen.");
-    }
-  }
-
-  async function exportDailyPdf() {
-    try {
-      await downloadDailyPdf(EVENT_ID, ADMIN_DEVICE_ID, deviceTokenFor(ADMIN_DEVICE_ID));
-      setMessage("PDF-Tagesbericht wurde erzeugt.");
-    } catch (cause) {
-      setMessage(cause instanceof Error ? cause.message : "PDF-Tagesbericht fehlgeschlagen.");
-    }
-  }
-
-  async function exportRawData() {
-    try {
-      await downloadTicketRawData(EVENT_ID, ADMIN_DEVICE_ID, deviceTokenFor(ADMIN_DEVICE_ID));
-      setMessage("Ticket-Rohdaten wurden exportiert.");
-    } catch (cause) {
-      setMessage(cause instanceof Error ? cause.message : "Rohdatenexport fehlgeschlagen.");
-    }
-  }
-
-  async function exportPerformanceProfile() {
-    try {
-      await downloadPerformanceProfile(EVENT_ID, ADMIN_DEVICE_ID, deviceTokenFor(ADMIN_DEVICE_ID));
-      setMessage("Kontextbezogenes Leistungsprofil wurde exportiert.");
-    } catch (cause) {
-      setMessage(
-        cause instanceof Error ? cause.message : "Leistungsprofil konnte nicht exportiert werden.",
-      );
-    }
   }
 
   function requestMasterSave(
@@ -2351,21 +2309,11 @@ export function AdminView() {
               board={board}
               onHistoryTabChange={changeHistoryView}
               summary={
-                <CompletionSummaryPanel
+                <AdminCompletionSummaryPanel
                   board={board}
                   busyActionKey={busyActionKey}
-                  onExportDailyCsv={() =>
-                    void runBusyAction("export-daily-csv", exportDailyReport)
-                  }
-                  onExportDailyPdf={() =>
-                    void runBusyAction("export-daily-pdf", exportDailyPdf)
-                  }
-                  onExportPerformance={() =>
-                    void runBusyAction("export-performance", exportPerformanceProfile)
-                  }
-                  onExportRawData={() =>
-                    void runBusyAction("export-raw-data", exportRawData)
-                  }
+                  onMessage={setMessage}
+                  onRunBusyAction={runBusyAction}
                 />
               }
               history={

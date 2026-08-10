@@ -13,8 +13,13 @@
     },
     {
       "path": "apps/web/src/admin-view.tsx",
-      "maxLines": 2492,
+      "maxLines": 2440,
       "targetLines": 700
+    },
+    {
+      "path": "apps/web/src/features/admin/completion/AdminCompletionSummaryPanel.tsx",
+      "maxLines": 79,
+      "targetLines": 1500
     },
     {
       "path": "apps/web/src/features/admin/event-workspace/useAdminEventCatalog.ts",
