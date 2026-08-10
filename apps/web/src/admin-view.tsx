@@ -108,6 +108,7 @@ import { ProductSalesDialog } from "./features/admin/products/ProductSalesDialog
 import { ProductsWorkspace } from "./features/admin/products/ProductsWorkspace";
 import { useProductEditorState } from "./features/admin/products/useProductEditorState";
 import { ResourceGroupsWorkspace } from "./features/admin/resource-groups/ResourceGroupsWorkspace";
+import { useResourceGroupEditorState } from "./features/admin/resource-groups/useResourceGroupEditorState";
 import { AnalysisWorkspace } from "./features/analysis/AnalysisWorkspace";
 import { AccountManagement } from "./features/auth/AccountManagement";
 import { useAuth } from "./features/auth/AuthContext";
@@ -406,11 +407,7 @@ export function AdminView() {
   const [manifestTicketGroupId, setManifestTicketGroupId] = useState("");
   const [manifestTargetRotationId, setManifestTargetRotationId] = useState("");
   const [manifestCorrectionReason, setManifestCorrectionReason] = useState("");
-  const [resourceEditorId, setResourceEditorId] = useState("new");
-  const [resourceName, setResourceName] = useState("");
-  const [resourceShortCode, setResourceShortCode] = useState("");
-  const [resourceGateId, setResourceGateId] = useState("");
-  const [resourceAutomaticPrecall, setResourceAutomaticPrecall] = useState(true);
+  const resourceEditor = useResourceGroupEditorState(board);
   const [aircraftEditorId, setAircraftEditorId] = useState("new");
   const [aircraftRegistration, setAircraftRegistration] = useState("");
   const [aircraftType, setAircraftType] = useState("");
@@ -422,13 +419,7 @@ export function AdminView() {
       : masterDataCategory === "products"
         ? productEditor.snapshot
         : masterDataCategory === "resource-groups"
-          ? createMasterEditorSnapshot([
-              "resource-groups",
-              resourceName,
-              resourceShortCode,
-              resourceGateId,
-              resourceAutomaticPrecall,
-            ])
+          ? resourceEditor.snapshot
           : masterDataCategory === "aircraft"
             ? createMasterEditorSnapshot([
                 "aircraft",
@@ -529,13 +520,8 @@ export function AdminView() {
     )
       return;
     initialMasterSelectionRef.current = true;
-    const entry = board.resourceGroups[0];
-    setResourceEditorId(entry?.id ?? "new");
-    setResourceName(entry?.name ?? "");
-    setResourceShortCode(entry?.shortCode ?? "");
-    setResourceGateId(entry?.gateId ?? board.gates.find((gate) => gate.active)?.id ?? "");
-    setResourceAutomaticPrecall(entry?.automaticPrecallEnabled ?? true);
-  }, [adminArea, board, eventStep]);
+    resourceEditor.select(board.resourceGroups[0]?.id ?? "new");
+  }, [adminArea, board, eventStep, resourceEditor.select]);
 
   useEffect(() => {
     const legacyRequest = legacyAssignmentRequestRef.current;
@@ -1328,23 +1314,7 @@ export function AdminView() {
   }
 
   function selectResourceForEditing(id: string) {
-    const entry = resourceGroups.find((group) => group.id === id);
-    const nextName = entry?.name ?? "";
-    const nextShortCode = entry?.shortCode ?? "";
-    const nextGateId = entry?.gateId ?? board?.gates.find((gate) => gate.active)?.id ?? "";
-    const nextAutomaticPrecall = entry?.automaticPrecallEnabled ?? true;
-    initialMasterEditorSnapshotRef.current = createMasterEditorSnapshot([
-      "resource-groups",
-      nextName,
-      nextShortCode,
-      nextGateId,
-      nextAutomaticPrecall,
-    ]);
-    setResourceEditorId(id);
-    setResourceName(nextName);
-    setResourceShortCode(nextShortCode);
-    setResourceGateId(nextGateId);
-    setResourceAutomaticPrecall(nextAutomaticPrecall);
+    initialMasterEditorSnapshotRef.current = resourceEditor.select(id);
     setMasterSubmitAttempted(false);
     setMasterEditorOpen(true);
   }
@@ -1374,15 +1344,15 @@ export function AdminView() {
   async function saveResourceGroup() {
     if (
       !board ||
-      !resourceGateId ||
-      resourceName.trim().length < 2 ||
-      !/^[A-Z0-9-]{2,8}$/.test(resourceShortCode.trim().toUpperCase()) ||
+      !resourceEditor.gateId ||
+      resourceEditor.name.trim().length < 2 ||
+      !/^[A-Z0-9-]{2,8}$/.test(resourceEditor.shortCode.trim().toUpperCase()) ||
       adminPinRef.current.length < 4
     )
       return;
     try {
-      const resourceGroupId = resourceEditorId === "new" ? crypto.randomUUID() : resourceEditorId;
-      const currentGroup = board.resourceGroups.find((group) => group.id === resourceGroupId);
+      const resourceGroupId =
+        resourceEditor.editorId === "new" ? crypto.randomUUID() : resourceEditor.editorId;
       await sendCommand(
         {
           commandId: crypto.randomUUID(),
@@ -1393,12 +1363,12 @@ export function AdminView() {
           type: "UPSERT_RESOURCE_GROUP",
           payload: {
             resourceGroupId,
-            name: resourceName.trim(),
-            shortCode: resourceShortCode.trim().toUpperCase(),
-            gateId: resourceGateId,
-            referenceCapacity: currentGroup?.referenceCapacity ?? 1,
+            name: resourceEditor.name.trim(),
+            shortCode: resourceEditor.shortCode.trim().toUpperCase(),
+            gateId: resourceEditor.gateId,
+            referenceCapacity: resourceEditor.currentGroup?.referenceCapacity ?? 1,
             compatibleAircraftTypes: [],
-            automaticPrecallEnabled: resourceAutomaticPrecall,
+            automaticPrecallEnabled: resourceEditor.automaticPrecall,
             reason: MASTER_DATA_AUDIT_REASON,
             adminPin: adminPinRef.current,
           },
@@ -1875,11 +1845,11 @@ export function AdminView() {
     }
     if (masterDataCategory === "resource-groups") {
       const invalidFieldId =
-        resourceName.trim().length < 2
+        resourceEditor.name.trim().length < 2
           ? "resource-name"
-          : !/^[A-Z0-9-]{2,8}$/.test(resourceShortCode.trim().toUpperCase())
+          : !/^[A-Z0-9-]{2,8}$/.test(resourceEditor.shortCode.trim().toUpperCase())
             ? "resource-short-code"
-            : !resourceGateId
+            : !resourceEditor.gateId
               ? "resource-gate"
               : undefined;
       requestMasterSave("resource-group", !invalidFieldId, invalidFieldId);
@@ -2375,11 +2345,11 @@ export function AdminView() {
           label: gateEditor.label,
           description: "Nur in der Vorbereitung und ohne operative Verwendung möglich.",
         }
-      : masterDataCategory === "resource-groups" && resourceEditorId !== "new"
+      : masterDataCategory === "resource-groups" && resourceEditor.editorId !== "new"
         ? {
             entityType: "RESOURCE_GROUP",
-            entityId: resourceEditorId,
-            label: resourceName,
+            entityId: resourceEditor.editorId,
+            label: resourceEditor.name,
             description: "Produkte und Flugzeugzuordnungen müssen vorher entfernt sein.",
           }
         : masterDataCategory === "aircraft" && aircraftEditorId !== "new"
@@ -3962,7 +3932,7 @@ export function AdminView() {
             size={masterDataCategory === "resource-groups" ? "wide" : "default"}
             title={
               masterDataCategory === "resource-groups"
-                ? resourceEditorId === "new"
+                ? resourceEditor.editorId === "new"
                   ? "Ressourcengruppe anlegen"
                   : "Ressourcengruppe bearbeiten"
                 : aircraftEditorId === "new"
@@ -3981,8 +3951,8 @@ export function AdminView() {
                   />
                   <input
                     id="resource-name"
-                    value={resourceName}
-                    onChange={(event) => setResourceName(event.target.value)}
+                    value={resourceEditor.name}
+                    onChange={(event) => resourceEditor.setName(event.target.value)}
                   />
                 </div>
                 <div className="field-control">
@@ -3996,12 +3966,8 @@ export function AdminView() {
                     id="resource-short-code"
                     maxLength={8}
                     placeholder="z. B. PA"
-                    value={resourceShortCode}
-                    onChange={(event) =>
-                      setResourceShortCode(
-                        event.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, ""),
-                      )
-                    }
+                    value={resourceEditor.shortCode}
+                    onChange={(event) => resourceEditor.setShortCode(event.target.value)}
                   />
                 </div>
                 <div className="field-control">
@@ -4012,8 +3978,8 @@ export function AdminView() {
                   />
                   <select
                     id="resource-gate"
-                    value={resourceGateId}
-                    onChange={(event) => setResourceGateId(event.target.value)}
+                    value={resourceEditor.gateId}
+                    onChange={(event) => resourceEditor.setGateId(event.target.value)}
                   >
                     <option value="">Bitte wählen</option>
                     {board?.gates
@@ -4026,11 +3992,11 @@ export function AdminView() {
                   </select>
                 </div>
                 <CheckboxField
-                  checked={resourceAutomaticPrecall}
+                  checked={resourceEditor.automaticPrecall}
                   className="resource-automatic-precall"
                   id="resource-automatic-precall"
                   label="Automatischer Voraufruf für diese Gruppe"
-                  onChange={(event) => setResourceAutomaticPrecall(event.target.checked)}
+                  onChange={(event) => resourceEditor.setAutomaticPrecall(event.target.checked)}
                   trailing={
                     <FieldHelp help="Kann für einzelne Ressourcengruppen abgeschaltet werden. Belegung, Pilot und Boarding bleiben immer manuell bestätigt." />
                   }
@@ -4041,12 +4007,12 @@ export function AdminView() {
                     Zuordnungen werden getrennt historisiert und beim Speichern der
                     Ressourcengruppe nicht verändert.
                   </p>
-                  {resourceEditorId !== "new" ? (
+                  {resourceEditor.editorId !== "new" ? (
                     <Button
                       onClick={() =>
                         setAssignmentDialogContext({
                           mode: "resource-group",
-                          resourceGroupId: resourceEditorId,
+                          resourceGroupId: resourceEditor.editorId,
                         })
                       }
                       type="button"
@@ -4061,9 +4027,9 @@ export function AdminView() {
                   )}
                 </section>
                 {masterSubmitAttempted &&
-                (resourceName.trim().length < 2 ||
-                  !/^[A-Z0-9-]{2,8}$/.test(resourceShortCode.trim().toUpperCase()) ||
-                  !resourceGateId) ? (
+                (resourceEditor.name.trim().length < 2 ||
+                  !/^[A-Z0-9-]{2,8}$/.test(resourceEditor.shortCode.trim().toUpperCase()) ||
+                  !resourceEditor.gateId) ? (
                   <ValidationHint tone="error">
                     Bezeichnung, gültiges Kurzzeichen und Gate müssen für die Ressourcengruppe
                     angegeben werden.
