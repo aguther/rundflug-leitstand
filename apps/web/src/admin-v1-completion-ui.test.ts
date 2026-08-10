@@ -15,6 +15,7 @@ const appSource = `${adminViewSource}\n${sharedSource}\n${factoryResetDialogSour
 
 const stylesSource = [
   readFileSync(new URL("./styles.css", import.meta.url), "utf8"),
+  readFileSync(new URL("./features/admin/admin-v12.css", import.meta.url), "utf8"),
   readFileSync(new URL("./features/admin/admin-v15.css", import.meta.url), "utf8"),
   readFileSync(
     new URL("./features/admin/event-parameters/event-parameters.css", import.meta.url),

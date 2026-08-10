@@ -111,11 +111,10 @@ describe("V1.9 Flight Director and Flight Line surfaces", () => {
     expect(stylesSource).not.toContain(".flight-director-aircraft-row > span {");
   });
 
-  it("applies the approved operations finish without leaking into unrelated views", () => {
+  it("applies the approved Flight Line finish without leaking into unrelated views", () => {
     expect(stylesSource).toContain(".assist-shell .aircraft-pause-dialog");
     expect(stylesSource).toContain("border-radius: 24px 24px 0 0");
     expect(stylesSource).toContain(".assist-meta-item");
-    expect(stylesSource).toContain(".setup-shell .setup-page");
     expect(stylesSource).not.toContain("body > button");
   });
 

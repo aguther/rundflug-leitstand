@@ -7,6 +7,7 @@ import { rememberActiveEvent } from "./event-context";
 import { eventDateInTimeZone } from "./event-time";
 import { LocalizedDateInput } from "./localized-date-input";
 import { setupValidationMessages } from "./setup-validation";
+import "./features/auth/setup.css";
 
 export function SetupView() {
   const [status, setStatus] = useState<{

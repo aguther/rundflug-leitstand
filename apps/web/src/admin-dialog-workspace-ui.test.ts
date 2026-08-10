@@ -10,8 +10,10 @@ const adminStyles = readFileSync(
   new URL("./features/admin/admin-v15.css", import.meta.url),
   "utf8",
 );
-const legacyStyles = readFileSync(new URL("./styles.css", import.meta.url), "utf8");
-
+const legacyAdminStyles = readFileSync(
+  new URL("./features/admin/admin-v12.css", import.meta.url),
+  "utf8",
+);
 describe("unified master-data dialogs and stable event workspace", () => {
   it("keeps the event header and setup navigation outside one internally scrolling step region", () => {
     const setupIndex = adminViewSource.indexOf("<SetupProgress");
@@ -62,10 +64,10 @@ describe("unified master-data dialogs and stable event workspace", () => {
   });
 
   it("uses shared touch-sized checkbox rows without direct aircraft membership editing", () => {
-    expect(legacyStyles).toMatch(
+    expect(legacyAdminStyles).toMatch(
       /\.resource-aircraft-selection \{[\s\S]*?grid-template-columns: minmax\(0, 1fr\);/,
     );
-    expect(legacyStyles).toMatch(
+    expect(legacyAdminStyles).toMatch(
       /\.gate-filter-options \{[\s\S]*?grid-template-columns: repeat\(auto-fit, minmax\(180px, 1fr\)\);/,
     );
     expect(adminEventStyles).not.toMatch(

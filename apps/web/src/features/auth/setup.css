@@ -1,0 +1,167 @@
+/* Setup finish: scoped fidelity layer for the first-run workspace. */
+/* biome-ignore-all lint/style/noDescendingSpecificity: setup overrides retain the approved cascade. */
+
+.setup-shell {
+  background:
+    radial-gradient(
+      circle at 50% 18%,
+      color-mix(in srgb, var(--ui-accent) 5%, transparent),
+      transparent 34rem
+    ),
+    var(--ui-bg);
+}
+
+.setup-shell > .app-header {
+  min-height: 58px;
+  padding: 0 clamp(18px, 2.4vw, 36px);
+  border-bottom: 1px solid var(--ui-border);
+  background: color-mix(in srgb, var(--ui-surface) 96%, transparent);
+  box-shadow: 0 1px 0 rgb(0 0 0 / 18%);
+}
+
+.setup-shell > .app-header nav {
+  display: none;
+}
+
+.setup-shell > .app-header .app-brand {
+  gap: 10px;
+}
+
+.setup-shell > .app-header .brand-mark {
+  width: 25px;
+  height: 25px;
+}
+
+.setup-shell > .app-header .app-brand strong {
+  font-size: 0.98rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.setup-shell > .app-header .app-brand > span {
+  color: var(--ui-muted);
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.setup-shell > footer {
+  color: var(--ui-muted);
+  border-top: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+}
+
+.setup-shell .setup-page {
+  width: min(920px, calc(100% - 40px));
+  max-width: none;
+  margin: clamp(32px, 7vh, 76px) auto;
+  padding: clamp(28px, 4vw, 44px);
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(145deg, var(--ui-surface-raised), var(--ui-surface));
+  box-shadow:
+    inset 0 1px 0 var(--ui-highlight),
+    0 24px 72px rgb(0 0 0 / 22%);
+}
+
+.setup-shell .setup-page::before {
+  content: "";
+  display: block;
+  width: 42px;
+  height: 3px;
+  margin-bottom: 18px;
+  border-radius: 99px;
+  background: var(--ui-accent);
+  box-shadow: 0 0 20px color-mix(in srgb, var(--ui-accent) 48%, transparent);
+}
+
+.setup-shell .setup-page .eyebrow {
+  display: block;
+  margin-bottom: 7px;
+  color: var(--ui-accent);
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.setup-shell .setup-page h1 {
+  margin-bottom: 12px;
+  color: var(--ui-text);
+  font-size: clamp(1.75rem, 3vw, 2.35rem);
+  font-weight: 650;
+  letter-spacing: -0.035em;
+  line-height: 1.08;
+}
+
+.setup-shell .setup-page > p {
+  max-width: 720px;
+  margin-bottom: 0;
+  color: var(--ui-muted);
+  font-size: 0.98rem;
+  line-height: 1.55;
+}
+
+.setup-shell .setup-grid {
+  gap: 18px 22px;
+  margin: 30px 0 28px;
+}
+
+.setup-shell .setup-grid label {
+  display: grid;
+  align-content: start;
+  gap: 7px;
+  color: var(--ui-text);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.setup-shell .setup-grid input,
+.setup-shell .localized-picker-control {
+  min-height: 44px;
+  border-color: var(--ui-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--ui-control);
+}
+
+.setup-shell .setup-grid input {
+  padding: 9px 12px;
+}
+
+.setup-shell .localized-input-field {
+  display: grid;
+  align-content: start;
+  gap: 7px;
+  color: var(--ui-text);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.setup-shell .localized-picker-control > input {
+  min-height: 42px;
+  padding-right: 48px;
+}
+
+.setup-shell .setup-grid small {
+  color: var(--ui-muted);
+  font-size: 0.73rem;
+  font-weight: 450;
+  line-height: 1.35;
+}
+
+.setup-shell .setup-page .primary-action {
+  min-height: 48px;
+  border-radius: var(--radius-sm);
+  font-size: 0.93rem;
+  letter-spacing: -0.005em;
+}
+
+.setup-shell .setup-page .action-message {
+  max-width: none;
+  margin-top: 18px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--ui-accent) 42%, var(--ui-border));
+  border-radius: var(--radius-sm);
+  color: var(--ui-text);
+  background: var(--ui-accent-soft);
+}

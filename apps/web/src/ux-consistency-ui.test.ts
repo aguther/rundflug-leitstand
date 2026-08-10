@@ -8,7 +8,10 @@ import sharedSource from "./operation-workspace.tsx?raw";
 
 const appSource = `${sharedSource}\n${adminSource}\n${productSalesDialogSource}\n${flightLineSource}\n${cashierSource}`;
 
-const stylesSource = readFileSync(new URL("./styles.css", import.meta.url), "utf8");
+const stylesSource = [
+  readFileSync(new URL("./styles.css", import.meta.url), "utf8"),
+  readFileSync(new URL("./features/admin/admin-v12.css", import.meta.url), "utf8"),
+].join("\n");
 const productSalesStyles = readFileSync(
   new URL("./features/admin/products/product-sales-dialog.css", import.meta.url),
   "utf8",
