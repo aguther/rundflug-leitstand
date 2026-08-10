@@ -32,7 +32,7 @@ describe("event parameter surface", () => {
   it("keeps operation planning outside the parameter workspace", () => {
     expect(adminSource).toContain("<EventParametersWorkspace");
     expect(adminSource).toContain("<OperationalPlanWorkspace");
-    expect(adminSource).toContain("<OperationsWorkspace");
+    expect(adminSource).toContain("<AdminOperationsPanel");
   });
 
   it("uses a bounded responsive workspace and exactly one mobile action bar", () => {

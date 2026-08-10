@@ -10,14 +10,7 @@ import type {
   OperationBoard,
 } from "@rundflug/contracts";
 import { masterDataTemplateSchema } from "@rundflug/contracts";
-import {
-  CheckCircle2,
-  Clock3,
-  ExternalLink,
-  FlaskConical,
-  LockKeyhole,
-  Trash2,
-} from "lucide-react";
+import { ExternalLink, FlaskConical, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { hasMasterEditorChanges } from "./admin-master-editor-state";
 import {
@@ -62,7 +55,6 @@ import {
   Field,
   ModalDialog,
   PageHeader,
-  Panel,
   StatusPill,
 } from "./design-system/components";
 import { forgetActiveEvent, rememberActiveEvent } from "./event-context";
@@ -103,7 +95,7 @@ import {
 } from "./features/admin/master-data/MasterDataWorkspace";
 import { ResourceAircraftEditorDialog } from "./features/admin/master-data/ResourceAircraftEditorDialog";
 import { OperationalPlanWorkspace } from "./features/admin/operational-plan/OperationalPlanWorkspace";
-import { OperationsWorkspace } from "./features/admin/operations/OperationsWorkspace";
+import { AdminOperationsPanel } from "./features/admin/operations/AdminOperationsPanel";
 import { AdminAccessStatusBar } from "./features/admin/overview/AdminAccessStatusBar";
 import {
   AdminOverviewPanel,
@@ -271,7 +263,6 @@ export function AdminView() {
       setMasterSearch("");
     }
   }, [eventStep]);
-  const [reason, setReason] = useState("");
   const [adminPin, setAdminPinState] = useState(session?.account.role === "ADMIN" ? "000000" : "");
   const adminPinRef = useRef(session?.account.role === "ADMIN" ? "000000" : "");
   const setAdminPin = useCallback((value: string) => {
@@ -333,10 +324,6 @@ export function AdminView() {
   }
   const [saleClosesAt, setSaleClosesAt] = useState("");
   const [salesProductId, setSalesProductId] = useState<string | null>(null);
-  const [endOperationsConfirmOpen, setEndOperationsConfirmOpen] = useState(false);
-  const [pendingEmergencyAction, setPendingEmergencyAction] = useState<
-    "TRIGGER_EMERGENCY" | "CLEAR_EMERGENCY" | null
-  >(null);
   const [message, setMessage] = useState<string | null>(null);
   useActionMessageBridge(message, setMessage);
   const [setupRequired, setSetupRequired] = useState(false);
@@ -1439,13 +1426,16 @@ export function AdminView() {
     }
   }
 
-  async function emergency(type: "TRIGGER_EMERGENCY" | "CLEAR_EMERGENCY") {
+  async function emergency(
+    type: "TRIGGER_EMERGENCY" | "CLEAR_EMERGENCY",
+    emergencyReason: string,
+  ): Promise<boolean> {
     if (
       !board ||
-      reason.trim().length < 3 ||
+      emergencyReason.trim().length < 3 ||
       (type === "CLEAR_EMERGENCY" && adminPinRef.current.length < 4)
     )
-      return;
+      return false;
     try {
       await sendCommand(
         type === "TRIGGER_EMERGENCY"
@@ -1456,7 +1446,7 @@ export function AdminView() {
               expectedVersion: board.event.version,
               issuedAt: new Date().toISOString(),
               type,
-              payload: { reason: reason.trim() },
+              payload: { reason: emergencyReason.trim() },
             }
           : {
               commandId: crypto.randomUUID(),
@@ -1465,19 +1455,20 @@ export function AdminView() {
               expectedVersion: board.event.version,
               issuedAt: new Date().toISOString(),
               type,
-              payload: { reason: reason.trim(), adminPin: adminPinRef.current },
+              payload: { reason: emergencyReason.trim(), adminPin: adminPinRef.current },
             },
         deviceTokenFor(ADMIN_DEVICE_ID),
       );
       setMessage(
         type === "TRIGGER_EMERGENCY" ? "Notfallmodus ausgelöst." : "Notfallmodus aufgehoben.",
       );
-      setReason("");
       if (!adminModeUnlocked) setAdminPin("");
       await refresh();
       await refreshHistory();
+      return true;
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : "Notfallkommando fehlgeschlagen.");
+      return false;
     }
   }
 
@@ -1963,7 +1954,6 @@ export function AdminView() {
   ];
   const setupComplete = setupSteps.slice(0, 6).every((step) => step.complete);
   const completedSetupSteps = setupSteps.slice(0, 6).filter((step) => step.complete).length;
-  const eventIsReleased = Boolean(board && board.event.status !== "PREPARATION");
   const adminAreaCopy: Record<AdminArea, { title: string; description: string }> = {
     overview: {
       title: "Übersicht",
@@ -2994,179 +2984,26 @@ export function AdminView() {
             </section>
           ) : null}
           {adminArea === "events" && eventStep === "operations" && board ? (
-            <section
-              aria-labelledby="admin-event-step-operations-tab"
-              id="admin-event-step-operations-panel"
-              role="tabpanel"
-            >
-              <OperationsWorkspace
-                board={board}
-                release={
-                  <Panel className="event-release-v15" padding="compact">
-                      <PageHeader
-                        actions={
-                          <StatusPill tone={eventIsReleased || setupComplete ? "success" : "warning"}>
-                            {eventIsReleased ? "Freigegeben" : `${completedSetupSteps}/6 erledigt`}
-                          </StatusPill>
-                        }
-                        level={2}
-                        title="Betriebsfreigabe"
-                      />
-                      {eventIsReleased ? (
-                        <>
-                          <p className="event-release-ready">
-                            <CheckCircle2 aria-hidden="true" />{" "}
-                            {board.event.status === "ACTIVE"
-                              ? "Der Veranstaltungsbetrieb ist freigegeben."
-                              : "Der Veranstaltungsbetrieb ist geschlossen."}
-                          </p>
-                          {board.event.status === "ACTIVE" ? (
-                            <div className="event-release-action">
-                              <Button
-                                disabled={!isAdministrator}
-                                onClick={() => setEndOperationsConfirmOpen(true)}
-                                variant="danger"
-                              >
-                                Betrieb beenden
-                              </Button>
-                            </div>
-                          ) : null}
-                        </>
-                      ) : !setupComplete ? (
-                        <>
-                          <p>
-                            Die Veranstaltung ist noch nicht betriebsbereit. Bitte erledige die
-                            offenen Punkte, um den Betrieb freizugeben.
-                          </p>
-                          <ul className="event-release-missing">
-                            {setupSteps
-                              .slice(0, 6)
-                              .filter((step) => !step.complete)
-                              .map((step) => (
-                                <li key={step.id}>
-                                  <Clock3 aria-hidden="true" />
-                                  <Button onClick={() => openSetupStep(step)} size="compact" variant="ghost">
-                                    {step.label} fehlt
-                                  </Button>
-                                </li>
-                              ))}
-                          </ul>
-                        </>
-                      ) : (
-                        <p className="event-release-ready">
-                          <CheckCircle2 aria-hidden="true" /> Alle Einrichtungsschritte sind abgeschlossen.
-                        </p>
-                      )}
-                      {!eventIsReleased ? (
-                        <div className="event-release-action">
-                          <Button
-                            disabled={!isAdministrator || !setupComplete}
-                            onClick={() => requestAdminAction(() => setEventLifecycle("ACTIVE"))}
-                            variant="primary"
-                          >
-                            <LockKeyhole aria-hidden="true" /> Betrieb freigeben
-                          </Button>
-                        </div>
-                      ) : null}
-                  </Panel>
-                }
-                emergency={
-                  <Panel className="admin-emergency-section" padding="compact">
-                    <h2>Notfallmodus</h2>
-                    <p>
-                      Aktivierung und Aufhebung werden getrennt bestätigt. Versteckte Flotten-,
-                      Piloten-, Queue- und Hinweissteuerungen gehören nicht zu diesem Admin-Ablauf.
-                    </p>
-                    <div className="operations-emergency-action">
-                      <div className="field-control">
-                        <FieldLabel
-                          htmlFor="emergency-reason"
-                          label="Begründung für den Notfallmodus"
-                          help="Mindestens drei Zeichen; der Grund wird mit der Zustandsänderung protokolliert."
-                        />
-                        <input
-                          id="emergency-reason"
-                          onChange={(event) => setReason(event.target.value)}
-                          placeholder="Mindestens 3 Zeichen"
-                          value={reason}
-                        />
-                      </div>
-                      <Button
-                        busy={
-                          busyActionKey ===
-                          (board.event.emergencyMode ? "emergency-clear" : "emergency-trigger")
-                        }
-                        className="danger-action"
-                        disabled={
-                          reason.trim().length < 3 ||
-                          busyActionKey !== null ||
-                          (board.event.emergencyMode && !isAdministrator)
-                        }
-                        onClick={() =>
-                          setPendingEmergencyAction(
-                            board.event.emergencyMode ? "CLEAR_EMERGENCY" : "TRIGGER_EMERGENCY",
-                          )
-                        }
-                        type="button"
-                        variant="danger"
-                      >
-                        {board.event.emergencyMode ? "Notfallmodus aufheben" : "Not-Halt auslösen"}
-                      </Button>
-                    </div>
-                  </Panel>
-                }
+            <AdminOperationsPanel
+              administrator={isAdministrator}
+              board={board}
+              busyActionKey={busyActionKey}
+              completedSetupSteps={completedSetupSteps}
+              onEmergency={(action, emergencyReason) => {
+                let succeeded = false;
+                return runBusyAction(
+                  action === "CLEAR_EMERGENCY" ? "emergency-clear" : "emergency-trigger",
+                  async () => {
+                    succeeded = await emergency(action, emergencyReason);
+                  },
+                ).then(() => succeeded);
+              }}
+              onOpenSetupStep={openSetupStep}
+              onRequestAdminAction={requestAdminAction}
+              onSetEventLifecycle={setEventLifecycle}
+              setupComplete={setupComplete}
+              setupSteps={setupSteps}
               />
-              <ConfirmationDialog
-                body={
-                  <p>
-                    Nach dem Betriebsende sind keine regulären operativen Änderungen mehr möglich.
-                    Der Vorgang wird protokolliert.
-                  </p>
-                }
-                confirmLabel="Betrieb jetzt beenden"
-                danger
-                onCancel={() => setEndOperationsConfirmOpen(false)}
-                onConfirm={() => {
-                  setEndOperationsConfirmOpen(false);
-                  return requestAdminAction(() => setEventLifecycle("CLOSED"));
-                }}
-                open={endOperationsConfirmOpen}
-                title="Betrieb wirklich beenden?"
-              />
-              <ConfirmationDialog
-                body={
-                  <p>
-                    {pendingEmergencyAction === "CLEAR_EMERGENCY"
-                      ? "Der Notfallmodus wird aufgehoben und die Aufhebung protokolliert."
-                      : "Der Notfallmodus wird veranstaltungsweit aktiviert und protokolliert."}
-                  </p>
-                }
-                confirmLabel={
-                  pendingEmergencyAction === "CLEAR_EMERGENCY"
-                    ? "Notfallmodus aufheben"
-                    : "Not-Halt auslösen"
-                }
-                danger
-                onCancel={() => setPendingEmergencyAction(null)}
-                onConfirm={() => {
-                  const action = pendingEmergencyAction;
-                  setPendingEmergencyAction(null);
-                  if (!action) return;
-                  if (action === "CLEAR_EMERGENCY") {
-                    return requestAdminAction(() =>
-                      runBusyAction("emergency-clear", () => emergency(action)),
-                    );
-                  }
-                  return runBusyAction("emergency-trigger", () => emergency(action));
-                }}
-                open={pendingEmergencyAction !== null}
-                title={
-                  pendingEmergencyAction === "CLEAR_EMERGENCY"
-                    ? "Notfallmodus wirklich aufheben?"
-                    : "Not-Halt wirklich auslösen?"
-                }
-              />
-            </section>
           ) : null}
           {adminArea === "events" && eventStep === "completion" && board ? (
             <section
