@@ -18,7 +18,7 @@
     },
     {
       "path": "packages/contracts/src/index.ts",
-      "maxLines": 3793,
+      "maxLines": 8,
       "targetLines": 300
     }
   ],
@@ -347,6 +347,46 @@
       "path": "apps/worker/src/fids-filter-options-service.ts",
       "maxLines": 51,
       "targetLines": 1500
+    },
+    {
+      "path": "packages/contracts/src/event-auth.ts",
+      "maxLines": 248,
+      "targetLines": 1500
+    },
+    {
+      "path": "packages/contracts/src/forecast-analysis.ts",
+      "maxLines": 1093,
+      "targetLines": 1500
+    },
+    {
+      "path": "packages/contracts/src/master-data.ts",
+      "maxLines": 386,
+      "targetLines": 1500
+    },
+    {
+      "path": "packages/contracts/src/operations-dispatch.ts",
+      "maxLines": 1298,
+      "targetLines": 1500
+    },
+    {
+      "path": "packages/contracts/src/reports-recovery.ts",
+      "maxLines": 383,
+      "targetLines": 1500
+    },
+    {
+      "path": "packages/contracts/src/schema-helpers.ts",
+      "maxLines": 42,
+      "targetLines": 1500
+    },
+    {
+      "path": "packages/contracts/src/shared.ts",
+      "maxLines": 38,
+      "targetLines": 1500
+    },
+    {
+      "path": "packages/contracts/src/tickets-public-status.ts",
+      "maxLines": 359,
+      "targetLines": 1500
     }
   ],
   "allowedProductionRawImports": [
@@ -480,7 +520,6 @@
     "apps/worker/src/maintainability-coverage.test.ts -> apps/web/src/admin-view.tsx",
     "apps/worker/src/maintainability-coverage.test.ts -> apps/web/src/features/admin/event-parameters/EventParametersWorkspace.tsx",
     "apps/worker/src/maintainability-coverage.test.ts -> apps/web/src/features/admin/event-parameters/useEventParametersForm.ts",
-    "apps/worker/src/maintainability-coverage.test.ts -> packages/contracts/src/index.ts",
     "apps/worker/src/maintainability-coverage.test.ts -> packages/domain/src/capacity.ts",
     "apps/worker/src/maintainability-coverage.test.ts -> packages/domain/src/forecast.ts",
     "apps/worker/src/maintainability-coverage.test.ts -> packages/domain/src/index.ts",
@@ -504,7 +543,6 @@
     "apps/worker/src/ticket-group-recall.test.ts -> apps/web/src/features/public-status/PublicStatusContent.tsx",
     "apps/worker/src/ticket-group-recall.test.ts -> apps/web/src/fids-display.tsx",
     "apps/worker/src/ticket-group-recall.test.ts -> apps/worker/src/web-push.ts",
-    "apps/worker/src/ticket-group-recall.test.ts -> packages/contracts/src/index.ts",
     "apps/worker/src/ticket-group-recall.test.ts -> packages/domain/src/index.ts",
     "apps/worker/src/web-push.test.ts -> apps/worker/src/web-push.ts"
   ]

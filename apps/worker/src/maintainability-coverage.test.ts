@@ -1,3 +1,4 @@
+import { commandEnvelopeSchema } from "@rundflug/contracts/operations-dispatch";
 import { describe, expect, it } from "vitest";
 import ciWorkflow from "../../../.github/workflows/ci.yml?raw";
 import cloudflarePerformanceWorkflow from "../../../.github/workflows/cloudflare-performance.yml?raw";
@@ -7,7 +8,6 @@ import interfaceDocumentation from "../../../docs/architecture/command-and-realt
 import rootManifestRaw from "../../../package.json?raw";
 import packageLockRaw from "../../../package-lock.json?raw";
 import contractsManifestRaw from "../../../packages/contracts/package.json?raw";
-import contractSource from "../../../packages/contracts/src/index.ts?raw";
 import domainManifestRaw from "../../../packages/domain/package.json?raw";
 import capacitySource from "../../../packages/domain/src/capacity.ts?raw";
 import forecastSource from "../../../packages/domain/src/forecast.ts?raw";
@@ -203,6 +203,97 @@ describe("V1 maintainability and portability boundaries", () => {
 
 describe("runtime configuration coverage", () => {
   it("exposes every required operational parameter through typed commands and administration", () => {
+    const commandBase = {
+      commandId: "a179125b-8409-48bb-a28f-1267f5ca5111",
+      eventId: "synthetic-event",
+      deviceId: "synthetic-admin",
+      expectedVersion: 7,
+      issuedAt: "2026-08-10T08:00:00.000Z",
+    };
+    const commands = [
+      commandEnvelopeSchema.parse({
+        ...commandBase,
+        type: "CONFIGURE_EVENT_PARAMETERS",
+        payload: {
+          saleOpensAt: null,
+          operationsStartAt: null,
+          operationsEndAt: "2026-08-10T18:00:00.000Z",
+          noShowAfterMinutes: 15,
+          maxTicketDeferrals: 2,
+          notificationLeadMinutes: 15,
+          automaticPrecallEnabled: true,
+          precallLeadMinutes: 15,
+          maximumGateWaitMinutes: 20,
+          precallMinimumQuality: "CHANGING",
+          precallGateCooldownMinutes: 2,
+          childReferenceWeightKg: 40,
+          normalReferenceWeightKg: 80,
+          heavyReferenceWeightKg: 100,
+          plannedBoardingMinutes: 5,
+          plannedDeboardingMinutes: 5,
+          plannedBufferMinutes: 3,
+          departedVisibilitySeconds: 15,
+          reason: "Synthetic configuration",
+          adminPin: "test-admin-pin",
+        },
+      }),
+      commandEnvelopeSchema.parse({
+        ...commandBase,
+        type: "UPSERT_PRODUCT",
+        payload: {
+          productId: "synthetic-product",
+          resourceGroupId: "synthetic-resource-group",
+          gateId: "synthetic-gate",
+          name: "Synthetic product",
+          code: "SYN-1",
+          publicDescription: "Synthetic public description",
+          priceCents: 1000,
+          referenceCapacity: 3,
+          referenceDurationMinutes: 20,
+          promisedFlightMinutes: 15,
+          childCompanionRequired: false,
+          weightClasses: ["NOT_CAPTURED"],
+          reason: "Synthetic product configuration",
+          adminPin: "test-admin-pin",
+        },
+      }),
+      commandEnvelopeSchema.parse({
+        ...commandBase,
+        type: "UPSERT_RESOURCE_GROUP",
+        payload: {
+          resourceGroupId: "synthetic-resource-group",
+          name: "Synthetic resource group",
+          shortCode: "SYN",
+          gateId: "synthetic-gate",
+          referenceCapacity: 3,
+          compatibleAircraftTypes: ["Synthetic aircraft"],
+          automaticPrecallEnabled: true,
+          reason: "Synthetic resource configuration",
+          adminPin: "test-admin-pin",
+        },
+      }),
+      commandEnvelopeSchema.parse({
+        ...commandBase,
+        type: "CONFIGURE_PRODUCT_SALES",
+        payload: {
+          productId: "synthetic-product",
+          saleEnabled: true,
+          saleClosesAt: null,
+          warningThreshold: 10,
+          criticalThreshold: 5,
+          reason: "Synthetic sales configuration",
+          adminPin: "test-admin-pin",
+        },
+      }),
+    ];
+
+    expect(commands.map((command) => command.type)).toEqual([
+      "CONFIGURE_EVENT_PARAMETERS",
+      "UPSERT_PRODUCT",
+      "UPSERT_RESOURCE_GROUP",
+      "CONFIGURE_PRODUCT_SALES",
+    ]);
+
     for (const token of [
       "CONFIGURE_EVENT_PARAMETERS",
       "saleOpensAt",
@@ -224,11 +315,7 @@ describe("runtime configuration coverage", () => {
       "childCompanionRequired",
       "compatibleAircraftTypes",
     ]) {
-      expect(contractSource).toContain(token);
       expect(webSource).toContain(token);
     }
-    expect(contractSource).toContain("CONFIGURE_PRODUCT_SALES");
-    expect(contractSource).toContain("warningThreshold");
-    expect(contractSource).toContain("criticalThreshold");
   });
 });

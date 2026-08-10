@@ -1,5 +1,5 @@
+import { commandEnvelopeSchema } from "@rundflug/contracts/operations-dispatch";
 import { describe, expect, it } from "vitest";
-import contracts from "../../../packages/contracts/src/index.ts?raw";
 import domain from "../../../packages/domain/src/index.ts?raw";
 import publicStatus from "../../web/src/features/public-status/PublicStatusContent.tsx?raw";
 import fids from "../../web/src/fids-display.tsx?raw";
@@ -8,9 +8,39 @@ import push from "./web-push.ts?raw";
 
 describe("V1.11 aktiver Gruppennachruf", () => {
   it("trennt den öffentlichen Nachruf vom bisherigen Queue-Kommando und berechtigt die drei Rollen", () => {
-    expect(contracts).toContain('type: z.literal("START_TICKET_GROUP_RECALL")');
-    expect(contracts).toContain('type: z.literal("CLEAR_TICKET_GROUP_RECALL")');
-    expect(contracts).toContain('type: z.literal("RESTORE_TICKET_GROUP_TO_QUEUE")');
+    const commandBase = {
+      commandId: "836fa884-8c1e-48ab-9a9e-a4e61ac889b6",
+      eventId: "synthetic-event",
+      deviceId: "synthetic-flight-line",
+      expectedVersion: 11,
+      issuedAt: "2026-08-10T08:00:00.000Z",
+    };
+    const commands = [
+      commandEnvelopeSchema.parse({
+        ...commandBase,
+        type: "START_TICKET_GROUP_RECALL",
+        payload: { ticketGroupId: "synthetic-ticket-group" },
+      }),
+      commandEnvelopeSchema.parse({
+        ...commandBase,
+        type: "CLEAR_TICKET_GROUP_RECALL",
+        payload: {
+          ticketGroupId: "synthetic-ticket-group",
+          recallId: "c3321176-e877-48fe-b90e-33cd944bcd8d",
+        },
+      }),
+      commandEnvelopeSchema.parse({
+        ...commandBase,
+        type: "RESTORE_TICKET_GROUP_TO_QUEUE",
+        payload: { ticketGroupId: "synthetic-ticket-group" },
+      }),
+    ];
+
+    expect(commands.map((command) => command.type)).toEqual([
+      "START_TICKET_GROUP_RECALL",
+      "CLEAR_TICKET_GROUP_RECALL",
+      "RESTORE_TICKET_GROUP_TO_QUEUE",
+    ]);
     expect(domain).toContain(
       'START_TICKET_GROUP_RECALL: ["FLIGHT_LINE", "FLIGHT_DIRECTOR", "ADMIN"]',
     );
@@ -51,6 +81,20 @@ describe("V1.11 aktiver Gruppennachruf", () => {
 
   it("nimmt keine Namen oder frei formulierten öffentlichen Texte in den Vorgang auf", () => {
     expect(migration).not.toMatch(/guest_name|passenger_name|phone_number/i);
-    expect(contracts).not.toMatch(/START_TICKET_GROUP_RECALL[\s\S]{0,300}(message|text):/i);
+    const command = commandEnvelopeSchema.parse({
+      commandId: "d35d70d4-c302-431a-89b8-83b7cad9d198",
+      eventId: "synthetic-event",
+      deviceId: "synthetic-flight-line",
+      expectedVersion: 11,
+      issuedAt: "2026-08-10T08:00:00.000Z",
+      type: "START_TICKET_GROUP_RECALL",
+      payload: {
+        ticketGroupId: "synthetic-ticket-group",
+        message: "This free text must not cross the contract boundary",
+        text: "This field must be removed as well",
+      },
+    });
+
+    expect(command.payload).toEqual({ ticketGroupId: "synthetic-ticket-group" });
   });
 });

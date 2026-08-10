@@ -4,7 +4,15 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./event-auth": "./src/event-auth.ts",
+    "./factory-reset": "./src/factory-reset.ts",
+    "./forecast-analysis": "./src/forecast-analysis.ts",
+    "./master-data": "./src/master-data.ts",
+    "./operations-dispatch": "./src/operations-dispatch.ts",
+    "./reports-recovery": "./src/reports-recovery.ts",
+    "./shared": "./src/shared.ts",
+    "./tickets-public-status": "./src/tickets-public-status.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"
