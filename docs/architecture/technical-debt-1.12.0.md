@@ -1,7 +1,7 @@
 # Technische Schulden – Stand 1.12.0
 
 Stand: 10. August 2026
-Messbasis: `15916aff75969bd4e9a959351ce0133beb7bb948` auf `main`/`origin/main`
+Messbasis: `1a5d364a8abf9409b51d9758754b0dbe6d67af80` auf `main`/`origin/main`
 
 Dieses Dokument schreibt die Restschuldenliste aus
 [`technical-debt-1.11.0.md`](technical-debt-1.11.0.md) fort. Es dokumentiert den Abschluss der
@@ -107,11 +107,12 @@ personenbezogene Inhalte werden nicht protokolliert. Korrektheitsrelevante Arbei
 
 ### Realtime-Fan-out
 
-Der gemeinsame Scheduler erzeugt einmal pro Tab einen nicht persistierten Zufallsversatz. Operative
-Clients verwenden 25 bis 200 ms, öffentliche Clients 150 bis 750 ms. Bursts werden auf die höchste
-`eventVersion` zusammengeführt; pro Client läuft höchstens ein Refresh, und eine währenddessen
-eingetroffene neuere Version erzeugt genau einen Folgeabruf. Initiales Laden, Reconnect und manuelle
-Aktualisierung bleiben unverzögert. Überholte Antworten dürfen keinen neueren Zustand überschreiben.
+Der gemeinsame Scheduler unter `apps/web/src/app/realtime-refresh-scheduler.ts` erzeugt einmal pro Tab
+einen nicht persistierten Zufallsversatz. Operative Clients verwenden 25 bis 200 ms, öffentliche
+Clients 150 bis 750 ms. Bursts werden auf die höchste `eventVersion` zusammengeführt; pro Client läuft
+höchstens ein Refresh, und eine währenddessen eingetroffene neuere Version erzeugt genau einen
+Folgeabruf. Initiales Laden, Reconnect und manuelle Aktualisierung bleiben unverzögert. Überholte
+Antworten dürfen keinen neueren Zustand überschreiben.
 
 Der deterministische Fan-out-Test simuliert getrennt 20 operative und 50 öffentliche Clients. Er
 prüft verteilte Requeststarts, Single-Flight-Verhalten und die Übernahme der neuesten Version
@@ -129,9 +130,9 @@ mit dem eingecheckten Snapshot von `5e1dce` sowie den festen Budgets.
 | globales CSS | 115,28 KiB | 21,45 KiB | 120 KiB | 24 KiB |
 | Flight-Line-CSS | 98,97 KiB | 15,60 KiB | 100 KiB | 18 KiB |
 | Admin-Route-Entry | 126,41 KiB | 35,89 KiB | 180 KiB | 48 KiB |
-| Haupt-Entry | 206,71 KiB | 64,57 KiB | 215 KiB | 68 KiB |
+| Haupt-Entry | 206,71 KiB | 64,56 KiB | 215 KiB | 68 KiB |
 | größter JavaScript-Chunk | 348,03 KiB | 100,05 KiB | 360 KiB | 105 KiB |
-| gesamter PWA-Precache | 1.414,29 KiB | – | 1,60 MiB | – |
+| gesamter PWA-Precache | 1.414,30 KiB | – | 1,60 MiB | – |
 
 Alle neun geprüften Routen bleiben mit ihrer transitiven Erstladegröße innerhalb des jeweiligen
 Ausgangssnapshots plus zwei Prozent. Analyse- und Diagrammflächen sowie Admin-Teilflächen werden nur

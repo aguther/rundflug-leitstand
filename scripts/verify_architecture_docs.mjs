@@ -63,6 +63,7 @@ const technicalDebtEvidence = [
   "npm audit --omit=dev",
   "npm run refactor:guardrails",
   "scripts/verify_web_assets.mjs",
+  "apps/web/src/app/realtime-refresh-scheduler.ts",
   "20 operative",
   "50 öffentliche",
 ];
