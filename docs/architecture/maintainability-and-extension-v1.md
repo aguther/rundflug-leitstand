@@ -5,9 +5,10 @@
 Der Rundflug-Leitstand verwendet TypeScript durchgängig, React und Vite für die PWA, HTTP und
 WebSocket als Transport, Zod für ausführbare Verträge sowie SQLite-kompatibles SQL für den
 relationalen Zustand. Hono bleibt eine dünne HTTP-Schicht. Biome, TypeScript und Vitest bilden die
-lokale Werkzeugkette. Alle Laufzeit- und Build-Abhängigkeiten sind im npm-Lockfile reproduzierbar
-festgeschrieben; eine maschinengeprüfte Allowlist verhindert das unbemerkte Einführen exotischer
-Bibliotheken.
+lokale Werkzeugkette. Mermaid und der vorhandene Playwright-Browser erzeugen die versionierte
+arc42-Dokumentation reproduzierbar als PDF, ohne Pandoc-, LaTeX- oder Docker-Abhängigkeit. Alle
+Laufzeit- und Build-Abhängigkeiten sind im npm-Lockfile reproduzierbar festgeschrieben; eine
+maschinengeprüfte Allowlist verhindert das unbemerkte Einführen exotischer Bibliotheken.
 
 Cloudflare-spezifische Typen, Bindings und Durable Objects liegen ausschließlich in `apps/worker`.
 Das Paket `packages/domain` besitzt keine Laufzeitabhängigkeiten und importiert weder Cloudflare,

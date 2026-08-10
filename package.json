@@ -65,7 +65,7 @@
     "check:ci": "npm run lint && npm run refactor:guardrails && npm run typecheck && npm run test:ci && npm run build:web && npm run build:worker && npm run requirements:verify",
     "check": "npm run lint && npm run refactor:guardrails && npm run typecheck && npm run test && npm run build:web:bundle && npm run build:worker && npm run test:analysis-replay && npm run test:analysis-scale && npm run test:worker-runtime && npm run test:v1-integrations && npm run test:v1-acceptance-day && npm run backup:restore:test && npm run docs:verify && npm run requirements:verify",
     "backup:restore:test": "python3 scripts/verify_backup_restore.py",
-    "docs:verify": "node scripts/verify_architecture_docs.mjs && npm run docs:requirements:check && npm run docs:migrations:check && npm run docs:licenses:check && npm run docs:guides:check",
+    "docs:verify": "node scripts/verify_architecture_docs.mjs && npm run docs:arc42:check && npm run docs:requirements:check && npm run docs:migrations:check && npm run docs:licenses:check && npm run docs:guides:check",
     "docs:guides:build": "node scripts/run_role_guides.mjs build",
     "docs:guides:check": "node scripts/run_role_guides.mjs check",
     "docs:migrations:build": "node scripts/verify_migrations.mjs --write",
@@ -87,7 +87,10 @@
     "cloudflare:bootstrap": "node scripts/cloudflare_bootstrap.mjs",
     "cloudflare:verify": "node scripts/cloudflare_verify.mjs",
     "cloudflare:ci-config": "node scripts/cloudflare_ci_config.mjs",
-    "clean": "node -e \"const fs=require('node:fs'); for (const p of ['apps/web/dist','apps/worker/dist']) fs.rmSync(p,{recursive:true,force:true})\""
+    "clean": "node -e \"const fs=require('node:fs'); for (const p of ['apps/web/dist','apps/worker/dist']) fs.rmSync(p,{recursive:true,force:true})\"",
+    "docs:arc42:check": "node scripts/verify_arc42_docs.mjs",
+    "docs:arc42:bundle": "node scripts/build_arc42_bundle.mjs",
+    "docs:arc42:pdf": "playwright install chromium && node scripts/build_arc42_pdf.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.6",
@@ -100,6 +103,7 @@
     "@vitest/coverage-v8": "^4.1.10",
     "concurrently": "^10.0.4",
     "jsdom": "^30.0.1",
+    "mermaid": "11.16.1",
     "typescript": "7.0.2",
     "vitest": "4.1.10",
     "wrangler": "^4.120.0"

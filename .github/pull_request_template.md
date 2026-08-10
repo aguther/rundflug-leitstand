@@ -6,6 +6,8 @@
 
 ## Technische Entscheidungen
 
+- [ ] arc42 wurde bei architekturrelevanten Änderungen aktualisiert oder ist nach Prüfung nicht betroffen
+
 ## Tests
 
 - [ ] `npm run check`

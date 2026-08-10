@@ -22,11 +22,15 @@ Laufzeitmetadaten und die aktuelle Requirements-/Traceability-Fassung.
 - D1 als relationale Source of Truth
 - ein SQLite-basiertes Durable Object je Veranstaltung als serieller Kommando-Koordinator und
   WebSocket-Hub
-- R2 für Sicherungen und Berichte
+- R2 für Sicherungen, Veranstaltungslogos und Analysepakete
 - Cloudflare Cron Triggers für Wartung, Löschung und spätere Backups
 - plattformneutrale Domänenlogik in `packages/domain`
 
 Die Entscheidung für diese Architektur ist in `docs/adr/` dokumentiert.
+Die zentrale, nach arc42 gegliederte Architekturdokumentation mit Kontext-, Baustein-, Laufzeit- und
+Verteilungssicht sowie Mermaid-Diagrammen steht unter
+[docs/arc42/](docs/arc42/README.md). Ein druckfertiges PDF erzeugt
+`npm run docs:arc42:pdf`.
 Ein datierter Vergleich mit kostengünstigen Alternativen liegt unter `docs/operations/provider-comparison.md`.
 Fachmodell, Zustandsautomaten, Invarianten und Prognoseverfahren sind unter
 `docs/architecture/domain-state-and-forecast-v1.md` zusammenhängend beschrieben.

@@ -1,5 +1,10 @@
 # Architekturübersicht
 
+Die zentrale Architekturdokumentation des Rundflug-Leitstands wird nach arc42 unter
+[`docs/arc42/`](../arc42/README.md) gepflegt. Dieses Dokument bleibt als kompakter technischer
+Einstieg und verweist für Kontext, Ziele, Baustein-, Laufzeit- und Verteilungssichten,
+Querschnittskonzepte, Qualitätsanforderungen und Risiken auf die arc42-Gesamtstruktur.
+
 Die detaillierte Beschreibung des Fachmodells, aller V1-Zustandsautomaten, technischen Invarianten
 und des Prognoseverfahrens steht in
 [`domain-state-and-forecast-v1.md`](domain-state-and-forecast-v1.md).
@@ -35,8 +40,8 @@ Cloudflare Worker
           │
           └── R2
               ├── portable Backups
-              ├── Tagesberichte
-              └── CSV-/PDF-Exporte
+              ├── Veranstaltungslogos
+              └── Analysepakete
 ```
 
 ## Konsistenzgrenze

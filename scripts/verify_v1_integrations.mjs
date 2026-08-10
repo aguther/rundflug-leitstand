@@ -10,7 +10,6 @@ export const exclusiveSuites = [
   "test:master-data",
   "test:ticket-assignment-concurrency",
   "test:ticket-deferrals",
-  "test:automatic-precall",
   "test:sale-guards",
   "test:fleet-operations",
   "test:recurring-operational-rules",
@@ -29,6 +28,9 @@ export const isolatedSuites = [
   "test:public-monitors",
   "test:first-run-setup",
 ];
+
+// This suite starts workerd only after both concurrent lanes have drained.
+export const serialSuites = ["test:automatic-precall"];
 
 export const suites = [
   "test:vertical-slice",
@@ -73,6 +75,15 @@ export async function runSuiteLanes({ lanes, runSuite }) {
   return outcomes.flatMap((outcome) => (outcome.status === "fulfilled" ? outcome.value : []));
 }
 
+export async function runIntegrationSchedule({ lanes, serialSuites: deferredSuites, runSuite }) {
+  const concurrentResults = await runSuiteLanes({ lanes, runSuite });
+  const serialResults = [];
+  for (const suite of deferredSuites) {
+    serialResults.push(await runSuite(suite, "serial"));
+  }
+  return [...concurrentResults, ...serialResults];
+}
+
 function runNpmSuite(npmCli, suite, lane) {
   return new Promise((resolvePromise, reject) => {
     const suiteStartedAt = Date.now();
@@ -107,11 +118,12 @@ async function main() {
   if (!npmCli) throw new Error("The npm execution path is missing.");
 
   const startedAt = Date.now();
-  const results = await runSuiteLanes({
+  const results = await runIntegrationSchedule({
     lanes: [
       { name: "exclusive", laneSuites: exclusiveSuites },
       { name: "isolated", laneSuites: isolatedSuites },
     ],
+    serialSuites,
     runSuite: (suite, lane) => runNpmSuite(npmCli, suite, lane),
   });
   const order = new Map(suites.map((suite, index) => [suite, index]));
@@ -123,6 +135,7 @@ async function main() {
       maximumParallelSuites: 2,
       exclusiveSuiteCount: exclusiveSuites.length,
       isolatedSuiteCount: isolatedSuites.length,
+      serialSuiteCount: serialSuites.length,
       suites: results,
       totalDurationSeconds: Number(((Date.now() - startedAt) / 1_000).toFixed(1)),
     })}\n`,

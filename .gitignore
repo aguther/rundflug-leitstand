@@ -23,3 +23,7 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 !.vscode/settings.json
+
+# Abgeleitete arc42-Artefakte
+output/arc42/rundflug-leitstand-arc42.md
+output/pdf/rundflug-leitstand-arc42.pdf

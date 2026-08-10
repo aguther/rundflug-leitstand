@@ -19,6 +19,9 @@ Auditierung.
 Binäre PDF-/DOCX-Dateien dienen als unveränderte Referenz. Ändere keine Anforderung stillschweigend.
 Dokumentiere Unklarheiten in `docs/requirements/open-questions.md`.
 
+Die zentrale, aus diesen Quellen abgeleitete Architekturdokumentation liegt unter `docs/arc42/`.
+Sie beschreibt den aktuellen Architekturstand, ersetzt aber weder Anforderungen noch ADRs oder Tests.
+
 ## Nicht verhandelbare fachliche Invarianten
 
 - Ein Produkt verwendet genau eine Ressourcengruppe.
@@ -50,7 +53,7 @@ Dokumentiere Unklarheiten in `docs/requirements/open-questions.md`.
 - Cloudflare Worker in `apps/worker`.
 - D1 als relationale Source of Truth.
 - SQLite-basiertes Durable Object je Veranstaltung für serialisierte Kommandos und WebSockets.
-- R2 für portable Sicherungen und Berichte.
+- R2 für portable Sicherungen, Veranstaltungslogos und Analysepakete.
 - Reine Fachlogik gehört in `packages/domain` und darf keine Cloudflare-, HTTP-, UI- oder
   Datenbankabhängigkeit besitzen.
 - Transportverträge gehören in `packages/contracts`.
@@ -60,6 +63,20 @@ Dokumentiere Unklarheiten in `docs/requirements/open-questions.md`.
   einer fachlich konsistenten D1-Batch-/Transaktionsgrenze gespeichert.
 - Realtime-Veröffentlichung erfolgt erst nach erfolgreicher Persistenz.
 - Cloudflare-spezifische Implementierung bleibt in Adaptern außerhalb des Domain-Pakets.
+
+### Pflege der arc42-Dokumentation
+
+- Änderungen an Systemgrenzen, Bausteinen, öffentlichen oder internen Schnittstellen, Persistenz,
+  Laufzeitinteraktionen, Deployment, Querschnittskonzepten, Qualitätszielen, Risiken oder ADRs müssen
+  im selben Auftrag in den betroffenen Kapiteln und Mermaid-Diagrammen unter `docs/arc42/`
+  nachvollzogen werden.
+- Strukturprägende Entscheidungen werden zuerst als ADR dokumentiert und in Kapitel 9 der
+  arc42-Dokumentation als aktueller Entscheidungsstand verlinkt und zusammengefasst.
+- Ist eine Änderung nach Prüfung nicht architekturrelevant, wird dies in der Pull-Request-Checkliste
+  ausdrücklich bestätigt.
+- Nach einer arc42-Änderung sind mindestens `npm run docs:arc42:check` und `npm run docs:verify`
+  auszuführen; Änderungen am PDF-Werkzeug oder an Diagrammen erfordern zusätzlich
+  `npm run docs:arc42:pdf` und eine visuelle Prüfung des erzeugten Dokuments.
 
 ## Erforderliche Befehle
 

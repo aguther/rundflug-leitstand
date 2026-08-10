@@ -57,6 +57,7 @@ describe("V1 maintainability and portability boundaries", () => {
       "@sonar/scan": "^5.0.0",
       "@vitest/coverage-v8": "^4.1.10",
       jsdom: "^30.0.1",
+      mermaid: "11.16.1",
       typescript: "7.0.2",
       wrangler: "^4.120.0",
     });
@@ -142,6 +143,7 @@ describe("V1 maintainability and portability boundaries", () => {
       "hono",
       "jsdom",
       "lucide-react",
+      "mermaid",
       "qrcode",
       "react",
       "react-dom",
