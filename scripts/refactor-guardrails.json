@@ -13,7 +13,7 @@
     },
     {
       "path": "apps/web/src/admin-view.tsx",
-      "maxLines": 5470,
+      "maxLines": 5422,
       "targetLines": 700
     },
     {
@@ -356,6 +356,11 @@
     {
       "path": "apps/web/src/features/admin/event-workspace/useAdminEventWorkspaceNavigation.ts",
       "maxLines": 142,
+      "targetLines": 1500
+    },
+    {
+      "path": "apps/web/src/features/admin/gates/useGateEditorState.ts",
+      "maxLines": 105,
       "targetLines": 1500
     },
     {

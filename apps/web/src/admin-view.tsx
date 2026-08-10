@@ -94,6 +94,7 @@ import type { ValidEventParameterPayload } from "./features/admin/event-paramete
 import { useAdminEventWorkspaceNavigation } from "./features/admin/event-workspace/useAdminEventWorkspaceNavigation";
 import { FactoryResetDialog } from "./features/admin/FactoryResetDialog";
 import { GatesWorkspace } from "./features/admin/gates/GatesWorkspace";
+import { useGateEditorState } from "./features/admin/gates/useGateEditorState";
 import { MasterDataPagination } from "./features/admin/master-data/MasterDataPagination";
 import {
   MasterDataEmptyState,
@@ -131,7 +132,6 @@ import {
   FieldGroupLabel,
   FieldHelp,
   FieldLabel,
-  type GateDisplayStatus,
   InterruptionNotice,
   MASTER_DATA_AUDIT_REASON,
   MASTER_DATA_DELETE_REASON,
@@ -416,18 +416,7 @@ export function AdminView() {
   const [productBufferOverride, setProductBufferOverride] = useState("");
   const [productChildCompanion, setProductChildCompanion] = useState(false);
   const [productWeightClasses, setProductWeightClasses] = useState<string[]>(["NOT_CAPTURED"]);
-  const [gateEditorId, setGateEditorId] = useState("new");
-  const [gateLabel, setGateLabel] = useState("");
-  const [gateType, setGateType] = useState<"FLIGHT_LINE" | "BOARDING" | "DISPLAY_ONLY">(
-    "FLIGHT_LINE",
-  );
-  const [gateActive, setGateActive] = useState(true);
-  const [gateSortOrder, setGateSortOrder] = useState(10);
-  const [gateTravelLeadMinutes, setGateTravelLeadMinutes] = useState(0);
-  const [gateDisplayProductIds, setGateDisplayProductIds] = useState<string[]>([]);
-  const [gateDisplayRotationStatuses, setGateDisplayRotationStatuses] = useState<
-    GateDisplayStatus[]
-  >([]);
+  const gateEditor = useGateEditorState(board?.gates);
   const [manifestTicketGroupId, setManifestTicketGroupId] = useState("");
   const [manifestTargetRotationId, setManifestTargetRotationId] = useState("");
   const [manifestCorrectionReason, setManifestCorrectionReason] = useState("");
@@ -443,16 +432,7 @@ export function AdminView() {
   const [aircraftMaximumPayload, setAircraftMaximumPayload] = useState("");
   const currentMasterEditorSnapshot =
     masterDataCategory === "gates"
-      ? createMasterEditorSnapshot([
-          "gates",
-          gateLabel,
-          gateType,
-          gateActive,
-          gateSortOrder,
-          gateTravelLeadMinutes,
-          gateDisplayProductIds,
-          gateDisplayRotationStatuses,
-        ])
+      ? gateEditor.snapshot
       : masterDataCategory === "products"
         ? createMasterEditorSnapshot([
             "products",
@@ -1181,39 +1161,14 @@ export function AdminView() {
   }
 
   function selectGateForEditing(id: string) {
-    const entry = board?.gates.find((gate) => gate.id === id);
-    const nextLabel = entry?.label ?? "";
-    const nextType = entry?.gateType ?? "FLIGHT_LINE";
-    const nextActive = entry?.active ?? true;
-    const nextSortOrder = entry?.sortOrder ?? 10;
-    const nextTravelLeadMinutes = entry?.travelLeadMinutes ?? 0;
-    const nextProductIds = entry?.displayFilter.productIds ?? [];
-    const nextRotationStatuses = entry?.displayFilter.rotationStatuses ?? [];
-    initialMasterEditorSnapshotRef.current = createMasterEditorSnapshot([
-      "gates",
-      nextLabel,
-      nextType,
-      nextActive,
-      nextSortOrder,
-      nextTravelLeadMinutes,
-      nextProductIds,
-      nextRotationStatuses,
-    ]);
-    setGateEditorId(id);
-    setGateLabel(nextLabel);
-    setGateType(nextType);
-    setGateActive(nextActive);
-    setGateSortOrder(nextSortOrder);
-    setGateTravelLeadMinutes(nextTravelLeadMinutes);
-    setGateDisplayProductIds(nextProductIds);
-    setGateDisplayRotationStatuses(nextRotationStatuses);
+    initialMasterEditorSnapshotRef.current = gateEditor.select(id);
     setMasterSubmitAttempted(false);
     setMasterEditorTab("general");
     setMasterEditorOpen(true);
   }
 
   async function saveGate() {
-    if (!board || gateLabel.trim().length < 2 || adminPinRef.current.length < 4) return;
+    if (!board || gateEditor.label.trim().length < 2 || adminPinRef.current.length < 4) return;
     try {
       await sendCommand(
         {
@@ -1224,16 +1179,13 @@ export function AdminView() {
           issuedAt: new Date().toISOString(),
           type: "UPSERT_GATE",
           payload: {
-            gateId: gateEditorId === "new" ? crypto.randomUUID() : gateEditorId,
-            label: gateLabel.trim(),
-            gateType,
-            active: gateActive,
-            sortOrder: gateSortOrder,
-            travelLeadMinutes: gateTravelLeadMinutes,
-            displayFilter: {
-              productIds: gateDisplayProductIds,
-              rotationStatuses: gateDisplayRotationStatuses,
-            },
+            gateId: gateEditor.editorId === "new" ? crypto.randomUUID() : gateEditor.editorId,
+            label: gateEditor.label.trim(),
+            gateType: gateEditor.gateType,
+            active: gateEditor.active,
+            sortOrder: gateEditor.sortOrder,
+            travelLeadMinutes: gateEditor.travelLeadMinutes,
+            displayFilter: gateEditor.displayFilter,
             reason: MASTER_DATA_AUDIT_REASON,
             adminPin: adminPinRef.current,
           },
@@ -1243,9 +1195,7 @@ export function AdminView() {
       setMessage("Gate-Stammdaten wurden protokolliert gespeichert.");
       if (!adminModeUnlocked) setAdminPin("");
       finishMasterEditor();
-      setGateEditorId("new");
-      setGateLabel("");
-      setGateTravelLeadMinutes(0);
+      gateEditor.resetAfterSave();
       await refresh();
       await refreshHistory();
     } catch (cause) {
@@ -2000,7 +1950,7 @@ export function AdminView() {
 
   function requestCurrentMasterSave() {
     if (masterDataCategory === "gates") {
-      requestMasterSave("gate", gateLabel.trim().length >= 2, "gate-label");
+      requestMasterSave("gate", gateEditor.label.trim().length >= 2, "gate-label");
       return;
     }
     if (masterDataCategory === "products") {
@@ -2498,11 +2448,11 @@ export function AdminView() {
     label: string;
     description: string;
   } | null =
-    masterDataCategory === "gates" && gateEditorId !== "new"
+    masterDataCategory === "gates" && gateEditor.editorId !== "new"
       ? {
           entityType: "GATE",
-          entityId: gateEditorId,
-          label: gateLabel,
+          entityId: gateEditor.editorId,
+          label: gateEditor.label,
           description: "Nur in der Vorbereitung und ohne operative Verwendung möglich.",
         }
       : masterDataCategory === "resource-groups" && resourceEditorId !== "new"
@@ -3567,7 +3517,7 @@ export function AdminView() {
             size="wide"
             title={
               masterDataCategory === "gates"
-                ? gateEditorId === "new"
+                ? gateEditor.editorId === "new"
                   ? "Gate anlegen"
                   : "Gate bearbeiten"
                 : productEditorId === "new"
@@ -3611,8 +3561,8 @@ export function AdminView() {
                   />
                   <input
                     id="gate-label"
-                    value={gateLabel}
-                    onChange={(event) => setGateLabel(event.target.value)}
+                    value={gateEditor.label}
+                    onChange={(event) => gateEditor.setLabel(event.target.value)}
                   />
                 </div>
                 <div className="gate-active-field">
@@ -3621,9 +3571,9 @@ export function AdminView() {
                     help="Nur aktive Gates stehen für neue Zuordnungen und öffentliche Anzeigen zur Verfügung."
                   />
                   <CheckboxField
-                    checked={gateActive}
+                    checked={gateEditor.active}
                     label="Gate ist aktiv"
-                    onChange={(event) => setGateActive(event.target.checked)}
+                    onChange={(event) => gateEditor.setActive(event.target.checked)}
                   />
                 </div>
                 <div className="field-control">
@@ -3636,9 +3586,11 @@ export function AdminView() {
                     id="gate-travel-lead-minutes"
                     max="30"
                     min="0"
-                    onChange={(event) => setGateTravelLeadMinutes(Number(event.target.value))}
+                    onChange={(event) =>
+                      gateEditor.setTravelLeadMinutes(Number(event.target.value))
+                    }
                     type="number"
-                    value={gateTravelLeadMinutes}
+                    value={gateEditor.travelLeadMinutes}
                   />
                 </div>
                 <details className="master-editor-further-settings">
@@ -3653,11 +3605,11 @@ export function AdminView() {
                       <select
                         id="gate-type"
                         onChange={(event) =>
-                          setGateType(
+                          gateEditor.setGateType(
                             event.target.value as "FLIGHT_LINE" | "BOARDING" | "DISPLAY_ONLY",
                           )
                         }
-                        value={gateType}
+                        value={gateEditor.gateType}
                       >
                         <option value="FLIGHT_LINE">Flight Line</option>
                         <option value="BOARDING">Boarding</option>
@@ -3673,9 +3625,9 @@ export function AdminView() {
                       <input
                         id="gate-sort-order"
                         min="0"
-                        onChange={(event) => setGateSortOrder(Number(event.target.value))}
+                        onChange={(event) => gateEditor.setSortOrder(Number(event.target.value))}
                         type="number"
-                        value={gateSortOrder}
+                        value={gateEditor.sortOrder}
                       />
                     </div>
                   </div>
@@ -3705,11 +3657,11 @@ export function AdminView() {
                     <div className="gate-filter-options">
                       {alphabeticalProducts.map((product) => (
                         <CheckboxField
-                          checked={gateDisplayProductIds.includes(product.id)}
+                          checked={gateEditor.displayProductIds.includes(product.id)}
                           key={product.id}
                           label={product.name}
                           onChange={() =>
-                            setGateDisplayProductIds((current) =>
+                            gateEditor.setDisplayProductIds((current) =>
                               current.includes(product.id)
                                 ? current.filter((id) => id !== product.id)
                                 : [...current, product.id],
@@ -3740,11 +3692,11 @@ export function AdminView() {
                         ] as const
                       ).map(([status, label]) => (
                         <CheckboxField
-                          checked={gateDisplayRotationStatuses.includes(status)}
+                          checked={gateEditor.displayRotationStatuses.includes(status)}
                           key={status}
                           label={label}
                           onChange={() =>
-                            setGateDisplayRotationStatuses((current) =>
+                            gateEditor.setDisplayRotationStatuses((current) =>
                               current.includes(status)
                                 ? current.filter((entry) => entry !== status)
                                 : [...current, status],
@@ -3754,12 +3706,12 @@ export function AdminView() {
                       ))}
                     </div>
                   </div>
-                  {gateEditorId !== "new" ? (
+                  {gateEditor.editorId !== "new" ? (
                     <div className="gate-assignment-summary">
                       <strong>Zugeordnete Ressourcengruppen</strong>
                       <span>
                         {resourceGroups
-                          .filter((group) => group.gateId === gateEditorId)
+                          .filter((group) => group.gateId === gateEditor.editorId)
                           .map((group) => group.name)
                           .join(", ") || "Keine"}
                       </span>
@@ -3767,7 +3719,7 @@ export function AdminView() {
                     </div>
                   ) : null}
                 </section>
-                {masterSubmitAttempted && gateLabel.trim().length < 2 ? (
+                {masterSubmitAttempted && gateEditor.label.trim().length < 2 ? (
                   <ValidationHint tone="error">
                     Die Gate-Bezeichnung muss mindestens 2 Zeichen lang sein.
                   </ValidationHint>

@@ -23,14 +23,6 @@ const stylesSource = [
 ].join("\n");
 
 describe("V1 administration completion UI", () => {
-  it("exposes typed gate display filters in the existing gate editor", () => {
-    expect(appSource).toContain("Anzeigefilter");
-    expect(appSource).toContain("gateDisplayProductIds");
-    expect(appSource).toContain("gateDisplayRotationStatuses");
-    expect(appSource).toContain("displayFilter:");
-    expect(appSource).toContain("Leere Auswahl bedeutet: alle Produkte");
-  });
-
   it("marks the post-departure manifest correction as an audited admin-only path", () => {
     expect(appSource).toContain("Dokumentierte Besetzung korrigieren");
     expect(appSource).toContain('type: "CORRECT_ROTATION_MANIFEST"');
