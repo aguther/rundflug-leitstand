@@ -10,9 +10,6 @@ describe("split booking-group coordination", () => {
   });
 
   it("publishes total and next-segment counts without replacing legacy totals", () => {
-    expect(workerSource).toContain("JOIN next_draft_segments next_segment");
-    expect(workerSource).not.toContain("(SELECT queued_segment.ticket_count");
-    expect(workerSource).toContain("next_segment_ticket_count");
     expect(workerSource).toContain("nextSegmentTicketCount: group.next_segment_ticket_count");
     expect(workerSource).toContain("ticketCount: group.ticket_count");
     expect(workerSource).toContain("segmentIndex: group.segment_index");

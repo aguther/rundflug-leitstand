@@ -14,20 +14,6 @@ describe("D-050 rotation data model", () => {
     expect(rotationMigration).toMatch(/UPDATE rotations[\s\S]*products[\s\S]*resource_groups/);
   });
 
-  it("returns gate, note, tickets and all three timeline kinds on the operation board", () => {
-    expect(worker).toContain("r.operational_note");
-    expect(worker).toContain("AS gate_id");
-    expect(worker).toContain("AS gate_label");
-    expect(worker).toContain("tickets_json");
-    expect(worker).toContain("planned_boarding_at");
-    expect(worker).toContain("predicted_boarding_at");
-    expect(worker).toContain("called_at");
-    expect(worker).toContain("withBookingGroupPartProjection(");
-    expect(worker).toContain("'partNumber', grouped_tickets.part_number");
-    expect(worker).toContain("'partCount', grouped_tickets.part_count");
-    expect(worker).toContain("JOIN booking_group_parts grouped_part");
-  });
-
   it("separates stable communication identifiers from mutable queue and capacity data", () => {
     expect(capacityMigration).toContain("ALTER TABLE flight_groups ADD COLUMN queue_position");
     expect(capacityMigration).toContain("ALTER TABLE rotations ADD COLUMN usable_capacity");

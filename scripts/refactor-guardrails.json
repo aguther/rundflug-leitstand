@@ -8,7 +8,7 @@
     },
     {
       "path": "apps/worker/src/index.ts",
-      "maxLines": 2045,
+      "maxLines": 1236,
       "targetLines": 800
     },
     {
@@ -316,6 +316,11 @@
     {
       "path": "apps/worker/src/control-transport-routes.ts",
       "maxLines": 98,
+      "targetLines": 1500
+    },
+    {
+      "path": "apps/worker/src/operations-read-service.ts",
+      "maxLines": 867,
       "targetLines": 1500
     },
     {
