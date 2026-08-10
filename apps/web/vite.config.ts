@@ -59,6 +59,7 @@ const operationalPwa = VitePWA({
       "**/ForecastSimulationView-*.js",
       "**/ForecastSimulationView-*.css",
       "**/comparison-worker-*.js",
+      "**/CartesianChart-*.js",
     ],
   },
 });
