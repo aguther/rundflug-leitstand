@@ -1,5 +1,4 @@
 import type { EventLogoTheme, OperationBoard } from "@rundflug/contracts";
-import { Trash2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   type AdminArea,
@@ -58,6 +57,11 @@ import { GateEditorDialog } from "./features/admin/gates/GateEditorDialog";
 import { GatesWorkspace } from "./features/admin/gates/GatesWorkspace";
 import { useGateEditorState } from "./features/admin/gates/useGateEditorState";
 import {
+  AdminMasterEditorFooter,
+  AdminMasterEditorFurtherActions,
+  getAdminMasterEditorPresentation,
+} from "./features/admin/master-data/AdminMasterEditorActions";
+import {
   MasterDataDeleteDialog,
   MasterDataTemplateImportDialog,
 } from "./features/admin/master-data/MasterDataManagementDialogs";
@@ -102,7 +106,6 @@ import {
   EVENT_ID,
   InterruptionNotice,
   MASTER_DATA_AUDIT_REASON,
-  type MasterDataDeleteTarget,
   OPERATIONAL_AUDIT_REASON,
   OperationalNotice,
   useOperationBoard,
@@ -1309,158 +1312,43 @@ export function AdminView() {
     },
   };
 
-  const masterDataSingularLabel: Record<MasterDataCategory, string> = {
-    gates: "Gate",
-    "resource-groups": "Ressourcengruppe",
-    aircraft: "Flugzeug",
-    assignments: "Flugzeug",
-    pilots: "Pilotencode",
-    products: "Produkt",
-  };
-  const masterDataPluralLabel: Record<MasterDataCategory, string> = {
-    gates: "Gates",
-    "resource-groups": "Ressourcengruppen",
-    aircraft: "Flugzeuge",
-    assignments: "Flugzeuge",
-    pilots: "Pilotencodes",
-    products: "Produkte",
-  };
+  const masterEditorPresentation = getAdminMasterEditorPresentation(
+    masterDataCategory,
+    totalMasterDataCount,
+    {
+      aircraft: aircraftEditor,
+      gate: gateEditor,
+      pilot: pilotEditor,
+      product: productEditor,
+      resourceGroup: resourceEditor,
+    },
+  );
   const masterDataEmptyState = (
     <MasterDataEmptyState
-      description={
-        totalMasterDataCount === 0
-          ? "Für diese Veranstaltung sind noch keine Einträge vorhanden."
-          : "Die aktuelle Suche oder Filterauswahl liefert keine Einträge."
-      }
-      title={
-        totalMasterDataCount === 0
-          ? `Noch keine ${masterDataPluralLabel[masterDataCategory]}`
-          : "Keine Treffer"
-      }
+      description={masterEditorPresentation.emptyDescription}
+      title={masterEditorPresentation.emptyTitle}
     />
   );
   const masterDataStepActive =
     adminArea === "events" &&
     ["gates", "resource-groups", "aircraft", "pilots", "products"].includes(eventStep);
-  const masterEditorDeleteAction: {
-    entityType: MasterDataDeleteTarget["entityType"];
-    entityId: string;
-    label: string;
-    description: string;
-  } | null =
-    masterDataCategory === "gates" && gateEditor.editorId !== "new"
-      ? {
-          entityType: "GATE",
-          entityId: gateEditor.editorId,
-          label: gateEditor.label,
-          description: "Nur in der Vorbereitung und ohne operative Verwendung möglich.",
-        }
-      : masterDataCategory === "resource-groups" && resourceEditor.editorId !== "new"
-        ? {
-            entityType: "RESOURCE_GROUP",
-            entityId: resourceEditor.editorId,
-            label: resourceEditor.name,
-            description: "Produkte und Flugzeugzuordnungen müssen vorher entfernt sein.",
-          }
-        : masterDataCategory === "aircraft" && aircraftEditor.editorId !== "new"
-          ? {
-              entityType: "AIRCRAFT",
-              entityId: aircraftEditor.editorId,
-              label: aircraftEditor.registration,
-              description: "Eine bestehende Zuordnung muss zuerst entfernt werden.",
-            }
-          : masterDataCategory === "pilots" && pilotEditor.editorId !== "new"
-            ? {
-                entityType: "PILOT",
-                entityId: pilotEditor.editorId,
-                label: pilotEditor.code,
-                description: "Nur ohne Umlauf oder Flugzeugbindung möglich.",
-              }
-            : masterDataCategory === "products" && productEditor.editorId !== "new"
-              ? {
-                  entityType: "PRODUCT",
-                  entityId: productEditor.editorId,
-                  label: productEditor.name,
-                  description: "Nur ohne Tickets oder Umläufe möglich.",
-                }
-              : null;
-  const masterEditorBusyKey =
-    masterDataCategory === "gates"
-      ? "master-gate"
-      : masterDataCategory === "resource-groups"
-        ? "master-resource-group"
-        : masterDataCategory === "aircraft"
-          ? "master-aircraft"
-          : masterDataCategory === "pilots"
-            ? "master-pilot"
-            : "master-product";
-  const masterEditorInitialFocusSelector =
-    masterDataCategory === "gates"
-      ? "#gate-label"
-      : masterDataCategory === "resource-groups"
-        ? "#resource-name"
-        : masterDataCategory === "aircraft"
-          ? "#aircraft-registration"
-          : masterDataCategory === "pilots"
-            ? "#pilot-operational-code"
-            : "#product-name";
   const masterEditorFooter = (
-    <>
-      {masterEditorDeleteAction ? (
-        <Button
-          className="master-editor-delete-footer"
-          disabled={!isAdministrator}
-          onClick={() =>
-            requestMasterDelete(
-              masterEditorDeleteAction.entityType,
-              masterEditorDeleteAction.entityId,
-              masterEditorDeleteAction.label,
-            )
-          }
-          type="button"
-          variant="danger"
-        >
-          <Trash2 aria-hidden="true" />
-          Löschen
-        </Button>
-      ) : null}
-      <div className="master-editor-standard-actions">
-        <Button onClick={requestMasterEditorClose} type="button">
-          Abbrechen
-        </Button>
-        <Button
-          busy={busyActionKey === masterEditorBusyKey}
-          disabled={!isAdministrator}
-          onClick={requestCurrentMasterSave}
-          type="button"
-          variant="primary"
-        >
-          Speichern
-        </Button>
-      </div>
-    </>
+    <AdminMasterEditorFooter
+      administrator={isAdministrator}
+      busy={busyActionKey === masterEditorPresentation.busyKey}
+      deleteAction={masterEditorPresentation.deleteAction}
+      onCancel={requestMasterEditorClose}
+      onDelete={(action) => requestMasterDelete(action.entityType, action.entityId, action.label)}
+      onSave={requestCurrentMasterSave}
+    />
   );
-  const masterEditorMobileFurtherActions = masterEditorDeleteAction ? (
-    <section className="master-editor-more-actions">
-      <h3>Weitere Aktionen</h3>
-      <p>{masterEditorDeleteAction.description}</p>
-      <Button
-        disabled={!isAdministrator}
-        onClick={() =>
-          requestMasterDelete(
-            masterEditorDeleteAction.entityType,
-            masterEditorDeleteAction.entityId,
-            masterEditorDeleteAction.label,
-          )
-        }
-        type="button"
-        variant="danger"
-      >
-        <Trash2 aria-hidden="true" />
-        Löschen
-      </Button>
-    </section>
-  ) : null;
+  const masterEditorMobileFurtherActions = (
+    <AdminMasterEditorFurtherActions
+      administrator={isAdministrator}
+      deleteAction={masterEditorPresentation.deleteAction}
+      onDelete={(action) => requestMasterDelete(action.entityType, action.entityId, action.label)}
+    />
+  );
   return (
     <Shell
       className="admin-shell"
@@ -1672,7 +1560,7 @@ export function AdminView() {
                   </label>
                 ) : undefined
               }
-              addAriaLabel={`${masterDataSingularLabel[masterDataCategory]} hinzufügen`}
+              addAriaLabel={`${masterEditorPresentation.singularLabel} hinzufügen`}
               onNew={startNewMasterDataEntry}
               onSearchChange={setMasterSearch}
               resultCount={activeMasterDataRowCount}
@@ -1827,7 +1715,7 @@ export function AdminView() {
             editor={gateEditor}
             footer={masterEditorFooter}
             furtherActions={masterEditorMobileFurtherActions}
-            initialFocusSelector={masterEditorInitialFocusSelector}
+            initialFocusSelector={masterEditorPresentation.initialFocusSelector}
             onClose={requestMasterEditorClose}
             onTabChange={setMasterEditorTab}
             open={masterDataStepActive && masterEditorOpen && masterDataCategory === "gates"}
@@ -1841,7 +1729,7 @@ export function AdminView() {
             editor={productEditor}
             footer={masterEditorFooter}
             furtherActions={masterEditorMobileFurtherActions}
-            initialFocusSelector={masterEditorInitialFocusSelector}
+            initialFocusSelector={masterEditorPresentation.initialFocusSelector}
             onClose={requestMasterEditorClose}
             onTabChange={setMasterEditorTab}
             open={masterDataStepActive && masterEditorOpen && masterDataCategory === "products"}
@@ -1855,7 +1743,7 @@ export function AdminView() {
             category={masterDataCategory}
             footer={masterEditorFooter}
             furtherActions={masterEditorMobileFurtherActions}
-            initialFocusSelector={masterEditorInitialFocusSelector}
+            initialFocusSelector={masterEditorPresentation.initialFocusSelector}
             onAssignAircraft={(resourceGroupId) =>
               setAssignmentDialogContext({ mode: "resource-group", resourceGroupId })
             }
@@ -1875,7 +1763,7 @@ export function AdminView() {
             editor={pilotEditor}
             footer={masterEditorFooter}
             furtherActions={masterEditorMobileFurtherActions}
-            initialFocusSelector={masterEditorInitialFocusSelector}
+            initialFocusSelector={masterEditorPresentation.initialFocusSelector}
             onClose={requestMasterEditorClose}
             onToggle={() => requestMasterSave("pilot-toggle", true)}
             open={masterDataStepActive && masterEditorOpen && masterDataCategory === "pilots"}

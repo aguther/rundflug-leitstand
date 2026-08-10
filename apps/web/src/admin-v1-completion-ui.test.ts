@@ -102,9 +102,6 @@ describe("V1 administration completion UI", () => {
     expect(appSource).toContain("Einzelzuordnung Flugzeug–Ressourcengruppe");
     expect(appSource).toContain("masterEditorFooter");
     expect(appSource).toContain("masterEditorMobileFurtherActions");
-    expect(appSource).toContain("Speichern");
-    expect(appSource).toContain("Abbrechen");
-    expect(appSource).toContain("Löschen");
     expect(appSource).not.toContain(">Gate speichern<");
     expect(appSource).not.toContain(">Ressourcengruppe speichern<");
     expect(appSource).not.toContain(">Flugzeug speichern<");

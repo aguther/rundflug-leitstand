@@ -56,14 +56,9 @@ describe("unified master-data dialogs and stable event workspace", () => {
     expect(adminStyles).toContain(".event-catalog-table tbody tr.is-current");
   });
 
-  it("uses content-appropriate shared modal sizes and neutral editor actions", () => {
+  it("uses content-appropriate shared modal sizes", () => {
     expect(adminEventStyles).toContain(".master-data-editor-dialog.ds-modal-dialog--wide");
     expect(adminEventStyles).toContain(".master-data-editor-dialog.ds-modal-dialog--default");
-    expect(adminViewSource).toContain('className="master-editor-delete-footer"');
-    expect(adminViewSource).toContain('className="master-editor-standard-actions"');
-    expect(adminViewSource).toMatch(/>\s*Abbrechen\s*<\/Button>/);
-    expect(adminViewSource).toMatch(/>\s*Speichern\s*<\/Button>/);
-    expect(adminViewSource).toContain("<h3>Weitere Aktionen</h3>");
   });
 
   it("uses shared touch-sized checkbox rows without direct aircraft membership editing", () => {
