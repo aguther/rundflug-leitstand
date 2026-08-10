@@ -101,6 +101,7 @@ import {
   MasterDataEmptyState,
   MasterDataWorkspace,
 } from "./features/admin/master-data/MasterDataWorkspace";
+import { ResourceAircraftEditorDialog } from "./features/admin/master-data/ResourceAircraftEditorDialog";
 import { OperationalPlanWorkspace } from "./features/admin/operational-plan/OperationalPlanWorkspace";
 import { OperationsWorkspace } from "./features/admin/operations/OperationsWorkspace";
 import { PilotCodesWorkspace } from "./features/admin/pilots/PilotCodesWorkspace";
@@ -128,13 +129,11 @@ import { clearOfflineOperationBoards } from "./offline-store";
 import {
   ADMIN_CONFIGURATION_AUDIT_REASON,
   ADMIN_DEVICE_ID,
-  aircraftStateLabel,
   ConnectionNotice,
   deviceTokenFor,
   EmergencyNotice,
   EVENT_ID,
   FieldGroupLabel,
-  FieldHelp,
   FieldLabel,
   InterruptionNotice,
   MASTER_DATA_AUDIT_REASON,
@@ -3893,220 +3892,25 @@ export function AdminView() {
             </div>
             {masterEditorMobileFurtherActions}
           </ModalDialog>
-          <ModalDialog
-            bodyClassName="master-data-editor-body"
-            className="master-data-editor-dialog"
+          <ResourceAircraftEditorDialog
+            aircraftEditor={aircraftEditor}
+            board={board}
+            category={masterDataCategory}
             footer={masterEditorFooter}
-            footerClassName="master-data-editor-footer"
+            furtherActions={masterEditorMobileFurtherActions}
             initialFocusSelector={masterEditorInitialFocusSelector}
+            onAssignAircraft={(resourceGroupId) =>
+              setAssignmentDialogContext({ mode: "resource-group", resourceGroupId })
+            }
             onClose={requestMasterEditorClose}
             open={
               masterDataStepActive &&
               masterEditorOpen &&
               ["resource-groups", "aircraft"].includes(masterDataCategory)
             }
-            size={masterDataCategory === "resource-groups" ? "wide" : "default"}
-            title={
-              masterDataCategory === "resource-groups"
-                ? resourceEditor.editorId === "new"
-                  ? "Ressourcengruppe anlegen"
-                  : "Ressourcengruppe bearbeiten"
-                : aircraftEditor.editorId === "new"
-                    ? "Flugzeug anlegen"
-                    : "Flugzeug bearbeiten"
-            }
-          >
-            <div className="resource-master-grid">
-              <fieldset hidden={masterDataCategory !== "resource-groups"}>
-                <legend>Ressourcengruppe</legend>
-                <div className="field-control">
-                  <FieldLabel
-                    htmlFor="resource-name"
-                    label="Bezeichnung"
-                    help="Lesbarer Name der gemeinsamen operativen Warteschlange."
-                  />
-                  <input
-                    id="resource-name"
-                    value={resourceEditor.name}
-                    onChange={(event) => resourceEditor.setName(event.target.value)}
-                  />
-                </div>
-                <div className="field-control">
-                  <FieldLabel
-                    htmlFor="resource-short-code"
-                    label="Kurzzeichen"
-                    help="Eindeutiges Kürzel mit 2 bis 8 Großbuchstaben, Ziffern oder Bindestrichen für kompakte operative Ansichten."
-                  />
-                  <input
-                    autoCapitalize="characters"
-                    id="resource-short-code"
-                    maxLength={8}
-                    placeholder="z. B. PA"
-                    value={resourceEditor.shortCode}
-                    onChange={(event) => resourceEditor.setShortCode(event.target.value)}
-                  />
-                </div>
-                <div className="field-control">
-                  <FieldLabel
-                    htmlFor="resource-gate"
-                    label="Gate"
-                    help="Standardmäßiger Treffpunkt für Produkte und Umläufe dieser Ressourcengruppe."
-                  />
-                  <select
-                    id="resource-gate"
-                    value={resourceEditor.gateId}
-                    onChange={(event) => resourceEditor.setGateId(event.target.value)}
-                  >
-                    <option value="">Bitte wählen</option>
-                    {board?.gates
-                      .filter((gate) => gate.active)
-                      .map((gate) => (
-                        <option key={gate.id} value={gate.id}>
-                          {gate.label}
-                        </option>
-                      ))}
-                  </select>
-                </div>
-                <CheckboxField
-                  checked={resourceEditor.automaticPrecall}
-                  className="resource-automatic-precall"
-                  id="resource-automatic-precall"
-                  label="Automatischer Voraufruf für diese Gruppe"
-                  onChange={(event) => resourceEditor.setAutomaticPrecall(event.target.checked)}
-                  trailing={
-                    <FieldHelp help="Kann für einzelne Ressourcengruppen abgeschaltet werden. Belegung, Pilot und Boarding bleiben immer manuell bestätigt." />
-                  }
-                />
-                <section className="resource-aircraft-selection resource-assignment-summary">
-                  <h3>Flugzeugzuordnungen</h3>
-                  <p>
-                    Zuordnungen werden getrennt historisiert und beim Speichern der
-                    Ressourcengruppe nicht verändert.
-                  </p>
-                  {resourceEditor.editorId !== "new" ? (
-                    <Button
-                      onClick={() =>
-                        setAssignmentDialogContext({
-                          mode: "resource-group",
-                          resourceGroupId: resourceEditor.editorId,
-                        })
-                      }
-                      type="button"
-                      variant="secondary"
-                    >
-                      Flugzeug zuordnen
-                    </Button>
-                  ) : (
-                    <ValidationHint>
-                      Die Ressourcengruppe zuerst speichern und anschließend Flugzeuge zuordnen.
-                    </ValidationHint>
-                  )}
-                </section>
-                {masterSubmitAttempted &&
-                (resourceEditor.name.trim().length < 2 ||
-                  !/^[A-Z0-9-]{2,8}$/.test(resourceEditor.shortCode.trim().toUpperCase()) ||
-                  !resourceEditor.gateId) ? (
-                  <ValidationHint tone="error">
-                    Bezeichnung, gültiges Kurzzeichen und Gate müssen für die Ressourcengruppe
-                    angegeben werden.
-                  </ValidationHint>
-                ) : null}
-              </fieldset>
-              <fieldset hidden={masterDataCategory !== "aircraft"}>
-                <legend>Flugzeug</legend>
-                <div className="field-control">
-                  <FieldLabel
-                    htmlFor="aircraft-registration"
-                    label="Kennzeichen"
-                    help="Eindeutiges operatives Luftfahrzeugkennzeichen, beispielsweise D-EXYZ."
-                  />
-                  <input
-                    id="aircraft-registration"
-                    value={aircraftEditor.registration}
-                    maxLength={16}
-                    onChange={(event) => aircraftEditor.setRegistration(event.target.value)}
-                  />
-                </div>
-                <div className="field-control">
-                  <FieldLabel
-                    htmlFor="aircraft-type"
-                    label="Flugzeugtyp"
-                    help="Typbezeichnung zur Prüfung gegen kompatible Ressourcengruppen."
-                  />
-                  <input
-                    id="aircraft-type"
-                    value={aircraftEditor.type}
-                    onChange={(event) => aircraftEditor.setType(event.target.value)}
-                  />
-                </div>
-                <div className="field-control">
-                  <FieldLabel
-                    htmlFor="aircraft-seats"
-                    label="Passagierplätze"
-                    help="Maximale Ticketanzahl je Umlauf; Besatzungsplätze werden hier nicht eingetragen."
-                  />
-                  <input
-                    id="aircraft-seats"
-                    type="number"
-                    min="1"
-                    max="100"
-                    value={aircraftEditor.passengerSeats}
-                    onChange={(event) => aircraftEditor.setPassengerSeats(Number(event.target.value))}
-                  />
-                </div>
-                <div className="field-control">
-                  <FieldLabel
-                    htmlFor="aircraft-maximum-payload"
-                    label="Max. Passagierzuladung (kg)"
-                    help="Optionaler organisatorischer Hinweiswert. Er besitzt keine Freigabe- oder Sicherheitssemantik."
-                  />
-                  <input
-                    id="aircraft-maximum-payload"
-                    type="number"
-                    min="1"
-                    value={aircraftEditor.maximumPassengerPayloadKg}
-                    onChange={(event) =>
-                      aircraftEditor.setMaximumPassengerPayloadKg(event.target.value)
-                    }
-                  />
-                </div>
-                {aircraftEditor.editorId !== "new" ? (
-                  <dl className="master-editor-readonly-summary">
-                    <div>
-                      <dt>Betriebsstatus</dt>
-                      <dd>
-                        {aircraftStateLabel[
-                          aircraftEditor.currentAircraft?.operationalState ?? "INACTIVE"
-                        ]}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt>Aktuelle Ressourcengruppe</dt>
-                      <dd>
-                        {aircraftEditor.currentAircraft?.resourceGroupName || "Nicht zugeordnet"}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt>Produktspezifische Zeitabweichungen</dt>
-                      <dd>
-                        {board?.aircraftProductTurnaroundOverrides.filter(
-                          (entry) => entry.aircraftId === aircraftEditor.editorId,
-                        ).length ?? 0}
-                      </dd>
-                    </div>
-                  </dl>
-                ) : null}
-                {masterSubmitAttempted &&
-                (aircraftEditor.registration.trim().length < 3 ||
-                  aircraftEditor.type.trim().length < 2) ? (
-                  <ValidationHint tone="error">
-                    Kennzeichen und Flugzeugtyp müssen mindestens 2 Zeichen lang sein.
-                  </ValidationHint>
-                ) : null}
-              </fieldset>
-            </div>
-            {masterEditorMobileFurtherActions}
-          </ModalDialog>
+            resourceEditor={resourceEditor}
+            submitAttempted={masterSubmitAttempted}
+          />
           <ModalDialog
             bodyClassName="master-data-editor-body"
             className="master-data-editor-dialog"

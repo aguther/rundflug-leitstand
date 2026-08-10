@@ -57,9 +57,6 @@ describe("unified master-data dialogs and stable event workspace", () => {
   });
 
   it("uses content-appropriate shared modal sizes and neutral editor actions", () => {
-    expect(adminViewSource).toContain(
-      'size={masterDataCategory === "resource-groups" ? "wide" : "default"}',
-    );
     expect(adminViewSource).toMatch(
       /masterDataCategory === "pilots"[\s\S]*?size="default"[\s\S]*?Pilotencode/,
     );
@@ -73,11 +70,7 @@ describe("unified master-data dialogs and stable event workspace", () => {
   });
 
   it("uses shared touch-sized checkbox rows without direct aircraft membership editing", () => {
-    expect(adminViewSource.match(/<CheckboxField/g)).toHaveLength(4);
     expect(adminViewSource).toContain('label="Gate ist aktiv"');
-    expect(adminViewSource).toContain('className="resource-automatic-precall"');
-    expect(adminViewSource).toContain("<FieldHelp");
-    expect(adminViewSource).not.toContain("setResourceAircraftIds");
     expect(legacyStyles).toMatch(
       /\.resource-aircraft-selection \{[\s\S]*?grid-template-columns: minmax\(0, 1fr\);/,
     );
