@@ -1,4 +1,3 @@
-import type { OperationBoard } from "@rundflug/contracts";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   type AdminArea,
@@ -9,7 +8,7 @@ import {
   type SetupStep,
   ValidationHint,
 } from "./admin-ux";
-import { getPushConfiguration, getSetupStatus, sendCommand } from "./api";
+import { getPushConfiguration, getSetupStatus } from "./api";
 import { AppShell as Shell } from "./app/AppShell";
 import { PageNotice, useActionMessageBridge } from "./app/PageNotifications";
 import {
@@ -60,6 +59,7 @@ import {
   MasterDataWorkspace,
 } from "./features/admin/master-data/MasterDataWorkspace";
 import { ResourceAircraftEditorDialog } from "./features/admin/master-data/ResourceAircraftEditorDialog";
+import { useAdminMasterDataActions } from "./features/admin/master-data/useAdminMasterDataActions";
 import { useAdminMasterDataDeletion } from "./features/admin/master-data/useAdminMasterDataDeletion";
 import { useAdminMasterDataTable } from "./features/admin/master-data/useAdminMasterDataTable";
 import { useAdminMasterEditorState } from "./features/admin/master-data/useAdminMasterEditorState";
@@ -90,12 +90,9 @@ import { useAuth } from "./features/auth/AuthContext";
 import {
   ADMIN_DEVICE_ID,
   ConnectionNotice,
-  deviceTokenFor,
   EmergencyNotice,
   EVENT_ID,
   InterruptionNotice,
-  MASTER_DATA_AUDIT_REASON,
-  OPERATIONAL_AUDIT_REASON,
   OperationalNotice,
   useOperationBoard,
 } from "./operation-workspace";
@@ -345,7 +342,6 @@ export function AdminView() {
     administrator: isAdministrator,
     onMessage: setMessage,
   });
-  const productPriceCents = productEditor.priceCents;
   const eventVersion = board?.event.version;
   const eventCatalog = useAdminEventCatalog({
     administrator: isAdministrator,
@@ -399,6 +395,41 @@ export function AdminView() {
     onRefreshBoard: refresh,
     onRefreshHistory: refreshHistory,
   });
+  const {
+    configureProductSales,
+    emergency,
+    requestAircraftAssignment,
+    requestCurrentMasterSave,
+    requestManifestCorrection,
+    requestMasterSave,
+    requestTurnaroundOverrideSave,
+  } = useAdminMasterDataActions({
+    administrator: isAdministrator,
+    board,
+    category: masterDataCategory,
+    clearPinWhenLocked,
+    editors: {
+      aircraft: aircraftEditor,
+      gate: gateEditor,
+      pilot: pilotEditor,
+      product: productEditor,
+      resourceGroup: resourceEditor,
+    },
+    finishEditor: finishMasterEditor,
+    getAdminPin,
+    onAssignmentComplete: () => setAssignmentDialogContext(null),
+    onManifestCorrected: () => setManifestCorrectionResetKey((current) => current + 1),
+    onMessage: setMessage,
+    onSalesComplete: () => setSalesProductId(null),
+    refreshBoard: refresh,
+    refreshHistory,
+    requestAdminAction,
+    runBusyAction,
+    selectAircraft: selectAircraftForEditing,
+    selectProduct: selectProductForEditing,
+    selectResourceGroup: selectResourceForEditing,
+    setSubmitAttempted: setMasterSubmitAttempted,
+  });
 
   useEffect(() => {
     if (
@@ -427,600 +458,6 @@ export function AdminView() {
     });
     return () => window.cancelAnimationFrame(frame);
   }, [board, eventStep]);
-
-  async function saveGate() {
-    if (!board || gateEditor.label.trim().length < 2 || getAdminPin().length < 4) return;
-    try {
-      await sendCommand(
-        {
-          commandId: crypto.randomUUID(),
-          eventId: EVENT_ID,
-          deviceId: ADMIN_DEVICE_ID,
-          expectedVersion: board.event.version,
-          issuedAt: new Date().toISOString(),
-          type: "UPSERT_GATE",
-          payload: {
-            gateId: gateEditor.editorId === "new" ? crypto.randomUUID() : gateEditor.editorId,
-            label: gateEditor.label.trim(),
-            gateType: gateEditor.gateType,
-            active: gateEditor.active,
-            sortOrder: gateEditor.sortOrder,
-            travelLeadMinutes: gateEditor.travelLeadMinutes,
-            displayFilter: gateEditor.displayFilter,
-            reason: MASTER_DATA_AUDIT_REASON,
-            adminPin: getAdminPin(),
-          },
-        },
-        deviceTokenFor(ADMIN_DEVICE_ID),
-      );
-      setMessage("Gate-Stammdaten wurden protokolliert gespeichert.");
-      clearPinWhenLocked();
-      finishMasterEditor();
-      gateEditor.resetAfterSave();
-      await refresh();
-      await refreshHistory();
-    } catch (cause) {
-      setMessage(cause instanceof Error ? cause.message : "Gate konnte nicht gespeichert werden.");
-    }
-  }
-
-  async function correctRotationManifest(
-    ticketGroupId: string,
-    targetRotationId: string,
-    correctionReason: string,
-  ) {
-    if (
-      !board ||
-      !ticketGroupId ||
-      !targetRotationId ||
-      correctionReason.trim().length < 10 ||
-      getAdminPin().length < 4
-    )
-      return;
-    try {
-      await sendCommand(
-        {
-          commandId: crypto.randomUUID(),
-          eventId: EVENT_ID,
-          deviceId: ADMIN_DEVICE_ID,
-          expectedVersion: board.event.version,
-          issuedAt: new Date().toISOString(),
-          type: "CORRECT_ROTATION_MANIFEST",
-          payload: {
-            ticketGroupId,
-            targetRotationId,
-            reason: correctionReason.trim(),
-            adminPin: getAdminPin(),
-          },
-        },
-        deviceTokenFor(ADMIN_DEVICE_ID),
-      );
-      setManifestCorrectionResetKey((current) => current + 1);
-      setMessage("Dokumentierte Besetzung wurde als Admin-Korrektur vollständig auditiert.");
-      clearPinWhenLocked();
-      await refresh();
-      await refreshHistory();
-    } catch (cause) {
-      setMessage(
-        cause instanceof Error
-          ? cause.message
-          : "Manifestkorrektur konnte nicht gespeichert werden.",
-      );
-    }
-  }
-
-  async function saveProduct() {
-    if (
-      !board ||
-      !productEditor.resourceGroupId ||
-      !productEditor.gateId ||
-      productPriceCents === null ||
-      getAdminPin().length < 4
-    )
-      return;
-    try {
-      await sendCommand(
-        {
-          commandId: crypto.randomUUID(),
-          eventId: EVENT_ID,
-          deviceId: ADMIN_DEVICE_ID,
-          expectedVersion: board.event.version,
-          issuedAt: new Date().toISOString(),
-          type: "UPSERT_PRODUCT",
-          payload: {
-            productId:
-              productEditor.editorId === "new" ? crypto.randomUUID() : productEditor.editorId,
-            resourceGroupId: productEditor.resourceGroupId,
-            gateId: productEditor.gateId,
-            name: productEditor.name.trim(),
-            code: productEditor.code.trim().toUpperCase(),
-            publicDescription: productEditor.description.trim(),
-            priceCents: productPriceCents,
-            referenceCapacity:
-              resourceGroups.find((group) => group.id === productEditor.resourceGroupId)
-                ?.referenceCapacity ?? 1,
-            referenceDurationMinutes: productEditor.referenceDuration,
-            promisedFlightMinutes: productEditor.promisedFlightMinutes,
-            plannedBoardingMinutesOverride:
-              productEditor.boardingOverride === "" ? null : Number(productEditor.boardingOverride),
-            plannedDeboardingMinutesOverride:
-              productEditor.deboardingOverride === ""
-                ? null
-                : Number(productEditor.deboardingOverride),
-            plannedBufferMinutesOverride:
-              productEditor.bufferOverride === "" ? null : Number(productEditor.bufferOverride),
-            childCompanionRequired: productEditor.childCompanion,
-            weightClasses: productEditor.weightClasses,
-            reason: MASTER_DATA_AUDIT_REASON,
-            adminPin: getAdminPin(),
-          },
-        },
-        deviceTokenFor(ADMIN_DEVICE_ID),
-      );
-      setMessage("Produktstammdaten wurden protokolliert gespeichert.");
-      clearPinWhenLocked();
-      selectProductForEditing("new");
-      finishMasterEditor();
-      await refresh();
-      await refreshHistory();
-    } catch (cause) {
-      setMessage(
-        cause instanceof Error ? cause.message : "Produkt konnte nicht gespeichert werden.",
-      );
-    }
-  }
-
-  async function persistAircraftProductTurnaroundOverride(
-    aircraftId: string,
-    productId: string,
-    values: { boarding: number | null; deboarding: number | null; buffer: number | null },
-  ) {
-    if (!board) return;
-    const existing = board.aircraftProductTurnaroundOverrides.find(
-      (override) => override.productId === productId && override.aircraftId === aircraftId,
-    );
-    const inheritAll =
-      values.boarding === null && values.deboarding === null && values.buffer === null;
-    if (inheritAll && !existing) return;
-    try {
-      await sendCommand(
-        inheritAll && existing
-          ? {
-              commandId: crypto.randomUUID(),
-              eventId: EVENT_ID,
-              deviceId: ADMIN_DEVICE_ID,
-              expectedVersion: board.event.version,
-              issuedAt: new Date().toISOString(),
-              type: "DELETE_AIRCRAFT_PRODUCT_TURNAROUND_OVERRIDE",
-              payload: {
-                aircraftId,
-                productId,
-                expectedOverrideVersion: existing.version,
-                reason: MASTER_DATA_AUDIT_REASON,
-                adminPin: getAdminPin(),
-              },
-            }
-          : {
-              commandId: crypto.randomUUID(),
-              eventId: EVENT_ID,
-              deviceId: ADMIN_DEVICE_ID,
-              expectedVersion: board.event.version,
-              issuedAt: new Date().toISOString(),
-              type: "UPSERT_AIRCRAFT_PRODUCT_TURNAROUND_OVERRIDE",
-              payload: {
-                aircraftId,
-                productId,
-                plannedBoardingMinutesOverride: values.boarding,
-                plannedDeboardingMinutesOverride: values.deboarding,
-                plannedBufferMinutesOverride: values.buffer,
-                expectedOverrideVersion: existing?.version ?? 0,
-                reason: MASTER_DATA_AUDIT_REASON,
-                adminPin: getAdminPin(),
-              },
-            },
-        deviceTokenFor(ADMIN_DEVICE_ID),
-      );
-      setMessage(
-        inheritAll
-          ? "Die Bodenzeiten erben wieder unmittelbar von Produkt oder Veranstaltung."
-          : "Flugzeugspezifische Bodenzeiten wurden protokolliert gespeichert.",
-      );
-      await refresh();
-      await refreshHistory();
-    } catch (cause) {
-      setMessage(
-        cause instanceof Error
-          ? cause.message
-          : "Flugzeugspezifische Bodenzeiten konnten nicht gespeichert werden.",
-      );
-    }
-  }
-
-  function requestTurnaroundOverrideSave(
-    aircraftId: string,
-    productId: string,
-    values: { boarding: number | null; deboarding: number | null; buffer: number | null },
-  ) {
-    if (!isAdministrator) {
-      setMessage("Für Änderungen am Zeitmodell wird ein Administrationskonto benötigt.");
-      return;
-    }
-    requestAdminAction(() =>
-      runBusyAction(`turnaround-${aircraftId}-${productId}`, () =>
-        persistAircraftProductTurnaroundOverride(aircraftId, productId, values),
-      ),
-    );
-  }
-
-  function requestAircraftAssignment(aircraftId: string, resourceGroupId: string) {
-    if (!isAdministrator) {
-      setMessage("Für Flugzeugzuordnungen wird ein Administrationskonto benötigt.");
-      return;
-    }
-    requestAdminAction(() =>
-      runBusyAction("master-assignment", () => assignAircraft(aircraftId, resourceGroupId)),
-    );
-  }
-
-  async function saveResourceGroup() {
-    if (
-      !board ||
-      !resourceEditor.gateId ||
-      resourceEditor.name.trim().length < 2 ||
-      !/^[A-Z0-9-]{2,8}$/.test(resourceEditor.shortCode.trim().toUpperCase()) ||
-      getAdminPin().length < 4
-    )
-      return;
-    try {
-      const resourceGroupId =
-        resourceEditor.editorId === "new" ? crypto.randomUUID() : resourceEditor.editorId;
-      await sendCommand(
-        {
-          commandId: crypto.randomUUID(),
-          eventId: EVENT_ID,
-          deviceId: ADMIN_DEVICE_ID,
-          expectedVersion: board.event.version,
-          issuedAt: new Date().toISOString(),
-          type: "UPSERT_RESOURCE_GROUP",
-          payload: {
-            resourceGroupId,
-            name: resourceEditor.name.trim(),
-            shortCode: resourceEditor.shortCode.trim().toUpperCase(),
-            gateId: resourceEditor.gateId,
-            referenceCapacity: resourceEditor.currentGroup?.referenceCapacity ?? 1,
-            compatibleAircraftTypes: [],
-            automaticPrecallEnabled: resourceEditor.automaticPrecall,
-            reason: MASTER_DATA_AUDIT_REASON,
-            adminPin: getAdminPin(),
-          },
-        },
-        deviceTokenFor(ADMIN_DEVICE_ID),
-      );
-      setMessage(
-        "Ressourcengruppe wurde protokolliert gespeichert; Zuordnungen bleiben unverändert.",
-      );
-      clearPinWhenLocked();
-      selectResourceForEditing("new");
-      finishMasterEditor();
-      await refresh();
-      await refreshHistory();
-    } catch (cause) {
-      setMessage(
-        cause instanceof Error
-          ? cause.message
-          : "Ressourcengruppe konnte nicht gespeichert werden.",
-      );
-    }
-  }
-
-  async function saveAircraft() {
-    if (
-      !board ||
-      aircraftEditor.registration.trim().length < 3 ||
-      aircraftEditor.type.trim().length < 2 ||
-      getAdminPin().length < 4
-    )
-      return;
-    try {
-      await sendCommand(
-        {
-          commandId: crypto.randomUUID(),
-          eventId: EVENT_ID,
-          deviceId: ADMIN_DEVICE_ID,
-          expectedVersion: board.event.version,
-          issuedAt: new Date().toISOString(),
-          type: "UPSERT_AIRCRAFT",
-          payload: {
-            aircraftId:
-              aircraftEditor.editorId === "new" ? crypto.randomUUID() : aircraftEditor.editorId,
-            registration: aircraftEditor.registration.trim().toUpperCase(),
-            aircraftType: aircraftEditor.type.trim(),
-            passengerSeats: aircraftEditor.passengerSeats,
-            maximumPassengerPayloadKg: aircraftEditor.maximumPassengerPayloadKg
-              ? Number(aircraftEditor.maximumPassengerPayloadKg)
-              : null,
-            reason: MASTER_DATA_AUDIT_REASON,
-            adminPin: getAdminPin(),
-          },
-        },
-        deviceTokenFor(ADMIN_DEVICE_ID),
-      );
-      setMessage("Flugzeugstammdaten wurden protokolliert gespeichert.");
-      clearPinWhenLocked();
-      selectAircraftForEditing("new");
-      finishMasterEditor();
-      await refresh();
-      await refreshHistory();
-    } catch (cause) {
-      setMessage(
-        cause instanceof Error ? cause.message : "Flugzeug konnte nicht gespeichert werden.",
-      );
-    }
-  }
-
-  async function assignAircraft(aircraftId: string, resourceGroupId: string) {
-    if (!board || !aircraftId || !resourceGroupId || getAdminPin().length < 4) return;
-    try {
-      await sendCommand(
-        {
-          commandId: crypto.randomUUID(),
-          eventId: EVENT_ID,
-          deviceId: ADMIN_DEVICE_ID,
-          expectedVersion: board.event.version,
-          issuedAt: new Date().toISOString(),
-          type: "ASSIGN_AIRCRAFT_RESOURCE_GROUP",
-          payload: {
-            aircraftId,
-            resourceGroupId,
-            effectiveAt: new Date().toISOString(),
-            reason: MASTER_DATA_AUDIT_REASON,
-            adminPin: getAdminPin(),
-          },
-        },
-        deviceTokenFor(ADMIN_DEVICE_ID),
-      );
-      setMessage(
-        "Flugzeugzuordnung wurde historisiert geändert; Queue und Prognose werden neu berechnet.",
-      );
-      clearPinWhenLocked();
-      setAssignmentDialogContext(null);
-      finishMasterEditor();
-      await refresh();
-      await refreshHistory();
-    } catch (cause) {
-      setMessage(
-        cause instanceof Error ? cause.message : "Flugzeugzuordnung konnte nicht geändert werden.",
-      );
-    }
-  }
-
-  async function emergency(
-    type: "TRIGGER_EMERGENCY" | "CLEAR_EMERGENCY",
-    emergencyReason: string,
-  ): Promise<boolean> {
-    if (
-      !board ||
-      emergencyReason.trim().length < 3 ||
-      (type === "CLEAR_EMERGENCY" && getAdminPin().length < 4)
-    )
-      return false;
-    try {
-      await sendCommand(
-        type === "TRIGGER_EMERGENCY"
-          ? {
-              commandId: crypto.randomUUID(),
-              eventId: EVENT_ID,
-              deviceId: ADMIN_DEVICE_ID,
-              expectedVersion: board.event.version,
-              issuedAt: new Date().toISOString(),
-              type,
-              payload: { reason: emergencyReason.trim() },
-            }
-          : {
-              commandId: crypto.randomUUID(),
-              eventId: EVENT_ID,
-              deviceId: ADMIN_DEVICE_ID,
-              expectedVersion: board.event.version,
-              issuedAt: new Date().toISOString(),
-              type,
-              payload: { reason: emergencyReason.trim(), adminPin: getAdminPin() },
-            },
-        deviceTokenFor(ADMIN_DEVICE_ID),
-      );
-      setMessage(
-        type === "TRIGGER_EMERGENCY" ? "Notfallmodus ausgelöst." : "Notfallmodus aufgehoben.",
-      );
-      clearPinWhenLocked();
-      await refresh();
-      await refreshHistory();
-      return true;
-    } catch (cause) {
-      setMessage(cause instanceof Error ? cause.message : "Notfallkommando fehlgeschlagen.");
-      return false;
-    }
-  }
-
-  async function configureProductSales(
-    product: OperationBoard["products"][number],
-    saleEnabled: boolean,
-    closingTimeOverride?: string | null,
-  ) {
-    if (!board || getAdminPin().length < 4) return;
-    try {
-      const configuredClosing =
-        closingTimeOverride === undefined ? product.saleClosesAt : closingTimeOverride;
-      await sendCommand(
-        {
-          commandId: crypto.randomUUID(),
-          eventId: EVENT_ID,
-          deviceId: ADMIN_DEVICE_ID,
-          expectedVersion: board.event.version,
-          issuedAt: new Date().toISOString(),
-          type: "CONFIGURE_PRODUCT_SALES",
-          payload: {
-            productId: product.id,
-            saleEnabled,
-            saleClosesAt: configuredClosing,
-            warningThreshold: product.capacityWarningThreshold,
-            criticalThreshold: product.capacityCriticalThreshold,
-            reason: OPERATIONAL_AUDIT_REASON,
-            adminPin: getAdminPin(),
-          },
-        },
-        deviceTokenFor(ADMIN_DEVICE_ID),
-      );
-      setMessage("Verkaufssteuerung wurde protokolliert aktualisiert.");
-      setSalesProductId(null);
-      await refresh();
-      await refreshHistory();
-    } catch (cause) {
-      setMessage(cause instanceof Error ? cause.message : "Verkaufssteuerung fehlgeschlagen.");
-    }
-  }
-
-  async function upsertPilot(
-    pilotId: string,
-    operationalCode: string,
-    operationalNote: string,
-    active: boolean,
-  ) {
-    if (!board || getAdminPin().length < 4) return;
-    try {
-      await sendCommand(
-        {
-          commandId: crypto.randomUUID(),
-          eventId: EVENT_ID,
-          deviceId: ADMIN_DEVICE_ID,
-          expectedVersion: board.event.version,
-          issuedAt: new Date().toISOString(),
-          type: "UPSERT_PILOT",
-          payload: {
-            pilotId,
-            operationalCode: operationalCode.trim().toUpperCase(),
-            operationalNote: operationalNote.trim(),
-            active,
-            reason: MASTER_DATA_AUDIT_REASON,
-            adminPin: getAdminPin(),
-          },
-        },
-        deviceTokenFor(ADMIN_DEVICE_ID),
-      );
-      setMessage("Anonymer operativer Pilotencode wurde aktualisiert.");
-      clearPinWhenLocked();
-      pilotEditor.resetAfterSave();
-      finishMasterEditor();
-      await refresh();
-      await refreshHistory();
-    } catch (cause) {
-      setMessage(
-        cause instanceof Error ? cause.message : "Pilotencode konnte nicht geändert werden.",
-      );
-    }
-  }
-
-  function requestMasterSave(
-    action: "gate" | "resource-group" | "aircraft" | "pilot" | "pilot-toggle" | "product",
-    valid: boolean,
-    invalidFieldId?: string,
-  ) {
-    setMasterSubmitAttempted(true);
-    if (!isAdministrator) {
-      setMessage("Für Stammdatenänderungen wird ein Administrationskonto benötigt.");
-      return;
-    }
-    if (!valid) {
-      if (invalidFieldId) {
-        window.requestAnimationFrame(() => document.getElementById(invalidFieldId)?.focus());
-      }
-      return;
-    }
-    requestAdminAction(() =>
-      runBusyAction(`master-${action}`, async () => {
-        if (action === "gate") await saveGate();
-        if (action === "resource-group") await saveResourceGroup();
-        if (action === "aircraft") await saveAircraft();
-        if (action === "product") await saveProduct();
-        if (action === "pilot") {
-          await upsertPilot(
-            pilotEditor.editorId === "new" ? crypto.randomUUID() : pilotEditor.editorId,
-            pilotEditor.code,
-            pilotEditor.note,
-            pilotEditor.currentPilot?.active ?? true,
-          );
-        }
-        if (action === "pilot-toggle") {
-          const existing = pilotEditor.currentPilot;
-          if (existing) {
-            await upsertPilot(
-              existing.id,
-              existing.operationalCode,
-              existing.operationalNote,
-              !existing.active,
-            );
-          }
-        }
-      }),
-    );
-  }
-
-  function requestProductSave() {
-    setMasterSubmitAttempted(true);
-    const invalidFieldId =
-      productEditor.name.trim().length < 2
-        ? "product-name"
-        : !/^[A-Z0-9-]{2,12}$/.test(productEditor.code)
-          ? "product-code"
-          : productPriceCents === null
-            ? "product-price"
-            : !productEditor.resourceGroupId
-              ? "product-resource-group"
-              : !productEditor.gateId
-                ? "product-gate"
-                : null;
-    if (invalidFieldId) {
-      window.requestAnimationFrame(() => document.getElementById(invalidFieldId)?.focus());
-      return;
-    }
-    requestMasterSave("product", true);
-  }
-
-  function requestCurrentMasterSave() {
-    if (masterDataCategory === "gates") {
-      requestMasterSave("gate", gateEditor.label.trim().length >= 2, "gate-label");
-      return;
-    }
-    if (masterDataCategory === "products") {
-      requestProductSave();
-      return;
-    }
-    if (masterDataCategory === "resource-groups") {
-      const invalidFieldId =
-        resourceEditor.name.trim().length < 2
-          ? "resource-name"
-          : !/^[A-Z0-9-]{2,8}$/.test(resourceEditor.shortCode.trim().toUpperCase())
-            ? "resource-short-code"
-            : !resourceEditor.gateId
-              ? "resource-gate"
-              : undefined;
-      requestMasterSave("resource-group", !invalidFieldId, invalidFieldId);
-      return;
-    }
-    if (masterDataCategory === "aircraft") {
-      const invalidFieldId =
-        aircraftEditor.registration.trim().length < 3
-          ? "aircraft-registration"
-          : aircraftEditor.type.trim().length < 2
-            ? "aircraft-type"
-            : undefined;
-      requestMasterSave("aircraft", !invalidFieldId, invalidFieldId);
-      return;
-    }
-    requestMasterSave(
-      "pilot",
-      /^[A-Z0-9-]{2,12}$/.test(pilotEditor.code),
-      "pilot-operational-code",
-    );
-  }
 
   const setupSteps: SetupStep[] = [
     {
@@ -1686,17 +1123,7 @@ export function AdminView() {
                   board={board}
                   busy={busyActionKey === "manifest-correction"}
                   key={manifestCorrectionResetKey}
-                  onCorrect={(ticketGroupId, targetRotationId, correctionReason) =>
-                    requestAdminAction(() =>
-                      runBusyAction("manifest-correction", () =>
-                        correctRotationManifest(
-                          ticketGroupId,
-                          targetRotationId,
-                          correctionReason,
-                        ),
-                      ),
-                    )
-                  }
+                  onCorrect={requestManifestCorrection}
                 />
               }
             />
