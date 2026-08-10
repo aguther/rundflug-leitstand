@@ -13,7 +13,7 @@
     },
     {
       "path": "apps/web/src/admin-view.tsx",
-      "maxLines": 764,
+      "maxLines": 707,
       "targetLines": 700
     },
     {
@@ -29,6 +29,11 @@
     {
       "path": "apps/web/src/features/admin/completion/AdminCompletionSummaryPanel.tsx",
       "maxLines": 79,
+      "targetLines": 1500
+    },
+    {
+      "path": "apps/web/src/features/admin/completion/AdminCompletionWorkspacePanel.tsx",
+      "maxLines": 86,
       "targetLines": 1500
     },
     {

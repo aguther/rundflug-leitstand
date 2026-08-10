@@ -21,10 +21,7 @@ import {
 import type { TurnaroundOverrideContext } from "./features/admin/aircraft/AircraftProductTurnaroundOverrideDialog";
 import type { AircraftResourceGroupAssignmentContext } from "./features/admin/aircraft/AircraftResourceGroupAssignmentDialog";
 import { useAircraftEditorState } from "./features/admin/aircraft/useAircraftEditorState";
-import { AdminCompletionSummaryPanel } from "./features/admin/completion/AdminCompletionSummaryPanel";
-import { CompletionHistoryPanel } from "./features/admin/completion/CompletionHistoryPanel";
-import { CompletionWorkspace } from "./features/admin/completion/CompletionWorkspace";
-import { ManifestCorrectionPanel } from "./features/admin/completion/ManifestCorrectionPanel";
+import { AdminCompletionWorkspacePanel } from "./features/admin/completion/AdminCompletionWorkspacePanel";
 import { useAdminHistory } from "./features/admin/completion/useAdminHistory";
 import { EventParametersWorkspace } from "./features/admin/event-parameters/EventParametersWorkspace";
 import { useAdminEventConfigurationActions } from "./features/admin/event-parameters/useAdminEventConfigurationActions";
@@ -150,25 +147,13 @@ export function AdminView() {
   const [message, setMessage] = useState<string | null>(null);
   useActionMessageBridge(message, setMessage);
   const [setupRequired, setSetupRequired] = useState(false);
-  const {
-    applyFilters: applyHistoryFilters,
-    auditHistory: history,
-    changeFilter: updateHistoryFilter,
-    changeView: changeHistoryView,
-    filters: historyFilters,
-    forecastHistory,
-    offset: historyOffset,
-    operationalHistory,
-    refreshAuditHistory: refreshHistory,
-    refreshDetailedHistory,
-    resetFilters: resetHistoryFilters,
-    view: historyView,
-  } = useAdminHistory({
+  const adminHistory = useAdminHistory({
     activeArea: adminArea,
     activeEventStep: eventStep,
     onError: setMessage,
     timeZone: board?.event.timeZone,
   });
+  const refreshHistory = adminHistory.refreshAuditHistory;
   const pilotEditor = usePilotEditorState(board?.pilots);
   const [pushConfigurationStatus, setPushConfigurationStatus] =
     useState<PushConfigurationStatus>("loading");
@@ -697,58 +682,16 @@ export function AdminView() {
               />
           ) : null}
           {adminArea === "events" && eventStep === "completion" && board ? (
-            <section
-              aria-labelledby="admin-event-step-completion-tab"
-              id="admin-event-step-completion-panel"
-              role="tabpanel"
-            >
-            <CompletionWorkspace
+            <AdminCompletionWorkspacePanel
+              administrator={isAdministrator}
               board={board}
-              onHistoryTabChange={changeHistoryView}
-              summary={
-                <AdminCompletionSummaryPanel
-                  board={board}
-                  busyActionKey={busyActionKey}
-                  onMessage={setMessage}
-                  onRunBusyAction={runBusyAction}
-                />
-              }
-              history={
-                <CompletionHistoryPanel
-                  auditHistory={history}
-                  board={board}
-                  busyActionKey={busyActionKey}
-                  filters={historyFilters}
-                  forecastHistory={forecastHistory}
-                  offset={historyOffset}
-                  onApplyFilters={applyHistoryFilters}
-                  onFilterChange={updateHistoryFilter}
-                  onNextPage={() =>
-                    runBusyAction("history-next", () =>
-                      refreshDetailedHistory(historyOffset + 50),
-                    )
-                  }
-                  onPreviousPage={() =>
-                    runBusyAction("history-previous", () =>
-                      refreshDetailedHistory(Math.max(0, historyOffset - 50)),
-                    )
-                  }
-                  onResetFilters={resetHistoryFilters}
-                  operationalHistory={operationalHistory}
-                  view={historyView}
-                />
-              }
-              corrections={
-                <ManifestCorrectionPanel
-                  administrator={isAdministrator}
-                  board={board}
-                  busy={busyActionKey === "manifest-correction"}
-                  key={manifestCorrectionResetKey}
-                  onCorrect={requestManifestCorrection}
-                />
-              }
+              busyActionKey={busyActionKey}
+              history={adminHistory}
+              manifestCorrectionResetKey={manifestCorrectionResetKey}
+              onMessage={setMessage}
+              onRequestManifestCorrection={requestManifestCorrection}
+              onRunBusyAction={runBusyAction}
             />
-            </section>
           ) : null}
           </div>
         </div>
