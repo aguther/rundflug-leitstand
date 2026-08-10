@@ -129,7 +129,7 @@ nicht.
 Wird eine untere Seite durch Realtime- oder Filteränderung ungültig, übernimmt der Controller die
 Antwort nicht als sichtbares Board. Er setzt `lowerPage` unmittelbar auf Seite 1 und lädt diese neu;
 bis zur gültigen Antwort bleibt das letzte bestätigte Board stehen. Die FIXED_PAGE-URL wird gemäß
-ADR-0033 niemals automatisch umgeschrieben.
+ADR-0039 niemals automatisch umgeschrieben.
 
 ## Lange Inhalte und Typografie
 

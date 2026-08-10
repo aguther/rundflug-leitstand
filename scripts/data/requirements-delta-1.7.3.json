@@ -10,7 +10,7 @@
       "priority": "MUSS",
       "stage": "V1",
       "status": "implemented",
-      "module": "apps/web/src/fids-display.tsx features/fids/useFidsExperience.ts fids-location.ts sowie ADR-0033",
+      "module": "apps/web/src/fids-display.tsx features/fids/useFidsExperience.ts fids-location.ts sowie ADR-0039",
       "tests": "fids-display-ui.test.ts fids-location.test.ts useFidsExperience.dom.test.tsx und Browser-Konzeptvergleich",
       "traceStatus": "umgesetzt"
     },
@@ -22,7 +22,7 @@
       "priority": "MUSS",
       "stage": "V1",
       "status": "implemented",
-      "module": "packages/domain/src/fids.ts apps/worker/src/fids-board-projection.ts apps/web/src/fids-display.tsx sowie ADR-0033",
+      "module": "packages/domain/src/fids.ts apps/worker/src/fids-board-projection.ts apps/web/src/fids-display.tsx sowie ADR-0039",
       "tests": "fids.test.ts fids-board-projection.test.ts fids-split-projection.worker-spec.ts simulation-fids-data-source.test.ts useFidsExperience.dom.test.tsx und Browserabnahme",
       "traceStatus": "umgesetzt"
     },
@@ -34,7 +34,7 @@
       "priority": "MUSS",
       "stage": "V1",
       "status": "implemented",
-      "module": "apps/web/src/fids-display.tsx features/fids/fids-v12.css sowie ADR-0033",
+      "module": "apps/web/src/fids-display.tsx features/fids/fids-v12.css sowie ADR-0039",
       "tests": "fids-display.dom.test.tsx fids-display-ui.test.ts fids-v12.test.ts useFidsExperience.dom.test.tsx und Light-/Dark-Browserabnahme",
       "traceStatus": "umgesetzt"
     },
@@ -46,7 +46,7 @@
       "priority": "MUSS",
       "stage": "V1",
       "status": "implemented",
-      "module": "apps/web/src/features/fids/FidsSettingsDialog.tsx fids-display.tsx und ADR-0033",
+      "module": "apps/web/src/features/fids/FidsSettingsDialog.tsx fids-display.tsx und ADR-0039",
       "tests": "fids-display-ui.test.ts und Dialog-Browserabnahme",
       "traceStatus": "umgesetzt"
     },
@@ -58,7 +58,7 @@
       "priority": "MUSS",
       "stage": "V1",
       "status": "implemented",
-      "module": "packages/contracts apps/worker/src/index.ts event-coordinator.ts und ADR-0033",
+      "module": "packages/contracts apps/worker/src/index.ts event-coordinator.ts und ADR-0039",
       "tests": "Contract- Auth- Autorisierungs- und Endpunktabnahme",
       "traceStatus": "umgesetzt"
     },
@@ -94,7 +94,7 @@
       "priority": "MUSS",
       "stage": "V1",
       "status": "implemented",
-      "module": "apps/worker/src/event-coordinator.ts fids-preferences-storage.ts fids-board-projection.ts sowie ADR-0033",
+      "module": "apps/worker/src/event-coordinator.ts fids-preferences-storage.ts fids-board-projection.ts sowie ADR-0039",
       "tests": "fids-preferences.test.ts fids.test.ts sowie Idempotenz- Konflikt- und Filter-Endpunktabnahme",
       "traceStatus": "umgesetzt"
     },

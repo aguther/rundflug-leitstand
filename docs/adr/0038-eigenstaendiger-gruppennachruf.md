@@ -1,4 +1,4 @@
-# ADR-0030: Eigenständiger aktiver Gruppennachruf
+# ADR-0038: Eigenständiger aktiver Gruppennachruf
 
 ## Status
 
