@@ -1,12 +1,9 @@
 import type {
   AdminEventFlow,
-  AuditHistory,
   EventCatalogEntry,
   EventLogoTheme,
-  ForecastHistory,
   MasterDataTemplate,
   MasterDataTemplateValidation,
-  OperationalHistory,
   OperationBoard,
 } from "@rundflug/contracts";
 import { masterDataTemplateSchema } from "@rundflug/contracts";
@@ -34,10 +31,7 @@ import {
   downloadTicketRawData,
   factoryReset,
   getAdminEventFlow,
-  getAuditHistory,
   getEventCatalog,
-  getForecastHistory,
-  getOperationalHistory,
   getPushConfiguration,
   getSetupStatus,
   importMasterDataTemplate,
@@ -69,13 +63,11 @@ import {
 } from "./features/admin/aircraft/AircraftResourceGroupAssignmentDialog";
 import { AircraftWorkspace } from "./features/admin/aircraft/AircraftWorkspace";
 import { useAircraftEditorState } from "./features/admin/aircraft/useAircraftEditorState";
-import {
-  type AdminHistoryFilterKey,
-  CompletionHistoryPanel,
-} from "./features/admin/completion/CompletionHistoryPanel";
+import { CompletionHistoryPanel } from "./features/admin/completion/CompletionHistoryPanel";
 import { CompletionSummaryPanel } from "./features/admin/completion/CompletionSummaryPanel";
 import { CompletionWorkspace } from "./features/admin/completion/CompletionWorkspace";
 import { ManifestCorrectionPanel } from "./features/admin/completion/ManifestCorrectionPanel";
+import { useAdminHistory } from "./features/admin/completion/useAdminHistory";
 import {
   type EventParameterSaveLifecycle,
   EventParametersWorkspace,
@@ -302,42 +294,24 @@ export function AdminView() {
   const [message, setMessage] = useState<string | null>(null);
   useActionMessageBridge(message, setMessage);
   const [setupRequired, setSetupRequired] = useState(false);
-  const [history, setHistory] = useState<AuditHistory>({ entries: [] });
-  const [historyView, setHistoryView] = useState<"OPERATIONS" | "FORECASTS" | "AUDIT">(
-    "OPERATIONS",
-  );
-  const [operationalHistory, setOperationalHistory] = useState<OperationalHistory>({
-    entries: [],
-    total: 0,
-    limit: 50,
-    offset: 0,
-  });
-  const [forecastHistory, setForecastHistory] = useState<ForecastHistory>({
-    entries: [],
-    total: 0,
-    limit: 50,
-    offset: 0,
-  });
-  const [historyOffset, setHistoryOffset] = useState(0);
-  const [historyEventType, setHistoryEventType] = useState("");
-  const [historyAggregateType, setHistoryAggregateType] = useState("");
-  const [historyAggregateId, setHistoryAggregateId] = useState("");
-  const [historySince, setHistorySince] = useState("");
-  const [historyUntil, setHistoryUntil] = useState("");
-  const [historyTicketStatus, setHistoryTicketStatus] = useState("");
-  const [historyAircraftId, setHistoryAircraftId] = useState("");
-  const [historyPilotId, setHistoryPilotId] = useState("");
-  const [historyProductId, setHistoryProductId] = useState("");
-  const [historyResourceGroupId, setHistoryResourceGroupId] = useState("");
-  const [historyCommunicationNumber, setHistoryCommunicationNumber] = useState("");
-  const [historyTicketId, setHistoryTicketId] = useState("");
-  const [historyTicketGroupId, setHistoryTicketGroupId] = useState("");
-  const [historyRotationId, setHistoryRotationId] = useState("");
-  const [historyTextSearch, setHistoryTextSearch] = useState("");
-  const historyFiltersByViewRef = useRef({
-    OPERATIONS: null as Record<string, string> | null,
-    FORECASTS: null as Record<string, string> | null,
-    AUDIT: null as Record<string, string> | null,
+  const {
+    applyFilters: applyHistoryFilters,
+    auditHistory: history,
+    changeFilter: updateHistoryFilter,
+    changeView: changeHistoryView,
+    filters: historyFilters,
+    forecastHistory,
+    offset: historyOffset,
+    operationalHistory,
+    refreshAuditHistory: refreshHistory,
+    refreshDetailedHistory,
+    resetFilters: resetHistoryFilters,
+    view: historyView,
+  } = useAdminHistory({
+    activeArea: adminArea,
+    activeEventStep: eventStep,
+    onError: setMessage,
+    timeZone: board?.event.timeZone,
   });
   const pilotEditor = usePilotEditorState(board?.pilots);
   const [pushConfigurationStatus, setPushConfigurationStatus] =
@@ -498,184 +472,6 @@ export function AdminView() {
     setAdminModeUnlocked(false);
     setAdminPin("");
   }, [isAdministrator, setAdminPin]);
-  const refreshHistory = useCallback(async () => {
-    try {
-      const timeZone = board?.event.timeZone ?? "Europe/Berlin";
-      setHistory(
-        await getAuditHistory(EVENT_ID, ADMIN_DEVICE_ID, deviceTokenFor(ADMIN_DEVICE_ID), {
-          eventType: historyEventType,
-          aggregateType: historyAggregateType,
-          aggregateId: historyAggregateId,
-          ...(historySince ? { since: eventLocalDateTimeToIso(historySince, timeZone) } : {}),
-          ...(historyUntil ? { until: eventLocalDateTimeToIso(historyUntil, timeZone) } : {}),
-        }),
-      );
-    } catch (cause) {
-      setMessage(cause instanceof Error ? cause.message : "Historie nicht verfügbar.");
-    }
-  }, [
-    board?.event.timeZone,
-    historyAggregateId,
-    historyAggregateType,
-    historyEventType,
-    historySince,
-    historyUntil,
-  ]);
-  const refreshDetailedHistory = useCallback(
-    async (requestedOffset: number) => {
-      try {
-        const timeZone = board?.event.timeZone ?? "Europe/Berlin";
-        const shared = {
-          ...(historySince ? { since: eventLocalDateTimeToIso(historySince, timeZone) } : {}),
-          ...(historyUntil ? { until: eventLocalDateTimeToIso(historyUntil, timeZone) } : {}),
-          ...(historyAircraftId ? { aircraftId: historyAircraftId } : {}),
-          ...(historyPilotId ? { pilotId: historyPilotId } : {}),
-          ...(historyRotationId ? { rotationId: historyRotationId.trim() } : {}),
-          limit: 50,
-          offset: requestedOffset,
-        };
-        if (historyView === "FORECASTS") {
-          setForecastHistory(
-            await getForecastHistory(
-              EVENT_ID,
-              ADMIN_DEVICE_ID,
-              deviceTokenFor(ADMIN_DEVICE_ID),
-              shared,
-            ),
-          );
-        } else if (historyView === "OPERATIONS") {
-          setOperationalHistory(
-            await getOperationalHistory(
-              EVENT_ID,
-              ADMIN_DEVICE_ID,
-              deviceTokenFor(ADMIN_DEVICE_ID),
-              {
-                ...shared,
-                ...(historyTicketStatus
-                  ? {
-                      ticketStatus:
-                        historyTicketStatus as OperationalHistory["entries"][number]["ticketStatus"],
-                    }
-                  : {}),
-                ...(historyProductId ? { productId: historyProductId } : {}),
-                ...(historyResourceGroupId ? { resourceGroupId: historyResourceGroupId } : {}),
-                ...(historyCommunicationNumber
-                  ? { communicationNumber: Number(historyCommunicationNumber) }
-                  : {}),
-                ...(historyTicketId ? { ticketId: historyTicketId.trim() } : {}),
-                ...(historyTicketGroupId ? { ticketGroupId: historyTicketGroupId.trim() } : {}),
-              },
-            ),
-          );
-        }
-        setHistoryOffset(requestedOffset);
-      } catch (cause) {
-        setMessage(cause instanceof Error ? cause.message : "Verlauf nicht verfügbar.");
-      }
-    },
-    [
-      board?.event.timeZone,
-      historyAircraftId,
-      historyCommunicationNumber,
-      historyPilotId,
-      historyProductId,
-      historyResourceGroupId,
-      historyRotationId,
-      historySince,
-      historyTicketGroupId,
-      historyTicketId,
-      historyTicketStatus,
-      historyUntil,
-      historyView,
-    ],
-  );
-  useEffect(() => {
-    void refreshHistory();
-    if (historyView !== "AUDIT") void refreshDetailedHistory(0);
-  }, [historyView, refreshDetailedHistory, refreshHistory]);
-  useEffect(() => {
-    if (adminArea === "events" && eventStep === "completion" && historyView === "AUDIT") return;
-    if (adminArea !== "events" && historyView === "AUDIT") setHistoryView("OPERATIONS");
-  }, [adminArea, eventStep, historyView]);
-
-  function changeHistoryView(nextView: "OPERATIONS" | "FORECASTS" | "AUDIT") {
-    historyFiltersByViewRef.current[historyView] = {
-      since: historySince,
-      until: historyUntil,
-      eventType: historyEventType,
-      aggregateType: historyAggregateType,
-      aggregateId: historyAggregateId,
-      ticketStatus: historyTicketStatus,
-      aircraftId: historyAircraftId,
-      pilotId: historyPilotId,
-      productId: historyProductId,
-      resourceGroupId: historyResourceGroupId,
-      communicationNumber: historyCommunicationNumber,
-      ticketId: historyTicketId,
-      ticketGroupId: historyTicketGroupId,
-      rotationId: historyRotationId,
-      textSearch: historyTextSearch,
-    };
-    const next = historyFiltersByViewRef.current[nextView] ?? {};
-    setHistorySince(next.since ?? "");
-    setHistoryUntil(next.until ?? "");
-    setHistoryEventType(next.eventType ?? "");
-    setHistoryAggregateType(next.aggregateType ?? "");
-    setHistoryAggregateId(next.aggregateId ?? "");
-    setHistoryTicketStatus(next.ticketStatus ?? "");
-    setHistoryAircraftId(next.aircraftId ?? "");
-    setHistoryPilotId(next.pilotId ?? "");
-    setHistoryProductId(next.productId ?? "");
-    setHistoryResourceGroupId(next.resourceGroupId ?? "");
-    setHistoryCommunicationNumber(next.communicationNumber ?? "");
-    setHistoryTicketId(next.ticketId ?? "");
-    setHistoryTicketGroupId(next.ticketGroupId ?? "");
-    setHistoryRotationId(next.rotationId ?? "");
-    setHistoryTextSearch(next.textSearch ?? "");
-    setHistoryOffset(0);
-    setHistoryView(nextView);
-  }
-
-  function resetHistoryFilters() {
-    setHistorySince("");
-    setHistoryUntil("");
-    setHistoryEventType("");
-    setHistoryAggregateType("");
-    setHistoryAggregateId("");
-    setHistoryTicketStatus("");
-    setHistoryAircraftId("");
-    setHistoryPilotId("");
-    setHistoryProductId("");
-    setHistoryResourceGroupId("");
-    setHistoryCommunicationNumber("");
-    setHistoryTicketId("");
-    setHistoryTicketGroupId("");
-    setHistoryRotationId("");
-    setHistoryTextSearch("");
-    setHistoryOffset(0);
-  }
-
-  function updateHistoryFilter(key: AdminHistoryFilterKey, value: string, resetOffset = false) {
-    const setters: Record<AdminHistoryFilterKey, (nextValue: string) => void> = {
-      aggregateId: setHistoryAggregateId,
-      aggregateType: setHistoryAggregateType,
-      aircraftId: setHistoryAircraftId,
-      communicationNumber: setHistoryCommunicationNumber,
-      eventType: setHistoryEventType,
-      pilotId: setHistoryPilotId,
-      productId: setHistoryProductId,
-      resourceGroupId: setHistoryResourceGroupId,
-      rotationId: setHistoryRotationId,
-      since: setHistorySince,
-      textSearch: setHistoryTextSearch,
-      ticketGroupId: setHistoryTicketGroupId,
-      ticketId: setHistoryTicketId,
-      ticketStatus: setHistoryTicketStatus,
-      until: setHistoryUntil,
-    };
-    setters[key](value);
-    if (resetOffset) setHistoryOffset(0);
-  }
   const refreshEvents = useCallback(async () => {
     if (!isAdministrator) return;
     try {
@@ -3034,30 +2830,10 @@ export function AdminView() {
                   auditHistory={history}
                   board={board}
                   busyActionKey={busyActionKey}
-                  filters={{
-                    aggregateId: historyAggregateId,
-                    aggregateType: historyAggregateType,
-                    aircraftId: historyAircraftId,
-                    communicationNumber: historyCommunicationNumber,
-                    eventType: historyEventType,
-                    pilotId: historyPilotId,
-                    productId: historyProductId,
-                    resourceGroupId: historyResourceGroupId,
-                    rotationId: historyRotationId,
-                    since: historySince,
-                    textSearch: historyTextSearch,
-                    ticketGroupId: historyTicketGroupId,
-                    ticketId: historyTicketId,
-                    ticketStatus: historyTicketStatus,
-                    until: historyUntil,
-                  }}
+                  filters={historyFilters}
                   forecastHistory={forecastHistory}
                   offset={historyOffset}
-                  onApplyFilters={() => {
-                    setHistoryOffset(0);
-                    if (historyView === "AUDIT") void refreshHistory();
-                    else void refreshDetailedHistory(0);
-                  }}
+                  onApplyFilters={applyHistoryFilters}
                   onFilterChange={updateHistoryFilter}
                   onNextPage={() =>
                     runBusyAction("history-next", () =>

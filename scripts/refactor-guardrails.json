@@ -13,7 +13,7 @@
     },
     {
       "path": "apps/web/src/admin-view.tsx",
-      "maxLines": 3179,
+      "maxLines": 2955,
       "targetLines": 700
     },
     {
@@ -431,6 +431,11 @@
     {
       "path": "apps/web/src/features/admin/completion/CompletionHistoryPanel.tsx",
       "maxLines": 554,
+      "targetLines": 1500
+    },
+    {
+      "path": "apps/web/src/features/admin/completion/useAdminHistory.ts",
+      "maxLines": 197,
       "targetLines": 1500
     },
     {
