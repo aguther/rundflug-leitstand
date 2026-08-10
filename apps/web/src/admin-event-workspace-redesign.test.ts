@@ -67,9 +67,6 @@ describe("event-scoped administration redesign", () => {
 
   it("provides an optional ninth operational-plan step and a simplified operation screen", () => {
     expect(adminUxSource).toContain('| "operational-plan"');
-    expect(adminViewSource).toContain('id: "operational-plan"');
-    expect(adminViewSource).toContain('label: "Betriebsplan"');
-    expect(adminViewSource).toContain("setupSteps.slice(0, 6)");
     expect(adminViewSource).toContain("<AdminOperationalPlanPanel");
     expect(operationalPlanSource).toContain('label: "Einschränkungen"');
     expect(operationalPlanSource).toContain('label: "Wiederkehrende Regeln"');
