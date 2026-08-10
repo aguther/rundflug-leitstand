@@ -459,7 +459,7 @@
       "targetLines": 1500
     },
     {
-      "path": "apps/web/src/realtime-refresh-scheduler.ts",
+      "path": "apps/web/src/app/realtime-refresh-scheduler.ts",
       "maxLines": 169,
       "targetLines": 1500
     },

@@ -9,7 +9,7 @@ import {
   createRealtimeRefreshScheduler,
   type RealtimeRefreshRequest,
   type RealtimeRefreshScheduler,
-} from "../../realtime-refresh-scheduler";
+} from "../../app/realtime-refresh-scheduler";
 import type {
   EditableFidsPreferences,
   FidsConnectionState,

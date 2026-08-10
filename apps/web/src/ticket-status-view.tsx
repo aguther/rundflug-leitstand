@@ -4,6 +4,10 @@ import { useEffect, useState } from "react";
 import { getPublicTicketStatus } from "./api";
 import { AppShell as Shell } from "./app/AppShell";
 import {
+  createRealtimeRefreshScheduler,
+  type RealtimeRefreshRequest,
+} from "./app/realtime-refresh-scheduler";
+import {
   nextBoardReconnectDelay,
   OPERATION_BOARD_POLL_INTERVAL_MS,
   OPERATION_BOARD_RECONNECT_INITIAL_MS,
@@ -21,11 +25,6 @@ import {
   realtimeStateChangeVersion,
   sendRealtimeHeartbeat,
 } from "./realtime-heartbeat";
-import {
-  createRealtimeRefreshScheduler,
-  type RealtimeRefreshRequest,
-} from "./realtime-refresh-scheduler";
-
 export function TicketStatusView({ code }: { code: string }) {
   const [status, setStatus] = useState<PublicTicketStatus | null>(null);
   const [error, setError] = useState<string | null>(null);

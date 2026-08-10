@@ -5,6 +5,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom";
 import { getOperationBoard } from "./api";
 import { PageNotice } from "./app/PageNotifications";
+import { createRealtimeRefreshScheduler } from "./app/realtime-refresh-scheduler";
 import {
   type BoardSyncState,
   createBoardSyncCoordinator,
@@ -20,8 +21,6 @@ import {
   realtimeStateChangeVersion,
   sendRealtimeHeartbeat,
 } from "./realtime-heartbeat";
-import { createRealtimeRefreshScheduler } from "./realtime-refresh-scheduler";
-
 export const EVENT_ID = resolveActiveEvent(
   window.location.search,
   window.localStorage,
