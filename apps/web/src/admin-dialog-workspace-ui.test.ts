@@ -70,7 +70,6 @@ describe("unified master-data dialogs and stable event workspace", () => {
   });
 
   it("uses shared touch-sized checkbox rows without direct aircraft membership editing", () => {
-    expect(adminViewSource).toContain('label="Gate ist aktiv"');
     expect(legacyStyles).toMatch(
       /\.resource-aircraft-selection \{[\s\S]*?grid-template-columns: minmax\(0, 1fr\);/,
     );

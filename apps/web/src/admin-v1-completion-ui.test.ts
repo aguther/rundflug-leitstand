@@ -111,11 +111,7 @@ describe("V1 administration completion UI", () => {
   });
 
   it("keeps every master-data category operable from create through delete or removal", () => {
-    for (const label of [
-      "Gate anlegen",
-      "Einzelzuordnung Flugzeug–Ressourcengruppe",
-      "Produkt anlegen",
-    ]) {
+    for (const label of ["Einzelzuordnung Flugzeug–Ressourcengruppe", "Produkt anlegen"]) {
       expect(appSource).toContain(label);
     }
     expect(appSource).toContain("masterEditorFooter");

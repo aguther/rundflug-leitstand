@@ -13,7 +13,7 @@
     },
     {
       "path": "apps/web/src/admin-view.tsx",
-      "maxLines": 5017,
+      "maxLines": 4820,
       "targetLines": 700
     },
     {
@@ -391,6 +391,11 @@
     {
       "path": "apps/web/src/features/admin/pilots/PilotEditorDialog.tsx",
       "maxLines": 113,
+      "targetLines": 1500
+    },
+    {
+      "path": "apps/web/src/features/admin/gates/GateEditorDialog.tsx",
+      "maxLines": 249,
       "targetLines": 1500
     },
     {
