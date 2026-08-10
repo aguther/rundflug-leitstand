@@ -152,19 +152,6 @@ describe("V1.5 administration UI", () => {
     ]) {
       expect(adminUxSource).toContain(navigationItem);
     }
-    for (const step of [
-      'id: "event"',
-      'id: "gates"',
-      'id: "resource-groups"',
-      'id: "aircraft"',
-      'id: "pilots"',
-      'id: "products"',
-      'id: "operational-plan"',
-      'id: "operations"',
-      'id: "completion"',
-    ]) {
-      expect(adminViewSource).toContain(step);
-    }
   });
 
   it("uses event-only flow data and a strict preview-before-import workflow", () => {

@@ -49,6 +49,17 @@ describe("admin shell model", () => {
 
   it("counts only the six required setup steps", () => {
     const steps = createAdminSetupSteps(boardWithSetup());
+    expect(steps.map((step) => step.id)).toEqual([
+      "event",
+      "gates",
+      "resource-groups",
+      "aircraft",
+      "pilots",
+      "products",
+      "operational-plan",
+      "operations",
+      "completion",
+    ]);
     expect(summarizeAdminSetup(steps)).toEqual({ complete: true, completedSteps: 6 });
     expect(steps.find((step) => step.id === "operational-plan")?.complete).toBe(false);
   });

@@ -67,12 +67,14 @@ const board = {
   resourceGroups: [],
 } as unknown as OperationBoard;
 
-function renderDialogs() {
+function renderDialogs({ discardChangesOpen = false } = {}) {
   const configureProductSales = vi.fn().mockResolvedValue(undefined);
   const requestAdminAction = vi.fn((action: () => Promise<void>) => action());
   const runBusyAction = vi.fn((_key: string, action: () => Promise<void>) => action());
   const setAssignmentContext = vi.fn();
   const confirmDeletion = vi.fn().mockResolvedValue(undefined);
+  const continueEditing = vi.fn();
+  const discardChanges = vi.fn();
 
   render(
     <AdminShellDialogs
@@ -110,10 +112,10 @@ function renderDialogs() {
       editors={{ aircraft: {}, gate: {}, pilot: {}, product: {}, resourceGroup: {} } as never}
       editorState={
         {
-          continueEditing: vi.fn(),
+          continueEditing,
           dirty: false,
-          discardChanges: vi.fn(),
-          discardChangesOpen: false,
+          discardChanges,
+          discardChangesOpen,
           open: false,
           requestClose: vi.fn(),
           setTab: vi.fn(),
@@ -149,6 +151,8 @@ function renderDialogs() {
   return {
     configureProductSales,
     confirmDeletion,
+    continueEditing,
+    discardChanges,
     requestAdminAction,
     runBusyAction,
     setAssignmentContext,
@@ -190,5 +194,16 @@ describe("admin shell dialogs", () => {
       resourceGroupId: "group-a",
     });
     expect(actions.runBusyAction).toHaveBeenCalledWith("master-delete", actions.confirmDeletion);
+  });
+
+  it("keeps dirty-editor recovery in a single destructive confirmation dialog", () => {
+    const actions = renderDialogs({ discardChangesOpen: true });
+
+    expect(screen.getByRole("alertdialog", { name: "Änderungen verwerfen?" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Weiter bearbeiten" }));
+    fireEvent.click(screen.getByRole("button", { name: "Verwerfen" }));
+
+    expect(actions.continueEditing).toHaveBeenCalledOnce();
+    expect(actions.discardChanges).toHaveBeenCalledOnce();
   });
 });

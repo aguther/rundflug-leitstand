@@ -106,6 +106,25 @@ describe("manifest correction panel", () => {
     expect(onCorrect).toHaveBeenCalledWith("group-a", "target", "Confirmed manifest correction");
   });
 
+  it("keeps the correction action disabled without administrator access", () => {
+    render(
+      <ManifestCorrectionPanel
+        administrator={false}
+        board={board}
+        busy={false}
+        onCorrect={vi.fn()}
+      />,
+    );
+
+    expect(
+      (
+        screen.getByRole("button", {
+          name: "Besetzung protokolliert korrigieren",
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(true);
+  });
+
   it("shows an empty state when no rotation has departed", () => {
     render(
       <ManifestCorrectionPanel

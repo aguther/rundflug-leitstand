@@ -85,9 +85,4 @@ describe("unified master-data dialogs and stable event workspace", () => {
       /@media \(max-width: 700px\) \{[\s\S]*?\.admin-shell \.master-editor-further-settings \.parameter-grid \{[\s\S]*?grid-template-columns: 1fr;[\s\S]*?align-items: stretch;/,
     );
   });
-
-  it("keeps status and discard flows in the shared modal language", () => {
-    expect(adminViewSource).toContain('title="Änderungen verwerfen?"');
-    expect(adminViewSource).toContain("Weiter bearbeiten");
-  });
 });

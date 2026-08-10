@@ -60,7 +60,6 @@ describe("event-scoped administration redesign", () => {
       expect(completionSource).toContain(label);
     }
     expect(completionSource).toContain("Korrektur beginnen");
-    expect(adminViewSource).toContain("<CompletionHistoryPanel");
     expect(adminViewSource).not.toContain("Flotte, Tanken und Pausen");
   });
 

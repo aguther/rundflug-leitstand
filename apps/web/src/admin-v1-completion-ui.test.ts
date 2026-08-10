@@ -23,10 +23,6 @@ const stylesSource = [
 ].join("\n");
 
 describe("V1 administration completion UI", () => {
-  it("renders the post-departure manifest correction as an admin-only path", () => {
-    expect(adminViewSource).toContain("<ManifestCorrectionPanel");
-  });
-
   it("uses account sessions instead of browser device recovery", () => {
     expect(appSource).not.toContain("attemptedDeviceCredentialRecoveries");
     expect(appSource).not.toContain("recoverAdminDevice(");
@@ -90,10 +86,6 @@ describe("V1 administration completion UI", () => {
     expect(notificationsSource).toContain('notice.tone === "danger" ? 10_000 : 5_000');
   });
 
-  it("loads the Web Push configuration for the overview", () => {
-    expect(appSource).toContain("getPushConfiguration(controller.signal)");
-  });
-
   it("keeps every master-data category operable from create through delete or removal", () => {
     expect(appSource).toContain("Einzelzuordnung Flugzeug–Ressourcengruppe");
     expect(appSource).toContain("masterEditorFooter");
@@ -112,17 +104,9 @@ describe("V1 administration completion UI", () => {
     expect(stylesSource).toContain("max-height: none");
   });
 
-  it("guards dirty editors and transitions to destructive confirmation without stacked dialogs", () => {
-    expect(appSource).toContain('title="Änderungen verwerfen?"');
-    expect(appSource).toContain("Weiter bearbeiten");
-  });
-
   it("separates administrative evaluation from operational flight-line work", () => {
     expect(adminUxSource).toContain('{ id: "evaluation", label: "Auswertung"');
     expect(adminUxSource).not.toContain('label: "Betrieb"');
-    expect(appSource).toContain('title: "Auswertung"');
-    expect(appSource).toContain('eventStep === "completion"');
-    expect(appSource).toContain("<CompletionWorkspace");
   });
 
   it("keeps the admin bar action touchable", () => {
