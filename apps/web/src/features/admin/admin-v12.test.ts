@@ -39,14 +39,8 @@ describe("V1.2 compact administration", () => {
     expect(appSource).not.toContain('className="admin-section restart-editor"');
     expect(modernizationStylesSource).toContain(".event-create-dialog-form");
     expect(modernizationStylesSource).toContain(".event-create-dialog-footer");
-    expect(stylesSource).toMatch(/\.admin-shell \.reset-levels\[hidden\]\s*\{\s*display: none;/);
-  });
-
-  it("makes technical event IDs visible, searchable and explicit during deletion", () => {
-    expect(appSource).toContain("entry.name} $" + "{entry.eventId} $" + "{entry.eventDate");
-    expect(appSource).toContain("Zum Bestätigen exakt");
-    expect(appSource).toContain("eventId}“ eingeben");
     expect(modernizationStylesSource).toContain(".event-catalog-entry-id");
+    expect(stylesSource).toMatch(/\.admin-shell \.reset-levels\[hidden\]\s*\{\s*display: none;/);
   });
 
   it("uses the desktop viewport without an avoidable page-level scrollbar", () => {

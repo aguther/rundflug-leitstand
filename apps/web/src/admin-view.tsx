@@ -1,6 +1,5 @@
 import type {
   AdminEventFlow,
-  EventCatalogEntry,
   EventLogoTheme,
   MasterDataTemplate,
   MasterDataTemplateValidation,
@@ -21,17 +20,13 @@ import {
 } from "./admin-ux";
 import {
   ApiCommandError,
-  cloneEvent,
-  deleteEvent,
   downloadDailyPdf,
   downloadDailyReport,
-  downloadMasterDataTemplate,
   downloadPerformanceProfile,
   downloadSimulationPlan,
   downloadTicketRawData,
   factoryReset,
   getAdminEventFlow,
-  getEventCatalog,
   getPushConfiguration,
   getSetupStatus,
   importMasterDataTemplate,
@@ -50,7 +45,6 @@ import {
   PageHeader,
   StatusPill,
 } from "./design-system/components";
-import { forgetActiveEvent, rememberActiveEvent } from "./event-context";
 import { eventLocalDateTimeToIso, formatEventLocalDateTime } from "./event-time";
 import { AdminAuthorizationDialog } from "./features/admin/AdminAuthorizationDialog";
 import {
@@ -74,6 +68,7 @@ import {
 } from "./features/admin/event-parameters/EventParametersWorkspace";
 import type { ValidEventParameterPayload } from "./features/admin/event-parameters/useEventParametersForm";
 import { EventCatalogDialog } from "./features/admin/event-workspace/EventCatalogDialog";
+import { useAdminEventCatalog } from "./features/admin/event-workspace/useAdminEventCatalog";
 import { useAdminEventWorkspaceNavigation } from "./features/admin/event-workspace/useAdminEventWorkspaceNavigation";
 import { FactoryResetDialog } from "./features/admin/FactoryResetDialog";
 import { GateEditorDialog } from "./features/admin/gates/GateEditorDialog";
@@ -350,16 +345,10 @@ export function AdminView() {
   const masterEditorDirty =
     masterEditorOpen &&
     hasMasterEditorChanges(initialMasterEditorSnapshotRef.current, currentMasterEditorSnapshot);
-  const [events, setEvents] = useState<EventCatalogEntry[]>([]);
   const [eventFlow, setEventFlow] = useState<AdminEventFlow | null>(null);
   const [eventFlowError, setEventFlowError] = useState<string | null>(null);
   const [eventFlowLoading, setEventFlowLoading] = useState(true);
   const [eventDialogView, setEventDialogView] = useState<"closed" | "catalog" | "create">("closed");
-  const [eventSearch, setEventSearch] = useState("");
-  const [eventSort, setEventSort] = useState<{
-    key: "name" | "eventDate" | "status" | "aerodrome";
-    direction: "asc" | "desc" | null;
-  }>({ key: "eventDate", direction: null });
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
   const [templateFileName, setTemplateFileName] = useState("");
   const [templateDraft, setTemplateDraft] = useState<MasterDataTemplate | null>(null);
@@ -368,13 +357,6 @@ export function AdminView() {
   );
   const [templateError, setTemplateError] = useState<string | null>(null);
   const [templateBusy, setTemplateBusy] = useState(false);
-  const [newEventId, setNewEventId] = useState("");
-  const [newEventName, setNewEventName] = useState("");
-  const [newEventDate, setNewEventDate] = useState("");
-  const [newEventAerodrome, setNewEventAerodrome] = useState("");
-  const [restartMode, setRestartMode] = useState<"KEEP_MASTER_DATA" | "EMPTY">("KEEP_MASTER_DATA");
-  const [restartConfirmation, setRestartConfirmation] = useState("");
-  const [eventCreationError, setEventCreationError] = useState<string | null>(null);
   const [factoryResetOpen, setFactoryResetOpen] = useState(false);
   const [factoryResetBusy, setFactoryResetBusy] = useState(false);
   const [factoryResetError, setFactoryResetError] = useState<string | null>(null);
@@ -388,13 +370,13 @@ export function AdminView() {
   const isAdministrator = session?.account.role === "ADMIN" || board?.currentDeviceRole === "ADMIN";
   const productPriceCents = productEditor.priceCents;
   const eventVersion = board?.event.version;
-  const eventCreationDisabled =
-    !isAdministrator ||
-    restartConfirmation !== "NEUSTART" ||
-    !/^[a-z0-9-]{3,64}$/.test(newEventId.trim()) ||
-    newEventName.trim().length < 3 ||
-    !newEventDate ||
-    newEventAerodrome.trim().length < 2;
+  const eventCatalog = useAdminEventCatalog({
+    administrator: isAdministrator,
+    board,
+    onMessage: setMessage,
+    onViewChange: setEventDialogView,
+    view: eventDialogView,
+  });
 
   useEffect(() => {
     if (eventVersion === undefined || adminArea !== "overview" || !isAdministrator) return;
@@ -466,25 +448,6 @@ export function AdminView() {
     setAdminModeUnlocked(false);
     setAdminPin("");
   }, [isAdministrator, setAdminPin]);
-  const refreshEvents = useCallback(async () => {
-    if (!isAdministrator) return;
-    try {
-      setEvents(
-        (await getEventCatalog(EVENT_ID, ADMIN_DEVICE_ID, deviceTokenFor(ADMIN_DEVICE_ID))).events,
-      );
-    } catch (cause) {
-      setMessage(cause instanceof Error ? cause.message : "Veranstaltungen nicht verfügbar.");
-    }
-  }, [isAdministrator]);
-  useEffect(() => {
-    void refreshEvents();
-  }, [refreshEvents]);
-
-  async function exportMasterDataTemplate() {
-    await downloadMasterDataTemplate(EVENT_ID, ADMIN_DEVICE_ID, deviceTokenFor(ADMIN_DEVICE_ID));
-    setMessage("Stammdatenvorlage wurde als versionierte JSON-Datei exportiert.");
-  }
-
   async function exportSimulationPlan() {
     await downloadSimulationPlan(EVENT_ID, ADMIN_DEVICE_ID, deviceTokenFor(ADMIN_DEVICE_ID));
     setMessage("Stammdaten und offener Betriebsplan wurden für die Simulation exportiert.");
@@ -550,7 +513,7 @@ export function AdminView() {
       setMessage(
         `Stammdatenvorlage importiert: ${result.counts.gates} Gates, ${result.counts.resourceGroups} Ressourcengruppen, ${result.counts.aircraft} Flugzeuge, ${result.counts.pilots} Pilotencodes und ${result.counts.products} Produkte.`,
       );
-      await Promise.all([refresh(), refreshEvents(), refreshHistory()]);
+      await Promise.all([refresh(), eventCatalog.refreshEvents(), refreshHistory()]);
     } catch (cause) {
       setTemplateError(
         cause instanceof Error
@@ -559,66 +522,6 @@ export function AdminView() {
       );
     } finally {
       setTemplateBusy(false);
-    }
-  }
-
-  async function createEventFromTemplate() {
-    setEventCreationError(null);
-    try {
-      const adminToken = deviceTokenFor(ADMIN_DEVICE_ID);
-      const result = await cloneEvent(EVENT_ID, ADMIN_DEVICE_ID, adminToken, {
-        commandId: crypto.randomUUID(),
-        expectedSourceVersion: board?.event.version ?? 0,
-        eventId: newEventId,
-        name: newEventName,
-        eventDate: newEventDate,
-        aerodrome: newEventAerodrome,
-        timeZone: board?.event.timeZone ?? "Europe/Berlin",
-        restartMode,
-      });
-      rememberActiveEvent(window.localStorage, result.eventId);
-      window.location.assign(`/admin?event=${encodeURIComponent(result.eventId)}`);
-    } catch (cause) {
-      setEventCreationError(
-        cause instanceof Error ? cause.message : "Veranstaltung konnte nicht angelegt werden.",
-      );
-    }
-  }
-
-  async function removeEvent(eventId: string, eventName: string, expectedVersion: number) {
-    const confirmation = window.prompt(
-      `„${eventName}“ wird vollständig gelöscht. Zum Bestätigen exakt „${eventId}“ eingeben:`,
-    );
-    if (confirmation !== eventId) return;
-    const reason = window.prompt("Kurze Begründung für die Löschung:")?.trim() ?? "";
-    if (reason.length < 3) {
-      setMessage("Die Löschung benötigt eine Begründung mit mindestens drei Zeichen.");
-      return;
-    }
-    try {
-      const result = await deleteEvent(
-        EVENT_ID,
-        eventId,
-        expectedVersion,
-        ADMIN_DEVICE_ID,
-        deviceTokenFor(ADMIN_DEVICE_ID),
-        reason,
-      );
-      if (eventId === EVENT_ID) {
-        forgetActiveEvent(window.localStorage);
-        window.location.assign(result.setupRequired ? "/setup" : "/");
-        return;
-      }
-      setMessage(
-        result.assetCleanupPending
-          ? "Veranstaltung gelöscht; die Logo-Bereinigung wird erneut versucht."
-          : "Veranstaltung vollständig gelöscht.",
-      );
-      await refreshEvents();
-    } catch (cause) {
-      setMessage(
-        cause instanceof Error ? cause.message : "Veranstaltung konnte nicht gelöscht werden.",
-      );
     }
   }
 
@@ -720,7 +623,7 @@ export function AdminView() {
       setMessage(`Veranstaltungsstatus auf ${status} gesetzt und protokolliert.`);
       if (!adminModeUnlocked) setAdminPin("");
       await refresh();
-      await refreshEvents();
+      await eventCatalog.refreshEvents();
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : "Statusänderung fehlgeschlagen.");
     }
@@ -2087,46 +1990,6 @@ export function AdminView() {
       </Button>
     </section>
   ) : null;
-  const filteredEvents = events.filter((entry) =>
-    `${entry.name} ${entry.eventId} ${entry.eventDate} ${entry.aerodrome}`
-      .toLocaleLowerCase("de-DE")
-      .includes(eventSearch.trim().toLocaleLowerCase("de-DE")),
-  );
-  const visibleEvents =
-    eventSort.direction === null
-      ? filteredEvents
-      : filteredEvents.toSorted((left, right) => {
-          const comparison = adminTableCollator.compare(
-            String(left[eventSort.key]),
-            String(right[eventSort.key]),
-          );
-          return eventSort.direction === "asc" ? comparison : -comparison;
-        });
-
-  function toggleEventSort(key: typeof eventSort.key) {
-    setEventSort((current) =>
-      current.key === key
-        ? {
-            key,
-            direction:
-              current.direction === "asc" ? "desc" : current.direction === "desc" ? null : "asc",
-          }
-        : { key, direction: "asc" },
-    );
-  }
-
-  function openEventCreation() {
-    setRestartMode("EMPTY");
-    setRestartConfirmation("");
-    setEventCreationError(null);
-    setEventDialogView("create");
-  }
-
-  function closeEventDialog() {
-    setEventDialogView("closed");
-    setEventCreationError(null);
-  }
-
   return (
     <Shell
       className="admin-shell"
@@ -2196,29 +2059,20 @@ export function AdminView() {
               busyActionKey={busyActionKey}
               canExport={Boolean(board)}
               canManage={isAdministrator}
-              creation={{
-                aerodrome: newEventAerodrome,
-                confirmation: restartConfirmation,
-                date: newEventDate,
-                disabled: eventCreationDisabled,
-                error: eventCreationError,
-                id: newEventId,
-                name: newEventName,
-                restartMode,
-              }}
+              creation={eventCatalog.creation}
               currentEventId={EVENT_ID}
               currentEventName={board?.event.name ?? EVENT_ID}
               currentStep={eventStep}
-              events={visibleEvents}
-              onClose={closeEventDialog}
-              onCreateSubmit={() => void runBusyAction("create-event", createEventFromTemplate)}
+              events={eventCatalog.visibleEvents}
+              onClose={eventCatalog.closeDialog}
+              onCreateSubmit={() => void runBusyAction("create-event", eventCatalog.createEvent)}
               onDelete={(entry) =>
                 void runBusyAction(`delete-event-${entry.eventId}`, () =>
-                  removeEvent(entry.eventId, entry.name, entry.version),
+                  eventCatalog.removeEvent(entry),
                 )
               }
               onExport={() =>
-                void runBusyAction("export-master-data-template", exportMasterDataTemplate)
+                void runBusyAction("export-master-data-template", eventCatalog.exportTemplate)
               }
               onImport={() => {
                 setTemplateDraft(null);
@@ -2227,19 +2081,19 @@ export function AdminView() {
                 setTemplateFileName("");
                 setTemplateDialogOpen(true);
               }}
-              onOpenCreate={openEventCreation}
-              onSearchChange={setEventSearch}
-              onSetCreationAerodrome={setNewEventAerodrome}
-              onSetCreationConfirmation={setRestartConfirmation}
-              onSetCreationDate={setNewEventDate}
-              onSetCreationId={setNewEventId}
-              onSetCreationName={setNewEventName}
-              onSetRestartMode={setRestartMode}
-              onShowCatalog={() => setEventDialogView("catalog")}
-              onSort={toggleEventSort}
-              search={eventSearch}
-              sort={eventSort}
-              view={eventDialogView}
+              onOpenCreate={eventCatalog.openCreation}
+              onSearchChange={eventCatalog.setSearch}
+              onSetCreationAerodrome={eventCatalog.setAerodrome}
+              onSetCreationConfirmation={eventCatalog.setConfirmation}
+              onSetCreationDate={eventCatalog.setEventDate}
+              onSetCreationId={eventCatalog.setEventId}
+              onSetCreationName={eventCatalog.setName}
+              onSetRestartMode={eventCatalog.setRestartMode}
+              onShowCatalog={eventCatalog.showCatalog}
+              onSort={eventCatalog.toggleSort}
+              search={eventCatalog.search}
+              sort={eventCatalog.sort}
+              view={eventCatalog.view}
             />
           ) : null}
           {adminArea === "events" ? (

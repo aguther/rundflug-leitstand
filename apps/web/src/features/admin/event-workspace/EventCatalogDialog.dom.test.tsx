@@ -75,6 +75,8 @@ describe("event catalog dialog", () => {
     render(<EventCatalogDialog {...props} />);
 
     expect(screen.getByRole("dialog", { name: "Veranstaltungen verwalten" })).toBeTruthy();
+    expect(screen.getByText("demo-2026")).toBeTruthy();
+    expect(screen.getByText("demo-2027")).toBeTruthy();
     const currentRow = screen.getByRole("link", { name: "Demo flight day" }).closest("tr");
     expect(currentRow?.getAttribute("aria-selected")).toBe("true");
     expect(screen.getByRole("link", { name: "Next flight day" }).getAttribute("href")).toContain(
