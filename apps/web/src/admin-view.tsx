@@ -83,6 +83,7 @@ import {
 } from "./features/admin/aircraft/AircraftResourceGroupAssignmentDialog";
 import { AircraftWorkspace } from "./features/admin/aircraft/AircraftWorkspace";
 import { useAircraftEditorState } from "./features/admin/aircraft/useAircraftEditorState";
+import { CompletionSummaryPanel } from "./features/admin/completion/CompletionSummaryPanel";
 import { CompletionWorkspace } from "./features/admin/completion/CompletionWorkspace";
 import {
   type EventParameterSaveLifecycle,
@@ -3330,58 +3331,22 @@ export function AdminView() {
               board={board}
               onHistoryTabChange={changeHistoryView}
               summary={
-                <section className="admin-section completion-day-summary">
-                  <div className="section-heading">
-                    <div>
-                      <h2>Tagesübersicht</h2>
-                      <p>Veranstaltungs-, Zeitraum- und Board-Kennzahlen des bestätigten Stands.</p>
-                    </div>
-                  </div>
-                  <dl className="completion-summary-grid">
-                    <div><dt>Betriebsbeginn</dt><dd>{formatEventLocalDateTime(board.event.operationsStartAt, board.event.timeZone) || "Nicht gestartet"}</dd></div>
-                    <div><dt>Betriebsende</dt><dd>{formatEventLocalDateTime(board.event.operationsEndAt, board.event.timeZone) || "Nicht gesetzt"}</dd></div>
-                    <div><dt>Abgeschlossene Umläufe</dt><dd>{board.metrics.completedRotations}</dd></div>
-                    <div><dt>Offene Tickets</dt><dd>{board.metrics.openTickets}</dd></div>
-                    <div><dt>Ø Umlaufzeit</dt><dd>{board.metrics.averageRotationMinutes ?? "–"} Min.</dd></div>
-                    <div><dt>Informatorischer Umsatz</dt><dd>{(board.metrics.informationalRevenueCents / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}</dd></div>
-                  </dl>
-                  <div className="completion-primary-exports">
-                    <Button
-                      busy={busyActionKey === "export-daily-pdf"}
-                      onClick={() => void runBusyAction("export-daily-pdf", exportDailyPdf)}
-                      type="button"
-                      variant="primary"
-                    >
-                      PDF-Tagesbericht
-                    </Button>
-                    <Button
-                      busy={busyActionKey === "export-daily-csv"}
-                      onClick={() => void runBusyAction("export-daily-csv", exportDailyReport)}
-                      type="button"
-                    >
-                      CSV-Tagesbericht
-                    </Button>
-                  </div>
-                  <details className="completion-secondary-exports">
-                    <summary>Weitere Datenexporte</summary>
-                    <div>
-                      <Button
-                        busy={busyActionKey === "export-raw-data"}
-                        onClick={() => void runBusyAction("export-raw-data", exportRawData)}
-                        type="button"
-                      >
-                        Ticket-Rohdaten CSV
-                      </Button>
-                      <Button
-                        busy={busyActionKey === "export-performance"}
-                        onClick={() => void runBusyAction("export-performance", exportPerformanceProfile)}
-                        type="button"
-                      >
-                        Leistungsprofil JSON
-                      </Button>
-                    </div>
-                  </details>
-                </section>
+                <CompletionSummaryPanel
+                  board={board}
+                  busyActionKey={busyActionKey}
+                  onExportDailyCsv={() =>
+                    void runBusyAction("export-daily-csv", exportDailyReport)
+                  }
+                  onExportDailyPdf={() =>
+                    void runBusyAction("export-daily-pdf", exportDailyPdf)
+                  }
+                  onExportPerformance={() =>
+                    void runBusyAction("export-performance", exportPerformanceProfile)
+                  }
+                  onExportRawData={() =>
+                    void runBusyAction("export-raw-data", exportRawData)
+                  }
+                />
               }
               history={
                 <section className="admin-section completion-history-panel">
