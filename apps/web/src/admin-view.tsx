@@ -9,29 +9,17 @@ import {
 import { getPushConfiguration, getSetupStatus } from "./api";
 import { AppShell as Shell } from "./app/AppShell";
 import { PageNotice, useActionMessageBridge } from "./app/PageNotifications";
-import {
-  Button,
-  ConfirmationDialog,
-  ModalDialog,
-  PageHeader,
-  StatusPill,
-} from "./design-system/components";
-import { eventLocalDateTimeToIso, formatEventLocalDateTime } from "./event-time";
-import { AdminAuthorizationDialog } from "./features/admin/AdminAuthorizationDialog";
+import { Button, PageHeader, StatusPill } from "./design-system/components";
+import { formatEventLocalDateTime } from "./event-time";
+import { AdminShellDialogs } from "./features/admin/AdminShellDialogs";
 import {
   adminAreaCopy,
   adminEventStepCopy,
   createAdminSetupSteps,
   summarizeAdminSetup,
 } from "./features/admin/admin-shell-model";
-import {
-  AircraftProductTurnaroundOverrideDialog,
-  type TurnaroundOverrideContext,
-} from "./features/admin/aircraft/AircraftProductTurnaroundOverrideDialog";
-import {
-  type AircraftResourceGroupAssignmentContext,
-  AircraftResourceGroupAssignmentDialog,
-} from "./features/admin/aircraft/AircraftResourceGroupAssignmentDialog";
+import type { TurnaroundOverrideContext } from "./features/admin/aircraft/AircraftProductTurnaroundOverrideDialog";
+import type { AircraftResourceGroupAssignmentContext } from "./features/admin/aircraft/AircraftResourceGroupAssignmentDialog";
 import { useAircraftEditorState } from "./features/admin/aircraft/useAircraftEditorState";
 import { AdminCompletionSummaryPanel } from "./features/admin/completion/AdminCompletionSummaryPanel";
 import { CompletionHistoryPanel } from "./features/admin/completion/CompletionHistoryPanel";
@@ -43,8 +31,6 @@ import { useAdminEventConfigurationActions } from "./features/admin/event-parame
 import { EventCatalogDialog } from "./features/admin/event-workspace/EventCatalogDialog";
 import { useAdminEventCatalog } from "./features/admin/event-workspace/useAdminEventCatalog";
 import { useAdminEventWorkspaceNavigation } from "./features/admin/event-workspace/useAdminEventWorkspaceNavigation";
-import { FactoryResetDialog } from "./features/admin/FactoryResetDialog";
-import { GateEditorDialog } from "./features/admin/gates/GateEditorDialog";
 import { useGateEditorState } from "./features/admin/gates/useGateEditorState";
 import { AdminMasterDataWorkspacePanel } from "./features/admin/master-data/AdminMasterDataWorkspacePanel";
 import {
@@ -52,12 +38,7 @@ import {
   AdminMasterEditorFurtherActions,
   getAdminMasterEditorPresentation,
 } from "./features/admin/master-data/AdminMasterEditorActions";
-import {
-  MasterDataDeleteDialog,
-  MasterDataTemplateImportDialog,
-} from "./features/admin/master-data/MasterDataManagementDialogs";
 import { MasterDataEmptyState } from "./features/admin/master-data/MasterDataWorkspace";
-import { ResourceAircraftEditorDialog } from "./features/admin/master-data/ResourceAircraftEditorDialog";
 import { useAdminMasterDataActions } from "./features/admin/master-data/useAdminMasterDataActions";
 import { useAdminMasterDataDeletion } from "./features/admin/master-data/useAdminMasterDataDeletion";
 import { useAdminMasterDataTable } from "./features/admin/master-data/useAdminMasterDataTable";
@@ -72,10 +53,7 @@ import {
 } from "./features/admin/overview/AdminOverviewPanel";
 import { AdminSimulationLauncher } from "./features/admin/overview/AdminSimulationLauncher";
 import { useAdminEventFlow } from "./features/admin/overview/useAdminEventFlow";
-import { PilotEditorDialog } from "./features/admin/pilots/PilotEditorDialog";
 import { usePilotEditorState } from "./features/admin/pilots/usePilotEditorState";
-import { ProductEditorDialog } from "./features/admin/products/ProductEditorDialog";
-import { ProductSalesDialog } from "./features/admin/products/ProductSalesDialog";
 import { useProductEditorState } from "./features/admin/products/useProductEditorState";
 import { useResourceGroupEditorState } from "./features/admin/resource-groups/useResourceGroupEditorState";
 import { useAdminAuthorization } from "./features/admin/useAdminAuthorization";
@@ -221,27 +199,7 @@ export function AdminView() {
   const [manifestCorrectionResetKey, setManifestCorrectionResetKey] = useState(0);
   const resourceEditor = useResourceGroupEditorState(board);
   const aircraftEditor = useAircraftEditorState(board);
-  const {
-    continueEditing: continueMasterEditing,
-    dirty: masterEditorDirty,
-    discardChanges: discardMasterChanges,
-    discardChangesOpen: discardMasterChangesOpen,
-    finish: finishMasterEditor,
-    open: masterEditorOpen,
-    requestClose: requestMasterEditorClose,
-    resetForStepChange: resetMasterEditorForStepChange,
-    selectAircraft: selectAircraftForEditing,
-    selectGate: selectGateForEditing,
-    selectPilot: selectPilotForEditing,
-    selectProduct: selectProductForEditing,
-    selectResourceGroup: selectResourceForEditing,
-    setOpen: setMasterEditorOpen,
-    setSubmitAttempted: setMasterSubmitAttempted,
-    setTab: setMasterEditorTab,
-    startNewEntry: startNewMasterDataEntry,
-    submitAttempted: masterSubmitAttempted,
-    tab: masterEditorTab,
-  } = useAdminMasterEditorState({
+  const masterEditorState = useAdminMasterEditorState({
     category: masterDataCategory,
     editors: {
       aircraft: aircraftEditor,
@@ -251,6 +209,19 @@ export function AdminView() {
       resourceGroups: resourceEditor,
     },
   });
+  const {
+    finish: finishMasterEditor,
+    requestClose: requestMasterEditorClose,
+    resetForStepChange: resetMasterEditorForStepChange,
+    selectAircraft: selectAircraftForEditing,
+    selectGate: selectGateForEditing,
+    selectPilot: selectPilotForEditing,
+    selectProduct: selectProductForEditing,
+    selectResourceGroup: selectResourceForEditing,
+    setOpen: setMasterEditorOpen,
+    setSubmitAttempted: setMasterSubmitAttempted,
+    startNewEntry: startNewMasterDataEntry,
+  } = masterEditorState;
   useEffect(() => {
     if (["gates", "resource-groups", "aircraft", "pilots", "products"].includes(eventStep)) {
       setMasterDataCategory(eventStep as MasterDataCategory);
@@ -261,26 +232,20 @@ export function AdminView() {
   const [eventDialogView, setEventDialogView] = useState<"closed" | "catalog" | "create">("closed");
   const resourceGroups = board?.resourceGroups ?? [];
   const isAdministrator = session?.account.role === "ADMIN" || board?.currentDeviceRole === "ADMIN";
-  const {
-    busy: adminPinBusy,
-    clearPinWhenLocked,
-    closeDialog: closeAdminPinDialog,
-    confirmDialog: confirmAdminPinDialog,
-    dialogMode: adminPinDialog,
-    error: adminPinError,
-    getPin: getAdminPin,
-    inputRef: adminPinInputRef,
-    lockMode: lockAdminMode,
-    modeUnlocked: adminModeUnlocked,
-    pin: adminPin,
-    requestAction: requestAdminAction,
-    requestModeUnlock: requestAdminModeUnlock,
-    setPin: setAdminPin,
-  } = useAdminAuthorization({
+  const authorization = useAdminAuthorization({
     accountIsAdministrator: session?.account.role === "ADMIN",
     administrator: isAdministrator,
     onMessage: setMessage,
   });
+  const {
+    clearPinWhenLocked,
+    getPin: getAdminPin,
+    lockMode: lockAdminMode,
+    modeUnlocked: adminModeUnlocked,
+    requestAction: requestAdminAction,
+    requestModeUnlock: requestAdminModeUnlock,
+    setPin: setAdminPin,
+  } = authorization;
   const eventVersion = board?.event.version;
   const eventCatalog = useAdminEventCatalog({
     administrator: isAdministrator,
@@ -288,6 +253,17 @@ export function AdminView() {
     onMessage: setMessage,
     onViewChange: setEventDialogView,
     view: eventDialogView,
+  });
+  const masterDataDeletion = useAdminMasterDataDeletion({
+    adminModeUnlocked,
+    board,
+    getAdminPin,
+    onClearAdminPin: () => setAdminPin(""),
+    onEditorOpenChange: setMasterEditorOpen,
+    onFinishEditor: finishMasterEditor,
+    onMessage: setMessage,
+    onRefreshBoard: refresh,
+    onRefreshHistory: refreshHistory,
   });
   const {
     requestClearEventLogo,
@@ -318,31 +294,8 @@ export function AdminView() {
     eventVersion,
   });
   const factoryResetState = useAdminFactoryReset({ onMessage: setMessage });
-  const {
-    cancelDeletion: cancelMasterDelete,
-    confirmDeletion: confirmMasterDelete,
-    pendingDeletion: pendingMasterDelete,
-    requestDeletion: requestMasterDelete,
-  } = useAdminMasterDataDeletion({
-    adminModeUnlocked,
-    board,
-    getAdminPin,
-    onClearAdminPin: () => setAdminPin(""),
-    onEditorOpenChange: setMasterEditorOpen,
-    onFinishEditor: finishMasterEditor,
-    onMessage: setMessage,
-    onRefreshBoard: refresh,
-    onRefreshHistory: refreshHistory,
-  });
-  const {
-    configureProductSales,
-    emergency,
-    requestAircraftAssignment,
-    requestCurrentMasterSave,
-    requestManifestCorrection,
-    requestMasterSave,
-    requestTurnaroundOverrideSave,
-  } = useAdminMasterDataActions({
+  const { requestDeletion: requestMasterDelete } = masterDataDeletion;
+  const masterDataActions = useAdminMasterDataActions({
     administrator: isAdministrator,
     board,
     category: masterDataCategory,
@@ -369,6 +322,7 @@ export function AdminView() {
     selectResourceGroup: selectResourceForEditing,
     setSubmitAttempted: setMasterSubmitAttempted,
   });
+  const { emergency, requestCurrentMasterSave, requestManifestCorrection } = masterDataActions;
 
   useEffect(() => {
     if (
@@ -656,144 +610,44 @@ export function AdminView() {
               table={masterDataTable}
             />
           ) : null}
-          {board ? (
-            <AircraftResourceGroupAssignmentDialog
-              board={board}
-              busy={busyActionKey === "master-assignment"}
-              context={assignmentDialogContext}
-              onClose={() => setAssignmentDialogContext(null)}
-              onConfirm={requestAircraftAssignment}
-            />
-          ) : null}
-          {board ? (
-            <AircraftProductTurnaroundOverrideDialog
-              board={board}
-              busyKey={busyActionKey}
-              context={turnaroundDialogContext}
-              onClose={() => setTurnaroundDialogContext(null)}
-              onSave={requestTurnaroundOverrideSave}
-            />
-          ) : null}
-          {board ? (
-            <ProductSalesDialog
-              busyAction={
-                salesProductId && busyActionKey === `product-${salesProductId}-closing`
-                  ? "closing"
-                  : salesProductId && busyActionKey === `product-${salesProductId}-sales`
-                    ? "toggle"
-                    : null
-              }
-              closingValue={saleClosesAt}
-              eventStatus={board.event.status}
-              key={salesProductId ?? "closed"}
-              onClose={() => setSalesProductId(null)}
-              onClosingChange={setSaleClosesAt}
-              onSaveClosing={(remove) => {
-                const product = board.products.find((entry) => entry.id === salesProductId);
-                if (!product) return;
-                const closingTime = remove
-                  ? null
-                  : eventLocalDateTimeToIso(saleClosesAt, board.event.timeZone);
-                requestAdminAction(() =>
-                  runBusyAction(`product-${product.id}-closing`, () =>
-                    configureProductSales(product, product.saleEnabled, closingTime),
-                  ),
-                );
-              }}
-              onToggleSales={() => {
-                const product = board.products.find((entry) => entry.id === salesProductId);
-                if (!product) return;
-                requestAdminAction(() =>
-                  runBusyAction(`product-${product.id}-sales`, () =>
-                    configureProductSales(product, !product.saleEnabled),
-                  ),
-                );
-              }}
-              product={board.products.find((product) => product.id === salesProductId) ?? null}
-            />
-          ) : null}
-          <GateEditorDialog
-            editor={gateEditor}
-            footer={masterEditorFooter}
-            furtherActions={masterEditorMobileFurtherActions}
-            initialFocusSelector={masterEditorPresentation.initialFocusSelector}
-            onClose={requestMasterEditorClose}
-            onTabChange={setMasterEditorTab}
-            open={masterDataStepActive && masterEditorOpen && masterDataCategory === "gates"}
-            products={alphabeticalProducts}
-            resourceGroups={resourceGroups}
-            submitAttempted={masterSubmitAttempted}
-            tab={masterEditorTab}
-          />
-          <ProductEditorDialog
-            board={board}
-            editor={productEditor}
-            footer={masterEditorFooter}
-            furtherActions={masterEditorMobileFurtherActions}
-            initialFocusSelector={masterEditorPresentation.initialFocusSelector}
-            onClose={requestMasterEditorClose}
-            onTabChange={setMasterEditorTab}
-            open={masterDataStepActive && masterEditorOpen && masterDataCategory === "products"}
-            resourceGroups={resourceGroups}
-            submitAttempted={masterSubmitAttempted}
-            tab={masterEditorTab}
-          />
-          <ResourceAircraftEditorDialog
-            aircraftEditor={aircraftEditor}
-            board={board}
-            category={masterDataCategory}
-            footer={masterEditorFooter}
-            furtherActions={masterEditorMobileFurtherActions}
-            initialFocusSelector={masterEditorPresentation.initialFocusSelector}
-            onAssignAircraft={(resourceGroupId) =>
-              setAssignmentDialogContext({ mode: "resource-group", resourceGroupId })
-            }
-            onClose={requestMasterEditorClose}
-            open={
-              masterDataStepActive &&
-              masterEditorOpen &&
-              ["resource-groups", "aircraft"].includes(masterDataCategory)
-            }
-            resourceEditor={resourceEditor}
-            submitAttempted={masterSubmitAttempted}
-          />
-          <PilotEditorDialog
+          <AdminShellDialogs
             administrator={isAdministrator}
-            busy={busyActionKey === "master-pilot-toggle"}
-            dirty={masterEditorDirty}
-            editor={pilotEditor}
-            footer={masterEditorFooter}
-            furtherActions={masterEditorMobileFurtherActions}
-            initialFocusSelector={masterEditorPresentation.initialFocusSelector}
-            onClose={requestMasterEditorClose}
-            onToggle={() => requestMasterSave("pilot-toggle", true)}
-            open={masterDataStepActive && masterEditorOpen && masterDataCategory === "pilots"}
-            submitAttempted={masterSubmitAttempted}
+            assignmentContext={assignmentDialogContext}
+            authorization={authorization}
+            board={board}
+            busyActionKey={busyActionKey}
+            cancelPendingNavigation={cancelPendingNavigation}
+            category={masterDataCategory}
+            confirmPendingNavigation={confirmPendingNavigation}
+            deletion={masterDataDeletion}
+            discardEventNavigationOpen={discardEventNavigationOpen}
+            editorFooter={masterEditorFooter}
+            editorFurtherActions={masterEditorMobileFurtherActions}
+            editorPresentation={masterEditorPresentation}
+            editors={{
+              aircraft: aircraftEditor,
+              gate: gateEditor,
+              pilot: pilotEditor,
+              product: productEditor,
+              resourceGroup: resourceEditor,
+            }}
+            editorState={masterEditorState}
+            factoryReset={factoryResetState}
+            masterDataActions={masterDataActions}
+            masterDataStepActive={masterDataStepActive}
+            products={alphabeticalProducts}
+            requestAdminAction={requestAdminAction}
+            resourceGroups={resourceGroups}
+            runBusyAction={runBusyAction}
+            saleClosesAt={saleClosesAt}
+            salesProductId={salesProductId}
+            setAssignmentContext={setAssignmentDialogContext}
+            setSaleClosesAt={setSaleClosesAt}
+            setSalesProductId={setSalesProductId}
+            setTurnaroundContext={setTurnaroundDialogContext}
+            templateImport={templateImport}
+            turnaroundContext={turnaroundDialogContext}
           />
-          <ModalDialog
-            className="master-discard-dialog"
-            footer={
-              <>
-                <Button data-master-discard-continue onClick={continueMasterEditing} type="button">
-                  Weiter bearbeiten
-                </Button>
-                <Button onClick={discardMasterChanges} type="button" variant="danger">
-                  Verwerfen
-                </Button>
-              </>
-            }
-            initialFocusSelector="[data-master-discard-continue]"
-            onClose={continueMasterEditing}
-            open={discardMasterChangesOpen}
-            role="alertdialog"
-            size="compact"
-            title="Änderungen verwerfen?"
-          >
-            <p className="master-discard-copy">
-              Die noch nicht gespeicherten Änderungen gehen verloren. Dieser Vorgang kann nicht
-              rückgängig gemacht werden.
-            </p>
-          </ModalDialog>
           {adminArea === "evaluation" ? (
             <AnalysisWorkspace
               backendConfirmed={backendConfirmed}
@@ -896,69 +750,6 @@ export function AdminView() {
             />
             </section>
           ) : null}
-          <AdminAuthorizationDialog
-            busy={adminPinBusy}
-            error={adminPinError}
-            inputRef={adminPinInputRef}
-            mode={adminPinDialog}
-            onClose={closeAdminPinDialog}
-            onPinChange={setAdminPin}
-            onSubmit={() => void confirmAdminPinDialog()}
-            pin={adminPin}
-          />
-          <MasterDataDeleteDialog
-            busy={busyActionKey === "master-delete"}
-            eventStatus={board?.event.status}
-            inputRef={adminPinInputRef}
-            modeUnlocked={adminModeUnlocked}
-            onCancel={cancelMasterDelete}
-            onConfirm={() => void runBusyAction("master-delete", confirmMasterDelete)}
-            onPinChange={setAdminPin}
-            pin={adminPin}
-            target={pendingMasterDelete}
-          />
-          <MasterDataTemplateImportDialog
-            busy={templateImport.busy}
-            draft={templateImport.draft}
-            error={templateImport.error}
-            fileName={templateImport.fileName}
-            onClose={templateImport.closeDialog}
-            onFile={(file) => void templateImport.readFile(file)}
-            onImport={() => void templateImport.applyTemplate()}
-            open={templateImport.open}
-            validation={templateImport.validation}
-          />
-          <ConfirmationDialog
-            body={
-              <p>
-                Die ungespeicherten Veranstaltungsparameter gehen beim Verlassen dieser Ansicht
-                verloren.
-              </p>
-            }
-            confirmLabel="Verwerfen und wechseln"
-            danger
-            onCancel={cancelPendingNavigation}
-            onConfirm={confirmPendingNavigation}
-            open={discardEventNavigationOpen}
-            title="Ungespeicherte Änderungen verwerfen?"
-          />
-          <FactoryResetDialog
-            busy={factoryResetState.busy}
-            confirmation={factoryResetState.confirmation}
-            deleteAllBackups={factoryResetState.deleteAllBackups}
-            error={factoryResetState.error}
-            onClose={factoryResetState.closeDialog}
-            onConfirmationChange={factoryResetState.setConfirmation}
-            onDeleteAllBackupsChange={factoryResetState.setDeleteAllBackups}
-            onPinChange={factoryResetState.setPin}
-            onReasonChange={factoryResetState.setReason}
-            onRetainRecoveryBackupChange={factoryResetState.setRetainRecoveryBackup}
-            onSubmit={() => void factoryResetState.performReset()}
-            open={factoryResetState.open}
-            pin={factoryResetState.pin}
-            reason={factoryResetState.reason}
-            retainRecoveryBackup={factoryResetState.retainRecoveryBackup}
-          />
           </div>
         </div>
       </section>

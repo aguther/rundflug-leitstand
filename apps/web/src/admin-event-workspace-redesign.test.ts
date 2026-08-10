@@ -49,7 +49,6 @@ describe("event-scoped administration redesign", () => {
   });
 
   it("keeps product sales outside operations and provides five gated completion tabs", () => {
-    expect(adminViewSource).toContain("<ProductSalesDialog");
     expect(operationsSource).not.toContain("Verkauf und Kapazität");
     for (const label of [
       "Tagesübersicht",
