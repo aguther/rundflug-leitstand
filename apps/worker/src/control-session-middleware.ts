@@ -16,7 +16,7 @@ export function registerControlSessionMiddleware(
   dependencies: ControlSessionMiddlewareDependencies = defaultDependencies,
 ): void {
   app.use("/api/control/*", async (context, next) => {
-    if (context.req.path.includes("/fids/")) {
+    if (context.req.path.includes("/fids/") || context.req.path.endsWith("/live")) {
       await next();
       return;
     }

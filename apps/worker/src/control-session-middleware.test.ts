@@ -27,6 +27,7 @@ function middlewareApp(actor: SessionActor | null) {
     context.json({ role: context.get("sessionActor")?.role ?? null }),
   );
   app.get("/api/control/:eventId/fids/board", (context) => context.json({ fids: true }));
+  app.get("/api/control/:eventId/live", (context) => context.json({ live: true }));
   return { app, env, authorizeSession };
 }
 
@@ -66,6 +67,19 @@ describe("control session middleware", () => {
     );
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ fids: true });
+    expect(authorizeSession).not.toHaveBeenCalled();
+  });
+
+  it("lets the live transport perform its own authorization for display accounts", async () => {
+    const { app, env, authorizeSession } = middlewareApp(displayActor);
+    const response = await app.request(
+      "https://worker.test/api/control/synthetic-event/live",
+      undefined,
+      env,
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ live: true });
     expect(authorizeSession).not.toHaveBeenCalled();
   });
 });
