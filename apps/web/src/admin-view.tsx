@@ -52,7 +52,6 @@ import { PageNotice, useActionMessageBridge } from "./app/PageNotifications";
 import {
   Button,
   ConfirmationDialog,
-  Field,
   ModalDialog,
   PageHeader,
   StatusPill,
@@ -70,6 +69,10 @@ import {
 } from "./features/admin/aircraft/AircraftResourceGroupAssignmentDialog";
 import { AircraftWorkspace } from "./features/admin/aircraft/AircraftWorkspace";
 import { useAircraftEditorState } from "./features/admin/aircraft/useAircraftEditorState";
+import {
+  type AdminHistoryFilterKey,
+  CompletionHistoryPanel,
+} from "./features/admin/completion/CompletionHistoryPanel";
 import { CompletionSummaryPanel } from "./features/admin/completion/CompletionSummaryPanel";
 import { CompletionWorkspace } from "./features/admin/completion/CompletionWorkspace";
 import { ManifestCorrectionPanel } from "./features/admin/completion/ManifestCorrectionPanel";
@@ -119,7 +122,6 @@ import type {
   UpsertPlannedOperationPayload,
   UpsertRecurringOperationalRulePayload,
 } from "./features/operations/OperationalPlanPanel";
-import { LocalizedDateTimeInput } from "./localized-date-input";
 import { clearOfflineOperationBoards } from "./offline-store";
 import {
   ADMIN_CONFIGURATION_AUDIT_REASON,
@@ -128,8 +130,6 @@ import {
   deviceTokenFor,
   EmergencyNotice,
   EVENT_ID,
-  FieldGroupLabel,
-  FieldLabel,
   InterruptionNotice,
   MASTER_DATA_AUDIT_REASON,
   MASTER_DATA_DELETE_REASON,
@@ -180,31 +180,6 @@ const eventStepCopy: Record<AdminEventStep, { title: string; description: string
     title: "Abschluss",
     description: "Betriebstag prüfen, Berichte exportieren und Verläufe auswerten.",
   },
-};
-
-const historyTicketStatusLabels: Record<string, string> = {
-  QUEUED: "In Warteschlange",
-  CHECKED_IN: "Eingecheckt",
-  CALLED: "Aufgerufen",
-  BOARDING: "Boarding",
-  IN_FLIGHT: "Im Flug",
-  LANDED: "Gelandet",
-  COMPLETED: "Abgeschlossen",
-  NO_SHOW: "Nicht erschienen",
-  CANCELED: "Storniert",
-  CLARIFICATION: "Klärung erforderlich",
-};
-
-const historyEventLabels: Record<string, string> = {
-  TICKET_NO_SHOW: "Ticket als nicht erschienen markiert",
-  ROTATION_CALLED: "Fluggruppe aufgerufen",
-  ROTATION_DEPARTED: "Umlauf gestartet",
-  ROTATION_LANDED: "Umlauf gelandet",
-  ROTATION_COMPLETED: "Umlauf abgeschlossen",
-  AIRCRAFT_RESOURCE_GROUP_ASSIGNED: "Flugzeug einer Ressourcengruppe zugeordnet",
-  PRODUCT_SALES_CONFIGURED: "Verkaufssteuerung geändert",
-  EMERGENCY_TRIGGERED: "Notfallmodus aktiviert",
-  EMERGENCY_CLEARED: "Notfallmodus aufgehoben",
 };
 
 export function AdminView() {
@@ -678,6 +653,28 @@ export function AdminView() {
     setHistoryRotationId("");
     setHistoryTextSearch("");
     setHistoryOffset(0);
+  }
+
+  function updateHistoryFilter(key: AdminHistoryFilterKey, value: string, resetOffset = false) {
+    const setters: Record<AdminHistoryFilterKey, (nextValue: string) => void> = {
+      aggregateId: setHistoryAggregateId,
+      aggregateType: setHistoryAggregateType,
+      aircraftId: setHistoryAircraftId,
+      communicationNumber: setHistoryCommunicationNumber,
+      eventType: setHistoryEventType,
+      pilotId: setHistoryPilotId,
+      productId: setHistoryProductId,
+      resourceGroupId: setHistoryResourceGroupId,
+      rotationId: setHistoryRotationId,
+      since: setHistorySince,
+      textSearch: setHistoryTextSearch,
+      ticketGroupId: setHistoryTicketGroupId,
+      ticketId: setHistoryTicketId,
+      ticketStatus: setHistoryTicketStatus,
+      until: setHistoryUntil,
+    };
+    setters[key](value);
+    if (resetOffset) setHistoryOffset(0);
   }
   const refreshEvents = useCallback(async () => {
     if (!isAdministrator) return;
@@ -3033,337 +3030,49 @@ export function AdminView() {
                 />
               }
               history={
-                <section className="admin-section completion-history-panel">
-            <fieldset className="history-filters">
-              <legend>
-                {historyView === "OPERATIONS"
-                  ? "Betriebsdaten filtern"
-                  : historyView === "FORECASTS"
-                    ? "Prognosen filtern"
-                    : "Audit-Ereignisse filtern"}
-              </legend>
-              <div className="history-visible-filters">
-                <LocalizedDateTimeInput
-                  label="Von"
-                  labelContent={<FieldGroupLabel label="Von" help="Optionaler Beginn des ausgewerteten Zeitraums." />}
-                  onChange={setHistorySince}
-                  value={historySince}
-                />
-                <LocalizedDateTimeInput
-                  label="Bis"
-                  labelContent={<FieldGroupLabel label="Bis" help="Optionales Ende des ausgewerteten Zeitraums." />}
-                  onChange={setHistoryUntil}
-                  value={historyUntil}
-                />
-                {historyView === "OPERATIONS" ? (
-                  <div className="field-control">
-                    <FieldLabel
-                      htmlFor="history-communication-number"
-                      label="Fluggruppennummer"
-                      help="Stabile Kommunikationsnummer, keine garantierte Uhrzeit."
-                    />
-                    <input
-                      id="history-communication-number"
-                      min="1"
-                      onChange={(event) => setHistoryCommunicationNumber(event.target.value)}
-                      type="number"
-                      value={historyCommunicationNumber}
-                    />
-                  </div>
-                ) : null}
-                {historyView === "FORECASTS" ? (
-                  <div className="field-control">
-                    <FieldLabel htmlFor="history-aircraft" label="Flugzeug" help="Begrenzt Prognosen auf ein Flugzeug." />
-                    <select id="history-aircraft" onChange={(event) => setHistoryAircraftId(event.target.value)} value={historyAircraftId}>
-                      <option value="">Alle</option>
-                      {board.aircraft.map((aircraft) => <option key={aircraft.id} value={aircraft.id}>{aircraft.registration}</option>)}
-                    </select>
-                  </div>
-                ) : null}
-                {historyView === "AUDIT" ? (
-                  <div className="field-control history-readable-search">
-                    <FieldLabel
-                      htmlFor="history-readable-search"
-                      label="Ereignis oder Objekt suchen"
-                      help="Durchsucht lesbare Ereignis- und Objekttexte; unbekannte technische Typen bleiben auffindbar."
-                    />
-                    <input
-                      id="history-readable-search"
-                      onChange={(event) => setHistoryTextSearch(event.target.value)}
-                      placeholder="z. B. Fluggruppe aufgerufen"
-                      type="search"
-                      value={historyTextSearch}
-                    />
-                  </div>
-                ) : null}
-              </div>
-              {historyView === "OPERATIONS" ? (
-                <>
-                  <details className="history-advanced-filters">
-                    <summary>Fachliche Filter</summary>
-                    <div>
-                      <div className="field-control">
-                        <FieldLabel htmlFor="history-aircraft" label="Flugzeug" help="Begrenzt die Betriebshistorie auf ein Flugzeug." />
-                        <select id="history-aircraft" onChange={(event) => setHistoryAircraftId(event.target.value)} value={historyAircraftId}>
-                          <option value="">Alle</option>
-                          {board.aircraft.map((aircraft) => <option key={aircraft.id} value={aircraft.id}>{aircraft.registration}</option>)}
-                        </select>
-                      </div>
-                      <div className="field-control">
-                        <FieldLabel htmlFor="history-pilot" label="Pilotencode" help="Anonymer operativer Pilotencode." />
-                        <select id="history-pilot" onChange={(event) => setHistoryPilotId(event.target.value)} value={historyPilotId}>
-                          <option value="">Alle</option>
-                          {board.pilots.map((pilot) => <option key={pilot.id} value={pilot.id}>{pilot.operationalCode}</option>)}
-                        </select>
-                      </div>
-                      <div className="field-control">
-                        <FieldLabel htmlFor="history-product" label="Produkt" help="Begrenzt die Betriebshistorie auf ein Produkt." />
-                        <select id="history-product" onChange={(event) => setHistoryProductId(event.target.value)} value={historyProductId}>
-                          <option value="">Alle</option>
-                          {alphabeticalProducts.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}
-                        </select>
-                      </div>
-                      <div className="field-control">
-                        <FieldLabel htmlFor="history-resource-group" label="Ressourcengruppe" help="Begrenzt die Historie auf eine operative Queue." />
-                        <select id="history-resource-group" onChange={(event) => setHistoryResourceGroupId(event.target.value)} value={historyResourceGroupId}>
-                          <option value="">Alle</option>
-                          {board.resourceGroups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
-                        </select>
-                      </div>
-                      <div className="field-control">
-                        <FieldLabel htmlFor="history-ticket-status" label="Ticketstatus" help="Lesbarer Status des anonymen Tickets." />
-                        <select id="history-ticket-status" onChange={(event) => setHistoryTicketStatus(event.target.value)} value={historyTicketStatus}>
-                          <option value="">Alle</option>
-                          {Object.entries(historyTicketStatusLabels).map(([status, label]) => <option key={status} value={status}>{label}</option>)}
-                        </select>
-                      </div>
-                    </div>
-                  </details>
-                  <details className="history-technical-filters">
-                    <summary>Technische Filter</summary>
-                    <div>
-                      <Field label="Umlauf-ID"><input onChange={(event) => setHistoryRotationId(event.target.value)} value={historyRotationId} /></Field>
-                      <Field label="Ticket-ID"><input onChange={(event) => setHistoryTicketId(event.target.value)} value={historyTicketId} /></Field>
-                      <Field label="Ticketgruppen-ID"><input onChange={(event) => setHistoryTicketGroupId(event.target.value)} value={historyTicketGroupId} /></Field>
-                    </div>
-                  </details>
-                </>
-              ) : null}
-              {historyView === "FORECASTS" ? (
-                <>
-                  <details className="history-advanced-filters">
-                    <summary>Weitere fachliche Filter</summary>
-                    <div>
-                      <div className="field-control">
-                        <FieldLabel htmlFor="history-pilot" label="Pilotencode" help="Anonymer operativer Pilotencode." />
-                        <select id="history-pilot" onChange={(event) => setHistoryPilotId(event.target.value)} value={historyPilotId}>
-                          <option value="">Alle</option>
-                          {board.pilots.map((pilot) => <option key={pilot.id} value={pilot.id}>{pilot.operationalCode}</option>)}
-                        </select>
-                      </div>
-                    </div>
-                  </details>
-                  <details className="history-technical-filters">
-                    <summary>Technische Filter</summary>
-                    <div><Field label="Umlauf-ID"><input onChange={(event) => setHistoryRotationId(event.target.value)} value={historyRotationId} /></Field></div>
-                  </details>
-                </>
-              ) : null}
-              {historyView === "AUDIT" ? (
-                <details className="history-technical-filters">
-                  <summary>Technische Serverfilter</summary>
-                  <div>
-                    <Field label="Ereignistyp"><input onChange={(event) => setHistoryEventType(event.target.value)} value={historyEventType} /></Field>
-                    <Field label="Aggregate-Typ"><input onChange={(event) => setHistoryAggregateType(event.target.value)} value={historyAggregateType} /></Field>
-                    <Field label="Aggregate-ID"><input onChange={(event) => setHistoryAggregateId(event.target.value)} value={historyAggregateId} /></Field>
-                  </div>
-                </details>
-              ) : null}
-              <nav className="history-filter-chips" aria-label="Aktive Filter">
-                {historySince ? <button onClick={() => { setHistorySince(""); setHistoryOffset(0); }} type="button">Von entfernen</button> : null}
-                {historyUntil ? <button onClick={() => { setHistoryUntil(""); setHistoryOffset(0); }} type="button">Bis entfernen</button> : null}
-                {historyCommunicationNumber ? <button onClick={() => { setHistoryCommunicationNumber(""); setHistoryOffset(0); }} type="button">Fluggruppe entfernen</button> : null}
-                {historyAircraftId ? <button onClick={() => { setHistoryAircraftId(""); setHistoryOffset(0); }} type="button">Flugzeug entfernen</button> : null}
-                {historyPilotId ? <button onClick={() => { setHistoryPilotId(""); setHistoryOffset(0); }} type="button">Pilotencode entfernen</button> : null}
-                {historyTextSearch ? <button onClick={() => { setHistoryTextSearch(""); setHistoryOffset(0); }} type="button">Suche entfernen</button> : null}
-              </nav>
-              <div className="history-filter-actions">
-                <Button
-                  onClick={() => {
+                <CompletionHistoryPanel
+                  auditHistory={history}
+                  board={board}
+                  busyActionKey={busyActionKey}
+                  filters={{
+                    aggregateId: historyAggregateId,
+                    aggregateType: historyAggregateType,
+                    aircraftId: historyAircraftId,
+                    communicationNumber: historyCommunicationNumber,
+                    eventType: historyEventType,
+                    pilotId: historyPilotId,
+                    productId: historyProductId,
+                    resourceGroupId: historyResourceGroupId,
+                    rotationId: historyRotationId,
+                    since: historySince,
+                    textSearch: historyTextSearch,
+                    ticketGroupId: historyTicketGroupId,
+                    ticketId: historyTicketId,
+                    ticketStatus: historyTicketStatus,
+                    until: historyUntil,
+                  }}
+                  forecastHistory={forecastHistory}
+                  offset={historyOffset}
+                  onApplyFilters={() => {
                     setHistoryOffset(0);
                     if (historyView === "AUDIT") void refreshHistory();
                     else void refreshDetailedHistory(0);
                   }}
-                  type="button"
-                  variant="primary"
-                >
-                  Anwenden
-                </Button>
-                <Button onClick={resetHistoryFilters} type="button">Zurücksetzen</Button>
-              </div>
-            </fieldset>
-            {historyView === "OPERATIONS" ? (
-              <div className="history-table-wrap">
-                <table className="history-table">
-                  <thead>
-                    <tr>
-                      <th>Zeitpunkt</th>
-                      <th>Fluggruppe</th>
-                      <th>Ticket / Gruppe</th>
-                      <th>Status</th>
-                      <th>Flugzeug</th>
-                      <th>Pilot</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {operationalHistory.entries.map((entry) => (
-                      <tr key={`${entry.ticketId}-${entry.rotationId ?? "open"}`}>
-                        <td>
-                          {new Date(entry.latestAt).toLocaleString("de-DE", {
-                            timeZone: board?.event.timeZone ?? "Europe/Berlin",
-                          })}
-                        </td>
-                        <td>{entry.communicationLabel ?? "Noch offen"}</td>
-                        <td>
-                          Anonymes Ticket
-                          <details className="history-row-details">
-                            <summary>Technische Details</summary>
-                            <code>{entry.ticketId}</code>
-                            <code>{entry.ticketGroupId}</code>
-                            {entry.rotationId ? <code>{entry.rotationId}</code> : null}
-                          </details>
-                        </td>
-                        <td>{historyTicketStatusLabels[entry.ticketStatus] ?? entry.ticketStatus}</td>
-                        <td>{entry.aircraftRegistration ?? "–"}</td>
-                        <td>{entry.pilotOperationalCode ?? "–"}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {operationalHistory.entries.length === 0 ? (
-                  <p>Keine passenden Betriebsdaten.</p>
-                ) : null}
-              </div>
-            ) : historyView === "FORECASTS" ? (
-              <div className="history-table-wrap">
-                <table className="history-table forecast-history-table">
-                  <thead>
-                    <tr>
-                      <th>Snapshot</th>
-                      <th>Fluggruppe</th>
-                      <th>Auslöser</th>
-                      <th>Qualität / Grundlage</th>
-                      <th>Abweichungen in Minuten</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {forecastHistory.entries.map((entry) => (
-                      <tr key={entry.snapshotId}>
-                        <td>
-                          {new Date(entry.capturedAt).toLocaleString("de-DE", {
-                            timeZone: board?.event.timeZone ?? "Europe/Berlin",
-                          })}
-                        </td>
-                        <td>
-                          {entry.communicationLabel}
-                          <details className="history-row-details">
-                            <summary>Technische Details</summary>
-                            <code>{entry.rotationId}</code>
-                            <code>{entry.snapshotId}</code>
-                          </details>
-                        </td>
-                        <td>{historyEventLabels[entry.triggerEventType] ?? entry.triggerEventType}</td>
-                        <td>
-                          {entry.quality}
-                          <small>
-                            {entry.dataBasisScope} · n={entry.sampleSize} · Alter{" "}
-                            {Math.round(entry.dataAgeMinutes)} Min.
-                          </small>
-                        </td>
-                        <td>
-                          <span>Boarding {entry.deviationMinutes.boarding ?? "–"}</span>
-                          <span>Start {entry.deviationMinutes.departure ?? "–"}</span>
-                          <span>Landung {entry.deviationMinutes.landing ?? "–"}</span>
-                          <span>Abschluss {entry.deviationMinutes.completion ?? "–"}</span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {forecastHistory.entries.length === 0 ? (
-                  <p>Keine passenden Prognosesnapshots.</p>
-                ) : null}
-              </div>
-            ) : (
-              <div className="audit-list">
-                {history.entries
-                  .filter((entry) =>
-                    `${historyEventLabels[entry.eventType] ?? entry.eventType} ${entry.eventType} ${entry.aggregateType}`
-                      .toLocaleLowerCase("de-DE")
-                      .includes(historyTextSearch.trim().toLocaleLowerCase("de-DE")),
-                  )
-                  .slice(0, 50)
-                  .map((entry) => (
-                  <div key={entry.sequence}>
-                    <time dateTime={entry.occurredAt}>
-                      {new Date(entry.occurredAt).toLocaleString("de-DE", {
-                        timeZone: board?.event.timeZone ?? "Europe/Berlin",
-                      })}
-                    </time>
-                    <strong>{historyEventLabels[entry.eventType] ?? entry.eventType}</strong>
-                    {historyEventLabels[entry.eventType] ? <small>{entry.eventType}</small> : null}
-                    <details className="history-row-details">
-                      <summary>Technische Details</summary>
-                      <span>{entry.aggregateType} · Version {entry.aggregateVersion}</span>
-                      <code>{entry.aggregateId}</code>
-                    </details>
-                  </div>
-                ))}
-                {history.entries.length === 0 ? <p>Keine passenden Ereignisse.</p> : null}
-              </div>
-            )}
-            {historyView !== "AUDIT" ? (
-              <div className="history-pagination">
-                <Button
-                  busy={busyActionKey === "history-previous"}
-                  disabled={historyOffset === 0 || busyActionKey !== null}
-                  onClick={() =>
+                  onFilterChange={updateHistoryFilter}
+                  onNextPage={() =>
+                    runBusyAction("history-next", () =>
+                      refreshDetailedHistory(historyOffset + 50),
+                    )
+                  }
+                  onPreviousPage={() =>
                     runBusyAction("history-previous", () =>
                       refreshDetailedHistory(Math.max(0, historyOffset - 50)),
                     )
                   }
-                  type="button"
-                >
-                  Zurück
-                </Button>
-                <span>
-                  {historyOffset + 1}–
-                  {Math.min(
-                    historyOffset + 50,
-                    historyView === "OPERATIONS" ? operationalHistory.total : forecastHistory.total,
-                  )}{" "}
-                  von{" "}
-                  {historyView === "OPERATIONS" ? operationalHistory.total : forecastHistory.total}
-                </span>
-                <Button
-                  busy={busyActionKey === "history-next"}
-                  disabled={
-                    busyActionKey !== null ||
-                    historyOffset + 50 >=
-                      (historyView === "OPERATIONS"
-                        ? operationalHistory.total
-                        : forecastHistory.total)
-                  }
-                  onClick={() =>
-                    runBusyAction("history-next", () => refreshDetailedHistory(historyOffset + 50))
-                  }
-                  type="button"
-                >
-                  Weiter
-                </Button>
-              </div>
-            ) : null}
-                </section>
+                  onResetFilters={resetHistoryFilters}
+                  operationalHistory={operationalHistory}
+                  view={historyView}
+                />
               }
               corrections={
                 <ManifestCorrectionPanel
