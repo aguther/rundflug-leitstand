@@ -10,6 +10,7 @@ import { registerAdminMasterDataTemplateRoutes } from "./admin-master-data-templ
 import { registerAdminSecurityRoutes } from "./admin-security-routes";
 import { expireAnalysisArchives, processPendingAnalysisArchives } from "./analysis-archive";
 import { registerAnalysisControlRoutes } from "./analysis-control-routes";
+import { registerApiCachePolicy } from "./api-cache-policy";
 import type { SessionActor } from "./auth";
 import { registerAuthRoutes } from "./auth-routes";
 import { createPortableBackup, operationDateInTimeZone } from "./backup";
@@ -87,10 +88,7 @@ app.use(
   }),
 );
 
-app.use("/api/*", async (context, next) => {
-  await next();
-  context.header("cache-control", "no-store");
-});
+registerApiCachePolicy(app);
 
 app.use("/api/*", limitApiBody);
 app.use("/api/*", requireValidJsonBody);
