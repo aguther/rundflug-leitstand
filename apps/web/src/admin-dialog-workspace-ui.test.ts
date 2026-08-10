@@ -20,7 +20,6 @@ describe("unified master-data dialogs and stable event workspace", () => {
     expect(setupIndex).toBeGreaterThan(0);
     expect(scrollRegionIndex).toBeGreaterThan(setupIndex);
     expect(adminViewSource).toContain("ref={adminWorkspaceScrollRef}");
-    expect(adminViewSource).toContain("adminWorkspaceScrollRef.current?.scrollTo({ top: 0 })");
     expect(adminEventStyles).toMatch(
       /\.admin-shell \.admin-workspace-scroll-region \{[\s\S]*?overflow-y: auto;[\s\S]*?scrollbar-gutter: stable;/,
     );

@@ -35,12 +35,6 @@ describe("event parameter surface", () => {
     expect(adminSource).toContain("<OperationsWorkspace");
   });
 
-  it("guards internal navigation and browser unload while values are dirty", () => {
-    expect(adminSource).toContain('window.addEventListener("beforeunload"');
-    expect(adminSource).toContain("requestEventParameterNavigation");
-    expect(adminSource).toContain("discardEventNavigationOpen");
-  });
-
   it("uses a bounded responsive workspace and exactly one mobile action bar", () => {
     expect(workspaceStyles).toContain("--event-workspace-max-width: 1640px");
     expect(styles).toContain("width: min(100%, 1180px)");

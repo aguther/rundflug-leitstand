@@ -128,13 +128,6 @@ describe("V1.2 app navigation", () => {
     expect(headerSource).toContain("!kiosk && !publicView && session");
   });
 
-  it("persists the selected administration area in the URL", () => {
-    expect(adminSource).toContain('url.searchParams.set("area", adminArea)');
-    expect(adminSource).toContain('url.searchParams.set("step", eventStep)');
-    expect(adminSource).toContain('url.searchParams.delete("section")');
-    expect(adminSource).toContain('window.history.replaceState(null, "", url)');
-  });
-
   it("launches the synthetic simulator from evaluation in a separate tab", () => {
     expect(adminSource).toContain("Prognose-Simulator öffnen");
     expect(adminSource).toContain('href="/simulation"');

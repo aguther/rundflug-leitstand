@@ -91,6 +91,7 @@ import {
   EventParametersWorkspace,
 } from "./features/admin/event-parameters/EventParametersWorkspace";
 import type { ValidEventParameterPayload } from "./features/admin/event-parameters/useEventParametersForm";
+import { useAdminEventWorkspaceNavigation } from "./features/admin/event-workspace/useAdminEventWorkspaceNavigation";
 import { FactoryResetDialog } from "./features/admin/FactoryResetDialog";
 import { GatesWorkspace } from "./features/admin/gates/GatesWorkspace";
 import { MasterDataPagination } from "./features/admin/master-data/MasterDataPagination";
@@ -216,43 +217,7 @@ export function AdminView() {
   const { board, error, lastConfirmedAt, backendConfirmed, refresh, refreshing } =
     useOperationBoard(ADMIN_DEVICE_ID);
   const initialAdminParams = useRef(new URLSearchParams(window.location.search)).current;
-  const [adminArea, setAdminArea] = useState<AdminArea>(() => {
-    const requestedArea = initialAdminParams.get("area");
-    const validAreas: AdminArea[] = ["overview", "events", "users", "evaluation", "backup"];
-    if (["setup", "master-data", "audit"].includes(requestedArea ?? "")) return "events";
-    return (validAreas as string[]).includes(requestedArea ?? "")
-      ? (requestedArea as AdminArea)
-      : "overview";
-  });
   const [accountCreateOpen, setAccountCreateOpen] = useState(false);
-  const [eventStep, setEventStep] = useState<AdminEventStep>(() => {
-    const requestedArea = initialAdminParams.get("area");
-    const requestedStep = initialAdminParams.get("step");
-    const legacySection = initialAdminParams.get("section");
-    const validSteps: AdminEventStep[] = [
-      "event",
-      "gates",
-      "resource-groups",
-      "aircraft",
-      "pilots",
-      "products",
-      "operational-plan",
-      "operations",
-      "completion",
-    ];
-    if ((validSteps as string[]).includes(requestedStep ?? "")) {
-      return requestedStep as AdminEventStep;
-    }
-    if (requestedArea === "audit") return "completion";
-    if (requestedArea === "master-data") {
-      if (legacySection === "assignments") return "aircraft";
-      if ((validSteps as string[]).includes(legacySection ?? "")) {
-        return legacySection as AdminEventStep;
-      }
-      return "resource-groups";
-    }
-    return "event";
-  });
   const [masterDataCategory, setMasterDataCategory] = useState<MasterDataCategory>(() => {
     const requestedSection = initialAdminParams.get("section");
     const validSections: MasterDataCategory[] = [
@@ -268,6 +233,24 @@ export function AdminView() {
       ? (requestedSection as MasterDataCategory)
       : "resource-groups";
   });
+  const handleSetupStepSelected = useCallback((step: SetupStep) => {
+    if (step.category) setMasterDataCategory(step.category);
+  }, []);
+  const {
+    adminArea,
+    adminWorkspaceScrollRef,
+    cancelPendingNavigation,
+    changeAdminArea,
+    confirmPendingNavigation,
+    discardEventNavigationOpen,
+    eventParametersResetKey,
+    eventStep,
+    openSetupStep,
+    setEventParametersDirty,
+  } = useAdminEventWorkspaceNavigation({
+    initialParams: initialAdminParams,
+    onStepSelected: handleSetupStepSelected,
+  });
   const legacyAssignmentRequestRef = useRef({
     requested:
       initialAdminParams.get("area") === "master-data" &&
@@ -275,7 +258,6 @@ export function AdminView() {
     aircraftId: initialAdminParams.get("aircraftId") ?? "",
     handled: false,
   });
-  const adminWorkspaceScrollRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (["gates", "resource-groups", "aircraft", "pilots", "products"].includes(eventStep)) {
       setMasterDataCategory(eventStep as MasterDataCategory);
@@ -286,18 +268,6 @@ export function AdminView() {
       setMasterSearch("");
     }
   }, [eventStep]);
-  useEffect(() => {
-    const url = new URL(window.location.href);
-    url.searchParams.set("area", adminArea);
-    if (adminArea === "events") url.searchParams.set("step", eventStep);
-    else url.searchParams.delete("step");
-    url.searchParams.delete("section");
-    window.history.replaceState(null, "", url);
-  }, [adminArea, eventStep]);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: switching area or setup step intentionally resets the independent content scroller
-  useEffect(() => {
-    adminWorkspaceScrollRef.current?.scrollTo({ top: 0 });
-  }, [adminArea, eventStep]);
   const [reason, setReason] = useState("");
   const [adminPin, setAdminPinState] = useState(session?.account.role === "ADMIN" ? "000000" : "");
   const adminPinRef = useRef(session?.account.role === "ADMIN" ? "000000" : "");
@@ -407,10 +377,6 @@ export function AdminView() {
   const [pilotCode, setPilotCode] = useState("P-01");
   const [pilotNote, setPilotNote] = useState("");
   const [pilotEditorId, setPilotEditorId] = useState("new");
-  const [eventParametersDirty, setEventParametersDirty] = useState(false);
-  const [eventParametersResetKey, setEventParametersResetKey] = useState(0);
-  const [discardEventNavigationOpen, setDiscardEventNavigationOpen] = useState(false);
-  const pendingEventNavigationRef = useRef<(() => void) | null>(null);
   const [pushConfigurationStatus, setPushConfigurationStatus] = useState<
     "loading" | "configured" | "missing" | "unavailable"
   >("loading");
@@ -436,15 +402,6 @@ export function AdminView() {
       .then((result) => setSetupRequired(result.setupRequired))
       .catch(() => setSetupRequired(false));
   }, [board]);
-  useEffect(() => {
-    if (!eventParametersDirty) return;
-    const warnBeforeUnload = (unloadEvent: BeforeUnloadEvent) => {
-      unloadEvent.preventDefault();
-      unloadEvent.returnValue = "";
-    };
-    window.addEventListener("beforeunload", warnBeforeUnload);
-    return () => window.removeEventListener("beforeunload", warnBeforeUnload);
-  }, [eventParametersDirty]);
   const [productEditorId, setProductEditorId] = useState("new");
   const [productName, setProductName] = useState("");
   const [productCode, setProductCode] = useState("");
@@ -2222,29 +2179,6 @@ export function AdminView() {
       description: "Daten gezielt bereinigen oder das System vollständig neu einrichten.",
     },
   };
-
-  function requestEventParameterNavigation(action: () => void) {
-    if (!eventParametersDirty) {
-      action();
-      return;
-    }
-    pendingEventNavigationRef.current = action;
-    setDiscardEventNavigationOpen(true);
-  }
-
-  function changeAdminArea(nextArea: AdminArea) {
-    if (nextArea === adminArea) return;
-    requestEventParameterNavigation(() => setAdminArea(nextArea));
-  }
-
-  function openSetupStep(step: SetupStep) {
-    if (adminArea === "events" && eventStep === step.id) return;
-    requestEventParameterNavigation(() => {
-      setAdminArea("events");
-      setEventStep(step.id);
-      if (step.category) setMasterDataCategory(step.category);
-    });
-  }
 
   function startNewMasterDataEntry() {
     if (masterDataCategory === "gates") selectGateForEditing("new");
@@ -5494,18 +5428,8 @@ export function AdminView() {
             }
             confirmLabel="Verwerfen und wechseln"
             danger
-            onCancel={() => {
-              pendingEventNavigationRef.current = null;
-              setDiscardEventNavigationOpen(false);
-            }}
-            onConfirm={() => {
-              const action = pendingEventNavigationRef.current;
-              pendingEventNavigationRef.current = null;
-              setDiscardEventNavigationOpen(false);
-              setEventParametersDirty(false);
-              setEventParametersResetKey((current) => current + 1);
-              action?.();
-            }}
+            onCancel={cancelPendingNavigation}
+            onConfirm={confirmPendingNavigation}
             open={discardEventNavigationOpen}
             title="Ungespeicherte Änderungen verwerfen?"
           />

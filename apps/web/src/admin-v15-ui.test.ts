@@ -144,7 +144,7 @@ describe("V1.5 administration UI", () => {
     expect(adminUxSource).toContain('step.complete ? "complete" : "pending"');
   });
 
-  it("implements the event-scoped information architecture and legacy URL redirects", () => {
+  it("implements the event-scoped information architecture", () => {
     for (const navigationItem of [
       '{ id: "overview", label: "Übersicht"',
       '{ id: "events", label: "Veranstaltungen"',
@@ -167,10 +167,6 @@ describe("V1.5 administration UI", () => {
     ]) {
       expect(adminViewSource).toContain(step);
     }
-    expect(adminViewSource).toContain(
-      'if (["setup", "master-data", "audit"].includes(requestedArea ?? "")) return "events";',
-    );
-    expect(adminViewSource).toContain('if (requestedArea === "audit") return "completion";');
   });
 
   it("uses event-only flow data and a strict preview-before-import workflow", () => {

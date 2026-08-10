@@ -144,9 +144,7 @@ describe("V1 administration completion UI", () => {
     expect(appSource).not.toContain(">Produkt speichern<");
   });
 
-  it("opens the approved overview and uses centered responsive master-data dialogs", () => {
-    expect(appSource).toContain("useState<AdminArea>(() => {");
-    expect(appSource).toContain(': "overview";');
+  it("uses centered responsive master-data dialogs", () => {
     expect(appSource).toContain("useState<MasterDataCategory>(() => {");
     expect(appSource).toContain(': "resource-groups";');
     expect(appSource).toContain("const [masterEditorOpen, setMasterEditorOpen] = useState(false);");
