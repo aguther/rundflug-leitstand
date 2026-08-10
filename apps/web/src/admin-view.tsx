@@ -103,6 +103,7 @@ import {
 import { OperationalPlanWorkspace } from "./features/admin/operational-plan/OperationalPlanWorkspace";
 import { OperationsWorkspace } from "./features/admin/operations/OperationsWorkspace";
 import { PilotCodesWorkspace } from "./features/admin/pilots/PilotCodesWorkspace";
+import { usePilotEditorState } from "./features/admin/pilots/usePilotEditorState";
 import { ProductSalesDialog } from "./features/admin/products/ProductSalesDialog";
 import { ProductsWorkspace } from "./features/admin/products/ProductsWorkspace";
 import { ResourceGroupsWorkspace } from "./features/admin/resource-groups/ResourceGroupsWorkspace";
@@ -374,9 +375,7 @@ export function AdminView() {
     FORECASTS: null as Record<string, string> | null,
     AUDIT: null as Record<string, string> | null,
   });
-  const [pilotCode, setPilotCode] = useState("P-01");
-  const [pilotNote, setPilotNote] = useState("");
-  const [pilotEditorId, setPilotEditorId] = useState("new");
+  const pilotEditor = usePilotEditorState(board?.pilots);
   const [pushConfigurationStatus, setPushConfigurationStatus] = useState<
     "loading" | "configured" | "missing" | "unavailable"
   >("loading");
@@ -466,7 +465,7 @@ export function AdminView() {
                 aircraftSeats,
                 aircraftMaximumPayload,
               ])
-            : createMasterEditorSnapshot(["pilots", pilotCode, pilotNote]);
+            : pilotEditor.snapshot;
   const masterEditorDirty =
     masterEditorOpen &&
     hasMasterEditorChanges(initialMasterEditorSnapshotRef.current, currentMasterEditorSnapshot);
@@ -1789,9 +1788,7 @@ export function AdminView() {
       );
       setMessage("Anonymer operativer Pilotencode wurde aktualisiert.");
       if (!adminModeUnlocked) setAdminPin("");
-      setPilotEditorId("new");
-      setPilotCode("P-01");
-      setPilotNote("");
+      pilotEditor.resetAfterSave();
       finishMasterEditor();
       await refresh();
       await refreshHistory();
@@ -1803,17 +1800,7 @@ export function AdminView() {
   }
 
   function selectPilotForEditing(id: string) {
-    const entry = board?.pilots.find((pilot) => pilot.id === id);
-    const nextCode = entry?.operationalCode ?? "P-01";
-    const nextNote = entry?.operationalNote ?? "";
-    initialMasterEditorSnapshotRef.current = createMasterEditorSnapshot([
-      "pilots",
-      nextCode,
-      nextNote,
-    ]);
-    setPilotEditorId(id);
-    setPilotCode(nextCode);
-    setPilotNote(nextNote);
+    initialMasterEditorSnapshotRef.current = pilotEditor.select(id);
     setMasterSubmitAttempted(false);
     setMasterEditorOpen(true);
   }
@@ -1879,16 +1866,15 @@ export function AdminView() {
         if (action === "aircraft") await saveAircraft();
         if (action === "product") await saveProduct();
         if (action === "pilot") {
-          const existing = board?.pilots.find((pilot) => pilot.id === pilotEditorId);
           await upsertPilot(
-            pilotEditorId === "new" ? crypto.randomUUID() : pilotEditorId,
-            pilotCode,
-            pilotNote,
-            existing?.active ?? true,
+            pilotEditor.editorId === "new" ? crypto.randomUUID() : pilotEditor.editorId,
+            pilotEditor.code,
+            pilotEditor.note,
+            pilotEditor.currentPilot?.active ?? true,
           );
         }
         if (action === "pilot-toggle") {
-          const existing = board?.pilots.find((pilot) => pilot.id === pilotEditorId);
+          const existing = pilotEditor.currentPilot;
           if (existing) {
             await upsertPilot(
               existing.id,
@@ -1979,7 +1965,11 @@ export function AdminView() {
       requestMasterSave("aircraft", !invalidFieldId, invalidFieldId);
       return;
     }
-    requestMasterSave("pilot", /^[A-Z0-9-]{2,12}$/.test(pilotCode), "pilot-operational-code");
+    requestMasterSave(
+      "pilot",
+      /^[A-Z0-9-]{2,12}$/.test(pilotEditor.code),
+      "pilot-operational-code",
+    );
   }
 
   function openFactoryReset() {
@@ -2441,7 +2431,7 @@ export function AdminView() {
   const masterDataStepActive =
     adminArea === "events" &&
     ["gates", "resource-groups", "aircraft", "pilots", "products"].includes(eventStep);
-  const currentPilot = board?.pilots.find((pilot) => pilot.id === pilotEditorId);
+  const currentPilot = pilotEditor.currentPilot;
   const masterEditorDeleteAction: {
     entityType: MasterDataDeleteTarget["entityType"];
     entityId: string;
@@ -2469,11 +2459,11 @@ export function AdminView() {
               label: aircraftRegistration,
               description: "Eine bestehende Zuordnung muss zuerst entfernt werden.",
             }
-          : masterDataCategory === "pilots" && pilotEditorId !== "new"
+          : masterDataCategory === "pilots" && pilotEditor.editorId !== "new"
             ? {
                 entityType: "PILOT",
-                entityId: pilotEditorId,
-                label: pilotCode,
+                entityId: pilotEditor.editorId,
+                label: pilotEditor.code,
                 description: "Nur ohne Umlauf oder Flugzeugbindung möglich.",
               }
             : masterDataCategory === "products" && productEditorId !== "new"
@@ -4254,7 +4244,9 @@ export function AdminView() {
             onClose={requestMasterEditorClose}
             open={masterDataStepActive && masterEditorOpen && masterDataCategory === "pilots"}
             size="default"
-            title={pilotEditorId === "new" ? "Pilotencode anlegen" : "Pilotencode bearbeiten"}
+            title={
+              pilotEditor.editorId === "new" ? "Pilotencode anlegen" : "Pilotencode bearbeiten"
+            }
           >
             <div className="parameter-grid compact-editor-grid">
               <div className="field-control">
@@ -4265,8 +4257,8 @@ export function AdminView() {
                 />
                 <input
                   id="pilot-operational-code"
-                  value={pilotCode}
-                  onChange={(event) => setPilotCode(event.target.value.toUpperCase())}
+                  value={pilotEditor.code}
+                  onChange={(event) => pilotEditor.setCode(event.target.value)}
                 />
                 <span className="field-help">
                   Nur technische Codes, keine Namen oder Lizenzdaten.
@@ -4280,13 +4272,13 @@ export function AdminView() {
                 />
                 <input
                   id="pilot-operational-note"
-                  value={pilotNote}
-                  onChange={(event) => setPilotNote(event.target.value)}
+                  value={pilotEditor.note}
+                  onChange={(event) => pilotEditor.setNote(event.target.value)}
                   placeholder="Optional · keine personenbezogenen Daten"
                 />
               </div>
             </div>
-            {pilotEditorId !== "new" ? (
+            {pilotEditor.editorId !== "new" ? (
               <dl className="master-editor-readonly-summary">
                 <div><dt>Pausenstatus</dt><dd>{currentPilot?.paused ? "Pause" : "Einsatzbereit"}</dd></div>
                 <div>
@@ -4299,13 +4291,13 @@ export function AdminView() {
                 </div>
               </dl>
             ) : null}
-            {masterSubmitAttempted && !/^[A-Z0-9-]{2,12}$/.test(pilotCode) ? (
+            {masterSubmitAttempted && !/^[A-Z0-9-]{2,12}$/.test(pilotEditor.code) ? (
               <ValidationHint tone="error">
                 Der Pilotencode muss aus 2 bis 12 Großbuchstaben, Ziffern oder Bindestrichen
                 bestehen.
               </ValidationHint>
             ) : null}
-            {pilotEditorId !== "new" ? (
+            {pilotEditor.editorId !== "new" ? (
               <section className="master-editor-status-section">
                 <div>
                   <h3>Status</h3>
