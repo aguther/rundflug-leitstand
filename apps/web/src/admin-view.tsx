@@ -1,5 +1,5 @@
 import type { EventLogoTheme, OperationBoard } from "@rundflug/contracts";
-import { ExternalLink, FlaskConical, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { hasMasterEditorChanges } from "./admin-master-editor-state";
 import {
@@ -13,7 +13,6 @@ import {
 } from "./admin-ux";
 import {
   ApiCommandError,
-  downloadSimulationPlan,
   getPushConfiguration,
   getSetupStatus,
   removeEventLogo,
@@ -77,6 +76,7 @@ import {
   AdminOverviewPanel,
   type PushConfigurationStatus,
 } from "./features/admin/overview/AdminOverviewPanel";
+import { AdminSimulationLauncher } from "./features/admin/overview/AdminSimulationLauncher";
 import { useAdminEventFlow } from "./features/admin/overview/useAdminEventFlow";
 import { PilotCodesWorkspace } from "./features/admin/pilots/PilotCodesWorkspace";
 import { PilotEditorDialog } from "./features/admin/pilots/PilotEditorDialog";
@@ -403,11 +403,6 @@ export function AdminView() {
     setAdminModeUnlocked(false);
     setAdminPin("");
   }, [isAdministrator, setAdminPin]);
-  async function exportSimulationPlan() {
-    await downloadSimulationPlan(EVENT_ID, ADMIN_DEVICE_ID, deviceTokenFor(ADMIN_DEVICE_ID));
-    setMessage("Stammdaten und offener Betriebsplan wurden für die Simulation exportiert.");
-  }
-
   function lockAdminMode(messageText = "Bearbeitungsmodus gesperrt.") {
     setAdminModeUnlocked(false);
     setAdminPin("");
@@ -2225,44 +2220,12 @@ export function AdminView() {
               board={board}
               onRefresh={refresh}
               simulator={
-                <section className="admin-section admin-simulator-launch">
-                  <div className="admin-simulator-launch-copy">
-                    <span aria-hidden="true" className="admin-simulator-launch-icon">
-                      <FlaskConical />
-                    </span>
-                    <div>
-                      <div className="admin-simulator-launch-title">
-                        <h2>Prognose-Simulator</h2>
-                        <span>Nur Simulation</span>
-                      </div>
-                      <p>
-                        Stammdaten und offene Planeinträge als lokale Simulationsgrundlage
-                        verwenden. {"Tickets, Ist-Verläufe und operative Zustände werden nicht exportiert."}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="admin-simulator-launch-actions">
-                    <Button
-                      busy={busyActionKey === "export-simulation-plan"}
-                      disabled={!board || busyActionKey !== null}
-                      onClick={() =>
-                        void runBusyAction("export-simulation-plan", exportSimulationPlan)
-                      }
-                      type="button"
-                    >
-                      Simulationsgrundlage exportieren
-                    </Button>
-                    <a
-                      className="admin-simulator-launch-action"
-                      href="/simulation"
-                      rel="noopener"
-                      target="_blank"
-                    >
-                      Prognose-Simulator öffnen
-                      <ExternalLink aria-hidden="true" />
-                    </a>
-                  </div>
-                </section>
+                <AdminSimulationLauncher
+                  available={Boolean(board)}
+                  busyActionKey={busyActionKey}
+                  onMessage={setMessage}
+                  onRunBusyAction={runBusyAction}
+                />
               }
             />
           ) : null}

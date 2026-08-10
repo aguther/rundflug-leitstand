@@ -13,7 +13,7 @@
     },
     {
       "path": "apps/web/src/admin-view.tsx",
-      "maxLines": 2440,
+      "maxLines": 2403,
       "targetLines": 700
     },
     {
@@ -34,6 +34,11 @@
     {
       "path": "apps/web/src/features/admin/overview/useAdminEventFlow.ts",
       "maxLines": 45,
+      "targetLines": 1500
+    },
+    {
+      "path": "apps/web/src/features/admin/overview/AdminSimulationLauncher.tsx",
+      "maxLines": 62,
       "targetLines": 1500
     },
     {
@@ -561,7 +566,6 @@
     "apps/web/src/admin-v15-ui.test.ts -> apps/web/src/features/admin/resource-groups/ResourceGroupsWorkspace.tsx",
     "apps/web/src/api.test.ts -> apps/web/src/api.ts",
     "apps/web/src/api.test.ts -> apps/web/src/operation-workspace.tsx",
-    "apps/web/src/app/navigation.test.ts -> apps/web/src/admin-view.tsx",
     "apps/web/src/app/navigation.test.ts -> apps/web/src/app/AppHeader.tsx",
     "apps/web/src/app/navigation.test.ts -> apps/web/src/app/AppShell.tsx",
     "apps/web/src/app/navigation.test.ts -> apps/web/src/ticket-status-view.tsx",

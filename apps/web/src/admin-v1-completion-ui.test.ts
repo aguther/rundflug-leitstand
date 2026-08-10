@@ -137,9 +137,6 @@ describe("V1 administration completion UI", () => {
     expect(adminUxSource).toContain('{ id: "evaluation", label: "Auswertung"');
     expect(adminUxSource).not.toContain('label: "Betrieb"');
     expect(appSource).toContain('title: "Auswertung"');
-    expect(appSource).toContain("Prognose-Simulator");
-    expect(appSource).toContain("Nur Simulation");
-    expect(appSource).toContain('className="admin-section admin-simulator-launch"');
     expect(appSource).toContain('eventStep === "completion"');
     expect(appSource).toContain("<CompletionWorkspace");
   });

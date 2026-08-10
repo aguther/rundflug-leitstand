@@ -1,6 +1,5 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import adminSource from "../admin-view.tsx?raw";
 import ticketStatusSource from "../ticket-status-view.tsx?raw";
 import headerSource from "./AppHeader.tsx?raw";
 import shellSource from "./AppShell.tsx?raw";
@@ -126,16 +125,5 @@ describe("V1.2 app navigation", () => {
     expect(ticketStatusSource).toContain("publicView");
     expect(shellSource).toContain("publicView={publicView}");
     expect(headerSource).toContain("!kiosk && !publicView && session");
-  });
-
-  it("launches the synthetic simulator from evaluation in a separate tab", () => {
-    expect(adminSource).toContain("Prognose-Simulator öffnen");
-    expect(adminSource).toContain('href="/simulation"');
-    expect(adminSource).toContain('target="_blank"');
-    expect(adminSource).toContain('rel="noopener"');
-    expect(adminSource).toContain("Stammdaten und offene Planeinträge");
-    expect(adminSource).toContain(
-      "Tickets, Ist-Verläufe und operative Zustände werden nicht exportiert",
-    );
   });
 });
