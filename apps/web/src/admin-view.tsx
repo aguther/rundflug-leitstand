@@ -18,7 +18,6 @@ import {
   downloadPerformanceProfile,
   downloadSimulationPlan,
   downloadTicketRawData,
-  factoryReset,
   getPushConfiguration,
   getSetupStatus,
   removeEventLogo,
@@ -92,10 +91,10 @@ import { ProductsWorkspace } from "./features/admin/products/ProductsWorkspace";
 import { useProductEditorState } from "./features/admin/products/useProductEditorState";
 import { ResourceGroupsWorkspace } from "./features/admin/resource-groups/ResourceGroupsWorkspace";
 import { useResourceGroupEditorState } from "./features/admin/resource-groups/useResourceGroupEditorState";
+import { useAdminFactoryReset } from "./features/admin/useAdminFactoryReset";
 import { AnalysisWorkspace } from "./features/analysis/AnalysisWorkspace";
 import { AccountManagement } from "./features/auth/AccountManagement";
 import { useAuth } from "./features/auth/AuthContext";
-import { clearOfflineOperationBoards } from "./offline-store";
 import {
   ADMIN_CONFIGURATION_AUDIT_REASON,
   ADMIN_DEVICE_ID,
@@ -338,15 +337,6 @@ export function AdminView() {
     masterEditorOpen &&
     hasMasterEditorChanges(initialMasterEditorSnapshotRef.current, currentMasterEditorSnapshot);
   const [eventDialogView, setEventDialogView] = useState<"closed" | "catalog" | "create">("closed");
-  const [factoryResetOpen, setFactoryResetOpen] = useState(false);
-  const [factoryResetBusy, setFactoryResetBusy] = useState(false);
-  const [factoryResetError, setFactoryResetError] = useState<string | null>(null);
-  const [factoryResetReason, setFactoryResetReason] = useState("");
-  const [factoryResetPin, setFactoryResetPin] = useState("");
-  const [factoryResetConfirmation, setFactoryResetConfirmation] = useState("");
-  const [retainRecoveryBackup, setRetainRecoveryBackup] = useState(true);
-  const [deleteAllBackups, setDeleteAllBackups] = useState(false);
-  const [factoryResetCommandId, setFactoryResetCommandId] = useState(() => crypto.randomUUID());
   const resourceGroups = board?.resourceGroups ?? [];
   const isAdministrator = session?.account.role === "ADMIN" || board?.currentDeviceRole === "ADMIN";
   const productPriceCents = productEditor.priceCents;
@@ -370,6 +360,7 @@ export function AdminView() {
     administrator: isAdministrator,
     eventVersion,
   });
+  const factoryResetState = useAdminFactoryReset({ onMessage: setMessage });
 
   useEffect(() => {
     if (
@@ -1309,66 +1300,6 @@ export function AdminView() {
     );
   }
 
-  function openFactoryReset() {
-    setFactoryResetCommandId(crypto.randomUUID());
-    setFactoryResetError(null);
-    setMessage(null);
-    setFactoryResetReason("");
-    setFactoryResetPin("");
-    setFactoryResetConfirmation("");
-    setRetainRecoveryBackup(true);
-    setDeleteAllBackups(false);
-    setFactoryResetOpen(true);
-  }
-
-  async function performFactoryReset() {
-    if (
-      factoryResetBusy ||
-      factoryResetReason.trim().length < 3 ||
-      !/^\d{6,12}$/.test(factoryResetPin) ||
-      factoryResetConfirmation !== "WERKSZUSTAND"
-    )
-      return;
-    setFactoryResetBusy(true);
-    setFactoryResetError(null);
-    try {
-      const result = await factoryReset(
-        EVENT_ID,
-        ADMIN_DEVICE_ID,
-        deviceTokenFor(ADMIN_DEVICE_ID),
-        {
-          commandId: factoryResetCommandId,
-          eventId: EVENT_ID,
-          reason: factoryResetReason.trim(),
-          adminPin: factoryResetPin,
-          confirmation: "WERKSZUSTAND",
-          retainRecoveryBackup,
-          deleteAllBackups,
-        },
-      );
-      if (result.resetComplete) {
-        await clearOfflineOperationBoards();
-        try {
-          // `ready` remains pending forever when this browser has no active PWA registration
-          // (for example during the initial local setup). Reset cleanup must never block the
-          // mandatory redirect back to /setup.
-          const registration = await navigator.serviceWorker?.getRegistration();
-          const subscription = await registration?.pushManager.getSubscription();
-          await subscription?.unsubscribe();
-        } catch {
-          // Der Serverzustand ist bereits gelöscht; lokale Push-Bereinigung ist best effort.
-        }
-        window.localStorage.clear();
-        window.location.replace("/setup");
-      }
-    } catch (cause) {
-      setFactoryResetError(
-        cause instanceof Error ? cause.message : "Werkszustand konnte nicht hergestellt werden.",
-      );
-      setFactoryResetBusy(false);
-    }
-  }
-
   const setupSteps: SetupStep[] = [
     {
       id: "event",
@@ -2043,7 +1974,7 @@ export function AdminView() {
               <button
                 className="danger-action"
                 disabled={!isAdministrator}
-                onClick={openFactoryReset}
+                onClick={factoryResetState.openDialog}
                 type="button"
               >
                 <span>Werkszustand vorbereiten</span>
@@ -2531,27 +2462,21 @@ export function AdminView() {
             title="Ungespeicherte Änderungen verwerfen?"
           />
           <FactoryResetDialog
-            busy={factoryResetBusy}
-            confirmation={factoryResetConfirmation}
-            deleteAllBackups={deleteAllBackups}
-            error={factoryResetError}
-            onClose={() => setFactoryResetOpen(false)}
-            onConfirmationChange={setFactoryResetConfirmation}
-            onDeleteAllBackupsChange={(checked) => {
-              setDeleteAllBackups(checked);
-              if (checked) setRetainRecoveryBackup(false);
-            }}
-            onPinChange={setFactoryResetPin}
-            onReasonChange={setFactoryResetReason}
-            onRetainRecoveryBackupChange={(checked) => {
-              setRetainRecoveryBackup(checked);
-              if (checked) setDeleteAllBackups(false);
-            }}
-            onSubmit={() => void performFactoryReset()}
-            open={factoryResetOpen}
-            pin={factoryResetPin}
-            reason={factoryResetReason}
-            retainRecoveryBackup={retainRecoveryBackup}
+            busy={factoryResetState.busy}
+            confirmation={factoryResetState.confirmation}
+            deleteAllBackups={factoryResetState.deleteAllBackups}
+            error={factoryResetState.error}
+            onClose={factoryResetState.closeDialog}
+            onConfirmationChange={factoryResetState.setConfirmation}
+            onDeleteAllBackupsChange={factoryResetState.setDeleteAllBackups}
+            onPinChange={factoryResetState.setPin}
+            onReasonChange={factoryResetState.setReason}
+            onRetainRecoveryBackupChange={factoryResetState.setRetainRecoveryBackup}
+            onSubmit={() => void factoryResetState.performReset()}
+            open={factoryResetState.open}
+            pin={factoryResetState.pin}
+            reason={factoryResetState.reason}
+            retainRecoveryBackup={factoryResetState.retainRecoveryBackup}
           />
           </div>
         </div>

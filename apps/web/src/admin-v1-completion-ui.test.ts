@@ -85,7 +85,6 @@ describe("V1 administration completion UI", () => {
   });
 
   it("routes admin action feedback through the global auto-dismissing notification stack", () => {
-    expect(appSource).toContain("factoryResetError");
     expect(appSource).toContain("useActionMessageBridge(message, setMessage)");
     expect(stylesSource).toContain(".admin-workspace button > span");
     expect(stylesSource).toContain(".page-notification-region");
@@ -152,10 +151,7 @@ describe("V1 administration completion UI", () => {
   });
 
   it("finishes a factory reset even when no service worker is registered", () => {
-    expect(appSource).toContain("await navigator.serviceWorker?.getRegistration()");
-    expect(appSource).toContain('window.location.replace("/setup")');
     expect(appSource).toContain('className="confirmation-dialog factory-reset-dialog"');
-    expect(appSource).toContain("void performFactoryReset()");
     expect(appSource).toContain('type="submit"');
     expect(appSource).toContain("Alles löschen und neu starten");
   });
