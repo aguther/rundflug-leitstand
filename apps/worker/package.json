@@ -14,7 +14,7 @@
     "@rundflug/contracts": "1.12.0",
     "@rundflug/domain": "1.12.0",
     "fflate": "^0.8.3",
-    "hono": "^4.12.34",
+    "hono": "^4.13.0",
     "zod": "4.4.3"
   }
 }
