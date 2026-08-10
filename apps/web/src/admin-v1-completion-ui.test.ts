@@ -52,11 +52,9 @@ describe("V1 administration completion UI", () => {
     expect(appSource).toContain("onCreateOpenChange={setAccountCreateOpen}");
   });
 
-  it("suspends product weight controls while retaining compatible product payloads", () => {
+  it("keeps product weight controls suspended in the editor", () => {
     expect(appSource).not.toContain('label="Gewichtserfassung"');
     expect(appSource).not.toContain("Bei Kinderbuchungen auf Begleitung hinweisen");
-    expect(appSource).toContain("weightClasses: productWeightClasses");
-    expect(appSource).toContain("childCompanionRequired: productChildCompanion");
     expect(appSource.match(/<FieldLabel/g)?.length).toBeGreaterThan(30);
   });
 

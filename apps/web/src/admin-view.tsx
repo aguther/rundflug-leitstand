@@ -106,6 +106,7 @@ import { PilotCodesWorkspace } from "./features/admin/pilots/PilotCodesWorkspace
 import { usePilotEditorState } from "./features/admin/pilots/usePilotEditorState";
 import { ProductSalesDialog } from "./features/admin/products/ProductSalesDialog";
 import { ProductsWorkspace } from "./features/admin/products/ProductsWorkspace";
+import { useProductEditorState } from "./features/admin/products/useProductEditorState";
 import { ResourceGroupsWorkspace } from "./features/admin/resource-groups/ResourceGroupsWorkspace";
 import { AnalysisWorkspace } from "./features/analysis/AnalysisWorkspace";
 import { AccountManagement } from "./features/auth/AccountManagement";
@@ -142,7 +143,6 @@ import {
   rotationStatusLabel,
   useOperationBoard,
 } from "./operation-workspace";
-import { formatEuroInput, parseEuroToCents } from "./product-editor";
 import { ProductReferenceRotation } from "./product-reference-rotation";
 
 const adminTableCollator = new Intl.Collator("de-DE", {
@@ -401,20 +401,7 @@ export function AdminView() {
       .then((result) => setSetupRequired(result.setupRequired))
       .catch(() => setSetupRequired(false));
   }, [board]);
-  const [productEditorId, setProductEditorId] = useState("new");
-  const [productName, setProductName] = useState("");
-  const [productCode, setProductCode] = useState("");
-  const [productDescription, setProductDescription] = useState("");
-  const [productResourceGroupId, setProductResourceGroupId] = useState("");
-  const [productGateId, setProductGateId] = useState("");
-  const [productPriceInput, setProductPriceInput] = useState("0,00 €");
-  const [productReferenceDuration, setProductReferenceDuration] = useState(20);
-  const [productPromisedFlightMinutes, setProductPromisedFlightMinutes] = useState(20);
-  const [productBoardingOverride, setProductBoardingOverride] = useState("");
-  const [productDeboardingOverride, setProductDeboardingOverride] = useState("");
-  const [productBufferOverride, setProductBufferOverride] = useState("");
-  const [productChildCompanion, setProductChildCompanion] = useState(false);
-  const [productWeightClasses, setProductWeightClasses] = useState<string[]>(["NOT_CAPTURED"]);
+  const productEditor = useProductEditorState(board);
   const gateEditor = useGateEditorState(board?.gates);
   const [manifestTicketGroupId, setManifestTicketGroupId] = useState("");
   const [manifestTargetRotationId, setManifestTargetRotationId] = useState("");
@@ -433,22 +420,7 @@ export function AdminView() {
     masterDataCategory === "gates"
       ? gateEditor.snapshot
       : masterDataCategory === "products"
-        ? createMasterEditorSnapshot([
-            "products",
-            productName,
-            productCode,
-            productDescription,
-            productResourceGroupId,
-            productGateId,
-            productPriceInput,
-            productReferenceDuration,
-            productPromisedFlightMinutes,
-            productBoardingOverride,
-            productDeboardingOverride,
-            productBufferOverride,
-            productChildCompanion,
-            productWeightClasses,
-          ])
+        ? productEditor.snapshot
         : masterDataCategory === "resource-groups"
           ? createMasterEditorSnapshot([
               "resource-groups",
@@ -505,7 +477,7 @@ export function AdminView() {
   const [factoryResetCommandId, setFactoryResetCommandId] = useState(() => crypto.randomUUID());
   const resourceGroups = board?.resourceGroups ?? [];
   const isAdministrator = session?.account.role === "ADMIN" || board?.currentDeviceRole === "ADMIN";
-  const productPriceCents = parseEuroToCents(productPriceInput);
+  const productPriceCents = productEditor.priceCents;
   const manifestCandidates = manifestCorrectionCandidates(board?.rotations ?? []);
   const selectedManifestCandidate = manifestCandidates.find(
     (candidate) => candidate.ticketGroupId === manifestTicketGroupId,
@@ -1110,50 +1082,7 @@ export function AdminView() {
   }
 
   function selectProductForEditing(id: string) {
-    const entry = board?.products.find((product) => product.id === id);
-    const nextName = entry?.name ?? "";
-    const nextCode = entry?.code ?? "";
-    const nextDescription = entry?.publicDescription ?? "";
-    const nextResourceGroupId = entry?.resourceGroupId ?? resourceGroups[0]?.id ?? "";
-    const nextGateId = entry?.gateId ?? board?.gates.find((gate) => gate.active)?.id ?? "";
-    const nextPriceInput = formatEuroInput(entry?.priceCents ?? 0);
-    const nextReferenceDuration = entry?.referenceDurationMinutes ?? 20;
-    const nextPromisedFlightMinutes = entry?.promisedFlightMinutes ?? 20;
-    const nextBoardingOverride = entry?.plannedBoardingMinutesOverride?.toString() ?? "";
-    const nextDeboardingOverride = entry?.plannedDeboardingMinutesOverride?.toString() ?? "";
-    const nextBufferOverride = entry?.plannedBufferMinutesOverride?.toString() ?? "";
-    const nextChildCompanion = entry?.childCompanionRequired ?? false;
-    const nextWeightClasses = entry?.weightClasses ?? ["NOT_CAPTURED"];
-    initialMasterEditorSnapshotRef.current = createMasterEditorSnapshot([
-      "products",
-      nextName,
-      nextCode,
-      nextDescription,
-      nextResourceGroupId,
-      nextGateId,
-      nextPriceInput,
-      nextReferenceDuration,
-      nextPromisedFlightMinutes,
-      nextBoardingOverride,
-      nextDeboardingOverride,
-      nextBufferOverride,
-      nextChildCompanion,
-      nextWeightClasses,
-    ]);
-    setProductEditorId(id);
-    setProductName(nextName);
-    setProductCode(nextCode);
-    setProductDescription(nextDescription);
-    setProductResourceGroupId(nextResourceGroupId);
-    setProductGateId(nextGateId);
-    setProductPriceInput(nextPriceInput);
-    setProductReferenceDuration(nextReferenceDuration);
-    setProductPromisedFlightMinutes(nextPromisedFlightMinutes);
-    setProductBoardingOverride(nextBoardingOverride);
-    setProductDeboardingOverride(nextDeboardingOverride);
-    setProductBufferOverride(nextBufferOverride);
-    setProductChildCompanion(nextChildCompanion);
-    setProductWeightClasses(nextWeightClasses);
+    initialMasterEditorSnapshotRef.current = productEditor.select(id);
     setMasterSubmitAttempted(false);
     setMasterEditorTab("general");
     setMasterEditorOpen(true);
@@ -1248,8 +1177,8 @@ export function AdminView() {
   async function saveProduct() {
     if (
       !board ||
-      !productResourceGroupId ||
-      !productGateId ||
+      !productEditor.resourceGroupId ||
+      !productEditor.gateId ||
       productPriceCents === null ||
       adminPinRef.current.length < 4
     )
@@ -1264,28 +1193,29 @@ export function AdminView() {
           issuedAt: new Date().toISOString(),
           type: "UPSERT_PRODUCT",
           payload: {
-            productId: productEditorId === "new" ? crypto.randomUUID() : productEditorId,
-            resourceGroupId: productResourceGroupId,
-            gateId: productGateId,
-            name: productName.trim(),
-            code: productCode.trim().toUpperCase(),
-            publicDescription: productDescription.trim(),
+            productId:
+              productEditor.editorId === "new" ? crypto.randomUUID() : productEditor.editorId,
+            resourceGroupId: productEditor.resourceGroupId,
+            gateId: productEditor.gateId,
+            name: productEditor.name.trim(),
+            code: productEditor.code.trim().toUpperCase(),
+            publicDescription: productEditor.description.trim(),
             priceCents: productPriceCents,
             referenceCapacity:
-              resourceGroups.find((group) => group.id === productResourceGroupId)
+              resourceGroups.find((group) => group.id === productEditor.resourceGroupId)
                 ?.referenceCapacity ?? 1,
-            referenceDurationMinutes: productReferenceDuration,
-            promisedFlightMinutes: productPromisedFlightMinutes,
+            referenceDurationMinutes: productEditor.referenceDuration,
+            promisedFlightMinutes: productEditor.promisedFlightMinutes,
             plannedBoardingMinutesOverride:
-              productBoardingOverride === "" ? null : Number(productBoardingOverride),
+              productEditor.boardingOverride === "" ? null : Number(productEditor.boardingOverride),
             plannedDeboardingMinutesOverride:
-              productDeboardingOverride === "" ? null : Number(productDeboardingOverride),
+              productEditor.deboardingOverride === ""
+                ? null
+                : Number(productEditor.deboardingOverride),
             plannedBufferMinutesOverride:
-              productBufferOverride === "" ? null : Number(productBufferOverride),
-            childCompanionRequired: productChildCompanion,
-            weightClasses: productWeightClasses as Array<
-              "NOT_CAPTURED" | "CHILD" | "NORMAL" | "HEAVY" | "INDIVIDUAL"
-            >,
+              productEditor.bufferOverride === "" ? null : Number(productEditor.bufferOverride),
+            childCompanionRequired: productEditor.childCompanion,
+            weightClasses: productEditor.weightClasses,
             reason: MASTER_DATA_AUDIT_REASON,
             adminPin: adminPinRef.current,
           },
@@ -1891,15 +1821,15 @@ export function AdminView() {
   function requestProductSave() {
     setMasterSubmitAttempted(true);
     const invalidFieldId =
-      productName.trim().length < 2
+      productEditor.name.trim().length < 2
         ? "product-name"
-        : !/^[A-Z0-9-]{2,12}$/.test(productCode)
+        : !/^[A-Z0-9-]{2,12}$/.test(productEditor.code)
           ? "product-code"
           : productPriceCents === null
             ? "product-price"
-            : !productResourceGroupId
+            : !productEditor.resourceGroupId
               ? "product-resource-group"
-              : !productGateId
+              : !productEditor.gateId
                 ? "product-gate"
                 : null;
     if (invalidFieldId) {
@@ -2466,11 +2396,11 @@ export function AdminView() {
                 label: pilotEditor.code,
                 description: "Nur ohne Umlauf oder Flugzeugbindung möglich.",
               }
-            : masterDataCategory === "products" && productEditorId !== "new"
+            : masterDataCategory === "products" && productEditor.editorId !== "new"
               ? {
                   entityType: "PRODUCT",
-                  entityId: productEditorId,
-                  label: productName,
+                  entityId: productEditor.editorId,
+                  label: productEditor.name,
                   description: "Nur ohne Tickets oder Umläufe möglich.",
                 }
               : null;
@@ -3510,7 +3440,7 @@ export function AdminView() {
                 ? gateEditor.editorId === "new"
                   ? "Gate anlegen"
                   : "Gate bearbeiten"
-                : productEditorId === "new"
+                : productEditor.editorId === "new"
                   ? "Produkt anlegen"
                   : "Produkt bearbeiten"
             }
@@ -3748,10 +3678,10 @@ export function AdminView() {
                       />
                       <input
                         id="product-name"
-                        value={productName}
-                        onChange={(event) => setProductName(event.target.value)}
+                        value={productEditor.name}
+                        onChange={(event) => productEditor.setName(event.target.value)}
                       />
-                      {masterSubmitAttempted && productName.trim().length < 2 ? (
+                      {masterSubmitAttempted && productEditor.name.trim().length < 2 ? (
                         <span className="field-error">Mindestens 2 Zeichen eingeben.</span>
                       ) : null}
                     </div>
@@ -3763,11 +3693,12 @@ export function AdminView() {
                       />
                       <input
                         id="product-code"
-                        value={productCode}
+                        value={productEditor.code}
                         maxLength={12}
-                        onChange={(event) => setProductCode(event.target.value.toUpperCase())}
+                        onChange={(event) => productEditor.setCode(event.target.value)}
                       />
-                      {masterSubmitAttempted && !/^[A-Z0-9-]{2,12}$/.test(productCode) ? (
+                      {masterSubmitAttempted &&
+                      !/^[A-Z0-9-]{2,12}$/.test(productEditor.code) ? (
                         <span className="field-error">Zum Beispiel PAN20 oder KURZ-10.</span>
                       ) : null}
                     </div>
@@ -3780,12 +3711,9 @@ export function AdminView() {
                       <input
                         id="product-price"
                         inputMode="decimal"
-                        value={productPriceInput}
-                        onBlur={() => {
-                          const cents = parseEuroToCents(productPriceInput);
-                          if (cents !== null) setProductPriceInput(formatEuroInput(cents));
-                        }}
-                        onChange={(event) => setProductPriceInput(event.target.value)}
+                        value={productEditor.priceInput}
+                        onBlur={productEditor.normalizePrice}
+                        onChange={(event) => productEditor.setPriceInput(event.target.value)}
                       />
                       {masterSubmitAttempted && productPriceCents === null ? (
                         <span className="field-error">
@@ -3801,9 +3729,9 @@ export function AdminView() {
                       />
                       <input
                         id="product-description"
-                        value={productDescription}
+                        value={productEditor.description}
                         maxLength={240}
-                        onChange={(event) => setProductDescription(event.target.value)}
+                        onChange={(event) => productEditor.setDescription(event.target.value)}
                       />
                     </div>
                   </div>
@@ -3825,8 +3753,8 @@ export function AdminView() {
                       />
                       <select
                         id="product-resource-group"
-                        value={productResourceGroupId}
-                        onChange={(event) => setProductResourceGroupId(event.target.value)}
+                        value={productEditor.resourceGroupId}
+                        onChange={(event) => productEditor.setResourceGroupId(event.target.value)}
                       >
                         <option value="">Bitte wählen</option>
                         {resourceGroups.map((group) => (
@@ -3835,7 +3763,7 @@ export function AdminView() {
                           </option>
                         ))}
                       </select>
-                      {masterSubmitAttempted && !productResourceGroupId ? (
+                      {masterSubmitAttempted && !productEditor.resourceGroupId ? (
                         <span className="field-error">Eine Ressourcengruppe auswählen.</span>
                       ) : null}
                     </div>
@@ -3847,8 +3775,8 @@ export function AdminView() {
                       />
                       <select
                         id="product-gate"
-                        value={productGateId}
-                        onChange={(event) => setProductGateId(event.target.value)}
+                        value={productEditor.gateId}
+                        onChange={(event) => productEditor.setGateId(event.target.value)}
                       >
                         <option value="">Bitte wählen</option>
                         {board?.gates
@@ -3859,7 +3787,7 @@ export function AdminView() {
                             </option>
                           ))}
                       </select>
-                      {masterSubmitAttempted && !productGateId ? (
+                      {masterSubmitAttempted && !productEditor.gateId ? (
                         <span className="field-error">Ein aktives Gate auswählen.</span>
                       ) : null}
                     </div>
@@ -3874,9 +3802,9 @@ export function AdminView() {
                         type="number"
                         min="1"
                         max="600"
-                        value={productReferenceDuration}
+                        value={productEditor.referenceDuration}
                         onChange={(event) =>
-                          setProductReferenceDuration(Number(event.target.value))
+                          productEditor.setReferenceDuration(Number(event.target.value))
                         }
                       />
                     </div>
@@ -3891,9 +3819,9 @@ export function AdminView() {
                         type="number"
                         min="1"
                         max="600"
-                        value={productPromisedFlightMinutes}
+                        value={productEditor.promisedFlightMinutes}
                         onChange={(event) =>
-                          setProductPromisedFlightMinutes(Number(event.target.value))
+                          productEditor.setPromisedFlightMinutes(Number(event.target.value))
                         }
                       />
                     </div>
@@ -3907,24 +3835,24 @@ export function AdminView() {
                         id="product-boarding-override"
                         max="120"
                         min="0"
-                        onChange={(event) => setProductBoardingOverride(event.target.value)}
+                        onChange={(event) => productEditor.setBoardingOverride(event.target.value)}
                         placeholder={`Veranstaltung: ${board?.event.plannedBoardingMinutes ?? 8}`}
                         type="number"
-                        value={productBoardingOverride}
+                        value={productEditor.boardingOverride}
                       />
                       <small>
-                        Quelle: {productBoardingOverride === "" ? "Veranstaltung" : "Produkt"}
+                        Quelle: {productEditor.boardingOverride === "" ? "Veranstaltung" : "Produkt"}
                       </small>
                       <button
                         className="table-action"
                         onClick={() =>
-                          setProductBoardingOverride((current) =>
+                          productEditor.setBoardingOverride((current) =>
                             current === "" ? String(board?.event.plannedBoardingMinutes ?? 8) : "",
                           )
                         }
                         type="button"
                       >
-                        {productBoardingOverride === ""
+                        {productEditor.boardingOverride === ""
                           ? "Produktabweichung festlegen"
                           : "Produktabweichung entfernen"}
                       </button>
@@ -3939,24 +3867,25 @@ export function AdminView() {
                         id="product-deboarding-override"
                         max="120"
                         min="0"
-                        onChange={(event) => setProductDeboardingOverride(event.target.value)}
+                        onChange={(event) => productEditor.setDeboardingOverride(event.target.value)}
                         placeholder={`Veranstaltung: ${board?.event.plannedDeboardingMinutes ?? 5}`}
                         type="number"
-                        value={productDeboardingOverride}
+                        value={productEditor.deboardingOverride}
                       />
                       <small>
-                        Quelle: {productDeboardingOverride === "" ? "Veranstaltung" : "Produkt"}
+                        Quelle:{" "}
+                        {productEditor.deboardingOverride === "" ? "Veranstaltung" : "Produkt"}
                       </small>
                       <button
                         className="table-action"
                         onClick={() =>
-                          setProductDeboardingOverride((current) =>
+                          productEditor.setDeboardingOverride((current) =>
                             current === "" ? String(board?.event.plannedDeboardingMinutes ?? 5) : "",
                           )
                         }
                         type="button"
                       >
-                        {productDeboardingOverride === ""
+                        {productEditor.deboardingOverride === ""
                           ? "Produktabweichung festlegen"
                           : "Produktabweichung entfernen"}
                       </button>
@@ -3971,45 +3900,45 @@ export function AdminView() {
                         id="product-buffer-override"
                         max="120"
                         min="0"
-                        onChange={(event) => setProductBufferOverride(event.target.value)}
+                        onChange={(event) => productEditor.setBufferOverride(event.target.value)}
                         placeholder={`Veranstaltung: ${board?.event.plannedBufferMinutes ?? 3}`}
                         type="number"
-                        value={productBufferOverride}
+                        value={productEditor.bufferOverride}
                       />
                       <small>
-                        Quelle: {productBufferOverride === "" ? "Veranstaltung" : "Produkt"}
+                        Quelle: {productEditor.bufferOverride === "" ? "Veranstaltung" : "Produkt"}
                       </small>
                       <button
                         className="table-action"
                         onClick={() =>
-                          setProductBufferOverride((current) =>
+                          productEditor.setBufferOverride((current) =>
                             current === "" ? String(board?.event.plannedBufferMinutes ?? 3) : "",
                           )
                         }
                         type="button"
                       >
-                        {productBufferOverride === ""
+                        {productEditor.bufferOverride === ""
                           ? "Produktabweichung festlegen"
                           : "Produktabweichung entfernen"}
                       </button>
                     </div>
                     <ProductReferenceRotation
                       boardingMinutes={
-                        productBoardingOverride === ""
+                        productEditor.boardingOverride === ""
                           ? (board?.event.plannedBoardingMinutes ?? 8)
-                          : Number(productBoardingOverride)
+                          : Number(productEditor.boardingOverride)
                       }
                       bufferMinutes={
-                        productBufferOverride === ""
+                        productEditor.bufferOverride === ""
                           ? (board?.event.plannedBufferMinutes ?? 3)
-                          : Number(productBufferOverride)
+                          : Number(productEditor.bufferOverride)
                       }
                       deboardingMinutes={
-                        productDeboardingOverride === ""
+                        productEditor.deboardingOverride === ""
                           ? (board?.event.plannedDeboardingMinutes ?? 5)
-                          : Number(productDeboardingOverride)
+                          : Number(productEditor.deboardingOverride)
                       }
-                      offBlockToOnBlockMinutes={productReferenceDuration}
+                      offBlockToOnBlockMinutes={productEditor.referenceDuration}
                     />
                   </div>
                 </section>
