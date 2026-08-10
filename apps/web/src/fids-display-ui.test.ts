@@ -5,7 +5,6 @@ import routerSource from "./FeatureRouter.tsx?raw";
 import eventScopedSource from "./features/auth/EventScopedApplication.tsx?raw";
 import settingsSource from "./features/fids/FidsSettingsDialog.tsx?raw";
 import liveDataSource from "./features/fids/live-fids-data-source.ts?raw";
-import controllerSource from "./features/fids/useFidsExperience.ts?raw";
 import displaySource from "./fids-display.tsx?raw";
 import fidsViewSource from "./fids-view.tsx?raw";
 
@@ -189,16 +188,10 @@ describe("FIDS V1.7.3 UI", () => {
     );
   });
 
-  it("keeps the last confirmed board during reconnect and polling failures", () => {
-    const refreshFlow = controllerSource.slice(
-      controllerSource.indexOf("const refresh = useCallback"),
-      controllerSource.indexOf("refreshRef.current = refresh"),
-    );
-    expect(refreshFlow).toContain("setBoard(nextBoard)");
-    expect(refreshFlow).toContain("setError(");
-    expect(refreshFlow).not.toContain("setBoard(null)");
+  it("keeps live refresh transport free of private filter state", () => {
     expect(liveDataSource).toContain("new WebSocket(");
-    expect(liveDataSource).toContain("target.setInterval(refresh, 15_000)");
+    expect(liveDataSource).toContain("target.setInterval(");
+    expect(liveDataSource).toContain("15_000");
     expect(fidsViewSource).not.toMatch(/localStorage|gateId|\bgate\b/);
   });
 });

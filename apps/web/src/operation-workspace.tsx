@@ -20,6 +20,7 @@ import {
   realtimeStateChangeVersion,
   sendRealtimeHeartbeat,
 } from "./realtime-heartbeat";
+import { createRealtimeRefreshScheduler } from "./realtime-refresh-scheduler";
 
 export const EVENT_ID = resolveActiveEvent(
   window.location.search,
@@ -339,6 +340,10 @@ export function useOperationBoard(deviceId: string) {
     let reconnectTimer: number | null = null;
     let heartbeatTimer: number | null = null;
     let reconnectDelay = OPERATION_BOARD_RECONNECT_INITIAL_MS;
+    const realtimeRefreshScheduler = createRealtimeRefreshScheduler({
+      target: "operational",
+      refresh: ({ eventVersion, forceFollowUp }) => refresh(eventVersion ?? 0, forceFollowUp),
+    });
     const stopHeartbeat = () => {
       if (heartbeatTimer !== null) window.clearInterval(heartbeatTimer);
       heartbeatTimer = null;
@@ -355,13 +360,13 @@ export function useOperationBoard(deviceId: string) {
           () => sendRealtimeHeartbeat(socket),
           REALTIME_HEARTBEAT_INTERVAL_MS,
         );
-        void refresh();
+        void realtimeRefreshScheduler.refreshNow();
       });
       socket.addEventListener("message", (event) => {
         const changedVersion = realtimeStateChangeVersion(event.data);
         if (changedVersion === false) return;
         if (changedVersion !== null && changedVersion <= latestVersionRef.current) return;
-        void refresh(changedVersion ?? 0, changedVersion === null);
+        realtimeRefreshScheduler.schedule(changedVersion);
       });
       socket.addEventListener("close", () => {
         stopHeartbeat();
@@ -381,17 +386,21 @@ export function useOperationBoard(deviceId: string) {
         }),
       );
     });
-    void refresh();
+    void realtimeRefreshScheduler.refreshNow();
     connect();
-    const timer = window.setInterval(refresh, OPERATION_BOARD_POLL_INTERVAL_MS);
+    const timer = window.setInterval(
+      () => void realtimeRefreshScheduler.refreshNow(),
+      OPERATION_BOARD_POLL_INTERVAL_MS,
+    );
     return () => {
       active = false;
+      realtimeRefreshScheduler.dispose();
       socket?.close();
       stopHeartbeat();
       if (reconnectTimer !== null) window.clearTimeout(reconnectTimer);
       window.clearInterval(timer);
     };
-  }, [refresh, deviceId]);
+  }, [deviceId, refresh]);
   return { ...state, backendConfirmed, confirmEvent, refresh, refreshAndGet, refreshing };
 }
 

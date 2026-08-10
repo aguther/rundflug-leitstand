@@ -349,6 +349,11 @@
       "targetLines": 1500
     },
     {
+      "path": "apps/web/src/realtime-refresh-scheduler.ts",
+      "maxLines": 169,
+      "targetLines": 1500
+    },
+    {
       "path": "packages/contracts/src/event-auth.ts",
       "maxLines": 248,
       "targetLines": 1500
@@ -471,7 +476,6 @@
     "apps/web/src/fids-display-ui.test.ts -> apps/web/src/features/auth/EventScopedApplication.tsx",
     "apps/web/src/fids-display-ui.test.ts -> apps/web/src/features/fids/FidsSettingsDialog.tsx",
     "apps/web/src/fids-display-ui.test.ts -> apps/web/src/features/fids/live-fids-data-source.ts",
-    "apps/web/src/fids-display-ui.test.ts -> apps/web/src/features/fids/useFidsExperience.ts",
     "apps/web/src/fids-display-ui.test.ts -> apps/web/src/fids-display.tsx",
     "apps/web/src/fids-display-ui.test.ts -> apps/web/src/fids-view.tsx",
     "apps/web/src/flight-line-assist-ui.test.ts -> apps/web/src/FeatureRouter.tsx",

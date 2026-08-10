@@ -5,6 +5,11 @@ import type {
   FidsPreferences,
 } from "@rundflug/contracts";
 import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  createRealtimeRefreshScheduler,
+  type RealtimeRefreshRequest,
+  type RealtimeRefreshScheduler,
+} from "../../realtime-refresh-scheduler";
 import type {
   EditableFidsPreferences,
   FidsConnectionState,
@@ -76,6 +81,7 @@ export function useFidsExperience(input: {
   const departureTimerDataSource = useRef(input.dataSource);
   const attemptedDepartureExpiries = useRef(new Set<string>());
   const refreshRef = useRef<() => void>(() => undefined);
+  const refreshSchedulerRef = useRef<RealtimeRefreshScheduler | null>(null);
 
   useEffect(() => {
     const timer = window.setInterval(() => setClock(new Date()), 1_000);
@@ -120,14 +126,18 @@ export function useFidsExperience(input: {
     };
   }, [input.dataSource]);
 
-  const refresh = useCallback(() => {
-    request.current?.abort();
-    const controller = new AbortController();
-    request.current = controller;
-    void input.dataSource
-      .loadBoard({ page, lowerPage, signal: controller.signal })
-      .then((nextBoard) => {
-        if (controller.signal.aborted) return;
+  const loadBoard = useCallback(
+    async (refreshRequest: RealtimeRefreshRequest) => {
+      request.current?.abort();
+      const controller = new AbortController();
+      request.current = controller;
+      try {
+        const nextBoard = await input.dataSource.loadBoard({
+          page,
+          lowerPage,
+          signal: controller.signal,
+        });
+        if (controller.signal.aborted || !refreshRequest.isCurrent()) return;
         const lastValidLowerPage = Math.max(1, nextBoard.page.totalPages);
         if (nextBoard.viewMode === "SPLIT" && nextBoard.page.requestedPage > lastValidLowerPage) {
           setLowerPage(1);
@@ -157,24 +167,47 @@ export function useFidsExperience(input: {
         }
         setBoard(nextBoard);
         setError(null);
-      })
-      .catch((cause) => {
-        if (controller.signal.aborted) return;
+      } catch (cause) {
+        if (controller.signal.aborted || !refreshRequest.isCurrent()) return;
         setError(cause instanceof Error ? cause.message : "FIDS-Anzeige nicht verfügbar.");
-      });
-  }, [input.dataSource, lowerPage, page]);
+      }
+    },
+    [input.dataSource, lowerPage, page],
+  );
+  const loadBoardRef = useRef(loadBoard);
+  const refresh = useCallback(() => {
+    void refreshSchedulerRef.current?.refreshNow();
+  }, []);
   refreshRef.current = refresh;
 
   useEffect(() => {
-    refresh();
+    const refreshScheduler = createRealtimeRefreshScheduler({
+      target: "public",
+      refresh: (refreshRequest) => loadBoardRef.current(refreshRequest),
+    });
+    refreshSchedulerRef.current = refreshScheduler;
     return () => {
+      if (refreshSchedulerRef.current === refreshScheduler) refreshSchedulerRef.current = null;
+      refreshScheduler.dispose();
       request.current?.abort();
       if (highlightTimer.current !== null) window.clearTimeout(highlightTimer.current);
     };
-  }, [refresh]);
+  }, []);
+
+  useEffect(() => {
+    loadBoardRef.current = loadBoard;
+    refresh();
+  }, [loadBoard, refresh]);
 
   useEffect(
-    () => input.dataSource.subscribe(() => refreshRef.current(), setConnection),
+    () =>
+      input.dataSource.subscribe((refreshRequest) => {
+        if (refreshRequest?.mode === "realtime") {
+          refreshSchedulerRef.current?.schedule(refreshRequest.eventVersion);
+          return;
+        }
+        void refreshSchedulerRef.current?.refreshNow();
+      }, setConnection),
     [input.dataSource],
   );
 

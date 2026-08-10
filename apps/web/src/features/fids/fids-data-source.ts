@@ -14,6 +14,10 @@ export interface FidsConnectionState {
   tone: "connected" | "offline" | "simulation";
 }
 
+export type FidsRefreshRequest =
+  | { mode: "immediate" }
+  | { mode: "realtime"; eventVersion: number | null };
+
 export interface FidsDataSource {
   readonly kind: "live" | "simulation";
   readonly initialConnection: FidsConnectionState;
@@ -25,7 +29,7 @@ export interface FidsDataSource {
     expectedVersion: number,
   ): Promise<FidsPreferences>;
   subscribe(
-    refresh: () => void,
+    refresh: (request?: FidsRefreshRequest) => void,
     connectionChanged: (state: FidsConnectionState) => void,
   ): () => void;
 }

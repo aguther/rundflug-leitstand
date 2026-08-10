@@ -16,10 +16,14 @@ import {
 import { usePublicPush } from "./features/public-status/use-public-push";
 import { usePublicStatusManifest } from "./features/public-status/use-public-status-manifest";
 import {
-  isRealtimeStateChange,
   REALTIME_HEARTBEAT_INTERVAL_MS,
+  realtimeStateChangeVersion,
   sendRealtimeHeartbeat,
 } from "./realtime-heartbeat";
+import {
+  createRealtimeRefreshScheduler,
+  type RealtimeRefreshRequest,
+} from "./realtime-refresh-scheduler";
 
 export function GroupStatusView({ code }: { code: string }) {
   const [status, setStatus] = useState<PublicGroupStatus | null>(null);
@@ -38,20 +42,26 @@ export function GroupStatusView({ code }: { code: string }) {
       if (heartbeatTimer !== null) window.clearInterval(heartbeatTimer);
       heartbeatTimer = null;
     };
-    const refresh = () =>
+    const refresh = (refreshRequest?: RealtimeRefreshRequest) =>
       getPublicGroupStatus(code, controller.signal)
         .then((nextStatus) => {
-          if (active) {
+          if (active && (refreshRequest?.isCurrent() ?? true)) {
             setStatus(nextStatus);
             setError(null);
           }
           return nextStatus;
         })
         .catch((reason) => {
-          if (active)
+          if (active && (refreshRequest?.isCurrent() ?? true))
             setError(reason instanceof Error ? reason.message : "Status nicht verfügbar.");
           return null;
         });
+    const refreshScheduler = createRealtimeRefreshScheduler({
+      target: "public",
+      refresh: async (refreshRequest) => {
+        await refresh(refreshRequest);
+      },
+    });
     const connect = (eventId: string) => {
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
       socket = new WebSocket(
@@ -64,10 +74,11 @@ export function GroupStatusView({ code }: { code: string }) {
           () => sendRealtimeHeartbeat(socket),
           REALTIME_HEARTBEAT_INTERVAL_MS,
         );
-        void refresh();
+        void refreshScheduler.refreshNow();
       });
       socket.addEventListener("message", (event) => {
-        if (isRealtimeStateChange(event.data)) void refresh();
+        const eventVersion = realtimeStateChangeVersion(event.data);
+        if (eventVersion !== false) refreshScheduler.schedule(eventVersion);
       });
       socket.addEventListener("close", () => {
         stopHeartbeat();
@@ -80,9 +91,13 @@ export function GroupStatusView({ code }: { code: string }) {
     void refresh().then((nextStatus) => {
       if (nextStatus && active) connect(nextStatus.eventId);
     });
-    const timer = window.setInterval(() => void refresh(), OPERATION_BOARD_POLL_INTERVAL_MS);
+    const timer = window.setInterval(
+      () => void refreshScheduler.refreshNow(),
+      OPERATION_BOARD_POLL_INTERVAL_MS,
+    );
     return () => {
       active = false;
+      refreshScheduler.dispose();
       controller.abort();
       socket?.close();
       stopHeartbeat();

@@ -3,7 +3,7 @@
 import type { FidsBoardResponse, FidsBoardRow, FidsPreferences } from "@rundflug/contracts";
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { FidsDataSource } from "./fids-data-source";
+import type { FidsDataSource, FidsRefreshRequest } from "./fids-data-source";
 import type { FidsLocationAdapter } from "./fids-location";
 import { useFidsExperience } from "./useFidsExperience";
 
@@ -180,6 +180,33 @@ describe("shared FIDS experience", () => {
     act(() => triggerRefresh());
     await waitFor(() => expect(screen.getByTestId("error").textContent).toBe("Offline"));
     expect(screen.getByTestId("lower-row").textContent).toBe("lower-1");
+  });
+
+  it("delays and coalesces realtime board refreshes", async () => {
+    vi.useFakeTimers();
+    let triggerRefresh: (request?: FidsRefreshRequest) => void = () => undefined;
+    const loadBoard = vi.fn(async ({ lowerPage }: { lowerPage: number }) => splitBoard(lowerPage));
+    const source = dataSource(loadBoard);
+    source.subscribe = (refresh) => {
+      triggerRefresh = refresh;
+      return () => undefined;
+    };
+    render(<Harness dataSource={source} />);
+    await act(async () => Promise.resolve());
+    expect(loadBoard).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      triggerRefresh({ mode: "realtime", eventVersion: 17 });
+      triggerRefresh({ mode: "realtime", eventVersion: 19 });
+      triggerRefresh({ mode: "realtime", eventVersion: 18 });
+    });
+    expect(loadBoard).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      vi.advanceTimersByTime(750);
+      await Promise.resolve();
+    });
+    expect(loadBoard).toHaveBeenCalledTimes(2);
   });
 
   it("refreshes once just after the next visible departure expiry", async () => {

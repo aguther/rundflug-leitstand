@@ -5,8 +5,8 @@ import {
   updateFidsPreferences,
 } from "../../api";
 import {
-  isRealtimeStateChange,
   REALTIME_HEARTBEAT_INTERVAL_MS,
+  realtimeStateChangeVersion,
   sendRealtimeHeartbeat,
 } from "../../realtime-heartbeat";
 import type { FidsDataSource } from "./fids-data-source";
@@ -47,10 +47,11 @@ export function createLiveFidsDataSource(eventId: string, target: Window = windo
             () => sendRealtimeHeartbeat(socket),
             REALTIME_HEARTBEAT_INTERVAL_MS,
           );
-          refresh();
+          refresh({ mode: "immediate" });
         });
         socket.addEventListener("message", (event) => {
-          if (isRealtimeStateChange(event.data)) refresh();
+          const eventVersion = realtimeStateChangeVersion(event.data);
+          if (eventVersion !== false) refresh({ mode: "realtime", eventVersion });
         });
         socket.addEventListener("close", () => {
           stopHeartbeat();
@@ -62,7 +63,7 @@ export function createLiveFidsDataSource(eventId: string, target: Window = windo
         socket.addEventListener("error", () => socket?.close());
       };
       connect();
-      const pollingTimer = target.setInterval(refresh, 15_000);
+      const pollingTimer = target.setInterval(() => refresh({ mode: "immediate" }), 15_000);
       return () => {
         active = false;
         socket?.close();
