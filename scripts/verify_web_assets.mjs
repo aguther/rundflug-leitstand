@@ -1,0 +1,228 @@
+import { execFileSync } from "node:child_process";
+import { readFile, stat, writeFile } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { gzipSync } from "node:zlib";
+
+const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+
+export const WEB_ASSET_BUDGETS = {
+  globalCss: { rawBytes: 120 * 1024, gzipBytes: 24 * 1024 },
+  flightLineCss: { rawBytes: 100 * 1024, gzipBytes: 18 * 1024 },
+  adminEntry: { rawBytes: 180 * 1024, gzipBytes: 48 * 1024 },
+  mainEntry: { rawBytes: 215 * 1024, gzipBytes: 68 * 1024 },
+  largestJavaScriptChunk: { rawBytes: 360 * 1024, gzipBytes: 105 * 1024 },
+  pwaPrecache: { rawBytes: Math.floor(1.6 * 1024 * 1024) },
+};
+
+export const WEB_ROUTE_ENTRIES = {
+  admin: "src/admin-view.tsx",
+  cashier: "src/cashier-view.tsx",
+  fids: "src/fids-view.tsx",
+  flightLine: "src/flight-line-view.tsx",
+  groupStatus: "src/group-status-view.tsx",
+  privacy: "src/privacy-view.tsx",
+  setup: "src/setup-view.tsx",
+  simulation: "src/features/forecast-simulation/ForecastSimulationView.tsx",
+  ticketStatus: "src/ticket-status-view.tsx",
+};
+
+const ENTRY_KEY = "index.html";
+const ROUTER_KEY = "src/FeatureRouter.tsx";
+const defaultDistDirectory = resolve(repositoryRoot, "apps/web/dist");
+const defaultBaselinePath = resolve(repositoryRoot, "scripts/data/web-asset-baseline-5e1dce.json");
+
+function formatKilobytes(bytes) {
+  return `${(bytes / 1024).toFixed(2)} KiB`;
+}
+
+function requireManifestEntry(manifest, key) {
+  const entry = manifest[key];
+  if (!entry) throw new Error(`Vite manifest entry is missing: ${key}`);
+  return entry;
+}
+
+export function collectManifestFiles(manifest, entryKeys) {
+  const files = new Set();
+  const visited = new Set();
+  const pending = [...entryKeys];
+  while (pending.length > 0) {
+    const key = pending.pop();
+    if (!key || visited.has(key)) continue;
+    visited.add(key);
+    const entry = requireManifestEntry(manifest, key);
+    if (entry.file) files.add(entry.file);
+    for (const file of entry.css ?? []) files.add(file);
+    for (const file of entry.assets ?? []) files.add(file);
+    for (const importedKey of entry.imports ?? []) pending.push(importedKey);
+  }
+  return [...files].sort();
+}
+
+async function measureFiles(distDirectory, files) {
+  let rawBytes = 0;
+  let gzipBytes = 0;
+  for (const file of files) {
+    const content = await readFile(resolve(distDirectory, file));
+    rawBytes += content.byteLength;
+    gzipBytes += gzipSync(content).byteLength;
+  }
+  return { rawBytes, gzipBytes };
+}
+
+async function measureManifestEntryFile(distDirectory, manifest, key) {
+  const entry = requireManifestEntry(manifest, key);
+  return measureFiles(distDirectory, [entry.file]);
+}
+
+async function measureManifestEntryCss(distDirectory, manifest, key) {
+  const entry = requireManifestEntry(manifest, key);
+  return measureFiles(distDirectory, entry.css ?? []);
+}
+
+function extractPrecacheUrls(serviceWorkerSource) {
+  const match = serviceWorkerSource.match(/precacheAndRoute\((\[[\s\S]*?\]),\{\}\)/);
+  if (!match) throw new Error("PWA precache manifest is missing from sw.js");
+  const urls = [...match[1].matchAll(/\{url:"([^"]+)"/g)].map((entry) => entry[1]);
+  if (urls.length === 0) throw new Error("PWA precache manifest contains no URLs");
+  return urls;
+}
+
+async function readSourceRevision() {
+  return execFileSync("git", ["rev-parse", "HEAD"], {
+    cwd: repositoryRoot,
+    encoding: "utf8",
+  }).trim();
+}
+
+export async function createWebAssetReport({
+  distDirectory = defaultDistDirectory,
+  sourceRevision,
+} = {}) {
+  const manifest = JSON.parse(
+    await readFile(resolve(distDirectory, ".vite/manifest.json"), "utf8"),
+  );
+  const globalCss = await measureManifestEntryCss(distDirectory, manifest, ENTRY_KEY);
+  const flightLineCss = await measureManifestEntryCss(
+    distDirectory,
+    manifest,
+    WEB_ROUTE_ENTRIES.flightLine,
+  );
+  const adminEntry = await measureManifestEntryFile(
+    distDirectory,
+    manifest,
+    WEB_ROUTE_ENTRIES.admin,
+  );
+  const mainEntry = await measureManifestEntryFile(distDirectory, manifest, ENTRY_KEY);
+  const javascriptFiles = [
+    ...new Set(
+      Object.values(manifest)
+        .map((entry) => entry.file)
+        .filter((file) => file?.endsWith(".js")),
+    ),
+  ];
+  let largestJavaScriptChunk = { file: "", rawBytes: 0, gzipBytes: 0 };
+  for (const file of javascriptFiles) {
+    const measured = await measureFiles(distDirectory, [file]);
+    if (measured.rawBytes > largestJavaScriptChunk.rawBytes) {
+      largestJavaScriptChunk = { file, ...measured };
+    }
+  }
+  const serviceWorkerSource = await readFile(resolve(distDirectory, "sw.js"), "utf8");
+  const precacheFiles = extractPrecacheUrls(serviceWorkerSource);
+  const pwaPrecache = {
+    entries: precacheFiles.length,
+    rawBytes: (await Promise.all(precacheFiles.map((file) => stat(resolve(distDirectory, file)))))
+      .map((file) => file.size)
+      .reduce((sum, size) => sum + size, 0),
+  };
+  const routes = {};
+  for (const [route, routeEntry] of Object.entries(WEB_ROUTE_ENTRIES)) {
+    const files = collectManifestFiles(manifest, [ENTRY_KEY, ROUTER_KEY, routeEntry]);
+    routes[route] = { files, ...(await measureFiles(distDirectory, files)) };
+  }
+  return {
+    schemaVersion: 1,
+    sourceRevision: sourceRevision ?? (await readSourceRevision()),
+    assets: {
+      globalCss,
+      flightLineCss,
+      adminEntry,
+      mainEntry,
+      largestJavaScriptChunk,
+      pwaPrecache,
+    },
+    routes,
+  };
+}
+
+function compareMetric(failures, label, actual, maximum) {
+  for (const metric of ["rawBytes", "gzipBytes"]) {
+    if (maximum[metric] !== undefined && actual[metric] > maximum[metric]) {
+      failures.push(
+        `${label} ${metric} is ${formatKilobytes(actual[metric])}; budget is ${formatKilobytes(maximum[metric])}`,
+      );
+    }
+  }
+}
+
+export function verifyWebAssetReport(report, baseline, budgets = WEB_ASSET_BUDGETS) {
+  const failures = [];
+  for (const [asset, budget] of Object.entries(budgets)) {
+    compareMetric(failures, asset, report.assets[asset], budget);
+  }
+  for (const [route, baselineMetrics] of Object.entries(baseline.routes)) {
+    const actual = report.routes[route];
+    if (!actual) {
+      failures.push(`Route is missing from the current asset report: ${route}`);
+      continue;
+    }
+    compareMetric(failures, `${route} initial route`, actual, {
+      rawBytes: Math.floor(baselineMetrics.rawBytes * 1.02),
+      gzipBytes: Math.floor(baselineMetrics.gzipBytes * 1.02),
+    });
+  }
+  return failures;
+}
+
+function printReport(report) {
+  for (const [asset, metrics] of Object.entries(report.assets)) {
+    const gzip =
+      metrics.gzipBytes === undefined ? "" : ` / ${formatKilobytes(metrics.gzipBytes)} gzip`;
+    console.log(`${asset}: ${formatKilobytes(metrics.rawBytes)} raw${gzip}`);
+  }
+  for (const [route, metrics] of Object.entries(report.routes)) {
+    console.log(
+      `route ${route}: ${formatKilobytes(metrics.rawBytes)} raw / ${formatKilobytes(metrics.gzipBytes)} gzip`,
+    );
+  }
+}
+
+async function run() {
+  const args = process.argv.slice(2);
+  const distIndex = args.indexOf("--dist");
+  const distDirectory =
+    distIndex >= 0 ? resolve(repositoryRoot, args[distIndex + 1]) : defaultDistDirectory;
+  const baselineIndex = args.indexOf("--write-baseline");
+  const report = await createWebAssetReport({
+    distDirectory,
+    sourceRevision: baselineIndex >= 0 ? args[baselineIndex + 1] : undefined,
+  });
+  printReport(report);
+  if (baselineIndex >= 0) {
+    await writeFile(defaultBaselinePath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
+    console.log(`Wrote baseline snapshot: ${defaultBaselinePath}`);
+    return;
+  }
+  if (args.includes("--report-only")) return;
+  const baseline = JSON.parse(await readFile(defaultBaselinePath, "utf8"));
+  const failures = verifyWebAssetReport(report, baseline);
+  if (failures.length > 0) {
+    throw new Error(`Web asset budgets failed:\n- ${failures.join("\n- ")}`);
+  }
+  console.log("Web asset budgets passed.");
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  await run();
+}

@@ -72,6 +72,9 @@ export default defineConfig(({ mode }) => {
     }),
   );
   return {
+    build: {
+      manifest: true,
+    },
     define: {
       "import.meta.env.SOURCE_REVISION": JSON.stringify(sourceRevision),
     },
