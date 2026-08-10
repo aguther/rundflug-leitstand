@@ -38,8 +38,6 @@ describe("V1 administration completion UI", () => {
 
   it("uses the authenticated administrator session for normal changes", () => {
     expect(appSource).toContain("const { session, logout } = useAuth()");
-    expect(appSource).toContain('useState(session?.account.role === "ADMIN" ? "000000" : "")');
-    expect(appSource).toContain('useState(session?.account.role === "ADMIN")');
     expect(appSource).toContain("<AccountManagement");
     expect(appSource).toContain("createOpen={accountCreateOpen}");
     expect(appSource).toContain("onCreateOpenChange={setAccountCreateOpen}");

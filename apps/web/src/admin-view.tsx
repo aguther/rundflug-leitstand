@@ -16,7 +16,6 @@ import {
   removeEventLogo,
   sendCommand,
   uploadEventLogo,
-  verifyAdminPin,
 } from "./api";
 import { AppShell as Shell } from "./app/AppShell";
 import { PageNotice, useActionMessageBridge } from "./app/PageNotifications";
@@ -93,6 +92,7 @@ import { ProductsWorkspace } from "./features/admin/products/ProductsWorkspace";
 import { useProductEditorState } from "./features/admin/products/useProductEditorState";
 import { ResourceGroupsWorkspace } from "./features/admin/resource-groups/ResourceGroupsWorkspace";
 import { useResourceGroupEditorState } from "./features/admin/resource-groups/useResourceGroupEditorState";
+import { useAdminAuthorization } from "./features/admin/useAdminAuthorization";
 import { useAdminFactoryReset } from "./features/admin/useAdminFactoryReset";
 import { AnalysisWorkspace } from "./features/analysis/AnalysisWorkspace";
 import { AccountManagement } from "./features/auth/AccountManagement";
@@ -216,20 +216,8 @@ export function AdminView() {
     aircraftId: initialAdminParams.get("aircraftId") ?? "",
     handled: false,
   });
-  const [adminPin, setAdminPinState] = useState(session?.account.role === "ADMIN" ? "000000" : "");
-  const adminPinRef = useRef(session?.account.role === "ADMIN" ? "000000" : "");
-  const setAdminPin = useCallback((value: string) => {
-    adminPinRef.current = value;
-    setAdminPinState(value);
-  }, []);
-  const [adminModeUnlocked, setAdminModeUnlocked] = useState(session?.account.role === "ADMIN");
-  const [adminPinDialog, setAdminPinDialog] = useState<"unlock" | "action" | null>(null);
-  const [adminPinError, setAdminPinError] = useState<string | null>(null);
-  const [adminPinBusy, setAdminPinBusy] = useState(false);
   const [busyActionKey, setBusyActionKey] = useState<string | null>(null);
   const [logoutBusy, setLogoutBusy] = useState(false);
-  const pendingAdminActionRef = useRef<(() => Promise<void>) | null>(null);
-  const adminPinInputRef = useRef<HTMLInputElement>(null);
   const initialMasterSelectionRef = useRef(false);
   const [assignmentDialogContext, setAssignmentDialogContext] =
     useState<AircraftResourceGroupAssignmentContext | null>(null);
@@ -348,6 +336,26 @@ export function AdminView() {
   const [eventDialogView, setEventDialogView] = useState<"closed" | "catalog" | "create">("closed");
   const resourceGroups = board?.resourceGroups ?? [];
   const isAdministrator = session?.account.role === "ADMIN" || board?.currentDeviceRole === "ADMIN";
+  const {
+    busy: adminPinBusy,
+    clearPinWhenLocked,
+    closeDialog: closeAdminPinDialog,
+    confirmDialog: confirmAdminPinDialog,
+    dialogMode: adminPinDialog,
+    error: adminPinError,
+    getPin: getAdminPin,
+    inputRef: adminPinInputRef,
+    lockMode: lockAdminMode,
+    modeUnlocked: adminModeUnlocked,
+    pin: adminPin,
+    requestAction: requestAdminAction,
+    requestModeUnlock: requestAdminModeUnlock,
+    setPin: setAdminPin,
+  } = useAdminAuthorization({
+    accountIsAdministrator: session?.account.role === "ADMIN",
+    administrator: isAdministrator,
+    onMessage: setMessage,
+  });
   const productPriceCents = productEditor.priceCents;
   const eventVersion = board?.event.version;
   const eventCatalog = useAdminEventCatalog({
@@ -378,7 +386,7 @@ export function AdminView() {
   } = useAdminMasterDataDeletion({
     adminModeUnlocked,
     board,
-    getAdminPin: () => adminPinRef.current,
+    getAdminPin,
     onClearAdminPin: () => setAdminPin(""),
     onEditorOpenChange: setMasterEditorOpen,
     onFinishEditor: finishMasterEditor,
@@ -415,101 +423,8 @@ export function AdminView() {
     return () => window.cancelAnimationFrame(frame);
   }, [board, eventStep]);
 
-  useEffect(() => {
-    if (!adminPinDialog) return;
-    const frame = window.requestAnimationFrame(() => adminPinInputRef.current?.focus());
-    return () => window.cancelAnimationFrame(frame);
-  }, [adminPinDialog]);
-
-  useEffect(() => {
-    if (session?.account.role !== "ADMIN") return;
-    setAdminModeUnlocked(true);
-    setAdminPin("000000");
-  }, [session?.account.role, setAdminPin]);
-
-  useEffect(() => {
-    if (isAdministrator) return;
-    setAdminModeUnlocked(false);
-    setAdminPin("");
-  }, [isAdministrator, setAdminPin]);
-  function lockAdminMode(messageText = "Bearbeitungsmodus gesperrt.") {
-    setAdminModeUnlocked(false);
-    setAdminPin("");
-    setAdminPinDialog(null);
-    pendingAdminActionRef.current = null;
-    setMessage(messageText);
-  }
-
-  function closeAdminPinDialog() {
-    if (adminPinBusy) return;
-    setAdminPinDialog(null);
-    setAdminPinError(null);
-    setAdminPin("");
-    pendingAdminActionRef.current = null;
-  }
-
-  function requestAdminAction(action: () => Promise<void>): void | Promise<void> {
-    if (!isAdministrator) {
-      setMessage("Für diese Änderung wird ein Administrationskonto benötigt.");
-      return;
-    }
-    if (
-      session?.account.role === "ADMIN" ||
-      (adminModeUnlocked && adminPinRef.current.length >= 4)
-    ) {
-      return action();
-    }
-    pendingAdminActionRef.current = action;
-    setAdminPin("");
-    setAdminPinError(null);
-    setAdminPinDialog("action");
-  }
-
-  function requestAdminModeUnlock() {
-    if (!isAdministrator) {
-      setMessage("Der Bearbeitungsmodus ist nur mit einer Administrationssitzung verfügbar.");
-      return;
-    }
-    if (session?.account.role === "ADMIN") {
-      setAdminModeUnlocked(true);
-      setAdminPin("000000");
-      return;
-    }
-    pendingAdminActionRef.current = null;
-    setAdminPin("");
-    setAdminPinError(null);
-    setAdminPinDialog("unlock");
-  }
-
-  async function confirmAdminPinDialog() {
-    if (!adminPinDialog || adminPinBusy || adminPin.length < 4) return;
-    setAdminPinBusy(true);
-    setAdminPinError(null);
-    try {
-      await verifyAdminPin(EVENT_ID, ADMIN_DEVICE_ID, deviceTokenFor(ADMIN_DEVICE_ID), adminPin);
-      if (adminPinDialog === "unlock") {
-        setAdminModeUnlocked(true);
-        setAdminPinDialog(null);
-        setMessage("Bearbeitungsmodus aktiv. Mehrere Änderungen können gespeichert werden.");
-        return;
-      }
-      const action = pendingAdminActionRef.current;
-      pendingAdminActionRef.current = null;
-      setAdminPinDialog(null);
-      if (action) await action();
-      setAdminPin("");
-    } catch (cause) {
-      setAdminPinError(
-        cause instanceof Error ? cause.message : "Administrator-PIN konnte nicht geprüft werden.",
-      );
-      window.requestAnimationFrame(() => adminPinInputRef.current?.select());
-    } finally {
-      setAdminPinBusy(false);
-    }
-  }
-
   async function setEventLifecycle(status: "PREPARATION" | "ACTIVE" | "CLOSED" | "ARCHIVED") {
-    if (!board || adminPinRef.current.length < 4) return;
+    if (!board || getAdminPin().length < 4) return;
     try {
       await sendCommand(
         {
@@ -522,13 +437,13 @@ export function AdminView() {
           payload: {
             status,
             reason: ADMIN_CONFIGURATION_AUDIT_REASON,
-            adminPin: adminPinRef.current,
+            adminPin: getAdminPin(),
           },
         },
         deviceTokenFor(ADMIN_DEVICE_ID),
       );
       setMessage(`Veranstaltungsstatus auf ${status} gesetzt und protokolliert.`);
-      if (!adminModeUnlocked) setAdminPin("");
+      clearPinWhenLocked();
       await refresh();
       await eventCatalog.refreshEvents();
     } catch (cause) {
@@ -542,7 +457,7 @@ export function AdminView() {
   ) {
     void requestAdminAction(() =>
       runBusyAction("event-parameters", async () => {
-        if (!board || adminPinRef.current.length < 4) return;
+        if (!board || getAdminPin().length < 4) return;
         try {
           await sendCommand(
             {
@@ -555,14 +470,14 @@ export function AdminView() {
               payload: {
                 ...payload,
                 reason: ADMIN_CONFIGURATION_AUDIT_REASON,
-                adminPin: adminPinRef.current,
+                adminPin: getAdminPin(),
               },
             },
             deviceTokenFor(ADMIN_DEVICE_ID),
           );
           lifecycle.onSaved();
           setMessage("Veranstaltungsparameter wurden protokolliert aktualisiert.");
-          if (!adminModeUnlocked) setAdminPin("");
+          clearPinWhenLocked();
           await Promise.all([refresh(), refreshHistory()]);
         } catch (cause) {
           if (
@@ -632,7 +547,7 @@ export function AdminView() {
   }
 
   async function saveGate() {
-    if (!board || gateEditor.label.trim().length < 2 || adminPinRef.current.length < 4) return;
+    if (!board || gateEditor.label.trim().length < 2 || getAdminPin().length < 4) return;
     try {
       await sendCommand(
         {
@@ -651,13 +566,13 @@ export function AdminView() {
             travelLeadMinutes: gateEditor.travelLeadMinutes,
             displayFilter: gateEditor.displayFilter,
             reason: MASTER_DATA_AUDIT_REASON,
-            adminPin: adminPinRef.current,
+            adminPin: getAdminPin(),
           },
         },
         deviceTokenFor(ADMIN_DEVICE_ID),
       );
       setMessage("Gate-Stammdaten wurden protokolliert gespeichert.");
-      if (!adminModeUnlocked) setAdminPin("");
+      clearPinWhenLocked();
       finishMasterEditor();
       gateEditor.resetAfterSave();
       await refresh();
@@ -677,7 +592,7 @@ export function AdminView() {
       !ticketGroupId ||
       !targetRotationId ||
       correctionReason.trim().length < 10 ||
-      adminPinRef.current.length < 4
+      getAdminPin().length < 4
     )
       return;
     try {
@@ -693,14 +608,14 @@ export function AdminView() {
             ticketGroupId,
             targetRotationId,
             reason: correctionReason.trim(),
-            adminPin: adminPinRef.current,
+            adminPin: getAdminPin(),
           },
         },
         deviceTokenFor(ADMIN_DEVICE_ID),
       );
       setManifestCorrectionResetKey((current) => current + 1);
       setMessage("Dokumentierte Besetzung wurde als Admin-Korrektur vollständig auditiert.");
-      if (!adminModeUnlocked) setAdminPin("");
+      clearPinWhenLocked();
       await refresh();
       await refreshHistory();
     } catch (cause) {
@@ -718,7 +633,7 @@ export function AdminView() {
       !productEditor.resourceGroupId ||
       !productEditor.gateId ||
       productPriceCents === null ||
-      adminPinRef.current.length < 4
+      getAdminPin().length < 4
     )
       return;
     try {
@@ -755,13 +670,13 @@ export function AdminView() {
             childCompanionRequired: productEditor.childCompanion,
             weightClasses: productEditor.weightClasses,
             reason: MASTER_DATA_AUDIT_REASON,
-            adminPin: adminPinRef.current,
+            adminPin: getAdminPin(),
           },
         },
         deviceTokenFor(ADMIN_DEVICE_ID),
       );
       setMessage("Produktstammdaten wurden protokolliert gespeichert.");
-      if (!adminModeUnlocked) setAdminPin("");
+      clearPinWhenLocked();
       selectProductForEditing("new");
       finishMasterEditor();
       await refresh();
@@ -800,7 +715,7 @@ export function AdminView() {
                 productId,
                 expectedOverrideVersion: existing.version,
                 reason: MASTER_DATA_AUDIT_REASON,
-                adminPin: adminPinRef.current,
+                adminPin: getAdminPin(),
               },
             }
           : {
@@ -818,7 +733,7 @@ export function AdminView() {
                 plannedBufferMinutesOverride: values.buffer,
                 expectedOverrideVersion: existing?.version ?? 0,
                 reason: MASTER_DATA_AUDIT_REASON,
-                adminPin: adminPinRef.current,
+                adminPin: getAdminPin(),
               },
             },
         deviceTokenFor(ADMIN_DEVICE_ID),
@@ -871,7 +786,7 @@ export function AdminView() {
       !resourceEditor.gateId ||
       resourceEditor.name.trim().length < 2 ||
       !/^[A-Z0-9-]{2,8}$/.test(resourceEditor.shortCode.trim().toUpperCase()) ||
-      adminPinRef.current.length < 4
+      getAdminPin().length < 4
     )
       return;
     try {
@@ -894,7 +809,7 @@ export function AdminView() {
             compatibleAircraftTypes: [],
             automaticPrecallEnabled: resourceEditor.automaticPrecall,
             reason: MASTER_DATA_AUDIT_REASON,
-            adminPin: adminPinRef.current,
+            adminPin: getAdminPin(),
           },
         },
         deviceTokenFor(ADMIN_DEVICE_ID),
@@ -902,7 +817,7 @@ export function AdminView() {
       setMessage(
         "Ressourcengruppe wurde protokolliert gespeichert; Zuordnungen bleiben unverändert.",
       );
-      if (!adminModeUnlocked) setAdminPin("");
+      clearPinWhenLocked();
       selectResourceForEditing("new");
       finishMasterEditor();
       await refresh();
@@ -921,7 +836,7 @@ export function AdminView() {
       !board ||
       aircraftEditor.registration.trim().length < 3 ||
       aircraftEditor.type.trim().length < 2 ||
-      adminPinRef.current.length < 4
+      getAdminPin().length < 4
     )
       return;
     try {
@@ -943,13 +858,13 @@ export function AdminView() {
               ? Number(aircraftEditor.maximumPassengerPayloadKg)
               : null,
             reason: MASTER_DATA_AUDIT_REASON,
-            adminPin: adminPinRef.current,
+            adminPin: getAdminPin(),
           },
         },
         deviceTokenFor(ADMIN_DEVICE_ID),
       );
       setMessage("Flugzeugstammdaten wurden protokolliert gespeichert.");
-      if (!adminModeUnlocked) setAdminPin("");
+      clearPinWhenLocked();
       selectAircraftForEditing("new");
       finishMasterEditor();
       await refresh();
@@ -962,7 +877,7 @@ export function AdminView() {
   }
 
   async function assignAircraft(aircraftId: string, resourceGroupId: string) {
-    if (!board || !aircraftId || !resourceGroupId || adminPinRef.current.length < 4) return;
+    if (!board || !aircraftId || !resourceGroupId || getAdminPin().length < 4) return;
     try {
       await sendCommand(
         {
@@ -977,7 +892,7 @@ export function AdminView() {
             resourceGroupId,
             effectiveAt: new Date().toISOString(),
             reason: MASTER_DATA_AUDIT_REASON,
-            adminPin: adminPinRef.current,
+            adminPin: getAdminPin(),
           },
         },
         deviceTokenFor(ADMIN_DEVICE_ID),
@@ -985,7 +900,7 @@ export function AdminView() {
       setMessage(
         "Flugzeugzuordnung wurde historisiert geändert; Queue und Prognose werden neu berechnet.",
       );
-      if (!adminModeUnlocked) setAdminPin("");
+      clearPinWhenLocked();
       setAssignmentDialogContext(null);
       finishMasterEditor();
       await refresh();
@@ -1004,7 +919,7 @@ export function AdminView() {
     if (
       !board ||
       emergencyReason.trim().length < 3 ||
-      (type === "CLEAR_EMERGENCY" && adminPinRef.current.length < 4)
+      (type === "CLEAR_EMERGENCY" && getAdminPin().length < 4)
     )
       return false;
     try {
@@ -1026,14 +941,14 @@ export function AdminView() {
               expectedVersion: board.event.version,
               issuedAt: new Date().toISOString(),
               type,
-              payload: { reason: emergencyReason.trim(), adminPin: adminPinRef.current },
+              payload: { reason: emergencyReason.trim(), adminPin: getAdminPin() },
             },
         deviceTokenFor(ADMIN_DEVICE_ID),
       );
       setMessage(
         type === "TRIGGER_EMERGENCY" ? "Notfallmodus ausgelöst." : "Notfallmodus aufgehoben.",
       );
-      if (!adminModeUnlocked) setAdminPin("");
+      clearPinWhenLocked();
       await refresh();
       await refreshHistory();
       return true;
@@ -1048,7 +963,7 @@ export function AdminView() {
     saleEnabled: boolean,
     closingTimeOverride?: string | null,
   ) {
-    if (!board || adminPinRef.current.length < 4) return;
+    if (!board || getAdminPin().length < 4) return;
     try {
       const configuredClosing =
         closingTimeOverride === undefined ? product.saleClosesAt : closingTimeOverride;
@@ -1067,7 +982,7 @@ export function AdminView() {
             warningThreshold: product.capacityWarningThreshold,
             criticalThreshold: product.capacityCriticalThreshold,
             reason: OPERATIONAL_AUDIT_REASON,
-            adminPin: adminPinRef.current,
+            adminPin: getAdminPin(),
           },
         },
         deviceTokenFor(ADMIN_DEVICE_ID),
@@ -1087,7 +1002,7 @@ export function AdminView() {
     operationalNote: string,
     active: boolean,
   ) {
-    if (!board || adminPinRef.current.length < 4) return;
+    if (!board || getAdminPin().length < 4) return;
     try {
       await sendCommand(
         {
@@ -1103,13 +1018,13 @@ export function AdminView() {
             operationalNote: operationalNote.trim(),
             active,
             reason: MASTER_DATA_AUDIT_REASON,
-            adminPin: adminPinRef.current,
+            adminPin: getAdminPin(),
           },
         },
         deviceTokenFor(ADMIN_DEVICE_ID),
       );
       setMessage("Anonymer operativer Pilotencode wurde aktualisiert.");
-      if (!adminModeUnlocked) setAdminPin("");
+      clearPinWhenLocked();
       pilotEditor.resetAfterSave();
       finishMasterEditor();
       await refresh();

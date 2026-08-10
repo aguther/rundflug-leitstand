@@ -13,7 +13,7 @@
     },
     {
       "path": "apps/web/src/admin-view.tsx",
-      "maxLines": 1982,
+      "maxLines": 1897,
       "targetLines": 700
     },
     {
@@ -69,6 +69,11 @@
     {
       "path": "apps/web/src/features/admin/useAdminFactoryReset.ts",
       "maxLines": 118,
+      "targetLines": 1500
+    },
+    {
+      "path": "apps/web/src/features/admin/useAdminAuthorization.ts",
+      "maxLines": 152,
       "targetLines": 1500
     },
     {
