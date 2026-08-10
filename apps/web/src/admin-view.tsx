@@ -68,6 +68,7 @@ import {
   MasterDataWorkspace,
 } from "./features/admin/master-data/MasterDataWorkspace";
 import { ResourceAircraftEditorDialog } from "./features/admin/master-data/ResourceAircraftEditorDialog";
+import { useAdminMasterDataDeletion } from "./features/admin/master-data/useAdminMasterDataDeletion";
 import { useAdminMasterDataTable } from "./features/admin/master-data/useAdminMasterDataTable";
 import { useMasterDataTemplateImport } from "./features/admin/master-data/useMasterDataTemplateImport";
 import { AdminOperationalPlanPanel } from "./features/admin/operational-plan/AdminOperationalPlanPanel";
@@ -101,7 +102,6 @@ import {
   EVENT_ID,
   InterruptionNotice,
   MASTER_DATA_AUDIT_REASON,
-  MASTER_DATA_DELETE_REASON,
   type MasterDataDeleteTarget,
   OPERATIONAL_AUDIT_REASON,
   OperationalNotice,
@@ -247,9 +247,6 @@ export function AdminView() {
     useState<AircraftResourceGroupAssignmentContext | null>(null);
   const [turnaroundDialogContext, setTurnaroundDialogContext] =
     useState<TurnaroundOverrideContext | null>(null);
-  const [pendingMasterDelete, setPendingMasterDelete] = useState<MasterDataDeleteTarget | null>(
-    null,
-  );
   async function runBusyAction(key: string, action: () => Promise<void>) {
     if (busyActionKey) return;
     setBusyActionKey(key);
@@ -361,6 +358,22 @@ export function AdminView() {
     eventVersion,
   });
   const factoryResetState = useAdminFactoryReset({ onMessage: setMessage });
+  const {
+    cancelDeletion: cancelMasterDelete,
+    confirmDeletion: confirmMasterDelete,
+    pendingDeletion: pendingMasterDelete,
+    requestDeletion: requestMasterDelete,
+  } = useAdminMasterDataDeletion({
+    adminModeUnlocked,
+    board,
+    getAdminPin: () => adminPinRef.current,
+    onClearAdminPin: () => setAdminPin(""),
+    onEditorOpenChange: setMasterEditorOpen,
+    onFinishEditor: finishMasterEditor,
+    onMessage: setMessage,
+    onRefreshBoard: refresh,
+    onRefreshHistory: refreshHistory,
+  });
 
   useEffect(() => {
     if (
@@ -1350,120 +1363,6 @@ export function AdminView() {
     if (masterDataCategory === "aircraft") selectAircraftForEditing("new");
     if (masterDataCategory === "pilots") selectPilotForEditing("new");
     if (masterDataCategory === "products") selectProductForEditing("new");
-  }
-
-  function masterDataDeletionBlockers(
-    entityType: MasterDataDeleteTarget["entityType"],
-    entityId: string,
-  ): string[] {
-    if (!board) return ["Der bestätigte Betriebsstand wird noch geladen"];
-    if (entityType === "GATE") {
-      const groups = resourceGroups.filter((group) => group.gateId === entityId).length;
-      const products = board.products.filter((product) => product.gateId === entityId).length;
-      const rotations = board.rotations.filter((rotation) => rotation.gateId === entityId).length;
-      return [
-        ...(groups ? [`${groups} Ressourcengruppe(n)`] : []),
-        ...(products ? [`${products} Produkt(e)`] : []),
-        ...(rotations ? [`${rotations} Umlauf/Umläufe`] : []),
-      ];
-    }
-    if (entityType === "RESOURCE_GROUP") {
-      const products = board.products.filter(
-        (product) => product.resourceGroupId === entityId,
-      ).length;
-      const assignments = board.aircraft.filter(
-        (aircraft) => aircraft.resourceGroupId === entityId,
-      ).length;
-      return [
-        ...(products ? [`${products} Produkt(e)`] : []),
-        ...(assignments ? [`${assignments} Flugzeugzuordnung(en)`] : []),
-      ];
-    }
-    if (entityType === "PRODUCT") {
-      const code = board.products.find((product) => product.id === entityId)?.code;
-      const rotations = board.rotations.filter((rotation) => rotation.productCode === code).length;
-      return rotations ? [`${rotations} Umlauf/Umläufe`] : [];
-    }
-    if (entityType === "AIRCRAFT") {
-      const aircraft = board.aircraft.find((entry) => entry.id === entityId);
-      const rotations = board.rotations.filter(
-        (rotation) => rotation.aircraftId === entityId,
-      ).length;
-      return [
-        ...(aircraft?.resourceGroupId ? ["1 Flugzeugzuordnung"] : []),
-        ...(rotations ? [`${rotations} Umlauf/Umläufe`] : []),
-      ];
-    }
-    if (entityType === "PILOT") {
-      const pilot = board.pilots.find((entry) => entry.id === entityId);
-      const aircraft = board.aircraft.filter((entry) => entry.currentPilotId === entityId).length;
-      return [
-        ...(pilot?.currentRotationId ? ["1 aktiver Umlauf"] : []),
-        ...(aircraft ? [`${aircraft} Flugzeugbindung(en)`] : []),
-      ];
-    }
-    const rotations = board.rotations.filter((rotation) => rotation.aircraftId === entityId).length;
-    return rotations ? [`${rotations} Umlauf/Umläufe`] : [];
-  }
-
-  function requestMasterDelete(
-    entityType: MasterDataDeleteTarget["entityType"],
-    entityId: string,
-    label: string,
-  ) {
-    if (!adminModeUnlocked) setAdminPin("");
-    setPendingMasterDelete({
-      entityType,
-      entityId,
-      label,
-      blockers: masterDataDeletionBlockers(entityType, entityId),
-    });
-    setMasterEditorOpen(false);
-  }
-
-  function cancelMasterDelete() {
-    setPendingMasterDelete(null);
-    setMasterEditorOpen(true);
-  }
-
-  async function confirmMasterDelete() {
-    if (
-      !board ||
-      !pendingMasterDelete ||
-      pendingMasterDelete.blockers.length > 0 ||
-      board.event.status !== "PREPARATION" ||
-      adminPinRef.current.length < 4
-    )
-      return;
-    try {
-      await sendCommand(
-        {
-          commandId: crypto.randomUUID(),
-          eventId: EVENT_ID,
-          deviceId: ADMIN_DEVICE_ID,
-          expectedVersion: board.event.version,
-          issuedAt: new Date().toISOString(),
-          type: "DELETE_MASTER_DATA",
-          payload: {
-            entityType: pendingMasterDelete.entityType,
-            entityId: pendingMasterDelete.entityId,
-            reason: MASTER_DATA_DELETE_REASON,
-            adminPin: adminPinRef.current,
-          },
-        },
-        deviceTokenFor(ADMIN_DEVICE_ID),
-      );
-      setMessage(`${pendingMasterDelete.label} wurde gelöscht und die Löschung protokolliert.`);
-      setPendingMasterDelete(null);
-      finishMasterEditor();
-      if (!adminModeUnlocked) setAdminPin("");
-      await refresh();
-      await refreshHistory();
-    } catch (cause) {
-      setMessage(
-        cause instanceof Error ? cause.message : "Stammdatensatz konnte nicht gelöscht werden.",
-      );
-    }
   }
 
   const masterDataSingularLabel: Record<MasterDataCategory, string> = {

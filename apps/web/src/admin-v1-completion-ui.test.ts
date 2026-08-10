@@ -128,9 +128,6 @@ describe("V1 administration completion UI", () => {
     expect(appSource).toContain("setDiscardMasterChangesOpen(true)");
     expect(appSource).toContain('title="Änderungen verwerfen?"');
     expect(appSource).toContain("Weiter bearbeiten");
-    expect(appSource).toContain("function cancelMasterDelete()");
-    expect(appSource).toContain("setPendingMasterDelete(null)");
-    expect(appSource).toContain("setMasterEditorOpen(true)");
   });
 
   it("separates administrative evaluation from operational flight-line work", () => {
