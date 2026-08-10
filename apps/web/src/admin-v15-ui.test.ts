@@ -36,9 +36,9 @@ describe("V1.5 administration UI", () => {
   it("uses one compact setup flow and the shared design-system primitives", () => {
     expect(adminViewSource.match(/<SetupProgress/g)).toHaveLength(1);
     expect(adminViewSource).toContain('className="event-setup-v15 single-panel"');
-    expect(adminViewSource).toContain("<AdminOperationsPanel");
+    expect(adminViewSource).toContain("<LazyAdmin.AdminOperationsPanel");
     expect(adminViewSource).toContain("<PageHeader");
-    expect(adminViewSource).toContain("<EventParametersWorkspace");
+    expect(adminViewSource).toContain("<LazyAdmin.EventParametersWorkspace");
     expect(adminViewSource).toContain("<Button");
   });
 

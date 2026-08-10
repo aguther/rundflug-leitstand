@@ -26,7 +26,7 @@ describe("modernized administration workspace", () => {
   });
 
   it("exposes the shared plan in admin without operational confirmation controls", () => {
-    expect(adminViewSource).toContain("<AdminOperationalPlanPanel");
+    expect(adminViewSource).toContain("<LazyAdmin.AdminOperationalPlanPanel");
     expect(planSource).toContain('mode === "flight-director" && onConfirm');
     expect(planSource).toContain('content = "combined"');
     expect(planSource).toContain("Bestätigung durch Flight Director");

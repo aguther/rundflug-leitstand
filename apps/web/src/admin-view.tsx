@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import {
   AdminNavigation,
   type MasterDataCategory,
@@ -11,6 +11,7 @@ import { PageNotice, useActionMessageBridge } from "./app/PageNotifications";
 import { Button, PageHeader, StatusPill } from "./design-system/components";
 import { formatEventLocalDateTime } from "./event-time";
 import { AdminShellDialogs } from "./features/admin/AdminShellDialogs";
+import * as LazyAdmin from "./features/admin/admin-lazy-components";
 import {
   adminAreaCopy,
   adminEventStepCopy,
@@ -56,55 +57,6 @@ import {
   OperationalNotice,
   useOperationBoard,
 } from "./operation-workspace";
-
-const AccountManagement = lazy(() =>
-  import("./features/auth/AccountManagement").then((module) => ({
-    default: module.AccountManagement,
-  })),
-);
-const AdminCompletionWorkspacePanel = lazy(() =>
-  import("./features/admin/completion/AdminCompletionWorkspacePanel").then((module) => ({
-    default: module.AdminCompletionWorkspacePanel,
-  })),
-);
-const AdminMasterDataWorkspacePanel = lazy(() =>
-  import("./features/admin/master-data/AdminMasterDataWorkspacePanel").then((module) => ({
-    default: module.AdminMasterDataWorkspacePanel,
-  })),
-);
-const AdminOperationalPlanPanel = lazy(() =>
-  import("./features/admin/operational-plan/AdminOperationalPlanPanel").then((module) => ({
-    default: module.AdminOperationalPlanPanel,
-  })),
-);
-const AdminOperationsPanel = lazy(() =>
-  import("./features/admin/operations/AdminOperationsPanel").then((module) => ({
-    default: module.AdminOperationsPanel,
-  })),
-);
-const AnalysisWorkspace = lazy(() =>
-  import("./features/analysis/AnalysisWorkspace").then((module) => ({
-    default: module.AnalysisWorkspace,
-  })),
-);
-const EventCatalogDialog = lazy(() =>
-  import("./features/admin/event-workspace/EventCatalogDialog").then((module) => ({
-    default: module.EventCatalogDialog,
-  })),
-);
-const EventParametersWorkspace = lazy(() =>
-  import("./features/admin/event-parameters/EventParametersWorkspace").then((module) => ({
-    default: module.EventParametersWorkspace,
-  })),
-);
-
-function AdminWorkspaceLoading() {
-  return (
-    <div className="admin-section" role="status">
-      Administrationsbereich wird geladen …
-    </div>
-  );
-}
 
 export function AdminView() {
   const { session, logout } = useAuth();
@@ -444,7 +396,7 @@ export function AdminView() {
           />
           <Suspense fallback={null}>
             {adminArea === "events" ? (
-              <EventCatalogDialog
+              <LazyAdmin.EventCatalogDialog
                 busyActionKey={busyActionKey}
                 canExport={Boolean(board)}
                 canManage={isAdministrator}
@@ -487,7 +439,7 @@ export function AdminView() {
           ) : null}
           {/* biome-ignore format: preserve the large existing workspace subtree while adding its scroll boundary */}
           <div className="admin-workspace-scroll-region" ref={adminWorkspaceScrollRef}>
-            <Suspense fallback={<AdminWorkspaceLoading />}>
+            <Suspense fallback={<LazyAdmin.AdminWorkspaceLoading />}>
             {board?.currentDeviceRole === "FLIGHT_DIRECTOR" ? (
               <div className="readonly-banner">Flight-Director-Ansicht · primär lesend</div>
             ) : null}
@@ -515,7 +467,7 @@ export function AdminView() {
               refreshing={refreshing}
             />
           {adminArea === "users" ? (
-            <AccountManagement
+            <LazyAdmin.AccountManagement
               createOpen={accountCreateOpen}
               onCreateOpenChange={setAccountCreateOpen}
             />
@@ -553,7 +505,7 @@ export function AdminView() {
             role="tabpanel"
           >
             {eventStep === "event" && board ? (
-              <EventParametersWorkspace
+              <LazyAdmin.EventParametersWorkspace
                 administrator={isAdministrator}
                 busyActionKey={busyActionKey}
                 event={board.event}
@@ -568,7 +520,7 @@ export function AdminView() {
           </div>
 
           {masterDataStepActive && board ? (
-            <AdminMasterDataWorkspacePanel
+            <LazyAdmin.AdminMasterDataWorkspacePanel
               board={board}
               category={masterDataCategory}
               emptyState={masterDataEmptyState}
@@ -637,7 +589,7 @@ export function AdminView() {
             turnaroundContext={turnaroundDialogContext}
           />
           {adminArea === "evaluation" ? (
-            <AnalysisWorkspace
+            <LazyAdmin.AnalysisWorkspace
               backendConfirmed={backendConfirmed}
               board={board}
               onRefresh={refresh}
@@ -652,7 +604,7 @@ export function AdminView() {
             />
           ) : null}
           {adminArea === "events" && eventStep === "operational-plan" && board ? (
-            <AdminOperationalPlanPanel
+            <LazyAdmin.AdminOperationalPlanPanel
               board={board}
               busy={busyActionKey !== null}
               onMessage={setMessage}
@@ -663,7 +615,7 @@ export function AdminView() {
             />
           ) : null}
           {adminArea === "events" && eventStep === "operations" && board ? (
-            <AdminOperationsPanel
+            <LazyAdmin.AdminOperationsPanel
               administrator={isAdministrator}
               board={board}
               busyActionKey={busyActionKey}
@@ -685,7 +637,7 @@ export function AdminView() {
               />
           ) : null}
           {adminArea === "events" && eventStep === "completion" && board ? (
-            <AdminCompletionWorkspacePanel
+            <LazyAdmin.AdminCompletionWorkspacePanel
               administrator={isAdministrator}
               board={board}
               busyActionKey={busyActionKey}

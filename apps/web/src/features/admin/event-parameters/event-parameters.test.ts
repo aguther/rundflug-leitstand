@@ -30,9 +30,9 @@ describe("event parameter surface", () => {
   });
 
   it("keeps operation planning outside the parameter workspace", () => {
-    expect(adminSource).toContain("<EventParametersWorkspace");
-    expect(adminSource).toContain("<AdminOperationalPlanPanel");
-    expect(adminSource).toContain("<AdminOperationsPanel");
+    expect(adminSource).toContain("<LazyAdmin.EventParametersWorkspace");
+    expect(adminSource).toContain("<LazyAdmin.AdminOperationalPlanPanel");
+    expect(adminSource).toContain("<LazyAdmin.AdminOperationsPanel");
   });
 
   it("uses a bounded responsive workspace and exactly one mobile action bar", () => {

@@ -65,13 +65,13 @@ describe("event-scoped administration redesign", () => {
 
   it("provides an optional ninth operational-plan step and a simplified operation screen", () => {
     expect(adminUxSource).toContain('| "operational-plan"');
-    expect(adminViewSource).toContain("<AdminOperationalPlanPanel");
+    expect(adminViewSource).toContain("<LazyAdmin.AdminOperationalPlanPanel");
     expect(operationalPlanSource).toContain('label: "Einschränkungen"');
     expect(operationalPlanSource).toContain('label: "Wiederkehrende Regeln"');
     expect(operationsSource).toContain("release");
     expect(operationsSource).toContain("emergency");
     expect(operationsSource).toContain('className="operations-workspace-content"');
-    expect(adminViewSource).toContain("<AdminOperationsPanel");
+    expect(adminViewSource).toContain("<LazyAdmin.AdminOperationsPanel");
     expect(operationsSource).not.toContain("OperationalPlanPanel");
     expect(operationsSource).not.toContain("Tabs");
   });
