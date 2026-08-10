@@ -114,14 +114,12 @@ describe("V1 administration completion UI", () => {
     for (const label of [
       "Gate anlegen",
       "Einzelzuordnung Flugzeug–Ressourcengruppe",
-      "Pilotencode anlegen",
       "Produkt anlegen",
     ]) {
       expect(appSource).toContain(label);
     }
     expect(appSource).toContain("masterEditorFooter");
     expect(appSource).toContain("masterEditorMobileFurtherActions");
-    expect(appSource).toContain("master-editor-status-section");
     expect(appSource).toContain("Speichern");
     expect(appSource).toContain("Abbrechen");
     expect(appSource).toContain("Löschen");

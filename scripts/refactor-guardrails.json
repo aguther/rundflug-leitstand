@@ -13,7 +13,7 @@
     },
     {
       "path": "apps/web/src/admin-view.tsx",
-      "maxLines": 5090,
+      "maxLines": 5017,
       "targetLines": 700
     },
     {
@@ -386,6 +386,11 @@
     {
       "path": "apps/web/src/features/admin/master-data/ResourceAircraftEditorDialog.tsx",
       "maxLines": 243,
+      "targetLines": 1500
+    },
+    {
+      "path": "apps/web/src/features/admin/pilots/PilotEditorDialog.tsx",
+      "maxLines": 113,
       "targetLines": 1500
     },
     {

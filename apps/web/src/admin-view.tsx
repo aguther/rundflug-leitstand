@@ -105,6 +105,7 @@ import { ResourceAircraftEditorDialog } from "./features/admin/master-data/Resou
 import { OperationalPlanWorkspace } from "./features/admin/operational-plan/OperationalPlanWorkspace";
 import { OperationsWorkspace } from "./features/admin/operations/OperationsWorkspace";
 import { PilotCodesWorkspace } from "./features/admin/pilots/PilotCodesWorkspace";
+import { PilotEditorDialog } from "./features/admin/pilots/PilotEditorDialog";
 import { usePilotEditorState } from "./features/admin/pilots/usePilotEditorState";
 import { ProductSalesDialog } from "./features/admin/products/ProductSalesDialog";
 import { ProductsWorkspace } from "./features/admin/products/ProductsWorkspace";
@@ -2306,7 +2307,6 @@ export function AdminView() {
   const masterDataStepActive =
     adminArea === "events" &&
     ["gates", "resource-groups", "aircraft", "pilots", "products"].includes(eventStep);
-  const currentPilot = pilotEditor.currentPilot;
   const masterEditorDeleteAction: {
     entityType: MasterDataDeleteTarget["entityType"];
     entityId: string;
@@ -3911,92 +3911,19 @@ export function AdminView() {
             resourceEditor={resourceEditor}
             submitAttempted={masterSubmitAttempted}
           />
-          <ModalDialog
-            bodyClassName="master-data-editor-body"
-            className="master-data-editor-dialog"
+          <PilotEditorDialog
+            administrator={isAdministrator}
+            busy={busyActionKey === "master-pilot-toggle"}
+            dirty={masterEditorDirty}
+            editor={pilotEditor}
             footer={masterEditorFooter}
-            footerClassName="master-data-editor-footer"
+            furtherActions={masterEditorMobileFurtherActions}
             initialFocusSelector={masterEditorInitialFocusSelector}
             onClose={requestMasterEditorClose}
+            onToggle={() => requestMasterSave("pilot-toggle", true)}
             open={masterDataStepActive && masterEditorOpen && masterDataCategory === "pilots"}
-            size="default"
-            title={
-              pilotEditor.editorId === "new" ? "Pilotencode anlegen" : "Pilotencode bearbeiten"
-            }
-          >
-            <div className="parameter-grid compact-editor-grid">
-              <div className="field-control">
-                <FieldLabel
-                  htmlFor="pilot-operational-code"
-                  label="Operativer Pilotencode"
-                  help="Anonymer technischer Code für die operative Zuordnung; keine Namen oder Lizenzdaten erfassen."
-                />
-                <input
-                  id="pilot-operational-code"
-                  value={pilotEditor.code}
-                  onChange={(event) => pilotEditor.setCode(event.target.value)}
-                />
-                <span className="field-help">
-                  Nur technische Codes, keine Namen oder Lizenzdaten.
-                </span>
-              </div>
-              <div className="field-control">
-                <FieldLabel
-                  htmlFor="pilot-operational-note"
-                  label="Organisatorische Bemerkung"
-                  help="Optionaler nicht personenbezogener Hinweis, zum Beispiel Einsatzbereich oder Schicht."
-                />
-                <input
-                  id="pilot-operational-note"
-                  value={pilotEditor.note}
-                  onChange={(event) => pilotEditor.setNote(event.target.value)}
-                  placeholder="Optional · keine personenbezogenen Daten"
-                />
-              </div>
-            </div>
-            {pilotEditor.editorId !== "new" ? (
-              <dl className="master-editor-readonly-summary">
-                <div><dt>Pausenstatus</dt><dd>{currentPilot?.paused ? "Pause" : "Einsatzbereit"}</dd></div>
-                <div>
-                  <dt>Aktuelle Fluggruppe</dt>
-                  <dd>
-                    {currentPilot?.currentCommunicationNumber
-                      ? `Fluggruppe ${currentPilot.currentCommunicationNumber}`
-                      : "Nicht zugeordnet"}
-                  </dd>
-                </div>
-              </dl>
-            ) : null}
-            {masterSubmitAttempted && !/^[A-Z0-9-]{2,12}$/.test(pilotEditor.code) ? (
-              <ValidationHint tone="error">
-                Der Pilotencode muss aus 2 bis 12 Großbuchstaben, Ziffern oder Bindestrichen
-                bestehen.
-              </ValidationHint>
-            ) : null}
-            {pilotEditor.editorId !== "new" ? (
-              <section className="master-editor-status-section">
-                <div>
-                  <h3>Status</h3>
-                  <p>
-                    Der Pilotencode ist aktuell {currentPilot?.active ? "aktiv" : "inaktiv"}.
-                    Statusänderungen werden separat gespeichert und protokolliert.
-                    {masterEditorDirty
-                      ? " Speichern oder verwerfen Sie zuerst die Formularänderungen."
-                      : ""}
-                  </p>
-                </div>
-                <Button
-                  busy={busyActionKey === "master-pilot-toggle"}
-                  disabled={!isAdministrator || masterEditorDirty}
-                  onClick={() => requestMasterSave("pilot-toggle", true)}
-                  type="button"
-                >
-                  {currentPilot?.active ? "Deaktivieren" : "Aktivieren"}
-                </Button>
-              </section>
-            ) : null}
-            {masterEditorMobileFurtherActions}
-          </ModalDialog>
+            submitAttempted={masterSubmitAttempted}
+          />
           <ModalDialog
             className="master-discard-dialog"
             footer={
