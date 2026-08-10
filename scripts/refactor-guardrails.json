@@ -13,7 +13,7 @@
     },
     {
       "path": "apps/web/src/admin-view.tsx",
-      "maxLines": 5309,
+      "maxLines": 5286,
       "targetLines": 700
     },
     {
@@ -375,6 +375,11 @@
     },
     {
       "path": "apps/web/src/features/admin/resource-groups/useResourceGroupEditorState.ts",
+      "maxLines": 78,
+      "targetLines": 1500
+    },
+    {
+      "path": "apps/web/src/features/admin/aircraft/useAircraftEditorState.ts",
       "maxLines": 78,
       "targetLines": 1500
     },

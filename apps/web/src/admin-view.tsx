@@ -24,7 +24,7 @@ import {
   manifestCorrectionCandidates,
   manifestCorrectionTargets,
 } from "./admin-manifest-correction";
-import { createMasterEditorSnapshot, hasMasterEditorChanges } from "./admin-master-editor-state";
+import { hasMasterEditorChanges } from "./admin-master-editor-state";
 import {
   type AdminArea,
   type AdminEventStep,
@@ -85,6 +85,7 @@ import {
   AircraftResourceGroupAssignmentDialog,
 } from "./features/admin/aircraft/AircraftResourceGroupAssignmentDialog";
 import { AircraftWorkspace } from "./features/admin/aircraft/AircraftWorkspace";
+import { useAircraftEditorState } from "./features/admin/aircraft/useAircraftEditorState";
 import { CompletionWorkspace } from "./features/admin/completion/CompletionWorkspace";
 import {
   type EventParameterSaveLifecycle,
@@ -408,11 +409,7 @@ export function AdminView() {
   const [manifestTargetRotationId, setManifestTargetRotationId] = useState("");
   const [manifestCorrectionReason, setManifestCorrectionReason] = useState("");
   const resourceEditor = useResourceGroupEditorState(board);
-  const [aircraftEditorId, setAircraftEditorId] = useState("new");
-  const [aircraftRegistration, setAircraftRegistration] = useState("");
-  const [aircraftType, setAircraftType] = useState("");
-  const [aircraftSeats, setAircraftSeats] = useState(3);
-  const [aircraftMaximumPayload, setAircraftMaximumPayload] = useState("");
+  const aircraftEditor = useAircraftEditorState(board);
   const currentMasterEditorSnapshot =
     masterDataCategory === "gates"
       ? gateEditor.snapshot
@@ -421,13 +418,7 @@ export function AdminView() {
         : masterDataCategory === "resource-groups"
           ? resourceEditor.snapshot
           : masterDataCategory === "aircraft"
-            ? createMasterEditorSnapshot([
-                "aircraft",
-                aircraftRegistration,
-                aircraftType,
-                aircraftSeats,
-                aircraftMaximumPayload,
-              ])
+            ? aircraftEditor.snapshot
             : pilotEditor.snapshot;
   const masterEditorDirty =
     masterEditorOpen &&
@@ -1320,23 +1311,7 @@ export function AdminView() {
   }
 
   function selectAircraftForEditing(id: string) {
-    const entry = board?.aircraft.find((aircraft) => aircraft.id === id);
-    const nextRegistration = entry?.registration ?? "";
-    const nextType = entry?.aircraftType ?? "";
-    const nextSeats = entry?.passengerSeats ?? 3;
-    const nextMaximumPayload = entry?.maximumPassengerPayloadKg?.toString() ?? "";
-    initialMasterEditorSnapshotRef.current = createMasterEditorSnapshot([
-      "aircraft",
-      nextRegistration,
-      nextType,
-      nextSeats,
-      nextMaximumPayload,
-    ]);
-    setAircraftEditorId(id);
-    setAircraftRegistration(nextRegistration);
-    setAircraftType(nextType);
-    setAircraftSeats(nextSeats);
-    setAircraftMaximumPayload(nextMaximumPayload);
+    initialMasterEditorSnapshotRef.current = aircraftEditor.select(id);
     setMasterSubmitAttempted(false);
     setMasterEditorOpen(true);
   }
@@ -1395,8 +1370,8 @@ export function AdminView() {
   async function saveAircraft() {
     if (
       !board ||
-      aircraftRegistration.trim().length < 3 ||
-      aircraftType.trim().length < 2 ||
+      aircraftEditor.registration.trim().length < 3 ||
+      aircraftEditor.type.trim().length < 2 ||
       adminPinRef.current.length < 4
     )
       return;
@@ -1410,12 +1385,13 @@ export function AdminView() {
           issuedAt: new Date().toISOString(),
           type: "UPSERT_AIRCRAFT",
           payload: {
-            aircraftId: aircraftEditorId === "new" ? crypto.randomUUID() : aircraftEditorId,
-            registration: aircraftRegistration.trim().toUpperCase(),
-            aircraftType: aircraftType.trim(),
-            passengerSeats: aircraftSeats,
-            maximumPassengerPayloadKg: aircraftMaximumPayload
-              ? Number(aircraftMaximumPayload)
+            aircraftId:
+              aircraftEditor.editorId === "new" ? crypto.randomUUID() : aircraftEditor.editorId,
+            registration: aircraftEditor.registration.trim().toUpperCase(),
+            aircraftType: aircraftEditor.type.trim(),
+            passengerSeats: aircraftEditor.passengerSeats,
+            maximumPassengerPayloadKg: aircraftEditor.maximumPassengerPayloadKg
+              ? Number(aircraftEditor.maximumPassengerPayloadKg)
               : null,
             reason: MASTER_DATA_AUDIT_REASON,
             adminPin: adminPinRef.current,
@@ -1857,9 +1833,9 @@ export function AdminView() {
     }
     if (masterDataCategory === "aircraft") {
       const invalidFieldId =
-        aircraftRegistration.trim().length < 3
+        aircraftEditor.registration.trim().length < 3
           ? "aircraft-registration"
-          : aircraftType.trim().length < 2
+          : aircraftEditor.type.trim().length < 2
             ? "aircraft-type"
             : undefined;
       requestMasterSave("aircraft", !invalidFieldId, invalidFieldId);
@@ -2352,11 +2328,11 @@ export function AdminView() {
             label: resourceEditor.name,
             description: "Produkte und Flugzeugzuordnungen müssen vorher entfernt sein.",
           }
-        : masterDataCategory === "aircraft" && aircraftEditorId !== "new"
+        : masterDataCategory === "aircraft" && aircraftEditor.editorId !== "new"
           ? {
               entityType: "AIRCRAFT",
-              entityId: aircraftEditorId,
-              label: aircraftRegistration,
+              entityId: aircraftEditor.editorId,
+              label: aircraftEditor.registration,
               description: "Eine bestehende Zuordnung muss zuerst entfernt werden.",
             }
           : masterDataCategory === "pilots" && pilotEditor.editorId !== "new"
@@ -3935,7 +3911,7 @@ export function AdminView() {
                 ? resourceEditor.editorId === "new"
                   ? "Ressourcengruppe anlegen"
                   : "Ressourcengruppe bearbeiten"
-                : aircraftEditorId === "new"
+                : aircraftEditor.editorId === "new"
                     ? "Flugzeug anlegen"
                     : "Flugzeug bearbeiten"
             }
@@ -4046,9 +4022,9 @@ export function AdminView() {
                   />
                   <input
                     id="aircraft-registration"
-                    value={aircraftRegistration}
+                    value={aircraftEditor.registration}
                     maxLength={16}
-                    onChange={(event) => setAircraftRegistration(event.target.value.toUpperCase())}
+                    onChange={(event) => aircraftEditor.setRegistration(event.target.value)}
                   />
                 </div>
                 <div className="field-control">
@@ -4059,8 +4035,8 @@ export function AdminView() {
                   />
                   <input
                     id="aircraft-type"
-                    value={aircraftType}
-                    onChange={(event) => setAircraftType(event.target.value)}
+                    value={aircraftEditor.type}
+                    onChange={(event) => aircraftEditor.setType(event.target.value)}
                   />
                 </div>
                 <div className="field-control">
@@ -4074,8 +4050,8 @@ export function AdminView() {
                     type="number"
                     min="1"
                     max="100"
-                    value={aircraftSeats}
-                    onChange={(event) => setAircraftSeats(Number(event.target.value))}
+                    value={aircraftEditor.passengerSeats}
+                    onChange={(event) => aircraftEditor.setPassengerSeats(Number(event.target.value))}
                   />
                 </div>
                 <div className="field-control">
@@ -4088,40 +4064,41 @@ export function AdminView() {
                     id="aircraft-maximum-payload"
                     type="number"
                     min="1"
-                    value={aircraftMaximumPayload}
-                    onChange={(event) => setAircraftMaximumPayload(event.target.value)}
+                    value={aircraftEditor.maximumPassengerPayloadKg}
+                    onChange={(event) =>
+                      aircraftEditor.setMaximumPassengerPayloadKg(event.target.value)
+                    }
                   />
                 </div>
-                {aircraftEditorId !== "new" ? (
+                {aircraftEditor.editorId !== "new" ? (
                   <dl className="master-editor-readonly-summary">
                     <div>
                       <dt>Betriebsstatus</dt>
                       <dd>
                         {aircraftStateLabel[
-                          board?.aircraft.find((entry) => entry.id === aircraftEditorId)
-                            ?.operationalState ?? "INACTIVE"
+                          aircraftEditor.currentAircraft?.operationalState ?? "INACTIVE"
                         ]}
                       </dd>
                     </div>
                     <div>
                       <dt>Aktuelle Ressourcengruppe</dt>
                       <dd>
-                        {board?.aircraft.find((entry) => entry.id === aircraftEditorId)
-                          ?.resourceGroupName || "Nicht zugeordnet"}
+                        {aircraftEditor.currentAircraft?.resourceGroupName || "Nicht zugeordnet"}
                       </dd>
                     </div>
                     <div>
                       <dt>Produktspezifische Zeitabweichungen</dt>
                       <dd>
                         {board?.aircraftProductTurnaroundOverrides.filter(
-                          (entry) => entry.aircraftId === aircraftEditorId,
+                          (entry) => entry.aircraftId === aircraftEditor.editorId,
                         ).length ?? 0}
                       </dd>
                     </div>
                   </dl>
                 ) : null}
                 {masterSubmitAttempted &&
-                (aircraftRegistration.trim().length < 3 || aircraftType.trim().length < 2) ? (
+                (aircraftEditor.registration.trim().length < 3 ||
+                  aircraftEditor.type.trim().length < 2) ? (
                   <ValidationHint tone="error">
                     Kennzeichen und Flugzeugtyp müssen mindestens 2 Zeichen lang sein.
                   </ValidationHint>
