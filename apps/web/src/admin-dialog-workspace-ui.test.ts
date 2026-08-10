@@ -1,6 +1,5 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import adminViewSource from "./admin-view.tsx?raw";
 
 const adminEventStyles = readFileSync(
   new URL("./features/admin/admin-event-workspace.css", import.meta.url),
@@ -15,13 +14,7 @@ const legacyAdminStyles = readFileSync(
   "utf8",
 );
 describe("unified master-data dialogs and stable event workspace", () => {
-  it("keeps the event header and setup navigation outside one internally scrolling step region", () => {
-    const setupIndex = adminViewSource.indexOf("<SetupProgress");
-    const scrollRegionIndex = adminViewSource.indexOf('className="admin-workspace-scroll-region"');
-
-    expect(setupIndex).toBeGreaterThan(0);
-    expect(scrollRegionIndex).toBeGreaterThan(setupIndex);
-    expect(adminViewSource).toContain("ref={adminWorkspaceScrollRef}");
+  it("keeps the event workspace in one stable internal scroll region", () => {
     expect(adminEventStyles).toMatch(
       /\.admin-shell \.admin-workspace-scroll-region \{[\s\S]*?overflow-y: auto;[\s\S]*?scrollbar-gutter: stable;/,
     );

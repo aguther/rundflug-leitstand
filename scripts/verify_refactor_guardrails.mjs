@@ -7,6 +7,12 @@ const configPath = resolve(root, "scripts/refactor-guardrails.json");
 const testFilePattern = /\.(?:test|spec)\.[cm]?[jt]sx?$/;
 const productionTypeScriptPattern = /\.(?:ts|tsx)$/;
 const rawImportPattern = /(?:\bfrom\s+|\bimport\s*)["']([^"']+\?raw)["']/g;
+const forbiddenProductionRawImportTargets = new Set([
+  "apps/web/src/admin-view.tsx",
+  "apps/worker/src/event-coordinator.ts",
+  "apps/worker/src/index.ts",
+  "packages/contracts/src/index.ts",
+]);
 
 function normalizePath(path) {
   return path.replaceAll("\\", "/");
@@ -84,6 +90,9 @@ async function run() {
   const allowedRawImports = new Set(config.allowedProductionRawImports);
   const currentRawImportSet = new Set(currentRawImports);
   const unexpected = currentRawImports.filter((entry) => !allowedRawImports.has(entry));
+  const forbidden = currentRawImports.filter((entry) =>
+    forbiddenProductionRawImportTargets.has(entry.split(" -> ")[1]),
+  );
   const removedButNotRatcheted = config.allowedProductionRawImports.filter(
     (entry) => !currentRawImportSet.has(entry),
   );
@@ -91,6 +100,9 @@ async function run() {
 
   if (unexpected.length > 0) {
     failures.push(`new production TypeScript raw imports:\n${unexpected.join("\n")}`);
+  }
+  if (forbidden.length > 0) {
+    failures.push(`forbidden target-file raw imports:\n${forbidden.join("\n")}`);
   }
   if (removedButNotRatcheted.length > 0) {
     failures.push(

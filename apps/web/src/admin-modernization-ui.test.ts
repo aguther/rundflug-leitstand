@@ -1,7 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import adminUxSource from "./admin-ux.tsx?raw";
-import adminViewSource from "./admin-view.tsx?raw";
 import accountSource from "./features/auth/AccountManagement.tsx?raw";
 import planSource from "./features/operations/OperationalPlanPanel.tsx?raw";
 
@@ -26,7 +25,6 @@ describe("modernized administration workspace", () => {
   });
 
   it("exposes the shared plan in admin without operational confirmation controls", () => {
-    expect(adminViewSource).toContain("<LazyAdmin.AdminOperationalPlanPanel");
     expect(planSource).toContain('mode === "flight-director" && onConfirm');
     expect(planSource).toContain('content = "combined"');
     expect(planSource).toContain("Bestätigung durch Flight Director");

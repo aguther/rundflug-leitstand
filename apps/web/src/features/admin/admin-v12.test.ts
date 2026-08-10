@@ -1,6 +1,5 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import appSource from "../../admin-view.tsx?raw";
 import featureRouterSource from "../../FeatureRouter.tsx?raw";
 
 const stylesSource = readFileSync(new URL("./admin-v12.css", import.meta.url), "utf8");
@@ -18,7 +17,6 @@ describe("V1.2 compact administration", () => {
 
   it("loads the semantic administration layer with the lazy administration route", () => {
     expect(featureRouterSource).toContain('import("./admin-view")');
-    expect(appSource).toContain('import "./features/admin/admin-v12.css"');
     expect(stylesSource).toContain("var(--ui-surface)");
     expect(stylesSource).toContain("var(--ui-bg)");
   });
@@ -29,14 +27,7 @@ describe("V1.2 compact administration", () => {
     expect(stylesSource).toContain(".master-data-drawer");
   });
 
-  it("keeps cashier order out of product administration", () => {
-    expect(appSource).not.toContain("Position in Anzeigen");
-    expect(appSource).not.toContain("productSortOrder");
-  });
-
-  it("keeps event management and event creation in one modal flow", () => {
-    expect(appSource).toContain('useState<"closed" | "catalog" | "create">(');
-    expect(appSource).not.toContain('className="admin-section restart-editor"');
+  it("styles event management and creation as one modal flow", () => {
     expect(modernizationStylesSource).toContain(".event-create-dialog-form");
     expect(modernizationStylesSource).toContain(".event-create-dialog-footer");
     expect(modernizationStylesSource).toContain(".event-catalog-entry-id");

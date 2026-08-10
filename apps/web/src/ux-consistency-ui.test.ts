@@ -1,12 +1,11 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import adminSource from "./admin-view.tsx?raw";
 import cashierSource from "./cashier-view.tsx?raw";
 import productSalesDialogSource from "./features/admin/products/ProductSalesDialog.tsx?raw";
 import flightLineSource from "./flight-line-view.tsx?raw";
 import sharedSource from "./operation-workspace.tsx?raw";
 
-const appSource = `${sharedSource}\n${adminSource}\n${productSalesDialogSource}\n${flightLineSource}\n${cashierSource}`;
+const appSource = `${sharedSource}\n${productSalesDialogSource}\n${flightLineSource}\n${cashierSource}`;
 
 const stylesSource = [
   readFileSync(new URL("./styles.css", import.meta.url), "utf8"),
@@ -24,14 +23,6 @@ describe("V1 UX consistency", () => {
     expect(appSource).toContain("rotationStatusLabel[selected.status]");
     expect(appSource).toContain("predictionQualityLabel[selected.timeline.predictionQuality]");
     expect(appSource).toContain("predictionQualityLabel[product.predictionQuality]");
-  });
-
-  it("keeps account session and logout wiring in the admin composition", () => {
-    expect(appSource).toContain('session?.account.role === "ADMIN"');
-    expect(appSource).toContain("void logoutAndReload()");
-    expect(appSource).not.toContain(
-      'className={adminModeUnlocked ? "secondary-action" : "primary-action"}',
-    );
   });
 
   it("provides touch-sized controls for frequent mobile administration", () => {

@@ -1,7 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import adminUxSource from "./admin-ux.tsx?raw";
-import adminViewSource from "./admin-view.tsx?raw";
 import apiSource from "./api.ts?raw";
 import chartSource from "./features/admin/AdminEventFlowChart.tsx?raw";
 import aircraftWorkspaceSource from "./features/admin/aircraft/AircraftWorkspace.tsx?raw";
@@ -33,24 +32,6 @@ const productSalesStyles = readFileSync(
 );
 
 describe("V1.5 administration UI", () => {
-  it("uses one compact setup flow and the shared design-system primitives", () => {
-    expect(adminViewSource.match(/<SetupProgress/g)).toHaveLength(1);
-    expect(adminViewSource).toContain('className="event-setup-v15 single-panel"');
-    expect(adminViewSource).toContain("<LazyAdmin.AdminOperationsPanel");
-    expect(adminViewSource).toContain("<PageHeader");
-    expect(adminViewSource).toContain("<LazyAdmin.EventParametersWorkspace");
-    expect(adminViewSource).toContain("<Button");
-  });
-
-  it("keeps reset actions out of the event setup workspace", () => {
-    const setupWorkspace = adminViewSource.slice(
-      adminViewSource.indexOf('<div className="event-setup-v15"'),
-      adminViewSource.indexOf("<MasterDataWorkspace"),
-    );
-    expect(setupWorkspace).not.toContain("Betriebsdaten zurücksetzen");
-    expect(setupWorkspace).not.toContain("Werkszustand");
-  });
-
   it("supports SVG branding and consistent Pilotencode terminology", () => {
     expect(eventLogoEditorSource).toContain("image/svg+xml");
     expect(eventLogoEditorSource).toContain("PNG, JPEG, WebP oder sicheres SVG bis 1 MiB.");
@@ -117,14 +98,7 @@ describe("V1.5 administration UI", () => {
     );
   });
 
-  it("keeps the area header mounted with the same geometry on master-data steps", () => {
-    const workspaceHeader = adminViewSource.slice(
-      adminViewSource.indexOf("<div className={`admin-workspace "),
-      adminViewSource.indexOf('{adminArea === "events" ? ('),
-    );
-
-    expect(workspaceHeader).toContain("<PageHeader");
-    expect(workspaceHeader).not.toContain("{!masterDataStepActive ? (");
+  it("keeps the area header geometry stable on master-data steps", () => {
     expect(adminStyles).toContain(".admin-shell .admin-workspace > .ds-page-header");
     expect(adminEventStyles).toContain(".admin-shell .admin-workspace > .ds-page-header");
     expect(adminStyles).not.toContain(
@@ -136,8 +110,6 @@ describe("V1.5 administration UI", () => {
     expect(adminEventStyles).toContain(
       ".admin-shell .admin-workspace,\n.admin-shell .admin-workspace.master-data-active",
     );
-    expect(adminViewSource).not.toContain('className="master-data-heading"');
-    expect(adminViewSource).not.toContain("Stammdaten <span");
     expect(adminUxSource).toContain('aria-current={current ? "step" : undefined}');
     expect(adminUxSource).toContain('step.complete ? "complete" : "pending"');
   });
@@ -155,7 +127,6 @@ describe("V1.5 administration UI", () => {
   });
 
   it("uses event-only flow data and a strict preview-before-import workflow", () => {
-    expect(adminViewSource).toContain("<AdminOverviewPanel");
     expect(chartSource).toContain("<ComposedChart");
     expect(chartSource).toContain("strokeWidth={1.75}");
     expect(chartSource).toContain('type="stepAfter"');

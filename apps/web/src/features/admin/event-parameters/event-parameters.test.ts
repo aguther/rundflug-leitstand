@@ -1,6 +1,5 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import adminSource from "../../../admin-view.tsx?raw";
 
 const styles = readFileSync(new URL("./event-parameters.css", import.meta.url), "utf8");
 const workspaceStyles = readFileSync(
@@ -27,12 +26,6 @@ describe("event parameter surface", () => {
     expect(styles).toMatch(
       /\.event-turnaround-fields > span \{[\s\S]*?height: var\(--event-parameter-control-height\);[\s\S]*?place-items: center;/,
     );
-  });
-
-  it("keeps operation planning outside the parameter workspace", () => {
-    expect(adminSource).toContain("<LazyAdmin.EventParametersWorkspace");
-    expect(adminSource).toContain("<LazyAdmin.AdminOperationalPlanPanel");
-    expect(adminSource).toContain("<LazyAdmin.AdminOperationsPanel");
   });
 
   it("uses a bounded responsive workspace and exactly one mobile action bar", () => {

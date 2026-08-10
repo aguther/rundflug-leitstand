@@ -3,7 +3,7 @@
   "sizeBudgets": [
     {
       "path": "apps/worker/src/event-coordinator.ts",
-      "maxLines": 1447,
+      "maxLines": 1395,
       "targetLines": 1500
     },
     {
@@ -13,7 +13,7 @@
     },
     {
       "path": "apps/web/src/admin-view.tsx",
-      "maxLines": 666,
+      "maxLines": 663,
       "targetLines": 700
     },
     {
@@ -146,6 +146,11 @@
     {
       "path": "apps/worker/src/coordinator-realtime-service.ts",
       "maxLines": 58,
+      "targetLines": 1500
+    },
+    {
+      "path": "apps/worker/src/operational-note-command-service.ts",
+      "maxLines": 78,
       "targetLines": 1500
     },
     {
@@ -590,9 +595,7 @@
     }
   ],
   "allowedProductionRawImports": [
-    "apps/web/src/admin-dialog-workspace-ui.test.ts -> apps/web/src/admin-view.tsx",
     "apps/web/src/admin-event-workspace-redesign.test.ts -> apps/web/src/admin-ux.tsx",
-    "apps/web/src/admin-event-workspace-redesign.test.ts -> apps/web/src/admin-view.tsx",
     "apps/web/src/admin-event-workspace-redesign.test.ts -> apps/web/src/features/admin/aircraft/AircraftProductTurnaroundOverrideDialog.tsx",
     "apps/web/src/admin-event-workspace-redesign.test.ts -> apps/web/src/features/admin/aircraft/AircraftResourceGroupAssignmentDialog.tsx",
     "apps/web/src/admin-event-workspace-redesign.test.ts -> apps/web/src/features/admin/completion/CompletionWorkspace.tsx",
@@ -601,11 +604,9 @@
     "apps/web/src/admin-event-workspace-redesign.test.ts -> apps/web/src/features/admin/operational-plan/OperationalPlanWorkspace.tsx",
     "apps/web/src/admin-event-workspace-redesign.test.ts -> apps/web/src/features/admin/operations/OperationsWorkspace.tsx",
     "apps/web/src/admin-modernization-ui.test.ts -> apps/web/src/admin-ux.tsx",
-    "apps/web/src/admin-modernization-ui.test.ts -> apps/web/src/admin-view.tsx",
     "apps/web/src/admin-modernization-ui.test.ts -> apps/web/src/features/auth/AccountManagement.tsx",
     "apps/web/src/admin-modernization-ui.test.ts -> apps/web/src/features/operations/OperationalPlanPanel.tsx",
     "apps/web/src/admin-v1-completion-ui.test.ts -> apps/web/src/admin-ux.tsx",
-    "apps/web/src/admin-v1-completion-ui.test.ts -> apps/web/src/admin-view.tsx",
     "apps/web/src/admin-v1-completion-ui.test.ts -> apps/web/src/app/PageNotifications.tsx",
     "apps/web/src/admin-v1-completion-ui.test.ts -> apps/web/src/features/admin/FactoryResetDialog.tsx",
     "apps/web/src/admin-v1-completion-ui.test.ts -> apps/web/src/features/admin/aircraft/AircraftResourceGroupAssignmentDialog.tsx",
@@ -615,7 +616,6 @@
     "apps/web/src/admin-v1-completion-ui.test.ts -> apps/web/src/features/admin/operations/OperationsWorkspace.tsx",
     "apps/web/src/admin-v1-completion-ui.test.ts -> apps/web/src/operation-workspace.tsx",
     "apps/web/src/admin-v15-ui.test.ts -> apps/web/src/admin-ux.tsx",
-    "apps/web/src/admin-v15-ui.test.ts -> apps/web/src/admin-view.tsx",
     "apps/web/src/admin-v15-ui.test.ts -> apps/web/src/api.ts",
     "apps/web/src/admin-v15-ui.test.ts -> apps/web/src/features/admin/AdminEventFlowChart.tsx",
     "apps/web/src/admin-v15-ui.test.ts -> apps/web/src/features/admin/EventLogoEditor.tsx",
@@ -631,7 +631,6 @@
     "apps/web/src/app/navigation.test.ts -> apps/web/src/ticket-status-view.tsx",
     "apps/web/src/app/web-architecture.test.ts -> apps/web/src/App.tsx",
     "apps/web/src/app/web-architecture.test.ts -> apps/web/src/FeatureRouter.tsx",
-    "apps/web/src/cashier-guidance-ui.test.ts -> apps/web/src/admin-view.tsx",
     "apps/web/src/cashier-guidance-ui.test.ts -> apps/web/src/cashier-view.tsx",
     "apps/web/src/cashier-v1-6.test.ts -> apps/web/src/api.ts",
     "apps/web/src/cashier-v1-6.test.ts -> apps/web/src/cashier-view.tsx",
@@ -640,8 +639,6 @@
     "apps/web/src/dispatch-recommendation-lease.test.ts -> apps/web/src/flight-line-shared.tsx",
     "apps/web/src/dispatch-recommendation-lease.test.ts -> apps/web/src/flight-line-view.tsx",
     "apps/web/src/features/admin/admin-v12.test.ts -> apps/web/src/FeatureRouter.tsx",
-    "apps/web/src/features/admin/admin-v12.test.ts -> apps/web/src/admin-view.tsx",
-    "apps/web/src/features/admin/event-parameters/event-parameters.test.ts -> apps/web/src/admin-view.tsx",
     "apps/web/src/features/auth/event-selection.test.ts -> apps/web/src/app/AppHeader.tsx",
     "apps/web/src/features/auth/event-selection.test.ts -> apps/web/src/app/navigation.ts",
     "apps/web/src/features/auth/event-selection.test.ts -> apps/web/src/features/auth/EventScopedApplication.tsx",
@@ -690,7 +687,6 @@
     "apps/web/src/notification-overlay.test.ts -> apps/web/src/cashier-view.tsx",
     "apps/web/src/notification-overlay.test.ts -> apps/web/src/flight-line-view.tsx",
     "apps/web/src/product-time-model-ui.test.ts -> apps/web/src/features/forecast-simulation/ScenarioEditor.tsx",
-    "apps/web/src/ux-consistency-ui.test.ts -> apps/web/src/admin-view.tsx",
     "apps/web/src/ux-consistency-ui.test.ts -> apps/web/src/cashier-view.tsx",
     "apps/web/src/ux-consistency-ui.test.ts -> apps/web/src/features/admin/products/ProductSalesDialog.tsx",
     "apps/web/src/ux-consistency-ui.test.ts -> apps/web/src/flight-line-view.tsx",
@@ -705,7 +701,6 @@
     "apps/web/src/v19-ui.test.ts -> apps/web/src/operation-workspace.tsx",
     "apps/worker/src/analysis-snapshot.test.ts -> apps/worker/src/analysis-snapshot.ts",
     "apps/worker/src/audit-coverage.test.ts -> apps/worker/src/daily-report.ts",
-    "apps/worker/src/cashier-ticket-attribution.test.ts -> apps/worker/src/event-coordinator.ts",
     "apps/worker/src/fids-board-projection.test.ts -> apps/worker/src/fids-board-projection.ts",
     "apps/worker/src/forecast-freshness-coverage.test.ts -> apps/worker/src/web-push.ts",
     "apps/worker/src/forecast-snapshot-coverage.test.ts -> apps/worker/src/backup.ts",
@@ -719,8 +714,6 @@
     "apps/worker/src/maintainability-coverage.test.ts -> packages/domain/src/index.ts",
     "apps/worker/src/maintainability-coverage.test.ts -> packages/domain/src/outage-recovery.ts",
     "apps/worker/src/maintainability-coverage.test.ts -> packages/domain/src/queue.ts",
-    "apps/worker/src/operational-note-permission.test.ts -> apps/worker/src/event-coordinator.ts",
-    "apps/worker/src/operational-note-permission.test.ts -> packages/domain/src/index.ts",
     "apps/worker/src/planning-capture.test.ts -> apps/worker/src/backup.ts",
     "apps/worker/src/planning-capture.test.ts -> apps/worker/src/event-deletion.ts",
     "apps/worker/src/planning-capture.test.ts -> apps/worker/src/factory-reset.ts",
@@ -729,8 +722,6 @@
     "apps/worker/src/public-status-v18.test.ts -> apps/worker/src/public-status-copy.ts",
     "apps/worker/src/pwa-installability.test.ts -> apps/web/vite.config.ts",
     "apps/worker/src/sale-capacity-policy.test.ts -> apps/web/src/cashier-view.tsx",
-    "apps/worker/src/sale-capacity-policy.test.ts -> apps/worker/src/event-coordinator.ts",
-    "apps/worker/src/sale-performance.test.ts -> apps/worker/src/event-coordinator.ts",
     "apps/worker/src/ticket-data-model.test.ts -> apps/web/src/cashier-view.tsx",
     "apps/worker/src/ticket-data-model.test.ts -> apps/web/src/operation-workspace.tsx",
     "apps/worker/src/ticket-data-model.test.ts -> apps/worker/src/fids-board-projection.ts",

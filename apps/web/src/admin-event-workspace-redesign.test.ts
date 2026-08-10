@@ -1,7 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import adminUxSource from "./admin-ux.tsx?raw";
-import adminViewSource from "./admin-view.tsx?raw";
 import turnaroundDialogSource from "./features/admin/aircraft/AircraftProductTurnaroundOverrideDialog.tsx?raw";
 import assignmentDialogSource from "./features/admin/aircraft/AircraftResourceGroupAssignmentDialog.tsx?raw";
 import completionSource from "./features/admin/completion/CompletionWorkspace.tsx?raw";
@@ -60,18 +59,15 @@ describe("event-scoped administration redesign", () => {
       expect(completionSource).toContain(label);
     }
     expect(completionSource).toContain("Korrektur beginnen");
-    expect(adminViewSource).not.toContain("Flotte, Tanken und Pausen");
   });
 
   it("provides an optional ninth operational-plan step and a simplified operation screen", () => {
     expect(adminUxSource).toContain('| "operational-plan"');
-    expect(adminViewSource).toContain("<LazyAdmin.AdminOperationalPlanPanel");
     expect(operationalPlanSource).toContain('label: "Einschränkungen"');
     expect(operationalPlanSource).toContain('label: "Wiederkehrende Regeln"');
     expect(operationsSource).toContain("release");
     expect(operationsSource).toContain("emergency");
     expect(operationsSource).toContain('className="operations-workspace-content"');
-    expect(adminViewSource).toContain("<LazyAdmin.AdminOperationsPanel");
     expect(operationsSource).not.toContain("OperationalPlanPanel");
     expect(operationsSource).not.toContain("Tabs");
   });
