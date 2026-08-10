@@ -13,7 +13,7 @@
     },
     {
       "path": "apps/web/src/admin-view.tsx",
-      "maxLines": 707,
+      "maxLines": 666,
       "targetLines": 700
     },
     {
@@ -24,6 +24,11 @@
     {
       "path": "apps/web/src/features/admin/AdminShellDialogs.tsx",
       "maxLines": 327,
+      "targetLines": 1500
+    },
+    {
+      "path": "apps/web/src/features/admin/useAdminShellState.ts",
+      "maxLines": 79,
       "targetLines": 1500
     },
     {

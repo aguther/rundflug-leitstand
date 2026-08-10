@@ -6,7 +6,6 @@ import {
   type SetupStep,
   ValidationHint,
 } from "./admin-ux";
-import { getPushConfiguration, getSetupStatus } from "./api";
 import { AppShell as Shell } from "./app/AppShell";
 import { PageNotice, useActionMessageBridge } from "./app/PageNotifications";
 import { Button, PageHeader, StatusPill } from "./design-system/components";
@@ -44,10 +43,7 @@ import { useMasterDataTemplateImport } from "./features/admin/master-data/useMas
 import { AdminOperationalPlanPanel } from "./features/admin/operational-plan/AdminOperationalPlanPanel";
 import { AdminOperationsPanel } from "./features/admin/operations/AdminOperationsPanel";
 import { AdminAccessStatusBar } from "./features/admin/overview/AdminAccessStatusBar";
-import {
-  AdminOverviewPanel,
-  type PushConfigurationStatus,
-} from "./features/admin/overview/AdminOverviewPanel";
+import { AdminOverviewPanel } from "./features/admin/overview/AdminOverviewPanel";
 import { AdminSimulationLauncher } from "./features/admin/overview/AdminSimulationLauncher";
 import { useAdminEventFlow } from "./features/admin/overview/useAdminEventFlow";
 import { usePilotEditorState } from "./features/admin/pilots/usePilotEditorState";
@@ -55,6 +51,7 @@ import { useProductEditorState } from "./features/admin/products/useProductEdito
 import { useResourceGroupEditorState } from "./features/admin/resource-groups/useResourceGroupEditorState";
 import { useAdminAuthorization } from "./features/admin/useAdminAuthorization";
 import { useAdminFactoryReset } from "./features/admin/useAdminFactoryReset";
+import { useAdminShellState } from "./features/admin/useAdminShellState";
 import { AnalysisWorkspace } from "./features/analysis/AnalysisWorkspace";
 import { AccountManagement } from "./features/auth/AccountManagement";
 import { useAuth } from "./features/auth/AuthContext";
@@ -116,37 +113,23 @@ export function AdminView() {
     aircraftId: initialAdminParams.get("aircraftId") ?? "",
     handled: false,
   });
-  const [busyActionKey, setBusyActionKey] = useState<string | null>(null);
-  const [logoutBusy, setLogoutBusy] = useState(false);
+  const {
+    busyActionKey,
+    logoutAndReload,
+    logoutBusy,
+    pushConfigurationStatus,
+    runBusyAction,
+    setupRequired,
+  } = useAdminShellState({ boardAvailable: Boolean(board), logout });
   const initialMasterSelectionRef = useRef(false);
   const [assignmentDialogContext, setAssignmentDialogContext] =
     useState<AircraftResourceGroupAssignmentContext | null>(null);
   const [turnaroundDialogContext, setTurnaroundDialogContext] =
     useState<TurnaroundOverrideContext | null>(null);
-  async function runBusyAction(key: string, action: () => Promise<void>) {
-    if (busyActionKey) return;
-    setBusyActionKey(key);
-    try {
-      await action();
-    } finally {
-      setBusyActionKey(null);
-    }
-  }
-
-  async function logoutAndReload() {
-    setLogoutBusy(true);
-    try {
-      await logout();
-      window.location.reload();
-    } finally {
-      setLogoutBusy(false);
-    }
-  }
   const [saleClosesAt, setSaleClosesAt] = useState("");
   const [salesProductId, setSalesProductId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   useActionMessageBridge(message, setMessage);
-  const [setupRequired, setSetupRequired] = useState(false);
   const adminHistory = useAdminHistory({
     activeArea: adminArea,
     activeEventStep: eventStep,
@@ -155,30 +138,6 @@ export function AdminView() {
   });
   const refreshHistory = adminHistory.refreshAuditHistory;
   const pilotEditor = usePilotEditorState(board?.pilots);
-  const [pushConfigurationStatus, setPushConfigurationStatus] =
-    useState<PushConfigurationStatus>("loading");
-  useEffect(() => {
-    const controller = new AbortController();
-    void getPushConfiguration(controller.signal)
-      .then((configuration) =>
-        setPushConfigurationStatus(configuration.configured ? "configured" : "missing"),
-      )
-      .catch((cause) => {
-        if (!(cause instanceof DOMException && cause.name === "AbortError")) {
-          setPushConfigurationStatus("unavailable");
-        }
-      });
-    return () => controller.abort();
-  }, []);
-  useEffect(() => {
-    if (board) {
-      setSetupRequired(false);
-      return;
-    }
-    void getSetupStatus()
-      .then((result) => setSetupRequired(result.setupRequired))
-      .catch(() => setSetupRequired(false));
-  }, [board]);
   const productEditor = useProductEditorState(board);
   const gateEditor = useGateEditorState(board?.gates);
   const [manifestCorrectionResetKey, setManifestCorrectionResetKey] = useState(0);
