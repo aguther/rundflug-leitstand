@@ -25,10 +25,11 @@ import { AssistClaimService } from "./assist-claim-service";
 import { AttendanceCommandService } from "./attendance-command-service";
 import {
   loadCommandPreflightReads,
-  type PlannedOperationRow,
   plannedOperationExpectation,
   scopedCommandTarget,
 } from "./command-preflight";
+import { CommandPreflightService } from "./command-preflight-service";
+import type { PlannedOperationRow } from "./command-preflight-types";
 import { CoordinatorRealtimeService } from "./coordinator-realtime-service";
 import { sha256Hex, verifyCredential } from "./crypto";
 import { DispatchRecommendationLeaseService } from "./dispatch-recommendation-lease-service";
@@ -59,7 +60,6 @@ import type { Env, StoredEventRow } from "./types";
 const JSON_HEADERS = { "content-type": "application/json; charset=utf-8" } as const;
 const FORECAST_TICK_INTERVAL_MS = 30_000;
 const FORECAST_COMMAND_DEBOUNCE_MS = 150;
-const ASSIST_CLAIM_TTL_MS = 30 * 60_000;
 
 export type {
   AnalysisSnapshotCaptureInput,
@@ -115,6 +115,7 @@ export class EventCoordinator extends DurableObject<Env> {
     (pathname) => this.eventIdFromPath(pathname),
     (eventVersion, eventType) => this.broadcastBoardRefresh(eventVersion, eventType),
   );
+  private readonly commandPreflight = new CommandPreflightService(this.env.DB);
   private readonly plannedOperationCommands = new PlannedOperationCommandService(
     this.env,
     (result) => this.broadcast(result),
@@ -520,21 +521,24 @@ export class EventCoordinator extends DurableObject<Env> {
     }
 
     try {
-      const prior = await this.env.DB.prepare(
-        "SELECT response_json FROM idempotency_receipts WHERE command_id = ?1",
-      )
-        .bind(command.commandId)
-        .first<{ response_json: string }>();
-      if (prior) {
-        const stored = commandResultSchema.parse(JSON.parse(prior.response_json));
-        return json({ ...stored, duplicate: true });
-      }
-
       const operatorRole = request.headers.get("x-operator-role") as DeviceRole | null;
       const operatorDeviceId = request.headers.get("x-operator-device-id");
+      const trustedOperatorRole =
+        operatorRole && operatorDeviceId === command.deviceId ? operatorRole : null;
+      if (!trustedOperatorRole) {
+        const prior = await this.env.DB.prepare(
+          "SELECT response_json FROM idempotency_receipts WHERE command_id = ?1",
+        )
+          .bind(command.commandId)
+          .first<{ response_json: string }>();
+        if (prior) {
+          const stored = commandResultSchema.parse(JSON.parse(prior.response_json));
+          return json({ ...stored, duplicate: true });
+        }
+      }
       let device: { role: DeviceRole; credential_hash: string | null } | null = null;
-      if (operatorRole && operatorDeviceId === command.deviceId) {
-        device = { role: operatorRole, credential_hash: null };
+      if (trustedOperatorRole) {
+        device = { role: trustedOperatorRole, credential_hash: null };
       } else {
         device = await this.env.DB.prepare(
           `SELECT role, credential_hash
@@ -556,7 +560,19 @@ export class EventCoordinator extends DurableObject<Env> {
           .bind(new Date().toISOString(), command.deviceId)
           .run();
       }
-
+      const operatorAccountId = request.headers.get("x-operator-account-id");
+      const commandNow = new Date();
+      const trustedPreflight = trustedOperatorRole
+        ? await this.commandPreflight.loadTrusted({
+            command,
+            deviceRole: device.role,
+            operatorAccountId,
+            now: commandNow,
+          })
+        : null;
+      if (trustedPreflight?.duplicateResult) {
+        return json({ ...trustedPreflight.duplicateResult, duplicate: true });
+      }
       try {
         assertRoleMayExecute(device.role, command.type as OperationalCommandType);
         if (command.type === "STAGE_OUTAGE_RECOVERY") {
@@ -571,27 +587,16 @@ export class EventCoordinator extends DurableObject<Env> {
         throw reason;
       }
 
-      const operatorAccountId = request.headers.get("x-operator-account-id");
-      const commandNow = new Date();
-      const preflight = await loadCommandPreflightReads({
-        db: this.env.DB,
-        command,
-        deviceRole: device.role,
-        operatorAccountId,
-        nowIso: commandNow.toISOString(),
-      });
-      if (preflight.durationMs >= 50) {
-        console.log(
-          JSON.stringify({
-            level: "info",
-            code: "SLOW_COMMAND_PREFLIGHT",
-            commandType: command.type,
-            durationMs: Math.round(preflight.durationMs),
-            batchCount: preflight.batchCount,
-            statementCount: preflight.statementCount,
-          }),
-        );
-      }
+      const preflight =
+        trustedPreflight?.reads ??
+        (await loadCommandPreflightReads({
+          db: this.env.DB,
+          command,
+          deviceRole: device.role,
+          operatorAccountId,
+          nowIso: commandNow.toISOString(),
+        }));
+      let trustedPreflightD1CallCount = trustedPreflight?.d1CallCount ?? 0;
       const current = preflight.current;
       if (!current) {
         return json(
@@ -645,21 +650,15 @@ export class EventCoordinator extends DurableObject<Env> {
         }
       }
       if (operatorAccountId && activeOperatorClaim) {
-        await this.env.DB.prepare(
-          `UPDATE flight_line_assist_claims
-              SET expires_at = ?1, revision = revision + 1
-            WHERE operation_day_id = ?2 AND operator_account_id = ?3
-              AND revision = ?4 AND expires_at > ?5`,
-        )
-          .bind(
-            new Date(commandNow.getTime() + ASSIST_CLAIM_TTL_MS).toISOString(),
-            command.eventId,
-            operatorAccountId,
-            activeOperatorClaim.revision,
-            commandNow.toISOString(),
-          )
-          .run();
+        const renewal = await this.commandPreflight.renewActiveClaim({
+          command,
+          operatorAccountId,
+          claim: activeOperatorClaim,
+          now: commandNow,
+        });
+        if (trustedPreflight) trustedPreflightD1CallCount += renewal.d1CallCount;
       }
+      this.commandPreflight.logSlowReads(command.type, preflight, trustedPreflightD1CallCount);
 
       if (command.type === "SELL_TICKET_GROUP") {
         const salePreflightStartedAt = performance.now();

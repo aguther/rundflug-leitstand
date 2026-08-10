@@ -3,7 +3,7 @@
   "sizeBudgets": [
     {
       "path": "apps/worker/src/event-coordinator.ts",
-      "maxLines": 1395,
+      "maxLines": 1394,
       "targetLines": 1500
     },
     {
@@ -120,7 +120,17 @@
   "extractedModuleBudgets": [
     {
       "path": "apps/worker/src/command-preflight.ts",
-      "maxLines": 259,
+      "maxLines": 241,
+      "targetLines": 1500
+    },
+    {
+      "path": "apps/worker/src/command-preflight-service.ts",
+      "maxLines": 93,
+      "targetLines": 1500
+    },
+    {
+      "path": "apps/worker/src/command-preflight-types.ts",
+      "maxLines": 42,
       "targetLines": 1500
     },
     {

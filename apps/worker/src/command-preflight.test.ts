@@ -153,6 +153,7 @@ describe("command preflight", () => {
 
     expect(batch).toHaveBeenCalledOnce();
     expect(result.statementCount).toBe(1);
+    expect(result.idempotencyResponseJson).toBeNull();
     expect(result.aggregateVersion).toBeNull();
     expect(result.plannedOperation).toBeNull();
     expect(result.activeOperatorClaim).toBeNull();

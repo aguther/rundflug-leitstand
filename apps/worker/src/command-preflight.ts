@@ -1,48 +1,17 @@
 import type { CommandEnvelope, CommandPrecondition } from "@rundflug/contracts";
 import type { DeviceRole } from "@rundflug/domain";
+import type {
+  ActiveOperatorClaimRow,
+  CommandAggregateTarget,
+  CommandPreflightReads,
+  PlannedOperationExpectation,
+  PlannedOperationRow,
+} from "./command-preflight-types";
 import type { StoredEventRow } from "./types";
-
-export interface CommandAggregateTarget {
-  aggregateType: CommandPrecondition["aggregateType"];
-  aggregateId: string;
-}
-
-export interface PlannedOperationRow {
-  scope_type: "EVENT" | "RESOURCE_GROUP" | "AIRCRAFT" | "PILOT";
-  scope_id: string;
-  status: "PLANNED" | "ACTIVE" | "CLEARED" | "CANCELED";
-  effect_mode: "BLOCKING" | "SLOWDOWN";
-}
-
-export interface ActiveOperatorClaimRow {
-  aircraft_id: string;
-  revision: number;
-}
-
-export type PlannedOperationExpectation =
-  | { kind: "none" }
-  | { kind: "unsupported"; plannedOperationId: string }
-  | {
-      kind: "supported";
-      plannedOperationId: string;
-      scopeType: PlannedOperationRow["scope_type"];
-      scopeId: string;
-      activating: boolean;
-    };
-
-export interface CommandPreflightReads {
-  current: StoredEventRow | null;
-  aggregateVersion: number | null;
-  plannedOperation: PlannedOperationRow | null;
-  activeOperatorClaim: ActiveOperatorClaimRow | null;
-  targetRotationAircraftId: string | null;
-  batchCount: 1;
-  statementCount: number;
-  durationMs: number;
-}
 
 type CommandPreflightRow =
   | StoredEventRow
+  | { response_json: string }
   | { version: number }
   | PlannedOperationRow
   | ActiveOperatorClaimRow
@@ -54,10 +23,12 @@ interface CommandPreflightInput {
   deviceRole: DeviceRole;
   operatorAccountId: string | null;
   nowIso: string;
+  includeIdempotencyReceipt?: boolean;
 }
 
 interface StatementIndexes {
-  current: number;
+  idempotencyReceipt?: number;
+  current?: number;
   aggregateVersion?: number;
   plannedOperation?: number;
   activeOperatorClaim?: number;
@@ -169,11 +140,19 @@ export async function loadCommandPreflightReads({
   deviceRole,
   operatorAccountId,
   nowIso,
+  includeIdempotencyReceipt = false,
 }: CommandPreflightInput): Promise<CommandPreflightReads> {
   const statements: D1PreparedStatement[] = [];
-  const indexes: StatementIndexes = {
-    current: addStatement(statements, db.prepare(EVENT_PROJECTION).bind(command.eventId)),
-  };
+  const indexes: StatementIndexes = {};
+  if (includeIdempotencyReceipt) {
+    indexes.idempotencyReceipt = addStatement(
+      statements,
+      db
+        .prepare("SELECT response_json FROM idempotency_receipts WHERE command_id = ?1")
+        .bind(command.commandId),
+    );
+  }
+  indexes.current = addStatement(statements, db.prepare(EVENT_PROJECTION).bind(command.eventId));
 
   const aggregatePrecondition = matchingAggregatePrecondition(command);
   if (aggregatePrecondition) {
@@ -247,6 +226,9 @@ export async function loadCommandPreflightReads({
   const targetRotation = firstRow<{ aircraft_id: string | null }>(results, indexes.targetRotation);
 
   return {
+    idempotencyResponseJson:
+      firstRow<{ response_json: string }>(results, indexes.idempotencyReceipt)?.response_json ??
+      null,
     current: firstRow<StoredEventRow>(results, indexes.current),
     aggregateVersion: aggregate?.version ?? null,
     plannedOperation: firstRow<PlannedOperationRow>(results, indexes.plannedOperation),
