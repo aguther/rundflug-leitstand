@@ -186,9 +186,6 @@ describe("V1.5 administration UI", () => {
     expect(adminViewSource).toContain(
       "Tickets, Ist-Verläufe und operative Zustände werden nicht exportiert.",
     );
-    expect(adminViewSource).toMatch(/>\s*Importieren\s*<\/Button>/);
-    expect(adminViewSource).toContain("templateValidation.counts");
-    expect(adminViewSource).toContain('size="wide"');
   });
 
   it("uses explicit touch actions instead of clickable master-data rows", () => {

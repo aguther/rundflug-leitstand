@@ -57,9 +57,6 @@ describe("unified master-data dialogs and stable event workspace", () => {
   });
 
   it("uses content-appropriate shared modal sizes and neutral editor actions", () => {
-    expect(adminViewSource).toMatch(
-      /masterDataCategory === "pilots"[\s\S]*?size="default"[\s\S]*?Pilotencode/,
-    );
     expect(adminEventStyles).toContain(".master-data-editor-dialog.ds-modal-dialog--wide");
     expect(adminEventStyles).toContain(".master-data-editor-dialog.ds-modal-dialog--default");
     expect(adminViewSource).toContain('className="master-editor-delete-footer"');
@@ -94,12 +91,8 @@ describe("unified master-data dialogs and stable event workspace", () => {
     );
   });
 
-  it("keeps status, discard, delete, import and PIN flows in the shared modal language", () => {
+  it("keeps status and discard flows in the shared modal language", () => {
     expect(adminViewSource).toContain('title="Änderungen verwerfen?"');
     expect(adminViewSource).toContain("Weiter bearbeiten");
-    expect(adminViewSource).toContain("Endgültig löschen");
-    expect(adminViewSource).toContain('initialFocusSelector="[data-master-delete-cancel]"');
-    expect(adminViewSource).toContain('title="Stammdatenvorlage importieren"');
-    expect(adminViewSource).toMatch(/>\s*Importieren\s*<\/Button>/);
   });
 });

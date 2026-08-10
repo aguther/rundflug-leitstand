@@ -115,7 +115,6 @@ describe("V1 administration completion UI", () => {
     expect(appSource).toContain("Speichern");
     expect(appSource).toContain("Abbrechen");
     expect(appSource).toContain("Löschen");
-    expect(appSource).toContain("Endgültig löschen");
     expect(appSource).not.toContain(">Gate speichern<");
     expect(appSource).not.toContain(">Ressourcengruppe speichern<");
     expect(appSource).not.toContain(">Flugzeug speichern<");
@@ -142,8 +141,6 @@ describe("V1 administration completion UI", () => {
     expect(appSource).toContain("function cancelMasterDelete()");
     expect(appSource).toContain("setPendingMasterDelete(null)");
     expect(appSource).toContain("setMasterEditorOpen(true)");
-    expect(appSource).toContain('initialFocusSelector="[data-master-delete-cancel]"');
-    expect(appSource).toContain('role="alertdialog"');
   });
 
   it("separates administrative evaluation from operational flight-line work", () => {

@@ -95,6 +95,10 @@ import { FactoryResetDialog } from "./features/admin/FactoryResetDialog";
 import { GateEditorDialog } from "./features/admin/gates/GateEditorDialog";
 import { GatesWorkspace } from "./features/admin/gates/GatesWorkspace";
 import { useGateEditorState } from "./features/admin/gates/useGateEditorState";
+import {
+  MasterDataDeleteDialog,
+  MasterDataTemplateImportDialog,
+} from "./features/admin/master-data/MasterDataManagementDialogs";
 import { MasterDataPagination } from "./features/admin/master-data/MasterDataPagination";
 import {
   MasterDataEmptyState,
@@ -3838,194 +3842,28 @@ export function AdminView() {
             onSubmit={() => void confirmAdminPinDialog()}
             pin={adminPin}
           />
-          {pendingMasterDelete ? (
-            <ModalDialog
-              bodyClassName="master-delete-dialog-body"
-              className="master-delete-dialog"
-              closeLabel="Löschen abbrechen"
-              description="Diese Aktion entfernt den Datensatz dauerhaft und wird dem angemeldeten Konto zugeordnet und protokolliert."
-              footer={
-                <>
-                  <Button data-master-delete-cancel onClick={cancelMasterDelete} type="button">
-                    Abbrechen
-                  </Button>
-                  <Button
-                    busy={busyActionKey === "master-delete"}
-                    disabled={
-                      board?.event.status !== "PREPARATION" ||
-                      pendingMasterDelete.blockers.length > 0 ||
-                      adminPin.length < 4
-                    }
-                    onClick={() => void runBusyAction("master-delete", confirmMasterDelete)}
-                    type="button"
-                    variant="danger"
-                  >
-                    Endgültig löschen
-                  </Button>
-                </>
-              }
-              initialFocusSelector="[data-master-delete-cancel]"
-              onClose={cancelMasterDelete}
-              open
-              role="alertdialog"
-              size="default"
-              title={
-                <span className="master-delete-title">
-                  <Trash2 aria-hidden="true" />
-                  {pendingMasterDelete.label} endgültig löschen?
-                </span>
-              }
-            >
-              <div className="master-delete-record">
-                <strong>{pendingMasterDelete.label}</strong>
-                <span>Administrativer Stammdatensatz</span>
-              </div>
-              <section aria-labelledby="master-delete-effects">
-                <h3 id="master-delete-effects">Auswirkungen</h3>
-                {board?.event.status !== "PREPARATION" ? (
-                  <div className="delete-blockers" role="status">
-                    <strong>Löschen ist nach Betriebsfreigabe gesperrt.</strong>
-                    <span>Stammdaten können jetzt nur noch deaktiviert werden.</span>
-                  </div>
-                ) : pendingMasterDelete.blockers.length > 0 ? (
-                  <div className="delete-blockers" role="status">
-                    <strong>Löschen noch nicht möglich</strong>
-                    <span>Zuerst entfernen:</span>
-                    <ul>
-                      {pendingMasterDelete.blockers.map((blocker) => (
-                        <li key={blocker}>{blocker}</li>
-                      ))}
-                    </ul>
-                  </div>
-                ) : (
-                  <div className="delete-ready-copy">
-                    <CheckCircle2 aria-hidden="true" />
-                    <span>
-                      Keine erkennbaren Abhängigkeiten. Der Server prüft sie vor dem Löschen erneut.
-                    </span>
-                  </div>
-                )}
-              </section>
-              {!adminModeUnlocked ? (
-                <div className="ds-field master-delete-pin-field">
-                  <label htmlFor="master-delete-pin">Administrator-PIN</label>
-                  <input
-                    autoComplete="current-password"
-                    id="master-delete-pin"
-                    onChange={(event) => setAdminPin(event.target.value)}
-                    ref={adminPinInputRef}
-                    type="password"
-                    value={adminPin}
-                  />
-                </div>
-              ) : (
-                <ValidationHint>
-                  Der Entwurf bleibt erhalten. Zum Löschen ist weiterhin diese ausdrückliche
-                  Bestätigung erforderlich.
-                </ValidationHint>
-              )}
-              <p className="master-delete-audit-note">
-                Einheitlicher Audit-Grund: Administrative Stammdatenlöschung
-              </p>
-            </ModalDialog>
-          ) : null}
-          <ModalDialog
-            description="Versionierte Stammdaten werden geprüft und ausschließlich atomar in eine leere Veranstaltung in Vorbereitung importiert."
-            footer={
-              <>
-                <Button
-                  disabled={templateBusy}
-                  onClick={() => setTemplateDialogOpen(false)}
-                  type="button"
-                >
-                  Abbrechen
-                </Button>
-                <Button
-                  busy={templateBusy}
-                  disabled={
-                    !templateDraft ||
-                    !templateValidation?.valid ||
-                    !templateValidation.targetEligible
-                  }
-                  onClick={() => void applyMasterDataTemplate()}
-                  type="button"
-                  variant="primary"
-                >
-                  Importieren
-                </Button>
-              </>
-            }
-            onClose={() => {
-              if (!templateBusy) setTemplateDialogOpen(false);
-            }}
+          <MasterDataDeleteDialog
+            busy={busyActionKey === "master-delete"}
+            eventStatus={board?.event.status}
+            inputRef={adminPinInputRef}
+            modeUnlocked={adminModeUnlocked}
+            onCancel={cancelMasterDelete}
+            onConfirm={() => void runBusyAction("master-delete", confirmMasterDelete)}
+            onPinChange={setAdminPin}
+            pin={adminPin}
+            target={pendingMasterDelete}
+          />
+          <MasterDataTemplateImportDialog
+            busy={templateBusy}
+            draft={templateDraft}
+            error={templateError}
+            fileName={templateFileName}
+            onClose={() => setTemplateDialogOpen(false)}
+            onFile={(file) => void readMasterDataTemplate(file)}
+            onImport={() => void applyMasterDataTemplate()}
             open={templateDialogOpen}
-            size="wide"
-            title="Stammdatenvorlage importieren"
-          >
-            <div className="template-import-dialog">
-              <Field
-                help="JSON-Datei im Format rundflug-master-data-template, Version 1, höchstens 1 MiB."
-                label="Vorlagendatei"
-              >
-                <input
-                  accept="application/json,.json"
-                  disabled={templateBusy}
-                  onChange={(event) => void readMasterDataTemplate(event.target.files?.[0] ?? null)}
-                  type="file"
-                />
-              </Field>
-              {templateFileName ? <p className="help-text">{templateFileName}</p> : null}
-              {templateBusy ? <p role="status">Vorlage wird geprüft …</p> : null}
-              {templateError ? <ValidationHint tone="error">{templateError}</ValidationHint> : null}
-              {templateValidation ? (
-                <>
-                  <div className="template-counts">
-                    <span className="visually-hidden">Inhalt der Vorlage:</span>
-                    <span>
-                      <strong>{templateValidation.counts.gates}</strong> Gates
-                    </span>
-                    <span>
-                      <strong>{templateValidation.counts.resourceGroups}</strong> Gruppen
-                    </span>
-                    <span>
-                      <strong>{templateValidation.counts.aircraft}</strong> Flugzeuge
-                    </span>
-                    <span>
-                      <strong>{templateValidation.counts.assignments}</strong> Zuordnungen
-                    </span>
-                    <span>
-                      <strong>{templateValidation.counts.pilots}</strong> Pilotencodes
-                    </span>
-                    <span>
-                      <strong>{templateValidation.counts.products}</strong> Produkte
-                    </span>
-                  </div>
-                  {!templateValidation.targetEligible ? (
-                    <ValidationHint tone="error">
-                      Das Ziel muss leer und im Status Vorbereitung sein. Vorhandene Stammdaten
-                      werden weder zusammengeführt noch ersetzt.
-                    </ValidationHint>
-                  ) : null}
-                  {templateValidation.errors.map((entry) => (
-                    <ValidationHint key={`${entry.path}-${entry.message}`} tone="error">
-                      {entry.path}: {entry.message}
-                    </ValidationHint>
-                  ))}
-                  {templateValidation.warnings.map((warning) => (
-                    <ValidationHint key={warning} tone="warning">
-                      {warning}
-                    </ValidationHint>
-                  ))}
-                  {templateValidation.valid && templateValidation.targetEligible ? (
-                    <ValidationHint>
-                      Die Vorlage ist gültig. Der Import erzeugt neue veranstaltungsbezogene
-                      Kennungen und genau einen auditierten Versionssprung.
-                    </ValidationHint>
-                  ) : null}
-                </>
-              ) : null}
-            </div>
-          </ModalDialog>
+            validation={templateValidation}
+          />
           <ConfirmationDialog
             body={
               <p>
