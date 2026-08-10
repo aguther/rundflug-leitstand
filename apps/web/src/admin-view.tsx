@@ -1,4 +1,4 @@
-import type { AdminEventFlow, EventLogoTheme, OperationBoard } from "@rundflug/contracts";
+import type { EventLogoTheme, OperationBoard } from "@rundflug/contracts";
 import { ExternalLink, FlaskConical, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { hasMasterEditorChanges } from "./admin-master-editor-state";
@@ -19,7 +19,6 @@ import {
   downloadSimulationPlan,
   downloadTicketRawData,
   factoryReset,
-  getAdminEventFlow,
   getPushConfiguration,
   getSetupStatus,
   removeEventLogo,
@@ -83,6 +82,7 @@ import {
   AdminOverviewPanel,
   type PushConfigurationStatus,
 } from "./features/admin/overview/AdminOverviewPanel";
+import { useAdminEventFlow } from "./features/admin/overview/useAdminEventFlow";
 import { PilotCodesWorkspace } from "./features/admin/pilots/PilotCodesWorkspace";
 import { PilotEditorDialog } from "./features/admin/pilots/PilotEditorDialog";
 import { usePilotEditorState } from "./features/admin/pilots/usePilotEditorState";
@@ -337,9 +337,6 @@ export function AdminView() {
   const masterEditorDirty =
     masterEditorOpen &&
     hasMasterEditorChanges(initialMasterEditorSnapshotRef.current, currentMasterEditorSnapshot);
-  const [eventFlow, setEventFlow] = useState<AdminEventFlow | null>(null);
-  const [eventFlowError, setEventFlowError] = useState<string | null>(null);
-  const [eventFlowLoading, setEventFlowLoading] = useState(true);
   const [eventDialogView, setEventDialogView] = useState<"closed" | "catalog" | "create">("closed");
   const [factoryResetOpen, setFactoryResetOpen] = useState(false);
   const [factoryResetBusy, setFactoryResetBusy] = useState(false);
@@ -368,31 +365,11 @@ export function AdminView() {
     onRefreshEvents: eventCatalog.refreshEvents,
     onRefreshHistory: refreshHistory,
   });
-
-  useEffect(() => {
-    if (eventVersion === undefined || adminArea !== "overview" || !isAdministrator) return;
-    const controller = new AbortController();
-    setEventFlowLoading(true);
-    setEventFlowError(null);
-    void getAdminEventFlow(
-      EVENT_ID,
-      ADMIN_DEVICE_ID,
-      deviceTokenFor(ADMIN_DEVICE_ID),
-      controller.signal,
-    )
-      .then(setEventFlow)
-      .catch((cause) => {
-        if (!(cause instanceof DOMException && cause.name === "AbortError")) {
-          setEventFlowError(
-            cause instanceof Error ? cause.message : "Ticketverlauf nicht verfügbar.",
-          );
-        }
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setEventFlowLoading(false);
-      });
-    return () => controller.abort();
-  }, [adminArea, eventVersion, isAdministrator]);
+  const eventFlow = useAdminEventFlow({
+    active: adminArea === "overview",
+    administrator: isAdministrator,
+    eventVersion,
+  });
 
   useEffect(() => {
     if (
@@ -2022,9 +1999,9 @@ export function AdminView() {
             {board && adminArea === "overview" ? (
               <AdminOverviewPanel
                 board={board}
-                eventFlow={eventFlow}
-                eventFlowError={eventFlowError}
-                eventFlowLoading={eventFlowLoading}
+                eventFlow={eventFlow.flow}
+                eventFlowError={eventFlow.error}
+                eventFlowLoading={eventFlow.loading}
                 pushConfigurationStatus={pushConfigurationStatus}
               />
             ) : null}
