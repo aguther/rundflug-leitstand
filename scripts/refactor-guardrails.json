@@ -13,12 +13,17 @@
     },
     {
       "path": "apps/web/src/admin-view.tsx",
-      "maxLines": 2675,
+      "maxLines": 2590,
       "targetLines": 700
     },
     {
       "path": "apps/web/src/features/admin/event-workspace/useAdminEventCatalog.ts",
       "maxLines": 199,
+      "targetLines": 1500
+    },
+    {
+      "path": "apps/web/src/features/admin/master-data/useMasterDataTemplateImport.ts",
+      "maxLines": 119,
       "targetLines": 1500
     },
     {

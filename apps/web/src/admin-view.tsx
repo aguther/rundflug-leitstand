@@ -1,11 +1,4 @@
-import type {
-  AdminEventFlow,
-  EventLogoTheme,
-  MasterDataTemplate,
-  MasterDataTemplateValidation,
-  OperationBoard,
-} from "@rundflug/contracts";
-import { masterDataTemplateSchema } from "@rundflug/contracts";
+import type { AdminEventFlow, EventLogoTheme, OperationBoard } from "@rundflug/contracts";
 import { ExternalLink, FlaskConical, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { hasMasterEditorChanges } from "./admin-master-editor-state";
@@ -29,11 +22,9 @@ import {
   getAdminEventFlow,
   getPushConfiguration,
   getSetupStatus,
-  importMasterDataTemplate,
   removeEventLogo,
   sendCommand,
   uploadEventLogo,
-  validateMasterDataTemplate,
   verifyAdminPin,
 } from "./api";
 import { AppShell as Shell } from "./app/AppShell";
@@ -84,6 +75,7 @@ import {
   MasterDataWorkspace,
 } from "./features/admin/master-data/MasterDataWorkspace";
 import { ResourceAircraftEditorDialog } from "./features/admin/master-data/ResourceAircraftEditorDialog";
+import { useMasterDataTemplateImport } from "./features/admin/master-data/useMasterDataTemplateImport";
 import { AdminOperationalPlanPanel } from "./features/admin/operational-plan/AdminOperationalPlanPanel";
 import { AdminOperationsPanel } from "./features/admin/operations/AdminOperationsPanel";
 import { AdminAccessStatusBar } from "./features/admin/overview/AdminAccessStatusBar";
@@ -349,14 +341,6 @@ export function AdminView() {
   const [eventFlowError, setEventFlowError] = useState<string | null>(null);
   const [eventFlowLoading, setEventFlowLoading] = useState(true);
   const [eventDialogView, setEventDialogView] = useState<"closed" | "catalog" | "create">("closed");
-  const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
-  const [templateFileName, setTemplateFileName] = useState("");
-  const [templateDraft, setTemplateDraft] = useState<MasterDataTemplate | null>(null);
-  const [templateValidation, setTemplateValidation] = useState<MasterDataTemplateValidation | null>(
-    null,
-  );
-  const [templateError, setTemplateError] = useState<string | null>(null);
-  const [templateBusy, setTemplateBusy] = useState(false);
   const [factoryResetOpen, setFactoryResetOpen] = useState(false);
   const [factoryResetBusy, setFactoryResetBusy] = useState(false);
   const [factoryResetError, setFactoryResetError] = useState<string | null>(null);
@@ -376,6 +360,13 @@ export function AdminView() {
     onMessage: setMessage,
     onViewChange: setEventDialogView,
     view: eventDialogView,
+  });
+  const templateImport = useMasterDataTemplateImport({
+    board,
+    onMessage: setMessage,
+    onRefreshBoard: refresh,
+    onRefreshEvents: eventCatalog.refreshEvents,
+    onRefreshHistory: refreshHistory,
   });
 
   useEffect(() => {
@@ -451,78 +442,6 @@ export function AdminView() {
   async function exportSimulationPlan() {
     await downloadSimulationPlan(EVENT_ID, ADMIN_DEVICE_ID, deviceTokenFor(ADMIN_DEVICE_ID));
     setMessage("Stammdaten und offener Betriebsplan wurden für die Simulation exportiert.");
-  }
-
-  async function readMasterDataTemplate(file: File | null) {
-    setTemplateDraft(null);
-    setTemplateValidation(null);
-    setTemplateError(null);
-    setTemplateFileName(file?.name ?? "");
-    if (!file) return;
-    if (file.size > 1_048_576) {
-      setTemplateError("Die Vorlagendatei darf höchstens 1 MiB groß sein.");
-      return;
-    }
-    setTemplateBusy(true);
-    try {
-      const parsedJson = JSON.parse(await file.text()) as unknown;
-      const parsedTemplate = masterDataTemplateSchema.safeParse(parsedJson);
-      if (!parsedTemplate.success) {
-        throw new Error(parsedTemplate.error.issues[0]?.message ?? "Ungültige Vorlage.");
-      }
-      setTemplateDraft(parsedTemplate.data);
-      const validation = await validateMasterDataTemplate(
-        EVENT_ID,
-        ADMIN_DEVICE_ID,
-        deviceTokenFor(ADMIN_DEVICE_ID),
-        parsedTemplate.data,
-      );
-      setTemplateValidation(validation);
-    } catch (cause) {
-      setTemplateError(
-        cause instanceof Error ? cause.message : "Die Vorlagendatei konnte nicht gelesen werden.",
-      );
-    } finally {
-      setTemplateBusy(false);
-    }
-  }
-
-  async function applyMasterDataTemplate() {
-    if (
-      !board ||
-      !templateDraft ||
-      !templateValidation?.valid ||
-      !templateValidation.targetEligible
-    ) {
-      return;
-    }
-    setTemplateBusy(true);
-    setTemplateError(null);
-    try {
-      const result = await importMasterDataTemplate(
-        EVENT_ID,
-        ADMIN_DEVICE_ID,
-        deviceTokenFor(ADMIN_DEVICE_ID),
-        {
-          commandId: crypto.randomUUID(),
-          expectedVersion: board.event.version,
-          template: templateDraft,
-        },
-      );
-      setTemplateDialogOpen(false);
-      setMessage(
-        `Stammdatenvorlage importiert: ${result.counts.gates} Gates, ${result.counts.resourceGroups} Ressourcengruppen, ${result.counts.aircraft} Flugzeuge, ${result.counts.pilots} Pilotencodes und ${result.counts.products} Produkte.`,
-      );
-      await Promise.all([refresh(), eventCatalog.refreshEvents(), refreshHistory()]);
-    } catch (cause) {
-      setTemplateError(
-        cause instanceof Error
-          ? cause.message
-          : "Stammdatenvorlage konnte nicht importiert werden.",
-      );
-    } finally {
-      setTemplateBusy(false);
-    }
   }
 
   function lockAdminMode(messageText = "Bearbeitungsmodus gesperrt.") {
@@ -2075,11 +1994,7 @@ export function AdminView() {
                 void runBusyAction("export-master-data-template", eventCatalog.exportTemplate)
               }
               onImport={() => {
-                setTemplateDraft(null);
-                setTemplateValidation(null);
-                setTemplateError(null);
-                setTemplateFileName("");
-                setTemplateDialogOpen(true);
+                templateImport.openDialog();
               }}
               onOpenCreate={eventCatalog.openCreation}
               onSearchChange={eventCatalog.setSearch}
@@ -2614,15 +2529,15 @@ export function AdminView() {
             target={pendingMasterDelete}
           />
           <MasterDataTemplateImportDialog
-            busy={templateBusy}
-            draft={templateDraft}
-            error={templateError}
-            fileName={templateFileName}
-            onClose={() => setTemplateDialogOpen(false)}
-            onFile={(file) => void readMasterDataTemplate(file)}
-            onImport={() => void applyMasterDataTemplate()}
-            open={templateDialogOpen}
-            validation={templateValidation}
+            busy={templateImport.busy}
+            draft={templateImport.draft}
+            error={templateImport.error}
+            fileName={templateImport.fileName}
+            onClose={templateImport.closeDialog}
+            onFile={(file) => void templateImport.readFile(file)}
+            onImport={() => void templateImport.applyTemplate()}
+            open={templateImport.open}
+            validation={templateImport.validation}
           />
           <ConfirmationDialog
             body={
