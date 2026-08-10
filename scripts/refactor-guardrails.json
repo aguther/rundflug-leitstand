@@ -13,7 +13,7 @@
     },
     {
       "path": "apps/web/src/admin-view.tsx",
-      "maxLines": 4820,
+      "maxLines": 4517,
       "targetLines": 700
     },
     {
@@ -399,6 +399,11 @@
       "targetLines": 1500
     },
     {
+      "path": "apps/web/src/features/admin/products/ProductEditorDialog.tsx",
+      "maxLines": 346,
+      "targetLines": 1500
+    },
+    {
       "path": "packages/contracts/src/event-auth.ts",
       "maxLines": 248,
       "targetLines": 1500
@@ -540,7 +545,6 @@
     "apps/web/src/notification-overlay.test.ts -> apps/web/src/app/PageNotifications.tsx",
     "apps/web/src/notification-overlay.test.ts -> apps/web/src/cashier-view.tsx",
     "apps/web/src/notification-overlay.test.ts -> apps/web/src/flight-line-view.tsx",
-    "apps/web/src/product-time-model-ui.test.ts -> apps/web/src/admin-view.tsx",
     "apps/web/src/product-time-model-ui.test.ts -> apps/web/src/features/forecast-simulation/ScenarioEditor.tsx",
     "apps/web/src/ux-consistency-ui.test.ts -> apps/web/src/admin-view.tsx",
     "apps/web/src/ux-consistency-ui.test.ts -> apps/web/src/cashier-view.tsx",

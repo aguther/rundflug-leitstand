@@ -70,7 +70,6 @@ import {
   Panel,
   SearchField,
   StatusPill,
-  Tabs,
 } from "./design-system/components";
 import { forgetActiveEvent, rememberActiveEvent } from "./event-context";
 import { eventLocalDateTimeToIso, formatEventLocalDateTime } from "./event-time";
@@ -107,6 +106,7 @@ import { OperationsWorkspace } from "./features/admin/operations/OperationsWorks
 import { PilotCodesWorkspace } from "./features/admin/pilots/PilotCodesWorkspace";
 import { PilotEditorDialog } from "./features/admin/pilots/PilotEditorDialog";
 import { usePilotEditorState } from "./features/admin/pilots/usePilotEditorState";
+import { ProductEditorDialog } from "./features/admin/products/ProductEditorDialog";
 import { ProductSalesDialog } from "./features/admin/products/ProductSalesDialog";
 import { ProductsWorkspace } from "./features/admin/products/ProductsWorkspace";
 import { useProductEditorState } from "./features/admin/products/useProductEditorState";
@@ -145,7 +145,6 @@ import {
   rotationStatusLabel,
   useOperationBoard,
 } from "./operation-workspace";
-import { ProductReferenceRotation } from "./product-reference-rotation";
 
 const adminTableCollator = new Intl.Collator("de-DE", {
   numeric: true,
@@ -3380,321 +3379,19 @@ export function AdminView() {
             submitAttempted={masterSubmitAttempted}
             tab={masterEditorTab}
           />
-          <ModalDialog
-            bodyClassName="master-data-editor-body"
-            className="master-data-editor-dialog"
+          <ProductEditorDialog
+            board={board}
+            editor={productEditor}
             footer={masterEditorFooter}
-            footerClassName="master-data-editor-footer"
+            furtherActions={masterEditorMobileFurtherActions}
             initialFocusSelector={masterEditorInitialFocusSelector}
             onClose={requestMasterEditorClose}
+            onTabChange={setMasterEditorTab}
             open={masterDataStepActive && masterEditorOpen && masterDataCategory === "products"}
-            size="wide"
-            title={
-              productEditor.editorId === "new" ? "Produkt anlegen" : "Produkt bearbeiten"
-            }
-          >
-            <div className="master-data-columns">
-              {masterDataCategory === "products" ? (
-              <fieldset>
-                <legend>Produkt</legend>
-                <div className="master-data-editor-tabs">
-                  <Tabs
-                    idPrefix="master-product-editor"
-                    items={[
-                      { value: "general", label: "Allgemein" },
-                      { value: "details", label: "Planung und Zeitmodell" },
-                    ]}
-                    label="Produktbereiche"
-                    onChange={setMasterEditorTab}
-                    value={masterEditorTab}
-                  />
-                </div>
-                <section
-                  aria-labelledby="master-product-editor-general-tab"
-                  className="product-editor-section master-data-editor-panel"
-                  hidden={masterEditorTab !== "general"}
-                  id="master-product-editor-general-panel"
-                  role="tabpanel"
-                >
-                  <h3>Allgemein</h3>
-                  <div className="parameter-grid">
-                    <div className="field-control">
-                      <FieldLabel
-                        htmlFor="product-name"
-                        label="Bezeichnung"
-                        help="Interner und öffentlicher Name des Produkts."
-                      />
-                      <input
-                        id="product-name"
-                        value={productEditor.name}
-                        onChange={(event) => productEditor.setName(event.target.value)}
-                      />
-                      {masterSubmitAttempted && productEditor.name.trim().length < 2 ? (
-                        <span className="field-error">Mindestens 2 Zeichen eingeben.</span>
-                      ) : null}
-                    </div>
-                    <div className="field-control">
-                      <FieldLabel
-                        htmlFor="product-code"
-                        label="Kürzel"
-                        help="2–12 Großbuchstaben, Ziffern oder Bindestriche; Bestandteil der stabilen Fluggruppenkennung."
-                      />
-                      <input
-                        id="product-code"
-                        value={productEditor.code}
-                        maxLength={12}
-                        onChange={(event) => productEditor.setCode(event.target.value)}
-                      />
-                      {masterSubmitAttempted &&
-                      !/^[A-Z0-9-]{2,12}$/.test(productEditor.code) ? (
-                        <span className="field-error">Zum Beispiel PAN20 oder KURZ-10.</span>
-                      ) : null}
-                    </div>
-                    <div className="field-control">
-                      <FieldLabel
-                        htmlFor="product-price"
-                        label="Preis in €"
-                        help="Informatorischer Einzelpreis je Ticket. Das System ist keine elektronische Kasse."
-                      />
-                      <input
-                        id="product-price"
-                        inputMode="decimal"
-                        value={productEditor.priceInput}
-                        onBlur={productEditor.normalizePrice}
-                        onChange={(event) => productEditor.setPriceInput(event.target.value)}
-                      />
-                      {masterSubmitAttempted && productPriceCents === null ? (
-                        <span className="field-error">
-                          Eurobetrag mit höchstens zwei Nachkommastellen eingeben.
-                        </span>
-                      ) : null}
-                    </div>
-                    <div className="field-control product-description-field">
-                      <FieldLabel
-                        htmlFor="product-description"
-                        label="Öffentliche Beschreibung"
-                        help="Kurzer Text für Kasse und öffentliche Anzeigen."
-                      />
-                      <input
-                        id="product-description"
-                        value={productEditor.description}
-                        maxLength={240}
-                        onChange={(event) => productEditor.setDescription(event.target.value)}
-                      />
-                    </div>
-                  </div>
-                </section>
-                <section
-                  aria-labelledby="master-product-editor-details-tab"
-                  className="product-editor-section master-data-editor-panel"
-                  hidden={masterEditorTab !== "details"}
-                  id="master-product-editor-details-panel"
-                  role="tabpanel"
-                >
-                  <h3>Planung und Zeitmodell</h3>
-                  <div className="parameter-grid">
-                    <div className="field-control">
-                      <FieldLabel
-                        htmlFor="product-resource-group"
-                        label="Ressourcengruppe"
-                        help="Ordnet das Produkt genau einer gemeinsamen operativen Queue und Kapazität zu."
-                      />
-                      <select
-                        id="product-resource-group"
-                        value={productEditor.resourceGroupId}
-                        onChange={(event) => productEditor.setResourceGroupId(event.target.value)}
-                      >
-                        <option value="">Bitte wählen</option>
-                        {resourceGroups.map((group) => (
-                          <option key={group.id} value={group.id}>
-                            {group.name}
-                          </option>
-                        ))}
-                      </select>
-                      {masterSubmitAttempted && !productEditor.resourceGroupId ? (
-                        <span className="field-error">Eine Ressourcengruppe auswählen.</span>
-                      ) : null}
-                    </div>
-                    <div className="field-control">
-                      <FieldLabel
-                        htmlFor="product-gate"
-                        label="Gate"
-                        help="Veröffentlichter Treffpunkt beziehungsweise Abfertigungsort."
-                      />
-                      <select
-                        id="product-gate"
-                        value={productEditor.gateId}
-                        onChange={(event) => productEditor.setGateId(event.target.value)}
-                      >
-                        <option value="">Bitte wählen</option>
-                        {board?.gates
-                          .filter((gate) => gate.active)
-                          .map((gate) => (
-                            <option key={gate.id} value={gate.id}>
-                              {gate.label}
-                            </option>
-                          ))}
-                      </select>
-                      {masterSubmitAttempted && !productEditor.gateId ? (
-                        <span className="field-error">Ein aktives Gate auswählen.</span>
-                      ) : null}
-                    </div>
-                    <div className="field-control">
-                      <FieldLabel
-                        htmlFor="product-reference-duration"
-                        label="Referenzzeit Offblock–Onblock (Min.)"
-                        help="Operative Planzeit vom bestätigten Offblock bis zum bestätigten Onblock. Boarding, Ausstieg und Puffer werden separat berücksichtigt. Trage hier weder die vollständige Umlaufzeit noch ausschließlich die beworbene Flugzeit ein."
-                      />
-                      <input
-                        id="product-reference-duration"
-                        type="number"
-                        min="1"
-                        max="600"
-                        value={productEditor.referenceDuration}
-                        onChange={(event) =>
-                          productEditor.setReferenceDuration(Number(event.target.value))
-                        }
-                      />
-                    </div>
-                    <div className="field-control">
-                      <FieldLabel
-                        htmlFor="product-promised-flight-minutes"
-                        label="Kommunizierte Flugzeit (Min.)"
-                        help="Gegenüber Gästen angegebene beziehungsweise verkaufte Flugzeit. Dieser Wert wird in Produktinformationen verwendet und beeinflusst die operative Prognose nicht."
-                      />
-                      <input
-                        id="product-promised-flight-minutes"
-                        type="number"
-                        min="1"
-                        max="600"
-                        value={productEditor.promisedFlightMinutes}
-                        onChange={(event) =>
-                          productEditor.setPromisedFlightMinutes(Number(event.target.value))
-                        }
-                      />
-                    </div>
-                    <div className="field-control">
-                      <FieldLabel
-                        htmlFor="product-boarding-override"
-                        label="Boarding (Min.)"
-                        help="Leer übernimmt den Veranstaltungswert."
-                      />
-                      <input
-                        id="product-boarding-override"
-                        max="120"
-                        min="0"
-                        onChange={(event) => productEditor.setBoardingOverride(event.target.value)}
-                        placeholder={`Veranstaltung: ${board?.event.plannedBoardingMinutes ?? 8}`}
-                        type="number"
-                        value={productEditor.boardingOverride}
-                      />
-                      <small>
-                        Quelle: {productEditor.boardingOverride === "" ? "Veranstaltung" : "Produkt"}
-                      </small>
-                      <button
-                        className="table-action"
-                        onClick={() =>
-                          productEditor.setBoardingOverride((current) =>
-                            current === "" ? String(board?.event.plannedBoardingMinutes ?? 8) : "",
-                          )
-                        }
-                        type="button"
-                      >
-                        {productEditor.boardingOverride === ""
-                          ? "Produktabweichung festlegen"
-                          : "Produktabweichung entfernen"}
-                      </button>
-                    </div>
-                    <div className="field-control">
-                      <FieldLabel
-                        htmlFor="product-deboarding-override"
-                        label="Ausstieg (Min.)"
-                        help="Leer übernimmt den Veranstaltungswert."
-                      />
-                      <input
-                        id="product-deboarding-override"
-                        max="120"
-                        min="0"
-                        onChange={(event) => productEditor.setDeboardingOverride(event.target.value)}
-                        placeholder={`Veranstaltung: ${board?.event.plannedDeboardingMinutes ?? 5}`}
-                        type="number"
-                        value={productEditor.deboardingOverride}
-                      />
-                      <small>
-                        Quelle:{" "}
-                        {productEditor.deboardingOverride === "" ? "Veranstaltung" : "Produkt"}
-                      </small>
-                      <button
-                        className="table-action"
-                        onClick={() =>
-                          productEditor.setDeboardingOverride((current) =>
-                            current === "" ? String(board?.event.plannedDeboardingMinutes ?? 5) : "",
-                          )
-                        }
-                        type="button"
-                      >
-                        {productEditor.deboardingOverride === ""
-                          ? "Produktabweichung festlegen"
-                          : "Produktabweichung entfernen"}
-                      </button>
-                    </div>
-                    <div className="field-control">
-                      <FieldLabel
-                        htmlFor="product-buffer-override"
-                        label="Puffer (Min.)"
-                        help="Leer übernimmt den Veranstaltungswert."
-                      />
-                      <input
-                        id="product-buffer-override"
-                        max="120"
-                        min="0"
-                        onChange={(event) => productEditor.setBufferOverride(event.target.value)}
-                        placeholder={`Veranstaltung: ${board?.event.plannedBufferMinutes ?? 3}`}
-                        type="number"
-                        value={productEditor.bufferOverride}
-                      />
-                      <small>
-                        Quelle: {productEditor.bufferOverride === "" ? "Veranstaltung" : "Produkt"}
-                      </small>
-                      <button
-                        className="table-action"
-                        onClick={() =>
-                          productEditor.setBufferOverride((current) =>
-                            current === "" ? String(board?.event.plannedBufferMinutes ?? 3) : "",
-                          )
-                        }
-                        type="button"
-                      >
-                        {productEditor.bufferOverride === ""
-                          ? "Produktabweichung festlegen"
-                          : "Produktabweichung entfernen"}
-                      </button>
-                    </div>
-                    <ProductReferenceRotation
-                      boardingMinutes={
-                        productEditor.boardingOverride === ""
-                          ? (board?.event.plannedBoardingMinutes ?? 8)
-                          : Number(productEditor.boardingOverride)
-                      }
-                      bufferMinutes={
-                        productEditor.bufferOverride === ""
-                          ? (board?.event.plannedBufferMinutes ?? 3)
-                          : Number(productEditor.bufferOverride)
-                      }
-                      deboardingMinutes={
-                        productEditor.deboardingOverride === ""
-                          ? (board?.event.plannedDeboardingMinutes ?? 5)
-                          : Number(productEditor.deboardingOverride)
-                      }
-                      offBlockToOnBlockMinutes={productEditor.referenceDuration}
-                    />
-                  </div>
-                </section>
-              </fieldset>
-              ) : null}
-            </div>
-            {masterEditorMobileFurtherActions}
-          </ModalDialog>
+            resourceGroups={resourceGroups}
+            submitAttempted={masterSubmitAttempted}
+            tab={masterEditorTab}
+          />
           <ResourceAircraftEditorDialog
             aircraftEditor={aircraftEditor}
             board={board}

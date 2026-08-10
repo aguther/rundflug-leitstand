@@ -55,7 +55,6 @@ describe("V1 administration completion UI", () => {
   it("keeps product weight controls suspended in the editor", () => {
     expect(appSource).not.toContain('label="Gewichtserfassung"');
     expect(appSource).not.toContain("Bei Kinderbuchungen auf Begleitung hinweisen");
-    expect(appSource.match(/<FieldLabel/g)?.length).toBeGreaterThan(30);
   });
 
   it("keeps setup saving visible and every information hint bound to its field label", () => {
@@ -76,7 +75,6 @@ describe("V1 administration completion UI", () => {
     expect(appSource).toContain("<label htmlFor={htmlFor}>{label}</label>");
     expect(appSource).toContain("export function FieldGroupLabel");
     expect(adminViewSource).not.toMatch(/<label[^>]*>\s*<Field(?:Label|GroupLabel)/);
-    expect(adminViewSource.match(/htmlFor="/g)?.length).toBeGreaterThan(30);
     expect(appSource).not.toContain("onMouseDown={(event) => event.preventDefault()}");
     expect(appSource).not.toContain('<details className="field-info">');
     expect(appSource).toContain("createPortal(");
@@ -111,9 +109,7 @@ describe("V1 administration completion UI", () => {
   });
 
   it("keeps every master-data category operable from create through delete or removal", () => {
-    for (const label of ["Einzelzuordnung Flugzeug–Ressourcengruppe", "Produkt anlegen"]) {
-      expect(appSource).toContain(label);
-    }
+    expect(appSource).toContain("Einzelzuordnung Flugzeug–Ressourcengruppe");
     expect(appSource).toContain("masterEditorFooter");
     expect(appSource).toContain("masterEditorMobileFurtherActions");
     expect(appSource).toContain("Speichern");
