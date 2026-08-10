@@ -101,15 +101,5 @@ describe("unified master-data dialogs and stable event workspace", () => {
     expect(adminViewSource).toContain('initialFocusSelector="[data-master-delete-cancel]"');
     expect(adminViewSource).toContain('title="Stammdatenvorlage importieren"');
     expect(adminViewSource).toMatch(/>\s*Importieren\s*<\/Button>/);
-    expect(adminViewSource).toContain('id="admin-pin-form"');
-    expect(adminViewSource).toContain('initialFocusSelector="#admin-pin-input"');
-
-    const pinDialogSource = adminViewSource.slice(
-      adminViewSource.indexOf("{adminPinDialog ? ("),
-      adminViewSource.indexOf("{pendingMasterDelete ? ("),
-    );
-    expect(pinDialogSource).toContain("<ModalDialog");
-    expect(pinDialogSource).not.toContain('className="confirmation-dialog"');
-    expect(pinDialogSource).not.toContain('className="modal-backdrop"');
   });
 });

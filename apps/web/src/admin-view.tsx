@@ -71,6 +71,7 @@ import {
 } from "./design-system/components";
 import { forgetActiveEvent, rememberActiveEvent } from "./event-context";
 import { eventLocalDateTimeToIso, formatEventLocalDateTime } from "./event-time";
+import { AdminAuthorizationDialog } from "./features/admin/AdminAuthorizationDialog";
 import { AdminEventFlowChart } from "./features/admin/AdminEventFlowChart";
 import {
   AircraftProductTurnaroundOverrideDialog,
@@ -3827,70 +3828,16 @@ export function AdminView() {
             />
             </section>
           ) : null}
-          {adminPinDialog ? (
-            <ModalDialog
-              description={
-                adminPinDialog === "unlock"
-                  ? "Die PIN gilt nur in diesem Browser-Tab und wird nach 15 Minuten Inaktivität verworfen."
-                  : "Diese einzelne Änderung wird nach erfolgreicher PIN-Prüfung ausgeführt und protokolliert."
-              }
-              footer={
-                <>
-                  <Button
-                    disabled={adminPinBusy}
-                    onClick={closeAdminPinDialog}
-                    type="button"
-                  >
-                    Abbrechen
-                  </Button>
-                  <Button
-                    busy={adminPinBusy}
-                    disabled={adminPin.length < 4}
-                    form="admin-pin-form"
-                    type="submit"
-                    variant="primary"
-                  >
-                    {adminPinDialog === "unlock" ? "Entsperren" : "Bestätigen"}
-                  </Button>
-                </>
-              }
-              initialFocusSelector="#admin-pin-input"
-              onClose={() => {
-                if (!adminPinBusy) closeAdminPinDialog();
-              }}
-              open
-              size="compact"
-              title={
-                adminPinDialog === "unlock"
-                  ? "Bearbeitungsmodus entsperren"
-                  : "Änderung bestätigen"
-              }
-            >
-              <form
-                className="admin-pin-form"
-                id="admin-pin-form"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  void confirmAdminPinDialog();
-                }}
-              >
-                <div className="ds-field admin-pin-field">
-                  <label htmlFor="admin-pin-input">Administrator-PIN</label>
-                  <input
-                    autoComplete="current-password"
-                    id="admin-pin-input"
-                    onChange={(event) => setAdminPin(event.target.value)}
-                    ref={adminPinInputRef}
-                    type="password"
-                    value={adminPin}
-                  />
-                </div>
-                {adminPinError ? (
-                  <ValidationHint tone="error">{adminPinError}</ValidationHint>
-                ) : null}
-              </form>
-            </ModalDialog>
-          ) : null}
+          <AdminAuthorizationDialog
+            busy={adminPinBusy}
+            error={adminPinError}
+            inputRef={adminPinInputRef}
+            mode={adminPinDialog}
+            onClose={closeAdminPinDialog}
+            onPinChange={setAdminPin}
+            onSubmit={() => void confirmAdminPinDialog()}
+            pin={adminPin}
+          />
           {pendingMasterDelete ? (
             <ModalDialog
               bodyClassName="master-delete-dialog-body"

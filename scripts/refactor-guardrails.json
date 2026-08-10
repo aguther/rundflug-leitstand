@@ -13,7 +13,7 @@
     },
     {
       "path": "apps/web/src/admin-view.tsx",
-      "maxLines": 4130,
+      "maxLines": 4077,
       "targetLines": 700
     },
     {
@@ -406,6 +406,11 @@
     {
       "path": "apps/web/src/features/admin/event-workspace/EventCatalogDialog.tsx",
       "maxLines": 397,
+      "targetLines": 1500
+    },
+    {
+      "path": "apps/web/src/features/admin/AdminAuthorizationDialog.tsx",
+      "maxLines": 83,
       "targetLines": 1500
     },
     {

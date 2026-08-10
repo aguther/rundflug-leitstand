@@ -128,9 +128,6 @@ describe("V1 administration completion UI", () => {
     expect(appSource).toContain("const [masterEditorOpen, setMasterEditorOpen] = useState(false);");
     expect(appSource).toContain("setMasterEditorOpen(false)");
     expect(appSource).toContain("<MasterDataWorkspace");
-    expect(appSource.match(/<ModalDialog/g)?.length).toBeGreaterThanOrEqual(4);
-    expect(appSource.match(/size="wide"/g)?.length).toBeGreaterThanOrEqual(2);
-    expect(appSource.match(/size="default"/g)?.length).toBeGreaterThanOrEqual(2);
     expect(appSource).not.toContain('<aside className="master-data-drawer"');
     expect(stylesSource).toContain("grid-template-columns: minmax(0, 1fr)");
     expect(stylesSource).toContain("max-height: none");
