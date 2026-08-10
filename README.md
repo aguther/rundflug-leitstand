@@ -35,7 +35,10 @@ Ein datierter Vergleich mit kostengünstigen Alternativen liegt unter `docs/oper
 Fachmodell, Zustandsautomaten, Invarianten und Prognoseverfahren sind unter
 `docs/architecture/domain-state-and-forecast-v1.md` zusammenhängend beschrieben.
 Der erledigte und noch verbleibende Konsolidierungsbedarf steht in
-[docs/architecture/technical-debt-1.12.0.md](docs/architecture/technical-debt-1.12.0.md).
+[docs/architecture/technical-debt-1.12.0.md](docs/architecture/technical-debt-1.12.0.md). Die
+quellenkritische Gesamtanalyse einschließlich SonarCloud-Triage und nummerierter Arbeitspakete liegt
+unter
+[docs/architecture/technical-debt-analysis-2026-08-10.md](docs/architecture/technical-debt-analysis-2026-08-10.md).
 
 ## Voraussetzungen
 

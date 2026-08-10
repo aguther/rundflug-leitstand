@@ -10,6 +10,11 @@ Analysepunkte 1.1, 1.2 und 2.1 bis 2.4 sowie die danach verbleibenden, priorisie
 Schnitte. Fachliche Invarianten, öffentliche Verträge und die Requirements 1.12.0 wurden dabei
 nicht geändert; es war keine D1-Migration erforderlich.
 
+Eine spätere quellenkritische Gesamtaufnahme einschließlich externer Analyse und SonarCloud-Triage
+liegt unter
+[`technical-debt-analysis-2026-08-10.md`](technical-debt-analysis-2026-08-10.md). Dieses Dokument
+bleibt der historische Umsetzungs- und Messnachweis der Konsolidierung 1.12.0.
+
 ## Aktueller Messstand
 
 Die Ausgangswerte stammen aus dem für die Umsetzung festgelegten Stand
