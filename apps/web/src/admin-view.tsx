@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import {
   AdminNavigation,
   type MasterDataCategory,
@@ -20,15 +20,11 @@ import {
 import type { TurnaroundOverrideContext } from "./features/admin/aircraft/AircraftProductTurnaroundOverrideDialog";
 import type { AircraftResourceGroupAssignmentContext } from "./features/admin/aircraft/AircraftResourceGroupAssignmentDialog";
 import { useAircraftEditorState } from "./features/admin/aircraft/useAircraftEditorState";
-import { AdminCompletionWorkspacePanel } from "./features/admin/completion/AdminCompletionWorkspacePanel";
 import { useAdminHistory } from "./features/admin/completion/useAdminHistory";
-import { EventParametersWorkspace } from "./features/admin/event-parameters/EventParametersWorkspace";
 import { useAdminEventConfigurationActions } from "./features/admin/event-parameters/useAdminEventConfigurationActions";
-import { EventCatalogDialog } from "./features/admin/event-workspace/EventCatalogDialog";
 import { useAdminEventCatalog } from "./features/admin/event-workspace/useAdminEventCatalog";
 import { useAdminEventWorkspaceNavigation } from "./features/admin/event-workspace/useAdminEventWorkspaceNavigation";
 import { useGateEditorState } from "./features/admin/gates/useGateEditorState";
-import { AdminMasterDataWorkspacePanel } from "./features/admin/master-data/AdminMasterDataWorkspacePanel";
 import {
   AdminMasterEditorFooter,
   AdminMasterEditorFurtherActions,
@@ -40,8 +36,6 @@ import { useAdminMasterDataDeletion } from "./features/admin/master-data/useAdmi
 import { useAdminMasterDataTable } from "./features/admin/master-data/useAdminMasterDataTable";
 import { useAdminMasterEditorState } from "./features/admin/master-data/useAdminMasterEditorState";
 import { useMasterDataTemplateImport } from "./features/admin/master-data/useMasterDataTemplateImport";
-import { AdminOperationalPlanPanel } from "./features/admin/operational-plan/AdminOperationalPlanPanel";
-import { AdminOperationsPanel } from "./features/admin/operations/AdminOperationsPanel";
 import { AdminAccessStatusBar } from "./features/admin/overview/AdminAccessStatusBar";
 import { AdminOverviewPanel } from "./features/admin/overview/AdminOverviewPanel";
 import { AdminSimulationLauncher } from "./features/admin/overview/AdminSimulationLauncher";
@@ -52,8 +46,6 @@ import { useResourceGroupEditorState } from "./features/admin/resource-groups/us
 import { useAdminAuthorization } from "./features/admin/useAdminAuthorization";
 import { useAdminFactoryReset } from "./features/admin/useAdminFactoryReset";
 import { useAdminShellState } from "./features/admin/useAdminShellState";
-import { AnalysisWorkspace } from "./features/analysis/AnalysisWorkspace";
-import { AccountManagement } from "./features/auth/AccountManagement";
 import { useAuth } from "./features/auth/AuthContext";
 import {
   ADMIN_DEVICE_ID,
@@ -64,6 +56,55 @@ import {
   OperationalNotice,
   useOperationBoard,
 } from "./operation-workspace";
+
+const AccountManagement = lazy(() =>
+  import("./features/auth/AccountManagement").then((module) => ({
+    default: module.AccountManagement,
+  })),
+);
+const AdminCompletionWorkspacePanel = lazy(() =>
+  import("./features/admin/completion/AdminCompletionWorkspacePanel").then((module) => ({
+    default: module.AdminCompletionWorkspacePanel,
+  })),
+);
+const AdminMasterDataWorkspacePanel = lazy(() =>
+  import("./features/admin/master-data/AdminMasterDataWorkspacePanel").then((module) => ({
+    default: module.AdminMasterDataWorkspacePanel,
+  })),
+);
+const AdminOperationalPlanPanel = lazy(() =>
+  import("./features/admin/operational-plan/AdminOperationalPlanPanel").then((module) => ({
+    default: module.AdminOperationalPlanPanel,
+  })),
+);
+const AdminOperationsPanel = lazy(() =>
+  import("./features/admin/operations/AdminOperationsPanel").then((module) => ({
+    default: module.AdminOperationsPanel,
+  })),
+);
+const AnalysisWorkspace = lazy(() =>
+  import("./features/analysis/AnalysisWorkspace").then((module) => ({
+    default: module.AnalysisWorkspace,
+  })),
+);
+const EventCatalogDialog = lazy(() =>
+  import("./features/admin/event-workspace/EventCatalogDialog").then((module) => ({
+    default: module.EventCatalogDialog,
+  })),
+);
+const EventParametersWorkspace = lazy(() =>
+  import("./features/admin/event-parameters/EventParametersWorkspace").then((module) => ({
+    default: module.EventParametersWorkspace,
+  })),
+);
+
+function AdminWorkspaceLoading() {
+  return (
+    <div className="admin-section" role="status">
+      Administrationsbereich wird geladen …
+    </div>
+  );
+}
 
 export function AdminView() {
   const { session, logout } = useAuth();
@@ -401,49 +442,52 @@ export function AdminView() {
                 : adminAreaCopy[adminArea].title
             }
           />
-          {adminArea === "events" ? (
-            <EventCatalogDialog
-              busyActionKey={busyActionKey}
-              canExport={Boolean(board)}
-              canManage={isAdministrator}
-              creation={eventCatalog.creation}
-              currentEventId={EVENT_ID}
-              currentEventName={board?.event.name ?? EVENT_ID}
-              currentStep={eventStep}
-              events={eventCatalog.visibleEvents}
-              onClose={eventCatalog.closeDialog}
-              onCreateSubmit={() => void runBusyAction("create-event", eventCatalog.createEvent)}
-              onDelete={(entry) =>
-                void runBusyAction(`delete-event-${entry.eventId}`, () =>
-                  eventCatalog.removeEvent(entry),
-                )
-              }
-              onExport={() =>
-                void runBusyAction("export-master-data-template", eventCatalog.exportTemplate)
-              }
-              onImport={() => {
-                templateImport.openDialog();
-              }}
-              onOpenCreate={eventCatalog.openCreation}
-              onSearchChange={eventCatalog.setSearch}
-              onSetCreationAerodrome={eventCatalog.setAerodrome}
-              onSetCreationConfirmation={eventCatalog.setConfirmation}
-              onSetCreationDate={eventCatalog.setEventDate}
-              onSetCreationId={eventCatalog.setEventId}
-              onSetCreationName={eventCatalog.setName}
-              onSetRestartMode={eventCatalog.setRestartMode}
-              onShowCatalog={eventCatalog.showCatalog}
-              onSort={eventCatalog.toggleSort}
-              search={eventCatalog.search}
-              sort={eventCatalog.sort}
-              view={eventCatalog.view}
-            />
-          ) : null}
+          <Suspense fallback={null}>
+            {adminArea === "events" ? (
+              <EventCatalogDialog
+                busyActionKey={busyActionKey}
+                canExport={Boolean(board)}
+                canManage={isAdministrator}
+                creation={eventCatalog.creation}
+                currentEventId={EVENT_ID}
+                currentEventName={board?.event.name ?? EVENT_ID}
+                currentStep={eventStep}
+                events={eventCatalog.visibleEvents}
+                onClose={eventCatalog.closeDialog}
+                onCreateSubmit={() => void runBusyAction("create-event", eventCatalog.createEvent)}
+                onDelete={(entry) =>
+                  void runBusyAction(`delete-event-${entry.eventId}`, () =>
+                    eventCatalog.removeEvent(entry),
+                  )
+                }
+                onExport={() =>
+                  void runBusyAction("export-master-data-template", eventCatalog.exportTemplate)
+                }
+                onImport={() => {
+                  templateImport.openDialog();
+                }}
+                onOpenCreate={eventCatalog.openCreation}
+                onSearchChange={eventCatalog.setSearch}
+                onSetCreationAerodrome={eventCatalog.setAerodrome}
+                onSetCreationConfirmation={eventCatalog.setConfirmation}
+                onSetCreationDate={eventCatalog.setEventDate}
+                onSetCreationId={eventCatalog.setEventId}
+                onSetCreationName={eventCatalog.setName}
+                onSetRestartMode={eventCatalog.setRestartMode}
+                onShowCatalog={eventCatalog.showCatalog}
+                onSort={eventCatalog.toggleSort}
+                search={eventCatalog.search}
+                sort={eventCatalog.sort}
+                view={eventCatalog.view}
+              />
+            ) : null}
+          </Suspense>
           {adminArea === "events" ? (
             <SetupProgress currentStepId={eventStep} onSelect={openSetupStep} steps={setupSteps} />
           ) : null}
           {/* biome-ignore format: preserve the large existing workspace subtree while adding its scroll boundary */}
           <div className="admin-workspace-scroll-region" ref={adminWorkspaceScrollRef}>
+            <Suspense fallback={<AdminWorkspaceLoading />}>
             {board?.currentDeviceRole === "FLIGHT_DIRECTOR" ? (
               <div className="readonly-banner">Flight-Director-Ansicht · primär lesend</div>
             ) : null}
@@ -652,6 +696,7 @@ export function AdminView() {
               onRunBusyAction={runBusyAction}
             />
           ) : null}
+            </Suspense>
           </div>
         </div>
       </section>
