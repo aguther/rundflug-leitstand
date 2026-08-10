@@ -68,6 +68,7 @@ import {
   MasterDataWorkspace,
 } from "./features/admin/master-data/MasterDataWorkspace";
 import { ResourceAircraftEditorDialog } from "./features/admin/master-data/ResourceAircraftEditorDialog";
+import { useAdminMasterDataTable } from "./features/admin/master-data/useAdminMasterDataTable";
 import { useMasterDataTemplateImport } from "./features/admin/master-data/useMasterDataTemplateImport";
 import { AdminOperationalPlanPanel } from "./features/admin/operational-plan/AdminOperationalPlanPanel";
 import { AdminOperationsPanel } from "./features/admin/operations/AdminOperationsPanel";
@@ -107,10 +108,6 @@ import {
   useOperationBoard,
 } from "./operation-workspace";
 
-const adminTableCollator = new Intl.Collator("de-DE", {
-  numeric: true,
-  sensitivity: "base",
-});
 const eventStepCopy: Record<AdminEventStep, { title: string; description: string }> = {
   event: {
     title: "Veranstaltung",
@@ -171,6 +168,26 @@ export function AdminView() {
       ? (requestedSection as MasterDataCategory)
       : "resource-groups";
   });
+  const {
+    alphabeticalProducts,
+    clampedPage: masterPageClamped,
+    filteredCount: activeMasterDataRowCount,
+    pageSize: masterPageSize,
+    pagedAircraft,
+    pagedGates,
+    pagedPilots,
+    pagedProducts,
+    pagedResourceGroups,
+    resourceStatusFilter,
+    search: masterSearch,
+    setPage: setMasterPage,
+    setPageSize: setMasterPageSize,
+    setResourceStatusFilter,
+    setSearch: setMasterSearch,
+    sort: masterSort,
+    toggleSort: toggleMasterSort,
+    totalCount: totalMasterDataCount,
+  } = useAdminMasterDataTable({ board, category: masterDataCategory });
   const handleSetupStepSelected = useCallback((step: SetupStep) => {
     if (step.category) setMasterDataCategory(step.category);
   }, []);
@@ -205,7 +222,7 @@ export function AdminView() {
       setMasterEditorOpen(false);
       setMasterSearch("");
     }
-  }, [eventStep]);
+  }, [eventStep, setMasterSearch]);
   const [adminPin, setAdminPinState] = useState(session?.account.role === "ADMIN" ? "000000" : "");
   const adminPinRef = useRef(session?.account.role === "ADMIN" ? "000000" : "");
   const setAdminPin = useCallback((value: string) => {
@@ -226,23 +243,10 @@ export function AdminView() {
   const initialMasterEditorSnapshotRef = useRef<string | null>(null);
   const initialMasterSelectionRef = useRef(false);
   const [masterSubmitAttempted, setMasterSubmitAttempted] = useState(false);
-  const [masterSearch, setMasterSearch] = useState("");
-  const [masterSort, setMasterSort] = useState<{
-    category: MasterDataCategory;
-    key: string;
-    direction: "asc" | "desc" | null;
-  }>({ category: "resource-groups", key: "name", direction: null });
-  const [masterPage, setMasterPage] = useState(0);
-  const [masterPageSize, setMasterPageSize] = useState(10);
-  const [resourceStatusFilter, setResourceStatusFilter] = useState("ALL");
   const [assignmentDialogContext, setAssignmentDialogContext] =
     useState<AircraftResourceGroupAssignmentContext | null>(null);
   const [turnaroundDialogContext, setTurnaroundDialogContext] =
     useState<TurnaroundOverrideContext | null>(null);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: changing a filter or page size intentionally resets pagination
-  useEffect(() => {
-    setMasterPage(0);
-  }, [masterDataCategory, masterSearch, masterPageSize, resourceStatusFilter]);
   const [pendingMasterDelete, setPendingMasterDelete] = useState<MasterDataDeleteTarget | null>(
     null,
   );
@@ -1462,162 +1466,6 @@ export function AdminView() {
     }
   }
 
-  function sortMasterRows<T extends { id: string }>(
-    category: MasterDataCategory,
-    rows: readonly T[],
-    valueFor: (row: T, key: string) => string | number,
-  ): T[] {
-    if (masterSort.category !== category || masterSort.direction === null) return [...rows];
-    return rows.toSorted((left, right) => {
-      const leftValue = valueFor(left, masterSort.key);
-      const rightValue = valueFor(right, masterSort.key);
-      const comparison =
-        typeof leftValue === "number" && typeof rightValue === "number"
-          ? leftValue - rightValue
-          : adminTableCollator.compare(String(leftValue), String(rightValue));
-      return masterSort.direction === "asc" ? comparison : -comparison;
-    });
-  }
-
-  function toggleMasterSort(key: string) {
-    setMasterSort((current) =>
-      current.category === masterDataCategory && current.key === key
-        ? {
-            ...current,
-            direction:
-              current.direction === "asc" ? "desc" : current.direction === "desc" ? null : "asc",
-          }
-        : { category: masterDataCategory, key, direction: "asc" },
-    );
-  }
-
-  const normalizedMasterSearch = masterSearch.trim().toLocaleLowerCase("de-DE");
-  const alphabeticalProducts = (board?.products ?? []).toSorted(
-    (left, right) =>
-      adminTableCollator.compare(left.name, right.name) ||
-      adminTableCollator.compare(left.code, right.code),
-  );
-  const visibleGates = sortMasterRows(
-    "gates",
-    (board?.gates ?? []).filter((gate) =>
-      `${gate.label} ${gate.gateType}`.toLocaleLowerCase("de-DE").includes(normalizedMasterSearch),
-    ),
-    (gate, key) =>
-      key === "status"
-        ? Number(gate.active)
-        : key === "sortOrder"
-          ? gate.sortOrder
-          : key === "type"
-            ? gate.gateType
-            : gate.label,
-  );
-  const visibleResourceGroups = sortMasterRows(
-    "resource-groups",
-    resourceGroups.filter(
-      (group) =>
-        (resourceStatusFilter === "ALL" || group.status === resourceStatusFilter) &&
-        `${group.name} ${group.shortCode} ${group.gateLabel}`
-          .toLocaleLowerCase("de-DE")
-          .includes(normalizedMasterSearch),
-    ),
-    (group, key) =>
-      key === "status"
-        ? group.status
-        : key === "gate"
-          ? group.gateLabel
-          : key === "capacity"
-            ? group.referenceCapacity
-            : key === "aircraft"
-              ? group.activeAircraftIds.length
-              : group.name,
-  );
-  const visibleAircraft = sortMasterRows(
-    "aircraft",
-    (board?.aircraft ?? []).filter((aircraft) =>
-      `${aircraft.registration} ${aircraft.aircraftType} ${aircraft.resourceGroupName}`
-        .toLocaleLowerCase("de-DE")
-        .includes(normalizedMasterSearch),
-    ),
-    (aircraft, key) =>
-      key === "type"
-        ? aircraft.aircraftType
-        : key === "seats"
-          ? aircraft.passengerSeats
-          : key === "group"
-            ? aircraft.resourceGroupName
-            : key === "pilot"
-              ? (aircraft.currentPilotOperationalCode ?? "")
-              : key === "status"
-                ? aircraft.operationalState
-                : aircraft.registration,
-  );
-  const visiblePilots = sortMasterRows(
-    "pilots",
-    (board?.pilots ?? []).filter((pilot) =>
-      `${pilot.operationalCode} ${pilot.operationalNote}`
-        .toLocaleLowerCase("de-DE")
-        .includes(normalizedMasterSearch),
-    ),
-    (pilot, key) =>
-      key === "note"
-        ? pilot.operationalNote
-        : key === "status"
-          ? Number(pilot.active) + Number(pilot.paused)
-          : key === "rotation"
-            ? (pilot.currentCommunicationNumber ?? 0)
-            : pilot.operationalCode,
-  );
-  const visibleProducts = sortMasterRows(
-    "products",
-    alphabeticalProducts.filter((product) =>
-      `${product.code} ${product.name} ${product.resourceGroupName} ${product.gateLabel}`
-        .toLocaleLowerCase("de-DE")
-        .includes(normalizedMasterSearch),
-    ),
-    (product, key) =>
-      key === "name"
-        ? product.name
-        : key === "group"
-          ? product.resourceGroupName
-          : key === "gate"
-            ? product.gateLabel
-            : key === "price"
-              ? product.priceCents
-              : key === "duration"
-                ? product.referenceDurationMinutes
-                : key === "status"
-                  ? Number(product.saleEnabled)
-                  : product.code,
-  );
-  const activeMasterDataRows: { id: string }[] =
-    masterDataCategory === "gates"
-      ? visibleGates
-      : masterDataCategory === "resource-groups"
-        ? visibleResourceGroups
-        : masterDataCategory === "aircraft"
-          ? visibleAircraft
-          : masterDataCategory === "pilots"
-            ? visiblePilots
-            : visibleProducts;
-  const totalMasterDataCount =
-    masterDataCategory === "gates"
-      ? (board?.gates.length ?? 0)
-      : masterDataCategory === "resource-groups"
-        ? resourceGroups.length
-        : masterDataCategory === "aircraft"
-          ? (board?.aircraft.length ?? 0)
-          : masterDataCategory === "pilots"
-            ? (board?.pilots.length ?? 0)
-            : (board?.products.length ?? 0);
-  const masterPageCount = Math.max(1, Math.ceil(activeMasterDataRows.length / masterPageSize));
-  const masterPageClamped = Math.min(masterPage, masterPageCount - 1);
-  const masterPageStart = masterPageClamped * masterPageSize;
-  const masterPageEnd = masterPageStart + masterPageSize;
-  const pagedGates = visibleGates.slice(masterPageStart, masterPageEnd);
-  const pagedResourceGroups = visibleResourceGroups.slice(masterPageStart, masterPageEnd);
-  const pagedAircraft = visibleAircraft.slice(masterPageStart, masterPageEnd);
-  const pagedPilots = visiblePilots.slice(masterPageStart, masterPageEnd);
-  const pagedProducts = visibleProducts.slice(masterPageStart, masterPageEnd);
   const masterDataSingularLabel: Record<MasterDataCategory, string> = {
     gates: "Gate",
     "resource-groups": "Ressourcengruppe",
@@ -1984,7 +1832,7 @@ export function AdminView() {
               addAriaLabel={`${masterDataSingularLabel[masterDataCategory]} hinzufügen`}
               onNew={startNewMasterDataEntry}
               onSearchChange={setMasterSearch}
-              resultCount={activeMasterDataRows.length}
+              resultCount={activeMasterDataRowCount}
               search={masterSearch}
             >
               {masterDataCategory === "gates" ? (
@@ -2063,11 +1911,11 @@ export function AdminView() {
                   sortKey={masterSort.category === "products" ? masterSort.key : undefined}
                 />
               ) : null}
-              {masterDataCategory === "resource-groups" && activeMasterDataRows.length === 0
+              {masterDataCategory === "resource-groups" && activeMasterDataRowCount === 0
                 ? masterDataEmptyState
                 : null}
               <MasterDataPagination
-                count={activeMasterDataRows.length}
+                count={activeMasterDataRowCount}
                 onPageChange={setMasterPage}
                 onPageSizeChange={setMasterPageSize}
                 page={masterPageClamped}

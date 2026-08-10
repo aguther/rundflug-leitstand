@@ -13,7 +13,7 @@
     },
     {
       "path": "apps/web/src/admin-view.tsx",
-      "maxLines": 2403,
+      "maxLines": 2251,
       "targetLines": 700
     },
     {
@@ -29,6 +29,11 @@
     {
       "path": "apps/web/src/features/admin/master-data/useMasterDataTemplateImport.ts",
       "maxLines": 119,
+      "targetLines": 1500
+    },
+    {
+      "path": "apps/web/src/features/admin/master-data/useAdminMasterDataTable.ts",
+      "maxLines": 227,
       "targetLines": 1500
     },
     {
