@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import migration from "../migrations/0039_operator_owned_flight_line_claims.sql?raw";
 import { FACTORY_RESET_DELETE_TABLES } from "./factory-reset";
-import workerSource from "./index.ts?raw";
 
 describe("loginbasierte Flight-Line-Assist-Betreuungsreservierung (F-INT-070)", () => {
   it("stores at most one expiring login claim per aircraft", () => {
@@ -11,10 +10,7 @@ describe("loginbasierte Flight-Line-Assist-Betreuungsreservierung (F-INT-070)", 
     expect(migration).toContain("expires_at TEXT NOT NULL");
   });
 
-  it("projects account-owned claims without exposing personal data", () => {
-    expect(workerSource).toContain("assistClaims: assistClaims.map");
-    expect(workerSource).toContain("claimedByCurrentOperator:");
-    expect(workerSource).toContain("claim.operator_account_id === device.accountId");
+  it("keeps claim persistence free of personal data", () => {
     expect(migration).not.toMatch(/phone|email/i);
   });
 

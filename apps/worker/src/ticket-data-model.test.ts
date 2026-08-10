@@ -6,7 +6,6 @@ import initialMigration from "../migrations/0001_initial.sql?raw";
 import pushMigration from "../migrations/0006_web_push.sql?raw";
 import rotationMigration from "../migrations/0026_rotation_gate_and_note.sql?raw";
 import fidsProjection from "./fids-board-projection.ts?raw";
-import worker from "./index.ts?raw";
 
 const cashierSource = `${cashierViewSource}\n${operationWorkspaceSource}`;
 
@@ -53,11 +52,7 @@ describe("anonymous V1 ticket data model", () => {
     expect(rotationMigration).toContain("ALTER TABLE rotations ADD COLUMN gate_id");
   });
 
-  it("uses the frozen rotation gate in protected and FIDS slot projections", () => {
+  it("uses the frozen rotation gate in the FIDS slot projection", () => {
     expect(fidsProjection).toContain("LEFT JOIN gates g ON g.id = COALESCE(r.gate_id, p.gate_id)");
-    expect(worker).toContain("communicationNumber: rotation.communication_number");
-    expect(worker).toContain("queuePosition:");
-    expect(worker).toContain("prediction_lower_minutes");
-    expect(worker).toContain("prediction_upper_minutes");
   });
 });

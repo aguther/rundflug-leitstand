@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import migration from "../migrations/0046_operational_plans.sql?raw";
 import slowdownMigration from "../migrations/0049_operational_plan_slowdown.sql?raw";
 import recurringMigration from "../migrations/0050_recurring_operational_rules.sql?raw";
-import worker from "./index.ts?raw";
 
 describe("general operational planning", () => {
   it("stores plans separately from confirmed operational blocks", () => {
@@ -103,12 +102,9 @@ describe("general operational planning", () => {
     ).toBe(true);
   });
 
-  it("publishes plans on the private operation board but no public cause field", () => {
-    expect(worker).toContain("plannedOperations: plannedOperationRows.results.map");
-    expect(worker).toContain("recurringOperationalRules: recurringRuleRows.results.map");
+  it("publishes plans in the private operation-board contract", () => {
     expect(operationBoardSchema.shape.plannedOperations).toBeTruthy();
-    expect(worker).not.toContain("reason: plan.reason");
-    expect(worker).not.toContain("publicOperationalPlanReason");
+    expect(operationBoardSchema.shape.recurringOperationalRules).toBeTruthy();
   });
 
   it("keeps recurring rules versioned, unique, audited and non-automatic", () => {

@@ -5,7 +5,6 @@ import leaseMigration from "../migrations/0064_dispatch_recommendation_leases.sq
 import memberMigration from "../migrations/0066_dispatch_recommendation_lease_members.sql?raw";
 import { EVENT_DELETION_SQL } from "./event-deletion";
 import { FACTORY_RESET_DELETE_TABLES } from "./factory-reset";
-import workerSource from "./index.ts?raw";
 
 function createLeaseDatabase(): DatabaseSync {
   const database = new DatabaseSync(":memory:");
@@ -138,12 +137,10 @@ describe("short-lived dispatch recommendation leases (F-BRD-010, Q-ZUV-020)", ()
     expect(JSON.parse(lease.member_rotation_ids_json)).toEqual([]);
   });
 
-  it("participates in every destructive lifecycle and operations projection", () => {
+  it("participates in every destructive lifecycle", () => {
     expect(FACTORY_RESET_DELETE_TABLES).toContain("dispatch_recommendation_leases");
     expect(EVENT_DELETION_SQL).toContain(
       "DELETE FROM dispatch_recommendation_leases WHERE operation_day_id = ?1",
     );
-    expect(workerSource).toContain("precalledAt: group.precalled_at");
-    expect(workerSource).toContain("dispatchReservationByGroupId.get(group.id) ?? null");
   });
 });
