@@ -114,8 +114,6 @@ describe("V1 administration completion UI", () => {
   it("uses centered responsive master-data dialogs", () => {
     expect(appSource).toContain("useState<MasterDataCategory>(() => {");
     expect(appSource).toContain(': "resource-groups";');
-    expect(appSource).toContain("const [masterEditorOpen, setMasterEditorOpen] = useState(false);");
-    expect(appSource).toContain("setMasterEditorOpen(false)");
     expect(appSource).toContain("<MasterDataWorkspace");
     expect(appSource).not.toContain('<aside className="master-data-drawer"');
     expect(stylesSource).toContain("grid-template-columns: minmax(0, 1fr)");
@@ -123,9 +121,6 @@ describe("V1 administration completion UI", () => {
   });
 
   it("guards dirty editors and transitions to destructive confirmation without stacked dialogs", () => {
-    expect(appSource).toContain("hasMasterEditorChanges(");
-    expect(appSource).toContain("function requestMasterEditorClose()");
-    expect(appSource).toContain("setDiscardMasterChangesOpen(true)");
     expect(appSource).toContain('title="Änderungen verwerfen?"');
     expect(appSource).toContain("Weiter bearbeiten");
   });

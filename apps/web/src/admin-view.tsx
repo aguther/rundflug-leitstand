@@ -1,7 +1,6 @@
 import type { EventLogoTheme, OperationBoard } from "@rundflug/contracts";
 import { Trash2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { hasMasterEditorChanges } from "./admin-master-editor-state";
 import {
   type AdminArea,
   type AdminEventStep,
@@ -70,6 +69,7 @@ import {
 import { ResourceAircraftEditorDialog } from "./features/admin/master-data/ResourceAircraftEditorDialog";
 import { useAdminMasterDataDeletion } from "./features/admin/master-data/useAdminMasterDataDeletion";
 import { useAdminMasterDataTable } from "./features/admin/master-data/useAdminMasterDataTable";
+import { useAdminMasterEditorState } from "./features/admin/master-data/useAdminMasterEditorState";
 import { useMasterDataTemplateImport } from "./features/admin/master-data/useMasterDataTemplateImport";
 import { AdminOperationalPlanPanel } from "./features/admin/operational-plan/AdminOperationalPlanPanel";
 import { AdminOperationsPanel } from "./features/admin/operations/AdminOperationsPanel";
@@ -213,16 +213,6 @@ export function AdminView() {
     aircraftId: initialAdminParams.get("aircraftId") ?? "",
     handled: false,
   });
-  useEffect(() => {
-    if (["gates", "resource-groups", "aircraft", "pilots", "products"].includes(eventStep)) {
-      setMasterDataCategory(eventStep as MasterDataCategory);
-      initialMasterEditorSnapshotRef.current = null;
-      setDiscardMasterChangesOpen(false);
-      setMasterSubmitAttempted(false);
-      setMasterEditorOpen(false);
-      setMasterSearch("");
-    }
-  }, [eventStep, setMasterSearch]);
   const [adminPin, setAdminPinState] = useState(session?.account.role === "ADMIN" ? "000000" : "");
   const adminPinRef = useRef(session?.account.role === "ADMIN" ? "000000" : "");
   const setAdminPin = useCallback((value: string) => {
@@ -237,12 +227,7 @@ export function AdminView() {
   const [logoutBusy, setLogoutBusy] = useState(false);
   const pendingAdminActionRef = useRef<(() => Promise<void>) | null>(null);
   const adminPinInputRef = useRef<HTMLInputElement>(null);
-  const [masterEditorOpen, setMasterEditorOpen] = useState(false);
-  const [masterEditorTab, setMasterEditorTab] = useState<"general" | "details">("general");
-  const [discardMasterChangesOpen, setDiscardMasterChangesOpen] = useState(false);
-  const initialMasterEditorSnapshotRef = useRef<string | null>(null);
   const initialMasterSelectionRef = useRef(false);
-  const [masterSubmitAttempted, setMasterSubmitAttempted] = useState(false);
   const [assignmentDialogContext, setAssignmentDialogContext] =
     useState<AircraftResourceGroupAssignmentContext | null>(null);
   const [turnaroundDialogContext, setTurnaroundDialogContext] =
@@ -320,19 +305,43 @@ export function AdminView() {
   const [manifestCorrectionResetKey, setManifestCorrectionResetKey] = useState(0);
   const resourceEditor = useResourceGroupEditorState(board);
   const aircraftEditor = useAircraftEditorState(board);
-  const currentMasterEditorSnapshot =
-    masterDataCategory === "gates"
-      ? gateEditor.snapshot
-      : masterDataCategory === "products"
-        ? productEditor.snapshot
-        : masterDataCategory === "resource-groups"
-          ? resourceEditor.snapshot
-          : masterDataCategory === "aircraft"
-            ? aircraftEditor.snapshot
-            : pilotEditor.snapshot;
-  const masterEditorDirty =
-    masterEditorOpen &&
-    hasMasterEditorChanges(initialMasterEditorSnapshotRef.current, currentMasterEditorSnapshot);
+  const {
+    continueEditing: continueMasterEditing,
+    dirty: masterEditorDirty,
+    discardChanges: discardMasterChanges,
+    discardChangesOpen: discardMasterChangesOpen,
+    finish: finishMasterEditor,
+    open: masterEditorOpen,
+    requestClose: requestMasterEditorClose,
+    resetForStepChange: resetMasterEditorForStepChange,
+    selectAircraft: selectAircraftForEditing,
+    selectGate: selectGateForEditing,
+    selectPilot: selectPilotForEditing,
+    selectProduct: selectProductForEditing,
+    selectResourceGroup: selectResourceForEditing,
+    setOpen: setMasterEditorOpen,
+    setSubmitAttempted: setMasterSubmitAttempted,
+    setTab: setMasterEditorTab,
+    startNewEntry: startNewMasterDataEntry,
+    submitAttempted: masterSubmitAttempted,
+    tab: masterEditorTab,
+  } = useAdminMasterEditorState({
+    category: masterDataCategory,
+    editors: {
+      aircraft: aircraftEditor,
+      gates: gateEditor,
+      pilots: pilotEditor,
+      products: productEditor,
+      resourceGroups: resourceEditor,
+    },
+  });
+  useEffect(() => {
+    if (["gates", "resource-groups", "aircraft", "pilots", "products"].includes(eventStep)) {
+      setMasterDataCategory(eventStep as MasterDataCategory);
+      resetMasterEditorForStepChange();
+      setMasterSearch("");
+    }
+  }, [eventStep, resetMasterEditorForStepChange, setMasterSearch]);
   const [eventDialogView, setEventDialogView] = useState<"closed" | "catalog" | "create">("closed");
   const resourceGroups = board?.resourceGroups ?? [];
   const isAdministrator = session?.account.role === "ADMIN" || board?.currentDeviceRole === "ADMIN";
@@ -619,20 +628,6 @@ export function AdminView() {
     }
   }
 
-  function selectProductForEditing(id: string) {
-    initialMasterEditorSnapshotRef.current = productEditor.select(id);
-    setMasterSubmitAttempted(false);
-    setMasterEditorTab("general");
-    setMasterEditorOpen(true);
-  }
-
-  function selectGateForEditing(id: string) {
-    initialMasterEditorSnapshotRef.current = gateEditor.select(id);
-    setMasterSubmitAttempted(false);
-    setMasterEditorTab("general");
-    setMasterEditorOpen(true);
-  }
-
   async function saveGate() {
     if (!board || gateEditor.label.trim().length < 2 || adminPinRef.current.length < 4) return;
     try {
@@ -865,18 +860,6 @@ export function AdminView() {
     requestAdminAction(() =>
       runBusyAction("master-assignment", () => assignAircraft(aircraftId, resourceGroupId)),
     );
-  }
-
-  function selectResourceForEditing(id: string) {
-    initialMasterEditorSnapshotRef.current = resourceEditor.select(id);
-    setMasterSubmitAttempted(false);
-    setMasterEditorOpen(true);
-  }
-
-  function selectAircraftForEditing(id: string) {
-    initialMasterEditorSnapshotRef.current = aircraftEditor.select(id);
-    setMasterSubmitAttempted(false);
-    setMasterEditorOpen(true);
   }
 
   async function saveResourceGroup() {
@@ -1135,12 +1118,6 @@ export function AdminView() {
     }
   }
 
-  function selectPilotForEditing(id: string) {
-    initialMasterEditorSnapshotRef.current = pilotEditor.select(id);
-    setMasterSubmitAttempted(false);
-    setMasterEditorOpen(true);
-  }
-
   function requestMasterSave(
     action: "gate" | "resource-group" | "aircraft" | "pilot" | "pilot-toggle" | "product",
     valid: boolean,
@@ -1205,31 +1182,6 @@ export function AdminView() {
       return;
     }
     requestMasterSave("product", true);
-  }
-
-  function finishMasterEditor() {
-    initialMasterEditorSnapshotRef.current = null;
-    setDiscardMasterChangesOpen(false);
-    setMasterSubmitAttempted(false);
-    setMasterEditorOpen(false);
-  }
-
-  function requestMasterEditorClose() {
-    if (masterEditorDirty) {
-      setMasterEditorOpen(false);
-      setDiscardMasterChangesOpen(true);
-      return;
-    }
-    finishMasterEditor();
-  }
-
-  function continueMasterEditing() {
-    setDiscardMasterChangesOpen(false);
-    setMasterEditorOpen(true);
-  }
-
-  function discardMasterChanges() {
-    finishMasterEditor();
   }
 
   function requestCurrentMasterSave() {
@@ -1356,14 +1308,6 @@ export function AdminView() {
       description: "Daten gezielt bereinigen oder das System vollständig neu einrichten.",
     },
   };
-
-  function startNewMasterDataEntry() {
-    if (masterDataCategory === "gates") selectGateForEditing("new");
-    if (masterDataCategory === "resource-groups") selectResourceForEditing("new");
-    if (masterDataCategory === "aircraft") selectAircraftForEditing("new");
-    if (masterDataCategory === "pilots") selectPilotForEditing("new");
-    if (masterDataCategory === "products") selectProductForEditing("new");
-  }
 
   const masterDataSingularLabel: Record<MasterDataCategory, string> = {
     gates: "Gate",

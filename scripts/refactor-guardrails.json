@@ -13,7 +13,7 @@
     },
     {
       "path": "apps/web/src/admin-view.tsx",
-      "maxLines": 2150,
+      "maxLines": 2094,
       "targetLines": 700
     },
     {
@@ -39,6 +39,11 @@
     {
       "path": "apps/web/src/features/admin/master-data/useAdminMasterDataDeletion.ts",
       "maxLines": 155,
+      "targetLines": 1500
+    },
+    {
+      "path": "apps/web/src/features/admin/master-data/useAdminMasterEditorState.ts",
+      "maxLines": 118,
       "targetLines": 1500
     },
     {
