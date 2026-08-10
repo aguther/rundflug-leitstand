@@ -89,7 +89,7 @@ import {
   MasterDataWorkspace,
 } from "./features/admin/master-data/MasterDataWorkspace";
 import { ResourceAircraftEditorDialog } from "./features/admin/master-data/ResourceAircraftEditorDialog";
-import { OperationalPlanWorkspace } from "./features/admin/operational-plan/OperationalPlanWorkspace";
+import { AdminOperationalPlanPanel } from "./features/admin/operational-plan/AdminOperationalPlanPanel";
 import { AdminOperationsPanel } from "./features/admin/operations/AdminOperationsPanel";
 import { AdminAccessStatusBar } from "./features/admin/overview/AdminAccessStatusBar";
 import {
@@ -108,12 +108,6 @@ import { useResourceGroupEditorState } from "./features/admin/resource-groups/us
 import { AnalysisWorkspace } from "./features/analysis/AnalysisWorkspace";
 import { AccountManagement } from "./features/auth/AccountManagement";
 import { useAuth } from "./features/auth/AuthContext";
-import type {
-  PlannedOperation,
-  RecurringOperationalRule,
-  UpsertPlannedOperationPayload,
-  UpsertRecurringOperationalRulePayload,
-} from "./features/operations/OperationalPlanPanel";
 import { clearOfflineOperationBoards } from "./offline-store";
 import {
   ADMIN_CONFIGURATION_AUDIT_REASON,
@@ -1262,113 +1256,6 @@ export function AdminView() {
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : "Notfallkommando fehlgeschlagen.");
       return false;
-    }
-  }
-
-  async function upsertAdminPlannedOperation(payload: UpsertPlannedOperationPayload) {
-    if (!board || !isAdministrator || !adminModeUnlocked) return;
-    try {
-      await sendCommand(
-        {
-          commandId: crypto.randomUUID(),
-          eventId: EVENT_ID,
-          deviceId: ADMIN_DEVICE_ID,
-          expectedVersion: board.event.version,
-          issuedAt: new Date().toISOString(),
-          type: "UPSERT_PLANNED_OPERATION",
-          payload,
-        },
-        deviceTokenFor(ADMIN_DEVICE_ID),
-      );
-      setMessage("Planeintrag gespeichert; der operative Zustand bleibt unverändert.");
-      await refresh();
-      await refreshHistory();
-    } catch (cause) {
-      setMessage(
-        cause instanceof Error ? cause.message : "Planeintrag konnte nicht gespeichert werden.",
-      );
-      throw cause;
-    }
-  }
-
-  async function cancelAdminPlannedOperation(plan: PlannedOperation) {
-    if (!board || !isAdministrator || !adminModeUnlocked) return;
-    try {
-      await sendCommand(
-        {
-          commandId: crypto.randomUUID(),
-          eventId: EVENT_ID,
-          deviceId: ADMIN_DEVICE_ID,
-          expectedVersion: board.event.version,
-          issuedAt: new Date().toISOString(),
-          type: "CANCEL_PLANNED_OPERATION",
-          payload: {
-            planId: plan.id,
-            planExpectedVersion: plan.version,
-          },
-        },
-        deviceTokenFor(ADMIN_DEVICE_ID),
-      );
-      setMessage("Planeintrag abgesagt; laufende Zustände wurden nicht verändert.");
-      await refresh();
-      await refreshHistory();
-    } catch (cause) {
-      setMessage(
-        cause instanceof Error ? cause.message : "Planeintrag konnte nicht abgesagt werden.",
-      );
-      throw cause;
-    }
-  }
-
-  async function upsertAdminRecurringRule(payload: UpsertRecurringOperationalRulePayload) {
-    if (!board || !isAdministrator || !adminModeUnlocked) return;
-    try {
-      await sendCommand(
-        {
-          commandId: crypto.randomUUID(),
-          eventId: EVENT_ID,
-          deviceId: ADMIN_DEVICE_ID,
-          expectedVersion: board.event.version,
-          issuedAt: new Date().toISOString(),
-          type: "UPSERT_RECURRING_OPERATIONAL_RULE",
-          payload,
-        },
-        deviceTokenFor(ADMIN_DEVICE_ID),
-      );
-      setMessage("Wiederkehrende Regel gespeichert.");
-      await refresh();
-      await refreshHistory();
-    } catch (cause) {
-      setMessage(cause instanceof Error ? cause.message : "Regel konnte nicht gespeichert werden.");
-      throw cause;
-    }
-  }
-
-  async function disableAdminRecurringRule(rule: RecurringOperationalRule) {
-    if (!board || !isAdministrator || !adminModeUnlocked) return;
-    try {
-      await sendCommand(
-        {
-          commandId: crypto.randomUUID(),
-          eventId: EVENT_ID,
-          deviceId: ADMIN_DEVICE_ID,
-          expectedVersion: board.event.version,
-          issuedAt: new Date().toISOString(),
-          type: "DISABLE_RECURRING_OPERATIONAL_RULE",
-          payload: {
-            ruleId: rule.id,
-            ruleExpectedVersion: rule.version,
-            reason: "Wiederkehrende Tagesregel deaktiviert.",
-          },
-        },
-        deviceTokenFor(ADMIN_DEVICE_ID),
-      );
-      setMessage("Wiederkehrende Regel deaktiviert; offene Planeinträge bleiben bestehen.");
-      await refresh();
-      await refreshHistory();
-    } catch (cause) {
-      setMessage(cause instanceof Error ? cause.message : "Regel konnte nicht deaktiviert werden.");
-      throw cause;
     }
   }
 
@@ -2745,36 +2632,15 @@ export function AdminView() {
             />
           ) : null}
           {adminArea === "events" && eventStep === "operational-plan" && board ? (
-            <section
-              aria-labelledby="admin-event-step-operational-plan-tab"
-              id="admin-event-step-operational-plan-panel"
-              role="tabpanel"
-            >
-              <OperationalPlanWorkspace
-                board={board}
-                panelProps={{
-                  aircraft: board.aircraft,
-                  busy: busyActionKey !== null,
-                  eventId: board.event.eventId,
-                  eventTimeZone: board.event.timeZone,
-                  mode: "admin",
-                  onCancel: (plan) =>
-                    runBusyAction("admin-plan-cancel", () => cancelAdminPlannedOperation(plan)),
-                  onDisableRecurringRule: (rule) =>
-                    runBusyAction("admin-rule-disable", () => disableAdminRecurringRule(rule)),
-                  onUpsert: (payload) =>
-                    runBusyAction("admin-plan-upsert", () => upsertAdminPlannedOperation(payload)),
-                  onUpsertRecurringRule: (payload) =>
-                    runBusyAction("admin-rule-upsert", () => upsertAdminRecurringRule(payload)),
-                  pilots: board.pilots,
-                  plannedOperations: board.plannedOperations,
-                  recurringOperationalRules: board.recurringOperationalRules,
-                  readOnly: !isAdministrator || !adminModeUnlocked,
-                  resourceGroups: board.resourceGroups,
-                  rotations: board.rotations,
-                }}
-              />
-            </section>
+            <AdminOperationalPlanPanel
+              board={board}
+              busy={busyActionKey !== null}
+              onMessage={setMessage}
+              onRefresh={refresh}
+              onRefreshHistory={refreshHistory}
+              onRunBusyAction={runBusyAction}
+              readOnly={!isAdministrator || !adminModeUnlocked}
+            />
           ) : null}
           {adminArea === "events" && eventStep === "operations" && board ? (
             <AdminOperationsPanel

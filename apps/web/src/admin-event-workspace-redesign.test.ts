@@ -79,7 +79,7 @@ describe("event-scoped administration redesign", () => {
     expect(adminViewSource).toContain('id: "operational-plan"');
     expect(adminViewSource).toContain('label: "Betriebsplan"');
     expect(adminViewSource).toContain("setupSteps.slice(0, 6)");
-    expect(adminViewSource).toContain("<OperationalPlanWorkspace");
+    expect(adminViewSource).toContain("<AdminOperationalPlanPanel");
     expect(operationalPlanSource).toContain('label: "Einschränkungen"');
     expect(operationalPlanSource).toContain('label: "Wiederkehrende Regeln"');
     expect(operationsSource).toContain("release");

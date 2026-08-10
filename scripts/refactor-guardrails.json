@@ -13,8 +13,13 @@
     },
     {
       "path": "apps/web/src/admin-view.tsx",
-      "maxLines": 2955,
+      "maxLines": 2821,
       "targetLines": 700
+    },
+    {
+      "path": "apps/web/src/features/admin/operational-plan/AdminOperationalPlanPanel.tsx",
+      "maxLines": 149,
+      "targetLines": 1500
     },
     {
       "path": "packages/contracts/src/index.ts",
