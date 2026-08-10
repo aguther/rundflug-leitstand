@@ -51,6 +51,35 @@ if (missingMaintainability.length > 0) {
   throw new Error(`Wartbarkeitsdokumentation unvollständig: ${missingMaintainability.join(", ")}`);
 }
 
+const technicalDebtPath = new URL("../docs/architecture/technical-debt-1.12.0.md", import.meta.url);
+const technicalDebt = await readFile(technicalDebtPath, "utf8");
+const technicalDebtEvidence = [
+  "Technische Schulden – Stand 1.12.0",
+  "1.394 Zeilen",
+  "219 Zeilen",
+  "663 Zeilen",
+  "135",
+  "D1Database.batch()",
+  "npm audit --omit=dev",
+  "npm run refactor:guardrails",
+  "scripts/verify_web_assets.mjs",
+  "20 operative",
+  "50 öffentliche",
+];
+const missingTechnicalDebt = technicalDebtEvidence.filter(
+  (entry) => !technicalDebt.includes(entry),
+);
+if (missingTechnicalDebt.length > 0) {
+  throw new Error(
+    `Technische-Schulden-Dokumentation unvollständig: ${missingTechnicalDebt.join(", ")}`,
+  );
+}
+
+const repositoryReadme = await readFile(resolve(root, "README.md"), "utf8");
+if (!repositoryReadme.includes("technical-debt-1.12.0.md")) {
+  throw new Error("README verweist nicht auf den aktuellen technischen Schuldenstand 1.12.0.");
+}
+
 const privacyAcceptancePath = new URL(
   "../docs/operations/cloudflare-data-protection-acceptance-v1.md",
   import.meta.url,
