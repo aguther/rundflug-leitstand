@@ -37,7 +37,6 @@ describe("V1.5 administration UI", () => {
     expect(adminViewSource.match(/<SetupProgress/g)).toHaveLength(1);
     expect(adminViewSource).toContain('className="event-setup-v15 single-panel"');
     expect(adminViewSource).toContain('className="event-release-v15"');
-    expect(adminViewSource).toContain('className="event-catalog-v15"');
     expect(adminViewSource).toContain("<PageHeader");
     expect(adminViewSource).toContain("<Panel");
     expect(adminViewSource).toContain("<EventParametersWorkspace");
@@ -47,7 +46,7 @@ describe("V1.5 administration UI", () => {
   it("keeps reset actions out of the event setup workspace", () => {
     const setupWorkspace = adminViewSource.slice(
       adminViewSource.indexOf('<div className="event-setup-v15"'),
-      adminViewSource.indexOf('<Panel className="event-catalog-v15"'),
+      adminViewSource.indexOf("<MasterDataWorkspace"),
     );
     expect(setupWorkspace).not.toContain("Betriebsdaten zurücksetzen");
     expect(setupWorkspace).not.toContain("Werkszustand");

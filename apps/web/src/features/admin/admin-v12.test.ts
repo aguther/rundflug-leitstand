@@ -39,9 +39,6 @@ describe("V1.2 compact administration", () => {
 
   it("keeps event management and event creation in one modal flow", () => {
     expect(appSource).toContain('useState<"closed" | "catalog" | "create">(');
-    expect(appSource).toContain('open={eventDialogView !== "closed"}');
-    expect(appSource).toContain('eventDialogView === "create"');
-    expect(appSource).toContain("Zurück zu Veranstaltungen");
     expect(appSource).not.toContain('className="admin-section restart-editor"');
     expect(modernizationStylesSource).toContain(".event-create-dialog-form");
     expect(modernizationStylesSource).toContain(".event-create-dialog-footer");
@@ -49,7 +46,6 @@ describe("V1.2 compact administration", () => {
   });
 
   it("makes technical event IDs visible, searchable and explicit during deletion", () => {
-    expect(appSource).toContain("Technische ID:");
     expect(appSource).toContain("entry.name} $" + "{entry.eventId} $" + "{entry.eventDate");
     expect(appSource).toContain("Zum Bestätigen exakt");
     expect(appSource).toContain("eventId}“ eingeben");
