@@ -107,7 +107,6 @@ describe("V1 administration completion UI", () => {
   it("uses centered responsive master-data dialogs", () => {
     expect(appSource).toContain("useState<MasterDataCategory>(() => {");
     expect(appSource).toContain(': "resource-groups";');
-    expect(appSource).toContain("<MasterDataWorkspace");
     expect(appSource).not.toContain('<aside className="master-data-drawer"');
     expect(stylesSource).toContain("grid-template-columns: minmax(0, 1fr)");
     expect(stylesSource).toContain("max-height: none");

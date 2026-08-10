@@ -3,6 +3,7 @@
 import type { OperationBoard } from "@rundflug/contracts";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { MasterDataCategory } from "../../../admin-ux";
 import { useAdminMasterDataActions } from "./useAdminMasterDataActions";
 
 const mocks = vi.hoisted(() => ({ sendCommand: vi.fn() }));
@@ -76,7 +77,11 @@ const baseEditors = {
 function renderActions({
   administrator = true,
   board = baseBoard,
-  category = "gates" as const,
+  category = "gates",
+}: {
+  administrator?: boolean;
+  board?: OperationBoard;
+  category?: MasterDataCategory;
 } = {}) {
   const clearPinWhenLocked = vi.fn();
   const finishEditor = vi.fn();
@@ -176,6 +181,50 @@ describe("admin master-data actions", () => {
     expect(refreshHistory).toHaveBeenCalledOnce();
   });
 
+  it("preserves resource-group membership by omitting aircraft from its update", async () => {
+    mocks.sendCommand.mockResolvedValue({});
+    const { result } = renderActions({ category: "resource-groups" });
+
+    act(() => result.current.requestCurrentMasterSave());
+
+    await waitFor(() => expect(mocks.sendCommand).toHaveBeenCalledOnce());
+    const command = mocks.sendCommand.mock.calls[0]?.[0] as { payload: Record<string, unknown> };
+    expect(command).toMatchObject({
+      type: "UPSERT_RESOURCE_GROUP",
+      payload: {
+        automaticPrecallEnabled: true,
+        compatibleAircraftTypes: [],
+        gateId: "gate-a",
+        referenceCapacity: 4,
+        shortCode: "PA",
+      },
+    });
+    expect(command.payload).not.toHaveProperty("aircraftIds");
+  });
+
+  it("maps every product planning field into its audited command", async () => {
+    mocks.sendCommand.mockResolvedValue({});
+    const { result } = renderActions({ category: "products" });
+
+    act(() => result.current.requestCurrentMasterSave());
+
+    await waitFor(() => expect(mocks.sendCommand).toHaveBeenCalledOnce());
+    expect(mocks.sendCommand.mock.calls[0]?.[0]).toEqual(
+      expect.objectContaining({
+        type: "UPSERT_PRODUCT",
+        payload: expect.objectContaining({
+          childCompanionRequired: false,
+          priceCents: 2500,
+          promisedFlightMinutes: 15,
+          publicDescription: "Synthetic product",
+          referenceCapacity: 4,
+          referenceDurationMinutes: 20,
+          weightClasses: [],
+        }),
+      }),
+    );
+  });
+
   it("keeps aircraft assignment behind the authenticated busy boundary", async () => {
     mocks.sendCommand.mockResolvedValue({});
     const { result, onAssignmentComplete, requestAdminAction, runBusyAction } = renderActions();
@@ -248,6 +297,33 @@ describe("admin master-data actions", () => {
       expect.objectContaining({
         type: "DELETE_AIRCRAFT_PRODUCT_TURNAROUND_OVERRIDE",
         payload: expect.objectContaining({ expectedOverrideVersion: 3 }),
+      }),
+      "synthetic-device-token",
+    );
+  });
+
+  it("creates a component-specific turnaround override from inherited values", async () => {
+    mocks.sendCommand.mockResolvedValue({});
+    const { result } = renderActions();
+
+    act(() =>
+      result.current.requestTurnaroundOverrideSave("aircraft-a", "product-a", {
+        boarding: 4,
+        buffer: null,
+        deboarding: 3,
+      }),
+    );
+
+    await waitFor(() => expect(mocks.sendCommand).toHaveBeenCalledOnce());
+    expect(mocks.sendCommand).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "UPSERT_AIRCRAFT_PRODUCT_TURNAROUND_OVERRIDE",
+        payload: expect.objectContaining({
+          expectedOverrideVersion: 0,
+          plannedBoardingMinutesOverride: 4,
+          plannedBufferMinutesOverride: null,
+          plannedDeboardingMinutesOverride: 3,
+        }),
       }),
       "synthetic-device-token",
     );

@@ -16,9 +16,6 @@ import outageRecoverySource from "../../../packages/domain/src/outage-recovery.t
 import queueSource from "../../../packages/domain/src/queue.ts?raw";
 import sonarProperties from "../../../sonar-project.properties?raw";
 import webManifestRaw from "../../web/package.json?raw";
-import webAdminSource from "../../web/src/admin-view.tsx?raw";
-import eventParametersSource from "../../web/src/features/admin/event-parameters/EventParametersWorkspace.tsx?raw";
-import eventParametersFormSource from "../../web/src/features/admin/event-parameters/useEventParametersForm.ts?raw";
 import initialMigration from "../migrations/0001_initial.sql?raw";
 import masterDataMigration from "../migrations/0015_product_and_gate_master_data.sql?raw";
 import multiEventMigration from "../migrations/0017_multi_event_templates.sql?raw";
@@ -33,7 +30,6 @@ type Manifest = {
   packageManager?: string;
   scripts?: Record<string, string>;
 };
-const webSource = `${webAdminSource}\n${eventParametersSource}\n${eventParametersFormSource}`;
 const dependencyNames = (raw: string) => {
   const manifest = JSON.parse(raw) as Manifest;
   return [
@@ -293,29 +289,5 @@ describe("runtime configuration coverage", () => {
       "UPSERT_RESOURCE_GROUP",
       "CONFIGURE_PRODUCT_SALES",
     ]);
-
-    for (const token of [
-      "CONFIGURE_EVENT_PARAMETERS",
-      "saleOpensAt",
-      "operationsEndAt",
-      "noShowAfterMinutes",
-      "maxTicketDeferrals",
-      "notificationLeadMinutes",
-      "childReferenceWeightKg",
-      "normalReferenceWeightKg",
-      "heavyReferenceWeightKg",
-      "plannedBoardingMinutes",
-      "plannedDeboardingMinutes",
-      "plannedBufferMinutes",
-      "publicDescription",
-      "referenceCapacity",
-      "referenceDurationMinutes",
-      "promisedFlightMinutes",
-      "weightClasses",
-      "childCompanionRequired",
-      "compatibleAircraftTypes",
-    ]) {
-      expect(webSource).toContain(token);
-    }
   });
 });

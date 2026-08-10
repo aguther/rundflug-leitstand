@@ -28,7 +28,6 @@ import {
   type AircraftResourceGroupAssignmentContext,
   AircraftResourceGroupAssignmentDialog,
 } from "./features/admin/aircraft/AircraftResourceGroupAssignmentDialog";
-import { AircraftWorkspace } from "./features/admin/aircraft/AircraftWorkspace";
 import { useAircraftEditorState } from "./features/admin/aircraft/useAircraftEditorState";
 import { AdminCompletionSummaryPanel } from "./features/admin/completion/AdminCompletionSummaryPanel";
 import { CompletionHistoryPanel } from "./features/admin/completion/CompletionHistoryPanel";
@@ -42,8 +41,8 @@ import { useAdminEventCatalog } from "./features/admin/event-workspace/useAdminE
 import { useAdminEventWorkspaceNavigation } from "./features/admin/event-workspace/useAdminEventWorkspaceNavigation";
 import { FactoryResetDialog } from "./features/admin/FactoryResetDialog";
 import { GateEditorDialog } from "./features/admin/gates/GateEditorDialog";
-import { GatesWorkspace } from "./features/admin/gates/GatesWorkspace";
 import { useGateEditorState } from "./features/admin/gates/useGateEditorState";
+import { AdminMasterDataWorkspacePanel } from "./features/admin/master-data/AdminMasterDataWorkspacePanel";
 import {
   AdminMasterEditorFooter,
   AdminMasterEditorFurtherActions,
@@ -53,11 +52,7 @@ import {
   MasterDataDeleteDialog,
   MasterDataTemplateImportDialog,
 } from "./features/admin/master-data/MasterDataManagementDialogs";
-import { MasterDataPagination } from "./features/admin/master-data/MasterDataPagination";
-import {
-  MasterDataEmptyState,
-  MasterDataWorkspace,
-} from "./features/admin/master-data/MasterDataWorkspace";
+import { MasterDataEmptyState } from "./features/admin/master-data/MasterDataWorkspace";
 import { ResourceAircraftEditorDialog } from "./features/admin/master-data/ResourceAircraftEditorDialog";
 import { useAdminMasterDataActions } from "./features/admin/master-data/useAdminMasterDataActions";
 import { useAdminMasterDataDeletion } from "./features/admin/master-data/useAdminMasterDataDeletion";
@@ -73,14 +68,11 @@ import {
 } from "./features/admin/overview/AdminOverviewPanel";
 import { AdminSimulationLauncher } from "./features/admin/overview/AdminSimulationLauncher";
 import { useAdminEventFlow } from "./features/admin/overview/useAdminEventFlow";
-import { PilotCodesWorkspace } from "./features/admin/pilots/PilotCodesWorkspace";
 import { PilotEditorDialog } from "./features/admin/pilots/PilotEditorDialog";
 import { usePilotEditorState } from "./features/admin/pilots/usePilotEditorState";
 import { ProductEditorDialog } from "./features/admin/products/ProductEditorDialog";
 import { ProductSalesDialog } from "./features/admin/products/ProductSalesDialog";
-import { ProductsWorkspace } from "./features/admin/products/ProductsWorkspace";
 import { useProductEditorState } from "./features/admin/products/useProductEditorState";
-import { ResourceGroupsWorkspace } from "./features/admin/resource-groups/ResourceGroupsWorkspace";
 import { useResourceGroupEditorState } from "./features/admin/resource-groups/useResourceGroupEditorState";
 import { useAdminAuthorization } from "./features/admin/useAdminAuthorization";
 import { useAdminFactoryReset } from "./features/admin/useAdminFactoryReset";
@@ -157,26 +149,8 @@ export function AdminView() {
       ? (requestedSection as MasterDataCategory)
       : "resource-groups";
   });
-  const {
-    alphabeticalProducts,
-    clampedPage: masterPageClamped,
-    filteredCount: activeMasterDataRowCount,
-    pageSize: masterPageSize,
-    pagedAircraft,
-    pagedGates,
-    pagedPilots,
-    pagedProducts,
-    pagedResourceGroups,
-    resourceStatusFilter,
-    search: masterSearch,
-    setPage: setMasterPage,
-    setPageSize: setMasterPageSize,
-    setResourceStatusFilter,
-    setSearch: setMasterSearch,
-    sort: masterSort,
-    toggleSort: toggleMasterSort,
-    totalCount: totalMasterDataCount,
-  } = useAdminMasterDataTable({ board, category: masterDataCategory });
+  const masterDataTable = useAdminMasterDataTable({ board, category: masterDataCategory });
+  const { alphabeticalProducts, totalCount: totalMasterDataCount } = masterDataTable;
   const handleSetupStepSelected = useCallback((step: SetupStep) => {
     if (step.category) setMasterDataCategory(step.category);
   }, []);
@@ -316,9 +290,9 @@ export function AdminView() {
     if (["gates", "resource-groups", "aircraft", "pilots", "products"].includes(eventStep)) {
       setMasterDataCategory(eventStep as MasterDataCategory);
       resetMasterEditorForStepChange();
-      setMasterSearch("");
+      masterDataTable.setSearch("");
     }
-  }, [eventStep, resetMasterEditorForStepChange, setMasterSearch]);
+  }, [eventStep, masterDataTable.setSearch, resetMasterEditorForStepChange]);
   const [eventDialogView, setEventDialogView] = useState<"closed" | "catalog" | "create">("closed");
   const resourceGroups = board?.resourceGroups ?? [];
   const isAdministrator = session?.account.role === "ADMIN" || board?.currentDeviceRole === "ADMIN";
@@ -770,124 +744,35 @@ export function AdminView() {
           </div>
 
           {masterDataStepActive && board ? (
-            <section
-              aria-labelledby={`admin-event-step-${eventStep}-tab`}
-              id={`admin-event-step-${eventStep}-panel`}
-              role="tabpanel"
-            >
-            <MasterDataWorkspace
-              event={board.event}
-              filters={
-                masterDataCategory === "resource-groups" ? (
-                  <label className="master-data-status-filter">
-                    <span>Status</span>
-                    <select
-                      onChange={(event) => setResourceStatusFilter(event.target.value)}
-                      value={resourceStatusFilter}
-                    >
-                      <option value="ALL">Alle Status</option>
-                      <option value="ACTIVE">Aktiv</option>
-                      <option value="PAUSED">Pausiert</option>
-                      <option value="INTERRUPTED">Unterbrochen</option>
-                      <option value="ENDED">Beendet</option>
-                    </select>
-                  </label>
-                ) : undefined
-              }
-              addAriaLabel={`${masterEditorPresentation.singularLabel} hinzufügen`}
+            <AdminMasterDataWorkspacePanel
+              board={board}
+              category={masterDataCategory}
+              emptyState={masterDataEmptyState}
+              eventStep={eventStep}
+              onDelete={requestMasterDelete}
+              onEdit={{
+                aircraft: selectAircraftForEditing,
+                gates: selectGateForEditing,
+                pilots: selectPilotForEditing,
+                products: selectProductForEditing,
+                resourceGroups: selectResourceForEditing,
+              }}
               onNew={startNewMasterDataEntry}
-              onSearchChange={setMasterSearch}
-              resultCount={activeMasterDataRowCount}
-              search={masterSearch}
-            >
-              {masterDataCategory === "gates" ? (
-                <GatesWorkspace
-                  board={board}
-                  emptyLabel={masterDataEmptyState}
-                  onDelete={(id, label) => requestMasterDelete("GATE", id, label)}
-                  onEdit={selectGateForEditing}
-                  onSort={toggleMasterSort}
-                  rows={pagedGates}
-                  sortDirection={masterSort.category === "gates" ? masterSort.direction : null}
-                  sortKey={masterSort.category === "gates" ? masterSort.key : undefined}
-                />
-              ) : null}
-              {masterDataCategory === "resource-groups" ? (
-                <ResourceGroupsWorkspace
-                  board={board}
-                  onAssign={(resourceGroupId) =>
-                    setAssignmentDialogContext({ mode: "resource-group", resourceGroupId })
-                  }
-                  onDelete={(id, label) => requestMasterDelete("RESOURCE_GROUP", id, label)}
-                  onEdit={selectResourceForEditing}
-                  rows={pagedResourceGroups}
-                />
-              ) : null}
-              {masterDataCategory === "aircraft" ? (
-                <AircraftWorkspace
-                  board={board}
-                  emptyLabel={masterDataEmptyState}
-                  onAssign={(aircraftId) =>
-                    setAssignmentDialogContext({ mode: "aircraft", aircraftId })
-                  }
-                  onDelete={(id, label) => requestMasterDelete("AIRCRAFT", id, label)}
-                  onEdit={selectAircraftForEditing}
-                  onSort={toggleMasterSort}
-                  onTurnaround={(aircraftId) =>
-                    setTurnaroundDialogContext({ mode: "aircraft", aircraftId })
-                  }
-                  rows={pagedAircraft}
-                  sortDirection={masterSort.category === "aircraft" ? masterSort.direction : null}
-                  sortKey={masterSort.category === "aircraft" ? masterSort.key : undefined}
-                />
-              ) : null}
-              {masterDataCategory === "pilots" ? (
-                <PilotCodesWorkspace
-                  emptyLabel={masterDataEmptyState}
-                  onDelete={(id, label) => requestMasterDelete("PILOT", id, label)}
-                  onEdit={selectPilotForEditing}
-                  onSort={toggleMasterSort}
-                  rows={pagedPilots}
-                  sortDirection={masterSort.category === "pilots" ? masterSort.direction : null}
-                  sortKey={masterSort.category === "pilots" ? masterSort.key : undefined}
-                />
-              ) : null}
-              {masterDataCategory === "products" ? (
-                <ProductsWorkspace
-                  emptyLabel={masterDataEmptyState}
-                  onDelete={(id, label) => requestMasterDelete("PRODUCT", id, label)}
-                  onEdit={selectProductForEditing}
-                  onSales={(productId) => {
-                    const product = board.products.find((entry) => entry.id === productId);
-                    if (!product) return;
-                    setSalesProductId(product.id);
-                    setSaleClosesAt(
-                      product.saleClosesAt
-                        ? formatEventLocalDateTime(product.saleClosesAt, board.event.timeZone)
-                        : "",
-                    );
-                  }}
-                  onSort={toggleMasterSort}
-                  onTurnaround={(productId) =>
-                    setTurnaroundDialogContext({ mode: "product", productId })
-                  }
-                  rows={pagedProducts}
-                  sortDirection={masterSort.category === "products" ? masterSort.direction : null}
-                  sortKey={masterSort.category === "products" ? masterSort.key : undefined}
-                />
-              ) : null}
-              {masterDataCategory === "resource-groups" && activeMasterDataRowCount === 0
-                ? masterDataEmptyState
-                : null}
-              <MasterDataPagination
-                count={activeMasterDataRowCount}
-                onPageChange={setMasterPage}
-                onPageSizeChange={setMasterPageSize}
-                page={masterPageClamped}
-                pageSize={masterPageSize}
-              />
-            </MasterDataWorkspace>
-            </section>
+              onOpenAssignment={setAssignmentDialogContext}
+              onOpenSales={(productId) => {
+                const product = board.products.find((entry) => entry.id === productId);
+                if (!product) return;
+                setSalesProductId(product.id);
+                setSaleClosesAt(
+                  product.saleClosesAt
+                    ? formatEventLocalDateTime(product.saleClosesAt, board.event.timeZone)
+                    : "",
+                );
+              }}
+              onOpenTurnaround={setTurnaroundDialogContext}
+              presentation={masterEditorPresentation}
+              table={masterDataTable}
+            />
           ) : null}
           {board ? (
             <AircraftResourceGroupAssignmentDialog

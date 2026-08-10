@@ -13,7 +13,7 @@
     },
     {
       "path": "apps/web/src/admin-view.tsx",
-      "maxLines": 1206,
+      "maxLines": 1091,
       "targetLines": 700
     },
     {
@@ -59,6 +59,11 @@
     {
       "path": "apps/web/src/features/admin/master-data/AdminMasterEditorActions.tsx",
       "maxLines": 184,
+      "targetLines": 1500
+    },
+    {
+      "path": "apps/web/src/features/admin/master-data/AdminMasterDataWorkspacePanel.tsx",
+      "maxLines": 155,
       "targetLines": 1500
     },
     {
@@ -689,9 +694,6 @@
     "apps/worker/src/group-ticket-v18.test.ts -> apps/web/src/features/public-status/PublicStatusContent.tsx",
     "apps/worker/src/group-ticket-v18.test.ts -> apps/web/src/group-status-view.tsx",
     "apps/worker/src/group-ticket-v18.test.ts -> apps/worker/src/web-push.ts",
-    "apps/worker/src/maintainability-coverage.test.ts -> apps/web/src/admin-view.tsx",
-    "apps/worker/src/maintainability-coverage.test.ts -> apps/web/src/features/admin/event-parameters/EventParametersWorkspace.tsx",
-    "apps/worker/src/maintainability-coverage.test.ts -> apps/web/src/features/admin/event-parameters/useEventParametersForm.ts",
     "apps/worker/src/maintainability-coverage.test.ts -> packages/domain/src/capacity.ts",
     "apps/worker/src/maintainability-coverage.test.ts -> packages/domain/src/forecast.ts",
     "apps/worker/src/maintainability-coverage.test.ts -> packages/domain/src/index.ts",

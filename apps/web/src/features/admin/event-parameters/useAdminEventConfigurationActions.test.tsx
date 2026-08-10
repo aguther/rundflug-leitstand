@@ -101,6 +101,52 @@ describe("admin event configuration actions", () => {
     expect(refreshBoard).toHaveBeenCalledOnce();
   });
 
+  it("maps every validated operational parameter into the audited command", async () => {
+    mocks.sendCommand.mockResolvedValue({});
+    const payload: ValidEventParameterPayload = {
+      automaticPrecallEnabled: true,
+      childReferenceWeightKg: 40,
+      departedVisibilitySeconds: 15,
+      heavyReferenceWeightKg: 100,
+      maxTicketDeferrals: 2,
+      maximumGateWaitMinutes: 20,
+      noShowAfterMinutes: 15,
+      normalReferenceWeightKg: 80,
+      notificationLeadMinutes: 15,
+      operationsEndAt: "2026-08-10T18:00:00.000Z",
+      operationsStartAt: null,
+      plannedBoardingMinutes: 5,
+      plannedBufferMinutes: 3,
+      plannedDeboardingMinutes: 5,
+      precallGateCooldownMinutes: 2,
+      precallLeadMinutes: 15,
+      precallMinimumQuality: "CHANGING",
+      saleOpensAt: null,
+    };
+    const lifecycle = { onConflict: vi.fn(), onSaved: vi.fn() };
+    const { result, clearPinWhenLocked, refreshBoard, refreshHistory } = renderActions();
+
+    act(() => result.current.requestSaveEventParameters(payload, lifecycle));
+
+    await waitFor(() => expect(mocks.sendCommand).toHaveBeenCalledOnce());
+    expect(mocks.sendCommand).toHaveBeenCalledWith(
+      expect.objectContaining({
+        expectedVersion: 41,
+        type: "CONFIGURE_EVENT_PARAMETERS",
+        payload: {
+          ...payload,
+          adminPin: "123456",
+          reason: "Synthetic configuration change",
+        },
+      }),
+      "synthetic-device-token",
+    );
+    expect(lifecycle.onSaved).toHaveBeenCalledOnce();
+    expect(clearPinWhenLocked).toHaveBeenCalledOnce();
+    expect(refreshBoard).toHaveBeenCalledOnce();
+    expect(refreshHistory).toHaveBeenCalledOnce();
+  });
+
   it("routes logo uploads and removals through authenticated busy actions", async () => {
     mocks.uploadEventLogo.mockResolvedValue({});
     mocks.removeEventLogo.mockResolvedValue({});

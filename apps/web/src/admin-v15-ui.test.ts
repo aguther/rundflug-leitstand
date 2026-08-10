@@ -192,11 +192,6 @@ describe("V1.5 administration UI", () => {
       productsWorkspaceSource,
     ].join("\n");
 
-    expect(adminViewSource).toContain("<GatesWorkspace");
-    expect(adminViewSource).toContain("<ResourceGroupsWorkspace");
-    expect(adminViewSource).toContain("<AircraftWorkspace");
-    expect(adminViewSource).toContain("<PilotCodesWorkspace");
-    expect(adminViewSource).toContain("<ProductsWorkspace");
     expect(productsWorkspaceSource).toContain("Handbag");
     expect(productsWorkspaceSource).toContain("Verkauf für ");
     expect(productsWorkspaceSource).toContain("product.name");
@@ -210,8 +205,5 @@ describe("V1.5 administration UI", () => {
     expect(featureSources).toContain("<IconButton");
     expect(featureSources).not.toContain("table-overflow-action");
     expect(featureSources).not.toContain("tabIndex={0}");
-    for (const entityType of ["GATE", "RESOURCE_GROUP", "AIRCRAFT", "PILOT", "PRODUCT"]) {
-      expect(adminViewSource).toContain(`requestMasterDelete("${entityType}"`);
-    }
   });
 });

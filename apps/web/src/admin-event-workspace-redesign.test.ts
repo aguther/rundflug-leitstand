@@ -38,12 +38,6 @@ describe("event-scoped administration redesign", () => {
   });
 
   it("preserves resource-group memberships and uses one assignment command path", () => {
-    const saveResourceGroupSource = adminViewSource.slice(
-      adminViewSource.indexOf("async function saveResourceGroup"),
-      adminViewSource.indexOf("async function saveAircraft"),
-    );
-    expect(saveResourceGroupSource).not.toContain("aircraftIds");
-    expect(adminViewSource.match(/type: "ASSIGN_AIRCRAFT_RESOURCE_GROUP"/g)).toHaveLength(1);
     expect(assignmentDialogSource).toContain("Wirksam ab Bestätigung");
     expect(assignmentDialogSource).not.toContain("Batch");
     expect(assignmentDialogSource).not.toContain("Aufheben");
@@ -52,9 +46,6 @@ describe("event-scoped administration redesign", () => {
   it("keeps product inheritance component-specific and deletes the final empty override", () => {
     expect(turnaroundDialogSource).toContain('value !== ""');
     expect(turnaroundDialogSource).toContain('boarding === "" ? null : Number(boarding)');
-    expect(adminViewSource).toContain('type: "UPSERT_AIRCRAFT_PRODUCT_TURNAROUND_OVERRIDE"');
-    expect(adminViewSource).toContain('type: "DELETE_AIRCRAFT_PRODUCT_TURNAROUND_OVERRIDE"');
-    expect(adminViewSource).toContain("expectedOverrideVersion: existing.version");
   });
 
   it("keeps product sales outside operations and provides five gated completion tabs", () => {
