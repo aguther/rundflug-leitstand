@@ -1,4 +1,4 @@
-import type { EventLogoTheme, OperationBoard } from "@rundflug/contracts";
+import type { OperationBoard } from "@rundflug/contracts";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   type AdminArea,
@@ -9,14 +9,7 @@ import {
   type SetupStep,
   ValidationHint,
 } from "./admin-ux";
-import {
-  ApiCommandError,
-  getPushConfiguration,
-  getSetupStatus,
-  removeEventLogo,
-  sendCommand,
-  uploadEventLogo,
-} from "./api";
+import { getPushConfiguration, getSetupStatus, sendCommand } from "./api";
 import { AppShell as Shell } from "./app/AppShell";
 import { PageNotice, useActionMessageBridge } from "./app/PageNotifications";
 import {
@@ -43,11 +36,8 @@ import { CompletionHistoryPanel } from "./features/admin/completion/CompletionHi
 import { CompletionWorkspace } from "./features/admin/completion/CompletionWorkspace";
 import { ManifestCorrectionPanel } from "./features/admin/completion/ManifestCorrectionPanel";
 import { useAdminHistory } from "./features/admin/completion/useAdminHistory";
-import {
-  type EventParameterSaveLifecycle,
-  EventParametersWorkspace,
-} from "./features/admin/event-parameters/EventParametersWorkspace";
-import type { ValidEventParameterPayload } from "./features/admin/event-parameters/useEventParametersForm";
+import { EventParametersWorkspace } from "./features/admin/event-parameters/EventParametersWorkspace";
+import { useAdminEventConfigurationActions } from "./features/admin/event-parameters/useAdminEventConfigurationActions";
 import { EventCatalogDialog } from "./features/admin/event-workspace/EventCatalogDialog";
 import { useAdminEventCatalog } from "./features/admin/event-workspace/useAdminEventCatalog";
 import { useAdminEventWorkspaceNavigation } from "./features/admin/event-workspace/useAdminEventWorkspaceNavigation";
@@ -98,7 +88,6 @@ import { AnalysisWorkspace } from "./features/analysis/AnalysisWorkspace";
 import { AccountManagement } from "./features/auth/AccountManagement";
 import { useAuth } from "./features/auth/AuthContext";
 import {
-  ADMIN_CONFIGURATION_AUDIT_REASON,
   ADMIN_DEVICE_ID,
   ConnectionNotice,
   deviceTokenFor,
@@ -365,6 +354,22 @@ export function AdminView() {
     onViewChange: setEventDialogView,
     view: eventDialogView,
   });
+  const {
+    requestClearEventLogo,
+    requestSaveEventLogo,
+    requestSaveEventParameters,
+    setEventLifecycle,
+  } = useAdminEventConfigurationActions({
+    board,
+    clearPinWhenLocked,
+    getAdminPin,
+    onMessage: setMessage,
+    refreshBoard: refresh,
+    refreshEvents: eventCatalog.refreshEvents,
+    refreshHistory,
+    requestAdminAction,
+    runBusyAction,
+  });
   const templateImport = useMasterDataTemplateImport({
     board,
     onMessage: setMessage,
@@ -422,129 +427,6 @@ export function AdminView() {
     });
     return () => window.cancelAnimationFrame(frame);
   }, [board, eventStep]);
-
-  async function setEventLifecycle(status: "PREPARATION" | "ACTIVE" | "CLOSED" | "ARCHIVED") {
-    if (!board || getAdminPin().length < 4) return;
-    try {
-      await sendCommand(
-        {
-          commandId: crypto.randomUUID(),
-          eventId: EVENT_ID,
-          deviceId: ADMIN_DEVICE_ID,
-          expectedVersion: board.event.version,
-          issuedAt: new Date().toISOString(),
-          type: "SET_EVENT_LIFECYCLE",
-          payload: {
-            status,
-            reason: ADMIN_CONFIGURATION_AUDIT_REASON,
-            adminPin: getAdminPin(),
-          },
-        },
-        deviceTokenFor(ADMIN_DEVICE_ID),
-      );
-      setMessage(`Veranstaltungsstatus auf ${status} gesetzt und protokolliert.`);
-      clearPinWhenLocked();
-      await refresh();
-      await eventCatalog.refreshEvents();
-    } catch (cause) {
-      setMessage(cause instanceof Error ? cause.message : "Statusänderung fehlgeschlagen.");
-    }
-  }
-
-  function requestSaveEventParameters(
-    payload: ValidEventParameterPayload,
-    lifecycle: EventParameterSaveLifecycle,
-  ) {
-    void requestAdminAction(() =>
-      runBusyAction("event-parameters", async () => {
-        if (!board || getAdminPin().length < 4) return;
-        try {
-          await sendCommand(
-            {
-              commandId: crypto.randomUUID(),
-              eventId: EVENT_ID,
-              deviceId: ADMIN_DEVICE_ID,
-              expectedVersion: board.event.version,
-              issuedAt: new Date().toISOString(),
-              type: "CONFIGURE_EVENT_PARAMETERS",
-              payload: {
-                ...payload,
-                reason: ADMIN_CONFIGURATION_AUDIT_REASON,
-                adminPin: getAdminPin(),
-              },
-            },
-            deviceTokenFor(ADMIN_DEVICE_ID),
-          );
-          lifecycle.onSaved();
-          setMessage("Veranstaltungsparameter wurden protokolliert aktualisiert.");
-          clearPinWhenLocked();
-          await Promise.all([refresh(), refreshHistory()]);
-        } catch (cause) {
-          if (
-            cause instanceof ApiCommandError &&
-            ["STALE_VERSION", "EVENT_VERSION_CONFLICT"].includes(cause.code)
-          ) {
-            lifecycle.onConflict(cause.currentVersion);
-            await refresh();
-          }
-          setMessage(
-            cause instanceof Error ? cause.message : "Parameter konnten nicht gespeichert werden.",
-          );
-        }
-      }),
-    );
-  }
-
-  function requestSaveEventLogo(theme: EventLogoTheme, file: File) {
-    void requestAdminAction(() =>
-      runBusyAction(`event-logo-${theme}`, () => saveEventLogo(theme, file)),
-    );
-  }
-
-  async function saveEventLogo(theme: EventLogoTheme, file: File) {
-    if (!board) return;
-    try {
-      await uploadEventLogo(
-        EVENT_ID,
-        ADMIN_DEVICE_ID,
-        deviceTokenFor(ADMIN_DEVICE_ID),
-        board.event.version,
-        theme,
-        file,
-      );
-      setMessage(
-        `Logo für das ${theme === "light" ? "helle" : "dunkle"} Theme gespeichert. Die Ansichten verwenden es nach dem Neuladen.`,
-      );
-      await refresh();
-    } catch (cause) {
-      setMessage(cause instanceof Error ? cause.message : "Logo konnte nicht gespeichert werden.");
-    }
-  }
-
-  function requestClearEventLogo(theme: EventLogoTheme) {
-    void requestAdminAction(() =>
-      runBusyAction(`clear-event-logo-${theme}`, () => clearEventLogo(theme)),
-    );
-  }
-
-  async function clearEventLogo(theme: EventLogoTheme) {
-    if (!board) return;
-    try {
-      await removeEventLogo(
-        EVENT_ID,
-        ADMIN_DEVICE_ID,
-        deviceTokenFor(ADMIN_DEVICE_ID),
-        board.event.version,
-        theme,
-      );
-      setMessage(
-        `Logo für das ${theme === "light" ? "helle" : "dunkle"} Theme entfernt. Fehlt die andere Variante ebenfalls, wird die Rundflug-Leitstand-Marke verwendet.`,
-      );
-      await refresh();
-    } catch (cause) {
-      setMessage(cause instanceof Error ? cause.message : "Logo konnte nicht entfernt werden.");
-    }
-  }
 
   async function saveGate() {
     if (!board || gateEditor.label.trim().length < 2 || getAdminPin().length < 4) return;
