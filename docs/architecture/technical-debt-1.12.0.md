@@ -1,7 +1,8 @@
 # Technische Schulden – Stand 1.12.0
 
 Stand: 10. August 2026
-Messbasis: `1a5d364a8abf9409b51d9758754b0dbe6d67af80` auf `main`/`origin/main`
+Messbasis: `7230fccaa11abf2d05b5d9c52648a80a97089696` auf dem abschließend validierten
+Integrationsstand
 
 Dieses Dokument schreibt die Restschuldenliste aus
 [`technical-debt-1.11.0.md`](technical-debt-1.11.0.md) fort. Es dokumentiert den Abschluss der
@@ -119,6 +120,12 @@ prüft verteilte Requeststarts, Single-Flight-Verhalten und die Übernahme der n
 innerhalb von einer Sekunde zuzüglich 40 ms synthetischer Serverantwortzeit. Der Nachweis ist damit
 vom früheren Parallel-HTTP-Lesetest getrennt.
 
+Der geschützte Live-Transport übernimmt die Autorisierung der WebSocket-Verbindung selbst. Die
+allgemeine Control-Middleware lässt deshalb neben den FIDS-Abfragen auch den Live-Pfad bis zu diesem
+Transport passieren. Dadurch erhalten angemeldete Display-Konten Realtime-Aktualisierungen, während
+fehlende Produktionssitzungen weiterhin am Transport abgewiesen werden. Ein Middleware-
+Regressionstest und der Browsernachweis sichern diesen Fall ab.
+
 ## Assetgrenzen
 
 Der Produktionsbuild erzeugt ein Vite-Manifest. `scripts/verify_web_assets.mjs` berechnet
@@ -150,9 +157,13 @@ Der abschließende Prüflauf auf dem integrierten Inhalt wurde mit npm 12.0.2 au
 - Produktions- und vollständiger Dependency-Audit: jeweils 0 Findings.
 - Admin und FIDS wurden bei 1440×1000, 1024×768 und 430×900 jeweils in Light und Dark geprüft. Die
   lazy geladene Admin-Auswertung und der FIDS-Einstellungsdialog wurden dabei interaktiv geöffnet;
-  ein horizontaler Dokumentüberlauf wurde nicht festgestellt. Die spätere Guardrail- und
-  Preflight-Bereinigung änderte keinen produktiven UI-Code und erforderte deshalb keine Wiederholung
-  dieser Browserabnahme.
+  ein horizontaler Dokumentüberlauf wurde nicht festgestellt. Ein abschließender deterministischer
+  Browserlauf verzögerte den Admin-Analyse-Chunk gezielt und maß Pending- sowie Inhaltszustand bei
+  1440×1000 Light und 430×900 Dark. Navigation, Seitenkopf, Aktionsgruppe und Workspace-Ursprung
+  bewegten sich jeweils um 0 px; die Layout-Shift-Summe blieb bei 0. Der FIDS-Dialog veränderte Board,
+  Kopf und Fuß ebenfalls um 0 px, blieb in beiden Viewports vollständig sichtbar und verband den
+  Realtime-WebSocket erfolgreich. Die spätere Guardrail- und Preflight-Bereinigung änderte keinen
+  produktiven UI-Code und erforderte deshalb keine Wiederholung der übrigen Viewports.
 
 ## Verbleibende Schulden
 
