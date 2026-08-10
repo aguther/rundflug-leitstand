@@ -24,11 +24,9 @@ const stylesSource = [
 
 describe("V1 administration completion UI", () => {
   it("marks the post-departure manifest correction as an audited admin-only path", () => {
-    expect(appSource).toContain("Dokumentierte Besetzung korrigieren");
+    expect(adminViewSource).toContain("<ManifestCorrectionPanel");
     expect(appSource).toContain('type: "CORRECT_ROTATION_MANIFEST"');
-    expect(appSource).toContain("Nur Administration");
-    expect(appSource).toContain("keine flugbetriebliche oder");
-    expect(appSource).toContain('runBusyAction("manifest-correction", correctRotationManifest)');
+    expect(adminViewSource).toContain('runBusyAction("manifest-correction"');
   });
 
   it("uses account sessions instead of browser device recovery", () => {

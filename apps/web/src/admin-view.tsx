@@ -19,10 +19,6 @@ import {
   Trash2,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  manifestCorrectionCandidates,
-  manifestCorrectionTargets,
-} from "./admin-manifest-correction";
 import { hasMasterEditorChanges } from "./admin-master-editor-state";
 import {
   type AdminArea,
@@ -85,6 +81,7 @@ import { AircraftWorkspace } from "./features/admin/aircraft/AircraftWorkspace";
 import { useAircraftEditorState } from "./features/admin/aircraft/useAircraftEditorState";
 import { CompletionSummaryPanel } from "./features/admin/completion/CompletionSummaryPanel";
 import { CompletionWorkspace } from "./features/admin/completion/CompletionWorkspace";
+import { ManifestCorrectionPanel } from "./features/admin/completion/ManifestCorrectionPanel";
 import {
   type EventParameterSaveLifecycle,
   EventParametersWorkspace,
@@ -143,7 +140,6 @@ import {
   type MasterDataDeleteTarget,
   OPERATIONAL_AUDIT_REASON,
   OperationalNotice,
-  rotationStatusLabel,
   useOperationBoard,
 } from "./operation-workspace";
 
@@ -405,9 +401,7 @@ export function AdminView() {
   }, [board]);
   const productEditor = useProductEditorState(board);
   const gateEditor = useGateEditorState(board?.gates);
-  const [manifestTicketGroupId, setManifestTicketGroupId] = useState("");
-  const [manifestTargetRotationId, setManifestTargetRotationId] = useState("");
-  const [manifestCorrectionReason, setManifestCorrectionReason] = useState("");
+  const [manifestCorrectionResetKey, setManifestCorrectionResetKey] = useState(0);
   const resourceEditor = useResourceGroupEditorState(board);
   const aircraftEditor = useAircraftEditorState(board);
   const currentMasterEditorSnapshot =
@@ -460,14 +454,6 @@ export function AdminView() {
   const resourceGroups = board?.resourceGroups ?? [];
   const isAdministrator = session?.account.role === "ADMIN" || board?.currentDeviceRole === "ADMIN";
   const productPriceCents = productEditor.priceCents;
-  const manifestCandidates = manifestCorrectionCandidates(board?.rotations ?? []);
-  const selectedManifestCandidate = manifestCandidates.find(
-    (candidate) => candidate.ticketGroupId === manifestTicketGroupId,
-  );
-  const manifestTargets = manifestCorrectionTargets(
-    board?.rotations ?? [],
-    selectedManifestCandidate,
-  );
   const eventVersion = board?.event.version;
   const eventCreationDisabled =
     !isAdministrator ||
@@ -1108,12 +1094,16 @@ export function AdminView() {
     }
   }
 
-  async function correctRotationManifest() {
+  async function correctRotationManifest(
+    ticketGroupId: string,
+    targetRotationId: string,
+    correctionReason: string,
+  ) {
     if (
       !board ||
-      !manifestTicketGroupId ||
-      !manifestTargetRotationId ||
-      manifestCorrectionReason.trim().length < 10 ||
+      !ticketGroupId ||
+      !targetRotationId ||
+      correctionReason.trim().length < 10 ||
       adminPinRef.current.length < 4
     )
       return;
@@ -1127,17 +1117,15 @@ export function AdminView() {
           issuedAt: new Date().toISOString(),
           type: "CORRECT_ROTATION_MANIFEST",
           payload: {
-            ticketGroupId: manifestTicketGroupId,
-            targetRotationId: manifestTargetRotationId,
-            reason: manifestCorrectionReason.trim(),
+            ticketGroupId,
+            targetRotationId,
+            reason: correctionReason.trim(),
             adminPin: adminPinRef.current,
           },
         },
         deviceTokenFor(ADMIN_DEVICE_ID),
       );
-      setManifestTicketGroupId("");
-      setManifestTargetRotationId("");
-      setManifestCorrectionReason("");
+      setManifestCorrectionResetKey((current) => current + 1);
       setMessage("Dokumentierte Besetzung wurde als Admin-Korrektur vollständig auditiert.");
       if (!adminModeUnlocked) setAdminPin("");
       await refresh();
@@ -3682,117 +3670,23 @@ export function AdminView() {
                 </section>
               }
               corrections={
-                <section className="admin-section manifest-correction">
-                  <div className="section-heading">
-                    <div>
-                      <h2>Dokumentierte Besetzung korrigieren</h2>
-                      <p>
-                        Eine anonyme Buchungsgruppe wird immer vollständig einem bereits gestarteten
-                        oder abgeschlossenen Umlauf zugeordnet.
-                      </p>
-                    </div>
-                    <span className="admin-only-badge">Nur Administration</span>
-                  </div>
-                  <ValidationHint>
-                    Diese Korrektur berichtigt ausschließlich die Dokumentation und besitzt keine
-                    flugbetriebliche oder sicherheitsbezogene Freigabewirkung.
-                  </ValidationHint>
-                  <div className="manifest-correction-grid">
-                    <div className="field-control">
-                      <FieldLabel
-                        htmlFor="manifest-ticket-group"
-                        label="Zu korrigierende Buchungsgruppe"
-                        help="Nur anonyme Gruppen mit bereits gestartetem oder abgeschlossenem dokumentiertem Umlauf."
-                      />
-                      <select
-                        id="manifest-ticket-group"
-                        onChange={(event) => {
-                          setManifestTicketGroupId(event.target.value);
-                          setManifestTargetRotationId("");
-                        }}
-                        value={manifestTicketGroupId}
-                      >
-                        <option value="">Bitte wählen</option>
-                        {manifestCandidates.map((candidate) => (
-                          <option key={candidate.ticketGroupId} value={candidate.ticketGroupId}>
-                            {candidate.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="field-control">
-                      <FieldLabel
-                        htmlFor="manifest-target-rotation"
-                        label="Tatsächlicher Zielumlauf"
-                        help="Der Zielumlauf muss mindestens den Status Im Flug erreicht haben."
-                      />
-                      <select
-                        disabled={!selectedManifestCandidate}
-                        id="manifest-target-rotation"
-                        onChange={(event) => setManifestTargetRotationId(event.target.value)}
-                        value={manifestTargetRotationId}
-                      >
-                        <option value="">Bitte wählen</option>
-                        {manifestTargets.map((rotation) => (
-                          <option key={rotation.id} value={rotation.id}>
-                            {rotation.communicationLabel} · {rotationStatusLabel[rotation.status]}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="field-control manifest-reason-field">
-                      <FieldLabel
-                        htmlFor="manifest-correction-reason"
-                        label="Dokumentationsgrund"
-                        help="Mindestens 10 Zeichen; Grund, Quelle, Ziel, Gerät und Version werden auditiert."
-                      />
-                      <textarea
-                        id="manifest-correction-reason"
-                        maxLength={500}
-                        onChange={(event) => setManifestCorrectionReason(event.target.value)}
-                        placeholder="Tatsächliche Besetzung nach Rückmeldung berichtigen"
-                        value={manifestCorrectionReason}
-                      />
-                      <small>{manifestCorrectionReason.trim().length}/10 Mindestzeichen</small>
-                    </div>
-                  </div>
-                  {selectedManifestCandidate ? (
-                    <div className="manifest-correction-preview">
-                      <div><span>Bisher dokumentiert</span><strong>{selectedManifestCandidate.label}</strong></div>
-                      <span aria-hidden="true">→</span>
-                      <div>
-                        <span>Wird vollständig zugeordnet zu</span>
-                        <strong>
-                          {manifestTargets.find((rotation) => rotation.id === manifestTargetRotationId)
-                            ?.communicationLabel ?? "Zielumlauf wählen"}
-                        </strong>
-                      </div>
-                    </div>
-                  ) : null}
-                  <Button
-                    busy={busyActionKey === "manifest-correction"}
-                    className="primary-action manifest-correction-action"
-                    disabled={
-                      busyActionKey !== null ||
-                      !isAdministrator ||
-                      !manifestTicketGroupId ||
-                      !manifestTargetRotationId ||
-                      manifestCorrectionReason.trim().length < 10
-                    }
-                    onClick={() =>
-                      requestAdminAction(() =>
-                        runBusyAction("manifest-correction", correctRotationManifest),
-                      )
-                    }
-                    type="button"
-                    variant="primary"
-                  >
-                    Besetzung protokolliert korrigieren
-                  </Button>
-                  {manifestCandidates.length === 0 ? (
-                    <p className="help-text">Aktuell ist keine Korrektur nach Flugstart erforderlich.</p>
-                  ) : null}
-                </section>
+                <ManifestCorrectionPanel
+                  administrator={isAdministrator}
+                  board={board}
+                  busy={busyActionKey === "manifest-correction"}
+                  key={manifestCorrectionResetKey}
+                  onCorrect={(ticketGroupId, targetRotationId, correctionReason) =>
+                    requestAdminAction(() =>
+                      runBusyAction("manifest-correction", () =>
+                        correctRotationManifest(
+                          ticketGroupId,
+                          targetRotationId,
+                          correctionReason,
+                        ),
+                      ),
+                    )
+                  }
+                />
               }
             />
             </section>
