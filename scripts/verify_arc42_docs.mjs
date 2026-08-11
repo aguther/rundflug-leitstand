@@ -2,6 +2,7 @@ import { access, readdir, readFile } from "node:fs/promises";
 import { dirname, extname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { JSDOM } from "jsdom";
+import { compareTechnicalStrings } from "./lib/technical-order.mjs";
 
 const defaultRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -125,7 +126,7 @@ export async function verifyArc42Documentation(root = defaultRoot) {
 
   const adrFiles = (await readdir(adrDirectory))
     .filter((name) => /^\d{4}-.*\.md$/.test(name))
-    .sort();
+    .sort(compareTechnicalStrings);
   const decisionChapter =
     documents.find(([path]) => path.endsWith("09-architekturentscheidungen.md"))?.[1] ?? "";
   for (const adrFile of adrFiles) {

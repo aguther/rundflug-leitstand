@@ -1,3 +1,5 @@
+import { compareTechnicalStrings } from "./technical-order";
+
 export type DispatchCommitmentLevel = "WAITING" | "PREPARE" | "COME_TO_FLIGHT_LINE";
 
 export type DispatchDecisionReason =
@@ -530,7 +532,7 @@ function buildCandidate(
   const occupiedSeats = chosen.reduce((sum, group) => sum + group.size, 0);
   const stableKey = chosen
     .map((group) => group.id)
-    .sort()
+    .sort(compareTechnicalStrings)
     .join("+");
   return {
     groups: [...chosen].sort(queueOrder),
@@ -962,7 +964,7 @@ export function createDispatchPlan(input: DispatchPlanInput): DispatchPlan {
       ...normalizedLanes.map((lane) => lane.resourceGroupId),
       ...lockedBatches.map((batch) => batch.resourceGroupId),
     ]),
-  ].sort();
+  ].sort(compareTechnicalStrings);
   for (const resourceGroupId of resourceGroupIds) {
     const groups = limitGroups(
       normalizedGroups.filter(

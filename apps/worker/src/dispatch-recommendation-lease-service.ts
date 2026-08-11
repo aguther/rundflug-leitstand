@@ -2,7 +2,7 @@ import {
   type DispatchRecommendationLease,
   dispatchRecommendationLeaseAcquireSchema,
 } from "@rundflug/contracts";
-import type { DeviceRole } from "@rundflug/domain";
+import { type DeviceRole, compareTechnicalStrings as order } from "@rundflug/domain";
 import { dispatchSegmentOrderSql } from "./dispatch-ordering-sql";
 import {
   type DispatchRecommendationFallbackReason,
@@ -17,6 +17,7 @@ import type { Env } from "./types";
 
 const JSON_HEADERS = { "content-type": "application/json; charset=utf-8" } as const;
 const DISPATCH_RECOMMENDATION_LEASE_TTL_MS = 90_000;
+const uniq = (values: string[]): string[] => [...new Set(values)];
 
 export interface StoredDispatchRecommendationLease {
   id: string;
@@ -127,7 +128,7 @@ export class DispatchRecommendationLeaseService {
     };
   }
 
-  private stringArray(value: string): string[] {
+  private strings(value: string): string[] {
     return (JSON.parse(value) as unknown[]).filter(
       (entry): entry is string => typeof entry === "string",
     );
@@ -175,7 +176,7 @@ export class DispatchRecommendationLeaseService {
       }>();
     const segmentsByGroupId = new Map<string, typeof rows.results>();
     for (const row of rows.results) {
-      for (const groupId of this.stringArray(row.group_ids_json)) {
+      for (const groupId of this.strings(row.group_ids_json)) {
         const segments = segmentsByGroupId.get(groupId) ?? [];
         segments.push(row);
         segmentsByGroupId.set(groupId, segments);
@@ -193,7 +194,7 @@ export class DispatchRecommendationLeaseService {
       if (first) firstRotationByGroupId.set(groupId, first.rotation_id);
     }
     return rows.results.flatMap((row) => {
-      const groupIds = this.stringArray(row.group_ids_json);
+      const groupIds = this.strings(row.group_ids_json);
       return groupIds.length > 0 &&
         groupIds.every((groupId) => firstRotationByGroupId.get(groupId) === row.rotation_id)
         ? [{ rotationId: row.rotation_id, queueSequence: Number(row.queue_sequence) }]
@@ -206,10 +207,8 @@ export class DispatchRecommendationLeaseService {
     aircraft: DispatchRecommendationAircraft,
   ): Promise<boolean> {
     if (aircraft.operational_state !== "AVAILABLE") return false;
-    const leaseGroupIds = [...new Set(this.stringArray(lease.ticket_group_ids_json))].sort();
-    const leaseMemberRotationIds = [
-      ...new Set(this.stringArray(lease.member_rotation_ids_json)),
-    ].sort();
+    const leaseGroupIds = [...new Set(this.strings(lease.ticket_group_ids_json))].sort(order);
+    const leaseMemberRotationIds = uniq(this.strings(lease.member_rotation_ids_json)).sort(order);
     if (leaseGroupIds.length === 0 || leaseMemberRotationIds.length === 0) return false;
 
     const rows = await this.env.DB.prepare(
@@ -253,8 +252,8 @@ export class DispatchRecommendationLeaseService {
         gate_id: string;
         ticket_count: number;
       }>();
-    const liveGroupIds = rows.results.map((row) => row.ticket_group_id).sort();
-    const liveMemberRotationIds = [...new Set(rows.results.map((row) => row.rotation_id))].sort();
+    const liveGroupIds = rows.results.map((row) => row.ticket_group_id).sort(order);
+    const liveMemberRotationIds = uniq(rows.results.map((row) => row.rotation_id)).sort(order);
     const liveSeatCount = rows.results.reduce((sum, row) => sum + Number(row.ticket_count), 0);
     return (
       liveGroupIds.length === leaseGroupIds.length &&
@@ -693,7 +692,7 @@ export class DispatchRecommendationLeaseService {
     const planningGroupIds = new Map<string, DispatchRecommendationPlanningRow[]>();
     const groupIdsByRotationId = new Map<string, string[]>();
     for (const row of planningRows.results) {
-      const groupIds = this.stringArray(row.group_ids_json);
+      const groupIds = this.strings(row.group_ids_json);
       groupIdsByRotationId.set(row.rotation_id, groupIds);
       for (const groupId of groupIds) {
         const segments = planningGroupIds.get(groupId) ?? [];
@@ -730,9 +729,9 @@ export class DispatchRecommendationLeaseService {
         batchId: row.dispatch_batch_id,
         dispatchOrder: row.dispatch_order,
         dispatchWave: row.dispatch_wave,
-        plannedGroupIds: this.stringArray(row.dispatch_group_ids_json),
+        plannedGroupIds: this.strings(row.dispatch_group_ids_json),
         plannedOccupiedSeats: row.dispatch_occupied_seats,
-        decisionReasons: this.stringArray(row.dispatch_decision_reasons_json),
+        decisionReasons: this.strings(row.dispatch_decision_reasons_json),
         predictionUpdatedAt: row.prediction_updated_at,
       })),
     });

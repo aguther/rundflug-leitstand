@@ -2,6 +2,8 @@ import { spawn, spawnSync } from "node:child_process";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { compareTechnicalStrings } from "./lib/technical-order.mjs";
+import { WINDOWS_TASKKILL_EXECUTABLE } from "./lib/tool-executables.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const port = Number(process.env.VERTICAL_SLICE_TEST_PORT ?? "18786");
@@ -446,7 +448,9 @@ try {
   );
   current = await board("flight-line-tablet-1", tokens.flightLine);
   const boardingRotation = current.rotations.find((rotation) => rotation.id === rotationId);
-  const boardingStatuses = boardingRotation?.tickets.map((ticket) => ticket.status).sort();
+  const boardingStatuses = boardingRotation?.tickets
+    .map((ticket) => ticket.status)
+    .sort(compareTechnicalStrings);
   if (boardingStatuses?.join(",") !== "BOARDING,BOARDING") {
     throw new Error(`NEXT bildet Check-in/Boarding nicht korrekt ab: ${boardingStatuses}`);
   }
@@ -620,7 +624,9 @@ try {
   cashierSocket?.close();
   flightLineSocket?.close();
   if (process.platform === "win32") {
-    spawnSync("taskkill", ["/PID", String(server.pid), "/T", "/F"], { stdio: "ignore" });
+    spawnSync(WINDOWS_TASKKILL_EXECUTABLE, ["/PID", String(server.pid), "/T", "/F"], {
+      stdio: "ignore",
+    });
   } else {
     server.kill();
   }

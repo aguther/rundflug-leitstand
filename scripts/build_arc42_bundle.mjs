@@ -1,6 +1,7 @@
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { compareTechnicalStrings } from "./lib/technical-order.mjs";
 
 // Bundles the arc42 chapters into a single Markdown document that pandoc, VS Code
 // or any Mermaid aware Markdown renderer can turn into a PDF.
@@ -23,7 +24,7 @@ function parseArguments(argv) {
 
 export async function chapterFiles() {
   const entries = await readdir(chapterDirectory);
-  return entries.filter((name) => chapterPattern.test(name)).sort();
+  return entries.filter((name) => chapterPattern.test(name)).sort(compareTechnicalStrings);
 }
 
 export function rewriteRelativeLinks(markdown, documentPath, linkBase) {

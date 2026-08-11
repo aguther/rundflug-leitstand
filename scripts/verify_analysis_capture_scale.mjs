@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { createServer } from "vite";
+import { compareTechnicalStrings } from "./lib/technical-order.mjs";
 
 const MAX_ADDITIONAL_BYTES = 50 * 1024 * 1024;
 const MAX_CAPTURE_P95_MS = 50;
@@ -17,7 +18,7 @@ const canonicalValue = (value) => {
   if (value && typeof value === "object") {
     return Object.fromEntries(
       Object.keys(value)
-        .sort()
+        .sort(compareTechnicalStrings)
         .filter((key) => value[key] !== undefined)
         .map((key) => [key, canonicalValue(value[key])]),
     );
@@ -40,7 +41,7 @@ try {
   const migrationDirectory = new URL("../apps/worker/migrations/", import.meta.url);
   for (const migrationName of readdirSync(migrationDirectory)
     .filter((name) => /^\d+.*\.sql$/.test(name))
-    .toSorted()) {
+    .toSorted(compareTechnicalStrings)) {
     database.exec(readFileSync(new URL(migrationName, migrationDirectory), "utf8"));
   }
   database.exec(`

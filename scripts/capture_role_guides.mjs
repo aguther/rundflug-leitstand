@@ -2,6 +2,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { mkdir, rm } from "node:fs/promises";
 import { resolve } from "node:path";
 import { chromium } from "@playwright/test";
+import { WINDOWS_TASKKILL_EXECUTABLE } from "./lib/tool-executables.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 const outputDirectory = resolve(root, "docs", "roles", "images");
@@ -174,7 +175,7 @@ async function startLocalWorker() {
 function stopLocalWorker() {
   if (!localWorker?.pid) return;
   if (process.platform === "win32") {
-    spawnSync("taskkill", ["/pid", String(localWorker.pid), "/T", "/F"], {
+    spawnSync(WINDOWS_TASKKILL_EXECUTABLE, ["/pid", String(localWorker.pid), "/T", "/F"], {
       stdio: "ignore",
       windowsHide: true,
     });

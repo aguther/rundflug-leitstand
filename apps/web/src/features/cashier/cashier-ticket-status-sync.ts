@@ -1,4 +1,5 @@
 import type { OperationBoard, TicketSearchResult } from "@rundflug/contracts";
+import { compareTechnicalStrings } from "../../technical-order";
 
 export const TICKET_STATUS_REVALIDATION_BATCH_SIZE = 50;
 
@@ -40,7 +41,7 @@ export function applyOperationBoardTicketStatuses(
   return results.map((result) => {
     const statuses = statusesByTicketGroupId.get(result.ticketGroupId);
     if (!statuses || statuses.size === 0) return result;
-    const rotationStatuses = [...statuses].sort();
+    const rotationStatuses = [...statuses].sort(compareTechnicalStrings);
     const allCompleted = rotationStatuses.every((status) => status === "COMPLETED");
     return {
       ...result,

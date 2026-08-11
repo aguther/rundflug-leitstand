@@ -1,6 +1,7 @@
 import { readdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { compareTechnicalStrings } from "./lib/technical-order.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const configPath = resolve(root, "scripts/refactor-guardrails.json");
@@ -57,7 +58,7 @@ async function collectProductionRawImports() {
       imports.push(`${normalizePath(relative(root, testFile))} -> ${relativeSource}`);
     }
   }
-  return [...new Set(imports)].sort();
+  return [...new Set(imports)].sort(compareTechnicalStrings);
 }
 
 async function verifySizeBudgets(config) {

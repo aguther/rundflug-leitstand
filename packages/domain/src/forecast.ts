@@ -10,6 +10,7 @@ import {
   orderDispatchGroupsForProjection,
 } from "./dispatch-plan";
 import { deriveReferenceRotationBreakdown } from "./reference-rotation";
+import { compareTechnicalStrings } from "./technical-order";
 
 export type PredictionQuality = "STABLE" | "CHANGING" | "UNCERTAIN";
 export type ForecastState =
@@ -1582,7 +1583,7 @@ export function calculateForecastTimelineResult(
             .filter((group) => group.resourceGroupId === resourceGroupId)
             .map((group) => group.productId),
         ),
-      ].sort();
+      ].sort(compareTechnicalStrings);
       return availability.lanes.map((lane) => ({
         id: lane.laneId,
         aircraftId: lane.aircraftId ?? lane.laneId,
@@ -1671,7 +1672,7 @@ export function calculateForecastTimelineResult(
   const longRangeReservationByMemberId = new Map<string, LongRangeReplayReservation>();
   const resourceGroupIdsForTail = [
     ...new Set(dispatchGroups.map((group) => group.resourceGroupId)),
-  ].sort();
+  ].sort(compareTechnicalStrings);
   for (const resourceGroupId of resourceGroupIdsForTail) {
     let remaining = orderDispatchGroupsForProjection({
       now: input.event.now,

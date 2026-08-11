@@ -8,6 +8,8 @@ export type AircraftOperationalState =
   | "PAUSED"
   | "INACTIVE";
 
+export { compareTechnicalStrings } from "./technical-order";
+
 export type AircraftDisplayState = AircraftOperationalState | "INTERRUPTED";
 
 export const aircraftOperationalStateLabels: Readonly<Record<AircraftDisplayState, string>> = {

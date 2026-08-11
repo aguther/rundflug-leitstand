@@ -1,5 +1,6 @@
 import { readdir, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import { compareTechnicalStrings } from "./lib/technical-order.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 const migrationsDirectory = resolve(root, "apps", "worker", "migrations");
@@ -12,7 +13,7 @@ const allowedDuplicate = new Set([
 
 const files = (await readdir(migrationsDirectory))
   .filter((name) => /^\d{4}_.+\.sql$/.test(name))
-  .sort();
+  .sort(compareTechnicalStrings);
 const byNumber = new Map();
 for (const file of files) {
   const number = file.slice(0, 4);

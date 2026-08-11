@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
+import { GIT_EXECUTABLE } from "./build-tool-executables.ts";
 import { resolveSourceRevision } from "./source-revision.ts";
 
 const repositoryRoot = fileURLToPath(new URL("../..", import.meta.url));
@@ -67,7 +68,7 @@ const operationalPwa = VitePWA({
 export default defineConfig(({ mode }) => {
   const simulator = mode === "simulator";
   const sourceRevision = resolveSourceRevision(process.env.SOURCE_REVISION, () =>
-    execFileSync("git", ["rev-parse", "HEAD"], {
+    execFileSync(GIT_EXECUTABLE, ["rev-parse", "HEAD"], {
       cwd: repositoryRoot,
       encoding: "utf8",
     }),

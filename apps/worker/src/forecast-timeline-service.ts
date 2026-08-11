@@ -8,6 +8,7 @@ import {
   deriveAdaptivePrecallLeadMinutes,
   type ForecastTimelinesInput,
   normalizePrecallObservation,
+  compareTechnicalStrings as order,
   resolveTurnaroundProfile,
   selectAutomaticPrecalls,
 } from "@rundflug/domain";
@@ -27,7 +28,6 @@ export interface ForecastRecalculationRequest {
   planningRunId?: string;
   expectedEventVersion?: number;
 }
-
 export interface ForecastRecalculationResult {
   planningRunId: string;
   eventVersion: number;
@@ -561,7 +561,7 @@ export class ForecastTimelineService {
         ...capacityRows.results.map((row) => row.resource_group_id),
         ...rotationRows.results.map((row) => row.resource_group_id),
       ]),
-    ].sort();
+    ].sort(order);
     type ForecastAircraftWindow = {
       resourceGroupId: string;
       aircraftId: string;

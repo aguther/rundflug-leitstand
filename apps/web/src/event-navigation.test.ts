@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { eventSelectionLocation, switchActiveEvent } from "./event-navigation";
+import {
+  eventSelectionLocation,
+  reloadAtEventSelectionLocation,
+  switchActiveEvent,
+} from "./event-navigation";
 
 const absoluteUrl = (location: string) => `https://leitstand.example${location}`;
 
@@ -30,20 +34,39 @@ describe("F-ADM-080 event navigation", () => {
     expect(normalized.hash).toBe("#aircraft");
   });
 
-  it("forgets both active-event keys before navigating to the cleaned location", () => {
+  it("replaces the current history entry before reloading it", () => {
+    const replaceState = vi.fn();
+    const reload = vi.fn();
+
+    reloadAtEventSelectionLocation(
+      {
+        href: absoluteUrl("/admin?event=e1&area=events&step=products#editor"),
+        reload,
+      },
+      { replaceState },
+    );
+
+    expect(replaceState).toHaveBeenCalledWith(null, "", "/admin?area=events&step=products#editor");
+    expect(reload).toHaveBeenCalledOnce();
+  });
+
+  it("forgets both active-event keys before reloading the cleaned location", () => {
     const removeItem = vi.fn();
-    const assign = vi.fn();
+    const replaceState = vi.fn();
+    const reload = vi.fn();
     vi.stubGlobal("window", {
       localStorage: { removeItem },
+      history: { replaceState },
       location: {
         href: absoluteUrl("/admin?event=e1&area=events&step=products#editor"),
-        assign,
+        reload,
       },
     });
 
     switchActiveEvent();
 
     expect(removeItem.mock.calls).toEqual([["active-event-id"], ["active-event-label"]]);
-    expect(assign).toHaveBeenCalledWith("/admin?area=events&step=products#editor");
+    expect(replaceState).toHaveBeenCalledWith(null, "", "/admin?area=events&step=products#editor");
+    expect(reload).toHaveBeenCalledOnce();
   });
 });

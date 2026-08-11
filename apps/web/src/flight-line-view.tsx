@@ -44,6 +44,7 @@ import {
   replacementSuggestion,
   sharedGroupSegmentLabel,
 } from "./operational-exceptions";
+import { compareTechnicalStrings } from "./technical-order";
 
 const actionForState = {
   DRAFT: { label: "Belegung bestätigen & Boarding starten", command: "CALL_NEXT" },
@@ -278,12 +279,13 @@ export function FlightLineView() {
             : selectedRotation.bookingGroups.length > 0
               ? selectedRotation.bookingGroups.map((group) => group.id)
               : [selectedRotation.ticketGroupId];
+        const sortedTicketGroupIds = [...ticketGroupIds].sort(compareTechnicalStrings);
         const reservedRecommendationSelected = Boolean(
           dispatchLease.mode === "RESERVED" &&
             dispatchLease.lease?.groupIds.length === ticketGroupIds.length &&
             [...(dispatchLease.lease?.groupIds ?? [])]
-              .sort()
-              .every((groupId, index) => groupId === [...ticketGroupIds].sort()[index]),
+              .sort(compareTechnicalStrings)
+              .every((groupId, index) => groupId === sortedTicketGroupIds[index]),
         );
         result = await sendCommand(
           {

@@ -4,6 +4,7 @@ import {
   analysisSnapshotSchema,
   type OperationBoard,
 } from "@rundflug/contracts";
+import { compareTechnicalStrings } from "@rundflug/domain";
 import type { Env } from "./types";
 
 const SUPPORT_SAFE_DENIED_KEYS = new Set([
@@ -269,7 +270,7 @@ export async function buildAnalysisSnapshot(input: {
       if (chunkId) chunkIds.add(chunkId);
     }
   }
-  const ids = [...chunkIds].sort();
+  const ids = [...chunkIds].sort(compareTechnicalStrings);
   const chunks =
     ids.length === 0
       ? []

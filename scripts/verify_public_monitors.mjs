@@ -6,6 +6,7 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { WINDOWS_TASKKILL_EXECUTABLE } from "./lib/tool-executables.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const wranglerCli = resolve(root, "node_modules", "wrangler", "bin", "wrangler.js");
@@ -1013,7 +1014,9 @@ try {
 } finally {
   socket?.close();
   if (process.platform === "win32") {
-    spawnSync("taskkill", ["/PID", String(server.pid), "/T", "/F"], { stdio: "ignore" });
+    spawnSync(WINDOWS_TASKKILL_EXECUTABLE, ["/PID", String(server.pid), "/T", "/F"], {
+      stdio: "ignore",
+    });
   } else {
     server.kill();
   }

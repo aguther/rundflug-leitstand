@@ -4,6 +4,7 @@ import {
   type ConfirmedOvertakeIncrement,
   calculateConfirmedOvertakeIncrements,
   DomainRuleError,
+  compareTechnicalStrings as order,
   resolveTurnaroundProfile,
   transitionRotation,
 } from "@rundflug/domain";
@@ -18,7 +19,6 @@ import type { Env, StoredEventRow } from "./types";
 import { sendRotationPushNotifications } from "./web-push";
 
 const JSON_HEADERS = { "content-type": "application/json; charset=utf-8" } as const;
-
 function json(data: unknown, init: ResponseInit = {}): Response {
   const headers = new Headers(init.headers);
   headers.set("content-type", JSON_HEADERS["content-type"]);
@@ -272,14 +272,14 @@ export class RotationTransitionCommandService {
             { status: 409 },
           );
         }
-        const leaseGroupIds = (JSON.parse(lease.ticket_group_ids_json) as string[]).sort();
+        const leaseGroupIds = (JSON.parse(lease.ticket_group_ids_json) as string[]).sort(order);
         const leaseMemberRotationIds = (
           JSON.parse(lease.member_rotation_ids_json) as string[]
-        ).sort();
-        const selectedGroupIds = [...distinctGroupIds].sort();
+        ).sort(order);
+        const selectedGroupIds = [...distinctGroupIds].sort(order);
         const selectedMemberRotationIds = [
           ...new Set(selectedGroups.map((group) => group.rotation_id)),
-        ].sort();
+        ].sort(order);
         const selectedSeatCount = selectedGroups.reduce(
           (sum, group) => sum + Number(group.ticket_count),
           0,
@@ -315,8 +315,8 @@ export class RotationTransitionCommandService {
         acceptedDispatchRecommendationLease = lease;
       } else if (command.payload.dispatchRecommendation) {
         const recommendedGroupIds = JSON.parse(rotation.dispatch_group_ids_json) as string[];
-        const selectedGroupIds = [...distinctGroupIds].sort();
-        const currentRecommendedGroupIds = [...recommendedGroupIds].sort();
+        const selectedGroupIds = [...distinctGroupIds].sort(order);
+        const currentRecommendedGroupIds = [...recommendedGroupIds].sort(order);
         acceptedDispatchRecommendation =
           rotation.dispatch_operation_day_version === current.version &&
           rotation.dispatch_plan_revision === command.payload.dispatchRecommendation.planRevision &&

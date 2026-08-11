@@ -1,3 +1,5 @@
+import { compareTechnicalStrings } from "@rundflug/domain";
+
 export type DispatchRecommendationSelectionSource = "CURRENT_PLAN_BATCH" | "CANONICAL_REPLAN";
 
 export type DispatchRecommendationFallbackReason =
@@ -42,7 +44,7 @@ export interface ReusableDispatchBatchSelection {
 }
 
 function stableStrings(values: readonly string[]): string[] {
-  return [...new Set(values)].sort();
+  return [...new Set(values)].sort(compareTechnicalStrings);
 }
 
 function sameStrings(left: readonly string[], right: readonly string[]): boolean {

@@ -2,6 +2,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { mkdir, rm } from "node:fs/promises";
 import { resolve } from "node:path";
 import { chromium } from "@playwright/test";
+import { WINDOWS_TASKKILL_EXECUTABLE } from "./lib/tool-executables.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 const port = Number(process.env.CASHIER_BROWSER_TEST_PORT ?? "18801");
@@ -140,7 +141,7 @@ async function startWorker() {
 function stopWorker() {
   if (!worker?.pid) return;
   if (process.platform === "win32") {
-    spawnSync("taskkill", ["/pid", String(worker.pid), "/T", "/F"], {
+    spawnSync(WINDOWS_TASKKILL_EXECUTABLE, ["/pid", String(worker.pid), "/T", "/F"], {
       stdio: "ignore",
       windowsHide: true,
     });

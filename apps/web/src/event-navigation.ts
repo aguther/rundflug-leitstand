@@ -7,7 +7,15 @@ export function eventSelectionLocation(href: string): string {
   return `${url.pathname}${url.search}${url.hash}`;
 }
 
+export function reloadAtEventSelectionLocation(
+  location: Pick<Location, "href" | "reload">,
+  history: Pick<History, "replaceState">,
+): void {
+  history.replaceState(null, "", eventSelectionLocation(location.href));
+  location.reload();
+}
+
 export function switchActiveEvent(): void {
   forgetActiveEvent(window.localStorage);
-  window.location.assign(eventSelectionLocation(window.location.href));
+  reloadAtEventSelectionLocation(window.location, window.history);
 }

@@ -20,7 +20,7 @@ const timeFormatter = new Intl.DateTimeFormat("de-DE", {
 });
 
 function formatTime(value: string | number): string {
-  return timeFormatter.format(typeof value === "number" ? new Date(value) : new Date(value));
+  return timeFormatter.format(new Date(value));
 }
 
 function statusAt(rotation: SimulationRotation, nowMs: number) {

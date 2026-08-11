@@ -31,6 +31,7 @@ import {
   dispatchLeaseRemainingSeconds,
   formatDispatchLeaseCountdown,
 } from "./dispatch-recommendation-lease";
+import { compareTechnicalStrings } from "./technical-order";
 
 export type FlightLineAircraft = OperationBoard["aircraft"][number];
 export type FlightLineRotation = OperationBoard["rotations"][number];
@@ -573,14 +574,14 @@ export function BookingGroupAssignmentDialog({
   const overridesOtherReservation = selectedGroups.some(
     (group) => group.dispatchReservation === "OTHER",
   );
-  const sortedSelectedQueueGroupIds = [...selectedQueueGroupIds].sort();
+  const sortedSelectedQueueGroupIds = [...selectedQueueGroupIds].sort(compareTechnicalStrings);
   const recommendationIsCurrent = dispatchLease.mode === "RESERVED";
   const recommendationMatchesSelection = Boolean(
     recommendationIsCurrent &&
       dispatchRecommendation &&
       dispatchRecommendation.groupIds.length === selectedQueueGroupIds.length &&
       [...dispatchRecommendation.groupIds]
-        .sort()
+        .sort(compareTechnicalStrings)
         .every((groupId, index) => groupId === sortedSelectedQueueGroupIds[index]),
   );
   const queueDeviationReasonRequired =

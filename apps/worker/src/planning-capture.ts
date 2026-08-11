@@ -1,9 +1,10 @@
 import { APP_VERSION, REQUIREMENTS_VERSION } from "@rundflug/config";
-import type {
-  AutomaticPrecallQueueDecision,
-  AutomaticPrecallQueueEntry,
-  ForecastCalculationResult,
-  ForecastTimelinesInput,
+import {
+  type AutomaticPrecallQueueDecision,
+  type AutomaticPrecallQueueEntry,
+  compareTechnicalStrings,
+  type ForecastCalculationResult,
+  type ForecastTimelinesInput,
 } from "@rundflug/domain";
 import { sha256Hex } from "./crypto";
 import type { Env } from "./types";
@@ -97,7 +98,7 @@ function canonicalValue(value: unknown, path: string): CanonicalJsonValue {
       throw new Error(`Planning value at ${path} is not a plain object.`);
     }
     const result: CanonicalJsonMap = {};
-    for (const key of Object.keys(value as Record<string, unknown>).sort()) {
+    for (const key of Object.keys(value as Record<string, unknown>).sort(compareTechnicalStrings)) {
       const entry = (value as Record<string, unknown>)[key];
       if (entry === undefined) continue;
       result[key] = canonicalValue(entry, `${path}.${key}`);

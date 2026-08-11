@@ -3,6 +3,8 @@ import { readFile, stat, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { gzipSync } from "node:zlib";
+import { compareTechnicalStrings } from "./lib/technical-order.mjs";
+import { GIT_EXECUTABLE } from "./lib/tool-executables.mjs";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -56,7 +58,7 @@ export function collectManifestFiles(manifest, entryKeys) {
     for (const file of entry.assets ?? []) files.add(file);
     for (const importedKey of entry.imports ?? []) pending.push(importedKey);
   }
-  return [...files].sort();
+  return [...files].sort(compareTechnicalStrings);
 }
 
 async function measureFiles(distDirectory, files) {
@@ -89,7 +91,7 @@ function extractPrecacheUrls(serviceWorkerSource) {
 }
 
 async function readSourceRevision() {
-  return execFileSync("git", ["rev-parse", "HEAD"], {
+  return execFileSync(GIT_EXECUTABLE, ["rev-parse", "HEAD"], {
     cwd: repositoryRoot,
     encoding: "utf8",
   }).trim();

@@ -6,6 +6,8 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { strFromU8, Unzip, UnzipInflate } from "fflate";
 import { createServer } from "vite";
+import { compareTechnicalStrings } from "./lib/technical-order.mjs";
+import { GIT_EXECUTABLE } from "./lib/tool-executables.mjs";
 
 class ReplayError extends Error {
   constructor(code, message, details = {}) {
@@ -59,7 +61,7 @@ function canonicalValue(value, path = "$") {
     return value.map((entry, index) => canonicalValue(entry, `${path}[${index}]`));
   if (typeof value === "object") {
     const output = {};
-    for (const key of Object.keys(value).sort()) {
+    for (const key of Object.keys(value).sort(compareTechnicalStrings)) {
       if (value[key] !== undefined) output[key] = canonicalValue(value[key], `${path}.${key}`);
     }
     return output;
@@ -88,7 +90,9 @@ function firstDifference(expected, actual, path = "$") {
     return null;
   }
   if (expected && actual && typeof expected === "object" && typeof actual === "object") {
-    const keys = [...new Set([...Object.keys(expected), ...Object.keys(actual)])].sort();
+    const keys = [...new Set([...Object.keys(expected), ...Object.keys(actual)])].sort(
+      compareTechnicalStrings,
+    );
     for (const key of keys) {
       const difference = firstDifference(expected[key], actual[key], `${path}.${key}`);
       if (difference) return difference;
@@ -307,7 +311,7 @@ async function loadModel(inputPath) {
 
 function verifyVersions(model, allowMismatch) {
   const packageJson = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
-  const git = spawnSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" });
+  const git = spawnSync(GIT_EXECUTABLE, ["rev-parse", "HEAD"], { encoding: "utf8" });
   const localSourceRevision =
     process.env.SOURCE_REVISION || (git.status === 0 ? git.stdout.trim() : "unknown");
   const differences = [];

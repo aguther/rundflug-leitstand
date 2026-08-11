@@ -1,8 +1,8 @@
+import { compareTechnicalStrings as order } from "@rundflug/domain";
 import { dailyReportCsv, dailyReportPdfLines, loadDailyReport } from "./daily-report";
 import { createCsv, createTextPdf } from "./report";
 
 export type GeneratedReportResult<T> = { status: "READY"; body: T } | { status: "EVENT_NOT_FOUND" };
-
 export async function generateDailyReportCsv(
   database: D1Database,
   eventId: string,
@@ -131,7 +131,7 @@ export async function loadPerformanceProfile(
         id: group.resource_group_id,
         name: group.resource_group_name,
         completedRotations: group.completed_rotations,
-        aircraftTypes: group.aircraft_types?.split(",").sort() ?? [],
+        aircraftTypes: group.aircraft_types?.split(",").sort(order) ?? [],
         passengerSeatCounts:
           group.passenger_seat_counts
             ?.split(",")

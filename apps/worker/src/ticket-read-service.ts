@@ -3,7 +3,11 @@ import type {
   TicketSearchRequest,
   TicketSearchResponse,
 } from "@rundflug/contracts";
-import { formatBookingGroupLabel, formatFlightGroupLabel } from "@rundflug/domain";
+import {
+  formatBookingGroupLabel,
+  formatFlightGroupLabel,
+  compareTechnicalStrings as order,
+} from "@rundflug/domain";
 import { sha256Hex } from "./crypto";
 import { ticketSearchStatusCondition } from "./ticket-search";
 
@@ -11,7 +15,6 @@ interface TicketSearchCursor {
   soldAt: string;
   id: string;
 }
-
 interface TicketSearchRow {
   ticket_group_id: string;
   group_status: string;
@@ -29,7 +32,6 @@ interface TicketSearchRow {
   communication_numbers: string | null;
   rotation_statuses: string | null;
 }
-
 interface TicketGroupPrintRow {
   public_code: string | null;
   event_name: string;
@@ -40,11 +42,9 @@ interface TicketGroupPrintRow {
   group_status: string;
   group_size: number;
 }
-
 export type TicketSearchServiceResult =
   | { ok: true; response: TicketSearchResponse }
   | { ok: false; code: "INVALID_TICKET_SEARCH_CURSOR" };
-
 export type TicketGroupPrintResult =
   | { status: "READY"; data: TicketGroupPrintData }
   | { status: "NOT_FOUND" }
@@ -200,7 +200,7 @@ export async function searchTicketGroups(
         const communicationLabels = communicationNumbers.map((number) =>
           formatFlightGroupLabel(row.resource_group_short_code, number),
         );
-        const rotationStatuses = (row.rotation_statuses?.split(",") ?? []).sort();
+        const rotationStatuses = (row.rotation_statuses?.split(",") ?? []).sort(order);
         return {
           ticketGroupId: row.ticket_group_id,
           productId: row.product_id,

@@ -3,6 +3,7 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { WINDOWS_TASKKILL_EXECUTABLE } from "./lib/tool-executables.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const durationSeconds = Number(process.env.SOAK_DURATION_SECONDS ?? 12 * 60 * 60);
@@ -147,7 +148,9 @@ for (const output of [server.stdout, server.stderr]) {
 const stopServer = () => {
   if (server.exitCode !== null) return;
   if (process.platform === "win32") {
-    spawnSync("taskkill", ["/pid", String(server.pid), "/t", "/f"], { stdio: "ignore" });
+    spawnSync(WINDOWS_TASKKILL_EXECUTABLE, ["/pid", String(server.pid), "/t", "/f"], {
+      stdio: "ignore",
+    });
   } else {
     server.kill("SIGTERM");
   }

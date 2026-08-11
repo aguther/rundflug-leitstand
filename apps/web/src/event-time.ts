@@ -1,3 +1,5 @@
+import { compareTechnicalStrings } from "./technical-order";
+
 const formatterCache = new Map<string, Intl.DateTimeFormat>();
 
 function formatterFor(timeZone: string): Intl.DateTimeFormat {
@@ -98,7 +100,7 @@ export function eventLocalDateTimeToIso(value: string, timeZone: string): string
     .map((offset) => new Date(localAsUtc - offset))
     .filter((candidate) => formatParts(localParts(candidate, timeZone)) === value)
     .map((candidate) => candidate.toISOString());
-  const uniqueCandidates = [...new Set(candidates)].sort();
+  const uniqueCandidates = [...new Set(candidates)].sort(compareTechnicalStrings);
 
   if (uniqueCandidates.length === 0) {
     throw new Error(
