@@ -542,7 +542,17 @@ try {
       },
     );
   }
-  const fourthSale = await sell(transition.event.version);
+  const isolatedPilotContinuation = await admin(
+    transition.event.version,
+    "SET_AIRCRAFT_OPERATIONAL_STATE",
+    {
+      aircraftId: "aircraft-b",
+      state: "PAUSED",
+      reason: "Keep alternate aircraft out of the pilot continuation fixture",
+      expectedReviewAt: null,
+    },
+  );
+  const fourthSale = await sell(isolatedPilotContinuation.event.version);
   current = await board();
   const fourthProposal = current.rotations.find(
     (rotation) => rotation.id === fourthSale.aggregate.relatedRotationId,
@@ -552,7 +562,7 @@ try {
     fourthProposal.suggestedPilotId !== "550e8400-e29b-41d4-a716-446655440200"
   ) {
     throw new Error(
-      "Geänderter Pilotencode wird beim Folgeumlauf nicht fortgeführt vorgeschlagen.",
+      `The changed pilot was not suggested for the next rotation: ${JSON.stringify({ suggestedAircraftId: fourthProposal?.suggestedAircraftId ?? null, suggestedPilotId: fourthProposal?.suggestedPilotId ?? null })}`,
     );
   }
   console.log(
