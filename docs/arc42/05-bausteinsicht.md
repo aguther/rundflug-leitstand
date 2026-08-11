@@ -58,7 +58,7 @@ flowchart TB
     end
 
     subgraph Services["Kommando- und Leseservices"]
-        CMD["*-command-service.ts<br/>Verkauf, Rotation, Flotte, Piloten,<br/>Stammdaten, Nachruf, Planung"]
+        CMD["command-handler-registry.ts + event-command-handlers.ts<br/>exhaustive Zuordnung zu *-command-service.ts<br/>für Verkauf, Rotation, Flotte und Planung"]
         READ["*-read-service.ts, *-projection.ts<br/>Operations, FIDS, öffentlicher Status"]
         PRE["command-preflight*<br/>Vertrag, Rolle, Version, Gerät"]
     end
@@ -94,8 +94,8 @@ flowchart TB
 | `control-coordination-routes.ts` | Kommandoannahme; leitet an das zuständige Durable Object weiter (`jurisdiction("eu")` außerhalb der Entwicklung) |
 | `control-transport-routes.ts` | WebSocket-Upgrade für `/api/control/:eventId/live` |
 | `command-preflight*.ts` | prüft Transportvertrag, Sitzung, Rolle, Gerätekopplung und erwartete Version vor der Fachlogik |
-| `event-coordinator.ts` | serialisiert Kommandos je Veranstaltung, orchestriert D1-Batch, Auditereignis, Idempotenzbeleg und Outbox, stößt Prognose an, verteilt Versionssignale, bedient Alarm für Prognosetakt und Nachrufablauf |
-| `*-command-service.ts` | fachlich abgegrenzte Schreiboperationen (Verkauf, Rotation, Flotte, Pilotenzuweisung, Stammdaten, Nachruf, Planung, Nacherfassung) |
+| `event-coordinator.ts` | serialisiert Kommandos je Veranstaltung, führt die gemeinsame Präambel aus, übergibt anschließend an die exhaustive Handler-Registry, stößt Prognose an, verteilt Versionssignale und bedient Alarm für Prognosetakt und Nachrufablauf |
+| `command-handler-registry.ts`, `event-command-handlers.ts`, `*-command-service.ts` | ordnen jeden Contract-Command zur Compile-Zeit genau einer Familie und einem Service-Handler zu; die Cloudflare-unabhängige Registry-Fabrik ist isoliert testbar, Ticketverkauf und Verkaufskonfiguration besitzen getrennte Services |
 | `public-code-service.ts` | kryptografische Vergabe und kollisionsgeprüfte Reservierung öffentlicher Gruppen- und Ticketcodes |
 | `*-read-service.ts`, `*-projection.ts` | berechtigungsabhängige Lesesichten: operative Vollsicht, FIDS-Board, öffentlicher Ticket-/Gruppenstatus |
 | `forecast-timeline-service.ts` | Prognoselauf, Snapshots, Voraufrufentscheidungen |
@@ -168,11 +168,14 @@ flowchart TB
     C --> D["4 Rolle<br/>assertRoleMayExecute"]
     D --> E["5 expectedVersion<br/>vergleichen"]
     E -->|"abweichend"| Y["STALE_VERSION<br/>keine Änderung"]
-    E --> F["6 Invarianten und<br/>Zustandsübergang"]
-    F --> G["7 D1-Batch:<br/>Zustand + operational_events<br/>+ idempotency_receipts + outbox"]
-    G --> H["8 Versionssignal an Clients"]
-    H --> I["asynchroner Prognoselauf"]
+    E --> F["6 exhaustive Handler-Registry<br/>Commandtyp → Familie"]
+    F --> G["7 Invarianten und<br/>Zustandsübergang"]
+    G --> H["8 D1-Batch:<br/>Zustand + operational_events<br/>+ idempotency_receipts + outbox"]
+    H --> I["9 Versionssignal an Clients"]
+    I --> J["asynchroner Prognoselauf"]
 ```
 
 Die Reihenfolge ist verbindlich. Ein abgewiesenes Kommando verändert weder Fachzustand noch
-Ereignisprotokoll, und es wird niemals vor erfolgreicher Persistenz veröffentlicht.
+Ereignisprotokoll, und es wird niemals vor erfolgreicher Persistenz veröffentlicht. Die Registry ist
+über die discriminated Union `CommandEnvelope` vollständig typisiert; ein neuer Commandtyp ohne
+Familien- und Handlerzuordnung lässt die Typprüfung fehlschlagen.

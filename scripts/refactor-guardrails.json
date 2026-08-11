@@ -3,7 +3,7 @@
   "sizeBudgets": [
     {
       "path": "apps/worker/src/event-coordinator.ts",
-      "maxLines": 1394,
+      "maxLines": 839,
       "targetLines": 1500
     },
     {
@@ -118,6 +118,21 @@
     }
   ],
   "extractedModuleBudgets": [
+    {
+      "path": "apps/worker/src/event-command-handlers.ts",
+      "maxLines": 363,
+      "targetLines": 500
+    },
+    {
+      "path": "apps/worker/src/command-handler-registry.ts",
+      "maxLines": 55,
+      "targetLines": 300
+    },
+    {
+      "path": "apps/worker/src/ticket-sales-command-service.ts",
+      "maxLines": 388,
+      "targetLines": 500
+    },
     {
       "path": "apps/worker/src/command-preflight.ts",
       "maxLines": 241,

@@ -202,7 +202,9 @@ Referenzgewichte, Boarding-, Ausstiegs- und Pufferzeiten, öffentliche Texte, Ka
 Produktkapazität und Referenzzeiten, Gewichtsklassen, Ressourcenkapazität, automatischer Voraufruf
 sowie Gates und deren Sortierung sind Stammdaten. Jede Änderung läuft über dieselbe Kommandopipeline
 mit Rollenprüfung, erwarteter Version, Idempotenzbeleg, Auditereignis und Outbox – ohne Deployment und
-ohne Codeänderung.
+ohne Codeänderung. Nach der gemeinsamen Präambel ordnet eine exhaustive typisierte Handler-Registry
+jeden `CommandEnvelope` genau einer fachlichen Familie zu. Rollen-, Versions- und Idempotenzprüfung
+werden dadurch nicht in Familiendienste dupliziert; deren D1-Batches bleiben die Persistenzgrenze.
 
 ## 8.12 Test- und Qualitätssicherungskonzept
 
