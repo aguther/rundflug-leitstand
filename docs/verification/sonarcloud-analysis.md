@@ -30,6 +30,13 @@ Die Projektkennung, Organisation, Quellen, Testdateien und der LCOV-Pfad liegen 
 `sonar-project.properties`. Die Abhängigkeiten `@sonar/scan` und `@vitest/coverage-v8` dienen
 ausschließlich dem optionalen Analyselauf und verändern den normalen Build nicht.
 
+`vitest.config.ts` nimmt alle ausführbaren Dateien unter `apps` und `packages` ausdrücklich auf.
+Vollständig unimportierte Produktionsdateien erscheinen deshalb mit 0 Prozent im LCOV-Nenner.
+Abgerundete lokale Mindestwerte für Statements, Branches, Functions und Lines verhindern eine
+Verschlechterung des Bestands; das SonarQube-Ziel für neuen Code bleibt davon getrennt bei 80 Prozent.
+Grundmenge, Messwerte und Schwellen sind im
+[`Coverage-Ratchet vom 11. August 2026`](coverage-ratchet-2026-08-11.md) festgehalten.
+
 Die fachliche Prüfung des Bug-/Vulnerability-Bestands vom 11. August 2026 ist unter
 [`sonarcloud-issue-triage-2026-08-11.md`](sonarcloud-issue-triage-2026-08-11.md) dokumentiert. Dort
 sind auch die sechs einzeln bestätigten Scanner-Fehlalarme begründet. Ihre Ausschlüsse sind in

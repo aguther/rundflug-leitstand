@@ -9,7 +9,26 @@ export default defineConfig({
       "scripts/**/*.test.ts",
     ],
     coverage: {
+      include: [
+        "apps/**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}",
+        "packages/**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}",
+      ],
+      exclude: [
+        "**/*.test.{js,jsx,mjs,cjs,ts,tsx,mts,cts}",
+        "**/*.spec.{js,jsx,mjs,cjs,ts,tsx,mts,cts}",
+        "**/*.worker-spec.{js,jsx,mjs,cjs,ts,tsx,mts,cts}",
+        "**/*.d.{ts,mts,cts}",
+        "**/dist/**",
+        "**/.wrangler/**",
+      ],
+      excludeAfterRemap: true,
       reporter: ["text", "html", "lcov"],
+      thresholds: {
+        statements: 56,
+        branches: 50,
+        functions: 54,
+        lines: 58,
+      },
     },
   },
 });

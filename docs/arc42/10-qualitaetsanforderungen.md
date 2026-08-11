@@ -47,6 +47,7 @@ flowchart LR
 | QS-13 | Wiederherstellung nach Datenverlust | Restore aus portabler R2-Sicherung beziehungsweise D1 Time Travel in eine isolierte Datenbank innerhalb von 30 Minuten | `scripts/verify_backup_restore.py`, `docs/operations/backup-restore.md` |
 | QS-14 | Monitor läuft acht Stunden ohne Bedienung | FIDS-Seite bleibt gebunden und layoutstabil; keine operativen Rechte des Display-Kontos | `docs/verification/public-monitors-v1.md`, `docs/ui/fids-split-layout-stability.md` |
 | QS-15 | Helferin bedient die Kasse nach zehn Minuten Einweisung | Ein-Bildschirm-Ablauf ohne Menünavigation; Rollenleitfaden und Screenshots als Einweisungsgrundlage | `docs/roles/kasse.md`, `npm run test:browser:roles` |
+| QS-16 | Eine neue Produktionsdatei wird noch von keinem Test importiert | Datei erscheint mit 0 Prozent im LCOV-Nenner; `npm run test:coverage` verhindert eine Unterschreitung der abgerundeten Bestands-Ratchets | `vitest.config.ts`, `docs/verification/coverage-ratchet-2026-08-11.md` |
 
 ## 10.3 Nicht abgedeckte oder eingeschränkte Ziele
 

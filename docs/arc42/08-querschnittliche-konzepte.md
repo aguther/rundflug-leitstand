@@ -195,6 +195,7 @@ ohne Codeänderung.
 | Oberfläche | Testing Library und jsdom für DOM-Tests, Playwright für Browserläufe |
 | Integration | zahlreiche `scripts/verify_*.mjs`-Läufe für Vertical Slice, Concurrency, Ausfallwiederherstellung, Notfallmodus, Stammdaten, Skalierung, Soak und Abnahmetag |
 | Architekturregeln | `apps/worker/src/maintainability-coverage.test.ts`, `npm run refactor:guardrails` (Dateibudgets, Importverbote) |
+| Coverage | expliziter Produktionscode-Nenner für `apps` und `packages`; lokale abgerundete Ratchets 56 % Statements, 50 % Branches, 54 % Functions und 58 % Lines; 80 % SonarQube-Ziel für neuen Code |
 | Dokumentation | `npm run docs:verify` prüft Architektur-, Datenschutz-, Lizenz-, Link-, Rollen- und Releasekonsistenz |
 | Anforderungen | `npm run requirements:verify` und Traceability-CSV |
 | Statische Analyse | Biome sowie SonarQube-Scan in der CI |
