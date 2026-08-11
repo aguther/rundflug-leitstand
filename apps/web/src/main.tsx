@@ -3,6 +3,8 @@ import { createRoot } from "react-dom/client";
 import "@fontsource/barlow-condensed/latin-200.css";
 import "@fontsource/barlow-condensed/latin-400.css";
 import { App } from "./App";
+import { AppErrorBoundary } from "./app/AppErrorBoundary";
+import "./app/app-error-boundary.css";
 import { applyInitialInstallMetadata } from "./app/install-metadata";
 import { applyInitialTheme, ThemeProvider } from "./design-system/theme";
 import "./design-system/tokens.css";
@@ -29,8 +31,10 @@ if (!root) {
 
 createRoot(root).render(
   <StrictMode>
-    <ThemeProvider>
-      <App />
-    </ThemeProvider>
+    <AppErrorBoundary scope="application">
+      <ThemeProvider>
+        <App />
+      </ThemeProvider>
+    </AppErrorBoundary>
   </StrictMode>,
 );

@@ -1,0 +1,19 @@
+.error-boundary-browser-success {
+  min-height: 100dvh;
+  display: grid;
+  place-content: center;
+  gap: var(--space-3);
+  padding: var(--space-6);
+  color: var(--ui-text);
+  background: var(--ui-bg);
+  text-align: center;
+}
+
+.error-boundary-browser-success h1,
+.error-boundary-browser-success p {
+  margin: 0;
+}
+
+.error-boundary-browser-success p {
+  color: var(--ui-muted);
+}

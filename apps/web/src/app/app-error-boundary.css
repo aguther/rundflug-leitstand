@@ -1,0 +1,75 @@
+.app-error-boundary {
+  box-sizing: border-box;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: var(--space-6);
+  color: var(--ui-text);
+  background: var(--ui-bg);
+}
+
+.app-error-boundary__panel {
+  box-sizing: border-box;
+  width: min(100%, 520px);
+  display: grid;
+  justify-items: center;
+  gap: var(--space-4);
+  padding: clamp(28px, 6vw, 48px);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-lg);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-soft);
+  text-align: center;
+}
+
+.app-error-boundary__symbol {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--ui-warning);
+  border-radius: 50%;
+  color: var(--ui-warning-text);
+  background: var(--ui-warning-soft);
+  font-size: 1.5rem;
+  font-weight: 750;
+  line-height: 1;
+}
+
+.app-error-boundary h1 {
+  margin: 0;
+  font-size: clamp(1.45rem, 4vw, 2rem);
+  line-height: 1.15;
+}
+
+.app-error-boundary p {
+  max-width: 42ch;
+  margin: 0;
+  color: var(--ui-muted);
+  line-height: 1.55;
+}
+
+.app-error-boundary__reload {
+  min-height: var(--control-touch);
+  padding: 10px 20px;
+  border: 1px solid var(--ui-accent);
+  border-radius: var(--radius-md);
+  color: #fff;
+  background: var(--ui-accent);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.app-error-boundary__reload:hover {
+  background: var(--ui-accent-hover);
+}
+
+@media (max-width: 520px) {
+  .app-error-boundary {
+    padding: var(--space-4);
+  }
+
+  .app-error-boundary__panel {
+    padding: 28px var(--space-5);
+  }
+}

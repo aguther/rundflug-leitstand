@@ -158,6 +158,14 @@ Reset, `DISPLAY` besitzt ausschließlich Lesezugriff auf die Boardprojektion.
   Zustand unberührt; der nächste bestätigte Zustandswechsel startet einen neuen Lauf.
 - Unbehandelte Fehler erzeugen eine strukturierte Logzeile ohne Nutzdaten und eine neutrale
   500-Antwort.
+- Die Web-Anwendung besitzt zwei gestaffelte React-Fehlergrenzen: Eine globale Fehlergrenze liegt
+  außerhalb der Context-Provider, eine zweite umschließt jeden lazy geladenen Rollenbereich. Beide
+  zeigen ausschließlich neutrale Texte ohne technische oder sensitive Fehlerdetails und bieten eine
+  explizite Aktion „Neu laden“.
+- Beim Fehler erhält die Überschrift den Fokus. Ein Routenwechsel setzt nur die routenbezogene
+  Fehlergrenze zurück; die globale Fehlergrenze bleibt der letzte Rückfall für Provider- und
+  Initialisierungsfehler. DOM- und Browser-Tests prüfen Darstellung und Wiederherstellung in hellem
+  und dunklem Farbschema sowie in Desktop- und Mobilbreite.
 
 ## 8.9 Bedienoberfläche und PWA
 

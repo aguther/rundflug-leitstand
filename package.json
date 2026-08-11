@@ -56,6 +56,7 @@
     "test:analysis-scale": "node scripts/verify_analysis_capture_scale.mjs",
     "test:browser:roles": "node scripts/capture_role_guides.mjs",
     "test:browser:cashier": "node scripts/verify_cashier_browser.mjs",
+    "test:browser:error-boundaries": "node scripts/verify_error_boundaries_browser.mjs",
     "test:browser:event-switch": "node scripts/verify_event_switch_browser.mjs",
     "test:v1-integrations": "node scripts/verify_v1_integrations.mjs",
     "test:watch": "vitest",

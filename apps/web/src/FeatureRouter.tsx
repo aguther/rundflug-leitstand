@@ -1,4 +1,5 @@
 import { lazy, type ReactNode, Suspense } from "react";
+import { AppErrorBoundary } from "./app/AppErrorBoundary";
 
 const AdminView = lazy(() =>
   import("./admin-view").then((module) => ({ default: module.AdminView })),
@@ -26,17 +27,19 @@ const GroupStatusView = lazy(() =>
   import("./group-status-view").then((module) => ({ default: module.GroupStatusView })),
 );
 
-function FeatureBoundary({ children }: { children: ReactNode }) {
+export function FeatureBoundary({ children, routeKey }: { children: ReactNode; routeKey: string }) {
   return (
-    <Suspense
-      fallback={
-        <div className="app-loading" role="status">
-          Arbeitsbereich wird geladen …
-        </div>
-      }
-    >
-      {children}
-    </Suspense>
+    <AppErrorBoundary scope="route" resetKey={routeKey}>
+      <Suspense
+        fallback={
+          <div className="app-loading" role="status">
+            Arbeitsbereich wird geladen …
+          </div>
+        }
+      >
+        {children}
+      </Suspense>
+    </AppErrorBoundary>
   );
 }
 
@@ -55,5 +58,5 @@ export function FeatureRouter() {
   else if (path === "/fids") view = <FidsView />;
   else if (path === "/admin") view = <AdminView />;
   else if (path === "/simulation") view = <ForecastSimulationView />;
-  return <FeatureBoundary>{view}</FeatureBoundary>;
+  return <FeatureBoundary routeKey={path}>{view}</FeatureBoundary>;
 }
