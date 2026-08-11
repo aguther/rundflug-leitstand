@@ -11,22 +11,24 @@ sequenceDiagram
     participant D as D1
     participant C as weitere Clients
 
-    K->>W: POST /api/control/:eventId/commands<br/>SELL_TICKET_GROUP, commandId, expectedVersion
+    K->>W: POST /api/control/:eventId/commands<br/>SELL_TICKET_GROUP, ticketCount, commandId, expectedVersion
     W->>W: Body-Grenze, JSON, Sitzungscookie, Vertrag (Zod)
     W->>DO: weiterleiten an DO-Instanz der Veranstaltung
     DO->>DO: Kommandos seriell einreihen (commandTail)
     DO->>D: vorhandenen Idempotenzbeleg lesen
     alt Beleg vorhanden
-        D-->>DO: gespeicherte Antwort
-        DO-->>K: 200, duplicate: true
+        D-->>DO: gespeicherter Beleg einschließlich Codes
+        DO-->>K: 200, identischer Beleg, duplicate: true
     else neues Kommando
         DO->>DO: Gerät, Rolle, Version, Kapazität, Gruppenschutz
         alt Version veraltet
             DO-->>K: 409 STALE_VERSION (keine Änderung)
         else zulässig
+            DO->>DO: Gruppen- und Ticketcodes mit Worker-WebCrypto erzeugen
+            DO->>D: Codehashes kollisionsfrei gegen Gruppen und Tickets prüfen
             DO->>D: ein Batch: tickets/ticket_groups/flight_groups<br/>+ operational_events + idempotency_receipts + outbox
             D-->>DO: Commit bestätigt
-            DO-->>K: 200, neue Veranstaltungsversion, Ticketdaten
+            DO-->>K: 200, neue Veranstaltungsversion, bestätigter Beleg mit Codes
             DO-->>C: Versionssignal über /live
             C->>W: GET /api/control/:eventId/operations
             DO->>DO: asynchroner Prognoselauf
@@ -36,7 +38,8 @@ sequenceDiagram
 
 Wesentlich: Die Antwort an die Kasse erfolgt erst nach dem Commit. Erst danach erfahren andere
 Geräte, dass eine neue Version existiert, und laden ihre jeweils berechtigte Sicht. Der Ticketdruck
-verwendet die bereits bestätigte Antwort.
+verwendet die bereits bestätigte Antwort. Die PWA wählt keine öffentlichen Codes; eine Wiederholung
+derselben `commandId` liest den zuerst gespeicherten Beleg, bevor neue Codes erzeugt würden.
 
 ## 6.2 Umlauf an der Flight Line
 

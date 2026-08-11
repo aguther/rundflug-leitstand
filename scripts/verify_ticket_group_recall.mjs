@@ -148,14 +148,8 @@ async function subscribe(path, endpoint) {
   }
 }
 
-const groupOne = {
-  publicGroupCode: "RECALLGROUPA22",
-  publicTicketCode: "RECALLTICKETA22",
-};
-const groupTwo = {
-  publicGroupCode: "RECALLGROUPB22",
-  publicTicketCode: "RECALLTICKETB22",
-};
+let groupOne;
+let groupTwo;
 
 let groupOneId;
 let groupTwoId;
@@ -188,21 +182,33 @@ try {
   });
   const soldOne = await command("cashier", result.event.version, "SELL_TICKET_GROUP", {
     productId: "panorama-20",
-    publicGroupCode: groupOne.publicGroupCode,
-    publicTicketCodes: [groupOne.publicTicketCode],
+    ticketCount: 1,
     standby: false,
     paymentStatus: "PAID",
     paymentMethod: "CASH",
   });
+  groupOne = {
+    publicGroupCode: soldOne.saleReceipt?.code,
+    publicTicketCode: soldOne.saleReceipt?.ticketCodes?.[0],
+  };
+  if (!groupOne.publicGroupCode || !groupOne.publicTicketCode) {
+    throw new Error("Erster Verkauf lieferte keine servergenerierten Statuscodes.");
+  }
   groupOneId = soldOne.aggregate.id;
   const soldTwo = await command("cashier", soldOne.event.version, "SELL_TICKET_GROUP", {
     productId: "panorama-20",
-    publicGroupCode: groupTwo.publicGroupCode,
-    publicTicketCodes: [groupTwo.publicTicketCode],
+    ticketCount: 1,
     standby: false,
     paymentStatus: "PAID",
     paymentMethod: "CASH",
   });
+  groupTwo = {
+    publicGroupCode: soldTwo.saleReceipt?.code,
+    publicTicketCode: soldTwo.saleReceipt?.ticketCodes?.[0],
+  };
+  if (!groupTwo.publicGroupCode || !groupTwo.publicTicketCode) {
+    throw new Error("Zweiter Verkauf lieferte keine servergenerierten Statuscodes.");
+  }
   groupTwoId = soldTwo.aggregate.id;
 
   await Promise.all([

@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { WINDOWS_TASKKILL_EXECUTABLE } from "./lib/tool-executables.mjs";
@@ -108,12 +108,6 @@ const history = async () => {
   return response.json();
 };
 
-const ticketCode = () =>
-  randomBytes(12)
-    .toString("base64url")
-    .toUpperCase()
-    .replaceAll(/[01OI_-]/g, "A");
-
 try {
   await waitForWorker();
   let current = await board();
@@ -138,7 +132,7 @@ try {
   });
   const sold = await accept("cashier", result.event.version, "SELL_TICKET_GROUP", {
     productId: "panorama-20",
-    publicTicketCodes: [ticketCode()],
+    ticketCount: 1,
     standby: false,
     paymentStatus: "PAID",
     paymentMethod: "CASH",

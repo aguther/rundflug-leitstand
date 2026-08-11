@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { WINDOWS_TASKKILL_EXECUTABLE } from "./lib/tool-executables.mjs";
@@ -96,12 +96,6 @@ const history = async () => {
   if (!response.ok) throw new Error(`Historien-Abruf fehlgeschlagen (${response.status}).`);
   return response.json();
 };
-const ticketCode = () =>
-  randomBytes(12)
-    .toString("base64url")
-    .toUpperCase()
-    .replaceAll(/[01OI_-]/g, "A");
-
 try {
   await waitForWorker();
   let current = await board(devices.admin, tokens.admin);
@@ -132,7 +126,6 @@ try {
     "SET_EVENT_LIFECYCLE",
     { status: "ACTIVE", reason: "Synthetischer Notfalltest", adminPin: pin },
   );
-  const activeTicketCode = ticketCode();
   const firstSale = await command(
     devices.cashier,
     tokens.cashier,
@@ -140,12 +133,13 @@ try {
     "SELL_TICKET_GROUP",
     {
       productId: "panorama-20",
-      publicTicketCodes: [activeTicketCode],
+      ticketCount: 1,
       standby: false,
       paymentStatus: "PAID",
       paymentMethod: "CASH",
     },
   );
+  const activeTicketCode = firstSale.saleReceipt.ticketCodes[0];
   const waitingSale = await command(
     devices.cashier,
     tokens.cashier,
@@ -153,7 +147,7 @@ try {
     "SELL_TICKET_GROUP",
     {
       productId: "panorama-20",
-      publicTicketCodes: [ticketCode()],
+      ticketCount: 1,
       standby: false,
       paymentStatus: "PAID",
       paymentMethod: "CASH",
@@ -194,7 +188,7 @@ try {
     "SELL_TICKET_GROUP",
     {
       productId: "panorama-20",
-      publicTicketCodes: [ticketCode()],
+      ticketCount: 1,
       standby: false,
       paymentStatus: "PAID",
       paymentMethod: "CASH",

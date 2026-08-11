@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { WINDOWS_TASKKILL_EXECUTABLE } from "./lib/tool-executables.mjs";
@@ -92,20 +92,12 @@ const board = async () => {
   return response.json();
 };
 
-const code = () =>
-  randomBytes(12)
-    .toString("base64url")
-    .toUpperCase()
-    .replaceAll(/[01OI_-]/g, "A");
 const salePayload = (ticketCount = 1) => ({
   productId: "panorama-20",
-  publicTicketCodes: Array.from({ length: ticketCount }, code),
+  ticketCount,
   standby: false,
   paymentStatus: "PAID",
   paymentMethod: "CASH",
-  // Absichtlicher Fremdinput: Die Kasse darf keine operative Zuordnung festlegen.
-  aircraftId: "aircraft-a",
-  pilotId: "550e8400-e29b-41d4-a716-446655440100",
 });
 const expectBlocked = async (version, expectedCode) => {
   const result = await command("cashier", version, "SELL_TICKET_GROUP", salePayload(), 409);

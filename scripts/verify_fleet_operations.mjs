@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { WINDOWS_TASKKILL_EXECUTABLE } from "./lib/tool-executables.mjs";
@@ -92,11 +92,6 @@ const history = async (aggregateType, aggregateId) => {
   if (!response.ok) throw new Error(`Historien-Abruf fehlgeschlagen (${response.status}).`);
   return response.json();
 };
-const code = () =>
-  randomBytes(12)
-    .toString("base64url")
-    .toUpperCase()
-    .replaceAll(/[01OI_-]/g, "A");
 const admin = (version, type, payload, expectedStatus) =>
   command(devices.admin, tokens.admin, version, type, payload, expectedStatus);
 const flight = (version, type, payload, expectedStatus, commandId) =>
@@ -148,7 +143,6 @@ try {
     reason: "Synthetischer Flottentest",
     adminPin: pin,
   });
-  const publicCode = code();
   const sold = await command(
     devices.cashier,
     tokens.cashier,
@@ -156,7 +150,7 @@ try {
     "SELL_TICKET_GROUP",
     {
       productId: "panorama-20",
-      publicTicketCodes: [publicCode],
+      ticketCount: 1,
       standby: false,
       paymentStatus: "PAID",
       paymentMethod: "CASH",
@@ -550,7 +544,7 @@ try {
     "SELL_TICKET_GROUP",
     {
       productId: "panorama-20",
-      publicTicketCodes: [code()],
+      ticketCount: 1,
       standby: false,
       paymentStatus: "PAID",
       paymentMethod: "CASH",

@@ -26,7 +26,7 @@ describe("V1 twelve-hour reliability harness", () => {
       'socket.send("ping")',
       "realtimeReconnects",
       "2_000",
-      "randomBytes(16)",
+      "ticketCount: 1",
       "anonymousSyntheticDataOnly: true",
     ]) {
       expect(soakHarness).toContain(evidence);

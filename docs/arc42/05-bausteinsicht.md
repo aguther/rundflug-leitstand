@@ -96,6 +96,7 @@ flowchart TB
 | `command-preflight*.ts` | prüft Transportvertrag, Sitzung, Rolle, Gerätekopplung und erwartete Version vor der Fachlogik |
 | `event-coordinator.ts` | serialisiert Kommandos je Veranstaltung, orchestriert D1-Batch, Auditereignis, Idempotenzbeleg und Outbox, stößt Prognose an, verteilt Versionssignale, bedient Alarm für Prognosetakt und Nachrufablauf |
 | `*-command-service.ts` | fachlich abgegrenzte Schreiboperationen (Verkauf, Rotation, Flotte, Pilotenzuweisung, Stammdaten, Nachruf, Planung, Nacherfassung) |
+| `public-code-service.ts` | kryptografische Vergabe und kollisionsgeprüfte Reservierung öffentlicher Gruppen- und Ticketcodes |
 | `*-read-service.ts`, `*-projection.ts` | berechtigungsabhängige Lesesichten: operative Vollsicht, FIDS-Board, öffentlicher Ticket-/Gruppenstatus |
 | `forecast-timeline-service.ts` | Prognoselauf, Snapshots, Voraufrufentscheidungen |
 | `backup.ts`, `admin-event-logo-service.ts`, `analysis-archive*.ts` | portable Sicherungen, Veranstaltungslogos und Analysepakete in R2 |

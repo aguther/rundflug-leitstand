@@ -36,7 +36,8 @@ describe("V1.8 approved UI deltas", () => {
     expect(cashier).toContain('rotation.status === "DRAFT" && rotation.precalledAt');
     expect(cashier).toContain("Ticket drucken");
     expect(cashier).not.toContain("Ticketzettel erneut drucken");
-    expect(cashier).toContain("publicGroupCode: groupCode");
+    expect(cashier).toContain("ticketCount: size");
+    expect(cashier).not.toContain("publicGroupCode");
   });
 
   it("keeps operational busy states through projection and releases sales after persistence", () => {

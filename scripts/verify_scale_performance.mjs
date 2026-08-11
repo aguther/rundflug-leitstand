@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { WINDOWS_TASKKILL_EXECUTABLE } from "./lib/tool-executables.mjs";
@@ -235,11 +235,6 @@ const waitForForecast = (socket) =>
       resolvePromise(message);
     });
   });
-const ticketCode = () =>
-  randomBytes(12)
-    .toString("base64url")
-    .toUpperCase()
-    .replaceAll(/[01OI_-]/g, "A");
 const sockets = [];
 try {
   await waitForWorker();
@@ -322,7 +317,7 @@ try {
     type: "SELL_TICKET_GROUP",
     payload: {
       productId: "perf-product",
-      publicTicketCodes: [ticketCode()],
+      ticketCount: 1,
       standby: false,
       paymentStatus: "PAID",
       paymentMethod: "CASH",

@@ -7,7 +7,6 @@ import {
 } from "@rundflug/contracts";
 import {
   assertMayStageOutageRecoveryEntry,
-  assertPublicTicketCode,
   assertRoleMayExecute,
   assertSaleAllowed,
   type DeviceRole,
@@ -31,7 +30,7 @@ import {
 import { CommandPreflightService } from "./command-preflight-service";
 import type { PlannedOperationRow } from "./command-preflight-types";
 import { CoordinatorRealtimeService } from "./coordinator-realtime-service";
-import { sha256Hex, verifyCredential } from "./crypto";
+import { verifyCredential } from "./crypto";
 import { DispatchRecommendationLeaseService } from "./dispatch-recommendation-lease-service";
 import { EventAdministrationCommandService } from "./event-administration-command-service";
 import { FidsPreferencesCommandService } from "./fids-preferences-command-service";
@@ -47,6 +46,7 @@ import { OutageRecoveryCommandService } from "./outage-recovery-command-service"
 import { PilotAssignmentCommandService } from "./pilot-assignment-command-service";
 import { PlannedOperationCommandService } from "./planned-operation-command-service";
 import { ProductSalesCommandService } from "./product-sales-command-service";
+import { allocatePublicSaleCodes, PublicCodeAllocationError } from "./public-code-service";
 import { RecurringOperationalRuleCommandService } from "./recurring-operational-rule-command-service";
 import { RotationCorrectionCommandService } from "./rotation-correction-command-service";
 import { RotationNoteCommandService } from "./rotation-note-command-service";
@@ -762,7 +762,7 @@ export class EventCoordinator extends DurableObject<Env> {
         let splitPlan: ReturnType<typeof planBookingGroupSplit>;
         try {
           splitPlan = planBookingGroupSplit({
-            groupSize: command.payload.publicTicketCodes.length,
+            groupSize: command.payload.ticketCount,
             referenceCapacity: effectiveGroupCapacity,
             splitAcknowledged: command.payload.oversizeSplitAcknowledged,
           });
@@ -774,46 +774,17 @@ export class EventCoordinator extends DurableObject<Env> {
         }
         const requiredFlightGroupCount = splitPlan.slotSizes.length;
 
-        const normalizedCodes = command.payload.publicTicketCodes.map(assertPublicTicketCode);
-        const normalizedGroupCode = assertPublicTicketCode(
-          command.payload.publicGroupCode ?? normalizedCodes[0] ?? "",
-        );
-        if (
-          command.payload.publicGroupCode !== undefined &&
-          normalizedCodes.includes(normalizedGroupCode)
-        ) {
-          return json(
-            {
-              error: {
-                code: "DUPLICATE_GROUP_CODE",
-                message: "Gruppen- und interne Ticketcodes müssen verschieden sein.",
-              },
-            },
-            { status: 409 },
-          );
-        }
-        if (new Set(normalizedCodes).size !== normalizedCodes.length) {
-          return json(
-            {
-              error: {
-                code: "DUPLICATE_TICKET_CODE",
-                message: "Ticketcodes müssen eindeutig sein.",
-              },
-            },
-            { status: 409 },
-          );
-        }
         const allowedWeightClasses = JSON.parse(product.weight_classes_json) as Array<
           "NOT_CAPTURED" | "CHILD" | "NORMAL" | "HEAVY" | "INDIVIDUAL"
         >;
         const ticketDetailsProvided = command.payload.ticketDetails !== undefined;
         const ticketDetails =
           command.payload.ticketDetails ??
-          normalizedCodes.map(() => ({
+          Array.from({ length: command.payload.ticketCount }, () => ({
             weightClass: "NOT_CAPTURED" as const,
             individualWeightKg: null,
           }));
-        if (ticketDetails.length !== normalizedCodes.length) {
+        if (ticketDetails.length !== command.payload.ticketCount) {
           return json(
             {
               error: {
@@ -843,20 +814,26 @@ export class EventCoordinator extends DurableObject<Env> {
             { status: 409 },
           );
         }
-        const [groupCodeHash, ...hashes] = await Promise.all(
-          [normalizedGroupCode, ...normalizedCodes].map(sha256Hex),
-        );
-        const publicCodeHashes = [groupCodeHash, ...hashes];
-        const hashPlaceholders = publicCodeHashes.map(() => "?").join(", ");
+        let publicCodes: Awaited<ReturnType<typeof allocatePublicSaleCodes>>;
+        try {
+          publicCodes = await allocatePublicSaleCodes(this.env.DB, command.payload.ticketCount);
+        } catch (reason: unknown) {
+          if (reason instanceof PublicCodeAllocationError) {
+            return json(
+              {
+                error: {
+                  code: "PUBLIC_CODE_ALLOCATION_FAILED",
+                  message: "Öffentliche Ticketcodes konnten nicht sicher reserviert werden.",
+                },
+              },
+              { status: 503 },
+            );
+          }
+          throw reason;
+        }
+        const { groupCode, groupCodeHash, ticketCodes, ticketCodeHashes } = publicCodes;
         const saleState = await this.env.DB.prepare(
           `SELECT
-             EXISTS(
-               SELECT 1 FROM ticket_groups
-                WHERE public_status_code_hash IN (${hashPlaceholders})
-               UNION ALL
-               SELECT 1 FROM tickets
-                WHERE public_code_hash IN (${hashPlaceholders})
-             ) AS public_code_exists,
              (SELECT COALESCE(MAX(tg.queue_sequence), 0) + 1
                 FROM ticket_groups tg
                 JOIN products p ON p.id = tg.product_id
@@ -869,8 +846,6 @@ export class EventCoordinator extends DurableObject<Env> {
                WHERE operation_day_id = ?) AS next_ticket_number`,
         )
           .bind(
-            ...publicCodeHashes,
-            ...publicCodeHashes,
             command.eventId,
             product.resource_group_id,
             command.eventId,
@@ -878,22 +853,10 @@ export class EventCoordinator extends DurableObject<Env> {
             command.eventId,
           )
           .first<{
-            public_code_exists: number;
             next_queue_sequence: number;
             next_flight_number: number;
             next_ticket_number: number;
           }>();
-        if (saleState?.public_code_exists) {
-          return json(
-            {
-              error: {
-                code: "DUPLICATE_GROUP_CODE",
-                message: "Einer der öffentlichen Codes wurde bereits verwendet.",
-              },
-            },
-            { status: 409 },
-          );
-        }
         const splitAcrossFlightGroups = splitPlan.splitAcknowledged;
         const now = new Date().toISOString();
         const nextVersion = current.version + 1;
@@ -907,7 +870,7 @@ export class EventCoordinator extends DurableObject<Env> {
         }));
         const primarySlot = slots[0];
         if (!primarySlot) throw new Error("Mindestens ein Fluggruppen-Slot wurde erwartet.");
-        const ticketIds = hashes.map(() => crypto.randomUUID());
+        const ticketIds = ticketCodeHashes.map(() => crypto.randomUUID());
         const eventId = crypto.randomUUID();
         const result: CommandResult = {
           accepted: true,
@@ -925,8 +888,9 @@ export class EventCoordinator extends DurableObject<Env> {
             productName: product.name,
             gateLabel: product.gate_label,
             communicationLabel: formatBookingGroupLabel(product.code, ticketCommunicationNumber),
-            code: normalizedGroupCode,
-            groupSize: normalizedCodes.length,
+            code: groupCode,
+            groupSize: ticketCodes.length,
+            ticketCodes,
           },
         };
         const stateChangeResult: CommandResult = {
@@ -953,7 +917,7 @@ export class EventCoordinator extends DurableObject<Env> {
             command.payload.standby ? 1 : 0,
             now,
             groupCodeHash,
-            normalizedGroupCode,
+            groupCode,
             operatorAccountId,
           ),
           ...slots.flatMap((slot) => [
@@ -980,7 +944,7 @@ export class EventCoordinator extends DurableObject<Env> {
               now,
             ),
           ]),
-          ...hashes.flatMap((hash, index) => {
+          ...ticketCodeHashes.flatMap((hash, index) => {
             const slotIndex = splitAcrossFlightGroups
               ? Math.floor(index / effectiveGroupCapacity)
               : 0;
@@ -994,7 +958,7 @@ export class EventCoordinator extends DurableObject<Env> {
                 ticketIds[index],
                 ticketGroupId,
                 hash,
-                normalizedCodes[index],
+                ticketCodes[index],
                 ticketDetails[index]?.weightClass,
                 ticketDetails[index]?.individualWeightKg,
                 command.payload.paymentStatus,

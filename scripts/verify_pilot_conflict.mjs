@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { WINDOWS_TASKKILL_EXECUTABLE } from "./lib/tool-executables.mjs";
@@ -83,15 +83,10 @@ const command = async (
 };
 const admin = (version, type, payload) =>
   command("technical-scaffold", tokens.admin, version, type, payload);
-const ticketCode = () =>
-  randomBytes(12)
-    .toString("base64url")
-    .toUpperCase()
-    .replaceAll(/[01OI_-]/g, "A");
 const sell = (version) =>
   command("cashier-tablet-1", tokens.cashier, version, "SELL_TICKET_GROUP", {
     productId: "panorama-20",
-    publicTicketCodes: Array.from({ length: 4 }, ticketCode),
+    ticketCount: 4,
     standby: false,
     paymentStatus: "PAID",
     paymentMethod: "CASH",

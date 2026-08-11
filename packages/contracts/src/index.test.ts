@@ -112,10 +112,12 @@ describe("commandEnvelopeSchema", () => {
         communicationLabel: "G-PAN-0101",
         code: "ABCDE2345678",
         groupSize: 1,
+        ticketCodes: ["FGHJK2345678"],
       },
     });
 
     expect(result.saleReceipt?.communicationLabel).toBe("G-PAN-0101");
+    expect(result.saleReceipt?.ticketCodes).toEqual(["FGHJK2345678"]);
   });
 
   it("validates an explicit anonymous pilot assignment with reassign confirmation", () => {
@@ -422,7 +424,7 @@ describe("commandEnvelopeSchema", () => {
       type: "SELL_TICKET_GROUP",
       payload: {
         productId: "synthetic-product",
-        publicTicketCodes: ["ABCDEFGHJKLM"],
+        ticketCount: 1,
         standby: false,
         paymentStatus: "PAID",
         paymentMethod: "CASH",
@@ -665,7 +667,7 @@ describe("commandEnvelopeSchema", () => {
       type: "SELL_TICKET_GROUP",
       payload: {
         productId: "panorama-20",
-        publicTicketCodes: ["ABCDE2345678", "FGHJK2345678"],
+        ticketCount: 2,
         ticketDetails: [
           { weightClass: "CHILD", individualWeightKg: null },
           { weightClass: "INDIVIDUAL", individualWeightKg: 72 },
@@ -678,6 +680,27 @@ describe("commandEnvelopeSchema", () => {
     if (parsed.type !== "SELL_TICKET_GROUP") throw new Error("Verkaufskommando erwartet.");
     expect("phoneNumber" in parsed.payload).toBe(false);
     expect(parsed.payload.ticketDetails?.[1]?.individualWeightKg).toBe(72);
+  });
+
+  it("rejects client-selected public codes even when they are formally valid", () => {
+    expect(() =>
+      commandEnvelopeSchema.parse({
+        commandId: "00e971df-23d5-4d28-9107-92b447416284",
+        eventId: "demo-2026",
+        deviceId: "cashier-tablet-1",
+        expectedVersion: 3,
+        issuedAt: "2026-07-11T12:00:00.000Z",
+        type: "SELL_TICKET_GROUP",
+        payload: {
+          productId: "panorama-20",
+          ticketCount: 1,
+          publicGroupCode: "AAAAAAAAAAAA",
+          publicTicketCodes: ["BBBBBBBBBBBB"],
+          paymentStatus: "PAID",
+          paymentMethod: "CASH",
+        },
+      }),
+    ).toThrow();
   });
 
   it("requires a concrete aircraft confirmation for NEXT", () => {

@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { createServer } from "node:net";
@@ -294,12 +294,6 @@ const nextRefresh = (socket) =>
     }, 2_000);
     socket.addEventListener("message", onMessage);
   });
-const ticketCode = () =>
-  randomBytes(12)
-    .toString("base64url")
-    .toUpperCase()
-    .replaceAll(/[01OI_-]/g, "A");
-
 const assertPublicTimeCommunication = (payload, label) => {
   const containsExactPrediction = (value) => {
     if (Array.isArray(value)) return value.some(containsExactPrediction);
@@ -401,8 +395,6 @@ try {
     },
   );
   socket = await connectRealtime();
-  const privateCodes = [ticketCode(), ticketCode()];
-  const publicGroupCode = ticketCode();
   const saleRefresh = nextRefresh(socket);
   const sold = await command(
     devices.cashier,
@@ -411,13 +403,17 @@ try {
     "SELL_TICKET_GROUP",
     {
       productId: "panorama-20",
-      publicGroupCode,
-      publicTicketCodes: privateCodes,
+      ticketCount: 2,
       standby: false,
       paymentStatus: "PAID",
       paymentMethod: "CASH",
     },
   );
+  const privateCodes = sold.saleReceipt?.ticketCodes;
+  const publicGroupCode = sold.saleReceipt?.code;
+  if (privateCodes?.length !== 2 || !publicGroupCode) {
+    throw new Error("Der Verkauf lieferte keine servergenerierten Gruppen- und Ticketcodes.");
+  }
   if ((await saleRefresh) !== sold.event.version) {
     throw new Error("Realtime-Version stimmt nach Verkauf nicht überein.");
   }
@@ -731,8 +727,6 @@ try {
       })}`,
     );
   }
-  const splitPrivateCodes = Array.from({ length: 5 }, ticketCode);
-  const splitGroupCode = ticketCode();
   const splitSaleRefresh = nextRefresh(socket);
   const splitSale = await command(
     devices.cashier,
@@ -741,14 +735,18 @@ try {
     "SELL_TICKET_GROUP",
     {
       productId: "panorama-20",
-      publicGroupCode: splitGroupCode,
-      publicTicketCodes: splitPrivateCodes,
+      ticketCount: 5,
       standby: false,
       paymentStatus: "PAID",
       paymentMethod: "CASH",
       oversizeSplitAcknowledged: true,
     },
   );
+  const splitPrivateCodes = splitSale.saleReceipt?.ticketCodes;
+  const splitGroupCode = splitSale.saleReceipt?.code;
+  if (splitPrivateCodes?.length !== 5 || !splitGroupCode) {
+    throw new Error("Der geteilte Verkauf lieferte keine vollständigen servergenerierten Codes.");
+  }
   await splitSaleRefresh;
   const splitStatus = await groupStatus(splitGroupCode);
   const splitTicketStatuses = await Promise.all(
@@ -834,7 +832,7 @@ try {
     "SELL_TICKET_GROUP",
     {
       productId: "panorama-30",
-      publicTicketCodes: [ticketCode()],
+      ticketCount: 1,
       standby: false,
       paymentStatus: "PAID",
       paymentMethod: "CASH",

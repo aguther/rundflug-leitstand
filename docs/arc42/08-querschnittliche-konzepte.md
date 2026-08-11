@@ -118,6 +118,7 @@ Jedes Schreibkommando trägt mindestens `commandId`, `eventId`, `deviceId`, `exp
 | Öffentliche Endpunkte | Hash-Lookup, neutrale Fehlerantworten, Rate-Limiting-Bindings (30/60 s öffentlich, 5/60 s Adminwiederherstellung) |
 | Browserhärtung | strikte CSP (`default-src 'self'`, keine externen Skripte), `frame-ancestors none`, `nosniff`, `no-referrer` |
 | Eingaben | Body-Größenbegrenzung, verpflichtende JSON-Validierung, Zod-Verträge vor jeder Fachlogik |
+| Öffentliche Codes | ausschließlich serverseitige WebCrypto-Vergabe im regulären Verkauf, chargen- und bestandsweite Kollisionsprüfung, 80 Bit Entropie, Rate Limits an öffentlichen Endpunkten |
 | Protokollierung | strukturierte Logs ohne Ticketcodes, PINs, Push-Ziele oder Secrets |
 | Analyseexporte | ausschließlich typisierte `SUPPORT_SAFE`-Allowlist-Projektionen, private R2-Objekte, keine Tabellendumps |
 
@@ -129,8 +130,9 @@ Reset, `DISPLAY` besitzt ausschließlich Lesezugriff auf die Boardprojektion.
 
 - Im Kernsystem existieren keine Gastnamen und keine Telefonnummern; der Betrieb funktioniert
   vollständig ohne personenbezogene Kontaktdaten.
-- Öffentliche Ticket- und Gruppencodes werden nur als SHA-256-Hash gespeichert; der Klartext lebt im
-  Browser und auf dem gedruckten Ticket.
+- Öffentliche Ticket- und Gruppencodes entstehen beim regulären Verkauf ausschließlich im Worker.
+  Der SHA-256-Hash dient dem öffentlichen Lookup; der Klartext liegt im bestätigten Kassenbeleg, auf
+  dem gedruckten Ticket und im geschützten operativen Datensatz für autorisierte Nachdrucke.
 - Piloten erscheinen ausschließlich als anonyme Kürzel; die Zuordnung zu realen Personen bleibt
   außerhalb des Systems.
 - Push-Abonnements liegen in getrennten Tabellen, sind nicht Teil portabler Sicherungen und werden

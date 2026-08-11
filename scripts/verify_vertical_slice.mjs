@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { compareTechnicalStrings } from "./lib/technical-order.mjs";
@@ -96,11 +96,6 @@ const post = async (token, body, expectedStatus = 200) => {
   }
   return response.json();
 };
-const ticketCode = () =>
-  randomBytes(12)
-    .toString("base64url")
-    .toUpperCase()
-    .replaceAll(/[01OI_-]/g, "A");
 const connectRealtime = () =>
   new Promise((resolvePromise, reject) => {
     const socket = new WebSocket(`${wsBase}/api/public/events/demo-2026/live`);
@@ -241,7 +236,7 @@ try {
   const flightLineSaleForecast = nextForecastVersion(flightLineSocket, expectedSaleVersion);
   const saleEnvelope = envelope("cashier-tablet-1", activated.event.version, "SELL_TICKET_GROUP", {
     productId: "panorama-20",
-    publicTicketCodes: [ticketCode(), ticketCode()],
+    ticketCount: 2,
     ticketDetails: [
       { weightClass: "CHILD", individualWeightKg: null },
       { weightClass: "INDIVIDUAL", individualWeightKg: 72 },
@@ -288,12 +283,16 @@ try {
     throw new Error("Persistierte Mehrgeräte-Prognose ist nach dem Verkauf inkonsistent.");
   }
   const duplicate = await post(tokens.cashier, saleEnvelope);
-  if (!duplicate.duplicate || duplicate.event.version !== sold.event.version) {
+  if (
+    !duplicate.duplicate ||
+    duplicate.event.version !== sold.event.version ||
+    JSON.stringify(duplicate.saleReceipt) !== JSON.stringify(sold.saleReceipt)
+  ) {
     throw new Error("Idempotente Wiederholung erzeugte einen abweichenden Zustand.");
   }
   const staleSale = envelope("cashier-tablet-1", activated.event.version, "SELL_TICKET_GROUP", {
     productId: "panorama-20",
-    publicTicketCodes: [ticketCode()],
+    ticketCount: 1,
     standby: false,
     paymentStatus: "PAID",
     paymentMethod: "CASH",
@@ -305,7 +304,7 @@ try {
     "invalid-synthetic-token",
     envelope("cashier-tablet-1", sold.event.version, "SELL_TICKET_GROUP", {
       productId: "panorama-20",
-      publicTicketCodes: [ticketCode()],
+      ticketCount: 1,
       standby: false,
       paymentStatus: "PAID",
       paymentMethod: "CASH",

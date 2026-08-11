@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { WINDOWS_TASKKILL_EXECUTABLE } from "./lib/tool-executables.mjs";
@@ -100,11 +100,6 @@ const history = async (aggregateType, aggregateId) => {
   if (!response.ok) throw new Error(`Historien-Abruf fehlgeschlagen (${response.status}).`);
   return response.json();
 };
-const ticketCode = () =>
-  randomBytes(12)
-    .toString("base64url")
-    .toUpperCase()
-    .replaceAll(/[01OI_-]/g, "A");
 const admin = (version, type, payload, expectedStatus) =>
   command(devices.admin, tokens.admin, version, type, payload, expectedStatus);
 
@@ -433,7 +428,6 @@ try {
     },
     409,
   );
-  const codes = [ticketCode(), ticketCode()];
   const firstSale = await command(
     devices.cashier,
     tokens.cashier,
@@ -441,12 +435,13 @@ try {
     "SELL_TICKET_GROUP",
     {
       productId: "product-shared-20",
-      publicTicketCodes: [codes[0]],
+      ticketCount: 1,
       standby: false,
       paymentStatus: "PAID",
       paymentMethod: "CASH",
     },
   );
+  const firstTicketCode = firstSale.saleReceipt.ticketCodes[0];
   const secondSale = await command(
     devices.cashier,
     tokens.cashier,
@@ -454,7 +449,7 @@ try {
     "SELL_TICKET_GROUP",
     {
       productId: "product-shared-30",
-      publicTicketCodes: [codes[1]],
+      ticketCount: 1,
       standby: false,
       paymentStatus: "PAID",
       paymentMethod: "CASH",
@@ -499,7 +494,7 @@ try {
     "SELL_TICKET_GROUP",
     {
       productId: "product-shared-20",
-      publicTicketCodes: [ticketCode()],
+      ticketCount: 1,
       standby: false,
       paymentStatus: "PAID",
       paymentMethod: "CASH",
@@ -518,8 +513,8 @@ try {
     },
     409,
   );
-  const publicStatus = await fetch(`${base}/api/public/tickets/${codes[0]}`).then((response) =>
-    response.json(),
+  const publicStatus = await fetch(`${base}/api/public/tickets/${firstTicketCode}`).then(
+    (response) => response.json(),
   );
   const publicBoard = await fetch(`${base}/api/public/events/demo-2026/board`).then((response) =>
     response.json(),

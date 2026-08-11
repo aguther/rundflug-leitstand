@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -131,11 +131,6 @@ const waitForWorker = async () => {
   }
   throw new Error("Lokaler Worker wurde nicht rechtzeitig bereit.");
 };
-const ticketCode = () =>
-  randomBytes(12)
-    .toString("base64url")
-    .toUpperCase()
-    .replaceAll(/[01OI_-]/g, "A");
 const envelope = (deviceId, expectedVersion, type, payload) => ({
   commandId: randomUUID(),
   eventId,
@@ -178,7 +173,7 @@ try {
     const sold = await post(
       envelope("acceptance-cashier", version, "SELL_TICKET_GROUP", {
         productId,
-        publicTicketCodes: [ticketCode(), ticketCode(), ticketCode()],
+        ticketCount: 3,
         standby: false,
         paymentStatus: "PAID",
         paymentMethod: "CASH",

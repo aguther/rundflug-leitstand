@@ -1,13 +1,9 @@
 import { describe, expect, it } from "vitest";
 import anonymityDecision from "../../../docs/adr/0006-vollstaendig-anonyme-identitaeten.md?raw";
-import cashierViewSource from "../../web/src/cashier-view.tsx?raw";
-import operationWorkspaceSource from "../../web/src/operation-workspace.tsx?raw";
 import initialMigration from "../migrations/0001_initial.sql?raw";
 import pushMigration from "../migrations/0006_web_push.sql?raw";
 import rotationMigration from "../migrations/0026_rotation_gate_and_note.sql?raw";
 import fidsProjection from "./fids-board-projection.ts?raw";
-
-const cashierSource = `${cashierViewSource}\n${operationWorkspaceSource}`;
 
 describe("anonymous V1 ticket data model", () => {
   it("stores the complete operational ticket record without contact data", () => {
@@ -30,12 +26,6 @@ describe("anonymous V1 ticket data model", () => {
     expect(pushMigration).not.toMatch(/phone|telefon|guest_name|passenger_name/i);
     expect(anonymityDecision).toMatch(
       /Telefonnummern werden weder verpflichtend noch optional erfasst/i,
-    );
-  });
-
-  it("generates non-sequential public codes from browser cryptography", () => {
-    expect(cashierSource).toMatch(
-      /function createTicketCode\(\): string \{[\s\S]*crypto\.getRandomValues\(new Uint8Array\(16\)\)/,
     );
   });
 

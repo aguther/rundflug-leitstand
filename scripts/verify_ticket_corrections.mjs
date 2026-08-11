@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -142,17 +142,12 @@ const dailyReport = async () => {
   if (!response.ok) throw new Error(`Tagesbericht-Abruf fehlgeschlagen (${response.status}).`);
   return response.text();
 };
-const ticketCode = () =>
-  randomBytes(12)
-    .toString("base64url")
-    .toUpperCase()
-    .replaceAll(/[01OI_-]/g, "A");
 const sale = (version, count = 2, oversizeSplitAcknowledged = false) =>
   post(
     tokens.cashier,
     envelope(devices.cashier, version, "SELL_TICKET_GROUP", {
       productId: "panorama-20",
-      publicTicketCodes: Array.from({ length: count }, ticketCode),
+      ticketCount: count,
       standby: false,
       paymentStatus: "PAID",
       paymentMethod: "CASH",
@@ -331,7 +326,7 @@ try {
     tokens.cashier,
     envelope(devices.cashier, resale.event.version, "SELL_TICKET_GROUP", {
       productId: "panorama-20",
-      publicTicketCodes: Array.from({ length: 5 }, ticketCode),
+      ticketCount: 5,
       standby: false,
       paymentStatus: "PAID",
       paymentMethod: "CASH",

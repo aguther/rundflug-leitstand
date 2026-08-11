@@ -88,7 +88,6 @@ import {
 import {
   CASHIER_DEVICE_ID,
   ConnectionNotice,
-  createTicketCode,
   deviceTokenFor,
   EmergencyNotice,
   EVENT_ID,
@@ -750,8 +749,6 @@ export function CashierView() {
     if (!board || busyProductId) return;
     const saleStartedAt = performance.now();
     const saleSplitPreview = oversizeSplitPreview(size, saleProduct.referenceCapacity);
-    const codes = Array.from({ length: size }, createTicketCode);
-    const groupCode = createTicketCode();
     setProductId(saleProduct.id);
     setBusyProductId(saleProduct.id);
     let saleResult: Awaited<ReturnType<typeof sendCommand>>;
@@ -766,8 +763,7 @@ export function CashierView() {
           type: "SELL_TICKET_GROUP",
           payload: {
             productId: saleProduct.id,
-            publicGroupCode: groupCode,
-            publicTicketCodes: codes,
+            ticketCount: size,
             standby: false,
             paymentStatus: "INFORMATIONAL_ONLY",
             paymentMethod: null,
@@ -788,7 +784,7 @@ export function CashierView() {
     setLastTicketGroupId(soldTicketGroupId);
     setBusyProductId(null);
     setMessage(null);
-    setSaleAnnouncement(`${codes.length} Ticket${codes.length === 1 ? "" : "s"} verkauft.`);
+    setSaleAnnouncement(`${size} Ticket${size === 1 ? "" : "s"} verkauft.`);
     if (soldTicketGroupId) queueSaleHighlight(soldTicketGroupId);
     try {
       performance.measure("rundflug:cashier-sale-ready", {
@@ -803,7 +799,7 @@ export function CashierView() {
       setPendingDraftCount(0);
     } catch {
       setMessage(
-        `${codes.length} Ticket${codes.length === 1 ? "" : "s"} verkauft. Der lokale Entwurf konnte noch nicht bereinigt werden; Ansicht und Beleg werden aktualisiert.`,
+        `${size} Ticket${size === 1 ? "" : "s"} verkauft. Der lokale Entwurf konnte noch nicht bereinigt werden; Ansicht und Beleg werden aktualisiert.`,
       );
     }
     const receiptRequestToken = ++receiptRequestRef.current;
@@ -825,13 +821,13 @@ export function CashierView() {
           boardResult.status === "fulfilled" && targetedListResult.status === "fulfilled";
         if (receiptRequestToken === receiptRequestRef.current && !(printPrepared && synchronized)) {
           setMessage(
-            `${codes.length} Ticket${codes.length === 1 ? "" : "s"} verkauft. Ansicht oder Druckvorbereitung wird weiter nachgeladen; Nachdruck bleibt möglich.`,
+            `${size} Ticket${size === 1 ? "" : "s"} verkauft. Ansicht oder Druckvorbereitung wird weiter nachgeladen; Nachdruck bleibt möglich.`,
           );
         }
       } catch {
         if (receiptRequestToken === receiptRequestRef.current) {
           setMessage(
-            `${codes.length} Ticket${codes.length === 1 ? "" : "s"} verkauft. Ansicht und Beleg werden weiter nachgeladen; Nachdruck bleibt möglich.`,
+            `${size} Ticket${size === 1 ? "" : "s"} verkauft. Ansicht und Beleg werden weiter nachgeladen; Nachdruck bleibt möglich.`,
           );
         }
       } finally {

@@ -18,8 +18,9 @@ describe("V1.8 public group ticket", () => {
   });
 
   it("creates a distinct group code and prints exactly one group QR document", () => {
-    expect(cashier).toContain("const groupCode = createTicketCode()");
-    expect(cashier).toContain("publicGroupCode: groupCode");
+    expect(cashier).toContain("ticketCount: size");
+    expect(cashier).not.toContain("publicGroupCode");
+    expect(cashier).not.toContain("publicTicketCodes");
     expect(cashier).toContain("/gruppe/");
     expect(cashier).toContain("images.length !== 1");
     expect(cashier).toContain("Ticket drucken");

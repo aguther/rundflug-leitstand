@@ -3,15 +3,12 @@ import { z } from "zod";
 import { eventSnapshotSchema } from "./event-auth";
 
 import { outageRecoveryEntrySchema } from "./reports-recovery";
-
+import { saleReceiptSchema } from "./sale-receipt";
 import { productWeightClassSchema, turnaroundPhaseOverrideValueSchema } from "./schema-helpers";
 
 import { gateDisplayFilterSchema } from "./shared";
 
-import {
-  ticketGroupPrintDataSchema,
-  ticketGroupRecallProjectionSchema,
-} from "./tickets-public-status";
+import { ticketGroupRecallProjectionSchema } from "./tickets-public-status";
 
 export const operationalPlanScopeSchema = z.enum(["EVENT", "RESOURCE_GROUP", "AIRCRAFT", "PILOT"]);
 export type OperationalPlanScope = z.infer<typeof operationalPlanScopeSchema>;
@@ -292,28 +289,26 @@ export const commandEnvelopeSchema = z.discriminatedUnion("type", [
   }),
   commandBaseSchema.extend({
     type: z.literal("SELL_TICKET_GROUP"),
-    payload: z.object({
-      productId: z.string().min(1).max(100),
-      publicGroupCode: z
-        .string()
-        .regex(/^[A-Z2-9]{12,32}$/)
-        .optional(),
-      publicTicketCodes: z.array(z.string().min(12).max(32)).min(1).max(12),
-      ticketDetails: z
-        .array(
-          z.object({
-            weightClass: z.enum(["NOT_CAPTURED", "CHILD", "NORMAL", "HEAVY", "INDIVIDUAL"]),
-            individualWeightKg: z.number().min(15).max(250).nullable(),
-          }),
-        )
-        .min(1)
-        .max(12)
-        .optional(),
-      standby: z.boolean().default(false),
-      paymentStatus: z.enum(["UNPAID", "PAID", "WAIVED", "INFORMATIONAL_ONLY"]),
-      paymentMethod: z.enum(["CASH", "CARD", "VOUCHER", "OTHER"]).nullable(),
-      oversizeSplitAcknowledged: z.boolean().default(false),
-    }),
+    payload: z
+      .object({
+        productId: z.string().min(1).max(100),
+        ticketCount: z.number().int().min(1).max(12),
+        ticketDetails: z
+          .array(
+            z.object({
+              weightClass: z.enum(["NOT_CAPTURED", "CHILD", "NORMAL", "HEAVY", "INDIVIDUAL"]),
+              individualWeightKg: z.number().min(15).max(250).nullable(),
+            }),
+          )
+          .min(1)
+          .max(12)
+          .optional(),
+        standby: z.boolean().default(false),
+        paymentStatus: z.enum(["UNPAID", "PAID", "WAIVED", "INFORMATIONAL_ONLY"]),
+        paymentMethod: z.enum(["CASH", "CARD", "VOUCHER", "OTHER"]).nullable(),
+        oversizeSplitAcknowledged: z.boolean().default(false),
+      })
+      .strict(),
   }),
   commandBaseSchema.extend({
     type: z.literal("ASSIGN_AIRCRAFT_PILOT"),
@@ -811,7 +806,7 @@ export const commandResultSchema = z.object({
       relatedRotationId: z.string().optional(),
     })
     .optional(),
-  saleReceipt: ticketGroupPrintDataSchema.optional(),
+  saleReceipt: saleReceiptSchema.optional(),
 });
 export type CommandResult = z.infer<typeof commandResultSchema>;
 

@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -193,12 +193,6 @@ const headers = {
   "x-device-id": deviceId,
   "x-device-token": deviceToken,
 };
-const ticketCodeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-const createTicketCode = () =>
-  Array.from(
-    randomBytes(16),
-    (value) => ticketCodeAlphabet[value % ticketCodeAlphabet.length],
-  ).join("");
 const board = () =>
   requestJson(`${base}/api/control/${eventId}/operations`, {
     headers: { "x-device-id": deviceId, "x-device-token": deviceToken },
@@ -319,7 +313,7 @@ try {
     const current = await board();
     const sale = await command(current.body.event.version, "SELL_TICKET_GROUP", {
       productId: "panorama-20",
-      publicTicketCodes: [createTicketCode()],
+      ticketCount: 1,
       standby: false,
       paymentStatus: "PAID",
       paymentMethod: "CASH",

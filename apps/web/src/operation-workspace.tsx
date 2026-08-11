@@ -29,7 +29,6 @@ export const EVENT_ID = resolveActiveEvent(
 export const FLIGHT_LINE_ASSIST_MODE = window.location.pathname === "/flight-line";
 export const LOCAL_DEVELOPMENT =
   import.meta.env.DEV || ["localhost", "127.0.0.1"].includes(window.location.hostname);
-export const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 export const publicStatusLabel = {
   WAITING: "Warten",
   PREPARE: "Bereithalten",
@@ -267,11 +266,6 @@ export type MasterDataDeleteTarget = {
   label: string;
   blockers: string[];
 };
-
-export function createTicketCode(): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(16));
-  return Array.from(bytes, (value) => CODE_ALPHABET[value % CODE_ALPHABET.length]).join("");
-}
 
 export function useOperationBoard(deviceId: string) {
   const [state, setState] = useState<BoardSyncState>({

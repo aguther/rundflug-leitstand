@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -133,15 +133,10 @@ const command = async (
   }
   return result;
 };
-const ticketCode = () =>
-  randomBytes(12)
-    .toString("base64url")
-    .toUpperCase()
-    .replaceAll(/[01OI_-]/g, "A");
 const sell = (version, size, oversizeSplitAcknowledged = false) =>
   command("cashier-tablet-1", tokens.cashier, version, "SELL_TICKET_GROUP", {
     productId: "panorama-20",
-    publicTicketCodes: Array.from({ length: size }, ticketCode),
+    ticketCount: size,
     standby: false,
     paymentStatus: "PAID",
     paymentMethod: "CASH",
