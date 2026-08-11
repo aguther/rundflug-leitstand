@@ -19,6 +19,11 @@ describe("Sonar issue triage exclusions", () => {
     expect(property("sonar.projectVersion")).not.toBe("not provided");
   });
 
+  it("measures coverage only for deployed application and package sources", () => {
+    expect(property("sonar.sources")).toBe("apps,packages,scripts");
+    expect(property("sonar.coverage.exclusions")).toBe("scripts/**");
+  });
+
   it("keeps every false-positive criterion limited to one exact rule and file", () => {
     const criteria = property("sonar.issue.ignore.multicriteria")?.split(",") ?? [];
 

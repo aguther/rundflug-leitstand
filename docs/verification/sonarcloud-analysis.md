@@ -40,6 +40,13 @@ LCOV-Import rote Gate mit 49,9 Prozent. Mit der expliziten Version beginnt der Z
 bei der ersten Analyse dieser Applikationsversion. Pull Requests messen weiterhin ihre tatsächliche
 Differenz zum Zielbranch; die unveränderte 80-Prozent-Bedingung wird nicht abgeschaltet.
 
+SonarQube analysiert `scripts` weiterhin auf Bugs, Sicherheits- und Wartbarkeitsbefunde. Die Skripte
+sind jedoch lokale Test-, Build-, Betriebs- und Verifikationswerkzeuge und werden nicht als
+Produktionscode in Worker oder PWA ausgeliefert. `sonar.coverage.exclusions=scripts/**` nimmt sie
+deshalb ausschließlich aus dem Coverage-Nenner. Dies entspricht der instrumentierten Grundmenge des
+Vitest-Ratchets unter `apps` und `packages`; ein Test schützt sowohl den vollständigen Sonar-Quellraum
+als auch den eng begrenzten Coverage-Ausschluss.
+
 `vitest.config.ts` nimmt alle ausführbaren Dateien unter `apps` und `packages` ausdrücklich auf.
 Vollständig unimportierte Produktionsdateien erscheinen deshalb mit 0 Prozent im LCOV-Nenner.
 Abgerundete lokale Mindestwerte für Statements, Branches, Functions und Lines verhindern eine

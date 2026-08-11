@@ -26,9 +26,11 @@ der Secret-Grenze weiterhin alle lokalen Jobs, aber keinen Sonar-Upload.
 Die öffentliche SonarQube-Cloud-API meldete nach AP-05 weiterhin `ERROR`. Reliability, Security,
 Maintainability, Duplikation und Security-Hotspot-Review bestanden; ausschließlich die Coverage auf
 neuem Code lag mit 49,7 Prozent unter dem unveränderten Ziel von 80 Prozent. Gesamt-Coverage lag bei
-47,7 Prozent, Line Coverage bei 45,9 Prozent und Branch Coverage bei 50,5 Prozent. Sonar analysiert
-mit `scripts` einen breiteren Quellenraum als der lokale Produktionscode-Ratchet und verwendet eine
-eigene New-Code-Periode, deshalb sind diese Werte nicht mit den vier Vitest-Ratchets gleichzusetzen.
+47,7 Prozent, Line Coverage bei 45,9 Prozent und Branch Coverage bei 50,5 Prozent. Die Ausgangsmessung
+zählte außerdem `scripts` als nicht instrumentierten Coverage-Quellraum, obwohl dieser nur Test-,
+Build-, Betriebs- und Verifikationswerkzeuge enthält. Sonar analysiert diese Dateien weiterhin auf
+Issues, nimmt sie aber analog zum lokalen Produktionscode-Ratchet unter `apps` und `packages` aus dem
+Coverage-Nenner. Die eigene New-Code-Periode bleibt von den vier Vitest-Ratchets getrennt.
 
 Der erste Main-Lauf mit `sonar.qualitygate.wait=true` wies diese bestehende Schuld folglich als roten
 Status aus. Die Log- und API-Analyse zeigte zusätzlich, dass der NPM-Scanner keine Projektversion
