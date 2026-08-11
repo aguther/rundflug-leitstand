@@ -197,6 +197,7 @@ ohne Codeänderung.
 | Architekturregeln | `apps/worker/src/maintainability-coverage.test.ts`, `npm run refactor:guardrails` (Dateibudgets, Importverbote) |
 | Coverage | expliziter Produktionscode-Nenner für `apps` und `packages`; lokale abgerundete Ratchets 56 % Statements, 50 % Branches, 54 % Functions und 58 % Lines; 80 % SonarQube-Ziel für neuen Code |
 | Dokumentation | `npm run docs:verify` prüft Architektur-, Datenschutz-, Lizenz-, Link-, Rollen- und Releasekonsistenz |
+| Refactoring-Ratchets | `npm run refactor:guardrails` scannt ausschließlich Tests unter den expliziten Quellwurzeln `apps` und `packages`; ignorierte Worktrees sowie generierte Wrangler-Zielkonfigurationen bleiben außerhalb lokaler Gates |
 | Anforderungen | `npm run requirements:verify` und Traceability-CSV |
 | Statische Analyse | Biome sowie nachgelagerter SonarQube-Scan, der den LCOV-Bericht des Basisjobs übernimmt und auf das Quality Gate wartet |
 

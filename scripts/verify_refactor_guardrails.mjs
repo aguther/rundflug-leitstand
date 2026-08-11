@@ -5,6 +5,7 @@ import { compareTechnicalStrings } from "./lib/technical-order.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const configPath = resolve(root, "scripts/refactor-guardrails.json");
+const productionSourceRoots = ["apps", "packages"];
 const testFilePattern = /\.(?:test|spec)\.[cm]?[jt]sx?$/;
 const productionTypeScriptPattern = /\.(?:ts|tsx)$/;
 const rawImportPattern = /(?:\bfrom\s+|\bimport\s*)["']([^"']+\?raw)["']/g;
@@ -38,15 +39,23 @@ async function collectFiles(directory) {
   return files;
 }
 
-async function collectProductionRawImports() {
-  const testFiles = (await collectFiles(root)).filter((path) => testFilePattern.test(path));
+export async function collectProductionRawImports(
+  repositoryRoot = root,
+  sourceRoots = productionSourceRoots,
+) {
+  const files = (
+    await Promise.all(
+      sourceRoots.map((sourceRoot) => collectFiles(resolve(repositoryRoot, sourceRoot))),
+    )
+  ).flat();
+  const testFiles = files.filter((path) => testFilePattern.test(path));
   const imports = [];
   for (const testFile of testFiles) {
     const content = await readFile(testFile, "utf8");
     for (const match of content.matchAll(rawImportPattern)) {
       const specifier = match[1];
       const sourcePath = resolve(dirname(testFile), specifier.slice(0, -"?raw".length));
-      const relativeSource = normalizePath(relative(root, sourcePath));
+      const relativeSource = normalizePath(relative(repositoryRoot, sourcePath));
       if (
         relativeSource.startsWith("../") ||
         !productionTypeScriptPattern.test(relativeSource) ||
@@ -55,7 +64,7 @@ async function collectProductionRawImports() {
       ) {
         continue;
       }
-      imports.push(`${normalizePath(relative(root, testFile))} -> ${relativeSource}`);
+      imports.push(`${normalizePath(relative(repositoryRoot, testFile))} -> ${relativeSource}`);
     }
   }
   return [...new Set(imports)].sort(compareTechnicalStrings);
@@ -118,4 +127,4 @@ async function run() {
   for (const observation of observations) console.log(observation);
 }
 
-await run();
+if (process.argv[1] === fileURLToPath(import.meta.url)) await run();
