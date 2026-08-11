@@ -92,8 +92,13 @@ describe("V1 maintainability and portability boundaries", () => {
     }
     expect(ciWorkflow).toContain("actions/setup-python@v7");
     expect(ciWorkflow).not.toContain("actions/setup-python@v5");
-    expect(ciWorkflow).toContain(
-      "python -m pip install --disable-pip-version-check pypdf==6.10.0",
+    expect(ciWorkflow).toContain("python -m pip install --disable-pip-version-check pypdf==6.10.0");
+    const workerRuntimeJob = ciWorkflow.slice(
+      ciWorkflow.indexOf("  worker-runtime:"),
+      ciWorkflow.indexOf("  v1-core:"),
+    );
+    expect(workerRuntimeJob.indexOf("npm run build:web")).toBeLessThan(
+      workerRuntimeJob.indexOf("npm run test:worker-runtime"),
     );
   });
 

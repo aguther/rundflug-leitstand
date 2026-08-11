@@ -9,7 +9,7 @@ starten folgende Jobs unabhängig voneinander:
 | Job | Verbindlicher Nachweis |
 | --- | --- |
 | `check` | ehrlicher LCOV-Lauf mit Ratchets sowie `npm run check:ci` |
-| `worker-runtime` | 23 Tests im echten Cloudflare-Worker-Pool |
+| `worker-runtime` | Web-Build und 23 Tests im echten Cloudflare-Worker-Pool; der Build stellt das vom Worker ausgelieferte Asset-Binding bereit |
 | `v1-core` | Web-Build und die 18 V1-Kernintegrationssuiten mit isolierten lokalen D1-/Worker-Zuständen |
 | `backup-restore` | isolierter Restore, Prüfsumme und Fremdschlüsselprüfung |
 | `documentation` | arc42, Architektur-, Datenschutz-, Lizenz-, Rollen-, Migrations- und Requirements-Konsistenz |

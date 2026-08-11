@@ -58,6 +58,8 @@ jobs:
           echo "$RUNNER_TEMP/npm/bin" >> "$GITHUB_PATH"
       - name: Install dependencies
         run: npm ci
+      - name: Build web assets
+        run: npm run build:web
       - name: Test Worker runtime
         run: npm run test:worker-runtime
 
