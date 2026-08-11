@@ -45,8 +45,10 @@ Regelabschaltungen sind nicht zulässig.
 
 ## GitHub Actions
 
-Die GitHub-CI in `.github/workflows/ci.yml` führt die Repository-Prüfung und die SonarQube-Analyse in
-einem gemeinsamen Workflow aus:
+Die GitHub-CI in `.github/workflows/ci.yml` führt Basisprüfung/Coverage, Worker-Runtime,
+V1-Kernintegration, Backup-Restore und Dokumentation als parallele Jobs aus. Der Sonar-Job folgt
+erst nach erfolgreichem Basisjob, lädt dessen LCOV-Artefakt und führt dadurch keinen zweiten,
+potenziell abweichenden Coverage-Lauf aus:
 
 - bei Änderungen auf `main`,
 - bei internen Pull Requests,
@@ -56,10 +58,11 @@ einem gemeinsamen Workflow aus:
 Im GitHub-Repository muss ein Actions-Secret namens `SONAR_TOKEN` mit einem ausschließlich für die
 Analyse berechtigten SonarQube-Cloud-Token eingerichtet sein. Fehlt das Secret bei einem vorgesehenen
 Lauf, kann die offizielle, versionsgenau gepinnte SonarSource-Action keine Analyse übertragen. Vor der
-Action installiert der Job die festgelegte Node-/npm-Toolchain, erzeugt den LCOV-Bericht und wartet
+Action erzeugt der Basisjob den LCOV-Bericht mit den lokalen Ratchets; der Scanner wartet
 anschließend höchstens fünf Minuten auf das Quality Gate. Ein nicht bestandenes Gate lässt den
-gemeinsamen Job fehlschlagen.
+Sonar-Job fehlschlagen. Details zu Jobgrenzen und bewusst getrennten Langzeitabnahmen stehen im
+[`CI-Qualitätsgate-Nachweis vom 11. August 2026`](ci-quality-gates-2026-08-11.md).
 
-Ein Ausfall von SonarQube Cloud kann den gemeinsamen GitHub-Job blockieren, aber weder
+Ein Ausfall von SonarQube Cloud kann den Sonar-Job blockieren, aber weder
 `npm run build` noch `npm run check`. Eine lokale Freigabe stützt sich weiterhin auf die
 Repository-Prüfung; Historie, zentrale Issues und das Quality Gate stammen aus SonarQube Cloud.

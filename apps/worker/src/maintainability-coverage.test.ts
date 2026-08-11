@@ -114,7 +114,18 @@ describe("V1 maintainability and portability boundaries", () => {
     expect(ciWorkflow).toContain(
       "SonarSource/sonarqube-scan-action@7006c4492b2e0ee0f816d36501671557c97f5995",
     );
-    expect(ciWorkflow).toContain("-Dsonar.qualitygate.wait=false");
+    expect(ciWorkflow).toContain("actions/upload-artifact@v7");
+    expect(ciWorkflow).toContain("actions/download-artifact@v8");
+    expect(ciWorkflow).toContain("npm run test:worker-runtime");
+    expect(ciWorkflow).toContain("npm run test:v1-integrations");
+    expect(ciWorkflow).toContain("npm run backup:restore:test");
+    expect(ciWorkflow).toContain("npm run docs:verify");
+    expect(ciWorkflow).not.toContain("npm run test:v1-acceptance-day");
+    expect(ciWorkflow).not.toContain("npm run test:soak-reliability");
+    expect(ciWorkflow).not.toContain("npm run test:cloudflare-scale-performance");
+    expect(ciWorkflow).toContain("needs: check");
+    expect(ciWorkflow).toContain("-Dsonar.qualitygate.wait=true");
+    expect(ciWorkflow).not.toContain("-Dsonar.qualitygate.wait=false");
     expect(ciWorkflow.indexOf("name: CI Check")).toBeLessThan(
       ciWorkflow.indexOf("name: SonarQube Scan"),
     );

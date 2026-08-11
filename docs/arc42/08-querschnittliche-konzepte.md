@@ -191,17 +191,18 @@ ohne Codeänderung.
 | --- | --- |
 | Fachlogik | Vitest-Unit-Tests neben jedem Domänenmodul |
 | Verträge | Schema-Tests in `packages/contracts` inklusive Modul-Exportprüfung |
-| Worker-Laufzeit | `@cloudflare/vitest-pool-workers` über `vitest.worker.config.ts` |
+| Worker-Laufzeit | `@cloudflare/vitest-pool-workers` über `vitest.worker.config.ts`; eigener PR-CI-Job |
 | Oberfläche | Testing Library und jsdom für DOM-Tests, Playwright für Browserläufe |
-| Integration | zahlreiche `scripts/verify_*.mjs`-Läufe für Vertical Slice, Concurrency, Ausfallwiederherstellung, Notfallmodus, Stammdaten, Skalierung, Soak und Abnahmetag |
+| Integration | zahlreiche `scripts/verify_*.mjs`-Läufe; 18 V1-Kernsuiten als eigener PR-CI-Job, Soak und Abnahmetag als getrennte Langzeitabnahmen |
 | Architekturregeln | `apps/worker/src/maintainability-coverage.test.ts`, `npm run refactor:guardrails` (Dateibudgets, Importverbote) |
 | Coverage | expliziter Produktionscode-Nenner für `apps` und `packages`; lokale abgerundete Ratchets 56 % Statements, 50 % Branches, 54 % Functions und 58 % Lines; 80 % SonarQube-Ziel für neuen Code |
 | Dokumentation | `npm run docs:verify` prüft Architektur-, Datenschutz-, Lizenz-, Link-, Rollen- und Releasekonsistenz |
 | Anforderungen | `npm run requirements:verify` und Traceability-CSV |
-| Statische Analyse | Biome sowie SonarQube-Scan in der CI |
+| Statische Analyse | Biome sowie nachgelagerter SonarQube-Scan, der den LCOV-Bericht des Basisjobs übernimmt und auf das Quality Gate wartet |
 
-Der vollständige Gesamtnachweis ist `npm run check`; die CI führt zusätzlich `npm run test:coverage`
-und `npm run check:ci` aus.
+Der vollständige Gesamtnachweis ist `npm run check`. Die PR-CI führt Basisprüfung/Coverage,
+Worker-Runtime, V1-Kernintegration, Backup-Restore und Dokumentation parallel aus; der Sonar-Job
+folgt abhängig vom erfolgreichen Basisjob und der Verfügbarkeit des geschützten Tokens.
 
 ## 8.13 Betrieb, Sicherung und Wiederherstellung
 

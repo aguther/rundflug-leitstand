@@ -48,6 +48,7 @@ flowchart LR
 | QS-14 | Monitor läuft acht Stunden ohne Bedienung | FIDS-Seite bleibt gebunden und layoutstabil; keine operativen Rechte des Display-Kontos | `docs/verification/public-monitors-v1.md`, `docs/ui/fids-split-layout-stability.md` |
 | QS-15 | Helferin bedient die Kasse nach zehn Minuten Einweisung | Ein-Bildschirm-Ablauf ohne Menünavigation; Rollenleitfaden und Screenshots als Einweisungsgrundlage | `docs/roles/kasse.md`, `npm run test:browser:roles` |
 | QS-16 | Eine neue Produktionsdatei wird noch von keinem Test importiert | Datei erscheint mit 0 Prozent im LCOV-Nenner; `npm run test:coverage` verhindert eine Unterschreitung der abgerundeten Bestands-Ratchets | `vitest.config.ts`, `docs/verification/coverage-ratchet-2026-08-11.md` |
+| QS-17 | Ein Pull Request beschädigt Worker-Laufzeit, D1-Kernablauf, Restore oder Dokumentation | Getrennte parallele CI-Jobs weisen die betroffene Qualitätsgrenze aus; Sonar übernimmt erst nach bestandenem Basisjob dessen LCOV-Bericht und wartet auf das Quality Gate | `.github/workflows/ci.yml`, `docs/verification/ci-quality-gates-2026-08-11.md` |
 
 ## 10.3 Nicht abgedeckte oder eingeschränkte Ziele
 

@@ -10,6 +10,7 @@ permissions:
 
 jobs:
   check:
+    name: Quality and coverage
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -27,20 +28,125 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.13"
-      - name: CI
+      - name: Install dependencies
         run: npm ci
-      - name: Test Coverage
+      - name: Test coverage
         run: npm run test:coverage
       - name: CI Check
         run: npm run check:ci
+      - name: Upload LCOV report
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-lcov
+          path: coverage/lcov.info
+          if-no-files-found: error
+          retention-days: 1
+
+  worker-runtime:
+    name: Worker runtime
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install npm 12.0.2
+        run: |
+          npm install --global --prefix "$RUNNER_TEMP/npm" npm@12.0.2
+          echo "$RUNNER_TEMP/npm/bin" >> "$GITHUB_PATH"
+      - name: Install dependencies
+        run: npm ci
+      - name: Test Worker runtime
+        run: npm run test:worker-runtime
+
+  v1-core:
+    name: V1 core integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install npm 12.0.2
+        run: |
+          npm install --global --prefix "$RUNNER_TEMP/npm" npm@12.0.2
+          echo "$RUNNER_TEMP/npm/bin" >> "$GITHUB_PATH"
+      - name: Install dependencies
+        run: npm ci
+      - name: Build web assets
+        run: npm run build:web
+      - name: Test V1 core integrations
+        run: npm run test:v1-integrations
+
+  backup-restore:
+    name: Backup and restore
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+      - name: Install npm 12.0.2
+        run: |
+          npm install --global --prefix "$RUNNER_TEMP/npm" npm@12.0.2
+          echo "$RUNNER_TEMP/npm/bin" >> "$GITHUB_PATH"
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - name: Test backup restore
+        run: npm run backup:restore:test
+
+  documentation:
+    name: Documentation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install npm 12.0.2
+        run: |
+          npm install --global --prefix "$RUNNER_TEMP/npm" npm@12.0.2
+          echo "$RUNNER_TEMP/npm/bin" >> "$GITHUB_PATH"
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - name: Install dependencies
+        run: npm ci
+      - name: Verify documentation
+        run: npm run docs:verify
+      - name: Verify requirements
+        run: npm run requirements:verify
+
+  sonar:
+    name: SonarQube quality gate
+    needs: check
+    if: >-
+      github.event_name != 'pull_request' ||
+      (github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Download LCOV report
+        uses: actions/download-artifact@v8
+        with:
+          name: coverage-lcov
+          path: coverage
       - name: SonarQube Scan
-        if: >-
-          github.event_name != 'pull_request' ||
-          (github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]')
         uses: SonarSource/sonarqube-scan-action@7006c4492b2e0ee0f816d36501671557c97f5995 # v8.1.0
         with:
           args: >-
-            -Dsonar.qualitygate.wait=false
+            -Dsonar.qualitygate.wait=true
             -Dsonar.qualitygate.timeout=300
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
