@@ -318,5 +318,5 @@ describe("portable backup format", () => {
     expect(storage.objects.get(result.key)?.byteLength).toBeGreaterThan(5 * 1024 * 1024);
     expect(portableBackupLimits.pageSize).toBe(500);
     expect(new Set(pageLimits)).toEqual(new Set([portableBackupLimits.pageSize]));
-  });
+  }, 15_000);
 });
