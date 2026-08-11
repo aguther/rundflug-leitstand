@@ -579,6 +579,86 @@
       "targetLines": 1500
     },
     {
+      "path": "apps/web/src/features/forecast-simulation/engine.ts",
+      "maxLines": 214,
+      "targetLines": 300
+    },
+    {
+      "path": "apps/web/src/features/forecast-simulation/operational-engine.ts",
+      "maxLines": 339,
+      "targetLines": 400
+    },
+    {
+      "path": "apps/web/src/features/forecast-simulation/simulation-primitives.ts",
+      "maxLines": 71,
+      "targetLines": 100
+    },
+    {
+      "path": "apps/web/src/features/forecast-simulation/simulation-metrics.ts",
+      "maxLines": 423,
+      "targetLines": 500
+    },
+    {
+      "path": "apps/web/src/features/forecast-simulation/legacy-simulation-scenario.ts",
+      "maxLines": 204,
+      "targetLines": 250
+    },
+    {
+      "path": "apps/web/src/features/forecast-simulation/legacy-simulation-forecast.ts",
+      "maxLines": 208,
+      "targetLines": 250
+    },
+    {
+      "path": "apps/web/src/features/forecast-simulation/legacy-simulation-lifecycle.ts",
+      "maxLines": 274,
+      "targetLines": 300
+    },
+    {
+      "path": "apps/web/src/features/forecast-simulation/legacy-simulation-precall.ts",
+      "maxLines": 143,
+      "targetLines": 200
+    },
+    {
+      "path": "apps/web/src/features/forecast-simulation/legacy-simulation-dispatch.ts",
+      "maxLines": 203,
+      "targetLines": 250
+    },
+    {
+      "path": "apps/web/src/features/forecast-simulation/legacy-simulation-snapshot.ts",
+      "maxLines": 87,
+      "targetLines": 120
+    },
+    {
+      "path": "apps/web/src/features/forecast-simulation/operational-simulation-scenario.ts",
+      "maxLines": 234,
+      "targetLines": 300
+    },
+    {
+      "path": "apps/web/src/features/forecast-simulation/operational-simulation-forecast.ts",
+      "maxLines": 333,
+      "targetLines": 400
+    },
+    {
+      "path": "apps/web/src/features/forecast-simulation/operational-simulation-lifecycle.ts",
+      "maxLines": 446,
+      "targetLines": 500
+    },
+    {
+      "path": "apps/web/src/features/forecast-simulation/operational-simulation-precall.ts",
+      "maxLines": 171,
+      "targetLines": 220
+    },
+    {
+      "path": "apps/web/src/features/forecast-simulation/operational-simulation-dispatch.ts",
+      "maxLines": 280,
+      "targetLines": 320
+    },
+    {
+      "path": "apps/web/src/features/forecast-simulation/operational-simulation-snapshot.ts",
+      "maxLines": 114,
+      "targetLines": 150
+    },
+    {
       "path": "packages/contracts/src/event-auth.ts",
       "maxLines": 248,
       "targetLines": 1500

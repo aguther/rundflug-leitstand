@@ -45,6 +45,7 @@ ist die Übersicht; verbindlich ist jeweils der ADR-Text mit Kontext, Alternativ
 | [0038](../adr/0038-eigenstaendiger-gruppennachruf.md) | Eigenständiger aktiver Gruppennachruf | Nachruf ist kein Ticketzustand; eigene Persistenz und Projektion |
 | [0039](../adr/0039-kontobezogene-fids-modi-url-seiten-filter-und-simulation.md) | Kontobezogene FIDS-Modi, URL-Seiten, Filter und gemeinsame Simulation | Monitorseiten aus der URL, Filter ausschließlich im geschützten Dialog |
 | [0040](../adr/0040-serverseitige-oeffentliche-codevergabe.md) | Serverseitige Vergabe öffentlicher Statuscodes | reguläre Verkäufe akzeptieren keine Clientcodes; Worker-Vergabe, Kollisionsprüfung und idempotenter Beleg |
+| [0042](../adr/0042-modulare-deterministische-simulationspipeline.md) | Modulare deterministische Simulationspipeline | gemeinsame Seed-Primitive und fachliche Phasen für Legacy-/Operational-Simulation; operative Tests sind Teil der Coverage |
 
 ## Offene Entscheidungen
 

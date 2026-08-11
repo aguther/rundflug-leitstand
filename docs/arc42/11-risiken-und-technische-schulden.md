@@ -33,6 +33,8 @@ Monolithen aufgelöst:
 | `apps/worker/src/index.ts` | 8.277 Zeilen | 219 Zeilen |
 | `apps/web/src/admin-view.tsx` | 5.546 Zeilen | 663 Zeilen |
 | `packages/contracts/src/index.ts` | 3.793 Zeilen | 8 Zeilen |
+| `apps/web/.../forecast-simulation/engine.ts` | 1.513 Zeilen | 214 Zeilen |
+| `apps/web/.../forecast-simulation/operational-engine.ts` | 1.490 Zeilen | 339 Zeilen |
 | Dependency-Audit | 13 High, 2 Moderate | 0 Findings |
 
 Verbleibende, bewusst priorisierte Schulden:
@@ -45,6 +47,11 @@ Verbleibende, bewusst priorisierte Schulden:
 | Mittel | `master-data-command-service.ts` (1.300 Zeilen) und `operations-routes.ts` (1.043 Zeilen) | Stammdatenfamilien trennen; Operations-Routen weiter auf Transport und Response-Mapping reduzieren |
 | Mittel | Haupt-Entry, Flight-Line-CSS und größter JavaScript-Chunk mit begrenztem Abstand zu den Assetbudgets | routentransitive Manifestwerte vor und nach jeder Änderung vergleichen; schwere Analysebausteine lazy halten |
 | Niedrig | Die Migrationsnummer `0036` existiert historisch zweimal; beide Dateien sind angewandt | eingefroren lassen, Register und Eindeutigkeitsprüfung beibehalten, neue Migrationen mit der nächsten freien Nummer |
+
+Die vormals monolithischen lokalen Simulationsengines sind in Szenario-, Lifecycle-, Forecast-,
+Precall-, Dispatch-, Snapshot- und Metrikmodule zerlegt. Gemeinsame deterministische Primitive und
+Golden-Seed-Tests verhindern Drift; die Operational-Tests werden nicht mehr aus dem Coverage-Lauf
+ausgeschlossen. Größenratchets schützen die erreichten Orchestratorgrenzen.
 
 ## 11.3 Leitplanken für weitere Umbauten
 

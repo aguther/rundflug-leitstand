@@ -114,6 +114,10 @@ Jedes Schreibkommando trägt mindestens `commandId`, `eventId`, `deviceId`, `exp
   Verfügbarkeitsbahn gelegt.
 - `assessMarginalProductCapacity` liefert die konservative Verkaufsfreigabe je Produkt; sie ist eine
   organisatorische Hilfe ohne Freigabewirkung.
+- Der lokale Browser-Simulator verwendet für Legacy- und importierte Betriebsszenarien dieselben
+  deterministischen Seed-, PRNG-, Stichproben- und Zeitprimitive. Seine feste Tick-Reihenfolge
+  Lifecycle → Precall → Dispatch → Snapshot sowie Golden-Seed-Sequenzen machen Replay-Ergebnisse
+  über Refactorings hinweg reproduzierbar.
 - Details: `docs/architecture/dispatch-planning-v1.md`, `docs/architecture/forecast-sample-policy-v1.md`
   und `docs/architecture/forecast-snapshots-v1.md`.
 

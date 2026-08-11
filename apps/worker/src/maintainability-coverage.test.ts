@@ -108,7 +108,7 @@ describe("V1 maintainability and portability boundaries", () => {
     expect(rootManifest.scripts).toMatchObject({
       sonar: "npm run test:coverage && sonar-scanner-npm",
       "test:coverage":
-        'vitest run --coverage --exclude=apps/web/src/features/forecast-simulation/engine.test.ts --exclude=apps/web/src/features/forecast-simulation/comparison.test.ts --testNamePattern="^(?!.*projects all 300 eligible groups beyond the bounded dispatch horizon).*$"',
+        'vitest run --coverage --exclude=apps/web/src/features/forecast-simulation/comparison.test.ts --testNamePattern="^(?!.*projects all 300 eligible groups beyond the bounded dispatch horizon).*$"',
     });
     expect(rootManifest.scripts?.build).not.toContain("sonar");
     expect(rootManifest.scripts?.check).not.toContain("sonar");

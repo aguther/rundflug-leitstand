@@ -134,13 +134,26 @@ flowchart TB
 | `fids` | Board, Einstellungsdialog, Live- und Simulationsdatenquelle |
 | `public-status` | Ticket- und Gruppenstatus, Push-Einwilligung, öffentliche Texte |
 | `analysis` | Diagnose-Momentaufnahmen und clientseitige Auswertung |
-| `forecast-simulation` | lokaler Prognosesimulator, ausschließlich im Browser |
+| `forecast-simulation` | lokaler Prognosesimulator; getrennte Legacy-/Operational-Szenarien orchestrieren gemeinsame deterministische Primitive sowie Lifecycle-, Forecast-, Precall-, Dispatch-, Snapshot- und Metrikphasen |
 
 Verbindliche Regeln dieser Ebene (Q-WAR-060): `App.tsx` enthält ausschließlich Komposition und
 Routing. Rollenansichten werden lazy geladen, damit ein Monitor nicht den Verwaltungscode lädt. Der
 API-Zugriff liegt gebündelt in `api.ts` und den Feature-Clients; Komponenten führen keine fachlichen
 Zustandsübergänge selbst aus. Der Prognosesimulator arbeitet ausschließlich im Browser und schreibt
 keine Daten in D1, R2 oder Durable Objects.
+
+```mermaid
+flowchart LR
+    CONFIG["synthetische Konfiguration<br/>oder importiertes Betriebsmodell"] --> SCENARIO["Legacy-/Operational-<br/>Szenarioaufbau"]
+    PRIMITIVES["deterministische Primitive<br/>Seed, PRNG, Zeit, Stichprobe"] --> SCENARIO
+    SCENARIO --> LIFE["Lifecycle"] --> PRECALL["Precall"] --> DISPATCH["Dispatch"] --> SNAPSHOT["Forecast-Snapshot"]
+    PRIMITIVES --> LIFE
+    PRIMITIVES --> DISPATCH
+    SNAPSHOT --> METRICS["gemeinsame Metriken"]
+```
+
+Die Tick-Reihenfolge ist Teil des reproduzierbaren Simulationsvertrags. Beide Orchestratoren dürfen
+keine fachliche Phasenlogik zurückübernehmen; Golden-Seed-Tests und Größenratchets sichern diese Grenze.
 
 ## 5.4 Ebene 3 – Fachlogik `packages/domain`
 
