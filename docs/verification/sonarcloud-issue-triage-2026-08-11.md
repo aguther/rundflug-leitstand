@@ -90,8 +90,12 @@ Migrationen aktiv.
 
 ## Verifikation
 
-Der Abschluss erfolgt erst nach erfolgreichem Lint, Typprüfung, Unit-/Integrationstests, Worker-
-Runtime, Backup-Restore, Dokumentations- und Requirements-Prüfung. Der nächste authentifizierte
-SonarQube-Cloud-Lauf muss bestätigen, dass keine Bugs oder Vulnerabilities aus diesem Bestand offen
-bleiben. Lokal ist kein `SONAR_TOKEN` konfiguriert; der Remote-Nachweis erfolgt deshalb über den
-CI-Scan nach Integration.
+Der vollständige lokale Repository-Check war erfolgreich: Lint, Refactoring-Ratchets, Typprüfung,
+1.562 Unit-/Integrationstests, Web- und Worker-Build, Worker-Runtime, V1-Integrationen,
+V1-Abnahmetag, Backup-Restore sowie Dokumentations- und Requirements-Prüfung bestanden.
+
+Der anschließende authentifizierte CI-Scan analysierte am 11. August 2026 exakt Revision
+`38651339e0386d9daf5b303bbd8fa98fc4a37a96`. SonarQube Cloud meldete danach **0 offene Bugs oder
+Vulnerabilities**. Das allgemeine Quality Gate blieb separat wegen einer New-Code-Coverage von
+53,9 % bei einem Schwellwert von 80 % auf `ERROR`; diese Testabdeckungsschuld ist nicht Bestandteil
+der hier abgeschlossenen Issue-Triage und wird als eigenes Arbeitspaket behandelt.
