@@ -8,12 +8,10 @@ import { registerAdminEventLogoRoutes } from "./admin-event-logo-routes";
 import { registerAdminEventRoutes } from "./admin-event-routes";
 import { registerAdminMasterDataTemplateRoutes } from "./admin-master-data-template-routes";
 import { registerAdminSecurityRoutes } from "./admin-security-routes";
-import { expireAnalysisArchives, processPendingAnalysisArchives } from "./analysis-archive";
 import { registerAnalysisControlRoutes } from "./analysis-control-routes";
 import { registerApiCachePolicy } from "./api-cache-policy";
 import type { SessionActor } from "./auth";
 import { registerAuthRoutes } from "./auth-routes";
-import { createPortableBackup, operationDateInTimeZone } from "./backup";
 import { registerControlCoordinationRoutes } from "./control-coordination-routes";
 import { registerControlSessionMiddleware } from "./control-session-middleware";
 import { registerControlTransportRoutes } from "./control-transport-routes";
@@ -31,12 +29,12 @@ import { registerPublicPushRoutes } from "./public-push-routes";
 import { registerPublicStatusRoutes } from "./public-status-routes";
 import { registerReportExportRoutes } from "./report-export-routes";
 import { limitApiBody, requireValidJsonBody } from "./request-body-boundaries";
+import { runScheduledMaintenance } from "./scheduled-maintenance";
 import { registerSetupRoutes } from "./setup-routes";
 import { registerSimulationPlanExportRoutes } from "./simulation-plan-export-routes";
 import { registerTicketReadRoutes } from "./ticket-read-routes";
 import { httpsRedirectLocation } from "./transport-security";
 import type { Env } from "./types";
-import { purgeExpiredPushSubscriptions } from "./web-push";
 
 const app = new Hono<{
   Bindings: Env;
@@ -187,33 +185,6 @@ export default {
     env: Env,
     _ctx: ExecutionContext,
   ): Promise<void> {
-    const purgedPushSubscriptions = await purgeExpiredPushSubscriptions(env);
-    const now = new Date();
-    const expiredAnalysisArchives = await expireAnalysisArchives(env, now);
-    const builtAnalysisArchives = await processPendingAnalysisArchives(env);
-    const nextOperationDate = operationDateInTimeZone(
-      new Date(now.getTime() + 24 * 60 * 60 * 1000),
-    );
-    const upcoming = await env.DB.prepare(
-      `SELECT COUNT(*) AS count FROM operation_days
-        WHERE event_date = ?1 AND status IN ('PREPARATION', 'ACTIVE')`,
-    )
-      .bind(nextOperationDate)
-      .first<{ count: number }>();
-    const backupReason = (upcoming?.count ?? 0) > 0 ? "PRE_EVENT" : "DAILY";
-    const result = await createPortableBackup(env, now, backupReason);
-    console.log(
-      JSON.stringify({
-        level: "info",
-        code: "PORTABLE_BACKUP_CREATED",
-        key: result.key,
-        checksum: result.checksum,
-        reason: backupReason,
-        purgedPushSubscriptions,
-        expiredAnalysisArchives,
-        builtAnalysisArchives,
-        timestamp: now.toISOString(),
-      }),
-    );
+    await runScheduledMaintenance(env);
   },
 };
