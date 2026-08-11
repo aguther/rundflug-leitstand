@@ -320,8 +320,37 @@ try {
   const earliestBusyProposal = current.rotations.find(
     (rotation) => rotation.id === busySale.aggregate.relatedRotationId,
   );
-  if (earliestBusyProposal?.suggestedAircraftId !== "aircraft-b") {
-    throw new Error("Das zeitlich früher verfügbare laufende Flugzeug wurde nicht vorgeschlagen.");
+  const busyAircraftByCompletion = current.rotations
+    .filter(
+      (rotation) =>
+        rotation.status === "CALLED" &&
+        rotation.aircraftId &&
+        Number.isFinite(Date.parse(rotation.timeline?.predicted?.completionAt ?? "")),
+    )
+    .map((rotation) => ({
+      aircraftId: rotation.aircraftId,
+      predictedCompletionAt: rotation.timeline.predicted.completionAt,
+      predictedCompletionMs: Date.parse(rotation.timeline.predicted.completionAt),
+    }))
+    .sort(
+      (left, right) =>
+        left.predictedCompletionMs - right.predictedCompletionMs ||
+        left.aircraftId.localeCompare(right.aircraftId),
+    );
+  const earliestBusyAircraft = busyAircraftByCompletion[0];
+  const nextBusyAircraft = busyAircraftByCompletion[1];
+  if (!earliestBusyAircraft || !nextBusyAircraft) {
+    throw new Error("Active aircraft do not expose comparable completion forecasts.");
+  }
+  if (earliestBusyAircraft.predictedCompletionMs === nextBusyAircraft.predictedCompletionMs) {
+    throw new Error(
+      `The fixture did not establish a unique earliest aircraft availability: ${JSON.stringify(busyAircraftByCompletion)}`,
+    );
+  }
+  if (earliestBusyProposal?.suggestedAircraftId !== earliestBusyAircraft.aircraftId) {
+    throw new Error(
+      `The earliest available active aircraft was not suggested: ${JSON.stringify({ suggestedAircraftId: earliestBusyProposal?.suggestedAircraftId ?? null, busyAircraftByCompletion })}`,
+    );
   }
   let transition = busySale;
   for (const rotationId of [
