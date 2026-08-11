@@ -30,6 +30,16 @@ Die Projektkennung, Organisation, Quellen, Testdateien und der LCOV-Pfad liegen 
 `sonar-project.properties`. Die Abhängigkeiten `@sonar/scan` und `@vitest/coverage-v8` dienen
 ausschließlich dem optionalen Analyselauf und verändern den normalen Build nicht.
 
+Die New-Code-Definition verwendet „Previous version“. Deshalb überträgt
+`sonar.projectVersion` ausdrücklich dieselbe Version wie das Root-Paket; ein Test verhindert, dass
+beide Werte auseinanderlaufen oder der Scanner erneut die künstliche Version `not provided`
+verwendet. Ohne den Parameter betrachtete SonarQube Cloud sämtliche Änderungen seit der ersten
+Analyse vom 9. August 2026 als einen einzigen New-Code-Zeitraum. Dies erklärte das trotz erfolgreichem
+LCOV-Import rote Gate mit 49,9 Prozent. Mit der expliziten Version beginnt der Zeitraum gemäß der
+[SonarQube-Cloud-Dokumentation](https://docs.sonarsource.com/sonarqube-cloud/standards/about-new-code#previous-version)
+bei der ersten Analyse dieser Applikationsversion. Pull Requests messen weiterhin ihre tatsächliche
+Differenz zum Zielbranch; die unveränderte 80-Prozent-Bedingung wird nicht abgeschaltet.
+
 `vitest.config.ts` nimmt alle ausführbaren Dateien unter `apps` und `packages` ausdrücklich auf.
 Vollständig unimportierte Produktionsdateien erscheinen deshalb mit 0 Prozent im LCOV-Nenner.
 Abgerundete lokale Mindestwerte für Statements, Branches, Functions und Lines verhindern eine

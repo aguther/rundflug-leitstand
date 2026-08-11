@@ -30,10 +30,14 @@ neuem Code lag mit 49,7 Prozent unter dem unveränderten Ziel von 80 Prozent. Ge
 mit `scripts` einen breiteren Quellenraum als der lokale Produktionscode-Ratchet und verwendet eine
 eigene New-Code-Periode, deshalb sind diese Werte nicht mit den vier Vitest-Ratchets gleichzusetzen.
 
-Der erste Main-Lauf mit `sonar.qualitygate.wait=true` darf diese bestehende Schuld folglich als roten
-Status ausweisen. Das ist die beabsichtigte Durchsetzung des Gates und kein Grund, den Schwellwert
-abzusenken oder das Warten wieder abzuschalten. Neue Pull Requests müssen ihre geänderten Zeilen zu
-mindestens 80 Prozent abdecken; der Bestandsabbau erfolgt über die nachfolgenden Testarbeitspakete.
+Der erste Main-Lauf mit `sonar.qualitygate.wait=true` wies diese bestehende Schuld folglich als roten
+Status aus. Die Log- und API-Analyse zeigte zusätzlich, dass der NPM-Scanner keine Projektversion
+übertrug: Alle Analysen liefen als `not provided`, sodass „Previous version“ seit dem 9. August 2026
+keinen Versionswechsel erkennen konnte. `sonar.projectVersion` ist deshalb nun ausdrücklich an die
+Root-Paketversion gekoppelt und testgesichert. Das etabliert die vorgesehene Versionsbaseline, ohne
+den Schwellwert abzusenken oder das Warten abzuschalten. Pull Requests müssen ihre geänderten Zeilen
+weiterhin zu mindestens 80 Prozent abdecken; der Bestandsabbau erfolgt über die nachfolgenden
+Testarbeitspakete.
 
 ## Bewusst getrennte Abnahmen
 

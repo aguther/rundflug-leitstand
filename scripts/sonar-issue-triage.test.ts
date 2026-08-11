@@ -2,6 +2,9 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const properties = readFileSync(new URL("../sonar-project.properties", import.meta.url), "utf8");
+const packageManifest = JSON.parse(
+  readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+) as { version: string };
 
 function property(name: string): string | undefined {
   return properties
@@ -11,6 +14,11 @@ function property(name: string): string | undefined {
 }
 
 describe("Sonar issue triage exclusions", () => {
+  it("publishes the application version used by the previous-version baseline", () => {
+    expect(property("sonar.projectVersion")).toBe(packageManifest.version);
+    expect(property("sonar.projectVersion")).not.toBe("not provided");
+  });
+
   it("keeps every false-positive criterion limited to one exact rule and file", () => {
     const criteria = property("sonar.issue.ignore.multicriteria")?.split(",") ?? [];
 
