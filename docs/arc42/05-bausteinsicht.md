@@ -67,7 +67,7 @@ flowchart TB
 
     subgraph Adapters["Adapter"]
         D1A["D1: Batch, Read-Scheduler, Migrationen"]
-        R2A["R2: backup.ts, admin-event-logo-service.ts,<br/>analysis-archive*.ts"]
+        R2A["R2: streaming backup v2, Logos,<br/>Analysearchive und Multipart-Writer"]
         REPORT["Berichte: daily-report.ts, report.ts,<br/>report-export-service.ts"]
         PUSHA["web-push*.ts: aes128gcm, VAPID"]
         AUTHA["auth.ts, crypto.ts, device-authorization.ts"]
@@ -99,7 +99,7 @@ flowchart TB
 | `public-code-service.ts` | kryptografische Vergabe und kollisionsgeprüfte Reservierung öffentlicher Gruppen- und Ticketcodes |
 | `*-read-service.ts`, `*-projection.ts` | berechtigungsabhängige Lesesichten: operative Vollsicht, FIDS-Board, öffentlicher Ticket-/Gruppenstatus |
 | `forecast-timeline-service.ts` | Prognoselauf, Snapshots, Voraufrufentscheidungen |
-| `backup.ts`, `admin-event-logo-service.ts`, `analysis-archive*.ts` | portable Sicherungen, Veranstaltungslogos und Analysepakete in R2 |
+| `backup.ts`, `analysis-archive-writer.ts`, `admin-event-logo-service.ts`, `analysis-archive*.ts` | portable seitenweise ZIP-/NDJSON-Sicherungen mit inkrementeller Prüfsumme, Veranstaltungslogos und Analysepakete in R2 |
 | `daily-report.ts`, `report.ts`, `report-export-service.ts` | erzeugen CSV- und PDF-Tagesberichte bei Abruf aus dem bestätigten D1-Zustand |
 | `web-push*.ts` | Verschlüsselung, VAPID-Signatur, Zustellwarteschlange, Löschfristen |
 | `auth.ts`, `crypto.ts`, `device-authorization.ts` | Sitzungen, PIN-Hash, Gerätekopplung, Ratenbegrenzung sensibler Pfade |

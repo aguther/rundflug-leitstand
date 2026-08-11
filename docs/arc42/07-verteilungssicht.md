@@ -43,7 +43,7 @@ flowchart TB
 | Worker | V8-Isolate am Cloudflare-Edge, `compatibility_date` 2026-07-11, `nodejs_compat` | liefert zusätzlich die statischen Assets aus; `/api/*` und Rollenpfade laufen zuerst durch den Worker |
 | Durable Object | SQLite-basiert, außerhalb der Entwicklung mit `jurisdiction("eu")` angefordert | genau eine aktive Instanz je Veranstaltung; hibernierende WebSockets |
 | D1 | Cloudflare-verwaltetes SQLite, Bindung `DB` | Source of Truth; Time Travel als kurzfristiger Wiederherstellungspfad |
-| R2 | Bucket mit `jurisdiction: eu`, Bindung `BACKUPS` | portable JSON-Sicherungen, Veranstaltungslogos und Analysepakete; keine öffentlichen Bucket-URLs |
+| R2 | Bucket mit `jurisdiction: eu`, Bindung `BACKUPS` | portable ZIP-/NDJSON-Sicherungen als Multipart-Archiv plus SHA-256-Sidecar, Veranstaltungslogos und Analysepakete; keine öffentlichen Bucket-URLs |
 | Cron | Cloudflare Cron Trigger | täglicher Wartungslauf, siehe Kapitel 6.6 |
 
 ## 7.2 Umgebungen

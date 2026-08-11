@@ -80,6 +80,11 @@ Jedes Schreibkommando trägt mindestens `commandId`, `eventId`, `deviceId`, `exp
 - Boardprojektionen indexieren wiederverwendete Produkte, Umläufe, Ressourcen, Pläne und Regeln
   einmalig in Maps. Wiederholte lineare Gesamtsuchen innerhalb von Rotations- und
   Ressourcengruppenschleifen sind dadurch ausgeschlossen.
+- Portable Backups werden als Format 2 seitenweise aus D1 gelesen und als ZIP mit einem
+  Tabellenmanifest sowie NDJSON-Dateien geschrieben. Ein Archivstrom, ein 500-Zeilen-D1-Fenster und
+  höchstens ein 5-MiB-R2-Multipart-Teil begrenzen den Speicherbedarf. SHA-256 entsteht inkrementell
+  über die übertragenen Archivbytes; das getrennte Sidecar ist zwingende Restore-Voraussetzung.
+  Der isolierte Restore akzeptiert während der dokumentierten Übergangsfrist weiterhin Format 1.
 
 ## 8.4 Echtzeit, Offline und degradierter Betrieb
 

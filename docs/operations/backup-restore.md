@@ -126,15 +126,22 @@ Datenbestand verifiziert.
 ## Implementierter Ansatz
 
 1. D1 Time Travel als schnelle erste Wiederherstellungsebene.
-2. Täglicher portabler JSON-Export aller V1-Kerntabellen nach EU-R2 unter `backups/YYYY-MM-DD/`.
-3. SHA-256-Prüfsumme als R2-Custom-Metadata und strukturiertes Format `formatVersion: 1`.
-
-4. automatisierter Restore-Test in zwei isolierten SQLite-Datenbanken mit Prüfsummen-, Mengen-,
+2. Täglicher portabler, streamingfähiger ZIP-/NDJSON-Export aller V1-Kerntabellen nach EU-R2 unter
+   `backups/YYYY-MM-DD/` im strukturierten Format `formatVersion: 2`.
+3. `manifest.json` mit Pfad, Encoding und geprüfter Zeilenzahl je Tabelle; Tabellen werden in
+   500-Zeilen-Seiten gelesen und ohne vollständigen Tabellen- oder Archivpuffer geschrieben.
+4. Inkrementelle SHA-256-Prüfsumme über die exakten ZIP-Bytes. R2-Multipart-Upload verwendet
+   5-MiB-Teile; die Prüfsumme wird nach erfolgreichem Abschluss als `<archiv>.sha256` gespeichert und
+   über `customMetadata.checksumKey` referenziert.
+5. Übergangsweise akzeptiert der Restore sowohl das bisherige JSON-Format 1 als auch Format 2. Der
+   alte Leser bleibt bestehen, bis keine V1-Sicherung mehr in der Aufbewahrungsfrist liegt und zwei
+   monatliche V2-Restore-Proben erfolgreich waren.
+6. Automatisierter Restore-Test in isolierten SQLite-Datenbanken mit Prüfsummen-, Manifest-, Mengen-,
    Fremdschlüssel- und Auditkontrolle über `npm run backup:restore:test`; Bestandteil von
    `npm run check` und zusätzlich monatlich im Betriebscheck auszuführen.
-5. Der tägliche Cron prüft das nächste Datum in `Europe/Berlin`. Liegt dort eine vorbereitete oder
+7. Der tägliche Cron prüft das nächste Datum in `Europe/Berlin`. Liegt dort eine vorbereitete oder
    aktive Veranstaltung, wird der Export als `PRE_EVENT` in den R2-Metadaten gekennzeichnet.
-6. Der Cron löscht Objekte erst nach Ablauf von 14 vollständigen Tagen.
+8. Der Cron löscht Archiv und Sidecar erst nach Ablauf von 14 vollständigen Tagen.
 
 Die portable Tabellensicherung umfasst seit Migration 0057 auch
 `aircraft_product_turnaround_overrides`; die ergänzten Produkt-, Rotations- und Snapshotspalten
@@ -148,7 +155,9 @@ Simulationspläne werden als Version 3 exportiert; Version 1 und 2 bleiben impor
 
 1. Betroffene Umgebung schreibsperren und Zeitpunkt dokumentieren.
 2. D1 Time Travel für die schnellste Wiederherstellung prüfen.
-3. Alternativ jüngstes R2-Objekt laden und SHA-256 gegen `customMetadata.sha256` prüfen.
+3. Alternativ jüngstes R2-Archiv laden, das über `customMetadata.checksumKey` referenzierte Sidecar
+   laden und SHA-256 über die vollständigen Archivbytes prüfen. Ein fehlendes oder abweichendes
+   Sidecar sperrt den Restore.
 4. Backup ausschließlich in eine neue isolierte D1-Instanz importieren; niemals die beschädigte
    Instanz direkt überschreiben.
 5. Tabellen in Fremdschlüsselreihenfolge einspielen, danach Invarianten- und Mengenkontrollen
@@ -158,9 +167,11 @@ Simulationspläne werden als Version 3 exportiert; Version 1 und 2 bleiben impor
 
 ## Wiederkehrender Abnahmenachweis
 
-`npm run backup:restore:test` baut das vollständige Migrationsschema zweimal isoliert auf, erzeugt
-einen synthetischen anonymen V1-Datenbestand, exportiert ihn im portablen Format und stellt ihn in
-die zweite Datenbank wieder her. Der Lauf prüft SHA-256, alle Tabellenmengen, Fremdschlüssel und das
-append-only Auditprotokoll und bricht oberhalb von 30 Minuten ab. Vor dem Echtbetrieb und danach
-monatlich wird zusätzlich ein reales R2-Objekt in eine neu angelegte isolierte D1-Datenbank
-eingespielt; die produktive Datenbank wird dabei niemals überschrieben.
+`npm run backup:restore:test` baut das vollständige Migrationsschema dreimal isoliert auf, erzeugt
+einen synthetischen anonymen V1-Datenbestand, exportiert ihn in den portablen Formaten 1 und 2 und
+stellt beide Formate getrennt wieder her. Der Lauf prüft SHA-256, V2-Tabellenmanifeste, alle
+Tabellenmengen, Fremdschlüssel und das append-only Auditprotokoll und bricht oberhalb von 30 Minuten
+ab. Der Vitest-Skalennachweis erzeugt zusätzlich große synthetische Bestände in
+`operational_events`, `forecast_snapshots` und `outbox` und erzwingt mehrere Multipart-Teile. Vor dem
+Echtbetrieb und danach monatlich wird zusätzlich ein reales R2-Objekt in eine neu angelegte isolierte
+D1-Datenbank eingespielt; die produktive Datenbank wird dabei niemals überschrieben.

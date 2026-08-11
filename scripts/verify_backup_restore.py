@@ -4,10 +4,12 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 import re
 import sqlite3
 import time
+import zipfile
 from pathlib import Path
 
 
@@ -232,7 +234,7 @@ def seed_source(connection: sqlite3.Connection, include_recurring: bool = True) 
     connection.commit()
 
 
-def export_backup(connection: sqlite3.Connection, tables: list[str]) -> tuple[str, str]:
+def export_backup_v1(connection: sqlite3.Connection, tables: list[str]) -> tuple[bytes, str]:
     connection.row_factory = sqlite3.Row
     payload = {
         "format": "rundflug-leitstand-portable-backup",
@@ -247,26 +249,101 @@ def export_backup(connection: sqlite3.Connection, tables: list[str]) -> tuple[st
         },
     }
     serialized = json.dumps(payload, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
-    return serialized, hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+    encoded = serialized.encode("utf-8")
+    return encoded, hashlib.sha256(encoded).hexdigest()
 
 
-def restore_backup(connection: sqlite3.Connection, serialized: str, checksum: str, tables: list[str]) -> None:
-    if hashlib.sha256(serialized.encode("utf-8")).hexdigest() != checksum:
-        raise AssertionError("Prüfsumme des portablen Backups ist ungültig")
+def export_backup_v2(connection: sqlite3.Connection, tables: list[str]) -> tuple[bytes, str]:
+    connection.row_factory = sqlite3.Row
+    table_manifest = []
+    with io.BytesIO() as output:
+        with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+            for table in tables:
+                rows = [dict(row) for row in connection.execute(f'SELECT * FROM "{table}"')]
+                path = f"tables/{table}.ndjson"
+                table_manifest.append(
+                    {"name": table, "path": path, "rowCount": len(rows), "encoding": "ndjson"}
+                )
+                archive.writestr(
+                    path,
+                    "".join(
+                        f"{json.dumps(row, ensure_ascii=False, separators=(',', ':'), sort_keys=True)}\n"
+                        for row in rows
+                    ),
+                )
+            manifest = {
+                "format": "rundflug-leitstand-portable-backup",
+                "formatVersion": 2,
+                "createdAt": "2026-07-11T02:15:00.000Z",
+                "applicationVersion": "1.12.0",
+                "requirementsVersion": "1.12.0",
+                "reason": "PRE_EVENT",
+                "checksum": {
+                    "algorithm": "SHA-256",
+                    "scope": "archive-bytes",
+                    "storage": "r2-sidecar",
+                },
+                "tables": table_manifest,
+            }
+            archive.writestr(
+                "manifest.json",
+                json.dumps(manifest, ensure_ascii=False, separators=(",", ":"), sort_keys=True),
+            )
+        serialized = output.getvalue()
+    return serialized, hashlib.sha256(serialized).hexdigest()
+
+
+def insert_rows(connection: sqlite3.Connection, table: str, rows: list[dict[str, object]]) -> None:
+    for row in rows:
+        columns = list(row)
+        placeholders = ",".join("?" for _ in columns)
+        column_sql = ",".join(f'"{column}"' for column in columns)
+        connection.execute(
+            f'INSERT INTO "{table}" ({column_sql}) VALUES ({placeholders})',
+            [row[column] for column in columns],
+        )
+
+
+def restore_backup_v1(connection: sqlite3.Connection, serialized: bytes, tables: list[str]) -> None:
     payload = json.loads(serialized)
     if payload.get("format") != "rundflug-leitstand-portable-backup" or payload.get("formatVersion") != 1:
         raise AssertionError("Unbekanntes Backupformat")
     if set(payload.get("tables", {})) != set(tables):
         raise AssertionError("Backup enthält nicht exakt die freigegebenen Tabellen")
     for table in tables:
-        for row in payload["tables"][table]:
-            columns = list(row)
-            placeholders = ",".join("?" for _ in columns)
-            column_sql = ",".join(f'"{column}"' for column in columns)
-            connection.execute(
-                f'INSERT INTO "{table}" ({column_sql}) VALUES ({placeholders})',
-                [row[column] for column in columns],
-            )
+        insert_rows(connection, table, payload["tables"][table])
+
+
+def restore_backup_v2(connection: sqlite3.Connection, serialized: bytes, tables: list[str]) -> None:
+    with zipfile.ZipFile(io.BytesIO(serialized), "r") as archive:
+        manifest = json.loads(archive.read("manifest.json"))
+        if (
+            manifest.get("format") != "rundflug-leitstand-portable-backup"
+            or manifest.get("formatVersion") != 2
+        ):
+            raise AssertionError("Unbekanntes Backupformat")
+        table_manifest = manifest.get("tables", [])
+        if {entry.get("name") for entry in table_manifest} != set(tables):
+            raise AssertionError("Backup enthält nicht exakt die freigegebenen Tabellen")
+        for entry in table_manifest:
+            table = entry["name"]
+            expected_path = f"tables/{table}.ndjson"
+            if entry.get("path") != expected_path or entry.get("encoding") != "ndjson":
+                raise AssertionError(f"Tabellenmanifest für {table} ist ungültig")
+            content = archive.read(expected_path).decode("utf-8")
+            rows = [json.loads(line) for line in content.splitlines() if line]
+            if len(rows) != entry.get("rowCount"):
+                raise AssertionError(f"Mengenkontrolle im Tabellenmanifest für {table} fehlgeschlagen")
+            insert_rows(connection, table, rows)
+
+
+def restore_backup(connection: sqlite3.Connection, serialized: bytes, checksum: str, tables: list[str]) -> None:
+    if hashlib.sha256(serialized).hexdigest() != checksum:
+        raise AssertionError("Prüfsumme des portablen Backups ist ungültig")
+    if serialized.startswith(b"PK"):
+        restore_backup_v2(connection, serialized, tables)
+    else:
+        restore_backup_v1(connection, serialized, tables)
     connection.commit()
 
 
@@ -324,18 +401,23 @@ def main() -> None:
     verify_aircraft_state_backfill()
     tables = backup_tables()
     source = sqlite3.connect(":memory:")
+    legacy_target = sqlite3.connect(":memory:")
     target = sqlite3.connect(":memory:")
     apply_schema(source)
+    apply_schema(legacy_target)
     apply_schema(target)
     seed_source(source)
-    serialized, checksum = export_backup(source, tables)
+    legacy_serialized, legacy_checksum = export_backup_v1(source, tables)
+    restore_backup(legacy_target, legacy_serialized, legacy_checksum, tables)
+    serialized, checksum = export_backup_v2(source, tables)
     restore_backup(target, serialized, checksum, tables)
     if target.execute("PRAGMA foreign_key_check").fetchall():
         raise AssertionError("Fremdschlüsselprüfung nach Restore fehlgeschlagen")
     for table in tables:
         source_count = source.execute(f'SELECT COUNT(*) FROM "{table}"').fetchone()[0]
+        legacy_count = legacy_target.execute(f'SELECT COUNT(*) FROM "{table}"').fetchone()[0]
         target_count = target.execute(f'SELECT COUNT(*) FROM "{table}"').fetchone()[0]
-        if source_count != target_count:
+        if source_count != legacy_count or source_count != target_count:
             raise AssertionError(f"Mengenkontrolle für {table} fehlgeschlagen")
     if target.execute("SELECT COUNT(*) FROM operational_events").fetchone()[0] != 1:
         raise AssertionError("Append-only Auditbestand wurde nicht wiederhergestellt")
@@ -364,11 +446,15 @@ def main() -> None:
     if restored_override != (9, None, 4):
         raise AssertionError("Flugzeug-/Produkt-Umlaufzeit-Ausnahme wurde nicht wiederhergestellt")
     source.close()
+    legacy_target.close()
     target.close()
     elapsed = time.monotonic() - started
     if elapsed >= 30 * 60:
         raise AssertionError("Wiederanlauf überschreitet 30 Minuten")
-    print(f"OK: isolierter Backup-Restore in {elapsed:.2f}s, Prüfsumme und Fremdschlüssel gültig")
+    print(
+        f"OK: isolierter Backup-Restore V1+V2 in {elapsed:.2f}s, "
+        "Prüfsummen, Tabellenmanifeste und Fremdschlüssel gültig"
+    )
 
 
 if __name__ == "__main__":
